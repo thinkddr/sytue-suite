@@ -23,7 +23,7 @@ import (
 
 // LOS GUARDIANES DE LA SEGUNDA TANDA: etiquetas, papelera, renombrar, el árbol de notas,
 // la barra que envuelve, las columnas, el teclado y la prosa. Las medidas son de la HOJA
-// (clases de Tailwind con el rem de 14) y de las capturas del caso de la web con los
+// (clases de Tailwind con el rem de 16) y de las capturas del caso de la web con los
 // mismos datos (`capturas_test.go`), no de lo que calcula el propio widget.
 
 // TestUnaEtiquetaSinNombreONiUnEstadoNoSeGuarda: es lo que la web no deja guardar, y

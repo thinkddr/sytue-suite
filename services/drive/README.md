@@ -1,41 +1,43 @@
 # Sytue Drive (`services/drive`)
 
-Servidor de archivos **Sytue-native** de la suite **Sytue One**: almacenamiento,
-sincronización y compartición de ficheros. Reimplementación **clean-room** sobre
-estándares abiertos (**WebDAV — RFC 4918**) con una **API REST propia**. Código
-Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas (BSD/MIT/Apache).
+**Sytue-native** file server for the **Sytue One** suite: file storage,
+sync and sharing. A **clean-room** reimplementation on
+open standards (**WebDAV — RFC 4918**) with its **own REST API**. Code
+Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); third-party dependencies are permissive only (BSD/MIT/Apache).
 
-- **Puerto:** `8082` (HTTP + WebDAV) · **Subdominio:** `drive.sytue.eu`
-- **Datastore:** PostgreSQL (metadatos, cuotas, outbox de eventos) — única fuente
-  de verdad. **Sin Redis/Valkey.**
-- **Blobs:** Object Storage S3 (Scaleway prod / MinIO dev), bucket `drive-blobs`,
-  aislados por **prefijo de tenant**.
-- **Auth:** JWT de **Sytue ID** validado vía JWKS (`platform/pkg/authn`).
-- **Multi-tenant:** aislamiento por **RLS** en PostgreSQL (`app.tenant`) + prefijo
-  S3 por tenant.
+- **Port:** `8082` (HTTP + WebDAV) · **Subdomain:** `drive.sytue.eu`
+- **Datastore:** PostgreSQL (metadata, quotas, event outbox) — single source
+  of truth. **No Redis/Valkey.**
+- **Blobs:** S3 Object Storage (Scaleway prod / MinIO dev), bucket `drive-blobs`,
+  isolated by **tenant prefix**.
+- **Auth:** **Sytue ID** JWT validated via JWKS (`platform/pkg/authn`).
+- **Multi-tenant:** isolation through **RLS** in PostgreSQL (`app.tenant`) + per-tenant S3
+  prefix.
 
-## Capacidades
+<a id="capacidades"></a>
+## Capabilities
 
-- **Carpetas:** árbol por tenant, raíz autogestionada, crear / renombrar / mover
-  (con detección de ciclos) / borrar (soft, subárbol completo).
-- **Ficheros:** subir (streaming a S3, checksum SHA-256, reserva de cuota),
-  descargar (stream o redirección a URL **prefirmada**), renombrar, mover,
-  borrar, **versionado** al sustituir.
-- **Group folders:** carpetas compartidas a nivel de organización (`is_group`).
-- **Compartición:** enlaces públicos con **token** de alta entropía (opción de
-  expiración), y por **usuario**/**grupo** de Sytue ID, con permiso `read`/`write`.
-- **Búsqueda:** por nombre de fichero (case-insensitive) dentro del tenant.
-- **Cuotas por tenant:** límite y uso mantenidos transaccionalmente; lectura para
-  cualquier miembro, cambio de límite solo `admin`/`owner`. La cuota del plan es
-  **una para toda la suite** y Drive es su dueño: Sytue Cast declara lo que ocupa en
-  cada organización por `PUT /internal/quota/external/cast` (secreto compartido
-  `CAST_INTERNAL_SECRET`, valor absoluto e idempotente) y `used_bytes` lo suma, con
-  el desglose en `external_usage`.
-- **WebDAV (RFC 4918):** montado en `/dav` con el mismo Bearer JWT
+- **Folders:** per-tenant tree, self-managed root, create / rename / move
+  (with cycle detection) / delete (soft, whole subtree).
+- **Files:** upload (streaming to S3, SHA-256 checksum, quota reservation),
+  download (stream or redirect to a **presigned** URL), rename, move,
+  delete, **versioning** on replace.
+- **Group folders:** organization-level shared folders (`is_group`).
+- **Sharing:** public links with a high-entropy **token** (optional
+  expiry), and by Sytue ID **user**/**group**, with `read`/`write` permission.
+- **Search:** by file name (case-insensitive) within the tenant.
+- **Per-tenant quotas:** limit and usage maintained transactionally; readable by
+  any member, limit changes only by `admin`/`owner`. The plan quota is
+  **one for the whole suite** and Drive owns it: Sytue Cast declares what it takes up in
+  each organization via `PUT /internal/quota/external/cast` (shared secret
+  `CAST_INTERNAL_SECRET`, absolute and idempotent value) and `used_bytes` adds it, with
+  the breakdown in `external_usage`.
+- **WebDAV (RFC 4918):** mounted at `/dav` with the same Bearer JWT
   (`golang.org/x/net/webdav`, BSD-3-Clause).
-- **Eventos:** publicación en el **outbox** sobre PostgreSQL (`platform/pkg/events`).
+- **Events:** published to the **outbox** on PostgreSQL (`platform/pkg/events`).
 
-## Estructura
+<a id="estructura"></a>
+## Structure
 
 ```
 services/drive/
@@ -52,31 +54,33 @@ services/drive/
 └── Dockerfile                   # multi-stage golang:1.26 -> distroless/static
 ```
 
-## Configuración (variables de entorno)
+<a id="configuración-variables-de-entorno"></a>
+## Configuration (environment variables)
 
-| Variable | Defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8082` | Puerto HTTP/WebDAV |
-| `PUBLIC_URL` | `https://drive.sytue.localhost` | URL pública (enlaces de compartición) |
-| `DATABASE_URL` | — (obligatoria) | DSN PostgreSQL |
-| `OIDC_ISSUER` | `https://id.sytue.localhost` | Issuer de Sytue ID |
-| `OIDC_JWKS_URL` | `<issuer>/.well-known/jwks.json` | Endpoint JWKS |
-| `OIDC_AUDIENCE` | `sytue-drive` | Audiencia esperada del token |
-| `S3_ENDPOINT` | `minio:9000` | Endpoint S3 (acepta `http(s)://host:port`) |
-| `S3_REGION` | `fr-par` | Región S3 (solo UE) |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — (obligatorias) | Credenciales S3 |
-| `S3_BUCKET` | `sytue-dev-drive-blobs` | Bucket de blobs |
-| `S3_USE_SSL` | `false` | TLS hacia S3 (`true` en prod) |
-| `MAX_UPLOAD_MB` | `5120` | Tamaño máximo de subida por fichero |
-| `DEFAULT_QUOTA_GB` | `10` | Cuota inicial por tenant |
-| `CAST_INTERNAL_SECRET` | dev: `dev-cast-internal-secret`; fuera, vacío | Secreto compartido con Sytue Cast para declarar su uso de la cuota (opcional; vacío = la puerta no abre) |
-| `PRESIGN_TTL` | `15m` | Validez de URLs prefirmadas |
-| `LOG_LEVEL` / `LOG_FORMAT` | `info` / `json` | Logging estructurado |
+| `PORT` | `8082` | HTTP/WebDAV port |
+| `PUBLIC_URL` | `https://drive.sytue.localhost` | Public URL (sharing links) |
+| `DATABASE_URL` | — (required) | PostgreSQL DSN |
+| `OIDC_ISSUER` | `https://id.sytue.localhost` | Sytue ID issuer |
+| `OIDC_JWKS_URL` | `<issuer>/.well-known/jwks.json` | JWKS endpoint |
+| `OIDC_AUDIENCE` | `sytue-drive` | Expected token audience |
+| `S3_ENDPOINT` | `minio:9000` | S3 endpoint (accepts `http(s)://host:port`) |
+| `S3_REGION` | `fr-par` | S3 region (EU only) |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — (required) | S3 credentials |
+| `S3_BUCKET` | `sytue-dev-drive-blobs` | Blob bucket |
+| `S3_USE_SSL` | `false` | TLS to S3 (`true` in prod) |
+| `MAX_UPLOAD_MB` | `5120` | Maximum upload size per file |
+| `DEFAULT_QUOTA_GB` | `10` | Initial quota per tenant |
+| `CAST_INTERNAL_SECRET` | dev: `dev-cast-internal-secret`; elsewhere, empty | Secret shared with Sytue Cast to declare its quota usage (optional; empty = the door does not open) |
+| `PRESIGN_TTL` | `15m` | Validity of presigned URLs |
+| `LOG_LEVEL` / `LOG_FORMAT` | `info` / `json` | Structured logging |
 
-No hay secretos en el repositorio: las credenciales llegan por entorno
-(Scaleway Secret Manager / Sealed Secrets en prod).
+There are no secrets in the repository: credentials arrive via the environment
+(Scaleway Secret Manager / Sealed Secrets in prod).
 
-## Ejecución
+<a id="ejecución"></a>
+## Running
 
 ```sh
 # Migraciones + servidor (las migraciones se aplican también al arrancar).
@@ -86,19 +90,20 @@ go run ./services/drive/cmd/drive
 go run ./services/drive/cmd/drive migrate
 ```
 
-En la suite completa se levanta con `make dev-up` (Docker Compose); el contexto
-de build de la imagen es la **raíz del repo** (módulo único `git.sytue.eu/sytue/one`).
+In the full suite it is brought up with `make dev-up` (Docker Compose); the image build
+context is the **repo root** (single module `git.sytue.eu/sytue/one`).
 
 ## Endpoints
 
-REST bajo `/api/v1` (ver [`openapi.yaml`](./openapi.yaml)); WebDAV bajo `/dav`;
-descarga pública por enlace en `/public/{token}`; sondas `/healthz` y `/readyz`.
+REST under `/api/v1` (see [`openapi.yaml`](./openapi.yaml)); WebDAV under `/dav`;
+public link download at `/public/{token}`; `/healthz` and `/readyz` probes.
 
-## Seguridad
+<a id="seguridad"></a>
+## Security
 
-Deny-by-default: toda la API exige JWT de Sytue ID; el aislamiento entre tenants
-lo garantiza RLS en PostgreSQL (más el prefijo S3). Consultas siempre
-parametrizadas; cuerpos limitados; cabeceras `X-Content-Type-Options: nosniff`
-en las descargas; tokens de enlace con 256 bits de entropía y resolución vía
-función `SECURITY DEFINER` acotada. Los enlaces públicos pueden expirar y
-revocarse.
+Deny-by-default: the whole API requires a Sytue ID JWT; isolation between tenants
+is guaranteed by RLS in PostgreSQL (plus the S3 prefix). Queries are always
+parameterized; bodies are size-limited; `X-Content-Type-Options: nosniff` headers
+on downloads; link tokens with 256 bits of entropy, resolved through a
+narrowly scoped `SECURITY DEFINER` function. Public links can expire and
+be revoked.

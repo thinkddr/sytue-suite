@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useId, useState } from 'preact/hooks';
-import { Avatar, Button, Icon, IconButton, Input } from '@sytue/ui';
+import { Avatar, Button, Icon, IconButton, Input, EmptyState } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import { anadirPersona, personas, quitarPersona } from '../client/castApi.js';
 import { FalloDelServicio } from '../lib/fallo.js';
@@ -94,7 +94,7 @@ export function PeoplePicker({ t, videoId }: { t: T; videoId: string }): JSX.Ele
         ) : null}
       </form>
       {lista === null ? null : lista.length === 0 ? (
-        <p class="text-text-muted text-sm">{t('manage.people.empty')}</p>
+        <EmptyState compact title={t('manage.people.empty')} />
       ) : (
         <ul class="flex flex-wrap gap-2">
           {lista.map((p) => (

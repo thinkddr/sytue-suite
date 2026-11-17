@@ -6,11 +6,13 @@ package bases
 import (
 	"image/color"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -48,9 +50,13 @@ func (a anchoFijo) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 }
 
 // objetoTablero es Tablero.tsx: una columna por opción del campo de selección y una
-// tarjeta por registro. Una tarjeta se mueve con su selector «Mover a», que vale igual
-// con ratón y con teclado. Mover es escribir ese campo en el registro: lo decide y lo
-// valida el servicio, como en la rejilla.
+// tarjeta por registro. Mover es escribir ese campo en el registro: lo decide y lo valida
+// el servicio, como en la rejilla.
+//
+// La tarjeta se pulsa para abrir su ficha. Se mueve con el asa o, sin arrastrar (WCAG
+// 2.5.7), desde «Mover a» de su menú «⋯»: el selector que iba siempre a la vista en cada
+// tarjeta saturaba la columna. Al pie de cada columna, «Añadir tarjeta» la crea ya con el
+// valor de esa columna y abre su ficha.
 func (p *Pantalla) objetoTablero(v tema.Variante, agrupar api.BasesField, puedeEditar bool) fyne.CanvasObject {
 	b := p.abierta
 	cols := columnasDeTablero(agrupar, b.vent.registros())
@@ -88,6 +94,16 @@ func (p *Pantalla) objetoTablero(v tema.Variante, agrupar api.BasesField, puedeE
 			}
 			hijos = append(hijos, p.tarjetaDeTablero(v, r, agrupar, otros, nombres, i, puedeEditar, asa))
 		}
+		if puedeEditar {
+			if len(col.registros) == 0 {
+				hijos = append(hijos, columnaVacia(p.t("board.empty")))
+			}
+			valor := col.valor
+			anadir := botonSM(p.t("board.add"), ui.Fantasma, func() { p.anadirEnColumna(agrupar, valor) })
+			anadir.Icono, anadir.TamIcono, anadir.Atenuado = iconos.Mas, 14, true
+			anadir.Rotulo = p.t("board.addIn", i18n.Vars{"name": nombres[i]})
+			hijos = append(hijos, container.New(ui.Fila{}, anadir))
+		}
 		aro := canvas.NewRectangle(color.NRGBA{})
 		aro.StrokeColor, aro.StrokeWidth, aro.CornerRadius = tema.Color("indicator", v), tema.AnilloFoco, tema.RadioLG
 		aro.Hide()
@@ -123,22 +139,43 @@ func (p *Pantalla) objetoTablero(v tema.Variante, agrupar api.BasesField, puedeE
 	return container.New(ui.Columna{Hueco: tema.Espacio(2)}, hijos...)
 }
 
-// tarjetaDeTablero es la tarjeta de un registro: su nombre, dos campos más y, si se puede
-// editar, el selector que la mueve de columna.
+// tarjetaDeTablero es la tarjeta de un registro: su nombre, que se pulsa para abrir la
+// ficha, dos campos más y el menú «⋯» con «Abrir» y, si se puede editar, «Mover a» cada
+// una de las otras columnas.
 func (p *Pantalla) tarjetaDeTablero(v tema.Variante, r api.BasesRecord, agrupar api.BasesField, otros []api.BasesField, columnas []string, actual int, puedeEditar bool, asa *ui.AsaArrastre) fyne.CanvasObject {
 	b := p.abierta
 	nombre := etiquetaDeRegistro(b.Campos, r)
-	titulo := ui.NuevoParrafo(nombre, tema.TextoSM, ui.SemiNegrita, "text", v).A(anchoTarjeta)
-	var cabeza fyne.CanvasObject = titulo
+	abrir := func() { p.abrirRegistro(r, false) }
+	rotulo := p.t("board.actions", i18n.Vars{"name": nombre})
+	var menu *ui.BotonIcono
+	menu = ui.NuevoBotonIcono(iconos.Puntos, rotulo, func() {
+		m := ui.NuevoMenu(p.accionesDeTarjeta(r, nombre, agrupar, columnas, actual, puedeEditar, abrir)...)
+		m.Rotulo, m.AlInicio = rotulo, false
+		m.Mostrar(menu)
+	})
+	menu.Lado = ui.LadoIconoSM
+	// El título es el botón de la tarjeta: lo que se pulsa con el ratón y lo que alcanza
+	// el teclado, con su nombre accesible de «Abrir …».
+	ancho := anchoTarjeta - menu.MinSize().Width - tema.Espacio(2)
+	partes := []fyne.CanvasObject{}
 	if asa != nil {
-		titulo.A(anchoTarjeta - asa.MinSize().Width - tema.Espacio(2))
-		cabeza = container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 1}, titulo, asa)
+		// Pulsar el asa sin arrastrar abre el menú, donde está «Mover a».
+		asa.AlPulsar = menu.AlPulsar
+		ancho -= asa.MinSize().Width + tema.Espacio(2)
+		partes = append(partes, asa)
 	}
-	hijos := []fyne.CanvasObject{cabeza}
+	titulo := ui.NuevoParrafo(nombre, tema.TextoSM, ui.SemiNegrita, "text", v).A(ancho - 2*tema.Espacio(2))
+	pulsable := ui.NuevaFilaPulsable(p.t("board.open", i18n.Vars{"name": nombre}), titulo, abrir)
+	pulsable.AltoMinimo = tema.TextoSM.Linea
+	partes = append(partes, container.New(anchoFijo{Ancho: ancho}, pulsable), menu)
+	hijos := []fyne.CanvasObject{container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: len(partes) - 1}, partes...)}
+	if quienes := p.enTarjeta(b, r.ID); len(quienes) > 0 {
+		hijos = append(hijos, etiquetaPresentes(p.t("rt.inCell", i18n.Vars{"names": strings.Join(quienes, ", ")}), v))
+	}
 	// Como la web (`.slice(1, 3)`): el primero con valor suele ser el propio nombre.
 	conValor := 0
 	for _, c := range otros {
-		texto := textoDeValor(r.Data[c.ID])
+		texto := textoVisible(c, r.Data[c.ID], p.tr.Locale())
 		if texto == "" {
 			continue
 		}
@@ -151,24 +188,51 @@ func (p *Pantalla) tarjetaDeTablero(v tema.Variante, r api.BasesRecord, agrupar 
 		}
 		hijos = append(hijos, ui.NuevoParrafo(c.Name+": "+texto, tema.TextoXS, ui.Normal, "text-muted", v).A(anchoTarjeta).Recortado(1))
 	}
-	if puedeEditar {
-		mover := ui.NuevoSelector(columnas, func(i int) {
-			if i == actual {
-				return
-			}
-			var valor any
-			if i < len(agrupar.Choices) {
-				valor = agrupar.Choices[i]
-			}
-			p.cambiar(r, map[string]any{agrupar.ID: valor}, nil)
-		}).Con(ui.CampoSM)
-		mover.Rotulo, mover.Elegida = p.t("board.moveTo", i18n.Vars{"name": nombre}), actual
-		if asa != nil {
-			asa.AlPulsar = mover.Alternar
-		}
-		hijos = append(hijos, mover)
-	}
 	return caja(tema.Color("surface", v), tema.RadioMD, margenTablero, v, container.New(ui.Columna{Hueco: tema.Espacio(2)}, hijos...))
+}
+
+// accionesDeTarjeta es el menú «⋯» de una tarjeta: «Abrir» y, para quien escribe, «Mover
+// a» cada una de las otras columnas. Se arma en cada apertura: un elemento recuerda el
+// menú en el que va.
+func (p *Pantalla) accionesDeTarjeta(r api.BasesRecord, nombre string, agrupar api.BasesField, columnas []string, actual int, puedeEditar bool, abrir func()) []fyne.CanvasObject {
+	elementos := []fyne.CanvasObject{ui.NuevoElementoMenu(p.t("board.open", i18n.Vars{"name": nombre}), iconos.Maximizar, abrir)}
+	if !puedeEditar {
+		return elementos
+	}
+	elementos = append(elementos, ui.NuevoSeparadorMenu())
+	for i, col := range columnas {
+		if i == actual {
+			continue
+		}
+		var valor any
+		if i < len(agrupar.Choices) {
+			valor = agrupar.Choices[i]
+		}
+		elementos = append(elementos, ui.NuevoElementoMenu(p.t("board.moveToColumn", i18n.Vars{"name": col}), iconos.ChevronDerecha, func() {
+			p.cambiar(r, map[string]any{agrupar.ID: valor}, nil)
+		}))
+	}
+	return elementos
+}
+
+// columnaVacia es el aviso de una columna sin tarjetas: un recuadro discontinuo que
+// invita a soltar una ahí (`border-dashed p-3 text-center text-xs`).
+func columnaVacia(texto string) fyne.CanvasObject {
+	m := margenTablero + tema.Borde
+	return container.NewStack(
+		ui.NuevoBordeDiscontinuo(tema.Borde, tema.RadioMD, "border"),
+		container.New(ui.Margen{Izq: m, Arr: m, Der: m, Abj: m},
+			container.NewCenter(ui.NuevoRotulo(texto, tema.TextoXS, ui.Normal, "text-muted"))))
+}
+
+// anadirEnColumna crea un registro con el valor de esa columna en el campo del tablero
+// (la de «sin valor», vacío) y abre su ficha, como «Añadir registro» en la rejilla.
+func (p *Pantalla) anadirEnColumna(agrupar api.BasesField, valor string) {
+	var datos map[string]any
+	if valor != "" {
+		datos = map[string]any{agrupar.ID: valor}
+	}
+	p.crearRegistro(datos)
 }
 
 type arrastreTablero struct {
@@ -245,4 +309,14 @@ func (a *arrastreTablero) asa(r api.BasesRecord, actual int) *ui.AsaArrastre {
 	}
 	asa.AlCancelar = a.limpiar
 	return asa
+}
+
+// etiquetaPresentes es quién está en una tarjeta (`bg-selected text-primary-text
+// self-start rounded px-1 text-xs`): a su ancho, a la izquierda.
+func etiquetaPresentes(texto string, v tema.Variante) fyne.CanvasObject {
+	fondo := canvas.NewRectangle(tema.Color("selected", v))
+	fondo.CornerRadius = tema.RadioSM
+	rotulo := ui.NuevoRotulo(texto, tema.TextoXS, ui.Normal, "primary-text")
+	m := tema.Espacio(1)
+	return container.New(ui.Fila{}, container.NewStack(fondo, container.New(ui.Margen{Izq: m, Der: m}, rotulo)))
 }

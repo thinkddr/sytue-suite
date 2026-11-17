@@ -178,6 +178,13 @@ func TestLasTeselasDeLaCuentaSonLasDeLaWeb(t *testing.T) {
 	if esta, apagada := tiene(v, "erp"); !esta || !apagada {
 		t.Errorf("en una cuenta personal el ERP está=%v apagado=%v, y va presente y apagado", esta, apagada)
 	}
+	// Y dice por qué en la propia tesela, como la web: el motivo va en la descripción.
+	motivo := traductor(t).T("launcher.orgOnlyReason", nil)
+	for _, x := range test.WidgetRenderer(v.lanzador).(*lanzadorRenderer).teselas {
+		if x.Producto.Marca.Clave() == "erp" && x.Descripcion != motivo {
+			t.Errorf("la tesela apagada del ERP dice %q y debe decir el motivo %q", x.Descripcion, motivo)
+		}
+	}
 }
 
 // abridorDoble apunta lo que se le pide abrir.

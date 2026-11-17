@@ -11,6 +11,14 @@
  * A11y: contenedor role="list" y filas role="listitem" por defecto, con
  * aria-setsize/aria-posinset (el DOM solo contiene una ventana de filas);
  * ambos roles son sobreescribibles y el resto de atributos pasan al contenedor.
+ * `isSeparator` marca filas que no son elementos (las cabeceras A–Z de Contacts):
+ * van con role="presentation" y sin aria-posinset, y no cuentan en setsize/posinset
+ * de las demás, así que «3 de 120» sigue hablando de contactos y no de filas.
+ *
+ * Teclado: una lista con tabulación itinerante (una sola fila con `tabIndex=0`)
+ * pierde su parada de Tab en cuanto esa fila sale de la ventana y se desmonta, y
+ * con ella el sitio donde estaba quien navega. `keepMounted` mantiene pintada esa
+ * fila (en su posición, fuera de la vista) aunque el scroll se la lleve.
  *
  * Chat: `stickToBottom` ancla el scroll al final — arranca abajo, sigue los
  * mensajes nuevos solo si el usuario ya estaba abajo y mantiene la posición
@@ -27,6 +35,7 @@ import {
 } from 'preact/hooks';
 import {
   Virtualizer,
+  defaultRangeExtractor,
   elementScroll,
   observeElementOffset,
   observeElementRect,
@@ -73,6 +82,18 @@ export interface VirtualListProps<T> extends Omit<
   handleRef?: RefObject<VirtualListHandle>;
   /** Padre que ya desplaza: la lista reserva su alto y no crea otro scroll. */
   scrollElementRef?: RefObject<HTMLDivElement>;
+  /**
+   * Índice que se pinta siempre, aunque caiga fuera de la ventana: la fila con la
+   * parada de Tab de una lista itinerante. Sin ella, desplazar con la rueda y
+   * volver con Tab saltaba la lista entera, porque ninguna fila pintada era
+   * enfocable.
+   */
+  keepMounted?: number;
+  /**
+   * Filas que separan y no son elementos (cabeceras de grupo): role="presentation",
+   * sin aria-setsize/aria-posinset, y fuera de la cuenta de las demás. Memoizar.
+   */
+  isSeparator?: (index: number) => boolean;
 }
 
 export function VirtualList<T>({
@@ -86,6 +107,8 @@ export function VirtualList<T>({
   itemRole = 'listitem',
   handleRef,
   scrollElementRef,
+  keepMounted,
+  isSeparator,
   class: cls,
   ...rest
 }: VirtualListProps<T>): JSX.Element {
@@ -155,6 +178,23 @@ export function VirtualList<T>({
     };
   }, [scrollElementRef, measureScrollMargin]);
 
+  // Estable por índice: el core memoiza la ventana con la función como dependencia.
+  const rangeExtractor = useCallback(
+    (range: Parameters<typeof defaultRangeExtractor>[0]) => {
+      const indices = defaultRangeExtractor(range);
+      if (
+        keepMounted === undefined ||
+        keepMounted < 0 ||
+        keepMounted >= range.count ||
+        indices.includes(keepMounted)
+      ) {
+        return indices;
+      }
+      return [...indices, keepMounted].sort((a, b) => a - b);
+    },
+    [keepMounted],
+  );
+
   const options: VirtualizerOptions<HTMLDivElement, HTMLElement> = {
     count: items.length,
     getScrollElement,
@@ -166,6 +206,7 @@ export function VirtualList<T>({
     observeElementRect,
     observeElementOffset,
     onChange: () => setTick((t) => t + 1),
+    rangeExtractor,
   };
   if (getItemKey) options.getItemKey = getItemKey;
   if (stickToBottom) {
@@ -205,6 +246,16 @@ export function VirtualList<T>({
   );
   useImperativeHandle(handleRef ?? null, () => handle, [handle]);
 
+  // Posición de cada fila entre las que SON elementos (0 si separa), y cuántas son.
+  // Sin separadores, la de siempre: índice + 1 sobre el total.
+  const posiciones = useMemo(() => {
+    if (!isSeparator) return null;
+    const pos = new Array<number>(items.length);
+    let n = 0;
+    for (let i = 0; i < items.length; i += 1) pos[i] = isSeparator(i) ? 0 : (n += 1);
+    return { pos, total: n };
+  }, [items, isSeparator]);
+
   const virtualItems = virtualizer.getVirtualItems();
   // TanStack ya resta scrollMargin del alto total. Volver a restarlo quitaría
   // filas al fondo; sumarlo repetiría aquí el alto de la cabecera del padre.
@@ -221,14 +272,16 @@ export function VirtualList<T>({
         {virtualItems.map((vi) => {
           const item = items[vi.index];
           if (item === undefined) return null;
+          const posicion = posiciones ? posiciones.pos[vi.index] : vi.index + 1;
+          const separa = posicion === 0;
           return (
             <div
               key={vi.key}
               data-index={vi.index}
               ref={virtualizer.measureElement}
-              role={itemRole}
-              aria-setsize={items.length}
-              aria-posinset={vi.index + 1}
+              role={separa ? 'presentation' : itemRole}
+              aria-setsize={separa ? undefined : (posiciones?.total ?? items.length)}
+              aria-posinset={separa ? undefined : posicion}
               class="absolute top-0 left-0 w-full"
               style={{ transform: `translateY(${vi.start - virtualizer.options.scrollMargin}px)` }}
             >

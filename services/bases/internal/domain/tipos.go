@@ -60,12 +60,27 @@ const (
 	TipoSeleccion Tipo = "select"
 	TipoMultiple  Tipo = "multiselect"
 	TipoRelacion  Tipo = "link"
+	// Tipos con formato (migración 0031): se guardan como un texto o un número, pero el
+	// servidor exige su forma (una URL http(s), un correo, un teléfono, un importe, una
+	// valoración de 1 a 5) y la interfaz los pinta y edita a su manera.
+	TipoURL        Tipo = "url"
+	TipoCorreo     Tipo = "email"
+	TipoTelefono   Tipo = "phone"
+	TipoMoneda     Tipo = "currency"
+	TipoValoracion Tipo = "rating"
 )
+
+// MaxValoracion es el tope de un campo de valoración (estrellas).
+const MaxValoracion = 5
+
+// MonedaPorDefecto es la moneda de un campo de moneda que no dice otra.
+const MonedaPorDefecto = "EUR"
 
 // Valido indica si es un tipo conocido.
 func (t Tipo) Valido() bool {
 	switch t {
-	case TipoTexto, TipoNumero, TipoFecha, TipoCasilla, TipoSeleccion, TipoMultiple, TipoRelacion, TipoFormula, TipoAdjunto:
+	case TipoTexto, TipoNumero, TipoFecha, TipoCasilla, TipoSeleccion, TipoMultiple, TipoRelacion, TipoFormula, TipoAdjunto,
+		TipoURL, TipoCorreo, TipoTelefono, TipoMoneda, TipoValoracion:
 		return true
 	}
 	return false
@@ -104,8 +119,10 @@ type Campo struct {
 	LinkTableID string   `json:"link_table_id,omitempty"`
 	// Formula y Result solo en los campos de fórmula: la expresión (referencias por id,
 	// ver formula.go) y el tipo de su resultado (number o text).
-	Formula  string `json:"formula,omitempty"`
-	Result   Tipo   `json:"result,omitempty"`
+	Formula string `json:"formula,omitempty"`
+	Result  Tipo   `json:"result,omitempty"`
+	// Currency solo en los campos de moneda: su código ISO 4217 (EUR, USD…).
+	Currency string `json:"currency,omitempty"`
 	Position int    `json:"position"`
 }
 

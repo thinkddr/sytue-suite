@@ -25,7 +25,7 @@ import (
 
 // buzonConVentana es el buzón de prueba montado en una ventana: el redactor es un
 // diálogo y necesita lienzo.
-func buzonConVentana(t *testing.T, s *servicioFalso, tam fyne.Size) (*Buzon, fyne.Window, *[]func()) {
+func buzonConVentana(t *testing.T, s Servicio, tam fyne.Size) (*Buzon, fyne.Window, *[]func()) {
 	t.Helper()
 	b, pendientes := buzonDePrueba(t, s)
 	t.Cleanup(func() {

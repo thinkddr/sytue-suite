@@ -224,7 +224,7 @@ function Inner({ locale, policies, groups, users, live }: AccessPolicyPanelProps
             <EmptyState
               title={t('access.empty.title')}
               description={t('access.empty.description')}
-              illustration={<Icon name="lock" size={28} />}
+              icon="lock"
               action={
                 <Button
                   variant="primary"

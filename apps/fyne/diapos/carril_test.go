@@ -32,7 +32,7 @@ func traductor(t *testing.T) func(string, i18nVars) string {
 // El 128 no sale de esta implementación: es THUMB_W de SlidesCanvas.tsx, y va en
 // PÍXELES porque lo de dentro se escala a 128 px — medirlo en rem lo ataría al tamaño
 // de letra de la raíz, que es como en la web cada miniatura llegó a recortar 16 px de
-// su lado derecho con la raíz en 14.
+// su lado derecho cuando 1 rem eran 14 px.
 func TestLaMiniaturaMideLoQueDiceMedir(t *testing.T) {
 	casos := []struct {
 		json string
@@ -121,10 +121,38 @@ func TestLasTeclasDePresentacionSonLasDeLaWeb(t *testing.T) {
 		{fyne.KeyEnd, 0, ultima},
 		{fyne.KeyEscape, 2, Salir},
 		{fyne.KeyF1, 2, SinDestino},
+		// La tabla de PowerPoint/Keynote, la misma que `slides-present.test.ts`.
+		{fyne.KeyDown, 0, 1},
+		{fyne.KeyReturn, 2, 3},
+		{fyne.KeyEnter, 2, 3},
+		{fyne.KeyDown, ultima, ultima},
+		{fyne.KeyUp, 2, 1},
+		{fyne.KeyBackspace, 1, 0},
+		{fyne.KeyBackspace, 0, 0},
 	}
 	for _, c := range casos {
 		if got := TeclaPresentando(c.tecla, c.desde, ultima); got != c.quiero {
 			t.Errorf("%v desde %d lleva a %d, quiero %d", c.tecla, c.desde, got, c.quiero)
+		}
+	}
+}
+
+// TestNumeroEIntroEsSlideFromDigits es `slideFromDigits`: el número 1-based, con tope en
+// la última y sin diapositiva cero.
+func TestNumeroEIntroEsSlideFromDigits(t *testing.T) {
+	casos := []struct {
+		cifras string
+		quiero int
+	}{
+		{"3", 2},
+		{"12", 9}, // más allá de la última: la última
+		{"007", 6},
+		{"0", SinDestino},
+		{"", SinDestino},
+	}
+	for _, c := range casos {
+		if got := DiapoDeCifras(c.cifras, 9); got != c.quiero {
+			t.Errorf("«%s» lleva a %d, quiero %d", c.cifras, got, c.quiero)
 		}
 	}
 }

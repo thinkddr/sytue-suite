@@ -21,6 +21,12 @@ export interface BarChartPoint {
   /** Etiqueta del eje X, ya formateada por quien llama (fecha corta, hora…). */
   label: string;
   value: number;
+  /**
+   * Rótulo corto bajo la barra («nov»). Si algún punto lo trae se pinta la fila de
+   * rótulos; sin él el gráfico sigue sin ejes, como en un sparkline. `label` va
+   * entero en el título y en la tabla accesible, que no tienen prisa de sitio.
+   */
+  axisLabel?: string;
 }
 
 export interface BarChartProps {
@@ -33,6 +39,9 @@ export interface BarChartProps {
   emptyLabel?: string;
   /** Cabeceras de la tabla accesible: [columna de etiqueta, columna de valor]. */
   tableHeaders?: [string, string];
+  /** Cómo se escribe un valor en el título de la barra, la descripción y la tabla
+   *  (un importe con su moneda). Sin él, el número tal cual. */
+  formatValue?: (value: number) => string;
   class?: string;
 }
 
@@ -46,6 +55,7 @@ export function BarChart({
   height = 120,
   emptyLabel,
   tableHeaders = ['', ''],
+  formatValue = String,
   class: cls,
 }: BarChartProps): JSX.Element {
   if (points.length === 0) {
@@ -67,7 +77,7 @@ export function BarChart({
         height={height}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`${seriesLabel}: ${total}`}
+        aria-label={`${seriesLabel}: ${formatValue(total)}`}
         class="overflow-visible"
       >
         {points.map((p, i) => {
@@ -88,11 +98,27 @@ export function BarChart({
               rx={1}
               fill={p.value === 0 ? 'var(--sytue-accent-200)' : 'var(--sytue-accent)'}
             >
-              <title>{`${p.label} · ${p.value} ${seriesLabel}`}</title>
+              <title>{`${p.label} · ${formatValue(p.value)} ${seriesLabel}`}</title>
             </rect>
           );
         })}
       </svg>
+      {/* Los rótulos van en HTML y no dentro del SVG: el lienzo se estira a lo ancho
+          (`preserveAspectRatio="none"`) y deformaría el texto. Cada uno ocupa el
+          mismo hueco que su barra, así que caen debajo sin calcular posiciones. Son
+          decorativos: la tabla de abajo ya lo dice todo al lector de pantalla. */}
+      {points.some((p) => p.axisLabel) ? (
+        <div aria-hidden="true" class="mt-1 flex" data-bar-chart-axis>
+          {points.map((p, i) => (
+            <span
+              key={i}
+              class="text-text-subtle min-w-0 flex-1 truncate text-center text-xs tabular-nums"
+            >
+              {p.axisLabel ?? ''}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {/* Los mismos datos en tabla, ocultos a la vista y no al lector de
           pantalla: un <svg role="img"> solo puede anunciar su etiqueta, y «1.204
           visitas» no dice cómo se repartieron. */}
@@ -108,7 +134,7 @@ export function BarChart({
           {points.map((p, i) => (
             <tr key={i}>
               <th scope="row">{p.label}</th>
-              <td>{p.value}</td>
+              <td>{formatValue(p.value)}</td>
             </tr>
           ))}
         </tbody>

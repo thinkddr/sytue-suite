@@ -42,6 +42,7 @@ func (e *Editor) abrirDiapos(disparador fyne.CanvasObject) {
 	}{
 		{"slides.new", e.ctx.SoloLectura, e.NuevaDiapositiva},
 		{"slides.duplicate", e.ctx.SoloLectura, e.Duplicar},
+		{"slides.hideSlide", e.ctx.SoloLectura || e.patron, func() { e.AlternarOculta(e.activa) }},
 		{"slides.delete", e.ctx.SoloLectura || len(e.m.Diapos) <= 1, e.Eliminar},
 		{"common.moveUp", e.ctx.SoloLectura || e.activa == 0, func() { e.Mover(e.activa, e.activa-1) }},
 		{"common.moveDown", e.ctx.SoloLectura || e.activa == len(e.m.Diapos)-1, func() { e.Mover(e.activa, e.activa+1) }},

@@ -32,7 +32,7 @@ func fichero(t *testing.T, nombre, contenido string) fyne.URI {
 func sobreFila(p *Pantalla, fila int) fyne.Position {
 	g := p.abierta.rejilla
 	a := fyne.CurrentApp().Driver().AbsolutePositionForObject(g)
-	return a.Add(fyne.NewPos(g.r.ancho0+4, altoCabeza+(float32(fila)+0.5)*g.r.alto))
+	return a.Add(fyne.NewPos(g.r.ancho0+4, g.altoCab()+(float32(fila)+0.5)*g.r.alto))
 }
 
 // conAdjuntosEnPersonas añade a «Personas» un campo de adjuntos.

@@ -248,7 +248,7 @@ func (f *formCompartir) campoQuien() fyne.CanvasObject {
 			for i, g := range f.grupos {
 				sugeridos[i] = botonSM(g, ui.Fantasma, func() { f.quien.PonerTexto(g) })
 			}
-			grupo = append(grupo, container.New(flujo{Hueco: tema.Espacio(1), Ancho: p.anchoDialogo(560)}, sugeridos...))
+			grupo = append(grupo, container.New(ui.Flujo{Hueco: tema.Espacio(1), Ancho: p.anchoDialogo(560)}, sugeridos...))
 		}
 		return container.New(ui.Columna{Hueco: tema.Espacio(1.5)}, grupo...)
 	}

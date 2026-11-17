@@ -1,0 +1,85 @@
+{
+  "active": 0,
+  "sheets": [
+    {
+      "id": "6f1c2a9e-0b7d-4c3e-9a51-2d8e4f7b1c60",
+      "name": "Ventas",
+      "tabColor": "#2E7D32",
+      "cells": {
+        "A1": "<b>Mes</b>",
+        "C1": "<b>Importe</b>",
+        "A2": "Enero",
+        "C2": "120",
+        "A4": "Febrero",
+        "C4": "80",
+        "A5": "Total",
+        "C5": "=SUM(C2:C4)",
+        "A7": "Notas &amp; dudas"
+      },
+      "formats": {
+        "C2": {
+          "id": "currency"
+        },
+        "C4": {
+          "id": "currency"
+        },
+        "C5": {
+          "id": "currency",
+          "decimals": 0
+        }
+      },
+      "styles": {
+        "A1": {
+          "fill": "#E8F5E9"
+        },
+        "C5": {
+          "color": "#1B5E20"
+        }
+      },
+      "freeze": {
+        "cols": 1,
+        "rows": 1
+      },
+      "colWidths": {
+        "0": 140
+      },
+      "merges": [
+        "A7:C7"
+      ],
+      "rowIds": [
+        {
+          "id": "t0"
+        },
+        {
+          "id": "t1"
+        },
+        {
+          "id": "n00000001"
+        }
+      ],
+      "rowBase": 2,
+      "colIds": [
+        {
+          "id": "t0"
+        },
+        {
+          "id": "n00000002"
+        }
+      ],
+      "colBase": 1
+    },
+    {
+      "id": "b3d0e2f4-5a6c-4e8f-9b1a-7c2d3e4f5a6b",
+      "name": "Resumen",
+      "cells": {
+        "A1": "=Ventas!C5"
+      }
+    }
+  ],
+  "names": [
+    {
+      "name": "Total",
+      "ref": "Ventas!$C$5"
+    }
+  ]
+}

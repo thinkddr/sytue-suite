@@ -6,7 +6,7 @@
  * la Sytue DevX API contra el Postgres del proyecto. docs/CONVENTIONS.md §14.
  */
 import { useMemo, useRef, useState } from 'preact/hooks';
-import { Button, Card, CardBody, Icon, Table, Badge, Select } from '@sytue/ui';
+import { Badge, Button, Card, CardBody, Icon, InlineHelp, Kbd, Select, Table } from '@sytue/ui';
 import type { TableColumn } from '@sytue/ui';
 import type { SqlResult } from '../../lib/types.js';
 import type { T } from '../../i18n/index.js';
@@ -140,14 +140,15 @@ export default function SqlEditor({ project, t }: { project: string; t: T }) {
           ))}
         </Select>
         <div class="ml-auto flex items-center gap-3">
-          <span class="text-text-subtle hidden items-center gap-1 text-sm sm:inline-flex">
-            <kbd class="border-border bg-surface text-text-muted rounded-sm border px-1.5 py-0.5 font-mono text-xs">
-              Ctrl/Cmd
-            </kbd>
-            +
-            <kbd class="border-border bg-surface text-text-muted rounded-sm border px-1.5 py-0.5 font-mono text-xs">
-              Enter
-            </kbd>
+          {/* Pista visual: las teclas van escondidas al lector (`Kbd`), y «para ejecutar»
+              suelto no diría nada; el atajo se anuncia en el botón con `aria-keyshortcuts`. */}
+          <span
+            aria-hidden="true"
+            class="text-text-subtle hidden items-center gap-1 text-sm sm:inline-flex"
+          >
+            <Kbd>Ctrl/Cmd</Kbd>
+            <span>+</span>
+            <Kbd>Enter</Kbd>
             <span class="ml-1">{t('db.sql.runHint')}</span>
           </span>
           <Button
@@ -155,6 +156,7 @@ export default function SqlEditor({ project, t }: { project: string; t: T }) {
             leadingIcon={<Icon name="chevronRight" size={16} />}
             loading={running}
             onClick={() => void execute()}
+            aria-keyshortcuts="Control+Enter Meta+Enter"
           >
             {t('common.run')}
           </Button>
@@ -199,10 +201,11 @@ export default function SqlEditor({ project, t }: { project: string; t: T }) {
               {result.notice ? <span class="text-text-muted text-sm">{result.notice}</span> : null}
             </div>
             {result.error ? (
-              <p class="bg-danger-bg text-danger-text flex items-start gap-2 rounded-md px-3 py-2 font-mono text-sm">
-                <Icon name="danger" size={16} class="mt-0.5 shrink-0" />
-                <span>{result.error}</span>
-              </p>
+              // El error de la base de datos es monoespaciado (cita la consulta y la
+              // columna): va por `children` en su color de error, sin forzar la caja.
+              <InlineHelp tone="danger">
+                <span class="text-danger-text font-mono break-words">{result.error}</span>
+              </InlineHelp>
             ) : result.columns.length > 0 ? (
               <Table
                 columns={resultColumns}

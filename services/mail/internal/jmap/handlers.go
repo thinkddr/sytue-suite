@@ -17,6 +17,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -24,6 +26,7 @@ import (
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
 	"git.sytue.eu/sytue/one/services/mail/internal/mime"
 	"git.sytue.eu/sytue/one/services/mail/internal/smime"
+	"git.sytue.eu/sytue/one/services/mail/internal/store"
 )
 
 // account resuelve la cuenta del usuario autenticado en el tenant del token.
@@ -42,6 +45,20 @@ func (a *API) account(r *http.Request) (domain.Account, error) {
 	claims, ok := authn.FromContext(r.Context())
 	if !ok {
 		return domain.Account{}, httpx.ErrUnauthorized
+	}
+	// Private clients pin their original actor even if token refresh selects another account.
+	if len(r.Header.Values(storage.ScopeHeader)) != 0 {
+		if _, err := privateMailRequestScope(r); err != nil {
+			return domain.Account{}, err
+		}
+	}
+	// Reading a session or a mailbox never creates an account. First use must
+	// explicitly provision frozen private routing with its enrolled ingress key.
+	if _, err := a.store.AccountBySubject(r.Context(), claims.Subject); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.Account{}, httpx.ErrConflict.WithCode("private_mail_account_required")
+		}
+		return domain.Account{}, mapErr(err)
 	}
 	// MailAddress y no Email: la dirección del buzón es la que Sytue ID asignó en el
 	// dominio de la organización, no el correo con el que el usuario se registró
@@ -118,7 +135,7 @@ func (a *API) createMailbox(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusCreated, mb)
 }
 
-// listMessages pagina el buzón por KEYSET: `cursor` es "received_at,id"
+// listMessages pagina el buzón por KEYSET: `cursor` es "fecha de orden,id"
 // (RFC 3339 + uuid) del último mensaje visto; vacío = primera página. La
 // respuesta trae `next_cursor` para pedir la siguiente ("" = no hay más).
 // Sustituye al antiguo `offset` (O(n) en buzones grandes), que se ignora.
@@ -162,7 +179,7 @@ func (a *API) listMessages(w http.ResponseWriter, r *http.Request) {
 	next := ""
 	if len(msgs) == limit {
 		last := msgs[len(msgs)-1]
-		next = formatCursor(last.ReceivedAt, last.ID)
+		next = formatCursor(last.FechaDeOrden(), last.ID)
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"messages": msgs, "limit": limit, "next_cursor": next})
 }
@@ -194,7 +211,19 @@ func (a *API) listThreadMessages(w http.ResponseWriter, r *http.Request) {
 	if msgs == nil {
 		msgs = []domain.Message{}
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"messages": msgs})
+	// El estado del hilo va con sus mensajes: el lector lo pinta («Pospuesto hasta…»,
+	// «Silenciada») y decide qué ofrecer sin otra petición. Un hilo ajeno o sin
+	// mensajes no tiene estado que contar: sale el de por defecto.
+	st, err := a.store.ThreadState(r.Context(), acc.ID, id)
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		httpx.Fail(w, r, mapErr(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{
+		"messages":      msgs,
+		"muted":         st.Muted,
+		"snoozed_until": st.SnoozedUntil,
+	})
 }
 
 // maxBusquedaSuite acota lo que el buscador global puede pedir de una vez: pinta
@@ -687,7 +716,7 @@ func errUnsupportedMethod(method string) error {
 	return fmt.Errorf("método JMAP no soportado: %s", method)
 }
 
-// parseCursor descompone el cursor keyset "received_at,id" (RFC 3339 con nanos
+// parseCursor descompone el cursor keyset "fecha,id" (RFC 3339 con nanos
 // + uuid). Cadena vacía = primera página (cero, uuid.Nil).
 func parseCursor(s string) (time.Time, uuid.UUID, error) {
 	if s == "" {
@@ -736,7 +765,13 @@ func queryIntNamed(r *http.Request, nombre string, def int) int {
 
 // mapErr traduce errores de dominio a *httpx.Error canónicos.
 func mapErr(err error) error {
+	err = store.PrivateStorageError(err)
+	if e := mapErrDeLectura(err); e != nil {
+		return e
+	}
 	switch {
+	case errors.Is(err, store.ErrPrivateStorageFrozen):
+		return httpx.ErrConflict.WithCode("private_storage_migration_required")
 	case errors.Is(err, domain.ErrNotFound):
 		return httpx.ErrNotFound
 	case errors.Is(err, domain.ErrScheduleGone):
@@ -765,6 +800,31 @@ func mapErr(err error) error {
 		return httpx.ErrForbidden.WithCode("from_not_allowed").WithMessage("The From header must be exactly one address of the sending mailbox.")
 	default:
 		return err
+	}
+}
+
+// mapErrDeLectura traduce los errores de las herramientas de lectura de la cuenta
+// (plantillas, posponer y silenciar, preferencias de lectura y remitentes de
+// confianza), o nil si no es de ellas. Va aparte de mapErr para que el switch no
+// pase del tope de gocyclo.
+func mapErrDeLectura(err error) error {
+	switch {
+	case errors.Is(err, domain.ErrTemplateExists):
+		return httpx.ErrConflict.WithCode("template_exists").WithMessage("A template with that name already exists.")
+	case errors.Is(err, domain.ErrTemplateLimite):
+		return httpx.ErrConflict.WithCode("template_limit").WithMessage("Your account has reached its limit of templates.")
+	case errors.Is(err, domain.ErrInvalidTemplate):
+		return httpx.ErrBadRequest.WithCode("invalid_template").WithMessage("Give the template a name of up to 100 characters and a body of up to 16 KiB.")
+	case errors.Is(err, domain.ErrInvalidSnooze):
+		return httpx.ErrBadRequest.WithCode("invalid_snooze").WithMessage("Pick a date and time between one minute and one year from now.")
+	case errors.Is(err, domain.ErrNothingToSnooze):
+		return httpx.ErrConflict.WithCode("nothing_to_snooze").WithMessage("Only conversations in the Inbox can be snoozed.")
+	case errors.Is(err, domain.ErrInvalidReadingPrefs):
+		return httpx.ErrBadRequest.WithCode("invalid_reading_prefs").WithMessage("Unknown auto-advance or swipe option.")
+	case errors.Is(err, domain.ErrTrustedSenderLimite):
+		return httpx.ErrConflict.WithCode("trusted_sender_limit").WithMessage("Your account has reached its limit of trusted senders.")
+	default:
+		return nil
 	}
 }
 

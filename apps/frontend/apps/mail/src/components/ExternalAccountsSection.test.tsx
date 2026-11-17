@@ -101,6 +101,7 @@ afterEach(() => {
   cuentas = [];
   fallar = false;
   sessionStorage.clear();
+  localStorage.clear();
   window.history.replaceState(null, '', '/mail');
   abiertas.length = 0;
   elegidas.length = 0;
@@ -201,6 +202,13 @@ function lateral(): string {
 async function pulsar(boton: HTMLElement | undefined | null): Promise<void> {
   if (!boton) throw new Error('no está el botón');
   await act(async () => boton.click());
+  await esperar();
+}
+async function tecla(boton: HTMLElement | undefined | null, key: string): Promise<void> {
+  if (!boton) throw new Error('no está el botón');
+  await act(async () => {
+    boton.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  });
   await esperar();
 }
 function botones(texto: string): HTMLButtonElement[] {
@@ -406,6 +414,8 @@ test('una cuenta que perdió el inicio de sesión lo dice en su sitio y lleva a 
     { ...trabajo, state: 'unavailable' },
   ];
   await montar();
+  // Con dos cuentas arrancan plegadas (MAIL-15): se despliegan con la flecha.
+  for (const cuenta of ['ana@gmail.com', 'ana@trabajo.eu']) await tecla(rama(cuenta), 'ArrowRight');
   expect(hijos(rama('ana@gmail.com'))).toEqual([en['externalMail.reconnectNeeded']]);
   expect(hijos(rama('ana@trabajo.eu'))).toEqual([en['externalMail.accountUnavailable']]);
   await pulsar(botones(en['externalMail.reconnectNeeded'])[0]);
@@ -414,6 +424,77 @@ test('una cuenta que perdió el inicio de sesión lo dice en su sitio y lleva a 
   const antes = resumenesPedidos().length;
   await pulsar(botones(en['externalMail.accountUnavailable'])[0]);
   expect(resumenesPedidos()).toHaveLength(antes + 1);
+});
+
+// MAIL-15: con más de una cuenta, cada una arranca PLEGADA, con los no leídos de su
+// Entrada a la vista, y lo que la persona elige se queda en el dispositivo; con una
+// sola, abierta. Se pliega también con el teclado (→ despliega, ← pliega). VISTO EN
+// ROJO (2026-11-09) con `useBranches(true)`: las tres abiertas y nada recordado al volver.
+test('con varias cuentas arrancan plegadas, se manejan con las flechas y se recuerdan', async () => {
+  const conEntrada = (unread: number) => [{ id: 'INBOX', name: 'INBOX', role: 'inbox', unread }];
+  cuentas = [
+    { ...nueva, folders: conEntrada(2) },
+    { ...trabajo, folders: conEntrada(0) },
+    { ...nueva, instance_id: 'otra', address: 'ana@otra.eu', folders: conEntrada(5) },
+  ];
+  await montar();
+  for (const cuenta of ['ana@gmail.com', 'ana@trabajo.eu', 'ana@otra.eu'])
+    expect(rama(cuenta)?.getAttribute('aria-expanded')).toBe('false');
+  // Plegada, el total a la vista; a cero no se pinta.
+  expect(rama('ana@gmail.com')?.textContent).toBe('ana@gmail.com2');
+  expect(rama('ana@trabajo.eu')?.textContent).toBe('ana@trabajo.eu');
+  await tecla(rama('ana@otra.eu'), 'ArrowRight');
+  expect(rama('ana@otra.eu')?.getAttribute('aria-expanded')).toBe('true');
+  expect(hijos(rama('ana@otra.eu'))).toEqual(['Inbox5']);
+  // La flecha que no cambia nada no hace nada: → en una abierta sigue abierta.
+  await tecla(rama('ana@otra.eu'), 'ArrowRight');
+  expect(rama('ana@otra.eu')?.getAttribute('aria-expanded')).toBe('true');
+  await tecla(rama('ana@gmail.com'), 'ArrowLeft');
+  expect(rama('ana@gmail.com')?.getAttribute('aria-expanded')).toBe('false');
+  // Al volver a la página, como se dejaron.
+  render(null, document.body);
+  await montar();
+  expect(rama('ana@otra.eu')?.getAttribute('aria-expanded')).toBe('true');
+  expect(rama('ana@gmail.com')?.getAttribute('aria-expanded')).toBe('false');
+  // Y una cuenta sola arranca abierta.
+  render(null, document.body);
+  localStorage.clear();
+  cuentas = [{ ...nueva, folders: conEntrada(2) }];
+  await montar();
+  expect(rama('ana@gmail.com')?.getAttribute('aria-expanded')).toBe('true');
+});
+
+// MAIL-15: en el cajón del teléfono la dirección se cortaba a pelo
+// («daniel.delgador@outlook.cor») o se partía en dos líneas. Ahora va en una con los
+// puntos en medio y el dominio entero, y la dirección completa en el `title`; las
+// carpetas, con menos sangría (`ml-3`). VISTO EN ROJO (2026-11-09) sin `middleTruncate`.
+test('una dirección larga conserva el dominio y sus carpetas van menos sangradas', async () => {
+  const larga = 'daniel.delgador.de.la.cuenta.larga@outlook.com';
+  cuentas = [{ ...nueva, address: larga, folders: carpetasGmail }];
+  await montar();
+  const cuenta = rama(larga);
+  expect(cuenta?.title).toBe(larga);
+  const partes = [...(cuenta?.querySelectorAll('span.truncate') ?? [])].map((s) => s.textContent);
+  expect(partes).toEqual(['daniel.delgador.de.la.cuenta.larga', '@outlook.com']);
+  expect(cuenta?.querySelector('.line-clamp-2')).toBeNull();
+  const grupo = cuenta?.parentElement?.querySelector(':scope > ul[role="group"]');
+  expect(grupo?.classList.contains('ml-3')).toBe(true);
+  // «Buzones» conserva la sangría hasta el rótulo.
+  await pulsar(rama(cuentasDeEntradas));
+  const fuentes = fila(en['nav.allInboxes'])?.parentElement?.querySelector('ul[role="group"]');
+  expect(fuentes?.classList.contains('ml-7')).toBe(true);
+});
+
+// MAIL-15: la cuenta de una empresa lleva el logo de su web (el de los remitentes);
+// un buzón gratuito, su glifo.
+test('la cuenta de un dominio propio lleva su logo y la gratuita su glifo', async () => {
+  cuentas = [trabajo, nueva];
+  await montar();
+  const logo = rama('ana@trabajo.eu')?.querySelector('img');
+  expect(logo?.getAttribute('src')).toContain('/api/sender-logo?d=trabajo.eu');
+  expect(logo?.getAttribute('alt')).toBe('');
+  expect(rama('ana@gmail.com')?.querySelector('img')).toBeNull();
+  expect(rama('ana@gmail.com')?.querySelector('svg')).not.toBeNull();
 });
 
 // «Buzones», arriba: solo con alguna cuenta externa (con Sytue sola sería «Carpetas»

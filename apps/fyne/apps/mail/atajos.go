@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"runtime"
 	"slices"
 
 	"fyne.io/fyne/v2"
@@ -27,8 +28,7 @@ func AtajoEnviar() string { return ui.AtajoDelSistema("Ctrl+↵") }
 func (b *Buzon) AtajoPersonalizado(s fyne.Shortcut) bool {
 	if cs, ok := s.(*desktop.CustomShortcut); ok {
 		if cs.KeyName == fyne.KeyComma && cs.Modifier&fyne.KeyModifierShortcutDefault != 0 {
-			b.P.Menu.AjustesAbiertos = true
-			b.P.Refrescar()
+			b.verAjustes()
 			return true
 		}
 	}
@@ -57,6 +57,12 @@ func (b *Buzon) Atajo(c fyne.Canvas, r rune) bool {
 	if b.redaccion != nil || (c != nil && c.Overlays().Top() != nil) {
 		return false
 	}
+	// En la página de ajustes no hay lista ni lector: j/k, archivar o destacar
+	// actuarían sobre una conversación que no se ve. Quedan la ayuda y redactar,
+	// como en la web (`enAjustes` en MailApp.tsx).
+	if b.P.Ajustes != nil && r != '?' && r != 'c' {
+		return false
+	}
 	abierta := b.P.Lector.Conversacion
 	hay := len(abierta.Mensajes) > 0 && b.hiloID != ""
 	a := b.P.Acciones
@@ -76,13 +82,11 @@ func (b *Buzon) Atajo(c fyne.Canvas, r rune) bool {
 		b.cerrarHilo()
 		b.P.Refrescar()
 	case 'r', 'a', 'f':
-		if !hay {
-			return false
-		}
-		modo := map[rune]Respuesta{'r': Responder, 'a': ResponderATodos, 'f': Reenviar}[r]
-		b.responder(abierta.Mensajes[0], modo)
+		return b.atajoDeRespuesta(r, abierta, hay)
 	case 'x', 'l', 'v':
 		return b.atajoDeSeleccion(r, hay)
+	case 'I', 'U', '!', 'z':
+		return b.atajoDeTriaje(r, abierta, hay)
 	case 's', 'e', '#':
 		h := map[rune]func(Conversacion){'s': a.Destacar, 'e': a.Archivar, '#': a.Papelera}[r]
 		if !hay || h == nil {
@@ -110,10 +114,66 @@ func (b *Buzon) atajoDeSeleccion(r rune, hay bool) bool {
 	}
 }
 
+// atajoDeRespuesta es «r», «a» y «f»: responder, responder a todos y reenviar el
+// último mensaje de la conversación abierta.
+func (b *Buzon) atajoDeRespuesta(r rune, abierta Conversacion, hay bool) bool {
+	if !hay {
+		return false
+	}
+	modo := map[rune]Respuesta{'r': Responder, 'a': ResponderATodos, 'f': Reenviar}[r]
+	b.responder(abierta.Mensajes[0], modo)
+	return true
+}
+
+// atajoDeTriaje es `atajoDeTriaje` de la web (utils.ts): `Mayús+I` marca leída, `Mayús+U`
+// no leída, «!» manda a spam —la abierta o, sin nada abierto, la fila del cursor de
+// j/k— y «z» deshace el último triaje. Marcar leída la que ya lo está, o no leída la que
+// no, no es atajo: conmutar haría lo contrario de lo pedido. En solo lectura no hay
+// triaje (las Acciones ya están a nil, pero «z» no pasa por ellas).
+func (b *Buzon) atajoDeTriaje(r rune, abierta Conversacion, hay bool) bool {
+	if b.P.Bandeja.SoloLectura {
+		return false
+	}
+	if r == 'z' {
+		if b.ultimoTriaje == nil {
+			return false
+		}
+		b.deshacerTriaje(b.ultimoTriaje)
+		return true
+	}
+	c := abierta
+	if !hay {
+		convs := b.P.Bandeja.Conversaciones
+		if len(convs) == 0 {
+			return false
+		}
+		c = convs[min(b.cursorAtajo, len(convs)-1)]
+	}
+	a := b.P.Acciones
+	switch {
+	case r == '!' && a.Spam != nil:
+		a.Spam(c)
+	case (r == 'I' && c.SinLeer || r == 'U' && !c.SinLeer) && a.Leido != nil:
+		a.Leido(c)
+	default:
+		return false
+	}
+	return true
+}
+
+// teclaMayus es la de la web: «⇧» en un Mac y el nombre de la tecla en su idioma en
+// los demás.
+func (b *Buzon) teclaMayus() string {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "ios" {
+		return "⇧"
+	}
+	return b.P.T.T("shortcuts.key.shift", nil)
+}
+
 // TeclaSuelta atiende Escape: vacía la selección, y solo si hay algo marcado; sin
 // selección la tecla sigue su camino. Devuelve si era suya.
 func (b *Buzon) TeclaSuelta(c fyne.Canvas, k *fyne.KeyEvent) bool {
-	if k == nil || k.Name != fyne.KeyEscape || b.redaccion != nil ||
+	if k == nil || k.Name != fyne.KeyEscape || b.redaccion != nil || b.P.Ajustes != nil ||
 		(c != nil && c.Overlays().Top() != nil) || b.P.Bandeja.CuantasMarcadas() == 0 {
 		return false
 	}
@@ -141,19 +201,23 @@ func (b *Buzon) marcarCursor() bool {
 	return true
 }
 
-// moverCursor es j/k: la conversación siguiente o la anterior. Sin nada abierto se
-// retoma donde estaba el cursor: tras archivar, esa posición ya la ocupa la siguiente
-// (como Gmail).
+// moverCursor es j/k y los botones «Más reciente»/«Más antigua» del lector: la
+// conversación siguiente o la anterior. Sin nada abierto se retoma donde estaba el
+// cursor: tras archivar, esa posición ya la ocupa la siguiente (como Gmail). Bajar
+// desde la última cargada, si quedan páginas, pide la siguiente y abre la que llega
+// (`seguirTrasPagina`), como `pasoDelCursor` de la web.
 func (b *Buzon) moverCursor(siguiente bool) {
 	convs := b.P.Bandeja.Conversaciones
 	if len(convs) == 0 {
 		return
 	}
-	actual := -1
-	for i, c := range convs {
-		if c.HiloID == b.hiloID && b.hiloID != "" {
-			actual = i
-		}
+	actual := b.indiceAbierta()
+	if siguiente && actual == len(convs)-1 && b.P.Bandeja.HayMas {
+		b.avanceTrasCargar = b.hiloID
+		b.MasPagina()
+		b.ponerNavegacion()
+		b.P.Lector.Refresh()
+		return
 	}
 	destino := min(b.cursorAtajo, len(convs)-1)
 	switch {
@@ -169,35 +233,85 @@ func (b *Buzon) moverCursor(siguiente bool) {
 	b.P.Bandeja.VerFila(destino)
 }
 
+// indiceAbierta es la fila de la conversación abierta en la lista; -1 si no hay
+// ninguna o no está a la vista (se llegó por enlace, o el filtro la dejó fuera).
+func (b *Buzon) indiceAbierta() int {
+	if b.hiloID == "" {
+		return -1
+	}
+	return slices.IndexFunc(b.P.Bandeja.Conversaciones, func(c Conversacion) bool { return c.HiloID == b.hiloID })
+}
+
+// ponerNavegacion enciende o apaga los botones del lector: la más reciente no tiene
+// nada encima, y la más antigua solo tiene algo debajo si quedan páginas
+// (`vecinasDeLaAbierta` de la web).
+func (b *Buzon) ponerNavegacion() {
+	l, i, n := b.P.Lector, b.indiceAbierta(), len(b.P.Bandeja.Conversaciones)
+	l.HayAnterior = i > 0
+	l.HaySiguiente = i >= 0 && (i < n-1 || b.P.Bandeja.HayMas)
+	l.CargandoSiguiente = b.avanceTrasCargar != "" && b.pidiendo
+}
+
+// seguirTrasPagina termina el «Más antigua» que pidió la página siguiente: cuando
+// llega (o falla), abre la conversación de detrás de la que estaba abierta, si la
+// hay. Si entretanto se abrió otra, o la página no trajo nada nuevo, se olvida.
+func (b *Buzon) seguirTrasPagina() {
+	pendiente := b.avanceTrasCargar
+	if pendiente == "" || b.pidiendo {
+		return
+	}
+	b.avanceTrasCargar = ""
+	convs := b.P.Bandeja.Conversaciones
+	if i := b.indiceAbierta(); b.hiloID == pendiente && i >= 0 && i+1 < len(convs) {
+		b.cursorAtajo = i + 1
+		b.Abrir(convs[i+1])
+		b.P.Bandeja.VerFila(i + 1)
+		return
+	}
+	b.ponerNavegacion()
+	b.P.Lector.Refresh()
+}
+
 // ---- La hoja de atajos (`ShortcutsModal.tsx`) ----
 
 // grupoAtajos es un apartado de la hoja.
 type grupoAtajos struct {
 	titulo string
-	atajos []struct{ teclas, descripcion string }
+	atajos []filaAtajo
 }
 
-// verAtajos abre la hoja (`ui.MostrarHojaAtajos`) con los tres grupos de la web.
+// filaAtajo es un atajo de la hoja: sus teclas, una pastilla cada una, y qué hace.
+type filaAtajo struct {
+	teclas      []string
+	descripcion string
+}
+
+// verAtajos abre la hoja (`ui.MostrarHojaAtajosDeSuite`) con los tres grupos de la web.
 func (b *Buzon) verAtajos() {
 	lienzo := b.P.Lienzo()
 	if lienzo == nil {
 		return
 	}
 	t := b.P.T
-	fila := func(teclas, clave string) struct{ teclas, descripcion string } {
-		return struct{ teclas, descripcion string }{teclas, t.T(clave, nil)}
+	fila := func(tecla, clave string) filaAtajo {
+		return filaAtajo{[]string{tecla}, t.T(clave, nil)}
+	}
+	mayus := func(tecla, clave string) filaAtajo {
+		return filaAtajo{[]string{b.teclaMayus(), tecla}, t.T(clave, nil)}
 	}
 	grupos := []grupoAtajos{
-		{t.T("shortcuts.group.move", nil), []struct{ teclas, descripcion string }{
+		{t.T("shortcuts.group.move", nil), []filaAtajo{
 			fila("j", "shortcuts.next"), fila("k", "shortcuts.prev"),
 			fila("u", "shortcuts.backToList"), fila("/", "shortcuts.search"),
 		}},
-		{t.T("shortcuts.group.write", nil), []struct{ teclas, descripcion string }{
+		{t.T("shortcuts.group.write", nil), []filaAtajo{
 			fila("c", "shortcuts.compose"), fila("r", "shortcuts.reply"), fila("a", "shortcuts.replyAll"),
 			fila("f", "shortcuts.forward"), fila(AtajoEnviar(), "shortcuts.send"),
 		}},
-		{t.T("shortcuts.group.triage", nil), []struct{ teclas, descripcion string }{
+		{t.T("shortcuts.group.triage", nil), []filaAtajo{
 			fila("e", "shortcuts.archive"), fila("#", "shortcuts.trash"),
+			fila("!", "shortcuts.spam"), fila("z", "shortcuts.undo"),
+			mayus("I", "shortcuts.markRead"), mayus("U", "shortcuts.markUnread"),
 			fila("s", "shortcuts.star"), fila("x", "shortcuts.select"),
 			fila("Esc", "shortcuts.clearSelection"), fila("l", "shortcuts.label"),
 			fila("v", "shortcuts.move"), fila("?", "shortcuts.help"),
@@ -207,9 +321,10 @@ func (b *Buzon) verAtajos() {
 	for _, g := range grupos {
 		h := ui.GrupoDeAtajos{Titulo: g.titulo}
 		for _, a := range g.atajos {
-			h.Atajos = append(h.Atajos, ui.AtajoDeTeclado{Teclas: []string{a.teclas}, Descripcion: a.descripcion})
+			h.Atajos = append(h.Atajos, ui.AtajoDeTeclado{Teclas: a.teclas, Descripcion: a.descripcion})
 		}
 		hoja = append(hoja, h)
 	}
-	ui.MostrarHojaAtajos(lienzo, t.T("shortcuts.title", nil), t.T("ui.close", nil), hoja)
+	// La hoja es la de la suite: los de Mail y, detrás, ⌘K, «?» y Esc.
+	ui.MostrarHojaAtajosDeSuite(lienzo, t.Locale(), hoja)
 }

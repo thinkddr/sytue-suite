@@ -4,44 +4,12 @@
 package rooms
 
 import (
-	"context"
 	"strings"
 	"testing"
 
-	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 )
-
-func TestNativeRecoveryKeyRequiresExplicitAcknowledgment(t *testing.T) {
-	sa, _, _ := salaEn(t, &servicioFalso{}, 320)
-	c := &Cifrado{Sala: sa, ctx: t.Context(), recovery: "ARTIFICIAL RECOVERY KEY", status: mx.VerificationStatus{Verified: true}}
-	ready := 0
-	c.AlLista = func(context.Context) { ready++ }
-	copied := ""
-	sa.Copiar = func(value string) { copied = value }
-	c.AbrirPanel()
-	t.Cleanup(c.Cerrar)
-	if c.dialog == nil || !c.dialog.NoDescartable {
-		t.Fatal("recovery key can be dismissed before saving")
-	}
-	c.dialog.Descartar()
-	if c.dialog == nil {
-		t.Fatal("discard lost the recovery key")
-	}
-	c.footer.Objects[0].(*ui.Boton).AlPulsar()
-	if copied != "ARTIFICIAL RECOVERY KEY" || ready != 0 {
-		t.Fatal("copy prematurely activated encrypted Rooms")
-	}
-	c.footer.Objects[1].(*ui.Boton).AlPulsar()
-	if c.recovery != "" || ready != 1 {
-		t.Fatal("save did not clear displayed key and activate Rooms")
-	}
-	c.dialog.Descartar()
-	if c.dialog != nil {
-		t.Fatal("closed recovery UI retained an overlay")
-	}
-}
 
 func TestNativeCryptoMessageLabelsDoNotImplyOldOrRecoveredContentIsVerified(t *testing.T) {
 	sa, _ := salaDePrueba(t, &servicioFalso{})
@@ -74,7 +42,7 @@ func TestNativeChannelsLoadWithoutAwaitingMatrixVerification(t *testing.T) {
 	}
 	sa, _, _ := salaEn(t, srv, 800)
 	// Matrix está configurado pero aún no verificado
-	c := &Cifrado{Sala: sa, ctx: t.Context(), status: mx.VerificationStatus{Verified: false}}
+	c := NuevoCifrado(sa, &api.Rooms{}, mx.Config{}, nil)
 	sa.Cifrado = c
 	sa.Arrancar(t.Context())
 

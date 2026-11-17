@@ -64,6 +64,13 @@ func quienDe(r *http.Request) service.Quien {
 
 // traducir pasa los errores del dominio al sobre canónico.
 func traducir(err error) error {
+	if castPrivateWriteBlocked(err) {
+		return httpx.ErrConflict.WithCode("private_storage_frozen").Wrap(err)
+	}
+	return traducirDominio(err)
+}
+
+func traducirDominio(err error) error {
 	switch {
 	case err == nil:
 		return nil

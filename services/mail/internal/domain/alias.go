@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/mail/model"
 )
 
 // ErrAliasExists indica que la dirección de alias ya está en uso (por otra cuenta
@@ -41,29 +43,7 @@ type Alias struct {
 
 // Vacation es la configuración de autorespuesta / fuera-de-oficina de una cuenta.
 // Rango [StartsAt, EndsAt] opcional (nil = sin límite por ese extremo).
-type Vacation struct {
-	Enabled   bool       `json:"enabled"`
-	Subject   string     `json:"subject"`
-	Body      string     `json:"body"`
-	StartsAt  *time.Time `json:"starts_at,omitempty"`
-	EndsAt    *time.Time `json:"ends_at,omitempty"`
-	UpdatedAt time.Time  `json:"updated_at,omitempty"`
-}
-
-// ActiveAt indica si la autorespuesta debe dispararse en el instante t: activada y
-// dentro del rango de fechas (los extremos nil no acotan). Base del gate de entrega.
-func (v Vacation) ActiveAt(t time.Time) bool {
-	if !v.Enabled {
-		return false
-	}
-	if v.StartsAt != nil && t.Before(*v.StartsAt) {
-		return false
-	}
-	if v.EndsAt != nil && t.After(*v.EndsAt) {
-		return false
-	}
-	return true
-}
+type Vacation = model.Vacation
 
 // AliasDomainAllowed valida que la dirección de alias está en un dominio que el
 // sistema sirve para esta cuenta: el dominio de su propia dirección primaria, uno

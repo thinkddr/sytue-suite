@@ -84,7 +84,7 @@ func TestUnDispositivoNuevoAvisaEnLaCampana(t *testing.T) {
 	u := caOrgUser(t, l, org, "nuevo@id.test")
 
 	entrar := func(galletas ...*http.Cookie) []*http.Cookie {
-		r := httptest.NewRequest(http.MethodGet, "/login", nil)
+		r := httptest.NewRequest(http.MethodGet, "/login", http.NoBody)
 		r.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15")
 		for _, c := range galletas {
 			r.AddCookie(c)

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/cast/internal/cuota"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
@@ -25,6 +27,7 @@ func TestTraducirLosErroresDeSubirDesdeDrive(t *testing.T) {
 		status int
 		code   string
 	}{
+		{"fuente privada retenida", &pgconn.PgError{Code: "PST01"}, http.StatusConflict, "private_storage_frozen"},
 		{"no existe", fmt.Errorf("%w: el fichero de Drive", domain.ErrNoExiste), http.StatusNotFound, "not_found"},
 		{"prohibido", fmt.Errorf("%w: el fichero de Drive", domain.ErrProhibido), http.StatusForbidden, "forbidden"},
 		{"no es vídeo", fmt.Errorf("%w (application/pdf)", service.ErrNoEsVideo), http.StatusUnsupportedMediaType, "not_video"},

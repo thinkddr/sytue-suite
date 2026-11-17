@@ -1,0 +1,100 @@
+{
+  "cases": [
+    {
+      "name": "organization",
+      "issuer": "https://id.example///",
+      "client": "sytue",
+      "subject": "ana",
+      "organization": "acme",
+      "context": "[\"https://id.example\",\"sytue\",\"ana\",\"acme\"]",
+      "identity_hash": "7948a29e860b745ebcfad3231899e39c2a0221ec6de7c9efcb915fddb9a8eece",
+      "scope": {
+        "tenant": "acme",
+        "subject": "ana",
+        "product": "mail"
+      },
+      "scope_header": "v1.eyJ0ZW5hbnQiOiJhY21lIiwic3ViamVjdCI6ImFuYSIsInByb2R1Y3QiOiJtYWlsIn0",
+      "scope_valid": true
+    },
+    {
+      "name": "individual",
+      "issuer": "https://id.example",
+      "client": "sytue",
+      "subject": "ana",
+      "organization": "",
+      "context": "[\"https://id.example\",\"sytue\",\"ana\",\"\"]",
+      "identity_hash": "239c233a3c70cfb694a8b60e6dcf64d9fe715f5fbfad7b018d2c23b78ee37be3",
+      "scope": {
+        "tenant": "p-personal",
+        "subject": "ana",
+        "product": "mail"
+      },
+      "scope_header": "v1.eyJ0ZW5hbnQiOiJwLXBlcnNvbmFsIiwic3ViamVjdCI6ImFuYSIsInByb2R1Y3QiOiJtYWlsIn0",
+      "scope_valid": true
+    },
+    {
+      "name": "unicode-and-escaping",
+      "issuer": "https://id.example/\u003c\u003e\u0026/",
+      "client": "cli/\\\"\u003c\u003e\u0026",
+      "subject": "💾 / \u003cowner\u003e\u2028\u2029 é é",
+      "organization": "t\u003c\u0026\u003e/",
+      "context": "[\"https://id.example/\\u003c\\u003e\\u0026\",\"cli/\\\\\\\"\\u003c\\u003e\\u0026\",\"💾 / \\u003cowner\\u003e\\u2028\\u2029 é é\",\"t\\u003c\\u0026\\u003e/\"]",
+      "identity_hash": "673dc4150ee8169e268d2bd20e720d429707a9c664d6285c489892356ac78c78",
+      "scope": {
+        "tenant": "t\u003c\u0026\u003e/",
+        "subject": "💾 / \u003cowner\u003e\u2028\u2029 é é",
+        "product": "mail"
+      },
+      "scope_header": "v1.eyJ0ZW5hbnQiOiJ0XHUwMDNjXHUwMDI2XHUwMDNlLyIsInN1YmplY3QiOiLwn5K-IC8gXHUwMDNjb3duZXJcdTAwM2VcdTIwMjhcdTIwMjkgZcyBIMOpIiwicHJvZHVjdCI6Im1haWwifQ",
+      "scope_valid": true
+    },
+    {
+      "name": "control-characters",
+      "issuer": "https://id.example",
+      "client": "\b\f\r\n\t\u0000\u0001\u001f\\u2028",
+      "subject": "owner\b\f\u0001\u001f/\\",
+      "organization": "acme",
+      "context": "[\"https://id.example\",\"\\b\\f\\r\\n\\t\\u0000\\u0001\\u001f\\\\u2028\",\"owner\\b\\f\\u0001\\u001f/\\\\\",\"acme\"]",
+      "identity_hash": "deb9e9255ce0ec1f6602111cd24521eb808a9eef83fe6bf7abd9765913e454d3",
+      "scope": {
+        "tenant": "acme",
+        "subject": "owner\b\f\u0001\u001f/\\",
+        "product": "mail"
+      },
+      "scope_header": "v1.eyJ0ZW5hbnQiOiJhY21lIiwic3ViamVjdCI6Im93bmVyXGJcZlx1MDAwMVx1MDAxZi9cXCIsInByb2R1Y3QiOiJtYWlsIn0",
+      "scope_valid": true
+    },
+    {
+      "name": "literal-escape-sequences",
+      "issuer": "https://id.example/",
+      "client": "\\/\\u2029",
+      "subject": "slash\\/ literal\\u2028 \\u003c \\n \\\" \u003c/script\u003e",
+      "organization": "acme",
+      "context": "[\"https://id.example\",\"\\\\/\\\\u2029\",\"slash\\\\/ literal\\\\u2028 \\\\u003c \\\\n \\\\\\\" \\u003c/script\\u003e\",\"acme\"]",
+      "identity_hash": "3ff2916957f3b0fc689f50578872f6c33a3c727c971170fabffa9e4774cf2b18",
+      "scope": {
+        "tenant": "acme",
+        "subject": "slash\\/ literal\\u2028 \\u003c \\n \\\" \u003c/script\u003e",
+        "product": "mail"
+      },
+      "scope_header": "v1.eyJ0ZW5hbnQiOiJhY21lIiwic3ViamVjdCI6InNsYXNoXFwvIGxpdGVyYWxcXHUyMDI4IFxcdTAwM2MgXFxuIFxcXCIgXHUwMDNjL3NjcmlwdFx1MDAzZSIsInByb2R1Y3QiOiJtYWlsIn0",
+      "scope_valid": true
+    },
+    {
+      "name": "invalid-storage-scope",
+      "issuer": "https://id.example",
+      "client": "sytue",
+      "subject": "ana\n",
+      "organization": "acme",
+      "context": "[\"https://id.example\",\"sytue\",\"ana\\n\",\"acme\"]",
+      "identity_hash": "840245fffe54a53adc4ef11a0705a22af5f0e2396ab169bf824f436c91c4ba7d",
+      "scope": {
+        "tenant": "acme",
+        "subject": "ana\n",
+        "product": "mail"
+      },
+      "scope_header": "",
+      "scope_valid": false
+    }
+  ]
+}

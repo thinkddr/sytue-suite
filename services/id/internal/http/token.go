@@ -223,8 +223,8 @@ func (s *Server) redeemAuthCode(ctx context.Context, q pg.Querier, client domain
 	if !u.Active() {
 		return domain.ErrInvalidGrant
 	}
-	if ac.OrgID != "" && !s.orgEntitled(ctx, ac.OrgID) {
-		return domain.ErrInvalidGrant
+	if err := s.validateAuthCodeOrg(ctx, client, *ac); err != nil {
+		return err
 	}
 	*user = u
 	// Emitir y persistir el refresh token DENTRO de la misma transacción,
@@ -272,20 +272,36 @@ type refreshRotation struct {
 // suscripción pagada. Se mantiene fuera de rotateRefresh para que la transacción
 // de rotación conserve una complejidad auditable.
 func (s *Server) validateRefreshOrg(ctx context.Context, rt domain.RefreshToken) error {
-	if rt.OrgID == "" {
+	return s.validateUserOrg(ctx, rt.UserID, rt.OrgID)
+}
+
+func (s *Server) validateAuthCodeOrg(ctx context.Context, client domain.Client, ac domain.AuthCode) error {
+	if client.ID == "sytue-matrix" {
+		return s.validateUserOrg(ctx, ac.UserID, ac.OrgID)
+	}
+	if ac.OrgID != "" && !s.orgEntitled(ctx, ac.OrgID) {
+		return domain.ErrInvalidGrant
+	}
+	return nil
+}
+
+// The same live membership/organization proof protects refresh and Matrix's
+// code exchange after a per-authorization organization selection.
+func (s *Server) validateUserOrg(ctx context.Context, userID, orgID string) error {
+	if orgID == "" {
 		return nil
 	}
-	if _, err := s.store.GetMembership(ctx, rt.OrgID, rt.UserID); err != nil {
+	if _, err := s.store.GetMembership(ctx, orgID, userID); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.ErrInvalidGrant
 		}
 		return err
 	}
-	org, err := s.store.GetOrgByID(ctx, rt.OrgID)
+	org, err := s.store.GetOrgByID(ctx, orgID)
 	if err != nil {
 		return err
 	}
-	if org.Status != domain.StatusActive || !s.orgEntitled(ctx, rt.OrgID) {
+	if org.Status != domain.StatusActive || !s.orgEntitled(ctx, orgID) {
 		return domain.ErrInvalidGrant
 	}
 	return nil

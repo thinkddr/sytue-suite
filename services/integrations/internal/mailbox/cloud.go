@@ -232,6 +232,9 @@ var graphWellKnown = []struct{ name, role string }{
 	{"junkemail", "junk"},
 	{"deleteditems", "trash"},
 	{"archive", "archive"},
+	// Outbox is not one of the roles Sytue mixes or moves to: it only gives the
+	// sidebar its own glyph and a translated name instead of a plain folder.
+	{"outbox", "outbox"},
 }
 
 const graphBatch = "https://graph.microsoft.com/v1.0/$batch"

@@ -36,21 +36,20 @@ import (
 	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/peticion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
 // Estado es el estado de carga de la pantalla, con los seis del encargo.
-type Estado = agenda.Estado
+type Estado = ui.Estado
 
 // Pantalla es Sytue Calendar entero: menú, cabecera de vista y la vista activa.
 //
@@ -66,7 +65,7 @@ type Pantalla struct {
 	Zona *time.Location
 	// Vista es cuál de las cuatro se enseña.
 	Vista Vista
-	// Estado son los seis del encargo. `agenda.Exito` pinta los datos.
+	// Estado son los seis del encargo. `ui.EstadoExito` pinta los datos.
 	Estado Estado
 	// Fallo es la clave del mensaje de error («no se pudieron cargar los calendarios» o
 	// «los eventos»), el `error` de la web. Vacía: el de los eventos.
@@ -122,6 +121,8 @@ type Pantalla struct {
 	cuerpoHorario *cuerpoHorario
 	// cajonAbierto es el menú sacado como cajón en ventana estrecha.
 	cajonAbierto bool
+	// controlesAjustes son los de la página de ajustes montada, para las pruebas.
+	controlesAjustes *controlesAjustes
 
 	// Ventana es el ancho de la ventana, que decide el mes del teléfono (< `ui.CorteSM`).
 	// Lo pone el armazón al medirse (`AlMedir`); 0 es «aún no se sabe» y no es compacto.
@@ -135,10 +136,16 @@ type Pantalla struct {
 	altoHoja    float32
 	hayAltoHoja bool
 	animHoja    *fyne.Animation
+	// hojaEnGesto es el asa con el dedo: mientras, ninguna lista refresca (un segundo
+	// dedo no lo convierte en un tirón). Es el `data-gesto-en-curso` de la web.
+	hojaEnGesto bool
 	// diaElegido y asaMes son el día elegido y el asa del último pintado del mes del
 	// teléfono: adonde vuelve el foco tras repintar si estaba en un día o en el asa.
 	diaElegido *diaCompacto
 	asaMes     *asaMes
+	// grupoCajon es el selector de vista del cajón del teléfono en el último pintado: las
+	// flechas cambian la vista sin cerrar el cajón y el repintado devuelve aquí el foco.
+	grupoCajon *ui.Segmentado
 	// recEnCajon es la rama de recordatorios desplegada en el cajón del teléfono, y
 	// recCargando/recFallo el estado del sondeo, que la App copia aquí al pintar.
 	recEnCajon            bool
@@ -174,6 +181,15 @@ type Pantalla struct {
 	Refresco            ui.RefrescoLista
 	// AlConmutarCajon abre o cierra el menú en ventana estrecha.
 	AlConmutarCajon func()
+
+	// Ajustes son los de la persona (ajustes.go); EnAjustes, que su página ocupa el
+	// sitio de la vista. AlCambiarAjustes guarda unos nuevos; AlAbrirAjustes y
+	// AlCerrarAjustes entran y salen de la página.
+	Ajustes          Ajustes
+	EnAjustes        bool
+	AlCambiarAjustes func(Ajustes)
+	AlAbrirAjustes   func()
+	AlCerrarAjustes  func()
 	// AlRehacer pide reconstruir la pantalla FUERA del Layout: la ventana cruzó el corte
 	// del mes del teléfono.
 	AlRehacer func()
@@ -280,7 +296,7 @@ func (p *Pantalla) cabecera() *CabeceraVista {
 	invitaciones := nuevoBotonInvitaciones(p.t("header.invitations", nil), p.Invitaciones,
 		p.t("header.pending", i18n.Vars{"count": p.Invitaciones}), p.AlVerInvitaciones)
 
-	derecha := []fyne.CanvasObject{buscar, p.nuevaCampana(), invitaciones, NuevoGrupoVista([4]string{
+	derecha := []fyne.CanvasObject{buscar, p.nuevaCampana(), invitaciones, NuevoGrupoVista(p.t("view.label", nil), [4]string{
 		p.t("view.month", nil), p.t("view.week", nil),
 		p.t("view.day", nil), p.t("view.agenda", nil),
 	}, p.Vista, p.cambiarVista)}
@@ -319,6 +335,9 @@ func contar(n int) string {
 // contenido es la cabecera y, debajo, la vista o el estado que toque. En el mes del
 // teléfono no hay cabecera de vista: lo suyo va en la barra móvil y en el cajón.
 func (p *Pantalla) contenido() fyne.CanvasObject {
+	if p.EnAjustes {
+		return p.paginaAjustes()
+	}
 	if p.compacta() {
 		return p.conFranjas(p.vistaMesCompacta())
 	}
@@ -329,7 +348,7 @@ func (p *Pantalla) contenido() fyne.CanvasObject {
 
 // cuerpo es la vista activa, o el panel del estado cuando no hay datos que enseñar.
 func (p *Pantalla) cuerpo() fyne.CanvasObject {
-	if panel := agenda.Panel(p.Estado, p.textosDeEstado(), p.esqueleto()); panel != nil {
+	if panel := ui.PanelEstado(p.Estado, p.textosDeEstado(), p.esqueleto()); panel != nil {
 		return panel
 	}
 	vista := p.vista()
@@ -361,8 +380,14 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 		return p.t("nav.createEventOn", i18n.Vars{"date": i18n.FormatDayMonthLong(p.locale(), d)})
 	}
 	m.DesdeAntes = p.t("cal.fromEarlier", nil)
+	if p.ajustes().NumeroSemana {
+		m.NumeroSemana = func(n int) string { return p.t("grid.weekNumber", i18n.Vars{"week": n}) }
+	}
 	m.AlCrear = p.AlCrearEvento
 	m.AlAbrir = p.AlAbrirEvento
+	m.AlMas = func(d time.Time, ancla fyne.CanvasObject) { p.mostrarDiaMes(d, ancla) }
+	// Arrastrar a otro día guarda por el mismo camino que la rejilla horaria.
+	m.AlMover = p.AlMoverEvento
 	// El mes conserva seis semanas legibles en horizontal: si no cabe su mínimo,
 	// se recorre entero en vez de apretar los números y eventos unos sobre otros.
 	desplazar, vista := desplazable(m)
@@ -373,41 +398,41 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 
 // textosDeEstado es la copia de cada uno de los seis, con las claves del catálogo de
 // la app. No se inventa ninguna: son las que la web ya tiene.
-func (p *Pantalla) textosDeEstado() agenda.Textos {
+func (p *Pantalla) textosDeEstado() ui.TextosEstado {
 	switch p.Estado {
-	case agenda.Error:
+	case ui.EstadoError:
 		// `illustration={<Illustration name="errorRetry" />}`.
-		return agenda.Textos{
+		return ui.TextosEstado{
 			Titulo:       p.t("load.error", nil),
 			Descripcion:  p.t(p.claveFallo(), nil),
 			RotuloAccion: p.t("common.retry", nil),
 			Accion:       p.AlReintentar,
 			Ilustracion:  iconos.Pintar(iconos.ErrorReintentar, tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(),
 		}
-	case agenda.SinConexion:
+	case ui.EstadoSinConexion:
 		// Sin red Calendar pasa a consulta: el reintento existe pero no se puede
 		// pulsar, que es lo que hace `disabled={offline}` en la web.
-		return agenda.Textos{
+		return ui.TextosEstado{
 			Titulo:       p.t("load.error", nil),
 			Descripcion:  p.t("cal.error.loadEvents", nil),
 			RotuloAccion: p.t("common.retry", nil),
 		}
-	case agenda.SinPermiso:
+	case ui.EstadoSinPermiso:
 		// Un 403 no se arregla reintentando, así que no lleva botón.
-		return agenda.Textos{
+		return ui.TextosEstado{
 			Titulo:      p.t("load.error", nil),
 			Descripcion: p.t(p.claveFallo(), nil),
 		}
-	case agenda.Vacia:
-		return agenda.Textos{
+	case ui.EstadoVacia:
+		return ui.TextosEstado{
 			Titulo:       p.t("cal.noUpcoming", nil),
 			Descripcion:  p.t("agenda.empty", nil),
 			RotuloAccion: p.t("nav.createEvent", nil),
 			Accion:       p.crearHoy,
 		}
-	case agenda.Exito, agenda.Cargando:
+	case ui.EstadoExito, ui.EstadoCargando:
 	}
-	return agenda.Textos{}
+	return ui.TextosEstado{}
 }
 
 // claveFallo es la clave del mensaje de error: la que dejó la carga que falló o, sin
@@ -425,31 +450,98 @@ func (p *Pantalla) crearHoy() {
 	}
 }
 
-// esqueleto es el `GridSkeleton` de la web: la GEOMETRÍA de la rejilla sin datos, para
-// que cambiar de mes no dé un salto de layout.
+// esqueleto es el `GridSkeleton` del mes de la web: la GEOMETRÍA de la rejilla sin
+// datos, para que cambiar de mes no dé un salto de layout.
+//
+// Es la de la web pieza a pieza: la fila de nombres con un bloque de `2rem × 0.75rem`
+// en `px-2.5 py-2.5` y su `border-b`; debajo, seis semanas que se reparten el alto
+// (`flex-1 grid-rows-6`), cada celda con `border-r border-b` y un círculo de `1.5rem`
+// en su `p-1.5`. Los bloques NO se estiran con la celda: hasta el 2026-11-16 eran
+// `Bloque` dentro de un `Margen` y la rejilla salía con barras de 128 × 24 en vez de
+// círculos, apiladas arriba sin líneas.
+//
+// Los 49 bloques son de UN `ui.BloquesEsqueleto`: laten a una y la rejilla se anuncia
+// una vez, como el `role="status"` con `loading.calendar` de la web.
 func (p *Pantalla) esqueleto() fyne.CanvasObject {
-	// La fila de nombres: siete bloques de `2rem × 0.75rem` con `px-2.5 py-2.5`.
-	cabecera := make([]fyne.CanvasObject, 0, 7)
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	b := ui.NuevosBloquesEsqueleto().ConRotulo(p.t("loading.calendar", nil))
+	c := &cargaMes{fondo: canvas.NewRectangle(tema.Color("surface", v))}
+	objs := []fyne.CanvasObject{c.fondo}
 	for range 7 {
-		cabecera = append(cabecera, conMargenSimple(espacio2p5,
-			agenda.Bloque(2*tema.Rem, 0.75*tema.Rem, false)))
+		c.dias = append(c.dias, b.BloqueFijo(AnchoDiaCarga, AltoDiaCarga))
 	}
-	// Y 42 celdas con su círculo de `1.5rem` y su `p-1.5`, que es lo que hace que el
-	// esqueleto tenga la GEOMETRÍA de la rejilla y no haya salto de layout al cargar.
-	celdas := make([]fyne.CanvasObject, 0, 42)
 	for range 42 {
-		celdas = append(celdas, conMargenSimple(espacio1p5,
-			agenda.Bloque(1.5*tema.Rem, 1.5*tema.Rem, false)))
+		c.celdas = append(c.celdas, b.Circulo(LadoCeldaCarga))
 	}
-	return container.New(&arriba{Alto: AltoDiasSemana + tema.Borde},
-		container.New(Cuadricula, cabecera...),
-		container.New(ui.Rejilla{Fijas: 7}, celdas...))
+	linea := func() *canvas.Rectangle {
+		r := canvas.NewRectangle(tema.Color("border", v))
+		objs = append(objs, r)
+		return r
+	}
+	objs = append(objs, c.dias...)
+	objs = append(objs, c.celdas...)
+	c.filete = linea()
+	for range 7 {
+		c.verticales = append(c.verticales, linea())
+	}
+	for range 6 {
+		c.horizontales = append(c.horizontales, linea())
+	}
+	return b.Con(container.New(c, objs...))
 }
 
-// conMargenSimple envuelve un objeto con el mismo relleno por los cuatro lados, que es
-// lo único que el esqueleto necesita: `ui.Margen`.
-func conMargenSimple(m float32, hijo fyne.CanvasObject) fyne.CanvasObject {
-	return container.New(ui.Margen{Izq: m, Arr: m, Der: m, Abj: m}, hijo)
+// Las medidas de los bloques de `GridSkeleton` (CalendarApp.tsx): el nombre del día es
+// `<Skeleton width="2rem" height="0.75rem" />` y la celda `<Skeleton width="1.5rem"
+// height="1.5rem" circle />`.
+const (
+	AnchoDiaCarga  float32 = 2 * tema.Rem
+	AltoDiaCarga   float32 = 0.75 * tema.Rem
+	LadoCeldaCarga float32 = 1.5 * tema.Rem
+)
+
+// cargaMes coloca la rejilla de carga como `mesRenderer` coloca la de verdad: las
+// columnas de `Cuadricula`, la fila de nombres de `AltoDiasSemana` y las semanas de
+// `AltoSemana`. Así el esqueleto y el mes que lo sustituye caen en el mismo sitio.
+type cargaMes struct {
+	fondo, filete            *canvas.Rectangle
+	dias, celdas             []fyne.CanvasObject
+	verticales, horizontales []*canvas.Rectangle
+}
+
+var _ fyne.Layout = (*cargaMes)(nil)
+
+// MinSize es el de un mes vacío: la fila de nombres y seis semanas con su círculo.
+func (c *cargaMes) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, AltoDiasSemana+tema.Borde+6*(2*RellenoCelda+LadoCeldaCarga+tema.Borde))
+}
+
+func (c *cargaMes) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	c.fondo.Resize(t)
+	ancho := Cuadricula.AnchoColumna(t.Width)
+	for i, d := range c.dias {
+		// `px-2.5 py-2.5`: el bloque de 12 de alto deja la fila en los 32 de la de verdad.
+		d.Move(fyne.NewPos(Cuadricula.X(t.Width, i)+espacio2p5, espacio2p5))
+		d.Resize(fyne.NewSize(max(ancho-2*espacio2p5, 0), AltoDiaCarga))
+	}
+	c.filete.Move(fyne.NewPos(0, AltoDiasSemana))
+	c.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
+	arriba := AltoDiasSemana + tema.Borde
+	alto := AltoSemana(t.Height)
+	for i, d := range c.celdas {
+		fila, col := i/7, i%7
+		d.Move(fyne.NewPos(Cuadricula.X(t.Width, col)+RellenoCelda, arriba+float32(fila)*alto+RellenoCelda))
+		d.Resize(fyne.NewSize(max(ancho-2*RellenoCelda, 0), max(alto-2*RellenoCelda-tema.Borde, 0)))
+	}
+	// `border-r border-b` de cada celda: la raya derecha de cada columna y la de abajo
+	// de cada semana, por dentro de la celda.
+	for col, r := range c.verticales {
+		r.Move(fyne.NewPos(Cuadricula.X(t.Width, col)+ancho-tema.Borde, arriba))
+		r.Resize(fyne.NewSize(tema.Borde, 6*alto))
+	}
+	for fila, r := range c.horizontales {
+		r.Move(fyne.NewPos(0, arriba+float32(fila+1)*alto-tema.Borde))
+		r.Resize(fyne.NewSize(t.Width, tema.Borde))
+	}
 }
 
 // AbrirNuevoEvento es la ruta `/calendar/events/new`: el enlace profundo de creación.

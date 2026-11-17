@@ -12,12 +12,11 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Input, Modal, cx } from '@sytue/ui';
+import { Input, Modal, Resaltado, cx, EmptyState } from '@sytue/ui';
 import { contiene } from '@sytue/i18n';
 import type { Note, NoteHit, Notebook } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
 import { Glyph } from './glyphs.js';
-import { Resaltado } from './Resaltado.js';
 import { principioDe } from './VistaPreviaEnlace.js';
 
 const ID_CAJA = 'notes-ir-a';
@@ -177,7 +176,7 @@ export function AbrirRapido({
           }}
         />
         {filas.length === 0 ? (
-          <p class="text-text-muted px-1 py-2 text-sm">{t('quickOpen.empty')}</p>
+          <EmptyState compact icon="search" title={t('quickOpen.empty')} />
         ) : (
           <ul
             id="notes-ir-a-lista"

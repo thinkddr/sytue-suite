@@ -17,7 +17,10 @@ import (
 // Calendars es el cliente de Sytue Calendar, escrito contra la API REST del servicio
 // (services/calendar/internal/http). La web habla CalDAV; una app nativa no necesita
 // componer iCalendar para enseñar un mes.
-type Calendars struct{ c *Client }
+type Calendars struct {
+	c    *Client
+	data CalendarData
+}
 
 // NewCalendars crea el cliente sobre la raíz del servicio (ServiceURL(apex, "calendar")).
 func NewCalendars(servicio string, s Session, h *http.Client) *Calendars {
@@ -216,6 +219,9 @@ const (
 // ponytail: una petición por invitación, en serie. La bandeja de pendientes son unas
 // pocas; si crece, en paralelo con un tope.
 func (c *Calendars) Invitations(ctx context.Context, soloPendientes bool) ([]Invitation, error) {
+	if c.data != nil {
+		return c.data.Invitations(ctx, soloPendientes)
+	}
 	q := url.Values{}
 	if soloPendientes {
 		q.Set("pending", "true")
@@ -255,6 +261,9 @@ func SinMailto(v string) string {
 
 // GetEvent trae UN evento por su id.
 func (c *Calendars) GetEvent(ctx context.Context, id string) (Event, error) {
+	if c.data != nil {
+		return c.data.GetEvent(ctx, id)
+	}
 	return JSON[Event](ctx, c.c, Request{Path: "/events/" + url.PathEscape(id)})
 }
 
@@ -262,6 +271,9 @@ func (c *Calendars) GetEvent(ctx context.Context, id string) (Event, error) {
 // InvitacionRechazada. El servicio pone el PARTSTAT del asistente y manda el REPLY a
 // quien organiza; solo el DESTINATARIO puede responder (si no, 404).
 func (c *Calendars) RespondInvitation(ctx context.Context, id, estado string) (Invitation, error) {
+	if c.data != nil {
+		return c.data.RespondInvitation(ctx, id, estado)
+	}
 	return PostJSON[Invitation](ctx, c.c, "/invitations/"+url.PathEscape(id)+"/respond", map[string]string{"status": estado})
 }
 
@@ -283,6 +295,9 @@ type Reminder struct {
 // esto son los avisos de una persona en su día: si alguien llega a cincuenta sin descartar
 // ninguno, el problema no se arregla trayendo la página siguiente.
 func (c *Calendars) Reminders(ctx context.Context) ([]Reminder, error) {
+	if c.data != nil {
+		return c.data.Reminders(ctx)
+	}
 	r, err := JSON[struct {
 		Reminders []Reminder `json:"reminders"`
 	}](ctx, c.c, Request{Path: "/reminders/due"})
@@ -291,6 +306,9 @@ func (c *Calendars) Reminders(ctx context.Context) ([]Reminder, error) {
 
 // DismissReminder descarta un recordatorio. Es idempotente en el servicio.
 func (c *Calendars) DismissReminder(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.DismissReminder(ctx, id)
+	}
 	resp, err := c.c.Do(ctx, Request{Method: http.MethodPost, Path: "/reminders/" + url.PathEscape(id) + "/dismiss"})
 	if err != nil {
 		return err
@@ -300,6 +318,9 @@ func (c *Calendars) DismissReminder(ctx context.Context, id string) error {
 
 // List lista los calendarios de la persona.
 func (c *Calendars) List(ctx context.Context) ([]Calendar, error) {
+	if c.data != nil {
+		return c.data.List(ctx)
+	}
 	r, err := JSON[struct {
 		Calendars []Calendar `json:"calendars"`
 	}](ctx, c.c, Request{Path: "/calendars"})
@@ -311,6 +332,9 @@ func (c *Calendars) List(ctx context.Context) ([]Calendar, error) {
 // trae el calendario entero. Lo usa el selector de la suite (Elegir).
 // Es la primera página de SearchEventsPage.
 func (c *Calendars) SearchEvents(ctx context.Context, q string, limite int) ([]Event, error) {
+	if c.data != nil {
+		return c.data.SearchEvents(ctx, q, limite)
+	}
 	b, err := c.SearchEventsPage(ctx, q, limite, "")
 	return b.Events, err
 }
@@ -322,6 +346,9 @@ func (c *Calendars) SearchEvents(ctx context.Context, q string, limite int) ([]E
 // servicio no lo marca así, porque su ReadOnly es solo de las suscripciones ICS, y una
 // pantalla que dejara arrastrar un evento ajeno recibiría un 403 al soltarlo.
 func (c *Calendars) SharedWithMe(ctx context.Context) ([]Calendar, error) {
+	if c.data != nil {
+		return c.data.SharedWithMe(ctx)
+	}
 	r, err := JSON[struct {
 		Calendars []Calendar `json:"calendars"`
 	}](ctx, c.c, Request{Path: "/calendars/shared-with-me"})
@@ -347,11 +374,17 @@ type CalendarInput struct {
 
 // CreateCalendar da de alta un calendario propio.
 func (c *Calendars) CreateCalendar(ctx context.Context, in CalendarInput) (Calendar, error) {
+	if c.data != nil {
+		return c.data.CreateCalendar(ctx, in)
+	}
 	return PostJSON[Calendar](ctx, c.c, "/calendars", in)
 }
 
 // UpdateCalendar cambia el nombre y el color de uno que ya existe.
 func (c *Calendars) UpdateCalendar(ctx context.Context, id string, in CalendarInput) (Calendar, error) {
+	if c.data != nil {
+		return c.data.UpdateCalendar(ctx, id, in)
+	}
 	cuerpo, err := json.Marshal(in)
 	if err != nil {
 		return Calendar{}, err
@@ -364,6 +397,9 @@ func (c *Calendars) UpdateCalendar(ctx context.Context, id string, in CalendarIn
 
 // DeleteCalendar borra un calendario CON SUS EVENTOS, o cancela una suscripción.
 func (c *Calendars) DeleteCalendar(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.DeleteCalendar(ctx, id)
+	}
 	resp, err := c.c.Do(ctx, Request{Method: http.MethodDelete, Path: "/calendars/" + url.PathEscape(id)})
 	if err != nil {
 		return err
@@ -381,12 +417,18 @@ type SubscriptionInput struct {
 
 // Subscribe se suscribe a un calendario ICS externo.
 func (c *Calendars) Subscribe(ctx context.Context, in SubscriptionInput) (Calendar, error) {
+	if c.data != nil {
+		return c.data.Subscribe(ctx, in)
+	}
 	return PostJSON[Calendar](ctx, c.c, "/subscriptions", in)
 }
 
 // Instances devuelve las ocurrencias de un calendario en [desde, hasta), con las
 // repeticiones ya expandidas por el servicio. La ventana máxima es de un año.
 func (c *Calendars) Instances(ctx context.Context, calendario string, desde, hasta time.Time) ([]Instance, error) {
+	if c.data != nil {
+		return c.data.Instances(ctx, calendario, desde, hasta)
+	}
 	r, err := JSON[struct {
 		Instances []Instance `json:"instances"`
 	}](ctx, c.c, Request{Path: "/calendars/" + url.PathEscape(calendario) + "/instances", Query: url.Values{
@@ -397,13 +439,19 @@ func (c *Calendars) Instances(ctx context.Context, calendario string, desde, has
 
 // CreateEvent crea un evento en un calendario.
 func (c *Calendars) CreateEvent(ctx context.Context, calendario string, in EventInput) (Event, error) {
+	if c.data != nil {
+		return c.data.CreateEvent(ctx, calendario, in)
+	}
 	return PostJSON[Event](ctx, c.c, "/calendars/"+url.PathEscape(calendario)+"/events", in)
 }
 
 // UpdateEvent SUSTITUYE un evento: se parte siempre de Event.Input. El calendario no se
-// cambia por aquí —el servicio conserva el del evento guardado—, y el evento que vuelve
-// trae OTRO id: el servicio borra la fila y la inserta de nuevo.
+// cambia por aquí —el servicio conserva el del evento guardado—. El servicio actualiza la
+// fila maestra en sitio, así que el evento conserva su id; aun así, manda el que vuelve.
 func (c *Calendars) UpdateEvent(ctx context.Context, id string, in EventInput) (Event, error) {
+	if c.data != nil {
+		return c.data.UpdateEvent(ctx, id, in)
+	}
 	cuerpo, err := json.Marshal(in)
 	if err != nil {
 		return Event{}, err
@@ -416,6 +464,9 @@ func (c *Calendars) UpdateEvent(ctx context.Context, id string, in EventInput) (
 
 // DeleteEvent borra un evento; si se repite, la serie entera.
 func (c *Calendars) DeleteEvent(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.DeleteEvent(ctx, id)
+	}
 	resp, err := c.c.Do(ctx, Request{Method: http.MethodDelete, Path: "/events/" + url.PathEscape(id)})
 	if err != nil {
 		return err
@@ -434,6 +485,9 @@ type Busqueda struct {
 // invitados), de `limite` en `limite` y a partir del cursor de la página anterior. Es el
 // buscador de eventos de la web (SearchPanel.tsx): una serie sale UNA vez, con su RRULE.
 func (c *Calendars) SearchEventsPage(ctx context.Context, texto string, limite int, cursor string) (Busqueda, error) {
+	if c.data != nil {
+		return c.data.SearchEventsPage(ctx, texto, limite, cursor)
+	}
 	return c.SearchEventsFiltrada(ctx, texto, FiltroBusqueda{}, limite, cursor)
 }
 
@@ -448,6 +502,9 @@ type FiltroBusqueda struct {
 // (`calendar`, `from` y `to` en RFC3339). El servicio cuenta como dentro del tramo un
 // evento que se solapa con él y una serie cuya recurrencia lo alcanza.
 func (c *Calendars) SearchEventsFiltrada(ctx context.Context, texto string, f FiltroBusqueda, limite int, cursor string) (Busqueda, error) {
+	if c.data != nil && f == (FiltroBusqueda{}) {
+		return c.data.SearchEventsPage(ctx, texto, limite, cursor)
+	}
 	q := url.Values{"q": {texto}}
 	if f.Calendario != "" {
 		q.Set("calendar", f.Calendario)
@@ -478,6 +535,9 @@ type Hueco struct {
 // «HH:MM»–«HH:MM» de la zona `zona` y, si `laborables`, solo de lunes a viernes. El
 // servicio incluye SIEMPRE al organizador y calcula él los cruces y el horario de verano.
 func (c *Calendars) SuggestSlots(ctx context.Context, desde, hasta time.Time, minutos int, zona, franjaDesde, franjaHasta string, laborables bool) ([]Hueco, error) {
+	if c.data != nil {
+		return c.data.SuggestSlots(ctx, desde, hasta, minutos, zona, franjaDesde, franjaHasta, laborables)
+	}
 	q := url.Values{
 		"start": {desde.UTC().Format(time.RFC3339)}, "end": {hasta.UTC().Format(time.RFC3339)},
 		"duration": {strconv.Itoa(minutos)}, "work_start": {franjaDesde}, "work_end": {franjaHasta},
@@ -505,12 +565,34 @@ const (
 // es la persona (el servicio lo casa con el correo del token). Es el «¿Vas a ir?» de la
 // vista rápida de la web.
 func (c *Calendars) SetPartStat(ctx context.Context, evento, partstat string) error {
+	if c.data != nil {
+		return c.data.SetPartStat(ctx, evento, partstat)
+	}
 	cuerpo, err := json.Marshal(map[string]string{"partstat": partstat})
 	if err != nil {
 		return err
 	}
 	resp, err := c.c.Do(ctx, Request{
 		Method: http.MethodPut, Path: "/events/" + url.PathEscape(evento) + "/attendees/partstat",
+		Header: http.Header{"Content-Type": {"application/json"}}, Body: cuerpo,
+	})
+	if err != nil {
+		return err
+	}
+	return resp.Body.Close()
+}
+
+// ResponderPorUID es SetPartStat por el UID del evento (el de su .ics): el servicio
+// escribe entonces la respuesta en el propio .ics y no solo en la lista de asistentes,
+// y la web, que lee CalDAV, la ve. El UID va en el cuerpo además de en la ruta: uno
+// con forma de UUID se tomaría en la ruta por el id interno.
+func (c *Calendars) ResponderPorUID(ctx context.Context, uid, partstat string) error {
+	cuerpo, err := json.Marshal(map[string]string{"uid": uid, "partstat": partstat})
+	if err != nil {
+		return err
+	}
+	resp, err := c.c.Do(ctx, Request{
+		Method: http.MethodPut, Path: "/events/" + url.PathEscape(uid) + "/attendees/partstat",
 		Header: http.Header{"Content-Type": {"application/json"}}, Body: cuerpo,
 	})
 	if err != nil {
@@ -530,6 +612,9 @@ const (
 // sin corromper la serie. `ocurrencia` es el inicio ORIGINAL de la ocurrencia (su
 // RECURRENCE-ID).
 func (c *Calendars) AmendRecurrence(ctx context.Context, calendario, uid string, ocurrencia time.Time, recorte string) error {
+	if c.data != nil {
+		return c.data.AmendRecurrence(ctx, calendario, uid, ocurrencia, recorte)
+	}
 	cuerpo, err := json.Marshal(map[string]any{"uid": uid, "recurrence_id": ocurrencia.UTC(), "mode": recorte})
 	if err != nil {
 		return err
@@ -546,6 +631,9 @@ func (c *Calendars) AmendRecurrence(ctx context.Context, calendario, uid string,
 
 // RefreshSubscription vuelve a leer ahora el .ics de una suscripción.
 func (c *Calendars) RefreshSubscription(ctx context.Context, calendario string) error {
+	if c.data != nil {
+		return c.data.RefreshSubscription(ctx, calendario)
+	}
 	resp, err := c.c.Do(ctx, Request{Method: http.MethodPost, Path: "/calendars/" + url.PathEscape(calendario) + "/refresh"})
 	if err != nil {
 		return err
@@ -556,6 +644,9 @@ func (c *Calendars) RefreshSubscription(ctx context.Context, calendario string) 
 // ExportICS descarga el calendario entero como .ics: «Descargar .ics» del menú de un
 // calendario. Vale también para una suscripción: es SU copia de esos eventos.
 func (c *Calendars) ExportICS(ctx context.Context, calendario string) ([]byte, error) {
+	if c.data != nil {
+		return c.data.ExportICS(ctx, calendario)
+	}
 	resp, err := c.c.Do(ctx, Request{Path: "/calendars/" + url.PathEscape(calendario) + "/export.ics"})
 	if err != nil {
 		return nil, err
@@ -578,6 +669,9 @@ const PermisoLlevar = "manage"
 
 // Shares lista con quién está compartido un calendario (solo su dueño lo ve).
 func (c *Calendars) Shares(ctx context.Context, calendario string) ([]CalendarShare, error) {
+	if c.data != nil {
+		return c.data.Shares(ctx, calendario)
+	}
 	r, err := JSON[struct {
 		Shares []CalendarShare `json:"shares"`
 	}](ctx, c.c, Request{Path: "/calendars/" + url.PathEscape(calendario) + "/shares"})
@@ -586,6 +680,9 @@ func (c *Calendars) Shares(ctx context.Context, calendario string) ([]CalendarSh
 
 // Share comparte un calendario propio con un correo.
 func (c *Calendars) Share(ctx context.Context, calendario, correo, permiso string) error {
+	if c.data != nil {
+		return c.data.Share(ctx, calendario, correo, permiso)
+	}
 	_, err := PostJSON[json.RawMessage](ctx, c.c, "/calendars/"+url.PathEscape(calendario)+"/shares",
 		map[string]string{"email": correo, "permission": permiso})
 	return err
@@ -593,6 +690,9 @@ func (c *Calendars) Share(ctx context.Context, calendario, correo, permiso strin
 
 // RevokeShare deja de compartirlo con alguien.
 func (c *Calendars) RevokeShare(ctx context.Context, calendario, compartido string) error {
+	if c.data != nil {
+		return c.data.RevokeShare(ctx, calendario, compartido)
+	}
 	resp, err := c.c.Do(ctx, Request{
 		Method: http.MethodDelete,
 		Path:   "/calendars/" + url.PathEscape(calendario) + "/shares/" + url.PathEscape(compartido),

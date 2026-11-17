@@ -105,19 +105,20 @@ func (f FondoLienzo) clave() string {
 // FondosLienzo son los cuatro, en el orden del menú.
 var FondosLienzo = [...]FondoLienzo{FondoCrema, FondoBlanco, FondoOscuro, FondoDamero}
 
-// colorFondo es el `backgroundColor` de `estilosFondoLienzo`: literales de la web, no
-// tokens —son el color de un papel, no de la interfaz—.
+// colorFondo es el `backgroundColor` de `estilosFondoLienzo`: escalones de la escala de
+// neutros, que no cambian con el modo (el fondo claro sigue claro con la suite en oscuro,
+// que es lo que se elige) pero sí siguen al color de la suite. Por eso se leen del claro.
 func (f FondoLienzo) colorFondo() color.NRGBA {
 	switch f {
 	case FondoBlanco, FondoDamero:
-		return color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+		return tema.Color("neutral-0", tema.Claro)
 	case FondoOscuro:
-		return color.NRGBA{R: 0x13, G: 0x16, B: 0x19, A: 255}
+		return tema.Color("neutral-900", tema.Claro)
 	case fondoSuelta:
 		return color.NRGBA{R: 14, G: 14, B: 14, A: 255}
 	case FondoCrema:
 	}
-	return color.NRGBA{R: 0xfa, G: 0xf9, B: 0xf6, A: 255}
+	return tema.Color("neutral-100", tema.Claro)
 }
 
 // Visor son los datos del visor a pantalla completa. Los `Con…` son los `on…` que cada
@@ -146,8 +147,6 @@ type Visor struct {
 	Posicion string
 	// HayAnterior y HaySiguiente encienden las flechas.
 	HayAnterior, HaySiguiente bool
-	// Borrando enseña la banda de confirmación bajo la cabecera.
-	Borrando bool
 	// Girando y Describiendo inertizan su mando mientras dura la llamada.
 	Girando, Describiendo bool
 
@@ -175,13 +174,19 @@ type Visor struct {
 	AlZoomEn func(fx, fy float32, vista fyne.Position)
 	// Desplazamiento es por dónde va el recorrido a tamaño real, y AlDesplazar lo recibe:
 	// el visor se rehace a cada cambio de estado y, sin él, volvía a la esquina.
-	Desplazamiento                                  fyne.Position
-	AlDesplazar                                     func(fyne.Position)
-	AlBorrar, AlConfirmarBorrar, AlCancelarBorrar   func()
+	Desplazamiento fyne.Position
+	AlDesplazar    func(fyne.Position)
+	AlBorrar       func()
+	// AlAtajos abre la hoja de atajos de teclado; nil, no se ofrece el botón.
+	AlAtajos                                        func()
 	AlParecidas, AlEditar, AlCerca, AlMapa, AlVerIA func()
 	AlEditarDesc, AlCancelarDesc, AlGuardarDesc     func()
 	AlDescargar                                     func(formato string)
-	AlFondo                                         func(FondoLienzo)
+	// AlSistema guarda la foto en la galería del sistema, con el rótulo `ClaveSistema`;
+	// nil, no se ofrece (va al final del desplegable de descargar).
+	AlSistema    func()
+	ClaveSistema string
+	AlFondo      func(FondoLienzo)
 	// AlMenuAlbumes pide la lista de álbumes (la web la pide al abrir el selector, no
 	// al abrir el visor) y se la da a `mostrar` en el hilo de la interfaz.
 	AlMenuAlbumes func(mostrar func([]api.Album))
@@ -234,14 +239,10 @@ func PantallaVisor(v Vista, d Visor) *fyne.Container {
 		ficha = FichaDelVisor(v, d)
 		asa = NuevaAsaFicha(v, d)
 	}
-	var confirmar fyne.CanvasObject
-	if d.Borrando && d.ConBorrar {
-		confirmar = bandaBorrar(v, d)
-	}
 	fondo := canvas.NewRectangle(tema.Color("bg", v.Variante))
 	filete := canvas.NewRectangle(tema.Color("border", v.Variante))
 	piezas := []fyne.CanvasObject{fondo, cabecera, filete, cuerpo}
-	for _, p := range []fyne.CanvasObject{confirmar, asa, ficha} {
+	for _, p := range []fyne.CanvasObject{asa, ficha} {
 		if p != nil {
 			piezas = append(piezas, p)
 		}
@@ -393,6 +394,11 @@ func mandosVisor(v Vista, d Visor) []fyne.CanvasObject {
 	info := mandoVisor(v, iconos.Informacion, "viewer.info", d.AlFicha)
 	info.Pulsado = d.ConFicha
 	hijos = append(hijos, pase, zoom, info, mandoFondo(v, d))
+	// La hoja de atajos, para quien no sabe que existe «?»: con ratón no hay otra forma
+	// de enterarse de que el visor se maneja con el teclado.
+	if d.AlAtajos != nil {
+		hijos = append(hijos, mandoVisor(v, iconos.Teclado, "shortcuts.help", d.AlAtajos))
+	}
 
 	if d.ConBorrar {
 		b := mandoVisor(v, iconos.Papelera, "viewer.delete", d.AlBorrar)
@@ -426,6 +432,9 @@ func mandoDescargar(v Vista, d Visor) *ui.BotonIcono {
 					d.AlDescargar(f.formato)
 				}
 			}))
+		}
+		if d.AlSistema != nil {
+			elems = append(elems, ui.NuevoElementoMenu(v.Traduce(d.ClaveSistema), iconos.Ninguno, d.AlSistema))
 		}
 		mostrarMenu(v.Traduce("viewer.download"), descargar, elems)
 	})
@@ -510,14 +519,6 @@ func (l visorLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[2].Resize(fyne.NewSize(t.Width, tema.Borde))
 
 	y, i := alto, 4
-	if l.d.Borrando && l.d.ConBorrar && len(objs) > i {
-		// `mx-3 mb-2`: sin margen arriba, pegada al filete.
-		h := ui.AltoA(objs[i], max(t.Width-2*RellenoVisorX, 0))
-		objs[i].Move(fyne.NewPos(RellenoVisorX, y))
-		objs[i].Resize(fyne.NewSize(max(t.Width-2*RellenoVisorX, 0), h))
-		y += h + RellenoVisorY
-		i++
-	}
 	anchoFicha, altoFicha := float32(0), float32(0)
 	switch {
 	case l.d.ConFicha && len(objs) > i+1 && movil(l.ventana):
@@ -545,20 +546,6 @@ func (l visorLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // por debajo del mínimo de arrastre: el resto de la ficha sigue en su scroll.
 func medidaFichaVisible(pedido, minimo, maximo, disponible float32) float32 {
 	return min(max(pedido, minimo), maximo, max(0.6*disponible-AnchoAsaFicha, 0))
-}
-
-// bandaBorrar es la confirmación que va DENTRO del visor: `border-border bg-surface
-// rounded-md border px-3 py-2 text-sm`.
-func bandaBorrar(v Vista, d Visor) fyne.CanvasObject {
-	// `flex flex-wrap gap-2` con el texto en `min-w-0 flex-1`: en un teléfono el texto se
-	// estrecha y se reparte en varias líneas junto a los dos botones.
-	fila := container.New(ui.FilaAuto{Hueco: HuecoVisor, Derecha: 3, Partir: true, SaltoFila: HuecoVisor, Elastico: 1},
-		ui.NuevoParrafo(v.Traduce("viewer.deleteConfirm"), tema.TextoSM, ui.Normal, "text", v.Variante),
-		ui.NuevoBoton(v.Traduce("viewer.delete"), d.AlConfirmarBorrar).Con(ui.Peligro, ui.TallaSM),
-		ui.NuevoBoton(v.Traduce("common.cancel"), d.AlCancelarBorrar).Con(ui.Fantasma, ui.TallaSM),
-	)
-	return recuadro(v, "surface", "border", tema.RadioMD,
-		ui.Margen{Izq: tema.Espacio(3), Der: tema.Espacio(3), Arr: tema.Espacio(2), Abj: tema.Espacio(2)}, fila)
 }
 
 // ---- La zona de la foto: el lienzo, las flechas y el rótulo de la descripción ----
@@ -1629,7 +1616,7 @@ type lienzoRenderer struct {
 	objetos []fyne.CanvasObject
 }
 
-// pintarDamero es el `repeating-conic-gradient(rgba(180,180,180,.35) 0% 25%,
+// pintarDamero es el `repeating-conic-gradient(var(--sytue-neutral-200) 0% 25%,
 // transparent 0% 50%)` de 16 px del fondo «damero»: cuadros de 8 px de CSS. El raster se
 // pide en píxeles de DISPOSITIVO, así que el cuadro se escala con la razón entre los
 // dos, que se lee del ancho de CSS que dejó Layout (atómico: lo escribe el hilo que
@@ -1646,7 +1633,7 @@ func (r *lienzoRenderer) pintarDamero(w, h int) image.Image {
 // comparten el visor y el editor, que ponen el mismo fondo detrás de la foto.
 func pintarDameroCon(w, h int, paso float32) *image.NRGBA {
 	m := image.NewNRGBA(image.Rect(0, 0, w, h))
-	gris := color.NRGBA{R: 180, G: 180, B: 180, A: 89} // 0,35 × 255
+	gris := tema.Color("neutral-200", tema.Claro)
 	for y := range h {
 		for x := range w {
 			// `repeating-conic-gradient(… 0% 25%, transparent 0% 50%)` pinta el cuarto de

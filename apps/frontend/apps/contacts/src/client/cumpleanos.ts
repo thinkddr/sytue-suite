@@ -19,26 +19,58 @@ export interface Cumpleanos {
   edad?: number;
 }
 
-const BDAY = /^BDAY(?:;[^:]*)?:(.+)$/im;
+// Con prefijo de grupo opcional (`item1.BDAY`, como lo escriben algunos clientes)
+// y sus parámetros aparte: la ficha leía antes el BDAY con `parseVcardDetails`,
+// que ya respetaba los grupos, y no debe dejar de enseñarlo por leerlo aquí.
+const BDAY = /^(?:[A-Za-z0-9-]+\.)?BDAY((?:;[^:]*)?):(.+)$/im;
 
 /** Mes (1-12), día y, si lo hay, año de nacimiento; `null` si no hay BDAY legible. */
 export function cumpleanosDe(vcard: string): { mes: number; dia: number; anyo?: number } | null {
-  const m = BDAY.exec(vcard);
+  const m = BDAY.exec(vcard.replace(/\r?\n[ \t]/g, ''));
   if (!m) return null;
-  const v = (m[1] ?? '').trim();
+  const v = (m[2] ?? '').trim();
   let r = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(v);
   if (r) {
     const [, a, mm, dd] = r;
-    return valida(Number(mm), Number(dd), Number(a));
+    // Contactos de Apple guarda el cumpleaños sin año como un año ficticio y lo
+    // marca con `X-APPLE-OMIT-YEAR=<ese año>`: tomarlo por real daría «… de 1604»
+    // en la ficha y una edad de cuatro siglos en «Próximos cumpleaños».
+    const omitido = /;X-APPLE-OMIT-YEAR=(\d{4})/i.exec(m[1] ?? '')?.[1];
+    return valida(Number(mm), Number(dd), omitido === a ? undefined : Number(a));
   }
   r = /^--(\d{2})-?(\d{2})/.exec(v);
   if (r) return valida(Number(r[1]), Number(r[2]));
   return null;
 }
 
+/**
+ * El cumpleaños en el formato largo del idioma (`tag` BCP 47): «15 de febrero de
+ * 1990» o, si el vCard no trae el año, «15 de febrero». La fecha se construye por
+ * partes y no con `new Date('1990-02-15')`, que es medianoche UTC y al oeste de
+ * Greenwich se pinta como el día 14. Sin año se usa uno bisiesto para que un
+ * 29 de febrero no se convierta en 1 de marzo.
+ */
+export function formatearCumpleanos(
+  c: { mes: number; dia: number; anyo?: number | undefined },
+  tag: string,
+): string {
+  if (c.anyo) {
+    return new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'long', year: 'numeric' }).format(
+      new Date(c.anyo, c.mes - 1, c.dia),
+    );
+  }
+  return new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'long' }).format(
+    new Date(2000, c.mes - 1, c.dia),
+  );
+}
+
 function valida(mes: number, dia: number, anyo?: number) {
-  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
-  return anyo && anyo > 1000 ? { mes, dia, anyo } : { mes, dia };
+  const conAnyo = anyo && anyo > 1000 ? anyo : undefined;
+  // Un 31 de febrero no es un cumpleaños: `Date` lo correría al 2 de marzo. Sin año
+  // se mide contra uno bisiesto para que el 29 de febrero valga.
+  const diasDelMes = new Date(conAnyo ?? 2000, mes, 0).getDate();
+  if (mes < 1 || mes > 12 || dia < 1 || dia > diasDelMes) return null;
+  return conAnyo ? { mes, dia, anyo: conAnyo } : { mes, dia };
 }
 
 /**

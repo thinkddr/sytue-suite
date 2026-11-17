@@ -89,6 +89,12 @@ type Vista struct {
 	Detalle string
 	// AlEntrar es el botón del estado SinSesion.
 	AlEntrar func()
+	// AlReintentar vuelve a pedir lo que no llegó: el botón de Error y SinConexion.
+	// Sin él (una pantalla que no sabe recargarse) no se ofrece el botón.
+	AlReintentar func()
+	// Desplaza es el desplazamiento de la página: las flechas lo mueven para que se vea
+	// la tesela enfocada (el `scrollIntoView` de la web). nil, no se mueve nada.
+	Desplaza *container.Scroll
 }
 
 // Traduce es el `t()` de la web.
@@ -147,7 +153,7 @@ func EstadoVacio(v Vista, titulo, descripcion string, accion fyne.CanvasObject) 
 }
 
 // AnchoIlustracion es el `size = 160` por defecto de Illustration.tsx: px literales,
-// el rem de 14 no lo toca.
+// el rem no lo toca.
 const AnchoIlustracion = 160
 
 // CuerpoDeEstado es lo que se pinta en cada uno de los cinco estados que NO son éxito.
@@ -161,20 +167,30 @@ func CuerpoDeEstado(v Vista, vacio *ui.Vacio) fyne.CanvasObject {
 	case Exito:
 		return nil
 	case Cargando:
-		// El `<Spinner />` suelto de la web: 18 px, a la izquierda y en el color del
-		// texto, con `ui.loading` como nombre accesible.
+		// Una rueda de 18 px, a la izquierda y en el color del texto, con `ui.loading`
+		// como nombre accesible. Las pantallas con datos que tienen forma conocida pasan
+		// por CuerpoConEsqueleto y enseñan su esqueleto en vez de esto.
 		r := ui.NuevaRueda(ui.LadoRueda, "text", v.Variante)
 		r.Rotulo = v.Traduce("ui.loading")
 		return container.New(fijo{ancho: ui.LadoRueda, alto: ui.LadoRueda}, r)
 	case Vacia:
 		return vacio
 	case Error:
-		return Parrafo(textoODefecto(v.Detalle, v.Traduce("error.connection")),
-			tema.TextoSM, ui.Normal, "danger-text", v.Variante)
+		// El `FalloDeCarga` de la web: el estado vacío con el icono de peligro y la
+		// salida. Era un párrafo rojo suelto, sin nada que hacer más que salir.
+		e := ui.NuevoVacio(textoODefecto(v.Detalle, v.Traduce("error.connection")), "")
+		e.Glifo = iconos.Trazo(iconos.Peligro, LadoGlifoFallo, "text-subtle", v.Variante)
+		e.Accion = botonReintentar(v)
+		return e
 	case SinConexion:
-		return EstadoVacio(v, "offline.status", "offline.description", nil)
+		e := EstadoVacio(v, "offline.status", "offline.description", botonReintentar(v))
+		e.Glifo = iconos.Trazo(iconos.Nube, LadoGlifoFallo, "text-subtle", v.Variante)
+		return e
 	case SinPermiso:
-		return EstadoVacio(v, "forbidden.title", "forbidden.description", nil)
+		// Sin «Reintentar»: volver a pedir lo mismo da el mismo 403.
+		e := EstadoVacio(v, "forbidden.title", "forbidden.description", nil)
+		e.Glifo = iconos.Trazo(iconos.Candado, LadoGlifoFallo, "text-subtle", v.Variante)
+		return e
 	case SinSesion:
 		entrar := ui.NuevoBoton(v.Traduce("account.signIn"), v.AlEntrar).Con(ui.Primario, ui.TallaSM)
 		e := ui.NuevoVacio(v.Traduce("app.title"), "")
@@ -183,6 +199,18 @@ func CuerpoDeEstado(v Vista, vacio *ui.Vacio) fyne.CanvasObject {
 		return e
 	}
 	return nil
+}
+
+// LadoGlifoFallo es el `<Icon size={28}>` del `FalloDeCarga` de la web.
+const LadoGlifoFallo = 28
+
+// botonReintentar es «Reintentar», o nada si la pantalla no sabe recargarse: un
+// botón que no hace nada es peor que no tenerlo.
+func botonReintentar(v Vista) fyne.CanvasObject {
+	if v.AlReintentar == nil {
+		return nil
+	}
+	return ui.NuevoBoton(v.Traduce("action.retry"), v.AlReintentar).Con(ui.Secundario, ui.TallaSM)
 }
 
 func textoODefecto(s, porDefecto string) string {

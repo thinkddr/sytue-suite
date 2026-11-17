@@ -1,50 +1,57 @@
-# Guía de alta — Slack ⇄ Sytue
+<a id="guía-de-alta--slack--sytue"></a>
+# Setup guide — Slack ⇄ Sytue
 
-Tiempo: ~10 min. Permisos: admin del workspace. Resultado: Slack conectado con
-OAuth (canales, avisos entrantes) y SAML/SCIM si tu plan los soporta.
+Time: ~10 min. Permissions: workspace admin. Result: Slack connected via
+OAuth (channels, incoming notifications) and SAML/SCIM if your plan supports them.
 
-## 1. Crear la app de Slack
+<a id="1-crear-la-app-de-slack"></a>
+## 1. Create the Slack app
 
-1. Entra en <https://api.slack.com/apps> con tu cuenta de Slack.
-2. «Create New App» → «From an app manifest» → elige tu workspace.
-3. Pega el contenido de `app-manifest.yml` (este mismo zip) → «Next» → «Create».
+1. Go to <https://api.slack.com/apps> with your Slack account.
+2. “Create New App” → “From an app manifest” → choose your workspace.
+3. Paste the contents of `app-manifest.yml` (in this same zip) → “Next” → “Create”.
 
-El manifiesto ya declara scopes, la página de instalación y el redirect URI del
-Integration Gateway (`https://integrations.sytue.eu/api/v1/oauth/callback`).
+The manifest already declares the scopes, the installation page and the
+Integration Gateway redirect URI (`https://integrations.sytue.eu/api/v1/oauth/callback`).
 
-## 2. Copiar las credenciales
+<a id="2-copiar-las-credenciales"></a>
+## 2. Copy the credentials
 
-1. «Basic Information» → «App Credentials».
-2. Copia **Client ID** y **Client Secret**.
-3. En «OAuth & Permissions», verifica que «Redirect URLs» contiene exactamente
-   el URI del paso 1 (el manifiesto lo rellena; si Slack lo marca pendiente,
-   «Add» y «Save URLs»).
+1. “Basic Information” → “App Credentials”.
+2. Copy the **Client ID** and **Client Secret**.
+3. In “OAuth & Permissions”, check that “Redirect URLs” contains exactly
+   the URI from step 1 (the manifest fills it in; if Slack marks it as pending,
+   click “Add” and “Save URLs”).
 
-## 3. Conectar desde Sytue Platform
+<a id="3-conectar-desde-sytue-platform"></a>
+## 3. Connect from Sytue Platform
 
-1. Entra en Sytue Platform → Integraciones → «Slack».
-2. Rellena el campo **Workspace** (el de `WORKSPACE.slack.com`) y los dos
-   valores del paso 2.
-3. «Conectar» te lleva a Slack: revisa los permisos y autoriza.
+1. Go to Sytue Platform → Integrations → “Slack”.
+2. Fill in the **Workspace** field (the one in `WORKSPACE.slack.com`) and the two
+   values from step 2.
+3. “Connect” takes you to Slack: review the permissions and authorize.
 
-## 4. (Opcional) SAML SSO y SCIM
+<a id="4-opcional-saml-sso-y-scim"></a>
+## 4. (Optional) SAML SSO and SCIM
 
-- **SAML**: en Slack, «Settings and Permissions» → «Sign in with Slack» /
-  SAML: carga los metadatos de Sytue ID y usa ACS
+- **SAML**: in Slack, “Settings and Permissions” → “Sign in with Slack” /
+  SAML: load the Sytue ID metadata and use the ACS
   `https://WORKSPACE.slack.com/sso/saml`, NameID `email`.
-- **SCIM**: genera un token de API de SCIM en Slack y pégalo en la ficha de la
-  integración en Sytue Platform; el aprovisionamiento de usuarios y grupos va
-  por `https://api.slack.com/scim/v2`.
+- **SCIM**: generate a SCIM API token in Slack and paste it into the integration's
+  detail card in Sytue Platform; user and group provisioning goes
+  through `https://api.slack.com/scim/v2`.
 
-## 5. Verificar
+<a id="5-verificar"></a>
+## 5. Verify
 
-1. «OAuth & Permissions» → «Install to Workspace» si Slack lo pide.
-2. En Sytue Platform, la ficha de Slack pasa a «activa» con la última sync.
-3. Envía un aviso de prueba desde la suite; debe aparecer en el canal elegido.
+1. “OAuth & Permissions” → “Install to Workspace” if Slack asks for it.
+2. In Sytue Platform, the Slack detail card switches to “active” with the latest sync.
+3. Send a test notification from the suite; it must appear in the chosen channel.
 
-## Problemas frecuentes
+<a id="problemas-frecuentes"></a>
+## Common problems
 
-- `redirect_uri_mismatch`: el Redirect URL de Slack y el de la ficha no son
-  byte a byte iguales (sin barra final).
-- La app no aparece en «From an app manifest»: el workspace elegido no es el
-  correcto; vuelve al paso 1.
+- `redirect_uri_mismatch`: the Slack Redirect URL and the one on the detail card are not
+  byte-for-byte identical (no trailing slash).
+- The app does not appear under “From an app manifest”: the chosen workspace is not the
+  right one; go back to step 1.

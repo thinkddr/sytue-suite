@@ -13,9 +13,12 @@
 package store_test
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +136,91 @@ func TestListFilesPageKeyset(t *testing.T) {
 	for i := 1; i < len(seen); i++ {
 		if strings.ToLower(seen[i-1]) >= strings.ToLower(seen[i]) {
 			t.Fatalf("orden no estrictamente creciente: %q >= %q", seen[i-1], seen[i])
+		}
+	}
+}
+
+// TestListFilesPageOrden recorre una carpeta por páginas en cada orden y sentido
+// (D-DRIVE-01) y comprueba que sale exactamente la lista ordenada por (clave, id):
+// sin repetir ni saltar ficheros, también con tamaños empatados, y en una
+// carpeta con más ficheros que una página.
+func TestListFilesPageOrden(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
+		t.Fatalf("EnsureQuota: %v", err)
+	}
+	root, err := st.EnsureRoot(ctx)
+	if err != nil {
+		t.Fatalf("EnsureRoot: %v", err)
+	}
+	// Nombres en un orden distinto del de creación (fecha) y del de tamaño, con
+	// tamaños repetidos para que el desempate por id cuente.
+	var todos []domain.File
+	for i, n := range []string{"Mango.txt", "abeto.txt", "Zorro.txt", "kiwi.txt", "boj.txt", "Pera.txt", "cedro.txt"} {
+		todos = append(todos, seedFile(t, ctx, st, root.ID, n, int64(10*(i%3))))
+	}
+
+	recorrer := func(o store.OrdenFicheros) []uuid.UUID {
+		var ids []uuid.UUID
+		cursor := store.FileCursor{Orden: o}
+		for vueltas := 0; ; vueltas++ {
+			page, err := st.ListFilesPage(ctx, root.ID, cursor, 2)
+			if err != nil {
+				t.Fatalf("%+v: ListFilesPage: %v", o, err)
+			}
+			for _, f := range page.Files {
+				ids = append(ids, f.ID)
+			}
+			if page.Next == nil {
+				return ids
+			}
+			if page.Next.Orden != o {
+				t.Fatalf("%+v: el cursor cambió de orden: %+v", o, page.Next.Orden)
+			}
+			cursor = *page.Next
+			if vueltas > 20 {
+				t.Fatalf("%+v: la paginación no termina", o)
+			}
+		}
+	}
+	// Lo esperado se calcula aparte: clave del orden y, a igualdad, id (el uuid de
+	// PostgreSQL compara por bytes, igual que aquí).
+	esperado := func(o store.OrdenFicheros) []uuid.UUID {
+		fs := append([]domain.File(nil), todos...)
+		clave := func(a, b domain.File) int {
+			switch o.Campo {
+			case store.OrdenModificado:
+				return a.UpdatedAt.Compare(b.UpdatedAt)
+			case store.OrdenTamano:
+				return cmp.Compare(a.SizeBytes, b.SizeBytes)
+			default:
+				return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+			}
+		}
+		slices.SortFunc(fs, func(a, b domain.File) int {
+			c := clave(a, b)
+			if c == 0 {
+				c = bytes.Compare(a.ID[:], b.ID[:])
+			}
+			if o.Desc {
+				return -c
+			}
+			return c
+		})
+		ids := make([]uuid.UUID, len(fs))
+		for i, f := range fs {
+			ids[i] = f.ID
+		}
+		return ids
+	}
+	for _, campo := range []store.CampoOrden{store.OrdenNombre, store.OrdenModificado, store.OrdenTamano} {
+		for _, desc := range []bool{false, true} {
+			o := store.OrdenFicheros{Campo: campo, Desc: desc}
+			if got, want := recorrer(o), esperado(o); !slices.Equal(got, want) {
+				t.Errorf("%+v:\n got %v\nwant %v", o, got, want)
+			}
 		}
 	}
 }

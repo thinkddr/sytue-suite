@@ -42,3 +42,5 @@ func (r *Reproductor) Volumen(float64)           {}
 func (r *Reproductor) Silenciar(bool)            {}
 func (r *Reproductor) Silenciado() bool          { return false }
 func (r *Reproductor) Cerrar()                   {}
+func (r *Reproductor) Velocidad() float64        { return 1 }
+func (r *Reproductor) PonerVelocidad(float64)    {}

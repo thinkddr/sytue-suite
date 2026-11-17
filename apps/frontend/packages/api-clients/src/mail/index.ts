@@ -37,6 +37,7 @@ export {
   parseAttachments,
   parseDraftContent,
   parseMessageBody,
+  senderAuthDe,
   parseSearchQuery,
 } from './jmap.js';
 export type {
@@ -45,6 +46,8 @@ export type {
   Mailbox,
   MailboxSetError,
   EmailSummary,
+  SenderAuth,
+  AuthVerdict,
   EmailAddress,
   OutgoingEmail,
   OutgoingAttachment,

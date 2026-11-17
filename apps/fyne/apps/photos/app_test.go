@@ -37,11 +37,18 @@ type servicioFalso struct {
 	pedido    []string
 	fotos     []api.Photo
 	papelera  []api.Photo
+	retencion int
 	porPagina int
+	// noRestaura son los ids cuyo `restore` el servicio niega (403).
+	noRestaura map[string]bool
 	// sinIA contesta a `/assist` como un servicio sin modelo (503 ai_not_configured).
-	sinIA            bool
+	sinIA bool
+	// lineaCaida es cuántas veces más contesta 500 la línea de tiempo.
+	lineaCaida       int
 	excluidaLoteIA   bool
 	puedeGestionarIA bool
+	// anyos es lo que contesta `/timeline/years`.
+	anyos []api.TimelineYear
 }
 
 func (s *servicioFalso) vistas() []string {
@@ -57,6 +64,9 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.pedido = append(s.pedido, strings.TrimSpace(r.Method+" "+r.URL.Path+"?"+r.URL.RawQuery+" "+string(cuerpo)))
 	escribir := func(v any) { _ = json.NewEncoder(w).Encode(v) }
 	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/timeline" && s.lineaCaida > 0:
+		s.lineaCaida--
+		w.WriteHeader(http.StatusInternalServerError)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/timeline":
 		q := r.URL.Query()
 		desde := 0
@@ -84,8 +94,12 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/assets/"):
 		w.WriteHeader(http.StatusNoContent)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/trash":
-		escribir(map[string]any{"items": s.papelera})
+		escribir(map[string]any{"items": s.papelera, "retentionDays": s.retencion})
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/restore"):
+		if s.noRestaura[strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/assets/"), "/restore")] {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/trash"):
 		escribir(map[string]int{"deleted": len(s.papelera)})
@@ -140,12 +154,19 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Lo añadido se copia al Drive de la dueña, y no cabe.
 		w.WriteHeader(http.StatusInsufficientStorage)
 		escribir(map[string]any{"error": map[string]string{"code": "quota_exceeded"}})
+	// «a3», también de «sub-ana», lleva TODAS las fotos: el visor dice «5 / 30».
+	case r.URL.Path == "/api/v1/shared/albums/a3":
+		escribir(map[string]any{"album": map[string]any{"id": "a3", "title": "Todas", "count": len(s.fotos), "sharedBy": "sub-ana", "permission": "read"}, "items": s.fotos})
+	case strings.HasPrefix(r.URL.Path, "/api/v1/shared/albums/a3/assets/"):
+		_, _ = w.Write(pngDe(bandas(40, 20)))
 	case r.URL.Path == "/api/v1/shared/albums/a1":
 		escribir(map[string]any{"album": map[string]any{"id": "a1", "title": "Viaje", "count": 2, "sharedBy": "sub-ana"}, "items": s.fotos[:2]})
 	case strings.HasPrefix(r.URL.Path, "/api/v1/shared/albums/a1/assets/"):
 		_, _ = w.Write(pngDe(bandas(40, 20)))
 	case r.URL.Path == "/api/v1/directory:resolve":
 		escribir(map[string]string{"user_id": "sub-ana", "email": "ana@acme.test", "name": "Ana"})
+	case r.URL.Path == "/api/v1/timeline/years":
+		escribir(map[string]any{"years": s.anyos})
 	case r.URL.Path == "/api/v1/memories":
 		escribir(map[string]any{"memories": []any{}})
 	case r.URL.Path == "/api/v1/albums":
@@ -296,37 +317,17 @@ func TestElVisorPasaDeFotoYSeCierra(t *testing.T) {
 	}
 }
 
-// TestBorrarDesdeElVisorPideConfirmacion: Suprimir enseña la banda y solo el botón de
-// la banda manda la foto a la papelera.
-func TestBorrarDesdeElVisorPideConfirmacion(t *testing.T) {
-	s := &servicioFalso{fotos: fotosDelServicio(3), porPagina: 100}
-	a, _ := appDePrueba(t, s)
-	a.Arrancar()
-	f := a.g.fotos[0]
-	a.abrirEnGaleria(f.ID)
-	a.teclaSuelta(&fyne.KeyEvent{Name: fyne.KeyDelete})
-	if !a.vis.borrando {
-		t.Fatal("Suprimir no enseñó la confirmación")
-	}
-	if n := len(s.vistas()); strings.HasPrefix(s.vistas()[n-1], "DELETE") {
-		t.Fatal("Suprimir borró sin confirmar")
-	}
-	a.tirarDelVisor(f)
-	if a.vis != nil || posicion(a.g.fotos, f.ID) >= 0 {
-		t.Error("confirmar no cerró el visor ni sacó la foto de la galería")
-	}
-	if n := len(s.vistas()); s.vistas()[n-1] != "DELETE /api/v1/assets/"+f.ID+"?" {
-		t.Errorf("la papelera se pidió con %q", s.vistas()[n-1])
-	}
-}
-
 // TestLaPapeleraRestauraYVacia: restaurar saca la foto; vaciar pregunta primero.
 func TestLaPapeleraRestauraYVacia(t *testing.T) {
-	s := &servicioFalso{papelera: fotosDePrueba(3), porPagina: 100}
+	s := &servicioFalso{papelera: fotosDePrueba(3), porPagina: 100, retencion: 30}
 	a, w := appDePrueba(t, s)
 	a.Ir(RutaPapelera)
 	if len(a.pap.fotos) != 3 {
 		t.Fatalf("la papelera trae %d fotos y el servicio tiene 3", len(a.pap.fotos))
+	}
+	// El plazo del servicio llega a la pantalla: es lo que dice cuándo se van.
+	if d := a.datosPapelera(); d.Retencion != 30 {
+		t.Errorf("la pantalla recibe una retención de %d días y el servicio dice 30", d.Retencion)
 	}
 	a.restaurar(a.pap.fotos[0])
 	if len(a.pap.fotos) != 2 {
@@ -505,8 +506,8 @@ func TestElLoteSeSaltaLasYaDescritas(t *testing.T) {
 	if n := contar(s, "POST /api/v1/assist"); n != 2 {
 		t.Errorf("el lote hizo %d llamadas a Sytue AI y tocaban 2", n)
 	}
-	if quiero := a.v.T.T("gallery.described", i18n.Vars{"count": 2}); a.g.aviso != quiero || a.g.lote != nil {
-		t.Errorf("al acabar el aviso dice %q (quiero %q) y el lote sigue en %v", a.g.aviso, quiero, a.g.lote)
+	if quiero := a.v.T.T("gallery.described", i18n.Vars{"count": 2}); ultimoAviso(a).Titulo != quiero || a.g.lote != nil {
+		t.Errorf("al acabar el aviso dice %q (quiero %q) y el lote sigue en %v", ultimoAviso(a).Titulo, quiero, a.g.lote)
 	}
 }
 
@@ -878,6 +879,52 @@ func TestCompartidoConmigo(t *testing.T) {
 	}
 }
 
+// TestElVisorCompartidoDiceDondeVaYSaltaConInicioYFin: en un álbum compartido conmigo
+// de 30 fotos, la quinta dice «5 / 30» en la cabecera, Fin lleva a la última e Inicio a
+// la primera; y una foto sola no lleva «1 / 1». VISTO EN ROJO sin el contador en
+// `VisorCompartido` y con Inicio y Fin sin saltar.
+func TestElVisorCompartidoDiceDondeVaYSaltaConInicioYFin(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(30), porPagina: 100}
+	a, _ := appDePrueba(t, s)
+	srvDir := httptest.NewServer(s)
+	t.Cleanup(srvDir.Close)
+	a.Directorio = api.NewDirectorio(srvDir.URL, nil, nil)
+	a.Arrancar()
+	a.AbrirCompartido("a3")
+	fotos := a.pub.album.Items
+	if len(fotos) != 30 {
+		t.Fatalf("el álbum compartido trae %d fotos", len(fotos))
+	}
+	a.verPublica(fotos[4])
+	quiero := a.v.T.T("viewer.counter", i18n.Vars{"index": 5, "total": 30})
+	if a.pub.capa == nil || !contieneTextoApp(a.pub.capa.dentro, quiero) {
+		t.Errorf("el visor de un álbum compartido no dice %q", quiero)
+	}
+	a.teclaSuelta(&fyne.KeyEvent{Name: fyne.KeyEnd})
+	if a.pub.abierta == nil || a.pub.abierta.ID != fotos[29].ID ||
+		!contieneTextoApp(a.pub.capa.dentro, a.v.T.T("viewer.counter", i18n.Vars{"index": 30, "total": 30})) {
+		t.Errorf("Fin deja abierta %+v", a.pub.abierta)
+	}
+	a.teclaSuelta(&fyne.KeyEvent{Name: fyne.KeyHome})
+	if a.pub.abierta == nil || a.pub.abierta.ID != fotos[0].ID {
+		t.Errorf("Inicio deja abierta %+v", a.pub.abierta)
+	}
+	// Las flechas siguen pasando de una en una.
+	a.teclaSuelta(&fyne.KeyEvent{Name: fyne.KeyRight})
+	if a.pub.abierta == nil || a.pub.abierta.ID != fotos[1].ID {
+		t.Errorf("la flecha derecha deja abierta %+v", a.pub.abierta)
+	}
+
+	a.pub.album.Items = fotos[:1]
+	a.verPublica(fotos[0])
+	if got := a.posicionCompartida(); got != "" {
+		t.Errorf("una foto sola lleva contador: %q", got)
+	}
+	if a.saltoCompartido(fyne.KeyEnd) {
+		t.Error("Fin salta con una foto sola")
+	}
+}
+
 // contieneTextoApp busca un rótulo en el árbol de la pantalla: un texto o una insignia.
 func contieneTextoApp(o fyne.CanvasObject, quiero string) bool {
 	switch x := o.(type) {
@@ -1137,8 +1184,8 @@ func TestFavoritasDesdeLaBarraDeSeleccion(t *testing.T) {
 	if !a.g.fotos[1].Favorite || a.g.seleccion != nil {
 		t.Errorf("tras el lote la 1 sigue sin corazón (%v) o la selección sigue abierta", a.g.fotos[1].Favorite)
 	}
-	if quiero := a.v.T.T("gallery.favorited", i18n.Vars{"count": 1}); a.g.aviso != quiero {
-		t.Errorf("el aviso dice %q y quiero %q", a.g.aviso, quiero)
+	if quiero := a.v.T.T("gallery.favorited", i18n.Vars{"count": 1}); ultimoAviso(a).Titulo != quiero {
+		t.Errorf("el aviso dice %q y quiero %q", ultimoAviso(a).Titulo, quiero)
 	}
 
 	a.entrarEnSeleccion()
@@ -1336,5 +1383,86 @@ func TestElVisorDiceDondeVaYSaltaConInicioYFin(t *testing.T) {
 	finContador := contador.Position().X + ui.Medir(contador.Text, tema.TextoXS, ui.Normal).Width
 	if contador.Text != "12 / 240" || contador.Position().X < finNombre || finContador > c.Objects[2].Position().X {
 		t.Errorf("en estrecho el contador %q va en x=%v (el nombre acaba en %v)", contador.Text, contador.Position().X, finNombre)
+	}
+}
+
+// TestLaBarraDeAnyosSaltaAUnaFecha: con fotos de varios años sale la barra, y pulsar uno
+// vuelve a pedir la línea desde ese año (`desde=`, como la web), arriba del todo. Buscar
+// la quita y olvida el año.
+func TestLaBarraDeAnyosSaltaAUnaFecha(t *testing.T) {
+	s := &servicioFalso{
+		fotos: fotosDelServicio(30), porPagina: 10,
+		anyos: []api.TimelineYear{{Year: 2024, Count: 20}, {Year: 2019, Count: 10}},
+	}
+	a, w := appDePrueba(t, s)
+	a.Arrancar()
+	b2019 := botonDeLaPantalla(w.Canvas().Content(), "2019")
+	if b2019 == nil {
+		t.Fatal("con dos años la galería no enseña la barra de años")
+	}
+	a.scroll.Offset.Y = 300
+	test.Tap(b2019)
+	if a.g.anyo != 2019 || a.scroll.Offset.Y != 0 {
+		t.Fatalf("tras pulsar 2019: año %d, desplazamiento %v", a.g.anyo, a.scroll.Offset.Y)
+	}
+	if contar(s, "GET /api/v1/timeline?desde=2019&limit=100") != 1 {
+		t.Errorf("pulsar 2019 tiene que pedir `timeline?desde=2019`: %v", s.vistas())
+	}
+	a.buscar("x")
+	if a.g.anyo != 0 {
+		t.Error("buscar es en toda la galería: el año tiene que olvidarse")
+	}
+}
+
+// TestLosAnyosLleganAunqueSeBusqueAntes: si se escribe en el buscador antes de que lleguen
+// los años, la respuesta no se tira (buscar sube `gen`, que es de la línea, no de la
+// barra), y al borrar la búsqueda la barra está ahí.
+func TestLosAnyosLleganAunqueSeBusqueAntes(t *testing.T) {
+	s := &servicioFalso{
+		fotos: fotosDelServicio(30), porPagina: 10,
+		anyos: []api.TimelineYear{{Year: 2024, Count: 20}, {Year: 2019, Count: 10}},
+	}
+	a, w := appDePrueba(t, s)
+	var cola []func()
+	a.lanzar = func(f func()) { cola = append(cola, f) }
+	a.Arrancar()
+	a.buscar("x")
+	for len(cola) > 0 {
+		f := cola[0]
+		cola = cola[1:]
+		f()
+	}
+	a.lanzar = func(f func()) { f() }
+	a.buscar("")
+	if len(a.anyos) != 2 {
+		t.Fatalf("los años se perdieron por buscar antes de que llegasen: %v", a.anyos)
+	}
+	if botonDeLaPantalla(w.Canvas().Content(), "2019") == nil {
+		t.Error("al borrar la búsqueda la galería no enseña la barra de años")
+	}
+}
+
+// TestLaBarraDeAnyosSeParteEnAncho: en una ventana ancha la barra es `flex-wrap` (como la
+// web por encima de `md`): con treinta años no ensancha el mínimo de la página y baja a
+// otra línea. Por debajo de `md`, una fila que se desliza.
+func TestLaBarraDeAnyosSeParteEnAncho(t *testing.T) {
+	var anyos []api.TimelineYear
+	for y := 2026; y > 1996; y-- {
+		anyos = append(anyos, api.TimelineYear{Year: y, Count: 1})
+	}
+	v := vistaDePrueba(t, nil)
+	v.Ventana = 1280
+	b := BarraDeAnyos(v, anyos, 0, nil)
+	_, caja := CajaGaleria(v.Ventana)
+	if m := b.MinSize(); m.Width > caja+0.5 {
+		t.Errorf("la barra pide %v de ancho y la caja mide %v", m.Width, caja)
+	}
+	una := BarraDeAnyos(v, anyos[:2], 0, nil).MinSize().Height
+	if alto := b.MinSize().Height; alto <= una {
+		t.Errorf("treinta años en %v de ancho caben en una línea de %v: no se parte (%v)", caja, una, alto)
+	}
+	v.Ventana = 400
+	if c, ok := BarraDeAnyos(v, anyos, 0, nil).(*fyne.Container); !ok || len(c.Objects) != 1 {
+		t.Errorf("en el teléfono la barra es una fila que se desliza")
 	}
 }

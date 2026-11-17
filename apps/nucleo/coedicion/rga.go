@@ -56,10 +56,13 @@ type elemento struct {
 // sobra para un documento de oficina; para cientos de miles de caracteres en vivo, un
 // árbol indexado por posición.
 type Secuencia struct {
-	actor    string
-	elems    map[Punto]*elemento
-	hijos    map[Punto][]*elemento
-	cache    []*elemento
+	actor string
+	elems map[Punto]*elemento
+	hijos map[Punto][]*elemento
+	cache []*elemento
+	// todo es el mismo recorrido con las tumbas: un cursor anclado a un carácter ya
+	// borrado sigue sabiendo dónde estaba (IndiceDe).
+	todo     []*elemento
 	valida   bool
 	contador uint64
 	// tumbas son los borrados que llegaron ANTES que la inserción de su objetivo (un
@@ -115,6 +118,7 @@ func (s *Secuencia) orden() []*elemento {
 		i     int
 	}
 	out := make([]*elemento, 0, len(s.elems))
+	todo := make([]*elemento, 0, len(s.elems))
 	vistos := make(map[Punto]bool, len(s.elems))
 	pila := []marco{{}}
 	for len(pila) > 0 {
@@ -130,13 +134,52 @@ func (s *Secuencia) orden() []*elemento {
 			continue // ciclo o punto repetido: no se vuelve a entrar
 		}
 		vistos[e.dot] = true
+		todo = append(todo, e)
 		if !e.borrado {
 			out = append(out, e)
 		}
 		pila = append(pila, marco{padre: e.dot})
 	}
-	s.cache, s.valida = out, true
+	s.cache, s.todo, s.valida = out, todo, true
 	return out
+}
+
+// PuntoEn es `puntoEn`: el punto del carácter que queda JUSTO ANTES de la posición visible
+// `indice` (un cursor entre dos caracteres se ancla al de su izquierda), o el punto cero al
+// principio. false si `indice` cae fuera del texto. Es lo que viaja en un cursor anclado.
+func (s *Secuencia) PuntoEn(indice int) (Punto, bool) {
+	vivos := s.orden()
+	if indice < 0 || indice > len(vivos) {
+		return Punto{}, false
+	}
+	if indice == 0 {
+		return Punto{}, true
+	}
+	return vivos[indice-1].dot, true
+}
+
+// IndiceDe es `indiceDe`: dónde queda hoy el cursor anclado a `p`, los caracteres vivos
+// hasta él, él incluido. Un carácter ya borrado coloca el cursor donde estaba (la tumba
+// se conserva). false si el punto aún no se conoce aquí (su inserción no ha llegado) o
+// es un huérfano al que no se llega desde la raíz.
+func (s *Secuencia) IndiceDe(p Punto) (int, bool) {
+	if p == (Punto{}) {
+		return 0, true
+	}
+	if _, hay := s.elems[p]; !hay {
+		return 0, false
+	}
+	s.orden()
+	vivos := 0
+	for _, e := range s.todo {
+		if !e.borrado {
+			vivos++
+		}
+		if e.dot == p {
+			return vivos, true
+		}
+	}
+	return 0, false
 }
 
 // Texto es el texto visible.
@@ -231,14 +274,7 @@ func (s *Secuencia) OpsDesdeTexto(nuevo string, lamport uint64) []Op {
 		return nil
 	}
 	vi, nu := []rune(viejo), []rune(nuevo)
-	pre := 0
-	for pre < len(vi) && pre < len(nu) && vi[pre] == nu[pre] {
-		pre++
-	}
-	suf := 0
-	for suf < len(vi)-pre && suf < len(nu)-pre && vi[len(vi)-1-suf] == nu[len(nu)-1-suf] {
-		suf++
-	}
+	pre, suf := IntervaloReemplazo(vi, nu, func(a, b rune) bool { return a == b })
 	ops := s.BorrarLocal(pre, len(vi)-pre-suf, lamport)
 	return append(ops, s.InsertarLocal(pre, string(nu[pre:len(nu)-suf]), lamport+uint64(len(ops)))...)
 }

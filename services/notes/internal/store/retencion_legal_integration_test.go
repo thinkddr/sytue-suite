@@ -239,3 +239,41 @@ func TestElHoldNoCruzaOrganizaciones(t *testing.T) {
 		t.Fatalf("el hold de acme no debía proteger a otra: n=%d err=%v", n, err)
 	}
 }
+
+// La papelera dice de qué cuaderno viene cada nota y si un hold la cubre, con la
+// MISMA condición que la purga: si discreparan, la app prometería «se borra en N días»
+// de algo que el recolector no va a tocar.
+func TestLaPapeleraDiceCuadernoFechaYHold(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+
+	nb, err := st.CreateNotebook(ctx, "ada", entradaCuaderno("Viaje a Lisboa", domain.VisPersonal))
+	if err != nil {
+		t.Fatalf("CreateNotebook: %v", err)
+	}
+	n, err := st.CreateNote(ctx, nb.ID, "ada", domain.NoteInput{Title: "billetes"})
+	if err != nil {
+		t.Fatalf("CreateNote: %v", err)
+	}
+	if err := st.DeleteNote(ctx, n.ID, "ada"); err != nil {
+		t.Fatalf("DeleteNote: %v", err)
+	}
+
+	papelera, err := st.ListTrash(ctx, "ada", 50)
+	if err != nil || len(papelera) != 1 {
+		t.Fatalf("ListTrash = %v, %v", papelera, err)
+	}
+	p := papelera[0]
+	if p.NotebookTitle != "Viaje a Lisboa" || p.DeletedAt.IsZero() || p.Held {
+		t.Fatalf("fila de papelera = %+v", p)
+	}
+
+	if _, err := st.CreateHold(ctx, "ada", "litigio", "CASO-P", "admin"); err != nil {
+		t.Fatalf("CreateHold: %v", err)
+	}
+	papelera, err = st.ListTrash(ctx, "ada", 50)
+	if err != nil || len(papelera) != 1 || !papelera[0].Held {
+		t.Fatalf("con un hold activo la nota debía salir retenida: %+v, %v", papelera, err)
+	}
+}

@@ -110,8 +110,12 @@ config:
   previewDomain: preview.sytue.eu
   ingressTarget: ingress.sytue.eu
   # Cierre a terceros hasta que gVisor esté operativo en los nodos de carga (CLOUD-12).
+  # La lista es la organización que opera la plataforma: `corporate`, el mismo
+  # `platformOrgSlug` del chart de ID. Ponía `sytue` y la organización se renombró a
+  # `corporate`: DevX dejaba fuera a su propio dueño y el slug `sytue`, ya libre,
+  # habría dado DevX a quien registrara una organización con ese nombre.
   abiertoATerceros: false
-  tenantsPermitidos: sytue
+  tenantsPermitidos: corporate
   # Forja donde Cloud le crea el repositorio a quien no tiene ninguno (tercera vía
   # del alta): la URL raíz de una forja Forgejo/Gitea; el client id/secret de la
   # aplicación OAuth2 van en el Secret, no aquí. Vacía, la vía está apagada: ya no

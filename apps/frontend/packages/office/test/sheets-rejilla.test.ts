@@ -8,6 +8,13 @@
  */
 import { expect, test } from 'bun:test';
 import {
+  ALTO_MAX,
+  ANCHO_MAX,
+  MEDIDA_MIN,
+  altoAjustado,
+  anchoAjustado,
+  conMedidas,
+  leerMedida,
   acumulado,
   indiceEn,
   medidaDe,
@@ -130,4 +137,41 @@ test('tramoPorPosiciones: cubre la ventana con margen, sin pasar de las fijas ni
   expect(a.desde).toBe(3);
   const z = tramoPorPosiciones(pos, 10_000_000, 600, 0, visibles.length, 'filas');
   expect(z.hasta).toBe(visibles.length);
+});
+
+test('leerMedida: px tecleados (con «px» o coma decimal), «auto» o nada válido', () => {
+  expect(leerMedida('120')).toBe(120);
+  expect(leerMedida(' 80px ')).toBe(80);
+  expect(leerMedida('12,5')).toBe(12.5);
+  expect(leerMedida('AUTO')).toBe('auto');
+  expect(leerMedida('')).toBeNull();
+  expect(leerMedida('-3')).toBeNull();
+  expect(leerMedida('ancho')).toBeNull();
+  expect(leerMedida(undefined)).toBeNull();
+});
+
+test('conMedidas: pone, acota, redondea y BORRA la clave al volver a la de serie', () => {
+  expect(conMedidas(undefined, [1, 2], 150.4, W)).toEqual({ '1': 150, '2': 150 });
+  expect(conMedidas({ '0': 50 }, [3], 1, W)).toEqual({ '0': 50, '3': MEDIDA_MIN });
+  expect(conMedidas(undefined, [0], 99999, W)).toEqual({ '0': ANCHO_MAX });
+  expect(conMedidas(undefined, [0], 99999, H, ALTO_MAX)).toEqual({ '0': ALTO_MAX });
+  // A la medida de serie (o null) la clave se va; sin claves, el mapa entero.
+  expect(conMedidas({ '0': 50, '4': 70 }, [4], W, W)).toEqual({ '0': 50 });
+  expect(conMedidas({ '4': 70 }, [4], null, W)).toBeUndefined();
+  // No muta la entrada (el modelo es inmutable: deshacer guarda la anterior).
+  const antes = { '1': 30 };
+  conMedidas(antes, [1], 60, W);
+  expect(antes).toEqual({ '1': 30 });
+});
+
+test('anchoAjustado y altoAjustado: lo usado más el aire; vacío = la de serie', () => {
+  expect(anchoAjustado([], W)).toBe(W);
+  expect(anchoAjustado([0, Number.NaN], W)).toBe(W);
+  expect(anchoAjustado([30.2, 141.1, 60], W)).toBe(152);
+  expect(anchoAjustado([1], W)).toBe(11);
+  expect(anchoAjustado([5000], W)).toBe(ANCHO_MAX);
+  expect(altoAjustado([], H)).toBe(H);
+  expect(altoAjustado([8], H)).toBe(H); // letra pequeña: nunca por debajo de la de serie
+  expect(altoAjustado([24], H)).toBe(48);
+  expect(altoAjustado([4000], H)).toBe(ALTO_MAX);
 });

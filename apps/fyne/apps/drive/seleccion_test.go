@@ -22,7 +22,7 @@ import (
 func TestMayusMarcaUnRangoDesdeElAncla(t *testing.T) {
 	els := []Elemento{{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "d"}, {ID: "e"}}
 	sel := map[string]bool{"e": true}
-	MarcarRango(sel, els, 3, 1)
+	ui.MarcarRango(sel, els, idDe, 3, 1)
 	var marcados []string
 	for _, el := range els {
 		if sel[el.ID] {
@@ -73,12 +73,25 @@ func TestLaTarjetaLlevaCasillaYMenuEnSusEsquinas(t *testing.T) {
 	w.Canvas().Capture()
 }
 
-// TestSoloLasImagenesDelServicioLlevanMiniatura: JPEG, PNG y GIF, que son las que el
+// TestSoloLasImagenesDelServicioLlevanMiniatura: JPEG, PNG, GIF y WebP, que son las que el
 // servicio sabe reducir; un SVG o una carpeta no se piden.
 func TestSoloLasImagenesDelServicioLlevanMiniatura(t *testing.T) {
-	for nombre, quiero := range map[string]bool{"a.jpg": true, "b.PNG": true, "c.gif": true, "d.svg": false, "e.pdf": false} {
+	for nombre, quiero := range map[string]bool{"a.jpg": true, "b.PNG": true, "c.gif": true, "f.webp": true, "g.avif": false, "d.svg": false, "e.pdf": false} {
 		if got := ConMiniatura(Elemento{ID: "x", Nombre: nombre}); got != quiero {
 			t.Errorf("%s: %v", nombre, got)
+		}
+	}
+	// Como la web y el servicio, manda el content-type: la extensión es el respaldo.
+	for _, c := range []struct {
+		nombre, tipo string
+		quiero       bool
+	}{
+		{"rosa", "image/webp", true},
+		{"rosa.bin", "IMAGE/WEBP; q=1", true},
+		{"rosa.webp", "image/avif", false},
+	} {
+		if got := ConMiniatura(Elemento{ID: "x", Nombre: c.nombre, Tipo: c.tipo}); got != c.quiero {
+			t.Errorf("%s (%s): %v", c.nombre, c.tipo, got)
 		}
 	}
 	if ConMiniatura(Elemento{ID: "x", Nombre: "fotos.jpg", Carpeta: true}) {
@@ -285,7 +298,7 @@ func TestLaFranjaDeCarpetasEnMarco(t *testing.T) {
 	}
 	// El rango, sobre la serie que se ve: de la segunda tesela a la segunda fila.
 	sel := map[string]bool{}
-	MarcarRango(sel, e.EnOrden(), 1, 3)
+	ui.MarcarRango(sel, e.EnOrden(), idDe, 1, 3)
 	if !sel["c2"] || !sel["f1"] || !sel["f2"] || sel["c1"] || sel["f3"] {
 		t.Errorf("el rango de la tesela a la fila marca %v", sel)
 	}

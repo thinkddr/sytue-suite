@@ -25,6 +25,7 @@ import (
 	temafyne "fyne.io/fyne/v2/theme"
 	"github.com/zalando/go-keyring"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -45,6 +46,9 @@ func aparte(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(casa, ".cache")) // cerrar sesión vacía la caché
 	keyring.MockInit()
 	tema.Elegir("")
+	// Lo que pinta un test no depende de si quien lo corre tiene «Aumentar contraste».
+	t.Cleanup(sistema.FijarMasContraste(false))
+	t.Cleanup(func() { tema.ElegirMasContraste(false) })
 }
 
 // Dos apps de la suite, UNA sesión: la segunda encuentra lo que dejó la primera sin
@@ -676,9 +680,6 @@ func TestCerrarSesionRevocaElTokenYVaciaLaCache(t *testing.T) {
 		}
 	}))
 	defer idp.Close()
-	if err := auth.Save(auth.Tokens{Refresh: "r-1", Subject: "u1"}); err != nil {
-		t.Fatal(err)
-	}
 	alm, err := Almacen()
 	if err != nil {
 		t.Fatal(err)
@@ -693,7 +694,15 @@ func TestCerrarSesionRevocaElTokenYVaciaLaCache(t *testing.T) {
 	defer a.Quit()
 	s := Abrir(a, "sytue.eu")
 	s.oidc.Issuer = idp.URL
-	s.Salir()
+	s.almacen = s.oidc.Almacen()
+	tokens := auth.Tokens{Issuer: idp.URL, Cliente: auth.ClientID, Access: "synthetic-access", Refresh: "r-1", Subject: "u1", Expiry: time.Now().Add(time.Hour)}
+	if err := s.almacen.Guardar(tokens); err != nil {
+		t.Fatal(err)
+	}
+	s.Sesion = auth.NewSession(tokens, nil, s.almacen.Guardar)
+	if err := s.SalirDescartando(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 
 	select {
 	case f := <-revocado:

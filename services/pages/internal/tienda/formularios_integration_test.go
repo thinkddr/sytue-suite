@@ -329,4 +329,3 @@ func TestPublicarCreaFormSettingsPorDefectoSinPisarLosExistentes(t *testing.T) {
 		t.Fatalf("la segunda publicación pisó form_settings: enabled=%v notify=%s", enabled, notify)
 	}
 }
-

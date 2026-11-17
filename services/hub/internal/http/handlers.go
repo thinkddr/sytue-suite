@@ -62,7 +62,7 @@ type notifStore interface {
 
 // presenceSvc gestiona la presencia de usuarios.
 type presenceSvc interface {
-	Heartbeat(ctx context.Context, subject string, state domain.PresenceState, status string) error
+	Heartbeat(ctx context.Context, subject string, state domain.PresenceState, status, zona string) error
 	Offline(ctx context.Context, subject string) error
 	Query(ctx context.Context, subjects []string) ([]domain.Presence, error)
 	TTL() time.Duration
@@ -153,7 +153,7 @@ func toAPIError(err error) error {
 // (ADR 0053): con ellos lee también sus avisos de otras organizaciones.
 func personales(ctx context.Context) context.Context {
 	c, _ := authn.FromContext(ctx)
-	return domain.ConBuzonesPersonales(ctx, buzonesPersonalesDel(c), c.Emitido)
+	return domain.ConBuzonesPersonales(ctx, c.Subject, buzonesPersonalesDel(c), c.Emitido)
 }
 
 // buzonesPersonalesDel token: ninguno si es DELEGADO (`act`): lo que es de la persona
@@ -543,6 +543,8 @@ func (h *Handlers) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 type heartbeatRequest struct {
 	State  string `json:"state"`
 	Status string `json:"status"`
+	// TZ es la zona IANA del dispositivo; opcional (ver domain.Presence.TimeZone).
+	TZ string `json:"tz"`
 }
 
 // Heartbeat: PUT /api/v1/presence.
@@ -552,7 +554,7 @@ func (h *Handlers) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	if err := h.presence.Heartbeat(r.Context(), subFromCtx(r), domain.PresenceState(req.State), req.Status); err != nil {
+	if err := h.presence.Heartbeat(r.Context(), subFromCtx(r), domain.PresenceState(req.State), req.Status, req.TZ); err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
@@ -691,7 +693,17 @@ func (h *Handlers) SetNotificationPref(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Origen desconocido: "+req.Source))
 		return
 	}
-	pref := domain.NotificationPref{Source: src, Kind: strings.TrimSpace(req.Kind), Muted: req.Muted}
+	// Quitar una regla de un origen fijo sí se deja: limpia las que quedaran de antes.
+	if req.Muted && !domain.Silenciable(src) {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Los avisos de seguridad de la cuenta no se pueden silenciar"))
+		return
+	}
+	kind := strings.TrimSpace(req.Kind)
+	if req.Muted && domain.TipoCritico(kind) {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Ese tipo de aviso pide actuar y no se puede silenciar"))
+		return
+	}
+	pref := domain.NotificationPref{Source: src, Kind: kind, Muted: req.Muted}
 	if err := h.store.SetNotificationPref(r.Context(), subFromCtx(r), pref); err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return

@@ -48,6 +48,7 @@ func pantallaConCarga(t func(string, i18n.Vars) string, loc i18n.Locale, alVolve
 	folio := NuevoFolio(ctx)
 	ctx.Lienzo = folio
 	ctx.Paneles = panelesDe(folio, t, loc)
+	ctx.PanelAjustes = func() fyne.CanvasObject { return folio.PanelAjustes(t) }
 	ctx.AjustarAlAncho = folio.AjustarAlAncho
 	if decorar != nil {
 		decorar(ctx)

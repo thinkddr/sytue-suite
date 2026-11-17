@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Badge, Button, Spinner, Tabs, useToast } from '@sytue/ui';
+import { Badge, Button, Spinner, Tabs, useToast, EmptyState } from '@sytue/ui';
 import { formatTimeAgo, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { useT, type T } from '../i18n/index.js';
@@ -181,7 +181,7 @@ function Cola({ t, locale, resueltas }: { t: T; locale: Locale; resueltas: boole
   };
   if (fallo) return <Fallo t={t} tipo="error" reintentar={cargar} />;
   if (!filas) return <Spinner label={t('player.loading')} />;
-  if (filas.length === 0) return <p class="text-text-muted text-sm">{t('moderation.empty')}</p>;
+  if (filas.length === 0) return <EmptyState compact title={t('moderation.empty')} />;
   return (
     <ul class="flex flex-col gap-3">
       {filas.map((d) => (

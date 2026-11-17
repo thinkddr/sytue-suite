@@ -13,6 +13,7 @@
  */
 import { appUrl } from '@sytue/config';
 import type { Slide, SlideBox } from '../types';
+import { hiddenMask } from './anim';
 
 /** Lo que se envía del título de una diapositiva (Cast guarda 120 caracteres). */
 export const MAX_TITULO = 120;
@@ -110,16 +111,24 @@ export interface PosicionCast {
   ref: string;
 }
 
-/** La posición de la diapositiva `index` (desde 0) de una presentación. */
+/**
+ * La posición de la diapositiva `index` (desde 0) de una presentación, contada entre las
+ * que se enseñan: el público no ve las ocultas, así que ni cuentan en el total ni dejan
+ * huecos en la numeración. Una oculta (a la que solo se llega con «número + Intro») no
+ * se anuncia: null, y Cast se queda en la última que vio.
+ */
 export function posicionDe(
   slides: readonly Slide[],
   index: number,
   docId: string,
 ): PosicionCast | null {
   if (slides.length === 0 || index < 0 || index >= slides.length) return null;
+  const hidden = hiddenMask(slides);
+  if (hidden[index]) return null;
+  const antes = hidden.slice(0, index).filter((h) => !h).length;
   return {
-    index,
-    total: slides.length,
+    index: antes,
+    total: hidden.filter((h) => !h).length,
     title: tituloDeDiapositiva(slides[index]),
     ref: `docs:${docId}`,
   };

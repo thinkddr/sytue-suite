@@ -5,11 +5,12 @@ SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
 
 # Sytue AI
 
-Microservicio Go que hace funcionar el **asistente de IA del editor** (Sytue
-Docs). Es _stateless_: no usa base de datos ni almacenamiento; solo autentica la
-petición, construye un prompt seguro y llama a un proveedor LLM configurable.
+Go microservice that powers the **editor's AI assistant** (Sytue
+Docs). It is _stateless_: it uses no database or storage; it only authenticates the
+request, builds a safe prompt and calls a configurable LLM provider.
 
-## Contrato HTTP
+<a id="contrato-http"></a>
+## HTTP contract
 
 ```
 POST /api/v1/assist        Authorization: Bearer <JWT de sesión de Sytue ID>
@@ -20,68 +21,73 @@ Content-Type: application/json
 200 OK  ->  { "text": "..." }
 ```
 
-El BFF (`apps/frontend/packages/office/src/pages/api/ai.ts`) reenvía a este endpoint
-apuntando `SYTUE_AI_URL` a `http://ai:8084/api/v1/assist` y espera `{ text }`.
-No hubo que tocar el BFF: el contrato ya coincidía.
+The BFF (`apps/frontend/packages/office/src/pages/api/ai.ts`) forwards to this endpoint
+by pointing `SYTUE_AI_URL` at `http://ai:8084/api/v1/assist` and expects `{ text }`.
+The BFF did not need to be touched: the contract already matched.
 
-Sondas: `GET /healthz` (liveness), `GET /readyz` (readiness, sin dependencias).
+Probes: `GET /healthz` (liveness), `GET /readyz` (readiness, no dependencies).
 
-## Idioma de las respuestas
+<a id="idioma-de-las-respuestas"></a>
+## Response language
 
-El asistente escribe en el idioma que la persona eligió en su perfil de Sytue
-ID: el claim `locale` del access token (scope `profile`), y en un token sin él
-el que negocie `Accept-Language`. Sin ninguno, el prompt no lleva directiva.
-La excepción es transformar un texto existente (corregir, reescribir, acortar…):
-ahí se conserva el idioma de ese texto. Ver `provider.ConIdioma`.
+The assistant writes in the language the person chose in their Sytue
+ID profile: the `locale` claim of the access token (scope `profile`), and for a token without it,
+the one negotiated by `Accept-Language`. With neither, the prompt carries no directive.
+The exception is transforming an existing text (correct, rewrite, shorten…):
+there the language of that text is preserved. See `provider.ConIdioma`.
 
-## Seguridad
+<a id="seguridad"></a>
+## Security
 
-- **API key server-only.** `AI_API_KEY` vive solo en el entorno del servidor.
-  NUNCA se registra ni se devuelve (ver `Config.LogValue` y `provider.postJSON`,
-  que en error solo expone el código de estado, jamás cabeceras ni cuerpo).
-- **JWT validado** contra el JWKS de Sytue ID (issuer/audiencia/expiración),
-  con allowlist de audiencias first-party (la suite comparte sesión).
-- **Rate-limit por usuario/tenant** (token bucket en memoria).
-- **Contexto tratado como DATOS.** El texto del documento se envuelve entre
-  marcadores con un _nonce_ impredecible por petición y el system prompt ordena
-  no obedecer instrucciones incrustadas en él: un documento que diga «ignora las
-  instrucciones anteriores» no puede escalar privilegios.
-- **Timeouts y límites de tamaño** en la frontera (instrucción y contexto).
-- Multi-tenant: el tenant sale de los claims del JWT y entra en la clave de
-  rate-limit.
+- **Server-only API key.** `AI_API_KEY` lives only in the server environment.
+  It is NEVER logged or returned (see `Config.LogValue` and `provider.postJSON`,
+  which on error only exposes the status code, never headers or body).
+- **JWT validated** against Sytue ID's JWKS (issuer/audience/expiry),
+  with an allowlist of first-party audiences (the suite shares the session).
+- **Rate limit per user/tenant** (in-memory token bucket).
+- **Context treated as DATA.** The document text is wrapped between
+  markers with an unpredictable per-request _nonce_ and the system prompt instructs
+  the model not to obey instructions embedded in it: a document that says “ignore the
+  previous instructions” cannot escalate privileges.
+- **Timeouts and size limits** at the boundary (instruction and context).
+- Multi-tenant: the tenant comes from the JWT claims and goes into the
+  rate-limit key.
 
-## Proveedor LLM (configurable)
+<a id="proveedor-llm-configurable"></a>
+## LLM provider (configurable)
 
-Detrás de la interfaz `provider.Provider` (una llamada, una respuesta; MVP sin
+Behind the `provider.Provider` interface (one call, one response; MVP without
 streaming):
 
-- **`scaleway`** (por defecto) — Generative APIs de Scaleway mediante Chat
-  Completions (`POST /v1/chat/completions`). Modelo por defecto
-  `mistral-small-3.2-24b-instruct-2506`; proveedor francés e inferencia en la UE.
-- **`openai-compat`** — endpoint OpenAI Chat Completions
-  (`POST /v1/chat/completions`, `Authorization: Bearer`). Vía para enchufar un
-  **modelo soberano/self-hosted** europeo (vLLM, llama.cpp, Ollama, TGI…).
+- **`scaleway`** (default) — Scaleway Generative APIs via Chat
+  Completions (`POST /v1/chat/completions`). Default model
+  `mistral-small-3.2-24b-instruct-2506`; French provider and inference in the EU.
+- **`openai-compat`** — OpenAI Chat Completions endpoint
+  (`POST /v1/chat/completions`, `Authorization: Bearer`). The way to plug in a
+  European **sovereign/self-hosted model** (vLLM, llama.cpp, Ollama, TGI…).
 
-## Configuración (entorno)
+<a id="configuración-entorno"></a>
+## Configuration (environment)
 
-| Variable | Por defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` / `HTTP_ADDR` | `:8084` | Escucha HTTP. |
-| `OIDC_ISSUER` | `https://id.sytue.localhost` | Issuer de Sytue ID. |
+| `PORT` / `HTTP_ADDR` | `:8084` | HTTP listener. |
+| `OIDC_ISSUER` | `https://id.sytue.localhost` | Sytue ID issuer. |
 | `OIDC_JWKS_URL` | `<issuer>/.well-known/jwks.json` | JWKS. |
-| `OIDC_ACCEPTED_AUDIENCES` | allowlist first-party | Audiencias aceptadas. |
+| `OIDC_ACCEPTED_AUDIENCES` | first-party allowlist | Accepted audiences. |
 | `AI_PROVIDER` | `scaleway` | `scaleway` \| `openai-compat`. |
-| `AI_API_KEY` | _(vacío)_ | **Secreto server-only.** Sin ella, `/assist` responde 503. |
-| `AI_MODEL` | `mistral-small-3.2-24b-instruct-2506` | Modelo. Obligatorio en `openai-compat`. |
-| `AI_BASE_URL` | `https://api.scaleway.ai` | Raíz del proveedor. Obligatoria en `openai-compat`. |
-| `AI_MAX_TOKENS` | `1024` | Tope de tokens de salida. |
-| `AI_TIMEOUT` | `60s` | Plazo de la llamada al proveedor. |
-| `AI_MAX_INSTRUCTION_BYTES` | `8192` | Límite de la instrucción. |
-| `AI_MAX_CONTEXT_BYTES` | `262144` | Límite del contexto (documento). |
-| `AI_RATE_LIMIT_PER_MIN` | `20` | Tasa sostenida por usuario/tenant. |
-| `AI_RATE_LIMIT_BURST` | `5` | Ráfaga por usuario/tenant. |
+| `AI_API_KEY` | _(empty)_ | **Server-only secret.** Without it, `/assist` responds 503. |
+| `AI_MODEL` | `mistral-small-3.2-24b-instruct-2506` | Model. Required with `openai-compat`. |
+| `AI_BASE_URL` | `https://api.scaleway.ai` | Provider root. Required with `openai-compat`. |
+| `AI_MAX_TOKENS` | `1024` | Output token cap. |
+| `AI_TIMEOUT` | `60s` | Deadline for the provider call. |
+| `AI_MAX_INSTRUCTION_BYTES` | `8192` | Instruction limit. |
+| `AI_MAX_CONTEXT_BYTES` | `262144` | Context (document) limit. |
+| `AI_RATE_LIMIT_PER_MIN` | `20` | Sustained rate per user/tenant. |
+| `AI_RATE_LIMIT_BURST` | `5` | Burst per user/tenant. |
 
-## Ejecutar / verificar
+<a id="ejecutar--verificar"></a>
+## Run / verify
 
 ```sh
 go build ./services/ai/...
@@ -89,11 +95,12 @@ go vet ./services/ai/...
 go test ./services/ai/...
 ```
 
-## Follow-ups documentados
+<a id="follow-ups-documentados"></a>
+## Documented follow-ups
 
-- Streaming SSE (el BFF ya prevé reenviar un `ReadableStream`); el MVP devuelve
-  `{ text }` completo.
-- Rate-limit global entre réplicas (hoy es por réplica, en memoria): migrar a un
-  `httpx.RateLimiter` compartido (p. ej. `pg.RateLimiter`) si hace falta.
-- Añadir la fila de Sytue AI (`:8084`) a la tabla de puertos de
-  `docs/CONVENTIONS.md §6` (fuera del alcance de este cambio).
+- SSE streaming (the BFF already anticipates forwarding a `ReadableStream`); the MVP returns
+  the complete `{ text }`.
+- Global rate limit across replicas (today it is per replica, in memory): migrate to a
+  shared `httpx.RateLimiter` (e.g. `pg.RateLimiter`) if needed.
+- Add the Sytue AI row (`:8084`) to the ports table in
+  `docs/CONVENTIONS.md §6` (outside the scope of this change).

@@ -160,7 +160,6 @@ export const nucleo = {
   'legal.phone': 'Sími',
   'legal.registry': 'Skráningarupplýsingar (fyrirtækjaskrá)',
   'legal.privacy_contact': 'Tengiliður persónuverndar (DPO)',
-  'legal.save': 'Vista lagalegar upplýsingar',
   'legal.saved': 'Lagalegar upplýsingar vistaðar',
 
   'settings.title': 'Stillingar vefsvæðis',
@@ -358,6 +357,17 @@ export const nucleo = {
   'legal.ph_privacy': 'personuvernd@daemi.is',
   'legal.ph_registry': 'Fyrirtækjaskrá Skattsins, kt. 000000-0000',
   'legal.err_generic': 'Ekki tókst að vista lagalegar upplýsingar. Reyndu aftur.',
+  'legal.section_holder': 'Eigandi',
+  'legal.section_holder_desc': 'Hver á vefinn og hvernig hann er skráður.',
+  'legal.section_address': 'Heimilisfang',
+  'legal.section_address_desc': 'Póstfangið sem birtist í lagalegu upplýsingunum.',
+  'legal.section_contact': 'Tengiliður',
+  'legal.section_contact_desc':
+    'Hvernig fólk sem heimsækir vefinn og yfirvöld geta haft samband við þig.',
+  'legal.save_section': 'Vista',
+  'legal.unsaved': 'Óvistaðar breytingar',
+  'legal.section_complete': 'Lokið',
+  'legal.section_incomplete': 'Ófullgert',
 
   'settings.tab': 'Stillingar',
   'settings.intro': 'Heiti, slóð og almennir valkostir fyrir vefsvæðið.',

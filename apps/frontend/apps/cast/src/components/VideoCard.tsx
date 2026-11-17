@@ -9,14 +9,20 @@
  * `propia`: en la biblioteca de quien lo subió se enseña además el estado (si aún
  * no está listo) y la visibilidad, que es lo que esa persona necesita ver de un
  * vistazo; al resto no le dice nada.
+ *
+ * `visto`: lo que esta persona lleva visto en este navegador (lib/reanudar.ts), como
+ * una barra fina al pie del póster; el nombre del enlace lo dice con palabras. Un
+ * directo no lleva barra: no hay dónde seguir.
  */
 import type { JSX } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 import { Badge, Icon, type IconName } from '@sytue/ui';
 import { formatTimeAgo, type Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
 import { duracion } from '../lib/formato.js';
 import { rutaPublica, urlDeMedia } from '../lib/rutas.js';
 import type { Video, Visibilidad } from '../lib/tipos.js';
+import { leer, visto as vistoDe, type Puntos } from '../lib/reanudar.js';
 
 export const ICONO_VISIBILIDAD: Record<Visibilidad, IconName> = {
   public: 'globe',
@@ -25,12 +31,28 @@ export const ICONO_VISIBILIDAD: Record<Visibilidad, IconName> = {
   people: 'users',
 };
 
+/**
+ * Lo visto de cada vídeo por esta persona, para la prop `visto` de las tarjetas. Se lee
+ * tras montar: la página llega pintada del servidor, que no sabe nada de este
+ * navegador, y leerlo al pintar descuadraría la hidratación.
+ */
+export function useVistos(persona: string | null | undefined): (id: string) => number | null {
+  // El reloj se lee junto con los puntos, fuera del pintado: basta con el de la carga.
+  const [{ puntos, ahora }, setLeido] = useState<{ puntos: Puntos; ahora: number }>({
+    puntos: {},
+    ahora: 0,
+  });
+  useEffect(() => setLeido({ puntos: leer(persona), ahora: Date.now() }), [persona]);
+  return (id) => vistoDe(puntos, id, ahora);
+}
+
 export function VideoCard({
   t,
   locale,
   video,
   propia = false,
   sinAutor = false,
+  visto = null,
 }: {
   t: T;
   locale: Locale;
@@ -38,16 +60,24 @@ export function VideoCard({
   propia?: boolean;
   /** En el canal todos son de la misma organización: el autor sí, la org no. */
   sinAutor?: boolean;
+  /** Lo visto, de 0 a 1; null, nada. */
+  visto?: number | null;
 }): JSX.Element {
   const enDirecto = video.status === 'live';
   const poster = urlDeMedia(video.poster_url);
   const cuando = video.published_at ?? video.created_at;
   const pendiente = video.status !== 'ready' && !enDirecto;
+  const progreso = !enDirecto && visto !== null && visto > 0 ? Math.min(visto, 1) : null;
+  const pct = progreso === null ? 0 : Math.round(progreso * 100);
   return (
     <a
       href={rutaPublica(`/watch/${video.id}`)}
       class="group sytue-focus-ring rounded-card flex min-w-0 flex-col gap-3"
-      aria-label={t('card.watch', { title: video.title })}
+      aria-label={
+        progreso === null
+          ? t('card.watch', { title: video.title })
+          : `${t('card.watch', { title: video.title })}. ${t('card.watched', { percent: pct })}`
+      }
     >
       <div class="bg-surface-sunken rounded-card relative aspect-video overflow-hidden">
         {poster ? (
@@ -80,6 +110,11 @@ export function VideoCard({
             {t('live.viewers', { count: video.live.viewers_now })}
           </span>
         ) : null}
+        {progreso === null ? null : (
+          <div class="absolute inset-x-0 bottom-0 h-1 bg-black/40" aria-hidden="true">
+            <div class="bg-primary h-full" data-visto style={{ width: `${Math.max(pct, 2)}%` }} />
+          </div>
+        )}
       </div>
       <div class="flex min-w-0 flex-col gap-1">
         <h3 class="text-text line-clamp-2 text-[length:calc(var(--text-sm)*var(--sytue-title-scale))] leading-snug font-[number:var(--sytue-subtitle-weight)] break-words group-hover:underline">

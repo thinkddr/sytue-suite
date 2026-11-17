@@ -20,9 +20,9 @@ func TestDominiosDeTodasLasOrganizaciones(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	acme, otra := tenantCtx("acme"), tenantCtx("otra")
-	ada := seedAccount(t, acme, st, "ada@Acme.eu")
-	seedAccount(t, acme, st, "bob@acme.eu")
-	seedAccount(t, otra, st, "eva@otra.es")
+	ada := seedAccount(acme, t, st, "ada@Acme.eu")
+	seedAccount(acme, t, st, "bob@acme.eu")
+	seedAccount(otra, t, st, "eva@otra.es")
 	if _, err := st.CreateAlias(acme, ada.ID, "ventas@tienda.acme.eu"); err != nil {
 		t.Fatalf("CreateAlias: %v", err)
 	}

@@ -175,14 +175,21 @@ func (s sesionDriveSistema) AccessToken(ctx context.Context) (string, error) {
 }
 
 func (s sesionDriveSistema) AccessTokenScoped(ctx context.Context) (string, *auth.AuthorizationScope, error) {
+	if !s.vigenteAhora(ctx) {
+		return "", nil, nube.ErrOtraCuenta
+	}
 	token, alcance, err := s.sesion.AccessTokenScoped(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	if s.sesion.SnapshotIdentity() != s.identidad || (s.vigente != nil && !s.vigente(ctx)) || !alcance.Current("Bearer "+token) {
+	if !s.vigenteAhora(ctx) || !alcance.Current("Bearer "+token) {
 		return "", nil, nube.ErrOtraCuenta
 	}
 	return token, alcance, nil
+}
+
+func (s sesionDriveSistema) vigenteAhora(ctx context.Context) bool {
+	return s.sesion != nil && s.sesion.SnapshotIdentity() == s.identidad && (s.vigente == nil || s.vigente(ctx))
 }
 func (s sesionDriveSistema) Invalidate(token string) { s.sesion.Invalidate(token) }
 
@@ -272,6 +279,38 @@ func (s *Suite) CuentaDriveEnSistema() *api.Account {
 	return api.NewAccount(s.URL("id"), s.autorizacionDriveSistema(s.Sesion.SnapshotIdentity()), nil)
 }
 
+// SesionVinculada fixes one presenter to the current identity and its lifetime.
+// Token renewal remains shared; a closed presenter cannot adopt a later login,
+// including a new login to the same account.
+func (s *Suite) SesionVinculada(vida context.Context) api.Session {
+	bound := s.autorizacionDriveSistema(s.Sesion.SnapshotIdentity())
+	current := bound.vigente
+	bound.vigente = func(ctx context.Context) bool { return vida.Err() == nil && current(ctx) }
+	return bound
+}
+
+// SesionVinculadaPrivada binds the shared HTTP adapter to one persistent device
+// session witness. Its lifetime may span refresh; a later login cannot replace it.
+func (s *Suite) SesionVinculadaPrivada(vida context.Context, witness auth.TestigoTrabajo) (api.Session, error) {
+	if s == nil || s.Sesion == nil || s.almacen == nil || vida == nil || witness.Almacen != s.almacen.Identificador() {
+		return nil, auth.ErrTrabajoSesion
+	}
+	if err := vida.Err(); err != nil {
+		return nil, err
+	}
+	identity := s.Sesion.SnapshotIdentity()
+	if identity.IdentidadSesion() != witness.Acceso.Identidad {
+		return nil, auth.ErrTrabajoSesion
+	}
+	if err := witness.Validar(); err != nil {
+		return nil, err
+	}
+	bound := s.autorizacionDriveSistema(identity)
+	current := bound.vigente
+	bound.vigente = func(ctx context.Context) bool { return vida.Err() == nil && witness.Validar() == nil && current(ctx) }
+	return bound, nil
+}
+
 func (s *Suite) autorizacionDriveSistema(i auth.IdentitySnapshot) sesionDriveSistema {
 	return sesionDriveSistema{s.Sesion, i, func(ctx context.Context) bool {
 		e := s.Estado()
@@ -287,7 +326,7 @@ func (s *Suite) autorizacionDriveSistema(i auth.IdentitySnapshot) sesionDriveSis
 		if s.almacen == nil {
 			return false
 		}
-		t, _, err := s.leerSesionCompartida(ctx)
+		t, err := s.leerSesionCompartida(ctx)
 		return err == nil && t.Refresh != "" && t.Issuer == i.Issuer && t.Cliente == i.Client && t.Subject == i.Subject && t.Organizacion == i.Organization
 	}}
 }

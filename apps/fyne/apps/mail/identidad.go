@@ -7,10 +7,12 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
-// Los borradores sin confirmar sobreviven a un cambio de cuenta en esta ventana,
-// sólo en memoria y ligados a emisor+sujeto+organización. Nunca se suben con la otra sesión.
+// Los editores sobreviven a un cambio de cuenta en esta ventana ligados a
+// emisor+sujeto+organización. Las revisiones privadas admitidas conservan además
+// su fuente cifrada; nunca se suben con la otra sesión.
 type redaccionSuspendida struct {
 	borrador *Borrador
+	privado  *privateDraftEditor
 	externo  *correoExterno
 	// envioIncierto es un envío en camino, por Sytue o por una cuenta externa: murió
 	// con la vida anterior y pudo salir o no.
@@ -29,8 +31,13 @@ func (b *Buzon) CambiarSesion(ctx context.Context, identidad string) {
 	if b.identidad != "" {
 		var pendiente redaccionSuspendida
 		if rd := b.redaccion; rd != nil {
+			// La copia local sí, con el dueño de antes: es del equipo, no del servidor.
+			if !rd.enviando {
+				b.guardarCopia(rd)
+			}
 			br := rd.r.B
 			pendiente.borrador, pendiente.envioIncierto = &br, rd.enviando
+			pendiente.privado = rd.privado
 			b.cerrar(rd) // No intenta guardar con la nueva sesión ya adoptada.
 		}
 		if c := b.correoAbierto; c != nil {
@@ -58,6 +65,7 @@ func (b *Buzon) CambiarSesion(ctx context.Context, identidad string) {
 		if pendiente.borrador != nil {
 			//nolint:contextcheck // Los eventos del redactor usan la vida de sesión vigente guardada en b.ctx.
 			b.abrirRedactor(*pendiente.borrador)
+			b.restaurarBorradorPrivado(pendiente.privado)
 			if pendiente.envioIncierto {
 				b.avisar(ui.AvisoPeligro, "externalMail.sendUnknown", nil)
 			}

@@ -134,7 +134,7 @@ func TestDirectorioInterno(t *testing.T) {
 		return strings.Join(ids, ",")
 	}
 	// Lo que no es un sub no cuenta, ni siquiera para el tope: 200 buenos y uno malo pasan.
-	var justos []string
+	justos := make([]string, 0, peticiones.MaxCandidatosDirectorio/peticiones.MaxCandidatosPorDireccion)
 	for i := range peticiones.MaxCandidatosDirectorio / peticiones.MaxCandidatosPorDireccion {
 		justos = append(justos, fmt.Sprintf(`"j%d@b.es":[%s]`, i, muchos(peticiones.MaxCandidatosPorDireccion)))
 	}
@@ -157,7 +157,7 @@ func TestDirectorioInterno(t *testing.T) {
 	if w, _ := pedir("s", `{"org":"acme-dir","candidatos":{"a@b.es":[`+muchos(peticiones.MaxCandidatosPorDireccion+1)+`]}}`); w.Code != http.StatusBadRequest {
 		t.Fatalf("más de %d candidatos para una dirección: %d, quiero 400", peticiones.MaxCandidatosPorDireccion, w.Code)
 	}
-	var cinco []string
+	cinco := make([]string, 0, 5)
 	for i := range 5 {
 		cinco = append(cinco, fmt.Sprintf(`"c%d@b.es":[%s]`, i, muchos(peticiones.MaxCandidatosPorDireccion)))
 	}
@@ -179,13 +179,13 @@ func TestDirectorioInterno(t *testing.T) {
 		return w.Code
 	}
 	parejas := func() string {
-		var dirs []string
+		dirs := make([]string, 0, peticiones.MaxCandidatosDirectorio/peticiones.MaxCandidatosPorDireccion)
 		for i := range peticiones.MaxCandidatosDirectorio / peticiones.MaxCandidatosPorDireccion {
 			dirs = append(dirs, fmt.Sprintf(`"k%d@b.es":[%s]`, i, muchos(peticiones.MaxCandidatosPorDireccion)))
 		}
 		return `{"org":"cobro-dir","candidatos":{` + strings.Join(dirs, ",") + `}}`
 	}
-	var codigos []int
+	codigos := make([]int, 0, 3)
 	for range 3 {
 		codigos = append(codigos, cobro(parejas()))
 	}
@@ -194,7 +194,7 @@ func TestDirectorioInterno(t *testing.T) {
 	if !slices.Contains(codigos, http.StatusTooManyRequests) {
 		t.Fatalf("200 parejas por llamada contra 400: %v, alguna tenía que ser 429", codigos)
 	}
-	codigos = nil
+	codigos = make([]int, 0, 4)
 	for range 4 {
 		codigos = append(codigos, cobro(`{"org":"cobro-dir","subs":[`+muchos(peticiones.MaxSubsDirectorio)+`]}`))
 	}

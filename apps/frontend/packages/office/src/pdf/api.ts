@@ -6,6 +6,7 @@
  * `/api/pdf-aplicar`). Aquí viven los tipos que cruzan la frontera y la
  * conversión de coordenadas, que es lo único con miga de todo el fichero.
  */
+import type { FileVersionPage } from '@sytue/api-clients';
 import type { InformeVerificacion } from './verificacion';
 
 /** Página tal y como la describe el motor. */
@@ -354,7 +355,7 @@ export interface PeticionFirma {
   file_id: string;
   path: string;
   message?: string;
-  status: 'pendiente' | 'firmada' | 'rechazada' | 'cancelada';
+  status: 'pendiente' | 'en_espera' | 'firmada' | 'rechazada' | 'cancelada' | 'caducada';
   created_at: string;
   resolved_at?: string;
   signed_path?: string;
@@ -368,6 +369,54 @@ export interface PeticionFirma {
   name?: string;
   /** Quien pide (en las recibidas) o a quien se pidió (en las pedidas). */
   persona?: { email: string; name?: string };
+  /**
+   * Varias personas en orden (mig. 0034): las de una misma cadena comparten `chain` y
+   * firman por `step`, desde 0 (sin él, 0). Solo la del turno está pendiente; las
+   * siguientes, `en_espera`.
+   */
+  chain?: string;
+  step?: number;
+  /** Cuándo deja de poder firmarse; sin ella, nunca. */
+  expires_at?: string;
+  remind_every_days?: number;
+}
+
+/** Opciones de una petición: confirmar a alguien de fuera, caducidad y recordatorios. */
+export interface OpcionesPedirFirma {
+  /**
+   * La confirmación de sacar el PDF por un enlace de Drive hacia esa persona de otra
+   * organización (ADR 0057): el `confirm` de los detalles del 409.
+   */
+  confirm?: string;
+  /** A los cuántos días caduca (0 o sin él, nunca). */
+  caducaDias?: number;
+  /** Cada cuántos días se le recuerda a quien tiene el turno (0 o sin él, nunca). */
+  recordarDias?: number;
+}
+
+/**
+ * Las pedidas de un fichero, agrupadas: cada cadena junta y en su orden, cada suelta
+ * sola; lo más reciente antes. Una cadena se reconoce por su primera persona, que es la
+ * de la ruta original (las siguientes cambian de ruta al firmar la anterior).
+ */
+export function pedidasDe(sent: PeticionFirma[], path: string): PeticionFirma[][] {
+  const cadenas = new Map<string, PeticionFirma[]>();
+  for (const p of sent) {
+    if (!p.chain) continue;
+    const c = cadenas.get(p.chain) ?? [];
+    c.push(p);
+    cadenas.set(p.chain, c);
+  }
+  const grupos: PeticionFirma[][] = [];
+  for (const p of sent) {
+    if (!p.chain) {
+      if (p.path === path) grupos.push([p]);
+      continue;
+    }
+    const c = (cadenas.get(p.chain) ?? []).sort((a, b) => (a.step ?? 0) - (b.step ?? 0));
+    if ((c[0]?.step ?? 0) === 0 && c[0] === p && p.path === path) grupos.push(c);
+  }
+  return grupos.sort((a, b) => (b[0]?.created_at ?? '').localeCompare(a[0]?.created_at ?? ''));
 }
 
 export interface PeticionesFirma {
@@ -396,6 +445,86 @@ export function nombreDePeticion(p: PeticionFirma): string {
   return p.name ?? p.path.slice(p.path.lastIndexOf('/') + 1);
 }
 
+/** Los trazos de una rúbrica dibujada, en coordenadas del lienzo de Firmar (480×148). */
+export type Trazos = [number, number][][];
+
+/**
+ * La rúbrica que la persona pidió recordar («Recordar mi firma»), guardada cifrada
+ * en su cuenta (`/api/pdf-rubrica` → Sytue ID). Es una comodidad: si no se puede
+ * leer o guardar, se firma igual, así que nada de esto lanza.
+ */
+export const rubrica = {
+  /** La guardada, o null si no hay ninguna (o no se pudo saber). */
+  leer: async (): Promise<Trazos | null> => {
+    try {
+      const r = await fetch('/api/pdf-rubrica', { credentials: 'include' });
+      if (!r.ok) return null;
+      const cuerpo = (await r.json()) as { trazos?: unknown };
+      return Array.isArray(cuerpo.trazos) && cuerpo.trazos.length > 0
+        ? (cuerpo.trazos as Trazos)
+        : null;
+    } catch {
+      return null;
+    }
+  },
+  /** Guarda (o sustituye) la rúbrica. true si quedó guardada. */
+  guardar: async (trazos: Trazos): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/pdf-rubrica', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ trazos: redondear(trazos) }),
+      });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  },
+  /** La olvida. true si ya no queda ninguna guardada. */
+  olvidar: async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/pdf-rubrica', { method: 'DELETE', credentials: 'include' });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+/**
+ * Una décima de punto del lienzo basta para que el trazo sea el mismo, y el JSON
+ * que se cifra y guarda ocupa la mitad. Se acota al lienzo: un puntero capturado
+ * puede salirse un poco del recuadro y el servicio rechaza lo que cae fuera.
+ */
+export function redondear(trazos: Trazos): Trazos {
+  const en = (v: number, max: number) => Math.round(Math.min(max, Math.max(0, v)) * 10) / 10;
+  return trazos
+    .filter((t) => t.length > 0)
+    .map((t) => t.map(([x, y]) => [en(x, 480), en(y, 148)] as [number, number]));
+}
+
+/**
+ * Las versiones del PDF en Drive (`/api/pdf-versiones`). Cada cambio guardado deja
+ * la anterior como versión, y restaurar no borra nada: la actual pasa a ser una más.
+ */
+export const versiones = {
+  /** Una página del historial, la actual primero. */
+  listar: async (path: string, cursor?: string): Promise<FileVersionPage> => {
+    const q = new URLSearchParams({ path });
+    if (cursor) q.set('cursor', cursor);
+    const r = await fetch(`/api/pdf-versiones?${q}`, { credentials: 'include' });
+    if (!r.ok) throw new ErrorPDF(`HTTP ${r.status}`, undefined, r.status);
+    return (await r.json()) as FileVersionPage;
+  },
+  /** Hace actual esa versión. Lanza `ErrorPDF` con el estado (403: solo lectura). */
+  restaurar: (path: string, version: number) =>
+    pedir<{ ok: boolean }>('/api/pdf-versiones', { path, version }),
+  /** Dónde se ve una versión archivada, SIN el prefijo de la app (lo pone `r()`). */
+  rutaDeVersion: (path: string, version: number): string =>
+    `/api/pdf-versiones?${new URLSearchParams({ path, version: String(version) })}`,
+};
+
 export const firmas = {
   listar: async (): Promise<PeticionesFirma> => {
     const r = await fetch('/api/pdf-firmas');
@@ -403,11 +532,20 @@ export const firmas = {
     return (await r.json()) as PeticionesFirma;
   },
   /**
-   * `confirm`: la confirmación de sacar el PDF por un enlace de Drive hacia esa persona
-   * de otra organización (ADR 0057): el `confirm` de los detalles del 409.
+   * Pide firmar `path` a `firmantes`: con una persona, una petición; con varias, una
+   * cadena en ese orden. El servicio contesta 409 con quién confirmar si la única
+   * persona es de otra organización (ver {@link OpcionesPedirFirma.confirm}).
    */
-  pedir: (path: string, email: string, mensaje: string, confirm = '') =>
-    pedir<PeticionFirma>('/api/pdf-firmas', { op: 'pedir', path, email, mensaje, confirm }),
+  pedir: (path: string, firmantes: string[], mensaje: string, o: OpcionesPedirFirma = {}) =>
+    pedir<unknown>('/api/pdf-firmas', {
+      op: 'pedir',
+      path,
+      firmantes,
+      mensaje,
+      confirm: o.confirm ?? '',
+      caducaDias: o.caducaDias ?? 0,
+      recordarDias: o.recordarDias ?? 0,
+    }),
   /** De fuera: trae el PDF a mi unidad y devuelve la petición con su `path`. */
   abrir: (id: string) => pedir<PeticionFirma>('/api/pdf-firmas', { op: 'abrir', id }),
   /** De fuera: trae la copia firmada a mi unidad. */
@@ -673,4 +811,40 @@ export function textoParaLeer(frags: Fragmento[]): string {
     )
     .filter((l) => l !== '')
     .join('. ');
+}
+
+/**
+ * Si este documento se puede imprimir. Es `puedeAnotar` de la cinta con el permiso de
+ * imprimir —y `puedeImprimir` de la app nativa—: abierto con la contraseña del dueño no
+ * hay restricción ninguna, así que el permiso solo manda cuando NO se tiene esa clave.
+ */
+export function puedeImprimir(p: Permisos): boolean {
+  return p.Imprimir || !p.SoloConClaveDeDueno;
+}
+
+/**
+ * Los rangos («5-8») que hay que pedir al motor para tener dibujadas de la 1 a la
+ * `hasta`, en tramos de como mucho `lote` páginas.
+ *
+ * Imprimir necesita TODAS las hojas, y en pantalla solo están las que se han visto: la
+ * carga va por lotes según se llega a ellas. Se agrupan las seguidas que faltan para no
+ * subir el fichero una vez por página, y un hueco corta el tramo para no volver a pedir
+ * lo que ya se tiene.
+ */
+export function rangosQueFaltan(
+  dibujadas: Record<number, string>,
+  hasta: number,
+  lote: number,
+): [number, number][] {
+  const out: [number, number][] = [];
+  let desde = 0;
+  for (let n = 1; n <= hasta + 1; n++) {
+    const falta = n <= hasta && dibujadas[n] === undefined;
+    if (falta && desde === 0) desde = n;
+    if (desde !== 0 && (!falta || n - desde === lote)) {
+      out.push([desde, n - 1]);
+      desde = falta ? n : 0;
+    }
+  }
+  return out;
 }

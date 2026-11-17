@@ -19,18 +19,20 @@ import type { JSX } from 'preact';
 import { driveFolderUrl, orgActual } from '@sytue/config';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
-  MASCARA_SCROLL_X,
-  Button,
-  Icon,
-  usePointerDrag,
-  IconButton,
-  Spinner,
-  cx,
-  useScrollRestante,
   atajoDelSistema,
+  Button,
+  cx,
+  Icon,
+  IconButton,
+  InlineHelp,
+  MASCARA_SCROLL_X,
+  Spinner,
+  usePointerDrag,
+  useScrollRestante,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import {
+  ErrorDeFotos,
   foto as pedirFoto,
   guardarReceta,
   obtenerReceta,
@@ -43,8 +45,10 @@ import {
   obtenerFondoLienzo,
   guardarFondoLienzo,
   estilosFondoLienzo,
+  FONDOS_DISPONIBLES,
   type FondoLienzo,
 } from '../lib/fondoLienzo.js';
+import { MuestraFondo } from './MuestraFondo.js';
 
 /** Rótulo de cada proporción; el texto es el mismo en los cinco idiomas. */
 const ETIQUETA_PROPORCION: Record<string, string> = {
@@ -54,6 +58,7 @@ const ETIQUETA_PROPORCION: Record<string, string> = {
   [String(16 / 9)]: '16:9',
 };
 import { useT } from '../i18n/index.js';
+import { FalloDeCarga } from './Fallo.js';
 import {
   RANGOS,
   huella,
@@ -120,6 +125,9 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
   const [guardada, setGuardada] = useState<Receta>(recetaVacia());
   const [estado, setEstado] = useState<'cargando' | 'lista' | 'guardando'>('cargando');
   const [aviso, setAviso] = useState('');
+  // La foto que no llegó a cargarse: ocupa el lienzo con su salida.
+  const [fallo, setFallo] = useState<unknown>(null);
+  const [vuelta, setVuelta] = useState(0);
   const bitmap = useRef<ImageBitmap | null>(null);
   const fuente = useRef<HTMLCanvasElement | null>(null);
   const lienzo = useRef<HTMLCanvasElement | null>(null);
@@ -229,6 +237,7 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
   // 1. Foto, receta guardada y previa, en paralelo.
   useEffect(() => {
     let viva = true;
+    setFallo(null);
     (async () => {
       // LA PREVIA DEL ORIGINAL, y no la de la receta vigente.
       //
@@ -244,7 +253,7 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
         pedirFoto(id),
         obtenerReceta(id),
         fetch(urlDeVarianteCon(id, 'previa', original), { credentials: 'include' }).then((res) => {
-          if (!res.ok) throw new Error(`previa ${res.status}`);
+          if (!res.ok) throw new ErrorDeFotos(res.status);
           return res.blob();
         }),
       ]);
@@ -255,16 +264,16 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
       setReceta(r.recipe);
       setGuardada(r.recipe);
       setEstado('lista');
-    })().catch(() => viva && setAviso(t('editor.saveFailed')));
+    })().catch((e: unknown) => {
+      // Decía «no se pudo guardar la edición» cuando lo que no había llegado era
+      // la foto, y se quedaba girando para siempre.
+      if (viva) setFallo(e);
+    });
     return () => {
       viva = false;
       bitmap.current?.close();
     };
-    // `t` queda fuera a propósito: esto carga la foto, y meterlo en las
-    // dependencias volvería a descargarla entera al cambiar de idioma. Solo se
-    // usa para el texto de un aviso de error.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, vuelta]);
 
   // 2. La fuente (geometría) se rehace solo cuando cambian los pasos de geometría.
   const claveGeometria = useMemo(
@@ -492,7 +501,16 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
       <div class="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* El lienzo ocupa lo que quede; la imagen se ajusta dentro sin deformarse. */}
         <div class="bg-bg-subtle relative flex min-h-0 flex-1 items-center justify-center p-3 max-md:min-h-[40dvh]">
-          {estado === 'cargando' ? <Spinner label={t('editor.loading')} /> : null}
+          {fallo !== null ? (
+            <FalloDeCarga
+              locale={locale}
+              fallo={fallo}
+              alReintentar={() => setVuelta((v) => v + 1)}
+              class="flex-1 self-stretch"
+            />
+          ) : estado === 'cargando' ? (
+            <Spinner label={t('editor.loading')} />
+          ) : null}
           {/* El contenedor mide EXACTAMENTE lo que el lienzo (inline-block +
               relative), así la capa de recorte y el lienzo comparten geometría. */}
           <div
@@ -715,7 +733,7 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
                   role="group"
                   aria-label={t('editor.canvasBackground')}
                 >
-                  {(['crema', 'blanco', 'oscuro', 'damero'] as const).map((opcion) => (
+                  {FONDOS_DISPONIBLES.map((opcion) => (
                     <button
                       key={opcion}
                       type="button"
@@ -728,16 +746,7 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
                           : 'border-border text-text hover:bg-bg-subtle',
                       )}
                     >
-                      <span
-                        class={cx(
-                          'h-3.5 w-3.5 shrink-0 rounded-full border',
-                          opcion === 'crema' && 'border-[#d8d3c6] bg-[#faf9f6]',
-                          opcion === 'blanco' && 'border-gray-300 bg-white',
-                          opcion === 'oscuro' && 'border-gray-700 bg-[#131619]',
-                          opcion === 'damero' &&
-                            'border-gray-300 bg-white bg-[repeating-conic-gradient(#cbd5e1_0%_25%,transparent_0%_50%)] bg-[length:6px_6px]',
-                        )}
-                      />
+                      <MuestraFondo fondo={opcion} tamanyo="md" />
                       <span class="truncate">{t(`editor.bg_${opcion}`)}</span>
                     </button>
                   ))}
@@ -808,13 +817,7 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
               ) : null}
 
               {/* Mensaje de error si falla */}
-              {aiError ? (
-                // La pareja de error de la suite (`danger-text` sobre `danger-bg`): el rojo
-                // de relleno sobre su velo al 10 % medía 4,42:1 en claro y 2,96 en oscuro.
-                <p role="alert" class="text-danger-text bg-danger-bg rounded-sm p-2 text-xs">
-                  {aiError}
-                </p>
-              ) : null}
+              {aiError ? <InlineHelp tone="danger">{aiError}</InlineHelp> : null}
 
               {/* Tarjeta de resultado con explicación de la IA */}
               {aiResultado ? (

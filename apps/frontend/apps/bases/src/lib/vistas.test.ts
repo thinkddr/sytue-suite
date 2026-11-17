@@ -1,12 +1,15 @@
 // El tablero reparte sin perder registros y el borrador de una vista solo se envía si
 // está completo. Ejecutar: `bun test`.
 import { expect, test } from 'bun:test';
-import type { BasesField, BasesRecord } from '@sytue/api-clients/bases';
+import type { BasesAttachment, BasesField, BasesRecord, BasesView } from '@sytue/api-clients/bases';
 import {
   SIN_VALOR,
+  borradorDeVista,
   camposDeFormulario,
   columnasDeTablero,
   configDeBorrador,
+  datosDeColumna,
+  portadaDe,
   type BorradorVista,
 } from './vistas.js';
 
@@ -39,6 +42,12 @@ test('el tablero tiene una columna por opción y una de «sin valor» al final',
   ]);
   expect(cols.map((c) => c.valor)).toEqual(['nuevo', 'hecho', SIN_VALOR]);
   expect(cols.map((c) => c.registros.map((r) => r.id))).toEqual([['3'], ['1'], ['2']]);
+});
+
+test('una tarjeta añadida al pie de una columna nace con el valor de esa columna', () => {
+  expect(datosDeColumna(sel, 'hecho')).toEqual({ s: 'hecho' });
+  // La de «sin valor» nace vacía: no se escribe una cadena vacía en un campo de selección.
+  expect(datosDeColumna(sel, SIN_VALOR)).toEqual({});
 });
 
 test('un valor que ya no es una opción cae en «sin valor»: ningún registro se pierde', () => {
@@ -100,4 +109,133 @@ test('configDeBorrador: kanban pide campo, formulario pide campos, filtro pide v
     sort: [{ field: 'n', dir: 'desc' }],
   });
   expect(configDeBorrador(base, [num])).toEqual({});
+});
+
+const vista = (kind: BasesView['kind'], config: BasesView['config']): BasesView => ({
+  id: 'v',
+  table_id: 't',
+  name: 'Mía',
+  kind,
+  config,
+  created_by: 'ana',
+});
+
+test('editar una vista: el borrador de lo guardado vuelve a dar lo guardado', () => {
+  const casilla: BasesField = {
+    id: 'c',
+    table_id: 't',
+    name: 'Hecho',
+    kind: 'checkbox',
+    position: 2,
+  };
+  for (const cfg of [
+    {
+      filters: [{ field: 'n', op: 'gte', value: 10.5 }],
+      sort: [{ field: 'n', dir: 'desc' as const }],
+    },
+    { filters: [{ field: 'c', op: 'eq', value: false }] },
+    { filters: [{ field: 's', op: 'empty' }] },
+    {},
+  ]) {
+    const b = borradorDeVista(vista('grid', cfg), [sel, num, casilla]);
+    expect(b.nombre).toBe('Mía');
+    expect(configDeBorrador(b, [sel, num, casilla])).toEqual(cfg);
+  }
+  const k = borradorDeVista(vista('kanban', { group_by: 's' }), [num, sel]);
+  expect(configDeBorrador(k, [num, sel])).toEqual({ group_by: 's' });
+});
+
+test('editar una vista no pierde los filtros y órdenes que el diálogo no enseña', () => {
+  const cfg: BasesView['config'] = {
+    filters: [
+      { field: 'n', op: 'gt', value: 1 },
+      { field: 's', op: 'eq', value: 'hecho' },
+      { field: 'borrado', op: 'empty' },
+    ],
+    sort: [
+      { field: 's', dir: 'asc' },
+      { field: 'n', dir: 'desc' },
+    ],
+  };
+  const b = borradorDeVista(vista('grid', cfg), [sel, num]);
+  expect(b.filtroCampo).toBe('n');
+  expect(b.ordenCampo).toBe('s');
+  // Se cambia el primer filtro; lo demás sigue, salvo lo del campo que ya no existe.
+  expect(configDeBorrador({ ...b, filtroValor: '5' }, [sel, num])).toEqual({
+    filters: [
+      { field: 'n', op: 'gt', value: 5 },
+      { field: 's', op: 'eq', value: 'hecho' },
+    ],
+    sort: [
+      { field: 's', dir: 'asc' },
+      { field: 'n', dir: 'desc' },
+    ],
+  });
+});
+
+test('un formulario guardado sin lista de campos se abre con todos los que admite marcados', () => {
+  const b = borradorDeVista(vista('form', {}), [sel, num]);
+  expect(b.campos).toEqual(['s', 'n']);
+  expect(configDeBorrador(b, [sel, num])).toEqual({ fields: ['s', 'n'] });
+  expect(borradorDeVista(vista('form', { fields: ['n'] }), [sel, num]).campos).toEqual(['n']);
+});
+
+const adjunto = (id: string, mime: string, has_thumb: boolean): BasesAttachment => ({
+  id,
+  record_id: 'r',
+  field_id: '',
+  name: id,
+  mime,
+  size: 1,
+  has_thumb,
+  created_by: '',
+  created_at: '',
+});
+
+test('la portada de la galería es la primera imagen con miniatura, por orden de campos', () => {
+  const docs: BasesField = {
+    id: 'd',
+    table_id: 't',
+    name: 'Docs',
+    kind: 'attachment',
+    position: 2,
+  };
+  const fotos: BasesField = {
+    id: 'f',
+    table_id: 't',
+    name: 'Fotos',
+    kind: 'attachment',
+    position: 3,
+  };
+  const r = {
+    ...reg('r', {}),
+    attachments: {
+      // Un PDF (aunque tuviera miniatura) y una imagen sin miniatura no son portada.
+      d: [adjunto('pdf', 'application/pdf', true), adjunto('grande', 'image/png', false)],
+      f: [adjunto('a', 'image/jpeg', true), adjunto('b', 'image/png', true)],
+    },
+  };
+  expect(portadaDe([num, docs, fotos], r)?.id).toBe('a');
+  // El orden es el de los campos, no el del mapa de adjuntos.
+  const r2 = { ...r, attachments: { f: r.attachments.f, d: [adjunto('c', 'image/gif', true)] } };
+  expect(portadaDe([num, docs, fotos], r2)?.id).toBe('c');
+  expect(portadaDe([num, docs, fotos], reg('vacío', {}))).toBeNull();
+});
+
+test('una galería se guarda como la rejilla: filtro y orden, sin agrupar', () => {
+  const b: BorradorVista = {
+    nombre: 'Fotos',
+    tipo: 'gallery',
+    agrupar: 's',
+    campos: [],
+    filtroCampo: 'n',
+    filtroOp: 'gt',
+    filtroValor: '3',
+    ordenCampo: 'n',
+    ordenDir: 'desc',
+  };
+  expect(configDeBorrador(b, [sel, num])).toEqual({
+    filters: [{ field: 'n', op: 'gt', value: 3 }],
+    sort: [{ field: 'n', dir: 'desc' }],
+  });
 });

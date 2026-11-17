@@ -22,26 +22,42 @@ import {
   Icon,
   SectionHeader,
   cx,
-  Illustration,
   Checkbox,
+  Resaltado,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
-import { senderLogoUrl, type Label } from '../client/mailApi.js';
+import { senderLogoUrl, type Label, type SwipeAction } from '../client/mailApi.js';
+import type { AccionDeslizar } from '@sytue/ui';
 import {
   FILTROS_RAPIDOS,
   displayName,
   fullDate,
   shortDate,
   conversationLabels,
+  fechaDeOrden,
   labelDot,
   type Conversation,
   type FiltroRapido,
 } from './utils.js';
 import { Glyph } from './glyphs.js';
 import { BatchActionBar } from './BatchActionBar.js';
+import { PanelOpcionesBusqueda } from './PanelOpcionesBusqueda.js';
+
+/**
+ * Lo que hace deslizar una fila con el dedo hacia un lado (Ajustes → Lectura). El
+ * padre lo da ya resuelto: null si en esta vista esa acción no existe (no se archiva
+ * desde Archivo) o la cuenta eligió «nada».
+ */
+export interface GestoDeFila {
+  accion: Exclude<SwipeAction, 'none'>;
+  hacer: (conv: Conversation) => void;
+}
 
 interface Props {
+  /** Deslizar a la derecha / a la izquierda en el móvil (por defecto archivar / papelera). */
+  gestoDerecha?: GestoDeFila | null;
+  gestoIzquierda?: GestoDeFila | null;
   /** Oculta cualquier acción que necesite confirmar estado en el servidor. */
   readOnly?: boolean;
   /** La franja de solo lectura del buzón compartido, bajo la cabecera. */
@@ -65,6 +81,8 @@ interface Props {
   mailboxName: string;
   /** «Vaciar carpeta» (papelera y spam): borra definitivamente todo lo que hay. */
   onEmptyFolder?: (() => void) | null | undefined;
+  /** «Marcar todo como leído» de la carpeta entera; el padre lo da solo si hay no leídos. */
+  onMarkAllRead?: (() => void) | null | undefined;
   /** Texto de búsqueda (controlado por el padre). */
   query: string;
   /** Se están mostrando resultados de búsqueda, no la carpeta. */
@@ -93,6 +111,11 @@ interface Props {
   enSpam?: boolean;
   /** Registro de etiquetas de la cuenta, para pintar los chips de cada fila. */
   labels: Label[];
+  /**
+   * En «Pospuestos»: hasta cuándo está pospuesto cada hilo (threadId → ISO). La fila
+   * enseña entonces cuándo VUELVE en lugar de cuándo llegó.
+   */
+  pospuestos?: Map<string, string> | null | undefined;
   // ---- Multiselección + acciones en lote ----
   /** threadIds seleccionados (para checkbox por fila y barra de lote). */
   selected: Set<string>;
@@ -172,7 +195,42 @@ function RowAction({
   );
 }
 
+/** La franja que se descubre al deslizar: rótulo, icono y color de la acción. */
+function accionDeslizar(
+  t: ReturnType<typeof useT>,
+  gesto: GestoDeFila | null | undefined,
+  conv: Conversation,
+): AccionDeslizar | null {
+  if (!gesto) return null;
+  const alSoltar = () => gesto.hacer(conv);
+  switch (gesto.accion) {
+    case 'archive':
+      return {
+        etiqueta: t('action.archive'),
+        icono: <Glyph name="archive" size={18} />,
+        tono: 'success',
+        alSoltar,
+      };
+    case 'trash':
+      return {
+        etiqueta: t('action.trash'),
+        icono: <Glyph name="trash" size={18} />,
+        tono: 'danger',
+        alSoltar,
+      };
+    case 'read':
+      return {
+        etiqueta: conv.unread ? t('action.markRead') : t('action.markUnread'),
+        icono: <Glyph name={conv.unread ? 'read' : 'unread'} size={18} />,
+        tono: 'info',
+        alSoltar,
+      };
+  }
+}
+
 export function MessageList({
+  gestoDerecha = null,
+  gestoIzquierda = null,
   readOnly = false,
   franja = null,
   locale,
@@ -185,6 +243,7 @@ export function MessageList({
   selectedThreadId,
   mailboxName,
   onEmptyFolder,
+  onMarkAllRead,
   query,
   searchMode,
   hasMore,
@@ -213,11 +272,15 @@ export function MessageList({
   onBatchRead,
   onBatchUnread,
   onBatchLabel,
+  pospuestos = null,
 }: Props): JSX.Element {
   const t = useT(locale);
   const unreadCount = conversations.reduce((n, c) => (c.unread ? n + 1 : n), 0);
   const name = mailboxName || t('list.fallbackName');
   const heading = searchMode ? t('list.searchResults') : name;
+  // Lo buscado se marca en los resultados, como en Notes; fuera de la búsqueda la
+  // caja puede tener texto a medio teclear que todavía no ha filtrado nada.
+  const resalte = searchMode ? query : '';
   const count = conversations.length;
 
   // Selección: cuántas de las conversaciones VISIBLES están seleccionadas (ignora
@@ -279,6 +342,13 @@ export function MessageList({
                       ? t('list.unreadCount', { count: unreadCount })
                       : t('list.conversationCount', { count })}
                 </span>
+                {onMarkAllRead && !searchMode ? (
+                  <Button size="sm" variant="ghost" onClick={onMarkAllRead}>
+                    <span class="inline-flex items-center gap-1.5">
+                      <Glyph name="read" size={14} /> {t('list.markAllRead')}
+                    </span>
+                  </Button>
+                ) : null}
                 {/* Solo donde borrar es definitivo (papelera, spam): el padre decide. */}
                 {onEmptyFolder && !searchMode ? (
                   <Button size="sm" variant="ghost" onClick={onEmptyFolder}>
@@ -310,6 +380,9 @@ export function MessageList({
             title={t('list.searchHint')}
             leadingIcon={<Icon name="search" size={16} />}
           />
+          {/* Los operadores en lenguaje llano. Antes de «Limpiar» para no cambiar de
+              sitio cuando este aparece al escribir. */}
+          <PanelOpcionesBusqueda locale={locale} query={query} onBuscar={onQueryChange} />
           {query ? (
             <Button
               type="button"
@@ -323,11 +396,14 @@ export function MessageList({
           ) : null}
         </form>
         {/* Filtros rápidos: conmutadores (`aria-pressed`), uno a la vez; pulsar el
-            activo vuelve a «todas». Filtran lo ya cargado, sin otra consulta. */}
+            activo vuelve a «todas». Filtran lo ya cargado, sin otra consulta.
+            `flex-wrap`: en alemán («Mit Anhängen», «Ungelesen»…) no caben en la
+            columna estrecha de la lista de una tableta, y el panel los recortaba
+            sin forma de llegar al último (barrido móvil de producción, iPad Mini). */}
         <div
           role="group"
           aria-label={t('filter.group')}
-          class="border-border flex items-center gap-1 border-b px-4 py-1.5"
+          class="border-border flex flex-wrap items-center gap-1 border-b px-4 py-1.5"
         >
           {FILTROS_RAPIDOS.filter((f) => f !== 'todas').map((f) => {
             const activo = filtro === f;
@@ -423,7 +499,8 @@ export function MessageList({
             class="h-full"
             title={t('list.errorTitle')}
             description={t('list.errorDescription')}
-            illustration={<Illustration name="errorRetry" />}
+            tone="error"
+            spot="errorRetry"
             action={
               <Button variant="secondary" size="sm" onClick={onRetry}>
                 {t('common.retry')}
@@ -436,7 +513,7 @@ export function MessageList({
               class="h-full"
               title={t('filter.emptyTitle')}
               description={t('filter.emptyDescription')}
-              illustration={<Illustration name="emptyMail" />}
+              spot="emptyMail"
               action={
                 onMasFiltro ? (
                   <Button variant="secondary" size="sm" onClick={onMasFiltro}>
@@ -454,14 +531,14 @@ export function MessageList({
               class="h-full"
               title={t('list.emptySearchTitle', { query: query.trim() })}
               description={t('list.emptySearchDescription')}
-              illustration={<Illustration name="emptyMail" />}
+              spot="emptyMail"
             />
           ) : (
             <EmptyState
               class="h-full"
               title={t('list.emptyTitle', { folder: name })}
               description={t('list.emptyDescription')}
-              illustration={<Illustration name="emptyMail" />}
+              spot="emptyMail"
               action={
                 <Button
                   variant="primary"
@@ -479,6 +556,11 @@ export function MessageList({
             <List id={CONVERSATION_LIST_ID} selectable label={t('list.region', { folder: name })}>
               {conversations.map((conv, index) => {
                 const email = conv.latest;
+                const vuelve = pospuestos?.get(conv.threadId);
+                // Lo vuelto de «Pospuestos» está arriba por su hora de vuelta: es la
+                // que se enseña, con el reloj, como la etiqueta «Pospuesto» de Gmail.
+                const volvio = vuelve ? undefined : email.unsnoozedAt;
+                const fecha = fechaDeOrden(email);
                 const unread = conv.unread;
                 const sender = displayName(t, email.from);
                 const subject = email.subject || t('common.noSubject');
@@ -503,6 +585,12 @@ export function MessageList({
                     unread={unread}
                     onClick={() => onSelect(conv)}
                     onLongPress={() => onToggleSelect(conv.threadId, index, false)}
+                    // Con la selección en marcha, deslizar no actúa: el dedo está
+                    // marcando filas, y archivar una por el camino sería un susto.
+                    deslizarDerecha={selectionActive ? null : accionDeslizar(t, gestoDerecha, conv)}
+                    deslizarIzquierda={
+                      selectionActive ? null : accionDeslizar(t, gestoIzquierda, conv)
+                    }
                     onKeyDown={(e: KeyboardEvent) => {
                       // Teclas sobre los botones de acción de la fila: no seleccionar.
                       if (e.target !== e.currentTarget) return;
@@ -587,7 +675,7 @@ export function MessageList({
                           )}
                           title={sender}
                         >
-                          {sender}
+                          <Resaltado texto={sender} consulta={resalte} />
                         </span>
                         {/* Cuenta el hilo ENTERO, que es lo que abre el lector: el
                             listado trae `thread_count` agregado en su propia
@@ -599,6 +687,20 @@ export function MessageList({
                             title={t('list.messagesInThread', { count: conv.total })}
                           >
                             {conv.total}
+                          </span>
+                        ) : null}
+                        {/* La flecha de «respondido», discreta, como en Apple Mail: el
+                            hilo ya tiene contestación y no hace falta abrirlo para
+                            saberlo. Es la marca `\Answered` de IMAP, la misma que
+                            enseñan Thunderbird o el iPhone. */}
+                        {conv.answered ? (
+                          <span
+                            class="text-text-subtle shrink-0"
+                            title={t('list.answered')}
+                            role="img"
+                            aria-label={t('list.answered')}
+                          >
+                            <Glyph name="reply" size={14} />
                           </span>
                         ) : null}
                         {conv.flagged ? (
@@ -618,16 +720,49 @@ export function MessageList({
                         {/* La fecha va en la línea del remitente, a la derecha, como
                             en cualquier cliente de móvil: antes era una columna
                             propia que robaba ancho a las tres líneas de texto. */}
-                        <time
-                          class={cx(
-                            'sytue-meta ml-auto shrink-0 pl-2 whitespace-nowrap tabular-nums',
-                            unread ? 'text-primary-text font-bold' : 'text-text-subtle font-normal',
-                          )}
-                          dateTime={email.receivedAt}
-                          title={fullDate(locale, email.receivedAt)}
-                        >
-                          {shortDate(locale, email.receivedAt)}
-                        </time>
+                        {vuelve ? (
+                          // Pospuesto: cuándo vuelve, con el reloj de «Posponer» para
+                          // que no se lea como la fecha de llegada.
+                          <time
+                            class="sytue-meta text-primary-text ml-auto inline-flex shrink-0 items-center gap-1 pl-2 whitespace-nowrap tabular-nums"
+                            dateTime={vuelve}
+                            title={t('snooze.done', { date: fullDate(locale, vuelve) })}
+                          >
+                            <Glyph name="clock" size={14} />
+                            <span aria-hidden="true">{shortDate(locale, vuelve)}</span>
+                            <span class="sr-only">
+                              {t('snooze.done', { date: fullDate(locale, vuelve) })}
+                            </span>
+                          </time>
+                        ) : (
+                          <time
+                            class={cx(
+                              'sytue-meta ml-auto shrink-0 pl-2 whitespace-nowrap tabular-nums',
+                              volvio && 'inline-flex items-center gap-1',
+                              unread
+                                ? 'text-primary-text font-bold'
+                                : 'text-text-subtle font-normal',
+                            )}
+                            dateTime={fecha}
+                            title={
+                              volvio
+                                ? t('snooze.returned', { date: fullDate(locale, volvio) })
+                                : fullDate(locale, fecha)
+                            }
+                          >
+                            {volvio ? (
+                              <>
+                                <Glyph name="clock" size={14} />
+                                <span aria-hidden="true">{shortDate(locale, fecha)}</span>
+                                <span class="sr-only">
+                                  {t('snooze.returned', { date: fullDate(locale, volvio) })}
+                                </span>
+                              </>
+                            ) : (
+                              shortDate(locale, fecha)
+                            )}
+                          </time>
+                        )}
                       </span>
                     }
                     subtitle={
@@ -642,7 +777,7 @@ export function MessageList({
                             )}
                             title={subject}
                           >
-                            {subject}
+                            <Resaltado texto={subject} consulta={resalte} />
                           </span>
                           {/* Un CLIP, no un Badge de texto: el Badge era el elemento
                               de más peso de la fila, gastado en el dato menos
@@ -675,7 +810,11 @@ export function MessageList({
                             táctil), sin scrollbar que ensucie el reveal. */}
                         <span class="relative flex h-6 min-h-[24px] w-full min-w-0 items-center">
                           <span class="text-text-subtle min-w-0 flex-1 truncate font-normal transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0">
-                            {email.preview || t('list.noPreview')}
+                            {email.preview ? (
+                              <Resaltado texto={email.preview} consulta={resalte} />
+                            ) : (
+                              t('list.noPreview')
+                            )}
                           </span>
                           {!readOnly ? (
                             <span

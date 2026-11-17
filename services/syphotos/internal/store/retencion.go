@@ -32,11 +32,12 @@ func (s *Store) PurgeExpiredTrash(ctx context.Context, retention time.Duration) 
 	var out []Purgada
 	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT a.id, a.tenant, coalesce(e.fingerprint, '')
+			SELECT a.id, a.tenant, a.owner_sub, coalesce(e.fingerprint, '')
 			  FROM assets a
 			  LEFT JOIN edits e
 			    ON e.tenant = a.tenant AND e.asset_id = a.id AND e.owner_sub = a.owner_sub
 			 WHERE a.deleted_at IS NOT NULL AND a.deleted_at < $1
+			 AND NOT public.sytue_private_storage_frozen('public.photos_private_storage_states'::regclass,a.tenant,a.owner_sub)
 			 -- El tope por vuelta acota lo que una purga tiene bloqueado a la
 			 -- vez. Lo que sobre se recoge en la siguiente, dentro de una hora.
 			 LIMIT 5000`, corte)
@@ -47,7 +48,7 @@ func (s *Store) PurgeExpiredTrash(ctx context.Context, retention time.Duration) 
 		out = out[:0]
 		for rows.Next() {
 			var p Purgada
-			if err := rows.Scan(&p.ID, &p.Tenant, &p.Huella); err != nil {
+			if err := rows.Scan(&p.ID, &p.Tenant, &p.Owner, &p.Huella); err != nil {
 				return err
 			}
 			out = append(out, p)

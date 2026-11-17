@@ -123,7 +123,19 @@ type estrellaFila struct {
 	Activo bool
 	// FilaEncima es el `group-hover` de la fila y el `pointer-coarse` de un teléfono.
 	FilaEncima bool
+	// fueraDelRecorrido es el `tabIndex={-1}` de la estrella en una fila que no es la
+	// del cursor: el tabulador se la salta y el puntero la sigue pulsando.
+	fueraDelRecorrido bool
 }
+
+var _ fyne.Disableable = (*estrellaFila)(nil)
+
+// Disabled saca la estrella del recorrido del tabulador (ver fueraDelRecorrido).
+func (b *estrellaFila) Disabled() bool { return b.Inerte || b.fueraDelRecorrido }
+
+// Disable y Enable completan `fyne.Disableable` con el `Inerte` de siempre.
+func (b *estrellaFila) Disable() { b.Inerte = true; b.Refresh() }
+func (b *estrellaFila) Enable()  { b.Inerte = false; b.Refresh() }
 
 func nuevaEstrellaFila() *estrellaFila {
 	b := &estrellaFila{}

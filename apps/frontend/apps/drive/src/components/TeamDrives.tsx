@@ -37,15 +37,18 @@ import {
   SettingsShell,
   SettingsSection,
   Skeleton,
+  SkeletonRows,
   useToast,
   cx,
-  Illustration,
   withBase,
+  Migas,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useI18n } from '@sytue/i18n/preact';
 import { useT, type T, type DriveMessageKey } from '../i18n';
 import { Glyph } from './glyphs';
+import { SelectorOrden, useOrdenRecordado } from './SelectorOrden';
+import { parametrosDeOrden, type Orden } from '../lib/orden';
 import { formatBytes } from '@sytue/ui';
 import { PreviewDialog, previewKind } from './FileBrowser';
 import type { DriveResource } from '@sytue/api-clients';
@@ -108,10 +111,17 @@ const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id, archived }),
     }),
-  children: (id: string, folder?: string, cursor?: string) => {
+  // El orden lo aplica el servicio (keyset por columna) y va también con el cursor: el
+  // cursor lleva su orden y seguirlo con otro es un 400.
+  children: (id: string, folder?: string, cursor?: string, orden?: Orden) => {
     const qs = new URLSearchParams({ id });
     if (folder) qs.set('folder', folder);
     if (cursor) qs.set('cursor', cursor);
+    const p = orden ? parametrosDeOrden(orden) : null;
+    if (p) {
+      qs.set('orden', p.orden);
+      qs.set('sentido', p.sentido);
+    }
     return bffJson<{ role: Role; canWrite: boolean; items: TeamNode[]; nextCursor?: string }>(
       `/api/team-drive-content?${qs.toString()}`,
     );
@@ -336,7 +346,7 @@ export function TeamDrivesView() {
             <EmptyState
               title={t(error === 'session' ? 'team.error.sessionTitle' : 'team.error.listTitle')}
               description={t(error === 'session' ? 'team.error.sessionBody' : 'team.error.network')}
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'session' ? (
                   <Button size="sm" onClick={() => location.reload()}>
@@ -353,7 +363,7 @@ export function TeamDrivesView() {
             <EmptyState
               title={t('team.empty.title')}
               description={t('team.empty.body')}
-              illustration={<Illustration name="emptyDrive" />}
+              spot="emptyDrive"
               action={
                 <Button
                   size="sm"
@@ -460,6 +470,8 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
   const isManager = role === 'manager';
   const currentFolder = stack.length > 0 ? stack[stack.length - 1]!.id : undefined;
   const epochRef = useRef(0);
+  // El mismo orden recordado que «Mi unidad»; cambiarlo vuelve a pedir la carpeta.
+  const { orden, ordenarPor, leido: ordenLeido } = useOrdenRecordado();
 
   const load = useCallback(
     async (folder?: string) => {
@@ -468,7 +480,7 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
       setNextCursor(null);
       setError(null);
       try {
-        const page = await api.children(drive.id, folder);
+        const page = await api.children(drive.id, folder, undefined, orden);
         if (epochRef.current !== e) return;
         setItems(page.items);
         setNextCursor(page.nextCursor ?? null);
@@ -482,19 +494,19 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
         );
       }
     },
-    [drive.id],
+    [drive.id, orden],
   );
 
   useEffect(() => {
-    void load(currentFolder);
-  }, [load, currentFolder]);
+    if (ordenLeido) void load(currentFolder);
+  }, [load, currentFolder, ordenLeido]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     const e = epochRef.current;
     try {
-      const page = await api.children(drive.id, currentFolder, nextCursor);
+      const page = await api.children(drive.id, currentFolder, nextCursor, orden);
       if (epochRef.current !== e) return;
       setItems((prev) => [...(prev ?? []), ...page.items]);
       setNextCursor(page.nextCursor ?? null);
@@ -503,7 +515,7 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
     } finally {
       setLoadingMore(false);
     }
-  }, [drive.id, currentFolder, nextCursor, loadingMore, toast, t]);
+  }, [drive.id, currentFolder, nextCursor, orden, loadingMore, toast, t]);
 
   const openFolder = (node: TeamNode) => setStack((s) => [...s, { id: node.id, name: node.name }]);
   const goToDepth = (depth: number) => setStack((s) => s.slice(0, depth));
@@ -650,50 +662,19 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
           <Icon name="chevronLeft" size={14} />
           {t('team.back')}
         </button>
-        <nav
-          aria-label={t('team.breadcrumb')}
-          class="flex min-w-0 grow flex-wrap items-center gap-0.5 text-base"
-        >
-          <Icon name="chevronRight" size={14} class="text-text/50 shrink-0" />
-          <button
-            type="button"
-            onClick={() => goToDepth(0)}
-            aria-current={stack.length === 0 ? 'page' : undefined}
-            title={name}
-            class={cx(
-              'hover:bg-surface-sunken sytue-focus-ring rounded-control max-w-[40vw] truncate px-2 py-1 transition-colors duration-150',
-              stack.length === 0
-                ? 'text-text font-semibold'
-                : 'text-text-muted hover:text-text font-medium',
-            )}
-          >
-            {name}
-          </button>
-          {stack.map((s, i) => {
-            const last = i === stack.length - 1;
-            return (
-              <span key={s.id} class="flex min-w-0 items-center gap-0.5">
-                <Icon name="chevronRight" size={14} class="text-text/50 shrink-0" />
-                <button
-                  type="button"
-                  onClick={() => goToDepth(i + 1)}
-                  aria-current={last ? 'page' : undefined}
-                  title={s.name}
-                  class={cx(
-                    'hover:bg-surface-sunken sytue-focus-ring rounded-control max-w-[40vw] truncate px-2 py-1 transition-colors duration-150',
-                    last
-                      ? 'text-text font-semibold'
-                      : 'text-text-muted hover:text-text font-medium',
-                  )}
-                >
-                  {s.name}
-                </button>
-              </span>
-            );
-          })}
-        </nav>
+        <Migas
+          label={t('team.breadcrumb')}
+          galonInicial
+          acotar="max-w-[40vw]"
+          migas={[
+            { clave: '', nombre: name, onIr: () => goToDepth(0) },
+            ...stack.map((s, i) => ({ clave: s.id, nombre: s.name, onIr: () => goToDepth(i + 1) })),
+          ]}
+          class="grow flex-wrap"
+        />
 
         <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+          <SelectorOrden orden={orden} onOrdenar={ordenarPor} t={t} />
           {archivedAt ? <ArchivedBadge t={t} /> : null}
           <RoleBadge role={role} t={t} />
           {writable ? (
@@ -770,7 +751,7 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
             <EmptyState
               title={t(error === 'denied' ? 'team.detail.deniedTitle' : 'team.detail.loadTitle')}
               description={t(error === 'denied' ? 'team.detail.deniedBody' : 'team.error.network')}
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'denied' ? (
                   <Button variant="secondary" size="sm" onClick={onBack}>
@@ -789,7 +770,7 @@ function TeamDriveDetail({ drive, onBack }: { drive: TeamDrive; onBack: () => vo
             <EmptyState
               title={t('team.folder.emptyTitle')}
               description={t(writable ? 'team.folder.emptyWritable' : 'team.folder.emptyReadonly')}
-              illustration={<Illustration name="emptyDrive" />}
+              spot="emptyDrive"
               action={
                 writable ? (
                   <Button
@@ -1182,19 +1163,12 @@ function MembersDialog({
 function TeamDriveListSkeleton() {
   const { t } = useTeamT();
   return (
-    <ul class="px-3" aria-busy="true">
-      <span class="sr-only" role="status">
-        {t('team.loading')}
-      </span>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <li key={i} class="flex items-center gap-3 px-3 py-2.5">
-          <Skeleton width="36px" height="36px" />
-          <Skeleton width={`${40 + ((i * 13) % 40)}%`} height="0.85rem" />
-          <span class="ml-auto">
-            <Skeleton width="60px" height="1.1rem" />
-          </span>
-        </li>
-      ))}
-    </ul>
+    <SkeletonRows
+      class="px-3"
+      rows={6}
+      lead="tile"
+      label={t('team.loading')}
+      meta={[{ width: '60px', height: '1.1rem' }]}
+    />
   );
 }

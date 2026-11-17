@@ -27,6 +27,7 @@ import {
   EmptyState,
   Table,
   useSondeo,
+  Stat,
 } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import type { ComponentVersion, PlatformVersions } from '../lib/platform.js';
@@ -56,35 +57,6 @@ function estadoDe(c: ComponentVersion, esperada: string): Estado {
   // backend. Marcar desviados sin patrón sería inventarse cuál es el bando bueno.
   if (!esperada || !c.release) return 'ok';
   return c.release === esperada ? 'ok' : 'desviada';
-}
-
-/** Cifra de cabecera; solo se enciende de color si hay algo que mirar. */
-function Kpi({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  tone?: string | undefined;
-}) {
-  return (
-    <Card raised={false}>
-      <CardBody>
-        <p class="text-text-muted truncate text-sm">{label}</p>
-        {/* El que se recortaba era el rótulo, y el que se sale es el VALOR: la
-            primera tarjeta enseña la release esperada («2026.08.09-a1b2c3d»), no
-            una cifra, y a `sytue-h3` no cabe en una columna de cuatro. Con `title`
-            se sigue pudiendo leer entera. */}
-        <p
-          class={`sytue-h3 mt-1 truncate tabular-nums ${tone ?? 'text-text'}`}
-          title={String(value)}
-        >
-          {value}
-        </p>
-      </CardBody>
-    </Card>
-  );
 }
 
 export default function VersionsPanel({ t }: { t: T }) {
@@ -199,17 +171,17 @@ export default function VersionsPanel({ t }: { t: T }) {
   return (
     <div class="flex flex-col gap-4">
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi label={t('platform.versions.kpi.expected')} value={esperada || '—'} />
-        <Kpi label={t('platform.versions.kpi.upToDate')} value={`${alDia}/${items.length}`} />
-        <Kpi
+        <Stat label={t('platform.versions.kpi.expected')} value={esperada || '—'} />
+        <Stat label={t('platform.versions.kpi.upToDate')} value={`${alDia}/${items.length}`} />
+        <Stat
           label={t('platform.versions.kpi.behind')}
           value={desviadas.length}
-          tone={desviadas.length > 0 ? 'text-warning-text' : undefined}
+          tone={desviadas.length > 0 ? 'warning' : 'neutral'}
         />
-        <Kpi
+        <Stat
           label={t('platform.versions.kpi.silent')}
           value={mudas.length}
-          tone={mudas.length > 0 ? 'text-danger-text' : undefined}
+          tone={mudas.length > 0 ? 'danger' : 'neutral'}
         />
       </div>
 

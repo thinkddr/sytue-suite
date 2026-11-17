@@ -182,6 +182,10 @@ func TestInsertarYBorrarReescribeLasFormulas(t *testing.T) {
 		{delFila(2, 3), "=SUMA(A1:A10)", "=SUMA(A1:A7)"},
 		{delFila(2, 3), "=SUMA(A4:A8)", "=SUMA(A3:A5)"},
 		{delFila(2, 3), "=SUMA(A3:A5)", "=SUMA(" + RefRota + ")"},
+		// Si lo borrado se lleva el final, el fin se pega a la última que queda antes.
+		{delFila(2, 3), "=SUMA(A1:A5)", "=SUMA(A1:A2)"},
+		{delFila(2, 3), "=SUMA(A5:A1)", "=SUMA(A2:A1)"},
+		{delCol(3, 5), "B2:E2", "B2:C2"},
 		{insFila(0), "$A$3", "$A$4"},
 		{insFila(0), "A$3", "A$4"},
 		{insFila(3), "=$B$2+$B$7", "=$B$2+$B$8"},
@@ -214,5 +218,41 @@ func TestInsertarYBorrarReescribeLasFormulas(t *testing.T) {
 		if got != c.quiero {
 			t.Errorf("%+v sobre %q da %q y la web da %q", c.d, c.antes, got, c.quiero)
 		}
+	}
+}
+
+// Con Hoja, solo se mueven las referencias que apuntan a la hoja del desplazamiento:
+// las de la propia hoja (sin prefijo o con él) y, desde OTRA hoja, las que la nombran.
+// Son los mismos casos que `sheets-refshift.test.ts` de la web.
+func TestReescribirFormulaSoloLaHojaQueSeMueve(t *testing.T) {
+	ins := Desplazamiento{Filas: true, Desde: 1, Cantidad: 1, Tope: 100, Hoja: "Ventas"}
+	del := Desplazamiento{Filas: true, Desde: 3, Cantidad: -1, Tope: 100, Hoja: "Ventas"}
+	col := Desplazamiento{Desde: 1, Cantidad: 1, Tope: 26, Hoja: "Hoja 2"}
+	for _, c := range []struct {
+		d                   Desplazamiento
+		base, antes, quiero string
+	}{
+		{ins, "Ventas", "=B4+Resumen!B4+Ventas!$B$4", "=B5+Resumen!B4+Ventas!$B$5"},
+		{ins, "Resumen", "=Ventas!B4", "=Ventas!B5"},
+		{ins, "Resumen", "=SUM(Ventas!A1:B9)", "=SUM(Ventas!A1:B10)"},
+		{ins, "Resumen", "=ventas!$B$4*B4", "=ventas!$B$5*B4"},
+		{ins, "Resumen", "=Ventas!A1", "=Ventas!A1"},
+		{col, "Resumen", "='Hoja 2'!C3+Hoja2!C3", "='Hoja 2'!D3+Hoja2!C3"},
+		{del, "Resumen", "=Ventas!B4", "=" + RefRota},
+		{del, "Resumen", "=SUM(Ventas!B2:B6)", "=SUM(Ventas!B2:B5)"},
+		{del, "Resumen", "=Ventas!B9", "=Ventas!B8"},
+	} {
+		if got := c.d.ReescribirFormulaEn(c.antes, c.base); got != c.quiero {
+			t.Errorf("%+v en %q sobre %q da %q y la web da %q", c.d, c.base, c.antes, got, c.quiero)
+		}
+	}
+	// Sin Hoja se mueven todas, como siempre; y ReescribirFormula toma de base la Hoja.
+	sin := ins
+	sin.Hoja = ""
+	if got := sin.ReescribirFormula("=B4+Resumen!B4"); got != "=B5+Resumen!B5" {
+		t.Errorf("sin hoja: %q", got)
+	}
+	if got := ins.ReescribirFormula("=B4+Resumen!B4"); got != "=B5+Resumen!B4" {
+		t.Errorf("en la propia hoja: %q", got)
 	}
 }

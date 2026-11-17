@@ -4,13 +4,20 @@
 package syerphttp
 
 import (
+	"cmp"
+	"context"
 	"errors"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
 	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 	"git.sytue.eu/sytue/one/services/syerp/internal/permisos"
@@ -155,7 +162,75 @@ func (h *Handlers) PedirAprobacion(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, errorDeEscritura(err))
 		return
 	}
+	h.avisarAprobadores(r.Context(), sol, etiqueta)
 	httpx.JSON(w, r, http.StatusCreated, sol)
+}
+
+// moduloAprobador es el módulo cuyo verbo `aprobar` exige la ruta de resolver
+// (exigirVerboContable): avisar con otro criterio mandaría el aviso a quien
+// luego no puede pulsar el botón.
+const moduloAprobador = "contabilidad"
+
+// avisarAprobadores deja en la campana de cada persona que puede aprobar la
+// solicitud recién abierta. Ni a quien la pide ni a quien creó el documento: los
+// cuatro ojos les impiden aprobarla, y un aviso que no pueden atender es ruido.
+// Si el Hub no responde, la solicitud sigue en la cola igual.
+func (h *Handlers) avisarAprobadores(ctx context.Context, a store.Aprobacion, etiqueta string) {
+	if h.hub == nil {
+		return
+	}
+	cs, err := h.store.CandidatosAprobacion(ctx, moduloAprobador)
+	if err != nil {
+		return
+	}
+	t, _ := tenancy.From(ctx)
+	actor := ""
+	if c, ok := authn.FromContext(ctx); ok {
+		actor = cmp.Or(strings.TrimSpace(c.Name), c.Email, c.Subject)
+	}
+	for _, sub := range aprobadores(cs, moduloAprobador, a.SolicitadaPor, a.CreadaPor) {
+		h.hub.SendAsync(ctx, avisoDeAprobacion(h.cfg.PublicURL, t.Slug, sub, actor, etiqueta, a))
+	}
+}
+
+// aprobadores filtra, con las reglas de la ruta de aprobar, a quien puede
+// resolver una solicitud y no queda fuera por los cuatro ojos.
+func aprobadores(cs []store.Candidato, modulo string, excluir ...string) []string {
+	var out []string
+	for _, c := range cs {
+		if c.Sub == "" || slices.Contains(excluir, c.Sub) {
+			continue
+		}
+		puestos := map[string]string{}
+		if c.Nivel != "" {
+			puestos[modulo] = c.Nivel
+		}
+		listas := map[string][]string{}
+		if c.Verbos != nil {
+			listas[modulo] = *c.Verbos
+		}
+		if permisos.PuedeVerbo(c.Roles, puestos, listas, modulo, permisos.Aprobar) {
+			out = append(out, c.Sub)
+		}
+	}
+	return out
+}
+
+// avisoDeAprobacion es el aviso a una persona que puede aprobar: quién lo pide,
+// qué documento y por cuánto, y el enlace abre la cola de aprobaciones.
+func avisoDeAprobacion(publicURL, tenant, para, actor, etiqueta string, a store.Aprobacion) hubnotify.Notification {
+	importe := strconv.FormatFloat(float64(a.Importe)/100, 'f', 2, 64) + " " + a.Moneda
+	return hubnotify.Notification{
+		Tenant:  tenant,
+		Subject: para,
+		Source:  "erp",
+		Type:    "erp.approval.requested",
+		Level:   "info",
+		Title:   actor + " asks you to approve “" + etiqueta + "”",
+		Body:    importe,
+		URL:     hubnotify.EnlaceAprobacionesERP(publicURL, tenant),
+		Params:  map[string]string{"actor": actor, "name": etiqueta, "resource": a.ID},
+	}
 }
 
 // ResolverAprobacion — POST /api/v1/aprobaciones/{id}/{aprobar|rechazar}.

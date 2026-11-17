@@ -4,16 +4,15 @@
 // (Fuera de src/ a propósito: astro check no typechequea este fichero.)
 import { expect, test } from 'bun:test';
 import {
+  buscarPaginas,
   cargaSinNovedad,
   enlaceCargarMas,
   groupBySource,
   hayMas,
   MAX_PAGINAS,
-  paginasHastaElFallo,
   paginasPedidas,
   POR_PAGINA,
   totalAMostrar,
-  unirPaginas,
 } from '../src/lib/search.js';
 import { rutaConOrg } from '@sytue/config';
 import type { SearchResult } from '@sytue/api-clients';
@@ -54,15 +53,50 @@ test('paginasPedidas lee ?paginas= como dato no confiable', () => {
   expect(paginasPedidas('999')).toBe(MAX_PAGINAS);
 });
 
-test('unirPaginas pega en orden, sin repetir, y la última dice si quedan', () => {
-  const u = unirPaginas([
-    pagina(['a', 'b'], 5, true, ['drive']),
-    pagina(['b', 'c', 'd'], 5, false, ['drive', 'rooms']),
-  ]);
-  expect(u.results.map((x) => x.id)).toEqual(['a', 'b', 'c', 'd']);
-  expect(u.total).toBe(5);
-  expect(u.hasMore).toBe(false);
-  expect(u.fallidos.map((f) => f.source)).toEqual(['drive', 'rooms']);
+// Un Hub falso que cuenta las peticiones: cada una es una búsqueda federada a todos
+// los orígenes, y antes «Cargar más» lanzaba una por página enseñada.
+function hubFalso(fallaSi: (limit: number) => boolean = () => false) {
+  const llamadas: { limit: number; offset: number }[] = [];
+  return {
+    llamadas,
+    search: async (_q: string, _s: undefined, page: { limit: number; offset: number }) => {
+      llamadas.push(page);
+      if (fallaSi(page.limit)) throw new Error('hub caído');
+      const ids = Array.from({ length: Math.min(page.limit, 250) }, (_, i) => `x${i}`);
+      return pagina(ids, 250, page.limit < 250, ['drive']);
+    },
+  };
+}
+
+// Visto en ROJO a mano: con una petición por página, `?paginas=10` hacía diez.
+test('buscarPaginas: las diez páginas en UNA petición al Hub', async () => {
+  const hub = hubFalso();
+  const b = await buscarPaginas(hub, 'informe', MAX_PAGINAS);
+  expect(hub.llamadas).toEqual([{ limit: MAX_PAGINAS * POR_PAGINA, offset: 0 }]);
+  expect(b.res.results.length).toBe(MAX_PAGINAS * POR_PAGINA);
+  expect(b.paginas).toBe(MAX_PAGINAS);
+  expect(b.cortada).toBe(false);
+  // El aviso de orígenes caídos viaja con la respuesta.
+  expect(b.res.fallidos.map((f) => f.source)).toEqual(['drive']);
+  expect(cargaSinNovedad(b)).toBe(false);
+});
+
+test('buscarPaginas: un «Cargar más» que falla no tira lo de antes', async () => {
+  const hub = hubFalso((limit) => limit > 2 * POR_PAGINA);
+  const b = await buscarPaginas(hub, 'informe', 3);
+  expect(hub.llamadas.map((l) => l.limit)).toEqual([3 * POR_PAGINA, 2 * POR_PAGINA]);
+  expect(b.paginas).toBe(2);
+  expect(b.res.results.length).toBe(2 * POR_PAGINA);
+  expect(b.cortada).toBe(true);
+  expect(cargaSinNovedad(b)).toBe(true);
+  // Si falla la primera página, la búsqueda entera ha fallado.
+  const caido = hubFalso(() => true);
+  await expect(buscarPaginas(caido, 'informe', 1)).rejects.toThrow('hub caído');
+  expect(caido.llamadas.length).toBe(1);
+  // Si tampoco salen las que ya se veían, es la búsqueda entera la que ha fallado.
+  const sinHub = hubFalso(() => true);
+  await expect(buscarPaginas(sinHub, 'informe', 3)).rejects.toThrow('hub caído');
+  expect(sinHub.llamadas.map((l) => l.limit)).toEqual([3 * POR_PAGINA, 2 * POR_PAGINA]);
 });
 
 test('hayMas: lo dice el Hub, y nunca pasado el tope de páginas', () => {
@@ -73,26 +107,11 @@ test('hayMas: lo dice el Hub, y nunca pasado el tope de páginas', () => {
   expect(hayMas(pagina(['a'], 400, true), MAX_PAGINAS)).toBe(false);
 });
 
-test('hayMas: los repetidos quitados no dejan el botón puesto para siempre', () => {
-  // Dos páginas pedidas (40), un repetido entre ellas: se enseñan 39 de 40 y el Hub
-  // dice que no quedan. Comparar el total con lo enseñado daba «hay más» sin fin.
-  const ids = Array.from({ length: 2 * POR_PAGINA }, (_, i) => `x${i}`);
-  const u = unirPaginas([
-    pagina(ids.slice(0, POR_PAGINA), 2 * POR_PAGINA, true),
-    pagina([ids[POR_PAGINA - 1]!, ...ids.slice(POR_PAGINA + 1)], 2 * POR_PAGINA, false),
-  ]);
-  expect(u.results.length).toBe(2 * POR_PAGINA - 1);
-  expect(hayMas(u, 2)).toBe(false);
-});
-
-test('paginasHastaElFallo: una página que falla no tira lo de antes', () => {
-  const ok = (ids: string[]) => ({ status: 'fulfilled' as const, value: pagina(ids, 9, true) });
-  const ko = { status: 'rejected' as const, reason: new Error('timeout') };
-  expect(paginasHastaElFallo([ko, ok(['b'])])).toBeNull();
-  const corta = paginasHastaElFallo([ok(['a']), ko, ok(['c'])]);
-  expect(corta?.paginas.map((p) => p.results[0]!.id)).toEqual(['a']);
-  expect(corta?.cortada).toBe(true);
-  expect(paginasHastaElFallo([ok(['a']), ok(['b'])])?.cortada).toBe(false);
+test('hayMas: lo enseñado por debajo de lo pedido no deja el botón puesto para siempre', () => {
+  // Dos páginas pedidas (40): el Hub manda 39 de un total de 40 y dice que no quedan.
+  // Comparar el total con lo enseñado daba «hay más» sin fin.
+  const ids = Array.from({ length: 2 * POR_PAGINA - 1 }, (_, i) => `x${i}`);
+  expect(hayMas(pagina(ids, 2 * POR_PAGINA, false), 2)).toBe(false);
 });
 
 test('enlaceCargarMas lleva el prefijo de la app y la org, y aterriza en el primero nuevo', () => {
@@ -106,24 +125,24 @@ test('enlaceCargarMas lleva el prefijo de la app y la org, y aterriza en el prim
 // Visto en ROJO a mano: devolviendo siempre `p.total`, el «39 de 40» se queda en pantalla
 // sin botón para traer el 40, que no existe.
 test('totalAMostrar: sin nada más en el Hub, lo enseñado es el total', () => {
-  const ids = Array.from({ length: 2 * POR_PAGINA }, (_, i) => `x${i}`);
-  const u = unirPaginas([
-    pagina(ids.slice(0, POR_PAGINA), 2 * POR_PAGINA, true),
-    pagina([ids[POR_PAGINA - 1]!, ...ids.slice(POR_PAGINA + 1)], 2 * POR_PAGINA, false),
-  ]);
-  expect(totalAMostrar(u, 2)).toBe(2 * POR_PAGINA - 1);
+  const ids = Array.from({ length: 2 * POR_PAGINA - 1 }, (_, i) => `x${i}`);
+  expect(totalAMostrar(pagina(ids, 2 * POR_PAGINA, false), 2)).toBe(2 * POR_PAGINA - 1);
   // Quedan en el Hub: su total sigue siendo la verdad, también pasado el tope.
   expect(totalAMostrar(pagina(['a'], 143, true), 1)).toBe(143);
   expect(totalAMostrar(pagina(['a'], 400, true), MAX_PAGINAS)).toBe(400);
 });
 
 // Visto en ROJO a mano: sin la comparación con lo de antes, una página vacía con
-// `has_more` (o toda repetidos) recargaba la pantalla igual y sin decir nada.
-test('cargaSinNovedad: una página que falla o que no trae nada nuevo se dice', () => {
-  const p1 = pagina(['a', 'b'], 9, true);
-  expect(cargaSinNovedad({ paginas: [p1], cortada: false })).toBe(false);
-  expect(cargaSinNovedad({ paginas: [p1], cortada: true })).toBe(true);
-  expect(cargaSinNovedad({ paginas: [p1, pagina(['c'], 9, true)], cortada: false })).toBe(false);
-  expect(cargaSinNovedad({ paginas: [p1, pagina([], 9, true)], cortada: false })).toBe(true);
-  expect(cargaSinNovedad({ paginas: [p1, pagina(['b'], 9, true)], cortada: false })).toBe(true);
+// `has_more` recargaba la pantalla igual y sin decir nada.
+test('cargaSinNovedad: una petición que falla o que no trae nada nuevo se dice', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `x${i}`);
+  const b = (n: number, paginas: number, cortada = false) => ({
+    res: pagina(ids(n), 99, true),
+    paginas,
+    cortada,
+  });
+  expect(cargaSinNovedad(b(POR_PAGINA, 1))).toBe(false);
+  expect(cargaSinNovedad(b(POR_PAGINA, 1, true))).toBe(true);
+  expect(cargaSinNovedad(b(POR_PAGINA + 1, 2))).toBe(false);
+  expect(cargaSinNovedad(b(POR_PAGINA, 2))).toBe(true);
 });

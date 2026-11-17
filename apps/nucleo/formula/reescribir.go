@@ -30,17 +30,33 @@ const RefRota = "#¡REF!"
 // Desplazamiento es un tramo que se abre (Cantidad > 0) o se cierra (< 0) en un eje, a
 // partir de Desde (base cero). Tope es el tamaño de la rejilla en ese eje: lo que
 // rebosa deja de existir.
+//
+// Hoja es la hoja en la que se abre o se cierra el tramo (`hoja` en la web): con ella,
+// una fórmula solo mueve las referencias que apuntan a ESA hoja —las suyas sin prefijo
+// si vive en ella y las `Hoja!A1` que la nombran desde cualquier otra—. Vacía, se mueven
+// todas (quien no sabe de libros).
 type Desplazamiento struct {
 	Filas    bool // el eje: filas o columnas
 	Desde    int
 	Cantidad int
 	Tope     int
+	Hoja     string
 }
 
-// mover es el índice nuevo, o false si deja de existir. Con `sujeta`, un extremo de
-// rango que cae en lo borrado se pega al borde de lo que queda: así se encoge el rango
-// en vez de romperse.
-func (d Desplazamiento) mover(i int, sujeta bool) (int, bool) {
+// Cómo trata `mover` una posición que cae en lo borrado: muere (una celda suelta), o se
+// pega al borde de lo que queda —el inicio de un rango a la primera que sigue al corte,
+// el fin a la última que lo precede—: así se encoge el rango en vez de romperse, y
+// `A1:A5` sin las filas 3-5 es `A1:A2`, no `A1:A3`, que ya sería un dato ajeno.
+type dentro int
+
+const (
+	muere dentro = iota
+	sujeta
+	sujetaFin
+)
+
+// mover es el índice nuevo, o false si deja de existir.
+func (d Desplazamiento) mover(i int, que dentro) (int, bool) {
 	if d.Cantidad > 0 {
 		if i < d.Desde {
 			return i, true
@@ -53,7 +69,10 @@ func (d Desplazamiento) mover(i int, sujeta bool) (int, bool) {
 	case i < d.Desde:
 		return i, true
 	case i < d.Desde+n:
-		return d.Desde, sujeta
+		if que == sujetaFin {
+			return d.Desde - 1, true
+		}
+		return d.Desde, que == sujeta
 	}
 	return i - n, true
 }
@@ -72,20 +91,20 @@ func partirExtremo(s string) (extremoTexto, bool) {
 
 // moverExtremo desplaza un extremo; false si desaparece. Un extremo sin fila («A») o sin
 // columna («5») no se toca en el eje que no tiene.
-func (d Desplazamiento) moverExtremo(e extremoTexto, sujeta bool) (extremoTexto, bool) {
+func (d Desplazamiento) moverExtremo(e extremoTexto, que dentro) (extremoTexto, bool) {
 	if d.Filas {
 		if e.fila == "" {
 			return e, true
 		}
 		f, _ := strconv.Atoi(e.fila)
-		i, ok := d.mover(f-1, sujeta)
+		i, ok := d.mover(f-1, que)
 		e.fila = strconv.Itoa(i + 1)
 		return e, ok
 	}
 	if e.col == "" {
 		return e, true
 	}
-	i, ok := d.mover(ColToNum(e.col), sujeta)
+	i, ok := d.mover(ColToNum(e.col), que)
 	if !ok {
 		return e, false
 	}
@@ -115,7 +134,7 @@ func (d Desplazamiento) MoverReferencia(ref string) string {
 		if !ok {
 			return ref
 		}
-		m, ok := d.moverExtremo(e, false)
+		m, ok := d.moverExtremo(e, muere)
 		if !ok {
 			return RefRota
 		}
@@ -130,27 +149,45 @@ func (d Desplazamiento) MoverReferencia(ref string) string {
 		return ref
 	}
 	// Un rango solo muere si se lleva por delante sus DOS extremos.
-	if _, vivo := d.moverExtremo(a, false); !vivo {
-		if _, vivo := d.moverExtremo(b, false); !vivo {
+	if _, vivo := d.moverExtremo(a, muere); !vivo {
+		if _, vivo := d.moverExtremo(b, muere); !vivo {
 			return RefRota
 		}
 	}
-	na, okA := d.moverExtremo(a, true)
-	nb, okB := d.moverExtremo(b, true)
+	// Cuál es el fin en el eje que se mueve: `A5:A1` también se encoge por el lado bueno.
+	pos := func(e extremoTexto) int {
+		if d.Filas {
+			f, _ := strconv.Atoi(e.fila)
+			return f
+		}
+		if e.col == "" {
+			return 0
+		}
+		return ColToNum(e.col)
+	}
+	qa, qb := sujeta, sujetaFin
+	if pos(a) > pos(b) {
+		qa, qb = sujetaFin, sujeta
+	}
+	na, okA := d.moverExtremo(a, qa)
+	nb, okB := d.moverExtremo(b, qb)
 	if !okA || !okB {
 		return RefRota
 	}
 	return hoja + na.String() + ":" + nb.String()
 }
 
-// ReescribirFormula es `reescribirFormula`: todas las referencias de una fórmula, de
-// derecha a izquierda para que las posiciones sigan valiendo mientras se sustituye.
-//
-// ponytail: como en la web, se reescriben TODAS las referencias de la fórmula, también
-// las que apuntan a otra hoja (`Hoja2!A5`), aunque lo que se ha movido es la hoja
-// activa; y las fórmulas de las otras hojas que apuntan a esta no se tocan. Se
-// arregla en los dos sitios a la vez, o el mismo documento daría dos números.
+// ReescribirFormula es `reescribirFormula` para una fórmula que vive en la hoja del
+// desplazamiento: sus referencias sin prefijo son de ella.
 func (d Desplazamiento) ReescribirFormula(texto string) string {
+	return d.ReescribirFormulaEn(texto, d.Hoja)
+}
+
+// ReescribirFormulaEn es `reescribirFormula` con su `base`: las referencias de una
+// fórmula que vive en la hoja `base` y apuntan a la del desplazamiento (todas si
+// d.Hoja está vacía), de derecha a izquierda para que las posiciones sigan valiendo
+// mientras se sustituye. Como en Excel, el nombre de hoja no distingue mayúsculas.
+func (d Desplazamiento) ReescribirFormulaEn(texto, base string) string {
 	if !strings.HasPrefix(texto, "=") {
 		return texto
 	}
@@ -158,6 +195,13 @@ func (d Desplazamiento) ReescribirFormula(texto string) string {
 	slices.SortFunc(refs, func(x, y Referencia) int { return y.Inicio - x.Inicio })
 	out := texto
 	for _, r := range refs {
+		de := r.Hoja
+		if de == "" {
+			de = base
+		}
+		if d.Hoja != "" && !strings.EqualFold(de, d.Hoja) {
+			continue
+		}
 		if nuevo := d.MoverReferencia(r.Texto); nuevo != r.Texto {
 			out = out[:r.Inicio] + nuevo + out[r.Fin:]
 		}

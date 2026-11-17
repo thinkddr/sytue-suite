@@ -52,6 +52,7 @@ export const fr: AppCatalog<typeof en> = {
     'Ce qui s’est passé récemment dans vos e-mails, fichiers, documents, événements et salons.',
   'activity.today': 'Aujourd’hui',
   'activity.yesterday': 'Hier',
+  'activity.emptyTitle': 'Aucune activité pour l’instant',
   'activity.empty':
     'Rien de récent pour l’instant. Au fil de votre utilisation de Sytue, ce que vous touchez apparaîtra ici.',
   'activity.failedTitle': 'Impossible de charger l’activité',
@@ -64,6 +65,7 @@ export const fr: AppCatalog<typeof en> = {
   // --- Boîte de notifications (Sytue Hub) --------------------------------
   'inbox.overline': 'Notifications',
   'inbox.heading': 'Notifications',
+  'inbox.trayUnread': 'Notifications ({count})',
   'inbox.intro': 'Tout ce que la suite a à vous dire, au même endroit.',
   'inbox.all': 'Toutes',
   'inbox.unreadFilter': { one: '{count} non lue', other: '{count} non lues' },
@@ -82,6 +84,53 @@ export const fr: AppCatalog<typeof en> = {
   'inbox.prefsTitle': 'Ce que vous souhaitez recevoir',
   'inbox.prefsBody':
     'Si vous désactivez un produit, il cesse de vous avertir ici et par e-mail. Vous pouvez le réactiver quand vous voulez.',
+  'inbox.prefsScopeOrg':
+    'Ces règles s’appliquent à vos notifications dans {org} ; chaque organisation dont vous faites partie a les siennes.',
+  'inbox.prefsScopePersonal':
+    'Ces règles s’appliquent aux notifications de votre compte personnel.',
+  'inbox.prefsGroup.communication': 'Communication',
+  'inbox.prefsGroup.files': 'Fichiers et documents',
+  'inbox.prefsGroup.business': 'Gestion',
+  'inbox.prefsGroup.publishing': 'Publication',
+  'inbox.prefsGroup.suite': 'Suite',
+  'inbox.prefsSource.integrations': 'Intégrations',
+  'inbox.prefsLoading': 'Chargement de vos préférences…',
+  'inbox.prefsLoadError': 'Impossible de charger vos préférences',
+  'inbox.prefsLoadErrorBody':
+    'Sans elles, nous ne savons pas ce que vous avez désactivé : rien ne peut encore être modifié. Réessayez dans quelques secondes.',
+  'inbox.prefsSaveError':
+    'La modification n’a pas pu être enregistrée et a été annulée. Réessayez.',
+  'inbox.prefsAlwaysOn': 'Toujours activées pour votre sécurité',
+  'inbox.prefsKindsToggle': 'Par type',
+  'inbox.prefsKindsOf': 'Notifications de {app} par type',
+  'inbox.prefsKindCritical': 'Toujours activées : elles demandent une action de votre part',
+  'inbox.prefsKind.messages': 'Nouveaux e-mails',
+  'inbox.prefsKind.directMessages': 'Messages directs',
+  'inbox.prefsKind.mentions': 'Mentions',
+  'inbox.prefsKind.invitations': 'Invitations',
+  'inbox.prefsKind.reports': 'Signalements de contenu',
+  'inbox.prefsKind.reminders': 'Rappels',
+  'inbox.prefsKind.accessRequests': 'Demandes d’accès',
+  'inbox.prefsKind.accessGranted': 'Accès qui vous sont accordés',
+  'inbox.prefsKind.shared': 'Partagé avec vous',
+  'inbox.prefsKind.comments': 'Commentaires',
+  'inbox.prefsKind.quota': 'Stockage presque plein',
+  'inbox.prefsKind.signatureRequests': 'Demandes de signature',
+  'inbox.prefsKind.signatureUpdates': 'Suivi de vos demandes de signature',
+  'inbox.prefsKind.albumChanges': 'Modifications de vos albums',
+  'inbox.prefsKind.tasks': 'Tâches qui vous sont attribuées',
+  'inbox.prefsKind.approvals': 'Demandes d’approbation',
+  'inbox.prefsKind.transfers': 'Bases qui vous sont transférées',
+  'inbox.prefsKind.orders': 'Nouvelles commandes',
+  'inbox.prefsKind.forms': 'Messages des formulaires',
+  'inbox.prefsKind.domains': 'État des domaines',
+  'inbox.prefsKind.exports': 'Exports prêts',
+  'inbox.prefsKind.settingsChanges': 'Modifications des paramètres',
+  'inbox.prefsKind.storeIncidents': 'Incidents de la boutique',
+  'inbox.prefsKind.withdrawals': 'Rétractations',
+  'inbox.prefsKind.live': 'Directs',
+  'inbox.prefsKind.deploys': 'Déploiements',
+  'inbox.prefsKind.updates': 'Mises à jour de l’app',
 
   // --- Lanzador ----------------------------------------------------------
   'launcher.heading': 'Vos applications',
@@ -94,6 +143,9 @@ export const fr: AppCatalog<typeof en> = {
   'launcher.appAria': '{name} — {description}',
   'launcher.servedBy': '{description} · {app}',
   'launcher.disabled': 'Désactivé',
+  'launcher.orgOnlyReason': 'Réservé aux organisations : votre compte est personnel.',
+  'launcher.orgOnlyHelp': 'En savoir plus',
+  'launcher.orgOnlyHelpAria': 'En savoir plus sur {name}',
 
   'product.mail': 'Messagerie',
   'product.drive': 'Fichiers et collaboration',
@@ -119,6 +171,7 @@ export const fr: AppCatalog<typeof en> = {
   'storage.connectDescription': 'Google Drive, OneDrive, Dropbox, WebDAV et plus encore.',
 
   'recent.heading': 'Activité récente dans toute la suite',
+  'recent.tray': 'Récents',
   'recent.viewAll': 'Tout afficher',
   'recent.loading': 'Chargement de votre activité récente…',
   'recent.errorTitle': 'Impossible de charger votre activité',
@@ -730,8 +783,29 @@ export const fr: AppCatalog<typeof en> = {
   'today.unavailable': 'L’agenda n’est pas disponible pour le moment.',
   'today.allDay': 'Toute la journée',
   'today.untitled': '(sans titre)',
+  'today.now': 'En cours',
+  'today.next': 'Ensuite',
+  'today.more': '+{count} de plus dans le calendrier',
+  'today.partial': 'Certains calendriers n’ont pas répondu : l’agenda est peut-être incomplet.',
   'today.unread': { one: '{count} courriel non lu', other: '{count} courriels non lus' },
   'today.inboxZero': 'Boîte de réception à jour',
+
+  // --- Primeros pasos de la portada ------------------------------------
+  'firstSteps.title': 'Premiers pas',
+  'firstSteps.hide': 'Masquer',
+  'firstSteps.hideAria': 'Masquer les premiers pas',
+  'firstSteps.mfa.title': 'Activez la validation en deux étapes',
+  'firstSteps.mfa.body':
+    'Un code ou une clé de sécurité en plus du mot de passe tient les autres à l’écart.',
+  'firstSteps.recovery.title': 'Ajoutez un moyen de récupérer votre compte',
+  'firstSteps.recovery.body':
+    'Une autre adresse e-mail ou un numéro de mobile pour revenir si vous oubliez votre mot de passe.',
+  'firstSteps.photo.title': 'Ajoutez une photo de profil',
+  'firstSteps.photo.body':
+    'Pour que vos collègues vous reconnaissent dans les courriels, les discussions et les réunions.',
+  'firstSteps.install.title': 'Installez Sytue One',
+  'firstSteps.install.body':
+    'Les applications pour votre ordinateur et votre téléphone, avec notifications.',
   'launcher.quickActions': 'Accès rapides',
   'launcher.recentAll': 'Récent dans toute la suite',
   'launcher.activityError': 'Impossible de charger votre activité',

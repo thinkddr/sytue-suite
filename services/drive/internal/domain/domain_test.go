@@ -23,6 +23,7 @@ func TestValidName(t *testing.T) {
 		{"nul byte", "a\x00b", false},
 		{"control char", "a\tb", false},
 		{"unicode valido", "résumé.doc", true},
+		{"utf8 invalido", string([]byte{'a', 0xff, 'b'}), false},
 		{"demasiado largo", string(make([]byte, 256)), false},
 		{"limite 255", string(repeat('a', 255)), true},
 	}

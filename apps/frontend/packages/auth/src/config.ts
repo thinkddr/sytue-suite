@@ -49,6 +49,20 @@ export function resolveRoomsServiceUrl(env: EnvLike): string {
  * es la ÚNICA fuente viva de SYTUE_OIDC_ISSUER y demás — sin esto el BFF da 500 en
  * producción. El runtime GANA sobre el de build. Uso: `serverEnv(import.meta.env)`.
  */
+/**
+ * ¿Funciona este despliegue sin el complemento de cifrado de extremo a extremo?
+ * `SYTUE_CIFRADO_E2E=desactivado` cuando no hay servidor Matrix: las apps guardan
+ * sus datos en el servidor (cifrados en tránsito y en reposo, no E2E). Cualquier
+ * otro valor, o ninguno, deja el cifrado E2E como hasta ahora.
+ */
+export function cifradoE2EDesactivado(env: EnvLike): boolean {
+  return (
+    String(env.SYTUE_CIFRADO_E2E ?? '')
+      .trim()
+      .toLowerCase() === 'desactivado'
+  );
+}
+
 export function serverEnv(buildEnv: EnvLike): EnvLike {
   const g = globalThis as { process?: { env?: EnvLike } };
   return { ...buildEnv, ...g.process?.env };

@@ -112,8 +112,8 @@ func TestElLibroYElBalanceSeAcotanPorPeriodo(t *testing.T) {
 func TestElSelectorDePeriodoSigueConRuedaYConFallo(t *testing.T) {
 	p, _ := pantallaConServicio(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Has("desde") {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = io.WriteString(w, `{"error":{"code":"caido","message":"Caído"}}`)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = io.WriteString(w, `{"error":{"code":"unavailable","message":"Down"}}`)
 			return
 		}
 		if r.URL.Path == "/api/v1/balance" {
@@ -150,7 +150,7 @@ func TestElSelectorDePeriodoSigueConRuedaYConFallo(t *testing.T) {
 		}
 		sel.AlElegir(slices.Index(Periodos, "trimestre"))
 		o := c.objeto()
-		if !contiene(textosDe(o), "Caído") {
+		if !contiene(textosDe(o), "ERP no responde.") {
 			t.Fatalf("%s: el fallo no se pinta: %v", c.vista, textosDe(o))
 		}
 		s := selectorDe(o)
@@ -158,7 +158,7 @@ func TestElSelectorDePeriodoSigueConRuedaYConFallo(t *testing.T) {
 			t.Fatalf("%s: con el período fallido no queda selector para volver", c.vista)
 		}
 		s.AlElegir(slices.Index(Periodos, "todo"))
-		if txt := textosDe(c.objeto()); contiene(txt, "Caído") || !contiene(txt, "Todavía no hay nada asentado") {
+		if txt := textosDe(c.objeto()); contiene(txt, "ERP no responde.") || !contiene(txt, "Todavía no hay nada asentado") {
 			t.Errorf("%s: volver a «Todo» no se recupera: %v", c.vista, txt)
 		}
 	}

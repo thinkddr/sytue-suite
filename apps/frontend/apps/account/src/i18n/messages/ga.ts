@@ -7,6 +7,23 @@ import type { en } from './en.js';
 
 export const ga: AppCatalog<typeof en> = {
   'app.title': 'Mo chuntas',
+  'app.description': 'Mo chuntas — próifíl, slándáil agus rochtain do chuntais Sytue.',
+  'app.lead':
+    'Do phróifíl, conas a shíníonn tú isteach agus a chosnaíonn tú an cuntas, agus cá bhfuil sé oscailte.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Seiceáil slándála',
+  'checkup.all_good': 'Gach rud ceart: tá do chuntas cosanta go maith.',
+  'checkup.dos_pasos': 'Tá fíorú dhá chéim múchta: osclaíonn do phasfhocal amháin an cuntas.',
+  'checkup.recuperacion':
+    'Gan ríomhphost ná fón athshlánaithe: má chailleann tú rochtain, níl bealach ar ais.',
+  'checkup.sesiones': 'Seisiúin oscailte ar ghléasanna eile: {count}',
+  'checkup.contrasenas_app': 'Pasfhocail aipe gan úsáid le 90 lá: {count}',
+  'checkup.dispositivos': 'Gléasanna iontaofa nach bhfacthas le 90 lá: {count}',
+  'checkup.turn_on': 'Cas air',
+  'checkup.add': 'Cuir leis',
+  'checkup.review': 'Athbhreithnigh',
+
   'profile.title': 'Próifíl',
   'profile.name': 'Ainm taispeána',
   'profile.name.hint': 'Mar a fheictear thú ar fud na sraithe.',
@@ -30,19 +47,40 @@ export const ga: AppCatalog<typeof en> = {
   'photo.errorRead': 'Níorbh fhéidir an íomhá a léamh.',
   'sessions.title': 'Seisiúin oscailte',
   'sessions.current': 'An gléas seo',
+  'sessions.signed_in': 'Logáilte isteach {time}',
   'sessions.close_one': 'Dún an seisiún seo',
+  'sessions.close_named': 'Dún an seisiún ar {device}',
+  'sessions.close_one_confirm':
+    'Logálfar {device} amach agus beidh air logáil isteach arís chun do chuntas a úsáid.',
   'sessions.close_others': 'Dún gach seisiún',
   'sessions.close_others_note': 'An ceann seo san áireamh: beidh ort logáil isteach arís.',
+  'sessions.close_all_confirm':
+    'Dúnfar gach seisiún, an ceann seo san áireamh. Beidh ort logáil isteach arís ar gach gléas.',
   'sessions.empty': 'Níl aon seisiún eile oscailte.',
   'sessions.failed': 'Níorbh fhéidir do sheisiúin a lódáil.',
   'common.loading': 'Á lódáil…',
+  'common.retry': 'Bain triail eile as',
   'devices.title': 'Gléasanna',
   'devices.current': 'An gléas seo',
   'devices.trusted': 'Iontaofa',
   'devices.trust': 'Marcáil mar iontaofa',
   'devices.forget': 'Déan dearmad ar an ngléas seo',
+  'devices.forget_named': 'Déan dearmad ar {device}',
+  'devices.forget_confirm':
+    'Ní aithneofar {device} a thuilleadh agus caillfidh sé a stádas iontaofa. Áireofar logáil isteach nua uaidh mar ghléas nua.',
   'devices.empty': 'Níor aithníodh aon ghléas fós.',
   'devices.failed': 'Níorbh fhéidir do ghléasanna a lódáil.',
+  'signature.title': 'Síniú sábháilte',
+  'signature.help':
+    'An síniú a d’iarr tú ar CertiPDF cuimhneamh air agus tú ag síniú de láimh. Stóráiltear é criptithe i do chuntas.',
+  'signature.empty':
+    'Níl aon síniú sábháilte agat. Agus tú ag síniú de láimh in CertiPDF, cuir tic le «Cuimhnigh ar mo shíniú».',
+  'signature.failed': 'Níorbh fhéidir do shíniú sábháilte a lódáil.',
+  'signature.preview': 'Do shíniú sábháilte',
+  'signature.saved_on': 'Sábháilte ar {date}',
+  'signature.delete': 'Scrios an síniú sábháilte',
+  'signature.delete_confirm':
+    'Scriosfar do shíniú sábháilte. Coinníonn na doiciméid atá sínithe agat cheana é; an chéad uair eile a shíneoidh tú de láimh, beidh ort é a tharraingt arís.',
   'security.title': 'Slándáil',
   'security.failed': 'Chuaigh rud éigin amú. Bain triail eile as.',
   'security.password.title': 'Pasfhocal',
@@ -50,6 +88,18 @@ export const ga: AppCatalog<typeof en> = {
     'Má athraíonn tú é, logálfar amach thú i ngach áit, anseo san áireamh.',
   'security.password.current': 'Pasfhocal reatha',
   'security.password.new': 'Pasfhocal nua',
+  'security.password.requirements': 'Riachtanais an phasfhocail nua:',
+  'security.password.req_length': {
+    one: '{count} charachtar ar a laghad',
+    two: '{count} charachtar ar a laghad',
+    few: '{count} charachtar ar a laghad',
+    many: '{count} gcarachtar ar a laghad',
+    other: '{count} carachtar ar a laghad',
+  },
+  'security.password.req_complexity': 'Litreacha agus uimhir amháin ar a laghad',
+  'security.password.req_different': 'Difriúil ón bpasfhocal reatha',
+  'security.password.req_met': 'Comhlíonta',
+  'security.password.req_pending': 'Níl fós',
   'security.password.submit': 'Athraigh an pasfhocal',
   'security.password.done': 'Pasfhocal athraithe. Dúnadh gach seisiún, an ceann seo san áireamh.',
   'security.password.signin_again': 'Logáil isteach arís',
@@ -72,6 +122,46 @@ export const ga: AppCatalog<typeof en> = {
   'security.codes.once':
     'Taispeántar uair amháin iad. Sábháil in áit shábháilte iad: ní oibríonn gach ceann ach uair amháin.',
   'security.codes.saved': 'Tá siad sábháilte agam',
+  'security.codes.regenerate_confirm':
+    'Stopfaidh do chóid athshlánaithe reatha ag obair láithreach, fiú na cinn atá priontáilte nó sábháilte agat.',
+  'security.mfa.step.need': 'Sula dtosaíonn tú',
+  'security.mfa.step.need.heading': 'A bhfuil uait',
+  'security.mfa.step.need.desc':
+    'Aip fíordheimhnithe ar do ghuthán. Taispeánann sí cód nua sé dhigit gach 30 soicind.',
+  'security.mfa.step.need.apps_title': 'Oibríonn aip fíordheimhnithe ar bith',
+  'security.mfa.step.need.apps':
+    'Mar shampla: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Mura bhfuil ceann agat, suiteáil é sula leanann tú ar aghaidh.',
+  'security.mfa.step.need.next': 'Tosaigh',
+  'security.mfa.step.scan': 'Scanáil',
+  'security.mfa.step.scan.heading': 'Cuir do chuntas leis an aip',
+  'security.mfa.key_label': 'Eochair shocraithe',
+  'security.mfa.step.code': 'Cód',
+  'security.mfa.step.code.heading': 'Clóscríobh an cód ón aip',
+  'security.mfa.step.code.desc':
+    'Seiceálann sé seo go réitíonn an aip agus do chuntas sula gcuirtear ar siúl é.',
+  'security.mfa.code.hint': 'Sé dhigit. Má athraíonn sé agus tú ag clóscríobh, úsáid an ceann nua.',
+  'security.mfa.step.codes.heading': 'Sábháil do chóid athshlánaithe',
+  'security.codes.copy': 'Cóipeáil iad uile',
+  'security.codes.copied': 'Cóipeáladh na cóid.',
+  'security.codes.copy_failed':
+    'Níorbh fhéidir cóipeáil. Roghnaigh na cóid agus cóipeáil de láimh iad.',
+  'security.codes.download': 'Íoslódáil .txt',
+  'security.codes.file_title': 'Cóid athshlánaithe Sytue',
+  'security.codes.file_account': 'Cuntas: {account}',
+  'security.codes.file_date': 'Cruthaithe: {date}',
+  'security.codes.file_note':
+    'Oibríonn gach cód uair amháin. Coinnigh an comhad seo in áit shábháilte, i bhfad ó do ghuthán.',
+  'security.mfa.step.done': 'Déanta',
+  'security.mfa.step.done.heading': 'Tá fíorú dhá chéim ar siúl',
+  'security.mfa.step.done.desc':
+    'An chéad uair eile a shíníonn tú isteach, iarrfar cód ón aip ort.',
+  'security.mfa.passkey_tip.title': 'Cuir pas-eochair leis freisin',
+  'security.mfa.passkey_tip':
+    'Le pas-eochair, síníonn tú isteach le méarlorg, aghaidh nó glas scáileáin, gan cóid a chlóscríobh.',
+  'security.mfa.passkey_tip.action': 'Cuir pas-eochair leis',
+  'security.mfa.close': 'Dún',
+  'security.mfa.disable_title': 'An gcuirfear fíorú dhá chéim as?',
+  'security.mfa.disable_warning': 'Osclóidh do phasfhocal amháin an cuntas arís.',
   'common.cancel': 'Cealaigh',
   'profile.given_name': 'Céadainm',
   'profile.family_name': 'Sloinne',
@@ -82,6 +172,8 @@ export const ga: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Úsáidtear ar fud Sytue é agus sna teachtaireachtaí a sheolaimid chugat.',
   'security.passkeys.title': 'Pas-eochracha',
   'security.passkeys.remove': 'Bain',
+  'security.passkeys.remove_named': 'Bain {name}',
+  'security.passkeys.remove_confirm': 'Ní bheidh tú in ann logáil isteach le {name} a thuilleadh.',
   'security.passkeys.unnamed': 'Eochair gan ainm',
   'app_passwords.title': 'Pasfhocail aipe',
   'app_passwords.hint':
@@ -90,6 +182,9 @@ export const ga: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Mar shampla: ríomhphost ríomhaire glúine, guthán.',
   'app_passwords.create': 'Cruthaigh pasfhocal',
   'app_passwords.revoke': 'Cúlghair',
+  'app_passwords.revoke_named': 'Cúlghair {label}',
+  'app_passwords.revoke_confirm':
+    'Ní bheidh aipeanna a úsáideann {label} in ann logáil isteach a thuilleadh. Ní féidir é seo a chealú.',
   'app_passwords.empty': 'Níl aon phasfhocal aipe fós.',
   'app_passwords.failed': 'Níorbh fhéidir do phasfhocail aipe a lódáil.',
   'app_passwords.unnamed': 'Gan ainm',

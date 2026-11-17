@@ -124,8 +124,9 @@ paths:
         - name: cursor
           in: query
           description: >-
-            Cursor keyset "received_at,id" (RFC 3339 + uuid) del último mensaje
-            de la página anterior; se toma tal cual del next_cursor de la
+            Cursor keyset "fecha de orden,id" (RFC 3339 + uuid) del último mensaje
+            de la página anterior (la fecha de orden es unsnoozed_at si lo trae, si
+            no received_at); se toma tal cual del next_cursor de la
             respuesta previa. Vacío u omitido = primera página.
           schema: { type: string }
       responses:
@@ -168,6 +169,101 @@ paths:
                   messages:
                     type: array
                     items: { $ref: "#/components/schemas/Message" }
+                  muted:
+                    type: boolean
+                    description: El hilo está silenciado (sus respuestas nuevas van al Archivo).
+                  snoozed_until:
+                    type: string
+                    format: date-time
+                    description: Hasta cuándo está pospuesto; ausente si no lo está.
+
+  /api/v1/snoozes:
+    get:
+      tags: [messages]
+      summary: Listar las conversaciones pospuestas
+      description: >-
+        Los hilos pospuestos de la cuenta y la fecha en que vuelven a Recibidos,
+        el que vuelve antes primero.
+      responses:
+        "200":
+          description: Posposiciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  snoozes:
+                    type: array
+                    items: { $ref: "#/components/schemas/Snooze" }
+
+  /api/v1/threads/{threadID}/snooze:
+    put:
+      tags: [messages]
+      summary: Posponer una conversación
+      description: >-
+        Mueve lo que el hilo tenga en Recibidos al buzón de rol `snoozed` hasta
+        `until`; entonces vuelve a Recibidos con lo más reciente sin leer. Una
+        respuesta nueva al hilo lo devuelve antes. Sobre un hilo ya pospuesto,
+        cambia la fecha.
+      parameters:
+        - { name: threadID, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [until]
+              properties:
+                until: { type: string, format: date-time, description: Entre un minuto y un año desde ahora. }
+      responses:
+        "200":
+          description: Pospuesta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Snooze" }
+        "400": { description: "Fecha fuera de rango (code invalid_snooze)" }
+        "404": { description: El hilo no es de la cuenta }
+        "409": { description: "Nada en Recibidos que posponer (code nothing_to_snooze)" }
+    delete:
+      tags: [messages]
+      summary: Quitar la posposición
+      description: Devuelve ya a Recibidos un hilo pospuesto, sin marcarlo como no leído.
+      parameters:
+        - { name: threadID, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Devuelta a Recibidos }
+        "404": { description: No estaba pospuesta o no es de la cuenta }
+
+  /api/v1/threads/{threadID}/mute:
+    put:
+      tags: [messages]
+      summary: Silenciar o dejar de silenciar una conversación
+      description: >-
+        Silenciada, lo que el hilo tenga en Recibidos se archiva y las respuestas
+        nuevas van directas al Archivo, sin aviso.
+      parameters:
+        - { name: threadID, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [muted]
+              properties:
+                muted: { type: boolean }
+      responses:
+        "200":
+          description: Estado nuevo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  muted: { type: boolean }
+                  archived: { type: integer, description: Mensajes que se sacaron de Recibidos. }
+        "404": { description: El hilo no es de la cuenta }
 
   /api/v1/messages/{messageID}:
     get:
@@ -277,9 +373,14 @@ components:
         name: { type: string }
         role:
           type: string
-          enum: ["", inbox, sent, drafts, trash, junk, archive]
+          enum: ["", inbox, sent, drafts, trash, junk, archive, snoozed]
         total_emails: { type: integer }
         unread_emails: { type: integer }
+    Snooze:
+      type: object
+      properties:
+        thread_id: { type: string, format: uuid }
+        until: { type: string, format: date-time }
     Message:
       type: object
       properties:
@@ -298,6 +399,13 @@ components:
         has_attachment: { type: boolean }
         received_at: { type: string, format: date-time }
         date: { type: string, format: date-time }
+        unsnoozed_at:
+          type: string
+          format: date-time
+          description: >-
+            Cuándo volvió de «Pospuestos» al vencer la fecha. Las listas ordenan por
+            ella cuando la hay (lo devuelto sube arriba, como en Gmail) y la fila la
+            enseña en lugar de received_at. Ausente si no se pospuso o se trajo a mano.
     JmapSession:
       type: object
       properties:

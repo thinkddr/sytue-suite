@@ -9,10 +9,12 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -396,9 +398,8 @@ func (l *Lateral) seccion(s Seccion, v tema.Variante) (*ui.SeccionLateral, fyne.
 		obj = sec
 	}
 	sec.AlPlegar = func() { l.AlPlegarSeccion(s) }
-	sec.Abierta = !l.Plegadas[s.Clave]
+	sec.Abierta = !l.plegada(s)
 	if s.Categoria != nil {
-		sec.Abierta = !s.Categoria.Plegada
 		if l.AlMenuCategoria != nil {
 			// Al pasar por encima (`group-hover/cat`), y siempre con el dedo.
 			sec.AccionesAlPasar = true
@@ -538,4 +539,102 @@ func (l *Lateral) marca(c Canal, v tema.Variante) fyne.CanvasObject {
 	case Publico:
 	}
 	return NuevaAlmohadilla("sidebar-fg-muted")
+}
+
+// plegada es `isGroupCollapsed`: las personalizadas lo guardan en su categoría, las
+// por defecto en Plegadas.
+func (l *Lateral) plegada(s Seccion) bool {
+	if s.Categoria != nil {
+		return s.Categoria.Plegada
+	}
+	return l.Plegadas[s.Clave]
+}
+
+// ---- Alt+↑/↓ y Alt+Mayús+↑/↓ (lib/navegarCanales.ts) ----
+
+// OrdenVisible es `ordenVisible`: los canales en el orden en que se ven en el carril,
+// sección a sección (Favoritos primero, como los da AgruparCanales) y sin los de las
+// secciones plegadas, que no se ven. La flecha recorre lo que hay delante.
+func OrdenVisible(secciones []Seccion, plegada func(Seccion) bool) []Canal {
+	var out []Canal
+	for _, s := range secciones {
+		if !plegada(s) {
+			out = append(out, s.Canales...)
+		}
+	}
+	return out
+}
+
+// CanalVecino es `canalVecino`: el canal al que lleva la flecha desde el abierto (paso
+// 1 baja, -1 sube), y false si no hay adónde ir. A secas no da la vuelta, como Slack;
+// con soloPendientes salta al siguiente con algo pendiente (la regla de la pastilla de
+// la sección: los silenciados no cuentan) y sí la da. El abierto nunca cuenta. Si el
+// abierto no está a la vista, se empieza por el primero al bajar y el último al subir.
+func CanalVecino(orden []Canal, activo string, paso int, soloPendientes bool) (Canal, bool) {
+	n := len(orden)
+	if n == 0 {
+		return Canal{}, false
+	}
+	i := -1
+	for k, c := range orden {
+		if activo != "" && c.ID == activo {
+			i = k
+			break
+		}
+	}
+	if !soloPendientes {
+		switch {
+		case i < 0 && paso > 0:
+			return orden[0], true
+		case i < 0:
+			return orden[n-1], true
+		case i+paso < 0 || i+paso >= n:
+			return Canal{}, false
+		}
+		return orden[i+paso], true
+	}
+	inicio := i
+	if i < 0 && paso > 0 {
+		inicio = -1
+	} else if i < 0 {
+		inicio = n
+	}
+	for k := 1; k <= n; k++ {
+		c := orden[((inicio+paso*k)%n+n)%n]
+		if c.ID != activo && pendientesDe(c) > 0 {
+			return c, true
+		}
+	}
+	return Canal{}, false
+}
+
+// pendientesDe es `pendientesDe`: lo que el canal suma a la pastilla de su sección.
+func pendientesDe(c Canal) int {
+	return api.PendientesRooms(c.Silenciado, nivelesAviso[c.Nivel].api, c.SinLeer, c.Menciones)
+}
+
+// Vecino es el canal al que lleva la flecha en el carril tal como está pintado.
+func (l *Lateral) Vecino(paso int, soloPendientes bool) (Canal, bool) {
+	orden := OrdenVisible(AgruparCanales(l.Canales, l.Categorias), l.plegada)
+	return CanalVecino(orden, l.CanalID, paso, soloPendientes)
+}
+
+// PasoDeNavegacion es `pasoDeNavegacion` sin la parte del campo, que mira quien recibe
+// el atajo: Alt+↑/↓ da el paso y con Mayús es el salto a pendientes. Con Ctrl o Super
+// no es nuestro.
+func PasoDeNavegacion(s fyne.Shortcut) (paso int, soloPendientes, ok bool) {
+	c, es := s.(*desktop.CustomShortcut)
+	if !es || c.Modifier&fyne.KeyModifierAlt == 0 ||
+		c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) != 0 {
+		return 0, false, false
+	}
+	switch c.KeyName {
+	case fyne.KeyDown:
+		paso = 1
+	case fyne.KeyUp:
+		paso = -1
+	default:
+		return 0, false, false
+	}
+	return paso, c.Modifier&fyne.KeyModifierShift != 0, true
 }

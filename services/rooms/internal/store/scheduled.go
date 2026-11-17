@@ -21,13 +21,13 @@ import (
 // file_ids se proyecta como text[] (cast) para escanear a []string y parsear a UUID
 // sin depender del códec binario de uuid[] de pgx; en la escritura se pasa []string
 // con cast $n::uuid[]. Simétrico y portable.
-const scheduledCols = `id, channel_id, parent_id, author_sub, author_name, body, file_ids::text[], send_at, created_at`
+const scheduledCols = `id, channel_id, parent_id, author_sub, author_name, body, file_ids::text[], send_at, created_at, also_in_channel`
 
 func scanScheduled(row pgx.Row, tenant string) (domain.ScheduledMessage, error) {
 	var sm domain.ScheduledMessage
 	var fileIDs []string
 	if err := row.Scan(&sm.ID, &sm.ChannelID, &sm.ParentID, &sm.AuthorSub, &sm.AuthorName,
-		&sm.Body, &fileIDs, &sm.SendAt, &sm.CreatedAt); err != nil {
+		&sm.Body, &fileIDs, &sm.SendAt, &sm.CreatedAt, &sm.AlsoInChannel); err != nil {
 		return domain.ScheduledMessage{}, err
 	}
 	sm.FileIDs = parseUUIDList(fileIDs)
@@ -67,6 +67,8 @@ type NewScheduledRecord struct {
 	Body       string
 	FileIDs    []uuid.UUID
 	SendAt     time.Time
+	// AlsoInChannel («También enviar al canal») solo cuenta en una respuesta (ParentID).
+	AlsoInChannel bool
 }
 
 // CreateScheduled programa un mensaje para publicarse en SendAt. Valida acceso de
@@ -85,10 +87,10 @@ func (s *Store) CreateScheduled(ctx context.Context, rec NewScheduledRecord) (do
 		}
 		row := tx.QueryRow(ctx,
 			`INSERT INTO scheduled_messages
-			   (tenant, channel_id, parent_id, author_sub, author_name, body, file_ids, send_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7::uuid[], $8) RETURNING `+scheduledCols,
+			   (tenant, channel_id, parent_id, author_sub, author_name, body, file_ids, send_at, also_in_channel)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7::uuid[], $8, $9) RETURNING `+scheduledCols,
 			t.Slug, rec.ChannelID, rec.ParentID, rec.AuthorSub, rec.AuthorName,
-			rec.Body, uuidStrings(rec.FileIDs), rec.SendAt.UTC())
+			rec.Body, uuidStrings(rec.FileIDs), rec.SendAt.UTC(), rec.ParentID != nil && rec.AlsoInChannel)
 		sm, err = scanScheduled(row, t.Slug)
 		return err
 	})
@@ -216,7 +218,7 @@ func (s *Store) ClaimDueScheduled(ctx context.Context, now time.Time, limit int,
 	var claimed int
 	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			`SELECT id, tenant, channel_id, parent_id, author_sub, author_name, body, file_ids::text[]
+			`SELECT id, tenant, channel_id, parent_id, author_sub, author_name, body, file_ids::text[], also_in_channel
 			   FROM scheduled_messages
 			  WHERE send_at <= $1
 			  ORDER BY send_at
@@ -230,11 +232,13 @@ func (s *Store) ClaimDueScheduled(ctx context.Context, now time.Time, limit int,
 			var d dueScheduled
 			var fileIDs []string
 			if err := rows.Scan(&d.id, &d.tenant, &d.rec.ChannelID, &d.rec.ParentID,
-				&d.rec.AuthorSub, &d.rec.AuthorName, &d.rec.Body, &fileIDs); err != nil {
+				&d.rec.AuthorSub, &d.rec.AuthorName, &d.rec.Body, &fileIDs, &d.rec.AlsoInChannel); err != nil {
 				rows.Close()
 				return err
 			}
 			d.rec.Attachments = bareAttachments(parseUUIDList(fileIDs))
+			// «También al canal» solo en una respuesta, como en un envío al momento.
+			d.rec.AlsoInChannel = d.rec.ParentID != nil && d.rec.AlsoInChannel
 			d.rec.MentionsAll = domain.HasChannelMention(d.rec.Body)
 			due = append(due, d)
 		}

@@ -136,6 +136,21 @@ export class CalDavClient {
       .filter((e): e is CalendarEvent => e !== null);
   }
 
+  /**
+   * Lee un recurso .ics tal y como está guardado (GET), con su ETag. Es lo que deja
+   * editar un evento sin regenerarlo entero: quien guarda funde sus cambios sobre
+   * esto y conserva lo que su formulario no sabe expresar.
+   */
+  async getEvent(eventUrl: string): Promise<{ ical: string; etag?: string | undefined }> {
+    const res = await this.http.request({
+      method: 'GET',
+      url: this.absolute(eventUrl),
+      headers: { accept: 'text/calendar' },
+    });
+    const etag = res.headers.get('etag') ?? undefined;
+    return { ical: await res.text(), etag };
+  }
+
   /** Crea o actualiza un evento (PUT del .ics). */
   async putEvent(eventUrl: string, ical: string, etag?: string): Promise<void> {
     await this.http.request({

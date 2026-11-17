@@ -41,6 +41,18 @@ test('updateRecord manda la versión vista y los enlaces', async () => {
   });
 });
 
+test('las opciones de un campo van por PATCH y el orden de los campos por PUT, todos', async () => {
+  const { c, llamadas } = cliente();
+  await c.setFieldChoices('f1', ['Alta', 'Baja']).catch(() => undefined);
+  await c.reorderFields('t1', ['f2', 'f1']).catch(() => undefined);
+  expect(llamadas[0]!.url).toBe('https://bases.test/api/v1/fields/f1');
+  expect(llamadas[0]!.init?.method).toBe('PATCH');
+  expect(JSON.parse(String(llamadas[0]!.init?.body))).toEqual({ choices: ['Alta', 'Baja'] });
+  expect(llamadas[1]!.url).toBe('https://bases.test/api/v1/tables/t1/field-order');
+  expect(llamadas[1]!.init?.method).toBe('PUT');
+  expect(JSON.parse(String(llamadas[1]!.init?.body))).toEqual({ fields: ['f2', 'f1'] });
+});
+
 test('listRecords lleva la vista y la página en la consulta; deleteRecord fuerza solo si se pide', async () => {
   const { c, llamadas } = cliente();
   await c.listRecords('t1', { view: 'v1', limit: 50, cursor: 'abc' }).catch(() => undefined);
@@ -61,6 +73,18 @@ test('importCsv envía el CSV tal cual con su tipo y el nombre en la consulta', 
   expect(llamadas[0]!.init?.body).toBe('a,b\n1,2\n');
   expect(new Headers(llamadas[0]!.init?.headers).get('content-type')).toBe('text/csv');
   expect(llamadas[0]!.url).toContain('name=Clientes');
+});
+
+test('updateView edita la vista por su id con PATCH y solo lo que cambia', async () => {
+  const { c, llamadas } = cliente();
+  await c
+    .updateView('v1', { config: { sort: [{ field: 'f', dir: 'desc' }] } })
+    .catch(() => undefined);
+  expect(llamadas[0]!.url).toBe('https://bases.test/api/v1/views/v1');
+  expect(llamadas[0]!.init?.method).toBe('PATCH');
+  expect(JSON.parse(String(llamadas[0]!.init?.body))).toEqual({
+    config: { sort: [{ field: 'f', dir: 'desc' }] },
+  });
 });
 
 test('los enlaces de formulario cuelgan de la vista y se revocan por su id', async () => {

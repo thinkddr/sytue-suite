@@ -46,7 +46,7 @@ import {
 import {
   POSICIONES,
   RECORRIDO_TOQUE,
-  alturaArrastre,
+  alturaVisible,
   alturaHoja,
   geometriaHoja,
   posicionAlSoltar,
@@ -212,10 +212,16 @@ export function MesCompacto({
   // ---- El asa ----
   // `arrastre` es lo recorrido mientras el dedo lleva la hoja; null, en reposo.
   const [arrastre, setArrastre] = useState<number | null>(null);
+  // El asa tiene el dedo (desde que se apoya hasta que se levanta, aunque aún no se haya
+  // movido): ningún otro gesto de la página puede empezar mientras (`data-gesto-en-curso`,
+  // que `usePullToRefresh` respeta).
+  const [agarrada, setAgarrada] = useState(false);
   const muestrasRef = useRef<{ t: number; y: number }[]>([]);
   const anularToqueRef = useRef(false);
   const n = delMes.length;
-  const alto = arrastre === null ? alturaHoja(posicion, n) : alturaArrastre(posicion, arrastre, n);
+  // Arrastrando, el alto que se ve: con el estirón elástico por debajo del mes (tirar
+  // del asa hacia abajo con la rejilla entera nunca refresca; cede y al soltar vuelve).
+  const alto = arrastre === null ? alturaHoja(posicion, n) : alturaVisible(posicion, arrastre, n);
   const { plegado, subida } = geometriaHoja(alto, n, filaCursor);
   const animar = arrastre === null ? ANIMADA : 'transition-none';
   // En reposo, lo que no se ve no se recorre: en la semana, las otras filas; en la
@@ -234,6 +240,7 @@ export function MesCompacto({
       const v = velocidadFinal(muestrasRef.current);
       muestrasRef.current = [];
       setArrastre(null);
+      setAgarrada(false);
       if (Math.abs(dy) < RECORRIDO_TOQUE) return; // es un toque: lo hace el clic
       anularToqueRef.current = true;
       const nueva = posicionAlSoltar(posicion, dy, v, n);
@@ -242,12 +249,13 @@ export function MesCompacto({
     onCancel: () => {
       muestrasRef.current = [];
       setArrastre(null);
+      setAgarrada(false);
     },
   });
   function onPointerDownAsa(e: PointerEvent): void {
     anularToqueRef.current = false;
     muestrasRef.current = [{ t: e.timeStamp, y: e.clientY }];
-    asa.iniciarArrastre(e, { y0: e.clientY });
+    if (asa.iniciarArrastre(e, { y0: e.clientY })) setAgarrada(true);
   }
   function onClickAsa(): void {
     // El clic que sigue a un arrastre no es un toque.
@@ -369,8 +377,11 @@ export function MesCompacto({
     >
       {/* La hoja de la rejilla, sobre la lista con una sombra que las separa. Su alto es el
           de la posición (o el que lleva el dedo) y recorta: las semanas que no tocan suben
-          bajo las iniciales, y en la agenda sube todo. */}
-      <div class="bg-surface relative z-10 shadow-[var(--shadow-sm)]">
+          bajo las iniciales, y en la agenda sube todo.
+          `data-sin-refresco`: un gesto que EMPIEZA en la hoja (iniciales, rejilla, columna
+          de semana o asa) es del asa o del deslizar de mes, nunca de tirar para refrescar.
+          Refresca la lista de debajo, si está arriba del todo. */}
+      <div data-sin-refresco class="bg-surface relative z-10 shadow-[var(--shadow-sm)]">
         <div
           class={cx('overflow-hidden transition-[height]', animar)}
           style={{ height: `${alto}px` }}
@@ -502,6 +513,7 @@ export function MesCompacto({
           onPointerUp={asa.onPointerUp}
           onPointerCancel={asa.onPointerCancel}
           onLostPointerCapture={asa.onLostPointerCapture}
+          data-gesto-en-curso={agarrada ? '' : undefined}
           class="sytue-focus-ring flex h-8 w-full cursor-grab touch-none items-center justify-center select-none focus-visible:outline-none active:cursor-grabbing"
         >
           <span aria-hidden="true" class="bg-border-strong rounded-pill h-1 w-9" />

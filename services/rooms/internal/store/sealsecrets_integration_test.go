@@ -28,7 +28,7 @@ func TestSealPlaintextSecrets(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, testCipher(t))
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	w, err := st.CreateOutgoingWebhook(ctx, &ch.ID, "alice",
 		"https://example.com/hook", "vtok", "sytue", "secreto-heredado", []string{"deploy"})
@@ -45,7 +45,7 @@ func TestSealPlaintextSecrets(t *testing.T) {
 	}
 
 	// Antes de sellar, quien lea la base se lleva el secreto tal cual.
-	if leer(t, h, ctx, w.ID) != "secreto-heredado" {
+	if leer(ctx, t, h, w.ID) != "secreto-heredado" {
 		t.Fatal("el montaje del test no dejó el secreto en claro")
 	}
 
@@ -57,7 +57,7 @@ func TestSealPlaintextSecrets(t *testing.T) {
 		t.Fatalf("sellados = %d, quiero 1", n)
 	}
 
-	sellado := leer(t, h, ctx, w.ID)
+	sellado := leer(ctx, t, h, w.ID)
 	if sellado == "secreto-heredado" {
 		t.Fatal("el secreto sigue EN CLARO tras sellar")
 	}
@@ -83,14 +83,14 @@ func TestSealPlaintextSecrets(t *testing.T) {
 	if n2 != 0 {
 		t.Fatalf("segunda pasada selló %d, quiero 0", n2)
 	}
-	if leer(t, h, ctx, w.ID) != sellado {
+	if leer(ctx, t, h, w.ID) != sellado {
 		t.Fatal("la segunda pasada cambió el valor sellado")
 	}
 }
 
 // leer devuelve la columna signing_secret tal y como está en la base, sin pasar
 // por el store (que descifra).
-func leer(t *testing.T, h *pgtest.Harness, ctx context.Context, id uuid.UUID) string {
+func leer(ctx context.Context, t *testing.T, h *pgtest.Harness, id uuid.UUID) string {
 	t.Helper()
 	var v string
 	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {

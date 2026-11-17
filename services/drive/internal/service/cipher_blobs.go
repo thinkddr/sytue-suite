@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -27,6 +28,12 @@ type cipherBlobStore interface {
 	CompleteCipherBlobDelete(context.Context, domain.CipherBlob) error
 }
 
+var (
+	ErrCipherBlobMissing  = errors.New("service: committed ciphertext missing from provider")
+	ErrCipherBlobCorrupt  = errors.New("service: committed ciphertext differs from receipt")
+	ErrCipherBlobProvider = errors.New("service: unable to verify committed ciphertext")
+)
+
 // PutCipherBlob never receives a key or private manifest. The existing router
 // chooses the connected provider and pins the stored key exactly as for Drive.
 // A repeated ID acknowledges only identical ciphertext, never a replacement.
@@ -44,7 +51,13 @@ func (s *Service) PutCipherBlob(ctx context.Context, product, id string, size in
 	limited := io.LimitReader(body, size+1)
 	prior, err := s.cipher.CipherBlob(ctx, product, id)
 	if err == nil {
-		return verifyCipherRetry(prior, size, limited)
+		if _, err := verifyCipherRetry(prior, size, limited); err != nil {
+			return domain.CipherBlob{}, err
+		}
+		if err := s.verifyStoredCipher(ctx, t, prior); err != nil {
+			return domain.CipherBlob{}, err
+		}
+		return prior, nil
 	}
 	if !errors.Is(err, domain.ErrNotFound) {
 		return domain.CipherBlob{}, err
@@ -79,16 +92,84 @@ func (s *Service) PutCipherBlob(ctx context.Context, product, id string, size in
 
 func (s *Service) commitCipherBlob(ctx context.Context, t tenancy.Tenant, blob domain.CipherBlob) (domain.CipherBlob, error) {
 	saved, err := s.cipher.CreateCipherBlob(ctx, blob)
-	if err != nil {
-		s.soltarBlob(ctx, t, blob.StorageKey)
-	}
+	// A failed COMMIT response does not prove the transaction rolled back. Its
+	// insert consumes the upload reservation atomically, so deleting here could
+	// destroy a committed block. An uncommitted upload keeps its reservation for
+	// the existing expired-upload collector instead.
 	if errors.Is(err, domain.ErrConflict) {
 		prior, readErr := s.cipher.CipherBlob(ctx, blob.Product, blob.ID)
 		if readErr == nil && prior.SizeBytes == blob.SizeBytes && prior.SHA256 == blob.SHA256 {
+			if err := s.verifyStoredCipher(ctx, t, prior); err != nil {
+				return domain.CipherBlob{}, err
+			}
 			return prior, nil
 		}
 	}
 	return saved, err
+}
+
+// A repeated PUT acknowledges a provider copy only after streaming its exact
+// ciphertext. This costs one block read on retries; it does not repair loss or
+// guarantee that a provider cannot lose the object after this check.
+func (s *Service) verifyStoredCipher(ctx context.Context, t tenancy.Tenant, blob domain.CipherBlob) error {
+	if !blob.Valid(blob.Product, blob.ID) || blob.StorageKey == "" {
+		return ErrCipherBlobCorrupt
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	body, err := s.openRawCipher(ctx, t, blob.StorageKey)
+	if err != nil {
+		if body != nil {
+			_ = body.Close()
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if errors.Is(err, objectstore.ErrNotFound) {
+			return ErrCipherBlobMissing
+		}
+		return fmt.Errorf("%w: %w", ErrCipherBlobProvider, err)
+	}
+	if body == nil {
+		return ErrCipherBlobProvider
+	}
+	h := sha256.New()
+	n, readErr := io.Copy(h, io.LimitReader(cipherContextReader{ctx: ctx, reader: body}, blob.SizeBytes+1))
+	closeErr := body.Close()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if n == 0 && errors.Is(readErr, objectstore.ErrNotFound) && closeErr == nil {
+		return ErrCipherBlobMissing
+	}
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return fmt.Errorf("%w: %w", ErrCipherBlobProvider, err)
+	}
+	if n != blob.SizeBytes || hex.EncodeToString(h.Sum(nil)) != blob.SHA256 {
+		return ErrCipherBlobCorrupt
+	}
+	return nil
+}
+
+func (s *Service) openRawCipher(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	raw, ok := s.blobs.(objectstore.RawBlobReader)
+	if !ok {
+		return nil, objectstore.ErrRawUnsupported
+	}
+	return raw.GetRaw(ctx, t, key)
+}
+
+type cipherContextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r cipherContextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.reader.Read(p)
 }
 
 func verifyCipherRetry(prior domain.CipherBlob, size int64, body io.Reader) (domain.CipherBlob, error) {
@@ -119,7 +200,7 @@ func (s *Service) OpenCipherBlob(ctx context.Context, product, id string) (domai
 	if err != nil {
 		return blob, nil, err
 	}
-	stream, err := s.blobs.Get(ctx, t, blob.StorageKey)
+	stream, err := s.openRawCipher(ctx, t, blob.StorageKey)
 	if errors.Is(err, objectstore.ErrNotFound) {
 		return blob, nil, domain.ErrNotFound
 	}

@@ -41,7 +41,7 @@ func nordika(t *testing.T) string {
 }
 
 func fidelidad(t *testing.T) string {
-	return literales(t, webref.Read(t, "services/docs/internal/domain/export_fidelity_test.go"), "const richDocHTML = ", "\n\n")
+	return literales(t, webref.Read(t, "apps/nucleo/office/model/export_fidelity_test.go"), "const richDocHTML = ", "\n\n")
 }
 
 // La regla de la casa: cargar → guardar sin tocar → IDÉNTICO, byte a byte.
@@ -96,7 +96,7 @@ func TestLoQueNoSeEntiendeSeLeeYNoSeToca(t *testing.T) {
 		`<p id="h-1">x</p>`:                          "p[id]",
 		`<nav><p>Índice</p></nav>`:                   "<nav>",
 		`<section><p>n</p></section>`:                "<section>",
-		`<p><span data-formfield="text"></span></p>`: "span[data-formfield]",
+		`<p><span data-formfield="date"></span></p>`: "span[data-formfield]", // un tipo que la web no tiene
 		`<p><ins>x</ins></p>`:                        "<ins>",
 	} {
 		if d := Parse(fuente); d.Editable() || !slices.Contains(d.NoEntendido(), motivo) {
@@ -912,5 +912,42 @@ func TestLaVinetaDeUnaListaImportada(t *testing.T) {
 	}
 	if b := d.Bloques(); b[0].Marca != "-" || b[1].Marca != "•" {
 		t.Errorf("marcas %q y %q", b[0].Marca, b[1].Marca)
+	}
+}
+
+// Una lista de casillas del editor (`ul[data-checklist]`) lleva la marca de cada elemento,
+// hecho o no, y el hecho va atenuado y tachado como en editor.css; leerla no cambia el HTML.
+func TestLaListaDeCasillas(t *testing.T) {
+	fuente := `<ul data-checklist=""><li data-checked="1">hecho</li><li data-checked="0">pendiente</li></ul><ul><li>viñeta</li></ul>`
+	d := Parse(fuente)
+	if !d.Editable() {
+		t.Fatalf("no se edita: %v", d.NoEntendido())
+	}
+	b := d.Bloques()
+	if b[0].Marca != CasillaHecha || b[1].Marca != CasillaVacia || b[2].Marca != "•" {
+		t.Errorf("marcas %q, %q y %q", b[0].Marca, b[1].Marca, b[2].Marca)
+	}
+	if e := b[0].Tramos[0].Estilo; !e.Tachado || e.Color != tintaHecha {
+		t.Errorf("el elemento hecho no va atenuado y tachado: %+v", e)
+	}
+	if e := b[1].Tramos[0].Estilo; e.Tachado || e.Color != Tinta {
+		t.Errorf("el elemento pendiente cambia de aspecto: %+v", e)
+	}
+	if !EsMarcaDeCasilla(b[0].Marca) || EsMarcaDeCasilla("•") {
+		t.Error("EsMarcaDeCasilla no distingue la casilla de la viñeta")
+	}
+	if got := d.HTML(); got != fuente {
+		t.Errorf("leerlo lo cambia:\n%s", got)
+	}
+}
+
+// Intro en un elemento hecho de una lista de casillas: el nuevo nace sin hacer.
+func TestIntroEnUnaCasillaHecha(t *testing.T) {
+	d := Parse(`<ul data-checklist=""><li data-checked="1">hecho</li></ul>`)
+	if _, ok := abrir(t, d, 0).Partir(len("hecho")); !ok {
+		t.Fatal("no parte el elemento")
+	}
+	if got, want := d.HTML(), `<ul data-checklist=""><li data-checked="1">hecho</li><li data-checked="0"><br></li></ul>`; got != want {
+		t.Errorf("tras Intro:\n%s\nquiero:\n%s", got, want)
 	}
 }

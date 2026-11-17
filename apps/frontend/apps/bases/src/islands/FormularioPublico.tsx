@@ -14,7 +14,13 @@ import type { Locale } from '@sytue/i18n';
 import type { BasesField, BasesValue } from '@sytue/api-clients/bases';
 import { useT } from '../i18n/index.js';
 import { resolverReto, type RetoAltcha } from '@sytue/config';
-import { valorDeTexto } from '../lib/valores.js';
+import {
+  estrellas,
+  MAX_VALORACION,
+  MODO_DE_ENTRADA,
+  TIPO_DE_INPUT,
+  valorDeTexto,
+} from '../lib/valores.js';
 
 interface Props {
   locale: Locale;
@@ -164,11 +170,28 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
                     </option>
                   ))}
                 </Select>
+              ) : c.kind === 'rating' ? (
+                <Select
+                  id={id}
+                  value={texto[c.id] ?? ''}
+                  onChange={(e) => setTexto({ ...texto, [c.id]: e.currentTarget.value })}
+                >
+                  <option value="" />
+                  {Array.from({ length: MAX_VALORACION }, (_, i) => i + 1).map((n) => (
+                    <option
+                      key={n}
+                      value={String(n)}
+                      aria-label={t('field.ratingValue', { n: String(n) })}
+                    >
+                      {estrellas(n)}
+                    </option>
+                  ))}
+                </Select>
               ) : (
                 <Input
                   id={id}
-                  type={c.kind === 'date' ? 'date' : 'text'}
-                  inputMode={c.kind === 'number' ? 'decimal' : undefined}
+                  type={TIPO_DE_INPUT[c.kind] ?? 'text'}
+                  inputMode={MODO_DE_ENTRADA[c.kind]}
                   maxLength={c.kind === 'text' ? 10000 : undefined}
                   value={texto[c.id] ?? ''}
                   onInput={(e) => setTexto({ ...texto, [c.id]: e.currentTarget.value })}

@@ -1,32 +1,34 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # sytue-cloud
 
-Cliente delgado de la API REST del control plane de Sytue Cloud. Cubre el árbol
-operacional (deploy, rollback, logs, consultas rápidas) y CRUD de conveniencia.
-La gestión **declarativa** vive en el provider de Terraform; este CLI es lo
-**imperativo**. Sin dependencias fuera de la stdlib.
+Thin client for the Sytue Cloud control plane REST API. It covers the operational
+tree (deploy, rollback, logs, quick queries) and convenience CRUD.
+**Declarative** management lives in the Terraform provider; this CLI is the
+**imperative** side. No dependencies outside the stdlib.
 
-## Configuración (entorno + flags)
+<a id="configuración-entorno--flags"></a>
+## Configuration (environment + flags)
 
-| Flag            | Entorno              | Default                 |
+| Flag            | Environment          | Default                 |
 |-----------------|----------------------|-------------------------|
 | `--api URL`     | `SYTUE_CLOUD_API`    | `http://127.0.0.1:8090` |
 | `--token TOKEN` | `SYTUE_CLOUD_TOKEN`  | —                       |
 | `-o, --output`  | `SYTUE_CLOUD_OUTPUT` | `table`                 |
 
-El token es un `scl_...` (scope `read<write<deploy`) o un JWT de Sytue ID.
-**Prioriza `$SYTUE_CLOUD_TOKEN`**: `--token` queda en el history del shell y es
-visible en `ps`. El token nunca se imprime ni se registra en logs.
+The token is an `scl_...` (scope `read<write<deploy`) or a Sytue ID JWT.
+**Prefer `$SYTUE_CLOUD_TOKEN`**: `--token` stays in the shell history and is
+visible in `ps`. The token is never printed or written to logs.
 
 ```sh
 export SYTUE_CLOUD_TOKEN=scl_xxx
 export SYTUE_CLOUD_API=https://cloud.sytue.eu
 ```
 
-Salida por defecto en **tabla** alineada; `-o json` devuelve el cuerpo crudo de
-la API para scripting (`| jq`). Errores a stderr, código de salida ≠ 0.
+Default output is an aligned **table**; `-o json` returns the raw API body
+for scripting (`| jq`). Errors go to stderr, exit code ≠ 0.
 
-## Comandos
+<a id="comandos"></a>
+## Commands
 
 ```sh
 # Proyectos
@@ -88,20 +90,21 @@ sytue-cloud billing invoice <id>
 sytue-cloud version | help
 ```
 
-Las flags y los posicionales se pueden intercalar: `deployments get <id> -o json`
-y `deployments get -o json <id>` son equivalentes.
+Flags and positional arguments can be interleaved: `deployments get <id> -o json`
+and `deployments get -o json <id>` are equivalent.
 
-## No cubierto (la API no lo expone; no se inventa)
+<a id="no-cubierto-la-api-no-lo-expone-no-se-inventa"></a>
+## Not covered (the API does not expose it; nothing is invented)
 
-- **Streaming de logs (`--follow`)**: no hay endpoint SSE/WS. Solo log de build
-  estático (`GET /builds/{id}/logs`); `--follow` devuelve error explícito.
-- Recursos con endpoint pero sin comando aún (YAGNI hasta que se pidan): org,
+- **Log streaming (`--follow`)**: there is no SSE/WS endpoint. Only the static build
+  log (`GET /builds/{id}/logs`); `--follow` returns an explicit error.
+- Resources with an endpoint but no command yet (YAGNI until requested): org,
   members, tokens, uptime-checks, alerts, builds (list/get), `usage/detail`,
   `billing/spend-limit`, `billing/invoices:generate`, project GitHub connect,
-  almacenamiento, DB Studio y la URL de despliegue (se emite desde el panel, y
-  por API es `POST /tokens` con `project_id` + scope `deploy`).
-  Se añaden con el mismo patrón cuando haga falta.
+  storage, DB Studio and the deploy URL (it is issued from the dashboard, and
+  via the API it is `POST /tokens` with `project_id` + scope `deploy`).
+  They are added with the same pattern when needed.
 
-> La línea «los logs por proyecto no existen» estuvo aquí hasta el 2026-08-17,
-> cuando ya llevaban olas existiendo: un README que envejece miente con más
-> autoridad que el código.
+> The line “per-project logs do not exist” was here until 2026-08-17,
+> when they had already existed for several waves: a README that ages lies with more
+> authority than the code.

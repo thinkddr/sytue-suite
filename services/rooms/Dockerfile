@@ -6,7 +6,7 @@
 # sobre distroless (rootless), conforme a CONVENTIONS §0.7.
 
 # --- Stage 1: build ---
-FROM golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd AS build
+FROM golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c AS build
 WORKDIR /src
 
 # Cache de dependencias: copia primero los manifiestos del módulo.
@@ -18,6 +18,21 @@ RUN go mod download
 
 # Código fuente (módulo completo; el servicio importa platform/pkg/*).
 COPY . .
+
+RUN cd apps/nucleo && CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" \
+    -o /src/services/rooms/internal/http/client_core_assets/core.wasm ./cmd/pqc-wasm \
+    && cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" /src/services/rooms/internal/http/client_core_assets/wasm_exec.js \
+    && cp "$(go env GOROOT)/LICENSE" /src/services/rooms/internal/http/client_core_assets/GO-LICENSE \
+    && mkdir -p /src/services/rooms/internal/http/client_core_assets/office \
+    && CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" \
+       -o /src/services/rooms/internal/http/client_core_assets/office/core.wasm ./cmd/office-wasm \
+    && cp /src/services/rooms/internal/http/client_core_assets/wasm_exec.js /src/services/rooms/internal/http/client_core_assets/office/wasm_exec.js \
+    && cp /src/services/rooms/internal/http/client_core_assets/GO-LICENSE /src/services/rooms/internal/http/client_core_assets/office/GO-LICENSE \
+    && mkdir -p /src/services/rooms/internal/http/client_core_assets/mail \
+    && CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" \
+       -o /src/services/rooms/internal/http/client_core_assets/mail/core.wasm ./cmd/mail-wasm \
+    && cp /src/services/rooms/internal/http/client_core_assets/wasm_exec.js /src/services/rooms/internal/http/client_core_assets/mail/wasm_exec.js \
+    && cp /src/services/rooms/internal/http/client_core_assets/GO-LICENSE /src/services/rooms/internal/http/client_core_assets/mail/GO-LICENSE
 
 ARG VERSION=dev
 # CGO desactivado -> binario estático apto para distroless/static.

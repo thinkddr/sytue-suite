@@ -39,8 +39,8 @@ import (
 // cabecera con `mb-6`, la vuelta con `mb-2` y las filas `px-3 py-2 border-b` con un
 // glifo de 28.
 var (
-	BajoCabeceraPapelera          = tema.Espacio(6) // mb-6 → 21
-	BajoVuelta                    = tema.Espacio(2) // mb-2 → 7
+	BajoCabeceraPapelera          = tema.Espacio(6) // mb-6 → 24
+	BajoVuelta                    = tema.Espacio(2) // mb-2 → 8
 	GlifoFilaPapelera     float32 = 28
 	MargenFilaPapelera            = tema.Espacio(3) // px-3
 	RellenoFilaPapelera           = tema.Espacio(2) // py-2
@@ -329,13 +329,15 @@ func (p *PapeleraDocs) cuerpo(v tema.Variante) fyne.CanvasObject {
 	var e *ui.Vacio
 	switch p.Estado {
 	case Cargando:
+		// Las filas son UN grupo de carga: laten a una y dicen «Cargando» una vez.
+		g := ui.NuevosBloquesEsqueleto()
 		esqueletos := make([]fyne.CanvasObject, EsqueletosPapelera)
 		for i := range esqueletos {
-			s := ui.NuevoEsqueleto(0, AltoEsqueletoPapelera)
-			s.Radio = tema.RadioLG
+			s := g.Bloque(0, AltoEsqueletoPapelera)
+			s.CornerRadius = tema.RadioLG
 			esqueletos[i] = s
 		}
-		return container.New(ui.Columna{Hueco: tema.Espacio(2)}, esqueletos...)
+		return g.Con(container.New(ui.Columna{Hueco: tema.Espacio(2)}, esqueletos...))
 	case Listo:
 		return p.listado(v)
 	case Vacio:

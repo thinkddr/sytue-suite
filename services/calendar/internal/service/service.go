@@ -525,6 +525,120 @@ func (s *Service) SetAttendeePartStat(ctx context.Context, eventID uuid.UUID, em
 	return s.store.SetAttendeePartStat(ctx, eventID, email, partstat)
 }
 
+// ResponderEvento fija el PARTSTAT de `email` en el evento de UID `uid`: es el
+// «¿vas a ir?» de la vista rápida, que conoce el UID del .ics y no el id interno.
+//
+// La respuesta se escribe en el .ics y no solo en la tabla de asistentes, porque
+// la web lee el .ics: con solo la tabla no veía la respuesta y el siguiente
+// guardado web la pisaba. Se reescribe cada copia de ese UID en la que quien
+// llama puede escribir y figura como asistente (la suya, y la del organizador si
+// se la ha compartido con escritura), por el escritor CalDAV (PutObject), que
+// recalcula la tabla de asistentes. Solo cambia la línea de `email`
+// (caldav.ConPartStat): nadie toca la respuesta de otro.
+//
+// Y quien organiza se entera, como al responder desde la bandeja (avisarAlOrganizador):
+// si no, cambiar de opinión desde el evento solo cambiaba tu copia y el organizador
+// seguía contando contigo.
+func (s *Service) ResponderEvento(ctx context.Context, uid, email string, partstat domain.ParticipationStatus) (domain.Attendee, error) {
+	uid, email = strings.TrimSpace(uid), strings.TrimSpace(email)
+	if uid == "" || email == "" || !domain.ValidPartStat(partstat) {
+		return domain.Attendee{}, domain.ErrInvalidEvent
+	}
+	objs, err := s.store.ObjetosPorUID(ctx, uid)
+	if err != nil {
+		return domain.Attendee{}, err
+	}
+	sub, callerEmail := caller(ctx)
+	encontrado := false
+	// La copia con la respuesta nueva, para el REPLY por correo; "" si no cambió nada.
+	escrita := ""
+	for _, obj := range objs {
+		// Sin escritura en ese calendario, su copia no se toca: ni se distingue un
+		// calendario ajeno de uno inexistente (deny-by-default, 404 al final).
+		if s.assertShareWritable(ctx, sub, callerEmail, obj.CalendarID) != nil {
+			continue
+		}
+		nuevo, figura, err := caldav.ConPartStat(obj.Data, email, partstat)
+		if err != nil {
+			return domain.Attendee{}, fmt.Errorf("%w: %w", domain.ErrInvalidEvent, err)
+		}
+		if !figura {
+			continue
+		}
+		// Una suscripción ICS es un espejo de fuera: lo que se escriba ahí lo pisa la
+		// próxima sincronización, y la web la pinta de solo lectura.
+		if cal, err := s.store.GetCalendar(ctx, obj.CalendarID); err != nil || cal.Subscription != nil {
+			continue
+		}
+		encontrado = true
+		if nuevo == obj.Data {
+			continue
+		}
+		s.store.AvisarQuienesVen(ctx, obj.CalendarID)
+		// Con el ETag leído: si alguien guarda a la vez, gana su versión y esta
+		// respuesta falla con conflicto en vez de pisarla.
+		if _, err := s.PutObject(ctx, obj.CalendarID, nuevo, obj.ETag, false); err != nil {
+			return domain.Attendee{}, err
+		}
+		escrita = nuevo
+	}
+	if !encontrado {
+		return domain.Attendee{}, domain.ErrNotFound
+	}
+	s.avisarAlOrganizador(ctx, uid, email, partstat, escrita)
+	return domain.Attendee{Email: email, PartStat: partstat}, nil
+}
+
+// avisarAlOrganizador hace llegar a quien organiza la respuesta dada desde el evento
+// (D-CAL-01), por el mismo camino que si se hubiera contestado la invitación:
+//
+//   - Si hay invitación de ese evento a quien contesta (quien organiza es de dentro),
+//     se marca con la respuesta —ya no sale como pendiente en la bandeja— y el REPLY
+//     llega a la bandeja del organizador (RespondInvitation del store, que admite
+//     cambiar de respuesta, y replyDeInvitacion). Si ya tenía esa respuesta, nada: volver
+//     a pulsar lo mismo no le manda otro aviso.
+//   - Si no la hay y quien organiza es de fuera, el REPLY va por correo, y solo si la
+//     copia cambió (`escrita`).
+//
+// Best effort: la respuesta ya está guardada en el .ics, y un aviso que no sale no
+// la deshace.
+func (s *Service) avisarAlOrganizador(ctx context.Context, uid, email string, partstat domain.ParticipationStatus, escrita string) {
+	estado, ok := partstatAInvitacion(string(partstat))
+	if !ok {
+		// NEEDS-ACTION o DELEGATED no son una respuesta que comunicar.
+		return
+	}
+	// Solo se avisa en nombre de quien llama: con escritura en un calendario
+	// compartido se puede cambiar la línea de otro asistente en esa copia, pero no
+	// contestar su invitación ni mandar un REPLY firmado por él.
+	sub, callerEmail := caller(ctx)
+	if !strings.EqualFold(domain.NormalizeEmail(email), domain.NormalizeEmail(callerEmail)) {
+		return
+	}
+	pend, err := s.store.InvitacionDeEvento(ctx, uid, []string{callerEmail}, sub)
+	switch {
+	case err == nil:
+		if pend.Status == estado {
+			return
+		}
+		inv, err := s.store.RespondInvitation(ctx, pend.ID, estado, []string{email}, sub)
+		if err != nil {
+			log.From(ctx).Warn("calendar: marcar la invitación al responder desde el evento", "uid", uid, "error", err)
+			return
+		}
+		s.replyDeInvitacion(ctx, inv)
+		s.publish(ctx, "calendar.invitation.responded", map[string]any{
+			"invitation_id": inv.ID, "status": inv.Status, "via": "evento",
+		})
+	case errors.Is(err, domain.ErrNotFound):
+		if escrita != "" {
+			s.mandarRespuestaPorCorreo(ctx, escrita, email, partstat)
+		}
+	default:
+		log.From(ctx).Warn("calendar: buscar la invitación al responder desde el evento", "uid", uid, "error", err)
+	}
+}
+
 // --- Recordatorios in-app ---------------------------------------------------
 
 // DueReminders devuelve los recordatorios vencidos y no descartados del usuario
@@ -710,11 +824,7 @@ func (s *Service) RespondInvitation(ctx context.Context, id uuid.UUID, status do
 	if err != nil {
 		return domain.Invitation{}, err
 	}
-	if inv.EventID != nil && inv.Organizer != "" {
-		if ev, err := s.store.GetEvent(ctx, *inv.EventID); err == nil {
-			s.deliverReply(ctx, ev, inv.Recipient)
-		}
-	}
+	s.replyDeInvitacion(ctx, inv)
 	s.publish(ctx, "calendar.invitation.responded", map[string]any{
 		"invitation_id": inv.ID, "status": inv.Status,
 	})
@@ -858,6 +968,42 @@ func (s *Service) deliverReply(ctx context.Context, ev domain.Event, replier str
 		Data:      data,
 	}); err != nil {
 		log.From(ctx).Warn("calendar: entregar REPLY", "organizer", ev.Organizer, "error", err)
+	}
+}
+
+// replyDeInvitacion deja en la bandeja de quien organiza el REPLY de una invitación
+// recién contestada. Con el evento a mano, el de siempre (deliverReply). Sin él lo
+// arma con el REQUEST de la propia invitación (caldav.Respuesta): cada guardado del
+// evento rehace su fila y la invitación pierde el enlace (ON DELETE SET NULL), así que
+// tras cualquier edición —o tras escribir la respuesta en el .ics al contestar desde
+// el evento— el organizador se quedaba sin enterarse.
+func (s *Service) replyDeInvitacion(ctx context.Context, inv domain.Invitation) {
+	if inv.Organizer == "" {
+		return
+	}
+	if inv.EventID != nil {
+		if ev, err := s.store.GetEvent(ctx, *inv.EventID); err == nil {
+			s.deliverReply(ctx, ev, inv.Recipient)
+			return
+		}
+	}
+	ps, ok := invitacionAPartstat(inv.Status)
+	if !ok {
+		return
+	}
+	data, org, _, err := caldav.Respuesta(inv.Data, inv.Recipient, ps)
+	if err != nil {
+		log.From(ctx).Warn("calendar: armar REPLY", "uid", inv.UID, "error", err)
+		return
+	}
+	if _, err := s.store.CreateInvitation(ctx, store.NewInvitation{
+		UID:       inv.UID,
+		Method:    domain.MethodReply,
+		Organizer: inv.Recipient,
+		Recipient: cmp.Or(org, cleanAddr(inv.Organizer)),
+		Data:      data,
+	}); err != nil {
+		log.From(ctx).Warn("calendar: entregar REPLY", "organizer", inv.Organizer, "error", err)
 	}
 }
 

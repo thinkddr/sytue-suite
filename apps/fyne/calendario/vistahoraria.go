@@ -27,10 +27,10 @@ import (
 // CREAR (pintando el rango), MOVER (también de día, en la semana) y REDIMENSIONAR (desde
 // el borde de abajo), imantado a 15 minutos o a 30.
 //
-// Los números salen de sus clases con el rem de 14:
+// Los números salen de sus clases con el rem de 16:
 //
 //	hora                 48 px (`HOUR_PX`), 0,8 px por minuto · 1152 el día entero
-//	eje                  `w-14` = 49, rótulo `sytue-meta-dense` a `right-1.5`
+//	eje                  `w-14` = 56, rótulo `sytue-meta-dense` a `right-1.5`
 //	cabecera de día      `px-3 py-2`, versalita y número alineados por la BASE
 //	franja todo el día   fila de 22, barra de 18, `4` de relleno arriba y abajo
 //	bloque               `rounded-sm border`, franja de color de 3, `py-0.5 pr-1 pl-2`
@@ -106,9 +106,14 @@ func (p *Pantalla) diasHorarios() []time.Time {
 		return []time.Time{inicioDelDia(p.Cursor, loc)}
 	}
 	desde, _ := Rango(VistaSemana, p.Cursor, loc)
-	d := make([]time.Time, 7)
-	for i := range d {
-		d[i] = desde.AddDate(0, 0, i)
+	d := make([]time.Time, 0, 7)
+	for i := range 7 {
+		dia := desde.AddDate(0, 0, i)
+		// Sin fines de semana, de lunes a viernes (`diasDeSemana` de la web).
+		if !p.ajustes().FinesDeSemana && (dia.Weekday() == time.Saturday || dia.Weekday() == time.Sunday) {
+			continue
+		}
+		d = append(d, dia)
 	}
 	return d
 }
@@ -178,7 +183,7 @@ func (p *Pantalla) vistaHoraria() fyne.CanvasObject {
 	// 08:00, una hora por encima. Solo al MONTAR la vista: navegar de semana conserva
 	// el desplazamiento, que por eso vive en la pantalla y no aquí.
 	if !p.scrollPuesto {
-		foco := 8 * 60
+		foco := (p.ajustes().InicioLaboral - 1) * 60
 		for _, dia := range d.dias {
 			if esHoy(dia) {
 				foco = minutoActual(p.zona())
@@ -320,6 +325,12 @@ func (c *cabeceraHoraria) CreateRenderer() fyne.WidgetRenderer {
 	r.iman = nuevoBotonIman(p)
 	r.filete = canvas.NewRectangle(tema.Color("border", v))
 	r.objetos = append(r.objetos, r.iman, r.filete)
+	// Número de semana ISO bajo el imantado (`numeroSemana` de la web), solo en la semana.
+	if p.ajustes().NumeroSemana && p.Vista == VistaSemana && len(c.d.dias) > 0 {
+		_, n := c.d.dias[0].ISOWeek()
+		r.semanaIso = ui.Texto(strconv.Itoa(n), tema.Texto2XS, ui.Normal, tema.Color("text-subtle", v))
+		r.objetos = append(r.objetos, r.semanaIso)
+	}
 	if len(c.d.franja) > 0 {
 		for _, linea := range c.d.todoElDia {
 			tx := ui.Texto(linea, tema.Texto2XS, ui.Normal, tema.Color("text-subtle", v))
@@ -351,6 +362,7 @@ type cabeceraHorariaRenderer struct {
 	fondo                *canvas.Rectangle
 	cols                 []*colDia
 	iman                 *botonIman
+	semanaIso            *canvas.Text // el número de semana bajo el imantado, si se pide
 	filete, fileteFranja *canvas.Rectangle
 	rotulo               []*canvas.Text
 	barras               []*barraEvento
@@ -381,8 +393,18 @@ func (r *cabeceraHorariaRenderer) Layout(t fyne.Size) {
 		r.colocarDia(col, x, ancho, apilar)
 	}
 	m := r.iman.MinSize()
-	r.iman.Move(fyne.NewPos((AnchoEje-m.Width)/2, (fila-tema.Borde-m.Height)/2))
+	altoEsquina := m.Height
+	if r.semanaIso != nil {
+		altoEsquina += r.semanaIso.MinSize().Height
+	}
+	y := (fila - tema.Borde - altoEsquina) / 2
+	r.iman.Move(fyne.NewPos((AnchoEje-m.Width)/2, y))
 	r.iman.Resize(m)
+	if r.semanaIso != nil {
+		n := r.semanaIso.MinSize()
+		r.semanaIso.Move(fyne.NewPos((AnchoEje-n.Width)/2, y+m.Height))
+		r.semanaIso.Resize(n)
+	}
 	r.filete.Move(fyne.NewPos(0, fila-tema.Borde))
 	r.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
 
@@ -632,7 +654,7 @@ func (c *cuerpoHorario) Tapped(e *fyne.PointEvent) {
 	dia, m := c.localizar(e.Position)
 	lo := Imantar(m, c.p.paso())
 	loc := c.p.zona()
-	c.p.AlCrearRango(alMinuto(c.d.dias[dia], lo, loc), alMinuto(c.d.dias[dia], min(MinutosDia, lo+60), loc))
+	c.p.AlCrearRango(alMinuto(c.d.dias[dia], lo, loc), alMinuto(c.d.dias[dia], min(MinutosDia, lo+c.p.ajustes().Duracion), loc))
 }
 
 // bloqueEn es el bloque visible bajo un punto del cuerpo, si lo hay.
@@ -713,7 +735,7 @@ func (c *cuerpoArrastrable) DragEnd() {
 	case gestoCrear:
 		lo, hi := min(a.ancla, a.actual), max(a.ancla, a.actual)
 		if hi-lo < p.paso() {
-			hi = min(MinutosDia, lo+60) // clic sin arrastre: una hora
+			hi = min(MinutosDia, lo+p.ajustes().Duracion) // clic sin arrastre: la duración de los ajustes
 		}
 		c.Refresh()
 		if p.AlCrearRango != nil {
@@ -756,6 +778,14 @@ func (c *cuerpoHorario) CreateRenderer() fyne.WidgetRenderer {
 	for range 24 {
 		r.lineas = append(r.lineas, canvas.NewRectangle(tema.Color("border", v)))
 	}
+	// Fuera de la jornada de los ajustes, las horas se atenúan (`data-fuera-de-jornada`
+	// de la web): solo se lee qué horas son de trabajo, el clic es el mismo.
+	if aj := c.p.ajustes(); aj.InicioLaboral > 0 {
+		r.antes = canvas.NewRectangle(colorFueraDeJornada(v))
+	}
+	if aj := c.p.ajustes(); aj.FinLaboral < 24 {
+		r.despues = canvas.NewRectangle(colorFueraDeJornada(v))
+	}
 	for range len(c.d.dias) - 1 {
 		r.rayas = append(r.rayas, canvas.NewRectangle(tema.Color("border", v)))
 	}
@@ -772,6 +802,13 @@ func (c *cuerpoHorario) CreateRenderer() fyne.WidgetRenderer {
 	r.linea = canvas.NewRectangle(tema.Color("danger", v))
 	r.rehacer()
 	return r
+}
+
+// colorFueraDeJornada es `bg-bg-subtle/50`.
+func colorFueraDeJornada(v tema.Variante) color.NRGBA {
+	c := tema.Color("bg-subtle", v)
+	c.A = uint8(float32(c.A)*0.5 + 0.5)
+	return c
 }
 
 func dosCifras(n int) string {
@@ -792,11 +829,19 @@ type cuerpoRenderer struct {
 	punto    *canvas.Rectangle
 	linea    *canvas.Rectangle
 	objetos  []fyne.CanvasObject
+	// antes y despues atenúan las horas fuera de la jornada; nil si no hay.
+	antes, despues *canvas.Rectangle
 }
 
 func (r *cuerpoRenderer) rehacer() {
 	r.c.renderer = r
 	r.objetos = r.objetos[:0]
+	// Debajo de todo: las líneas de hora y los bloques se pintan encima.
+	for _, f := range []*canvas.Rectangle{r.antes, r.despues} {
+		if f != nil {
+			r.objetos = append(r.objetos, f)
+		}
+	}
 	for _, l := range r.lineas {
 		r.objetos = append(r.objetos, l)
 	}
@@ -816,6 +861,21 @@ func (r *cuerpoRenderer) MinSize() fyne.Size           { return r.c.MinSize() }
 func (r *cuerpoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *cuerpoRenderer) Destroy()                     {}
 
+// colocarFueraDeJornada coloca las franjas atenuadas de antes y después de la jornada.
+// Va aparte para que Layout no pase del límite de complejidad del lint.
+func (r *cuerpoRenderer) colocarFueraDeJornada(util, alto float32) {
+	aj := r.c.p.ajustes()
+	if r.antes != nil {
+		r.antes.Move(fyne.NewPos(AnchoEje, 0))
+		r.antes.Resize(fyne.NewSize(util, float32(aj.InicioLaboral)*HoraPx))
+	}
+	if r.despues != nil {
+		y := float32(aj.FinLaboral) * HoraPx
+		r.despues.Move(fyne.NewPos(AnchoEje, y))
+		r.despues.Resize(fyne.NewSize(util, max(alto-y, 0)))
+	}
+}
+
 // Layout coloca eje, líneas, bloques y lo que se esté arrastrando.
 func (r *cuerpoRenderer) Layout(t fyne.Size) {
 	c := r.c
@@ -827,6 +887,7 @@ func (r *cuerpoRenderer) Layout(t fyne.Size) {
 		// `absolute right-1.5 -translate-y-1/2`: centrado en la línea de su hora.
 		ui.ColocarTexto(h, tema.Texto2XS, AnchoEje-espacio1p5-w, y-tema.Texto2XS.Linea/2)
 	}
+	r.colocarFueraDeJornada(util, t.Height)
 	for i, l := range r.lineas {
 		l.Move(fyne.NewPos(AnchoEje, float32(i)*HoraPx))
 		l.Resize(fyne.NewSize(util, tema.Borde))
@@ -857,7 +918,7 @@ func (r *cuerpoRenderer) Layout(t fyne.Size) {
 		lo, hi := min(a.ancla, a.actual), max(a.ancla, a.actual)
 		fin := hi
 		if hi == lo {
-			fin = lo + 60
+			fin = lo + c.p.ajustes().Duracion
 		}
 		r.borrador.rotulo = rangoHoras(c.p, c.d.dias[a.dia], lo, fin, loc)
 		r.borrador.Show()
@@ -926,6 +987,11 @@ func (r *cuerpoRenderer) Refresh() {
 	}
 	for _, h := range r.horas {
 		h.Color = tema.Color("text-subtle", v)
+	}
+	for _, f := range []*canvas.Rectangle{r.antes, r.despues} {
+		if f != nil {
+			f.FillColor = colorFueraDeJornada(v)
+		}
 	}
 	r.punto.FillColor = tema.Color("danger", v)
 	r.linea.FillColor = tema.Color("danger", v)

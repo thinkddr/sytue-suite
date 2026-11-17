@@ -140,6 +140,20 @@
       ]
     },
     {
+      "nombre": "Outlook en español: la Bandeja de salida llega con su rol y lleva su glifo, no el de una carpeta propia",
+      "locale": "es",
+      "carpetas": [
+        { "id": "AAMk-outbox", "name": "Outbox", "role": "outbox" },
+        { "id": "AAMk-mine", "name": "Facturas" },
+        { "id": "AAMk-inbox", "name": "Inbox", "role": "inbox" }
+      ],
+      "esperado": [
+        { "id": "AAMk-inbox", "rotulo": "Recibidos", "glifo": "unread" },
+        { "id": "AAMk-mine", "rotulo": "Facturas", "glifo": "folder" },
+        { "id": "AAMk-outbox", "rotulo": "Bandeja de salida", "glifo": "outbox" }
+      ]
+    },
+    {
       "nombre": "POP3 solo tiene la bandeja de entrada",
       "locale": "es",
       "carpetas": [{ "id": "INBOX", "name": "INBOX", "role": "inbox" }],

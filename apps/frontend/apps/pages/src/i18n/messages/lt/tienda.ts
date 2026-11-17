@@ -176,14 +176,9 @@ export const tienda = {
   'store.mode_test_help':
     'Imituojami mokėjimai su teikėjo testavimo raktais. Niekas neapmokestinamas.',
   'store.mode_live_help': 'Tikri mokėjimai naudojant gamybinius raktus.',
-  'store.webhook_title': '1 žingsnis: webhook adresas',
   'store.webhook_help': 'Įklijuokite šį adresą {nombre} valdymo skydelyje.',
   'store.webhook_label': 'Webhook adresas',
   'store.webhook_error': 'Nepavyko gauti webhook adreso. Uždarykite langą ir bandykite dar kartą.',
-  'store.copy': 'Kopijuoti',
-  'store.copied': 'Adresas nukopijuotas.',
-  'store.credentials_title': 'Prisijungimo duomenys',
-  'store.credentials_step': '2 žingsnis: prisijungimo duomenys',
   'store.f_api_key': 'API raktas',
   'store.f_api_key_mode': 'API raktas ({modo})',
   'store.f_profile_id': 'Profilio ID (neprivaloma)',
@@ -201,6 +196,48 @@ export const tienda = {
   'store.gateway_save': 'Išsaugoti ir išbandyti',
   'store.gateway_saved': 'Šliuzas {nombre} išbandytas ir išsaugotas.',
   'store.gateway_save_error': 'Nepavyko patvirtinti šliuzo prisijungimo duomenų.',
+  'store.wz_progress': 'Mokėjimų tarpininko prijungimo žingsniai',
+  'store.wz_step_mode': 'Režimas',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Raktai',
+  'store.wz_step_check': 'Patikrinti',
+  'store.wz_step_done': 'Atlikta',
+  'store.wz_mode_heading': 'Bandomieji ar tikri mokėjimai?',
+  'store.wz_mode_desc':
+    'Pradėkite bandomuoju režimu; kai viskas veiks, vėl atidarykite šį vedlį ir pasirinkite tikrą režimą.',
+  'store.wz_webhook_heading': 'Nurodykite {nombre}, kur siųsti pranešimus apie mokėjimus',
+  'store.wz_keys_heading': 'Jūsų {nombre} raktai',
+  'store.wz_keys_desc':
+    'Slaptieji raktai saugomi užantspauduoti ir daugiau nerodomi: norėdami pakeisti raktą, įveskite jį iš naujo.',
+  'store.wz_keys_rejected': '{nombre} nepriėmė šių raktų',
+  'store.wz_check_heading': 'Patikrinti ir išsaugoti',
+  'store.wz_check_desc':
+    'Sytue Web išbando raktus {nombre} sistemoje prieš įjungdama tarpininką. Niekas neišsaugoma, kol bandymas nepavyksta.',
+  'store.wz_secret_hidden': 'Įvestas (paslėptas)',
+  'store.wz_empty_value': 'Nenurodyta',
+  'store.wz_done_heading': '{nombre} paruoštas',
+  'store.wz_finish': 'Baigti',
+  'store.hint_mollie_api_key':
+    'Mollie: Developers › API keys. Bandomieji raktai prasideda test_, tikri – live_.',
+  'store.hint_mollie_profile':
+    'Mollie: Settings › Website profiles. Prasideda pfl_; palikite tuščią, kad būtų naudojamas numatytasis profilis.',
+  'store.hint_adyen_api_key':
+    'Adyen Customer Area: Developers › API credentials › jūsų prisijungimo duomenys › API key.',
+  'store.hint_adyen_merchant':
+    'Adyen Customer Area viršutiniame paskyros pasirinkiklyje: prekybininko paskyra, ne įmonės paskyra.',
+  'store.hint_adyen_hmac': 'Adyen: Developers › Webhooks › jūsų webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Adyen (tikras režimas): Developers › API URLs. Tai adreso dalis prieš -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Jį jums duoda bankas kartu su virtualaus POS sutartimi; jis matomas ir Redsys administravimo portale.',
+  'store.hint_redsys_terminal':
+    'Redsys administravimo portale, šalia prekybininko kodo. Paprastai tai 1.',
+  'store.hint_redsys_secret':
+    'Redsys administravimo portale: prekybininko duomenys › SHA-256 raktas. Bandomasis ir tikras raktai skiriasi.',
+  'store.hint_stripe_secret':
+    'Stripe: Developers › API keys › Secret key. Prasideda sk_test_ arba sk_live_.',
+  'store.hint_stripe_webhook':
+    'Stripe: Developers › Webhooks › jūsų galinis taškas › Signing secret. Prasideda whsec_.',
   'orders.subtitle': 'Jūsų svetainėje pateikti užsakymai ir pirkimai.',
   'orders.count': {
     one: '{count} užsakymas',

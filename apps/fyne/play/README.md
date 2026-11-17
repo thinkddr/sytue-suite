@@ -1,9 +1,10 @@
-# Google Play: las fichas de las quince apps
+<a id="google-play-las-fichas-de-las-quince-apps"></a>
+# Google Play: the store listings of the fifteen apps
 
-Todo lo que Play Console pide de cada app y se puede tener en el repositorio. Lo sube
-`apps/fyne/scripts/play-publicar.sh` (workflow `play-publicar.yml`, y el paso opcional
-de `release-mobile.yml`); el porqué y el funcionamiento, en «Google Play: ficha y subida
-por la API» de `docs/operations.md`.
+Everything Play Console asks for about each app that can be kept in the repository. It is uploaded by
+`apps/fyne/scripts/play-publicar.sh` (the `play-publicar.yml` workflow, and the optional step
+in `release-mobile.yml`); the why and how it works are in «Google Play: ficha y subida
+por la API» (Google Play: listing and upload through the API) in `docs/operations.md`.
 
 ```
 <app>/<idioma de Play>/title.txt               ≤ 30 caracteres (el Name de FyneApp.toml)
@@ -15,332 +16,374 @@ por la API» de `docs/operations.md`.
 <app>/seguridad-datos.csv                      «Seguridad de los datos», formato de exportación de Play
 ```
 
-`<app>` es el directorio de `apps/fyne/cmd/`; el paquete sale de su `FyneApp.toml`
-(`eu.sytue.<app>`, y `eu.sytue.one` para el Hub).
+`<app>` is the directory under `apps/fyne/cmd/`; the package comes from its `FyneApp.toml`
+(`eu.sytue.<app>`, and `eu.sytue.one` for the Hub).
 
-## Cómo se regenera
+<a id="cómo-se-regenera"></a>
+## How it is regenerated
 
-- **Textos y CSV**: `bun apps/fyne/play/generar.ts` desde la raíz. Los textos salen del
-  catálogo de www (`product.<clave>.*`), que ya está en los 26 idiomas: la ficha dice lo
-  mismo que la web y no hay otra traducción que mantener. Lo que la app del teléfono no
-  hace se deja fuera clave a clave, en `FICHAS`, con el motivo al lado.
-  **24 idiomas, no 26**: Play Console no tiene irlandés (`ga`) ni maltés (`mt`).
-  El idioma por defecto es `es-ES`: las imágenes solo se suben a él, y Play las enseña en
-  los demás.
-- **Icono y gráfico destacado**: `bash apps/fyne/play/graficos.sh` (necesita `magick`, así
-  que en el Mac). El icono es el `Icon.png` de la app; el destacado, la marca y el nombre
-  sobre el papel de la suite (`--sytue-neutral-50`, tinta `--sytue-ink`, Figtree Bold).
-- **Capturas**: el recorrido de cada app (`TestRecorridoConSesion`) contra su servicio
-  falso, con `SYTUE_CAPTURAS_PLAY=<dir>`: en vez de comprobar, pone la ventana a
-  360 × 640 a ×3 (1080 × 1920, disposición de teléfono) y deja una captura de cada
-  pantalla y cada capa a la que se llega pulsando. Las de la ficha se eligen de ahí y se
-  copian con `graficos.sh <dir>`, que lee la lista `CAPTURAS` de ese guion. La vía habitual
-  es el CI, que importa esa selección con `graficos.sh --seleccion <app>`:
+- **Texts and CSV**: `bun apps/fyne/play/generar.ts` from the root. The texts come from the
+  www catalog (`product.<clave>.*`), which is already in the 26 languages: the listing says the
+  same as the website and there is no other translation to maintain. What the phone app does not
+  do is left out key by key, in `FICHAS`, with the reason next to it.
+  **24 languages, not 26**: Play Console has no Irish (`ga`) or Maltese (`mt`).
+  The default language is `es-ES`: images are only uploaded to it, and Play shows them in
+  the others.
+- **Icon and feature graphic**: `bash apps/fyne/play/graficos.sh` (it needs `magick`, so
+  on the Mac). The icon is the app's `Icon.png`; the feature graphic, the mark and the name
+  on the suite's paper (`--sytue-neutral-50`, ink `--sytue-ink`, Figtree Bold).
+- **Screenshots**: each app's walkthrough (`TestRecorridoConSesion`) against its fake
+  service, with `SYTUE_CAPTURAS_PLAY=<dir>`: instead of checking, it sets the window to
+  360 × 640 at ×3 (1080 × 1920, phone layout) and leaves a screenshot of every
+  screen and every layer reached by tapping. The listing ones are chosen from there and
+  copied with `graficos.sh <dir>`, which reads the `CAPTURAS` list in that script. The usual way
+  is the CI, which imports that selection with `graficos.sh --seleccion <app>`:
 
-  ```sh
+    ```sh
   gh workflow run ci-desktop.yml --ref <rama> -F empaquetado_solo=true \
     -F captura_fichas=true -f apps_fichas=todas -f clase_fichas=android
   ```
 
-  `apps_fichas` también acepta una lista separada por espacios. El trabajo conserva el
-  índice completo y solo los PNG seleccionados, como se describe en
-  [`../appstore/README.md`](../appstore/README.md). Hay que volver a mirar las imágenes
-  tras regenerarlas: los números del recorrido cambian al cambiar la interfaz.
+  `apps_fichas` also accepts a space-separated list. The job keeps the full
+  index and only the selected PNGs, as described in
+  [`../appstore/README.md`](../appstore/README.md). The images must be looked at again
+  after regenerating them: the walkthrough numbers change when the interface changes.
 
-  **Revisión visual completada el 2026-10-14: 45 PNG de teléfono de las quince apps**,
-  de 1080 × 1920, RGB sin alfa. Se revisó
-  [la regeneración completa de Android](https://github.com/thinkddr/sytue-one/actions/runs/38608561176)
-  y se sustituyeron Rooms y Drive por las imágenes de
-  [la regeneración dirigida](https://github.com/thinkddr/sytue-one/actions/runs/38613047745),
-  también revisadas. De las 54 iniciales se retiraron dos de Calcus, una de Calendar y
-  una de Docus con avisos de error del servicio falso, una de Drive y dos de Rooms,
-  y las vistas opcionales de Photos y Diapos con controles recortados. `graficos.sh`
-  conserva la selección final; los PNG conservan el render original.
-  La revisión es de capturas del driver de software a medida de teléfono. La validación
-  en dispositivos físicos sigue pendiente y las imágenes no acreditan el funcionamiento
-  completo de las apps en Android.
+  **Visual review completed on 2026-10-14: 45 phone PNGs of the fifteen apps**,
+  at 1080 × 1920, RGB without alpha. The review covered
+  [the full Android regeneration](https://github.com/thinkddr/sytue-one/actions/runs/38608561176)
+  and Rooms and Drive were replaced with the images from
+  [the targeted regeneration](https://github.com/thinkddr/sytue-one/actions/runs/38613047745),
+  also reviewed. Of the initial 54, two from Calcus, one from Calendar and
+  one from Docus with error notices from the fake service, one from Drive and two from Rooms,
+  and the optional views of Photos and Diapos with clipped controls were removed. `graficos.sh`
+  keeps the final selection; the PNGs keep the original render.
+  The review is of screenshots from the software driver at phone size. Validation
+  on physical devices is still pending and the images do not prove that the apps
+  work fully on Android.
 
-## Lo que hace la API y lo que no
+<a id="lo-que-hace-la-api-y-lo-que-no"></a>
+## What the API does and what it does not
 
-| Paso                                                                                            | ¿Por la API?                                                                      | Quién                                          |
-| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Crear la app en Play Console                                                                    | No                                                                                | El dueño (trece el 25/09; **Cast, pendiente**) |
-| Ficha (título, descripciones) en 24 idiomas                                                     | Sí, `edits.listings.update`                                                       | `play-publicar.sh`                             |
-| Icono, destacado y capturas                                                                     | Sí, `edits.images.upload`                                                         | `play-publicar.sh`                             |
-| Sitio web de contacto (`https://sytue.eu`) e idioma por defecto                                 | Sí, `edits.details.patch`                                                         | `play-publicar.sh`                             |
-| Correo de contacto                                                                              | Sí, pero **no nos lo inventamos**                                                 | DECISIÓN del dueño                             |
-| Política de privacidad (`https://sytue.eu/privacidad`)                                          | **No**: `AppDetails` no la tiene                                                  | El dueño, en _Contenido de la app_             |
-| Seguridad de los datos                                                                          | Sí, `applications.dataSafety` (fuera de la edición)                               | `play-publicar.sh`                             |
-| AAB a «internal» (como borrador)                                                                | Sí, `edits.bundles.upload` + `edits.tracks.update`                                | `play-publicar.sh --aab`                       |
-| Testers de «internal»                                                                           | Solo **grupos de Google** (`edits.testers`); las listas de correos, en la consola | El dueño                                       |
-| Países (todos salvo `scripts/paises.json`)                                                      | **No**: `countryAvailability` solo se lee; `--paises` lo comprueba               | El dueño; DECISIÓN abajo                       |
-| Clasificación de contenido, público objetivo, anuncios, acceso, declaraciones, ID de publicidad | **No**                                                                            | El dueño, con las respuestas de abajo          |
-| Enviar a revisión y a producción                                                                | No se hace                                                                        | El dueño                                       |
+| Step                                                                                    | Through the API?                                                                | Who                                                   |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Create the app in Play Console                                                          | No                                                                              | The owner (thirteen on 25/09; **Cast, pending**)      |
+| Listing (title, descriptions) in 24 languages                                           | Yes, `edits.listings.update`                                                    | `play-publicar.sh`                                    |
+| Icon, feature graphic and screenshots                                                   | Yes, `edits.images.upload`                                                      | `play-publicar.sh`                                    |
+| Contact website (`https://sytue.eu`) and default language                               | Yes, `edits.details.patch`                                                      | `play-publicar.sh`                                    |
+| Contact email                                                                           | Yes, but **we do not make it up**                                               | The owner's DECISION                                  |
+| Privacy policy (`https://sytue.eu/privacidad`)                                          | **No**: `AppDetails` does not have it                                           | The owner, in _Contenido de la app_ (App content)     |
+| Data safety                                                                             | Yes, `applications.dataSafety` (outside the edit)                               | `play-publicar.sh`                                    |
+| AAB to “internal” (as a draft)                                                          | Yes, `edits.bundles.upload` + `edits.tracks.update`                             | `play-publicar.sh --aab`                              |
+| “internal” testers                                                                      | Only **Google groups** (`edits.testers`); email lists, in the console           | The owner                                             |
+| Countries (all except `scripts/paises.json`)                                            | **No**: `countryAvailability` is read-only; `--paises` checks it                | The owner; DECISION below                             |
+| Content rating, target audience, ads, access, declarations, advertising ID             | **No**                                                                          | The owner, with the answers below                     |
+| Send for review and to production                                                       | Not done                                                                        | The owner                                             |
 
-## Respuestas para _Contenido de la app_, pregunta a pregunta
+<a id="respuestas-para-contenido-de-la-app-pregunta-a-pregunta"></a>
+## Answers for _Contenido de la app_ (App content), question by question
 
-Valen para las quince salvo donde se dice otra cosa. Salen del código y del inventario de
-lo que sale a terceros (2026-09-14): sin rastreadores, sin SDK de terceros, sin anuncios,
-sin analítica en las apps; los avisos de Android llegan por el SSE del Hub (sin Firebase).
+They apply to all fifteen except where stated otherwise. They come from the code and from the inventory of
+what goes out to third parties (2026-09-14): no trackers, no third-party SDKs, no ads,
+no analytics in the apps; Android notifications arrive through the Hub's SSE (no Firebase).
 
-### Política de privacidad
+<a id="política-de-privacidad"></a>
+### Privacy policy
 
 `https://sytue.eu/privacidad`.
 
-### Acceso a la app
+<a id="acceso-a-la-app"></a>
+### App access
 
-«**Toda o parte de la funcionalidad está restringida**». Todas piden iniciar sesión con
-Sytue ID (se abre el navegador del sistema en `id.sytue.eu`). Instrucciones para el
-revisor, que **escribe el dueño** con una cuenta de prueba suya (nadie más la tiene ni debe
-tenerla en el repositorio):
+«**Toda o parte de la funcionalidad está restringida**» (“All or some functionality is restricted”). All of them require signing in with
+Sytue ID (the system browser opens at `id.sytue.eu`). Instructions for the
+reviewer, which **the owner writes** with a test account of their own (nobody else has it, nor should
+it be in the repository):
 
-> Pulse «Iniciar sesión»: se abre el navegador en id.sytue.eu. Usuario: `<la del dueño>`.
-> Contraseña: `<la del dueño>`. La cuenta pertenece a una organización de demostración con
-> correo, archivos, calendario y canales de ejemplo. No pide segundo factor.
+> Tap «Iniciar sesión» (“Sign in”): the browser opens at id.sytue.eu. Username: `<la del dueño>`.
+> Password: `<la del dueño>`. The account belongs to a demo organization with
+> sample email, files, calendar and channels. It does not ask for a second factor.
 
-La cuenta tiene que ir **sin segundo factor ni passkey obligatoria**, o el revisor se queda
-en la puerta y Play rechaza la app. Una sola cuenta vale para las quince.
+The account must have **no second factor and no mandatory passkey**, or the reviewer is stuck
+at the door and Play rejects the app. A single account works for all fifteen.
 
-### Anuncios
+<a id="anuncios"></a>
+### Ads
 
-«**No, mi app no contiene anuncios**».
+«**No, mi app no contiene anuncios**» (“No, my app does not contain ads”).
 
-### ID de publicidad
+<a id="id-de-publicidad"></a>
+### Advertising ID
 
-«**No**»: ninguna app lo usa (no hay SDK de anuncios ni de analítica, ni `AD_ID` en el
-manifiesto).
+«**No**»: no app uses it (there is no ads or analytics SDK, and no `AD_ID` in the
+manifest).
 
-### Clasificación de contenido (IARC)
+<a id="clasificación-de-contenido-iarc"></a>
+### Content rating (IARC)
 
-- Correo de contacto: el del dueño.
-- Categoría: «**Todas las demás tipos de apps**» (ni juego ni tienda).
-- Violencia, sexualidad, lenguaje soez, sustancias, apuestas, contenido sensible: **No** a todo, en lo que la app trae
-  de fábrica. **Sytue Cast es la excepción** en la pregunta de si los usuarios pueden compartir públicamente desnudos o
-  violencia: ahí se declara **Sí** (decisión del dueño, 2026-10-06; el porqué y lo que haría falta para un «No», más
-  abajo en «Bloquear y denunciar»).
-- ¿Los usuarios pueden interactuar o intercambiar contenido? **Sí** en las quince: todas
-  comparten dentro de la organización (Mail, Rooms y Cast además con otras; Cast, con
-  portada pública). No cambia la edad
-  (sale PEGI 3 / USK 0 / IARC 3+) y solo añade el aviso «Los usuarios interactúan».
-- ¿Comparte la ubicación del usuario? **No**. ¿Compras digitales dentro de la app? **No**.
-- ¿Es un navegador web o un buscador? **No**.
+- Contact email: the owner's.
+- Category: «**Todas las demás tipos de apps**» (“All other app types”) (neither a game nor a store).
+- Violence, sexuality, crude language, substances, gambling, sensitive content: **No** to everything, as far as the app
+  ships out of the box. **Sytue Cast is the exception** on the question of whether users can publicly share nudity or
+  violence: there the answer is **Yes** (owner's decision, 2026-10-06; the why and what would be needed for a “No” are
+  further down in “Block and report”).
+- Can users interact or exchange content? **Yes** in all fifteen: they all
+  share within the organization (Mail, Rooms and Cast also with others; Cast, with a
+  public front page). It does not change the age rating
+  (it comes out PEGI 3 / USK 0 / IARC 3+) and only adds the «Los usuarios interactúan» (“Users interact”) notice.
+- Does it share the user's location? **No**. Digital purchases inside the app? **No**.
+- Is it a web browser or a search engine? **No**.
 
-### Bloquear y denunciar (contenido generado por usuarios)
+<a id="bloquear-y-denunciar-contenido-generado-por-usuarios"></a>
+### Block and report (user-generated content)
 
-La clasificación pregunta si la app permite **bloquear** usuarios o contenido y **denunciar**
-usuarios o contenido, y la política de contenido generado por usuarios lo exige donde el
-contenido principal es de usuarios.
+The rating asks whether the app lets users **block** users or content and **report**
+users or content, and the user-generated content policy requires it where the
+main content comes from users.
 
-**Sytue Rooms** ([ADR 0073](../../../docs/decisions.md#0073)). Lo que se puede declarar, y dónde
-está en la app:
+**Sytue Rooms** ([ADR 0073](../../../docs/decisions.md#0073)). What can be declared, and where
+it is in the app:
 
-| Pregunta de la consola                         | Respuesta | Dónde, en la app                                                                                                                                                                                |
-| ---------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ¿Se puede bloquear a otros usuarios?           | **Sí**    | «…» de un mensaje → «Bloquear a…»; panel «Personas» → «…» de la persona. Se deshace en el menú del canal → «Personas bloqueadas»                                                                |
-| ¿Se puede denunciar a otros usuarios?          | **Sí**    | Panel «Personas» → «…» de la persona → «Denunciar a…»                                                                                                                                           |
-| ¿Se puede denunciar contenido?                 | **Sí**    | «…» de un mensaje → «Denunciar mensaje», con motivo (acoso, contenido sexual, violencia, spam, otro) y nota opcional                                                                            |
-| ¿Hay moderación del contenido de los usuarios? | **Sí**    | Los administradores del equipo y de la organización reciben la denuncia y pueden descartarla, borrar el mensaje o expulsar del canal; y el operador de la plataforma (Sytue), en su propia cola |
+| Console question                               | Answer    | Where, in the app                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can other users be blocked?                    | **Yes**   | «…» on a message → «Bloquear a…» (Block…); «Personas» (People) panel → the person's «…». It is undone in the channel menu → «Personas bloqueadas» (Blocked people)                                                                                 |
+| Can other users be reported?                   | **Yes**   | «Personas» panel → the person's «…» → «Denunciar a…» (Report…)                                                                                                                                                                                     |
+| Can content be reported?                       | **Yes**   | «…» on a message → «Denunciar mensaje» (Report message), with a reason (harassment, sexual content, violence, spam, other) and an optional note                                                                                                     |
+| Is user content moderated?                     | **Yes**   | Team and organization administrators receive the report and can dismiss it, delete the message or remove the person from the channel; and the platform operator (Sytue), in its own queue                                                         |
 
-- **Qué hace bloquear**, por si lo pide la revisión: quien bloquea deja de recibir los
-  mensajes directos y los avisos de esa persona —lo aplica el servidor, no la app— y ve
-  plegados sus mensajes en los canales que comparten. No se borra nada.
-- **Condición para declararlo.** Es verdad cuando la versión que se sube a Play y el servicio
-  desplegado llevan los dos esta función: la app sin el servicio enseña las entradas y
-  falla al usarlas, y el servicio sin la app no tiene puerta. Antes de marcarlo, comprobar
-  las dos cosas en la versión que se envía.
+- **What blocking does**, in case the review asks: whoever blocks stops receiving that person's
+  direct messages and notifications —enforced by the server, not the app— and sees
+  their messages collapsed in the channels they share. Nothing is deleted.
+- **Condition for declaring it.** It is true when the version uploaded to Play and the deployed
+  service both include this feature: the app without the service shows the entries and
+  fails when they are used, and the service without the app has no way in. Before ticking it, check
+  both things in the version being submitted.
 
-**Sytue Cast** ([ADR 0074](../../../docs/decisions.md#0074)). Lo que se puede declarar, y dónde
-está en la app:
+**Sytue Cast** ([ADR 0074](../../../docs/decisions.md#0074)). What can be declared, and where
+it is in the app:
 
-| Pregunta de la consola                         | Respuesta | Dónde, en la app                                                                                                                                                                                                                                                                                                                                                 |
-| ---------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ¿Se puede bloquear a otros usuarios?           | **Sí**    | «Denunciar» junto al vídeo → «Bloquear a…»; «Bloquear a…» bajo cada comentario; «…» de un mensaje del chat. Se deshace en «Denuncias y bloqueos»                                                                                                                                                                                                                 |
-| ¿Se puede denunciar a otros usuarios?          | **Sí**    | «Denunciar» junto al vídeo → «Denunciar a…»                                                                                                                                                                                                                                                                                                                      |
-| ¿Se puede denunciar contenido?                 | **Sí**    | «Denunciar» junto al vídeo, bajo cada comentario, en el «…» de cada mensaje del chat y en la cabecera de un canal; con motivo (acoso, contenido sexual o desnudos, violencia, spam o engaño, derechos de autor, otro) y texto opcional. **También sin cuenta**, en lo público                                                                                    |
-| ¿Hay moderación del contenido de los usuarios? | **Sí**    | Quienes administran la organización dueña del contenido ven la cola en «Denuncias y bloqueos» y pueden descartar, borrar el comentario o el mensaje, retirar el vídeo de la portada pública, despublicarlo o bloquear a la persona; nadie ve las denuncias contra sí mismo. Y el operador de la plataforma (Sytue) tiene su propia cola, con las mismas acciones |
+| Console question                               | Answer    | Where, in the app                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can other users be blocked?                    | **Yes**   | «Denunciar» (Report) next to the video → «Bloquear a…» (Block…); «Bloquear a…» under each comment; «…» on a chat message. It is undone in «Denuncias y bloqueos» (Reports and blocks)                                                                                                                                                                                  |
+| Can other users be reported?                   | **Yes**   | «Denunciar» next to the video → «Denunciar a…» (Report…)                                                                                                                                                                                                                                                                                                                |
+| Can content be reported?                       | **Yes**   | «Denunciar» next to the video, under each comment, in the «…» of each chat message and in a channel's header; with a reason (harassment, sexual content or nudity, violence, spam or deception, copyright, other) and optional text. **Also without an account**, on public content                                                                                     |
+| Is user content moderated?                     | **Yes**   | Those who administer the organization that owns the content see the queue in «Denuncias y bloqueos» and can dismiss, delete the comment or the message, remove the video from the public front page, unpublish it or block the person; nobody sees reports against themselves. And the platform operator (Sytue) has its own queue, with the same actions                 |
 
-- **Qué hace bloquear**, por si lo pide la revisión: quien bloquea deja de recibir los comentarios, los mensajes del chat
-  y los avisos de directo de esa persona, y esa persona deja de poder comentar y escribir en los vídeos de quien la
-  bloqueó. Lo aplica el servidor. No se borra nada.
-- **Condición para declararlo**, la misma que en Rooms: que la versión que se sube a Play y el servicio desplegado lleven
-  los dos esta función. Además, la denuncia sin cuenta pasa por la web de Cast solo si esa web está desplegada con ella.
-- **La cola del operador** ([ADR 0075](../../../docs/decisions.md#0075)) es de la consola de plataforma, solo web: la
-  app no cambia. Para contarla en la revisión hace falta que estén desplegados a la vez Sytue ID (la ruta
-  `platform/moderation/access`), Cast (migraciones 0010-0012) y Rooms (migración 0039), y la consola de plataforma; y
-  que el dueño haya revisado las condiciones y el DPA, porque es acceso de Sytue al contenido de los clientes.
+- **What blocking does**, in case the review asks: whoever blocks stops receiving that person's comments, chat messages
+  and live notifications, and that person can no longer comment or write on the videos of whoever
+  blocked them. It is enforced by the server. Nothing is deleted.
+- **Condition for declaring it**, the same as in Rooms: the version uploaded to Play and the deployed service must
+  both include this feature. In addition, reporting without an account goes through the Cast website only if that website is deployed with it.
+- **The operator queue** ([ADR 0075](../../../docs/decisions.md#0075)) belongs to the platform console, web only: the
+  app does not change. To count it in the review, Sytue ID (the
+  `platform/moderation/access` route), Cast (migrations 0010-0012) and Rooms (migration 0039), and the platform console, must all be deployed at the same time; and
+  the owner must have reviewed the terms and the DPA, because it is Sytue access to customers' content.
 
-**Desnudos y violencia en Cast: hoy se declara que SÍ pueden compartirse públicamente.** Es la decisión del dueño
-(2026-10-06) y sigue siendo la respuesta verdadera: nada lo impide técnicamente, cualquiera con una cuenta puede publicar
-un vídeo y aparece en la portada sin revisión. Para poder responder «**No**» harían falta, todas (estado al 2026-10-12):
+**Nudity and violence in Cast: today we declare that they CAN be shared publicly.** That is the owner's decision
+(2026-10-06) and it is still the truthful answer: nothing prevents it technically, anyone with an account can publish
+a video and it appears on the front page without review. To be able to answer “**No**”, all of the following would be needed (status as of 2026-10-12):
 
-1. **Condiciones de uso que lo prohíban**, aceptadas por quien publica, y enlazadas desde la ficha y desde la app.
-   **Falta**: es texto legal, decisión del dueño.
-2. **Retirada tras denuncia hecha por Sytue**, no solo por la organización que publica. **Hecho en código, sin
-   desplegar**: la cola del operador ([ADR 0075](../../../docs/decisions.md#0075)) recibe todas las denuncias —también
-   las que son contra quien administra, que esa persona ya no ve— y puede retirar de la portada, despublicar, borrar y
-   bloquear. **Falta** comprometer un plazo de respuesta y que alguien mire la cola: el operador no recibe avisos.
-3. **Capacidad de actuar contra reincidentes.** **A medias**: suspender una organización ya existe en la consola de
-   plataforma (con segunda persona), y el bloqueo en la organización cierra la puerta a una persona dentro de ella.
-   **No existe** suspender a una persona en toda la plataforma, ni quitarle a una cuenta u organización la publicación
-   en abierto sin suspenderla entera.
-4. **Una decisión sobre la portada**: que un vídeo no llegue a «Explorar» sin algún filtro (revisión previa, antigüedad
-   de la cuenta o detección automática), o aceptar por escrito que la retirada es posterior a la publicación.
-   **Falta**: decisión del dueño.
-5. **Contacto de abuso publicado** para quien no usa la app (un correo), atendido. **Falta.** (La denuncia sin cuenta
-   desde la web pública ya existe y llega a las dos colas.)
+1. **Terms of use that forbid it**, accepted by whoever publishes, and linked from the listing and from the app.
+   **Missing**: it is legal text, the owner's decision.
+2. **Takedown after a report, carried out by Sytue**, not only by the publishing organization. **Done in code, not
+   deployed**: the operator queue ([ADR 0075](../../../docs/decisions.md#0075)) receives every report —including
+   those against whoever administers, which that person no longer sees— and can remove from the front page, unpublish, delete and
+   block. **Missing**: committing to a response time and someone watching the queue: the operator receives no notifications.
+3. **Ability to act against repeat offenders.** **Partly**: suspending an organization already exists in the platform
+   console (with a second person), and blocking within the organization shuts the door on a person inside it.
+   There is **no** way to suspend a person across the whole platform, nor to take away public publishing from an account or
+   organization without suspending it entirely.
+4. **A decision about the front page**: that a video does not reach «Explorar» (Explore) without some filter (prior review, account
+   age or automatic detection), or accepting in writing that takedown happens after publication.
+   **Missing**: the owner's decision.
+5. **A published abuse contact** for those who do not use the app (an email address), that is attended to. **Missing.** (Reporting without an account
+   from the public website already exists and reaches both queues.)
 
-Con 1, 2 —desplegado y con plazo— y 5 se puede sostener «no está permitido y se retira». Hasta entonces la respuesta
-honrada sigue siendo «sí».
+With 1, 2 —deployed and with a response time— and 5, “it is not allowed and it is taken down” can be upheld. Until then the honest
+answer remains “yes”.
 
-**Qué se puede declarar hoy, en una línea.** Bloquear usuarios, denunciar usuarios y contenido y moderación: **Sí** en
-Rooms y en Cast, en cuanto la versión que se sube y los servicios desplegados lleven la función (la cola del operador
-añade moderación de Sytue cuando esté desplegada). Desnudos y violencia en Cast: **Sí** pueden compartirse.
+**What can be declared today, in one line.** Blocking users, reporting users and content, and moderation: **Yes** in
+Rooms and in Cast, as soon as the version uploaded and the deployed services include the feature (the operator queue
+adds Sytue moderation once deployed). Nudity and violence in Cast: they **can** be shared.
 
-### Público objetivo y contenido
+<a id="público-objetivo-y-contenido"></a>
+### Target audience and content
 
-- Edad del público objetivo: **18 años o más en las quince apps**. Decisión explícita
-  del dueño, confirmada el **2026-10-15** para Google Play.
-- ¿Podría atraer a niños sin querer? **No**.
+- Target audience age: **18 or over in all fifteen apps**. An explicit decision
+  by the owner, confirmed on **2026-10-15** for Google Play.
+- Could it unintentionally appeal to children? **No**.
 
-### Seguridad de los datos
+<a id="seguridad-de-los-datos"></a>
+### Data safety
 
-Se sube por la API desde `seguridad-datos.csv`. Resumen de lo declarado:
+It is uploaded through the API from `seguridad-datos.csv`. Summary of what is declared:
 
-- Se **recoge** (va a nuestros servidores) y **no se comparte** con nadie: Scaleway, Mollie
-  y Sweego son encargados, que Play no cuenta como «compartir».
-- Todo cifrado en tránsito (TLS 1.3). Se puede pedir la eliminación de los datos
-  (`PSL_SUPPORT_DATA_DELETION_BY_USER` = sí).
-- En todas: nombre, correo, ID de usuario (la cuenta: funcionalidad y gestión de la cuenta;
-  obligatorio) e historial de búsqueda en la app (efímero).
-- Además: Hub → teléfono (opcional; el alta guiada lo verifica por SMS); Mail → correos y
-  ficheros; Drive → ficheros, fotos y vídeos; Docus, Calcus, Diapos y CertiPDF → ficheros
-  y documentos; Calendar → calendario; Contacts → contactos; Notepads → contenido creado
-  por el usuario y ficheros; Photos → fotos; Rooms → otros mensajes, audio y vídeos (la
-  voz y la cámara o la pantalla de una llamada; no efímeros, porque la reunión se puede
-  grabar desde el teléfono), fotos y ficheros; Cast → vídeos y su audio (la grabación de
-  un directo se queda como vídeo), fotos (el póster propio), contenido creado por el
-  usuario (título y descripción) y otros mensajes (chat y comentarios), todo opcional, e
-  interacciones con la app (quién está viendo un directo, guardado mientras dura); ERP → «otra información financiera»
-  (los libros de la organización); Bases → contenido creado por el usuario (lo que la
-  organización escribe en sus tablas; los adjuntos no se suben desde la app).
-- **Alta de la cuenta**: en Sytue ID, con **usuario y contraseña** (`PSL_ACM_USER_ID_PASSWORD`);
-  el SMS del móvil y las invitaciones de la organización no cuentan como otro método. Sin
-  esta respuesta la API rechaza el CSV entero («Response missing for
-  PSL_SUPPORTED_ACCOUNT_CREATION_METHODS»).
-- **Eliminar la cuenta**: el enlace web que pide Play es `https://id.sytue.eu/account/delete`
-  (`PSL_ACCOUNT_DELETION_URL`), en las quince. Tiene que funcionar antes de enviar a revisión:
-  Play rechaza la app por «Invalid account/data deletion link» si no carga.
-- **Eliminar datos sin eliminar la cuenta** (`PSL_DATA_DELETION_URL`): la política de
-  privacidad, `https://sytue.eu/privacidad`, que explica cómo pedir la supresión. Sin esta
-  respuesta la API también rechaza el CSV («Response missing for PSL_DATA_DELETION_URL»).
+- Data is **collected** (it goes to our servers) and **not shared** with anyone: Scaleway, Mollie
+  and Sweego are processors, which Play does not count as “sharing”.
+- Everything encrypted in transit (TLS 1.3). Data deletion can be requested
+  (`PSL_SUPPORT_DATA_DELETION_BY_USER` = yes).
+- In all of them: name, email, user ID (the account: app functionality and account management;
+  required) and in-app search history (ephemeral).
+- In addition: Hub → phone number (optional; the guided sign-up verifies it by SMS); Mail → emails and
+  files; Drive → files, photos and videos; Docus, Calcus, Diapos and CertiPDF → files
+  and documents; Calendar → calendar; Contacts → contacts; Notepads → user-generated content
+  and files; Photos → photos; Rooms → other messages, audio and videos (the
+  voice and the camera or screen of a call; not ephemeral, because the meeting can be
+  recorded from the phone), photos and files; Cast → videos and their audio (the recording of
+  a live stream stays as a video), photos (the custom poster), user-generated
+  content (title and description) and other messages (chat and comments), all optional, and
+  app interactions (who is watching a live stream, stored while it lasts); ERP → “other financial info”
+  (the organization's books); Bases → user-generated content (what the
+  organization writes in its tables; attachments are not uploaded from the app).
+- **Account creation**: in Sytue ID, with **username and password** (`PSL_ACM_USER_ID_PASSWORD`);
+  the mobile SMS and organization invitations do not count as another method. Without
+  this answer the API rejects the entire CSV (“Response missing for
+  PSL_SUPPORTED_ACCOUNT_CREATION_METHODS”).
+- **Account deletion**: the web link Play asks for is `https://id.sytue.eu/account/delete`
+  (`PSL_ACCOUNT_DELETION_URL`), in all fifteen. It must work before submitting for review:
+  Play rejects the app with “Invalid account/data deletion link” if it does not load.
+- **Deleting data without deleting the account** (`PSL_DATA_DELETION_URL`): the privacy
+  policy, `https://sytue.eu/privacidad`, which explains how to request erasure. Without this
+  answer the API also rejects the CSV (“Response missing for PSL_DATA_DELETION_URL”).
 
-### Apps gubernamentales
+<a id="apps-gubernamentales"></a>
+### Government apps
 
-«**No**» en las quince.
+«**No**» in all fifteen.
 
-### Funciones financieras
+<a id="funciones-financieras"></a>
+### Financial features
 
-- Trece apps: «**Mi app no ofrece ninguna función financiera**».
-- **ERP**: contabilidad por partida doble, facturación y VERI*FACTU para la organización; no
-  mueve dinero, no da préstamos ni guarda tarjetas. **DECISIÓN**: declararla en
-  «Servicios de soporte y gestión» (herramientas de gestión financiera/contable) por
-  transparencia, o «ninguna» si la consola no tiene esa casilla. Si algún día se conecta al
-  banco (PSD2, pendiente del dueño), la respuesta cambia.
+- Thirteen apps: «**Mi app no ofrece ninguna función financiera**» (“My app doesn't provide any financial features”).
+- **ERP**: double-entry accounting, invoicing and VERI*FACTU for the organization; it does not
+  move money, give loans or store cards. **DECISION**: declare it under
+  «Servicios de soporte y gestión» (“Support and management services”) (financial/accounting management tools) for
+  transparency, or “none” if the console does not have that checkbox. If it is ever connected to the
+  bank (PSD2, pending the owner), the answer changes.
 
-### Apps de salud
+<a id="apps-de-salud"></a>
+### Health apps
 
-«**No**» en las quince (ninguna trata datos de salud).
+«**No**» in all fifteen (none processes health data).
 
-### Apps de noticias
+<a id="apps-de-noticias"></a>
+### News apps
 
-«**No**» en las quince.
+«**No**» in all fifteen.
 
-### Permisos
+<a id="permisos"></a>
+### Permissions
 
-- Todas: `INTERNET`, `POST_NOTIFICATIONS` (avisos, Android 13+) y `USE_BIOMETRIC` (el
-  bloqueo de la sesión). Ninguno necesita declaración aparte.
-- Hub: `FOREGROUND_SERVICE` y `FOREGROUND_SERVICE_SPECIAL_USE` (mantener abierto el flujo
-  de avisos sin Firebase).
-- Rooms y Cast (`llamadas = "si"` en su `FyneApp.toml`): además `RECORD_AUDIO`,
-  `MODIFY_AUDIO_SETTINGS`, `CAMERA`, `FOREGROUND_SERVICE` y
-  `FOREGROUND_SERVICE_MEDIA_PROJECTION` (la voz y el vídeo de una llamada en Rooms; emitir
-  en directo con cámara, micrófono o pantalla en Cast). Se piden al usarlos, no al
-  instalar. Ninguna pide la ubicación, SMS, registro de llamadas ni «todos los ficheros».
-- **Servicios en primer plano** (_Contenido de la app → Permisos de servicios en primer
-  plano_): Play pide declararlos a quien apunta a Android 14+. Rooms y Cast, «Proyección
-  multimedia» (compartir la pantalla en una llamada o emitirla en directo; lo empieza la
-  persona y lo ve en la notificación); Hub, «Uso especial» (recibir los avisos de la
-  organización sin Firebase). Cada declaración pide un vídeo corto del uso: lo graba el
-  dueño.
+- All: `INTERNET`, `POST_NOTIFICATIONS` (notifications, Android 13+) and `USE_BIOMETRIC` (the
+  session lock). None of them needs a separate declaration.
+- Hub: `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` (keeping the notification
+  stream open without Firebase).
+- Rooms and Cast (`llamadas = "si"` in their `FyneApp.toml`): additionally `RECORD_AUDIO`,
+  `MODIFY_AUDIO_SETTINGS`, `CAMERA`, `FOREGROUND_SERVICE` and
+  `FOREGROUND_SERVICE_MEDIA_PROJECTION` (voice and video of a call in Rooms; streaming
+  live with camera, microphone or screen in Cast). They are requested when used, not at
+  install time. None asks for location, SMS, call log or “all files”.
+- Photos (`fototeca = "si"`): additionally `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` and
+  `READ_MEDIA_VISUAL_USER_SELECTED` (`READ_EXTERNAL_STORAGE` up to Android 12),
+  `ACCESS_MEDIA_LOCATION` (without it, Android strips the GPS from photos when reading them and the
+  «Cerca» (Nearby) view stays empty), `ACCESS_NETWORK_STATE` (backup, by default, only on Wi-Fi) and
+  `RECEIVE_BOOT_COMPLETED` (rescheduling the backup after a reboot). The gallery ones
+  are requested when backup is turned on, not at install time.
+- **Photo and video permissions** (_Contenido de la app → Permisos de fotos y vídeos_, App content → Photo and video permissions): Play
+  requires anyone requesting `READ_MEDIA_IMAGES` or `READ_MEDIA_VIDEO` to declare them, and only accepts them
+  if reading the gallery is a CORE feature; otherwise the system photo picker must be used.
+  In Photos it is: backup reads the whole gallery, continuously and
+  with the app closed, which the picker does not allow. The owner submits it; the text, ready
+  to paste (the console asks for it in English):
 
-## Por app: categoría y lo que queda
+  > Sytue Photos is a photo gallery and backup app. Its core feature is the automatic
+  > backup of the device's photo and video library to the user's own Sytue Drive: when the
+  > user turns backup on, the app reads every photo and video in the device library, uploads
+  > the ones that are not backed up yet, and keeps doing so for new ones in the background
+  > (JobScheduler, only while the device is unlocked and, by default, on Wi-Fi). This needs
+  > persistent access to the whole library, which the Android photo picker cannot provide.
+  > Location metadata (ACCESS_MEDIA_LOCATION) is kept so the gallery can sort and map photos
+  > by place. Nothing is read until the user turns backup on.
 
-**Categoría** (DECISIÓN; en la consola, _Presencia en tienda → Configuración de la tienda_):
+  And the short video it asks for: turning on «Copia de seguridad» (Backup) in the gallery's cloud,
+  accepting the permission and seeing «Copiando 1 de N…» (Copying 1 of N…) with photos and videos. The owner records it.
 
-| App               | Paquete             | Categoría propuesta               | Etiquetas            |
-| ----------------- | ------------------- | --------------------------------- | -------------------- |
-| Sytue Hub (`hub`) | `eu.sytue.one`      | Productividad                     | —                    |
-| Sytue Mail        | `eu.sytue.mail`     | Comunicación                      | Correo               |
-| Sytue Rooms       | `eu.sytue.rooms`    | Comunicación                      | Mensajería de equipo |
-| Sytue Contacts    | `eu.sytue.contacts` | Comunicación                      | Contactos            |
-| Sytue Calendar    | `eu.sytue.calendar` | Productividad                     | Calendario           |
-| Sytue Drive       | `eu.sytue.drive`    | Productividad                     | Almacenamiento       |
-| Sytue Docus       | `eu.sytue.docus`    | Productividad                     | Procesador de textos |
-| Sytue Calcus      | `eu.sytue.calcus`   | Productividad                     | Hoja de cálculo      |
-| Sytue Diapos      | `eu.sytue.diapos`   | Productividad                     | Presentaciones       |
-| Sytue CertiPDF    | `eu.sytue.certipdf` | Productividad                     | PDF                  |
-| Sytue Notepads    | `eu.sytue.notes`    | Productividad                     | Notas                |
-| Sytue Photos      | `eu.sytue.photos`   | Fotografía                        | Galería              |
-| Sytue Cast        | `eu.sytue.cast`     | Reproductores y editores de vídeo | Vídeo                |
-| Sytue ERP         | `eu.sytue.erp`      | Empresa                           | Contabilidad         |
-| Sytue Bases       | `eu.sytue.bases`    | Productividad                     | Bases de datos       |
+- **Foreground services** (_Contenido de la app → Permisos de servicios en primer
+  plano_, App content → Foreground service permissions): Play asks apps targeting Android 14+ to declare them. Rooms and Cast, «Proyección
+  multimedia» (Media projection) (sharing the screen in a call or streaming it live; the
+  person starts it and sees it in the notification); Hub, «Uso especial» (Special use) (receiving the
+  organization's notifications without Firebase). Each declaration asks for a short video of the use: the
+  owner records it.
 
-**Países** (DECISIÓN del titular, **2026-11-01**): **todos** los que ofrece Play salvo
-los de [`scripts/paises.json`](../scripts/paises.json): Francia (exclusión del
-2026-10-14, hasta tramitar la ANSSI), China (Play no opera allí; se deja explícito) y los
-sancionados por la UE (Rusia y Bielorrusia; Irán, Corea del Norte, Siria y Cuba por si
-aparecieran). Sustituye a la lista de 30 (UE + EEE + CH) guardada el 2026-10-25.
+<a id="por-app-categoría-y-lo-que-queda"></a>
+## Per app: category and what remains
 
-La API no deja escribirlos. En **cada una de las quince**: _Prueba y publicación →
-Producción → Países o regiones → Añadir países o regiones_, marcar **todos**, desmarcar
-Francia, Rusia y Bielorrusia (y cualquier otro de `paises.json` que ofrezca), guardar y
-enviar los cambios con la siguiente publicación. No activar la disponibilidad automática
-en países nuevos. Después, `play-publicar` con `modo=paises` lo comprueba (solo lee):
-falla si aparece un excluido, si «resto del mundo» está activado o si hay menos de
-`minimo_play` países.
+**Category** (DECISION; in the console, _Presencia en tienda → Configuración de la tienda_, Store presence → Store settings):
 
-**Lo que le queda al dueño en CADA una de las quince**, en este orden:
+| App               | Package             | Proposed category       | Tags                 |
+| ----------------- | ------------------- | ----------------------- | -------------------- |
+| Sytue Hub (`hub`) | `eu.sytue.one`      | Productivity            | —                    |
+| Sytue Mail        | `eu.sytue.mail`     | Communication           | Email                |
+| Sytue Rooms       | `eu.sytue.rooms`    | Communication           | Team messaging       |
+| Sytue Contacts    | `eu.sytue.contacts` | Communication           | Contacts             |
+| Sytue Calendar    | `eu.sytue.calendar` | Productivity            | Calendar             |
+| Sytue Drive       | `eu.sytue.drive`    | Productivity            | Storage              |
+| Sytue Docus       | `eu.sytue.docus`    | Productivity            | Word processor       |
+| Sytue Calcus      | `eu.sytue.calcus`   | Productivity            | Spreadsheet          |
+| Sytue Diapos      | `eu.sytue.diapos`   | Productivity            | Presentations        |
+| Sytue CertiPDF    | `eu.sytue.certipdf` | Productivity            | PDF                  |
+| Sytue Notepads    | `eu.sytue.notes`    | Productivity            | Notes                |
+| Sytue Photos      | `eu.sytue.photos`   | Photography             | Gallery              |
+| Sytue Cast        | `eu.sytue.cast`     | Video Players & Editors | Video                |
+| Sytue ERP         | `eu.sytue.erp`      | Business                | Accounting           |
+| Sytue Bases       | `eu.sytue.bases`    | Productivity            | Databases            |
 
-0. Las quince apps, incluidas Cast y Bases, **existen y permiten editar con la cuenta de
-   servicio**, confirmado el 2026-10-14 por
-   [el sondeo de Play](https://github.com/thinkddr/sytue-one/actions/runs/38608638019).
-   `modo=produccion` exige en las quince el `versionCode` exacto del `tag` solicitado en
-   `internal`; una versión diferente detiene la preparación antes de modificar releases.
-   **Bases, además, no está vista en un teléfono**: sus capturas son del recorrido a 360 × 640 contra el
-   servicio falso (la cabecera y los diálogos se ajustaron ese día; la rejilla se
-   desplaza de lado). Antes de promoverla a producción, abrirla en un teléfono de verdad.
+**Countries** (the account holder's DECISION, **2026-11-01**): **all** those Play offers except
+those in [`scripts/paises.json`](../scripts/paises.json): France (excluded on
+2026-10-14, until the ANSSI procedure is completed), China (Play does not operate there; it is made explicit) and those
+sanctioned by the EU (Russia and Belarus; Iran, North Korea, Syria and Cuba in case they
+appear). It replaces the list of 30 (EU + EEA + CH) saved on 2026-10-25.
 
-1. _Contenido de la app_: política de privacidad, acceso (con la cuenta de prueba),
-   anuncios, ID de publicidad, clasificación, público objetivo, gubernamental, financieras,
-   salud y noticias, con las respuestas de arriba.
-2. _Presencia en tienda_: categoría, etiquetas y correo de contacto.
-3. Comprobar que `https://id.sytue.eu/account/delete` responde: el CSV ya lleva el enlace.
-4. Lanzar el workflow `play-publicar.yml` con `modo=sondear`, luego `modo=ficha`, y
-   `modo=todo` con el tag cuando haya AAB firmados (Codemagic `android-fyne` +
+The API does not allow writing them. In **each of the fifteen**: _Prueba y publicación →
+Producción → Países o regiones → Añadir países o regiones_ (Test and release → Production → Countries / regions → Add countries / regions), tick **all**, untick
+France, Russia and Belarus (and any other from `paises.json` that it offers), save and
+send the changes with the next release. Do not enable automatic availability
+in new countries. Afterwards, `play-publicar` with `modo=paises` checks it (read-only):
+it fails if an excluded one appears, if “rest of the world” is enabled or if there are fewer than
+`minimo_play` countries.
+
+**What remains for the owner in EACH of the fifteen**, in this order:
+
+0. The fifteen apps, including Cast and Bases, **exist and allow editing with the service
+   account**, confirmed on 2026-10-14 by
+   [the Play probe](https://github.com/thinkddr/sytue-one/actions/runs/38608638019).
+   `modo=produccion` requires, in all fifteen, the exact `versionCode` of the requested `tag` in
+   `internal`; a different version stops the preparation before modifying releases.
+   **Bases, in addition, has not been seen on a phone**: its screenshots are from the walkthrough at 360 × 640 against the
+   fake service (the header and the dialogs were adjusted that day; the grid
+   scrolls sideways). Before promoting it to production, open it on a real phone.
+
+1. _Contenido de la app_ (App content): privacy policy, access (with the test account),
+   ads, advertising ID, rating, target audience, government, financial,
+   health and news, with the answers above.
+2. _Presencia en tienda_ (Store presence): category, tags and contact email.
+3. Check that `https://id.sytue.eu/account/delete` responds: the CSV already carries the link.
+4. Run the `play-publicar.yml` workflow with `modo=sondear`, then `modo=ficha`, and
+   `modo=todo` with the tag when there are signed AABs (Codemagic `android-fyne` +
    `release-mobile.yml`).
-5. En «internal»: la lista de testers y **publicar el borrador** que deja la API.
-6. Producción: preparar los borradores con `play-publicar.yml`, `modo=produccion`,
-   `apps` vacío, `tag=vX.Y.Z`, `estado_produccion=draft` y la confirmación exacta
-   `PUBLICAR_15_APPS`. Reutiliza los AAB ya firmados de ese tag en `internal`, sin
-   volver a subirlos ni cambiar países o ficha, y deja borradores sin revisión ni
-   publicación pública. Comprueba las quince antes de modificar la primera; conserva
-   cualquier otra release de producción y repetir el mismo borrador no lo sobrescribe.
-   **Las quince apps siguen en estado Draft y sus releases de internal son borradores**:
-   no repetir `completed` en ese estado. La
-   [primera publicación se completa en Play Console](https://developers.google.com/android-publisher/edits),
-   con sus formularios y consentimientos; si se empieza por pruebas internas, también
-   hay que activar su release en Console. Solo cuando el estado de la app permita
-   publicar por la API y estén completas la ficha, cuenta demo, países y borrado,
-   `estado_produccion=completed` podrá solicitar revisión del mismo AAB. Si una app ya
-   está en revisión, falla sin cancelarla; un error de Google no provoca otro estado
-   automático. Un borrador preparado no acredita que Play haya publicado o revisado la app.
+5. In “internal”: the testers list and **publish the draft** that the API leaves.
+6. Production: prepare the drafts with `play-publicar.yml`, `modo=produccion`,
+   empty `apps`, `tag=vX.Y.Z`, `estado_produccion=draft` and the exact confirmation
+   `PUBLICAR_15_APPS`. It reuses the AABs already signed for that tag in `internal`, without
+   uploading them again or changing countries or listing, and leaves drafts with no review and no
+   public release. It checks all fifteen before modifying the first one; it keeps
+   any other production release, and repeating the same draft does not overwrite it.
+   **The fifteen apps are still in Draft state and their internal releases are drafts**:
+   do not repeat `completed` in that state. The
+   [first release is completed in Play Console](https://developers.google.com/android-publisher/edits),
+   with its forms and consents; if you start with internal testing, its release
+   must also be activated in the Console. Only when the app's state allows
+   publishing through the API and the listing, demo account, countries and deletion are complete
+   can `estado_produccion=completed` request review of the same AAB. If an app is already
+   in review, it fails without cancelling it; a Google error does not trigger any other
+   automatic state. A prepared draft does not prove that Play has published or reviewed the app.

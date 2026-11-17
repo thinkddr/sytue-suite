@@ -77,6 +77,13 @@ type Miniatura struct {
 
 	AlPulsar   func()
 	AlFavorita func()
+	// AlMantener es mantener pulsada la tesela en el móvil (y el clic derecho en el
+	// escritorio, que Fyne entrega igual): empieza a seleccionar con esta foto marcada.
+	// Solo fuera del modo selección; nil, el gesto no hace nada.
+	AlMantener func()
+	// AlFlecha recibe las flechas, Inicio y Fin y dice si movió el foco a otra tesela:
+	// quien sabe dónde están las demás es la galería (enlazarFlechas).
+	AlFlecha func(tecla fyne.KeyName) bool
 
 	teca *Fototeca
 	// muPintar serializa el `Refresh()` ENTERO. No es la misma precaución que
@@ -99,11 +106,12 @@ type Miniatura struct {
 }
 
 var (
-	_ fyne.Widget       = (*Miniatura)(nil)
-	_ fyne.Tappable     = (*Miniatura)(nil)
-	_ fyne.Focusable    = (*Miniatura)(nil)
-	_ fyne.Accessible   = (*Miniatura)(nil)
-	_ desktop.Hoverable = (*Miniatura)(nil)
+	_ fyne.Widget            = (*Miniatura)(nil)
+	_ fyne.Tappable          = (*Miniatura)(nil)
+	_ fyne.SecondaryTappable = (*Miniatura)(nil)
+	_ fyne.Focusable         = (*Miniatura)(nil)
+	_ fyne.Accessible        = (*Miniatura)(nil)
+	_ desktop.Hoverable      = (*Miniatura)(nil)
 )
 
 // NuevaMiniatura crea la tesela de esa foto contra esa caché.
@@ -159,6 +167,15 @@ func (m *Miniatura) Tapped(ev *fyne.PointEvent) {
 	}
 }
 
+// TappedSecondary es mantener pulsado (o el clic derecho): fuera del modo selección
+// empieza a seleccionar con esta foto marcada, y NO abre el visor. Es el `useLongPress`
+// de la tesela en la web.
+func (m *Miniatura) TappedSecondary(*fyne.PointEvent) {
+	if m.AlMantener != nil && !m.Seleccionando {
+		m.AlMantener()
+	}
+}
+
 // Refrescar es el Refresh de la tesela SERIALIZADO. Todo lo que repinte —el puntero,
 // el foco y la miniatura que acaba de llegar— pasa por aquí.
 func (m *Miniatura) Refrescar() {
@@ -185,13 +202,17 @@ func (m *Miniatura) TypedRune(r rune) {
 	}
 }
 
-// TypedKey activa con Intro.
+// TypedKey activa con Intro; las flechas, Inicio y Fin van a otra tesela.
 func (m *Miniatura) TypedKey(e *fyne.KeyEvent) {
 	if ui.SubirEscape(m, e) { // Escape y «atrás» son del diálogo de encima
 		return
 	}
 	if e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter {
 		m.Tapped(nil)
+		return
+	}
+	if m.AlFlecha != nil {
+		m.AlFlecha(e.Name)
 	}
 }
 

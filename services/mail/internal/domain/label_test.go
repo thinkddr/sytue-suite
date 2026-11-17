@@ -4,6 +4,10 @@
 package domain
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -45,6 +49,32 @@ func TestValidLabelColor(t *testing.T) {
 	for _, bad := range []string{"neon", "#ff0000", "red; color:evil", "SLATE"} {
 		if ValidLabelColor(bad) {
 			t.Errorf("color fuera de paleta %q no debe ser válido", bad)
+		}
+	}
+}
+
+// Los tokens que se aceptan son los ids de la paleta de colores de usuario de la web,
+// en su orden: si la web estrena un tono y aquí no se añade, el selector de Mail ofrece
+// un color que el servicio rechaza al guardar. Go no puede importar TypeScript, así que
+// el test lee el fichero y compara.
+func TestLabelColorsEsLaPaletaDeUsuario(t *testing.T) {
+	ruta := filepath.Join("..", "..", "..", "..", "apps", "frontend", "packages", "config", "src", "paleta-usuario.ts")
+	src, err := os.ReadFile(ruta)
+	if err != nil {
+		t.Fatalf("no se encuentra %s (%v): ¿se movió de sitio? el guardián habría quedado desactivado", ruta, err)
+	}
+	tonos := regexp.MustCompile(`\{ id: '([a-z]+)', valor: '#[0-9a-f]{6}' \}`).FindAllStringSubmatch(string(src), -1)
+	web := make([]string, 0, len(tonos))
+	for _, m := range tonos {
+		web = append(web, m[1])
+	}
+	if !slices.Equal(web, LabelColors) {
+		t.Errorf("LabelColors = %v; la paleta de la web es %v", LabelColors, web)
+	}
+	// Las etiquetas guardadas con la paleta sobria de antes siguen siendo válidas.
+	for _, c := range []string{"slate", "brass", "sage", "clay", "blue", "plum", "teal", "rose"} {
+		if !ValidLabelColor(c) {
+			t.Errorf("el token de antes %q ya no es válido", c)
 		}
 	}
 }

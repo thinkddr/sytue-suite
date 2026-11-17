@@ -3,36 +3,40 @@ SPDX-License-Identifier: Apache-2.0
 Copyright (c) 2026 Daniel Delgado Ramos (thinkddr)
 -->
 
-# Documentación — Sytue Suite
+<a id="documentación--sytue-suite"></a>
 
-**Un tema, un documento.** Toda la documentación vive en los nueve ficheros de abajo. Si dos se
-contradicen, manda `CONVENTIONS.md`; corrige el otro en el mismo cambio.
+# Documentation — Sytue Suite
 
-| Documento                              | Qué contiene                                                                                                                                                                                                                                                                                         | Cuándo lo abres                                                                  |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| ★ **[CONVENTIONS.md](CONVENTIONS.md)** | **Contrato canónico**: principios nucleares, catálogo de productos, versiones del stack, puertos, layout del monorepo, identidad, tenancy, licencias y, en el anexo §16, naming, dominios y DNS.                                                                                                     | Antes de nombrar, versionar o exponer cualquier cosa. Manda sobre todo lo demás. |
-| **[architecture.md](architecture.md)** | Arquitectura de la suite (C4, flujos SSO/intents/deploy, multi-tenancy, topología), integración Shell+Hub, Sytue Cloud, Integration Gateway (saliente), capa de compatibilidad (entrante), identidad enterprise y el hogar de los documentos en Drive.                                               | Para entender cómo encajan las piezas antes de tocar una.                        |
-| **[decisions.md](decisions.md)**       | Las decisiones de arquitectura (ADR) con contexto, alternativas descartadas y consecuencias, incluido el pivote «Sytue Native» y el [0037](decisions.md#0037), que fija cómo se comparte el código.                                                                                                  | Cuando te preguntes _por qué_ algo es así, o vayas a cambiarlo.                  |
-| **[security.md](security.md)**         | Seguridad y RGPD, modelo de amenazas STRIDE, checklist OWASP ASVS L2, política clean-room y licencias.                                                                                                                                                                                               | Al tocar auth, datos personales, dependencias o el gate de licencias.            |
-| **[operations.md](operations.md)**     | Guía de despliegue y operación: CLI interactivo (`./sytue-deploy`), Docker Compose, Kubernetes/Helm, variables de entorno, migraciones, identidad, tenants, correo, backups, secretos, CI/CD, pruebas e2e y rendimiento/SEO.                                                                         | Para levantar, desplegar, configurar, verificar o recuperar algo.                |
-| **[design.md](design.md)**             | Dirección de arte, sistema de diseño (`@sytue/ui`, tokens `--sytue-*`, AppShell, componentes, WCAG AA, configuración guiada) y assets.                                                                                                                                                               | Antes de escribir una línea de UI.                                               |
-| **[roadmap.md](roadmap.md)**           | Estado y madurez por producto, arquitectura entregada y hoja de ruta pública de la suite.                                                                                                                                                                                                            | Para conocer las capacidades actuales y la evolución de la suite.                |
-| **[paridad-pdf.md](paridad-pdf.md)**   | Sytue CertiPDF función a función con la referencia de implementación de cada herramienta.                                                                                                                                                                                                            | Para consultar las capacidades de edición, firma eIDAS y OCR de PDF.             |
-| **[business.md](business.md)**         | Visión de plataforma (posicionamiento, interoperabilidad, Platform OS) y modelo de dimensionamiento.                                                                                                                                                                                                 | Para entender el enfoque de producto e interoperabilidad.                        |
+**One topic, one document.** All the documentation lives in the nine files below. If two
+contradict each other, `CONVENTIONS.md` wins; fix the other one in the same change.
 
-**Fuera de `docs/`:** `branding/` es la fuente de verdad de logos, iconos, ilustraciones y tokens.
+| Document                               | What it contains                                                                                                                                                                                                                       | When to open it                                                               |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| ★ **[CONVENTIONS.md](CONVENTIONS.md)** | **Canonical contract**: core principles, product catalog, stack versions, ports, monorepo layout, identity, tenancy, licenses and, in annex §16, naming, domains and DNS.                                                              | Before naming, versioning or exposing anything. It overrides everything else. |
+| **[architecture.md](architecture.md)** | Suite architecture (C4, SSO/intents/deploy flows, multi-tenancy, topology), Shell+Hub integration, Sytue Cloud, Integration Gateway (outbound), compatibility layer (inbound), enterprise identity and the home of documents in Drive. | To understand how the pieces fit together before touching one.                |
+| **[decisions.md](decisions.md)**       | The architecture decisions (ADRs) with context, rejected alternatives and consequences, including the “Sytue Native” pivot and [0037](decisions.md#0037), which sets how code is shared.                                               | When you wonder _why_ something is the way it is, or are about to change it.  |
+| **[security.md](security.md)**         | Security and GDPR, STRIDE threat model, OWASP ASVS L2 checklist, clean-room policy and licenses.                                                                                                                                       | When touching auth, personal data, dependencies or the license gate.          |
+| **[operations.md](operations.md)**     | Deployment and operations guide: interactive CLI (`./sytue-deploy`), Docker Compose, Kubernetes/Helm, environment variables, migrations, identity, tenants, mail, backups, secrets, CI/CD, e2e tests and performance/SEO.              | To bring up, deploy, configure, verify or recover something.                  |
+| **[design.md](design.md)**             | Art direction, design system (`@sytue/ui`, `--sytue-*` tokens, AppShell, components, WCAG AA, guided setup) and assets.                                                                                                                | Before writing a single line of UI.                                           |
+| **[roadmap.md](roadmap.md)**           | Status and maturity per product, delivered architecture and the suite's public roadmap.                                                                                                                                                | To learn the current capabilities and how the suite is evolving.              |
+| **[paridad-pdf.md](paridad-pdf.md)**   | Sytue CertiPDF feature by feature, with the reference implementation of each tool.                                                                                                                                                     | To look up the PDF editing, eIDAS signing and OCR capabilities.               |
+| **[business.md](business.md)**         | Platform vision (positioning, interoperability, Platform OS) and sizing model.                                                                                                                                                         | To understand the product and interoperability approach.                      |
+
+**Outside `docs/`:** `branding/` is the source of truth for logos, icons, illustrations and tokens.
 
 <a id="reglas"></a>
 
-## Reglas
+<a id="reglas"></a>
 
-- **No crear ficheros nuevos en `docs/`.** Lo nuevo entra como sección del documento que le
-  corresponde, con su `<a id="...">` para poder enlazarlo. Si de verdad no encaja en ninguno, es
-  señal de que falta una decisión, no un fichero.
-- **Antes de escribir código**, [`CONVENTIONS.md` §13.2](CONVENTIONS.md#13-2-lo-que-ya-existe):
-  el catálogo de lo que ya existe en `platform/pkg/` y en `apps/frontend/packages/`, qué NO se
-  unifica y por qué, y los tests que se ponen en rojo cuando alguien vuelve a copiar plomería.
-- **Cada afirmación, anclada al código.** Los documentos citan `fichero:línea` o el comando que lo
-  verifica; lo que no se puede verificar se marca como pendiente, no se pinta como hecho.
-- **Al entregar algo, actualízalo donde estaba anotado** (estado en `roadmap.md`, decisión en
-  `decisions.md`), no en un documento nuevo.
+## Rules
+
+- **Do not create new files in `docs/`.** New material goes in as a section of the document it
+  belongs to, with its `<a id="...">` so it can be linked. If it really does not fit in any of them,
+  that is a sign that a decision is missing, not a file.
+- **Before writing code**, read [`CONVENTIONS.md` §13.2](CONVENTIONS.md#13-2-lo-que-ya-existe):
+  the catalog of what already exists in `platform/pkg/` and in `apps/frontend/packages/`, what is
+  NOT unified and why, and the tests that turn red when someone copies plumbing again.
+- **Every claim, anchored to the code.** The documents cite `fichero:línea` (file:line) or the command that
+  verifies it; what cannot be verified is marked as pending, not presented as done.
+- **When you deliver something, update it where it was recorded** (status in `roadmap.md`, decision in
+  `decisions.md`), not in a new document.

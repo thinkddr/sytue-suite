@@ -75,6 +75,12 @@ func TestLoQueViajaConUnEnvio(t *testing.T) {
 	if got := cuerpos["POST /api/v1/channels/c1/messages"]; got != `{"body":"luego","send_at":"2026-09-24T07:00:00Z"}` {
 		t.Errorf("programar: %s", got)
 	}
+	if _, err := r.ScheduleReply(ctx, "m1", "luego", nil, cuando, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := cuerpos["POST /api/v1/messages/m1/replies"]; got != `{"body":"luego","also_in_channel":true,"send_at":"2026-09-24T07:00:00Z"}` {
+		t.Errorf("programar una respuesta también al canal: %s", got)
+	}
 	p, err := r.Reschedule(ctx, "p1", cuando.Add(24*time.Hour))
 	if err != nil || p.SendAt.IsZero() {
 		t.Fatalf("reprogramar: %+v, %v", p, err)

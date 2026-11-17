@@ -9,8 +9,15 @@
  * vive ahora en `@sytue/escena`; aquí queda lo propio del modelo de Diapos (el
  * lienzo de 100 × 100 y los grupos por `groupId`). Pruebas: test/slides-organize.test.ts.
  */
-import { alignBoxes as alignGeneric, boundingBox, distributeBoxes, reorderZ } from '@sytue/escena';
-import type { AlignEdge } from '@sytue/escena';
+import {
+  alignBoxes as alignGeneric,
+  boundingBox,
+  distributeBoxes,
+  guiasDeAjuste,
+  reorderZ,
+} from '@sytue/escena';
+import type { AlignEdge, Guia, Rect } from '@sytue/escena';
+import { calcularArrastre, calcularRedimension } from '@sytue/ui';
 import type { SlideBox } from '../types';
 
 export { boundingBox, distributeBoxes, reorderZ };
@@ -86,4 +93,61 @@ export function ungroupBoxes(boxes: SlideBox[], ids: readonly string[]): SlideBo
     }
     return b;
   });
+}
+
+/* ---------- Guías inteligentes al mover y redimensionar ---------- */
+
+const LIENZO: Rect = { x: 0, y: 0, w: 100, h: 100 };
+
+/** Contexto del ajuste: cajas quietas de la diapositiva, tolerancia por eje (en %)
+ *  y si está desactivado (Alt pulsado). */
+export interface ContextoGuias {
+  otros: readonly Rect[];
+  tolerancia: { x: number; y: number };
+  sinAjuste: boolean;
+}
+
+/** Mover un conjunto con guías: primero el delta topado de siempre, luego el ajuste
+ *  magnético de su envolvente y de nuevo el tope (la guía nunca saca nada del
+ *  lienzo). Las guías vuelven aparte: son de vista y no tocan las cajas. Pura. */
+export function moverConGuias<T extends Rect & { id: string }>(
+  origs: readonly T[],
+  dxRaw: number,
+  dyRaw: number,
+  min: { x: number; y: number },
+  max: { x: number; y: number },
+  c: ContextoGuias,
+): { nuevasPosiciones: T[]; guias: Guia[] } {
+  const previo = calcularArrastre(origs, dxRaw, dyRaw, min, max);
+  if (c.sinAjuste) return { nuevasPosiciones: previo.nuevasPosiciones, guias: [] };
+  const bx = boundingBox(origs);
+  const aj = guiasDeAjuste(
+    { ...bx, x: bx.x + previo.dx, y: bx.y + previo.dy },
+    c.otros,
+    LIENZO,
+    c.tolerancia,
+  );
+  const { nuevasPosiciones } = calcularArrastre(
+    origs,
+    previo.dx + aj.dx,
+    previo.dy + aj.dy,
+    min,
+    max,
+  );
+  return { nuevasPosiciones, guias: aj.lineas };
+}
+
+/** Redimensionar (esquina inferior derecha, sin giro) con guías: solo se ajustan
+ *  los bordes que se mueven, el derecho y el inferior. Pura. */
+export function redimensionarConGuias(
+  o: Rect,
+  dxRaw: number,
+  dyRaw: number,
+  c: ContextoGuias,
+): { rect: Rect; guias: Guia[] } {
+  const previo = calcularRedimension(o, dxRaw, dyRaw, 4, 100);
+  if (c.sinAjuste) return { rect: previo, guias: [] };
+  const aj = guiasDeAjuste(previo, c.otros, LIENZO, c.tolerancia, { x: ['fin'], y: ['fin'] });
+  const rect = calcularRedimension(o, previo.w - o.w + aj.dx, previo.h - o.h + aj.dy, 4, 100);
+  return { rect, guias: aj.lineas };
 }

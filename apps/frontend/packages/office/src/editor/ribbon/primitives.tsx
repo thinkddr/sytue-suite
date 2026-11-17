@@ -12,16 +12,9 @@ import { createContext } from 'preact';
 import type { ComponentChildren, JSX, RefObject } from 'preact';
 import { EditorCtx, useT } from '../context';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
-import {
-  BOTON_DE_BARRA,
-  CAMPO_DE_BARRA_BASE,
-  atajoDelSistema,
-  cx,
-  esMac,
-  useMobileBack,
-} from '@sytue/ui';
-import type { DocsT } from '../../i18n';
+import { BOTON_DE_BARRA, CAMPO_DE_BARRA_BASE, cx, useMobileBack } from '@sytue/ui';
 import { COMANDOS, ariaAtajo, atajoDe, bloqueo } from '../comandos';
+import { textoAtajo } from '../atajosAyuda';
 import type { IdComando } from '../comandos';
 import { EditorIcon } from '../icons';
 import { CLASE_POPOVER } from './popovers';
@@ -177,16 +170,8 @@ export function usePopover(): {
 
 /* ---------- Comandos del registro ---------- */
 
-/**
- * Un atajo como lo lee quien tiene delante el teclado: «⌘⇧X» en un Mac y, en el resto,
- * con los nombres de tecla del idioma («Strg+Umschalt+X», «Ctrl+Mayús+X»).
- */
-export function textoAtajo(keys: string, t: DocsT, mac: boolean = esMac()): string {
-  if (mac) return atajoDelSistema(keys, true).replace(/Shift\+/g, '⇧');
-  return keys
-    .replace(/^Ctrl\+/, `${t('shortcut.ctrl')}+`)
-    .replace(/Shift\+/, `${t('shortcut.shift')}+`);
-}
+/* `textoAtajo` vive con la hoja de atajos (`atajosAyuda.ts`), que escribe las teclas igual. */
+export { textoAtajo };
 
 /**
  * Lo que el registro dice de un control: rótulo, atajo y si está disponible ahora (solo
@@ -234,11 +219,17 @@ export type RibbonButtonProps = ConRotulo & {
   active?: boolean; // aria-pressed
   disabled?: boolean;
   onAction: () => void;
+  /** Atajo («Ctrl+Shift+H») de un botón que no está en el registro de comandos: se
+   *  enseña en el `title` y en `aria-keyshortcuts` igual que el de un comando. Lo
+   *  atiende quien pinta el botón; el del registro, si lo hay, manda. */
+  keys?: string;
 };
 
 export function RibbonButton(props: RibbonButtonProps): JSX.Element {
   const t = useT();
-  const { label, atajo, bloqueado } = useComando(props.commandId, props.label);
+  const cmd = useComando(props.commandId, props.label);
+  const { label, bloqueado } = cmd;
+  const atajo = cmd.atajo ?? props.keys;
   const title = atajo ? `${label} (${textoAtajo(atajo, t)})` : label;
   return (
     <button

@@ -24,6 +24,7 @@ type EntradaCampo struct {
 	LinkTableID string   `json:"link_table_id"`
 	Formula     string   `json:"formula"`
 	Result      Tipo     `json:"result"`
+	Currency    string   `json:"currency"`
 }
 
 // ValidarEntradaCampo limpia y valida la definición de un campo. El destino de un
@@ -37,20 +38,8 @@ func ValidarEntradaCampo(in EntradaCampo) (EntradaCampo, error) {
 	in.Name = nombre
 	switch in.Kind {
 	case TipoSeleccion, TipoMultiple:
-		if len(in.Choices) == 0 || len(in.Choices) > MaxOpciones {
-			return in, ErrInvalido
-		}
-		vistas := make(map[string]struct{}, len(in.Choices))
-		for i, c := range in.Choices {
-			c2, err := limpiarOpcion(c)
-			if err != nil {
-				return in, err
-			}
-			if _, dup := vistas[c2]; dup {
-				return in, ErrInvalido
-			}
-			vistas[c2] = struct{}{}
-			in.Choices[i] = c2
+		if in.Choices, err = ValidarOpciones(in.Choices); err != nil {
+			return in, err
 		}
 		in.LinkTableID = ""
 	case TipoRelacion:
@@ -70,13 +59,82 @@ func ValidarEntradaCampo(in EntradaCampo) (EntradaCampo, error) {
 		}
 		in.Formula = strings.TrimPrefix(strings.TrimSpace(in.Formula), "=")
 		in.Choices, in.LinkTableID = nil, ""
+	case TipoMoneda:
+		in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
+		if in.Currency == "" {
+			in.Currency = MonedaPorDefecto
+		}
+		if !codigoMoneda(in.Currency) {
+			return in, ErrInvalido
+		}
+		in.Choices, in.LinkTableID = nil, ""
 	default:
 		in.Choices, in.LinkTableID = nil, ""
+	}
+	if in.Kind != TipoMoneda {
+		in.Currency = ""
 	}
 	if in.Kind != TipoFormula {
 		in.Formula, in.Result = "", ""
 	}
 	return in, nil
+}
+
+// ValidarOpciones limpia y valida la lista de opciones de un campo de selección:
+// entre 1 y MaxOpciones, sin repetidas (tras limpiarlas) y en el orden recibido.
+func ValidarOpciones(opciones []string) ([]string, error) {
+	if len(opciones) == 0 || len(opciones) > MaxOpciones {
+		return nil, ErrInvalido
+	}
+	out := make([]string, 0, len(opciones))
+	vistas := make(map[string]struct{}, len(opciones))
+	for _, o := range opciones {
+		o2, err := limpiarOpcion(o)
+		if err != nil {
+			return nil, err
+		}
+		if _, dup := vistas[o2]; dup {
+			return nil, ErrInvalido
+		}
+		vistas[o2] = struct{}{}
+		out = append(out, o2)
+	}
+	return out, nil
+}
+
+// ConRetiradas devuelve los campos con las opciones que el registro YA tiene aunque
+// se hayan retirado del campo. Retirar una opción no borra los valores que la usan:
+// quien escribe el mismo valor (o, en una múltiple, añade otra opción a las que había)
+// no debe recibir un error por una opción que no ha tocado. Una opción retirada que no
+// estaba en el registro sigue sin valer.
+func ConRetiradas(campos []Campo, actual []byte) []Campo {
+	var datos map[string]json.RawMessage
+	if json.Unmarshal(actual, &datos) != nil || len(datos) == 0 {
+		return campos
+	}
+	out := slices.Clone(campos)
+	for i, c := range out {
+		raw, ok := datos[c.ID]
+		if !ok {
+			continue
+		}
+		var tiene []string
+		switch c.Kind { //nolint:exhaustive // solo las selecciones tienen opciones
+		case TipoSeleccion:
+			var s string
+			if json.Unmarshal(raw, &s) == nil {
+				tiene = []string{s}
+			}
+		case TipoMultiple:
+			_ = json.Unmarshal(raw, &tiene)
+		}
+		for _, s := range tiene {
+			if !slices.Contains(c.Choices, s) {
+				out[i].Choices = append(slices.Clone(out[i].Choices), s)
+			}
+		}
+	}
+	return out
 }
 
 func limpiarOpcion(s string) (string, error) {
@@ -108,12 +166,40 @@ func ValidarValor(c Campo, raw json.RawMessage) (json.RawMessage, error) {
 			return nil, nil
 		}
 		return json.Marshal(s)
-	case TipoNumero:
+	case TipoNumero, TipoMoneda:
 		var f float64
 		if json.Unmarshal(raw, &f) != nil || math.IsNaN(f) || math.IsInf(f, 0) || math.Abs(f) > 1e15 {
 			return nil, malo
 		}
+		if c.Kind == TipoMoneda {
+			// Céntimos: un importe con más decimales es un error de redondeo de quien
+			// escribe, no un dato; guardarlo tal cual haría que dos «iguales» no lo fueran.
+			f = math.Round(f*100) / 100
+		}
 		return json.Marshal(f)
+	case TipoValoracion:
+		var f float64
+		if json.Unmarshal(raw, &f) != nil || f != math.Trunc(f) || f < 0 || f > MaxValoracion {
+			return nil, malo
+		}
+		if f == 0 { // cero estrellas es «sin valorar»
+			return nil, nil
+		}
+		return json.Marshal(int(f))
+	case TipoURL, TipoCorreo, TipoTelefono:
+		var s string
+		if json.Unmarshal(raw, &s) != nil {
+			return nil, malo
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return nil, nil
+		}
+		v, ok := normalizarFormato(c.Kind, s)
+		if !ok {
+			return nil, malo
+		}
+		return json.Marshal(v)
 	case TipoFecha:
 		var s string
 		if json.Unmarshal(raw, &s) != nil {

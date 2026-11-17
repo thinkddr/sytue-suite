@@ -20,37 +20,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { JSX, TargetedEvent } from 'preact';
 import {
+  Badge,
   Button,
   Card,
   CardBody,
-  FieldGroup,
-  Glifo,
-  Icon,
-  Input,
-  Modal,
-  Spinner,
-  Skeleton,
-  Badge,
-  EmptyState,
-  VirtualList,
-  useToast,
   cx,
   Dropdown,
+  EmptyState,
+  esAtajoDeApp,
+  FieldGroup,
+  Glifo,
+  grosorDeGlifo,
+  Icon,
+  InlineHelp,
+  Input,
   MenuItem,
   MenuSeparator,
-  Illustration,
-  esAtajoDeApp,
-  grosorDeGlifo,
+  Modal,
+  Select,
+  Skeleton,
+  Spinner,
   useBarraUnica,
+  useToast,
+  VirtualList,
+  withBase,
 } from '@sytue/ui';
 import type {
   DocKind,
+  DocListScope,
+  DocListSort,
   DocTemplate,
   DocTemplatesResponse,
   DocThemesResponse,
   DocumentMeta,
 } from '@sytue/api-clients';
-import { formatDate, type Locale } from '@sytue/i18n';
+import { formatDate, plegar, type Locale } from '@sytue/i18n';
 import { useConnectivity } from '@sytue/offline/preact';
 import { docsT, type DocsT } from '../i18n';
 import { r } from '../lib/rutas';
@@ -99,8 +103,9 @@ const kindLabel = (t: DocsT, k: DocKind): string => t(`kind.${safeKind(k)}`);
  * iconos de @sytue/ui.
  */
 const KIND_PATH: Record<DocKind, string> = {
-  // Hoja con la esquina doblada y tres renglones.
-  document: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4',
+  // La hoja de la casa (la `file` de Notepads) con dos renglones.
+  document:
+    'M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5M8.5 13h7M8.5 16.5h4.5',
   // Rejilla: la tabla se reconoce por sus divisiones, no por su marco.
   spreadsheet: 'M4 5h16v14H4zM4 10h16M4 15h16M10 5v14',
   // Lienzo apaisado sobre pie, como una diapositiva proyectada.
@@ -155,7 +160,7 @@ export function PdfGlyph({ size = 24 }: { size?: number }): JSX.Element {
   return (
     <Glifo size={size}>
       {/* La hoja, igual que el resto de la familia. */}
-      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5" />
+      <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5" />
       {/* Y el ESTAMPADOR dentro: el mismo trazo que `stamp` de @sytue/ui, no un
           dibujo paralelo. Escalado a 0,63 y con el trazo compensado (el grosor
           del glifo entre esa escala) para que al reducir no quede más fino que
@@ -194,6 +199,64 @@ function urlKind(): DocKind | '' {
 /** Debounce del filtro por título (tecleo → petición al servidor). */
 const FILTER_DEBOUNCE_MS = 250;
 
+/** Alcance por propiedad: todos, «Míos» o «Compartidos conmigo». */
+export type AlcanceLista = '' | DocListScope;
+
+/** Lo que filtra y ordena el listado; todo lo resuelve el servicio. */
+export interface FiltrosLista {
+  q: string;
+  starred: boolean;
+  scope: AlcanceLista;
+  sort: DocListSort;
+}
+
+/**
+ * parametrosLista — la consulta a /api/documents para unos filtros (y el cursor de la
+ * página siguiente, si lo hay). Una sola función para la primera página y las demás:
+ * si divergieran, la segunda página seguiría otro orden u otro alcance que la primera.
+ */
+export function parametrosLista(
+  f: FiltrosLista,
+  kind: DocKind | '',
+  cursor?: string,
+): URLSearchParams {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+  if (cursor) params.set('cursor', cursor);
+  if (f.q) params.set('q', f.q);
+  if (f.starred) params.set('starred', '1');
+  if (f.scope) params.set('scope', f.scope);
+  if (f.sort === 'title') params.set('sort', 'title');
+  if (kind) params.set('kind', kind);
+  return params;
+}
+
+/**
+ * vistaSinRed — los mismos alcance y orden sobre los documentos de la caché local.
+ * Sin red, el servicio no filtra; pero de quién es cada documento sí lo sabe la caché
+ * (`ownerId`), así que «Míos» no tiene por qué enseñar lo ajeno.
+ */
+export function vistaSinRed(
+  docs: DocumentMeta[],
+  userId: string,
+  scope: AlcanceLista,
+  sort: DocListSort,
+): DocumentMeta[] {
+  const out =
+    scope === 'mine'
+      ? docs.filter((d) => d.ownerId === userId)
+      : scope === 'shared'
+        ? docs.filter((d) => d.ownerId !== userId)
+        : [...docs];
+  if (sort === 'title') {
+    out.sort((a, b) => {
+      const x = plegar(a.title);
+      const y = plegar(b.title);
+      return x < y ? -1 : x > y ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+  }
+  return out;
+}
+
 /** Página tal y como la responde el BFF (GET /api/documents). */
 interface DocPage {
   documents?: DocumentMeta[];
@@ -229,7 +292,7 @@ const GLYPHS = {
     'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm12 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 13.5l6.8 3.9M15.4 6.6 8.6 10.5',
   // Mismo trazado que la estrella de Sytue Drive: es la misma función y no puede
   // dibujarse distinta en dos apps de la suite.
-  star: 'm12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.4L12 17.8l-5.8 3 1.1-6.4-4.7-4.6 6.5-.9Z',
+  star: 'M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z',
 } as const;
 
 function Glyph({
@@ -249,6 +312,60 @@ function Glyph({
 /** Botón de acción sobre el tile (aparece con hover/foco; en táctil, siempre). */
 const tileActionBtn =
   'flex h-7 w-7 items-center justify-center rounded-control border border-border bg-surface text-text-muted shadow-[var(--shadow-xs)] transition-colors duration-150 hover:bg-bg-subtle hover:text-text sytue-focus-ring-inset';
+
+/** La miniatura de un documento, servida por el BFF con su versión en la URL. */
+export function urlDeMiniatura(doc: DocumentMeta): string | null {
+  if (!doc.thumbnailSeq) return null;
+  // `withBase` y no el shim de `fetch`: un <img> no pasa por `fetch`, y sin el prefijo
+  // de la app pediría la raíz del host.
+  return withBase(
+    import.meta.env.BASE_URL ?? '/',
+    `/api/thumbnail?id=${encodeURIComponent(doc.id)}&v=${doc.thumbnailSeq}`,
+  );
+}
+
+/**
+ * La franja de arriba de la tesela: la MINIATURA del documento —su primera página, hoja o
+ * diapositiva, que el servicio dibuja al guardar— y, mientras no la tiene (recién creado,
+ * vacío, de otra organización) o si no carga (sin conexión, acceso revocado), el glifo de
+ * su tipo. La miniatura es decorativa: el título y el tipo ya van escritos debajo.
+ */
+export function PortadaDeTesela({ doc }: { doc: DocumentMeta }): JSX.Element {
+  const [fallo, setFallo] = useState<string | null>(null);
+  const src = urlDeMiniatura(doc);
+  if (src && fallo !== src) {
+    return (
+      <div class="border-border bg-bg-subtle h-24 overflow-hidden border-b" aria-hidden="true">
+        {/* Un documento y una hoja se recortan por arriba, que es donde empiezan; una
+            diapositiva se enseña entera. */}
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          class={cx(
+            'h-full w-full',
+            doc.kind === 'presentation' ? 'object-contain' : 'object-cover object-top',
+          )}
+          onError={() => setFallo(src)}
+        />
+      </div>
+    );
+  }
+  return (
+    // Un relleno, no tres. Llevaba banda tintada + chip sólido con sombra + glifo:
+    // exactamente lo que el design system rechaza por escrito en EmptyState («tres
+    // rellenos apilados es la firma visual del estado vacío genérico»).
+    <div
+      class="border-border bg-bg-subtle sytue-glifo-tinta flex h-24 items-center justify-center border-b"
+      style={{ color: KIND_COLOR[safeKind(doc.kind)] }}
+      aria-hidden="true"
+    >
+      <KindGlyph kind={doc.kind} size={32} />
+    </div>
+  );
+}
 
 interface DocTileProps {
   doc: DocumentMeta;
@@ -287,17 +404,7 @@ function DocTile({
         href={r(`/edit?id=${encodeURIComponent(doc.id)}`)}
         class="border-border bg-surface hover:border-border-strong hover:bg-bg-subtle sytue-focus-ring-inset flex h-full flex-col overflow-hidden rounded-lg border transition duration-150"
       >
-        {/* Un relleno, no tres. Llevaba banda tintada + chip sólido con sombra +
-            glifo: exactamente lo que el design system rechaza por escrito en
-            EmptyState («tres rellenos apilados es la firma visual del estado
-            vacío genérico»). La sombra, además, sobre un chip que no flota. */}
-        <div
-          class="border-border bg-bg-subtle sytue-glifo-tinta flex h-24 items-center justify-center border-b"
-          style={{ color: KIND_COLOR[safeKind(doc.kind)] }}
-          aria-hidden="true"
-        >
-          <KindGlyph kind={doc.kind} size={32} />
-        </div>
+        <PortadaDeTesela doc={doc} />
         <div class="flex min-w-0 flex-col gap-0.5 p-3">
           <span class="text-text truncate font-medium" title={doc.title}>
             {doc.title}
@@ -478,6 +585,11 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
   // keyset, filtrar la página traída diría «ninguno» mientras los destacados
   // esperan tres páginas más allá.
   const [starredOnly, setStarredOnly] = useState(false);
+  // «Míos / Compartidos conmigo» y el orden por título: también del SERVICIO, por la
+  // misma razón. Cambiar el orden cambia el cursor (de fecha a título), así que
+  // recarga desde la primera página.
+  const [scope, setScope] = useState<AlcanceLista>('');
+  const [sort, setSort] = useState<DocListSort>('updated');
 
   // Tipo fijado por la URL (?kind=spreadsheet). Es lo que separa Sytue Sheets y Sytue
   // Slides de Sytue Docs: las tres apps —de escritorio y móvil— cargan ESTA misma web
@@ -494,18 +606,16 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(
-    async (q: string, onlyStarred: boolean) => {
+    async (f: FiltrosLista) => {
+      const { q } = f;
       const seq = ++reqSeq.current;
       setDocs(null);
       setError(false);
       setNextCursor(null);
       try {
-        const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-        if (q) params.set('q', q);
-        if (onlyStarred) params.set('starred', '1');
-        if (fixedKind.current) params.set('kind', fixedKind.current);
+        const params = parametrosLista(f, fixedKind.current);
         // BFF: cookie de sesion httpOnly; el token nunca llega al cliente.
-        // El servicio ya ordena por updated_at DESC (keyset): no se reordena aquí.
+        // El servicio ya ordena (por fecha o por título, keyset): no se reordena aquí.
         const res = await fetch(`/api/documents?${params}`, { credentials: 'include' });
         if (!res.ok) throw new Error('list');
         setCachedMode(res.headers.get('x-sytue-offline') === 'cache');
@@ -526,7 +636,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
         }).catch(() => []);
         setCachedMode(true);
         if (cached.length > 0) {
-          setDocs(cached);
+          setDocs(vistaSinRed(cached, userId, f.scope, f.sort));
           setNextCursor(null);
           setError(false);
         } else {
@@ -543,9 +653,13 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
   }, [query]);
 
   // Carga inicial (applied='') y recarga al cambiar el filtro aplicado.
+  const filtros = useMemo<FiltrosLista>(
+    () => ({ q: applied, starred: starredOnly, scope, sort }),
+    [applied, starredOnly, scope, sort],
+  );
   useEffect(() => {
-    void load(applied, starredOnly);
-  }, [applied, starredOnly, load]);
+    void load(filtros);
+  }, [filtros, load]);
 
   // Abrir un fichero de Drive que no se pudo abrir devuelve aquí con el motivo
   // (/open-from-drive). Sin esto, la persona pulsa «Abrir con Sytue Docs», acaba en
@@ -573,10 +687,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
     setLoadingMore(true);
     const seq = reqSeq.current;
     try {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), cursor: nextCursor });
-      if (applied) params.set('q', applied);
-      if (starredOnly) params.set('starred', '1');
-      if (fixedKind.current) params.set('kind', fixedKind.current);
+      const params = parametrosLista(filtros, fixedKind.current, nextCursor);
       const res = await fetch(`/api/documents?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('more');
       const data = (await res.json()) as DocPage;
@@ -1009,15 +1120,9 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
         </header>
 
         {offline ? (
-          <div
-            class="border-warning bg-warning-bg text-warning-text mb-5 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-            role="status"
-          >
-            <span class="bg-warning h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
-            <span>
-              <strong>{t('list.offline.title')}</strong> {t('list.offline.description')}
-            </span>
-          </div>
+          <InlineHelp tone="warning" class="mb-5 shrink-0" title={t('list.offline.title')}>
+            {t('list.offline.description')}
+          </InlineHelp>
         ) : null}
 
         {/* Crear nuevo — accesos destacados a documento en blanco por tipo. */}
@@ -1138,7 +1243,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
 
       {/* Documentos recientes — cuadrícula virtualizada de miniaturas por tipo. */}
       <section aria-labelledby="docs-heading">
-        <div class="mb-3 flex shrink-0 items-center gap-2">
+        <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
           <h2 id="docs-heading" class="sytue-overline text-text-subtle">
             {t('list.recent.heading')}
           </h2>
@@ -1153,10 +1258,33 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
               {nextCursor ? '+' : ''}
             </Badge>
           ) : null}
+          {/* «Míos / Compartidos conmigo» y el orden: selectores nativos (teclado y
+              lector de pantalla de serie). Con poco ancho la fila se parte en dos. */}
+          <div class="ml-auto flex items-center gap-2">
+            <Select
+              size="md"
+              value={scope}
+              aria-label={t('list.scope.label')}
+              onChange={(e) => setScope(e.currentTarget.value as AlcanceLista)}
+            >
+              <option value="">{t('list.scope.all')}</option>
+              <option value="mine">{t('list.scope.mine')}</option>
+              <option value="shared">{t('list.scope.shared')}</option>
+            </Select>
+            <Select
+              size="md"
+              value={sort}
+              aria-label={t('list.sort.label')}
+              onChange={(e) => setSort(e.currentTarget.value as DocListSort)}
+            >
+              <option value="updated">{t('list.sort.updated')}</option>
+              <option value="title">{t('list.sort.title')}</option>
+            </Select>
+          </div>
           <button
             type="button"
             class={cx(
-              'sytue-focus-ring rounded-control ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-sm font-medium transition-colors duration-150',
+              'sytue-focus-ring rounded-control inline-flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-sm font-medium transition-colors duration-150',
               starredOnly
                 ? 'border-border-strong bg-selected text-text'
                 : 'border-border bg-surface text-text-muted hover:bg-bg-subtle hover:text-text',
@@ -1195,19 +1323,12 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
                   description={t(
                     offline ? 'list.offline.emptyDescription' : 'list.error.description',
                   )}
-                  // Icono en línea (no <img>): dentro de <img> las variables CSS del
-                  // tema no resuelven y la ilustración quedaba invisible.
-                  // `-text`, no el token de relleno: `--sytue-danger` no se reasigna
-                  // en oscuro y este icono se pinta sobre `surface-raised` (#22262b),
-                  // donde da 2,65:1 — por debajo del 3:1 de WCAG 1.4.11. Con `-text`
-                  // sube a 6,08:1 en oscuro y también mejora en claro.
-                  illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+                  // El tono de error pone el glifo de peligro en `danger-text` (no el
+                  // relleno `--sytue-danger`, que en oscuro sobre `surface-raised` da
+                  // 2,65:1, por debajo del 3:1 de WCAG 1.4.11).
+                  tone="error"
                   action={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void load(applied, starredOnly)}
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => void load(filtros)}>
                       {t('list.retry')}
                     </Button>
                   }
@@ -1226,7 +1347,27 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
                     description={t(
                       offline ? 'list.offline.emptyDescription' : 'list.empty.search.description',
                     )}
-                    illustration={<Illustration name="emptySearch" />}
+                    spot="emptySearch"
+                  />
+                ) : scope || starredOnly ? (
+                  // Con «Míos», «Compartidos conmigo» o «Destacados» puestos, una lista
+                  // vacía no es «aún no tienes documentos»: se dice y se ofrece verlo todo.
+                  <EmptyState
+                    title={t('list.empty.filtered.title')}
+                    description={t('list.empty.filtered.description')}
+                    spot="emptySearch"
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setScope('');
+                          setStarredOnly(false);
+                        }}
+                      >
+                        {t('list.empty.filtered.action')}
+                      </Button>
+                    }
                   />
                 ) : (
                   <EmptyState

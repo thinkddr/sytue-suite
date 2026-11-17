@@ -1,6 +1,6 @@
 # Snowflake — SAML SSO
-1. Snowflake (role ACCOUNTADMIN): **Admin → Identiy → Single Sign-On** (o `ALTER ACCOUNT SET SAML_IDENTITY_PROVIDER`).
-2. Metadatos de Sytue ID como IdP; **Name ID** `email`.
-3. Anota tu **account** (el identificador `orgname-account_name` de la URL) en la ficha de Sytue Platform.
-4. Prueba con `sso_login_page=true` antes de forzarlo.
-**Errores**: `user not found` = el login de Snowflake no coincide con el correo del Name ID.
+1. Snowflake (role ACCOUNTADMIN): **Admin → Identiy → Single Sign-On** (or `ALTER ACCOUNT SET SAML_IDENTITY_PROVIDER`).
+2. Sytue ID metadata as the IdP; **Name ID** `email`.
+3. Write down your **account** (the `orgname-account_name` identifier from the URL) on the Sytue Platform detail card.
+4. Test with `sso_login_page=true` before enforcing it.
+**Errors**: `user not found` = the Snowflake login does not match the Name ID email.

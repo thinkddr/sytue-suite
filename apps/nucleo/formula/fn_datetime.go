@@ -117,6 +117,13 @@ func serialFromYMD(y, m, d float64) float64 {
 	return s
 }
 
+// SerialDeFecha es el número de serie de un día del calendario (sistema 1900, con el
+// día fantasma), el mismo que da HOY() ese día. Es lo que escribe Ctrl+; en la hoja:
+// la fecha como VALOR, que no cambia mañana como cambiaría `=HOY()`.
+func SerialDeFecha(anio, mes, dia int) int {
+	return int(serialFromYMD(float64(anio), float64(mes), float64(dia)))
+}
+
 // maxSerial cierra el rango válido [0, 2958465] = 1900-01-00 … 9999-12-31.
 var maxSerial = serialFromYMD(9999, 12, 31)
 

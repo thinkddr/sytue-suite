@@ -160,7 +160,11 @@ func (lz *Lienzo) cuerpoInicio(c *editor.Contexto) fyne.CanvasObject {
 		editor.SeparadorGrupos(),
 		editor.NuevoGrupo(c.Traducir("group.styles"), lz.botonCondicional(c)),
 		editor.SeparadorGrupos(),
-		editor.NuevoGrupo(c.Traducir("group.merge"), boton(iconos.EdCombinar, "sheet.merge", false, CmdCombinar, "")),
+		editor.NuevoGrupo(c.Traducir("group.merge"),
+			boton(iconos.EdCombinar, "sheet.merge.center", false, CmdCombinar, "center"), lz.botonMasCombinar(c)),
+		editor.SeparadorGrupos(),
+		// Las medidas: el teclado llega aquí; el ratón, también al asa de las cabeceras.
+		editor.NuevoGrupo(c.Traducir("group.cells"), lz.botonMedida(c, CmdAnchoCol), lz.botonMedida(c, CmdAltoFila)),
 	}
 	// El tema común y la marca de la organización: la cabecera de la hoja.
 	if c.Temas != nil {
@@ -176,6 +180,43 @@ func (lz *Lienzo) grupoBloques(c *editor.Contexto) fyne.CanvasObject {
 		return container.NewWithoutLayout()
 	}
 	return editor.Grupos(c.Bloques.Grupo(c), editor.SeparadorGrupos())
+}
+
+// opcionesCombinar son MERGE_OPCIONES: lo que despliega el «▾» de «Combinar y centrar».
+var opcionesCombinar = []struct {
+	valor, clave string
+	icono        iconos.Ed
+}{
+	{"center", "sheet.merge.center", iconos.EdCombinar},
+	{"merge", "sheet.merge", iconos.EdCombinar},
+	{"content", "sheet.merge.content", iconos.EdCombinar},
+	{"unmerge", "sheet.unmerge", iconos.EdDividirCeldas},
+}
+
+// botonMasCombinar es `MergeMenu`: el «▾» junto al botón, con las cuatro maneras de
+// combinar (y separar) en un menú denso.
+func (lz *Lienzo) botonMasCombinar(c *editor.Contexto) *editor.BotonCinta {
+	b := editor.NuevoBotonCinta(iconos.EdChevronAbajo, c.Traducir("sheet.merge.more"), nil)
+	b.Inerte = c.SoloLectura
+	var menu *ui.Menu
+	b.AlPulsar = func() {
+		if menu != nil && menu.Abierto() {
+			menu.Cerrar()
+			return
+		}
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		elems := make([]fyne.CanvasObject, 0, len(opcionesCombinar))
+		for _, o := range opcionesCombinar {
+			e := ui.NuevoElementoMenu(c.Traducir(o.clave), iconos.Ninguno, func() { c.Mandar(CmdCombinar, o.valor) })
+			e.Denso, e.Glifo, e.TamIcono = true, iconos.TrazoEd(o.icono, editor.IconoBotonCinta, "text", v), editor.IconoBotonCinta
+			elems = append(elems, e)
+		}
+		menu = ui.NuevoMenu(elems...)
+		// `left-0 w-56`: alineado al borde izquierdo del «▾», con el ancho del panel.
+		menu.Rotulo, menu.AlInicio, menu.Ancho = c.Traducir("group.merge"), true, anchoPanelCelda
+		menu.Mostrar(b)
+	}
+	return b
 }
 
 // ---- los paneles de la cinta ----
@@ -462,6 +503,7 @@ func (lz *Lienzo) cuerpoDatos(c *editor.Contexto) fyne.CanvasObject {
 			boton(iconos.EdColDer, "table.colRight", CmdInsCol, "right"),
 			boton(iconos.EdMenos, "table.deleteRows", CmdBorrarFilas, ""),
 			boton(iconos.EdCerrar, "table.deleteCols", CmdBorrarCols, ""),
+			lz.botonOcultar(c),
 		),
 		editor.SeparadorGrupos(),
 		editor.NuevoGrupo(c.Traducir("slides.box.chart"), lz.botonGrafico(c)),

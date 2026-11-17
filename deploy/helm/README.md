@@ -1,22 +1,24 @@
-# Sytue One — Despliegue en producción (Helm / Scaleway Kapsule)
+<a id="sytue-one--despliegue-en-producción-helm--scaleway-kapsule"></a>
+# Sytue One — Production deployment (Helm / Scaleway Kapsule)
 
-Charts Helm para desplegar la suite **Sytue One** en **Scaleway Kapsule** (Kubernetes
-1.31, **solo regiones UE**). El chart paraguas (umbrella) `sytue-one` despliega los
-**servicios Go propios** (Sytue-native), el **SFU LiveKit** (Apache-2.0) y los
-**frontends Astro+Preact**, sobre el ingress canónico **Traefik** y TLS automático
+Helm charts to deploy the **Sytue One** suite on **Scaleway Kapsule** (Kubernetes
+1.31, **EU regions only**). The `sytue-one` umbrella chart deploys the
+**in-house Go services** (Sytue-native), the **LiveKit SFU** (Apache-2.0) and the
+**Astro+Preact frontends**, on top of the canonical **Traefik** ingress and automatic TLS with
 **cert-manager**.
 
-> Fuente de verdad: [`docs/CONVENTIONS.md`](../../docs/CONVENTIONS.md) (v4 "Sytue
-> Native"). Nombres, dominios, puertos, clients OIDC y licencias coinciden exactamente
-> con el contrato. Paridad dev/prod: el entorno local vive en
+> Source of truth: [`docs/CONVENTIONS.md`](../../docs/CONVENTIONS.md) (v4 "Sytue
+> Native"). Names, domains, ports, OIDC clients and licenses match the contract
+> exactly. Dev/prod parity: the local environment lives in
 > [`deploy/compose`](../compose).
 
-> **Sin motores AGPL** (Keycloak, Nextcloud, OnlyOffice, Mattermost, Stalwart) y **sin
-> Redis/Valkey**. Cada producto es un **servicio Go original** (clean-room sobre
-> estándares abiertos) con **PostgreSQL** como único datastore. La única app de terceros
-> es **LiveKit** (Apache-2.0) como SFU de medios de Meet.
+> **No AGPL engines** (Keycloak, Nextcloud, OnlyOffice, Mattermost, Stalwart) and **no
+> Redis/Valkey**. Each product is an **original Go service** (clean-room on
+> open standards) with **PostgreSQL** as the only datastore. The only third-party app
+> is **LiveKit** (Apache-2.0) as the media SFU for Meet.
 
-## Estructura
+<a id="estructura"></a>
+## Structure
 
 ```
 deploy/helm/
@@ -49,18 +51,19 @@ deploy/helm/
     └── tenant/                # plantilla de onboarding de tenant (namespace+quota+netpol)
 ```
 
-Cada servicio Go incluye: **Deployment, Service, Ingress (className traefik), HPA,
-NetworkPolicy y ServiceMonitor**. Todas las plantillas llevan las labels obligatorias
-`app.kubernetes.io/part-of=sytue-one`, `sytue.eu/env` y `sytue.eu/stack=go`.
+Each Go service includes: **Deployment, Service, Ingress (className traefik), HPA,
+NetworkPolicy and ServiceMonitor**. All templates carry the mandatory labels
+`app.kubernetes.io/part-of=sytue-one`, `sytue.eu/env` and `sytue.eu/stack=go`.
 
-## Requisitos previos
+<a id="requisitos-previos"></a>
+## Prerequisites
 
-- Cluster **Kapsule 1.31** (Terraform en [`infra/terraform`](../../infra/terraform)).
-- **Postgres EXTERNO** (Scaleway RDB) — el chart **no** despliega Postgres. Es el único
-  datastore (estado + colas + caché sobre Postgres; **sin Redis/Valkey**).
-- **Object Storage S3** (fr-par, versionado) para blobs (Drive, Docs, Mail, PaaS).
-- **Scaleway Container Registry** (`rg.fr-par.scw.cloud/sytue`) con las imágenes propias.
-- Dependencias Helm preparadas (solo upstream permisivos):
+- **Kapsule 1.31** cluster (Terraform in [`infra/terraform`](../../infra/terraform)).
+- **EXTERNAL Postgres** (Scaleway RDB) — the chart does **not** deploy Postgres. It is the only
+  datastore (state + queues + cache on Postgres; **no Redis/Valkey**).
+- **S3 Object Storage** (fr-par, versioned) for blobs (Drive, Docs, Mail, PaaS).
+- **Scaleway Container Registry** (`rg.fr-par.scw.cloud/sytue`) with the in-house images.
+- Helm dependencies prepared (permissive upstreams only):
 
   ```sh
   helm repo add traefik https://traefik.github.io/charts     # ingress CANÓNICO (MIT)
@@ -68,61 +71,64 @@ NetworkPolicy y ServiceMonitor**. Todas las plantillas llevan las labels obligat
   helm dependency build deploy/helm/sytue-one
   ```
 
-## Ingress (Traefik canónico) y reparto de hosts
+<a id="ingress-traefik-canónico-y-reparto-de-hosts"></a>
+## Ingress (canonical Traefik) and host allocation
 
-Traefik 3 es el **ingress canónico** (`CONVENTIONS.md §3`): `traefik.enabled=true` +
-`IngressClass` por defecto. Todos los Ingress usan `className: traefik`.
+Traefik 3 is the **canonical ingress** (`CONVENTIONS.md §3`): `traefik.enabled=true` +
+default `IngressClass`. All Ingresses use `className: traefik`.
 
-En los subdominios compartidos, el **SPA Astro** (`sytue-frontend`) sirve `/` y el
-**backend Go** expone su API/protocolo bajo prefijos de ruta (coexisten como dos Ingress
-sobre el mismo host, fusionados por Traefik, con **un único secret TLS por host**):
+On the shared subdomains, the **Astro SPA** (`sytue-frontend`) serves `/` and the
+**Go backend** exposes its API/protocol under path prefixes (they coexist as two Ingresses
+on the same host, merged by Traefik, with **a single TLS secret per host**):
 
-| Host                 | `/` (frontend)        | Backend Go (prefijos)                |
+| Host                 | `/` (frontend)        | Go backend (prefixes)                |
 |----------------------|-----------------------|--------------------------------------|
 | `id.sytue.eu`        | —                     | `/` (OIDC/JWKS/discovery/SCIM)       |
-| `drive.sytue.eu`     | SPA Drive             | `/api`, `/dav` (WebDAV)              |
-| `docs.sytue.eu`      | Editor Docs           | `/api`, `/colab` (WS)                |
+| `drive.sytue.eu`     | Drive SPA             | `/api`, `/dav` (WebDAV)              |
+| `docs.sytue.eu`      | Docs editor           | `/api`, `/colab` (WS)                |
 | `mail.sytue.eu`      | Webmail               | `/jmap`, `/api` (SMTP/IMAP → `mx`)   |
-| `calendar.sytue.eu`  | SPA Calendar          | `/api`, `/dav` (CalDAV)              |
-| `contacts.sytue.eu`  | SPA Contacts          | `/api`, `/dav` (CardDAV)             |
-| `rooms.sytue.eu`     | SPA Rooms             | `/api`, `/ws`, `/hooks`              |
-| `cloud.sytue.eu`     | Dashboard PaaS        | `/api` (control-plane)               |
+| `calendar.sytue.eu`  | Calendar SPA          | `/api`, `/dav` (CalDAV)              |
+| `contacts.sytue.eu`  | Contacts SPA          | `/api`, `/dav` (CardDAV)             |
+| `rooms.sytue.eu`     | Rooms SPA             | `/api`, `/ws`, `/hooks`              |
+| `cloud.sytue.eu`     | PaaS dashboard        | `/api` (control-plane)               |
 
-`mx.sytue.eu` publica **SMTP (25/465/587)** e **IMAPS (993)** vía un Service
-`LoadBalancer` dedicado (no Ingress HTTP).
+`mx.sytue.eu` exposes **SMTP (25/465/587)** and **IMAPS (993)** through a dedicated
+`LoadBalancer` Service (not an HTTP Ingress).
 
-## Secretos (NUNCA en git)
+<a id="secretos-nunca-en-git"></a>
+## Secrets (NEVER in git)
 
-Se gestionan con **Scaleway Secret Manager** y `deploy/production/02b-secretos.sh`
-los materializa como `Secret` nativos de Kubernetes. Los charts solo los referencian
-por `existingSecret`: deben existir en el namespace **antes** de instalar. Solo se
-muestran las claves esperadas (valores como **placeholders**):
+They are managed with **Scaleway Secret Manager**, and `deploy/production/02b-secretos.sh`
+materializes them as native Kubernetes `Secret`s. The charts only reference them
+via `existingSecret`: they must exist in the namespace **before** installing. Only the
+expected keys are shown (values as **placeholders**):
 
-| Secret                   | Claves                                              |
+| Secret                   | Keys                                                |
 |--------------------------|-----------------------------------------------------|
-| `sytue-registry`         | `.dockerconfigjson` (pull privado de `sytue-prod-platform`) |
+| `sytue-registry`         | `.dockerconfigjson` (private pull from `sytue-prod-platform`) |
 | `sytue-postgresql`       | `host`, `port`                                      |
 | `sytue-object-storage`   | `endpoint`, `access-key`, `secret-key`              |
 | `sytue-id`               | `key-encryption-key`, `mollie-api-key` (prod)      |
 | `sytue-id-db`            | `dsn`                                               |
 | `sytue-<svc>`            | `oidc-client-secret` (svc: drive/docs/mail/calendar/contacts/rooms/hub) |
-| `sytue-<svc>-db`         | `dsn` (un secret de BD por servicio)                |
+| `sytue-<svc>-db`         | `dsn` (one DB secret per service)                   |
 | `sytue-livekit-keys`     | `api-key`, `api-secret`, `keys.yaml`                |
 | `sytue-cloud-api`        | `oidc-client-secret`, `scaleway-api-key`, `control-db-url` |
 | `sytue-cloud-api-db`     | `dsn`                                               |
 | `sytue-cloud-builder`    | `scaleway-api-key`, `registry-token`                |
-| `sytue-analytics`        | `key-encryption-key` (KEK AES-256 de la **sal diaria**; sin ella la sal se guardaría en claro) |
-| `sytue-analytics-db`     | `dsn`, `dsn-direct` (la comparten colector y API)   |
+| `sytue-analytics`        | `key-encryption-key` (AES-256 KEK for the **daily salt**; without it the salt would be stored in plaintext) |
+| `sytue-analytics-db`     | `dsn`, `dsn-direct` (shared by the collector and the API) |
 | `sytue-frontend-bff`     | `cookie-secret`, `<app>-oidc-client-secret`         |
 
-Materialización para producción (los valores no aparecen en stdout ni en Git):
+Materialization for production (the values do not appear on stdout or in Git):
 
 ```sh
 cd deploy/production
 ./02b-secretos.sh prod
 ```
 
-## Instalación
+<a id="instalación"></a>
+## Installation
 
 ```sh
 # Staging
@@ -138,24 +144,25 @@ helm upgrade --install sytue-one deploy/helm/sytue-one \
   -f deploy/helm/sytue-one/values-prod.yaml
 ```
 
-> El namespace del ingress controller debe llevar la etiqueta `sytue.eu/role=ingress`
-> para que las NetworkPolicy permitan el tráfico entrante:
+> The ingress controller's namespace must carry the `sytue.eu/role=ingress` label
+> so that the NetworkPolicies allow inbound traffic:
 > `kubectl label ns <ns-ingress> sytue.eu/role=ingress`.
 
-## Identidad (NUCLEAR)
+<a id="identidad-nuclear"></a>
+## Identity (CORE)
 
-**Sytue ID** (servicio Go propio) es la columna vertebral. El issuer OIDC
-`https://id.<dominio>` (discovery estándar en `/.well-known/openid-configuration`,
-**sin** `/realms/` — eso era Keycloak, retirado) se inyecta en cada componente;
-**cada servicio Go valida los JWT vía JWKS**. Los clients OIDC (BFF por superficie) son `sytue-one`,
+**Sytue ID** (in-house Go service) is the backbone. The OIDC issuer
+`https://id.<dominio>` (standard discovery at `/.well-known/openid-configuration`,
+**without** `/realms/` — that was Keycloak, now retired) is injected into every component;
+**each Go service validates JWTs via JWKS**. The OIDC clients (one BFF per surface) are `sytue-one`,
 `sytue-console`, `sytue-cloud` (+ `sytue-cloud-api`), `sytue-mail`, `sytue-drive`,
 `sytue-calendar`, `sytue-contacts`, `sytue-docs`, `sytue-chat`, `sytue-meet`,
-`sytue-hub`. **No** hay clients de federación de motores (ya no hay motores).
+`sytue-hub`. There are **no** engine federation clients (there are no engines anymore).
 
 ## Multi-tenant — onboarding
 
-Cada organización obtiene un namespace `tenant-<slug>` con ResourceQuota, LimitRange y
-NetworkPolicy de aislamiento:
+Each organization gets a `tenant-<slug>` namespace with ResourceQuota, LimitRange and
+isolation NetworkPolicy:
 
 ```sh
 helm install tenant-acme deploy/helm/charts/tenant \
@@ -166,25 +173,27 @@ helm install tenant-acme deploy/helm/charts/tenant \
   --set tenant.plan=team
 ```
 
-El mapeo lógico (grupo `org/acme` en Sytue ID, esquema/RLS en PostgreSQL, dominio de
-correo, prefijo S3) queda anotado en el namespace; el aprovisionamiento de datos por
-tenant lo realizan los servicios Go.
+The logical mapping (group `org/acme` in Sytue ID, schema/RLS in PostgreSQL, mail
+domain, S3 prefix) is recorded as annotations on the namespace; per-tenant data
+provisioning is done by the Go services.
 
 ## TLS
 
-`cert-manager` 1.21 se instala una sola vez, como release cluster-wide independiente,
-antes del umbrella (el flujo de producción lo hace automáticamente con sus CRD). Emite
-certificados Let's Encrypt vía HTTP-01 sobre Traefik. Los `ClusterIssuer`
-(`sytue-letsencrypt-staging` / `sytue-letsencrypt-prod`) los crea después el umbrella
-(`templates/cluster-issuers.yaml`). El overlay selecciona el issuer por entorno.
+`cert-manager` 1.21 is installed only once, as an independent cluster-wide release,
+before the umbrella (the production flow does this automatically along with its CRDs). It issues
+Let's Encrypt certificates via HTTP-01 over Traefik. The `ClusterIssuer`s
+(`sytue-letsencrypt-staging` / `sytue-letsencrypt-prod`) are created afterwards by the umbrella
+(`templates/cluster-issuers.yaml`). The overlay selects the issuer per environment.
 
-## Observabilidad
+<a id="observabilidad"></a>
+## Observability
 
-Si `kube-prometheus-stack` está instalado (cluster-wide), los `ServiceMonitor` de cada
-componente exponen métricas en `/metrics`. Etiqueta de descubrimiento configurable en
-`global.metrics.serviceMonitor.labels` (por defecto `release: kube-prometheus-stack`).
+If `kube-prometheus-stack` is installed (cluster-wide), each component's `ServiceMonitor`s
+expose metrics at `/metrics`. The discovery label is configurable in
+`global.metrics.serviceMonitor.labels` (default `release: kube-prometheus-stack`).
 
-## Validación local (sin desplegar)
+<a id="validación-local-sin-desplegar"></a>
+## Local validation (without deploying)
 
 ```sh
 helm lint deploy/helm/sytue-one -f deploy/helm/sytue-one/values-prod.yaml
@@ -193,9 +202,10 @@ helm template sytue-one deploy/helm/sytue-one \
   -f deploy/helm/sytue-one/values-prod.yaml | less
 ```
 
-## Licencias
+<a id="licencias"></a>
+## Licenses
 
-Código de producto **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))** — sin copyleft. Dependencias de terceros
-solo **permisivas**: Traefik (MIT), cert-manager (Apache-2.0), **LiveKit** (Apache-2.0,
-única app de terceros). **Prohibido** AGPL/GPL/source-available. Matriz en
+Product code **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))** — no copyleft. Third-party dependencies
+**permissive** only: Traefik (MIT), cert-manager (Apache-2.0), **LiveKit** (Apache-2.0,
+the only third-party app). AGPL/GPL/source-available is **forbidden**. Matrix in
 [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](../../docs/security.md#5-licencias-propiedad-y-cumplimiento).

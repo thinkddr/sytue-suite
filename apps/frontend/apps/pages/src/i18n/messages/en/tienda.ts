@@ -171,15 +171,10 @@ export const tienda = {
   'store.gateway_mode': 'Gateway mode',
   'store.mode_test_help': "Simulated payments with the provider's test keys. Nobody is charged.",
   'store.mode_live_help': 'Real payments from your customers with the production keys.',
-  'store.webhook_title': 'Step 1: webhook address',
   'store.webhook_help': 'Paste this address into the {nombre} dashboard.',
   'store.webhook_label': 'Webhook address',
   'store.webhook_error':
     'The webhook address could not be retrieved. Close the dialog and try again.',
-  'store.copy': 'Copy',
-  'store.copied': 'Address copied.',
-  'store.credentials_title': 'Credentials',
-  'store.credentials_step': 'Step 2: credentials',
   'store.f_api_key': 'API key',
   'store.f_api_key_mode': 'API key ({modo})',
   'store.f_profile_id': 'Profile ID (optional)',
@@ -197,6 +192,48 @@ export const tienda = {
   'store.gateway_save': 'Save and test',
   'store.gateway_saved': '{nombre} gateway tested and saved.',
   'store.gateway_save_error': 'The gateway credentials could not be validated.',
+  'store.wz_progress': 'Steps to connect the gateway',
+  'store.wz_step_mode': 'Mode',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Keys',
+  'store.wz_step_check': 'Check',
+  'store.wz_step_done': 'Done',
+  'store.wz_mode_heading': 'Test payments or real payments?',
+  'store.wz_mode_desc':
+    'Start in test mode; when everything works, run this assistant again and choose live.',
+  'store.wz_webhook_heading': 'Tell {nombre} where to send payment notices',
+  'store.wz_keys_heading': 'Your {nombre} keys',
+  'store.wz_keys_desc':
+    'Secret keys are stored sealed and never shown again: to change one, type it again.',
+  'store.wz_keys_rejected': '{nombre} did not accept these keys',
+  'store.wz_check_heading': 'Check and save',
+  'store.wz_check_desc':
+    'Sytue Web tests the keys with {nombre} before turning the gateway on. Nothing is saved until the test passes.',
+  'store.wz_secret_hidden': 'Typed (hidden)',
+  'store.wz_empty_value': 'Not provided',
+  'store.wz_done_heading': '{nombre} is ready',
+  'store.wz_finish': 'Finish',
+  'store.hint_mollie_api_key':
+    'In Mollie: Developers › API keys. Test keys start with test_ and live keys with live_.',
+  'store.hint_mollie_profile':
+    'In Mollie: Settings › Website profiles. It starts with pfl_; leave it empty to use your default profile.',
+  'store.hint_adyen_api_key':
+    'In the Adyen Customer Area: Developers › API credentials › your credential › API key.',
+  'store.hint_adyen_merchant':
+    'In the Adyen Customer Area, in the account selector at the top: the merchant account, not the company account.',
+  'store.hint_adyen_hmac': 'In Adyen: Developers › Webhooks › your webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'In Adyen (live): Developers › API URLs. It is the part of the address before -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Your bank gives it to you with the virtual POS contract; it also appears in the Redsys admin portal.',
+  'store.hint_redsys_terminal':
+    'In the Redsys admin portal, next to the merchant code. It is usually 1.',
+  'store.hint_redsys_secret':
+    'In the Redsys admin portal: merchant details › SHA-256 key. The test and live keys are different.',
+  'store.hint_stripe_secret':
+    'In Stripe: Developers › API keys › Secret key. It starts with sk_test_ or sk_live_.',
+  'store.hint_stripe_webhook':
+    'In Stripe: Developers › Webhooks › your endpoint › Signing secret. It starts with whsec_.',
   'orders.subtitle': 'Orders and purchases made on your website.',
   'orders.count': { one: '{count} order', other: '{count} orders' },
   'orders.loading': 'Loading orders',

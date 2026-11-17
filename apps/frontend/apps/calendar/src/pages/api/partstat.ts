@@ -15,6 +15,11 @@
  * un «estado» propio: es lo que viaja en el .ics y lo que entiende cualquier otro
  * calendario del mundo.
  *
+ * `id` es el UID del evento (el del .ics, «…@calendar.sytue.eu»), que es lo que
+ * la web conoce: viaja en el cuerpo como `uid` y no solo en la ruta, porque un UID
+ * con forma de UUID se tomaría allí por el id interno. Con el UID el servicio
+ * escribe la respuesta en el propio .ics, que es lo que lee la rejilla al recargar.
+ *
  * Proxy BFF autorizado por cookie: el access token httpOnly autoriza la API REST
  * del servicio Go y nunca llega al navegador.
  */
@@ -40,6 +45,8 @@ export const POST: APIRoute = async (ctx) => {
   const id = typeof body.id === 'string' ? body.id.trim() : '';
   const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : '';
   if (!id) return json({ error: 'missing_id' }, 400);
+  // Un salto de línea en un UID no identifica ningún evento: se corta aquí.
+  if (!uidValido(id)) return json({ error: 'invalid_id' }, 400);
   // Se valida aquí y no solo en el servicio para que un estado inventado no llegue
   // a escribirse en el .ics de nadie: un PARTSTAT desconocido lo ignoran unos
   // clientes y otros lo pintan en crudo.
@@ -55,7 +62,7 @@ export const POST: APIRoute = async (ctx) => {
           'content-type': 'application/json',
           accept: 'application/json',
         },
-        body: JSON.stringify({ partstat: status.toUpperCase() }),
+        body: JSON.stringify({ uid: id, partstat: status.toUpperCase() }),
       },
     );
     if (!res.ok) {
@@ -71,6 +78,16 @@ export const POST: APIRoute = async (ctx) => {
     return json({ error: 'calendar_unreachable' }, 502);
   }
 };
+
+/** Los mismos límites que el servicio: sin caracteres de control y de un largo razonable. */
+function uidValido(uid: string): boolean {
+  if (uid.length > 512) return false;
+  for (let i = 0; i < uid.length; i++) {
+    const c = uid.charCodeAt(i);
+    if (c < 0x20 || c === 0x7f) return false;
+  }
+  return true;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

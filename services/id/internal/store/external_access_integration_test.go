@@ -24,7 +24,7 @@ func TestMatrixRevocationFencesActivationAfterCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	st, ctx := store.New(h.Pool), context.Background()
-	user := seedUser(t, ctx, st, "matrix@acme.example")
+	user := seedUser(ctx, t, st, "matrix@acme.example")
 	unavailable := errors.New("encrypted transport unavailable")
 	var observed []store.MatrixAccessChange
 	st.SetExternalAccessGuard(store.ExternalAccessGuard{Apply: func(_ context.Context, c store.MatrixAccessChange) error {
@@ -81,7 +81,7 @@ func TestMatrixRevocationFencesActivationAfterCommit(t *testing.T) {
 
 func TestMatrixOrganizationRemovalFailsClosed(t *testing.T) {
 	st, ctx := newStore(t)
-	user := seedUser(t, ctx, st, "matrix-member@acme.example")
+	user := seedUser(ctx, t, st, "matrix-member@acme.example")
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: "matrix-acme", Name: "Acme"})
 	if err != nil {
 		t.Fatal(err)

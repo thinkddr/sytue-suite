@@ -1,354 +1,461 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+import { readdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { expect, test } from 'bun:test';
-import { StorageRepository, type StorageRecordTransport } from './storage-repository.js';
+import { Attachment, initAsync } from '@matrix-org/matrix-sdk-crypto-wasm';
+import { createSHA256 } from 'hash-wasm';
+import { maxCipherBlockBytes, type CipherBlobReceipt } from '@sytue/config/matrix';
+import { StorageRepository } from './storage-repository.js';
+import { StorageJobs, type StorageJobRunner } from './storage-jobs.js';
+import { StorageFiles, maxStorageFileBytes, type StorageFileSink } from './storage-files.js';
 import {
-  StorageRecordError,
+  createStorageRecord,
   encodeStorageJSON,
   storageJSONBytes,
-  storageObjectKind,
   type StorageRecord,
-  type StorageRecordEntry,
 } from './storage.js';
-import {
-  StorageSourceChangedError,
-  maxCipherBlockBytes,
-  sha256Hex,
-  type BlobReceipt,
-  type CipherBlobGateway,
-} from './storage-blocks.js';
-import {
-  StreamingSha256,
-  bytesStorageFileSource,
-  filePageKind,
-  fileRootLevel,
-  fileBlocks,
-  pendingUploadsNamespace,
-  validateStorageFilePage,
-  type StorageUploadJournal,
-} from './storage-files.js';
-import type { MatrixReference, MatrixStorageProduct, MatrixStorageScope } from './types.js';
-
+import type { MatrixReference, MatrixStorageScope } from './types.js';
 const scope: MatrixStorageScope = { tenant: 'acme', subject: 'person', product: 'drive' };
-const room = '!private:matrix.test';
-const encoder = new TextEncoder();
-
-class MemoryTransport implements StorageRecordTransport {
-  readonly rooms = [room];
-  readonly records = new Map<string, StorageRecord>();
-  readonly transactions = new Map<string, MatrixReference>();
-  closed = false;
-  posts = 0;
-  failOnPutCount = -1;
-
-  assertOpen = (): void => {
-    if (this.closed) throw new Error('closed');
-  };
-
-  put = async (transaction: string, record: StorageRecord): Promise<MatrixReference> => {
-    this.posts++;
-    if (this.posts === this.failOnPutCount) {
-      throw new Error('simulated_manifest_network_drop');
-    }
-    let ref = this.transactions.get(transaction);
-    if (!ref) {
-      ref = { room_id: room, event_id: `$evt_${this.records.size + 1}` };
-      this.transactions.set(transaction, ref);
-      this.records.set(ref.event_id, structuredClone(record));
-    }
-    return ref;
-  };
-
-  read = async (reference: MatrixReference): Promise<StorageRecord> => {
-    const found = this.records.get(reference.event_id);
-    if (!found) throw new Error('missing_record');
-    return structuredClone(found);
-  };
-
-  history = async (): Promise<{
-    entries: StorageRecordEntry[];
-    scanned: number;
-    next: string | null;
-  }> => {
-    const entries = [...this.records.entries()].map(([event_id, record]) => ({
-      reference: { room_id: room, event_id },
-      record: structuredClone(record),
-    }));
-    return { entries, scanned: entries.length, next: null };
-  };
+const ref = (name: string): MatrixReference => ({
+  room_id: '!private:matrix.test',
+  event_id: '$' + name,
+});
+const metadata = encodeStorageJSON(
+  new TextEncoder().encode('{"title":"private <file>","amount":900719925474099512345}'),
+);
+async function digest(data: Uint8Array<ArrayBuffer>): Promise<string> {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
 }
-
-class MemoryBlobGateway implements CipherBlobGateway {
-  readonly blobs = new Map<
-    string,
-    { product: MatrixStorageProduct; bytes: Uint8Array<ArrayBuffer> }
-  >();
-  puts = 0;
-  failOnPutNumber = -1;
-
-  put = async (
-    product: MatrixStorageProduct,
-    id: string,
-    ciphertext: Uint8Array<ArrayBuffer>,
-  ): Promise<BlobReceipt> => {
-    this.puts++;
-    if (this.puts === this.failOnPutNumber) {
-      throw new Error('simulated_blob_network_drop');
+async function fixture(size = 73, run?: StorageJobRunner) {
+  await initAsync();
+  const blobs = new Map<string, Uint8Array<ArrayBuffer>>(),
+    records = new Map<string, StorageRecord>();
+  const leaves: {
+    block: { blob: CipherBlobReceipt; matrix_file: unknown; plain_sha256: string };
+  }[] = [];
+  const all = await createSHA256();
+  for (let index = 0; index < Math.max(1, Math.ceil(size / maxCipherBlockBytes)); index++) {
+    const data = new Uint8Array(
+      Math.min(maxCipherBlockBytes, Math.max(0, size - index * maxCipherBlockBytes)),
+    ).fill(index + 1);
+    all.update(data);
+    const encrypted = Attachment.encrypt(data);
+    try {
+      const ciphertext = encrypted.encryptedData as Uint8Array<ArrayBuffer>;
+      const id = 'A'.repeat(26) + String.fromCharCode(65 + index);
+      blobs.set(id, ciphertext);
+      leaves.push({
+        block: {
+          blob: { id, product: 'drive', size_bytes: data.length, sha256: await digest(ciphertext) },
+          matrix_file: JSON.parse(encrypted.mediaEncryptionInfo!) as unknown,
+          plain_sha256: await digest(data),
+        },
+      });
+    } finally {
+      data.fill(0);
+      encrypted.free();
     }
-    const copy = new Uint8Array(ciphertext.byteLength);
-    copy.set(ciphertext);
-    this.blobs.set(id, { product, bytes: copy });
-    return {
-      id,
-      product,
-      size_bytes: copy.byteLength,
-      sha256: await sha256Hex(copy),
-    };
+  }
+  let root: unknown = { kind: 'org.sytue.file.page.v1', level: 0, index: 0, nodes: leaves };
+  if (leaves.length > 16) {
+    const nodes = [];
+    for (let index = 0; index < Math.ceil(leaves.length / 16); index++) {
+      const id = 'leaf-' + index;
+      records.set(
+        '$' + id,
+        createStorageRecord(
+          scope,
+          'object',
+          'revision',
+          'manifest',
+          new TextEncoder().encode(
+            JSON.stringify({
+              kind: 'org.sytue.file.page.v1',
+              level: 0,
+              index,
+              nodes: leaves.slice(index * 16, index * 16 + 16),
+            }),
+          ),
+        ),
+      );
+      nodes.push({ event: ref(id) });
+    }
+    root = { kind: 'org.sytue.file.page.v1', level: 1, index: 0, nodes };
+  }
+  const document = {
+    kind: 'org.sytue.file.v1',
+    request: { object_id: 'object', revision_id: 'revision', size_bytes: size, metadata },
+    sha256: all.digest('hex'),
+    root,
   };
-
-  read = async (product: MatrixStorageProduct, id: string): Promise<Uint8Array<ArrayBuffer>> => {
-    const entry = this.blobs.get(id);
-    if (!entry || entry.product !== product) throw new Error('missing_blob');
-    const copy = new Uint8Array(entry.bytes.byteLength);
-    copy.set(entry.bytes);
-    return copy;
-  };
-}
-
-function createMemoryJournal(encrypted = true): {
-  journal: StorageUploadJournal;
-  rows: Map<string, string>;
-} {
-  const rows = new Map<string, string>();
-  const locks = new Map<string, Promise<void>>();
-  const keyOf = (owner: string, ns: string, id: string) => `${owner}\u001f${ns}\u001f${id}`;
+  const save = () =>
+    records.set(
+      '$root',
+      createStorageRecord(
+        scope,
+        'object',
+        'revision',
+        'manifest',
+        new TextEncoder().encode(JSON.stringify(document)),
+      ),
+    );
+  save();
+  const requests: string[] = [];
+  let closed = false;
+  const files = new StorageFiles(
+    scope,
+    {
+      ...(run ? { run } : {}),
+      assertOpen: () => {
+        if (closed) throw new Error('closed artificial device');
+      },
+      readRecord: async (reference) => {
+        const value = records.get(reference.event_id);
+        if (!value || reference.room_id !== '!private:matrix.test')
+          throw new Error('missing artificial record');
+        return structuredClone(value);
+      },
+    },
+    {
+      read: async (id) => {
+        requests.push(id);
+        const bytes = blobs.get(id);
+        if (!bytes) throw new Error('missing artificial block');
+        return bytes.slice();
+      },
+    },
+  );
   return {
-    rows,
-    journal: {
-      isEncrypted: () => encrypted,
-      exclusive: async (owner, ns, id, task) => {
-        const key = keyOf(owner, ns, id);
-        const prev = locks.get(key) ?? Promise.resolve();
-        let release!: () => void;
-        const curr = new Promise<void>((r) => {
-          release = r;
-        });
-        locks.set(
-          key,
-          prev.then(() => curr),
-        );
-        await prev;
-        try {
-          return await task();
-        } finally {
-          release();
-        }
-      },
-      read: async <T>(owner: string, ns: string, id: string): Promise<T | null> => {
-        const raw = rows.get(keyOf(owner, ns, id));
-        return raw ? (JSON.parse(raw) as T) : null;
-      },
-      write: async (owner, ns, id, value) => {
-        rows.set(keyOf(owner, ns, id), JSON.stringify(value));
-      },
-      delete: async (owner, ns, id) => {
-        rows.delete(keyOf(owner, ns, id));
-      },
+    files,
+    document,
+    blobs,
+    records,
+    requests,
+    save,
+    close: () => {
+      closed = true;
     },
   };
 }
-
-test('StreamingSha256 matches WebCrypto SHA-256 across all block padding boundaries', async () => {
-  for (const len of [0, 1, 55, 56, 63, 64, 65, 119, 120, 128, 4099]) {
-    const data = new Uint8Array(len);
-    for (let i = 0; i < len; i++) data[i] = (i * 131 + 17) & 0xff;
-    const stream = new StreamingSha256();
-    for (let offset = 0; offset < len;) {
-      const step = Math.min(13, len - offset);
-      stream.update(data.subarray(offset, offset + step));
-      offset += step;
-    }
-    expect(stream.digestHex()).toBe(await sha256Hex(data));
-  }
-});
-
-test('cipher blocks authenticate scope, object, revision, part and ciphertext before returning plaintext', async () => {
-  const transport = new MemoryTransport();
-  const repo = new StorageRepository(scope, transport);
-  const gateway = new MemoryBlobGateway();
-  const secret = encoder.encode('Secreto empresarial privado E2EE: 900719925474099312345');
-
-  const block = await repo.uploadBlock(gateway, 'doc-1', 'rev-1', 0, secret);
-  const storedCipher = gateway.blobs.get(block.blob.id)!.bytes;
-  expect(new TextDecoder().decode(storedCipher)).not.toContain('Secreto empresarial');
-
-  expect(await repo.downloadBlock(gateway, block, 'doc-1', 'rev-1', 0)).toEqual(secret);
-  await expect(repo.downloadBlock(gateway, block, 'other-doc', 'rev-1', 0)).rejects.toThrow(
-    StorageRecordError,
-  );
-  await expect(repo.downloadBlock(gateway, block, 'doc-1', 'other-rev', 0)).rejects.toThrow(
-    StorageRecordError,
-  );
-  await expect(repo.downloadBlock(gateway, block, 'doc-1', 'rev-1', 1)).rejects.toThrow(
-    StorageRecordError,
-  );
-
-  storedCipher[0]! ^= 0x01;
-  await expect(repo.downloadBlock(gateway, block, 'doc-1', 'rev-1', 0)).rejects.toThrow(
-    'matrix_unverified',
-  );
-});
-
-// This functional fixture must cross the real 8 MiB block boundary. Its repeated
-// encryption, resume and full-file hashes need a bounded budget under CI CPU load.
-test('multi-block resumable upload, range read across block boundary, source-change guard and kind=file catalog publication', async () => {
-  const transport = new MemoryTransport();
-  const repo = new StorageRepository(scope, transport);
-  const gateway = new MemoryBlobGateway();
-  const { journal, rows } = createMemoryJournal(true);
-
-  // Two full 8 MiB blocks + trailing 321 bytes => 3 encrypted blocks.
-  const totalSize = maxCipherBlockBytes * 2 + 321;
-  const plain = new Uint8Array(totalSize);
-  for (let i = 0; i < totalSize; i += 4096) {
-    plain[i] = ((i / 4096) * 37 + 11) & 0xff;
-  }
-  plain.set(encoder.encode('BOUNDARY-MARKER-ACROSS-8MIB'), maxCipherBlockBytes - 12);
-
-  const metaJson = '{"filename":"presupuesto-2027.xlsx","exact_cents":900719925474099312345}';
-  const request = {
-    object_id: 'sheet-budget',
-    revision_id: 'rev-file-1',
-    size_bytes: totalSize,
-    metadata: encodeStorageJSON(encoder.encode(metaJson), 8192),
+function staging() {
+  const result = { bytes: 0, committed: false, aborted: false, chunks: 0 };
+  const sink: StorageFileSink = {
+    write: async (bytes) => {
+      result.bytes += bytes.length;
+      result.chunks++;
+    },
+    commit: async () => {
+      result.committed = true;
+    },
+    abort: async () => {
+      result.aborted = true;
+    },
   };
+  return { result, sink };
+}
 
-  // Unencrypted journals are refused upfront.
+test('native-format pages verify 17 bounded Matrix blocks, exact private metadata and ranges across a boundary', async () => {
+  const size = 16 * maxCipherBlockBytes + 73,
+    f = await fixture(size),
+    staged = staging();
+  expect((await f.files.info(ref('root'), 'object', 'revision')).metadata).toBe(metadata);
+  expect(f.requests).toHaveLength(0);
+  const range = await f.files.readRange(
+    ref('root'),
+    'object',
+    'revision',
+    maxCipherBlockBytes - 4,
+    8,
+  );
+  expect(range).toEqual(new Uint8Array([1, 1, 1, 1, 2, 2, 2, 2]));
+  const result = await f.files.download(ref('root'), 'object', 'revision', staged.sink);
+  expect(result.size_bytes).toBe(size);
+  expect(staged.result).toEqual({ bytes: size, chunks: 17, committed: true, aborted: false });
+  const directory = process.env.SYTUE_STORAGE_WEB_FILE_VECTOR_DIR;
+  if (directory) {
+    if (!path.isAbsolute(directory) || (await readdir(directory)).length)
+      throw new Error('empty absolute fixture directory required');
+    for (const [id, data] of f.blobs)
+      await writeFile(path.join(directory, id), data, { mode: 0o600 });
+    await writeFile(
+      path.join(directory, 'vector.json'),
+      JSON.stringify({
+        artificial: true,
+        selected: {
+          offset: maxCipherBlockBytes - 4,
+          bytes: btoa(String.fromCharCode(1, 1, 1, 1, 2, 2, 2, 2)),
+        },
+        scope,
+        reference: ref('root'),
+        request: f.document.request,
+        entries: [...f.records].map(([event, record]) => ({
+          reference: ref(event.slice(1)),
+          record,
+        })),
+      }),
+      { mode: 0o600 },
+    );
+  }
+}, 60_000);
+
+test('an empty native-format file still authenticates its single empty Matrix block', async () => {
+  const f = await fixture(0),
+    staged = staging();
+  await f.files.download(ref('root'), 'object', 'revision', staged.sink);
+  expect(staged.result).toEqual({ bytes: 0, chunks: 1, committed: true, aborted: false });
+  expect(await f.files.readRange(ref('root'), 'object', 'revision', 0, 0)).toEqual(
+    new Uint8Array(),
+  );
+});
+
+test.each([
+  'whole-hash',
+  'plain-hash',
+  'ciphertext',
+  'blob-size',
+  'cipher-hash',
+  'blob-hash',
+  'key',
+  'iv',
+  'object',
+  'revision',
+  'scope',
+  'parents',
+  'metadata',
+  'page-index',
+  'page-kind',
+])('%s tampering never commits a replacement and aborts staging', async (kind) => {
+  const f = await fixture(),
+    staged = staging();
+  const root = f.document.root as {
+    index: number;
+    kind: string;
+    nodes: {
+      block: {
+        blob: CipherBlobReceipt;
+        matrix_file: { key: { k: string }; iv: string; hashes: { sha256: string } };
+        plain_sha256: string;
+      };
+    }[];
+  };
+  const leaf = root.nodes[0]!.block;
+  if (kind === 'whole-hash') f.document.sha256 = '0'.repeat(64);
+  if (kind === 'plain-hash') leaf.plain_sha256 = '0'.repeat(64);
+  if (kind === 'ciphertext') f.blobs.get(leaf.blob.id)![0]! ^= 1;
+  if (kind === 'blob-size') leaf.blob.size_bytes++;
+  if (kind === 'blob-hash') leaf.blob.sha256 = '0'.repeat(64);
+  if (kind === 'cipher-hash') leaf.matrix_file.hashes.sha256 = 'A'.repeat(43);
+  if (kind === 'key') leaf.matrix_file.key.k = 'A'.repeat(43);
+  if (kind === 'iv') leaf.matrix_file.iv = 'A'.repeat(22);
+  if (kind === 'object') f.document.request.object_id = 'other';
+  if (kind === 'revision') f.document.request.revision_id = 'other';
+  if (kind === 'parents') Object.assign(f.document.request, { previous: ['$other'] });
+  if (kind === 'metadata') f.document.request.metadata = btoa('not JSON');
+  if (kind === 'page-index') root.index = 1;
+  if (kind === 'page-kind') root.kind = 'other';
+  f.save();
+  if (kind === 'scope') f.records.get('$root')!.scope.product = 'mail';
+  await expect(f.files.download(ref('root'), 'object', 'revision', staged.sink)).rejects.toThrow();
+  expect(staged.result.committed).toBe(false);
+  expect(staged.result.aborted).toBe(true);
+});
+
+test('maximum root geometry is bounded without downloading an entire multi-terabyte file', async () => {
+  const f = await fixture();
+  f.document.request.size_bytes = maxStorageFileBytes;
+  f.document.root = {
+    kind: 'org.sytue.file.page.v1',
+    level: 5,
+    index: 0,
+    nodes: Array.from({ length: 16 }, (_, index) => ({ event: ref('child-' + index) })),
+  };
+  f.save();
+  expect((await f.files.info(ref('root'), 'object', 'revision')).size_bytes).toBe(
+    maxStorageFileBytes,
+  );
+  expect(f.requests).toHaveLength(0);
+  f.document.request.size_bytes++;
+  f.save();
+  await expect(f.files.info(ref('root'), 'object', 'revision')).rejects.toThrow();
+});
+
+test('abort and logout after asynchronous reads cannot publish plaintext or commit staging', async () => {
+  for (const reason of ['signal', 'logout']) {
+    const f = await fixture(),
+      staged = staging(),
+      signal = new AbortController();
+    staged.sink.write = async () => {
+      if (reason === 'signal') signal.abort();
+      else f.close();
+    };
+    await expect(
+      f.files.download(ref('root'), 'object', 'revision', staged.sink, signal.signal),
+    ).rejects.toThrow();
+    expect(staged.result.committed).toBe(false);
+    expect(staged.result.aborted).toBe(true);
+  }
+});
+
+test('range limits and object/revision context fail before fetching ciphertext', async () => {
+  const f = await fixture();
+  for (const [offset, length] of [
+    [-1, 1],
+    [0, -1],
+    [0, maxCipherBlockBytes + 1],
+    [73, 1],
+    [74, 0],
+    [0.5, 1],
+  ])
+    await expect(
+      f.files.readRange(ref('root'), 'object', 'revision', offset!, length!),
+    ).rejects.toThrow();
+  await expect(f.files.readRange(ref('root'), 'object', 'other', 0, 1)).rejects.toThrow();
+  expect(f.requests).toHaveLength(0);
+  const original = JSON.parse(
+    new TextDecoder().decode(storageJSONBytes(f.records.get('$root')!.payload)),
+  ) as { request: { metadata: string } };
+  expect(original.request.metadata).toBe(metadata);
+});
+
+test('file catalog publication verifies every stored block before writing an index revision', async () => {
+  const { StorageRepository } = await import('./storage-repository.js');
+  const f = await fixture();
+  let published = 0;
+  const repository = new StorageRepository(
+    scope,
+    {
+      rooms: ['!private:matrix.test'],
+      assertOpen: () => {},
+      put: async (_transaction, record) => {
+        const reference = ref('published-' + ++published);
+        f.records.set(reference.event_id, record);
+        return reference;
+      },
+      read: async (reference) => {
+        const record = f.records.get(reference.event_id);
+        if (!record) throw new Error('missing artificial record');
+        return record;
+      },
+      history: async () => ({ entries: [], scanned: 0, next: null }),
+    },
+    {
+      read: async (id) => {
+        const data = f.blobs.get(id);
+        if (!data) throw new Error('missing artificial block');
+        return data.slice();
+      },
+    },
+  );
+  const commit = {
+    kind: 'org.sytue.object.v1' as const,
+    state: 'live' as const,
+    metadata,
+    content: { kind: 'file' as const, revision_id: 'revision', reference: ref('root') },
+  };
+  const first = await repository.putObject('first-file', 'object', 'published', commit);
+  expect(first.commit.content).toEqual(commit.content);
+  expect(published).toBe(1);
+  f.document.sha256 = '0'.repeat(64);
+  f.save();
   await expect(
-    repo.uploadFile(gateway, 'job-budget', request, bytesStorageFileSource(plain), {
-      journal: createMemoryJournal(false).journal,
+    repository.putObject('bad-file', 'object', 'bad-published', commit),
+  ).rejects.toThrow();
+  expect(published).toBe(1);
+});
+
+test('file shutdown waits for asynchronous staged plaintext disposal and never commits a cancelled stream', async () => {
+  const jobs = new StorageJobs();
+  const f = await fixture(73);
+  const repository = new StorageRepository(
+    scope,
+    {
+      rooms: ['!private:matrix.test'],
+      assertOpen: () => {},
+      run: (name, action, parent) => jobs.run(name, action, parent),
+      read: async (reference) => {
+        const record = f.records.get(reference.event_id);
+        if (!record) throw new Error('missing artificial record');
+        return structuredClone(record);
+      },
+      put: async () => {
+        throw new Error('unexpected fixture write');
+      },
+      history: async () => {
+        throw new Error('unexpected fixture history');
+      },
+    },
+    {
+      read: async (id) => {
+        const data = f.blobs.get(id);
+        if (!data) throw new Error('missing artificial block');
+        return data.slice();
+      },
+    },
+  );
+  let began!: () => void, release!: () => void, aborting!: () => void, cleaned!: () => void;
+  const entered = new Promise<void>((resolve) => {
+      began = resolve;
     }),
-  ).rejects.toThrow(StorageRecordError);
-
-  // Simulate network failure on the 2nd block upload: pending block 1 stays checkpointed.
-  gateway.failOnPutNumber = 2;
-  await expect(
-    repo.uploadFile(gateway, 'job-budget', request, bytesStorageFileSource(plain), { journal }),
-  ).rejects.toThrow('simulated_blob_network_drop');
-  expect(rows.size).toBe(1);
-  expect([...rows.keys()][0]).toContain(pendingUploadsNamespace);
-
-  // Mutating the source while a pending AES-CTR key/IV is checkpointed MUST fail without reusing keys.
-  const mutated = new Uint8Array(plain);
-  mutated[maxCipherBlockBytes + 5]! ^= 0xff;
-  await expect(
-    repo.uploadFile(gateway, 'job-budget', request, bytesStorageFileSource(mutated), { journal }),
-  ).rejects.toThrow(StorageSourceChangedError);
-
-  // Resume with the original immutable source; then simulate root manifest network drop.
-  gateway.failOnPutNumber = -1;
-  transport.failOnPutCount = 1;
-  await expect(
-    repo.uploadFile(gateway, 'job-budget', request, bytesStorageFileSource(plain), { journal }),
-  ).rejects.toThrow('simulated_manifest_network_drop');
-  expect(rows.size).toBe(1);
-
-  // Final resume completes verification and removes the pending upload journal entry.
-  transport.failOnPutCount = -1;
-  const manifestRef = await repo.uploadFile(
-    gateway,
-    'job-budget',
-    request,
-    bytesStorageFileSource(plain),
-    { journal },
-  );
-  expect(rows.size).toBe(0);
-
-  const info = await repo.fileInfo(manifestRef, 'sheet-budget', 'rev-file-1');
-  expect(info.size_bytes).toBe(totalSize);
-  expect(new TextDecoder().decode(storageJSONBytes(info.metadata, 8192))).toBe(metaJson);
-
-  // Range read spanning across the end of block 0 and start of block 1.
-  const crossSlice = await repo.readFileRange(
-    gateway,
-    manifestRef,
-    'sheet-budget',
-    'rev-file-1',
-    maxCipherBlockBytes - 12,
-    27,
-  );
-  expect(new TextDecoder().decode(crossSlice)).toBe('BOUNDARY-MARKER-ACROSS-8MIB');
-
-  // Full streaming download verifies whole-file SHA-256.
-  const reassembled = new Uint8Array(totalSize);
-  let cursor = 0;
-  await repo.downloadFile(gateway, manifestRef, 'sheet-budget', 'rev-file-1', (chunk) => {
-    reassembled.set(chunk, cursor);
-    cursor += chunk.byteLength;
-  });
-  expect(cursor).toBe(totalSize);
-  expect(await sha256Hex(reassembled)).toBe(await sha256Hex(plain));
-
-  // Publish catalog commit with `kind: 'file'` and verify catalog head resolution!
-  const version = await repo.putObject('commit-budget-1', 'sheet-budget', 'rev-obj-1', {
-    kind: storageObjectKind,
-    state: 'live',
-    metadata: encodeStorageJSON(encoder.encode(metaJson), 8192),
-    content: {
-      kind: 'file',
-      revision_id: 'rev-file-1',
-      reference: manifestRef,
+    gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  const cleanupStarted = new Promise<void>((resolve) => {
+      aborting = resolve;
+    }),
+    cleanupGate = new Promise<void>((resolve) => {
+      cleaned = resolve;
+    });
+  let committed = false,
+    stopped = false,
+    aborted = false;
+  const pending = repository.files().download(ref('root'), 'object', 'revision', {
+    write: async () => {
+      began();
+      await gate;
+    },
+    commit: async () => {
+      committed = true;
+    },
+    abort: async () => {
+      aborted = true;
+      aborting();
+      await cleanupGate;
     },
   });
-  expect(version.commit.content?.kind).toBe('file');
-  const heads = await repo.catalog();
-  expect(heads.map((h) => h.object_id)).toEqual(['sheet-budget']);
-}, 20_000);
+  const caught = Promise.allSettled([pending]);
+  await entered;
+  const closing = jobs.close().then(() => {
+    stopped = true;
+  });
+  try {
+    expect(jobs.empty).toBe(false);
+    expect(stopped).toBe(false);
+    release();
+    await cleanupStarted;
+    expect(stopped).toBe(false);
+    expect(committed).toBe(false);
+  } finally {
+    release();
+    cleaned();
+    await caught;
+    await closing;
+  }
+  expect(aborted).toBe(true);
+  expect(committed).toBe(false);
+  expect(stopped).toBe(true);
+});
 
-test('paged manifest tree geometry matches Go fanout-16 multi-level invariants', () => {
-  expect(fileBlocks(0)).toBe(1);
-  expect(fileRootLevel(fileBlocks(0))).toBe(0);
-  expect(fileRootLevel(16)).toBe(0);
-  expect(fileRootLevel(17)).toBe(1);
-  expect(fileRootLevel(256)).toBe(1);
-  expect(fileRootLevel(257)).toBe(2);
-
-  const req17 = {
-    object_id: 'video',
-    revision_id: 'rev1',
-    size_bytes: 16 * maxCipherBlockBytes + 100,
-    metadata: encodeStorageJSON(encoder.encode('{}'), 8192),
-  };
-  expect(() =>
-    validateStorageFilePage(
-      {
-        kind: filePageKind,
-        level: 1,
-        index: 0,
-        nodes: [
-          { event: { room_id: room, event_id: '$p0' } },
-          { event: { room_id: room, event_id: '$p1' } },
-        ],
-      },
-      scope,
-      req17,
-      1,
-      0,
-    ),
-  ).not.toThrow();
-
-  // Wrong node count at root level 1 (17 blocks requires 2 child pages, not 1).
-  expect(() =>
-    validateStorageFilePage(
-      {
-        kind: filePageKind,
-        level: 1,
-        index: 0,
-        nodes: [{ event: { room_id: room, event_id: '$p0' } }],
-      },
-      scope,
-      req17,
-      1,
-      0,
-    ),
-  ).toThrow(StorageRecordError);
+test('late job cancellation zeroes a plaintext range that has not been handed to its caller', async () => {
+  let discarded: Uint8Array | undefined;
+  const f = await fixture(73, async (_name, action, parent) => {
+    const value = await action(parent ?? new AbortController().signal);
+    if (value instanceof Uint8Array) discarded = value;
+    throw new Error('late cancellation');
+  });
+  await expect(f.files.readRange(ref('root'), 'object', 'revision', 0, 12)).rejects.toThrow(
+    'late cancellation',
+  );
+  expect(discarded?.every((byte) => byte === 0)).toBe(true);
 });

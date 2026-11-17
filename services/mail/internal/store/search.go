@@ -138,7 +138,7 @@ func (s *Store) SearchMessages(ctx context.Context, accountID uuid.UUID, f Searc
 	offsetPos := len(args)
 
 	query := selectMessageCols + " AND " + strings.Join(preds, " AND ") +
-		fmt.Sprintf(" ORDER BY received_at DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
+		fmt.Sprintf(" ORDER BY "+ordenLista+" DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
 
 	var out []domain.Message
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {

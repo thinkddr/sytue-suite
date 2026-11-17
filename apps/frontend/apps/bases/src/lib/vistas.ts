@@ -2,13 +2,17 @@
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
- * Lo que la interfaz hace con las vistas guardadas: agrupar para el tablero y armar la
- * configuración de una vista nueva. El servidor valida y ejecuta los filtros y el orden
+ * Lo que la interfaz hace con las vistas guardadas: agrupar para el tablero, armar la
+ * configuración de una vista nueva y volver a abrir una guardada para editarla. El servidor valida y ejecuta los filtros y el orden
  * (no se evalúa nada aquí); esto solo decide cómo se PINTA.
  */
 import type {
+  BasesAttachment,
   BasesField,
+  BasesFilter,
   BasesRecord,
+  BasesValue,
+  BasesView,
   BasesViewConfig,
   BasesViewKind,
 } from '@sytue/api-clients/bases';
@@ -40,6 +44,33 @@ export function columnasDeTablero(campo: BasesField, registros: readonly BasesRe
   return [...cols, sin];
 }
 
+/**
+ * La portada de una tarjeta de galería: el primer adjunto de imagen del registro,
+ * recorriendo los campos de adjuntos en el orden de la tabla y sus ficheros en el orden
+ * en que se subieron. Solo vale una imagen con miniatura: el servicio la genera de lo
+ * que el CONTENIDO dice que es imagen, y la tarjeta nunca baja el original entero. Sin
+ * ninguna, `null` (la tarjeta pinta su hueco).
+ */
+export function portadaDe(campos: readonly BasesField[], r: BasesRecord): BasesAttachment | null {
+  for (const c of campos) {
+    if (c.kind !== 'attachment') continue;
+    const imagen = (r.attachments?.[c.id] ?? []).find(
+      (a) => a.has_thumb && a.mime.startsWith('image/'),
+    );
+    if (imagen) return imagen;
+  }
+  return null;
+}
+
+/**
+ * Los datos con los que nace una tarjeta añadida al pie de una columna: el valor de esa
+ * columna en el campo de agrupación, para que no haya que crearla en la rejilla y moverla.
+ * La de «sin valor» nace vacía.
+ */
+export function datosDeColumna(campo: BasesField, valor: string): Record<string, BasesValue> {
+  return valor === SIN_VALOR ? {} : { [campo.id]: valor };
+}
+
 /** Los campos que admite un formulario público: todos menos enlaces, fórmulas y adjuntos. */
 export function camposDeFormulario(campos: readonly BasesField[]): BasesField[] {
   return campos.filter((c) => c.kind !== 'link' && c.kind !== 'formula' && c.kind !== 'attachment');
@@ -57,6 +88,41 @@ export interface BorradorVista {
   filtroValor: string;
   ordenCampo: string;
   ordenDir: 'asc' | 'desc';
+  /**
+   * Al editar: los filtros y órdenes que la vista ya tenía después del primero. El diálogo
+   * solo enseña uno de cada (la API admite más), y editar una vista no debe perder lo que
+   * no se ve; se reenvían tal cual detrás del primero.
+   */
+  restoFiltros?: BasesFilter[];
+  restoOrden?: { field: string; dir: 'asc' | 'desc' }[];
+}
+
+/** El borrador de una vista guardada, para abrirla en el diálogo y editarla. */
+export function borradorDeVista(v: BasesView, campos: readonly BasesField[]): BorradorVista {
+  const [filtro, ...restoFiltros] = v.config.filters ?? [];
+  const [orden, ...restoOrden] = v.config.sort ?? [];
+  const valor = filtro?.value;
+  return {
+    nombre: v.name,
+    tipo: v.kind,
+    agrupar: v.config.group_by ?? campos.find((c) => efectivo(c).kind === 'select')?.id ?? '',
+    // Un formulario sin lista pide todos los que admite: se abre con todos marcados, que
+    // es lo mismo que guardarlo así.
+    campos:
+      v.kind === 'form' && (v.config.fields ?? []).length === 0
+        ? camposDeFormulario(campos).map((c) => c.id)
+        : [...(v.config.fields ?? [])],
+    filtroCampo: filtro?.field ?? '',
+    filtroOp: filtro?.op ?? 'eq',
+    filtroValor:
+      typeof valor === 'string' || typeof valor === 'number' || typeof valor === 'boolean'
+        ? String(valor)
+        : '',
+    ordenCampo: orden?.field ?? '',
+    ordenDir: orden?.dir ?? 'asc',
+    restoFiltros,
+    restoOrden,
+  };
 }
 
 /** Operadores por tipo de campo, espejo de `domain.operadores` del servicio. */
@@ -64,7 +130,10 @@ export type Operador =
   'eq' | 'neq' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte' | 'empty' | 'notempty';
 
 export const OPERADORES: Record<
-  Exclude<BasesField['kind'], 'formula' | 'attachment'>,
+  Exclude<
+    BasesField['kind'],
+    'formula' | 'attachment' | 'url' | 'email' | 'phone' | 'currency' | 'rating'
+  >,
   readonly Operador[]
 > = {
   text: ['contains', 'eq', 'neq', 'empty', 'notempty'],
@@ -76,10 +145,10 @@ export const OPERADORES: Record<
   link: ['empty', 'notempty'],
 };
 
-/** Los operadores de un campo; una fórmula se filtra como el tipo de su resultado. */
+/** Los operadores de un campo; una fórmula o un campo con formato, los de lo que guarda. */
 export function operadoresDe(campo: BasesField): readonly Operador[] {
   const k = efectivo(campo).kind;
-  return k === 'formula' || k === 'attachment' ? [] : OPERADORES[k];
+  return k in OPERADORES ? OPERADORES[k as keyof typeof OPERADORES] : [];
 }
 
 /** La configuración que se envía al servicio, o `null` si el borrador no es válido todavía. */
@@ -119,6 +188,13 @@ export function configDeBorrador(
       { field: f.id, op: b.filtroOp, ...(valor === undefined ? {} : { value: valor }) },
     ];
   }
+  // Lo que se conserva de la vista editada, salvo lo de campos que ya no existen: el
+  // servidor rechazaría la vista entera por un filtro sobre un campo borrado.
+  const existe = (id: string): boolean => campos.some((c) => c.id === id);
+  const restoFiltros = (b.restoFiltros ?? []).filter((x) => existe(x.field));
+  if (restoFiltros.length > 0) cfg.filters = [...(cfg.filters ?? []), ...restoFiltros];
   if (b.ordenCampo) cfg.sort = [{ field: b.ordenCampo, dir: b.ordenDir }];
+  const restoOrden = (b.restoOrden ?? []).filter((x) => existe(x.field));
+  if (restoOrden.length > 0) cfg.sort = [...(cfg.sort ?? []), ...restoOrden];
   return cfg;
 }

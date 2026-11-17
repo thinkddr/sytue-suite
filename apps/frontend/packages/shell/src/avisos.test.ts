@@ -4,7 +4,10 @@
  * Es la mitad web del guardián de «Todo al día con cosas pasando» (2026-09-24).
  */
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { Notification } from '@sytue/api-clients';
+import { catalogs } from '@sytue/i18n';
 import {
   abrirAviso,
   alLlegarAviso,
@@ -14,7 +17,10 @@ import {
   destinoAviso,
   fotoConVersion,
   nombreDeOrganizacion,
+  ORIGENES_DE_AVISOS,
   procedenciaAviso,
+  TIPOS_CRITICOS,
+  TIPOS_DE_AVISOS,
   tituloAviso,
   type EstadoAvisos,
   type FlujoAvisos,
@@ -52,20 +58,43 @@ function hubDoble(lista: Notification[], sinLeer: number, correo: number | null 
   const leidos: string[] = [];
   let todos = 0;
   let cargas = 0;
+  let pendientes = sinLeer;
+  let correoPendiente = correo;
+  let filas = [...lista];
   const hub: FuenteAvisos = {
     notifications: async () => {
       cargas++;
-      return [...lista];
+      return [...filas];
     },
-    contadores: async () => ({ unread: sinLeer, mailUnread: correo }),
+    contadores: async () => ({ unread: pendientes, mailUnread: correoPendiente }),
     markRead: async (id: string) => {
       leidos.push(id);
+      if (filas.some((n) => n.id === id && !n.read)) pendientes = Math.max(0, pendientes - 1);
+      filas = filas.map((n) => (n.id === id ? { ...n, read: true } : n));
     },
     markAllRead: async () => {
       todos++;
+      pendientes = 0;
+      filas = filas.map((n) => ({ ...n, read: true }));
     },
     streamNotifications: async () => {
       const f = new FlujoDoble();
+      f.addEventListener('notification', (e) => {
+        try {
+          const n = JSON.parse(String(e.data)) as Notification;
+          if (!n.id) return;
+          const anterior = filas.find((fila) => fila.id === n.id);
+          if (!anterior && !n.read) pendientes++;
+          if (!anterior && n.type === 'mail.message.received' && correoPendiente !== null)
+            correoPendiente++;
+          filas = [
+            { ...n, read: n.read || Boolean(anterior?.read) },
+            ...filas.filter((fila) => fila.id !== n.id),
+          ];
+        } catch {
+          // El doble conserva solo avisos válidos.
+        }
+      });
       flujos.push(f);
       return f;
     },
@@ -74,6 +103,460 @@ function hubDoble(lista: Notification[], sinLeer: number, correo: number | null 
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+
+function aplazado<T>() {
+  let resolver!: (value: T) => void;
+  let rechazar!: (error: Error) => void;
+  const promesa = new Promise<T>((resolve, reject) => {
+    resolver = resolve;
+    rechazar = reject;
+  });
+  return { promesa, resolver, rechazar };
+}
+
+async function hasta(comprobar: () => boolean): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    if (comprobar()) return;
+    await Promise.resolve();
+  }
+  throw new Error('no se alcanzó el estado esperado');
+}
+
+describe('cargas y gestos intercalados', () => {
+  it('descarta la lista y el contador de una carga anterior', async () => {
+    const listas = [aplazado<Notification[]>(), aplazado<Notification[]>()];
+    const cuentas = [
+      aplazado<{ unread: number; mailUnread: number | null }>(),
+      aplazado<{ unread: number; mailUnread: number | null }>(),
+    ];
+    let li = 0;
+    let ci = 0;
+    const hub: FuenteAvisos = {
+      notifications: () => listas[li++]!.promesa,
+      contadores: () => cuentas[ci++]!.promesa,
+      markRead: async () => undefined,
+      markAllRead: async () => undefined,
+      streamNotifications: async () => new FlujoDoble(),
+    };
+    let estado: EstadoAvisos | undefined;
+    const avisos = conectarAvisos(hub, (e) => (estado = e), { limite: 30 });
+    avisos.reintentar();
+    listas[1]!.resolver([aviso('nuevo')]);
+    cuentas[1]!.resolver({ unread: 2, mailUnread: 1 });
+    await hasta(() => estado?.items[0]?.id === 'nuevo' && estado.sinLeer === 2);
+    listas[0]!.resolver([aviso('viejo')]);
+    cuentas[0]!.resolver({ unread: 99, mailUnread: 99 });
+    await listas[0]!.promesa;
+    await cuentas[0]!.promesa;
+    await Promise.resolve();
+    expect(estado?.items.map((n) => n.id)).toEqual(['nuevo']);
+    expect(estado?.sinLeer).toBe(2);
+    expect(estado?.correoSinLeer).toBe(1);
+    avisos.cerrar();
+  });
+
+  it('conserva un evento llegado durante la carga y vuelve a contar sin tormenta', async () => {
+    const lista = aplazado<Notification[]>();
+    const cuentas = [
+      aplazado<{ unread: number; mailUnread: number | null }>(),
+      aplazado<{ unread: number; mailUnread: number | null }>(),
+    ];
+    const flujo = new FlujoDoble();
+    const timers: { fn: () => void; ms: number; cancelado: boolean }[] = [];
+    let ci = 0;
+    let estado: EstadoAvisos | undefined;
+    const hub: FuenteAvisos = {
+      notifications: () => lista.promesa,
+      contadores: () => cuentas[ci++]!.promesa,
+      markRead: async () => undefined,
+      markAllRead: async () => undefined,
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), {
+      limite: 30,
+      programar: (fn, ms) => {
+        const timer = { fn, ms, cancelado: false };
+        timers.push(timer);
+        return () => {
+          timer.cancelado = true;
+        };
+      },
+    });
+    await hasta(() => flujo.oyentes.has('notification'));
+    flujo.emitir('notification', JSON.stringify(aviso('nuevo')));
+    lista.resolver([aviso('anterior')]);
+    cuentas[0]!.resolver({ unread: 0, mailUnread: null });
+    await hasta(() => estado?.items.length === 2 && timers.length === 1);
+    expect(estado?.items.map((n) => n.id)).toEqual(['nuevo', 'anterior']);
+    expect(estado?.sinLeer).toBe(1);
+    expect(timers[0]?.ms).toBe(500);
+    timers[0]!.fn();
+    cuentas[1]!.resolver({ unread: 2, mailUnread: null });
+    await hasta(() => estado?.sinLeer === 2);
+    expect(ci).toBe(2);
+    avisos.cerrar();
+  });
+
+  it('al fallar leer todos conserva el aviso nuevo y no restaura toda la lista', async () => {
+    const escritura = aplazado<void>();
+    const cargaSiguiente = aplazado<Notification[]>();
+    const cuentaSiguiente = aplazado<{ unread: number; mailUnread: number | null }>();
+    const flujo = new FlujoDoble();
+    let cargas = 0;
+    let llamadas = 0;
+    let cuentas = 0;
+    let estado: EstadoAvisos | undefined;
+    const hub: FuenteAvisos = {
+      notifications: () =>
+        ++cargas === 1 ? Promise.resolve([aviso('a')]) : cargaSiguiente.promesa,
+      contadores: () =>
+        ++cuentas === 1
+          ? Promise.resolve({ unread: 1, mailUnread: null })
+          : cuentaSiguiente.promesa,
+      markRead: async () => undefined,
+      markAllRead: () => {
+        llamadas++;
+        return escritura.promesa;
+      },
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), { limite: 30 });
+    await hasta(() => estado?.items.length === 1 && flujo.oyentes.has('notification'));
+    const accion = avisos.leerTodos();
+    await hasta(() => llamadas === 1);
+    flujo.emitir('notification', JSON.stringify(aviso('b')));
+    escritura.rechazar(new Error('fallo'));
+    await accion;
+    expect(estado?.items.map((n) => n.id)).toEqual(['b', 'a']);
+    expect(estado?.items.every((n) => !n.read)).toBe(true);
+    expect(estado?.sinLeer).toBe(2);
+    const final = estado;
+    avisos.cerrar();
+    cargaSiguiente.resolver([]);
+    await cargaSiguiente.promesa;
+    await Promise.resolve();
+    expect(estado).toBe(final);
+  });
+
+  it('serializa leer y leer todos, conservando avisos que llegaron entre gestos', async () => {
+    const uno = aplazado<void>();
+    const todos = aplazado<void>();
+    const posteriores = aplazado<Notification[]>();
+    const flujo = new FlujoDoble();
+    let cargas = 0;
+    let llamadasUno = 0;
+    let llamadasTodos = 0;
+    let estado: EstadoAvisos | undefined;
+    const hub: FuenteAvisos = {
+      notifications: () =>
+        ++cargas === 1 ? Promise.resolve([aviso('a'), aviso('b')]) : posteriores.promesa,
+      contadores: async () => ({ unread: 2, mailUnread: null }),
+      markRead: () => {
+        llamadasUno++;
+        return uno.promesa;
+      },
+      markAllRead: () => {
+        llamadasTodos++;
+        return todos.promesa;
+      },
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), { limite: 30 });
+    await hasta(() => estado?.items.length === 2 && flujo.oyentes.has('notification'));
+    const primera = avisos.leer('a');
+    const segunda = avisos.leerTodos();
+    await hasta(() => llamadasUno === 1);
+    expect(llamadasTodos).toBe(0);
+    flujo.emitir('notification', JSON.stringify(aviso('c')));
+    uno.resolver(undefined);
+    await primera;
+    await hasta(() => llamadasTodos === 1);
+    todos.rechazar(new Error('fallo'));
+    await segunda;
+    expect(estado?.items.map((n) => [n.id, n.read])).toEqual([
+      ['c', false],
+      ['b', false],
+      ['a', true],
+    ]);
+    expect(estado?.sinLeer).toBe(2);
+    avisos.cerrar();
+  });
+
+  it('no permite que el duplicado del flujo ni una página vieja deshagan una lectura', async () => {
+    const escritura = aplazado<void>();
+    const posteriores = aplazado<Notification[]>();
+    const cuentaSiguiente = aplazado<{ unread: number; mailUnread: number | null }>();
+    const flujo = new FlujoDoble();
+    let cargas = 0;
+    let llamada = false;
+    let cuentas = 0;
+    let estado: EstadoAvisos | undefined;
+    const hub: FuenteAvisos = {
+      notifications: () => (++cargas === 1 ? Promise.resolve([aviso('a')]) : posteriores.promesa),
+      contadores: () =>
+        ++cuentas === 1
+          ? Promise.resolve({ unread: 1, mailUnread: null })
+          : cuentaSiguiente.promesa,
+      markRead: () => {
+        llamada = true;
+        return escritura.promesa;
+      },
+      markAllRead: async () => undefined,
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), { limite: 1 });
+    await hasta(() => estado?.items.length === 1 && flujo.oyentes.has('notification'));
+    const accion = avisos.leer('a');
+    await hasta(() => llamada);
+    flujo.emitir('notification', JSON.stringify(aviso('a')));
+    expect(estado?.items[0]?.read).toBe(true);
+    await avisos.masAntiguos();
+    expect(cargas).toBe(1);
+    escritura.resolver(undefined);
+    await accion;
+    flujo.emitir('notification', JSON.stringify(aviso('a')));
+    expect(estado?.items[0]?.read).toBe(true);
+    expect(estado?.sinLeer).toBe(0);
+    avisos.cerrar();
+  });
+
+  it('concilia tras ready el aviso creado entre la primera carga y la suscripción', async () => {
+    const primera = aplazado<Notification[]>();
+    const segunda = aplazado<Notification[]>();
+    const flujo = new FlujoDoble();
+    const llegados: string[] = [];
+    let cargas = 0;
+    let estado: EstadoAvisos | undefined;
+    const a = aviso('a', { created_at: '2026-09-24T10:00:00Z' });
+    const b = aviso('b', { created_at: '2026-09-24T10:00:01Z' });
+    const hub: FuenteAvisos = {
+      notifications: () => (++cargas === 1 ? primera.promesa : segunda.promesa),
+      contadores: async () => ({ unread: 2, mailUnread: null }),
+      markRead: async () => undefined,
+      markAllRead: async () => undefined,
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), {
+      limite: 30,
+      alLlegar: (n) => llegados.push(n.id),
+    });
+    await hasta(() => flujo.oyentes.has('ready'));
+    flujo.emitir('ready');
+    primera.resolver([a]);
+    await hasta(() => cargas === 2);
+    segunda.resolver([b, a]);
+    await hasta(() => estado?.items[0]?.id === 'b');
+    expect(llegados).toEqual(['b']);
+    expect(estado?.items.map((n) => n.id)).toEqual(['b', 'a']);
+    avisos.cerrar();
+  });
+
+  it('concilia ready durante una escritura incluso si la primera carga quedó obsoleta', async () => {
+    const inicial = aplazado<Notification[]>();
+    const base = aplazado<Notification[]>();
+    const reconciliada = aplazado<Notification[]>();
+    const escritura = aplazado<void>();
+    const flujo = new FlujoDoble();
+    const llegados: string[] = [];
+    let cargas = 0;
+    let llamada = false;
+    let estado: EstadoAvisos | undefined;
+    const a = aviso('a', { created_at: '2026-09-24T10:00:00Z' });
+    const b = aviso('b', { created_at: '2026-09-24T10:00:01Z' });
+    const hub: FuenteAvisos = {
+      notifications: () => [inicial, base, reconciliada][cargas++]!.promesa,
+      contadores: async () => ({ unread: 0, mailUnread: null }),
+      markRead: () => {
+        llamada = true;
+        return escritura.promesa;
+      },
+      markAllRead: async () => undefined,
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), {
+      limite: 30,
+      alLlegar: (n) => llegados.push(n.id),
+    });
+    await hasta(() => flujo.oyentes.has('ready'));
+    flujo.emitir('notification', JSON.stringify(a));
+    const accion = avisos.leer('a');
+    await hasta(() => llamada);
+    flujo.emitir('ready');
+    inicial.resolver([]);
+    escritura.resolver(undefined);
+    await accion;
+    await hasta(() => cargas === 2);
+    base.resolver([{ ...a, read: true }]);
+    await hasta(() => cargas === 3);
+    reconciliada.resolver([b, { ...a, read: true }]);
+    await hasta(() => estado?.items[0]?.id === 'b');
+    expect(llegados).toEqual(['a', 'b']);
+    expect(estado?.items.map((n) => [n.id, n.read])).toEqual([
+      ['b', false],
+      ['a', true],
+    ]);
+    avisos.cerrar();
+  });
+
+  it('ordena eventos fuera de orden y rechaza eventos sin fecha válida', async () => {
+    const flujo = new FlujoDoble();
+    let estado: EstadoAvisos | undefined;
+    const hub = hubDoble([], 0).hub;
+    hub.streamNotifications = async () => flujo;
+    const avisos = conectarAvisos(hub, (e) => (estado = e), { limite: 30 });
+    await hasta(() => estado?.cargando === false && flujo.oyentes.has('notification'));
+    flujo.emitir(
+      'notification',
+      JSON.stringify(aviso('nuevo', { created_at: '2026-09-24T10:00:02Z' })),
+    );
+    flujo.emitir(
+      'notification',
+      JSON.stringify(aviso('viejo', { created_at: '2026-09-24T10:00:01Z' })),
+    );
+    flujo.emitir('notification', JSON.stringify({ id: 'invalido', read: false }));
+    flujo.emitir(
+      'notification',
+      JSON.stringify({ id: 'parcial', read: false, created_at: '2026-09-24T10:00:03Z' }),
+    );
+    expect(estado?.items.map((n) => n.id)).toEqual(['nuevo', 'viejo']);
+    expect(estado?.sinLeer).toBe(2);
+    avisos.cerrar();
+  });
+
+  it('reemite una concesión recuperada ya leída a la página sin avisar al sistema', async () => {
+    const g = globalThis as { window?: EventTarget };
+    const habia = g.window;
+    g.window ??= new EventTarget();
+    const oidos: string[] = [];
+    const quitar = alLlegarAviso((n) => oidos.push(n.id));
+    const flujo = new FlujoDoble();
+    const base = aviso('a', { created_at: '2026-09-24T10:00:00Z' });
+    const concesion = aviso('b', {
+      type: 'docs.access.granted',
+      read: true,
+      created_at: '2026-09-24T10:00:01Z',
+    });
+    const notificados: string[] = [];
+    let cargas = 0;
+    let estado: EstadoAvisos | undefined;
+    const hub: FuenteAvisos = {
+      notifications: async () => (++cargas === 1 ? [base] : [concesion, base]),
+      contadores: async () => ({ unread: 1, mailUnread: null }),
+      markRead: async () => undefined,
+      markAllRead: async () => undefined,
+      streamNotifications: async () => flujo,
+    };
+    const avisos = conectarAvisos(hub, (e) => (estado = e), {
+      limite: 30,
+      alLlegar: (n) => notificados.push(n.id),
+    });
+    try {
+      await hasta(() => estado?.items[0]?.id === 'a');
+      avisos.reintentar();
+      await hasta(() => estado?.items[0]?.id === 'b');
+      expect(oidos).toEqual(['b']);
+      expect(notificados).toEqual([]);
+    } finally {
+      avisos.cerrar();
+      quitar();
+      if (!habia) delete g.window;
+    }
+  });
+
+  it('al cerrar ignora el fallo tardío y no inicia gestos pendientes de la cuenta anterior', async () => {
+    const escritura = aplazado<void>();
+    const flujo = new FlujoDoble();
+    let llamadasUno = 0;
+    let llamadasTodos = 0;
+    let cambios = 0;
+    let estado: EstadoAvisos | undefined;
+    const hub = hubDoble([aviso('a')], 1).hub;
+    hub.streamNotifications = async () => flujo;
+    hub.markRead = () => {
+      llamadasUno++;
+      return escritura.promesa;
+    };
+    hub.markAllRead = async () => {
+      llamadasTodos++;
+    };
+    const avisos = conectarAvisos(
+      hub,
+      (e) => {
+        estado = e;
+        cambios++;
+      },
+      { limite: 30 },
+    );
+    await hasta(() => estado?.items.length === 1);
+    const primera = avisos.leer('a');
+    const segunda = avisos.leerTodos();
+    await hasta(() => llamadasUno === 1);
+    avisos.cerrar();
+    const alCerrar = cambios;
+    escritura.rechazar(new Error('sesión retirada'));
+    await primera;
+    await segunda;
+    flujo.emitir('notification', JSON.stringify(aviso('tardio')));
+    expect(cambios).toBe(alCerrar);
+    expect(llamadasTodos).toBe(0);
+    expect(flujo.cerrado).toBe(true);
+  });
+
+  it('no emite más cambios si el callback de llegada cierra la sesión de forma reentrante', async () => {
+    const flujo = new FlujoDoble();
+    let cambios = 0;
+    let cambiosAlCerrar = -1;
+    let estado: EstadoAvisos | undefined;
+    const hub = hubDoble([], 0).hub;
+    hub.streamNotifications = async () => flujo;
+    const avisos = conectarAvisos(
+      hub,
+      (e) => {
+        estado = e;
+        cambios++;
+      },
+      {
+        limite: 30,
+        alLlegar: () => {
+          avisos.cerrar();
+          cambiosAlCerrar = cambios;
+        },
+      },
+    );
+    await hasta(() => estado?.cargando === false && flujo.oyentes.has('notification'));
+    flujo.emitir('notification', JSON.stringify(aviso('nuevo')));
+    expect(cambiosAlCerrar).toBeGreaterThanOrEqual(0);
+    expect(cambios).toBe(cambiosAlCerrar);
+    expect(flujo.cerrado).toBe(true);
+  });
+
+  it('un error del callback externo no impide actualizar página ni campana', async () => {
+    const g = globalThis as { window?: EventTarget };
+    const habia = g.window;
+    g.window ??= new EventTarget();
+    const oidos: string[] = [];
+    const quitar = alLlegarAviso((n) => oidos.push(n.id));
+    const d = hubDoble([], 0);
+    let estado: EstadoAvisos | undefined;
+    const avisos = conectarAvisos(d.hub, (e) => (estado = e), {
+      limite: 30,
+      alLlegar: () => {
+        throw new Error('fallo del sistema');
+      },
+    });
+    try {
+      await hasta(() => d.flujos.length === 1 && !estado?.cargando);
+      d.flujos[0]!.emitir('notification', JSON.stringify(aviso('nuevo')));
+      expect(oidos).toEqual(['nuevo']);
+      expect(estado?.items.map((n) => n.id)).toEqual(['nuevo']);
+      expect(estado?.sinLeer).toBe(1);
+    } finally {
+      avisos.cerrar();
+      quitar();
+      if (!habia) delete g.window;
+    }
+  });
+});
 
 describe('conectarAvisos', () => {
   it('un aviso nuevo llega, cuenta, y deja de contar al leerlo', async () => {
@@ -430,5 +913,102 @@ describe('el flujo del Hub, para la página (desbloqueo en vivo de la franja)', 
     expect(esConcesion(concedido, 'calendar.access.granted', 'cal-1')).toBe(true);
     expect(esConcesion(concedido, 'calendar.access.granted', 'cal-2')).toBe(false);
     expect(esConcesion(concedido, 'drive.access.granted', 'cal-1')).toBe(false);
+  });
+});
+
+/**
+ * Los orígenes que el Hub acepta para un aviso, leídos de su `domain.go`: los de
+ * `AllSources` más los que `NotificationSources` añade. Se lee el Go y no una copia
+ * para que un origen nuevo allí —como lo fue Cast, que avisaba sin poder callarse—
+ * ponga esto en rojo el mismo día.
+ */
+function origenesDelHub(): Set<string> {
+  const raiz = fileURLToPath(new URL('../../../../../', import.meta.url));
+  const go = readFileSync(`${raiz}services/hub/internal/domain/domain.go`, 'utf8');
+  const valor = new Map<string, string>();
+  for (const [, nombre, v] of go.matchAll(/\b(Source\w+)\s+Source\s*=\s*"([a-z]+)"/g)) {
+    valor.set(nombre ?? '', v ?? '');
+  }
+  const cuerpo = (fn: string): string =>
+    new RegExp(`func ${fn}\\(\\) \\[\\]Source \\{([^}]*)\\}`).exec(go)?.[1] ?? '';
+  const nombres = [
+    ...cuerpo('AllSources').matchAll(/\bSource[A-Z]\w*/g),
+    ...cuerpo('NotificationSources').matchAll(/\bSource[A-Z]\w*/g),
+  ].map(([n]) => n);
+  return new Set(nombres.map((n) => valor.get(n) ?? `¿${n}?`));
+}
+
+describe('ORIGENES_DE_AVISOS', () => {
+  const ofrecidos = ORIGENES_DE_AVISOS.flatMap((g) => g.origenes);
+
+  it('ofrece todos los orígenes que pueden avisar, salvo seguridad y el alias de búsqueda', () => {
+    const delHub = origenesDelHub();
+    // Si la lectura del Go fallara, la comparación pasaría con dos conjuntos vacíos.
+    expect(delHub.size).toBeGreaterThan(15);
+    for (const fuera of ['id', 'chat']) delHub.delete(fuera);
+    expect([...ofrecidos].sort()).toEqual([...delHub].sort());
+  });
+
+  it('nunca ofrece callar los avisos de seguridad de Sytue ID', () => {
+    expect(ofrecidos).not.toContain('id');
+  });
+
+  it('cada origen sale una sola vez y ningún grupo queda vacío', () => {
+    expect(new Set(ofrecidos).size).toBe(ofrecidos.length);
+    for (const g of ORIGENES_DE_AVISOS) expect(g.origenes.length).toBeGreaterThan(0);
+  });
+});
+
+/** Los `notifications.kind.*` del catálogo común (los títulos de los avisos del Hub). */
+function tiposDelCatalogo(): string[] {
+  return Object.keys(catalogs.en)
+    .filter((k) => k.startsWith('notifications.kind.'))
+    .map((k) => k.slice('notifications.kind.'.length));
+}
+
+/** `tiposCriticos` del `domain.go` del Hub, leído del Go y no de una copia. */
+function criticosDelHub(): string[] {
+  const raiz = fileURLToPath(new URL('../../../../../', import.meta.url));
+  const go = readFileSync(`${raiz}services/hub/internal/domain/domain.go`, 'utf8');
+  const cuerpo = /var tiposCriticos = \[\]string\{([^}]*)\}/.exec(go)?.[1] ?? '';
+  return [...cuerpo.matchAll(/"([a-z._]+)"/g)].map(([, t]) => t ?? '');
+}
+
+describe('TIPOS_DE_AVISOS', () => {
+  const filas = Object.values(TIPOS_DE_AVISOS).flatMap((f) => f ?? []);
+  const tipos = new Set(filas.flatMap((f) => f.tipos));
+
+  it('cubre todos los tipos de aviso del catálogo salvo los de seguridad, que van fijos', () => {
+    const delCatalogo = tiposDelCatalogo();
+    expect(delCatalogo.length).toBeGreaterThan(40);
+    const faltan = delCatalogo.filter((t) => !t.startsWith('security.') && !tipos.has(t));
+    expect(faltan).toEqual([]);
+    for (const t of tipos) if (t.startsWith('security.')) throw new Error(`${t} no se calla`);
+  });
+
+  it('cada tipo tiene su título en el catálogo (salvo los que el servicio titula)', () => {
+    const delCatalogo = new Set(tiposDelCatalogo());
+    // `cloud.deploy` lleva el título del servicio (`sinClave` de hubnotify).
+    const sinTitulo = [...tipos].filter((t) => !delCatalogo.has(t));
+    expect(sinTitulo).toEqual(['cloud.deploy']);
+  });
+
+  it('solo da tipos a orígenes que se ofrecen, y sin repetir fila en un origen', () => {
+    const ofrecidos = new Set<string>(ORIGENES_DE_AVISOS.flatMap((g) => g.origenes));
+    for (const [origen, f] of Object.entries(TIPOS_DE_AVISOS)) {
+      expect(ofrecidos.has(origen)).toBe(true);
+      const ids = (f ?? []).map((x) => x.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it('los críticos son los mismos que el Hub no deja callar', () => {
+    const delHub = criticosDelHub();
+    expect(delHub.length).toBeGreaterThan(0);
+    expect([...TIPOS_CRITICOS].sort()).toEqual([...delHub].sort());
+    // Una fila crítica solo reúne críticos: si no, callaría lo que no se puede.
+    for (const f of filas) {
+      if (!f.critico) for (const t of f.tipos) expect(TIPOS_CRITICOS.has(t)).toBe(false);
+    }
   });
 });

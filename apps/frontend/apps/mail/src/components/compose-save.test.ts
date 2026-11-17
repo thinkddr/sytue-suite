@@ -16,3 +16,20 @@ test('guardar borrador usa el disquete sin perder su nombre accesible', () => {
   expect(boton).toContain("title={t('compose.saveDraft')}");
   expect(boton).toContain('<Icon name="save" size={16} />');
 });
+
+// El viaje de la CCO por el BFF se prueba en lib/borrador-cco.test.ts; aquí, que
+// el compositor la mande al guardar y que reabrir un borrador la vuelva a poner.
+test('el borrador guarda la CCO y reabrirlo la enseña', async () => {
+  const desde = fuente.indexOf('async function doSave(');
+  const guardar = fuente.slice(desde, fuente.indexOf('setDraftId(res.id)', desde));
+  expect(guardar).toContain('bcc: parseAddresses(bcc)');
+  expect(fuente).toContain("setBcc(initial?.bcc ?? '')");
+  expect(fuente).toContain('setShowCcBcc(Boolean(initial?.cc || initial?.bcc))');
+
+  const app = await Bun.file(join(import.meta.dir, 'MailApp.tsx')).text();
+  const abrir = app.slice(
+    app.indexOf('function openDraft('),
+    app.indexOf('.catch(', app.indexOf('function openDraft(')),
+  );
+  expect(abrir).toContain('bcc: d.bcc');
+});

@@ -44,7 +44,7 @@ func NewRouter(d Deps) http.Handler {
 	r := httpx.NewRouter(httpx.RouterOptions{RequestTimeout: 30 * time.Second})
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
-	h := &Handlers{store: d.Store, cfg: d.Cfg}
+	h := &Handlers{store: d.Store, source: d.Store, cfg: d.Cfg}
 	// La señal de cambios por la REST y por CardDAV, que es por donde escriben los
 	// teléfonos y las libretas de escritorio.
 	cambios := d.Hub.TrasEscribir(nil, "contacts")
@@ -66,6 +66,11 @@ func NewRouter(d Deps) http.Handler {
 		// Alto a propósito: corta el barrido del directorio entero, no el uso normal.
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
 		api.Use(cambios)
+
+		api.Get("/private-storage/migration", h.PrivateStorageState)
+		api.Post("/private-storage/migration", h.BeginPrivateStorageMigration)
+		api.Get("/private-storage/migration/{epoch}/rows", h.PrivateStorageSourcePage)
+		api.Get("/private-storage/migration/{epoch}/blobs/{kind}/{id}", h.OpenPrivateStorageSource)
 
 		// «Exportar tus datos»: la entrega de la agenda (platform/pkg/portabilidad).
 		api.Get("/export", h.Export)

@@ -116,6 +116,10 @@ type Canal struct {
 	Tema string
 	// Proposito es el `purpose`: de qué va el canal, lo que se lee al explorar.
 	Proposito string
+	// CreadoPor y Creado son el `created_by` y el `created_at`: quién lo creó y cuándo,
+	// lo que dice el inicio del historial.
+	CreadoPor string
+	Creado    time.Time
 	// CategoriaID es la categoría personalizada a la que se movió; vacío, cae en su
 	// sección por defecto.
 	CategoriaID string
@@ -212,12 +216,22 @@ type Mensaje struct {
 	Acuses    int
 	Acusado   bool
 
-	Editado    bool
-	Enviando   bool
-	Fallido    bool
+	Editado  bool
+	Enviando bool
+	Fallido  bool
+	// Mio es que lo ha escrito quien mira (`mine`): no cuenta como nuevo abajo.
+	Mio        bool
 	Reacciones []Reaccion
 	// Respuestas es el `threadCount`: cuántas hay colgando en el hilo.
 	Respuestas int
+	// UltimaRespuesta y Participantes son el indicador de hilo de una raíz (`lastReplyAt`
+	// y `threadParticipants`): cuándo fue la última respuesta y los NOMBRES de quienes
+	// respondieron más recientemente, el más reciente primero.
+	UltimaRespuesta time.Time
+	Participantes   []string
+	// RaizHilo es la raíz de una respuesta mandada «también al canal»: la que va en el
+	// feed con «Respondió en un hilo». Vacío en una raíz o en una respuesta normal.
+	RaizHilo string
 	// Siguiendo dice que quien mira sigue el hilo de este mensaje (`followedIds`).
 	Siguiendo bool
 	// Tarjeta es la encuesta o la tarea del mensaje, o nil.
@@ -397,7 +411,9 @@ func mismoDia(a, b time.Time) bool {
 	return ay == by && am == bm && ad == bd
 }
 
-// RotuloDia es `dayLabel`: «Hoy», «Ayer» o la fecha larga con el día de la semana.
+// RotuloDia es `dayLabel`: «Hoy», «Ayer» o la fecha larga con el día de la semana, y
+// con el año solo si no es el de `ahora` («viernes, 7 de noviembre de 2025»): un canal
+// vive años y la fecha sin año es ambigua en cuanto el mensaje es del año pasado.
 //
 // La mayúscula inicial NO se fuerza, y eso es deliberado: en alemán y en inglés el día
 // ya va en mayúscula y en español, francés e italiano va en minúscula a propósito.
@@ -410,6 +426,9 @@ func RotuloDia(t *i18n.Translator, l i18n.Locale, cuando, ahora time.Time) strin
 		return t.T("day.today", nil)
 	case mismoDia(cuando, ahora.AddDate(0, 0, -1)):
 		return t.T("day.yesterday", nil)
+	}
+	if cuando.Year() != ahora.Year() {
+		return i18n.FormatFullDate(l, cuando)
 	}
 	return i18n.FormatWeekdayDayMonth(l, cuando)
 }

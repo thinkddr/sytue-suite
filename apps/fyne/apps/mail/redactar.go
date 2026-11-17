@@ -48,6 +48,7 @@ var _ Remitente = (*api.Mail)(nil)
 
 // redaccion es el redactor abierto con su estado de trabajo.
 type redaccion struct {
+	privado         *privateDraftEditor
 	r               *Redactor
 	d               *ui.Dialogo
 	guardar, enviar *ui.Boton
@@ -56,6 +57,9 @@ type redaccion struct {
 	reloj               *ui.BotonIcono
 	enviando, guardando bool
 	pararAuto           func()
+	// cambios cuenta las ediciones: un guardado que acaba solo borra la copia local si
+	// nada ha cambiado desde que salió.
+	cambios int
 	// La libreta se pide una vez por redacción (`libreta !== null || fallo`).
 	libreta        []EntradaLibreta
 	falloLibreta   bool
@@ -122,6 +126,10 @@ func (b *Buzon) remitentesDe() []OpcionDe {
 //
 // En un buzón compartido con permiso de envío, sale desde su dirección (`openCompose`).
 func (b *Buzon) Redactar() {
+	// Lo que quedó en el equipo sin subir va primero: es lo que se estaba escribiendo.
+	if b.redaccion == nil && b.restaurarCopia() {
+		return
+	}
 	// Con la carpeta de una cuenta a la vista, se escribe desde esa cuenta.
 	if b.redactarExterno() {
 		return
@@ -145,6 +153,11 @@ func (b *Buzon) responder(m Mensaje, modo Respuesta) {
 	if de := b.deCompartido(); de != "" {
 		br.De = de
 	}
+	// El original de un buzón compartido es de otra cuenta: la marca en lote solo
+	// toca las propias y la flecha saldría aquí sin llegar al servidor.
+	if b.compartido != nil {
+		br.Responde = ""
+	}
 	b.abrirRedactor(br)
 }
 
@@ -158,7 +171,7 @@ func (b *Buzon) abrirBorrador(m Mensaje) {
 			return eml.Mensaje{}, err
 		}
 		defer r.Close()
-		return eml.Leer(r)
+		return leerMIME(ctx, b.S, r)
 	}, func(x eml.Mensaje, err error) {
 		br := Borrador{ID: m.ID}
 		if err != nil && x.Asunto == "" && x.Texto == "" {
@@ -170,6 +183,7 @@ func (b *Buzon) abrirBorrador(m Mensaje) {
 			b.abrirRedactor(br)
 			return
 		}
+		br.De = x.De
 		br.Para, br.Cc, br.Cco = strings.Join(x.Para, ", "), strings.Join(x.Cc, ", "), strings.Join(x.Cco, ", ")
 		br.Asunto, br.Cuerpo, br.HTML = x.Asunto, strings.ReplaceAll(x.Texto, "\r\n", "\n"), x.HTML
 		if strings.TrimSpace(br.Cuerpo) == "" && x.HTML != "" {
@@ -189,11 +203,16 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 		return
 	}
 	if b.redaccion != nil {
+		if state := b.redaccion.privado; state != nil {
+			state.next = &br
+			b.cerrarBorradorPrivado(b.redaccion, false)
+			return
+		}
 		b.cerrarGuardando(b.redaccion)
 	}
 	t := b.P.T
 	ancho := AnchoCuerpoDialogo(ui.DialogoLG, lienzo.Size().Width)
-	rd := &redaccion{r: NuevoRedactorDe(t, b.P.Locale, br, b.remitentesDe(), ancho, lienzo.Size().Width)}
+	rd := &redaccion{r: NuevoRedactorDe(t, b.P.Locale, br, b.remitentesDe(), ancho, lienzo.Size().Width), privado: privateDraftFor(b.S)}
 	// Las herramientas y «Guardar borrador» son `Button variant="ghost" iconOnly`
 	// de talla por defecto (31,5); «Enviar» conserva el rótulo y la jerarquía principal.
 	rd.descartar = ui.NuevoBoton(t.T("compose.discard", nil), func() { b.descartar(rd) }).Con(ui.Fantasma, ui.TallaMD)
@@ -261,7 +280,13 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 	rd.d.AlCerrar = func() { b.cerrarGuardando(rd) }
 	rd.d.AlPulsarAspa = func() { b.aspaRedactor(rd) }
 	rd.d.Foco = rd.r.Foco()
-	rd.r.AlCambiar = func() { b.programarAutoguardado(rd) }
+	rd.r.AlCambiar = func() {
+		if rd.privado != nil {
+			rd.privado.generation++
+		}
+		rd.cambios++
+		b.programarAutoguardado(rd)
+	}
 	rd.r.AlEnviar = func() { b.enviar(rd, false) }
 	rd.r.AlPegar = func(texto string) { b.pegar(rd, texto) }
 	if b.ElegirImagenes != nil {
@@ -414,11 +439,23 @@ func (b *Buzon) cerrar(rd *redaccion) {
 // borrador se escribe detrás. Y si falla, SE DICE —la web calla en este camino—,
 // porque cerrar dando por guardado lo que no está en ningún sitio es perderlo.
 func (b *Buzon) cerrarGuardando(rd *redaccion) {
+	if rd != nil && rd.privado != nil {
+		b.cerrarBorradorPrivado(rd, false)
+		return
+	}
 	if !b.redaccionVigente(rd) {
 		return
 	}
-	if !rd.enviando && !rd.guardando && rd.r.B.ConContenido() {
-		b.guardarBorrador(rd, false, false)
+	if !rd.enviando && rd.r.B.ConContenido() {
+		// La copia va antes que nada: si el servidor no contesta, es lo único que queda.
+		b.guardarCopia(rd)
+		if rd.guardando {
+			// El guardado en marcha aún no ha contestado: «Redactar» no la recupera hasta
+			// entonces, o el borrador saldría dos veces.
+			b.copiaEnVuelo(rd.r.B.Copia)
+		} else {
+			b.guardarBorrador(rd, false, false)
+		}
 	}
 	b.cerrar(rd)
 }
@@ -426,6 +463,10 @@ func (b *Buzon) cerrarGuardando(rd *redaccion) {
 // aspaRedactor es `handleCloseButtonClick`: lo único que ofrece NO guardar, así que
 // pregunta. Descartar borra también el borrador que el autoguardado ya había dejado.
 func (b *Buzon) aspaRedactor(rd *redaccion) {
+	if rd != nil && rd.privado != nil && (rd.guardando || rd.privado.pending != nil || rd.privado.outgoing != nil) {
+		b.cerrarBorradorPrivado(rd, false)
+		return
+	}
 	if !b.redaccionVigente(rd) {
 		return
 	}
@@ -445,6 +486,13 @@ func (b *Buzon) aspaRedactor(rd *redaccion) {
 			if !b.redaccionVigente(rd) {
 				return
 			}
+			// Autosave may have admitted this revision after the confirmation
+			// opened. Its original must finish ACK before this editor can close.
+			if rd.privado != nil && rd.privado.pending != nil {
+				b.descartar(rd)
+				return
+			}
+			b.borrarCopia(rd.r.B.Copia)
 			if id := rd.r.B.ID; id != "" {
 				ctx := b.ctx
 				b.Lanzar(func() {
@@ -461,7 +509,22 @@ func (b *Buzon) aspaRedactor(rd *redaccion) {
 
 // descartar es la papelera del pie: cierra SIN guardar. El borrador que ya estuviera en
 // Borradores se queda (la web tampoco lo borra desde aquí).
-func (b *Buzon) descartar(rd *redaccion) { b.cerrar(rd) }
+//
+// La copia local sí se borra: descartar es no querer lo escrito (`removeLocalDraft`).
+func (b *Buzon) descartar(rd *redaccion) {
+	if rd != nil && rd.privado != nil && rd.privado.outgoing != nil {
+		b.descartarEnvioPrivado(rd)
+		return
+	}
+	if rd != nil && rd.privado != nil && rd.privado.pending != nil {
+		b.cerrarBorradorPrivado(rd, true)
+		return
+	}
+	if b.redaccionVigente(rd) {
+		b.borrarCopia(rd.r.B.Copia)
+	}
+	b.cerrar(rd)
+}
 
 // programarAutoguardado es el autoguardado en vivo: dos segundos sin tocar nada y el
 // borrador ya está en el servidor.
@@ -477,6 +540,9 @@ func (b *Buzon) programarAutoguardado(rd *redaccion) {
 	rd.pararAuto = b.Esperar(EsperaAutoguardado, func() {
 		// Stop no retira un callback que el reloj ya entregó al hilo de la interfaz.
 		if ctx.Err() == nil && ciclo == b.ciclo && b.redaccionVigente(rd) && !rd.enviando {
+			// Primero en el equipo, que no depende de la red: un cierre forzado después de
+			// esto ya no se lleva lo escrito.
+			b.guardarCopia(rd)
 			//nolint:contextcheck // La vida capturada ya está validada; guardarBorrador adopta ese mismo b.ctx mediante pedir.
 			b.guardarBorrador(rd, true, false)
 		}
@@ -543,6 +609,10 @@ var (
 // aviso por cada tecla, ya lo intentará el siguiente. Con `yCerrar`, es el botón
 // «Guardar borrador»: avisa y cierra, y si falla se queda abierto.
 func (b *Buzon) guardarBorrador(rd *redaccion, silencioso, yCerrar bool) {
+	if rd != nil && rd.privado != nil {
+		b.guardarBorradorPrivado(rd, silencioso, yCerrar)
+		return
+	}
 	if !b.redaccionVigente(rd) || rd.guardando || rd.enviando {
 		return
 	}
@@ -556,18 +626,34 @@ func (b *Buzon) guardarBorrador(rd *redaccion, silencioso, yCerrar bool) {
 	}
 	rd.guardando = true
 	b.pintarBotonesRedactor(rd)
+	version := rd.cambios
+	b.copiaEnVuelo(br.Copia)
 	pedir(b, func(ctx context.Context) (api.MailMessage, error) {
 		return b.S.SaveDraft(ctx, br.ID, de, crudo)
 	}, func(m api.MailMessage, err error) {
+		// La copia pudo nacer con el guardado ya en marcha (al cerrar el redactor).
+		delete(b.copiasEnVuelo, br.Copia)
+		delete(b.copiasEnVuelo, rd.r.B.Copia)
 		rd.guardando = false
 		b.pintarBotonesRedactor(rd)
 		if err != nil {
+			if b.guardadoSinRed(rd, err, silencioso, yCerrar) {
+				return
+			}
 			if !silencioso {
 				b.avisar(ui.AvisoPeligro, "compose.draftFailed", nil)
 			}
 			return
 		}
 		rd.r.B.ID = m.ID // el servicio SUSTITUYE el borrador y le da otro id
+		if rd.cambios == version {
+			b.borrarCopia(rd.r.B.Copia)
+		} else if rd.r.B.Copia != "" {
+			// Lo escrito mientras tanto sigue solo en la copia, que aún apunta al borrador
+			// que el servicio acaba de sustituir: recuperada tras un cierre forzado,
+			// guardarla iría contra un id que ya no existe y dejaría otro en Borradores.
+			b.guardarCopia(rd)
+		}
 		b.alGuardarBorrador()
 		if yCerrar {
 			b.avisar(ui.AvisoExito, "compose.draftSaved", nil)
@@ -598,7 +684,17 @@ func (b *Buzon) pintarBotonesRedactor(rd *redaccion) {
 
 // enviar es `handleSend`: valida «Para» en línea, pregunta si se menciona un adjunto
 // que no va, y envía con la ventana de deshacer.
+//
+//nolint:gocyclo // es `handleSend`: una validación por campo antes de enviar, como en la web.
 func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
+	if rd != nil && rd.privado != nil && rd.privado.outgoing != nil {
+		b.reintentarEnvioPrivado(rd)
+		return
+	}
+	if rd != nil && rd.privado != nil && rd.privado.pending != nil {
+		b.guardarBorradorPrivado(rd, false, false)
+		return
+	}
 	if !b.redaccionVigente(rd) || rd.enviando || rd.guardando {
 		return
 	}
@@ -626,6 +722,10 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 		b.avisarEnvio(err)
 		return
 	}
+	if rd.privado != nil {
+		b.confirmarEnvioPrivado(rd, de, s.Destinatarios(), crudo, time.Now().Add(VentanaDeshacer*time.Second))
+		return
+	}
 	if rd.pararAuto != nil {
 		rd.pararAuto()
 	}
@@ -637,9 +737,12 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 		rd.enviando = false
 		if err != nil {
 			b.pintarBotonesRedactor(rd)
-			b.avisarEnvio(err)
+			if !b.quedaSinRed(rd, err) {
+				b.avisarEnvio(err)
+			}
 			return
 		}
+		b.borrarCopia(br.Copia)
 		if id := br.ID; id != "" { // el borrador reabierto ya no hace falta
 			ctx := b.ctx
 			b.Lanzar(func() {
@@ -650,6 +753,7 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 		}
 		b.cerrar(rd)
 		b.alGuardarBorrador()
+		b.retenerRespuesta(env.ID, br.Responde)
 		a := ui.NuevoAviso(ui.AvisoExito, t.T("compose.sent", nil), "")
 		a.RotuloCerrar = t.T("ui.dismissNotification", nil)
 		if env.ID != "" {
@@ -712,6 +816,7 @@ func (b *Buzon) enviarPorCuenta(rd *redaccion, br Borrador) {
 			b.P.Avisar(ui.AvisoPeligro, t.T("compose.sendFailed", nil), t.T(errorCorreo(err, icloud), nil))
 			return
 		}
+		b.borrarCopia(br.Copia)
 		if id := br.ID; id != "" { // el borrador del autoguardado ya no hace falta
 			ctx := b.ctx
 			b.Lanzar(func() {
@@ -767,6 +872,7 @@ func (b *Buzon) deshacerEnvio(id string, br Borrador) {
 	pedir(b, func(ctx context.Context) (struct{}, error) {
 		return struct{}{}, b.S.CancelOutbound(ctx, id)
 	}, func(_ struct{}, err error) {
+		b.anularRespuesta(id, err == nil)
 		switch {
 		case err == nil:
 			b.abrirRedactor(br)
@@ -775,6 +881,88 @@ func (b *Buzon) deshacerEnvio(id string, br Borrador) {
 			b.avisar(ui.AvisoPeligro, "error.undoSend", nil)
 		default:
 			b.avisar(ui.AvisoPeligro, "error.undoSendGone", nil)
+		}
+	})
+}
+
+// ---- Respondido (`\Answered`) ----
+
+// respuestaRetenida es un envío retenido que contesta a un correo: `parar` detiene el
+// plazo y `puesta` dice si la marca ya se puso.
+type respuestaRetenida struct {
+	id     string
+	puesta bool
+	parar  func()
+}
+
+// retenerRespuesta es `handleAnswered`: el envío `envio` contesta al correo `id`, que
+// se marca `\Answered` —lo que Thunderbird o el iPhone leen— cuando el envío SALE.
+// Durante la ventana de deshacer sigue retenido en la cola y puede no salir nunca;
+// sin ventana (sin id de envío), ya salió.
+func (b *Buzon) retenerRespuesta(envio, id string) {
+	// Lo de una cuenta externa se contesta por su proveedor, que lleva sus marcas.
+	if _, externo := origenExterno(id); id == "" || externo {
+		return
+	}
+	// Ya estaba respondido: nada que poner, y deshacer este envío no puede quitar la
+	// marca del anterior.
+	for _, lista := range [][]api.MailMessage{b.mensajes, b.resultados, b.hilo} {
+		for _, m := range lista {
+			if m.ID == id && m.Has(api.MailFlagAnswered) {
+				return
+			}
+		}
+	}
+	if envio == "" {
+		b.ponerRespondido(id, true)
+		return
+	}
+	r := &respuestaRetenida{id: id}
+	ctx, ciclo := b.ctx, b.ciclo
+	r.parar = b.Esperar(VentanaDeshacer*time.Second, func() {
+		// Stop no retira un callback que el reloj ya entregó al hilo de la interfaz.
+		if ctx.Err() != nil || ciclo != b.ciclo || b.respuestas[envio] != r {
+			return
+		}
+		r.puesta = true
+		//nolint:contextcheck // La vida capturada ya está validada; ponerRespondido adopta ese mismo b.ctx mediante pedir.
+		b.ponerRespondido(id, true)
+	})
+	if b.respuestas == nil {
+		b.respuestas = map[string]*respuestaRetenida{}
+	}
+	b.respuestas[envio] = r
+}
+
+// anularRespuesta es `anularRespondido`: al deshacer, si la cola canceló el envío, el
+// plazo deja de correr y, si ya se había cumplido, el original pierde la marca. Si no
+// lo canceló (ya salió), la marca es cierta.
+func (b *Buzon) anularRespuesta(envio string, cancelado bool) {
+	r, hay := b.respuestas[envio]
+	if !hay {
+		return
+	}
+	if !cancelado {
+		return // el plazo sigue: el envío salió y la marca será cierta
+	}
+	delete(b.respuestas, envio)
+	r.parar()
+	// El plazo pudo cumplirse un instante antes de que la cola soltara el envío.
+	if r.puesta {
+		b.ponerRespondido(r.id, false)
+	}
+}
+
+// ponerRespondido pone o quita `\Answered` en la lista y en el servidor. Si el
+// servidor dice que no, la fila vuelve a como estaba y no se avisa: es una marca de
+// cortesía con otros clientes, no algo que la persona haya pedido.
+func (b *Buzon) ponerRespondido(id string, poner bool) {
+	b.marcar([]string{id}, api.MailFlagAnswered, poner)
+	pedir(b, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, b.S.SetFlagMany(ctx, []string{id}, api.MailFlagAnswered, poner)
+	}, func(_ struct{}, err error) {
+		if err != nil {
+			b.marcar([]string{id}, api.MailFlagAnswered, !poner)
 		}
 	})
 }
@@ -823,6 +1011,7 @@ func (b *Buzon) editarFirma() {
 			}
 			b.firma = valor
 			d.Cerrar()
+			b.leerEstadoAjustes()
 		})
 	}).Con(ui.Primario, ui.TallaMD)
 	d = ui.NuevoDialogo(t.T("signature.title", nil), grupo).
@@ -832,7 +1021,7 @@ func (b *Buzon) editarFirma() {
 	d.Mostrar(lienzo)
 }
 
-// abrirAjuste atiende las entradas de «Ajustes» del lateral.
+// abrirAjuste atiende las filas de la página de ajustes (y «Programados» del lateral).
 func (b *Buzon) abrirAjuste(clave string) {
 	b.P.CerrarCajon()
 	switch clave {

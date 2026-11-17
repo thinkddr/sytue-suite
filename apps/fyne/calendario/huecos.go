@@ -89,20 +89,18 @@ type buscaHueco struct {
 	turno      int
 	laborables *ui.Conmutador
 	ventana    *ui.Selector
-	// esqueletos son los dos de «cargando», los mismos mientras dure la carga: el pulso
-	// es una animación y se para al terminar, no cuando Fyne recoja los viejos.
-	esqueletos []fyne.CanvasObject
+	// carga son las dos barras de «cargando», las mismas mientras dure la carga: el
+	// latido es una animación y se para al terminar, no cuando Fyne recoja las viejas.
+	carga *ui.BloquesEsqueleto
 }
 
-// cargado termina la carga y para el pulso de los esqueletos.
+// cargado termina la carga y para el latido de las barras.
 func (h *buscaHueco) cargado() {
 	h.cargando = false
-	for _, o := range h.esqueletos {
-		if e, ok := o.(*ui.Esqueleto); ok {
-			e.Parar()
-		}
+	if h.carga != nil {
+		h.carga.Parar()
 	}
-	h.esqueletos = nil
+	h.carga = nil
 }
 
 // construirHuecos crea los dos controles del panel una sola vez, para que no pierdan
@@ -202,23 +200,25 @@ func (f *formulario) panelHuecos() fyne.CanvasObject {
 	}
 	resumen := aSuLinea(p.t("findTime.summary", i18n.Vars{"start": FranjaDesde, "end": FranjaHasta, "duration": minutos}),
 		tema.TextoXS, "text-muted", interior)
-	// `flex items-center gap-3`: envolver a su ancho justo es una fila centrada en vertical.
+	// `flex items-center gap-3`: un flujo a su ancho justo es una fila centrada en vertical.
 	natural := h.laborables.MinSize().Width + espacio3 + h.ventana.MinSize().Width
-	controles := container.New(&envolver{Hueco: espacio3, Ancho: natural}, h.laborables, h.ventana)
-	filas := []fyne.CanvasObject{container.New(&envolver{Hueco: espacio2, Ancho: interior, Repartir: true}, resumen, controles)}
+	controles := container.New(ui.Flujo{Hueco: espacio3, Ancho: natural}, h.laborables, h.ventana)
+	filas := []fyne.CanvasObject{container.New(ui.Flujo{Hueco: espacio2, Ancho: interior, Repartir: true}, resumen, controles)}
 
 	inicios := IniciosCandidatos(h.lista, time.Duration(minutos)*time.Minute)
 	switch {
 	case h.cargando:
-		// `<Skeleton height="1.75rem" />` y el mismo al 70 %.
-		if h.esqueletos == nil {
-			h.esqueletos = []fyne.CanvasObject{ui.NuevoEsqueleto(0, tema.Espacio(7)), ui.NuevoEsqueleto(0, tema.Espacio(7))}
+		// `<Skeleton height="1.75rem" />` y el mismo al 70 %, en un `role="status"`
+		// que dice `findTime.loading`.
+		if h.carga == nil {
+			b := ui.NuevosBloquesEsqueleto().ConRotulo(p.t("findTime.loading", nil))
+			h.carga = b.Con(container.New(ui.Columna{Hueco: espacio1p5},
+				b.Bloque(0, tema.Espacio(7)), container.New(fraccion(0.7), b.Bloque(0, tema.Espacio(7)))))
 		}
-		filas = append(filas, container.New(ui.Columna{Hueco: espacio1p5},
-			h.esqueletos[0], container.New(fraccion(0.7), h.esqueletos[1])))
+		filas = append(filas, h.carga)
 	case h.fallo:
 		otra := ui.NuevoBoton(p.t("common.retry", nil), f.pedirHuecos).Con(ui.Secundario, ui.TallaSM)
-		filas = append(filas, container.New(&envolver{Hueco: espacio2, Ancho: interior, Repartir: true},
+		filas = append(filas, container.New(ui.Flujo{Hueco: espacio2, Ancho: interior, Repartir: true},
 			aSuLinea(p.t("findTime.error", nil), tema.TextoSM, "text-subtle", interior-espacio2-otra.MinSize().Width), otra))
 	case len(inicios) == 0:
 		filas = append(filas, container.New(layout.NewCustomPaddedLayout(espacio2, espacio2, 0, 0),
@@ -248,7 +248,7 @@ func (f *formulario) gruposHuecos(inicios []time.Time, minutos int, interior flo
 		}
 		dia := alto(ui.Texto(capitalizar(clave), tema.TextoXS, ui.Medio, tema.Color("text-subtle", v)), tema.TextoXS.Linea)
 		dias = append(dias, container.New(ui.Columna{Hueco: espacio1}, dia,
-			container.New(&envolver{Hueco: espacio1p5, Ancho: interior}, horas...)))
+			container.New(ui.Flujo{Hueco: espacio1p5, Ancho: interior}, horas...)))
 		horas = nil
 	}
 	for _, t := range inicios {

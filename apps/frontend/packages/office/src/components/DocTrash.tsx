@@ -10,16 +10,7 @@
  * «Vaciar papelera», también con confirmación. Habla solo con el BFF (/api/trash).
  */
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import {
-  Button,
-  EmptyState,
-  Icon,
-  Illustration,
-  InlineHelp,
-  Modal,
-  Skeleton,
-  useToast,
-} from '@sytue/ui';
+import { Button, EmptyState, Icon, InlineHelp, Modal, Skeleton, useToast } from '@sytue/ui';
 import type { DocKind } from '@sytue/api-clients';
 import { formatDate, type Locale } from '@sytue/i18n';
 import { useConnectivity } from '@sytue/offline/preact';
@@ -216,7 +207,7 @@ export function DocTrash({ locale, kind = '', org }: DocTrashProps) {
         <EmptyState
           title={t('trash.errorTitle')}
           description={t('list.error.description')}
-          illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+          tone="error"
           action={
             <Button variant="secondary" size="sm" onClick={() => void load()}>
               {t('list.retry')}
@@ -227,7 +218,7 @@ export function DocTrash({ locale, kind = '', org }: DocTrashProps) {
         <EmptyState
           title={t('trash.emptyTitle')}
           description={t('trash.emptyBody')}
-          illustration={<Illustration name="emptyDrive" />}
+          spot="emptyDrive"
         />
       ) : (
         <ul>

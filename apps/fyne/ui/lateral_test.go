@@ -185,7 +185,7 @@ func TestElCarrilMide260YDejaSuCanalon(t *testing.T) {
 	}
 	viewport := test.WidgetRenderer(menu).(*lateralRenderer).desplaza
 	if got := viewport.Position().X + seccion.Position().X; got != tema.Espacio(4) {
-		t.Errorf("el cuerpo empieza en x=%v y `px-4` con el rem de 14 son %v", got, tema.Espacio(4))
+		t.Errorf("el cuerpo empieza en x=%v y `px-4` con el rem de 16 son %v", got, tema.Espacio(4))
 	}
 	// Plegado, el carril es el token de 64.
 	menu.Plegado = true
@@ -202,7 +202,7 @@ func TestElCarrilMide260YDejaSuCanalon(t *testing.T) {
 //	       con acciones, que miden 24 y son más altas que las versalitas
 //
 // Las dos salen de `pt-1 pb-1.5` sobre el elemento más alto de la línea. El botón era
-// de 21 (`h-6 w-6` con el rem de 14, y la segunda medía 29,75) hasta que la web le puso
+// de 21 (`h-6 w-6` cuando 1 rem eran 14 px, y la segunda medía 29,75) hasta que la web le puso
 // el suelo de 24 px (PR #834): el encabezado con acciones crece los 3 px.
 func TestElEncabezadoDeSeccionCreceConSusAcciones(t *testing.T) {
 	s := NuevaSeccionLateral("Carpetas")
@@ -253,9 +253,9 @@ func TestElPuntoDeEtiquetaVaCentradoEnLaCajaDelIcono(t *testing.T) {
 	x0, x1, y0, y1 := caja(img, rojo)
 	lado := float32(x1-x0+1) / escala
 	if lado < PuntoEtiqueta-1 || lado > PuntoEtiqueta+1 {
-		t.Errorf("el punto mide %v y `h-2.5` con el rem de 14 son %v", lado, PuntoEtiqueta)
+		t.Errorf("el punto mide %v y `h-2.5` con el rem de 16 son %v", lado, PuntoEtiqueta)
 	}
-	// Centrado en la caja de 17,5 que arranca en `px-2.5`.
+	// Centrado en la caja de 20 que arranca en `px-2.5`.
 	centro := (float32(x0+x1) / 2) / escala
 	if quiero := tema.Espacio(2.5) + CajaIcono/2; centro < quiero-1 || centro > quiero+1 {
 		t.Errorf("el punto se centra en x=%v y su caja lo pone en %v", centro, quiero)

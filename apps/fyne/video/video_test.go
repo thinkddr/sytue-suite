@@ -339,6 +339,51 @@ func TestElRelojEsElAudio(t *testing.T) {
 	}
 }
 
+// TestElReproductorAVelocidadDoble: a 2× la tarjeta pide al mismo ritmo de siempre,
+// pero cada tramo es el doble de vídeo; los fotogramas siguen al reloj y lo que suena
+// sigue siendo el tono de 440 Hz, no uno de 880.
+func TestElReproductorAVelocidadDoble(t *testing.T) {
+	tarjeta := &tarjetaFalsa{}
+	r, err := Nuevo(abrirFixture(t), tarjeta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var vistos []time.Duration
+	r.AlFotograma = func(_ image.Image, t time.Duration) { mu.Lock(); vistos = append(vistos, t); mu.Unlock() }
+	r.Arrancar()
+	defer r.Cerrar()
+	r.PonerVelocidad(2)
+	r.Reproducir()
+	for range 25 {
+		esperar(t, func() bool { r.mu.Lock(); defer r.mu.Unlock(); return len(r.pcm) >= 3*llamada.Tramo }, "PCM que sonar")
+		tarjeta.tramo()
+	}
+	if p := r.Posicion(); p != time.Second {
+		t.Errorf("tras 25 tramos a 2× el reloj está en %v y debería ser 1 s", p)
+	}
+	esperar(t, func() bool { mu.Lock(); defer mu.Unlock(); return vistos[len(vistos)-1] >= 900*time.Millisecond }, "fotogramas hasta los 900 ms")
+	mu.Lock()
+	if ultimo := vistos[len(vistos)-1]; ultimo > time.Second {
+		t.Errorf("se ha enseñado un fotograma de %v con el reloj en 1 s", ultimo)
+	}
+	mu.Unlock()
+	sonado := tarjeta.sonado[llamada.Tramo*5:]
+	if hz := float64(cruces(sonado)) / (float64(len(sonado)) / 48000); hz < 420 || hz > 460 {
+		t.Errorf("a 2× el tono suena a %.0f Hz y es de 440", hz)
+	}
+	// Volver a 1× no mueve el reloj.
+	r.PonerVelocidad(1)
+	if p := r.Posicion(); p != time.Second {
+		t.Errorf("al volver a 1× el reloj salta a %v", p)
+	}
+	esperar(t, func() bool { r.mu.Lock(); defer r.mu.Unlock(); return len(r.pcm) >= llamada.Tramo }, "PCM que sonar")
+	tarjeta.tramo()
+	if p := r.Posicion(); p != time.Second+20*time.Millisecond {
+		t.Errorf("un tramo a 1× tras el segundo deja el reloj en %v", p)
+	}
+}
+
 // TestSinTarjetaVaConElRelojDePared: sin audio llega al final en unos dos segundos, con
 // los fotogramas en orden, y se queda en pausa al acabar. Buscar hacia atrás lo
 // devuelve a ese punto.

@@ -8,9 +8,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
+
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -129,4 +132,157 @@ func TestLaCapturaDeLaLibretaSeGuarda(t *testing.T) {
 	g := b.verLibreta(b.redaccion, b.redaccion.r.para)
 	g.alternar(FilasLibreta("es", b.redaccion.libreta, "")[0])
 	guardar(t, filepath.Join(dir, "libreta.png"), w.Canvas().Capture())
+}
+
+// fichasFalsas es Contacts con su libreta por defecto: busca por subcadena, como el
+// servicio, y apunta lo que se crea.
+type fichasFalsas struct {
+	contactosFalsos
+	cs      []api.Contact
+	creados []api.ContactInput
+	libreta string
+}
+
+func (f *fichasFalsas) Search(_ context.Context, q string, _ int) ([]api.Contact, error) {
+	f.buscados = append(f.buscados, q)
+	var out []api.Contact
+	for _, c := range f.cs {
+		for _, e := range c.Emails {
+			if strings.Contains(strings.ToLower(e.Email), strings.ToLower(q)) {
+				out = append(out, c)
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func (f *fichasFalsas) AddressBooks(context.Context) ([]api.AddressBook, error) {
+	return []api.AddressBook{{ID: "otra"}, {ID: "porDefecto", IsDefault: true}}, nil
+}
+
+func (f *fichasFalsas) Create(_ context.Context, libreta string, in api.ContactInput) (api.Contact, error) {
+	f.libreta = libreta
+	f.creados = append(f.creados, in)
+	c := api.Contact{ID: "0b6f6c2e-6a39-4bd2-9a57-4f2d3c9f5a10", FormattedName: in.FormattedName, Emails: in.Emails}
+	f.cs = append(f.cs, c)
+	return c, nil
+}
+
+// elementoDelMenu es la entrada de «Más acciones» con ese texto, o nil.
+func elementoDelMenu(b *Buzon, texto string) *ui.ElementoMenu {
+	for _, o := range b.P.Lector.menuMas().Elementos {
+		if e, ok := o.(*ui.ElementoMenu); ok && e.Texto == texto {
+			return e
+		}
+	}
+	return nil
+}
+
+// TestAnadirALaLibretaDesdeElRemitenteCreaUnaSolaFicha: «Más acciones» ofrece «Añadir a
+// Contactos»; pulsarlo crea la ficha en la libreta por defecto con nombre y correo,
+// avisa con «Ver» (que abre la ficha por `sytue-contacts:`), y en la segunda vuelta la
+// entrada ya es «Ver en Contactos» y no se crea nada más.
+//
+// VISTO EN ROJO (2026-11-13): sin la entrada en `menuMas` no se ofrece. Deshecho.
+func TestAnadirALaLibretaDesdeElRemitenteCreaUnaSolaFicha(t *testing.T) {
+	s := servicioConTodas()
+	b := buzonConAvisos(t, s)
+	ab := &abridorFalso{}
+	b.Abridor = ab
+	f := &fichasFalsas{cs: []api.Contact{{ID: "otro", Emails: []api.ContactEmail{{Email: "xm1@example.org"}}}}}
+	b.ConContactos(f)
+	b.Arrancar(context.Background())
+	b.Abrir(b.P.Bandeja.Conversaciones[0])
+
+	if elementoDelMenu(b, "Ver en Contactos") != nil {
+		t.Fatal("la ficha de otra dirección que la contiene no es la suya")
+	}
+	anadir := elementoDelMenu(b, "Añadir a Contactos")
+	if anadir == nil {
+		t.Fatal("«Más acciones» no ofrece «Añadir a Contactos»")
+	}
+	anadir.AlPulsar()
+	if len(f.creados) != 1 || f.libreta != "porDefecto" || f.creados[0].FormattedName != "Persona m1" ||
+		len(f.creados[0].Emails) != 1 || f.creados[0].Emails[0].Email != "m1@example.org" {
+		t.Fatalf("alta: libreta %q, %+v", f.libreta, f.creados)
+	}
+	avisos := b.P.Avisos.Avisos()
+	if len(avisos) != 1 || avisos[0].Titulo != "Añadido a Contactos" || avisos[0].RotuloAccion != "Ver" {
+		t.Fatalf("aviso: %+v", avisos)
+	}
+	avisos[0].AlPulsarAccion()
+	if len(ab.abiertas) != 1 || !strings.HasPrefix(ab.abiertas[0], "sytue-contacts:") ||
+		!strings.HasSuffix(ab.abiertas[0], "/contacts/0b6f6c2e-6a39-4bd2-9a57-4f2d3c9f5a10") {
+		t.Fatalf("«Ver» abre %v", ab.abiertas)
+	}
+
+	if elementoDelMenu(b, "Añadir a Contactos") != nil {
+		t.Error("en la segunda vuelta sigue ofreciendo «Añadir»")
+	}
+	ver := elementoDelMenu(b, "Ver en Contactos")
+	if ver == nil {
+		t.Fatal("en la segunda vuelta no ofrece «Ver en Contactos»")
+	}
+	ver.AlPulsar()
+	if len(ab.abiertas) != 2 || len(f.creados) != 1 {
+		t.Errorf("abiertas %v, creados %d", ab.abiertas, len(f.creados))
+	}
+}
+
+// TestLaLibretaYaTieneAlRemitente: si Contacts ya lo tiene, al abrir el hilo se sabe y
+// el menú ofrece «Ver»; y si se pulsara «Añadir» antes de saberlo, no se duplica.
+func TestLaLibretaYaTieneAlRemitente(t *testing.T) {
+	s := servicioConTodas()
+	b := buzonConAvisos(t, s)
+	f := &fichasFalsas{cs: []api.Contact{{ID: "ya", Emails: []api.ContactEmail{{Email: "M1@example.org"}}}}}
+	b.ConContactos(f)
+	b.Arrancar(context.Background())
+	c := b.P.Bandeja.Conversaciones[0]
+	b.Abrir(c)
+	if elementoDelMenu(b, "Ver en Contactos") == nil || elementoDelMenu(b, "Añadir a Contactos") != nil {
+		t.Fatal("con ficha, el menú no ofrece «Ver en Contactos»")
+	}
+	b.anadirAContactos("Persona m1", "m1@example.org")
+	if len(f.creados) != 0 {
+		t.Errorf("duplica la ficha: %+v", f.creados)
+	}
+}
+
+// TestLaLibretaNoSeOfreceEnSpamNiANoReplyNiAUnoMismo: las reglas de OfrecerContacto, y
+// en la carpeta de Spam el menú no lleva la entrada.
+func TestLaLibretaNoSeOfreceEnSpamNiANoReplyNiAUnoMismo(t *testing.T) {
+	propias := []string{"yo@sytue.eu"}
+	if !OfrecerContacto("ana@example.eu", false, propias) || OfrecerContacto("ana@example.eu", true, propias) ||
+		OfrecerContacto("YO@sytue.eu", false, propias) || OfrecerContacto("", false, propias) {
+		t.Error("spam, uno mismo o vacío")
+	}
+	sinRespuesta := []string{
+		"no-reply@x.eu", "noreply@x.eu", "No_Reply@x.eu", "do-not-reply@x.eu",
+		"noreply-avisos@x.eu", "mailer-daemon@x.eu", "bounces+123@x.eu",
+	}
+	for _, c := range sinRespuesta {
+		if !EsSinRespuesta(c) {
+			t.Errorf("%s no se reconoce como sin respuesta", c)
+		}
+	}
+	for _, c := range []string{"ana@x.eu", "noelia@x.eu", "replyall@x.eu"} {
+		if EsSinRespuesta(c) {
+			t.Errorf("%s no es un no-reply", c)
+		}
+	}
+
+	s := servicioConTodas()
+	s.paginas[""] = append(s.paginas[""], sobre("m9", "h9", "jk", "Premio", true, 0))
+	b := buzonConAvisos(t, s)
+	b.ConContactos(&fichasFalsas{})
+	b.Arrancar(context.Background())
+	b.ElegirCarpeta(Carpeta{ID: "jk", Rol: "junk"})
+	if len(b.P.Bandeja.Conversaciones) == 0 {
+		t.Fatal("Spam sin conversaciones")
+	}
+	b.Abrir(b.P.Bandeja.Conversaciones[0])
+	if elementoDelMenu(b, "Añadir a Contactos") != nil || elementoDelMenu(b, "Ver en Contactos") != nil {
+		t.Error("en Spam se ofrece guardar al remitente")
+	}
 }

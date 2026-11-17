@@ -7,19 +7,55 @@
  * con domain.Slugify: se muestra como pista para que nadie se lleve sorpresas con los
  * espacios ni con los acentos (que el backend descarta).
  *
- * ponytail: sin miembros iniciales. El backend acepta `members[]` solo en la creación y
- * todavía no hay panel de miembros de canal, así que un canal privado nacería congelado
- * con esa lista; se añade cuando exista ese panel (docs/roadmap.md, «Miembros del
- * canal»). Mientras tanto, un canal privado empieza con su creador.
+ * Personas iniciales (opcional, el selector de «Nuevo mensaje»): al volver la
+ * creación se añade a cada una con POST /api/channel-members, el mismo camino que el
+ * panel de Miembros, que comprueba que sea del equipo e INVITA a quien es de otra
+ * organización. No se usa el `members[]` de la creación: el servicio los siembra sin
+ * validar ni avisar de nada. Si alguna adición falla, el canal ya existe y se queda;
+ * el padre recibe los nombres que faltan para decirlo.
  */
 import type { JSX } from 'preact';
 import { useEffect, useId, useState } from 'preact/hooks';
 import { Modal, Button, Input, FieldGroup, Radio, describedBy } from '@sytue/ui';
-import { createChannel, ChatHttpError, type Channel } from '../client/chatApi.js';
+import {
+  addChannelMember,
+  createChannel,
+  ChatHttpError,
+  type Channel,
+  type ChannelMember,
+} from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
+import { SelectorDePersonas } from './SelectorDePersonas.js';
 
 /** Tope de `domain.ValidName` en el servicio Go (100 runas). */
 const MAX_NAME = 100;
+
+/**
+ * Tope de personas iniciales: cada una es una petición tras crear, y unas decenas es lo
+ * que una persona elige a mano. Más allá, el panel de Miembros o «/invite».
+ */
+export const MAX_INITIAL_MEMBERS = 50;
+
+/**
+ * Añade al canal recién creado a cada persona, una tras otra (no hay prisa y así no se
+ * dispara una ráfaga contra el servicio), y devuelve las que NO se pudieron añadir. Un
+ * fallo no corta las demás: el canal ya existe y cada persona es independiente.
+ */
+export async function addInitialMembers(
+  channelId: string,
+  people: ChannelMember[],
+  add: typeof addChannelMember = addChannelMember,
+): Promise<ChannelMember[]> {
+  const missing: ChannelMember[] = [];
+  for (const m of people) {
+    try {
+      await add(channelId, m.sub, m.name);
+    } catch {
+      missing.push(m);
+    }
+  }
+  return missing;
+}
 
 /**
  * Réplica del `domain.Slugify` del servicio Go (services/chat/internal/domain/domain.go):
@@ -52,16 +88,31 @@ function trimDashes(s: string): string {
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Llamado con el canal recién creado (para refrescar el sidebar y entrar en él). */
-  onCreated: (channel: Channel) => void;
+  /** Miembros del team: los candidatos del campo «Personas». */
+  members: ChannelMember[];
+  /** Sub de quien crea: ya está dentro y no se ofrece. */
+  selfId: string;
+  /**
+   * Llamado con el canal recién creado (para refrescar el sidebar y entrar en él) y las
+   * personas elegidas que no se pudieron añadir (vacío si entraron todas).
+   */
+  onCreated: (channel: Channel, missing: ChannelMember[]) => void;
   /** Traductor ya atado al idioma. */
   t: T;
 }
 
-export function CreateChannelModal({ open, onClose, onCreated, t }: Props): JSX.Element | null {
+export function CreateChannelModal({
+  open,
+  onClose,
+  members,
+  selfId,
+  onCreated,
+  t,
+}: Props): JSX.Element | null {
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'public' | 'private'>('public');
   const [topic, setTopic] = useState('');
+  const [people, setPeople] = useState<ChannelMember[]>([]);
   const [busy, setBusy] = useState(false);
   /** Error del campo Nombre (duplicado / inválido), junto al campo. */
   const [nameError, setNameError] = useState('');
@@ -70,6 +121,7 @@ export function CreateChannelModal({ open, onClose, onCreated, t }: Props): JSX.
 
   const nameId = useId();
   const topicId = useId();
+  const peopleId = useId();
   const kindPublicId = useId();
   const kindPrivateId = useId();
 
@@ -85,6 +137,7 @@ export function CreateChannelModal({ open, onClose, onCreated, t }: Props): JSX.
     setName('');
     setKind('public');
     setTopic('');
+    setPeople([]);
     setBusy(false);
     setNameError('');
     setFailed(false);
@@ -93,6 +146,7 @@ export function CreateChannelModal({ open, onClose, onCreated, t }: Props): JSX.
   const slug = channelSlug(name);
   const nameHelp = slug ? t('createChannel.slugHelp', { slug }) : t('createChannel.nameHelp');
   const topicHelp = t('createChannel.topicHelp');
+  const peopleHelp = t('createChannel.peopleHelp');
 
   function submit(): void {
     if (!slug || busy) return;
@@ -100,7 +154,10 @@ export function CreateChannelModal({ open, onClose, onCreated, t }: Props): JSX.
     setNameError('');
     setFailed(false);
     createChannel({ name: name.trim(), kind, ...(topic.trim() ? { topic: topic.trim() } : {}) })
-      .then(({ channel }) => onCreated(channel))
+      .then(async ({ channel }) => {
+        const missing = await addInitialMembers(channel.id, people);
+        onCreated(channel, missing);
+      })
       .catch((err: unknown) => {
         if (err instanceof ChatHttpError && err.status === 409) {
           setNameError(t('createChannel.duplicate'));
@@ -205,6 +262,21 @@ export function CreateChannelModal({ open, onClose, onCreated, t }: Props): JSX.
             placeholder={t('createChannel.topicPlaceholder')}
             aria-describedby={describedBy(topicId, topicHelp)}
             onInput={(e) => setTopic(e.currentTarget.value)}
+          />
+        </FieldGroup>
+
+        <FieldGroup label={t('createChannel.people')} htmlFor={peopleId} help={peopleHelp}>
+          <SelectorDePersonas
+            members={members}
+            selfId={selfId}
+            selected={people}
+            onChange={setPeople}
+            max={MAX_INITIAL_MEMBERS}
+            disabled={busy}
+            inputId={peopleId}
+            describedBy={describedBy(peopleId, peopleHelp)}
+            empty="texto"
+            t={t}
           />
         </FieldGroup>
 

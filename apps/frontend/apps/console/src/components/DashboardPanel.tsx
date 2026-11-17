@@ -13,6 +13,7 @@ import {
   EmptyState,
   Icon,
   SectionHeader,
+  Stat,
 } from '@sytue/ui';
 import type { IconName } from '@sytue/ui';
 import { formatDateTime, type Locale } from '@sytue/i18n';
@@ -20,6 +21,9 @@ import { useT, type ConsoleMessageKey } from '../i18n/index.js';
 import type { AuditEvent, ConsoleMetric, Tenant } from '../lib/types.js';
 import type { OrgInsights } from '../lib/admin.js';
 import { r } from '../lib/rutas.js';
+import type { FiltroUsuarios } from '../lib/filtros-usuarios.js';
+import type { SetupStep } from '../lib/primeros-pasos.js';
+import { SetupGuideCard } from './SetupGuideCard.js';
 
 // Tonos con par claro/oscuro completo (tokens *-bg/*-text; «primary» del Badge
 // no se reasigna en oscuro, «info» sí y en claro rinde idéntico).
@@ -61,17 +65,29 @@ function Aviso({
   );
 }
 
+/**
+ * Usuarios con el filtro de estado del aviso puesto. «Revisar» tiene que llevar a
+ * las personas que el aviso cuenta, no al directorio entero: con cuatrocientas
+ * filas, encontrar a las tres sin segundo factor era otra tarea más.
+ */
+function usuariosCon(filtro: FiltroUsuarios): string {
+  return `${r('/users')}?filter=${filtro}`;
+}
+
 export default function DashboardPanel({
   metrics,
   tenants,
   events,
   insights,
+  setupSteps,
   locale,
 }: {
   metrics: ConsoleMetric[];
   tenants: Tenant[];
   events: AuditEvent[];
   insights?: OrgInsights;
+  /** Primeros pasos de la organización; la tarjeta se esconde sola al completarlos. */
+  setupSteps?: SetupStep[];
   locale: Locale;
 }) {
   const t = useT(locale);
@@ -88,7 +104,7 @@ export default function DashboardPanel({
             icon="shield"
             tone="warning"
             texto={t('dashboard.todo.withoutMfa', { count: i.without_mfa })}
-            href={r('/users')}
+            href={usuariosCon('without_mfa')}
             cta={t('dashboard.todo.review')}
           />
         ),
@@ -108,7 +124,7 @@ export default function DashboardPanel({
             icon="info"
             tone="neutral"
             texto={t('dashboard.todo.unverified', { count: i.unverified_email })}
-            href={r('/users')}
+            href={usuariosCon('unverified_email')}
             cta={t('dashboard.todo.review')}
           />
         ),
@@ -118,7 +134,7 @@ export default function DashboardPanel({
             icon="user"
             tone="neutral"
             texto={t('dashboard.todo.suspended', { count: i.suspended })}
-            href={r('/users')}
+            href={usuariosCon('suspended')}
             cta={t('dashboard.todo.review')}
           />
         ),
@@ -134,22 +150,12 @@ export default function DashboardPanel({
       <div class="px-4 py-4">
         <div class="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {metrics.map((m) => (
-            <Card key={m.labelKey} raised={false}>
-              <CardBody class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p
-                    class="text-text-muted truncate text-sm"
-                    title={t(m.labelKey as ConsoleMessageKey)}
-                  >
-                    {t(m.labelKey as ConsoleMessageKey)}
-                  </p>
-                  <p class="sytue-h3 text-text mt-1 tabular-nums">{m.value}</p>
-                  {m.hintKey ? (
-                    <p class="sytue-meta mt-0.5">{t(m.hintKey as ConsoleMessageKey)}</p>
-                  ) : null}
-                </div>
-              </CardBody>
-            </Card>
+            <Stat
+              key={m.labelKey}
+              label={t(m.labelKey as ConsoleMessageKey)}
+              value={m.value}
+              {...(m.hintKey ? { hint: t(m.hintKey as ConsoleMessageKey) } : {})}
+            />
           ))}
         </div>
 
@@ -158,6 +164,8 @@ export default function DashboardPanel({
           las métricas de abajo dicen cuánta gente hay, que no cambia nada de lo
           que uno vaya a hacer al abrir esto.
         */}
+        {setupSteps && <SetupGuideCard locale={locale} steps={setupSteps} />}
+
         {avisos.length > 0 && (
           <Card class="mb-4">
             <CardHeader>
@@ -185,7 +193,7 @@ export default function DashboardPanel({
                 <EmptyState
                   title={t('dashboard.tenants.emptyTitle')}
                   description={t('dashboard.tenants.emptyDescription')}
-                  illustration={<Icon name="building" size={28} />}
+                  icon="building"
                   action={
                     <a href={r('/tenants')}>
                       <Button
@@ -247,7 +255,7 @@ export default function DashboardPanel({
                 <EmptyState
                   title={t('dashboard.activity.emptyTitle')}
                   description={t('dashboard.activity.emptyDescription')}
-                  illustration={<Icon name="audit" size={28} />}
+                  icon="audit"
                 />
               ) : (
                 <ul>

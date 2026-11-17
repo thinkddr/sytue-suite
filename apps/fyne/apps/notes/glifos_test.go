@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/notes"
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
@@ -36,6 +37,30 @@ func TestLosGlifosSonLosDeLaWeb(t *testing.T) {
 			t.Errorf("el glifo %q tiene otra ruta en la web:\n  web:  %s\n  aquí: %s",
 				clave, suya, nuestra)
 		}
+	}
+}
+
+// TestNingunGlifoPropioRepiteUnNombreDelComun es el espejo del guardián de la web
+// (`glifos-al-comun.test.ts`): un nombre que también está en `Icon.tsx` es el MISMO
+// concepto y se pinta con la ruta del catálogo compartido. Y una nota que guardó uno de
+// esos nombres en `data.icon` lo sigue resolviendo, ahora con ese dibujo.
+//
+// VISTO EN ROJO (2026-11-13): con `"trash": PapeleraD` de vuelta en `Glifos`, el test
+// nombra «trash».
+func TestNingunGlifoPropioRepiteUnNombreDelComun(t *testing.T) {
+	for clave := range notes.Glifos {
+		if _, es := iconos.Comun(clave); es {
+			t.Errorf("%q es un icono del catálogo compartido: se pinta con su ruta, no con una propia", clave)
+		}
+	}
+	for _, clave := range []string{"trash", "link", "image", "quote", "table", "upload", "download", "undo", "redo"} {
+		i, _ := iconos.Comun(clave)
+		if got := notes.GlifoPorNombre(clave); got == "" || got != i.Ruta() {
+			t.Errorf("una nota con el icono %q pinta %q, y es el %q del catálogo compartido", clave, got, i.Ruta())
+		}
+	}
+	if notes.GlifoPorNombre("notebook") != notes.CuadernoD {
+		t.Error("un glifo propio tiene que seguir saliendo de esta app")
 	}
 }
 
@@ -97,7 +122,7 @@ func rutasDeGlyphsTSX(t *testing.T) map[string]string {
 	for _, m := range re.FindAllStringSubmatch(fuente[i:j], -1) {
 		out[m[1]] = m[2]
 	}
-	if len(out) < 30 {
+	if len(out) < 20 {
 		t.Fatalf("solo se han leído %d glifos de %s: el patrón ya no vale",
 			len(out), notes.FuenteGlifos)
 	}

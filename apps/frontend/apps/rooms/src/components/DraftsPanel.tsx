@@ -13,7 +13,7 @@
  * fuera de ese botón, nunca anidado dentro.
  */
 import type { JSX } from 'preact';
-import { EmptyState, Illustration, Icon, IconButton } from '@sytue/ui';
+import { EmptyState, Icon, IconButton } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import type { LocalDraft } from '../lib/drafts.js';
 import { TrashGlyph } from './glyphs.js';
@@ -58,11 +58,7 @@ export function DraftsPanel({
 
       <div class="min-h-0 flex-1 overflow-y-auto py-2">
         {drafts.length === 0 ? (
-          <EmptyState
-            class="py-4"
-            title={t('drafts.empty')}
-            illustration={<Illustration name="emptyChat" size={96} />}
-          />
+          <EmptyState class="py-4" title={t('drafts.empty')} spot="emptyChat" />
         ) : (
           drafts.map((d) => {
             const nombre = channelNames?.[d.channelId];

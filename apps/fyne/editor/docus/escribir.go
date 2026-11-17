@@ -15,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/editor/docus/rico"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
 // ESCRIBIR en el folio: el cursor, la selección, el teclado, el ratón, el portapapeles, el
@@ -377,7 +378,8 @@ func (f *Folio) deshacer() { f.viajar(&f.hist.atras, &f.hist.adelante) }
 func (f *Folio) rehacer()  { f.viajar(&f.hist.adelante, &f.hist.atras) }
 
 func (f *Folio) viajar(desde, hacia *[]paso) {
-	if !f.editable() || len(*desde) == 0 {
+	// Rellenando también: lo que se deshace es lo rellenado.
+	if !f.editable() && !f.puedeRellenar() || len(*desde) == 0 {
 		return
 	}
 	p := (*desde)[len(*desde)-1]
@@ -418,6 +420,10 @@ func (f *Folio) Mandar(c editor.Comando, valor string) {
 	}
 	a, b := f.orden()
 	switch c {
+	case editor.CopiarFormato:
+		f.alternarBrocha()
+	case editor.Mayusculas:
+		f.cambiarMayusculas(valor)
 	case editor.Fuente:
 		f.porTramos(func(e *rico.Edicion, d, h int) { e.PonerPropiedad(d, h, "font-family", familiaCSS(valor)) })
 	case editor.Tamano:
@@ -610,6 +616,40 @@ func (f *Folio) sangrar(a, b punto, mas bool) {
 	})
 }
 
+// sangrarConRegla escribe en el párrafo del cursor lo que dicta la regla: `margin-left`,
+// `text-indent` y `margin-right`, sin la propiedad cuando vale cero (el `applyIndents` de
+// la web). Con `nuevoPaso` abre un paso de deshacer; sin él, el movimiento se suma al
+// del mismo arrastre. Dice si ha escrito algo.
+func (f *Folio) sangrarConRegla(izq, primera, der float32, nuevoPaso bool) bool {
+	if !f.deTexto(f.cur.b) {
+		return false
+	}
+	foto := paso{f.doc.HTML(), f.cur, f.anc}
+	e := f.bloques[f.cur.b].Editar()
+	cambio := false
+	for _, d := range []struct {
+		prop string
+		v    float32
+	}{{"margin-left", izq}, {"text-indent", primera}, {"margin-right", der}} {
+		valor := ""
+		if d.v != 0 {
+			valor = pxTexto(d.v)
+		}
+		if e.PonerBloque(d.prop, valor) {
+			cambio = true
+		}
+	}
+	if !cambio {
+		return false
+	}
+	if nuevoPaso {
+		f.apuntar(foto, false)
+	}
+	a, b := f.cur, f.anc
+	f.volverA([]rico.Lugar{f.bloques[f.cur.b].Lugar}, a, b)
+	return true
+}
+
 // PasoSangria es lo que mueve cada pulsación de sangría.
 const PasoSangria float32 = 40
 
@@ -619,10 +659,10 @@ const PasoSangria float32 = 40
 // folio es el vacío, como `getFormatState` cuando la selección no está en el lienzo.
 func (f *Folio) Formato() editor.Formato {
 	if !f.conCursor || !f.deTexto(f.cur.b) {
-		return editor.Formato{PuedeDeshacer: len(f.hist.atras) > 0, PuedeRehacer: len(f.hist.adelante) > 0}
+		return editor.Formato{PuedeDeshacer: len(f.hist.atras) > 0, PuedeRehacer: len(f.hist.adelante) > 0, Brocha: f.brocha != nil}
 	}
 	a, b := f.orden()
-	out := editor.Formato{PuedeDeshacer: len(f.hist.atras) > 0, PuedeRehacer: len(f.hist.adelante) > 0}
+	out := editor.Formato{PuedeDeshacer: len(f.hist.atras) > 0, PuedeRehacer: len(f.hist.adelante) > 0, Brocha: f.brocha != nil}
 	tiene := func(m rico.Marca) bool {
 		if !f.haySeleccion() {
 			return f.edicion(f.cur.b).Tiene(f.cur.p, f.cur.p, m)
@@ -666,14 +706,19 @@ func (f *Folio) Formato() editor.Formato {
 }
 
 // programarFormato repinta la cinta si el formato bajo el cursor ha cambiado, como mucho
-// cada [PausaFormato]; la barra de estado se repinta siempre (las palabras).
+// cada [PausaFormato]; la barra de estado se repinta siempre (las palabras). Antes avisa a
+// la coedición de que el cursor se ha movido: es por donde pasa cada movimiento.
 func (f *Folio) programarFormato() {
+	f.avisarCursor()
 	if f.formatoPendiente || f.ctx == nil {
 		return
 	}
 	f.formatoPendiente = true
 	f.Programar(PausaFormato, func() {
 		f.formatoPendiente = false
+		if f.ajustes != nil {
+			f.ajustes.refrescar() // el espaciado y las sangrías no están en el Formato
+		}
 		if nuevo := f.Formato(); nuevo != f.ultimoFormato {
 			f.ultimoFormato = nuevo
 			if f.ctx.Refrescar != nil {
@@ -1069,7 +1114,13 @@ func (p *pagina) FocusLost() {
 }
 
 // TypedRune escribe.
-func (p *pagina) TypedRune(r rune) { p.f.escribir(string(r)) }
+func (p *pagina) TypedRune(r rune) {
+	if r == ' ' && p.f.rellenando {
+		p.f.activarCampo(p.f.campoFoco) // Espacio activa el campo enfocado, como Intro
+		return
+	}
+	p.f.escribir(string(r))
+}
 
 // KeyDown y KeyUp siguen la Mayús, que Fyne no manda con cada tecla.
 func (p *pagina) KeyDown(e *fyne.KeyEvent) {
@@ -1090,10 +1141,15 @@ func (p *pagina) KeyUp(e *fyne.KeyEvent) {
 func (p *pagina) TypedKey(e *fyne.KeyEvent) {
 	f := p.f
 	ext := f.mayus
+	if f.teclaRellenar(e) {
+		return
+	}
 	switch e.Name {
 	case fyne.KeyEscape:
 		p.CancelarArrastre()
 		switch {
+		case f.brocha != nil: // Esc desarma la brocha sin pintar, como en la web
+			f.desarmarBrocha()
 		case f.caja != nil && f.caja.AlSalir != nil:
 			f.caja.AlSalir()
 		case f.sel != nil: // Escape suelta la imagen, como en la web
@@ -1259,7 +1315,7 @@ func (p *pagina) TypedShortcut(s fyne.Shortcut) {
 			f.retroceso()
 		}
 	case *fyne.ShortcutPaste:
-		f.escribir(fyne.CurrentApp().Clipboard().Content())
+		f.pegar(fyne.CurrentApp().Clipboard().Content()) // con formato si lo hay (pegar.go)
 	case *fyne.ShortcutSelectAll:
 		n := len(f.bloques) - 1
 		f.anc = f.acotar(punto{0, 0})
@@ -1285,17 +1341,20 @@ func (f *Folio) atajo(s *desktop.CustomShortcut) {
 	mod := s.Modifier &^ fyne.KeyModifierShift
 	ext := s.Modifier&fyne.KeyModifierShift != 0
 	principal := mod == fyne.KeyModifierShortcutDefault
+	// Los de formato salen del registro común, como en la web: negrita, alinear, listas,
+	// títulos, sangría, super/subíndice, quitar formato y enlace.
+	if c, valor, ok := editor.ComandoDelAtajo(s); ok {
+		f.atajoDeComando(c, valor)
+		return
+	}
 	switch {
-	case principal && s.KeyName == fyne.KeyB:
-		f.Mandar(editor.Negrita, "")
-	case principal && s.KeyName == fyne.KeyI:
-		f.Mandar(editor.Cursiva, "")
-	case principal && s.KeyName == fyne.KeyU:
-		f.Mandar(editor.Subrayado, "")
-	case principal && ext && s.KeyName == fyne.KeyX:
-		f.Mandar(editor.Tachado, "")
 	case principal && ext && s.KeyName == fyne.KeyZ:
 		f.rehacer()
+	case principal && ext && s.KeyName == fyne.KeyV:
+		// Pegar sin formato, como en la web: el texto aunque el portapapeles traiga HTML.
+		if f.editable() {
+			f.pegarTexto(fyne.CurrentApp().Clipboard().Content())
+		}
 	case principal && s.KeyName == fyne.KeyS:
 		if f.AlGuardarYa != nil {
 			f.AlGuardarYa()
@@ -1325,6 +1384,37 @@ func (f *Folio) atajo(s *desktop.CustomShortcut) {
 	}
 }
 
+// atajoDeComando despacha el comando de un atajo del registro. El enlace no se manda
+// vacío: abre su panel (el de «Insertar › Enlace») junto al folio, como Ctrl+K en la web.
+func (f *Folio) atajoDeComando(c editor.Comando, valor string) {
+	if c != editor.InsertarEnlace {
+		f.Mandar(c, valor)
+		return
+	}
+	if !f.editable() || f.ctx == nil {
+		return
+	}
+	lienzo := fyne.CurrentApp().Driver().CanvasForObject(f.pag)
+	if lienzo == nil {
+		return
+	}
+	var em *ui.Emergente
+	panel := editor.NuevoPanelEnlace(f.ctx, f.textoSeleccionado(), func(href, texto string) {
+		if em != nil {
+			em.Cerrar()
+		}
+		f.Mandar(editor.InsertarEnlace, href+"\n"+texto)
+	})
+	em = ui.MostrarEmergenteEn(lienzo, panel, editor.RellenoEmergenteCinta, colocarEnlace)
+	f.enlaceAbierto = em
+}
+
+// colocarEnlace pone el panel del enlace centrado arriba, donde no tapa la línea que se
+// escribe en la mayoría de los casos y siempre cabe.
+func colocarEnlace(ventana, tam fyne.Size) (fyne.Position, fyne.Size) {
+	return fyne.NewPos((ventana.Width-tam.Width)/2, ventana.Height/6), tam
+}
+
 // esSaltoPalabra: Alt en macOS y Ctrl en los demás, como en cualquier campo del sistema.
 func esSaltoPalabra(mod fyne.KeyModifier) bool {
 	if fyne.KeyModifierShortcutDefault == fyne.KeyModifierSuper {
@@ -1344,14 +1434,15 @@ func (p *pagina) MouseDown(e *desktop.MouseEvent) {
 	f := p.f
 	f.enfocar()
 	f.porRaton = true
-	if f.pulsarImagen(e.Position) {
+	if f.pulsarCampo(e.Position) || f.pulsarImagen(e.Position) {
 		return
 	}
 	f.mover(f.enPunto(e.Position), e.Modifier&fyne.KeyModifierShift != 0)
 	f.hayObjetivo = false
 }
 
-func (p *pagina) MouseUp(*desktop.MouseEvent) {}
+// MouseUp pinta con la brocha armada lo que se acaba de seleccionar arrastrando.
+func (p *pagina) MouseUp(*desktop.MouseEvent) { p.f.soltarBrocha() }
 
 // Tapped es el clic en el móvil, donde no llega MouseDown.
 func (p *pagina) Tapped(e *fyne.PointEvent) {
@@ -1361,7 +1452,7 @@ func (p *pagina) Tapped(e *fyne.PointEvent) {
 		return
 	}
 	f.enfocar()
-	if f.pulsarImagen(e.Position) {
+	if f.pulsarCampo(e.Position) || f.pulsarImagen(e.Position) {
 		return
 	}
 	f.mover(f.enPunto(e.Position), false)
@@ -1383,6 +1474,7 @@ func (p *pagina) DoubleTapped(e *fyne.PointEvent) {
 	f.anc, f.cur = a, b
 	f.pag.Refresh()
 	f.programarFormato()
+	f.soltarBrocha() // el doble clic llega tras el último MouseUp: la palabra es la selección
 }
 
 // Dragged extiende la selección en el escritorio; en el móvil mueve un tirador de la
@@ -1432,6 +1524,7 @@ func (p *pagina) DragEnd() {
 	}
 	p.f.tiradorTexto = sinDecidir
 	p.f.soltarArrastre()
+	p.f.soltarBrocha() // en el móvil no hay MouseUp: el tirador suelta aquí
 }
 
 // CancelarArrastre descarta una edición provisional de imagen sin guardarla ni añadirla al

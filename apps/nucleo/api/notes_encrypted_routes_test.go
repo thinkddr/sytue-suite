@@ -61,7 +61,9 @@ func TestNotasCifradasServidorAntiguoNoEscribeNiRetrocede(t *testing.T) {
 }
 
 func TestNotasCifradasUsanRutaVersionadaConCASCompleto(t *testing.T) {
-	crypto := json.RawMessage(`{"v":1,"salt":"public","iterations":600000,"check":"check","extra":"keep"}`)
+	// expected_crypto viaja tal cual, pero solo con los campos de NotesCrypto: uno
+	// desconocido se rechaza antes de la red (igual que notesApi.ts en la web).
+	crypto := json.RawMessage(`{"v":1,"kdf":"PBKDF2-SHA256","salt":"public","iterations":600000,"check":"check"}`)
 	in := NoteInput{CipherVersion: 2, ExpectedCrypto: crypto, ContentCipher: "encv1:sealed", Data: json.RawMessage(`{"client_id":"opaque"}`)}
 	for _, method := range []string{http.MethodPost, http.MethodPut} {
 		t.Run(method, func(t *testing.T) {
@@ -98,6 +100,16 @@ func TestNotasCifradasUsanRutaVersionadaConCASCompleto(t *testing.T) {
 			}
 			if err != nil || calls != 1 || got.ID != "saved" {
 				t.Fatalf("encrypted write: calls=%d note=%+v err=%v", calls, got, err)
+			}
+			extra := in
+			extra.ExpectedCrypto = json.RawMessage(`{"v":1,"salt":"public","iterations":600000,"check":"check","extra":"keep"}`)
+			if method == http.MethodPost {
+				_, err = svc.CreateNote(context.Background(), "book", extra)
+			} else {
+				_, err = svc.UpdateNote(context.Background(), "note", "book", extra)
+			}
+			if !errors.Is(err, ErrDatosCifradosNotas) || calls != 1 {
+				t.Fatalf("unknown expected_crypto field reached the network: calls=%d err=%v", calls, err)
 			}
 		})
 	}

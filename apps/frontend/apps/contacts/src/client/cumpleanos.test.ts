@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { Contact } from '@sytue/api-clients';
-import { cumpleanosDe, proximosCumpleanos } from './cumpleanos.js';
+import { cumpleanosDe, formatearCumpleanos, proximosCumpleanos } from './cumpleanos.js';
 
 const contacto = (fullName: string, bday?: string): Contact => ({
   href: `/c/${fullName}`,
@@ -19,6 +19,19 @@ test('lee las cuatro formas del BDAY y descarta lo ilegible', () => {
   expect(cumpleanosDe('BDAY:mañana')).toBeNull();
   expect(cumpleanosDe('FN:Sin fecha')).toBeNull();
   expect(cumpleanosDe('BDAY:19901315')).toBeNull();
+});
+
+test('respeta el grupo, el año omitido de Apple y los días que no existen', () => {
+  expect(cumpleanosDe('FN:Ana\nitem1.BDAY:1990-02-15')).toEqual({ mes: 2, dia: 15, anyo: 1990 });
+  expect(cumpleanosDe('BDAY;X-APPLE-OMIT-YEAR=1604:1604-02-15')).toEqual({ mes: 2, dia: 15 });
+  expect(cumpleanosDe('BDAY;X-APPLE-OMIT-YEAR=1604:1990-02-15')).toEqual({
+    mes: 2,
+    dia: 15,
+    anyo: 1990,
+  });
+  expect(cumpleanosDe('BDAY:--0231')).toBeNull();
+  expect(cumpleanosDe('BDAY:19900229')).toBeNull();
+  expect(cumpleanosDe('BDAY:--0229')).toEqual({ mes: 2, dia: 29 });
 });
 
 test('ordena del más cercano al más lejano, con hoy a cero y la edad que cumple', () => {
@@ -45,4 +58,16 @@ test('la ventana recorta y un 29 de febrero no rompe nada', () => {
   const bisiesto = proximosCumpleanos([contacto('Leo', '20000229')], hoy);
   expect(bisiesto).toHaveLength(1);
   expect(bisiesto[0]?.fecha.getFullYear()).toBe(2027);
+});
+
+test('formatea el cumpleaños con año y, sin año, solo el día y el mes', () => {
+  const sinAnyo = cumpleanosDe('BDAY:--0215');
+  expect(sinAnyo).not.toBeNull();
+  expect(formatearCumpleanos(sinAnyo!, 'es-ES')).toBe('15 de febrero');
+  expect(formatearCumpleanos(sinAnyo!, 'en-GB')).toBe('15 February');
+  expect(formatearCumpleanos(cumpleanosDe('BDAY:1990-02-15')!, 'es-ES')).toBe(
+    '15 de febrero de 1990',
+  );
+  // Un 29 de febrero sin año no se corre al 1 de marzo.
+  expect(formatearCumpleanos(cumpleanosDe('BDAY:--0229')!, 'es-ES')).toBe('29 de febrero');
 });

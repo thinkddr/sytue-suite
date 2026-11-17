@@ -128,3 +128,28 @@ test('el progreso deja volver a un paso ya completado', () => {
   expect(current).toBe(0);
   render(null, host);
 });
+
+// El paso que sigue a algo ya aplicado en el servidor (los códigos de recuperación
+// tras activar la verificación en dos pasos) aún pide algo, pero no deja volver: el
+// formulario anterior ya no tiene nada que enviar.
+test('canGoBack=false quita «Atrás» y los enlaces del progreso, pero deja avanzar', () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let current = 1;
+  render(
+    <I18nProvider locale="es">
+      <Wizard
+        steps={steps([{}, { canGoBack: false }])}
+        current={1}
+        onCurrentChange={(i) => (current = i)}
+      />
+    </I18nProvider>,
+    host,
+  );
+
+  expect(button(host, 'Atrás')).toBeUndefined();
+  expect(host.querySelectorAll('ol button').length).toBe(0);
+  button(host, 'Continuar')?.click();
+  expect(current).toBe(2);
+  render(null, host);
+});

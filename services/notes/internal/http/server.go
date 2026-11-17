@@ -40,7 +40,7 @@ func NewRouter(d Deps) http.Handler {
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
 	h := &Handlers{
-		store: d.Store, cfg: d.Cfg, hub: hubnotify.New(d.Cfg.HubBaseURL, d.Cfg.HubInternalSecret),
+		store: d.Store, migration: d.Store, cfg: d.Cfg, hub: hubnotify.New(d.Cfg.HubBaseURL, d.Cfg.HubInternalSecret),
 		avisados: hubnotify.NuevaUnaVez(VentanaAviso),
 	}
 
@@ -73,6 +73,11 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(h.hub.TrasEscribir(func(r *http.Request) bool {
 			return strings.HasSuffix(r.URL.Path, "/notebooks/preview")
 		}, "notes"))
+
+		api.Get("/private-storage/migration", h.PrivateStorageState)
+		api.Post("/private-storage/migration", h.BeginPrivateStorage)
+		api.Get("/private-storage/migration/{epoch}/rows", h.PrivateStoragePage)
+		api.Get("/private-storage/migration/{epoch}/source/{kind}/{source}", h.PrivateStorageBody)
 
 		// Cuadernos (el árbol de la barra lateral).
 		// «Exportar tus datos»: la entrega de los cuadernos (platform/pkg/portabilidad).
@@ -155,6 +160,11 @@ func NewRouter(d Deps) http.Handler {
 		// estado de más abajo). Las notas de uno se piden a la búsqueda: `q=#plan`.
 		api.Get("/hashtags", h.Hashtags)
 
+		// Historial de versiones (versiones.go): la lista y una entera. Volver a una
+		// es un guardado normal desde el cliente, que en un cuaderno cifrado es el
+		// único que puede descifrarla.
+		api.Get("/notes/{id}/versions", h.ListVersions)
+		api.Get("/notes/{id}/versions/{versionID}", h.GetVersion)
 		api.Put("/notes/{id}", h.UpdateNote)
 		api.Put("/notes/{id}/encrypted", h.UpdateEncryptedNote)
 		api.Post("/notes/{id}/encrypted-content", h.MigrateEncryptedContent)

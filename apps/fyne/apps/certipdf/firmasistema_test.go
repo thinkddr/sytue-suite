@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"math/big"
 	"net/http"
@@ -52,6 +53,8 @@ type motorDeFirmaDePrueba struct {
 	mu       sync.Mutex
 	completa []map[string]string
 	subido   string
+	// preparada son las opciones que llegaron al primer paso (el campo `firma`).
+	preparada string
 }
 
 func (m *motorDeFirmaDePrueba) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +62,8 @@ func (m *motorDeFirmaDePrueba) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	defer m.mu.Unlock()
 	switch r.Method + " " + r.URL.Path {
 	case "POST /api/v1/pdf/sign/prepare":
+		_ = r.ParseMultipartForm(1 << 20)
+		m.preparada = r.FormValue("firma")
 		_, _ = io.WriteString(w, `{"id":"p1","preparado":"`+base64.StdEncoding.EncodeToString([]byte("%PDF-hueco"))+
 			`","resumen":"`+base64.StdEncoding.EncodeToString(make([]byte, 32))+
 			`","algoritmo":"ecdsa","nivel":"cualificada","paginas":3,"sello":"tsa.izenpe.com",
@@ -113,6 +118,8 @@ func TestFirmarConElCertificadoDelSistema(t *testing.T) {
 		p.abrirDialogo(DialogoFirmar)
 		d = nuevoDialogoFirmar(p.dialogo)
 		d.modo = "certificado"
+		// Abajo a la derecha: lo que se prepara tiene que llevar ESE recuadro.
+		d.posicion = FirmaAbajoDerecha
 		p.dialogo.pintar = d.vista
 		d.buscarCertificados()
 	})
@@ -127,6 +134,14 @@ func TestFirmarConElCertificadoDelSistema(t *testing.T) {
 		t.Fatalf("antes del PIN: %+v pin=%v", d.sistema.prep, d.sistema.pin)
 	}
 
+	motor.mu.Lock()
+	var opts api.PDFFirmaOpciones
+	preparada := motor.preparada
+	motor.mu.Unlock()
+	_ = json.Unmarshal([]byte(preparada), &opts)
+	if opts.Rect != (Rect{299, 56, 539, 130}) {
+		t.Errorf("el primer paso lleva el recuadro %v (%s); quiero el de abajo a la derecha", opts.Rect, preparada)
+	}
 	fyne.DoAndWait(func() { d.sistema.pin.PonerTexto("0000"); d.firmarSistema() })
 	hasta(t, func() bool { return !d.sistema.trabajando && d.sistema.error != "" })
 	if d.sistema.firma != nil {

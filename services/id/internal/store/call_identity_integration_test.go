@@ -37,7 +37,7 @@ func (f *identityCallRevoker) MinimumSubjectVersion(_ context.Context, actor, te
 
 func TestCallIdentityRevokesBeforeGroupCommitAndRecoversRollback(t *testing.T) {
 	st, ctx := newStore(t)
-	user := seedUser(t, ctx, st, "current-group@acme.example")
+	user := seedUser(ctx, t, st, "current-group@acme.example")
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: "current-groups", Name: "Acme"})
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestCallIdentityRevokesBeforeGroupCommitAndRecoversRollback(t *testing.T) {
 
 func TestCallIdentityCoversSCIMDynamicGroupsAndRoleWriters(t *testing.T) {
 	st, ctx := newStore(t)
-	user := seedUser(t, ctx, st, "dynamic-current@acme.example")
+	user := seedUser(ctx, t, st, "dynamic-current@acme.example")
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: "dynamic-calls", Name: "Acme"})
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +182,7 @@ func TestCallIdentityCoversSCIMDynamicGroupsAndRoleWriters(t *testing.T) {
 
 func TestCallIdentitySQLImporterCannotBypassRevocation(t *testing.T) {
 	st, ctx := newStore(t)
-	user := seedUser(t, ctx, st, "import-current@acme.example")
+	user := seedUser(ctx, t, st, "import-current@acme.example")
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: "import-calls", Name: "Acme"})
 	if err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func TestCallIdentitySQLImporterCannotBypassRevocation(t *testing.T) {
 
 func TestCallIdentityOrganizationMergePreservesBothScopeFences(t *testing.T) {
 	st, ctx := newStore(t)
-	user := seedUser(t, ctx, st, "merge-call-identity@acme.example")
+	user := seedUser(ctx, t, st, "merge-call-identity@acme.example")
 	source, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: "identity-source", Name: "Source"})
 	if err != nil {
 		t.Fatal(err)

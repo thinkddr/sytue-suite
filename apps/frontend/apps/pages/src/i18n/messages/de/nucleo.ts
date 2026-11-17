@@ -163,7 +163,6 @@ export const nucleo = {
   'legal.phone': 'Telefon',
   'legal.registry': 'Registerangaben (Buch, Band, Blatt)',
   'legal.privacy_contact': 'Kontakt für Datenschutz (DSB)',
-  'legal.save': 'Rechtliche Angaben speichern',
   'legal.saved': 'Rechtliche Angaben gespeichert',
 
   'settings.title': 'Website-Einstellungen',
@@ -370,6 +369,16 @@ export const nucleo = {
   'legal.ph_registry': 'Handelsregister Madrid, Band 1234, Folio 56, Blatt M-789',
   'legal.err_generic':
     'Die rechtlichen Angaben konnten nicht gespeichert werden. Versuchen Sie es erneut.',
+  'legal.section_holder': 'Inhaber',
+  'legal.section_holder_desc': 'Wem die Website gehört und wie er eingetragen ist.',
+  'legal.section_address': 'Sitz',
+  'legal.section_address_desc': 'Die Postanschrift, die im Impressum erscheint.',
+  'legal.section_contact': 'Kontakt',
+  'legal.section_contact_desc': 'Wie Besucher und Behörden Sie erreichen.',
+  'legal.save_section': 'Speichern',
+  'legal.unsaved': 'Ungespeicherte Änderungen',
+  'legal.section_complete': 'Vollständig',
+  'legal.section_incomplete': 'Unvollständig',
 
   'settings.tab': 'Einstellungen',
   'settings.intro': 'Name, Adresse und allgemeine Optionen der Website.',

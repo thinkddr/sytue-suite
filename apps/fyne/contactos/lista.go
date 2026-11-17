@@ -4,18 +4,18 @@
 package contactos
 
 import (
+	"strings"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // El panel de lista de Contacts. Medido en `contacts/lista.ancho.json`:
@@ -208,10 +208,10 @@ func (p *Pantalla) bloqueBuscador() fyne.CanvasObject {
 			// `.sytue-meta`: `text-xs` fijado a `text-subtle`, con `tabular-nums`.
 			ui.NuevoRotulo(p.recuentoConEtiqueta(), tema.TextoXS, ui.Normal, "text-subtle"),
 		)
-		hijos = append(hijos, agenda.Espaciador(MargenRecuento),
+		hijos = append(hijos, ui.Espaciador(MargenRecuento),
 			conRelleno(ui.Margen{Izq: SangriaRecuento, Der: SangriaRecuento}, fila))
 	}
-	bloque := agenda.EnColumna(0, hijos...)
+	bloque := ui.EnColumna(0, hijos...)
 	// El filete de abajo es del bloque, no del campo.
 	filete := canvas.NewRectangle(tema.Color("border", v))
 	return container.New(&conFilete{}, conRelleno(ui.Margen{
@@ -280,7 +280,7 @@ func (p *Pantalla) estadoMarcado() (todos, alguno bool) {
 // hayRecuento es la condición de la web: el recuento solo sale con la lista cargada y
 // con contactos.
 func (p *Pantalla) hayRecuento() bool {
-	return p.Estado != agenda.Cargando && p.Total > 0
+	return p.Estado != ui.EstadoCargando && p.Total > 0
 }
 
 // recuento es el `countSummary`: con filtro, «X de Y»; sin él, «Y contactos». Se
@@ -307,12 +307,12 @@ func (p *Pantalla) recuentoConEtiqueta() string {
 // cuerpoLista es la lista, o el estado que toque.
 func (p *Pantalla) cuerpoLista() fyne.CanvasObject {
 	switch {
-	case p.Estado == agenda.Vacia || p.Estado == agenda.Exito && len(p.Contactos) == 0:
+	case p.Estado == ui.EstadoVacia || p.Estado == ui.EstadoExito && len(p.Contactos) == 0:
 		refresco := p.Refresco
 		refresco.Arriba = func() bool { return true }
-		return ui.RefrescarAlTirar(agenda.Panel(agenda.Vacia, p.textosDeVacio(), nil), &refresco)
-	case p.Estado != agenda.Exito:
-		return agenda.Panel(p.Estado, p.textosDeEstado(), p.esqueletoLista())
+		return ui.RefrescarAlTirar(ui.PanelEstado(ui.EstadoVacia, p.textosDeVacio(), nil), &refresco)
+	case p.Estado != ui.EstadoExito:
+		return ui.PanelEstado(p.Estado, p.textosDeEstado(), p.esqueletoLista())
 	}
 	return p.listaViva()
 }
@@ -324,23 +324,119 @@ func (p *Pantalla) cuerpoLista() fyne.CanvasObject {
 func (p *Pantalla) listaViva() fyne.CanvasObject {
 	if p.virtual == nil {
 		p.virtual = widget.NewList(
-			func() int { return len(p.Contactos) },
+			func() int { return len(p.filasLista) },
 			func() fyne.CanvasObject { return NuevaFilaContacto() },
 			func(i widget.ListItemID, o fyne.CanvasObject) {
-				if f, ok := o.(*FilaContacto); ok && i >= 0 && i < len(p.Contactos) {
-					p.rellenarFila(f, p.Contactos[i])
+				f, ok := o.(*FilaContacto)
+				if !ok || i < 0 || i >= len(p.filasLista) {
+					return
+				}
+				if ini := p.filasLista[i].cabecera; ini != "" {
+					p.ponerCabecera(f, ini)
+					return
+				}
+				if c := p.filasLista[i].contacto; c < len(p.Contactos) {
+					f.Cabecera = ""
+					p.tecladoDeFila(f, c)
+					p.rellenarFila(f, p.Contactos[c])
 				}
 			},
 		)
 		p.Refresco.Arriba = func() bool { return p.virtual.GetScrollOffset() <= 0.5 }
 		p.cuerpo = ui.RefrescarAlTirar(ui.EnvolverLista(p.virtual), &p.Refresco)
 	}
-	// El alto de cada fila: 49 con correo u organización, 46 sin ninguno.
-	for i, c := range p.Contactos {
-		p.virtual.SetItemHeight(i, MedidaFilaContacto(subtituloDe(c) != ""))
+	p.montarFilas()
+	// El alto de cada fila: 49 con correo u organización, 46 sin ninguno, y 28 la
+	// cabecera de una inicial.
+	for i, fila := range p.filasLista {
+		alto := AltoCabeceraLista
+		if fila.cabecera == "" {
+			alto = MedidaFilaContacto(subtituloDe(p.Contactos[fila.contacto]) != "")
+		}
+		p.virtual.SetItemHeight(i, alto)
 	}
 	p.virtual.Refresh()
 	return p.cuerpo
+}
+
+// ---- Cabeceras A–Z (CONT-05) ----
+//
+// La lista virtual mezcla cabeceras y contactos, pero todo lo demás —el cursor, j/k, la
+// selección, `IrAFila`— sigue hablando en índices de `p.Contactos`: las cabeceras no
+// existen para el teclado, que así se las salta sin saber que están. `filaDe` traduce
+// de contacto a fila de la lista para desplazar.
+
+// filaLista es una fila de la lista virtual: la cabecera de una inicial, o un contacto.
+type filaLista struct {
+	cabecera string // no vacía: la cabecera de esa inicial
+	contacto int    // índice en p.Contactos
+}
+
+// ConCabeceras dice si la lista se agrupa por inicial: solo sin búsqueda, etiqueta ni
+// destacados. Con un filtro, la lista es un resultado, no la libreta, y una «A» con un
+// solo contacto debajo no sitúa a nadie.
+func (p *Pantalla) ConCabeceras() bool {
+	return strings.TrimSpace(p.Busqueda) == "" && p.EtiquetaActiva == "" && !p.SoloDestacados
+}
+
+// montarFilas rehace las filas de la lista virtual a partir de `p.Contactos`.
+func (p *Pantalla) montarFilas() {
+	p.filasLista = p.filasLista[:0]
+	p.filaDe = make([]int, len(p.Contactos))
+	if !p.ConCabeceras() {
+		for i := range p.Contactos {
+			p.filaDe[i] = len(p.filasLista)
+			p.filasLista = append(p.filasLista, filaLista{contacto: i})
+		}
+		return
+	}
+	for _, g := range GruposPorInicial(nombresDe(p.Contactos), p.locale()) {
+		p.filasLista = append(p.filasLista, filaLista{cabecera: g.Inicial})
+		for _, i := range g.Indices {
+			p.filaDe[i] = len(p.filasLista)
+			p.filasLista = append(p.filasLista, filaLista{contacto: i})
+		}
+	}
+}
+
+// porInicial devuelve la libreta en el orden de sus cabeceras: el de la colación, con
+// lo que no empieza por letra al final. Es una copia: `filtrar` devuelve la libreta
+// entera sin filtro, y reordenarla en su sitio cambiaría el estado de la app.
+func porInicial(lista []api.Contact, l i18n.Locale) []api.Contact {
+	fuera := make([]api.Contact, 0, len(lista))
+	for _, g := range GruposPorInicial(nombresDe(lista), l) {
+		for _, i := range g.Indices {
+			fuera = append(fuera, lista[i])
+		}
+	}
+	return fuera
+}
+
+func nombresDe(lista []api.Contact) []string {
+	nombres := make([]string, len(lista))
+	for i, c := range lista {
+		nombres[i] = c.DisplayName()
+	}
+	return nombres
+}
+
+// ponerCabecera convierte una fila reciclada en la cabecera de una inicial. Sale del
+// mapa de `filas`: no enseña ningún contacto y el teclado no debe encontrarla.
+func (p *Pantalla) ponerCabecera(f *FilaContacto, inicial string) {
+	delete(p.filas, f)
+	f.Cabecera = inicial
+	f.EsCursor = false
+	f.Nombre, f.Subtitulo, f.Foto = "", "", nil
+	f.Abierta, f.Marcada, f.Destacado = false, false, false
+	f.AlAbrir, f.AlMarcar, f.AlDestacar = nil, nil, nil
+	// La rueda puede reciclar en cabecera la fila ENFOCADA: el foco se queda en ella, y
+	// sin esto ↑ ↓ Inicio Fin morirían ahí. Mueven desde el cursor, que no ha cambiado.
+	f.AlMover = func(k fyne.KeyName) {
+		if d := destinoDeTecla(k, p.CursorFila(), len(p.Contactos)); d >= 0 {
+			p.IrAFila(d)
+		}
+	}
+	f.Refresh()
 }
 
 // rellenarFila pone un contacto en una fila reciclada.
@@ -388,6 +484,114 @@ func (p *Pantalla) refrescarLista() {
 	}
 }
 
+// ---- Teclado (el `tabindex` itinerante de ContactsApp.tsx) ----
+//
+// La lista es UNA parada del tabulador —la fila del cursor— y las flechas la recorren,
+// como un `listbox`. `widget.List` recicla las filas al desplazar, así que la fila no
+// sabe quién es: se lo dice `tecladoDeFila` cada vez que la rellena, y `filas` lleva qué
+// índice enseña cada fila pintada, que es como se encuentra la que hay que enfocar.
+
+// CursorFila es la fila del cursor dentro de la lista filtrada; -1 sin filas.
+func (p *Pantalla) CursorFila() int {
+	if len(p.Contactos) == 0 {
+		return -1
+	}
+	return min(max(p.Cursor, 0), len(p.Contactos)-1)
+}
+
+// tecladoDeFila le dice a una fila reciclada qué índice enseña y si es la del cursor.
+func (p *Pantalla) tecladoDeFila(f *FilaContacto, i int) {
+	if p.filas == nil {
+		p.filas = map[*FilaContacto]int{}
+	}
+	antes, estaba := p.filas[f]
+	p.filas[f] = i
+	// La rueda puede reciclar la fila ENFOCADA para otro contacto: el foco se queda en
+	// el widget, así que el cursor se va con él. Si no, Intro abriría un contacto y el
+	// aro estaría en otro. Rellenarla con el MISMO índice no cuenta: es un repintado.
+	if f.enfocada && estaba && antes != i {
+		p.Cursor = i
+	}
+	f.EsCursor = i == p.CursorFila()
+	f.AlMover = func(k fyne.KeyName) {
+		if d := destinoDeTecla(k, p.filas[f], len(p.Contactos)); d >= 0 {
+			p.IrAFila(d)
+		}
+	}
+}
+
+// destinoDeTecla es adónde lleva ↑ ↓ Inicio Fin desde la fila `i`; -1 si no mueve.
+func destinoDeTecla(k fyne.KeyName, i, total int) int {
+	if total <= 0 {
+		return -1
+	}
+	switch k {
+	case fyne.KeyDown:
+		return min(i+1, total-1)
+	case fyne.KeyUp:
+		return max(i-1, 0)
+	case fyne.KeyHome:
+		return 0
+	case fyne.KeyEnd:
+		return total - 1
+	default:
+		return -1
+	}
+}
+
+// FilaEnfocada es el índice de la fila con el foco del teclado, o -1.
+func (p *Pantalla) FilaEnfocada() int {
+	for f, i := range p.filas {
+		if f.enfocada && i < len(p.Contactos) {
+			return i
+		}
+	}
+	return -1
+}
+
+// IrAFila lleva el cursor a la fila `i`, la trae a la vista y le da el foco. El orden
+// importa: el gestor de foco se NIEGA a enfocar lo que está fuera del recorrido, así
+// que primero la fila pasa a ser la del cursor y después se enfoca.
+func (p *Pantalla) IrAFila(i int) {
+	if i < 0 || i >= len(p.Contactos) || p.virtual == nil {
+		return
+	}
+	p.Cursor = i
+	fila := i
+	if i < len(p.filaDe) {
+		fila = p.filaDe[i]
+	}
+	p.virtual.ScrollTo(fila)
+	// Rellena las filas pintadas con el cursor nuevo: la de `i` entra en el recorrido y
+	// la anterior sale.
+	p.virtual.Refresh()
+	c := fyne.CurrentApp().Driver().CanvasForObject(p.virtual)
+	if c == nil {
+		return
+	}
+	// Puede haber más de una fila que dijo enseñar `i`: la lista guarda en reserva las
+	// que el desplazamiento dejó sin uso, fuera del lienzo. El gestor de foco no enfoca
+	// lo que no encuentra en el árbol, así que vale la que acaba con el foco.
+	for f, j := range p.filas {
+		if j == i && f.Visible() {
+			c.Focus(f)
+			if c.Focused() == fyne.Focusable(f) {
+				return
+			}
+		}
+	}
+}
+
+// EnfocarBuscador es «/»: el foco al buscador de la lista.
+func (p *Pantalla) EnfocarBuscador() {
+	if p.buscador == nil {
+		return
+	}
+	if c := fyne.CurrentApp().Driver().CanvasForObject(p.buscador); c != nil {
+		c.Focus(p.buscador)
+	}
+}
+
 // subtituloDe es el `c.emails[0] ?? c.organization` de la web.
 func subtituloDe(c api.Contact) string {
 	if len(c.Emails) > 0 {
@@ -398,25 +602,28 @@ func subtituloDe(c api.Contact) string {
 
 // esqueletoLista es `ContactListSkeleton`: seis filas con el ritmo de las de verdad
 // —un círculo de 2rem y dos barras de 0,75 y 0,625 rem—, alternando los anchos de las
-// barras (70/65 % y 55/80 %) para que no parezca una rejilla.
+// barras (70/65 % y 55/80 %) para que no parezca una rejilla. Es `ui.FilasEsqueleto`
+// con esa receta: `flex items-center gap-3 px-3 py-2` y las barras en una columna
+// `flex-1`, un solo latido y un solo «Cargando».
 func (p *Pantalla) esqueletoLista() fyne.CanvasObject {
-	filas := make([]fyne.CanvasObject, 0, 6)
-	for i := range 6 {
-		a, b := float32(0.70), float32(0.65)
-		if i%2 == 1 {
-			a, b = 0.55, 0.80
-		}
-		filas = append(filas, container.New(&filaEsqueleto{Anchos: [2]float32{a, b}},
-			ui.NuevoEsqueletoRedondo(LadoEsqueleto),
-			ui.NuevoEsqueleto(0, BarraEsqueleto1), ui.NuevoEsqueleto(0, BarraEsqueleto2)))
-	}
-	return agenda.EnColumna(0, filas...)
+	return ui.NuevasFilasEsqueleto(6, ui.DelanteroAvatar, 2).ConReceta(ui.RecetaEsqueleto{
+		Alto:           AltoFilaEsqueleto,
+		Izq:            ui.MargenFila,
+		Der:            ui.MargenFila,
+		Delantero:      fyne.NewSize(LadoEsqueleto, LadoEsqueleto),
+		HuecoDelantero: ui.HuecoFila,
+		Rayas: []ui.RayaEsqueleto{
+			{Alto: BarraEsqueleto1, Partes: []float32{0.70, 0.55}},
+			{Alto: BarraEsqueleto2, Partes: []float32{0.65, 0.80}},
+		},
+		HuecoRayas: HuecoBarras,
+	})
 }
 
 // La geometría de `ContactListSkeleton`.
 const (
-	// LadoEsqueleto es el `<Skeleton circle width="2rem">`: 28 con el rem de 14, no
-	// los 32 del avatar de verdad. Es lo que pinta la web.
+	// LadoEsqueleto es el `<Skeleton circle width="2rem">`: 32 con el rem de 16, lo
+	// mismo que el avatar de verdad. Es lo que pinta la web.
 	LadoEsqueleto = 2 * tema.Rem
 	// BarraEsqueleto1 y BarraEsqueleto2 son los `height="0.75rem"` y `"0.625rem"`.
 	BarraEsqueleto1 = 0.75 * tema.Rem
@@ -431,75 +638,49 @@ const (
 var AltoFilaEsqueleto = 2*ui.AltoFila + max(LadoEsqueleto,
 	BarraEsqueleto1+HuecoBarras+BarraEsqueleto2+2*RellenoBarras)
 
-// filaEsqueleto coloca el círculo y las dos barras de una fila del esqueleto:
-// `flex items-center gap-3 px-3 py-2`, y las barras en una columna `flex-1`.
-type filaEsqueleto struct{ Anchos [2]float32 }
-
-var _ fyne.Layout = (*filaEsqueleto)(nil)
-
-func (f *filaEsqueleto) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(2*ui.MargenFila+LadoEsqueleto, AltoFilaEsqueleto)
-}
-
-func (f *filaEsqueleto) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	if len(objs) < 3 {
-		return
-	}
-	x := ui.MargenFila
-	objs[0].Move(fyne.NewPos(x, (t.Height-LadoEsqueleto)/2))
-	objs[0].Resize(fyne.NewSize(LadoEsqueleto, LadoEsqueleto))
-	x += LadoEsqueleto + ui.HuecoFila
-	util := max(t.Width-ui.MargenFila-x, 0)
-	y := (t.Height - (BarraEsqueleto1 + HuecoBarras + BarraEsqueleto2)) / 2
-	objs[1].Move(fyne.NewPos(x, y))
-	objs[1].Resize(fyne.NewSize(util*f.Anchos[0], BarraEsqueleto1))
-	objs[2].Move(fyne.NewPos(x, y+BarraEsqueleto1+HuecoBarras))
-	objs[2].Resize(fyne.NewSize(util*f.Anchos[1], BarraEsqueleto2))
-}
-
 // textosDeEstado es la copia de los estados de la LISTA. El error lleva el aviso de
 // 40 de la web (`<Icon name="warning" size={40} />`) en lugar de ilustración.
-func (p *Pantalla) textosDeEstado() agenda.Textos {
+func (p *Pantalla) textosDeEstado() ui.TextosEstado {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	aviso := iconos.Trazo(iconos.Aviso, 40, "text-subtle", v).Objeto()
 	switch p.Estado {
-	case agenda.Error:
-		return agenda.Textos{
+	case ui.EstadoError:
+		return ui.TextosEstado{
 			Titulo:       p.t("list.errorTitle", nil),
 			Descripcion:  p.t("list.errorDescription", nil),
 			RotuloAccion: p.t("common.retry", nil),
 			Accion:       p.AlReintentar,
 			Ilustracion:  aviso,
 		}
-	case agenda.SinConexion:
-		return agenda.Textos{
+	case ui.EstadoSinConexion:
+		return ui.TextosEstado{
 			Titulo:       p.t("list.errorTitle", nil),
 			Descripcion:  p.t("list.errorDescription", nil),
 			RotuloAccion: p.t("common.retry", nil),
 			Ilustracion:  aviso,
 		}
-	case agenda.SinPermiso:
-		return agenda.Textos{
+	case ui.EstadoSinPermiso:
+		return ui.TextosEstado{
 			Titulo:      p.t("nav.booksError", nil),
 			Descripcion: p.t("list.errorDescription", nil),
 			Ilustracion: aviso,
 		}
-	case agenda.Exito, agenda.Cargando, agenda.Vacia:
+	case ui.EstadoExito, ui.EstadoCargando, ui.EstadoVacia:
 	}
-	return agenda.Textos{}
+	return ui.TextosEstado{}
 }
 
 // textosDeVacio es el vacío de la lista, y cada filtro explica LO SUYO y ofrece su
 // salida. No es cosmética: en «Destacados» sin destacados se leía «tu libreta está
 // vacía» —con la libreta llena— y el único botón creaba un contacto que tampoco iba a
 // salir ahí.
-func (p *Pantalla) textosDeVacio() agenda.Textos {
+func (p *Pantalla) textosDeVacio() ui.TextosEstado {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	ilustracion := iconos.VacioContactos
 	if p.Busqueda != "" {
 		ilustracion = iconos.VacioBusqueda
 	}
-	t := agenda.Textos{
+	t := ui.TextosEstado{
 		Titulo:      p.t("list.emptyTitle", nil),
 		Ilustracion: iconos.Pintar(ilustracion, v).Objeto(),
 	}

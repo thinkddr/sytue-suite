@@ -17,7 +17,12 @@ import (
 // clúster en dev local). Registra las acciones en el log y considera todo listo,
 // permitiendo recorrer el flujo deploy → ready end-to-end. En producción se
 // sustituye por la implementación con client-go contra Kapsule.
-type StubPlatform struct{}
+type StubPlatform struct {
+	// DomainChecks fija, por hostname, el resultado de VerifyDomain. Sin entrada
+	// (lo normal en dev) el dominio se autoverifica con motivo `ok`: así se recorre
+	// el flujo entero sin DNS, y los tests pueden ensayar cada motivo.
+	DomainChecks map[string]domain.DomainCheck
+}
 
 // NewStubPlatform construye una StubPlatform.
 func NewStubPlatform() *StubPlatform { return &StubPlatform{} }
@@ -39,10 +44,13 @@ func (StubPlatform) RetireApp(ctx context.Context, namespace, deploymentID strin
 	return nil
 }
 
-func (StubPlatform) VerifyDomain(ctx context.Context, hostname, token, ingressTarget string) (bool, error) {
+func (p StubPlatform) VerifyDomain(ctx context.Context, hostname, _, ingressTarget string) (domain.DomainCheck, error) {
+	if c, ok := p.DomainChecks[hostname]; ok {
+		return c, nil
+	}
 	log.From(ctx).Info("stub-platform: verificar dominio (dev, autoverificado)",
 		"hostname", hostname, "target", ingressTarget)
-	return true, nil
+	return domain.DomainCheck{Verified: true, Reason: domain.DomainCheckOK}, nil
 }
 
 func (StubPlatform) EnsureTLS(ctx context.Context, req TLSRequest) (bool, error) {

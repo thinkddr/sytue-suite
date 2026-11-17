@@ -15,21 +15,27 @@ import (
 )
 
 type MatrixNativeStart struct {
-	Product      string `json:"product"`
-	AuthorizeURL string `json:"authorize_url"`
-	State        string `json:"state"`
+	Purpose          string                  `json:"purpose,omitempty"`
+	ResourceApproved bool                    `json:"resource_approved"`
+	NativeConsumer   string                  `json:"native_consumer,omitempty"`
+	IdentityVersion  storage.IdentityVersion `json:"identity_version,omitempty"`
+	Product          string                  `json:"product"`
+	Tenant           string                  `json:"tenant"`
+	AuthorizeURL     string                  `json:"authorize_url"`
+	State            string                  `json:"state"`
 }
 type MatrixNativePreview struct {
 	MatrixNativeStart
 	Actor         string `json:"actor"`
-	Tenant        string `json:"tenant"`
 	HomeserverURL string `json:"homeserver_url"`
 	SSOProviderID string `json:"sso_provider_id"`
 }
 type MatrixNativeAccepted struct {
-	Product     string `json:"product"`
-	Ticket      string `json:"ticket"`
-	RedirectURL string `json:"redirect_url"`
+	NativeConsumer  string                  `json:"native_consumer,omitempty"`
+	IdentityVersion storage.IdentityVersion `json:"identity_version,omitempty"`
+	Product         string                  `json:"product"`
+	Ticket          string                  `json:"ticket"`
+	RedirectURL     string                  `json:"redirect_url"`
 }
 
 func matrixOpaque(value string) bool {
@@ -68,6 +74,21 @@ func (s *Service) matrixNativeActor(ctx context.Context, actor string) error {
 	return s.pstore.MatrixActorAllowed(ctx, actor)
 }
 
+func (s *Service) matrixNativeConsentContext(ctx context.Context, actor, state string) (context.Context, error) {
+	if s.pstore == nil || s.matrix == nil {
+		return nil, domain.ErrMatrixUnavailable
+	}
+	tenant, err := s.pstore.MatrixNativeConsentTenant(ctx, actor, state)
+	if err != nil {
+		return nil, err
+	}
+	selected := tenancy.Into(ctx, tenant)
+	if err := s.matrixNativeActor(selected, actor); err != nil {
+		return nil, err
+	}
+	return selected, nil
+}
+
 func (s *Service) matrixNativePublicURL(path, state string) (string, error) {
 	base, err := url.Parse(s.cfg.PublicURL)
 	if err != nil || base.Scheme != "https" || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
@@ -80,19 +101,28 @@ func (s *Service) matrixNativePublicURL(path, state string) (string, error) {
 }
 
 func (s *Service) StartMatrixNative(ctx context.Context, actor, challenge, method, product string) (MatrixNativeStart, error) {
+	return s.StartMatrixNativeForIdentity(ctx, actor, challenge, method, product, storage.LegacyIdentity)
+}
+
+func (s *Service) StartMatrixNativeForIdentity(ctx context.Context, actor, challenge, method, product string, version storage.IdentityVersion) (MatrixNativeStart, error) {
+	return s.StartMatrixNativeForConsumer(ctx, actor, challenge, method, product, "", version)
+}
+
+func (s *Service) StartMatrixNativeForConsumer(ctx context.Context, actor, challenge, method, product, consumer string, version storage.IdentityVersion) (MatrixNativeStart, error) {
+	version = version.Normalized()
 	if product == "" {
 		product = "rooms"
 	}
-	if method != "S256" || !matrixOpaque(challenge) || storage.NativeApp(product) == "" {
+	if !version.Valid() || method != "S256" || !matrixOpaque(challenge) || storage.NativeReturnApp(product, consumer) == "" {
 		return MatrixNativeStart{}, domain.ErrInvalidInput
 	}
 	if err := s.matrixNativeActor(ctx, actor); err != nil {
 		return MatrixNativeStart{}, err
 	}
-	if _, err := s.matrix.EnsureUser(ctx, actor); err != nil {
+	if _, err := s.matrixStorageIdentity(ctx, storage.Scope{Tenant: tenancy.MustFrom(ctx).Slug, Subject: actor, Product: product}, version); err != nil {
 		return MatrixNativeStart{}, err
 	}
-	state, err := s.pstore.CreateMatrixNativeConsentFor(ctx, actor, challenge, product)
+	state, err := s.pstore.CreateMatrixNativeConsentForConsumer(ctx, actor, challenge, product, consumer, version)
 	if err != nil {
 		return MatrixNativeStart{}, err
 	}
@@ -100,17 +130,18 @@ func (s *Service) StartMatrixNative(ctx context.Context, actor, challenge, metho
 	if err != nil {
 		return MatrixNativeStart{}, err
 	}
-	return MatrixNativeStart{AuthorizeURL: target, State: state, Product: product}, nil
+	return MatrixNativeStart{NativeConsumer: consumer, AuthorizeURL: target, State: state, Product: product, IdentityVersion: version, Tenant: tenancy.MustFrom(ctx).Slug}, nil
 }
 
 func (s *Service) PreviewMatrixNative(ctx context.Context, actor, state string) (MatrixNativePreview, error) {
 	if !matrixOpaque(state) {
 		return MatrixNativePreview{}, domain.ErrInvalidInput
 	}
-	if err := s.matrixNativeActor(ctx, actor); err != nil {
+	ctx, err := s.matrixNativeConsentContext(ctx, actor, state)
+	if err != nil {
 		return MatrixNativePreview{}, err
 	}
-	product, err := s.pstore.PreviewMatrixNativeProduct(ctx, actor, state)
+	destination, err := s.pstore.PreviewMatrixNativeDestination(ctx, actor, state)
 	if err != nil {
 		return MatrixNativePreview{}, err
 	}
@@ -122,31 +153,59 @@ func (s *Service) PreviewMatrixNative(ctx context.Context, actor, state string) 
 	if err != nil || authorize.Scheme != "https" || authorize.Host != s.cfg.MatrixServerName || authorize.User != nil || authorize.RawQuery != "" || authorize.Fragment != "" {
 		return MatrixNativePreview{}, domain.ErrMatrixUnavailable
 	}
-	authorize.Path = "/_matrix/client/v3/login/sso/redirect/" + s.cfg.MatrixSSOProviderID
-	authorize.RawQuery = url.Values{"redirectUrl": {callback}}.Encode()
-	return MatrixNativePreview{MatrixNativeStart: MatrixNativeStart{Product: product, AuthorizeURL: authorize.String(), State: state}, Actor: actor, Tenant: tenancy.MustFrom(ctx).Slug, HomeserverURL: s.cfg.MatrixHomeserverURL, SSOProviderID: s.cfg.MatrixSSOProviderID}, nil
+	provider := s.cfg.MatrixSSOProviderID
+	if destination.IdentityVersion == storage.IsolatedIdentity {
+		provider, err = s.matrix.StorageSSOProviderID(destination.Product)
+		if err != nil {
+			return MatrixNativePreview{}, err
+		}
+	}
+	authorize.Path = "/_matrix/client/v3/login/sso/redirect/" + provider
+	query := url.Values{"redirectUrl": {callback}}
+	if destination.IdentityVersion == storage.IsolatedIdentity {
+		query.Set("sytue_tenant", tenancy.MustFrom(ctx).Slug)
+		query.Set("sytue_subject", actor)
+	}
+	authorize.RawQuery = query.Encode()
+	return MatrixNativePreview{MatrixNativeStart: MatrixNativeStart{Purpose: destination.Purpose, ResourceApproved: destination.ResourceApproved, NativeConsumer: destination.NativeConsumer, Product: destination.Product, IdentityVersion: destination.IdentityVersion, AuthorizeURL: authorize.String(), State: state, Tenant: tenancy.MustFrom(ctx).Slug}, Actor: actor, HomeserverURL: s.cfg.MatrixHomeserverURL, SSOProviderID: provider}, nil
 }
 
 func (s *Service) AcceptMatrixNative(ctx context.Context, actor, state, loginToken string) (MatrixNativeAccepted, error) {
 	if !matrixOpaque(state) || len(loginToken) < 16 || len(loginToken) > 8192 || strings.ContainsAny(loginToken, "\r\n\x00") {
 		return MatrixNativeAccepted{}, domain.ErrInvalidInput
 	}
-	if err := s.matrixNativeActor(ctx, actor); err != nil {
-		return MatrixNativeAccepted{}, err
-	}
-	ticket, product, err := s.pstore.AcceptMatrixNativeConsentWithProduct(ctx, actor, state, loginToken)
+	ctx, err := s.matrixNativeConsentContext(ctx, actor, state)
 	if err != nil {
 		return MatrixNativeAccepted{}, err
 	}
-	native := storage.NativeApp(product)
+	ticket, destination, err := s.pstore.AcceptMatrixNativeConsentWithDestination(ctx, actor, state, loginToken)
+	if err != nil {
+		return MatrixNativeAccepted{}, err
+	}
+	native := storage.NativeReturnApp(destination.Product, destination.NativeConsumer)
 	if native == "" {
 		return MatrixNativeAccepted{}, domain.ErrForbidden
 	}
 	target := url.URL{Scheme: "sytue-" + native, Host: "matrix", Path: "/callback", RawQuery: url.Values{"state": {state}, "ticket": {ticket}}.Encode()}
-	return MatrixNativeAccepted{Product: product, Ticket: ticket, RedirectURL: target.String()}, nil
+	return MatrixNativeAccepted{NativeConsumer: destination.NativeConsumer, Product: destination.Product, IdentityVersion: destination.IdentityVersion, Ticket: ticket, RedirectURL: target.String()}, nil
 }
 
 func (s *Service) FinishMatrixNative(ctx context.Context, actor, state, ticket, verifier string) (string, error) {
+	return s.FinishMatrixNativeForIdentity(ctx, actor, state, ticket, verifier, "", storage.LegacyIdentity)
+}
+
+func (s *Service) FinishMatrixNativeForIdentity(ctx context.Context, actor, state, ticket, verifier, product string, version storage.IdentityVersion) (string, error) {
+	return s.FinishMatrixNativeForConsumer(ctx, actor, state, ticket, verifier, product, "", version)
+}
+
+func (s *Service) FinishMatrixNativeForConsumer(ctx context.Context, actor, state, ticket, verifier, product, consumer string, version storage.IdentityVersion) (string, error) {
+	if consumer != "" && storage.NativeReturnApp(product, consumer) == "" {
+		return "", domain.ErrInvalidInput
+	}
+	version = version.Normalized()
+	if !version.Valid() {
+		return "", domain.ErrInvalidInput
+	}
 	if !matrixOpaque(state) || !matrixOpaque(ticket) {
 		return "", domain.ErrInvalidInput
 	}
@@ -154,8 +213,9 @@ func (s *Service) FinishMatrixNative(ctx context.Context, actor, state, ticket, 
 	if err != nil {
 		return "", err
 	}
-	if err := s.matrixNativeActor(ctx, actor); err != nil {
+	ctx, err = s.matrixNativeConsentContext(ctx, actor, state)
+	if err != nil {
 		return "", err
 	}
-	return s.pstore.FinishMatrixNativeConsent(ctx, actor, state, ticket, challenge)
+	return s.pstore.FinishMatrixNativeConsentForConsumer(ctx, actor, state, ticket, challenge, product, consumer, version)
 }

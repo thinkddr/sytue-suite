@@ -59,7 +59,7 @@ func sealCache(ctx context.Context, root *os.Root, secrets CacheSecrets) (ficher
 	if secrets == nil {
 		return ficheros{}, ErrCacheKey
 	}
-	lock, err := openRootLockFile(root, cacheKeyLock)
+	lock, err := ajustes.AbrirCreandoEnRaiz(root, cacheKeyLock, os.O_RDWR, 0o600)
 	if err != nil {
 		return ficheros{}, err
 	}
@@ -81,16 +81,15 @@ func sealCache(ctx context.Context, root *os.Root, secrets CacheSecrets) (ficher
 		return ficheros{}, err
 	}
 	name := "offline-cache-" + cacheID
+	if _, system := secrets.(systemSecrets); system && !newCache {
+		secrets = boundCacheSecrets{CacheSecrets: secrets, root: root, cacheID: cacheID, ctx: ctx}
+	}
 	key, err := loadCacheKey(secrets, name, newCache)
 	if err != nil {
 		return ficheros{}, err
 	}
 	defer clear(key.Key)
-	block, err := aes.NewCipher(key.Key)
-	if err != nil {
-		return ficheros{}, ErrCacheKey
-	}
-	aead, err := cipher.NewGCMWithRandomNonce(block)
+	aead, err := cacheCipher(key.Key)
 	if err != nil {
 		return ficheros{}, err
 	}
@@ -125,11 +124,15 @@ func cacheIdentity(root *os.Root) (string, bool, error) {
 		return "", false, err
 	}
 	id := strings.TrimPrefix(string(marker), cacheMagic)
-	invalid := func(c rune) bool { return (c < 'A' || c > 'Z') && (c < '2' || c > '7') }
-	if !bytes.HasPrefix(marker, []byte(cacheMagic)) || len(id) < 26 || len(id) > 64 || strings.IndexFunc(id, invalid) >= 0 {
+	if !bytes.HasPrefix(marker, []byte(cacheMagic)) || !validCacheIdentity(id) {
 		return "", false, ErrCacheKey
 	}
 	return id, false, nil
+}
+
+func validCacheIdentity(id string) bool {
+	invalid := func(c rune) bool { return (c < 'A' || c > 'Z') && (c < '2' || c > '7') }
+	return len(id) >= 26 && len(id) <= 64 && strings.IndexFunc(id, invalid) < 0
 }
 
 func rejectOrphanedCiphertext(root *os.Root) error {
@@ -160,12 +163,7 @@ func loadCacheKey(secrets CacheSecrets, name string, newCache bool) (cacheKey, e
 	}
 	defer clear(raw)
 	if len(raw) != 0 {
-		var key cacheKey
-		if json.Unmarshal(raw, &key) != nil || key.Version != 1 || len(key.Key) != 32 {
-			clear(key.Key)
-			return cacheKey{}, ErrCacheKey
-		}
-		return key, nil
+		return decodeCacheKey(raw)
 	}
 	if !newCache {
 		return cacheKey{}, ErrCacheKey
@@ -182,6 +180,15 @@ func loadCacheKey(secrets CacheSecrets, name string, newCache bool) (cacheKey, e
 	return key, nil
 }
 
+func decodeCacheKey(raw []byte) (cacheKey, error) {
+	var key cacheKey
+	if json.Unmarshal(raw, &key) != nil || key.Version != 1 || len(key.Key) != 32 {
+		clear(key.Key)
+		return cacheKey{}, ErrCacheKey
+	}
+	return key, nil
+}
+
 func saveCacheKey(secrets CacheSecrets, name string, key cacheKey) error {
 	raw, err := json.Marshal(key)
 	if err != nil {
@@ -192,6 +199,14 @@ func saveCacheKey(secrets CacheSecrets, name string, key cacheKey) error {
 		return ErrCacheKey
 	}
 	return nil
+}
+
+func cacheCipher(key []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, ErrCacheKey
+	}
+	return cipher.NewGCMWithRandomNonce(block)
 }
 
 func (f ficheros) sealRecord(key string, data []byte) ([]byte, error) {
@@ -220,7 +235,9 @@ func (f ficheros) storedSize(size int64) int64 {
 	return size + int64(len(cacheMagic)+f.sealed.NonceSize()+f.sealed.Overhead())
 }
 
-func (f ficheros) migrateCache(ctx context.Context) error {
+func (f ficheros) migrateCache(ctx context.Context) error { return f.checkCache(ctx, true) }
+
+func (f ficheros) checkCache(ctx context.Context, allowPlain bool) error {
 	return fs.WalkDir(f.raiz.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -228,7 +245,7 @@ func (f ficheros) migrateCache(ctx context.Context) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return f.migrateCacheFile(name, entry)
+		return f.migrateCacheFile(name, entry, allowPlain)
 	})
 }
 
@@ -245,7 +262,7 @@ func cacheTemporary(entry fs.DirEntry) (string, bool) {
 	return base, err == nil
 }
 
-func (f ficheros) migrateCacheFile(name string, entry fs.DirEntry) error {
+func (f ficheros) migrateCacheFile(name string, entry fs.DirEntry, allowPlain bool) error {
 	base, temporary := cacheTemporary(entry)
 	if entry.IsDir() || !strings.HasSuffix(name, ".json") && !temporary {
 		return nil
@@ -263,6 +280,9 @@ func (f ficheros) migrateCacheFile(name string, entry fs.DirEntry) error {
 		plain, err := f.openRecord(key, data)
 		clear(plain)
 		return err
+	}
+	if !allowPlain {
+		return ErrCacheCiphertext
 	}
 	// Preserve even a damaged legacy record byte-for-byte. Orphan temporaries can
 	// be the only copy of an interrupted draft and must not be deleted as garbage.

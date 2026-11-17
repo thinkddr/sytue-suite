@@ -17,7 +17,7 @@
  * el SERVIDOR (`src/middleware.ts`); aquí solo se lee, nunca se detecta.
  */
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { Illustration, Button, EmptyState, Icon, Input, Skeleton } from '@sytue/ui';
+import { Button, EmptyState, Input, SkeletonRows } from '@sytue/ui';
 import { formatDateTime, formatTimeAgo } from '@sytue/i18n';
 import { useI18n } from '@sytue/i18n/preact';
 import { useT } from '../i18n';
@@ -105,20 +105,18 @@ export function DocumentsView() {
 
       <div class="min-h-0 flex-1 overflow-y-auto">
         {items === null && !error ? (
-          <ul class="px-3 pb-6" aria-hidden="true">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <li key={i} class="border-border/60 flex items-center gap-3 border-b px-3 py-2">
-                <Skeleton class="h-9 w-9 rounded-md" />
-                <Skeleton class="h-4 w-1/3" />
-              </li>
-            ))}
-          </ul>
+          <SkeletonRows
+            class="px-3 pb-6"
+            rows={5}
+            lead="tile"
+            rowClass="border-border/60 border-b"
+          />
         ) : error ? (
           <div class="grid h-full place-items-center p-6">
             <EmptyState
               title={t(error === 'session' ? 'files.error.sessionTitle' : 'docs.errorTitle')}
               description={t(error === 'session' ? 'docs.sessionBody' : 'docs.errorBody')}
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'session' ? (
                   <Button size="sm" onClick={() => location.reload()}>
@@ -137,7 +135,7 @@ export function DocumentsView() {
             <EmptyState
               title={t(q ? 'docs.emptyQueryTitle' : 'docs.emptyTitle')}
               description={t(q ? 'docs.emptyQueryBody' : 'docs.emptyBody')}
-              illustration={<Illustration name="emptyDrive" />}
+              spot="emptyDrive"
             />
           </div>
         ) : (

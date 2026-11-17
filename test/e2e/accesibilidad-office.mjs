@@ -245,7 +245,9 @@ async function esperarEditor(page, producto) {
   if (producto.kind === 'pdf') {
     // El visor entero (cinta y hojas), no el esqueleto de «Abriendo el documento…».
     await page.waitForSelector('[role="tablist"]', { timeout: 60000 });
-    await page.waitForSelector('[data-pagina]', { timeout: 60000 });
+    // `data-pagina` lo llevan también las miniaturas del panel de páginas, que en móvil está
+    // cerrado: la primera coincidencia en el DOM puede ser una oculta. Se espera a una VISIBLE.
+    await page.waitForSelector('[data-pagina]:visible', { timeout: 60000 });
     await page.waitForTimeout(600);
     return;
   }

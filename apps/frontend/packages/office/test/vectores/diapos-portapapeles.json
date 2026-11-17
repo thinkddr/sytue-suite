@@ -1,0 +1,4770 @@
+{
+  "origen": {
+    "boxes": [
+      {
+        "id": "t",
+        "x": 10,
+        "y": 10,
+        "w": 20,
+        "h": 10,
+        "html": "<h1>Título &amp; <b>más</b></h1>"
+      },
+      {
+        "id": "ga",
+        "x": 30,
+        "y": 40,
+        "w": 20,
+        "h": 10,
+        "html": "",
+        "kind": "shape",
+        "shape": "rect",
+        "fill": "#112233",
+        "groupId": "g",
+        "anims": [
+          {
+            "type": "fade",
+            "order": 2,
+            "trigger": "after"
+          }
+        ]
+      },
+      {
+        "id": "gb",
+        "x": 55,
+        "y": 40,
+        "w": 20,
+        "h": 10,
+        "html": "",
+        "kind": "shape",
+        "shape": "ellipse",
+        "groupId": "g"
+      },
+      {
+        "id": "img",
+        "x": 80,
+        "y": 90,
+        "w": 20,
+        "h": 10,
+        "html": "",
+        "kind": "image",
+        "src": "data:image/png;base64,AAAA",
+        "anims": [
+          {
+            "type": "motion-custom",
+            "order": 1,
+            "points": [
+              {
+                "dx": 3,
+                "dy": -2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "viejo",
+        "x": 5,
+        "y": 70,
+        "w": 20,
+        "h": 10,
+        "html": "<p>viejo</p>",
+        "anim": {
+          "type": "zoom",
+          "order": 3
+        }
+      }
+    ],
+    "connectors": [
+      {
+        "id": "k1",
+        "kind": "elbow",
+        "from": {
+          "boxId": "ga"
+        },
+        "to": {
+          "boxId": "gb"
+        },
+        "endArrow": true,
+        "stroke": "#aa0000"
+      },
+      {
+        "id": "k2",
+        "kind": "curved",
+        "from": {
+          "boxId": "ga",
+          "anchor": "top"
+        },
+        "to": {
+          "x": 90,
+          "y": 5
+        }
+      },
+      {
+        "id": "k3",
+        "kind": "straight",
+        "from": {
+          "boxId": "gb"
+        },
+        "to": {
+          "boxId": "t"
+        }
+      },
+      {
+        "id": "k4",
+        "kind": "straight",
+        "from": {
+          "x": 5,
+          "y": 5
+        },
+        "to": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    ]
+  },
+  "pegados": [
+    {
+      "nombre": "grupo con sus conectores internos → la misma diapositiva",
+      "ids": ["gb", "ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n2",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 4,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n3",
+            "x": 57,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n2"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n4",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n1"
+            },
+            "to": {
+              "boxId": "n3"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n5",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 92,
+              "y": 7
+            }
+          }
+        ],
+        "ids": ["n1", "n3"]
+      }
+    },
+    {
+      "nombre": "grupo con sus conectores internos → otra diapositiva con animaciones",
+      "ids": ["gb", "ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n2",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n3",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n2"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n4",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n1"
+            },
+            "to": {
+              "boxId": "n3"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n5",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          }
+        ],
+        "ids": ["n1", "n3"]
+      }
+    },
+    {
+      "nombre": "grupo con sus conectores internos → una diapositiva vacía",
+      "ids": ["gb", "ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n2",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 1,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n3",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n2"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "n4",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n1"
+            },
+            "to": {
+              "boxId": "n3"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n5",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          }
+        ],
+        "ids": ["n1", "n3"]
+      }
+    },
+    {
+      "nombre": "grupo con sus conectores internos → tras un pegado anterior",
+      "ids": ["gb", "ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          },
+          {
+            "id": "n1",
+            "x": 34,
+            "y": 44,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n2",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 4,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n3",
+            "x": 59,
+            "y": 44,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n2"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n4",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n1"
+            },
+            "to": {
+              "boxId": "n3"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n5",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 94,
+              "y": 9
+            }
+          }
+        ],
+        "ids": ["n1", "n3"]
+      }
+    },
+    {
+      "nombre": "grupo con sus conectores internos → el patrón (sin conectores)",
+      "ids": ["gb", "ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": false,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n2",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 1,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n3",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n2"
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1", "n3"]
+      }
+    },
+    {
+      "nombre": "todo → la misma diapositiva",
+      "ids": ["t", "ga", "gb", "img", "viejo"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"},{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}},{\"id\":\"k3\",\"kind\":\"straight\",\"from\":{\"boxId\":\"gb\"},\"to\":{\"boxId\":\"t\"}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n3",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 5,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n4",
+            "x": 57,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n3"
+          },
+          {
+            "id": "n5",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 4,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "n6",
+            "x": 7,
+            "y": 72,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 6
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n7",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n2"
+            },
+            "to": {
+              "boxId": "n4"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n8",
+            "kind": "curved",
+            "from": {
+              "boxId": "n2",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 92,
+              "y": 7
+            }
+          },
+          {
+            "id": "n9",
+            "kind": "straight",
+            "from": {
+              "boxId": "n4"
+            },
+            "to": {
+              "boxId": "n1"
+            }
+          }
+        ],
+        "ids": ["n1", "n2", "n4", "n5", "n6"]
+      }
+    },
+    {
+      "nombre": "todo → otra diapositiva con animaciones",
+      "ids": ["t", "ga", "gb", "img", "viejo"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"},{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}},{\"id\":\"k3\",\"kind\":\"straight\",\"from\":{\"boxId\":\"gb\"},\"to\":{\"boxId\":\"t\"}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n3",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 3,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n4",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n3"
+          },
+          {
+            "id": "n5",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 2,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "n6",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 4
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n7",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n2"
+            },
+            "to": {
+              "boxId": "n4"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n8",
+            "kind": "curved",
+            "from": {
+              "boxId": "n2",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "n9",
+            "kind": "straight",
+            "from": {
+              "boxId": "n4"
+            },
+            "to": {
+              "boxId": "n1"
+            }
+          }
+        ],
+        "ids": ["n1", "n2", "n4", "n5", "n6"]
+      }
+    },
+    {
+      "nombre": "todo → una diapositiva vacía",
+      "ids": ["t", "ga", "gb", "img", "viejo"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"},{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}},{\"id\":\"k3\",\"kind\":\"straight\",\"from\":{\"boxId\":\"gb\"},\"to\":{\"boxId\":\"t\"}}]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n3",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n4",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n3"
+          },
+          {
+            "id": "n5",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "n6",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "n7",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n2"
+            },
+            "to": {
+              "boxId": "n4"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n8",
+            "kind": "curved",
+            "from": {
+              "boxId": "n2",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "n9",
+            "kind": "straight",
+            "from": {
+              "boxId": "n4"
+            },
+            "to": {
+              "boxId": "n1"
+            }
+          }
+        ],
+        "ids": ["n1", "n2", "n4", "n5", "n6"]
+      }
+    },
+    {
+      "nombre": "todo → tras un pegado anterior",
+      "ids": ["t", "ga", "gb", "img", "viejo"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"},{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}},{\"id\":\"k3\",\"kind\":\"straight\",\"from\":{\"boxId\":\"gb\"},\"to\":{\"boxId\":\"t\"}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          },
+          {
+            "id": "n1",
+            "x": 14,
+            "y": 14,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 34,
+            "y": 44,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n3",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 5,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n4",
+            "x": 59,
+            "y": 44,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n3"
+          },
+          {
+            "id": "n5",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 4,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "n6",
+            "x": 9,
+            "y": 74,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 6
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n7",
+            "kind": "elbow",
+            "from": {
+              "boxId": "n2"
+            },
+            "to": {
+              "boxId": "n4"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "n8",
+            "kind": "curved",
+            "from": {
+              "boxId": "n2",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 94,
+              "y": 9
+            }
+          },
+          {
+            "id": "n9",
+            "kind": "straight",
+            "from": {
+              "boxId": "n4"
+            },
+            "to": {
+              "boxId": "n1"
+            }
+          }
+        ],
+        "ids": ["n1", "n2", "n4", "n5", "n6"]
+      }
+    },
+    {
+      "nombre": "todo → el patrón (sin conectores)",
+      "ids": ["t", "ga", "gb", "img", "viejo"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]},{\"id\":\"gb\",\"x\":55,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"ellipse\",\"groupId\":\"g\"},{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[{\"id\":\"k1\",\"kind\":\"elbow\",\"from\":{\"boxId\":\"ga\"},\"to\":{\"boxId\":\"gb\"},\"endArrow\":true,\"stroke\":\"#aa0000\"},{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}},{\"id\":\"k3\",\"kind\":\"straight\",\"from\":{\"boxId\":\"gb\"},\"to\":{\"boxId\":\"t\"}}]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": false,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "n3",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "n4",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "n3"
+          },
+          {
+            "id": "n5",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "n6",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1", "n2", "n4", "n5", "n6"]
+      }
+    },
+    {
+      "nombre": "una caja de un grupo → la misma diapositiva",
+      "ids": ["ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]}],\"connectors\":[{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 4,
+                "trigger": "after"
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n3",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 92,
+              "y": 7
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "una caja de un grupo → otra diapositiva con animaciones",
+      "ids": ["ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]}],\"connectors\":[{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n3",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "una caja de un grupo → una diapositiva vacía",
+      "ids": ["ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]}],\"connectors\":[{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 1,
+                "trigger": "after"
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "n3",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "una caja de un grupo → tras un pegado anterior",
+      "ids": ["ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]}],\"connectors\":[{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          },
+          {
+            "id": "n1",
+            "x": 34,
+            "y": 44,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 4,
+                "trigger": "after"
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          },
+          {
+            "id": "n3",
+            "kind": "curved",
+            "from": {
+              "boxId": "n1",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 94,
+              "y": 9
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "una caja de un grupo → el patrón (sin conectores)",
+      "ids": ["ga"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"ga\",\"x\":30,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\",\"fill\":\"#112233\",\"groupId\":\"g\",\"anims\":[{\"type\":\"fade\",\"order\":2,\"trigger\":\"after\"}]}],\"connectors\":[{\"id\":\"k2\",\"kind\":\"curved\",\"from\":{\"boxId\":\"ga\",\"anchor\":\"top\"},\"to\":{\"x\":90,\"y\":5}}]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": false,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 1,
+                "trigger": "after"
+              }
+            ]
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "imagen en el borde con trayectoria → la misma diapositiva",
+      "ids": ["img"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 4,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "imagen en el borde con trayectoria → otra diapositiva con animaciones",
+      "ids": ["img"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 2,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "imagen en el borde con trayectoria → una diapositiva vacía",
+      "ids": ["img"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "imagen en el borde con trayectoria → tras un pegado anterior",
+      "ids": ["img"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          },
+          {
+            "id": "n1",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 4,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "imagen en el borde con trayectoria → el patrón (sin conectores)",
+      "ids": ["img"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"img\",\"x\":80,\"y\":90,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"image\",\"src\":\"data:image/png;base64,AAAA\",\"anims\":[{\"type\":\"motion-custom\",\"order\":1,\"points\":[{\"dx\":3,\"dy\":-2}]}]}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": false,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1"]
+      }
+    },
+    {
+      "nombre": "animación del modelo viejo → la misma diapositiva",
+      "ids": ["viejo", "t"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 7,
+            "y": 72,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 4
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ],
+        "ids": ["n1", "n2"]
+      }
+    },
+    {
+      "nombre": "animación del modelo viejo → otra diapositiva con animaciones",
+      "ids": ["viejo", "t"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "z",
+            "x": 50,
+            "y": 50,
+            "w": 20,
+            "h": 10,
+            "html": "<p>z</p>",
+            "anims": [
+              {
+                "type": "appear",
+                "order": 1
+              }
+            ]
+          },
+          {
+            "id": "n1",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 2
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "kz",
+            "kind": "straight",
+            "from": {
+              "boxId": "z"
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ],
+        "ids": ["n1", "n2"]
+      }
+    },
+    {
+      "nombre": "animación del modelo viejo → una diapositiva vacía",
+      "ids": ["viejo", "t"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1", "n2"]
+      }
+    },
+    {
+      "nombre": "animación del modelo viejo → tras un pegado anterior",
+      "ids": ["viejo", "t"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 3,
+                    "dy": -2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anim": {
+              "type": "zoom",
+              "order": 3
+            }
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ]
+      },
+      "conConectores": true,
+      "sale": {
+        "boxes": [
+          {
+            "id": "t",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "ga",
+            "x": 30,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect",
+            "fill": "#112233",
+            "groupId": "g",
+            "anims": [
+              {
+                "type": "fade",
+                "order": 2,
+                "trigger": "after"
+              }
+            ]
+          },
+          {
+            "id": "gb",
+            "x": 55,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "ellipse",
+            "groupId": "g"
+          },
+          {
+            "id": "img",
+            "x": 80,
+            "y": 90,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "image",
+            "src": "data:image/png;base64,AAAA",
+            "anims": [
+              {
+                "type": "motion-custom",
+                "order": 1,
+                "points": [
+                  {
+                    "dx": 0,
+                    "dy": 0
+                  },
+                  {
+                    "dx": 25,
+                    "dy": 15
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "viejo",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 3
+              }
+            ]
+          },
+          {
+            "id": "copia",
+            "x": 32,
+            "y": 42,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia</p>"
+          },
+          {
+            "id": "copia2",
+            "x": 12,
+            "y": 12,
+            "w": 20,
+            "h": 10,
+            "html": "<p>copia2</p>"
+          },
+          {
+            "id": "c3",
+            "x": 82,
+            "y": 92,
+            "w": 20,
+            "h": 10,
+            "html": "<p>c3</p>"
+          },
+          {
+            "id": "n1",
+            "x": 14,
+            "y": 14,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 9,
+            "y": 74,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 4
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "id": "k1",
+            "kind": "elbow",
+            "from": {
+              "boxId": "ga"
+            },
+            "to": {
+              "boxId": "gb"
+            },
+            "endArrow": true,
+            "stroke": "#aa0000"
+          },
+          {
+            "id": "k2",
+            "kind": "curved",
+            "from": {
+              "boxId": "ga",
+              "anchor": "top"
+            },
+            "to": {
+              "x": 90,
+              "y": 5
+            }
+          },
+          {
+            "id": "k3",
+            "kind": "straight",
+            "from": {
+              "boxId": "gb"
+            },
+            "to": {
+              "boxId": "t"
+            }
+          },
+          {
+            "id": "k4",
+            "kind": "straight",
+            "from": {
+              "x": 5,
+              "y": 5
+            },
+            "to": {
+              "x": 50,
+              "y": 50
+            }
+          }
+        ],
+        "ids": ["n1", "n2"]
+      }
+    },
+    {
+      "nombre": "animación del modelo viejo → el patrón (sin conectores)",
+      "ids": ["viejo", "t"],
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"t\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<h1>Título &amp; <b>más</b></h1>\"},{\"id\":\"viejo\",\"x\":5,\"y\":70,\"w\":20,\"h\":10,\"html\":\"<p>viejo</p>\",\"anim\":{\"type\":\"zoom\",\"order\":3}}],\"connectors\":[]}",
+      "destino": {
+        "boxes": [],
+        "connectors": []
+      },
+      "conConectores": false,
+      "sale": {
+        "boxes": [
+          {
+            "id": "n1",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<h1>Título &amp; <b>más</b></h1>"
+          },
+          {
+            "id": "n2",
+            "x": 5,
+            "y": 70,
+            "w": 20,
+            "h": 10,
+            "html": "<p>viejo</p>",
+            "anims": [
+              {
+                "type": "zoom",
+                "order": 1
+              }
+            ]
+          }
+        ],
+        "connectors": [],
+        "ids": ["n1", "n2"]
+      }
+    }
+  ],
+  "lecturas": [
+    {
+      "nombre": "texto ajeno",
+      "texto": "hola",
+      "sale": null
+    },
+    {
+      "nombre": "sin prefijo",
+      "texto": "{\"boxes\":[]}",
+      "sale": null
+    },
+    {
+      "nombre": "otra versión",
+      "texto": "sytue-diapos-cajas/2:{\"boxes\":[]}",
+      "sale": null
+    },
+    {
+      "nombre": "JSON roto",
+      "texto": "sytue-diapos-cajas/1:{roto",
+      "sale": null
+    },
+    {
+      "nombre": "sin cajas",
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[]}",
+      "sale": null
+    },
+    {
+      "nombre": "boxes no es una lista",
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":{\"id\":\"a\"}}",
+      "sale": null
+    },
+    {
+      "nombre": "no es un objeto",
+      "texto": "sytue-diapos-cajas/1:[1,2]",
+      "sale": null
+    },
+    {
+      "nombre": "ninguna caja con forma de caja",
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"x\"}]}",
+      "sale": null
+    },
+    {
+      "nombre": "cajas y conectores mezclados con basura",
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"a\",\"x\":10,\"y\":10,\"w\":20,\"h\":10,\"html\":\"<p>a</p>\"},{\"id\":\"mal\",\"x\":\"a\",\"y\":0,\"w\":1,\"h\":1,\"html\":\"\"},{\"id\":\"\",\"x\":0,\"y\":0,\"w\":1,\"h\":1,\"html\":\"\"},{\"id\":\"sinhtml\",\"x\":0,\"y\":0,\"w\":1,\"h\":1},{\"id\":\"nulo\",\"x\":null,\"y\":0,\"w\":1,\"h\":1,\"html\":\"\"},\"cadena\",{\"id\":\"b\",\"x\":40,\"y\":40,\"w\":20,\"h\":10,\"html\":\"\",\"kind\":\"shape\",\"shape\":\"rect\"}],\"connectors\":[{\"id\":\"am\",\"kind\":\"straight\",\"from\":{\"boxId\":\"a\"},\"to\":{\"boxId\":\"mal\"}},{\"kind\":\"zigzag\",\"from\":{\"boxId\":\"a\",\"anchor\":\"auto\"},\"to\":{\"boxId\":\"b\",\"anchor\":\"left\"}},7,{\"id\":\"k\",\"kind\":\"curved\",\"from\":{\"x\":150,\"y\":-3},\"to\":{\"x\":\"a\"},\"startArrow\":\"sí\",\"endArrow\":true,\"stroke\":\"red\"},{\"id\":\"k2\",\"kind\":\"elbow\",\"from\":{},\"to\":{\"boxId\":\"b\"},\"stroke\":\"#A1b2C3\"}]}",
+      "sale": {
+        "boxes": [
+          {
+            "id": "a",
+            "x": 10,
+            "y": 10,
+            "w": 20,
+            "h": 10,
+            "html": "<p>a</p>"
+          },
+          {
+            "id": "b",
+            "x": 40,
+            "y": 40,
+            "w": 20,
+            "h": 10,
+            "html": "",
+            "kind": "shape",
+            "shape": "rect"
+          }
+        ],
+        "connectors": [
+          {
+            "id": "am",
+            "kind": "straight",
+            "from": {
+              "boxId": "a"
+            },
+            "to": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": "c1",
+            "kind": "straight",
+            "from": {
+              "boxId": "a"
+            },
+            "to": {
+              "boxId": "b",
+              "anchor": "left"
+            }
+          },
+          {
+            "id": "k",
+            "kind": "curved",
+            "from": {
+              "x": 100,
+              "y": 0
+            },
+            "to": {
+              "x": 0,
+              "y": 0
+            },
+            "endArrow": true
+          },
+          {
+            "id": "k2",
+            "kind": "elbow",
+            "from": {
+              "x": 0,
+              "y": 0
+            },
+            "to": {
+              "boxId": "b"
+            },
+            "stroke": "#A1b2C3"
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "sin conectores",
+      "texto": "sytue-diapos-cajas/1:{\"boxes\":[{\"id\":\"a\",\"x\":1,\"y\":2,\"w\":3,\"h\":4,\"html\":\"<p>x</p>\"}]}",
+      "sale": {
+        "boxes": [
+          {
+            "id": "a",
+            "x": 1,
+            "y": 2,
+            "w": 3,
+            "h": 4,
+            "html": "<p>x</p>"
+          }
+        ],
+        "connectors": []
+      }
+    }
+  ]
+}

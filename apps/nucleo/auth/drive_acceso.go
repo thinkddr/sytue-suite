@@ -17,12 +17,29 @@ import (
 // IdentidadDrive es un contexto opaco estable. Cambiar un refresh token no cambia
 // este hash; un emisor, cliente, persona u organización diferentes sí lo hacen.
 func (i IdentitySnapshot) IdentidadDrive() string {
-	if i.Issuer == "" || i.Client == "" || i.Subject == "" || i.Organization == "" {
+	if i.Organization == "" {
 		return ""
 	}
-	b, _ := json.Marshal([]string{strings.TrimRight(i.Issuer, "/"), i.Client, i.Subject, i.Organization})
-	sum := sha256.Sum256(b)
+	return i.IdentidadSesion()
+}
+
+// IdentidadSesion is the shared opaque context for device work, independent of
+// whether this user mounted Drive in the operating system.
+func (i IdentitySnapshot) IdentidadSesion() string {
+	raw := i.contextoSesion()
+	if raw == nil {
+		return ""
+	}
+	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
+}
+
+func (i IdentitySnapshot) contextoSesion() []byte {
+	if i.Issuer == "" || i.Client == "" || i.Subject == "" {
+		return nil
+	}
+	raw, _ := json.Marshal([]string{strings.TrimRight(i.Issuer, "/"), i.Client, i.Subject, i.Organization})
+	return raw
 }
 
 func (a *AlmacenSesion) publicarAccesoDrive(t Tokens) error {

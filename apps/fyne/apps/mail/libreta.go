@@ -4,7 +4,11 @@
 package mail
 
 import (
+	"cmp"
 	"context"
+	"errors"
+	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -100,8 +104,8 @@ func AnadirDeLibreta(previo string, elegidos []Sugerencia) string {
 
 // ConLibreta engancha «Elegir de Contactos». `url` es la de Sytue Contacts, para el
 // botón «Abrir Sytue Contacts» de una libreta vacía.
-func (b *Buzon) ConLibreta(l Libreta, url string) *Buzon {
-	b.Libreta, b.URLContactos = l, url
+func (b *Buzon) ConLibreta(l Libreta, direccion string) *Buzon {
+	b.Libreta, b.URLContactos = l, direccion
 	return b
 }
 
@@ -353,4 +357,208 @@ func (r *filaLibretaRenderer) Refresh() {
 	r.fondo.Refresh()
 	r.f.casilla.Refresh()
 	r.Layout(r.f.Size())
+}
+
+// # «Añadir a Contactos» / «Ver en Contactos» desde el remitente (MAIL-12)
+//
+// El menú «Más acciones» del lector guarda al remitente en la libreta por defecto con
+// su nombre y su correo, o abre su ficha si ya estaba. Al abrir un hilo se le pregunta
+// a Contacts si lo tiene; hasta que contesta se ofrece «Añadir», que mira antes de
+// crear y no deja dos fichas. Es `MessageReader.tsx` + `pages/api/contacts.ts` de la
+// web, y estas reglas, las de `lib/contactoRemitente.ts`.
+
+// FichasContactos es lo que hace falta para dar de alta al remitente: buscarlo, la
+// libreta por defecto y crear la ficha. Lo cumple *api.Contacts; un Buscador que no lo
+// cumpla deja sin la entrada.
+type FichasContactos interface {
+	Buscador
+	AddressBooks(ctx context.Context) ([]api.AddressBook, error)
+	Create(ctx context.Context, libreta string, in api.ContactInput) (api.Contact, error)
+}
+
+var _ FichasContactos = (*api.Contacts)(nil)
+
+// limiteFicha es cuántos contactos se miran para encontrar la dirección EXACTA: la
+// búsqueda es por subcadena, y `ana@` también trae a `mariana@`. El del BFF.
+const limiteFicha = 20
+
+var sinRespuesta = map[string]bool{
+	"noreply": true, "donotreply": true, "mailerdaemon": true, "postmaster": true,
+	"bounce": true, "bounces": true,
+}
+
+// EsSinRespuesta dice si es un buzón que no lee (`no-reply@`, `mailer-daemon@`,
+// `bounces+…@`): guardarlo en la libreta solo ensucia el autocompletado de Para.
+func EsSinRespuesta(correo string) bool {
+	c := strings.ToLower(strings.TrimSpace(correo))
+	local, _, _ := strings.Cut(c, "@")
+	base, _, _ := strings.Cut(local, "+")
+	plana := strings.NewReplacer("-", "", "_", "", ".", "").Replace(base)
+	if sinRespuesta[plana] {
+		return true
+	}
+	// `noreply-avisos@`, `no_reply.facturas@`: el mismo buzón con un apellido.
+	return reNoReplyConApellido.MatchString(base)
+}
+
+var reNoReplyConApellido = regexp.MustCompile(`^no[-_.]?reply[-_.]`)
+
+// OfrecerContacto dice si el menú lleva la entrada: no en Spam (sería premiar al que se
+// ha marcado), ni para un `no-reply`, ni para uno mismo —tu respuesta desde Enviados—.
+func OfrecerContacto(correo string, enSpam bool, propias []string) bool {
+	c := strings.ToLower(strings.TrimSpace(correo))
+	if !strings.Contains(c, "@") || enSpam || EsSinRespuesta(c) {
+		return false
+	}
+	return !slices.ContainsFunc(propias, func(p string) bool { return strings.ToLower(strings.TrimSpace(p)) == c })
+}
+
+// ContactoConCorreo es el id del contacto que tiene EXACTAMENTE esa dirección, o "".
+func ContactoConCorreo(cs []api.Contact, correo string) string {
+	c := strings.ToLower(strings.TrimSpace(correo))
+	for _, k := range cs {
+		if k.ID == "" {
+			continue
+		}
+		for _, e := range k.Emails {
+			if strings.ToLower(strings.TrimSpace(e.Email)) == c {
+				return k.ID
+			}
+		}
+	}
+	return ""
+}
+
+// NombreDelContacto es con qué nombre se guarda: el del remitente, o su dirección.
+func NombreDelContacto(nombre, correo string) string {
+	if n := strings.TrimSpace(nombre); n != "" {
+		return n
+	}
+	return strings.TrimSpace(correo)
+}
+
+// fichasContactos es el Buscador si sabe dar de alta, o nil.
+func (b *Buzon) fichasContactos() FichasContactos {
+	f, _ := b.Contactos.(FichasContactos)
+	return f
+}
+
+// direccionesPropias son las del «De» y las de las cuentas externas.
+func (b *Buzon) direccionesPropias() []string {
+	out := b.opcionesDe()
+	for _, d := range b.direccionesDeCuentas() {
+		out = append(out, d)
+	}
+	return out
+}
+
+// ponerContactos engancha la entrada en el triaje, si hay Contacts que la atienda.
+func (b *Buzon) ponerContactos(a *Acciones) {
+	if b.fichasContactos() == nil {
+		return
+	}
+	a.FichaDe = func(correo string) (string, bool) {
+		if !OfrecerContacto(correo, b.enSpam(), b.direccionesPropias()) {
+			return "", false
+		}
+		return b.fichas[strings.ToLower(strings.TrimSpace(correo))], true
+	}
+	a.AnadirAContactos = b.anadirAContactos
+	a.VerEnContactos = b.verEnContactos
+}
+
+// preguntarFicha le pregunta a Contacts, al abrir un hilo, si ya tiene al remitente:
+// con ficha, el menú dice «Ver en Contactos». Sin respuesta, se queda en «Añadir».
+func (b *Buzon) preguntarFicha(c Conversacion) {
+	a := b.P.Acciones
+	correo := remitenteDe(c)
+	clave := strings.ToLower(correo)
+	if a.FichaDe == nil || correo == "" || b.fichas[clave] != "" {
+		return
+	}
+	if _, ofrecer := a.FichaDe(correo); !ofrecer {
+		return
+	}
+	f := b.fichasContactos()
+	pedir(b, func(ctx context.Context) ([]api.Contact, error) {
+		return f.Search(ctx, correo, limiteFicha)
+	}, func(cs []api.Contact, err error) {
+		if id := ContactoConCorreo(cs, correo); err == nil && id != "" {
+			b.guardarFicha(clave, id)
+		}
+	})
+}
+
+func (b *Buzon) guardarFicha(clave, id string) {
+	if b.fichas == nil {
+		b.fichas = map[string]string{}
+	}
+	b.fichas[clave] = id
+}
+
+// anadirAContactos crea la ficha en la libreta por defecto, salvo que la dirección ya
+// estuviera, y avisa con «Ver». Una segunda pulsación mientras va la primera no hace nada.
+func (b *Buzon) anadirAContactos(nombre, correo string) {
+	f := b.fichasContactos()
+	clave := strings.ToLower(strings.TrimSpace(correo))
+	if f == nil || clave == "" || b.anadiendoFicha[clave] {
+		return
+	}
+	if b.anadiendoFicha == nil {
+		b.anadiendoFicha = map[string]bool{}
+	}
+	b.anadiendoFicha[clave] = true
+	pedir(b, func(ctx context.Context) (string, error) {
+		cs, err := f.Search(ctx, correo, limiteFicha)
+		if err != nil {
+			return "", err
+		}
+		if id := ContactoConCorreo(cs, correo); id != "" {
+			return id, nil
+		}
+		libretas, err := f.AddressBooks(ctx)
+		if err != nil {
+			return "", err
+		}
+		i := slices.IndexFunc(libretas, func(l api.AddressBook) bool { return l.IsDefault })
+		if i < 0 && len(libretas) > 0 {
+			i = 0 // el servicio crea la de por defecto al listar: no debería faltar
+		}
+		if i < 0 {
+			return "", errSinLibreta
+		}
+		k, err := f.Create(ctx, libretas[i].ID, api.ContactInput{
+			FormattedName: NombreDelContacto(nombre, correo),
+			Emails:        []api.ContactEmail{{Email: strings.TrimSpace(correo), IsPrimary: true}},
+		})
+		return k.ID, err
+	}, func(id string, err error) {
+		delete(b.anadiendoFicha, clave)
+		t := b.P.T
+		if err != nil || id == "" {
+			b.avisar(ui.AvisoPeligro, "reader.addToContactsFailed", nil)
+			return
+		}
+		b.guardarFicha(clave, id)
+		a := ui.NuevoAviso(ui.AvisoExito, t.T("reader.addedToContacts", nil), "")
+		a.RotuloCerrar = t.T("ui.dismissNotification", nil)
+		a.RotuloAccion = t.T("reader.viewContact", nil)
+		a.AlPulsarAccion = func() { b.verEnContactos(id) }
+		b.P.Notificar(a)
+	})
+}
+
+var errSinLibreta = errors.New("mail: Contacts no tiene libreta por defecto")
+
+// verEnContactos abre la ficha en Sytue Contacts por su esquema (`sytue-contacts:`,
+// contactos/enlace.go), o en la web si la app no está instalada.
+func (b *Buzon) verEnContactos(id string) {
+	if b.Abridor == nil || id == "" {
+		return
+	}
+	org := ""
+	if b.Org != nil {
+		org = b.Org()
+	}
+	_ = api.AbrirEn(b.Abridor, cmp.Or(b.Apex, api.ApexProd), "contacts", org, "/contacts/"+url.PathEscape(id))
 }

@@ -23,7 +23,8 @@
 import type { JSX } from 'preact';
 import type { Locale } from '@sytue/i18n';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Badge, Button, Icon, Input, Modal, Select, Spinner, cx } from '@sytue/ui';
+import { colorDeUsuario } from '@sytue/config';
+import { Badge, Button, Icon, Input, Modal, Select, Spinner, cx, EmptyState } from '@sytue/ui';
 import { searchEvents, type Calendar, type EventSearchResult } from '../client/calendarApi.js';
 import {
   isRecurring,
@@ -231,21 +232,23 @@ export function SearchPanel({
               <span class="text-text-muted text-sm">{t('search.searching')}</span>
             </div>
           ) : error ? (
-            <div class="flex flex-col items-center gap-2 py-8">
-              <p class="text-text-muted text-sm">{t('search.error')}</p>
-              <Button variant="secondary" size="sm" onClick={() => setQuery((q) => q + ' ')}>
-                {t('common.retry')}
-              </Button>
-            </div>
+            <EmptyState
+              compact
+              tone="error"
+              title={t('search.error')}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setQuery((q) => q + ' ')}>
+                  {t('common.retry')}
+                </Button>
+              }
+            />
           ) : results.length === 0 ? (
-            <p class="text-text-subtle px-1 py-10 text-center text-sm">
-              {t('search.noResults', { term })}
-            </p>
+            <EmptyState compact icon="search" title={t('search.noResults', { term })} />
           ) : (
             <ul class="flex flex-col gap-0.5">
               {results.map((r) => {
                 const cal = calById.get(r.calendar_id);
-                const color = cal?.color ?? 'var(--sytue-primary-500)';
+                const color = colorDeUsuario(cal?.color) ?? 'var(--sytue-primary-500)';
                 const when = whenLabel(locale, r);
                 const sub = snippet(r);
                 return (

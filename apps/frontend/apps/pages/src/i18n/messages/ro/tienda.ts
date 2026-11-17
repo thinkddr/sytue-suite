@@ -176,15 +176,10 @@ export const tienda = {
   'store.mode_test_help':
     'Plăți simulate cu cheile de test ale furnizorului. Nu se încasează bani de la nimeni.',
   'store.mode_live_help': 'Plăți reale de la clienți cu cheile de producție.',
-  'store.webhook_title': 'Pasul 1: adresa webhook-ului',
   'store.webhook_help': 'Lipiți această adresă în panoul de administrare {nombre}.',
   'store.webhook_label': 'Adresa webhook-ului',
   'store.webhook_error':
     'Adresa webhook-ului nu a putut fi obținută. Închideți fereastra și încercați din nou.',
-  'store.copy': 'Copiați',
-  'store.copied': 'Adresa a fost copiată.',
-  'store.credentials_title': 'Credențiale',
-  'store.credentials_step': 'Pasul 2: credențiale',
   'store.f_api_key': 'Cheie API',
   'store.f_api_key_mode': 'Cheie API ({modo})',
   'store.f_profile_id': 'ID de profil (opțional)',
@@ -202,6 +197,49 @@ export const tienda = {
   'store.gateway_save': 'Salvați și testați',
   'store.gateway_saved': 'Procesatorul {nombre} a fost testat și salvat.',
   'store.gateway_save_error': 'Credențialele procesatorului nu au putut fi validate.',
+  'store.wz_progress': 'Pașii pentru conectarea procesatorului de plăți',
+  'store.wz_step_mode': 'Mod',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Chei',
+  'store.wz_step_check': 'Verificare',
+  'store.wz_step_done': 'Gata',
+  'store.wz_mode_heading': 'Plăți de test sau plăți reale?',
+  'store.wz_mode_desc':
+    'Începeți în modul de test; când totul funcționează, deschideți din nou acest asistent și alegeți modul real.',
+  'store.wz_webhook_heading': 'Spuneți-i lui {nombre} unde să trimită notificările de plată',
+  'store.wz_keys_heading': 'Cheile dvs. {nombre}',
+  'store.wz_keys_desc':
+    'Cheile secrete sunt păstrate sigilate și nu mai sunt afișate niciodată: pentru a schimba una, scrieți-o din nou.',
+  'store.wz_keys_rejected': '{nombre} nu a acceptat aceste chei',
+  'store.wz_check_heading': 'Verificați și salvați',
+  'store.wz_check_desc':
+    'Sytue Web testează cheile la {nombre} înainte de a activa procesatorul. Nu se salvează nimic până când testul reușește.',
+  'store.wz_secret_hidden': 'Introdusă (ascunsă)',
+  'store.wz_empty_value': 'Neprecizat',
+  'store.wz_done_heading': '{nombre} este gata',
+  'store.wz_finish': 'Finalizare',
+  'store.hint_mollie_api_key':
+    'În Mollie: Developers › API keys. Cheile de test încep cu test_, iar cele reale cu live_.',
+  'store.hint_mollie_profile':
+    'În Mollie: Settings › Website profiles. Începe cu pfl_; lăsați gol pentru profilul implicit.',
+  'store.hint_adyen_api_key':
+    'În Adyen Customer Area: Developers › API credentials › acreditarea dvs. › API key.',
+  'store.hint_adyen_merchant':
+    'În Adyen Customer Area, în selectorul de cont de sus: contul de comerciant, nu contul companiei.',
+  'store.hint_adyen_hmac':
+    'În Adyen: Developers › Webhooks › webhookul dvs. › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'În Adyen (real): Developers › API URLs. Este partea adresei dinaintea -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Vi-l dă banca odată cu contractul pentru POS-ul virtual; apare și în portalul de administrare Redsys.',
+  'store.hint_redsys_terminal':
+    'În portalul de administrare Redsys, lângă codul de comerciant. De obicei este 1.',
+  'store.hint_redsys_secret':
+    'În portalul de administrare Redsys: datele comerciantului › cheia SHA-256. Cheia de test și cea reală diferă.',
+  'store.hint_stripe_secret':
+    'În Stripe: Developers › API keys › Secret key. Începe cu sk_test_ sau sk_live_.',
+  'store.hint_stripe_webhook':
+    'În Stripe: Developers › Webhooks › endpointul dvs. › Signing secret. Începe cu whsec_.',
   'orders.subtitle': 'Comenzi și achiziții efectuate pe site-ul dumneavoastră.',
   'orders.count': {
     one: '{count} comandă',

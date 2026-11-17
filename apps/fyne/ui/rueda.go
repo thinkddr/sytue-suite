@@ -40,22 +40,11 @@ import (
 // Tampoco es un icono del catálogo: `iconos` es un conjunto CERRADO que sale de
 // `Icon.tsx`, y la rueda no está ahí — está en `Spinner.tsx`, que es otro componente.
 //
-// # prefers-reduced-motion: Fyne no lo tiene
+// # prefers-reduced-motion
 //
-// El navegador consulta el ajuste del sistema y la hoja de la suite lo respeta; Fyne
-// v2.8.1 no expone nada equivalente en ninguna plataforma. Lo que se hace aquí es
-// `SinMovimiento`: una variable que pone quien arranca la app leyendo el ajuste del
-// sistema, y que NO apaga el indicador —lo deja QUIETO en su posición de salida—. Una
-// rueda parada sigue diciendo «esto está cargando» con la forma y con su nombre
-// accesible; una rueda que desaparece no dice nada.
-
-// SinMovimiento apaga las animaciones de repetición infinita de la suite. Es lo que la
-// web recibe de `prefers-reduced-motion: reduce`, y aquí lo pone quien monta la app
-// —antes de la primera pantalla— porque Fyne no lee ese ajuste del sistema.
-//
-// No afecta a las animaciones de ENTRADA (diálogo, velo, pista): esas duran 150-180 ms
-// y se acaban solas. La que marea es la que no para.
-var SinMovimiento bool
+// Con «menos movimiento» (MenosMovimiento, en menosmovimiento.go) la rueda NO se apaga: se
+// queda QUIETA en su posición de salida. Una rueda parada sigue diciendo «esto está
+// cargando» con la forma y con su nombre accesible; una rueda que desaparece no dice nada.
 
 // DuracionRueda es el `[animation-duration:700ms]` de Spinner.tsx.
 const DuracionRueda = 700 * time.Millisecond
@@ -157,7 +146,7 @@ func (r *Rueda) CreateRenderer() fyne.WidgetRenderer {
 // Lineal a propósito: `animate-spin` de Tailwind es `linear infinite`, y una rueda con
 // aceleración se lee como un tirón.
 func (r *Rueda) arrancar(raster *canvas.Raster) {
-	if SinMovimiento {
+	if MenosMovimiento() {
 		return
 	}
 	a := fyne.NewAnimation(DuracionRueda, func(p float32) {

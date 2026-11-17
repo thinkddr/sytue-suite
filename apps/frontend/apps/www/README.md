@@ -1,100 +1,106 @@
-# Sytue One — sitio público (`www`)
+<a id="sytue-one--sitio-público-www"></a>
+# Sytue One — public website (`www`)
 
-Landing de marketing de **Sytue One** (`sytue.eu` / `www.sytue.eu`): comunica la
-suite de productividad **soberana europea**, nativa e integrada con Sytue ID.
-**Astro 7 + Preact 10**, **estático (SSG)**, **Tailwind v4** y tokens de marca.
-Usa **solo** `@sytue/ui`. Código **propietario** (`MIT`).
+Marketing landing page for **Sytue One** (`sytue.eu` / `www.sytue.eu`): it presents the
+**European sovereign** productivity suite, native and integrated with Sytue ID.
+**Astro 7 + Preact 10**, **static (SSG)**, **Tailwind v4** and brand tokens.
+Uses **only** `@sytue/ui`. **Proprietary** code (`MIT`).
 
-> Contrato: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) §4, §5.
-> Puerto dev: **4324**. Sin autenticación (sitio público).
+> Contract: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) §4, §5.
+> Dev port: **4324**. No authentication (public site).
 
-## Idiomas y rutas
+<a id="idiomas-y-rutas"></a>
+## Languages and routes
 
-Los **26 idiomas de producto** (`docs/CONVENTIONS.md` §13.1) con el **inglés
-de base y sin prefijo**: `/` es una página real, no una redirección, que es lo
-que quieren el rastreador y el `x-default`.
+The **26 product languages** (`docs/CONVENTIONS.md` §13.1), with **English
+as the base and without a prefix**: `/` is a real page, not a redirect, which is
+what the crawler and `x-default` want.
 
-| Idioma   | Portada | Resto                                                |
+| Language | Home    | Rest                                                 |
 | -------- | ------- | ---------------------------------------------------- |
-| inglés   | `/`     | `/downloads`, `/privacy`, `/terms`, `/product/<key>` |
-| español  | `/es`   | `/es/downloads`, …                                   |
-| francés  | `/fr`   | `/fr/downloads`, …                                   |
-| alemán   | `/de`   | `/de/downloads`, …                                   |
-| italiano | `/it`   | `/it/downloads`, …                                   |
+| English  | `/`     | `/downloads`, `/privacy`, `/terms`, `/product/<key>` |
+| Spanish  | `/es`   | `/es/downloads`, …                                   |
+| French   | `/fr`   | `/fr/downloads`, …                                   |
+| German   | `/de`   | `/de/downloads`, …                                   |
+| Italian  | `/it`   | `/it/downloads`, …                                   |
 
-Una sola plantilla por ruta, en `src/pages/[...locale]/`: el parámetro **rest**
-casa también con cero segmentos, así que el mismo fichero genera `/` y `/es/…`.
-Los **slugs van en inglés en todos los idiomas** (`/es/downloads`, no
-`/es/descargas`): traducirlos exige una tabla de rutas por idioma en cada página
-y en el selector, y con `hreflang` recíproco Google ya entiende que son la misma
-página en otra lengua. El **404** queda fuera del esquema porque el servidor
-estático sirve un único `404.html` para todo.
+A single template per route, in `src/pages/[...locale]/`: the **rest** parameter
+also matches zero segments, so the same file generates `/` and `/es/…`.
+**Slugs are in English in every language** (`/es/downloads`, not
+`/es/descargas`): translating them requires a per-language route table on every page
+and in the switcher, and with reciprocal `hreflang` Google already understands that they are the same
+page in another language. The **404** stays outside the scheme because the static
+server serves a single `404.html` for everything.
 
-Las URLs españolas de la etapa anterior (`/descargas`, `/privacidad`,
-`/terminos`, `/producto/*`, `/en`) **redirigen** a su equivalente
-(`redirects` en `astro.config.mjs`).
+The Spanish URLs from the previous stage (`/descargas`, `/privacidad`,
+`/terminos`, `/producto/*`, `/en`) **redirect** to their equivalent
+(`redirects` in `astro.config.mjs`).
 
-Todo el texto sale del catálogo de `src/i18n/messages/` (inglés = fuente de
-verdad; los otros 25 derivan su tipo con `AppCatalog<typeof en>`). Los
-**nombres de producto** —Sytue, Mail, Drive, Docs, Rooms, Cloud— son marca y no
-se traducen.
+All text comes from the catalog in `src/i18n/messages/` (English = source of
+truth; the other 25 derive their type with `AppCatalog<typeof en>`). The
+**product names** —Sytue, Mail, Drive, Docs, Rooms, Cloud— are brand names and are not
+translated.
 
-## Contenido
+<a id="contenido"></a>
+## Content
 
-- **Hero** — propuesta de valor (soberanía + estándares abiertos + integración).
-- **Productos** (`#products`) — rejilla generada desde el catálogo canónico (`suiteApps`), con enlace a la ficha de cada producto.
-- **Integración** — login único, shell común y acciones cruzadas.
-- **Soberanía** (`#sovereignty`) — 100 % UE, RGPD, sin lock-in.
-- **Estándares abiertos** (`#standards`) — productos nativos sobre protocolos abiertos (OIDC, JMAP, CalDAV, CardDAV, WebDAV).
+- **Hero** — value proposition (sovereignty + open standards + integration).
+- **Products** (`#products`) — grid generated from the canonical catalog (`suiteApps`), with a link to each product's page.
+- **Integration** — single sign-on, shared shell and cross-app actions.
+- **Sovereignty** (`#sovereignty`) — 100 % EU, GDPR, no lock-in.
+- **Open standards** (`#standards`) — native products on open protocols (OIDC, JMAP, CalDAV, CardDAV, WebDAV).
 - **CTA** + **404** + `robots.txt`.
 
-Los `id` de sección son los mismos en todos los idiomas: un ancla es un
-identificador, no texto de escaparate.
+Section `id`s are the same in every language: an anchor is an
+identifier, not shop-window text.
 
-El acceso (`Empezar`) enlaza al login de **Sytue One** (`one.sytue.eu/auth/login`).
+The sign-in entry point (`Empezar`) links to the **Sytue One** login (`one.sytue.eu/auth/login`).
 
-## Build estático y runtime
+<a id="build-estático-y-runtime"></a>
+## Static build and runtime
 
-`astro build` genera `dist/`. La imagen de producción lo sirve con `serve.mjs`
-(servidor estático Bun sin dependencias, cabeceras de caché y fallback a
-`404.html`). Se ejecuta en Scaleway/Kapsule (UE).
+`astro build` generates `dist/`. The production image serves it with `serve.mjs`
+(a dependency-free Bun static server, with cache headers and a fallback to
+`404.html`). It runs on Scaleway/Kapsule (EU).
 
-## SEO y rendimiento (contrato §0.8)
+<a id="seo-y-rendimiento-contrato-08"></a>
+## SEO and performance (contract §0.8)
 
-Superficie **pública indexable**: aquí se concentra el SEO (las apps
-autenticadas van `noindex`). Estrategia y presupuestos en
+**Public indexable** surface: this is where SEO is concentrated (the authenticated
+apps are `noindex`). Strategy and budgets in
 [`docs/operations.md#4-rendimiento-y-seo`](../../../../docs/operations.md#4-rendimiento-y-seo).
 
-- **SSG (`output: 'static'`)** — HTML pre-renderizado: TTFB mínimo y CWV verdes.
-- **HTML semántico** — `header`/`main`/`nav`/`footer`, jerarquía de encabezados,
-  `skip-link` al contenido y `aria-label` en la navegación, todo traducido.
-- **Metadatos + OpenGraph + Twitter Cards** — en `MarketingLayout.astro`
-  (título, descripción, `og:*`, `twitter:card=summary_large_image`).
-- **Datos estructurados JSON-LD** (`src/lib/seo.ts`) — schema.org
-  `Organization`, `WebSite` y `SoftwareApplication`, inyectados en la home.
-- **`sitemap.xml`** — `@astrojs/sitemap` genera `sitemap-index.xml` +
-  `sitemap-0.xml` (con `hreflang`); excluye `/404`.
-- **`robots.txt`** (`public/robots.txt`) — permite lo público, bloquea rutas de
-  utilidad (`/api/`, `/auth/`, previews) y apunta al sitemap.
-- **Canonical + hreflang** — canónica del **propio idioma** de cada página y
-  alternos recíprocos en los 26 idiomas (`en-GB`, `de-DE`, `pl-PL`…) +
-  `x-default` → inglés, más `og:locale` y `og:locale:alternate`.
-  `hreflangAlternates(path, locales)` **exige** la lista de idiomas en los que la
-  página existe: declarar uno sin traducción manda al rastreador a un 404, así
-  que la función no puede afirmarlo por su cuenta.
-- **Selector de idioma** — cambia de idioma **sin perder la página**
-  (`/es/privacy` → `/fr/privacy`) y nombra cada idioma en su propio idioma.
-- **Imágenes AVIF/WebP** — `astro:assets` (Sharp) sirve formatos modernos con
-  dimensiones explícitas (sin CLS) y `loading="lazy"`.
-- **Presupuesto de bundle** — `vite.build.chunkSizeWarningLimit: 100` (kB);
-  islands con JS mínimo (`client:visible`/`idle`).
-- **Cabeceras de seguridad** — `serve.mjs` emite CSP estricta, HSTS, `nosniff`,
-  `X-Frame-Options: DENY` y cache-control por tipo de recurso.
+- **SSG (`output: 'static'`)** — pre-rendered HTML: minimal TTFB and green CWV.
+- **Semantic HTML** — `header`/`main`/`nav`/`footer`, heading hierarchy,
+  `skip-link` to the content and `aria-label` on the navigation, all translated.
+- **Metadata + OpenGraph + Twitter Cards** — in `MarketingLayout.astro`
+  (title, description, `og:*`, `twitter:card=summary_large_image`).
+- **JSON-LD structured data** (`src/lib/seo.ts`) — schema.org
+  `Organization`, `WebSite` and `SoftwareApplication`, injected into the home page.
+- **`sitemap.xml`** — `@astrojs/sitemap` generates `sitemap-index.xml` +
+  `sitemap-0.xml` (with `hreflang`); excludes `/404`.
+- **`robots.txt`** (`public/robots.txt`) — allows the public pages, blocks utility
+  routes (`/api/`, `/auth/`, previews) and points to the sitemap.
+- **Canonical + hreflang** — each page's canonical is in **its own language**, with
+  reciprocal alternates in the 26 languages (`en-GB`, `de-DE`, `pl-PL`…) +
+  `x-default` → English, plus `og:locale` and `og:locale:alternate`.
+  `hreflangAlternates(path, locales)` **requires** the list of languages in which the
+  page exists: declaring one without a translation sends the crawler to a 404, so
+  the function cannot assert it on its own.
+- **Language switcher** — changes language **without losing the page**
+  (`/es/privacy` → `/fr/privacy`) and names each language in its own language.
+- **AVIF/WebP images** — `astro:assets` (Sharp) serves modern formats with
+  explicit dimensions (no CLS) and `loading="lazy"`.
+- **Bundle budget** — `vite.build.chunkSizeWarningLimit: 100` (kB);
+  islands with minimal JS (`client:visible`/`idle`).
+- **Security headers** — `serve.mjs` emits a strict CSP, HSTS, `nosniff`,
+  `X-Frame-Options: DENY` and cache-control per resource type.
 
-### Patrón `noindex` para superficies autenticadas (todas las apps)
+<a id="patrón-noindex-para-superficies-autenticadas-todas-las-apps"></a>
+### `noindex` pattern for authenticated surfaces (all apps)
 
-El contrato exige que **las superficies autenticadas NO se indexen**. Este sitio
-soporta `noindex` por página vía la prop del layout:
+The contract requires that **authenticated surfaces are NOT indexed**. This site
+supports per-page `noindex` via the layout prop:
 
 ```astro
 <MarketingLayout locale={locale} path="/…" title="…" description="…" noindex={true}>
@@ -102,12 +108,12 @@ soporta `noindex` por página vía la prop del layout:
 </MarketingLayout>
 ```
 
-que emite `<meta name="robots" content="noindex, nofollow">`. Las **apps
-autenticadas** (`portal`, `mail`, `drive`, …) deben aplicar el **mismo patrón en
-su layout base, fijado siempre a `noindex`** (nunca condicional), ya que sirven
-SSR con sesión. Además, su servidor/ingress debe emitir la cabecera
-`X-Robots-Tag: noindex, nofollow` para blindar respuestas no-HTML. No requieren
-`sitemap.xml` ni datos estructurados: el SEO se concentra en `www`.
+which emits `<meta name="robots" content="noindex, nofollow">`. The **authenticated
+apps** (`portal`, `mail`, `drive`, …) must apply the **same pattern in
+their base layout, always set to `noindex`** (never conditional), since they serve
+SSR with a session. In addition, their server/ingress must emit the
+`X-Robots-Tag: noindex, nofollow` header to protect non-HTML responses. They do not need
+`sitemap.xml` or structured data: SEO is concentrated in `www`.
 
 ## Scripts
 

@@ -35,6 +35,10 @@ var (
 	// ArribaBarraMensaje es el `-top-3.5` y DerechaBarraMensaje el `right-2`.
 	ArribaBarraMensaje  = tema.Espacio(3.5)
 	DerechaBarraMensaje = tema.Espacio(2)
+	// ArribaBarraHilo y DerechaBarraHilo son el `-top-2 right-3` de la barra en una
+	// fila del hilo (`ThreadPanel.tsx`).
+	ArribaBarraHilo  = tema.Espacio(2)
+	DerechaBarraHilo = tema.Espacio(3)
 	// GlifoBarraMensaje es el `size={16}` de sus glifos.
 	GlifoBarraMensaje = iconos.TallaSM
 	// AnchoMenuMensaje es `MENU_W` de MessageMenu.tsx.

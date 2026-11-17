@@ -35,15 +35,16 @@ import (
 // (`Documento`) y pinta con el MISMO maquetador que la lectura (`Maquetar`), así que lo
 // que se ve escribiendo es lo que se ve después, a la letra.
 //
-// ponytail: tres límites conocidos. (1) No hay IME: el driver de Fyne no lo tiene en
+// ponytail: dos límites conocidos. (1) No hay IME: el driver de Fyne no lo tiene en
 // escritorio (docs/roadmap.md, «Techos del toolkit»), así que el chino o el japonés no se
-// teclean aquí ni en ningún campo nativo. (2) El cursor no parpadea. (3) La barra no entra
-// en el orden de tabulación (el Tab del cuerpo es sangrar, como en la web); se usa con el
-// puntero o con sus atajos (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K, Ctrl+Alt+0…5).
+// teclean aquí ni en ningún campo nativo. (2) La barra no entra en el orden de tabulación
+// (el Tab del cuerpo es sangrar, como en la web); se usa con el puntero o con sus atajos
+// (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K, Ctrl+Alt+0…5). El cursor sí parpadea, como el del
+// navegador (cursor_parpadeo.go).
 
-// Medidas de la barra y del cuerpo, de la hoja con el rem de 14.
+// Medidas de la barra y del cuerpo, de la hoja con el rem de 16.
 const (
-	LadoBotonEd      = 7 * 0.25 * tema.Rem   // `h-7 w-7`: 24,5
+	LadoBotonEd      = 7 * 0.25 * tema.Rem   // `h-7 w-7`: 28
 	HuecoBarraEd     = 0.5 * 0.25 * tema.Rem // `gap-0.5`
 	PXBarraEd        = 1.5 * 0.25 * tema.Rem // `px-1.5`
 	PYBarraEd        = 1 * 0.25 * tema.Rem   // `py-1`
@@ -139,6 +140,11 @@ type EditorNota struct {
 	bloqueBt                *botonBloque
 	// Estirado es la tarjeta estirada: el cuerpo crece hasta abajo (`flex-1`).
 	Estirado bool
+	// SinAro quita el aro de foco del cuerpo (`sinAro` de RichText.tsx): en la hoja del
+	// árbol y en la fila de lista o diario el editor es la página, y un recuadro de color
+	// alrededor del texto la parte; el foco ya lo dicen el cursor y la barra abierta. En
+	// una tarjeta (columnas, lienzo) el aro se queda.
+	SinAro bool
 
 	AlCambiar  func(html string)
 	AlTerminar func()
@@ -265,16 +271,34 @@ func (e *EditorNota) guardarFoto() {
 	e.rehacer = nil
 }
 
+// rechazarCambio restores the last accepted HTML when the original session
+// refuses a new edit. It cannot retain that unaccepted change in Undo/Redo.
+func (e *EditorNota) rechazarCambio(html string) {
+	e.doc = Leer(html).ParaEditar()
+	e.cur, e.ancla = e.acotar(e.cur), e.acotar(e.ancla)
+	e.deshacer, e.rehacer = nil, nil
+	e.pendiente = nil
+	e.repintar()
+}
+
 // cambiado es lo que sigue a todo cambio: acotar el cursor, avisar y repintar.
 func (e *EditorNota) cambiado() {
 	e.cur, e.ancla = e.acotar(e.cur), e.acotar(e.ancla)
 	e.pendiente = nil
-	llamar1(e.AlCambiar, e.HTML())
+	e.avisarCambio()
 	e.repintar()
+}
+
+// avisarCambio cuenta hacia fuera que el documento ha cambiado (para guardarlo) y, con
+// «Buscar en la nota» abierta, rehace las coincidencias para que los velos sigan al texto.
+func (e *EditorNota) avisarCambio() {
+	e.rehacerHallados()
+	llamar1(e.AlCambiar, e.HTML())
 }
 
 func (e *EditorNota) repintar() {
 	antes, tabla := e.zona.Size().Height, e.barraTabla.Visible()
+	e.zona.encenderCursor() // el cursor que se mueve o escribe se ve, como en el navegador
 	e.refrescarBarra()
 	e.zona.Refresh()
 	if e.enTabla() != tabla {
@@ -342,7 +366,7 @@ func (e *EditorNota) escribir(s string) {
 	e.ancla = e.cur
 	e.escribiendo = true
 	e.hayX = false
-	llamar1(e.AlCambiar, e.HTML())
+	e.avisarCambio()
 	e.pendiente = pendiente
 	e.repintar()
 }
@@ -506,7 +530,7 @@ func (e *EditorNota) deshacerUno() {
 	e.rehacer = append(e.rehacer, foto{e.doc.copia(), e.cur, e.ancla})
 	e.doc, e.cur, e.ancla = f.doc, f.cur, f.ancla
 	e.escribiendo = false
-	llamar1(e.AlCambiar, e.HTML())
+	e.avisarCambio()
 	e.repintar()
 }
 
@@ -519,7 +543,7 @@ func (e *EditorNota) rehacerUno() {
 	e.deshacer = append(e.deshacer, foto{e.doc.copia(), e.cur, e.ancla})
 	e.doc, e.cur, e.ancla = f.doc, f.cur, f.ancla
 	e.escribiendo = false
-	llamar1(e.AlCambiar, e.HTML())
+	e.avisarCambio()
 	e.repintar()
 }
 
@@ -555,9 +579,24 @@ func (e *EditorNota) PegarTexto(t string) {
 	e.escribiendo = false
 }
 
+// PegarConMarkdown es el ⌘V de una nota: el texto que parece Markdown entra con su
+// formato (títulos, listas, tareas…) y el resto, como texto plano. En un bloque de
+// código el Markdown se queda en letras, como al teclear (`lineaAntes`) y como en la web.
+func (e *EditorNota) PegarConMarkdown(t string) {
+	if e.bloqueActual().Tipo == Codigo {
+		e.PegarTexto(t)
+		return
+	}
+	if d := documentoDePegado(t); d != nil {
+		e.Pegar(d)
+		return
+	}
+	e.PegarTexto(t)
+}
+
 // Pegar pega un documento con su formato donde está el cursor, pisando lo seleccionado,
-// en un solo paso de deshacer. Es para quien pega HTML (el redactor de Mail); en una nota
-// el portapapeles entra como texto, como en la web.
+// en un solo paso de deshacer. Es para quien pega HTML (el redactor de Mail) y para el
+// Markdown pegado en una nota (`PegarConMarkdown`).
 func (e *EditorNota) Pegar(d *Documento) {
 	if d.Vacio() {
 		return
@@ -815,9 +854,11 @@ func (e *EditorNota) atajo(s fyne.Shortcut) {
 			e.tecla(fyne.KeyDelete)
 		}
 	case *fyne.ShortcutPaste:
-		// Ver la cabecera de RichText.tsx: el portapapeles entra como TEXTO PLANO.
+		// Ver la cabecera de RichText.tsx: el portapapeles entra como TEXTO PLANO, salvo
+		// que parezca Markdown, que llega con su formato (markdown.go). Ctrl+Mayús+V,
+		// en atajoPropio, lo pega plano siempre.
 		if x.Clipboard != nil {
-			e.PegarTexto(x.Clipboard.Content())
+			e.PegarConMarkdown(x.Clipboard.Content())
 		}
 	case *fyne.ShortcutSelectAll:
 		if len(e.doc.Bloques) > 0 {
@@ -829,7 +870,9 @@ func (e *EditorNota) atajo(s fyne.Shortcut) {
 	case *fyne.ShortcutRedo:
 		e.rehacerUno()
 	case *desktop.CustomShortcut:
-		e.atajoPropio(x)
+		if !e.pegarSinFormato(x) {
+			e.atajoPropio(x)
+		}
 	}
 }
 
@@ -839,6 +882,19 @@ func (e *EditorNota) copiar(c fyne.Clipboard) bool {
 	}
 	a, b := e.seleccion()
 	c.SetContent(e.doc.TextoEntre(a, b))
+	return true
+}
+
+// pegarSinFormato es Ctrl/⌘+Mayús+V: pegar como texto plano, también el Markdown, como
+// en la web y en el redactor de Mail. Dice si era ese atajo.
+func (e *EditorNota) pegarSinFormato(x *desktop.CustomShortcut) bool {
+	if x.KeyName != fyne.KeyV || x.Modifier&fyne.KeyModifierShift == 0 ||
+		x.Modifier&fyne.KeyModifierShortcutDefault == 0 || x.Modifier&fyne.KeyModifierAlt != 0 {
+		return false
+	}
+	if a := fyne.CurrentApp(); a != nil {
+		e.PegarTexto(a.Clipboard().Content())
+	}
 	return true
 }
 
@@ -1179,6 +1235,13 @@ type zonaEdicion struct {
 	arrastre bool
 	// contexto es el doble toque y el menú contextual (editor_menu.go).
 	contexto contextoZona
+	// El parpadeo del cursor (cursor_parpadeo.go): la raya pintada, si está en su fase
+	// apagada, desde cuándo cuenta, la animación que lo mueve y el reloj de las pruebas.
+	raya     *canvas.Rectangle
+	apagado  bool
+	desde    time.Time
+	parpadeo *fyne.Animation
+	ahora    func() time.Time
 }
 
 var (
@@ -1233,7 +1296,12 @@ func (z *zonaEdicion) Cursor() desktop.Cursor { return desktop.TextCursor }
 // AcceptsTab: el tabulador es sangrar, no salir del cuerpo.
 func (z *zonaEdicion) AcceptsTab() bool { return true }
 
-func (z *zonaEdicion) FocusGained() { z.enfocado = true; z.Refresh(); z.e.Refresh() }
+func (z *zonaEdicion) FocusGained() {
+	z.enfocado = true
+	z.encenderCursor()
+	z.Refresh()
+	z.e.Refresh()
+}
 
 // FocusLost: salir del cuerpo guarda y cierra el editor —se salga como se salga—, salvo
 // que el foco se haya ido a un menú o a una paleta de la barra (una capa encima) o a
@@ -1241,6 +1309,7 @@ func (z *zonaEdicion) FocusGained() { z.enfocado = true; z.Refresh(); z.e.Refres
 // web. Se decide DESPUÉS, cuando el foco ya ha caído en su sitio.
 func (z *zonaEdicion) FocusLost() {
 	z.enfocado = false
+	z.pararParpadeo()
 	z.Refresh()
 	z.e.Refresh() // la burbuja solo se ve con el cuerpo enfocado
 	fyne.Do(z.comprobarSalida)
@@ -1269,6 +1338,7 @@ func (z *zonaEdicion) comprobarSalida() {
 }
 
 func (z *zonaEdicion) TypedRune(r rune) {
+	z.encenderCursor()
 	if r == ' ' {
 		z.e.espacio()
 		return
@@ -1277,6 +1347,7 @@ func (z *zonaEdicion) TypedRune(r rune) {
 }
 
 func (z *zonaEdicion) TypedKey(k *fyne.KeyEvent) {
+	z.encenderCursor() // también una flecha contra el borde, que no mueve nada
 	// Escape es del editor (`AlTerminar`, en `tecla`), no del diálogo de encima.
 	if z.e.Tecla != nil && z.e.Tecla(k) {
 		return
@@ -1285,6 +1356,7 @@ func (z *zonaEdicion) TypedKey(k *fyne.KeyEvent) {
 }
 
 func (z *zonaEdicion) TypedShortcut(s fyne.Shortcut) {
+	z.encenderCursor()
 	if z.e.Atajo != nil && z.e.Atajo(s) {
 		return
 	}
@@ -1399,7 +1471,7 @@ func (r *zonaRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(0, r.z.altoPara(max(r.z.Size().Width, r.z.ancho)))
 }
 func (r *zonaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *zonaRenderer) Destroy()                     {}
+func (r *zonaRenderer) Destroy()                     { r.z.pararParpadeo() }
 
 func (r *zonaRenderer) Layout(t fyne.Size) {
 	z := r.z
@@ -1407,7 +1479,7 @@ func (r *zonaRenderer) Layout(t fyne.Size) {
 	z.ancho = t.Width
 	z.maq = z.maquetar(t.Width, v)
 	var objs []fyne.CanvasObject
-	if z.enfocado {
+	if z.enfocado && !z.e.SinAro {
 		// `.sytue-focus-ring`: 2 px de `focus-ring` por fuera de la caja. La esquina es la
 		// que la zona tiene enfocada en la web: 4 arriba (la del aro global) y 6 abajo
 		// (`rounded-b-md`). Medido en producción: «4px 4px 6px 6px».
@@ -1416,20 +1488,28 @@ func (r *zonaRenderer) Layout(t fyne.Size) {
 		aro.Ver(true)
 		objs = append(objs, aro.Objetos()...)
 	}
-	objs = append(objs, r.seleccion(v)...)
-	dentro := PintarProsa(z.maq, v)
-	for _, o := range dentro {
+	// Los velos de la búsqueda y la selección van sobre los fondos de la prosa (el del
+	// código, el del `<mark>`) y bajo el texto, como en la web; si no, una coincidencia
+	// en un bloque de código no se vería.
+	fondos, delante := pintarProsaEnCapas(z.maq, v)
+	for _, o := range append(fondos, delante...) {
 		o.Move(o.Position().Add(fyne.NewPos(PXZonaEd, PYZonaEd)))
 	}
-	objs = append(objs, dentro...)
+	objs = append(objs, fondos...)
+	objs = append(objs, r.velosBuscar(v)...)
+	objs = append(objs, r.seleccion(v)...)
+	objs = append(objs, delante...)
 	if z.e.doc.Vacio() && z.e.marca != "" {
 		// La marca de agua (`top-2 left-3`), mientras no hay nada escrito.
 		m := ui.Texto(z.e.marca, escalonCuerpo, ui.Normal, tema.Color("text-subtle", v))
 		ui.ColocarTexto(m, escalonCuerpo, PXZonaEd, PYZonaEd)
 		objs = append(objs, m)
 	}
+	z.raya = nil
 	if z.enfocado && !z.e.haySeleccion() {
-		objs = append(objs, r.cursor(v)...)
+		z.raya = r.cursor(v)
+		z.raya.Hidden = z.apagado
+		objs = append(objs, z.raya)
 	}
 	if a := z.contexto.ancla; a != nil {
 		objs = append(objs, a) // de donde cuelga el menú contextual (editor_menu.go)
@@ -1438,9 +1518,11 @@ func (r *zonaRenderer) Layout(t fyne.Size) {
 }
 
 // cursor es la raya de 1 px del alto de la letra, en la tinta del texto.
-func (r *zonaRenderer) cursor(v tema.Variante) []fyne.CanvasObject {
+// Parpadea (cursor_parpadeo.go): la raya se guarda en la zona para encenderla y apagarla
+// sin volver a maquetar.
+func (r *zonaRenderer) cursor(v tema.Variante) *canvas.Rectangle {
 	x, arriba, alto := r.z.cajaCursor()
-	return []fyne.CanvasObject{rect(tema.Color("text", v), PXZonaEd+x, PYZonaEd+arriba, 1, alto, 0)}
+	return rect(tema.Color("text", v), PXZonaEd+x, PYZonaEd+arriba, 1, alto, 0)
 }
 
 // cajaCursor es dónde va la raya del cursor en lo maquetado (sin el relleno de la zona):
@@ -1460,7 +1542,7 @@ func (z *zonaEdicion) cajaCursor() (x, arriba, alto float32) {
 // seleccion son los rectángulos de lo seleccionado, detrás del texto.
 func (r *zonaRenderer) seleccion(v tema.Variante) []fyne.CanvasObject {
 	z := r.z
-	if !z.e.haySeleccion() {
+	if !z.e.haySeleccion() || z.e.actualSeleccionada() {
 		return nil
 	}
 	a, b := z.e.seleccion()

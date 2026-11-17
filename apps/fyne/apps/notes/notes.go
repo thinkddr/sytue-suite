@@ -10,7 +10,7 @@
 // `apps/frontend/apps/notes/src/components/**`, y los números salen del barrido de
 // producción (`test/e2e/medidas-web.mjs notes`, 1280×800, es-ES, DSF 1,
 // corporate.sytue.eu v3.3.9, 2026-09-21). Cada constante lleva de dónde salió: «medido»
-// es del volcado del DOM, «hoja» es la clase de Tailwind convertida con el rem de 14.
+// es del volcado del DOM, «hoja» es la clase de Tailwind convertida con el rem de 16.
 //
 // # EL FORMATO NATIVO ES HTML, y los documentos no se corrompen
 //
@@ -231,6 +231,18 @@ type Nota struct {
 	// armar el cuerpo con lo que la vista usa perdía `data`, los enlaces, la
 	// visibilidad y el ancho de la nota —le pasaba a la casilla de una tarea—.
 	Crudo api.Note
+	// Papelera solo la llevan las notas de la papelera (`DeNotasPapelera`): de qué
+	// cuaderno vienen y cuándo se vaciarán solas. Nil en todas las demás.
+	Papelera *EnPapelera
+}
+
+// EnPapelera es lo que la papelera sabe de una nota y el resto de vistas no: el título
+// de su cuaderno —que puede estar también en la papelera y no salir en el árbol— y
+// cuándo la destruirá el servicio. `SeBorra` nil = no caduca (purga apagada o retención
+// legal; el servicio no dice cuál, y la vista tampoco).
+type EnPapelera struct {
+	Cuaderno string
+	SeBorra  *time.Time
 }
 
 // DeNota convierte una del cliente y le interpreta el HTML.
@@ -277,6 +289,16 @@ func DeNotas(ns []api.Note) []Nota {
 	out := make([]Nota, len(ns))
 	for i, n := range ns {
 		out[i] = DeNota(n)
+	}
+	return out
+}
+
+// DeNotasPapelera convierte la papelera del cliente.
+func DeNotasPapelera(ns []api.TrashedNote) []Nota {
+	out := make([]Nota, len(ns))
+	for i, n := range ns {
+		out[i] = DeNota(n.Note)
+		out[i].Papelera = &EnPapelera{Cuaderno: n.NotebookTitle, SeBorra: n.PurgeAt}
 	}
 	return out
 }

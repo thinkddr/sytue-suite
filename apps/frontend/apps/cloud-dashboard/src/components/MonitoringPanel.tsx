@@ -441,7 +441,7 @@ function UptimeSection({
         <Card>
           <CardBody class="p-0">
             <EmptyState
-              illustration={<Icon name="globe" size={24} />}
+              icon="globe"
               title={t('monitoring.empty.title')}
               description={t('monitoring.empty.desc')}
             />
@@ -725,7 +725,7 @@ function AlertsSection({ initial, t }: { initial: AlertPolicy[]; t: T }) {
         <Card>
           <CardBody class="p-0">
             <EmptyState
-              illustration={<Icon name="bell" size={24} />}
+              icon="bell"
               title={t('monitoring.alerts.empty.title')}
               description={t('monitoring.alerts.empty.desc')}
             />

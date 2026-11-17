@@ -10,6 +10,7 @@ import { useT } from '../i18n/index.js';
 import { Launcher } from '../components/Launcher';
 import { bff, toBffContext, idBaseUrl, hubInternalUrl, driveInternalUrl } from '../lib/auth';
 import { almacenamientoExternoDisponible } from '../lib/almacenamiento-externo';
+import { cargarPrimerosPasos, clavePrimerosPasos, guionAntesDePintar } from '../lib/primeros-pasos';
 import { puedeAdministrar } from '@sytue/ui';
 import { permsFromAccessToken } from '@sytue/auth/server';
 import { esCuentaPersonal, sinAdminPorPlan } from '@sytue/auth';
@@ -51,6 +52,16 @@ const almacenamientoDisponible = almacenamientoExternoDisponible(
   driveInternalUrl(),
 );
 
+// «Primeros pasos»: también en paralelo y también resueltos en SSR, para que la
+// tarjeta llegue pintada encima de las apps y no las empuje al hidratar. Con
+// Sytue ID lento no se espera: `undefined` y el lanzador los pide al BFF.
+const pasosPendientes = cargarPrimerosPasos(
+  idBaseUrl(),
+  session.tokens.accessToken,
+  AbortSignal.timeout(1500),
+).catch(() => null);
+const clavePasos = clavePrimerosPasos(session.user.id, session.user.tenant);
+
 // Qué aplicaciones levanta esta instalación, resuelto ya en SSR: evita el desfase
 // de hidratación de Preact (p. ej. si Sytue DevX está apagado y no debe pintar tesela).
 let desplegadas: string[] | undefined;
@@ -89,6 +100,7 @@ if (!session.user.tenant) {
 }
 const t = useT(Astro.locals.locale);
 const puedeAlmacenamientoExterno = await almacenamientoDisponible;
+const primerosPasos = (await pasosPendientes) ?? undefined;
 ---
 
 <AppLayout title={t('page.home')}>
@@ -101,7 +113,12 @@ const puedeAlmacenamientoExterno = await almacenamientoDisponible;
     desplegadasIniciales={desplegadas}
     org={session.user.tenant}
     nombre={session.user.givenName ?? session.user.name?.split(' ')[0]}
+    primerosPasos={primerosPasos}
+    clavePasos={clavePasos}
   />
+  {/* Detrás de la isla y antes del primer pintado: lo que este navegador recuerda
+      de los «Primeros pasos» (ocultos, ya instalada), que el servidor no ve. */}
+  <script is:inline set:html={guionAntesDePintar(clavePasos)} />
   <p class="text-text-muted mx-auto max-w-3xl px-6 pt-2 pb-8 text-center text-xs">
     {t('privacy.notice')}
   </p>

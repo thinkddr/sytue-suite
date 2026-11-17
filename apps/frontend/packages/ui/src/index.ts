@@ -45,6 +45,7 @@ export {
 // Tamaños de fichero con el separador decimal del idioma. Estaba copiado siete
 // veces, cuatro de ellas con `toFixed` (que siempre pone el punto inglés).
 export { formatBytes } from './lib/formatBytes.js';
+export { EN_PARALELO, enTandas } from './lib/enTandas.js';
 export { useNavDrawer, DRAWER_FOCUSABLE } from './lib/useNavDrawer.js';
 export { useMobileBack } from './lib/useMobileBack.js';
 export {
@@ -61,6 +62,8 @@ export {
   useConsulta,
   useEstrecha,
   CONSULTA_ESTRECHA,
+  CONSULTA_DEDO,
+  useDedo,
 } from './lib/useEnHoja.js';
 // Cuándo un arrastre horizontal pasa a lo siguiente (Photos, Calendar). Pareja en Fyne.
 export {
@@ -143,6 +146,15 @@ export type { IconName, IconProps } from './components/Icon.js';
 export { Glifo, grosorDeGlifo, puntos, subtrazosCerrados } from './components/Glifo.js';
 export type { GlifoProps } from './components/Glifo.js';
 export { useLongPress } from './lib/useLongPress.js';
+export { idsDelRango, marcarConTramo } from './lib/seleccion.js';
+export {
+  enfocarALaVista,
+  moverFocoEnListaVirtual,
+  moverFocoEnRejilla,
+  vecinoEnLista,
+  vecinoEnRejilla,
+} from './lib/navegacionRejilla.js';
+export type { CajaRejilla } from './lib/navegacionRejilla.js';
 
 // Catalogo de apps (app switcher)
 export {
@@ -178,17 +190,36 @@ export { Button } from './components/Button.js';
 export type { ButtonProps, ButtonVariant, ButtonSize } from './components/Button.js';
 export { IconButton } from './components/IconButton.js';
 export type { IconButtonProps, IconButtonSize, IconButtonTone } from './components/IconButton.js';
+// Elegir UNA de varias opciones a la vista (§3.13, variante segmented): radiogroup con
+// flechas, dos tallas, iconos y rejilla. `ui.Segmentado` en Fyne.
+export { SegmentedControl } from './components/SegmentedControl.js';
+export type {
+  SegmentedControlProps,
+  SegmentedControlSize,
+  SegmentedOption,
+} from './components/SegmentedControl.js';
 export { Spinner } from './components/Spinner.js';
 export type { SpinnerProps } from './components/Spinner.js';
-export { Skeleton } from './components/Skeleton.js';
-export type { SkeletonProps } from './components/Skeleton.js';
+export { Skeleton, SkeletonRows, altoFilaEsqueleto } from './components/Skeleton.js';
+export type {
+  SkeletonProps,
+  SkeletonRowsLead,
+  SkeletonRowsMeta,
+  SkeletonRowsProps,
+} from './components/Skeleton.js';
 // Cuota consumida (disco, asientos, aforo): avisa al 80 % y al 95 %, y lo dice
 // con palabras además de con color.
 export { Meter } from './components/Meter.js';
 export type { MeterProps } from './components/Meter.js';
+// Una cifra con su rótulo (KPI): misma tipografía en todas las consolas.
+export { Stat } from './components/Stat.js';
+export type { StatProps, StatTone } from './components/Stat.js';
 // Progreso de algo que está pasando (una subida): sin los avisos del medidor.
 export { ProgressBar } from './components/ProgressBar.js';
 export type { ProgressBarProps } from './components/ProgressBar.js';
+// Lo buscado marcado en un resultado (Notes, Mail, Contacts).
+export { Resaltado } from './components/Resaltado.js';
+export type { ResaltadoProps } from './components/Resaltado.js';
 export { BarChart } from './components/BarChart.js';
 export type { BarChartProps, BarChartPoint } from './components/BarChart.js';
 export {
@@ -206,6 +237,12 @@ export { Badge } from './components/Badge.js';
 export { ReadOnlyBar } from './components/ReadOnlyBar.js';
 export type { ReadOnlyBarProps, ReadOnlyBarAction } from './components/ReadOnlyBar.js';
 export type { BadgeProps, BadgeTone } from './components/Badge.js';
+// «Rótulo · valor · Copiar», el único de la suite (su espejo nativo es ui.FilaCopia).
+export { CopyField, copiarAlPortapapeles } from './components/CopyField.js';
+export type { CopyFieldProps, CopyFieldLabelWidth } from './components/CopyField.js';
+// La etiqueta (chip) de un recurso, con punto de color y aspa opcionales.
+export { Tag } from './components/Tag.js';
+export type { TagProps, TagSize, TagTone } from './components/Tag.js';
 export { ConfirmDialog } from './components/ConfirmDialog.js';
 export { useConfirm } from './components/useConfirm.js';
 export { usePrompt } from './components/usePrompt.js';
@@ -253,10 +290,14 @@ export type {
 } from './components/Form.js';
 export { LanguageSelect } from './components/LanguageSelect.js';
 export type { LanguageSelectProps } from './components/LanguageSelect.js';
+// La tecla dibujada, la única receta de tecla de la suite (su espejo nativo es ui.Tecla).
+export { Kbd } from './components/Kbd.js';
+export type { KbdProps, KbdTone } from './components/Kbd.js';
 export { ShortcutsModal } from './components/ShortcutsModal.js';
 export type { AtajoDeTeclado, GrupoDeAtajos } from './components/ShortcutsModal.js';
 export { PaletaDeComandos } from './components/PaletaDeComandos.js';
 export type { OpcionDePaleta, PaletaDeComandosProps } from './components/PaletaDeComandos.js';
+export { filterCommands } from './lib/filtrarComandos.js';
 export { Modal } from './components/Modal.js';
 // Selector de elementos enfocables: lo comparten el Modal y cualquier otra
 // superficie que atrape el foco (el visor de presentación de Docs).
@@ -277,7 +318,10 @@ export {
   SEPARADOR_DE_BARRA,
   BARRA_DE_EDICION,
 } from './lib/cromoDeEditor.js';
-export type { DropdownProps, MenuItemProps } from './components/Dropdown.js';
+export type { DropdownProps, MenuItemProps, PuntoDeMenu } from './components/Dropdown.js';
+// La ruta de carpetas que pliega los niveles intermedios en «…» cuando no cabe.
+export { Migas, pliegueDeMigas } from './components/Migas.js';
+export type { Miga, MigasProps } from './components/Migas.js';
 export { Popover } from './components/Popover.js';
 export type { PopoverProps } from './components/Popover.js';
 export { Tooltip } from './components/Tooltip.js';
@@ -285,13 +329,30 @@ export type { TooltipProps } from './components/Tooltip.js';
 export { Tabs } from './components/Tabs.js';
 export type { TabsProps, TabItem } from './components/Tabs.js';
 export { List, ListItem } from './components/List.js';
-export type { ListProps, ListItemProps } from './components/List.js';
+export type { ListProps, ListItemProps, AccionDeslizar } from './components/List.js';
+// Deslizar una fila con el dedo (Mail: archivar / papelera). Ver el módulo.
+export {
+  useDeslizarFila,
+  iniciarDeslizar,
+  desplazamientoVisible,
+  UMBRAL_INICIO,
+} from './lib/useDeslizarFila.js';
+export type { DeslizarFila, SentidoDeslizar } from './lib/useDeslizarFila.js';
 export { VirtualList } from './components/VirtualList.js';
 export type { VirtualListProps, VirtualListHandle } from './components/VirtualList.js';
 export { Table } from './components/Table.js';
 export type { TableProps, TableColumn, SortDirection } from './components/Table.js';
-export { EmptyState } from './components/EmptyState.js';
-export type { EmptyStateProps } from './components/EmptyState.js';
+export {
+  EmptyState,
+  EMPTY_ICON_SIZE,
+  EMPTY_ICON_SIZE_COMPACT,
+  EMPTY_SPOT_SIZE,
+} from './components/EmptyState.js';
+export type {
+  EmptyStateHeadingLevel,
+  EmptyStateProps,
+  EmptyStateTone,
+} from './components/EmptyState.js';
 export { PaginaNoEncontrada } from './components/PaginaNoEncontrada.js';
 export type { PaginaNoEncontradaProps } from './components/PaginaNoEncontrada.js';
 export { DURACION_DESHACER, ToastProvider, useToast } from './components/Toast.js';
@@ -302,12 +363,25 @@ export type { ToastInput, ToastTone } from './components/Toast.js';
 // dónde conseguirlo, valida en vivo y resume antes de aplicar.
 export { Wizard, Stepper } from './components/Wizard.js';
 export type { WizardProps, WizardStep, StepperProps, WizardLabels } from './components/Wizard.js';
-export { SettingsShell, SettingsSection } from './components/SettingsShell.js';
-export type { SettingsShellProps, SettingsSectionProps } from './components/SettingsShell.js';
+export { SettingsShell, SettingsSection, seccionDelFragmento } from './components/SettingsShell.js';
+export type {
+  SettingsShellProps,
+  SettingsSectionProps,
+  SettingsIndexEntry,
+} from './components/SettingsShell.js';
 export { ChoiceCard } from './components/ChoiceCard.js';
 export type { ChoiceCardProps } from './components/ChoiceCard.js';
+export { SelectorDeColor } from './components/SelectorDeColor.js';
+export type { SelectorDeColorProps, ColorDeSelector } from './components/SelectorDeColor.js';
 export { FieldHint, InlineHelp } from './components/FieldHint.js';
-export type { FieldHintProps, InlineHelpProps, HintTone } from './components/FieldHint.js';
+export type {
+  FieldHintProps,
+  InlineHelpProps,
+  InlineHelpLive,
+  HintTone,
+} from './components/FieldHint.js';
+export { VersionList, formatVersionDate } from './components/VersionList.js';
+export type { VersionListProps, VersionListItem } from './components/VersionList.js';
 export { ReviewSummary } from './components/ReviewSummary.js';
 export type { ReviewSummaryProps, ReviewItem } from './components/ReviewSummary.js';
 // «Qué pasa con los datos» al conectar algo con un tercero: entra, sale o las dos

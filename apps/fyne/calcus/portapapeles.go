@@ -176,12 +176,14 @@ func (r *Rejilla) Pegar(texto string, soloValores bool) {
 		corte = &cp.rango
 		r.copiado = nil
 	}
-	r.L.Pegar(c0, f0, r.Cols, r.Fils, bloque, corte)
+	// Se recorta en los límites de Excel y no en la extensión (Cols, Fils), que es solo
+	// lo que se recorre ahora: lo pegado empuja la rejilla al crecer, como en la web.
+	r.L.Pegar(c0, f0, MaxColumnas, MaxFilas, bloque, corte)
 
 	cMax, fMax := c0, f0
 	for i, fila := range bloque {
-		fMax = max(fMax, min(f0+i, r.Fils-1))
-		cMax = max(cMax, min(c0+len(fila)-1, r.Cols-1))
+		fMax = max(fMax, min(f0+i, MaxFilas-1))
+		cMax = max(cMax, min(c0+len(fila)-1, MaxColumnas-1))
 	}
 	r.sel, r.ext = Celda{C: c0, F: f0}, nil
 	if cMax != c0 || fMax != f0 {

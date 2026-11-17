@@ -204,12 +204,12 @@ func (p *Pantalla) previaDe(href string, listo func()) (VistaPrevia, bool) {
 				p.notasDeOtros = map[string]*[]Nota{}
 			}
 			p.notasDeOtros[cuaderno] = nil // pedida: no se vuelve a pedir mientras llega
-			go func() {
+			p.iniciar(func() {
 				ctx, cancelar := p.ctx()
 				defer cancelar()
 				l, err := p.svc.ListNotes(ctx, cuaderno)
 				ns := DeNotas(l)
-				enHilo(func() {
+				p.enHilo(func() {
 					if err != nil {
 						delete(p.notasDeOtros, cuaderno) // que el siguiente paso lo reintente
 					} else {
@@ -217,7 +217,7 @@ func (p *Pantalla) previaDe(href string, listo func()) (VistaPrevia, bool) {
 					}
 					listo()
 				})
-			}()
+			})
 			return VistaPrevia{}, false
 		case guardadas == nil:
 			return VistaPrevia{}, false // en camino

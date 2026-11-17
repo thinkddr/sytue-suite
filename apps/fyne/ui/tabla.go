@@ -541,7 +541,7 @@ func (f *FilaTabla) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.fijos = []fyne.CanvasObject{r.base, r.velo}
 	if f.t.seleccionable() {
-		r.casilla = casillaDeFila(false, func() {
+		r.casilla = casillaDeFila(false, "", func() {
 			if f.t.AlMarcar != nil && f.fila >= 0 {
 				f.t.AlMarcar(f.fila)
 			}

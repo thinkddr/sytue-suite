@@ -20,6 +20,7 @@ import {
   Badge,
   Button,
   ChoiceCard,
+  CopyField,
   DataFlow,
   FieldGroup,
   FieldHint,
@@ -447,19 +448,6 @@ export default function ConnectIdpWizard({
       return;
     }
     onCancel();
-  }
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.notify({ tone: 'success', title: t('common.copied') });
-    } catch {
-      toast.notify({
-        tone: 'danger',
-        title: t('sso.secret.copyFailed'),
-        description: t('sso.secret.copyFailedHint'),
-      });
-    }
   }
 
   // ---- Pasos ----
@@ -1086,45 +1074,22 @@ export default function ConnectIdpWizard({
           {t(saved.enabled ? 'wizard.idp.done.savedOn' : 'wizard.idp.done.savedOff')}
         </InlineHelp>
 
-        <section class="border-warning bg-warning-bg rounded-lg border p-4">
-          <h3 class="text-warning-text text-sm font-semibold">{t('wizard.idp.done.pasteTitle')}</h3>
-          <p class="text-text-muted mt-1 text-sm leading-relaxed">
-            {t(isOidc ? 'wizard.idp.done.pasteOidc' : 'wizard.idp.done.pasteSaml')}
-          </p>
+        <InlineHelp tone="warning" live="off" title={t('wizard.idp.done.pasteTitle')} titleAs="h3">
+          <p>{t(isOidc ? 'wizard.idp.done.pasteOidc' : 'wizard.idp.done.pasteSaml')}</p>
           <div class="mt-3 flex flex-col gap-2">
             {isOidc ? (
-              <CopyRow
-                label={t('wizard.idp.done.redirectUri')}
-                value={saved.redirectUri}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
-              />
+              <CopyField label={t('wizard.idp.done.redirectUri')} value={saved.redirectUri} />
             ) : (
               <>
-                <CopyRow
-                  label={t('wizard.idp.done.acsUrl')}
-                  value={saved.acsUrl}
-                  copyLabel={t('common.copy')}
-                  onCopy={(v) => void copy(v)}
-                />
-                <CopyRow
-                  label={t('wizard.idp.done.spEntityId')}
-                  value={saved.spEntityId}
-                  copyLabel={t('common.copy')}
-                  onCopy={(v) => void copy(v)}
-                />
+                <CopyField label={t('wizard.idp.done.acsUrl')} value={saved.acsUrl} />
+                <CopyField label={t('wizard.idp.done.spEntityId')} value={saved.spEntityId} />
                 {saved.metadataUrl ? (
-                  <CopyRow
-                    label={t('wizard.idp.done.metadataUrl')}
-                    value={saved.metadataUrl}
-                    copyLabel={t('common.copy')}
-                    onCopy={(v) => void copy(v)}
-                  />
+                  <CopyField label={t('wizard.idp.done.metadataUrl')} value={saved.metadataUrl} />
                 ) : null}
               </>
             )}
           </div>
-        </section>
+        </InlineHelp>
 
         <section class="border-border bg-surface-raised rounded-lg border p-4">
           <h3 class="text-text text-sm font-semibold">{t('wizard.idp.done.nextTitle')}</h3>
@@ -1194,29 +1159,6 @@ export function NextStep({
         <p class="text-text-muted mt-0.5 text-sm leading-snug">{children}</p>
       </div>
     </li>
-  );
-}
-
-export function CopyRow({
-  label,
-  value,
-  copyLabel,
-  onCopy,
-}: {
-  label: string;
-  value: string;
-  /** Texto del botón; ya traducido por quien lo usa (`t('common.copy')`). */
-  copyLabel: string;
-  onCopy: (value: string) => void;
-}) {
-  return (
-    <div class="border-border bg-surface flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-      <span class="sytue-meta w-full shrink-0 sm:w-52">{label}</span>
-      <code class="text-text min-w-0 flex-1 font-mono text-xs break-all">{value || '—'}</code>
-      <Button variant="ghost" size="sm" disabled={!value} onClick={() => onCopy(value)}>
-        {copyLabel}
-      </Button>
-    </div>
   );
 }
 

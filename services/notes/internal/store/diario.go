@@ -21,6 +21,11 @@ func (s *Store) DailyNotebook(ctx context.Context, sub, date, title string, carr
 	t := tenancy.MustFrom(ctx)
 	var nb domain.Notebook
 	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if carry {
+			if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+				return err
+			}
+		}
 		var err error
 		if nb, err = abrirDiario(ctx, tx, t.Slug, sub, date, title); err != nil || !carry {
 			return err

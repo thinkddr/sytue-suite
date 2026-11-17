@@ -35,7 +35,8 @@ import (
 // --- fake service --------------------------------------------------------
 
 type fakeSvc struct {
-	labelSet     *domain.Label // último snapshot recibido por SetFileLabel
+	lastOrden    store.OrdenFicheros // último orden recibido por ListFilesPage / TeamListChildren
+	labelSet     *domain.Label       // último snapshot recibido por SetFileLabel
 	labelPerm    domain.Permission
 	labelErr     error
 	root         domain.Folder
@@ -160,6 +161,7 @@ type fakeSvc struct {
 
 	// captura
 	lastUploadName string
+	lastKeepBoth   bool
 	lastShareInput service.CreateShareInput
 	lastVerifyPass string
 	lastGroups     []string
@@ -212,7 +214,8 @@ func (f *fakeSvc) ListSubfolders(context.Context, uuid.UUID) ([]domain.Folder, e
 	return f.childFold, f.childErr
 }
 
-func (f *fakeSvc) ListFilesPage(context.Context, uuid.UUID, string, int) (service.FilePage, error) {
+func (f *fakeSvc) ListFilesPage(_ context.Context, _ uuid.UUID, orden store.OrdenFicheros, _ string, _ int) (service.FilePage, error) {
+	f.lastOrden = orden
 	return f.page, f.pageErr
 }
 
@@ -228,8 +231,9 @@ func (f *fakeSvc) MoveFolder(context.Context, uuid.UUID, uuid.UUID) (domain.Fold
 	return f.moved, f.moveErr
 }
 func (f *fakeSvc) DeleteFolder(context.Context, uuid.UUID) error { return f.delFldErr }
-func (f *fakeSvc) UploadFile(_ context.Context, _ uuid.UUID, name, _, _ string, body io.Reader) (domain.File, error) {
+func (f *fakeSvc) UploadFile(ctx context.Context, _ uuid.UUID, name, _, _ string, body io.Reader) (domain.File, error) {
 	f.lastUploadName = name
+	f.lastKeepBoth = store.PideConservarAmbos(ctx)
 	_, _ = io.Copy(io.Discard, body)
 	return f.uploaded, f.uploadErr
 }
@@ -460,8 +464,9 @@ func (f *fakeSvc) RemoveTeamDriveMember(_ context.Context, _ uuid.UUID, _, subje
 	return f.teamRemoveErr
 }
 
-func (f *fakeSvc) TeamListChildren(_ context.Context, _ uuid.UUID, _ string, folderID uuid.UUID, _ string, _ int) (service.TeamListing, error) {
+func (f *fakeSvc) TeamListChildren(_ context.Context, _ uuid.UUID, _ string, folderID uuid.UUID, orden store.OrdenFicheros, _ string, _ int) (service.TeamListing, error) {
 	f.lastTeamFolderID = folderID
+	f.lastOrden = orden
 	return f.teamListing, f.teamChildErr
 }
 
@@ -890,6 +895,31 @@ func TestUploadFileOK(t *testing.T) {
 	}
 	if svc.lastUploadName != "f.txt" {
 		t.Fatalf("nombre pasado = %q", svc.lastUploadName)
+	}
+}
+
+// TestUploadFileOnConflict: `on_conflict=keep_both` llega al servicio como
+// store.ConservarAmbos; sin él, o con `replace`, se sustituye como siempre; y un valor
+// que no es ninguno de los dos es un 400, no una sustitución por sorpresa.
+func TestUploadFileOnConflict(t *testing.T) {
+	for _, c := range []struct {
+		query  string
+		codigo int
+		ambos  bool
+	}{
+		{"", http.StatusCreated, false},
+		{"&on_conflict=replace", http.StatusCreated, false},
+		{"&on_conflict=keep_both", http.StatusCreated, true},
+		{"&on_conflict=rename", http.StatusBadRequest, false},
+	} {
+		svc := &fakeSvc{uploaded: domain.File{ID: uuid.New()}}
+		h := newHandlers(svc)
+		r := mkReq(http.MethodPost, "/x?name=IMG_0001.jpg"+c.query, "c", map[string]string{"id": uuid.New().String()})
+		rec := httptest.NewRecorder()
+		h.UploadFile(rec, r)
+		if rec.Code != c.codigo || svc.lastKeepBoth != c.ambos {
+			t.Errorf("%q: código %d (quiero %d), conservar ambos %v (quiero %v)", c.query, rec.Code, c.codigo, svc.lastKeepBoth, c.ambos)
+		}
 	}
 }
 

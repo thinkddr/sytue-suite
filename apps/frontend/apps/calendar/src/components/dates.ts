@@ -16,9 +16,8 @@
  * necesite, tocando SOLO `startOfWeek` y ese índice.
  */
 
-import type { CalendarEvent } from '@sytue/api-clients';
 import { intlTag, type Locale } from '@sytue/i18n';
-import { parseExdates, parseRecurrence, type Recurrence } from '../lib/ical.js';
+import type { Recurrence } from '../lib/ical.js';
 import { instantFromZonedWallClock } from './tz.js';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda';
@@ -335,12 +334,6 @@ export function toIcalUtc(d: Date): string {
     .replace(/\.\d{3}Z$/, 'Z');
 }
 
-/** yyyymmdd (fecha local) para DTSTART de un evento de todo el dia. */
-function toIcalDateLocal(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-}
-
 /** DTSTART de la i-esima ocurrencia, calculado desde el maestro (sin acumular). */
 export function occurrenceStart(
   base: Date,
@@ -351,78 +344,31 @@ export function occurrenceStart(
   if (i === 0) return new Date(base);
   if (freq === 'DAILY') return addDays(base, i * interval);
   if (freq === 'WEEKLY') return addDays(base, i * interval * 7);
+  if (freq === 'YEARLY') return addMonths(base, i * interval * 12);
   return addMonths(base, i * interval); // MONTHLY (día del mes vía JS Date; Feb 30 → Mar)
-}
-
-/**
- * Expande los eventos recurrentes (RRULE) en ocurrencias individuales dentro de
- * [rangeStart, rangeEnd). El backend CalDAV NO expande: devuelve el VEVENT
- * maestro con su RRULE, y solo lo incluye en el rango si el maestro (su primera
- * instancia) solapa la ventana. Por eso expandimos aquí, cara al usuario.
- *
- * Cada ocurrencia es un clon del maestro con su propio start/end; conserva
- * href/uid/ical del maestro, así que editar/borrar cualquier ocurrencia opera
- * sobre la serie. Los eventos puntuales pasan tal cual.
- *
- * Respeta EXDATE: las instancias excluidas (borradas «solo este» o editadas como
- * evento suelto aparte) no se pintan, evitando el duplicado con el override.
- *
- * ponytail: solo DAILY/WEEKLY/MONTHLY (lo que crea la UI); cota de 400 iters por
- * serie acota reglas infinitas. Upgrade: expandir en el backend (Go
- * QueryCalendarObjects) para ver series cuya 1ª instancia queda fuera de la vista.
- */
-export function expandOccurrences(
-  events: CalendarEvent[],
-  rangeStart: Date,
-  rangeEnd: Date,
-): CalendarEvent[] {
-  const out: CalendarEvent[] = [];
-  for (const ev of events) {
-    const rec = ev.ical ? parseRecurrence(ev.ical) : null;
-    const start = parseIcalDate(ev.start);
-    if (!rec || !start) {
-      out.push(ev);
-      continue;
-    }
-    const allDay = /^\d{8}$/.test(ev.start);
-    const end = ev.end ? parseIcalDate(ev.end) : null;
-    const durMs = end ? end.getTime() - start.getTime() : 0;
-    const interval = rec.interval && rec.interval > 0 ? rec.interval : 1;
-    const untilMs = rec.until ? endOfLocalDay(rec.until).getTime() : Infinity;
-    const cap = rec.count && rec.count > 0 ? Math.min(rec.count, 400) : 400;
-    // Instantes excluidos (EXDATE): la instancia se editó/borró «solo este».
-    const excluded = new Set<number>();
-    for (const tok of ev.ical ? parseExdates(ev.ical) : []) {
-      const d = parseIcalDate(tok);
-      if (d) excluded.add(d.getTime());
-    }
-    for (let i = 0; i < cap; i++) {
-      const occ = occurrenceStart(start, i, rec.freq, interval);
-      const occMs = occ.getTime();
-      if (occMs > untilMs || occMs >= rangeEnd.getTime()) break; // monótono: nada más cabe
-      if (excluded.has(occMs)) continue; // instancia excluida (EXDATE)
-      if (occMs + durMs <= rangeStart.getTime()) continue; // termina antes de la ventana
-      const occEnd = new Date(occMs + durMs);
-      out.push({
-        ...ev,
-        start: allDay ? toIcalDateLocal(occ) : toIcalUtc(occ),
-        ...(end ? { end: allDay ? toIcalDateLocal(occEnd) : toIcalUtc(occEnd) } : {}),
-      });
-    }
-  }
-  return out;
-}
-
-/** 'yyyy-mm-dd' → Date del final de ese día (hora local). */
-function endOfLocalDay(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y!, m! - 1, d, 23, 59, 59, 999);
 }
 
 /** Convierte una Date a value para <input type="datetime-local">. */
 export function toDatetimeLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Lee el valor de un `<input type="date">` ('AAAA-MM-DD') como medianoche LOCAL. No
+ * vale `new Date('2026-11-11')`: el estándar la lee en UTC y al oeste de Greenwich
+ * caería en el día anterior. Null si no es una fecha de verdad (vacío, 31 de febrero).
+ */
+export function parseDateInput(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const fecha = new Date(y, mo - 1, d);
+  // `Date` desborda en silencio (31 feb → 3 mar): si no vuelve igual, no existía.
+  if (fecha.getFullYear() !== y || fecha.getMonth() !== mo - 1 || fecha.getDate() !== d) {
+    return null;
+  }
+  return fecha;
 }
 
 /**
@@ -448,6 +394,33 @@ export function shiftEnd(from: string, to: string, end: string): string {
   const finish = Date.parse(end);
   if (!Number.isFinite(before) || !Number.isFinite(after) || !Number.isFinite(finish)) return end;
   return toDatetimeLocal(new Date(finish + (after - before)));
+}
+
+/**
+ * Último día de un evento de día completo a partir de su DTEND, que es EXCLUSIVO
+ * (RFC 5545 §3.6.1: «8–10 nov» se guarda con DTEND=20261111). Es lo que enseña el
+ * formulario al abrirlo: las vistas ya pintan así el evento y el campo «Fin» tiene
+ * que decir lo mismo que la rejilla. Sin fin, o con un fin que no pasa del inicio
+ * (datos de otros clientes, o los guardados antes con el fin inclusivo), el último
+ * día es el del inicio: nunca un fin anterior al inicio.
+ */
+export function finInclusivo(start: Date, end: Date | undefined): Date {
+  if (!end) return start;
+  const last = addDays(end, -1);
+  return last.getTime() < start.getTime() ? start : last;
+}
+
+/**
+ * DTEND exclusivo que se guarda para un día completo cuyo último día es el de `end`
+ * (valores de datetime-local; la hora se conserva para no dejar en blanco el campo
+ * si luego se quita «todo el día»). Un fin vacío o anterior al inicio cuenta como un
+ * día suelto: su DTEND es el día siguiente al inicio, nunca igual (inválido).
+ */
+export function finExclusivo(start: string, end: string): string {
+  const last = end && Date.parse(end) >= Date.parse(start) ? end : start;
+  const [y, m, d] = last.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return end;
+  return withLocalDate(last, toDatetimeLocal(new Date(y, m - 1, d + 1)).slice(0, 10));
 }
 
 function capitalize(s: string): string {

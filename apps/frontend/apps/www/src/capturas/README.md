@@ -1,55 +1,60 @@
-# Capturas de producto
+<a id="capturas-de-producto"></a>
 
-Las imágenes de esta carpeta salen en las fichas `/product/<key>`, **por
-convención de nombre**. No hay lista que mantener en ninguna parte:
+# Product screenshots
 
-| Fichero                         | Dónde sale                                               |
-| ------------------------------- | -------------------------------------------------------- |
-| `<key>.<idioma>.webp`           | Bajo el titular de la ficha, antes de los cuatro puntos. |
-| `<key>-funciones.<idioma>.webp` | Después de la lista larga de funciones.                  |
+The images in this folder appear on the `/product/<key>` pages, **by naming
+convention**. There is no list to maintain anywhere:
 
-`<key>` es la clave del producto (`mail`, `drive`, `notes`, `photos`…), la misma
-de `PRODUCT_KEYS` en `src/lib/product-content.ts`. `<idioma>` es uno de los cinco
-de `LOCALES` (`packages/i18n`). Un producto sin captura enseña la ficha de
-siempre: no hay hueco vacío ni imagen rota.
+| File                            | Where it appears                                        |
+| ------------------------------- | ------------------------------------------------------- |
+| `<key>.<idioma>.webp`           | Below the page headline, before the four bullet points. |
+| `<key>-funciones.<idioma>.webp` | After the long list of features.                        |
 
-**El idioma va en el nombre porque la pantalla también está traducida.** Enseñar
-la captura en español dentro de la ficha alemana deja media página en un idioma y
-la imagen que la ilustra en otro. Si falta la de un idioma, la ficha cae a la del
-idioma por defecto antes que quedarse sin imagen.
+`<key>` is the product key (`mail`, `drive`, `notes`, `photos`…), the same one as
+in `PRODUCT_KEYS` in `src/lib/product-content.ts`. `<idioma>` (language) is one of
+the five in `LOCALES` (`packages/i18n`). A product without a screenshot shows the
+usual page: no empty gap and no broken image.
 
-Lo que **no** se traduce es el contenido de la cuenta —los asuntos de los correos,
-los títulos de las notas—: es lo que hay dentro del buzón de demostración y sigue
-en español en las cinco. Lo que cambia es la interfaz, que es lo que la ficha
-viene a enseñar.
+**The language goes in the name because the screen is translated too.** Showing
+the Spanish screenshot on the German page leaves half the page in one language and
+the image illustrating it in another. If the one for a language is missing, the
+page falls back to the default language's screenshot rather than going without an image.
 
-## Cómo se hacen
+What is **not** translated is the account content —email subjects, note
+titles—: it is what is inside the demo mailbox and it stays in Spanish in all
+five. What changes is the interface, which is what the page is there to show.
 
-**1440×900** (proporción 16/10, la que reserva `Captura.astro`), una pasada por
-idioma y con una cuenta de demostración, nunca con datos de nadie. Se generan con
-Playwright contra la suite desplegada y se convierten a WebP:
+<a id="cómo-se-hacen"></a>
+
+## How they are made
+
+**1440×900** (16/10 aspect ratio, the one `Captura.astro` reserves), one pass per
+language and with a demo account, never with anyone's data. They are generated
+with Playwright against the deployed suite and converted to WebP:
 
 ```
 magick captura.png -quality 82 -define webp:method=6 <key>.webp
 ```
 
-Que sean **capturas de verdad** no es un detalle: la ficha promete lo que el
-producto hace hoy, y una imagen retocada con funciones que no existen convierte
-esa promesa en publicidad engañosa.
+That they are **real screenshots** is not a detail: the page promises what the
+product does today, and an image retouched with features that do not exist turns
+that promise into misleading advertising.
 
-## Lo que no se publica
+<a id="lo-que-no-se-publica"></a>
 
-Antes de disparar, el guion **desenfoca** lo que identifica a alguien:
-direcciones de correo, direcciones IP y el `@usuario`. No toca los dominios reservados para
-documentación (RFC 2606 y 6761: `.example`, `.test`, `.invalid`,
-`example.com`…), que son justamente los datos de demostración que la ficha viene
-a enseñar: tapar `carla.benet@ejemplo.test` deja la pantalla borrosa sin
-proteger a nadie.
+## What is not published
 
-Va con CSS y **antes** del disparo, no recortando el PNG después: un recorte por
-coordenadas se desalinea en cuanto cambia el diseño, y entonces el dato queda al
-aire sin que nadie se entere.
+Before shooting, the script **blurs** anything that identifies someone:
+email addresses, IP addresses and the `@usuario` (`@username`). It does not touch
+the domains reserved for documentation (RFC 2606 and 6761: `.example`, `.test`,
+`.invalid`, `example.com`…), which are precisely the demo data the page is there
+to show: covering `carla.benet@ejemplo.test` leaves the screen blurry without
+protecting anyone.
 
-Aun así, **míralas antes de commitear**. El guion tapa lo que sabe reconocer; un
-nombre propio, el asunto de un correo de verdad o lo que ponga dentro de un
-documento no los reconoce, y ahí no hay red que te salve.
+It is done with CSS and **before** the shot, not by cropping the PNG afterwards: a
+coordinate-based crop goes out of alignment as soon as the design changes, and then
+the data is left exposed without anyone noticing.
+
+Even so, **look at them before committing**. The script covers what it knows how to
+recognize; a person's name, the subject of a real email or whatever is written inside
+a document are not recognized, and there is no safety net there.

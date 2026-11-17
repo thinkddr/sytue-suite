@@ -1,5 +1,5 @@
 # Trello — workspace
-1. Trello enterprise/workspace: la conexión con el gateway es por API key/token del workspace (identidad vía Atlassian ya cubierta por la ficha Jira si la tienes).
-2. Crea la API key en <https://trello.com/app-key> y genera el token.
-3. Sytue Platform → Integraciones → **Trello**: rellena el **workspace** y pega token.
-**Verificar**: listado de tableros del workspace en el panel.
+1. Trello enterprise/workspace: the connection to the gateway uses the workspace API key/token (identity via Atlassian is already covered by the Jira listing if you have it).
+2. Create the API key at <https://trello.com/app-key> and generate the token.
+3. Sytue Platform → Integrations → **Trello**: fill in the **workspace** and paste the token.
+**Verify**: the workspace's boards are listed in the panel.

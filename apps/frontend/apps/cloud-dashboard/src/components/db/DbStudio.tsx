@@ -296,7 +296,7 @@ function ProvisionDb({ project, locale }: { project: string; locale: Locale }) {
     <Card>
       <CardBody class="p-0">
         <EmptyState
-          illustration={<Icon name="database" size={24} />}
+          icon="database"
           title={t('db.provision.title')}
           description={t('db.provision.desc')}
           action={

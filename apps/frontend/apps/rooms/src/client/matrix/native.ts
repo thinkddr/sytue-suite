@@ -5,9 +5,19 @@ import { MatrixSecurityError } from './types.js';
 export function opaqueMatrixNative(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
 }
+function nativeCatalogApp(product: string): string {
+  const native = product === 'hub' ? 'one' : product;
+  if (!Object.hasOwn(productColor, native)) throw new MatrixSecurityError('identity');
+  return native;
+}
 export function matrixNativeReturn(input: unknown, state: string): string {
   if (!input || typeof input !== 'object') throw new MatrixSecurityError('identity');
-  const result = input as { ticket?: unknown; redirect_url?: unknown; product?: unknown };
+  const result = input as {
+    ticket?: unknown;
+    redirect_url?: unknown;
+    product?: unknown;
+    native_consumer?: unknown;
+  };
   if (!opaqueMatrixNative(result.ticket) || typeof result.redirect_url !== 'string')
     throw new MatrixSecurityError('identity');
   const url = new URL(result.redirect_url);
@@ -15,8 +25,14 @@ export function matrixNativeReturn(input: unknown, state: string): string {
   // suite catalog to narrow the custom scheme; never accept a return_to URL.
   const product = result.product ?? 'rooms';
   if (typeof product !== 'string') throw new MatrixSecurityError('identity');
-  const native = product === 'hub' ? 'one' : product;
-  if (!Object.hasOwn(productColor, native)) throw new MatrixSecurityError('identity');
+  nativeCatalogApp(product);
+  const consumer = result.native_consumer === undefined ? '' : result.native_consumer;
+  if (
+    typeof consumer !== 'string' ||
+    (consumer !== '' && (product !== 'drive' || consumer === product))
+  )
+    throw new MatrixSecurityError('identity');
+  const native = nativeCatalogApp(consumer || product);
   if (
     url.protocol !== `sytue-${native}:` ||
     url.host !== 'matrix' ||

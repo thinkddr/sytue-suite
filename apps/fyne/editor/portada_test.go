@@ -228,6 +228,67 @@ func TestLaPortadaPideLoQuePideLaWeb(t *testing.T) {
 	}
 }
 
+// TestLaPortadaPideMiosCompartidosYPorTitulo: «Míos / Compartidos conmigo» y el orden
+// por título van al servicio (`scope=`, `sort=title`), también en la página siguiente,
+// como en `DocList.tsx`; y con un filtro puesto, el vacío ofrece verlo todo.
+func TestLaPortadaPideMiosCompartidosYPorTitulo(t *testing.T) {
+	s := &servicio{lista: dosDocs}
+	p := portadaDePrueba(t, s)
+	p.Cargar()
+	p.vista.alcance.AlElegir(2)
+	p.vista.orden.AlElegir(1)
+	if got := s.ultimo(); got != "GET /api/v1/documents?kind=document&limit=100&scope=shared&sort=title" {
+		t.Errorf("con alcance y orden pide %q", got)
+	}
+	if p.vista.alcance.Elegida != 2 || p.vista.orden.Elegida != 1 {
+		t.Errorf("los selectores no reflejan lo elegido: %d, %d", p.vista.alcance.Elegida, p.vista.orden.Elegida)
+	}
+	p.Mas()
+	if got := s.ultimo(); got != "GET /api/v1/documents?cursor=c2&kind=document&limit=100&scope=shared&sort=title" {
+		t.Errorf("la página siguiente pide %q", got)
+	}
+
+	s.lista = `{"documents":[]}`
+	p.ElegirAlcance(api.DocsMine)
+	if p.Estado != Vacio {
+		t.Fatalf("estado %v", p.Estado)
+	}
+	if e := p.vista.vacio(); e.Accion == nil {
+		t.Fatal("con «Míos» y sin documentos, el vacío no ofrece verlo todo")
+	}
+	p.VerTodo()
+	if got := s.ultimo(); got != "GET /api/v1/documents?kind=document&limit=100&sort=title" || p.Alcance != api.DocsAll {
+		t.Errorf("«Ver todos» pide %q", got)
+	}
+}
+
+// TestLosSelectoresDeRecientesNoSePisan: a 360 bajan a su propia fila; a 1280 van en
+// la de «Recientes», delante de «Destacados». En ningún ancho se pisan ni se salen.
+func TestLosSelectoresDeRecientesNoSePisan(t *testing.T) {
+	p := portadaDePrueba(t, &servicio{lista: dosDocs})
+	p.Cargar()
+	w := test.NewTempWindow(t, p.Objeto())
+	w.SetPadded(false)
+	for _, ancho := range []float32{360, 1280} {
+		w.Resize(fyne.NewSize(ancho, 800))
+		v := p.vista
+		a, o, f := v.alcance, v.orden, v.filtro
+		if a.Position().X+a.Size().Width > o.Position().X && a.Position().Y == o.Position().Y {
+			t.Errorf("a %g «Propietario» pisa «Ordenar por»", ancho)
+		}
+		if o.Position().X+o.Size().Width > ancho {
+			t.Errorf("a %g «Ordenar por» se sale", ancho)
+		}
+		mismaFila := a.Position().Y < f.Position().Y+f.Size().Height
+		if ancho == 1280 && (!mismaFila || o.Position().X+o.Size().Width > f.Position().X) {
+			t.Errorf("a 1280 los selectores no van delante de «Destacados»: %v / %v", o.Position(), f.Position())
+		}
+		if ancho == 360 && mismaFila {
+			t.Error("a 360 los selectores no bajan a su fila")
+		}
+	}
+}
+
 // TestCadaFalloTieneSuEstado: el 401 es la sesión, el 403 el permiso, el resto un error,
 // y una lista vacía es «vacío», no un error.
 func TestCadaFalloTieneSuEstado(t *testing.T) {

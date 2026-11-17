@@ -21,7 +21,12 @@ import (
 //
 // Todo lo de este fichero lleva el prefijo Slides: comparte paquete con el cliente de
 // Docus (docs.go), que escribe otra línea de trabajo a la vez.
-type Slides struct{ c *Client }
+type Slides struct {
+	c           *Client
+	private     SlidesData
+	docsPrivate DocsData
+	privateMode bool
+}
 
 // NewSlides crea el cliente sobre la raíz del servicio de Docs (ServiceURL(apex, "slides")
 // en nativo; el proxy «/svc/docs» en la web).
@@ -84,6 +89,15 @@ const slidesMaxCuerpo = 1 << 20
 // List devuelve una página de presentaciones, la más reciente primero, y el cursor de la
 // siguiente ("" si no hay más).
 func (s *Slides) List(ctx context.Context, q, cursor string) ([]SlidesDocument, string, error) {
+	if s == nil {
+		return nil, "", ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.ListSlides(ctx, q, cursor)
+	}
+	if s.privateMode || s.c == nil {
+		return nil, "", ErrPrivateDataOnly
+	}
 	query := url.Values{"kind": {slidesKind}, "limit": {strconv.Itoa(SlidesPagina)}}
 	if q != "" {
 		query.Set("q", q)
@@ -103,6 +117,15 @@ func (s *Slides) List(ctx context.Context, q, cursor string) ([]SlidesDocument, 
 // Create crea una presentación vacía. El servicio le crea además su fichero en la
 // unidad de la persona, y puede devolver el título desambiguado.
 func (s *Slides) Create(ctx context.Context, titulo string) (SlidesDocument, error) {
+	if s == nil {
+		return SlidesDocument{}, ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.CreateSlidePresentation(ctx, titulo)
+	}
+	if s.privateMode || s.c == nil {
+		return SlidesDocument{}, ErrPrivateDataOnly
+	}
 	r, err := PostJSON[struct {
 		Document SlidesDocument `json:"document"`
 	}](ctx, s.c, "/documents", map[string]string{"kind": slidesKind, "title": titulo})
@@ -112,6 +135,15 @@ func (s *Slides) Create(ctx context.Context, titulo string) (SlidesDocument, err
 // Get devuelve la ficha y el ROL de quien pregunta ("viewer", "commenter", "editor",
 // "owner"): solo los dos últimos pueden escribir.
 func (s *Slides) Get(ctx context.Context, id string) (SlidesDocument, string, error) {
+	if s == nil {
+		return SlidesDocument{}, "", ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.GetSlidePresentation(ctx, id)
+	}
+	if s.privateMode || s.c == nil {
+		return SlidesDocument{}, "", ErrPrivateDataOnly
+	}
 	r, err := JSON[struct {
 		Document SlidesDocument `json:"document"`
 		Role     string         `json:"role"`
@@ -124,6 +156,15 @@ func SlidesPuedeEscribir(rol string) bool { return rol == "editor" || rol == "ow
 
 // Rename cambia el título.
 func (s *Slides) Rename(ctx context.Context, id, titulo string) error {
+	if s == nil {
+		return ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.RenameSlidePresentation(ctx, id, titulo)
+	}
+	if s.privateMode || s.c == nil {
+		return ErrPrivateDataOnly
+	}
 	cuerpo, err := json.Marshal(map[string]string{"title": titulo})
 	if err != nil {
 		return err
@@ -136,11 +177,29 @@ func (s *Slides) Rename(ctx context.Context, id, titulo string) error {
 
 // Delete elimina la presentación.
 func (s *Slides) Delete(ctx context.Context, id string) error {
+	if s == nil {
+		return ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.DeleteSlidePresentation(ctx, id)
+	}
+	if s.privateMode || s.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return s.sinCuerpo(ctx, Request{Method: http.MethodDelete, Path: slidesRuta(id, "")})
 }
 
 // Content carga el contenido: el registro `doc:slides` del estado consolidado.
 func (s *Slides) Content(ctx context.Context, id string) (SlidesContent, error) {
+	if s == nil {
+		return SlidesContent{}, ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.SlideContent(ctx, id)
+	}
+	if s.privateMode || s.c == nil {
+		return SlidesContent{}, ErrPrivateDataOnly
+	}
 	r, err := JSON[struct {
 		Seq   int64 `json:"seq"`
 		State struct {
@@ -180,6 +239,15 @@ func (s *Slides) Content(ctx context.Context, id string) (SlidesContent, error) 
 // La escritura lleva `base_seq` (la seq que se cargó): si otro escribe entre esa lectura y
 // el POST, el servicio contesta 409 y el resultado es el mismo ErrSlidesConflict, sin ventana.
 func (s *Slides) Save(ctx context.Context, id string, base SlidesContent, actor string, contador uint64, modelo string) (SlidesContent, error) {
+	if s == nil {
+		return SlidesContent{}, ErrPrivateDataOnly
+	}
+	if s.private != nil {
+		return s.private.SaveSlideContent(ctx, id, base, actor, contador, modelo)
+	}
+	if s.privateMode || s.c == nil {
+		return SlidesContent{}, ErrPrivateDataOnly
+	}
 	// Solo lo que cambió, como parche (docs_parche.go): el servicio lo aplica sobre lo último
 	// que tiene y no hay conflicto con lo que otra persona haya tocado en otras cajas. Si no se
 	// deja decir así, o el servicio no entiende parches, abajo va el modelo entero.
@@ -249,6 +317,9 @@ func (s *Slides) Save(ctx context.Context, id string, base SlidesContent, actor 
 }
 
 func (s *Slides) sinCuerpo(ctx context.Context, r Request) error {
+	if s == nil || s.privateMode || s.c == nil {
+		return ErrPrivateDataOnly
+	}
 	resp, err := s.c.Do(ctx, r)
 	if err != nil {
 		return err

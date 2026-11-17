@@ -11,6 +11,7 @@
  * Reexporta los tipos de dominio desde src/lib/chat.ts.
  */
 import { roomsMatrix } from './matrix/client.js';
+import { searchEncryptedMessages } from './matrix/search.js';
 import {
   decryptPayload,
   decryptMessage,
@@ -47,6 +48,7 @@ import type {
   Persona,
 } from '../lib/chat.js';
 import { toAttachment, ChatHttpError } from '../lib/chat.js';
+import { threadInfo, type RawThreadInfo } from '../lib/hilos.js';
 import type { Invitacion } from '../lib/chat.js';
 /*
  * `withBase` en la vuelta al login: la app se sirve bajo su prefijo en el dominio
@@ -387,12 +389,14 @@ export function listThreads(
   return getJson(`/api/threads${qs}`);
 }
 
-/** Publica una respuesta dentro del hilo de un mensaje raíz. */
+/** Publica una respuesta dentro del hilo de un mensaje raíz. Con `alsoToChannel` la
+ *  respuesta se ve además en el feed del canal («También enviar al canal»). */
 export async function postReply(input: {
   messageId: string;
   body: string;
   mentions?: string[];
   fileIds?: string[];
+  alsoToChannel?: boolean;
 }): Promise<{ message: ChatMessage }> {
   const root = knownMessage(input.messageId);
   const files = input.fileIds?.length ? encryptedFiles(root.channelId, input.fileIds) : undefined;
@@ -407,7 +411,12 @@ export async function postReply(input: {
     root.matrix_event ? { thread: root.matrix_event } : undefined,
     files?.room,
   );
-  return postJson('/api/reply', { messageId: input.messageId, body: '', matrix_event });
+  return postJson('/api/reply', {
+    messageId: input.messageId,
+    body: '',
+    matrix_event,
+    ...(input.alsoToChannel ? { alsoToChannel: true } : {}),
+  });
 }
 
 /** Edita el cuerpo de un mensaje propio; devuelve el mensaje con `editedAt`. */
@@ -896,9 +905,11 @@ export function markUnread(input: { messageId: string }): Promise<{ ok: boolean 
  * incluidos los operadores from:/in:/before:/after:; el backend los parsea. Los
  * resultados no traen el nombre del canal (se resuelve en el cliente).
  */
-export function searchMessages(query: string): Promise<{ messages: ChatMessage[] }> {
-  void query;
-  return Promise.reject(new MatrixSecurityError('unsupported'));
+export function searchMessages(
+  query: string,
+  signal?: AbortSignal,
+): Promise<{ messages: ChatMessage[] }> {
+  return searchEncryptedMessages(query, signal);
 }
 
 /**
@@ -925,6 +936,18 @@ export function messageLink(
   base: string = appUrl('rooms', '', orgActual('/rooms')),
 ): string {
   return `${base}/channels/${encodeURIComponent(channelId)}?message=${encodeURIComponent(messageId)}`;
+}
+
+/**
+ * El enlace a un CANAL o chat, con las mismas reglas que `messageLink` (host, prefijo
+ * y organización de la URL vista). Lo lleva la descripción del evento de «Programar
+ * reunión» para volver a la conversación desde Calendar.
+ */
+export function channelLink(
+  channelId: string,
+  base: string = appUrl('rooms', '', orgActual('/rooms')),
+): string {
+  return `${base}/channels/${encodeURIComponent(channelId)}`;
 }
 
 // ---- Tiempo real (WebSocket) ----
@@ -986,7 +1009,7 @@ interface RawReaction {
 }
 
 /** Mensaje tal y como lo empuja el servicio Go por el WS (snake_case). */
-interface RawMessage {
+interface RawMessage extends RawThreadInfo {
   matrix_event?: ChatMessage['matrix_event'];
   encryption?: ChatMessage['encryption'];
   id: string;
@@ -1076,6 +1099,7 @@ function mapRawMessage(m: RawMessage, userId: string): ChatMessage {
       ? { attachments: m.attachments.map(toAttachment) }
       : {}),
     ...(m.reply_count ? { replyCount: m.reply_count } : {}),
+    ...threadInfo(m),
     ...(m.card?.kind ? { card: mapRawCard(m.card, userId) } : {}),
     ...(m.reactions
       ? {

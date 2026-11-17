@@ -14,7 +14,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Modal, Spinner } from '@sytue/ui';
+import { Modal, Spinner, Button, EmptyState } from '@sytue/ui';
 import type { Note } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
 import * as api from '../client/notesApi.js';
@@ -31,6 +31,8 @@ export function BacklinksPanel({
 }): JSX.Element {
   const [estado, setEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
   const [notas, setNotas] = useState<Note[]>([]);
+  // Sube con «Reintentar»: vuelve a pedir los retroenlaces sin cerrar el panel.
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     // `vivo` corta el `setState` de una respuesta que llega después de cerrar:
@@ -48,7 +50,7 @@ export function BacklinksPanel({
     return () => {
       vivo = false;
     };
-  }, [note.id]);
+  }, [note.id, intento]);
 
   return (
     <Modal open onClose={onClose} title={t('backlinks.title')} size="sm">
@@ -60,16 +62,25 @@ export function BacklinksPanel({
           <Spinner label={t('backlinks.title')} />
         </div>
       ) : estado === 'error' ? (
-        <p class="text-danger-text text-base" role="alert">
-          {t('error.loadFailed')}
-        </p>
+        <EmptyState
+          compact
+          tone="error"
+          title={t('error.loadFailed')}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setIntento((n) => n + 1)}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
       ) : notas.length === 0 ? (
         // El vacío se EXPLICA. «Ninguna» a secas se lee como un fallo; lo que
         // hace falta saber es que esto se llena solo, enlazando desde otra nota.
-        <div class="grid gap-1.5 py-4">
-          <p class="text-text text-base">{t('backlinks.empty')}</p>
-          <p class="sytue-meta">{t('backlinks.emptyHint')}</p>
-        </div>
+        <EmptyState
+          compact
+          icon="link"
+          title={t('backlinks.empty')}
+          description={t('backlinks.emptyHint')}
+        />
       ) : (
         <ul class="grid gap-1.5">
           {notas.map((n) => (

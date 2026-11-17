@@ -3,12 +3,13 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * Pestaña «Colaboración» del ribbon (BLUEPRINT.md §6.3 + encargo B5):
- * comentarios (nuevo sobre la selección + mostrar/ocultar panel), control de
+ * comentarios (nuevo sobre la selección, o sobre la celda activa en una hoja, + mostrar/ocultar panel), control de
  * cambios (marca la edición con autoría —<ins>/<del> data-track— en el HTML del
  * folio; solo kind document), versiones (guardar + historial) y compartir
  * (mismo diálogo que la cabecera: copiar enlace + toast).
  */
 import type { JSX } from 'preact';
+import { useState } from 'preact/hooks';
 import { useConfirm, usePrompt, useToast } from '@sytue/ui';
 import {
   getEditorRoot,
@@ -17,12 +18,14 @@ import {
   wrapSelectionForComment,
 } from '../../canvas/exec';
 import { quitarTabulaciones } from '../../canvas/tabulaciones';
+import { autoformatoActivo, fijarAutoformato } from '../../canvas/autoformato';
 import { withTrackFlag } from '../../trackchanges';
 import { ShareDialog } from '../../dialogs/ShareDialog';
 import { EditorIcon } from '../../icons';
 import type { EditorContext } from '../../types';
 import { MenuHistorial } from '../../HistorialVersiones';
 import { RibbonButton, RibbonGroup, RibbonSeparator } from '../primitives';
+import { readSheetCellAnchor } from '../../sheets/SheetCanvas';
 
 /** Receta de foco visible del blueprint (§0.6): nunca outline:none sin reemplazo. */
 // El anillo canónico vive en `@sytue/ui/styles.css` (.sytue-focus-ring): una sola
@@ -71,12 +74,28 @@ export function ColaboracionTab({ ctx }: { ctx: EditorContext }): JSX.Element {
   const t = ctx.t;
   const offline = ctx.connection === 'offline';
   const comentariosVisibles = ctx.ui.panel === 'comentarios';
+  // Preferencia de quien escribe (por navegador), no del documento: no pasa por el modelo.
+  const [autoformato, setAutoformato] = useState(autoformatoActivo);
 
   /** Comentario anclado a la selección: se envuelve lo seleccionado en un
    *  `<mark data-comment-id>` (resaltado sutil que persiste en el HTML del folio)
    *  ANTES del prompt —que colapsa la selección— y el ancla `{ mark, text }` viaja
    *  en el comentario. Sin selección → comentario de documento (ancla null). */
   const nuevoComentario = async (): Promise<void> => {
+    // En una hoja el comentario va pegado a la celda activa (`sheets/anclaCelda.ts`), como en
+    // Excel y Sheets: la rejilla lo marca con su triángulo y sigue a la celda si se insertan
+    // filas o columnas. Sin hoja montada (no debería pasar) queda suelto.
+    if (ctx.kind === 'spreadsheet') {
+      const celda = readSheetCellAnchor();
+      const body = await preguntar({ mensaje: t('comments.newPrompt') });
+      if (body === null || !body.trim()) return;
+      void ctx
+        .addComment(body.trim(), celda)
+        .then(() => toast.notify({ tone: 'success', title: t('comments.added') }))
+        .catch(() => toast.notify({ tone: 'danger', title: t('comments.addError') }));
+      ctx.setUi({ panel: 'comentarios' });
+      return;
+    }
     const markId = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
     const cita = wrapSelectionForComment(markId); // null si no hay selección de texto
     const body = await preguntar({ mensaje: t('comments.newPrompt') });
@@ -165,6 +184,17 @@ export function ColaboracionTab({ ctx }: { ctx: EditorContext }): JSX.Element {
               icon="trackChanges"
               active={ctx.ui.track}
               onAction={conmutarControlCambios}
+            />
+            {/* Autoformato Markdown al escribir («# » título, «- » viñetas, «[ ] » casillas,
+             **negrita**…): encendido por defecto, como en Google Docs. */}
+            <RibbonButton
+              commandId="markdownAutoformat"
+              icon="markdown"
+              active={autoformato}
+              onAction={() => {
+                fijarAutoformato(!autoformato);
+                setAutoformato(!autoformato);
+              }}
             />
             {/* Abre el panel de revisión (aceptar/rechazar cambio a cambio + navegar). */}
             <RibbonButton

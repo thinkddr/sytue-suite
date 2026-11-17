@@ -1,13 +1,15 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-## Descripción
+<a id="descripción"></a>
+## Description
 
-<!-- Qué cambia y por qué. Referencia a la incidencia si la hay. -->
+<!-- What changes and why. Reference the issue if there is one. -->
 
-## Checklist de paridad y versiones
+<a id="checklist-de-paridad-y-versiones"></a>
+## Parity and versions checklist
 
-- [ ] **Paridad web → nativas (CONVENTIONS §13.5)**: si este PR añade o toca una función de las web apps, el registro `apps/frontend/packages/config/src/paridad.ts` la incorpora con estado en `escritorio` y `movil` ('si', o 'planificado' con `deuda`). TopBar = única excepción.
-- [ ] En cada ola con funciones de web pendientes en el registro: ci-desktop y ci-mobile corren al crear la release — no cortes una con 'planificado' nuevo sin su deuda.
-- [ ] Dependencias/Action/imágenes a la última estable, con su fila en `compliance/supply-chain/blocked-baseline.tsv` si introduce host no-UE.
-- [ ] Gates en local ANTES de pushear (el hook de pre-push los corre).
-- [ ] Prueba dejada detrás (§13.4) y, si hay SQL nuevo, test de integración contra Postgres.
+- [ ] **Web → native parity (CONVENTIONS §13.5)**: if this PR adds or touches a web app feature, the registry `apps/frontend/packages/config/src/paridad.ts` includes it with a status in `escritorio` and `movil` ('si', or 'planificado' with `deuda`). TopBar = the only exception.
+- [ ] In every wave with pending web features in the registry: ci-desktop and ci-mobile run when the release is created — do not cut one with a new 'planificado' without its `deuda`.
+- [ ] Dependencies/Actions/images at the latest stable version, with their row in `compliance/supply-chain/blocked-baseline.tsv` if it introduces a non-EU host.
+- [ ] Gates run locally BEFORE pushing (the pre-push hook runs them).
+- [ ] A test left behind (§13.4) and, if there is new SQL, an integration test against Postgres.

@@ -77,6 +77,56 @@ func (s *Store) CrearVista(ctx context.Context, a domain.Actor, tabla, nombre st
 	return v, err
 }
 
+// ActualizarVista cambia el nombre y/o la configuración de una vista guardada (editor).
+// El tipo no cambia: los enlaces de formulario y las conexiones cuelgan de la vista y
+// dan por hecho lo que es; para otra forma de mirar la tabla se crea otra vista. La
+// configuración nueva se valida contra los campos de AHORA, igual que al crearla, y la
+// traza guarda la de antes y la de después (`view.update`).
+func (s *Store) ActualizarVista(ctx context.Context, a domain.Actor, vista string, nombre *string, cfg *domain.ConfigVista) (domain.Vista, error) {
+	if nombre == nil && cfg == nil {
+		return domain.Vista{}, domain.ErrInvalido
+	}
+	if nombre != nil {
+		limpio, err := domain.LimpiarNombre(*nombre)
+		if err != nil {
+			return domain.Vista{}, err
+		}
+		nombre = &limpio
+	}
+	var v domain.Vista
+	err := s.en(ctx, a, func(tx pgx.Tx) error {
+		var base string
+		var crudo []byte
+		if err := errNoFilas(tx.QueryRow(ctx, `SELECT id::text, table_id::text, base_id::text, name, kind, config, created_by FROM base_views WHERE id = $1 AND tenant = $2 FOR UPDATE`, vista, a.Tenant).
+			Scan(&v.ID, &v.TableID, &base, &v.Name, &v.Kind, &crudo, &v.CreatedBy)); err != nil {
+			return err
+		}
+		if err := autorizar(ctx, tx, a, base, v.TableID, domain.AccGestionVistas); err != nil {
+			return err
+		}
+		_ = json.Unmarshal(crudo, &v.Config)
+		antes := map[string]any{"name": v.Name, "config": v.Config}
+		if nombre != nil {
+			v.Name = *nombre
+		}
+		if cfg != nil {
+			campos, err := camposDe(ctx, tx, a, v.TableID)
+			if err != nil {
+				return err
+			}
+			if v.Config, err = domain.ValidarConfig(v.Kind, *cfg, campos); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE base_views SET name = $3, config = $4::jsonb WHERE id = $1 AND tenant = $2`,
+			vista, a.Tenant, v.Name, jsonDe(v.Config)); err != nil {
+			return err
+		}
+		return auditar(ctx, tx, a, base, &v.TableID, nil, nil, "view.update", jsonDe(antes), jsonDe(map[string]any{"name": v.Name, "config": v.Config}))
+	})
+	return v, err
+}
+
 // BorrarVista borra una vista (editor).
 func (s *Store) BorrarVista(ctx context.Context, a domain.Actor, vista string) error {
 	return s.en(ctx, a, func(tx pgx.Tx) error {

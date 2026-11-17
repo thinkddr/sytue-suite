@@ -6,11 +6,19 @@
  * docs/CONVENTIONS.md §10, §14.
  */
 import { useState } from 'preact/hooks';
-import { Card, CardBody, CardHeader, CardTitle, Badge, Button, useToast } from '@sytue/ui';
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Button,
+  useToast,
+  CopyField,
+} from '@sytue/ui';
 import type { DbApiInfo, DbTable } from '../../lib/types.js';
 import type { T } from '../../i18n/index.js';
 import { r } from '../../lib/rutas.js';
-import { CopyField } from '../CopyField.js';
 
 export default function ApiPanel({
   project,
@@ -48,21 +56,21 @@ export default function ApiPanel({
         </CardHeader>
         <CardBody class="flex flex-col gap-4">
           <p class="text-text-muted max-w-2xl text-base">{t('db.api.desc')}</p>
-          <CopyField t={t} label={t('db.api.restUrl')} value={api.restUrl} />
+          <CopyField labelWidth="stacked" label={t('db.api.restUrl')} value={api.restUrl} />
           <div class="grid gap-4 sm:grid-cols-2">
             <CopyField
-              t={t}
+              labelWidth="stacked"
               label={t('db.api.anonKey')}
               value={api.anonKeyPreview}
               secret
-              manageHref={secretsHref}
+              action={<GestionarSecreto t={t} label={t('db.api.anonKey')} href={secretsHref} />}
             />
             <CopyField
-              t={t}
+              labelWidth="stacked"
               label={t('db.api.serviceKey')}
               value={api.serviceKeyPreview}
               secret
-              manageHref={secretsHref}
+              action={<GestionarSecreto t={t} label={t('db.api.serviceKey')} href={secretsHref} />}
             />
           </div>
           <ConnectionString project={project} masked={api.connectionString} t={t} />
@@ -130,16 +138,15 @@ function ConnectionString({ project, masked, t }: { project: string; masked: str
   // Revelada: es un valor real, así que se copia como cualquier otro campo (y ya
   // no se ofrece «gestionar en Secretos», que aquí no viene a cuento).
   if (dsn) {
-    return <CopyField t={t} label={t('db.api.connectionString')} value={dsn} />;
+    return <CopyField labelWidth="stacked" label={t('db.api.connectionString')} value={dsn} />;
   }
   return (
-    <div class="flex flex-col gap-1">
-      <span class="text-text text-sm font-semibold">{t('db.api.connectionString')}</span>
-      <div class="flex items-center gap-2">
-        <code class="border-border bg-surface-sunken text-text-muted min-w-0 flex-1 truncate rounded-md border px-3 py-2 font-mono text-sm">
-          {masked}
-        </code>
-        <Badge tone="warning">{t('copy.secret')}</Badge>
+    <CopyField
+      labelWidth="stacked"
+      label={t('db.api.connectionString')}
+      value={masked}
+      secret
+      action={
         <Button
           variant="secondary"
           size="sm"
@@ -149,7 +156,23 @@ function ConnectionString({ project, masked, t }: { project: string; masked: str
         >
           {t('db.api.reveal')}
         </Button>
-      </div>
-    </div>
+      }
+    />
+  );
+}
+
+/**
+ * El preview de una clave está enmascarado por diseño: en vez de copiarlo (sería una
+ * clave rota) se lleva a «Variables y secretos», donde vive el valor real.
+ */
+function GestionarSecreto({ t, label, href }: { t: T; label: string; href: string }) {
+  return (
+    <a
+      href={href}
+      class="text-primary-text sytue-focus-ring-inset shrink-0 rounded-sm text-sm font-semibold hover:underline"
+      aria-label={t('copy.manageLabel', { label })}
+    >
+      {t('copy.manage')}
+    </a>
   );
 }

@@ -87,12 +87,7 @@ func SetMaintenance(ctx context.Context, q Querier) error {
 // LOCAL) y ejecuta fn. Es el camino para tareas cross-tenant legítimas (cola de
 // salida, resolución de dirección entrante del MX) sin recurrir a BYPASSRLS.
 func (p *Pool) InMaintenanceTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
-	return p.InTx(ctx, func(tx pgx.Tx) error {
-		if err := SetMaintenance(ctx, tx); err != nil {
-			return err
-		}
-		return fn(tx)
-	})
+	return inModeTx(ctx, p, SetMaintenance, fn)
 }
 
 // identSafe valida que un identificador SQL contenga solo caracteres seguros
@@ -138,12 +133,7 @@ func SetMerge(ctx context.Context, q Querier) error {
 // InMergeTx abre una transacción con `app.merge='on'` fijado y ejecuta fn. Lo usa
 // EXCLUSIVAMENTE la fusión de organizaciones de la administración de plataforma.
 func (p *Pool) InMergeTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
-	return p.InTx(ctx, func(tx pgx.Tx) error {
-		if err := SetMerge(ctx, tx); err != nil {
-			return err
-		}
-		return fn(tx)
-	})
+	return inModeTx(ctx, p, SetMerge, fn)
 }
 
 // MergePolicySQL genera el SQL idempotente que autoriza a una transacción de
@@ -162,4 +152,17 @@ func MergePolicySQL(table string) (string, error) {
 			"    WITH CHECK (current_setting('%[3]s', true) = 'on');",
 		table, policy, MergeSettingKey,
 	), nil
+}
+
+type transactionRunner interface {
+	InTx(context.Context, func(pgx.Tx) error) error
+}
+
+func inModeTx(ctx context.Context, db transactionRunner, set func(context.Context, Querier) error, fn func(pgx.Tx) error) error {
+	return db.InTx(ctx, func(tx pgx.Tx) error {
+		if err := set(ctx, tx); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
 }

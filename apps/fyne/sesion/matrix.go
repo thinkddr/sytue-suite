@@ -73,7 +73,7 @@ func (s *Suite) recibirMatrix(u *url.URL) bool {
 	if flow == nil {
 		return true
 	}
-	callback, ok := api.ParseMatrixNativeCallbackFor(u, flow.start.Product())
+	callback, ok := api.ParseMatrixNativeCallbackForConsumer(u, flow.start.Product(), flow.start.NativeConsumer())
 	if !ok {
 		return true
 	}

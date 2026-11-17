@@ -411,7 +411,7 @@ function Inner({ projectSlug, catalog, installed, hayPostgres, live, t }: Props 
         <Card>
           <CardBody>
             <EmptyState
-              illustration={<Icon name="grid" size={32} />}
+              icon="grid"
               title={t('apps.empty.title')}
               description={t('apps.empty.desc')}
             />

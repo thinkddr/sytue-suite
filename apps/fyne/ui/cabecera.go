@@ -17,13 +17,14 @@ import (
 // un filete abajo. Es el patrón canónico del título de bandeja, lista o vista de cada
 // app, y NO lleva el color del producto: ese vive en el menú y en la barra.
 //
-// Medida en producción, y con dos alturas que salen de la misma regla:
+// Medida en producción, y con dos alturas que salen de la misma regla (las cifras, con
+// el rem de 16):
 //
-//	42     «Recibidos · 17 sin leer» (Mail) y «Hoy · Ver el calendario» (Hub):
-//	       el contenido (22,75) no llega al `min-h-12`, y el mínimo manda
-//	46,5   la cabecera de Calendar, que mete un botón de 28: ahí manda el contenido
+//	48     «Recibidos · 17 sin leer» (Mail) y «Hoy · Ver el calendario» (Hub):
+//	       el contenido (26) no llega al `min-h-12`, y el mínimo manda
+//	53     la cabecera de Calendar, que mete un botón de 32: ahí manda el contenido
 //
-// O sea `max(42, contenido + py-2.5 × 2 + 1)`. Los 42 son `min-h-12` con el rem de 14,
+// O sea `max(48, contenido + py-2.5 × 2 + 1)`. Los 48 son `min-h-12` con el rem de 16,
 // y el 1 es el `border-b`, que en `border-box` va DENTRO del alto.
 var (
 	cabeceraPX     = tema.Espacio(4)   // px-4
@@ -33,7 +34,7 @@ var (
 	huecoLineasCab = tema.Espacio(2)   // gap-y-2 entre las dos líneas
 )
 
-// MinCabeceraApp es el `min-h-12`: 42 con el rem de 14.
+// MinCabeceraApp es el `min-h-12`: 48 con el rem de 16.
 const MinCabeceraApp = 3 * tema.Rem
 
 // CabeceraApp es SectionHeader: icono opcional, título, subtítulo opcional y acciones
@@ -128,18 +129,17 @@ func (c *CabeceraApp) marca() fyne.CanvasObject {
 // envolverAcciones reparte las acciones en líneas de `ancho` como su `flex flex-wrap
 // gap-2`: cada una entra en la línea si cabe con su hueco, y si no abre otra.
 func envolverAcciones(acciones []fyne.CanvasObject, ancho float32) []filaAcciones {
-	var filas []filaAcciones
-	usado := float32(0)
-	for _, a := range acciones {
-		m := a.MinSize()
-		if len(filas) == 0 || usado+huecoAcc+m.Width > ancho {
-			filas = append(filas, filaAcciones{})
-			usado = -huecoAcc
+	anchos := make([]float32, len(acciones))
+	for i, a := range acciones {
+		anchos[i] = a.MinSize().Width
+	}
+	lineas := RepartirEnLineas(anchos, ancho, func(int) float32 { return huecoAcc })
+	filas := make([]filaAcciones, len(lineas))
+	for n, l := range lineas {
+		filas[n].n = len(l)
+		for _, i := range l {
+			filas[n].alto = max(filas[n].alto, acciones[i].MinSize().Height)
 		}
-		f := &filas[len(filas)-1]
-		f.n++
-		f.alto = max(f.alto, m.Height)
-		usado += huecoAcc + m.Width
 	}
 	return filas
 }

@@ -42,6 +42,9 @@ type Caja struct {
 	// AlDesplazar recibe el gesto táctil fuera de los tiradores de selección. Una
 	// caja recorta con ScrollNone: el desplazamiento pertenece a su escenario.
 	AlDesplazar func(*fyne.ScrollEvent)
+	// AlPegar convierte el texto del portapapeles antes de escribirlo (en Diapos, un
+	// recorte de cajas se pega como su texto, nunca como su JSON). Nil = tal cual.
+	AlPegar func(string) string
 }
 
 // NuevoFolioCaja crea el folio de una caja. El contexto es el del folio, no el del

@@ -16,7 +16,10 @@ import (
 
 // Photos es el cliente de Sytue Photos (services/syphotos, `/api/v1`). OJO: esta API
 // habla en camelCase («takenAt», «nextCursor»), al revés que el resto de la suite.
-type Photos struct{ c *Client }
+type Photos struct {
+	c    *Client
+	data PhotosData
+}
 
 // NewPhotos crea el cliente sobre la raíz del servicio (ServiceURL(apex, "photos")).
 func NewPhotos(servicio string, s Session, h *http.Client) *Photos {
@@ -54,6 +57,25 @@ type Photo struct {
 	Location *PhotoPlace `json:"location,omitempty"`
 	// DriveFileID es el original en Sytue Drive, que es donde viven los ficheros.
 	DriveFileID string `json:"driveFileId"`
+	// DeletedAt y PurgeAt solo vienen en la papelera: cuándo se llevó allí y cuándo
+	// la borra para siempre el servicio. PurgeAt nil es que la organización no
+	// caduca la papelera, y entonces no hay fecha que prometer.
+	DeletedAt *time.Time `json:"deletedAt,omitempty"`
+	PurgeAt   *time.Time `json:"purgeAt,omitempty"`
+}
+
+// DiasParaPurga son los días que le quedan en la papelera, redondeados hacia arriba
+// (a 30 h de la purga quedan «2 días», no 1), y 0 si ya le toca: el servicio purga
+// por lotes y puede llegar un poco tarde. ok es false si no hay fecha de purga.
+func (f Photo) DiasParaPurga(ahora time.Time) (dias int, ok bool) {
+	if f.PurgeAt == nil {
+		return 0, false
+	}
+	falta := f.PurgeAt.Sub(ahora)
+	if falta <= 0 {
+		return 0, true
+	}
+	return int((falta + 24*time.Hour - 1) / (24 * time.Hour)), true
 }
 
 // PhotoPlace son las coordenadas de una foto.
@@ -67,12 +89,33 @@ type PhotoPlace struct {
 // con `texto` la misma acotada a lo que coincida por nombre o descripción. `tambien` son
 // los términos con los que Sytue AI amplía una búsqueda que no encontró nada.
 func (p *Photos) Timeline(ctx context.Context, cursor string, limite int, soloFavoritas bool, texto string, tambien ...string) (fotos []Photo, siguiente string, err error) {
+	if p.data != nil {
+		return p.data.Timeline(ctx, cursor, limite, soloFavoritas, texto, tambien...)
+	}
+	return p.linea(ctx, cursor, "", limite, soloFavoritas, texto, tambien)
+}
+
+// TimelineDesde es la PRIMERA página de la galería empezando en una fecha —`2019`,
+// `2019-07` o `2019-07-14`—: la foto más reciente de ese periodo y hacia atrás. Las
+// páginas siguientes se piden con Timeline y el cursor que devuelve, como siempre.
+func (p *Photos) TimelineDesde(ctx context.Context, desde string, limite int, soloFavoritas bool) (fotos []Photo, siguiente string, err error) {
+	if p.data != nil {
+		// Saltar a una fecha lo resuelve el índice del servicio, que no tiene la
+		// galería privada.
+		return nil, "", ErrPrivatePhotosOperation
+	}
+	return p.linea(ctx, "", desde, limite, soloFavoritas, "", nil)
+}
+
+func (p *Photos) linea(ctx context.Context, cursor, desde string, limite int, soloFavoritas bool, texto string, tambien []string) (fotos []Photo, siguiente string, err error) {
 	q := url.Values{"limit": {strconv.Itoa(limite)}}
 	if len(tambien) > 0 {
 		q.Set("tambien", strings.Join(tambien, ","))
 	}
 	if cursor != "" {
 		q.Set("cursor", cursor)
+	} else if desde != "" {
+		q.Set("desde", desde)
 	}
 	if soloFavoritas {
 		q.Set("favoritas", "1")
@@ -87,6 +130,28 @@ func (p *Photos) Timeline(ctx context.Context, cursor string, limite int, soloFa
 	return r.Items, r.NextCursor, err
 }
 
+// TimelineYear es un año de la galería con cuántas fotos tiene.
+type TimelineYear struct {
+	Year  int `json:"year"`
+	Count int `json:"count"`
+}
+
+// TimelineYears son los años con fotos, del más reciente al más antiguo: la barra para
+// saltar a una fecha. Con soloFavoritas, los de «Favoritas».
+func (p *Photos) TimelineYears(ctx context.Context, soloFavoritas bool) ([]TimelineYear, error) {
+	if p.data != nil {
+		return nil, ErrPrivatePhotosOperation
+	}
+	q := url.Values{}
+	if soloFavoritas {
+		q.Set("favoritas", "1")
+	}
+	r, err := JSON[struct {
+		Years []TimelineYear `json:"years"`
+	}](ctx, p.c, Request{Path: "/timeline/years", Query: q})
+	return r.Years, err
+}
+
 // Indexar mete en la galería un fichero que YA está en Sytue Drive y devuelve la foto.
 // Los originales viven en Drive (decisión de almacén de Sytue Fotos), así que subir es
 // de dos pasos: primero el fichero entra en la carpeta «Fotos» del Drive de la persona
@@ -94,6 +159,12 @@ func (p *Photos) Timeline(ctx context.Context, cursor string, limite int, soloFa
 //
 // ES IDEMPOTENTE: indexar dos veces el mismo fichero no duplica nada.
 func (p *Photos) Indexar(ctx context.Context, ficheroDrive string) (Photo, error) {
+	if p.data != nil {
+		if ingest, ok := p.data.(PhotosIngestData); ok {
+			return ingest.Indexar(ctx, ficheroDrive)
+		}
+		return Photo{}, ErrPrivatePhotosOperation
+	}
 	cuerpo, err := json.Marshal(map[string]string{"driveFileId": ficheroDrive})
 	if err != nil {
 		return Photo{}, err
@@ -113,6 +184,12 @@ func (p *Photos) Variant(ctx context.Context, id, variante string) (io.ReadClose
 // VariantDe es Variant con la HUELLA de la receta (`?f=`): la que devolvió Rotar. Sin
 // ella el servicio sirve la última que tenga guardada, que tras girar es la de antes.
 func (p *Photos) VariantDe(ctx context.Context, id, variante, huella string) (io.ReadCloser, error) {
+	if p.data != nil {
+		if media, ok := p.data.(PhotosMediaData); ok {
+			return media.VariantDe(ctx, id, variante, huella)
+		}
+		return nil, ErrPrivatePhotosOperation
+	}
 	var q url.Values
 	if huella != "" {
 		q = url.Values{"f": {huella}}
@@ -123,6 +200,13 @@ func (p *Photos) VariantDe(ctx context.Context, id, variante, huella string) (io
 // Export es la foto con su receta aplicada en ese formato (`jpeg` o `png`), la de
 // «Descargar». Cerrarla es cosa de quien llama.
 func (p *Photos) Export(ctx context.Context, id, formato string) (io.ReadCloser, error) {
+	if p.data != nil {
+		exporter, ok := p.data.(PhotosExportData)
+		if !ok {
+			return nil, ErrPrivatePhotosOperation
+		}
+		return exporter.Export(ctx, id, formato)
+	}
 	return p.imagen(ctx, "/assets/"+url.PathEscape(id)+"/export", url.Values{"formato": {formato}})
 }
 
@@ -136,12 +220,18 @@ func (p *Photos) imagen(ctx context.Context, ruta string, q url.Values) (io.Read
 
 // Photo es una foto por su id: la de partida de «parecidas» y «por aquí».
 func (p *Photos) Photo(ctx context.Context, id string) (Photo, error) {
+	if p.data != nil {
+		return p.data.Photo(ctx, id)
+	}
 	return JSON[Photo](ctx, p.c, Request{Path: "/assets/" + url.PathEscape(id)})
 }
 
 // SetDescription guarda la descripción y las etiquetas: el texto alternativo de la
 // foto, que es lo que también se busca.
 func (p *Photos) SetDescription(ctx context.Context, id, descripcion string, etiquetas []string) error {
+	if p.data != nil {
+		return p.data.SetDescription(ctx, id, descripcion, etiquetas)
+	}
 	if etiquetas == nil {
 		etiquetas = []string{}
 	}
@@ -153,12 +243,20 @@ func (p *Photos) SetDescription(ctx context.Context, id, descripcion string, eti
 // servicio guarda entera. Devuelve la huella nueva, que es con la que se vuelve a pedir
 // la imagen (VariantDe).
 func (p *Photos) Rotar(ctx context.Context, id string) (string, error) {
+	pending, err := p.EdicionPendiente(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if pending != nil {
+		return p.GuardarRecetaDesde(ctx, id, pending.Receta, pending.Base)
+	}
 	r, err := p.LeerReceta(ctx, id)
 	if err != nil {
 		return "", err
 	}
+	base := r.Huella()
 	r.Pasos = append(r.Pasos, PasoReceta{Tipo: PasoGiro, Params: map[string]float64{"grados": 90}})
-	return p.GuardarReceta(ctx, id, r)
+	return p.GuardarRecetaDesde(ctx, id, r, base)
 }
 
 // Similar son las fotos que más se parecen a una, por el vector de la imagen.
@@ -234,6 +332,9 @@ func (p *Photos) mandar(ctx context.Context, metodo, ruta string, cuerpo any) er
 
 // SetFavorite marca o desmarca una foto como favorita.
 func (p *Photos) SetFavorite(ctx context.Context, id string, favorita bool) error {
+	if p.data != nil {
+		return p.data.SetFavorite(ctx, id, favorita)
+	}
 	cuerpo, err := json.Marshal(map[string]bool{"favorite": favorita})
 	if err != nil {
 		return err
@@ -250,6 +351,9 @@ func (p *Photos) SetFavorite(ctx context.Context, id string, favorita bool) erro
 
 // Trash manda una foto a la papelera. El fichero sigue en Sytue Drive.
 func (p *Photos) Trash(ctx context.Context, id string) error {
+	if p.data != nil {
+		return p.data.Trash(ctx, id)
+	}
 	resp, err := p.c.Do(ctx, Request{Method: http.MethodDelete, Path: "/assets/" + url.PathEscape(id)})
 	if err != nil {
 		return err
@@ -257,17 +361,30 @@ func (p *Photos) Trash(ctx context.Context, id string) error {
 	return resp.Body.Close()
 }
 
+// FotosEnPapelera es la papelera con su plazo. RetentionDays son los días que pasa
+// una foto allí antes de borrarse para siempre; 0, la organización no la caduca y
+// solo se vacía a mano.
+type FotosEnPapelera struct {
+	Items         []Photo `json:"items"`
+	RetentionDays int     `json:"retentionDays"`
+}
+
 // Papelera son las fotos quitadas de la galería, que siguen ahí hasta que alguien las
-// restaura o las borra para siempre. No pagina: el servicio las devuelve todas.
-func (p *Photos) Papelera(ctx context.Context) ([]Photo, error) {
-	r, err := JSON[struct {
-		Items []Photo `json:"items"`
-	}](ctx, p.c, Request{Path: "/trash"})
-	return r.Items, err
+// restaura, las borra para siempre o caduca su plazo. No pagina: el servicio las
+// devuelve todas.
+func (p *Photos) Papelera(ctx context.Context) (FotosEnPapelera, error) {
+	if p.data != nil {
+		items, err := p.data.Papelera(ctx)
+		return FotosEnPapelera{Items: items}, err
+	}
+	return JSON[FotosEnPapelera](ctx, p.c, Request{Path: "/trash"})
 }
 
 // Restaurar devuelve una foto de la papelera a la galería.
 func (p *Photos) Restaurar(ctx context.Context, id string) error {
+	if p.data != nil {
+		return p.data.Restaurar(ctx, id)
+	}
 	resp, err := p.c.Do(ctx, Request{Method: http.MethodPost, Path: "/assets/" + url.PathEscape(id) + "/restore"})
 	if err != nil {
 		return err
@@ -299,6 +416,9 @@ type Album struct {
 	// Shared dice si tiene enlace público. El enlace solo sale al generarlo
 	// (ShareAlbum): el servicio guarda su huella, no el enlace (FILE-10).
 	Shared bool `json:"shared,omitempty"`
+	// UpdatedAt es la última modificación: el orden «recientes» de «Álbumes», que es el
+	// del servicio (`updated_at DESC`).
+	UpdatedAt time.Time `json:"updatedAt"`
 	// CompartidoPor es de quién es un álbum de OTRA persona que me lo ha compartido para
 	// editar (va en «Añadir a un álbum…»); vacío en los míos. No viaja: lo pone la app.
 	CompartidoPor string `json:"-"`
@@ -315,6 +435,12 @@ func (a Album) Rotulo() string {
 
 // Albums son los álbumes de la persona, del más nuevo al más viejo.
 func (p *Photos) Albums(ctx context.Context) ([]Album, error) {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumData); ok {
+			return albums.Albums(ctx)
+		}
+		return nil, ErrPrivatePhotosOperation
+	}
 	r, err := JSON[struct {
 		Items []Album `json:"items"`
 	}](ctx, p.c, Request{Path: "/albums"})
@@ -323,22 +449,46 @@ func (p *Photos) Albums(ctx context.Context) ([]Album, error) {
 
 // CreateAlbum crea un álbum vacío con ese título.
 func (p *Photos) CreateAlbum(ctx context.Context, titulo string) (Album, error) {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumData); ok {
+			return albums.CreateAlbum(ctx, titulo)
+		}
+		return Album{}, ErrPrivatePhotosOperation
+	}
 	return PostJSON[Album](ctx, p.c, "/albums", map[string]string{"title": titulo})
 }
 
 // Album es un álbum por su id, con su recuento y su enlace si está compartido.
 func (p *Photos) Album(ctx context.Context, id string) (Album, error) {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumData); ok {
+			return albums.Album(ctx, id)
+		}
+		return Album{}, ErrPrivatePhotosOperation
+	}
 	return JSON[Album](ctx, p.c, Request{Path: "/albums/" + url.PathEscape(id)})
 }
 
 // DeleteAlbum borra el álbum. Las fotos se quedan: un álbum solo las agrupa.
 func (p *Photos) DeleteAlbum(ctx context.Context, id string) error {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumData); ok {
+			return albums.DeleteAlbum(ctx, id)
+		}
+		return ErrPrivatePhotosOperation
+	}
 	return p.mandar(ctx, http.MethodDelete, "/albums/"+url.PathEscape(id), nil)
 }
 
 // AddToAlbum mete esas fotos en el álbum y devuelve cuántas entraron (las que ya
 // estaban no cuentan).
 func (p *Photos) AddToAlbum(ctx context.Context, album string, ids []string) (int, error) {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumMembershipData); ok {
+			return albums.AddToAlbum(ctx, album, ids)
+		}
+		return 0, ErrPrivatePhotosOperation
+	}
 	r, err := PostJSON[struct {
 		Added int `json:"added"`
 	}](ctx, p.c, "/albums/"+url.PathEscape(album)+"/assets", map[string][]string{"ids": ids})
@@ -347,12 +497,24 @@ func (p *Photos) AddToAlbum(ctx context.Context, album string, ids []string) (in
 
 // RemoveFromAlbum saca una foto del álbum. La foto sigue en la galería.
 func (p *Photos) RemoveFromAlbum(ctx context.Context, album, id string) error {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumMembershipData); ok {
+			return albums.RemoveFromAlbum(ctx, album, id)
+		}
+		return ErrPrivatePhotosOperation
+	}
 	return p.mandar(ctx, http.MethodDelete, "/albums/"+url.PathEscape(album)+"/assets/"+url.PathEscape(id), nil)
 }
 
 // RenameAlbum le cambia el título a un álbum: a uno mío o a uno que me han compartido
 // para editar.
 func (p *Photos) RenameAlbum(ctx context.Context, id, titulo string) error {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumData); ok {
+			return albums.RenameAlbum(ctx, id, titulo)
+		}
+		return ErrPrivatePhotosOperation
+	}
 	return p.mandar(ctx, http.MethodPatch, "/albums/"+url.PathEscape(id), map[string]string{"title": titulo})
 }
 
@@ -379,6 +541,12 @@ func (p *Photos) UnshareAlbum(ctx context.Context, id string) error {
 
 // AlbumPhotos son las fotos de un álbum, en su orden.
 func (p *Photos) AlbumPhotos(ctx context.Context, album string) ([]Photo, error) {
+	if p.data != nil {
+		if albums, ok := p.data.(PhotosAlbumData); ok {
+			return albums.AlbumPhotos(ctx, album)
+		}
+		return nil, ErrPrivatePhotosOperation
+	}
 	r, err := JSON[struct {
 		Items []Photo `json:"items"`
 	}](ctx, p.c, Request{Path: "/albums/" + url.PathEscape(album) + "/assets"})

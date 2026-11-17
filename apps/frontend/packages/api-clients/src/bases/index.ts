@@ -30,8 +30,13 @@ export type BasesFieldKind =
   | 'multiselect'
   | 'link'
   | 'formula'
-  | 'attachment';
-export type BasesViewKind = 'grid' | 'kanban' | 'form';
+  | 'attachment'
+  | 'url'
+  | 'email'
+  | 'phone'
+  | 'currency'
+  | 'rating';
+export type BasesViewKind = 'grid' | 'kanban' | 'form' | 'gallery';
 
 export interface BasesBase {
   id: string;
@@ -56,6 +61,8 @@ export interface BasesField {
   /** Solo en un campo de fórmula: la expresión (referencias por id) y el tipo de su resultado. */
   formula?: string;
   result?: 'number' | 'text';
+  /** Solo en un campo de moneda: su código ISO 4217 (EUR, USD…). */
+  currency?: string;
   position: number;
 }
 
@@ -311,6 +318,8 @@ export interface BasesNewField {
   link_table_id?: string;
   formula?: string;
   result?: 'number' | 'text';
+  /** Solo en un campo de moneda; sin él, el servidor pone EUR. */
+  currency?: string;
 }
 
 export class BasesClient {
@@ -379,6 +388,17 @@ export class BasesClient {
   renameField(fieldId: string, name: string): Promise<void> {
     return this.sendEmpty('PATCH', `/fields/${fieldId}`, { name });
   }
+  /**
+   * Sustituye las opciones de un campo de selección, en ese orden (solo el propietario).
+   * Una opción quitada no se borra de los registros: se queda como «retirada».
+   */
+  setFieldChoices(fieldId: string, choices: string[]): Promise<void> {
+    return this.sendEmpty('PATCH', `/fields/${fieldId}`, { choices });
+  }
+  /** Fija el orden de TODOS los campos de una tabla. Si no coinciden con los de la tabla, 409. */
+  reorderFields(tableId: string, fieldIds: string[]): Promise<void> {
+    return this.sendEmpty('PUT', `/tables/${tableId}/field-order`, { fields: fieldIds });
+  }
   /** Sube un fichero a un campo de adjuntos de un registro. El tipo lo decide el servicio. */
   uploadAttachment(recordId: string, fieldId: string, file: File): Promise<BasesAttachment> {
     return this.http.json<BasesAttachment>({
@@ -403,7 +423,9 @@ export class BasesClient {
 
   listRecords(
     tableId: string,
-    opts: { view?: string; limit?: number; cursor?: string } = {},
+    /** `q` busca en toda la tabla y `sort` (`campo:asc|desc`, hasta 3 separados por
+     * comas) sustituye el orden de la vista; ninguno de los dos se guarda en ella. */
+    opts: { view?: string; limit?: number; cursor?: string; q?: string; sort?: string } = {},
   ): Promise<BasesRecordPage> {
     return this.http.json<BasesRecordPage>({ path: `/tables/${tableId}/records`, query: opts });
   }
@@ -482,6 +504,13 @@ export class BasesClient {
     view: { name: string; kind: BasesViewKind; config: BasesViewConfig },
   ): Promise<BasesView> {
     return this.send('POST', `/tables/${tableId}/views`, view);
+  }
+  /** Cambia el nombre y/o la configuración de una vista; el tipo no se cambia. */
+  updateView(
+    viewId: string,
+    cambio: { name?: string; config?: BasesViewConfig },
+  ): Promise<BasesView> {
+    return this.send('PATCH', `/views/${viewId}`, cambio);
   }
   deleteView(viewId: string): Promise<void> {
     return this.sendEmpty('DELETE', `/views/${viewId}`);

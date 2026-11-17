@@ -9,7 +9,7 @@ import { ruta } from '../lib/rutas.js';
  */
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import type { ComponentChildren, JSX } from 'preact';
-import { Button, Meter, Skeleton } from '@sytue/ui';
+import { Button, InlineHelp, Meter, Skeleton } from '@sytue/ui';
 import { formatDate, isLocale, type Locale } from '@sytue/i18n';
 import { t as translate, type ClaveMensaje } from '../i18n/index.js';
 import { leerFallo } from '../lib/ficha.js';
@@ -253,23 +253,17 @@ export function PanelContextoIA({
       )}
 
       {ctx.bloqueado ? (
-        <div role="alert" class="border-border bg-danger-bg rounded-md border p-3">
-          <p class="text-danger-text text-sm font-semibold">
-            {t('ai.context.quota_exhausted_title')}
-          </p>
-          <p class="text-text mt-1 text-sm">
-            {t('ai.context.quota_exhausted_desc', { date: reinicio })}
-          </p>
-        </div>
+        <InlineHelp tone="danger" title={t('ai.context.quota_exhausted_title')}>
+          {t('ai.context.quota_exhausted_desc', { date: reinicio })}
+        </InlineHelp>
       ) : null}
 
       {fuera ? (
-        <div class="border-border bg-warning-bg rounded-md border p-3">
-          <p class="text-warning-text text-sm font-semibold">{t('ai.notice.non_eu_title')}</p>
-          <p class="text-text mt-1 text-sm">
-            {t('ai.notice.non_eu_desc', { provider: etiquetaProveedor(t, clave?.provider ?? '') })}
-          </p>
-        </div>
+        // Aviso permanente mientras el proveedor esté fuera de la UE: no se anuncia
+        // (no es un cambio de estado, es el contexto de la página).
+        <InlineHelp tone="warning" live="off" title={t('ai.notice.non_eu_title')}>
+          {t('ai.notice.non_eu_desc', { provider: etiquetaProveedor(t, clave?.provider ?? '') })}
+        </InlineHelp>
       ) : clave ? (
         <p class="text-text-muted text-xs">{t('ai.notice.eu')}</p>
       ) : null}
@@ -309,12 +303,5 @@ export function TarjetaResultadoIA({
 
 /** Mensaje de error de un envío o de un resultado vacío. */
 export function AvisoErrorIA({ texto }: { texto: string }): JSX.Element {
-  return (
-    <p
-      role="alert"
-      class="border-border bg-danger-bg text-danger-text rounded-md border p-3 text-sm"
-    >
-      {texto}
-    </p>
-  );
+  return <InlineHelp tone="danger">{texto}</InlineHelp>;
 }

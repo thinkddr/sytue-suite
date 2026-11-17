@@ -309,7 +309,7 @@ export function ResourcesModal({ t, open, onClose }: Props): JSX.Element {
             <EmptyState
               title={t('resources.emptyTitle')}
               description={t('resources.emptyDescription')}
-              illustration={<Icon name="building" size={32} />}
+              icon="building"
               action={
                 <Button
                   variant="secondary"

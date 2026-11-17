@@ -161,6 +161,8 @@ const PATHS = {
   flipH: 'M12 3v18M4 8l4 4-4 4V8ZM20 8l-4 4 4 4V8Z',
   flipV: 'M3 12h18M8 4l4 4 4-4H8ZM8 20l4-4 4 4H8Z',
   undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  // `undo` en espejo: rehacer es la misma flecha de vuelta, no otro dibujo.
+  redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
   // Disquete: guardar el trabajo actual. La etiqueta superior y la ventana
   // inferior lo distinguen de un documento a 16px.
   save: 'M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7',
@@ -196,6 +198,7 @@ const PATHS = {
   ojoOff:
     'M10 5.7A9.5 9.5 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.4 3.2M6.3 6.8C3.9 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 4.7-1.3M10.2 10.2a2.5 2.5 0 0 0 3.6 3.6M4 4l16 16',
   grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+  teclado: 'M3.5 6.5h17v11h-17zM7 10h.01M10.33 10h.01M13.67 10h.01M17 10h.01M8 14h8',
 } as const;
 
 export type IconName = keyof typeof PATHS;

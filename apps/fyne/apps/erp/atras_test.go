@@ -19,10 +19,11 @@ func TestElAtrasRespetaElCierreDeLaFicha(t *testing.T) {
 	p.Atajos(w.Canvas(), nil)
 	cierres := 0
 	f := &Ficha{AlCerrar: func() { cierres++ }}
-	p.ficha, p.abierta = f, true
+	p.ficha = f
+	p.AbrirPaleta()
 	atras := func() { w.Canvas().OnTypedKey()(&fyne.KeyEvent{Name: mobile.KeyBack}) }
 	atras()
-	if p.abierta || p.ficha != f || cierres != 0 {
+	if p.paleta.Abierta() || p.ficha != f || cierres != 0 {
 		t.Fatal("atrás debe cerrar primero la paleta")
 	}
 	atras()

@@ -148,6 +148,24 @@
       "valor": "3"
     },
     {
+      "nombre": "cambiar mayúsculas válido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "changeCase",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "title"
+    },
+    {
+      "nombre": "cambiar mayúsculas inválido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "changeCase",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "alternar"
+    },
+    {
       "nombre": "bloque válido",
       "kind": "document",
       "editor": "document",
@@ -427,6 +445,14 @@
       "kind": "document",
       "editor": "document",
       "cmd": "undo",
+      "soloLectura": false,
+      "esperado": "excluido"
+    },
+    {
+      "nombre": "brocha nunca",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "formatPainter",
       "soloLectura": false,
       "esperado": "excluido"
     },

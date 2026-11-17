@@ -6,6 +6,7 @@ package photos
 import (
 	"context"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 
@@ -20,12 +21,20 @@ import (
 // pedir es el patrón de las seis: la llamada en segundo plano y el resultado en el
 // hilo de la interfaz, tirado si entretanto se ha cambiado de pantalla.
 func pedir[T any](a *App, llamada func(context.Context, *api.Photos) (T, error), listo func(T, error)) {
+	pedirConPlazo(a, llamada, listo, 60*time.Second)
+}
+
+func pedirAlbum[T any](a *App, llamada func(context.Context, *api.Photos) (T, error), listo func(T, error)) {
+	pedirConPlazo(a, llamada, listo, a.plazoAlbum())
+}
+
+func pedirConPlazo[T any](a *App, llamada func(context.Context, *api.Photos) (T, error), listo func(T, error), plazo time.Duration) {
 	if a.cli == nil {
 		return
 	}
 	gen := a.gen
 	a.enSesion(func(vida context.Context) {
-		c, fin := ctx(vida)
+		c, fin := context.WithTimeout(vida, plazo)
 		defer fin()
 		r, err := llamada(c, a.cli)
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
@@ -34,6 +43,17 @@ func pedir[T any](a *App, llamada func(context.Context, *api.Photos) (T, error),
 			a.pintar()
 		})
 	})
+}
+
+func (a *App) ctxAlbum(vida context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(vida, a.plazoAlbum())
+}
+
+func (a *App) plazoAlbum() time.Duration {
+	if a.cli != nil && a.cli.UsesPrivateData() {
+		return 10 * time.Minute
+	}
+	return 60 * time.Second
 }
 
 // ---- Álbumes ----
@@ -70,11 +90,31 @@ func (a *App) datosAlbumes() Albumes {
 		Buscando: a.alb.buscando, Creando: a.alb.creando, Error: a.alb.error,
 		ExcluidaLoteIA: a.aj.ExcludeAIBatch, PuedeGestionarLoteIA: a.aj.CanManageAIBatch,
 		AlExcluirLoteIA: a.cambiarExclusionLote,
-		AlAbrir:         func(al api.Album) { a.AbrirAlbum(al.ID) },
-		AlIr:            a.irSeccion, AlCrear: a.crearAlbum, AlBuscar: a.buscarMontones,
+		Orden:           a.ordenAlbumes(), AlOrdenar: a.ordenarAlbumes,
+		AlAbrir: func(al api.Album) { a.AbrirAlbum(al.ID) },
+		AlIr:    a.irSeccion, AlCrear: a.crearAlbum, AlBuscar: a.buscarMontones,
 		AlGuardar: a.guardarMonton,
 		AlVer:     func(fotos []api.Photo) { a.AbrirParecidas(idsDe(fotos)) },
 	}
+}
+
+// ordenAlbumes es el orden recordado en este equipo; sin preferencias, «recientes».
+func (a *App) ordenAlbumes() OrdenAlbum {
+	if p := a.prefs(); p != nil {
+		if o := p.String(ClavePrefOrdenAlbumes); EsOrdenAlbum(o) {
+			return OrdenAlbum(o)
+		}
+	}
+	return OrdenAlbumReciente
+}
+
+// ordenarAlbumes cambia el orden y lo recuerda: quien prefiere verlos por nombre lo
+// prefiere siempre. Es el `localStorage` de la web, con la misma clave.
+func (a *App) ordenarAlbumes(o OrdenAlbum) {
+	if p := a.prefs(); p != nil {
+		p.SetString(ClavePrefOrdenAlbumes, string(o))
+	}
+	a.pintar()
 }
 
 func (a *App) pedirAlbumes() {
@@ -160,7 +200,7 @@ func (a *App) guardarMonton(fotos []api.Photo) {
 
 // crearCon crea un álbum y le mete esas fotos de una vez.
 func (a *App) crearCon(titulo string, ids []string, listo func(api.Album, error)) {
-	pedir(a, func(x context.Context, c *api.Photos) (api.Album, error) {
+	pedirAlbum(a, func(x context.Context, c *api.Photos) (api.Album, error) {
 		al, err := c.CreateAlbum(x, strings.TrimSpace(titulo))
 		if err == nil {
 			_, err = c.AddToAlbum(x, al.ID, ids)
@@ -368,22 +408,22 @@ func (a *App) borrarAlbum() {
 // ---- La papelera ----
 
 func (a *App) pedirPapelera() {
-	pedir(a, func(x context.Context, c *api.Photos) ([]api.Photo, error) { return c.Papelera(x) }, func(l []api.Photo, err error) {
+	pedir(a, func(x context.Context, c *api.Photos) (api.FotosEnPapelera, error) { return c.Papelera(x) }, func(p api.FotosEnPapelera, err error) {
 		a.pap.cargando, a.pap.fallo = false, err
 		if err != nil {
 			a.pap.error = a.textoDeFallo(err)
 			return
 		}
-		if l == nil {
-			l = []api.Photo{}
+		if p.Items == nil {
+			p.Items = []api.Photo{}
 		}
-		a.pap.fotos = l
+		a.pap.fotos, a.pap.retencion = p.Items, p.RetentionDays
 	})
 }
 
 func (a *App) datosPapelera() Papelera {
 	return Papelera{
-		Fotos: a.pap.fotos, Aviso: a.pap.aviso, Error: a.pap.error, AlIr: a.irSeccion,
+		Fotos: a.pap.fotos, Retencion: a.pap.retencion, Aviso: a.pap.aviso, Error: a.pap.error, AlIr: a.irSeccion,
 		AlRestaurar: a.restaurar,
 		AlPurgar: func(f api.Photo) {
 			a.confirmar(a.v.Traduce("trash.purge"), a.v.Traduce("trash.purgeConfirm"), a.v.Traduce("trash.purge"),

@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -59,6 +60,24 @@ func nuevaPildora(m *Mes, o Ocurrencia, _ tema.Variante) *pildora {
 	}
 	p.ExtendBaseWidget(p)
 	return p
+}
+
+// nuevaPildoraMes es la píldora de la celda: arrastrable a otro día en escritorio si el
+// evento se puede mover (`arrastremes.go`). Devuelve la píldora, para colocarla, y el
+// objeto que va al lienzo, que es su envoltorio cuando se arrastra.
+func nuevaPildoraMes(m *Mes, o Ocurrencia, v tema.Variante) (*pildora, fyne.CanvasObject) {
+	if !m.arrastrable(o) {
+		p := nuevaPildora(m, o, v)
+		return p, p
+	}
+	a := &pildoraArrastrable{pildora{m: m, o: o}}
+	a.AlPulsar = func() {
+		if m.AlAbrir != nil {
+			m.AlAbrir(o, a)
+		}
+	}
+	a.ExtendBaseWidget(a)
+	return &a.pildora, a
 }
 
 // resumen es el título del evento, con el «(sin título)» del catálogo si viene vacío.
@@ -176,9 +195,20 @@ func (r *pildoraRenderer) Refresh() {
 	r.aro.Ver(r.p.Enfocado())
 }
 
-// colorDe convierte el `#rrggbb` que trae un calendario o un evento en un color. Lo
+// colorDe es el color con que se pinta el de un calendario o un evento: su tono de la
+// paleta de colores de usuario (`colorDeUsuario` de la web), el más cercano si se guardó
+// con la paleta de antes o viene de otro cliente CalDAV. Lo guardado no se reescribe. Lo
 // que no se pueda leer cae en el acento por defecto, igual que la web.
 func colorDe(s string) color.NRGBA {
+	if c, ok := tokens.TonoDeUsuario(s); ok {
+		return c.NRGBA()
+	}
+	return AcentoPorDefecto
+}
+
+// hexCrudo convierte un `#rrggbb` en un color tal cual, sin pasar por la paleta: es para
+// los colores de la suite (un token resuelto), no para los que elige la gente.
+func hexCrudo(s string) color.NRGBA {
 	if len(s) != 7 || s[0] != '#' {
 		return AcentoPorDefecto
 	}

@@ -5,10 +5,13 @@ package merge
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
+	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	roomsdb "git.sytue.eu/sytue/one/services/rooms/db"
 )
@@ -59,5 +62,50 @@ func TestRoomsMergeKeepsNewestMatrixLifecycleTombstone(t *testing.T) {
 	leftovers, err := LeftoversIn(ctx, h.Pool, "rooms", origen)
 	if err != nil || len(leftovers) != 0 {
 		t.Fatalf("leftovers=%v err=%v", leftovers, err)
+	}
+}
+
+func TestRoomsStorageMappingsRemainImmutableUnderMaintenance(t *testing.T) {
+	h := pgtest.New(t, roomsdb.Migrations, roomsdb.MigrationsDir)
+	ctx := t.Context()
+	admin := h.PoolSinRLS(t)
+	for _, table := range []string{"matrix_storage_rooms", "matrix_storage_isolated_rooms"} {
+		if _, err := admin.Exec(ctx, `INSERT INTO `+pgx.Identifier{table}.Sanitize()+`(tenant,subject,product,room_id) VALUES('org-absorbida','alice','photos',$1)`, "!"+table+":fixture.invalid"); err != nil {
+			t.Fatal(err)
+		}
+		err := h.Pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `UPDATE `+pgx.Identifier{table}.Sanitize()+` SET tenant='org-receptora' WHERE tenant='org-absorbida'`)
+			return err
+		})
+		var blocked *pgconn.PgError
+		if !errors.As(err, &blocked) || blocked.Code != "PST01" {
+			t.Fatal("maintenance retagged an encrypted record scope", table, err)
+		}
+	}
+}
+
+func TestRoomsEncryptedDraftScopeBlocksBeforeDiscardingLoginGrants(t *testing.T) {
+	for _, tenant := range []string{origen, destino} {
+		t.Run(tenant, func(t *testing.T) {
+			h := pgtest.New(t, roomsdb.Migrations, roomsdb.MigrationsDir)
+			admin := h.PoolSinRLS(t)
+			if _, err := admin.Exec(t.Context(), `INSERT INTO matrix_draft_rooms(tenant,subject,room_id) VALUES($1,'alice','!retained-draft:fixture.invalid')`, tenant); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(t.Context(), `INSERT INTO matrix_native_consents(tenant,state_hash,subject,challenge,expires_at) VALUES($1,'synthetic-state','alice',repeat('A',43),now()+interval '2 minutes')`, origen); err != nil {
+				t.Fatal(err)
+			}
+			_, err := MoveService(t.Context(), h.Pool, origen, destino)
+			if !errors.Is(err, pg.ErrScopeBoundMerge) {
+				t.Fatal("tenant-bound encrypted draft did not block merge", err)
+			}
+			var n int
+			if err := admin.QueryRow(t.Context(), `SELECT count(*) FROM matrix_native_consents WHERE tenant=$1 AND state_hash='synthetic-state'`, origen).Scan(&n); err != nil || n != 1 {
+				t.Fatal("prepare hook discarded grants before scope preflight", n, err)
+			}
+			if err := admin.QueryRow(t.Context(), `SELECT count(*) FROM matrix_draft_rooms WHERE tenant=$1 AND room_id='!retained-draft:fixture.invalid'`, tenant).Scan(&n); err != nil || n != 1 {
+				t.Fatal("encrypted draft scope was retagged", n, err)
+			}
+		})
 	}
 }

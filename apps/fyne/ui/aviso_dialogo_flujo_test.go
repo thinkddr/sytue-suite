@@ -5,6 +5,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -87,11 +88,12 @@ func TestAvisosDelDialogoSeDesplazanYVuelvenAlAnterior(t *testing.T) {
 		t.Fatal("los avisos largos no tienen recorrido propio")
 	}
 	r.desplazaAvisos.ScrollToBottom()
-	ultimo := pila.Avisos()[5]
+	// Se ven MaxAvisosVisibles; los otros tres esperan en cola.
+	ultimo := pila.Avisos()[len(pila.Avisos())-1]
 	test.WidgetRenderer(ultimo)
 	pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(ultimo.aspa)
 	test.TapCanvas(w.Canvas(), pos.Add(fyne.NewPos(ultimo.aspa.Size().Width/2, ultimo.aspa.Size().Height/2)))
-	if len(pila.Avisos()) != 5 {
+	if slices.Contains(pila.Avisos(), ultimo) || len(pila.Avisos())+len(pila.EnCola()) != 5 {
 		t.Fatal("el aviso del final no se puede cerrar después de desplazar")
 	}
 	dos.Cerrar()

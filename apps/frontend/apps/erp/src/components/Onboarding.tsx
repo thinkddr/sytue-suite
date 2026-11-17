@@ -35,7 +35,7 @@ import {
 } from '@sytue/ui';
 import type { WizardStep } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
-import { api, baseDeLaApp, consulta, ErrorApi } from '../lib/api.js';
+import { api, baseDeLaApp, consulta, mensajeDeError } from '../lib/api.js';
 import type { useT } from '../i18n/index.js';
 import type {
   FormaJuridica,
@@ -195,7 +195,7 @@ export function Onboarding({
     } catch (err) {
       aviso.notify({
         tone: 'danger',
-        title: err instanceof ErrorApi ? err.message : t('error.generic'),
+        title: mensajeDeError(err, t),
       });
     } finally {
       setOcupado(false);

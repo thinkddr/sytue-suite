@@ -1,6 +1,6 @@
 # DocuSign — SAML SSO
 1. DocuSign eSignature Admin → **Identity Providers → Add Identity Provider**.
-2. Sube los metadatos de Sytue ID; **Name ID format** `emailAddress`.
-3. Copia el **SP Entity ID** y el **ACS URL** de DocuSign a la ficha de Sytue Platform.
-4. En «Claim Settings» elige el atributo de correo; crea el «Signing Certificate» si tu flujo lo exige.
-**Verificar**: «Test SSO» del propio DocuSign antes de activarlo para todos.
+2. Upload the Sytue ID metadata; **Name ID format** `emailAddress`.
+3. Copy DocuSign's **SP Entity ID** and **ACS URL** into the Sytue Platform card.
+4. In “Claim Settings” choose the email attribute; create the “Signing Certificate” if your flow requires it.
+**Verify**: DocuSign's own “Test SSO” before enabling it for everyone.

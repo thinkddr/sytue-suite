@@ -22,6 +22,7 @@ package eml
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -44,10 +45,11 @@ import (
 
 // Los topes de lo que se lee de un mensaje ajeno.
 const (
-	maxMensaje  = 50 << 20 // el servicio no admite más por SMTP
-	maxTexto    = 2 << 20  // de cuerpo que se enseña
-	maxAnidado  = 8
-	maxAdjuntos = 200
+	DefaultMessageByteLimit = 50 << 20
+	maxMensaje              = DefaultMessageByteLimit // Compatibility for callers without a private source capability.
+	maxTexto                = 2 << 20                 // de cuerpo que se enseña
+	maxAnidado              = 8
+	maxAdjuntos             = 200
 	// maxPartes acota cuántas partes MIME se recorren: un correo de 50 MiB con
 	// millones de partes diminutas costaba minutos de CPU al abrirlo (FYC-03).
 	maxPartes = 10_000
@@ -75,14 +77,44 @@ type Mensaje struct {
 	Asunto        string
 	EnRespuestaA  string
 	Referencias   []string
+	De, DeNombre  string
+	ResponderA    []string
+	ID            string
+	Fecha         time.Time
 }
 
 // Leer descompone un .eml. Un mensaje mal formado devuelve lo que se haya podido leer
 // junto al error: medio correo legible es mejor que ninguno.
 func Leer(r io.Reader) (Mensaje, error) {
+	return LeerConLimite(context.Background(), r, maxMensaje)
+}
+
+// LeerConLimite uses the caller's authenticated MIME capability, including the
+// complete raw stream. An overrun or cancelled operation never returns a
+// successful truncated message.
+func LeerConLimite(ctx context.Context, r io.Reader, limite int64) (Mensaje, error) {
+	return LeerConAdjuntos(ctx, r, limite, nil)
+}
+
+// ConsumirAdjunto receives a decoded attachment stream during this call. It must
+// not retain the reader; callers can hash/encrypt/write incrementally without
+// building a complete plaintext attachment in memory. Datos is nil in metadata.
+type ConsumirAdjunto func(context.Context, Adjunto, io.Reader) error
+
+func LeerConAdjuntos(ctx context.Context, r io.Reader, limite int64, consumir ConsumirAdjunto) (Mensaje, error) {
 	var m Mensaje
-	crudo, err := mail.ReadMessage(io.LimitReader(r, maxMensaje))
+	if ctx == nil || r == nil || limite <= 0 || limite >= 1<<63-1 {
+		return m, ErrLimiteInvalido
+	}
+	bounded := &io.LimitedReader{R: lectorContexto{ctx: ctx, r: r}, N: limite + 1}
+	crudo, err := mail.ReadMessage(bounded)
 	if err != nil {
+		if current := ctx.Err(); current != nil {
+			return m, current
+		}
+		if bounded.N == 0 {
+			return m, ErrLimiteMensaje
+		}
 		return m, err
 	}
 	m.Para, m.Cc, m.Cco = direccionesDe(crudo.Header, "To"), direccionesDe(crudo.Header, "Cc"), direccionesDe(crudo.Header, "Bcc")
@@ -92,8 +124,29 @@ func Leer(r io.Reader) (Mensaje, error) {
 	}
 	m.EnRespuestaA = strings.TrimSpace(crudo.Header.Get("In-Reply-To"))
 	m.Referencias = strings.Fields(crudo.Header.Get("References"))
-	l := &lector{m: &m}
+	if from, err := (&mail.AddressParser{WordDecoder: &palabras}).ParseList(crudo.Header.Get("From")); err == nil && len(from) == 1 {
+		m.De, m.DeNombre = from[0].Address, from[0].Name
+	}
+	m.ResponderA = direccionesDe(crudo.Header, "Reply-To")
+	m.ID = strings.Trim(strings.TrimSpace(crudo.Header.Get("Message-ID")), "<>")
+	m.Fecha, _ = crudo.Header.Date()
+	l := &lector{m: &m, ctx: ctx, limite: limite, consumir: consumir}
 	err = l.parte(textproto.MIMEHeader(crudo.Header), crudo.Body, 0)
+	if err == nil {
+		_, err = io.Copy(io.Discard, crudo.Body)
+	} // Includes an epilogue after the final multipart boundary.
+	if bounded.N == 0 {
+		err = ErrLimiteMensaje
+	}
+	if current := ctx.Err(); current != nil {
+		err = current
+	}
+	if errors.Is(err, ErrLimiteMensaje) || ctx.Err() != nil {
+		for _, a := range m.Adjuntos {
+			clear(a.Datos)
+		}
+		return Mensaje{}, err
+	}
 	m.HTML, m.Texto = l.html.String(), l.texto.String()
 	return m, err
 }
@@ -102,6 +155,9 @@ func Leer(r io.Reader) (Mensaje, error) {
 // tope: con `m.Texto += texto` cada parte copiaba todo lo anterior, y un correo de
 // millones de partes era cuadrático (FYC-03).
 type lector struct {
+	ctx         context.Context
+	limite      int64
+	consumir    ConsumirAdjunto
 	m           *Mensaje
 	html, texto strings.Builder
 	partes      int
@@ -127,7 +183,13 @@ func direccionesDe(c mail.Header, nombre string) []string {
 	return out
 }
 
+//nolint:gocyclo // MIME part dispatch with explicit limits (depth, parts, attachments); one branch per RFC 2045 case
 func (l *lector) parte(cabecera textproto.MIMEHeader, cuerpo io.Reader, nivel int) error {
+	if l.ctx != nil {
+		if err := l.ctx.Err(); err != nil {
+			return err
+		}
+	}
 	if nivel > maxAnidado {
 		return errors.New("eml: demasiados niveles de anidamiento")
 	}
@@ -141,41 +203,84 @@ func (l *lector) parte(cabecera textproto.MIMEHeader, cuerpo io.Reader, nivel in
 		tipo, params = "text/plain", nil // sin Content-Type —o ilegible— es texto (RFC 2045 §5.2)
 	}
 	if strings.HasPrefix(tipo, "multipart/") {
-		partes := multipart.NewReader(cuerpo, params["boundary"])
-		for {
-			p, err := partes.NextRawPart() // «Raw»: la codificación se deshace aquí, igual para todas
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-			if err := l.parte(p.Header, p, nivel+1); err != nil {
-				return err
-			}
-		}
-	}
-	datos, err := io.ReadAll(io.LimitReader(decodificar(cabecera.Get("Content-Transfer-Encoding"), cuerpo), maxMensaje))
-	if err != nil && len(datos) == 0 {
-		return err
+		return l.parteMultipart(cuerpo, params["boundary"], nivel)
 	}
 	disposicion, dparams, _ := mime.ParseMediaType(cabecera.Get("Content-Disposition"))
 	nombre := nombreDe(dparams["filename"], params["name"])
 	esTexto := tipo == "text/plain" || tipo == "text/html"
-	if disposicion == "attachment" || nombre != "" || !esTexto {
+	decoded := decodificar(cabecera.Get("Content-Transfer-Encoding"), cuerpo)
+	if l.ctx != nil {
+		decoded = lectorContexto{ctx: l.ctx, r: decoded}
+	}
+	if l.consumir != nil && (disposicion == "attachment" || nombre != "" || !esTexto) {
+		meta := Adjunto{Nombre: nombre, Tipo: tipo, CID: strings.Trim(strings.TrimSpace(cabecera.Get("Content-ID")), "<>")}
+		if len(m.Adjuntos) < maxAdjuntos {
+			if err := l.consumir(l.ctx, meta, decoded); err != nil {
+				return err
+			}
+			m.Adjuntos = append(m.Adjuntos, meta)
+		}
+		_, err := io.Copy(io.Discard, decoded)
+		return err
+	}
+	esTextoCuerpo := esTexto && disposicion != "attachment" && nombre == ""
+	datos, err := l.leerDatosParte(decoded, esTextoCuerpo)
+	if err != nil && len(datos) == 0 {
+		return err
+	}
+	readErr := err
+
+	if !esTextoCuerpo {
 		if len(m.Adjuntos) < maxAdjuntos {
 			cid := strings.Trim(strings.TrimSpace(cabecera.Get("Content-ID")), "<>")
 			m.Adjuntos = append(m.Adjuntos, Adjunto{Nombre: nombre, Tipo: tipo, Datos: datos, CID: cid})
 		}
-		return nil
+		return readErr
 	}
+	defer clear(datos)
 	texto := aUTF8(datos[:min(len(datos), maxTexto)], params["charset"])
 	if tipo == "text/html" {
 		acumular(&l.html, texto)
 	} else {
 		acumular(&l.texto, texto)
 	}
-	return nil
+	return readErr
+}
+
+func (l *lector) parteMultipart(cuerpo io.Reader, boundary string, nivel int) error {
+	partes := multipart.NewReader(cuerpo, boundary)
+	for {
+		p, err := partes.NextRawPart() // «Raw»: la codificación se deshace aquí, igual para todas
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := l.parte(p.Header, p, nivel+1); err != nil {
+			return err
+		}
+	}
+}
+
+func (l *lector) leerDatosParte(decoded io.Reader, esTextoCuerpo bool) ([]byte, error) {
+	limit := l.limite
+	if limit <= 0 {
+		limit = maxMensaje
+	}
+	if esTextoCuerpo {
+		datos, err := io.ReadAll(io.LimitReader(decoded, maxTexto))
+		if err == nil {
+			_, err = io.Copy(io.Discard, decoded)
+		}
+		return datos, err
+	}
+	datos, err := io.ReadAll(io.LimitReader(decoded, limit+1))
+	if int64(len(datos)) > limit {
+		clear(datos)
+		return nil, ErrLimiteMensaje
+	}
+	return datos, err
 }
 
 func decodificar(codificacion string, r io.Reader) io.Reader {
@@ -193,18 +298,19 @@ func decodificar(codificacion string, r io.Reader) io.Reader {
 type sinSaltos struct{ r io.Reader }
 
 func (s sinSaltos) Read(p []byte) (int, error) {
-	n, err := s.r.Read(p)
-	k := 0
-	for _, b := range p[:n] {
-		if b != '\r' && b != '\n' && b != ' ' && b != '\t' {
-			p[k] = b
-			k++
+	for {
+		n, err := s.r.Read(p)
+		k := 0
+		for _, b := range p[:n] {
+			if b != '\r' && b != '\n' && b != ' ' && b != '\t' {
+				p[k] = b
+				k++
+			}
+		}
+		if k != 0 || n == 0 || err != nil {
+			return k, err
 		}
 	}
-	if k == 0 && n > 0 && err == nil {
-		return s.Read(p) // todo eran saltos: devolver 0 sin error se toma por atasco
-	}
-	return k, err
 }
 
 func aUTF8(datos []byte, charset string) string {

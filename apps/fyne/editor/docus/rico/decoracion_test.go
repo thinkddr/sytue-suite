@@ -89,3 +89,33 @@ func TestLasColumnasComoLaWeb(t *testing.T) {
 		t.Error("una tabla en columnas no se edita")
 	}
 }
+
+// TestElIdiomaDelDocumentoEsDeLaCapa: `data-lang` es de la capa de la página, como en
+// `pagedecor.ts`. Se vio en ROJO sin él: el documento que la web guardaba con su idioma se
+// abría en solo lectura («div[data-lang]»).
+func TestElIdiomaDelDocumentoEsDeLaCapa(t *testing.T) {
+	h := `<div data-sytue-page="" data-width="794" data-height="1123" data-margins="96 96 96 96" data-color="#FFF2CC" data-lang="de" contenteditable="false" aria-hidden="true"></div><p>Hallo</p>`
+	d := Parse(h)
+	if !d.Editable() {
+		t.Fatalf("con su idioma, el documento no se entiende (%v)", d.NoEntendido())
+	}
+	if p := d.PaginaDe(); p == nil || p.Idioma != "de" || p.Color != "#FFF2CC" {
+		t.Fatalf("la página es %+v", p)
+	}
+	if got := d.HTML(); got != h {
+		t.Errorf("no vuelve igual: %s", got)
+	}
+	// Se escribe como `paginaHtml`: detrás del color, delante de contenteditable.
+	d.PonerPaginaDoc(&PaginaDoc{Ancho: 794, Alto: 1123, Margenes: [4]float32{96, 96, 96, 96}, Color: "#FFF2CC", Idioma: "de"})
+	if got := d.HTML(); got != h {
+		t.Errorf("PonerPaginaDoc no escribe lo de la web: %s", got)
+	}
+	// Uno que no es de la suite ni se lee ni se escribe.
+	if p := Parse(`<div data-sytue-page="" data-lang="xx"></div><p>a</p>`).PaginaDe(); p == nil || p.Idioma != "" {
+		t.Errorf("un idioma desconocido se lee: %+v", p)
+	}
+	d.PonerPaginaDoc(&PaginaDoc{Ancho: 794, Alto: 1123, Margenes: [4]float32{96, 96, 96, 96}, Idioma: `es" onload="x`})
+	if got := d.HTML(); strings.Contains(got, "data-lang") {
+		t.Errorf("un idioma desconocido se escribe: %s", got)
+	}
+}

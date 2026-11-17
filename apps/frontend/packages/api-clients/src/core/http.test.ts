@@ -10,7 +10,17 @@
  * Ejecutar: `bun test`.
  */
 import { describe, expect, test } from 'bun:test';
-import { HttpClient, HttpError, cuerpoDeError, sameOriginUrl, upstreamStatus } from './http.js';
+import {
+  HttpClient,
+  HttpError,
+  cuerpoDeError,
+  sameOriginUrl,
+  upstreamStatus,
+  exactResponseLength,
+  hasExpectedResponseLengthHeaders,
+  validateResponseLengthHeaders,
+  ResponseLengthError,
+} from './http.js';
 
 function error(status: number, body?: string): HttpError {
   return new HttpError(status, 'Forbidden', 'https://mail.sytue.eu/api/v1/labels', body);
@@ -219,4 +229,111 @@ test('provider cooldown reads wrapped params and rejects malformed delays', () =
       error(429, JSON.stringify({ params: { retry_after_seconds: delay } })).retryAfterMs,
     ).toBe(0);
   expect(error(429, '{"params":{"retry_after_seconds":999999}}').retryAfterMs).toBe(86400000);
+});
+
+test('exact streaming accepts chunked transfer and checks its final byte count', async () => {
+  for (const headers of [{}, { 'content-length': '3' }]) {
+    const response = await exactResponseLength(
+      new Response(Uint8Array.of(1, 2, 3), { headers }),
+      3,
+    );
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(Uint8Array.of(1, 2, 3));
+  }
+  const short = await exactResponseLength(new Response(Uint8Array.of(1, 2)), 3);
+  await expect(short.arrayBuffer()).rejects.toBeInstanceOf(ResponseLengthError);
+  const long = await exactResponseLength(new Response(Uint8Array.of(1, 2, 3, 4)), 3);
+  await expect(long.arrayBuffer()).rejects.toBeInstanceOf(ResponseLengthError);
+  await expect(
+    exactResponseLength(new Response('x', { headers: { 'content-length': '1' } }), 2),
+  ).rejects.toBeInstanceOf(ResponseLengthError);
+});
+
+test('exact streaming preserves backpressure and cancels the original on an overrun or cancellation', async () => {
+  let cancelled: unknown,
+    pulls = 0;
+  const source = () =>
+    new ReadableStream<Uint8Array<ArrayBuffer>>(
+      {
+        pull(controller) {
+          pulls++;
+          controller.enqueue(Uint8Array.of(1, 2, 3));
+        },
+        cancel(reason) {
+          cancelled = reason;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+  const bounded = await exactResponseLength(new Response(source()), 3);
+  expect(pulls).toBe(0);
+  const reader = bounded.body!.getReader();
+  expect((await reader.read()).value).toEqual(Uint8Array.of(1, 2, 3));
+  await expect(reader.read()).rejects.toBeInstanceOf(ResponseLengthError);
+  expect(cancelled).toBeInstanceOf(ResponseLengthError);
+  cancelled = undefined;
+  pulls = 0;
+  const stopped = await exactResponseLength(new Response(source()), 1000);
+  await stopped.body!.cancel('device closed');
+  expect(cancelled).toBe('device closed');
+  expect(pulls).toBe(0);
+});
+
+test('source header validation preserves byte readers while rejecting a changed declared revision', async () => {
+  const body = new ReadableStream({
+    type: 'bytes',
+    start(controller) {
+      controller.enqueue(Uint8Array.of(1, 2, 3));
+      controller.close();
+    },
+  });
+  const response = new Response(body, { headers: { 'content-length': '3' } });
+  const validated = await validateResponseLengthHeaders(response, 3);
+  expect(validated).toBe(response);
+  expect(validated.body).toBe(body);
+  const reader = validated.body!.getReader({ mode: 'byob' });
+  const part = await reader.read(new Uint8Array(2));
+  expect(part.value).toEqual(Uint8Array.of(1, 2));
+  part.value?.fill(0);
+  await reader.cancel();
+  reader.releaseLock();
+  let cancelled = false;
+  const changed = new Response(
+    new ReadableStream({
+      cancel() {
+        cancelled = true;
+      },
+    }),
+    { headers: { 'content-length': '4' } },
+  );
+  await expect(validateResponseLengthHeaders(changed, 3)).rejects.toBeInstanceOf(
+    ResponseLengthError,
+  );
+  expect(cancelled).toBe(true);
+});
+
+test('pure source header inspection leaves an invalid body to its owner', async () => {
+  let cancelled = 0;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(Uint8Array.of(1, 2, 3));
+    },
+    cancel() {
+      cancelled++;
+    },
+  });
+  const response = new Response(body, { headers: { 'content-length': '4' } });
+  expect(hasExpectedResponseLengthHeaders(response, 3)).toBe(false);
+  expect(cancelled).toBe(0);
+  expect(body.locked).toBe(false);
+  expect(response.bodyUsed).toBe(false);
+  const reader = body.getReader();
+  const sentinel = await reader.read();
+  if (!sentinel.value) throw new Error('missing sentinel bytes');
+  expect(sentinel.value).toEqual(Uint8Array.of(1, 2, 3));
+  sentinel.value.fill(0);
+  reader.releaseLock();
+  await expect(validateResponseLengthHeaders(response, 3)).rejects.toBeInstanceOf(
+    ResponseLengthError,
+  );
+  expect(cancelled).toBe(1);
 });

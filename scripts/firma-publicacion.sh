@@ -109,12 +109,17 @@ sumas() {
   [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "«${version}» no es vX.Y.Z" >&2; return 1; }
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "«${commit}» no es un commit de 40 hex" >&2; return 1; }
   [ -d "$dir" ] || { echo "no existe $dir" >&2; return 1; }
-  local nombres
-  nombres="$(cd "$dir" && find . -maxdepth 1 -type f \( -name '*.dmg' -o -name '*-installer.exe' -o -name '*-linux-*.tar.xz' \) \
-    -printf '%f\n' | LC_ALL=C sort)"
+  local nombres f
+  # Con globos y no con `find -printf` + `xargs -d`: este guion se prueba en el
+  # portátil (find/xargs de BSD, sin -printf ni -d) y corre en el CI (GNU), y el
+  # listado es plano, de un solo directorio. `[ -f ]` deja fuera directorios que
+  # se llamen como un instalador, que es lo que miraba `-type f`.
+  nombres="$(cd "$dir" && for f in *.dmg *-installer.exe *-linux-*.tar.xz; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done | LC_ALL=C sort)"
   [ -n "$nombres" ] || { echo "no hay ningún instalador en $dir" >&2; return 1; }
   printf '# sytue-instaladores 1\n# version: %s\n# commit: %s\n' "$version" "$commit"
-  (cd "$dir" && printf '%s\n' "$nombres" | xargs -d '\n' sha256sum)
+  (cd "$dir" && while IFS= read -r f; do sha256sum "$f"; done <<<"$nombres")
 }
 
 firmar() {

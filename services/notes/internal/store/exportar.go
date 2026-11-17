@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/notes/internal/domain"
 )
@@ -17,30 +18,44 @@ import (
 // ExportNotebook devuelve un cuaderno con sus notas para volcarlo fuera, y deja
 // constancia de que alguien se lo llevó.
 //
-// SE APOYA EN GetNotebook Y ListNotes en vez de escribir su propia consulta: son
-// las que ya deciden quién ve qué —cuaderno propio o de la organización, y notas
-// privadas solo para su dueño— y duplicar ese predicado aquí sería tener dos
-// definiciones de «quién puede leer esto» que se separan a la primera.
+// Reutiliza los lectores autorizados de cuaderno y notas dentro de un mismo
+// snapshot, para conservar las reglas de visibilidad sin duplicar sus consultas.
 //
 // LA TRAZA ES PARTE DE LA OPERACIÓN, no un extra: si no se puede anotar quién
 // exportó, no se exporta. Una copia de todo un cuaderno que no deja rastro es
 // justo lo que una auditoría viene a buscar después.
 func (s *Store) ExportNotebook(
-	ctx context.Context, id uuid.UUID, sub string,
+	ctx context.Context, id uuid.UUID, sub string, formats ...domain.FormatoExport,
 ) (domain.Notebook, []domain.Note, error) {
-	nb, err := s.GetNotebook(ctx, id, sub)
-	if err != nil {
-		return domain.Notebook{}, nil, err
+	if len(formats) > 1 {
+		return domain.Notebook{}, nil, domain.ErrInvalidInput
 	}
-	notas, err := s.ListNotes(ctx, id, sub)
-	if err != nil {
-		return domain.Notebook{}, nil, err
+	format := domain.FormatoHTML
+	if len(formats) == 1 {
+		format = formats[0]
 	}
-
 	t := tenancy.MustFrom(ctx)
-	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		// `notas` y el título en el detalle: lo que hace útil la línea después es
-		// saber CUÁNTO salió y de dónde, no solo que hubo una exportación.
+	var nb domain.Notebook
+	var notas []domain.Note
+	err := s.pool.InTxOpts(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead}, func(tx pgx.Tx) error {
+		if err := pg.SetTenant(ctx, tx, t.Slug); err != nil {
+			return err
+		}
+		var err error
+		nb, err = s.getNotebookTx(ctx, tx, id, sub)
+		if err != nil {
+			return err
+		}
+		notas, err = s.listNotesTx(ctx, tx, id, sub)
+		if err != nil {
+			return err
+		}
+		if err := domain.ValidateEncryptedBackup(nb, notas); err != nil {
+			return err
+		}
+		if err := domain.ValidateEncryptedBackupFormat(nb, format); err != nil {
+			return err
+		}
 		return writeAuditTx(ctx, tx, t.Slug, sub, domain.AuditNotebookExport, id.String(),
 			map[string]any{"titulo": nb.Title, "notas": len(notas)})
 	})
@@ -64,6 +79,9 @@ func (s *Store) ExportNotebook(
 func (s *Store) ImportNotebook(
 	ctx context.Context, sub string, nb domain.Notebook, notas []domain.Note,
 ) (domain.Notebook, int, int, error) {
+	if err := domain.ValidateBackupUpload(nb, notas); err != nil {
+		return domain.Notebook{}, 0, 0, err
+	}
 	entrada := nb.AImportar()
 	if err := entrada.Normalize(); err != nil {
 		return domain.Notebook{}, 0, 0, err

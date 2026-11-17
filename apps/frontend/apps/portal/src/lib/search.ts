@@ -32,15 +32,15 @@ export function groupBySource(results: SearchResult[]): SourceGroup[] {
 
 /**
  * «Cargar más» de la búsqueda. La página es SSR y sin JS de cliente, así que «más» es
- * la MISMA URL con una página más (`?paginas=2`): se piden al Hub las páginas una a
- * una por `offset` —el Hub acota `limit` a su máximo por petición, así que pedir 40
- * de golpe devuelve 20— y se pegan en orden.
+ * la MISMA URL con una página más (`?paginas=2`): se pide al Hub, en UNA búsqueda
+ * federada, todo lo que se enseña (`limit = páginas × POR_PAGINA`, desde el principio).
+ * Antes era una petición por página —el Hub acotaba `limit` a su máximo POR ORIGEN—, y
+ * cada clic volvía a lanzar todas: con `?paginas=10`, unas cien llamadas a servicios.
  */
 export const POR_PAGINA = 20;
 /**
- * Tope de páginas: lo que el Hub puede devolver, `SEARCH_LIMIT` (20) por origen × sus diez
- * orígenes = 200. Cada «más» vuelve a pedir TODAS las páginas (limitación conocida, en
- * docs/roadmap.md «Hub + Portal + www»): el tope acota también lo que cuesta un `?paginas=`.
+ * Tope de páginas: el tamaño de página máximo del agregado en el Hub, 10 × `SEARCH_LIMIT`
+ * (20) = 200. Pasado el tope el Hub recortaría y el botón no traería nada nuevo.
  */
 export const MAX_PAGINAS = 10;
 
@@ -58,60 +58,42 @@ export interface Paginas {
   fallidos: { source: ProductKey; error: string }[];
 }
 
-/**
- * Une las páginas en el orden en que se pidieron. Cada una es una búsqueda aparte, así
- * que entre dos el ranking puede moverse: un resultado repetido sale una vez, en su
- * primera posición. Un origen que falla en cualquiera de ellas se avisa una vez.
- */
-export function unirPaginas(paginas: readonly Paginas[]): Paginas {
-  const vistos = new Set<string>();
-  const results: SearchResult[] = [];
-  const fallidos = new Map<ProductKey, { source: ProductKey; error: string }>();
-  let total = 0;
-  for (const p of paginas) {
-    for (const r of p.results) {
-      const clave = `${r.source}\u0000${r.id}`;
-      if (vistos.has(clave)) continue;
-      vistos.add(clave);
-      results.push(r);
-    }
-    for (const f of p.fallidos) if (!fallidos.has(f.source)) fallidos.set(f.source, f);
-    total = Math.max(total, p.total);
-  }
-  const ultima = paginas.at(-1);
-  return {
-    results,
-    total: Math.max(total, results.length),
-    hasMore: ultima?.hasMore === true,
-    fallidos: [...fallidos.values()],
-  };
+/** Lo que `buscarPaginas` necesita del cliente del Hub (el SDK lo cumple). */
+export interface BuscadorDelHub {
+  search: (
+    query: string,
+    sources: undefined,
+    page: { limit: number; offset: number },
+  ) => Promise<Paginas>;
 }
 
 /**
- * Las páginas que se pueden enseñar de las pedidas en paralelo: las seguidas desde la
- * primera hasta el primer fallo. Una página que falla corta ahí —lo de detrás dejaría un
- * hueco en el ranking— pero NO tira lo anterior: es lo que hace Fyne cuando falla un
- * «Cargar más», y el botón queda para reintentar. Solo si falla la primera (`null`) la
- * búsqueda entera ha fallado.
+ * Las `paginas` primeras páginas del agregado en UNA sola petición al Hub. El ranking
+ * es el de una sola búsqueda, así que no hay repetidos que quitar ni huecos entre
+ * páginas, y el aviso de orígenes caídos es el de esa búsqueda.
+ *
+ * Si falla un «Cargar más» (`paginas` ≥ 2) se piden las que ya se veían: el fallo NO
+ * tira lo de antes —es lo que hace Fyne— y `cortada` deja el botón para reintentar.
+ * Solo si falla la primera página la búsqueda entera ha fallado (lanza).
  */
-export function paginasHastaElFallo(
-  pedidas: readonly PromiseSettledResult<Paginas>[],
-): { paginas: Paginas[]; cortada: boolean } | null {
-  const paginas: Paginas[] = [];
-  for (const p of pedidas) {
-    if (p.status === 'rejected') break;
-    paginas.push(p.value);
+export async function buscarPaginas(
+  hub: BuscadorDelHub,
+  q: string,
+  paginas: number,
+): Promise<{ res: Paginas; paginas: number; cortada: boolean }> {
+  const pedir = (n: number) => hub.search(q, undefined, { limit: n * POR_PAGINA, offset: 0 });
+  try {
+    return { res: await pedir(paginas), paginas, cortada: false };
+  } catch (err) {
+    if (paginas < 2) throw err;
+    return { res: await pedir(paginas - 1), paginas: paginas - 1, cortada: true };
   }
-  if (paginas.length === 0) return null;
-  return { paginas, cortada: paginas.length < pedidas.length };
 }
 
 /**
  * Hay «Cargar más» si el Hub dice que quedan y no se ha llegado al tope. Manda el
- * `has_more` de la ÚLTIMA página, que el Hub calcula sobre el agregado. El respaldo por
- * total compara con lo PEDIDO (`paginas × POR_PAGINA`), no con lo enseñado: tras quitar
- * repetidos lo enseñado queda por debajo del total aunque no quede nada, y el botón no
- * se iría nunca.
+ * `has_more`, que el Hub calcula sobre el agregado. El respaldo por total compara con lo
+ * PEDIDO (`paginas × POR_PAGINA`), no con lo enseñado.
  */
 export function hayMas(p: Paginas, paginas: number): boolean {
   return paginas < MAX_PAGINAS && quedanEnElHub(p, paginas);
@@ -124,24 +106,23 @@ function quedanEnElHub(p: Paginas, paginas: number): boolean {
 
 /**
  * El total que se puede decir en «Se muestran 39 de 40». Si el Hub ya no tiene nada más,
- * lo enseñado ES todo: tras quitar un repetido, «39 de 40» sin botón prometería un
- * resultado que no existe. Con el tope de páginas alcanzado y más en el Hub, el total
- * del Hub sigue siendo la verdad.
+ * lo enseñado ES todo: si los orígenes cambian entre el recuento y la página, «39 de
+ * 40» sin botón prometería un resultado que no existe. Con el tope de páginas alcanzado
+ * y más en el Hub, el total del Hub sigue siendo la verdad.
  */
 export function totalAMostrar(p: Paginas, paginas: number): number {
   return quedanEnElHub(p, paginas) ? p.total : p.results.length;
 }
 
 /**
- * El último «Cargar más» no trajo nada: una página pedida falló (`cortada`) o llegó sin
- * un solo resultado nuevo (vacía aunque el Hub dijera `has_more`, o todo repetidos). La
- * pantalla lo dice junto al botón; si no, se recargaría igual y arriba del todo.
+ * El último «Cargar más» no trajo nada: la petición falló (`cortada`) o la página pedida
+ * llegó sin un solo resultado más de los que ya se veían (vacía aunque el Hub dijera
+ * `has_more`). La pantalla lo dice junto al botón; si no, se recargaría igual y arriba
+ * del todo.
  */
-export function cargaSinNovedad(hasta: { paginas: readonly Paginas[]; cortada: boolean }): boolean {
-  if (hasta.cortada) return true;
-  if (hasta.paginas.length < 2) return false;
-  const antes = unirPaginas(hasta.paginas.slice(0, -1)).results.length;
-  return unirPaginas(hasta.paginas).results.length === antes;
+export function cargaSinNovedad(b: { res: Paginas; paginas: number; cortada: boolean }): boolean {
+  if (b.cortada) return true;
+  return b.paginas >= 2 && b.res.results.length <= (b.paginas - 1) * POR_PAGINA;
 }
 
 /** El `id` de la fila del resultado `n` (desde 0): el ancla donde aterriza «Cargar más». */

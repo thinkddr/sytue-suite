@@ -8,6 +8,7 @@
  * el chip lo cuenta. Ctrl/Cmd+F abría el buscador del navegador, que no ve más que el
  * folio visible y no sabe reemplazar, teniendo el panel Buscar del editor a un lado.
  * Ctrl/⌘ +, − y 0 ampliaban la página entera en vez del documento (atajosZoom.ts).
+ * Ctrl/⌘+/ abre y cierra la hoja de atajos (atajosAyuda.ts), como en Google Docs.
  * Van en window y no en el folio para que respondan también con el foco en la cinta
  * o en un panel.
  *
@@ -20,6 +21,7 @@
  */
 import type { Dispatch, StateUpdater } from 'preact/hooks';
 import { useEffect } from 'preact/hooks';
+import { esAtajoAyuda } from './atajosAyuda';
 import { zoomDeAtajo } from './atajosZoom';
 import type { EditorUi } from './types';
 
@@ -37,6 +39,14 @@ export function useAtajosDelEditor(
           const zoom = zoomDeAtajo(event, prev.zoom) ?? prev.zoom;
           return zoom === prev.zoom ? prev : { ...prev, zoom };
         });
+        return;
+      }
+      if (esAtajoAyuda(event)) {
+        // La rejilla de Calcus ya la abrió (su Ctrl+/ también lee la «/» con Mayús, la de
+        // un teclado español): alternarla aquí la volvería a cerrar.
+        if (event.defaultPrevented) return;
+        event.preventDefault();
+        setUiState((prev) => ({ ...prev, atajos: !prev.atajos }));
         return;
       }
       const key = event.key.toLowerCase();

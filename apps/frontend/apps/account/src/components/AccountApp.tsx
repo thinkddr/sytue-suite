@@ -10,10 +10,10 @@
  */
 import type { JSX } from 'preact';
 import { SytueShell } from '@sytue/shell';
-import { AppShell } from '@sytue/ui';
+import { AppShell, SettingsShell, type SettingsIndexEntry } from '@sytue/ui';
 import { esCuentaPersonal, type SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
-import { useT } from '../i18n/index.js';
+import { useT, type T } from '../i18n/index.js';
 import { getAccessToken } from '@sytue/auth/client';
 import PerfilCard from './PerfilCard.js';
 import SesionesCard from './SesionesCard.js';
@@ -23,6 +23,29 @@ import RecuperacionCard from './RecuperacionCard.js';
 import AppPasswordsCard from './AppPasswordsCard.js';
 import PlanCard from './PlanCard.js';
 import BorrarCuentaCard from './BorrarCuentaCard.js';
+import RubricaCard from './RubricaCard.js';
+import RevisionSeguridad from './RevisionSeguridad.js';
+
+/**
+ * Las secciones de Mi cuenta, en el orden en que se pintan. Los `id` son anclas
+ * PÚBLICAS (`/account#seguridad`): enlazan aquí el portal, la revisión de seguridad
+ * (`revisionDeCuenta` de `@sytue/shell`), los avisos de Sytue ID y Sytue Mail; no se
+ * renombran. Los alias son anclas que ya circulan con otro nombre: `#app-passwords`
+ * (Sytue Mail, web y escritorio) y `#claves` (Sytue ID tras dar de alta una llave).
+ */
+export function indiceDeCuenta(t: T, personal: boolean): SettingsIndexEntry[] {
+  return [
+    { id: 'perfil', rotulo: t('profile.title') },
+    { id: 'seguridad', rotulo: t('security.title'), alias: ['claves'] },
+    { id: 'recuperacion', rotulo: t('recovery.title') },
+    { id: 'sesiones', rotulo: t('sessions.title') },
+    { id: 'dispositivos', rotulo: t('devices.title') },
+    { id: 'contrasenas-app', rotulo: t('app_passwords.title'), alias: ['app-passwords'] },
+    { id: 'firma', rotulo: t('signature.title') },
+    ...(personal ? [{ id: 'plan', rotulo: t('plan.title') }] : []),
+    { id: 'borrar', rotulo: t('delete.title') },
+  ];
+}
 
 interface Props {
   user: SytueUser;
@@ -48,6 +71,8 @@ export function AccountApp({
   mfaRequired = false,
 }: Props): JSX.Element {
   const t = useT(locale);
+  const personal = esCuentaPersonal(user);
+  const indice = indiceDeCuenta(t, personal);
   return (
     // `currentApp="id"` y no una clave propia: esta pantalla ES Sytue ID, solo que
     // servida desde aquí. Inventarle una clave la sacaría del selector como un
@@ -65,45 +90,35 @@ export function AccountApp({
         class="h-[calc(100dvh-var(--spacing-topbar))]!"
         title={t('app.title')}
       >
-        {/* DOS COLUMNAS EXPLÍCITAS, no el flujo `columns` de CSS.
+        {/* UNA COLUMNA CON ÍNDICE, como Google Account o el Apple ID. Eran ocho
+            tarjetas en dos columnas, sin título ni forma de enlazar a una sección:
+            «/account#seguridad» abría arriba del todo. El índice de `SettingsShell`
+            lleva a cada tarjeta por su `id` —que es el ancla pública: la usan la
+            revisión de abajo, el portal, los avisos de Sytue ID y Sytue Mail— y
+            deja el foco en su título.
 
-            Con `columns` reparte el navegador, por altura, y nadie decide qué
-            cae a cada lado: Seguridad —con diferencia la sección más alta— se
-            quedaba al final de la izquierda y la derecha era un hueco vacío
-            debajo de «Contraseñas de aplicación».
-
-            La razón por la que se eligió `columns` era evitar que una rejilla
-            alineara las tarjetas por la más alta. Aquí no pasa: cada columna es
-            su propio contenedor, así que las tarjetas no se alinean entre
-            columnas y siguen apiladas sin huecos.
-
-            El `mb-6` que llevan las tarjetas es quien las separa; por eso aquí
-            NO hay `gap` vertical, que las separaría el doble. El
-            `break-inside-avoid` que también llevan ya no hace nada —era del
-            flujo multicolumna— y queda inerte.
-
-            `grid-cols-1`: sin plantilla, la columna única era `auto` y medía como
-            poco lo que midiera sin partir lo más ancho de dentro. Un texto con
-            `truncate` —el nombre de un dispositivo, un correo— no parte, así que en
-            vez de recortarse ensanchaba la columna entera: 350 px en una pantalla de
-            320. Con `minmax(0, 1fr)` la columna mide lo que hay y el texto se recorta. */}
-        <div class="mx-auto grid w-full max-w-5xl grid-cols-1 gap-x-6 p-4 sm:p-6 lg:grid-cols-2 lg:items-start">
-          <div>
-            {/* El plan, ARRIBA y solo en cuentas personales: es lo único comercial
-                que una persona sola tiene que poder ver y tocar. Una organización
-                factura por asientos desde Sytue Admin y aquí no pinta nada. */}
-            {esCuentaPersonal(user) ? <PlanCard t={t} locale={locale} /> : null}
-            <PerfilCard t={t} nombreInicial={nombreInicial} email={email} idBaseUrl={idBaseUrl} />
-            <SesionesCard t={t} />
-          </div>
-          <div>
-            <SeguridadCard t={t} mfaRequired={mfaRequired} />
-            <RecuperacionCard t={t} />
-            <DispositivosCard t={t} locale={locale} />
-            <AppPasswordsCard t={t} locale={locale} />
-            <BorrarCuentaCard t={t} idBaseUrl={idBaseUrl} />
-          </div>
-        </div>
+            La revisión va PRIMERO y fuera del índice: es el resumen de lo que viene
+            debajo y cada aviso lleva a su sección. */}
+        <SettingsShell
+          title={t('app.title')}
+          description={t('app.lead')}
+          indice={indice}
+          seccionInicial={mfaRequired ? 'seguridad' : undefined}
+        >
+          <RevisionSeguridad t={t} />
+          <PerfilCard t={t} nombreInicial={nombreInicial} email={email} idBaseUrl={idBaseUrl} />
+          <SeguridadCard t={t} mfaRequired={mfaRequired} />
+          <RecuperacionCard t={t} />
+          <SesionesCard t={t} locale={locale} />
+          <DispositivosCard t={t} locale={locale} />
+          <AppPasswordsCard t={t} locale={locale} />
+          <RubricaCard t={t} locale={locale} />
+          {/* El plan, solo en cuentas personales: es lo único comercial que una
+              persona sola tiene que poder ver y tocar. Una organización factura por
+              asientos desde Sytue Admin y aquí no pinta nada. */}
+          {personal ? <PlanCard t={t} locale={locale} /> : null}
+          <BorrarCuentaCard t={t} idBaseUrl={idBaseUrl} />
+        </SettingsShell>
       </AppShell>
     </SytueShell>
   );

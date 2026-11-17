@@ -1,317 +1,465 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright (c) 2026 Daniel Delgado Ramos (thinkddr) -->
 
-# Operación y despliegue — Sytue Suite
+<a id="operación-y-despliegue--sytue-suite"></a>
 
-Guía completa para **configurar, desplegar, verificar y operar** Sytue Suite en local, en un servidor único con Docker Compose o en un clúster de Kubernetes mediante Helm:
+# Operations and deployment — Sytue Suite
 
-1. **[Runbook de operación](#1-runbook-de-operacion)** — asistente interactivo `./sytue-deploy`, variables de entorno, Docker Compose, Kubernetes/Helm, migraciones, identidad, alta de organizaciones, correo, backups, rotación de secretos, escalado y healthchecks.
-2. **[CI/CD y cadena de suministro](#2-cicd-y-cadena-de-suministro)** — workflows de GitHub Actions y puertas de calidad.
-3. **[Pruebas E2E (smoke test)](#3-pruebas-e2e-smoke-test)** — validación de extremo a extremo.
-4. **[Rendimiento y SEO](#4-rendimiento-y-seo)** — objetivos SLO, presupuestos y medición continua.
-5. **[Go-live de Sytue Cloud](#5-go-live-de-sytue-cloud)** — activación del plano de ejecución PaaS en Kubernetes.
+A complete guide to **configuring, deploying, verifying and operating** Sytue Suite locally, on a single server with Docker Compose or on a Kubernetes cluster with Helm:
 
-> Contrato canónico: [`CONVENTIONS.md`](CONVENTIONS.md). Seguridad y RGPD: [`security.md`](security.md). Arquitectura: [`architecture.md`](architecture.md).
+1. **[Operations runbook](#1-runbook-de-operacion)** — `./sytue-deploy` interactive wizard, environment variables, Docker Compose, Kubernetes/Helm, migrations, identity, organization onboarding, email, backups, secret rotation, scaling and healthchecks.
+2. **[CI/CD and supply chain](#2-cicd-y-cadena-de-suministro)** — GitHub Actions workflows and quality gates.
+3. **[E2E tests (smoke test)](#3-pruebas-e2e-smoke-test)** — end-to-end validation.
+4. **[Performance and SEO](#4-rendimiento-y-seo)** — SLO targets, budgets and continuous measurement.
+5. **[Sytue Cloud go-live](#5-go-live-de-sytue-cloud)** — activating the PaaS execution plane on Kubernetes.
+
+> Canonical contract: [`CONVENTIONS.md`](CONVENTIONS.md). Security and GDPR: [`security.md`](security.md). Architecture: [`architecture.md`](architecture.md).
 
 ---
 
 <a id="1-runbook-de-operacion"></a>
 
-## 1. Runbook de operación
+<a id="1-runbook-de-operación"></a>
+
+## 1. Operations runbook
 
 <a id="10-convenciones-de-este-runbook"></a>
 
-### 1.0 Principios operativos y prerrequisitos
+<a id="10-principios-operativos-y-prerrequisitos"></a>
 
-- **Cero secretos en el repositorio:** ningún archivo versionado incluye contraseñas ni claves por defecto. Todas las credenciales se generan en el momento del despliegue mediante el asistente interactivo **`./sytue-deploy`** (o `make deploy`) usando `openssl rand`.
-- **Modos de despliegue soportados:**
-  1. **Docker Compose (`deploy/compose/`)**: ideal para desarrollo local (`*.sytue.localhost` con `mkcert`) o despliegue rápido en un servidor único. Soporta perfiles modulares (`core`, `office`, `full` o lista personalizada de servicios).
-  2. **Kubernetes con Helm (`deploy/helm/sytue-one/`)**: pensado para entornos de producción o *staging* con alta disponibilidad, ingress **Traefik 3**, certificados automáticos con **cert-manager** (Let's Encrypt), PostgreSQL externo y almacenamiento de objetos S3.
-- **Herramientas requeridas según el modo:**
-  - Común: `bash`, `openssl`, `git`, `make`.
-  - Modo Docker Compose: `docker` y `docker compose` v2, `mkcert` (para TLS local).
-  - Modo Kubernetes / Helm: `kubectl`, `helm`.
+### 1.0 Operating principles and prerequisites
+
+- **Zero secrets in the repository:** no versioned file includes default passwords or keys. All credentials are generated at deployment time by the **`./sytue-deploy`** interactive wizard (or `make deploy`) using `openssl rand`.
+- **Supported deployment modes:**
+  1. **Docker Compose (`deploy/compose/`)**: ideal for local development (`*.sytue.localhost` with `mkcert`) or a quick deployment on a single server. Supports modular profiles (`core`, `office`, `full` or a custom list of services).
+  2. **Kubernetes with Helm (`deploy/helm/sytue-one/`)**: intended for high-availability production or _staging_ environments, with a **Traefik 3** ingress, automatic certificates with **cert-manager** (Let's Encrypt), external PostgreSQL and S3 object storage.
+- **Required tools depending on the mode:**
+  - Common: `bash`, `openssl`, `git`, `make`.
+  - Docker Compose mode: `docker` and `docker compose` v2, `mkcert` (for local TLS).
+  - Kubernetes / Helm mode: `kubectl`, `helm`.
 
 ---
 
 <a id="11-bootstrap-inicial-una-sola-vez-por-estacion--por-entorno"></a>
 
-### 1.1 Despliegue guiado paso a paso con `./sytue-deploy`
+<a id="11-instalación-guiada-con-sytue-deploy"></a>
 
-La forma recomendada de configurar cualquier entorno por primera vez es ejecutar el asistente interactivo incluido en la raíz del repositorio:
+### 1.1 Guided installation with `./sytue-deploy`
+
+The recommended way to install the suite is the wizard at the repository root
+(user guide: [`QUICKSTART.md`](../QUICKSTART.md)):
 
 ```bash
-./sytue-deploy
-# o equivalente con Make:
-make deploy
+./sytue-deploy          # o: make deploy
 ```
 
-El asistente guía paso a paso por 5 etapas:
+**Local mode (Docker Compose, recommended).** Five steps, each with a default value
+that you can simply accept with Enter:
 
-1. **Modo de despliegue**: elección entre **Docker Compose** (`compose`) o **Kubernetes / Helm** (`helm`).
-2. **Topología y servicios**:
-   - En **Docker Compose**: dominio base (por defecto `sytue.localhost`) y perfil de servicios:
-     - `full`: toda la suite (16 servicios Go + 22 frontends web + infraestructura).
-     - `office`: núcleo + Drive, Docs/Sheets/Slides/CertiPDF, Mail, Calendar, Contacts, Portal y Console.
-     - `core`: solo el núcleo (Traefik, PostgreSQL, MinIO, Dragonfly, Sytue ID, Sytue Hub, Portal y Console).
-     - `custom`: selección a medida (por ejemplo `mail,drive,docs,rooms,portal`).
-   - En **Kubernetes / Helm**: dominio raíz (p. ej. `suite.miempresa.eu`), namespace de Kubernetes, correo para ACME/Let's Encrypt, endpoint de PostgreSQL y credenciales de Object Storage S3.
-3. **Organización y administrador inicial**: slug de la primera organización (p. ej. `acme`), correo del administrador y contraseña (introducida manualmente o autogenerada con alta entropía), más configuración opcional de **Sytue AI**.
-4. **Generación automática de secretos criptográficos**:
-   - Crea contraseñas únicas de 192 bits (`openssl rand -hex 24`) para el superusuario de PostgreSQL y para cada una de las **17 bases de datos de servicio** (`id`, `drive`, `docs`, `mail`, `calendar`, `contacts`, `syerp`, `notes`, `photos`, `cast`, `pages`, `bases`, `rooms`, `hub`, `integrations`, `cloud`, `analytics`), además del rol `authenticator` de PostgREST y MinIO.
-   - Genera claves AES-256-GCM de 32 bytes en Base64 (`openssl rand -base64 32`) para el cifrado en reposo de secretos en Cloud (`CLOUD_SECRET_ENC_KEY`), Docs (`DOCS_SECRET_ENC_KEY`), ERP (`SYERP_SECRET_ENC_KEY`), Integrations (`INTEGRATIONS_KEY_ENCRYPTION_KEY`) y la sal diaria de Analytics (`SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY`).
-   - Genera secretos de 256 bits (`openssl rand -hex 32`) para las cookies de sesión BFF (`SYTUE_SESSION_SECRET`), clientes OIDC (`SYTUE_DEV_CLIENT_SECRET`), comunicación interna entre microservicios (`ID_INTERNAL_SECRET`, `ROOMS_INTERNAL_SECRET`, `CAST_INTERNAL_SECRET`, `CAST_MEDIA_SIGNING_KEY`) y LiveKit (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`), sincronizando además `deploy/compose/livekit/livekit.yaml`.
-   - Escribe `deploy/compose/.env` (modo Compose) o `deploy/helm/values-custom.yaml` + `deploy/helm/apply-secrets.sh` (modo Helm) con permisos restringidos (`0600` / `0700`).
-5. **Puesta en marcha**: verifica las herramientas instaladas, ofrece emitir los certificados locales con `mkcert` y lanza el despliegue si el operador lo confirma.
+1. **Where to install**: this machine with Docker (`compose`) or a cluster (`helm`).
+2. **Requirements**: Docker running, Compose v2, memory assigned to Docker (warning below
+   4 GB; the full suite once started uses ~1.4 GB with the web apps compiled), `mkcert` and ports 80/443 free. If something is missing it explains
+   how to install it and stops without writing anything.
+3. **Services** (`COMPOSE_PROFILES`): `full` (everything), `office` (Drive, Docus/Calcus/Diapos/
+   CertiPDF, Mail, Calendar, Contacts, portal and console), `core` (identity, portal and
+   console) or a custom list (`mail,drive,docs,rooms`).
+4. **Configuration and secrets**: administrator password (Enter = random), optional Sytue AI
+   and `deploy/compose/.env` with unique values generated with `openssl rand`: the 17
+   databases, AES-256 keys, OIDC/HMAC secrets, MinIO, LiveKit and PostgREST. If the
+   `.env` already exists **it is reused** (its passwords are already in the PostgreSQL volume) and
+   only the variables missing from earlier versions are filled in.
+5. **Build and startup**: `mkcert` certificate for `*.sytue.localhost`,
+   `docker compose build` + `up -d`, creation of the administrator in Sytue ID (`id seed` with
+   the password from the `.env`), a wait until all containers are `healthy` and end-to-end
+   verification with `scripts/e2e/smoke.sh` (result in `deploy/compose/.verificacion.log`).
 
-También puede ejecutarse de forma no interactiva en pipelines o scripts automatizados:
+The Compose environment always lives on `*.sytue.localhost` (the hosts are fixed in
+`docker-compose.yml`, in Traefik and in the seeded OIDC clients). Accounts created:
+`admin@sytue.localhost` (admin role, development TOTP `JBSWY3DPEHPK3PXP`) and
+`member@sytue.localhost` (member role, no second factor), both in the `acme` organization.
+
+Useful options:
 
 ```bash
-# Generar configuración completa para Docker Compose sin preguntas:
-./sytue-deploy --mode compose --profile full --non-interactive --only-config
-
-# Generar overlay y script de secretos para Kubernetes/Helm:
-./sytue-deploy --mode helm --domain suite.ejemplo.eu --namespace sytue-prod --non-interactive --only-config
+./sytue-deploy --yes                       # sin preguntas, suite completa
+./sytue-deploy --yes --profile office      # sin preguntas, versión ligera
+./sytue-deploy --only-config               # solo genera deploy/compose/.env
+./sytue-deploy --reset                     # BORRA los datos locales y reinstala
+./sytue-deploy --admin-password '…'        # fija la contraseña (también SYTUE_ADMIN_PASSWORD)
+./sytue-deploy --help                      # todas las opciones
 ```
 
 ---
 
 <a id="variables-de-entorno"></a>
 
-### Referencia de variables de entorno
+<a id="referencia-de-variables-de-entorno"></a>
 
-Ninguna variable tiene secretos predefinidos en el repositorio. A continuación se detallan todas las variables utilizadas por el despliegue (`deploy/compose/.env` y Secrets de Kubernetes):
+### Environment variable reference
 
-#### Variables globales y de acceso inicial
+No variable has predefined secrets in the repository. All the variables used by the deployment (`deploy/compose/.env` and Kubernetes Secrets) are detailed below:
 
-| Variable | Descripción | Cómo se genera / Ejemplo |
-| --- | --- | --- |
-| `COMPOSE_PROFILES` | Perfiles de Docker Compose a levantar además del núcleo (`full`, o lista separada por comas: `mail,drive,docs,rooms,portal,console`). | `full` |
-| `SYTUE_DOMAIN` | Dominio base del despliegue. | `sytue.localhost` (local) o `ejemplo.eu` (prod) |
-| `SYTUE_ADMIN_EMAIL` | Correo del propietario/administrador inicial. | `admin@sytue.localhost` |
-| `SYTUE_ORG_SLUG` | Identificador (slug) de la organización inicial. | `acme` |
-| `SYTUE_ID_DEV_SEED_PASSWORD` | Contraseña del administrador para `make dev-seed` en entorno `dev`. | Generada por `./sytue-deploy` |
-| `SYTUE_ID_BOOTSTRAP_EMAIL` | Correo del propietario inicial para el comando `id bootstrap-owner` en producción. | `admin@ejemplo.eu` |
-| `SYTUE_ID_BOOTSTRAP_ORG_SLUG` | Slug de la organización inicial en producción (`id bootstrap-owner`). | `acme` |
-| `SYTUE_ID_BOOTSTRAP_PASSWORD` | Contraseña inicial (mínimo 12 caracteres) para `id bootstrap-owner`. | Generada por `./sytue-deploy` |
+<a id="variables-globales-y-de-acceso-inicial"></a>
 
-#### Variables de bases de datos PostgreSQL (aislamiento por servicio)
+#### Global and initial access variables
 
-Cada microservicio Go dispone de su propia base de datos y rol de PostgreSQL inicializados en `deploy/compose/postgres/init/01-databases.sh`:
+| Variable                                                                                   | Description                                                                                                                              | How it is generated / Example                   |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `COMPOSE_PROFILES`                                                                         | Docker Compose profiles to bring up in addition to the core (`full`, or a comma-separated list: `mail,drive,docs,rooms,portal,console`). | `full`                                          |
+| `SYTUE_ID_DEV_SEED_PASSWORD`                                                               | Password of `admin@sytue.localhost` and `member@sytue.localhost` (Compose). Applied by `./sytue-deploy` and `make dev-seed`.             | Chosen in the wizard or a random `Sytue-<hex>!` |
+| `SYTUE_ID_BOOTSTRAP_EMAIL` · `SYTUE_ID_BOOTSTRAP_ORG_SLUG` · `SYTUE_ID_BOOTSTRAP_PASSWORD` | Initial owner in Kubernetes (`id bootstrap-owner`, launched by `deploy/helm/bootstrap-admin.sh`).                                        | Asked for by the wizard in Helm mode            |
 
-| Servicio | Variables (`*_DB_NAME`, `*_DB_USER`, `*_DB_PASSWORD`) | Base de datos por defecto |
-| --- | --- | --- |
-| Superusuario PG | `POSTGRES_SUPERUSER`, `POSTGRES_SUPERUSER_PASSWORD` | `postgres` (`openssl rand -hex 24`) |
-| Sytue ID | `ID_DB_NAME`, `ID_DB_USER`, `ID_DB_PASSWORD` | `sytue_id` |
-| Sytue Drive | `DRIVE_DB_NAME`, `DRIVE_DB_USER`, `DRIVE_DB_PASSWORD` | `sytue_drive` |
-| Sytue Docs | `DOCS_DB_NAME`, `DOCS_DB_USER`, `DOCS_DB_PASSWORD` | `sytue_docs` |
-| Sytue Mail | `MAIL_DB_NAME`, `MAIL_DB_USER`, `MAIL_DB_PASSWORD` | `sytue_mail` |
-| Sytue Calendar | `CALENDAR_DB_NAME`, `CALENDAR_DB_USER`, `CALENDAR_DB_PASSWORD` | `sytue_calendar` |
-| Sytue Contacts | `CONTACTS_DB_NAME`, `CONTACTS_DB_USER`, `CONTACTS_DB_PASSWORD` | `sytue_contacts` |
-| SyERP | `SYERP_DB_NAME`, `SYERP_DB_USER`, `SYERP_DB_PASSWORD` | `sytue_syerp` |
-| Sytue Notepads | `NOTES_DB_NAME`, `NOTES_DB_USER`, `NOTES_DB_PASSWORD` | `sytue_notes` |
-| Sytue Photos | `SYPHOTOS_DB_NAME`, `SYPHOTOS_DB_USER`, `SYPHOTOS_DB_PASSWORD` | `sytue_syphotos` |
-| Sytue Cast | `CAST_DB_NAME`, `CAST_DB_USER`, `CAST_DB_PASSWORD` | `sytue_cast` |
-| Sytue Web (Pages) | `PAGES_DB_NAME`, `PAGES_DB_USER`, `PAGES_DB_PASSWORD` | `sytue_pages` |
-| Sytue Bases | `BASES_DB_NAME`, `BASES_DB_USER`, `BASES_DB_PASSWORD` | `sytue_bases` |
-| Sytue Rooms | `ROOMS_DB_NAME`, `ROOMS_DB_USER`, `ROOMS_DB_PASSWORD` | `sytue_rooms` |
-| Sytue Hub | `HUB_DB_NAME`, `HUB_DB_USER`, `HUB_DB_PASSWORD` | `sytue_hub` |
-| Integration Gateway | `INTEGRATIONS_DB_NAME`, `INTEGRATIONS_DB_USER`, `INTEGRATIONS_DB_PASSWORD` | `sytue_integrations` |
-| Sytue Cloud | `CLOUD_DB_NAME`, `CLOUD_DB_USER`, `CLOUD_DB_PASSWORD` | `sytue_cloud` |
-| Sytue Analytics | `ANALYTICS_DB_NAME`, `ANALYTICS_DB_USER`, `ANALYTICS_DB_PASSWORD` | `sytue_analytics` |
-| PostgREST (Cloud DB) | `POSTGREST_ROLE`, `POSTGREST_ROLE_PASSWORD`, `POSTGREST_JWT_SECRET` | `authenticator` |
+<a id="variables-de-bases-de-datos-postgresql-aislamiento-por-servicio"></a>
 
-#### Claves criptográficas, OIDC, Object Storage y tiempo real
+#### PostgreSQL database variables (per-service isolation)
 
-| Variable | Propósito | Generación |
-| --- | --- | --- |
-| `SYTUE_SESSION_SECRET` | Clave para sellar las cookies de sesión HTTP-only de las aplicaciones web (`@sytue/auth`). | `openssl rand -hex 32` |
-| `SYTUE_DEV_CLIENT_SECRET` | Secreto compartido de los clientes confidenciales OIDC entre los BFF y Sytue ID. | `openssl rand -hex 32` |
-| `CLOUD_SECRET_ENC_KEY` | Clave KEK AES-256-GCM (32 bytes en Base64) para cifrar secretos de proyectos en Sytue Cloud. | `openssl rand -base64 32` |
-| `DOCS_SECRET_ENC_KEY` | Clave KEK AES-256-GCM (32 bytes en Base64) para cifrar credenciales de conectores de datos en Calcus. | `openssl rand -base64 32` |
-| `SYERP_SECRET_ENC_KEY` | Clave KEK AES-256-GCM (32 bytes en Base64) para cifrar secretos de pasarelas en SyERP. | `openssl rand -base64 32` |
-| `INTEGRATIONS_KEY_ENCRYPTION_KEY` | Clave KEK AES-256-GCM (32 bytes en Base64) para cifrar tokens de conectores SaaS en reposo. | `openssl rand -base64 32` |
-| `SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY` | Clave KEK AES-256-GCM (32 bytes en Base64) para cifrar la sal diaria de Sytue Analytics. | `openssl rand -base64 32` |
-| `ID_INTERNAL_SECRET` | Secreto HMAC interno entre Sytue ID y Sytue Mail para verificar contraseñas de aplicación IMAP/SMTP. | `openssl rand -hex 32` |
-| `ROOMS_INTERNAL_SECRET` | Secreto interno entre Sytue Rooms y Sytue Drive para autorizar adjuntos de canales. | `openssl rand -hex 32` |
-| `CAST_INTERNAL_SECRET` | Secreto interno para comunicación de control con Sytue Cast. | `openssl rand -hex 32` |
-| `CAST_MEDIA_SIGNING_KEY` | Clave para firmar URLs de segmentos y manifiestos HLS en Sytue Cast. | `openssl rand -hex 32` |
-| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Credenciales del almacenamiento S3 local (MinIO). | `openssl rand -hex 24` |
-| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Par de claves del SFU WebRTC LiveKit para firmar tokens de sala y webhooks. | `openssl rand -hex 32` |
-| `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` | Configuración opcional del proveedor LLM para el asistente `services/ai`. | Proveedor (`scaleway` u `openai-compat`) |
+Each Go microservice has its own PostgreSQL database and role, initialized in `deploy/compose/postgres/init/01-databases.sh`:
+
+| Service              | Variables (`*_DB_NAME`, `*_DB_USER`, `*_DB_PASSWORD`)                      | Default database                    |
+| -------------------- | -------------------------------------------------------------------------- | ----------------------------------- |
+| PG superuser         | `POSTGRES_SUPERUSER`, `POSTGRES_SUPERUSER_PASSWORD`                        | `postgres` (`openssl rand -hex 24`) |
+| Sytue ID             | `ID_DB_NAME`, `ID_DB_USER`, `ID_DB_PASSWORD`                               | `sytue_id`                          |
+| Sytue Drive          | `DRIVE_DB_NAME`, `DRIVE_DB_USER`, `DRIVE_DB_PASSWORD`                      | `sytue_drive`                       |
+| Sytue Docs           | `DOCS_DB_NAME`, `DOCS_DB_USER`, `DOCS_DB_PASSWORD`                         | `sytue_docs`                        |
+| Sytue Mail           | `MAIL_DB_NAME`, `MAIL_DB_USER`, `MAIL_DB_PASSWORD`                         | `sytue_mail`                        |
+| Sytue Calendar       | `CALENDAR_DB_NAME`, `CALENDAR_DB_USER`, `CALENDAR_DB_PASSWORD`             | `sytue_calendar`                    |
+| Sytue Contacts       | `CONTACTS_DB_NAME`, `CONTACTS_DB_USER`, `CONTACTS_DB_PASSWORD`             | `sytue_contacts`                    |
+| SyERP                | `SYERP_DB_NAME`, `SYERP_DB_USER`, `SYERP_DB_PASSWORD`                      | `sytue_syerp`                       |
+| Sytue Notepads       | `NOTES_DB_NAME`, `NOTES_DB_USER`, `NOTES_DB_PASSWORD`                      | `sytue_notes`                       |
+| Sytue Photos         | `SYPHOTOS_DB_NAME`, `SYPHOTOS_DB_USER`, `SYPHOTOS_DB_PASSWORD`             | `sytue_syphotos`                    |
+| Sytue Cast           | `CAST_DB_NAME`, `CAST_DB_USER`, `CAST_DB_PASSWORD`                         | `sytue_cast`                        |
+| Sytue Web (Pages)    | `PAGES_DB_NAME`, `PAGES_DB_USER`, `PAGES_DB_PASSWORD`                      | `sytue_pages`                       |
+| Sytue Bases          | `BASES_DB_NAME`, `BASES_DB_USER`, `BASES_DB_PASSWORD`                      | `sytue_bases`                       |
+| Sytue Rooms          | `ROOMS_DB_NAME`, `ROOMS_DB_USER`, `ROOMS_DB_PASSWORD`                      | `sytue_rooms`                       |
+| Sytue Hub            | `HUB_DB_NAME`, `HUB_DB_USER`, `HUB_DB_PASSWORD`                            | `sytue_hub`                         |
+| Integration Gateway  | `INTEGRATIONS_DB_NAME`, `INTEGRATIONS_DB_USER`, `INTEGRATIONS_DB_PASSWORD` | `sytue_integrations`                |
+| Sytue Cloud          | `CLOUD_DB_NAME`, `CLOUD_DB_USER`, `CLOUD_DB_PASSWORD`                      | `sytue_cloud`                       |
+| Sytue Analytics      | `ANALYTICS_DB_NAME`, `ANALYTICS_DB_USER`, `ANALYTICS_DB_PASSWORD`          | `sytue_analytics`                   |
+| PostgREST (Cloud DB) | `POSTGREST_ROLE`, `POSTGREST_ROLE_PASSWORD`, `POSTGREST_JWT_SECRET`        | `authenticator`                     |
+
+<a id="claves-criptográficas-oidc-object-storage-y-tiempo-real"></a>
+
+#### Cryptographic keys, OIDC, Object Storage and real time
+
+| Variable                                               | Purpose                                                                                 | Generation                               |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `SYTUE_SESSION_SECRET`                                 | Key used to seal the HTTP-only session cookies of the web applications (`@sytue/auth`). | `openssl rand -hex 32`                   |
+| `SYTUE_DEV_CLIENT_SECRET`                              | Shared secret of the confidential OIDC clients between the BFFs and Sytue ID.           | `openssl rand -hex 32`                   |
+| `CLOUD_SECRET_ENC_KEY`                                 | AES-256-GCM KEK (32 bytes in Base64) to encrypt project secrets in Sytue Cloud.         | `openssl rand -base64 32`                |
+| `DOCS_SECRET_ENC_KEY`                                  | AES-256-GCM KEK (32 bytes in Base64) to encrypt data connector credentials in Calcus.   | `openssl rand -base64 32`                |
+| `SYERP_SECRET_ENC_KEY`                                 | AES-256-GCM KEK (32 bytes in Base64) to encrypt payment gateway secrets in SyERP.       | `openssl rand -base64 32`                |
+| `INTEGRATIONS_KEY_ENCRYPTION_KEY`                      | AES-256-GCM KEK (32 bytes in Base64) to encrypt SaaS connector tokens at rest.          | `openssl rand -base64 32`                |
+| `SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY`                   | AES-256-GCM KEK (32 bytes in Base64) to encrypt the daily salt of Sytue Analytics.      | `openssl rand -base64 32`                |
+| `ID_INTERNAL_SECRET`                                   | Internal HMAC secret between Sytue ID and Sytue Mail to verify IMAP/SMTP app passwords. | `openssl rand -hex 32`                   |
+| `ROOMS_INTERNAL_SECRET`                                | Internal secret between Sytue Rooms and Sytue Drive to authorize channel attachments.   | `openssl rand -hex 32`                   |
+| `CAST_INTERNAL_SECRET`                                 | Internal secret for control communication with Sytue Cast.                              | `openssl rand -hex 32`                   |
+| `CAST_MEDIA_SIGNING_KEY`                               | Key to sign HLS segment and manifest URLs in Sytue Cast.                                | `openssl rand -hex 32`                   |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`              | Credentials of the local S3 storage (MinIO).                                            | `openssl rand -hex 24`                   |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`               | Key pair of the LiveKit WebRTC SFU to sign room tokens and webhooks.                    | `openssl rand -hex 32`                   |
+| `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` | Optional LLM provider configuration for the `services/ai` assistant.                    | Provider (`scaleway` or `openai-compat`) |
 
 ---
 
 <a id="12-dev-local-en-un-solo-comando"></a>
 
-### 1.2 Despliegue con Docker Compose
+<a id="12-despliegue-con-docker-compose"></a>
 
-Una vez generado `deploy/compose/.env` con `./sytue-deploy`:
+### 1.2 Deployment with Docker Compose
 
-```bash
-# Levantar los servicios configurados en COMPOSE_PROFILES (con generación de certificados mkcert):
-make dev-up
+`./sytue-deploy` does everything in this section. To operate the suite afterwards:
 
-# Crear la organización inicial y el usuario administrador en Sytue ID:
-make dev-seed
+| Command                                     | What it does                                                                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `make dev-up`                               | Builds whatever has changed and starts the profiles in `COMPOSE_PROFILES` (if there is no `.env`, the wizard generates it). |
+| `make dev-seed`                             | Creates or re-asserts the development accounts with the password from `SYTUE_ID_DEV_SEED_PASSWORD`. Idempotent.             |
+| `make dev-app P=docs,mail`                  | Only the core and the given profiles.                                                                                       |
+| `make dev-up-built`                         | Compiled frontends (less memory, no hot reload).                                                                            |
+| `make dev-ps` · `make dev-logs SVC=id`      | Status and logs.                                                                                                            |
+| `make dev-down`                             | Stops the containers, keeping the data.                                                                                     |
+| `make dev-clean` / `./sytue-deploy --reset` | Deletes the volumes (the latter also regenerates the secrets and reinstalls).                                               |
+| `scripts/e2e/smoke.sh`                      | End-to-end verification.                                                                                                    |
 
-# (Opcional) Levantar únicamente perfiles concretos para ahorrar memoria RAM:
-make dev-app P=docs,mail,portal
+<a id="servidor-único-y-contenedor-único"></a>
 
-# (Opcional) Levantar la suite con los frontends precompilados (menor consumo de RAM):
-make dev-up-built
-```
+#### Single server and single container
 
-Comandos de gestión:
+`./sytue-deploy --mode servidor --domain <dominio>` uses the same Compose files,
+rendered for your domain in `deploy/compose/.servidor/` (outside Git), plus two
+overlays:
 
-- `make dev-ps`: muestra el estado y salud (`healthy`) de cada contenedor.
-- `make dev-logs SVC=id`: sigue los logs de un servicio específico.
-- `make dev-down`: detiene los contenedores conservando los volúmenes de datos.
-- `make dev-clean`: detiene los contenedores y elimina todos los volúmenes locales.
+| File                                                   | What changes                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`servidor.yml`](../deploy/compose/servidor.yml)       | Traefik publishes 80/443 on all interfaces and without a dashboard; LiveKit publishes 7881/TCP and announces the public IP (or `SYTUE_IP_MEDIOS`); Sytue ID in self-hosted production (`SYTUE_ID_SELF_HOSTED`, encrypted signing key, SMTP, open or closed sign-up depending on `--usuarios`/`--registro-abierto`). |
+| [`letsencrypt.yml`](../deploy/compose/letsencrypt.yml) | With `--tls letsencrypt` (the default): Traefik's ACME HTTP-01 issuer and an `acme` volume for the certificates. With `--tls interno`, an mkcert certificate for `*.<dominio>`.                                                                                                                                     |
+
+After startup, the wizard sets the secrets of the apps' OIDC clients
+(`id reconcile-client-secrets`), adds their redirect addresses on your domain and creates the
+owner (`id bootstrap-owner`); all of it is idempotent. Mode-specific variables in
+`deploy/compose/.env`: `SYTUE_DOMINIO`, `SYTUE_TLS`, `SYTUE_ACME_EMAIL`,
+`SYTUE_PROPIETARIO`, `SYTUE_ORGANIZACION`, `SYTUE_PROPIETARIO_PASSWORD`, `SYTUE_USUARIOS`,
+`SYTUE_REGISTRO_ABIERTO`, `ID_KEY_ENCRYPTION_KEY` and `SYTUE_SMTP_*` (empty: the suite's own
+mail server sends Sytue ID's email).
+
+[`deploy/todo-en-uno/`](../deploy/todo-en-uno/Dockerfile) packages exactly that mode
+in an image with internal Docker: the container keeps the images, the
+volumes, `.env`, the certificates and the CA in `/datos`, and on every startup it runs the
+wizard again without questions (`--no-build` from the second time on).
 
 ---
 
 <a id="13-prod-en-scaleway-terraform--helm"></a>
 
-### 1.3 Despliegue en Kubernetes con Helm
+<a id="13-despliegue-en-kubernetes-con-helm-avanzado"></a>
 
-Para desplegar en cualquier clúster de Kubernetes (k3s, Kapsule o clúster gestionado):
+### 1.3 Deployment on Kubernetes with Helm (advanced)
 
-1. **Generar los secretos y el overlay de valores**:
-   ```bash
-   ./sytue-deploy --mode helm --domain suite.miempresa.eu --namespace sytue-prod --only-config
-   ```
-2. **Aplicar los Secrets en el clúster**:
-   ```bash
-   bash deploy/helm/apply-secrets.sh
-   ```
-3. **Preparar las dependencias vendorizadas del chart y desplegar con Helm**:
-   ```bash
-   make helm-vendor-prepare
-   HELM_REPOSITORY_CONFIG="deploy/helm/.vendor/no-repositories.yaml" \
-   HELM_REPOSITORY_CACHE="deploy/helm/.vendor/repository-cache" \
-     helm dependency build deploy/helm/sytue-one
+The `deploy/helm/sytue-one` chart does not deploy PostgreSQL or S3 and pulls the images from
+`global.imageRegistry`. It needs Kubernetes 1.31+ with cert-manager already installed; it brings its
+own Traefik, so on k3s install the cluster with `--disable traefik`. Hardware and network
+requirements: [README § Minimum requirements](../README.md#requisitos-mínimos-para-desplegar-en-un-servidor).
+The wizard prepares everything else:
 
-   helm upgrade --install sytue-one deploy/helm/sytue-one \
-     --namespace sytue-prod --create-namespace \
-     -f deploy/helm/sytue-one/values.yaml \
-     -f deploy/helm/values-custom.yaml
-   ```
-4. **Dar de alta el propietario inicial y reconciliar los secretos OIDC en Sytue ID**:
-   ```bash
-   kubectl -n sytue-prod exec deploy/sytue-one-id -- /app/id bootstrap-owner
-   ```
+```bash
+./sytue-deploy --mode helm --domain suite.miempresa.eu
+```
+
+It generates in `deploy/helm/` (ignored by Git; they contain secrets):
+
+| File                                                 | What for                                                                                                                                                                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `values-custom.yaml`                                 | Domain, registry, PostgreSQL, S3, ACME, `livekit.webhook.apiKey` and the load balancer CIDR.                                                                                                                                                            |
+| `apply-secrets.sh`                                   | All the Secrets referenced by the chart: DSNs of the 17 databases, S3, encryption keys, LiveKit, cookies and **one OIDC secret per web app** (the same in `sytue-frontend-bff` and in `sytue-id-client-secrets`, which Sytue ID reconciles on startup). |
+| `create-databases.sh`                                | One role and one database per service in your PostgreSQL (idempotent).                                                                                                                                                                                  |
+| `bootstrap-admin.sh`                                 | One-off Job that creates the initial owner (`id bootstrap-owner`).                                                                                                                                                                                      |
+| `apply-integrations.sh` · `values-integrations.yaml` | Integration Gateway base and OAuth apps (README § integrations).                                                                                                                                                                                        |
+
+And then, in order:
+
+```bash
+docker login <registro>
+bash deploy/helm/publicar-imagenes.sh <registro> suite.miempresa.eu   # construye y sube 42 imágenes
+PGUSER=postgres PGPASSWORD=… bash deploy/helm/create-databases.sh
+bash deploy/helm/apply-secrets.sh && bash deploy/helm/apply-integrations.sh
+bash scripts/prepare-helm-vendor.sh
+HELM_REPOSITORY_CONFIG=deploy/helm/.vendor/no-repositories.yaml \
+HELM_REPOSITORY_CACHE=deploy/helm/.vendor/repository-cache \
+  helm dependency build deploy/helm/sytue-one
+helm upgrade --install sytue-one deploy/helm/sytue-one -n sytue-prod --create-namespace \
+  -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml \
+  -f deploy/helm/values-integrations.yaml
+bash deploy/helm/bootstrap-admin.sh
+```
+
+The owner signs in at `https://id.<dominio>/account` and enables their second factor: until
+then the `owner` role keeps Sytue Admin closed. Email (SMTP/IMAP) uses the
+`tls-wildcard-sytue-eu` Secret; if it does not exist, `apply-secrets.sh` creates a self-signed one so that
+Mail starts: replace it with your domain's wildcard certificate. The
+Dragonfly image (`ghcr.io/thinkddr/upstream-dragonfly`) is not built by `publicar-imagenes.sh`.
 
 ---
 
 <a id="14-migraciones-de-postgresql-por-servicio-go"></a>
 
-### 1.4 Migraciones de PostgreSQL
+<a id="14-migraciones-de-postgresql"></a>
 
-Cada microservicio Go embebe sus migraciones SQL (`services/<svc>/db/migrations/*.sql`) mediante `embed.FS` y las aplica automáticamente al arrancar de forma transaccional (`platform/pkg/pg/migrate.go`). También pueden ejecutarse manualmente:
+### 1.4 PostgreSQL migrations
+
+Each Go microservice embeds its SQL migrations (`services/<svc>/db/migrations/*.sql`) via `embed.FS` and applies them automatically and transactionally on startup (`platform/pkg/pg/migrate.go`). They can also be run manually:
 
 ```bash
 make migrate SVC=id
 ```
 
-El gate `make migrate-check` verifica que no existan números de versión duplicados ni operaciones destructivas sin anotación explícita.
+The `make migrate-check` gate verifies that there are no duplicate version numbers and no destructive operations without an explicit annotation.
 
 ---
 
 <a id="15-identidad-sso-y-scim-sytue-id--servicio-go-nuclear"></a>
 
-### 1.5 Identidad, SSO y SCIM (Sytue ID)
+<a id="15-identidad-sso-y-scim-sytue-id"></a>
 
-**Sytue ID** (`services/id`, puerto `:8081`) es el proveedor OpenID Connect nuclear de la suite:
+### 1.5 Identity, SSO and SCIM (Sytue ID)
 
-- **Discovery OIDC**: `GET /.well-known/openid-configuration` y claves públicas en `GET /.well-known/jwks.json`.
-- **OAuth 2.1 + PKCE (`S256`)**: obligatorio en todos los flujos de autorización.
-- **Segundo factor (MFA)**: soporte integrado para TOTP (RFC 6238) y WebAuthn / Passkeys (FIDO2). Los roles `owner` y `admin` requieren *step-up MFA*.
-- **SCIM 2.0**: aprovisionamiento automatizado de usuarios y grupos bajo `/scim/v2/Users` y `/scim/v2/Groups` mediante tokens Bearer por organización.
+**Sytue ID** (`services/id`, port `:8081`) is the suite's core OpenID Connect provider:
+
+- **OIDC Discovery**: `GET /.well-known/openid-configuration` and public keys at `GET /.well-known/jwks.json`.
+- **OAuth 2.1 + PKCE (`S256`)**: mandatory in all authorization flows.
+- **Second factor (MFA)**: built-in support for TOTP (RFC 6238) and WebAuthn / Passkeys (FIDO2). The `owner` and `admin` roles require _step-up MFA_.
+- **SCIM 2.0**: automated provisioning of users and groups under `/scim/v2/Users` and `/scim/v2/Groups` with per-organization Bearer tokens.
 
 ---
 
 <a id="16-alta-de-un-tenant-nuevo"></a>
 
-### 1.6 Alta de organizaciones (Multi-tenancy)
+<a id="16-alta-de-organizaciones-multi-tenancy"></a>
 
-Cada organización se identifica por un `slug` inmutable (`^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`) y está aislada en todas las tablas de negocio mediante políticas PostgreSQL `ENABLE` + `FORCE ROW LEVEL SECURITY` (`platform/pkg/pg/tx.go` fija `SET LOCAL app.tenant = $1` en cada transacción).
+### 1.6 Organization onboarding (Multi-tenancy)
 
-Para crear organizaciones adicionales puedes usar la consola de administración (`https://admin.<dominio>`) o la API de Sytue ID.
+Each organization is identified by an immutable `slug` (`^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`) and is isolated in every business table by PostgreSQL `ENABLE` + `FORCE ROW LEVEL SECURITY` policies (`platform/pkg/pg/tx.go` sets `SET LOCAL app.tenant = $1` in every transaction).
+
+To create additional organizations you can use the admin console (`https://admin.<dominio>`) or the Sytue ID API.
 
 ---
 
 <a id="17-operacion-de-correo-sytue-mail-dns-y-prueba-de-entrega"></a>
 
-### 1.7 Operación de correo (Sytue Mail): DNS y DKIM
+<a id="17-operación-de-correo-sytue-mail-dns-y-dkim"></a>
 
-Para habilitar el envío y recepción de correo en un dominio propio con `services/mail`:
+### 1.7 Email operations (Sytue Mail): DNS and DKIM
 
-1. **Registros DNS requeridos**:
+To enable sending and receiving email on your own domain with `services/mail`:
+
+1. **Required DNS records**:
    - `MX`: `@ IN MX 10 mx.<dominio>.`
    - `SPF`: `@ IN TXT "v=spf1 mx -all"`
    - `DKIM`: `sytue._domainkey IN TXT "v=DKIM1; k=rsa; p=<clave_publica>"`
    - `DMARC`: `_dmarc IN TXT "v=DMARC1; p=quarantine; rua=mailto:postmaster@<dominio>"`
-2. **Puertos expuestos**: JMAP/HTTP en `:8086`, SMTP en `:25`, `:465` y `:587`, e IMAPS en `:993`.
+2. **Exposed ports**: JMAP/HTTP on `:8086`, SMTP on `:25`, `:465` and `:587`, and IMAPS on `:993`.
 
 ---
 
 <a id="19-backup-y-restore"></a>
 
-### 1.8 Copias de seguridad y restauración
+<a id="18-copias-de-seguridad-y-restauración"></a>
 
-1. **PostgreSQL**: realizar volcados lógicos por base de datos con `pg_dump -Fc --no-owner --no-acl -d <db> > <db>.dump` o copias físicas continuas (PITR) del servidor PostgreSQL.
-2. **Object Storage (S3)**: activar el versionado de buckets en S3/MinIO y replicar periódicamente los buckets `sytue-drive`, `sytue-mail`, `sytue-docs` y `sytue-cloud`.
-3. **Restauración**: restaurar las bases de datos con `pg_restore --clean --if-exists -d <db> <db>.dump` y verificar la salud de los servicios con `/healthz` y `/readyz`.
+### 1.8 Backups and restore
+
+1. **PostgreSQL**: take logical dumps per database with `pg_dump -Fc --no-owner --no-acl -d <db> > <db>.dump` or continuous physical backups (PITR) of the PostgreSQL server.
+2. **Object Storage (S3)**: enable bucket versioning in S3/MinIO and periodically replicate the `sytue-drive`, `sytue-mail`, `sytue-docs` and `sytue-cloud` buckets.
+3. **Restore**: restore the databases with `pg_restore --clean --if-exists -d <db> <db>.dump` and check the health of the services with `/healthz` and `/readyz`.
 
 ---
 
 <a id="110-rotacion-de-secretos"></a>
 
-### 1.9 Rotación de secretos y claves de firma
+<a id="19-rotación-de-secretos-y-claves-de-firma"></a>
 
-- **Claves de firma OIDC (JWKS)**: Sytue ID soporta múltiples claves activas en `signing_keys`. Al rotar la clave primaria, la anterior permanece publicada en `/.well-known/jwks.json` con estado `retiring` hasta que expiran los tokens en vuelo. En caso de emergencia, `/app/id revoke-all` invalida inmediatamente todas las sesiones y tokens anteriores.
-- **Secretos de aplicación y base de datos**: regenerar ejecutando `./sytue-deploy` o actualizando los `Secret` de Kubernetes y realizando un `kubectl rollout restart deployment` en el namespace correspondiente.
+### 1.9 Rotation of secrets and signing keys
+
+- **OIDC signing keys (JWKS)**: Sytue ID supports multiple active keys in `signing_keys`. When the primary key is rotated, the previous one stays published in `/.well-known/jwks.json` with the `retiring` status until in-flight tokens expire. In an emergency, `/app/id revoke-all` immediately invalidates all previous sessions and tokens.
+- **Application and database secrets**: regenerate them by running `./sytue-deploy` or by updating the Kubernetes `Secret` objects and running a `kubectl rollout restart deployment` in the corresponding namespace.
 
 ---
 
 <a id="112-escalado"></a>
 
-### 1.10 Escalado y comprobaciones de salud (Healthchecks)
+<a id="110-escalado-y-comprobaciones-de-salud-healthchecks"></a>
 
-Todos los servicios Go son *stateless* y escalan horizontalmente detrás de Traefik (`HorizontalPodAutoscaler` incluido en cada subchart de `deploy/helm/charts/*`). El estado compartido reside en PostgreSQL, S3 y Dragonfly.
+### 1.10 Scaling and healthchecks
 
-Cada servicio expone dos sondas estándar (`platform/pkg/httpx/health.go`):
+All Go services are _stateless_ and scale horizontally behind Traefik (`HorizontalPodAutoscaler` included in each subchart of `deploy/helm/charts/*`). Shared state lives in PostgreSQL, S3 and Dragonfly.
 
-- `GET /healthz`: *liveness probe* (verifica que el proceso HTTP responde).
-- `GET /readyz`: *readiness probe* (verifica conectividad activa con PostgreSQL y dependencias críticas).
+Each service exposes two standard probes (`platform/pkg/httpx/health.go`):
+
+- `GET /healthz`: _liveness probe_ (checks that the HTTP process responds).
+- `GET /readyz`: _readiness probe_ (checks active connectivity with PostgreSQL and critical dependencies).
 
 ---
 
 <a id="1b-perfiles-de-despliegue-cual-es-cual"></a>
 <a id="111-apps-oauth-de-la-plataforma-google-drive-onedrive-y-dropbox-como-almacen-conectado"></a>
 
-### 1.11 Almacenamiento externo conectado (Google Drive, OneDrive, Dropbox y S3)
+<a id="111-almacenamiento-externo-conectado-google-drive-onedrive-dropbox-y-s3"></a>
 
-Sytue Drive permite conectar cuentas externas de almacenamiento mediante OAuth 2.0 o credenciales S3:
+### 1.11 Connected external storage (Google Drive, OneDrive, Dropbox and S3)
 
-- Las credenciales de aplicación OAuth se configuran mediante variables de entorno en `services/drive` (`DRIVE_GOOGLE_CLIENT_ID` / `DRIVE_GOOGLE_CLIENT_SECRET`, `DRIVE_ONEDRIVE_CLIENT_ID` / `DRIVE_ONEDRIVE_CLIENT_SECRET`, `DRIVE_DROPBOX_CLIENT_ID` / `DRIVE_DROPBOX_CLIENT_SECRET`).
-- Los tokens de cada usuario se almacenan cifrados en reposo con AES-256-GCM.
+Sytue Drive can connect external storage accounts via OAuth 2.0 or S3 credentials:
+
+- OAuth application credentials are configured through environment variables in `services/drive` (`DRIVE_GOOGLE_CLIENT_ID` / `DRIVE_GOOGLE_CLIENT_SECRET`, `DRIVE_ONEDRIVE_CLIENT_ID` / `DRIVE_ONEDRIVE_CLIENT_SECRET`, `DRIVE_DROPBOX_CLIENT_ID` / `DRIVE_DROPBOX_CLIENT_SECRET`).
+- Each user's tokens are stored encrypted at rest with AES-256-GCM.
+
+---
+
+<a id="112-integraciones"></a>
+
+<a id="112-integraciones-y-conectores-con-terceros"></a>
+
+### 1.12 Third-party integrations and connectors
+
+The **Sytue Integration Gateway** (`services/integrations`) connects the suite with some fifty external services: Google Workspace, Microsoft 365, Slack, Zoom, GitHub, Jira, Salesforce, Dropbox, WhatsApp Business, IMAP/POP3 mailboxes, SAML/OIDC providers and more. All traffic to third parties goes out through it, with per-organization policy, and the credentials of each connection are stored **sealed with AES-256**: never in plain text.
+
+> **Requirement:** the gateway is deployed with **Kubernetes/Helm**. The Docker Compose profile does not include it yet, so the connectors are not available on Compose. The only external provider in that profile is Sytue AI, which the wizard configures in step 3.
+
+<a id="activarlas-paso-a-paso-con-el-cli"></a>
+
+#### Enabling them step by step with the CLI
+
+```bash
+# Dentro del despliegue completo (paso 4 de 6 del asistente):
+./sytue-deploy --mode helm
+
+# O solo las integraciones, sobre un despliegue Helm ya existente (se puede repetir;
+# también `make deploy-integrations`):
+./sytue-deploy --integrations --domain suite.miempresa.eu
+```
+
+The wizard goes through three levels:
+
+1. **Gateway base (automatic).** It generates the KEK that seals the credentials, the secret of the `sytue-gateway` client in Sytue ID and the internal secret it shares with Drive. Without this base the integrations pod does not start. **No existing key is rotated when it is run again**: rotating the KEK would make the credentials already stored unreadable.
+2. **Platform OAuth apps (optional, provider by provider).** For each provider it tells you where to register the app, which options to choose and which **redirect URI** to declare, and then asks you for the `client_id` and the `client_secret` (the latter without showing it on screen). With a platform app, each organization connects **with one click**: it only approves the permissions screen. If you do not register it, each organization will have to register its own (_BYO_).
+3. **The rest of the connectors** (SAML, OIDC, IMAP/POP3, API tokens) need nothing in the deployment: each organization sets them up from Sytue Admin.
+
+The redirect URI is **the same for all providers**:
+
+```
+https://integrations.<tu-dominio>/api/v1/oauth/callback
+```
+
+| Provider          | Where the app is registered                                                                                                                               | What it covers                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Google            | [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) · OAuth client ID “Web application”                               | Workspace, Drive, Gmail, Chat and Meet (a single app)            |
+| Microsoft         | [Microsoft Entra → App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) · multitenant, “Web” redirect | Microsoft 365, Azure, OneDrive, Teams and Outlook (a single app) |
+| Slack             | [api.slack.com/apps](https://api.slack.com/apps) · from a manifest ([`integraciones-marketplace/slack`](../integraciones-marketplace/slack))              | SSO/SCIM, Rooms channels and rooms                               |
+| Zoom              | [Zoom App Marketplace](https://marketplace.zoom.us/develop/create) · “General App”                                                                        | Meetings                                                         |
+| GitHub            | [New OAuth App](https://github.com/settings/applications/new)                                                                                             | Repositories and migration                                       |
+| Jira Cloud        | [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) · OAuth 2.0 (3LO)                                                          | Jira and Atlassian SSO                                           |
+| Salesforce        | Setup → App Manager → _Connected App_                                                                                                                     | CRM                                                              |
+| ServiceNow        | System OAuth → _Application Registry_                                                                                                                     | Incidents and services                                           |
+| Dropbox           | [Dropbox App Console](https://www.dropbox.com/developers/apps)                                                                                            | Connected storage in Drive                                       |
+| Business Central  | App registration in Entra with the Dynamics 365 Business Central API                                                                                      | ERP                                                              |
+| Databricks        | Account console → _App connections_                                                                                                                       | Data                                                             |
+| Yahoo Mail        | [Yahoo Developer](https://developer.yahoo.com/apps/)                                                                                                      | Mailboxes and migration                                          |
+| WhatsApp Business | [Meta for Developers](https://developers.facebook.com/apps/) · _Business_ type app                                                                        | Conversations in Rooms (webhook: `/api/v1/whatsapp/webhook`)     |
+
+<a id="qué-genera-y-cómo-se-aplica"></a>
+
+#### What it generates and how it is applied
+
+| File (in `deploy/helm/`, outside Git)                               | Contents                                                                                                                                                                                                           |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `integrations-oauth.tsv` · `integrations-oauth-clients.json` (0600) | The registered OAuth apps. The wizard keeps them when it is run again.                                                                                                                                             |
+| `apply-integrations.sh` (0700)                                      | Creates or completes the `sytue-integrations`, `sytue-integrations-platform-oauth`, `sytue-id-client-secrets` and `sytue-drive` Secrets (it only generates what is missing) and restarts the affected Deployments. |
+| `values-integrations.yaml`                                          | Enables `id.clientSecrets` so that Sytue ID registers the `sytue-gateway` client.                                                                                                                                  |
+
+```bash
+bash deploy/helm/apply-secrets.sh          # si aún no lo has aplicado
+bash deploy/helm/apply-integrations.sh
+helm upgrade --install sytue-one deploy/helm/sytue-one -n sytue-prod \
+  -f deploy/helm/sytue-one/values.yaml \
+  -f deploy/helm/values-custom.yaml \
+  -f deploy/helm/values-integrations.yaml
+```
+
+<a id="conectar-una-organización"></a>
+
+#### Connecting an organization
+
+With the suite running, an organization administrator goes to **Sytue Admin → Integrations** (`https://admin.<tu-dominio>/admin/apps`), clicks **Connect** on the application they want and approves the permissions at the provider. From then on, each person uses the connection from their app (Drive, Mail, Rooms…) without copying tokens or webhooks. To publish the apps in the Slack, Teams, Google Workspace or Zoom stores, see [`integraciones-marketplace/`](../integraciones-marketplace/README.md).
 
 ---
 
 <a id="2-cicd-y-cadena-de-suministro"></a>
 
-## 2. CI/CD y cadena de suministro
+## 2. CI/CD and supply chain
 
-Los flujos de integración continua en `.github/workflows/` validan el repositorio en cada ejecución:
+The continuous integration workflows in `.github/workflows/` validate the repository on every run:
 
-- **`ci-go.yml`**: compilación, `go vet`, tests unitarios con detector de carreras (`-race`) y `golangci-lint` v2.
-- **`ci-frontend.yml`**: compilación de paquetes `@sytue/*`, `typecheck`, `lint`, `format:check` y tests unitarios con Bun.
-- **`ci-integration.yml`**: tests de integración (`//go:build integration`) contra PostgreSQL real.
-- **`security.yml`**: análisis estático de vulnerabilidades (`govulncheck`, `osv-scanner`, `trivy`), detección de secretos (`gitleaks`), cumplimiento de licencias permisivas y control de cadena de suministro (`make eu-supply-chain-check`).
+- **`ci-go.yml`**: build, `go vet`, unit tests with the race detector (`-race`) and `golangci-lint` v2.
+- **`ci-frontend.yml`**: build of the `@sytue/*` packages, `typecheck`, `lint`, `format:check` and unit tests with Bun.
+- **`ci-integration.yml`**: integration tests (`//go:build integration`) against a real PostgreSQL.
+- **`security.yml`**: static vulnerability analysis (`govulncheck`, `osv-scanner`, `trivy`), secret detection (`gitleaks`), permissive license compliance and supply-chain control (`make eu-supply-chain-check`).
 
-Para ejecutar todas las comprobaciones localmente:
+To run all the checks locally:
 
 ```bash
 make gates
@@ -321,35 +469,35 @@ make gates
 
 <a id="3-pruebas-e2e-smoke-test"></a>
 
-## 3. Pruebas E2E (smoke test)
+## 3. E2E tests (smoke test)
 
-Con el entorno levantado, el script `scripts/e2e/smoke.sh` verifica de extremo a extremo las sondas `/healthz` y `/readyz` de todos los servicios, el descubrimiento OIDC de Sytue ID, el flujo Authorization Code + PKCE y las rutas principales de Traefik:
+With the environment up, the `scripts/e2e/smoke.sh` script verifies end to end the `/healthz` and `/readyz` probes of all services, Sytue ID's OIDC discovery, the Authorization Code + PKCE flow and the main Traefik routes:
 
 ```bash
 bash scripts/e2e/smoke.sh
 ```
 
-Las pruebas completas de navegador con Playwright se encuentran en `test/e2e/`.
+The full browser tests with Playwright are in `test/e2e/`.
 
 ---
 
 <a id="4-rendimiento-y-seo"></a>
 
-## 4. Rendimiento y SEO
+## 4. Performance and SEO
 
-- **Objetivos de latencia (SLO)**: APIs Go `p95 < 150 ms` en lecturas y `< 300 ms` en escrituras; hidratación selectiva en Astro (*Islands Architecture*) para minimizar el JavaScript enviado al navegador.
-- **Core Web Vitals**: LCP `< 2.0 s`, CLS `< 0.05` e INP `< 150 ms`, verificados con Lighthouse CI (`.lighthouserc.json`).
-- **Compresión y caché**: compresión Brotli/Zstd/Gzip en el borde y activos estáticos inmutables con `Cache-Control: public, max-age=31536000, immutable`.
+- **Latency targets (SLO)**: Go APIs `p95 < 150 ms` for reads and `< 300 ms` for writes; selective hydration in Astro (_Islands Architecture_) to minimize the JavaScript sent to the browser.
+- **Core Web Vitals**: LCP `< 2.0 s`, CLS `< 0.05` and INP `< 150 ms`, verified with Lighthouse CI (`.lighthouserc.json`).
+- **Compression and caching**: Brotli/Zstd/Gzip compression at the edge and immutable static assets with `Cache-Control: public, max-age=31536000, immutable`.
 
 ---
 
 <a id="5-go-live-de-sytue-cloud"></a>
 
-## 5. Go-live de Sytue Cloud
+## 5. Sytue Cloud go-live
 
-`services/cloud` opera en dos modos configurables por `RUNNER_MODE`:
+`services/cloud` runs in two modes configurable through `RUNNER_MODE`:
 
-1. **Modo simulado (`noop`, por defecto en desarrollo local)**: permite utilizar todo el dashboard y la API de Sytue Cloud sin requerir un clúster Kubernetes subyacente.
-2. **Modo Kubernetes (`kube`, en producción)**: `cloud-api` y `cloud-controller` crean los recursos reales (`Namespace`, `Deployment`, `Service`, `Ingress`, `NetworkPolicy`) en el clúster y `cloud-builder` ejecuta las construcciones de imágenes de contenedor aisladas.
+1. **Simulated mode (`noop`, the default in local development)**: lets you use the whole Sytue Cloud dashboard and API without requiring an underlying Kubernetes cluster.
+2. **Kubernetes mode (`kube`, in production)**: `cloud-api` and `cloud-controller` create the real resources (`Namespace`, `Deployment`, `Service`, `Ingress`, `NetworkPolicy`) in the cluster and `cloud-builder` runs isolated container image builds.
 
-Las plantillas de referencia para activar el modo `kube` en un clúster se encuentran en `services/cloud/deploy/go-live/`.
+The reference templates for enabling `kube` mode on a cluster are in `services/cloud/deploy/go-live/`.

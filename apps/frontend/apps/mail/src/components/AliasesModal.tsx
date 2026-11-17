@@ -22,13 +22,8 @@ import {
   Spinner,
   useToast,
 } from '@sytue/ui';
-import {
-  listAliases,
-  createAlias,
-  deleteAlias,
-  MailHttpError,
-  type Alias,
-} from '../client/mailApi.js';
+import { MailHttpError, type Alias } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
 
@@ -47,6 +42,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function AliasesModal({ locale, open, onChanged, onClose }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { listAliases, createAlias, deleteAlias } = usePrivateMailApi();
   const toast = useToast();
   const [aliases, setAliases] = useState<Alias[]>([]);
   const [primary, setPrimary] = useState('');
@@ -72,7 +68,7 @@ export function AliasesModal({ locale, open, onChanged, onClose }: Props): JSX.E
     return () => {
       active = false;
     };
-  }, [open, reload]);
+  }, [open, reload, listAliases]);
 
   async function handleAdd(): Promise<void> {
     const address = draft.trim();
@@ -209,7 +205,7 @@ export function AliasesModal({ locale, open, onChanged, onClose }: Props): JSX.E
                   <EmptyState
                     title={t('aliases.emptyTitle')}
                     description={t('aliases.emptyDescription')}
-                    illustration={<Icon name="user" size={32} />}
+                    icon="user"
                     action={
                       <Button
                         variant="secondary"

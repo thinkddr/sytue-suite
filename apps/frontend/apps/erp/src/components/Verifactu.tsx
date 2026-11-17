@@ -18,6 +18,7 @@ import { formatDate } from '@sytue/i18n';
 import { api, baseDeLaApp, mensajeDeError } from '../lib/api.js';
 import type { ErpMessageKey, useT } from '../i18n/index.js';
 import type { EstadoVerifactu, MotivoVerifactu, RegistroVerifactu } from './tipos.js';
+import { AsistenteCertificadoVerifactu } from './CertificadoVerifactu.js';
 
 type Traducir = ReturnType<typeof useT>;
 
@@ -59,6 +60,7 @@ export function TarjetaVerifactu({
 }): JSX.Element | null {
   const [estado, setEstado] = useState<EstadoVerifactu | null>(null);
   const [activando, setActivando] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
   const { confirmar, dialogo } = useConfirm();
   const aviso = useToast();
 
@@ -97,6 +99,28 @@ export function TarjetaVerifactu({
   }
 
   const enCola = estado.pendientes + estado.con_errores + estado.rechazadas;
+  // El certificado caduca (los de la FNMT, a los dos o tres años): quien
+  // administra lo puede cambiar también con VERI*FACTU ya activo.
+  const certificado = estado.tiene_certificado ? (
+    <p class="text-text-subtle mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {estado.certificado_nif ? (
+        <span>{t('vf.cert.current', { nif: estado.certificado_nif })}</span>
+      ) : null}
+      {administrador ? (
+        <button type="button" class={enlace} onClick={() => setSubiendo(true)}>
+          {t('vf.cert.change')}
+        </button>
+      ) : null}
+    </p>
+  ) : administrador && !estado.motivo ? (
+    // En el entorno de pruebas basta el certificado del despliegue, pero quien
+    // quiera probar ya con el suyo (el que usará en producción) puede subirlo.
+    <p class="mt-2 text-xs">
+      <button type="button" class={enlace} onClick={() => setSubiendo(true)}>
+        {t('vf.cert.upload')}
+      </button>
+    </p>
+  ) : null;
   return (
     <section class="border-border bg-surface rounded-card mx-4 mt-4 border px-4 py-3 md:mx-6">
       <div class="flex flex-wrap items-center gap-2">
@@ -146,7 +170,14 @@ export function TarjetaVerifactu({
       ) : (
         <div class="mt-1 space-y-2">
           <p class="text-text-muted max-w-prose text-xs leading-relaxed">{t('vf.intro')}</p>
-          {estado.motivo ? (
+          {estado.motivo === 'sin_certificado' && administrador ? (
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="text-text-subtle flex-1 text-xs">{t(MOTIVOS[estado.motivo])}</p>
+              <Button size="xs" onClick={() => setSubiendo(true)}>
+                {t('vf.cert.upload')}
+              </Button>
+            </div>
+          ) : estado.motivo ? (
             <p class="text-text-subtle text-xs">{t(MOTIVOS[estado.motivo])}</p>
           ) : administrador ? (
             <Button size="xs" loading={activando} onClick={() => void activar()}>
@@ -157,6 +188,14 @@ export function TarjetaVerifactu({
           )}
         </div>
       )}
+      {certificado}
+      {subiendo ? (
+        <AsistenteCertificadoVerifactu
+          t={t}
+          onCerrar={() => setSubiendo(false)}
+          onGuardado={setEstado}
+        />
+      ) : null}
       {dialogo}
     </section>
   );

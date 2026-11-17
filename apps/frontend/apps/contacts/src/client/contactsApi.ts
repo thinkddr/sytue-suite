@@ -4,7 +4,7 @@
  * access token Bearer. Asi el access token no toca el navegador para los datos de
  * contactos. Reexporta los tipos del SDK @sytue/api-clients.
  */
-import type { AddressBook as AddressBookCardDav, Contact } from '@sytue/api-clients';
+import type { AddressBook as AddressBookCardDav, Contact, SearchResult } from '@sytue/api-clients';
 import type { TypedValue, PostalAddress } from '../lib/vcard.js';
 /*
  * `withBase` en la vuelta al login: la app se sirve bajo su prefijo en el dominio
@@ -44,10 +44,18 @@ export interface ContactInput {
   birthday?: string;
   organization?: string;
   title?: string;
+  /** Apodos (NICKNAME), separados por comas; definido (aunque sea '') = se gestiona. */
+  nickname?: string;
   note?: string;
+  /** Sitios web; definido (aunque sea []) = el editor los gestiona (ver lib/vcard.ts). */
+  urls?: TypedValue[];
+  /** Personas relacionadas (`value` el nombre); mismo trato que `urls`. */
+  related?: TypedValue[];
+  /** Aniversario YYYY-MM-DD; definido (aunque sea '') = el editor gestiona ANNIVERSARY. */
+  anniversary?: string;
   /**
    * vCard cruda existente (editar/fusionar): el BFF conserva sus propiedades no
-   * proyectadas (PHOTO/X-*…, y ADR/BDAY si el editor no las gestiona) al
+   * proyectadas (PHOTO/X-*…, y ADR/BDAY/N/ORG/TITLE/NICKNAME si no se gestionan) al
    * regenerar la tarjeta. Sin base = campos solo de la proyección (crear/importar).
    */
   baseVcard?: string;
@@ -91,6 +99,17 @@ export async function sincronizarDirectorio(): Promise<void> {
   } catch {
     // Sin directorio se sigue: las libretas propias no dependen de él.
   }
+}
+
+/**
+ * Los últimos correos y eventos con esa persona (búsqueda federada del Hub, por el
+ * BFF). Lanza si el Hub no está: la ficha lo distingue de «no hay ninguno».
+ */
+export async function interaccionesRecientes(emails: readonly string[]): Promise<SearchResult[]> {
+  const q = new URLSearchParams();
+  for (const e of emails) q.append('email', e);
+  const r = await getJson<{ items?: SearchResult[] }>(`/api/interacciones?${q}`);
+  return r.items ?? [];
 }
 
 export function listAddressBooks(): Promise<{ addressBooks: AddressBook[] }> {

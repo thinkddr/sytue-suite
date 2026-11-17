@@ -176,7 +176,7 @@ public final class RefrescoWidgets extends JobService {
      * La biblioteca de la app, con el nombre que lee GoNativeActivity (android.app.lib_name
      * de la actividad). Cargarla dos veces no hace nada; con la actividad viva ya lo está.
      */
-    private static synchronized void cargar(Context app) throws PackageManager.NameNotFoundException {
+    static synchronized void cargar(Context app) throws PackageManager.NameNotFoundException {
         if (cargada) {
             return;
         }

@@ -3,20 +3,21 @@
 
 # SyERP (`:8098`)
 
-El ERP de Sytue One: contactos, ventas, compras, inventario, fabricación,
-facturación, contabilidad, proyectos, RRHH, mantenimiento, soporte y once áreas
-más. **24 módulos, 36 modelos**, un servicio, una base de datos.
+The Sytue One ERP: contacts, sales, purchasing, inventory, manufacturing,
+invoicing, accounting, projects, HR, maintenance, support and eleven more
+areas. **24 modules, 36 models**, one service, one database.
 
-## La decisión que ordena todo lo demás
+<a id="la-decisión-que-ordena-todo-lo-demás"></a>
+## The decision that orders everything else
 
-Un ERP «con todos los módulos» escrito módulo a módulo son doscientas tablas,
-doscientos CRUD que solo se diferencian en los nombres de las columnas y una
-migración cada vez que alguien quiere un campo nuevo. Aquí no.
+An ERP “with every module” written module by module means two hundred tables,
+two hundred CRUDs that differ only in their column names, and a
+migration every time someone wants a new field. Not here.
 
-**El catálogo de modelos es DATO.** Vive en
-[`internal/catalogo/modulos/*.json`](internal/catalogo/modulos): cada fichero
-declara modelos con sus campos, sus estados y sus columnas de lista. El núcleo no
-tiene una sola línea de código específica de Ventas, de Flota ni de Calidad.
+**The model catalog is DATA.** It lives in
+[`internal/catalogo/modulos/*.json`](internal/catalogo/modulos): each file
+declares models with their fields, their states and their list columns. The core does not
+have a single line of code specific to Sales, Fleet or Quality.
 
 ```jsonc
 {
@@ -31,136 +32,142 @@ tiene una sola línea de código específica de Ventas, de Flota ni de Calidad.
 }
 ```
 
-Consecuencias, que son el producto:
+The consequences, which are the product:
 
-- **Añadir un módulo es un fichero JSON.** Sin DDL, sin migración, sin bloqueo de
-  tabla, sin ruta HTTP nueva, sin pantalla nueva, sin tocar el frontend.
-- **Una sola API.** `/api/v1/{modelo}` sirve a los 36 modelos.
-- **Una sola interfaz.** La app (`apps/frontend/apps/erp`) genera lista y ficha
-  del catálogo que le sirve este servicio.
-- **Los cinco idiomas, una vez.** Los rótulos comunes (fecha, importe, cliente…)
-  viven en [`terminos.json`](internal/catalogo/terminos.json) con sus cinco
-  traducciones y los comparten los 24 módulos; un campo sin rótulo **impide el
-  arranque**, no sale en inglés. Lo vigila `TestTodoTraducidoEnLosCincoIdiomas`.
+- **Adding a module is a JSON file.** No DDL, no migration, no table
+  lock, no new HTTP route, no new screen, no frontend changes.
+- **A single API.** `/api/v1/{modelo}` serves all 36 models.
+- **A single interface.** The app (`apps/frontend/apps/erp`) generates the list and the detail view
+  from the catalog this service provides.
+- **The five languages, once.** Common labels (date, amount, customer…)
+  live in [`terminos.json`](internal/catalogo/terminos.json) with their five
+  translations and are shared by the 24 modules; a field without a label **prevents
+  startup**, it does not fall back to English. `TestTodoTraducidoEnLosCincoIdiomas` guards this.
 
-## Lo que NO va en JSONB: el dinero
+<a id="lo-que-no-va-en-jsonb-el-dinero"></a>
+## What does NOT go in JSONB: money
 
-La maestra vive en `records.data` (jsonb). La contabilidad tiene tablas propias,
-columnas tipadas y restricciones de verdad:
+The master data lives in `records.data` (jsonb). Accounting has its own tables,
+typed columns and real constraints:
 
-- **Importes en céntimos enteros** (`bigint`). Ni un `float` en ninguna columna
-  de dinero: 0,1 + 0,2 no es 0,3 y una factura no puede depender de eso. Las
-  cantidades no monetarias viajan como cadena decimal y Postgres las castea a
-  `numeric` para sumar.
-- **El cuadre lo impone Postgres**, no el código: `move_lines_cuadre` es un
-  `CONSTRAINT TRIGGER … DEFERRABLE` que comprueba `sum(debe) = sum(haber)` al
-  confirmar la transacción.
-- **Lo asentado no se toca.** `moves_inmutables` y `move_lines_inmutables`
-  rechazan modificar, borrar **y añadir** sobre un asiento asentado; la única
-  transición permitida es anularlo. Corregir se hace con otro asiento, que es lo
-  que separa un libro contable de una hoja de cálculo.
+- **Amounts in integer cents** (`bigint`). Not a single `float` in any money
+  column: 0.1 + 0.2 is not 0.3 and an invoice cannot depend on that.
+  Non-monetary quantities travel as a decimal string and Postgres casts them to
+  `numeric` to add them up.
+- **Balancing is enforced by Postgres**, not by the code: `move_lines_cuadre` is a
+  `CONSTRAINT TRIGGER … DEFERRABLE` that checks `sum(debe) = sum(haber)` when
+  the transaction commits.
+- **What is posted is not touched.** `moves_inmutables` and `move_lines_inmutables`
+  reject updating, deleting **and adding** to a posted journal entry; the only
+  allowed transition is voiding it. Corrections are made with another entry, which is what
+  separates an accounting ledger from a spreadsheet.
 
-  El `INSERT` de esa lista llegó tarde y conviene que quede escrito: el trigger
-  cubría solo `UPDATE`/`DELETE`, así que **añadir** apuntes a un asiento ya
-  cerrado estaba permitido. Un apunte suelto lo paraba el cuadre por accidente,
-  pero un par equilibrado —un cargo y su abono— entraba sin que nada se quejara.
-  Lo encontró `TestAsientoAsentadoEsInmutable/colar_un_par_equilibrado` al
-  exigir que el fallo viniera del trigger y no de cualquier error. De ahí que un
-  asiento se escriba en borrador, se le pongan los apuntes y se cierre al final:
-  ese orden ya no es una convención del código, lo impone la base.
-- **Un documento, un asiento.** Índice único parcial `moves_un_asiento_por_documento`:
-  un reintento, dos pestañas o una carrera entre réplicas se estrellan contra el
-  índice en vez de duplicar ingresos.
+  The `INSERT` in that list arrived late, and it is worth writing down: the trigger
+  covered only `UPDATE`/`DELETE`, so **adding** lines to an already
+  closed entry was allowed. A single stray line was stopped by the balance check by accident,
+  but a balanced pair —a debit and its credit— got in without anything complaining.
+  `TestAsientoAsentadoEsInmutable/colar_un_par_equilibrado` found it by
+  requiring the failure to come from the trigger and not from just any error. That is why an
+  entry is written as a draft, its lines are added and it is closed at the end:
+  that order is no longer a code convention, the database enforces it.
+- **One document, one entry.** Partial unique index `moves_un_asiento_por_documento`:
+  a retry, two tabs or a race between replicas crash into the
+  index instead of duplicating revenue.
 
-Un abono no es un caso aparte: es la misma factura en negativo, y cada importe se
-coloca en su lado natural invirtiéndolo si viene negativo. Cubierto por
+A credit note is not a special case: it is the same invoice in negative, and each amount is
+placed on its natural side, inverted if it comes in negative. Covered by
 `TestAsientoRectificativo`.
 
-## Rendimiento, medido
+<a id="rendimiento-medido"></a>
+## Performance, measured
 
-Números reales, no estimaciones: 20.000 filas por modelo en un PostgreSQL con
-estadísticas al día. Se reproducen con
+Real numbers, not estimates: 20,000 rows per model in a PostgreSQL with
+up-to-date statistics. They are reproduced with
 `go test -tags integration -run "TestElListadoUsaSuIndice|TestTiempoDeListado"`
-y con `go test -bench Vista ./internal/catalogo`.
+and with `go test -bench Vista ./internal/catalogo`.
 
-| | Antes | Ahora |
+| | Before | Now |
 |---|---|---|
-| Primera página de una lista | 9,4 ms · coste 2114 · **20.000 filas leídas** | **0,56 ms** · coste 8,88 · 51 filas |
-| Lista filtrada por estado | 5,5 ms | **0,54 ms** |
-| Catálogo (cada carga de página) | 144 µs · **115 KB reservados** | **7,9 ns · 0 B** |
-| Catálogo por el cable, al volver | 32 KB | **304, sin cuerpo** |
+| First page of a list | 9.4 ms · cost 2114 · **20,000 rows read** | **0.56 ms** · cost 8.88 · 51 rows |
+| List filtered by state | 5.5 ms | **0.54 ms** |
+| Catalog (every page load) | 144 µs · **115 KB allocated** | **7.9 ns · 0 B** |
+| Catalog over the wire, on return | 32 KB | **304, no body** |
 
-Las tres causas, y ninguna era la que parecía:
+The three causes, and none was the one it seemed to be:
 
-1. **`tenant` faltaba en el `WHERE`.** Lo impone la RLS, sí, pero comparándolo
-   con `current_setting`, que es una expresión estable y **no sirve como
-   condición de índice ORDENADA**. `tenant` es la primera columna de
-   `records_listado`, así que sin la igualdad explícita PostgreSQL no podía
-   recorrer el índice en orden: leía el modelo entero y hacía un top-N para
-   servir cincuenta filas. Con ella, *Index Scan* y se para en la página.
-   La política sigue aplicándose como `Filter`: esto no la sustituye, le da al
-   planificador el dato que ella no puede darle.
+1. **`tenant` was missing from the `WHERE`.** RLS enforces it, yes, but by comparing it
+   with `current_setting`, which is a stable expression and **cannot serve as an
+   ORDERED index condition**. `tenant` is the first column of
+   `records_listado`, so without the explicit equality PostgreSQL could not
+   walk the index in order: it read the entire model and did a top-N to
+   serve fifty rows. With it, *Index Scan*, and it stops at the page.
+   The policy is still applied as a `Filter`: this does not replace it, it gives the
+   planner the information the policy cannot give it.
 
-2. **El catálogo se traducía y serializaba en cada petición.** Es inmutable —va
-   horneado en la imagen—, así que ahora se calcula una vez por idioma al
-   arrancar. Cuesta 160 KB de memoria en total y deja el manejador en una copia
-   de bytes. Con ETag encima, volver a una pantalla no baja ni un byte de él.
+2. **The catalog was translated and serialized on every request.** It is immutable —it is
+   baked into the image—, so now it is computed once per language at
+   startup. It costs 160 KB of memory in total and leaves the handler as a byte
+   copy. With an ETag on top, returning to a screen does not download a single byte of it.
 
-3. **Y un parpadeo que no era de rendimiento sino de corrección:** al cambiar de
-   modelo se quedaban en pantalla las filas del anterior pintadas con las
-   columnas del nuevo —una tabla de guiones que parecía un error de datos—.
+3. **And a flicker that was not about performance but about correctness:** when switching
+   models, the rows of the previous one stayed on screen painted with the
+   columns of the new one —a table of dashes that looked like a data error—.
 
-En el navegador, las listas ya vistas se pintan **al instante** desde una caché
-en memoria y se refrescan por detrás; escribir invalida la de ese modelo, porque
-servir una lista vieja justo después de crear algo es la forma más rápida de que
-alguien crea que no se ha guardado.
+In the browser, lists already seen are painted **instantly** from an in-memory
+cache and refreshed in the background; writing invalidates that model's cache, because
+serving a stale list right after creating something is the fastest way to make
+someone believe it was not saved.
 
-`TestElListadoUsaSuIndice` es un **gate sobre el plan**, no una medida: quien
-quite el `tenant` del `WHERE` no rompe nada visible —la lista sigue saliendo
-bien, solo que diecisiete veces más lenta— y por eso hay un test mirando el
+`TestElListadoUsaSuIndice` is a **gate on the plan**, not a measurement: whoever
+removes `tenant` from the `WHERE` breaks nothing visible —the list still comes out
+fine, just seventeen times slower— and that is why there is a test looking at the
 `EXPLAIN`.
 
-**Lo que se midió y se decidió NO tocar:** la búsqueda por texto tarda 9,8 ms y
-no usa `records_etiqueta_trgm` — a este tamaño PostgreSQL acierta al preferir el
-escaneo, y lo mismo con un patrón literal o con un GIN compuesto sobre
-`btree_gin`. El índice se queda para cuando la tabla crezca; la alternativa era
-añadir una extensión nueva sin ninguna mejora medible.
+**What was measured and deliberately NOT touched:** text search takes 9.8 ms and
+does not use `records_etiqueta_trgm` — at this size PostgreSQL is right to prefer the
+scan, and the same goes for a literal pattern or a composite GIN on
+`btree_gin`. The index stays for when the table grows; the alternative was
+adding a new extension with no measurable improvement.
 
-## Conectores
+<a id="conectores"></a>
+## Connectors
 
-| Conector | Sentido | Cómo |
+| Connector | Direction | How |
 |---|---|---|
-| **Salesforce** | entrada | `POST /api/v1/importar/salesforce`. Sale por el **Sytue Integration Gateway** (`:8093`) reenviando la autorización de quien importa: SyERP no guarda credenciales de Salesforce ni tiene cuenta de servicio con acceso a todas las organizaciones. Idempotente por `externo_id`: importar dos veces actualiza, no duplica. Mapea `Account`, `Contact` y `Opportunity`. |
-| **Stripe** | entrada | `POST /webhooks/stripe/{org}`. Sin sesión —Stripe no presenta un token de Sytue ID—: su autenticación es la **firma HMAC-SHA256** del cuerpo crudo, con ventana de 5 minutos contra repeticiones y comparación en tiempo constante. `invoice.paid` marca la factura pagada y escribe el asiento de cobro. La repetición de eventos la corta la clave primaria de `eventos_entrantes`. |
+| **Salesforce** | inbound | `POST /api/v1/importar/salesforce`. It goes out through the **Sytue Integration Gateway** (`:8093`), forwarding the importing user's authorization: SyERP stores no Salesforce credentials and has no service account with access to every organization. Idempotent by `externo_id`: importing twice updates, it does not duplicate. It maps `Account`, `Contact` and `Opportunity`. |
+| **Stripe** | inbound | `POST /webhooks/stripe/{org}`. No session —Stripe does not present a Sytue ID token—: its authentication is the **HMAC-SHA256 signature** of the raw body, with a 5-minute window against replays and constant-time comparison. `invoice.paid` marks the invoice as paid and writes the collection entry. Event replays are cut off by the primary key of `eventos_entrantes`. |
 
-Lo que **no** hay todavía, dicho claro: **cobrar desde SyERP** (crear un enlace
-de pago en Stripe desde una factura). El plano de datos de la pasarela es de
-**solo lectura** (`TabularSource`), así que un conector de escritura necesita
-primero ese plano en `services/integrations`. Mientras tanto la factura se crea
-en Stripe y se casa por `externo_id` o por `metadata.syerp_ref`.
+What does **not** exist yet, stated plainly: **charging from SyERP** (creating a Stripe payment
+link from an invoice). The gateway's data plane is
+**read-only** (`TabularSource`), so a write connector first needs
+that plane in `services/integrations`. Meanwhile the invoice is created
+in Stripe and matched by `externo_id` or by `metadata.syerp_ref`.
 
-## Licencias
+<a id="licencias"></a>
+## Licenses
 
-Modelo propio, escrito desde el dominio funcional. Que un ERP tenga
-oportunidades, albaranes, partes de horas o asientos por partida doble son ideas
-del oficio —y contabilidad de 1494—, no código con licencia: **no se ha
-consultado ni portado fuente de terceros** (CONVENTIONS §12). Sin dependencias
-LGPL/AGPL arrastradas: el servicio usa la misma pila que el resto de la suite
+Our own model, written from the functional domain. That an ERP has
+opportunities, delivery notes, timesheets or double-entry journal entries are ideas
+of the trade —and accounting from 1494—, not licensed code: **no third-party source
+has been consulted or ported** (CONVENTIONS §12). No LGPL/AGPL dependencies
+dragged in: the service uses the same stack as the rest of the suite
 (chi, pgx, `platform/pkg/*`).
 
-## Lo que NO reimplementa
+<a id="lo-que-no-reimplementa"></a>
+## What it does NOT reimplement
 
-La suite ya tiene correo, documentos, hoja de cálculo, calendario, chat, vídeo,
-almacenamiento y firma. SyERP **no** los vuelve a construir: donde otro ERP mete
-su propio módulo de mensajería o de documentos, aquí se usa Sytue Mail, Docus,
-Drive y Rooms. Es la mitad del código que no existe.
+The suite already has mail, documents, spreadsheets, calendar, chat, video,
+storage and signing. SyERP does **not** build them again: where another ERP puts in
+its own messaging or document module, here Sytue Mail, Docus,
+Drive and Rooms are used. It is the half of the code that does not exist.
 
-Las cuatro garantías tienen su prueba contra un PostgreSQL real en
-`internal/store/libro_integration_test.go` (`-tags integration`), y los negativos
-están atados al mensaje del trigger: un test que solo exija «que falle» seguiría
-en verde el día que falle por otra cosa.
+The four guarantees have their test against a real PostgreSQL in
+`internal/store/libro_integration_test.go` (`-tags integration`), and the negative cases
+are tied to the trigger's message: a test that only requires “that it fails” would stay
+green the day it fails for some other reason.
 
-## Uso
+<a id="uso"></a>
+## Usage
 
 ```bash
 # Validar los manifiestos y ver qué hay. Sin base de datos y sin red.
@@ -174,14 +181,15 @@ docker compose -p sytue-one-dev -f deploy/compose/docker-compose.yml \
   --profile erp up -d postgres id syerp erp-web
 ```
 
-| Variable | Para qué |
+| Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | PostgreSQL (única fuente de verdad) |
-| `OIDC_ISSUER` / `OIDC_JWKS_URL` | Validación de tokens de Sytue ID |
-| `INTEGRATIONS_BASE_URL` | Pasarela de egress (por defecto `http://integrations:8093`) |
-| `SECRET_ENC_KEY` | AES-256 en base64: sella el secreto de firma de los webhooks. **Obligatoria en prod** |
+| `DATABASE_URL` | PostgreSQL (single source of truth) |
+| `OIDC_ISSUER` / `OIDC_JWKS_URL` | Sytue ID token validation |
+| `INTEGRATIONS_BASE_URL` | Egress gateway (default `http://integrations:8093`) |
+| `SECRET_ENC_KEY` | Base64 AES-256: seals the webhook signing secret. **Required in prod** |
 
-## Rutas
+<a id="rutas"></a>
+## Routes
 
 ```
 GET    /api/v1/catalogo                    catálogo traducido + módulos activos
@@ -199,6 +207,8 @@ GET    /api/v1/balance                     sumas y saldos
 POST   /api/v1/libro/{id}/anular           anular un asiento               (admin)
 GET    /api/v1/conexiones                  conectores configurados         (admin)
 POST   /api/v1/conexiones/{proveedor}      configurar Stripe/Salesforce    (admin)
-POST   /api/v1/importar/salesforce         importar                        (admin)
+POST   /api/v1/conexiones/{p}/probar       probar sin escribir (1 fila)    (admin)
+POST   /api/v1/importar/{p}                importar (salesforce, odoo,
+                                           business-central, holded)       (admin)
 POST   /webhooks/stripe/{org}              webhook de Stripe          (sin sesión)
 ```

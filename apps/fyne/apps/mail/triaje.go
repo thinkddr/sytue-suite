@@ -6,6 +6,7 @@ package mail
 import (
 	"cmp"
 	"context"
+	"errors"
 	"maps"
 	"net/url"
 	"slices"
@@ -76,7 +77,15 @@ func (b *Buzon) ponerAcciones() {
 	actual := b.carpetaVista()
 	a.Destacar, a.Leido = b.alternarDestacado, b.alternarLeido
 	a.CrearRegla = func(c Conversacion) { b.crearReglaDesde(c) }
+	// «Bloquear a …»: con carpeta Spam y fuera de ella (dentro, todo lo suyo ya está
+	// ahí). La regla es de la cuenta de Sytue: una vista externa no llega hasta aquí.
+	if spam, hay := b.carpetaDeRol("junk"); hay && b.rolVista() != "junk" {
+		a.Bloquear = func(c Conversacion) { b.bloquear(c, spam) }
+		a.PuedeBloquear = func(correo string) bool { return OfrecerBloqueo(correo, b.direccionesPropias()) }
+	}
+	a.BuscarRemitente = b.buscarRemitente
 	a.Etiquetar = b.etiquetar
+	b.ponerContactos(a)
 	// Los destinos de triaje no incluyen la carpeta en la que ya se está: en la
 	// Papelera no hay «Mover a la papelera».
 	destino := func(rol string) func(Conversacion) {
@@ -99,10 +108,12 @@ func (b *Buzon) ponerAcciones() {
 	}
 	a.Mover = func(x Conversacion, c Carpeta) { b.moverConvs([]Conversacion{x}, c) }
 	for _, m := range b.carpetas {
-		if m.ID != actual && m.Role != "drafts" {
+		// Ni «Pospuestos»: lo que entra ahí sin posponerlo no tiene fecha de vuelta.
+		if m.ID != actual && m.Role != "drafts" && m.Role != "snoozed" {
 			a.Destinos = append(a.Destinos, carpetaDe(m))
 		}
 	}
+	b.ponerPosponer(a)
 }
 
 // consultaVacia dice que se mira una carpeta y no resultados de búsqueda.
@@ -248,11 +259,25 @@ func origenesDeMovimiento(cs []Conversacion, vista, destino string) map[string][
 // tirar con una tecla se hace sin querer.
 func (b *Buzon) avisarDeshacer(carpeta string, origenes map[string][]string) {
 	t := b.P.T
+	u := &triajeDeshacible{origenes}
+	b.ultimoTriaje = u
 	a := ui.NuevoAviso(ui.AvisoExito, t.T("triage.moved", i18n.Vars{"folder": carpeta}), "")
 	a.RotuloCerrar = t.T("ui.dismissNotification", nil)
 	a.RotuloAccion = t.T("compose.undo", nil)
-	a.AlPulsarAccion = func() { b.deshacerMovimiento(origenes) }
+	a.AlPulsarAccion = func() { b.deshacerTriaje(u) }
 	b.P.Notificar(a)
+}
+
+// triajeDeshacible es un movimiento confirmado con su vuelta atrás. Va por puntero
+// para saber si el que se deshace desde un aviso viejo es aún el último.
+type triajeDeshacible struct{ origenes map[string][]string }
+
+// deshacerTriaje es el «Deshacer» del aviso y «z»: una vez deshecho, «z» no lo repite.
+func (b *Buzon) deshacerTriaje(u *triajeDeshacible) {
+	if b.ultimoTriaje == u {
+		b.ultimoTriaje = nil
+	}
+	b.deshacerMovimiento(u.origenes)
 }
 
 // deshacerMovimiento devuelve los mensajes a sus carpetas, una llamada en lote por
@@ -262,26 +287,116 @@ func (b *Buzon) avisarDeshacer(carpeta string, origenes map[string][]string) {
 // —que también perdió los movidos— se pide al salir de ella.
 func (b *Buzon) deshacerMovimiento(origenes map[string][]string) {
 	pedir(b, func(ctx context.Context) (struct{}, error) {
-		for _, carpeta := range slices.Sorted(maps.Keys(origenes)) {
-			if err := b.S.MoveMany(ctx, origenes[carpeta], carpeta); err != nil {
-				return struct{}{}, err
-			}
+		return struct{}{}, b.devolverACarpetas(ctx, origenes)
+	}, func(_ struct{}, err error) { b.trasDeshacer(err) })
+}
+
+// devolverACarpetas mueve cada grupo de mensajes a su carpeta, una llamada por carpeta.
+func (b *Buzon) devolverACarpetas(ctx context.Context, origenes map[string][]string) error {
+	for _, carpeta := range slices.Sorted(maps.Keys(origenes)) {
+		if err := b.S.MoveMany(ctx, origenes[carpeta], carpeta); err != nil {
+			return err
 		}
-		return struct{}{}, nil
-	}, func(_ struct{}, err error) {
+	}
+	return nil
+}
+
+// trasDeshacer avisa de cómo fue un «Deshacer» y vuelve a pedir lo que se ve.
+func (b *Buzon) trasDeshacer(err error) {
+	if err != nil {
+		b.avisar(ui.AvisoPeligro, "error.undoMove", nil)
+	} else {
+		b.avisar(ui.AvisoExito, "triage.undone", nil)
+	}
+	if b.consulta != "" {
+		b.listaCaducada = true
+		b.buscarYa(b.consulta)
+	} else {
+		b.cargarLista()
+	}
+	b.refrescarContadores()
+}
+
+// ---- «Bloquear a …» (MAIL-13) ----
+
+// OfrecerBloqueo es `ofrecerBloqueo` de la web (lib/bloqueoRemitente.ts): sin dirección
+// o a uno mismo no —una regla con tu dirección mandaría a Spam tus respuestas en cada
+// hilo—; a un no-reply sí, que los boletines sin baja son justo a quien se bloquea. Lo
+// de Spam lo decide ponerAcciones, que ahí no pone Bloquear.
+func OfrecerBloqueo(correo string, propias []string) bool {
+	c := strings.ToLower(strings.TrimSpace(correo))
+	if !strings.Contains(c, "@") {
+		return false
+	}
+	return !slices.ContainsFunc(propias, func(p string) bool { return strings.ToLower(strings.TrimSpace(p)) == c })
+}
+
+// ReglaDeBloqueo es `reglaDeBloqueo`: la dirección EXACTA (no su dominio: bloquear a una
+// persona no puede llevarse a Spam a toda su empresa) a la carpeta Spam, con el mismo
+// rótulo del menú por nombre para que en «Reglas» se lea qué es y de dónde salió.
+func ReglaDeBloqueo(t *i18n.Translator, correo, spam string) api.MailFilter {
+	correo = strings.TrimSpace(correo)
+	return api.MailFilter{
+		Name:      t.T("reader.block", i18n.Vars{"sender": correo}),
+		Enabled:   true,
+		MatchFrom: correo,
+		MoveTo:    spam,
+	}
+}
+
+// bloquear es `bloquearDesde` de MailApp: optimista como el triaje —el hilo sale de la
+// vista al pulsar—, crea la regla y mueve el hilo a Spam. Todo o nada: si el movimiento
+// falla se borra la regla recién creada, porque un aviso de error con la regla puesta
+// dejaría a la persona creyendo que no ha bloqueado a nadie. El aviso trae «Deshacer».
+func (b *Buzon) bloquear(c Conversacion, spam Carpeta) {
+	remitente := remitenteDe(c)
+	cs := []Conversacion{c}
+	ids := idsDe(cs)
+	if remitente == "" || len(ids) == 0 {
+		return
+	}
+	vista := b.vista
+	origenes := origenesDeMovimiento(cs, b.carpetaVista(), spam.ID)
+	antes, antesR := b.quitarDeLaVista(cs)
+	b.pintarLista()
+	regla := ReglaDeBloqueo(b.P.T, remitente, spam.ID)
+	pedir(b, func(ctx context.Context) (string, error) {
+		f, err := b.S.CreateFilter(ctx, regla)
 		if err != nil {
-			b.avisar(ui.AvisoPeligro, "error.undoMove", nil)
-		} else {
-			b.avisar(ui.AvisoExito, "triage.undone", nil)
+			return "", err
 		}
-		if b.consulta != "" {
-			b.listaCaducada = true
-			b.buscarYa(b.consulta)
-		} else {
-			b.cargarLista()
+		if err := b.S.MoveMany(ctx, ids, spam.ID); err != nil {
+			_ = b.S.DeleteFilter(ctx, f.ID)
+			return "", err
+		}
+		return f.ID, nil
+	}, func(id string, err error) {
+		if err != nil {
+			if vista == b.vista {
+				b.mensajes, b.resultados = antes, antesR
+				b.pintarLista()
+			}
+			b.avisar(ui.AvisoPeligro, "reader.blockFailed", nil)
+			return
 		}
 		b.refrescarContadores()
+		t := b.P.T
+		a := ui.NuevoAviso(ui.AvisoExito, t.T("reader.blocked", i18n.Vars{"sender": remitente}), "")
+		a.RotuloCerrar = t.T("ui.dismissNotification", nil)
+		a.RotuloAccion = t.T("compose.undo", nil)
+		a.AlPulsarAccion = func() { b.deshacerBloqueo(id, origenes) }
+		b.P.Notificar(a)
 	})
+}
+
+// deshacerBloqueo es «Deshacer» del bloqueo, entero: quita la regla y devuelve cada
+// mensaje a SU carpeta. Se intentan las dos cosas aunque una falle —que quede la regla
+// sin el hilo, o al revés, es peor que medio deshecho avisado—.
+func (b *Buzon) deshacerBloqueo(regla string, origenes map[string][]string) {
+	pedir(b, func(ctx context.Context) (struct{}, error) {
+		errRegla := b.S.DeleteFilter(ctx, regla)
+		return struct{}{}, errors.Join(errRegla, b.devolverACarpetas(ctx, origenes))
+	}, func(_ struct{}, err error) { b.trasDeshacer(err) })
 }
 
 // etiquetar es `handleToggleLabel`: pone o quita la etiqueta a TODO el hilo. Si se
@@ -523,12 +638,15 @@ func (b *Buzon) compartirEnRooms(m Mensaje) {
 // TextoParaRooms es `textoParaRooms` de la web: el asunto y, debajo, el enlace.
 func TextoParaRooms(asunto, enlace string) string { return asunto + "\n" + enlace }
 
+// buscarRemitente es `onSearchSender` de MailApp: la consulta `from:` de esa dirección
+// en el buscador, que es quien busca (y cierra el hilo, como al teclear).
+func (b *Buzon) buscarRemitente(correo string) {
+	b.P.Bandeja.PonerConsulta(ComponerConsulta(OpcionesBusqueda{De: correo}))
+}
+
 // crearReglaDesde es `crearReglaDesde` de MailApp: el asistente con el remitente del
 // último mensaje como condición y como nombre.
 func (b *Buzon) crearReglaDesde(c Conversacion) *gestorReglas {
-	de := ""
-	if len(c.Ultimo.De) > 0 {
-		de = strings.TrimSpace(c.Ultimo.De[0].Correo)
-	}
+	de := remitenteDe(c)
 	return b.verReglas(&BorradorRegla{Nombre: de, De: de})
 }

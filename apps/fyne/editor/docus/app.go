@@ -18,13 +18,10 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/editor/docus/rico"
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
@@ -134,6 +131,13 @@ type abierto struct {
 	cerrarCanal  func()
 	canalAbierto bool
 	seqVista     atomic.Int64
+	// Los cursores (`cursores_app.go`): el lado de escritura del canal, los de los demás
+	// por su `sub`, y el ritmo del propio: cuándo salió el último y si hay uno en espera.
+	canal          *api.CanalDoc
+	genCanal       int
+	pares          map[string]*parAjeno
+	cursorEnviado  time.Time
+	cursorEnEspera bool
 }
 
 // NuevaApp monta Docus. `svc` puede ser nil: la portada se pinta y no pide nada, que es
@@ -153,6 +157,7 @@ func NuevaApp(t func(string, i18n.Vars) string, loc i18n.Locale, svc *api.Docs) 
 	a.portada = editor.NuevaPortada(editor.Documento, t, loc, svc)
 	a.portada.Avisos = a.avisos
 	a.portada.AlAbrir = a.Abrir
+	a.portada.Carpeta = func() (string, error) { return a.carpeta() }
 	a.raiz = container.NewStack(a.portada.Objeto(), a.avisos)
 	return a
 }
@@ -167,6 +172,14 @@ func (a *App) Portada() *editor.Portada { return a.portada }
 // Arrancar pide la primera página de la portada.
 func (a *App) Arrancar() {
 	editor.EngancharAtras(a.raiz, a.portada, func() bool { return a.abierto != nil }, a.Volver)
+	// La tesela comparte con el mismo panel que la cabecera; los enlaces los pone quien
+	// monta la app después de NuevaApp, así que se engancha aquí y no allí.
+	a.portada.Compartir = nil
+	if a.EnlaceDoc != nil {
+		a.portada.Compartir = func(d api.Document, desde fyne.CanvasObject) {
+			a.panelCompartir(d.ID, d.Title).Mostrar(desde)
+		}
+	}
 	a.portada.Cargar()
 }
 
@@ -195,6 +208,10 @@ func (a *App) Volver() {
 		// Lo que quedara por guardar sale ya: salir no es perderlo.
 		ab.cancelar()
 		a.guardar(ab)
+	}
+	if ab := a.abierto; ab != nil && ab.cerrarCanal != nil {
+		// Ya, y no en la siguiente ronda del sondeo: los demás dejan de ver el cursor al salir.
+		ab.cerrarCanal()
 	}
 	a.abierto = nil
 	editor.DejarDeEscucharRol()
@@ -249,8 +266,11 @@ func (a *App) AbrirID(id, titulo string) {
 		}
 		return delFolio(p)
 	}
+	ctx.PanelAjustes = func() fyne.CanvasObject { return folio.PanelAjustes(a.T) }
 	a.abierto = ab
 	a.mostrar(marco)
+	// «Reintentar» del error vuelve a pedir el mismo documento, con el título que ya se sepa.
+	ab.ctx.Reintentar = func() { a.AbrirID(id, ab.ctx.Titulo) }
 	if a.Svc == nil {
 		return
 	}
@@ -301,7 +321,11 @@ func (a *App) cargar(ab *abierto) {
 		ctx := ab.ctx
 		if err != nil {
 			ctx.Estado = editor.EstadoDe(err, hayRed, 1)
-			a.mostrar(a.pantallaFallo(ab))
+			// Como en la web (`status === 'error'`), un fallo al abrir cede la
+			// pantalla entera al error con «Reintentar» y «Volver». Antes se recompone el
+			// marco, que así quita el esqueleto de carga y para su pulso.
+			ab.ctx.Refrescar()
+			a.mostrar(editor.PantallaFallo(ab.ctx))
 			return
 		}
 		ab.base = cont
@@ -318,12 +342,22 @@ func (a *App) cargar(ab *abierto) {
 		}
 		if ab.cerrarCanal != nil {
 			ab.cerrarCanal()
-			ab.canalAbierto = false
+			ab.genCanal++      // lo que aún llegue de ese canal ya no es de este documento
+			a.canalCerrado(ab) // y los cursores ajenos eran del texto de antes
 		}
 		if entendido && ctx.Tipo == editor.Documento {
 			a.iniciarCoedicion(ab, cont)
 		}
 		ctx.SoloLectura = !api.CanWrite(rol) || !entendido
+		if !api.CanWrite(rol) {
+			// Sin permiso manda el permiso: la franja de siempre, con «Pedir acceso».
+			ctx.SinMotivo()
+		}
+		ctx.EnLaWeb = nil
+		if a.EnlaceDoc != nil {
+			enlace := a.EnlaceDoc(ab.id)
+			ctx.EnLaWeb = func() { _ = api.AbrirFuera(fyne.CurrentApp(), enlace) }
+		}
 		// La salida de la franja: pedir acceso, o concederlo si soy el dueño. El canal de
 		// coedición ya está abierto para un texto entendido, y su `role` llega a `enVivo`.
 		editor.EngancharPeticionEdicion(ctx, a.Svc, ab.id, rol, !entendido || ctx.Tipo != editor.Documento,
@@ -366,7 +400,7 @@ func (a *App) cargar(ab *abierto) {
 			ctx.Actividad = func(listo func([]api.DocActividad, error)) { a.servicio().Actividad(ab.id, listo) }
 		}
 		if a.EnlaceDoc != nil {
-			ctx.Compartir = func(desde fyne.CanvasObject) { a.compartir(ab).Mostrar(desde) }
+			ctx.Compartir = func(desde fyne.CanvasObject) { a.panelCompartir(ab.id, ab.ctx.Titulo).Mostrar(desde) }
 		}
 		a.configurarComentario(ab, rol)
 		ctx.SinRed = !hayRed
@@ -411,22 +445,6 @@ func (a *App) autor(c context.Context) rico.Autor {
 		nombre = "Usuario"
 	}
 	return rico.Autor{Nombre: nombre, ID: r.Sub}
-}
-
-// pantallaFallo es lo que la web pinta cuando el documento no se puede abrir: el
-// editor entero cede el sitio a un EmptyState centrado sobre `surface`, con el aviso de
-// 40 en `danger`, «Reintentar» y «Volver». Es un solo estado para todos los fallos, como
-// en la web (`status === 'error'`).
-func (a *App) pantallaFallo(ab *abierto) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	e := ui.NuevoVacio(a.t("editor.error.title"), a.t("editor.error.description"))
-	e.Ilustracion = iconos.Trazo(iconos.Aviso, 40, "danger", v).Objeto()
-	reintentar := ui.NuevoBoton(a.t("editor.error.retry"), func() { a.AbrirID(ab.id, ab.ctx.Titulo) }).
-		Con(ui.Primario, ui.TallaSM)
-	volver := ui.NuevoBoton(a.t("editor.error.back"), a.Volver).Con(ui.Secundario, ui.TallaSM)
-	e.Accion = container.New(ui.Fila{Hueco: tema.Espacio(2)}, reintentar, volver)
-	fondo := canvas.NewRectangle(tema.Color("surface", v))
-	return container.NewStack(fondo, e)
 }
 
 // renombrar programa el cambio de título tras la pausa de la web. Un título en blanco
@@ -656,11 +674,12 @@ func (a *App) restaurarVersion(ab *abierto, v api.DocVersion) {
 	})
 }
 
-// compartir es el panel de «Compartir» de este documento.
-func (a *App) compartir(ab *abierto) *editor.Compartir {
+// panelCompartir es el panel de «Compartir» de un documento, el de la cabecera y el de
+// la tesela de la portada.
+func (a *App) panelCompartir(id, titulo string) *editor.Compartir {
 	return &editor.Compartir{
-		T: a.T, Svc: a.Svc, ID: ab.id, Titulo: ab.ctx.Titulo,
-		Enlace: a.EnlaceDoc(ab.id), EnlacePublico: a.EnlacePublico,
+		T: a.T, Svc: a.Svc, ID: id, Titulo: titulo,
+		Enlace: a.EnlaceDoc(id), EnlacePublico: a.EnlacePublico,
 		Avisos: a.avisos, Lanzar: a.lanzar, Plazo: a.Plazo, Dir: a.Directorio,
 	}
 }

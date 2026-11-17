@@ -64,3 +64,43 @@ test('un modelo ilegible devuelve null y no una pantalla en blanco', () => {
   // El documento de texto ES html: pasa tal cual.
   expect(modeloAHtml('document', '<p>hola</p>', '')).toBe('<p>hola</p>');
 });
+
+test('la imagen de una diapositiva lleva su texto alternativo; la portada de un vídeo, no', () => {
+  // DIAP-06: antes TODA imagen salía con alt="" (decorativa) y la foto de una
+  // presentación no se podía leer con lector de pantalla.
+  const modelo: SlidesModel = {
+    slides: [
+      {
+        id: 's',
+        boxes: [
+          {
+            id: 'i',
+            x: 0,
+            y: 0,
+            w: 50,
+            h: 50,
+            kind: 'image',
+            html: '',
+            src: 'data:image/png;base64,AA',
+            alt: 'Gráfico de "ventas" <2026>',
+          },
+          {
+            id: 'v',
+            x: 50,
+            y: 0,
+            w: 50,
+            h: 50,
+            kind: 'media',
+            mediaType: 'video',
+            html: '',
+            src: 'https://x.test/v.mp4',
+            poster: 'data:image/png;base64,BB',
+          },
+        ],
+      },
+    ],
+  };
+  const html = modeloAHtml('presentation', JSON.stringify(modelo), '') ?? '';
+  expect(html).toContain('alt="Gráfico de &quot;ventas&quot; &lt;2026&gt;"');
+  expect(html).toContain('src="data:image/png;base64,BB" alt=""');
+});

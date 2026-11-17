@@ -318,9 +318,12 @@ async function sesion(esquema) {
   await lienzo.focus();
   await page.keyboard.press('Enter');
   await page.waitForTimeout(150);
-  const avisoLive = dialogo.locator('[role="status"]');
+  // Dentro del diálogo hay más de una región viva (la fija de los avisos, vacía, y la de la
+  // figura): se lee el conjunto en vez de suponer que hay una sola.
+  const textoLive = async () =>
+    (await dialogo.locator('[role="status"]').allTextContents()).find((t) => t.trim()) ?? '';
   afirma(
-    (await avisoLive.textContent()) === 'Star 1 added',
+    (await textoLive()) === 'Star 1 added',
     'Intro con la herramienta armada coloca el objeto y lo anuncia',
   );
   const antes = Number(await izq.inputValue());
@@ -330,12 +333,12 @@ async function sesion(esquema) {
   await page.keyboard.press('[');
   await page.waitForTimeout(100);
   afirma(
-    /selected$/.test((await avisoLive.textContent()) ?? ''),
+    /selected$/.test(await textoLive()),
     '«[» recorre los objetos y lo anuncia',
   );
   await page.keyboard.press('Delete');
   await page.waitForTimeout(100);
-  afirma(/deleted$/.test((await avisoLive.textContent()) ?? ''), 'Supr borra y lo anuncia');
+  afirma(/deleted$/.test(await textoLive()), 'Supr borra y lo anuncia');
 
   /* ----- 6. axe del diálogo ----- */
   const axe = await new AxeBuilder({ page })

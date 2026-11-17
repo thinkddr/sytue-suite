@@ -180,7 +180,6 @@ export const nucleo = {
   'legal.phone': 'Guthán',
   'legal.registry': 'Sonraí clárlainne (Leabhar, Imleabhar, Leathanach)',
   'legal.privacy_contact': 'Teagmháil phríobháideachais (COS)',
-  'legal.save': 'Sábháil na sonraí dlíthiúla',
   'legal.saved': 'Sábháladh na sonraí dlíthiúla',
 
   'settings.title': 'Socruithe an tsuímh',
@@ -381,6 +380,17 @@ export const nucleo = {
   'legal.ph_privacy': 'dpo@sampla.ie',
   'legal.ph_registry': 'Clárlann Tráchtála, Imleabhar 1234, Fóilió 56, Bileog M-789',
   'legal.err_generic': 'Níorbh fhéidir na sonraí dlíthiúla a shábháil. Bain triail eile as.',
+  'legal.section_holder': 'Sealbhóir',
+  'legal.section_holder_desc': 'Cé leis an suíomh agus conas atá sé cláraithe.',
+  'legal.section_address': 'Seoladh cláraithe',
+  'legal.section_address_desc': 'An seoladh poist a thaispeántar san fhógra dlíthiúil.',
+  'legal.section_contact': 'Teagmháil',
+  'legal.section_contact_desc':
+    'Conas is féidir le cuairteoirí agus le húdaráis teagmháil a dhéanamh leat.',
+  'legal.save_section': 'Sábháil',
+  'legal.unsaved': 'Athruithe nár sábháladh',
+  'legal.section_complete': 'Iomlán',
+  'legal.section_incomplete': 'Neamhiomlán',
 
   'settings.tab': 'Socruithe',
   'settings.intro': 'Ainm, seoladh agus roghanna ginearálta an tsuímh.',

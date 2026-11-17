@@ -36,6 +36,9 @@ spec:
           # para los tres binarios; cloud-api usa este subconjunto). Los secretos SOLO
           # por secretKeyRef del existingSecret; los no-secretos por value.
           env:
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu); GO.Values.resources.limits.memoryLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "cloud-api" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
             {{- include "sytue.logCollectorEnv" . | nindent 12 }}
             {{- if (.Values.global).otlp }}
             {{- if (.Values.global).otlp.endpoint }}

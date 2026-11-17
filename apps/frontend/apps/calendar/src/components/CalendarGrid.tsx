@@ -8,8 +8,8 @@
  */
 import type { JSX } from 'preact';
 import { useT } from '../i18n/index.js';
-import { useMemo, useState } from 'preact/hooks';
-import { Button, Icon, cx } from '@sytue/ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { Button, Icon, Popover, cx, usePointerDrag, useToast } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { CalendarEvent } from '../client/calendarApi.js';
 import {
@@ -24,6 +24,7 @@ import {
   timeLabel,
   dayMonthLabel,
   monthShortLabel,
+  isoWeek,
 } from './dates.js';
 import { DiaDeSemana } from './DiaDeSemana.js';
 import {
@@ -37,6 +38,7 @@ import {
   type Segment,
 } from './multiDayLayout.js';
 import { TimeGrid } from './TimeGrid.js';
+import { celdaEnPunto, desplazarDias, eventoDesplazado } from './arrastreMes.js';
 import { plegar } from '@sytue/i18n';
 
 // Geometría de las barras multi-día en la vista MES.
@@ -56,6 +58,13 @@ const BAR_INNER_H = 18; // alto pintado de la barra
 const DATE_ROW_H = 30;
 const MAX_BAR_ROWS = 3; // filas de barras visibles por semana; el resto va a «+N más»
 const MAX_LANES = 4; // presupuesto de filas por celda (barras + chips)
+// Lo que tiene que viajar el puntero para que pulsar una píldora deje de ser un clic
+// (vista rápida) y pase a ser un arrastre: el mismo umbral que el desplazamiento por
+// los bordes de `usePointerDrag`, para que un temblor de la mano no mueva nada.
+const UMBRAL_ARRASTRE_PX = 4;
+// Tras soltar un arrastre el navegador aún emite el `click` del gesto; durante este
+// margen se traga, o abriría la vista rápida (o «Crear» en la celda de destino).
+const MARGEN_CLIC_TRAS_ARRASTRE_MS = 500;
 
 // Color de reserva cuando un calendario no trae el suyo. HEX RESUELTO (no var())
 // para que barTextColor mida el contraste REAL sobre el relleno: primary-600
@@ -85,10 +94,37 @@ interface Props {
   /** Abre la vista rápida del evento anclada a su rectángulo (viewport). */
   onSelectEvent: (event: GridEvent, anchor: DOMRect) => void;
   onCreateAt: (day: Date) => void;
+  /** Abrir ese día en la vista Día (el número del día en el mes). Sin él, el número
+   * es solo un rótulo. */
+  onOpenDay?: ((day: Date) => void) | undefined;
   /** Crear con el rango pintado en la rejilla horaria (semana/día). */
   onCreateRange: (start: Date, end: Date) => void;
   /** Persistir un mover/redimensionar de la rejilla horaria (semana/día). */
   onMoveResize: (event: GridEvent, start: Date, end: Date) => Promise<void>;
+  /**
+   * Los ajustes de la persona que cambian lo que se ve (`lib/preferencias.ts`). Sin
+   * ellos, lo de siempre: semana entera, sin número de semana, jornada de 9 a 18 y
+   * clic de una hora.
+   */
+  vista?: VistaAjustada | undefined;
+}
+
+/** Lo de los ajustes que llega a la rejilla. */
+export interface VistaAjustada {
+  finesDeSemana: boolean;
+  numeroSemana: boolean;
+  inicioLaboral: number;
+  finLaboral: number;
+  duracion: number;
+}
+
+/**
+ * Los días de la vista semana: sin fines de semana, de lunes a viernes. La semana
+ * empieza en lunes (`weekGrid`), así que basta con quitar sábado y domingo.
+ */
+export function diasDeSemana(cursor: Date, finesDeSemana: boolean): Date[] {
+  const dias = weekGrid(cursor);
+  return finesDeSemana ? dias : dias.filter((d) => d.getDay() !== 0 && d.getDay() !== 6);
 }
 
 interface Positioned {
@@ -105,6 +141,28 @@ function position(events: GridEvent[]): Positioned[] {
       return date ? { event, date } : null;
     })
     .filter((p): p is Positioned => p !== null);
+}
+
+/** Un arrastre en curso en el mes: qué evento, de qué celda y hasta qué celda. */
+interface ArrastreMes {
+  event: GridEvent;
+  /** Celda (índice de la rejilla) donde se cogió. */
+  origen: number;
+  /** Celda bajo el puntero ahora. */
+  destino: number;
+  /** Ya ha pasado el umbral: deja de ser un clic. */
+  movido: boolean;
+}
+
+/**
+ * Un evento soltado en otro día cuyo guardado aún no ha vuelto. Se reconoce por
+ * IDENTIDAD y no por href: las ocurrencias de una serie comparten href, y solo se
+ * pinta movida la que se arrastró.
+ */
+interface PendienteMes {
+  original: GridEvent;
+  desplazado: GridEvent;
+  dias: number;
 }
 
 interface MonthChip {
@@ -158,11 +216,17 @@ function MonthBar({
   seg,
   accent,
   onSelect,
+  onPointerDown,
+  atenuado,
 }: {
   locale: Locale;
   seg: Segment<GridEvent>;
   accent: string;
   onSelect: (event: GridEvent, anchor: DOMRect) => void;
+  /** Empieza el arrastre a otro día (sin él, la barra solo se abre). */
+  onPointerDown?: ((e: PointerEvent) => void) | undefined;
+  /** Es la que se está arrastrando: su sitio de antes queda en tenue. */
+  atenuado?: boolean | undefined;
 }): JSX.Element {
   const t = useT(locale);
   const event = seg.item;
@@ -174,6 +238,7 @@ function MonthBar({
       type="button"
       title={event.summary}
       aria-label={`${event.summary || t('event.untitled')}${seg.continuesLeft ? t('cal.fromEarlier') : ''}`}
+      onPointerDown={onPointerDown}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(event, e.currentTarget.getBoundingClientRect());
@@ -186,8 +251,10 @@ function MonthBar({
         }
       }}
       class={cx(
-        'pointer-events-auto absolute flex items-center overflow-hidden px-1.5 text-left',
-        'transition-[filter] duration-150 hover:brightness-95',
+        'pointer-events-auto absolute flex items-center overflow-hidden px-1.5 text-left select-none',
+        'transition-[filter,opacity] duration-150 hover:brightness-95',
+        onPointerDown ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+        atenuado && 'opacity-50',
         'sytue-focus-ring focus-visible:z-10',
         seg.continuesLeft ? 'rounded-l-none' : 'rounded-l-[3px]',
         seg.continuesRight ? 'rounded-r-none' : 'rounded-r-[3px]',
@@ -220,19 +287,128 @@ export function CalendarGrid({
   accentColor,
   onSelectEvent,
   onCreateAt,
+  onOpenDay,
   onCreateRange,
   onMoveResize,
+  vista,
 }: Props): JSX.Element {
   const t = useT(locale);
+  const toast = useToast();
   const items = position(events);
   const color = accentColor ?? DEFAULT_ACCENT;
+
+  // Un evento soltado en otro día se pinta ya en su sitio nuevo mientras se guarda;
+  // la recarga del padre trae el dato guardado y lo sustituye (o lo devuelve a su día
+  // si se canceló el alcance de una serie o falló el guardado).
+  const [pendienteMes, setPendienteMes] = useState<PendienteMes | null>(null);
+  useEffect(() => {
+    setPendienteMes(null);
+  }, [events]);
+  const eventosMes = useMemo(
+    () =>
+      pendienteMes
+        ? events.map((e) => (e === pendienteMes.original ? pendienteMes.desplazado : e))
+        : events,
+    [events, pendienteMes],
+  );
 
   // Layout de barras multi-día del MES: se recalcula solo al cambiar los eventos
   // o el cursor (memoizado), nunca en cada render — clave para la escala.
   const monthLayout = useMemo(
-    () => (mode === 'month' ? buildMonthLayout(events, monthGrid(cursor)) : null),
-    [mode, events, cursor],
+    () => (mode === 'month' ? buildMonthLayout(eventosMes, monthGrid(cursor)) : null),
+    [mode, eventosMes, cursor],
   );
+
+  // --- Arrastrar a otro día en el mes ------------------------------------------
+  // Solo la rejilla horaria arrastraba, y el mes es donde se replanifica casi todo.
+  // Se arrastra la píldora o la barra; el desplazamiento son los días entre la celda
+  // donde se cogió y la celda donde se suelta, así que una barra de varios días
+  // cogida por su tercer día cae con ese día bajo el puntero. Guarda por el mismo
+  // `onMoveResize` que la rejilla horaria: pregunta el alcance en una serie, no mueve
+  // una suscripción y trae «Deshacer».
+  const rejillaMesRef = useRef<HTMLDivElement | null>(null);
+  const arrastreMesRef = useRef<ArrastreMes | null>(null);
+  const [arrastreMes, setArrastreMes] = useState<ArrastreMes | null>(null);
+  const suprimirClicHastaRef = useRef(0);
+
+  function celdaDelPuntero(e: { clientX: number; clientY: number }): number | null {
+    const el = rejillaMesRef.current;
+    if (!el || !monthLayout) return null;
+    return celdaEnPunto(el.getBoundingClientRect(), monthLayout.weeks.length, e.clientX, e.clientY);
+  }
+
+  // En `useCallback`: tocan refs y solo se llaman desde manejadores, nunca al pintar.
+  const terminarArrastreMes = useCallback((): ArrastreMes | null => {
+    const d = arrastreMesRef.current;
+    arrastreMesRef.current = null;
+    setArrastreMes(null);
+    if (d?.movido) suprimirClicHastaRef.current = Date.now() + MARGEN_CLIC_TRAS_ARRASTRE_MS;
+    return d;
+  }, []);
+
+  /** ¿Es este `click` el que cierra un arrastre? Si lo es, lo gasta. */
+  const esClicDeArrastre = useCallback((): boolean => {
+    if (Date.now() >= suprimirClicHastaRef.current) return false;
+    suprimirClicHastaRef.current = 0;
+    return true;
+  }, []);
+
+  // La píldora que se suelta en otro día se vuelve a montar allí antes de que llegue
+  // su `click`, que entonces ya no pasa por el contenedor: lo filtra ella misma.
+  function seleccionarEnMes(event: GridEvent, anchor: DOMRect): void {
+    if (!esClicDeArrastre()) onSelectEvent(event, anchor);
+  }
+
+  const arrastreDelMes = usePointerDrag<null>({
+    // En el documento: la píldora puede desmontarse a mitad del gesto (pasa a «+N más»
+    // o cambia de fila al recolocarse) y el arrastre tiene que sobrevivirle.
+    documentEvents: true,
+    onMove: ({ dxRaw, dyRaw }, e) => {
+      const d = arrastreMesRef.current;
+      if (!d) return;
+      const destino = celdaDelPuntero(e) ?? d.destino;
+      const movido = d.movido || Math.hypot(dxRaw, dyRaw) >= UMBRAL_ARRASTRE_PX;
+      if (destino === d.destino && movido === d.movido) return;
+      const siguiente = { ...d, destino, movido };
+      arrastreMesRef.current = siguiente;
+      if (movido) setArrastreMes(siguiente);
+    },
+    // Sin arrastre real no se hace nada aquí: el `click` del botón abre la vista rápida.
+    onEnd: () => {
+      const d = terminarArrastreMes();
+      if (d?.movido && d.destino !== d.origen) void soltarEnMes(d.event, d.destino - d.origen);
+    },
+    onCancel: () => {
+      terminarArrastreMes();
+    },
+  });
+
+  function empezarArrastreMes(e: PointerEvent, event: GridEvent): void {
+    // Una suscripción no se mueve. Con el dedo, pulsar y deslizar es desplazar la
+    // página o abrir la píldora; el arrastre es del ratón y del lápiz.
+    if (event.readOnly || e.pointerType === 'touch') return;
+    const origen = celdaDelPuntero(e);
+    if (origen === null) return;
+    if (!arrastreDelMes.iniciarArrastre(e, null)) return;
+    arrastreMesRef.current = { event, origen, destino: origen, movido: false };
+  }
+
+  async function soltarEnMes(event: GridEvent, dias: number): Promise<void> {
+    // Se mueve siempre el evento TAL COMO LLEGÓ: si se vuelve a arrastrar uno que aún
+    // se está guardando, los días se suman a los que ya llevaba.
+    const previo = pendienteMes?.desplazado === event ? pendienteMes : null;
+    const original = previo?.original ?? event;
+    const total = (previo?.dias ?? 0) + dias;
+    const nuevo = desplazarDias(original, total);
+    if (!nuevo) return;
+    setPendienteMes({ original, desplazado: eventoDesplazado(original, total), dias: total });
+    try {
+      await onMoveResize(original, nuevo.start, nuevo.end);
+    } catch {
+      setPendienteMes(null);
+      toast.notify({ tone: 'danger', title: t('cal.error.updateEvent') });
+    }
+  }
 
   if (mode === 'agenda') {
     return (
@@ -249,8 +425,24 @@ export function CalendarGrid({
 
   if (mode === 'month' && monthLayout) {
     const { days, weeks, chipsByDayIdx } = monthLayout;
+    // Días que ocuparía el evento si se soltara ahora: se resaltan como destino.
+    const destino = (() => {
+      if (!arrastreMes?.movido) return null;
+      const nuevo = desplazarDias(arrastreMes.event, arrastreMes.destino - arrastreMes.origen);
+      return nuevo ? barSpan(days, nuevo.start, nuevo.end) : null;
+    })();
+    // Por IDENTIDAD y no por href: las ocurrencias de una serie comparten href, y solo
+    // queda en tenue la que se coge.
+    const arrastrado = arrastreMes?.movido ? arrastreMes.event : null;
     return (
-      <div class="bg-surface flex h-full flex-col">
+      <div
+        class={cx('bg-surface flex h-full flex-col', arrastrado && 'cursor-grabbing select-none')}
+        onClickCapture={(e) => {
+          if (!esClicDeArrastre()) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
         <div class="border-border grid grid-cols-7 border-b">
           {/* Cada celda es `@container`: en una columna estrecha —un mes en un móvil mide
               46 px por día— va la inicial en vez de la abreviatura recortada. */}
@@ -262,7 +454,7 @@ export function CalendarGrid({
             </div>
           ))}
         </div>
-        <div class="flex min-h-0 flex-1 flex-col">
+        <div ref={rejillaMesRef} class="flex min-h-0 flex-1 flex-col">
           {weeks.map((weekSegs, w) => {
             // Filas de barras visibles de la semana (tope MAX_BAR_ROWS); el resto
             // cuenta como «+N más» por día. Los chips comparten el presupuesto.
@@ -279,58 +471,104 @@ export function CalendarGrid({
                   const dayChips = chipsByDayIdx[gi]!;
                   const shown = dayChips.slice(0, chipCap);
                   const more = hiddenByCol[c]! + (dayChips.length - shown.length);
+                  const esDestino = destino !== null && destino.start <= gi && gi <= destino.end;
                   return (
-                    <button
+                    // La celda NO es un botón: dentro lleva el número del día, las
+                    // píldoras y el «+N más», que son controles propios, y un control
+                    // dentro de otro (axe `nested-interactive`) ni se anuncia bien ni
+                    // deja pulsar lo de dentro sin disparar lo de fuera —el «+N más»
+                    // abría «Crear evento»—. Crear es un botón DE FONDO que ocupa la
+                    // celda entera; el contenido va encima sin recibir el puntero salvo
+                    // en sus controles, así que pulsar el hueco vacío sigue creando.
+                    <div
                       key={day.toISOString()}
-                      type="button"
-                      aria-label={t('nav.createEventOn', { date: dayMonthLabel(locale, day) })}
-                      onClick={() => onCreateAt(day)}
                       class={cx(
-                        'border-border flex min-h-0 flex-col overflow-hidden border-r border-b p-[6px] text-left',
-                        'hover:bg-bg-subtle focus-visible:bg-bg-subtle transition-colors focus-visible:z-10 focus-visible:outline-none',
+                        'border-border relative flex min-h-0 flex-col overflow-hidden border-r border-b p-[6px]',
                         !inMonth && 'bg-bg-subtle/40',
                       )}
+                      {...(esDestino ? { 'data-destino-arrastre': '' } : {})}
                     >
-                      <span
+                      <button
+                        type="button"
+                        aria-label={t('nav.createEventOn', { date: dayMonthLabel(locale, day) })}
+                        onClick={() => onCreateAt(day)}
                         class={cx(
-                          'inline-flex h-[24px] w-[24px] items-center justify-center rounded-full text-sm tabular-nums',
-                          isToday(day)
-                            ? 'bg-primary font-semibold text-[var(--sytue-on-primary)]'
-                            : inMonth
-                              ? 'text-text-muted'
-                              : 'text-text-subtle',
+                          'absolute inset-0 transition-colors',
+                          'hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:outline-none',
                         )}
-                      >
-                        {day.getDate()}
-                      </span>
-                      {/* Reserva para el carril de barras (overlay), que se pinta encima. */}
-                      {barsAreaH > 0 ? (
-                        <span aria-hidden="true" style={{ height: `${barsAreaH}px` }} />
+                      />
+                      {esDestino ? (
+                        <span
+                          aria-hidden="true"
+                          class="bg-primary/10 pointer-events-none absolute inset-0"
+                        />
                       ) : null}
-                      <span class="mt-0.5 flex min-w-0 flex-col gap-0.5 overflow-hidden">
-                        {shown.map(({ event, date }) => (
-                          <EventChip
-                            locale={locale}
-                            key={event.href}
-                            event={event}
-                            date={date}
-                            color={color}
-                            onClick={onSelectEvent}
-                          />
-                        ))}
-                        {more > 0 ? (
+                      {esDestino && destino?.start === gi && arrastreMes ? (
+                        <span
+                          aria-hidden="true"
+                          class={cx(
+                            'border-primary bg-surface text-text pointer-events-none absolute inset-x-1 bottom-1 z-20',
+                            'truncate rounded-sm border px-1.5 py-0.5 text-xs font-medium shadow-[var(--shadow-sm)]',
+                          )}
+                        >
+                          {arrastreMes.event.summary || t('event.untitled')}
+                        </span>
+                      ) : null}
+                      {/* Número de semana ISO en la esquina del lunes, como en la hoja
+                          del teléfono (`MesCompacto`): visible el número, leído entero. */}
+                      {vista?.numeroSemana && c === 0 ? (
+                        <span
+                          data-numero-semana=""
+                          class="pointer-events-none absolute top-[6px] right-1.5"
+                        >
                           <span
-                            class="text-text-muted px-1.5 text-xs font-medium"
-                            title={dayChips
-                              .slice(chipCap)
-                              .map(({ event }) => event.summary)
-                              .join('\n')}
+                            aria-hidden="true"
+                            class="bg-bg-subtle text-text-subtle text-2xs grid h-5.5 min-w-5.5 place-items-center rounded-sm px-1 font-medium tabular-nums"
                           >
-                            {t('grid.more', { count: more })}
+                            {isoWeek(day)}
                           </span>
+                          <span class="sr-only">
+                            {t('grid.weekNumber', { week: isoWeek(day) })}
+                          </span>
+                        </span>
+                      ) : null}
+                      <div class="pointer-events-none relative flex min-h-0 flex-col">
+                        <NumeroDia locale={locale} day={day} inMonth={inMonth} onOpen={onOpenDay} />
+                        {/* Reserva para el carril de barras (overlay), que se pinta encima. */}
+                        {barsAreaH > 0 ? (
+                          <span aria-hidden="true" style={{ height: `${barsAreaH}px` }} />
                         ) : null}
-                      </span>
-                    </button>
+                        <div class="mt-0.5 flex min-w-0 flex-col gap-0.5 overflow-hidden">
+                          {shown.map(({ event, date }) => (
+                            <EventChip
+                              locale={locale}
+                              key={event.href}
+                              event={event}
+                              date={date}
+                              color={color}
+                              onClick={seleccionarEnMes}
+                              atenuado={event === arrastrado}
+                              {...(event.readOnly
+                                ? {}
+                                : {
+                                    onPointerDown: (e: PointerEvent) =>
+                                      empezarArrastreMes(e, event),
+                                  })}
+                            />
+                          ))}
+                          {more > 0 ? (
+                            <MasDelDia
+                              locale={locale}
+                              day={day}
+                              more={more}
+                              items={eventosDelDiaMes(weekSegs, c, dayChips)}
+                              color={color}
+                              onSelectEvent={onSelectEvent}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
                 {/* Overlay de barras de la semana: cruzan las celdas sin recorte y
@@ -345,7 +583,11 @@ export function CalendarGrid({
                       locale={locale}
                       seg={seg}
                       accent={color}
-                      onSelect={onSelectEvent}
+                      onSelect={seleccionarEnMes}
+                      atenuado={seg.item === arrastrado}
+                      {...(seg.item.readOnly
+                        ? {}
+                        : { onPointerDown: (e: PointerEvent) => empezarArrastreMes(e, seg.item) })}
                     />
                   ))}
                 </div>
@@ -360,17 +602,160 @@ export function CalendarGrid({
   // Vistas semana/día: rejilla horaria real (eje 0–24 h, bloques posicionados por
   // hora y dimensionados por duración, columnas lado a lado en los solapes, franja
   // de todo-el-día, línea de hora actual y arrastre para crear/mover/redimensionar).
-  const days = mode === 'week' ? weekGrid(cursor) : [cursor];
+  const days = mode === 'week' ? diasDeSemana(cursor, vista?.finesDeSemana ?? true) : [cursor];
   return (
     <TimeGrid
       locale={locale}
       days={days}
+      {...(vista
+        ? {
+            jornada: [vista.inicioLaboral, vista.finLaboral] as const,
+            duracion: vista.duracion,
+            numeroSemana: mode === 'week' && vista.numeroSemana,
+          }
+        : {})}
       events={events}
       accentColor={color}
       onSelectEvent={onSelectEvent}
       onCreateRange={onCreateRange}
       onMoveResize={onMoveResize}
     />
+  );
+}
+
+// --- Celda del mes: número del día y «+N más» --------------------------------
+
+/**
+ * Todos los eventos de un día del mes, en el orden de la celda: primero las barras
+ * (día completo o varios días) que lo cruzan, por su fila, y luego los chips con hora,
+ * ya ordenados por inicio. Es la lista que despliega «+N más»: el contador cuenta los
+ * ocultos, pero la lista los enseña TODOS para que el día se lea entero y en orden.
+ */
+export function eventosDelDiaMes(
+  weekSegs: Segment<GridEvent>[],
+  col: number,
+  chips: MonthChip[],
+): Positioned[] {
+  const barras = weekSegs
+    .filter((s) => s.col <= col && col < s.col + s.span)
+    .sort((a, z) => a.row - z.row)
+    .flatMap((s) => {
+      const date = eventInstant(s.item.start, parseTzid(s.item.ical));
+      return date ? [{ event: s.item, date }] : [];
+    });
+  return [...barras, ...chips.map(({ event, date }) => ({ event, date }))];
+}
+
+/**
+ * El número del día. Con `onOpen` es un botón que abre el día en la vista Día —como
+ * en cualquier calendario de escritorio, y la única salida a «ver ese día» sin
+ * cambiar de vista a mano—; sin él, un rótulo. Mide 24×24 (`DATE_ROW_H`).
+ */
+function NumeroDia({
+  locale,
+  day,
+  inMonth,
+  onOpen,
+}: {
+  locale: Locale;
+  day: Date;
+  inMonth: boolean;
+  onOpen?: ((day: Date) => void) | undefined;
+}): JSX.Element {
+  const t = useT(locale);
+  const hoy = isToday(day);
+  const clase = cx(
+    'inline-flex h-[24px] w-[24px] items-center justify-center rounded-full text-sm tabular-nums',
+    hoy
+      ? 'bg-primary font-semibold text-[var(--sytue-on-primary)]'
+      : inMonth
+        ? 'text-text-muted'
+        : 'text-text-subtle',
+  );
+  if (!onOpen) return <span class={clase}>{day.getDate()}</span>;
+  return (
+    <button
+      type="button"
+      aria-label={t('grid.openDay', { date: dayMonthLabel(locale, day) })}
+      onClick={() => onOpen(day)}
+      class={cx(
+        clase,
+        'sytue-focus-ring pointer-events-auto transition-colors duration-150',
+        hoy ? 'hover:brightness-95' : 'hover:bg-surface-sunken hover:text-text',
+      )}
+    >
+      {day.getDate()}
+    </button>
+  );
+}
+
+/**
+ * «+N más»: un botón que despliega en un Popover TODOS los eventos del día, con la
+ * fila de la agenda (`AgendaRow`). Pulsar una fila cierra la lista y abre su vista
+ * rápida. Antes era un `<span title>` dentro del botón de la celda: pulsarlo creaba
+ * un evento y los ocultos solo se veían pasando el ratón (en el móvil, nunca).
+ */
+function MasDelDia({
+  locale,
+  day,
+  more,
+  items,
+  color,
+  onSelectEvent,
+}: {
+  locale: Locale;
+  day: Date;
+  more: number;
+  items: Positioned[];
+  color: string;
+  onSelectEvent: (event: GridEvent, anchor: DOMRect) => void;
+}): JSX.Element {
+  const t = useT(locale);
+  const fecha = dayMonthLabel(locale, day);
+  return (
+    <div class="pointer-events-auto flex min-w-0">
+      <Popover
+        label={t('grid.dayEvents', { date: fecha, count: items.length })}
+        trigger={(props) => (
+          <button
+            type="button"
+            {...props}
+            class={cx(
+              'text-text-muted hover:text-text hover:bg-surface-sunken sytue-focus-ring',
+              'max-w-full truncate rounded-sm px-1.5 text-left text-xs font-medium transition-colors',
+            )}
+          >
+            {t('grid.more', { count: more })}
+          </button>
+        )}
+      >
+        {(close) => (
+          <div class="flex w-72 max-w-full flex-col gap-2">
+            <div class="text-text text-sm font-semibold">{fecha}</div>
+            <ul class="-mx-2 flex flex-col gap-0.5">
+              {items.map((p) => (
+                <li key={p.event.href} class="min-w-0">
+                  <AgendaRow
+                    locale={locale}
+                    event={p.event}
+                    date={p.date}
+                    color={color}
+                    onClick={(event, anchor) => {
+                      close();
+                      // La vista rápida se abre DESPUÉS de que la lista se haya ido:
+                      // al cerrarse, el Popover devuelve el foco a «+N más», y si la
+                      // vista rápida se abriera en el mismo commit ese foco se la
+                      // robaría (y su Escape volvería a un botón que ya no está).
+                      setTimeout(() => onSelectEvent(event, anchor), 0);
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Popover>
+    </div>
   );
 }
 
@@ -488,14 +873,15 @@ function AgendaView({
                 </div>
                 <ul class="flex min-w-0 flex-1 flex-col gap-1">
                   {evs.map((p) => (
-                    <AgendaRow
-                      locale={locale}
-                      key={p.event.href}
-                      event={p.event}
-                      date={p.date}
-                      color={color}
-                      onClick={onSelectEvent}
-                    />
+                    <li key={p.event.href} class="min-w-0">
+                      <AgendaRow
+                        locale={locale}
+                        event={p.event}
+                        date={p.date}
+                        color={color}
+                        onClick={onSelectEvent}
+                      />
+                    </li>
                   ))}
                 </ul>
               </li>
@@ -523,22 +909,14 @@ function AgendaRow({
   const t = useT(locale);
   const allDay = /^\d{8}$/.test(event.start);
   return (
-    <span
-      role="button"
-      tabIndex={0}
-      onClick={(e: MouseEvent) => {
+    <button
+      type="button"
+      onClick={(e) => {
         e.stopPropagation();
-        onClick(event, (e.currentTarget as HTMLElement).getBoundingClientRect());
-      }}
-      onKeyDown={(e: KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          e.stopPropagation();
-          onClick(event, (e.currentTarget as HTMLElement).getBoundingClientRect());
-        }
+        onClick(event, e.currentTarget.getBoundingClientRect());
       }}
       class={cx(
-        'flex min-w-0 items-center gap-2.5 rounded-md border border-transparent px-2 py-1.5 text-left',
+        'flex w-full min-w-0 items-center gap-2.5 rounded-md border border-transparent px-2 py-1.5 text-left',
         'hover:border-border hover:bg-bg-subtle cursor-pointer transition-colors duration-150',
         'sytue-focus-ring',
       )}
@@ -558,7 +936,7 @@ function AgendaRow({
       {event.location ? (
         <span class="sytue-meta hidden max-w-[38%] shrink truncate sm:block">{event.location}</span>
       ) : null}
-    </span>
+    </button>
   );
 }
 
@@ -569,6 +947,8 @@ export function EventChip({
   color,
   expanded,
   onClick,
+  onPointerDown,
+  atenuado,
 }: {
   locale: Locale;
   event: GridEvent;
@@ -577,27 +957,31 @@ export function EventChip({
   color: string;
   expanded?: boolean;
   onClick: (e: GridEvent, anchor: DOMRect) => void;
+  /** Empieza el arrastre a otro día (sin él, la píldora solo se abre). */
+  onPointerDown?: ((e: PointerEvent) => void) | undefined;
+  /** Es la que se está arrastrando: su sitio de antes queda en tenue. */
+  atenuado?: boolean | undefined;
 }): JSX.Element {
+  // Un `<button>` de verdad: la celda del mes ya no es un botón, así que la píldora no
+  // queda anidada en otro control y no necesita imitar el rol ni el teclado.
   return (
-    <span
-      role="button"
-      tabIndex={0}
-      onClick={(e: MouseEvent) => {
+    <button
+      type="button"
+      onPointerDown={onPointerDown}
+      onClick={(e) => {
         e.stopPropagation();
-        onClick(event, (e.currentTarget as HTMLElement).getBoundingClientRect());
-      }}
-      onKeyDown={(e: KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          e.stopPropagation();
-          onClick(event, (e.currentTarget as HTMLElement).getBoundingClientRect());
-        }
+        onClick(event, e.currentTarget.getBoundingClientRect());
       }}
       class={cx(
         // Pildora sobre superficie con borde: el color del calendario va en el
         // punto (portador de color con texto AA garantizado sobre el borde).
-        'border-border bg-bg-subtle text-text flex min-w-0 items-center gap-1.5 rounded-sm border px-1.5 text-xs',
-        'cursor-pointer transition-colors duration-150',
+        'border-border bg-bg-subtle text-text flex min-w-0 items-center gap-1.5 rounded-sm border px-1.5 text-left text-xs',
+        // En la celda del mes el contenido no recibe el puntero (cae al botón de
+        // crear de fondo); la píldora sí.
+        'pointer-events-auto',
+        onPointerDown ? 'cursor-grab select-none active:cursor-grabbing' : 'cursor-pointer',
+        'transition-[color,background-color,border-color,opacity] duration-150',
+        atenuado && 'opacity-50',
         'hover:border-border-strong hover:bg-surface hover:shadow-[var(--shadow-xs)]',
         'sytue-focus-ring',
         expanded ? 'py-1' : 'py-0.5',
@@ -621,6 +1005,6 @@ export function EventChip({
         {timeLabel(locale, date)}
       </span>
       <span class="truncate">{event.summary}</span>
-    </span>
+    </button>
   );
 }

@@ -25,8 +25,8 @@ func TestBajaYRestauracionDeCuenta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrg: %v", err)
 	}
-	jefa := seedUser(t, ctx, st, "jefa@acme.test")
-	ana := seedUser(t, ctx, st, "ana@acme.test")
+	jefa := seedUser(ctx, t, st, "jefa@acme.test")
+	ana := seedUser(ctx, t, st, "ana@acme.test")
 	for _, m := range []domain.Membership{
 		{OrgID: org.ID, UserID: jefa.ID, Role: domain.RoleOwner},
 		{OrgID: org.ID, UserID: ana.ID, Role: domain.RoleMember},

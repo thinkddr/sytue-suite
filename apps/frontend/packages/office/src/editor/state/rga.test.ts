@@ -7,7 +7,7 @@
 // forma más cara de romperse.
 //
 // El orden de hermanos (descendente por punto) y el desempate del punto
-// (contador y luego actor) son un CONTRATO con `services/docs/internal/domain/crdt.go`.
+// (contador y luego actor) son un CONTRATO con `apps/nucleo/office/model/crdt.go`.
 // Los casos de `TestOrdenReplicaAlServidor` están escritos con los mismos
 // valores que el test de Go, para que una divergencia rompa un lado u otro.
 import { expect, test } from 'bun:test';

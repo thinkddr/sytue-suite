@@ -4,14 +4,12 @@
 package mail
 
 import (
+	"cmp"
 	"fmt"
-	"image/color"
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -38,23 +36,10 @@ const (
 	HuecoChipsLector  float32 = 1.5 * 0.25 * tema.Rem
 )
 
-// Los chips de etiqueta de la cabecera: `rounded-pill border bg-bg-subtle text-xs
-// py-0.5 ps-2 pe-1 gap-1.5`, el punto de `h-2 w-2`, el nombre con `max-w-[12rem]` y el
-// aspa de 24 con `-my-1`, que se come 3,5 por arriba y por abajo para no ensanchar la
-// fila de chips.
-const (
-	margenIzqChipLector float32 = 2 * 0.25 * tema.Rem
-	margenDerChipLector float32 = 1 * 0.25 * tema.Rem
-	rellenoChipLector   float32 = 0.5 * 0.25 * tema.Rem
-	puntoChipLector     float32 = 2 * 0.25 * tema.Rem
-	huecoChipLector     float32 = 1.5 * 0.25 * tema.Rem
-	maxNombreChip       float32 = 12 * tema.Rem
-	// aspaChipLector es `h-6 w-6`: 21 con el rem de 14. El comentario de la web dice
-	// 24 y el DOM mide 21 × 21 (arnés sin sesión, 2026-09-22): se copia lo medido.
-	aspaChipLector float32 = 1.5 * tema.Rem
-	comeAspaChip   float32 = 1 * 0.25 * tema.Rem
-	tallaAspaChip  float32 = 12
-)
+// Los chips de etiqueta de la cabecera son la `<Tag size="xs" tone="muted">` de
+// MessageReader.tsx: `ui.Etiqueta` densa y apagada, con el punto del color de la etiqueta
+// y el nombre en `max-w-[12rem]`.
+const maxNombreChip float32 = 12 * tema.Rem
 
 // estrecha es `max-md:`: la VENTANA por debajo de 768 px del rem de 16.
 func estrecha(o fyne.CanvasObject, respaldo float32) bool {
@@ -96,15 +81,21 @@ func botonIconoCabecera(rotulo, d, token string, lleno bool, alPulsar func()) *u
 func (x *Lector) claveBarra(estrecha bool) string {
 	a, c := x.Acciones, x.Conversacion
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v|%v|%v|%v|%v|%v|%v|%s", x.SoloLectura, estrecha, x.Baja, x.DandoDeBaja,
-		x.CreandoEvento, c.Destacada, c.SinLeer, c.HiloID)
+	fmt.Fprintf(&b, "%v|%v|%v|%v|%v|%v|%v|%s|%v%v%v%v", x.SoloLectura, estrecha, x.Baja, x.DandoDeBaja,
+		x.CreandoEvento, c.Destacada, c.SinLeer, c.HiloID,
+		x.AlNavegar != nil, x.HayAnterior, x.HaySiguiente, x.CargandoSiguiente)
+	fmt.Fprintf(&b, "|%v|%d", x.Silenciada, x.PospuestaHasta.Unix())
 	if a != nil {
+		fmt.Fprintf(&b, "|%v%v%v", a.Posponer != nil, a.QuitarPosposicion != nil, a.Silenciar != nil)
 		fmt.Fprintf(&b, "|%v%v%v%v%v%v%v|%d|%d", a.Archivar != nil, a.Papelera != nil, a.Spam != nil,
 			a.NoSpam != nil, a.Purgar != nil, a.CrearRegla != nil, a.Etiquetar != nil,
 			len(a.Destinos), len(a.Etiquetas))
 		for _, e := range EtiquetasDe(c, a.Etiquetas) {
 			b.WriteString("|" + e.ID + e.Nombre + e.Color)
 		}
+		// El punto de una etiqueta sin color es `border-strong`, que cambia con el tema: los
+		// chips se rehacen al cambiarlo para que no se quede el del tema anterior.
+		fmt.Fprintf(&b, "|%v", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	}
 	return b.String()
 }
@@ -145,7 +136,28 @@ func (x *Lector) barra(estrecha bool) *fyne.Container {
 	if !x.SoloLectura && x.Acciones != nil {
 		objs = append(objs, x.grupoTriaje(estrecha))
 	}
-	return container.New(flujo{hueco: HuecoBarraLector, ultimoADerecha: true}, objs...)
+	return container.New(ui.Flujo{Hueco: HuecoBarraLector, UltimoADerecha: true}, objs...)
+}
+
+// navegacion son «Más reciente» y «Más antigua», los `iconOnly` `sm` con galón de 16
+// de la fila del asunto (`flex shrink-0 gap-1 self-start`). Van ahí y no en la barra:
+// la barra ya está al límite de ancho, y en un teléfono, que es quien más los
+// necesita, dos botones más la partían en otra fila. Nil sin `AlNavegar`.
+func (x *Lector) navegacion() *fyne.Container {
+	if x.AlNavegar == nil {
+		return nil
+	}
+	t := x.T
+	boton := func(clave string, icono iconos.Icono, siguiente, hay bool) *ui.Boton {
+		b := ui.NuevoBoton(t.T(clave, nil), func() { x.AlNavegar(siguiente) }).Con(ui.Fantasma, ui.TallaSM)
+		b.Rotulo, b.SoloIcono, b.Icono, b.TamIcono = b.Texto, true, icono, 16
+		b.Inerte = !hay
+		return b
+	}
+	anterior := boton("reader.newer", iconos.ChevronArriba, false, x.HayAnterior)
+	siguiente := boton("reader.older", iconos.ChevronAbajo, true, x.HaySiguiente)
+	siguiente.Cargando = x.CargandoSiguiente
+	return container.New(ui.Flujo{Hueco: HuecoTriajeLector}, anterior, siguiente)
 }
 
 // grupoTriaje es el `<span role="group">` del triaje del hilo abierto. Destacar,
@@ -167,6 +179,11 @@ func (x *Lector) grupoTriaje(estrecha bool) *fyne.Container {
 	if a.Archivar != nil {
 		objs = append(objs, botonIconoCabecera(t.T("action.archive", nil), ArchivarD, "", false,
 			func() { a.Archivar(x.Conversacion) }))
+	}
+	// «Posponer» va junto a archivar, como en la web: es la otra forma de quitarse un
+	// correo de delante.
+	if a.Posponer != nil {
+		objs = append(objs, x.botonPosponer())
 	}
 	if a.Papelera != nil {
 		objs = append(objs, botonIconoCabecera(t.T("action.trash", nil), PapeleraD, "", false,
@@ -196,7 +213,7 @@ func (x *Lector) grupoTriaje(estrecha bool) *fyne.Container {
 		objs = append(objs, mover)
 		x.botonMover = mover
 	}
-	return container.New(flujo{hueco: HuecoTriajeLector}, objs...)
+	return container.New(ui.Flujo{Hueco: HuecoTriajeLector}, objs...)
 }
 
 // AbrirEtiquetar y AbrirMover son los atajos «l» y «v»: pulsan el disparador del
@@ -229,6 +246,20 @@ func elementoGlifo(texto, d string, peligro bool, alPulsar func()) *ui.ElementoM
 	return e
 }
 
+// elementoBloquear es «Bloquear a …» con el nombre del remitente, si se ofrece: con
+// acción puesta, fuera de una cuenta externa y no a uno mismo.
+func (x *Lector) elementoBloquear() (*ui.ElementoMenu, bool) {
+	a := x.Acciones
+	remitente := remitenteDe(x.Conversacion)
+	if a.Bloquear == nil || a.PuedeBloquear == nil || esExterno(x.Conversacion.Ultimo.ID) ||
+		!a.PuedeBloquear(remitente) {
+		return nil, false
+	}
+	quien := cmp.Or(strings.TrimSpace(x.Conversacion.Ultimo.De[0].Nombre), remitente)
+	return elementoGlifo(x.T.T("reader.block", i18n.Vars{"sender": quien}), SpamD, false,
+		func() { a.Bloquear(x.Conversacion) }), true
+}
+
 // menuMas es «Más acciones»: marcar como no leído, crear una regla, spam y el borrado
 // definitivo, en ese orden.
 func (x *Lector) menuMas() *ui.Menu {
@@ -253,6 +284,36 @@ func (x *Lector) menuMas() *ui.Menu {
 		els = append(els, elementoGlifo(t.T("reader.createRule", nil), CarpetaD, false,
 			func() { a.CrearRegla(x.Conversacion) }))
 	}
+	// La búsqueda es la del servicio de Sytue: lo de una cuenta externa no está en ella,
+	// y ofrecerlo daría «sin resultados» por respuesta.
+	if remitente := remitenteDe(x.Conversacion); a.BuscarRemitente != nil && remitente != "" &&
+		!esExterno(x.Conversacion.Ultimo.ID) {
+		e := ui.NuevoElementoMenu(t.T("reader.searchFromSender", nil), iconos.Buscar,
+			func() { a.BuscarRemitente(remitente) })
+		e.TamIcono = TallaGlifoLector
+		els = append(els, e)
+	}
+	// Ni en Spam, ni a un no-reply, ni a uno mismo (OfrecerContacto, libreta.go).
+	if remitente := remitenteDe(x.Conversacion); a.FichaDe != nil && remitente != "" {
+		if id, ofrecer := a.FichaDe(remitente); ofrecer && id != "" && a.VerEnContactos != nil {
+			e := ui.NuevoElementoMenu(t.T("reader.viewInContacts", nil), iconos.UsuarioVisto,
+				func() { a.VerEnContactos(id) })
+			e.TamIcono = TallaGlifoLector
+			els = append(els, e)
+		} else if ofrecer && a.AnadirAContactos != nil {
+			nombre := x.Conversacion.Ultimo.De[0].Nombre
+			e := ui.NuevoElementoMenu(t.T("reader.addToContacts", nil), iconos.Usuario,
+				func() { a.AnadirAContactos(nombre, remitente) })
+			e.TamIcono = TallaGlifoLector
+			els = append(els, e)
+		}
+	}
+	// «Bloquear a …» va junto a «Marcar como spam», que es su pariente: esto además
+	// manda a Spam lo que esa dirección escriba después.
+	if e, hay := x.elementoBloquear(); hay {
+		els = append(els, e)
+	}
+	els = append(els, x.elementosPosponer()...)
 	if a.Spam != nil {
 		els = append(els, elementoGlifo(t.T("action.spam", nil), SpamD, false,
 			func() { a.Spam(x.Conversacion) }))
@@ -264,6 +325,15 @@ func (x *Lector) menuMas() *ui.Menu {
 	m := ui.NuevoMenu(els...)
 	m.Rotulo = t.T("reader.moreActions", nil)
 	return m
+}
+
+// remitenteDe es quien escribe el hilo según la carpeta que se mira, como en «Crear una
+// regla»: el último del hilo completo podría ser tu propia respuesta desde Enviados.
+func remitenteDe(c Conversacion) string {
+	if len(c.Ultimo.De) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(c.Ultimo.De[0].Correo)
 }
 
 // circulo es la ruta de un círculo que llena su caja con el trazo de 2 del glifo: el
@@ -321,112 +391,26 @@ func (x *Lector) chips() *fyne.Container {
 		return nil
 	}
 	var objs []fyne.CanvasObject
+	quitable := !x.SoloLectura && x.Acciones.Etiquetar != nil
 	for _, e := range EtiquetasDe(x.Conversacion, x.Acciones.Etiquetas) {
-		ch := nuevoChipLector(x.T, e, !x.SoloLectura && x.Acciones.Etiquetar != nil)
-		ch.AlQuitar = func() { x.Acciones.Etiquetar(x.Conversacion, e.ID, false) }
-		objs = append(objs, ch)
+		objs = append(objs, nuevoChipLector(x.T, e, quitable, func() {
+			x.Acciones.Etiquetar(x.Conversacion, e.ID, false)
+		}))
 	}
 	if len(objs) == 0 {
 		return nil
 	}
-	return container.New(flujo{hueco: HuecoChipsLector}, objs...)
+	return container.New(ui.Flujo{Hueco: HuecoChipsLector}, objs...)
 }
 
-// chipLector es una etiqueta aplicada, en la cabecera del lector.
-type chipLector struct {
-	widget.BaseWidget
-	Etiqueta Etiqueta
-	AlQuitar func()
-
-	aspa *ui.BotonIcono // nil en solo lectura: no hay nada que quitar
-}
-
-func nuevoChipLector(t *i18n.Translator, e Etiqueta, quitable bool) *chipLector {
-	c := &chipLector{Etiqueta: e}
-	if quitable {
-		rot := t.T("reader.removeLabel", i18n.Vars{"label": e.Nombre})
-		c.aspa = ui.NuevoBotonIcono(iconos.Cerrar, rot, func() {
-			if c.AlQuitar != nil {
-				c.AlQuitar()
-			}
-		})
-		// `hover:text-danger-text` sobre el `text-text-muted` del chip, sin velo, y la
-		// esquina redonda entera (`rounded-full`).
-		c.aspa.Lado, c.aspa.TamIcono, c.aspa.Radio = aspaChipLector, tallaAspaChip, tema.Forma("radius-control")
-		c.aspa.Trazo, c.aspa.TrazoEncima, c.aspa.FondoEncima = "text-muted", "danger-text", ""
-	}
-	c.ExtendBaseWidget(c)
-	return c
-}
-
-// MedidaChipLector es lo que ocupa un chip: el nombre con su tope, el punto, los
-// huecos y, si se puede quitar, el aspa, que manda en el alto aunque se coma su
-// `-my-1`.
-func MedidaChipLector(nombre string, quitable bool) fyne.Size {
-	ancho := 2*tema.Borde + margenIzqChipLector + margenDerChipLector + puntoChipLector + huecoChipLector +
-		min(ui.Medir(nombre, tema.TextoXS, ui.Normal).Width, maxNombreChip)
-	fila := tema.TextoXS.Linea
-	if quitable {
-		ancho += huecoChipLector + aspaChipLector
-		fila = max(fila, aspaChipLector-2*comeAspaChip)
-	}
-	return fyne.NewSize(ancho, fila+2*rellenoChipLector+2*tema.Borde)
-}
-
-func (c *chipLector) CreateRenderer() fyne.WidgetRenderer {
+// nuevoChipLector es una etiqueta aplicada, en la cabecera del lector. Sin `quitable`
+// (solo lectura) no hay aspa: no hay nada que quitar.
+func nuevoChipLector(t *i18n.Translator, e Etiqueta, quitable bool, alQuitar func()) *ui.Etiqueta {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &chipLectorRenderer{
-		c:      c,
-		caja:   ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioPill),
-		punto:  canvas.NewCircle(color.NRGBA{}),
-		nombre: ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text-muted", v)),
+	ch := ui.NuevaEtiqueta(e.Nombre)
+	ch.Punto, ch.Apagada, ch.Densa, ch.Tope = ColorEtiqueta(e.Color, v), true, true, maxNombreChip
+	if quitable {
+		ch.ConAspa(t.T("reader.removeLabel", i18n.Vars{"label": e.Nombre}), alQuitar)
 	}
-	r.objetos = append(r.caja.Objetos(), r.punto, r.nombre)
-	if c.aspa != nil {
-		r.objetos = append(r.objetos, c.aspa)
-	}
-	r.Refresh()
-	return r
-}
-
-type chipLectorRenderer struct {
-	c       *chipLector
-	caja    *ui.Caja
-	punto   *canvas.Circle
-	nombre  *canvas.Text
-	objetos []fyne.CanvasObject
-}
-
-func (r *chipLectorRenderer) MinSize() fyne.Size {
-	return MedidaChipLector(r.c.Etiqueta.Nombre, r.c.aspa != nil)
-}
-func (r *chipLectorRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *chipLectorRenderer) Destroy()                     {}
-
-func (r *chipLectorRenderer) Layout(t fyne.Size) {
-	r.caja.Redimensionar(t)
-	x := tema.Borde + margenIzqChipLector
-	r.punto.Move(fyne.NewPos(x, (t.Height-puntoChipLector)/2))
-	r.punto.Resize(fyne.NewSize(puntoChipLector, puntoChipLector))
-	x += puntoChipLector + huecoChipLector
-	w := ui.Truncar(r.nombre, r.c.Etiqueta.Nombre, tema.TextoXS, ui.Normal, maxNombreChip)
-	ui.ColocarTexto(r.nombre, tema.TextoXS, x, (t.Height-tema.TextoXS.Linea)/2)
-	if a := r.c.aspa; a != nil {
-		x += w + huecoChipLector
-		a.Move(fyne.NewPos(x, (t.Height-aspaChipLector)/2))
-		a.Resize(fyne.NewSize(aspaChipLector, aspaChipLector))
-	}
-}
-
-func (r *chipLectorRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.caja.Pintar(tema.Color("bg-subtle", v), tema.Color("border", v))
-	r.punto.FillColor = ColorEtiqueta(r.c.Etiqueta.Color, v)
-	r.nombre.Color = tema.Color("text-muted", v)
-	for _, o := range r.objetos {
-		o.Refresh()
-	}
-	if t := r.c.Size(); t.Width > 0 {
-		r.Layout(t)
-	}
+	return ch
 }

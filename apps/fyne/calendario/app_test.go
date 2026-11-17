@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
 // TestElRangoEsElDeLaWeb compara `Rango` con `rangeFor` de CalendarApp.tsx, calculado a
@@ -151,7 +151,7 @@ func appDePrueba(t *testing.T, s http.Handler) *App {
 	t.Cleanup(srv.Close)
 	p := &Pantalla{T: traductor(t), Cursor: time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC), Zona: time.UTC}
 	a := NuevaApp(p, api.NewCalendars(srv.URL, nil, nil))
-	a.lanzar = func(f func()) { f() }
+	a.lanzar = func(f func(context.Context)) bool { f(a.vida); return true }
 	a.enUI = func(f func()) { f() }
 	return a
 }
@@ -165,7 +165,7 @@ func TestLaAppCargaFundeYCachea(t *testing.T) {
 	a.Arrancar()
 	p := a.P
 
-	if p.Estado != agenda.Exito || len(p.Calendarios) != 1 || len(p.Compartidos) != 1 {
+	if p.Estado != ui.EstadoExito || len(p.Calendarios) != 1 || len(p.Compartidos) != 1 {
 		t.Fatalf("tras arrancar: estado %d, %d propios, %d compartidos", p.Estado, len(p.Calendarios), len(p.Compartidos))
 	}
 	if len(p.Eventos) != 2 || s.cuantos() != 2 {
@@ -234,7 +234,7 @@ func TestUnCalendarioSinAccesoSeQuitaYNoTumbaLaVista(t *testing.T) {
 	a := appDePrueba(t, s)
 	a.Arrancar()
 	p := a.P
-	if p.Estado != agenda.Exito {
+	if p.Estado != ui.EstadoExito {
 		t.Fatalf("un 403 de un calendario dejó la pantalla en el estado %d (fallo %q)", p.Estado, p.Fallo)
 	}
 	if len(p.Compartidos) != 0 || p.Visibles["suyo"] || len(p.Eventos) != 1 {
@@ -256,14 +256,14 @@ func TestLaAppSinCalendariosEnsenaElError(t *testing.T) {
 	s := &servicioFalso{romper: true}
 	a := appDePrueba(t, s)
 	a.Arrancar()
-	if a.P.Estado != agenda.Error || a.P.Fallo != "cal.error.loadCalendars" {
+	if a.P.Estado != ui.EstadoError || a.P.Fallo != "cal.error.loadCalendars" {
 		t.Fatalf("estado %d con fallo %q", a.P.Estado, a.P.Fallo)
 	}
 	s.mu.Lock()
 	s.romper = false
 	s.mu.Unlock()
 	a.P.AlReintentar()
-	if a.P.Estado != agenda.Exito || s.listados != 2 {
+	if a.P.Estado != ui.EstadoExito || s.listados != 2 {
 		t.Errorf("reintentar: estado %d, %d listados", a.P.Estado, s.listados)
 	}
 }

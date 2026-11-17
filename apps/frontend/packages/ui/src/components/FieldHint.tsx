@@ -15,7 +15,9 @@
  *
  * InlineHelp: bloque de contexto dentro del flujo («qué necesitas a mano», el
  * resultado de una prueba, un aviso). Sobrio: borde + fondo tenue del tono, sin
- * degradados ni sombras.
+ * degradados ni sombras. Es LA caja de aviso de la suite: las apps no se hacen la
+ * suya con `bg-warning-bg rounded-md p-3` (lo vigila `avisos-al-comun.test.ts`),
+ * porque cada copia decidía su radio, su icono y si se anunciaba o no.
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { cx } from '../lib/cx.js';
@@ -78,10 +80,26 @@ export function FieldHint({
   );
 }
 
+/** Cómo se anuncia la caja a un lector de pantalla. */
+export type InlineHelpLive = 'alert' | 'status' | 'off';
+
 export interface InlineHelpProps {
   tone?: HintTone;
   /** Titular breve; el cuerpo va en `children`. */
   title?: string;
+  /**
+   * Etiqueta del titular. Por defecto un párrafo; cuando la caja es una sección con
+   * nombre propio (el secreto que se ve una sola vez, lo que no se migra) va como
+   * encabezado para que siga en el índice de encabezados del lector de pantalla.
+   */
+  titleAs?: 'p' | 'h2' | 'h3' | 'h4';
+  /**
+   * Anuncio. Por defecto lo decide el tono (danger → alert, warning → status). `off`
+   * para la caja que envuelve controles (una casilla de «lo entiendo», un campo que
+   * copiar): una región viva con controles dentro se relee entera a cada cambio.
+   * `alert` para el aviso que bloquea y aparece después de pintar.
+   */
+  live?: InlineHelpLive;
   /** Oculta el icono del tono. */
   hideIcon?: boolean;
   /** Acción a la derecha (enlace o botón pequeño). */
@@ -98,14 +116,25 @@ const helpSurface: Record<HintTone, string> = {
   danger: 'border-danger bg-danger-bg',
 };
 
+const liveRole: Record<HintTone, InlineHelpLive> = {
+  neutral: 'off',
+  info: 'off',
+  success: 'off',
+  warning: 'status',
+  danger: 'alert',
+};
+
 export function InlineHelp({
   tone = 'neutral',
   title,
+  titleAs: Titulo = 'p',
+  live,
   hideIcon,
   action,
   children,
   class: cls,
 }: InlineHelpProps): JSX.Element {
+  const anuncio = live ?? liveRole[tone];
   return (
     <div
       class={cx('flex gap-3 rounded-md border p-3', helpSurface[tone], cls)}
@@ -114,7 +143,7 @@ export function InlineHelp({
       // aparece DESPUÉS de pintar la página —el de un asistente que falla al
       // conectar, por ejemplo— era invisible para un lector de pantalla, que es
       // justo el momento en el que hace falta enterarse (WCAG 4.1.3).
-      role={tone === 'danger' ? 'alert' : tone === 'warning' ? 'status' : undefined}
+      role={anuncio === 'off' ? undefined : anuncio}
     >
       {hideIcon ? null : (
         <Icon
@@ -125,9 +154,11 @@ export function InlineHelp({
       )}
       <div class="min-w-0 flex-1 text-sm leading-relaxed">
         {title ? (
-          <p class={cx('font-semibold', tone === 'neutral' ? 'text-text' : hintText[tone])}>
+          <Titulo
+            class={cx('text-sm font-semibold', tone === 'neutral' ? 'text-text' : hintText[tone])}
+          >
             {title}
-          </p>
+          </Titulo>
         ) : null}
         {children ? <div class={cx('text-text-muted', title ? 'mt-1' : '')}>{children}</div> : null}
       </div>

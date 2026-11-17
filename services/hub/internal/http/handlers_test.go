@@ -125,7 +125,7 @@ type fakePresence struct {
 	ttl   time.Duration
 }
 
-func (f *fakePresence) Heartbeat(_ context.Context, _ string, state domain.PresenceState, _ string) error {
+func (f *fakePresence) Heartbeat(_ context.Context, _ string, state domain.PresenceState, _, _ string) error {
 	if state != "" && !domain.ValidState(state) {
 		return domain.ErrInvalidInput
 	}
@@ -353,6 +353,44 @@ func TestCreateNotification(t *testing.T) {
 	h.CreateNotification(rec, request(t, "POST", "/api/v1/notifications", userClaims(), `{"source":"nope","type":"t","title":"X"}`))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("source desconocido: code=%d", rec.Code)
+	}
+}
+
+// Los avisos de seguridad de Sytue ID y los tipos críticos (un cobro duplicado, una
+// denuncia) no se silencian: el Hub lo rechaza sin guardar nada, aunque la interfaz no
+// ofrezca el interruptor (un cliente viejo o a mano sí podría pedirlo). Quitar una
+// regla vieja sí se deja.
+func TestSetNotificationPrefNoSilenciaLosAvisosDeSeguridad(t *testing.T) {
+	t.Parallel()
+	casos := []struct {
+		nombre string
+		body   string
+		code   int
+		guarda bool
+	}{
+		{"silenciar Sytue ID", `{"source":"id","muted":true}`, http.StatusBadRequest, false},
+		{"silenciar un tipo de Sytue ID", `{"source":"id","kind":"login","muted":true}`, http.StatusBadRequest, false},
+		{"volver a permitir Sytue ID", `{"source":"id","muted":false}`, http.StatusOK, true},
+		{"silenciar el correo sigue valiendo", `{"source":"mail","muted":true}`, http.StatusOK, true},
+		{"silenciar un tipo crítico", `{"source":"pages","kind":"pages.payment.duplicated","muted":true}`, http.StatusBadRequest, false},
+		{"silenciar las denuncias de Rooms", `{"source":"rooms","kind":"rooms.report","muted":true}`, http.StatusBadRequest, false},
+		{"volver a permitir un tipo crítico", `{"source":"pages","kind":"pages.payment.duplicated","muted":false}`, http.StatusOK, true},
+		{"silenciar un tipo normal sigue valiendo", `{"source":"pages","kind":"pages.form.received","muted":true}`, http.StatusOK, true},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			t.Parallel()
+			st := &fakeStore{}
+			h := newHandlers(nil, nil, st, nil, nil)
+			rec := httptest.NewRecorder()
+			h.SetNotificationPref(rec, request(t, "PUT", "/api/v1/notifications/prefs", userClaims(), c.body))
+			if rec.Code != c.code {
+				t.Fatalf("code=%d, quiero %d (%s)", rec.Code, c.code, rec.Body.String())
+			}
+			if (st.savedPref != nil) != c.guarda {
+				t.Fatalf("guardada=%v, quiero %v", st.savedPref != nil, c.guarda)
+			}
+		})
 	}
 }
 

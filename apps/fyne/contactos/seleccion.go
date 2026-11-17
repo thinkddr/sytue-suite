@@ -66,7 +66,7 @@ func (a *App) exportarContactos(nombre string, cs []api.Contact) {
 		return
 	}
 	cs = slices.Clone(cs)
-	a.enFondo(func() { a.guardarVCards(nombre, cs) })
+	a.programar(func(scope cargaContacts) { a.guardarVCards(scope, nombre, cs) })
 }
 
 // miembrosEtiquetaActiva son los contactos de la libreta que llevan la etiqueta por la

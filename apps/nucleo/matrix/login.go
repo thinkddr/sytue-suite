@@ -17,18 +17,33 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // Login opens the system browser using Matrix SSO and exchanges its one-use login
 // token directly with the homeserver. The random callback path binds the local
 // return; Whoami pins both person and device before any credentials are persisted.
-func Login(ctx context.Context, cfg Config, openBrowser func(string) error) (*Client, error) {
+func Login(ctx context.Context, cfg Config, openBrowser func(string) error) (_ *Client, err error) {
+	if cfg.NativeConsumer != "" || cfg.ResourceProduct != "" {
+		return nil, api.ErrMatrixSSO
+	}
 	c, err := newClient(cfg)
 	if err != nil {
 		return nil, err
 	}
 	if openBrowser == nil {
 		return nil, errors.New("matrix: browser is unavailable")
+	}
+	if err := c.acquireStore(ctx); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = c.Close()
+		}
+	}()
+	if err := c.resumeLogout(ctx); err != nil {
+		return nil, err
 	}
 	flow, err := c.cli.GetLoginFlows(ctx)
 	if err != nil {
@@ -53,6 +68,10 @@ func Login(ctx context.Context, cfg Config, openBrowser func(string) error) (*Cl
 			}
 			values := target.Query()
 			values.Set("redirectUrl", redirect)
+			if cfg.Bootstrap.StorageIdentityVersion == storage.IsolatedIdentity {
+				values.Set("sytue_tenant", cfg.Tenant)
+				values.Set("sytue_subject", cfg.Subject)
+			}
 			target.RawQuery = values.Encode()
 			return openBrowser(target.String())
 		},
@@ -74,7 +93,7 @@ func Login(ctx context.Context, cfg Config, openBrowser func(string) error) (*Cl
 // LoginNative wraps Matrix SSO in the first-party PKCE handoff. No bearer Matrix
 // credential crosses a custom-scheme URL on mobile. The browser callback broker
 // also binds the ticket to this Sytue actor/tenant before releasing a one-use token.
-func LoginNative(ctx context.Context, cfg Config, rooms *api.Rooms, await func(context.Context, api.MatrixNativeAuthorization) (api.MatrixNativeCallback, error)) (*Client, error) {
+func LoginNative(ctx context.Context, cfg Config, rooms *api.Rooms, await func(context.Context, api.MatrixNativeAuthorization) (api.MatrixNativeCallback, error)) (_ *Client, err error) {
 	c, err := newClient(cfg)
 	if err != nil {
 		return nil, err
@@ -82,26 +101,60 @@ func LoginNative(ctx context.Context, cfg Config, rooms *api.Rooms, await func(c
 	if rooms == nil || await == nil {
 		return nil, api.ErrMatrixSSO
 	}
+	if err := c.acquireStore(ctx); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = c.Close()
+		}
+	}()
+	if err := c.resumeLogout(ctx); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	product := cfg.Bootstrap.StorageProduct
 	if product == "" {
 		product = "rooms"
 	}
-	authorization, err := rooms.MatrixNativeStartFor(ctx, product)
+	var authorization api.MatrixNativeAuthorization
+	if cfg.ResourceProduct != "" {
+		product = cfg.ResourceProduct
+		authorization, err = rooms.MatrixResourceNativeStart(ctx, product)
+	} else {
+		authorization, err = rooms.MatrixNativeStartForConsumer(ctx, product, cfg.NativeConsumer, c.cfg.Bootstrap.StorageIdentityVersion.Normalized())
+	}
 	if err != nil {
 		return nil, err
 	}
-	if !authorization.ForProduct(cfg.SytueApex, product) {
+	if !authorization.ForConsumer(cfg.SytueApex, product, cfg.NativeConsumer) {
+		return nil, api.ErrMatrixSSO
+	}
+	if (authorization.IdentityVersion() == storage.IsolatedIdentity || cfg.ResourceProduct != "") && authorization.Tenant() != cfg.Tenant {
 		return nil, api.ErrMatrixSSO
 	}
 	callback, err := await(ctx, authorization)
 	if err != nil {
 		return nil, err
 	}
-	token, err := rooms.MatrixNativeFinish(ctx, authorization, callback)
-	if err != nil {
-		return nil, err
+	var token string
+	if cfg.ResourceProduct != "" {
+		if !authorization.ForResources(cfg.SytueApex, cfg.ResourceProduct) {
+			return nil, api.ErrMatrixSSO
+		}
+		grant, finishErr := rooms.MatrixResourceNativeFinish(ctx, authorization, callback)
+		if finishErr != nil {
+			return nil, finishErr
+		}
+		token = grant.LoginToken
+		grant.LoginToken = ""
+		c.resourceGrant = &grant
+	} else {
+		token, err = rooms.MatrixNativeFinish(ctx, authorization, callback)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return c.finishLogin(ctx, token)
 }
@@ -142,7 +195,7 @@ func (c *Client) finishLogin(ctx context.Context, loginToken string) (*Client, e
 		_, _ = c.cli.Logout(ctx)
 		return nil, ErrIdentity
 	}
-	c.session = credentials{Homeserver: c.cfg.Bootstrap.HomeserverURL, UserID: who.UserID, DeviceID: device, AccessToken: response.AccessToken, Subject: cfg.Subject, Tenant: cfg.Tenant}
+	c.session = credentials{ResourceProduct: cfg.ResourceProduct, NativeConsumer: cfg.NativeConsumer, Homeserver: c.cfg.Bootstrap.HomeserverURL, UserID: who.UserID, DeviceID: device, AccessToken: response.AccessToken, Subject: cfg.Subject, Tenant: cfg.Tenant}
 	if err = c.loadMaster(newDevice); err != nil {
 		_, _ = c.cli.Logout(ctx)
 		return nil, err

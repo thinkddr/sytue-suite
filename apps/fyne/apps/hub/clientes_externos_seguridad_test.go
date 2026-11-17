@@ -21,6 +21,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
@@ -34,14 +35,16 @@ func coordenadasExternas() api.Coordenadas {
 	}
 }
 
-func filasExternas(objetos []fyne.CanvasObject) []*FilaCopia {
-	var filas []*FilaCopia
+func filasExternas(objetos []fyne.CanvasObject) []*ui.FilaCopia {
+	var filas []*ui.FilaCopia
 	for _, objeto := range objetos {
 		switch o := objeto.(type) {
-		case *FilaCopia:
+		case *ui.FilaCopia:
 			filas = append(filas, o)
 		case *Detalles:
 			filas = append(filas, filasExternas(o.contenido.objetos())...)
+		case *ui.SeccionAjustes, *colocado:
+			filas = append(filas, filasExternas(test.WidgetRenderer(o.(fyne.Widget)).Objects())...)
 		}
 	}
 	return filas
@@ -81,7 +84,7 @@ func TestDispositivosSegurosSirveLosSieteClientesConDatosDeLaCuenta(t *testing.T
 			}
 			for _, fila := range filasExternas(r.cuerpo.objetos()) {
 				if fila.Valor == caso.valor {
-					fila.boton.Tapped(nil)
+					fila.Boton().Tapped(nil)
 				}
 			}
 			if copiado != caso.valor {
@@ -308,7 +311,7 @@ func TestDispositivosSegurosElCambioDeSesionBorraLaClaveYRecargaLaCuenta(t *test
 	clip.SetContent("")
 	for _, fila := range filasAnteriores {
 		if fila.Valor == "secreto-ana" {
-			fila.boton.Tapped(nil)
+			fila.Boton().Tapped(nil)
 		}
 	}
 	if clip.Content() != "" {

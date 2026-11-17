@@ -113,26 +113,26 @@ func TestElMenuDeUnElementoEsElDeLaWeb(t *testing.T) {
 		quiero   []string
 	}{
 		{"un fichero", fichero, false, false, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "action.classify", "action.attachToMail",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "details.action", "action.classify", "action.attachToMail",
 			"action.shareToRooms", "action.addFavorite", "action.delete")},
 		{"un PDF", pdf, false, true, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "pdf.openInPdf", "action.classify",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "details.action", "pdf.openInPdf", "action.classify",
 			"action.attachToMail", "action.shareToRooms", "action.removeFavorite", "action.delete")},
 		// Resumir solo donde hay texto que leer, y detrás de Clasificar.
 		{"un texto", notas, false, false, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "action.classify", "ai.summarize",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "details.action", "action.classify", "ai.summarize",
 			"action.attachToMail", "action.shareToRooms", "action.addFavorite", "action.delete")},
 		// Clasificado, el menú dice con qué.
 		{"un fichero clasificado", etiquetado, false, false, append(append(k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.copyLink", "action.versions"), clasificado),
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "details.action"), clasificado),
 			k("action.attachToMail", "action.shareToRooms", "action.addFavorite", "action.delete")...)},
 		// Un vídeo se puede llevar a Sytue Cast, detrás de Rooms como en la web.
 		{"un vídeo", video, false, false, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "action.classify", "action.attachToMail",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "details.action", "action.classify", "action.attachToMail",
 			"action.shareToRooms", "action.uploadToCast", "action.addFavorite", "action.delete")},
 		// Una carpeta no se adjunta a un correo, pero sí se comparte en una sala.
 		{"una carpeta", carpeta, false, false, k("action.downloadZip", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.copyLink", "action.shareToRooms", "action.addFavorite", "action.delete")},
+			"action.copy", "action.shareLink", "action.copyLink", "details.action", "action.shareToRooms", "action.addFavorite", "action.delete")},
 		// Sin red quedan las de lectura de un fichero: bajarlo, copiar su enlace y su
 		// historial. De una carpeta, su enlace.
 		{"un fichero sin red", fichero, true, false, k("action.download", "action.copyLink", "action.versions")},
@@ -174,8 +174,8 @@ func TestNuevoEsUnDesplegableYMideLoDeProduccion(t *testing.T) {
 		t.Fatal("«Nuevo» ya no es un botón")
 	}
 	cercaDe(t, "el ancho de «Nuevo»", nuevo.Size().Width, 84.734375, 0.75)
-	cercaDe(t, "«Nuevo» empieza en x=1036,25", tema.AnchoLateral+nuevo.Position().X, 1006.328125, 0.75)
-	cercaDe(t, "el buscador empieza en x=833,25", tema.AnchoLateral+lay.Acciones[0].Position().X, 774.328125, 0.75)
+	cercaDe(t, "«Nuevo» empieza en x=1036,25", tema.AnchoLateral+nuevo.Position().X, 1010.328125, 0.75)
+	cercaDe(t, "el buscador empieza en x=833,25", tema.AnchoLateral+lay.Acciones[0].Position().X, 778.328125, 0.75)
 	nuevo.Tapped(nil)
 	if disparado != nuevo {
 		t.Error("«Nuevo» no abre su menú colgado de sí mismo")
@@ -400,8 +400,9 @@ func TestElMenuDeRecientesTraeCopiarEnlace(t *testing.T) {
 		sinRed bool
 		quiero []string
 	}{
-		{"un fichero", Elemento{ID: "f1", Nombre: "acta.odt"}, false, k("action.download", "action.shareLink", "action.copyLink")},
-		{"una carpeta", Elemento{ID: "c1", Nombre: "C", Carpeta: true}, false, k("action.shareLink", "action.copyLink")},
+		// «Mostrar en su carpeta» detrás de descargar, como en la web (DRIVE-01).
+		{"un fichero", Elemento{ID: "f1", Nombre: "acta.odt"}, false, k("action.download", "action.showInFolder", "action.shareLink", "action.copyLink")},
+		{"una carpeta", Elemento{ID: "c1", Nombre: "C", Carpeta: true}, false, k("action.showInFolder", "action.shareLink", "action.copyLink")},
 		{"una carpeta sin red", Elemento{ID: "c1", Nombre: "C", Carpeta: true}, true, k("action.copyLink")},
 		{"un fichero sin id", Elemento{Nombre: "suelto.txt"}, false, k("action.download", "action.shareLink")},
 	}

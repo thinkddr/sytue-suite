@@ -236,9 +236,45 @@ type NotificationPref struct {
 	Muted bool   `json:"muted"`
 }
 
+// Silenciable indica si los avisos de un origen se pueden silenciar. Los de Sytue ID
+// no: son los avisos de seguridad de la cuenta (un inicio de sesión nuevo, la
+// contraseña o la verificación en dos pasos que cambian), y quien los callara no se
+// enteraría de que le han entrado en la cuenta, que es justo cuando hacen falta.
+func Silenciable(s Source) bool {
+	return s != SourceID
+}
+
+// tiposCriticos son los tipos de aviso que piden actuar y que nadie puede callar: un
+// pedido cobrado sin existencias o cobrado dos veces, un pedido que no llegó a la
+// contabilidad o una tienda saturada (es dinero de la tienda y de quien compra), un
+// desistimiento (la ley da 14 días para devolver el dinero) y una denuncia de
+// contenido en Rooms o Cast (hay que atenderla con diligencia). Callarlos dejaría
+// pasar el plazo sin enterarse. La bandeja de One los enseña fijos con la misma lista
+// (`TIPOS_DE_AVISOS` de @sytue/shell, que la compara con esta).
+var tiposCriticos = []string{
+	"pages.order.oversold",
+	"pages.payment.duplicated",
+	"pages.erp.failed",
+	"pages.store.busy",
+	"pages.withdrawal.requested",
+	"rooms.report",
+	"cast.report",
+}
+
+// TipoCritico indica si un tipo de aviso es de los que no se pueden silenciar.
+func TipoCritico(kind string) bool {
+	return slices.Contains(tiposCriticos, kind)
+}
+
 // Muted decide si un aviso se entrega, aplicando la regla MÁS ESPECÍFICA: una que
 // nombra origen+tipo gana sobre la que solo nombra el origen. Sin reglas, se entrega.
+// Un origen no silenciable o un tipo crítico se entregan siempre, aunque quede una
+// regla guardada de antes de que se rechazaran o aunque se haya callado el origen
+// entero: callar «Sytue Web» calla los formularios, no los cobros duplicados.
 func Muted(prefs []NotificationPref, source Source, kind string) bool {
+	if !Silenciable(source) || TipoCritico(kind) {
+		return false
+	}
 	deOrigen := false
 	for _, p := range prefs {
 		if p.Source != source {
@@ -498,10 +534,16 @@ func ValidState(s PresenceState) bool {
 
 // Presence es la presencia agregada de un usuario en la suite.
 type Presence struct {
-	Subject  string        `json:"subject"`
-	State    PresenceState `json:"state"`
-	Status   string        `json:"status,omitempty"`
-	LastSeen time.Time     `json:"last_seen"`
+	Subject string        `json:"subject"`
+	State   PresenceState `json:"state"`
+	Status  string        `json:"status,omitempty"`
+	// TimeZone es la zona IANA del dispositivo con el que late («Europe/Madrid»):
+	// la hora local de la tarjeta de persona de Rooms. Es la de dónde está AHORA,
+	// no la de su ficha, que es justo lo que importa para no escribir a las tres
+	// de la mañana. Solo viaja por Dragonfly: el respaldo PostgreSQL no la guarda
+	// (sin migración por un dato efímero) y la tarjeta entonces no enseña hora.
+	TimeZone string    `json:"tz,omitempty"`
+	LastSeen time.Time `json:"last_seen"`
 }
 
 // ---------------------------------------------------------------------------
@@ -593,6 +635,7 @@ func BuzonesPersonales(sub string, mailboxes ...string) []string {
 // Persona es lo que el handler saca del token para leer avisos de todas sus
 // organizaciones: sus buzones personales y cuándo se emitió el token.
 type Persona struct {
+	Subject string
 	Buzones []string
 	Emitido time.Time
 }
@@ -602,8 +645,8 @@ type claveBuzonesPersonales struct{}
 // ConBuzonesPersonales deja en el contexto los buzones personales de quien llama y la
 // hora de su token; el store los usa para `app.destinatarios`. Solo lo ponen los
 // handlers, con el token.
-func ConBuzonesPersonales(ctx context.Context, b []string, emitido time.Time) context.Context {
-	return context.WithValue(ctx, claveBuzonesPersonales{}, Persona{Buzones: b, Emitido: emitido})
+func ConBuzonesPersonales(ctx context.Context, subject string, b []string, emitido time.Time) context.Context {
+	return context.WithValue(ctx, claveBuzonesPersonales{}, Persona{Subject: subject, Buzones: slices.Clone(b), Emitido: emitido})
 }
 
 // BuzonesPersonalesDe es lo que puso ConBuzonesPersonales, o nada.

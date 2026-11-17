@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // # La hoja de atajos de teclado (`ShortcutsModal.tsx`)
@@ -52,18 +53,18 @@ func MostrarHojaAtajos(lienzo fyne.Canvas, titulo, cerrar string, grupos []Grupo
 
 // Las medidas de la hoja: grupos con `gap-5`, el rótulo en `sytue-overline mb-2`, filas
 // `flex items-center gap-4 py-1.5` separadas por `divide-y` a `border/60`, y cada tecla
-// `h-6 min-w-6 px-1.5 rounded border bg-bg-subtle text-xs` con `gap-1` entre ellas.
+// la `<Kbd>` del papel (TeclaSuperficie) con `gap-1` entre ellas.
 const (
 	huecoGruposAtajos float32 = 5 * 0.25 * tema.Rem
 	bajoRotuloAtajos  float32 = 2 * 0.25 * tema.Rem
 	rellenoFilaAtajo  float32 = 1.5 * 0.25 * tema.Rem
 	huecoFilaAtajo    float32 = 4 * 0.25 * tema.Rem
-	ladoTecla         float32 = 6 * 0.25 * tema.Rem
 	huecoTeclas       float32 = 1 * 0.25 * tema.Rem
 )
 
-// AltoFilaAtajo es una fila: su `py-1.5` y la tecla de 21 (que manda sobre el texto).
-var AltoFilaAtajo = 2*rellenoFilaAtajo + ladoTecla
+// AltoFilaAtajo es una fila: su `py-1.5` y lo más alto de la tecla (17,5, que hoy manda)
+// y la línea de `text-sm`.
+var AltoFilaAtajo = 2*rellenoFilaAtajo + max(LadoTecla, tema.TextoSM.Linea)
 
 // seccionAtajos es un grupo de la hoja.
 type seccionAtajos struct {
@@ -95,10 +96,7 @@ func (s *seccionAtajos) CreateRenderer() fyne.WidgetRenderer {
 		}
 		fila := make([]*Tecla, 0, len(a.Teclas))
 		for _, k := range a.Teclas {
-			tecla := NuevaTecla(k, tema.TextoXS, Normal)
-			tecla.Fondo, tecla.Tinta, tecla.Borde = "bg-subtle", "text-muted", "border"
-			tecla.RellenoX, tecla.Radio = tema.Espacio(1.5), tema.RadioSM
-			tecla.Minimo = fyne.NewSize(ladoTecla, ladoTecla)
+			tecla := TeclaSuperficie(k)
 			fila = append(fila, tecla)
 			r.objetos = append(r.objetos, tecla)
 		}
@@ -137,7 +135,7 @@ func (r *seccionAtajosRenderer) Layout(t fyne.Size) {
 				x += huecoTeclas
 			}
 			m := k.MinSize()
-			k.Move(fyne.NewPos(x, y+rellenoFilaAtajo))
+			k.Move(fyne.NewPos(x, y+(AltoFilaAtajo-m.Height)/2))
 			k.Resize(m)
 			x += m.Width
 		}
@@ -164,4 +162,62 @@ func (r *seccionAtajosRenderer) Refresh() {
 func veloAtajos(c color.NRGBA) color.NRGBA {
 	c.A = uint8(float32(c.A) * 0.6)
 	return c
+}
+
+// # La hoja de la SUITE (`HojaDeAtajos.tsx` de @sytue/shell)
+//
+// «?» en todas las apps: los atajos que declara la app y, al final, el grupo de la
+// suite —⌘K, «?» y Esc—, que es de todas y antes no lo enseñaba ninguna. Los textos
+// salen del catálogo COMÚN, como el resto de la barra de la suite, en el idioma de la
+// app (el de la barra, si aún no hay ninguno).
+
+// comunEn es el catálogo común en ese idioma; vacío, el de la barra.
+func comunEn(l i18n.Locale) func(string) string {
+	if l != "" {
+		if t, err := i18n.New(l, i18n.Common()); err == nil {
+			return func(clave string) string { return t.T(clave, nil) }
+		}
+	}
+	return textoComun
+}
+
+// GrupoDeAtajosDeLaSuite es el grupo «Toda la suite» de la hoja, en el idioma `l`.
+func GrupoDeAtajosDeLaSuite(l i18n.Locale) GrupoDeAtajos {
+	tc := comunEn(l)
+	return GrupoDeAtajos{
+		Titulo: tc("shell.shortcuts.group"),
+		Atajos: []AtajoDeTeclado{
+			{Teclas: []string{AtajoDelSistema("Ctrl+K")}, Descripcion: tc("shell.shortcuts.search")},
+			{Teclas: []string{"?"}, Descripcion: tc("shell.shortcuts.help")},
+			{Teclas: []string{"Esc"}, Descripcion: tc("shell.shortcuts.close")},
+		},
+	}
+}
+
+// ComponerHojaDeSuite pone el grupo de la suite detrás de los de la app. La fila de «?»
+// que traen las apps (cuando la hoja era suya, la contaban) se quita: ahora es de la
+// suite y saldría dos veces. Un grupo que se queda vacío no se pinta.
+func ComponerHojaDeSuite(l i18n.Locale, app []GrupoDeAtajos) []GrupoDeAtajos {
+	hoja := make([]GrupoDeAtajos, 0, len(app)+1)
+	for _, g := range app {
+		propios := GrupoDeAtajos{Titulo: g.Titulo}
+		for _, a := range g.Atajos {
+			if len(a.Teclas) == 1 && a.Teclas[0] == "?" {
+				continue
+			}
+			propios.Atajos = append(propios.Atajos, a)
+		}
+		if len(propios.Atajos) > 0 {
+			hoja = append(hoja, propios)
+		}
+	}
+	return append(hoja, GrupoDeAtajosDeLaSuite(l))
+}
+
+// MostrarHojaAtajosDeSuite abre la hoja de «?» con los grupos de la app y el de la
+// suite, titulada y cerrada con el catálogo común en el idioma `l` de la app: es la
+// misma hoja en todas las apps.
+func MostrarHojaAtajosDeSuite(lienzo fyne.Canvas, l i18n.Locale, app []GrupoDeAtajos) *Dialogo {
+	tc := comunEn(l)
+	return MostrarHojaAtajos(lienzo, tc("shell.shortcuts.title"), tc("ui.close"), ComponerHojaDeSuite(l, app))
 }

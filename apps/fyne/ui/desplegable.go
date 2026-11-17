@@ -32,8 +32,8 @@ const (
 )
 
 var (
-	rellenoPanelMenu = tema.Espacio(1) // p-1 del panel: 3,5
-	huecoElemento    = tema.Espacio(2) // gap-2 entre el icono y el rótulo: 7
+	rellenoPanelMenu = tema.Espacio(1) // p-1 del panel: 4
+	huecoElemento    = tema.Espacio(2) // gap-2 entre el icono y el rótulo: 8
 	// Las dos densidades de MenuItem. `md` es el cromo de la aplicación; `sm`, el
 	// cromo denso de los editores.
 	margenElemento = [...]fyne.Size{
@@ -374,6 +374,10 @@ func conMayusculas() bool {
 	d, es := fyne.CurrentApp().Driver().(desktop.Driver)
 	return es && d.CurrentKeyModifiers()&fyne.KeyModifierShift != 0
 }
+
+// MayusculasPulsadas es [conMayusculas] para los controles de las apps que cambian el
+// paso de las flechas con Mayúsculas.
+func MayusculasPulsadas() bool { return conMayusculas() }
 
 // Tapped se traga el clic que cae en el panel y no en un elemento, para que no lo
 // recoja el velo de debajo y cierre el menú.

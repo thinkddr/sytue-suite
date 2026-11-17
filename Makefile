@@ -59,41 +59,49 @@ deploy-integrations: ## Asistente de integraciones y conectores con terceros (./
 # Desarrollo LOCAL (Docker Compose en deploy/compose)
 # =============================================================================
 .PHONY: dev-up
-dev-up: ## Levanta toda la suite en local (TLS mkcert + servicios Go + frontends)
-	@# Lee COMPOSE_PROFILES del .env (por defecto `full` = suite completa, como siempre).
-	@test -f $(COMPOSE_DIR)/.env || cp $(COMPOSE_DIR)/.env.example $(COMPOSE_DIR)/.env
+dev-up: ## Levanta toda la suite en local con las apps web COMPILADAS (~2-3 GB de RAM)
+	@# Lee COMPOSE_PROFILES del .env (por defecto `full` = suite completa).
+	@# Apps web compiladas (frontlite.yml): ~80 MiB cada una en vez de 0,6-0,9 GiB con
+	@# `astro dev` (medido: 11,4 GiB las 18). Para recarga en caliente: dev-up-caliente
+	@# (toda la suite) o dev-app P=<perfil> (una app).
+	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
 	@$(MAKE) dev-certs
 	@# BuildKit es obligatorio (los Dockerfile Go usan `RUN --mount=type=cache`). En
 	@# entornos sin el plugin `docker buildx`, `up --build` cae al builder legacy y
 	@# falla; por eso se SEPARA el build (con DOCKER_BUILDKIT) del up.
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
-
-.PHONY: dev-up-built
-dev-up-built: ## Suite COMPLETA en modo COMPILADO (SSR runtime, ~1.2 GB vs ~4.8 GB de dev; sin HMR)
-	@# Cada frontend se sirve compilado (target runtime, ~80 MB) en vez de astro dev
-	@# (~450 MB). Representativo de prod. Para desarrollar UNA app con HMR usa dev-app.
-	@test -f $(COMPOSE_DIR)/.env || cp $(COMPOSE_DIR)/.env.example $(COMPOSE_DIR)/.env
-	@$(MAKE) dev-certs
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml build
 	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml up -d
 
+.PHONY: dev-up-built
+dev-up-built: dev-up ## Alias de dev-up (las apps compiladas ya son el modo por defecto)
+
+.PHONY: dev-up-caliente
+dev-up-caliente: ## Toda la suite con `astro dev` y recarga en caliente (~12 GB de RAM)
+	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
+	@$(MAKE) dev-certs
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
+
 .PHONY: dev-app
 dev-app: ## Solo núcleo + apps concretas (DEV, cabe en 8 GB): make dev-app P=docs,mail
-	@# DEV-ONLY: núcleo (traefik/postgres/minio/dragonfly/id/hub) + los perfiles de P.
+	@# DEV-ONLY: núcleo (traefik/postgres/s3/dragonfly/id/hub) + los perfiles de P.
 	@# COMPOSE_PROFILES en la línea de comandos GANA al `full` del .env (mismo compose).
 	@test -n "$(P)" || (echo "ERROR: indica el/los perfiles, p.ej. make dev-app P=docs,mail" && exit 1)
-	@test -f $(COMPOSE_DIR)/.env || cp $(COMPOSE_DIR)/.env.example $(COMPOSE_DIR)/.env
+	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
 	@$(MAKE) dev-certs
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 COMPOSE_PROFILES=$(P) $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
 	COMPOSE_PROFILES=$(P) $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
 
 .PHONY: dev-certs
-dev-certs: ## Genera el certificado TLS local de confianza (mkcert)
-	mkcert -install
-	mkcert -cert-file $(COMPOSE_DIR)/traefik/certs/sytue-localhost.pem \
-	       -key-file  $(COMPOSE_DIR)/traefik/certs/sytue-localhost-key.pem \
-	       "sytue.localhost" "*.sytue.localhost"
+dev-certs: ## Genera el certificado TLS local de confianza (mkcert), si aún no existe
+	@if [ -s $(COMPOSE_DIR)/traefik/certs/sytue-localhost.pem ]; then \
+	  echo "Certificado local ya presente (deploy/compose/traefik/certs/)."; \
+	else \
+	  mkcert -install && \
+	  mkcert -cert-file $(COMPOSE_DIR)/traefik/certs/sytue-localhost.pem \
+	         -key-file  $(COMPOSE_DIR)/traefik/certs/sytue-localhost-key.pem \
+	         "sytue.localhost" "*.sytue.localhost"; \
+	fi
 
 .PHONY: dev-down
 dev-down: ## Para la suite local (conserva volúmenes)
@@ -119,13 +127,14 @@ dev-seed: ## Crea el usuario admin de desarrollo en Sytue ID
 	@#   SYTUE_ID_ENV=dev \
 	@#   SYTUE_ID_DATABASE_DSN="postgres://sytue_id:PASS@127.0.0.1:5432/sytue_id?sslmode=disable" \
 	@#   go run ./services/id/cmd/id seed
-	@# La contraseña por defecto es sytue-dev-admin; cámbiala con
-	@# SYTUE_ID_DEV_SEED_PASSWORD.
-	cd "$(COMPOSE_DIR)" && { \
+	@# La contraseña es SYTUE_ID_DEV_SEED_PASSWORD de deploy/compose/.env (la genera
+	@# ./sytue-deploy); si no está, el valor de desarrollo sytue-dev-admin.
+	@cd "$(COMPOSE_DIR)" && { \
 	  if [ -z "$$DOCKER_HOST" ] && [ -S "$$HOME/.colima/default/docker.sock" ]; then \
 	    export DOCKER_HOST="unix://$$HOME/.colima/default/docker.sock"; \
 	  fi; \
-	  $(COMPOSE) exec -T id /app/id seed; \
+	  PASS="$${SYTUE_ID_DEV_SEED_PASSWORD:-$$(sed -n 's/^SYTUE_ID_DEV_SEED_PASSWORD=//p' .env 2>/dev/null | tail -1)}"; \
+	  $(COMPOSE) exec -T -e SYTUE_ID_DEV_SEED_PASSWORD="$${PASS:-sytue-dev-admin}" id /app/id seed; \
 	}
 
 .PHONY: dev-demo

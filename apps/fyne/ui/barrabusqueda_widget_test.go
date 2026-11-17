@@ -53,7 +53,7 @@ func TestWidgetBuscaTrasLoginYMontajeSinConsultaNiAtajoCedido(t *testing.T) {
 			b := NuevaBarraSuite(traductorPrueba(t), s, iconos.Docs)
 			t.Cleanup(b.Parar)
 			cedido := false
-			b.CederAtajo(func() { cedido = true })
+			b.CederAtajoSi(func() bool { cedido = true; return true })
 			if !frio {
 				a.alAbrir(u)
 			}

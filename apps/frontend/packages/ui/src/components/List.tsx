@@ -8,6 +8,7 @@ import { createContext } from 'preact';
 import { useContext, useEffect, useState } from 'preact/hooks';
 import { cx } from '../lib/cx.js';
 import { useLongPress } from '../lib/useLongPress.js';
+import { useDeslizarFila } from '../lib/useDeslizarFila.js';
 
 interface ListFocusContextValue {
   focusedIndex: number;
@@ -93,7 +94,31 @@ export interface ListItemProps extends Omit<JSX.HTMLAttributes<HTMLLIElement>, '
   interactive?: boolean;
   /** Índice en la lista (obligatorio para roving tabindex en listbox). */
   index?: number;
+  /**
+   * Deslizar la fila con el DEDO hacia la derecha / la izquierda (Mail: archivar,
+   * papelera). Ausente o null, ese sentido no hace nada. Es un atajo táctil: la
+   * acción tiene que estar también en un botón, para el teclado y el ratón.
+   */
+  deslizarDerecha?: AccionDeslizar | null | undefined;
+  deslizarIzquierda?: AccionDeslizar | null | undefined;
 }
+
+/** Lo que hace deslizar una fila hacia un lado, y cómo se anuncia mientras se arrastra. */
+export interface AccionDeslizar {
+  /** Lo que se lee bajo el dedo («Archivar»). */
+  etiqueta: string;
+  icono?: ComponentChildren;
+  /** El color de la franja que se descubre: verde guardar, rojo tirar, azul el resto. */
+  tono: 'success' | 'danger' | 'info';
+  alSoltar: () => void;
+}
+
+/** Fondo y tinta de la franja por tono (tokens: nada de colores sueltos). */
+const TONO_DESLIZAR = {
+  success: { fondo: 'var(--sytue-success-bg)', tinta: 'text-success-text' },
+  danger: { fondo: 'var(--sytue-danger-bg)', tinta: 'text-danger-text' },
+  info: { fondo: 'var(--sytue-info-bg)', tinta: 'text-info-text' },
+} as const;
 
 export function ListItem({
   leading,
@@ -108,10 +133,23 @@ export function ListItem({
   onFocus,
   onKeyDown,
   onLongPress,
+  deslizarDerecha,
+  deslizarIzquierda,
+  style,
   ...rest
 }: ListItemProps): JSX.Element {
   const focusCtx = useContext(ListFocusContext);
   const hold = useLongPress<undefined>(onLongPress);
+  const conGesto = Boolean(deslizarDerecha || deslizarIzquierda);
+  const desliza = useDeslizarFila({
+    derecha: Boolean(deslizarDerecha),
+    izquierda: Boolean(deslizarIzquierda),
+    alSoltar: (sentido) =>
+      (sentido === 'derecha' ? deslizarDerecha : deslizarIzquierda)?.alSoltar(),
+  });
+  const dx = desliza.dx;
+  const accionVisible = dx > 0 ? deslizarDerecha : dx < 0 ? deslizarIzquierda : null;
+  const tono = accionVisible ? TONO_DESLIZAR[accionVisible.tono] : null;
   // El List solo provee ListFocusContext cuando es `selectable` (role=listbox).
   // `role=option` fuera de un listbox es ARIA inválido, así que solo lo emitimos
   // dentro de un listbox; en una lista plana el item queda como <li> (listitem).
@@ -155,8 +193,21 @@ export function ListItem({
       aria-selected={interactive && inListbox ? Boolean(selected) : undefined}
       tabIndex={tabIndex}
       title={tooltip}
-      onPointerDown={(e) => hold.iniciar(e, undefined)}
-      onClickCapture={hold.onClickCapture}
+      onPointerDown={(e) => {
+        hold.iniciar(e, undefined);
+        if (conGesto) desliza.onPointerDown(e);
+      }}
+      {...(conGesto
+        ? {
+            onPointerMove: desliza.onPointerMove,
+            onPointerUp: desliza.onPointerUp,
+            onPointerCancel: desliza.onPointerCancel,
+          }
+        : {})}
+      onClickCapture={(e) => {
+        hold.onClickCapture(e);
+        if (conGesto) desliza.onClickCapture(e);
+      }}
       onContextMenuCapture={hold.onContextMenuCapture}
       onKeyDown={handleKeyDown}
       onFocus={(e) => {
@@ -171,7 +222,12 @@ export function ListItem({
         // le quitaría al aro de foco su esquina de 4 px.
         'sytue-row mx-[var(--sytue-row-inset)] flex items-center gap-3 border-l-[length:var(--sytue-row-bar)] text-base',
         'px-[calc(0.75rem-var(--sytue-row-inset))] py-[calc(0.5rem+var(--sytue-row-grow))]',
-        'transition-colors duration-150',
+        conGesto
+          ? // La fila se mueve con el dedo (sin transición: iría por detrás) y, si
+            // no actúa, vuelve a su sitio animada. `pan-y` deja el desplazamiento
+            // vertical de la lista al navegador.
+            'relative touch-pan-y transition-[color,background-color,border-color,transform,box-shadow] duration-150 motion-reduce:transition-none'
+          : 'transition-colors duration-150',
         interactive && 'cursor-pointer focus-visible:outline-none',
         selected
           ? 'border-l-primary bg-selected'
@@ -182,7 +238,33 @@ export function ListItem({
         cls,
       )}
       {...rest}
+      style={
+        dx !== 0 && tono
+          ? Object.assign({}, typeof style === 'object' ? style : null, {
+              transform: `translateX(${dx}px)`,
+              // La sombra es una copia de la fila desplazada justo lo que se movió:
+              // rellena con el color de la acción el hueco que deja al otro lado.
+              boxShadow: `${-dx}px 0 0 0 ${tono.fondo}`,
+              transition: 'none',
+            })
+          : style
+      }
     >
+      {accionVisible && tono ? (
+        <span
+          aria-hidden="true"
+          data-deslizar={dx > 0 ? 'derecha' : 'izquierda'}
+          class={cx(
+            'pointer-events-none absolute inset-y-0 flex items-center gap-2 overflow-hidden px-4 text-sm font-semibold whitespace-nowrap',
+            dx > 0 ? 'justify-start' : 'justify-end',
+            tono.tinta,
+          )}
+          style={dx > 0 ? { right: '100%', width: `${dx}px` } : { left: '100%', width: `${-dx}px` }}
+        >
+          {accionVisible.icono}
+          {accionVisible.etiqueta}
+        </span>
+      ) : null}
       {leading ? <span class="shrink-0">{leading}</span> : null}
       <span class="flex min-w-0 flex-1 flex-col">
         <span

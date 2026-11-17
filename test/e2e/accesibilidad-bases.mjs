@@ -70,7 +70,7 @@ const LADO_CELDA = 24;
 const PANTALLAS = [
   { id: 'lista', ruta: '/dev/app?que=lista', espera: 'section[aria-labelledby="lista-bases"] li a' },
   { id: 'base', ruta: '/dev/app?que=base', espera: '[role="grid"]' },
-  { id: 'base-tablero', ruta: '/dev/app?que=base', espera: '[role="grid"]', vista: `Por estado · ${es['view.kind.kanban']}`, luego: 'section[aria-label] select' },
+  { id: 'base-tablero', ruta: '/dev/app?que=base', espera: '[role="grid"]', vista: `Por estado · ${es['view.kind.kanban']}`, luego: 'section[aria-label] li [data-bases-card-menu]' },
   { id: 'compartir', ruta: '/dev/app?que=base', espera: '[role="grid"]', abrir: [es['share.open']], luego: '[role="dialog"]' },
   { id: 'scripts', ruta: '/dev/app?que=base', espera: '[role="grid"]', menuBase: es['scripts.open'], luego: '[role="dialog"] textarea' },
 ];
@@ -732,6 +732,13 @@ async function gestionCompacta(page, datos, ctx) {
     antes + 1,
   );
   if (datos.creados.length !== 1) falla('gestión', ctx, 'añadir registro no ejecuta una sola alta');
+  // El alta abre la ficha del registro nuevo: se cierra antes de seguir con los menús de la
+  // tabla, que el modal dejaría tapados.
+  const ficha = page.getByRole('dialog');
+  if (await ficha.count()) {
+    await page.keyboard.press('Escape');
+    await ficha.waitFor({ state: 'hidden' });
+  }
 
   // Abrir una acción destructiva no confirma; cancelar no debe emitir DELETE.
   await menuTabla(page).click();
@@ -862,16 +869,22 @@ try {
         const desborda = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
         if (desborda) falla('zoom', ctx, 'la página desborda de lado');
         if (que === 'tablero' && ancho.w === 1280 && esquema === 'light') {
-          // Sin arrastrar: el selector «Mover a» de la tarjeta la cambia de columna.
+          // Sin arrastrar: el menú de la tarjeta ofrece «Mover a» cada otra columna.
           const cuenta = async () => page.locator('section[aria-label]').nth(1).locator('li').count();
           const antes = await cuenta();
-          const sel = page.locator('section[aria-label]').first().locator('select').first();
-          await sel.focus();
+          const menu = page.locator('section[aria-label]').first().locator('[data-bases-card-menu]').first();
+          await menu.focus();
           const f = await focoVisible(page);
-          if (!f.ok) falla('teclado', ctx, 'el selector «Mover a» no muestra foco visible');
-          await sel.selectOption({ index: 1 });
+          if (!f.ok) falla('teclado', ctx, 'el menú de la tarjeta no muestra foco visible');
+          await page.keyboard.press('Enter');
+          const mover = es['board.moveToColumn'].split('{name}')[0];
+          await page
+            .getByRole('menuitem')
+            .filter({ hasText: new RegExp(`^${mover}`) })
+            .first()
+            .click();
           await page.waitForTimeout(200);
-          if ((await cuenta()) !== antes + 1) falla('teclado', ctx, 'mover una tarjeta con el selector no la cambia de columna');
+          if ((await cuenta()) !== antes + 1) falla('teclado', ctx, 'mover una tarjeta desde su menú no la cambia de columna');
           else ok(ctx, 'la tarjeta se mueve sin arrastrar');
           if (!(await page.locator('[role="status"]').first().innerText()).trim()) falla('lector', ctx, 'mover una tarjeta no se anuncia');
           const origen = page.locator('[data-bases-column="en curso"]');
@@ -926,7 +939,10 @@ try {
     await celda(page, 0, 0).focus();
     await page.keyboard.press('Enter');
     if ((await page.locator('#ed-0-0').count()) !== 0) falla('lectura', 'solo lectura', 'se abre un editor en solo lectura');
-    if ((await page.locator('tbody th button').count()) > 0) falla('lectura', 'solo lectura', 'hay botones de borrar en solo lectura');
+    // La cabecera de fila lleva «Abrir el registro» y «Comentar», que un lector sí tiene:
+    // lo que no puede aparecer es «Borrar la fila N», así que se busca eso y no «un botón».
+    const borrar = new RegExp(`^${es['grid.deleteRecord'].replace('{n}', '').trim()}`);
+    if ((await page.getByRole('button', { name: borrar }).count()) > 0) falla('lectura', 'solo lectura', 'hay botones de borrar en solo lectura');
     await c.close();
   }
   // La gestión compacta respeta el rol real de la base y de su tabla.
@@ -935,21 +951,32 @@ try {
     for (const clave of ['share.open', 'grid.addRecord']) {
       if (await page.getByRole('button', { name: es[clave], exact: true }).count()) falla('lectura', 'menús', `${clave} aparece para un lector`);
     }
-    await menuTabla(page).click();
+    // Cada ausencia se comprueba con el menú ya abierto: contar antes de que se pinte
+    // daría cero siempre, y un Escape anterior a su apertura no lo cerraría.
+    const abrirMenu = async (disparador) => {
+      await disparador.click();
+      await page.getByRole('menu').waitFor();
+    };
+    const cerrarMenu = async () => {
+      await page.keyboard.press('Escape');
+      await page.getByRole('menu').waitFor({ state: 'detached' });
+    };
+    await abrirMenu(menuTabla(page));
     for (const clave of ['field.add', 'table.rename', 'table.delete', 'table.add', 'import.open']) {
       if (await page.getByRole('menuitem', { name: es[clave], exact: true }).count()) falla('lectura', 'menús', `${clave} aparece para un lector`);
     }
     for (const clave of ['export.csv', 'export.json']) {
       if (!await page.getByRole('menuitem', { name: es[clave], exact: true }).isVisible()) falla('lectura', 'menús', `${clave} no está disponible para un lector`);
     }
-    await page.keyboard.press('Escape');
-    await selectorDeVistas(page).click();
+    await cerrarMenu();
+    await abrirMenu(selectorDeVistas(page));
     if (await page.getByRole('menuitem', { name: es['view.add'], exact: true }).count()) falla('lectura', 'menús', 'crear vista aparece para un lector');
     await page.getByRole('menuitem', { name: `Por estado · ${es['view.kind.kanban']}`, exact: true }).click();
-    await selectorDeVistas(page).click();
+    await page.getByRole('menu').waitFor({ state: 'detached' });
+    await abrirMenu(selectorDeVistas(page));
     if (await page.getByRole('menuitem', { name: es['view.delete'], exact: true }).count()) falla('lectura', 'menús', 'borrar vista aparece para un lector');
-    await page.keyboard.press('Escape');
-    await menuBase(page).click();
+    await cerrarMenu();
+    await abrirMenu(menuBase(page));
     for (const clave of ['base.rename', 'base.delete', 'conn.open']) {
       if (await page.getByRole('menuitem', { name: es[clave], exact: true }).count()) falla('lectura', 'menús', `${clave} aparece para un lector`);
     }

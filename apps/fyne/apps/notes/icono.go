@@ -76,7 +76,7 @@ func conIcono(data json.RawMessage, icono string) (json.RawMessage, error) {
 func (p *Pantalla) ponerIcono(id, icono string) error {
 	var datos json.RawMessage
 	hay := false
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		if n, ok := p.nota(id); ok {
 			datos, hay = n.Datos, true
 		}
@@ -100,7 +100,7 @@ func (p *Pantalla) dialogoIcono(n Nota) {
 	for _, id := range IconosNota {
 		celdas = append(celdas, p.celdaIcono(id, n.Icono == id, func() {
 			d.Cerrar()
-			lanzar(func() error { return p.ponerIcono(n.ID, id) })
+			p.lanzar(func() error { return p.ponerIcono(n.ID, id) })
 		}, v))
 	}
 	columnas := 3 // `grid-cols-3 sm:grid-cols-4`, y `sm:` mide la VENTANA

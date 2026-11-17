@@ -42,7 +42,7 @@ func TestLaRotacionDeCalcusConPocaAlturaEnseñaDosFilasYLasCabeceras(t *testing.
 			continue
 		}
 		vista := lz.Rejilla.vista()
-		finSegundaFila := vista.y(1) + vista.alto()
+		finSegundaFila := vista.y(1) + vista.alto(1)
 		if vista.y(0) < AltoCelda || finSegundaFila > lz.Rejilla.Size().Height {
 			t.Fatalf("%v: cabecera y dos filas necesitan %g px; rejilla=%v", tam, finSegundaFila, lz.Rejilla.Size())
 		}

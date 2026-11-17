@@ -7,6 +7,8 @@ package hub
 
 import (
 	"image/color"
+	"slices"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -23,7 +25,7 @@ import (
 // vista COMPLETA de lo que el panel de la campana solo asoma —filtros, «marcar todas» y
 // las reglas de silencio—, y es adonde lleva «Ver todas» desde cualquier app de la suite.
 //
-// Las medidas salen de las clases con el rem de 14; las piezas que repite (cabecera,
+// Las medidas salen de las clases con el rem de 16; las piezas que repite (cabecera,
 // píldora, conmutador, estado vacío y botón) son las ya medidas en producción en las
 // otras pantallas. La bandeja en sí NO se ha medido contra producción: la sonda del
 // portal no la recorre todavía.
@@ -63,10 +65,78 @@ const (
 	SangriaTextoReglas float32 = 1 * 0.25 * tema.Rem
 	MargenTextoReglas  float32 = 4 * 0.25 * tema.Rem
 	HuecoReglas        float32 = 3 * 0.25 * tema.Rem
+
+	// Los grupos de `PreferenciasAvisos.tsx`: `flex-col gap-6` entre familias, la
+	// `legend` en `text-xs` con su `mb-3` y la rejilla `gap-x-6 gap-y-3`, a dos columnas
+	// desde `sm`.
+	HuecoGruposReglas   float32 = 6 * 0.25 * tema.Rem
+	MargenLeyendaReglas float32 = 3 * 0.25 * tema.Rem
+	HuecoColumnasReglas float32 = 6 * 0.25 * tema.Rem
+	// AnchoDosColumnasReglas es el `sm:` de Tailwind (640 px) pasado al ancho de la
+	// columna de contenido, que es lo que aquí se reparte.
+	AnchoDosColumnasReglas float32 = 640
+	// El fantasma de una regla: `Skeleton 36×20` y la etiqueta al 45 % con 14 de alto,
+	// separados por `gap-2.5`. Píxeles literales en la web.
+	AnchoFantasmaRegla       float32 = 36
+	AltoFantasmaRegla        float32 = 20
+	AltoEtiquetaFantasma     float32 = 14
+	HuecoFantasmaRegla       float32 = 2.5 * 0.25 * tema.Rem
+	SangriaFalloRegla        float32 = 1 * 0.25 * tema.Rem
+	HuecoReintentarReglas    float32 = 3 * 0.25 * tema.Rem
+	FraccionEtiquetaFantasma float32 = 0.45
 )
 
-// OrigenesSilenciables son los seis productos con interruptor, en el orden de la web.
-var OrigenesSilenciables = []string{"mail", "drive", "docs", "calendar", "contacts", "rooms"}
+// GrupoAvisos es una familia de orígenes bajo su `legend`.
+type GrupoAvisos struct {
+	// Grupo es la clave de `inbox.prefsGroup.<grupo>`.
+	Grupo    string
+	Origenes []string
+}
+
+// GruposDeAvisos es `ORIGENES_DE_AVISOS` de @sytue/shell (`avisos.ts`): los orígenes
+// que se pueden silenciar, por familia y en el orden en que se enseñan. Antes eran seis
+// productos escritos a mano y las tareas del ERP, los pedidos de Web o los directos de
+// Cast avisaban sin remedio. `TestLosGruposDeAvisosSonLosDeLaWeb` compara las dos.
+var GruposDeAvisos = []GrupoAvisos{
+	{"communication", []string{"mail", "rooms", "calendar", "contacts"}},
+	{"files", []string{"drive", "docs", "sheets", "slides", "pdf", "notes", "photos"}},
+	{"business", []string{"erp", "bases"}},
+	{"publishing", []string{"pages", "cast", "cloud"}},
+	{"suite", []string{"one", "integrations"}},
+}
+
+// OrigenesSilenciables son todos los orígenes con interruptor, en el orden de la web.
+var OrigenesSilenciables = func() []string {
+	var out []string
+	for _, g := range GruposDeAvisos {
+		out = append(out, g.Origenes...)
+	}
+	return out
+}()
+
+// CargaReglas es el ciclo de las reglas, aparte del de la lista: la bandeja sirve
+// aunque el Hub no sirva las preferencias.
+type CargaReglas int
+
+const (
+	// ReglasListas es el cero: un `Avisos` suelto, sin Hub detrás, no espera nada.
+	ReglasListas CargaReglas = iota
+	ReglasCargando
+	ReglasFallo
+)
+
+// OrigenFijo es el origen que sale al final, encendido y sin poder tocarse: los avisos
+// de seguridad de Sytue ID, que el Hub no deja silenciar (`domain.Silenciable`) y que
+// por eso no están en `GruposDeAvisos`.
+const OrigenFijo = "id"
+
+// SangriaNotaFija es el `ps-11.5` de la nota «Siempre activos…» bajo el interruptor fijo.
+// HuecoNotaFija es el `gap-0.5` entre ese interruptor y su nota. Entre el último grupo
+// y la fila fija va el `gap-6` de los grupos (`HuecoGruposReglas`).
+const (
+	SangriaNotaFija float32 = 11.5 * 0.25 * tema.Rem
+	HuecoNotaFija   float32 = 0.5 * 0.25 * tema.Rem
+)
 
 // Silenciado es el `silenciado` de la web: solo cuenta la regla del ORIGEN entero (sin
 // `kind`). Las de un tipo concreto las pone quien las pone, no esta pantalla.
@@ -113,6 +183,20 @@ type Avisos struct {
 	Estado Estado
 	Items  []api.HubNotification
 	Reglas []api.HubNotificationPref
+	// CargaReglas dice si las reglas están, llegando o sin poder llegar: sin ellas no se
+	// sabe qué está callado y NO se enseñan interruptores, que saldrían encendidos.
+	CargaReglas CargaReglas
+	// GuardandoRegla son los orígenes con un cambio en vuelo: no admiten otro clic (dos
+	// PUT cruzados dejarían el que llegue último, no el último pulsado).
+	GuardandoRegla map[string]bool
+	// FalloRegla son los orígenes cuyo guardado falló y volvieron a su sitio: lo dice su fila.
+	FalloRegla map[string]bool
+	// Organizacion es la activa: las reglas del Hub son por persona Y organización.
+	Organizacion string
+	// Personal: cuenta personal, sin ámbito de organización ni ERP, Bases o Web.
+	Personal bool
+	// AlReintentarReglas vuelve a pedirlas tras un fallo.
+	AlReintentarReglas func()
 
 	// Los dos filtros son estado de la PANTALLA, como en la web: no piden nada al Hub.
 	SoloSinLeer bool
@@ -179,23 +263,54 @@ func (a *Avisos) sinLeer() int {
 	return n
 }
 
-// CreateRenderer construye la pantalla. Los seis interruptores se crean UNA vez y
+// gruposVisibles son los grupos que esta cuenta ve: una personal no abre Sytue ERP,
+// Bases ni Web y ofrecer callarlos es ruido. Un grupo que se queda sin nada, se va.
+func (a *Avisos) gruposVisibles() []GrupoAvisos {
+	var out []GrupoAvisos
+	for _, g := range GruposDeAvisos {
+		var origenes []string
+		for _, o := range g.Origenes {
+			if !a.Personal || !slices.Contains(SoloOrganizaciones, o) {
+				origenes = append(origenes, o)
+			}
+		}
+		if len(origenes) > 0 {
+			out = append(out, GrupoAvisos{g.Grupo, origenes})
+		}
+	}
+	return out
+}
+
+// CreateRenderer construye la pantalla. Los interruptores se crean UNA vez y
 // sobreviven a los repintados: rehacerlos al pulsar uno le quitaba el foco a quien lo
 // maneja con el teclado.
 func (a *Avisos) CreateRenderer() fyne.WidgetRenderer {
-	r := &avisosRenderer{a: a, fondo: ui.NuevoFondoSuite(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))}
+	r := &avisosRenderer{
+		a:            a,
+		fondo:        ui.NuevoFondoSuite(tema.De(fyne.CurrentApp().Settings().ThemeVariant())),
+		conmutadores: map[string]*ui.Conmutador{},
+	}
 	for _, clave := range OrigenesSilenciables {
 		nombre := clave
 		if p, ok := ProductoDe(clave); ok {
 			nombre = p.Nombre
+		} else if clave == "integrations" {
+			nombre = a.T.T("inbox.prefsSource.integrations", nil)
 		}
 		c := ui.NuevoConmutador(nombre, func(recibir bool) {
 			if a.AlSilenciar != nil {
 				a.AlSilenciar(clave, !recibir) // el interruptor dice «recibir»; el Hub guarda «silenciado»
 			}
 		})
-		r.conmutadores = append(r.conmutadores, c)
+		r.conmutadores[clave] = c
 	}
+	nombreFijo := OrigenFijo
+	if p, ok := ProductoDe(OrigenFijo); ok {
+		nombreFijo = p.Nombre
+	}
+	r.fijo = ui.NuevoConmutador(nombreFijo, nil)
+	r.fijo.Encendido = true
+	r.fijo.Disable()
 	r.rehacer()
 	return r
 }
@@ -208,6 +323,7 @@ type avisosRenderer struct {
 	filtros   []*Pildora
 	marcar    *ui.Boton
 	esqueleto []fyne.CanvasObject
+	carga     *ui.BloquesEsqueleto // el grupo de `esqueleto`
 	aviso     *ui.Vacio
 	filas     []*FilaAviso
 	// leidos es el botón del punto de cada fila sin leer, a su par en `filas` (nil en
@@ -221,7 +337,21 @@ type avisosRenderer struct {
 	fileteReglas *canvas.Rectangle
 	tituloReglas *canvas.Text
 	textoReglas  *ui.Parrafo
-	conmutadores []*ui.Conmutador
+	conmutadores map[string]*ui.Conmutador
+	// Lo de las reglas que cambia con su carga: los grupos visibles con su leyenda, los
+	// fantasmas (dos por origen) mientras cargan, el aviso con «Reintentar» si fallan y
+	// el texto de la fila cuyo guardado falló.
+	grupos      []GrupoAvisos
+	leyendas    []*canvas.Text
+	fantasmas   map[string][2]*canvas.Rectangle
+	cargaReglas *ui.BloquesEsqueleto // el grupo de los fantasmas
+	falloReglas *ui.AyudaEnLinea
+	reintentar  *ui.Boton
+	fallosFila  map[string]*ui.Parrafo
+	// fijo es el de Sytue ID: encendido e inerte, con notaFijo («Siempre activos…»).
+	// Sale, como en la web, solo con las reglas ya cargadas.
+	fijo     *ui.Conmutador
+	notaFijo *ui.Parrafo
 
 	objetos []fyne.CanvasObject
 }
@@ -243,15 +373,21 @@ func (r *avisosRenderer) rehacer() {
 	r.cabecera = nuevaCabecera(v, t.T("inbox.overline", nil), t.T("inbox.heading", nil), t.T("inbox.intro", nil))
 	r.cabecera.preparar(v, ancho)
 	r.hacerBarra(t)
-	r.esqueleto, r.aviso, r.filas, r.filetes, r.mas, r.leidos, r.ids = nil, nil, nil, nil, nil, nil, nil
+	r.esqueleto, r.carga, r.aviso, r.filas, r.filetes, r.mas, r.leidos, r.ids = nil, nil, nil, nil, nil, nil, nil, nil
 
 	visibles := Visibles(a.Items, a.SoloSinLeer, a.Producto)
 	switch {
 	case a.Estado == Cargando:
+		// Las cuatro filas son UN grupo, que se anuncia con `inbox.loading` como el
+		// `role="status"` de la web.
+		g := ui.NuevosBloquesEsqueleto()
 		for range FilasEsqueletoAvisos {
-			r.esqueleto = append(r.esqueleto, ui.NuevoEsqueletoRedondo(LadoMarcaAviso),
-				ui.NuevoEsqueleto(0, AltoBarraEsqueleto1), ui.NuevoEsqueleto(0, AltoBarraEsqueleto2))
+			circulo := g.Bloque(LadoMarcaAviso, LadoMarcaAviso)
+			circulo.CornerRadius = LadoMarcaAviso / 2 // `circle`
+			r.esqueleto = append(r.esqueleto, circulo,
+				g.Bloque(0, AltoBarraEsqueleto1), g.Bloque(0, AltoBarraEsqueleto2))
 		}
+		r.carga = g.AMano().ConRotulo(t.T("inbox.loading", nil))
 		r.filetes = Divisores(v, FilasEsqueletoAvisos)
 	case a.Estado == Fallo:
 		// Sin icono y con el botón en su talla de siempre: es el EmptyState de la
@@ -297,12 +433,15 @@ func (r *avisosRenderer) rehacer() {
 
 	r.fileteReglas = canvas.NewRectangle(tema.Color("border", v))
 	r.tituloReglas = ui.Texto(t.T("inbox.prefsTitle", nil), tema.TextoBase, ui.SemiNegrita, tema.Color("text", v))
-	r.textoReglas = ui.NuevoParrafo(t.T("inbox.prefsBody", nil), tema.TextoSM, ui.Normal, "text-muted", v).
-		A(min(ancho, AnchoIntro))
-	for i, c := range r.conmutadores {
-		c.Encendido = !Silenciado(a.Reglas, OrigenesSilenciables[i])
-		c.Refresh()
+	ambito := t.T("inbox.prefsScopePersonal", nil)
+	if !a.Personal && a.Organizacion != "" {
+		ambito = t.T("inbox.prefsScopeOrg", map[string]any{"org": a.Organizacion})
 	}
+	r.textoReglas = ui.NuevoParrafo(t.T("inbox.prefsBody", nil)+" "+ambito, tema.TextoSM, ui.Normal, "text-muted", v).
+		A(min(ancho, AnchoIntro))
+	r.notaFijo = ui.NuevoParrafo(t.T("inbox.prefsAlwaysOn", nil), tema.TextoSM, ui.Normal, "text-muted", v).
+		A(max(0, ancho-SangriaNotaFija))
+	r.rehacerReglas(v)
 	r.recomponer()
 }
 
@@ -381,7 +520,9 @@ func (r *avisosRenderer) recomponer() {
 	if r.marcar != nil {
 		r.objetos = append(r.objetos, r.marcar)
 	}
-	r.objetos = append(r.objetos, r.esqueleto...)
+	if r.carga != nil {
+		r.objetos = append(r.objetos, r.carga)
+	}
 	if r.aviso != nil {
 		r.objetos = append(r.objetos, r.aviso)
 	}
@@ -400,9 +541,93 @@ func (r *avisosRenderer) recomponer() {
 		r.objetos = append(r.objetos, r.mas)
 	}
 	r.objetos = append(r.objetos, r.fileteReglas, r.tituloReglas, r.textoReglas)
-	for _, c := range r.conmutadores {
-		r.objetos = append(r.objetos, c)
+	if r.falloReglas != nil {
+		r.objetos = append(r.objetos, r.falloReglas)
+		if r.reintentar != nil {
+			r.objetos = append(r.objetos, r.reintentar)
+		}
+		return
 	}
+	if r.cargaReglas != nil {
+		r.objetos = append(r.objetos, r.cargaReglas)
+	}
+	for i, g := range r.grupos {
+		r.objetos = append(r.objetos, r.leyendas[i])
+		for _, o := range g.Origenes {
+			if _, ok := r.fantasmas[o]; ok {
+				continue
+			}
+			r.objetos = append(r.objetos, r.conmutadores[o])
+			if p := r.fallosFila[o]; p != nil {
+				r.objetos = append(r.objetos, p)
+			}
+		}
+	}
+	if r.conFijo() {
+		r.objetos = append(r.objetos, r.fijo, r.notaFijo)
+	}
+}
+
+// conFijo dice si sale la fila fija de Sytue ID: con las reglas cargadas, como en la web.
+func (r *avisosRenderer) conFijo() bool { return r.a.CargaReglas == ReglasListas }
+
+// rehacerReglas pone la sección de reglas en su estado: fantasmas sin nada que pulsar
+// mientras cargan, el aviso sin interruptores si fallan, y si no los interruptores en
+// su posición, inertes los que guardan y con su texto los que fallaron.
+func (r *avisosRenderer) rehacerReglas(v tema.Variante) {
+	a, t := r.a, r.a.T
+	r.grupos, r.leyendas, r.fantasmas, r.falloReglas, r.reintentar, r.fallosFila = a.gruposVisibles(), nil, nil, nil, nil, nil
+	r.cargaReglas = nil
+	if a.CargaReglas == ReglasFallo {
+		r.falloReglas = ui.NuevaAyudaEnLinea(t.T("inbox.prefsLoadErrorBody", nil)).
+			ConTono(ui.AyudaPeligro).ConTitulo(t.T("inbox.prefsLoadError", nil))
+		if a.AlReintentarReglas != nil {
+			r.reintentar = ui.NuevoBoton(t.T("inbox.retry", nil), a.AlReintentarReglas).Con(ui.Secundario, ui.TallaSM)
+		}
+		return
+	}
+	for _, g := range r.grupos {
+		r.leyendas = append(r.leyendas, ui.Texto(strings.ToUpper(t.T("inbox.prefsGroup."+g.Grupo, nil)),
+			tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)))
+		for _, o := range g.Origenes {
+			if a.CargaReglas == ReglasCargando {
+				// Todos los fantasmas son UN grupo: laten a una.
+				if r.fantasmas == nil {
+					r.fantasmas = map[string][2]*canvas.Rectangle{}
+					r.cargaReglas = ui.NuevosBloquesEsqueleto()
+				}
+				r.fantasmas[o] = [2]*canvas.Rectangle{
+					r.cargaReglas.Bloque(AnchoFantasmaRegla, AltoFantasmaRegla),
+					r.cargaReglas.Bloque(0, AltoEtiquetaFantasma),
+				}
+				continue
+			}
+			c := r.conmutadores[o]
+			c.Encendido = !Silenciado(a.Reglas, o)
+			if a.GuardandoRegla[o] {
+				c.Disable()
+			} else {
+				c.Enable()
+			}
+			if a.FalloRegla[o] {
+				if r.fallosFila == nil {
+					r.fallosFila = map[string]*ui.Parrafo{}
+				}
+				r.fallosFila[o] = ui.NuevoParrafo(t.T("inbox.prefsSaveError", nil), tema.TextoXS, ui.Normal, "danger-text", v)
+			}
+		}
+	}
+	if r.cargaReglas != nil {
+		r.cargaReglas.AMano()
+	}
+}
+
+// anchoColumnaReglas es el de cada celda de la rejilla: dos columnas desde `sm`.
+func anchoColumnaReglas(ancho float32) (float32, int) {
+	if ancho >= AnchoDosColumnasReglas {
+		return (ancho - HuecoColumnasReglas) / 2, 2
+	}
+	return ancho, 1
 }
 
 func (r *avisosRenderer) MinSize() fyne.Size { return fyne.NewSize(0, r.alto(r.a.Ancho())) }
@@ -479,15 +704,8 @@ func (r *avisosRenderer) altoLista(ancho float32) float32 {
 }
 
 func (r *avisosRenderer) altoReglas() float32 {
-	alto := MargenReglas + tema.Borde + RellenoReglas + tema.TextoBase.Linea + SangriaTextoReglas
-	alto += ui.AltoParrafo(r.textoReglas, r.textoReglas.Ancho) + MargenTextoReglas
-	for i, c := range r.conmutadores {
-		if i > 0 {
-			alto += HuecoReglas
-		}
-		alto += c.MinSize().Height
-	}
-	return alto
+	_, ancho := CajaContenido(r.a.Ancho())
+	return r.reglas(0, 0, ancho, false)
 }
 
 // barra coloca los filtros y el botón (`flex flex-wrap items-center justify-between
@@ -555,7 +773,10 @@ func (r *avisosRenderer) Layout(t fyne.Size) {
 	if t.Width <= 0 {
 		return
 	}
-	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width))))
+	tam := fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width)))
+	r.fondo.Resize(tam)
+	r.carga.Cubrir(tam)
+	r.cargaReglas.Cubrir(tam)
 	x, ancho := CajaContenido(t.Width)
 	y := r.cabecera.colocar(x) + MargenCabeceraActividad
 	y += r.barra(x, y, ancho, true) + HuecoBandeja
@@ -616,23 +837,116 @@ func (r *avisosRenderer) colocarEsqueleto(x, y, ancho float32) {
 	}
 }
 
-func (r *avisosRenderer) colocarReglas(x, y, ancho float32) {
+func (r *avisosRenderer) colocarReglas(x, y, ancho float32) { r.reglas(x, y, ancho, true) }
+
+// reglas coloca la sección de reglas y devuelve su alto; con `mover` a false solo mide,
+// como `barra`: así `alto` y `Layout` no pueden discrepar.
+func (r *avisosRenderer) reglas(x, y, ancho float32, mover bool) float32 {
+	y0 := y
 	y += MargenReglas
-	r.fileteReglas.Move(fyne.NewPos(x, y))
-	r.fileteReglas.Resize(fyne.NewSize(ancho, tema.Borde))
+	if mover {
+		r.fileteReglas.Move(fyne.NewPos(x, y))
+		r.fileteReglas.Resize(fyne.NewSize(ancho, tema.Borde))
+	}
 	y += tema.Borde + RellenoReglas
-	ui.ColocarTexto(r.tituloReglas, tema.TextoBase, x, y)
+	if mover {
+		ui.ColocarTexto(r.tituloReglas, tema.TextoBase, x, y)
+	}
 	y += tema.TextoBase.Linea + SangriaTextoReglas
 	alto := ui.AltoParrafo(r.textoReglas, r.textoReglas.Ancho)
-	r.textoReglas.Move(fyne.NewPos(x, y))
-	r.textoReglas.Resize(fyne.NewSize(r.textoReglas.Ancho, alto))
-	y += alto + MargenTextoReglas
-	for _, c := range r.conmutadores {
-		m := c.MinSize()
-		c.Move(fyne.NewPos(x, y))
-		c.Resize(m)
-		y += m.Height + HuecoReglas
+	if mover {
+		r.textoReglas.Move(fyne.NewPos(x, y))
+		r.textoReglas.Resize(fyne.NewSize(r.textoReglas.Ancho, alto))
 	}
+	y += alto + MargenTextoReglas
+
+	if r.falloReglas != nil {
+		m := ui.MedidaAyudaEnLinea(r.falloReglas, ancho)
+		if mover {
+			r.falloReglas.Move(fyne.NewPos(x, y))
+			r.falloReglas.Resize(m)
+		}
+		y += m.Height
+		if r.reintentar != nil {
+			b := r.reintentar.MinSize()
+			if mover {
+				r.reintentar.Move(fyne.NewPos(x, y+HuecoReintentarReglas))
+				r.reintentar.Resize(b)
+			}
+			y += HuecoReintentarReglas + b.Height
+		}
+		return y - y0
+	}
+
+	col, columnas := anchoColumnaReglas(ancho)
+	for i, g := range r.grupos {
+		if i > 0 {
+			y += HuecoGruposReglas
+		}
+		if mover {
+			ui.ColocarTexto(r.leyendas[i], tema.TextoXS, x, y)
+		}
+		y += tema.TextoXS.Linea + MargenLeyendaReglas
+		// La rejilla, fila a fila: cada fila mide lo que su celda más alta.
+		for f := 0; f < len(g.Origenes); f += columnas {
+			if f > 0 {
+				y += HuecoReglas
+			}
+			var altoFila float32
+			for c := 0; c < columnas && f+c < len(g.Origenes); c++ {
+				cx := x + float32(c)*(col+HuecoColumnasReglas)
+				altoFila = max(altoFila, r.celdaRegla(g.Origenes[f+c], cx, y, col, mover))
+			}
+			y += altoFila
+		}
+	}
+	if r.conFijo() {
+		y += HuecoGruposReglas
+		m := r.fijo.MinSize()
+		if mover {
+			r.fijo.Move(fyne.NewPos(x, y))
+			r.fijo.Resize(fyne.NewSize(min(m.Width, ancho), m.Height))
+		}
+		y += m.Height + HuecoNotaFija
+		h := ui.AltoParrafo(r.notaFijo, r.notaFijo.Ancho)
+		if mover {
+			r.notaFijo.Move(fyne.NewPos(x+SangriaNotaFija, y))
+			r.notaFijo.Resize(fyne.NewSize(r.notaFijo.Ancho, h))
+		}
+		y += h
+	}
+	return y - y0
+}
+
+// celdaRegla coloca el interruptor de un origen (o su fantasma) con, debajo, el texto
+// de su guardado fallido, y devuelve lo que ocupa.
+func (r *avisosRenderer) celdaRegla(o string, x, y, ancho float32, mover bool) float32 {
+	if f, ok := r.fantasmas[o]; ok {
+		if mover {
+			f[0].Move(fyne.NewPos(x, y))
+			f[0].Resize(fyne.NewSize(AnchoFantasmaRegla, AltoFantasmaRegla))
+			resto := ancho - AnchoFantasmaRegla - HuecoFantasmaRegla
+			f[1].Move(fyne.NewPos(x+AnchoFantasmaRegla+HuecoFantasmaRegla, y+(AltoFantasmaRegla-AltoEtiquetaFantasma)/2))
+			f[1].Resize(fyne.NewSize(resto*FraccionEtiquetaFantasma, AltoEtiquetaFantasma))
+		}
+		return AltoFantasmaRegla
+	}
+	c := r.conmutadores[o]
+	m := c.MinSize()
+	alto := m.Height
+	if mover {
+		c.Move(fyne.NewPos(x, y))
+		c.Resize(fyne.NewSize(min(m.Width, ancho), m.Height))
+	}
+	if p := r.fallosFila[o]; p != nil {
+		h := ui.AltoParrafo(p, ancho)
+		if mover {
+			p.Move(fyne.NewPos(x, y+alto+SangriaFalloRegla))
+			p.Resize(fyne.NewSize(ancho, h))
+		}
+		alto += SangriaFalloRegla + h
+	}
+	return alto
 }
 
 // ---- La fila de aviso ----

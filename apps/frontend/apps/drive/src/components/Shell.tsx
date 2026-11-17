@@ -17,16 +17,16 @@
  */
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { FranjaPeticion, SytueShell } from '@sytue/shell';
+import { SytueShell } from '@sytue/shell';
 import { AdminShell } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import { getAccessToken } from '@sytue/auth/client';
 import { DriveSidebar, type Section } from './DriveSidebar';
-import { FileBrowser, TrashView, ResourceListView, SharedWithMeView } from './FileBrowser';
-import { TeamDrivesView } from './TeamDrives';
-import { DocumentsView } from './DocumentsView';
-import { CloudView, type Cloud } from './PersonalClouds';
+import type { Cloud } from './PersonalClouds';
+import { PrivateDriveGate } from './PrivateDriveGate.js';
+import { PrivateDriveProvider } from '../client/private-browser.js';
+import { PrivateFileBrowser } from './PrivateFileBrowser.js';
 
 interface ShellProps {
   user: SytueUser;
@@ -61,11 +61,7 @@ function seccionDeLaUrl(): Section {
 export function Shell({ user, hubBaseUrl, locale }: ShellProps) {
   const [section, setSection] = useState<Section>(seccionDeLaUrl);
   const [cloud, setCloud] = useState<Cloud | null>(null);
-  const [peticion] = useState(() =>
-    typeof window === 'undefined'
-      ? ''
-      : (new URLSearchParams(window.location.search).get('request') ?? ''),
-  );
+  const [navigation, setNavigation] = useState(0);
 
   return (
     <SytueShell
@@ -75,62 +71,45 @@ export function Shell({ user, hubBaseUrl, locale }: ShellProps) {
       accessToken={getAccessToken}
       locale={locale}
     >
-      {/* Cuerpo bajo la topbar (56px): sidebar de ubicaciones + navegador. El
-          AdminShell aporta el `main`, el alto y —en <768px— la sidebar como
-          drawer con su botón de menú. */}
-      <AdminShell
-        sidebar={
-          <DriveSidebar
-            active={section}
-            onSelect={(s) => {
-              setCloud(null);
-              setSection(s);
-            }}
-            locale={locale}
-            cloud={cloud?.instance_id ?? null}
-            onCloud={setCloud}
-          />
-        }
-        // Sin `title`: cada vista trae su propio cabecero con el nombre de la sección
-        // justo debajo de la barra móvil, y «Mi unidad» salía dos veces seguidas.
-      >
-        {/* El aviso de una petición de edición (`hubnotify.EnlacePeticionDrive`): quien
-            compartió ve aquí quién le pide editar y lo concede con un clic. */}
-        {peticion ? (
-          <FranjaPeticion
-            endpoint={`/api/edit-requests?id=${encodeURIComponent(peticion)}`}
-            soloLectura={false}
-            puedeConceder
-            mensaje=""
-            locale={locale}
-          />
-        ) : null}
-        {/* Sobre SUPERFICIE: las listas de Drive son filas con filetes, no tarjetas, y
-            directamente sobre el lienzo gris se leían como contenido sin panel. */}
-        <div class="bg-surface min-h-full">
-          {cloud ? (
-            <CloudView
-              key={cloud.instance_id}
-              cloud={cloud}
-              onDisconnected={() => setCloud(null)}
-            />
-          ) : section === 'documents' ? (
-            <DocumentsView />
-          ) : section === 'trash' ? (
-            <TrashView />
-          ) : section === 'recent' ? (
-            <ResourceListView mode="recent" />
-          ) : section === 'favorites' ? (
-            <ResourceListView mode="favorites" />
-          ) : section === 'shared' ? (
-            <SharedWithMeView />
-          ) : section === 'team' ? (
-            <TeamDrivesView />
-          ) : (
-            <FileBrowser />
-          )}
-        </div>
-      </AdminShell>
+      <PrivateDriveGate actor={user.id} tenant={user.tenant} locale={locale}>
+        {(session, baseURL) => (
+          <PrivateDriveProvider session={session} baseURL={baseURL}>
+            <AdminShell
+              sidebar={
+                <DriveSidebar
+                  active={section}
+                  onSelect={(s) => {
+                    const url = new URL(window.location.href);
+                    for (const key of ['request', 'path', 'preview', 'file', 'folder'])
+                      url.searchParams.delete(key);
+                    url.searchParams.set('section', s);
+                    window.history.replaceState(null, '', url);
+                    setCloud(null);
+                    setSection(s);
+                    setNavigation((value) => value + 1);
+                  }}
+                  locale={locale}
+                  cloud={cloud?.instance_id ?? null}
+                  onCloud={setCloud}
+                />
+              }
+              // Sin `title`: cada vista trae su propio cabecero con el nombre de la sección
+              // justo debajo de la barra móvil, y «Mi unidad» salía dos veces seguidas.
+            >
+              <div class="bg-surface flex min-h-full flex-col">
+                <PrivateFileBrowser
+                  key={navigation}
+                  section={cloud ? 'external' : section}
+                  onOpenFolder={() => {
+                    setCloud(null);
+                    setSection('my');
+                  }}
+                />
+              </div>
+            </AdminShell>
+          </PrivateDriveProvider>
+        )}
+      </PrivateDriveGate>
     </SytueShell>
   );
 }

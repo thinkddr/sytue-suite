@@ -18,7 +18,10 @@ import (
 )
 
 // Hub es el cliente de las notificaciones unificadas de Sytue Hub (services/hub, `/api/v1`).
-type Hub struct{ c *Client }
+type Hub struct {
+	c       *Client
+	private HubData
+}
 
 // NewHub crea el cliente sobre la raíz del servicio (ServiceURL(apex, "hub")).
 func NewHub(servicio string, s Session, h *http.Client) *Hub {
@@ -51,6 +54,9 @@ type HubNotification struct {
 // NotificationsAntes devuelve los avisos de DETRÁS de `antes` (el último de la página
 // anterior), por (fecha, id): con la fecha sola se perdían los del mismo instante.
 func (h *Hub) NotificationsAntes(ctx context.Context, limite int, antes HubNotification) ([]HubNotification, error) {
+	if h.private != nil {
+		return h.private.NotificationsAntes(ctx, limite, antes)
+	}
 	out, err := JSON[struct {
 		Notifications []HubNotification `json:"notifications"`
 	}](ctx, h.c, Request{Path: "/notifications", Query: url.Values{
@@ -63,6 +69,9 @@ func (h *Hub) NotificationsAntes(ctx context.Context, limite int, antes HubNotif
 
 // Notifications devuelve los últimos avisos, el más reciente primero.
 func (h *Hub) Notifications(ctx context.Context, limite int) ([]HubNotification, error) {
+	if h.private != nil {
+		return h.private.Notifications(ctx, limite)
+	}
 	out, err := JSON[struct {
 		Notifications []HubNotification `json:"notifications"`
 	}](ctx, h.c, Request{Path: "/notifications", Query: url.Values{"limit": {strconv.Itoa(limite)}}})
@@ -82,6 +91,9 @@ type HubAvisoPropio struct {
 // AvisarAMi deja el aviso en la campana de quien tiene la sesión
 // (`POST /api/v1/notifications` sin sujeto: a uno mismo siempre vale).
 func (h *Hub) AvisarAMi(ctx context.Context, n HubAvisoPropio) error {
+	if h.private != nil {
+		return h.private.AvisarAMi(ctx, n)
+	}
 	cuerpo, err := json.Marshal(n)
 	if err != nil {
 		return err
@@ -106,6 +118,9 @@ type HubContadores struct {
 
 // Contadores cuenta los avisos y el correo sin leer.
 func (h *Hub) Contadores(ctx context.Context) (HubContadores, error) {
+	if h.private != nil {
+		return h.private.Contadores(ctx)
+	}
 	return JSON[HubContadores](ctx, h.c, Request{Path: "/notifications/unread_count"})
 }
 
@@ -173,6 +188,9 @@ func (h *Hub) Escuchar(ctx context.Context, cada func(HubNotification), alEstado
 
 // MarkRead da un aviso por leído.
 func (h *Hub) MarkRead(ctx context.Context, id string) error {
+	if h.private != nil {
+		return h.private.MarkRead(ctx, id)
+	}
 	resp, err := h.c.Do(ctx, Request{Method: http.MethodPost, Path: "/notifications/" + url.PathEscape(id) + "/read"})
 	if err != nil {
 		return err
@@ -182,6 +200,9 @@ func (h *Hub) MarkRead(ctx context.Context, id string) error {
 
 // MarkAllRead da por leídos TODOS los avisos de una vez (`POST /notifications/read_all`).
 func (h *Hub) MarkAllRead(ctx context.Context) error {
+	if h.private != nil {
+		return h.private.MarkAllRead(ctx)
+	}
 	resp, err := h.c.Do(ctx, Request{Method: http.MethodPost, Path: "/notifications/read_all"})
 	if err != nil {
 		return err
@@ -200,6 +221,9 @@ type HubNotificationPref struct {
 // NotificationPrefs son las reglas de silencio del PROPIO usuario: el Hub no deja leer
 // las de otro, ni con permiso, y por eso no hay parámetro de sujeto.
 func (h *Hub) NotificationPrefs(ctx context.Context) ([]HubNotificationPref, error) {
+	if h.private != nil {
+		return h.private.NotificationPrefs(ctx)
+	}
 	out, err := JSON[struct {
 		Prefs []HubNotificationPref `json:"prefs"`
 	}](ctx, h.c, Request{Path: "/notifications/prefs"})
@@ -209,6 +233,9 @@ func (h *Hub) NotificationPrefs(ctx context.Context) ([]HubNotificationPref, err
 // SetNotificationPref silencia —o vuelve a permitir— un origen, o un tipo dentro de él.
 // El `kind` viaja siempre, vacío si no lo hay: es lo que manda la web.
 func (h *Hub) SetNotificationPref(ctx context.Context, p HubNotificationPref) (HubNotificationPref, error) {
+	if h.private != nil {
+		return h.private.SetNotificationPref(ctx, p)
+	}
 	cuerpo, err := json.Marshal(map[string]any{"source": p.Source, "kind": p.Kind, "muted": p.Muted})
 	if err != nil {
 		return HubNotificationPref{}, err
@@ -282,8 +309,8 @@ func (h *Hub) Search(ctx context.Context, texto string, limite int) (HubBusqueda
 }
 
 // SearchDesde es la página de la búsqueda que empieza en `desde`: el «Cargar más». El
-// Hub pagina sobre el AGREGADO ya ordenado (`offset`) y acota `limit` a su máximo, así
-// que la única forma de llegar a la página siguiente es su desplazamiento.
+// Hub pagina sobre el AGREGADO ya ordenado (`offset`): se pide solo la página nueva,
+// sin volver a traer lo que ya se enseña.
 func (h *Hub) SearchDesde(ctx context.Context, texto string, limite, desde int) (HubBusqueda, error) {
 	q := url.Values{"q": {texto}}
 	if limite > 0 {

@@ -21,7 +21,7 @@ import (
 )
 
 // reclamado añade un dominio y devuelve su fila.
-func reclamado(t *testing.T, ctx context.Context, st *store.Store, orgID, host string) store.OrgMailDomain {
+func reclamado(ctx context.Context, t *testing.T, st *store.Store, orgID, host string) store.OrgMailDomain {
 	t.Helper()
 	d, err := st.AddOrgMailDomain(ctx, nil, orgID, host, "tok-"+host)
 	if err != nil {
@@ -31,13 +31,13 @@ func reclamado(t *testing.T, ctx context.Context, st *store.Store, orgID, host s
 }
 
 // verificado añade un dominio y sella su titularidad.
-func verificado(t *testing.T, ctx context.Context, st *store.Store, orgID, host string) store.OrgMailDomain {
+func verificado(ctx context.Context, t *testing.T, st *store.Store, orgID, host string) store.OrgMailDomain {
 	t.Helper()
-	reclamado(t, ctx, st, orgID, host)
+	reclamado(ctx, t, st, orgID, host)
 	if err := st.MarkOrgMailDomainVerified(ctx, nil, orgID, host); err != nil {
 		t.Fatalf("MarkOrgMailDomainVerified(%q): %v", host, err)
 	}
-	for _, d := range listados(t, ctx, st, orgID) {
+	for _, d := range listados(ctx, t, st, orgID) {
 		if d.Domain == host {
 			return d
 		}
@@ -46,7 +46,7 @@ func verificado(t *testing.T, ctx context.Context, st *store.Store, orgID, host 
 	return store.OrgMailDomain{}
 }
 
-func listados(t *testing.T, ctx context.Context, st *store.Store, orgID string) []store.OrgMailDomain {
+func listados(ctx context.Context, t *testing.T, st *store.Store, orgID string) []store.OrgMailDomain {
 	t.Helper()
 	lista, err := st.ListOrgMailDomains(ctx, orgID)
 	if err != nil {
@@ -58,12 +58,12 @@ func listados(t *testing.T, ctx context.Context, st *store.Store, orgID string) 
 func TestVariosDominiosDeCorreo(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
 	// El PRIMERO verificado se estrena solo: si no, la organización tendría un
 	// dominio propio conectado y sus altas seguirían naciendo en el subdominio de
 	// la suite sin que nada lo explicara.
-	primero := verificado(t, ctx, st, org.ID, "acme.eu")
+	primero := verificado(ctx, t, st, org.ID, "acme.eu")
 	if !primero.Primary {
 		t.Fatal("el primer dominio verificado tiene que quedar como principal")
 	}
@@ -73,7 +73,7 @@ func TestVariosDominiosDeCorreo(t *testing.T) {
 
 	// El SEGUNDO no mueve a nadie. Es toda la diferencia con lo que había antes:
 	// conectar otro dominio no puede cambiar la dirección de la plantilla.
-	segundo := verificado(t, ctx, st, org.ID, "acme.es")
+	segundo := verificado(ctx, t, st, org.ID, "acme.es")
 	if segundo.Primary {
 		t.Fatal("añadir un dominio no puede robarle el puesto al principal")
 	}
@@ -90,7 +90,7 @@ func TestVariosDominiosDeCorreo(t *testing.T) {
 
 	// Un dominio sin verificar NO se puede estrenar: repartir direcciones en él
 	// crearía correo que nuestro MX no sirve y que pisa el del dueño real.
-	pendiente := reclamado(t, ctx, st, org.ID, "acme.example")
+	pendiente := reclamado(ctx, t, st, org.ID, "acme.example")
 	if _, err := st.SetPrimaryOrgMailDomain(ctx, org.ID, pendiente.ID); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("estrenar un dominio sin verificar = %v, quiero ErrNotFound", err)
 	}
@@ -100,7 +100,7 @@ func TestVariosDominiosDeCorreo(t *testing.T) {
 		t.Fatalf("SetPrimaryOrgMailDomain: %v", err)
 	}
 	principales := 0
-	for _, d := range listados(t, ctx, st, org.ID) {
+	for _, d := range listados(ctx, t, st, org.ID) {
 		if d.Primary {
 			principales++
 			if d.Domain != "acme.es" {
@@ -124,7 +124,7 @@ func TestVariosDominiosDeCorreo(t *testing.T) {
 
 	// Reclamar no prueba nada, pero VERIFICAR sí: el dominio de otra organización
 	// no se puede reclamar una vez está verificado.
-	otra := orgConBuzones(t, ctx, st, "otra")
+	otra := orgConBuzones(ctx, t, st, "otra")
 	if _, err := st.AddOrgMailDomain(ctx, nil, otra.ID, "acme.eu", "tok"); !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("reclamar el dominio verificado de otra = %v, quiero ErrConflict", err)
 	}
@@ -135,7 +135,7 @@ func TestVariosDominiosDeCorreo(t *testing.T) {
 
 	// Y una dirección solo se asigna en un dominio de la organización: con varios,
 	// componerla con el principal ya no basta como comprobación.
-	ada := usuarioConNombre(t, ctx, st, "ada@correo-personal.example", "Ada", "Lovelace")
+	ada := usuarioConNombre(ctx, t, st, "ada@correo-personal.example", "Ada", "Lovelace")
 	if err := st.UpsertMembership(ctx, nil, domain.Membership{
 		OrgID: org.ID, UserID: ada.ID, Role: "member",
 	}); err != nil {

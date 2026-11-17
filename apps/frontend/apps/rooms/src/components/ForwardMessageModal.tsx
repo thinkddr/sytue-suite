@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Modal, Input, Avatar, Spinner, useToast, cx, Icon } from '@sytue/ui';
+import { Modal, Input, Avatar, Spinner, useToast, cx, Icon, EmptyState } from '@sytue/ui';
 import type { Channel, ChatMessage } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { ChannelIcon } from './glyphs.js';
@@ -94,9 +94,7 @@ export function ForwardMessageModal({
         />
 
         {candidates.length === 0 ? (
-          <p class="text-text-muted py-8 text-center text-sm">
-            {query.trim() ? t('forward.emptyQuery') : t('forward.empty')}
-          </p>
+          <EmptyState compact title={query.trim() ? t('forward.emptyQuery') : t('forward.empty')} />
         ) : (
           <ul class="flex max-h-[46dvh] flex-col gap-0.5 overflow-y-auto">
             {candidates.map((c) => (

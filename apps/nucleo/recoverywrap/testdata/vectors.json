@@ -1,0 +1,51 @@
+[
+  {
+    "name": "password-rooms",
+    "kind": "password",
+    "account": "@sytue_0f3c:sytue.eu",
+    "key_id": "gTCx1L6rB9mQ0r2A",
+    "credential_id": "",
+    "password": "correct horse battery staple ñ€",
+    "recovery_key": "EsT3 4kza y1Xs efFA tKyi HVwT kdEP 4UEk rvNr dFvy 8nGq AkqP",
+    "wrap_key": "de7d3b0fdbb5a9924210d984b1231f2a403d4be3d94e23ab8b1cad20d7b42cc6",
+    "aad": "73797475652d6d61747269782d7265636f766572792d777261702d76310070617373776f7264004073797475655f306633633a73797475652e65750067544378314c367242396d513072324100",
+    "wrapper": {
+      "v": 1,
+      "kind": "password",
+      "key_id": "gTCx1L6rB9mQ0r2A",
+      "credential_id": "",
+      "kdf": {
+        "alg": "argon2id",
+        "m": 65536,
+        "t": 3,
+        "p": 1,
+        "salt": "EBESExQVFhcYGRobHB0eHw=="
+      },
+      "nonce": "cHFyc3R1dnd4eXp7",
+      "ciphertext": "GWRz0ee1TKLgjzg3JaE4SFFgrMF4UNwseJ3Y8TGX1wr5opmK41zObgVSZT9vKfGSi7cvN5/dFJq9/M/ysd5Oy5HJV7I8QCTVwCfA"
+    }
+  },
+  {
+    "name": "passkey-isolated-drive",
+    "kind": "passkey",
+    "account": "@sytue_storage_drive_acme_0f3c:sytue.eu",
+    "key_id": "QW1x8sY0b0dRk1Zp",
+    "credential_id": "oKGio6SlpqeoqaqrrK2ur7CxsrM",
+    "prf_output": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8=",
+    "recovery_key": "EsT3 4kza y1Xs efFA tKyi HVwT kdEP 4UEk rvNr dFvy 8nGq AkqP",
+    "wrap_key": "ac5f3f1c9ff0fd5864aa6e30ea7d9516102d59b4e042cef23894d35e9fdfc9a0",
+    "aad": "73797475652d6d61747269782d7265636f766572792d777261702d763100706173736b6579004073797475655f73746f726167655f64726976655f61636d655f306633633a73797475652e6575005157317838735930623064526b315a70006f4b47696f36536c7071656f71617172724b32757237437873724d",
+    "wrapper": {
+      "v": 1,
+      "kind": "passkey",
+      "key_id": "QW1x8sY0b0dRk1Zp",
+      "credential_id": "oKGio6SlpqeoqaqrrK2ur7CxsrM",
+      "kdf": {
+        "alg": "webauthn-prf-hkdf-sha256",
+        "prf_salt": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8="
+      },
+      "nonce": "gIGCg4SFhoeIiYqL",
+      "ciphertext": "hbgQYIjXSa9hxPVzvdHh6lJ6GewBQkvaqgSCl/rdVd90RQUecgFvVnE2R8KeyotqDxUk9vWPUcYPkWw790QXYWuT36Yll7RKgabT"
+    }
+  }
+]

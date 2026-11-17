@@ -30,7 +30,7 @@ import (
 // público.
 func equipoDeTres(ctx context.Context, t *testing.T, st *store.Store) (domain.Team, domain.Channel) {
 	t.Helper()
-	tm, canal := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, canal := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	for _, p := range []string{"bob", "carla"} {
 		if err := st.AddTeamMember(ctx, tm.ID, "alice", p, p, domain.RoleMember); err != nil {
 			t.Fatalf("AddTeamMember(%s): %v", p, err)

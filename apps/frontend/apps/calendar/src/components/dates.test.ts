@@ -6,7 +6,6 @@
  * para el día siguiente. Hora local (constructor Date sin Z).
  */
 import { describe, expect, test } from 'bun:test';
-import type { CalendarEvent } from '@sytue/api-clients';
 import {
   addMonthsClamped,
   compactTitle,
@@ -14,13 +13,19 @@ import {
   isoWeek,
   titleFor,
   overlapsDay,
-  expandOccurrences,
+  finExclusivo,
+  finInclusivo,
+  parseDateInput,
+  parseIcalDate,
   shiftEnd,
+  toDatetimeLocal,
   withLocalDate,
   weekdayLabels,
   weekdayLongLabels,
   weekdayNarrowLabels,
 } from './dates.js';
+import { barSpan } from './multiDayLayout.js';
+import { buildVevent } from '../lib/ical.js';
 
 // 10 y 11 de julio de 2026 a mediodía local (referencia estable de cada día).
 const D10 = new Date(2026, 6, 10, 12, 0, 0);
@@ -72,49 +77,6 @@ describe('overlapsDay', () => {
   });
 });
 
-/** Serie semanal (COUNT=4) desde el 1-jul, con un EXDATE opcional. */
-function weekly(exdate?: string): CalendarEvent {
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'BEGIN:VEVENT',
-    'UID:w1@sytue.eu',
-    'DTSTART:20260701T090000Z',
-    'DTEND:20260701T100000Z',
-    'RRULE:FREQ=WEEKLY;COUNT=4',
-    'SUMMARY:Semanal',
-    ...(exdate ? [`EXDATE:${exdate}`] : []),
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ];
-  return {
-    href: '/w1.ics',
-    uid: 'w1@sytue.eu',
-    summary: 'Semanal',
-    start: '20260701T090000Z',
-    end: '20260701T100000Z',
-    ical: lines.join('\r\n') + '\r\n',
-  };
-}
-
-describe('expandOccurrences + EXDATE', () => {
-  const from = new Date('2026-06-30T00:00:00Z');
-  const to = new Date('2026-08-01T00:00:00Z');
-
-  test('sin EXDATE expande las 4 ocurrencias semanales', () => {
-    expect(expandOccurrences([weekly()], from, to)).toHaveLength(4);
-  });
-
-  test('EXDATE excluye esa instancia (edición «solo este» / borrado)', () => {
-    const out = expandOccurrences([weekly('20260708T090000Z')], from, to);
-    expect(out).toHaveLength(3);
-    expect(out.some((e) => e.start === '20260708T090000Z')).toBe(false);
-    // Las demás siguen presentes.
-    expect(out.some((e) => e.start === '20260701T090000Z')).toBe(true);
-    expect(out.some((e) => e.start === '20260715T090000Z')).toBe(true);
-  });
-});
-
 /**
  * Los dos campos de fecha del EventModal. La regresión que cubren: mover el
  * inicio dejaba el fin donde estaba, así que reprogramar una reunión de las 10 a
@@ -136,6 +98,28 @@ describe('withLocalDate', () => {
   });
 });
 
+describe('parseDateInput («Ir a una fecha»)', () => {
+  test('lee el día en hora LOCAL, no en UTC', () => {
+    const d = parseDateInput('2027-03-05');
+    expect(d?.getFullYear()).toBe(2027);
+    expect(d?.getMonth()).toBe(2);
+    expect(d?.getDate()).toBe(5);
+    expect(d?.getHours()).toBe(0);
+  });
+
+  test('ida y vuelta con el valor que pinta el campo', () => {
+    const d = new Date(2026, 10, 11, 15, 40);
+    expect(parseDateInput(toDatetimeLocal(d).slice(0, 10))?.getDate()).toBe(11);
+  });
+
+  test('vacío, a medias o un día que no existe no llevan a ninguna parte', () => {
+    expect(parseDateInput('')).toBeNull();
+    expect(parseDateInput('2026-11')).toBeNull();
+    expect(parseDateInput('2026-02-31')).toBeNull();
+    expect(parseDateInput('2026-13-01')).toBeNull();
+  });
+});
+
 describe('shiftEnd', () => {
   test('mover el inicio arrastra el fin conservando la duración', () => {
     expect(shiftEnd('2026-07-10T10:00', '2026-07-10T12:00', '2026-07-10T11:00')).toBe(
@@ -152,6 +136,58 @@ describe('shiftEnd', () => {
   test('un valor ilegible deja el fin intacto', () => {
     expect(shiftEnd('', '2026-07-10T12:00', '2026-07-10T11:00')).toBe('2026-07-10T11:00');
     expect(shiftEnd('2026-07-10T10:00', '2026-07-10T12:00', '')).toBe('');
+  });
+});
+
+/**
+ * El fin de un día completo: el formulario enseña y edita el ÚLTIMO día, y el DTEND que
+ * se guarda es el día siguiente (exclusivo, RFC 5545 §3.6.1), que es como lo leen las
+ * vistas. Antes se guardaba el valor crudo: «8 → 10 nov» acababa pintado 8–9, un día
+ * suelto salía con DTEND = DTSTART y un «8–10» de Apple se abría con fin el 11.
+ */
+describe('el fin de un día completo es el último día', () => {
+  const dtendDe = (ics: string) => ics.match(/^DTEND;VALUE=DATE:(\d{8})/m)?.[1];
+  const guardar = (start: string, end: string) =>
+    buildVevent({ uid: 'u', summary: 's', allDay: true, start, end: finExclusivo(start, end) });
+  // Las cuatro semanas desde el lunes 2 nov 2026, como la rejilla del mes.
+  const dias = Array.from({ length: 28 }, (_, i) => new Date(2026, 10, 2 + i));
+
+  test('«8 → 10 nov» guarda DTEND=20261111 y se pinta en tres días', () => {
+    const ics = guardar('2026-11-08T00:00', '2026-11-10T00:00');
+    expect(dtendDe(ics)).toBe('20261111');
+    const span = barSpan(dias, parseIcalDate('20261108')!, parseIcalDate(dtendDe(ics)!));
+    expect(span).toEqual({ start: 6, end: 8 });
+  });
+
+  test('un día suelto guarda el DTEND del día siguiente, nunca igual al inicio', () => {
+    expect(dtendDe(guardar('2026-11-08T00:00', '2026-11-08T00:00'))).toBe('20261109');
+    // Sin fin, o con un fin anterior al inicio, también es un día suelto.
+    expect(finExclusivo('2026-11-08T00:00', '')).toBe('2026-11-09T00:00');
+    expect(finExclusivo('2026-11-08T00:00', '2026-11-06T00:00')).toBe('2026-11-09T00:00');
+  });
+
+  test('conserva la hora del campo y cruza meses y años', () => {
+    expect(finExclusivo('2026-11-08T09:00', '2026-11-30T10:30')).toBe('2026-12-01T10:30');
+    expect(finExclusivo('2026-12-30T00:00', '2026-12-31T00:00')).toBe('2027-01-01T00:00');
+  });
+
+  test('abrir un evento de tres días enseña el tercero como fin', () => {
+    const inicio = parseIcalDate('20261108')!;
+    expect(finInclusivo(inicio, parseIcalDate('20261111')!)).toEqual(new Date(2026, 10, 10));
+  });
+
+  test('abrir un día suelto, o uno sin DTEND o mal guardado, no deja el fin antes del inicio', () => {
+    const inicio = parseIcalDate('20261108')!;
+    expect(finInclusivo(inicio, parseIcalDate('20261109')!)).toEqual(inicio);
+    expect(finInclusivo(inicio, parseIcalDate('20261108')!)).toEqual(inicio);
+    expect(finInclusivo(inicio, undefined)).toEqual(inicio);
+  });
+
+  test('abrir y guardar sin tocar nada devuelve el mismo DTEND', () => {
+    const inicio = parseIcalDate('20261108')!;
+    const ultimo = finInclusivo(inicio, parseIcalDate('20261111')!);
+    const ics = guardar('2026-11-08T00:00', toDatetimeLocal(ultimo));
+    expect(dtendDe(ics)).toBe('20261111');
   });
 });
 

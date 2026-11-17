@@ -11,10 +11,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 )
 
 // TestLaPildoraDelMesLlevaLaHoraDeInicio es `EventChip`: el punto, la hora de inicio en
@@ -65,7 +64,7 @@ func TestLaPildoraDelMesLlevaLaHoraDeInicio(t *testing.T) {
 func TestEnElTelefonoLaBarraDeDiaCompletoSeLee(t *testing.T) {
 	dia := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)
 	p := &Pantalla{
-		T: traductor(t), Vista: VistaDia, Estado: agenda.Exito, Zona: time.UTC, Ventana: 390,
+		T: traductor(t), Vista: VistaDia, Estado: ui.EstadoExito, Zona: time.UTC, Ventana: 390,
 		Cursor: time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC),
 		Eventos: []Ocurrencia{{Instance: api.Instance{
 			Event: api.Event{ID: "e2", Summary: "Vacaciones en la playa de Cádiz con toda la familia, los abuelos y los perros", AllDay: true, DTStart: dia, DTEnd: dia.AddDate(0, 0, 1)},

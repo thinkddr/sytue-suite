@@ -9,6 +9,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/internal/testsource"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
@@ -259,7 +261,7 @@ var formaDeClave = regexp.MustCompile(`^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$`)
 
 // noSonClaves son las extensiones que la forma de clave no distingue de una: un
 // «en.json» es indistinguible de «grupo.subgrupo» mirando solo el texto.
-var noSonClaves = []string{".json", ".png", ".pdf", ".p12", ".pem", ".svg", ".go", ".ts", ".tsx", ".css", ".xml", ".toml", ".jar", ".eu", ".com", ".org", ".io", ".us"}
+var noSonClaves = []string{".json", ".png", ".pdf", ".p12", ".pem", ".svg", ".go", ".ts", ".tsx", ".css", ".xml", ".toml", ".jar", ".eu", ".com", ".org", ".io", ".us", ".example"}
 
 // literalesQueNoSonClaves son identificadores de almacenamiento que tienen la forma
 // de una clave i18n, pero no se pasan al traductor. Mantenerlos fuera evita que el
@@ -280,12 +282,37 @@ var literalesQueNoSonClaves = map[string]bool{
 	// guardan, no se traducen.
 	"actualizacion.enLaCampana": true,
 	"import.plegado":            true,
+	// La preferencia «PDF accesible» de Docs (`editor/servicio.go`), con la clave del
+	// `localStorage` de la web: se guarda, no se traduce.
+	"sytue.docs.pdfAccesible": true,
+	// Claves del almacén por persona de Calendar (`calendario/preferencias.go`): la
+	// vista y los calendarios ocultos de cada uno, como el `localStorage` de la web.
+	"sytue.calendar.vista":   true,
+	"sytue.calendar.ocultos": true,
+	"sytue.calendar.ajustes": true,
+	// El tamaño de las notas del moderador de Diapos (`diapos/moderador.go`), con la
+	// clave del `localStorage` de la web.
+	"sytue.slides.notesSize": true,
+	// El orden de «Álbumes» en Photos (`apps/photos/orden_albumes.go`), con la clave
+	// del `localStorage` de la web.
+	"sytue.photos.ordenAlbumes": true,
+	// El orden y la vista de la lista de Drive (`apps/drive/orden.go`), con las claves
+	// del `localStorage` de la web (`lib/orden.ts`).
+	"sytue.drive.orden": true,
+	"sytue.drive.vista": true,
 	// Tipos de aviso del Hub (`sesion/actualizar.go`, `ui/barraavisos.go`): se mandan o
 	// se comparan con el `type`; el título sale de `notifications.kind.<tipo>`.
 	"one.update.available":  true,
 	"mail.message.received": true,
 	// El programa que abre la carpeta de Drive de Windows (`cmd/hub/nube.go`).
 	"explorer.exe": true,
+	// Acciones del flujo de cambios de Bases (`apps/bases/tiemporeal.go`): se comparan
+	// con el `action` que llega por el tiempo real para decidir qué releer.
+	"base.update":   true,
+	"record.create": true,
+	"record.update": true,
+	"record.link":   true,
+	"record.delete": true,
 }
 
 // clavesDelArbol recorre `apps/fyne` y devuelve cada literal con forma de clave con el
@@ -307,7 +334,18 @@ func clavesDelArbol(t *testing.T) []usoDeClave {
 		case !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go"):
 			return nil
 		}
-		arbol, err := parser.ParseFile(fset, p, nil, 0)
+		source, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		supportOnly, err := testsource.IntegrationOnly(source)
+		if err != nil {
+			return err
+		}
+		if supportOnly {
+			return nil
+		}
+		arbol, err := parser.ParseFile(fset, p, source, 0)
 		if err != nil {
 			return err
 		}

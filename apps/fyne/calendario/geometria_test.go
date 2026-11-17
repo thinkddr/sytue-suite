@@ -120,7 +120,9 @@ func TestTintaSobreEsBarTextColor(t *testing.T) {
 			t.Errorf("sobre %s la web pone blanco y aquí sale %v", hex, got)
 		}
 	}
-	if got := TintaSobre(colorDe("#ffe08a")); got != TintaOscuraBarra {
+	// Un relleno claro solo llega sin pasar por la paleta de usuario, cuyos tonos llevan
+	// todos rótulo blanco: la regla de la tinta se prueba con el hex tal cual.
+	if got := TintaSobre(hexCrudo("#ffe08a")); got != TintaOscuraBarra {
 		t.Errorf("sobre #ffe08a la web pone #111827 y aquí sale %v", got)
 	}
 	if got := TintaSobre(color.NRGBA{R: 255, G: 255, B: 255, A: 255}); got != TintaOscuraBarra {

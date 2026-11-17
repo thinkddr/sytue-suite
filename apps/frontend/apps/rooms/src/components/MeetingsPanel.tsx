@@ -24,7 +24,6 @@ import type { JSX } from 'preact';
 import {
   EmptyState,
   formatBytes,
-  Illustration,
   Button,
   Dropdown,
   Icon,
@@ -363,7 +362,7 @@ export function MeetingsPanel({
               class="py-4"
               title={t('meetings.empty')}
               description={t('meetings.emptyHint')}
-              illustration={<Illustration name="emptyCalendar" size={96} />}
+              spot="emptyCalendar"
             />
           ) : (
             <ul class="flex flex-col gap-2">

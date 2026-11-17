@@ -12,6 +12,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -84,11 +85,11 @@ const (
 )
 
 var (
-	anchoBarraAviso = tema.Espacio(1)   // w-1 de la banda de tono: 3,5
-	huecoAviso      = tema.Espacio(3)   // gap-3 entre las cuatro piezas: 10,5
+	anchoBarraAviso = tema.Espacio(1)   // w-1 de la banda de tono: 4
+	huecoAviso      = tema.Espacio(3)   // gap-3 entre las cuatro piezas: 12
 	margenYAviso    = tema.Espacio(3)   // py-3 del icono y del bloque de texto
 	margenDerAviso  = tema.Espacio(3)   // pr-3
-	ladoCerrarAviso = tema.Espacio(7)   // h-7 w-7 del aspa: 24,5
+	ladoCerrarAviso = tema.Espacio(7)   // h-7 w-7 del aspa: 28
 	arribaCerrar    = tema.Espacio(1)   // mt-1 del aspa
 	sepDescripcion  = tema.Espacio(0.5) // mt-0.5
 	sepAccion       = tema.Espacio(1.5) // mt-1.5
@@ -98,6 +99,11 @@ var (
 // importación): 10 s y no los 5 de serie, porque deshacer hay que leerlo, decidirlo y
 // alcanzarlo. Uno para toda la suite; espejo de `DURACION_DESHACER` de `@sytue/ui`.
 const DuracionDeshacer = 10 * time.Second
+
+// MaxAvisosVisibles es cuántos avisos se ven a la vez; los demás esperan en cola, por
+// orden, y su reloj no corre hasta que entran. Espejo de `MAX_AVISOS_VISIBLES` de
+// `@sytue/ui`.
+const MaxAvisosVisibles = 3
 
 // DuracionDe es la vida de un aviso: 5 s, salvo advertencia y peligro, que PERSISTEN
 // hasta que alguien los cierra.
@@ -132,12 +138,23 @@ type Aviso struct {
 	// fundido es `sytue-toast-in` con la opacidad de grupo de la tarjeta (fundido.go).
 	fundido *fundido
 	aspa    *BotonIcono
+	// accion es el enlace de la acción, si la lleva: su foco también retiene el aviso.
+	accion *Enlace
 	// sombra es el `shadow-[var(--shadow-lg)]` de Toast.tsx. La pinta la PILA, de
 	// hermano y detrás: el aviso recorta (`avisoRenderer.IsClip`) y se comería la suya.
 	sombra *Sombra
+
+	// encima es el puntero sobre la tarjeta; aspaEncima, sobre su aspa, que es otro
+	// `Hoverable` y al entrar en ella Fyne saca el puntero de la tarjeta. Con eso y el
+	// foco de sus dos controles se sabe si alguien está leyendo el aviso (ver
+	// `Aviso.retenido`). Solo los toca la rutina de la interfaz.
+	encima, aspaEncima bool
 }
 
-var _ fyne.Widget = (*Aviso)(nil)
+var (
+	_ fyne.Widget       = (*Aviso)(nil)
+	_ desktop.Hoverable = (*Aviso)(nil)
+)
 
 // NuevoAviso crea el aviso.
 func NuevoAviso(t TonoAviso, titulo, descripcion string) *Aviso {
@@ -208,7 +225,9 @@ func (a *Aviso) CreateRenderer() fyne.WidgetRenderer {
 		Icono: iconos.Cerrar, Lado: ladoCerrarAviso, TamIcono: iconos.TallaSM,
 		Radio: tema.RadioSM, Trazo: "text-subtle", TrazoEncima: "text",
 		Rotulo: a.RotuloCerrar, AlPulsar: a.Cerrar, fueraDelTab: a.prestado,
+		alEnfoque: func(bool) { a.revisarRetencion() },
 	}
+	a.aspa.alEncima = func(si bool) { a.aspaEncima = si; a.revisarRetencion() }
 	a.aspa.ExtendBaseWidget(a.aspa)
 
 	r.ico = iconos.Trazo(t.icono, iconos.TallaMD, t.trazo, v)
@@ -227,6 +246,8 @@ func (a *Aviso) CreateRenderer() fyne.WidgetRenderer {
 		})
 		r.accion.Boton = true
 		r.accion.fueraDelTab = a.prestado
+		r.accion.alCambio = a.revisarRetencion
+		a.accion = r.accion
 		r.objetos = append(r.objetos, r.accion)
 	}
 	r.objetos = append(r.objetos, a.aspa)
@@ -237,6 +258,36 @@ func (a *Aviso) CreateRenderer() fyne.WidgetRenderer {
 // diálogo, sus controles sí participan en el recorrido del propio diálogo.
 func (a *Aviso) prestado() bool {
 	return a.pila != nil && a.pila.capaEncima() != nil && a.pila.dialogoEncima() == nil
+}
+
+// MouseIn, MouseMoved y MouseOut son el `onMouseEnter`/`onMouseLeave` de Toast.tsx:
+// con el puntero encima el reloj se para (WCAG 2.2.1).
+func (a *Aviso) MouseIn(*desktop.MouseEvent) { a.encima = true; a.revisarRetencion() }
+
+// MouseMoved no cambia nada: ya está encima.
+func (a *Aviso) MouseMoved(*desktop.MouseEvent) {}
+
+// MouseOut deja correr el reloj otra vez, con lo que le quedaba.
+func (a *Aviso) MouseOut() { a.encima = false; a.revisarRetencion() }
+
+// retenido dice si alguien está con el aviso: el puntero en la tarjeta o en su aspa, o
+// el foco en el aspa o en la acción. Es el `onFocusIn` de la web, pieza a pieza, porque
+// Fyne no tiene `focus-within`.
+func (a *Aviso) retenido() bool {
+	if a.encima || a.aspaEncima {
+		return true
+	}
+	if a.aspa != nil && a.aspa.enfocado {
+		return true
+	}
+	return a.accion != nil && (a.accion.encima || a.accion.enfocado)
+}
+
+// revisarRetencion para o reanuda el reloj según `retenido`.
+func (a *Aviso) revisarRetencion() {
+	if a.pila != nil {
+		a.pila.retener(a, a.retenido())
+	}
 }
 
 // Cerrar quita el aviso de su pila.
@@ -353,20 +404,35 @@ type PilaAvisos struct {
 	// `Layout()`: sostener `mu` mientras se refresca se autobloquea. El orden es
 	// siempre muPintar → mu, nunca al revés.
 	muPintar sync.Mutex
-	avisos   []*Aviso
-	relojes  map[*Aviso]*time.Timer
+	// avisos son los que están en pantalla, como mucho MaxAvisosVisibles; cola, los que
+	// esperan su turno.
+	avisos, cola []*Aviso
+	relojes      map[*Aviso]*relojAviso
+}
+
+// relojAviso es la cuenta atrás de un aviso que se va solo, PAUSABLE: guarda lo que le
+// queda para reanudarla donde se quedó, no desde el principio.
+type relojAviso struct {
+	t                  *time.Timer
+	restante           time.Duration
+	desde              time.Time
+	retenido, iniciado bool
+	// vuelta cuenta las veces que se ha puesto en marcha: el disparo de una vuelta ya
+	// parada o retenida no vale (ver `vencer`).
+	vuelta uint64
 }
 
 var _ fyne.Widget = (*PilaAvisos)(nil)
 
 // NuevaPilaAvisos crea la pila, vacía.
 func NuevaPilaAvisos() *PilaAvisos {
-	p := &PilaAvisos{relojes: map[*Aviso]*time.Timer{}}
+	p := &PilaAvisos{relojes: map[*Aviso]*relojAviso{}}
 	p.ExtendBaseWidget(p)
 	return p
 }
 
-// Notificar añade el aviso y le pone su reloj, si le toca.
+// Notificar añade el aviso y le pone su reloj, si le toca. Con MaxAvisosVisibles en
+// pantalla, espera en cola: ni se pinta ni le corre el tiempo.
 func (p *PilaAvisos) Notificar(a *Aviso) {
 	a.pila = p
 	d := a.Duracion
@@ -376,17 +442,82 @@ func (p *PilaAvisos) Notificar(a *Aviso) {
 
 	p.registrar()
 	p.mu.Lock()
-	p.avisos = append(p.avisos, a)
 	if d > 0 {
-		// `fyne.Do` y no una llamada directa: el reloj dispara en OTRA rutina, y
-		// desde Fyne 2.6 tocar la interfaz fuera de la principal es carrera.
-		p.relojes[a] = time.AfterFunc(d, func() { fyne.Do(func() { p.Descartar(a) }) })
+		p.relojes[a] = &relojAviso{restante: d}
 	}
+	if len(p.avisos) >= MaxAvisosVisibles {
+		p.cola = append(p.cola, a)
+		p.mu.Unlock()
+		return
+	}
+	p.mostrar(a)
 	p.mu.Unlock()
 
 	p.refrescar()
-	// `sytue-toast-in`: 180 ms subiendo desde 8 px más abajo y desde transparente, con la
-	// opacidad de GRUPO de la tarjeta entera (fundido.go).
+	p.fundirEntrada(a)
+}
+
+// mostrar pasa el aviso a pantalla y arranca su reloj. Con `mu` cogido.
+func (p *PilaAvisos) mostrar(a *Aviso) {
+	p.avisos = append(p.avisos, a)
+	if r := p.relojes[a]; r != nil {
+		r.iniciado = true
+		p.correr(a, r)
+	}
+}
+
+// correr pone en marcha la cuenta atrás con lo que le queda, salvo que esté retenida.
+// Con `mu` cogido.
+func (p *PilaAvisos) correr(a *Aviso, r *relojAviso) {
+	if r.t != nil || r.retenido || !r.iniciado {
+		return
+	}
+	r.desde = time.Now()
+	r.vuelta++
+	vuelta := r.vuelta
+	// `fyne.Do` y no una llamada directa: el reloj dispara en OTRA rutina, y desde
+	// Fyne 2.6 tocar la interfaz fuera de la principal es carrera.
+	r.t = time.AfterFunc(r.restante, func() { fyne.Do(func() { p.vencer(a, r, vuelta) }) })
+}
+
+// vencer es el disparo del reloj, ya en la rutina de la interfaz. Entre que el reloj
+// dispara y esto corre, el foco o el puntero pueden haber entrado en el aviso (el Tab
+// de la acción al aspa suelta y retiene en la misma pulsación): entonces el disparo
+// llegó tarde y el aviso se queda, que quien está con él manda (WCAG 2.2.1). Al
+// soltarlo, `correr` arranca otra vuelta con lo que quedaba.
+func (p *PilaAvisos) vencer(a *Aviso, r *relojAviso, vuelta uint64) {
+	p.mu.Lock()
+	vale := p.relojes[a] == r && r.vuelta == vuelta && r.t != nil && !r.retenido
+	p.mu.Unlock()
+	if vale {
+		p.Descartar(a)
+	}
+}
+
+// retener para (o reanuda) el reloj del aviso: el puntero o el foco están en él.
+func (p *PilaAvisos) retener(a *Aviso, si bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	r := p.relojes[a]
+	if r == nil || r.retenido == si {
+		return
+	}
+	r.retenido = si
+	if !si {
+		p.correr(a, r)
+		return
+	}
+	if r.t != nil {
+		// Si ya había disparado, su `vencer` está encolado y lo ignora: llegó tarde.
+		r.t.Stop()
+		r.t = nil
+		r.restante = max(r.restante-time.Since(r.desde), 0)
+	}
+}
+
+// fundirEntrada es `sytue-toast-in`: 180 ms subiendo desde 8 px más abajo y desde
+// transparente, con la opacidad de GRUPO de la tarjeta entera (fundido.go).
+func (p *PilaAvisos) fundirEntrada(a *Aviso) {
 	fundir(lienzoDe(p), a, a.sombra, DuracionAviso, DesplazamientoAviso, 1, 0.5, func(f *fundido) {
 		p.mu.Lock()
 		a.fundido = f
@@ -436,22 +567,33 @@ func (p *PilaAvisos) objetosAvisos() []fyne.CanvasObject {
 	return out
 }
 
-// Descartar quita el aviso y para su reloj.
+// Descartar quita el aviso —de la pantalla o de la cola— y para su reloj. Si deja un
+// hueco en pantalla, entra el primero de la cola.
 func (p *PilaAvisos) Descartar(a *Aviso) {
+	var entra *Aviso
 	p.mu.Lock()
-	for i, x := range p.avisos {
-		if x == a {
-			p.avisos = append(p.avisos[:i], p.avisos[i+1:]...)
-			break
+	if i := slices.Index(p.avisos, a); i >= 0 {
+		p.avisos = slices.Delete(p.avisos, i, i+1)
+		if len(p.cola) > 0 && len(p.avisos) < MaxAvisosVisibles {
+			entra = p.cola[0]
+			p.cola = slices.Delete(p.cola, 0, 1)
+			p.mostrar(entra)
 		}
+	} else if i := slices.Index(p.cola, a); i >= 0 {
+		p.cola = slices.Delete(p.cola, i, i+1)
 	}
-	if t := p.relojes[a]; t != nil {
-		t.Stop()
+	if r := p.relojes[a]; r != nil {
+		if r.t != nil {
+			r.t.Stop()
+		}
 		delete(p.relojes, a)
 	}
 	p.mu.Unlock()
 
 	p.refrescar()
+	if entra != nil {
+		p.fundirEntrada(entra)
+	}
 }
 
 // refrescar es el ÚNICO `Refresh` de la pila, y va con su propio cerrojo: el reloj de un
@@ -477,6 +619,13 @@ func (p *PilaAvisos) refrescar() {
 
 // Avisos son los que hay en pantalla, del más viejo al más nuevo.
 func (p *PilaAvisos) Avisos() []*Aviso { return p.instantanea() }
+
+// EnCola son los que esperan a que se vaya uno de pantalla, en el orden en que entrarán.
+func (p *PilaAvisos) EnCola() []*Aviso {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.cola)
+}
 
 // instantanea copia la lista bajo el cerrojo para que quien la recorra lo haga fuera de
 // él. Es el ÚNICO sitio por el que leen el renderer y Avisos: sin la copia, un reloj que

@@ -14,6 +14,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	roomsearch "git.sytue.eu/sytue/one/apps/nucleo/rooms/search"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/rooms/internal/config"
@@ -26,15 +30,20 @@ import (
 // como interfaz (satisfecha por *service.Service) para poder inyectar dobles en
 // los tests sin depender de una base de datos.
 type chatService interface {
-	StartMatrixNative(context.Context, string, string, string, string) (service.MatrixNativeStart, error)
+	StartMatrixNativeForConsumer(context.Context, string, string, string, string, string, storage.IdentityVersion) (service.MatrixNativeStart, error)
 	PreviewMatrixNative(context.Context, string, string) (service.MatrixNativePreview, error)
 	AcceptMatrixNative(context.Context, string, string, string) (service.MatrixNativeAccepted, error)
-	FinishMatrixNative(context.Context, string, string, string, string) (string, error)
+	FinishMatrixNativeForConsumer(context.Context, string, string, string, string, string, string, storage.IdentityVersion) (string, error)
 
 	BootstrapMatrix(context.Context, string, string) (service.MatrixBootstrap, error)
-	BootstrapMatrixStorage(context.Context, string, string) (service.MatrixBootstrap, error)
+	BootstrapMatrixStorageForIdentity(context.Context, string, string, storage.IdentityVersion) (service.MatrixBootstrap, error)
+	MatrixStorageMigration(context.Context, string, string) (storage.IdentityCutoverState, error)
+	BeginMatrixStorageMigration(context.Context, string, string, string) (storage.IdentityCutoverState, error)
+	CompleteMatrixStorageMigration(context.Context, string, string, string, storage.Reference) (storage.IdentityCutoverState, error)
 	MatrixRecoveryKey(context.Context, string) (string, error)
 	StoreMatrixRecoveryKey(context.Context, string, string) error
+	MatrixRecoveryWrappers(context.Context, string, service.MatrixRecoveryAccount) (service.MatrixRecoveryWrappers, error)
+	PutMatrixRecoveryWrapper(context.Context, string, service.MatrixRecoveryAccount, recoverywrap.Wrapper) (string, error)
 	MatrixAccountAccess(context.Context, string, string, int64) error
 	MatrixTenantAccess(context.Context, string, string, string, int64) error
 	EditMatrixMessage(context.Context, uuid.UUID, string, string, domain.MatrixEventRef) (domain.Message, error)
@@ -48,6 +57,8 @@ type chatService interface {
 	Unread(ctx context.Context, teamID uuid.UUID, sub string) ([]domain.ReadState, error)
 	SearchMessages(ctx context.Context, teamID uuid.UUID, sub, query string, limit int) ([]domain.Message, error)
 	SearchAll(ctx context.Context, sub, query string, limit int) ([]domain.Message, error)
+	MessageMetadata(context.Context, string, string, int) (roomsearch.Page, error)
+	MessageMetadataVisible(context.Context, string, []roomsearch.Identity) ([]roomsearch.Metadata, error)
 
 	CreateChannel(ctx context.Context, in service.CreateChannelInput) (domain.Channel, error)
 	ListChannels(ctx context.Context, teamID uuid.UUID, sub string, includeArchived bool) ([]domain.Channel, error)
@@ -145,6 +156,8 @@ func toAPIError(err error) error {
 		return nil
 	case errors.Is(err, domain.ErrEncryptedRequired):
 		return httpx.ErrConflict.WithCode("encrypted_client_required").WithMessage("Open an encrypted Rooms client to perform this action.")
+	case errors.Is(err, domain.ErrRecoveryEscrowRetired):
+		return httpx.NewError(http.StatusGone, "recovery_key_escrow_retired", "Recovery keys are no longer escrowed in clear. Wrap them on the device.")
 	case errors.Is(err, domain.ErrMatrixUnavailable):
 		return httpx.ErrUnavailable.WithCode("encrypted_messaging_unavailable").WithMessage("Encrypted messaging is unavailable. Try again.")
 	case errors.Is(err, service.ErrRoomsIntegrationUnavailable):
@@ -1087,6 +1100,9 @@ type postMessageRequest struct {
 	// [...]}) o tarea ({"kind":"task","assignee_sub":…}). El cuerpo sigue siendo la
 	// pregunta o el título. El servicio la sanea (domain.NormalizeCard).
 	Card *domain.Card `json:"card,omitempty"`
+	// AlsoInChannel («También enviar al canal») solo vale en una respuesta de hilo:
+	// la respuesta se ve además en el feed del canal. En un mensaje raíz se ignora.
+	AlsoInChannel bool `json:"also_in_channel,omitempty"`
 }
 
 // ListMessages devuelve una página de mensajes (?before=RFC3339&limit=N).
@@ -1290,6 +1306,8 @@ func (h *Handlers) postMessage(w http.ResponseWriter, r *http.Request, channelID
 			SendAt:     sendAt,
 			AuthorSub:  sub,
 			AuthorName: name,
+
+			AlsoInChannel: parentID != nil && req.AlsoInChannel,
 		})
 		if serr != nil {
 			httpx.Fail(w, r, toAPIError(serr))
@@ -1312,6 +1330,8 @@ func (h *Handlers) postMessage(w http.ResponseWriter, r *http.Request, channelID
 		Priority:    req.Priority,
 		RequiresAck: req.RequiresAck,
 		Card:        req.Card,
+
+		AlsoInChannel: parentID != nil && req.AlsoInChannel,
 	})
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))

@@ -51,3 +51,19 @@ func TestElTituloYLaRutaNoLleganAlGuionDePowerShellComoCodigo(t *testing.T) {
 		}
 	}
 }
+
+// TestElegirCarpetaEnWindowsYMac: los guiones de carpeta abren el diálogo de carpetas
+// de cada sistema, y el título no llega como código (FYS-12).
+func TestElegirCarpetaEnWindowsYMac(t *testing.T) {
+	peligroso := "L’app'; Remove-Item C:\\x; '"
+	guion := guionCarpetaWindows(peligroso)
+	if !strings.Contains(guion, "FolderBrowserDialog") || !strings.Contains(guion, "$d.SelectedPath") {
+		t.Errorf("no es el diálogo de carpetas: %s", guion)
+	}
+	if strings.Contains(guion, "Remove-Item") || strings.ContainsAny(guion, "’") {
+		t.Errorf("el título va en claro: %s", guion)
+	}
+	if got, want := guionCarpetaApple(`Subir "esto"`), `return POSIX path of (choose folder with prompt "Subir \"esto\"")`; got != want {
+		t.Errorf("guion de Mac = %s; quiero %s", got, want)
+	}
+}

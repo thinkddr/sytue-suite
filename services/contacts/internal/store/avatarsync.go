@@ -41,7 +41,9 @@ func (s *Store) SyncAvatarByEmail(ctx context.Context, emails []string, dataURI 
 			SELECT DISTINCT c.object_id, c.address_book_id
 			FROM contacts c
 			JOIN contact_emails ce ON ce.tenant = c.tenant AND ce.contact_id = c.id
-			WHERE c.tenant = $1 AND lower(ce.email) = ANY($2) AND c.deleted_at IS NULL`,
+			JOIN address_books b ON b.tenant=c.tenant AND b.id=c.address_book_id
+			WHERE c.tenant = $1 AND lower(ce.email) = ANY($2) AND c.deleted_at IS NULL
+              AND NOT sytue_private_storage_frozen('public.contacts_private_storage_states'::regclass,b.tenant,b.owner_sub)`,
 			t.Slug, lower)
 		if err != nil {
 			return fmt.Errorf("store: buscar fichas por correo: %w", err)

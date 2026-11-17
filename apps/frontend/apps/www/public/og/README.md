@@ -3,23 +3,25 @@ SPDX-License-Identifier: Apache-2.0
 SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
 -->
 
-# Recursos sociales (OpenGraph / Twitter / JSON-LD)
+<a id="recursos-sociales-opengraph--twitter--json-ld"></a>
 
-Imágenes que **no** se procesan por `astro:assets` (deben ser URLs absolutas y
-estables para los _crawlers_ sociales), servidas tal cual desde `/og/`. Las
-referencia `src/lib/seo.ts` y `MarketingLayout.astro`.
+# Social assets (OpenGraph / Twitter / JSON-LD)
 
-| Fichero         | Uso                                            | Formato requerido                              |
-| --------------- | ---------------------------------------------- | ---------------------------------------------- |
-| `sytue-one.png` | `og:image` / `twitter:image` por defecto       | **PNG 1200×630**, < 150 kB                     |
-| `logo.png`      | `logo` de `Organization` (JSON-LD, schema.org) | **PNG cuadrado** ≥ 112×112, fondo transparente |
+Images that are **not** processed by `astro:assets` (they must be absolute, stable
+URLs for social _crawlers_), served as-is from `/og/`. They are
+referenced by `src/lib/seo.ts` and `MarketingLayout.astro`.
 
-Ambos se generan desde los SVG de `branding/` con `bun render-og.mjs` (en la raíz
-de esta app). Van **versionados** —no se generan en el build— porque los
-_crawlers_ sociales necesitan una URL absoluta y estable, y `astro:assets` no
-toca `public/`. Al cambiar la identidad: editar el SVG en `branding/` y volver a
-ejecutar el script.
+| File            | Use                                         | Required format                                  |
+| --------------- | ------------------------------------------- | ------------------------------------------------ |
+| `sytue-one.png` | Default `og:image` / `twitter:image`        | **PNG 1200×630**, < 150 kB                       |
+| `logo.png`      | `Organization` `logo` (JSON-LD, schema.org) | **Square PNG** ≥ 112×112, transparent background |
 
-> `og-image.svg` es **solo el símbolo**, sin el logotipo: el renderizador no tiene
-> tipografías instaladas —un `<text>` sale en blanco— y el sitio habla cinco
-> idiomas, así que una tarjeta sin palabras es la misma en todos.
+Both are generated from the SVGs in `branding/` with `bun render-og.mjs` (at the root
+of this app). They are **checked in** (not generated at build time) because
+social _crawlers_ need an absolute, stable URL, and `astro:assets` does not
+touch `public/`. When the brand identity changes: edit the SVG in `branding/` and run
+the script again.
+
+> `og-image.svg` is **only the symbol**, without the wordmark: the renderer has no
+> fonts installed (a `<text>` comes out blank) and the site speaks five
+> languages, so a card without words is the same in all of them.

@@ -195,3 +195,118 @@ test('el padre desplaza una ventana virtual bajo una cabecera que cambia de alto
     window.ResizeObserver = nativeResizeObserver;
   }
 });
+
+test('keepMounted pinta la fila pedida aunque caiga fuera de la ventana', async () => {
+  // La parada de Tab de una lista itinerante: si la fila del cursor se desmonta al
+  // desplazar, Tab se salta la lista entera.
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const items = Array.from({ length: 1000 }, (_, i) => `fila ${i}`);
+  const clientGeometry = new Map<string, PropertyDescriptor | undefined>();
+  for (const [field, size] of [
+    ['clientHeight', VIEWPORT_H],
+    ['clientWidth', 800],
+  ] as const) {
+    clientGeometry.set(field, Object.getOwnPropertyDescriptor(HTMLElement.prototype, field));
+    Object.defineProperty(HTMLElement.prototype, field, {
+      configurable: true,
+      get: () => size,
+    });
+  }
+
+  try {
+    render(
+      <VirtualList
+        items={items}
+        estimateSize={ROW_H}
+        keepMounted={900}
+        renderItem={(texto) => <span>{texto}</span>}
+        aria-label="lista de prueba"
+      />,
+      host,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    const rows = [...host.querySelectorAll<HTMLElement>('[role="listitem"]')];
+    expect(rows.length).toBeLessThan(100);
+    expect(rows[0]?.textContent).toBe('fila 0');
+    // La fila 900 está, al final y en su sitio: no en mitad de la ventana.
+    const lejana = rows.at(-1);
+    expect(lejana?.textContent).toBe('fila 900');
+    expect(lejana?.getAttribute('aria-posinset')).toBe('901');
+    expect(lejana?.style.transform).toBe(`translateY(${900 * ROW_H}px)`);
+
+    // Un índice fuera de rango no pinta nada de más.
+    render(
+      <VirtualList
+        items={items}
+        estimateSize={ROW_H}
+        keepMounted={5000}
+        renderItem={(texto) => <span>{texto}</span>}
+        aria-label="lista de prueba"
+      />,
+      host,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(host.querySelector('[aria-posinset="5001"]')).toBeNull();
+  } finally {
+    render(null, host);
+    host.remove();
+    for (const [field, descriptor] of clientGeometry) {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, field, descriptor);
+      else Reflect.deleteProperty(HTMLElement.prototype, field);
+    }
+  }
+});
+
+test('isSeparator: las cabeceras van con role="presentation" y no cuentan en posinset', async () => {
+  // Las cabeceras A–Z de Contacts (CONT-05): «Ana, 1 de 3» y no «Ana, 2 de 5».
+  // VISTO EN ROJO (2026-11-12): sin `isSeparator`, la cabecera era un listitem más y
+  // descolocaba la cuenta de todas las filas.
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const items = ['A', 'Ana', 'Alba', 'B', 'Bea'];
+  const separa = (i: number): boolean => items[i]?.length === 1;
+  const clientGeometry = new Map<string, PropertyDescriptor | undefined>();
+  for (const [field, size] of [
+    ['clientHeight', VIEWPORT_H],
+    ['clientWidth', 800],
+  ] as const) {
+    clientGeometry.set(field, Object.getOwnPropertyDescriptor(HTMLElement.prototype, field));
+    Object.defineProperty(HTMLElement.prototype, field, {
+      configurable: true,
+      get: () => size,
+    });
+  }
+
+  try {
+    render(
+      <VirtualList
+        items={items}
+        estimateSize={ROW_H}
+        isSeparator={separa}
+        renderItem={(texto) => <span>{texto}</span>}
+        aria-label="lista de prueba"
+      />,
+      host,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    const elementos = [...host.querySelectorAll<HTMLElement>('[role="listitem"]')];
+    expect(elementos.map((e) => e.textContent)).toEqual(['Ana', 'Alba', 'Bea']);
+    expect(elementos.map((e) => e.getAttribute('aria-posinset'))).toEqual(['1', '2', '3']);
+    expect(elementos.every((e) => e.getAttribute('aria-setsize') === '3')).toBe(true);
+
+    const cabeceras = [...host.querySelectorAll<HTMLElement>('[role="presentation"]')];
+    expect(cabeceras.map((e) => e.textContent)).toEqual(['A', 'B']);
+    expect(cabeceras.some((e) => e.hasAttribute('aria-posinset'))).toBe(false);
+    expect(cabeceras.some((e) => e.hasAttribute('aria-setsize'))).toBe(false);
+  } finally {
+    render(null, host);
+    host.remove();
+    for (const [field, descriptor] of clientGeometry) {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, field, descriptor);
+      else Reflect.deleteProperty(HTMLElement.prototype, field);
+    }
+  }
+});

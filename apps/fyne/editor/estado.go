@@ -32,8 +32,19 @@ func clavePosicion(t Tipo) string {
 	return "status.page"
 }
 
+// LienzoConIdioma es el lienzo cuyo documento guarda su idioma: el folio de Docus, en la
+// capa de la página (`data-lang`), como `StatusBar.tsx`.
+type LienzoConIdioma interface {
+	// IdiomaDocumento es el que guarda el documento ("" sin él) y si se puede cambiar.
+	IdiomaDocumento() (idioma string, editable bool)
+	// PonerIdiomaDocumento lo guarda en el documento, con su paso de deshacer.
+	PonerIdiomaDocumento(idioma string)
+}
+
 // BarraEstado es la barra inferior de 28 px (§6.7): la posición, las palabras y el
-// idioma a la izquierda; el zoom a la derecha.
+// idioma a la izquierda; el zoom a la derecha. Las palabras son un botón que abre el
+// recuento detallado (Ctrl/Cmd+Mayús+C) y, con selección, dicen «12 de 340». El idioma
+// es el DEL DOCUMENTO: un botón con su nombre que abre los 26 de la suite.
 //
 // Medido: los rótulos en `text-xs` (10,5/14) sobre `--color-text-muted`, los botones de
 // zoom de 24×24 y el deslizador de 84×16 con el porcentaje en un hueco de 35.
@@ -46,6 +57,12 @@ type BarraEstado struct {
 	// porciento es el «100 %» de la barra, que se pulsa para volver al 100 (el
 	// `<button>` de StatusBar.tsx; Ctrl/Cmd+0 hace lo mismo).
 	porciento *ui.Enlace
+	// palabras es la cifra de Docus, que se pulsa para abrir el recuento (el `<button>`
+	// de las palabras de StatusBar.tsx).
+	palabras *ui.Enlace
+	// idioma es el `<select>` del idioma del documento: su nombre, que abre la lista.
+	idioma     *ui.Enlace
+	menuIdioma *ui.Menu
 }
 
 var _ fyne.Widget = (*BarraEstado)(nil)
@@ -77,7 +94,65 @@ func NuevaBarraEstado(ctx *Contexto) *BarraEstado {
 	b.porciento = ui.NuevoEnlace("", tema.TextoXS, ui.Normal, "text-muted", func() { ctx.PonerZoom(100) })
 	b.porciento.Boton, b.porciento.Liso = true, true
 	b.ponerPorciento()
+	b.palabras = ui.NuevoEnlace("", tema.TextoXS, ui.Normal, "text-muted", b.abrirRecuento)
+	b.palabras.Boton, b.palabras.Liso = true, true
+	b.idioma = ui.NuevoEnlace("", tema.TextoXS, ui.Normal, "text-muted", b.abrirIdiomas)
+	b.idioma.Boton, b.idioma.Liso = true, true
+	if ctx.Tipo == Documento {
+		ctx.AbrirRecuento = b.abrirRecuento
+	}
 	return b
+}
+
+// lienzoConIdioma es el lienzo si guarda el idioma del documento (solo Docus).
+func (b *BarraEstado) lienzoConIdioma() (LienzoConIdioma, bool) {
+	if b.ctx.Tipo != Documento {
+		return nil, false
+	}
+	l, ok := b.ctx.Lienzo.(LienzoConIdioma)
+	return l, ok
+}
+
+// idiomaActual es el del documento o, sin él, el de la interfaz, como el `value` del
+// `<select>` de la web; y si se puede cambiar.
+func (b *BarraEstado) idiomaActual() (i18n.Locale, bool) {
+	l, ok := b.lienzoConIdioma()
+	if !ok {
+		return b.ctx.Loc, false
+	}
+	idioma, editable := l.IdiomaDocumento()
+	if !i18n.IsLocale(idioma) {
+		idioma = string(b.ctx.Loc)
+	}
+	return i18n.Locale(idioma), editable && !b.ctx.SoloLectura
+}
+
+// abrirIdiomas abre la lista de los 26, cada uno con su nombre en su idioma y el del
+// documento marcado. Elegir uno lo guarda en el documento.
+func (b *BarraEstado) abrirIdiomas() {
+	l, ok := b.lienzoConIdioma()
+	actual, editable := b.idiomaActual()
+	if !ok || !editable {
+		return
+	}
+	if b.menuIdioma != nil && b.menuIdioma.Abierto() {
+		b.menuIdioma.Cerrar()
+		return
+	}
+	elems := make([]fyne.CanvasObject, len(i18n.Locales))
+	for i, loc := range i18n.Locales {
+		e := ui.NuevoElementoMenu(i18n.Names[loc], iconos.Ninguno, func() {
+			if loc != actual {
+				l.PonerIdiomaDocumento(string(loc))
+			}
+			b.Refresh()
+		})
+		e.Denso, e.Marcada = true, loc == actual
+		elems[i] = e
+	}
+	b.menuIdioma = ui.NuevoMenu(elems...)
+	b.menuIdioma.AlInicio, b.menuIdioma.Rotulo = true, b.ctx.Traducir("status.language")
+	b.menuIdioma.Mostrar(b.idioma)
 }
 
 // zoomEnPaso redondea a la decena, como hacía el `Step` de `widget.Slider`.
@@ -121,23 +196,22 @@ func (b *BarraEstado) CreateRenderer() fyne.WidgetRenderer {
 		fondo:    canvas.NewRectangle(tema.Color("surface", v)),
 		linea:    canvas.NewRectangle(tema.Color("border", v)),
 		posicion: ui.Texto("", tema.TextoXS, ui.Normal, tinta),
-		palabras: ui.Texto("", tema.TextoXS, ui.Normal, tinta),
 	}
 	r.poner(v)
 	return r
 }
 
 type estadoRenderer struct {
-	b                  *BarraEstado
-	fondo, linea       *canvas.Rectangle
-	posicion, palabras *canvas.Text
+	b            *BarraEstado
+	fondo, linea *canvas.Rectangle
+	posicion     *canvas.Text
 }
 
 func (r *estadoRenderer) MinSize() fyne.Size { return r.b.MinSize() }
 
 func (r *estadoRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
-		r.fondo, r.linea, r.posicion, r.palabras,
+		r.fondo, r.linea, r.posicion, r.b.palabras, r.b.idioma,
 		r.b.menos, r.b.deslizador, r.b.porciento, r.b.mas,
 	}
 }
@@ -148,14 +222,26 @@ func (r *estadoRenderer) poner(v tema.Variante) {
 	unidad, total, palabras := r.b.cifras()
 	c := r.b.ctx
 	r.posicion.Text = c.Traducir(clavePosicion(c.Tipo), i18n.Vars{"page": unidad, "pages": total})
-	r.palabras.Text = ""
+	r.b.palabras.Texto = ""
 	if c.Tipo == Documento {
-		r.palabras.Text = c.Traducir("status.words", i18n.Vars{"count": palabras})
+		r.b.palabras.Texto = c.Traducir("status.words", i18n.Vars{"count": palabras})
+		if l, ok := c.Lienzo.(LienzoConRecuento); ok {
+			if sel, hay := l.PalabrasSeleccionadas(); hay {
+				r.b.palabras.Texto = c.Traducir("status.words.selection", i18n.Vars{"selected": sel, "count": palabras})
+			}
+		}
 	}
+	r.b.palabras.Nombre = r.b.palabras.Texto
+	r.b.idioma.Texto = ""
+	if _, ok := r.b.lienzoConIdioma(); ok {
+		idioma, editable := r.b.idiomaActual()
+		r.b.idioma.Texto = i18n.Names[idioma]
+		r.b.idioma.Inerte = !editable
+	}
+	// El `aria-label` del `<select>`; lo que se lee es el valor, que va en el texto.
+	r.b.idioma.Nombre = c.Traducir("status.language")
 	r.b.ponerPorciento()
-	for _, t := range []*canvas.Text{r.posicion, r.palabras} {
-		t.Color = tema.Color("text-muted", v)
-	}
+	r.posicion.Color = tema.Color("text-muted", v)
 }
 
 func (r *estadoRenderer) Layout(t fyne.Size) {
@@ -172,11 +258,24 @@ func (r *estadoRenderer) Layout(t fyne.Size) {
 	x := MargenEstado
 	ui.ColocarTexto(r.posicion, tema.TextoXS, x, centroTexto)
 	x += ui.Medir(r.posicion.Text, tema.TextoXS, ui.Normal).Width + HuecoEstado
-	if r.palabras.Text != "" {
-		ui.ColocarTexto(r.palabras, tema.TextoXS, x, centroTexto)
-		r.palabras.Show()
+	if r.b.palabras.Texto != "" {
+		p := ui.MedidaEnlace(r.b.palabras)
+		r.b.palabras.Move(fyne.NewPos(x, tema.Borde+(alto-p.Height)/2))
+		r.b.palabras.Resize(p)
+		r.b.palabras.Show()
+		x += p.Width + HuecoEstado
 	} else {
-		r.palabras.Hide()
+		r.b.palabras.Hide()
+	}
+	// Fuera por debajo de `sm`, como el `max-sm:hidden` del `<select>` de la web: la barra
+	// no envuelve y en un teléfono el idioma se montaba sobre el zoom.
+	if r.b.idioma.Texto != "" && t.Width >= ui.CorteSM {
+		p := ui.MedidaEnlace(r.b.idioma)
+		r.b.idioma.Move(fyne.NewPos(x, tema.Borde+(alto-p.Height)/2))
+		r.b.idioma.Resize(p)
+		r.b.idioma.Show()
+	} else {
+		r.b.idioma.Hide()
 	}
 
 	// `ml-auto`: el zoom pegado a la derecha, en el orden −, deslizador, %, +.

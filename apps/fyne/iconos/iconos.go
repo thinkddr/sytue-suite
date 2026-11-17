@@ -30,9 +30,9 @@
 // tampoco: viven en `apps/frontend/apps/<app>/src/components/glyphs.tsx`. Aquí entran
 // con su constante y su entrada, al final y detrás de una frontera declarada en
 // `propios`, y el mismo guardián los compara contra ESE .tsx. No se mezclan con los
-// compartidos —van detrás y no intercalados— porque las
-// claves CHOCAN —`trash`, `clock` y `tag` existen en los dos con rutas distintas—, y
-// porque de una app se porta lo que se usa, no el fichero entero.
+// compartidos —van detrás y no intercalados— porque de una app se porta lo que se usa,
+// no el fichero entero. Lo que NO puede hacer un glifo propio es llevar el nombre de
+// uno del común: es el mismo concepto y se pinta con la ruta de aquí (`Comun`, `Ruta`).
 //
 // # Cómo se pinta (y por qué no con canvas.Image)
 //
@@ -130,6 +130,7 @@ const (
 	VoltearH                  // flipH
 	VoltearV                  // flipV
 	Deshacer                  // undo
+	Rehacer                   // redo
 	Guardar                   // save
 	Descargar                 // download
 	Subir                     // upload
@@ -152,6 +153,7 @@ const (
 	VozApagada                // vozOff
 	OjoTachado                // ojoOff
 	Arrastrar                 // grip
+	Teclado                   // teclado
 
 	// --- Los glifos PROPIOS de Sytue Drive (`apps/drive/.../glyphs.tsx`) ---
 	//
@@ -288,6 +290,7 @@ var catalogo = [...]entrada{
 	VoltearH:            {"flipH", "M12 3v18M4 8l4 4-4 4V8ZM20 8l-4 4 4 4V8Z"},
 	VoltearV:            {"flipV", "M3 12h18M8 4l4 4 4-4H8ZM8 20l4-4 4 4H8Z"},
 	Deshacer:            {"undo", "M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"},
+	Rehacer:             {"redo", "M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"},
 	Guardar:             {"save", "M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7"},
 	Descargar:           {"download", "M12 4v12M7 11l5 5 5-5M4 20h16"},
 	Subir:               {"upload", "M12 16V4M7 9l5-5 5 5M4 20h16"},
@@ -311,14 +314,35 @@ var catalogo = [...]entrada{
 	OjoTachado:          {"ojoOff", "M10 5.7A9.5 9.5 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.4 3.2M6.3 6.8C3.9 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 4.7-1.3M10.2 10.2a2.5 2.5 0 0 0 3.6 3.6M4 4l16 16"},
 
 	Arrastrar: {"grip", "M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"},
+	Teclado:   {"teclado", "M3.5 6.5h17v11h-17zM7 10h.01M10.33 10h.01M13.67 10h.01M17 10h.01M8 14h8"},
 
 	// Los glifos propios de Sytue Drive, verbatim de su `glyphs.tsx`.
-	DriveCarpeta:      {"folder", "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"},
-	DriveFichero:      {"file", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6"},
-	DriveDocumento:    {"document", "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4"},
+	DriveCarpeta:      {"folder", "M3.5 6.5A1.5 1.5 0 0 1 5 5h4.4l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5ZM3.5 10.5h17"},
+	DriveFichero:      {"file", "M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5"},
+	DriveDocumento:    {"document", "M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5M8.5 13h7M8.5 16.5h4.5"},
 	DriveHoja:         {"spreadsheet", "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14"},
 	DrivePresentacion: {"presentation", "M4 4h16v11H4zM12 15v4M9 21h6"},
-	DriveEstrella:     {"star", "m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.4L12 17.8l-5.8 3 1.1-6.4-4.7-4.6 6.5-.9Z"},
+	DriveEstrella:     {"star", "M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z"},
+}
+
+// Ruta es el `d` del icono, para la pantalla que pinta glifos por su ruta
+// (`iconos.TrazoDeRuta`) y tiene que mezclar los suyos con los del catálogo: Mail y
+// Notepads piden la papelera o el enlace por nombre de su `glyphs.tsx`, pero el dibujo
+// es el de aquí. Así no hay una segunda copia que pueda divergir.
+func (i Icono) Ruta() string { return catalogo[i].d }
+
+// Comun busca un icono del catálogo COMPARTIDO por su clave de `Icon.tsx`. Los glifos
+// propios de una app quedan fuera aunque vivan en este catálogo: su clave es la de
+// SU `glyphs.tsx`, no la del común. Lo usan los guardianes de cada app («ningún
+// glifo propio repite un nombre del común») y Notepads para resolver el icono que una
+// nota guarda por nombre.
+func Comun(clave string) (Icono, bool) {
+	for i := Ninguno + 1; i < numIconos; i++ {
+		if catalogo[i].clave == clave && i.Origen() == FuenteComun {
+			return i, true
+		}
+	}
+	return Ninguno, false
 }
 
 // Clave es el nombre del icono en la web. Solo para mensajes de error y para el

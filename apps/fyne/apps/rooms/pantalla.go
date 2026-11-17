@@ -42,6 +42,10 @@ type Pantalla struct {
 	Canal   *VistaCanal
 	// Avisos es la pila de avisos flotantes (`toast` de la web): «Texto copiado»…
 	Avisos *ui.PilaAvisos
+	// Entrante es el aviso de llamada entrante de arriba a la derecha
+	// (IncomingCall.tsx); capaEntrante, el hueco de la ventana donde se coloca.
+	Entrante     *LlamadaEntrante
+	capaEntrante *fyne.Container
 
 	armazon *ui.Armazon
 	raiz    fyne.CanvasObject
@@ -60,6 +64,11 @@ type VistaCanal struct {
 	Cabecera   *Cabecera
 	Historial  *Historial
 	Compositor *Compositor
+	// Llamada es la franja de «Llamada en curso · N» bajo la cabecera. Se ve con
+	// alguien dentro y si quien mira no está ya en una llamada (`!call` en la web):
+	// ofrecerle unirse a la que tiene abierta sería invitarle a donde ya está.
+	Llamada         *FranjaLlamada
+	DentroDeLlamada bool
 	// Vacio es lo que se ve sin canal abierto.
 	Vacio *ui.Vacio
 	// Escribiendo son los nombres de quien está escribiendo en el canal abierto.
@@ -124,7 +133,9 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 	// desactivar el gesto que abre el carril de canales.
 	p.armazon.MenuEnDetalle = true
 	p.Avisos = ui.NuevaPilaAvisos()
-	p.raiz = container.NewStack(p.armazon, p.Avisos)
+	p.Entrante = NuevaLlamadaEntrante(t)
+	p.capaEntrante = nuevaCapaEntrante(p.Entrante)
+	p.raiz = container.NewStack(p.armazon, p.capaEntrante, p.Avisos)
 	p.Canal.Ventana = func() float32 { return p.armazon.Size().Width }
 	// La hamburguesa saca el carril como cajón, y tocar el velo lo recoge.
 	//
@@ -148,6 +159,7 @@ func nuevoCanal(t *i18n.Translator, l i18n.Locale) *VistaCanal {
 		Cabecera:   NuevaCabecera(t, l),
 		Historial:  NuevoHistorial(t, l),
 		Compositor: NuevoCompositor(t, l),
+		Llamada:    NuevaFranjaLlamada(t),
 		Vacio:      ui.NuevoVacio(t.T("empty.pickChannel", nil), t.T("empty.pickChannelHelp", nil)),
 		T:          t,
 		sinCanal:   true,
@@ -208,7 +220,7 @@ func (p *Pantalla) PonerPagina(o fyne.CanvasObject) {
 	if o != nil {
 		objs = append(objs, o)
 	}
-	objs = append(objs, p.Avisos)
+	objs = append(objs, p.capaEntrante, p.Avisos)
 	p.pagina = o
 	p.armazon.MenuEnDetalle = o == nil
 	p.raiz.(*fyne.Container).Objects = objs //nolint:errcheck,forcetypeassert // Raíz se crea como contenedor en NuevaPantalla.
@@ -260,6 +272,20 @@ func (c *VistaCanal) vacioSinCanal(v tema.Variante) *ui.Vacio {
 	return x
 }
 
+// ConFranjaLlamada dice si se ve «Llamada en curso»: `activeCallCount > 0 && !call`.
+func (c *VistaCanal) ConFranjaLlamada() bool {
+	return c.Llamada != nil && c.Llamada.Participantes > 0 && !c.DentroDeLlamada
+}
+
+// altoArriba es lo que ocupan la cabecera y, si se ve, la franja de la llamada: donde
+// empieza el historial.
+func (c *VistaCanal) altoArriba() float32 {
+	if c.ConFranjaLlamada() {
+		return AltoCabecera + MedidaFranjaLlamada().Height
+	}
+	return AltoCabecera
+}
+
 // estrecha es la ventana por debajo de `md` (768).
 func (c *VistaCanal) estrecha() bool { return c.Ventana != nil && c.Ventana() < ui.Estrecho }
 
@@ -284,7 +310,7 @@ func (c *VistaCanal) CreateRenderer() fyne.WidgetRenderer {
 			c.AlIrAlFinal()
 		}
 	})
-	c.objetos = []fyne.CanvasObject{c.fondo, c.Cabecera, c.Historial, c.escribiendo, c.Compositor, c.Vacio}
+	c.objetos = []fyne.CanvasObject{c.fondo, c.Cabecera, c.Llamada, c.Historial, c.escribiendo, c.Compositor, c.Vacio}
 	r := &canalRenderer{c: c}
 	r.flujo = columnaConversacion{minimo: r.altoMinimo, colocar: r.colocarContenido}
 	r.Refresh()
@@ -315,7 +341,7 @@ func (r *canalRenderer) Objects() []fyne.CanvasObject {
 func (r *canalRenderer) Destroy() {}
 
 func (r *canalRenderer) altoMinimo(ancho float32) float32 {
-	alto := AltoCabecera + AltoFilaMensaje(false) + AltoEscribiendo + r.c.Compositor.medidaPara(ancho).Height
+	alto := r.c.altoArriba() + AltoFilaMensaje(false) + AltoEscribiendo + r.c.Compositor.medidaPara(ancho).Height
 	if r.c.ViendoHistorial {
 		alto += MedidaBarraRecientes().Height
 	}
@@ -342,8 +368,8 @@ func (r *canalRenderer) Layout(t fyne.Size) {
 			t = fyne.NewSize(t.Width-ancho, t.Height)
 		}
 	}
-	for _, o := range []fyne.CanvasObject{c.Cabecera, c.Historial, c.alFinal, c.escribiendo, c.Compositor} {
-		if c.sinCanal || tapado || (o == c.alFinal && !c.ViendoHistorial) {
+	for _, o := range []fyne.CanvasObject{c.Cabecera, c.Llamada, c.Historial, c.alFinal, c.escribiendo, c.Compositor} {
+		if c.sinCanal || tapado || (o == c.alFinal && !c.ViendoHistorial) || (o == c.Llamada && !c.ConFranjaLlamada()) {
 			o.Hide()
 			continue
 		}
@@ -376,15 +402,20 @@ func (r *canalRenderer) Layout(t fyne.Size) {
 		c.Cabecera.menuYaVisible = menuVisible
 		c.Cabecera.Refresh()
 	}
-	r.flujo.repartir(t, []fyne.CanvasObject{c.Cabecera, c.Historial, c.alFinal, c.escribiendo, c.Compositor})
+	r.flujo.repartir(t, []fyne.CanvasObject{c.Cabecera, c.Llamada, c.Historial, c.alFinal, c.escribiendo, c.Compositor})
 }
 
 func (r *canalRenderer) colocarContenido(t fyne.Size) {
 	c := r.c
 	c.Cabecera.Move(fyne.NewPos(0, 0))
 	c.Cabecera.Resize(fyne.NewSize(t.Width, AltoCabecera))
+	arriba := c.altoArriba()
+	if c.ConFranjaLlamada() {
+		c.Llamada.Move(fyne.NewPos(0, AltoCabecera))
+		c.Llamada.Resize(fyne.NewSize(t.Width, arriba-AltoCabecera))
+	}
 	alto := c.Compositor.medidaPara(t.Width).Height
-	yCaja := max(t.Height-alto, AltoCabecera+AltoEscribiendo)
+	yCaja := max(t.Height-alto, arriba+AltoEscribiendo)
 	c.Compositor.Move(fyne.NewPos(0, yCaja))
 	c.Compositor.Resize(fyne.NewSize(t.Width, alto))
 	// La línea de «escribiendo», con su `px-4` y truncada. El texto va arriba del
@@ -399,8 +430,8 @@ func (r *canalRenderer) colocarContenido(t fyne.Size) {
 		c.alFinal.Move(fyne.NewPos(0, fin))
 		c.alFinal.Resize(fyne.NewSize(t.Width, MedidaBarraRecientes().Height))
 	}
-	c.Historial.Move(fyne.NewPos(0, AltoCabecera))
-	c.Historial.Resize(fyne.NewSize(t.Width, max(fin-AltoCabecera, 0)))
+	c.Historial.Move(fyne.NewPos(0, arriba))
+	c.Historial.Resize(fyne.NewSize(t.Width, max(fin-arriba, 0)))
 }
 
 // Refresh repinta y REHACE la disposición: abrir un canal no cambia el tamaño de la
@@ -410,7 +441,7 @@ func (r *canalRenderer) Refresh() {
 	if r.c.sinCanal {
 		r.c.Vacio = r.c.vacioSinCanal(v)
 	}
-	r.c.objetos = []fyne.CanvasObject{r.c.fondo, r.c.Cabecera, r.c.Historial, r.c.alFinal, r.c.escribiendo, r.c.Compositor, r.c.Vacio}
+	r.c.objetos = []fyne.CanvasObject{r.c.fondo, r.c.Cabecera, r.c.Llamada, r.c.Historial, r.c.alFinal, r.c.escribiendo, r.c.Compositor, r.c.Vacio}
 	if r.c.Derecho != nil {
 		r.c.objetos = append(r.c.objetos, r.c.Derecho)
 	}
@@ -423,6 +454,9 @@ func (r *canalRenderer) Refresh() {
 	if !r.c.sinCanal {
 		r.c.Cabecera.Refresh()
 		r.c.Compositor.Refresh()
+		if r.c.ConFranjaLlamada() {
+			r.c.Llamada.Refresh()
+		}
 	}
 	r.Layout(r.c.Size())
 }

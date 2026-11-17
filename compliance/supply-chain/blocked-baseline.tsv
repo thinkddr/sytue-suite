@@ -13,6 +13,10 @@
 # and is now scanned (it was not before). Same send ADR 0039 already accepted, no new
 # provider; the baseline grows by this decision, documented in the ADR 0039
 # amendment of 2026-11-06 and docs/security.md#apns-despertar.
+# 2026-11-16: deploy/upstream-reconstruidas recompila imágenes de terceros con la
+# MISMA imagen golang fijada que ya usan los servicios (go.dev) y parte de la
+# imagen de synapse ya espejada (element.io). Ningún canal nuevo: los mismos
+# orígenes bloqueados, en rutas exactas. Ver la cabecera de su catalogo.txt.
 eur-lex.europa.eu	scripts/certipdf-compat/ue.py
 online-forms.e-justice.europa.eu	scripts/certipdf-compat/ue.py
 www.sede.fnmt.gob.es	scripts/certipdf-compat/ue.py
@@ -59,6 +63,19 @@ go.dev	services/pages/Dockerfile
 go.dev	services/rooms/Dockerfile
 go.dev	services/syerp/Dockerfile
 go.dev	services/syphotos/Dockerfile
+go.dev	deploy/upstream-reconstruidas/buildkit-rootless/Dockerfile
+go.dev	deploy/upstream-reconstruidas/buildkit/Dockerfile
+go.dev	deploy/upstream-reconstruidas/cert-manager-acmesolver/Dockerfile
+go.dev	deploy/upstream-reconstruidas/cert-manager-cainjector/Dockerfile
+go.dev	deploy/upstream-reconstruidas/cert-manager-controller/Dockerfile
+go.dev	deploy/upstream-reconstruidas/cert-manager-startupapicheck/Dockerfile
+go.dev	deploy/upstream-reconstruidas/cert-manager-webhook-scaleway/Dockerfile
+go.dev	deploy/upstream-reconstruidas/cert-manager-webhook/Dockerfile
+go.dev	deploy/upstream-reconstruidas/crane/Dockerfile
+go.dev	deploy/upstream-reconstruidas/livekit/Dockerfile
+go.dev	deploy/upstream-reconstruidas/managed-postgres/Dockerfile
+go.dev	deploy/upstream-reconstruidas/prometheus-adapter/Dockerfile
+go.dev	deploy/upstream-reconstruidas/synapse/Dockerfile
 login.microsoftonline.com	deploy/sytue-git/bin/firmar-windows.sh
 nodejs.org	deploy/sytue-git/runner/Containerfile
 oauth2.googleapis.com	apps/fyne/scripts/play-publicar.sh
@@ -132,7 +149,7 @@ graph.facebook.com	services/integrations/internal/http/handlers_whatsapp_consent
 www.facebook.com	services/integrations/internal/http/handlers_whatsapp_consent.go
 web.facebook.com	services/integrations/internal/http/handlers_whatsapp_consent.go
 facebook.com	services/integrations/internal/http/handlers_whatsapp_consent.go
-element.io	deploy/helm/charts/matrix/values.yaml
+element.io	deploy/upstream-reconstruidas/synapse/Dockerfile
 slack.com	services/integrations/db/seeds/templates/slack-chat.json
 app.slack.com	services/integrations/db/seeds/templates/slack-chat.json
 login.microsoftonline.com	services/integrations/db/seeds/templates/microsoft-teams-chat.json
@@ -163,3 +180,4 @@ www.googleapis.com	services/integrations/internal/linkedservices/catalog.go
 www.googleapis.com	services/integrations/internal/linkedservices/client.go
 openidconnect.googleapis.com	services/integrations/internal/mailbox/cloud.go
 api.login.yahoo.com	services/integrations/internal/mailbox/cloud.go
+android.googlesource.com	apps/fyne/scripts/android-work-context-test.py

@@ -1,8 +1,9 @@
-# Power BI — alta en Sytue Platform
-**Qué conecta**: consultas de lectura sobre un dataset publicado (sin OAuth de usuario: credencial del servicio).
-1. En app.powerbi.com identifica el **dataset_id**: abre el semantic model → el GUID de la URL (`/datasets/XXXX-…`).
-2. Necesitas una identidad con licencia Pro/Premium sobre ese dataset y su **api_base** (`https://api.powerbi.com`, o el de tu VNET/SSRS si es on-prem).
-3. Crea la credencial de servicio (service principal en Entra + grupo de seguridad con acceso al dataset, o usuario técnico con licencia).
-4. Sytue Platform → Integraciones → **Power BI**: dataset_id y api_base + credencial → «Conectar».
-**Verificar**: una DAX de prueba (`EVALUATE ROW("x", 1)`) desde el panel.
-**Errores**: `DatasetNotFound` = el GUID no es del dataset sino del informe; 401 = el principal no tiene acceso al espacio.
+<a id="power-bi--alta-en-sytue-platform"></a>
+# Power BI — setup in Sytue Platform
+**What it connects**: read queries against a published dataset (no user OAuth: a service credential).
+1. In app.powerbi.com, find the **dataset_id**: open the semantic model → the GUID in the URL (`/datasets/XXXX-…`).
+2. You need an identity with a Pro/Premium license on that dataset and its **api_base** (`https://api.powerbi.com`, or the one for your VNET/SSRS if it is on-prem).
+3. Create the service credential (a service principal in Entra + a security group with access to the dataset, or a licensed technical user).
+4. Sytue Platform → Integrations → **Power BI**: dataset_id and api_base + credential → “Connect”.
+**Verify**: a test DAX query (`EVALUATE ROW("x", 1)`) from the panel.
+**Errors**: `DatasetNotFound` = the GUID belongs to the report, not the dataset; 401 = the principal has no access to the workspace.

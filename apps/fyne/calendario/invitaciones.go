@@ -88,12 +88,12 @@ func (a *App) abrirInvitaciones() {
 	// Mientras carga: la rueda centrada con su `py-10`.
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	cuerpo.Objects = []fyne.CanvasObject{container.New(&centrado{Y: tema.Espacio(10)}, ui.NuevaRueda(ui.LadoRueda, "text-muted", v))}
-	d.Mostrar(lienzo)
+	a.mostrarDialogo(d, lienzo)
 	if a.Cal == nil {
 		return
 	}
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), plazo)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, plazo)
 		defer parar()
 		invs, err := a.Cal.Invitations(ctx, true)
 		a.enUI(func() {
@@ -144,7 +144,7 @@ func (p *Pantalla) cuerpoInvitaciones(util float32, lista []api.Invitation, ocup
 		contenido := container.New(ui.Columna{},
 			ui.NuevoParrafo(titulo, tema.TextoBase, ui.Medio, "text", v),
 			container.New(&margenArriba{Arr: tema.Espacio(0.5)}, ui.NuevoParrafo(detalle, tema.TextoSM, ui.Normal, "text-muted", v)),
-			container.New(&margenArriba{Arr: tema.Espacio(2.5)}, container.New(&envolver{Hueco: espacio2, Ancho: util - 2*(espacio3+tema.Borde)}, botones...)),
+			container.New(&margenArriba{Arr: tema.Espacio(2.5)}, container.New(ui.Flujo{Hueco: espacio2, Ancho: util - 2*(espacio3+tema.Borde)}, botones...)),
 		)
 		caja := ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioMD)
 		tarjetas = append(tarjetas, container.New(&conCajaArriba{caja: caja, M: espacio3}, append(caja.Objetos(), contenido)...))

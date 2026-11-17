@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -61,6 +62,9 @@ func (r *RoomsService) connection(ctx context.Context, channel string) (*Client,
 	if err != nil {
 		return nil, "", err
 	}
+	if c == nil || c.cfg.Bootstrap.StorageProduct != "" {
+		return nil, "", ErrIdentity
+	}
 	room, err := c.RoomID(channel)
 	if err != nil {
 		next, readErr := r.MatrixBootstrap(ctx)
@@ -103,28 +107,43 @@ func (r *RoomsService) hydrateAt(ctx context.Context, m api.RoomsMessage, epoch 
 	return r.hydrateDecryptedAt(ctx, m, c, room, value, epoch)
 }
 
-func (r *RoomsService) hydrateDecryptedAt(ctx context.Context, m api.RoomsMessage, c *Client, room string, value DecryptedEvent, epoch uint64) (api.RoomsMessage, error) {
+func decodeDecryptedMessage(m api.RoomsMessage, c *Client, value DecryptedEvent) (api.RoomsMessage, MessageContent, error) {
+	if c == nil || c.cfg.Bootstrap.StorageProduct != "" {
+		return m, MessageContent{}, ErrIdentity
+	}
 	ownID, _ := c.Identity()
 	host := strings.SplitN(ownID, ":", 2)
 	if len(host) != 2 || value.Sender != "@sytue_"+m.AuthorSub+":"+host[1] {
-		return m, ErrIdentity
+		return m, MessageContent{}, ErrIdentity
 	}
 	content, err := DecodeMessage(value)
 	if err != nil {
-		return m, err
+		return m, MessageContent{}, err
 	}
+	m.EncryptionError, m.RequiresOriginalDevice = false, false
 	m.Body, m.Mentions, m.Card, m.Priority, m.RequiresAck = content.Body, content.Mentions, content.Card, content.Priority, content.RequiresAck
-	m.AuthenticityVerified = !value.Recovered
+	// Successful Rooms reads already authenticated exact session provenance, including recovery.
+	m.AuthenticityVerified = true
 	m.IdentityVerified = value.Trust >= id.TrustStateCrossSignedVerified
 	m.Attachments = nil
+	for _, file := range content.Attachments {
+		descriptor, _ := json.Marshal(file.MatrixFile)
+		m.Attachments = append(m.Attachments, api.RoomsAttachment{FileID: file.FileID, Name: file.Name, ContentType: file.ContentType, SizeBytes: file.SizeBytes, MatrixFile: descriptor})
+	}
+	return m, content, nil
+}
+
+func (r *RoomsService) hydrateDecryptedAt(ctx context.Context, m api.RoomsMessage, c *Client, room string, value DecryptedEvent, epoch uint64) (api.RoomsMessage, error) {
+	m, content, err := decodeDecryptedMessage(m, c, value)
+	if err != nil {
+		return m, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.epoch != epoch || ctx.Err() != nil || c.closed.Load() {
 		return api.RoomsMessage{}, ErrIdentity
 	}
 	for _, file := range content.Attachments {
-		descriptor, _ := json.Marshal(file.MatrixFile)
-		m.Attachments = append(m.Attachments, api.RoomsAttachment{FileID: file.FileID, Name: file.Name, ContentType: file.ContentType, SizeBytes: file.SizeBytes, MatrixFile: descriptor})
 		r.files[attachmentKey{c, room, file.FileID}] = cachedAttachment{file: file, channel: m.ChannelID}
 	}
 	r.messages[m.ID] = cachedMessage{value: m, client: c, room: room}
@@ -146,7 +165,7 @@ func (r *RoomsService) hydrateMany(ctx context.Context, messages []api.RoomsMess
 			return nil, ErrIdentity
 		}
 		if err != nil {
-			value = unreadableMessage(m)
+			value = unreadableMessage(m, err)
 		}
 		messages[i] = value
 	}
@@ -189,7 +208,7 @@ func (r *RoomsService) hydrateReceiptPages(ctx context.Context, messages []api.R
 				return ErrIdentity
 			}
 			if err != nil {
-				value = unreadableMessage(m)
+				value = unreadableMessage(m, err)
 			}
 			messages[index] = value
 		}
@@ -197,7 +216,8 @@ func (r *RoomsService) hydrateReceiptPages(ctx context.Context, messages []api.R
 	return nil
 }
 
-func unreadableMessage(m api.RoomsMessage) api.RoomsMessage {
+func unreadableMessage(m api.RoomsMessage, err error) api.RoomsMessage {
+	m.RequiresOriginalDevice = errors.Is(err, ErrSessionProvenanceMissing)
 	m.Body, m.Priority, m.RequiresAck = "", "", false
 	m.Attachments, m.Mentions, m.Card = nil, nil, nil
 	m.AuthenticityVerified, m.IdentityVerified, m.EncryptionError = false, false, true
@@ -289,7 +309,7 @@ func (r *RoomsService) ReplyWith(ctx context.Context, parent, text string, optio
 	if err != nil {
 		return api.RoomsMessage{}, err
 	}
-	m, err := r.MatrixReply(ctx, parent, reference)
+	m, err := r.MatrixReply(ctx, parent, reference, options.AlsoInChannel)
 	if err != nil {
 		return m, err
 	}
@@ -462,10 +482,6 @@ func (r *RoomsService) ForgetUploads(channel string) {
 
 func (*RoomsService) SaveChannelFileToMyDrive(context.Context, string, string) (api.File, error) {
 	return api.File{}, ErrUnsupported
-}
-
-func (*RoomsService) Search(context.Context, string, int) ([]api.RoomsMessage, error) {
-	return nil, ErrUnsupported
 }
 
 func (*RoomsService) Schedule(context.Context, string, string, []string, time.Time) (api.RoomsScheduled, error) {

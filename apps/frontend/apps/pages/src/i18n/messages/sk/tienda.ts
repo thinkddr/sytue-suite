@@ -172,14 +172,9 @@ export const tienda = {
   'store.mode_test_help':
     'Simulované platby pomocou testovacích kľúčov poskytovateľa. Nikomu sa nič neúčtuje.',
   'store.mode_live_help': 'Skutočné platby pomocou produkčných kľúčov.',
-  'store.webhook_title': 'Krok 1: adresa webhooku',
   'store.webhook_help': 'Vložte túto adresu do administrácie služby {nombre}.',
   'store.webhook_label': 'Adresa webhooku',
   'store.webhook_error': 'Adresu webhooku sa nepodarilo získať. Zavrite dialóg a skúste to znova.',
-  'store.copy': 'Kopírovať',
-  'store.copied': 'Adresa skopírovaná.',
-  'store.credentials_title': 'Prihlasovacie údaje',
-  'store.credentials_step': 'Krok 2: prihlasovacie údaje',
   'store.f_api_key': 'Kľúč API',
   'store.f_api_key_mode': 'Kľúč API ({modo})',
   'store.f_profile_id': 'ID profilu (voliteľné)',
@@ -197,6 +192,48 @@ export const tienda = {
   'store.gateway_save': 'Uložiť a otestovať',
   'store.gateway_saved': 'Brána {nombre} bola otestovaná a uložená.',
   'store.gateway_save_error': 'Prihlasovacie údaje brány sa nepodarilo overiť.',
+  'store.wz_progress': 'Kroky pripojenia platobnej brány',
+  'store.wz_step_mode': 'Režim',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Kľúče',
+  'store.wz_step_check': 'Overiť',
+  'store.wz_step_done': 'Hotovo',
+  'store.wz_mode_heading': 'Testovacie, alebo skutočné platby?',
+  'store.wz_mode_desc':
+    'Začnite v testovacom režime; keď všetko funguje, otvorte sprievodcu znova a zvoľte ostrú prevádzku.',
+  'store.wz_webhook_heading': 'Povedzte {nombre}, kam posielať oznámenia o platbách',
+  'store.wz_keys_heading': 'Vaše kľúče pre {nombre}',
+  'store.wz_keys_desc':
+    'Tajné kľúče sa ukladajú zapečatené a už sa nikdy nezobrazia: ak chcete kľúč zmeniť, zadajte ho znova.',
+  'store.wz_keys_rejected': '{nombre} tieto kľúče neprijal',
+  'store.wz_check_heading': 'Overiť a uložiť',
+  'store.wz_check_desc':
+    'Sytue Web pred zapnutím brány vyskúša kľúče v {nombre}. Nič sa neuloží, kým skúška neuspeje.',
+  'store.wz_secret_hidden': 'Zadané (skryté)',
+  'store.wz_empty_value': 'Neuvedené',
+  'store.wz_done_heading': '{nombre} je pripravený',
+  'store.wz_finish': 'Dokončiť',
+  'store.hint_mollie_api_key':
+    'V Mollie: Developers › API keys. Testovacie kľúče začínajú test_ a ostré live_.',
+  'store.hint_mollie_profile':
+    'V Mollie: Settings › Website profiles. Začína pfl_; nechajte prázdne pre predvolený profil.',
+  'store.hint_adyen_api_key':
+    'V Adyen Customer Area: Developers › API credentials › vaše poverenie › API key.',
+  'store.hint_adyen_merchant':
+    'V Adyen Customer Area, vo výbere účtu hore: obchodnícky účet, nie firemný účet.',
+  'store.hint_adyen_hmac': 'V Adyen: Developers › Webhooks › váš webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'V Adyen (ostrá prevádzka): Developers › API URLs. Je to časť adresy pred -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Dostanete ho od banky so zmluvou o virtuálnom termináli; nájdete ho aj v administračnom portáli Redsys.',
+  'store.hint_redsys_terminal':
+    'V administračnom portáli Redsys, vedľa kódu obchodníka. Zvyčajne je to 1.',
+  'store.hint_redsys_secret':
+    'V administračnom portáli Redsys: údaje obchodníka › kľúč SHA-256. Testovací a ostrý kľúč sa líšia.',
+  'store.hint_stripe_secret':
+    'V Stripe: Developers › API keys › Secret key. Začína sk_test_ alebo sk_live_.',
+  'store.hint_stripe_webhook':
+    'V Stripe: Developers › Webhooks › váš endpoint › Signing secret. Začína whsec_.',
   'orders.subtitle': 'Objednávky a nákupy uskutočnené na vašom webe.',
   'orders.count': {
     one: '{count} objednávka',

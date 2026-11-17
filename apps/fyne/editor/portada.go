@@ -11,6 +11,7 @@ import (
 	"errors"
 	"image/color"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,11 +35,10 @@ import (
 // presentaciones—. Vive en el cromo compartido y no en Docus porque en la web es UNA
 // isla con el tipo como parámetro, y tres copias serían tres portadas que divergen.
 //
-// Lo que NO trae todavía, con su motivo, está en `ponytail:` en su sitio: abrir un
-// fichero del ordenador (no hay selector de ficheros nativo en `apps/fyne`), descargar
-// y compartir desde la tesela (el SDK no tiene las exportaciones ni los permisos), y el
-// modo sin conexión con los documentos guardados en el dispositivo (la portada nativa no
-// tiene caché local: sin red dice que no hay red).
+// Lo que NO trae todavía: descargar y compartir desde la tesela (su `ponytail:` está en
+// `tesela.go`), y el modo sin conexión con los documentos guardados en el dispositivo (la
+// portada nativa no tiene caché local: sin red dice que no hay red). «Abrir un archivo» sí
+// está: es `AlAbrirArchivo`, el mismo selector del sistema que «Abrir…» (`abrir.go`).
 
 // Las constantes de la web que gobiernan la carga.
 const (
@@ -58,18 +58,18 @@ const (
 // Medidas del marco de la portada: `max-w-[1280px] px-6 pt-8`, la cabecera con
 // `mb-8`, «Crear nuevo» con `mb-10` y los encabezados de sección con `mb-3 gap-2`.
 var (
-	MargenPortada             = tema.Espacio(6)  // px-6 → 21
-	ArribaPortada             = tema.Espacio(8)  // pt-8 → 28
-	BajoCabecera              = tema.Espacio(8)  // mb-8 → 28
-	BajoLema                  = tema.Espacio(1)  // mt-1 → 3,5
+	MargenPortada             = tema.Espacio(6)  // px-6 → 24
+	ArribaPortada             = tema.Espacio(8)  // pt-8 → 32
+	BajoCabecera              = tema.Espacio(8)  // mb-8 → 32
+	BajoLema                  = tema.Espacio(1)  // mt-1 → 4
 	HuecoPapelera             = tema.Espacio(3)  // gap-3 → 12, título ↔ «Papelera»
 	AnchoLema         float32 = 42 * tema.Rem    // max-w-2xl → 672
-	BajoNuevo                 = tema.Espacio(10) // mb-10 → 35
-	BajoEncabezado            = tema.Espacio(3)  // mb-3 → 10,5
-	HuecoEncabezado           = tema.Espacio(2)  // gap-2 → 7
+	BajoNuevo                 = tema.Espacio(10) // mb-10 → 40
+	BajoEncabezado            = tema.Espacio(3)  // mb-3 → 12
+	HuecoEncabezado           = tema.Espacio(2)  // gap-2 → 8
 	HuecoAccesos              = tema.Espacio(3)  // gap-3 → 12
-	AnchoBuscador             = tema.Espacio(64) // w-64 → 224
-	AltoFranjaPortada         = tema.Espacio(8)  // h-8 → 28
+	AnchoBuscador             = tema.Espacio(64) // w-64 → 256
+	AltoFranjaPortada         = tema.Espacio(8)  // h-8 → 32
 	RuedaFranja       float32 = 14
 	// La banda sin conexión: `mb-5 rounded-lg border px-3 py-2 text-sm gap-2` y el punto
 	// `h-2 w-2`.
@@ -97,6 +97,12 @@ type Portada struct {
 	AlAbrir func(api.Document)
 	// AlEntrar abre Sytue ID. Solo se ofrece cuando el servicio dice 401.
 	AlEntrar func()
+	// Compartir abre, colgado de `desde`, el panel de compartir de un documento: el
+	// mismo que la cabecera del editor, que es de la app (los enlaces de la web y el
+	// directorio). nil: las teselas no llevan «Compartir».
+	Compartir func(d api.Document, desde fyne.CanvasObject)
+	// Carpeta es dónde deja las descargas «Más acciones»; nil, la del sistema.
+	Carpeta func() (string, error)
 
 	// AlAbrirArchivo es «Abrir un archivo», el botón de la fila de «Crear nuevo»: el
 	// mismo `AbrirArchivo.Abrir` del menú Archivo del editor. nil: no sale.
@@ -130,12 +136,16 @@ type Portada struct {
 	masOcupado bool
 
 	// Lo que se pinta. Solo se toca en el hilo de la interfaz.
-	Estado      Estado
-	Docs        []api.Document
-	Cursor      string
-	Consulta    string // lo que hay escrito
-	Aplicada    string // lo que se ha pedido, tras la pausa
-	Destacados  bool
+	Estado     Estado
+	Docs       []api.Document
+	Cursor     string
+	Consulta   string // lo que hay escrito
+	Aplicada   string // lo que se ha pedido, tras la pausa
+	Destacados bool
+	// Alcance es «Míos» / «Compartidos conmigo» (vacío = todos) y PorTitulo el orden
+	// A→Z; los dos los resuelve el SERVICIO, como «Destacados».
+	Alcance     api.DocsScope
+	PorTitulo   bool
 	Creando     bool
 	CargandoMas bool
 
@@ -246,6 +256,7 @@ func (p *Portada) avisar(clave string) {
 func (p *Portada) filtro(cursor string) api.DocsFilter {
 	return api.DocsFilter{
 		Kind: p.Tipo.Kind(), Query: p.Aplicada, Starred: p.Destacados,
+		Scope: p.Alcance, ByTitle: p.PorTitulo,
 		Cursor: cursor, Limit: PaginaPortada,
 	}
 }
@@ -364,6 +375,35 @@ func (p *Portada) aplicarConsulta() {
 // AlternarDestacados enciende o apaga el filtro, que resuelve el SERVICIO.
 func (p *Portada) AlternarDestacados() {
 	p.Destacados = !p.Destacados
+	p.Cargar()
+}
+
+// alcances es el orden de las opciones de «Propietario»: el del `<select>` de la web.
+var alcances = [...]api.DocsScope{api.DocsAll, api.DocsMine, api.DocsShared}
+
+// ElegirAlcance pone «Todos», «Míos» o «Compartidos conmigo» y recarga.
+func (p *Portada) ElegirAlcance(a api.DocsScope) {
+	if a == p.Alcance {
+		return
+	}
+	p.Alcance = a
+	p.Cargar()
+}
+
+// ElegirOrden pasa del orden por fecha al de título (o al revés). El cursor cambia
+// de forma con el orden, así que se recarga desde la primera página.
+func (p *Portada) ElegirOrden(porTitulo bool) {
+	if porTitulo == p.PorTitulo {
+		return
+	}
+	p.PorTitulo = porTitulo
+	p.Cargar()
+}
+
+// VerTodo quita «Míos / Compartidos conmigo» y «Destacados»: la acción del vacío
+// con filtros.
+func (p *Portada) VerTodo() {
+	p.Alcance, p.Destacados = api.DocsAll, false
 	p.Cargar()
 }
 
@@ -542,6 +582,24 @@ func (p *Portada) Copiar(d api.Document) {
 	}, func() { p.copiando = false })
 }
 
+// Descargar baja un documento desde la tesela, sin abrirlo (`descargar` de DocList.tsx):
+// el mismo [Servicio.Descargar] del editor, que lo deja en la carpeta de descargas sin
+// pisar otro fichero y avisa de dónde ha ido a parar o de que ha fallado. Desde la
+// portada no hay nada pendiente de guardar.
+func (p *Portada) Descargar(d api.Document, formato string) {
+	if p.Svc == nil || !p.hayRed() {
+		return
+	}
+	Servicio{
+		Svc: p.Svc, Plazo: p.Plazo, T: p.T, Lanzar: p.Lanzar, Carpeta: p.Carpeta,
+		Avisar: func(tono ui.TonoAviso, titulo string) {
+			if p.Avisos != nil {
+				p.Avisos.Notificar(ui.NuevoAviso(tono, titulo, ""))
+			}
+		},
+	}.Descargar(d.ID, d.Title, TipoDe(d.Kind), formato, nil, nil)
+}
+
 // PedirBorrado confirma antes de borrar: es una acción destructiva y nunca va directa.
 func (p *Portada) PedirBorrado(d api.Document) {
 	lienzo := p.lienzo()
@@ -586,6 +644,8 @@ type vistaPortada struct {
 	galeria  fyne.CanvasObject
 	abrir    *ui.Boton
 	filtro   *FiltroDestacados
+	alcance  *ui.Selector
+	orden    *ui.Selector
 	papelera *FiltroDestacados
 	buscador *ui.Entrada
 	insignia *ui.Insignia
@@ -609,6 +669,13 @@ func nuevaVistaPortada(p *Portada) *vistaPortada {
 	w.abrir.Glifo = iconos.TrazoDeRuta(GlifoSubir, 14, tema.Color("text", tema.De(fyne.CurrentApp().Settings().ThemeVariant())))
 	w.abrir.TamIcono = 14
 	w.filtro = NuevoFiltroDestacados(p.t("list.filter.starred"), p.AlternarDestacados)
+	// «Míos / Compartidos conmigo» y el orden: los `<Select size="md">` de la web.
+	w.alcance = ui.NuevoSelector([]string{p.t("list.scope.all"), p.t("list.scope.mine"), p.t("list.scope.shared")},
+		func(i int) { p.ElegirAlcance(alcances[i]) })
+	w.alcance.Rotulo = p.t("list.scope.label")
+	w.orden = ui.NuevoSelector([]string{p.t("list.sort.updated"), p.t("list.sort.title")},
+		func(i int) { p.ElegirOrden(i == 1) })
+	w.orden.Rotulo = p.t("list.sort.label")
 	w.papelera = NuevoAccesoPapelera(p.t("list.trash"), p.AbrirPapelera)
 	w.buscador = ui.NuevaEntrada(p.t("list.filter.placeholder"))
 	w.buscador.Icono = iconos.Buscar
@@ -630,6 +697,13 @@ func (w *vistaPortada) rehacer() {
 	// `disabled={offline || creating !== null || importing}`.
 	w.abrir.Inerte = p.Creando || !p.hayRed()
 	w.filtro.Activo = p.Destacados
+	w.alcance.Elegida = slices.Index(alcances[:], p.Alcance)
+	w.orden.Elegida = 0
+	if p.PorTitulo {
+		w.orden.Elegida = 1
+	}
+	w.alcance.Refresh()
+	w.orden.Refresh()
 	w.insignia.Texto = strconv.Itoa(len(p.Docs))
 	if p.Cursor != "" {
 		w.insignia.Texto += "+"
@@ -647,17 +721,22 @@ func (w *vistaPortada) rehacerCuerpo() {
 	w.rejilla = nil
 	switch p.Estado {
 	case Cargando:
+		// Las teselas son UN grupo de carga: laten a una y dicen «Cargando» una vez.
+		g := ui.NuevosBloquesEsqueleto()
 		esqueletos := make([]fyne.CanvasObject, EsqueletosPortada)
 		for i := range esqueletos {
-			e := ui.NuevoEsqueleto(0, AltoEsqueletoPortada)
-			e.Radio = tema.RadioLG
+			e := g.Bloque(0, AltoEsqueletoPortada)
+			e.CornerRadius = tema.RadioLG
 			esqueletos[i] = e
 		}
 		w.rejilla = &rejillaPortada{auto: true, alto: AltoEsqueletoPortada}
-		w.cuerpo = container.New(w.rejilla, esqueletos...)
+		w.cuerpo = g.Con(container.New(w.rejilla, esqueletos...))
 	case Listo:
 		teselas := make([]fyne.CanvasObject, len(p.Docs))
-		acc := AccionesTesela{Abrir: p.AlAbrir, Destacar: p.Destacar, Renombrar: p.PedirNombre, Copiar: p.Copiar, Eliminar: p.PedirBorrado}
+		acc := AccionesTesela{
+			Abrir: p.AlAbrir, Destacar: p.Destacar, Renombrar: p.PedirNombre, Copiar: p.Copiar,
+			Descargar: p.Descargar, Compartir: p.Compartir, Eliminar: p.PedirBorrado,
+		}
 		for i, d := range p.Docs {
 			s := NuevaTeselaDoc(d, p.t2(), p.Loc, acc)
 			s.SinRed = !p.hayRed()
@@ -701,6 +780,13 @@ func (w *vistaPortada) vacio() *ui.Vacio {
 		if p.Aplicada != "" {
 			e = ui.NuevoVacio(p.t("list.empty.search.title", i18n.Vars{"query": p.Aplicada}), p.t("list.empty.search.description"))
 			e.Ilustracion = iconos.Pintar(iconos.VacioBusqueda, v).Objeto()
+			break
+		}
+		if p.Alcance != api.DocsAll || p.Destacados {
+			// Con filtros puestos, vacío no es «aún no tienes documentos».
+			e = ui.NuevoVacio(p.t("list.empty.filtered.title"), p.t("list.empty.filtered.description"))
+			e.Ilustracion = iconos.Pintar(iconos.VacioBusqueda, v).Objeto()
+			e.Accion = ui.NuevoBoton(p.t("list.empty.filtered.action"), p.VerTodo).Con(ui.Secundario, ui.TallaSM)
 			break
 		}
 		e = ui.NuevoVacio(p.t("list.empty.title"), p.t("list.empty.description"))
@@ -918,7 +1004,7 @@ func (r *vistaRenderer) piezas() []fyne.CanvasObject {
 	if len(w.p.Docs) > 0 && w.p.Estado == Listo {
 		objs = append(objs, w.insignia)
 	}
-	objs = append(objs, w.papelera, w.filtro, w.buscador)
+	objs = append(objs, w.papelera, w.alcance, w.orden, w.filtro, w.buscador)
 	if w.cuerpo != nil {
 		objs = append(objs, w.cuerpo)
 	}
@@ -1022,11 +1108,22 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 	if conInsignia {
 		izquierda += ui.MedidaInsignia(w.insignia.Texto).Width + HuecoEncabezado
 	}
+	// «Propietario» y «Ordenar por» van delante de «Destacados» si caben con el
+	// buscador entero; si no, la fila se parte (`flex-wrap`) y bajan a la suya.
+	alc, ord := w.alcance.MinSize(), w.orden.MinSize()
+	sels := alc.Width + HuecoEncabezado + ord.Width + HuecoEncabezado
+	selsDebajo := izquierda+sels+min(AnchoBuscador, 0.6*ancho) > ancho
+	if !selsDebajo {
+		izquierda += sels
+	}
 	busc.Width = max(min(AnchoBuscador, 0.6*ancho, ancho-izquierda), 0)
 	// Si no cabe el icono y una palabra, conserva un campo útil en otra fila.
 	// Un Entry de ancho cero además hacía dibujar un rectángulo de -0,5 px.
 	buscDebajo := busc.Width < min(tema.Espacio(16), ancho)
 	fila = max(fil.Height, tema.TextoXS.Linea)
+	if !selsDebajo {
+		fila = max(fila, alc.Height, ord.Height)
+	}
 	if !buscDebajo {
 		fila = max(fila, busc.Height)
 	}
@@ -1043,7 +1140,28 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 	}
 	w.filtro.Move(fyne.NewPos(der-fil.Width, y+(fila-fil.Height)/2))
 	w.filtro.Resize(fil)
+	der -= fil.Width + HuecoEncabezado
+	if !selsDebajo {
+		w.orden.Move(fyne.NewPos(der-ord.Width, y+(fila-ord.Height)/2))
+		der -= ord.Width + HuecoEncabezado
+		w.alcance.Move(fyne.NewPos(der-alc.Width, y+(fila-alc.Height)/2))
+	}
 	y += fila + BajoEncabezado
+	if selsDebajo {
+		// En su fila, a la derecha como en la web (`ml-auto`); si ni así caben,
+		// se reparten el ancho.
+		if alc.Width+HuecoEncabezado+ord.Width > ancho {
+			alc.Width = max((ancho-HuecoEncabezado)/2, 0)
+			ord.Width = alc.Width
+		}
+		d := x + ancho
+		w.orden.Move(fyne.NewPos(d-ord.Width, y))
+		d -= ord.Width + HuecoEncabezado
+		w.alcance.Move(fyne.NewPos(d-alc.Width, y))
+		y += max(alc.Height, ord.Height) + BajoEncabezado
+	}
+	w.alcance.Resize(alc)
+	w.orden.Resize(ord)
 	if buscDebajo {
 		busc.Width = ancho
 		w.buscador.Move(fyne.NewPos(x, y))

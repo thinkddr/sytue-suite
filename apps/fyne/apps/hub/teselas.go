@@ -24,7 +24,7 @@ import (
 
 // ---- La tesela de producto ----
 
-// Medidas de la tesela, del marcado de `Launcher.tsx` y medidas en producción a
+// Medidas de la tesela, del marcado de `TeselaProducto.tsx` y medidas en producción a
 // 1280×800 (`inicio.ancho.json`):
 //
 //	tesela      239,19 × 115,39 · `rounded-lg border p-4 gap-3`
@@ -44,7 +44,7 @@ const (
 )
 
 // La tesela COMPACTA de la forma Marco (`marco:flex-row marco:items-center marco:px-3
-// marco:py-2.5` en `Launcher.tsx`): la marca a la izquierda —el `ProductIcon` de 40 al
+// marco:py-2.5` en `TeselaProducto.tsx`): la marca a la izquierda —el `ProductIcon` de 40 al
 // 105 %, 42— y, a su derecha, el nombre y la descripción, en UNA línea cada uno.
 const (
 	// TeselaCompactaPX es el `marco:px-3` y TeselaCompactaPY el `marco:py-2.5`.
@@ -69,11 +69,6 @@ var EscalonDescripcion = tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.375 * tema
 // TeselaApp es el lanzador de un producto: la marca, el nombre corto y la
 // descripción. Pulsarla NO abre una pantalla de este binario: le pide al sistema que
 // abra la aplicación de ese producto (ver `productos.go`).
-//
-// ponytail: una tesela deshabilitada lleva además `grayscale` en la web, y la marca
-// aquí sale en color. Fyne no tiene filtros de imagen y el SVG de la marca es la
-// fuente compartida con la web, que no se toca: se cerraría desaturando el mapa de
-// bits en `iconos.Dibujo`, que es donde están los píxeles.
 type TeselaApp struct {
 	ui.Pulsable
 
@@ -87,6 +82,37 @@ type TeselaApp struct {
 	Deshabilitada bool
 	// RotuloDeshabilitada es «Desactivado», la insignia de la esquina.
 	RotuloDeshabilitada string
+	// Vecina es la tesela a la que lleva una flecha, Inicio o Fin, o nil. La pone el
+	// lanzador, que es quien conoce la rejilla (`navegarProducto` en `Launcher.tsx`).
+	Vecina Vecina
+}
+
+// Vecina da la tesela a la que lleva una flecha, Inicio o Fin desde `desde`, o nil. La
+// galería son las DOS rejillas, la de producto y la de apps conectadas: el destino
+// puede ser de cualquiera de las dos (`[data-hub-galeria]` en la web).
+type Vecina func(desde fyne.Focusable, tecla fyne.KeyName) fyne.Focusable
+
+// moverEnGaleria atiende las flechas, Inicio y Fin de una tesela con vecinas; devuelve
+// false con cualquier otra tecla, o fuera de una galería, para que siga su camino.
+// La sobrescritura va en las teselas y no en el `Pulsable` común: fuera de una rejilla
+// las flechas tienen que seguir subiendo a la ventana.
+func moverEnGaleria(p *ui.Pulsable, yo fyne.Focusable, vecina Vecina, e *fyne.KeyEvent) bool {
+	switch e.Name {
+	case fyne.KeyLeft, fyne.KeyRight, fyne.KeyUp, fyne.KeyDown, fyne.KeyHome, fyne.KeyEnd:
+	default:
+		return false
+	}
+	if vecina == nil {
+		return false
+	}
+	// Como el `preventDefault` de la web: sin destino (borde de la galería), la tecla
+	// se consume igual y el foco no se mueve.
+	if d := vecina(yo, e.Name); d != nil && d != yo {
+		if c := p.Lienzo(); c != nil {
+			c.Focus(d)
+		}
+	}
+	return true
 }
 
 var _ fyne.Widget = (*TeselaApp)(nil)
@@ -103,6 +129,15 @@ func NuevaTeselaApp(p Producto, descripcion, rotulo string, alPulsar func()) *Te
 // AccessibilityLabel es el `aria-label` de la web, que junta nombre y descripción: un
 // lector de pantalla que solo diga «Mail» no dice a dónde lleva.
 func (t *TeselaApp) AccessibilityLabel() string { return t.Rotulo }
+
+// TypedKey mueve el foco entre las teselas con las flechas, Inicio y Fin, como el
+// `onKeyDown={navegarProducto}` de la web. Lo demás (Intro, Escape…) lo sigue
+// atendiendo el `Pulsable`.
+func (t *TeselaApp) TypedKey(e *fyne.KeyEvent) {
+	if !moverEnGaleria(&t.Pulsable, t, t.Vecina, e) {
+		t.Pulsable.TypedKey(e)
+	}
+}
 
 // AltoTesela es lo que ocupa una tesela cuya descripción se reparte en `lineas`.
 func AltoTesela(lineas int) float32 {
@@ -340,21 +375,23 @@ func juntar(lineas []string) string {
 
 // ---- La tesela de una aplicación conectada ----
 
-// Medidas de la tesela de una aplicación de terceros (`Launcher.tsx`, «Conectado»): la
-// misma caja que la de producto, pero el icono va dentro de un cuadro NEUTRO de
-// `h-12 w-12 rounded-lg bg-bg-subtle` —42 con el rem de 14— con la imagen de 28 en el
-// centro. El cuadro sí vale aquí: el logotipo lo pone un tercero y su forma es
-// impredecible; lo que no se hace es teñirlo con el color de la app.
+// La tesela de una aplicación de terceros (`TeselaConectada` de `TeselaProducto.tsx`) es
+// la de producto: la misma caja, las mismas medidas, la forma compacta de Marco y su
+// sitio en las flechas. Iba con caja propia —`rounded-lg border-border`, un cuadro de 42
+// y sin forma compacta— y, al lado de las propias, se leía como de otro sitio.
+//
+// Su marca es un distintivo NEUTRO con la geometría de `ProductIcon size={40}` (de 4 a
+// 36, radio del 22,5 %): el logotipo lo pone un tercero y su forma es impredecible, así
+// que va dentro, a 20, sin teñirlo con el color de la app. Sin icono, la inicial del
+// nombre sobre ese neutro, en vez de una caja gris vacía.
 const (
-	LadoCuadroConectada float32 = 12 * 0.25 * tema.Rem
-	LadoIconoConectada  float32 = 28
+	// LadoIconoConectada es el `<img width={20} height={20}>` dentro del distintivo.
+	LadoIconoConectada float32 = 20
+	// MargenDistintivo y RadioDistintivo son el `inset: 4px` y el `border-radius: 9px`
+	// del distintivo sobre su caja de 40 (los de `ProductIcon`), en proporción.
+	MargenDistintivo = 0.1
+	RadioDistintivo  = 0.225
 )
-
-// AltoTeselaConectada es lo que ocupa con la descripción en `lineas`.
-func AltoTeselaConectada(lineas int) float32 {
-	return 2*tema.Borde + 2*MargenTesela + LadoCuadroConectada + HuecoTesela +
-		tema.TextoRaiz.Linea + float32(lineas)*EscalonDescripcion.Linea
-}
 
 // TeselaConectada es el lanzador de una aplicación conectada por la organización.
 // Pulsarla abre su dirección de lanzamiento en el navegador (`target="_blank"`).
@@ -364,6 +401,8 @@ type TeselaConectada struct {
 	App api.AppConectada
 	// Rotulo es el `aria-label`/`title`: «{name} — {description}».
 	Rotulo string
+	// Vecina es la de `TeselaApp`: la pone el lanzador, y la galería es una sola.
+	Vecina Vecina
 }
 
 var _ fyne.Widget = (*TeselaConectada)(nil)
@@ -379,10 +418,26 @@ func NuevaTeselaConectada(a api.AppConectada, rotulo string, alPulsar func()) *T
 // AccessibilityLabel junta nombre y descripción, como la de producto.
 func (t *TeselaConectada) AccessibilityLabel() string { return t.Rotulo }
 
+// TypedKey: las flechas, Inicio y Fin recorren la galería entera, como la de producto.
+func (t *TeselaConectada) TypedKey(e *fyne.KeyEvent) {
+	if !moverEnGaleria(&t.Pulsable, t, t.Vecina, e) {
+		t.Pulsable.TypedKey(e)
+	}
+}
+
+// InicialDe es la letra de reserva de una app sin icono: la primera LETRA, en
+// mayúscula (`inicialDe` de la web: «écija» da «É» y no medio carácter).
+func InicialDe(nombre string) string {
+	for _, r := range strings.TrimSpace(nombre) {
+		return strings.ToUpper(string(r))
+	}
+	return "?"
+}
+
 // iconoDe convierte el `data:image/svg+xml;base64,…` del manifiesto en un dibujo, con
 // las mismas correcciones de `oksvg` que las marcas de la suite (`iconos.DeSVGAjeno`) y
-// encajado sin deformar en su cuadro, como el `<img width=28 height=28>` de la web. Sin
-// icono, o con uno que no se deja leer, el cuadro va vacío: es lo que hace la web.
+// encajado sin deformar en su cuadro, como el `<img width=20 height=20>` de la web. Sin
+// icono, o con uno que no se deja leer, nil: la tesela pone la inicial.
 func iconoDe(a api.AppConectada) *iconos.Dibujo {
 	const prefijo = "data:image/svg+xml;base64,"
 	if !strings.HasPrefix(a.IconURL, prefijo) {
@@ -399,22 +454,31 @@ func iconoDe(a api.AppConectada) *iconos.Dibujo {
 	return d
 }
 
-// CreateRenderer compone la caja, el cuadro con su imagen, el nombre y la descripción.
+// CreateRenderer compone la caja de la tesela de producto, el distintivo con su imagen
+// o su inicial, el nombre y la descripción.
 func (t *TeselaConectada) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r := &teselaConectadaRenderer{
-		t:      t,
-		caja:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioLG),
-		aro:    ui.NuevoAro(tema.RadioLG, ui.SinHueco, v),
-		cuadro: canvas.NewRectangle(tema.Color("bg-subtle", v)),
-		nombre: ui.Texto(t.App.Name, tema.TextoRaiz, ui.SemiNegrita, tema.Color("text", v)),
+		t:          t,
+		v:          v,
+		sombra:     ui.NuevaSombra(tema.SombraSM, radioTesela()).SinInterior(),
+		caja:       ui.NuevaCaja(tema.Color("surface", v), t.borde(v), radioTesela()).ConTrazo(),
+		aro:        ui.NuevoAro(radioTesela(), ui.SinHueco, v),
+		distintivo: canvas.NewRectangle(tema.Color("bg-subtle", v)),
+		nombre:     ui.Texto(t.App.Name, tema.TextoRaiz, ui.SemiNegrita, tema.Color("text", v)),
 	}
-	r.cuadro.CornerRadius = tema.RadioLG
-	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
-	r.objetos = append(r.objetos, r.cuadro)
+	r.distintivo.StrokeColor = tema.Color("border-subtle", v)
+	r.distintivo.StrokeWidth = tema.Borde
+	r.objetos = append([]fyne.CanvasObject{r.sombra.Objeto()}, r.aro.Objetos()...)
+	r.objetos = append(r.objetos, r.caja.Objetos()...)
+	r.objetos = append(r.objetos, r.distintivo)
 	if d := iconoDe(t.App); d != nil {
 		r.icono = d
 		r.objetos = append(r.objetos, d.Objeto())
+	} else {
+		r.inicial = ui.Texto(InicialDe(t.App.Name), tema.TextoRaiz, ui.SemiNegrita,
+			tema.Color("text-muted", v))
+		r.objetos = append(r.objetos, r.inicial)
 	}
 	r.objetos = append(r.objetos, r.nombre)
 	for range LineasDescripcion {
@@ -425,36 +489,96 @@ func (t *TeselaConectada) CreateRenderer() fyne.WidgetRenderer {
 	return r
 }
 
-type teselaConectadaRenderer struct {
-	t       *TeselaConectada
-	caja    *ui.Caja
-	aro     *ui.Aro
-	cuadro  *canvas.Rectangle
-	icono   *iconos.Dibujo
-	nombre  *canvas.Text
-	desc    []*canvas.Text
-	objetos []fyne.CanvasObject
+// borde es el de la tesela de producto: `border-border-subtle` y, con el puntero
+// encima, `hover:border-border-strong`.
+func (t *TeselaConectada) borde(v tema.Variante) color.NRGBA {
+	nombre := "border-subtle"
+	if t.Encima() {
+		nombre = "border-strong"
+	}
+	return tokens.SobreConAlfa(tokens.Crudo(nombre, v), tema.Color("surface", v))
 }
 
+type teselaConectadaRenderer struct {
+	t          *TeselaConectada
+	v          tema.Variante
+	sombra     *ui.Sombra
+	caja       *ui.Caja
+	aro        *ui.Aro
+	distintivo *canvas.Rectangle
+	icono      *iconos.Dibujo
+	inicial    *canvas.Text
+	nombre     *canvas.Text
+	desc       []*canvas.Text
+	objetos    []fyne.CanvasObject
+}
+
+// MinSize es el de la tesela de producto: las dos rejillas miden lo mismo.
 func (r *teselaConectadaRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(0, AltoTeselaConectada(LineasDescripcion))
+	if tema.EsMarco() {
+		return fyne.NewSize(0, AltoTeselaCompacta)
+	}
+	return fyne.NewSize(0, AltoTesela(LineasDescripcion))
 }
 func (r *teselaConectadaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *teselaConectadaRenderer) Destroy()                     {}
 
+// colocarMarca pone el distintivo en la caja de la marca de lado `lado` con su esquina
+// en (x, y), y dentro, centrados, el icono o la inicial.
+func (r *teselaConectadaRenderer) colocarMarca(x, y, lado float32) {
+	m := lado * MargenDistintivo
+	r.distintivo.CornerRadius = lado * RadioDistintivo
+	r.distintivo.Move(fyne.NewPos(x+m, y+m))
+	r.distintivo.Resize(fyne.NewSize(lado-2*m, lado-2*m))
+	cx, cy := x+lado/2, y+lado/2
+	if r.icono != nil {
+		// `xMidYMid`: el dibujo ya encajado, centrado, y con el `scale-105` de Marco.
+		tam := r.icono.Medida()
+		esc := lado / iconos.MarcaLG
+		tam = fyne.NewSize(tam.Width*esc, tam.Height*esc)
+		r.icono.ColocarCaja(cx-tam.Width/2, cy-tam.Height/2, tam)
+	}
+	if r.inicial != nil {
+		w := ui.Medir(r.inicial.Text, tema.TextoRaiz, ui.SemiNegrita).Width
+		ui.ColocarTexto(r.inicial, tema.TextoRaiz, cx-w/2, cy-tema.TextoRaiz.Linea/2)
+	}
+}
+
+// colocarCompacta es la de `teselaRenderer`: marca a la izquierda, nombre y
+// descripción en una línea cada uno.
+func (r *teselaConectadaRenderer) colocarCompacta(t fyne.Size) {
+	x := tema.Borde + TeselaCompactaPX
+	crece := iconos.MarcaLG * (EscalaMarcaCompacta - 1) / 2
+	r.colocarMarca(x-crece, (t.Height-iconos.MarcaLG)/2-crece, iconos.MarcaLG*EscalaMarcaCompacta)
+	x += iconos.MarcaLG + HuecoTesela
+	cabe := max(t.Width-x-TeselaCompactaPX-tema.Borde, 0)
+	y := (t.Height - tema.TextoRaiz.Linea - EscalonDescripcion.Linea) / 2
+	ui.Truncar(r.nombre, r.t.App.Name, tema.TextoRaiz, ui.SemiNegrita, cabe)
+	ui.ColocarTexto(r.nombre, tema.TextoRaiz, x, y)
+	y += tema.TextoRaiz.Linea
+	for i, d := range r.desc {
+		if i > 0 { // `marco:line-clamp-1`
+			d.Hide()
+			continue
+		}
+		d.Show()
+		ui.Truncar(d, r.t.App.Description, EscalonDescripcion, ui.Normal, cabe)
+		ui.ColocarTexto(d, EscalonDescripcion, x, y)
+	}
+}
+
 func (r *teselaConectadaRenderer) Layout(t fyne.Size) {
 	r.aro.Colocar(t)
+	r.sombra.Ajustar(fyne.NewPos(0, 0), t, r.v)
 	r.caja.Redimensionar(t)
+	if tema.EsMarco() {
+		r.colocarCompacta(t)
+		return
+	}
 	x, y := tema.Borde+MargenTesela, tema.Borde+MargenTesela
 	cabe := t.Width - 2*x
-	r.cuadro.Move(fyne.NewPos(x, y))
-	r.cuadro.Resize(fyne.NewSize(LadoCuadroConectada, LadoCuadroConectada))
-	if r.icono != nil {
-		// `xMidYMid`: el dibujo ya encajado, centrado en el cuadro.
-		m := r.icono.Medida()
-		r.icono.ColocarCaja(x+(LadoCuadroConectada-m.Width)/2, y+(LadoCuadroConectada-m.Height)/2, m)
-	}
-	y += LadoCuadroConectada + HuecoTesela
+	r.colocarMarca(x, y, iconos.MarcaLG)
+	y += iconos.MarcaLG + HuecoTesela
 	ui.Truncar(r.nombre, r.t.App.Name, tema.TextoRaiz, ui.SemiNegrita, cabe)
 	ui.ColocarTexto(r.nombre, tema.TextoRaiz, x, y)
 	y += tema.TextoRaiz.Linea
@@ -475,15 +599,28 @@ func (r *teselaConectadaRenderer) Layout(t fyne.Size) {
 	}
 }
 
-// Refresh: `hover:border-border-strong hover:bg-bg-subtle` y el anillo al enfocar.
+// Refresh repinta con el tema, la forma, el puntero y el foco, como la de producto.
 func (r *teselaConectadaRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	relleno, borde := tema.Color("surface", v), tema.Color("border", v)
-	if r.t.Encima() {
-		relleno, borde = tema.Color("bg-subtle", v), tema.Color("border-strong", v)
-	}
-	r.caja.Pintar(relleno, borde)
+	r.v = v
+	r.sombra.CambiarRadio(radioTesela())
+	r.caja.CambiarRadio(radioTesela())
+	r.aro.CambiarRadio(radioTesela())
+	r.caja.Pintar(tema.Color("surface", v), r.t.borde(v))
 	r.aro.Pintar(v)
 	r.aro.Ver(r.t.Enfocado())
+	r.distintivo.FillColor = tema.Color("bg-subtle", v)
+	r.distintivo.StrokeColor = tema.Color("border-subtle", v)
+	r.distintivo.Refresh()
+	if r.inicial != nil {
+		r.inicial.Color = tema.Color("text-muted", v)
+		r.inicial.Refresh()
+	}
+	r.nombre.Color = tema.Color("text", v)
+	r.nombre.Refresh()
+	for _, d := range r.desc {
+		d.Color = tema.Color("text-muted", v)
+		d.Refresh()
+	}
 	r.Layout(r.t.Size())
 }

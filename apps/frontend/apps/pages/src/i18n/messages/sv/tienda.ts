@@ -171,14 +171,9 @@ export const tienda = {
   'store.gateway_mode': 'Läge för betalväxel',
   'store.mode_test_help': 'Simulerade betalningar med leverantörens testnycklar. Ingen debiteras.',
   'store.mode_live_help': 'Skarpa betalningar från dina kunder med produktionsnycklarna.',
-  'store.webhook_title': 'Steg 1: webhook-adress',
   'store.webhook_help': 'Klistra in den här adressen i kontrollpanelen hos {nombre}.',
   'store.webhook_label': 'Webhook-adress',
   'store.webhook_error': 'Webhook-adressen kunde inte hämtas. Stäng dialogrutan och försök igen.',
-  'store.copy': 'Kopiera',
-  'store.copied': 'Adress kopierad.',
-  'store.credentials_title': 'Inloggningsuppgifter',
-  'store.credentials_step': 'Steg 2: inloggningsuppgifter',
   'store.f_api_key': 'API-nyckel',
   'store.f_api_key_mode': 'API-nyckel ({modo})',
   'store.f_profile_id': 'Profil-ID (valfritt)',
@@ -196,6 +191,48 @@ export const tienda = {
   'store.gateway_save': 'Spara och testa',
   'store.gateway_saved': 'Betalväxeln {nombre} har testats och sparats.',
   'store.gateway_save_error': 'Uppgifterna för betalväxeln kunde inte valideras.',
+  'store.wz_progress': 'Steg för att ansluta betalleverantören',
+  'store.wz_step_mode': 'Läge',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Nycklar',
+  'store.wz_step_check': 'Kontrollera',
+  'store.wz_step_done': 'Klart',
+  'store.wz_mode_heading': 'Testbetalningar eller riktiga betalningar?',
+  'store.wz_mode_desc':
+    'Börja i testläge; när allt fungerar öppnar du guiden igen och väljer live.',
+  'store.wz_webhook_heading': 'Berätta för {nombre} vart betalningsaviseringar ska skickas',
+  'store.wz_keys_heading': 'Dina nycklar från {nombre}',
+  'store.wz_keys_desc':
+    'Hemliga nycklar sparas förseglade och visas aldrig igen: skriv in en nyckel på nytt för att ändra den.',
+  'store.wz_keys_rejected': '{nombre} godkände inte de här nycklarna',
+  'store.wz_check_heading': 'Kontrollera och spara',
+  'store.wz_check_desc':
+    'Sytue Web testar nycklarna hos {nombre} innan betalleverantören aktiveras. Inget sparas förrän testet lyckas.',
+  'store.wz_secret_hidden': 'Inskriven (dold)',
+  'store.wz_empty_value': 'Inte angiven',
+  'store.wz_done_heading': '{nombre} är klar',
+  'store.wz_finish': 'Slutför',
+  'store.hint_mollie_api_key':
+    'I Mollie: Developers › API keys. Testnycklar börjar med test_ och livenycklar med live_.',
+  'store.hint_mollie_profile':
+    'I Mollie: Settings › Website profiles. Det börjar med pfl_; lämna tomt för att använda din standardprofil.',
+  'store.hint_adyen_api_key':
+    'I Adyen Customer Area: Developers › API credentials › din credential › API key.',
+  'store.hint_adyen_merchant':
+    'I Adyen Customer Area, i kontoväljaren högst upp: handlarkontot, inte företagskontot.',
+  'store.hint_adyen_hmac': 'I Adyen: Developers › Webhooks › din webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'I Adyen (live): Developers › API URLs. Det är delen av adressen före -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Din bank ger dig den med avtalet för den virtuella betalterminalen; den finns också i Redsys administrationsportal.',
+  'store.hint_redsys_terminal':
+    'I Redsys administrationsportal, bredvid handlarkoden. Oftast är det 1.',
+  'store.hint_redsys_secret':
+    'I Redsys administrationsportal: handlaruppgifter › SHA-256-nyckel. Test- och livenyckeln är olika.',
+  'store.hint_stripe_secret':
+    'I Stripe: Developers › API keys › Secret key. Den börjar med sk_test_ eller sk_live_.',
+  'store.hint_stripe_webhook':
+    'I Stripe: Developers › Webhooks › din endpoint › Signing secret. Den börjar med whsec_.',
   'orders.subtitle': 'Beställningar och köp som gjorts på din webbplats.',
   'orders.count': { one: '{count} beställning', other: '{count} beställningar' },
   'orders.loading': 'Läser in beställningar',

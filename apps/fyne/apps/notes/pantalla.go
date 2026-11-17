@@ -28,6 +28,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	colaNotas "git.sytue.eu/sytue/one/apps/nucleo/notas"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
@@ -40,6 +41,12 @@ import (
 // se rellenan esos campos y se vuelve a pintar. Es lo que hace que los guardianes de
 // píxel no necesiten ni red ni servicio.
 type Pantalla struct {
+	lifetime               vidaPantalla
+	erroresEdiciones       map[string]borradorEdicion
+	avisoBorradorBloqueado bool // solo se accede en el hilo de la interfaz
+	avisoCapturaBloqueada  bool // solo se accede en el hilo de la interfaz
+	prepararSuite          func(context.Context) context.Context
+	verificarSuite         func(context.Context) error
 	// peticion es la franja de «Pedir acceso de edición» del cuaderno abierto, y
 	// cuadernoDelAviso el del aviso de una petición que atiende su dueño (peticiones.go).
 	peticion         pet.Estado
@@ -76,6 +83,10 @@ type Pantalla struct {
 
 	// hist es el deshacer y rehacer del cuaderno: crear, editar, mover y eliminar.
 	hist Historial
+	// versiones lleva la versión del servidor de cada nota guardada desde aquí y pone
+	// sus guardados en fila; conflicto es el que espera respuesta (conflicto.go).
+	versiones versiones
+	conflicto *conflictoAbierto
 	// creando corta el doble clic en «Nueva nota». Solo se toca en el hilo de la
 	// interfaz.
 	creando          bool
@@ -213,13 +224,23 @@ const clavePrefOcultarTerminadas = "sytue-notes-ocultar-terminadas"
 // NuevaPantalla monta la aplicación. `svc` puede ser nil: la pantalla se pinta igual y
 // se queda en la fase que se le ponga, que es lo que hace el guardián.
 func NuevaPantalla(tr *i18n.Translator, l i18n.Locale, svc *api.Notes, red *offline.Monitor, win fyne.Window) *Pantalla {
+	return NuevaPantallaConContexto(context.Background(), tr, l, svc, red, win)
+}
+
+// NuevaPantallaConContexto creates one presenter for one verified device session.
+func NuevaPantallaConContexto(parent context.Context, tr *i18n.Translator, l i18n.Locale, svc *api.Notes, red *offline.Monitor, win fyne.Window) *Pantalla {
+	return nuevaPantalla(parent, nil, tr, l, svc, red, win)
+}
+
+func nuevaPantalla(parent context.Context, work *colaNotas.LocalWork, tr *i18n.Translator, l i18n.Locale, svc *api.Notes, red *offline.Monitor, win fyne.Window) *Pantalla {
 	// Notepads es una libreta: marco, menú y barra en el fondo de la página, la hoja en
 	// blanco con su filete y los glifos de una sola tinta (el `data-cromo="papel"` de la
 	// web, ADR 0079). Antes de construir nada: los colores se leen al pintar.
 	tema.ElegirCromo(tema.CromoPapel)
 	p := &Pantalla{
 		svc: svc, tr: tr, loc: l, red: red, win: win,
-		Plazo: 30 * time.Second, avisos: ui.NuevaPilaAvisos(), orden: OrdenManual,
+		lifetime: vidaPantalla{parent: parent, work: work},
+		Plazo:    30 * time.Second, avisos: ui.NuevaPilaAvisos(), orden: OrdenManual,
 	}
 	if o := fyne.CurrentApp().Preferences().String(clavePrefOrden); EsOrden(o) {
 		p.orden = Orden(o)
@@ -234,9 +255,9 @@ func NuevaPantalla(tr *i18n.Translator, l i18n.Locale, svc *api.Notes, red *offl
 	p.busqueda = NuevaBusqueda(tr)
 	p.papelera = NuevaPapelera(tr)
 	p.fijadas, p.archivo = &Fijadas{tr: tr}, &Archivo{tr: tr}
-	p.enganchar()
-	p.engancharCompartidas()
-	p.atajos()
+	p.enganchar()            //nolint:contextcheck // These handlers run later with the mounted presenter lifetime, not during construction.
+	p.engancharCompartidas() //nolint:contextcheck // These handlers run later with the mounted presenter lifetime, not during construction.
+	p.atajos()               //nolint:contextcheck // These handlers run later with the mounted presenter lifetime, not during construction.
 	return p
 }
 
@@ -267,7 +288,7 @@ func (r *raiz) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		// `fyne.Do` desde la rutina de la interfaz ENCOLA: el repintado va después de
 		// este Layout y no cambia los hijos que se están colocando ahora mismo. (El
 		// driver de pruebas lo ejecuta en el acto, en la misma rutina.)
-		fyne.Do(r.p.Repintar)
+		r.p.enHilo(r.p.Repintar)
 	}
 }
 
@@ -477,6 +498,9 @@ func (p *Pantalla) variante() tema.Variante {
 // Repintar rehace el árbol con el estado de ahora. Se llama SIEMPRE desde la rutina
 // principal: quien venga de una goroutine pasa por `enHilo`.
 func (p *Pantalla) Repintar() {
+	if !p.vigente() {
+		return
+	}
 	p.autoArrastre.Parar()
 	if p.raiz == nil {
 		return
@@ -490,7 +514,7 @@ func (p *Pantalla) Repintar() {
 	if a := p.ancla; a != "" {
 		if _, ok := p.nota(p.lienzo.Seleccionada); ok {
 			p.ancla = ""
-			fyne.Do(func() { p.irAlAncla(a) })
+			p.enHilo(func() { p.irAlAncla(a) })
 		}
 	}
 }
@@ -610,13 +634,9 @@ func (p *Pantalla) quitarFiltro() {
 	p.Repintar()
 }
 
-// enHilo ejecuta algo en la rutina de la interfaz. `fyne.Do` es obligatorio desde Fyne
-// 2.6 para tocar la interfaz desde otra rutina, y aquí hace falta de verdad: la carga
-// corre en su propia rutina para no congelar la ventana.
-func enHilo(f func()) { fyne.Do(f) }
-
 func (p *Pantalla) ctx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), p.Plazo)
+	ctx, _ := p.contextoTrabajo()
+	return context.WithTimeout(ctx, p.Plazo)
 }
 
 // hayRed dice si el monitor de conectividad ve red. Sin monitor se asume que sí: no
@@ -636,29 +656,33 @@ func (p *Pantalla) afuera() fyne.Scrollable {
 }
 
 func (p *Pantalla) Arrancar() {
-	go p.cargarCuadernos()
-	go p.cargarEtiquetas()
-	go p.cargarRecordatorios()
+	if !p.vigente() {
+		return
+	}
+	p.iniciar(p.cargarCuadernos)
+	p.iniciar(p.cargarEtiquetas)
+	p.iniciar(p.cargarRecordatorios)
 	if p.Almacen != nil {
 		p.cola = pendientesDe(p.Almacen, p.claveAlmacen())
 	}
 	p.vigilarCola()
 }
 
+//nolint:gocognit // la carga, su vigencia por época y el cuaderno que se reabre van juntos para no pintar uno de otra sesión.
 func (p *Pantalla) cargarCuadernos() {
 	var generacion string
-	fyne.DoAndWait(func() { generacion = p.generacionCrypto() })
-	enHilo(func() { p.lateral.Fase = Cargando; p.Repintar() })
+	p.enHiloEsperar(func() { generacion = p.generacionCrypto() })
+	p.enHilo(func() { p.lateral.Fase = Cargando; p.Repintar() })
 	// Con almacén se pide igual sin red: el transporte sirve la última copia.
 	if p.svc == nil || !p.hayRed() && p.Almacen == nil {
-		enHilo(func() { p.lateral.Fase = SinConexion; p.Repintar() })
+		p.enHilo(func() { p.lateral.Fase = SinConexion; p.Repintar() })
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	lista, err := p.svc.ListNotebooks(ctx)
 	cuadernos := DeCuadernos(lista)
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.generacionCrypto() != generacion {
 			return
 		}
@@ -669,6 +693,12 @@ func (p *Pantalla) cargarCuadernos() {
 		for _, c := range cuadernos {
 			if c.ID == p.activo.ID {
 				changed := c.Cifrado != p.activo.Cifrado || !bytes.Equal(c.Crudo.Crypto, p.activo.Crudo.Crypto)
+				if changed && p.edicion != nil && p.edicion.bloqueoBorrador {
+					p.cerrarEditor()
+					if p.edicion != nil {
+						return
+					}
+				}
 				p.activo = c
 				if changed {
 					p.cancelarMigracion()
@@ -706,7 +736,7 @@ func (p *Pantalla) cargarEtiquetas() {
 	if err != nil {
 		return // las etiquetas son un extra: sin ellas la app funciona entera
 	}
-	enHilo(func() { p.etiquetas = tags; p.Repintar() })
+	p.enHilo(func() { p.etiquetas = tags; p.Repintar() })
 }
 
 // abrirCuaderno cambia de cuaderno y carga sus notas.
@@ -715,7 +745,13 @@ func (p *Pantalla) cargarEtiquetas() {
 // todavía, pero la bandera se reinicia igual: dejarla puesta haría que un cuaderno
 // cifrado se abriera como si ya lo estuviera.
 func (p *Pantalla) abrirCuaderno(c Cuaderno) {
+	if !p.vigente() {
+		return
+	}
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	if p.campoCaptura != nil && p.activo.ID != "" {
 		p.guardarBorrador(p.activo.ID, p.capturaTexto)
 	}
@@ -733,27 +769,31 @@ func (p *Pantalla) abrirCuaderno(c Cuaderno) {
 		p.desplazador.ScrollToTop() // otro cuaderno empieza por arriba
 	}
 	p.Repintar()
-	go p.cargarNotas(c)
+	{
+		notaFuncion := p.cargarNotas
+		notaArgumento0 := c
+		p.iniciar(func() { notaFuncion(notaArgumento0) })
+	}
 }
 
 func (p *Pantalla) cargarNotas(c Cuaderno) {
 	var generacion string
 	var epoch uint64
-	fyne.DoAndWait(func() { generacion, epoch = p.generacionCrypto(), p.cryptoEpoch })
+	p.enHiloEsperar(func() { generacion, epoch = p.generacionCrypto(), p.cryptoEpoch })
 	if esProvisional(c.ID) {
 		// El día provisional no existe todavía: no hay nada que leer.
-		enHilo(func() { p.notas, p.lienzo.Fase = nil, Vacia; p.Repintar() })
+		p.enHilo(func() { p.notas, p.lienzo.Fase = nil, Vacia; p.Repintar() })
 		return
 	}
-	enHilo(func() { p.lienzo.Fase = Cargando; p.Repintar() })
+	p.enHilo(func() { p.lienzo.Fase = Cargando; p.Repintar() })
 	if p.svc == nil || !p.hayRed() && p.Almacen == nil {
-		enHilo(func() { p.lienzo.Fase = SinConexion; p.Repintar() })
+		p.enHilo(func() { p.lienzo.Fase = SinConexion; p.Repintar() })
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	lista, err := p.svc.ListNotes(ctx, c.ID)
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.activo.ID != c.ID || p.generacionCrypto() != generacion || p.cryptoEpoch != epoch {
 			return // se ha cambiado de cuaderno mientras llegaba: esto ya no vale
 		}
@@ -769,16 +809,16 @@ func (p *Pantalla) cargarNotas(c Cuaderno) {
 }
 
 func (p *Pantalla) cargarPapelera() {
-	enHilo(func() { p.papelera.Fase = Cargando; p.Repintar() })
+	p.enHilo(func() { p.papelera.Fase = Cargando; p.Repintar() })
 	if !p.hayRed() || p.svc == nil {
-		enHilo(func() { p.papelera.Fase = SinConexion; p.Repintar() })
+		p.enHilo(func() { p.papelera.Fase = SinConexion; p.Repintar() })
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	lista, err := p.svc.ListTrash(ctx, limitePapelera)
-	notas := DeNotas(lista)
-	enHilo(func() {
+	notas := DeNotasPapelera(lista)
+	p.enHilo(func() {
 		p.papelera.Notas = notas
 		p.papelera.Fase = FaseDe(err, p.hayRed(), len(notas))
 		p.Repintar()
@@ -787,15 +827,15 @@ func (p *Pantalla) cargarPapelera() {
 
 func (p *Pantalla) buscar(q string, archivados bool) {
 	esta := p.busquedas.Add(1)
-	enHilo(func() { p.busqueda.Fase = Cargando; p.busqueda.Consulta = q; p.Repintar() })
+	p.enHilo(func() { p.busqueda.Fase = Cargando; p.busqueda.Consulta = q; p.Repintar() })
 	if !p.hayRed() || p.svc == nil {
-		enHilo(func() { p.busqueda.Fase = SinConexion; p.Repintar() })
+		p.enHilo(func() { p.busqueda.Fase = SinConexion; p.Repintar() })
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	res, err := p.svc.Search(ctx, q, limiteBusqueda, archivados)
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.busquedas.Load() != esta {
 			return
 		}
@@ -814,7 +854,7 @@ func (p *Pantalla) cargarHashtags() {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	if tags, err := p.svc.Hashtags(ctx); err == nil {
-		enHilo(func() { p.busqueda.Hashtags = tags; p.Repintar() })
+		p.enHilo(func() { p.busqueda.Hashtags = tags; p.Repintar() })
 	}
 }
 
@@ -834,6 +874,11 @@ func (p *Pantalla) enganchar() {
 	l.AlNuevoCuaderno = func() { p.dialogoAjustes(nil, "") }
 	l.AlNuevoDentro = func(c Cuaderno) { p.dialogoAjustes(nil, c.ID) }
 	l.AlAjustes = func(c Cuaderno) { p.dialogoAjustes(&c, "") }
+	// El «…» de cada fila: «Mover cuaderno a…» con las mismas condiciones que el de la
+	// página, y sin tener que abrir antes el cuaderno.
+	l.PuedeMover = p.puedeMoverCuaderno
+	l.AlMover = p.dialogoMoverCuaderno
+	l.AlMenu = p.abrirMenu
 	l.AlEtiquetas = p.dialogoEtiquetas
 	l.AlImportar = p.importar
 	l.AlHoy = func() { p.abrirDia(time.Now().Format(time.DateOnly)) }
@@ -864,22 +909,37 @@ func (p *Pantalla) enganchar() {
 			p.win.Canvas().Focus(b.campoFiltro())
 		}
 	}
-	b.AlExportar = func(formato string, ver bool) { go p.exportar(p.activo.ID, "", formato, ver) }
+	b.AlExportar = func(formato string, ver bool) {
+		{
+			notaFuncion := p.exportar
+			notaArgumento0 := p.activo.ID
+			notaArgumento1 := ""
+			notaArgumento2 := formato
+			notaArgumento3 := ver
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1, notaArgumento2, notaArgumento3) })
+		}
+	}
 	b.AlMenu = p.abrirMenu
 	b.AlNuevaNota = p.nuevaNota
 	b.AlAjustes = func() { c := p.activo; p.dialogoAjustes(&c, "") }
-	b.AlDeshacer = func() { go p.deshacer() }
-	b.AlRehacer = func() { go p.rehacer() }
+	b.AlDeshacer = func() { p.iniciar(p.deshacer) }
+	b.AlRehacer = func() { p.iniciar(p.rehacer) }
 	b.AlDesbloquear = p.desbloquear
 	b.AlBloquear = p.bloquear
 
 	p.lienzo.AlSeleccionar = p.abrirNota
 	p.lienzo.AlMarcar = func(n Nota, m bool) {
-		lanzar(func() error { return p.editar(n.ID, Parche{Marcada: &m}, true) })
+		p.lanzar(func() error { return p.editar(n.ID, Parche{Marcada: &m}, true) })
 	}
 	p.lienzo.AlConvertir = func(n Nota) { p.convertir(n.ID) }
 	p.lienzo.AlRecordatorio = p.dialogoRecordatorio
-	p.lienzo.AlReintentar = func() { go p.cargarNotas(p.activo) }
+	p.lienzo.AlReintentar = func() {
+		{
+			notaFuncion := p.cargarNotas
+			notaArgumento0 := p.activo
+			p.iniciar(func() { notaFuncion(notaArgumento0) })
+		}
+	}
 	p.lienzo.AlCrearPrimera = p.nuevaNota
 	p.lienzo.AlTecla = p.tecla
 	p.lienzo.AlTeclaEspecial = p.teclaEspecial
@@ -888,7 +948,7 @@ func (p *Pantalla) enganchar() {
 	p.arbol.AlSeleccionar = p.abrirNota
 	p.arbol.AlNueva = p.nuevaNota
 	p.arbol.AlPlegar = func(n Nota, plegada bool) {
-		lanzar(func() error { return p.editar(n.ID, Parche{Plegada: &plegada}, true) })
+		p.lanzar(func() error { return p.editar(n.ID, Parche{Plegada: &plegada}, true) })
 	}
 	p.arbol.AlMenuNota = func(n Nota, d fyne.CanvasObject) { p.abrirMenu(d, p.menuNota(n, true)) }
 	p.arbol.AlRenombrar = p.renombrarEnArbol
@@ -897,7 +957,7 @@ func (p *Pantalla) enganchar() {
 	p.lienzo.Previa = p.previaDe
 	p.lienzo.AlPlegarLista = p.plegarLista
 	p.lienzo.AlEditar = p.abrirEditor
-	p.lienzo.AlMoverLibre = func(n Nota, en fyne.Position) { lanzar(func() error { return p.moverLibre(n, en) }) }
+	p.lienzo.AlMoverLibre = func(n Nota, en fyne.Position) { p.lanzar(func() error { return p.moverLibre(n, en) }) }
 	p.lienzo.AlSoltarEnDia = p.soltarEnDia
 	p.lienzo.AlArrastrarNota = p.marcarArrastreNota
 	p.lienzo.AlSoltarNota = p.soltarNota
@@ -913,20 +973,42 @@ func (p *Pantalla) enganchar() {
 	p.lienzo.Imagen, p.lienzo.Documento = p.imagenDe, p.docDe
 	p.lienzo.AlQuitarAdjunto = p.quitarAdjunto
 
-	p.busqueda.AlBuscar = func(q string) { go p.buscar(q, p.busqueda.Archivados) }
+	p.busqueda.AlBuscar = func(q string) {
+		{
+			notaFuncion := p.buscar
+			notaArgumento0 := q
+			notaArgumento1 := p.busqueda.Archivados
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+		}
+	}
 	p.busqueda.AlAbrir = p.abrirResultado
 
 	p.fijadas.AlAbrir = p.abrirResultado
 	p.archivo.AlAbrir, p.archivo.EsMio = p.abrirCuaderno, p.esMio
-	p.archivo.AlDesarchivar = func(c Cuaderno) { go p.archivar(c, false) }
-	p.papelera.AlRestaurar = func(n Nota) { go p.restaurar(n) }
+	p.archivo.AlDesarchivar = func(c Cuaderno) {
+		{
+			notaFuncion := p.archivar
+			notaArgumento0 := c
+			notaArgumento1 := false
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+		}
+	}
+	p.papelera.AlRestaurar = func(n Nota) {
+		{
+			notaFuncion := p.restaurar
+			notaArgumento0 := n
+			p.iniciar(func() { notaFuncion(notaArgumento0) })
+		}
+	}
 	p.papelera.AlPurgar = p.purgar
 	p.papelera.AlVaciar = p.vaciarPapelera
 }
 
 // nuevaNota es «Nueva nota», venga de la barra, del estado vacío, del árbol o de la
 // tecla `n`.
-func (p *Pantalla) nuevaNota() { lanzar(func() error { return p.crear(api.NoteInput{Kind: "text"}) }) }
+func (p *Pantalla) nuevaNota() {
+	p.lanzar(func() error { return p.crear(api.NoteInput{Kind: "text"}) })
+}
 
 // atajos engancha al lienzo de la ventana lo que la web escucha en `document`: Ctrl+Z y
 // Ctrl+Mayús+Z (o Ctrl+Y) deshacen y rehacen el CUADERNO, y la `n` crea una nota.
@@ -942,9 +1024,9 @@ func (p *Pantalla) atajos() {
 	atajo := func(k fyne.KeyName, m fyne.KeyModifier, f func()) {
 		c.AddShortcut(&desktop.CustomShortcut{KeyName: k, Modifier: m}, func(fyne.Shortcut) { f() })
 	}
-	atajo(fyne.KeyZ, fyne.KeyModifierShortcutDefault, func() { go p.deshacer() })
-	atajo(fyne.KeyZ, fyne.KeyModifierShortcutDefault|fyne.KeyModifierShift, func() { go p.rehacer() })
-	atajo(fyne.KeyY, fyne.KeyModifierShortcutDefault, func() { go p.rehacer() })
+	atajo(fyne.KeyZ, fyne.KeyModifierShortcutDefault, func() { p.iniciar(p.deshacer) })
+	atajo(fyne.KeyZ, fyne.KeyModifierShortcutDefault|fyne.KeyModifierShift, func() { p.iniciar(p.rehacer) })
+	atajo(fyne.KeyY, fyne.KeyModifierShortcutDefault, func() { p.iniciar(p.rehacer) })
 	// Los del diario, como la web: ⌘D hoy y ⌘⇧←/→ el día de al lado (⌘K lo cede la
 	// barra de la suite: `EnfocarCaptura`).
 	atajo(fyne.KeyD, fyne.KeyModifierShortcutDefault, func() { p.atajoDiario("today") })
@@ -999,7 +1081,7 @@ func (p *Pantalla) moverConTeclado(k fyne.KeyName) {
 		return
 	}
 	pos := posicionConTeclado(n, k, p.activo.Vista == Libre)
-	lanzar(func() error { return p.colocar(n.ID, pos, true) })
+	p.lanzar(func() error { return p.colocar(n.ID, pos, true) })
 }
 
 // posicionConTeclado es adónde lleva Alt+flecha una nota.
@@ -1040,7 +1122,13 @@ func posicionConTeclado(n Nota, k fyne.KeyName, libre bool) api.NotePosition {
 func (p *Pantalla) tecla(r rune) {
 	if tag, estado, ok := p.atajoDeEstado(r); ok {
 		nota := p.lienzo.Seleccionada
-		go p.marcarEstado(nota, tag, estado)
+		{
+			notaFuncion := p.marcarEstado
+			notaArgumento0 := nota
+			notaArgumento1 := tag
+			notaArgumento2 := estado
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1, notaArgumento2) })
+		}
 		return
 	}
 	if r == 'n' && p.vista == VistaCuaderno && !p.bloqueado && p.hayRed() {
@@ -1070,22 +1158,30 @@ func (p *Pantalla) irA(v Vista) {
 		return
 	}
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	p.vista, p.cajon = v, false
 	p.Repintar()
 	if v == VistaPapelera {
-		go p.cargarPapelera()
+		p.iniciar(p.cargarPapelera)
 	}
 	if v == VistaFijadas {
-		go p.cargarFijadas()
+		p.iniciar(p.cargarFijadas)
 	}
 	if v == VistaCompartidas {
 		p.comp.abierta, p.comp.fase = "", Cargando
 		p.Repintar()
-		go p.cargarCompartidas()
+		p.iniciar(p.cargarCompartidas)
 	}
 	if v == VistaBusqueda {
-		go p.buscar("", p.busqueda.Archivados)
-		go p.cargarHashtags()
+		{
+			notaFuncion := p.buscar
+			notaArgumento0 := ""
+			notaArgumento1 := p.busqueda.Archivados
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+		}
+		p.iniciar(p.cargarHashtags)
 		// `autofocus` del buscador: se abre para escribir.
 		if p.win != nil {
 			p.win.Canvas().Focus(p.busqueda.Campo())
@@ -1154,7 +1250,13 @@ func (p *Pantalla) restaurar(n Nota) {
 func (p *Pantalla) purgar(n Nota) {
 	t := p.tr.T
 	p.confirmar(t("trash.purge", nil), t("trash.purgeConfirm", nil), t("trash.purge", nil),
-		func() { go p.purgarYa(n) })
+		func() {
+			{
+				notaFuncion := p.purgarYa
+				notaArgumento0 := n
+				p.iniciar(func() { notaFuncion(notaArgumento0) })
+			}
+		})
 }
 
 func (p *Pantalla) purgarYa(n Nota) {
@@ -1219,7 +1321,13 @@ func (p *Pantalla) vaciarPapelera() {
 	t := p.tr.T
 	notas := p.papelera.Notas
 	p.confirmar(t("trash.emptyAll", nil), t("trash.emptyAllConfirm", i18n.Vars{"count": len(notas)}),
-		t("trash.emptyAll", nil), func() { go p.vaciarYa(notas) })
+		t("trash.emptyAll", nil), func() {
+			{
+				notaFuncion := p.vaciarYa
+				notaArgumento0 := notas
+				p.iniciar(func() { notaFuncion(notaArgumento0) })
+			}
+		})
 }
 
 // vaciarYa borra cada nota por su lado y deja en la papelera SOLO las que fallaron: es el
@@ -1246,7 +1354,7 @@ func (p *Pantalla) vaciarYa(notas []Nota) {
 		})
 	}
 	wg.Wait()
-	enHilo(func() {
+	p.enHilo(func() {
 		p.papelera.Notas = slices.DeleteFunc(slices.Clone(p.papelera.Notas), func(n Nota) bool { return !fallidas[n.ID] })
 		if len(p.papelera.Notas) == 0 {
 			p.papelera.Fase = Vacia
@@ -1272,5 +1380,5 @@ func (p *Pantalla) abrirMenu(disparador fyne.CanvasObject, m *ui.Menu) {
 
 // avisar apila un aviso desde cualquier rutina.
 func (p *Pantalla) avisar(tono ui.TonoAviso, titulo, descripcion string) {
-	enHilo(func() { p.avisos.Notificar(ui.NuevoAviso(tono, titulo, descripcion)) })
+	p.enHilo(func() { p.avisos.Notificar(ui.NuevoAviso(tono, titulo, descripcion)) })
 }

@@ -23,6 +23,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
@@ -102,7 +103,7 @@ func appConVentana(t *testing.T, s http.Handler) (*App, fyne.Window) {
 	t.Cleanup(srv.Close)
 	p := &Pantalla{T: traductor(t), Cursor: time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC), Zona: time.UTC}
 	a := NuevaApp(p, api.NewCalendars(srv.URL, nil, nil))
-	a.lanzar = func(f func()) { f() }
+	a.lanzar = func(f func(context.Context)) bool { f(a.vida); return true }
 	a.enUI = func(f func()) { f() }
 	w := test.NewWindow(a.Objeto())
 	t.Cleanup(w.Close)
@@ -257,8 +258,8 @@ func TestElFormularioMovilDejaVerLasAccionesSinTeclado(t *testing.T) {
 					}
 				}
 			}
-			if c, ok := o.(*fyne.Container); ok {
-				if l, ok := c.Layout.(*pildoraLayout); ok && l.boton.Position().X+l.boton.Size().Width > c.Size().Width+0.5 {
+			if e, ok := o.(*ui.Etiqueta); ok {
+				if a := e.Aspa(); a != nil && a.Position().X+a.Size().Width > e.Size().Width+0.5 {
 					t.Errorf("a %g: el correo largo deja «Quitar invitado» fuera de su píldora", ancho)
 				}
 			}
@@ -370,18 +371,79 @@ func TestUnaSerieSeParteSegunElAlcance(t *testing.T) {
 	}
 }
 
-// TestLaReglaEsLaDeIcalTs: lo que la interfaz sabe leer y escribir, y lo que no (BY*).
+// TestLaReglaEsLaDeIcalTs: lo que la interfaz sabe leer y escribir, y lo que no (los
+// BY* que no son el BYDAY de una semanal). Los vectores de BYDAY y YEARLY son los de
+// «Repetir: cada año, cada día laborable y ciertos días» en ical.test.ts.
 func TestLaReglaEsLaDeIcalTs(t *testing.T) {
-	for _, s := range []string{"FREQ=DAILY", "FREQ=WEEKLY;INTERVAL=2;COUNT=5", "FREQ=MONTHLY;UNTIL=20261231T235959Z"} {
+	for _, s := range []string{
+		"FREQ=DAILY", "FREQ=WEEKLY;INTERVAL=2;COUNT=5", "FREQ=MONTHLY;UNTIL=20261231T235959Z",
+		"FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6",
+		"FREQ=YEARLY", "FREQ=YEARLY;UNTIL=20301231T235959Z",
+	} {
 		r, ok := LeerRRule(s)
 		if !ok || r.RRule() != s {
 			t.Errorf("%q vuelve como %q (ok=%v)", s, r.RRule(), ok)
 		}
 	}
-	for _, s := range []string{"FREQ=WEEKLY;BYDAY=MO,WE", "FREQ=YEARLY", ""} {
+	if r, _ := LeerRRule("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"); !r.EsLaborable() {
+		t.Error("lunes a viernes no se reconoce como «cada día laborable»")
+	}
+	if r, ok := LeerRRule("FREQ=WEEKLY;BYDAY=we,MO;WKST=MO"); !ok || !slices.Equal(r.Dias, []string{"MO", "WE"}) {
+		t.Errorf("los días no salen ordenados de lunes a domingo: %v", r.Dias)
+	}
+	if got := (Recurrencia{Freq: "WEEKLY", Dias: []string{"FR", "MO", "FR", "XX"}}).RRule(); got != "FREQ=WEEKLY;BYDAY=MO,FR" {
+		t.Errorf("BYDAY sale %q", got)
+	}
+	if got := (Recurrencia{Freq: "DAILY", Dias: []string{"MO"}}).RRule(); got != "FREQ=DAILY" {
+		t.Errorf("BYDAY solo acompaña a una semanal y sale %q", got)
+	}
+	for _, s := range []string{
+		"FREQ=MONTHLY;BYDAY=2MO", "FREQ=WEEKLY;BYDAY=1MO", "FREQ=WEEKLY;BYDAY=MO;BYMONTH=3",
+		"FREQ=DAILY;BYDAY=MO,TU", "FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=8",
+		"FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU", "FREQ=HOURLY", "",
+	} {
 		if _, ok := LeerRRule(s); ok {
-			t.Errorf("%q no debería leerse: la web lo trata como puntual", s)
+			t.Errorf("%q no debería leerse: la web la trata como personalizada", s)
 		}
+	}
+}
+
+// TestRecurrenciaCuentaLosDiasAlPartir es `countBefore`/`carryRule` con BYDAY y YEARLY:
+// partir «este y los siguientes» descuenta cada día elegido, no una por semana.
+func TestRecurrenciaCuentaLosDiasAlPartir(t *testing.T) {
+	inicio := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC) // miércoles
+	corte := time.Date(2026, 7, 15, 9, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		r     Recurrencia
+		corte time.Time
+		n     int
+	}{
+		{Recurrencia{Freq: "WEEKLY"}, corte, 2},
+		{Recurrencia{Freq: "WEEKLY", Dias: []string{"MO", "WE"}}, corte, 4},
+		{Recurrencia{Freq: "WEEKLY", Dias: Laborables}, corte, 10},
+		{Recurrencia{Freq: "WEEKLY", Intervalo: 2, Dias: []string{"MO", "WE"}}, corte, 2},
+		{Recurrencia{Freq: "YEARLY"}, time.Date(2028, 8, 1, 9, 0, 0, 0, time.UTC), 3},
+	} {
+		if got := contarAntes(inicio, c.r, c.corte); got != c.n {
+			t.Errorf("%s: %d antes del corte, y son %d", c.r.RRule(), got, c.n)
+		}
+	}
+	nueva := arrastrarRegla(Recurrencia{Freq: "WEEKLY", Dias: []string{"MO", "WE"}, Cuenta: 10}, inicio, corte)
+	if nueva.RRule() != "FREQ=WEEKLY;BYDAY=MO,WE;COUNT=6" {
+		t.Errorf("la serie nueva es %q", nueva.RRule())
+	}
+	// Lunes a las 00:30 en Madrid, que en UTC es domingo: los días se cuentan en la zona
+	// del evento, como los expande el servicio. En UTC el primer lunes se perdía.
+	madrid, err := time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		t.Skip(err)
+	}
+	lunes := time.Date(2026, 7, 6, 0, 30, 0, 0, madrid)
+	maestro := api.Event{DTStart: lunes.UTC(), TZID: "Europe/Madrid"}
+	viernes := time.Date(2026, 7, 10, 0, 30, 0, 0, madrid)
+	r := Recurrencia{Freq: "WEEKLY", Dias: Laborables, Cuenta: 10}
+	if got := arrastrarRegla(r, inicioEnSuZona(maestro), viernes).Cuenta; got != 6 {
+		t.Errorf("partida el viernes quedan %d, y son 6 (de lunes a jueves van 4)", got)
 	}
 }
 
@@ -809,5 +871,333 @@ func TestLasHorasDeBuscarHuecoTienenCifrasTabulares(t *testing.T) {
 	a, b := nuevoBotonHueco("11:11", nil).MinSize().Width, nuevoBotonHueco("08:00", nil).MinSize().Width
 	if a != b {
 		t.Fatalf("«11:11» mide %v y «08:00» %v: sin cifras tabulares", a, b)
+	}
+}
+
+// conReglaCruda es el servicio falso con una serie BYDAY —de las que crean Apple o
+// Google y la interfaz no sabe editar— en vez de las de siempre. `regla` es su RRULE.
+type conReglaCruda struct {
+	*escrituras
+	regla string
+}
+
+func (s conReglaCruda) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method+" "+r.URL.Path == "GET /api/v1/calendars/mio/instances" {
+		_, _ = io.WriteString(w, `{"instances":[
+			{"event":{"id":"b1","uid":"ub","summary":"Pilates","rrule":"`+s.regla+`","dtstart":"2026-09-14T17:00:00Z","dtend":"2026-09-14T18:00:00Z"},"start":"2026-09-16T17:00:00Z","end":"2026-09-16T18:00:00Z"}]}`)
+		return
+	}
+	s.escrituras.ServeHTTP(w, r)
+}
+
+// confirmarAlcance pulsa la opción `rotulo` del diálogo de alcance que está encima y
+// «Guardar». Devuelve los rótulos de las opciones que ofrecía.
+func confirmarAlcance(t *testing.T, w fyne.Window, rotulo string) []string {
+	t.Helper()
+	capas := w.Canvas().Overlays().List()
+	if len(capas) == 0 {
+		t.Fatal("no se ha preguntado el alcance")
+	}
+	arriba := capas[len(capas)-1]
+	var ofrecidas []string
+	var recorrer func(o fyne.CanvasObject)
+	recorrer = func(o fyne.CanvasObject) {
+		switch v := o.(type) {
+		case *filaAlcance:
+			ofrecidas = append(ofrecidas, v.etiqueta)
+			if v.etiqueta == rotulo {
+				v.Tapped(nil)
+			}
+			return
+		case *fyne.Container:
+			for _, h := range v.Objects {
+				recorrer(h)
+			}
+			return
+		}
+		if wd, ok := o.(fyne.Widget); ok {
+			for _, h := range test.WidgetRenderer(wd).Objects() {
+				recorrer(h)
+			}
+		}
+	}
+	recorrer(arriba)
+	b := buscarBoton(arriba, "Guardar")
+	if b == nil {
+		t.Fatal("el diálogo de alcance no tiene «Guardar»")
+	}
+	b.Tapped(nil)
+	return ofrecidas
+}
+
+// TestLaReglaPersonalizadaSeConservaAlEditar: una serie BYDAY se abre con «Repetir» en
+// «Personalizada»; cambiar el título y guardar «todos» manda la MISMA RRULE byte a
+// byte, y elegir «No se repite» la quita. Antes el formulario la dejaba en «No se
+// repite» sin preguntar y la serie se quedaba en un evento suelto.
+func TestLaReglaPersonalizadaSeConservaAlEditar(t *testing.T) {
+	const regla = "FREQ=MONTHLY;BYDAY=2MO"
+	for _, quitar := range []bool{false, true} {
+		s := &escrituras{}
+		a, w := appConVentana(t, conReglaCruda{s, regla})
+		o := ocurrenciaDe(t, a, "b1")
+		if !esSerie(o) {
+			t.Fatal("una serie «el segundo lunes» no se trata como serie")
+		}
+		e := a.P.EdicionDe(o)
+		if e.Regla != nil || e.ReglaCruda != regla {
+			t.Fatalf("la edición no guarda la regla: %+v %q", e.Regla, e.ReglaCruda)
+		}
+		f := a.P.nuevoFormulario(e, a.destinos(), a.accionesFormulario(e))
+		f.d.Mostrar(w.Canvas())
+		if got := f.repetir.Valor(); got != "Personalizada" {
+			t.Fatalf("«Repetir» dice %q", got)
+		}
+		if !quitar {
+			guardar(t, w.Canvas().Capture(), "calendario-formulario-regla-personalizada")
+		}
+		f.titulo.PonerTexto("Pilates avanzado")
+		if quitar {
+			f.repetir.AlElegir(0)
+		}
+		f.enviar()
+		ofrecidas := confirmarAlcance(t, w, "Todos los eventos")
+		if len(ofrecidas) != 3 {
+			t.Errorf("sin COUNT se ofrecen los tres alcances y salen %v", ofrecidas)
+		}
+		// El primero es el GET de los recordatorios, que el falso no conoce y apunta.
+		hechas, cuerpos := s.apuntadas()
+		if len(hechas) != 2 || hechas[1] != "PUT /api/v1/events/b1" {
+			t.Fatalf("guardar hizo %v", hechas)
+		}
+		c := cuerpos[1]
+		if c["summary"] != "Pilates avanzado" {
+			t.Errorf("el título del PUT es %v", c["summary"])
+		}
+		switch got, _ := c["rrule"].(string); {
+		case !quitar && got != regla:
+			t.Errorf("la regla del PUT es %q y era %q", got, regla)
+		case quitar && got != "":
+			t.Errorf("«No se repite» mandó la regla %q", got)
+		}
+	}
+}
+
+// TestLaReglaPersonalizadaVuelveSiSeReelige: probar «Semanalmente» y volver a
+// «Personalizada» devuelve la regla de origen, no la semanal simple.
+func TestLaReglaPersonalizadaVuelveSiSeReelige(t *testing.T) {
+	const regla = "FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=8"
+	a, _ := appConVentana(t, conReglaCruda{&escrituras{}, regla})
+	e := a.P.EdicionDe(ocurrenciaDe(t, a, "b1"))
+	f := a.P.nuevoFormulario(e, a.destinos(), a.accionesFormulario(e))
+	f.repetir.AlElegir(2)
+	if in := f.e.EntradaDe(a.P); in.RRule != "FREQ=WEEKLY" {
+		t.Fatalf("elegir «Semanalmente» manda %q", in.RRule)
+	}
+	f.repetir.AlElegir(len(frecuencias))
+	if in := f.e.EntradaDe(a.P); in.RRule != regla {
+		t.Fatalf("volver a «Personalizada» manda %q", in.RRule)
+	}
+}
+
+// TestUnaReglaPersonalizadaSeParteSinPerderla: «solo este» saca el suelto y excluye la
+// ocurrencia; «este y los siguientes» arrastra la regla tal cual a la serie nueva; con
+// COUNT ese alcance no se ofrece al editar (no se sabe cuántas quedan), pero sí al
+// borrar; y arrastrar el bloque conserva la regla en «todos».
+func TestUnaReglaPersonalizadaSeParteSinPerderla(t *testing.T) {
+	const regla = "FREQ=MONTHLY;BYDAY=2MO;UNTIL=20261231T235959Z"
+	s := &escrituras{}
+	a, _ := appConVentana(t, conReglaCruda{s, regla})
+	o := ocurrenciaDe(t, a, "b1")
+	in := o.Event.Input()
+	if err := EditarSerie(context.Background(), a.Cal, o, AlcanceSiguientes, in, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := EditarSerie(context.Background(), a.Cal, o, AlcanceTodos, in, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, cuerpos := s.apuntadas()
+	if len(cuerpos) != 3 || cuerpos[0]["rrule"] != regla || cuerpos[1]["mode"] != "until" || cuerpos[2]["rrule"] != regla {
+		t.Errorf("la regla no se arrastra: %v", cuerpos)
+	}
+	o.Event.RRule = "FREQ=MONTHLY;BYDAY=2MO;COUNT=6"
+	if got := alcancesDe(o, false); !slices.Equal(got, []string{AlcanceEste, AlcanceTodos}) {
+		t.Errorf("editar una personalizada con COUNT ofrece %v", got)
+	}
+	if got := alcancesDe(o, true); len(got) != 3 {
+		t.Errorf("borrarla ofrece %v", got)
+	}
+	o.Event.RRule = "FREQ=WEEKLY;COUNT=6"
+	if got := alcancesDe(o, false); len(got) != 3 {
+		t.Errorf("una regla que se sabe editar ofrece %v", got)
+	}
+}
+
+// TestResponderDesdeLaVistaRapidaMarcaLaRespuesta: «¿Vas a ir?» manda la respuesta por
+// el UID del evento (para que llegue al .ics que lee la web), y la respuesta ya dada
+// sale primaria y con ✓ y las otras dos, secundarias. Sin responder, ninguna marcada.
+func TestResponderDesdeLaVistaRapidaMarcaLaRespuesta(t *testing.T) {
+	s := &escrituras{}
+	a, w := appConVentana(t, s)
+	a.Correo = "yo@sytue.eu"
+	ancla := container.NewWithoutLayout()
+	ancla.Move(fyne.NewPos(700, 200))
+	ancla.Resize(fyne.NewSize(140, 18))
+	a.raiz.Add(container.NewWithoutLayout(ancla))
+	o := ocurrenciaDe(t, a, "e1")
+	marcados := func() []string {
+		var out []string
+		for _, r := range []string{"Sí", "Quizá", "No"} {
+			b := buscarBoton(a.vista, r)
+			if b == nil {
+				t.Fatalf("no está «%s»", r)
+			}
+			if b.Variante == ui.Primario || b.Icono == iconos.Tic {
+				out = append(out, r)
+			}
+		}
+		return out
+	}
+
+	a.abrirVistaRapida(o, ancla)
+	if got := marcados(); len(got) != 0 {
+		t.Errorf("sin responder salen marcados %v", got)
+	}
+
+	o.Event.Attendees = []api.Attendee{{Email: "yo@sytue.eu", PartStat: "TENTATIVE"}}
+	a.abrirVistaRapida(o, ancla)
+	if got := marcados(); !slices.Equal(got, []string{"Quizá"}) {
+		t.Errorf("con «Quizá» dado salen marcados %v", got)
+	}
+	if b := buscarBoton(a.vista, "Quizá"); b.Variante != ui.Primario || b.Icono != iconos.Tic {
+		t.Error("la respuesta dada no es primaria con ✓")
+	}
+	guardar(t, w.Canvas().Capture(), "calendario-vista-rapida-respondida")
+
+	buscarBoton(a.vista, "No").Tapped(nil)
+	hechas, cuerpos := s.apuntadas()
+	if len(hechas) != 1 || hechas[0] != "PUT /api/v1/events/u1/attendees/partstat" {
+		t.Fatalf("responder hizo %v", hechas)
+	}
+	if cuerpos[0]["uid"] != "u1" || cuerpos[0]["partstat"] != "DECLINED" {
+		t.Errorf("responder mandó %v", cuerpos[0])
+	}
+}
+
+// botonesDias son los siete botones de «Se repite el» del formulario, en orden, o nil
+// si no está el selector.
+func botonesDias(f *formulario) []*ui.Boton {
+	var out []*ui.Boton
+	var recorrer func(o fyne.CanvasObject)
+	recorrer = func(o fyne.CanvasObject) {
+		switch v := o.(type) {
+		case *ui.Boton:
+			if v.Ancho == tema.Espacio(8) && v.Rotulo != "" {
+				out = append(out, v)
+			}
+		case *fyne.Container:
+			for _, h := range v.Objects {
+				recorrer(h)
+			}
+		}
+	}
+	recorrer(f.cuerpo)
+	return out
+}
+
+func encendidos(bs []*ui.Boton) []string {
+	var out []string
+	for _, b := range bs {
+		if b.Variante == ui.Primario {
+			out = append(out, b.Rotulo)
+		}
+	}
+	return out
+}
+
+// TestRepetirCadaAnoLaborablesYDias es CAL-11: «Repetir» ofrece cada año y cada día
+// laborable, una semanal deja elegir los días, y reabrir la serie enseña lo elegido.
+// Las reglas son las mismas que guarda la web (EventModal.repetir.test.tsx).
+func TestRepetirCadaAnoLaborablesYDias(t *testing.T) {
+	a, w := appConVentana(t, &escrituras{})
+	inicio := time.Date(2026, 11, 11, 9, 0, 0, 0, time.UTC) // miércoles
+	e := Edicion{Inicio: inicio, Fin: inicio.Add(time.Hour)}
+	f := a.P.nuevoFormulario(e, a.destinos(), AccionesFormulario{})
+	elegir := func(freq string) {
+		t.Helper()
+		i := slices.Index(frecuencias, freq)
+		if i < 0 {
+			t.Fatalf("«Repetir» no tiene %s", freq)
+		}
+		f.repetir.AlElegir(i)
+		f.repetir.Elegida = i
+		f.rehacer()
+	}
+	regla := func() string { return f.e.EntradaDe(a.P).RRule }
+
+	elegir("WEEKDAYS")
+	if got := f.repetir.Valor(); got != "Cada día laborable (de lunes a viernes)" {
+		t.Errorf("la opción dice %q", got)
+	}
+	if got := regla(); got != "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" {
+		t.Errorf("«cada día laborable» guarda %q", got)
+	}
+	if len(botonesDias(f)) != 0 {
+		t.Error("«cada día laborable» no enseña los días")
+	}
+	elegir("YEARLY")
+	if got := regla(); got != "FREQ=YEARLY" {
+		t.Errorf("«Anualmente» guarda %q", got)
+	}
+
+	elegir("WEEKLY")
+	bs := botonesDias(f)
+	if len(bs) != 7 || !slices.Equal(encendidos(bs), []string{"miércoles"}) {
+		t.Fatalf("una semanal enciende %v de %d", encendidos(bs), len(bs))
+	}
+	if got := regla(); got != "FREQ=WEEKLY" {
+		t.Errorf("sin tocar los días guarda %q", got)
+	}
+	bs[0].Tapped(nil) // + lunes
+	if got := regla(); got != "FREQ=WEEKLY;BYDAY=MO,WE" {
+		t.Errorf("lunes y miércoles guarda %q", got)
+	}
+	f.d.Mostrar(w.Canvas())
+	guardar(t, w.Canvas().Capture(), "calendario-formulario-repetir-dias")
+	bs = botonesDias(f)
+	bs[0].Tapped(nil) // − lunes
+	bs = botonesDias(f)
+	bs[2].Tapped(nil) // el miércoles es el único: no se apaga
+	if got := encendidos(botonesDias(f)); !slices.Equal(got, []string{"miércoles"}) {
+		t.Errorf("tras apagar quedan %v", got)
+	}
+
+	// Reabrir: la serie enseña lo que se eligió.
+	for _, c := range []struct {
+		rrule, opcion string
+		dias          []string
+	}{
+		{"FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", "Cada día laborable (de lunes a viernes)", nil},
+		{"FREQ=WEEKLY;BYDAY=MO,WE", "Semanalmente", []string{"lunes", "miércoles"}},
+		{"FREQ=YEARLY", "Anualmente", nil},
+		// Una serie sin fin se guarda sin fin: el «4» de partida del campo de veces no
+		// se cuela como COUNT.
+		{"FREQ=DAILY", "Diariamente", nil},
+		{"FREQ=WEEKLY;BYDAY=MO,WE;COUNT=2", "Semanalmente", []string{"lunes", "miércoles"}},
+	} {
+		a, _ := appConVentana(t, conReglaCruda{&escrituras{}, c.rrule})
+		e := a.P.EdicionDe(ocurrenciaDe(t, a, "b1"))
+		if e.Regla == nil || e.ReglaCruda != "" {
+			t.Fatalf("%s se abre como personalizada", c.rrule)
+		}
+		f := a.P.nuevoFormulario(e, a.destinos(), a.accionesFormulario(e))
+		if got := f.repetir.Valor(); got != c.opcion {
+			t.Errorf("%s se abre con «%s»", c.rrule, got)
+		}
+		if got := encendidos(botonesDias(f)); !slices.Equal(got, c.dias) {
+			t.Errorf("%s enciende %v", c.rrule, got)
+		}
+		if got := f.e.EntradaDe(a.P).RRule; got != c.rrule {
+			t.Errorf("%s se guarda sin tocar como %q", c.rrule, got)
+		}
 	}
 }

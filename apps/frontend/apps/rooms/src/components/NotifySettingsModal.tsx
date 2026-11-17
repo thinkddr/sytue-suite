@@ -5,6 +5,8 @@
  * NATIVOS (<input type="time">). Carga las prefs al abrir y las guarda con putNotifyPrefs
  * (el backend las sanea: dedupe/recorte, rango DND). DND desactivado se guarda como
  * start==end (00:00–00:00); activado, con la franja elegida (cruce de medianoche válido).
+ * El sonido de aviso (D-ROOM-07) es de ESTE navegador: se lee de localStorage al abrir
+ * y se guarda ahí al pulsar «Guardar», aunque el servicio falle, porque no depende de él.
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
@@ -18,6 +20,12 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '../lib/push.js';
+import {
+  guardarPreferenciasSonido,
+  leerPreferenciasSonido,
+  sonarAviso,
+  type PreferenciasSonido,
+} from '../lib/sonidoAviso.js';
 
 interface Props {
   open: boolean;
@@ -58,6 +66,7 @@ export function NotifySettingsModal({ open, onClose, onSaved, t }: Props): JSX.E
   const [vapidKey, setVapidKey] = useState('');
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [sonido, setSonido] = useState<PreferenciasSonido>(leerPreferenciasSonido);
 
   // Carga las prefs al abrir (reinicia el estado en cada apertura).
   useEffect(() => {
@@ -66,6 +75,7 @@ export function NotifySettingsModal({ open, onClose, onSaved, t }: Props): JSX.E
     setLoading(true);
     setError(false);
     setDraft('');
+    setSonido(leerPreferenciasSonido());
     getNotifyPrefs()
       .then(({ prefs }) => {
         if (!live) return;
@@ -133,8 +143,17 @@ export function NotifySettingsModal({ open, onClose, onSaved, t }: Props): JSX.E
     setKeywords((prev) => prev.filter((x) => x !== k));
   }
 
+  /** Cambia un interruptor de sonido; al encenderlo suena una vez de muestra (el clic
+   *  es el gesto que el navegador exige para dejar sonar). */
+  function cambiarSonido(campo: keyof PreferenciasSonido): void {
+    const encender = !sonido[campo];
+    setSonido({ ...sonido, [campo]: encender });
+    if (encender) sonarAviso();
+  }
+
   function save(): void {
     if (busy) return;
+    guardarPreferenciasSonido(sonido);
     setBusy(true);
     setError(false);
     // DND desactivado ⇒ start==end (deshabilitado). Activado ⇒ la franja elegida.
@@ -253,6 +272,23 @@ export function NotifySettingsModal({ open, onClose, onSaved, t }: Props): JSX.E
             </div>
           ) : null}
         </div>
+
+        {/* Sonido de aviso (D-ROOM-07): de este navegador; encendido por defecto solo para
+            directos y menciones. */}
+        <fieldset class="flex flex-col gap-2">
+          <legend class="text-text mb-1 text-sm font-semibold">{t('notify.sound')}</legend>
+          <p class="text-text-muted text-xs">{t('notify.soundHelp')}</p>
+          <Switch
+            label={t('notify.soundDirect')}
+            checked={sonido.directos}
+            onChange={() => cambiarSonido('directos')}
+          />
+          <Switch
+            label={t('notify.soundOthers')}
+            checked={sonido.resto}
+            onChange={() => cambiarSonido('resto')}
+          />
+        </fieldset>
 
         {/* Notificaciones push (Ola 18): avisos con la app cerrada (Web Push). Solo si hay
             soporte del navegador y el servidor tiene VAPID configurado (vapidKey no vacía). */}

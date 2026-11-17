@@ -138,7 +138,7 @@ func (p *Pantalla) dialogoMover(n Nota) {
 		for _, c := range candidatos {
 			filas = append(filas, p.filaMover(c, profundidad(c, candidatos), func() {
 				d.Cerrar()
-				lanzar(func() error { return p.moverACuaderno(n.ID, c, true) })
+				p.lanzar(func() error { return p.moverACuaderno(n.ID, c, true) })
 			}, v))
 		}
 		cuerpo = listaConFiletes(v, filas)
@@ -218,7 +218,14 @@ func (p *Pantalla) dialogoExportarNota(n Nota) {
 		o := NuevaOpcion(t("export."+f.ID, nil),
 			container.New(&filaElastica{hueco: HuecoFilaDialogo}, rotulo, id), func() {
 				d.Cerrar()
-				go p.exportar(cuaderno, n.ID, f.ID, f.Ver)
+				{
+					notaFuncion := p.exportar
+					notaArgumento0 := cuaderno
+					notaArgumento1 := n.ID
+					notaArgumento2 := f.ID
+					notaArgumento3 := f.Ver
+					p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1, notaArgumento2, notaArgumento3) })
+				}
 			})
 		o.Radio, o.PX, o.PY, o.Fila = 0, PXFilaDialogo, PYFilaDialogo, true
 		filas = append(filas, o)
@@ -248,12 +255,12 @@ func (p *Pantalla) dialogoRetroenlaces(n Nota) {
 	if p.svc == nil {
 		return
 	}
-	go func() {
+	p.iniciar(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
 		notas, err := p.svc.LinkedNotes(ctx, "note", n.ID, limiteRetroenlaces)
-		enHilo(func() { pintar(FaseDe(err, p.hayRed(), len(notas)), notas) })
-	}()
+		p.enHilo(func() { pintar(FaseDe(err, p.hayRed(), len(notas)), notas) })
+	})
 }
 
 // cuerpoRetroenlaces es lo de dentro del panel en cada fase.
@@ -358,10 +365,10 @@ func (p *Pantalla) aplicarEtiquetas(n Nota) {
 			actual = x
 		}
 		cuerpo.Objects = []fyne.CanvasObject{p.cuerpoEtiquetas(actual, func(tag, estado string) {
-			go func() {
+			p.iniciar(func() {
 				p.marcarEstado(n.ID, tag, estado)
-				enHilo(pintar)
-			}()
+				p.enHilo(pintar)
+			})
 		})}
 		cuerpo.Refresh()
 		d.Refresh()
@@ -418,7 +425,7 @@ func pildoraEstado(s api.TagState, marcado bool, alPulsar func(), v tema.Variant
 	o := NuevaOpcion(rotulo, linea(rotulo, tema.TextoBase, ui.Normal, tinta), alPulsar)
 	o.Radio, o.PX, o.PY, o.Borde = tema.Forma("radius-control"), 2.5*0.25*tema.Rem, 1*0.25*tema.Rem, true
 	o.Activa = marcado
-	o.FondoActivo = hexO(s.Color, tema.Color("primary", v))
+	o.FondoActivo = tonoO(s.Color, tema.Color("primary", v))
 	o.BordeActivo = o.FondoActivo // `border-transparent` sobre su propio fondo
 	return o
 }
@@ -446,7 +453,7 @@ func (p *Pantalla) marcarEstado(nota, tag, estado string) {
 func (p *Pantalla) releerNotas(ctx context.Context) {
 	var c, generacion string
 	var epoch uint64
-	fyne.DoAndWait(func() { c, generacion, epoch = p.activo.ID, p.generacionCrypto(), p.cryptoEpoch })
+	p.enHiloEsperar(func() { c, generacion, epoch = p.activo.ID, p.generacionCrypto(), p.cryptoEpoch })
 	if c == "" {
 		return
 	}
@@ -454,7 +461,7 @@ func (p *Pantalla) releerNotas(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.activo.ID == c && p.cryptoVigente(epoch, generacion) {
 			p.ponerNotas(p.deNotas(lista))
 			p.Repintar()

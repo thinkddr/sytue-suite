@@ -50,9 +50,9 @@ type autofiltroCrudo struct {
 // sanear es la rama `autofilter` de `sanitizeSheet`: columnas y fila dentro de la
 // rejilla, y de las exclusiones solo las de una columna cubierta y con textos.
 func (a autofiltroCrudo) sanear() *Autofiltro {
-	c1 := clamp(enteroJS(a.C1), Columnas-1)
-	c2 := min(max(enteroJS(a.C2), c1), Columnas-1)
-	out := &Autofiltro{Row: clamp(enteroJS(a.Row), Filas-1), C1: c1, C2: c2}
+	c1 := clamp(enteroJS(a.C1), MaxColumnas-1)
+	c2 := min(max(enteroJS(a.C2), c1), MaxColumnas-1)
+	out := &Autofiltro{Row: clamp(enteroJS(a.Row), MaxFilas-1), C1: c1, C2: c2}
 	for clave, crudo := range a.Excl {
 		n, err := strconv.ParseFloat(strings.TrimSpace(clave), 64)
 		lista, esLista := crudo.([]any)
@@ -90,7 +90,7 @@ func (l *Libro) AlternarAutofiltro(c1, f1, c2, f2 int) bool {
 		return true
 	}
 	if c1 == c2 && f1 == f2 {
-		c1, f1, c2, f2 = Columnas, Filas, -1, -1
+		c1, f1, c2, f2 = MaxColumnas, MaxFilas, -1, -1
 		for k := range h.celdas {
 			c1, f1, c2, f2 = min(c1, k.C), min(f1, k.F), max(c2, k.C), max(f2, k.F)
 		}
@@ -159,21 +159,51 @@ func (l *Libro) textoFiltro(c, f int) string { return formula.Display(l.Valor(c,
 
 // FilasOcultas son las filas que no se ven en la hoja activa: las que esconde el
 // autofiltro (`filteredRows`) y las del detalle de un grupo contraído del esquema
-// (`hiddenUnits(rowGroups)`), que la web une en el mismo conjunto. nil si no se oculta
+// (`hiddenUnits(rowGroups)`) y las ocultas a mano (`hiddenRows`), que la web une en el
+// mismo conjunto. nil si no se oculta
 // ninguna, que es lo corriente y deja la rejilla con su geometría de siempre.
 func (l *Libro) FilasOcultas() []bool {
-	var ocultas []bool
-	marcar := func(f int) {
-		if ocultas == nil {
-			ocultas = make([]bool, Filas)
+	m := &l.filasOcultas
+	if !m.listo || m.version != l.version || m.activa != l.f.activa || m.filtro != l.h().filtro {
+		m.v = l.filasOcultasSinCache()
+		m.listo, m.version, m.activa, m.filtro = true, l.version, l.f.activa, l.h().filtro
+	}
+	return m.v
+}
+
+func (l *Libro) filasOcultasSinCache() []bool {
+	// Tan largo como la rejilla de lo usado (o hasta la última oculta) y no como la hoja:
+	// con el millón de filas de Excel serían megas por fotograma, y `mapaFilas` ya trata
+	// lo de después como visible. Las ocultas a mano van por tramos (no por unidades):
+	// solo ocultar hasta el final de la hoja alarga la lista hasta el final.
+	marcadas := l.filtradasDe(l.f.activa)
+	for f := range analisis.Ocultas(l.h().grupFilas) {
+		if f < MaxFilas {
+			marcadas = append(marcadas, f)
 		}
+	}
+	fin := 0
+	for _, t := range l.h().ocultFilas {
+		if t.Start <= t.End && t.Start < MaxFilas {
+			fin = max(fin, min(t.End, MaxFilas-1)+1)
+		}
+	}
+	if len(marcadas) == 0 && fin == 0 {
+		return nil
+	}
+	_, ultima := l.Usado()
+	n := max(fin, finFiltro(ultima))
+	if len(marcadas) > 0 {
+		n = max(n, slices.Max(marcadas)+1)
+	}
+	ocultas := make([]bool, n)
+	for _, f := range marcadas {
 		ocultas[f] = true
 	}
-	for _, f := range l.filtradasDe(l.f.activa) {
-		marcar(f)
-	}
-	for f := range analisis.Ocultas(l.h().grupFilas) {
-		marcar(f)
+	for _, t := range l.h().ocultFilas {
+		for f := max(t.Start, 0); f <= t.End && f < MaxFilas; f++ {
+			ocultas[f] = true
+		}
 	}
 	return ocultas
 }
@@ -200,7 +230,8 @@ func (l *Libro) filtradasDe(i int) []int {
 			ocultas[f] = true
 		}
 	}
-	// Los valores excluidos se miran hasta el final de la rejilla, que es lo que este
+	// Los valores excluidos se miran hasta el final de la rejilla (lo usado más la
+	// holgura mínima, `finFiltro`; no el millón de filas de Excel), que es lo que este
 	// lienzo hacía y lo que fija `TestLaTablaCreceYSeGestionaDesdeLosComandos`: excluir
 	// «(Vacías)» se lleva también las filas en blanco de debajo de los datos.
 	//
@@ -210,10 +241,19 @@ func (l *Libro) filtradasDe(i int) []int {
 	// ponytail: son dos topes distintos. La web usa el de la última fila usada para los
 	// dos; igualar el de los valores excluidos cambia lo que hoy se ve al excluir
 	// «(Vacías)» y es decisión de producto, no de este arreglo.
-	_, ultima := l.motor.UsedRange(h.nombre)
-	l.ocultarExcluidas(h, af, Filas, ocultar)
-	l.ocultarPorCondicion(h, af, min(ultima+1, Filas), ocultar)
+	_, ultima := usadoDe(h)
+	l.ocultarExcluidas(h, af, finFiltro(ultima), ocultar)
+	l.ocultarPorCondicion(h, af, min(ultima+1, MaxFilas), ocultar)
 	return slices.Sorted(maps.Keys(ocultas))
+}
+
+// finFiltro es hasta dónde mira el autofiltro los valores excluidos: la rejilla que se
+// recorre sin desplazarse más allá de lo usado (`extension`), que deja debajo de los
+// datos las mismas filas en blanco que la rejilla fija de 26×100 de antes. Recorrer el
+// millón de filas de Excel serían un millón de lecturas del motor por cada filtrado.
+func finFiltro(ultima int) int {
+	_, filas := extension(-1, ultima, 0, 0, Vista{}, AnchoCelda, AltoCelda)
+	return filas
 }
 
 // ocultarExcluidas marca las filas del cuerpo cuyo valor en una columna está excluido.
@@ -276,7 +316,8 @@ func (l *Libro) ValoresFiltro(col int) []EntradaFiltro {
 	excl := af.Excl[strconv.Itoa(col)]
 	var out []EntradaFiltro
 	vistos := map[string]bool{}
-	for f := af.Row + 1; f < Filas; f++ {
+	_, ultima := l.Usado()
+	for f := af.Row + 1; f < finFiltro(ultima); f++ {
 		t := l.textoFiltro(col, f)
 		if !vistos[t] {
 			vistos[t] = true
@@ -308,7 +349,7 @@ func (r *Rejilla) botonFiltro(c int) (fyne.Position, fyne.Size, bool) {
 		return fyne.Position{}, fyne.Size{}, false
 	}
 	vw := r.vista()
-	return fyne.NewPos(vw.x(c+1)-AnchoBotonFiltro*vw.z, vw.y(af.Row)), fyne.NewSize(AnchoBotonFiltro*vw.z, vw.alto()), true
+	return fyne.NewPos(vw.x(c+1)-AnchoBotonFiltro*vw.z, vw.y(af.Row)), fyne.NewSize(AnchoBotonFiltro*vw.z, vw.alto(af.Row)), true
 }
 
 // filtroEn dice de qué columna es el «▾» del autofiltro que hay bajo un punto.
@@ -389,7 +430,7 @@ func (c *Lienzo) abrirFiltro(col int) {
 	ancho := ui.MedidaEmergente(desp, 0).Width
 	// El emergente cuelga a `mt-1` de su disparador; este va a `mt-0.5`, así que el
 	// ancla se queda corta en la diferencia.
-	c.anclaFiltro.Move(fyne.NewPos(c.Rejilla.vista().x(col), AltoBarra+pos.Y))
+	c.anclaFiltro.Move(fyne.NewPos(c.Rejilla.vista().x(col), c.Barra.Alto()+pos.Y))
 	c.anclaFiltro.Resize(fyne.NewSize(ancho, tam.Height-(ui.SeparacionEmergente-SeparacionValores)))
 	emergente = ui.MostrarEmergente(c.anclaFiltro, desp, 0)
 }

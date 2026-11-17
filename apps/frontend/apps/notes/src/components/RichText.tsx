@@ -22,7 +22,9 @@
  * que reconstruye un árbol nuevo con lista blanca —títulos, negrita, cursiva,
  * listas, enlaces…— sin copiar ningún atributo salvo un `href` seguro: ni
  * manejadores, ni `style`, ni imágenes. Sin HTML, entra como texto; y si Safari
- * solo trae HTML, también.
+ * solo trae HTML, también. El texto que parece Markdown (dos o más marcas de
+ * bloque) llega con su formato, por el mismo saneado; Ctrl/⌘+Mayús+V lo pega
+ * plano. La decisión vive en `queSePega` (`client/markdown.ts`).
  */
 import { Fragment, type JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
@@ -55,7 +57,6 @@ import {
   editingCommandValue,
   executeEditingCommand,
 } from '@sytue/ui/browser/editing';
-import { pegadoConFormato, textoPegado } from '@sytue/ui/browser/portapapeles';
 import {
   ESTILO_CELDA,
   celdaDe,
@@ -67,7 +68,7 @@ import {
 } from '@sytue/ui/browser/tabla';
 import type { T } from '../i18n/index.js';
 import { escapar } from '../client/captura.js';
-import { atajoMarkdown } from '../client/markdown.js';
+import { atajoMarkdown, queSePega } from '../client/markdown.js';
 import {
   consultaDeBarra,
   consultaDeEnlace,
@@ -77,6 +78,7 @@ import {
 } from '../client/comandos.js';
 import { coincidenciasEn, liPlegable } from '../client/en-nota.js';
 import { Glyph, type GlyphName } from './glyphs.js';
+import { COLORES_DE_TEXTO, nombreDeColor } from './colores.js';
 import { construirPeticion, leerRespuesta, type AccionIA } from '../lib/ai.js';
 import { bloquesDe, type Bloque } from '@sytue/ai';
 import { LinkTool, useOpcionesDeEnlace, type FuentesDeEnlace, type Opcion } from './LinkTool.js';
@@ -98,6 +100,14 @@ interface Props {
    * de escribir llega hasta abajo, en vez de quedarse en las primeras líneas.
    */
   estirado?: boolean;
+  /**
+   * Sin anillo de foco alrededor del cuerpo. En la hoja del árbol y en la fila de
+   * lista o diario el editor ES la página («papel», ADR 0079): un recuadro azul
+   * alrededor del texto la parte en dos, y el foco ya se ve en el cursor y en la
+   * barra de formato abierta encima, como en Apple Notas o Bear. En una tarjeta
+   * (columnas, lienzo) el aro se queda: allí sí delimita qué ficha se edita.
+   */
+  sinAro?: boolean;
 }
 
 interface Accion {
@@ -127,16 +137,7 @@ const BLOQUES: {
 ];
 
 /** Colores de texto legibles sobre claro y oscuro. El primero es «por defecto». */
-const COLORES = [
-  '#b91c1c',
-  '#c2410c',
-  '#a16207',
-  '#15803d',
-  '#0e7490',
-  '#1d4ed8',
-  '#7e22ce',
-  '#be185d',
-];
+const COLORES = COLORES_DE_TEXTO;
 const RESALTADO = '#fff3a3';
 
 /** El dibujo de cada comando de «/»: el mismo que su botón en la barra. */
@@ -208,6 +209,53 @@ function resaltar(nombre: string, rangosDom: Range[]): void {
   else reg.set(nombre, new H(...rangosDom));
 }
 
+/**
+ * Botón de la barra de formato. Va FUERA de `RichText` a propósito: declarado dentro,
+ * cada render del editor creaba un tipo de componente nuevo y Preact desmontaba y
+ * volvía a montar todos los botones. Basta con que la nota guarde al perder el foco el
+ * texto (que es lo que pasa al enfocar un botón con el teclado) para que el botón
+ * recién enfocado desaparezca y el Intro caiga en el `body`: la cursiva no se aplicaba.
+ */
+function BotonDeBarra({
+  a,
+  onPress,
+  activos,
+  t,
+}: {
+  a: Accion;
+  onPress: () => void;
+  activos: Record<string, boolean>;
+  t: T;
+}): JSX.Element {
+  return (
+    <Tooltip
+      label={
+        a.atajo ? t('editor.shortcut', { label: a.label, keys: atajoDelSistema(a.atajo) }) : a.label
+      }
+    >
+      <button
+        type="button"
+        class={cx(
+          BOTON_DE_BARRA,
+          a.conEstado && activos[a.cmd] && 'bg-bg-subtle text-text',
+          a.desactivada && 'opacity-40',
+        )}
+        aria-label={a.label}
+        disabled={a.desactivada}
+        {...(a.conEstado ? { 'aria-pressed': activos[a.cmd] ?? false } : {})}
+        // Conservar el cursor al apoyar; activar en click también permite usar
+        // Intro/Espacio y la activación táctil normal del botón.
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={onPress}
+      >
+        {a.icon ? <Icon name={a.icon} size={16} /> : <Glyph name={a.glyph ?? 'note'} size={16} />}
+      </button>
+    </Tooltip>
+  );
+}
+
 export function RichText({
   t,
   initialHtml,
@@ -217,6 +265,7 @@ export function RichText({
   onDone,
   enlaces,
   estirado = false,
+  sinAro = false,
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   // Qué comandos están activos en la selección actual. Sin esto, el botón de
@@ -244,6 +293,8 @@ export function RichText({
   // Las herramientas pueden tomar el foco (menús, colores, enlaces, teclado).
   // El rango sigue perteneciendo al texto hasta volver de ellas.
   const seleccion = useRef<Range | null>(null);
+  /** Ctrl/⌘+Mayús+V: el pegado que viene es «sin formato». */
+  const pegarSinFormato = useRef(false);
 
   const guardarSeleccion = useCallback(() => {
     const rango = window.getSelection();
@@ -896,34 +947,6 @@ export function RichText({
     emitir();
   };
 
-  const Boton = ({ a, onPress }: { a: Accion; onPress: () => void }) => (
-    <Tooltip
-      label={
-        a.atajo ? t('editor.shortcut', { label: a.label, keys: atajoDelSistema(a.atajo) }) : a.label
-      }
-    >
-      <button
-        type="button"
-        class={cx(
-          BOTON_DE_BARRA,
-          a.conEstado && activos[a.cmd] && 'bg-bg-subtle text-text',
-          a.desactivada && 'opacity-40',
-        )}
-        aria-label={a.label}
-        disabled={a.desactivada}
-        {...(a.conEstado ? { 'aria-pressed': activos[a.cmd] ?? false } : {})}
-        // Conservar el cursor al apoyar; activar en click también permite usar
-        // Intro/Espacio y la activación táctil normal del botón.
-        onMouseDown={(e) => {
-          e.preventDefault();
-        }}
-        onClick={onPress}
-      >
-        {a.icon ? <Icon name={a.icon} size={16} /> : <Glyph name={a.glyph ?? 'note'} size={16} />}
-      </button>
-    </Tooltip>
-  );
-
   const etiquetaBloque = t(
     `editor.${BLOQUES.find((b) => b.valor === bloque)?.clave ?? 'paragraph'}` as never,
   );
@@ -941,7 +964,9 @@ export function RichText({
         )}
         aria-label={ariaLabel}
       >
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{
             cmd: 'undo',
             glyph: 'undo',
@@ -951,7 +976,9 @@ export function RichText({
           }}
           onPress={() => aplicar('undo')}
         />
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{
             cmd: 'redo',
             glyph: 'redo',
@@ -1001,13 +1028,17 @@ export function RichText({
         <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
 
         {formato.map((a) => (
-          <Boton key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
+          <BotonDeBarra t={t} activos={activos} key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
         ))}
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{ cmd: 'mark', icon: 'highlighter', label: t('editor.highlight') }}
           onPress={() => aplicar('hiliteColor', RESALTADO)}
         />
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{ cmd: 'code', icon: 'code', label: t('editor.inlineCode') }}
           onPress={() => envolver('code')}
         />
@@ -1044,9 +1075,12 @@ export function RichText({
                 <button
                   key={c}
                   type="button"
-                  aria-label={c}
+                  // Acción, no estado: aplica y cierra, así que botones con el nombre
+                  // del tono (no un radiogroup, que elegiría al moverse con flechas).
+                  aria-label={nombreDeColor(t, c)}
+                  title={nombreDeColor(t, c)}
                   style={{ background: c }}
-                  class="sytue-focus-ring h-7 w-7 rounded-full"
+                  class="sytue-focus-ring border-border h-7 w-7 rounded-full border"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     aplicar('foreColor', c);
@@ -1060,7 +1094,9 @@ export function RichText({
         <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
 
         {listas.map((a) => (
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             key={a.cmd}
             a={a}
             onPress={() => (a.cmd === 'insertTask' ? insertarTarea() : aplicar(a.cmd))}
@@ -1068,7 +1104,7 @@ export function RichText({
         ))}
         <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
         {alineacion.map((a) => (
-          <Boton key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
+          <BotonDeBarra t={t} activos={activos} key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
         ))}
         <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
 
@@ -1105,17 +1141,23 @@ export function RichText({
             }}
           />
         </Popover>
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{ cmd: 'insertHorizontalRule', icon: 'minus', label: t('editor.hr') }}
           onPress={() => aplicar('insertHorizontalRule')}
         />
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{ cmd: 'removeFormat', glyph: 'eraser', label: t('editor.clearFormat') }}
           onPress={() => aplicar('removeFormat')}
         />
         {/* Tabla 3×3 de partida: es la que sale en cualquier editor al pulsar el
             botón, y crece con las acciones de abajo. */}
-        <Boton
+        <BotonDeBarra
+          t={t}
+          activos={activos}
           a={{ cmd: 'insertTable', glyph: 'table', label: t('editor.table') }}
           onPress={() => insertarTabla(3, 3)}
         />
@@ -1172,32 +1214,46 @@ export function RichText({
           aria-label={t('editor.tableTools')}
         >
           <span class="text-text-subtle px-1 text-xs">{t('editor.table')}</span>
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'rowAbove', icon: 'minus', label: t('editor.rowAbove') }}
             onPress={() => enCelda((c) => insertarFila(c, 'antes'))}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'rowBelow', icon: 'minus', label: t('editor.rowBelow') }}
             onPress={() => enCelda((c) => insertarFila(c, 'despues'))}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'colBefore', icon: 'minus', label: t('editor.colBefore') }}
             onPress={() => enCelda((c) => insertarColumna(c, 'antes'))}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'colAfter', icon: 'minus', label: t('editor.colAfter') }}
             onPress={() => enCelda((c) => insertarColumna(c, 'despues'))}
           />
           <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'rowDelete', glyph: 'trash', label: t('editor.rowDelete') }}
             onPress={() => enCelda(eliminarFila)}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'colDelete', glyph: 'trash', label: t('editor.colDelete') }}
             onPress={() => enCelda(eliminarColumna)}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'tableDelete', glyph: 'trash', label: t('editor.tableDelete') }}
             onPress={() => enCelda(eliminarTabla)}
           />
@@ -1240,7 +1296,9 @@ export function RichText({
                 ? t('find.none')
                 : ''}
           </span>
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{
               cmd: 'findPrev',
               icon: 'chevronUp',
@@ -1249,11 +1307,15 @@ export function RichText({
             }}
             onPress={() => pintarBusqueda(buscador.q, buscador.i - 1)}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'findNext', icon: 'chevronDown', label: t('find.next'), atajo: 'Enter' }}
             onPress={() => pintarBusqueda(buscador.q, buscador.i + 1)}
           />
-          <Boton
+          <BotonDeBarra
+            t={t}
+            activos={activos}
             a={{ cmd: 'findClose', icon: 'close', label: t('find.close') }}
             onPress={cerrarBuscador}
           />
@@ -1284,7 +1346,10 @@ export function RichText({
             : {})}
           aria-label={ariaLabel}
           class={cx(
-            'sytue-prose text-text sytue-focus-ring min-h-24 rounded-b-md px-3 py-2 text-base leading-relaxed',
+            'sytue-prose text-text min-h-24 rounded-b-md px-3 py-2 text-base leading-relaxed',
+            // `outline-none` y no solo quitar la clase: sin ella, el navegador pinta
+            // su propio contorno de `contenteditable` y el recuadro vuelve.
+            sinAro ? 'outline-none' : 'sytue-focus-ring',
             // EN UNA TARJETA ESTIRADA, LA ZONA DE ESCRIBIR LLEGA HASTA ABAJO.
             // `min-h-24` son 96px: en una nota ensanchada a 70dvh eso dejaba
             // más de quinientos píxeles de blanco donde pulsar no hacía nada, y
@@ -1325,17 +1390,26 @@ export function RichText({
             }
           }}
           onPaste={(e) => {
-            // Ver la cabecera: la estructura del origen, sin su estilo ni sus atributos.
+            // Ver la cabecera: la estructura del origen, sin su estilo ni sus atributos;
+            // el Markdown, convertido; y con Mayúsculas, el texto plano.
             e.preventDefault();
             e.stopPropagation();
-            const rico = pegadoConFormato(e.clipboardData?.getData('text/html') ?? '');
-            const texto = rico ? '' : textoPegado(e.clipboardData);
-            if (rico) executeEditingCommand('insertHTML', rico);
-            else if (texto) executeEditingCommand('insertText', texto);
+            // En un bloque de código el Markdown se queda en letras, como al teclear.
+            const ancla = window.getSelection()?.anchorNode;
+            const enCodigo = !!(ancla instanceof Element ? ancla : ancla?.parentElement)?.closest(
+              'pre',
+            );
+            const pegado = queSePega(e.clipboardData, pegarSinFormato.current, !enCodigo);
+            pegarSinFormato.current = false;
+            if ('html' in pegado) executeEditingCommand('insertHTML', pegado.html);
+            else if (pegado.texto) executeEditingCommand('insertText', pegado.texto);
             emitir();
           }}
           onKeyDown={(e) => {
             const mod = e.metaKey || e.ctrlKey;
+            // El evento `paste` no dice qué teclas lo trajeron: Ctrl/⌘+Mayús+V se apunta
+            // aquí, justo antes, y lo consume `onPaste`. Cualquier otra tecla lo olvida.
+            pegarSinFormato.current = mod && e.shiftKey && e.key.toLowerCase() === 'v';
             // Con un menú abierto, las flechas, Intro, Tab y Escape son suyas.
             if (menu && abierto && !mod && !e.altKey) {
               const n = sugerencias.length;
@@ -1574,17 +1648,29 @@ export function RichText({
                   {formato
                     .filter((a) => a.cmd !== 'underline')
                     .map((a) => (
-                      <Boton key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
+                      <BotonDeBarra
+                        t={t}
+                        activos={activos}
+                        key={a.cmd}
+                        a={a}
+                        onPress={() => aplicar(a.cmd)}
+                      />
                     ))}
-                  <Boton
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
                     a={{ cmd: 'mark', icon: 'highlighter', label: t('editor.highlight') }}
                     onPress={() => aplicar('hiliteColor', RESALTADO)}
                   />
-                  <Boton
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
                     a={{ cmd: 'code', icon: 'code', label: t('editor.inlineCode') }}
                     onPress={() => envolver('code')}
                   />
-                  <Boton
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
                     a={{
                       cmd: 'link',
                       glyph: 'link',

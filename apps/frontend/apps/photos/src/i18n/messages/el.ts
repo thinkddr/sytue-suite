@@ -56,6 +56,10 @@ export const el: AppCatalog<typeof en> = {
   'albums.suggestionSave': 'Αποθήκευση ως άλμπουμ',
   'albums.suggestionSee': 'Προβολή όλων',
   'albums.count': '{count} φωτογραφίες',
+  'albums.sort.label': 'Ταξινόμηση κατά',
+  'albums.sort.recent': 'Πρόσφατα τροποποιημένα',
+  'albums.sort.title': 'Όνομα',
+  'albums.sort.count': 'Περισσότερες φωτογραφίες',
   'albums.delete': 'Διαγραφή άλμπουμ',
   'albums.deleteConfirm':
     'Διαγραφή αυτού του άλμπουμ; Οι φωτογραφίες παραμένουν στη βιβλιοθήκη σας.',
@@ -80,6 +84,11 @@ export const el: AppCatalog<typeof en> = {
   'trash.empty.title': 'Ο κάδος είναι άδειος',
   'trash.empty.description':
     'Οι φωτογραφίες που αφαιρείτε από τη συλλογή καταλήγουν εδώ και μπορούν να επαναφερθούν.',
+  'trash.retention': {
+    one: 'Οι φωτογραφίες που αφαιρείτε από τη συλλογή μένουν εδώ 1 ημέρα και μέχρι τότε μπορούν να επαναφερθούν.',
+    other:
+      'Οι φωτογραφίες που αφαιρείτε από τη συλλογή μένουν εδώ {count} ημέρες και μέχρι τότε μπορούν να επαναφερθούν.',
+  },
   'trash.restore': 'Επαναφορά',
   'editor.crop': 'Περικοπή',
   'editor.cropHint': 'Σύρετε πάνω στη φωτογραφία για να επιλέξετε την περιοχή και μετά εφαρμόστε.',
@@ -110,7 +119,7 @@ export const el: AppCatalog<typeof en> = {
   'editor.aiViewManual': 'Λεπτομερής ρύθμιση στις ρυθμίσεις',
   'editor.aiFailed': 'Δεν ήταν δυνατή η εφαρμογή της επεξεργασίας AI',
   'editor.canvasBackground': 'Φόντο καμβά',
-  'editor.bg_crema': 'Κρεμ',
+  'editor.bg_crema': 'Ανοιχτό',
   'editor.bg_blanco': 'Λευκό',
   'editor.bg_oscuro': 'Σκούρο',
   'editor.bg_damero': 'Σκακιέρα (διαφανές)',
@@ -140,6 +149,8 @@ export const el: AppCatalog<typeof en> = {
     'Αιτήματα λήψης που ξεκίνησαν: {count}. Ελέγξτε τις λήψεις του προγράμματος περιήγησης.',
   'gallery.downloadingNative': { one: 'Λήψη 1 φωτογραφίας…', other: 'Λήψη {count} φωτογραφιών…' },
   'gallery.downloadCapped': 'Φωτογραφίες εκτός αυτής της παρτίδας: {count}.',
+  'gallery.downloadingZip': 'Ξεκίνησε η λήψη ZIP. Φωτογραφίες: {count}.',
+  'gallery.zipName': 'Φωτογραφίες',
   'gallery.newAlbum': 'Νέο άλμπουμ',
   'gallery.newAlbumTitle': 'Νέο άλμπουμ',
   'gallery.newAlbumPrompt': {
@@ -168,6 +179,19 @@ export const el: AppCatalog<typeof en> = {
     one: 'Δεν ήταν δυνατή η μετακίνηση 1 φωτογραφίας',
     other: 'Δεν ήταν δυνατή η μετακίνηση {count} φωτογραφιών',
   },
+  'gallery.trashedStays': {
+    one: 'Το αρχείο παραμένει στο Sytue Drive.',
+    other: 'Τα αρχεία παραμένουν στο Sytue Drive.',
+  },
+  'gallery.undo': 'Αναίρεση',
+  'gallery.restored': {
+    one: '1 φωτογραφία επέστρεψε στη θέση της',
+    other: '{count} φωτογραφίες επέστρεψαν στη θέση τους',
+  },
+  'gallery.restoreFailed': {
+    one: 'Δεν ήταν δυνατή η επαναφορά 1 φωτογραφίας· παραμένει στον κάδο',
+    other: 'Δεν ήταν δυνατή η επαναφορά {count} φωτογραφιών· παραμένουν στον κάδο',
+  },
   'gallery.addedToAlbum': {
     one: '1 φωτογραφία προστέθηκε στο {title}',
     other: '{count} φωτογραφίες προστέθηκαν στο {title}',
@@ -184,6 +208,11 @@ export const el: AppCatalog<typeof en> = {
   'trash.purgeConfirm':
     'Οριστική διαγραφή αυτής της φωτογραφίας; Το αρχείο παραμένει στο Sytue Drive.',
   'trash.purged': '{count} φωτογραφίες διαγράφηκαν οριστικά',
+  'trash.purgesIn': {
+    one: 'Διαγράφεται σε 1 ημέρα',
+    other: 'Διαγράφεται σε {count} ημέρες',
+  },
+  'trash.purgesToday': 'Διαγράφεται σήμερα',
   'viewer.infoPlace': 'Πού',
   'viewer.infoPlaceMap': 'Προβολή σε χάρτη',
   'viewer.infoPlaceNearby': 'Φωτογραφίες από εδώ γύρω',
@@ -260,6 +289,8 @@ export const el: AppCatalog<typeof en> = {
     'Τίποτα δεν ταίριαξε με αυτές τις λέξεις. Το Sytue AI μπορεί να αναζητήσει φωτογραφίες που περιγράφονται διαφορετικά.',
   'gallery.searchWiderWith': 'Αναζήτηση επίσης για: {terms}',
   'gallery.searchWiderNone': 'Το Sytue AI δεν βρήκε άλλους τρόπους να το εκφράσει',
+  'gallery.jumpToYear': 'Μετάβαση σε έτος',
+  'gallery.latest': 'Πρόσφατες',
   'memories.title': 'Μια μέρα σαν τη σημερινή',
   'memories.years': 'Πριν από {count} χρόνια',
   'memories.oneYear': 'Πριν από έναν χρόνο',
@@ -283,4 +314,48 @@ export const el: AppCatalog<typeof en> = {
   'viewer.counterMore': '{count}+',
   'viewer.counterLabel': 'Φωτογραφία {index} από {total}',
   'viewer.shortcutsJump': 'Τα Home και End πηγαίνουν στην πρώτη και στην τελευταία φωτογραφία.',
+  'shortcuts.title': 'Συντομεύσεις πληκτρολογίου',
+  'shortcuts.help': 'Εμφάνιση συντομεύσεων πληκτρολογίου',
+  'shortcuts.group.gallery': 'Συλλογή',
+  'shortcuts.group.viewer': 'Προβολή',
+  'shortcuts.first': 'Πρώτη φωτογραφία',
+  'shortcuts.last': 'Τελευταία φωτογραφία',
+  'shortcuts.slideshow': 'Έναρξη ή διακοπή της προβολής διαφανειών',
+  'shortcuts.info': 'Εμφάνιση ή απόκρυψη πληροφοριών',
+  'shortcuts.zoom': 'Πραγματικό μέγεθος ή προσαρμογή στην οθόνη',
+  'shortcuts.keyHome': 'Home',
+  'shortcuts.keyEnd': 'End',
+  'shortcuts.keySpace': 'Διάστημα',
+  'shortcuts.keyDelete': 'Delete',
+  'shortcuts.keyEsc': 'Esc',
+  'backup.title': 'Αντίγραφο ασφαλείας',
+  'backup.description':
+    'Ανεβάζει αυτόματα στο Sytue Fotos τις φωτογραφίες και τα βίντεο αυτής της συσκευής, το καθένα μόνο μία φορά. Φυλάσσονται στον φάκελο Φωτογραφίες του Sytue Drive σας.',
+  'backup.turnOn': 'Ενεργοποίηση',
+  'backup.turnOff': 'Απενεργοποίηση',
+  'backup.off': 'Το αντίγραφο ασφαλείας είναι απενεργοποιημένο σε αυτή τη συσκευή.',
+  'backup.running': 'Αντιγραφή {done} από {total}…',
+  'backup.upToDate': 'Όλες οι φωτογραφίες αυτής της συσκευής έχουν αντίγραφο ασφαλείας.',
+  'backup.waiting': 'Η αντιγραφή θα ξεκινήσει μόλις υπάρξει σύνδεση.',
+  'backup.paused': 'Η αντιγραφή σταμάτησε λόγω προβλήματος σύνδεσης. Θα προσπαθήσει ξανά μόνη της.',
+  'backup.noPermission':
+    'Το Sytue Fotos δεν έχει άδεια να βλέπει τις φωτογραφίες αυτής της συσκευής. Μπορείτε να τη δώσετε στις ρυθμίσεις του συστήματος.',
+  'backup.limited':
+    'Αντιγράφονται μόνο οι φωτογραφίες που έχετε επιτρέψει στο Sytue Fotos να βλέπει.',
+  'backup.done': 'Νέες φωτογραφίες με αντίγραφο ασφαλείας: {count}',
+  'backup.waitingWifi': 'Αναμονή για δίκτυο Wi-Fi για το αντίγραφο ασφαλείας.',
+  'backup.mobileData': 'Χρήση και δεδομένων κινητής',
+  'backup.videos': 'Συμπερίληψη βίντεο',
+  'backup.driveOnly':
+    'Τα βίντεο φυλάσσονται στο Sytue Drive σας· η συλλογή δείχνει τις φωτογραφίες.',
+  'backup.closed': 'Κάνει αντίγραφο και με την εφαρμογή κλειστή, όσο η συσκευή είναι ξεκλείδωτη.',
+  'gallery.uploadedNotShown':
+    'Αποθηκεύτηκε στο Sytue Drive, αλλά η συλλογή δεν μπορεί να εμφανίσει: {name}',
+  'library.addToPhotos': 'Προσθήκη στις Φωτογραφίες',
+  'library.saveToPictures': 'Αποθήκευση στις Εικόνες',
+  'library.addedToPhotos': 'Προστέθηκαν στις Φωτογραφίες: {count}',
+  'library.savedToPictures': 'Αποθηκεύτηκαν στις Εικόνες › Sytue Photos: {count}',
+  'library.saveFailed': 'Δεν ήταν δυνατή η αποθήκευση στη συλλογή αυτού του υπολογιστή: {name}',
+  'backup.whileOpen':
+    'Σε αυτόν τον υπολογιστή, το αντίγραφο γίνεται όσο το Sytue Fotos είναι ανοιχτό.',
 };

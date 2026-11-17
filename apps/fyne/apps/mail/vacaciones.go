@@ -133,7 +133,7 @@ func (g *dialogoVacaciones) montar(ventana float32) {
 	izq := g.ancho - 2*tema.Borde - 3*tema.Espacio(3) - g.conmutador.MinSize().Width
 	g.insignia = ui.NuevaInsignia("", ui.InsigniaNeutra)
 	g.detalle = ui.NuevoParrafo("", ajustado, ui.Normal, "text-muted", v).A(izq)
-	titular := container.New(flujo{hueco: tema.Espacio(2), ancho: izq},
+	titular := container.New(ui.Flujo{Hueco: tema.Espacio(2), Ancho: izq},
 		ui.NuevoRotulo(t.T("vacation.autoReply", nil), sm, ui.SemiNegrita, "text"), g.insignia)
 	izquierda := container.New(ui.Columna{Hueco: tema.Espacio(1)}, titular, g.detalle)
 	estado := enCajaDe(tema.Color("surface-raised", v), v, container.New(margen(tema.Espacio(3)),
@@ -361,6 +361,7 @@ func (g *dialogoVacaciones) salvar() {
 		}
 		g.b.avisar(ui.AvisoExito, "vacation.saved", nil)
 		g.d.Cerrar()
+		g.b.leerEstadoAjustes()
 	})
 }
 

@@ -5,6 +5,7 @@
 import type { ComponentChildren } from 'preact';
 import { useRef } from 'preact/hooks';
 import { SytueShell } from '@sytue/shell';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 import { IndicadorRefrescoTactil, usePullToRefresh } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
@@ -43,7 +44,16 @@ export function Shell({ user, hubBaseUrl, locale, producto = 'docs', children }:
         class="sytue-frame sytue-frame-page sytue-safe-workspace focus-visible:outline-none"
       >
         <IndicadorRefrescoTactil estado={refresco} fijo />
-        <div class="sytue-sheet sytue-sheet-page">{children}</div>
+        <div class="sytue-sheet sytue-sheet-page">
+          <MatrixStorageGate
+            actor={user.id}
+            tenant={user.tenant}
+            locale={locale}
+            product={producto}
+          >
+            {children}
+          </MatrixStorageGate>
+        </div>
       </main>
     </SytueShell>
   );

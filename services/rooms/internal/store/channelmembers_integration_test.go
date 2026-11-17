@@ -38,7 +38,7 @@ func TestDefaultChannelsSeedAndAutoJoin(t *testing.T) {
 		t.Fatalf("CreateTeam: %v", err)
 	}
 	// El creador ya tiene canales (antes el team nacía vacío).
-	if slugs := channelSlugs(t, ctx, st, tm.ID, "alice"); !slugs["general"] || !slugs["aleatorio"] {
+	if slugs := channelSlugs(ctx, t, st, tm.ID, "alice"); !slugs["general"] || !slugs["aleatorio"] {
 		t.Fatalf("alice no ve los canales por defecto: %v", slugs)
 	}
 
@@ -47,10 +47,10 @@ func TestDefaultChannelsSeedAndAutoJoin(t *testing.T) {
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
-	if slugs := channelSlugs(t, ctx, st, tm.ID, "bob"); !slugs["general"] || !slugs["aleatorio"] {
+	if slugs := channelSlugs(ctx, t, st, tm.ID, "bob"); !slugs["general"] || !slugs["aleatorio"] {
 		t.Fatalf("bob no ve los canales por defecto: %v", slugs)
 	}
-	general := channelBySlug(t, ctx, st, tm.ID, "alice", "general")
+	general := channelBySlug(ctx, t, st, tm.ID, "alice", "general")
 	members, err := st.ListChannelMembers(ctx, general.ID, "alice")
 	if err != nil {
 		t.Fatalf("ListChannelMembers: %v", err)
@@ -84,7 +84,7 @@ func TestEnsureDefaultTeamMembershipSeedsChannels(t *testing.T) {
 	if err != nil || !created {
 		t.Fatalf("EnsureDefaultTeamMembership: created=%v err=%v", created, err)
 	}
-	if slugs := channelSlugs(t, ctx, st, tm.ID, "alice"); !slugs["general"] || !slugs["aleatorio"] {
+	if slugs := channelSlugs(ctx, t, st, tm.ID, "alice"); !slugs["general"] || !slugs["aleatorio"] {
 		t.Fatalf("el tenant nuevo nace sin canales: %v", slugs)
 	}
 	// Segundo usuario: mismo team, y con membresía explícita de los por defecto.
@@ -92,7 +92,7 @@ func TestEnsureDefaultTeamMembershipSeedsChannels(t *testing.T) {
 	if err != nil || created2 || tm2.ID != tm.ID {
 		t.Fatalf("segundo usuario: created=%v team=%v err=%v", created2, tm2.ID, err)
 	}
-	general := channelBySlug(t, ctx, st, tm.ID, "bob", "general")
+	general := channelBySlug(ctx, t, st, tm.ID, "bob", "general")
 	members, err := st.ListChannelMembers(ctx, general.ID, "bob")
 	if err != nil {
 		t.Fatalf("ListChannelMembers(bob): %v", err)
@@ -230,7 +230,7 @@ func TestChannelMemberAuthzGates(t *testing.T) {
 			t.Fatalf("AddTeamMember %s: %v", sub, err)
 		}
 	}
-	general := channelBySlug(t, ctx, st, tm.ID, "alice", "general")
+	general := channelBySlug(ctx, t, st, tm.ID, "alice", "general")
 
 	// bob es miembro raso del canal por defecto: no gestiona el roster.
 	if _, err := st.AddChannelMember(ctx, general.ID, "bob", "caro", "Caro"); !errors.Is(err, domain.ErrForbidden) {
@@ -280,7 +280,7 @@ func TestChannelMembersTenantIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTeam acme: %v", err)
 	}
-	chA := channelBySlug(t, acme, st, tmA.ID, "alice", "general")
+	chA := channelBySlug(acme, t, st, tmA.ID, "alice", "general")
 	if _, err := st.CreateTeam(globex, store.NewTeamRecord{
 		Slug: "eq", Name: "Equipo", CreatedBy: "gwen", CreatorName: "Gwen",
 	}); err != nil {
@@ -301,7 +301,7 @@ func TestChannelMembersTenantIsolation(t *testing.T) {
 // --- Helpers -----------------------------------------------------------------
 
 // channelSlugs proyecta los slugs de los canales visibles para un usuario en un team.
-func channelSlugs(t *testing.T, ctx context.Context, st *store.Store, teamID uuid.UUID, subject string) map[string]bool {
+func channelSlugs(ctx context.Context, t *testing.T, st *store.Store, teamID uuid.UUID, subject string) map[string]bool {
 	t.Helper()
 	list, err := st.ListChannels(ctx, teamID, subject, false)
 	if err != nil {
@@ -315,7 +315,7 @@ func channelSlugs(t *testing.T, ctx context.Context, st *store.Store, teamID uui
 }
 
 // channelBySlug localiza un canal del team por su slug (falla si no está).
-func channelBySlug(t *testing.T, ctx context.Context, st *store.Store, teamID uuid.UUID, subject, slug string) domain.Channel {
+func channelBySlug(ctx context.Context, t *testing.T, st *store.Store, teamID uuid.UUID, subject, slug string) domain.Channel {
 	t.Helper()
 	list, err := st.ListChannels(ctx, teamID, subject, false)
 	if err != nil {

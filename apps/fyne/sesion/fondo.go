@@ -338,12 +338,20 @@ func (s *Suite) iniciarRefrescoEnFondo() {
 }
 
 // refrescoDelSistema traduce el Resultado a lo que pide BGAppRefreshTask: éxito, y
-// cuándo pedir el siguiente.
+// cuándo pedir el siguiente. Primero el widget, que es lo que la persona ve; después,
+// con el tiempo que quede, la tarea en segundo plano de la app si tiene una
+// (tareas_fondo.go: la copia de seguridad de Photos). Si cualquiera de las dos se
+// aplaza, el siguiente se pide antes.
 func (s *Suite) refrescoDelSistema(ctx context.Context) (ok bool, reintento time.Duration) {
-	switch s.RefrescarWidgetEnFondo(ctx) {
-	case Aplazado:
+	widget := s.RefrescarWidgetEnFondo(ctx)
+	tarea := SinCambios
+	if ctx.Err() == nil {
+		tarea = s.TareaEnFondo(ctx)
+	}
+	switch {
+	case widget == Aplazado || tarea == Aplazado:
 		return true, ReintentoAplazado
-	case Fallo:
+	case widget == Fallo:
 		return false, 0
 	default:
 		return true, 0

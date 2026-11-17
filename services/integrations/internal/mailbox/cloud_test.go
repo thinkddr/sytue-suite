@@ -227,7 +227,8 @@ func TestOAuthIdentityDoesNotRequireAnyMailboxRequest(t *testing.T) {
 
 // Graph v1.0 no dice qué carpeta es cuál: sin pedir los nombres conocidos, Enviados,
 // Borradores, Correo no deseado y Elementos eliminados llegaban sin rol y el cliente
-// no podía traducirlas ni ordenarlas. Va en UN $batch, no en seis peticiones.
+// no podía traducirlas ni ordenarlas. Va en UN $batch, no en siete peticiones. La Bandeja
+// de salida (MAIL-15) lleva su rol para que el lateral le ponga su glifo.
 func TestGraphFoldersCarryWellKnownRolesInOneBatch(t *testing.T) {
 	batches := 0
 	client := NewCloudClient(Account{Provider: "microsoft"}, cloudHTTP(func(r *http.Request) (*http.Response, error) {
@@ -239,7 +240,7 @@ func TestGraphFoldersCarryWellKnownRolesInOneBatch(t *testing.T) {
 					ID, Method, URL string
 				} `json:"requests"`
 			}
-			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil || len(body.Requests) != 6 {
+			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil || len(body.Requests) != 7 {
 				t.Fatalf("well-known folders not batched: %s %+v", r.Method, body)
 			}
 			return cloudReply(200, `{"responses":[
@@ -249,9 +250,10 @@ func TestGraphFoldersCarryWellKnownRolesInOneBatch(t *testing.T) {
 				{"id":"junk","status":200,"body":{"id":"sp"}},
 				{"id":"trash","status":200,"body":{"id":"del"}},
 				{"id":"archive","status":404,"body":{"error":{"code":"ErrorFolderNotFound"}}},
+				{"id":"outbox","status":200,"body":{"id":"ob"}},
 				{"id":"forged","status":200,"body":{"id":"mine"}}]}`), nil
 		case "/v1.0/me/mailFolders":
-			return cloudReply(200, `{"value":[{"id":"in","displayName":"Inbox","unreadItemCount":3},{"id":"out","displayName":"Sent Items"},{"id":"dr","displayName":"Drafts"},{"id":"sp","displayName":"Junk Email"},{"id":"del","displayName":"Deleted Items"},{"id":"mine","displayName":"Projects"}]}`), nil
+			return cloudReply(200, `{"value":[{"id":"in","displayName":"Inbox","unreadItemCount":3},{"id":"out","displayName":"Sent Items"},{"id":"dr","displayName":"Drafts"},{"id":"sp","displayName":"Junk Email"},{"id":"del","displayName":"Deleted Items"},{"id":"ob","displayName":"Outbox"},{"id":"mine","displayName":"Projects"}]}`), nil
 		}
 		t.Fatalf("unexpected request %s", r.URL)
 		return nil, ErrUnavailable
@@ -264,7 +266,7 @@ func TestGraphFoldersCarryWellKnownRolesInOneBatch(t *testing.T) {
 	for _, f := range folders {
 		got[f.ID] = f.Role
 	}
-	want := map[string]string{"in": "inbox", "out": "sent", "dr": "drafts", "sp": "junk", "del": "trash", "mine": ""}
+	want := map[string]string{"in": "inbox", "out": "sent", "dr": "drafts", "sp": "junk", "del": "trash", "ob": "outbox", "mine": ""}
 	for id, role := range want {
 		if got[id] != role {
 			t.Errorf("folder %s role %q, want %q", id, got[id], role)

@@ -114,7 +114,10 @@ class Wrappers(unittest.TestCase):
     def test_xcrun_signers_and_find_use_the_owned_wrappers(self):
         for name in ("codesign", "productsign", "productbuild"):
             with self.subTest(tool=name):
-                wrapper = self.root / name
+                # The wrapper resolves its own directory with `cd -P`, so on macOS
+                # (where $TMPDIR lives under the /var -> /private/var symlink) it
+                # reports the physical path; expect the same resolved location.
+                wrapper = (self.root / name).resolve()
                 for flag in ("--find", "-f"):
                     found = self.run_wrapper("xcrun", "--sdk", "macosx", flag, name)
                     self.assertEqual(found.returncode, 0, found.stderr)

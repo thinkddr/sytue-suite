@@ -49,6 +49,10 @@ type Versal struct {
 	ancho    float32
 	escalon  tema.Escalon
 	tracking float32
+	peso     Peso
+	// cortada es la letra que hace de «…» tras Recortar, o -1.
+	cortada      int
+	letraCortada string
 }
 
 // NuevoVersal construye el rótulo ya en mayúsculas.
@@ -70,7 +74,7 @@ func NuevoVersalCon(s string, e tema.Escalon, p Peso, c color.NRGBA, em float32)
 // cabecera de la tabla del ERP lleva `tracking-wider` y se pinta en caja mixta
 // («Vencimiento», medido 84,63 con su botón y no los 96 de «VENCIMIENTO»).
 func NuevoEspaciado(s string, e tema.Escalon, p Peso, c color.NRGBA, em float32) *Versal {
-	v := &Versal{escalon: e, tracking: em * e.Tam}
+	v := &Versal{escalon: e, tracking: em * e.Tam, peso: p, cortada: -1}
 	r := []rune(s)
 	for i, letra := range r {
 		t := Texto(string(letra), e, p, c)
@@ -114,6 +118,44 @@ func (v *Versal) Ancho() float32 { return v.ancho }
 func (v *Versal) Colocar(x, y float32) {
 	for i, t := range v.letras {
 		ColocarTexto(t, v.escalon, x+v.x[i], y)
+	}
+}
+
+// Recortar es el `truncate` del rótulo: si no cabe en `ancho`, esconde las letras que
+// se salen y la primera que no cabe pasa a ser «…». Se puede llamar en cada Layout:
+// deshace el recorte anterior antes de medir. No toca el ancho que dice Ancho().
+func (v *Versal) Recortar(ancho float32) {
+	if v.cortada >= 0 {
+		v.letras[v.cortada].Text = v.letraCortada
+		v.letras[v.cortada].Refresh()
+		v.cortada = -1
+	}
+	for _, t := range v.letras {
+		t.Show()
+	}
+	if ancho >= v.ancho {
+		return
+	}
+	puntos := Medir("…", v.escalon, v.peso).Width
+	corte := 0
+	for i := range v.letras {
+		fin := v.ancho - v.tracking
+		if i+1 < len(v.x) {
+			fin = v.x[i+1] - v.tracking
+		}
+		if fin+v.tracking+puntos > ancho {
+			break
+		}
+		corte = i + 1
+	}
+	if corte >= len(v.letras) {
+		return
+	}
+	v.cortada, v.letraCortada = corte, v.letras[corte].Text
+	v.letras[corte].Text = "…"
+	v.letras[corte].Refresh()
+	for _, t := range v.letras[corte+1:] {
+		t.Hide()
 	}
 }
 

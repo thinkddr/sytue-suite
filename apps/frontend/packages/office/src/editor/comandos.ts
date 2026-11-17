@@ -134,7 +134,36 @@ const leerTeclas = (keys: string): Teclas => {
 };
 
 /** Lo que un `keydown` necesita para casar con un atajo. */
-export type Pulsacion = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>;
+export type Pulsacion = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'> &
+  Partial<Pick<KeyboardEvent, 'code'>>;
+
+/**
+ * La tecla física de los atajos que no son letras («Digit7», «BracketRight»…). Con Mayús,
+ * `key` es lo que escribe la tecla en esa distribución (Ctrl+Mayús+7 llega como «/» en un
+ * teclado español y como «&» en uno inglés), así que esos atajos se casan por la posición,
+ * como hace Google Docs. Las letras se casan siempre por `key`: Ctrl+B es la B que pone la
+ * tecla, también en un teclado Dvorak.
+ */
+const TECLA_FISICA: Readonly<Record<string, string>> = {
+  BracketLeft: '[',
+  BracketRight: ']',
+  Period: '.',
+  Comma: ',',
+  Backslash: '\\',
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, n) => [`Digit${n}`, String(n)])),
+};
+
+/**
+ * ¿Es `t.key` la tecla pulsada? Por `key` o, si no es una letra, por su posición. Con Ctrl
+ * y Alt a la vez NO se mira la posición: en Windows así llega AltGr, y AltGr+2 es la «@»
+ * de un teclado español; casarla por la posición pondría un título 2 con cada arroba. En
+ * un Mac (⌘+⌥) sí, porque ⌥ cambia `key` («¡» con el 1) y no hay AltGr.
+ */
+const esLaTecla = (t: Teclas, e: Pulsacion, key: string): boolean => {
+  if (t.key === key) return true;
+  if (/^[a-z]$/.test(t.key) || !e.code || (e.ctrlKey && e.altKey)) return false;
+  return TECLA_FISICA[e.code] === t.key;
+};
 
 /**
  * El comando que dispara esta pulsación en un lienzo de ese tipo, o `null`. Es el ÚNICO
@@ -157,7 +186,7 @@ export function comandoDelAtajo(
     for (const a of def.shortcuts) {
       if (a.canvas) continue;
       const t = leerTeclas(a.keys);
-      if (t.ctrl && t.key === key && t.shift === e.shiftKey && t.alt === e.altKey) {
+      if (t.ctrl && t.shift === e.shiftKey && t.alt === e.altKey && esLaTecla(t, e, key)) {
         return a.value === undefined ? { id } : { id, value: a.value };
       }
     }

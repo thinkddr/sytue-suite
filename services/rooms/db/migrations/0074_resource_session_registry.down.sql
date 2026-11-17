@@ -1,0 +1,11 @@
+-- SPDX-License-Identifier: Apache-2.0
+DROP TRIGGER matrix_native_resources_retire_identity ON matrix_identity_access;
+DROP TRIGGER matrix_native_resources_retire_tenant ON matrix_tenant_access;
+DROP FUNCTION matrix_native_resources_retire();
+DROP TABLE matrix_resource_routes,matrix_resource_devices,matrix_resource_session_challenges,matrix_resource_authorities,matrix_resource_consents;
+DROP FUNCTION matrix_resource_public_guard();
+DROP TRIGGER matrix_resource_native_guard ON matrix_native_consents;
+DROP FUNCTION matrix_resource_native_guard();
+DROP POLICY matrix_native_consents_resource_contract ON matrix_native_consents;
+ALTER TABLE matrix_native_consents DROP CONSTRAINT matrix_native_resource_approval;
+ALTER TABLE matrix_native_consents DROP COLUMN resource_approved_at,DROP COLUMN resource_client_id,DROP COLUMN purpose;

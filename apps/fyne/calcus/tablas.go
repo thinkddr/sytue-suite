@@ -448,7 +448,7 @@ func crecerTablas(lista []TablaFmt, c, f int) []TablaFmt {
 		if !ok {
 			continue
 		}
-		r, crece := crecerPorEdicion(ct, c, f, Columnas-1, Filas-1)
+		r, crece := crecerPorEdicion(ct, c, f, MaxColumnas-1, MaxFilas-1)
 		if !crece {
 			continue
 		}
@@ -465,10 +465,10 @@ func crecerTablas(lista []TablaFmt, c, f int) []TablaFmt {
 // Devuelve la tabla creada.
 func (l *Libro) CrearTabla(rango string, cabeceras bool, estilo string) (TablaFmt, bool) {
 	r, ok := formula.ParseRangeRef(rango)
-	if !ok || r.C1 >= Columnas || r.R1 >= Filas {
+	if !ok || r.C1 >= MaxColumnas || r.R1 >= MaxFilas {
 		return TablaFmt{}, false // ancla fuera de la rejilla: no se crea una tabla fantasma
 	}
-	c2, f2 := min(r.C2, Columnas-1), min(r.R2, Filas-1)
+	c2, f2 := min(r.C2, MaxColumnas-1), min(r.R2, MaxFilas-1)
 	t := TablaFmt{Name: nombreTablaLibre(l.NombresDeTabla()), Range: Ref(r.C1, r.R1) + ":" + Ref(c2, f2)}
 	if estilo != "" {
 		t.Style = estiloTablaDe(estilo).ID
@@ -538,7 +538,7 @@ func (l *Libro) AlternarTotales(i int) bool {
 		return true
 	}
 	poner := !t.TotalsRow
-	if poner && r.R2+1 >= Filas {
+	if poner && r.R2+1 >= MaxFilas {
 		return false
 	}
 	nueva := t
@@ -635,8 +635,8 @@ func (rr *rejillaRenderer) pintarMarcosTabla(vw vista, _ fyne.Size) {
 		n += k
 		return out
 	}
-	x := func(c int) float32 { return vw.ox() + float32(c)*vw.ancho() - vw.desX }
-	y := func(puesto int) float32 { return vw.oy() + float32(puesto)*vw.alto() - vw.desY }
+	x := func(c int) float32 { return vw.ox() + vw.cols.borde(c)*vw.z - vw.desX }
+	y := func(puesto int) float32 { return vw.oy() + vw.filas.inicio(puesto)*vw.z - vw.desY }
 	for _, ct := range rr.tablas {
 		arriba, abajo := -1, -1
 		for f := ct.rect.R1; f <= ct.rect.R2; f++ {
@@ -647,11 +647,11 @@ func (rr *rejillaRenderer) pintarMarcosTabla(vw vista, _ fyne.Size) {
 				abajo = vw.filas.puesto(f)
 			}
 		}
-		if abajo < 0 || ct.rect.C1 >= Columnas {
+		if abajo < 0 || ct.rect.C1 >= MaxColumnas {
 			continue
 		}
 		col, _ := tokens.ParseColor(estiloTablaDe(ct.t.Style).Borde)
-		izq, der := x(ct.rect.C1), x(min(ct.rect.C2, Columnas-1)+1)
+		izq, der := x(ct.rect.C1), x(min(ct.rect.C2, MaxColumnas-1)+1)
 		var cuatro [4]*canvas.Rectangle
 		copy(cuatro[:], tomar(4))
 		marco(cuatro, col, fyne.NewPos(izq, y(arriba)), fyne.NewSize(der-izq, y(abajo+1)-y(arriba)), tema.Borde*vw.z, vw.ox(), vw.oy(), true)

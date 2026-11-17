@@ -36,6 +36,8 @@ var (
 		"The organisation's tax ID cannot change while VERI*FACTU is enabled.")
 	errCertificadoInvalido = httpx.NewError(http.StatusUnprocessableEntity, "certificado_invalido",
 		"The certificate or private key is not a valid qualified certificate with a Spanish tax ID.")
+	errCertificadoContrasena = httpx.NewError(http.StatusUnprocessableEntity, "certificado_contrasena",
+		"The certificate password is not correct.")
 	errCertificadoNIFNoCoincide = httpx.NewError(http.StatusUnprocessableEntity, "certificado_nif_no_coincide",
 		"The tax ID on the certificate does not match the organisation's tax ID.")
 )
@@ -151,22 +153,49 @@ func (h *Handlers) ActivarVerifactu(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusOK, estadoVerifactu{Verifactu: v, Entorno: h.entornoVerifactu()})
 }
 
+// cuerpoCertificadoVerifactu llega por TLS y solo vive en memoria mientras se
+// valida: la clave privada se sella antes de tocar la base de datos y la
+// contraseña del `.p12` no se guarda en ninguna parte.
 type cuerpoCertificadoVerifactu struct {
-	CertPEM string `json:"cert_pem"`
-	KeyPEM  string `json:"key_pem"`
+	// Fichero es el `.p12`/`.pfx` (o el PEM) tal como se descargó, en base64.
+	Fichero []byte `json:"fichero,omitempty"`
+	// Clave es la clave privada PEM cuando va en un fichero aparte del certificado.
+	Clave      []byte `json:"clave,omitempty"`
+	Contrasena string `json:"contrasena,omitempty"`
+	// CertPEM y KeyPEM son la forma de antes (dos PEM en texto); siguen valiendo.
+	CertPEM string `json:"cert_pem,omitempty"`
+	KeyPEM  string `json:"key_pem,omitempty"`
 	Sello   bool   `json:"sello"`
 }
 
+// tamMaxCertificado acota el cuerpo: un `.p12` con su cadena ronda los 10 KiB, y
+// en base64 dentro de JSON sigue muy por debajo de esto.
+const tamMaxCertificado = 256 << 10
+
 // GuardarCertificadoVerifactu — PUT /api/v1/verifactu/certificado. Owner y admin.
 // Guarda el certificado cualificado propio de la organización tras comprobar que
-// su NIF coincide con el NIF del emisor.
+// su NIF coincide con el NIF del emisor. Acepta el `.p12`/`.pfx` con su
+// contraseña, o el certificado y la clave en PEM.
 func (h *Handlers) GuardarCertificadoVerifactu(w http.ResponseWriter, r *http.Request) {
 	var cuerpo cuerpoCertificadoVerifactu
-	if err := httpx.DecodeJSON(w, r, &cuerpo); err != nil {
+	if err := httpx.DecodeJSONLimit(w, r, &cuerpo, tamMaxCertificado); err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
-	if _, err := h.store.GuardarCertificadoVerifactu(r.Context(), []byte(cuerpo.CertPEM), []byte(cuerpo.KeyPEM), cuerpo.Sello, h.cifra); err != nil {
+	certPEM, keyPEM := []byte(cuerpo.CertPEM), []byte(cuerpo.KeyPEM)
+	if len(cuerpo.Fichero) > 0 {
+		var err error
+		certPEM, keyPEM, err = verifactu.PEMDeFichero(cuerpo.Fichero, cuerpo.Clave, cuerpo.Contrasena)
+		switch {
+		case errors.Is(err, verifactu.ErrContrasenaCertificado):
+			httpx.Fail(w, r, errCertificadoContrasena)
+			return
+		case err != nil:
+			httpx.Fail(w, r, errCertificadoInvalido)
+			return
+		}
+	}
+	if _, err := h.store.GuardarCertificadoVerifactu(r.Context(), certPEM, keyPEM, cuerpo.Sello, h.cifra); err != nil {
 		httpx.Fail(w, r, errorDeEscritura(err))
 		return
 	}

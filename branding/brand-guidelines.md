@@ -1,260 +1,279 @@
-# Sytue — Guía de marca (brand guidelines)
+<a id="sytue--guía-de-marca-brand-guidelines"></a>
+# Sytue — Brand guidelines
 
-> Marca padre: **Sytue**. Suite: **Sytue One**. Identidad visual moderna y
-> **100% Sytue-native**. Esta guía rige el uso de logos, color, tipografía y
-> tono. La implementación de UI vive en el sistema de diseño (`docs/design.md#2-sistema-de-diseno`)
-> y la marca en `branding/` (tokens, logos, iconos).
+> Parent brand: **Sytue**. Suite: **Sytue One**. A modern and **100% Sytue-native**
+> visual identity. This guide governs the use of logos, color, typography and
+> tone. The UI implementation lives in the design system (`docs/design.md#2-sistema-de-diseno`)
+> and the brand in `branding/` (tokens, logos, icons).
 
 ---
 
-## 1. La marca
+<a id="1-la-marca"></a>
+## 1. The brand
 
-**Sytue** es una suite de productividad **europea, soberana y libre**: alternativa a
-Google Workspace / Microsoft 365 construida 100% sobre infraestructura UE (Scaleway)
-y software libre (FOSS). **Sytue One** es el conjunto integrado (portal único, login
-único, shell común). La soberanía europea y el código abierto son **valores centrales
-de marca**, no notas al pie.
+**Sytue** is a **European, sovereign and free** productivity suite: an alternative to
+Google Workspace / Microsoft 365 built 100% on EU infrastructure (Scaleway)
+and free software (FOSS). **Sytue One** is the integrated whole (single portal, single
+login, common shell). European sovereignty and open source are **core brand
+values**, not footnotes.
 
-**Atributos de marca:** confiable · clara · soberana · moderna · libre.
+**Brand attributes:** trustworthy · clear · sovereign · modern · free.
 
 ---
 
 ## 2. Logos
 
-Activos en `branding/logo/`:
+Assets in `branding/logo/`:
 
-| Activo | Archivo | Uso |
+| Asset | File | Use |
 |---|---|---|
-| Wordmark marca padre | `sytue.svg` | marca general, documentos, footers |
-| Wordmark suite | `sytue-one.svg` | producto/portal, materiales de la suite |
-| Wordmark suite (blanco) | `sytue-one-white.svg` | sobre fondos de marca / sidebar oscuro |
-| Símbolo (marca aislada) | `sytue-mark.svg` | avatar de app, espacios cuadrados, favicons grandes |
-| Favicon | `favicon.svg` | pestañas, PWA |
+| Parent brand wordmark | `sytue.svg` | general brand, documents, footers |
+| Suite wordmark | `sytue-one.svg` | product/portal, suite materials |
+| Suite wordmark (white) | `sytue-one-white.svg` | on brand backgrounds / dark sidebar |
+| Symbol (standalone mark) | `sytue-mark.svg` | app avatar, square spaces, large favicons |
+| Favicon | `favicon.svg` | tabs, PWA |
 
-El símbolo de marca es un **bloque redondeado** (azul Sytue `#2b6cff`) con la
-**"S-swoosh"** blanca. Es la base geométrica de todos los iconos de producto.
+The brand symbol is a **rounded block** (Sytue blue `#2b6cff`) with the white
+**"S-swoosh"**. It is the geometric basis of all product icons.
 
-### Área de seguridad y tamaños
+<a id="área-de-seguridad-y-tamaños"></a>
+### Clear space and sizes
 
-- **Área de seguridad:** margen libre alrededor del logo ≥ **la mitad de la altura
-  del símbolo** (≈ el ancho del bloque "S"). Nada (texto, bordes, otros logos) invade
-  esa zona.
-- **Tamaño mínimo:** wordmark **≥ 96px** de ancho; símbolo **≥ 24px**. Por debajo,
-  usar el favicon.
-- Mantener siempre la **proporción** original; escalar de forma uniforme.
+- **Clear space:** free margin around the logo ≥ **half the height of the
+  symbol** (≈ the width of the "S" block). Nothing (text, borders, other logos) intrudes
+  on that zone.
+- **Minimum size:** wordmark **≥ 96px** wide; symbol **≥ 24px**. Below that,
+  use the favicon.
+- Always keep the original **proportions**; scale uniformly.
 
 ### Do / Don't
 
-**Sí (do):**
-- Usar los SVG provistos, sin alterar.
-- Sobre fondo claro: logo a color. Sobre fondo de marca/oscuro: versión blanca.
-- Respetar el área de seguridad y el tamaño mínimo.
+**Do:**
+- Use the provided SVGs, unaltered.
+- On a light background: color logo. On a brand/dark background: white version.
+- Respect the clear space and the minimum size.
 
-**No (don't):**
-- No recolorear el logo fuera de la paleta (`branding/tokens/colors.json`).
-- No deformar, rotar, aplicar sombras, degradados ni contornos.
-- No reconstruir el wordmark con otra tipografía.
-- No colocar el logo a color sobre fondos de bajo contraste.
-- No encerrar el símbolo en otra forma ni añadir relleno desigual.
+**Don't:**
+- Do not recolor the logo outside the palette (`branding/tokens/colors.json`).
+- Do not distort, rotate, or apply shadows, gradients or outlines.
+- Do not rebuild the wordmark with another typeface.
+- Do not place the color logo on low-contrast backgrounds.
+- Do not enclose the symbol in another shape or add uneven padding.
 
 ---
 
 ## 3. Color
 
-Paleta canónica en `branding/tokens/colors.json` / `colors.css`.
+Canonical palette in `branding/tokens/colors.json` / `colors.css`.
 
-- **Primario — Azul Sytue `#2b6cff`:** acción, marca, enlaces, foco.
-- **Acento — Teal Sytue `#00c2a8`:** detalles de marca, presencia, "One".
-- **Neutros:** superficies y texto (`#ffffff` … `#0f1115`).
-- **Semánticos:** success `#1f9d57`, warning `#d98b0a`, danger `#e0395e`, info `#2b6cff`.
+- **Primary — Sytue Blue `#2b6cff`:** action, brand, links, focus.
+- **Accent — Sytue Teal `#00c2a8`:** brand details, presence, "One".
+- **Neutrals:** surfaces and text (`#ffffff` … `#0f1115`).
+- **Semantic:** success `#1f9d57`, warning `#d98b0a`, danger `#e0395e`, info `#2b6cff`.
 
-Reglas: usar **tokens/variables de rol**, nunca HEX sueltos en producto; garantizar
-contraste **WCAG AA**; respetar modo claro y oscuro.
-
----
-
-## 4. Tipografía
-
-Familia única **Inter** (libre, SIL OFL) para toda la suite; **JetBrains Mono** para
-código. Escala y roles en `branding/tokens/typography.json`. No introducir otras
-familias en superficies de producto.
+Rules: use **role tokens/variables**, never loose HEX values in product; guarantee
+**WCAG AA** contrast; respect light and dark mode.
 
 ---
 
-## 5. Iconografía — sistema de iconos de producto
+<a id="4-tipografía"></a>
+## 4. Typography
 
-En `branding/icons/` viven los 14 **iconos de producto** (`one, id, drive, docs, sheets,
-slides, mail, calendar, contacts, chat, meet, cloud, console, hub`) — el "logo de app"
-que aparece en el **app switcher** de la Sytue Shell, en avatares de app y en favicons
-grandes. Son un **set único y coherente**: mismo grid, mismo trazo, misma familia formal.
-Nacen del mismo molde que el símbolo de marca (la S-swoosh). No confundir con los **iconos
-de UI** (chevrons, papelera, buscar…), que son line-icons neutros 24×24 dentro de los
-componentes (ver `docs/design.md#1-direccion-de-arte §4.4`); no se mezclan los dos sistemas.
+A single family, **Inter** (free, SIL OFL), for the whole suite; **JetBrains Mono** for
+code. Scale and roles in `branding/tokens/typography.json`. Do not introduce other
+families on product surfaces.
 
-### 5.1 Grid y construcción
+---
 
-| Parámetro | Valor | Nota |
+<a id="5-iconografía--sistema-de-iconos-de-producto"></a>
+## 5. Iconography — product icon system
+
+`branding/icons/` holds the 14 **product icons** (`one, id, drive, docs, sheets,
+slides, mail, calendar, contacts, chat, meet, cloud, console, hub`) — the "app logo"
+that appears in the Sytue Shell **app switcher**, in app avatars and in large
+favicons. They are a **single, coherent set**: same grid, same stroke, same formal family.
+They come from the same mold as the brand symbol (the S-swoosh). Not to be confused with
+the **UI icons** (chevrons, trash, search…), which are neutral 24×24 line icons inside the
+components (see `docs/design.md#1-direccion-de-arte §4.4`); the two systems are not mixed.
+
+<a id="51-grid-y-construcción"></a>
+### 5.1 Grid and construction
+
+| Parameter | Value | Note |
 |---|---|---|
-| **viewBox** | `0 0 40 40` | canónico; escala a cualquier tamaño |
-| **Tile** | `rect x4 y4 w32 h32 rx9` | bloque redondeado; el `rx 9` ecoa el radio del símbolo de marca |
-| **Área segura del glyph** | 24×24 (≈ `x8→x32`, `y8→y32`) | el dibujo respira dentro del tile; nada toca el borde |
-| **Trazo** | `stroke-width="2.4"` **uniforme** | un solo grosor en todo el set (incl. líneas interiores) |
-| **Terminaciones** | `stroke-linecap="round"` + `stroke-linejoin="round"` | siempre las dos, en todo trazo |
-| **Glyph** | blanco `#ffffff`, outline (sin relleno salvo puntos/acento puntual) | contraste garantizado sobre el tile de color |
-| **Rejilla** | coordenadas sobre malla de ~1px, formas centradas ópticamente | la calidad nace de la alineación |
+| **viewBox** | `0 0 40 40` | canonical; scales to any size |
+| **Tile** | `rect x4 y4 w32 h32 rx9` | rounded block; the `rx 9` echoes the radius of the brand symbol |
+| **Glyph safe area** | 24×24 (≈ `x8→x32`, `y8→y32`) | the drawing breathes inside the tile; nothing touches the edge |
+| **Stroke** | **uniform** `stroke-width="2.4"` | a single weight across the whole set (incl. inner lines) |
+| **Line ends** | `stroke-linecap="round"` + `stroke-linejoin="round"` | always both, on every stroke |
+| **Glyph** | white `#ffffff`, outline (no fill except dots/occasional accent) | guaranteed contrast on the colored tile |
+| **Grid** | coordinates on a ~1px mesh, optically centered shapes | quality comes from alignment |
 
-Legible y reconocible a **20px**, bonito a **64px**. Una sola idea geométrica por icono;
-geométrico antes que ilustrativo.
+Legible and recognizable at **20px**, beautiful at **64px**. A single geometric idea per icon;
+geometric rather than illustrative.
 
-### 5.2 Color y tematización
+<a id="52-color-y-tematización"></a>
+### 5.2 Color and theming
 
-Cada icono se rellena con su **color de producto** vía variable CSS con *fallback* HEX:
+Each icon is filled with its **product color** via a CSS variable with a HEX *fallback*:
 
 ```svg
 <rect x="4" y="4" width="32" height="32" rx="9" fill="var(--sytue-product-drive, #1f9d57)"/>
 ```
 
-- Las variables `--sytue-product-*` viven en `branding/tokens/colors.css` (fuente única)
-  y coinciden con `colors.json → product`. El *fallback* HEX hace que el SVG se vea
-  correcto **también aislado** (sin CSS cargado: e-mail, README, favicon estático).
-- El **glyph es blanco fijo**, no `currentColor`: lo que se tematiza es el tile, no el
-  trazo. El color de producto **no invade** la UI de trabajo — solo tiñe el icono y
-  acentos contextuales puntuales (ver `art-direction.md §3.4`).
+- The `--sytue-product-*` variables live in `branding/tokens/colors.css` (single source)
+  and match `colors.json → product`. The HEX *fallback* makes the SVG look
+  right **also on its own** (with no CSS loaded: email, README, static favicon).
+- The **glyph is fixed white**, not `currentColor`: what gets themed is the tile, not the
+  stroke. The product color **does not spill into** the working UI — it only tints the icon and
+  occasional contextual accents (see `art-direction.md §3.4`).
 
-Colores de producto vigentes:
+Current product colors:
 
 | App | Color | App | Color |
 |---|---|---|---|
-| one | azul `#2b6cff` | contacts | teal `#00c2a8` |
-| id | teal `#00c2a8` | chat | azul `#2b6cff` |
-| drive | verde `#1f9d57` | meet | violeta `#7c5cff` |
-| docs | azul `#2b6cff` | cloud | azul profundo `#1f57d6` |
-| sheets | verde `#1f9d57` | console | gris `#5c6270` |
-| slides | ámbar `#d98b0a` | hub | teal `#00c2a8` |
-| mail | rojo `#e0395e` | calendar | violeta `#7c5cff` |
+| one | blue `#2b6cff` | contacts | teal `#00c2a8` |
+| id | teal `#00c2a8` | chat | blue `#2b6cff` |
+| drive | green `#1f9d57` | meet | violet `#7c5cff` |
+| docs | blue `#2b6cff` | cloud | deep blue `#1f57d6` |
+| sheets | green `#1f9d57` | console | gray `#5c6270` |
+| slides | amber `#d98b0a` | hub | teal `#00c2a8` |
+| mail | red `#e0395e` | calendar | violet `#7c5cff` |
 
-### 5.3 Símbolo de marca y logos (coherencia formal)
+<a id="53-símbolo-de-marca-y-logos-coherencia-formal"></a>
+### 5.3 Brand symbol and logos (formal coherence)
 
-Los logos comparten el mismo ADN que los iconos: mismo tile redondeado y la **S-swoosh**
-como raíz formal única, con `stroke-linejoin="round"` y radios de la misma familia. El
-tile del símbolo se tematiza con `var(--sytue-primary, #2b6cff)`; el wordmark usa
-`var(--sytue-text, …)` para adaptarse a claro/oscuro. La variante `sytue-one-white.svg`
-es para fondos de marca/sidebar oscuro. Una sola S-swoosh, escalada proporcionalmente,
-en símbolo, wordmark y favicon — nunca tres curvas distintas.
+The logos share the same DNA as the icons: the same rounded tile and the **S-swoosh**
+as the single formal root, with `stroke-linejoin="round"` and radii from the same family. The
+symbol's tile is themed with `var(--sytue-primary, #2b6cff)`; the wordmark uses
+`var(--sytue-text, …)` to adapt to light/dark. The `sytue-one-white.svg` variant
+is for brand backgrounds/dark sidebar. A single S-swoosh, scaled proportionally,
+in the symbol, wordmark and favicon — never three different curves.
 
-### 5.4 Reglas
+<a id="54-reglas"></a>
+### 5.4 Rules
 
-- **No** crear iconos fuera de este molde (mismo tile, trazo, aire).
-- **No** mezclar rellenos e outline en un mismo glyph salvo puntos de acento (p. ej. el
-  punto del día en `calendar`).
-- **No** meter HEX de color de producto suelto en una app: usar la variable.
-- SVG **limpios**: sin metadatos de editor, `viewBox` coherente, formas mínimas.
-- Un icono nuevo (app futura) se dibuja sobre este mismo grid y se añade su
-  `--sytue-product-<app>` al token.
-
----
-
-## 6. Tono de voz
-
-- **Idioma de producto:** **español** (es_ES). Identificadores de código en inglés.
-- **Claro y directo.** Frases cortas, sin jerga cloud innecesaria (especialmente en
-  Sytue DevX: lenguaje sencillo, orientado a la acción).
-- **Cercano y profesional.** Trato de "tú/tu" en producto; respetuoso y sobrio.
-- **Honesto sobre soberanía y libertad.** Comunicamos con orgullo el origen europeo y
-  el software libre, sin exagerar ni alarmar.
-- **Accesible.** Mensajes de error útiles que explican qué pasó y qué hacer.
-
-Ejemplos:
-- Botón: "Crear evento" (no "Creación de evento").
-- Vacío: "Aún no tienes archivos. Sube el primero para empezar."
-- Error: "No pudimos guardar los cambios. Revisa tu conexión e inténtalo de nuevo."
+- **Do not** create icons outside this mold (same tile, stroke, breathing room).
+- **Do not** mix fills and outline in the same glyph except for accent dots (e.g. the
+  day dot in `calendar`).
+- **Do not** put a loose product-color HEX in an app: use the variable.
+- **Clean** SVGs: no editor metadata, consistent `viewBox`, minimal shapes.
+- A new icon (future app) is drawn on this same grid and its
+  `--sytue-product-<app>` is added to the token.
 
 ---
 
-## 7. Soberanía europea como valor de marca
+<a id="6-tono-de-voz"></a>
+## 6. Tone of voice
 
-- **Mensaje central:** *"Tu suite europea, soberana y libre."*
-- Datos 100% en la UE (Scaleway, solo regiones UE); sin proveedores US para datos
-  personales; sin transferencias fuera de la UE.
-- Todo el stack es **FOSS con licencia libre**; el código propio es **AGPL-3.0**.
-- Donde sea pertinente (footer, login, marketing), reforzar el origen europeo con
-  sobriedad (p.ej. indicador 🇪🇺), nunca como mero adorno.
+- **Product language:** **Spanish** (es_ES). Code identifiers in English.
+- **Clear and direct.** Short sentences, no unnecessary cloud jargon (especially in
+  Sytue DevX: plain, action-oriented language).
+- **Friendly and professional.** Informal "tú/tu" address in product; respectful and sober.
+- **Honest about sovereignty and freedom.** We communicate the European origin and
+  free software with pride, without exaggerating or alarming.
+- **Accessible.** Useful error messages that explain what happened and what to do.
+
+Examples (Spanish product copy):
+- Button: "Crear evento" ("Create event"; not "Creación de evento", "Event creation").
+- Empty: "Aún no tienes archivos. Sube el primero para empezar." ("You have no files yet. Upload the first one to get started.")
+- Error: "No pudimos guardar los cambios. Revisa tu conexión e inténtalo de nuevo." ("We couldn't save the changes. Check your connection and try again.")
 
 ---
 
-## 8. Ilustración e imagen de marca
+<a id="7-soberanía-europea-como-valor-de-marca"></a>
+## 7. European sovereignty as a brand value
 
-Sistema de ilustración SVG en `branding/illustrations/` (+ imágenes sociales en
-`branding/og/`). Es **ilustración de servicio, no decoración**: aparece casi solo en
-`EmptyState`, onboarding, páginas de error y superficies de marca (www). Sigue la
-dirección de `docs/design.md#1-direccion-de-arte §4.5`.
+- **Core message:** *"Tu suite europea, soberana y libre."* ("Your European, sovereign and free suite.")
+- Data 100% in the EU (Scaleway, EU regions only); no US providers for personal
+  data; no transfers outside the EU.
+- The whole stack is **FOSS with a free license**; our own code is **AGPL-3.0**.
+- Where relevant (footer, login, marketing), reinforce the European origin with
+  restraint (e.g. a 🇪🇺 indicator), never as mere decoration.
 
-### 8.1 Estilo
+---
 
-- **Line-art geométrico y plano.** Construido con las mismas primitivas del sistema:
-  tiles redondeados (mismo molde `rx` que el símbolo de marca), la **S-swoosh** como
-  motivo recurrente, trazo del grosor del icono de producto (`2.4px` a escala 200×160;
-  `linecap`/`linejoin` `round`). Nada de isométrico, sombras largas, degradados difusos
-  ni personajes "corporate memphis".
-- **Un solo toque de color por pieza.** El resto es neutro. El acento marca el foco:
-  azul (acción/marca), teal (presencia/éxito), violeta (dato/Calendar) o `danger`
-  (error, con forma reconocible además del color).
-- **Concepto, no chiste.** Un empty state ilustra el *vacío* (una bandeja, una carpeta),
-  sereno y útil. Acompaña **siempre** a título + descripción + CTA; nunca va solo.
+<a id="8-ilustración-e-imagen-de-marca"></a>
+## 8. Illustration and brand imagery
 
-### 8.2 Color y tema (claro/oscuro)
+SVG illustration system in `branding/illustrations/` (+ social images in
+`branding/og/`). It is **illustration that serves, not decoration**: it appears almost only in
+`EmptyState`, onboarding, error pages and brand surfaces (www). It follows the
+direction of `docs/design.md#1-direccion-de-arte §4.5`.
 
-Las ilustraciones usan **roles de token** (`stroke="var(--sytue-neutral-400)"`,
-`var(--sytue-primary-500)`, `var(--sytue-accent-500)`, `var(--sytue-border)`…), **nunca
-HEX sueltos**. Así respetan light/dark automáticamente al heredar las variables de
-`branding/tokens/colors.css`. Consumo recomendado: `<img>`/`<object>` inline o SVG
-embebido en el DOM para que las custom properties cascadeen.
+<a id="81-estilo"></a>
+### 8.1 Style
 
-> **Excepción — superficies de marca fijas.** El hero (`hero-suite.svg`) y las imágenes
-> de `branding/og/` viven sobre azul profundo de marca **independiente del tema** (igual
-> que `sytue-one-white.svg`), por lo que embeben los hexes de marca a propósito. No son
-> el patrón general; toda ilustración de producto usa roles.
+- **Geometric, flat line art.** Built with the system's own primitives:
+  rounded tiles (the same `rx` mold as the brand symbol), the **S-swoosh** as a
+  recurring motif, a stroke as thick as the product icon's (`2.4px` at 200×160 scale;
+  `linecap`/`linejoin` `round`). No isometric, long shadows, diffuse gradients
+  or "corporate memphis" characters.
+- **A single touch of color per piece.** The rest is neutral. The accent marks the focus:
+  blue (action/brand), teal (presence/success), violet (data/Calendar) or `danger`
+  (error, with a recognizable shape in addition to the color).
+- **Concept, not joke.** An empty state illustrates the *emptiness* (a tray, a folder),
+  calm and useful. It **always** accompanies a title + description + CTA; it never stands alone.
 
-### 8.3 Catálogo
+<a id="82-color-y-tema-clarooscuro"></a>
+### 8.2 Color and theme (light/dark)
 
-| Pieza | Archivo | Uso |
+Illustrations use **token roles** (`stroke="var(--sytue-neutral-400)"`,
+`var(--sytue-primary-500)`, `var(--sytue-accent-500)`, `var(--sytue-border)`…), **never
+loose HEX values**. That way they respect light/dark automatically by inheriting the variables from
+`branding/tokens/colors.css`. Recommended consumption: inline `<img>`/`<object>` or SVG
+embedded in the DOM so that the custom properties cascade.
+
+> **Exception — fixed brand surfaces.** The hero (`hero-suite.svg`) and the images
+> in `branding/og/` live on the brand graphite **independently of the theme** (just
+> like `sytue-one-white.svg`), so they embed the brand hexes on purpose: field
+> `#1a1d21`, the symbol from `logo/sytue-mark.svg` as is and brass as the only accent.
+> `arte-de-marca.test.ts` (in `@sytue/ui`) fails if any of them strays from that palette. They are not
+> the general pattern; every product illustration uses roles.
+
+<a id="83-catálogo"></a>
+### 8.3 Catalog
+
+| Piece | File | Use |
 |---|---|---|
-| Bandeja vacía | `illustrations/empty-mail.svg` | Mail sin correos |
-| Sin archivos | `illustrations/empty-drive.svg` | Drive/carpeta vacía |
-| Sin eventos | `illustrations/empty-calendar.svg` | Calendar vacío |
-| Canal vacío | `illustrations/empty-chat.svg` | Chat/Hub sin mensajes |
-| Sin contactos | `illustrations/empty-contacts.svg` | Contacts vacío |
-| Sin resultados | `illustrations/empty-search.svg` | Búsqueda sin coincidencias (genérico) |
-| Error / reintentar | `illustrations/error-retry.svg` | Fallo de carga o red |
-| Todo al día | `illustrations/all-done.svg` | Bandeja/lista completada (estado positivo) |
-| Hero de suite | `illustrations/hero-suite.svg` | www: imagen de marca (640×480) |
-| Spot soberanía | `illustrations/spot-sovereignty.svg` | Dato en la UE (120×120) |
-| Spot subir | `illustrations/spot-upload.svg` | "Sube tu primer archivo" (120×120) |
+| Empty inbox | `illustrations/empty-mail.svg` | Mail with no emails |
+| No files | `illustrations/empty-drive.svg` | Empty Drive/folder |
+| No events | `illustrations/empty-calendar.svg` | Empty Calendar |
+| Empty channel | `illustrations/empty-chat.svg` | Chat/Hub with no messages |
+| No contacts | `illustrations/empty-contacts.svg` | Empty Contacts |
+| No results | `illustrations/empty-search.svg` | Search with no matches (generic) |
+| Error / retry | `illustrations/error-retry.svg` | Load or network failure |
+| All caught up | `illustrations/all-done.svg` | Completed inbox/list (positive state) |
+| Suite hero | `illustrations/hero-suite.svg` | www: brand image (640×480) |
+| Sovereignty spot | `illustrations/spot-sovereignty.svg` | Data in the EU (120×120) |
+| Upload spot | `illustrations/spot-upload.svg` | "Sube tu primer archivo" ("Upload your first file") (120×120) |
 | OG / social card | `og/og-image.svg` | Open Graph / Twitter (1200×630) |
-| Favicon maskable | `og/favicon-maskable.svg` | PWA maskable (512×512, safe-zone) |
+| Maskable favicon | `og/favicon-maskable.svg` | PWA maskable (512×512, safe zone) |
 
-Los empty states comparten `viewBox` **200×160**; los spots **120×120**. Para el favicon
-de pestaña sigue usándose `logo/favicon.svg` (32×32); el maskable es su variante PWA con
-fondo a sangre y símbolo dentro de la safe-zone.
+Empty states share a **200×160** `viewBox`; spots **120×120**. For the tab
+favicon, `logo/favicon.svg` (32×32) is still used; the maskable one is its PWA variant with
+a full-bleed background and the symbol inside the safe zone.
 
-### 8.4 Reglas
+<a id="84-reglas"></a>
+### 8.4 Rules
 
-- **Sí:** usar los SVG provistos; incrustarlos de forma que hereden las variables de
-  tema; acompañar siempre de texto y acción; mantener el `viewBox` al escalar.
-- **No:** recolorear fuera de la paleta; añadir un segundo acento; usar la ilustración
-  en UI de trabajo densa (ahí basta un icono de sistema); crear ilustración nueva que no
-  siga el molde geométrico (line-art, un solo acento, roles de token). Ilustración que no
-  aporta, se elimina.
+- **Do:** use the provided SVGs; embed them so that they inherit the theme
+  variables; always accompany them with text and an action; keep the `viewBox` when scaling.
+- **Don't:** recolor outside the palette; add a second accent; use illustration
+  in dense working UI (a system icon is enough there); create new illustration that does not
+  follow the geometric mold (line art, a single accent, token roles). Illustration that does not
+  add anything gets removed.
 
 ---
 
-## 9. Diseño 100% Sytue-native
+<a id="9-diseño-100-sytue-native"></a>
+## 9. 100% Sytue-native design
 
-> **Nota de retiro (v4):** ya **no** hay motores de terceros que tematizar. Los motores
-> AGPL (Mattermost, Nextcloud, Keycloak, OnlyOffice, Stalwart) fueron **retirados** y
-> sustituidos por servicios **Sytue-native en Go**, por lo que `branding/themes/` ya no
-> existe.
+> **Retirement note (v4):** there are **no** longer third-party engines to theme. The
+> AGPL engines (Mattermost, Nextcloud, Keycloak, OnlyOffice, Stalwart) were **retired** and
+> replaced by **Sytue-native Go** services, so `branding/themes/` no longer
+> exists.
 
-Toda la suite es **obra original de Sytue** con una sola identidad visual. La marca, la
-paleta y la tipografía las define directamente `@sytue/ui` a partir de `branding/`
-(tokens, logos, iconos) y deben coincidir con esta guía y con `docs/design.md#2-sistema-de-diseno`.
+The whole suite is **Sytue's original work** with a single visual identity. The brand, the
+palette and the typography are defined directly by `@sytue/ui` from `branding/`
+(tokens, logos, icons) and must match this guide and `docs/design.md#2-sistema-de-diseno`.

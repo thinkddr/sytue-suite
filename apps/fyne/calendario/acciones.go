@@ -25,7 +25,7 @@ const plazo = 20 * time.Second
 
 // lienzo es el de la ventana donde está la app, que es donde van diálogos y paneles.
 func (a *App) lienzo() fyne.Canvas {
-	if a.raiz == nil {
+	if a.vida.Err() != nil || a.raiz == nil {
 		return nil
 	}
 	return fyne.CurrentApp().Driver().CanvasForObject(a.raiz)
@@ -33,18 +33,24 @@ func (a *App) lienzo() fyne.Canvas {
 
 // avisar saca un aviso con una clave del catálogo.
 func (a *App) avisar(tono ui.TonoAviso, clave string) {
+	if a.vida.Err() != nil {
+		return
+	}
 	a.avisos.Notificar(ui.NuevoAviso(tono, a.P.t(clave, nil), ""))
 }
 
 // escribir lanza una escritura contra el servicio y vuelve al hilo de la interfaz con
 // su resultado. Sin cliente (una prueba sin servicio), falla.
 func (a *App) escribir(f func(ctx context.Context) error, listo func(err error)) {
+	if a.vida.Err() != nil {
+		return
+	}
 	if a.Cal == nil {
 		listo(errSinServicio)
 		return
 	}
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), plazo)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, plazo)
 		defer parar()
 		err := f(ctx)
 		a.enUI(func() { listo(err) })
@@ -99,8 +105,8 @@ func (a *App) abrirVistaRapida(o Ocurrencia, ancla fyne.CanvasObject) {
 	if a.Notas != nil && o.Event.UID != "" {
 		uid := o.Event.UID
 		acciones.Notas = func(listo func([]api.Note, error)) {
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
 				defer parar()
 				l, err := a.Notas(ctx, uid)
 				a.enUI(func() { listo(l, err) })
@@ -118,7 +124,7 @@ func (a *App) abrirVistaRapida(o Ocurrencia, ancla fyne.CanvasObject) {
 			}
 		}
 	}
-	contenido := a.P.nuevaVistaRapida(o, a.meHanInvitado(o), acciones)
+	contenido := a.P.nuevaVistaRapida(o, a.miRespuesta(o), acciones)
 	e = ui.MostrarEmergenteEn(c, contenido, rellenoRapida,
 		func(ventana, tam fyne.Size) (fyne.Position, fyne.Size) {
 			tam.Width = min(tam.Width, ventana.Width-2*MargenVistaRapida) // `max-w-[calc(100vw-16px)]`
@@ -141,18 +147,20 @@ func (a *App) cerrarVistaRapida() {
 	}
 }
 
-// meHanInvitado es la regla de la web: SOLO si mi dirección está entre los asistentes.
-// Al organizador no se le pregunta «¿vas a ir?» a su propia reunión.
-func (a *App) meHanInvitado(o Ocurrencia) bool {
+// miRespuesta es `miRespuesta` de lib/ical.ts: lo que he contestado («accepted»,
+// «tentative», «declined» o «pending»), o "" si no me han invitado. Es la regla de la
+// web: SOLO si mi dirección está entre los asistentes; al organizador no se le pregunta
+// «¿vas a ir?» a su propia reunión.
+func (a *App) miRespuesta(o Ocurrencia) string {
 	if a.Correo == "" {
-		return false
+		return ""
 	}
 	for _, at := range o.Event.Attendees {
 		if strings.EqualFold(strings.TrimPrefix(strings.ToLower(at.Email), "mailto:"), a.Correo) {
-			return true
+			return estadoInvitado(at.PartStat)
 		}
 	}
-	return false
+	return ""
 }
 
 // responder es `responderInvitacion`: el PARTSTAT desde el propio evento.
@@ -162,6 +170,12 @@ func (a *App) responder(o Ocurrencia, estado string) {
 	}
 	partstat := strings.ToUpper(estado)
 	a.escribir(func(ctx context.Context) error {
+		// Por UID, como la web: así la respuesta queda en el .ics, que es lo que lee la
+		// web; por id solo cambiaba la lista de asistentes y el siguiente guardado web
+		// la pisaba.
+		if o.Event.UID != "" {
+			return a.Cal.ResponderPorUID(ctx, o.Event.UID, partstat)
+		}
 		return a.Cal.SetPartStat(ctx, o.Event.ID, partstat)
 	}, func(err error) {
 		if err != nil {
@@ -185,9 +199,9 @@ func (a *App) crearEn(dia time.Time) {
 	inicio := dia.In(p.zona())
 	// La semana del teléfono es el mes plegado, no la rejilla horaria: tampoco fija hora.
 	if p.Vista == VistaMes || p.Vista == VistaAgenda || p.compacta() {
-		inicio = time.Date(inicio.Year(), inicio.Month(), inicio.Day(), 9, 0, 0, 0, p.zona())
+		inicio = time.Date(inicio.Year(), inicio.Month(), inicio.Day(), p.ajustes().InicioLaboral, 0, 0, 0, p.zona())
 	}
-	a.abrirFormulario(Edicion{Inicio: inicio, Fin: inicio.Add(time.Hour)})
+	a.abrirFormulario(Edicion{Inicio: inicio, Fin: inicio.Add(time.Duration(p.ajustes().Duracion) * time.Minute)})
 }
 
 // crearRango es `openCreateRange`: con el rango pintado en la rejilla horaria.
@@ -219,8 +233,9 @@ func (a *App) duplicar(o Ocurrencia) {
 }
 
 func (a *App) abrirFormulario(e Edicion) {
-	if c := a.lienzo(); c != nil {
-		a.P.AbrirFormulario(c, e, a.destinos(), a.accionesFormulario(e))
+	if c := a.lienzo(); c != nil && a.vida.Err() == nil {
+		d := a.P.AbrirFormulario(c, e, a.destinos(), a.accionesFormulario(e))
+		a.registrarDialogo(d)
 	}
 }
 
@@ -243,16 +258,16 @@ func (a *App) accionesFormulario(e Edicion) AccionesFormulario {
 	}
 	if a.Cal != nil && !a.P.SinConexion {
 		acc.Huecos = func(desde, hasta time.Time, minutos int, zona string, laborables bool, listo func([]api.Hueco, error)) {
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
 				defer parar()
 				l, err := a.Cal.SuggestSlots(ctx, desde, hasta, minutos, zona, FranjaDesde, FranjaHasta, laborables)
 				a.enUI(func() { listo(l, err) })
 			})
 		}
 		acc.Recursos = func(desde, hasta time.Time, listo func([]api.Resource, error)) {
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
 				defer parar()
 				l, err := a.Cal.Resources(ctx, desde, hasta)
 				a.enUI(func() { listo(l, err) })
@@ -261,9 +276,9 @@ func (a *App) accionesFormulario(e Edicion) AccionesFormulario {
 	}
 	if a.Asistente != nil && !a.P.SinConexion {
 		acc.Asistente = func(pet api.PeticionIA, listo func(string, error)) {
-			a.lanzar(func() {
+			a.lanzar(func(vida context.Context) {
 				// Los 130 s del modelo de calidad en el proxy de la web, y un margen.
-				ctx, parar := context.WithTimeout(context.Background(), 135*time.Second)
+				ctx, parar := context.WithTimeout(vida, 135*time.Second)
 				defer parar()
 				texto, err := a.Asistente(ctx, pet)
 				a.enUI(func() { listo(texto, err) })
@@ -272,8 +287,8 @@ func (a *App) accionesFormulario(e Edicion) AccionesFormulario {
 	}
 	if id := e.origen(); id != "" && a.Cal != nil && !a.P.SinConexion {
 		acc.Recordatorios = func(listo func([]int, error)) {
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
 				defer parar()
 				ev, err := a.Cal.GetEvent(ctx, id)
 				if err == nil && ev.Reminders == nil {
@@ -299,7 +314,7 @@ func (a *App) guardar(e Edicion, listo func(ok bool)) {
 	in.UID = e.UID // solo lo lee el servicio al crear
 	nuevo := e.O == nil
 	if !nuevo && esSerie(*e.O) {
-		a.preguntarAlcance(false, func(alcance string) {
+		a.preguntarAlcance(*e.O, false, func(alcance string) {
 			a.escribir(func(ctx context.Context) error {
 				return EditarSerie(ctx, a.Cal, *e.O, alcance, in, e.Regla)
 			}, func(err error) { a.trasGuardar(err, false, "toast.eventSaveFailed", listo) })
@@ -376,13 +391,13 @@ func (a *App) trasGuardar(err error, nuevo bool, claveFallo string, listo func(b
 }
 
 // preguntarAlcance abre ScopeDialog.
-func (a *App) preguntarAlcance(borrar bool, si func(alcance string), no func()) {
+func (a *App) preguntarAlcance(o Ocurrencia, borrar bool, si func(alcance string), no func()) {
 	c := a.lienzo()
 	if c == nil {
 		no()
 		return
 	}
-	a.P.DialogoAlcance(borrar, si, no).Mostrar(c)
+	a.mostrarDialogo(a.P.dialogoAlcance(borrar, alcancesDe(o, borrar), si, no), c)
 }
 
 // ---- Borrar ----
@@ -404,30 +419,92 @@ func (a *App) borrarDesdeFormulario(e Edicion, listo func(bool)) {
 }
 
 func (a *App) borrar(o Ocurrencia, listo func(bool)) {
+	// guardado es el evento entero, leído antes de borrarlo, si se puede deshacer.
+	var guardado *api.Event
 	hecho := func(err error) {
 		if err != nil {
 			a.avisar(ui.AvisoPeligro, "cal.error.deleteEvent")
 			listo(false)
 			return
 		}
-		a.avisar(ui.AvisoExito, "toast.eventDeleted")
+		if guardado != nil {
+			ev := *guardado
+			a.avisarConDeshacer("toast.eventDeleted", func() { a.recrear(o, ev) })
+		} else {
+			a.avisar(ui.AvisoExito, "toast.eventDeleted")
+		}
 		listo(true)
 		a.Recargar()
 	}
 	if esSerie(o) {
-		a.preguntarAlcance(true, func(alcance string) {
+		a.preguntarAlcance(o, true, func(alcance string) {
 			a.escribir(func(ctx context.Context) error { return BorrarSerie(ctx, a.Cal, o, alcance) }, hecho)
 		}, func() { listo(false) })
 		return
 	}
-	a.escribir(func(ctx context.Context) error { return a.Cal.DeleteEvent(ctx, o.Event.ID) }, hecho)
+	a.escribir(func(ctx context.Context) error {
+		if puedeDeshacerBorrado(o) {
+			// Los recordatorios solo vienen en GetEvent (en el listado van a nil): sin
+			// leerlo, deshacer lo devolvería sin ellos. Si la lectura falla, se borra
+			// igual y no se ofrece deshacer.
+			if ev, err := a.Cal.GetEvent(ctx, o.Event.ID); err == nil && ev.Reminders != nil {
+				guardado = &ev
+			}
+		}
+		return a.Cal.DeleteEvent(ctx, o.Event.ID)
+	}, hecho)
 }
 
-// ---- Mover en la rejilla horaria ----
+// puedeDeshacerBorrado es la de lib/deshacer.ts: solo un evento propio, suelto y SIN
+// invitados. Con invitados, el borrado ya les mandó la cancelación y recrearlo les
+// mandaría otra invitación; una serie se borra por alcance y no vuelve con un único
+// evento.
+func puedeDeshacerBorrado(o Ocurrencia) bool {
+	e := o.Event
+	return !o.SoloLectura && e.ID != "" && e.UID != "" && !e.Recurring() &&
+		len(e.Attendees) == 0 && e.Organizer == ""
+}
+
+// recrear es el «Deshacer» de un borrado: el mismo evento, con su UID y sus
+// recordatorios, en el calendario de donde salió.
+func (a *App) recrear(o Ocurrencia, ev api.Event) {
+	if a.P.SinConexion {
+		return
+	}
+	cal := ev.CalendarID
+	if cal == "" {
+		cal = o.CalendarioID
+	}
+	in := ev.Input()
+	in.UID = ev.UID
+	a.escribir(func(ctx context.Context) error {
+		_, err := a.Cal.CreateEvent(ctx, cal, in)
+		return err
+	}, func(err error) {
+		if err != nil {
+			a.avisar(ui.AvisoPeligro, "toast.eventRestoreFailed")
+			return
+		}
+		a.avisar(ui.AvisoExito, "toast.eventRestored")
+		a.Recargar()
+	})
+}
+
+// avisarConDeshacer es el aviso de éxito con «Deshacer», que dura DuracionDeshacer
+// como el de la web (`DURACION_DESHACER`).
+func (a *App) avisarConDeshacer(clave string, deshacer func()) {
+	av := ui.NuevoAviso(ui.AvisoExito, a.P.t(clave, nil), "")
+	av.Duracion = ui.DuracionDeshacer
+	av.RotuloAccion = a.P.t("common.undo", nil)
+	av.AlPulsarAccion = deshacer
+	a.avisos.Notificar(av)
+}
+
+// ---- Mover en la rejilla horaria y en el mes ----
 
 // mover es `moveResizeEvent`: el mismo PUT con el inicio y el fin nuevos, conservando
 // todo lo demás del evento. Una serie pregunta el alcance; cancelarlo devuelve el bloque
-// a su sitio.
+// a su sitio. Un evento suelto avisa con «Deshacer».
 func (a *App) mover(o Ocurrencia, inicio, fin time.Time) {
 	p := a.P
 	if p.SinConexion || o.SoloLectura {
@@ -445,10 +522,14 @@ func (a *App) mover(o Ocurrencia, inicio, fin time.Time) {
 		a.Recargar()
 	}
 	if esSerie(o) {
-		regla, _ := LeerRRule(o.Event.RRule)
-		a.preguntarAlcance(false, func(alcance string) {
+		// Una regla personalizada viaja tal cual en `in` (nil: EditarSerie no la toca).
+		var regla *Recurrencia
+		if r, ok := LeerRRule(o.Event.RRule); ok {
+			regla = &r
+		}
+		a.preguntarAlcance(o, false, func(alcance string) {
 			a.escribir(func(ctx context.Context) error {
-				return EditarSerie(ctx, a.Cal, o, alcance, in, &regla)
+				return EditarSerie(ctx, a.Cal, o, alcance, in, regla)
 			}, fallo)
 		}, func() { fallo(nil) })
 		return
@@ -456,7 +537,31 @@ func (a *App) mover(o Ocurrencia, inicio, fin time.Time) {
 	a.escribir(func(ctx context.Context) error {
 		_, err := a.Cal.UpdateEvent(ctx, o.Event.ID, in)
 		return err
-	}, fallo)
+	}, func(err error) {
+		fallo(err)
+		// Como `horarioAnterior` de la web: solo un evento con hora y suelto vuelve a
+		// su sitio con fidelidad.
+		if err == nil && !o.Event.AllDay && !o.Event.Recurring() {
+			a.avisarConDeshacer("toast.eventMoved", func() { a.devolver(o) })
+		}
+	})
+}
+
+// devolver es el «Deshacer» de un movimiento: el mismo PUT con el inicio y el fin de
+// antes. `Input` lleva los recordatorios a nil, así que el servicio los conserva.
+func (a *App) devolver(o Ocurrencia) {
+	if a.P.SinConexion {
+		return
+	}
+	a.escribir(func(ctx context.Context) error {
+		_, err := a.Cal.UpdateEvent(ctx, o.Event.ID, o.Event.Input())
+		return err
+	}, func(err error) {
+		if err != nil {
+			a.avisar(ui.AvisoPeligro, "cal.error.updateEvent")
+		}
+		a.Recargar()
+	})
 }
 
 // Reloj pone en marcha lo que corre solo mientras la app está abierta: la línea de la
@@ -464,16 +569,23 @@ func (a *App) mover(o Ocurrencia, inicio, fin time.Time) {
 // de los recordatorios. Lo arranca el binario, no las pruebas: el cuerpo en pantalla se
 // busca en la pantalla en cada tic, así que sobrevive a que la App la reconstruya.
 func (a *App) Reloj() {
-	go a.sondearRecordatorios()
-	go func() {
-		t := time.NewTicker(time.Minute)
-		defer t.Stop()
-		for range t.C {
-			a.enUI(func() {
-				if c := a.P.cuerpoHorario; c != nil {
-					c.Ahora()
+	a.reloj.Do(func() {
+		a.lanzar(a.sondearRecordatorios)
+		a.lanzar(func(vida context.Context) {
+			t := time.NewTicker(time.Minute)
+			defer t.Stop()
+			for {
+				select {
+				case <-vida.Done():
+					return
+				case <-t.C:
+					a.enUI(func() {
+						if c := a.P.cuerpoHorario; c != nil {
+							c.Ahora()
+						}
+					})
 				}
-			})
-		}
-	}()
+			}
+		})
+	})
 }

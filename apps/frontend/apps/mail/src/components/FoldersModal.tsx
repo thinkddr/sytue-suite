@@ -27,13 +27,8 @@ import {
   SettingsSection,
   useToast,
 } from '@sytue/ui';
-import {
-  createMailbox,
-  renameMailbox,
-  deleteMailbox,
-  type FolderResult,
-  type Mailbox,
-} from '../client/mailApi.js';
+import { type FolderResult, type Mailbox } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import type { Locale } from '@sytue/i18n';
 import { useT, type MailMessageKey, type T } from '../i18n/index.js';
 import { Glyph } from './glyphs.js';
@@ -65,6 +60,7 @@ export function FoldersModal({
   onChanged,
 }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { createMailbox } = usePrivateMailApi();
   const toast = useToast();
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -218,6 +214,7 @@ function FolderRow({
   onReport: (res: FolderResult, okTitle: string) => boolean;
   onFail: (title: string) => void;
 }): JSX.Element {
+  const { renameMailbox, deleteMailbox } = usePrivateMailApi();
   const [name, setName] = useState(folder.name);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);

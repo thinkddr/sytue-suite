@@ -24,7 +24,7 @@ func TestListPlatformAuditPage(t *testing.T) {
 	st, ctx := newStore(t)
 
 	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
-	admin := seedUser(t, ctx, st, "global@sytue.eu")
+	admin := seedUser(ctx, t, st, "global@sytue.eu")
 
 	audita := func(action, orgID string) {
 		t.Helper()

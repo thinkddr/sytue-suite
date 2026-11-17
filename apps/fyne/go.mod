@@ -11,7 +11,7 @@
 // hay destino `js/wasm` y no hay que sostener ninguno.
 module git.sytue.eu/sytue/one/apps/fyne
 
-go 1.27.3
+go 1.27.4
 
 require (
 	fyne.io/fyne/v2 v2.8.2
@@ -52,7 +52,9 @@ require (
 	buf.build/go/protovalidate v1.2.0 // indirect
 	buf.build/go/protoyaml v0.7.0 // indirect
 	cel.dev/expr v0.25.2 // indirect
+	filippo.io/age v1.3.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
+	filippo.io/hpke v0.4.0 // indirect
 	fyne.io/systray v1.12.3-0.20260810170012-af4e8e793ec4 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/anthonynsimon/bild v0.14.0 // indirect
@@ -65,6 +67,8 @@ require (
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dennwc/iters v1.2.2 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
+	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608 // indirect
+	github.com/emersion/go-vcard v0.1.0 // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
@@ -120,6 +124,7 @@ require (
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
+	github.com/teambition/rrule-go v1.8.2 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/tidwall/gjson v1.20.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -131,7 +136,7 @@ require (
 	github.com/yuin/goldmark v1.8.6 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.mau.fi/util v0.11.0 // indirect
-	go.opentelemetry.io/otel v1.45.0 // indirect
+	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
@@ -154,7 +159,7 @@ replace git.sytue.eu/sytue/one/apps/nucleo => ../nucleo
 // móviles y geometría de la ventana UIKit al girar o redimensionar. El original
 // conserva BSD-3-Clause y las modificaciones Apache-2.0; parches y retirada en
 // upstream/README.md.
-replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.5
+replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.7
 
 // GLFW solo acepta FICHEROS soltados: su XDnD de X11 y su wl_data_device de Wayland
 // piden `text/uri-list` y nada más. El fork —el mismo commit que requiere Fyne, con un
@@ -168,8 +173,8 @@ replace github.com/go-gl/glfw/v3.4/glfw => github.com/thinkddr/glfw/v3.4/glfw v0
 //
 // go-text/typesetting escalaba la fuente a `ceil(tamaño)` antes de pedirle los avances
 // a harfbuzz (`shaping/shaping.go`), así que un tamaño fraccionario salía con los
-// avances del entero siguiente. Con `1 rem = 14 px` casi toda la escala de la suite es
-// fraccionaria, y CADA texto salía más ancho: `text-base` (12,25 px) un +6,12 %,
+// avances del entero siguiente. Con la suite medida entonces a 14 px el rem, casi toda la
+// escala era fraccionaria, y CADA texto salía más ancho: `text-base` (12,25 px) un +6,12 %,
 // `text-sm` +5,49 %, `text-xl` +3,90 %. Medido, no estimado.
 //
 // Y no lo arreglaba una pantalla HiDPI: Fyne conforma en px de CSS y multiplica DESPUÉS

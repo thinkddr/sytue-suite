@@ -11,9 +11,8 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { HubClient, bearer } from '@sytue/api-clients';
-import type { NotificationPref } from '@sytue/api-clients';
 import type { ProductKey } from '@sytue/config';
-import { appForKey, Button, EmptyState, ProductIcon, Skeleton, Switch } from '@sytue/ui';
+import { appForKey, Button, EmptyState, ProductIcon, Skeleton } from '@sytue/ui';
 import { formatTimeAgo, translate } from '@sytue/i18n';
 import type { Locale } from '@sytue/i18n';
 import { getAccessToken } from '@sytue/auth/client';
@@ -29,15 +28,24 @@ import {
   type EstadoAvisos,
 } from '@sytue/shell';
 import { useT } from '../i18n/index.js';
+import { PreferenciasAvisos } from './PreferenciasAvisos.js';
 
 interface Props {
   locale: Locale;
   hubBaseUrl: string;
+  /** Organización activa: las reglas de silencio son de ella (ver `PreferenciasAvisos`). */
+  organizacion?: string | undefined;
+  personal?: boolean;
 }
 
 type Filtro = 'all' | 'unread';
 
-export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
+export function NotificationsInbox({
+  locale,
+  hubBaseUrl,
+  organizacion,
+  personal = false,
+}: Props): JSX.Element {
   const t = useT(locale);
   const hub = useMemo(
     () => new HubClient({ baseUrl: hubBaseUrl, auth: bearer(getAccessToken) }),
@@ -51,8 +59,6 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
   // En estado y no en un ref: mutar `.current` dentro del efecto hacía que el React
   // Compiler se saltara el componente entero (react/immutability).
   const [avisos, setAvisos] = useState<Avisos | null>(null);
-  const [prefs, setPrefs] = useState<NotificationPref[]>([]);
-  const [intento, setIntento] = useState(0);
   const [filtro, setFiltro] = useState<Filtro>('all');
   const [producto, setProducto] = useState<ProductKey | null>(null);
 
@@ -62,35 +68,9 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
     return () => a.cerrar();
   }, [hub]);
 
-  // Las preferencias van aparte a propósito: si el Hub no las sirve, la bandeja sigue
-  // siendo útil y solo se cae esa sección.
-  useEffect(() => {
-    let cancelado = false;
-    void hub
-      .notificationPrefs()
-      .then((p) => {
-        if (!cancelado) setPrefs(p);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelado = true;
-    };
-  }, [hub, intento]);
-
   const items = estado && !estado.cargando ? estado.items : null;
   const error = estado?.fallo === true && (estado.items.length ?? 0) === 0;
   const marcarTodas = () => void avisos?.leerTodos();
-
-  const silenciar = async (source: ProductKey, muted: boolean) => {
-    setPrefs((prev) => [
-      ...prev.filter((p) => !(p.source === source && !p.kind)),
-      { source, muted },
-    ]);
-    await hub.setNotificationPref({ source, muted }).catch(() => undefined);
-  };
-
-  const silenciado = (source: ProductKey): boolean =>
-    prefs.some((p) => p.source === source && !p.kind && p.muted);
 
   const todas = items ?? [];
   // El número de la base, no el de los cien cargados.
@@ -171,16 +151,11 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
         </div>
       ) : error ? (
         <EmptyState
+          tone="error"
           title={t('inbox.errorTitle')}
           description={t('inbox.errorBody')}
           action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                avisos?.reintentar();
-                setIntento((n) => n + 1);
-              }}
-            >
+            <Button variant="secondary" onClick={() => avisos?.reintentar()}>
               {t('inbox.retry')}
             </Button>
           }
@@ -276,31 +251,15 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
       ) : null}
 
       {/* Reglas de silencio. Al final y no en otra página: quien viene a mirar
-          sus avisos es quien decide cuáles quiere, y son dos clics desde aquí. */}
-      <section aria-labelledby="prefs-title" class="border-border mt-2 border-t pt-6">
-        <h2 id="prefs-title" class="text-text text-base font-semibold">
-          {t('inbox.prefsTitle')}
-        </h2>
-        <p class="text-text-muted mt-1 mb-4 max-w-2xl text-sm">{t('inbox.prefsBody')}</p>
-        <div class="flex flex-col gap-3">
-          {(['mail', 'drive', 'docs', 'calendar', 'contacts', 'rooms'] as ProductKey[]).map(
-            (key) => {
-              const app = appForKey(key);
-              return (
-                <Switch
-                  key={key}
-                  label={app ? app.name : key}
-                  checked={!silenciado(key)}
-                  onChange={(e) => {
-                    // El interruptor dice «recibir»; el Hub guarda «silenciado».
-                    void silenciar(key, !e.currentTarget.checked);
-                  }}
-                />
-              );
-            },
-          )}
-        </div>
-      </section>
+          sus avisos es quien decide cuáles quiere, y son dos clics desde aquí. Van
+          aparte a propósito: si el Hub no las sirve, la bandeja sigue siendo útil y
+          solo se cae esa sección. */}
+      <PreferenciasAvisos
+        locale={locale}
+        hub={hub}
+        organizacion={organizacion}
+        personal={personal}
+      />
     </div>
   );
 }

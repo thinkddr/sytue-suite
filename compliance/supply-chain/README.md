@@ -1,203 +1,208 @@
-# Cadena de suministro UE
+<a id="cadena-de-suministro-ue"></a>
+# EU supply chain
 
-Este directorio materializa el criterio de `docs/CONVENTIONS.md`: para ser
-`eu-approved` no basta con alojar datos en una región europea. La entidad matriz
-o controladora, la distribución del artefacto y cualquier tratamiento de datos
-deben quedar bajo entidades y operación de la Unión Europea.
+This directory puts into practice the criterion in `docs/CONVENTIONS.md`: to be
+`eu-approved`, hosting data in a European region is not enough. The parent or
+controlling entity, the distribution of the artifact and any data processing
+must remain under European Union entities and operation.
 
-## Dos riesgos distintos que este inventario mezcla en una sola columna
+<a id="dos-riesgos-distintos-que-este-inventario-mezcla-en-una-sola-columna"></a>
+## Two different risks that this inventory mixes in a single column
 
-Añadido el 2026-08-11 tras revisarlo con el propietario, que lo formuló así: **lo
-que importa es que los contenidos de nuestro proyecto no pasen por proveedores
-online ni conexiones hacia fuera de la UE**. Eso separa dos cosas que hoy
-comparten el mismo `status`, y confundirlas hace leer mal el contador:
+Added on 2026-08-11 after reviewing it with the owner, who put it this way: **what
+matters is that our project's contents do not go through online providers or
+connections outside the EU**. That separates two things that today share the same
+`status`, and confusing them leads to misreading the counter:
 
-**A · SALIDA — algo nuestro viaja fuera.** Código, datos, secretos, nombres de
-repositorios o de servicios, listas de dependencias, digests de artefactos,
-telemetría, identificadores de usuario. Es el riesgo que el criterio persigue, y
-no se arregla con una licencia permisiva ni alojando nada en Francia: o se corta,
-o sale. Tres casos reales encontrados y cerrados ese mismo día:
+**A · EGRESS — something of ours travels outside.** Code, data, secrets, names of
+repositories or services, dependency lists, artifact digests, telemetry, user
+identifiers. This is the risk the criterion targets, and it is not fixed with a
+permissive license or by hosting something in France: either it is cut, or it
+leaves. Three real cases found and closed that same day:
 
-- `osv-scanner` enviaba a `api.osv.dev` el inventario completo de dependencias
-  del proyecto en **cada** ejecución. Cortado con `--offline-vulnerabilities`.
-- `cosign` publicaba en el registro de transparencia de Sigstore (EE. UU.) la
-  referencia completa de cada imagen, su digest y la fecha: el inventario de
-  servicios y la cadencia de releases. Apagado en los dos extremos.
-- `GOPRIVATE` vacío habría enviado al proxy de módulos y al registro de sumas de
-  Google las rutas de nuestros módulos privados `git.sytue.eu/...` en cuanto un
-  `go.mod` requiriera a otro nuestro. Cerrado antes de que ocurriera.
+- `osv-scanner` sent the project's full dependency inventory to `api.osv.dev` on
+  **every** run. Cut with `--offline-vulnerabilities`.
+- `cosign` published to the Sigstore transparency log (US) the full reference of
+  each image, its digest and the date: the service inventory and the release
+  cadence. Turned off at both ends.
+- An empty `GOPRIVATE` would have sent the paths of our private modules
+  `git.sytue.eu/...` to Google's module proxy and checksum database as soon as a
+  `go.mod` required another one of ours. Closed before it happened.
 
-**B · ENTRADA — traemos un artefacto público.** Un binario, una imagen base, un
-módulo, un chart. Aquí **no sale nada nuestro**: el riesgo es de integridad de la
-cadena de suministro —que nos den algo distinto de lo que pedimos— y se mitiga
-con digest fijado, sha256 comprobado y espejo propio, no cortando la conexión.
+**B · INGRESS — we bring in a public artifact.** A binary, a base image, a
+module, a chart. Here **nothing of ours leaves**: the risk is supply-chain
+integrity —being given something other than what we asked for— and it is mitigated
+with a pinned digest, a checked sha256 and our own mirror, not by cutting the connection.
 
-**Por qué importa la distinción al leer el contador.** De los 49 `blocked` de
-agosto de 2026, **34 no eran proveedores**. Este apartado ya lo decía de los
-espacios de nombres de módulos Go —`gonum.org`, `dario.cat`, `pgregory.net`,
-`go.uber.org`, `gopkg.in`…—: con `GOPROXY=https://proxy.golang.org,direct` esos
-dominios **no se contactan nunca**, porque quien sirve el módulo es
-`proxy.golang.org`, inventariado aparte.
+**Why the distinction matters when reading the counter.** Of the 49 `blocked` in
+August 2026, **34 were not providers**. This section already said so about Go
+module namespaces —`gonum.org`, `dario.cat`, `pgregory.net`, `go.uber.org`,
+`gopkg.in`…—: with `GOPROXY=https://proxy.golang.org,direct` those domains are
+**never contacted**, because the module is served by `proxy.golang.org`,
+inventoried separately.
 
-**El 2026-08-11 se implementó el estado `identifier` que este texto ya daba por
-existente** —estaba documentado y no en el código— y se aplicó a las otras dos
-familias que cumplen lo mismo:
+**On 2026-08-11 the `identifier` status that this text already assumed existed
+was implemented** —it was documented but not in the code— and it was applied to
+the other two families that meet the same condition:
 
-- **Grupos de API y prefijos de etiqueta de Kubernetes.** `monitoring.coreos.com`
-  es un campo `apiVersion`; `app.kubernetes.io/name` y `topology.kubernetes.io/zone`
-  son etiquetas. **232 líneas** de `blocked-baseline.tsv` existían solo para
-  silenciarlos.
-- **Sitios de proyecto citados en metadatos**, como el `home:` de un `Chart.yaml`
-  (`min.io`, `prometheus.io`, `www.pgbouncer.org`). El canal real de esos productos
-  —`docker.io`, `docker.dragonflydb.io`— sigue bloqueado y contado aparte.
+- **Kubernetes API groups and label prefixes.** `monitoring.coreos.com`
+  is an `apiVersion` field; `app.kubernetes.io/name` and `topology.kubernetes.io/zone`
+  are labels. **232 lines** of `blocked-baseline.tsv` existed only to
+  silence them.
+- **Project sites cited in metadata**, such as the `home:` of a `Chart.yaml`
+  (`min.io`, `prometheus.io`, `www.pgbouncer.org`). The real channel of those products
+  —`docker.io`, `docker.dragonflydb.io`— remains blocked and counted separately.
 
-`identifier` **no relaja nada**: la fila sigue exigiendo evidencia, responsable y
-revisión que caduca a los 183 días. Lo único que cambia es que deja de contarse
-como dependencia, porque no lo es. El contador quedó en **15 canales de descarga
-efectiva**, que son el trabajo real.
+`identifier` **relaxes nothing**: the row still requires evidence, an owner and a
+review that expires after 183 days. The only change is that it is no longer counted
+as a dependency, because it is not one. The counter ended at **15 actual download
+channels**, which are the real work.
 
-**Y de esos quince, cinco se cerraron el mismo día con `pinned-artifact`**: los
-registros de imagen (`docker.io`, `gcr.io`, `ghcr.io`, `quay.io`,
-`docker.dragonflydb.io`). Es la aplicación literal de lo que dice el apartado B de
-arriba —el riesgo de la ENTRADA es de integridad y se mitiga con digest, no
-cortando la conexión—, y aquí la mitigación **existe y se comprueba**:
+**And of those fifteen, five were closed the same day with `pinned-artifact`**: the
+image registries (`docker.io`, `gcr.io`, `ghcr.io`, `quay.io`,
+`docker.dragonflydb.io`). It is the literal application of what section B above
+says —the INGRESS risk is about integrity and is mitigated with a digest, not by
+cutting the connection—, and here the mitigation **exists and is checked**:
 
-- En ejecución los charts apuntan solo a `rg.fr-par.scw.cloud`; las veinte imágenes
-  de terceros están en `upstream-images.txt` con digest inmutable y firmadas, y
-  `upstream-vigencia-test.sh` rechaza cualquiera que no esté catalogada.
-- En build, los **treinta `FROM`** de los Dockerfile llevan `@sha256:`.
+- At runtime the charts point only to `rg.fr-par.scw.cloud`; the twenty third-party
+  images are in `upstream-images.txt` with an immutable digest and signed, and
+  `upstream-vigencia-test.sh` rejects any that is not catalogued.
+- At build time, the **thirty `FROM`** lines of the Dockerfiles carry `@sha256:`.
 
-Eso último no se toma como palabra: `TestLosRegistrosFijadosLoEstanDeVerdad` recorre
-los Dockerfile y falla si alguno pierde el digest. La etiqueta describe una
-mitigación real o no vale nada.
+That last point is not taken on trust: `TestLosRegistrosFijadosLoEstanDeVerdad` walks
+the Dockerfiles and fails if any of them loses its digest. The label describes a
+real mitigation or it is worth nothing.
 
-Tres filas, además, contradecían su propio contenido: `dario.cat` declara sede en
-**España**, `alpinelinux.org` anfitrión fiscal en la **Open Collective Europe
-Foundation (UE)** y `postgresql.org` en **Canadá**. Estaban las tres como
-bloqueadas por gobernanza extracomunitaria.
+In addition, three rows contradicted their own content: `dario.cat` declares its
+headquarters in **Spain**, `alpinelinux.org` its fiscal host in the **Open Collective
+Europe Foundation (EU)** and `postgresql.org` in **Canada**. All three were listed as
+blocked due to non-EU governance.
 
-**Y el contador vuelve a subir el mismo día**, porque el perfil on-premise entró
-en git y trajo consigo cuatro canales que antes no se veían: `get.k3s.io`,
-`download.docker.com`, `raw.githubusercontent.com` y `charts.jetstack.io`.
-Son descargas de verdad y sin mitigación —dos de ellas ejecutan lo descargado
-(`curl … | sh`) y una apunta a la rama `main` de un tercero—, así que van como
-`blocked` con su fila de baseline, no como `pinned-artifact`. Efectivos quedan
-**catorce**, no diez: cerrarlos exige fijar versión y checksum en
-`deploy/helm/bin/install-host.sh`, que hoy no lo hace.
+**And the counter goes up again the same day**, because the on-premise profile entered
+git and brought with it four channels that were not visible before: `get.k3s.io`,
+`download.docker.com`, `raw.githubusercontent.com` and `charts.jetstack.io`.
+They are real downloads with no mitigation —two of them execute what they download
+(`curl … | sh`) and one points to a third party's `main` branch—, so they go in as
+`blocked` with their baseline row, not as `pinned-artifact`. The effective count is
+**fourteen**, not ten: closing them requires pinning the version and checksum in
+`deploy/helm/bin/install-host.sh`, which does not do so today.
 
-Regla práctica al clasificar una fila: **preguntarse qué viaja y en qué
-dirección**. Si la respuesta es «algo nuestro, hacia fuera», es un incumplimiento
-que hay que cerrar. Si es «un artefacto público, hacia dentro», lo que toca es
-fijar su digest y espejarlo, y el `status` describe su gobernanza, no una fuga.
+Rule of thumb when classifying a row: **ask what travels and in which
+direction**. If the answer is “something of ours, outward”, it is a non-compliance
+that must be closed. If it is “a public artifact, inward”, what is needed is to
+pin its digest and mirror it, and the `status` describes its governance, not a leak.
 
-## Archivos y gate
+<a id="archivos-y-gate"></a>
+## Files and gate
 
-- `providers.tsv`: inventario versionado con controlador, sede, región,
-  finalidad, evidencia primaria, responsable, fecha de revisión, caducidad y
-  licencia o términos aplicables.
-- `blocked-baseline.tsv`: deuda heredada exacta `host + archivo`. No es una
-  allowlist: cada fila continúa siendo un incumplimiento que debe desaparecer.
-- `tools/eusupply`: extrae referencias de ficheros tracked de CI, Docker,
-  Compose, Helm, Terraform, scripts, módulos Go y locks Bun. Falla ante un host
-  desconocido, evidencia con más de 183 días, una excepción caducada, una
-  nueva referencia bloqueada o una fila obsoleta de la línea base.
+- `providers.tsv`: versioned inventory with controller, headquarters, region,
+  purpose, primary evidence, owner, review date, expiry and applicable license
+  or terms.
+- `blocked-baseline.tsv`: exact inherited debt `host + file`. It is not an
+  allowlist: every row remains a non-compliance that must disappear.
+- `tools/eusupply`: extracts references from tracked CI, Docker, Compose, Helm,
+  Terraform, script, Go module and Bun lock files. It fails on an unknown host,
+  evidence older than 183 days, an expired exception, a new blocked reference
+  or an obsolete baseline row.
 
-Ejecutar localmente:
+Run locally:
 
 ```sh
 make eu-supply-chain-check
 ```
 
-El mismo gate forma parte de `make gates`, GitHub `security` durante la
-transición y el piloto de Sytue Git. La línea base solo puede disminuir; no debe
-ampliarse para hacer pasar CI sin una decisión documentada.
+The same gate is part of `make gates`, GitHub `security` during the
+transition and the Sytue Git pilot. The baseline can only shrink; it must not be
+expanded to make CI pass without a documented decision.
 
-## Estado de la migración (2026-08-02)
+<a id="estado-de-la-migración-2026-08-02"></a>
+## Migration status (2026-08-02)
 
-Ya aprobados o migrados:
+Already approved or migrated:
 
-- automatización de Sytue Git (Gitea) autohospedado sobre Scaleway Francia y workflows de
-  piloto preparados; el alta real sigue pendiente de aplicar la infraestructura;
-- runtime, registry, S3 y observabilidad gestionada sobre Scaleway;
-- pagos con Mollie B.V. (Países Bajos);
-- inferencia IA por defecto con Scaleway Generative APIs y Mistral; Anthropic ha
-  sido retirado del servicio;
-- Traefik (SAS francesa), con su chart vendorizado, y base GeoIP estática de
-  DB-IP (Francia).
+- automation of a self-hosted Sytue Git (Gitea) on Scaleway France and pilot
+  workflows prepared; the actual go-live is still pending applying the infrastructure;
+- runtime, registry, S3 and managed observability on Scaleway;
+- payments with Mollie B.V. (Netherlands);
+- AI inference by default with Scaleway Generative APIs and Mistral; Anthropic has
+  been withdrawn from the service;
+- Traefik (French SAS), with its vendored chart, and a static GeoIP database from
+  DB-IP (France).
 
-**Retirada el 2026-10-06**: la forja es GitHub, la pasarela `services/ghcompat`
-salió del repositorio (auditoría de seguridad, CLOUD-02) y con ella la fila de
-`claude.ai` de `blocked-baseline.tsv`. Lo que sigue es el registro de la
-decisión que estuvo vigente hasta entonces.
+**Withdrawn on 2026-10-06**: the forge is GitHub, the `services/ghcompat` gateway
+left the repository (security audit, CLOUD-02) and with it the `claude.ai` row
+of `blocked-baseline.tsv`. What follows is the record of the decision that was
+in force until then.
 
-Decidido el 2026-08-15, **Claude Code sobre Sytue Git**: la pasarela presentaba
-la forja como un GitHub Enterprise Server para poder conectarla con Claude Code,
-que con una forja autohospedada solo habla GHES.
+Decided on 2026-08-15, **Claude Code on Sytue Git**: the gateway presented
+the forge as a GitHub Enterprise Server so it could be connected to Claude Code,
+which, with a self-hosted forge, only speaks GHES.
 
-La topología de partida fue la de **entorno autohospedado** —sesiones en un
-runner nuestro en la UE, que clona desde dentro de la red— precisamente para no
-abrir nada entrante. **Ese punto se revisó el mismo día, y hay que decirlo
-claro**: la conexión de Claude Code no llega a establecerse sin que su
-infraestructura alcance la instancia, así que el propietario decidió abrir el
-puerto de la pasarela (8443) **restringido al rango saliente de Anthropic**,
-`160.79.104.0/21`, en el grupo de seguridad de la forja.
+The starting topology was the **self-hosted environment** one —sessions on a
+runner of ours in the EU, which clones from inside the network— precisely so as not
+to open anything inbound. **That point was revised the same day, and it must be said
+clearly**: the Claude Code connection cannot be established unless its
+infrastructure reaches the instance, so the owner decided to open the
+gateway port (8443) **restricted to Anthropic's outbound range**,
+`160.79.104.0/21`, in the forge's security group.
 
-Lo que eso significa, sin adornos:
+What that means, without embellishment:
 
-- **La API traducida es alcanzable desde infraestructura de Estados Unidos**, y
-  esa API sirve el contenido de los ficheros, no solo metadatos. Es un
-  apartamiento del criterio EU-only estricto, tomado a sabiendas.
-- **No es acceso general**: la puerta está cerrada a todo lo demás, y el alcance
-  —qué repositorios se ven— no lo fija la regla de red sino el usuario bot
-  `claude-bot`, que solo pertenece al equipo `claude` de la organización.
-- **El clonado sigue siendo interno** mientras las sesiones corran en el runner
-  autohospedado: quien clona es nuestra máquina.
-- **Lo que cada sesión lea va al modelo**, que es inherente a usar Claude y no a
-  esta pasarela.
+- **The translated API is reachable from United States infrastructure**, and
+  that API serves file contents, not just metadata. It is a
+  departure from the strict EU-only criterion, taken knowingly.
+- **It is not general access**: the door is closed to everything else, and the scope
+  —which repositories are visible— is set not by the network rule but by the bot
+  user `claude-bot`, which only belongs to the organization's `claude` team.
+- **Cloning remains internal** as long as the sessions run on the self-hosted
+  runner: the one cloning is our machine.
+- **Whatever each session reads goes to the model**, which is inherent to using
+  Claude and not to this gateway.
 
-Con el puerto abierto entran también el Code Review alojado y las métricas de
-contribución, que antes quedaban fuera. La vía de vuelta, si se quiere estrechar,
-es cerrar el 8443 y pasar al conector SCM del orquestador; estaba descrita en el
-README del servicio, que ya no existe.
+With the port open, the hosted Code Review and the contribution metrics also come
+in, which were previously left out. The way back, if it is to be narrowed,
+is to close 8443 and move to the orchestrator's SCM connector; it was described in
+the service's README, which no longer exists.
 
-Excepciones temporales, ambas con salida obligatoria antes de 2026-10-01:
+Temporary exceptions, both with a mandatory exit before 2026-10-01:
 
-- GitHub exclusivamente como puente de migración hasta completar dos releases
-  verificadas en Sytue Git;
-- Bun mientras se retira el BFF/SSR JavaScript según ADR-0027.
+- GitHub exclusively as a migration bridge until two verified releases are
+  completed on Sytue Git;
+- Bun while the JavaScript BFF/SSR is retired according to ADR-0027.
 
-Bloqueos que no se resuelven cambiando solo la región de hosting:
+Blockers that are not resolved just by changing the hosting region:
 
-1. **Toolchains y gobernanza:** Go/Google, Kubernetes/Helm/CNCF/Linux
-   Foundation, npm/Microsoft y Node/OpenJS no cumplen el criterio de sede UE.
-   Requieren un ADR de arquitectura y migración de código, no un mero mirror.
-2. **Artefactos upstream:** ~~Docker Hub, GCR, GHCR, Quay, imágenes base y el
-   chart servido desde GitHub deben importarse una sola vez, verificar firma y
-   checksum y promoverse al Registry/Object Storage de Scaleway.~~ **HECHO y
-   verificado el 2026-08-11**: los cinco registros pasan a `pinned-artifact`
-   (mirror con digest inmutable y firma en ejecución; `@sha256:` en los treinta
-   `FROM` de build), y el chart de Traefik está vendorizado —`traefik.github.io`
-   ya no se observa en ningún fichero—. Sigue siendo cierto lo segundo: **el
-   mirror reduce la exposición operativa, no convierte el origen en UE**; por eso
-   el estado se llama «artefacto fijado» y no «aprobado».
-3. **PKI pública:** Let's Encrypt pertenece a una entidad estadounidense.
-   HARICA (Grecia) ofrece ACME, pero exige alta y validación previa de la
-   organización; no se cambia el issuer hasta completar ese proceso para no
-   interrumpir TLS.
-4. **Componentes autohospedados no UE o de control no verificable:** Dragonfly,
-   PostgreSQL/PgBouncer, MinIO, LiveKit, PostgREST, Paketo y dependencias
-   transitivas necesitan sustitución o una decisión expresa. Autohospedarlos
-   evita transferencias de datos, pero no satisface la regla de origen.
+1. **Toolchains and governance:** Go/Google, Kubernetes/Helm/CNCF/Linux
+   Foundation, npm/Microsoft and Node/OpenJS do not meet the EU headquarters
+   criterion. They require an architecture ADR and code migration, not a mere mirror.
+2. **Upstream artifacts:** ~~Docker Hub, GCR, GHCR, Quay, base images and the
+   chart served from GitHub must be imported only once, have their signature and
+   checksum verified and be promoted to Scaleway's Registry/Object Storage.~~ **DONE and
+   verified on 2026-08-11**: the five registries move to `pinned-artifact`
+   (mirror with an immutable digest and signature at runtime; `@sha256:` in the thirty
+   build `FROM` lines), and the Traefik chart is vendored —`traefik.github.io`
+   no longer appears in any file—. The second point still holds: **the
+   mirror reduces operational exposure, it does not make the origin EU**; that is why
+   the status is called “pinned artifact” and not “approved”.
+3. **Public PKI:** Let's Encrypt belongs to a US entity.
+   HARICA (Greece) offers ACME, but requires prior registration and validation of the
+   organization; the issuer is not changed until that process is complete so as not
+   to interrupt TLS.
+4. **Self-hosted components that are non-EU or whose control cannot be verified:** Dragonfly,
+   PostgreSQL/PgBouncer, MinIO, LiveKit, PostgREST, Paketo and transitive
+   dependencies need replacement or an explicit decision. Self-hosting them
+   avoids data transfers, but does not satisfy the origin rule.
 
-## Orden de salida
+<a id="orden-de-salida"></a>
+## Exit order
 
-1. finalizar Sytue Git y cortar GitHub tras dos releases verdes;
-2. cerrar el ingress de artefactos con mirrors privados y builds reproducibles;
-3. contratar/validar HARICA y cambiar los ClusterIssuers;
-4. retirar Bun/Node del runtime y del build productivo;
-5. aprobar el ADR de sustitución de Go/Kubernetes y ejecutar la migración por
+1. finish Sytue Git and cut GitHub after two green releases;
+2. close the artifact ingress with private mirrors and reproducible builds;
+3. contract/validate HARICA and change the ClusterIssuers;
+4. remove Bun/Node from the runtime and from the production build;
+5. approve the ADR for replacing Go/Kubernetes and carry out the migration by
    bounded context;
-6. sustituir componentes restantes y llevar `blocked-baseline.tsv` a cero.
+6. replace the remaining components and bring `blocked-baseline.tsv` down to zero.
 
-No se puede declarar la cadena "100 % UE" hasta que la línea base esté vacía
-y el inventario no contenga excepciones temporales.
+The chain cannot be declared "100 % EU" until the baseline is empty
+and the inventory contains no temporary exceptions.

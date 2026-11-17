@@ -23,7 +23,7 @@ func TestDocs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/documents":
-			if got := r.URL.RawQuery; got != "cursor=c1&kind=document&limit=100&q=acta&starred=1" {
+			if got := r.URL.RawQuery; got != "cursor=c1&kind=document&limit=100&q=acta&scope=shared&sort=title&starred=1" {
 				t.Errorf("filtro: %s", got)
 			}
 			_, _ = io.WriteString(w, `{"documents":[{"id":"d1","kind":"document","title":"Acta","owner_sub":"u1","seq":7,"starred":true,"created_at":"2026-09-20T10:00:00Z","updated_at":"2026-09-21T10:00:00Z","source_ref":"drive:f1"}],"next_cursor":"c2"}`)
@@ -68,7 +68,7 @@ func TestDocs(t *testing.T) {
 	defer srv.Close()
 	d, ctx := NewDocs(srv.URL, nil, nil), context.Background()
 
-	docs, sig, err := d.List(ctx, DocsFilter{Kind: DocText, Query: "acta", Starred: true, Cursor: "c1", Limit: 100})
+	docs, sig, err := d.List(ctx, DocsFilter{Kind: DocText, Query: "acta", Starred: true, Scope: DocsShared, ByTitle: true, Cursor: "c1", Limit: 100})
 	if err != nil || len(docs) != 1 || sig != "c2" || !docs[0].Starred || docs[0].Kind != DocText || docs[0].UpdatedAt.IsZero() || docs[0].SourceRef != "drive:f1" {
 		t.Fatalf("lista: %+v, %q, %v", docs, sig, err)
 	}
@@ -134,20 +134,20 @@ func TestElContratoDeDocsEsElDelServicio(t *testing.T) {
 			`idr.Get("/comments", h.listComments)`,
 		},
 		"services/docs/internal/http/documents.go": {
-			`q.Get("kind")`, `q.Get("q")`, `q.Get("starred") == "1"`, `q.Get("cursor")`, `q.Get("limit")`,
+			`q.Get("kind")`, `q.Get("q")`, `q.Get("starred") == "1"`, `q.Get("scope")`, `q.Get("sort") == "title"`, `domain.ListScope`, `q.Get("cursor")`, `q.Get("limit")`,
 			`"documents": docs`, `resp["next_cursor"]`, "`json:\"document\"`", "`json:\"role,omitempty\"`",
 			"`json:\"kind\"`", "`json:\"title\"`", "`json:\"starred\"`",
 		},
 		"services/docs/internal/http/collab.go":   {`"state": state`, "`json:\"ops\"`", `"seq": newSeq`},
 		"services/docs/internal/http/versions.go": {`"versions": versions`},
 		"services/docs/internal/http/comments.go": {`"comments": comments`},
-		"services/docs/internal/domain/doc.go": {
+		"apps/nucleo/office/model/doc.go": {
 			`KindDocument     Kind = "document"`, `KindSpreadsheet  Kind = "spreadsheet"`, `KindPresentation Kind = "presentation"`,
 			`RoleEditor    Role = "editor"`, `RoleOwner     Role = "owner"`,
 			"`json:\"owner_sub\"`", "`json:\"seq\"`", "`json:\"updated_at\"`", "`json:\"source_ref,omitempty\"`",
 			"`json:\"label,omitempty\"`", "`json:\"auto\"`", "`json:\"parent_id,omitempty\"`", "`json:\"body\"`", "`json:\"resolved\"`",
 		},
-		"services/docs/internal/domain/crdt.go": {
+		"apps/nucleo/office/model/crdt.go": {
 			"`json:\"a\"`", "`json:\"c\"`", `OpSet OpKind = "set"`, "`json:\"key,omitempty\"`", "`json:\"value,omitempty\"`",
 			"`json:\"lamport\"`", "`json:\"registers\"`",
 		},
@@ -271,6 +271,9 @@ func TestDocsComentarios(t *testing.T) {
 	if _, err := d.CreateAnchoredComment(ctx, "d1", "Ojo", "m7", "la cita"); err != nil {
 		t.Fatalf("crear anclado: %v", err)
 	}
+	if _, err := d.CreateCellComment(ctx, "d1", "Revisa", AnclaCelda{Hoja: "h:Datos", Fila: "t4", Col: "t1", Text: "B5"}); err != nil {
+		t.Fatalf("crear en una celda: %v", err)
+	}
 	if err := d.ResolveComment(ctx, "d1", "c1", true); err != nil {
 		t.Fatalf("resolver: %v", err)
 	}
@@ -281,11 +284,37 @@ func TestDocsComentarios(t *testing.T) {
 		"GET /api/v1/documents/d1/comments?resolved=true ",
 		`POST /api/v1/documents/d1/comments? {"body":"Sí","parent_id":"c1"}`,
 		`POST /api/v1/documents/d1/comments? {"anchor":{"mark":"m7","text":"la cita"},"body":"Ojo"}`,
+		`POST /api/v1/documents/d1/comments? {"anchor":{"hoja":"h:Datos","fila":"t4","col":"t1","text":"B5"},"body":"Revisa"}`,
 		`PUT /api/v1/documents/d1/comments/c1/resolve? {"resolved":true}`,
 		"DELETE /api/v1/documents/d1/comments/c2? ",
 	}
 	if !slices.Equal(visto, quiero) {
 		t.Errorf("peticiones:\n%q\nquiero:\n%q", visto, quiero)
+	}
+}
+
+// El ancla de una celda se lee como `leerAnclaCelda` de la web: con hoja, fila y columna
+// válidas; lo demás (el ancla del folio, un dibujo, ids que el servicio no admite) no lo es.
+func TestElAnclaDeCeldaDeUnComentario(t *testing.T) {
+	casos := []struct {
+		ancla  string
+		ok     bool
+		quiero AnclaCelda
+	}{
+		{`{"hoja":"h:Datos","fila":"t4","col":"n1a2b3c4d","text":"B5"}`, true, AnclaCelda{Hoja: "h:Datos", Fila: "t4", Col: "n1a2b3c4d", Text: "B5"}},
+		{`{"hoja":"x","fila":"t0","col":"t0"}`, true, AnclaCelda{Hoja: "x", Fila: "t0", Col: "t0"}},
+		{`{"mark":"m1","text":"cita"}`, false, AnclaCelda{}},
+		{`"cita"`, false, AnclaCelda{}},
+		{`{"hoja":"","fila":"t0","col":"t0"}`, false, AnclaCelda{}},
+		{`{"hoja":"x","fila":"t 0","col":"t0"}`, false, AnclaCelda{}},
+		{`{"hoja":"x","fila":"t0"}`, false, AnclaCelda{}},
+		{``, false, AnclaCelda{}},
+	}
+	for _, c := range casos {
+		a, ok := DocComment{Anchor: json.RawMessage(c.ancla)}.AnclaCelda()
+		if ok != c.ok || a != c.quiero {
+			t.Errorf("%s: %+v %v", c.ancla, a, ok)
+		}
 	}
 }
 

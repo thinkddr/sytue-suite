@@ -1,16 +1,19 @@
-# Destino: Shopify (Theme Store & Online Store 2.0)
+<a id="destino-shopify-theme-store--online-store-20"></a>
+# Target: Shopify (Theme Store & Online Store 2.0)
 
-Ficha técnica y normativa para la exportación de sitios a temas de Shopify Online Store 2.0.
+Technical and normative specification for exporting sites to Shopify Online Store 2.0 themes.
 
-## 1. Versiones y Herramientas
+<a id="1-versiones-y-herramientas"></a>
+## 1. Versions and Tools
 
-- Versión del tema: `{{v.shopify_theme_version}}`
-- Herramienta CLI de desarrollo: `{{v.shopify_cli_version}}`
-- Linter oficial: `{{v.shopify_theme_check_version}}`
+- Theme version: `{{v.shopify_theme_version}}`
+- Development CLI tool: `{{v.shopify_cli_version}}`
+- Official linter: `{{v.shopify_theme_check_version}}`
 
-## 2. Árbol de Directorios Permitido
+<a id="2-árbol-de-directorios-permitido"></a>
+## 2. Allowed Directory Tree
 
-El tema exportado debe generar exclusivamente los siguientes directorios y archivos:
+The exported theme must generate only the following directories and files:
 
 ```text
 ├── assets/
@@ -35,33 +38,36 @@ El tema exportado debe generar exclusivamente los siguientes directorios y archi
 └── README.md
 ```
 
-## 3. Restricciones y Límites Normativos de Shopify
+<a id="3-restricciones-y-límites-normativos-de-shopify"></a>
+## 3. Shopify Restrictions and Normative Limits
 
-- **Niveles de anidamiento**: Máximo 8 niveles de profundidad en el árbol de bloques de una sección. Si una sección del IR supera 8 niveles, la instrucción a la IA y el generador aplanan el contenido como HTML directo dentro del bloque padre.
-- **Tope de bloques por sección**: Máximo 50 bloques por sección.
-- **Longitud de identificadores**:
-  - `type` de bloques: Máximo 25 caracteres.
-  - `label` o nombres descriptivos en esquemas: Máximo 50 caracteres.
-- **Esquema de configuraciones (`settings`)**:
-  - Parámetros `range`: Valores enteros comprendidos entre 1 y 250.
-- **Puntos de anclaje obligatorios en `layout/theme.liquid`**:
-  - Elemento `{{ content_for_header }}` dentro de `<head>`.
-  - Elemento `{{ content_for_layout }}` dentro de `<body>`.
-- **Integridad referencial**:
-  - Toda sección referenciada en `templates/*.json` debe existir como archivo `.liquid` o grupo `.json`.
-  - Todo bloque referenciado en la configuración de una sección debe estar declarado en el `schema.blocks` correspondiente.
-  - Toda clave de traducción `t:clave` o `{{ 'clave' | t }}` debe existir en el archivo `locales/en.default.json`.
-- **Información del tema**:
-  - El archivo `config/settings_schema.json` debe contener una categoría `theme_info` con nombre, versión `{{v.shopify_theme_version}}`, autor y documentación.
-- **Sin scripts ni fuentes externas no autorizadas**:
-  - Prohibido enlazar hojas de estilo o scripts externos desde CDNs o Google Fonts. Todo el CSS y los recursos van empaquetados localmente en `assets/` o usan fuentes del sistema.
+- **Nesting levels**: Maximum of 8 levels of depth in a section's block tree. If an IR section exceeds 8 levels, the AI instruction and the generator flatten the content as direct HTML inside the parent block.
+- **Block cap per section**: Maximum of 50 blocks per section.
+- **Identifier length**:
+  - Block `type`: Maximum of 25 characters.
+  - `label` or descriptive names in schemas: Maximum of 50 characters.
+- **Settings schema (`settings`)**:
+  - `range` parameters: Integer values between 1 and 250.
+- **Mandatory anchor points in `layout/theme.liquid`**:
+  - The `{{ content_for_header }}` element inside `<head>`.
+  - The `{{ content_for_layout }}` element inside `<body>`.
+- **Referential integrity**:
+  - Every section referenced in `templates/*.json` must exist as a `.liquid` file or a `.json` group.
+  - Every block referenced in a section's settings must be declared in the corresponding `schema.blocks`.
+  - Every translation key `t:clave` or `{{ 'clave' | t }}` must exist in the `locales/en.default.json` file.
+- **Theme information**:
+  - The `config/settings_schema.json` file must contain a `theme_info` category with name, version `{{v.shopify_theme_version}}`, author and documentation.
+- **No unauthorized external scripts or fonts**:
+  - Linking external stylesheets or scripts from CDNs or Google Fonts is forbidden. All CSS and assets are packaged locally in `assets/` or use system fonts.
 
-## 4. Gestión de Idiomas y Contenido
+<a id="4-gestión-de-idiomas-y-contenido"></a>
+## 4. Language and Content Management
 
-- El contenido principal del sitio se exporta en el idioma principal (`languages.default`) como configuraciones editables del tema.
-- `locales/en.default.json` contiene únicamente los textos y etiquetas del sistema del tema.
-- Las traducciones adicionales se gestionan a través de las capacidades nativas multi-idioma de Shopify (Shopify Translate & Adapt), como se documenta en el `README.md` del archivo zip.
+- The site's main content is exported in the primary language (`languages.default`) as editable theme settings.
+- `locales/en.default.json` contains only the theme's system texts and labels.
+- Additional translations are managed through Shopify's native multi-language capabilities (Shopify Translate & Adapt), as documented in the `README.md` of the zip file.
 
-## 5. Catálogo de Productos
+<a id="5-catálogo-de-productos"></a>
+## 5. Product Catalog
 
-- Los productos de la tienda se exportan como archivo independiente `products_export_shopify.csv` listo para importar en el panel de administración de Shopify.
+- The store's products are exported as a standalone `products_export_shopify.csv` file ready to import into the Shopify admin panel.

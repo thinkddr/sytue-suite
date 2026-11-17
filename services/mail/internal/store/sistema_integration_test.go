@@ -21,8 +21,8 @@ import (
 func TestAsegurarAliasDeSistema(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	ops := seedAccount(t, tenantCtx("corporate"), st, "operaciones@sytue.eu")
-	seedAccount(t, tenantCtx("acme"), st, "ana@sytue.eu")
+	ops := seedAccount(tenantCtx("corporate"), t, st, "operaciones@sytue.eu")
+	seedAccount(tenantCtx("acme"), t, st, "ana@sytue.eu")
 	si := func(store.ResolvedAddress) bool { return true }
 
 	for range 2 {

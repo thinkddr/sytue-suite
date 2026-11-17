@@ -67,6 +67,9 @@ type Lienzo struct {
 	// AlAviso enseña un aviso —«Se han quitado 3 duplicados»—, que en la web es un
 	// `notify` de la pila de avisos, con su tono. Lo pone quien monta el lienzo.
 	AlAviso func(tono ui.TonoAviso, titulo, detalle string)
+	// combinarPendiente es «Combinar» esperando a que se confirme que se vacían celdas
+	// escritas (nil si no se pregunta nada): es lo que hace el botón de confirmar.
+	combinarPendiente func()
 	// avisoProtegida es cuándo se dijo por última vez «hoja protegida» (el antirrebote).
 	avisoProtegida time.Time
 	// IA es la consulta a Sytue AI del relleno con IA; nil, sin servicio, y el botón no
@@ -92,6 +95,11 @@ type Lienzo struct {
 	// Las tarjetas de los gráficos y de las segmentaciones, por id (`flotantes.go`).
 	tarjetas  map[string]*TarjetaGrafico
 	segmentos map[string]*TarjetaSegmentacion
+	// chip es el del enlace de la celda activa (`flotantes.go`), y chipHref su destino.
+	chip     *ui.Boton
+	chipHref string
+	// menuCtx es el menú contextual de la rejilla (`menu_celda.go`), abierto o el último.
+	menuCtx *ui.Menu
 }
 
 var _ fyne.Widget = (*Lienzo)(nil)
@@ -106,8 +114,11 @@ func NuevoLienzo(l *Libro) *Lienzo {
 	c.ExtendBaseWidget(c)
 	l.rotulo = func(clave string) string { return c.t(clave, nil) }
 	c.Rejilla = NuevaRejilla(l)
+	c.Rejilla.T = c.t
 	c.Rejilla.Flotantes = c.flotantes
 	c.Barra = NuevaBarra(c.Rejilla)
+	c.Barra.T = func(clave string) string { return c.t(clave, nil) }
+	c.Barra.AlCambiarAlto = c.Refresh
 	c.Pestanas = nuevasPestanas(c)
 	c.Rejilla.AlMoverse = func() {
 		c.cerrarValores() // cambiar de celda cierra el desplegable, como en la web
@@ -118,6 +129,9 @@ func NuevoLienzo(l *Libro) *Lienzo {
 	}
 	c.Rejilla.AlEditar = func() { c.sincronizar(); c.avisar() }
 	c.Rejilla.AlDeshacer = c.Deshacer
+	c.Rejilla.AlAtajos = c.MostrarAtajos
+	c.Rejilla.AlIrA = c.Barra.EnfocarCuadro
+	c.Barra.AlIrA = c.IrA
 	c.sug = nuevasSugerencias(c)
 	c.engancharFx()
 	return c
@@ -127,8 +141,10 @@ func NuevoLienzo(l *Libro) *Lienzo {
 // dónde está el cursor, las teclas que se queda la lista, el señalar en la rejilla y el
 // fin de la edición.
 func (c *Lienzo) engancharFx() {
-	for _, barra := range []bool{false, true} {
-		ed := c.editorFx(barra)
+	// La barra tiene dos campos, el de una línea y el desplegado, y los dos editan.
+	eds := c.Barra.Editores()
+	for i, ed := range []*ui.EditorPlano{c.Rejilla.ed, eds[0], eds[1]} {
+		barra := i > 0
 		ed.AlCambiar(func(string) { c.sincronizarFx(barra) })
 		ed.OnCursorChanged = func() { c.sincronizarFx(barra) }
 		previa := ed.Tecla
@@ -154,6 +170,7 @@ func (c *Lienzo) engancharFx() {
 	c.Rejilla.AlBotonFiltro = c.abrirFiltro
 	c.Rejilla.AlEsquema = func(valor string) { c.Mandar(CmdEsquema, valor) }
 	c.Rejilla.AlProtegida = c.avisarProtegida
+	c.Rejilla.AlMenu = c.abrirMenuContextual
 	c.Rejilla.AlRechazar = func(msg string) {
 		if c.AlAviso != nil {
 			c.AlAviso(ui.AvisoAdvertencia, c.t("sheet.msg.badValue", nil), msg)
@@ -214,7 +231,7 @@ func (c *Lienzo) SoloLectura(si bool) {
 func (c *Lienzo) MinSize() fyne.Size {
 	c.ExtendBaseWidget(c)
 	m := c.Rejilla.MinSize()
-	return fyne.NewSize(max(m.Width, MedidaBarra().Width), AltoBarra+m.Height+AltoPestanas)
+	return fyne.NewSize(max(m.Width, MedidaBarra().Width), c.Barra.Alto()+m.Height+AltoPestanas)
 }
 
 // CreateRenderer apila barra, rejilla y pestañas, y encima la lista o la pista de la
@@ -238,12 +255,13 @@ func (r *lienzoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *lienzoRenderer) Destroy()                     {}
 
 func (r *lienzoRenderer) Layout(t fyne.Size) {
+	alto := r.c.Barra.Alto()
 	r.c.Barra.Move(fyne.NewPos(0, 0))
-	r.c.Barra.Resize(fyne.NewSize(t.Width, AltoBarra))
-	altoRejilla := max(t.Height-AltoBarra-AltoPestanas, 0)
-	r.c.Rejilla.Move(fyne.NewPos(0, AltoBarra))
+	r.c.Barra.Resize(fyne.NewSize(t.Width, alto))
+	altoRejilla := max(t.Height-alto-AltoPestanas, 0)
+	r.c.Rejilla.Move(fyne.NewPos(0, alto))
 	r.c.Rejilla.Resize(fyne.NewSize(t.Width, altoRejilla))
-	r.c.Pestanas.Move(fyne.NewPos(0, AltoBarra+altoRejilla))
+	r.c.Pestanas.Move(fyne.NewPos(0, alto+altoRejilla))
 	r.c.Pestanas.Resize(fyne.NewSize(t.Width, AltoPestanas))
 	r.colocarSugerencias()
 }
@@ -265,14 +283,14 @@ func (r *lienzoRenderer) colocarSugerencias() {
 	case c.sug.valores:
 		// `absolute top-full right-0 mt-0.5` bajo el «▾».
 		p, t, _ := c.Rejilla.botonValores()
-		pos = fyne.NewPos(p.X+t.Width-tam.Width, AltoBarra+p.Y+t.Height+SeparacionValores)
+		pos = fyne.NewPos(p.X+t.Width-tam.Width, c.Barra.Alto()+p.Y+t.Height+SeparacionValores)
 	case c.fx.barra:
 		x, abajo := c.Barra.campoX()
 		pos = fyne.NewPos(x, abajo+SeparacionEmergenteFx)
 	default:
 		rj := c.Rejilla
 		vw := rj.vista()
-		pos = fyne.NewPos(vw.x(rj.sel.C), AltoBarra+vw.y(rj.sel.F)+vw.alto())
+		pos = fyne.NewPos(vw.x(rj.sel.C), c.Barra.Alto()+vw.y(rj.sel.F)+vw.alto(rj.sel.F))
 	}
 	c.sug.Move(pos)
 	c.sug.Resize(tam)
@@ -282,6 +300,12 @@ func (r *lienzoRenderer) colocarSugerencias() {
 }
 
 func (r *lienzoRenderer) Refresh() {
+	// La barra de fórmulas se ha desplegado o recogido: la rejilla y la barra de hojas
+	// se recolocan bajo su alto nuevo. Solo entonces, que recolocar en cada repintado
+	// sobraría.
+	if t := r.c.Size(); t.Height > 0 && r.c.Barra.Size().Height != r.c.Barra.Alto() {
+		r.Layout(t)
+	}
 	r.colocarSugerencias()
 	for _, o := range r.objetos {
 		o.Refresh()

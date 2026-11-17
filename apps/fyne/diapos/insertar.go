@@ -27,9 +27,10 @@ import (
 // # La pestaña «Insertar» de una presentación
 //
 // Es `InsertarTab` con `ctx.kind === 'presentation'`, grupo a grupo y en su orden:
-// Tabla · Imagen · Formas · Conectores · SmartArt · Multimedia · Enlace · Elementos ·
-// Comentario. Multimedia abre su panel (`medios.go`) y Comentario el de comentarios del
-// cromo.
+// Tabla · Imagen · Formas · Conectores · Gráfico · SmartArt · Multimedia · Enlace ·
+// Elementos · Comentario. Gráfico es el mismo `NuevoGrafico` de la mini-barra (en Docus
+// vive en Insertar y aquí se busca ahí). Multimedia abre su panel (`medios.go`) y
+// Comentario el de comentarios del cromo.
 //
 // La tabla, el enlace, la línea, el salto y el símbolo se escriben en el CURSOR de la
 // caja de texto que se está escribiendo (el `exec` de la web): los hace su folio, con los
@@ -83,6 +84,9 @@ func (e *Editor) cuerpoInsertar(c *editor.Contexto) fyne.CanvasObject {
 		editor.NuevoGrupo(c.Traducir("blocks.shapes"), formas...),
 		editor.SeparadorGrupos(),
 		editor.NuevoGrupo(c.Traducir("group.connectors"), conectores...),
+		editor.SeparadorGrupos(),
+		editor.NuevoGrupo(c.Traducir("blocks.chart"),
+			boton(iconos.EdGrafico, c.Traducir("data.chart.insert"), false, e.NuevoGrafico)),
 		editor.SeparadorGrupos(),
 		editor.NuevoGrupo(c.Traducir("smartart.title"), smart...),
 		editor.SeparadorGrupos(),
@@ -327,6 +331,14 @@ func tieneAlfa(img image.Image) bool {
 // cabeCaja dice si el modelo, con `c` añadida a lo que se edita, sigue cabiendo en un
 // guardado (`modelWithBoxes` y MODEL_MAX_CHARS de la web).
 func (e *Editor) cabeCaja(c Caja) bool {
+	return e.cabeCon(func(m *Modelo) {
+		m.cambiarCajas(e.objetivo(), true, func(cs []Caja) []Caja { return append(slices.Clone(cs), c) })
+	})
+}
+
+// cabeCon dice si el modelo seguiría cabiendo en un guardado tras `cambio`, que se prueba
+// en una copia superficial: las listas que cambia se clonan, el resto se comparte.
+func (e *Editor) cabeCon(cambio func(*Modelo)) bool {
 	prueba := *e.m
 	prueba.Diapos = append([]Diapo(nil), e.m.Diapos...)
 	if e.m.Patron != nil {
@@ -334,6 +346,6 @@ func (e *Editor) cabeCaja(c Caja) bool {
 		copia.Disenos = slices.Clone(e.m.Patron.Disenos)
 		prueba.Patron = &copia
 	}
-	prueba.cambiarCajas(e.objetivo(), true, func(cs []Caja) []Caja { return append(slices.Clone(cs), c) })
+	cambio(&prueba)
 	return prueba.cabe()
 }

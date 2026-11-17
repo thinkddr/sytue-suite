@@ -252,17 +252,19 @@ type decoracion struct {
 
 // decorar es `buildCondDecor`: la decoración de cada celda de la hoja activa según sus
 // reglas, en orden de prioridad. `evalFormula` evalúa una regla de fórmula desplazada a
-// una celda (la pone el libro, con una celda de apoyo del motor).
-func decorar(reglas []ReglaCond, valor func(c, f int) formula.Value, evalFormula func(f string, dc, df int) bool) map[Celda]*decoracion {
+// una celda (la pone el libro, con una celda de apoyo del motor). topeC y topeF acotan
+// lo que se recorre: la extensión de la hoja, no el millón de filas de Excel.
+func decorar(reglas []ReglaCond, valor func(c, f int) formula.Value, evalFormula func(f string, dc, df int) bool, topeC, topeF int) map[Celda]*decoracion {
 	d := decorador{mapa: map[Celda]*decoracion{}, valor: valor, evalFormula: evalFormula}
 	for _, r := range reglas {
 		rect, ok := formula.ParseRangeRef(r.Rango)
 		if !ok {
 			continue
 		}
-		// Acotado a la rejilla, como los demás recorridos (gráficos, dinámicas…): una
-		// regla sobre A1:A9999999 recorría diez millones de celdas en cada edición (FYE-03).
-		d.rect = formula.Rect{C1: min(rect.C1, Columnas-1), R1: min(rect.R1, Filas-1), C2: min(rect.C2, Columnas-1), R2: min(rect.R2, Filas-1)}
+		// Acotado a la extensión de la hoja: una regla sobre A1:A9999999 recorría diez
+		// millones de celdas en cada edición (FYE-03), y la de un .xlsx importado suele
+		// ser de la columna entera (A1:A1048576). Más allá de lo usado todo está vacío.
+		d.rect = formula.Rect{C1: min(rect.C1, topeC-1), R1: min(rect.R1, topeF-1), C2: min(rect.C2, topeC-1), R2: min(rect.R2, topeF-1)}
 		switch r.Clase {
 		case "", "cell":
 			d.celda(r)

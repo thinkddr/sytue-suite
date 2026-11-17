@@ -101,3 +101,36 @@ func (s *Store) SetFlagsBatch(ctx context.Context, accountID uuid.UUID, ids []uu
 	})
 	return n, err
 }
+
+// MarkMailboxRead marca como leídos TODOS los mensajes no leídos de un buzón en un
+// solo UPDATE («Marcar todo como leído» de una carpeta). Se hace en el servidor y no
+// con SetFlagsBatch desde el cliente porque el cliente solo conoce la página cargada
+// de la lista: una carpeta con miles de no leídos quedaría a medias. Solo toca los
+// que aún no tienen \Seen, así updated_at (y el delta de Changes) refleja únicamente
+// lo que cambió. El buzón debe ser de la cuenta (ErrNotFound si no), igual que el
+// destino de MoveMessages. Devuelve cuántos mensajes se marcaron.
+func (s *Store) MarkMailboxRead(ctx context.Context, accountID, mailboxID uuid.UUID) (int, error) {
+	var n int
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var owned bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS(SELECT 1 FROM mailboxes WHERE tenant = current_setting('app.tenant', true) AND id = $1 AND account_id = $2)`,
+			mailboxID, accountID).Scan(&owned); err != nil {
+			return fmt.Errorf("store: verificar buzón: %w", err)
+		}
+		if !owned {
+			return domain.ErrNotFound
+		}
+		tag, err := tx.Exec(ctx, `
+			UPDATE messages SET flags = array_append(flags, $3), updated_at = now()
+			WHERE tenant = current_setting('app.tenant', true) AND account_id = $2 AND mailbox_id = $1
+			  AND deleted_at IS NULL AND NOT ($3 = ANY(flags))`,
+			mailboxID, accountID, domain.FlagSeen)
+		if err != nil {
+			return fmt.Errorf("store: marcar buzón leído: %w", err)
+		}
+		n = int(tag.RowsAffected())
+		return nil
+	})
+	return n, err
+}

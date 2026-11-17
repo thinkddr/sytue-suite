@@ -13,10 +13,7 @@ import (
 // StorageObjectPage is private client data. Exhaust every allowed storage room's
 // history before reducing its index entries with storage.CatalogHeads. A partial
 // page is never evidence that a missing object or parent was deleted.
-type StorageObjectPage struct {
-	Entries []storage.RecordEntry
-	Next    string
-}
+type StorageObjectPage = storage.ObjectPage
 
 func (c *Client) StorageObjectHistory(ctx context.Context, room, cursor string, limit int) (StorageObjectPage, error) {
 	scope, err := c.storageBlockScope(ctx)
@@ -29,10 +26,14 @@ func (c *Client) StorageObjectHistory(ctx context.Context, room, cursor string, 
 	}
 	out := StorageObjectPage{Next: page.Next}
 	for _, value := range page.Events {
-		if err := c.verifyRecoveredStorageEvent(ctx, scope, value); err != nil {
+		fragment, err := storagePQHistoryFragment(value, c.session.UserID.String())
+		if err != nil {
 			return StorageObjectPage{}, err
 		}
-		rec, err := decodePrivateRecord(value, scope, c.session.UserID.String())
+		if fragment {
+			continue
+		}
+		rec, err := c.readPrivateStorageRecord(ctx, value, scope, c.session.UserID.String())
 		if err != nil {
 			return StorageObjectPage{}, err
 		}
@@ -40,7 +41,7 @@ func (c *Client) StorageObjectHistory(ctx context.Context, room, cursor string, 
 			continue
 		}
 		entry := storage.RecordEntry{Reference: value.Reference, Record: rec}
-		if _, err = storage.DecodeObject(entry, scope); err != nil {
+		if err := storage.ValidateCatalogEntry(entry, scope); err != nil {
 			return StorageObjectPage{}, err
 		}
 		out.Entries = append(out.Entries, entry)
@@ -91,6 +92,16 @@ func (c *Client) checkStorageObjectContent(ctx context.Context, scope storage.Sc
 // new content/metadata needs a new transaction and revision. Concurrent edits keep
 // their explicit parent branches instead of choosing a winner by timestamp.
 func (c *Client) PutStorageObject(ctx context.Context, transaction, object, revision string, commit storage.ObjectCommit) (storage.ObjectVersion, error) {
+	target, err := c.StoragePublicationTarget()
+	if err != nil {
+		return storage.ObjectVersion{}, err
+	}
+	return c.PutStorageObjectAt(ctx, target, transaction, object, revision, commit)
+}
+
+// PutStorageObjectAt keeps a durable application intent on its original device
+// and room endpoint, including retries after a catalog ACK was lost.
+func (c *Client) PutStorageObjectAt(ctx context.Context, target storage.PublicationTarget, transaction, object, revision string, commit storage.ObjectCommit) (storage.ObjectVersion, error) {
 	if !commit.Valid() || !storage.Identifier(object) || !storage.Identifier(revision) || !storage.Identifier(transaction) {
 		return storage.ObjectVersion{}, storage.ErrRecord
 	}
@@ -102,6 +113,9 @@ func (c *Client) PutStorageObject(ctx context.Context, transaction, object, revi
 		return storage.ObjectVersion{}, storage.ErrRecord
 	}
 	commit = copied
+	if err := c.CheckStoragePublicationTarget(target); err != nil {
+		return storage.ObjectVersion{}, err
+	}
 	scope, err := c.storageBlockScope(ctx)
 	if err != nil {
 		return storage.ObjectVersion{}, err
@@ -123,7 +137,7 @@ func (c *Client) PutStorageObject(ctx context.Context, transaction, object, revi
 		}
 	}
 	record := storage.Record{Version: 1, Scope: scope, ObjectID: object, RevisionID: revision, Role: "index", Previous: previous, Payload: payload}
-	ref, err := writeStorageRecordVerified(ctx, c, transaction, record)
+	ref, err := writeStorageRecordVerified(ctx, pinnedStorageRecords{storageRecordIO: c, publication: c, target: target}, transaction, record)
 	if err != nil {
 		return storage.ObjectVersion{}, err
 	}

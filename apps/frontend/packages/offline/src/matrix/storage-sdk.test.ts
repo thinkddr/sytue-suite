@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { expect, test } from 'bun:test';
-import { createClient, EventType, type MatrixEvent, type IEvent } from 'matrix-js-sdk';
+import { createClient, EventType, MsgType, type MatrixEvent, type IEvent } from 'matrix-js-sdk';
 import { EventShieldColour, EventShieldReason } from 'matrix-js-sdk/lib/crypto-api';
 import type { CryptoBackend } from 'matrix-js-sdk/lib/common-crypto/CryptoBackend';
 import {
@@ -12,6 +12,8 @@ import { SuiteMatrix } from './client.js';
 import { privateDeviceFetch } from './private-policy.js';
 import { createStorageRecord, storageJSONBytes, type StorageRecord } from './storage.js';
 import type { MatrixBootstrap } from './types.js';
+import { MatrixSecurityError } from './types.js';
+import type { StorageOwnerProof } from './owner-proof.js';
 const own = '@sytue_11111111-1111-4111-8111-111111111111:matrix.test';
 const room = '!private:matrix.test';
 const bootstrap: MatrixBootstrap = {
@@ -49,6 +51,7 @@ function fixture() {
       content: { algorithm: 'artificial-boundary-fixture' },
     } as Partial<IEvent>,
     record: record(),
+    proof: undefined as StorageOwnerProof | undefined,
     posts: 0,
     decrypts: 0,
     next: null as string | null,
@@ -59,15 +62,46 @@ function fixture() {
     decryptEvent: async () => ({
       clearEvent: {
         type: String(EventType.RoomMessage),
-        content: { msgtype: 'm.text', body: '', 'org.sytue.storage': state.record },
+        content: {
+          msgtype: 'm.text',
+          body: '',
+          'org.sytue.storage': state.record,
+          ...(state.proof === undefined ? {} : { 'org.sytue.storage_auth': state.proof }),
+        },
       },
       keyForwardedBy: state.forwarded,
     }),
-  } as CryptoBackend;
+  } as unknown as CryptoBackend;
   const instance = Object.assign(Object.create(SuiteMatrix.prototype), {
     bootstrap: structuredClone(bootstrap),
     closed: false,
+    network: { closed: false, lifetime: new AbortController() },
     privateDraftRoom: async () => {},
+    // This fixture isolates owner proofs and SDK transport policy. Hybrid wire
+    // encryption is exercised by the real native/browser integration test.
+    storagePq: () => ({
+      keys: { prepare: async () => {} },
+      write: async (
+        _room: string,
+        transaction: string,
+        input: StorageRecord,
+        proof: Uint8Array,
+        send: (
+          transaction: string,
+          content: Record<string, unknown>,
+        ) => Promise<{ room_id: string; event_id: string }>,
+      ) =>
+        send(transaction, {
+          msgtype: 'm.text',
+          body: '',
+          'org.sytue.storage': input,
+          'org.sytue.storage_auth': JSON.parse(new TextDecoder().decode(proof)) as unknown,
+        }),
+    }),
+    storageAuthKey: async (id?: string) => {
+      if (id !== undefined && id !== 'artificial-owner') throw new MatrixSecurityError('recovery');
+      return { id: 'artificial-owner', key: new Uint8Array(32).fill(7) };
+    },
     crypto: {
       getEncryptionInfoForEvent: async () => ({
         shieldColour: state.shield,
@@ -75,10 +109,15 @@ function fixture() {
       }),
     },
     client: {
+      getDeviceId: () => 'DEVICE',
       sendEvent: async (
         id: string,
         type: string,
-        content: { body: string; 'org.sytue.storage': StorageRecord },
+        content: {
+          body: string;
+          'org.sytue.storage': StorageRecord;
+          'org.sytue.storage_auth': StorageOwnerProof;
+        },
         txn: string,
       ) => {
         expect(id).toBe(room);
@@ -87,6 +126,7 @@ function fixture() {
         expect(txn).toBe('sytue-storage-opaque');
         state.posts++;
         state.record = structuredClone(content['org.sytue.storage']);
+        state.proof = structuredClone(content['org.sytue.storage_auth']);
         return { event_id: '$record' };
       },
       fetchRoomEvent: async () => structuredClone(state.raw),
@@ -124,12 +164,20 @@ test('the actual SDK HTTP path refuses plaintext application events for private 
     client.sendEvent(
       room,
       EventType.RoomMessage,
-      { msgtype: 'm.text', body: 'must never reach the server' },
+      { msgtype: MsgType.Text, body: 'must never reach the server' },
       'plain',
     ),
   ).rejects.toThrow();
   expect(requests).toHaveLength(0);
-  await client.sendEvent(
+  // Deliberately exercise the adversarial encrypted-event HTTP boundary,
+  // which is excluded from the SDK's normal plaintext timeline overload.
+  const rawSend = client.sendEvent.bind(client) as unknown as (
+    room: string,
+    type: string,
+    content: Record<string, unknown>,
+    txn: string,
+  ) => Promise<{ event_id: string }>;
+  await rawSend(
     room,
     EventType.RoomMessageEncrypted,
     {
@@ -229,6 +277,111 @@ test('logout during prepare or fetch prevents private output and plaintext histo
   ).rejects.toThrow('matrix_device');
 });
 
+test('owner-attested private records recover without accepting anonymous backup provenance, and invalid proofs never fall back to sender trust', async () => {
+  const { instance, state } = fixture();
+  const repository = instance.storage();
+  const saved = await repository.putRecord('opaque', record());
+  const proof = structuredClone(state.proof!);
+  state.shield = EventShieldColour.GREY;
+  state.reason = EventShieldReason.AUTHENTICITY_NOT_GUARANTEED;
+  expect(await repository.readRecord(saved, 'object', 'content')).toEqual(record());
+  state.proof = undefined;
+  await expect(repository.readRecord(saved, 'object', 'content')).rejects.toThrow(
+    'matrix_unverified',
+  );
+  state.shield = EventShieldColour.NONE;
+  state.reason = null;
+  state.proof = { ...proof, mac: btoa(String.fromCharCode(...new Uint8Array(32))) };
+  await expect(repository.readRecord(saved, 'object', 'content')).rejects.toThrow(
+    'matrix_unverified',
+  );
+  state.proof = proof;
+  state.record = { ...state.record, payload: btoa('{"forged":true}') };
+  await expect(repository.readRecord(saved, 'object', 'content')).rejects.toThrow(
+    'matrix_unverified',
+  );
+});
+
+test('actual private repository reads retain their device lease until SDK work has quiesced', async () => {
+  const { instance, state } = fixture();
+  let started!: () => void,
+    release!: () => void,
+    erased = 0,
+    released = 0;
+  const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    }),
+    gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  const erase = async () => {
+    erased++;
+  };
+  Object.assign(instance.client, {
+    fetchRoomEvent: async () => {
+      started();
+      await gate;
+      return structuredClone(state.raw);
+    },
+    stopClient: () => {},
+    clearStores: erase,
+  });
+  Object.assign(instance, {
+    network: { closed: false, lifetime: new AbortController() },
+    temporaryKeys: new Map(),
+    urls: new Set(),
+    onOfflineClear: () => {},
+    ownerKeys: { close: () => {}, destroy: erase },
+    adapter: { forgetSession: erase },
+    release: () => {
+      released++;
+    },
+  });
+  const reading = instance
+    .storage()
+    .readRecord({ room_id: room, event_id: '$record' }, 'object', 'content');
+  const caught = Promise.allSettled([reading]);
+  await entered;
+  const forgetting = instance.forget();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    expect(erased).toBe(0);
+    expect(released).toBe(0);
+  } finally {
+    release();
+    await caught;
+    await forgetting;
+  }
+  expect(erased).toBe(3);
+  expect(released).toBe(1);
+  expect(state.decrypts).toBe(0);
+});
+
+test('private source preparation validates room and owner key before permitting a write fence', async () => {
+  const { instance, state } = fixture(),
+    calls: string[] = [];
+  Object.assign(instance, {
+    session: { device_id: 'DEVICE' },
+    privateDraftRoom: () => {
+      calls.push('room');
+      return Promise.resolve();
+    },
+    storageAuthKey: () => {
+      calls.push('owner');
+      return Promise.resolve({ id: 'artificial-owner', key: new Uint8Array(32).fill(7) });
+    },
+  });
+  const repository = instance.storage();
+  await repository.prepare();
+  expect(calls).toEqual(['room', 'owner']);
+  expect(state.posts).toBe(0);
+  Object.assign(instance, {
+    storageAuthKey: () => Promise.reject(new MatrixSecurityError('recovery')),
+  });
+  await expect(repository.prepare()).rejects.toThrow('matrix_recovery');
+  expect(state.posts).toBe(0);
+});
+
 async function createSsssHarness() {
   const accountData = new Map<string, Record<string, unknown>>();
   const rawKey = new Uint8Array(32);
@@ -323,6 +476,7 @@ test('recovered private storage accepts SSSS-attested owner sessions and rejects
     trusted: async () => true,
     crypto: {
       ...writer.instance['crypto'],
+      flushKeyBackup: async () => {},
       checkKeyBackupAndEnable: async () => ({
         backupInfo: { algorithm: 'm.megolm_backup.v1.curve25519-aes-sha2', version: '1' },
         trustInfo: { trusted: true, matchesDecryptionKey: true },

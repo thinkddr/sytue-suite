@@ -20,13 +20,13 @@ import (
 )
 
 // seedPIMOrg crea org + usuario miembro + rol personalizado «Help Desk» (users.manage).
-func seedPIMOrg(t *testing.T, st *store.Store, ctx context.Context) (org domain.Organization, user domain.User, role domain.CustomRole) {
+func seedPIMOrg(ctx context.Context, t *testing.T, st *store.Store) (org domain.Organization, user domain.User, role domain.CustomRole) {
 	t.Helper()
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: "pim", Name: "PIM Co"})
 	if err != nil {
 		t.Fatalf("CreateOrg: %v", err)
 	}
-	user = seedUser(t, ctx, st, "eve@sytue.eu")
+	user = seedUser(ctx, t, st, "eve@sytue.eu")
 	if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: org.ID, UserID: user.ID, Role: domain.RoleMember}); err != nil {
 		t.Fatalf("UpsertMembership: %v", err)
 	}
@@ -38,7 +38,7 @@ func seedPIMOrg(t *testing.T, st *store.Store, ctx context.Context) (org domain.
 }
 
 // effective calcula los perms efectivos como buildTokens: direct ∪ activaciones activas.
-func effective(t *testing.T, st *store.Store, ctx context.Context, orgID, userID string, now time.Time) []string {
+func effective(ctx context.Context, t *testing.T, st *store.Store, orgID, userID string, now time.Time) []string {
 	t.Helper()
 	direct, err := st.PermissionsForUserInOrg(ctx, orgID, userID)
 	if err != nil {
@@ -64,14 +64,14 @@ func has(perms []string, want string) bool {
 // perezosa (los perms desaparecen pasado expires_at) y la desactivación.
 func TestPIMActivationLifecycle(t *testing.T) {
 	st, ctx := newStore(t)
-	org, user, role := seedPIMOrg(t, st, ctx)
+	org, user, role := seedPIMOrg(ctx, t, st)
 	now := time.Now().UTC()
 
 	// Elegible pero SIN activar ⇒ sin perms (la elegibilidad no concede).
 	if _, err := st.CreateEligibility(ctx, org.ID, user.ID, role.ID, "", false, 60); err != nil {
 		t.Fatalf("CreateEligibility: %v", err)
 	}
-	if p := effective(t, st, ctx, org.ID, user.ID, now); has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now); has(p, "users.manage") {
 		t.Fatalf("elegible-no-activado no debe conceder: %v", p)
 	}
 
@@ -83,12 +83,12 @@ func TestPIMActivationLifecycle(t *testing.T) {
 	if act.Status != domain.ActivationActive {
 		t.Fatalf("status = %q, quiero active", act.Status)
 	}
-	if p := effective(t, st, ctx, org.ID, user.ID, now); !has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now); !has(p, "users.manage") {
 		t.Fatalf("activado debe conceder: %v", p)
 	}
 
 	// Pasado expires_at ⇒ perms desaparecen (expiración perezosa evaluada contra now).
-	if p := effective(t, st, ctx, org.ID, user.ID, now.Add(31*time.Minute)); has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now.Add(31*time.Minute)); has(p, "users.manage") {
 		t.Fatalf("expirado no debe conceder: %v", p)
 	}
 
@@ -97,7 +97,7 @@ func TestPIMActivationLifecycle(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("DeactivateActivation: ok=%v err=%v", ok, err)
 	}
-	if p := effective(t, st, ctx, org.ID, user.ID, now); has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now); has(p, "users.manage") {
 		t.Fatalf("revocado no debe conceder: %v", p)
 	}
 }
@@ -105,8 +105,8 @@ func TestPIMActivationLifecycle(t *testing.T) {
 // TestPIMApprovalFlow cubre pending→approved→active y el rechazo.
 func TestPIMApprovalFlow(t *testing.T) {
 	st, ctx := newStore(t)
-	org, user, role := seedPIMOrg(t, st, ctx)
-	approver := seedUser(t, ctx, st, "boss@sytue.eu")
+	org, user, role := seedPIMOrg(ctx, t, st)
+	approver := seedUser(ctx, t, st, "boss@sytue.eu")
 	now := time.Now().UTC()
 
 	if _, err := st.CreateEligibility(ctx, org.ID, user.ID, role.ID, "", true, 60); err != nil {
@@ -120,7 +120,7 @@ func TestPIMApprovalFlow(t *testing.T) {
 	if act.Status != domain.ActivationPending {
 		t.Fatalf("status = %q, quiero pending", act.Status)
 	}
-	if p := effective(t, st, ctx, org.ID, user.ID, now); has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now); has(p, "users.manage") {
 		t.Fatalf("pending no debe conceder: %v", p)
 	}
 
@@ -132,7 +132,7 @@ func TestPIMApprovalFlow(t *testing.T) {
 	if appr.Status != domain.ActivationActive || appr.ExpiresAt == nil {
 		t.Fatalf("aprobada: status=%q expires=%v", appr.Status, appr.ExpiresAt)
 	}
-	if p := effective(t, st, ctx, org.ID, user.ID, now); !has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now); !has(p, "users.manage") {
 		t.Fatalf("aprobada debe conceder: %v", p)
 	}
 	// Re-aprobar una ya activa ⇒ ErrNotFound (solo transiciona desde pending).
@@ -155,14 +155,14 @@ func TestPIMApprovalFlow(t *testing.T) {
 // concediendo sin PIM) y la no-elegibilidad (no se puede activar un rol sin elegibilidad).
 func TestPIMBackwardCompatAndIsolation(t *testing.T) {
 	st, ctx := newStore(t)
-	org, user, role := seedPIMOrg(t, st, ctx)
+	org, user, role := seedPIMOrg(ctx, t, st)
 	now := time.Now().UTC()
 
 	// Asignación DIRECTA (mig 0019) ⇒ concede sin ninguna activación PIM.
 	if err := st.AssignCustomRole(ctx, nil, org.ID, role.ID, user.ID); err != nil {
 		t.Fatalf("AssignCustomRole: %v", err)
 	}
-	if p := effective(t, st, ctx, org.ID, user.ID, now); !has(p, "users.manage") {
+	if p := effective(ctx, t, st, org.ID, user.ID, now); !has(p, "users.manage") {
 		t.Fatalf("asignación directa debe conceder (retrocompat): %v", p)
 	}
 

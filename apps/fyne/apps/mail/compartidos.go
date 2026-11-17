@@ -86,6 +86,7 @@ func (b *Buzon) ElegirCompartido(c Compartido) {
 		return
 	}
 	b.P.CerrarCajon()
+	b.dejarAjustes()
 	b.P.Bandeja.Filtro = FiltroTodas // otra vista empieza sin filtro
 	b.dejarExterna()
 	x := b.compartidos[i]

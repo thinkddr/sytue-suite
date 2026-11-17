@@ -35,7 +35,7 @@ import (
 // Los paneles con campos de texto se rehacen solo cuando cambia su FORMA (otra caja,
 // otra fila, otro elemento): rehacerlos con cada letra quitaría el foco al campo.
 
-// Medidas comunes de los paneles (con el rem de 14).
+// Medidas comunes de los paneles (con el rem de 16).
 var (
 	// Los topes de alto: `max-h-44` el del gráfico, `max-h-52` los otros dos.
 	altoMaxGrafico = tema.Espacio(44)
@@ -45,7 +45,7 @@ var (
 	altoCelda     = float32(24)
 	margenCelda   = tema.Espacio(0.5)
 	botonPanelXS  = float32(24)     // `h-6 min-h-[24px]` de los botones de pie
-	ladoBotonFila = tema.Espacio(6) // `h-6 w-6` de los botones de una fila (21)
+	ladoBotonFila = tema.Espacio(6) // `h-6 w-6` de los botones de una fila (24)
 )
 
 // campoCelda son las medidas del `<input>` de una celda o de un elemento, escrito a
@@ -471,6 +471,9 @@ func (e *Editor) rotuloCaja(c Caja) string {
 			}
 		}
 		return e.t("slides.box.shape")
+	}
+	if alt := rotuloAlt(c); alt != "" {
+		return alt
 	}
 	if !esTexto(c) {
 		return e.t(claveDe(c))

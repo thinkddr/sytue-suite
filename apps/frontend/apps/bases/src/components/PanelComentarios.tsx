@@ -12,7 +12,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { Button, FieldGroup, Modal, Skeleton, Textarea, useConfirm } from '@sytue/ui';
+import { Button, FieldGroup, Modal, Skeleton, Textarea, useConfirm, EmptyState } from '@sytue/ui';
 import { formatDateTime, type Locale } from '@sytue/i18n';
 import type { BasesComment } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
@@ -137,7 +137,7 @@ export function PanelComentarios(p: {
         {comentarios === null ? (
           <Skeleton height="6rem" />
         ) : comentarios.length === 0 ? (
-          <p class="text-text-muted text-sm">{t('comments.empty')}</p>
+          <EmptyState compact title={t('comments.empty')} />
         ) : (
           <ul aria-label={t('comments.listLabel')} class="flex flex-col gap-3">
             {hilosDe(comentarios).map((h) => (

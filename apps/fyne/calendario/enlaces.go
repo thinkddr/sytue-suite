@@ -96,7 +96,7 @@ func recortar(s string, n int) string {
 
 // AtenderEnlace atiende un enlace del esquema de Calendar.
 func (a *App) AtenderEnlace(u *url.URL) {
-	if u == nil {
+	if u == nil || a.vida.Err() != nil {
 		return
 	}
 	p := a.P
@@ -110,8 +110,8 @@ func (a *App) AtenderEnlace(u *url.URL) {
 	}
 	if id, ok := api.LeerEvento(u); ok {
 		if a.Cal != nil {
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
 				defer parar()
 				ev, err := a.Cal.GetEvent(ctx, id)
 				if err != nil || ev.DTStart.IsZero() {
@@ -130,6 +130,8 @@ func (a *App) AtenderEnlace(u *url.URL) {
 		return
 	}
 	if dia, ok := FechaDelEnlace(q, p.zona()); ok {
+		// Puede llegar antes de que entre nadie: la vista guardada no la pisa.
+		a.vistaDelEnlace = true
 		a.irAlDia(dia)
 	}
 }

@@ -1,30 +1,33 @@
 # Sytue Drive (`drive.sytue.eu`)
 
-Cliente propio de archivos de **Sytue One** (Astro 7 + Preact 10) sobre el
-**servicio Go de Sytue Drive** via su API REST + **WebDAV** (`@sytue/api-clients`
-→ `DriveClient`). Implementacion **clean-room**, sin motores de terceros. UX y
-marca 100 % Sytue.
+**Sytue One**'s own file client (Astro 7 + Preact 10) on top of the
+**Sytue Drive Go service** via its REST API + **WebDAV** (`@sytue/api-clients`
+→ `DriveClient`). **Clean-room** implementation, with no third-party engines. UX and
+branding 100 % Sytue.
 
-## Funcionalidad
+<a id="funcionalidad"></a>
+## Features
 
-- Explorador de carpetas con **breadcrumb** y navegacion.
-- Vistas **lista** y **rejilla**.
-- **Subir** archivos (multiarchivo), **crear carpeta**, **descargar**, **eliminar**.
-- **Compartir** mediante enlace publico (API de shares del servicio Go).
-- Sidebar de secciones (Mi unidad, Compartido, Recientes, Favoritos, Papelera).
+- Folder explorer with **breadcrumb** and navigation.
+- **List** and **grid** views.
+- **Upload** files (multi-file), **create folder**, **download**, **delete**.
+- **Share** via public link (the Go service's shares API).
+- Section sidebar (Mi unidad, Compartido, Recientes, Favoritos, Papelera — My drive, Shared, Recent, Favorites, Trash).
 
-## Diseno e integracion
+<a id="diseno-e-integracion"></a>
+## Design and integration
 
-- `@sytue/ui` + `@sytue/shell`, modo claro/oscuro, WCAG AA.
-- **Sytue Shell** (`@sytue/shell`) montada: topbar, app switcher, busqueda,
-  notificaciones, presencia y cuenta.
-- Identidad: OIDC/PKCE contra **Sytue ID** (client `sytue-drive`) via el BFF de
-  `@sytue/auth`; cookie de sesión host-only `__Host-`, httpOnly. El access token de Sytue
-  ID autoriza las llamadas REST/WebDAV al servicio Go.
+- `@sytue/ui` + `@sytue/shell`, light/dark mode, WCAG AA.
+- **Sytue Shell** (`@sytue/shell`) mounted: top bar, app switcher, search,
+  notifications, presence and account.
+- Identity: OIDC/PKCE against **Sytue ID** (client `sytue-drive`) via the
+  `@sytue/auth` BFF; host-only session cookie `__Host-`, httpOnly. The Sytue
+  ID access token authorizes the REST/WebDAV calls to the Go service.
 
-## Desarrollo
+<a id="desarrollo"></a>
+## Development
 
-Puerto dev **4326** (`docs/CONVENTIONS.md` §6). Servicio Go de Sytue Drive en
+Dev port **4326** (`docs/CONVENTIONS.md` §6). Sytue Drive Go service on
 `8082`.
 
 ```bash
@@ -33,11 +36,12 @@ bun run --filter @sytue/drive build
 bun run --filter @sytue/drive typecheck
 ```
 
-## Variables de entorno (BFF, solo servidor)
+<a id="variables-de-entorno-bff-solo-servidor"></a>
+## Environment variables (BFF, server only)
 
-`SYTUE_OIDC_ISSUER` (issuer de Sytue ID, sin `/realms/`),
+`SYTUE_OIDC_ISSUER` (Sytue ID issuer, without `/realms/`),
 `SYTUE_OIDC_CLIENT_ID=sytue-drive`, `SYTUE_OIDC_CLIENT_SECRET`,
 `SYTUE_OIDC_REDIRECT_URI`, `SYTUE_SESSION_SECRET`,
 `PUBLIC_SYTUE_HUB_BASE_URL`,
-`PUBLIC_SYTUE_DRIVE_BASE_URL` (servicio Go de Sytue Drive), `SYTUE_SECURE_COOKIES`.
-Nunca se incluyen secretos en git (Scaleway Secret Manager / Sealed Secrets).
+`PUBLIC_SYTUE_DRIVE_BASE_URL` (Sytue Drive Go service), `SYTUE_SECURE_COOKIES`.
+Secrets are never included in git (Scaleway Secret Manager / Sealed Secrets).

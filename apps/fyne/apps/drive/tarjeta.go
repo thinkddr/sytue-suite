@@ -106,11 +106,17 @@ type TarjetaDrive struct {
 	// AlMenu es el «⋯» de la otra esquina (`top-1.5 right-1.5`), colgado de su caja.
 	AlMenu func(disparador fyne.CanvasObject)
 	Grueso bool
+	// AlFlecha recibe las teclas que no son de la tarjeta (las flechas, Inicio y Fin) y
+	// dice si movió el foco: quien sabe dónde están las demás es la rejilla.
+	AlFlecha func(tecla fyne.KeyName) bool
 	// Miniatura es la de una imagen, ya descodificada: se pinta con `object-cover` en
 	// la previsualización en vez de la tesela. nil, la tesela.
 	Miniatura image.Image
 	// Rotulo es el `aria-label` («Abrir la carpeta X»); vacío, el nombre.
 	Rotulo string
+	// RotuloCasilla es el `aria-label={t('files.select', { name })}` de la casilla de la
+	// esquina: «Seleccionar X». Vacío, el nombre a secas, que no dice qué hace pulsarla.
+	RotuloCasilla string
 	// Tono es el color de grupo de una CARPETA, por turno (`cardTone` en
 	// FileBrowser.tsx): en la forma Marco la tarjeta es de color pleno, y lo de dentro
 	// toma la tinta de ese relleno (`.sytue-card-tone` de appearance.css). En Carril no
@@ -132,10 +138,11 @@ type TarjetaDrive struct {
 }
 
 var (
-	_ fyne.Widget       = (*TarjetaDrive)(nil)
-	_ fyne.Tappable     = (*TarjetaDrive)(nil)
-	_ fyne.Focusable    = (*TarjetaDrive)(nil)
-	_ desktop.Hoverable = (*TarjetaDrive)(nil)
+	_ fyne.Widget            = (*TarjetaDrive)(nil)
+	_ fyne.Tappable          = (*TarjetaDrive)(nil)
+	_ fyne.SecondaryTappable = (*TarjetaDrive)(nil)
+	_ fyne.Focusable         = (*TarjetaDrive)(nil)
+	_ desktop.Hoverable      = (*TarjetaDrive)(nil)
 )
 
 // NuevaTarjetaDrive crea la tesela de un elemento.
@@ -181,6 +188,14 @@ func (t *TarjetaDrive) Tapped(e *fyne.PointEvent) {
 	}
 }
 
+// TappedSecondary es el clic derecho (o mantener pulsado): abre el menú del «⋯» sin
+// abrir la tarjeta, como `onContextMenu` en la web. Sin menú no hace nada.
+func (t *TarjetaDrive) TappedSecondary(*fyne.PointEvent) {
+	if t.AlMenu != nil && t.r != nil && t.r.zonaMas != nil {
+		t.AlMenu(t.r.zonaMas)
+	}
+}
+
 // enfocable es lo que puede recibir el foco al pulsar: un objeto del lienzo que además
 // se enfoca.
 type enfocable interface {
@@ -217,6 +232,14 @@ func (t *TarjetaDrive) enMas(p fyne.Position) bool {
 	return p.X >= o.X && p.X < o.X+m.Width && p.Y >= o.Y && p.Y < o.Y+m.Height
 }
 
+// rotuloCasilla es lo que anuncia la casilla de la esquina.
+func (t *TarjetaDrive) rotuloCasilla() string {
+	if t.RotuloCasilla != "" {
+		return t.RotuloCasilla
+	}
+	return t.Nombre
+}
+
 // verEsquinas dice si la casilla y el «⋯» se ven.
 func (t *TarjetaDrive) verCasilla() bool {
 	return t.AlMarcar != nil && (t.Seleccionada || t.SeleccionActiva || t.encima || t.Grueso)
@@ -250,17 +273,37 @@ func (t *TarjetaDrive) FocusLost() { t.enfocado = false; t.Refresh() }
 func (t *TarjetaDrive) TypedRune(r rune) {
 	if r == ' ' {
 		t.Tapped(nil)
+		return
 	}
+	ui.SubirRuna(t.lienzo(), r) // «u», «?»… con la tarjeta enfocada tras un clic
 }
 
-// TypedKey abre con Intro.
+// TypedKey abre con Intro; las flechas, Inicio y Fin pasan el foco a otra tarjeta, y lo
+// demás sube a la ventana, que es donde están los atajos del explorador (Supr, F2, Esc).
 func (t *TarjetaDrive) TypedKey(e *fyne.KeyEvent) {
 	if ui.SubirEscape(t, e) { // Escape y «atrás» son del diálogo de encima
 		return
 	}
 	if e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter {
 		t.Tapped(nil)
+		return
 	}
+	if t.AlFlecha != nil && t.AlFlecha(e.Name) {
+		return
+	}
+	ui.SubirTecla(t.lienzo(), e)
+}
+
+// lienzo es el de la tarjeta tal como está en el árbol: la que la embebe, si la hay.
+func (t *TarjetaDrive) lienzo() fyne.Canvas {
+	var yo fyne.CanvasObject = t
+	if t.yo != nil {
+		yo = t.yo
+	}
+	if a := fyne.CurrentApp(); a != nil {
+		return a.Driver().CanvasForObject(yo)
+	}
+	return nil
 }
 
 // AccessibilityLabel es el `aria-label` de la tarjeta, o su nombre.
@@ -319,8 +362,9 @@ func (t *TarjetaDrive) CreateRenderer() fyne.WidgetRenderer {
 		r.objetos = append(r.objetos, r.filete, r.nombre, r.meta)
 	}
 	if t.AlMarcar != nil {
-		r.casilla = ui.NuevaCasilla(t.Nombre, func(bool) { t.AlMarcar() })
+		r.casilla = ui.NuevaCasilla(t.rotuloCasilla(), func(bool) { t.AlMarcar() })
 		r.casilla.SinEtiqueta, r.casilla.Marcada = true, t.Seleccionada
+		r.casilla.SubeTeclas = true // los atajos del explorador tras marcar con un clic
 		r.objetos = append(r.objetos, r.casilla)
 	}
 	if t.AlMenu != nil {
@@ -473,6 +517,7 @@ func (r *tarjetaRenderer) Refresh() {
 	r.colocarHalo(r.t.Size()) // el grosor cambia al entrar o salir un arrastre
 	if r.casilla != nil {
 		r.casilla.Marcada = r.t.Seleccionada
+		r.casilla.Etiqueta = r.t.rotuloCasilla()
 		r.casilla.Hidden = !r.t.verCasilla()
 	}
 	if r.zonaMas != nil {

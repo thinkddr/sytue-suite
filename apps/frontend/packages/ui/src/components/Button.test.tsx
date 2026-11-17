@@ -76,7 +76,7 @@ test('el enlace conserva el aspecto del botón, incluido el anillo de foco', () 
 test('`xs` es 24 px, el suelo de WCAG 2.5.8, y no arrastra el gap de las tallas grandes', () => {
   const host = mount(<Button size="xs">Aceptar</Button>);
   const cls = host.querySelector('button')!.className;
-  // El suelo en px: `h-6` solo son 21 con la raíz a 14.
+  // El suelo en px: `h-6` son 1.5rem, y con una base de letra menor que 16 no llegan a 24.
   expect(cls).toContain('min-h-[24px]');
   expect(cls).toContain('text-xs');
   // El gap salió de la clase base a cada talla justamente por esto: `gap-2` y `gap-1` en
@@ -147,9 +147,10 @@ test('todas las tallas garantizan 44 px con el dedo, y solo con el dedo', () => 
   // `lg` TAMBIÉN LO LLEVA, y esta prueba decía lo contrario.
   //
   // Su premisa era «lg ya mide 44», leyendo `h-11` como 2.75rem = 44px. Pero eso
-  // solo es cierto con la raíz en 16px, y LA DE LA SUITE ES 14: ahí `h-11` son
-  // 38,5px, que es exactamente el fallo que arregló el commit anterior —«los
-  // objetivos táctiles medían 38px para quien reduce el tamaño de letra»—.
+  // solo es cierto con la base de letra en 16px: con 14 (la de la suite hasta que
+  // la raíz subió a 16, o la de quien la reduce) `h-11` son 38,5px, que es
+  // exactamente el fallo que arregló el commit anterior —«los objetivos táctiles
+  // medían 38px para quien reduce el tamaño de letra»—.
   //
   // Por eso el mínimo se escribe `max(44px, 2.75rem)`: los 44 son el suelo
   // absoluto y el rem solo manda cuando la persona ha AGRANDADO la letra. Sin él,

@@ -8,6 +8,7 @@
  */
 import { withBase } from '@sytue/ui';
 import { noteWritePath } from '@sytue/api-clients';
+import { validateImportBeforeUpload } from './onexGuard.js';
 import type {
   DailyDay,
   Hashtag,
@@ -15,6 +16,7 @@ import type {
   SharedNote,
   Note,
   NoteInput,
+  NoteVersion,
   NoteCipherMigration,
   NoteHit,
   NoteLinkTarget,
@@ -26,6 +28,7 @@ import type {
   TagState,
   Task,
   TaskState,
+  TrashedNote,
 } from '@sytue/api-clients';
 
 export type {
@@ -44,6 +47,7 @@ export type {
   ReminderInput,
   Tag,
   TagState,
+  TrashedNote,
 };
 
 /** Error del BFF con su estado, para que la interfaz distinga 404 de 500. */
@@ -173,10 +177,239 @@ export async function listNotes(notebookId: string, signal?: AbortSignal): Promi
   );
 }
 
-export function createNote(notebookId: string, input: NoteInput): Promise<Note> {
-  return pedir<Note>(`/api${noteWritePath('create', notebookId, input)}`, {
+function textoBienFormado(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(++index);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) return false;
+  }
+  return true;
+}
+
+function datoJSONSeguro(value: unknown, seen = new Set<object>(), depth = 0): boolean {
+  if (value === null || typeof value === 'boolean') return true;
+  if (typeof value === 'string') return textoBienFormado(value);
+  if (typeof value === 'number')
+    return Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value));
+  if (typeof value !== 'object' || depth > 128 || seen.has(value)) return false;
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+        if (
+          !descriptor ||
+          descriptor.get ||
+          descriptor.set ||
+          !datoJSONSeguro(descriptor.value, seen, depth + 1)
+        )
+          return false;
+      }
+      if (
+        Object.getOwnPropertySymbols(value).length !== 0 ||
+        Object.keys(value).length !== value.length
+      )
+        return false;
+      return true;
+    }
+    const proto: unknown = Object.getPrototypeOf(value);
+    if (proto !== null && proto !== Object.prototype) return false;
+    if (Object.getOwnPropertySymbols(value).length !== 0) return false;
+    return Object.entries(Object.getOwnPropertyDescriptors(value)).every(
+      ([key, descriptor]) =>
+        textoBienFormado(key) &&
+        !descriptor.get &&
+        !descriptor.set &&
+        datoJSONSeguro(descriptor.value, seen, depth + 1),
+    );
+  } finally {
+    seen.delete(value);
+  }
+}
+
+function enlaceBienFormado(value: unknown): boolean {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  if (proto !== null && proto !== Object.prototype) return false;
+  const fields = Object.getOwnPropertyDescriptors(value);
+  if (typeof fields.target_kind?.value !== 'string' || typeof fields.target_id?.value !== 'string')
+    return false;
+  for (const [key, descriptor] of Object.entries(fields)) {
+    if (
+      !['target_kind', 'target_id', 'label', 'url'].includes(key) ||
+      descriptor.get ||
+      descriptor.set
+    )
+      return false;
+    if (typeof descriptor.value !== 'string' || !textoBienFormado(descriptor.value)) return false;
+  }
+  return true;
+}
+
+export function admiteEnlacesEnEnvio(input: unknown, observacion?: { cifrado: boolean }): boolean {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return false;
+  const proto: unknown = Object.getPrototypeOf(input);
+  if (proto !== null && proto !== Object.prototype) return false;
+  const value = input as Record<string, unknown>;
+  const fields = new Set([
+    'cipher_version',
+    'expected_crypto',
+    'expected_updated_at',
+    'kind',
+    'title',
+    'content',
+    'content_cipher',
+    'data',
+    'x',
+    'y',
+    'col',
+    'position',
+    'width',
+    'group_id',
+    'collapsed',
+    'checked',
+    'cancelled',
+    'pinned',
+    'visibility',
+    'indexable',
+    'links',
+  ]);
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
+    // Go's JSON decoder matches ASCII fields case-insensitively, including
+    // Unicode simple folds such as long s and Kelvin sign. Do not let an alias
+    // escape this check and acquire a different meaning after serialization.
+    if (!fields.has(key) || descriptor.get || descriptor.set) return false;
+  }
+  for (const key of [
+    'kind',
+    'title',
+    'content',
+    'content_cipher',
+    'visibility',
+    'expected_updated_at',
+  ]) {
+    const field = value[key];
+    if (field !== undefined && (typeof field !== 'string' || !textoBienFormado(field)))
+      return false;
+  }
+  if (value.cipher_version === null) return false;
+  for (const key of ['cipher_version', 'x', 'y', 'col', 'position', 'width']) {
+    const number = value[key];
+    if (number != null && (typeof number !== 'number' || !Number.isSafeInteger(number)))
+      return false;
+  }
+  for (const key of ['collapsed', 'checked', 'cancelled', 'pinned', 'indexable']) {
+    const flag = value[key];
+    if (flag != null && typeof flag !== 'boolean') return false;
+  }
+  if (
+    value.group_id != null &&
+    (typeof value.group_id !== 'string' || !textoBienFormado(value.group_id))
+  )
+    return false;
+  if (value.data !== undefined && !datoJSONSeguro(value.data)) return false;
+  const links = value.links;
+  if (links != null && !Array.isArray(links)) return false;
+  if (links?.some((link: unknown) => !enlaceBienFormado(link))) return false;
+  const encrypted =
+    value.cipher_version !== undefined ||
+    value.expected_crypto !== undefined ||
+    Boolean(value.content_cipher);
+  if (observacion) observacion.cifrado = encrypted;
+  if (!encrypted) return true;
+  if ((links?.length ?? 0) !== 0) return false;
+  if (
+    (value.title != null && value.title !== '') ||
+    (value.content != null && value.content !== '')
+  )
+    return false;
+  if (value.expected_crypto !== undefined) {
+    if (
+      value.expected_crypto === null ||
+      typeof value.expected_crypto !== 'object' ||
+      Array.isArray(value.expected_crypto)
+    )
+      return false;
+    const cryptoProto: unknown = Object.getPrototypeOf(value.expected_crypto);
+    if (cryptoProto !== null && cryptoProto !== Object.prototype) return false;
+    const allowed = new Set(['v', 'kdf', 'salt', 'iterations', 'check']);
+    for (const [key, descriptor] of Object.entries(
+      Object.getOwnPropertyDescriptors(value.expected_crypto),
+    )) {
+      if (!allowed.has(key) || descriptor.get || descriptor.set) return false;
+      if (key === 'v' || key === 'iterations') {
+        if (typeof descriptor.value !== 'number' || !Number.isSafeInteger(descriptor.value))
+          return false;
+      } else if (typeof descriptor.value !== 'string' || !textoBienFormado(descriptor.value))
+        return false;
+    }
+  }
+  if (value.data != null) {
+    if (typeof value.data !== 'object' || Array.isArray(value.data)) return false;
+    const dataProto: unknown = Object.getPrototypeOf(value.data);
+    if (dataProto !== null && dataProto !== Object.prototype) return false;
+    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value.data))) {
+      if (key !== 'client_id' || descriptor.get || descriptor.set) return false;
+      if (
+        descriptor.value != null &&
+        (typeof descriptor.value !== 'string' ||
+          descriptor.value === '' ||
+          !textoBienFormado(descriptor.value) ||
+          new TextEncoder().encode(descriptor.value).length > 64)
+      )
+        return false;
+    }
+  }
+  return true;
+}
+
+function prepararEnvioNota(
+  input: NoteInput,
+  scope?: { notebookId: string },
+): { body: string; snapshot: NoteInput } {
+  // Validate both the live input and the actual serialized snapshot: arrays,
+  // proxies or inherited toJSON hooks can change what JSON.stringify emits.
+  if (scope && (typeof scope.notebookId !== 'string' || !textoBienFormado(scope.notebookId)))
+    throw new Error('notes: unsafe notebook scope');
+  if (input === null || typeof input !== 'object' || Array.isArray(input))
+    throw new Error('notes: unsafe or malformed note input');
+  const originalFields = Object.getOwnPropertyDescriptors(input);
+  const wasEncrypted =
+    originalFields.cipher_version?.value !== undefined ||
+    originalFields.expected_crypto?.value !== undefined ||
+    Boolean(originalFields.content_cipher?.value);
+  const observacion = { cifrado: false };
+  if (!admiteEnlacesEnEnvio(input, observacion))
+    throw new Error('notes: unsafe or malformed note input');
+  const body = JSON.stringify(scope ? { ...input, notebook_id: scope.notebookId } : input);
+  if (typeof body !== 'string') throw new Error('notes: unsafe or malformed note input');
+  const parsed: unknown = JSON.parse(body);
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new Error('notes: unsafe or malformed note input');
+  let snapshot = parsed as Record<string, unknown>;
+  if (scope) {
+    if (snapshot.notebook_id !== scope.notebookId) throw new Error('notes: unsafe notebook scope');
+    const { notebook_id: _notebookId, ...note } = snapshot;
+    snapshot = note;
+  }
+  if (!admiteEnlacesEnEnvio(snapshot)) throw new Error('notes: unsafe or malformed note input');
+  if (
+    (wasEncrypted || observacion.cifrado) &&
+    snapshot.cipher_version === undefined &&
+    snapshot.expected_crypto === undefined &&
+    !snapshot.content_cipher
+  )
+    throw new Error('notes: unsafe encryption downgrade');
+  return { body, snapshot: snapshot };
+}
+
+export async function createNote(notebookId: string, input: NoteInput): Promise<Note> {
+  const { body, snapshot } = prepararEnvioNota(input);
+  return await pedir<Note>(`/api${noteWritePath('create', notebookId, snapshot)}`, {
     method: 'POST',
-    ...cuerpo(input),
+    body,
   });
 }
 
@@ -192,10 +425,11 @@ export function migrateEncryptedContent(
   });
 }
 
-export function updateNote(id: string, notebookId: string, input: NoteInput): Promise<Note> {
-  return pedir<Note>(`/api${noteWritePath('update', id, input)}`, {
+export async function updateNote(id: string, notebookId: string, input: NoteInput): Promise<Note> {
+  const { body, snapshot } = prepararEnvioNota(input, { notebookId });
+  return await pedir<Note>(`/api${noteWritePath('update', id, snapshot)}`, {
     method: 'PUT',
-    ...cuerpo({ ...input, notebook_id: notebookId }),
+    body,
   });
 }
 
@@ -236,8 +470,8 @@ export function purgeNote(id: string): Promise<void> {
   return pedir<void>(`/api/notes/${encodeURIComponent(id)}/purge`, { method: 'DELETE' });
 }
 
-export async function listTrash(): Promise<Note[]> {
-  return (await pedir<{ notes: Note[] }>('/api/trash')).notes ?? [];
+export async function listTrash(): Promise<TrashedNote[]> {
+  return (await pedir<{ notes: TrashedNote[] }>('/api/trash')).notes ?? [];
 }
 
 // --- Etiquetas --------------------------------------------------------------
@@ -353,6 +587,21 @@ export function retroenlaces(noteId: string): Promise<{ notes: Note[] }> {
   return pedir<{ notes: Note[] }>(`/api/backlinks?note=${encodeURIComponent(noteId)}`);
 }
 
+/** El historial de versiones de una nota (sin el texto de cada una). */
+export async function versionesDeNota(noteId: string): Promise<NoteVersion[]> {
+  const r = await pedir<{ versions?: NoteVersion[] }>(
+    `/api/notes/${encodeURIComponent(noteId)}/versions`,
+  );
+  return r.versions ?? [];
+}
+
+/** Una versión entera; en un cuaderno cifrado, con el criptograma por descifrar. */
+export function versionDeNota(noteId: string, versionId: string): Promise<NoteVersion> {
+  return pedir<NoteVersion>(
+    `/api/notes/${encodeURIComponent(noteId)}/versions/${encodeURIComponent(versionId)}`,
+  );
+}
+
 /** El tipo de destino de enlace que corresponde a cada origen de la suite. */
 export const DESTINO_POR_ORIGEN: Record<OrigenSuite, NoteLinkTarget> = {
   drive: 'drive_file',
@@ -410,22 +659,34 @@ export interface VistaPreviaVolcado {
 }
 
 /**
- * Lee un `.onex` y devuelve lo que ENTRARÍA, sin crear nada: el ensayo saneado
+ * Lee un `.onex`, un Markdown o un `.enex` y devuelve lo que ENTRARÍA, sin crear nada: el ensayo saneado
  * de la importación, con las notas que no pasarían ya contadas.
  */
-export function previsualizarVolcado(volcado: string): Promise<VistaPreviaVolcado> {
-  return pedir<VistaPreviaVolcado>('/api/notebooks/import?preview=1', {
-    method: 'POST',
-    body: volcado,
-  });
+export async function previsualizarVolcado(
+  volcado: Uint8Array<ArrayBuffer>,
+  nombre = '',
+): Promise<VistaPreviaVolcado> {
+  validateImportBeforeUpload(volcado, nombre);
+  return pedir<VistaPreviaVolcado>(
+    `/api/notebooks/import?preview=1&name=${encodeURIComponent(nombre)}`,
+    {
+      method: 'POST',
+      body: volcado,
+    },
+  );
 }
 
-/** Crea un cuaderno nuevo a partir de un `.onex`. No sobrescribe ninguno. */
-export function importarVolcado(
-  volcado: string,
+/**
+ * Crea un cuaderno nuevo a partir de un `.onex`, Markdown (`.md`, `.zip`) o
+ * Evernote (`.enex`). No sobrescribe ninguno.
+ */
+export async function importarVolcado(
+  volcado: Uint8Array<ArrayBuffer>,
+  nombre = '',
 ): Promise<{ notebook: Notebook; importadas: number; descartadas: number }> {
+  validateImportBeforeUpload(volcado, nombre);
   return pedir<{ notebook: Notebook; importadas: number; descartadas: number }>(
-    '/api/notebooks/import',
+    `/api/notebooks/import?name=${encodeURIComponent(nombre)}`,
     { method: 'POST', body: volcado },
   );
 }

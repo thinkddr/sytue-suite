@@ -29,7 +29,7 @@ import (
 // TestDeleteUserRevokesCredentials: el DELETE de SCIM revoca sesión y refresh.
 func TestDeleteUserRevokesCredentials(t *testing.T) {
 	st, ctx := newStore(t)
-	ada := seedUser(t, ctx, st, "ada@acme.example")
+	ada := seedUser(ctx, t, st, "ada@acme.example")
 
 	sessHash := hashOf("sess-ada")
 	if _, err := st.InsertSession(ctx, nil, domain.Session{
@@ -81,7 +81,7 @@ func TestSCIMDeactivateRevokesAndCannotResurrect(t *testing.T) {
 	st, ctx := newStore(t)
 
 	// (1) active:false ⇒ suspendido + credenciales revocadas.
-	bob := seedUser(t, ctx, st, "bob@acme.example")
+	bob := seedUser(ctx, t, st, "bob@acme.example")
 	if _, err := st.InsertSession(ctx, nil, domain.Session{
 		TokenHash: hashOf("sess-bob"), UserID: bob.ID, AuthTime: time.Now().UTC(), AMR: []string{"pwd"},
 		ExpiresAt: time.Now().UTC().Add(12 * time.Hour),
@@ -101,7 +101,7 @@ func TestSCIMDeactivateRevokesAndCannotResurrect(t *testing.T) {
 	}
 
 	// (2) Una cuenta BORRADA no resucita con active:true.
-	eve := seedUser(t, ctx, st, "eve@acme.example")
+	eve := seedUser(ctx, t, st, "eve@acme.example")
 	if err := st.DeleteUser(ctx, nil, eve.ID); err != nil {
 		t.Fatalf("DeleteUser: %v", err)
 	}

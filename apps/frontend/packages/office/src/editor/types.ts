@@ -132,6 +132,8 @@ export interface EditorUi {
    *  modo persisten en el HTML del folio (el modo, como sentinela al frente del
    *  contenido); reabrir el doc restaura el estado (persistencia por-documento). */
   track: boolean;
+  /** La hoja «Atajos de teclado» abierta (Ctrl+/ o Vista › Mostrar). Ausente = cerrada. */
+  atajos?: boolean;
 }
 
 /** Configuración de página (solo kind document). Se guarda en el documento como la capa
@@ -151,6 +153,9 @@ export interface PageSetup {
   width?: number | undefined;
   height?: number | undefined;
   margins?: [number, number, number, number] | undefined;
+  /** Idioma del documento (`data-lang` de la capa): el `lang` del folio, que decide el
+   *  diccionario del corrector. Sin él, el de la interfaz. */
+  lang?: Locale | undefined;
 }
 
 export interface EditorStats {
@@ -250,12 +255,14 @@ export type EditorCommand =
   | 'color' // value: hex de CONTENT_PALETTE
   | 'highlight' // value: hex de HIGHLIGHT_PALETTE o 'transparent'
   | 'clearFormat'
+  | 'changeCase' // value: 'sentence' | 'lower' | 'upper' | 'title' (mayusculas.ts)
   | 'alignLeft'
   | 'alignCenter'
   | 'alignRight'
   | 'alignJustify'
   | 'listBullet'
   | 'listNumber'
+  | 'listCheck' // lista de casillas (canvas/casillas.ts): pone o quita
   | 'indent'
   | 'outdent'
   | 'lineHeight' // value: '1' | '1.15' | '1.5' | '2'
@@ -292,6 +299,8 @@ export interface FormatState {
   align: 'left' | 'center' | 'right' | 'justify';
   bullet: boolean;
   number: boolean;
+  /** El cursor está en una lista de casillas (entonces `bullet` va apagado). */
+  checklist: boolean;
   heading: 'p' | 'h1' | 'h2' | 'h3' | 'blockquote';
   /** La selección está dentro de una tabla (activa el panel Tabla). */
   inTable: boolean;
@@ -311,6 +320,7 @@ export const EMPTY_FORMAT: FormatState = {
   align: 'left',
   bullet: false,
   number: false,
+  checklist: false,
   heading: 'p',
   inTable: false,
   imageSelected: false,
@@ -1073,6 +1083,17 @@ export interface SheetGroup {
   collapsed?: boolean;
 }
 
+/**
+ * Tramo de filas o de columnas OCULTAS A MANO («Ocultar filas»/«Mostrar filas»): las
+ * unidades [start,end] (0-based, ambos dentro). No es el esquema: no lleva nivel ni botón
+ * de contraer. Se guarda en tramos y no fila a fila porque ocultar desde una fila hasta el
+ * final de la hoja es un millón de filas. Helpers puros en sheets/ocultas.ts.
+ */
+export interface SheetSpan {
+  start: number;
+  end: number;
+}
+
 export interface SheetData {
   /** Identidad estable de la hoja: no cambia al renombrarla ni al moverla. La co-edición
    *  (state/fusion.ts) y las operaciones de hoja se anclan en ella y no en el nombre.
@@ -1115,6 +1136,10 @@ export interface SheetData {
   rowGroups?: SheetGroup[];
   /** Grupos de esquema de COLUMNAS; ausente = sin esquema de columnas. */
   colGroups?: SheetGroup[];
+  /** Filas ocultas a mano, en tramos ordenados y sin solaparse; ausente = ninguna. */
+  hiddenRows?: SheetSpan[];
+  /** Columnas ocultas a mano, igual; ausente = ninguna. */
+  hiddenCols?: SheetSpan[];
   /** Escenarios del Análisis Y-si (Administrador de escenarios); ausente = ninguno. */
   scenarios?: Scenario[];
   /** Tablas dinámicas de la hoja (su definición; lo que escriben son celdas normales). */
@@ -1236,6 +1261,10 @@ export interface Slide {
   /** Oculta los elementos del patrón (slide master) en ESTA diapositiva (p. ej.
    *  la portada). Ausente/false = se muestran. Retrocompatible. */
   hideMaster?: boolean;
+  /** Oculta al presentar: se ve (atenuada) en el carril y se edita igual, pero avanzar,
+   *  retroceder, Inicio/Fin, la «siguiente» del moderador y Cast la saltan; solo se llega
+   *  a ella con «número + Intro». Ausente/false = se presenta. Retrocompatible. */
+  hidden?: boolean;
 }
 /** Destino de un enlace de acción de una caja al hacer clic en presentación
  *  (fase Slides-Enlaces): salto relativo o a una diapositiva concreta (1-based). */
@@ -1410,6 +1439,10 @@ export interface SlideBox {
   /** Origen del medio: dataURL reescalado en cliente (kind image; < ~700 KiB, ver
    *  Insertar.tsx) o, en kind 'media', la URL o el dataURL del audio/vídeo. */
   src?: string;
+  /** Solo kind 'image': texto alternativo (WCAG 1.1.1) para el lector de pantalla al
+   *  editar, presentar y en las miniaturas. Ausente = sin describir (`alt=""`). Se sanea
+   *  al pintar (slides/textoAlt.ts). Retrocompatible. */
+  alt?: string;
   /** Solo kind 'media': tipo de medio incrustado. */
   mediaType?: 'video' | 'audio';
   /** Solo kind 'media' (vídeo): imagen de portada (URL o dataURL) para el marcador
@@ -1450,6 +1483,10 @@ export interface SlideBox {
    *  mismo `groupId` se mueven/alinean/animan juntas. Ausente = suelta.
    *  Retrocompatible (un doc previo sin este campo carga igual). */
   groupId?: string;
+  /** Giro en grados, sentido horario y alrededor del centro de la caja (0..360, como el
+   *  `rot` de PowerPoint). x/y/w/h son los de la caja SIN girar. Ausente = sin giro
+   *  (slides/girar.ts). Retrocompatible. */
+  rot?: number;
 }
 
 /* ---------- EL contrato: contexto que recibe toda zona ---------- */

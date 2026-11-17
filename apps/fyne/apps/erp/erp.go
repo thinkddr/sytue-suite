@@ -9,7 +9,7 @@
 // De medir el DOM de producción (`corporate.sytue.eu/erp`, 1280×800, rem 14) con
 // `test/e2e/medidas-web.mjs erp` el 2026-09-22. Cada constante lleva escrito si es
 // **medida** (salió de `getBoundingClientRect`) o de **hoja** (se deriva de la clase de
-// Tailwind con el rem de 14 porque ninguna pantalla de producción la montaba).
+// Tailwind con el rem de 16 porque ninguna pantalla de producción la montaba).
 //
 // La cuenta del barrido: portada 567 elementos, lista 163. Y el aviso que va con ella:
 // **la cuenta de auditoría no tiene permisos en los módulos del ERP**, así que las tres

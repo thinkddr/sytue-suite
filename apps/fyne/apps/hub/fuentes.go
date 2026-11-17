@@ -19,9 +19,10 @@ type AgendaDeLaSuite struct {
 
 var _ Agendable = AgendaDeLaSuite{}
 
-// Hoy es api.Calendars.Hoy: la misma agenda que publica el widget del Hub.
-func (a AgendaDeLaSuite) Hoy(ctx context.Context, desde, hasta time.Time) ([]EventoDeHoy, error) {
-	return a.Calendario.Hoy(ctx, desde, hasta)
+// Hoy es api.Calendars.AgendaCompleta: la misma agenda que publica el widget del Hub,
+// con lo que la tarjeta añade (el total para el «+N» y si falta algún calendario).
+func (a AgendaDeLaSuite) Hoy(ctx context.Context, desde, hasta time.Time) (api.AgendaDeHoy, error) {
+	return a.Calendario.AgendaCompleta(ctx, desde, hasta)
 }
 
 // SinLeer son los no leídos de la bandeja de entrada o, si no hay buzón con ese rol, los

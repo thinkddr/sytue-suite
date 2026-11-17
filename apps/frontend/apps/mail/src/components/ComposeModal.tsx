@@ -25,13 +25,12 @@ import {
   atajoDelSistema,
 } from '@sytue/ui';
 import {
-  sendEmail,
-  saveDraft,
-  deleteDraft,
   type EmailAddress,
   type SendInput,
+  type ReplyTemplate,
   MailHttpError,
 } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import { restaurarZoomDelViewport } from '@sytue/ui/browser/zoom';
 import type { Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
@@ -51,8 +50,8 @@ export function motivoDeEnvio(
   return null;
 }
 import { textToHtml, htmlToText, sanitizeHtml } from '../client/richtext.js';
-import { deleteOfflineValue, readOfflineValue, writeOfflineValue } from '@sytue/offline';
-import { RichTextEditor } from './RichTextEditor.js';
+import { LocalComposeDraftStore, type LocalComposeDraft } from '../client/local-draft.js';
+import { RichTextEditor, type EditorControl } from './RichTextEditor.js';
 
 /** Clave de localStorage de la barra de formato del compositor. */
 const FORMATO_KEY = 'sytue-mail-formato';
@@ -101,20 +100,6 @@ const MAX_IMAGEN_EMBEBIDA = MAX_ATTACHMENT_BYTES;
  * `atajoDelSistema` de la suite: solo decide un rótulo, el atajo escucha las dos.
  */
 export const ATAJO_ENVIAR = atajoDelSistema('Ctrl+↵');
-
-const LOCAL_DRAFT_NAMESPACE = 'mail.compose';
-const LOCAL_DRAFT_ID = 'active';
-
-interface LocalComposeDraft {
-  from: string;
-  to: string;
-  cc: string;
-  bcc: string;
-  subject: string;
-  bodyHtml: string;
-  attachments: Attachment[];
-  files: FileAttachment[];
-}
 
 type DraftSaveResult = 'server' | 'device' | null;
 
@@ -272,12 +257,24 @@ interface Props {
   externalAccounts?: readonly ExternalMailAccount[] | undefined;
   /** Ventana de deshacer (s) tras «Enviar»; 0 = enviar sin retención (sin undo). */
   undoSeconds?: number | undefined;
+  /**
+   * Las plantillas de respuesta de la cuenta: el menú «Plantillas» del pie las
+   * inserta donde estaba el cursor. Se crean en Ajustes de Mail.
+   */
+  templates?: readonly ReplyTemplate[] | undefined;
   onClose: () => void;
   /** Se guardó/actualizó o se envió un borrador: el padre refresca la lista. */
   onSaved?: (() => void) | undefined;
   /** Envío con ventana de deshacer: el padre, al deshacer, saca el diferido de la
    * cola (por id) y reabre el compositor con `reopen` (el estado justo enviado). */
   onUndoSend?: ((outboundId: string, reopen: ComposeDraft) => void) | undefined;
+  /**
+   * Una respuesta (`initial.answers`) ha salido por Sytue: el padre marca el original
+   * como respondido cuando el envío deja de poder deshacerse. `outboundId` y
+   * `undoSeconds` son los del envío retenido; sin ellos, ya salió.
+   */
+  onAnswered?:
+    ((answers: string, outboundId: string | undefined, undoSeconds: number) => void) | undefined;
 }
 
 export function ComposeModal({
@@ -292,11 +289,14 @@ export function ComposeModal({
   fromOptions = [],
   externalAccounts = [],
   undoSeconds = 0,
+  templates = [],
   onClose,
   onSaved,
   onUndoSend,
+  onAnswered,
 }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { sendEmail, saveDraft, deleteDraft } = usePrivateMailApi();
   const toast = useToast();
   // Dirección «De»: por defecto la primera opción (la primaria). El selector solo
   // aparece si hay alias (más de una opción). `primaryFrom` es un primitivo estable
@@ -336,8 +336,8 @@ export function ComposeModal({
   const externalApi = useMemo(externalMailClient, []);
   const [to, setTo] = useState(initial?.to ?? '');
   const [cc, setCc] = useState(initial?.cc ?? '');
-  const [bcc, setBcc] = useState('');
-  const [showCcBcc, setShowCcBcc] = useState(Boolean(initial?.cc));
+  const [bcc, setBcc] = useState(initial?.bcc ?? '');
+  const [showCcBcc, setShowCcBcc] = useState(Boolean(initial?.cc || initial?.bcc));
   const [subject, setSubject] = useState(initial?.subject ?? '');
   const [bodyHtml, setBodyHtml] = useState('');
   // Remonta el editor rich-text al (re)abrir para fijar su contenido inicial sin
@@ -403,7 +403,14 @@ export function ComposeModal({
   // por primera vez, para que un segundo guardado actualice en vez de duplicar.
   const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
   const [localReady, setLocalReady] = useState(false);
+  const [localDraftBlocked, setLocalDraftBlocked] = useState(false);
+  const localDraftStore = useMemo(
+    () => (ownerId ? new LocalComposeDraftStore(ownerId) : null),
+    [ownerId],
+  );
   const fileInput = useRef<HTMLInputElement>(null);
+  // Para insertar una plantilla donde estaba el cursor sin volver controlado el editor.
+  const editorControl = useRef<EditorControl | null>(null);
   /**
    * Dónde tiene que estar el cursor cuando la ventana termina de montarse.
    *
@@ -454,11 +461,14 @@ export function ComposeModal({
     if (!open) return;
     let active = true;
     setLocalReady(false);
+    setLocalDraftBlocked(false);
     setFrom(wantFrom);
     setTo(initial?.to ?? '');
     setCc(initial?.cc ?? '');
-    setBcc('');
-    setShowCcBcc(Boolean(initial?.cc));
+    setBcc(initial?.bcc ?? '');
+    // Un borrador reabierto con solo CCO tiene que enseñarla: con la fila
+    // plegada, la copia oculta seguiría ahí pero invisible hasta enviar.
+    setShowCcBcc(Boolean(initial?.cc || initial?.bcc));
     setSubject(initial?.subject ?? '');
     setBodyHtml(seedHtml(initial, signatureRef.current, Boolean(initialDraftId)));
     destinoDelFoco.current = (initial?.to ?? '').trim() ? 'body' : 'to';
@@ -480,7 +490,12 @@ export function ComposeModal({
       setLocalReady(true);
       return;
     }
-    void readOfflineValue<LocalComposeDraft>(ownerId, LOCAL_DRAFT_NAMESPACE, LOCAL_DRAFT_ID)
+    if (!localDraftStore) {
+      setLocalReady(true);
+      return;
+    }
+    void localDraftStore
+      .read()
       .then((local) => {
         if (!active || local === null) return;
         setFrom(local.from || wantFrom);
@@ -499,13 +514,18 @@ export function ComposeModal({
           title: tRef.current('compose.draftRestoredOffline'),
         });
       })
+      .catch(() => {
+        if (!active) return;
+        setLocalDraftBlocked(true);
+        toastRef.current.notify({ tone: 'danger', title: tRef.current('compose.draftFailed') });
+      })
       .finally(() => active && setLocalReady(true));
     return () => {
       active = false;
     };
     // Sin `t`, `toast` ni los adjuntos: los tres cambian de identidad en cada
     // render y aquí solo se leen. Ver el bloque de refs de arriba.
-  }, [open, initial, initialDraftId, wantFrom, ownerId]);
+  }, [open, initial, initialDraftId, wantFrom, ownerId, localDraftStore]);
 
   /**
    * Lleva el cursor a donde se escribe, en cuanto hay dónde escribir.
@@ -592,40 +612,55 @@ export function ComposeModal({
   }
 
   async function persistLocalDraft(): Promise<void> {
-    await writeOfflineValue(ownerId, LOCAL_DRAFT_NAMESPACE, LOCAL_DRAFT_ID, localDraft());
+    if (!localDraftStore) throw new Error('encrypted_offline_unavailable');
+    await localDraftStore.write(localDraft());
   }
 
   async function removeLocalDraft(): Promise<void> {
-    await deleteOfflineValue(ownerId, LOCAL_DRAFT_NAMESPACE, LOCAL_DRAFT_ID).catch(() => undefined);
+    await localDraftStore?.delete().catch(() => undefined);
   }
 
   // Salvaguarda continua en el dispositivo: protege también un cierre forzado
   // del webview, no solo el botón Guardar o el cierre limpio del modal.
   useEffect(() => {
-    if (!open || !localReady) return;
+    if (!open || !localReady || localDraftBlocked) return;
     const timer = window.setTimeout(() => {
       const content = Boolean(
         to.trim() || cc.trim() || bcc.trim() || subject.trim() || htmlToText(bodyHtml).trim(),
       );
       if (content) {
-        void writeOfflineValue(ownerId, LOCAL_DRAFT_NAMESPACE, LOCAL_DRAFT_ID, {
-          from,
-          to,
-          cc,
-          bcc,
-          subject,
-          bodyHtml,
-          attachments,
-          files,
-        } satisfies LocalComposeDraft).catch(() => undefined);
+        void localDraftStore
+          ?.write({
+            from,
+            to,
+            cc,
+            bcc,
+            subject,
+            bodyHtml,
+            attachments,
+            files,
+          })
+          .catch(() => undefined);
       } else {
-        void deleteOfflineValue(ownerId, LOCAL_DRAFT_NAMESPACE, LOCAL_DRAFT_ID).catch(
-          () => undefined,
-        );
+        void localDraftStore?.delete().catch(() => undefined);
       }
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [open, localReady, ownerId, from, to, cc, bcc, subject, bodyHtml, attachments, files]);
+  }, [
+    open,
+    localReady,
+    localDraftBlocked,
+    ownerId,
+    localDraftStore,
+    from,
+    to,
+    cc,
+    bcc,
+    subject,
+    bodyHtml,
+    attachments,
+    files,
+  ]);
 
   // Adjuntar ficheros del disco: los lee a base64 y los añade a la lista.
   async function handleFilesChosen(list: FileList | null): Promise<void> {
@@ -680,12 +715,9 @@ export function ComposeModal({
   // texto plano sin adjuntos porque nada llamaba a saveDraft con esos campos, no
   // porque el servicio no supiera guardarlos.
   //
-  // ponytail: reabrir un borrador ya guardado (readDraft) sigue leyendo solo el
-  // texto plano — el formato y los ficheros quedan en el MIME del servidor pero no
-  // vuelven al editor. No es una pérdida nueva (antes ni se guardaban); lo es
-  // seguir editando ESE borrador y que el siguiente autoguardado lo reemplace sin
-  // ellos. Arreglarlo pide que readDraft/parseDraftContent extraigan también el
-  // HTML y los adjuntos del .eml, como ya hace la lectura de un correo recibido.
+  // La CCO también se guarda: va en la cabecera `Bcc` del borrador (solo ahí; el
+  // envío nunca la escribe) y vuelve al reabrirlo. Antes se perdía en el primer
+  // autoguardado, y reabrir un borrador la enseñaba vacía — y se enviaba sin ella.
   //
   // `silencioso`: el autoguardado en tiempo real no debe interrumpir con un aviso
   // de fallo en cada tecleo — ya lo intentará el siguiente disparo, y si sigue sin
@@ -697,6 +729,7 @@ export function ComposeModal({
         ...(draftId ? { id: draftId } : {}),
         to: parseAddresses(to),
         ...(cc ? { cc: parseAddresses(cc) } : {}),
+        ...(bcc ? { bcc: parseAddresses(bcc) } : {}),
         subject,
         textBody: composedTextForDraft(),
         htmlBody: composedHtml(),
@@ -708,7 +741,12 @@ export function ComposeModal({
       return 'server';
     } catch (error) {
       if (!navigator.onLine || error instanceof TypeError) {
-        await persistLocalDraft().catch(() => undefined);
+        try {
+          await persistLocalDraft();
+        } catch {
+          if (!silencioso) toast.notify({ tone: 'danger', title: t('compose.draftFailed') });
+          return null;
+        }
         if (!silencioso) toast.notify({ tone: 'info', title: t('compose.draftSavedOffline') });
         return 'device';
       }
@@ -869,12 +907,18 @@ export function ComposeModal({
       const reopen: ComposeDraft = {
         to,
         ...(cc ? { cc } : {}),
+        ...(bcc ? { bcc } : {}),
         subject,
         body: htmlToText(bodyHtml),
+        // Deshacer y volver a enviar sigue siendo contestar a ese correo.
+        ...(initial?.answers ? { answers: initial.answers } : {}),
       };
       await discardOpenDraft();
       await removeLocalDraft();
       const undoId = res.id;
+      if (initial?.answers) {
+        onAnswered?.(initial.answers, undoId, undoId && undoSeconds > 0 ? undoSeconds : 0);
+      }
       onSaved?.();
       onClose();
       if (undoId && undoSeconds > 0) {
@@ -1081,6 +1125,49 @@ export function ComposeModal({
                     </MenuItem>
                   </>
                 )}
+              </Dropdown>
+              {/* Plantillas de respuesta: un menú y no una lista fija, como «Adjuntar».
+                  Sin ninguna, el menú dice dónde se crean en vez de esconder el botón:
+                  quien no sabe que existen no las va a buscar en Ajustes. */}
+              <Dropdown
+                label={t('compose.templates')}
+                align="start"
+                side="top"
+                trigger={({ onClick, ...aria }) => (
+                  <Button
+                    {...aria}
+                    onClick={onClick}
+                    variant="ghost"
+                    iconOnly
+                    aria-label={t('compose.templates')}
+                    title={t('compose.templates')}
+                    disabled={sending || saving}
+                    leadingIcon={<Icon name="copies" />}
+                  />
+                )}
+              >
+                {(close) =>
+                  templates.length === 0 ? (
+                    <MenuItem disabled onClick={close}>
+                      {t('compose.templatesEmpty')}
+                    </MenuItem>
+                  ) : (
+                    <>
+                      {templates.map((p) => (
+                        <MenuItem
+                          key={p.id}
+                          onClick={() => {
+                            close();
+                            // Texto plano: una plantilla nunca mete marcado en el cuerpo.
+                            editorControl.current?.insertarTexto(p.body);
+                          }}
+                        >
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </>
+                  )
+                }
               </Dropdown>
               {/* Programar es de la cola de Sytue: desde una cuenta externa no se ofrece. */}
               {cuentaDe ? null : (
@@ -1318,6 +1405,7 @@ export function ComposeModal({
               onChange={setBodyHtml}
               onInsertarImagen={insertarImagenLocal}
               mostrarBarra={formatoVisible}
+              controlRef={editorControl}
             />
           </div>
           {attachments.length + files.length > 0 ? (

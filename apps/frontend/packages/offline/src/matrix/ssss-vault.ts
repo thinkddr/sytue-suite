@@ -282,3 +282,13 @@ export function decodeAttestedStorageSessions(payload: Uint8Array): AttestedStor
   }
   return normalizeAttestedStorageSessions(obj.sessions as AttestedStorageSession[]);
 }
+
+/** Raw native SSSS account data: mautrix's SSSS key codec base64-encodes
+ * bytes before encryption; MatrixJS secretStorage exposes that same string.
+ * This adds no vault envelope and performs no cryptographic operation. */
+export function encodeSsssRawSecret(bytes: Uint8Array): string {
+  return bytesToBase64(bytes, true);
+}
+export function decodeSsssRawSecret(value: string): Uint8Array<ArrayBuffer> {
+  return base64ToBytes(value, false);
+}

@@ -24,7 +24,7 @@ import (
 // (pool o tx) como primer argumento, de modo que cada operación funciona dentro
 // o fuera de una transacción sin duplicar consultas.
 type Store struct {
-	db *pg.Pool
+	db pg.Database
 	// keyCipher cifra/descifra el material sensible de claves (private_pem) en
 	// reposo (F9). nil ⇒ sin cifrado (solo dev); en prod se exige (ver main).
 	keyCipher *keycrypto.Cipher
@@ -40,13 +40,17 @@ type Store struct {
 // New construye un Store sobre el pool dado, sin cifrado de claves (dev).
 func New(db *pg.Pool) *Store { return &Store{db: db} }
 
+// WithDatabase retains the configured policy/cipher dependencies while binding
+// this operation's SQL to an owned physical session. It never mutates the server store.
+func (s *Store) WithDatabase(db pg.Database) *Store { owned := *s; owned.db = db; return &owned }
+
 // NewWithCipher construye un Store con cifrado en reposo del material de claves.
 func NewWithCipher(db *pg.Pool, c *keycrypto.Cipher) *Store {
 	return &Store{db: db, keyCipher: c}
 }
 
 // DB devuelve el Querier del pool para operaciones fuera de transacción.
-func (s *Store) DB() pg.Querier { return s.db.Pool }
+func (s *Store) DB() pg.Querier { return s.db }
 
 // Healthz delega en el pool (para /readyz).
 func (s *Store) Healthz(ctx context.Context) error { return s.db.Healthz(ctx) }

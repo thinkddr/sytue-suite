@@ -720,13 +720,12 @@ func (r *estadoRenderer) Refresh() {
 // del color del filete. Aquí el relleno es el del carril, opaco, y el velo de `hover`
 // se compone encima.
 //
-// A la derecha lleva el `<kbd class="text-2xs border-sidebar-fg-muted/40 rounded border
-// px-1 font-mono">Ctrl+G</kbd>`, que es `ui.Tecla`. La tecla sigue además en el nombre
-// accesible, como el `title` de la web: el `kbd` es decoración.
+// A la derecha lleva la `<Kbd tone="chrome">Ctrl+G</Kbd>`, que es `ui.TeclaCromo`. La
+// tecla sigue además en el nombre accesible, como el `title` de la web: es decoración.
 //
 // ponytail: la pastilla de la web no tiene relleno y deja ver el botón; `ui.Caja` pinta
 // el filete como rectángulo relleno DEBAJO del de dentro, así que aquí el de dentro es
-// `sidebar-bg`, opaco. En reposo sale exacto; al pasar por encima, el interior de la
+// el del carril, opaco. En reposo sale exacto; al pasar por encima, el interior de la
 // pastilla no recibe el 8 % blanco de `sidebar-hover`. Se arregla cuando `ui.Caja`
 // sepa pintar un filete hueco.
 type BotonIrACanal struct {
@@ -765,10 +764,7 @@ func (b *BotonIrACanal) CreateRenderer() fyne.WidgetRenderer {
 	b.caja = ui.NuevaCaja(ui.FondoCarril(v), filetesIrACanal(v), tema.Forma("radius-control"))
 	b.glifo = iconos.Trazo(iconos.Buscar, GlifoIrACanal, "sidebar-fg-muted", v)
 	b.texto = ui.Texto(b.Rotulo, tema.TextoSM, ui.Normal, tema.Color("sidebar-fg-muted", v))
-	b.tecla = ui.NuevaTecla(ui.AtajoDelSistema("Ctrl+G"), tema.Texto2XS, ui.Normal)
-	b.tecla.Fondo, b.tecla.Tinta = ui.TokenCarril(), "sidebar-fg-muted"
-	b.tecla.Borde, b.tecla.OpacidadBorde = "sidebar-fg-muted", 0.4
-	b.tecla.RellenoX = tema.Espacio(1) // `px-1`; sin `py`, la caja es la de la línea
+	b.tecla = ui.TeclaCromo(ui.AtajoDelSistema("Ctrl+G"))
 	b.objetos = append(b.aro.Objetos(), b.caja.Objetos()...)
 	b.objetos = append(b.objetos, b.glifo.Objeto(), b.texto, b.tecla)
 	r := &irACanalRenderer{b: b}

@@ -158,6 +158,25 @@ test('no intercepta listas ya desplazadas, cintas horizontales, campos ni modale
     } finally {
       dialogo.remove();
     }
+
+    // 4. Ni con el cajón de navegación del teléfono abierto, ni mientras otro control
+    // tiene el dedo (`data-gesto-en-curso`: el asa del mes de Calendar a medio arrastre).
+    // VISTO EN ROJO sin los dos selectores en `hayCapaModalAbierta`.
+    for (const capa of ['sytue-drawer-in', 'data-gesto-en-curso']) {
+      const otro = document.body.appendChild(document.createElement('div'));
+      if (capa.startsWith('data-')) otro.setAttribute(capa, '');
+      else otro.className = `sytue-nav-drawer ${capa}`;
+      try {
+        expect(arrastrarAbajo(fila).defaultPrevented).toBe(false);
+        expect(recargas).toBe(0);
+      } finally {
+        otro.remove();
+      }
+    }
+    // Sin ellos, el mismo gesto sí refresca: la prueba no pasa por otra causa.
+    arrastrarAbajo(fila);
+    await turno();
+    expect(recargas).toBe(1);
   } finally {
     render(null, host);
     host.remove();

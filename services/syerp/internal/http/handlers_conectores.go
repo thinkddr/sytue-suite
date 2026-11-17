@@ -92,6 +92,41 @@ type resultadoObjeto struct {
 	Fallos       []string `json:"fallos,omitempty"`
 }
 
+// importador es lo que distingue a un proveedor de importación: qué objetos
+// trae y cómo se le pide cada uno a su driver de la pasarela. Importar y probar
+// la conexión salen de esta misma tabla, así que no pueden pedir cosas distintas.
+type importador struct {
+	mapeos []conectores.Mapeo
+	spec   func(conectores.Mapeo, int) map[string]any
+}
+
+var importadores = map[string]importador{
+	// Salesforce: cuentas, contactos y oportunidades.
+	"salesforce": {conectores.MapeosSalesforce, func(m conectores.Mapeo, limite int) map[string]any {
+		return map[string]any{"object": m.Objeto, "fields": m.Columnas(), "limit": limite}
+	}},
+	// Odoo: contactos, productos, facturas emitidas y oportunidades (JSON-RPC).
+	"odoo": {conectores.MapeosOdoo, func(m conectores.Mapeo, limite int) map[string]any {
+		spec := map[string]any{"model": m.Objeto, "fields": m.Columnas(), "limit": limite}
+		if m.Filtro != nil {
+			spec["domain"] = m.Filtro
+		}
+		return spec
+	}},
+	// Business Central: clientes, proveedores, artículos y facturas (OData).
+	"business-central": {conectores.MapeosBusinessCentral, func(m conectores.Mapeo, limite int) map[string]any {
+		spec := map[string]any{"entity_set": m.Objeto, "select": m.Columnas(), "max_rows": limite}
+		if filtro, ok := m.Filtro.(string); ok && filtro != "" {
+			spec["filter"] = filtro
+		}
+		return spec
+	}},
+	// Holded: contactos, productos y facturas emitidas y recibidas.
+	"holded": {conectores.MapeosHolded, func(m conectores.Mapeo, limite int) map[string]any {
+		return map[string]any{"resource": m.Objeto, "fields": m.Columnas(), "limit": limite}
+	}},
+}
+
 // ImportarSalesforce trae cuentas, contactos y oportunidades de Salesforce.
 //
 // Sale por el Integration Gateway reenviando la autorización de quien importa:
@@ -101,46 +136,71 @@ type resultadoObjeto struct {
 // Es idempotente: cada fila se identifica por su id de origen (`externo_id`),
 // así que importar dos veces actualiza en vez de duplicar.
 func (h *Handlers) ImportarSalesforce(w http.ResponseWriter, r *http.Request) {
-	h.importarDesde(w, r, "salesforce", conectores.MapeosSalesforce, func(m conectores.Mapeo, limite int) map[string]any {
-		return map[string]any{"object": m.Objeto, "fields": m.Columnas(), "limit": limite}
-	})
+	h.importarDesde(w, r, "salesforce")
 }
 
-// ImportarOdoo trae contactos, productos, facturas emitidas y oportunidades de
-// Odoo. Mismo camino que Salesforce: el driver JSON-RPC vive en la pasarela.
+// ImportarOdoo: mismo camino que Salesforce; el driver JSON-RPC vive en la pasarela.
 func (h *Handlers) ImportarOdoo(w http.ResponseWriter, r *http.Request) {
-	h.importarDesde(w, r, "odoo", conectores.MapeosOdoo, func(m conectores.Mapeo, limite int) map[string]any {
-		spec := map[string]any{"model": m.Objeto, "fields": m.Columnas(), "limit": limite}
-		if m.Filtro != nil {
-			spec["domain"] = m.Filtro
-		}
-		return spec
-	})
+	h.importarDesde(w, r, "odoo")
 }
 
-// ImportarBusinessCentral trae clientes, proveedores, artículos y facturas de
-// Microsoft Dynamics 365 Business Central por el driver OData de la pasarela.
+// ImportarBusinessCentral trae de Microsoft Dynamics 365 Business Central.
 func (h *Handlers) ImportarBusinessCentral(w http.ResponseWriter, r *http.Request) {
-	h.importarDesde(w, r, "business-central", conectores.MapeosBusinessCentral, func(m conectores.Mapeo, limite int) map[string]any {
-		spec := map[string]any{"entity_set": m.Objeto, "select": m.Columnas(), "max_rows": limite}
-		if filtro, ok := m.Filtro.(string); ok && filtro != "" {
-			spec["filter"] = filtro
-		}
-		return spec
-	})
+	h.importarDesde(w, r, "business-central")
 }
 
-// ImportarHolded trae contactos, productos y facturas emitidas y recibidas de
-// Holded por su driver de la pasarela.
+// ImportarHolded trae de Holded por su driver de la pasarela.
 func (h *Handlers) ImportarHolded(w http.ResponseWriter, r *http.Request) {
-	h.importarDesde(w, r, "holded", conectores.MapeosHolded, func(m conectores.Mapeo, limite int) map[string]any {
-		return map[string]any{"resource": m.Objeto, "fields": m.Columnas(), "limit": limite}
-	})
+	h.importarDesde(w, r, "holded")
 }
 
-func (h *Handlers) importarDesde(w http.ResponseWriter, r *http.Request, proveedor string,
-	mapeos []conectores.Mapeo, spec func(conectores.Mapeo, int) map[string]any,
-) {
+type cuerpoProbar struct {
+	// Instancia a probar ANTES de guardarla. Vacía = la de la conexión guardada.
+	Instancia string `json:"instancia"`
+}
+
+// ProbarConexion pide UNA fila del primer objeto del proveedor sin escribir nada.
+//
+// El asistente de importación la usa para decir «conecta» antes de traer miles de
+// filas: una instancia mal copiada o un permiso que falta en la pasarela salen
+// aquí, con su motivo, y no a mitad de una importación.
+func (h *Handlers) ProbarConexion(w http.ResponseWriter, r *http.Request) {
+	proveedor := chi.URLParam(r, "proveedor")
+	imp, ok := importadores[proveedor]
+	if !ok || h.pasarela == nil {
+		httpx.Fail(w, r, errConectorDesconocido)
+		return
+	}
+	var cuerpo cuerpoProbar
+	if err := httpx.DecodeJSON(w, r, &cuerpo); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	instancia := cuerpo.Instancia
+	if instancia == "" {
+		cx, err := h.store.Conexion(r.Context(), proveedor, h.cifra)
+		if err != nil {
+			httpx.Fail(w, r, errorDeLectura(err))
+			return
+		}
+		instancia = cx.Instancia
+	}
+	if instancia == "" {
+		httpx.Fail(w, r, httpx.ErrUnprocessable.WithMessage(
+			proveedor+" is not connected: set the gateway instance first."))
+		return
+	}
+	mapeo := imp.mapeos[0]
+	tabla, err := h.pasarela.Consultar(r.Context(), instancia, r.Header.Get("Authorization"), imp.spec(mapeo, 1))
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrUnprocessable.Wrap(err).WithMessage(err.Error()))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"ok": true, "objeto": mapeo.Clave(), "filas": len(tabla.Rows)})
+}
+
+func (h *Handlers) importarDesde(w http.ResponseWriter, r *http.Request, proveedor string) {
+	mapeos, spec := importadores[proveedor].mapeos, importadores[proveedor].spec
 	if h.pasarela == nil {
 		httpx.Fail(w, r, errConectorDesconocido)
 		return

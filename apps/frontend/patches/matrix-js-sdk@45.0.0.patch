@@ -1,0 +1,391 @@
+diff --git a/lib/crypto-api/index.d.ts b/lib/crypto-api/index.d.ts
+--- a/lib/crypto-api/index.d.ts
++++ b/lib/crypto-api/index.d.ts
+@@ -75,6 +75,17 @@
+      * @returns The public device keys.
+      */
+     getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
++    /** Sign public JSON with the maintained own account; no private key leaves the SDK. */
++    signJsonObject(object: Record<string, unknown>): Promise<Record<string, unknown>>;
++    /** Require a trusted, acknowledged backup before publishing encrypted room events. */
++    setRequireKeyBackupBeforeSending(required: boolean): void;
++    /** Run an authenticated client guard after encryption and backup, before publication. */
++    setEncryptedEventPublicationGuard(guard: ((event: MatrixEvent) => Promise<void>) | undefined): void;
++    /** Verify the original backup version, room authority/session and owner guard for a cached event. */
++    revalidateEncryptedEventPublication(event: MatrixEvent): Promise<void>;
++    /** Flush pending room keys through the maintained backup engine. */
++    flushKeyBackup(): Promise<string>;
++
+     /**
+      * Check if we believe the given room to be encrypted.
+      *
+diff --git a/lib/rust-crypto/RoomEncryptor.d.ts b/lib/rust-crypto/RoomEncryptor.d.ts
+--- a/lib/rust-crypto/RoomEncryptor.d.ts
++++ b/lib/rust-crypto/RoomEncryptor.d.ts
+@@ -27,6 +27,11 @@
+      * An encryption operation is either a {@link prepareForEncryption} or an {@link encryptEvent} call.
+      */
+     private currentEncryptionPromise;
++    private publicationGeneration;
++    private publicationWitnesses;
++    private verifyPublication;
++    revalidatePublication(event: MatrixEvent, beforePublish: () => Promise<void>): Promise<void>;
++    invalidatePublication(): void;
+     /**
+      * @param prefixedLogger - A logger to use for log messages.
+      * @param olmMachine - The rust-sdk's OlmMachine
+@@ -71,7 +76,7 @@
+      * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+      * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
+      */
+-    encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean, deviceIsolationMode: DeviceIsolationMode): Promise<void>;
++    encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean, deviceIsolationMode: DeviceIsolationMode, beforePublish?: () => Promise<void>): Promise<void>;
+     /**
+      * Prepare to encrypt events in this room.
+      *
+diff --git a/lib/rust-crypto/RoomEncryptor.js b/lib/rust-crypto/RoomEncryptor.js
+--- a/lib/rust-crypto/RoomEncryptor.js
++++ b/lib/rust-crypto/RoomEncryptor.js
+@@ -47,6 +47,7 @@
+      * An encryption operation is either a {@link prepareForEncryption} or an {@link encryptEvent} call.
+      */
+     _defineProperty(this, "currentEncryptionPromise", Promise.resolve());
++    _defineProperty(this, "publicationGeneration", 0);
+     this.prefixedLogger = prefixedLogger;
+     this.olmMachine = olmMachine;
+     this.keyClaimManager = keyClaimManager;
+@@ -69,6 +70,7 @@
+    * @param config - The content of the encryption event
+    */
+   onCryptoEvent(config) {
++    this.invalidatePublication();
+     if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
+       // This should currently be unreachable, since the Rust SDK will reject any attempts to change config.
+       throw new Error("Cannot reconfigure an active RoomEncryptor");
+@@ -81,6 +83,7 @@
+    * @param member - new membership state
+    */
+   onRoomMembership(member) {
++    this.invalidatePublication();
+     if (member.membership == KnownMembership.Join || member.membership == KnownMembership.Invite && this.room.shouldEncryptForInvitedMembers()) {
+       // make sure we are tracking the deviceList for this user
+       this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch(e => {
+@@ -124,7 +127,11 @@
+    * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+    * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
+    */
+-  encryptEvent(event, globalBlacklistUnverifiedDevices, deviceIsolationMode) {
++  invalidatePublication() {
++    this.publicationGeneration++;
++  }
++
++  encryptEvent(event, globalBlacklistUnverifiedDevices, deviceIsolationMode, beforePublish) {
+     const logger = new LogSpan(this.prefixedLogger, event ? event.getTxnId() ?? "" : "prepareForEncryption");
+     // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
+     // events order after they have been encrypted.
+@@ -136,9 +143,16 @@
+         await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices, deviceIsolationMode);
+       });
+       if (event) {
++        const generation = this.publicationGeneration;
+         await logDuration(logger, "encryptEventInner", async () => {
+           await this.encryptEventInner(logger, event);
+         });
++        if (beforePublish) {
++          const sessionId = event.getWireContent().session_id;
++          await beforePublish();
++          await this.verifyPublication(event, generation, sessionId);
++          (this.publicationWitnesses ??= new WeakMap()).set(event, { generation, sessionId });
++        }
+       }
+     });
+     this.currentEncryptionPromise = prom;
+@@ -157,6 +171,28 @@
+    * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+    * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
+    */
++  async verifyPublication(event, generation, sessionId) {
++    if (generation !== this.publicationGeneration || this.room.getMyMembership() !== KnownMembership.Join ||
++        !sessionId || event.getWireContent().session_id !== sessionId) {
++      throw new Error("Room authority changed during publication");
++    }
++    const probe = JSON.parse(await this.olmMachine.encryptRoomEvent(new RoomId(this.room.roomId), EventType.RoomMessage, "{}"));
++    if (generation !== this.publicationGeneration || this.room.getMyMembership() !== KnownMembership.Join ||
++        probe.session_id !== sessionId || event.getWireContent().session_id !== sessionId) {
++      throw new Error("Encryption session changed during publication");
++    }
++  }
++  async revalidatePublication(event, beforePublish) {
++    const witness = this.publicationWitnesses?.get(event);
++    if (!witness || witness.generation !== this.publicationGeneration ||
++        witness.sessionId !== event.getWireContent().session_id ||
++        this.room.getMyMembership() !== KnownMembership.Join) {
++      throw new Error("An authenticated original publication witness is required");
++    }
++    await beforePublish();
++    await this.verifyPublication(event, witness.generation, witness.sessionId);
++  }
++
+   async ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices, deviceIsolationMode) {
+     if (this.encryptionSettings.algorithm !== "m.megolm.v1.aes-sha2") {
+       throw new Error(`Cannot encrypt in ${this.room.roomId} for unsupported algorithm '${this.encryptionSettings.algorithm}'`);
+@@ -249,6 +285,7 @@
+    * Discard any existing group session for this room
+    */
+   async forceDiscardSession() {
++    this.invalidatePublication();
+     const r = await this.olmMachine.invalidateGroupSession(new RoomId(this.room.roomId));
+     if (r) {
+       this.prefixedLogger.info("Discarded existing group session");
+diff --git a/lib/rust-crypto/backup.d.ts b/lib/rust-crypto/backup.d.ts
+--- a/lib/rust-crypto/backup.d.ts
++++ b/lib/rust-crypto/backup.d.ts
+@@ -149,6 +149,9 @@
+      */
+     maybeUploadKey(): Promise<void>;
+     private disableKeyBackup;
++    private backupUploadPromise;
++    private uploadBackupBatch;
++    flushKeyBackup(): Promise<string>;
+     private backupKeysLoop;
+     /**
+      * Utility method to count the number of keys in a backup request, in order to update the remaining keys count.
+diff --git a/lib/rust-crypto/backup.js b/lib/rust-crypto/backup.js
+--- a/lib/rust-crypto/backup.js
++++ b/lib/rust-crypto/backup.js
+@@ -49,6 +49,8 @@
+     _defineProperty(this, "stopped", false);
+     /** whether {@link backupKeysLoop} is currently running */
+     _defineProperty(this, "backupKeysLoopRunning", false);
++    // Background and publication uploads share one acknowledged SDK queue.
++    _defineProperty(this, "backupUploadPromise", Promise.resolve());
+     /** The logger to use */
+     _defineProperty(this, "logger", void 0);
+     _defineProperty(this, "keyBackupCheckInProgress", null);
+@@ -350,6 +352,41 @@
+     this.activeBackupVersion = null;
+     this.emit(CryptoEvent.KeyBackupStatus, false);
+   }
++  async uploadBackupBatch() {
++    const pending = this.backupUploadPromise.catch(() => {}).then(async () => {
++      const version = await this.getActiveBackupVersion();
++      if (this.stopped || !version) throw new Error("Key backup is unavailable");
++      const request = await this.olmMachine.backupRoomKeys();
++      if (this.stopped || version !== await this.getActiveBackupVersion()) {
++        throw new Error("Key backup changed during publication");
++      }
++      if (request) await this.outgoingRequestProcessor.makeOutgoingRequest(request);
++      if (this.stopped || version !== await this.getActiveBackupVersion()) {
++        throw new Error("Key backup changed during publication");
++      }
++      return request;
++    });
++    this.backupUploadPromise = pending.then(() => {}, () => {});
++    return pending;
++  }
++
++  // Resolve only after the maintained SDK acknowledges all pending keys.
++  // No full-store roomKeyCounts scan is needed on the message sending path.
++  async flushKeyBackup() {
++    const checked = await this.checkKeyBackupAndEnable(true);
++    const version = await this.getActiveBackupVersion();
++    if (this.stopped || !checked?.trustInfo.trusted || !version) {
++      throw new Error("A trusted key backup is required before publication");
++    }
++    while (true) {
++      const request = await this.uploadBackupBatch();
++      if (this.stopped || version !== await this.getActiveBackupVersion()) {
++        throw new Error("Key backup changed during publication");
++      }
++      if (!request) return version;
++    }
++  }
++
+   async backupKeysLoop() {
+     const logger = this.logger.getChild("[backupKeysLoop]");
+     if (this.backupKeysLoopRunning) {
+@@ -375,7 +412,7 @@
+         // Get a batch of room keys to upload
+         let request;
+         try {
+-          request = await this.olmMachine.backupRoomKeys();
++          request = await this.uploadBackupBatch();
+           if (request) {
+             logger.debug("Got keys to back up from crypto-sdk");
+           } else {
+@@ -383,20 +420,7 @@
+             this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
+             return;
+           }
+-        } catch (err) {
+-          logger.error("Failed to get keys to backup from rust crypto-sdk: ending backup loop", err);
+-          return;
+-        }
+-        if (this.stopped) {
+-          logger.debug(`Client stopping: ending loop for version ${this.activeBackupVersion}.`);
+-          return;
+-        }
+-        if (!this.activeBackupVersion) {
+-          logger.debug(`Backup no longer active: ending loop.`);
+-          return;
+-        }
+-        try {
+-          await this.outgoingRequestProcessor.makeOutgoingRequest(request);
++          // uploadBackupBatch already sent and acknowledged this request.
+           numFailures = 0;
+           if (this.stopped) break;
+ 
+diff --git a/lib/rust-crypto/rust-crypto.d.ts b/lib/rust-crypto/rust-crypto.d.ts
+--- a/lib/rust-crypto/rust-crypto.d.ts
++++ b/lib/rust-crypto/rust-crypto.d.ts
+@@ -389,6 +389,16 @@
+      *
+      * @param obj - The object to sign
+      */
++    /** Sign public JSON with the maintained own account; no private key leaves the SDK. */
++    signJsonObject(object: Record<string, unknown>): Promise<Record<string, unknown>>;
++    /** Require a trusted, acknowledged backup before publishing encrypted room events. */
++    setRequireKeyBackupBeforeSending(required: boolean): void;
++    /** Run an authenticated client guard after encryption and backup, before publication. */
++    setEncryptedEventPublicationGuard(guard: ((event: MatrixEvent) => Promise<void>) | undefined): void;
++    /** Verify the original backup version, room authority/session and owner guard for a cached event. */
++    revalidateEncryptedEventPublication(event: MatrixEvent): Promise<void>;
++    /** Flush pending room keys through the maintained backup engine. */
++    flushKeyBackup(): Promise<string>;
+     private signObject;
+     /**
+      * Implementation of {@link CryptoApi#restoreKeyBackupWithPassphrase}.
+diff --git a/lib/rust-crypto/rust-crypto.js b/lib/rust-crypto/rust-crypto.js
+--- a/lib/rust-crypto/rust-crypto.js
++++ b/lib/rust-crypto/rust-crypto.js
+@@ -168,13 +168,51 @@
+     // can then be deleted.
+     this.olmMachine.close();
+   }
++  setRequireKeyBackupBeforeSending(required) {
++    this.requireKeyBackupBeforeSending = required;
++  }
++  setEncryptedEventPublicationGuard(guard) {
++    this.encryptedEventPublicationGuard = guard;
++  }
++  async flushKeyBackup() {
++    this.getOlmMachineOrThrow();
++    const version = await this.backupManager.flushKeyBackup();
++    this.getOlmMachineOrThrow();
++    return version;
++  }
+   async encryptEvent(event, _room) {
+     const roomId = event.getRoomId();
+     const encryptor = this.roomEncryptors[roomId];
+     if (!encryptor) {
+       throw new Error(`Cannot encrypt event in unconfigured room ${roomId}`);
+     }
+-    await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
++    await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode,
++      this.requireKeyBackupBeforeSending || this.encryptedEventPublicationGuard ? async () => {
++        const version = this.requireKeyBackupBeforeSending ? await this.flushKeyBackup() : null;
++        await this.encryptedEventPublicationGuard?.(event);
++        if (version !== null && version !== await this.getActiveSessionBackupVersion()) {
++          throw new Error("Key backup changed during publication guard");
++        }
++        if (version !== null) (this.encryptedPublicationBackups ??= new WeakMap()).set(event, version);
++      } : undefined);
++  }
++  async revalidateEncryptedEventPublication(event) {
++    if (!this.requireKeyBackupBeforeSending && !this.encryptedEventPublicationGuard) return;
++    this.getOlmMachineOrThrow();
++    const encryptor = this.roomEncryptors[event.getRoomId()];
++    if (!encryptor) throw new Error("Original encrypted room is unavailable");
++    await encryptor.revalidatePublication(event, async () => {
++      const expected = this.encryptedPublicationBackups?.get(event);
++      const version = this.requireKeyBackupBeforeSending ? await this.flushKeyBackup() : null;
++      if (this.requireKeyBackupBeforeSending && (!expected || version !== expected)) {
++        throw new Error("Original trusted backup changed before HTTP publication");
++      }
++      await this.encryptedEventPublicationGuard?.(event);
++      if (version !== null && version !== await this.getActiveSessionBackupVersion()) {
++        throw new Error("Key backup changed during HTTP publication guard");
++      }
++    });
++    this.getOlmMachineOrThrow();
+   }
+   async decryptEvent(event) {
+     const roomId = event.getRoomId();
+@@ -1132,6 +1170,12 @@
+    *
+    * @param obj - The object to sign
+    */
++  async signJsonObject(object) {
++    const value = JSON.parse(JSON.stringify(object));
++    await this.signObject(value);
++    return value;
++  }
++
+   async signObject(obj) {
+     const sigs = new Map(Object.entries(obj.signatures || {}));
+     const unsigned = obj.unsigned;
+@@ -1681,6 +1725,7 @@
+    * @param userIds - an array of user IDs of users whose devices have updated.
+    */
+   async onDevicesUpdated(userIds) {
++    for (const encryptor of Object.values(this.roomEncryptors)) encryptor.invalidatePublication();
+     this.emit(CryptoEvent.WillUpdateDevices, userIds, false);
+     this.emit(CryptoEvent.DevicesUpdated, userIds, false);
+   }
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -2018,7 +2018,10 @@
+       event.setStatus(newStatus);
+     }
+   }
+-  sendEventHttpRequest(event, delayMsOrQueryDict, queryDict) {
++  setEventHttpGuard(guard) {
++    this.eventHttpGuard = guard;
++  }
++  async sendEventHttpRequest(event, delayMsOrQueryDict, queryDict) {
+     let txnId = event.getTxnId();
+     if (!txnId) {
+       txnId = this.makeTxnId();
+@@ -2047,17 +2050,19 @@
+     } else {
+       path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
+     }
++    const abortSignal = await this.eventHttpGuard?.(event);
++    abortSignal?.throwIfAborted();
+     const content = event.getWireContent();
+     if (typeof delayMsOrQueryDict === "number") {
+-      return this.http.authedRequest(Method.Put, path, _objectSpread({
+-        [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMsOrQueryDict
+-      }, queryDict), content);
+-    } else {
+-      return this.http.authedRequest(Method.Put, path, delayMsOrQueryDict, content).then(res => {
+-        this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+-        return res;
+-      });
+-    }
++      return this.http.authedRequest(Method.Put, path, {
++        [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMsOrQueryDict,
++        ...queryDict
++      }, content, { abortSignal });
++    }
++    return this.http.authedRequest(Method.Put, path, delayMsOrQueryDict, content, { abortSignal }).then(res => {
++      this.logger.debug("Event sent to " + event.getRoomId() + " with event id " + res.event_id);
++      return res;
++    });
+   }
+ 
+   /**
+diff --git a/lib/client.d.ts b/lib/client.d.ts
+--- a/lib/client.d.ts
++++ b/lib/client.d.ts
+@@ -1518,6 +1518,9 @@
+      */
+     private getEncryptedIfNeededEventType;
+     protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus): void;
++    private eventHttpGuard;
++    /** Recheck a scoped event and return its cancellation signal before every HTTP send/retry. */
++    setEventHttpGuard(guard: ((event: MatrixEvent) => Promise<AbortSignal | undefined>) | undefined): void;
+     private sendEventHttpRequest;
+     /**
+      * @param txnId -  transaction id. One will be made up if not supplied.

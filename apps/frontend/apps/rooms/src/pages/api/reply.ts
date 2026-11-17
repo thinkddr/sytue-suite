@@ -1,7 +1,8 @@
 /**
  * POST /api/reply — publica una respuesta en el hilo de un mensaje raíz (proxy
  * BFF hacia el servicio Go Sytue Chat). Cuerpo: { messageId, body, mentions?,
- * fileIds? }. Una respuesta puede llevar solo adjuntos (cuerpo vacío). El resto
+ * fileIds?, alsoToChannel? }; con `alsoToChannel` la respuesta se ve también en el
+ * feed del canal. Una respuesta puede llevar solo adjuntos (cuerpo vacío). El resto
  * de clientes recibe la respuesta por WebSocket.
  */
 import type { APIRoute } from 'astro';
@@ -22,6 +23,7 @@ export const POST: APIRoute = async (ctx) => {
     body?: string;
     mentions?: string[];
     fileIds?: unknown;
+    alsoToChannel?: unknown;
   };
   try {
     payload = (await ctx.request.json()) as typeof payload;
@@ -51,6 +53,7 @@ export const POST: APIRoute = async (ctx) => {
       ...(matrixEvent ? { matrix_event: matrixEvent } : {}),
       ...(mentions?.length ? { mentions } : {}),
       ...(fileIds.length ? { fileIds } : {}),
+      ...(payload.alsoToChannel === true ? { alsoToChannel: true } : {}),
     });
     return json({ message });
   } catch {

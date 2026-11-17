@@ -107,6 +107,9 @@ func construirConsulta(campos []domain.Campo, cfg domain.ConfigVista) consulta {
 			}
 		}
 	}
+	if b := strings.TrimSpace(cfg.Search); b != "" {
+		where = append(where, condicionBusqueda(campos, porID, b, add))
+	}
 	if len(where) > 0 {
 		q.where = " AND " + strings.Join(where, " AND ")
 	}
@@ -138,6 +141,26 @@ func construirConsulta(campos []domain.Campo, cfg domain.ConfigVista) consulta {
 	orden = append(orden, "r.created_at", "r.id")
 	q.order = strings.Join(orden, ", ")
 	return q
+}
+
+// condicionBusqueda: el registro contiene el texto (sin distinguir mayúsculas) en alguno
+// de sus campos con valor escrito. Los enlaces y adjuntos no cuentan (guardan ids, no lo
+// que se ve) y una casilla no tiene texto que buscar. Sin campos buscables, nada casa:
+// buscar algo nunca devuelve «todo».
+func condicionBusqueda(campos []domain.Campo, porID map[string]domain.Campo, texto string, add func(any) string) string {
+	o := make([]string, 0, len(campos))
+	for _, c0 := range campos {
+		c := porID[c0.ID]
+		switch c.Kind { //nolint:exhaustive // el resto lleva un valor con texto
+		case domain.TipoRelacion, domain.TipoAdjunto, domain.TipoCasilla:
+			continue
+		}
+		o = append(o, "position(lower("+add(texto)+") in lower(coalesce(r.data ->> "+add(c.ID)+", ''))) > 0")
+	}
+	if len(o) == 0 {
+		return "false"
+	}
+	return "(" + strings.Join(o, " OR ") + ")"
 }
 
 // valorFiltro pasa el valor de un filtro a texto para el parámetro.

@@ -51,9 +51,12 @@ it('el aviso lleva «Deshacer», que devuelve todo el lote y lo dice', async () 
 
 it('si no vuelve, lo dice con el motivo', async () => {
   globalThis.fetch = (async (_input: RequestInfo | URL) =>
-    new Response(JSON.stringify({ error: { message: 'Sin permiso' } }), {
-      status: 403,
-    })) as typeof fetch;
+    new Response(
+      JSON.stringify({
+        error: { code: 'sin_permiso', message: 'You do not have access to this module.' },
+      }),
+      { status: 403 },
+    )) as typeof fetch;
   const { toast, avisos } = toastFalso();
   let repintado = 0;
   avisarPapelera(toast, t, 'cliente', ['a'], () => repintado++);
@@ -62,7 +65,8 @@ it('si no vuelve, lo dice con el motivo', async () => {
   expect(avisos[1]).toMatchObject({
     tone: 'danger',
     title: 'No se pudo deshacer',
-    description: 'Sin permiso',
+    // El motivo, traducido por su código: el respaldo inglés del servicio no se enseña.
+    description: 'Pídeselo a una persona administradora de tu organización.',
   });
 });
 
@@ -104,9 +108,12 @@ it('el lote que sale bien recarga la lista; el que falla, no', async () => {
   }
 
   globalThis.fetch = (async (_input: RequestInfo | URL) =>
-    new Response(JSON.stringify({ error: { message: 'Sin permiso' } }), {
-      status: 403,
-    })) as typeof fetch;
+    new Response(
+      JSON.stringify({
+        error: { code: 'sin_permiso', message: 'You do not have access to this module.' },
+      }),
+      { status: 403 },
+    )) as typeof fetch;
   recargas = 0;
   const fallo = await aplicarLote(toast, t, 'cliente', 'restaurar', ['a'], () => recargas++).then(
     () => null,

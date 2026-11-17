@@ -77,6 +77,21 @@ func (c *Lienzo) MoverHoja(de, a int) {
 	c.avisar()
 }
 
+// PonerColorPestana es `setTabColor`: el color de la pestaña de la hoja i ("" lo quita).
+// Es estructura del libro: con el libro protegido Excel también lo apaga.
+func (c *Lienzo) PonerColorPestana(i int, color string) {
+	if c.Rejilla.SoloLectura || !c.estructura() {
+		return
+	}
+	antes := c.Libro.ColorPestana(i)
+	c.Libro.PonerColorPestana(i, color)
+	if c.Libro.ColorPestana(i) == antes {
+		return
+	}
+	c.Pestanas.Refresh()
+	c.avisar()
+}
+
 // PedirBorrarHoja es `deleteSheet`: una confirmación de peligro con el nombre de la
 // hoja, porque su contenido se pierde.
 func (c *Lienzo) PedirBorrarHoja() {

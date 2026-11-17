@@ -1,0 +1,178 @@
+{
+  "elementos": [
+    {
+      "name": "informe 10.pdf",
+      "isDirectory": false,
+      "size": 300,
+      "modifiedAt": "2026-01-03T10:00:00Z"
+    },
+    {
+      "name": "Zeta",
+      "isDirectory": true,
+      "size": 0,
+      "modifiedAt": "2026-01-01T10:00:00Z"
+    },
+    {
+      "name": "informe 2.pdf",
+      "isDirectory": false,
+      "size": 100,
+      "modifiedAt": "2026-01-05T10:00:00Z"
+    },
+    {
+      "name": "alfa",
+      "isDirectory": true,
+      "size": 0,
+      "modifiedAt": "2026-01-09T10:00:00Z"
+    },
+    {
+      "name": "árbol.txt",
+      "isDirectory": false,
+      "size": 100,
+      "modifiedAt": "2026-01-05T10:00:00Z"
+    },
+    {
+      "name": "öl.csv",
+      "isDirectory": false,
+      "size": 50,
+      "modifiedAt": "2026-01-02T10:00:00Z"
+    },
+    {
+      "name": "zorro.md",
+      "isDirectory": false,
+      "size": 2048,
+      "modifiedAt": "2026-01-07T10:00:00Z"
+    }
+  ],
+  "casos": [
+    {
+      "nota": "por nombre: carpetas delante, orden natural y sin distinguir tildes ni mayúsculas",
+      "orden": { "campo": "name", "sentido": "asc" },
+      "locale": "es",
+      "esperado": [
+        "alfa",
+        "Zeta",
+        "árbol.txt",
+        "informe 2.pdf",
+        "informe 10.pdf",
+        "öl.csv",
+        "zorro.md"
+      ]
+    },
+    {
+      "nota": "en sueco la «ö» va detrás de la «z»",
+      "orden": { "campo": "name", "sentido": "asc" },
+      "locale": "sv",
+      "esperado": [
+        "alfa",
+        "Zeta",
+        "árbol.txt",
+        "informe 2.pdf",
+        "informe 10.pdf",
+        "zorro.md",
+        "öl.csv"
+      ]
+    },
+    {
+      "nota": "nombre descendente: las carpetas siguen delante",
+      "orden": { "campo": "name", "sentido": "desc" },
+      "locale": "es",
+      "esperado": [
+        "Zeta",
+        "alfa",
+        "zorro.md",
+        "öl.csv",
+        "informe 10.pdf",
+        "informe 2.pdf",
+        "árbol.txt"
+      ]
+    },
+    {
+      "nota": "lo más reciente primero; a igualdad de fecha decide el nombre",
+      "orden": { "campo": "modified", "sentido": "desc" },
+      "locale": "es",
+      "esperado": [
+        "alfa",
+        "Zeta",
+        "zorro.md",
+        "árbol.txt",
+        "informe 2.pdf",
+        "informe 10.pdf",
+        "öl.csv"
+      ]
+    },
+    {
+      "nota": "lo más antiguo primero; el desempate por nombre no se invierte",
+      "orden": { "campo": "modified", "sentido": "asc" },
+      "locale": "es",
+      "esperado": [
+        "Zeta",
+        "alfa",
+        "öl.csv",
+        "informe 10.pdf",
+        "árbol.txt",
+        "informe 2.pdf",
+        "zorro.md"
+      ]
+    },
+    {
+      "nota": "lo más grande primero",
+      "orden": { "campo": "size", "sentido": "desc" },
+      "locale": "es",
+      "esperado": [
+        "alfa",
+        "Zeta",
+        "zorro.md",
+        "informe 10.pdf",
+        "árbol.txt",
+        "informe 2.pdf",
+        "öl.csv"
+      ]
+    },
+    {
+      "nota": "lo más pequeño primero",
+      "orden": { "campo": "size", "sentido": "asc" },
+      "locale": "es",
+      "esperado": [
+        "alfa",
+        "Zeta",
+        "öl.csv",
+        "árbol.txt",
+        "informe 2.pdf",
+        "informe 10.pdf",
+        "zorro.md"
+      ]
+    }
+  ],
+  "siguiente": [
+    {
+      "actual": { "campo": "name", "sentido": "asc" },
+      "campo": "name",
+      "esperado": { "campo": "name", "sentido": "desc" }
+    },
+    {
+      "actual": { "campo": "name", "sentido": "desc" },
+      "campo": "name",
+      "esperado": { "campo": "name", "sentido": "asc" }
+    },
+    {
+      "actual": { "campo": "name", "sentido": "asc" },
+      "campo": "modified",
+      "esperado": { "campo": "modified", "sentido": "desc" }
+    },
+    {
+      "actual": { "campo": "modified", "sentido": "desc" },
+      "campo": "modified",
+      "esperado": { "campo": "modified", "sentido": "asc" }
+    },
+    {
+      "actual": { "campo": "modified", "sentido": "asc" },
+      "campo": "size",
+      "esperado": { "campo": "size", "sentido": "desc" }
+    },
+    {
+      "actual": { "campo": "size", "sentido": "desc" },
+      "campo": "name",
+      "esperado": { "campo": "name", "sentido": "asc" }
+    }
+  ]
+}

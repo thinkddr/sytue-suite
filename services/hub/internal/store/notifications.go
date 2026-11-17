@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/hub/internal/domain"
@@ -153,102 +154,147 @@ func (s *Store) ListNotifications(ctx context.Context, subjects []string, onlyUn
 		antesEn, antesID = &before.En, before.ID
 	}
 	var out []domain.Notification
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
 		d, err := conDestinatarios(ctx, tx, subjects)
 		if err != nil {
 			return err
 		}
-		rows, err := tx.Query(ctx,
-			`SELECT `+notificationCols+` FROM notifications
+		out, err = listarNotificacionesTx(ctx, tx, d, onlyUnread, antesEn, limit, antesID)
+		return err
+	})
+	return out, err
+}
+
+func listarNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios, onlyUnread bool, antesEn *time.Time, limit int, antesID uuid.UUID) ([]domain.Notification, error) {
+	// Recheck the tombstone in the same statement snapshot as the row. The
+	// earlier recipient prefilter alone can be stale under READ COMMITTED. This
+	// does not fence a forget that commits after this statement has started.
+	rows, err := tx.Query(ctx,
+		`SELECT `+notificationCols+` FROM notifications
 			 WHERE ((tenant = $6 AND subject = ANY($1)) OR subject = ANY($7))
+			   AND (subject = $8 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $9))
 			   AND ($2::boolean = false OR read = false)
 			   AND ($3::timestamptz IS NULL OR (created_at, id) < ($3, $5::uuid))
 			 ORDER BY created_at DESC, id DESC
 			 LIMIT $4`,
-			d.enLaOrganizacion, onlyUnread, antesEn, limit, antesID, d.organizacion, d.deLaPersona)
+		d.enLaOrganizacion, onlyUnread, antesEn, limit, antesID, d.organizacion, d.deLaPersona, d.subject, d.emitido)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Notification
+	for rows.Next() {
+		n, err := scanNotification(rows)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			n, err := scanNotification(rows)
-			if err != nil {
-				return err
-			}
-			out = append(out, n)
-		}
-		return rows.Err()
-	})
-	return out, err
+		out = append(out, n)
+	}
+	return out, rows.Err()
 }
 
 // UnreadCount devuelve el número de notificaciones sin leer de un usuario.
 func (s *Store) UnreadCount(ctx context.Context, subjects []string) (int, error) {
 	var count int
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
 		d, err := conDestinatarios(ctx, tx, subjects)
 		if err != nil {
 			return err
 		}
-		return tx.QueryRow(ctx,
-			`SELECT count(*) FROM notifications
-			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false`,
-			d.enLaOrganizacion, d.organizacion, d.deLaPersona).Scan(&count)
+		count, err = contarNotificacionesTx(ctx, tx, d)
+		return err
 	})
+	return count, err
+}
+
+func contarNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios) (int, error) {
+	var count int
+	err := tx.QueryRow(ctx,
+		`SELECT count(*) FROM notifications
+			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false
+			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5))`,
+		d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido).Scan(&count)
 	return count, err
 }
 
 // MarkRead marca una notificación como leída (idempotente). Falla con
 // ErrNotFound si no existe o no pertenece al usuario.
 func (s *Store) MarkRead(ctx context.Context, id uuid.UUID, subjects []string) error {
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
 		d, err := conDestinatarios(ctx, tx, subjects)
 		if err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx,
-			`UPDATE notifications SET read = true, read_at = now()
-			 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4)) AND read = false`,
-			id, d.enLaOrganizacion, d.organizacion, d.deLaPersona)
-		if err != nil {
+		return marcarNotificacionTx(ctx, tx, id, d)
+	})
+}
+
+func marcarNotificacionTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, d destinatarios) error {
+	tag, err := tx.Exec(ctx,
+		`UPDATE notifications SET read = true, read_at = now()
+			 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4)) AND read = false
+			   AND (subject = $5 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $6))`,
+		id, d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		// Distinguir "no existe" de "ya leída": comprobar existencia.
+		var exists bool
+		if err := tx.QueryRow(ctx,
+			`SELECT true FROM notifications
+				 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4))
+				   AND (subject = $5 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $6))`,
+			id, d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido).Scan(&exists); errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNotFound
+		} else if err != nil {
 			return err
 		}
-		if tag.RowsAffected() == 0 {
-			// Distinguir "no existe" de "ya leída": comprobar existencia.
-			var exists bool
-			if err := tx.QueryRow(ctx,
-				`SELECT true FROM notifications
-				 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4))`,
-				id, d.enLaOrganizacion, d.organizacion, d.deLaPersona).Scan(&exists); errors.Is(err, pgx.ErrNoRows) {
-				return domain.ErrNotFound
-			} else if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // MarkAllRead marca todas las notificaciones del usuario como leídas y devuelve
 // cuántas se han actualizado.
 func (s *Store) MarkAllRead(ctx context.Context, subjects []string) (int64, error) {
 	var affected int64
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
 		d, err := conDestinatarios(ctx, tx, subjects)
 		if err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx,
-			`UPDATE notifications SET read = true, read_at = now()
-			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false`,
-			d.enLaOrganizacion, d.organizacion, d.deLaPersona)
-		if err != nil {
-			return err
-		}
-		affected = tag.RowsAffected()
-		return nil
+		affected, err = marcarTodasNotificacionesTx(ctx, tx, d)
+		return err
 	})
 	return affected, err
+}
+
+func marcarTodasNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios) (int64, error) {
+	tag, err := tx.Exec(ctx,
+		`UPDATE notifications SET read = true, read_at = now()
+			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false
+			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5))`,
+		d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// A database-wide REPEATABLE READ default would pin the snapshot during the
+// recipient prefilter. Set isolation at BEGIN, before pg's tenant setup or any
+// other statement, so each guarded SQL statement gets a fresh snapshot.
+func (s *Store) enLecturaDeAvisos(ctx context.Context, fn func(pgx.Tx) error) error {
+	t, err := tenancy.From(ctx)
+	if err != nil {
+		return err
+	}
+	return s.pool.InTxOpts(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, func(tx pgx.Tx) error {
+		if err := pg.SetTenant(ctx, tx, t.Slug); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
 }
 
 // PurgeReadBefore borra notificaciones leídas anteriores al instante dado
@@ -296,6 +342,8 @@ type destinatarios struct {
 	organizacion     string
 	enLaOrganizacion []string
 	deLaPersona      []string
+	subject          string
+	emitido          time.Time
 }
 
 // conDestinatarios reparte los buzones de quien llama (ver destinatarios) y fija LOCAL
@@ -312,31 +360,73 @@ func conDestinatarios(ctx context.Context, q pg.Querier, subjects []string) (des
 		return destinatarios{}, err
 	}
 	persona := domain.BuzonesPersonalesDe(ctx)
-	personales := []string{}
-	for _, s := range persona.Buzones {
-		if strings.TrimSpace(s) != "" && !strings.Contains(s, separadorDestinatarios) && !slices.Contains(personales, s) {
-			personales = append(personales, s)
+	if strings.TrimSpace(persona.Subject) == "" || strings.Contains(persona.Subject, separadorDestinatarios) {
+		return destinatarios{}, domain.ErrInvalidInput
+	}
+	subjects, err = validarDestinatariosConClaims(ctx, persona, subjects)
+	if err != nil {
+		return destinatarios{}, err
+	}
+	personales := filtrarDestinatariosUnicos(persona.Buzones)
+	// Comprueba TODOS los alias, también el email de entrada local y los de
+	// tokens delegados; el subject estable se identifica explícitamente, nunca
+	// por su posición o por el formato de su cadena. La tabla legacy no distingue
+	// tipo de destinatario: si un sub colisiona con un alias no se puede resolver
+	// esa ambigüedad con este filtro.
+	aliases := []string{}
+	for _, s := range append(slices.Clone(subjects), personales...) {
+		if s != persona.Subject && strings.TrimSpace(s) != "" && !strings.Contains(s, separadorDestinatarios) && !slices.Contains(aliases, s) {
+			aliases = append(aliases, s)
 		}
 	}
-	if len(personales) > 1 {
-		olvidados, err := buzonesOlvidadosDesde(ctx, q, personales[1:], persona.Emitido)
+	var olvidados []string
+	if !persona.Emitido.After(time.Unix(0, 0)) || persona.Emitido.After(time.Now()) {
+		// Sin iat fiable no puede demostrarse que el alias siga siendo del token.
+		olvidados = aliases
+	} else if len(aliases) > 0 {
+		olvidados, err = buzonesOlvidadosDesde(ctx, q, aliases, persona.Emitido)
 		if err != nil {
 			return destinatarios{}, err
 		}
-		personales = slices.DeleteFunc(personales, func(b string) bool { return slices.Contains(olvidados, b) })
-		subjects = slices.DeleteFunc(slices.Clone(subjects), func(b string) bool { return slices.Contains(olvidados, b) })
 	}
+	personales = slices.DeleteFunc(personales, func(b string) bool { return b != persona.Subject && slices.Contains(olvidados, b) })
+	subjects = slices.DeleteFunc(slices.Clone(subjects), func(b string) bool { return b != persona.Subject && slices.Contains(olvidados, b) })
 	if _, err := q.Exec(ctx, "SELECT set_config('app.destinatarios', $1, true)",
 		strings.Join(personales, separadorDestinatarios)); err != nil {
 		return destinatarios{}, err
 	}
-	enOrg := make([]string, 0, len(subjects))
-	for _, s := range subjects {
-		if strings.TrimSpace(s) != "" && !slices.Contains(enOrg, s) {
-			enOrg = append(enOrg, s)
+	enOrg := filtrarDestinatariosUnicos(subjects)
+	return destinatarios{organizacion: t.Slug, enLaOrganizacion: enOrg, deLaPersona: personales, subject: persona.Subject, emitido: persona.Emitido}, nil
+}
+
+func validarDestinatariosConClaims(ctx context.Context, persona domain.Persona, subjects []string) ([]string, error) {
+	claims, ok := authn.FromContext(ctx)
+	if !ok {
+		return subjects, nil
+	}
+	if claims.Subject != persona.Subject || !claims.Emitido.Equal(persona.Emitido) {
+		return nil, domain.ErrInvalidInput
+	}
+	// Do not accept a caller-supplied recipient list in place of the token.
+	subjects = domain.Destinatarios(claims.Subject, claims.Email, claims.Mailbox)
+	var personalesDeClaims []string
+	if !claims.Delegado {
+		personalesDeClaims = domain.BuzonesPersonales(claims.Subject, append([]string{claims.Mailbox}, claims.Mailboxes...)...)
+	}
+	if !slices.Equal(persona.Buzones, personalesDeClaims) {
+		return nil, domain.ErrInvalidInput
+	}
+	return subjects, nil
+}
+
+func filtrarDestinatariosUnicos(items []string) []string {
+	out := make([]string, 0, len(items))
+	for _, s := range items {
+		if strings.TrimSpace(s) != "" && !strings.Contains(s, separadorDestinatarios) && !slices.Contains(out, s) {
+			out = append(out, s)
 		}
 	}
-	return destinatarios{organizacion: t.Slug, enLaOrganizacion: enOrg, deLaPersona: personales}, nil
+	return out
 }
 
 // buzonesOlvidadosDesde son, de `buzones`, los que Sytue ID retiró después de `emitido`.
@@ -406,14 +496,36 @@ func (s *Store) ListNotificationPrefs(ctx context.Context, subject string) ([]do
 // regla previa BORRA la fila en vez de guardar un «no silenciado»: el estado por defecto
 // ya es ese, y persistirlo llenaría la tabla de filas que no dicen nada. La excepción es
 // cuando hace de contra-regla de una del origen entero, que sí hay que guardar.
+//
+// Por lo mismo, un «no silenciado» de un tipo solo se guarda mientras el origen esté
+// callado, y volver a permitir el origen borra los que quedaran: sin eso, apagar y
+// encender un tipo dejaba una contra-regla muda que, al callar más tarde el producto
+// entero, seguía dejando pasar ese tipo sin que el interruptor del producto lo dijera.
 func (s *Store) SetNotificationPref(ctx context.Context, subject string, p domain.NotificationPref) error {
 	t := tenancy.MustFrom(ctx)
 	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		if !p.Muted && p.Kind == "" {
 			_, err := tx.Exec(ctx,
-				`DELETE FROM notification_prefs WHERE tenant = $3 AND subject = $1 AND source = $2 AND kind = ''`,
+				`DELETE FROM notification_prefs
+				  WHERE tenant = $3 AND subject = $1 AND source = $2 AND (kind = '' OR NOT muted)`,
 				subject, string(p.Source), t.Slug)
 			return err
+		}
+		if !p.Muted {
+			var callado bool
+			if err := tx.QueryRow(ctx,
+				`SELECT EXISTS (SELECT 1 FROM notification_prefs
+				                 WHERE tenant = $3 AND subject = $1 AND source = $2
+				                   AND kind = '' AND muted)`,
+				subject, string(p.Source), t.Slug).Scan(&callado); err != nil {
+				return err
+			}
+			if !callado {
+				_, err := tx.Exec(ctx,
+					`DELETE FROM notification_prefs WHERE tenant = $4 AND subject = $1 AND source = $2 AND kind = $3`,
+					subject, string(p.Source), p.Kind, t.Slug)
+				return err
+			}
 		}
 		_, err := tx.Exec(ctx,
 			`INSERT INTO notification_prefs (tenant, subject, source, kind, muted)

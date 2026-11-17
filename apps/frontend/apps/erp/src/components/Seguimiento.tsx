@@ -12,7 +12,16 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Badge, Button, Icon, Spinner, formatBytes, useToast, withBase } from '@sytue/ui';
+import {
+  Badge,
+  Button,
+  Icon,
+  Spinner,
+  formatBytes,
+  useToast,
+  withBase,
+  EmptyState,
+} from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import { api, baseDeLaApp, consulta, mensajeDeError } from '../lib/api.js';
 import type { ErpMessageKey, useT } from '../i18n/index.js';
@@ -209,7 +218,7 @@ export function DocumentosRegistro({
       {lista === null ? (
         <Spinner size={14} />
       ) : lista.length === 0 ? (
-        <p class="text-text-subtle text-xs">{t('docs.empty')}</p>
+        <EmptyState compact title={t('docs.empty')} />
       ) : (
         <ul class="border-border divide-border divide-y rounded-md border">
           {lista.map((a) => (
@@ -459,7 +468,7 @@ export function TareasRegistro({
       {lista === null ? (
         <Spinner size={14} />
       ) : lista.length === 0 ? (
-        <p class="text-text-subtle text-xs">{t('tasks.none')}</p>
+        <EmptyState compact title={t('tasks.none')} />
       ) : (
         <ul class="space-y-1">
           {lista.map((a) => (
@@ -598,7 +607,7 @@ export function HistorialRegistro({
       {lista === null ? (
         <Spinner size={14} />
       ) : lista.length === 0 ? (
-        <p class="text-text-subtle text-xs">{t('history.empty')}</p>
+        <EmptyState compact title={t('history.empty')} />
       ) : (
         <ol class="space-y-2">
           {lista.map((e) => (

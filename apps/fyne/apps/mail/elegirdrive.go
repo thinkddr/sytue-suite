@@ -281,7 +281,7 @@ func (g *selectorDrive) pintar() {
 	lista := enCajaDe(tema.Color("surface-raised", v), v, container.New(fijo{alto: altoListaDrive - 2*tema.Borde}, dentro))
 
 	g.caja.Objects = []fyne.CanvasObject{
-		container.New(ui.Columna{Hueco: aireMigas}, container.New(flujo{hueco: huecoMigas, ancho: g.ancho}, migas...), lista),
+		container.New(ui.Columna{Hueco: aireMigas}, container.New(ui.Flujo{Hueco: huecoMigas, Ancho: g.ancho}, migas...), lista),
 		container.New(ui.Margen{Arr: airePieSelector},
 			ui.NuevoParrafo(t.T("drive.footer", nil), tema.TextoSM, ui.Normal, "text-subtle", v).A(g.ancho)),
 	}

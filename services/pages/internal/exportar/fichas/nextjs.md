@@ -1,18 +1,21 @@
-# Destino: Next.js (App Router + TypeScript)
+<a id="destino-nextjs-app-router--typescript"></a>
+# Target: Next.js (App Router + TypeScript)
 
-Ficha técnica y normativa para la exportación de sitios a proyectos Next.js con App Router y TypeScript.
+Technical and normative spec sheet for exporting sites to Next.js projects with App Router and TypeScript.
 
-## 1. Versiones y Herramientas
+<a id="1-versiones-y-herramientas"></a>
+## 1. Versions and Tools
 
 - Next.js: `{{v.nextjs_version}}`
 - React: `{{v.react_version}}`
 - React DOM: `{{v.react_dom_version}}`
 - TypeScript: `{{v.typescript_version}}`
-- Tipos de React: `{{v.types_react_version}}`
-- Tipos de React DOM: `{{v.types_react_dom_version}}`
-- Tipos de Node: `{{v.types_node_version}}`
+- React types: `{{v.types_react_version}}`
+- React DOM types: `{{v.types_react_dom_version}}`
+- Node types: `{{v.types_node_version}}`
 
-## 2. Árbol de Directorios Permitido
+<a id="2-árbol-de-directorios-permitido"></a>
+## 2. Allowed Directory Tree
 
 ```text
 ├── package.json
@@ -31,9 +34,10 @@ Ficha técnica y normativa para la exportación de sitios a proyectos Next.js co
 └── README.md
 ```
 
-## 3. Restricciones y Reglas de Exportación
+<a id="3-restricciones-y-reglas-de-exportación"></a>
+## 3. Export Constraints and Rules
 
-- **Conexión a la API Pública**: La comunicación con la tienda y los formularios públicos delegados utiliza el cliente `lib/pages-api.ts`.
-- **Estructura App Router**: Emplea el enrutador estándar App Router de Next.js.
-- **Dependencias exactas**: `package.json` declara versiones estrictas y coincidentes con la tabla normativa de versiones.
-- **Validación de orígenes y seguridad**: Los formularios integran el resolvedor de ALTCHA del lado del navegador para validar envíos.
+- **Public API connection**: Communication with the store and the delegated public forms uses the `lib/pages-api.ts` client.
+- **App Router structure**: Uses the standard Next.js App Router.
+- **Exact dependencies**: `package.json` declares strict versions that match the normative version table.
+- **Origin validation and security**: Forms embed the browser-side ALTCHA solver to validate submissions.

@@ -27,6 +27,7 @@ type driveDePrueba struct {
 	conCarpeta bool
 	subido     struct{ carpeta, nombre, tipo, cuerpo string }
 	creada     string
+	restaurada string
 	motor      struct {
 		ruta     string
 		campos   map[string]string
@@ -68,6 +69,13 @@ func (d *driveDePrueba) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	case "GET /api/v1/files/f1/content":
 		_, _ = io.WriteString(w, "%PDF-1.7 hola")
+	case "GET /api/v1/files/f1/versions":
+		_, _ = io.WriteString(w, `{"versions":[{"version":3,"size_bytes":30,"is_current":true,"created_at":"2026-11-10T10:00:00Z"},{"version":2,"size_bytes":20,"author_sub":"ada","created_at":"2026-11-09T10:00:00Z"}],"next_cursor":"v2"}`)
+	case "GET /api/v1/files/f1/versions/2/content":
+		_, _ = io.WriteString(w, "%PDF-1.7 la de antes")
+	case "POST /api/v1/files/f1/versions/2/restore":
+		d.restaurada = "f1@2"
+		_, _ = io.WriteString(w, `{"id":"f1","name":"viejo.pdf"}`)
 	case "GET /api/v1/folders/otra/children":
 		_, _ = io.WriteString(w, `{"folders":[],"files":[{"id":"img1","folder_id":"otra","name":"recibo.JPG"}]}`)
 	case "GET /api/v1/files/img1/content":
@@ -154,6 +162,26 @@ func TestPDFEnDrive(t *testing.T) {
 	}
 	if datos, err := p.Descargar(ctx, "f1"); err != nil || string(datos) != "%PDF-1.7 hola" {
 		t.Fatalf("Descargar = %q, %v", datos, err)
+	}
+}
+
+// TestLasVersionesDelPDF: el historial de Drive es el «deshacer» de CertiPDF. Se lista
+// con la actual primero, se baja una archivada y se restaura por su número.
+func TestLasVersionesDelPDF(t *testing.T) {
+	d := &driveDePrueba{t: t, conCarpeta: true}
+	srv := httptest.NewServer(d)
+	defer srv.Close()
+	p, ctx := NewPDF(srv.URL, srv.URL, nil, nil), context.Background()
+
+	vs, cursor, err := p.Versiones(ctx, "f1", "")
+	if err != nil || cursor != "v2" || len(vs) != 2 || !vs[0].IsCurrent || vs[1].Version != 2 || vs[1].AuthorSub != "ada" {
+		t.Fatalf("Versiones = %+v, %q, %v", vs, cursor, err)
+	}
+	if datos, err := p.DescargarVersion(ctx, "f1", 2); err != nil || string(datos) != "%PDF-1.7 la de antes" {
+		t.Fatalf("DescargarVersion = %q, %v", datos, err)
+	}
+	if err := p.RestaurarVersion(ctx, "f1", 2); err != nil || d.restaurada != "f1@2" {
+		t.Fatalf("RestaurarVersion: %v; restaurada %q", err, d.restaurada)
 	}
 }
 
@@ -278,27 +306,26 @@ func TestCertiDocsHablaComoSusServicios(t *testing.T) {
 		},
 		"services/docs/internal/http/pdfpages.go": {
 			`r.MultipartForm.File["file"]`, `r.FormValue("clave")`, `r.FormValue("op")`, `r.FormValue("paginas"), r.FormValue("grados")`,
-			`case "combinar":`, `case "extraer", "borrar", "rotar":`, `WithCode("pdf_password_required")`,
+			`case "combinar", "extraer", "borrar", "rotar":`, `domain.ApplyPageOperation(op, paginas, grados, docs...)`, `domain.DescribeReadError(err, nombre)`,
 		},
 		"services/docs/internal/http/pdfstudio.go": {
-			`"paginas":     indiceDe(doc, doc.NumPaginas(), presupuestoExtractos),`, `"total":       doc.NumPaginas()`, `"indice":      doc.IndiceDelDocumento()`, `"adjuntos":    doc.AdjuntosDelDocumento()`,
-			`"anotaciones": doc.AnotacionesDelDocumento()`, `"campos":      doc.CamposDelFormulario()`, `"firmas":      doc.FirmasDelDocumento()`,
-			`"cifrado":     doc.EstaCifrado()`, `"permisos":    permisos`, `"huella":      doc.Huella()`,
-			"`json:\"texto\"`", "`json:\"tamano\"`", `map[string]any{"paginas": paginas}`,
-			`r.FormValue("escala")`, `enteroOpcional(r.FormValue("pagina"), 1, doc.NumPaginas())`, `"image/svg+xml; charset=utf-8"`,
-			`const maxPaginasPNGPorLote = 8`, `base64.StdEncoding.EncodeToString(datos)`, `formato != "png"`,
+			`domain.Summary(doc, presupuestoExtractos)`, `domain.RenderView(r.Context(), doc, fields)`, `domain.TextSpans(r.Context(), doc)`,
 		},
-		"services/docs/internal/http/pdfinspect.go":    {"`json:\"numero\"`", "`json:\"ancho\"`", "`json:\"alto\"`", "`json:\"rotacion\"`", "`json:\"extracto,omitempty\"`"},
-		"services/docs/internal/domain/import.go":      {`const MaxImportBytes = 25 << 20`},
-		"services/docs/internal/domain/pdfread.go":     {`const MaxPDFBytes = 100 << 20`},
-		"services/docs/internal/domain/pdfindice.go":   {"`json:\"titulo\"`", "`json:\"nivel\"`"},
-		"services/docs/internal/domain/pdfadjuntos.go": {"`json:\"nombre\"`", "`json:\"tamano_bytes\"`"},
-		"services/docs/internal/domain/pdfannot.go":    {"`json:\"tipo\"`", "`json:\"texto,omitempty\"`", "`json:\"autor,omitempty\"`"},
-		"services/docs/internal/domain/pdfform.go":     {"`json:\"nombre\"`", "`json:\"valor,omitempty\"`"},
-		"services/docs/internal/domain/pdfsign.go":     {"`json:\"motivo,omitempty\"`", "`json:\"lugar,omitempty\"`", "`json:\"fecha,omitempty\"`", "`json:\"cubre_todo\"`"},
+		"apps/nucleo/pdf/view.go": {
+			"`json:\"texto\"`", "`json:\"tamano\"`", `"image/svg+xml; charset=utf-8"`,
+			`MaxPNGViewPages = 8`, `base64.StdEncoding.EncodeToString(raw)`,
+		},
+		"apps/nucleo/pdf/metadata.go":        {"`json:\"numero\"`", "`json:\"ancho\"`", "`json:\"alto\"`", "`json:\"rotacion\"`", "`json:\"extracto,omitempty\"`"},
+		"apps/nucleo/office/model/import.go": {`const MaxImportBytes = 25 << 20`},
+		"apps/nucleo/pdf/pdfread.go":         {`const MaxPDFBytes = 100 << 20`},
+		"apps/nucleo/pdf/pdfindice.go":       {"`json:\"titulo\"`", "`json:\"nivel\"`"},
+		"apps/nucleo/pdf/pdfadjuntos.go":     {"`json:\"nombre\"`", "`json:\"tamano_bytes\"`"},
+		"apps/nucleo/pdf/pdfannot.go":        {"`json:\"tipo\"`", "`json:\"texto,omitempty\"`", "`json:\"autor,omitempty\"`"},
+		"apps/nucleo/pdf/pdfform.go":         {"`json:\"nombre\"`", "`json:\"valor,omitempty\"`"},
+		"apps/nucleo/pdf/pdfsign.go":         {"`json:\"motivo,omitempty\"`", "`json:\"lugar,omitempty\"`", "`json:\"fecha,omitempty\"`", "`json:\"cubre_todo\"`"},
 		// Huella y Permisos viajan SIN etiquetas JSON: con el nombre del campo de Go.
-		"services/docs/internal/domain/pdfprotect.go": {"\tAutor ", "\tCreador ", "\tProductor ", "\tTitulo ", "\tConAdjuntos ", "\tConJS "},
-		"services/docs/internal/domain/pdfcrypt.go":   {"\tModificar ", "\tEnsamblar "},
+		"apps/nucleo/pdf/pdfprotect.go": {"\tAutor ", "\tCreador ", "\tProductor ", "\tTitulo ", "\tConAdjuntos ", "\tConJS "},
+		"apps/nucleo/pdf/pdfcrypt.go":   {"\tModificar ", "\tEnsamblar "},
 		"services/drive/internal/http/server.go": {
 			`api.Patch("/files/{id}", h.UpdateFile)`, `api.Delete("/files/{id}", h.DeleteFile)`,
 		},

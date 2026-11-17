@@ -65,6 +65,9 @@ type barraEvento struct {
 	rotulo   string // el título, o «(sin título)»
 	nombre   string // el `aria-label`, con «(viene de antes)» si toca
 	alPulsar func(Ocurrencia, fyne.CanvasObject)
+	// ancla es el objeto que está en el lienzo: la propia barra o su envoltorio
+	// arrastrable, que es al que se pega la vista rápida.
+	ancla fyne.CanvasObject
 
 	encima, enfocada bool
 }
@@ -77,14 +80,29 @@ var (
 
 func nuevaBarraEvento(t Tramo[Ocurrencia], rotulo, nombre string, alPulsar func(Ocurrencia, fyne.CanvasObject)) *barraEvento {
 	b := &barraEvento{t: t, rotulo: rotulo, nombre: nombre, alPulsar: alPulsar}
+	b.ancla = b
 	b.ExtendBaseWidget(b)
 	return b
+}
+
+// nuevaBarraMes es la barra del mes: arrastrable a otro día en escritorio si el evento
+// se puede mover (`arrastremes.go`). Devuelve la barra, para colocarla, y el objeto que
+// va al lienzo, que es su envoltorio cuando se arrastra.
+func nuevaBarraMes(m *Mes, t Tramo[Ocurrencia], rotulo, nombre string) (*barraEvento, fyne.CanvasObject) {
+	if !m.arrastrable(t.Item) {
+		b := nuevaBarraEvento(t, rotulo, nombre, m.AlAbrir)
+		return b, b
+	}
+	a := &barraArrastrable{barraEvento: barraEvento{t: t, rotulo: rotulo, nombre: nombre, alPulsar: m.AlAbrir}, m: m}
+	a.ancla = a
+	a.ExtendBaseWidget(a)
+	return &a.barraEvento, a
 }
 
 // Tapped abre la vista rápida; el clic no baja a la celda (`stopPropagation`).
 func (b *barraEvento) Tapped(*fyne.PointEvent) {
 	if b.alPulsar != nil {
-		b.alPulsar(b.t.Item, b)
+		b.alPulsar(b.t.Item, b.ancla)
 	}
 }
 

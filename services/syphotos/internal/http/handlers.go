@@ -157,7 +157,7 @@ func lugarDe(a domain.Activo) *lugarJSON {
 	return &lugarJSON{Lat: *a.Lat, Lon: *a.Lon}
 }
 
-// GET /api/v1/timeline?limit=&cursor=
+// GET /api/v1/timeline?limit=&cursor=&desde=
 //
 // EL CURSOR ES OPACO para el cliente: un `<fecha>|<id>` en texto. Podría ir en
 // dos parámetros, y no van, porque entonces alguien los compondría a mano y la
@@ -211,6 +211,16 @@ func (h *Handlers) LineaDeTiempo(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.Desde = cur
+	} else if d := params.Get("desde"); d != "" {
+		// Saltar a una fecha. Solo para la PRIMERA página: con cursor, la
+		// posición ya la lleva él, y que `desde` ganase devolvería la misma
+		// página una y otra vez al desplazarse.
+		cur, err := cursorDeFecha(d)
+		if err != nil {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("invalid_date").Wrap(err))
+			return
+		}
+		f.Desde = cur
 	}
 
 	activos, siguiente, err := h.store.LineaDeTiempo(r.Context(), f)
@@ -233,6 +243,25 @@ func (h *Handlers) LineaDeTiempo(w http.ResponseWriter, r *http.Request) {
 		cuerpo["nextCursor"] = cifrarCursor(*siguiente)
 	}
 	httpx.JSON(w, r, http.StatusOK, cuerpo)
+}
+
+// GET /api/v1/timeline/years?favoritas=
+//
+// Los años que tienen fotos, del más reciente al más antiguo, con cuántas hay
+// en cada uno: es la barra para saltar a una fecha sin desplazarse por diez
+// años de galería. Sin años vacíos: un botón que lleva a una página en blanco
+// no ayuda a nadie.
+func (h *Handlers) AnyosDeLaLinea(w http.ResponseWriter, r *http.Request) {
+	anyos, err := h.store.AnyosDeLaLinea(r.Context(), sub(r), r.URL.Query().Get("favoritas") == "1")
+	if err != nil {
+		httpx.Fail(w, r, traducir(err))
+		return
+	}
+	salida := make([]map[string]int, 0, len(anyos))
+	for _, a := range anyos {
+		salida = append(salida, map[string]int{"year": a.Anyo, "count": a.Fotos})
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"years": salida})
 }
 
 // GET /api/v1/assets/{id}.

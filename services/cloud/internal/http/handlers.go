@@ -69,6 +69,7 @@ type cloudService interface {
 	ListDomains(ctx context.Context, projectID uuid.UUID) ([]domain.Domain, error)
 	RemoveDomain(ctx context.Context, id uuid.UUID) error
 	SetDomainPrimary(ctx context.Context, id uuid.UUID) (domain.Domain, error)
+	VerifyDomainNow(ctx context.Context, id uuid.UUID) (domain.Domain, domain.DomainCheck, error)
 	CancelBuild(ctx context.Context, id uuid.UUID) error
 	ListAudit(ctx context.Context, f store.AuditFilter, cursor string, limit int) (service.AuditPage, error)
 	ExportAudit(ctx context.Context, f store.AuditFilter, w io.Writer) error
@@ -160,6 +161,8 @@ func toAPIError(err error) error {
 		return httpx.ErrUnavailable.WithMessage("Sytue ID is unavailable; try again.")
 	case errors.Is(err, domain.ErrQuotaExceeded):
 		return httpx.NewError(http.StatusPaymentRequired, "quota_exceeded", "You have reached the limit of your plan.")
+	case errors.Is(err, domain.ErrTooSoon):
+		return httpx.ErrTooManyRequests.WithMessage("Wait a few seconds before trying again.")
 	case errors.Is(err, domain.ErrQueueFull):
 		return httpx.ErrTooManyRequests.WithMessage("There is already too much work queued; wait for it to finish.")
 	case errors.Is(err, domain.ErrSpendLimitExceeded):

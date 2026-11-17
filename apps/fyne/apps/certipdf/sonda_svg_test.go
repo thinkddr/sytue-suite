@@ -17,7 +17,7 @@ import (
 //
 // # Qué se mide, y por qué por este camino
 //
-// El motor de la casa (`services/docs/internal/domain/pdfrender.go`) entrega cada
+// El motor de la casa (`apps/nucleo/pdf/pdfrender.go`) entrega cada
 // página como SVG con `<text>` y las fuentes incrustadas en `@font-face`, y NO
 // rasteriza a propósito (ADR-0033: «el motor de la casa traduce a SVG precisamente para
 // que rasterice quien sabe»). En el navegador eso es gratis. En Fyne, TODO el SVG pasa

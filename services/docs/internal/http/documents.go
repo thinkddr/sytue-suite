@@ -4,6 +4,8 @@
 package http
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/buscar"
 
 	"github.com/google/uuid"
 
@@ -147,15 +151,36 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 		// hay. Con esto, «Abrir con Sytue Docs» sabe si ya existe SIN descargar el
 		// fichero entero para descubrir que sobraba.
 		SourceRef: q.Get("source_ref"),
+		// ?sort=title — por título (A→Z, sin mayúsculas ni acentos). Cualquier otro
+		// valor deja el orden de siempre: lo modificado más recientemente primero.
+		ByTitle: q.Get("sort") == "title",
+	}
+	// ?scope=mine|shared — «Míos» / «Compartidos conmigo». Un valor desconocido es un
+	// 400: ignorarlo enseñaría «todos» a quien pidió otra cosa.
+	switch sc := domain.ListScope(q.Get("scope")); sc {
+	case domain.ScopeAll, domain.ScopeMine, domain.ScopeShared:
+		f.Scope = sc
+	default:
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid scope: use mine or shared."))
+		return
 	}
 	if c := q.Get("cursor"); c != "" {
-		at, id, err := parseListCursor(c)
-		if err != nil {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid pagination cursor."))
-			return
+		if f.ByTitle {
+			tc, err := parseTitleCursor(c)
+			if err != nil {
+				httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid pagination cursor."))
+				return
+			}
+			f.TitleCursor = &tc
+		} else {
+			at, id, err := parseListCursor(c)
+			if err != nil {
+				httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid pagination cursor."))
+				return
+			}
+			f.BeforeUpdatedAt = &at
+			f.BeforeID = id
 		}
-		f.BeforeUpdatedAt = &at
-		f.BeforeID = id
 	}
 	docs, err := h.svc.List(r.Context(), subj, f)
 	if err != nil {
@@ -163,16 +188,12 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Y los de OTRAS organizaciones en los que canjeó un enlace (ADR 0052), con los
-	// mismos filtros y el mismo cursor: se mezclan por fecha y se corta la página.
-	if h.canje != nil {
-		if fuera, err := h.canje.DeFuera(r.Context(), subj.Sub, f); err == nil && len(fuera) > 0 {
+	// mismos filtros y el mismo cursor: se mezclan en el orden pedido y se corta la
+	// página. Nunca son «míos»: con ese alcance ni se piden.
+	if h.canje != nil && f.Scope != domain.ScopeMine {
+		if fuera, err := h.deFuera(r, subj.Sub, f); err == nil && len(fuera) > 0 {
 			docs = append(docs, fuera...)
-			slices.SortFunc(docs, func(a, b domain.Document) int {
-				if c := b.UpdatedAt.Compare(a.UpdatedAt); c != 0 {
-					return c
-				}
-				return strings.Compare(b.ID, a.ID)
-			})
+			slices.SortFunc(docs, ordenLista(f.ByTitle))
 			if len(docs) > limit {
 				docs = docs[:limit]
 			}
@@ -182,9 +203,83 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	// Página llena => puede haber más: cursor keyset al último documento.
 	if len(docs) == limit {
 		last := docs[len(docs)-1]
-		resp["next_cursor"] = last.UpdatedAt.UTC().Format(time.RFC3339Nano) + "~" + last.ID
+		if f.ByTitle {
+			resp["next_cursor"] = titleCursor(last)
+		} else {
+			resp["next_cursor"] = last.UpdatedAt.UTC().Format(time.RFC3339Nano) + "~" + last.ID
+		}
 	}
 	httpx.JSON(w, r, http.StatusOK, resp)
+}
+
+// deFuera trae los documentos de fuera para la página pedida. La función de la base
+// (`docs_de_fuera`) solo pagina por fecha, así que en el orden por título se piden
+// los más recientes (son pocos: los canjeados por una persona) y se recorta aquí
+// por el cursor de título.
+func (h *Handler) deFuera(r *http.Request, sub string, f domain.ListFilter) ([]domain.Document, error) {
+	if !f.ByTitle {
+		return h.canje.DeFuera(r.Context(), sub, f)
+	}
+	g := f
+	g.BeforeUpdatedAt, g.BeforeID, g.TitleCursor, g.Limit = nil, "", nil, 200
+	todos, err := h.canje.DeFuera(r.Context(), sub, g)
+	if err != nil || f.TitleCursor == nil {
+		return todos, err
+	}
+	desde := domain.Document{Title: f.TitleCursor.Title, ID: f.TitleCursor.ID}
+	cmp := ordenLista(true)
+	return slices.DeleteFunc(todos, func(d domain.Document) bool { return cmp(d, desde) <= 0 }), nil
+}
+
+// ordenLista es el orden del listado para mezclar lo propio con lo de fuera. Por
+// título usa el mismo plegado que `plegar()` en la base con orden de puntos de código
+// (COLLATE "C"), así que la mezcla y el cursor casan con lo que pagina la consulta.
+func ordenLista(porTitulo bool) func(a, b domain.Document) int {
+	if porTitulo {
+		return func(a, b domain.Document) int {
+			if c := strings.Compare(plegarTitulo(a.Title), plegarTitulo(b.Title)); c != 0 {
+				return c
+			}
+			return strings.Compare(a.ID, b.ID)
+		}
+	}
+	return func(a, b domain.Document) int {
+		if c := b.UpdatedAt.Compare(a.UpdatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(b.ID, a.ID)
+	}
+}
+
+// plegarTitulo es el gemelo en Go de `plegar()` (lower(unaccent(t))): el pliegue
+// común de la suite, que también reescribe ligaduras (æ→ae, ß→ss) como unaccent.
+func plegarTitulo(t string) string { return buscar.Plegar(t) }
+
+// titleCursor es el cursor del orden por título: "t~<título en base64url>~<id>". El
+// título va codificado porque puede llevar «~»; la «t» lo distingue del de fecha.
+func titleCursor(d domain.Document) string {
+	return "t~" + base64.RawURLEncoding.EncodeToString([]byte(d.Title)) + "~" + d.ID
+}
+
+// parseTitleCursor decodifica lo que emite titleCursor y valida el uuid aquí, por la
+// misma razón que parseListCursor.
+func parseTitleCursor(c string) (domain.TitleCursor, error) {
+	resto, ok := strings.CutPrefix(c, "t~")
+	if !ok {
+		return domain.TitleCursor{}, fmt.Errorf("cursor de título sin prefijo")
+	}
+	tit, id, ok := strings.Cut(resto, "~")
+	if !ok {
+		return domain.TitleCursor{}, fmt.Errorf("cursor de título sin separador")
+	}
+	crudo, err := base64.RawURLEncoding.DecodeString(tit)
+	if err != nil {
+		return domain.TitleCursor{}, err
+	}
+	if _, err := uuid.Parse(id); err != nil {
+		return domain.TitleCursor{}, err
+	}
+	return domain.TitleCursor{Title: string(crudo), ID: id}, nil
 }
 
 // parseListCursor decodifica el cursor keyset del listado:
@@ -258,15 +353,20 @@ func (h *Handler) deleteDocument(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, err)
 		return
 	}
-	if err := h.ficheroDelDocumento(r.Context(), doc, drive.AccionTirar); err != nil {
+	if err := h.tirar(r.Context(), subj, doc); err != nil {
 		errorDePapelera(w, r, err)
 		return
 	}
-	if err := h.svc.Delete(r.Context(), subj, docID(r)); err != nil {
-		fail(w, r, err)
-		return
-	}
 	httpx.NoContent(w)
+}
+
+func (h *Handler) tirar(ctx context.Context, subj domain.Subject, doc *domain.Document) error {
+	return h.withLegacyDocumentEffect(ctx, doc.ID, func() error {
+		if err := h.ficheroDelDocumento(ctx, doc, drive.AccionTirar); err != nil {
+			return err
+		}
+		return h.svc.Delete(ctx, subj, doc.ID)
+	})
 }
 
 type starReq struct {

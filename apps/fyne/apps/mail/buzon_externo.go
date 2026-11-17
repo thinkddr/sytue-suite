@@ -53,6 +53,7 @@ func (b *Buzon) ElegirUnificado(rol string) {
 
 func (b *Buzon) abrirVistaExterna(v VistaExterna) {
 	b.P.CerrarCajon()
+	b.dejarAjustes()
 	b.P.Bandeja.Filtro = FiltroTodas // otra vista empieza sin filtro
 	b.dejarCompartido()
 	b.externa = &v
@@ -304,6 +305,7 @@ func (b *Buzon) masExterna(v VistaExterna) {
 		if err != nil {
 			b.cursor = ""
 			b.P.Bandeja.Refresh()
+			b.seguirTrasPagina()
 			return
 		}
 		b.mensajes = sinRepetir(b.mensajes, r.mensajes)
@@ -606,6 +608,7 @@ func (b *Buzon) rolExterno() string {
 func (b *Buzon) ponerAccionesExternas(a *Acciones) {
 	v := b.externa
 	a.Destacar, a.Leido = b.alternarDestacado, b.alternarLeido
+	b.ponerContactos(a)
 	rolActual := b.rolExterno()
 	destino := func(rol string) func(Conversacion) {
 		if rolActual == rol {
@@ -695,7 +698,7 @@ func CuerpoExterno(m api.ExternalMailMessage, err error) Cuerpo {
 		return Cuerpo{Texto: strings.ReplaceAll(texto, "\r\n", "\n"), ConFormato: conFormato, Adjuntos: adjuntos}
 	}
 	if conFormato {
-		return Cuerpo{Texto: htmltext.Text(m.HTML), ConFormato: true, Adjuntos: adjuntos}
+		return Cuerpo{Texto: htmltext.TextoConEnlaces(m.HTML), ConFormato: true, Adjuntos: adjuntos}
 	}
 	return Cuerpo{Fallo: err != nil, Adjuntos: adjuntos}
 }

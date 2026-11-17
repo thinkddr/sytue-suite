@@ -17,20 +17,25 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
 	"git.sytue.eu/sytue/one/services/cast/internal/service"
+	"git.sytue.eu/sytue/one/services/cast/internal/store"
 )
 
 // Almacen implementa service.Objetos sobre el cliente S3 de la suite.
 type Almacen struct {
-	c *objectstore.Client
+	c *Guardado
 }
 
 // New construye el almacén. Con cliente nil devuelve nil: el servicio lo trata
 // como «sin almacén» y falla con claridad en lo que lo necesita.
-func New(c *objectstore.Client) *Almacen {
+func New(c *objectstore.Client, state *store.Store) *Almacen {
 	if c == nil {
 		return nil
 	}
-	return &Almacen{c: c}
+	guard := ConFuenteRetenida(c, state)
+	if guard == nil {
+		return nil
+	}
+	return &Almacen{c: guard}
 }
 
 func tenantDe(slug string) tenancy.Tenant { return tenancy.Tenant{Slug: slug} }
@@ -63,4 +68,4 @@ func (a *Almacen) DeletePrefix(ctx context.Context, tenant, prefix string) error
 
 // Cliente expone el cliente de debajo para el transcodificador, que sube muchos
 // ficheros y prefiere hablar con el almacén directamente.
-func (a *Almacen) Cliente() *objectstore.Client { return a.c }
+func (a *Almacen) Cliente() *Guardado { return a.c }

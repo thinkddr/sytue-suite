@@ -7,6 +7,7 @@
   "block.short": "Bac",
   "card.untitledOwner": "Ainm anaithnid",
   "card.watch": "Féach ar {title}",
+  "card.watched": "{percent}% feicthe",
   "channel.count": {
     "other": "Físeáin phoiblí: {count}"
   },
@@ -150,7 +151,12 @@
   "player.qualityAuto": "Uathoibríoch",
   "player.qualityAutoNow": "Uathoibríoch ({quality})",
   "player.region": "Seinnteoir físe",
+  "player.restart": "Tosaigh ón tús",
+  "player.resumedAt": "Ag leanúint ar aghaidh ó {time}",
   "player.seek": "Suíomh",
+  "player.speed": "Luas",
+  "player.speedNormal": "Gnáthluas",
+  "player.speedNow": "Luas {rate}",
   "player.unmute": "Cuir fuaim ar siúl",
   "player.volume": "Airde",
   "quality.approximate": "Meastachán garbh: níl fad an fhíseáin ar eolas fós.",

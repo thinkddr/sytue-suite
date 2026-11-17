@@ -4,13 +4,9 @@
 package drive
 
 import (
-	"image/color"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -30,19 +26,17 @@ import (
 //	ruta       el primer segmento en x=281 = 260 (carril) + 21
 //	buscador   28 × 196, en x=833,25
 //	«Nuevo»    28 × 76,25, en x=1036,25  ·  «Subir» 28 × 71, en x=1119,5
-//	conmutador 58 × 30, de x=1201 a 1259 — y es ÉL quien manda el alto
+//	conmutador 62 × 32, el `SegmentedControl` de iconos solos (dos `w-7` y el `p-0.5`)
 //
-// Los 30 son la pieza que no se ve: todos los controles miden 28, pero el conmutador de
-// vista lleva `border` y con `box-sizing: border-box`… no, al revés: el `div` que lo
-// envuelve es `inline-flex` con borde, así que mide 28 + 2 = 30 y estira la línea. De
-// ahí salen los 48,5 de la cabecera y los 66,63 de la ruta (centrada en 30, no en 28).
-// Calcularlo con 28 da 47,5 y deja toda la pantalla un píxel arriba.
+// Antes el conmutador llevaba `border` y medía 30 (28 + 2): era el hijo más alto y
+// estiraba la línea. Ahora es un carril sin borde del alto de un control, así que la
+// línea la ponen todos por igual y la cabecera mide 2 menos.
 const (
 	// AltoControlCromo es el `h-8` de los controles de la cabecera.
 	AltoControlCromo float32 = 8 * 0.25 * tema.Rem
-	// AltoLineaCabecera es lo que mide la línea de la cabecera: el conmutador con su
-	// borde, que es el hijo más alto.
-	AltoLineaCabecera float32 = AltoControlCromo + 2*tema.Borde
+	// AltoLineaCabecera es lo que mide la línea de la cabecera: la de un control, que
+	// es lo que miden el buscador, los botones y el conmutador de vista.
+	AltoLineaCabecera float32 = AltoControlCromo
 	// RellenoYCabecera es `py-2.5`.
 	RellenoYCabecera float32 = 2.5 * 0.25 * tema.Rem
 	// AltoCabeceraVista es el total, con el `border-b` por dentro de la caja.
@@ -68,237 +62,27 @@ func CanalonCabecera(ventana float32) float32 {
 
 // ---- El conmutador de vista (lista / cuadrícula) ----
 
-// Es UN widget y no dos botones sueltos porque en la web es un `div` con `border`,
-// `divide-x` y `overflow-hidden`: el filete del medio es el borde izquierdo del segundo
-// segmento y las esquinas redondeadas son del grupo. Partido en dos, el filete se pinta
-// dos veces o ninguna.
+// NuevoConmutadorVista es el `SegmentedControl` de iconos solos de FileBrowser.tsx: el
+// `ui.Segmentado` de la suite en su talla mediana, dos cuadrados `w-7 h-7` con el menú y
+// la rejilla dentro, sobre el carril `bg-subtle` con su `p-0.5` (62 × 32). La elegida
+// va sobre `surface` en `primary-text`. Antes era un par de botones con borde y
+// `divide-x` escrito aquí a mano, la tercera copia de la misma receta.
 //
-// Medido: grupo 58 × 30 con `rounded-md` y `border-border-strong`; cada segmento 28×28;
-// el activo `bg-surface-sunken text-primary-text` y el apagado `text-text-muted`, que
-// al pasar por encima va a `bg-surface-sunken text-text`.
-const (
-	// LadoSegmento es el `h-8 w-8` de cada mitad.
-	LadoSegmento = AltoControlCromo
-	// GlifoSegmento es el `size={16}` del icono de dentro.
-	GlifoSegmento float32 = 16
-)
-
-// MedidaConmutadorVista es lo que ocupa el grupo: dos segmentos y el marco.
-func MedidaConmutadorVista() fyne.Size {
-	return fyne.NewSize(2*LadoSegmento+2*tema.Borde, LadoSegmento+2*tema.Borde)
-}
-
-// ConmutadorVista es el par de botones «vista de lista» / «vista de cuadrícula».
-type ConmutadorVista struct {
-	widget.BaseWidget
-
-	// Rejilla dice cuál está activo. El cero es la lista, como en la web.
-	Rejilla bool
-	// NombreLista y NombreRejilla son los `aria-label`, ya traducidos.
-	NombreLista, NombreRejilla string
-	AlCambiar                  func(rejilla bool)
-
-	encima   int // 0 ninguno, 1 lista, 2 rejilla
-	enfocado bool
-}
-
-var (
-	_ fyne.Widget       = (*ConmutadorVista)(nil)
-	_ fyne.Tappable     = (*ConmutadorVista)(nil)
-	_ fyne.Focusable    = (*ConmutadorVista)(nil)
-	_ desktop.Hoverable = (*ConmutadorVista)(nil)
-)
-
-// NuevoConmutadorVista crea el conmutador con los dos nombres ya traducidos.
-func NuevoConmutadorVista(lista, rejilla string, alCambiar func(bool)) *ConmutadorVista {
-	c := &ConmutadorVista{NombreLista: lista, NombreRejilla: rejilla, AlCambiar: alCambiar}
-	c.ExtendBaseWidget(c)
-	return c
-}
-
-// MinSize es la medida declarada.
-func (c *ConmutadorVista) MinSize() fyne.Size {
-	c.ExtendBaseWidget(c)
-	return MedidaConmutadorVista()
-}
-
-// segmentoEn dice sobre qué mitad cae una posición: 1 la lista, 2 la rejilla.
-func (c *ConmutadorVista) segmentoEn(x float32) int {
-	if x < tema.Borde+LadoSegmento {
-		return 1
-	}
-	return 2
-}
-
-// Tapped elige la vista de la mitad pulsada.
-func (c *ConmutadorVista) Tapped(e *fyne.PointEvent) {
-	if l := fyne.CurrentApp().Driver().CanvasForObject(c); l != nil {
-		l.Focus(c)
-	}
-	c.poner(c.segmentoEn(e.Position.X) == 2)
-}
-
-func (c *ConmutadorVista) poner(rejilla bool) {
-	if c.Rejilla == rejilla {
-		return
-	}
-	c.Rejilla = rejilla
-	c.Refresh()
-	if c.AlCambiar != nil {
-		c.AlCambiar(rejilla)
-	}
-}
-
-// MouseIn y MouseMoved: el hover es POR SEGMENTO, así que hace falta la posición.
-func (c *ConmutadorVista) MouseIn(e *desktop.MouseEvent) { c.MouseMoved(e) }
-
-// MouseMoved mueve el resalte de una mitad a la otra sin salir del widget.
-func (c *ConmutadorVista) MouseMoved(e *desktop.MouseEvent) {
-	if s := c.segmentoEn(e.Position.X); s != c.encima {
-		c.encima = s
-		c.Refresh()
-	}
-}
-
-// MouseOut apaga el resalte.
-func (c *ConmutadorVista) MouseOut() { c.encima = 0; c.Refresh() }
-
-// FocusGained enciende el aro.
-func (c *ConmutadorVista) FocusGained() { c.enfocado = true; c.Refresh() }
-
-// FocusLost lo apaga.
-func (c *ConmutadorVista) FocusLost() { c.enfocado = false; c.Refresh() }
-
-// TypedRune conmuta con la barra espaciadora.
-func (c *ConmutadorVista) TypedRune(r rune) {
-	if r == ' ' {
-		c.poner(!c.Rejilla)
-	}
-}
-
-// TypedKey recorre los dos segmentos con las flechas, como un grupo de radios.
-func (c *ConmutadorVista) TypedKey(e *fyne.KeyEvent) {
-	if ui.SubirEscape(c, e) { // Escape y «atrás» son del diálogo de encima
-		return
-	}
-	switch e.Name { //nolint:exhaustive // las demás teclas son de quien tenga el foco
-	case fyne.KeyLeft:
-		c.poner(false)
-	case fyne.KeyRight:
-		c.poner(true)
-	case fyne.KeyReturn, fyne.KeyEnter:
-		c.poner(!c.Rejilla)
-	}
-}
-
-// AccessibilityLabel anuncia la vista ACTIVA, que es lo que `aria-pressed` transmite en
-// la web. Fyne no tiene forma de decir «pulsado», así que lo dice el rótulo.
-func (c *ConmutadorVista) AccessibilityLabel() string {
-	if c.Rejilla {
-		return c.NombreRejilla
-	}
-	return c.NombreLista
-}
-
-// AccessibilityRole implementa fyne.Accessible.
-func (c *ConmutadorVista) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
-
-// CreateRenderer compone el marco, el filete del medio y los dos glifos.
-func (c *ConmutadorVista) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &conmutadorRenderer{
-		c:   c,
-		aro: ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
-		// Con relleno: con el de `Caja` transparente, el rectángulo de fuera se veía entero
-		// —el segmento sin elegir, gris oscuro— y los velos tapaban el borde (2026-11-06).
-		marco:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border-strong", v), tema.RadioMD),
-		veloA:   canvas.NewRectangle(color.NRGBA{}),
-		veloB:   canvas.NewRectangle(color.NRGBA{}),
-		filete:  canvas.NewRectangle(tema.Color("border", v)),
-		glifoA:  iconos.Trazo(iconos.Menu, GlifoSegmento, "primary-text", v),
-		glifoB:  iconos.Trazo(iconos.Rejilla, GlifoSegmento, "text-muted", v),
-		trasero: canvas.NewRectangle(tema.Color("surface", v)),
-	}
-	// Los velos siguen la esquina de dentro del marco: cuadrados, tapaban el borde en
-	// las cuatro esquinas.
-	dentro := max(tema.RadioMD-tema.Borde, 0)
-	r.veloA.TopLeftCornerRadius, r.veloA.BottomLeftCornerRadius = dentro, dentro
-	r.veloB.TopRightCornerRadius, r.veloB.BottomRightCornerRadius = dentro, dentro
-	r.trasero.CornerRadius = tema.RadioMD
-	r.objetos = append(r.aro.Objetos(), r.trasero)
-	r.objetos = append(r.objetos, r.marco.Objetos()...)
-	r.objetos = append(r.objetos, r.veloA, r.veloB, r.filete, r.glifoA.Objeto(), r.glifoB.Objeto())
-	r.Refresh()
-	return r
-}
-
-type conmutadorRenderer struct {
-	c              *ConmutadorVista
-	aro            *ui.Aro
-	marco          *ui.Caja
-	trasero        *canvas.Rectangle
-	veloA, veloB   *canvas.Rectangle
-	filete         *canvas.Rectangle
-	glifoA, glifoB *iconos.Dibujo
-	objetos        []fyne.CanvasObject
-}
-
-func (r *conmutadorRenderer) MinSize() fyne.Size           { return MedidaConmutadorVista() }
-func (r *conmutadorRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *conmutadorRenderer) Destroy()                     {}
-
-func (r *conmutadorRenderer) Layout(t fyne.Size) {
-	r.trasero.Move(fyne.NewPos(0, 0))
-	r.trasero.Resize(t)
-	r.marco.Redimensionar(t)
-
-	interior := fyne.NewSize(LadoSegmento, t.Height-2*tema.Borde)
-	r.veloA.Move(fyne.NewPos(tema.Borde, tema.Borde))
-	r.veloA.Resize(interior)
-	x := tema.Borde + LadoSegmento
-	r.veloB.Move(fyne.NewPos(x, tema.Borde))
-	r.veloB.Resize(interior)
-	// `divide-x`: el filete del medio es el borde IZQUIERDO del segundo segmento, así
-	// que va dentro de sus 28 y no entre los dos.
-	r.filete.Move(fyne.NewPos(x, tema.Borde))
-	r.filete.Resize(fyne.NewSize(tema.Borde, interior.Height))
-
-	y := (t.Height - GlifoSegmento) / 2
-	r.glifoA.Colocar(tema.Borde+(LadoSegmento-GlifoSegmento)/2, y, GlifoSegmento)
-	r.glifoB.Colocar(x+(LadoSegmento-GlifoSegmento)/2, y, GlifoSegmento)
-	r.aro.Colocar(t)
-}
-
-func (r *conmutadorRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	c := r.c
-	r.trasero.FillColor = tema.Color("surface", v)
-	r.trasero.Refresh()
-	r.marco.Pintar(tema.Color("surface", v), tema.Color("border-strong", v))
-	r.filete.FillColor = tema.Color("border", v)
-
-	// El orden de la web: activo gana, y el hover solo existe en la otra rama.
-	pinta := func(velo *canvas.Rectangle, glifo *iconos.Dibujo, activo, encima bool) {
-		switch {
-		case activo:
-			velo.FillColor = tema.Color("surface-sunken", v)
-			glifo.Tenir("primary-text", v)
-		case encima:
-			velo.FillColor = tema.Color("surface-sunken", v)
-			glifo.Tenir("text", v)
-		default:
-			velo.FillColor = color.NRGBA{}
-			glifo.Tenir("text-muted", v)
+// Es un grupo de radios: una parada de Tab y las flechas; los rótulos, ya traducidos,
+// quedan como nombre accesible de cada opción.
+func NuevoConmutadorVista(grupo, lista, rejilla string, enRejilla bool, alCambiar func(bool)) *ui.Segmentado {
+	s := ui.NuevoSegmentado(grupo, []string{lista, rejilla}, func(i int) {
+		if alCambiar != nil {
+			alCambiar(i == 1)
 		}
+	})
+	s.Talla, s.SoloIcono = ui.SegmentoMD, true
+	s.SubeTeclas = true // «v», «?», Supr o F2 justo después de cambiar de vista con un clic
+	s.Iconos = []iconos.Icono{iconos.Menu, iconos.Rejilla}
+	if enRejilla {
+		s.Elegida = 1
 	}
-	pinta(r.veloA, r.glifoA, !c.Rejilla, c.encima == 1)
-	pinta(r.veloB, r.glifoB, c.Rejilla, c.encima == 2)
-
-	r.aro.Pintar(v)
-	r.aro.Ver(c.enfocado)
-	for _, o := range r.objetos {
-		o.Refresh()
-	}
+	return s
 }
 
 // ---- La cabecera de vista ----
@@ -318,6 +102,10 @@ type CabeceraVista struct {
 	// Conmutador va el último y se separa con `ml-1` ADEMÁS del `gap-2` del grupo:
 	// 10,5 en total. Medido: «Subir» acaba en 1190,5 y el conmutador empieza en 1201.
 	Conmutador fyne.CanvasObject
+	// Orden es el selector «Ordenar» (`SelectorOrden` de la web), delante del
+	// conmutador: en la cuadrícula, que no tiene cabeceras de columna, y en la lista por
+	// debajo de 768, donde «Tamaño» y «Modificado» no se pintan. Nil: no se ofrece.
+	Orden fyne.CanvasObject
 	// Ventana es el ancho de la VENTANA en px de CSS: decide el canalón (`sm:px-6`).
 	Ventana float32
 	// AlCambiarAlto lo llama Layout cuando el ancho cambia el número de líneas: quien la
@@ -340,6 +128,9 @@ func (c *CabeceraVista) Objeto(v tema.Variante) fyne.CanvasObject {
 		hijos = append(hijos, c.Ruta)
 	}
 	hijos = append(hijos, c.Acciones...)
+	if c.Orden != nil {
+		hijos = append(hijos, c.Orden)
+	}
 	if c.Conmutador != nil {
 		hijos = append(hijos, c.Conmutador)
 	}
@@ -360,9 +151,13 @@ func (c *CabeceraVista) enRejilla() bool {
 const AltoCabeceraRejilla float32 = 2*RellenoYCabecera + AltoLineaCabecera + HuecoAcciones + AltoControlCromo + tema.Borde
 
 // columnasRejilla mide las tres columnas: el buscador crece y las otras dos
-// conservan «Nuevo» y lo más ancho de «Subir» y el conmutador de vista.
+// conservan lo más ancho de «Nuevo» y el selector «Ordenar», y de «Subir» y el
+// conmutador de vista (`auto` en la rejilla de la web).
 func (c *CabeceraVista) columnasRejilla(ancho float32) [3]float32 {
 	col2 := c.Acciones[1].MinSize().Width
+	if c.Orden != nil {
+		col2 = max(col2, c.Orden.MinSize().Width)
+	}
 	col3 := max(c.Acciones[2].MinSize().Width, c.Conmutador.MinSize().Width)
 	col1 := max(ancho-2*CanalonCabecera(c.Ventana)-col2-col3-2*HuecoAcciones, 0)
 	return [3]float32{col1, col2, col3}
@@ -380,28 +175,36 @@ func (c *CabeceraVista) colocarRejilla(ancho float32) {
 	columnas := c.columnasRejilla(ancho)
 	col1, col2 := columnas[0], columnas[1]
 
-	// Las migas ocupan las dos primeras columnas (`col-span-2`) y se recortan si no caben.
+	// Las migas ocupan las dos primeras columnas (`col-span-2`) y se recortan si no caben;
+	// con el selector «Ordenar» le ceden la segunda, donde va pegado a la derecha
+	// (`max-md:col-start-2 max-md:row-start-1 max-md:justify-self-end`).
 	y := RellenoYCabecera
-	centrarEn(c.Ruta, canalon, y, min(c.Ruta.MinSize().Width, col1+HuecoAcciones+col2), AltoLineaCabecera)
+	migas := col1 + HuecoAcciones + col2
+	if c.Orden != nil {
+		migas = col1
+		w := c.Orden.MinSize().Width
+		centrarEnLinea(c.Orden, canalon+col1+HuecoAcciones+col2-w, y, w)
+	}
+	centrarEnLinea(c.Ruta, canalon, y, min(c.Ruta.MinSize().Width, migas))
 	conmutador := c.Conmutador.MinSize().Width
-	centrarEn(c.Conmutador, ancho-canalon-conmutador, y, conmutador, AltoLineaCabecera)
+	centrarEnLinea(c.Conmutador, ancho-canalon-conmutador, y, conmutador)
 
 	y += AltoLineaCabecera + HuecoAcciones
 	if c.buscadorEnFilaPropia(ancho) {
 		// El carril móvil y el área segura pueden dejar menos que el propio
 		// relleno del campo. Conservar una columna casi vacía impide escribir.
-		centrarEn(c.Acciones[0], canalon, y, max(ancho-2*canalon, 0), AltoControlCromo)
+		centrarEnLinea(c.Acciones[0], canalon, y, max(ancho-2*canalon, 0))
 		y += AltoControlCromo + HuecoAcciones
 		x := ancho - canalon - columnas[1] - columnas[2] - HuecoAcciones
 		for i := 1; i < len(columnas); i++ {
-			centrarEn(c.Acciones[i], x, y, columnas[i], AltoControlCromo)
+			centrarEnLinea(c.Acciones[i], x, y, columnas[i])
 			x += columnas[i] + HuecoAcciones
 		}
 		return
 	}
 	x := canalon
 	for i, w := range columnas {
-		centrarEn(c.Acciones[i], x, y, w, AltoControlCromo)
+		centrarEnLinea(c.Acciones[i], x, y, w)
 		x += w + HuecoAcciones
 	}
 }
@@ -449,6 +252,9 @@ type linea struct {
 // «Mi unidad» no se veía (visto en una ventana real el 2026-09-27).
 func (c *CabeceraVista) lineas(ancho float32) []linea {
 	grupo := append([]fyne.CanvasObject{}, c.Acciones...)
+	if c.Orden != nil {
+		grupo = append(grupo, c.Orden)
+	}
 	if c.Conmutador != nil {
 		grupo = append(grupo, c.Conmutador)
 	}
@@ -539,16 +345,12 @@ func (c *CabeceraVista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 }
 
-// centrarEnLinea coloca un hijo centrado en el alto de 30 de la línea que empieza en y.
+// centrarEnLinea coloca un hijo con ese ancho centrado en el alto de la línea que
+// empieza en y (`items-center`). Todas las filas de la cabecera miden lo mismo: la de un
+// control.
 func centrarEnLinea(o fyne.CanvasObject, x, y, ancho float32) {
-	centrarEn(o, x, y, ancho, AltoLineaCabecera)
-}
-
-// centrarEn coloca un hijo con ese ancho, centrado en una fila de ese alto que empieza
-// en y (`items-center`).
-func centrarEn(o fyne.CanvasObject, x, y, ancho, fila float32) {
 	alto := o.MinSize().Height
-	o.Move(fyne.NewPos(x, y+(fila-alto)/2))
+	o.Move(fyne.NewPos(x, y+(AltoLineaCabecera-alto)/2))
 	o.Resize(fyne.NewSize(ancho, alto))
 }
 

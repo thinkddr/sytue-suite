@@ -5,12 +5,19 @@
 // runner de migraciones de platform/pkg/pg las aplique al arrancar (o vía CLI).
 package db
 
-import "embed"
+import (
+	"embed"
+
+	"git.sytue.eu/sytue/one/platform/pkg/pg"
+)
 
 // Migrations contiene los ficheros *.up.sql / *.down.sql de db/migrations.
 //
 //go:embed all:migrations
-var Migrations embed.FS
+var migrationFiles embed.FS
+
+// Migrations expands the shared immutable source and scope-fence implementation.
+var Migrations = pg.WithResourceRelayDDL(pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateStorageDDL(migrationFiles))))
 
 // MigrationsDir es la subcarpeta dentro de Migrations donde viven los .sql.
 const MigrationsDir = "migrations"

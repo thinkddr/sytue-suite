@@ -343,8 +343,7 @@ func (p *HojaReuniones) construirCuerpo(v tema.Variante) fyne.CanvasObject {
 	case p.Estado == Error:
 		activas = append(activas, bloqueReunion{o: NuevoAvisoHilo(t.T("error.loadFailed", nil), t.T("action.retry", nil), p.AlReintentar), arriba: tema.Espacio(3)})
 	case p.Estado == Cargando:
-		e := NuevoEsqueletoHilo(t.T("state.loading", nil))
-		e.Partes = []float32{0.70, 0.55}
+		e := NuevoEsqueletoHilo(t.T("state.loading", nil), 0.70, 0.55)
 		activas = append(activas, bloqueReunion{o: e, arriba: tema.Espacio(3)})
 	case len(p.Reuniones) == 0:
 		vac := ui.NuevoVacio(t.T("meetings.empty", nil), t.T("meetings.emptyHint", nil))

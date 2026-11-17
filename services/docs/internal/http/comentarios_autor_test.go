@@ -4,6 +4,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -76,5 +77,44 @@ func TestImportarComentariosGuardaRaicesYRespuestasYDiceLosAnclados(t *testing.T
 	}
 	if out.Saved != 3 || len(out.Anchored) != 1 || out.Anchored[0] != "aa" {
 		t.Errorf("guardados %d, anclados %v; quería 3 y [aa]", out.Saved, out.Anchored)
+	}
+}
+
+// anclasStore apunta el ancla de cada comentario que se guarda.
+type anclasStore struct {
+	*fakeStore
+	anclas []string
+}
+
+func (s *anclasStore) CreateComment(ctx context.Context, p domain.CreateCommentParams) (*domain.Comment, error) {
+	s.anclas = append(s.anclas, string(p.Anchor))
+	return s.fakeStore.CreateComment(ctx, p)
+}
+
+// Un comentario de una celda de un .xlsx/.ods se guarda anclado a su celda con la identidad de
+// su fila y de su columna (`{hoja, fila, col, text}`), la que sigue a la celda si se insertan
+// filas. Un ancla de celda con una fila que no es un id se queda en el texto citado.
+func TestImportarComentariosDeCeldasLosAnclaASuCelda(t *testing.T) {
+	fs := &anclasStore{fakeStore: &fakeStore{doc: ownedDoc()}}
+	h := newHandler(fs.fakeStore)
+	h.store = fs
+	cuerpo := `{"comments":[
+		{"id":"aa","text":"Ana: ¿Cifra?","quote":"B4","cell":{"hoja":"h:Ventas","fila":"t3","col":"t1","text":"B4"}},
+		{"id":"bb","parent_id":"aa","text":"Bea: Sí","quote":"B4"},
+		{"id":"cc","text":"mala","quote":"C1","cell":{"hoja":"h:Ventas","fila":"<script>","col":"t2","text":"C1"}}]}`
+	rq := req(t, "POST", "/v1/documents/d1/comments/import", ownerClaims(), map[string]string{"id": "d1"}, cuerpo)
+	rec := httptest.NewRecorder()
+	h.importComments(rec, rq)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("respuesta: %d %s", rec.Code, rec.Body)
+	}
+	quiero := []string{`{"col":"t1","fila":"t3","hoja":"h:Ventas","text":"B4"}`, `{"text":"C1"}`, `{"text":"B4"}`}
+	if len(fs.anclas) != 3 {
+		t.Fatalf("anclas = %v", fs.anclas)
+	}
+	for i, w := range quiero {
+		if fs.anclas[i] != w {
+			t.Errorf("ancla %d = %s, quiero %s", i, fs.anclas[i], w)
+		}
 	}
 }

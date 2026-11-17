@@ -339,16 +339,16 @@ func Load(defaultPort string) (Config, error) {
 		CloudControllerServiceAccount: l.Get("CLOUD_CONTROLLER_SERVICE_ACCOUNT"),
 		CloudControllerNamespace:      l.Get("CLOUD_CONTROLLER_NAMESPACE"),
 		AbiertoATerceros:              l.GetBoolDefault("ABIERTO_A_TERCEROS", false),
-		TenantsPermitidos:             l.GetCSVDefault("TENANTS_PERMITIDOS", "sytue"),
+		TenantsPermitidos:             l.GetCSVDefault("TENANTS_PERMITIDOS", OrganizacionDeLaPlataforma),
 		RunnerMode:                    l.GetDefault("RUNNER_MODE", ""),
-		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.34.2-rootless@sha256:c8252268760e1baba80780d63d738ef9f260fb7c7c0973c78494cb9ddd99eda1"),
-		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93"),
+		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.35.0-rootless@sha256:5987568f92dafbfb679879de59c1cd8d26597f5f6635c314e166164e2615870c"),
+		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "alpine/curl:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d"),
 		CraneImage:                    l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1"),
 
 		// Pinneadas por tag (no :latest); en prod, re-pinnear por digest tras
 		// verificar con un build vivo (como KANIKO_IMAGE).
-		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.681@sha256:7192795369e3c5bed59f5f63ed2542dee9efdfd016404d417bcda36f47c602d8"),
-		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.0@sha256:6a1fdb962814ca11508ca8d1bab94375b5b7ac4e4a9a40981c29fc32c02f095d"),
+		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.683@sha256:d0baadcb686410540faee151c197f0f95f752fa09bc78590891f2ed80a8f57a8"),
+		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.1@sha256:2306e2b05ee0ef99f5d25b0779f645b24ae9f91ba187107503592fcdfe78da3a"),
 		CNBRunImage:     l.Get("CNB_RUN_IMAGE"),
 
 		BuildNamespace:      l.GetDefault("BUILD_NAMESPACE", "sytue-builds"),
@@ -435,6 +435,13 @@ func (c Config) RequireWebhookSecret() error {
 	return nil
 }
 
+// OrganizacionDeLaPlataforma es el slug de la organización que opera Sytue, la
+// única que entra en DevX mientras esté cerrado a terceros. Es el
+// `platformOrgSlug` de Sytue ID: la organización se llamó `sytue` y se renombró a
+// `corporate` (su dirección es `<slug>.sytue.eu`). Dejar aquí el nombre viejo
+// cerraba DevX a su propio dueño y se lo abría a quien registrara `sytue`.
+const OrganizacionDeLaPlataforma = "corporate"
+
 // TenantAllowed informa de si el tenant puede operar en Sytue Cloud según el
 // cerrojo AbiertoATerceros / TenantsPermitidos. En dev/test con Config{} en
 // memoria (sin entorno prod ni lista explícita) no bloquea los tests unitarios.
@@ -447,7 +454,7 @@ func (c Config) TenantAllowed(tenant string) bool {
 	}
 	allowed := c.TenantsPermitidos
 	if len(allowed) == 0 {
-		allowed = []string{"sytue"}
+		allowed = []string{OrganizacionDeLaPlataforma}
 	}
 	return slices.Contains(allowed, tenant)
 }

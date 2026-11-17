@@ -1,46 +1,19 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-export interface MatrixBootstrap {
-  actor: string;
-  tenant: string;
-  homeserver_url: string;
-  sso_provider_id: string;
-  matrix_user_id: string;
-  controller_user_id: string;
-  channels: { channel_id: string; matrix_room_id: string }[];
-  encryption: 'm.megolm.v1.aes-sha2';
-  draft_room_id?: string;
-  draft_room_ids?: string[];
-  source_url?: string;
-  storage_product?: MatrixStorageProduct;
-  storage_room_id?: string;
-  storage_room_ids?: string[];
-}
-const storageProducts = [
-  'hub',
-  'mail',
-  'drive',
-  'docs',
-  'sheets',
-  'slides',
-  'pdf',
-  'calendar',
-  'contacts',
-  'notes',
-  'photos',
-  'rooms',
-  'cast',
-  'erp',
-  'bases',
-] as const;
-export type MatrixStorageProduct = (typeof storageProducts)[number];
-export interface MatrixStorageScope {
-  tenant: string;
-  subject: string;
-  product: MatrixStorageProduct;
-}
-export function isStorageProduct(value: unknown): value is MatrixStorageProduct {
-  return typeof value === 'string' && (storageProducts as readonly string[]).includes(value);
-}
+import {
+  isStorageProduct,
+  isMatrixRoomId,
+  isMatrixDeviceId,
+  type MatrixBootstrapMetadata as MatrixBootstrap,
+  type MatrixStorageScope,
+  type MatrixReference,
+} from '@sytue/config/matrix';
+export { isStorageProduct, isMatrixRoomId, isMatrixDeviceId } from '@sytue/config/matrix';
+export type {
+  MatrixBootstrapMetadata as MatrixBootstrap,
+  MatrixStorageProduct,
+  MatrixStorageScope,
+  MatrixReference,
+} from '@sytue/config/matrix';
 function privateIdentity(value: string, maximum: number): boolean {
   if (!value || new TextEncoder().encode(value).length > maximum || /[\0\r\n\t]/.test(value))
     return false;
@@ -49,10 +22,6 @@ function privateIdentity(value: string, maximum: number): boolean {
     if (character.length === 1 && code >= 0xd800 && code <= 0xdfff) return false;
   }
   return true;
-}
-export interface MatrixReference {
-  room_id: string;
-  event_id: string;
 }
 export interface MatrixDraft {
   channelId: string;
@@ -66,6 +35,17 @@ export interface MatrixSession {
   access_token: string;
   storage_scope?: MatrixStorageScope;
 }
+/** Keep the deployed Rooms name and the private product/device namespace byte-for-byte. */
+export function matrixStorePrefix(input: MatrixBootstrap, device: string): string {
+  const bootstrap = validateBootstrap(input);
+  if (!isMatrixDeviceId(device)) throw new MatrixSecurityError('device');
+  const user = bootstrap.matrix_user_id,
+    home = bootstrap.homeserver_url;
+  if (bootstrap.storage_product)
+    return `sytue-storage-matrix-${encodeURIComponent(JSON.stringify([bootstrap.storage_product, bootstrap.tenant, bootstrap.actor, home, user, device]))}`;
+  return `sytue-rooms-matrix-${encodeURIComponent(home)}-${encodeURIComponent(user)}-${encodeURIComponent(device)}`;
+}
+
 export interface MatrixFile {
   url: string;
   key: JsonWebKey;
@@ -108,29 +88,33 @@ export class MatrixSecurityError extends Error {
     this.name = 'MatrixSecurityError';
   }
 }
-function boundedIdentifier(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= 255 &&
-    !/\s/.test(value) &&
-    Array.from(value).every(
-      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127,
-    )
-  );
+/**
+ * El despliegue funciona SIN cifrado de extremo a extremo (complemento Matrix
+ * desactivado: `SYTUE_CIFRADO_E2E=desactivado` en el BFF). No es un fallo de
+ * seguridad que haya que mostrar: la puerta deja pasar a la app, que trabaja con
+ * sus datos en claro en el servidor (cifrados en reposo y en tránsito, no E2E).
+ */
+export class CifradoDesactivado extends Error {
+  constructor() {
+    super('cifrado_desactivado');
+    this.name = 'CifradoDesactivado';
+  }
 }
-export function isMatrixDeviceId(value: unknown): value is string {
-  return boundedIdentifier(value);
-}
-/** Room v12 IDs are a SHA-256 base64url digest; earlier room versions include a server name. */
-export function isMatrixRoomId(value: unknown): value is string {
-  return (
-    boundedIdentifier(value) && (/^![A-Za-z0-9_-]{43}$/.test(value) || /^![^:]+:.+$/.test(value))
-  );
+/** Never turn an arbitrary rejection value (which may contain private input) into a message. */
+export function matrixFailure(reason: unknown): Error {
+  return reason instanceof Error ? reason : new MatrixSecurityError('device');
 }
 
 export function validateBootstrap(input: MatrixBootstrap): MatrixBootstrap {
   const home = new URL(input.homeserver_url);
+  const identityVersion =
+    input.storage_identity_version === undefined || input.storage_identity_version === 0
+      ? 1
+      : input.storage_identity_version;
+  const userID =
+    identityVersion === 2 && input.storage_product
+      ? `@sytue_storage_${input.storage_product}_${input.tenant}_${input.actor}:${home.host}`
+      : `@sytue_${input.actor}:${home.host}`;
   if (
     home.protocol !== 'https:' ||
     home.username ||
@@ -142,7 +126,9 @@ export function validateBootstrap(input: MatrixBootstrap): MatrixBootstrap {
     !input.actor ||
     !input.tenant ||
     !input.sso_provider_id ||
-    input.matrix_user_id !== `@sytue_${input.actor}:${home.host}` ||
+    (identityVersion !== 1 && identityVersion !== 2) ||
+    (identityVersion === 2 && !input.storage_product) ||
+    input.matrix_user_id !== userID ||
     input.controller_user_id !== `@rooms_controller:${home.host}` ||
     !Array.isArray(input.channels)
   )
@@ -175,7 +161,11 @@ export function validateBootstrap(input: MatrixBootstrap): MatrixBootstrap {
       !rooms.includes(input.storage_room_id)
     )
       throw new MatrixSecurityError('identity');
-  } else if (input.storage_room_id || (input.storage_room_ids?.length ?? 0) !== 0) {
+  } else if (
+    input.storage_room_id ||
+    (input.storage_room_ids?.length ?? 0) !== 0 ||
+    (input.storage_identity_version ?? 0) !== 0
+  ) {
     throw new MatrixSecurityError('identity');
   }
   return { ...input, homeserver_url: home.origin };

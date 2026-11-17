@@ -7,6 +7,7 @@
   "block.short": "Blockera",
   "card.untitledOwner": "Okänt namn",
   "card.watch": "Titta på {title}",
+  "card.watched": "{percent} % sett",
   "channel.count": {
     "one": "{count} offentlig video",
     "other": "{count} offentliga videor"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Automatisk",
   "player.qualityAutoNow": "Automatisk ({quality})",
   "player.region": "Videospelare",
+  "player.restart": "Börja från början",
+  "player.resumedAt": "Fortsätter från {time}",
   "player.seek": "Position",
+  "player.speed": "Hastighet",
+  "player.speedNormal": "Normal",
+  "player.speedNow": "Hastighet {rate}",
   "player.unmute": "Slå på ljudet",
   "player.volume": "Volym",
   "quality.approximate": "Grov uppskattning: videons längd är inte känd ännu.",

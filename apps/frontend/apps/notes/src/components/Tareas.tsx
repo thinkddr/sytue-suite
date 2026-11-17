@@ -16,7 +16,7 @@ import {
   Input,
   MenuItem,
   Modal,
-  Spinner,
+  SkeletonRows,
   cx,
 } from '@sytue/ui';
 import { intlTag, type Locale } from '@sytue/i18n';
@@ -91,9 +91,7 @@ export function PanelTareas({
         </div>
       </div>
       {tareas === null ? (
-        <div class="grid place-items-center p-6">
-          <Spinner />
-        </div>
+        <SkeletonRows class="-mx-2" rows={5} />
       ) : tareas.length === 0 ? (
         <p class="text-text-subtle text-base">{t(`tasks.empty.${estado}`)}</p>
       ) : (

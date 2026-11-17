@@ -144,7 +144,7 @@ func (a *API) applyLabel(w http.ResponseWriter, r *http.Request) {
 }
 
 // listLabelMessages pagina por KEYSET los mensajes de una etiqueta (mismo contrato
-// que listMessages: `cursor` = "received_at,id", `next_cursor` para la siguiente).
+// que listMessages: `cursor` = "fecha de orden,id", `next_cursor` para la siguiente).
 func (a *API) listLabelMessages(w http.ResponseWriter, r *http.Request) {
 	acc, err := a.account(r)
 	if err != nil {
@@ -173,7 +173,7 @@ func (a *API) listLabelMessages(w http.ResponseWriter, r *http.Request) {
 	next := ""
 	if len(msgs) == limit {
 		last := msgs[len(msgs)-1]
-		next = formatCursor(last.ReceivedAt, last.ID)
+		next = formatCursor(last.FechaDeOrden(), last.ID)
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"messages": msgs, "limit": limit, "next_cursor": next})
 }

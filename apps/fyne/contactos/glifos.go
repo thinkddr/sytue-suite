@@ -27,7 +27,7 @@ import (
 const (
 	// EstrellaD es el `StarGlyph`. Relleno cuando el contacto está destacado y solo
 	// trazo cuando no; la ruta es la misma y lo que cambia es el `fill`.
-	EstrellaD = "M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z"
+	EstrellaD = "M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z"
 	// TartaD es el `CakeGlyph` de «Próximos cumpleaños». Son dos subrutas, como en la
 	// web: la tarta con su glaseado y la vela.
 	TartaD = "M4 20h16M4 20v-7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7M4 15.5c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 2-1 2.5-.5 M12 11V8M12 5.5a1 1 0 1 0 0-.01"

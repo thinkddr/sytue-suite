@@ -27,6 +27,8 @@ func TestLasFirmasJNICoincidenConElJava(t *testing.T) {
 		"../../sesion/atras_android.go":          "Atras",
 		"../../sesion/teclado_android.go":        "Teclado",
 		"../../sesion/imagenenimagen_android.go": "ImagenEnImagen",
+		// La galería del teléfono de Photos (copia de seguridad), en el núcleo.
+		"../../../nucleo/carrete/carrete_android.go": "Carrete",
 	} {
 		g, err := os.ReadFile(goF)
 		if err != nil {

@@ -18,8 +18,9 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
-// celdaMes es un día de la rejilla del mes: el `<button>` de CalendarGrid.tsx que crea
-// un evento al pulsarlo, con su número, sus píldoras y su «+N más».
+// celdaMes es un día de la rejilla del mes: el botón de fondo de CalendarGrid.tsx que
+// crea un evento al pulsar el hueco, con su número, sus píldoras y su «+N más». Las
+// píldoras y el «+N más» son widgets propios encima: reciben ellos su pulsación.
 //
 // Es un widget y no un contenedor porque recibe el clic, se enfoca y se anuncia con su
 // fecha («Crear evento el 21 de septiembre»), que es lo que hace la web.
@@ -37,6 +38,8 @@ type celdaMes struct {
 	ocultas  int
 	// reserva es el alto del carril de barras de su semana (`barsAreaH`).
 	reserva float32
+	// destino: aquí caería el evento que se está arrastrando (`arrastremes.go`).
+	destino bool
 }
 
 var _ fyne.Widget = (*celdaMes)(nil)
@@ -101,13 +104,12 @@ func (c *celdaMes) CreateRenderer() fyne.WidgetRenderer {
 	r.circulo.CornerRadius = LadoNumeroDia / 2
 	r.objetos = []fyne.CanvasObject{r.fondo, r.der, r.abajo, r.circulo, r.numero}
 	for _, o := range c.visibles {
-		p := nuevaPildora(c.m, o, v)
+		p, obj := nuevaPildoraMes(c.m, o, v)
 		r.pildoras = append(r.pildoras, p)
-		r.objetos = append(r.objetos, p)
+		r.objetos = append(r.objetos, obj)
 	}
 	if c.ocultas > 0 && c.m.MasRotulo != nil {
-		r.masTexto = c.m.MasRotulo(c.ocultas)
-		r.mas = ui.Texto(r.masTexto, tema.TextoXS, ui.Medio, tema.Color("text-muted", v))
+		r.mas = nuevoMasDia(c.m, c.dia, c.m.MasRotulo(c.ocultas))
 		r.objetos = append(r.objetos, r.mas)
 	}
 	r.pintar(v)
@@ -121,8 +123,7 @@ type celdaRenderer struct {
 	circulo           *canvas.Rectangle
 	numero            *canvas.Text
 	pildoras          []*pildora
-	masTexto          string
-	mas               *canvas.Text
+	mas               *masDia
 	objetos           []fyne.CanvasObject
 }
 
@@ -137,6 +138,10 @@ func (r *celdaRenderer) Destroy()                     {}
 func (r *celdaRenderer) pintar(v tema.Variante) {
 	c := r.c
 	switch {
+	// El destino de un arrastre (`bg-primary/10`) manda sobre todo lo demás: es lo
+	// único que se mira mientras se arrastra.
+	case c.destino:
+		r.fondo.FillColor = mezclar(tema.Color("surface", v), tema.Color("primary", v), 0.1)
 	// `focus-visible:bg-bg-subtle`: en la celda el foco es un cambio de fondo y no un
 	// aro, porque la rejilla no tiene hueco donde dibujarlo.
 	case c.Encima() || c.Enfocado():
@@ -197,9 +202,10 @@ func (r *celdaRenderer) Layout(t fyne.Size) {
 		y += h + espacio0p5
 	}
 	if r.mas != nil {
-		// `px-1.5 text-xs font-medium`, recortado con puntos suspensivos si no cabe.
-		ui.Truncar(r.mas, r.masTexto, tema.TextoXS, ui.Medio, ancho-2*espacio1p5)
-		ui.ColocarTexto(r.mas, tema.TextoXS, x+espacio1p5, y)
+		// `px-1.5 text-xs font-medium`, recortado con puntos suspensivos si no cabe: el
+		// botón mide su texto, nunca más que el ancho útil.
+		r.mas.Move(fyne.NewPos(x, y))
+		r.mas.Resize(fyne.NewSize(min(r.mas.MinSize().Width, ancho), tema.TextoXS.Linea))
 	}
 }
 

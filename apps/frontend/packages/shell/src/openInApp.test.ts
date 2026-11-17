@@ -20,8 +20,14 @@ function enHost(hostname: string): void {
   });
 }
 
+// Se restaura el `window` que hubiera, no se borra: los ficheros comparten proceso, y
+// borrarlo dejaba a happy-dom (registrado por otro fichero) con `document` y sin
+// `window`, y los tests del portero de Matrix que van detrás fallaban solo en según
+// qué orden de ficheros.
+const windowOriginal = Object.getOwnPropertyDescriptor(globalThis, 'window');
 afterEach(() => {
-  Reflect.deleteProperty(globalThis, 'window');
+  if (windowOriginal) Object.defineProperty(globalThis, 'window', windowOriginal);
+  else Reflect.deleteProperty(globalThis, 'window');
 });
 
 describe('sameSuite', () => {

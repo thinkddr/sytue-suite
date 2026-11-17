@@ -16,8 +16,10 @@ describe('nativeWorkerResponse', () => {
     expect(source).toContain("ownerCache('pages', context)");
     expect(source).toContain("ownerCache('api', context)");
     expect(source).toContain("data.type !== 'INITIALISE'");
-    expect(source).toContain("request.destination === 'script'");
-    expect(source).toContain("indexedDB.deleteDatabase('sytue-offline')");
+    expect(source).toContain("STATIC_CACHE = VERSION + '-static-v2'");
+    expect(source).toContain('isBundledAsset');
+    expect(source).toContain('sytue-offline-cas-v2');
+    expect(source).toContain('indexedDB.deleteDatabase(name)');
     expect(source).toContain('SYTUE_CLEAR_OFFLINE');
     expect(source).toContain('includeUncontrolled: true');
     expect(source).toContain('const path = sinBase(url.pathname)');

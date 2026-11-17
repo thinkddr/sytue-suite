@@ -218,6 +218,24 @@ func TestRespondInvitationRecipientOnly(t *testing.T) {
 	if err != nil || len(gotEv.Attendees) != 1 || gotEv.Attendees[0].PartStat != domain.PartAccepted {
 		t.Fatalf("partstat tras responder: %+v err=%v, quiero ACCEPTED", gotEv.Attendees, err)
 	}
+
+	// Cambiar de opinión (D-CAL-01): una invitación ya contestada se vuelve a
+	// contestar, solo por su destinatario, y la encuentra InvitacionDeEvento.
+	if _, err := st.RespondInvitation(ctx, inv.ID, domain.InvAccepted, []string{"mallory@sytue.eu"}, "mallory-1"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("ajeno sobre una contestada: err=%v, quiero ErrNotFound", err)
+	}
+	if resp, err = st.RespondInvitation(ctx, inv.ID, domain.InvDeclined, []string{"bob@sytue.eu"}, "bob-1"); err != nil || resp.Status != domain.InvDeclined {
+		t.Fatalf("cambiar de respuesta: status=%v err=%v, quiero declined", resp.Status, err)
+	}
+	if gotEv, err = st.GetEvent(ctx, ev.ID); err != nil || gotEv.Attendees[0].PartStat != domain.PartDeclined {
+		t.Fatalf("partstat tras cambiar: %+v err=%v, quiero DECLINED", gotEv.Attendees, err)
+	}
+	if got, err := st.InvitacionDeEvento(ctx, inv.UID, []string{"bob@sytue.eu"}, ""); err != nil || got.ID != inv.ID {
+		t.Fatalf("InvitacionDeEvento por correo: %+v err=%v", got, err)
+	}
+	if _, err := st.InvitacionDeEvento(ctx, inv.UID, nil, ""); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("identidad vacía: err=%v, quiero ErrNotFound", err)
+	}
 }
 
 // TestTenantIsolation es la prueba nuclear de RLS (CONVENTIONS §0.7/§10): los
@@ -282,5 +300,38 @@ func TestTenantIsolation(t *testing.T) {
 	}
 	if len(listB) != 1 || listB[0].ID != calB.ID {
 		t.Fatalf("B ve calendarios ajenos: %+v", listB)
+	}
+}
+
+// Editar un evento conserva su id: con DELETE+INSERT cada PUT le daba otro, y quien lo
+// tenía abierto o enlazado por /events/{id} se quedaba con un 404.
+func TestUpdateEventConservaElID(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+	cal, err := st.CreateCalendar(ctx, store.NewCalendar{OwnerSub: "user-1", Name: "trabajo", DisplayName: "Trabajo"})
+	if err != nil {
+		t.Fatalf("CreateCalendar: %v", err)
+	}
+	ev, _, err := st.CreateEvent(ctx, sampleEvent(cal.ID, "evt-estable"))
+	if err != nil {
+		t.Fatalf("CreateEvent: %v", err)
+	}
+	in := sampleEvent(cal.ID, "evt-estable")
+	in.Summary = "Reunion movida"
+	in.SequenceNo = 1
+	upd, _, err := st.UpdateEvent(ctx, in, uuid.Nil)
+	if err != nil {
+		t.Fatalf("UpdateEvent: %v", err)
+	}
+	if upd.ID != ev.ID {
+		t.Fatalf("editar ha cambiado el id: %s → %s", ev.ID, upd.ID)
+	}
+	got, err := st.GetEvent(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("GetEvent por el id de siempre: %v", err)
+	}
+	if got.Summary != "Reunion movida" || got.SequenceNo != 1 {
+		t.Fatalf("la edición no se ha guardado: %+v", got)
 	}
 }

@@ -109,6 +109,10 @@ type FilaLista struct {
 	SinLeer bool
 	// ConCasilla enseña la casilla de selección delante de todo.
 	ConCasilla bool
+	// RotuloCasilla es el `aria-label` de la casilla, ya traducido: «Seleccionar
+	// informe.pdf». Vacío cae en el genérico «Seleccionar fila» de Table.tsx, que en una
+	// lista larga obliga a quien usa lector de pantalla a adivinar qué fila marca.
+	RotuloCasilla string
 	// ConGalon enseña el galón de «entrar aquí» al final de la fila.
 	ConGalon bool
 	// Delantero es el `leading` de la web: un avatar, una tesela de tipo, un icono.
@@ -169,7 +173,7 @@ func (f *FilaLista) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.objetos = []fyne.CanvasObject{r.base, r.velo, r.galon}
 	if f.ConCasilla {
-		r.casilla = casillaDeFila(f.Seleccionada, f.AlMarcar)
+		r.casilla = casillaDeFila(f.Seleccionada, f.RotuloCasilla, f.AlMarcar)
 		r.objetos = append(r.objetos, r.casilla)
 	}
 	if f.Delantero != nil {
@@ -251,16 +255,28 @@ type filaListaRenderer struct {
 }
 
 // casillaDeFila es la `Eleccion` sin etiqueta que marca una fila: el texto ya está en
-// la fila, así que la casilla solo lo ANUNCIA. Es el `aria-label="Seleccionar fila"`
-// de Table.tsx.
-func casillaDeFila(marcada bool, alMarcar func()) *Eleccion {
-	c := NuevaCasilla(textoComun("ui.selectRow"), func(bool) {
+// la fila, así que la casilla solo lo ANUNCIA, con el rótulo que traiga quien la pinta
+// (ver rotuloCasilla).
+func casillaDeFila(marcada bool, rotulo string, alMarcar func()) *Eleccion {
+	c := NuevaCasilla(rotuloCasilla(rotulo), func(bool) {
 		if alMarcar != nil {
 			alMarcar()
 		}
 	})
 	c.SinEtiqueta, c.Marcada = true, marcada
 	return c
+}
+
+// rotuloCasilla es lo que anuncia la casilla de una fila: el rótulo propio, que nombra
+// el elemento como el `aria-label={t('files.select', { name })}` de Drive, o, si no lo
+// hay, el `aria-label="Seleccionar fila"` de Table.tsx. Se vuelve a poner en cada
+// Refresh porque las filas de un `widget.List` se RECICLAN: la casilla se crea una vez
+// y luego la fila pasa a ser la de otro fichero.
+func rotuloCasilla(rotulo string) string {
+	if rotulo != "" {
+		return rotulo
+	}
+	return textoComun("ui.selectRow")
 }
 
 func (r *filaListaRenderer) MinSize() fyne.Size {
@@ -422,6 +438,7 @@ func (r *filaListaRenderer) Refresh() {
 	}
 	if r.casilla != nil {
 		r.casilla.Marcada = f.Seleccionada
+		r.casilla.Etiqueta = rotuloCasilla(f.RotuloCasilla)
 	}
 	if r.chevron != nil {
 		r.chevron.Tenir("text-subtle", v)
@@ -483,6 +500,9 @@ type FilaDrive struct {
 
 	Seleccionada bool
 	ConCasilla   bool
+	// RotuloCasilla es el `aria-label={t('files.select', { name })}` de la casilla, ya
+	// traducido: «Seleccionar informe.pdf». Vacío, «Seleccionar fila».
+	RotuloCasilla string
 	// Ubicacion es la carpeta donde vive, en una búsqueda (`showLocation`): una línea de
 	// `sytue-meta` bajo el nombre con la carpeta de 12 delante. Vacía, no hay línea.
 	Ubicacion string
@@ -521,9 +541,10 @@ type FilaDrive struct {
 }
 
 var (
-	_ fyne.Widget       = (*FilaDrive)(nil)
-	_ fyne.Tappable     = (*FilaDrive)(nil)
-	_ desktop.Hoverable = (*FilaDrive)(nil)
+	_ fyne.Widget            = (*FilaDrive)(nil)
+	_ fyne.Tappable          = (*FilaDrive)(nil)
+	_ fyne.SecondaryTappable = (*FilaDrive)(nil)
+	_ desktop.Hoverable      = (*FilaDrive)(nil)
 )
 
 // LadoMasFila es el `h-8 w-8` del botón «⋯», que llena la columna `w-8` de acciones.
@@ -588,7 +609,14 @@ func (f *FilaDrive) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.objetos = []fyne.CanvasObject{r.base, r.velo}
 	if f.ConCasilla {
-		r.casilla = casillaDeFila(f.Seleccionada, f.AlMarcar)
+		// AlMarcar se lee al pulsar, no al crear: la lista recicla la fila para otro
+		// elemento (y la crea antes de rellenarla), y la casilla marcaba el de entonces.
+		r.casilla = casillaDeFila(f.Seleccionada, f.RotuloCasilla, func() {
+			if f.AlMarcar != nil {
+				f.AlMarcar()
+			}
+		})
+		r.casilla.SubeTeclas = true // los atajos de Drive (Supr, F2, Esc) tras marcar
 		r.objetos = append(r.objetos, r.casilla)
 	}
 	r.objetos = append(r.objetos, r.tesela.Objetos()...)
@@ -627,6 +655,16 @@ func (f *FilaDrive) Tapped(e *fyne.PointEvent) {
 	}
 	if f.AlAbrir != nil {
 		f.AlAbrir()
+	}
+}
+
+// TappedSecondary es el clic derecho (y mantener pulsado en el móvil): en un explorador
+// de ficheros es el gesto con el que se piden las acciones, así que abre el MISMO menú
+// que el «⋯», colgado de su caja aunque el botón no se vea todavía. Sin menú (sin red,
+// por ejemplo) no hace nada: abrir la fila con el botón secundario sorprendería.
+func (f *FilaDrive) TappedSecondary(*fyne.PointEvent) {
+	if f.AlMenu != nil && f.zonaMas != nil {
+		f.AlMenu(f.zonaMas)
 	}
 }
 
@@ -805,6 +843,7 @@ func (r *filaDriveRenderer) Refresh() {
 	r.tesela.Poner(f.Extension, f.Carpeta, v)
 	if r.casilla != nil {
 		r.casilla.Marcada = f.Seleccionada
+		r.casilla.Etiqueta = rotuloCasilla(f.RotuloCasilla)
 		r.casilla.Hidden = !f.Seleccionada && !f.SeleccionActiva && !f.encima && !f.SiempreMenu
 	}
 	for _, o := range r.objetos {
@@ -847,15 +886,102 @@ type CabeceraDrive struct {
 	Todas, Algunas        bool
 	Ventana               float32
 	AlMarcarTodas         func()
+	// RotuloCasilla es el `aria-label={t('files.selectAll')}` de la casilla de la
+	// cabecera: marca TODAS, no una fila, y anunciarla como «Seleccionar fila» engaña.
+	RotuloCasilla string
+
+	// Con AlOrdenar, cada rótulo es el `<button>` de la web que ordena por su columna
+	// (`files.sort.by`): recibe el campo pulsado, `name`, `size` o `modified`. Sin él
+	// los rótulos son decorativos, como en la búsqueda, donde manda la relevancia.
+	AlOrdenar func(campo string)
+	// OrdenCampo es la columna por la que está ordenada la lista, y OrdenDesc su
+	// sentido: esa va en `text-text` con su flecha (`chevronUp`, o `chevronDown` en
+	// descendente).
+	OrdenCampo string
+	OrdenDesc  bool
+
+	// encima es el campo del rótulo bajo el puntero (`hover:text-text`); zonas, lo que
+	// ocupa cada botón en la última colocación, para saber cuál se pulsa.
+	encima string
+	zonas  map[string][2]float32
 }
 
-var _ fyne.Widget = (*CabeceraDrive)(nil)
+// Los campos de las tres columnas, como los llama la web (`files.col.<campo>`).
+const (
+	CampoNombre     = "name"
+	CampoTamano     = "size"
+	CampoModificado = "modified"
+)
+
+const (
+	// HuecoOrdenDrive es el `gap-1` entre el rótulo y su flecha.
+	HuecoOrdenDrive float32 = 1 * 0.25 * tema.Rem
+	// TamFlechaOrdenDrive es el `size={12}` del `Icon` de la columna ordenada: más
+	// pequeña que la de Table.tsx (14), porque el rótulo es `sytue-overline`.
+	TamFlechaOrdenDrive float32 = 12
+)
+
+var (
+	_ fyne.Widget        = (*CabeceraDrive)(nil)
+	_ fyne.Tappable      = (*CabeceraDrive)(nil)
+	_ desktop.Hoverable  = (*CabeceraDrive)(nil)
+	_ desktop.Cursorable = (*CabeceraDrive)(nil)
+)
 
 // NuevaCabeceraDrive crea la cabecera con los tres rótulos ya traducidos.
 func NuevaCabeceraDrive(nombre, tamano, fecha string) *CabeceraDrive {
 	c := &CabeceraDrive{Nombre: nombre, Tamano: tamano, Fecha: fecha}
 	c.ExtendBaseWidget(c)
 	return c
+}
+
+// Tapped ordena por la columna cuyo rótulo se pulsa. La casilla es un hijo pulsable y
+// se queda su toque; fuera de los rótulos no pasa nada, como fuera de los botones.
+func (c *CabeceraDrive) Tapped(e *fyne.PointEvent) {
+	if campo := c.campoEn(e.Position.X); campo != "" && c.AlOrdenar != nil {
+		c.AlOrdenar(campo)
+	}
+}
+
+// campoEn dice qué rótulo cae bajo una x; vacío, ninguno o no se ordena.
+func (c *CabeceraDrive) campoEn(x float32) string {
+	if c.AlOrdenar == nil {
+		return ""
+	}
+	for campo, z := range c.zonas {
+		if x >= z[0] && x < z[1] {
+			return campo
+		}
+	}
+	return ""
+}
+
+// MouseIn empieza a seguir el puntero.
+func (c *CabeceraDrive) MouseIn(e *desktop.MouseEvent) { c.MouseMoved(e) }
+
+// MouseMoved pinta en `text-text` el rótulo bajo el puntero, que es lo que dice que se
+// puede pulsar.
+func (c *CabeceraDrive) MouseMoved(e *desktop.MouseEvent) {
+	if campo := c.campoEn(e.Position.X); campo != c.encima {
+		c.encima = campo
+		c.Refresh()
+	}
+}
+
+// MouseOut devuelve los rótulos a su tinta.
+func (c *CabeceraDrive) MouseOut() {
+	if c.encima != "" {
+		c.encima = ""
+		c.Refresh()
+	}
+}
+
+// Cursor es la mano sobre un rótulo que ordena.
+func (c *CabeceraDrive) Cursor() desktop.Cursor {
+	if c.encima != "" {
+		return desktop.PointerCursor
+	}
+	return desktop.DefaultCursor
 }
 
 // CreateRenderer compone la cabecera.
@@ -869,19 +995,25 @@ func (c *CabeceraDrive) CreateRenderer() fyne.WidgetRenderer {
 		nombre: NuevoVersal(c.Nombre, tema.TextoXS, SemiNegrita, tinta),
 		tamano: NuevoVersal(c.Tamano, tema.TextoXS, SemiNegrita, tinta),
 		fecha:  NuevoVersal(c.Fecha, tema.TextoXS, SemiNegrita, tinta),
+		flecha: iconos.Trazo(iconos.ChevronArriba, TamFlechaOrdenDrive, "text", v),
 	}
 	r.objetos = []fyne.CanvasObject{r.base}
 	if c.ConCasilla {
 		// ponytail: `Eleccion` no tiene estado indeterminado y la cabecera de Drive
 		// sí (`someSelected`). Aquí se pinta marcada o no; el tercer estado se cierra
 		// añadiendo un `Parcial bool` a `Eleccion`, que es de otro agente.
-		r.casilla = casillaDeFila(c.Todas, c.AlMarcarTodas)
+		r.casilla = casillaDeFila(c.Todas, c.RotuloCasilla, c.AlMarcarTodas)
+		r.casilla.SubeTeclas = true // los atajos de Drive tras marcar todo con un clic
 		r.objetos = append(r.objetos, r.casilla)
 	}
 	r.objetos = append(r.objetos, r.nombre.Objetos()...)
 	r.objetos = append(r.objetos, r.tamano.Objetos()...)
 	r.objetos = append(r.objetos, r.fecha.Objetos()...)
-	r.objetos = append(r.objetos, r.sombra)
+	r.objetos = append(r.objetos, r.flecha.Objeto(), r.sombra)
+	r.flecha.Ver(false)
+	// La tinta de la columna ordenada y la forma de su flecha son de Refresh: sin él,
+	// una cabecera recién creada se pintaba como si no ordenara.
+	r.Refresh()
 	return r
 }
 
@@ -890,7 +1022,9 @@ type cabeceraDriveRenderer struct {
 	base, sombra          *canvas.Rectangle
 	casilla               *Eleccion
 	nombre, tamano, fecha *Versal
-	objetos               []fyne.CanvasObject
+	// flecha es la de la columna ordenada: solo hay una a la vez.
+	flecha  *iconos.Dibujo
+	objetos []fyne.CanvasObject
 }
 
 func (r *cabeceraDriveRenderer) MinSize() fyne.Size {
@@ -899,6 +1033,20 @@ func (r *cabeceraDriveRenderer) MinSize() fyne.Size {
 
 func (r *cabeceraDriveRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *cabeceraDriveRenderer) Destroy()                     {}
+
+// conFlecha dice si la columna lleva la flecha del orden: la activa, si se ordena.
+func (r *cabeceraDriveRenderer) conFlecha(campo string) bool {
+	return r.c.AlOrdenar != nil && r.c.OrdenCampo == campo
+}
+
+// anchoBoton es lo que ocupa el botón de una columna: el rótulo y, en la activa, el
+// `gap-1` y la flecha.
+func (r *cabeceraDriveRenderer) anchoBoton(campo string, e *Versal) float32 {
+	if r.conFlecha(campo) {
+		return e.Ancho() + HuecoOrdenDrive + TamFlechaOrdenDrive
+	}
+	return e.Ancho()
+}
 
 func (r *cabeceraDriveRenderer) Layout(t fyne.Size) {
 	c := r.c
@@ -917,7 +1065,17 @@ func (r *cabeceraDriveRenderer) Layout(t fyne.Size) {
 		r.casilla.Move(fyne.NewPos(x, (t.Height-m.Height)/2))
 		x += m.Width + HuecoFila
 	}
-	r.nombre.Colocar(x, y)
+	zonas := map[string][2]float32{}
+	// colocar pone un rótulo con su botón empezando en bx, y la flecha detrás si es la
+	// columna ordenada.
+	colocar := func(campo string, e *Versal, bx float32) {
+		e.Colocar(bx, y)
+		zonas[campo] = [2]float32{bx, bx + r.anchoBoton(campo, e)}
+		if r.conFlecha(campo) {
+			r.flecha.Colocar(bx+e.Ancho()+HuecoOrdenDrive, (t.Height-TamFlechaOrdenDrive)/2, TamFlechaOrdenDrive)
+		}
+	}
+	colocar(CampoNombre, r.nombre, x)
 
 	// Las columnas que no caben (`hidden md:block`, `hidden sm:block`) se esconden: sin
 	// colocar, sus letras se amontonaban en la esquina de arriba a la izquierda, un
@@ -927,25 +1085,45 @@ func (r *cabeceraDriveRenderer) Layout(t fyne.Size) {
 	r.fecha.Ver(conFecha)
 	r.tamano.Ver(conTamano)
 	if conFecha {
-		r.fecha.Colocar(derecha-ColFecha, y)
+		colocar(CampoModificado, r.fecha, derecha-ColFecha)
 		derecha -= ColFecha + HuecoFila
 	}
 	if conTamano {
-		r.tamano.Colocar(derecha-r.tamano.Ancho(), y)
+		// `justify-end`: el botón entero, flecha incluida, va pegado a la derecha.
+		colocar(CampoTamano, r.tamano, derecha-r.anchoBoton(CampoTamano, r.tamano))
 	}
+	c.zonas = zonas
+	// La flecha de una columna escondida no se ve.
+	visible := map[string]bool{CampoNombre: true, CampoTamano: conTamano, CampoModificado: conFecha}
+	r.flecha.Ver(c.AlOrdenar != nil && visible[c.OrdenCampo])
 }
 
 func (r *cabeceraDriveRenderer) Refresh() {
+	c := r.c
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.base.FillColor = tema.Color(FondoHoja(), v)
 	r.sombra.FillColor = BordeSobre("border", FondoHoja(), v)
-	tinta := tema.Color("text-subtle", v)
-	for _, e := range []*Versal{r.nombre, r.tamano, r.fecha} {
-		e.Pintar(tinta)
+	// `text-text-subtle` en reposo; la columna ordenada y la que está bajo el puntero,
+	// `text-text` (`activa ? 'text-text' : 'hover:text-text'`).
+	for campo, e := range map[string]*Versal{CampoNombre: r.nombre, CampoTamano: r.tamano, CampoModificado: r.fecha} {
+		tinta := "text-subtle"
+		if c.AlOrdenar != nil && (c.OrdenCampo == campo || c.encima == campo) {
+			tinta = "text"
+		}
+		e.Pintar(tema.Color(tinta, v))
 	}
+	flecha := iconos.ChevronArriba
+	if c.OrdenDesc {
+		flecha = iconos.ChevronAbajo
+	}
+	r.flecha.Cambiar(flecha, tema.Color("text", v))
 	if r.casilla != nil {
-		r.casilla.Marcada = r.c.Todas
+		r.casilla.Marcada = c.Todas
+		r.casilla.Etiqueta = rotuloCasilla(c.RotuloCasilla)
 	}
+	// Y se vuelve a colocar: cambiar de columna mueve la flecha, y en «Tamaño», pegado
+	// a la derecha, también el rótulo.
+	r.Layout(c.Size())
 	for _, o := range r.objetos {
 		o.Refresh()
 	}

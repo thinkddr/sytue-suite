@@ -610,7 +610,7 @@ function PoliciesTab({
           <EmptyState
             title={t('access.empty.title')}
             description={t('gov.rules.emptyDescription')}
-            illustration={<Icon name="lock" size={28} />}
+            icon="lock"
             action={
               <Button
                 variant="primary"
@@ -851,7 +851,7 @@ function EgressTab({
           <EmptyState
             title={t('gov.egress.emptyTitle')}
             description={t('gov.egress.emptyDescription')}
-            illustration={<Icon name="globe" size={28} />}
+            icon="globe"
           />
         ) : (
           <div class="border-border bg-surface overflow-hidden rounded-lg border">
@@ -986,7 +986,7 @@ function DecisionsTab({
           <EmptyState
             title={t('gov.decisions.emptyTitle')}
             description={t('gov.decisions.emptyDescription')}
-            illustration={<Icon name="check" size={28} />}
+            icon="check"
           />
         ) : (
           <div class="border-border bg-surface overflow-hidden rounded-lg border">

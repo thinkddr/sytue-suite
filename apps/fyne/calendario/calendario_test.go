@@ -15,13 +15,11 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // Los guardianes de Sytue Calendar.
@@ -229,21 +227,22 @@ func TestLosSeisEstadosSePintan(t *testing.T) {
 		nombre string
 		e      Estado
 	}{
-		{"carga", agenda.Cargando},
-		{"vacio", agenda.Vacia},
-		{"error", agenda.Error},
-		{"sin-conexion", agenda.SinConexion},
-		{"sin-permiso", agenda.SinPermiso},
-		{"exito", agenda.Exito},
+		{"carga", ui.EstadoCargando},
+		{"vacio", ui.EstadoVacia},
+		{"error", ui.EstadoError},
+		{"sin-conexion", ui.EstadoSinConexion},
+		{"sin-permiso", ui.EstadoSinPermiso},
+		{"exito", ui.EstadoExito},
 	} {
 		t.Run(c.nombre, func(t *testing.T) {
 			p := pantallaDeMuestra(t)
 			p.Estado = c.e
-			p.SinConexion = c.e == agenda.SinConexion
+			p.SinConexion = c.e == ui.EstadoSinConexion
 			img := pintar(t, p)
 			if !hayTinta(img, int(tema.AnchoLateral)+20, filaFileteCab+20, int(ventana)-20, int(altoUtil)-20) {
 				t.Errorf("el estado %q deja el contenido en blanco", c.nombre)
 			}
+			guardar(t, img, "calendario-estado-"+c.nombre)
 		})
 	}
 }
@@ -253,11 +252,11 @@ func TestLosSeisEstadosSePintan(t *testing.T) {
 // «sin permiso» es justo esa y es fácil de perder al refactorizar.
 func TestElEstadoSinPermisoNoOfreceReintentar(t *testing.T) {
 	p := pantallaDeMuestra(t)
-	p.Estado = agenda.SinPermiso
+	p.Estado = ui.EstadoSinPermiso
 	if got := p.textosDeEstado(); got.RotuloAccion != "" {
 		t.Errorf("«sin permiso» ofrece la acción %q y no debería ofrecer ninguna", got.RotuloAccion)
 	}
-	p.Estado = agenda.Error
+	p.Estado = ui.EstadoError
 	if got := p.textosDeEstado(); got.RotuloAccion == "" {
 		t.Error("«error» tiene que ofrecer «Reintentar»")
 	}
@@ -267,7 +266,7 @@ func TestElEstadoSinPermisoNoOfreceReintentar(t *testing.T) {
 // está pero inerte (`disabled={offline}`), no ausente.
 func TestSinConexionElReintentoEstaApagado(t *testing.T) {
 	p := pantallaDeMuestra(t)
-	p.Estado = agenda.SinConexion
+	p.Estado = ui.EstadoSinConexion
 	got := p.textosDeEstado()
 	if got.RotuloAccion == "" {
 		t.Fatal("sin conexión el botón de reintentar sigue estando, solo que apagado")
@@ -426,5 +425,67 @@ func TestLosIconosDeLaCabeceraSiguenAlModo(t *testing.T) {
 	}
 	if got, quiero := rc.icono.Tinta(), tema.Color("header-fg", v); got != quiero {
 		t.Errorf("el icono de la campana sigue en %v; en oscuro es %v", got, quiero)
+	}
+}
+
+// TestElFinDeUnDiaCompletoEsElUltimoDia: los vectores de dates.test.ts. El campo «Fin» de
+// un día completo es el último día y el DTEND que viaja es el siguiente (exclusivo, RFC
+// 5545 §3.6.1), que es como lo pintan las vistas. Antes viajaba el valor crudo: «8 → 10
+// nov» se pintaba 8–9, un día suelto salía con DTEND = DTSTART y un «8–10» de Apple se
+// abría con fin el 11. La zona de visualización no es UTC a propósito: el día flotante
+// no puede correrse.
+func TestElFinDeUnDiaCompletoEsElUltimoDia(t *testing.T) {
+	madrid, err := time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &Pantalla{T: traductor(t), Zona: madrid}
+	local := func(d int) time.Time { return time.Date(2026, 11, d, 0, 0, 0, 0, madrid) }
+	utc := func(d int) time.Time { return time.Date(2026, 11, d, 0, 0, 0, 0, time.UTC) }
+	ocurrencia := func(in api.EventInput) Ocurrencia {
+		return Ocurrencia{Instance: api.Instance{Event: api.Event{AllDay: true, Summary: "s"}, Start: in.Start, End: in.End}}
+	}
+
+	in := Edicion{TodoElDia: true, Inicio: local(8), Fin: local(10)}.EntradaDe(p)
+	if !in.Start.Equal(utc(8)) || !in.End.Equal(utc(11)) {
+		t.Fatalf("«8 → 10 nov» tiene que guardar DTSTART 8 y DTEND 11: %v – %v", in.Start, in.End)
+	}
+	ini, fin := ocurrenciaInstantes(ocurrencia(in), madrid)
+	if got, want := p.Cuando(ini, fin, true), p.Cuando(local(8), local(11), true); got != want || got == p.Cuando(local(8), local(10), true) {
+		t.Errorf("lo guardado no se lee como 8–10: %q", got)
+	}
+
+	for _, fin := range []time.Time{local(8), {}, local(6)} {
+		in := Edicion{TodoElDia: true, Inicio: local(8), Fin: fin}.EntradaDe(p)
+		if !in.End.Equal(utc(9)) {
+			t.Errorf("un día suelto (fin %v) tiene que guardar DTEND del día siguiente: %v", fin, in.End)
+		}
+	}
+
+	e := p.EdicionDe(ocurrencia(api.EventInput{Start: utc(8), End: utc(11)}))
+	if !e.Fin.Equal(local(10)) {
+		t.Errorf("abrir un evento de tres días tiene que enseñar fin el 10: %v", e.Fin)
+	}
+	if in := e.EntradaDe(p); !in.End.Equal(utc(11)) {
+		t.Errorf("abrir y guardar sin tocar nada cambia el DTEND: %v", in.End)
+	}
+	// Un día suelto, uno guardado antes con el fin inclusivo y uno sin DTEND: el fin
+	// nunca queda antes del inicio.
+	for _, dtend := range []time.Time{utc(9), utc(8), {}} {
+		if e := p.EdicionDe(ocurrencia(api.EventInput{Start: utc(8), End: dtend})); !e.Fin.Equal(local(8)) {
+			t.Errorf("DTEND %v: el fin tiene que ser el día del inicio, es %v", dtend, e.Fin)
+		}
+	}
+	// El aviso «el fin es anterior al inicio» compara solo fechas en día completo: la
+	// hora que arrastran los campos (de antes de encender «Todo el día») no se ve.
+	hora := func(d, h int) time.Time { return time.Date(2026, 11, d, h, 0, 0, 0, madrid) }
+	if (Edicion{TodoElDia: true, Inicio: hora(8, 22), Fin: hora(8, 1)}).FinAntesDelInicio(madrid) {
+		t.Error("un día suelto con la hora del fin antes que la del inicio no es un fin anterior")
+	}
+	if !(Edicion{TodoElDia: true, Inicio: hora(8, 0), Fin: hora(7, 23)}).FinAntesDelInicio(madrid) {
+		t.Error("un fin el día anterior al inicio tiene que avisar")
+	}
+	if !(Edicion{Inicio: hora(8, 22), Fin: hora(8, 1)}).FinAntesDelInicio(madrid) {
+		t.Error("con hora, un fin antes del inicio tiene que avisar")
 	}
 }

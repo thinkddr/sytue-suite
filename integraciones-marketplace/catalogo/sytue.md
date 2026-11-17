@@ -1,5 +1,6 @@
-# Sytue — identidad interna
-No se configura: es el conector de identidad PROPIO de la suite (el sujeto que
-queda registrado en las peticiones internas del gateway). Su único campo,
-`subject`, lo rellena el sistema. Esta ficha existe para que el catálogo
-documente el origen de cada aviso.
+<a id="sytue--identidad-interna"></a>
+# Sytue — internal identity
+Not configured: it is the suite's OWN identity connector (the subject that
+gets recorded in the gateway's internal requests). Its only field,
+`subject`, is filled in by the system. This page exists so that the catalog
+documents the origin of each notice.

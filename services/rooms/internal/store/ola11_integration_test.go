@@ -30,7 +30,7 @@ func TestCategoriesCRUDAndAssignment(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	// Crear dos categorías: sort_order incremental (0,1).
 	c1, err := st.CreateCategory(ctx, "alice", "Proyectos")
@@ -116,7 +116,7 @@ func TestCategoryIsolationPerUser(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}

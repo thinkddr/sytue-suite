@@ -15,9 +15,9 @@ const APP = join(import.meta.dir, '../../..');
 const FRONTEND = join(APP, '../..');
 const RAIZ = join(APP, '../../../..');
 
-/** Lo que acepta `FormatoDe` en services/notes/internal/domain/exportar.go. */
+/** Lo que acepta `FormatoDe` en apps/nucleo/notes/model/exportar.go. */
 async function formatosDelServicio(): Promise<Set<string>> {
-  const fuente = await Bun.file(join(RAIZ, 'services/notes/internal/domain/exportar.go')).text();
+  const fuente = await Bun.file(join(RAIZ, 'apps/nucleo/notes/model/exportar.go')).text();
   const bloque = fuente.slice(fuente.indexOf('func FormatoDe'));
   return new Set(
     [...bloque.slice(0, bloque.indexOf('\n}')).matchAll(/case ([^:]+):/g)].flatMap((m) =>

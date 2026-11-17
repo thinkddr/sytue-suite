@@ -6,6 +6,7 @@ package calcus
 import (
 	"image/color"
 	"runtime"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -16,8 +17,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
-	"git.sytue.eu/sytue/one/apps/nucleo/formula"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // La barra de hojas de SheetCanvas.tsx:
@@ -28,15 +27,21 @@ import (
 // subrayado `bg-indicator absolute inset-x-1 bottom-0 h-0.5 rounded-full` en la activa.
 // Todo rem: con el de 14, `h-8` son 28, `px-2` 7, `gap-1` 3,5 y `max-w-[12rem]` 168.
 var (
-	AltoPestanas      = tema.Espacio(8)
-	MargenPestanas    = tema.Espacio(2)
-	HuecoPestanas     = tema.Espacio(1)
-	MargenPestana     = tema.Espacio(2)
-	AnchoMaxPestana   = float32(12 * tema.Rem)
-	SangriaIndicador  = tema.Espacio(1)
-	GrosorIndicador   = tema.Espacio(0.5)
-	EscalonPestanas   = tema.TextoXS
-	altoContenidoTira = AltoPestanas - tema.Borde // `h-full` dentro del `border-t`
+	AltoPestanas     = tema.Espacio(8)
+	MargenPestanas   = tema.Espacio(2)
+	HuecoPestanas    = tema.Espacio(1)
+	MargenPestana    = tema.Espacio(2)
+	AnchoMaxPestana  = float32(12 * tema.Rem)
+	SangriaIndicador = tema.Espacio(1)
+	GrosorIndicador  = tema.Espacio(0.5)
+	EscalonPestanas  = tema.TextoXS
+	// AnchoChevronPestana es el `w-5` del ▾ que sigue a la pestaña activa y abre su menú
+	// (`MenuPestana.tsx`). Es un botón APARTE, como en la web: la pestaña mide lo mismo
+	// esté activa o no, y `MedidaPestanaHoja` no cambia.
+	AnchoChevronPestana = tema.Espacio(5)
+	// LadoIconoChevron es el `<Icon name="chevronDown" size={12} />` del ▾.
+	LadoIconoChevron  float32 = 12
+	altoContenidoTira         = AltoPestanas - tema.Borde // `h-full` dentro del `border-t`
 )
 
 // MedidaPestanaHoja es lo que ocupa una pestaña: su nombre en `text-xs` (seminegrita
@@ -54,13 +59,22 @@ func pesoPestana(activa bool) ui.Peso {
 }
 
 // Pestanas es la barra de hojas: las pestañas, los tres botones (añadir, duplicar y
-// eliminar hoja) y el resumen del rango seleccionado.
+// eliminar hoja), el de la hoja de atajos y el resumen del rango seleccionado.
 type Pestanas struct {
 	widget.BaseWidget
 
 	lz                  *Lienzo
 	tira                *tiraHojas
 	mas, copiar, borrar *editor.BotonCinta
+	// teclado abre la hoja de atajos (Ctrl+/), que si no nadie sabría que existe.
+	teclado *editor.BotonCinta
+	// resumen es el del rango marcado, que se pulsa para elegir qué enseña (`resumen.go`),
+	// y medidas lo elegido.
+	resumen *botonResumen
+	medidas []MedidaResumen
+	// menu es el de la pestaña activa mientras está abierto (o el de sus colores, o el
+	// del resumen).
+	menu *ui.Menu
 }
 
 var _ fyne.Widget = (*Pestanas)(nil)
@@ -70,10 +84,15 @@ func nuevasPestanas(lz *Lienzo) *Pestanas {
 	p.ExtendBaseWidget(p)
 	p.tira = &tiraHojas{p: p, arrastre: -1}
 	p.tira.ExtendBaseWidget(p.tira)
+	p.tira.chevron = &chevronPestana{tira: p.tira}
+	p.tira.chevron.ExtendBaseWidget(p.tira.chevron)
 	// Los rótulos se ponen al pintar: el traductor llega DESPUÉS de construir el lienzo.
 	p.mas = editor.NuevoBotonCinta(iconos.EdMas, "", lz.AnadirHoja)
 	p.copiar = editor.NuevoBotonCinta(iconos.EdCopiar, "", lz.DuplicarHoja)
 	p.borrar = editor.NuevoBotonCinta(iconos.EdPapelera, "", lz.PedirBorrarHoja)
+	p.teclado = editor.NuevoBotonCinta(iconos.EdTeclado, "", lz.MostrarAtajos)
+	p.resumen = nuevoBotonResumen(p.AbrirMenuResumen)
+	p.medidas = medidasRecordadas()
 	return p
 }
 
@@ -83,35 +102,32 @@ func (p *Pestanas) AccessibilityRole() fyne.AccessibleRole { return fyne.Accessi
 // MinSize es el `h-8`; el ancho lo pone quien la coloca.
 func (p *Pestanas) MinSize() fyne.Size {
 	p.ExtendBaseWidget(p)
-	return fyne.NewSize(2*MargenPestanas+3*editor.LadoBotonCinta, AltoPestanas)
+	return fyne.NewSize(2*MargenPestanas+4*editor.LadoBotonCinta, AltoPestanas)
 }
 
-// Resumen es el texto del `<output>`: «Recuento: 3 · Suma: 6 · Promedio: 2». Vacío
-// sin rango o sin ningún número, que es cuando la web no lo pinta.
+// Resumen es el texto del `<output>` con las medidas elegidas: «Suma: 6», o «Recuento: 3
+// · Suma: 6». Vacío sin rango o sin ningún número, que es cuando la web no lo pinta.
 func (p *Pestanas) Resumen() string {
-	r := p.lz.Rejilla
-	if r.ext == nil {
-		return ""
-	}
-	n, suma, media, ok := p.lz.Libro.Resumen(r.Rango())
+	e, ok := p.estadisticas()
 	if !ok {
 		return ""
 	}
-	return p.lz.t("sheet.stats.count", i18n.Vars{"count": n}) + " · " +
-		p.lz.t("sheet.stats.sum", i18n.Vars{"value": formula.FormatNumber(suma)}) + " · " +
-		p.lz.t("sheet.stats.average", i18n.Vars{"value": formula.FormatNumber(media)})
+	partes := make([]string, len(p.medidas))
+	for i, m := range p.medidas {
+		partes[i] = p.lz.textoMedida(m, e)
+	}
+	return strings.Join(partes, separadorResumen)
 }
 
 // CreateRenderer compone el fondo, la línea de arriba, la tira, los botones y el resumen.
 func (p *Pestanas) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r := &pestanasRenderer{
-		p:       p,
-		fondo:   canvas.NewRectangle(tema.Color("surface", v)),
-		linea:   canvas.NewRectangle(tema.Color("border", v)),
-		resumen: ui.Texto("", EscalonPestanas, ui.Normal, tema.Color("text-muted", v)),
+		p:     p,
+		fondo: canvas.NewRectangle(tema.Color("surface", v)),
+		linea: canvas.NewRectangle(tema.Color("border", v)),
 	}
-	r.objetos = []fyne.CanvasObject{r.fondo, r.linea, p.tira, p.mas, p.copiar, p.borrar, r.resumen}
+	r.objetos = []fyne.CanvasObject{r.fondo, r.linea, p.tira, p.mas, p.copiar, p.borrar, p.teclado, p.resumen}
 	r.Refresh()
 	return r
 }
@@ -119,7 +135,6 @@ func (p *Pestanas) CreateRenderer() fyne.WidgetRenderer {
 type pestanasRenderer struct {
 	p            *Pestanas
 	fondo, linea *canvas.Rectangle
-	resumen      *canvas.Text
 	objetos      []fyne.CanvasObject
 }
 
@@ -135,15 +150,16 @@ func (r *pestanasRenderer) Layout(t fyne.Size) {
 
 	alto := t.Height - tema.Borde
 	der := t.Width - MargenPestanas
-	if r.resumen.Text != "" {
-		ancho := ui.Medir(r.resumen.Text, EscalonPestanas, ui.Normal).Width
-		der -= ancho
-		ui.ColocarTexto(r.resumen, EscalonPestanas, der, tema.Borde+(alto-EscalonPestanas.Linea)/2)
+	if res := r.p.resumen; res.texto != "" {
+		tam := res.MinSize()
+		der -= tam.Width
+		res.Move(fyne.NewPos(der, tema.Borde+(alto-tam.Height)/2))
+		res.Resize(tam)
 		der -= HuecoPestanas
 	}
 	// `items-center` centra los botones de la cinta en el alto útil de la barra.
 	lado := editor.LadoBotonCinta
-	for _, b := range []*editor.BotonCinta{r.p.borrar, r.p.copiar, r.p.mas} {
+	for _, b := range []*editor.BotonCinta{r.p.teclado, r.p.borrar, r.p.copiar, r.p.mas} {
 		der -= lado
 		b.Move(fyne.NewPos(der, tema.Borde+(alto-lado)/2))
 		b.Resize(fyne.NewSize(lado, lado))
@@ -158,11 +174,18 @@ func (r *pestanasRenderer) Refresh() {
 	lz := r.p.lz
 	r.fondo.FillColor = tema.Color("surface", v)
 	r.linea.FillColor = tema.Color("border", v)
-	r.resumen.Color = tema.Color("text-muted", v)
-	r.resumen.Text = r.p.Resumen()
+	res := r.p.resumen
+	res.texto = r.p.Resumen()
+	res.Nombre = res.texto // el nombre del `<button>` es su texto, como en la web
+	if res.texto == "" {
+		res.Hide()
+	} else {
+		res.Show()
+	}
 	r.p.mas.Rotulo = lz.t("sheet.add", nil)
 	r.p.copiar.Rotulo = lz.t("sheet.duplicate", nil)
 	r.p.borrar.Rotulo = lz.t("sheet.delete", nil)
+	r.p.teclado.Rotulo = lz.t("sheet.shortcuts.title", nil)
 	// Con el libro protegido los tres botones se apagan, como en la web (`disabled`).
 	estructura := !lz.Rejilla.SoloLectura && lz.Libro.ProteccionLibro() == nil
 	r.p.mas.Inerte = !estructura
@@ -204,7 +227,8 @@ type tiraHojas struct {
 	desX     float32
 	encima   bool // el puntero, sobre la tira (sobre una pestaña lo dice la pestaña)
 	pestanas []*pestanaHoja
-	arrastre int // la pestaña que se está arrastrando, o -1
+	chevron  *chevronPestana // el ▾ de la activa
+	arrastre int             // la pestaña que se está arrastrando, o -1
 	soltarX  float32
 	// sobrePulgar es el puntero sobre el pulgar; arrastrandoPulgar, que se le está
 	// arrastrando, y arrastreSuelto, un arrastre que no empezó en él.
@@ -404,6 +428,9 @@ func (t *tiraHojas) anchoContenido() float32 {
 			x += HuecoPestanas
 		}
 		x += MedidaPestanaHoja(ph.nombre, ph.activa).Width
+		if ph.activa {
+			x += t.chevron.MinSize().Width
+		}
 	}
 	return x
 }
@@ -442,7 +469,7 @@ func (r *tiraRenderer) Objects() []fyne.CanvasObject {
 	for i, ph := range r.t.pestanas {
 		o[i] = ph
 	}
-	return append(o, r.pulgar, r.flechas[0].Objeto(), r.flechas[1].Objeto()) // encima de las pestañas
+	return append(o, r.t.chevron, r.pulgar, r.flechas[0].Objeto(), r.flechas[1].Objeto()) // encima de las pestañas
 }
 
 func (r *tiraRenderer) Layout(tam fyne.Size) {
@@ -452,12 +479,21 @@ func (r *tiraRenderer) Layout(tam fyne.Size) {
 		alto -= AltoBarraClasica // el `h-full` de las pestañas es lo que queda encima
 	}
 	x := -r.t.desX
+	r.t.chevron.Hide()
 	for _, ph := range r.t.pestanas {
 		m := MedidaPestanaHoja(ph.nombre, ph.activa)
 		m.Height = min(m.Height, alto)
 		ph.Move(fyne.NewPos(x, (alto-m.Height)/2))
 		ph.Resize(m)
-		x += m.Width + HuecoPestanas
+		x += m.Width
+		if ph.activa { // el ▾, pegado a su pestaña: van en el mismo `<span>`
+			ch := r.t.chevron
+			ch.Show()
+			ch.Move(fyne.NewPos(x, 0))
+			ch.Resize(fyne.NewSize(ch.MinSize().Width, alto))
+			x += ch.MinSize().Width
+		}
+		x += HuecoPestanas
 	}
 	r.flechas[0].Ver(clasica)
 	r.flechas[1].Ver(clasica)
@@ -489,6 +525,7 @@ func (r *tiraRenderer) Refresh() {
 	for _, ph := range r.t.pestanas {
 		ph.Refresh()
 	}
+	r.t.chevron.Refresh()
 }
 
 // soltar es el `onDrop`: la pestaña arrastrada va a la posición de la que cae debajo.
@@ -524,19 +561,24 @@ type pestanaHoja struct {
 }
 
 var (
-	_ fyne.Tappable       = (*pestanaHoja)(nil)
-	_ fyne.DoubleTappable = (*pestanaHoja)(nil)
-	_ fyne.Focusable      = (*pestanaHoja)(nil)
-	_ fyne.Draggable      = (*pestanaHoja)(nil)
-	_ fyne.Accessible     = (*pestanaHoja)(nil)
-	_ desktop.Hoverable   = (*pestanaHoja)(nil)
+	_ fyne.Tappable          = (*pestanaHoja)(nil)
+	_ fyne.DoubleTappable    = (*pestanaHoja)(nil)
+	_ fyne.SecondaryTappable = (*pestanaHoja)(nil)
+	_ fyne.Focusable         = (*pestanaHoja)(nil)
+	_ fyne.Draggable         = (*pestanaHoja)(nil)
+	_ fyne.Accessible        = (*pestanaHoja)(nil)
+	_ desktop.Hoverable      = (*pestanaHoja)(nil)
 )
 
-func (ph *pestanaHoja) Tapped(*fyne.PointEvent)        { ph.tira.p.lz.CambiarHoja(ph.i) }
-func (ph *pestanaHoja) DoubleTapped(*fyne.PointEvent)  { ph.tira.p.lz.PedirRenombrarHoja(ph.i) }
-func (ph *pestanaHoja) FocusGained()                   { ph.enfocado = true; ph.Refresh() }
-func (ph *pestanaHoja) FocusLost()                     { ph.enfocado = false; ph.Refresh() }
-func (ph *pestanaHoja) MouseMoved(*desktop.MouseEvent) {}
+func (ph *pestanaHoja) Tapped(*fyne.PointEvent)       { ph.tira.p.lz.CambiarHoja(ph.i) }
+func (ph *pestanaHoja) DoubleTapped(*fyne.PointEvent) { ph.tira.p.lz.PedirRenombrarHoja(ph.i) }
+
+// TappedSecondary es el clic derecho (y la pulsación larga): el menú de ESA hoja, que
+// antes se activa, porque el menú actúa sobre la activa como duplicar y eliminar.
+func (ph *pestanaHoja) TappedSecondary(*fyne.PointEvent) { ph.tira.p.AbrirMenuHoja(ph.i) }
+func (ph *pestanaHoja) FocusGained()                     { ph.enfocado = true; ph.Refresh() }
+func (ph *pestanaHoja) FocusLost()                       { ph.enfocado = false; ph.Refresh() }
+func (ph *pestanaHoja) MouseMoved(*desktop.MouseEvent)   {}
 
 func (ph *pestanaHoja) MouseIn(*desktop.MouseEvent) {
 	ph.encima = true
@@ -556,8 +598,15 @@ func (ph *pestanaHoja) TypedKey(e *fyne.KeyEvent) {
 	if ui.SubirEscape(ph, e) { // Escape y «atrás» son del diálogo de encima
 		return
 	}
-	if e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter {
+	switch {
+	case e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter:
 		ph.Tapped(nil)
+	// F2 renombra y Mayús+F10 abre el menú (`accionDeTeclaEnPestana`): el doble clic no
+	// lo alcanzan ni el teclado (WCAG 2.1.1) ni el dedo.
+	case e.Name == fyne.KeyF2 && !ui.Mayus():
+		ph.tira.p.lz.PedirRenombrarHoja(ph.i)
+	case e.Name == fyne.KeyF10 && ui.Mayus():
+		ph.tira.p.AbrirMenuHoja(ph.i)
 	}
 }
 

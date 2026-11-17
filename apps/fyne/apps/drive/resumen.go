@@ -53,6 +53,21 @@ func EsTexto(el Elemento) bool {
 	return !el.Carpeta && el.ID != "" && extensionesTexto[Extension(el.Nombre)]
 }
 
+// extensionesMultimedia son las de `tipoMultimedia` de la web
+// (apps/frontend/apps/drive/src/lib/multimedia.ts): lo que se reproduce sin códecs
+// extra. Un .avi o un .mkv siguen bajándose sin más.
+var extensionesMultimedia = map[string]bool{
+	"mp4": true, "m4v": true, "webm": true, "mov": true, "ogv": true,
+	"mp3": true, "m4a": true, "aac": true, "wav": true, "ogg": true, "oga": true,
+	"opus": true, "flac": true, "weba": true,
+}
+
+// EsMultimedia es `previewKind(item)` 'video' o 'audio' de la web: en Fyne se abre con
+// la app del sistema.
+func EsMultimedia(el Elemento) bool {
+	return !el.Carpeta && el.ID != "" && extensionesMultimedia[strings.ToLower(Extension(el.Nombre))]
+}
+
 // dialogoResumen es el estado del diálogo.
 type dialogoResumen struct {
 	p       *Pantalla

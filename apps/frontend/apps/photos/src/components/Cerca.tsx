@@ -12,16 +12,18 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Spinner } from '@sytue/ui';
+import { Button, EmptyState, Icon } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import { cerca as pedirCerca, foto as pedirFoto, type Foto } from '../client/photosApi.js';
 import { useT } from '../i18n/index.js';
 import { posicionVisor } from '../lib/posicionVisor.js';
 import { RUTA } from '../lib/ruta.js';
+import { FalloDeCarga } from './Fallo.js';
 import { Marco } from './Marco.js';
-import { Miniatura, Visor } from './PhotosApp.js';
+import { alTeclearEnGaleria, Miniatura, Visor } from './PhotosApp.js';
 import { Nav } from './Nav.js';
+import { EsqueletoFilas } from './Esqueletos.js';
 
 export function Cerca({
   locale,
@@ -38,16 +40,19 @@ export function Cerca({
   const [referencia, setReferencia] = useState<Foto | null>(null);
   const [fotos, setFotos] = useState<Foto[] | null>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
-  const [error, setError] = useState('');
+  const [fallo, setFallo] = useState<unknown>(null);
 
-  useEffect(() => {
+  const cargar = () => {
+    setFallo(null);
     Promise.all([pedirFoto(id), pedirCerca(id)])
       .then(([r, lista]) => {
         setReferencia(r);
         setFotos(lista);
       })
-      .catch((e) => setError(String(e)));
-  }, [id]);
+      .catch(setFallo);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(cargar, [id]);
 
   return (
     <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={t('nearby.title')}>
@@ -71,14 +76,10 @@ export function Cerca({
           ) : null}
         </header>
 
-        {error ? (
-          <p class="text-danger-text mb-4 text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        {fotos === null ? (
-          <Spinner />
+        {fallo !== null ? (
+          <FalloDeCarga locale={locale} fallo={fallo} alReintentar={cargar} />
+        ) : fotos === null ? (
+          <EsqueletoFilas />
         ) : fotos.length === 0 ? (
           // Vacío no es un fallo: o la foto no trae coordenadas —la mayoría de
           // las de una cámara sin GPS— o de verdad no hay otra por allí.
@@ -86,10 +87,11 @@ export function Cerca({
             class="flex-1"
             title={t('nearby.empty.title')}
             description={t('nearby.empty.description')}
-            illustration={<Illustration name="emptyPhotos" />}
+            spot="emptyPhotos"
           />
         ) : (
-          <ul class="filas">
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- las teselas son los botones y las paradas de Tab; la lista solo recoge sus flechas
+          <ul class="filas" onKeyDown={alTeclearEnGaleria}>
             {fotos.map((f, i) => (
               <Miniatura key={f.id} foto={f} t={t} onOpen={() => setAbierta(i)} />
             ))}

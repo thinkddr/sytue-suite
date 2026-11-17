@@ -52,12 +52,12 @@ var (
 // cargarExterno pregunta si hay almacén conectado. Un 403 (no es administración) o
 // cualquier fallo lo deja en nil, que es lo que hace la web.
 func (p *Pantalla) cargarExterno() {
-	if p.svc == nil || !p.hayRed() {
+	if p.cuenta() == nil || !p.hayRed() {
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
-	e, err := p.svc.ExternalStorage(ctx)
+	e, err := p.cuenta().ExternalStorage(ctx)
 	enHilo(func() {
 		p.lateral.Externo = nil
 		if err == nil {
@@ -133,7 +133,7 @@ func (p *Pantalla) pedirExterno() *dialogoExterno { return p.abrirExterno("elegi
 func (p *Pantalla) gestionarExterno() *dialogoExterno { return p.abrirExterno("gestionar") }
 
 func (p *Pantalla) abrirExterno(vista string) *dialogoExterno {
-	if p.win == nil || p.svc == nil {
+	if p.win == nil || p.cuenta() == nil {
 		return nil
 	}
 	de := &dialogoExterno{p: p, vista: vista, fase: "idle", cuerpo: container.NewStack(), abierto: true}
@@ -236,7 +236,7 @@ func (de *dialogoExterno) cargarCuentas(despues func(error)) {
 	de.p.enSegundoPlano(func() {
 		ctx, cancelar := de.p.ctx()
 		defer cancelar()
-		cuentas, err := de.p.svc.ExternalStorageAccounts(ctx)
+		cuentas, err := de.p.cuenta().ExternalStorageAccounts(ctx)
 		enHilo(func() {
 			if !de.abierto {
 				return
@@ -387,7 +387,7 @@ func (de *dialogoExterno) sondearNas() {
 	consultar = func() {
 		ctx, cancelar := de.p.ctx()
 		defer cancelar()
-		st, err := de.p.svc.NASStatus(ctx)
+		st, err := de.p.cuenta().NASStatus(ctx)
 		enHilo(func() {
 			if !de.abierto {
 				de.sondeando = false
@@ -466,9 +466,9 @@ func (de *dialogoExterno) guardar() {
 		var st api.EstadoNAS
 		var err error
 		if c.Kind == "nas" {
-			st, err = de.p.svc.ConnectNAS(ctx, c)
+			st, err = de.p.cuenta().ConnectNAS(ctx, c)
 		} else {
-			err = de.p.svc.SaveExternalStorage(ctx, c)
+			err = de.p.cuenta().SaveExternalStorage(ctx, c)
 		}
 		enHilo(func() {
 			de.fase = "idle"
@@ -500,7 +500,7 @@ func (de *dialogoExterno) desconectar() {
 	de.p.enSegundoPlano(func() {
 		ctx, cancelar := de.p.ctx()
 		defer cancelar()
-		err := de.p.svc.DeleteExternalStorage(ctx)
+		err := de.p.cuenta().DeleteExternalStorage(ctx)
 		enHilo(func() {
 			de.fase = "idle"
 			switch {

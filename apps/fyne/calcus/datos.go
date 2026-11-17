@@ -4,11 +4,14 @@
 package calcus
 
 import (
+	"maps"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
+	"git.sytue.eu/sytue/one/apps/nucleo/formula/analisis"
 )
 
 // Las operaciones de la pestaña Datos que tocan el libro: ordenar, quitar duplicados,
@@ -45,7 +48,7 @@ func (l *Libro) ponerFila(f, c1 int, fila filaDeCeldas) {
 
 // usado es el rectángulo que ocupan las celdas con algo de la hoja activa.
 func (l *Libro) usado() (c1, f1, c2, f2 int, ok bool) {
-	c1, f1, c2, f2 = Columnas, Filas, -1, -1
+	c1, f1, c2, f2 = MaxColumnas, MaxFilas, -1, -1
 	for k := range l.h().celdas {
 		c1, f1, c2, f2 = min(c1, k.C), min(f1, k.F), max(c2, k.C), max(f2, k.F)
 	}
@@ -182,7 +185,7 @@ func (l *Libro) TextoEnColumnas(sep string, c1, f1, f2 int) {
 			continue
 		}
 		for i, p := range partes {
-			if c1+i >= Columnas {
+			if c1+i >= MaxColumnas {
 				break
 			}
 			nuevo[Celda{C: c1 + i, F: f}] = escaparHTML(strings.TrimSpace(p))
@@ -198,26 +201,27 @@ func (l *Libro) TextoEnColumnas(sep string, c1, f1, f2 int) {
 }
 
 // Estructura es el comando `insrow`, `inscol`, `delrow` o `delcol` sobre el rango: se
-// mueven las celdas con su formato y se reescriben las fórmulas de la hoja activa para
-// que sigan apuntando a su dato (`formula.Desplazamiento`, las reglas de Excel).
+// mueven las celdas con su formato y se reescriben las fórmulas de la hoja activa, y las
+// de las otras hojas que la citan, para que sigan apuntando a su dato
+// (`formula.Desplazamiento`, las reglas de Excel).
 // `lado` es "above"/"below" o "left"/"right" al insertar.
 func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	var d formula.Desplazamiento
 	switch cmd {
 	case "insrow":
-		d = formula.Desplazamiento{Filas: true, Desde: f1, Cantidad: 1, Tope: Filas}
+		d = formula.Desplazamiento{Filas: true, Desde: f1, Cantidad: 1, Tope: MaxFilas}
 		if lado == "below" {
 			d.Desde = f2 + 1
 		}
 	case "delrow":
-		d = formula.Desplazamiento{Filas: true, Desde: f1, Cantidad: -(f2 - f1 + 1), Tope: Filas}
+		d = formula.Desplazamiento{Filas: true, Desde: f1, Cantidad: -(f2 - f1 + 1), Tope: MaxFilas}
 	case "inscol":
-		d = formula.Desplazamiento{Desde: c1, Cantidad: 1, Tope: Columnas}
+		d = formula.Desplazamiento{Desde: c1, Cantidad: 1, Tope: MaxColumnas}
 		if lado == "right" {
 			d.Desde = c2 + 1
 		}
 	case "delcol":
-		d = formula.Desplazamiento{Desde: c1, Cantidad: -(c2 - c1 + 1), Tope: Columnas}
+		d = formula.Desplazamiento{Desde: c1, Cantidad: -(c2 - c1 + 1), Tope: MaxColumnas}
 	default:
 		return
 	}
@@ -234,6 +238,8 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	}
 	l.anotar()
 	h := l.h()
+	// Solo se mueven las referencias que apuntan a esta hoja, estén donde estén.
+	d.Hoja = h.nombre
 	viejas, formatos, estilos := h.celdas, h.formatos, h.estilos
 	h.celdas, h.formatos, h.estilos = map[Celda]string{}, map[Celda]FormatoNum{}, map[Celda]Estilo{}
 	for k, html := range viejas {
@@ -252,13 +258,86 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 		}
 	}
 	moverObjetos(h, d)
+	// La identidad de las filas o columnas sigue a las suyas (`conEstructura`): un
+	// comentario anclado a B4 pasa a B5 al insertar una fila encima.
+	if d.Filas {
+		h.filasA = h.filasA.mover(d.Desde, d.Cantidad)
+	} else {
+		h.colsA = h.colsA.mover(d.Desde, d.Cantidad)
+	}
+	// Las ocultas a mano siguen a su fila o columna, contra los límites de la web.
+	if d.Filas {
+		h.ocultFilas = tramosONil(analisis.MoverTramos(h.ocultFilas, d.Desde, d.Cantidad, MaxFilas))
+	} else {
+		h.ocultCols = tramosONil(analisis.MoverTramos(h.ocultCols, d.Desde, d.Cantidad, MaxColumnas))
+	}
+	for i := range l.f.hojas {
+		if i != l.f.activa {
+			moverReferenciasAjenas(&l.f.hojas[i], d)
+		}
+	}
 	l.f.nombres = moverNombres(l.f.nombres, h.nombre, l.f.hojas[0].nombre, d)
 	l.restaurar(l.f)
 }
 
+// moverReferenciasAjenas es `moverReferenciasAjenas` de refshift.ts: en una hoja que NO
+// es la del desplazamiento, las fórmulas que la citan (`=Ventas!B4`) siguen a su dato
+// —las celdas y las del formato condicional y las validaciones; sus rangos son de esta
+// hoja y no se mueven—. Antes «Resumen» se quedaba mirando la celda vieja sin avisar.
+//
+// Con la hoja protegida se reescriben TODAS las celdas, también las bloqueadas: seguir a
+// su dato no es editarlas, y el servidor lo acepta cuando el cambio es exactamente este
+// desplazamiento (apps/nucleo/office/model/proteccion_ajenas.go). Las reglas siguen
+// necesitando `objects`, como en `moverObjetos`.
+func moverReferenciasAjenas(h *hojaLibro, d formula.Desplazamiento) {
+	if strings.EqualFold(h.nombre, d.Hoja) {
+		return
+	}
+	var celdas map[Celda]string
+	for k, html := range h.celdas {
+		if nuevo := reescribirCeldaEn(html, d, h.nombre); nuevo != html {
+			if celdas == nil {
+				celdas = maps.Clone(h.celdas)
+			}
+			celdas[k] = nuevo
+		}
+	}
+	if celdas != nil {
+		h.celdas = celdas
+	}
+	// Las tablas dinámicas que leen de aquella hoja (`sourceSheet`) mueven su origen.
+	h.dinamicas = moverDinamicas(h, d, false)
+	if h.proteccion != nil && !h.proteccion.Objects {
+		return
+	}
+	// Las reglas son inmutables y la foto las comparte: se ponen listas nuevas.
+	if len(h.condiciones) > 0 {
+		conds := slices.Clone(h.condiciones)
+		for i := range conds {
+			conds[i].Formula = d.ReescribirFormulaEn(conds[i].Formula, h.nombre)
+		}
+		h.condiciones = conds
+	}
+	if len(h.validaciones) > 0 {
+		vals := slices.Clone(h.validaciones)
+		for i := range vals {
+			vals[i].Formula = d.ReescribirFormulaEn(vals[i].Formula, h.nombre)
+		}
+		h.validaciones = vals
+	}
+}
+
 // moverObjetos es `moverObjetos` de `refshift.ts`: las tablas, los minigráficos, los
-// gráficos, las segmentaciones y el autofiltro siguen a sus celdas con las reglas de las
-// fórmulas; lo que se queda sin dato desaparece.
+// gráficos, las tablas dinámicas (`moverDinamicas`), las segmentaciones, el autofiltro, el formato condicional, las validaciones,
+// el esquema, las combinadas y los anchos y altos siguen a sus celdas con las reglas de
+// las fórmulas; lo que se queda sin dato desaparece.
+//
+// Con la hoja protegida, lo que gobierna un permiso no concedido no se toca —el formato
+// condicional, las validaciones, los gráficos, los minigráficos y las segmentaciones sin
+// `objects`; el autofiltro sin `autoFilter`—: el servidor lo veta
+// (services/docs/internal/domain/proteccion.go) y rechazaría el guardado entero, celdas
+// movidas incluidas. Los rangos editables (`protect.ranges`), que la web sí mueve, aquí
+// no se tocan porque `Proteccion` aún no los guarda.
 //
 //nolint:gocognit // una rama por clase de objeto, como `moverObjetos` de refshift.ts
 func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
@@ -266,13 +345,17 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 		r := d.MoverReferencia(ref)
 		return r, r != formula.RefRota
 	}
-	var tablas []TablaFmt
-	for _, t := range h.tablas {
-		if r, ok := vivo(t.Range); ok {
-			t.Range = r
-			tablas = append(tablas, t)
-		}
+	columna := func(c int) (int, bool) { return moverColumna(c, d) }
+	moverEstructura(h, d, vivo)
+	h.tablas = moverTablas(h.tablas, vivo)
+	h.dinamicas = moverDinamicas(h, d, true)
+	if h.proteccion == nil || h.proteccion.AutoFilter {
+		h.filtro = moverAutofiltro(h.filtro, vivo, columna)
 	}
+	if h.proteccion != nil && !h.proteccion.Objects {
+		return
+	}
+	moverReglas(h, d, vivo)
 	var minis []Minigrafico
 	for _, m := range h.minis {
 		celda, ok1 := vivo(m.Cell)
@@ -289,12 +372,6 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 			graficos = append(graficos, g)
 		}
 	}
-	columna := func(c int) (int, bool) {
-		if d.Filas {
-			return c, true
-		}
-		return moverIndice(c, d)
-	}
 	var segs []Segmentacion
 	for _, s := range h.segs {
 		if s.Pivot != "" { // su Col es un campo del origen, no una columna
@@ -306,8 +383,224 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 			segs = append(segs, s)
 		}
 	}
-	h.tablas, h.minis, h.graficos, h.segs = tablas, minis, graficos, segs
-	h.filtro = moverAutofiltro(h.filtro, vivo, columna)
+	h.minis, h.graficos, h.segs = minis, graficos, segs
+}
+
+// moverDinamicas es `moverDinamicas` de refshift.ts: el origen de cada tabla dinámica
+// sigue a la hoja de la que lee (la suya, o `SourceSheet`, comparado tal cual como en
+// hojaOrigen) y, en la hoja que la aloja (`propia`), su esquina y lo que ocupó. Sin
+// origen, o sin esquina ni nada de lo que ocupaba, desaparece; sin esquina pero con
+// algo de lo que ocupaba, pasa a la primera celda que queda. Con la hoja protegida no se
+// toca: el servidor veta cualquier cambio de `pivots`. Devuelve la misma lista si nada
+// cambia (la foto de deshacer la comparte).
+func moverDinamicas(h *hojaLibro, d formula.Desplazamiento, propia bool) []analisis.Dinamica {
+	if len(h.dinamicas) == 0 || h.proteccion != nil {
+		return h.dinamicas
+	}
+	vivo := func(ref string) (string, bool) {
+		r := d.MoverReferencia(ref)
+		return r, r != formula.RefRota
+	}
+	cambia := false
+	var out []analisis.Dinamica
+	for _, p := range h.dinamicas {
+		q := p
+		origen := p.SourceSheet
+		if origen == "" {
+			origen = h.nombre
+		}
+		if d.Hoja == "" || origen == d.Hoja {
+			src, ok := vivo(p.Source)
+			if !ok {
+				cambia = true
+				continue
+			}
+			q.Source = src
+		}
+		if propia {
+			rango, conRango := "", false
+			if p.Range != "" {
+				rango, conRango = vivo(p.Range)
+			}
+			esquina, ok := vivo(p.Anchor)
+			if !ok && conRango {
+				esquina, _, _ = strings.Cut(rango, ":")
+				ok = true
+			}
+			if !ok {
+				cambia = true
+				continue
+			}
+			q.Anchor, q.Range = esquina, ""
+			if conRango {
+				q.Range = rango
+			}
+		}
+		if q.Source != p.Source || q.Anchor != p.Anchor || q.Range != p.Range {
+			cambia = true
+		}
+		out = append(out, q)
+	}
+	if !cambia {
+		return h.dinamicas
+	}
+	return out
+}
+
+func moverTablas(ts []TablaFmt, vivo func(string) (string, bool)) []TablaFmt {
+	var out []TablaFmt
+	for _, t := range ts {
+		if r, ok := vivo(t.Range); ok {
+			t.Range = r
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// moverColumna es dónde va una columna (las filas no la tocan), o false si deja de existir.
+func moverColumna(c int, d formula.Desplazamiento) (int, bool) {
+	if d.Filas {
+		return c, true
+	}
+	return moverIndice(c, d)
+}
+
+// reCombinada es la combinada que de verdad combina algo: dos extremos con fila y columna.
+var reCombinada = regexp.MustCompile(`[A-Z]+\d+:[A-Z]+\d+`)
+
+// moverEstructura es lo que ningún permiso gobierna: el esquema, las combinadas y los
+// anchos y altos, que siguen a sus filas y columnas pase lo que pase.
+func moverEstructura(h *hojaLibro, d formula.Desplazamiento, vivo func(string) (string, bool)) {
+	if d.Filas {
+		h.grupFilas = moverGrupos(h.grupFilas, d)
+		h.altos = moverMedidas(h.altos, d)
+	} else {
+		h.grupCols = moverGrupos(h.grupCols, d)
+		h.anchos = moverMedidas(h.anchos, d)
+	}
+	var fusiones []string
+	for _, m := range h.fusiones {
+		// Una combinada que queda en una sola celda ya no combina nada.
+		if r, ok := vivo(m); ok && reCombinada.MatchString(r) && !esUnaCelda(r) {
+			fusiones = append(fusiones, r)
+		}
+	}
+	h.fusiones = fusiones
+}
+
+// moverReglas es el formato condicional y las validaciones: su rango, con las reglas de
+// un rango, y su fórmula, con `moverFormulaAnclada`.
+func moverReglas(h *hojaLibro, d formula.Desplazamiento, vivo func(string) (string, bool)) {
+	var conds []ReglaCond
+	for _, c := range h.condiciones {
+		r, ok := vivo(c.Rango)
+		if !ok {
+			continue
+		}
+		if c.Formula != "" {
+			c.Formula = moverFormulaAnclada(c.Formula, c.Rango, d)
+		}
+		c.Rango = compacto(r)
+		conds = append(conds, c)
+	}
+	var vals []Validacion
+	for _, v := range h.validaciones {
+		r, ok := vivo(v.Rango)
+		if !ok {
+			continue
+		}
+		if v.Formula != "" {
+			v.Formula = moverFormulaAnclada(v.Formula, v.Rango, d)
+		}
+		v.Rango = compacto(r)
+		vals = append(vals, v)
+	}
+	h.condiciones, h.validaciones = conds, vals
+}
+
+// esUnaCelda dice si el rango «A1:B2» es en realidad una sola celda.
+func esUnaCelda(r string) bool {
+	a, b, ok := strings.Cut(r, ":")
+	return ok && a == b
+}
+
+// compacto es `compacto`: un rango que se ha quedado en una celda se escribe como la
+// celda, «B5» y no «B5:B5».
+func compacto(r string) string {
+	if esUnaCelda(r) {
+		a, _, _ := strings.Cut(r, ":")
+		return a
+	}
+	return r
+}
+
+// moverFormulaAnclada es `moverFormulaAnclada` de refshift.ts: la fórmula de una regla
+// está escrita respecto a la celda de arriba a la izquierda de su rango; si lo borrado se
+// lleva esa celda, la fórmula pasa a ser la de la primera superviviente —se «copia» a
+// ella, como el autorrelleno— antes de aplicar el desplazamiento. Si no, borrar la primera
+// fila de `=B2>5` sobre `B2:B10` la dejaría en `=#¡REF!>5`, apagada.
+func moverFormulaAnclada(f, rango string, d formula.Desplazamiento) string {
+	r, ok := formula.ParseRangeRef(rango)
+	if ok && strings.HasPrefix(f, "=") && d.Cantidad < 0 {
+		n, ancla := -d.Cantidad, r.C1
+		if d.Filas {
+			ancla = r.R1
+		}
+		if ancla >= d.Desde && ancla < d.Desde+n {
+			salto := d.Desde + n - ancla
+			dc, dr := salto, 0
+			if d.Filas {
+				dc, dr = 0, salto
+			}
+			if copiada := formula.ShiftRefs(f, dc, dr); strings.HasPrefix(copiada, "=") {
+				return d.ReescribirFormula(copiada)
+			}
+		}
+	}
+	return d.ReescribirFormula(f)
+}
+
+// moverGrupos es el esquema tras el desplazamiento: cada grupo, con las reglas de un
+// rango, crece si se inserta dentro de su detalle, encoge si se le borra un trozo y
+// desaparece si se le borra entero. Su fila de resumen (end+1) queda fuera.
+func moverGrupos(gs []analisis.Grupo, d formula.Desplazamiento) []analisis.Grupo {
+	var out []analisis.Grupo
+	for _, g := range gs {
+		ref := "A" + strconv.Itoa(g.Start+1) + ":A" + strconv.Itoa(g.End+1)
+		if !d.Filas {
+			ref = formula.NumToCol(g.Start) + "1:" + formula.NumToCol(g.End) + "1"
+		}
+		r, ok := formula.ParseRangeRef(d.MoverReferencia(ref))
+		if !ok {
+			continue
+		}
+		g.Start, g.End = r.C1, r.C2
+		if d.Filas {
+			g.Start, g.End = r.R1, r.R2
+		}
+		out = append(out, g)
+	}
+	return out
+}
+
+// moverMedidas es `medidas`: los anchos o los altos personalizados siguen a su columna o
+// a su fila; los de lo borrado se van con ello. nil si no queda ninguno.
+func moverMedidas(m map[string]float64, d formula.Desplazamiento) map[string]float64 {
+	var out map[string]float64
+	for k, v := range m {
+		i, err := strconv.Atoi(k)
+		if err != nil {
+			continue
+		}
+		if n, ok := moverIndice(i, d); ok {
+			if out == nil {
+				out = map[string]float64{}
+			}
+			out[strconv.Itoa(n)] = v
+		}
+	}
+	return out
 }
 
 // moverAutofiltro es el autofiltro tras el desplazamiento: su fila de cabecera sigue a sus
@@ -372,12 +665,13 @@ func moverIndice(i int, d formula.Desplazamiento) (int, bool) {
 // reescribirCelda es `reescribirCelda`: la fórmula de la celda con sus referencias
 // movidas, conservando el envoltorio. Un literal sale tal cual.
 func reescribirCelda(html string, d formula.Desplazamiento) string {
-	if html == "" || !esFormula(html) {
-		return html
-	}
-	p := leerCelda(html)
-	p.dentro = escaparHTML(d.ReescribirFormula(textoPlano(html)))
-	return p.html()
+	return reescribirCeldaEn(html, d, d.Hoja)
+}
+
+// reescribirCeldaEn es `reescribirCelda` con la hoja en la que vive la celda (`base`).
+// Sin cambios, el HTML sale tal cual, como en la web.
+func reescribirCeldaEn(html string, d formula.Desplazamiento, base string) string {
+	return d.ReescribirCeldaEn(html, base)
 }
 
 // Rellenar es `applyFill` (el asa de autorrelleno): copia el bloque origen sobre el

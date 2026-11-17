@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/mail/model"
 )
 
 // Errores de dominio. La capa de transporte los traduce a su forma (httpx.Error
@@ -37,7 +39,7 @@ var (
 	ErrNoSuchUser       = errors.New("mail: destinatario local desconocido")
 	ErrQuotaExceeded    = errors.New("mail: cuota de buzón superada")
 	ErrSpecialMailbox   = errors.New("mail: buzón de sistema no modificable")
-	ErrInvalidFilter    = errors.New("mail: regla de filtrado inválida")
+	ErrInvalidFilter    = model.ErrInvalidFilter
 	// ErrScheduleGone: un envío diferido (programado/deshacer) ya no es
 	// cancelable/editable porque el worker lo liberó, ya se envió o no es del
 	// usuario. Cancelar/editar tras la ventana devuelve esto (409), no un 404,
@@ -70,6 +72,10 @@ const (
 	RoleTrash   SpecialUse = "trash"
 	RoleJunk    SpecialUse = "junk"
 	RoleArchive SpecialUse = "archive"
+	// RoleSnoozed es el buzón de lo pospuesto (rol JMAP/IMAP «snoozed»). No es de
+	// los que se crean al provisionar: nace la primera vez que se pospone algo,
+	// para no añadir una carpeta vacía a todas las cuentas. Ver snooze.go.
+	RoleSnoozed SpecialUse = "snoozed"
 	RoleNone    SpecialUse = ""
 )
 
@@ -136,12 +142,29 @@ type Message struct {
 	HasAttach bool     `json:"has_attachment"`
 
 	// Resultados de autenticación del remitente (RFC 8601), para correo entrante.
-	SPFResult   AuthResult `json:"-"`
-	DKIMResult  AuthResult `json:"-"`
-	DMARCResult AuthResult `json:"-"`
+	// Viajan al cliente para que el lector resuma «Verificado» o avise; vacíos
+	// (lo propio, lo importado) no salen.
+	SPFResult   AuthResult `json:"auth_spf,omitempty"`
+	DKIMResult  AuthResult `json:"auth_dkim,omitempty"`
+	DMARCResult AuthResult `json:"auth_dmarc,omitempty"`
 
 	ReceivedAt time.Time `json:"received_at"`
 	SentAt     time.Time `json:"date"`
+	// UnsnoozedAt es cuándo volvió el mensaje de «Pospuestos» al vencer la fecha
+	// (migración 0037): lo devuelto sube arriba de la carpeta a esa hora, como en
+	// Gmail, y la fila la enseña en lugar de la de llegada. Nil si no se pospuso, o si
+	// se trajo a mano antes de tiempo (eso lo deja en su sitio).
+	UnsnoozedAt *time.Time `json:"unsnoozed_at,omitempty"`
+}
+
+// FechaDeOrden es por lo que se ordenan las listas y lo que lleva su cursor keyset:
+// la vuelta de «Pospuestos» si la hubo, si no la llegada. Es el
+// COALESCE(unsnoozed_at, received_at) de las consultas.
+func (m Message) FechaDeOrden() time.Time {
+	if m.UnsnoozedAt != nil {
+		return *m.UnsnoozedAt
+	}
+	return m.ReceivedAt
 }
 
 // HasFlag indica si el mensaje tiene un flag/keyword.
@@ -287,10 +310,13 @@ type Label struct {
 // como atom IMAP (solo [0-9a-f-]) y keyword JMAP.
 func (l Label) Keyword() string { return l.ID.String() }
 
-// LabelColors es la paleta sobria de etiquetas (Graphite & Brass): TOKENS, no CSS
-// crudo, para alinear con la identidad, evitar inyección de estilo y que el color
-// no sea el único indicador (el nombre siempre acompaña). Vacío = sin color.
-var LabelColors = []string{"slate", "brass", "sage", "clay", "blue", "plum", "teal", "rose"}
+// LabelColors son los ids de la paleta de colores de usuario de la suite
+// (`PALETA_DE_USUARIO` de apps/frontend/packages/config/src/paleta-usuario.ts), en su
+// orden: TOKENS, no CSS crudo, para alinear con la identidad, evitar inyección de estilo
+// y que el color no sea el único indicador (el nombre siempre acompaña). Vacío = sin
+// color. Los ocho de la paleta sobria de antes siguen siendo los mismos tokens: las
+// etiquetas guardadas valen tal cual y se pintan con el tono nuevo.
+var LabelColors = []string{"red", "clay", "brass", "sage", "green", "teal", "cyan", "blue", "indigo", "plum", "rose", "slate"}
 
 // ValidLabelColor acepta el vacío (neutro) o un token de la paleta.
 func ValidLabelColor(c string) bool {

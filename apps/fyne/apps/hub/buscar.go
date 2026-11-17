@@ -105,9 +105,10 @@ func TotalAMostrar(res api.HubBusqueda, paginas, total, mostrados int) int {
 // claveHit identifica un resultado entre páginas: el mismo id en dos productos son dos.
 func claveHit(h api.HubHit) string { return h.Source + "\x00" + h.ID }
 
-// UnirBusqueda es el `unirPaginas` de la web: pega la página nueva detrás de lo que ya
-// hay, sin repetir. Cada página es una búsqueda aparte y entre dos el ranking puede
-// moverse; un resultado repetido se queda en su primera posición.
+// UnirBusqueda pega la página nueva detrás de lo que ya hay, sin repetir. Fyne pide
+// solo la página nueva (la web, SSR, vuelve a pedir todo lo enseñado en UNA búsqueda),
+// así que cada página es una búsqueda aparte y entre dos el ranking puede moverse; un
+// resultado repetido se queda en su primera posición.
 func UnirBusqueda(previos, nuevos []api.HubHit) []api.HubHit {
 	visto := make(map[string]bool, len(previos)+len(nuevos))
 	out := make([]api.HubHit, 0, len(previos)+len(nuevos))
@@ -346,7 +347,7 @@ func (r *buscarRenderer) avisoCaidos(v tema.Variante) bloque {
 	return nuevoAvisoCaidos(v, r.b.T.T("search.partial", i18n.Vars{"sources": strings.Join(nombres, r.b.T.T("search.partialJoin", nil))}))
 }
 
-// AnchoParrafo es el `max-w-xl` de la pista de la búsqueda: 36rem con el rem 14.
+// AnchoParrafo es el `max-w-xl` de la pista de la búsqueda: 36rem, 576 px.
 const AnchoParrafo float32 = 36 * tema.Rem
 
 // HuecoSinNovedad es el `flex flex-col items-start gap-2` entre el aviso de que el

@@ -76,15 +76,33 @@ type Mensaje struct {
 	// Extracto es el `preview` del servidor (~280 caracteres de texto plano).
 	Extracto     string
 	De, Para, CC []Direccion
-	Recibido     time.Time
-	Leido        bool
-	Destacado    bool
-	ConAdjunto   bool
+	// CCO solo la trae el servicio cuando la cabecera `Bcc` viajó en el MIME, que en
+	// la práctica es lo propio: Borradores y la copia de Enviados.
+	CCO      []Direccion
+	Recibido time.Time
+	// Vuelto es cuándo volvió de «Pospuestos» al vencer la fecha (`unsnoozed_at`):
+	// la lista lo pone arriba a esa hora, como en Gmail, y la fila enseña esa hora con
+	// el reloj. Cero si no se pospuso o se trajo a mano.
+	Vuelto     time.Time
+	Leido      bool
+	Destacado  bool
+	ConAdjunto bool
+	// Respondido es la marca `\Answered`: alguien ya contestó este correo.
+	Respondido bool
 	// Etiquetas son los `keywords` que son id de etiqueta.
 	Etiquetas map[string]bool
 	// EnHilo es el `threadCount` del listado: cuántos mensajes tiene el hilo en TODA
 	// la cuenta, no en esta carpeta.
 	EnHilo int
+}
+
+// FechaDeOrden es por lo que se ordena la lista, como en el servicio: la vuelta de
+// «Pospuestos» si la hubo, si no la llegada.
+func (m Mensaje) FechaDeOrden() time.Time {
+	if !m.Vuelto.IsZero() {
+		return m.Vuelto
+	}
+	return m.Recibido
 }
 
 // Conversacion es un hilo plegado, igual que `groupByThread` en la web.
@@ -97,6 +115,9 @@ type Conversacion struct {
 	// Total es el tamaño del hilo ENTERO, que es lo que abre el lector.
 	Total                          int
 	SinLeer, Destacada, ConAdjunto bool
+	// Respondida es que el ÚLTIMO mensaje está respondido, no uno cualquiera: si
+	// después de contestar llegó otro, el hilo vuelve a estar pendiente (`answered`).
+	Respondida bool
 }
 
 // Carpeta es un `Mailbox` de JMAP.
@@ -127,7 +148,7 @@ func AgruparPorHilo(mensajes []Mensaje) []Conversacion {
 		}
 		c, ya := porHilo[clave]
 		if !ya {
-			c = &Conversacion{HiloID: clave, Ultimo: m}
+			c = &Conversacion{HiloID: clave, Ultimo: m, Respondida: m.Respondido}
 			porHilo[clave] = c
 			orden = append(orden, clave)
 		}
@@ -159,6 +180,8 @@ var rolesTraducidos = map[string]string{
 	"trash":   "folder.trash",
 	"junk":    "folder.junk",
 	"archive": "folder.archive",
+	"outbox":  "folder.outbox",
+	"snoozed": "folder.snoozed",
 }
 
 // RotuloCarpeta es `mailboxLabel`.
@@ -178,6 +201,8 @@ var glifosDeRol = map[string]string{
 	"trash":   PapeleraD,
 	"junk":    SpamD,
 	"archive": ArchivarD,
+	"outbox":  BandejaSalidaD,
+	"snoozed": RelojD,
 }
 
 // GlifoCarpeta es `mailboxGlyph`. Borradores se queda en la carpeta neutra: no hay

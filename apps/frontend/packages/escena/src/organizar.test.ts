@@ -38,3 +38,31 @@ test('distribuir con 2 cajas no hace nada', () => {
   const l = [caja('a', 0, 0, 10, 10), caja('b', 50, 0, 10, 10)];
   expect(distributeBoxes(l, ['a', 'b'], 'h')).toBe(l);
 });
+
+/* Guías inteligentes: los vectores son compartidos con el espejo Go de Fyne. */
+import { guiasDeAjuste } from './organizar.js';
+import type { AnclaGuia, AjusteGuias, Rect } from './organizar.js';
+import vectores from './guias.vectores.json';
+
+interface CasoGuias {
+  nombre: string;
+  mov: Rect;
+  otros: Rect[];
+  lienzo: Rect;
+  tolerancia: number | { x: number; y: number };
+  anclas?: { x?: AnclaGuia[]; y?: AnclaGuia[] };
+  esperado: AjusteGuias;
+}
+
+for (const c of vectores.casos as CasoGuias[]) {
+  test(`guiasDeAjuste: ${c.nombre}`, () => {
+    expect(guiasDeAjuste(c.mov, c.otros, c.lienzo, c.tolerancia, c.anclas)).toEqual(c.esperado);
+  });
+}
+
+test('los vectores de guías son los mismos que prueba el espejo Go', async () => {
+  const go = await Bun.file(
+    new URL('../../../../fyne/diapos/testdata/guias.vectores.json', import.meta.url),
+  ).json();
+  expect(go).toEqual(vectores);
+});

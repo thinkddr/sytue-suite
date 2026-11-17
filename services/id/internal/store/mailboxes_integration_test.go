@@ -21,7 +21,7 @@ import (
 )
 
 // orgConBuzones crea una organización lista para repartir direcciones.
-func orgConBuzones(t *testing.T, ctx context.Context, st *store.Store, slug string) domain.Organization {
+func orgConBuzones(ctx context.Context, t *testing.T, st *store.Store, slug string) domain.Organization {
 	t.Helper()
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{Slug: slug, Name: slug})
 	if err != nil {
@@ -32,7 +32,7 @@ func orgConBuzones(t *testing.T, ctx context.Context, st *store.Store, slug stri
 
 // usuarioConNombre da de alta a alguien con nombre y apellidos separados, que es de
 // donde sale el patrón nombre.apellidos.
-func usuarioConNombre(t *testing.T, ctx context.Context, st *store.Store, email, nombre, apellidos string) domain.User {
+func usuarioConNombre(ctx context.Context, t *testing.T, st *store.Store, email, nombre, apellidos string) domain.User {
 	t.Helper()
 	u, err := st.CreateUser(ctx, nil, domain.User{
 		Email: email, EmailVerified: true,
@@ -51,10 +51,10 @@ func usuarioConNombre(t *testing.T, ctx context.Context, st *store.Store, email,
 func TestBuzonPorDefectoYHomonimos(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
-	primera := usuarioConNombre(t, ctx, st, "ana.perez@personal.example", "Ana", "Pérez")
-	segunda := usuarioConNombre(t, ctx, st, "otra.ana@personal.example", "Ana", "Pérez")
+	primera := usuarioConNombre(ctx, t, st, "ana.perez@personal.example", "Ana", "Pérez")
+	segunda := usuarioConNombre(ctx, t, st, "otra.ana@personal.example", "Ana", "Pérez")
 
 	dir1, err := st.EnsureOrgMailbox(ctx, nil, org.ID, primera.ID, "")
 	if err != nil {
@@ -94,9 +94,9 @@ func TestBuzonPorDefectoYHomonimos(t *testing.T) {
 func TestBuzonPersonalizado(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
-	sofia := usuarioConNombre(t, ctx, st, "sofia@personal.example", "Sofía", "Ramos")
+	sofia := usuarioConNombre(ctx, t, st, "sofia@personal.example", "Sofía", "Ramos")
 	dir, err := st.EnsureOrgMailbox(ctx, nil, org.ID, sofia.ID, "soporte")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox(personalizada): %v", err)
@@ -106,7 +106,7 @@ func TestBuzonPersonalizado(t *testing.T) {
 	}
 
 	// Otra persona pide la MISMA: se le da la del patrón, sin romper su alta.
-	luis := usuarioConNombre(t, ctx, st, "luis@personal.example", "Luis", "Gil")
+	luis := usuarioConNombre(ctx, t, st, "luis@personal.example", "Luis", "Gil")
 	dir2, err := st.EnsureOrgMailbox(ctx, nil, org.ID, luis.ID, "soporte")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox(personalizada cogida): %v", err)
@@ -122,10 +122,10 @@ func TestBuzonPersonalizado(t *testing.T) {
 func TestBuzonAislamientoEntreOrganizaciones(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	acme := orgConBuzones(t, ctx, st, "acme")
-	otra := orgConBuzones(t, ctx, st, "otra")
+	acme := orgConBuzones(ctx, t, st, "acme")
+	otra := orgConBuzones(ctx, t, st, "otra")
 
-	ana := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
+	ana := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
 
 	// La MISMA persona en DOS organizaciones: una dirección en cada dominio, porque
 	// su correo de trabajo en una nada tiene que ver con el de la otra.
@@ -149,7 +149,7 @@ func TestBuzonAislamientoEntreOrganizaciones(t *testing.T) {
 	// está cogida» le dejaría enumerar las direcciones de un cliente ajeno
 	// probando alias. Lo que se le dice es lo único que le incumbe: ese dominio
 	// no es suyo.
-	bob := usuarioConNombre(t, ctx, st, "bob@personal.example", "Bob", "Gil")
+	bob := usuarioConNombre(ctx, t, st, "bob@personal.example", "Bob", "Gil")
 	if _, err := st.AddMailboxAlias(ctx, otra.ID, bob.ID, enAcme); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("alias sobre la dirección de otra org = %v, quiero ErrInvalidInput", err)
 	}
@@ -162,10 +162,10 @@ func TestBuzonAislamientoEntreOrganizaciones(t *testing.T) {
 func TestAliasChocaConBuzonExistente(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
-	ana := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
-	bob := usuarioConNombre(t, ctx, st, "bob@personal.example", "Bob", "Gil")
+	ana := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
+	bob := usuarioConNombre(ctx, t, st, "bob@personal.example", "Bob", "Gil")
 	dirAna, err := st.EnsureOrgMailbox(ctx, nil, org.ID, ana.ID, "")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox(ana): %v", err)
@@ -195,9 +195,9 @@ func TestAliasChocaConBuzonExistente(t *testing.T) {
 func TestCambiarDireccionConservaLaAnterior(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
-	ana := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
+	ana := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
 	vieja, err := st.EnsureOrgMailbox(ctx, nil, org.ID, ana.ID, "")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox: %v", err)
@@ -245,10 +245,10 @@ func TestCambiarDireccionConservaLaAnterior(t *testing.T) {
 func TestQuitarAliasEsperaARetirarloDeMail(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
-	ana := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
-	bob := usuarioConNombre(t, ctx, st, "bob@personal.example", "Bob", "Gil")
+	ana := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
+	bob := usuarioConNombre(ctx, t, st, "bob@personal.example", "Bob", "Gil")
 	if _, err := st.EnsureOrgMailbox(ctx, nil, org.ID, ana.ID, ""); err != nil {
 		t.Fatalf("EnsureOrgMailbox(ana): %v", err)
 	}
@@ -309,9 +309,9 @@ func TestQuitarAliasEsperaARetirarloDeMail(t *testing.T) {
 // parece que funciona y no recibe nada.
 func TestSinDominioDeSuiteNoSeAsignaBuzon(t *testing.T) {
 	st, ctx := newStore(t)
-	org := orgConBuzones(t, ctx, st, "acme") // sin SetSuiteDomain
+	org := orgConBuzones(ctx, t, st, "acme") // sin SetSuiteDomain
 
-	ana := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
+	ana := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
 	dir, err := st.EnsureOrgMailbox(ctx, nil, org.ID, ana.ID, "")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox sin dominio debe ser inocuo, no un error: %v", err)
@@ -323,7 +323,7 @@ func TestSinDominioDeSuiteNoSeAsignaBuzon(t *testing.T) {
 
 // conDominioPropio reclama un dominio y lo da por verificado, que es el estado del
 // que cuelgan las dos garantías de abajo.
-func conDominioPropio(t *testing.T, ctx context.Context, st *store.Store, orgID, host string) {
+func conDominioPropio(ctx context.Context, t *testing.T, st *store.Store, orgID, host string) {
 	t.Helper()
 	if _, err := st.SetOrgDomain(ctx, nil, orgID, host, "tok-"+host); err != nil {
 		t.Fatalf("SetOrgDomain(%q): %v", host, err)
@@ -334,7 +334,7 @@ func conDominioPropio(t *testing.T, ctx context.Context, st *store.Store, orgID,
 }
 
 // direcciones devuelve las direcciones de una persona, con cuál es la principal.
-func direcciones(t *testing.T, ctx context.Context, st *store.Store, orgID, userID string) (principal string, todas []string) {
+func direcciones(ctx context.Context, t *testing.T, st *store.Store, orgID, userID string) (principal string, todas []string) {
 	t.Helper()
 	boxes, err := st.ListOrgMailboxes(ctx, orgID, userID)
 	if err != nil {
@@ -370,10 +370,10 @@ func contiene(lista []string, quiero string) bool {
 func TestConDominioPropioSigueHabiendoDireccionDeLaSuite(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
-	conDominioPropio(t, ctx, st, org.ID, "acme.com")
+	org := orgConBuzones(ctx, t, st, "acme")
+	conDominioPropio(ctx, t, st, org.ID, "acme.com")
 
-	u := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
+	u := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
 	dir, err := st.EnsureOrgMailbox(ctx, nil, org.ID, u.ID, "")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox: %v", err)
@@ -381,7 +381,7 @@ func TestConDominioPropioSigueHabiendoDireccionDeLaSuite(t *testing.T) {
 	if dir != "ana.perez@acme.com" {
 		t.Fatalf("principal = %q, quiero ana.perez@acme.com", dir)
 	}
-	principal, todas := direcciones(t, ctx, st, org.ID, u.ID)
+	principal, todas := direcciones(ctx, t, st, org.ID, u.ID)
 	if principal != "ana.perez@acme.com" {
 		t.Errorf("principal = %q, quiero ana.perez@acme.com", principal)
 	}
@@ -394,7 +394,7 @@ func TestConDominioPropioSigueHabiendoDireccionDeLaSuite(t *testing.T) {
 	if _, err := st.EnsureOrgMailbox(ctx, nil, org.ID, u.ID, ""); err != nil {
 		t.Fatalf("EnsureOrgMailbox(repetido): %v", err)
 	}
-	_, otraVez := direcciones(t, ctx, st, org.ID, u.ID)
+	_, otraVez := direcciones(ctx, t, st, org.ID, u.ID)
 	if len(otraVez) != len(todas) {
 		t.Fatalf("repetir el alta añadió direcciones: %v -> %v", todas, otraVez)
 	}
@@ -410,10 +410,10 @@ func TestConDominioPropioSigueHabiendoDireccionDeLaSuite(t *testing.T) {
 func TestVerificarElDominioMudaAQuienYaEstaba(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	org := orgConBuzones(t, ctx, st, "acme")
+	org := orgConBuzones(ctx, t, st, "acme")
 
 	// Entra ANTES de que exista el dominio propio.
-	u := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
+	u := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
 	antes, err := st.EnsureOrgMailbox(ctx, nil, org.ID, u.ID, "")
 	if err != nil {
 		t.Fatalf("EnsureOrgMailbox: %v", err)
@@ -422,7 +422,7 @@ func TestVerificarElDominioMudaAQuienYaEstaba(t *testing.T) {
 		t.Fatalf("dirección previa = %q, quiero ana.perez@acme.sytue.eu", antes)
 	}
 
-	conDominioPropio(t, ctx, st, org.ID, "acme.com")
+	conDominioPropio(ctx, t, st, org.ID, "acme.com")
 	movidos, err := st.PromoteOrgMailDomain(ctx, org.ID)
 	if err != nil {
 		t.Fatalf("PromoteOrgMailDomain: %v", err)
@@ -431,7 +431,7 @@ func TestVerificarElDominioMudaAQuienYaEstaba(t *testing.T) {
 		t.Fatalf("movidos = %d, quiero 1", movidos)
 	}
 
-	principal, todas := direcciones(t, ctx, st, org.ID, u.ID)
+	principal, todas := direcciones(ctx, t, st, org.ID, u.ID)
 	if principal != "ana.perez@acme.com" {
 		t.Errorf("principal tras mudar = %q, quiero ana.perez@acme.com", principal)
 	}
@@ -448,7 +448,7 @@ func TestVerificarElDominioMudaAQuienYaEstaba(t *testing.T) {
 	if otra != 0 {
 		t.Errorf("la segunda pasada movió %d, quiero 0", otra)
 	}
-	_, despues := direcciones(t, ctx, st, org.ID, u.ID)
+	_, despues := direcciones(ctx, t, st, org.ID, u.ID)
 	if len(despues) != len(todas) {
 		t.Fatalf("la segunda pasada añadió direcciones: %v -> %v", todas, despues)
 	}
@@ -461,8 +461,8 @@ func TestAliasReservadoSoloEnElDominioRaiz(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
 
-	personal := orgConBuzones(t, ctx, st, domain.PersonalSlug("ana@personal.example"))
-	ana := usuarioConNombre(t, ctx, st, "ana@personal.example", "Ana", "Pérez")
+	personal := orgConBuzones(ctx, t, st, domain.PersonalSlug("ana@personal.example"))
+	ana := usuarioConNombre(ctx, t, st, "ana@personal.example", "Ana", "Pérez")
 	if _, err := st.EnsureOrgMailbox(ctx, nil, personal.ID, ana.ID, ""); err != nil {
 		t.Fatalf("EnsureOrgMailbox(ana): %v", err)
 	}
@@ -475,8 +475,8 @@ func TestAliasReservadoSoloEnElDominioRaiz(t *testing.T) {
 		t.Fatalf("un alias corriente en el raíz debe entrar: %v", err)
 	}
 
-	acme := orgConBuzones(t, ctx, st, "acme")
-	bob := usuarioConNombre(t, ctx, st, "bob@personal.example", "Bob", "Gil")
+	acme := orgConBuzones(ctx, t, st, "acme")
+	bob := usuarioConNombre(ctx, t, st, "bob@personal.example", "Bob", "Gil")
 	if _, err := st.EnsureOrgMailbox(ctx, nil, acme.ID, bob.ID, ""); err != nil {
 		t.Fatalf("EnsureOrgMailbox(bob): %v", err)
 	}
@@ -490,8 +490,8 @@ func TestAliasReservadoSoloEnElDominioRaiz(t *testing.T) {
 func TestBuzonesDeLaPersonaSoloDeSusOrganizaciones(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	acme, globex := orgConBuzones(t, ctx, st, "acme"), orgConBuzones(t, ctx, st, "globex")
-	eva := usuarioConNombre(t, ctx, st, "eva@personal.example", "Eva", "Gil")
+	acme, globex := orgConBuzones(ctx, t, st, "acme"), orgConBuzones(ctx, t, st, "globex")
+	eva := usuarioConNombre(ctx, t, st, "eva@personal.example", "Eva", "Gil")
 	for _, o := range []domain.Organization{acme, globex} {
 		if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: o.ID, UserID: eva.ID, Role: domain.RoleMember}); err != nil {
 			t.Fatal(err)

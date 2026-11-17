@@ -33,9 +33,9 @@ import (
 // letra (para el cursor y la selección) y qué letra hay bajo un punto (para el clic). Si
 // fueran dos, el cursor acabaría a medio píxel de la letra que se ve.
 //
-// Lo que se mide y de dónde sale, con el rem de 14:
+// Lo que se mide y de dónde sale, con el rem de 16:
 //
-//	cuerpo        12,25 con `leading-relaxed` (× 1,625): 19,906
+//	cuerpo        14 con `leading-relaxed` (× 1,625): 22,75
 //	p             `mb-2 last:mb-0`
 //	h1…h6         2xl, xl, lg, base, sm, sm · `mt-4 mb-1.5 leading-tight` semi-negrita
 //	ul / ol       `my-1.5 pl-6`; li `my-0.5`
@@ -505,25 +505,37 @@ func (m *Maquetado) componer(i int, fila []pedazo, e estiloBloque, y, cabe float
 		l.Desde = fila[0].desde
 	}
 	var x float32
-	for _, p := range fila {
+	for k := 0; k < len(fila); {
+		p := fila[k]
+		k++
 		if p.salto {
 			continue
 		}
-		w := p.ancho()
-		n := len(l.Trozos)
-		if n > 0 && p.img == nil && l.Trozos[n-1].img == nil && l.Trozos[n-1].estilo == p.estilo && l.Trozos[n-1].Hasta == p.desde {
-			t := &l.Trozos[n-1]
-			t.Texto += p.texto
-			t.Hasta += utf8.RuneCountInString(p.texto)
-			t.Ancho = medirTrozo(t.Texto, t.estilo)
-		} else {
-			l.Trozos = append(l.Trozos, Trozo{
-				Texto: p.texto, X: x, Ancho: w, Desde: p.desde,
-				Hasta: p.desde + p.letras(), estilo: p.estilo, img: p.img,
-			})
+		hasta := p.desde + p.letras()
+		if p.img == nil {
+			// Measure the complete style run once, retaining its kerning. At
+			// the editor's initial unbounded width this can be an entire large
+			// signature; measuring every growing prefix made opening quadratic.
+			var texto strings.Builder
+			texto.WriteString(p.texto)
+			for k < len(fila) {
+				next := fila[k]
+				if next.salto || next.img != nil || next.estilo != p.estilo || next.desde != hasta {
+					break
+				}
+				texto.WriteString(next.texto)
+				hasta += next.letras()
+				k++
+			}
+			p.texto = texto.String()
 		}
-		x = l.Trozos[len(l.Trozos)-1].X + l.Trozos[len(l.Trozos)-1].Ancho
-		l.Hasta = l.Trozos[len(l.Trozos)-1].Hasta
+		w := p.ancho()
+		l.Trozos = append(l.Trozos, Trozo{
+			Texto: p.texto, X: x, Ancho: w, Desde: p.desde,
+			Hasta: hasta, estilo: p.estilo, img: p.img,
+		})
+		x += w
+		l.Hasta = hasta
 	}
 	// Los blancos del final no cuentan para alinear, igual que en el navegador.
 	util := x
@@ -1072,6 +1084,30 @@ func PintarProsa(m *Maquetado, v tema.Variante) []fyne.CanvasObject {
 		}
 	}
 	return out
+}
+
+// pintarProsaEnCapas es PintarProsa partida en dos: los fondos (el de un bloque de
+// código, el de una celda, el del `<code>` o el `<mark>` en línea) y lo que va delante.
+// El editor mete entre las dos los velos de «Buscar en la nota» y la selección, que en
+// la web se pintan por encima de los fondos y por debajo del texto.
+func pintarProsaEnCapas(m *Maquetado, v tema.Variante) (fondos, delante []fyne.CanvasObject) {
+	for _, a := range m.Adornos {
+		if a.Tipo == adornoFondo || a.Tipo == adornoCaja {
+			fondos = append(fondos, pintarAdorno(a, v)...)
+		} else {
+			delante = append(delante, pintarAdorno(a, v)...)
+		}
+	}
+	for _, l := range m.Lineas {
+		for _, t := range l.Trozos {
+			objs := pintarTrozo(l, t, v)
+			if t.img == nil && t.estilo.fondo.A > 0 {
+				fondos, objs = append(fondos, objs[0]), objs[1:]
+			}
+			delante = append(delante, objs...)
+		}
+	}
+	return fondos, delante
 }
 
 func rect(c color.NRGBA, x, y, an, al, radio float32) *canvas.Rectangle {

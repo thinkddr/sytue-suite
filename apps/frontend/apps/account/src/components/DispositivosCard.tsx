@@ -9,11 +9,17 @@
  * sola. Como la lista llega sin ella, cuál es «este dispositivo» se sabe al
  * marcarlo: el servicio devuelve cuál era. Un dispositivo robado no se marca a
  * distancia; se olvida.
+ *
+ * Olvidar es irreversible (quita la confianza y el dispositivo vuelve a ser un
+ * desconocido), así que se confirma nombrándolo, y si el servicio lo rechaza la
+ * tarjeta lo dice.
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Card, EmptyState, Icon } from '@sytue/ui';
+import { Button, Card, EmptyState, Icon, IconButton, useConfirm } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
+import { primeraLectura } from '../lib/primeraLectura.js';
+import { FilasCargando } from './FilasCargando.js';
 
 interface Dispositivo {
   id: string;
@@ -29,11 +35,16 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
   const [equipos, setEquipos] = useState<Dispositivo[] | null>(null);
   const [error, setError] = useState(false);
   const [actual, setActual] = useState<string | null>(null);
-  const [falloConfianza, setFalloConfianza] = useState(false);
+  // Confiar y olvidar comparten aviso: los dos dicen «no se ha podido» con el
+  // mismo texto y nunca ocurren a la vez.
+  const [falloAccion, setFalloAccion] = useState(false);
+  const { confirmar, dialogo } = useConfirm();
 
-  async function cargar(): Promise<void> {
+  // `inicial`: la del montaje se comparte con la revisión de seguridad.
+  async function cargar(inicial = false): Promise<void> {
+    setError(false);
     try {
-      const res = await fetch('/api/devices');
+      const res = await (inicial ? primeraLectura('/api/devices') : fetch('/api/devices'));
       if (!res.ok) throw new Error(String(res.status));
       const datos = (await res.json()) as { devices?: Dispositivo[] };
       setEquipos(datos.devices ?? []);
@@ -44,13 +55,25 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
   }
 
   useEffect(() => {
-    void cargar();
+    void cargar(true);
   }, []);
 
   // Se relee en vez de tocar la lista en memoria, por lo mismo que en sesiones: si
   // el servicio rechaza la operación, lo que se ve sigue siendo lo que hay.
-  async function olvidar(id: string): Promise<void> {
-    await fetch(`/api/devices/${id}`, { method: 'DELETE' });
+  async function olvidar(d: Dispositivo): Promise<void> {
+    const ok = await confirmar({
+      mensaje: t('devices.forget_confirm', { device: d.name }),
+      confirmLabel: t('devices.forget'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setFalloAccion(false);
+    try {
+      const res = await fetch(`/api/devices/${d.id}`, { method: 'DELETE' });
+      if (!res.ok) setFalloAccion(true);
+    } catch {
+      setFalloAccion(true);
+    }
     await cargar();
   }
 
@@ -58,9 +81,13 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
   // Sytue ID en `id.<dominio>`, que es donde se sirve esta app (ingress del chart
   // de `id`, `rutasDeCuenta`).
   async function confiar(): Promise<void> {
-    const res = await fetch('/account/devices/trust', { method: 'POST' });
-    setFalloConfianza(!res.ok);
-    if (res.ok) setActual(((await res.json()) as { id?: string }).id ?? null);
+    try {
+      const res = await fetch('/account/devices/trust', { method: 'POST' });
+      setFalloAccion(!res.ok);
+      if (res.ok) setActual(((await res.json()) as { id?: string }).id ?? null);
+    } catch {
+      setFalloAccion(true);
+    }
     await cargar();
   }
 
@@ -70,12 +97,19 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
   };
 
   return (
-    <Card class="mb-6 break-inside-avoid">
+    <Card id="dispositivos">
       <div class="flex flex-col gap-4 p-4 sm:p-5">
         <h2 class="text-lg font-semibold">{t('devices.title')}</h2>
 
-        {error && <p class="text-danger text-sm">{t('devices.failed')}</p>}
-        {!error && equipos === null && <p class="text-text-muted text-sm">{t('common.loading')}</p>}
+        {error && (
+          <div role="alert" class="flex items-center justify-between gap-3">
+            <p class="text-danger-text text-sm">{t('devices.failed')}</p>
+            <Button variant="ghost" onClick={() => void cargar()}>
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
+        {!error && equipos === null && <FilasCargando etiqueta={t('common.loading')} />}
         {!error && equipos?.length === 0 && <EmptyState title={t('devices.empty')} />}
 
         {!(equipos ?? []).some((d) => d.id === actual && d.trusted) && (
@@ -86,7 +120,11 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
             </Button>
           </div>
         )}
-        {falloConfianza && <p class="text-danger text-sm">{t('security.failed')}</p>}
+        {falloAccion && (
+          <p role="alert" class="text-danger-text text-sm">
+            {t('security.failed')}
+          </p>
+        )}
 
         <ul class="flex flex-col gap-3">
           {(equipos ?? []).map((d) => (
@@ -95,7 +133,7 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
                 <p class="truncate text-sm font-medium" title={d.user_agent}>
                   {d.name}
                   {(d.current || d.id === actual) && (
-                    <span class="text-success ml-2 text-xs">{t('devices.current')}</span>
+                    <span class="text-success-text ml-2 text-xs">{t('devices.current')}</span>
                   )}
                   {d.trusted && (
                     <span class="text-text-muted ml-2 text-xs">{t('devices.trusted')}</span>
@@ -106,19 +144,20 @@ export function DispositivosCard({ t, locale }: { t: T; locale: string }): JSX.E
                 </p>
               </div>
               <div class="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => void olvidar(d.id)}
-                  aria-label={t('devices.forget')}
-                  class="text-text-muted hover:text-danger p-1"
+                <IconButton
+                  size="sm"
+                  tone="danger"
+                  label={t('devices.forget_named', { device: d.name })}
+                  onClick={() => void olvidar(d)}
                 >
                   <Icon name="close" />
-                </button>
+                </IconButton>
               </div>
             </li>
           ))}
         </ul>
       </div>
+      {dialogo}
     </Card>
   );
 }

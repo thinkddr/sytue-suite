@@ -21,7 +21,7 @@ import (
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
-func clavesIdP(t *testing.T, l *liveServer, orgID string) int {
+func clavesIDP(t *testing.T, l *liveServer, orgID string) int {
 	t.Helper()
 	var n int
 	if err := l.st.DB().QueryRow(context.Background(),
@@ -31,7 +31,7 @@ func clavesIdP(t *testing.T, l *liveServer, orgID string) int {
 	return n
 }
 
-func (l *liveServer) metadataIdP(t *testing.T, slug string) int {
+func (l *liveServer) metadataIDP(t *testing.T, slug string) int {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	l.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/saml/idp/metadata?org="+slug, http.NoBody))
@@ -47,10 +47,10 @@ func TestMetadataIdPNoAcuñaClaveAnonima(t *testing.T) {
 		t.Fatalf("CreateOrg: %v", err)
 	}
 	// GET anónimo ⇒ 404 y, sobre todo, NO se crea ninguna clave (ID-02).
-	if code := l.metadataIdP(t, "acme"); code != http.StatusNotFound {
+	if code := l.metadataIDP(t, "acme"); code != http.StatusNotFound {
 		t.Fatalf("metadata de una org sin SP: código=%d, quiero 404", code)
 	}
-	if n := clavesIdP(t, l, sinSAML.ID); n != 0 {
+	if n := clavesIDP(t, l, sinSAML.ID); n != 0 {
 		t.Fatalf("ID-02: una GET anónima acuñó una clave de IdP para una org sin SAML (filas=%d)", n)
 	}
 
@@ -68,14 +68,14 @@ func TestMetadataIdPNoAcuñaClaveAnonima(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateSAMLServiceProvider: %v", err)
 	}
-	if code := l.metadataIdP(t, "beta"); code != http.StatusOK {
+	if code := l.metadataIDP(t, "beta"); code != http.StatusOK {
 		t.Fatalf("metadata de una org con SP registrado: código=%d, quiero 200", code)
 	}
-	if n := clavesIdP(t, l, conSAML.ID); n != 1 {
+	if n := clavesIDP(t, l, conSAML.ID); n != 1 {
 		t.Fatalf("la org con SP debería tener su clave de IdP (filas=%d)", n)
 	}
 	// Y la org sin SAML sigue sin clave: servir la de otra no le crea nada.
-	if n := clavesIdP(t, l, sinSAML.ID); n != 0 {
+	if n := clavesIDP(t, l, sinSAML.ID); n != 0 {
 		t.Fatalf("la org sin SAML no debe tener clave (filas=%d)", n)
 	}
 }

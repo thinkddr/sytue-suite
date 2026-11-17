@@ -66,7 +66,7 @@ func TestCustomEmojiDeleteAuthorOrAdmin(t *testing.T) {
 	ctx := tenantCtx("acme")
 
 	// "alice" es admin de su team y, por su token, de la organización; "bob" es solo miembro.
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}

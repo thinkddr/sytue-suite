@@ -4,11 +4,13 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +20,10 @@ import (
 // carpeta y de fichero; el cliente de la web (packages/api-clients/src/drive) le monta
 // encima una capa de rutas («/Contabilidad/2026») porque la web navega por URL. Una app
 // nativa navega por carpetas: aquí se porta el núcleo por id y no la capa de rutas.
-type Drive struct{ c *Client }
+type Drive struct {
+	c    *Client
+	data DriveData
+}
 
 // NewDrive crea el cliente sobre la raíz del servicio (ServiceURL(apex, "drive")).
 func NewDrive(servicio string, s Session, h *http.Client) *Drive {
@@ -27,11 +32,14 @@ func NewDrive(servicio string, s Session, h *http.Client) *Drive {
 
 // Folder es una carpeta.
 type Folder struct {
-	ID        string    `json:"id"`
-	ParentID  *string   `json:"parent_id,omitempty"`
-	Name      string    `json:"name"`
-	IsRoot    bool      `json:"is_root"`
-	IsGroup   bool      `json:"is_group"`
+	ID       string  `json:"id"`
+	ParentID *string `json:"parent_id,omitempty"`
+	Name     string  `json:"name"`
+	IsRoot   bool    `json:"is_root"`
+	IsGroup  bool    `json:"is_group"`
+	// OwnerSub es el `sub` de quien la creó; CreatedAt, cuándo. Los pinta «Detalles».
+	OwnerSub  string    `json:"owner_sub,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	// DeletedAt solo viene en la papelera.
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
@@ -42,13 +50,18 @@ type Folder struct {
 
 // File es un fichero.
 type File struct {
-	ID          string    `json:"id"`
-	FolderID    string    `json:"folder_id"`
-	Name        string    `json:"name"`
-	SizeBytes   int64     `json:"size_bytes"`
-	ContentType string    `json:"content_type"`
-	Version     int       `json:"version"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string `json:"id"`
+	FolderID    string `json:"folder_id"`
+	Name        string `json:"name"`
+	SizeBytes   int64  `json:"size_bytes"`
+	ContentType string `json:"content_type"`
+	Version     int    `json:"version"`
+	// OwnerSub es quien lo subió por primera vez y ModifiedBy quien subió el contenido
+	// ACTUAL (ambos `sub`); CreatedAt, cuándo nació. Son lo que enseña «Detalles».
+	OwnerSub   string    `json:"owner_sub,omitempty"`
+	ModifiedBy string    `json:"modified_by,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 	// Checksum es el SHA-256 en hexadecimal del contenido, que el servicio calcula
 	// al subir. Es con lo que `GuardarAdjunto` sabe que un adjunto ya está guardado
 	// y no lo guarda dos veces.
@@ -76,12 +89,82 @@ type Children struct {
 
 // Root es la carpeta raíz de la persona («Mi unidad»).
 func (d *Drive) Root(ctx context.Context) (Folder, error) {
+	if d.data != nil {
+		return d.data.Root(ctx)
+	}
 	return JSON[Folder](ctx, d.c, Request{Path: "/folders/root"})
 }
 
-// Children lista una página de una carpeta. cursor vacío es la primera.
+// Children lista una página de una carpeta en el orden de siempre. cursor vacío es la
+// primera.
 func (d *Drive) Children(ctx context.Context, carpeta, cursor string) (Children, error) {
+	return d.ChildrenEn(ctx, carpeta, cursor, OrdenListado{})
+}
+
+// OrdenListado es el `?orden=&sentido=` de un listado de carpeta: Campo es `nombre`,
+// `modificado` o `tamano`, y Sentido `asc` o `desc`. El cero es el orden de siempre
+// (nombre ascendente) y no añade parámetros, así que la URL —y con ella la caché sin
+// conexión— es la de antes.
+type OrdenListado struct {
+	Campo, Sentido string
+}
+
+// ordenar aplica el orden a una página ya en memoria: carpetas y ficheros por separado,
+// como el servicio, con el nombre de desempate.
+func (o OrdenListado) ordenar(ch *Children) {
+	if o.Campo == "" && o.Sentido == "" {
+		return
+	}
+	desc := o.Sentido == "desc"
+	compara := func(na, nb string, ta, tb time.Time, sa, sb int64) int {
+		r := 0
+		switch o.Campo {
+		case "modificado":
+			r = ta.Compare(tb)
+		case "tamano":
+			r = cmp.Compare(sa, sb)
+		}
+		if r == 0 {
+			r = strings.Compare(strings.ToLower(na), strings.ToLower(nb))
+		}
+		if desc {
+			r = -r
+		}
+		return r
+	}
+	slices.SortStableFunc(ch.Folders, func(a, b Folder) int {
+		return compara(a.Name, b.Name, a.UpdatedAt, b.UpdatedAt, 0, 0)
+	})
+	slices.SortStableFunc(ch.Files, func(a, b File) int {
+		return compara(a.Name, b.Name, a.UpdatedAt, b.UpdatedAt, a.SizeBytes, b.SizeBytes)
+	})
+}
+
+func (o OrdenListado) poner(q url.Values) {
+	if o.Campo != "" {
+		q.Set("orden", o.Campo)
+	}
+	if o.Sentido != "" {
+		q.Set("sentido", o.Sentido)
+	}
+}
+
+// ChildrenEn lista una página de una carpeta en el orden pedido, que aplica el servicio
+// con keyset por columna. El cursor lleva su orden: la página siguiente se pide en el
+// MISMO, o el servicio contesta 400.
+//
+// En el almacenamiento privado los nombres van cifrados y el servicio no puede
+// ordenarlos: la página se ordena aquí, ya descifrada.
+func (d *Drive) ChildrenEn(ctx context.Context, carpeta, cursor string, o OrdenListado) (Children, error) {
+	if d.data != nil {
+		ch, err := d.data.Children(ctx, carpeta, cursor)
+		if err == nil {
+			o.ordenar(&ch)
+		}
+		return ch, err
+	}
 	q := url.Values{}
+	o.poner(q)
 	if cursor != "" {
 		q.Set("cursor", cursor)
 	}
@@ -90,11 +173,33 @@ func (d *Drive) Children(ctx context.Context, carpeta, cursor string) (Children,
 
 // CreateFolder crea una carpeta dentro de otra.
 func (d *Drive) CreateFolder(ctx context.Context, padre, nombre string) (Folder, error) {
+	if d.data != nil {
+		return d.data.CreateFolder(ctx, padre, nombre)
+	}
 	return PostJSON[Folder](ctx, d.c, "/folders", map[string]string{"parent_id": padre, "name": nombre})
 }
 
+// ExportBasesView deja en la carpeta un CSV con la vista de Sytue Bases que abarca el
+// token de una conexión de solo lectura concedida a Sytue Drive, y devuelve el fichero.
+// Es `importBasesView` del cliente de la web. El token va en el cuerpo, nunca en la URL,
+// y el servicio no lo guarda: refrescar la vista es volver a exportarla. Si la conexión
+// no vale (revocada, caducada, de otro producto u otra organización) contesta 422 con
+// el código CodigoBasesConexionInvalida; si no cabe, 507.
+func (d *Drive) ExportBasesView(ctx context.Context, carpeta, token string) (File, error) {
+	r, err := PostJSON[struct {
+		File File `json:"file"`
+	}](ctx, d.c, "/folders/"+url.PathEscape(carpeta)+"/imports/bases", map[string]string{"token": token})
+	return r.File, err
+}
+
+// CodigoBasesConexionInvalida es el `code` del 422 de ExportBasesView.
+const CodigoBasesConexionInvalida = "bases_connection_invalid"
+
 // Download abre el contenido de un fichero. Cerrarlo es cosa de quien llama.
 func (d *Drive) Download(ctx context.Context, fichero string) (io.ReadCloser, error) {
+	if d.data != nil {
+		return d.data.Download(ctx, fichero)
+	}
 	resp, err := d.c.Do(ctx, Request{Path: "/files/" + url.PathEscape(fichero) + "/content"})
 	if err != nil {
 		return nil, err
@@ -105,6 +210,9 @@ func (d *Drive) Download(ctx context.Context, fichero string) (io.ReadCloser, er
 // Thumbnail abre la miniatura de una imagen (512 px de lado como mucho, JPEG o PNG). El
 // servicio solo las hace de JPEG, PNG y GIF; de lo demás contesta 415.
 func (d *Drive) Thumbnail(ctx context.Context, fichero string) (io.ReadCloser, error) {
+	if d.data != nil {
+		return d.data.Thumbnail(ctx, fichero)
+	}
 	resp, err := d.c.Do(ctx, Request{Path: "/files/" + url.PathEscape(fichero) + "/thumbnail"})
 	if err != nil {
 		return nil, err
@@ -114,12 +222,32 @@ func (d *Drive) Thumbnail(ctx context.Context, fichero string) (io.ReadCloser, e
 
 // Upload sube un fichero a una carpeta, sin pasarlo por memoria. El nombre va en la
 // query y no en `X-File-Name`: una cabecera no lleva bien «Factura nº 3 — señal.pdf».
+// Si ya hay un fichero con ese nombre en la carpeta, lo SUSTITUYE (una versión nueva).
 func (d *Drive) Upload(ctx context.Context, carpeta, nombre, tipo string, cuerpo io.Reader, tamano int64) (File, error) {
+	if d.data != nil {
+		return d.data.Upload(ctx, carpeta, nombre, tipo, cuerpo, tamano)
+	}
+	return d.subir(ctx, carpeta, url.Values{"name": {nombre}}, tipo, cuerpo, tamano)
+}
+
+// UploadConservando es Upload sin sustituir nada: con un fichero del mismo nombre en la
+// carpeta, este se guarda como «nombre (2).ext» (`on_conflict=keep_both`) y el File que
+// vuelve dice cuál. Es la de las fotos, donde «IMG_0001.jpg» se repite en cada teléfono.
+// Un Drive anterior a la opción la ignora y sustituye: quien no pueda permitírselo
+// sigue eligiendo un nombre libre antes de subir.
+func (d *Drive) UploadConservando(ctx context.Context, carpeta, nombre, tipo string, cuerpo io.Reader, tamano int64) (File, error) {
+	if d.data != nil {
+		return d.data.Upload(ctx, carpeta, nombre, tipo, cuerpo, tamano)
+	}
+	return d.subir(ctx, carpeta, url.Values{"name": {nombre}, "on_conflict": {"keep_both"}}, tipo, cuerpo, tamano)
+}
+
+func (d *Drive) subir(ctx context.Context, carpeta string, q url.Values, tipo string, cuerpo io.Reader, tamano int64) (File, error) {
 	if tipo == "" {
 		tipo = "application/octet-stream"
 	}
 	resp, err := d.c.Stream(ctx, http.MethodPost, "/folders/"+url.PathEscape(carpeta)+"/files",
-		url.Values{"name": {nombre}}, http.Header{"Content-Type": {tipo}}, cuerpo, tamano)
+		q, http.Header{"Content-Type": {tipo}}, cuerpo, tamano)
 	if err != nil {
 		return File{}, err
 	}
@@ -162,12 +290,18 @@ func elemento(k DriveKind, id, resto string) string {
 
 // Rename cambia el nombre. El servicio contesta 409 si ya hay otro igual en su carpeta.
 func (d *Drive) Rename(ctx context.Context, k DriveKind, id, nombre string) error {
+	if d.data != nil {
+		return d.data.Rename(ctx, k, id, nombre)
+	}
 	return d.mandar(ctx, http.MethodPatch, elemento(k, id, ""), map[string]string{"name": nombre})
 }
 
 // Move lleva el elemento a otra carpeta. El PATCH es el de Rename, y el servicio exige
 // que lleve UNA de las dos cosas: nombre o destino.
 func (d *Drive) Move(ctx context.Context, k DriveKind, id, destino string) error {
+	if d.data != nil {
+		return d.data.Move(ctx, k, id, destino)
+	}
 	campo := "new_folder_id"
 	if k == DriveFolder {
 		campo = "new_parent_id"
@@ -177,11 +311,17 @@ func (d *Drive) Move(ctx context.Context, k DriveKind, id, destino string) error
 
 // Delete manda el elemento a la papelera; una carpeta, con todo lo que lleva dentro.
 func (d *Drive) Delete(ctx context.Context, k DriveKind, id string) error {
+	if d.data != nil {
+		return d.data.Delete(ctx, k, id)
+	}
 	return d.mandar(ctx, http.MethodDelete, elemento(k, id, ""), nil)
 }
 
 // Restore lo devuelve de la papelera a donde estaba.
 func (d *Drive) Restore(ctx context.Context, k DriveKind, id string) error {
+	if d.data != nil {
+		return d.data.Restore(ctx, k, id)
+	}
 	return d.mandar(ctx, http.MethodPost, elemento(k, id, "/restore"), nil)
 }
 
@@ -193,6 +333,9 @@ func (d *Drive) Purge(ctx context.Context, k DriveKind, id string) error {
 // CopyFile hace una copia junto al original. No mueve bytes: el servicio apunta la
 // copia al mismo contenido, y el nombre («Copia de …») lo pone él.
 func (d *Drive) CopyFile(ctx context.Context, id string) (File, error) {
+	if d.data != nil {
+		return d.data.CopyFile(ctx, id)
+	}
 	return JSON[File](ctx, d.c, Request{Method: http.MethodPost, Path: elemento(DriveFile, id, "/copy")})
 }
 
@@ -211,6 +354,9 @@ type DriveTrash struct {
 
 // Trash lista la papelera.
 func (d *Drive) Trash(ctx context.Context) (DriveTrash, error) {
+	if d.data != nil {
+		return d.data.Trash(ctx)
+	}
 	return JSON[DriveTrash](ctx, d.c, Request{Path: "/trash"})
 }
 
@@ -238,6 +384,9 @@ func (c Compartidos) Hijos() Children {
 // Search busca por nombre en TODA la unidad. Va por QUERY: lo que alguien busca no
 // tiene por qué quedarse en el log de acceso de cada proxy del camino.
 func (d *Drive) Search(ctx context.Context, texto string) (Children, error) {
+	if d.data != nil {
+		return d.data.Search(ctx, texto)
+	}
 	r, err := Consulta[struct {
 		Files Compartidos `json:"files"` // la clave es "files" aunque sean nodos: la comparte con el Hub
 	}](ctx, d.c, Request{Path: "/search", Query: url.Values{"q": {texto}}})
@@ -248,6 +397,9 @@ func (d *Drive) Search(ctx context.Context, texto string) (Children, error) {
 // ORDEN del servicio. `cursor` vacío es la primera; el de la siguiente vuelve aparte,
 // vacío si no hay más.
 func (d *Drive) Recent(ctx context.Context, cursor string) (Compartidos, string, error) {
+	if d.data != nil {
+		return d.data.Recent(ctx, cursor)
+	}
 	q := url.Values{}
 	if cursor != "" {
 		q.Set("cursor", cursor)
@@ -263,6 +415,9 @@ func (d *Drive) Recent(ctx context.Context, cursor string) (Compartidos, string,
 // último marcado primero. Van MEZCLADOS y en ese orden: repartirlos en carpetas y
 // ficheros, como `Hijos`, cambiaría lo que la web enseña.
 func (d *Drive) Favorites(ctx context.Context) (Compartidos, error) {
+	if d.data != nil {
+		return d.data.Favorites(ctx)
+	}
 	r, err := JSON[struct {
 		Items Compartidos `json:"items"`
 	}](ctx, d.c, Request{Path: "/favorites"})
@@ -271,6 +426,9 @@ func (d *Drive) Favorites(ctx context.Context) (Compartidos, error) {
 
 // SetFavorite pone o quita la estrella. Es de la persona, no del fichero: nadie más la ve.
 func (d *Drive) SetFavorite(ctx context.Context, k DriveKind, id string, favorito bool) error {
+	if d.data != nil {
+		return d.data.SetFavorite(ctx, k, id, favorito)
+	}
 	campo := "file_id"
 	if k == DriveFolder {
 		campo = "folder_id"
@@ -282,12 +440,18 @@ func (d *Drive) SetFavorite(ctx context.Context, k DriveKind, id string, favorit
 // resuelve. Es el `statById` de la web: lo que se sabe de un fichero cuando lo único
 // que llegó fue su id, como en un enlace de apertura.
 func (d *Drive) File(ctx context.Context, id string) (File, error) {
+	if d.data != nil {
+		return d.data.File(ctx, id)
+	}
 	return JSON[File](ctx, d.c, Request{Path: elemento(DriveFile, id, "")})
 }
 
 // Folder trae una carpeta por su identificador. Sirve para saber de quién cuelga: un
 // favorito llega sin su camino, y se sube de padre en padre hasta la raíz.
 func (d *Drive) Folder(ctx context.Context, id string) (Folder, error) {
+	if d.data != nil {
+		return d.data.Folder(ctx, id)
+	}
 	return JSON[Folder](ctx, d.c, Request{Path: elemento(DriveFolder, id, "")})
 }
 
@@ -499,6 +663,9 @@ func version(fichero string, n int, resto string) string {
 // Versions es una página del historial de un fichero, lo más nuevo primero, y el cursor
 // de la siguiente ("" si no hay más). `cursor` vacío es la primera.
 func (d *Drive) Versions(ctx context.Context, fichero, cursor string) ([]DriveVersion, string, error) {
+	if d.data != nil {
+		return d.data.Versions(ctx, fichero, cursor)
+	}
 	q := url.Values{}
 	if cursor != "" {
 		q.Set("cursor", cursor)
@@ -512,6 +679,9 @@ func (d *Drive) Versions(ctx context.Context, fichero, cursor string) ([]DriveVe
 
 // DownloadVersion abre el contenido de una versión ARCHIVADA; la actual se baja con Download.
 func (d *Drive) DownloadVersion(ctx context.Context, fichero string, n int) (io.ReadCloser, error) {
+	if d.data != nil {
+		return d.data.DownloadVersion(ctx, fichero, n)
+	}
 	resp, err := d.c.Do(ctx, Request{Path: version(fichero, n, "/content")})
 	if err != nil {
 		return nil, err
@@ -522,6 +692,9 @@ func (d *Drive) DownloadVersion(ctx context.Context, fichero string, n int) (io.
 // RestoreVersion hace actual una versión archivada. No se pierde nada: lo que había pasa
 // a ser una versión más del historial.
 func (d *Drive) RestoreVersion(ctx context.Context, fichero string, n int) error {
+	if d.data != nil {
+		return d.data.RestoreVersion(ctx, fichero, n)
+	}
 	return d.mandar(ctx, http.MethodPost, version(fichero, n, "/restore"), nil)
 }
 
@@ -564,6 +737,9 @@ func (d *Drive) BatchTrash(ctx context.Context, ficheros, carpetas []string) (Dr
 // streaming, así que su propio tamaño no se sabe hasta el final. Con él, quien lo lee
 // puede enseñar el porcentaje (`ficheros` cuenta lo descomprimido a medida que llega).
 func (d *Drive) Zip(ctx context.Context, ficheros, carpetas []string, nombre string) (cuerpo io.ReadCloser, contenido int64, err error) {
+	if d.data != nil {
+		return d.data.Zip(ctx, ficheros, carpetas, nombre)
+	}
 	q := url.Values{"file_ids": {strings.Join(ficheros, ",")}, "folder_ids": {strings.Join(carpetas, ",")}}
 	if nombre != "" {
 		q.Set("name", nombre)

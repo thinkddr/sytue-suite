@@ -61,3 +61,40 @@ export function rangoDePeriodo(
       return {};
   }
 }
+
+/**
+ * Las fechas que se proponen al CERRAR el libro: el último día del mes, del trimestre
+ * y del año que ya terminaron. Cerrar es declarar acabado lo que pasó —el servicio
+ * rechaza una fecha futura—, así que ninguna propuesta cae después de hoy. En enero
+ * las tres coinciden (31 de diciembre) y en abril las dos primeras: se dejan una vez,
+ * con el rótulo de la más amplia, que es lo que de verdad se está cerrando.
+ */
+export const PROPUESTAS_CIERRE = ['mesAnterior', 'trimestreAnterior', 'anioAnterior'] as const;
+export type PropuestaCierre = (typeof PROPUESTAS_CIERRE)[number];
+
+export const ROTULO_PROPUESTA: Record<PropuestaCierre, ErpMessageKey> = {
+  mesAnterior: 'close.endOfLastMonth',
+  trimestreAnterior: 'close.endOfLastQuarter',
+  anioAnterior: 'close.endOfLastYear',
+};
+
+export function propuestasDeCierre(
+  hoy: Date = new Date(),
+): { propuesta: PropuestaCierre; hasta: string }[] {
+  const a = hoy.getFullYear();
+  const m = hoy.getMonth();
+  const fechas: Record<PropuestaCierre, string> = {
+    mesAnterior: iso(a, m, 0),
+    trimestreAnterior: iso(a, m - (m % 3), 0),
+    anioAnterior: iso(a, 0, 0),
+  };
+  const fuera = new Set<string>();
+  const out: { propuesta: PropuestaCierre; hasta: string }[] = [];
+  // De la más amplia a la más corta para quedarse con su rótulo, y luego en su orden.
+  for (const p of [...PROPUESTAS_CIERRE].reverse()) {
+    if (fuera.has(fechas[p])) continue;
+    fuera.add(fechas[p]);
+    out.unshift({ propuesta: p, hasta: fechas[p] });
+  }
+  return out;
+}

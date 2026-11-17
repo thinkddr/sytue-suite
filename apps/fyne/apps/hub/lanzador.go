@@ -157,9 +157,20 @@ func antes(a, b EventoDeHoy) bool {
 type Agenda struct {
 	Estado  Estado
 	Eventos []EventoDeHoy
+	// Total son los eventos que tiene el día (la tarjeta enseña MaxEventosHoy): lo que
+	// pasa de Eventos es el «+N más en el calendario» del pie.
+	Total int
+	// Parcial dice que algún calendario no contestó: la tarjeta lo avisa en una línea.
+	Parcial bool
 	// HayCorreo dice si el buzón contestó; con false no se pinta el pie.
 	HayCorreo bool
 	SinLeer   int
+}
+
+// EventosDeMas es el `eventosDeMas` de `lib/hoy.ts`: cuántos eventos del día no caben
+// en la tarjeta. Sin Total (una agenda de antes) no inventa un «+N».
+func (a Agenda) EventosDeMas() int {
+	return max(a.Total-len(a.Eventos), 0)
 }
 
 // Reciente es la tarjeta de abajo: la actividad cross-app que sirve el Hub.
@@ -205,6 +216,13 @@ type Lanzador struct {
 
 	Agenda   Agenda
 	Reciente Reciente
+
+	// Pasos son los «Primeros pasos» que le quedan a esta persona (`api.PrimerosPasos`);
+	// sin ninguno, ni oculta, no hay tarjeta. AlOcultarPasos la quita para siempre y
+	// AlAbrirPaso lleva a donde se arregla cada uno.
+	Pasos          []api.PasoPendiente
+	AlOcultarPasos func()
+	AlAbrirPaso    func(api.PasoPendiente)
 
 	// AlAbrir salta a otro producto: es una acción del SISTEMA, no una pantalla.
 	AlAbrir func(p Producto, ruta string)
@@ -272,11 +290,15 @@ type lanzadorRenderer struct {
 	// menu es el último que desplegó «Más»: lo mira el guardián.
 	menu *ui.Menu
 
-	hoy       *tarjeta
-	tAccesos  *tarjeta
-	filasHoy  []fyne.CanvasObject // filas de evento y, al final, el pie de correo
-	textoHoy  *canvas.Text        // el párrafo de «no hay nada» / «no disponible»
-	esqueleto []fyne.CanvasObject
+	hoy      *tarjeta
+	tAccesos *tarjeta
+	filasHoy []fyne.CanvasObject // filas de evento y, al final, el pie («+N» y correo)
+	textoHoy *canvas.Text        // el párrafo de «no hay nada» / «no disponible»
+	// avisoHoy es la línea de «agenda incompleta» y fileteAviso su `border-b`.
+	avisoHoy    *canvas.Text
+	fileteAviso *canvas.Rectangle
+	esqueleto   []fyne.CanvasObject
+	cargaHoy    *ui.BloquesEsqueleto // el grupo de `esqueleto`
 
 	recientes  *tarjeta
 	filas      []*FilaReciente
@@ -284,7 +306,13 @@ type lanzadorRenderer struct {
 	filetesHoy []*canvas.Rectangle
 	avisoRec   *ui.Vacio
 	esqRec     []fyne.CanvasObject
+	cargaRec   *ui.BloquesEsqueleto // el grupo de `esqRec`
+	// fraccRec son las dos fracciones de cada fila de carga: las de la web, de la
+	// columna de texto.
+	fraccRec   []float32
 	privacidad []*canvas.Text
+	// pasos es la tarjeta «Primeros pasos», encima de las apps; nil si no queda nada.
+	pasos *TarjetaPasos
 
 	objetos []fyne.CanvasObject
 }
@@ -320,6 +348,12 @@ func (r *lanzadorRenderer) rehacer() {
 	r.cabecera = nuevaCabecera(v, i18n.FormatWeekdayDayMonth(t.Locale(), l.Ahora), l.titulo(), "")
 	r.cabecera.preparar(v, ancho)
 	r.atajosConexiones = nil
+	r.pasos = nil
+	if len(l.Pasos) > 0 {
+		r.pasos = NuevaTarjetaPasos(t, l.Pasos, l.Ancho())
+		r.pasos.AlOcultar = l.AlOcultarPasos
+		r.pasos.AlAbrir = l.AlAbrirPaso
+	}
 	var conexiones []ui.Bloque
 	tarjeta := func(titulo, descripcion string, hacer func()) {
 		c := ui.NuevaTarjetaEleccion(titulo, descripcion, hacer).A(ancho)
@@ -346,11 +380,13 @@ func (r *lanzadorRenderer) rehacer() {
 		for _, a := range l.Conectadas {
 			href := a.Href
 			rotulo := t.T("launcher.appAria", i18n.Vars{"name": a.Name, "description": a.Description})
-			r.conectadas = append(r.conectadas, NuevaTeselaConectada(a, rotulo, func() {
+			tesela := NuevaTeselaConectada(a, rotulo, func() {
 				if l.AlAbrirURL != nil {
 					l.AlAbrirURL(href)
 				}
-			}))
+			})
+			tesela.Vecina = r.vecina
+			r.conectadas = append(r.conectadas, tesela)
 		}
 	}
 	// En Marco los accesos rápidos no llevan tarjeta (`marco:hidden`): son las píldoras
@@ -364,7 +400,7 @@ func (r *lanzadorRenderer) rehacer() {
 		r.tAccesos = nuevaTarjeta(v, t.T("launcher.quickActions", nil), nil)
 	}
 	r.hacerHoy(v)
-	r.hacerReciente(v, ancho)
+	r.hacerReciente(v)
 	r.privacidad = nil
 	for _, linea := range ui.Repartir(t.T("privacy.notice", nil), tema.TextoXS, ui.Normal,
 		min(ancho-2*MargenX, AnchoAviso-2*MargenX)) {
@@ -376,6 +412,9 @@ func (r *lanzadorRenderer) rehacer() {
 	r.objetos = append(r.objetos, r.cabecera.objetos()...)
 	if r.tiraPildoras != nil {
 		r.objetos = append(r.objetos, r.tiraPildoras)
+	}
+	if r.pasos != nil {
+		r.objetos = append(r.objetos, r.pasos)
 	}
 	if r.atajosConexiones != nil {
 		r.objetos = append(r.objetos, r.atajosConexiones)
@@ -391,7 +430,10 @@ func (r *lanzadorRenderer) rehacer() {
 		r.objetos = append(r.objetos, x)
 	}
 	r.objetos = append(r.objetos, r.hoy.objetos()...)
-	r.objetos = append(r.objetos, r.esqueleto...)
+	r.objetos = conCarga(r.objetos, r.cargaHoy)
+	if r.avisoHoy != nil {
+		r.objetos = append(r.objetos, r.fileteAviso, r.avisoHoy)
+	}
 	if r.textoHoy != nil {
 		r.objetos = append(r.objetos, r.textoHoy)
 	}
@@ -406,7 +448,7 @@ func (r *lanzadorRenderer) rehacer() {
 		r.objetos = append(r.objetos, a)
 	}
 	r.objetos = append(r.objetos, r.recientes.objetos()...)
-	r.objetos = append(r.objetos, r.esqRec...)
+	r.objetos = conCarga(r.objetos, r.cargaRec)
 	if r.avisoRec != nil {
 		r.objetos = append(r.objetos, r.avisoRec)
 	}
@@ -471,9 +513,13 @@ func (r *lanzadorRenderer) teselasDe() []*TeselaApp {
 		apagada := l.Apagados[p.Marca.Clave()]
 		rotulo := t.T("launcher.appAria", i18n.Vars{"name": p.Nombre, "description": desc})
 		if apagada {
+			// Como la tesela desactivada de la web (`TeselaProducto`): en el sitio de la
+			// descripción va el PORQUÉ, a la vista, y no solo en el rótulo accesible.
+			desc = t.T("launcher.orgOnlyReason", nil)
 			rotulo = p.Nombre + " — " + desc + " (" + t.T("launcher.disabled", nil) + ")"
 		}
 		tesela := NuevaTeselaApp(p, desc, rotulo, r.abrir(p))
+		tesela.Vecina = r.vecina
 		tesela.Deshabilitada = apagada
 		tesela.Inerte = apagada
 		if apagada {
@@ -482,6 +528,90 @@ func (r *lanzadorRenderer) teselasDe() []*TeselaApp {
 		out = append(out, tesela)
 	}
 	return out
+}
+
+// vecina es el destino de una flecha, Inicio o Fin desde la tesela `t`, con el criterio
+// de `navegarProducto` (web): solo las teselas que se pueden abrir (`a[href]`: la
+// apagada no tiene), de las DOS rejillas —la de producto y la de apps conectadas, que
+// la web junta en `[data-hub-galeria]`—; en horizontal la anterior o la siguiente en
+// ese orden, y en vertical la de la fila más cercana por arriba o por abajo y, dentro
+// de ella, la de columna más próxima. Se mira la posición ya colocada, igual que la web
+// mira `getBoundingClientRect`, para que valga con 2, 3 o 5 columnas y en Marco.
+func (r *lanzadorRenderer) vecina(t fyne.Focusable, tecla fyne.KeyName) fyne.Focusable {
+	activas := r.galeria()
+	i := -1
+	for j, x := range activas {
+		if fyne.Focusable(x) == t {
+			i = j
+		}
+	}
+	if i < 0 {
+		return nil
+	}
+	switch tecla {
+	case fyne.KeyHome:
+		return activas[0]
+	case fyne.KeyEnd:
+		return activas[len(activas)-1]
+	case fyne.KeyLeft:
+		if i > 0 {
+			return activas[i-1]
+		}
+	case fyne.KeyRight:
+		if i+1 < len(activas) {
+			return activas[i+1]
+		}
+	case fyne.KeyUp:
+		return enOtraFila(activas, i, -1)
+	case fyne.KeyDown:
+		return enOtraFila(activas, i, 1)
+	default:
+	}
+	return nil
+}
+
+// enGaleria es una tesela de cualquiera de las dos rejillas.
+type enGaleria interface {
+	fyne.Focusable
+	fyne.CanvasObject
+}
+
+// galeria son las teselas que se pueden abrir, en orden: las de producto y, detrás,
+// las de apps conectadas.
+func (r *lanzadorRenderer) galeria() []enGaleria {
+	activas := make([]enGaleria, 0, len(r.teselas)+len(r.conectadas))
+	for _, x := range r.teselas {
+		if !x.Inerte {
+			activas = append(activas, x)
+		}
+	}
+	for _, x := range r.conectadas {
+		activas = append(activas, x)
+	}
+	return activas
+}
+
+// enOtraFila es la tesela de la fila más cercana por arriba (dir -1) o por abajo
+// (dir 1) de `activas[i]` y, dentro de ella, la de columna más próxima; nil si no hay.
+func enOtraFila(activas []enGaleria, i int, dir float32) fyne.Focusable {
+	abs := func(f float32) float32 { return max(f, -f) }
+	p := activas[i].Position()
+	var mejor enGaleria
+	var dy, dx float32
+	for _, c := range activas {
+		q := c.Position()
+		if (q.Y-p.Y)*dir <= 1 {
+			continue
+		}
+		cy, cx := abs(q.Y-p.Y), abs(q.X-p.X)
+		if mejor == nil || cy < dy || (cy == dy && cx < dx) {
+			mejor, dy, dx = c, cy, cx
+		}
+	}
+	if mejor == nil {
+		return nil // sin esto, un nil con tipo: el foco iría a ninguna parte
+	}
+	return mejor
 }
 
 func (r *lanzadorRenderer) abrir(p Producto) func() {
@@ -514,18 +644,19 @@ func (r *lanzadorRenderer) acciones() []accion {
 			}
 		}
 	}
-	saltar := func(clave, ruta string) func() {
-		return func() { l.abrirProducto(clave, ruta) }
+	saltar := func(acceso string) func() {
+		s := saltosAcceso[acceso]
+		return func() { l.abrirProducto(s.producto, s.ruta) }
 	}
 	// El destino de cada uno es el de la web, ruta a ruta. `quick.download` apunta al
 	// sitio público y no a la pantalla de descargas de esta app: en la web tampoco
 	// van al mismo sitio, y la paridad es de pantallas, no de criterio.
 	return []accion{
 		{"quick.search", GlifoAcceso{Icono: iconos.Buscar}, ir(ABuscar)},
-		{"quick.compose", GlifoAcceso{Ruta: GlifoCorreo}, saltar("mail", "/compose")},
-		{"quick.newDoc", GlifoAcceso{Ruta: GlifoFichero}, saltar("docs", "")},
-		{"quick.upload", GlifoAcceso{Ruta: GlifoSubir}, saltar("drive", "/?upload=1")},
-		{"quick.newEvent", GlifoAcceso{Ruta: GlifoAgenda}, saltar("calendar", "/new")},
+		{"quick.compose", GlifoAcceso{Ruta: GlifoCorreo}, saltar("quick.compose")},
+		{"quick.newDoc", GlifoAcceso{Ruta: GlifoFichero}, saltar("quick.newDoc")},
+		{"quick.upload", GlifoAcceso{Ruta: GlifoSubir}, saltar("quick.upload")},
+		{"quick.newEvent", GlifoAcceso{Ruta: GlifoAgenda}, saltar("quick.newEvent")},
 		{"quick.download", GlifoAcceso{Ruta: GlifoDescarga}, r.abrirWeb()},
 		{"quick.devices", GlifoAcceso{Ruta: GlifoTelefono}, ir(ADispositivos)},
 		{"quick.data", GlifoAcceso{Ruta: GlifoArchivo}, ir(ADatos)},
@@ -552,20 +683,37 @@ func (r *lanzadorRenderer) abrirWeb() func() {
 	}
 }
 
+// conCarga añade el grupo de carga, si lo hay: un `*ui.BloquesEsqueleto` nil dentro de
+// la lista sería un objeto que no es nil y que Fyne intentaría pintar.
+func conCarga(objs []fyne.CanvasObject, g *ui.BloquesEsqueleto) []fyne.CanvasObject {
+	if g == nil {
+		return objs
+	}
+	return append(objs, g)
+}
+
 // hacerHoy monta la tarjeta «Hoy» con el estado en el que esté la agenda.
 func (r *lanzadorRenderer) hacerHoy(v tema.Variante) {
 	l, t := r.l, r.l.T
 	abrir := enlace(t.T("today.openCalendar", nil), ui.Medio, func() { l.abrirProducto("calendar", "") })
 	r.hoy = nuevaTarjeta(v, t.T("today.title", nil), nil, abrir)
-	r.filasHoy, r.textoHoy, r.esqueleto = nil, nil, nil
+	r.filasHoy, r.textoHoy, r.esqueleto, r.cargaHoy = nil, nil, nil, nil
+	r.avisoHoy, r.fileteAviso = nil, nil
+	if l.Agenda.Parcial && (l.Agenda.Estado == Listo || l.Agenda.Estado == SinNada) {
+		// Un calendario que no contestó deja la agenda a medias: se dice en una línea,
+		// encima, para que un día «tranquilo» no lo parezca (`text-warning-text text-xs`).
+		r.avisoHoy = ui.Texto(t.T("today.partial", nil), tema.TextoXS, ui.Normal,
+			tema.Color("warning-text", v))
+		r.fileteAviso = canvas.NewRectangle(tema.Color("border", v))
+	}
 
 	switch l.Agenda.Estado {
 	case Cargando:
 		// «filas Skeleton con la geometría real de la lista»: dos rótulos de
-		// `0.875rem` al 70 % y al 55 %, en un `flex-col gap-2 p-4`.
-		r.esqueleto = []fyne.CanvasObject{
-			ui.NuevoEsqueleto(0, tema.TextoRaiz.Tam), ui.NuevoEsqueleto(0, tema.TextoRaiz.Tam),
-		}
+		// `0.875rem` al 70 % y al 55 %, en un `flex-col gap-2 p-4`, de un solo grupo.
+		g := ui.NuevosBloquesEsqueleto()
+		r.esqueleto = []fyne.CanvasObject{g.Bloque(0, tema.TextoRaiz.Tam), g.Bloque(0, tema.TextoRaiz.Tam)}
+		r.cargaHoy = g.AMano()
 	case SinNada:
 		r.textoHoy = ui.Texto(t.T("today.noEvents", nil), tema.TextoSM, ui.Normal,
 			tema.Color("text-muted", v))
@@ -575,21 +723,26 @@ func (r *lanzadorRenderer) hacerHoy(v tema.Variante) {
 		r.textoHoy = ui.Texto(t.T("today.unavailable", nil), tema.TextoSM, ui.Normal,
 			tema.Color("text-muted", v))
 	case Listo:
-		for _, e := range OrdenarEventos(l.Agenda.Eventos) {
+		eventos := OrdenarEventos(l.Agenda.Eventos)
+		marcas := api.MarcasDeLaAgenda(eventos, l.Ahora)
+		for i, e := range eventos {
 			// Cada evento abre ESE evento en Calendar (su día); con Calendar sustituido,
 			// la aplicación elegida, como «Ver el calendario».
 			ruta := RutaDelEvento(e)
-			r.filasHoy = append(r.filasHoy, nuevaFilaEvento(v, t, e, l.Ahora,
+			r.filasHoy = append(r.filasHoy, nuevaFilaEvento(v, t, e, l.Ahora, marcas[i],
 				func() { l.abrirProducto("calendar", ruta) }))
 		}
 	}
-	if l.Agenda.HayCorreo && l.Agenda.Estado != Cargando {
-		// El pie lleva su propio `border-t`, así que no cuenta para el `divide-y`.
-		r.filetesHoy = Divisores(v, len(r.filasHoy))
-		r.filasHoy = append(r.filasHoy, r.pieCorreo(v))
-		return
-	}
+	// El pie lleva su propio `border-t`, así que no cuenta para el `divide-y`.
 	r.filetesHoy = Divisores(v, len(r.filasHoy))
+	if n := l.Agenda.EventosDeMas(); n > 0 && l.Agenda.Estado == Listo {
+		// La tarjeta enseña seis: lo que no cabe se cuenta y lleva a Calendar.
+		r.filasHoy = append(r.filasHoy, NuevaFilaPie(iconos.Calendar,
+			t.T("today.more", i18n.Vars{"count": n}), func() { l.abrirProducto("calendar", "") }))
+	}
+	if l.Agenda.HayCorreo && l.Agenda.Estado != Cargando {
+		r.filasHoy = append(r.filasHoy, r.pieCorreo(v))
+	}
 }
 
 // pieCorreo es la línea de abajo de «Hoy»: la marca de Mail y el número de no leídos.
@@ -605,7 +758,7 @@ func (r *lanzadorRenderer) pieCorreo(v tema.Variante) fyne.CanvasObject {
 }
 
 // hacerReciente monta la tarjeta «Reciente en toda la suite».
-func (r *lanzadorRenderer) hacerReciente(v tema.Variante, ancho float32) {
+func (r *lanzadorRenderer) hacerReciente(v tema.Variante) {
 	l, t := r.l, r.l.T
 	verTodo := enlace(t.T("recent.viewAll", nil)+" →", ui.SemiNegrita, func() {
 		if l.AlIr != nil {
@@ -613,22 +766,28 @@ func (r *lanzadorRenderer) hacerReciente(v tema.Variante, ancho float32) {
 		}
 	})
 	r.recientes = nuevaTarjeta(v, t.T("launcher.recentAll", nil), nil, verTodo)
-	r.filas, r.avisoRec, r.esqRec = nil, nil, nil
+	r.filas, r.avisoRec, r.esqRec, r.cargaRec, r.fraccRec = nil, nil, nil, nil, nil
 
 	switch l.Reciente.Estado {
 	case Cargando:
+		// Las cuatro filas son UN grupo, que se anuncia con `recent.loading` como el
+		// `role="status"` de la web.
+		g := ui.NuevosBloquesEsqueleto()
 		for i := range 4 {
 			ancho1, ancho2 := float32(0.6), float32(0.35)
 			if i%2 == 1 {
 				ancho1, ancho2 = 0.45, 0.7
 			}
-			interior := AnchoInterior(ancho)
+			punto := g.Bloque(10, 10)
+			punto.CornerRadius = 5 // `circle`
 			r.esqRec = append(r.esqRec,
-				ui.NuevoEsqueletoRedondo(10),
-				ui.NuevoEsqueleto(interior*ancho1, tema.TextoRaiz.Tam),
-				ui.NuevoEsqueleto(interior*ancho2, tema.TextoXS.Tam),
-				ui.NuevoEsqueleto(3*tema.Rem, tema.TextoXS.Tam))
+				punto,
+				g.Bloque(0, tema.TextoRaiz.Tam),
+				g.Bloque(0, tema.TextoXS.Tam),
+				g.Bloque(3*tema.Rem, tema.TextoXS.Tam))
+			r.fraccRec = append(r.fraccRec, ancho1, ancho2)
 		}
+		r.cargaRec = g.AMano().ConRotulo(t.T("recent.loading", nil))
 	case SinNada:
 		r.avisoRec = Aviso(t, v, SinNada, textosReciente, func() { l.abrirProducto("drive", "") })
 	case Fallo, SinConexion, Prohibido:
@@ -654,6 +813,7 @@ var textosReciente = Textos{
 	Accion:      "recent.emptyCta",
 	Fallo:       "launcher.activityError",
 	FalloCuerpo: "recent.hubDown",
+	Ilustracion: new(iconos.VacioBusqueda),
 }
 
 func (r *lanzadorRenderer) filaDe(it api.HubHit) *FilaReciente {
@@ -690,7 +850,7 @@ func (r *lanzadorRenderer) alto(ventana float32) float32 {
 		return r.altoMarco(ventana, ancho)
 	}
 	y := MargenY
-	y += r.cabecera.alto(ancho) + MargenSeccion
+	y += r.cabecera.alto(ancho) + MargenSeccion + r.altoPasos(ventana, ancho)
 	if r.atajosConexiones != nil {
 		y += ui.AltoA(r.atajosConexiones, ancho) + MargenSeccion
 	}
@@ -774,9 +934,12 @@ func (r *lanzadorRenderer) filasConectadas(ventana, ancho float32) (cols int, co
 	rj := r.rejillaApps(ventana)
 	cols, col = rj.Columnas(ancho), rj.AnchoColumna(ancho)
 	for i := 0; i < len(r.conectadas); i += cols {
-		var alto float32
-		for c := i; c < len(r.conectadas) && c < i+cols; c++ {
-			alto = max(alto, AltoTeselaConectada(LineasDe(r.conectadas[c].App.Description, col)))
+		alto := AltoTeselaCompacta // Marco: una línea de descripción, como las propias
+		if !tema.EsMarco() {
+			alto = 0
+			for c := i; c < len(r.conectadas) && c < i+cols; c++ {
+				alto = max(alto, AltoTesela(LineasDe(r.conectadas[c].App.Description, col)))
+			}
 		}
 		filas = append(filas, alto)
 	}
@@ -817,11 +980,14 @@ func (r *lanzadorRenderer) altoCuerpoHoy() float32 {
 		return float32(len(r.esqueleto))*tema.TextoRaiz.Tam +
 			float32(len(r.esqueleto)-1)*HuecoEsqueleto
 	}
+	if r.avisoHoy != nil {
+		alto += MedidaAvisoHoy()
+	}
 	if r.textoHoy != nil {
 		alto += tema.TextoSM.Linea + 2*AltoParrafoHoy // `px-4 py-3`
 	}
 	for i, f := range r.filasHoy {
-		if i > 0 {
+		if i > 0 && !esPieHoy(f) {
 			alto += tema.Borde // `divide-y`
 		}
 		alto += f.MinSize().Height
@@ -863,13 +1029,15 @@ func (r *lanzadorRenderer) Layout(t fyne.Size) {
 		return
 	}
 	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width))))
+	r.cargaHoy.Cubrir(r.fondo.Size())
+	r.cargaRec.Cubrir(r.fondo.Size())
 	x, ancho := CajaContenido(t.Width)
 	r.medirCabecerasTarjetas(t.Width, ancho)
 	if tema.EsMarco() {
 		r.colocarPie(x, r.colocarMarco(x, t.Width, ancho), ancho)
 		return
 	}
-	y := r.cabecera.colocar(x) + MargenSeccion
+	y := r.colocarPasos(x, r.cabecera.colocar(x)+MargenSeccion, t.Width, ancho)
 	if r.atajosConexiones != nil {
 		h := ui.AltoA(r.atajosConexiones, ancho)
 		r.atajosConexiones.Move(fyne.NewPos(x, y))
@@ -905,6 +1073,28 @@ func (r *lanzadorRenderer) Layout(t fyne.Size) {
 	}
 
 	r.colocarPie(x, y, ancho)
+}
+
+// altoPasos es lo que ocupa «Primeros pasos» con su `mb-4`; 0 sin tarjeta.
+func (r *lanzadorRenderer) altoPasos(ventana, ancho float32) float32 {
+	if r.pasos == nil {
+		return 0
+	}
+	r.pasos.Ventana = ventana
+	return r.pasos.AltoPara(ancho) + MargenPasos
+}
+
+// colocarPasos pone «Primeros pasos» en `y`, bajo la cabecera y encima de todo lo demás,
+// como en la web, y devuelve dónde sigue la página.
+func (r *lanzadorRenderer) colocarPasos(x, y, ventana, ancho float32) float32 {
+	if r.pasos == nil {
+		return y
+	}
+	r.pasos.Ventana = ventana
+	h := r.pasos.AltoPara(ancho)
+	r.pasos.Move(fyne.NewPos(x, y))
+	r.pasos.Resize(fyne.NewSize(ancho, h))
+	return y + h + MargenPasos
 }
 
 // colocarPie pone el aviso de privacidad, centrado, bajo el cuerpo que acaba en `y`.
@@ -991,7 +1181,7 @@ func (r *lanzadorRenderer) altoPrincipalMarco(ventana, ancho float32) float32 {
 // entre las dos filas, bajando «Reciente». Aquí «Reciente» se queda a 16 de las apps:
 // hacen falta más de ocho eventos en el día para que se note.
 func (r *lanzadorRenderer) altoMarco(ventana, ancho float32) float32 {
-	y := r.altoCabeceraMarco(ancho)
+	y := r.altoCabeceraMarco(ancho) + r.altoPasos(ventana, ancho)
 	hoy := r.hoy.alto(r.altoCuerpoHoy())
 	rec := func(a float32) float32 { return r.recientes.alto(r.altoCuerpoReciente(a)) }
 	principal, lado := columnasMarco(ancho)
@@ -1010,7 +1200,7 @@ func (r *lanzadorRenderer) altoMarco(ventana, ancho float32) float32 {
 // sus píldoras y, debajo, las apps con «Hoy» y «Reciente» a su derecha desde 1024 —o
 // «Reciente» bajo las apps si son pocas—, y en una columna por debajo.
 func (r *lanzadorRenderer) colocarMarco(x, ventana, ancho float32) float32 {
-	y := r.colocarCabeceraMarco(x, ancho)
+	y := r.colocarPasos(x, r.colocarCabeceraMarco(x, ancho), ventana, ancho)
 	interior := r.altoCuerpoHoy()
 	hoy := func(hx, hy, hw float32) float32 {
 		r.hoy.colocar(hx, hy, hw, interior)
@@ -1081,12 +1271,19 @@ func (r *lanzadorRenderer) colocarHoy(x, y, ancho float32) {
 	if len(r.esqueleto) == 2 {
 		r.esqueleto[1].Resize(fyne.NewSize(iw*0.55, tema.TextoRaiz.Tam))
 	}
+	if r.avisoHoy != nil {
+		ui.Truncar(r.avisoHoy, r.l.T.T("today.partial", nil), tema.TextoXS, ui.Normal, max(iw-2*MargenEvento, 0))
+		ui.ColocarTexto(r.avisoHoy, tema.TextoXS, ix+MargenEvento, iy+AltoEvento)
+		iy += MedidaAvisoHoy() - tema.Borde
+		ColocarDivisor(r.fileteAviso, ix, iy, iw)
+		iy += tema.Borde
+	}
 	if r.textoHoy != nil {
 		ui.ColocarTexto(r.textoHoy, tema.TextoSM, ix+MargenTarjeta, iy+AltoParrafoHoy)
 		iy += tema.TextoSM.Linea + 2*AltoParrafoHoy
 	}
 	for i, f := range r.filasHoy {
-		if i > 0 {
+		if i > 0 && !esPieHoy(f) {
 			if i-1 < len(r.filetesHoy) {
 				ColocarDivisor(r.filetesHoy[i-1], ix, iy, iw)
 			}
@@ -1097,6 +1294,13 @@ func (r *lanzadorRenderer) colocarHoy(x, y, ancho float32) {
 		f.Resize(fyne.NewSize(iw, h))
 		iy += h
 	}
+}
+
+// esPieHoy dice si la fila es una línea del pie («+N» o correo): lleva su propio
+// `border-t` dentro del alto, así que no suma el hueco del `divide-y` de la lista.
+func esPieHoy(f fyne.CanvasObject) bool {
+	_, ok := f.(*FilaCorreo)
+	return ok
 }
 
 func (r *lanzadorRenderer) colocarAccesos(x, y, ancho, interior float32) {
@@ -1129,6 +1333,15 @@ func (r *lanzadorRenderer) colocarReciente(x, y, ancho float32) float32 {
 		r.esqRec[i+1].Move(fyne.NewPos(cx, fy+altoReciente()))
 		r.esqRec[i+2].Move(fyne.NewPos(cx, fy+altoReciente()+tema.TextoRaiz.Linea))
 		r.esqRec[i+3].Move(fyne.NewPos(ix+iw-MargenReciente-3*tema.Rem, fy+altoReciente()))
+		// Las barras, a su fracción de la columna de texto (`flex-1` entre el punto y
+		// la meta de `3rem`, con `gap-3`). Hasta el 2026-11-16 eran `ui.Esqueleto` que
+		// nadie redimensionaba: se quedaban en 0 × 0 y la fila de carga era solo el
+		// punto.
+		columna := max(iw-2*MargenReciente-10-2*HuecoReciente-3*tema.Rem, 0)
+		f := r.fraccRec[i/2 : i/2+2]
+		r.esqRec[i+1].Resize(fyne.NewSize(columna*f[0], tema.TextoRaiz.Tam))
+		r.esqRec[i+2].Resize(fyne.NewSize(columna*f[1], tema.TextoXS.Tam))
+		r.esqRec[i+3].Resize(fyne.NewSize(3*tema.Rem, tema.TextoXS.Tam))
 	}
 	for i, f := range r.filas {
 		if i > 0 {

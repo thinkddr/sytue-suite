@@ -93,13 +93,28 @@ export function esSoloDeOrganizaciones(key: string): boolean {
   return (PRODUCTOS_SOLO_ORGANIZACION as readonly string[]).includes(key);
 }
 
-export const radii = values(spacing.radii);
+/**
+ * Segmento de la ficha pública de `key` en `/product/<segmento>` del sitio de la suite,
+ * cuando NO es la propia clave. Sytue Web sigue siendo `pages` por dentro, pero su ficha
+ * vive en `/product/web`. Está aquí y no solo en www porque el lanzador del portal
+ * también enlaza a las fichas: si cada uno guardara su tabla, la del portal acabaría
+ * apuntando a una dirección vieja que solo redirige.
+ */
+const SEGMENTO_DE_FICHA: Partial<Record<ProductKey, string>> = { pages: 'web' };
+
+/** Segmento de `/product/<segmento>` para `key`: la clave salvo las que cambiaron. */
+export function segmentoDeFicha(key: string): string {
+  return SEGMENTO_DE_FICHA[key as ProductKey] ?? key;
+}
+
+/*
+ * Radios, z-index y motion NO se exportan aquí: los componentes los toman de theme.css
+ * (`rounded-*`, `z-(--z-*)`, `ease-*`), y una copia en TypeScript sin consumidores es la
+ * que se quedó con el z-index anterior al arreglo del 2026-09-15 sin que nadie lo viera.
+ * Lo que sí se vigila es que spacing.json y theme.css digan lo mismo
+ * (`tokens-coherentes.test.ts`).
+ */
 export const layout = values(spacing.layout);
-export const zIndex = { ...spacing.zIndex } as const;
-export const motion = {
-  duration: { ...spacing.motion.duration },
-  easing: { ...spacing.motion.easing },
-} as const;
 
 export const fontFamily = {
   sans: '"Figtree Variable", "Inter Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif',
@@ -357,6 +372,8 @@ export function volverA(valor: string | null | undefined): string | undefined {
  *  producto y la consola gestiona las conexiones. Va aparte para no ensanchar
  *  `appDomains`, cuyo tipo garantiza que están TODOS los productos y solo ellos. */
 export const integrationsDomain: string = at('integrations');
+/** Maintained Matrix transport for private suite data; infrastructure, not a product tile. */
+export const matrixDomain: string = at('matrix');
 
 /**
  * Los orígenes AJENOS al de la app con los que habla la shell común (`@sytue/shell`)
@@ -389,7 +406,7 @@ export function origenesDeLaShell(hubBaseUrl: string = appDomains.hub): {
     }
   };
   return {
-    conectar: [...origen(hubBaseUrl), ...origen(integrationsDomain)],
+    conectar: [...origen(hubBaseUrl), ...origen(integrationsDomain), ...origen(matrixDomain)],
     imagenes: origen(appDomains.id),
   };
 }

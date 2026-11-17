@@ -114,6 +114,22 @@ export interface Notebook {
   edit_requested?: boolean;
 }
 
+/**
+ * Cómo estaba una nota antes de una tanda de edición (historial de versiones).
+ * `replaced_by` es quien guardó encima. La lista llega sin texto; la versión entera,
+ * con él (o con `content_cipher`, que solo descifra el navegador).
+ */
+export interface NoteVersion {
+  id: string;
+  note_id: string;
+  replaced_by: string;
+  title?: string;
+  content?: string;
+  content_cipher?: string;
+  data?: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface Note {
   id: string;
   notebook_id: string;
@@ -150,6 +166,16 @@ export interface Note {
   repeated_into?: string;
 }
 
+/**
+ * Una nota de la papelera (`GET /notes/trash`): la nota, de qué cuaderno viene y cuándo
+ * se vaciará sola. Sin `purge_at` no caduca (purga apagada o retención legal).
+ */
+export interface TrashedNote extends Note {
+  deleted_at: string;
+  notebook_title: string;
+  purge_at?: string;
+}
+
 /** Un día del diario con sus cuentas (`GET /daily`). `notes` solo si se pidieron. */
 export interface DailyDay {
   date: string;
@@ -184,6 +210,12 @@ export interface NotebookInput {
 export interface NoteInput {
   cipher_version?: 2;
   expected_crypto?: NotesCrypto;
+  /**
+   * El `updated_at` de la versión sobre la que se editó. Si la nota ya no está en
+   * ella (la guardó otro dispositivo), el servicio responde 409 `note_edit_conflict`
+   * en vez de pisarla. Sin él, se escribe como siempre.
+   */
+  expected_updated_at?: string;
   kind?: NoteKind;
   title?: string;
   content?: string;
@@ -501,6 +533,21 @@ export class NotesClient {
     await this.http.postJson<void>(`/notes/${encodeURIComponent(id)}/restore`, {});
   }
 
+  /** El historial de una nota, de la versión más reciente a la más antigua. */
+  async noteVersions(id: string): Promise<NoteVersion[]> {
+    const r = await this.http.json<{ versions: NoteVersion[] }>({
+      path: `/notes/${encodeURIComponent(id)}/versions`,
+    });
+    return r.versions ?? [];
+  }
+
+  /** Una versión entera, para verla o volver a ella. */
+  async noteVersion(id: string, versionId: string): Promise<NoteVersion> {
+    return this.http.json<NoteVersion>({
+      path: `/notes/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}`,
+    });
+  }
+
   async purgeNote(id: string): Promise<void> {
     await this.http.request({ method: 'DELETE', path: `/notes/${encodeURIComponent(id)}/purge` });
   }
@@ -511,8 +558,11 @@ export class NotesClient {
     return r.notes ?? [];
   }
 
-  async listTrash(limit = 100): Promise<Note[]> {
-    const r = await this.http.json<{ notes: Note[] }>({ path: '/notes/trash', query: { limit } });
+  async listTrash(limit = 100): Promise<TrashedNote[]> {
+    const r = await this.http.json<{ notes: TrashedNote[] }>({
+      path: '/notes/trash',
+      query: { limit },
+    });
     return r.notes ?? [];
   }
 
@@ -566,21 +616,39 @@ export class NotesClient {
     });
   }
 
-  /** Crea un cuaderno nuevo a partir de un `.onex`. No sobrescribe ninguno. */
-  importNotebook(volcado: BodyInit): Promise<ImportResult> {
-    return this.http.json<ImportResult>({
+  /**
+   * Crea un cuaderno nuevo a partir de un `.onex`, un Markdown (`.md` o `.zip`)
+   * o un Evernote (`.enex`). No sobrescribe ninguno. `name` es el nombre del
+   * fichero: da título al cuaderno cuando el formato no lo trae.
+   */
+  async importNotebook(
+    volcado: BodyInit,
+    name?: string,
+    signal?: AbortSignal,
+  ): Promise<ImportResult> {
+    signal?.throwIfAborted();
+    return await this.http.json<ImportResult>({
       method: 'POST',
       path: '/notebooks/import',
+      query: { name: name || undefined },
       body: volcado,
+      ...(signal ? { signal } : {}),
     });
   }
 
-  /** Lee un `.onex` y devuelve lo que entraría —ya saneado— sin crear nada. */
-  previewNotebook(volcado: BodyInit): Promise<PreviewResult> {
-    return this.http.json<PreviewResult>({
+  /** Lee el fichero y devuelve lo que entraría —ya saneado— sin crear nada. */
+  async previewNotebook(
+    volcado: BodyInit,
+    name?: string,
+    signal?: AbortSignal,
+  ): Promise<PreviewResult> {
+    signal?.throwIfAborted();
+    return await this.http.json<PreviewResult>({
       method: 'POST',
       path: '/notebooks/preview',
+      query: { name: name || undefined },
       body: volcado,
+      ...(signal ? { signal } : {}),
     });
   }
 

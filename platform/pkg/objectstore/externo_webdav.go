@@ -201,6 +201,33 @@ func (w *WebDAV) Get(ctx context.Context, t tenancy.Tenant, key string) (io.Read
 	return res.Body, nil
 }
 
+func (w *WebDAV) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	ruta, err := w.ruta(t, key)
+	if err != nil {
+		return nil, err
+	}
+	if !rawHTTPClient(w.http) {
+		return nil, ErrRawUnsupported
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	res, err := w.hacer(ctx, http.MethodGet, ruta, http.NoBody, 0, map[string]string{"Accept-Encoding": "identity"})
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("webdav: get %q: %w", key, err)
+	}
+	if res.StatusCode == http.StatusNotFound {
+		cancel()
+		_ = res.Body.Close()
+		return nil, ErrNotFound
+	}
+	if res.StatusCode != http.StatusOK {
+		cancel()
+		_ = res.Body.Close()
+		return nil, fmt.Errorf("webdav: get %q: %s", key, res.Status)
+	}
+	return acceptRawHTTP(res, cancel)
+}
+
 func (w *WebDAV) Delete(ctx context.Context, t tenancy.Tenant, key string) error {
 	ruta, err := w.ruta(t, key)
 	if err != nil {

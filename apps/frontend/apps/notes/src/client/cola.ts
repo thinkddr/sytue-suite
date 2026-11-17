@@ -4,23 +4,17 @@
  * Captura y lectura sin conexión.
  *
  * Lo que se captura sin red NO se pierde: va a una cola en IndexedDB
- * (@sytue/offline, por persona) y sale en cuanto vuelve la conexión. Cada captura
- * lleva su `data.client_id`, y el servicio devuelve la nota que ya tenga con esa
- * marca (Store.CreateNote): reintentar nunca duplica, ni siquiera cuando la
- * primera llegó y lo que se perdió fue la respuesta.
- *
- * La cola se vacía UNA sola vez entre pestañas: con Web Locks, la que no consigue
- * el cerrojo no hace nada (la que lo tiene ya está enviando). Sin Web Locks, el
- * `client_id` sigue impidiendo duplicados.
+ * (@sytue/offline, por persona). El envío automático está pausado hasta disponer
+ * de una confirmación atómica compatible con escritores de versiones anteriores.
  *
  * Y para leer sin red: la lista de cuadernos y las notas de cada cuaderno ya
  * abierto se guardan al llegar, y se sirven de aquí cuando la red falla.
  */
 import type { Note, NoteInput, Notebook } from '@sytue/api-clients';
+import { admiteEnlacesEnEnvio } from './notesApi.js';
 import {
   deleteOfflineValue,
   listOfflineValues,
-  mutateOfflineValue,
   readOfflineValue,
   writeOfflineValue,
 } from '@sytue/offline';
@@ -28,7 +22,6 @@ import {
 const COLA = 'notes.capturas';
 const CUADERNOS = 'notes.cuadernos';
 const NOTAS = 'notes.notas';
-const CERROJO = 'sytue-notes-capturas';
 /** Por aquí se avisan las pestañas de que la cola ha cambiado. */
 export const CANAL = 'sytue-notes-capturas';
 
@@ -106,54 +99,35 @@ export async function descartar(owner: string, clientId: string): Promise<void> 
 /** Las pendientes, de la más antigua a la más reciente: es el orden en que se escribieron. */
 export async function pendientes(owner: string): Promise<CapturaPendiente[]> {
   const r = await listOfflineValues<CapturaPendiente>(owner, COLA);
-  return r.map((x) => x.value).sort((a, b) => a.at - b.at);
+  return r
+    .map(({ id, value }) => {
+      const input = value?.input;
+      const data = input?.data;
+      const keys =
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? Object.keys(data).filter(
+              (key) => key.toLowerCase().replaceAll('ſ', 's') === 'client_id',
+            )
+          : [];
+      const valid =
+        typeof id === 'string' &&
+        id !== '' &&
+        value?.client_id === id &&
+        admiteEnlacesEnEnvio(input) &&
+        keys.length === 1 &&
+        keys[0] === 'client_id' &&
+        data?.client_id === id;
+      return valid ? value : { ...value, client_id: id, rechazada: true };
+    })
+    .sort((a, b) => a.at - b.at);
 }
 
 /**
- * Envía la cola en orden. Para en el primer fallo de red (el resto fallaría igual)
- * y aparta las rechazadas. Devuelve los cuadernos que han recibido notas, o null
- * si otra pestaña ya la estaba enviando.
+ * El replay está pausado hasta contar con un CAS de IndexedDB que también cerque
+ * pestañas antiguas. La fuente queda intacta y no se crean cuadernos ni notas.
  */
-export async function vaciar(owner: string, envio: Envio): Promise<Set<string> | null> {
-  const locks = (globalThis.navigator as Navigator | undefined)?.locks;
-  if (locks) {
-    return locks.request(CERROJO, { ifAvailable: true }, (lock) =>
-      lock ? enviarTodas(owner, envio) : null,
-    );
-  }
-  return enviarTodas(owner, envio);
-}
-
-async function enviarTodas(owner: string, envio: Envio): Promise<Set<string>> {
-  const tocados = new Set<string>();
-  let cambio = false;
-  for (const c of await pendientes(owner)) {
-    if (c.rechazada) continue;
-    try {
-      let nb = c.notebook_id;
-      if (!nb) {
-        const dia = await envio.dailyNotebook(
-          c.date ?? envio.hoy,
-          c.title ?? '',
-          c.date === envio.hoy,
-        );
-        nb = dia.id;
-        tocados.add(`${PREFIJO_DIA}${c.date ?? envio.hoy}`);
-      }
-      await envio.createNote(nb, c.input);
-      await deleteOfflineValue(owner, COLA, c.client_id);
-      tocados.add(nb);
-      cambio = true;
-    } catch (err) {
-      if (!esRechazo(err)) break;
-      await mutateOfflineValue<CapturaPendiente>(owner, COLA, c.client_id, (prev) =>
-        prev ? { ...prev, rechazada: true } : null,
-      );
-      cambio = true;
-    }
-  }
-  if (cambio) avisar();
-  return tocados;
+export function vaciar(_owner: string, _envio: Envio): Promise<Set<string> | null> {
+  return Promise.resolve(new Set());
 }
 
 // --- Lectura sin conexión ----------------------------------------------------

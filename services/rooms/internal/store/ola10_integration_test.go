@@ -28,7 +28,7 @@ func TestOpenGroupDirectSetIdempotentAndCap(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic) // alice = "Creador"
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic) // Alice creó el canal.
 	for _, m := range []struct{ sub, name string }{
 		{"bob", "Bob"},
 		{"carol", "Carol"},
@@ -103,7 +103,7 @@ func TestGroupDirectDisplayPerViewer(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic) // alice = "Creador"
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic) // Alice creó el canal.
 	for _, m := range []struct{ sub, name string }{{"bob", "Bob"}, {"carol", "Carol"}} {
 		if err := st.AddTeamMember(ctx, tm.ID, "alice", m.sub, m.name, domain.RoleMember); err != nil {
 			t.Fatalf("AddTeamMember %s: %v", m.sub, err)

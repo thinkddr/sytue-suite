@@ -63,7 +63,7 @@ func TestElAutofiltroEscondeFilasYLaRejillaLasSalta(t *testing.T) {
 	r := lz.Rejilla
 	vw := r.vista()
 	// Fila 1 (cabecera), luego la 3 («Sur») en el segundo puesto y la 5 («Este») en el tercero.
-	if vw.y(2) != vw.oy()+vw.alto() || vw.y(4) != vw.oy()+2*vw.alto() {
+	if vw.y(2) != vw.oy()+vw.alto(0) || vw.y(4) != vw.oy()+2*vw.alto(0) {
 		t.Errorf("la fila 3 está en %v y la 5 en %v", vw.y(2), vw.y(4))
 	}
 	medio := func(f int) fyne.Position { return fyne.NewPos(vw.x(0)+5, vw.y(f)+5) }
@@ -72,7 +72,7 @@ func TestElAutofiltroEscondeFilasYLaRejillaLasSalta(t *testing.T) {
 	}
 	// Quitar la exclusión devuelve la geometría de siempre.
 	lz.Mandar(CmdFiltrar, `{"col":0,"value":"Norte","hidden":false}`)
-	if lz.Libro.FilasOcultas() != nil || r.vista().y(4) != vw.oy()+4*vw.alto() {
+	if lz.Libro.FilasOcultas() != nil || r.vista().y(4) != vw.oy()+4*vw.alto(0) {
 		t.Error("sin exclusiones no se esconde nada")
 	}
 	if !lz.Libro.PuedeDeshacer() {

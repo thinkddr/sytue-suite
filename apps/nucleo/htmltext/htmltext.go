@@ -12,6 +12,7 @@ import (
 	"html"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -70,4 +71,101 @@ func Summary(s string, n int) string {
 		return strings.TrimSpace(string(r[:n])) + "…"
 	}
 	return t
+}
+
+// TextStats son las cuentas de «Información» de una nota.
+type TextStats struct {
+	Palabras   int `json:"palabras"`
+	Caracteres int `json:"caracteres"`
+	// Minutos de lectura a PalabrasPorMinuto, redondeando hacia arriba.
+	Minutos int `json:"minutos"`
+}
+
+// PalabrasPorMinuto es el ritmo de lectura silenciosa que usan Medium, Bear o Notion.
+const PalabrasPorMinuto = 200
+
+// Stats es `estadisticas` de apps/notes/src/client/extracto.ts sobre un texto PLANO
+// (el de Flat): palabras, caracteres y minutos de lectura. Los vectores de
+// testdata/estadisticas.json los recorren las dos, y tienen que dar lo mismo.
+//
+// Los caracteres son runas del texto con los blancos juntados en un espacio. Una
+// palabra es una racha de letras y cifras; un apóstrofo o un guion entre letras
+// («don't», «e-mail») y un punto o una coma entre cifras («1.250») no la cortan. Una
+// marca combinante (un acento suelto, el dakuten de un kana descompuesto, el selector
+// de variante de «❤️») va con lo que tiene delante y nunca empieza una palabra: si no,
+// un emoji o un «が» en NFD contarían de más. Han, hiragana y katakana se escriben sin
+// espacios y cada carácter cuenta como una palabra, como en Word; el hangul separa con
+// espacios y va como los demás.
+func Stats(texto string) TextStats {
+	rs := []rune(strings.Join(camposJS(texto), " "))
+	palabras, enPalabra := 0, false
+	for i, c := range rs {
+		switch {
+		case unicode.IsMark(c):
+			// Sigue lo que hubiera: ni empieza ni corta una palabra.
+		case esCJK(c):
+			palabras++
+			enPalabra = false
+		case esLetra(c):
+			if !enPalabra {
+				palabras++
+			}
+			enPalabra = true
+		case enPalabra && i+1 < len(rs) && une(rs[i-1], c, rs[i+1]):
+			// Sigue la misma palabra.
+		default:
+			enPalabra = false
+		}
+	}
+	return TextStats{
+		Palabras:   palabras,
+		Caracteres: len(rs),
+		Minutos:    (palabras + PalabrasPorMinuto - 1) / PalabrasPorMinuto,
+	}
+}
+
+func esCJK(c rune) bool {
+	return unicode.In(c, unicode.Han, unicode.Hiragana, unicode.Katakana)
+}
+
+func esLetra(c rune) bool {
+	return unicode.IsLetter(c) || unicode.IsNumber(c)
+}
+
+// esBlancoJS es el `\s` de JavaScript, que es lo que juntan textoDeNota y estadisticas
+// en la web. No es unicode.IsSpace (el de strings.Fields): JavaScript cuenta como blanco
+// U+FEFF (el BOM que llega pegado de otros sitios) y no U+0085, y con Fields los dos
+// darían números distintos del mismo texto.
+func esBlancoJS(c rune) bool {
+	return c == '\uFEFF' || (c != '\u0085' && unicode.IsSpace(c))
+}
+
+func camposJS(s string) []string { return strings.FieldsFunc(s, esBlancoJS) }
+
+func une(antes, c, despues rune) bool {
+	if esCJK(despues) || !esLetra(despues) {
+		return false
+	}
+	switch c {
+	case '\'', '’', '-', '‐':
+		return true
+	case '.', ',':
+		return unicode.IsDigit(antes) && unicode.IsDigit(despues)
+	}
+	return false
+}
+
+var (
+	reOcultoPlano = regexp.MustCompile(`(?is)<(script|style|head|template|noscript|iframe|object)\b.*?</(script|style|head|template|noscript|iframe|object)\s*>`)
+	reBloquePlano = regexp.MustCompile(`(?i)</?(br|hr|p|div|li|ul|ol|blockquote|pre|h[1-6]|table|thead|tbody|tfoot|tr|td|th)\b[^>]*>`)
+)
+
+// Flat es `textoDeNota` de extracto.ts: el texto de una nota en UNA línea, sin las
+// viñetas que pone Text, con cada bloque separado por un espacio. Es lo que se cuenta
+// con Stats; con Text, el «•» de cada viñeta sería un carácter que la web no ve.
+func Flat(s string) string {
+	s = reOcultoPlano.ReplaceAllString(s, "")
+	s = reBloquePlano.ReplaceAllString(s, " ")
+	s = html.UnescapeString(reEtiqueta.ReplaceAllString(s, ""))
+	return strings.Join(camposJS(s), " ")
 }

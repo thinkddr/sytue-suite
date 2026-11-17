@@ -25,6 +25,7 @@ import (
 	gosmtp "github.com/emersion/go-smtp"
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
+	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
@@ -207,6 +208,7 @@ func run() error {
 		RejectOnFail:  cfg.RejectOnDMARCFail,
 		HubNotifier:   hubNotifier,
 		MailPublicURL: cfg.PublicURL,
+		AuthServID:    cfg.Hostname,
 		// Correo a canal de Sytue Rooms: nil si falta cualquiera de las dos piezas,
 		// y entonces esas direcciones no existen para el MX.
 		Channels: delivery.NewChannelBridge(cfg.ChannelMailDomain, cfg.RoomsURL),
@@ -240,7 +242,9 @@ func run() error {
 		}
 		logger.Info("salida por relé SMTP", "host", cfg.RelayHost, "puerto", cfg.RelayPort)
 	}
-	queue := delivery.NewQueueWorker(st, blobs, delivery.NewSMTPSenderConRelay(logger, relay), logger, delivery.QueueConfig{
+	smtpSender := delivery.NewSMTPSenderConRelay(logger, relay)
+	outbound.WithPrivateSender(smtpSender)
+	queue := delivery.NewQueueWorker(st, blobs, smtpSender, logger, delivery.QueueConfig{
 		Workers:      cfg.QueueWorkers,
 		MaxAttempts:  cfg.QueueMaxAttempts,
 		BaseBackoff:  cfg.QueueBaseBackoff,
@@ -268,7 +272,7 @@ func run() error {
 		httpx.CheckerFunc{Label: "postgres", Fn: st.Healthz},
 		httpx.CheckerFunc{Label: "objectstore", Fn: blobs.Healthz},
 	)
-	api := jmap.New(cfg, st, blobs, outbound, logger).WithHub(hubNotifier)
+	api := jmap.New(cfg, st, blobs, outbound, logger).WithHub(hubNotifier).WithPrivateIngressQueue(st.PrivateIngressQueue(callaccess.New(cfg.RoomsURL, cfg.RoomsInternalSecret), blobs))
 	// El mismo servicio que firma publica su ancla: sin esto la ruta contesta 503
 	// y el correo sale firmado por una autoridad que nadie puede instalar.
 	//
@@ -320,6 +324,7 @@ func run() error {
 			RejectOnFail:  cfg.RejectOnDMARCFail,
 			HubNotifier:   hubNotifier,
 			MailPublicURL: cfg.PublicURL,
+			AuthServID:    cfg.Hostname,
 			Channels:      delivery.NewChannelBridge(cfg.ChannelMailDomain, cfg.RoomsURL),
 			Calendario:    delivery.NewPuenteCalendario(cfg.CalendarURL, cfg.HubInternalSecret, logger),
 		})

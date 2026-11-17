@@ -25,12 +25,104 @@ mock.module('@sytue/offline', () => ({
     else mem.set(k(o, n, id), { value: next, updatedAt: Date.now() });
   },
   listOfflineValues: async (o: string, n: string) =>
-    [...mem.entries()].filter(([key]) => key.startsWith(`${o}|${n}|`)).map(([, v]) => v),
+    [...mem.entries()]
+      .filter(([key]) => key.startsWith(`${o}|${n}|`))
+      .map(([key, value]) => ({ ...value, id: key.slice(`${o}|${n}|`.length) })),
 }));
 
 const cola = await import('./cola.js');
 
 beforeEach(() => mem.clear());
+
+test('legacy encrypted capture with clear links remains rejected without any network call', async () => {
+  const input: NoteInput = {
+    content_cipher: 'encv1:synthetic',
+    cipher_version: 2,
+    links: [{ target_kind: 'docs_document', target_id: 'secret-id', label: 'private' }],
+  };
+  await cola.encolar('ada', { client_id: 'unsafe', date: '2026-10-02', input, at: 1 });
+  const { e, enviadas, dias } = envio();
+  await cola.vaciar('ada', e);
+  const pending = await cola.pendientes('ada');
+  expect(enviadas).toEqual([]);
+  expect(dias).toEqual([]);
+  expect(pending).toHaveLength(1);
+  expect(pending[0]?.rechazada).toBe(true);
+  expect(pending[0]?.input).toEqual(input);
+});
+
+test('unsafe legacy shapes remain in the journal without daily or note requests', async () => {
+  const inputs: unknown[] = [
+    {
+      cipher_version: 2,
+      content_cipher: 'encv1:old',
+      Links: [{ target_kind: 'note', target_id: 'secret' }],
+    },
+    {
+      cipher_version: 2,
+      content_cipher: 'encv1:old',
+      links: [],
+      Links: [{ target_kind: 'note', target_id: 'secret' }],
+    },
+    { Cipher_Version: 2, content_cipher: 'encv1:old', links: [] },
+    { cipher_version: 2, content_cipher: 'encv1:old', linKs: [{ target_id: 'secret' }] },
+    { cipher_version: 2, content_cipher: 'encv1:old', linkſ: [{ target_id: 'secret' }] },
+    { cipher_version: 2, content_cipher: 'encv1:old', links: { label: 'secret' } },
+    { cipher_version: 2, content_cipher: 'encv1:old', links: [null] },
+    { cipher_version: 2, content_cipher: 'encv1:old', data: { attachment: 'secret' } },
+    { cipher_version: 2, content_cipher: 'encv1:old', expected_crypto: { secret: 'private' } },
+    { cipher_version: 2, content_cipher: 'encv1:old', title: 'secret' },
+    { cipher_version: 2, content_cipher: 'encv1:old', unknown: 'secret' },
+    { cipher_version: '2', content_cipher: 'encv1:old' },
+    { cipher_version: 2, content_cipher: 'encv1:old', checked: 'yes' },
+    { content: '\ud800' },
+    { data: { attachment: { title: '\ud800' } } },
+    { data: { attachment: { id: Number.MAX_SAFE_INTEGER + 1 } } },
+    { cipher_version: 2, content_cipher: 'encv1:old', data: { client_id: '\udc00' } },
+    null,
+  ];
+  for (const [index, input] of inputs.entries()) {
+    await cola.encolar('ada', {
+      client_id: String(index),
+      date: '2026-10-02',
+      input: input as NoteInput,
+      at: index,
+    });
+  }
+  const { e, enviadas, dias } = envio();
+  await cola.vaciar('ada', e);
+  const pending = await cola.pendientes('ada');
+  expect(enviadas).toEqual([]);
+  expect(dias).toEqual([]);
+  expect(pending.map((entry) => entry.rechazada)).toEqual(inputs.map(() => true));
+  expect(pending.map((entry): unknown => entry.input)).toEqual(inputs);
+  for (const [index, input] of inputs.entries()) {
+    expect(mem.get(k('ada', 'notes.capturas', String(index)))?.value).toEqual({
+      client_id: String(index),
+      date: '2026-10-02',
+      input,
+      at: index,
+    });
+  }
+});
+
+test('capture record, capture ID and payload ID must match without rewriting the source', async () => {
+  const captures = [
+    { client_id: 'other', input: { data: { client_id: 'x' } }, at: 1 },
+    { client_id: 'x', input: { data: { client_id: 'other' } }, at: 1 },
+    { client_id: 'x', input: { data: {} }, at: 1 },
+    { client_id: 'x', input: { data: { client_id: 'x', Client_ID: 'other' } }, at: 1 },
+  ];
+  for (const capture of captures) {
+    mem.set(k('ada', 'notes.capturas', 'x'), { value: capture, updatedAt: 1 });
+    const { e, enviadas, dias } = envio();
+    await cola.vaciar('ada', e);
+    expect(enviadas).toEqual([]);
+    expect(dias).toEqual([]);
+    expect((await cola.pendientes('ada'))[0]?.rechazada).toBe(true);
+    expect(mem.get(k('ada', 'notes.capturas', 'x'))?.value).toEqual(capture);
+  }
+});
 
 const nota = (id: string): Note => ({ id }) as Note;
 const texto = (s: string): NoteInput => ({ kind: 'text', content: `<p>${s}</p>` });
@@ -57,7 +149,7 @@ function envio(fallos: Record<string, unknown> = {}) {
   };
 }
 
-test('se envía en orden, cada una UNA vez, y la cola queda vacía', async () => {
+test('el replay pausado conserva capturas y no invoca la red', async () => {
   await cola.encolar('ada', {
     client_id: 'b',
     notebook_id: 'nb1',
@@ -72,11 +164,11 @@ test('se envía en orden, cada una UNA vez, y la cola queda vacía', async () =>
   });
   const { e, enviadas } = envio();
   const tocados = await cola.vaciar('ada', e);
-  expect(enviadas.map(([, i]) => i.content)).toEqual(['<p>uno</p>', '<p>dos</p>']);
-  expect([...(tocados ?? [])]).toEqual(['nb1']);
-  expect(await cola.pendientes('ada')).toEqual([]);
+  expect(enviadas).toEqual([]);
+  expect([...(tocados ?? [])]).toEqual([]);
+  expect((await cola.pendientes('ada')).map((c) => c.client_id)).toEqual(['a', 'b']);
   await cola.vaciar('ada', e);
-  expect(enviadas).toHaveLength(2);
+  expect(enviadas).toEqual([]);
 });
 
 test('un fallo de red para la cola y no pierde nada', async () => {
@@ -98,7 +190,7 @@ test('un fallo de red para la cola y no pierde nada', async () => {
   expect((await cola.pendientes('ada')).map((c) => c.client_id)).toEqual(['a', 'b']);
 });
 
-test('un 5xx también se reintenta; un 4xx se aparta y no bloquea a las demás', async () => {
+test('el replay pausado conserva capturas aunque el servicio rechazara alguna', async () => {
   await cola.encolar('ada', {
     client_id: 'a',
     notebook_id: 'nb1',
@@ -116,18 +208,20 @@ test('un 5xx también se reintenta; un 4xx se aparta y no bloquea a las demás',
   expect(caido.enviadas).toEqual([]);
   const borrado = envio({ a: { status: 404 } });
   await cola.vaciar('ada', borrado.e);
-  expect(borrado.enviadas.map(([, i]) => i.content)).toEqual(['<p>dos</p>']);
+  expect(borrado.enviadas).toEqual([]);
   const quedan = await cola.pendientes('ada');
-  expect(quedan.map((c) => [c.client_id, c.rechazada])).toEqual([['a', true]]);
-  // Una rechazada no se vuelve a intentar.
+  expect(quedan.map((c) => [c.client_id, c.rechazada])).toEqual([
+    ['a', undefined],
+    ['b', undefined],
+  ]);
   const otra = envio();
   await cola.vaciar('ada', otra.e);
   expect(otra.enviadas).toEqual([]);
   await cola.descartar('ada', 'a');
-  expect(await cola.pendientes('ada')).toEqual([]);
+  expect((await cola.pendientes('ada')).map((c) => c.client_id)).toEqual(['b']);
 });
 
-test('una captura de un día sin cuaderno abre el día al enviarla', async () => {
+test('una captura de día no crea cuaderno mientras el replay está pausado', async () => {
   await cola.encolar('ada', {
     client_id: 'a',
     date: '2026-10-02',
@@ -137,9 +231,10 @@ test('una captura de un día sin cuaderno abre el día al enviarla', async () =>
   });
   const { e, enviadas, dias } = envio();
   const tocados = await cola.vaciar('ada', e);
-  expect(dias).toEqual(['2026-10-02:true']);
-  expect(enviadas[0]![0]).toBe('nb-2026-10-02');
-  expect(tocados?.has('dia:2026-10-02')).toBe(true);
+  expect(dias).toEqual([]);
+  expect(enviadas).toEqual([]);
+  expect(tocados?.size).toBe(0);
+  expect((await cola.pendientes('ada')).map((c) => c.client_id)).toEqual(['a']);
 });
 
 test('la cola es de cada persona', async () => {

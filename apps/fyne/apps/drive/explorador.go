@@ -5,6 +5,7 @@ package drive
 
 import (
 	"image"
+	"image/color"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -52,6 +53,10 @@ type Explorador struct {
 	Seleccion map[string]bool
 	// Rejilla es la vista de tarjetas (`view === 'grid'`).
 	Rejilla bool
+	// Orden es en el que llegan los Elementos (lo aplica el servicio), y AlOrdenar lo
+	// cambia por una columna: la misma invierte el sentido. Nil: no se ordena.
+	Orden     Orden
+	AlOrdenar func(CampoOrden)
 	// Consulta es lo que hay escrito en el buscador, y EnBusqueda si los elementos
 	// que se enseñan son su resultado.
 	Consulta   string
@@ -70,6 +75,13 @@ type Explorador struct {
 	// Desconectado es que el monitor de red dice que no hay: lo cargado se sigue viendo
 	// (el contrato offline), pero las mutaciones se apagan igual que en SinConexion.
 	Desconectado bool
+	// Arrastrando es que hay ficheros del sistema arrastrándose por encima de la ventana
+	// (el `dragging` de la web): el cuerpo se tapa con «Suelta para subir aquí». Sin red
+	// no se enseña, porque soltar no subiría nada.
+	Arrastrando bool
+	// AVista es el id que llevar a la vista en el próximo pintado («Mostrar en su
+	// carpeta»); se consume al pintarlo.
+	AVista string
 
 	// Enganches. Los rellena quien monta la app; nil es «esta acción no está».
 	AlAbrir                               func(Elemento)
@@ -81,6 +93,11 @@ type Explorador struct {
 	AlSeleccionarTodo                     func()
 	AlDescargarLote, AlPapeleraLote       func()
 	AlMoverLote                           func()
+	// AlCombinarPDF une en un PDF nuevo los PDF marcados; nil, la acción no está (no
+	// hay cliente de PDF). Combinando es que hay una combinación en curso: el botón
+	// gira hasta que acaba.
+	AlCombinarPDF func()
+	Combinando    bool
 	// AlCargarMas pide la página siguiente. Lo llama la lista al pintar una de sus
 	// últimas filas y el botón «Cargar más» de la rejilla.
 	AlCargarMas func()
@@ -103,7 +120,7 @@ type Explorador struct {
 	// manos: el buscador perdía el foco en la primera letra (cada pulsación repinta),
 	// y la lista volvía arriba al marcar una casilla o cada 250 ms durante una subida.
 	buscador     *ui.Entrada
-	filas        *widget.List
+	filas        *listaFilas
 	filasObj     fyne.CanvasObject
 	filasCasilla bool
 	// filasLineas son las líneas bajo el nombre con las que se creó la lista: una fila
@@ -196,7 +213,7 @@ func (e *Explorador) AlPrincipio() { e.arriba = true }
 
 // NuevoExplorador crea la pantalla en su estado inicial: cargando.
 func NuevoExplorador(tr *i18n.Translator) *Explorador {
-	return &Explorador{tr: tr, loc: tr.Locale(), Seleccion: map[string]bool{}}
+	return &Explorador{tr: tr, loc: tr.Locale(), Seleccion: map[string]bool{}, Orden: OrdenDelServicio}
 }
 
 func (e *Explorador) t(clave string, vars ...i18n.Vars) string {
@@ -230,6 +247,29 @@ func (e *Explorador) Marcados() int {
 	return n
 }
 
+// PDFMarcados son los PDF marcados, en el orden en que se VEN: es el orden en que se
+// combinan, como en la web (`selectedPdfs`), porque es el que la persona tiene delante.
+func (e *Explorador) PDFMarcados() []Elemento {
+	var out []Elemento
+	for _, el := range e.EnOrden() {
+		if e.Seleccion[el.ID] && !el.Carpeta && Extension(el.Nombre) == "pdf" {
+			out = append(out, el)
+		}
+	}
+	return out
+}
+
+// PuedeCombinar es el `puedeCombinar` de la web: dos o más PDF marcados y NADA más.
+// Con una carpeta o un .docx en la selección la acción no tendría sentido, y ofrecerla
+// para fallar después es peor que ocultarla. Sin red tampoco: el resultado se sube.
+func (e *Explorador) PuedeCombinar() bool {
+	if e.AlCombinarPDF == nil || e.SinRed() {
+		return false
+	}
+	n := len(e.PDFMarcados())
+	return n >= 2 && n == e.Marcados()
+}
+
 // TodoMarcado y AlgoMarcado son el `allSelected`/`someSelected` de la web: el segundo
 // solo cuenta si el primero es falso, que es lo que hace la casilla indeterminada.
 func (e *Explorador) TodoMarcado() bool {
@@ -261,7 +301,7 @@ func (e *Explorador) Objeto(v tema.Variante) fyne.CanvasObject {
 		franjas = append(franjas, e.barraSubida(v))
 		elastico++
 	}
-	franjas = append(franjas, e.cuerpo(v))
+	franjas = append(franjas, e.conVeloSoltar(e.cuerpo(v), v))
 	// Pila mide AltoCon con el ancho actual antes de colocar la cabecera.
 	// No se encola su Refresh: un repintado retira esta pila pero conserva
 	// listaFranja, y una notificación antigua redimensionaría el scroll vivo.
@@ -309,8 +349,7 @@ func (e *Explorador) cabecera(v tema.Variante) fyne.CanvasObject {
 	subir.Cargando = e.Subiendo()
 	conGlifo(subir, glifoSubir, v)
 
-	conmutador := NuevoConmutadorVista(e.t("files.viewList"), e.t("files.viewGrid"), e.AlCambiarVista)
-	conmutador.Rejilla = e.Rejilla
+	conmutador := NuevoConmutadorVista(e.t("files.viewLabel"), e.t("files.viewList"), e.t("files.viewGrid"), e.Rejilla, e.AlCambiarVista)
 
 	c := &CabeceraVista{
 		Ruta:       migas,
@@ -318,7 +357,56 @@ func (e *Explorador) cabecera(v tema.Variante) fyne.CanvasObject {
 		Conmutador: conmutador,
 		Ventana:    e.Ventana,
 	}
+	if e.conSelectorOrden() {
+		var orden *ui.Boton
+		orden = ui.NuevoBoton(e.t("files.sort.label"), func() { e.menuOrden(orden) }).Con(ui.Secundario, ui.TallaSM)
+		orden.IconoDetras, orden.TamIcono, orden.Hueco = iconos.ChevronAbajo, LadoGalonNuevo, HuecoNuevo
+		c.Orden = orden
+	}
 	return c.Objeto(v)
+}
+
+// ordenable dice si lo que se ve se puede ordenar: en una búsqueda manda la relevancia.
+func (e *Explorador) ordenable() bool { return e.AlOrdenar != nil && !e.EnBusqueda }
+
+// conSelectorOrden dice si la cabecera lleva «Ordenar»: donde no hay cabeceras de
+// columna que pulsar, que es la cuadrícula, y la lista por debajo de 768, donde «Tamaño»
+// y «Modificado» no se pintan y solo quedaría ordenar por nombre.
+func (e *Explorador) conSelectorOrden() bool {
+	return e.ordenable() && (e.Rejilla || (e.Ventana > 0 && e.Ventana < ui.Estrecho))
+}
+
+// menuOrden despliega las tres columnas bajo «Ordenar», como `SelectorOrden`: la vigente
+// con la flecha de su sentido, y las otras con el hueco de la
+// flecha para que los rótulos queden alineados. Elegir la vigente invierte el sentido.
+func (e *Explorador) menuOrden(disparador fyne.CanvasObject) {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	elementos := make([]fyne.CanvasObject, 0, len(CamposOrden))
+	for _, campo := range CamposOrden {
+		rotulo := e.t("files.col." + string(campo))
+		el := ui.NuevoElementoMenu(rotulo, iconos.Ninguno, func() {
+			if e.AlOrdenar != nil {
+				e.AlOrdenar(campo)
+			}
+		})
+		if campo == e.Orden.Campo {
+			flecha, sentido := iconos.ChevronArriba, "files.sort.asc"
+			if e.Orden.Desc {
+				flecha, sentido = iconos.ChevronAbajo, "files.sort.desc"
+			}
+			// `text-text-muted`, el hueco del icono de MenuItem. Sin `Actual`: en la web
+			// el `aria-current` solo dice dónde cae el foco al abrir, no pinta fondo.
+			el.Glifo = iconos.Trazo(flecha, iconos.TallaSM, "text-muted", v)
+			// La flecha es solo visual: el sentido va también en el nombre accesible.
+			el.Rotulo = rotulo + " · " + e.t(sentido)
+		} else {
+			el.Glifo = iconos.TrazoConTinta(iconos.ChevronArriba, iconos.TallaSM, color.NRGBA{})
+		}
+		elementos = append(elementos, el)
+	}
+	m := ui.NuevoMenu(elementos...)
+	m.Rotulo = e.t("files.sort.label")
+	m.Mostrar(disparador)
 }
 
 // campoBusqueda es el buscador de la cabecera, el MISMO de un pintado a otro: cada
@@ -368,19 +456,27 @@ func conGlifo(b *ui.Boton, cuerpo string, v tema.Variante) *ui.Boton {
 	return b
 }
 
-// barraSeleccion es la franja de acciones en lote: `ui.BarraDeLote` con las dos
+// barraSeleccion es la franja de acciones en lote: `ui.BarraDeLote` con las
 // acciones de Drive y su canalón (`px-4 sm:px-6`).
 //
-// Lleva «Mover», «Descargar» y «Papelera», en el orden de la web.
+// Lleva «Combinar PDF» (solo si se puede, ver PuedeCombinar), «Mover», «Descargar» y
+// «Papelera», en el orden de la web.
 //
-// ponytail: falta «Combinar PDF» (dos o más PDF y nada más), que pide la operación de
-// páginas del servicio de PDF y entra con el organizador de páginas.
+// ponytail: sin el `title` de la web («Se combinan en el orden en que aparecen en la
+// lista»): `ui.BarraDeLote` recibe botones sueltos y no los envuelve en una `ui.Pista`.
 func (e *Explorador) barraSeleccion(v tema.Variante, n int) fyne.CanvasObject {
-	acciones := []*ui.Boton{
+	var acciones []*ui.Boton
+	if e.PuedeCombinar() {
+		b := ui.NuevoBoton(e.t("pdf.combine"), e.AlCombinarPDF).Con(ui.Secundario, ui.TallaSM)
+		b.Inerte = e.Ocupado && !e.Combinando
+		b.Cargando = e.Combinando
+		acciones = append(acciones, conGlifo(b, glifoCopia, v))
+	}
+	acciones = append(acciones,
 		conGlifo(ui.NuevoBoton(e.t("files.selection.move"), e.AlMoverLote).Con(ui.Secundario, ui.TallaSM), glifoMover, v),
 		conGlifo(ui.NuevoBoton(e.t("files.selection.download"), e.AlDescargarLote).Con(ui.Secundario, ui.TallaSM), glifoDescargar, v),
 		conGlifo(ui.NuevoBoton(e.t("files.selection.trash"), e.AlPapeleraLote).Con(ui.Peligro, ui.TallaSM), glifoPapelera, v),
-	}
+	)
 	recuento := e.t("files.selection.count", i18n.Vars{"count": n})
 	return ui.NuevaBarraDeLote(recuento, e.t("ui.bulk.region"), e.t("files.selection.clear"),
 		acciones, e.limpiarSeleccion).Con(CanalonCabecera(e.Ventana))
@@ -497,6 +593,41 @@ func (e *Explorador) cuerpo(v tema.Variante) fyne.CanvasObject {
 	return e.lista(v)
 }
 
+// MargenVeloSoltar es el `inset-2` del velo de soltar, RadioVeloSoltar su `rounded-xl`,
+// GrosorVeloSoltar su `border-2` y LadoGlifoSoltar la caja `h-12 w-12` del glifo.
+const (
+	GrosorVeloSoltar float32 = 2
+	LadoGlifoSoltar  float32 = 12 * 0.25 * tema.Rem
+)
+
+var (
+	MargenVeloSoltar = tema.Espacio(2)
+	RadioVeloSoltar  = tema.RadioXL
+)
+
+// conVeloSoltar tapa el cuerpo, mientras se arrastran ficheros del sistema por encima,
+// con el velo de FileBrowser.tsx: `bg-bg/90 absolute inset-2 rounded-xl border-2
+// border-dashed border-primary`, y en el centro el glifo `upload` de 24 en
+// `text-primary-text` sobre «Suelta para subir aquí» en `text-base font-semibold`. En la
+// web es `aria-hidden` y `pointer-events-none`: solo avisa, la subida la hace soltar.
+func (e *Explorador) conVeloSoltar(cuerpo fyne.CanvasObject, v tema.Variante) fyne.CanvasObject {
+	if !e.Arrastrando || e.SinRed() {
+		return cuerpo
+	}
+	fondo := tema.Color("bg", v)
+	fondo.A = uint8(float32(fondo.A) * 0.9)
+	placa := canvas.NewRectangle(fondo)
+	placa.CornerRadius = RadioVeloSoltar
+	glifo := glifoCon(glifoSubir, 24, tema.Color("primary-text", v)).Objeto()
+	caja := container.NewGridWrap(fyne.NewSize(LadoGlifoSoltar, LadoGlifoSoltar), container.NewCenter(glifo))
+	texto := ui.NuevoRotulo(e.t("files.dropHere"), tema.TextoBase, ui.SemiNegrita, "text")
+	centro := container.NewCenter(container.New(ui.Columna{Hueco: tema.Espacio(2), Encaja: true}, caja, texto))
+	m := MargenVeloSoltar
+	velo := container.New(ui.Margen{Izq: m, Arr: m, Der: m, Abj: m}, container.NewStack(
+		placa, ui.NuevoBordeDiscontinuo(GrosorVeloSoltar, RadioVeloSoltar, "primary"), centro))
+	return container.NewStack(cuerpo, velo)
+}
+
 // vacio es el estado sin elementos. La búsqueda tiene su propio texto: decirle «esta
 // carpeta está vacía» a quien acaba de buscar en TODO el árbol es mentirle.
 func (e *Explorador) vacio(v tema.Variante) fyne.CanvasObject {
@@ -592,13 +723,33 @@ func (c *centrado) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 
 // ---- La lista ----
 
+// llevarAVista desplaza la lista hasta `AVista` («Mostrar en su carpeta») y lo consume.
+// Una carpeta de la franja ya está arriba, a la vista; un fichero se busca en la lista.
+func (e *Explorador) llevarAVista() {
+	if e.AVista == "" {
+		return
+	}
+	for i, el := range e.deLista {
+		if el.ID == e.AVista {
+			e.filas.ScrollTo(i)
+			break
+		}
+	}
+	e.AVista = ""
+}
+
 // lista es la cabecera de columnas más el listado virtualizado.
 func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 	cab := ui.NuevaCabeceraDrive(e.t("files.col.name"), e.t("files.col.size"), e.t("files.col.modified"))
 	cab.ConCasilla = !e.SinRed()
+	cab.RotuloCasilla = e.t("files.selectAll")
 	cab.Todas, cab.Algunas = e.TodoMarcado(), e.AlgoMarcado()
 	cab.Ventana = e.Ventana
 	cab.AlMarcarTodas = e.AlSeleccionarTodo
+	if e.ordenable() {
+		cab.OrdenCampo, cab.OrdenDesc = string(e.Orden.Campo), e.Orden.Desc
+		cab.AlOrdenar = func(campo string) { e.AlOrdenar(CampoOrden(campo)) }
+	}
 	var carpetas []Elemento
 	carpetas, e.deLista = e.Partes()
 
@@ -621,7 +772,8 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		lineas++
 	}
 	if e.filas == nil || e.filasCasilla != conCasilla || e.filasLineas != lineas {
-		e.filas = widget.NewList(
+		e.filas = nuevaListaFilas(
+			e.abrirFila,
 			func() int { return len(e.filasDeLista()) },
 			func() fyne.CanvasObject {
 				// Con ratón la fila se arrastra a una carpeta; con el dedo, no: una fila
@@ -673,6 +825,7 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		}
 		e.arriba = false
 	}
+	e.llevarAVista()
 
 	fondo := canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))
 	col := &columnaLista{cab: cab, filas: e.filasObj}
@@ -793,6 +946,7 @@ func (e *Explorador) ponerFila(f *ui.FilaDrive, el Elemento) {
 	}
 	f.Meta = e.metaFila(el)
 	f.Seleccionada = e.Seleccion[el.ID]
+	f.RotuloCasilla = e.t("files.select", i18n.Vars{"name": el.Nombre})
 	f.SeleccionActiva = e.marcados > 0
 	id, elemento := el.ID, el
 	f.AlAbrir = func() {
@@ -984,7 +1138,9 @@ func (marcoFranja) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 const FilasEsqueleto = 9
 
 // esqueletoCuerpo es el placeholder de carga con la geometría de la vista que toca, que
-// es lo que evita el salto de layout al llegar los datos.
+// es lo que evita el salto de layout al llegar los datos: la cabecera de columnas y las
+// filas comunes de carga (`ui.FilasEsqueleto`, el `SkeletonRows` de la web) con la tesela
+// de 36 y el tamaño y la fecha, que se esconden por corte de ventana como las de verdad.
 //
 // Solo se porta el de la LISTA. En rejilla la web pinta diez tarjetas y aquí se pintan
 // las mismas nueve filas: es la misma promesa —«esto está llegando»— y la única
@@ -992,49 +1148,41 @@ const FilasEsqueleto = 9
 // que tarde la respuesta. ponytail: se cierra copiando la geometría de la tarjeta en
 // cuanto haya una medida de la tarjeta de carga.
 func (e *Explorador) esqueletoCuerpo(v tema.Variante) fyne.CanvasObject {
-	hijos := make([]fyne.CanvasObject, 0, 4+4*FilasEsqueleto)
-	hijos = append(hijos, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)))
-	s := &esqueletoLista{}
-	// La cabecera: tres rayas de `0.6rem` donde van los tres rótulos de columna.
+	haySM := e.Ventana == 0 || e.Ventana >= ui.CorteSM
+	hayMD := e.Ventana == 0 || e.Ventana >= ui.CorteMD
+	filas := ui.NuevasFilasEsqueleto(FilasEsqueleto, ui.DelanteroTesela, 1)
+	filas.Margen = CanalonLista
+	filas.Rotulo = e.t("files.loading")
+	filas.Meta = []ui.MetaEsqueleto{{Ancho: 44, Oculta: !haySM}, {Ancho: 76, Oculta: !hayMD}}
+	// La cabecera: tres rayas de `0.6rem` donde van los tres rótulos de columna, en UN
+	// grupo de carga que late a una; las coloca esqueletoLista en las coordenadas de la
+	// lista, porque el grupo la cubre entera.
+	s := &esqueletoLista{haySM: haySM, hayMD: hayMD, filas: filas, grupo: ui.NuevosBloquesEsqueleto()}
+	rayas := make([]fyne.CanvasObject, 0, 3)
 	for _, ancho := range []float32{56, 48, 72} {
-		b := ui.NuevoEsqueleto(ancho, 0.6*tema.Rem)
+		b := s.grupo.Bloque(ancho, 0.6*tema.Rem)
 		s.cabecera = append(s.cabecera, b)
-		hijos = append(hijos, b)
+		rayas = append(rayas, b)
 	}
-	for i := range FilasEsqueleto {
-		// Los anchos del nombre son los de la web: `38 + (i*11)%42` por ciento. Sin
-		// esa variación el esqueleto parece una tabla de rayas iguales.
-		fila := filaEsqueleto{
-			tesela: ui.NuevoEsqueleto(ui.TeselaDrive, ui.TeselaDrive),
-			nombre: ui.NuevoEsqueleto(0, 0.85*tema.Rem),
-			pct:    float32(38+(i*11)%42) / 100,
-			tamano: ui.NuevoEsqueleto(44, 0.7*tema.Rem),
-			fecha:  ui.NuevoEsqueleto(76, 0.7*tema.Rem),
-		}
-		s.filas = append(s.filas, fila)
-		hijos = append(hijos, fila.tesela, fila.nombre, fila.tamano, fila.fecha)
-	}
-	s.ventana = e.Ventana
-	return container.New(s, hijos...)
+	s.grupo.Con(container.NewWithoutLayout(rayas...))
+	return container.New(s, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), s.grupo, filas)
 }
 
-type filaEsqueleto struct {
-	tesela, nombre, tamano, fecha *ui.Esqueleto
-	pct                           float32
-}
-
-// esqueletoLista coloca el placeholder con la geometría real: la cabecera con `px-3
-// py-2.5` y las filas con `px-3 py-2` y la tesela de 36, dentro del `px-3` del
-// contenedor.
+// esqueletoLista coloca la cabecera con `px-3 py-2.5` dentro del `px-3` del contenedor,
+// y debajo las filas.
 type esqueletoLista struct {
-	ventana  float32
-	cabecera []*ui.Esqueleto
-	filas    []filaEsqueleto
+	haySM, hayMD bool
+	grupo        *ui.BloquesEsqueleto
+	cabecera     []*canvas.Rectangle
+	filas        *ui.FilasEsqueleto
 }
 
 var _ fyne.Layout = (*esqueletoLista)(nil)
 
 func (s *esqueletoLista) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 0) }
+
+// altoCabeceraEsqueleto es `py-2.5` y su `border-b`: 2×8,75 + 8,4 + 1.
+var altoCabeceraEsqueleto = 2*(2.5*0.25*tema.Rem) + 0.6*tema.Rem + tema.Borde
 
 func (s *esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	if len(objs) > 0 {
@@ -1043,10 +1191,11 @@ func (s *esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	izq := 2 * CanalonLista // el `px-3` del contenedor más el de la fila
 	der := t.Width - izq
-	ancho := max(der-izq, 0)
-	haySM := s.ventana == 0 || s.ventana >= ui.CorteSM
-	hayMD := s.ventana == 0 || s.ventana >= ui.CorteMD
-	poner := func(r *ui.Esqueleto, x, y, w, h float32, visible bool) {
+	if s.grupo != nil {
+		s.grupo.Move(fyne.NewPos(0, 0))
+		s.grupo.Resize(fyne.NewSize(t.Width, altoCabeceraEsqueleto))
+	}
+	poner := func(r *canvas.Rectangle, x, y, w, h float32, visible bool) {
 		if !visible {
 			r.Hide()
 			return
@@ -1055,34 +1204,18 @@ func (s *esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		r.Move(fyne.NewPos(x, y))
 		r.Resize(fyne.NewSize(w, h))
 	}
-
-	// Cabecera: `py-2.5` y su `border-b`, o sea 2×8,75 + 8,4 + 1.
-	altoCab := 2*(2.5*0.25*tema.Rem) + 0.6*tema.Rem + tema.Borde
-	y := (altoCab - tema.Borde - 0.6*tema.Rem) / 2
+	y := (altoCabeceraEsqueleto - tema.Borde - 0.6*tema.Rem) / 2
 	if len(s.cabecera) == 3 {
 		poner(s.cabecera[0], izq, y, 56, 0.6*tema.Rem, true)
-		poner(s.cabecera[2], der-72, y, 72, 0.6*tema.Rem, hayMD)
+		poner(s.cabecera[2], der-72, y, 72, 0.6*tema.Rem, s.hayMD)
 		x := der - 72 - 2*tema.Espacio(4)
-		if !hayMD {
+		if !s.hayMD {
 			x = der
 		}
-		poner(s.cabecera[1], x-48, y, 48, 0.6*tema.Rem, haySM)
+		poner(s.cabecera[1], x-48, y, 48, 0.6*tema.Rem, s.haySM)
 	}
-
-	y = altoCab
-	for _, f := range s.filas {
-		centro := func(alto float32) float32 { return y + (ui.AltoFilaDrive-alto)/2 }
-		poner(f.tesela, izq, centro(ui.TeselaDrive), ui.TeselaDrive, ui.TeselaDrive, true)
-		x := izq + ui.TeselaDrive + ui.HuecoFila
-		poner(f.fecha, der-76, centro(0.7*tema.Rem), 76, 0.7*tema.Rem, hayMD)
-		derTam := der - 76 - 2*tema.Espacio(4)
-		if !hayMD {
-			derTam = der
-		}
-		poner(f.tamano, derTam-44, centro(0.7*tema.Rem), 44, 0.7*tema.Rem, haySM)
-		poner(f.nombre, x, centro(0.85*tema.Rem), max(ancho*f.pct, 0), 0.85*tema.Rem, true)
-		y += ui.AltoFilaDrive
-	}
+	s.filas.Move(fyne.NewPos(0, altoCabeceraEsqueleto))
+	s.filas.Resize(fyne.NewSize(t.Width, max(t.Height-altoCabeceraEsqueleto, s.filas.MinSize().Height)))
 }
 
 // ---- La rejilla ----
@@ -1123,6 +1256,10 @@ func (e *Explorador) rejilla(v tema.Variante) fyne.CanvasObject {
 		e.desplazable.ScrollToTop()
 		e.arriba = false
 	}
+	// ponytail: en la rejilla el marcado se ve pero no se desplaza hasta él (la rejilla
+	// no sabe en qué fila cae cada tesela hasta medirla); se consume para que no salte
+	// al volver a la lista.
+	e.AVista = ""
 	fondo := canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))
 	refresco := e.Refresco
 	refresco.Arriba = func() bool { return e.desplazable.Offset.Y <= 0.5 }
@@ -1233,6 +1370,7 @@ func (e *Explorador) ponerTarjeta(t *TarjetaDrive, el Elemento) {
 		clave = "files.openFolder"
 	}
 	t.Rotulo = e.t(clave, i18n.Vars{"name": el.Nombre})
+	t.RotuloCasilla = e.t("files.select", i18n.Vars{"name": el.Nombre})
 	elemento := el
 	t.AlAbrir = func() {
 		if e.AlAbrir != nil {
@@ -1245,6 +1383,7 @@ func (e *Explorador) ponerTarjeta(t *TarjetaDrive, el Elemento) {
 	if e.AlMenu != nil {
 		t.AlMenu = func(d fyne.CanvasObject) { e.AlMenu(elemento, d) }
 	}
+	t.AlFlecha = func(tecla fyne.KeyName) bool { return e.flechaEnTarjetas(t, tecla) }
 	if ConMiniatura(el) {
 		if img, ya := e.Miniaturas[el.ID]; ya {
 			t.Miniatura = img
@@ -1254,14 +1393,121 @@ func (e *Explorador) ponerTarjeta(t *TarjetaDrive, el Elemento) {
 	}
 }
 
-// ConMiniatura es el `thumbable` de la web: el servicio solo hace miniaturas de JPEG,
-// PNG y GIF.
+// flechaEnTarjetas mueve el foco desde la tarjeta `t` con las flechas, Inicio y Fin: es
+// el `moverFocoEnRejilla` de `FileGrid`. Las tarjetas de este pintado son las de la
+// rejilla o las de la franja de carpetas, nunca las dos, y cada una vive en su
+// desplazable, que es el que se mueve para que se vea la enfocada.
+func (e *Explorador) flechaEnTarjetas(t *TarjetaDrive, tecla fyne.KeyName) bool {
+	objs := make([]fyne.CanvasObject, len(e.tarjetas))
+	actual := -1
+	for i, p := range e.tarjetas {
+		objs[i] = p.objeto
+		if p.t == t {
+			actual = i
+		}
+	}
+	if actual < 0 {
+		return false
+	}
+	s := e.franjaScroll
+	if e.Rejilla {
+		s = e.desplazable
+	}
+	return ui.MoverFocoEnRejilla(objs, actual, tecla, s)
+}
+
+// listaFilas es el `widget.List` de la vista lista con el teclado de la web. En la web
+// cada fila es un botón y las flechas pasan el foco de una a otra (`moverFocoEnListaVirtual`);
+// aquí el foco es de la lista, que ya mueve su resalte con ↑ y ↓ y lo lleva a la vista. Le
+// faltaban Inicio y Fin, y que Intro y Espacio ABRAN la fila resaltada, como un botón:
+// Espacio la seleccionaba y nadie escucha la selección.
+type listaFilas struct {
+	widget.List
+	alAbrir   func(int)
+	resaltada widget.ListItemID
+	// sincronizando: OnHighlighted también salta al pasar el ratón por una fila, sin mover
+	// el resalte del teclado; solo vale cuando lo provoca la propia lista (teclas y foco).
+	// Si no, Intro abría la fila de debajo del puntero y no la resaltada.
+	sincronizando bool
+}
+
+func nuevaListaFilas(
+	alAbrir func(int), largo func() int, crear func() fyne.CanvasObject,
+	rellenar func(widget.ListItemID, fyne.CanvasObject),
+) *listaFilas {
+	l := &listaFilas{alAbrir: alAbrir}
+	l.Length, l.CreateItem, l.UpdateItem = largo, crear, rellenar
+	l.OnHighlighted = func(i widget.ListItemID) {
+		if l.sincronizando {
+			l.resaltada = i
+		}
+	}
+	l.ExtendBaseWidget(l)
+	return l
+}
+
+// abrirFila abre la fila `i` de la lista, si existe.
+func (e *Explorador) abrirFila(i int) {
+	if l := e.filasDeLista(); i >= 0 && i < len(l) && e.AlAbrir != nil {
+		e.AlAbrir(l[i])
+	}
+}
+
+// TypedKey: Intro abre, Inicio y Fin saltan a los extremos y ↑ ↓ son de la lista.
+func (l *listaFilas) TypedKey(ev *fyne.KeyEvent) {
+	l.sincronizando = true
+	defer func() { l.sincronizando = false }()
+	switch ev.Name {
+	case fyne.KeyReturn, fyne.KeyEnter:
+		l.alAbrir(l.resaltada)
+	case fyne.KeySpace:
+		// Abre TypedRune. La lista la SELECCIONARÍA, y una fila seleccionada se queda
+		// pintada con el color de selección sin que nadie la haya marcado.
+	case fyne.KeyHome, fyne.KeyEnd:
+		if d := ui.VecinoEnLista(l.resaltada, l.Length(), ev.Name); d >= 0 {
+			antes := l.resaltada
+			l.Highlight(d)
+			l.RefreshItem(antes)
+			l.RefreshItem(d)
+		}
+	default:
+		l.List.TypedKey(ev)
+	}
+}
+
+// FocusGained: la lista avisa de su resalte al recibir el foco.
+func (l *listaFilas) FocusGained() {
+	l.sincronizando = true
+	defer func() { l.sincronizando = false }()
+	l.List.FocusGained()
+}
+
+// TypedRune: Espacio abre, como en un botón.
+func (l *listaFilas) TypedRune(r rune) {
+	if r == ' ' {
+		l.alAbrir(l.resaltada)
+		return
+	}
+	l.List.TypedRune(r)
+}
+
+// ConMiniatura es el `thumbable` de la web (lib/miniaturas.ts): el servicio hace
+// miniaturas de JPEG, PNG, GIF y WebP (las de WebP llegan como PNG, así que aquí no
+// hace falta decodificarlo). Manda el content-type, que es lo que mira el servicio; la
+// extensión solo cuenta cuando el fichero no lo trae.
 func ConMiniatura(el Elemento) bool {
 	if el.Carpeta || el.ID == "" {
 		return false
 	}
+	if tipo, _, _ := strings.Cut(el.Tipo, ";"); strings.TrimSpace(tipo) != "" {
+		switch strings.ToLower(strings.TrimSpace(tipo)) {
+		case "image/jpeg", "image/png", "image/gif", "image/webp":
+			return true
+		}
+		return false
+	}
 	switch Extension(el.Nombre) {
-	case "jpg", "jpeg", "png", "gif":
+	case "jpg", "jpeg", "png", "gif", "webp":
 		return true
 	}
 	return false

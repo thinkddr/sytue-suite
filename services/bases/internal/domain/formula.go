@@ -180,10 +180,16 @@ func (f Formula) Comprobar(propios []Campo, deTabla func(tabla string) []Campo) 
 }
 
 // Efectivo es el campo tal como lo ven filtros, orden, exportación y conector: un campo
-// de fórmula se comporta como un campo del tipo de su resultado.
+// de fórmula se comporta como un campo del tipo de su resultado, y uno con formato
+// (moneda, valoración, URL, correo, teléfono) como el número o el texto que guarda.
 func (c Campo) Efectivo() Campo {
-	if c.Kind == TipoFormula {
+	switch c.Kind { //nolint:exhaustive // el resto se comporta como su propio tipo
+	case TipoFormula:
 		c.Kind = c.Result
+	case TipoMoneda, TipoValoracion:
+		c.Kind = TipoNumero // un importe y una valoración se filtran y ordenan como números
+	case TipoURL, TipoCorreo, TipoTelefono:
+		c.Kind = TipoTexto
 	}
 	return c
 }

@@ -5,48 +5,50 @@ Copyright (c) 2026 Daniel Delgado Ramos
 
 # Sytue Docs/Sheets/Slides (`services/docs`)
 
-Backend Go de la **ofimática colaborativa** de Sytue One (`docs.sytue.eu`, puerto
-dev **8083**). Documentos de texto, hojas de cálculo y presentaciones, con
-**edición en tiempo real** por WebSocket, **versionado**, **comentarios**,
-**permisos** y **exports OOXML/ODF**. Producto **Sytue-native, propietario
-(© Sytue)** y **clean-room**: implementado sobre estándares abiertos (ECMA-376
-OOXML, OASIS ODF) y la literatura pública de CRDTs; **sin** motores AGPL
-(OnlyOffice/Nextcloud quedan fuera) y **sin Redis** (el estado, las operaciones
-y la difusión cross-réplica viven en **PostgreSQL**).
+Go backend for the **collaborative office suite** of Sytue One (`docs.sytue.eu`, dev
+port **8083**). Text documents, spreadsheets and presentations, with
+**real-time editing** over WebSocket, **versioning**, **comments**,
+**permissions** and **OOXML/ODF exports**. A **Sytue-native, proprietary
+(© Sytue)** and **clean-room** product: implemented on open standards (ECMA-376
+OOXML, OASIS ODF) and the public CRDT literature; **no** AGPL engines
+(OnlyOffice/Nextcloud are out) and **no Redis** (state, operations
+and cross-replica broadcasting live in **PostgreSQL**).
 
-> Parte del módulo Go único `git.sytue.eu/sytue/one` (go.mod en la **raíz** del
-> repo). Reutiliza `platform/pkg/*` (config, log, httpx, pg, objectstore, authn,
-> events, tenancy). El **editor visual** vive en `apps/frontend/packages/office` y lo montan las apps de Docus, Calcus, Diapos y CertiPDF (`apps/frontend/apps/{docus,calcus,diapos,certipdf}`, ADR 0076).
+> Part of the single Go module `git.sytue.eu/sytue/one` (go.mod at the repo **root**).
+> It reuses `platform/pkg/*` (config, log, httpx, pg, objectstore, authn,
+> events, tenancy). The **visual editor** lives in `apps/frontend/packages/office` and is mounted by the Docus, Calcus, Diapos and CertiPDF apps (`apps/frontend/apps/{docus,calcus,diapos,certipdf}`, ADR 0076).
 
-## Estrategia de colaboración: CRDT (no OT)
+<a id="estrategia-de-colaboración-crdt-no-ot"></a>
+## Collaboration strategy: CRDT (not OT)
 
-La convergencia se logra con un **CRDT de secuencia tipo RGA** (Replicated
-Growable Array) con identidades densas e independientes (`Dot{actor, counter}`)
-y **reloj Lamport**, más **registros LWW** para celdas/formato/propiedades.
-Decisión y motivos:
+Convergence is achieved with an **RGA-style sequence CRDT** (Replicated
+Growable Array) with dense, independent identities (`Dot{actor, counter}`)
+and a **Lamport clock**, plus **LWW registers** for cells/formatting/properties.
+Decision and rationale:
 
-- **El servidor solo SECUENCIA y persiste** operaciones (append-only en
-  `doc_operations`); **no transforma** (no es OT). La fusión es determinista en
-  cliente y servidor (`internal/domain/crdt.go`), lo que evita un servidor de
-  transformación con estado complejo y encaja con un datastore único.
-- **Offline-first / reconexión:** un cliente envía su `last_seq` (`hello`) y
-  recibe el *replay* de las operaciones posteriores; converge sin conflictos.
-- **Idempotencia y conmutatividad:** aplicar una operación dos veces o en
-  distinto orden produce el mismo estado (propiedad CRDT) — ver tests.
-- **Multi-réplica sin Redis:** si hay varias réplicas del servicio, la difusión
-  cross-réplica se hace por el **bus de eventos sobre PostgreSQL**
-  (`platform/pkg/events`, LISTEN/NOTIFY + outbox). El `Hub` en memoria es el
-  fan-out local por proceso.
+- **The server only SEQUENCES and persists** operations (append-only in
+  `doc_operations`); it **does not transform** them (it is not OT). Merging is deterministic on
+  client and server (`internal/domain/crdt.go`), which avoids a transformation
+  server with complex state and fits a single datastore.
+- **Offline-first / reconnection:** a client sends its `last_seq` (`hello`) and
+  receives the *replay* of later operations; it converges without conflicts.
+- **Idempotence and commutativity:** applying an operation twice or in a
+  different order produces the same state (CRDT property) — see the tests.
+- **Multi-replica without Redis:** if there are several replicas of the service, cross-replica
+  broadcasting goes through the **event bus on PostgreSQL**
+  (`platform/pkg/events`, LISTEN/NOTIFY + outbox). The in-memory `Hub` is the
+  local per-process fan-out.
 
-El modelo por tipo de documento se construye sobre estas primitivas:
+The per-document-type model is built on these primitives:
 
-| Tipo | Modelo |
+| Type | Model |
 |------|--------|
-| `document` | secuencia RGA de caracteres + marcas de formato (LWW) |
-| `spreadsheet` | mapa LWW de celdas (`"Hoja!fila:col" → valor/fórmula`) |
-| `presentation` | secuencia RGA de diapositivas + LWW de propiedades |
+| `document` | RGA sequence of characters + formatting marks (LWW) |
+| `spreadsheet` | LWW map of cells (`"Hoja!fila:col" → valor/fórmula`) |
+| `presentation` | RGA sequence of slides + LWW of properties |
 
-## Arquitectura (capas)
+<a id="arquitectura-capas"></a>
+## Architecture (layers)
 
 ```
 services/docs/
@@ -62,98 +64,105 @@ services/docs/
 └── Dockerfile                  # multi-stage -> distroless static (rootless)
 ```
 
-## Datos (PostgreSQL, multi-tenant con RLS)
+<a id="datos-postgresql-multi-tenant-con-rls"></a>
+## Data (PostgreSQL, multi-tenant with RLS)
 
-- `documents` — metadatos + `seq` (vector de versión lógico) + papelera.
-- `doc_operations` — log **inmutable** de operaciones CRDT (append-only).
-- `doc_snapshots` — estado CRDT consolidado (inline en `jsonb` o en S3).
-- `doc_versions` — historial de versiones nombradas/automáticas (restaurables).
-- `doc_permissions` — ACL **deny-by-default** (user/group/tenant + rol).
-- `doc_share_links` — enlaces públicos (token **hasheado** sha-256).
-- `doc_comments` — comentarios anclados a referencias CRDT estables.
-- `doc_blobs` — metadatos de exports en S3 (OOXML/ODF/PDF/HTML/MD).
-- `events_outbox` — bus de eventos transaccional.
+- `documents` — metadata + `seq` (logical version vector) + trash.
+- `doc_operations` — **immutable** log of CRDT operations (append-only).
+- `doc_snapshots` — consolidated CRDT state (inline in `jsonb` or in S3).
+- `doc_versions` — history of named/automatic versions (restorable).
+- `doc_permissions` — **deny-by-default** ACL (user/group/tenant + role).
+- `doc_share_links` — public links (sha-256 **hashed** token).
+- `doc_comments` — comments anchored to stable CRDT references.
+- `doc_blobs` — metadata of exports in S3 (OOXML/ODF/PDF/HTML/MD).
+- `events_outbox` — transactional event bus.
 
-Aislamiento multi-tenant por **RLS** (`current_setting('app.tenant')`, fijado por
-`platform/pkg/pg.SetTenant`). La **única** lectura cross-tenant permitida es la
-resolución de un enlace público, vía la función `SECURITY DEFINER`
-`docs_resolve_share(token_hash)` de superficie mínima (devuelve solo
-`document_id/tenant/role` de enlaces activos).
+Multi-tenant isolation through **RLS** (`current_setting('app.tenant')`, set by
+`platform/pkg/pg.SetTenant`). The **only** cross-tenant read allowed is
+resolving a public link, via the minimal-surface `SECURITY DEFINER` function
+`docs_resolve_share(token_hash)` (it returns only
+`document_id/tenant/role` of active links).
 
-## Permisos (deny-by-default)
+<a id="permisos-deny-by-default"></a>
+## Permissions (deny-by-default)
 
-Roles crecientes: `viewer < commenter < editor < owner`. El `owner_sub` del
-documento es siempre `owner`. Para el resto, el rol efectivo es el **máximo**
-entre las entradas de ACL aplicables (usuario, grupos de Sytue ID, tenant). Sin
-entrada aplicable ⇒ **sin acceso**. Los enlaces de compartición nunca conceden
+Increasing roles: `viewer < commenter < editor < owner`. The document's `owner_sub`
+is always `owner`. For everyone else, the effective role is the **maximum**
+among the applicable ACL entries (user, Sytue ID groups, tenant). No
+applicable entry ⇒ **no access**. Share links never grant
 `owner`.
 
-## Identidad
+<a id="identidad"></a>
+## Identity
 
-Cada petición se valida contra **Sytue ID** (OIDC/JWKS) con el middleware
-`authn.RequireAuth` de la plataforma. El `sub`, los grupos y el `tenant` se
-extraen del JWT para resolver la autorización. El canal WebSocket exige el mismo
-JWT (Bearer) y rol mínimo `viewer`; editar requiere `editor`.
+Every request is validated against **Sytue ID** (OIDC/JWKS) with the platform's
+`authn.RequireAuth` middleware. The `sub`, the groups and the `tenant` are
+extracted from the JWT to resolve authorization. The WebSocket channel requires the same
+JWT (Bearer) and a minimum role of `viewer`; editing requires `editor`.
 
-## Exports OOXML/ODF (clean-room)
+<a id="exports-ooxmlodf-clean-room"></a>
+## OOXML/ODF exports (clean-room)
 
-`internal/domain/export.go` genera paquetes **OPC** (OOXML, ECMA-376: docx/xlsx/
-pptx) y **ODF** (OASIS 1.3: odt/ods/odp) con la stdlib de Go (`archive/zip`,
-`encoding/xml`), además de PDF/HTML/Markdown. Obra original sobre las
-especificaciones públicas; los binarios se materializan en Object Storage S3
+`internal/domain/export.go` generates **OPC** packages (OOXML, ECMA-376: docx/xlsx/
+pptx) and **ODF** packages (OASIS 1.3: odt/ods/odp) with the Go stdlib (`archive/zip`,
+`encoding/xml`), as well as PDF/HTML/Markdown. Original work based on the public
+specifications; the binaries are materialized in S3 Object Storage
 (bucket `docs-blobs`).
 
-## Configuración (entorno, prefijo `SYTUE_DOCS_`)
+<a id="configuración-entorno-prefijo-sytue_docs_"></a>
+## Configuration (environment, prefix `SYTUE_DOCS_`)
 
-| Variable | Por defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `SYTUE_DOCS_HTTP_ADDR` | `:8083` | dirección de escucha HTTP |
-| `SYTUE_DOCS_DATABASE_URL` | — (obligatoria) | DSN PostgreSQL |
-| `SYTUE_DOCS_OIDC_ISSUER` | `https://id.sytue.eu` | issuer de Sytue ID |
-| `SYTUE_DOCS_OIDC_AUDIENCE` | `sytue-docs` | audiencia esperada |
-| `SYTUE_DOCS_OIDC_JWKS_URL` | (derivada del issuer) | endpoint JWKS |
+| `SYTUE_DOCS_HTTP_ADDR` | `:8083` | HTTP listen address |
+| `SYTUE_DOCS_DATABASE_URL` | — (required) | PostgreSQL DSN |
+| `SYTUE_DOCS_OIDC_ISSUER` | `https://id.sytue.eu` | Sytue ID issuer |
+| `SYTUE_DOCS_OIDC_AUDIENCE` | `sytue-docs` | expected audience |
+| `SYTUE_DOCS_OIDC_JWKS_URL` | (derived from the issuer) | JWKS endpoint |
 | `SYTUE_DOCS_S3_ENDPOINT` | — | Object Storage (MinIO dev / Scaleway prod) |
-| `SYTUE_DOCS_S3_REGION` | `fr-par` | región S3 (solo UE) |
-| `SYTUE_DOCS_S3_ACCESS_KEY` / `_SECRET_KEY` | — | credenciales S3 |
-| `SYTUE_DOCS_S3_BUCKET` | `docs-blobs` | bucket de blobs/exports |
-| `SYTUE_DOCS_S3_USE_SSL` | `false` | TLS hacia S3 |
-| `SYTUE_DOCS_SNAPSHOT_INLINE_LIMIT` | `262144` | tope (bytes) de snapshot inline |
-| `SYTUE_DOCS_DRIVE_URL` | `http://drive:8082` | Sytue Drive: la unidad donde vive el fichero de cada documento |
-| `SYTUE_DOCS_DRIVE_TIMEOUT` | `15s` | tope por llamada a Drive |
+| `SYTUE_DOCS_S3_REGION` | `fr-par` | S3 region (EU only) |
+| `SYTUE_DOCS_S3_ACCESS_KEY` / `_SECRET_KEY` | — | S3 credentials |
+| `SYTUE_DOCS_S3_BUCKET` | `docs-blobs` | blobs/exports bucket |
+| `SYTUE_DOCS_S3_USE_SSL` | `false` | TLS to S3 |
+| `SYTUE_DOCS_SNAPSHOT_INLINE_LIMIT` | `262144` | cap (bytes) for inline snapshots |
+| `SYTUE_DOCS_DRIVE_URL` | `http://drive:8082` | Sytue Drive: the drive where each document's file lives |
+| `SYTUE_DOCS_DRIVE_TIMEOUT` | `15s` | cap per call to Drive |
 | `SYTUE_DOCS_LOG_LEVEL` / `_LOG_FORMAT` | `info` / `json` | logging |
 
-> Sin secretos en código ni en logs: todo por entorno / gestor de secretos.
+> No secrets in code or in logs: everything via the environment / secrets manager.
 
-> **El fichero del documento vive en Sytue Drive.** Un documento nuevo se crea
-> también como `.odt`/`.ods`/`.odp` en la carpeta `Sytue Docs/` de la unidad de
-> quien lo crea, y nace anclado a él (`source_ref`, mig. 0006). La llamada va con
-> el **JWT de esa persona**, no con un secreto de servicio, para que Drive aplique
-> su propia autorización. Consecuencia visible: crear un documento **consume cuota
-> de Drive**, y con la unidad llena la creación responde 507. El diseño completo,
-> lo que falta y el plan para los documentos anteriores están en
+> **The document's file lives in Sytue Drive.** A new document is also created
+> as `.odt`/`.ods`/`.odp` in the `Sytue Docs/` folder of its creator's
+> drive, and is born anchored to it (`source_ref`, mig. 0006). The call is made with
+> **that person's JWT**, not with a service secret, so that Drive applies
+> its own authorization. Visible consequence: creating a document **consumes Drive
+> quota**, and when the drive is full creation responds 507. The full design,
+> what is missing and the plan for earlier documents are in
 > [`docs/architecture.md#docs-en-drive`](../../docs/architecture.md#docs-en-drive).
 
-## Protocolo WebSocket (`/v1/documents/{id}/ws`)
+<a id="protocolo-websocket-v1documentsidws"></a>
+## WebSocket protocol (`/v1/documents/{id}/ws`)
 
-Mensajes JSON. Cliente→servidor: `hello` (sincronización por `last_seq`), `ops`
-(edición), `cursor` (presencia efímera), `ping`. Servidor→cliente: `welcome`
-(rol + seq), `ops` (operaciones secuenciadas), `ack` (confirmación con seq),
+JSON messages. Client→server: `hello` (synchronization by `last_seq`), `ops`
+(editing), `cursor` (ephemeral presence), `ping`. Server→client: `welcome`
+(role + seq), `ops` (sequenced operations), `ack` (acknowledgement with seq),
 `presence`, `error`.
 
-## API REST
+<a id="api-rest"></a>
+## REST API
 
-Contrato completo en [`openapi.yaml`](./openapi.yaml). Resumen:
+Full contract in [`openapi.yaml`](./openapi.yaml). Summary:
 
 - `GET/POST /v1/documents`, `GET/PATCH/DELETE /v1/documents/{id}`, `PUT …/star`
 - `GET …/state`, `GET/POST …/ops`, `GET …/ws`
 - `GET/POST …/versions`, `POST …/versions/{vid}/restore`
 - `GET/POST …/comments`, `PUT …/comments/{cid}/resolve`, `DELETE …/comments/{cid}`
 - `GET/PUT/DELETE …/permissions`, `GET/POST …/shares`, `DELETE …/shares/{lid}`
-- `GET /v1/share/{token}` (público, sin JWT)
-- `GET /v1/share/{token}/view` (público, sin JWT): su vista de solo lectura en HTML, la de `/s/{token}` en la web
-- `POST /v1/share/redeem` `{token}` (con sesión): canjea un enlace de editor o comentarista por un permiso de quien llama, también desde otra organización (ADR 0052)
+- `GET /v1/share/{token}` (public, no JWT)
+- `GET /v1/share/{token}/view` (public, no JWT): its read-only HTML view, the one behind `/s/{token}` on the web
+- `POST /v1/share/redeem` `{token}` (with a session): redeems an editor or commenter link for a permission for the caller, also from another organization (ADR 0052)
 - `GET/POST …/exports`, `GET …/exports/{bid}`
-- Sondas `/healthz` (liveness) y `/readyz` (readiness: PostgreSQL + S3).
+- Probes `/healthz` (liveness) and `/readyz` (readiness: PostgreSQL + S3).
 
 ## Tests
 
@@ -161,7 +170,7 @@ Contrato completo en [`openapi.yaml`](./openapi.yaml). Resumen:
 go test ./services/docs/...
 ```
 
-Cubren la **convergencia CRDT** (independencia de orden, idempotencia,
-tombstones, LWW), la **resolución de roles** (deny-by-default) y los **exports**
-(docx como ZIP OPC válido, ODF con `mimetype` primero y sin comprimir). No
-requieren PostgreSQL/MinIO/Sytue ID.
+They cover **CRDT convergence** (order independence, idempotence,
+tombstones, LWW), **role resolution** (deny-by-default) and **exports**
+(docx as a valid OPC ZIP, ODF with `mimetype` first and uncompressed). They do not
+require PostgreSQL/MinIO/Sytue ID.

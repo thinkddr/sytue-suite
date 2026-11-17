@@ -24,6 +24,8 @@ export interface Presence {
   state: PresenceState;
   /** Estado personalizado (emoji + texto), reutiliza el campo status del heartbeat. */
   status?: string;
+  /** Zona IANA del dispositivo con el que late: la hora local de su tarjeta. */
+  tz?: string;
   last_seen?: string;
 }
 
@@ -87,6 +89,18 @@ export async function queryPresence(subjects: string[]): Promise<Record<string, 
   return out;
 }
 
+/**
+ * La zona IANA del navegador («Europe/Madrid»), o vacía si `Intl` no la sabe. Va en
+ * cada latido: así la hora local que enseña la tarjeta de persona sigue a quien viaja.
+ */
+export function zonaDelDispositivo(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
+  } catch {
+    return '';
+  }
+}
+
 /** Envía un heartbeat con el estado propio; devuelve el intervalo sugerido (~TTL/2). */
 export async function sendHeartbeat(
   state: PresenceState,
@@ -96,7 +110,7 @@ export async function sendHeartbeat(
     method: 'PUT',
     credentials: 'include',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ state, status }),
+    body: JSON.stringify({ state, status, tz: zonaDelDispositivo() }),
   });
   if (!res.ok) throw new Error(`heartbeat ${res.status}`);
   return (await res.json()) as { heartbeat_seconds?: number };

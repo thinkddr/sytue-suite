@@ -8,6 +8,7 @@ package notes
 // dentro de la pantalla del cuaderno; no es una pantalla aparte del inventario.
 
 import (
+	"context"
 	"html"
 	"image/color"
 	"regexp"
@@ -133,7 +134,15 @@ func (p *Pantalla) asegurarDiario(dia time.Time) {
 func (p *Pantalla) pedirDiario(c carga, clave *string, nueva string, desde, hasta time.Time) {
 	if *clave != nueva {
 		*clave = nueva
-		go p.cargarDiario(c, clave, nueva, desde, hasta)
+		{
+			notaFuncion := p.cargarDiario
+			notaArgumento0 := c
+			notaArgumento1 := clave
+			notaArgumento2 := nueva
+			notaArgumento3 := desde
+			notaArgumento4 := hasta
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1, notaArgumento2, notaArgumento3, notaArgumento4) })
+		}
 	}
 }
 
@@ -185,7 +194,7 @@ func (p *Pantalla) cargarDiario(c carga, clave *string, nueva string, desde, has
 		r, err = p.Suite.Agenda(ctx, desde)
 		poner = func() { p.dia.agenda = r }
 	}
-	enHilo(func() {
+	p.enHilo(func() {
 		if *clave != nueva {
 			return
 		}
@@ -246,6 +255,9 @@ func (p *Pantalla) selectorVista(v tema.Variante) fyne.CanvasObject {
 	for _, vista := range vistasDiario {
 		bs = append(bs, segmento(p.tr.T("daily.view."+vista, nil), "", p.vistaDiario() == vista, v, func() {
 			p.cerrarEditor()
+			if p.edicion != nil {
+				return
+			}
 			p.dia.vista, p.dia.tramos = vista, 1
 			p.Repintar()
 		}))
@@ -268,7 +280,7 @@ func (p *Pantalla) soltarEnDia(n Nota, en fyne.Position) {
 		}
 		if i != 3 {
 			fecha := p.dia.semanaDia.AddDate(0, 0, i-3).Format(time.DateOnly)
-			go func() { _ = p.moverADia(n.ID, fecha) }()
+			p.iniciar(func() { _ = p.moverADia(n.ID, fecha) })
 		}
 		return
 	}
@@ -285,24 +297,24 @@ func (p *Pantalla) moverADia(id, fecha string) error {
 	defer cancelar()
 	nb, err := p.svc.DailyNotebook(ctx, fecha, i18n.FormatDateLong(p.loc, d), false)
 	if err != nil {
-		enHilo(func() { p.fallo("move.failed", err) })
+		p.enHilo(func() { p.fallo("move.failed", err) })
 		return err
 	}
 	destino := DeCuaderno(nb)
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		if !slices.ContainsFunc(p.cuadernos, func(c Cuaderno) bool { return c.ID == destino.ID }) {
 			p.cuadernos = append(p.cuadernos, destino)
 		}
 	})
 	err = p.moverACuaderno(id, destino, true)
-	enHilo(func() { p.dia.version++; p.Repintar() })
+	p.enHilo(func() { p.dia.version++; p.Repintar() })
 	return err
 }
 
 // crearEvento es «Añadir al calendario»: un evento de día completo el día del diario (u
 // hoy) en el calendario por defecto, enlazado a la nota.
 func (p *Pantalla) crearEvento(n Nota) {
-	if p.Suite == nil || p.Suite.Calendar == nil || p.activo.Cifrado || !p.puedeEscribir() {
+	if p.Suite == nil || p.Suite.Calendar == nil || !p.permiteEnviarContenidoExterno(p.activo.ID, n) || !p.puedeEscribir() {
 		return
 	}
 	fecha := p.activo.Crudo.DailyDate
@@ -313,14 +325,22 @@ func (p *Pantalla) crearEvento(n Nota) {
 	if resumen == "" {
 		resumen = p.tr.T("note.untitled", nil)
 	}
-	go func() {
-		ctx, cancelar := p.ctx()
+	trabajo, suite := p.capturarAutorizacionSuite(), p.Suite
+	if trabajo == nil {
+		return
+	}
+	p.iniciar(func() {
+		ctx, cancelar := context.WithTimeout(trabajo, p.Plazo)
 		defer cancelar()
-		l, err := p.Suite.CrearEventoDelDia(ctx, fecha, resumen)
+		l, err := suite.CrearEventoDelDia(ctx, fecha, resumen)
 		if err == nil {
-			err = p.editar(n.ID, Parche{Enlaces: append(slices.Clone(n.Enlaces), l)}, false)
+			_, err = p.editarConEntrada(ctx, n.ID, Parche{Enlaces: append(slices.Clone(n.Enlaces), l)}, false, "", nil)
 		}
-		enHilo(func() {
+		//nolint:contextcheck // Rendering installs future actions that use the retained presenter lifetime.
+		p.enHilo(func() {
+			if !p.suiteVidaVigente(trabajo) {
+				return
+			}
 			if err != nil {
 				p.fallo("event.failed", err)
 				return
@@ -329,7 +349,7 @@ func (p *Pantalla) crearEvento(n Nota) {
 			p.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, p.tr.T("event.created", nil), ""))
 			p.Repintar()
 		})
-	}()
+	})
 }
 
 // ---- Lo que se pinta ----

@@ -60,11 +60,11 @@ import { r } from '../lib/rutas.js';
     {templates.length === 0 ? (
       <Card class="mt-2">
         <EmptyState
-          illustration={<Icon name="grid" size={24} />}
+          icon="grid"
           title={t('templates.empty.title')}
           description={t('templates.empty.desc')}
           action={
-            <a href={r('/?new=1')} class={ctaClass}>
+            <a href={r('/new')} class={ctaClass}>
               <Icon name="plus" size={16} />
               {t('projects.new')}
             </a>

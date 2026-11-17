@@ -81,6 +81,9 @@ type Vista struct {
 	// Movil: la app corre en un teléfono. Cambia lo que no tiene sentido allí: el
 	// reproductor va de borde a borde y la zona de subir no habla de arrastrar.
 	Movil bool
+	// Visto es lo que lleva visto quien está dentro de cada vídeo (de 0 a 1), para la
+	// barra de las tarjetas (reanudar.go). nil: no se pinta.
+	Visto func(id string) float64
 	// AlEntrar es el botón del estado SinSesion.
 	AlEntrar func()
 	// AlReintentar es el botón de los estados de fallo. nil: no se ofrece.

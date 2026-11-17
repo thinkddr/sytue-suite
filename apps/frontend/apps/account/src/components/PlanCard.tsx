@@ -103,14 +103,14 @@ export function PlanCard({ t, locale }: Props): JSX.Element {
   };
 
   return (
-    <Card class="mb-6 break-inside-avoid">
+    <Card id="plan">
       <div class="flex flex-col gap-4 p-4 sm:p-5">
         <h2 class="text-lg font-semibold">{t('plan.title')}</h2>
 
         {estado === 'cargando' ? (
           <p class="text-text-muted text-sm">{t('plan.loading')}</p>
         ) : estado === 'error' ? (
-          <p class="text-danger text-sm" role="alert">
+          <p class="text-danger-text text-sm" role="alert">
             {t('plan.error')}
           </p>
         ) : (

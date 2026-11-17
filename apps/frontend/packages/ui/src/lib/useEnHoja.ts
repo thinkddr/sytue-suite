@@ -22,6 +22,13 @@ export const CONSULTA_HOJA = '(width < 48rem)';
 export const CONSULTA_ESTRECHA = '(width < 40rem)';
 
 /**
+ * El dedo: `pointer: coarse`, la variante `pointer-coarse:` de Tailwind preguntada desde JS
+ * (lo que en la app nativa es `ui.EsTactil`). Para los gestos que cambian con el dedo, no
+ * para el tamaño de lo que se toca, que ya lo pone el CSS.
+ */
+export const CONSULTA_DEDO = '(pointer: coarse)';
+
+/**
  * ¿Se cumple la media query? Sigue a la ventana. `inicial` es lo que vale en el primer
  * render: sin darlo se pregunta ya a `matchMedia` (lo que hacía `useEnHoja`); con `false`
  * el primer render coincide con el del servidor y la respuesta llega en el efecto, que es
@@ -43,6 +50,11 @@ export function useConsulta(consulta: string, inicial?: boolean): boolean {
     return () => m.removeEventListener?.('change', cambiar);
   }, [consulta]);
   return cumple;
+}
+
+/** ¿Se maneja con el dedo? Arranca en `false`, como `useEstrecha`: el servidor no lo sabe. */
+export function useDedo(): boolean {
+  return useConsulta(CONSULTA_DEDO, false);
 }
 
 export function useEnHoja(): boolean {

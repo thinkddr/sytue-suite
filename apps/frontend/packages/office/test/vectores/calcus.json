@@ -6600,7 +6600,112 @@
           "1": ["Norte"],
           "3": ["0"]
         }
-      }
+      },
+      "condFormats": [
+        {
+          "range": "B2:B10",
+          "kind": "formula",
+          "formula": "=B2>$E$1",
+          "fill": "#FFEB9C"
+        },
+        {
+          "range": "D3",
+          "op": "gt",
+          "value": "5",
+          "fill": "#FFC7CE"
+        },
+        {
+          "range": "C4:D5",
+          "kind": "dataBar",
+          "color": "#638EC6"
+        }
+      ],
+      "validations": [
+        {
+          "range": "B2:B10",
+          "values": ["Norte", "Sur"]
+        },
+        {
+          "range": "C3:C6",
+          "type": "formula",
+          "formula": "=C3<=SUMA($D$3:D3)",
+          "strict": true
+        }
+      ],
+      "rowGroups": [
+        {
+          "start": 2,
+          "end": 8,
+          "level": 1
+        },
+        {
+          "start": 3,
+          "end": 4,
+          "level": 2,
+          "collapsed": true
+        }
+      ],
+      "colGroups": [
+        {
+          "start": 2,
+          "end": 3,
+          "level": 1
+        }
+      ],
+      "merges": ["A1:D1", "F3:G4"],
+      "colWidths": {
+        "1": 120,
+        "3": 60
+      },
+      "rowHeights": {
+        "0": 32,
+        "9": 20
+      },
+      "pivots": [
+        {
+          "name": "TD1",
+          "source": "B2:D6",
+          "anchor": "J2",
+          "range": "J2:K5",
+          "rows": [
+            {
+              "field": 0
+            }
+          ],
+          "cols": [
+            {
+              "field": 1
+            }
+          ],
+          "values": [
+            {
+              "field": 2,
+              "fn": "sum"
+            }
+          ]
+        },
+        {
+          "name": "TD2",
+          "source": "F10:G12",
+          "anchor": "J20",
+          "rows": [
+            {
+              "field": 0
+            }
+          ],
+          "cols": [
+            {
+              "field": 1
+            }
+          ],
+          "values": [
+            {
+              "field": 1,
+              "fn": "count"
+            }
+          ]
+        }
+      ]
     },
     "casos": [
       {
@@ -6676,7 +6781,112 @@
               "1": ["Norte"],
               "3": ["0"]
             }
-          }
+          },
+          "condFormats": [
+            {
+              "range": "B2:B11",
+              "kind": "formula",
+              "formula": "=B2>$E$1",
+              "fill": "#FFEB9C"
+            },
+            {
+              "range": "D3",
+              "op": "gt",
+              "value": "5",
+              "fill": "#FFC7CE"
+            },
+            {
+              "range": "C5:D6",
+              "kind": "dataBar",
+              "color": "#638EC6"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B2:B11",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "C3:C7",
+              "type": "formula",
+              "formula": "=C3<=SUMA($D$3:D3)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 9,
+              "level": 1
+            },
+            {
+              "start": 4,
+              "end": 5,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 2,
+              "end": 3,
+              "level": 1
+            }
+          ],
+          "merges": ["A1:D1", "F3:G5"],
+          "colWidths": {
+            "1": 120,
+            "3": 60
+          },
+          "rowHeights": {
+            "0": 32,
+            "10": 20
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D7",
+              "anchor": "J2",
+              "range": "J2:K6",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F11:G13",
+              "anchor": "J21",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -6752,7 +6962,112 @@
               "1": ["Norte"],
               "3": ["0"]
             }
-          }
+          },
+          "condFormats": [
+            {
+              "range": "B4:B12",
+              "kind": "formula",
+              "formula": "=B4>$E$3",
+              "fill": "#FFEB9C"
+            },
+            {
+              "range": "D5",
+              "op": "gt",
+              "value": "5",
+              "fill": "#FFC7CE"
+            },
+            {
+              "range": "C6:D7",
+              "kind": "dataBar",
+              "color": "#638EC6"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B4:B12",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "C5:C8",
+              "type": "formula",
+              "formula": "=C5<=SUMA($D$5:D5)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 4,
+              "end": 10,
+              "level": 1
+            },
+            {
+              "start": 5,
+              "end": 6,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 2,
+              "end": 3,
+              "level": 1
+            }
+          ],
+          "merges": ["A3:D3", "F5:G6"],
+          "colWidths": {
+            "1": 120,
+            "3": 60
+          },
+          "rowHeights": {
+            "2": 32,
+            "11": 20
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B4:D8",
+              "anchor": "J4",
+              "range": "J4:K7",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F12:G14",
+              "anchor": "J22",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -6819,7 +7134,111 @@
               "1": ["Norte"],
               "3": ["0"]
             }
-          }
+          },
+          "condFormats": [
+            {
+              "range": "B2:B9",
+              "kind": "formula",
+              "formula": "=B2>$E$1",
+              "fill": "#FFEB9C"
+            },
+            {
+              "range": "D3",
+              "op": "gt",
+              "value": "5",
+              "fill": "#FFC7CE"
+            },
+            {
+              "range": "C4:D5",
+              "kind": "dataBar",
+              "color": "#638EC6"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B2:B9",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "C3:C6",
+              "type": "formula",
+              "formula": "=C3<=SUMA($D$3:D3)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 8,
+              "level": 1
+            },
+            {
+              "start": 3,
+              "end": 4,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 2,
+              "end": 3,
+              "level": 1
+            }
+          ],
+          "merges": ["A1:D1", "F3:G4"],
+          "colWidths": {
+            "1": 120,
+            "3": 60
+          },
+          "rowHeights": {
+            "0": 32
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D6",
+              "anchor": "J2",
+              "range": "J2:K5",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F10:G11",
+              "anchor": "J19",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -6885,6 +7304,111 @@
               "id": "s3",
               "col": 1,
               "pivot": "TablaDinámica1"
+            }
+          ],
+          "condFormats": [
+            {
+              "range": "B2:B9",
+              "kind": "formula",
+              "formula": "=B2>$E$1",
+              "fill": "#FFEB9C"
+            },
+            {
+              "range": "D2",
+              "op": "gt",
+              "value": "5",
+              "fill": "#FFC7CE"
+            },
+            {
+              "range": "C3:D4",
+              "kind": "dataBar",
+              "color": "#638EC6"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B2:B9",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "C2:C5",
+              "type": "formula",
+              "formula": "=C2<=SUMA($D$2:D2)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 1,
+              "end": 7,
+              "level": 1
+            },
+            {
+              "start": 2,
+              "end": 3,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 2,
+              "end": 3,
+              "level": 1
+            }
+          ],
+          "merges": ["A1:D1", "F2:G3"],
+          "colWidths": {
+            "1": 120,
+            "3": 60
+          },
+          "rowHeights": {
+            "0": 32,
+            "8": 20
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D5",
+              "anchor": "J2",
+              "range": "J2:K4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F9:G11",
+              "anchor": "J19",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
             }
           ]
         }
@@ -6957,7 +7481,95 @@
               "1": ["Norte"],
               "3": ["0"]
             }
-          }
+          },
+          "condFormats": [
+            {
+              "range": "B2:B7",
+              "kind": "formula",
+              "formula": "=B2>$E$1",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B2:B7",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "C3",
+              "type": "formula",
+              "formula": "=C3<=SUMA($D$3:D3)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 5,
+              "level": 1
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 2,
+              "end": 3,
+              "level": 1
+            }
+          ],
+          "merges": ["A1:D1"],
+          "colWidths": {
+            "1": 120,
+            "3": 60
+          },
+          "rowHeights": {
+            "0": 32,
+            "6": 20
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D3",
+              "anchor": "J2",
+              "range": "J2:K2",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F7:G9",
+              "anchor": "J17",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7033,7 +7645,112 @@
               "1": ["Norte"],
               "4": ["0"]
             }
-          }
+          },
+          "condFormats": [
+            {
+              "range": "B2:B10",
+              "kind": "formula",
+              "formula": "=B2>$F$1",
+              "fill": "#FFEB9C"
+            },
+            {
+              "range": "E3",
+              "op": "gt",
+              "value": "5",
+              "fill": "#FFC7CE"
+            },
+            {
+              "range": "D4:E5",
+              "kind": "dataBar",
+              "color": "#638EC6"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B2:B10",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "D3:D6",
+              "type": "formula",
+              "formula": "=D3<=SUMA($E$3:E3)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 8,
+              "level": 1
+            },
+            {
+              "start": 3,
+              "end": 4,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 3,
+              "end": 4,
+              "level": 1
+            }
+          ],
+          "merges": ["A1:E1", "G3:H4"],
+          "colWidths": {
+            "1": 120,
+            "4": 60
+          },
+          "rowHeights": {
+            "0": 32,
+            "9": 20
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:E6",
+              "anchor": "K2",
+              "range": "K2:L5",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "G10:H12",
+              "anchor": "K20",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7047,7 +7764,7 @@
           "tables": [
             {
               "name": "Ventas",
-              "range": "B2:D6",
+              "range": "B2:C6",
               "totalsRow": true,
               "totals": {
                 "2": "sum"
@@ -7061,12 +7778,12 @@
           "sparklines": [
             {
               "cell": "G3",
-              "range": "C3:D3",
+              "range": "C3:C3",
               "type": "line"
             },
             {
               "cell": "A9",
-              "range": "B9:D9",
+              "range": "B9:C9",
               "type": "column"
             }
           ],
@@ -7074,7 +7791,7 @@
             {
               "id": "g1",
               "type": "bar",
-              "range": "B2:D6",
+              "range": "B2:C6",
               "x": 300,
               "y": 40
             },
@@ -7098,11 +7815,109 @@
           "autofilter": {
             "row": 1,
             "c1": 1,
-            "c2": 3,
+            "c2": 2,
             "excl": {
               "1": ["Norte"]
             }
-          }
+          },
+          "condFormats": [
+            {
+              "range": "B2:B10",
+              "kind": "formula",
+              "formula": "=B2>$D$1",
+              "fill": "#FFEB9C"
+            },
+            {
+              "range": "C4:C5",
+              "kind": "dataBar",
+              "color": "#638EC6"
+            }
+          ],
+          "validations": [
+            {
+              "range": "B2:B10",
+              "values": ["Norte", "Sur"]
+            },
+            {
+              "range": "C3:C6",
+              "type": "formula",
+              "formula": "=C3<=SUMA(#¡REF!)",
+              "strict": true
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 8,
+              "level": 1
+            },
+            {
+              "start": 3,
+              "end": 4,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "colGroups": [
+            {
+              "start": 2,
+              "end": 2,
+              "level": 1
+            }
+          ],
+          "merges": ["A1:C1", "E3:F4"],
+          "colWidths": {
+            "1": 120
+          },
+          "rowHeights": {
+            "0": 32,
+            "9": 20
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:C6",
+              "anchor": "I2",
+              "range": "I2:J5",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "E10:F12",
+              "anchor": "I20",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7132,6 +7947,47 @@
               "col": 1,
               "pivot": "TablaDinámica1"
             }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 8,
+              "level": 1
+            },
+            {
+              "start": 3,
+              "end": 4,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "merges": ["C3:D4"],
+          "rowHeights": {
+            "0": 32,
+            "9": 20
+          },
+          "pivots": [
+            {
+              "name": "TD2",
+              "source": "C10:D12",
+              "anchor": "G20",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
           ]
         }
       },
@@ -7148,6 +8004,773 @@
               "id": "s3",
               "col": 1,
               "pivot": "TablaDinámica1"
+            }
+          ],
+          "rowGroups": [
+            {
+              "start": 2,
+              "end": 8,
+              "level": 1
+            },
+            {
+              "start": 3,
+              "end": 4,
+              "level": 2,
+              "collapsed": true
+            }
+          ],
+          "rowHeights": {
+            "0": 32,
+            "9": 20
+          }
+        }
+      }
+    ]
+  },
+  "referenciasAjenas": {
+    "hojas": [
+      {
+        "name": "Resumen",
+        "cells": {
+          "A1": "=Ventas!B4",
+          "A2": "<b>=SUM(Ventas!A1:B9)</b>",
+          "A3": "=ventas!$B$4*B4",
+          "A4": "='Hoja 2'!C3+Hoja2!C3",
+          "A5": "=Ventas!B4:B6",
+          "A6": "Ventas!B4"
+        },
+        "condFormats": [
+          {
+            "range": "A1:A3",
+            "kind": "formula",
+            "formula": "=A1>Ventas!$B$4",
+            "fill": "#FFEB9C"
+          }
+        ],
+        "validations": [
+          {
+            "range": "C1",
+            "type": "formula",
+            "formula": "=COUNTIF(Ventas!$A$1:$A$9,C1)>0"
+          },
+          {
+            "range": "C2",
+            "values": ["Sí", "No"]
+          }
+        ],
+        "pivots": [
+          {
+            "name": "TD1",
+            "source": "A1:C9",
+            "sourceSheet": "Ventas",
+            "anchor": "E1",
+            "range": "E1:F4",
+            "rows": [
+              {
+                "field": 0
+              }
+            ],
+            "cols": [
+              {
+                "field": 1
+              }
+            ],
+            "values": [
+              {
+                "field": 2,
+                "fn": "sum"
+              }
+            ]
+          },
+          {
+            "name": "TD2",
+            "source": "A1:A6",
+            "anchor": "E10",
+            "rows": [
+              {
+                "field": 0
+              }
+            ],
+            "cols": [
+              {
+                "field": 0
+              }
+            ],
+            "values": [
+              {
+                "field": 0,
+                "fn": "count"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Protegida",
+        "cells": {
+          "A1": "=Ventas!B4",
+          "A2": "=Ventas!B4"
+        },
+        "styles": {
+          "A2": {
+            "locked": false
+          }
+        },
+        "protect": {},
+        "validations": [
+          {
+            "range": "C1",
+            "type": "formula",
+            "formula": "=Ventas!$B$4>0"
+          }
+        ]
+      }
+    ],
+    "casos": [
+      {
+        "hoja": 0,
+        "d": {
+          "eje": "fila",
+          "desde": 1,
+          "cantidad": 1,
+          "tope": 100,
+          "hoja": "Ventas"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!B5",
+            "A2": "<b>=SUM(Ventas!A1:B10)</b>",
+            "A3": "=ventas!$B$5*B4",
+            "A4": "='Hoja 2'!C3+Hoja2!C3",
+            "A5": "=Ventas!B5:B7",
+            "A6": "Ventas!B4"
+          },
+          "condFormats": [
+            {
+              "range": "A1:A3",
+              "kind": "formula",
+              "formula": "=A1>Ventas!$B$5",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=COUNTIF(Ventas!$A$1:$A$10,C1)>0"
+            },
+            {
+              "range": "C2",
+              "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C10",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 0,
+        "d": {
+          "eje": "fila",
+          "desde": 3,
+          "cantidad": -1,
+          "tope": 100,
+          "hoja": "Ventas"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=#¡REF!",
+            "A2": "<b>=SUM(Ventas!A1:B8)</b>",
+            "A3": "=#¡REF!*B4",
+            "A4": "='Hoja 2'!C3+Hoja2!C3",
+            "A5": "=Ventas!B4:B5",
+            "A6": "Ventas!B4"
+          },
+          "condFormats": [
+            {
+              "range": "A1:A3",
+              "kind": "formula",
+              "formula": "=A1>#¡REF!",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=COUNTIF(Ventas!$A$1:$A$8,C1)>0"
+            },
+            {
+              "range": "C2",
+              "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C8",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 0,
+        "d": {
+          "eje": "fila",
+          "desde": 3,
+          "cantidad": -3,
+          "tope": 100,
+          "hoja": "Ventas"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=#¡REF!",
+            "A2": "<b>=SUM(Ventas!A1:B6)</b>",
+            "A3": "=#¡REF!*B4",
+            "A4": "='Hoja 2'!C3+Hoja2!C3",
+            "A5": "=#¡REF!",
+            "A6": "Ventas!B4"
+          },
+          "condFormats": [
+            {
+              "range": "A1:A3",
+              "kind": "formula",
+              "formula": "=A1>#¡REF!",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=COUNTIF(Ventas!$A$1:$A$6,C1)>0"
+            },
+            {
+              "range": "C2",
+              "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C6",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 0,
+        "d": {
+          "eje": "columna",
+          "desde": 1,
+          "cantidad": 1,
+          "tope": 26,
+          "hoja": "VENTAS"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!C4",
+            "A2": "<b>=SUM(Ventas!A1:C9)</b>",
+            "A3": "=ventas!$C$4*B4",
+            "A4": "='Hoja 2'!C3+Hoja2!C3",
+            "A5": "=Ventas!C4:C6",
+            "A6": "Ventas!B4"
+          },
+          "condFormats": [
+            {
+              "range": "A1:A3",
+              "kind": "formula",
+              "formula": "=A1>Ventas!$C$4",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=COUNTIF(Ventas!$A$1:$A$9,C1)>0"
+            },
+            {
+              "range": "C2",
+              "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C9",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 0,
+        "d": {
+          "eje": "columna",
+          "desde": 0,
+          "cantidad": 2,
+          "tope": 26,
+          "hoja": "Hoja 2"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!B4",
+            "A2": "<b>=SUM(Ventas!A1:B9)</b>",
+            "A3": "=ventas!$B$4*B4",
+            "A4": "='Hoja 2'!E3+Hoja2!C3",
+            "A5": "=Ventas!B4:B6",
+            "A6": "Ventas!B4"
+          },
+          "condFormats": [
+            {
+              "range": "A1:A3",
+              "kind": "formula",
+              "formula": "=A1>Ventas!$B$4",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=COUNTIF(Ventas!$A$1:$A$9,C1)>0"
+            },
+            {
+              "range": "C2",
+              "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C9",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 0,
+        "d": {
+          "eje": "fila",
+          "desde": 0,
+          "cantidad": 1,
+          "tope": 100,
+          "hoja": "Resumen"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!B4",
+            "A2": "<b>=SUM(Ventas!A1:B9)</b>",
+            "A3": "=ventas!$B$4*B4",
+            "A4": "='Hoja 2'!C3+Hoja2!C3",
+            "A5": "=Ventas!B4:B6",
+            "A6": "Ventas!B4"
+          },
+          "condFormats": [
+            {
+              "range": "A1:A3",
+              "kind": "formula",
+              "formula": "=A1>Ventas!$B$4",
+              "fill": "#FFEB9C"
+            }
+          ],
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=COUNTIF(Ventas!$A$1:$A$9,C1)>0"
+            },
+            {
+              "range": "C2",
+              "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C9",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 1,
+          "cantidad": 1,
+          "tope": 100,
+          "hoja": "Ventas"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!B5",
+            "A2": "=Ventas!B5"
+          },
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=Ventas!$B$4>0"
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 3,
+          "cantidad": -1,
+          "tope": 100,
+          "hoja": "Ventas"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=#¡REF!",
+            "A2": "=#¡REF!"
+          },
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=Ventas!$B$4>0"
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 3,
+          "cantidad": -3,
+          "tope": 100,
+          "hoja": "Ventas"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=#¡REF!",
+            "A2": "=#¡REF!"
+          },
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=Ventas!$B$4>0"
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "columna",
+          "desde": 1,
+          "cantidad": 1,
+          "tope": 26,
+          "hoja": "VENTAS"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!C4",
+            "A2": "=Ventas!C4"
+          },
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=Ventas!$B$4>0"
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "columna",
+          "desde": 0,
+          "cantidad": 2,
+          "tope": 26,
+          "hoja": "Hoja 2"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!B4",
+            "A2": "=Ventas!B4"
+          },
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=Ventas!$B$4>0"
+            }
+          ]
+        }
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 0,
+          "cantidad": 1,
+          "tope": 100,
+          "hoja": "Resumen"
+        },
+        "sale": {
+          "cells": {
+            "A1": "=Ventas!B4",
+            "A2": "=Ventas!B4"
+          },
+          "validations": [
+            {
+              "range": "C1",
+              "type": "formula",
+              "formula": "=Ventas!$B$4>0"
             }
           ]
         }
@@ -8200,6 +9823,1525 @@
       {
         "entrada": null,
         "sale": null
+      }
+    ]
+  },
+  "fusiones": {
+    "parse": [
+      {
+        "merges": ["A1:D1", "F3:G4"],
+        "sale": [
+          {
+            "c1": 0,
+            "r1": 0,
+            "c2": 3,
+            "r2": 0
+          },
+          {
+            "c1": 5,
+            "r1": 2,
+            "c2": 6,
+            "r2": 3
+          }
+        ]
+      },
+      {
+        "merges": ["A1", "B2"],
+        "sale": []
+      },
+      {
+        "merges": ["B2:C3", "C3:D4", "E1:E2"],
+        "sale": [
+          {
+            "c1": 1,
+            "r1": 1,
+            "c2": 2,
+            "r2": 2
+          },
+          {
+            "c1": 4,
+            "r1": 0,
+            "c2": 4,
+            "r2": 1
+          }
+        ]
+      },
+      {
+        "merges": ["D4:B2", " $a$1:$a$3 "],
+        "sale": [
+          {
+            "c1": 1,
+            "r1": 1,
+            "c2": 3,
+            "r2": 3
+          },
+          {
+            "c1": 0,
+            "r1": 0,
+            "c2": 0,
+            "r2": 2
+          }
+        ]
+      },
+      {
+        "merges": ["basura", "A1:", "A0:B2", "ZZZZ1:A2", "A2:B2"],
+        "sale": [
+          {
+            "c1": 0,
+            "r1": -1,
+            "c2": 1,
+            "r2": 1
+          }
+        ]
+      },
+      {
+        "merges": null,
+        "sale": []
+      }
+    ],
+    "fusionEn": {
+      "merges": ["A1:D1", "F3:G4", "B10:C12"],
+      "casos": [
+        {
+          "c": 0,
+          "r": 0,
+          "sale": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 3,
+            "r2": 0
+          }
+        },
+        {
+          "c": 3,
+          "r": 0,
+          "sale": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 3,
+            "r2": 0
+          }
+        },
+        {
+          "c": 4,
+          "r": 0,
+          "sale": null
+        },
+        {
+          "c": 5,
+          "r": 2,
+          "sale": {
+            "c1": 5,
+            "r1": 2,
+            "c2": 6,
+            "r2": 3
+          }
+        },
+        {
+          "c": 6,
+          "r": 3,
+          "sale": {
+            "c1": 5,
+            "r1": 2,
+            "c2": 6,
+            "r2": 3
+          }
+        },
+        {
+          "c": 7,
+          "r": 3,
+          "sale": null
+        },
+        {
+          "c": 0,
+          "r": 1,
+          "sale": null
+        },
+        {
+          "c": 2,
+          "r": 11,
+          "sale": {
+            "c1": 1,
+            "r1": 9,
+            "c2": 2,
+            "r2": 11
+          }
+        }
+      ]
+    },
+    "ventana": {
+      "merges": ["A1:D1", "F3:G4", "B10:C12"],
+      "casos": [
+        {
+          "c1": 2,
+          "r1": 0,
+          "c2": 5,
+          "r2": 5,
+          "sale": [
+            {
+              "c1": 0,
+              "r1": 0,
+              "c2": 3,
+              "r2": 0
+            },
+            {
+              "c1": 5,
+              "r1": 2,
+              "c2": 6,
+              "r2": 3
+            }
+          ]
+        },
+        {
+          "c1": 0,
+          "r1": 4,
+          "c2": 10,
+          "r2": 8,
+          "sale": []
+        },
+        {
+          "c1": 0,
+          "r1": 0,
+          "c2": 10,
+          "r2": 20,
+          "tope": 2,
+          "sale": [
+            {
+              "c1": 0,
+              "r1": 0,
+              "c2": 3,
+              "r2": 0
+            },
+            {
+              "c1": 5,
+              "r1": 2,
+              "c2": 6,
+              "r2": 3
+            }
+          ]
+        },
+        {
+          "c1": 1,
+          "r1": 11,
+          "c2": 1,
+          "r2": 11,
+          "sale": [
+            {
+              "c1": 1,
+              "r1": 9,
+              "c2": 2,
+              "r2": 11
+            }
+          ]
+        },
+        {
+          "c1": 7,
+          "r1": 0,
+          "c2": 9,
+          "r2": 30,
+          "sale": []
+        }
+      ]
+    },
+    "mover": {
+      "merges": ["B2:D3", "F2:F5"],
+      "maxC": 25,
+      "maxR": 99,
+      "casos": [
+        {
+          "base": {
+            "c": 1,
+            "r": 1
+          },
+          "dc": 1,
+          "dr": 0,
+          "sale": {
+            "c": 4,
+            "r": 1
+          }
+        },
+        {
+          "base": {
+            "c": 1,
+            "r": 1
+          },
+          "dc": 0,
+          "dr": 1,
+          "sale": {
+            "c": 1,
+            "r": 3
+          }
+        },
+        {
+          "base": {
+            "c": 1,
+            "r": 1
+          },
+          "dc": -1,
+          "dr": 0,
+          "sale": {
+            "c": 0,
+            "r": 1
+          }
+        },
+        {
+          "base": {
+            "c": 1,
+            "r": 1
+          },
+          "dc": 0,
+          "dr": -1,
+          "sale": {
+            "c": 1,
+            "r": 0
+          }
+        },
+        {
+          "base": {
+            "c": 4,
+            "r": 1
+          },
+          "dc": 1,
+          "dr": 0,
+          "sale": {
+            "c": 5,
+            "r": 1
+          }
+        },
+        {
+          "base": {
+            "c": 4,
+            "r": 3
+          },
+          "dc": -1,
+          "dr": 0,
+          "sale": {
+            "c": 3,
+            "r": 3
+          }
+        },
+        {
+          "base": {
+            "c": 5,
+            "r": 1
+          },
+          "dc": 0,
+          "dr": 1,
+          "sale": {
+            "c": 5,
+            "r": 5
+          }
+        },
+        {
+          "base": {
+            "c": 5,
+            "r": 1
+          },
+          "dc": 0,
+          "dr": -1,
+          "sale": {
+            "c": 5,
+            "r": 0
+          }
+        },
+        {
+          "base": {
+            "c": 0,
+            "r": 2
+          },
+          "dc": 1,
+          "dr": 0,
+          "sale": {
+            "c": 1,
+            "r": 1
+          }
+        },
+        {
+          "base": {
+            "c": 3,
+            "r": 0
+          },
+          "dc": 0,
+          "dr": 1,
+          "sale": {
+            "c": 1,
+            "r": 1
+          }
+        },
+        {
+          "base": {
+            "c": 1,
+            "r": 1
+          },
+          "dc": 0,
+          "dr": 30,
+          "sale": {
+            "c": 1,
+            "r": 32
+          }
+        },
+        {
+          "base": {
+            "c": 24,
+            "r": 98
+          },
+          "dc": 5,
+          "dr": 5,
+          "sale": {
+            "c": 25,
+            "r": 99
+          }
+        },
+        {
+          "base": {
+            "c": 1,
+            "r": 1
+          },
+          "dc": -1,
+          "dr": 0,
+          "sale": {
+            "c": 0,
+            "r": 1
+          }
+        },
+        {
+          "base": {
+            "c": 2,
+            "r": 2
+          },
+          "dc": 0,
+          "dr": 0,
+          "sale": {
+            "c": 1,
+            "r": 1
+          }
+        }
+      ]
+    },
+    "rango": [
+      {
+        "f": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 3,
+          "r2": 0
+        },
+        "sale": "A1:D1"
+      },
+      {
+        "f": {
+          "c1": 5,
+          "r1": 2,
+          "c2": 6,
+          "r2": 3
+        },
+        "sale": "F3:G4"
+      },
+      {
+        "f": {
+          "c1": 1,
+          "r1": 9,
+          "c2": 2,
+          "r2": 11
+        },
+        "sale": "B10:C12"
+      }
+    ],
+    "combinar": [
+      {
+        "merges": [],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 1,
+          "r2": 1
+        },
+        "sale": {
+          "merges": ["A1:B2"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 1,
+            "r2": 1
+          }
+        }
+      },
+      {
+        "merges": null,
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 0
+        },
+        "sale": null
+      },
+      {
+        "merges": ["B2:C3"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 1,
+          "r2": 1
+        },
+        "sale": {
+          "merges": ["A1:C3"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 2,
+            "r2": 2
+          }
+        }
+      },
+      {
+        "merges": ["B2:C3", "D3:E4"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 1
+        },
+        "sale": {
+          "merges": ["D3:E4", "A1:C3"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 2,
+            "r2": 2
+          }
+        }
+      },
+      {
+        "merges": ["B2:C3", "D3:E4"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 3,
+          "r2": 1
+        },
+        "sale": {
+          "merges": ["A1:E4"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 4,
+            "r2": 3
+          }
+        }
+      },
+      {
+        "merges": ["A1:B1", "x", "H8:H9"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 0
+        },
+        "sale": {
+          "merges": ["x", "H8:H9", "A1:C1"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 2,
+            "r2": 0
+          }
+        }
+      },
+      {
+        "merges": ["B2:C3"],
+        "rect": {
+          "c1": 1,
+          "r1": 1,
+          "c2": 1,
+          "r2": 1
+        },
+        "sale": {
+          "merges": ["B2:C3"],
+          "fusion": {
+            "c1": 1,
+            "r1": 1,
+            "c2": 2,
+            "r2": 2
+          }
+        }
+      }
+    ],
+    "separar": [
+      {
+        "merges": ["A1:B2", "D1:E1"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 0
+        },
+        "sale": ["D1:E1"]
+      },
+      {
+        "merges": ["A1:B2"],
+        "rect": {
+          "c1": 3,
+          "r1": 3,
+          "c2": 3,
+          "r2": 3
+        },
+        "sale": null
+      },
+      {
+        "merges": null,
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 5,
+          "r2": 5
+        },
+        "sale": null
+      },
+      {
+        "merges": ["A1:B2", "D1:E1", "raro"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 4,
+          "r2": 0
+        },
+        "sale": ["raro"]
+      },
+      {
+        "merges": ["A1:B2"],
+        "rect": {
+          "c1": 1,
+          "r1": 1,
+          "c2": 1,
+          "r2": 1
+        },
+        "sale": []
+      }
+    ],
+    "hojas": [
+      {
+        "cells": {
+          "A1": "Título",
+          "B1": "",
+          "C1": "<b>x</b>",
+          "A2": "y",
+          "D1": "fuera"
+        },
+        "merges": ["A2:A3"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 0
+        },
+        "centrar": true,
+        "cubiertas": ["B1", "C1"],
+        "pierde": true,
+        "sale": {
+          "cells": {
+            "A1": "<div style=\"text-align: center;\">Título</div>",
+            "A2": "y",
+            "D1": "fuera"
+          },
+          "merges": ["A2:A3", "A1:C1"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 2,
+            "r2": 0
+          }
+        }
+      },
+      {
+        "cells": {
+          "A1": "Título",
+          "C1": "<b>x</b>"
+        },
+        "merges": null,
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 0
+        },
+        "centrar": false,
+        "cubiertas": ["C1"],
+        "pierde": true,
+        "sale": {
+          "cells": {
+            "A1": "Título"
+          },
+          "merges": ["A1:C1"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 2,
+            "r2": 0
+          }
+        }
+      },
+      {
+        "cells": {
+          "A1": "<div style=\"text-align: right;\"><b>5</b></div>",
+          "B2": "<i> </i>"
+        },
+        "merges": null,
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 1,
+          "r2": 1
+        },
+        "centrar": true,
+        "cubiertas": ["B2"],
+        "pierde": false,
+        "sale": {
+          "cells": {
+            "A1": "<div style=\"text-align: center;\"><b>5</b></div>"
+          },
+          "merges": ["A1:B2"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 1,
+            "r2": 1
+          }
+        }
+      },
+      {
+        "cells": {
+          "B1": "z"
+        },
+        "merges": null,
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 1,
+          "r2": 0
+        },
+        "centrar": true,
+        "cubiertas": ["B1"],
+        "pierde": true,
+        "sale": {
+          "cells": {},
+          "merges": ["A1:B1"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 1,
+            "r2": 0
+          }
+        }
+      },
+      {
+        "cells": {
+          "A1": "a",
+          "B1": "<b></b>",
+          "A9": "lejos"
+        },
+        "merges": ["B1:B3"],
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 1
+        },
+        "centrar": true,
+        "cubiertas": [],
+        "pierde": false,
+        "sale": {
+          "cells": {
+            "A1": "<div style=\"text-align: center;\">a</div>",
+            "B1": "<b></b>",
+            "A9": "lejos"
+          },
+          "merges": ["B1:B3", "A1:A2"],
+          "fusion": {
+            "c1": 0,
+            "r1": 0,
+            "c2": 0,
+            "r2": 1
+          }
+        }
+      },
+      {
+        "cells": {
+          "A1": "a"
+        },
+        "merges": null,
+        "rect": {
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 0
+        },
+        "centrar": true,
+        "cubiertas": [],
+        "pierde": false,
+        "sale": null
+      }
+    ]
+  },
+  "irA": {
+    "libro": {
+      "hojas": ["Hoja1", "Ventas 2026", "D'Ana", "Resumen", "Año"],
+      "activa": 0,
+      "nombres": [
+        {
+          "name": "Total",
+          "ref": "Hoja1!$B$20"
+        },
+        {
+          "name": "Datos",
+          "ref": "'Ventas 2026'!$A$1:$D$50"
+        },
+        {
+          "name": "IVA",
+          "ref": "0.21"
+        },
+        {
+          "name": "Suma",
+          "ref": "SUM(Hoja1!A1:A3)"
+        },
+        {
+          "name": "Zona",
+          "ref": "$C$3:$E$4"
+        },
+        {
+          "name": "Total",
+          "ref": "Resumen!$Z$9",
+          "sheet": "Resumen"
+        },
+        {
+          "name": "Local",
+          "ref": "$F$6",
+          "sheet": "Hoja1"
+        },
+        {
+          "name": "Lejos",
+          "ref": "$A$1",
+          "sheet": "Ventas 2026"
+        },
+        {
+          "name": "Columnas",
+          "ref": "Hoja1!$C:$D"
+        },
+        {
+          "name": "Rota",
+          "ref": "NoHay!$A$1"
+        },
+        {
+          "name": "Cierre",
+          "ref": "'Año'!$B$2:$B$13"
+        }
+      ]
+    },
+    "casos": [
+      {
+        "texto": "B12",
+        "sale": {
+          "hoja": 0,
+          "c1": 1,
+          "r1": 11,
+          "c2": 1,
+          "r2": 11
+        }
+      },
+      {
+        "texto": " b12 ",
+        "sale": {
+          "hoja": 0,
+          "c1": 1,
+          "r1": 11,
+          "c2": 1,
+          "r2": 11
+        }
+      },
+      {
+        "texto": "=C3",
+        "sale": {
+          "hoja": 0,
+          "c1": 2,
+          "r1": 2,
+          "c2": 2,
+          "r2": 2
+        }
+      },
+      {
+        "texto": "$A$1",
+        "sale": {
+          "hoja": 0,
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 0
+        }
+      },
+      {
+        "texto": "A1:C5",
+        "sale": {
+          "hoja": 0,
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 4
+        }
+      },
+      {
+        "texto": "C5:A1",
+        "sale": {
+          "hoja": 0,
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 4
+        }
+      },
+      {
+        "texto": "AA1000:AB1200",
+        "sale": {
+          "hoja": 0,
+          "c1": 26,
+          "r1": 999,
+          "c2": 27,
+          "r2": 1199
+        }
+      },
+      {
+        "texto": "'Ventas 2026'!A1:C5",
+        "sale": {
+          "hoja": 1,
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 4
+        }
+      },
+      {
+        "texto": "resumen!B2",
+        "sale": {
+          "hoja": 3,
+          "c1": 1,
+          "r1": 1,
+          "c2": 1,
+          "r2": 1
+        }
+      },
+      {
+        "texto": "'D''Ana'!H8",
+        "sale": {
+          "hoja": 2,
+          "c1": 7,
+          "r1": 7,
+          "c2": 7,
+          "r2": 7
+        }
+      },
+      {
+        "texto": "NoHay!A1",
+        "sale": {
+          "error": "hoja"
+        }
+      },
+      {
+        "texto": "Año!B2",
+        "sale": {
+          "hoja": 4,
+          "c1": 1,
+          "r1": 1,
+          "c2": 1,
+          "r2": 1
+        }
+      },
+      {
+        "texto": "año!b2:c3",
+        "sale": {
+          "hoja": 4,
+          "c1": 1,
+          "r1": 1,
+          "c2": 2,
+          "r2": 2
+        }
+      },
+      {
+        "texto": "'Año'!A1",
+        "sale": {
+          "hoja": 4,
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 0
+        }
+      },
+      {
+        "texto": "Cierre",
+        "sale": {
+          "hoja": 4,
+          "c1": 1,
+          "r1": 1,
+          "c2": 1,
+          "r2": 12
+        }
+      },
+      {
+        "texto": "A:C",
+        "sale": {
+          "hoja": 0,
+          "c1": 0,
+          "r1": 0,
+          "c2": 2,
+          "r2": 1048575
+        }
+      },
+      {
+        "texto": "3:5",
+        "sale": {
+          "hoja": 0,
+          "c1": 0,
+          "r1": 2,
+          "c2": 16383,
+          "r2": 4
+        }
+      },
+      {
+        "texto": "XFD1048576",
+        "sale": {
+          "hoja": 0,
+          "c1": 16383,
+          "r1": 1048575,
+          "c2": 16383,
+          "r2": 1048575
+        }
+      },
+      {
+        "texto": "XFE1",
+        "sale": {
+          "error": "fuera"
+        }
+      },
+      {
+        "texto": "A1048577",
+        "sale": {
+          "error": "fuera"
+        }
+      },
+      {
+        "texto": "Total",
+        "sale": {
+          "hoja": 0,
+          "c1": 1,
+          "r1": 19,
+          "c2": 1,
+          "r2": 19
+        }
+      },
+      {
+        "texto": "total",
+        "sale": {
+          "hoja": 0,
+          "c1": 1,
+          "r1": 19,
+          "c2": 1,
+          "r2": 19
+        }
+      },
+      {
+        "texto": "Datos",
+        "sale": {
+          "hoja": 1,
+          "c1": 0,
+          "r1": 0,
+          "c2": 3,
+          "r2": 49
+        }
+      },
+      {
+        "texto": "Zona",
+        "sale": {
+          "hoja": 0,
+          "c1": 2,
+          "r1": 2,
+          "c2": 4,
+          "r2": 3
+        }
+      },
+      {
+        "texto": "Local",
+        "sale": {
+          "hoja": 0,
+          "c1": 5,
+          "r1": 5,
+          "c2": 5,
+          "r2": 5
+        }
+      },
+      {
+        "texto": "Lejos",
+        "sale": {
+          "error": "nombre"
+        }
+      },
+      {
+        "texto": "'Ventas 2026'!Lejos",
+        "sale": {
+          "hoja": 1,
+          "c1": 0,
+          "r1": 0,
+          "c2": 0,
+          "r2": 0
+        }
+      },
+      {
+        "texto": "Resumen!Total",
+        "sale": {
+          "hoja": 3,
+          "c1": 25,
+          "r1": 8,
+          "c2": 25,
+          "r2": 8
+        }
+      },
+      {
+        "texto": "Resumen!Datos",
+        "sale": {
+          "error": "nombre"
+        }
+      },
+      {
+        "texto": "Columnas",
+        "sale": {
+          "hoja": 0,
+          "c1": 2,
+          "r1": 0,
+          "c2": 3,
+          "r2": 1048575
+        }
+      },
+      {
+        "texto": "IVA",
+        "sale": {
+          "error": "noRango"
+        }
+      },
+      {
+        "texto": "Suma",
+        "sale": {
+          "error": "noRango"
+        }
+      },
+      {
+        "texto": "Rota",
+        "sale": {
+          "error": "hoja"
+        }
+      },
+      {
+        "texto": "NoExiste",
+        "sale": {
+          "error": "nombre"
+        }
+      },
+      {
+        "texto": "",
+        "sale": {
+          "error": "vacio"
+        }
+      },
+      {
+        "texto": "   ",
+        "sale": {
+          "error": "vacio"
+        }
+      },
+      {
+        "texto": "A1 B2",
+        "sale": {
+          "error": "invalido"
+        }
+      },
+      {
+        "texto": "1+1",
+        "sale": {
+          "error": "invalido"
+        }
+      },
+      {
+        "texto": "Hoja1!",
+        "sale": {
+          "error": "invalido"
+        }
+      },
+      {
+        "texto": "#REF!",
+        "sale": {
+          "error": "invalido"
+        }
+      }
+    ],
+    "desdeResumen": [
+      {
+        "texto": "Total",
+        "sale": {
+          "hoja": 3,
+          "c1": 25,
+          "r1": 8,
+          "c2": 25,
+          "r2": 8
+        }
+      },
+      {
+        "texto": "Zona",
+        "sale": {
+          "hoja": 3,
+          "c1": 2,
+          "r1": 2,
+          "c2": 4,
+          "r2": 3
+        }
+      },
+      {
+        "texto": "Local",
+        "sale": {
+          "error": "nombre"
+        }
+      },
+      {
+        "texto": "B2",
+        "sale": {
+          "hoja": 3,
+          "c1": 1,
+          "r1": 1,
+          "c2": 1,
+          "r2": 1
+        }
+      }
+    ],
+    "nombres": [
+      {
+        "activa": 0,
+        "sale": ["Cierre", "Columnas", "Datos", "Local", "Total", "Zona"]
+      },
+      {
+        "activa": 3,
+        "sale": ["Cierre", "Columnas", "Datos", "Total", "Zona"]
+      }
+    ]
+  },
+  "medidas": {
+    "limites": {
+      "min": 4,
+      "anchoMax": 1790,
+      "altoMax": 545,
+      "aire": 10
+    },
+    "medidaDe": [
+      {
+        "i": 0,
+        "serie": 96,
+        "sale": 96
+      },
+      {
+        "medidas": {
+          "0": 150
+        },
+        "i": 0,
+        "serie": 96,
+        "sale": 150
+      },
+      {
+        "medidas": {
+          "0": 150
+        },
+        "i": 1,
+        "serie": 96,
+        "sale": 96
+      },
+      {
+        "medidas": {
+          "2": 3.9
+        },
+        "i": 2,
+        "serie": 96,
+        "sale": 96
+      },
+      {
+        "medidas": {
+          "2": 4
+        },
+        "i": 2,
+        "serie": 96,
+        "sale": 4
+      },
+      {
+        "medidas": {
+          "3": 5000
+        },
+        "i": 3,
+        "serie": 96,
+        "sale": 1790
+      },
+      {
+        "medidas": {
+          "3": 5000
+        },
+        "i": 3,
+        "serie": 24,
+        "tope": 545,
+        "sale": 545
+      },
+      {
+        "medidas": {
+          "1": 64.5
+        },
+        "i": 1,
+        "serie": 96,
+        "sale": 64.5
+      },
+      {
+        "medidas": {
+          "1": -3
+        },
+        "i": 1,
+        "serie": 24,
+        "tope": 545,
+        "sale": 24
+      }
+    ],
+    "geometrias": [
+      {
+        "colWidths": {
+          "0": 150,
+          "2": 64.5,
+          "4": 30,
+          "7": 5000,
+          "9": 2,
+          "x": 80
+        },
+        "rowHeights": {
+          "0": 32,
+          "3": 60,
+          "5": 12,
+          "8": 900
+        },
+        "ocultasCols": [],
+        "ocultasFilas": [],
+        "nCols": 12,
+        "nRows": 14,
+        "xs": [0, 39.9, 40, 189.9, 190, 286, 350.5, 351, 2500, 99999],
+        "ys": [24, 55.9, 56, 128, 200, 260, 1500, 99999],
+        "colX": [
+          40, 190, 286, 350.5, 446.5, 476.5, 572.5, 668.5, 2458.5, 2554.5, 2650.5, 2746.5, 2842.5
+        ],
+        "rowTop": [24, 56, 80, 104, 164, 188, 200, 224, 248, 793, 817, 841, 865, 889, 913],
+        "colEn": [0, 0, 0, 0, 1, 2, 3, 3, 8, 11],
+        "filaEn": [0, 0, 1, 3, 6, 8, 13, 13]
+      },
+      {
+        "colWidths": {
+          "1": 200,
+          "3": 50
+        },
+        "rowHeights": {
+          "1": 40,
+          "2": 48
+        },
+        "ocultasCols": [1, 5],
+        "ocultasFilas": [2, 3],
+        "nCols": 8,
+        "nRows": 10,
+        "xs": [40, 136, 231.9, 232, 282, 400, 700],
+        "ys": [24, 48, 88, 100, 200],
+        "colX": [40, 136, 136, 232, 282, 378, 378, 474, 570],
+        "rowTop": [24, 48, 88, 112, 136, 160, 184, 208, 232],
+        "colEn": [0, 2, 2, 3, 4, 6, 7],
+        "filaEn": [0, 1, 4, 4, 8]
+      },
+      {
+        "ocultasCols": [],
+        "ocultasFilas": [0],
+        "nCols": 4,
+        "nRows": 4,
+        "xs": [40, 136, 200],
+        "ys": [24, 48, 60],
+        "colX": [40, 136, 232, 328, 424],
+        "rowTop": [24, 48, 72, 96],
+        "colEn": [0, 1, 1],
+        "filaEn": [1, 2, 2]
+      }
+    ],
+    "leer": [
+      {
+        "valor": "120",
+        "sale": 120
+      },
+      {
+        "valor": "120px",
+        "sale": 120
+      },
+      {
+        "valor": "120,5",
+        "sale": 120.5
+      },
+      {
+        "valor": " 64.25 PX ",
+        "sale": 64.25
+      },
+      {
+        "valor": "auto",
+        "sale": "auto"
+      },
+      {
+        "valor": "AUTO",
+        "sale": "auto"
+      },
+      {
+        "valor": "",
+        "sale": null
+      },
+      {
+        "valor": "x",
+        "sale": null
+      },
+      {
+        "valor": "-3",
+        "sale": null
+      },
+      {
+        "valor": "12px3",
+        "sale": null
+      },
+      {
+        "valor": "1e3",
+        "sale": null
+      }
+    ],
+    "conMedidas": [
+      {
+        "indices": [0],
+        "px": 150,
+        "serie": 96,
+        "sale": {
+          "0": 150
+        }
+      },
+      {
+        "medidas": {
+          "0": 150
+        },
+        "indices": [0, 1],
+        "px": 96,
+        "serie": 96,
+        "sale": null
+      },
+      {
+        "medidas": {
+          "0": 150,
+          "3": 20
+        },
+        "indices": [3],
+        "px": null,
+        "serie": 96,
+        "sale": {
+          "0": 150
+        }
+      },
+      {
+        "medidas": {
+          "0": 150
+        },
+        "indices": [0],
+        "px": null,
+        "serie": 96,
+        "sale": null
+      },
+      {
+        "indices": [2],
+        "px": 1,
+        "serie": 96,
+        "sale": {
+          "2": 4
+        }
+      },
+      {
+        "indices": [2],
+        "px": 99999,
+        "serie": 24,
+        "tope": 545,
+        "sale": {
+          "2": 545
+        }
+      },
+      {
+        "indices": [5, 6],
+        "px": 30.5,
+        "serie": 24,
+        "tope": 545,
+        "sale": {
+          "5": 31,
+          "6": 31
+        }
+      },
+      {
+        "indices": [5],
+        "px": 30.49,
+        "serie": 24,
+        "tope": 545,
+        "sale": {
+          "5": 30
+        }
+      }
+    ],
+    "anchoAjustado": [
+      {
+        "anchos": [],
+        "sale": 96
+      },
+      {
+        "anchos": [0],
+        "sale": 96
+      },
+      {
+        "anchos": [12.3],
+        "sale": 23
+      },
+      {
+        "anchos": [12.3, 80, 41],
+        "sale": 90
+      },
+      {
+        "anchos": [5000],
+        "sale": 1790
+      },
+      {
+        "anchos": [-4, null],
+        "sale": 96
+      }
+    ],
+    "altoAjustado": [
+      {
+        "tamanos": [],
+        "sale": 24
+      },
+      {
+        "tamanos": [0],
+        "sale": 24
+      },
+      {
+        "tamanos": [8],
+        "sale": 24
+      },
+      {
+        "tamanos": [11, 18],
+        "sale": 38
+      },
+      {
+        "tamanos": [24, 10],
+        "sale": 48
+      },
+      {
+        "tamanos": [400],
+        "sale": 545
       }
     ]
   }

@@ -66,6 +66,10 @@ func desbordado(raiz fyne.CanvasObject, ancho float32) string {
 //
 // Con SYTUE_CAPTURA=/ruta deja las capturas para compararlas con la web a 360 px.
 func TestLasPantallasEnElMovil(t *testing.T) {
+	if conRaza {
+		t.Skip("el barrido de píxeles se ejecuta en el gate de capturas sin -race; las interacciones conservan el detector")
+	}
+
 	conVariante(t, tema.Claro)
 	pantallas := []string{"inicio", "explorar", "canal", "ver", "directo", "subir", "gestionar", "emitir"}
 	for _, pos := range posturasMovil {

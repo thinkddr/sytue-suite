@@ -1,14 +1,17 @@
-# Destino: PrestaShop (Tema Child de Hummingbird)
+<a id="destino-prestashop-tema-child-de-hummingbird"></a>
+# Destination: PrestaShop (Hummingbird Child Theme)
 
-Ficha técnica y normativa para la exportación de sitios a temas modernos de PrestaShop basados en Hummingbird.
+Technical and normative sheet for exporting sites to modern PrestaShop themes based on Hummingbird.
 
-## 1. Versiones y Herramientas
+<a id="1-versiones-y-herramientas"></a>
+## 1. Versions and Tools
 
-- Versión del tema: `{{v.prestashop_theme_version}}`
-- Versión de PrestaShop compatible: `{{v.prestashop_version}}`
-- Versión de tema padre Hummingbird: `{{v.prestashop_hummingbird_version}}`
+- Theme version: `{{v.prestashop_theme_version}}`
+- Compatible PrestaShop version: `{{v.prestashop_version}}`
+- Hummingbird parent theme version: `{{v.prestashop_hummingbird_version}}`
 
-## 2. Árbol de Directorios Permitido
+<a id="2-árbol-de-directorios-permitido"></a>
+## 2. Allowed Directory Tree
 
 ```text
 ├── config/
@@ -25,9 +28,10 @@ Ficha técnica y normativa para la exportación de sitios a temas modernos de Pr
 └── README.md
 ```
 
-## 3. Restricciones y Reglas de Exportación
+<a id="3-restricciones-y-reglas-de-exportación"></a>
+## 3. Export Restrictions and Rules
 
-- **Tema hijo de Hummingbird**: `config/theme.yml` declara obligatoriamente `parent: hummingbird` para garantizar compatibilidad con el estándar moderno de PrestaShop.
-- **Imagen de vista previa obligatoria**: `preview.png` se genera de forma determinista mediante `image/png` reflejando el color primario del sitio.
-- **Catálogo de productos**: Exportación en CSV listo para importación en el catálogo de PrestaShop.
-- **Plantillas Smarty**: Las plantillas en `templates/` heredan de los bloques principales de Hummingbird sin scripts externos arbitrarios.
+- **Hummingbird child theme**: `config/theme.yml` must declare `parent: hummingbird` to guarantee compatibility with the modern PrestaShop standard.
+- **Mandatory preview image**: `preview.png` is generated deterministically with `image/png`, reflecting the site's primary color.
+- **Product catalog**: CSV export ready to be imported into the PrestaShop catalog.
+- **Smarty templates**: The templates in `templates/` inherit from Hummingbird's main blocks with no arbitrary external scripts.

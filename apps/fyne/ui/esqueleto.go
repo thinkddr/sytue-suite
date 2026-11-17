@@ -36,17 +36,19 @@ import (
 // desaparece, y eso es `WidgetRenderer.Destroy`: un `canvas.Rectangle` suelto se lo
 // lleva el recolector con la animación todavía repintándolo.
 //
-// ponytail: una animación POR BLOQUE. Fyne las tica todas desde una sola goroutina, así
-// que nueve filas de Drive son nueve cierres en la lista del animador, no nueve hilos;
-// lo que cuesta de verdad es un `Refresh` por bloque y fotograma mientras se carga. Si
-// alguna vez hay una pantalla con cientos, lo que toca es un latido de paquete —una
-// animación y un registro de bloques vivos—, no quitar el pulso.
+// Una animación POR BLOQUE: Fyne las tica todas desde una sola goroutina, así que son
+// cierres en la lista del animador, no hilos. Para una LISTA de carga, que son decenas
+// de bloques, está `FilasEsqueleto`, que late a una con una sola animación.
 type Esqueleto struct {
 	widget.BaseWidget
 
 	// Ancho es el `width`. Cero es el `width: 100%` por defecto de Skeleton.tsx: el
 	// bloque no pide nada y se queda con lo que le dé su contenedor.
 	Ancho float32
+	// Fraccion es un `width` en porcentaje (`width="62%"`): el bloque ocupa esa parte
+	// del ancho que le dé su contenedor, pegado a la izquierda. Cero, o uno, es todo. Las
+	// líneas de un párrafo de carga necesitan anchos distintos o parecen una tabla.
+	Fraccion float32
 	// Alto es el `height`, que por defecto es `1rem`.
 	Alto float32
 	// Redondo es el `circle`: `rounded-full` en vez de `rounded-md`.
@@ -54,6 +56,10 @@ type Esqueleto struct {
 	// Radio es la clase `rounded-*` que quien lo usa pone ENCIMA de la de serie: las
 	// teselas de carga de la portada de Docus son `rounded-lg`. Cero es `rounded-md`.
 	Radio float32
+	// SoloArriba redondea solo las dos esquinas de arriba: el bloque que hace de banda
+	// de una tarjeta, que en la web va recortado por el `overflow-hidden rounded-lg`
+	// de la tarjeta y por abajo es recto.
+	SoloArriba bool
 	// Tinte es el token del relleno. Vacío es `bg-subtle`, que es el de la hoja; sobre
 	// el cromo oscuro del menú la web pide `sidebar-hover-bg`, porque ahí un gris claro
 	// sería un destello.
@@ -69,8 +75,8 @@ var (
 	_ fyne.Accessible = (*Esqueleto)(nil)
 )
 
-// AltoEsqueleto es el `height = '1rem'` por defecto de Skeleton.tsx. Con el rem de 14
-// son 14, no 16.
+// AltoEsqueleto es el `height = '1rem'` por defecto de Skeleton.tsx: 16 con el rem de
+// la suite.
 const AltoEsqueleto = tema.Rem
 
 // DuracionPulso es el `animation: sytue-skeleton-pulse 1600ms var(--ease-standard)
@@ -85,6 +91,14 @@ const OpacidadPulso float32 = 0.55
 func NuevoEsqueleto(ancho, alto float32) *Esqueleto {
 	e := &Esqueleto{Ancho: ancho, Alto: alto}
 	e.ExtendBaseWidget(e)
+	return e
+}
+
+// NuevoEsqueletoFraccion es el `<Skeleton width="NN%">`: una línea que ocupa esa parte
+// del ancho de su contenedor.
+func NuevoEsqueletoFraccion(fraccion, alto float32) *Esqueleto {
+	e := NuevoEsqueleto(0, alto)
+	e.Fraccion = fraccion
 	return e
 }
 
@@ -137,14 +151,20 @@ func opacidadPulso(p float32) float32 {
 // pinta lo mismo sobre `bg` que sobre una tarjeta, así que quien tiene que componer es
 // el pintor, con lo que de verdad haya debajo.
 func (e *Esqueleto) tinta() color.NRGBA {
-	tinte := e.Tinte
+	e.mu.Lock()
+	fase := e.fase
+	e.mu.Unlock()
+	return tintaEsqueleto(e.Tinte, fase)
+}
+
+// tintaEsqueleto es el relleno del token `tinte` (vacío es `bg-subtle`) en el instante
+// `fase` del pulso. La comparten el bloque suelto y las filas de carga.
+func tintaEsqueleto(tinte string, fase float32) color.NRGBA {
 	if tinte == "" {
 		tinte = "bg-subtle"
 	}
 	c := tema.Color(tinte, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
-	e.mu.Lock()
-	o := opacidadPulso(e.fase)
-	e.mu.Unlock()
+	o := opacidadPulso(fase)
 	if o >= 1 {
 		return c
 	}
@@ -162,11 +182,11 @@ func (e *Esqueleto) CreateRenderer() fyne.WidgetRenderer {
 	return r
 }
 
-// arrancar lanza el pulso. Con `SinMovimiento` el bloque se queda opaco: sigue diciendo
+// arrancar lanza el pulso. Con «menos movimiento» (MenosMovimiento) el bloque se queda opaco: sigue diciendo
 // «esto está cargando» con la forma, que es lo que hace la hoja con
 // `prefers-reduced-motion`.
 func (e *Esqueleto) arrancar(bloque *canvas.Rectangle) {
-	if SinMovimiento {
+	if MenosMovimiento() {
 		return
 	}
 	a := fyne.NewAnimation(DuracionPulso, func(p float32) {
@@ -203,7 +223,12 @@ type esqueletoRenderer struct {
 func (r *esqueletoRenderer) MinSize() fyne.Size           { return MedidaEsqueleto(r.e) }
 func (r *esqueletoRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.bloque} }
 func (r *esqueletoRenderer) Destroy()                     { r.e.Parar() }
-func (r *esqueletoRenderer) Layout(t fyne.Size)           { r.bloque.Resize(t) }
+func (r *esqueletoRenderer) Layout(t fyne.Size) {
+	if f := r.e.Fraccion; f > 0 && f < 1 {
+		t.Width = float32(int(t.Width*f + 0.5))
+	}
+	r.bloque.Resize(t)
+}
 
 func (r *esqueletoRenderer) Refresh() {
 	radio := tema.RadioMD
@@ -214,6 +239,11 @@ func (r *esqueletoRenderer) Refresh() {
 		radio = min(r.e.Ancho, MedidaEsqueleto(r.e).Height) / 2
 	}
 	r.bloque.CornerRadius = radio
+	r.bloque.TopLeftCornerRadius, r.bloque.TopRightCornerRadius = 0, 0
+	if r.e.SoloArriba && !r.e.Redondo {
+		r.bloque.CornerRadius = 0
+		r.bloque.TopLeftCornerRadius, r.bloque.TopRightCornerRadius = radio, radio
+	}
 	r.bloque.FillColor = r.e.tinta()
 	r.bloque.Refresh()
 }

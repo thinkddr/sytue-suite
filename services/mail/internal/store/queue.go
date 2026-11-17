@@ -86,6 +86,7 @@ func (s *Store) ClaimDue(ctx context.Context, limit int) ([]domain.OutboundMessa
 			WITH claimed AS (
 				SELECT id FROM outbound
 				WHERE state IN ('queued','deferred') AND hold = '' AND next_retry_at <= now()
+                  AND NOT mail_private_storage_frozen_account(outbound.tenant,outbound.account_id)
 				ORDER BY next_retry_at
 				FOR UPDATE SKIP LOCKED
 				LIMIT $1
@@ -279,6 +280,7 @@ func (s *Store) PromoteDueHeld(ctx context.Context, now time.Time, limit int, ge
 			SELECT id, tenant, account_id, mail_from, recipients, blob_key
 			FROM outbound
 			WHERE state = 'queued' AND hold <> '' AND next_retry_at <= $1
+              AND NOT mail_private_storage_frozen_account(outbound.tenant,outbound.account_id)
 			ORDER BY next_retry_at
 			FOR UPDATE SKIP LOCKED
 			LIMIT $2`, now.UTC(), limit)

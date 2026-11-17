@@ -5,7 +5,6 @@ package http
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,11 +30,6 @@ import (
 //
 // La verja es la sesión (RequireAuth + RequireTenant, que aplica el router). No
 // hay documento que autorizar porque el fichero lo aporta quien llama.
-
-// maxTamanoCampoJSON acota los campos de texto que llevan JSON (anotaciones,
-// valores de formulario). Sin tope, un cuerpo de pocos megas puede describir un
-// millón de objetos y el trabajo de construirlos no lo acota `MaxPDFBytes`.
-const maxTamanoCampoJSON = 8 << 20
 
 // prepararFormularioPDF hace el trabajo común: comprueba sesión, acota el cuerpo
 // y parsea el multipart.
@@ -99,22 +93,8 @@ func responderPDF(w http.ResponseWriter, entrada *domain.PDFDoc, salida []byte, 
 // de nivel «a» a «b» («rebajado»: censurar quita la estructura etiquetada).
 // Decisión del dueño (2026-10-15): solo la marca, si cumple, y avisando.
 func avisarPDFA(w http.ResponseWriter, entrada *domain.PDFDoc, salida []byte) {
-	if entrada == nil {
-		return
-	}
-	antes := entrada.DeclaraPDFA()
-	if antes == "" {
-		return
-	}
-	despues := ""
-	if d, err := domain.LeerPDF(salida); err == nil {
-		despues = d.DeclaraPDFA()
-	}
-	switch {
-	case despues == "":
-		w.Header().Set("X-Sytue-PDFA", "perdido")
-	case strings.HasSuffix(antes, "a") && strings.HasSuffix(despues, "b"):
-		w.Header().Set("X-Sytue-PDFA", "rebajado")
+	if change := domain.ArchivalChange(entrada, salida); change != "" {
+		w.Header().Set("X-Sytue-PDFA", change)
 	}
 }
 
@@ -131,145 +111,27 @@ func (h *Handler) pdfRender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer limpiarFormulario(r)
-
 	doc, err := unDocumento(r)
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
-	escala := 1.0
-	if s := strings.TrimSpace(r.FormValue("escala")); s != "" {
-		v, err := strconv.ParseFloat(s, 64)
-		if err != nil || v <= 0 || v > 16 {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The scale must be between 0 and 16."))
-			return
-		}
-		escala = v
+	fields := map[string]string{}
+	for _, key := range []string{"escala", "sin_anotaciones", "formato", "paginas", "pagina"} {
+		fields[key] = r.FormValue(key)
 	}
-	opts := domain.OpcionesRender{Escala: escala, SinAnotaciones: r.FormValue("sin_anotaciones") == "1"}
-
-	// `formato=png` entrega la MISMA página rasterizada. Es para el cliente que no
-	// tiene detrás un motor de SVG con texto —el escritorio Fyne—, y no cambia
-	// nada de lo de siempre: sin el campo, o con `svg`, sale el SVG con `<text>`,
-	// que es lo que la web necesita para seleccionar, buscar y leer en voz alta.
-	formato := strings.TrimSpace(r.FormValue("formato"))
-	if formato != "" && formato != "svg" && formato != "png" {
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(`The format must be "svg" or "png".`))
-		return
-	}
-	if formato == "png" {
-		h.pdfRenderPNG(w, r, doc, opts)
-		return
-	}
-
-	// Con `paginas` se devuelve un LOTE en JSON. El visor pide la ventana que se
-	// está mirando de una vez: sin esto, desplazarse por un documento de veinte
-	// megas lo vuelve a subir y a parsear en cada página.
-	if lista := strings.TrimSpace(r.FormValue("paginas")); lista != "" {
-		indices, err := parsearPaginas(lista, doc.NumPaginas())
-		if err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		if len(indices) > maxPaginasPorLote {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(fmt.Sprintf(
-				"Too many pages in a single batch (maximum %d).", maxPaginasPorLote,
-			)))
-			return
-		}
-		out := make(map[string]string, len(indices))
-		for _, i := range indices {
-			svg, err := doc.RenderizarPaginaSVG(i, opts)
-			if err != nil {
-				// Una página ilegible no tumba el lote: se devuelve sin ella y la
-				// interfaz enseña el hueco en vez de una pantalla de error.
-				continue
-			}
-			out[strconv.Itoa(i+1)] = svg
-		}
-		httpx.JSON(w, r, http.StatusOK, map[string]any{"paginas": out, "total": doc.NumPaginas()})
-		return
-	}
-
-	pagina, err := enteroOpcional(r.FormValue("pagina"), 1, doc.NumPaginas())
+	result, err := domain.RenderView(r.Context(), doc, fields)
 	if err != nil {
-		httpx.Fail(w, r, err)
+		httpx.Fail(w, r, errorDeDominio(err))
 		return
 	}
-	svg, err := doc.RenderizarPaginaSVG(pagina-1, opts)
-	if err != nil {
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("That page could not be drawn."))
-		return
-	}
-
-	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	// El SVG lleva texto del documento: sin esto, un navegador podría
-	// interpretarlo como HTML si algo lo sirviera con otro tipo.
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.WriteString(w, svg)
-}
-
-// maxPaginasPorLote acota cuántas páginas se rasterizan en un lote. Es MENOS
-// que en SVG: una A4 a ×2 son 8 MiB de mapa de bits mientras se dibuja, y veinte
-// a la vez en varias peticiones simultáneas se comen el servicio.
-const maxPaginasPNGPorLote = 8
-
-// pdfRenderPNG entrega la página rasterizada. Una imagen no se selecciona ni la
-// lee un lector de pantalla —por eso NO es la salida por defecto— pero se ve en
-// cualquier cliente, que es lo que el escritorio necesita.
-func (h *Handler) pdfRenderPNG(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc, opts domain.OpcionesRender) {
-	if lista := strings.TrimSpace(r.FormValue("paginas")); lista != "" {
-		indices, err := parsearPaginas(lista, doc.NumPaginas())
-		if err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		if len(indices) > maxPaginasPNGPorLote {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(fmt.Sprintf(
-				"Too many pages in a single batch (maximum %d).", maxPaginasPNGPorLote,
-			)))
-			return
-		}
-		out := make(map[string]string, len(indices))
-		for _, i := range indices {
-			datos, err := doc.RenderizarPaginaPNG(i, opts)
-			if err != nil {
-				// Una página que no cabe o no se deja dibujar no tumba el lote: la
-				// interfaz enseña el hueco, como con el SVG.
-				continue
-			}
-			out[strconv.Itoa(i+1)] = base64.StdEncoding.EncodeToString(datos)
-		}
-		httpx.JSON(w, r, http.StatusOK, map[string]any{
-			"paginas": out, "total": doc.NumPaginas(), "formato": "png",
-		})
-		return
-	}
-
-	pagina, err := enteroOpcional(r.FormValue("pagina"), 1, doc.NumPaginas())
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	datos, err := doc.RenderizarPaginaPNG(pagina-1, opts)
-	if err != nil {
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("That page could not be drawn."))
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Content-Length", strconv.Itoa(len(datos)))
+	w.Header().Set("Content-Type", result.ContentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(result.Data)))
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(datos)
+	_, _ = w.Write(result.Data)
 }
-
-// maxPaginasPorLote acota cuántas páginas se dibujan en una sola petición. Una
-// página compleja son cientos de kilobytes de SVG: veinte de golpe ya son varios
-// megas, y más que eso no cabe en ninguna ventana de visor.
-const maxPaginasPorLote = 20
 
 // pdfContenido atiende POST /api/v1/pdf/content: todo lo que la interfaz
 // necesita saber del documento en UNA llamada — páginas, texto, anotaciones,
@@ -289,20 +151,7 @@ func (h *Handler) pdfContenido(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	permisos := doc.PermisosDelDocumento()
-	httpx.JSON(w, r, http.StatusOK, map[string]any{
-		"paginas":     indiceDe(doc, doc.NumPaginas(), presupuestoExtractos),
-		"total":       doc.NumPaginas(),
-		"indice":      doc.IndiceDelDocumento(),
-		"enlaces":     doc.EnlacesDelDocumento(),
-		"adjuntos":    doc.AdjuntosDelDocumento(),
-		"anotaciones": doc.AnotacionesDelDocumento(),
-		"campos":      doc.CamposDelFormulario(),
-		"firmas":      doc.FirmasDelDocumento(),
-		"cifrado":     doc.EstaCifrado(),
-		"permisos":    permisos,
-		"huella":      doc.Huella(),
-	})
+	httpx.JSON(w, r, http.StatusOK, domain.Summary(doc, presupuestoExtractos))
 }
 
 // pdfAdjunto atiende POST /api/v1/pdf/attachment: saca un fichero incrustado.
@@ -367,29 +216,12 @@ func (h *Handler) pdfTexto(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	type fragmento struct {
-		Texto  string  `json:"texto"`
-		X      float64 `json:"x"`
-		Y      float64 `json:"y"`
-		Tamano float64 `json:"tamano"`
+	pages, err := domain.TextSpans(r.Context(), doc)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
 	}
-	paginas := make([][]fragmento, 0, doc.NumPaginas())
-	for i := 0; i < doc.NumPaginas(); i++ {
-		frags, err := doc.TextoDePagina(i)
-		if err != nil {
-			paginas = append(paginas, nil)
-			continue
-		}
-		out := make([]fragmento, 0, len(frags))
-		for _, f := range frags {
-			if strings.TrimSpace(f.Texto) == "" {
-				continue
-			}
-			out = append(out, fragmento{Texto: f.Texto, X: f.X, Y: f.Y, Tamano: f.Tamano})
-		}
-		paginas = append(paginas, out)
-	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"paginas": paginas})
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"paginas": pages})
 }
 
 // --- Anotar ------------------------------------------------------------------
@@ -408,11 +240,6 @@ func quienFirma(r *http.Request) string {
 	return claims.Email
 }
 
-// maxIndiceComentario acota el número de comentario que se acepta pedir. El
-// motor comprueba que exista de verdad; esto solo evita que un número absurdo
-// llegue a recorrer el documento entero.
-const maxIndiceComentario = 100000
-
 // pdfAnotar atiende POST /api/v1/pdf/annotate.
 //
 //	op          poner | borrar | aplanar
@@ -430,50 +257,10 @@ func (h *Handler) pdfAnotar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var salida []byte
-	switch op := strings.TrimSpace(r.FormValue("op")); op {
-	case "", "poner":
-		var anots []domain.Anotacion
-		if err := leerJSONDelFormulario(r, "anotaciones", &anots); err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		salida, err = domain.AnadirAnotacionesPDF(doc, anots)
-	case "borrar":
-		indices, err2 := listaDeEnteros(r.FormValue("indices"))
-		if err2 != nil {
-			httpx.Fail(w, r, err2)
-			return
-		}
-		salida, err = domain.BorrarAnotacionesPDF(doc, indices)
-	case "aplanar":
-		salida, err = domain.AplanarAnotacionesPDF(doc)
-	case "responder":
-		indice, err2 := enteroOpcional(r.FormValue("indice"), 1, maxIndiceComentario)
-		if err2 != nil {
-			httpx.Fail(w, r, err2)
-			return
-		}
-		// El índice llega 1-based como todo lo que ve el usuario; el motor cuenta
-		// desde 0. La conversión, en un solo sitio.
-		//
-		// El AUTOR sale de la sesión y no del formulario: si lo pusiera el cliente,
-		// cualquiera podría firmar una réplica con el nombre de otro, y en un
-		// documento de revisión eso es justo lo que no puede pasar.
-		salida, err = domain.ResponderAAnotacionPDF(doc, indice-1, r.FormValue("texto"), quienFirma(r))
-	case "marcar":
-		indice, err2 := enteroOpcional(r.FormValue("indice"), 1, maxIndiceComentario)
-		if err2 != nil {
-			httpx.Fail(w, r, err2)
-			return
-		}
-		salida, err = domain.MarcarComentarioPDF(doc, indice-1, r.FormValue("estado"), quienFirma(r))
-	default:
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(
-			fmt.Sprintf("%q is not a valid operation. Use poner, borrar, responder, marcar or aplanar.", op),
-		))
-		return
-	}
+	salida, err := domain.ApplyAnnotationOperation(doc, domain.AnnotationOperationInput{Fields: map[string]string{
+		"op": r.FormValue("op"), "anotaciones": r.FormValue("anotaciones"), "indices": r.FormValue("indices"),
+		"indice": r.FormValue("indice"), "texto": r.FormValue("texto"), "estado": r.FormValue("estado"),
+	}, Author: quienFirma(r)})
 	if err != nil {
 		httpx.Fail(w, r, errorDeDominio(err))
 		return
@@ -489,132 +276,48 @@ func (h *Handler) pdfAnotar(w http.ResponseWriter, r *http.Request) {
 //	         | exportar-datos | importar-datos   (XFDF, ISO 19444-1)
 //	valores  JSON {"nombre del campo": "valor"} (op=rellenar)
 //	campos   JSON [{tipo,nombre,pagina,rect,…}] (op=crear)
-//
-// pdfImportarDatos atiende el caso «importar-datos» de pdfFormulario: un XFDF
-// que se vuelca sobre el impreso. Va aparte porque encadena tres operaciones
-// —leer el fichero, interpretarlo y rellenar— y era el caso más largo del switch.
-func (h *Handler) pdfImportarDatos(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	datos, err := leerFicheroDelFormulario(r, "datos")
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	valores, err := domain.ImportarXFDF(datos)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	salida, err := domain.RellenarFormularioPDF(doc, valores)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	// Cuántos campos entraron: sin esto, importar un fichero de OTRO impreso
-	// —que no casa con ningún campo— se anuncia igual que uno que sí encajó.
-	w.Header().Set("X-Sytue-Campos-Importados", strconv.Itoa(len(valores)))
-	responderPDF(w, doc, salida, "formulario.pdf")
-}
-
 func (h *Handler) pdfFormulario(w http.ResponseWriter, r *http.Request) {
 	if !h.prepararFormularioPDF(w, r) {
 		return
 	}
 	defer limpiarFormulario(r)
-
 	doc, err := unDocumento(r)
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
-
-	// Una función por operación, igual que en `pdfEditar`: el despachador se lee
-	// de un vistazo y tocar una no obliga a leer las otras siete.
-	switch op := strings.TrimSpace(r.FormValue("op")); op {
-	case "", "leer":
-		httpx.JSON(w, r, http.StatusOK, map[string]any{"campos": doc.CamposDelFormulario()})
-	case "exportar-datos":
-		formExportarDatos(w, r, doc)
-	case "importar-datos":
-		h.pdfImportarDatos(w, r, doc)
-	case "detectar":
-		formDetectar(w, r, doc)
-	case "crear":
-		formCrear(w, r, doc)
-	case "rellenar":
-		formRellenar(w, r, doc)
-	case "aplanar":
-		formAplanar(w, r, doc)
-	default:
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(
-			fmt.Sprintf("%q is not a valid operation. Use leer, detectar, crear, rellenar, "+
-				"aplanar, exportar-datos or importar-datos.", op),
-		))
+	input := domain.FormOperationInput{Fields: map[string]string{}, Filename: nombreDelFicheroSubido(r)}
+	for _, field := range []string{"op", "pagina", "campos", "valores"} {
+		input.Fields[field] = r.FormValue(field)
 	}
-}
-
-func formExportarDatos(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	xfdf, err := doc.ExportarXFDF(nombreDelFicheroSubido(r))
+	if strings.TrimSpace(input.Fields["op"]) == "importar-datos" {
+		input.Data, err = leerFicheroDelFormulario(r, "datos")
+		if err != nil {
+			httpx.Fail(w, r, err)
+			return
+		}
+		input.DataProvided = true
+	}
+	result, err := domain.ApplyFormOperation(doc, input)
 	if err != nil {
 		httpx.Fail(w, r, errorDeDominio(err))
 		return
 	}
-	w.Header().Set("Content-Type", "application/vnd.adobe.xfdf")
-	w.Header().Set("Content-Length", strconv.Itoa(len(xfdf)))
+	if imported := domain.FormImportedFieldsHeader(result); imported != "" {
+		w.Header().Set("X-Sytue-Campos-Importados", imported)
+	}
+	if result.ContentType == "application/pdf" {
+		responderPDF(w, doc, result.Data, "formulario.pdf")
+		return
+	}
+	w.Header().Set("Content-Type", result.ContentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(result.Data)))
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Disposition", `attachment; filename="datos.xfdf"`)
+	if result.ContentType == "application/vnd.adobe.xfdf" {
+		w.Header().Set("Content-Disposition", `attachment; filename="datos.xfdf"`)
+	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(xfdf)
-}
-
-func formDetectar(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	pagina, err := enteroOpcional(r.FormValue("pagina"), 1, doc.NumPaginas())
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	props, err := doc.DetectarCamposPDF(pagina - 1)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"propuestas": props})
-}
-
-func formCrear(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	var campos []domain.CampoNuevo
-	if err := leerJSONDelFormulario(r, "campos", &campos); err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	salida, err := domain.AnadirCamposPDF(doc, campos)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	responderPDF(w, doc, salida, "formulario.pdf")
-}
-
-func formRellenar(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	var valores map[string]string
-	if err := leerJSONDelFormulario(r, "valores", &valores); err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	salida, err := domain.RellenarFormularioPDF(doc, valores)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	responderPDF(w, doc, salida, "formulario.pdf")
-}
-
-func formAplanar(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	salida, err := domain.AplanarFormularioPDF(doc)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	responderPDF(w, doc, salida, "formulario.pdf")
+	_, _ = w.Write(result.Data)
 }
 
 // --- Proteger ----------------------------------------------------------------
@@ -638,92 +341,18 @@ func (h *Handler) pdfProteger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var salida []byte
-	switch op := strings.TrimSpace(r.FormValue("op")); op {
-	case "proteger":
-		usuario, dueno := r.FormValue("usuario"), r.FormValue("dueno")
-		if usuario == "" && dueno == "" {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(
-				"Protecting needs at least one password.",
-			))
-			return
-		}
-		salida, err = domain.ProtegerPDF(doc, domain.OpcionesProteccion{
-			ContrasenaUsuario: usuario,
-			ContrasenaDueno:   dueno,
-			Permitir:          permisosDeLista(r.FormValue("permisos")),
-		})
-	case "desproteger":
-		salida, err = domain.DesprotegerPDF(doc)
-	case "metadatos":
-		var m domain.Metadatos
-		if err := leerJSONDelFormulario(r, "metadatos", &m); err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		salida, conXMP, err := domain.EditarMetadatosPDF(doc, m)
-		if err != nil {
-			httpx.Fail(w, r, errorDeDominio(err))
-			return
-		}
-		// Si el documento lleva XMP, el cambio puede NO verse: un lector moderno
-		// prefiere ese bloque, que aquí no se toca. Decirlo es la diferencia entre
-		// una limitación conocida y un cambio que se pierde en silencio.
-		if conXMP {
-			w.Header().Set("X-Sytue-Metadatos-Xmp", "1")
-		}
-		responderPDF(w, doc, salida, "documento.pdf")
-	case "sanear":
-		salida, err = domain.SanearMetadatosPDF(doc)
-	case "redactar":
-		var areas []domain.AreaRedaccion
-		if err := leerJSONDelFormulario(r, "areas", &areas); err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		salida, err = domain.RedactarPDF(doc, areas)
-	default:
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(
-			fmt.Sprintf("%q is not a valid operation. Use proteger, desproteger, metadatos, "+
-				"sanear or redactar.", op),
-		))
-		return
-	}
+	result, err := domain.ApplyProtectionOperation(doc, map[string]string{
+		"op": r.FormValue("op"), "usuario": r.FormValue("usuario"), "dueno": r.FormValue("dueno"),
+		"permisos": r.FormValue("permisos"), "metadatos": r.FormValue("metadatos"), "areas": r.FormValue("areas"),
+	})
 	if err != nil {
 		httpx.Fail(w, r, errorDeDominio(err))
 		return
 	}
-	responderPDF(w, doc, salida, "documento.pdf")
-}
-
-// permisosDeLista traduce «imprimir,copiar» a los permisos. Lo que no se nombra
-// se prohíbe: quien protege un documento espera que lo NO dicho quede fuera, no
-// dentro.
-func permisosDeLista(s string) domain.Permisos {
-	var p domain.Permisos
-	for _, x := range strings.Split(s, ",") {
-		switch strings.TrimSpace(strings.ToLower(x)) {
-		case "imprimir":
-			p.Imprimir = true
-		case "imprimir-alta":
-			p.ImprimirEnAlta = true
-		case "modificar":
-			p.Modificar = true
-		case "copiar":
-			p.Copiar = true
-		case "anotar":
-			p.Anotar = true
-		case "rellenar":
-			p.RellenarCampos = true
-		case "ensamblar":
-			p.Ensamblar = true
-		}
+	if result.UnchangedXMP {
+		w.Header().Set("X-Sytue-Metadatos-Xmp", "1")
 	}
-	// La accesibilidad NO es negociable: prohibir la extracción de texto para un
-	// lector de pantalla deja el documento fuera del alcance de quien lo necesita,
-	// y la propia especificación marcó ese bit como obsoleto por eso mismo.
-	p.Accesibilidad = true
-	return p
+	responderPDF(w, doc, result.Data, "documento.pdf")
 }
 
 // --- Firmar ------------------------------------------------------------------
@@ -851,77 +480,32 @@ func (h *Handler) pdfHerramientas(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch op {
-	case "comprimir":
-		nivel := domain.NivelCompresion(strings.TrimSpace(r.FormValue("nivel")))
-		switch nivel {
-		case domain.CompresionSinPerdida, domain.CompresionEquilibrada, domain.CompresionFuerte:
-		case "":
-			nivel = domain.CompresionEquilibrada
-		default:
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(
-				"The level must be sin-perdida, equilibrada or fuerte.",
-			))
-			return
-		}
-		salida, res, err := domain.ComprimirPDF(doc, nivel)
-		if err != nil {
-			httpx.Fail(w, r, errorDeDominio(err))
-			return
-		}
-		// El resultado va con su resumen en cabeceras: el cuerpo es el PDF, y sin
-		// ellas la interfaz no podría decir cuánto se ahorró.
-		w.Header().Set("X-Sytue-Bytes-Antes", strconv.Itoa(res.Antes))
-		w.Header().Set("X-Sytue-Bytes-Despues", strconv.Itoa(res.Despues))
-		w.Header().Set("X-Sytue-Ahorro", strconv.Itoa(res.Ahorro()))
-		responderPDF(w, doc, salida, "comprimido.pdf")
-
-	case "recortar":
-		margenes, err := cuatroReales(r.FormValue("margenes"))
-		if err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		salida, err := domain.RecortarPDF(doc, margenes)
-		if err != nil {
-			httpx.Fail(w, r, errorDeDominio(err))
-			return
-		}
-		responderPDF(w, doc, salida, "recortado.pdf")
-
-	case "archivo":
-		h.prepararArchivo(w, r, doc)
-
-	case "comprobar-archivo":
-		httpx.JSON(w, r, http.StatusOK, doc.ComprobarArchivo())
-
-	default:
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(fmt.Sprintf(
-			"%q is not a valid operation.", op,
-		)))
-	}
-}
-
-func (h *Handler) prepararArchivo(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	nivel := domain.PDFA2B
-	if strings.TrimSpace(r.FormValue("nivel")) == "2A" {
-		nivel = domain.PDFA2A
-	}
-	salida, err := domain.PrepararArchivoPDF(doc, domain.OpcionesArchivo{
-		Nivel:  nivel,
-		Idioma: strings.TrimSpace(r.FormValue("idioma")),
-		Titulo: strings.TrimSpace(r.FormValue("titulo")),
-		Autor:  strings.TrimSpace(r.FormValue("autor")),
+	result, err := domain.ApplyToolOperation(doc, map[string]string{
+		"op": op, "nivel": r.FormValue("nivel"), "margenes": r.FormValue("margenes"),
+		"idioma": r.FormValue("idioma"), "titulo": r.FormValue("titulo"), "autor": r.FormValue("autor"),
 	})
 	if err != nil {
-		// Negarse a declarar PDF/A es ACCIONABLE: el mensaje dice qué fuentes
-		// faltan por incrustar, que es lo que hay que arreglar.
-		httpx.Fail(w, r, httpx.ErrBadRequest.
-			WithMessage(err.Error()).
-			WithCode("pdf_archive_not_possible"))
+		httpx.Fail(w, r, errorDeDominio(err))
 		return
 	}
-	responderPDF(w, doc, salida, "archivo.pdf")
+	for name, value := range domain.ToolOperationHeaders(result) {
+		w.Header().Set(name, value)
+	}
+	if result.ContentType == "application/json" {
+		w.Header().Set("Content-Type", result.ContentType)
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(result.Data)
+		return
+	}
+	name := "archivo.pdf"
+	if op == "comprimir" {
+		name = "comprimido.pdf"
+	}
+	if op == "recortar" {
+		name = "recortado.pdf"
+	}
+	responderPDF(w, doc, result.Data, name)
 }
 
 // imagenesAPDF construye un PDF con una página por imagen enviada.
@@ -953,195 +537,60 @@ func (h *Handler) imagenesAPDF(w http.ResponseWriter, r *http.Request) {
 	responderPDF(w, nil, salida, "documento.pdf")
 }
 
-// cuatroReales lee «10,20,10,20».
-func cuatroReales(s string) ([4]float64, error) {
-	var out [4]float64
-	partes := strings.Split(s, ",")
-	if len(partes) != 4 {
-		return out, httpx.ErrBadRequest.WithMessage(
-			`Give four margins in points: "left,bottom,right,top".`,
-		)
-	}
-	for i, p := range partes {
-		v, err := strconv.ParseFloat(strings.TrimSpace(p), 64)
-		if err != nil || v < 0 || v > 10000 {
-			return out, httpx.ErrBadRequest.WithMessage(fmt.Sprintf("%q is not a valid margin.", p))
-		}
-		out[i] = v
-	}
-	return out, nil
-}
-
 // --- Editar el contenido (ola P5) --------------------------------------------
 
 // pdfEditar atiende POST /api/v1/pdf/edit.
 //
 //	op       analizar | texto | imagen | capas
-//	pagina   0-based (op=analizar, imagen)
+//	pagina   1-based (op=analizar, imagen)
 //	cambios  JSON con la lista de sustituciones (op=texto)
 //	id       nombre del XObject (op=imagen)
 //	visibles lista de identificadores de capa separados por comas (op=capas)
-//
-// pdfBuscarReemplazar atiende el caso «buscar-reemplazar» de pdfEditar. Sale a
-// una función propia porque son dos operaciones en una —listar coincidencias y
-// aplicarlas— y juntas hacían de `pdfEditar` un switch imposible de leer.
-func (h *Handler) pdfBuscarReemplazar(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	var b domain.BusquedaReemplazo
-	if err := leerJSONDelFormulario(r, "busqueda", &b); err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	// Sin `aplicar` solo se BUSCA: es lo que permite enseñar la lista, decir
-	// cuáles quedan apretadas y elegir, antes de tocar el documento.
-	if r.FormValue("aplicar") != "1" {
-		c, err := doc.BuscarParaReemplazar(b)
-		if err != nil {
-			httpx.Fail(w, r, errorDeDominio(err))
-			return
-		}
-		httpx.JSON(w, r, http.StatusOK, map[string]any{"coincidencias": c})
-		return
-	}
-	var elegidas []domain.Coincidencia
-	if r.FormValue("elegidas") != "" {
-		if err := leerJSONDelFormulario(r, "elegidas", &elegidas); err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-	}
-	salida, n, err := domain.ReemplazarEnDocumentoPDF(doc, b, elegidas)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	w.Header().Set("X-Sytue-Reemplazos", strconv.Itoa(n))
-	responderPDF(w, doc, salida, "documento.pdf")
-}
-
-// pdfSustituirImagen atiende el caso «imagen» de pdfEditar: cambiar una imagen
-// del documento o, sin fichero, quitarla.
-func (h *Handler) pdfSustituirImagen(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	pagina, err := enteroOpcional(r.FormValue("pagina"), 1, doc.NumPaginas())
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	id := strings.TrimSpace(r.FormValue("id"))
-	if id == "" {
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The image id is missing."))
-		return
-	}
-	// Sin fichero «imagen» se QUITA, que es una operación legítima y no un
-	// error: la interfaz ofrece las dos con el mismo botón.
-	var nueva []byte
-	if r.MultipartForm != nil && len(r.MultipartForm.File["imagen"]) > 0 {
-		nueva, err = leerFicheroDelFormulario(r, "imagen")
-		if err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-	}
-	salida, err := domain.SustituirImagenPDF(doc, pagina-1, id, nueva)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	responderPDF(w, doc, salida, "editado.pdf")
-}
-
 func (h *Handler) pdfEditar(w http.ResponseWriter, r *http.Request) {
 	if !h.prepararFormularioPDF(w, r) {
 		return
 	}
 	defer limpiarFormulario(r)
-
 	doc, err := unDocumento(r)
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
-
-	// Cada operación va en su función: juntas, el despachador crecía hasta ser
-	// ilegible y cambiar una obligaba a leer las cinco de alrededor.
-	switch op := strings.TrimSpace(r.FormValue("op")); op {
-	case "", "analizar":
-		editarAnalizar(w, r, doc)
-	case "texto":
-		editarTexto(w, r, doc)
-	case "buscar-reemplazar":
-		h.pdfBuscarReemplazar(w, r, doc)
-	case "imagen":
-		h.pdfSustituirImagen(w, r, doc)
-	case "capas":
-		editarCapas(w, r, doc)
-	case "indice":
-		editarIndice(w, r, doc)
-	default:
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(fmt.Sprintf(
-			"%q is not a valid operation. Use analizar, texto, buscar-reemplazar, imagen, capas or indice.", op,
-		)))
+	input := domain.EditOperationInput{Fields: map[string]string{}}
+	for _, name := range []string{"op", "pagina", "cambios", "busqueda", "aplicar", "elegidas", "id", "visibles", "marcadores"} {
+		input.Fields[name] = r.FormValue(name)
 	}
-}
-
-func editarAnalizar(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	pagina, err := enteroOpcional(r.FormValue("pagina"), 1, doc.NumPaginas())
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	analisis, err := doc.AnalizarEdicion(pagina - 1)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	httpx.JSON(w, r, http.StatusOK, analisis)
-}
-
-func editarTexto(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	var cambios []domain.CambioDeTexto
-	if err := leerJSONDelFormulario(r, "cambios", &cambios); err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	salida, err := domain.EditarTextoPDF(doc, cambios)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	responderPDF(w, doc, salida, "editado.pdf")
-}
-
-func editarCapas(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	visibles, err := listaDeEnteros(r.FormValue("visibles"))
-	if err != nil && strings.TrimSpace(r.FormValue("visibles")) != "" {
-		httpx.Fail(w, r, err)
-		return
-	}
-	salida, err2 := domain.CambiarCapasPDF(doc, visibles)
-	if err2 != nil {
-		httpx.Fail(w, r, errorDeDominio(err2))
-		return
-	}
-	responderPDF(w, doc, salida, "capas.pdf")
-}
-
-func editarIndice(w http.ResponseWriter, r *http.Request, doc *domain.PDFDoc) {
-	// Una lista vacía es LEGÍTIMA: es cómo se quita el índice que trae un
-	// documento mal generado. Por eso no se exige el campo, solo que si viene
-	// sea JSON válido.
-	var marcadores []domain.Marcador
-	if crudo := strings.TrimSpace(r.FormValue("marcadores")); crudo != "" {
-		if err := leerJSONDelFormulario(r, "marcadores", &marcadores); err != nil {
+	if strings.TrimSpace(input.Fields["op"]) == "imagen" && r.MultipartForm != nil && len(r.MultipartForm.File["imagen"]) > 0 {
+		input.Image, err = leerFicheroDelFormulario(r, "imagen")
+		if err != nil {
 			httpx.Fail(w, r, err)
 			return
 		}
+		defer clear(input.Image)
 	}
-	salida, err := domain.EscribirIndicePDF(doc, marcadores)
+	result, err := domain.ApplyEditOperation(doc, input)
 	if err != nil {
 		httpx.Fail(w, r, errorDeDominio(err))
 		return
 	}
-	responderPDF(w, doc, salida, "indice.pdf")
+	for name, value := range domain.EditOperationHeaders(result) {
+		w.Header().Set(name, value)
+	}
+	if result.ContentType == "application/json" {
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, r, http.StatusOK, json.RawMessage(result.Data))
+		return
+	}
+	name := "documento.pdf"
+	switch strings.TrimSpace(input.Fields["op"]) {
+	case "texto", "imagen":
+		name = "editado.pdf"
+	case "capas":
+		name = "capas.pdf"
+	case "indice":
+		name = "indice.pdf"
+	}
+	responderPDF(w, doc, result.Data, name)
 }
 
 // --- Capa de texto de un escaneo (ola P8) ------------------------------------
@@ -1505,19 +954,8 @@ func (h *Handler) pdfCompararVisual(w http.ResponseWriter, r *http.Request, a, b
 // «color» donde se espera «colour» merece enterarse, no que su anotación salga
 // negra sin motivo.
 func leerJSONDelFormulario(r *http.Request, campo string, destino any) error {
-	crudo := r.FormValue(campo)
-	if strings.TrimSpace(crudo) == "" {
-		return httpx.ErrBadRequest.WithMessage(fmt.Sprintf("The %q field is missing.", campo))
-	}
-	if len(crudo) > maxTamanoCampoJSON {
-		return errPayloadTooLarge
-	}
-	dec := json.NewDecoder(strings.NewReader(crudo))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(destino); err != nil {
-		return httpx.ErrBadRequest.WithMessage(
-			fmt.Sprintf("The %q field is not valid JSON: %v", campo, err),
-		)
+	if err := domain.DecodeOperationJSON(r.FormValue(campo), campo, destino); err != nil {
+		return errorDeDominio(err)
 	}
 	return nil
 }
@@ -1534,16 +972,12 @@ func nombreDelFicheroSubido(r *http.Request) string {
 		return ""
 	}
 	// El nombre lo pone el cliente: se queda el último tramo, sin rutas.
-	n := fs[0].Filename
-	if i := strings.LastIndexAny(n, `/\`); i >= 0 {
-		n = n[i+1:]
-	}
-	return n
+	return domain.UploadedDocumentName(fs[0].Filename)
 }
 
 // leerFicheroDelFormulario lee un fichero pequeño (un certificado, una clave).
 func leerFicheroDelFormulario(r *http.Request, campo string) ([]byte, error) {
-	const maxTamano = 256 << 10
+	const maxTamano = domain.MaxOperationFileBytes
 	if r.MultipartForm == nil {
 		return nil, httpx.ErrBadRequest.WithMessage(fmt.Sprintf("The %q file is missing.", campo))
 	}
@@ -1563,63 +997,10 @@ func leerFicheroDelFormulario(r *http.Request, campo string) ([]byte, error) {
 	return datos, nil
 }
 
-// listaDeEnteros lee «0,2,5» y devuelve los índices.
-func listaDeEnteros(s string) ([]int, error) {
-	var out []int
-	for _, trozo := range strings.Split(s, ",") {
-		trozo = strings.TrimSpace(trozo)
-		if trozo == "" {
-			continue
-		}
-		n, err := strconv.Atoi(trozo)
-		if err != nil || n < 0 {
-			return nil, httpx.ErrBadRequest.WithMessage(
-				fmt.Sprintf("%q is not a valid index.", trozo),
-			)
-		}
-		out = append(out, n)
-		if len(out) > maxPaginasPorPeticion {
-			return nil, httpx.ErrBadRequest.WithMessage("Too many items in a single request.")
-		}
-	}
-	if len(out) == 0 {
-		return nil, httpx.ErrBadRequest.WithMessage("No item was given.")
-	}
-	return out, nil
-}
-
 // errorDeDominio traduce los errores del motor a una respuesta de cliente. Casi
 // todos lo son —un rango que no existe, un certificado que no cuadra— y
 // devolverlos como 500 escondería la causa a quien puede arreglarla.
 func errorDeDominio(err error) error {
-	switch {
-	case errors.Is(err, domain.ErrCertificadoNoUsable):
-		return httpx.ErrBadRequest.
-			WithMessage("The certificate or the private key cannot be used to sign.").
-			WithCode("pdf_bad_certificate")
-	case errors.Is(err, domain.ErrCertificarFirmado):
-		return httpx.ErrBadRequest.
-			WithMessage("Only the first signature can certify the document.").
-			WithCode("pdf_certify_signed")
-	case errors.Is(err, domain.ErrFirmaNoCabe):
-		return httpx.ErrBadRequest.
-			WithMessage("The certificate chain is too long for the reserved signature space.").
-			WithCode("pdf_signature_too_large")
-	case errors.Is(err, domain.ErrInvalidaFirmas):
-		// 409 y no 400: la petición es correcta, pero guardarla destruiría las
-		// firmas. La interfaz lo pregunta y la repite con invalidar_firmas=1.
-		return httpx.ErrConflict.
-			WithMessage("Saving this change would invalidate the signatures of the document: " + err.Error()).
-			WithCode("pdf_invalidates_signatures")
-	case errors.Is(err, domain.ErrLetrasDesconocidas):
-		return httpx.ErrBadRequest.
-			WithMessage("The font of this text does not say which letters it uses, so it cannot be rewritten.").
-			WithCode("pdf_unknown_letters")
-	case errors.Is(err, domain.ErrPDFClaveIncorrecta):
-		return httpx.ErrBadRequest.
-			WithMessage("The password is not correct.").
-			WithCode("pdf_password_required")
-	default:
-		return httpx.ErrBadRequest.WithMessage(err.Error())
-	}
+	failure := domain.DescribeOperationError(err)
+	return httpx.NewError(failure.Status, failure.Code, failure.Message)
 }

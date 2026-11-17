@@ -3,7 +3,7 @@
  * (heartbeat + consulta agregada) vive en Sytue Hub; este proxy reenvia con el
  * access token de la sesion, que nunca llega al navegador.
  *   GET  /api/presence?subjects=a,b,c   -> Hub GET /api/v1/presence   -> {presence:[…]}
- *   PUT  /api/presence  {state,status}  -> Hub PUT /api/v1/presence   (heartbeat)
+ *   PUT  /api/presence  {state,status,tz} -> Hub PUT /api/v1/presence (heartbeat)
  */
 import type { APIRoute } from 'astro';
 import { serverEnv } from '@sytue/auth/server';
@@ -47,7 +47,7 @@ export const PUT: APIRoute = async (ctx) => {
   const session = await getApiSession(ctx);
   if (!session) return json({ error: 'unauthenticated' }, 401);
 
-  let payload: { state?: string; status?: string };
+  let payload: { state?: string; status?: string; tz?: unknown };
   try {
     payload = (await ctx.request.json()) as typeof payload;
   } catch {
@@ -62,7 +62,12 @@ export const PUT: APIRoute = async (ctx) => {
         'content-type': 'application/json',
         accept: 'application/json',
       },
-      body: JSON.stringify({ state: payload.state ?? 'online', status: payload.status ?? '' }),
+      body: JSON.stringify({
+        state: payload.state ?? 'online',
+        status: payload.status ?? '',
+        // La zona la valida el Hub; aquí solo se descarta lo que no es texto.
+        tz: typeof payload.tz === 'string' ? payload.tz.slice(0, 64) : '',
+      }),
     });
     if (!res.ok) return json({ error: 'hub_error', status: res.status }, 502);
     return json(await res.json());

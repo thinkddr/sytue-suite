@@ -3,7 +3,7 @@
  * trabajo y los ajustes.
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { expect, test, describe, beforeEach } from 'bun:test';
+import { expect, test, describe, beforeEach, afterEach } from 'bun:test';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { useState } from 'preact/hooks';
@@ -18,9 +18,19 @@ if (typeof document === 'undefined') {
   GlobalRegistrator.register();
 }
 
+const montados: HTMLElement[] = [];
+
+afterEach(() => {
+  while (montados.length > 0) {
+    render(null, montados.pop()!);
+  }
+  document.body.innerHTML = '';
+});
+
 function mount(children: VNode): HTMLElement {
   const host = document.createElement('div');
   document.body.appendChild(host);
+  montados.push(host);
   render(children, host);
   return host;
 }

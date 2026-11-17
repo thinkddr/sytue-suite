@@ -1,42 +1,46 @@
-# BLUEPRINT — Editor Sytue Docs (v1)
+<a id="blueprint--editor-sytue-docs-v1"></a>
 
-Especificación normativa para 14 constructores en paralelo (A1–A3, B1–B11).
-Este documento ES el contrato: las interfaces de §2–§5 se copian tal cual a
-`src/editor/types.ts` y ficheros indicados. Ante duda, gana el CONTRATO TÉCNICO
-del auditor (2026-07-03) y después este blueprint. No es código importable.
+# BLUEPRINT — Sytue Docs editor (v1)
+
+Normative specification for 14 builders working in parallel (A1–A3, B1–B11).
+This document IS the contract: the interfaces in §2–§5 are copied verbatim into
+`src/editor/types.ts` and the files indicated. When in doubt, the auditor's TECHNICAL CONTRACT
+(2026-07-03) wins, then this blueprint. It is not importable code.
 
 ---
 
-## 0. Reglas de oro
+<a id="0-reglas-de-oro"></a>
 
-1. **Clean-room estricto.** OnlyOffice es AGPL: PROHIBIDO copiar su código, CSS,
-   nombres de clases, iconos o assets. Aquí se replica la _experiencia_ descrita
-   en §6 con marca Sytue. Nada de mirar su repositorio.
-2. **Cada fichero tiene UN dueño** (§10). No toques ficheros de otro constructor.
-   PROHIBIDO tocar `src/components/{DocList,Shell,DocsEditor}.tsx`,
+## 0. Golden rules
+
+1. **Strict clean-room.** OnlyOffice is AGPL: it is FORBIDDEN to copy its code, CSS,
+   class names, icons or assets. Here we replicate the _experience_ described
+   in §6 with Sytue branding. Do not look at its repository at all.
+2. **Each file has ONE owner** (§10). Do not touch another builder's files.
+   It is FORBIDDEN to touch `src/components/{DocList,Shell,DocsEditor}.tsx`,
    `src/pages/api/{documents,create,collab}.ts`, `src/lib/{auth,token}.ts`,
-   `packages/ui` y cualquier cosa fuera de `apps/frontend/packages/office/`
-   (excepción: A1 edita `src/pages/edit.astro`; A2 crea rutas nuevas bajo
-   `src/pages/api/` y `src/lib/docsProxy.ts`; A1 puede añadir un spec en
-   `test/e2e/tests/`). Si un fichero ajeno cambia bajo tus pies, reléelo y
-   fusiona; JAMÁS reviertas trabajo ajeno. NO `git commit/push`.
-3. **Nada de fetch directo del navegador a `docs-api.sytue.localhost`** (no hay
-   CORS) y **nada de WebSocket** (el handshake del navegador recibe 401 —
-   verificado). Todo pasa por los proxies BFF same-origin de §4 y la
-   colaboración es _polling_ REST.
-4. **Sin dependencias nuevas.** Preact + `@sytue/ui` + Tailwind v4 ya instalados.
-   Iconos del editor: locales en `src/editor/icons.tsx` (§9).
-5. **Colores:** utilidades de token (`bg-surface`, `text-text`, `border-border`,
+   `packages/ui` and anything outside `apps/frontend/packages/office/`
+   (exception: A1 edits `src/pages/edit.astro`; A2 creates new routes under
+   `src/pages/api/` and `src/lib/docsProxy.ts`; A1 may add a spec in
+   `test/e2e/tests/`). If someone else's file changes under your feet, re-read it and
+   merge; NEVER revert someone else's work. NO `git commit/push`.
+3. **No direct fetch from the browser to `docs-api.sytue.localhost`** (there is no
+   CORS) and **no WebSocket** (the browser handshake gets a 401 —
+   verified). Everything goes through the same-origin BFF proxies in §4 and
+   collaboration is REST _polling_.
+4. **No new dependencies.** Preact + `@sytue/ui` + Tailwind v4 are already installed.
+   Editor icons: local, in `src/editor/icons.tsx` (§9).
+5. **Colors:** token utilities (`bg-surface`, `text-text`, `border-border`,
    `bg-bg-subtle`, `bg-selected`, `text-text-muted`, `text-text-subtle`,
-   `--sytue-focus-ring`…). Hex nuevos SOLO los declarados en `editor.css` (§8)
-   y las paletas de CONTENIDO de §5 (colores que el usuario aplica a su texto).
-6. **Accesibilidad AA:** todo icon-button con `aria-label` + `title`; toggles con
-   `aria-pressed`; pestañas con roles `tablist/tab/tabpanel` y flechas; estado
-   de guardado con `aria-live="polite"`; foco visible siempre
-   (el aro global o una variante `sytue-focus-ring*` de `@sytue/ui`; nunca
-   `outline:none` sin reemplazo, ni `focus-visible:shadow-[…]`, que no pinta).
-7. **Español correcto con tildes** en toda cadena visible y comentario.
-8. Cabecera SPDX en cada fichero nuevo, como el resto del repo:
+   `--sytue-focus-ring`…). New hex values ONLY those declared in `editor.css` (§8)
+   and the CONTENT palettes in §5 (colors the user applies to their text).
+6. **AA accessibility:** every icon-button with `aria-label` + `title`; toggles with
+   `aria-pressed`; tabs with `tablist/tab/tabpanel` roles and arrow keys; save
+   status with `aria-live="polite"`; focus always visible
+   (the global ring or a `sytue-focus-ring*` variant from `@sytue/ui`; never
+   `outline:none` without a replacement, nor `focus-visible:shadow-[…]`, which does not paint).
+7. **Correct Spanish with accents** in every visible string and comment.
+8. SPDX header in every new file, like the rest of the repo:
    ```
    /*
     * SPDX-License-Identifier: Apache-2.0
@@ -44,15 +48,17 @@ del auditor (2026-07-03) y después este blueprint. No es código importable.
     */
    ```
 9. Typecheck: `export PATH="/opt/homebrew/bin:/Users/ddr/.npm-global/bin:$PATH"`
-   y `(cd apps/frontend && bunx astro check --root packages/office)`. El check global
-   solo estará verde cuando A1, A3 y B5 hayan aterrizado; cada constructor
-   responde de que SUS ficheros no aporten errores propios.
-10. Atajos deliberados se marcan con comentario `// ponytail: …` indicando techo
-    y camino de mejora.
+   and `(cd apps/frontend && bunx astro check --root packages/office)`. The global check
+   will only be green once A1, A3 and B5 have landed; each builder
+   is responsible for ensuring that THEIR files do not contribute errors of their own.
+10. Deliberate shortcuts are marked with a `// ponytail: …` comment stating the ceiling
+    and the path to improvement.
 
 ---
 
-## 1. Estructura de ficheros (todo bajo `apps/frontend/packages/office/`)
+<a id="1-estructura-de-ficheros-todo-bajo-appsfrontendpackagesoffice"></a>
+
+## 1. File structure (everything under `apps/frontend/packages/office/`)
 
 ```
 src/editor/
@@ -99,14 +105,16 @@ src/pages/edit.astro              A1  monta EditorApp en vez de DocsEditor
 test/e2e/tests/docs-editor.spec.ts A1 humo Playwright (§11)
 ```
 
-`src/components/DocsEditor.tsx` queda sin montar; NO se borra (limpieza en otra
-fase). Orden de aterrizaje recomendado: A1 sube `types.ts` + `editor.css` de
-inmediato; A3 y B5 después; A1 integra `EditorApp.tsx` + `edit.astro` al final.
-Mientras tanto, todos codifican contra las interfaces de este documento.
+`src/components/DocsEditor.tsx` is left unmounted; it is NOT deleted (cleanup in a later
+phase). Recommended landing order: A1 pushes `types.ts` + `editor.css`
+immediately; A3 and B5 next; A1 integrates `EditorApp.tsx` + `edit.astro` at the end.
+In the meantime, everyone codes against the interfaces in this document.
 
 ---
 
-## 2. Contratos compartidos — `src/editor/types.ts` (íntegro, A1 lo pega tal cual)
+<a id="2-contratos-compartidos--srceditortypests-íntegro-a1-lo-pega-tal-cual"></a>
+
+## 2. Shared contracts — `src/editor/types.ts` (in full, A1 pastes it verbatim)
 
 ```ts
 /*
@@ -383,7 +391,7 @@ export interface EditorContext {
 }
 ```
 
-**Firma universal de zona y pestaña** (todas idénticas, sin excepción):
+**Universal zone and tab signature** (all identical, no exceptions):
 
 ```ts
 import type { JSX } from 'preact';
@@ -397,7 +405,7 @@ export function InicioTab({ ctx }: { ctx: EditorContext }): JSX.Element {
 // SheetCanvas, SlidesCanvas — todas reciben `{ ctx: EditorContext }`.
 ```
 
-`EditorLayout` es la única con props propias (slots):
+`EditorLayout` is the only one with its own props (slots):
 
 ```ts
 import type { ComponentChildren, JSX } from 'preact';
@@ -413,15 +421,17 @@ export interface EditorLayoutProps {
 export function EditorLayout(props: EditorLayoutProps): JSX.Element;
 ```
 
-`EditorApp` (raíz de isla): `export function EditorApp({ documentId }: { documentId: string }): JSX.Element`.
+`EditorApp` (island root): `export function EditorApp({ documentId }: { documentId: string }): JSX.Element`.
 
 ---
 
-## 3. API de comandos — `src/editor/canvas/exec.ts` (B5)
+<a id="3-api-de-comandos--srceditorcanvasexects-b5"></a>
 
-El HTML del lienzo ES el modelo. Implementación: `contenteditable` +
-`document.execCommand`, con fallbacks de `Selection`/`Range` donde execCommand
-no llega. Módulo sin componentes; API pública exacta:
+## 3. Command API — `src/editor/canvas/exec.ts` (B5)
+
+The canvas HTML IS the model. Implementation: `contenteditable` +
+`document.execCommand`, with `Selection`/`Range` fallbacks where execCommand
+falls short. Module without components; exact public API:
 
 ```ts
 import type { EditorCommand, FormatState } from '../types';
@@ -441,61 +451,67 @@ export function exec(command: EditorCommand, value?: string): void;
 export function getFormatState(): FormatState;
 ```
 
-Detalles internos obligatorios:
+Mandatory internal details:
 
-- **Memoria de selección:** listener módulo-global de `selectionchange`; si el
-  `anchorNode` está dentro del root, clona y guarda el `Range`. `exec()` lo
-  restaura cuando `document.activeElement` no está dentro del root. Así las
-  primitivas no gestionan selección.
-- Al registrar el root: `document.execCommand('styleWithCSS', false, 'true')`
-  (envuelto en try/catch), y `defaultParagraphSeparator` = `'p'`.
+- **Selection memory:** module-global `selectionchange` listener; if the
+  `anchorNode` is inside the root, it clones and stores the `Range`. `exec()`
+  restores it when `document.activeElement` is not inside the root. That way the
+  primitives do not manage selection.
+- When registering the root: `document.execCommand('styleWithCSS', false, 'true')`
+  (wrapped in try/catch), and `defaultParagraphSeparator` = `'p'`.
 
-### 3.1 Mapa de comandos
+<a id="31-mapa-de-comandos"></a>
 
-| Comando                            | Implementación                                                                                                                                                                                                                                                           |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| bold / italic / underline / strike | `execCommand('bold'\|'italic'\|'underline'\|'strikeThrough')`                                                                                                                                                                                                            |
-| font                               | `execCommand('fontName', false, value)`                                                                                                                                                                                                                                  |
-| size                               | `execCommand('fontSize', false, value)` con value `'1'..'7'` (§3.2)                                                                                                                                                                                                      |
-| color                              | `execCommand('foreColor', false, value)`                                                                                                                                                                                                                                 |
-| highlight                          | `execCommand('hiliteColor', …)`; si lanza, fallback `backColor`; `'transparent'` quita el resaltado                                                                                                                                                                      |
-| clearFormat                        | `execCommand('removeFormat')`                                                                                                                                                                                                                                            |
-| alignLeft/Center/Right/Justify     | `execCommand('justifyLeft'\|'justifyCenter'\|'justifyRight'\|'justifyFull')`                                                                                                                                                                                             |
-| listBullet / listNumber            | `execCommand('insertUnorderedList'\|'insertOrderedList')`                                                                                                                                                                                                                |
-| indent / outdent                   | `execCommand('indent'\|'outdent')`                                                                                                                                                                                                                                       |
-| lineHeight                         | Range: para cada bloque de `blocksInSelection()` (p, h1–h3, li, td), `style.lineHeight = value`                                                                                                                                                                          |
-| heading                            | `execCommand('formatBlock', false, value === 'p' ? '<P>' : '<H1>'…)`                                                                                                                                                                                                     |
-| insertTable                        | `execCommand('insertHTML')` con `<table><tbody>` de F filas × C columnas, cada celda `<td><br></td>`, seguido de `<p><br></p>`                                                                                                                                           |
-| insertImage                        | `execCommand('insertImage', false, dataUrl)`                                                                                                                                                                                                                             |
-| insertLink                         | `execCommand('createLink', false, url)` (solo con selección no colapsada; si está colapsada, insertHTML `<a href>url</a>`)                                                                                                                                               |
-| insertHr                           | `execCommand('insertHorizontalRule')`                                                                                                                                                                                                                                    |
-| insertToc                          | Escanea `h1,h2,h3` del root, asigna `id="h-<n>"` a los que no tengan, elimina `nav[data-toc]` previo e inserta en el cursor `<nav data-toc><p><b>Tabla de contenidos</b></p><ol><li data-level="…"><a href="#id">texto</a></li>…</ol></nav>`                             |
-| tableRow*/tableCol*/tableDel*      | Range: desde `anchorNode` → `closest('td')`/`closest('tr')`/`closest('table')` dentro del root; clona/inserta/elimina fila o columna por índice de celda; borrar la última fila/columna elimina la tabla; `tableDelete` elimina la tabla. Sin selección en tabla → no-op |
-| undo / redo                        | `execCommand('undo'\|'redo')` (historial nativo del contenteditable)                                                                                                                                                                                                     |
+### 3.1 Command map
+
+| Command                            | Implementation                                                                                                                                                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bold / italic / underline / strike | `execCommand('bold'\|'italic'\|'underline'\|'strikeThrough')`                                                                                                                                                                                                         |
+| font                               | `execCommand('fontName', false, value)`                                                                                                                                                                                                                               |
+| size                               | `execCommand('fontSize', false, value)` with value `'1'..'7'` (§3.2)                                                                                                                                                                                                  |
+| color                              | `execCommand('foreColor', false, value)`                                                                                                                                                                                                                              |
+| highlight                          | `execCommand('hiliteColor', …)`; if it throws, fall back to `backColor`; `'transparent'` removes the highlight                                                                                                                                                        |
+| clearFormat                        | `execCommand('removeFormat')`                                                                                                                                                                                                                                         |
+| alignLeft/Center/Right/Justify     | `execCommand('justifyLeft'\|'justifyCenter'\|'justifyRight'\|'justifyFull')`                                                                                                                                                                                          |
+| listBullet / listNumber            | `execCommand('insertUnorderedList'\|'insertOrderedList')`                                                                                                                                                                                                             |
+| indent / outdent                   | `execCommand('indent'\|'outdent')`                                                                                                                                                                                                                                    |
+| lineHeight                         | Range: for each block in `blocksInSelection()` (p, h1–h3, li, td), `style.lineHeight = value`                                                                                                                                                                         |
+| heading                            | `execCommand('formatBlock', false, value === 'p' ? '<P>' : '<H1>'…)`                                                                                                                                                                                                  |
+| insertTable                        | `execCommand('insertHTML')` with a `<table><tbody>` of R rows × C columns, each cell `<td><br></td>`, followed by `<p><br></p>`                                                                                                                                       |
+| insertImage                        | `execCommand('insertImage', false, dataUrl)`                                                                                                                                                                                                                          |
+| insertLink                         | `execCommand('createLink', false, url)` (only with a non-collapsed selection; if collapsed, insertHTML `<a href>url</a>`)                                                                                                                                             |
+| insertHr                           | `execCommand('insertHorizontalRule')`                                                                                                                                                                                                                                 |
+| insertToc                          | Scans the root's `h1,h2,h3`, assigns `id="h-<n>"` to those without one, removes any previous `nav[data-toc]` and inserts at the cursor `<nav data-toc><p><b>Tabla de contenidos</b></p><ol><li data-level="…"><a href="#id">texto</a></li>…</ol></nav>`               |
+| tableRow*/tableCol*/tableDel*      | Range: from `anchorNode` → `closest('td')`/`closest('tr')`/`closest('table')` within the root; clones/inserts/deletes a row or column by cell index; deleting the last row/column removes the table; `tableDelete` removes the table. No selection in a table → no-op |
+| undo / redo                        | `execCommand('undo'\|'redo')` (the contenteditable's native history)                                                                                                                                                                                                  |
 
 `// ponytail: execCommand está deprecado pero es interoperable y sin dependencias;
 // migrar a un modelo propio de Range solo si un navegador soportado lo retira.`
 
-### 3.2 Escala de tallas (UI ↔ execCommand)
+<a id="32-escala-de-tallas-ui--execcommand"></a>
+
+### 3.2 Size scale (UI ↔ execCommand)
 
 | UI (pt) | 8   | 10  | 12  | 14  | 18  | 24  | 36  |
 | ------- | --- | --- | --- | --- | --- | --- | --- |
 | value   | '1' | '2' | '3' | '4' | '5' | '6' | '7' |
 
-El select de talla del ribbon muestra los pt y envía `'1'..'7'`;
-`getFormatState().size` devuelve `'1'..'7'` (de `queryCommandValue('fontSize')`).
+The ribbon's size select shows the pt values and sends `'1'..'7'`;
+`getFormatState().size` returns `'1'..'7'` (from `queryCommandValue('fontSize')`).
 
 ### 3.3 getFormatState
 
-`queryCommandState` para bold/italic/underline/strikeThrough/insertUnorderedList/
-insertOrderedList/justify*; `queryCommandValue` para fontName (quitar comillas),
-fontSize y formatBlock (→ heading, por defecto 'p'); `queryCommandEnabled('undo'|'redo')`;
-`inTable` = ancestro `table` del anchorNode dentro del root. Todo en try/catch;
-sin selección dentro del root → devolver `EMPTY_FORMAT`.
+`queryCommandState` for bold/italic/underline/strikeThrough/insertUnorderedList/
+insertOrderedList/justify*; `queryCommandValue` for fontName (strip quotes),
+fontSize and formatBlock (→ heading, default 'p'); `queryCommandEnabled('undo'|'redo')`;
+`inTable` = `table` ancestor of the anchorNode within the root. Everything in try/catch;
+no selection inside the root → return `EMPTY_FORMAT`.
 
 ---
 
-## 4. Datos — `state/useDocument.ts` + proxies BFF (A2)
+<a id="4-datos--stateusedocumentts--proxies-bff-a2"></a>
+
+## 4. Data — `state/useDocument.ts` + BFF proxies (A2)
 
 ### 4.1 Helper `src/lib/docsProxy.ts`
 
@@ -511,37 +527,41 @@ export async function proxyDocs(
 ): Promise<Response>;
 ```
 
-Implementación: `bff.getSession(toBffContext(ctx))` → si falta,
+Implementation: `bff.getSession(toBffContext(ctx))` → if missing,
 `{"error":"unauthenticated"}` 401; `fetch(docsBaseUrl() + '/api/v1' + path, …)`
-con `authorization: Bearer <session.tokens.accessToken>`; devuelve `Response`
-con el MISMO status y el cuerpo textual (204 → cuerpo null),
+with `authorization: Bearer <session.tokens.accessToken>`; returns a `Response`
+with the SAME status and the text body (204 → null body),
 `content-type: application/json; charset=utf-8`, `cache-control: no-store`.
-**Todo parámetro interpolado en `path` pasa por `encodeURIComponent`** (frontera
-de confianza). `since`/`limit` se validan numéricos. `export const prerender = false;`
-en cada ruta.
+**Every parameter interpolated into `path` goes through `encodeURIComponent`** (trust
+boundary). `since`/`limit` are validated as numeric. `export const prerender = false;`
+in every route.
 
-### 4.2 Rutas BFF (mapeo exacto)
+<a id="42-rutas-bff-mapeo-exacto"></a>
 
-| Ruta BFF (same-origin)                                    | Upstream Go (`/api/v1`)                                                                                                                              |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/state?id=`                                      | `GET /documents/{id}/state`                                                                                                                          |
-| `POST /api/ops?id=` (body tal cual)                       | `POST /documents/{id}/ops`                                                                                                                           |
-| `GET /api/ops?id=&since=&limit=`                          | `GET /documents/{id}/ops?since=&limit=`                                                                                                              |
-| `POST /api/rename` body `{id,title}`                      | `PATCH /documents/{id}` body `{title}` → 204                                                                                                         |
-| `GET /api/comments?id=&resolved=`                         | `GET /documents/{id}/comments[?resolved=true]`                                                                                                       |
-| `POST /api/comments?id=` body `{body,parent_id?,anchor?}` | `POST /documents/{id}/comments` → 201                                                                                                                |
-| `PUT /api/comments?id=&commentId=` body `{resolved}`      | `PUT /documents/{id}/comments/{commentId}/resolve` → 204                                                                                             |
-| `DELETE /api/comments?id=&commentId=`                     | `DELETE /documents/{id}/comments/{commentId}` → 204                                                                                                  |
-| `GET /api/versions?id=&limit=`                            | `GET /documents/{id}/versions?limit=`                                                                                                                |
-| `POST /api/versions?id=` body `{label?}`                  | `POST /documents/{id}/versions` → 201                                                                                                                |
-| `POST /api/versions?id=&restore=<versionId>`              | `POST /documents/{id}/versions/{versionId}/restore`                                                                                                  |
-| `POST /api/export?id=` body `{format}`                    | `POST /documents/{id}/exports` → 201 `{export:{id}}`, luego `GET /documents/{id}/exports/{blobId}` → responde `{url,content_type,size_bytes,format}` |
+### 4.2 BFF routes (exact mapping)
 
-Falta `id` u otro parámetro obligatorio → `{"error":"missing_id"}` 400. Los
-cuerpos Go se reenvían VERBATIM (snake_case llega al cliente; los tipos de §2 lo
-reflejan). `/api/documents` (camelCase) y `/api/create` existentes NO se tocan.
+| BFF route (same-origin)                                   | Go upstream (`/api/v1`)                                                                                                                             |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/state?id=`                                      | `GET /documents/{id}/state`                                                                                                                         |
+| `POST /api/ops?id=` (body as-is)                          | `POST /documents/{id}/ops`                                                                                                                          |
+| `GET /api/ops?id=&since=&limit=`                          | `GET /documents/{id}/ops?since=&limit=`                                                                                                             |
+| `POST /api/rename` body `{id,title}`                      | `PATCH /documents/{id}` body `{title}` → 204                                                                                                        |
+| `GET /api/comments?id=&resolved=`                         | `GET /documents/{id}/comments[?resolved=true]`                                                                                                      |
+| `POST /api/comments?id=` body `{body,parent_id?,anchor?}` | `POST /documents/{id}/comments` → 201                                                                                                               |
+| `PUT /api/comments?id=&commentId=` body `{resolved}`      | `PUT /documents/{id}/comments/{commentId}/resolve` → 204                                                                                            |
+| `DELETE /api/comments?id=&commentId=`                     | `DELETE /documents/{id}/comments/{commentId}` → 204                                                                                                 |
+| `GET /api/versions?id=&limit=`                            | `GET /documents/{id}/versions?limit=`                                                                                                               |
+| `POST /api/versions?id=` body `{label?}`                  | `POST /documents/{id}/versions` → 201                                                                                                               |
+| `POST /api/versions?id=&restore=<versionId>`              | `POST /documents/{id}/versions/{versionId}/restore`                                                                                                 |
+| `POST /api/export?id=` body `{format}`                    | `POST /documents/{id}/exports` → 201 `{export:{id}}`, then `GET /documents/{id}/exports/{blobId}` → responds `{url,content_type,size_bytes,format}` |
 
-### 4.3 Hook `useDocument` — firma
+Missing `id` or another mandatory parameter → `{"error":"missing_id"}` 400. The
+Go bodies are forwarded VERBATIM (snake_case reaches the client; the types in §2
+reflect that). The existing `/api/documents` (camelCase) and `/api/create` are NOT touched.
+
+<a id="43-hook-usedocument--firma"></a>
+
+### 4.3 Hook `useDocument` — signature
 
 ```ts
 import type {
@@ -581,60 +601,64 @@ export interface UseDocumentResult {
 export function useDocument(documentId: string): UseDocumentResult;
 ```
 
-### 4.4 Algoritmo (contrato del auditor §5, obligatorio)
+<a id="44-algoritmo-contrato-del-auditor-5-obligatorio"></a>
 
-- **Carga:** en paralelo `GET /api/documents?id=` (meta camelCase) y
+### 4.4 Algorithm (auditor's contract §5, mandatory)
+
+- **Load:** in parallel `GET /api/documents?id=` (camelCase meta) and
   `GET /api/state?id=`. `content = String(state.registers[CONTENT_KEY[kind]]?.value ?? '')`,
   `lamport = state.state.lamport`, `lastSeq = seq`, `actor = crypto.randomUUID()`,
-  `counter = 0`, `contentEpoch = 1`. También `GET /api/comments?id=` (no bloquea
-  el `ready`). Cualquier fallo de meta/state → `status: 'error'`.
-- **Autosave:** `onContentInput(html)` guarda el HTML en un **ref** (¡no en
-  estado que re-renderice el lienzo!), pone `save='dirty'` y re-arma un debounce
-  de **1500 ms**. Al disparar: `save='saving'` y
+  `counter = 0`, `contentEpoch = 1`. Also `GET /api/comments?id=` (does not block
+  `ready`). Any meta/state failure → `status: 'error'`.
+- **Autosave:** `onContentInput(html)` stores the HTML in a **ref** (not in
+  state that re-renders the canvas!), sets `save='dirty'` and re-arms a debounce
+  of **1500 ms**. When it fires: `save='saving'` and
   `POST /api/ops?id=` body
   `{"ops":[{"kind":"set","dot":{"a":actor,"c":++counter},"key":CONTENT_KEY[kind],"value":html,"lamport":++lamport}]}`.
-  200 → `lastSeq = seq`, `save='saved'`, recalcular `words`
+  200 → `lastSeq = seq`, `save='saved'`, recompute `words`
   (`html.replace(/<[^>]+>/g,' ').trim().split(/\s+/).filter(Boolean).length`,
-  solo kind document; resto 0). Red/5xx → `save='error'` y reintento a los 5 s
-  (mismo cuerpo, MISMO counter/lamport no: recalcula `++counter`/`++lamport` en
-  cada intento para monotonicidad). 401 → `save='error'` sin reintento (chip
-  "Sesión caducada — recarga la página"). 4xx restantes → re-GET state una vez,
-  adoptar lamport/lastSeq y reintentar.
-- **Título:** `setTitle` optimista + debounce 800 ms → `POST /api/rename`
-  `{id,title}`; error → revertir + toast. Efecto aparte:
+  kind document only; otherwise 0). Network/5xx → `save='error'` and retry after 5 s
+  (same body; SAME counter/lamport, no: recompute `++counter`/`++lamport` on
+  each attempt for monotonicity). 401 → `save='error'` with no retry (chip
+  "Sesión caducada — recarga la página" (Session expired — reload the page)). Remaining 4xx → re-GET state once,
+  adopt lamport/lastSeq and retry.
+- **Title:** optimistic `setTitle` + 800 ms debounce → `POST /api/rename`
+  `{id,title}`; error → revert + toast. Separate effect:
   `document.title = \`${title} — Sytue Docs\``.
-- **Contenido (colaboración, sin WS):** cada **4000 ms**, solo con
+- **Content (collaboration, no WS):** every **4000 ms**, only when
   `document.visibilityState === 'visible'`: `GET /api/ops?id=&since=${lastSeq}`.
-  Por cada `SequencedOp`: `lastSeq = max(lastSeq, so.seq)`; si `so.actor !== actor`
-  y además `so.op.kind==='set' && so.op.key===CONTENT_KEY[kind] &&
-so.op.lamport > lamport` → **adoptar**: `lamport = so.op.lamport`,
-  `content = String(so.op.value)`, `contentEpoch++` — SOLO si `save==='saved'`
-  (si hay edición local en vuelo, gana el próximo autosave: LWW).
-- **Presencia REAL por conexión:** cada **10000 ms** `PUT /api/presence?id=`
-  `{conn: actor}`; el servicio Go registra la pestaña (TTL 30 s, en memoria) y
-  devuelve `{members:[{conn,sub}]}`. `peers` = miembros con `conn !== actor`,
-  deduplicados por `sub`. Cuenta al LECTOR PASIVO (abrir basta; no exige ops).
+  For each `SequencedOp`: `lastSeq = max(lastSeq, so.seq)`; if `so.actor !== actor`
+  and also `so.op.kind==='set' && so.op.key===CONTENT_KEY[kind] &&
+so.op.lamport > lamport` → **adopt**: `lamport = so.op.lamport`,
+  `content = String(so.op.value)`, `contentEpoch++` — ONLY if `save==='saved'`
+  (if there is a local edit in flight, the next autosave wins: LWW).
+- **REAL per-connection presence:** every **10000 ms** `PUT /api/presence?id=`
+  `{conn: actor}`; the Go service registers the tab (TTL 30 s, in memory) and
+  returns `{members:[{conn,sub}]}`. `peers` = members with `conn !== actor`,
+  deduplicated by `sub`. It counts the PASSIVE READER (opening is enough; no ops required).
   `// ponytail: adoptar recoloca el caret al principio; cursores finos llegarán con la migración a RGA.`
-- **flush():** si hay autosave pendiente,
+- **flush():** if there is a pending autosave,
   `navigator.sendBeacon('/api/ops?id='+id, new Blob([body], {type:'application/json'}))`
-  (cookies same-origin viajan). Registrar en `pagehide`.
-- **Comentarios:** `addComment` → `POST /api/comments?id=` `{body, anchor: null}`
-  (`// ponytail: anclas por carácter cuando haya RGA`); mutaciones re-consultan
-  la lista. **Versiones:** `loadVersions` bajo demanda; `createVersion` →
-  POST; `restoreVersion` → POST restore y después re-GET `/api/state` para
-  adoptar contenido/lamport/lastSeq con `contentEpoch++`. **exportAs** → POST
-  `/api/export` → `window.open(url, '_blank')`; error → toast "No se pudo exportar".
+  (same-origin cookies are sent). Register it on `pagehide`.
+- **Comments:** `addComment` → `POST /api/comments?id=` `{body, anchor: null}`
+  (`// ponytail: anclas por carácter cuando haya RGA`); mutations re-query
+  the list. **Versions:** `loadVersions` on demand; `createVersion` →
+  POST; `restoreVersion` → POST restore and then re-GET `/api/state` to
+  adopt content/lamport/lastSeq with `contentEpoch++`. **exportAs** → POST
+  `/api/export` → `window.open(url, '_blank')`; error → toast "No se pudo exportar" (Could not export).
 
-`EditorApp` (A1) compone: `useDocument` + estado local `ui`, `pageSetup`,
-`fmt` (listener `selectionchange` con throttle 100 ms → `getFormatState()` si la
-selección está en el root), `stats` (merge de `words` del hook con
-`reportStats` de los lienzos) → construye `ctx: EditorContext` y lo pasa a las
-zonas. Envuelve todo en `<ToastProvider>` de `@sytue/ui`. Estados `loading` /
-`error` como el DocsEditor actual (Spinner / EmptyState + botón a `/`).
+`EditorApp` (A1) composes: `useDocument` + local state `ui`, `pageSetup`,
+`fmt` (`selectionchange` listener throttled to 100 ms → `getFormatState()` if the
+selection is in the root), `stats` (merge of the hook's `words` with
+the canvases' `reportStats`) → builds `ctx: EditorContext` and passes it to the
+zones. It wraps everything in `@sytue/ui`'s `<ToastProvider>`. `loading` /
+`error` states like the current DocsEditor (Spinner / EmptyState + button to `/`).
 
 ---
 
-## 5. Primitivas del ribbon — `src/editor/ribbon/primitives.tsx` (A3)
+<a id="5-primitivas-del-ribbon--srceditorribbonprimitivestsx-a3"></a>
+
+## 5. Ribbon primitives — `src/editor/ribbon/primitives.tsx` (A3)
 
 ```ts
 import type { ComponentChildren, JSX } from 'preact';
@@ -713,8 +737,8 @@ export const HIGHLIGHT_PALETTE = [
 ] as const;
 ```
 
-Receta de clases del `RibbonButton` (uniformidad; el resto de primitivas en el
-mismo lenguaje):
+Class recipe for `RibbonButton` (for uniformity; the rest of the primitives use the
+same language):
 
 ```
 inline-flex h-7 w-7 items-center justify-center rounded-sm text-text-muted
@@ -723,62 +747,66 @@ disabled:pointer-events-none disabled:opacity-40
 sytue-focus-ring
 ```
 
-Cada muestra del ColorSwatch es un `<button aria-label="Color #F97316">` de
-20×20 con `border border-border` (y `check` sobre el color actual). Popover:
+Each ColorSwatch sample is a 20×20 `<button aria-label="Color #F97316">`
+with `border border-border` (and `check` over the current color). Popover:
 `absolute top-full mt-1 z-[var(--z-popover)] rounded-md border border-border
-bg-surface p-2 shadow-[var(--shadow-lg)]`; se cierra con Escape y clic fuera.
+bg-surface p-2 shadow-[var(--shadow-lg)]`; it closes on Escape and on an outside click.
 
 ---
 
-## 6. Blueprint visual por zona
+<a id="6-blueprint-visual-por-zona"></a>
 
-Contenedor raíz (`EditorLayout`): `class="sytue-editor flex h-full min-h-0
-flex-col bg-surface text-text"`. El editor vive bajo la topbar de la Shell
-(56px): `edit.astro` ya reserva `h-[calc(100vh-var(--spacing-topbar))]`.
-Estructura vertical: cabecera 48 · pestañas 32 · grupos 68 · [franja 40 |
-panel-izq 288? | lienzo flex-1 | ajustes 288?] · estado 28. Alturas/anchos
-salen de las vars de §8 (`h-[var(--editor-header-h)]`, etc.).
+## 6. Visual blueprint by zone
+
+Root container (`EditorLayout`): `class="sytue-editor flex h-full min-h-0
+flex-col bg-surface text-text"`. The editor lives under the Shell's topbar
+(56px): `edit.astro` already reserves `h-[calc(100vh-var(--spacing-topbar))]`.
+Vertical structure: header 48 · tabs 32 · groups 68 · [rail 40 |
+left panel 288? | canvas flex-1 | settings 288?] · status 28. Heights/widths
+come from the vars in §8 (`h-[var(--editor-header-h)]`, etc.).
 
 ### 6.1 EditorHeader (B2) — 48px, `bg-surface border-b border-border px-3 gap-2`
 
-De izquierda a derecha:
+From left to right:
 
-1. Botón volver (`chevronLeft`, aria-label "Volver a tus documentos", href `/`).
-2. **Título editable**: `<input id="editor-title-input" aria-label="Título del
-documento">` sin borde (`bg-transparent text-sm font-semibold text-text
+1. Back button (`chevronLeft`, aria-label "Volver a tus documentos" (Back to your documents), href `/`).
+2. **Editable title**: `<input id="editor-title-input" aria-label="Título del
+documento">` without a border (`bg-transparent text-sm font-semibold text-text
 hover:bg-bg-subtle focus:bg-bg-subtle rounded-sm px-1.5 h-7 max-w-[360px]`),
-   `value={ctx.title}`, onInput → `ctx.setTitle`. Enter/blur confirman.
-3. **Chip de guardado** `aria-live="polite"` (`text-xs text-text-muted`):
-   saved → "Guardado" (punto `bg-success`) · saving → "Guardando…"
-   (`bg-warning`) · dirty → "Cambios sin guardar" (`bg-warning`) · error →
-   "Error al guardar" (`bg-danger`).
+   `value={ctx.title}`, onInput → `ctx.setTitle`. Enter/blur confirm.
+3. **Save chip** `aria-live="polite"` (`text-xs text-text-muted`):
+   saved → "Guardado" (Saved; `bg-success` dot) · saving → "Guardando…" (Saving…)
+   (`bg-warning`) · dirty → "Cambios sin guardar" (Unsaved changes; `bg-warning`) · error →
+   "Error al guardar" (Error saving; `bg-danger`).
 4. `flex-1`.
-5. **Colaboradores**: círculos 24px solapados (máx. 4, `-ml-1.5`,
-   `rounded-full bg-bg-subtle border border-border text-[10px]`) con
-   `peer.sub.slice(0,2).toUpperCase()` y `title="Colaborador conectado"`.
+5. **Collaborators**: overlapping 24px circles (max. 4, `-ml-1.5`,
+   `rounded-full bg-bg-subtle border border-border text-[10px]`) with
+   `peer.sub.slice(0,2).toUpperCase()` and `title="Colaborador conectado"`.
    `// ponytail: nombres reales cuando exista lookup de identidad.`
-6. **Compartir**: `Button variant="primary" size="sm"` → popover propio:
-   texto "Solo pueden abrirlo usuarios con permiso." + botón "Copiar enlace"
-   (`navigator.clipboard.writeText(location.href)` + toast "Enlace copiado").
+6. **Share**: `Button variant="primary" size="sm"` → its own popover:
+   text "Solo pueden abrirlo usuarios con permiso." (Only users with permission can open it.) + button "Copiar enlace" (Copy link)
+   (`navigator.clipboard.writeText(location.href)` + toast "Enlace copiado" (Link copied)).
    `// ponytail: permisos finos y enlaces de invitado en fase 2 (API ya existe).`
-7. **Descargar**: `Dropdown` de `@sytue/ui` (`Button variant="secondary"
+7. **Download**: `@sytue/ui` `Dropdown` (`Button variant="secondary"
 size="sm"` + `download`): MenuItems "PDF", "HTML", "Markdown", "ODF (.odt)",
    "OOXML (.docx)" → `ctx.exportAs('pdf'|'html'|'markdown'|'odf'|'ooxml')`.
 
-### 6.2 Ribbon (B7) — pestañas 32px + grupos 68px
+<a id="62-ribbon-b7--pestañas-32px--grupos-68px"></a>
 
-**Tira de pestañas** (`h-[var(--editor-tabs-h)] bg-surface border-b
+### 6.2 Ribbon (B7) — tabs 32px + groups 68px
+
+**Tab strip** (`h-[var(--editor-tabs-h)] bg-surface border-b
 border-border px-2 flex items-end gap-1`, `role="tablist"`
-aria-label "Cinta de opciones"): primera "posición" es **Archivo** (NO es tab:
-botón que abre `Dropdown` con "Descargar como PDF/HTML/Markdown", "Guardar
-versión", "Renombrar" (foco a `#editor-title-input`), "Volver a Documentos"
-(href `/`)). Después las pestañas reales, filtradas por kind.
+aria-label "Cinta de opciones" (Ribbon)): the first “position” is **Archivo** (File; it is NOT a tab:
+a button that opens a `Dropdown` with "Descargar como PDF/HTML/Markdown" (Download as PDF/HTML/Markdown), "Guardar
+versión" (Save version), "Renombrar" (Rename; focuses `#editor-title-input`), "Volver a Documentos" (Back to Documents)
+(href `/`)). Then the real tabs, filtered by kind.
 
-> **Vigente desde cinta-4 (2026-10-02):** la lista de pestañas y los tipos en que se
-> ven viven en `pestanas.json` (copia de `apps/nucleo/office/pestanas.json`); Inicio y
-> Revisar siempre, Insertar y Diseño en documento y presentación, Datos y Fórmulas en la
-> hoja, Presentar en las diapositivas. El bloque de abajo es el de la primera versión
-> y se conserva como historia.
+> **In force since cinta-4 (2026-10-02):** the list of tabs and the kinds in which they
+> are shown live in `pestanas.json` (a copy of `apps/nucleo/office/pestanas.json`); Inicio (Home) and
+> Revisar (Review) always, Insertar (Insert) and Diseño (Design) in document and presentation, Datos (Data) and Fórmulas (Formulas) in the
+> spreadsheet, Presentar (Present) in slides. The block below is the one from the first version
+> and is kept as history.
 
 ```ts
 const TABS = [
@@ -807,249 +835,267 @@ const TABS = [
 ```
 
 Tab: `role="tab" aria-selected` · `text-sm px-3 h-full text-text-muted
-hover:text-text` · activa: `text-text font-medium` + subrayado 2px
-`bg-accent` (naranja de marca) pegado al borde inferior. Flechas ←/→ mueven
-la pestaña activa (foco roving), Home/End extremos. Estado `useState` local
-(inicial `'inicio'`).
+hover:text-text` · active: `text-text font-medium` + 2px underline
+`bg-accent` (brand orange) attached to the bottom edge. ←/→ arrows move
+the active tab (roving focus), Home/End to the ends. Local `useState` state
+(initially `'inicio'`).
 
-**Fila de grupos** (`h-[var(--editor-groups-h)] bg-surface border-b
+**Groups row** (`h-[var(--editor-groups-h)] bg-surface border-b
 border-border px-2 flex items-stretch overflow-x-auto`, `role="tabpanel"`):
-renderiza `<Body ctx={ctx}/>` de la pestaña activa. Los tabs componen
-`RibbonGroup` + `RibbonSeparator` entre grupos.
+renders the active tab's `<Body ctx={ctx}/>`. The tabs compose
+`RibbonGroup` + `RibbonSeparator` between groups.
 
-### 6.3 Contenido de cada pestaña
+<a id="63-contenido-de-cada-pestaña"></a>
 
-**Inicio (B8):**
+### 6.3 Contents of each tab
 
-1. Grupo "Deshacer": `undo` (Ctrl+Z, disabled `!fmt.canUndo`), `redo` (Ctrl+Y,
+**Inicio (Home) (B8):**
+
+1. Group "Deshacer" (Undo): `undo` (Ctrl+Z, disabled `!fmt.canUndo`), `redo` (Ctrl+Y,
    disabled `!fmt.canRedo`).
-2. Grupo "Fuente": RibbonSelect fuente (Inter, Arial, Georgia, Times New Roman,
-   Courier New, JetBrains Mono; width 132; value `fmt.font` si coincide) ·
-   RibbonSelect talla (§3.2, width 64) · `bold` (Ctrl+B, active `fmt.bold`) ·
-   `italic` (Ctrl+I) · `underline` (Ctrl+U) · `strike` (Ctrl+Mayús+X) ·
-   ColorSwatch texto (`exec('color', c)`) · ColorSwatch resaltado
+2. Group "Fuente" (Font): font RibbonSelect (Inter, Arial, Georgia, Times New Roman,
+   Courier New, JetBrains Mono; width 132; value `fmt.font` if it matches) ·
+   size RibbonSelect (§3.2, width 64) · `bold` (Ctrl+B, active `fmt.bold`) ·
+   `italic` (Ctrl+I) · `underline` (Ctrl+U) · `strike` (Ctrl+Mayús+X, i.e. Ctrl+Shift+X) ·
+   text ColorSwatch (`exec('color', c)`) · highlight ColorSwatch
    (HIGHLIGHT_PALETTE, `exec('highlight', c)`) · `clearFormat`.
-3. Grupo "Párrafo": `alignLeft/Center/Right/Justify` (active según `fmt.align`)
-   · `listBullet`/`listNumber` (active) · `outdent`/`indent` · RibbonSelect
-   interlineado (1 / 1,15 / 1,5 / 2 → `exec('lineHeight', v)`, width 64).
-4. Grupo "Estilos" (oculto si `kind==='spreadsheet'`): RibbonSelect (Texto
-   normal / Título 1 / Título 2 / Título 3 → `exec('heading', v)`, value
+3. Group "Párrafo" (Paragraph): `alignLeft/Center/Right/Justify` (active according to `fmt.align`)
+   · `listBullet`/`listNumber` (active) · `outdent`/`indent` · line spacing
+   RibbonSelect (1 / 1,15 / 1,5 / 2 → `exec('lineHeight', v)`, width 64).
+4. Group "Estilos" (Styles; hidden if `kind==='spreadsheet'`): RibbonSelect (Texto
+   normal / Título 1 / Título 2 / Título 3 (Normal text / Heading 1 / Heading 2 / Heading 3) → `exec('heading', v)`, value
    `fmt.heading`, width 132).
 
-**Insertar (B9):**
+**Insertar (Insert) (B9):**
 
-1. "Tabla": botón `table` que abre popover propio con rejilla 6×6 de celdas
-   16×16 (hover marca F×C y rótulo "3 × 4"; clic → `exec('insertTable','3x4')`;
-   mousedown preventDefault en todo el popover; Escape cierra).
-2. "Imagen": botón `image` + `<input type="file" accept="image/*" hidden>` →
-   FileReader → dataURL; si `dataUrl.length > 1_500_000` → toast "Imagen
-   demasiado grande (máx. ~1 MB)" y no insertar (el documento entero viaja en
-   cada autosave); si ok → `exec('insertImage', dataUrl)`.
-3. "Enlace": botón `link` → `window.prompt('URL del enlace:')` → si no vacío,
+1. "Tabla" (Table): `table` button that opens its own popover with a 6×6 grid of
+   16×16 cells (hover marks R×C and a "3 × 4" label; click → `exec('insertTable','3x4')`;
+   mousedown preventDefault on the whole popover; Escape closes).
+2. "Imagen" (Image): `image` button + `<input type="file" accept="image/*" hidden>` →
+   FileReader → dataURL; if `dataUrl.length > 1_500_000` → toast "Imagen
+   demasiado grande (máx. ~1 MB)" (Image too large (max. ~1 MB)) and do not insert (the whole document travels on
+   every autosave); if ok → `exec('insertImage', dataUrl)`.
+3. "Enlace" (Link): `link` button → `window.prompt('URL del enlace:')` → if not empty,
    `exec('insertLink', url)`.
-4. "Separador": botón `hr` → `exec('insertHr')`.
-5. "Comentario": botón `comment` → `ctx.setUi({ panel: 'comentarios' })`.
+4. "Separador" (Separator): `hr` button → `exec('insertHr')`.
+5. "Comentario" (Comment): `comment` button → `ctx.setUi({ panel: 'comentarios' })`.
 
-**Disposición (B10):** "Márgenes" RibbonSelect (Estrecho 48 / Normal 96 /
-Ancho 128 → `setPageSetup({margin})`) · "Orientación" botones `pagePortrait`/
-`pageLandscape` (active según `pageSetup.landscape`) · "Sangría"
-`outdent`/`indent` · "Interlineado" select como Inicio.
+**Disposición (Layout) (B10):** "Márgenes" (Margins) RibbonSelect (Estrecho 48 / Normal 96 /
+Ancho 128 (Narrow / Normal / Wide) → `setPageSetup({margin})`) · "Orientación" (Orientation) buttons `pagePortrait`/
+`pageLandscape` (active according to `pageSetup.landscape`) · "Sangría" (Indent)
+`outdent`/`indent` · "Interlineado" (Line spacing) select as in Inicio.
 
-**Referencias (B9):** "Tabla de contenidos" botón `toc` → `exec('insertToc')`
-(re-ejecutar la regenera) · "Vínculos" botón `link` (como Insertar) ·
-"Comentario" botón `comment`.
+**Referencias (References) (B9):** "Tabla de contenidos" (Table of contents) button `toc` → `exec('insertToc')`
+(running it again regenerates it) · "Vínculos" (Links) button `link` (as in Insertar) ·
+"Comentario" button `comment`.
 
-**Colaboración (B10):**
+**Colaboración (Collaboration) (B10):**
 
-1. "Comentarios": `comment` "Añadir comentario" (abre panel) · toggle
-   "Mostrar comentarios" (active `ui.panel==='comentarios'`).
-2. "Versiones": botón `history` "Guardar versión" →
-   `window.prompt('Etiqueta de la versión (opcional):')`; null → cancelar; →
-   `ctx.createVersion(label || undefined)` + toast "Versión guardada" ·
-   `Dropdown` "Historial" que al abrir llama `ctx.loadVersions()` y lista
-   MenuItems "`label ?? 'Versión'` — fecha local" → `confirm('¿Restaurar esta
+1. "Comentarios" (Comments): `comment` "Añadir comentario" (Add comment; opens the panel) · toggle
+   "Mostrar comentarios" (Show comments; active `ui.panel==='comentarios'`).
+2. "Versiones" (Versions): `history` button "Guardar versión" (Save version) →
+   `window.prompt('Etiqueta de la versión (opcional):')`; null → cancel; →
+   `ctx.createVersion(label || undefined)` + toast "Versión guardada" (Version saved) ·
+   `Dropdown` "Historial" (History) which on opening calls `ctx.loadVersions()` and lists
+   MenuItems "`label ?? 'Versión'` — local date" → `confirm('¿Restaurar esta
 versión? El estado actual se conserva en el historial.')` →
    `ctx.restoreVersion(id)` + toast.
-3. "Compartir": botón `share` → copia `location.href` + toast (como cabecera).
+3. "Compartir" (Share): `share` button → copies `location.href` + toast (as in the header).
 
-**Vista (B10):** "Zoom": `minus` (−10) · RibbonSelect con presets 50 / 75 /
-100 / 125 / 150 / 200 % (si el zoom actual no es un preset, muestra el más
-cercano) · `plus` (+10), clamp 50..200 → `setUi({zoom})` · "Mostrar": toggle `ruler`
-"Regla" (solo kind document; active `ui.ruler`) · toggle `panelRight` "Panel de
-ajustes" (active `ui.settingsOpen`).
+**Vista (View) (B10):** "Zoom": `minus` (−10) · RibbonSelect with presets 50 / 75 /
+100 / 125 / 150 / 200 % (if the current zoom is not a preset, it shows the
+nearest one) · `plus` (+10), clamp 50..200 → `setUi({zoom})` · "Mostrar" (Show): toggle `ruler`
+"Regla" (Ruler; kind document only; active `ui.ruler`) · toggle `panelRight` "Panel de
+ajustes" (Settings panel; active `ui.settingsOpen`).
 
-### 6.4 LeftRail (B3) — franja 40px + panel 288px
+<a id="64-leftrail-b3--franja-40px--panel-288px"></a>
 
-Franja: `w-[var(--editor-rail-w)] bg-surface border-r border-border flex
-flex-col items-center gap-1 py-2`. Tres botones 32×32 (`search` "Buscar",
-`outline` "Esquema del documento", `comment` "Comentarios"; active
-`bg-selected` + `aria-pressed`): clic alterna `setUi({ panel: x | null })`.
+### 6.4 LeftRail (B3) — 40px rail + 288px panel
 
-Panel (si `ui.panel`): `w-[var(--editor-panel-w)] bg-surface border-r
-border-border flex flex-col min-h-0`, `role="complementary"` con aria-label;
-cabecera h-10 (`text-sm font-semibold px-3` + botón `close`); cuerpo
+Rail: `w-[var(--editor-rail-w)] bg-surface border-r border-border flex
+flex-col items-center gap-1 py-2`. Three 32×32 buttons (`search` "Buscar" (Search),
+`outline` "Esquema del documento" (Document outline), `comment` "Comentarios"; active
+`bg-selected` + `aria-pressed`): a click toggles `setUi({ panel: x | null })`.
+
+Panel (if `ui.panel`): `w-[var(--editor-panel-w)] bg-surface border-r
+border-border flex flex-col min-h-0`, `role="complementary"` with aria-label;
+h-10 header (`text-sm font-semibold px-3` + `close` button); body
 `overflow-y-auto`:
 
-- **Buscar:** input (`Input` de `@sytue/ui`, aria-label "Buscar en el
-  documento", debounce 300 ms) + contador "3 de 7" + botones anterior/
-  siguiente (Enter = siguiente). Implementación: TreeWalker de nodos de texto
-  del root (`getEditorRoot()`), `indexOf` case-insensitive → lista de Ranges;
-  seleccionar el activo (`selection.addRange`) + `scrollIntoView({block:'center'})`.
-  Sin resultados → "Sin coincidencias".
-- **Esquema:** lista de `h1,h2,h3` del root (indentación por nivel:
-  `pl-2/4/6`; `text-sm`, hover `bg-bg-subtle`); clic → `scrollIntoView`.
-  Se refresca al abrir y en cada transición de `ctx.save` a `'saved'`. Vacío →
-  "Añade títulos para ver el esquema".
-- **Comentarios:** tarjetas (`rounded-md border border-border p-2`): autor
-  (`author_sub.slice(0,8)`), fecha local, cuerpo, botón "Resolver"/"Reabrir"
-  (`check`) y `trash` "Eliminar" (403 → toast). Resueltos con `opacity-60`.
-  Abajo textarea + `Button size="sm"` "Comentar" (disabled vacío) →
+- **Search:** input (`@sytue/ui` `Input`, aria-label "Buscar en el
+  documento" (Search in the document), 300 ms debounce) + counter "3 de 7" (3 of 7) + previous/next
+  buttons (Enter = next). Implementation: TreeWalker over the root's text nodes
+  (`getEditorRoot()`), case-insensitive `indexOf` → list of Ranges;
+  select the active one (`selection.addRange`) + `scrollIntoView({block:'center'})`.
+  No results → "Sin coincidencias" (No matches).
+- **Outline:** list of the root's `h1,h2,h3` (indentation by level:
+  `pl-2/4/6`; `text-sm`, hover `bg-bg-subtle`); click → `scrollIntoView`.
+  It refreshes on opening and on every transition of `ctx.save` to `'saved'`. Empty →
+  "Añade títulos para ver el esquema" (Add headings to see the outline).
+- **Comments:** cards (`rounded-md border border-border p-2`): author
+  (`author_sub.slice(0,8)`), local date, body, "Resolver"/"Reabrir" (Resolve/Reopen) button
+  (`check`) and `trash` "Eliminar" (Delete) (403 → toast). Resolved ones with `opacity-60`.
+  At the bottom a textarea + `Button size="sm"` "Comentar" (Comment; disabled when empty) →
   `ctx.addComment`.
 
-### 6.5 Lienzo + regla (B6) — kind `document`
+<a id="65-lienzo--regla-b6--kind-document"></a>
 
-Zona central: `flex-1 min-w-0 overflow-auto` con
-`background: var(--editor-canvas-bg)`. Dentro, un wrapper centrado con
-`style="zoom: ctx.ui.zoom / 100"` que contiene regla y página (así escalan
-juntas).
+### 6.5 Canvas + ruler (B6) — kind `document`
 
-- **Página**: `class="sytue-page"` (estilos en §8), `contentEditable`,
+Central zone: `flex-1 min-w-0 overflow-auto` with
+`background: var(--editor-canvas-bg)`. Inside, a centered wrapper with
+`style="zoom: ctx.ui.zoom / 100"` that contains the ruler and the page (so they scale
+together).
+
+- **Page**: `class="sytue-page"` (styles in §8), `contentEditable`,
   `role="textbox" aria-multiline="true"` `aria-label={ctx.title}` `lang="es"`,
-  `spellcheck`. Dimensiones vía style: ancho `794px` (apaisado `1123px`),
-  `min-height 1123px` (apaisado `794px`), `padding: pageSetup.margin px`,
-  `margin: 32px auto`. Fondo SIEMPRE blanco (papel), sombra
-  `var(--editor-page-shadow)`, sin borde.
-- **Ciclo de datos**: al montar → `setEditorRoot(el)`;
+  `spellcheck`. Dimensions via style: width `794px` (landscape `1123px`),
+  `min-height 1123px` (landscape `794px`), `padding: pageSetup.margin px`,
+  `margin: 32px auto`. Background ALWAYS white (paper), shadow
+  `var(--editor-page-shadow)`, no border.
+- **Data cycle**: on mount → `setEditorRoot(el)`;
   `useEffect([ctx.contentEpoch])` → `el.innerHTML = ctx.content ||
-'<p><br></p>'`; `onInput` → `ctx.onContentInput(el.innerHTML)`. Desmontar →
-  `setEditorRoot(null)`. El contenido NO pasa por estado Preact por tecla
-  (el caret sobrevive).
-- **Atajos** (`onKeyDown`, `metaKey||ctrlKey`): B/I/U → `exec('bold'|…)` +
-  preventDefault; Mayús+X → strike. Z/Y se dejan al historial nativo.
-- **Estadísticas**: en input (throttle 500 ms) y scroll:
+'<p><br></p>'`; `onInput` → `ctx.onContentInput(el.innerHTML)`. On unmount →
+  `setEditorRoot(null)`. Content does NOT go through Preact state on every keystroke
+  (the caret survives).
+- **Shortcuts** (`onKeyDown`, `metaKey||ctrlKey`): B/I/U → `exec('bold'|…)` +
+  preventDefault; Mayús+X (Shift+X) → strike. Z/Y are left to the native history.
+- **Statistics**: on input (500 ms throttle) and scroll:
   `pages = max(1, ceil(el.offsetHeight / altoPágina))`,
   `page = clamp(floor(scrollTop / (altoPágina · zoom/100)) + 1, 1, pages)` →
   `ctx.reportStats({pages, page})`.
   `// ponytail: folio continuo que crece; paginación visual real (cortes) en fase 2.`
-- **Ruler (B6, mismo dueño)**: visible si `ui.ruler && kind==='document'`;
-  `height: var(--editor-ruler-h)`, mismo ancho que la página, `sticky top-0`
-  dentro del wrapper. Un `<svg>` con ticks: mayor cada cm (número `8px
-text-text-subtle`), medio cada 0,5 cm (px/cm = anchoPágina/21 — apaisado /29,7).
-  Zonas de margen sombreadas (`--editor-ruler-margin`), dos triangulitos
-  estáticos marcando la sangría en los márgenes.
+- **Ruler (B6, same owner)**: visible if `ui.ruler && kind==='document'`;
+  `height: var(--editor-ruler-h)`, same width as the page, `sticky top-0`
+  inside the wrapper. An `<svg>` with ticks: major every cm (number `8px
+text-text-subtle`), medium every 0.5 cm (px/cm = page width/21 — landscape /29.7).
+  Shaded margin zones (`--editor-ruler-margin`), two small static
+  triangles marking the indent on the margins.
   `// ponytail: marcadores no arrastrables; drag de sangría en fase 2.`
 
-### 6.6 SettingsPanel (B4) — 288px derecha
+<a id="66-settingspanel-b4--288px-derecha"></a>
 
-Visible si `ui.settingsOpen`. `w-[var(--editor-panel-w)] bg-surface border-l
+### 6.6 SettingsPanel (B4) — 288px right
+
+Visible if `ui.settingsOpen`. `w-[var(--editor-panel-w)] bg-surface border-l
 border-border overflow-y-auto`, `role="complementary"`
-aria-label "Ajustes". Cabecera h-10: "Ajustes de tabla" si `fmt.inTable`,
-si no "Ajustes de párrafo"; botón `close` → `setUi({settingsOpen:false})`.
+aria-label "Ajustes" (Settings). h-10 header: "Ajustes de tabla" (Table settings) if `fmt.inTable`,
+otherwise "Ajustes de párrafo" (Paragraph settings); `close` button → `setUi({settingsOpen:false})`.
 
-- **Sección Párrafo** (siempre): "Interlineado" (`Select` de `@sytue/ui` →
-  `exec('lineHeight', v)`) · "Alineación" (4 RibbonButtons, active por
-  `fmt.align`) · "Sangría" (outdent/indent).
-- **Sección Tabla** (solo `fmt.inTable`, encima de Párrafo): filas de botón
-  ancho completo (h-8, icono + texto, `hover:bg-bg-subtle rounded-sm`):
-  "Insertar fila encima/debajo" (`rowAbove/rowBelow`), "Insertar columna a la
-  izquierda/derecha" (`colLeft/colRight`), "Eliminar fila" / "Eliminar
-  columna" / "Eliminar tabla" (`trash`, esta última `text-danger`) → comandos
-  `table*` de §3.
+- **Paragraph section** (always): "Interlineado" (Line spacing; `@sytue/ui` `Select` →
+  `exec('lineHeight', v)`) · "Alineación" (Alignment; 4 RibbonButtons, active according to
+  `fmt.align`) · "Sangría" (Indent; outdent/indent).
+- **Table section** (only `fmt.inTable`, above Paragraph): full-width button
+  rows (h-8, icon + text, `hover:bg-bg-subtle rounded-sm`):
+  "Insertar fila encima/debajo" (Insert row above/below; `rowAbove/rowBelow`), "Insertar columna a la
+  izquierda/derecha" (Insert column left/right; `colLeft/colRight`), "Eliminar fila" / "Eliminar
+  columna" / "Eliminar tabla" (Delete row / column / table; `trash`, the last one `text-danger`) → the
+  `table*` commands in §3.
   `// ponytail: sin espaciado antes/después ni anchos de columna en v1.`
 
 ### 6.7 StatusBar (B1) — 28px
 
 `h-[var(--editor-status-h)] bg-surface border-t border-border px-3 flex
-items-center gap-4 text-xs text-text-muted`. Izquierda según kind:
-document → "Página {page} de {pages}" · "Palabras: {words}" · "Español
-(España)"; spreadsheet → "Hoja {page} de {pages}"; presentation →
-"Diapositiva {page} de {pages}". Derecha (`ml-auto flex items-center gap-1`):
-botón `minus` "Reducir" (−10) · `<input type="range" min="50" max="200"
+items-center gap-4 text-xs text-text-muted`. Left side depending on kind:
+document → "Página {page} de {pages}" (Page {page} of {pages}) · "Palabras: {words}" (Words) · "Español
+(España)" (Spanish (Spain)); spreadsheet → "Hoja {page} de {pages}" (Sheet … of …); presentation →
+"Diapositiva {page} de {pages}" (Slide … of …). Right side (`ml-auto flex items-center gap-1`):
+`minus` button "Reducir" (Zoom out; −10) · `<input type="range" min="50" max="200"
 step="10" aria-label="Zoom">` (w-24, `accent-color: var(--sytue-accent)`) ·
-texto "{zoom} %" (w-10, `tabular-nums`) · botón `plus` "Ampliar" (+10).
+text "{zoom} %" (w-10, `tabular-nums`) · `plus` button "Ampliar" (Zoom in; +10).
 
-### 6.8 Atajos globales
+<a id="68-atajos-globales"></a>
 
-| Atajo              | Acción                        | Dónde                                |
-| ------------------ | ----------------------------- | ------------------------------------ |
-| Ctrl/Cmd+B · I · U | negrita · cursiva · subrayado | onKeyDown del lienzo (§6.5)          |
-| Ctrl/Cmd+Mayús+X   | tachado                       | ídem                                 |
-| Ctrl/Cmd+Z · Y     | deshacer · rehacer            | historial nativo del contenteditable |
+### 6.8 Global shortcuts
 
-Los `shortcut` de RibbonButton solo documentan (title); no registran listeners.
+| Shortcut           | Action                    | Where                                |
+| ------------------ | ------------------------- | ------------------------------------ |
+| Ctrl/Cmd+B · I · U | bold · italic · underline | canvas onKeyDown (§6.5)              |
+| Ctrl/Cmd+Mayús+X   | strikethrough             | same                                 |
+| Ctrl/Cmd+Z · Y     | undo · redo               | the contenteditable's native history |
+
+RibbonButton `shortcut`s are documentation only (title); they do not register listeners.
 
 ---
 
-## 7. Variantes sheets y slides (B11) — MISMO chrome, mismo guardado
+<a id="7-variantes-sheets-y-slides-b11--mismo-chrome-mismo-guardado"></a>
 
-Ambas usan el mismo header/ribbon/rail/status; solo cambia el lienzo que
-`EditorApp` monta según `ctx.kind`. Persisten por el MISMO camino: serializan su
-modelo con `JSON.stringify` y llaman `ctx.onContentInput(json)`; cargan con
-`JSON.parse(ctx.content || 'null') ?? modeloVacío` en cada `contentEpoch`.
-Parse inválido → modelo vacío + toast. Registran la celda/caja enfocada con
-`setEditorRoot` en `focusin` (así Inicio/exec formatean texto dentro de la
-celda o caja) y `setEditorRoot(null)` al desmontar.
+## 7. Sheets and slides variants (B11) — SAME chrome, same saving
 
-### 7.1 SheetCanvas — `kind==='spreadsheet'` (clave `doc:sheet`)
+Both use the same header/ribbon/rail/status; only the canvas that
+`EditorApp` mounts according to `ctx.kind` changes. They persist through the SAME path: they serialize their
+model with `JSON.stringify` and call `ctx.onContentInput(json)`; they load with
+`JSON.parse(ctx.content || 'null') ?? modeloVacío` on every `contentEpoch`.
+Invalid parse → empty model + toast. They register the focused cell/box with
+`setEditorRoot` on `focusin` (so Inicio/exec format text inside the
+cell or box) and `setEditorRoot(null)` on unmount.
 
-Modelo vacío: `{ active: 0, sheets: [{ name: 'Hoja 1', cells: {} }] }`.
+<a id="71-sheetcanvas--kindspreadsheet-clave-docsheet"></a>
 
-- **Barra de fórmulas** (h-7, bajo el ribbon, `bg-surface border-b
-border-border px-2 flex items-center gap-2 text-sm`): caja de referencia
-  (w-16, `text-text-muted`, p. ej. "B4") + `<input aria-label="Barra de
-fórmulas">` flex-1 con el TEXTO de la celda seleccionada; Enter escribe el
-  texto (escapando HTML) en la celda y baja una fila.
+### 7.1 SheetCanvas — `kind==='spreadsheet'` (key `doc:sheet`)
+
+Empty model: `{ active: 0, sheets: [{ name: 'Hoja 1', cells: {} }] }`.
+
+- **Formula bar** (h-7, under the ribbon, `bg-surface border-b
+border-border px-2 flex items-center gap-2 text-sm`): reference box
+  (w-16, `text-text-muted`, e.g. "B4") + `<input aria-label="Barra de
+fórmulas">` flex-1 with the TEXT of the selected cell; Enter writes the
+  text (escaping HTML) into the cell and moves down one row.
   `// ponytail: sin fórmulas (=SUMA…) en v1; solo valores.`
-- **Rejilla A..Z × 1..100** en el área con scroll: esquina + cabeceras de
-  columna (sticky top) y de fila (sticky left), `bg-bg-subtle text-xs
-text-text-muted border-border`, cabecera de la celda seleccionada resaltada.
-  Celdas: div `contenteditable` 96×24, `border-r border-b border-border
-bg-white` (blanco SIEMPRE: papel), `text-sm px-1`, contenido =
+- **A..Z × 1..100 grid** in the scrolling area: corner + column headers
+  (sticky top) and row headers (sticky left), `bg-bg-subtle text-xs
+text-text-muted border-border`, with the selected cell's headers highlighted.
+  Cells: `contenteditable` div 96×24, `border-r border-b border-border
+bg-white` (ALWAYS white: paper), `text-sm px-1`, content =
   `cells[ref] ?? ''` (innerHTML).
-- **Selección/edición**: estados `selected {c,r}` y `editing: boolean`. Clic =
-  seleccionar (anillo `2px var(--sytue-accent)` inset); doble clic, Enter o
-  teclear = editar (foco + caret); Escape = volver a selección; flechas (no
-  editando) mueven; Tab/Enter confirman y avanzan (dcha/abajo). Commit (blur o
-  confirmación): si `innerHTML` cambió → actualizar `cells[ref]` (vacío →
+- **Selection/editing**: states `selected {c,r}` and `editing: boolean`. Click =
+  select (`2px var(--sytue-accent)` inset ring); double click, Enter or
+  typing = edit (focus + caret); Escape = back to selection; arrows (when not
+  editing) move; Tab/Enter confirm and advance (right/down). Commit (blur or
+  confirmation): if `innerHTML` changed → update `cells[ref]` (empty →
   `delete`) → `onContentInput(JSON.stringify(model))`.
-- **Pestañas de hoja** (strip inferior h-7, `bg-surface border-t
-border-border px-2 flex gap-1 text-xs`): una pestaña por hoja (activa
-  `font-medium text-text` + subrayado `bg-accent`; inactivas
-  `text-text-muted`), doble clic renombra (prompt), botón `plus` "Añadir
-  hoja" (nombre "Hoja N"). Cambio de hoja → `model.active` + commit.
+- **Sheet tabs** (bottom strip h-7, `bg-surface border-t
+border-border px-2 flex gap-1 text-xs`): one tab per sheet (active
+  `font-medium text-text` + `bg-accent` underline; inactive
+  `text-text-muted`), double click renames (prompt), `plus` button "Añadir
+  hoja" (Add sheet; name "Hoja N"). Switching sheet → `model.active` + commit.
 - `reportStats({ pages: sheets.length, page: active + 1 })`.
-- La rejilla es `role="grid"` con `aria-rowindex/aria-colindex` en celdas;
-  cabeceras `role="columnheader"/"rowheader"`.
+- The grid is `role="grid"` with `aria-rowindex/aria-colindex` on cells;
+  headers `role="columnheader"/"rowheader"`.
   `// ponytail: 26×100 celdas fijas renderizadas de golpe (~2600 divs, va sobrado); virtualizar solo si se amplía la rejilla.`
 
-### 7.2 SlidesCanvas — `kind==='presentation'` (clave `doc:slides`)
+<a id="72-slidescanvas--kindpresentation-clave-docslides"></a>
 
-Modelo vacío: una diapositiva con caja título
+### 7.2 SlidesCanvas — `kind==='presentation'` (key `doc:slides`)
+
+Empty model: one slide with a title box
 `{ id, boxes: [{ id, x: 10, y: 35, w: 80, h: 20, html: '<h1>Haz clic para añadir título</h1>' }] }`
-(ids con `crypto.randomUUID()`).
+(ids with `crypto.randomUUID()`).
 
-- **Carril de miniaturas** (izquierda, w-40 = 160px, `bg-surface border-r
-border-border overflow-y-auto p-2 flex flex-col gap-2`): miniatura 16:9
-  (caja 128×72: interior 960×540 con `transform: scale(128/960)` origin
-  top-left, `pointer-events-none`, cajas pintadas readonly). Activa: anillo
-  `2px var(--sytue-accent)`; número de orden en la esquina. Botones: `plus`
-  "Nueva diapositiva" y `trash` "Eliminar diapositiva" (mín. 1, `confirm`).
-- **Lienzo**: centrado sobre `var(--editor-canvas-bg)`; escenario 16:9 base
-  960×540 escalado por `min(anchoDisponible/960, altoDisponible/540) ·
-zoom/100`, fondo blanco, sombra `var(--editor-page-shadow)`.
-- **Cajas de texto**: div absoluto (x/y/w/h en %), interior `contenteditable`.
-  Clic = seleccionar (borde `1px dashed var(--sytue-accent)` + asa de mover
-  superior + asa de redimensionar SE); doble clic = editar texto; arrastrar
-  asas con Pointer Events (`setPointerCapture`) actualiza x/y o w/h (clamp
-  0..100); Supr con caja seleccionada (no editando) la elimina. Botón "Cuadro
-  de texto" (`textBox`) en una mini-barra sobre el escenario añade una caja
-  centrada. Todo cambio → commit del modelo → `onContentInput`.
+- **Thumbnail rail** (left, w-40 = 160px, `bg-surface border-r
+border-border overflow-y-auto p-2 flex flex-col gap-2`): 16:9 thumbnail
+  (128×72 box: 960×540 interior with `transform: scale(128/960)` origin
+  top-left, `pointer-events-none`, boxes painted read-only). Active: ring
+  `2px var(--sytue-accent)`; order number in the corner. Buttons: `plus`
+  "Nueva diapositiva" (New slide) and `trash` "Eliminar diapositiva" (Delete slide; min. 1, `confirm`).
+- **Canvas**: centered on `var(--editor-canvas-bg)`; 16:9 stage, base
+  960×540, scaled by `min(anchoDisponible/960, altoDisponible/540) ·
+zoom/100`, white background, shadow `var(--editor-page-shadow)`.
+- **Text boxes**: absolute div (x/y/w/h in %), `contenteditable` interior.
+  Click = select (`1px dashed var(--sytue-accent)` border + top move
+  handle + SE resize handle); double click = edit text; dragging the
+  handles with Pointer Events (`setPointerCapture`) updates x/y or w/h (clamp
+  0..100); Supr (Delete) with a box selected (not editing) removes it. A "Cuadro
+  de texto" (Text box) button (`textBox`) in a mini-bar above the stage adds a
+  centered box. Every change → model commit → `onContentInput`.
 - `reportStats({ pages: slides.length, page: activa + 1 })`.
   `// ponytail: sin imágenes ni formas en slides v1; solo cajas de texto.`
 
 ---
 
-## 8. `src/editor/editor.css` (A1 lo pega tal cual; ÚNICO fichero con hex de UI)
+<a id="8-srceditoreditorcss-a1-lo-pega-tal-cual-único-fichero-con-hex-de-ui"></a>
+
+## 8. `src/editor/editor.css` (A1 pastes it verbatim; the ONLY file with UI hex values)
 
 ```css
 /*
@@ -1168,17 +1214,19 @@ zoom/100`, fondo blanco, sombra `var(--editor-page-shadow)`.
 }
 ```
 
-`EditorApp.tsx` hace `import './editor.css';`. Tailwind detecta las clases de
-`src/editor/*.tsx` automáticamente (detección de fuentes del plugin Vite).
+`EditorApp.tsx` does `import './editor.css';`. Tailwind detects the classes in
+`src/editor/*.tsx` automatically (the Vite plugin's source detection).
 
 ---
 
-## 9. Iconos — `src/editor/icons.tsx` (A3)
+<a id="9-iconos--srceditoriconstsx-a3"></a>
 
-Mismo patrón que `Icon` de `@sytue/ui` (NO tocar packages/ui; trazados PROPIOS,
-dibujados de cero): `viewBox="0 0 24 24"`, `fill="none"`,
+## 9. Icons — `src/editor/icons.tsx` (A3)
+
+Same pattern as `@sytue/ui`'s `Icon` (do NOT touch packages/ui; OWN paths,
+drawn from scratch): `viewBox="0 0 24 24"`, `fill="none"`,
 `stroke="currentColor"`, `stroke-width={1.75}`, `stroke-linecap/linejoin="round"`,
-decorativo salvo `label`.
+decorative unless `label`.
 
 ```ts
 export type EditorIconName =
@@ -1237,55 +1285,59 @@ export interface EditorIconProps {
 export function EditorIcon(props: EditorIconProps): JSX.Element;
 ```
 
-Multi-path permitido (array de `d` por nombre). Estética: geometría simple de
-línea, esquinas redondeadas, coherente con el design system.
+Multi-path allowed (array of `d` per name). Aesthetics: simple line
+geometry, rounded corners, consistent with the design system.
 
 ---
 
-## 10. Reparto por constructor (ficheros DISJUNTOS)
+<a id="10-reparto-por-constructor-ficheros-disjuntos"></a>
 
-| Quién   | Ficheros (dueño único)                                                                                         | Depende de (contratos)                                          | Notas                                                                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A1**  | `types.ts`, `EditorApp.tsx`, `editor.css`, `src/pages/edit.astro`, `test/e2e/tests/docs-editor.spec.ts`        | §2 (lo publica), A2 (hook), B5 (getFormatState)                 | Sube `types.ts`+`editor.css` PRIMERO (los pega de §2/§8); integra `EditorApp` y el swap de `edit.astro` al final; escribe el humo e2e (§11) siguiendo `test/e2e/tests/helpers.ts` |
-| **A2**  | `state/useDocument.ts`, `src/lib/docsProxy.ts`, `src/pages/api/{state,ops,rename,comments,versions,export}.ts` | §2, §4                                                          | La capa de datos completa; verificable con curl (contrato §5)                                                                                                                     |
-| **A3**  | `icons.tsx`, `ribbon/primitives.tsx`                                                                           | §2, §5, §9                                                      | Bloquea a B4 y B7–B10: aterrizar pronto                                                                                                                                           |
-| **B1**  | `layout/EditorLayout.tsx`, `layout/StatusBar.tsx`                                                              | §2, §6.7, §8                                                    | Layout puro + barra de estado                                                                                                                                                     |
-| **B2**  | `layout/EditorHeader.tsx`                                                                                      | §2, §6.1, A3 (iconos), `@sytue/ui` (Button, Dropdown, useToast) | Título, chip, peers, Compartir, Descargar                                                                                                                                         |
-| **B3**  | `layout/LeftRail.tsx`                                                                                          | §2, §6.4, A3, B5 (`getEditorRoot`)                              | Franja + buscar/esquema/comentarios                                                                                                                                               |
-| **B4**  | `layout/SettingsPanel.tsx`                                                                                     | §2, §6.6, A3                                                    | Párrafo + Tabla contextual                                                                                                                                                        |
-| **B5**  | `canvas/exec.ts`                                                                                               | §2, §3                                                          | El cerebro de edición; sin componentes                                                                                                                                            |
-| **B6**  | `canvas/PageCanvas.tsx`, `canvas/Ruler.tsx`                                                                    | §2, §6.5, §8, B5                                                | Página A4 + regla                                                                                                                                                                 |
-| **B7**  | `ribbon/Ribbon.tsx`                                                                                            | §2, §6.2, A3, tabs (import)                                     | Tira de pestañas + menú Archivo                                                                                                                                                   |
-| **B8**  | `ribbon/tabs/Inicio.tsx`                                                                                       | §2, §5, §6.3                                                    | La pestaña más densa                                                                                                                                                              |
-| **B9**  | `ribbon/tabs/Insertar.tsx`, `ribbon/tabs/Referencias.tsx`                                                      | §2, §5, §6.3                                                    | Incluye el popover 6×6 de tabla                                                                                                                                                   |
-| **B10** | `ribbon/tabs/Disposicion.tsx`, `ribbon/tabs/Vista.tsx`, `ribbon/tabs/Colaboracion.tsx`                         | §2, §5, §6.3, `@sytue/ui` (Dropdown)                            | Tres pestañas ligeras                                                                                                                                                             |
-| **B11** | `sheets/SheetCanvas.tsx`, `slides/SlidesCanvas.tsx`                                                            | §2, §7, B5 (`setEditorRoot`)                                    | Las dos variantes; el lote más pesado                                                                                                                                             |
+## 10. Allocation by builder (DISJOINT files)
 
-Reglas de integración: los imports cruzados van SOLO hacia `types.ts`,
-`icons.tsx`, `primitives.tsx` y `canvas/exec.ts` (más los imports de
-composición de `EditorApp`/`Ribbon`/`EditorLayout`, que hacen sus dueños).
-Nadie importa ficheros de otro constructor fuera de esa lista.
+| Who     | Files (single owner)                                                                                           | Depends on (contracts)                                         | Notes                                                                                                                                                                                              |
+| ------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A1**  | `types.ts`, `EditorApp.tsx`, `editor.css`, `src/pages/edit.astro`, `test/e2e/tests/docs-editor.spec.ts`        | §2 (publishes it), A2 (hook), B5 (getFormatState)              | Pushes `types.ts`+`editor.css` FIRST (pasting them from §2/§8); integrates `EditorApp` and the `edit.astro` swap at the end; writes the e2e smoke test (§11) following `test/e2e/tests/helpers.ts` |
+| **A2**  | `state/useDocument.ts`, `src/lib/docsProxy.ts`, `src/pages/api/{state,ops,rename,comments,versions,export}.ts` | §2, §4                                                         | The complete data layer; verifiable with curl (contract §5)                                                                                                                                        |
+| **A3**  | `icons.tsx`, `ribbon/primitives.tsx`                                                                           | §2, §5, §9                                                     | Blocks B4 and B7–B10: land early                                                                                                                                                                   |
+| **B1**  | `layout/EditorLayout.tsx`, `layout/StatusBar.tsx`                                                              | §2, §6.7, §8                                                   | Pure layout + status bar                                                                                                                                                                           |
+| **B2**  | `layout/EditorHeader.tsx`                                                                                      | §2, §6.1, A3 (icons), `@sytue/ui` (Button, Dropdown, useToast) | Title, chip, peers, Share, Download                                                                                                                                                                |
+| **B3**  | `layout/LeftRail.tsx`                                                                                          | §2, §6.4, A3, B5 (`getEditorRoot`)                             | Rail + search/outline/comments                                                                                                                                                                     |
+| **B4**  | `layout/SettingsPanel.tsx`                                                                                     | §2, §6.6, A3                                                   | Paragraph + contextual Table                                                                                                                                                                       |
+| **B5**  | `canvas/exec.ts`                                                                                               | §2, §3                                                         | The editing brain; no components                                                                                                                                                                   |
+| **B6**  | `canvas/PageCanvas.tsx`, `canvas/Ruler.tsx`                                                                    | §2, §6.5, §8, B5                                               | A4 page + ruler                                                                                                                                                                                    |
+| **B7**  | `ribbon/Ribbon.tsx`                                                                                            | §2, §6.2, A3, tabs (import)                                    | Tab strip + Archivo (File) menu                                                                                                                                                                    |
+| **B8**  | `ribbon/tabs/Inicio.tsx`                                                                                       | §2, §5, §6.3                                                   | The densest tab                                                                                                                                                                                    |
+| **B9**  | `ribbon/tabs/Insertar.tsx`, `ribbon/tabs/Referencias.tsx`                                                      | §2, §5, §6.3                                                   | Includes the 6×6 table popover                                                                                                                                                                     |
+| **B10** | `ribbon/tabs/Disposicion.tsx`, `ribbon/tabs/Vista.tsx`, `ribbon/tabs/Colaboracion.tsx`                         | §2, §5, §6.3, `@sytue/ui` (Dropdown)                           | Three lightweight tabs                                                                                                                                                                             |
+| **B11** | `sheets/SheetCanvas.tsx`, `slides/SlidesCanvas.tsx`                                                            | §2, §7, B5 (`setEditorRoot`)                                   | The two variants; the heaviest batch                                                                                                                                                               |
+
+Integration rules: cross imports go ONLY towards `types.ts`,
+`icons.tsx`, `primitives.tsx` and `canvas/exec.ts` (plus the composition imports
+of `EditorApp`/`Ribbon`/`EditorLayout`, which their owners do).
+Nobody imports another builder's files outside that list.
 
 ---
 
-## 11. Definición de hecho
+<a id="11-definición-de-hecho"></a>
 
-1. `(cd apps/frontend && bunx astro check --root packages/office)` en verde tras la
-   integración de A1 (cada constructor: cero errores propios).
-2. Humo Playwright (A1, `test/e2e/tests/docs-editor.spec.ts`, patrón de
+## 11. Definition of done
+
+1. `(cd apps/frontend && bunx astro check --root packages/office)` green after
+   A1's integration (each builder: zero errors of their own).
+2. Playwright smoke test (A1, `test/e2e/tests/docs-editor.spec.ts`, following the pattern of
    `docs.spec.ts`/`helpers.ts`, `ignoreHTTPSErrors: true`, login
-   `admin@sytue.localhost` / `sytue-dev-admin`): crear documento (POST
-   `/api/create` o UI) → abrir `/edit?id=` → escribir "Hola mundo" en la página
-   → pulsar el botón Negrita y escribir → esperar chip "Guardado" → `reload()`
-   → el texto persiste (y el fragmento en negrita sigue en `<b>`/`<span>` con
-   `font-weight`). Es LA verificación del contrato de persistencia.
-3. AA: navegable con teclado (pestañas del ribbon con flechas, todos los
-   controles enfocables con foco visible), `aria-label` en cada icon-button,
-   `aria-pressed` en toggles, `aria-live` en el chip de guardado.
-4. Sin errores de consola en carga y edición normal; sin peticiones del
-   navegador a `docs-api.sytue.localhost` (todo same-origin).
-5. Sin dependencias nuevas en `package.json`; sin ficheros fuera del reparto.
+   `admin@sytue.localhost` / `sytue-dev-admin`): create a document (POST
+   `/api/create` or UI) → open `/edit?id=` → type "Hola mundo" on the page
+   → click the Negrita (Bold) button and type → wait for the "Guardado" (Saved) chip → `reload()`
+   → the text persists (and the bold fragment is still in `<b>`/`<span>` with
+   `font-weight`). This is THE verification of the persistence contract.
+3. AA: keyboard navigable (ribbon tabs with arrow keys, all
+   controls focusable with visible focus), `aria-label` on every icon-button,
+   `aria-pressed` on toggles, `aria-live` on the save chip.
+4. No console errors on load and normal editing; no requests from the
+   browser to `docs-api.sytue.localhost` (everything same-origin).
+5. No new dependencies in `package.json`; no files outside the allocation.
 
-Fuera de alcance v1 (explícito, no lo intentes): WebSocket/cursores en vivo,
-paginación visual real, fórmulas de hoja de cálculo, permisos/uso compartido
-fino, anclas de comentario por carácter, arrastre de sangrías en la regla.
+Out of scope for v1 (explicit, do not attempt it): WebSocket/live cursors,
+real visual pagination, spreadsheet formulas, fine-grained permissions/sharing,
+per-character comment anchors, dragging indents on the ruler.

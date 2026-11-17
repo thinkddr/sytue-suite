@@ -6,7 +6,9 @@ package rooms
 import (
 	"context"
 	"errors"
+	"fmt"
 	"image/png"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,27 +26,33 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // servicioFalso es el servidor de Rooms en memoria. Apunta cada llamada para que el
 // guardián compruebe QUÉ se pidió, no solo qué se pintó.
 type servicioFalso struct {
-	canales     []api.RoomsChannel
-	pend        []api.RoomsUnread
-	fuera       []api.RoomsChannel
-	mensajes    map[string][]api.RoomsMessage
-	errLista    error
-	errMens     error
-	errPost     error
+	canales  []api.RoomsChannel
+	pend     []api.RoomsUnread
+	fuera    []api.RoomsChannel
+	mensajes map[string][]api.RoomsMessage
+	errLista error
+	errMens  error
+	errPost  error
+	// errReply hace fallar las respuestas de hilo (ReplyWith).
+	errReply    error
 	tramas      []api.RoomsEvent
 	hilo        api.RoomsThread
 	errHilo     error
 	errAccion   error
 	fijados     []api.RoomsMessage
 	hallados    []api.RoomsMessage
+	errBuscar   error
 	raizAround  string
 	errCrear    error
+	errAnadirA  map[string]error // fallo de AddChannelMember para esa persona
 	explorables []api.RoomsChannel
 	errExplorar error
 	archivados  []api.RoomsChannel
@@ -122,7 +130,36 @@ func (s *servicioFalso) MarkRead(_ context.Context, c string) error {
 
 func (s *servicioFalso) React(_ context.Context, m, e string, poner bool) error {
 	s.apuntar("React", m, e, map[bool]string{true: "poner", false: "quitar"}[poner])
+	// En el hilo la reacción se queda, para que releerlo la enseñe.
+	s.enHilo(m, func(x *api.RoomsMessage) {
+		i := slices.IndexFunc(x.Reactions, func(r api.RoomsReaction) bool { return r.Emoji == e })
+		switch {
+		case poner && i < 0:
+			x.Reactions = append(x.Reactions, api.RoomsReaction{Emoji: e, Count: 1, Subs: []string{"yo"}})
+		case poner:
+			x.Reactions[i].Count++
+			x.Reactions[i].Subs = append(x.Reactions[i].Subs, "yo")
+		case i >= 0:
+			x.Reactions[i].Count--
+			x.Reactions[i].Subs = slices.DeleteFunc(x.Reactions[i].Subs, func(s string) bool { return s == "yo" })
+			if x.Reactions[i].Count == 0 {
+				x.Reactions = slices.Delete(x.Reactions, i, i+1)
+			}
+		}
+	})
 	return nil
+}
+
+// enHilo cambia el mensaje del hilo con ese id, raíz o respuesta, si lo hay.
+func (s *servicioFalso) enHilo(id string, f func(*api.RoomsMessage)) {
+	if s.hilo.Root.ID == id {
+		f(&s.hilo.Root)
+	}
+	for i := range s.hilo.Replies {
+		if s.hilo.Replies[i].ID == id {
+			f(&s.hilo.Replies[i])
+		}
+	}
 }
 
 func (s *servicioFalso) SetNotifyLevel(_ context.Context, c, n string) error {
@@ -206,11 +243,15 @@ func (s *servicioFalso) Edit(_ context.Context, m, texto string) (api.RoomsMessa
 		return api.RoomsMessage{}, s.errAccion
 	}
 	ahora := time.Now()
+	s.enHilo(m, func(x *api.RoomsMessage) { x.Body, x.EditedAt = texto, &ahora })
 	return api.RoomsMessage{ID: m, Body: texto, EditedAt: &ahora}, nil
 }
 
 func (s *servicioFalso) Delete(_ context.Context, m string) error {
 	s.apuntar("Delete", m)
+	if s.errAccion == nil {
+		s.hilo.Replies = slices.DeleteFunc(s.hilo.Replies, func(x api.RoomsMessage) bool { return x.ID == m })
+	}
 	return s.errAccion
 }
 
@@ -249,7 +290,7 @@ func (s *servicioFalso) MyThreads(_ context.Context, antes string) ([]api.RoomsT
 
 func (s *servicioFalso) Search(_ context.Context, q string, _ int) ([]api.RoomsMessage, error) {
 	s.apuntar("Search", q)
-	return s.hallados, nil
+	return s.hallados, s.errBuscar
 }
 
 func (s *servicioFalso) Around(_ context.Context, c, m string, _ int) ([]api.RoomsMessage, string, error) {
@@ -310,6 +351,9 @@ func (s *servicioFalso) ChannelMembers(_ context.Context, c string) ([]api.Rooms
 
 func (s *servicioFalso) AddChannelMember(_ context.Context, c, p, n string) (api.RoomsMember, error) {
 	s.apuntar("AddChannelMember", c, p, n)
+	if err := s.errAnadirA[p]; err != nil {
+		return api.RoomsMember{}, err
+	}
 	return api.RoomsMember{Subject: p, Name: n, Role: "member"}, s.errAccion
 }
 
@@ -917,6 +961,37 @@ func TestEditarYBorrarUnMensajePropio(t *testing.T) {
 	}
 }
 
+// TestRepintarElHistorialNoPierdeLaEdicionAMedias: el historial se rehace con cada
+// mensaje o reacción ajena; la caja de editar vuelve con lo que se llevaba escrito, no con
+// el texto original, y conserva el cursor si lo tenía.
+func TestRepintarElHistorialNoPierdeLaEdicionAMedias(t *testing.T) {
+	s := servicioConDos()
+	s.mensajes["c1"] = append(s.mensajes["c1"], mensajeMio())
+	sa, _, w := salaEn(t, s, 1280)
+	sa.Arrancar(context.Background())
+	h := sa.P.Canal.Historial
+	sa.Editar(h.Mensajes[len(h.Mensajes)-1])
+	f := filaDe(t, h, "mio")
+	test.WidgetRenderer(f.edicion)
+	f.edicion.area.PonerTexto("a medias")
+	w.Canvas().Focus(f.edicion.area)
+
+	// Llega un mensaje de otra persona: la lista se rehace entera.
+	h.Mensajes = append(h.Mensajes, Mensaje{ID: "otro", Autor: Autor{ID: "ana", Nombre: "Ana"}, Cuerpo: "hola", Creado: time.Now()})
+	h.Refresh()
+
+	f = filaDe(t, h, "mio")
+	if f.edicion == nil {
+		f.Refresh()
+	}
+	if got := f.edicion.Texto(); got != "a medias" {
+		t.Errorf("tras repintar la caja dice %q y se llevaba escrito «a medias»", got)
+	}
+	if w.Canvas().Focused() != fyne.Focusable(f.edicion.area) {
+		t.Error("tras repintar la caja de editar pierde el cursor")
+	}
+}
+
 // TestLaBarraDeUnMensajeSaleAlPasarPorEncima: la barra de acciones está apagada y se
 // enciende con el puntero sobre la fila, sigue mientras el puntero pasa a la barra y se va
 // al salir. Mide lo que suman sus seis botones de 24,5 con `p-0.5 gap-0.5` y borde.
@@ -1151,6 +1226,58 @@ func TestLaBusquedaEsperaYPregunta(t *testing.T) {
 	}
 }
 
+// TestLaBusquedaConCifradoNoEsUnFallo: con el cifrado activo `/api/search` contesta
+// 409 `encrypted_client_required`. «Archivos del canal» (y la búsqueda a mano) lo
+// explican con un estado vacío y sin «reintentar»; nunca «No se pudo buscar». Otro
+// fallo sigue siendo el aviso de error. Gemelo de SearchPanel.test.tsx en la web.
+func TestLaBusquedaConCifradoNoEsUnFallo(t *testing.T) {
+	s := servicioConDos()
+	s.errBuscar = &api.Error{
+		Status: http.StatusConflict,
+		Body:   `{"error":{"code":"encrypted_client_required","message":"Open an encrypted Rooms client to perform this action."}}`,
+	}
+	sa, relojes := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	sa.VerArchivos()
+	l := sa.lista
+	test.WidgetRenderer(l)
+	relojes[EsperaBusqueda]()
+	if !s.pidio("Search(in:#equipo has:file)") || l.Estado != SinPermiso {
+		t.Fatalf("buscar: %v, estado %v", s.llamadas, l.Estado)
+	}
+	if got := l.textoEstado(); got == "Falló la búsqueda" || got == "" {
+		t.Errorf("la línea de estado dice %q", got)
+	}
+	var vac *ui.Vacio
+	for _, o := range test.LaidOutObjects(l) {
+		if x, ok := o.(*ui.Vacio); ok {
+			vac = x
+		}
+		if a, ok := o.(*AvisoHilo); ok {
+			t.Errorf("con cifrado sale el aviso de fallo %+v", a)
+		}
+	}
+	if vac == nil || vac.Titulo == "" || vac.Descripcion == "" || vac.Titulo == "Sin resultados" {
+		t.Fatalf("con cifrado no sale el estado que lo explica: %+v", vac)
+	}
+
+	// El servicio cifrado de producción (`mx.RoomsService`) ni pregunta: lo rechaza
+	// con `mx.ErrUnsupported`, y tiene que acabar en el mismo estado.
+	s.errBuscar = fmt.Errorf("buscar: %w", mx.ErrUnsupported)
+	l.PonerConsulta("hola")
+	relojes[EsperaBusqueda]()
+	if l.Estado != SinPermiso || l.textoEstado() == "Falló la búsqueda" {
+		t.Errorf("mx.ErrUnsupported deja %v, %q", l.Estado, l.textoEstado())
+	}
+
+	s.errBuscar = &api.Error{Status: http.StatusInternalServerError}
+	l.PonerConsulta("adios")
+	relojes[EsperaBusqueda]()
+	if l.Estado != Error || l.textoEstado() != "Falló la búsqueda" {
+		t.Errorf("un 500 deja %v, %q", l.Estado, l.textoEstado())
+	}
+}
+
 // TestIrAUnMensajeLoResaltaSinDarPorLeido es `goToMessage`: la ventana centrada en el
 // mensaje, resaltado 2,5 s, «Ir a mensajes recientes» y el canal SIN dar por leído; la
 // barra vuelve al final y entonces sí.
@@ -1272,6 +1399,64 @@ func TestCrearCanalEsElDeLaWeb(t *testing.T) {
 	f.Enviar()
 	if !s.pidio("CreateChannel(t1,Ventas Sur,,privado)") || sa.P.Lateral.CanalID != "nuevo" {
 		t.Errorf("crear: %v, abierto %q", s.llamadas, sa.P.Lateral.CanalID)
+	}
+}
+
+// TestCrearCanalConPersonas es el campo «Personas» de `CreateChannelModal`: quien crea
+// no se ofrece, el canal se crea SIN lista de miembros y luego entra cada persona por
+// `AddChannelMember`, en orden. Si una falla, el canal se queda abierto y un aviso
+// dice a quién le faltó. Gemelo web: CreateChannelModal.test.ts.
+func TestCrearCanalConPersonas(t *testing.T) {
+	s := servicioConDos()
+	s.equipo = []api.RoomsMember{{Subject: "yo", Name: "Yo"}, {Subject: "ana", Name: "Ana Ruiz"}, {Subject: "be", Name: "Beto"}}
+	s.errAnadirA = map[string]error{"be": &api.Error{Status: 500}}
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	sa.AbrirCrearCanal()
+	f := sa.crearCanal
+	test.WidgetRenderer(f)
+	sel := f.Personas
+	if c := sel.Candidatas(); len(c) != 2 || c[0].ID != "ana" || c[1].ID != "be" {
+		t.Fatalf("el selector ofrece %+v y son Ana y Beto (sin quien crea)", c)
+	}
+	// Una búsqueda que falla añade la línea del error: el diálogo tiene que remedirse
+	// o la línea queda tapada por el pie hasta la siguiente colocación.
+	remedidas, alCambiar := 0, sel.AlCambiar
+	sel.AlCambiar = func() { remedidas++; alCambiar() }
+	sel.AlBuscarPersona("@nadie")
+	sel.AlCambiar = alCambiar
+	if sel.ErrorBuscar == "" || remedidas < 2 {
+		t.Errorf("buscar a quien no existe: error %q, %d remedidas (y son al menos 2)", sel.ErrorBuscar, remedidas)
+	}
+	sel.Caja().PonerTexto("")
+	// Quien crea, encontrado por su @usuario, no entra: ya está dentro, y no es «de fuera».
+	sel.Encontrada(Persona{ID: "yo", Nombre: "Yo"})
+	if len(sel.Elegidas) != 0 {
+		t.Fatalf("buscarse a uno mismo lo elige: %+v", sel.Elegidas)
+	}
+	for _, p := range sel.Candidatas() {
+		sel.Conmutar(p)
+	}
+	f.Nombre().PonerTexto("Ventas")
+	f.privado.Tapped(nil)
+	f.Enviar()
+	quiero := []string{"CreateChannel(t1,Ventas,,privado)", "AddChannelMember(nuevo,ana,Ana Ruiz)", "AddChannelMember(nuevo,be,Beto)"}
+	var vistas []string
+	for _, l := range s.llamadas {
+		if strings.HasPrefix(l, "CreateChannel(") || strings.HasPrefix(l, "AddChannelMember(") {
+			vistas = append(vistas, l)
+		}
+	}
+	if strings.Join(vistas, " ") != strings.Join(quiero, " ") {
+		t.Fatalf("crear con personas pide %v y debe pedir %v", vistas, quiero)
+	}
+	if sa.P.Lateral.CanalID != "nuevo" || f.Ocupado {
+		t.Errorf("el canal no queda abierto (%q) o el formulario sigue ocupado", sa.P.Lateral.CanalID)
+	}
+	avisos := sa.P.Avisos.Avisos()
+	falta := sa.P.T.T("createChannel.membersMissing", i18n.Vars{"names": "Beto"})
+	if len(avisos) == 0 || avisos[len(avisos)-1].Titulo != falta || avisos[len(avisos)-1].Tono != ui.AvisoAdvertencia {
+		t.Errorf("no se dice que faltó Beto: %+v", avisos)
 	}
 }
 
@@ -2079,6 +2264,31 @@ func TestLosProgramados(t *testing.T) {
 	l.AlCancelarYa(l.Programados[0])
 	if s.veces("Scheduled()") != 2 || len(l.Programados) != 2 {
 		t.Errorf("cancelar con el servicio caído: %v, %d en la lista", s.llamadas, len(l.Programados))
+	}
+}
+
+// TestUnaRespuestaProgramadaSaleEnSuHiloYEnElCanal: la lista guarda de un programado su
+// hilo y su «También enviar al canal», y «Enviar ya» lo publica como respuesta en ese hilo
+// con la casilla, no como mensaje suelto del canal.
+func TestUnaRespuestaProgramadaSaleEnSuHiloYEnElCanal(t *testing.T) {
+	s := servicioConDos()
+	raiz := "m1"
+	s.programados = []api.RoomsScheduled{
+		{ID: "p1", ChannelID: "c1", ParentID: &raiz, AuthorSub: "yo", Body: "luego", AlsoInChannel: true, SendAt: time.Date(2026, 9, 24, 8, 0, 0, 0, time.UTC)},
+	}
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	sa.AbrirPanel(PanelProgramado)
+	l := sa.lista
+	if len(l.Programados) != 1 || l.Programados[0].Raiz != "m1" || !l.Programados[0].AlCanal {
+		t.Fatalf("el programado de la lista: %+v", l.Programados)
+	}
+	l.AlEnviarYa(l.Programados[0])
+	if slices.Index(s.llamadas, "Reply(m1,luego)") < 0 || slices.Index(s.llamadas, "Post(c1,luego)") >= 0 {
+		t.Errorf("«Enviar ya» de una respuesta: %v", s.llamadas)
+	}
+	if n := len(s.envios); n == 0 || !s.envios[n-1].AlsoInChannel {
+		t.Errorf("«Enviar ya» pierde «También enviar al canal»: %+v", s.envios)
 	}
 }
 

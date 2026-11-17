@@ -20,7 +20,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/driver/desktop"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/peticion"
@@ -48,9 +47,16 @@ var SinGuardarSinConexion = []string{
 // pintar. Es lo que hace que los guardianes de píxel no necesiten ni red ni servicio.
 type Pantalla struct {
 	svc *api.Drive
-	tr  *i18n.Translator
-	red *offline.Monitor
-	win fyne.Window
+	// Cuenta is the separate account/control client when svc owns private data.
+	Cuenta  *api.Drive
+	bajaRed func()
+	cerrada atomic.Bool
+	// RefrescarDatos authenticates external revisions before a user refresh.
+	RefrescarDatos func(listo func())
+	Vida           context.Context
+	tr             *i18n.Translator
+	red            *offline.Monitor
+	win            fyne.Window
 
 	seccion Seccion
 	// pedidoCompartido es lo compartido que abrir cuando llegue la lista (un aviso).
@@ -79,6 +85,12 @@ type Pantalla struct {
 	// cursor es el de la página siguiente de la carpeta; vacío, no hay más. Solo se
 	// toca en la rutina de la interfaz.
 	cursor string
+	// ordenCursor es el orden en que se pidió la página de `cursor`: el cursor lleva su
+	// orden y seguirlo con otro es un 400 del servicio.
+	ordenCursor Orden
+	// orden es `explor.Orden` legible desde las rutinas de carga, que no deben leer el
+	// estado de la interfaz.
+	orden atomic.Pointer[Orden]
 	// busqueda es el rebote de 300 ms del buscador.
 	busqueda *time.Timer
 	// ancla es el índice de la última casilla marcada sin Mayús, desde el que Mayús
@@ -89,6 +101,15 @@ type Pantalla struct {
 	// favoritos son los ids con estrella, para que el menú diga «Añadir» o «Quitar» sin
 	// pedir nada por fila. Solo se toca en la rutina de la interfaz.
 	favoritos map[string]bool
+	// Para «Mostrar en su carpeta» (ubicacion.go), todo en la rutina de la interfaz:
+	// raizID es el id de «Mi unidad» en cuanto se sabe; padres, la carpeta de cada
+	// elemento visto al cargar una; cargadas, las carpetas que llegaron bien en esta
+	// sesión —las que la caché del transporte puede servir sin red—, y alLlegar, lo que
+	// marcar cuando llegue su carpeta.
+	raizID   string
+	padres   map[string]string
+	cargadas map[string]bool
+	alLlegar marcaPendiente
 	// taxonomia son las etiquetas de sensibilidad de la organización, pedidas la primera
 	// vez que se clasifica algo; nil, todavía no. Solo se toca en la rutina de la interfaz.
 	taxonomia []api.EtiquetaDrive
@@ -115,6 +136,10 @@ type Pantalla struct {
 	// del disco en escritorio, flujos del proveedor de contenido en el móvil. Lo pone el
 	// `main`, que es quien tiene la ventana; nil, «Subir» no hace nada.
 	ElegirFicheros func(listo func([]Entrada))
+	// ElegirCarpeta abre el selector de CARPETAS del sistema, con ese título, y le pasa
+	// a `listo` la elegida, que [Pantalla.SubirEntradas] recorre entera como una carpeta soltada. nil
+	// —el móvil, que no tiene selector de carpetas—: «Subir carpeta» no se ofrece.
+	ElegirCarpeta func(titulo string, listo func([]Entrada))
 	// App es quien delega en el sistema al abrir otra aplicación; vacío es la app de
 	// Fyne en marcha. Apex es el dominio de la suite; vacío es producción. Los dos se
 	// dejan abiertos para el guardián, que no tiene ni sistema ni red.
@@ -135,6 +160,9 @@ type Pantalla struct {
 	// IA es el cliente de Sytue AI, para «Resumir». Lo pone el `main`; nil, la acción
 	// no se ofrece.
 	IA *api.IA
+	// pdf es el cliente de PDF para «Combinar PDF» en la barra de selección. Lo pone el
+	// `main` con `ConPDF`; nil, la acción no se ofrece.
+	pdf *api.PDF
 	// Integraciones es la pasarela, para «Traer mis datos». Lo pone el `main` con
 	// `ConIntegraciones`; nil, el bloque no se pinta.
 	integraciones *api.Integraciones
@@ -182,9 +210,14 @@ func NuevaPantalla(tr *i18n.Translator, svc *api.Drive, red *offline.Monitor, wi
 	p := &Pantalla{
 		svc: svc, tr: tr, red: red, win: win, Plazo: 30 * time.Second,
 		avisos: ui.NuevaPilaAvisos(), favoritos: map[string]bool{},
+		padres: map[string]string{}, cargadas: map[string]bool{},
 		ancla: -1, pidiendo: map[string]bool{},
 	}
 	p.explor = NuevoExplorador(tr)
+	// Vista y orden se recuerdan entre sesiones, con las claves de la web: quien trabaja
+	// en cuadrícula o por fecha lo quiere así también al volver.
+	p.explor.Rejilla = LeerVista(prefs())
+	p.ponerOrden(LeerOrden(prefs()))
 	p.papelera = NuevaVistaPapelera(tr)
 	p.papelera.Ahora = time.Now()
 	p.lateral = NuevoLateral(tr, MiUnidad, p.irA)
@@ -195,9 +228,60 @@ func NuevaPantalla(tr *i18n.Translator, svc *api.Drive, red *offline.Monitor, wi
 	p.montarEquipos()
 	p.montarNube()
 	if red != nil {
-		red.Subscribe(func(e offline.State) { enHilo(func() { p.conexion(e != offline.Offline) }) })
+		p.bajaRed = red.Subscribe(func(e offline.State) {
+			enHilo(func() {
+				if !p.cerrada.Load() {
+					p.conexion(e != offline.Offline)
+				}
+			})
+		})
 	}
 	return p
+}
+
+func (p *Pantalla) cuenta() *api.Drive {
+	if p.Cuenta != nil {
+		return p.Cuenta
+	}
+	return p.svc
+}
+
+// Cerrar detaches a presenter before its private repository is drained. A later
+// network notification cannot resurrect the removed screen or its importer.
+func (p *Pantalla) Cerrar() {
+	if p.cerrada.Swap(true) {
+		return
+	}
+	p.epoca.Add(1)
+	if p.bajaRed != nil {
+		p.bajaRed()
+		p.bajaRed = nil
+	}
+	if p.busqueda != nil {
+		p.busqueda.Stop()
+	}
+	if p.sec.buscarDocs != nil {
+		p.sec.buscarDocs.Stop()
+	}
+	p.PararImportador()
+	p.dentro = false
+	if p.win != nil {
+		ui.OlvidarSuperposiciones(p.win.Canvas())
+	}
+	p.explor.Elementos, p.papelera.Elementos = nil, nil
+	p.sec.recientes.Elementos, p.sec.destacados.Elementos = nil, nil
+	clear(p.favoritos)
+	clear(p.pidiendo)
+	p.taxonomia = nil
+	clear(p.explor.Miniaturas)
+	p.sec.compartido.Raices, p.sec.compartido.Raiz, p.sec.compartido.Carpeta = nil, nil, nil
+	p.sec.documentos.Documentos = nil
+	p.sec.equipos.Unidades, p.sec.equipos.Abierta, p.sec.equipos.Contenido = nil, nil, nil
+	p.sec.nube.Elementos, p.sec.nube.Pila = nil, nil
+	if p.raiz != nil {
+		p.raiz.Objects = nil
+		p.raiz.Refresh()
+	}
 }
 
 // conexion aplica un cambio de la red: sin ella se apagan las mutaciones pero se sigue
@@ -326,7 +410,7 @@ func (p *Pantalla) vista(v tema.Variante) fyne.CanvasObject {
 // Repintar rehace el árbol con el estado de ahora. Se llama SIEMPRE desde la rutina
 // principal: quien venga de una goroutine pasa por `enHilo`.
 func (p *Pantalla) Repintar() {
-	if p.raiz == nil {
+	if p.cerrada.Load() || p.raiz == nil {
 		return
 	}
 	v := p.variante()
@@ -340,8 +424,20 @@ func (p *Pantalla) Repintar() {
 // Recargar vuelve a pedir lo de la sección en la que se está. Lo llama el `main`
 // cuando cambia la sesión: entrar en otra de las apps de la suite abre esta también.
 func (p *Pantalla) Recargar() {
-	p.irA(p.seccion)
-	go p.cargarCuota()
+	if p.cerrada.Load() {
+		return
+	}
+	load := func() {
+		if !p.cerrada.Load() {
+			p.irA(p.seccion)
+			go p.cargarCuota()
+		}
+	}
+	if p.RefrescarDatos != nil {
+		p.RefrescarDatos(load)
+		return
+	}
+	load()
 }
 
 // enSegundoPlano lanza `f` fuera de la rutina de la interfaz (ver `aparte`).
@@ -361,7 +457,11 @@ func (p *Pantalla) enSegundoPlano(f func()) {
 func enHilo(f func()) { fyne.Do(f) }
 
 func (p *Pantalla) ctx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), p.Plazo)
+	vida := p.Vida
+	if vida == nil {
+		vida = context.Background()
+	}
+	return context.WithTimeout(vida, p.Plazo)
 }
 
 // hayRed dice si el monitor de conectividad ve red. Sin monitor se asume que sí: no
@@ -499,6 +599,7 @@ func (p *Pantalla) cargarCarpeta(id string) {
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
+	pedida := id
 	if id == "" {
 		raiz, err := p.svc.Root(ctx)
 		if err != nil {
@@ -506,8 +607,12 @@ func (p *Pantalla) cargarCarpeta(id string) {
 			return
 		}
 		id = raiz.ID
+		enHilo(func() { p.raizID = raiz.ID })
 	}
-	hijos, err := p.svc.Children(ctx, id, "")
+	// El orden lo aplica el servicio (carpetas primero, luego ficheros por la columna,
+	// keyset): reordenar aquí rompería la continuidad al encadenar páginas.
+	orden := p.ordenDeCarga()
+	hijos, err := p.svc.ChildrenEn(ctx, id, "", orden.Listado())
 	elementos := DeHijos(hijos)
 	enHilo(func() {
 		if p.epoca.Load() != epoca {
@@ -515,10 +620,17 @@ func (p *Pantalla) cargarCarpeta(id string) {
 		}
 		p.explor.Elementos = elementos
 		p.explor.Fase = FaseDe(err, p.hayRed() || err == nil, len(elementos))
-		p.cursor = hijos.NextCursor
+		p.cursor, p.ordenCursor = hijos.NextCursor, orden
 		p.explor.HayMas = err == nil && p.cursor != ""
 		clear(p.explor.Seleccion)
 		p.ancla = -1
+		if err == nil {
+			p.cargadas[id] = true
+			for _, el := range elementos {
+				p.padres[el.ID] = id
+			}
+			p.aplicarMarca(pedida, id)
+		}
 		p.Repintar()
 	})
 }
@@ -532,7 +644,7 @@ func (p *Pantalla) cargarMas() {
 		return
 	}
 	p.explor.CargandoMas = true
-	carpeta, cursor, epoca := p.carpetaActual(), p.cursor, p.epoca.Load()
+	carpeta, cursor, orden, epoca := p.carpetaActual(), p.cursor, p.ordenCursor, p.epoca.Load()
 	go func() {
 		enHilo(p.Repintar)
 		ctx, cancelar := p.ctx()
@@ -547,7 +659,7 @@ func (p *Pantalla) cargarMas() {
 		}
 		var hijos api.Children
 		if err == nil {
-			hijos, err = p.svc.Children(ctx, id, cursor)
+			hijos, err = p.svc.ChildrenEn(ctx, id, cursor, orden.Listado())
 		}
 		enHilo(func() {
 			if p.epoca.Load() != epoca {
@@ -582,12 +694,12 @@ func (p *Pantalla) fallo(epoca uint64, err error) {
 // cargarCuota pide el espacio usado para el medidor del carril. Un fallo lo deja sin
 // medidor, que es lo que hace la web: el pie se enseña sin barra y no estorba.
 func (p *Pantalla) cargarCuota() {
-	if p.svc == nil || !p.hayRed() {
+	if p.cuenta() == nil || !p.hayRed() {
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
-	q, err := p.svc.Quota(ctx)
+	q, err := p.cuenta().Quota(ctx)
 	if err != nil {
 		return
 	}
@@ -630,7 +742,12 @@ func (p *Pantalla) enganchar() {
 		return p.dentro && p.hayRed() && e.Fase != Cargando && !e.Ocupado && !e.CargandoMas && !e.AlgoMarcado()
 	}
 	e.Refresco.Revision = p.epoca.Load
-	e.AlCambiarVista = func(rejilla bool) { e.Rejilla = rejilla; p.Repintar() }
+	e.AlCambiarVista = func(rejilla bool) {
+		e.Rejilla = rejilla
+		GuardarVista(prefs(), rejilla)
+		p.Repintar()
+	}
+	e.AlOrdenar = p.ordenarPor
 	e.AlBuscar = p.buscar
 	e.AlSeleccionar = p.marcar
 	e.AlSeleccionarTodo = p.marcarTodo
@@ -685,7 +802,11 @@ func (p *Pantalla) abrir(el Elemento) {
 	if p.abrirEnSuApp(el) {
 		return
 	}
-	if TipoVista(el) != "" {
+	if EsMultimedia(el) {
+		go p.reproducir(el)
+		return
+	}
+	if TipoVista(el, false) != "" {
 		p.pedirVista(el)
 		return
 	}
@@ -884,8 +1005,8 @@ func (p *Pantalla) marcar(id string) {
 	case id == "":
 		clear(e.Seleccion)
 		p.ancla = -1
-	case Mayus() && p.ancla >= 0 && i >= 0:
-		MarcarRango(e.Seleccion, enOrden, p.ancla, i)
+	case ui.Mayus() && p.ancla >= 0 && i >= 0:
+		ui.MarcarRango(e.Seleccion, enOrden, idDe, p.ancla, i)
 	default:
 		e.Seleccion[id] = !e.Seleccion[id]
 		p.ancla = i
@@ -893,15 +1014,8 @@ func (p *Pantalla) marcar(id string) {
 	p.Repintar()
 }
 
-// MarcarRango marca los elementos entre dos índices, ambos incluidos, en cualquier orden.
-func MarcarRango(sel map[string]bool, els []Elemento, a, b int) {
-	lo, hi := min(a, b), max(a, b)
-	for i := max(lo, 0); i <= hi && i < len(els); i++ {
-		if els[i].ID != "" {
-			sel[els[i].ID] = true
-		}
-	}
-}
+// idDe es la clave de un elemento para los rangos de `ui.MarcarRango`.
+func idDe(el Elemento) string { return el.ID }
 
 func indiceDe(els []Elemento, id string) int {
 	for i, el := range els {
@@ -910,13 +1024,6 @@ func indiceDe(els []Elemento, id string) int {
 		}
 	}
 	return -1
-}
-
-// Mayus dice si la tecla Mayús está pulsada ahora mismo. Un toque de Fyne no trae los
-// modificadores, pero el driver de escritorio sabe cuáles hay pulsados; en móvil no hay.
-func Mayus() bool {
-	d, ok := fyne.CurrentApp().Driver().(desktop.Driver)
-	return ok && d.CurrentKeyModifiers()&fyne.KeyModifierShift != 0
 }
 
 // marcarTodo es el «seleccionar todo» de la cabecera: si ya está todo marcado, lo
@@ -1063,11 +1170,11 @@ func (p *Pantalla) pedirVaciar() {
 func (p *Pantalla) vaciarPapelera(todo []Elemento) {
 	p.papeleraOcupada(true)
 	defer p.papeleraOcupada(false)
-	_, fallidos := EnTandas(conID(todo), func(el Elemento) error {
+	_, fallidos := ui.EnTandas(conID(todo), func(el Elemento) error {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
 		return p.svc.Purge(ctx, claseDe(el), el.ID)
-	}, EnParalelo)
+	}, ui.EnParalelo)
 	if len(fallidos) == 0 {
 		p.avisar(ui.AvisoExito, p.tr.T("trash.emptiedAll", nil), "")
 	} else {
@@ -1122,23 +1229,28 @@ func (p *Pantalla) descargar(el Elemento) {
 	p.avisar(ui.AvisoExito, el.Nombre, ruta)
 }
 
-// Atajo es la tecla suelta de la web: «u» sube y «n» crea una carpeta
-// (`esAtajoDeApp`: sin modificadores, fuera de un campo y sin nada superpuesto; lo
-// primero y lo último los comprueba quien llama). Solo en «Mi unidad» y con red, que
-// es donde la web los escucha. Devuelve si la tecla era suya.
-func (p *Pantalla) Atajo(r rune) bool {
-	if p.seccion != MiUnidad || p.explor.SinRed() {
-		return false
+// reproducir es la vista previa de vídeo y audio en Fyne: Fyne no trae reproductor, así
+// que el fichero se baja como siempre y se entrega a la app del sistema. Si el sistema
+// no tiene quién lo abra, queda el aviso de la descarga, igual que antes.
+func (p *Pantalla) reproducir(el Elemento) {
+	prog := NuevoProgreso(1)
+	prog.Bajada = true
+	prog.Empezar(0, el.Nombre)
+	enHilo(func() { p.explor.Subida = prog; p.Repintar() })
+	parar := p.latido()
+	defer parar()
+
+	ctx, cancelar := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancelar()
+	ruta, err := Descargar(ctx, p.svc, el, prog)
+	enHilo(func() { p.explor.Subida = nil; p.Repintar() })
+	if err != nil {
+		p.avisar(ui.AvisoPeligro, p.tr.T("files.error.network", nil), motivo(err))
+		return
 	}
-	switch r {
-	case 'u':
-		p.elegirYSubir()
-	case 'n':
-		p.pedirCarpeta()
-	default:
-		return false
+	if abrirConElSistema(ruta) != nil {
+		p.avisar(ui.AvisoExito, el.Nombre, ruta)
 	}
-	return true
 }
 
 // elegirYSubir es el botón «Subir»: abre el selector del sistema y sube lo elegido.
@@ -1147,6 +1259,15 @@ func (p *Pantalla) elegirYSubir() {
 		return
 	}
 	p.ElegirFicheros(p.SubirEntradas)
+}
+
+// elegirCarpetaYSubir es «Nuevo → Subir carpeta»: la carpeta elegida sube con su árbol,
+// con la misma barra y el mismo resumen que al soltarla.
+func (p *Pantalla) elegirCarpetaYSubir() {
+	if p.ElegirCarpeta == nil || p.explor.SinRed() {
+		return
+	}
+	p.ElegirCarpeta(p.tr.T("files.upload.folder", nil), p.SubirEntradas)
 }
 
 // descargarLote baja la selección empaquetada en un ZIP, en streaming, a la carpeta de
@@ -1204,6 +1325,21 @@ func partir(sel []Elemento) (ficheros, carpetas []string) {
 		}
 	}
 	return ficheros, carpetas
+}
+
+// Arrastrando es el `dragenter`/`dragleave` de la zona de soltar de la web: con ficheros
+// del sistema arrastrándose por encima de la ventana (true) el explorador se tapa con
+// «Suelta para subir aquí», y se destapa al salir, al cancelar o al soltar. Lo conecta
+// el `main` con `soltar.AlArrastrar`. Solo se ve en «Mi unidad» y con red, que es donde
+// soltar sube algo (SubirEntradas); en otra sección se apunta y no se repinta nada.
+func (p *Pantalla) Arrastrando(encima bool) {
+	if p.explor.Arrastrando == encima {
+		return
+	}
+	p.explor.Arrastrando = encima
+	if p.seccion == MiUnidad && !p.explor.SinRed() {
+		p.Repintar()
+	}
 }
 
 // Subir sube los ficheros que la persona haya soltado en la ventana. Una CARPETA
@@ -1337,4 +1473,36 @@ func (p *Pantalla) pedirMiniatura(el Elemento) {
 			}
 		})
 	}()
+}
+
+// AvisarCifrado reports a private storage failure without exposing source details.
+func (p *Pantalla) AvisarCifrado(message string) {
+	if !p.cerrada.Load() {
+		p.avisar(ui.AvisoPeligro, message, "")
+	}
+}
+
+// ordenarPor es la pulsación sobre una columna o el selector «Ordenar»: la misma columna
+// invierte el sentido. Se recuerda, y la carpeta se vuelve a pedir en el orden nuevo
+// desde arriba, porque lo ordena el servicio.
+func (p *Pantalla) ordenarPor(campo CampoOrden) {
+	p.ponerOrden(SiguienteOrden(p.explor.Orden, campo))
+	GuardarOrden(prefs(), p.explor.Orden)
+	carpeta := p.carpetaActual()
+	p.enSegundoPlano(func() { p.cargarCarpeta(carpeta) })
+}
+
+// ponerOrden cambia el orden de la interfaz y el que leen las cargas. Se llama en la
+// rutina de la interfaz.
+func (p *Pantalla) ponerOrden(o Orden) {
+	p.explor.Orden = o
+	p.orden.Store(&o)
+}
+
+// ordenDeCarga es el orden vigente, para pedir la carpeta desde una rutina de carga.
+func (p *Pantalla) ordenDeCarga() Orden {
+	if o := p.orden.Load(); o != nil {
+		return *o
+	}
+	return OrdenDelServicio
 }

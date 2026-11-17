@@ -37,3 +37,8 @@ test('multi-token es AND: todas las palabras deben aparecer', () => {
 test('sin coincidencias devuelve lista vacía', () => {
   expect(filterCommands(cmds, 'zzz')).toEqual([]);
 });
+
+test('pliega acentos: «reunion» encuentra «Reunión»', () => {
+  const filas: Row[] = [{ label: 'Reunión semanal', group: 'Proyectos' }, ...cmds];
+  expect(filterCommands(filas, 'reunion').map((c) => c.label)).toEqual(['Reunión semanal']);
+});

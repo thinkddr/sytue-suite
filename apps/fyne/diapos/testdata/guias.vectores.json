@@ -1,0 +1,298 @@
+{
+  "comentario": "Vectores compartidos de guiasDeAjuste (web) y su espejo Go en apps/fyne/diapos: misma entrada, misma salida.",
+  "casos": [
+    {
+      "nombre": "sin nada cerca no ajusta",
+      "mov": {
+        "x": 13,
+        "y": 23,
+        "w": 10,
+        "h": 10
+      },
+      "otros": [
+        {
+          "x": 60,
+          "y": 60,
+          "w": 10,
+          "h": 10
+        }
+      ],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": 1,
+      "esperado": {
+        "dx": 0,
+        "dy": 0,
+        "lineas": []
+      }
+    },
+    {
+      "nombre": "borde izquierdo al de otra caja",
+      "mov": {
+        "x": 20.6,
+        "y": 40,
+        "w": 10,
+        "h": 10
+      },
+      "otros": [
+        {
+          "x": 20,
+          "y": 10,
+          "w": 15,
+          "h": 5
+        }
+      ],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": 1,
+      "esperado": {
+        "dx": -0.6,
+        "dy": 0,
+        "lineas": [
+          {
+            "eje": "x",
+            "pos": 20,
+            "desde": 10,
+            "hasta": 50
+          },
+          {
+            "eje": "y",
+            "pos": 50,
+            "desde": 0,
+            "hasta": 100
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "centro del lienzo en ambos ejes",
+      "mov": {
+        "x": 39.5,
+        "y": 45.3,
+        "w": 20,
+        "h": 10
+      },
+      "otros": [],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": 1,
+      "esperado": {
+        "dx": 0.5,
+        "dy": -0.3,
+        "lineas": [
+          {
+            "eje": "x",
+            "pos": 50,
+            "desde": 0,
+            "hasta": 100
+          },
+          {
+            "eje": "y",
+            "pos": 50,
+            "desde": 0,
+            "hasta": 100
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "gana el objetivo más cercano y se ven todas las guías que coinciden",
+      "mov": {
+        "x": 30.4,
+        "y": 70,
+        "w": 10,
+        "h": 10
+      },
+      "otros": [
+        {
+          "x": 31,
+          "y": 0,
+          "w": 8,
+          "h": 5
+        },
+        {
+          "x": 30,
+          "y": 20,
+          "w": 10,
+          "h": 5
+        }
+      ],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": 1,
+      "esperado": {
+        "dx": -0.4,
+        "dy": 0,
+        "lineas": [
+          {
+            "eje": "x",
+            "pos": 30,
+            "desde": 20,
+            "hasta": 80
+          },
+          {
+            "eje": "x",
+            "pos": 35,
+            "desde": 0,
+            "hasta": 80
+          },
+          {
+            "eje": "x",
+            "pos": 40,
+            "desde": 20,
+            "hasta": 80
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "tolerancia por eje",
+      "mov": {
+        "x": 51.5,
+        "y": 51.5,
+        "w": 10,
+        "h": 10
+      },
+      "otros": [
+        {
+          "x": 50,
+          "y": 20,
+          "w": 20,
+          "h": 5
+        }
+      ],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": {
+        "x": 2,
+        "y": 1
+      },
+      "esperado": {
+        "dx": -1.5,
+        "dy": 0,
+        "lineas": [
+          {
+            "eje": "x",
+            "pos": 50,
+            "desde": 0,
+            "hasta": 100
+          },
+          {
+            "eje": "x",
+            "pos": 60,
+            "desde": 20,
+            "hasta": 61.5
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "redimensionar: solo se ajustan los bordes finales",
+      "mov": {
+        "x": 10,
+        "y": 10,
+        "w": 29.5,
+        "h": 20
+      },
+      "otros": [
+        {
+          "x": 40,
+          "y": 60,
+          "w": 10,
+          "h": 10
+        }
+      ],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": 1,
+      "anclas": {
+        "x": ["fin"],
+        "y": ["fin"]
+      },
+      "esperado": {
+        "dx": 0.5,
+        "dy": 0,
+        "lineas": [
+          {
+            "eje": "x",
+            "pos": 40,
+            "desde": 10,
+            "hasta": 70
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "las guías llegan hasta la caja ya corregida en el otro eje",
+      "mov": {
+        "x": 20.4,
+        "y": 60,
+        "w": 10,
+        "h": 10
+      },
+      "otros": [
+        {
+          "x": 30,
+          "y": 10,
+          "w": 20,
+          "h": 10
+        },
+        {
+          "x": 60,
+          "y": 70.5,
+          "w": 5,
+          "h": 5
+        }
+      ],
+      "lienzo": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 100
+      },
+      "tolerancia": 1,
+      "esperado": {
+        "dx": -0.4,
+        "dy": 0.5,
+        "lineas": [
+          {
+            "eje": "x",
+            "pos": 30,
+            "desde": 10,
+            "hasta": 70.5
+          },
+          {
+            "eje": "y",
+            "pos": 70.5,
+            "desde": 20,
+            "hasta": 65
+          }
+        ]
+      }
+    }
+  ]
+}

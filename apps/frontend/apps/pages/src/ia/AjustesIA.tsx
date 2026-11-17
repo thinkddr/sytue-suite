@@ -10,6 +10,7 @@ import {
   Checkbox,
   EmptyState,
   FieldGroup,
+  InlineHelp,
   Input,
   Meter,
   Select,
@@ -247,6 +248,7 @@ export function AjustesIA({ locale, administra }: AjustesIAProps): JSX.Element {
   if (errorCarga || !keyVista || !quota) {
     return (
       <EmptyState
+        tone="error"
         title={t('ai.settings.load_error')}
         description={
           errorCarga?.status === 401 || errorCarga?.status === 403
@@ -327,16 +329,13 @@ export function AjustesIA({ locale, administra }: AjustesIAProps): JSX.Element {
       </div>
 
       {mensaje ? (
-        <p
-          role={mensaje.tipo === 'error' ? 'alert' : 'status'}
-          class={`rounded-md border p-3 text-sm ${
-            mensaje.tipo === 'exito'
-              ? 'border-border bg-success-bg text-success-text'
-              : 'border-border bg-danger-bg text-danger-text'
-          }`}
+        <InlineHelp
+          tone={mensaje.tipo === 'exito' ? 'success' : 'danger'}
+          // El «guardado» también se anuncia: es la respuesta al botón que se pulsó.
+          live={mensaje.tipo === 'error' ? 'alert' : 'status'}
         >
           {mensaje.texto}
-        </p>
+        </InlineHelp>
       ) : null}
 
       <form
@@ -399,13 +398,8 @@ export function AjustesIA({ locale, administra }: AjustesIAProps): JSX.Element {
           </FieldGroup>
 
           {requiereAviso ? (
-            <div class="border-border bg-warning-bg rounded-md border p-4">
-              <p class="text-warning-text text-sm font-semibold">
-                {t('ai.settings.notice_eu_title')}
-              </p>
-              <p class="text-text mt-1 text-xs leading-relaxed">
-                {t('ai.settings.notice_eu_desc', { provider: provider.toUpperCase() })}
-              </p>
+            <InlineHelp tone="warning" live="off" title={t('ai.settings.notice_eu_title')}>
+              <p>{t('ai.settings.notice_eu_desc', { provider: provider.toUpperCase() })}</p>
               <div class="mt-3">
                 <Checkbox
                   id="notice-eu"
@@ -414,7 +408,7 @@ export function AjustesIA({ locale, administra }: AjustesIAProps): JSX.Element {
                   onChange={(e) => setNoticeAccepted(e.currentTarget.checked)}
                 />
               </div>
-            </div>
+            </InlineHelp>
           ) : null}
         </div>
 

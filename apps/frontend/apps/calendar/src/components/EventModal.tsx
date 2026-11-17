@@ -19,6 +19,7 @@ import {
   Modal,
   useToast,
   describedBy,
+  Tag,
 } from '@sytue/ui';
 import {
   saveEvent,
@@ -34,24 +35,44 @@ import {
   buildAlarm,
   buildRRule,
   guestPartstats,
+  normalizeWeekdays,
   parseGuests,
   parseOrganizer,
   parseReminders,
   REMINDER_PRESETS,
+  WEEKDAYS,
+  WORKWEEK,
+  type Weekday,
 } from '../lib/ical.js';
 import { GUEST_TONE, GuestList, guestStatusLabel } from './GuestList.js';
-import { applyRecurringEdit, applyRecurringDelete, type RecurTarget } from '../lib/recurrence.js';
+import {
+  applyRecurringEdit,
+  applyRecurringDelete,
+  permiteSiguientes,
+  type RecurTarget,
+} from '../lib/recurrence.js';
 import { ScopeDialog } from './ScopeDialog.js';
 import { AsistenteEvento } from './AsistenteEvento.js';
 import type { EventoPropuesto } from '../lib/ai.js';
 import { ColorSwatches } from './CalendarModal.js';
 import { FindTimePanel } from './FindTimePanel.js';
 import { ResourcePicker, type BookingStatus } from './ResourcePicker.js';
-import { shiftEnd, toDatetimeLocal, withLocalDate } from './dates.js';
+import {
+  finExclusivo,
+  shiftEnd,
+  toDatetimeLocal,
+  weekdayLongLabels,
+  weekdayNarrowLabels,
+  withLocalDate,
+} from './dates.js';
 import { browserZone, listTimeZones, zoneLabel, instantFromZonedWallClock } from './tz.js';
 import type { T } from '../i18n/index.js';
 
-type RepeatFreq = '' | Recurrence['freq'];
+/**
+ * 'WEEKDAYS' = «cada día laborable», que se guarda como semanal de lunes a viernes.
+ * 'CUSTOM' = la regla que trae el evento y el formulario no sabe editar (`rruleRaw`).
+ */
+type RepeatFreq = '' | Recurrence['freq'] | 'WEEKDAYS' | 'CUSTOM';
 type RepeatEnd = 'never' | 'count' | 'until';
 
 export interface EditingEvent {
@@ -68,6 +89,11 @@ export interface EditingEvent {
   location?: string | undefined;
   description?: string | undefined;
   recurrence?: Recurrence | undefined;
+  /**
+   * RRULE tal cual (sin «RRULE:») si el formulario no la sabe editar (BYMONTH, 2MO…):
+   * «Repetir» dice «Personalizada» y solo deja conservarla o quitarla.
+   */
+  rruleRaw?: string | undefined;
   /** Color del evento (hex #RRGGBB); vacio => hereda el del calendario. */
   color?: string | undefined;
   /** URL de la videollamada del evento (RFC 7986 CONFERENCE). */
@@ -92,6 +118,11 @@ interface Props {
   /** Calendarios del usuario (selector de destino). */
   calendars: Calendar[];
   editing: EditingEvent | null;
+  /**
+   * Recordatorio que trae un evento NUEVO (minutos antes; null, ninguno), de los
+   * ajustes de Calendar. Al editar uno que ya existe manda lo que tenga guardado.
+   */
+  recordatorioPorDefecto?: number | null | undefined;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -102,6 +133,7 @@ export function EventModal({
   open,
   calendars,
   editing,
+  recordatorioPorDefecto = null,
   onClose,
   onSaved,
 }: Props): JSX.Element | null {
@@ -130,10 +162,12 @@ export function EventModal({
   const [color, setColor] = useState(editing?.color ?? '');
   // Panel «buscar hueco» (asistente de programacion): plegado por defecto.
   const [findTimeOpen, setFindTimeOpen] = useState(false);
-  const [repeatFreq, setRepeatFreq] = useState<RepeatFreq>(editing?.recurrence?.freq ?? '');
+  const [repeatFreq, setRepeatFreq] = useState<RepeatFreq>(repeatFreqOf(editing));
   const [repeatEnd, setRepeatEnd] = useState<RepeatEnd>(repeatEndOf(editing?.recurrence));
   const [repeatCount, setRepeatCount] = useState(String(editing?.recurrence?.count ?? 4));
   const [repeatUntil, setRepeatUntil] = useState(editing?.recurrence?.until ?? '');
+  // Días de una semanal. null = sin tocar: el del inicio, como la regla sin BYDAY.
+  const [repeatDays, setRepeatDays] = useState<Weekday[] | null>(repeatDaysOf(editing));
   const [invitees, setInvitees] = useState<string[]>(editing?.invitees ?? []);
   const [inviteeDraft, setInviteeDraft] = useState('');
   const [inviteeError, setInviteeError] = useState<string | null>(null);
@@ -143,8 +177,8 @@ export function EventModal({
   const [resourceIds, setResourceIds] = useState<string[]>([]);
   const [bookingStatus, setBookingStatus] = useState<Record<string, BookingStatus>>({});
   // Recordatorios editables (minutos antes) + VALARM no editables (passthrough).
-  const [reminders, setReminders] = useState<number[]>(
-    () => parseReminders((editing?.alarms ?? []).join('\r\n')).minutes,
+  const [reminders, setReminders] = useState<number[]>(() =>
+    recordatoriosIniciales(editing, recordatorioPorDefecto),
   );
   const [passthroughAlarms, setPassthroughAlarms] = useState<string[]>(
     () => parseReminders((editing?.alarms ?? []).join('\r\n')).passthrough,
@@ -196,8 +230,10 @@ export function EventModal({
   // Instantes reales (tz-correctos) del inicio/fin elegidos: la disponibilidad de
   // recursos y la reserva usan el MISMO instante que persiste el evento.
   const startInstant = useMemo(() => localInstant(start, tzid, allDay), [start, tzid, allDay]);
+  // En día completo el campo dice el ÚLTIMO día; la franja real acaba al empezar el
+  // siguiente (sin esto, reservar un día suelto pedía una franja vacía).
   const endInstant = useMemo(
-    () => localInstant(end || start, tzid, allDay),
+    () => localInstant(allDay ? finExclusivo(start, end) : end || start, tzid, allDay),
     [end, start, tzid, allDay],
   );
 
@@ -216,10 +252,11 @@ export function EventModal({
     setDescription(editing?.description ?? '');
     setColor(editing?.color ?? '');
     setFindTimeOpen(false);
-    setRepeatFreq(editing?.recurrence?.freq ?? '');
+    setRepeatFreq(repeatFreqOf(editing));
     setRepeatEnd(repeatEndOf(editing?.recurrence));
     setRepeatCount(String(editing?.recurrence?.count ?? 4));
     setRepeatUntil(editing?.recurrence?.until ?? '');
+    setRepeatDays(repeatDaysOf(editing));
     setInvitees(editing?.invitees ?? []);
     setInviteeDraft('');
     setInviteeError(null);
@@ -228,9 +265,12 @@ export function EventModal({
     setSummaryError(null);
     setEndError(null);
     const parsed = parseReminders((editing?.alarms ?? []).join('\r\n'));
-    setReminders(parsed.minutes);
+    setReminders(recordatoriosIniciales(editing, recordatorioPorDefecto));
     setPassthroughAlarms(parsed.passthrough);
     setScopePrompt(null);
+    // El recordatorio por defecto se lee al abrir; cambiarlo con el modal abierto no
+    // debe pisar lo que la persona ya ha tocado.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
   // Si los calendarios llegan con el modal ya abierto, fija el destino por
@@ -355,7 +395,11 @@ export function EventModal({
     // Fin anterior al inicio: el `min` del campo marca el valor como inválido pero
     // no impide guardarlo (esto no es un envío nativo), y el evento acababa en el
     // calendario con duración negativa, invisible en la rejilla.
-    if (Date.parse(end) < Date.parse(start)) {
+    // En día completo cuentan las fechas: la hora que arrastran los campos no se ve.
+    const finAntes = allDay
+      ? end !== '' && end.slice(0, 10) < start.slice(0, 10)
+      : Date.parse(end) < Date.parse(start);
+    if (finAntes) {
       setEndError(t('event.endBeforeStart'));
       document.getElementById('ev-end')?.focus();
       return;
@@ -371,27 +415,65 @@ export function EventModal({
       draft && !invitees.some((e) => e.toLowerCase() === draft.toLowerCase())
         ? [...invitees, draft]
         : invitees;
-    const recurrence = buildRecurrence(repeatFreq, repeatEnd, repeatCount, repeatUntil);
+    const custom = repeatFreq === 'CUSTOM';
+    const recurrence = buildRecurrence(
+      repeatFreq,
+      repeatEnd,
+      repeatCount,
+      repeatUntil,
+      repeatDays,
+      weekdayOf(start),
+    );
+    // El formulario no edita el INTERVAL: con la misma frecuencia se queda el que había
+    // («cada 2 semanas» no pasa a «cada semana» por cambiar el fin). «Cada día
+    // laborable» es siempre cada semana.
+    const intervalo = editing?.recurrence?.interval;
+    if (
+      recurrence &&
+      intervalo &&
+      repeatFreq !== 'WEEKDAYS' &&
+      recurrence.freq === editing?.recurrence?.freq
+    ) {
+      recurrence.interval = intervalo;
+    }
+    const rruleRaw = custom ? editing?.rruleRaw : undefined;
+    // Sin tocar «Repetir», el BFF conserva la RRULE guardada byte a byte (rehacerla
+    // desde el formulario normaliza el UNTIL y quita lo que no entiende, como WKST).
+    const recurrenceUnchanged =
+      isEdit &&
+      (custom ||
+        (!editing?.rruleRaw && sameRecurrence(recurrence, editing?.recurrence, weekdayOf(start))));
+    const repeticion: Pick<EventInput, 'recurrence' | 'rruleRaw' | 'recurrenceUnchanged'> = {
+      ...(recurrence ? { recurrence } : {}),
+      ...(rruleRaw ? { rruleRaw } : {}),
+      ...(recurrenceUnchanged ? { recurrenceUnchanged } : {}),
+    };
     // Las respuestas que ya dieron los invitados viajan con el evento: guardar no las
     // devuelve a «sin responder».
     const partstats = guestPartstats(editing?.ical);
     // VALARM = recordatorios editados (minutos antes) + los no editables preservados.
     const alarms = [...reminders.map((m) => buildAlarm(m, summary.trim())), ...passthroughAlarms];
+    // El campo «Fin» de un día completo es el último día; el DTEND es exclusivo (RFC 5545
+    // §3.6.1): «8 → 10 nov» guarda DTEND=20261111 y un día suelto, el día siguiente.
+    const finGuardado = allDay ? finExclusivo(start, end) : end;
 
     // Editar una INSTANCIA de serie recurrente: preguntar el alcance y aplicar el
     // split (this/following/all) en vez del PUT directo, para no corromper la serie.
-    if (isEdit && editing?.recurrence) {
+    if (isEdit && (editing?.recurrence || editing?.rruleRaw)) {
       const edited: EventInput = {
         summary: summary.trim(),
         start,
         allDay,
         ...(allDay ? {} : { tzid }),
-        ...(end ? { end } : {}),
+        ...(finGuardado ? { end: finGuardado } : {}),
         ...(location ? { location } : {}),
         ...(description ? { description } : {}),
         ...(color ? { color } : {}),
+        ...(conferenceUrl ? { conferenceUrl } : {}),
         ...(finalInvitees.length ? { attendees: finalInvitees, partstats } : {}),
         ...(alarms.length ? { alarms } : {}),
+        ...(rruleRaw ? { rruleRaw } : {}),
+        ...(recurrenceUnchanged ? { recurrenceUnchanged } : {}),
       };
       setScopePrompt({ op: 'edit', edited, rule: recurrence });
       return;
@@ -410,12 +492,12 @@ export function EventModal({
       allDay,
       ...(allDay ? {} : { tzid }),
       ...(bookingUid ? { uid: bookingUid } : {}),
-      ...(end ? { end } : {}),
+      ...(finGuardado ? { end: finGuardado } : {}),
       ...(location ? { location } : {}),
       ...(description ? { description } : {}),
       ...(color ? { color } : {}),
       ...(conferenceUrl ? { conferenceUrl } : {}),
-      ...(recurrence ? { recurrence } : {}),
+      ...repeticion,
       ...(finalInvitees.length ? { attendees: finalInvitees, partstats } : {}),
       ...(alarms.length ? { alarms } : {}),
     };
@@ -435,7 +517,7 @@ export function EventModal({
           ...(editing?.etag ? { etag: editing.etag } : {}),
         });
       }
-      const bookingToast = await bookSelectedResources(bookingUid, recurrence);
+      const bookingToast = await bookSelectedResources(bookingUid, recurrence, rruleRaw);
       toast.notify(
         bookingToast ?? {
           tone: 'success',
@@ -459,9 +541,10 @@ export function EventModal({
   async function bookSelectedResources(
     uid: string | undefined,
     recurrence: Recurrence | undefined,
+    rruleRaw?: string,
   ): Promise<{ tone: 'success' | 'warning'; title: string } | null> {
     if (!uid || resourceIds.length === 0) return null;
-    const rrule = recurrence ? buildRRule(recurrence).replace(/^RRULE:/, '') : undefined;
+    const rrule = recurrence ? buildRRule(recurrence).replace(/^RRULE:/, '') : rruleRaw;
     const statuses: Record<string, BookingStatus> = {};
     await Promise.all(
       resourceIds.map(async (id) => {
@@ -501,7 +584,7 @@ export function EventModal({
   async function handleDelete(): Promise<void> {
     if (!editing?.href) return;
     // Serie recurrente: preguntar el alcance del borrado (this/following/all).
-    if (editing.recurrence) {
+    if (editing.recurrence || editing.rruleRaw) {
       setScopePrompt({ op: 'delete' });
       return;
     }
@@ -733,12 +816,22 @@ export function EventModal({
                 onChange={(e) => setRepeatFreq(e.currentTarget.value as RepeatFreq)}
               >
                 <option value="">{t('event.repeatNever')}</option>
-                <option value="DAILY">{t('event.repeatDaily')}</option>
-                <option value="WEEKLY">{t('event.repeatWeekly')}</option>
-                <option value="MONTHLY">{t('event.repeatMonthly')}</option>
+                {editing?.rruleRaw ? (
+                  // Una regla que el formulario no sabe editar: se conserva o se quita,
+                  // nunca se reescribe a medias.
+                  <option value="CUSTOM">{t('event.repeatCustom')}</option>
+                ) : (
+                  <>
+                    <option value="DAILY">{t('event.repeatDaily')}</option>
+                    <option value="WEEKLY">{t('event.repeatWeekly')}</option>
+                    <option value="MONTHLY">{t('event.repeatMonthly')}</option>
+                    <option value="YEARLY">{t('event.repeatYearly')}</option>
+                    <option value="WEEKDAYS">{t('event.repeatWeekdays')}</option>
+                  </>
+                )}
               </Select>
             </FieldGroup>
-            {repeatFreq ? (
+            {repeatFreq && repeatFreq !== 'CUSTOM' ? (
               <FieldGroup label={t('event.repeatEnds')} htmlFor="ev-repeat-end">
                 <Select
                   id="ev-repeat-end"
@@ -752,7 +845,15 @@ export function EventModal({
               </FieldGroup>
             ) : null}
           </div>
-          {repeatFreq && repeatEnd === 'count' ? (
+          {repeatFreq === 'WEEKLY' ? (
+            <WeekdayPicker
+              t={t}
+              locale={locale}
+              selected={repeatDays ?? [weekdayOf(start)]}
+              onChange={setRepeatDays}
+            />
+          ) : null}
+          {repeatFreq && repeatFreq !== 'CUSTOM' && repeatEnd === 'count' ? (
             <FieldGroup label={t('event.repeatCount')} htmlFor="ev-repeat-count">
               <Input
                 id="ev-repeat-count"
@@ -763,7 +864,7 @@ export function EventModal({
               />
             </FieldGroup>
           ) : null}
-          {repeatFreq && repeatEnd === 'until' ? (
+          {repeatFreq && repeatFreq !== 'CUSTOM' && repeatEnd === 'until' ? (
             <FieldGroup label={t('event.repeatUntil')} htmlFor="ev-repeat-until">
               <Input
                 id="ev-repeat-until"
@@ -845,7 +946,6 @@ export function EventModal({
               t={t}
               value={color}
               onChange={setColor}
-              idPrefix="ev-color"
               allowNone
               labelledBy="ev-color-label"
             />
@@ -865,24 +965,21 @@ export function EventModal({
                 {invitees.map((email) => {
                   const respuesta = respuestas.get(email.toLowerCase());
                   return (
-                    <li
-                      key={email}
-                      class="rounded-pill border-border bg-bg-subtle text-text inline-flex items-center gap-1 border py-0.5 pr-1 pl-2.5 text-sm"
-                    >
-                      <span class="max-w-[16rem] truncate">{email}</span>
-                      {respuesta ? (
-                        <Badge tone={GUEST_TONE[respuesta]} class="shrink-0">
-                          {guestStatusLabel(t, respuesta)}
-                        </Badge>
-                      ) : null}
-                      <button
-                        type="button"
-                        aria-label={t('event.guestRemove', { email })}
-                        onClick={() => removeInvitee(email)}
-                        class="text-text-muted hover:bg-danger-bg hover:text-danger-text sytue-focus-ring rounded-control grid h-5 w-5 place-items-center transition-colors"
+                    <li key={email} class="flex max-w-full min-w-0">
+                      <Tag
+                        maxWidth="max-w-[16rem]"
+                        trailing={
+                          respuesta ? (
+                            <Badge tone={GUEST_TONE[respuesta]}>
+                              {guestStatusLabel(t, respuesta)}
+                            </Badge>
+                          ) : undefined
+                        }
+                        onRemove={() => removeInvitee(email)}
+                        removeLabel={t('event.guestRemove', { email })}
                       >
-                        <Icon name="close" size={14} />
-                      </button>
+                        {email}
+                      </Tag>
                     </li>
                   );
                 })}
@@ -952,6 +1049,9 @@ export function EventModal({
         t={t}
         open={scopePrompt !== null}
         op={scopePrompt?.op ?? 'edit'}
+        conSiguientes={
+          scopePrompt?.op !== 'edit' || permiteSiguientes(scopePrompt.edited?.rruleRaw)
+        }
         busy={busy !== false}
         onConfirm={(scope) => void performScoped(scope)}
         onClose={() => setScopePrompt(null)}
@@ -968,7 +1068,22 @@ function isPreset(m: number): boolean {
   return REMINDER_PRESETS.includes(m);
 }
 
-function reminderLabel(t: T, minutes: number): string {
+/**
+ * Los recordatorios con los que se abre el formulario: los del evento si los tiene y,
+ * si es NUEVO y no trae ninguno, el de los ajustes. Un duplicado también es nuevo
+ * (href null) pero ya trae sus alarmas: esas mandan.
+ */
+export function recordatoriosIniciales(
+  editing: EditingEvent | null,
+  porDefecto: number | null,
+): number[] {
+  if (editing && !editing.href && !editing.alarms?.length && porDefecto !== null) {
+    return [porDefecto];
+  }
+  return parseReminders((editing?.alarms ?? []).join('\r\n')).minutes;
+}
+
+export function reminderLabel(t: T, minutes: number): string {
   if (minutes === 0) return t('reminder.atTime');
   if (minutes % 10080 === 0) return t('reminder.weeks', { count: minutes / 10080 });
   if (minutes % 1440 === 0) return t('reminder.days', { count: minutes / 1440 });
@@ -1099,6 +1214,59 @@ function durationMinutesOf(start: string, end: string): number {
   return Number.isFinite(min) && min >= 15 ? Math.round(min) : 60;
 }
 
+/** Valor inicial de «Repetir»: la regla que entiende, «Personalizada» o ninguna. */
+function repeatFreqOf(editing: EditingEvent | null | undefined): RepeatFreq {
+  const rec = editing?.recurrence;
+  if (rec) return isWorkweek(rec) ? 'WEEKDAYS' : rec.freq;
+  return editing?.rruleRaw ? 'CUSTOM' : '';
+}
+
+/** Días elegidos al abrir: los del BYDAY de una semanal, o null (el del inicio). */
+function repeatDaysOf(editing: EditingEvent | null | undefined): Weekday[] | null {
+  const rec = editing?.recurrence;
+  return rec?.freq === 'WEEKLY' && rec.byday?.length ? [...rec.byday] : null;
+}
+
+/** La regla es «cada día laborable»: semanal, cada semana, de lunes a viernes. */
+function isWorkweek(rec: Recurrence): boolean {
+  return (
+    rec.freq === 'WEEKLY' &&
+    (rec.interval ?? 1) === 1 &&
+    (rec.byday ?? []).join(',') === WORKWEEK.join(',')
+  );
+}
+
+/** El día de la semana (BYDAY) de un datetime-local del formulario. */
+function weekdayOf(value: string): Weekday {
+  const d = new Date(value);
+  const i = Number.isNaN(d.getTime()) ? 0 : (d.getDay() + 6) % 7;
+  return WEEKDAYS[i]!;
+}
+
+/**
+ * Misma regla (lo que el formulario sabe expresar de ella). Un BYDAY de un solo día,
+ * el del inicio, es la semanal sin BYDAY (`buildRecurrence` lo quita): sin esto, una
+ * «FREQ=WEEKLY;BYDAY=MO» de otro cliente se reescribía al cambiar solo el título.
+ */
+export function sameRecurrence(
+  a: Recurrence | undefined,
+  b: Recurrence | undefined,
+  startDay: Weekday,
+): boolean {
+  if (!a || !b) return !a && !b;
+  const dias = (r: Recurrence) => {
+    const d = (r.byday ?? []).join(',');
+    return d === startDay ? '' : d;
+  };
+  return (
+    a.freq === b.freq &&
+    (a.interval ?? 1) === (b.interval ?? 1) &&
+    dias(a) === dias(b) &&
+    (a.count ?? 0) === (b.count ?? 0) &&
+    (a.until ?? '') === (b.until ?? '')
+  );
+}
+
 /** Deriva el modo de fin del selector desde una Recurrence existente. */
 function repeatEndOf(rec: Recurrence | undefined): RepeatEnd {
   if (rec?.count) return 'count';
@@ -1106,15 +1274,78 @@ function repeatEndOf(rec: Recurrence | undefined): RepeatEnd {
   return 'never';
 }
 
-/** Ensambla la Recurrence a enviar, o undefined si el evento no se repite. */
-function buildRecurrence(
+/**
+ * Ensambla la Recurrence a enviar, o undefined si el evento no se repite (o su regla
+ * es la «Personalizada», que viaja aparte como `rruleRaw`).
+ */
+export function buildRecurrence(
   freq: RepeatFreq,
   end: RepeatEnd,
   count: string,
   until: string,
+  days: readonly Weekday[] | null = null,
+  startDay: Weekday = 'MO',
 ): Recurrence | undefined {
-  if (!freq) return undefined;
-  if (end === 'count') return { freq, count: Math.max(1, parseInt(count, 10) || 1) };
-  if (end === 'until' && until) return { freq, until };
-  return { freq };
+  if (!freq || freq === 'CUSTOM') return undefined;
+  const rec: Recurrence = freq === 'WEEKDAYS' ? { freq: 'WEEKLY', byday: [...WORKWEEK] } : { freq };
+  if (freq === 'WEEKLY' && days?.length) {
+    const byday = normalizeWeekdays(days);
+    // Solo el día del inicio es la semanal de siempre: sin BYDAY, la regla sigue al
+    // evento si luego se cambia de día.
+    if (byday.length && !(byday.length === 1 && byday[0] === startDay)) rec.byday = byday;
+  }
+  if (end === 'count') rec.count = Math.max(1, parseInt(count, 10) || 1);
+  else if (end === 'until' && until) rec.until = until;
+  return rec;
+}
+
+/**
+ * «Se repite el»: las siete iniciales de la semana como botones que se encienden y se
+ * apagan (`aria-pressed`). El lector de pantalla oye el nombre entero del día. El último
+ * día encendido no se apaga: una semanal sin días no es una regla.
+ */
+function WeekdayPicker({
+  t,
+  locale,
+  selected,
+  onChange,
+}: {
+  t: T;
+  locale: Locale;
+  selected: readonly Weekday[];
+  onChange: (days: Weekday[]) => void;
+}): JSX.Element {
+  const narrow = weekdayNarrowLabels(locale);
+  const long = weekdayLongLabels(locale);
+  return (
+    <div class="flex flex-col gap-1.5">
+      <span id="ev-repeat-days" class="text-text text-sm font-semibold">
+        {t('event.repeatOn')}
+      </span>
+      <div role="group" aria-labelledby="ev-repeat-days" class="flex flex-wrap gap-1">
+        {WEEKDAYS.map((day, i) => {
+          const on = selected.includes(day);
+          return (
+            <Button
+              key={day}
+              size="sm"
+              iconOnly
+              variant={on ? 'primary' : 'ghost'}
+              aria-pressed={on}
+              aria-label={long[i]}
+              title={long[i]}
+              onClick={() => {
+                if (on && selected.length === 1) return;
+                onChange(
+                  normalizeWeekdays(on ? selected.filter((d) => d !== day) : [...selected, day]),
+                );
+              }}
+            >
+              {narrow[i]}
+            </Button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

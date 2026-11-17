@@ -304,7 +304,7 @@ func anfitriona(seleccion string) string {
 	if !ok {
 		return ""
 	}
-	return Ref(min(r.C1, Columnas-1), r.R1)
+	return Ref(min(r.C1, MaxColumnas-1), r.R1)
 }
 
 // abrirMinigrafico es `SparklineMenu`: los que hay (con quitar), el rango, el tipo y
@@ -478,7 +478,7 @@ func (lz *Lienzo) cabecerasDe(c *editor.Contexto, rango string) []string {
 		return nil
 	}
 	var out []string
-	for col := r.C1; col <= min(r.C2, Columnas-1); col++ {
+	for col := r.C1; col <= min(r.C2, MaxColumnas-1); col++ {
 		t := strings.TrimSpace(lz.Libro.Texto(col, r.R1))
 		if t == "" {
 			t = c.Traducir("common.columnN", i18n.Vars{"n": col - r.C1 + 1})

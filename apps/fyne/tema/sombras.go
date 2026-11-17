@@ -10,7 +10,7 @@ import "image/color"
 // Las declara `--shadow-xs … --shadow-xl`, y su comentario dice para qué es cada una:
 // «xs contacto · sm tarjetas · md menús/popovers · lg overlays · xl modales».
 //
-// Van en **px de CSS en la hoja**, no en rem, así que el rem de 14 de esta suite NO las
+// Van en **px de CSS en la hoja**, no en rem, así que el rem de esta suite NO las
 // toca: un `24px` de la hoja son 24 px aquí. Es la única familia de medidas del tema de
 // la que eso es verdad junto con el layout canónico.
 //

@@ -37,6 +37,7 @@ func textos(m *ui.Menu) []string {
 // del formato que toca a cada tipo, guardar versión, renombrar y volver; y sin gancho, la entrada no hace como
 // que funciona.
 func TestElMenuArchivoEsElDeLaWeb(t *testing.T) {
+	a := test.NewTempApp(t)
 	var pedido string
 	ctx := &Contexto{Tipo: Hoja, Exportar: func(f string) { pedido = f }}
 	m := NuevoBotonArchivo(ctx).Menu()
@@ -58,10 +59,18 @@ func TestElMenuArchivoEsElDeLaWeb(t *testing.T) {
 		t.Errorf("«PDF accesible» sale marcada y sin cerrar el menú: %+v", op)
 	} else {
 		op.AlPulsar()
-		if !PDFSimple || NuevoBotonArchivo(ctx).Menu().Elementos[1].(*ui.ElementoMenu).Marcada {
+		if PDFAccesible() || NuevoBotonArchivo(ctx).Menu().Elementos[1].(*ui.ElementoMenu).Marcada {
 			t.Error("pulsar «PDF accesible» no la apaga")
 		}
-		PDFSimple = false
+		// Se guarda en las preferencias de la app, con la clave y el valor de la web: cerrar
+		// la app no la vuelve a encender. Se vio en ROJO cuando vivía en una variable.
+		if got := a.Preferences().String(ClavePDFAccesible); got != "0" {
+			t.Errorf("apagada se guarda «0» en %s, y hay %q", ClavePDFAccesible, got)
+		}
+		NuevoBotonArchivo(ctx).Menu().Elementos[1].(*ui.ElementoMenu).AlPulsar()
+		if !PDFAccesible() || a.Preferences().String(ClavePDFAccesible) != "" {
+			t.Error("volver a pulsarla la enciende y borra la clave, como `fijarPdfAccesible(true)`")
+		}
 	}
 	m.Elementos[2].(*ui.ElementoMenu).AlPulsar()
 	if pedido != "ooxml" {

@@ -52,6 +52,8 @@ type facturaImprimible struct {
 	Leyenda                         string
 	QR                              template.URL
 	QRTexto                         string
+	// qrPNG es la imagen del QR, para el PDF (el HTML la lleva en QR como data:).
+	qrPNG []byte
 	// Con líneas: sus columnas, las líneas y el desglose por tipo de IVA.
 	Columnas [5]string
 	Lineas   [][5]string
@@ -60,50 +62,59 @@ type facturaImprimible struct {
 
 // Imprimir — GET /api/v1/{modelo}/{id}/imprimir.
 func (h *Handlers) Imprimir(w http.ResponseWriter, r *http.Request) {
-	m := h.modeloDe(w, r)
-	if m == nil {
+	f, _, ok := h.facturaParaCliente(w, r)
+	if !ok {
 		return
 	}
-	if m.Clave != "factura_venta" {
-		httpx.Fail(w, r, errNoContable.WithMessage("Only customer invoices can be printed."))
-		return
-	}
-	ctx := r.Context()
-	reg, err := h.store.Obtener(ctx, m.Clave, chi.URLParam(r, "id"))
-	if err != nil {
-		httpx.Fail(w, r, errorDeLectura(err))
-		return
-	}
-	org, err := h.store.Organizacion(ctx)
-	if errors.Is(err, store.ErrNoEncontrado) {
-		httpx.Fail(w, r, errSinOrganizacion)
-		return
-	}
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	_, urlQR, err := h.registrosDeFactura(ctx, reg)
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	lineas, err := h.store.LineasDeFactura(ctx, reg.ID)
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	simplificada := cadena(reg.Data["tipo_factura"]) == "F2"
-	idioma := httpx.LanguageFromRequest(r)
-	rot := func(clave string) string { return h.cat.Rotulo(clave, idioma) }
-
-	f := h.construirFactura(ctx, reg, org, lineas, simplificada, idioma, rot, urlQR)
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	if err := plantillaFactura.Execute(w, f); err != nil {
 		httpx.Fail(w, r, err)
 	}
+}
+
+// facturaParaCliente reúne lo que lleva el impreso de la factura de la ruta: lo
+// comparten el HTML para imprimir, el PDF y el envío por correo, para que el
+// cliente reciba exactamente lo que se ve al imprimir. Si devuelve false, ya ha
+// respondido.
+func (h *Handlers) facturaParaCliente(w http.ResponseWriter, r *http.Request) (facturaImprimible, store.Registro, bool) {
+	m := h.modeloDe(w, r)
+	if m == nil {
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	if m.Clave != "factura_venta" {
+		httpx.Fail(w, r, errNoContable.WithMessage("Only customer invoices can be printed."))
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	ctx := r.Context()
+	reg, err := h.store.Obtener(ctx, m.Clave, chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Fail(w, r, errorDeLectura(err))
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	org, err := h.store.Organizacion(ctx)
+	if errors.Is(err, store.ErrNoEncontrado) {
+		httpx.Fail(w, r, errSinOrganizacion)
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	_, urlQR, err := h.registrosDeFactura(ctx, reg)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	lineas, err := h.store.LineasDeFactura(ctx, reg.ID)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return facturaImprimible{}, store.Registro{}, false
+	}
+	simplificada := cadena(reg.Data["tipo_factura"]) == "F2"
+	idioma := httpx.LanguageFromRequest(r)
+	rot := func(clave string) string { return h.cat.Rotulo(clave, idioma) }
+	return h.construirFactura(ctx, reg, org, lineas, simplificada, idioma, rot, urlQR), reg, true
 }
 
 // conLineas pinta las líneas y el desglose por tipo de IVA, con los totales que
@@ -281,6 +292,7 @@ func (h *Handlers) construirFactura(ctx context.Context, reg store.Registro, org
 	if urlQR != "" {
 		f.QRTexto = urlQR
 		if png, err := qr.PNG(urlQR); err == nil {
+			f.qrPNG = png
 			f.QR = template.URL("data:image/png;base64," + base64.StdEncoding.EncodeToString(png)) //nolint:gosec // lo genera este servicio
 		}
 	}

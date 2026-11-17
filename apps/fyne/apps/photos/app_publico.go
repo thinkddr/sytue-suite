@@ -125,7 +125,30 @@ func (a *App) pintarPublica() {
 	if a.cmp.editable {
 		quitar = a.quitarCompartida
 	}
-	p.capa.poner(VisorCompartido(v, *p.abierta, p.real, zoom, anterior, siguiente, a.cerrarPublica, quitar))
+	p.capa.poner(VisorCompartido(v, *p.abierta, a.posicionCompartida(), p.real, zoom, anterior, siguiente, a.cerrarPublica, quitar))
+}
+
+// posicionCompartida es el «5 / 30» de la foto abierta de un álbum compartido conmigo.
+// El álbum llega entero, sin páginas por pedir: nunca lleva el «+».
+func (a *App) posicionCompartida() string {
+	if a.pub.abierta == nil {
+		return ""
+	}
+	return a.textoDePosicion(posicion(a.pub.album.Items, a.pub.abierta.ID), len(a.pub.album.Items), false)
+}
+
+// saltoCompartido es Inicio y Fin en un álbum compartido conmigo: la primera o la
+// última foto. false: esa tecla no salta, o ya está ahí.
+func (a *App) saltoCompartido(tecla fyne.KeyName) bool {
+	if a.pub.abierta == nil {
+		return false
+	}
+	fotos := a.pub.album.Items
+	j, ok := saltoVisor(tecla, posicion(fotos, a.pub.abierta.ID), len(fotos))
+	if ok {
+		a.verPublica(fotos[j])
+	}
+	return ok
 }
 
 // vecinaCompartida abre la foto de al lado (-1, 1) del álbum compartido, o nil si no hay.

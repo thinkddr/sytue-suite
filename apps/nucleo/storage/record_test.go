@@ -49,3 +49,66 @@ func TestPrivateScopeRejectsNormalizationAndTupleAmbiguity(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicationTargetRejectsAmbiguousEndpoints(t *testing.T) {
+	if !(PublicationTarget{RoomID: "!private:matrix.test", DeviceID: "DEVICE"}).Valid() {
+		t.Fatal("valid target rejected")
+	}
+	for _, target := range []PublicationTarget{{RoomID: "!", DeviceID: "DEVICE"}, {RoomID: "!a b", DeviceID: "DEVICE"}, {RoomID: "!room", DeviceID: ""}, {RoomID: "!room", DeviceID: "other\x00device"}, {RoomID: "!room", DeviceID: string([]byte{0xff})}, {RoomID: "!room", DeviceID: strings.Repeat("a", 256)}} {
+		if target.Valid() {
+			t.Fatal("ambiguous target accepted")
+		}
+	}
+}
+
+func TestPrivateRecordExactReadbackKeepsEveryFieldAndOriginalNumericBytes(t *testing.T) {
+	for _, product := range Products() {
+		t.Run(product, func(t *testing.T) {
+			original := Record{Version: 1, Scope: Scope{Tenant: "owner-org", Subject: "person", Product: product}, ObjectID: "object", RevisionID: "revision", Role: "content", Previous: []string{"$first", "$second"}, Payload: []byte(`{"integer":900719925474099312345,"name":"private"}`)}
+			if !original.MatchesExact(original) {
+				t.Fatal("exact readback rejected")
+			}
+			for _, fault := range []string{"version", "tenant", "subject", "product", "object", "revision", "role", "bytes", "rounded-number", "previous", "previous-order", "missing-payload"} {
+				t.Run(fault, func(t *testing.T) {
+					actual := original
+					switch fault {
+					case "version":
+						actual.Version = 2
+					case "tenant":
+						actual.Scope.Tenant = "foreign"
+					case "subject":
+						actual.Scope.Subject = "foreign"
+					case "product":
+						if product == "drive" {
+							actual.Scope.Product = "mail"
+						} else {
+							actual.Scope.Product = "drive"
+						}
+					case "object":
+						actual.ObjectID = "other"
+					case "revision":
+						actual.RevisionID = "other"
+					case "role":
+						actual.Role = "index"
+					case "bytes":
+						actual.Payload = []byte(`{ "integer":900719925474099312345,"name":"private"}`)
+					case "rounded-number":
+						actual.Payload = []byte(`{"integer":900719925474099300000,"name":"private"}`)
+					case "previous":
+						actual.Previous = []string{"$first"}
+					case "previous-order":
+						actual.Previous = []string{"$second", "$first"}
+					case "missing-payload":
+						actual.Payload = nil
+					}
+					if original.MatchesExact(actual) || actual.MatchesExact(original) {
+						t.Fatal("substituted logical record accepted", fault)
+					}
+				})
+			}
+		})
+	}
+	if (Record{}).MatchesExact(Record{}) {
+		t.Fatal("two invalid empty records matched")
+	}
+}

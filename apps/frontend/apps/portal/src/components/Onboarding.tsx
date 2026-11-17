@@ -27,6 +27,7 @@ import {
   Button,
   ChoiceCard,
   Checkbox,
+  CopyField,
   EmptyState,
   FieldGroup,
   FieldHint,
@@ -481,9 +482,9 @@ function OnboardingWizard({ locale }: { locale: Locale }) {
   if (failed) {
     return (
       <EmptyState
+        tone="error"
         title={t('ob.failedTitle')}
         description={t('ob.failedBody')}
-        illustration={<Icon name="danger" size={32} />}
         action={
           <Button variant="primary" onClick={() => window.location.reload()}>
             {t('ob.retry')}
@@ -754,7 +755,6 @@ function OnboardingWizard({ locale }: { locale: Locale }) {
                       state={domainState}
                       busy={busy}
                       onCheck={() => void run(checkDomain)}
-                      onCopy={copy}
                     />
                   </div>
                 </details>
@@ -764,7 +764,6 @@ function OnboardingWizard({ locale }: { locale: Locale }) {
                   state={domainState}
                   busy={busy}
                   onCheck={() => void run(checkDomain)}
-                  onCopy={copy}
                 />
               )}
             </div>
@@ -866,7 +865,7 @@ function OnboardingWizard({ locale }: { locale: Locale }) {
             class="border-border-subtle rounded-lg border border-dashed"
             title={t('ob.people.emptyTitle')}
             description={t('ob.people.emptyBody')}
-            illustration={<Icon name="users" size={28} />}
+            icon="users"
           />
         )}
       </div>
@@ -1387,13 +1386,11 @@ function DomainPanel({
   state,
   busy,
   onCheck,
-  onCopy,
 }: {
   t: T;
   state: DomainWire | undefined;
   busy: boolean;
   onCheck: () => void;
-  onCopy: (text: string, what: PortalMessageKey) => Promise<void>;
 }) {
   return (
     <div class="border-border bg-surface-raised flex flex-col gap-4 rounded-lg border p-4">
@@ -1403,24 +1400,9 @@ function DomainPanel({
             <p class="text-text text-sm font-semibold">{t('ob.dnsRec.title')}</p>
             <p class="text-text-muted mt-1 text-sm leading-relaxed">{t('ob.dnsRec.body')}</p>
             <div class="mt-3 flex flex-col gap-2">
-              <CopyRow
-                label={t('ob.dnsRec.type')}
-                value="TXT"
-                copyLabel={t('devices.copy')}
-                onCopy={() => void onCopy('TXT', 'ob.copied.recordType')}
-              />
-              <CopyRow
-                label={t('ob.dnsRec.name')}
-                value={state.record_name}
-                copyLabel={t('devices.copy')}
-                onCopy={() => void onCopy(state.record_name, 'ob.copied.recordName')}
-              />
-              <CopyRow
-                label={t('ob.dnsRec.value')}
-                value={state.record_value}
-                copyLabel={t('devices.copy')}
-                onCopy={() => void onCopy(state.record_value, 'ob.copied.recordValue')}
-              />
+              <CopyField label={t('ob.dnsRec.type')} value="TXT" labelWidth="sm" />
+              <CopyField label={t('ob.dnsRec.name')} value={state.record_name} labelWidth="sm" />
+              <CopyField label={t('ob.dnsRec.value')} value={state.record_value} labelWidth="sm" />
             </div>
           </div>
 
@@ -1452,7 +1434,7 @@ function DomainPanel({
           )}
         </>
       ) : (
-        <p class="text-text-subtle text-sm">{t('ob.dnsRec.empty')}</p>
+        <EmptyState compact title={t('ob.dnsRec.empty')} />
       )}
 
       <div>
@@ -1689,29 +1671,6 @@ function CloudflarePanel({
           )}
         </>
       ) : null}
-    </div>
-  );
-}
-
-function CopyRow({
-  label,
-  value,
-  copyLabel,
-  onCopy,
-}: {
-  label: string;
-  value: string;
-  /** Rótulo del botón: lo pasa el padre, que es quien tiene la `t`. */
-  copyLabel: string;
-  onCopy: () => void;
-}) {
-  return (
-    <div class="border-border bg-surface flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-      <span class="sytue-meta w-full shrink-0 sm:w-24">{label}</span>
-      <code class="text-text min-w-0 flex-1 font-mono text-xs break-all">{value}</code>
-      <Button variant="ghost" size="sm" onClick={onCopy}>
-        {copyLabel}
-      </Button>
     </div>
   );
 }

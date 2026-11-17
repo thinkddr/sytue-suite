@@ -118,13 +118,12 @@ func TestEncryptedArchiveCannotSkipPrivateDataOrCreateAnEmptyDestination(t *test
 	}
 	sealed := legacy
 	sealed.Data = json.RawMessage(`{"client_id":"archive-1","repeated_into":"old-object-id"}`)
-	created, imported, skipped, err := st.ImportNotebook(ctx, "ada", book, []domain.Note{sealed})
-	if err != nil || imported != 1 || skipped != 0 {
-		t.Fatalf("sealed archive failed: %d/%d %v", imported, skipped, err)
+	if _, _, _, err := st.ImportNotebook(ctx, "ada", book, []domain.Note{sealed}); !errors.Is(err, domain.ErrEncryptedMigrationRequired) {
+		t.Fatalf("encrypted backup left device: %v", err)
 	}
-	notes, err := st.ListNotes(ctx, created.ID, "ada")
-	if err != nil || len(notes) != 1 || notes[0].ContentCipher != sealed.ContentCipher || strings.Contains(string(notes[0].Data), "old-object-id") {
-		t.Fatalf("archive changed ciphertext or trusted task references from another notebook: %#v %v", notes, err)
+	books, err = st.ListNotebooks(ctx, "ada")
+	if err != nil || len(books) != 0 || sealed.ContentCipher != legacy.ContentCipher {
+		t.Fatalf("rejected encrypted backup changed source or created notebook: %#v %v", books, err)
 	}
 }
 

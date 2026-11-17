@@ -28,7 +28,7 @@ const EXCEPCIONES: Record<string, [number, string]> = {
   ],
   'packages/office/src/pdf/Paneles.tsx': [
     1,
-    'radio `sr-only` del segmentado «Organizar»: el control visible es la etiqueta',
+    '`OpcionSegmento`, radio `sr-only` de los segmentados («Organizar», posición de la firma): el control visible es la etiqueta',
   ],
   'apps/notes/src/components/RichText.tsx': [
     4,
@@ -38,7 +38,10 @@ const EXCEPCIONES: Record<string, [number, string]> = {
     2,
     'HTML de la página publicada (cadena, no JSX): el sitio público no carga @sytue/ui',
   ],
-  'apps/notes/src/client/markdown.ts': [1, 'HTML que se inserta en el editor, no JSX'],
+  'apps/notes/src/client/markdown.ts': [
+    2,
+    'HTML que se inserta en el editor, no JSX: la tarea del atajo y la del Markdown pegado',
+  ],
   'apps/notes/src/client/plantillas.ts': [1, 'HTML de plantilla para el editor, no JSX'],
 };
 

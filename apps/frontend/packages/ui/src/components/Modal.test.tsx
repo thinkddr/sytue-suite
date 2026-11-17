@@ -52,16 +52,17 @@ test('persistent feedback follows nested dialogs without floating over their act
     </ToastProvider>
   );
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  // La tarjeta visible es `[data-toast]`; lo que se lee va a las regiones vivas de Toast.tsx.
   try {
     render(ui(false, false), host);
     document.getElementById('raise-toast')!.click();
     await flush();
-    expect(document.querySelector('[role="alert"]')?.closest('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('[data-toast]')?.closest('[role="dialog"]')).toBeNull();
     render(ui(true, false), host);
     await flush();
     expect(
       document
-        .querySelector('[role="alert"]')
+        .querySelector('[data-toast]')
         ?.closest('[role="dialog"]')
         ?.getAttribute('aria-label'),
     ).toBe('Outer');
@@ -70,7 +71,7 @@ test('persistent feedback follows nested dialogs without floating over their act
     await flush();
     expect(
       document
-        .querySelector('[role="alert"]')
+        .querySelector('[data-toast]')
         ?.closest('[role="dialog"]')
         ?.getAttribute('aria-label'),
     ).toBe('Inner');
@@ -78,14 +79,14 @@ test('persistent feedback follows nested dialogs without floating over their act
     await flush();
     expect(
       document
-        .querySelector('[role="alert"]')
+        .querySelector('[data-toast]')
         ?.closest('[role="dialog"]')
         ?.getAttribute('aria-label'),
     ).toBe('Outer');
     render(ui(false, false), host);
     await flush();
-    expect(document.querySelectorAll('[role="alert"]').length).toBe(1);
-    expect(document.querySelector('[role="alert"]')?.closest('[role="dialog"]')).toBeNull();
+    expect(document.querySelectorAll('[data-toast]').length).toBe(1);
+    expect(document.querySelector('[data-toast]')?.closest('[role="dialog"]')).toBeNull();
   } finally {
     render(null, host);
     host.remove();

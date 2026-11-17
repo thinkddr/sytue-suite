@@ -55,7 +55,7 @@ func TestUnAvisoCreadoLlegaAlFlujoYBajaAlLeerlo(t *testing.T) {
 	r.Route("/api/v1", func(api chi.Router) {
 		api.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				c := authn.Claims{Subject: "ana", Tenant: "acme", Mailbox: "Ana@Acme.es"}
+				c := authn.Claims{Subject: "ana", Tenant: "acme", Mailbox: "Ana@Acme.es", Emitido: time.Now().Add(-time.Second)}
 				next.ServeHTTP(w, r.WithContext(tenancy.Into(authn.Into(r.Context(), c), tenancy.Tenant{Slug: "acme"})))
 			})
 		})

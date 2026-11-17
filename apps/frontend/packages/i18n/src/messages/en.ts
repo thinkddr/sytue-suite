@@ -9,8 +9,60 @@
  * categoría la elige `Intl.PluralRules`, no un `n === 1`).
  */
 export const en = {
+  'matrix.reset': 'I don’t have another device',
+  'matrix.resetAction': 'Reset encryption',
+  'matrix.resetBody':
+    'Your account’s encryption will be reset. Earlier encrypted messages will only be readable on devices that already have them, and you’ll need to verify your other devices and your contacts again.',
+  'matrix.resetUnderstood': 'I understand I may lose access to earlier encrypted messages',
+  'matrix.unknownKey':
+    'This account was encrypted before Sytue protected its key with your sign-in. Verify this device from another one where you’re already signed in.',
+  'matrix.unlockTitle': 'Open your encrypted data',
+  'matrix.unlockBody':
+    'Confirm it’s you with your passkey or your Sytue password. It is checked on this device: nobody else can open your data.',
+  'matrix.protectTitle': 'Protect your encrypted data',
+  'matrix.protectBody':
+    'Choose how you’ll open your encrypted data on your other devices: with your passkey or your Sytue password. Only you will be able to open it.',
+  'matrix.usePasskey': 'Use passkey',
+  'matrix.usePassword': 'Use password',
+  'matrix.password': 'Sytue password',
+  'matrix.passwordConfirm': 'Repeat the password',
+  'matrix.passwordMismatch': 'The passwords don’t match.',
+  'matrix.unlockWrong': 'That didn’t work. Try again.',
+  'matrix.passkeyUnsupported': 'This passkey can’t open encrypted data. Use your password.',
+  // Device verification and recovery shared by the suite.
+  'matrix.allowStorageTitle': 'Allow encrypted processing',
+  'matrix.allowStorageBody':
+    'Allow this verified device to process new encrypted data for this app.',
+  'matrix.allowStorageAction': 'Allow this device',
+  'matrix.choosePerson': 'Choose someone in this channel',
+  'matrix.notices': 'Third-party licences',
+  'action.cancel': 'Cancel',
+  'action.done': 'Done',
+  'matrix.auth': 'Confirm your identity',
+  'matrix.authContinue': 'I’ve completed sign-in',
+  'matrix.compare': 'Compare these emoji on both devices.',
+  'matrix.connect': 'Set up this device',
+  'matrix.devices': 'Your devices',
+  'matrix.failed': 'Encryption could not be set up. Try again.',
+  'matrix.incoming': 'Verify this device',
+  'matrix.match': 'They match',
+  'matrix.mismatch': 'They don’t match',
+  'matrix.revoke': 'Sign out device',
+  'matrix.subtitle':
+    'Messages and files are encrypted on your devices. Only verified devices can read them.',
+  'matrix.tab': 'Rooms is open in another tab. Close it to use this device here.',
+  'matrix.title': 'End-to-end encryption',
+  'matrix.trusted': 'Device verified',
+  'matrix.verify': 'Verify with another device',
+  'matrix.verifyPeopleFirst':
+    'Verify the people in this conversation before sending your first message.',
+  'matrix.verifyPerson': 'Verify a person',
+  'matrix.waiting': 'Waiting for the other device…',
+  'state.loading': 'Loading…',
+
   // Genéricos del cromo
   'action.retry': 'Retry',
+  'account.connectFailed': 'This account could not be connected.',
   'error.connection': 'Check your connection and try again.',
 
   // Etiquetas de accesibilidad del design system. Las pinta @sytue/ui en las
@@ -27,6 +79,7 @@ export const en = {
   'ui.mainNav': 'Main navigation',
   'ui.openNav': 'Open navigation',
   'ui.closeNav': 'Close navigation',
+  'ui.settingsIndex': 'Sections on this page',
   'ui.backToList': 'Back to the list',
   'ui.suiteOpen': 'Sytue: apps, search, notifications and account',
   'ui.suiteClose': 'Back to the app',
@@ -40,6 +93,16 @@ export const en = {
   // Barra de acciones en lote (BulkActionBar).
   'ui.bulk.region': 'Actions for the selection',
   'ui.bulk.clear': 'Clear selection',
+
+  // Campo con botón de copiar (CopyField). «Copied: {label}» lo oye el lector
+  // de pantalla; el fallo se dice con palabras porque no se finge que se copió.
+  'ui.copy.copy': 'Copy',
+  'ui.copy.copyLabel': 'Copy {label}',
+  'ui.copy.copied': 'Copied',
+  'ui.copy.copiedLabel': 'Copied: {label}',
+  'ui.copy.failed': "Couldn't copy. Select the value and copy it by hand.",
+  'ui.copy.secret': 'secret',
+  'ui.migas.ocultas': 'Show hidden folders',
 
   // Wizard chrome. It lives here and not in each app because the wizard is a
   // system component: hard-coding its buttons meant every wizard in the suite
@@ -57,6 +120,13 @@ export const en = {
   'shell.appSwitcher': 'Sytue One — suite apps',
   'shell.apps': 'Sytue One apps',
   'shell.shortcutHint': 'Shortcut: {keys}',
+  'shell.shortcuts.title': 'Keyboard shortcuts',
+  'shell.shortcuts.group': 'Whole suite',
+  'shell.shortcuts.search': 'Search across Sytue One',
+  'shell.shortcuts.help': 'Show this list',
+  'shell.shortcuts.close': 'Close a dialog or menu',
+  'shell.shortcuts.contextMenu': 'Open the context menu',
+  'shell.shortcuts.key.shift': 'Shift',
   // Solo las apps nativas: la lista de inicio del sistema y montar Drive como disco.
   'shell.launchAtLogin': 'Open at login',
   'shell.mountDrive': 'Connect Drive to this computer',
@@ -83,6 +153,9 @@ export const en = {
     'This app needs OpenGL 2.1 and this computer’s graphics driver does not offer it ({detalle}). Install or update the graphics card driver. Without a graphics card (remote desktop or virtual machine) it cannot open.',
   'shell.lock.reasonNotebook': 'open your encrypted notebook',
   'shell.lock.faceIdUsage': 'Sytue uses Face ID to unlock your session when you open the app.',
+  'shell.photos.libraryUsage':
+    'Sytue reads the photos and videos on this device to back them up to your Sytue Drive.',
+  'shell.photos.libraryAddUsage': 'Sytue saves the photos you download to your photo library.',
   'shell.widgets.wake': 'Update widgets while the app is closed',
   'shell.widgets.wakeHelp':
     'When something of yours changes, Sytue wakes the app with an empty Apple notification so it can refresh its widget. Apple sees which app and when, never what changed.',
@@ -144,6 +217,13 @@ export const en = {
   'search.kind.contact': 'contacts',
   'search.kind.note': 'notes',
   'search.kind.channel': 'channels',
+  'suitePalette.dialog': 'Go to or search',
+  'suitePalette.input': 'Search or go to',
+  'suitePalette.placeholder': 'Search Sytue One or go to…',
+  'suitePalette.typeToSearch': 'Type to search across Sytue One',
+  'suitePalette.hint.move': 'move',
+  'suitePalette.hint.open': 'open',
+  'suitePalette.hint.close': 'close',
 
   // Notificaciones
   'notifications.title': 'Notifications',
@@ -185,6 +265,8 @@ export const en = {
   'notifications.kind.docs.signature.requested': '{actor} is asking you to sign “{name}”',
   'notifications.kind.docs.signature.completed': '{actor} signed “{name}”',
   'notifications.kind.docs.signature.declined': '{actor} declined to sign “{name}”',
+  'notifications.kind.docs.signature.expired': 'The request to sign “{name}” expired',
+  'notifications.kind.docs.signature.reminder': '{actor} is still waiting for you to sign “{name}”',
   'notifications.kind.docs.access.granted': '{actor} gave you edit access to “{name}”',
   'notifications.kind.erp.task.assigned': '{actor} assigned you “{title}”',
   'notifications.kind.security.signin.new': 'New sign-in to your account on {device}',
@@ -229,6 +311,20 @@ export const en = {
   'account.color.petroleo': 'Petrol blue',
   'account.color.cobalto': 'Cobalt blue',
   'account.color.app': 'Per app',
+  // Los nombres de la paleta de colores de usuario (`@sytue/config` paleta-usuario.ts):
+  // los lee el lector de pantalla en cada muestra y salen en su `title`.
+  'userColor.red': 'Red',
+  'userColor.clay': 'Orange',
+  'userColor.brass': 'Ochre',
+  'userColor.sage': 'Olive',
+  'userColor.green': 'Green',
+  'userColor.teal': 'Teal',
+  'userColor.cyan': 'Petrol',
+  'userColor.blue': 'Blue',
+  'userColor.indigo': 'Indigo',
+  'userColor.plum': 'Purple',
+  'userColor.rose': 'Pink',
+  'userColor.slate': 'Grey',
   'account.forma': 'Layout',
   'account.forma.marco': 'Frame',
   'account.forma.carril': 'Rail',
@@ -338,6 +434,7 @@ export const en = {
     "This sheet is protected: its cells can't be changed until it's unprotected.",
   'readOnly.password': 'Password',
   'notifications.kind.erp.access.requested': '{actor} is asking to edit “{name}”',
+  'notifications.kind.erp.approval.requested': '{actor} asks you to approve “{name}”',
   'notifications.kind.erp.access.granted': '{actor} gave you edit access to “{name}”',
   'readOnly.module': 'Read-only in “{name}”: you can see it, but not change it.',
   'notifications.kind.drive.access.requested': '{actor} is asking to edit “{name}”',
@@ -418,4 +515,7 @@ export const en = {
     'To open “{name}”, it will be uploaded to your Sytue One account.',
   'localFile.confirmUpload.remember': 'Remember my choice on this device',
   'localFile.confirmUpload.confirm': 'Upload and open',
+  'action.back': 'Back',
+  'action.close': 'Close',
+  'action.copy': 'Copy',
 };

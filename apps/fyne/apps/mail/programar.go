@@ -62,6 +62,10 @@ func (c *campoCuando) leer() (time.Time, bool) {
 // programar es `handleSchedule`: la hora tiene que ser futura, el mensaje tiene que
 // poder enviarse, y al programarse se cierra el redactor diciendo cuándo saldrá.
 func (b *Buzon) programar(rd *redaccion, cuando time.Time, ok bool) {
+	if rd != nil && rd.privado != nil && rd.privado.outgoing != nil {
+		b.reintentarEnvioPrivado(rd)
+		return
+	}
 	if !b.redaccionVigente(rd) || rd.enviando || rd.guardando {
 		return
 	}
@@ -79,6 +83,10 @@ func (b *Buzon) programar(rd *redaccion, cuando time.Time, ok bool) {
 		b.avisarEnvio(err)
 		return
 	}
+	if rd.privado != nil {
+		b.confirmarEnvioPrivado(rd, de, s.Destinatarios(), crudo, cuando)
+		return
+	}
 	if rd.pararAuto != nil {
 		rd.pararAuto()
 	}
@@ -94,9 +102,12 @@ func (b *Buzon) programar(rd *redaccion, cuando time.Time, ok bool) {
 		rd.r.BotonProgramar.Refresh()
 		if err != nil {
 			b.pintarBotonesRedactor(rd)
-			b.avisar(ui.AvisoPeligro, "compose.scheduleFailed", nil)
+			if !b.quedaSinRed(rd, err) {
+				b.avisar(ui.AvisoPeligro, "compose.scheduleFailed", nil)
+			}
 			return
 		}
+		b.borrarCopia(br.Copia)
 		if id := br.ID; id != "" {
 			ctx := b.ctx
 			b.Lanzar(func() {

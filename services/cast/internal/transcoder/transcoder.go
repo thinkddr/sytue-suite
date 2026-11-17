@@ -43,6 +43,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
+	"git.sytue.eu/sytue/one/services/cast/internal/almacen"
 	"git.sytue.eu/sytue/one/services/cast/internal/config"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
 	"git.sytue.eu/sytue/one/services/cast/internal/service"
@@ -141,7 +142,7 @@ func Run(ctx context.Context, d Deps) error {
 	if d.Objetos == nil || d.Store == nil {
 		return ErrSinDependencias
 	}
-	w, err := nuevo(d, d.Store, d.Objetos)
+	w, err := nuevo(d, d.Store, almacen.ConFuenteRetenida(d.Objetos, d.Store))
 	if err != nil {
 		return err
 	}

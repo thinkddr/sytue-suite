@@ -6,7 +6,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Icon, IconButton, Spinner, useConfirm, usePrompt, withBase } from '@sytue/ui';
+import { Button, Icon, IconButton, useConfirm, usePrompt, withBase } from '@sytue/ui';
 import { translate, type Locale } from '@sytue/i18n';
 import { CompartirConPersonas } from '@sytue/shell';
 import {
@@ -26,12 +26,17 @@ import { useT } from '../i18n/index.js';
 import { posicionVisor } from '../lib/posicionVisor.js';
 import { esPortada, mandoPortada, tituloRenombrado } from '../lib/edicionAlbum.js';
 import { RUTA } from '../lib/ruta.js';
+import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
+import { textoDeFallo } from '../lib/fallo.js';
 import { Marco } from './Marco.js';
 import type { SytueUser } from '@sytue/auth';
-import { Filete, Miniatura, Visor } from './PhotosApp.js';
+import { Filete, alTeclearEnGaleria, Miniatura, Visor } from './PhotosApp.js';
 import { Nav } from './Nav.js';
+import { EsqueletoFilas } from './Esqueletos.js';
 
-export function AlbumView({
+export const AlbumView = conAvisos(VistaDeAlbum);
+
+function VistaDeAlbum({
   locale,
   id,
   user,
@@ -48,19 +53,23 @@ export function AlbumView({
   const [al, setAl] = useState<Album | null>(null);
   const [fotos, setFotos] = useState<Foto[] | null>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
-  const [error, setError] = useState('');
+  const [fallo, setFallo] = useState<unknown>(null);
+  const avisarFallo = useAvisoDeFallo(locale);
   const [aviso, setAviso] = useState('');
   // «Compartir con personas»: para ver o para editar (lo añadido se copia a su Drive).
   const [conPersonas, setConPersonas] = useState(false);
 
-  useEffect(() => {
+  const cargar = () => {
+    setFallo(null);
     Promise.all([pedirAlbum(id), fotosDelAlbum(id)])
       .then(([a, f]) => {
         setAl(a);
         setFotos(f);
       })
-      .catch((e) => setError(String(e)));
-  }, [id]);
+      .catch(setFallo);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(cargar, [id]);
 
   /** Renombrar: el diálogo de la casa con el título de ahora escrito. */
   const renombrar = async () => {
@@ -77,7 +86,7 @@ export function AlbumView({
     try {
       setAl(await renombrarAlbum(id, nuevo));
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -95,8 +104,8 @@ export function AlbumView({
       setAviso(t('album.coverSet'));
       avisar(t('album.coverSet'));
     } catch (e) {
-      setError(String(e));
-      avisar(String(e));
+      // Solo dentro del visor: un aviso fuera quedaría detrás del modal.
+      avisar(textoDeFallo(locale, e));
     }
   };
 
@@ -106,7 +115,7 @@ export function AlbumView({
       setFotos((f) => (f ?? []).filter((x) => x.id !== foto.id));
       setAbierta(null);
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -129,7 +138,7 @@ export function AlbumView({
       setAl((a) => (a ? { ...a, shared: true } : a));
       await copiar(token);
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -163,7 +172,7 @@ export function AlbumView({
       });
       setAviso('');
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -184,7 +193,7 @@ export function AlbumView({
       // conserva el segmento sin importar desde qué URL se pulse.
       window.location.href = `${RUTA}albums`;
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -278,15 +287,13 @@ export function AlbumView({
             </IconButton>
           </span>
         </header>
-        {error ? (
-          <p class="text-danger-text mb-4 text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {fotos === null ? (
-          <Spinner />
+        {fallo !== null ? (
+          <FalloDeCarga locale={locale} fallo={fallo} alReintentar={cargar} />
+        ) : fotos === null ? (
+          <EsqueletoFilas />
         ) : (
-          <ul class="filas">
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- las teselas son los botones y las paradas de Tab; la lista solo recoge sus flechas
+          <ul class="filas" onKeyDown={alTeclearEnGaleria}>
             {fotos.map((f, i) => (
               <Miniatura key={f.id} foto={f} t={t} onOpen={() => setAbierta(i)} />
             ))}

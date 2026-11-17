@@ -1,37 +1,42 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright (c) 2026 Daniel Delgado Ramos -->
 
-# Sellado de tiempo de las firmas
+<a id="sellado-de-tiempo-de-las-firmas"></a>
+# Timestamping of signatures
 
-## El hueco
+<a id="el-hueco"></a>
+## The gap
 
-Las imágenes se firman con `cosign` y una clave propia, sin subir nada al registro
-público de transparencia. Esa decisión está razonada en `deploy/production/03-desplegar.sh`
-y no se discute aquí: publicar en Rekor exponía el inventario de servicios y la
-cadencia de releases de un producto que aún no ha salido.
+Images are signed with `cosign` and our own key, without uploading anything to the
+public transparency log. That decision is reasoned in `deploy/production/03-desplegar.sh`
+and is not debated here: publishing to Rekor exposed the service inventory and the
+release cadence of a product that has not launched yet.
 
-Lo que esa decisión deja abierto, y no estaba escrito en ninguna parte: **una firma
-no prueba cuándo se hizo**. Si la clave de release se compromete, no hay forma de
-distinguir lo que se firmó antes del robo de lo que se firmó después. La respuesta a
-ese incidente pasa a ser revocar y volver a firmar TODO, sin poder salvar nada, y sin
-poder demostrar a un cliente que la versión que tiene desplegada es anterior al robo.
+What that decision leaves open, and was not written down anywhere: **a signature
+does not prove when it was made**. If the release key is compromised, there is no way
+to tell what was signed before the theft from what was signed after it. The response to
+that incident becomes revoking and re-signing EVERYTHING, without being able to save
+anything, and without being able to prove to a customer that the version they have
+deployed predates the theft.
 
-## Lo que lo cubre, y lo que no
+<a id="lo-que-lo-cubre-y-lo-que-no"></a>
+## What covers it, and what does not
 
-Un sello de tiempo RFC 3161 dice «esta firma existía a esta hora» y nada más: no
-lleva el nombre de la imagen ni su digest, así que **no reintroduce el problema que
-nos sacó de Rekor**. No es un registro público: es un tercero de confianza que
-contrafirma un hash.
+An RFC 3161 timestamp says “this signature existed at this time” and nothing more: it
+does not carry the image name or its digest, so **it does not reintroduce the problem
+that took us off Rekor**. It is not a public log: it is a trusted third party that
+countersigns a hash.
 
-No sustituye a la custodia de la clave. Con la clave robada se pueden seguir firmando
-imágenes nuevas; lo que se gana es poder acotar el daño en el tiempo en vez de dar por
-comprometido todo lo firmado desde siempre.
+It does not replace key custody. With the stolen key, new images can still be signed;
+what is gained is the ability to bound the damage in time instead of treating
+everything ever signed as compromised.
 
-## Receta, probada con cosign 3.1.3
+<a id="receta-probada-con-cosign-313"></a>
+## Recipe, tested with cosign 3.1.3
 
-Verificada de punta a punta el 2026-08-18 contra una TSA pública de pruebas.
+Verified end to end on 2026-08-18 against a public test TSA.
 
-Firmar —el sello OBLIGA al formato nuevo de bundle, no es opcional—:
+Signing —the timestamp FORCES the new bundle format, it is not optional—:
 
 ```bash
 cosign sign-blob --key "$CLAVE" --tlog-upload=false --use-signing-config=false --yes \
@@ -39,10 +44,10 @@ cosign sign-blob --key "$CLAVE" --tlog-upload=false --use-signing-config=false -
   --new-bundle-format --bundle firma.bundle artefacto
 ```
 
-Construir el material de confianza. **La cadena va con la HOJA PRIMERO**: si se pone
-la CA raíz al principio, `trusted-root create` falla con «first certificate in chain
-must be a leaf certificate», que no dice en ningún momento que el problema sea el
-orden.
+Building the trust material. **The chain goes with the LEAF FIRST**: if the root CA is
+put first, `trusted-root create` fails with “first certificate in chain
+must be a leaf certificate”, which at no point says that the problem is the
+order.
 
 ```bash
 cat tsa-hoja.crt tsa-ca.pem > tsa-cadena.pem
@@ -50,7 +55,7 @@ cosign trusted-root create --no-default-fulcio --no-default-rekor --no-default-c
   --tsa="url=$SYTUE_TSA_URL,certificate-chain=tsa-cadena.pem" --out trusted-root.json
 ```
 
-Verificar:
+Verifying:
 
 ```bash
 cosign verify-blob --key cosign.pub --bundle firma.bundle \
@@ -58,40 +63,42 @@ cosign verify-blob --key cosign.pub --bundle firma.bundle \
   --insecure-ignore-tlog=true artefacto
 ```
 
-`--insecure-ignore-tlog` sigue haciendo falta aunque haya sello: sin Rekor, cosign
-exige inclusión en el log y falla con «not enough verified log entries from
-transparency log: 0 < 1». El sello de tiempo no lo sustituye.
+`--insecure-ignore-tlog` is still needed even with a timestamp: without Rekor, cosign
+requires inclusion in the log and fails with “not enough verified log entries from
+transparency log: 0 < 1”. The timestamp does not replace it.
 
-## Lo que falta para activarlo
+<a id="lo-que-falta-para-activarlo"></a>
+## What is missing to enable it
 
-1. **Elegir una TSA cualificada de la UE.** Es una decisión de negocio: hay
-   prestadores cualificados eIDAS en España, Italia, Alemania y Polonia, con contrato
-   y coste. La de pruebas usada para validar la receta no sirve para producción, ni
-   por jurisdicción ni por garantías.
-2. **Migrar las firmas al formato bundle**, que es lo que el sello obliga. Eso toca
-   `sign`, `attest` y la verificación de `03-desplegar.sh` A LA VEZ, más los cuatro
-   sitios que vigila `release-workflow-test.sh`. De regalo desaparece el aviso de
-   `--tlog-upload` deprecado.
-3. **Probarlo entero en el efímero**, no en una release. Si la verificación falla tras
-   el cambio de formato, no se despliega nada.
+1. **Choose an EU qualified TSA.** It is a business decision: there are
+   eIDAS qualified providers in Spain, Italy, Germany and Poland, with a contract
+   and a cost. The test one used to validate the recipe is not fit for production,
+   neither by jurisdiction nor by guarantees.
+2. **Migrate the signatures to the bundle format**, which is what the timestamp forces.
+   That touches `sign`, `attest` and the verification in `03-desplegar.sh` AT THE SAME
+   TIME, plus the four places watched by `release-workflow-test.sh`. As a bonus, the
+   deprecated `--tlog-upload` warning goes away.
+3. **Test it end to end in the ephemeral environment**, not in a release. If verification
+   fails after the format change, nothing is deployed.
 
-## Custodia de la clave
+<a id="custodia-de-la-clave"></a>
+## Key custody
 
-`COSIGN_PRIVATE_KEY` y `COSIGN_PASSWORD` viven como secretos del repositorio en la
-forja, así que quien comprometa la forja tiene la clave con la que se firma
-producción. Mitigación aplicada: **entregar el secreto solo a quien lo necesita**.
+`COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD` live as repository secrets in the
+forge, so whoever compromises the forge has the key that production is signed with.
+Mitigation applied: **hand the secret only to whoever needs it**.
 
-Los únicos workflows que firman son cuatro, y solo con dos eventos:
+Only four workflows sign, and only on two events:
 
 | | |
 | --- | --- |
 | Workflows | `release.yml`, `imagenes-rama.yml`, `espejo-upstream.yml`, `release-desktop.yml` |
-| Eventos | `push`, `workflow_dispatch` |
+| Events | `push`, `workflow_dispatch` |
 
-Con eso, una pull request —propia o de un fork— y cualquier workflow nuevo dejan de
-poder leer la clave de firma. Se configura en cada secreto desde la forja, en
-«Limitar a eventos» y «Workflows».
+With that, a pull request —our own or from a fork— and any new workflow can no
+longer read the signing key. It is configured on each secret in the forge, under
+«Limitar a eventos» (Limit to events) and «Workflows».
 
-Lo que NO resuelve: quien tenga acceso administrativo a la forja sigue pudiendo
-leerla. Eliminar eso requiere una clave no extraíble en un HSM o KMS, y cosign no
-soporta hoy el Key Manager de Scaleway.
+What it does NOT solve: whoever has administrative access to the forge can still
+read it. Removing that requires a non-extractable key in an HSM or KMS, and cosign
+does not support Scaleway's Key Manager today.

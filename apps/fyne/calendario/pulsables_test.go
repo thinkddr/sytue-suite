@@ -13,14 +13,12 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
-// TestLosBotonesDelCalendarioSePulsanComoUnBoton: el botón de vista, el día del
-// mini-mes, la píldora y la celda del mes son `<button>` en la web y embeben
-// `ui.Pulsable`. Cada uno tiene que llegar a SU acción con el ratón, con Intro y con
+// TestLosBotonesDelCalendarioSePulsanComoUnBoton: el día del mini-mes, la píldora y la
+// celda del mes son `<button>` en la web y embeben `ui.Pulsable`. Cada uno tiene que llegar a SU acción con el ratón, con Intro y con
 // Espacio —si el constructor olvida `AlPulsar`, no llega ninguna— y encender `:hover`.
 func TestLosBotonesDelCalendarioSePulsanComoUnBoton(t *testing.T) {
 	dia := time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
 	var pulsado string
-	g := &GrupoVista{Rotulos: [4]string{"Mes", "Semana", "Día", "Agenda"}, AlElegir: func(Vista) { pulsado = "vista" }}
 	mm := &MiniMes{Cursor: dia, AlElegir: func(time.Time) { pulsado = "día" }}
 	m := &Mes{Cursor: dia, AlCrear: func(time.Time) { pulsado = "crear" }, AlAbrir: func(Ocurrencia, fyne.CanvasObject) { pulsado = "abrir" }}
 
@@ -34,7 +32,6 @@ func TestLosBotonesDelCalendarioSePulsanComoUnBoton(t *testing.T) {
 		quiero string
 		b      boton
 	}{
-		{"vista", nuevoBotonVista(g, 0)},
 		{"día", nuevoDiaMini(mm, dia)},
 		{"abrir", nuevaPildora(m, Ocurrencia{}, tema.Claro)},
 		{"crear", nuevaCelda(m, dia, nil, 0, 0, tema.Claro)},

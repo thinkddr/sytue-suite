@@ -51,6 +51,13 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	// El slug de la organización ACTIVA (el claim `tenant` de este token), para
 	// que el selector sepa cuál marcar sin adivinarlo por el orden.
 	out["active_org"] = c.Tenant
+	// Los requisitos de contraseña que se le van a exigir al cambiarla, para que
+	// «Mi cuenta» los enseñe ANTES de enviar y no tras un 400. Solo lectura; si
+	// la consulta falla se omite el campo (la pantalla calla y el servidor sigue
+	// validando) en vez de tumbar todo el perfil.
+	if p, err := s.store.EffectivePasswordPolicyForUser(r.Context(), user.ID); err == nil {
+		out["password_policy"] = mePasswordPolicyJSON(p)
+	}
 	setAvatarFields(r.Context(), s, user.ID, out)
 	httpx.JSON(w, r, http.StatusOK, out)
 }
@@ -122,8 +129,10 @@ func (s *Server) handleAddMember(w http.ResponseWriter, r *http.Request) {
 // emitidos para ESA org, así que requireRole ya autoriza el ámbito) con
 // paginación keyset (created_at, id) DESC: sin OFFSET, estable a cientos de
 // miles de usuarios. Query: cursor (token opaco de la página anterior; vacío =
-// primera página), limit (1..200, 50 por defecto) y q (subcadena de correo o
-// nombre). Responde {items, nextCursor} con nextCursor="" al agotar.
+// primera página), limit (1..200, 50 por defecto), q (subcadena de correo o
+// nombre) y filter (without_mfa | suspended | unverified_email: los recuentos de
+// /admin/insights a los que enlazan los avisos de la portada). Responde
+// {items, nextCursor} con nextCursor="" al agotar.
 //
 // `q` es del SERVIDOR: buscar sobre lo ya paginado responde «no hay nadie» a
 // quien está en la página doce, y el buscador queda inútil justo en las
@@ -180,7 +189,14 @@ func (s *Server) responderUsuariosDeOrg(w http.ResponseWriter, r *http.Request, 
 	if len(q) > 128 {
 		q = q[:128]
 	}
-	page, more, err := s.store.ListOrgUsersPage(r.Context(), orgID, q, after, limit)
+	// Un filtro desconocido es un 400 y no la lista entera: quien pide «los que no
+	// tienen segundo factor» y recibe a todo el mundo cree que son todos.
+	filtro := store.FiltroUsuarios(strings.TrimSpace(params.Get("filter")))
+	if !store.FiltroUsuariosValido(filtro) {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid filter (without_mfa, suspended, unverified_email)."))
+		return
+	}
+	page, more, err := s.store.ListOrgUsersPage(r.Context(), orgID, q, filtro, after, limit)
 	if err != nil {
 		httpx.Fail(w, r, mapDomainErr(err))
 		return

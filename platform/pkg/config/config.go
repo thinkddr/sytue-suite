@@ -82,10 +82,48 @@ const sytueOperatedExtraDevCSV = "https://git.sytue.localhost,https://platform.s
 // FirstPartyWebOrigins devuelve los orígenes de primera parte del entorno dado.
 // En prod, solo los de producción.
 func FirstPartyWebOrigins(env Environment) string {
+	if propio := origenesDeDominioPropio(); propio != "" {
+		if env.IsProd() {
+			return propio
+		}
+		return propio + "," + firstPartyWebOriginsProdCSV + "," + firstPartyWebOriginsDevCSV
+	}
 	if env.IsProd() {
 		return firstPartyWebOriginsProdCSV
 	}
 	return firstPartyWebOriginsProdCSV + "," + firstPartyWebOriginsDevCSV
+}
+
+// BaseDomainEnvVar es el dominio de una instalación autoalojada (p. ej.
+// `suite.miempresa.eu`): con él, la suite vive en <producto>.<dominio> en vez de
+// en *.sytue.eu. Vacío deja las listas de siempre (sytue.eu y sytue.localhost).
+const BaseDomainEnvVar = "SYTUE_BASE_DOMAIN"
+
+// dominioPropio devuelve el dominio autoalojado, normalizado, o "" si no hay uno
+// válido. Rechaza lo que no sea un nombre DNS (comodines, esquemas, rutas): estas
+// listas acaban en la CSP del IdP y en CORS, donde un valor laxo abriría la puerta.
+func dominioPropio() string {
+	d := strings.ToLower(strings.TrimSpace(os.Getenv(BaseDomainEnvVar)))
+	if d == "" || len(d) > 253 || strings.HasPrefix(d, ".") || strings.HasSuffix(d, ".") || !strings.Contains(d, ".") {
+		return ""
+	}
+	for _, r := range d {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '.') {
+			return ""
+		}
+	}
+	return d
+}
+
+// origenesDeDominioPropio son los mismos orígenes de producción con el dominio
+// autoalojado en lugar de sytue.eu: se derivan de la lista de producción para que
+// un producto nuevo no se pueda quedar fuera de uno de los dos sitios.
+func origenesDeDominioPropio() string {
+	d := dominioPropio()
+	if d == "" {
+		return ""
+	}
+	return strings.ReplaceAll(firstPartyWebOriginsProdCSV, "sytue.eu", d)
 }
 
 // SytueOperatedWebOrigins añade a los anteriores la forja y la consola de
@@ -95,6 +133,9 @@ func FirstPartyWebOrigins(env Environment) string {
 // y *.preview.sytue.eu. (El comodín de CORS de `httpx` sí está acotado a una
 // etiqueta y por eso ahí sí se usa; son dos mecanismos distintos.)
 func SytueOperatedWebOrigins(env Environment) string {
+	if d := dominioPropio(); d != "" && env.IsProd() {
+		return origenesDeDominioPropio() + "," + strings.ReplaceAll(sytueOperatedExtraProdCSV, "sytue.eu", d)
+	}
 	if env.IsProd() {
 		return firstPartyWebOriginsProdCSV + "," + sytueOperatedExtraProdCSV
 	}
@@ -122,6 +163,12 @@ func SytueOperatedWebOrigins(env Environment) string {
 // así que aquí `algo.apps.sytue.eu` queda fuera. Son dos mecanismos con la misma
 // sintaxis y distinta semántica, y por eso son dos listas.
 func FirstPartyCORSOrigins(env Environment) string {
+	if d := dominioPropio(); d != "" {
+		if env.IsProd() {
+			return "https://*." + d + "," + FirstPartyWebOrigins(env)
+		}
+		return "https://*." + d + ",https://*.sytue.eu,https://*.sytue.localhost," + FirstPartyWebOrigins(env)
+	}
 	if env.IsProd() {
 		return "https://*.sytue.eu," + firstPartyWebOriginsProdCSV
 	}

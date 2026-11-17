@@ -251,6 +251,41 @@ func (e *ERP) AnularAsiento(ctx context.Context, id, motivo string) error {
 	return e.enviar(ctx, "/libro/"+url.PathEscape(id)+"/anular", map[string]string{"motivo": motivo})
 }
 
+// ERPMovimientoCierre es una fila del libro de cierres: un cierre o una reapertura.
+// Hasta es la última fecha CERRADA tras el movimiento (llega como instante; cuenta el
+// día); nil, la reapertura dejó el libro abierto entero.
+type ERPMovimientoCierre struct {
+	Hasta  *time.Time `json:"hasta,omitempty"`
+	Accion string     `json:"accion"`
+	Motivo string     `json:"motivo,omitempty"`
+	Por    string     `json:"por,omitempty"`
+	En     time.Time  `json:"en"`
+}
+
+// ERPCierre es hasta cuándo está cerrado el libro y su historial, del más reciente al
+// más antiguo. CerradoHasta va en `YYYY-MM-DD`; vacío, abierto entero.
+type ERPCierre struct {
+	CerradoHasta string                `json:"cerrado_hasta"`
+	Historial    []ERPMovimientoCierre `json:"historial"`
+}
+
+// Cierre pide el estado del cierre del ejercicio (`contabilidad/cierre` de la web).
+func (e *ERP) Cierre(ctx context.Context) (ERPCierre, error) {
+	return JSON[ERPCierre](ctx, e.c, e.pedir("/contabilidad/cierre", nil))
+}
+
+// Cerrar cierra el libro hasta `hasta` (`YYYY-MM-DD`, incluida). El servicio rechaza
+// una fecha futura y una que no avance el corte (`cierre_hacia_atras`).
+func (e *ERP) Cerrar(ctx context.Context, hasta string) error {
+	return e.enviar(ctx, "/contabilidad/cierre", map[string]string{"hasta": hasta})
+}
+
+// Reabrir retrocede el corte a `hasta`, o abre el libro entero con `hasta` vacío.
+// Exige motivo: es lo que deja volver a tocar un ejercicio ya declarado.
+func (e *ERP) Reabrir(ctx context.Context, hasta, motivo string) error {
+	return e.enviar(ctx, "/contabilidad/reapertura", map[string]string{"hasta": hasta, "motivo": motivo})
+}
+
 // ERPSaldoCuenta es una fila del sumas y saldos.
 type ERPSaldoCuenta struct {
 	Cuenta string `json:"cuenta"`
@@ -368,6 +403,30 @@ func (e *ERP) GuardarCertificadoVerifactu(ctx context.Context, certPEM, keyPEM s
 		KeyPEM  string `json:"key_pem"`
 		Sello   bool   `json:"sello"`
 	}{certPEM, keyPEM, sello})
+	if err != nil {
+		return ERPEstadoVerifactu{}, err
+	}
+	r := e.pedir("/verifactu/certificado", nil)
+	r.Method, r.Body = http.MethodPut, datos
+	r.Header.Set("Content-Type", "application/json")
+	return JSON[ERPEstadoVerifactu](ctx, e.c, r)
+}
+
+// ERPFicheroCertificado es el certificado tal como lo tiene quien lo sube: el
+// `.p12`/`.pfx` con su contraseña, o un PEM (con la clave dentro o en `Clave`).
+// La contraseña solo viaja en esta petición, por TLS: el servicio no la guarda.
+type ERPFicheroCertificado struct {
+	Fichero    []byte `json:"fichero"`
+	Clave      []byte `json:"clave,omitempty"`
+	Contrasena string `json:"contrasena,omitempty"`
+	Sello      bool   `json:"sello"`
+}
+
+// SubirCertificadoVerifactu es GuardarCertificadoVerifactu con el fichero tal
+// cual: el servicio lo abre, comprueba el NIF y sella la clave. Una contraseña
+// equivocada vuelve como `certificado_contrasena`.
+func (e *ERP) SubirCertificadoVerifactu(ctx context.Context, f ERPFicheroCertificado) (ERPEstadoVerifactu, error) {
+	datos, err := json.Marshal(f)
 	if err != nil {
 		return ERPEstadoVerifactu{}, err
 	}

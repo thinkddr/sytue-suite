@@ -15,7 +15,9 @@
  */
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { Button, Icon, Input, Modal, cx, useConfirm } from '@sytue/ui';
+import { Button, Icon, Input, Modal, SelectorDeColor, useConfirm, EmptyState } from '@sytue/ui';
+import { PALETA_DE_USUARIO, claveDeColorDeUsuario, colorDeUsuario } from '@sytue/config';
+import { useI18n } from '@sytue/i18n/preact';
 import type { Tag, TagState } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
 
@@ -27,7 +29,14 @@ interface Props {
   onDelete: (id: string) => Promise<void>;
 }
 
-const COLORES = ['#b0413a', '#8a6a1e', '#16794a', '#0e7490', '#1c58d9', '#86198f', '#565b62'];
+/**
+ * Los tonos que estrena cada estado nuevo, por turno: de la paleta de colores de usuario
+ * (la misma de cuadernos, calendarios y etiquetas de Mail), saltando de matiz para que
+ * dos estados seguidos no salgan casi iguales. El primero es el de un estado nuevo.
+ */
+const COLORES = ['red', 'brass', 'green', 'cyan', 'blue', 'plum', 'slate'].map(
+  (id) => PALETA_DE_USUARIO.find((c) => c.id === id)!.valor,
+);
 
 /** Una etiqueta vacía, para empezar. Nace con un estado: una etiqueta sin
  *  estados no se puede aplicar a nada, así que no tiene sentido guardarla. */
@@ -38,6 +47,8 @@ const NUEVA = (): { name: string; states: TagState[] } => ({
 
 export function TagsModal({ t, tags, onClose, onSave, onDelete }: Props): JSX.Element {
   const { confirmar, dialogo } = useConfirm();
+  // El nombre de cada tono es del catálogo común: lo comparten todas las apps.
+  const tc = useI18n().t;
   const [editando, setEditando] = useState<{
     id?: string;
     name: string;
@@ -103,9 +114,10 @@ export function TagsModal({ t, tags, onClose, onSave, onDelete }: Props): JSX.El
               // El índice como clave es correcto aquí: la lista se reordena solo
               // añadiendo o quitando al final, y los estados nuevos no tienen id.
               // eslint-disable-next-line react/no-array-index-key
-              // En el teléfono, los colores bajan a su línea: en una, el nombre del
-              // estado se quedaba en 26 px y no se leía ninguno.
-              <div key={i} class="flex items-center gap-1.5 max-md:flex-wrap">
+              // Los colores bajan a su línea: en una, el nombre del estado se quedaba
+              // en 26 px en el teléfono, y con los doce tonos de la paleta de usuario,
+              // también en el diálogo de escritorio.
+              <div key={i} class="flex flex-wrap items-center gap-1.5">
                 <Input
                   value={s.emoji ?? ''}
                   maxLength={4}
@@ -129,25 +141,18 @@ export function TagsModal({ t, tags, onClose, onSave, onDelete }: Props): JSX.El
                     cambiarEstado(i, { shortcut: (e.target as HTMLInputElement).value })
                   }
                 />
-                <span class="flex shrink-0 gap-1 max-md:order-last max-md:basis-full max-md:pl-[3.875rem] pointer-coarse:gap-6">
-                  {COLORES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={c}
-                      aria-pressed={s.color === c}
-                      onClick={() => cambiarEstado(i, { color: c })}
-                      style={{ background: c }}
-                      // El punto se queda en 20; con el dedo el BLANCO es de 44
-                      // (`after:-inset-3`) y el paso entre puntos también (`gap-6`).
-                      class={cx(
-                        "relative h-5 w-5 rounded-full pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']",
-                        s.color === c &&
-                          'ring-text ring-2 ring-offset-1 ring-offset-[var(--sytue-bg)]',
-                      )}
-                    />
-                  ))}
-                </span>
+                <SelectorDeColor
+                  colores={PALETA_DE_USUARIO.map(({ id, valor }) => ({
+                    valor,
+                    nombre: tc(claveDeColorDeUsuario(id)),
+                  }))}
+                  // Un estado con un color de antes se marca con su tono más cercano.
+                  valor={colorDeUsuario(s.color) ?? ''}
+                  onChange={(color) => cambiarEstado(i, { color })}
+                  aria-label={t('notebook.color')}
+                  tamano="sm"
+                  class="shrink-0 max-md:order-last max-md:basis-full max-md:pl-[3.875rem]"
+                />
                 {editando.states.length > 1 ? (
                   <button
                     type="button"
@@ -191,7 +196,7 @@ export function TagsModal({ t, tags, onClose, onSave, onDelete }: Props): JSX.El
       ) : (
         <div class="grid gap-2">
           {tags.length === 0 ? (
-            <p class="text-text-muted text-base">{t('tags.none')}</p>
+            <EmptyState compact icon="tag" title={t('tags.none')} />
           ) : (
             <ul class="grid gap-1">
               {tags.map((tag) => (
@@ -209,7 +214,7 @@ export function TagsModal({ t, tags, onClose, onSave, onDelete }: Props): JSX.El
                       <span
                         key={s.id}
                         class="rounded-full px-2 py-0.5 text-sm text-[var(--sytue-on-primary)]"
-                        style={{ background: s.color }}
+                        style={{ background: colorDeUsuario(s.color) ?? s.color }}
                       >
                         {s.emoji ? `${s.emoji} ` : ''}
                         {s.name}

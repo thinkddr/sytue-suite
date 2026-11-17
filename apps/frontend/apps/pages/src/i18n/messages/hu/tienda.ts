@@ -174,15 +174,10 @@ export const tienda = {
   'store.mode_test_help':
     'Szimulált fizetések a szolgáltató tesztkulcsaival. Senkitől nem vonunk le pénzt.',
   'store.mode_live_help': 'Valódi fizetések a vásárlóitól az éles kulcsokkal.',
-  'store.webhook_title': '1. lépés: a webhook címe',
   'store.webhook_help': 'Illessze be ezt a címet a(z) {nombre} vezérlőpultjába.',
   'store.webhook_label': 'Webhook címe',
   'store.webhook_error':
     'A webhook címét nem sikerült lekérni. Zárja be az ablakot, és próbálja újra.',
-  'store.copy': 'Másolás',
-  'store.copied': 'A cím másolva.',
-  'store.credentials_title': 'Hitelesítő adatok',
-  'store.credentials_step': '2. lépés: hitelesítő adatok',
   'store.f_api_key': 'API-kulcs',
   'store.f_api_key_mode': 'API-kulcs ({modo})',
   'store.f_profile_id': 'Profilazonosító (nem kötelező)',
@@ -200,6 +195,50 @@ export const tienda = {
   'store.gateway_save': 'Mentés és tesztelés',
   'store.gateway_saved': 'A(z) {nombre} fizetési kapu tesztelve és mentve.',
   'store.gateway_save_error': 'A fizetési kapu hitelesítő adatait nem sikerült érvényesíteni.',
+  'store.wz_progress': 'A fizetési szolgáltató csatlakoztatásának lépései',
+  'store.wz_step_mode': 'Mód',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Kulcsok',
+  'store.wz_step_check': 'Ellenőrzés',
+  'store.wz_step_done': 'Kész',
+  'store.wz_mode_heading': 'Tesztfizetés vagy valódi fizetés?',
+  'store.wz_mode_desc':
+    'Kezdje tesztmódban; ha minden működik, nyissa meg újra ezt a varázslót, és válassza az éles módot.',
+  'store.wz_webhook_heading':
+    'Adja meg a(z) {nombre} számára, hová küldje a fizetési értesítéseket',
+  'store.wz_keys_heading': 'A(z) {nombre} kulcsai',
+  'store.wz_keys_desc':
+    'A titkos kulcsokat lepecsételve tároljuk, és többé nem jelennek meg: a módosításhoz írja be újra a kulcsot.',
+  'store.wz_keys_rejected': 'A(z) {nombre} nem fogadta el ezeket a kulcsokat',
+  'store.wz_check_heading': 'Ellenőrzés és mentés',
+  'store.wz_check_desc':
+    'A Sytue Web a szolgáltató bekapcsolása előtt kipróbálja a kulcsokat a(z) {nombre} rendszerében. Semmi sem mentődik, amíg a próba nem sikerül.',
+  'store.wz_secret_hidden': 'Beírva (rejtve)',
+  'store.wz_empty_value': 'Nincs megadva',
+  'store.wz_done_heading': 'A(z) {nombre} készen áll',
+  'store.wz_finish': 'Befejezés',
+  'store.hint_mollie_api_key':
+    'A Mollie-ban: Developers › API keys. A tesztkulcsok test_, az élesek live_ előtaggal kezdődnek.',
+  'store.hint_mollie_profile':
+    'A Mollie-ban: Settings › Website profiles. pfl_ előtaggal kezdődik; hagyja üresen az alapértelmezett profilhoz.',
+  'store.hint_adyen_api_key':
+    'Az Adyen Customer Area felületén: Developers › API credentials › az Ön hitelesítője › API key.',
+  'store.hint_adyen_merchant':
+    'Az Adyen Customer Area felületén, a felső fiókválasztóban: a kereskedői fiók, nem a vállalati fiók.',
+  'store.hint_adyen_hmac':
+    'Az Adyenben: Developers › Webhooks › az Ön webhookja › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Az Adyenben (éles): Developers › API URLs. A cím -checkout-live előtti része.',
+  'store.hint_redsys_merchant':
+    'A bankja adja meg a virtuális POS-szerződéssel; a Redsys adminisztrációs portálján is látható.',
+  'store.hint_redsys_terminal':
+    'A Redsys adminisztrációs portálján, a kereskedői kód mellett. Általában 1.',
+  'store.hint_redsys_secret':
+    'A Redsys adminisztrációs portálján: kereskedői adatok › SHA-256 kulcs. A teszt- és az éles kulcs eltér.',
+  'store.hint_stripe_secret':
+    'A Stripe-ban: Developers › API keys › Secret key. sk_test_ vagy sk_live_ előtaggal kezdődik.',
+  'store.hint_stripe_webhook':
+    'A Stripe-ban: Developers › Webhooks › az Ön végpontja › Signing secret. whsec_ előtaggal kezdődik.',
   'orders.subtitle': 'A webhelyén leadott rendelések és vásárlások.',
   'orders.count': { one: '{count} rendelés', other: '{count} rendelés' },
   'orders.loading': 'Rendelések betöltése',

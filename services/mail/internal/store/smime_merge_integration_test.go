@@ -42,7 +42,7 @@ import (
 func seedSMIME(t *testing.T, st *store.Store, pool *pg.Pool, tenant, address string) {
 	t.Helper()
 	ctx := tenantCtx(tenant)
-	acc := seedAccount(t, ctx, st, address)
+	acc := seedAccount(ctx, t, st, address)
 	err := pool.InMergeTx(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO smime_authorities (tenant, cert_pem, key_enc) VALUES ($1, $2, $3)
@@ -64,7 +64,7 @@ func seedSMIME(t *testing.T, st *store.Store, pool *pg.Pool, tenant, address str
 
 // contarSMIME cuenta autoridades e identidades de un tenant. Va en transacción
 // de fusión para poder mirar ambos lados de una fusión desde la misma sesión.
-func contarSMIME(t *testing.T, ctx context.Context, pool *pg.Pool, tenant string) (autoridades, identidades int) {
+func contarSMIME(ctx context.Context, t *testing.T, pool *pg.Pool, tenant string) (autoridades, identidades int) {
 	t.Helper()
 	err := pool.InMergeTx(ctx, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx,
@@ -112,11 +112,11 @@ func TestMergePrepareDescartaLaAutoridadHuerfana(t *testing.T) {
 		t.Fatal("el gancho no dijo nada: descartar material de un cliente en silencio es lo que no puede pasar")
 	}
 
-	if a, i := contarSMIME(t, ctx, h.Pool, "huerfana"); a != 0 || i != 0 {
+	if a, i := contarSMIME(ctx, t, h.Pool, "huerfana"); a != 0 || i != 0 {
 		t.Errorf("del origen quedan %d autoridades y %d identidades, quiero 0 y 0", a, i)
 	}
 	// Y lo que NO debe tocar: el destino, intacto.
-	if a, i := contarSMIME(t, ctx, h.Pool, "destino"); a != 1 || i != 1 {
+	if a, i := contarSMIME(ctx, t, h.Pool, "destino"); a != 1 || i != 1 {
 		t.Errorf("el destino tiene %d autoridades y %d identidades, quiero 1 y 1", a, i)
 	}
 
@@ -145,7 +145,7 @@ func TestMergePrepareNoTocaNadaSiElDestinoNoTieneAutoridad(t *testing.T) {
 	if nota != "" {
 		t.Errorf("no había conflicto y el gancho descartó algo: %q", nota)
 	}
-	if a, i := contarSMIME(t, ctx, h.Pool, "vieja"); a != 1 || i != 1 {
+	if a, i := contarSMIME(ctx, t, h.Pool, "vieja"); a != 1 || i != 1 {
 		t.Errorf("el material del origen se tocó: %d autoridades, %d identidades; quiero 1 y 1", a, i)
 	}
 }
@@ -179,7 +179,7 @@ func TestMergePrepareSoloDentroDeUnaFusion(t *testing.T) {
 	}
 
 	// Lo que importa de verdad: después de los dos intentos, el material sigue ahí.
-	if a, i := contarSMIME(t, ctx, h.Pool, "acme"); a != 1 || i != 1 {
+	if a, i := contarSMIME(ctx, t, h.Pool, "acme"); a != 1 || i != 1 {
 		t.Fatalf("se perdió material S/MIME: %d autoridades, %d identidades; quiero 1 y 1", a, i)
 	}
 }

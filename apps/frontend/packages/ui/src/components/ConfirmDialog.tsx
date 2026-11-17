@@ -32,6 +32,10 @@ export interface ConfirmDialogProps {
   /** Rótulo del botón que confirma. Un verbo, no «Aceptar»: quien lee tiene que
    *  saber qué va a pasar sin volver al título. */
   confirmLabel: string;
+  /** Rótulo del botón que no hace nada; por defecto, «Cancelar». Cuando cancelar es
+   *  QUEDARSE donde se estaba —«Seguir editando» frente a «Descartar»—, decirlo evita
+   *  que se lea como «cancelar lo que estaba haciendo». */
+  cancelLabel?: string;
   /** `danger` para lo que destruye, desconecta o suspende. */
   tone?: 'primary' | 'danger';
   /** Deshabilita el botón de confirmar (p. ej. falta un campo obligatorio). */
@@ -47,6 +51,7 @@ export function ConfirmDialog({
   onConfirm,
   title,
   confirmLabel,
+  cancelLabel,
   tone = 'primary',
   confirmDisabled = false,
   busy = false,
@@ -66,7 +71,7 @@ export function ConfirmDialog({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
-            {t('ui.cancel')}
+            {cancelLabel ?? t('ui.cancel')}
           </Button>
           <Button
             variant={tone === 'danger' ? 'danger' : 'primary'}

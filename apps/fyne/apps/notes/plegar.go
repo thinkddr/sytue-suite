@@ -114,5 +114,5 @@ func (p *Pantalla) plegarLista(n Nota, i int) {
 		return
 	}
 	html := d.ParaGuardar()
-	lanzar(func() error { return p.editar(n.ID, Parche{Contenido: &html}, true) })
+	p.lanzar(func() error { return p.editar(n.ID, Parche{Contenido: &html}, true) })
 }

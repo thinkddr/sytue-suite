@@ -11,6 +11,7 @@ package notes
 
 import (
 	"crypto/rand"
+	"errors"
 	"log/slog"
 	"slices"
 	"strings"
@@ -63,6 +64,9 @@ const MaxLineasPegadas = notas.MaxLineasPegadas
 // dueño es el `sub` de quien usa la app: el mismo en todas sus organizaciones, así que
 // vale para comparar con OwnerSub pero no para indexar el almacén (claveAlmacen).
 func (p *Pantalla) dueño() string {
+	if work := p.vida().work; work != nil {
+		return work.PrivateStorageScope().Subject
+	}
 	if p.Yo == nil {
 		return ""
 	}
@@ -71,6 +75,9 @@ func (p *Pantalla) dueño() string {
 
 // claveAlmacen es persona y organización: de ella cuelgan la cola y los borradores.
 func (p *Pantalla) claveAlmacen() string {
+	if work := p.vida().work; work != nil {
+		return work.Owner()
+	}
 	org := ""
 	if p.Org != nil {
 		org = p.Org()
@@ -80,7 +87,7 @@ func (p *Pantalla) claveAlmacen() string {
 
 // puedeCapturar es puedeEscribir sin exigir red cuando hay dónde encolar.
 func (p *Pantalla) puedeCapturar() bool {
-	return !p.migrando && p.svc != nil && p.activo.ID != "" && !p.activo.Crudo.ReadOnly && (p.hayRed() || p.Almacen != nil)
+	return p.vigente() && !p.migrando && p.svc != nil && p.activo.ID != "" && !p.activo.Crudo.ReadOnly && (p.hayRed() || p.Almacen != nil)
 }
 
 // esProvisional dice si el cuaderno es un día que aún no existe en el servicio.
@@ -98,18 +105,26 @@ func diaSinConexion(cuadernos []Cuaderno, dueño, fecha, titulo string) Cuaderno
 
 // encolar guarda la captura para el cuaderno abierto. En el hilo de la interfaz.
 func (p *Pantalla) encolar(in api.NoteInput, c Cuaderno) error {
+	if !p.vigente() {
+		return offline.ErrWorkClosed
+	}
 	cp := capturaPendiente{ClientID: in.ClientID(), In: in, At: time.Now().UnixMilli()}
 	if esProvisional(c.ID) {
 		cp.Fecha, cp.Titulo = c.Crudo.DailyDate, c.Titulo
 	} else {
 		cp.Cuaderno = c.ID
 	}
-	if err := p.Almacen.Write(p.claveAlmacen(), espacioCola, cp.ClientID, cp); err != nil {
+	ctx, done, err := p.admitir()
+	if err != nil {
+		return err
+	}
+	defer done()
+	if err := p.escribirLocal(ctx, espacioCola, cp.ClientID, cp); err != nil {
 		return err
 	}
 	p.cola = pendientesDe(p.Almacen, p.claveAlmacen())
 	if p.hayRed() {
-		go p.vaciar()
+		p.iniciar(p.vaciar)
 	}
 	return nil
 }
@@ -127,10 +142,18 @@ func (p *Pantalla) pendientesAqui() []capturaPendiente {
 
 // descartar quita de la cola una captura rechazada.
 func (p *Pantalla) descartar(id string) {
+	if !p.vigente() {
+		return
+	}
+	ctx, done, err := p.admitir()
+	if err != nil {
+		return
+	}
+	defer done()
 	if p.Almacen == nil {
 		return
 	}
-	_ = p.Almacen.Delete(p.claveAlmacen(), espacioCola, id)
+	_ = p.escribirLocal(ctx, espacioCola, id, nil)
 	p.cola = pendientesDe(p.Almacen, p.claveAlmacen())
 	p.Repintar()
 }
@@ -141,11 +164,30 @@ func (p *Pantalla) vaciar() {
 		return
 	}
 	defer p.vaciando.Store(false)
+	ctxEdiciones, cancelEdiciones := p.ctx()
+	errEdiciones := p.vaciarEdiciones(ctxEdiciones)
+	cancelEdiciones()
+	if errors.Is(errEdiciones, api.ErrDatosCifradosNotas) {
+		p.enHilo(func() {
+			if !p.avisoBorradorBloqueado {
+				p.avisoBorradorBloqueado = true
+				p.fallo("note.saveFailed", api.ErrDatosCifradosNotas)
+			}
+		})
+	}
 	pend := pendientesDe(p.Almacen, p.claveAlmacen())
+	if slices.ContainsFunc(pend, func(c capturaPendiente) bool { return c.Insegura }) {
+		p.enHilo(func() {
+			if !p.avisoCapturaBloqueada {
+				p.avisoCapturaBloqueada = true
+				p.fallo("note.saveFailed", api.ErrDatosCifradosNotas)
+			}
+		})
+	}
 	if !slices.ContainsFunc(pend, func(c capturaPendiente) bool { return !c.Rechazada }) {
 		// Nada que enviar, pero lo que se ve puede ser de antes de cambiar de
 		// organización: se pone al día en la siguiente ronda.
-		enHilo(func() {
+		p.enHilo(func() {
 			if !slices.EqualFunc(p.cola, pend, func(a, b capturaPendiente) bool { return a.ClientID == b.ClientID && a.Rechazada == b.Rechazada }) {
 				p.cola = pend
 				p.Repintar()
@@ -156,16 +198,18 @@ func (p *Pantalla) vaciar() {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	tocados := vaciarCola(ctx, p.Almacen, p.claveAlmacen(), notas.EnvioDe(p.svc, time.Now().Format(time.DateOnly)))
-	enHilo(func() {
+	p.enHilo(func() {
 		p.cola = pendientesDe(p.Almacen, p.claveAlmacen())
 		if len(tocados) > 0 {
 			switch {
 			case esProvisional(p.activo.ID) && tocados[p.activo.ID]:
 				p.abrirDia(p.activo.Crudo.DailyDate) // el día ya existe: el de verdad
 			case tocados[p.activo.ID]:
-				go p.cargarNotas(p.activo)
+				notaFuncion := p.cargarNotas
+				notaArgumento0 := p.activo
+				p.iniciar(func() { notaFuncion(notaArgumento0) })
 			}
-			go p.cargarCuadernos()
+			p.iniciar(p.cargarCuadernos)
 		}
 		p.Repintar()
 	})
@@ -174,24 +218,31 @@ func (p *Pantalla) vaciar() {
 // vigilarCola arranca la cola: lo que quedó de la última vez, al volver la red y cada
 // cadaReintento mientras quede algo. Una vez por Pantalla.
 func (p *Pantalla) vigilarCola() {
-	if p.Almacen == nil {
+	if p.Almacen == nil || !p.vigente() {
 		return
 	}
 	p.vigilando.Do(func() {
 		if p.red != nil {
-			p.red.Subscribe(func(e offline.State) {
+			p.vida().unsubscribe = p.red.Subscribe(func(e offline.State) {
 				if e == offline.Online {
-					go p.vaciar()
+					p.iniciar(p.vaciar)
 				}
-				fyne.Do(p.Repintar)
+				p.enHilo(p.Repintar)
 			})
 		}
-		go func() {
+		p.iniciar(func() {
+			ctxTrabajo, _ := p.contextoTrabajo()
+			reloj := time.NewTicker(cadaReintento)
+			defer reloj.Stop()
 			for {
 				p.vaciar()
-				time.Sleep(cadaReintento)
+				select {
+				case <-ctxTrabajo.Done():
+					return
+				case <-reloj.C:
+				}
 			}
-		}()
+		})
 	})
 }
 
@@ -206,23 +257,36 @@ func (p *Pantalla) borradorGuardado(id string) string {
 }
 
 // guardarBorrador lo recuerda en memoria y en el almacén (vacío, lo borra).
-func (p *Pantalla) guardarBorrador(id, texto string) {
+func (p *Pantalla) guardarBorrador(id, texto string) { _ = p.guardarBorradorConError(id, texto) }
+
+func (p *Pantalla) guardarBorradorConError(id, texto string) error {
+	if !p.vigente() {
+		return errors.Join(notas.ErrLocalAdmission, offline.ErrWorkClosed)
+	}
+	ctx, done, admissionErr := p.admitir()
+	if admissionErr != nil {
+		return errors.Join(notas.ErrLocalAdmission, admissionErr)
+	}
+	defer done()
+	var err error
+	if p.Almacen != nil && id != "" {
+		var value any = texto
+		if texto == "" {
+			value = nil
+		}
+		err = p.escribirLocal(ctx, espacioBorradores, id, value)
+		if errors.Is(err, notas.ErrLocalAdmission) {
+			return err
+		}
+	}
 	if p.borradores == nil {
 		p.borradores = map[string]string{}
 	}
 	p.borradores[id] = texto
-	if p.Almacen == nil || id == "" {
-		return
-	}
-	var err error
-	if texto == "" {
-		err = p.Almacen.Delete(p.claveAlmacen(), espacioBorradores, id)
-	} else {
-		err = p.Almacen.Write(p.claveAlmacen(), espacioBorradores, id, texto)
-	}
 	if err != nil {
 		slog.Warn("notes: no se ha podido guardar el borrador", "error", err)
 	}
+	return err
 }
 
 // nuevoClientID es la marca de una nota nueva.

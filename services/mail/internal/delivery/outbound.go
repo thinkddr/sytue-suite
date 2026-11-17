@@ -28,11 +28,12 @@ import (
 // Outbound acepta correo saliente del MSA/JMAP, lo firma con DKIM, lo guarda en
 // la carpeta Sent y lo encola en PostgreSQL para entrega diferida.
 type Outbound struct {
-	store    *store.Store
-	blobs    *objectstore.Client
-	signer   *auth.Signer
-	logger   *slog.Logger
-	maxBytes int64
+	store         *store.Store
+	blobs         *objectstore.Client
+	signer        *auth.Signer
+	logger        *slog.Logger
+	maxBytes      int64
+	privateSender PrivateSender
 	// quotaBytes es la cuota con la que se aprovisiona un buzón nuevo por esta
 	// vía. Tiene que ser la MISMA que usa el alta por webmail, o el buzón
 	// tendría un tamaño distinto según por dónde llegara el primer mensaje.

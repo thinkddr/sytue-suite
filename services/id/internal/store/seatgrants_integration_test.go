@@ -26,7 +26,7 @@ import (
 func TestRetirarPlazasRegaladas(t *testing.T) {
 	st, ctx := newStore(t)
 	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
-	admin := seedUser(t, ctx, st, "global@sytue.eu")
+	admin := seedUser(ctx, t, st, "global@sytue.eu")
 
 	dar := func(seats int, kind, motivo string) store.SeatGrant {
 		t.Helper()
@@ -101,7 +101,7 @@ func TestRetirarPlazasRegaladas(t *testing.T) {
 func TestPlazasCaducadasNoSuman(t *testing.T) {
 	st, ctx := newStore(t)
 	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "temporal", Name: "Temporal"})
-	admin := seedUser(t, ctx, st, "global2@sytue.eu")
+	admin := seedUser(ctx, t, st, "global2@sytue.eu")
 
 	ayer := time.Now().Add(-24 * time.Hour)
 	if _, err := st.CreateSeatGrant(ctx, nil, store.SeatGrant{

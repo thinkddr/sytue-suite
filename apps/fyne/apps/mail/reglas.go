@@ -134,11 +134,9 @@ var rolesConTarjeta = []string{"archive", "junk", "trash"}
 
 // Medidas de la web.
 const (
-	huecoAsistente   float32 = 6 * 0.25 * tema.Rem   // `gap-6` del Wizard
-	descAsistenteMax float32 = 42 * tema.Rem         // `max-w-2xl` de la descripción
-	ladoBorrarRegla  float32 = 7 * 0.25 * tema.Rem   // `h-7 w-7`
-	colResumen       float32 = 11 * tema.Rem         // `minmax(0,11rem)`
-	margenYResumen   float32 = 2.5 * 0.25 * tema.Rem // `py-2.5`
+	huecoAsistente   float32 = 6 * 0.25 * tema.Rem // `gap-6` del Wizard
+	descAsistenteMax float32 = 42 * tema.Rem       // `max-w-2xl` de la descripción
+	ladoBorrarRegla  float32 = 7 * 0.25 * tema.Rem // `h-7 w-7`
 )
 
 type gestorReglas struct {
@@ -395,13 +393,14 @@ func (g *gestorReglas) borrar(f api.MailFilter) {
 // ---- El asistente ----
 
 // destinos son las carpetas a las que se puede mover el correo que llega: todas menos
-// Borradores y Enviados. Las de sistema con consecuencia propia van en su tarjeta; las
-// demás, en el desplegable de «otra carpeta».
+// Borradores, Enviados y Pospuestos (lo que entra ahí sin posponerlo no vuelve nunca).
+// Las de sistema con consecuencia propia van en su tarjeta; las demás, en el
+// desplegable de «otra carpeta».
 func (g *gestorReglas) destinos() (roles map[string]api.Mailbox, otras []api.Mailbox) {
 	roles = map[string]api.Mailbox{}
 	for _, m := range g.b.carpetas {
 		switch _, propio := eleccionRol[m.Role]; {
-		case m.Role == "drafts" || m.Role == "sent":
+		case m.Role == "drafts" || m.Role == "sent" || m.Role == "snoozed":
 		case propio:
 			roles[m.Role] = m
 		default:
@@ -446,7 +445,7 @@ func (g *gestorReglas) asistente() fyne.CanvasObject {
 	case 1:
 		contenido = g.pasoAccion()
 	default:
-		contenido = g.pasoResumen(v)
+		contenido = g.pasoResumen()
 	}
 
 	// La botonera: `border-t border-border-subtle pt-4`, cancelar a la izquierda y
@@ -563,17 +562,19 @@ func (g *gestorReglas) pasoAccion() fyne.CanvasObject {
 	return container.New(ui.Columna{Hueco: tema.Espacio(4)}, objs...)
 }
 
-func (g *gestorReglas) pasoResumen(v tema.Variante) fyne.CanvasObject {
+func (g *gestorReglas) pasoResumen() fyne.CanvasObject {
 	t, l := g.b.P.T, g.b.P.Locale
 	d := g.borrador
-	filas := []filaResumen{
-		{t.T("rules.summaryWhich", nil), CondicionRegla(t, l, strings.TrimSpace(d.De), strings.TrimSpace(d.Asunto)), func() { g.irA(0) }},
-		{t.T("rules.summaryWhat", nil), AccionRegla(t, l, g.carpeta, d.MoverA, d.Leido, d.Destacado), func() { g.irA(1) }},
-		{t.T("rules.summaryWhen", nil), t.T("rules.summaryWhenValue", nil), nil},
-	}
+	// El `ReviewSummary` de la suite, con el «Editar» del catálogo común.
+	resumen := ui.NuevoResumen(t,
+		ui.FilaResumen{Clave: t.T("rules.summaryWhich", nil), Valor: CondicionRegla(t, l, strings.TrimSpace(d.De), strings.TrimSpace(d.Asunto)), AlEditar: func() { g.irA(0) }},
+		ui.FilaResumen{Clave: t.T("rules.summaryWhat", nil), Valor: AccionRegla(t, l, g.carpeta, d.MoverA, d.Leido, d.Destacado), AlEditar: func() { g.irA(1) }},
+		ui.FilaResumen{Clave: t.T("rules.summaryWhen", nil), Valor: t.T("rules.summaryWhenValue", nil)},
+	)
+	resumen.Ventana = g.ventana
 	return container.New(ui.Columna{Hueco: tema.Espacio(4)},
 		ui.NuevaAyudaEnLinea(FraseRegla(t, l, g.carpeta, d)).ConTono(ui.AyudaInfo),
-		resumenRevision(t.T("ui.review.edit", nil), filas, g.ancho, g.ventana, v),
+		ui.AlAncho(g.ancho, resumen),
 		g.campoRegla(t.T("rules.nameLabel", nil), g.nombre, t.T("rules.nameHint", nil), ui.AyudaNeutra))
 }
 
@@ -609,18 +610,13 @@ func (g *gestorReglas) crear() {
 
 // ---- Piezas ----
 
-// seccionCon es `SettingsSection plain` con `actions`: el título y la descripción a la
-// izquierda y la acción a la derecha. La cabecera es `flex-wrap`, pero el lado de los
-// textos es `flex-1` (base 0), así que no parte: en el móvil la descripción se estrecha.
+// seccionCon es `SettingsSection plain` con `actions`: la `ui.SeccionAjustes` sin
+// tarjeta, con el título y la descripción a la izquierda y la acción a la derecha, y lo
+// de dentro en columna con `gap-3`. Se declara a su ancho: el diálogo pregunta el mínimo.
 func seccionCon(titulo, descripcion string, ancho float32, accion fyne.CanvasObject, dentro ...fyne.CanvasObject) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	relajado := tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}
-	izq := ancho - tema.Espacio(3) - accion.MinSize().Width
-	cabeza := container.New(ui.Columna{Hueco: tema.Espacio(1)},
-		ui.NuevoRotulo(titulo, tema.TextoLG, ui.SemiNegrita, "text"),
-		ui.NuevoParrafo(descripcion, relajado, ui.Normal, "text-muted", v).A(izq))
-	return container.New(ui.Columna{Hueco: huecoDentroSeccion},
-		append([]fyne.CanvasObject{container.New(extremos{}, cabeza, accion)}, dentro...)...)
+	s := ui.NuevaSeccionAjustes(titulo, descripcion, container.New(ui.Columna{Hueco: huecoDentroSeccion}, dentro...))
+	s.Plana, s.Acciones = true, []fyne.CanvasObject{accion}
+	return ui.AlAncho(ancho, s)
 }
 
 // textoRecortado es una línea con `truncate`: se corta por letras, con puntos
@@ -658,101 +654,4 @@ func (anchoLibre) MinSize(objs []fyne.CanvasObject) fyne.Size {
 func (anchoLibre) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(fyne.NewSize(max(t.Width, objs[0].MinSize().Width), t.Height))
-}
-
-// filaResumen es un `ReviewItem`: rótulo, valor y, si lo lleva, a qué paso vuelve su
-// «Editar».
-type filaResumen struct {
-	rotulo, valor string
-	editar        func()
-}
-
-// resumenRevision es `ReviewSummary`: `dl` con borde y filetes, cada fila —rótulo y
-// valor— en `px-3 py-2.5`; desde `sm:`, en rejilla con el rótulo a 11rem y la columna
-// de «Editar» detrás (`auto`); en el móvil, en fila con «Editar» a la derecha. Todo a
-// la línea base (`items-baseline`). Vive en Mail porque es la única pantalla que lo pide.
-func resumenRevision(editar string, filas []filaResumen, ancho, ventana float32, v tema.Variante) fyne.CanvasObject {
-	interior := ancho - 2*tema.Borde - 2*margenXFilaEtiqueta
-	objs := make([]fyne.CanvasObject, 0, len(filas))
-	for _, f := range filas {
-		rot := ui.NuevoRotulo(f.rotulo, tema.TextoSM, ui.Normal, "text-muted")
-		col1, huecos := rot.MinSize().Width, float32(1)
-		if ventana >= ui.CorteSM {
-			col1, huecos = colResumen, 2
-		}
-		var boton *ui.Enlace
-		anchoBoton := float32(0)
-		if f.editar != nil {
-			boton = ui.NuevoEnlace(editar, tema.TextoSM, ui.SemiNegrita, "primary-text", f.editar)
-			boton.Boton = true
-			boton.Nombre = editar + " " + f.rotulo // el `sr-only` que sigue al rótulo
-			anchoBoton = boton.MinSize().Width
-			if ventana < ui.CorteSM {
-				huecos = 2
-			}
-		}
-		wv := max(interior-col1-huecos*tema.Espacio(3)-anchoBoton, 0)
-		valor := ui.NuevoParrafo(f.valor, tema.TextoSM, ui.Normal, "text", v).A(wv)
-		celdas := []fyne.CanvasObject{rot, valor}
-		if boton != nil {
-			celdas = append(celdas, boton)
-		}
-		objs = append(objs, container.New(ui.Margen{Izq: margenXFilaEtiqueta, Der: margenXFilaEtiqueta, Arr: margenYResumen, Abj: margenYResumen},
-			container.New(filaDeResumen{col1: col1}, celdas...)))
-	}
-	caja := ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioMD)
-	dentro := container.New(ui.Columna{}, intercalar(objs, v)...)
-	return container.New(&enCaja{caja: caja}, append(caja.Objetos(), dentro)...)
-}
-
-// intercalar pone el filete `divide-border-subtle` entre las filas.
-func intercalar(filas []fyne.CanvasObject, v tema.Variante) []fyne.CanvasObject {
-	out := make([]fyne.CanvasObject, 0, 2*len(filas))
-	for i, f := range filas {
-		if i > 0 {
-			r := canvas.NewRectangle(tema.Color("border-subtle", v))
-			r.SetMinSize(fyne.NewSize(0, tema.Borde))
-			out = append(out, r)
-		}
-		out = append(out, f)
-	}
-	return out
-}
-
-// filaDeResumen coloca el rótulo en su columna, el valor detrás a `gap-3` y, si lo
-// hay, «Editar» al final.
-//
-// Con «Editar» la fila CRECE (medido en la web: 33,25 → 36,75 sin contar el filete): el
-// botón vive en un `<dd>` sin clase de texto, cuyo puntal es el de `text-base` (19,25
-// de línea), y al alinear a la línea base (`items-baseline`) ese puntal baja 3 px el
-// texto de toda la fila. El botón queda a la altura del texto.
-type filaDeResumen struct{ col1 float32 }
-
-// bajoEditar es lo que baja el texto en una fila con «Editar» (medido: 11,75 − 8,75).
-const bajoEditar float32 = 3
-
-func (f filaDeResumen) conEditar(objs []fyne.CanvasObject) bool { return len(objs) > 2 }
-
-func (f filaDeResumen) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	alto := max(objs[1].MinSize().Height, tema.TextoSM.Linea)
-	if f.conEditar(objs) {
-		alto = max(bajoEditar+alto, tema.TextoBase.Linea)
-	}
-	return fyne.NewSize(0, alto)
-}
-
-func (f filaDeResumen) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	y, der := float32(0), float32(0)
-	if f.conEditar(objs) {
-		y = bajoEditar
-		b := objs[2].MinSize()
-		der = b.Width + tema.Espacio(3)
-		objs[2].Move(fyne.NewPos(t.Width-b.Width, y))
-		objs[2].Resize(fyne.NewSize(b.Width, tema.TextoSM.Linea))
-	}
-	objs[0].Move(fyne.NewPos(0, y))
-	objs[0].Resize(fyne.NewSize(f.col1, tema.TextoSM.Linea))
-	x := f.col1 + tema.Espacio(3)
-	objs[1].Move(fyne.NewPos(x, y))
-	objs[1].Resize(fyne.NewSize(max(t.Width-x-der, 0), objs[1].MinSize().Height))
 }

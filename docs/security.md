@@ -1,170 +1,186 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright (c) 2026 Daniel Delgado Ramos -->
 
-# Seguridad, cumplimiento y licencias — Sytue Suite
+<a id="seguridad-cumplimiento-y-licencias--sytue-suite"></a>
 
-Documento único de seguridad de la suite. Cuatro partes:
+# Security, compliance and licensing — Sytue Suite
 
-1. **[Seguridad y RGPD](#1-seguridad-y-rgpd)** — controles por capa, soberanía, secretos,
-   IdP, multi-tenancy, correo, backups, hardening, respuesta a incidentes y cumplimiento.
-2. **[Modelo de amenazas](#2-modelo-de-amenazas-stride-por-servicio)** — STRIDE por servicio.
-3. **[Checklist OWASP ASVS L2](#3-checklist-owasp-asvs-l2)** — mapeada al repositorio.
-4. **[Política clean-room y licencias](#4-politica-de-reimplementacion-clean-room)** — cómo se
-   reimplementa sin obra derivada, matriz de dependencias y obligaciones.
+The suite's single security document. Four parts:
 
-> Normativo: [`CONVENTIONS.md`](CONVENTIONS.md). Decisiones y su porqué:
-> [`decisions.md`](decisions.md). La **auditoría de seguridad externa antes de producción
-> sigue siendo obligatoria**.
+1. **[Security and GDPR](#1-seguridad-y-rgpd)** — controls per layer, sovereignty, secrets,
+   IdP, multi-tenancy, mail, backups, hardening, incident response and compliance.
+2. **[Threat model](#2-modelo-de-amenazas-stride-por-servicio)** — STRIDE per service.
+3. **[OWASP ASVS L2 checklist](#3-checklist-owasp-asvs-l2)** — mapped to the repository.
+4. **[Clean-room policy and licensing](#4-politica-de-reimplementacion-clean-room)** — how
+   reimplementation is done without derivative works, dependency matrix and obligations.
+
+> Normative: [`CONVENTIONS.md`](CONVENTIONS.md). Decisions and their rationale:
+> [`decisions.md`](decisions.md). The **external security audit before production
+> remains mandatory**.
 
 ---
 
 <a id="1-seguridad-y-rgpd"></a>
 
-## 1. Seguridad y RGPD
+## 1. Security and GDPR
 
-Seguridad, soberanía y cumplimiento del **RGPD** (Reglamento (UE) 2016/679). Principios
-rectores: **100 % Europa sobre Scaleway (solo regiones UE)**; productos **Sytue-native
-bajo licencia Apache-2.0** sin motores de terceros AGPL; **stack único Go + Astro/Preact + PostgreSQL**;
-**Sytue ID (IdP propio en Go) como pieza nuclear**. Sin proveedores US para datos personales
-y sin transferencias fuera de la UE. Cada control técnico se mapea a su **implementación
-real** en `platform/pkg/*` y `services/<svc>` para que esto sea verificable, no aspiracional.
+Security, sovereignty and compliance with the **GDPR** (Regulation (EU) 2016/679). Guiding
+principles: **100 % Europe on Scaleway (EU regions only)**; **Sytue-native products
+under the Apache-2.0 license** with no third-party AGPL engines; **single Go + Astro/Preact + PostgreSQL stack**;
+**Sytue ID (in-house IdP in Go) as the core piece**. No US providers for personal data
+and no transfers outside the EU. Each technical control is mapped to its **actual
+implementation** in `platform/pkg/*` and `services/<svc>` so that this is verifiable, not aspirational.
 
-> La **auditoría de seguridad independiente de Sytue ID antes de producción es obligatoria**
-> por ser código de autenticación propio y crítico (§1.14 y §4).
+> The **independent security audit of Sytue ID before production is mandatory**
+> because it is in-house, critical authentication code (§1.14 and §4).
 
 ---
 
 <a id="11-modelo-de-seguridad-por-defecto--mapa-de-controles-conventions-07--implementacion"></a>
 
-### 1.1 Modelo de seguridad por defecto — mapa de controles CONVENTIONS §0.7 → implementación
+<a id="11-modelo-de-seguridad-por-defecto--mapa-de-controles-conventions-07--implementación"></a>
 
-Esta sección **materializa** cada mínimo no negociable de CONVENTIONS §0.7 con el punto de código
-que lo implementa. Es el índice maestro de trazabilidad de "seguridad por defecto".
+### 1.1 Secure-by-default model — map of CONVENTIONS §0.7 controls → implementation
 
-| Control (CONVENTIONS §0.7)                          | Implementación real (fichero / mecanismo)                                                                                                                                                                                                       | Detalle                                                                                                                                         |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Deny-by-default (autorización)**                  | `platform/pkg/authn/middleware.go` (`RequireAuth`, `RequireRole`, `RequireScope`); `services/docs/internal/domain/access.go` (`ResolveRole`/`ResolveShare` devuelven "sin acceso" salvo ACL explícita)                                          | Sin token válido → 401; sin rol/scope → 403. El resolver de Docs parte de `Role("")` y solo concede lo explícito.                               |
-| **Mínimo privilegio**                               | Roles `owner/admin/member/billing` en `Claims.HasAnyRole`; client OIDC por superficie; rol de BD runtime ≠ rol de migraciones; IAM Scaleway acotado por servicio                                                                                | §5.4. Cada BFF su propio `client_secret`; cada servicio Go sus credenciales PG/S3 acotadas al esquema/prefijo.                                  |
-| **RLS multi-tenant (Postgres)**                     | `platform/pkg/pg/tx.go` (`InTenantTx`, `SetTenant` vía `set_config('app.tenant', $1, true)`); `services/*/db/migrations/0001_*.up.sql` (`ENABLE`+`FORCE ROW LEVEL SECURITY`, `POLICY ... USING (tenant = current_setting('app.tenant', true))`) | §5.1. El slug se valida (`tenancy.ValidSlug`) antes de fijar la GUC → sin inyección. `FORCE RLS` aplica incluso al owner de la tabla.           |
-| **TLS 1.3 + HSTS**                                  | Terminación en Traefik 3 (edge); HSTS `max-age=63072000; includeSubDomains; preload`; `TLSOption` `default` con suites solo AEAD (`deploy/helm/sytue-one/values.yaml`, `traefik.tlsOptions`)                                                    | §2.1, §9.2. El **mTLS este-oeste NO está**: ver §2.2 y V9.2.1.                                                                                  |
-| **Cookies host-only HttpOnly/Secure/SameSite**      | Sesión SSO de Sytue ID (`services/id/internal/http/session.go`) y cookies `__Host-` de cada BFF                                                                                                                                                 | §4.1. Sin `Domain`: las publicaciones `*.apps/preview.sytue.eu` nunca las reciben. `token_hash` (SHA-256) persistido, nunca la cookie en claro. |
-| **CSP estricta + cabeceras de seguridad**           | Middleware Traefik (§9.2) + CSP por superficie (§9.3)                                                                                                                                                                                           | `default-src 'self'`, sin scripts/iframes de terceros.                                                                                          |
-| **CSRF**                                            | Patrón BFF + `SameSite` + `state`/`nonce` en OIDC (`services/id/internal/http/authorize.go`)                                                                                                                                                    | §4.1, §9.3.                                                                                                                                     |
-| **Validación/saneado + consultas parametrizadas**   | `pgx` con args posicionales en todo el acceso a datos (p. ej. `services/id/internal/store/audit.go`); `set_config(...,$1,...)`; `html.EscapeString` en el fallback de login (`services/id/internal/http/login.go`)                              | Sin SQL dinámico concatenado. Slugs validados por regex (`tenancy.slugRe`), `CHECK` en columnas.                                                |
-| **Rate-limiting / anti-fuerza-bruta**               | Mensajes de login genéricos (no enumeración) + auditoría de fallos (`auth.login.failed`) en `services/id/internal/http/login.go`; rate-limit del edge (Traefik middleware) + bloqueo progresivo sobre tablas PostgreSQL (§4.3)                  | §4.3. Argon2id encarece cada intento por diseño.                                                                                                |
-| **MFA/WebAuthn**                                    | `services/id/internal/webauthn/*` (registro/login FIDO2, `sign_count` anti-clonado); TOTP (RFC 6238) con secreto cifrado; step-up forzado por rol en `authorize.go` (`requiresStepUp`)                                                          | §4.2. `admin`/`owner` obligan MFA (`domain.Role.RequiresMFA`).                                                                                  |
-| **Secretos fuera del código/logs**                  | `platform/pkg/config/config.go` (12-factor, solo env; nunca valores en git); Scaleway Secret Manager + sincronización controlada a Kubernetes (§3); logs `slog` sin secretos ni cuerpos                                                         | §3, §7. `.env` ignorado por git; solo placeholders en el repo.                                                                                  |
-| **Cifrado en reposo / campos sensibles**            | `services/cloud/internal/crypto/crypto.go` (AES-256-GCM, `Sealer`); columnas cifradas en Sytue ID (`private_pem`, `totp_secrets.secret`, `webauthn`); SSE en S3/RDB                                                                             | §2.2.                                                                                                                                           |
-| **Auditoría inmutable**                             | `services/id/internal/store/audit.go` + tabla `audit_log` (append-only, `GENERATED ALWAYS AS IDENTITY`); tablas de auditoría por servicio                                                                                                       | §7.                                                                                                                                             |
-| **Logs sin datos personales**                       | `platform/pkg/httpx/middleware.go` (`RequestLogger` registra método/ruta/estado/duración/IP, no cuerpos); política de minimización en auditoría                                                                                                 | §7.                                                                                                                                             |
-| **Validación de tokens (JWKS, sin `alg:none`)**     | `platform/pkg/authn/verifier.go` (`jwt.WithValidate`, `WithIssuer`, `WithAudience`, `WithKeySet`, `WithAcceptableSkew`); firma RS256, nunca `none`/HMAC compartido                                                                              | §3.2, §4.1.                                                                                                                                     |
-| **PKCE obligatorio + redirect_uri exacto**          | `services/id/internal/http/authorize.go` (`client.RequirePKCE`, `S256` forzado, `ValidRedirectURI`) y `token.go` (`VerifyPKCE`, `HashToken`)                                                                                                    | §4.1. Código de un solo uso; solo el hash se persiste.                                                                                          |
-| **Rotación de refresh tokens + detección de reuso** | `services/id/internal/http/token.go` (`grantRefresh`: `RotateRefreshToken`, `RevokeRefreshChain` ante reuso)                                                                                                                                    | §4.4. Reuso → revoca toda la familia + auditoría `oauth.refresh.reuse_detected`.                                                                |
-| **Comparaciones en tiempo constante**               | `crypto/subtle.ConstantTimeCompare` (Argon2/PKCE en `services/id/internal/domain/secret.go`); `hmac.Equal` (webhook LiveKit en `services/rooms/internal/media/livekit/token.go`)                                                                | Anti timing-attack en contraseñas, PKCE y firmas.                                                                                               |
-| **Contenedores rootless/distroless**                | `services/*/Dockerfile` (multi-stage `golang:1.26` → `gcr.io/distroless/static:nonroot`, `USER nonroot`, `CGO_ENABLED=0`, `-trimpath -ldflags="-s -w"`)                                                                                         | §9.1. Sin shell ni gestor de paquetes. **Una excepción: `services/ocr`** — ver debajo.                                                          |
-| **NetworkPolicies deny-by-default**                 | Manifiestos Helm por namespace `tenant-<slug>` (§5.2)                                                                                                                                                                                           | Ingress/egress denegados salvo lo explícito.                                                                                                    |
-| **Recovery de panics sin fuga**                     | `platform/pkg/httpx/middleware.go` (`Recoverer` → 500 JSON canónico, stack solo a logs)                                                                                                                                                         | El cliente nunca ve stack traces (§9.4).                                                                                                        |
+This section **materializes** each non-negotiable minimum in CONVENTIONS §0.7 with the code point
+that implements it. It is the master traceability index for "security by default".
 
-> **Definition of Done de cada PR:** ningún cambio se fusiona si degrada un control de esta tabla.
-> Los `*_test.go` de `platform/pkg/{authn,tenancy,pg}` y de `services/id/internal/*` fijan el
-> comportamiento seguro (verificación de firma, aislamiento de tenant, PKCE) como regresión.
+| Control (CONVENTIONS §0.7)                          | Actual implementation (file / mechanism)                                                                                                                                                                                                        | Detail                                                                                                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Deny-by-default (authorization)**                 | `platform/pkg/authn/middleware.go` (`RequireAuth`, `RequireRole`, `RequireScope`); `services/docs/internal/domain/access.go` (`ResolveRole`/`ResolveShare` return "no access" unless there is an explicit ACL)                                  | No valid token → 401; no role/scope → 403. The Docs resolver starts from `Role("")` and only grants what is explicit.                                  |
+| **Least privilege**                                 | Roles `owner/admin/member/billing` in `Claims.HasAnyRole`; one OIDC client per surface; runtime DB role ≠ migrations role; Scaleway IAM scoped per service                                                                                      | §5.4. Each BFF has its own `client_secret`; each Go service has its PG/S3 credentials scoped to its schema/prefix.                                     |
+| **Multi-tenant RLS (Postgres)**                     | `platform/pkg/pg/tx.go` (`InTenantTx`, `SetTenant` via `set_config('app.tenant', $1, true)`); `services/*/db/migrations/0001_*.up.sql` (`ENABLE`+`FORCE ROW LEVEL SECURITY`, `POLICY ... USING (tenant = current_setting('app.tenant', true))`) | §5.1. The slug is validated (`tenancy.ValidSlug`) before setting the GUC → no injection. `FORCE RLS` applies even to the table owner.                  |
+| **TLS 1.3 + HSTS**                                  | Termination in Traefik 3 (edge); HSTS `max-age=63072000; includeSubDomains; preload`; `TLSOption` `default` with AEAD-only suites (`deploy/helm/sytue-one/values.yaml`, `traefik.tlsOptions`)                                                   | §2.1, §9.2. **East-west mTLS is NOT in place**: see §2.2 and V9.2.1.                                                                                   |
+| **Host-only HttpOnly/Secure/SameSite cookies**      | Sytue ID SSO session (`services/id/internal/http/session.go`) and each BFF's `__Host-` cookies                                                                                                                                                  | §4.1. No `Domain`: the `*.apps/preview.sytue.eu` publications never receive them. `token_hash` (SHA-256) is persisted, never the cookie in clear text. |
+| **Strict CSP + security headers**                   | Traefik middleware (§9.2) + CSP per surface (§9.3)                                                                                                                                                                                              | `default-src 'self'`, no third-party scripts/iframes.                                                                                                  |
+| **CSRF**                                            | BFF pattern + `SameSite` + `state`/`nonce` in OIDC (`services/id/internal/http/authorize.go`)                                                                                                                                                   | §4.1, §9.3.                                                                                                                                            |
+| **Validation/sanitization + parameterized queries** | `pgx` with positional args in all data access (e.g. `services/id/internal/store/audit.go`); `set_config(...,$1,...)`; `html.EscapeString` in the login fallback (`services/id/internal/http/login.go`)                                          | No concatenated dynamic SQL. Slugs validated by regex (`tenancy.slugRe`), `CHECK` on columns.                                                          |
+| **Rate limiting / anti-brute-force**                | Generic login messages (no enumeration) + auditing of failures (`auth.login.failed`) in `services/id/internal/http/login.go`; edge rate limit (Traefik middleware) + progressive lockout on PostgreSQL tables (§4.3)                            | §4.3. Argon2id makes each attempt expensive by design.                                                                                                 |
+| **MFA/WebAuthn**                                    | `services/id/internal/webauthn/*` (FIDO2 registration/login, anti-cloning `sign_count`); TOTP (RFC 6238) with encrypted secret; step-up enforced by role in `authorize.go` (`requiresStepUp`)                                                   | §4.2. `admin`/`owner` require MFA (`domain.Role.RequiresMFA`).                                                                                         |
+| **Secrets out of code/logs**                        | `platform/pkg/config/config.go` (12-factor, env only; never values in git); Scaleway Secret Manager + controlled sync to Kubernetes (§3); `slog` logs without secrets or bodies                                                                 | §3, §7. `.env` ignored by git; only placeholders in the repo.                                                                                          |
+| **Encryption at rest / sensitive fields**           | `services/cloud/internal/crypto/crypto.go` (AES-256-GCM, `Sealer`); encrypted columns in Sytue ID (`private_pem`, `totp_secrets.secret`, `webauthn`); SSE in S3/RDB                                                                             | §2.2.                                                                                                                                                  |
+| **Immutable audit**                                 | `services/id/internal/store/audit.go` + `audit_log` table (append-only, `GENERATED ALWAYS AS IDENTITY`); audit tables per service                                                                                                               | §7.                                                                                                                                                    |
+| **Logs without personal data**                      | `platform/pkg/httpx/middleware.go` (`RequestLogger` records method/path/status/duration/IP, not bodies); minimization policy in auditing                                                                                                        | §7.                                                                                                                                                    |
+| **Token validation (JWKS, no `alg:none`)**          | `platform/pkg/authn/verifier.go` (`jwt.WithValidate`, `WithIssuer`, `WithAudience`, `WithKeySet`, `WithAcceptableSkew`); RS256 signature, never `none`/shared HMAC                                                                              | §3.2, §4.1.                                                                                                                                            |
+| **Mandatory PKCE + exact redirect_uri**             | `services/id/internal/http/authorize.go` (`client.RequirePKCE`, `S256` enforced, `ValidRedirectURI`) and `token.go` (`VerifyPKCE`, `HashToken`)                                                                                                 | §4.1. Single-use code; only the hash is persisted.                                                                                                     |
+| **Refresh token rotation + reuse detection**        | `services/id/internal/http/token.go` (`grantRefresh`: `RotateRefreshToken`, `RevokeRefreshChain` on reuse)                                                                                                                                      | §4.4. Reuse → revokes the whole family + `oauth.refresh.reuse_detected` audit.                                                                         |
+| **Constant-time comparisons**                       | `crypto/subtle.ConstantTimeCompare` (Argon2/PKCE in `services/id/internal/domain/secret.go`); `hmac.Equal` (LiveKit webhook in `services/rooms/internal/media/livekit/token.go`)                                                                | Anti timing attack on passwords, PKCE and signatures.                                                                                                  |
+| **Rootless/distroless containers**                  | `services/*/Dockerfile` (multi-stage `golang:1.26` → `gcr.io/distroless/static:nonroot`, `USER nonroot`, `CGO_ENABLED=0`, `-trimpath -ldflags="-s -w"`)                                                                                         | §9.1. No shell or package manager. **One exception: `services/ocr`** — see below.                                                                      |
+| **Deny-by-default NetworkPolicies**                 | Helm manifests per `tenant-<slug>` namespace (§5.2)                                                                                                                                                                                             | Ingress/egress denied except what is explicit.                                                                                                         |
+| **Panic recovery without leaks**                    | `platform/pkg/httpx/middleware.go` (`Recoverer` → canonical JSON 500, stack only to logs)                                                                                                                                                       | The client never sees stack traces (§9.4).                                                                                                             |
+
+> **Definition of Done for every PR:** no change is merged if it degrades a control in this table.
+> The `*_test.go` files of `platform/pkg/{authn,tenancy,pg}` and of `services/id/internal/*` pin the
+> secure behavior (signature verification, tenant isolation, PKCE) as regression tests.
 
 ---
 
 <a id="12-soberania-residencia-de-datos-ue-y-cifrado"></a>
 
-### 1.2 Soberanía, residencia de datos (UE) y cifrado
+<a id="12-soberanía-residencia-de-datos-ue-y-cifrado"></a>
 
-#### 2.1 Residencia (solo UE: Scaleway y zona on-premise en Madrid)
+### 1.2 Sovereignty, data residency (EU) and encryption
 
-| Recurso                                              | Ubicación           | Región Scaleway           | Notas                                                                                                                     |
-| ---------------------------------------------------- | ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Cómputo (Kapsule, GA soportada)                      | UE                  | `fr-par` (`fr-par-1/2/3`) | DR en `nl-ams`.                                                                                                           |
-| Bases de datos (RDB PostgreSQL)                      | UE                  | `fr-par`                  | Réplica/backup en `nl-ams`. Único datastore (estado + colas + caché).                                                     |
-| Object Storage (S3)                                  | UE                  | `fr-par`                  | Buckets versionados, cifrado en reposo (drive/mail/docs-blobs, backups).                                                  |
-| Secret Manager                                       | UE                  | `fr-par`                  | Secretos de plataforma (§3).                                                                                              |
-| Registry (imágenes)                                  | UE                  | `fr-par`                  | Scaleway Container Registry (escaneado).                                                                                  |
-| Correo (Sytue Mail Go, blobs S3)                     | UE                  | `fr-par`                  | Buzones/índices en PostgreSQL; blobs cifrados en S3 UE.                                                                   |
-| Medios WebRTC (LiveKit)                              | UE                  | `fr-par`                  | SFU de _Sytue Rooms_ (Apache-2.0), autohospedado en UE.                                                                   |
-| DNS / Load Balancer                                  | UE                  | `fr-par`                  | Traefik 3 + cert-manager.                                                                                                 |
-| Despliegue on-premise / autohospedado                | UE / Servidor propio| —                         | Clúster Kubernetes (k3s/estándar) o Docker Compose sobre infraestructura propia, con el mismo perímetro y mismas reglas.  |
+<a id="21-residencia-solo-ue-scaleway-y-zona-on-premise-en-madrid"></a>
 
-Reglas de soberanía:
+#### 2.1 Residency (EU only: Scaleway and on-premise zone in Madrid)
 
-- **Ningún dato personal sale de la UE, con UNA excepción escrita: los avisos con la app o el
-  navegador cerrados.** El Web Push (RFC 8291) entrega el contenido **cifrado extremo a
-  extremo** —el servicio de push del fabricante no puede leerlo—, pero ve el _endpoint_
-  (identificador seudónimo del aparato) y el momento de cada aviso; en iOS, APNs ve el token
-  del aparato y el momento, y el aviso va **vacío** (`content-available`, sin título, texto,
-  autor ni canal: ver ADR 0039). En Android nativo no interviene ningún tercero —la app
-  mantiene el flujo SSE del hub—. Quien no quiera ni esos metadatos puede apagar los avisos.
-  Fuera de ahí, no se emplean servicios US (CDN, analítica, IA, correo
-  transaccional, etc.) sobre datos personales. Toda dependencia se autohospeda en Kapsule o se
-  consume de servicios UE de Scaleway. La resolución DNS del verificador SPF/DMARC de Mail usa
-  resolvers UE (`net.DefaultResolver`, ver `services/mail/internal/auth/verify.go`).
-- **Subprocesadores:** **Scaleway SAS** (Francia, UE) como infraestructura y **Mollie B.V.** (Países
-  Bajos, UE) para el cobro de suscripciones, que solo trata los datos del pago. La zona on-premise de
-  Madrid es infraestructura propia, no un subprocesador. La lista de subprocesadores se mantiene en
-  el anexo del DPA (§11.3) y se versiona en este repositorio.
-- **Sin telemetría externa.** El frontend Astro + Preact no carga scripts de terceros; la
-  observabilidad (`slog` estructurado + OpenTelemetry) permanece dentro del clúster.
-- **Soberanía operativa:** código de producto **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))**; dependencias incorporadas
-  **permisivas** (MIT/BSD/Apache-2.0/ISC/PostgreSQL/MPL-2.0) → portabilidad y ausencia de lock-in.
-  Producto, infraestructura y tooling pasan además el gate independiente de origen UE; GitHub es
-  la única excepción temporal, acotada en `roadmap.md` P0.
+| Resource                            | Location        | Scaleway region           | Notes                                                                                                                  |
+| ----------------------------------- | --------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Compute (Kapsule, supported GA)     | EU              | `fr-par` (`fr-par-1/2/3`) | DR in `nl-ams`.                                                                                                        |
+| Databases (RDB PostgreSQL)          | EU              | `fr-par`                  | Replica/backup in `nl-ams`. Single datastore (state + queues + cache).                                                 |
+| Object Storage (S3)                 | EU              | `fr-par`                  | Versioned buckets, encryption at rest (drive/mail/docs-blobs, backups).                                                |
+| Secret Manager                      | EU              | `fr-par`                  | Platform secrets (§3).                                                                                                 |
+| Registry (images)                   | EU              | `fr-par`                  | Scaleway Container Registry (scanned).                                                                                 |
+| Mail (Sytue Mail Go, S3 blobs)      | EU              | `fr-par`                  | Mailboxes/indexes in PostgreSQL; encrypted blobs in EU S3.                                                             |
+| WebRTC media (LiveKit)              | EU              | `fr-par`                  | _Sytue Rooms_ SFU (Apache-2.0), self-hosted in the EU.                                                                 |
+| DNS / Load Balancer                 | EU              | `fr-par`                  | Traefik 3 + cert-manager.                                                                                              |
+| On-premise / self-hosted deployment | EU / Own server | —                         | Kubernetes cluster (k3s/standard) or Docker Compose on own infrastructure, with the same perimeter and the same rules. |
 
-#### 2.2 Cifrado en tránsito
+Sovereignty rules:
 
-- **TLS 1.3** obligatorio en todos los `*.sytue.eu`. TLS 1.2 solo como mínimo de respaldo con
-  suites AEAD; SSLv3/TLS 1.0/1.1 deshabilitados.
-- **Terminación TLS** en Traefik 3; certificados por **cert-manager** (ACME/Let's Encrypt, DNS-01
-  sobre DNS de Scaleway). Renovación automática.
-- **HSTS** `max-age=63072000; includeSubDomains; preload` en el edge (§9.2).
-- **Tráfico este-oeste (servicio↔servicio): HTTP plano dentro del clúster, restringido por
-  NetworkPolicy** (§5.2). Es el control VIGENTE y es real: hay NetworkPolicy por chart
-  (`deploy/helm/charts/*/templates/networkpolicy.yaml`) y las URL internas son `http://<svc>`
-  (`deploy/helm/charts/*/templates/deployment.yaml`). El **mTLS este-oeste es DISEÑO, no está
-  desplegado**: no hay malla de servicio en `deploy/` ni en `infra/`, y así figura en V9.2.1 (☐).
-  Este documento lo daba por vigente en cuatro sitios y no lo era.
-- **Correo (Sytue Mail Go):** SMTP con STARTTLS obligatorio + MTA-STS `enforce` y DANE/TLSA donde
-  aplique (§6); IMAP 993 / submission 465/587 sobre TLS.
-- **WebRTC (Sytue Rooms):** medios DTLS-SRTP vía LiveKit; el servicio `sytue-rooms` mintea el JWT de
-  LiveKit (HS256 con el API secret) **solo tras validar el JWT de Sytue ID** y autorizar al usuario
+- **No personal data leaves the EU, with ONE written exception: notifications with the app or the
+  browser closed.** Web Push (RFC 8291) delivers the content **end-to-end
+  encrypted** —the vendor's push service cannot read it—, but it sees the _endpoint_
+  (pseudonymous device identifier) and the time of each notification; on iOS, APNs sees the device
+  token and the time, and the notification is **empty** (`content-available`, no title, text,
+  author or channel: see ADR 0039). On native Android no third party is involved —the app
+  keeps the hub's SSE stream—. Anyone who does not want even that metadata can turn notifications off.
+  Beyond that, no US services (CDN, analytics, AI, transactional
+  email, etc.) are used on personal data. Every dependency is self-hosted on Kapsule or
+  consumed from Scaleway EU services. DNS resolution for Mail's SPF/DMARC verifier uses
+  EU resolvers (`net.DefaultResolver`, see `services/mail/internal/auth/verify.go`).
+- **Subprocessors:** **Scaleway SAS** (France, EU) as infrastructure and **Mollie B.V.** (the
+  Netherlands, EU) for subscription billing, which only processes payment data. The Madrid on-premise
+  zone is own infrastructure, not a subprocessor. The list of subprocessors is maintained in
+  the DPA annex (§11.3) and versioned in this repository.
+- **No external telemetry.** The Astro + Preact frontend loads no third-party scripts;
+  observability (structured `slog` + OpenTelemetry) stays inside the cluster.
+- **Operational sovereignty:** product code **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))**; incorporated
+  dependencies are **permissive** (MIT/BSD/Apache-2.0/ISC/PostgreSQL/MPL-2.0) → portability and no lock-in.
+  Product, infrastructure and tooling also pass the independent EU-origin gate; GitHub is
+  the only temporary exception, scoped in `roadmap.md` P0.
+
+<a id="22-cifrado-en-tránsito"></a>
+
+#### 2.2 Encryption in transit
+
+- **TLS 1.3** mandatory on all `*.sytue.eu`. TLS 1.2 only as a fallback minimum with
+  AEAD suites; SSLv3/TLS 1.0/1.1 disabled.
+- **TLS termination** in Traefik 3; certificates by **cert-manager** (ACME/Let's Encrypt, DNS-01
+  on Scaleway DNS). Automatic renewal.
+- **HSTS** `max-age=63072000; includeSubDomains; preload` at the edge (§9.2).
+- **East-west traffic (service↔service): plain HTTP inside the cluster, restricted by
+  NetworkPolicy** (§5.2). This is the CURRENT control and it is real: there is a NetworkPolicy per chart
+  (`deploy/helm/charts/*/templates/networkpolicy.yaml`) and internal URLs are `http://<svc>`
+  (`deploy/helm/charts/*/templates/deployment.yaml`). **East-west mTLS is DESIGN, not
+  deployed**: there is no service mesh in `deploy/` or in `infra/`, and that is how V9.2.1 (☐) records it.
+  This document claimed it was in force in four places and it was not.
+- **Mail (Sytue Mail Go):** SMTP with mandatory STARTTLS + MTA-STS `enforce` and DANE/TLSA where
+  applicable (§6); IMAP 993 / submission 465/587 over TLS.
+- **WebRTC (Sytue Rooms):** DTLS-SRTP media via LiveKit; the `sytue-rooms` service mints the LiveKit
+  JWT (HS256 with the API secret) **only after validating the Sytue ID JWT** and authorizing the user
   (`services/rooms/internal/media/livekit/token.go`, `AccessToken`).
-- **Dev local:** TLS con **mkcert** bajo `*.sytue.localhost` vía Traefik (paridad dev/prod).
+- **Local dev:** TLS with **mkcert** under `*.sytue.localhost` via Traefik (dev/prod parity).
 
-#### 2.3 Cifrado en reposo
+<a id="23-cifrado-en-reposo"></a>
 
-| Capa                              | Mecanismo                                                                                                                                        | Referencia                                 |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| Object Storage (S3)               | Cifrado del lado del servidor (SSE) gestionado por Scaleway.                                                                                     | §2.1                                       |
-| Block Storage (volúmenes Kapsule) | Cifrado de volumen a nivel de plataforma Scaleway.                                                                                               | —                                          |
-| PostgreSQL (RDB)                  | Cifrado en reposo de la instancia gestionada + TLS para conexiones.                                                                              | —                                          |
-| **Columnas sensibles**            | **Cifrado de campo**: `signing_keys.private_pem`, `totp_secrets.secret`, secretos de WebAuthn, claves DKIM. Claves de cifrado en Secret Manager. | Sytue ID `0001_core_identity.up.sql`       |
-| **Secretos de Sytue Cloud**       | AES-256-GCM (`Sealer`, nonce aleatorio por valor, tag de autenticación) con `SECRET_ENC_KEY` de 32 bytes.                                        | `services/cloud/internal/crypto/crypto.go` |
-| Sytue Drive (ficheros)            | Blobs en S3 cifrado (SSE) + metadatos en PostgreSQL; `checksum` SHA-256 por fichero (integridad).                                                | Drive `0001_init.up.sql`                   |
-| Sytue Mail (buzones)              | Mensajes/índices en PostgreSQL; cuerpos/adjuntos como blobs en S3 cifrado; claves DKIM cifradas.                                                 | §6                                         |
-| Tokens/códigos opacos             | Solo se persiste el **hash** (SHA-256): sesiones, refresh, auth codes, tokens de enlace.                                                         | `domain.HashToken`                         |
-| Backups / dumps                   | Cifrados en bucket de backups versionado y aislado (§8).                                                                                         | §8                                         |
+#### 2.3 Encryption at rest
 
-> El cifrado en reposo **no sustituye** el control de acceso: las claves de servicio nunca se
-> almacenan junto a los datos y rotan según política (§3.2). El `Sealer` usa AEAD (GCM): un
-> ciphertext corrupto o con clave incorrecta falla la apertura (`ErrCiphertextInvalid`), no filtra
-> el motivo.
+| Layer                           | Mechanism                                                                                                                                | Reference                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Object Storage (S3)             | Server-side encryption (SSE) managed by Scaleway.                                                                                        | §2.1                                       |
+| Block Storage (Kapsule volumes) | Volume encryption at the Scaleway platform level.                                                                                        | —                                          |
+| PostgreSQL (RDB)                | Encryption at rest of the managed instance + TLS for connections.                                                                        | —                                          |
+| **Sensitive columns**           | **Field encryption**: `signing_keys.private_pem`, `totp_secrets.secret`, WebAuthn secrets, DKIM keys. Encryption keys in Secret Manager. | Sytue ID `0001_core_identity.up.sql`       |
+| **Sytue Cloud secrets**         | AES-256-GCM (`Sealer`, random nonce per value, authentication tag) with a 32-byte `SECRET_ENC_KEY`.                                      | `services/cloud/internal/crypto/crypto.go` |
+| Sytue Drive (files)             | Blobs in encrypted S3 (SSE) + metadata in PostgreSQL; SHA-256 `checksum` per file (integrity).                                           | Drive `0001_init.up.sql`                   |
+| Sytue Mail (mailboxes)          | Messages/indexes in PostgreSQL; bodies/attachments as blobs in encrypted S3; encrypted DKIM keys.                                        | §6                                         |
+| Opaque tokens/codes             | Only the **hash** (SHA-256) is persisted: sessions, refresh, auth codes, link tokens.                                                    | `domain.HashToken`                         |
+| Backups / dumps                 | Encrypted in a versioned, isolated backup bucket (§8).                                                                                   | §8                                         |
+
+> Encryption at rest **does not replace** access control: service keys are never
+> stored alongside the data and they rotate according to policy (§3.2). The `Sealer` uses AEAD (GCM): a
+> corrupt ciphertext or one with the wrong key fails to open (`ErrCiphertextInvalid`), without leaking
+> the reason.
 
 ---
 
 <a id="13-gestion-de-secretos"></a>
 
-### 1.3 Gestión de secretos
+<a id="13-gestión-de-secretos"></a>
 
-**Regla absoluta:** **ningún secreto en Git.** Solo placeholders y nombres de variables de entorno
-en el repositorio (p. ej. `SYTUE_ID_OIDC_SIGNING_KEY`, `MAIL_DKIM_PRIVATE_KEY`, `LIVEKIT_API_SECRET`,
-`SCW_SECRET_KEY`, `PG_DSN`, `CLOUD_SECRET_ENC_KEY`), nunca valores. `platform/pkg/config` lee **solo**
-del entorno (12-factor); `Require` falla el arranque si falta un secreto obligatorio, de modo que un
-servicio nunca arranca en un estado inseguro por configuración ausente.
+### 1.3 Secrets management
 
-#### 3.1 Cadena de secretos
+**Absolute rule:** **no secrets in Git.** Only placeholders and environment variable names
+in the repository (e.g. `SYTUE_ID_OIDC_SIGNING_KEY`, `MAIL_DKIM_PRIVATE_KEY`, `LIVEKIT_API_SECRET`,
+`SCW_SECRET_KEY`, `PG_DSN`, `CLOUD_SECRET_ENC_KEY`), never values. `platform/pkg/config` reads **only**
+from the environment (12-factor); `Require` fails startup if a mandatory secret is missing, so a
+service never starts in an insecure state because of missing configuration.
+
+<a id="31-cadena-de-secretos"></a>
+
+#### 3.1 Secrets chain
 
 ```
 Scaleway Secret Manager  (fuente de verdad, UE, cifrado, auditado; IAM privilegio mínimo)
@@ -176,654 +192,700 @@ Pods de los servicios Go (Sytue ID / Drive / Docs / Mail / Calendar / Contacts /
                           Chat / Meet / Hub / Cloud) + LiveKit
 ```
 
-- **Scaleway Secret Manager:** secretos de plataforma (DSN de RDB, claves S3, **claves de firma
-  OIDC/JWKS de Sytue ID**, claves DKIM de Mail, API key/secret de LiveKit, `SECRET_ENC_KEY` de
-  Cloud). Acceso por IAM de Scaleway con privilegio mínimo y auditado (quién/cuándo).
-- **Producción inicial:** `deploy/production/02b-secretos.sh` crea o recupera valores en
-  Secret Manager y materializa los `Secret` nativos de Kubernetes. No hay Sealed Secrets
-  ni valores cifrados en Git: una sola fuente de verdad evita desincronización. Al introducir
-  rotación frecuente se sustituirá por External Secrets Operator, conservando los nombres de
-  los `Secret` y sin cambiar los charts.
-- **Dev:** `.env.example` con placeholders; valores reales en `.env` **ignorado por Git**;
-  `SECRET_ENC_KEY` de dev generada localmente (nunca compartida).
+- **Scaleway Secret Manager:** platform secrets (RDB DSN, S3 keys, **Sytue ID OIDC/JWKS signing
+  keys**, Mail DKIM keys, LiveKit API key/secret, Cloud's
+  `SECRET_ENC_KEY`). Access through Scaleway IAM with least privilege and audited (who/when).
+- **Initial production:** `deploy/production/02b-secretos.sh` creates or retrieves values in
+  Secret Manager and materializes the native Kubernetes `Secret`s. There are no Sealed Secrets
+  or encrypted values in Git: a single source of truth avoids drift. When frequent
+  rotation is introduced it will be replaced by External Secrets Operator, keeping the names of
+  the `Secret`s and without changing the charts.
+- **Dev:** `.env.example` with placeholders; real values in `.env`, **ignored by Git**;
+  dev `SECRET_ENC_KEY` generated locally (never shared).
 
-#### 3.2 Gestión de claves, JWKS y rotación en Sytue ID
+<a id="32-gestión-de-claves-jwks-y-rotación-en-sytue-id"></a>
 
-Implementación en `services/id/internal/oidc/keys.go` (`KeyManager`) + tabla `signing_keys`:
+#### 3.2 Key management, JWKS and rotation in Sytue ID
 
-- **Bootstrap:** al arrancar, si no hay clave activa se genera una **RSA-2048** y se persiste
-  (`Bootstrap`/`generateAndStore`). La clave privada (`private_pem`) se cifra en reposo a nivel de
-  columna en prod (KMS/pgcrypto).
-- **JWKS público:** `PublicJWKS()` publica **todas** las claves no retiradas en
-  `/.well-known/jwks.json`; cada token lleva `kid`. Los servicios validadores cachean el JWKS con
-  refresco periódico (`platform/pkg/authn/verifier.go`, `jwk.NewCache` + `WithMinRefreshInterval`,
-  15 min por defecto; precarga inicial que **falla rápido** si Sytue ID es inalcanzable).
-- **Rotación sin downtime (key rollover):** `Rotate()` marca la clave `active` como `next`, genera
-  una nueva `active` en la misma transacción y recarga en memoria. Los tokens ya emitidos siguen
-  validando contra la clave `next` (aún publicada en JWKS) hasta expirar; después pasa a `retired`
-  y se retira del JWKS. Estados en `signing_keys.status ∈ {active, next, retired}`.
-- **Algoritmos:** firma asimétrica **RS256** (ES256/EdDSA admitidos por diseño); **nunca** `none`
-  ni HMAC con secreto compartido entre servicios. La clave privada vive solo en Sytue ID; los
-  validadores solo ven la pública vía JWKS.
-- **Rotación periódica** (≤ 90 días) de claves de firma, credenciales de servicio, client secrets
-  OIDC, claves DKIM y secreto de LiveKit; **inmediata** ante sospecha de compromiso (con revocación
-  de tokens/sesiones, §4.4).
-- **Mínimo privilegio:** cada superficie/BFF su propio client secret OIDC (hash Argon2id en
-  `oauth_clients.secret_hash`); cada servicio Go sus credenciales PostgreSQL/S3 acotadas a su
-  esquema/prefijo.
-- **Operación de rotación:** ejecutada por Sytue Admin / cron con validación previa; auditada
-  (`rotación de claves JWKS` en el log de Sytue ID, §7).
+Implementation in `services/id/internal/oidc/keys.go` (`KeyManager`) + `signing_keys` table:
+
+- **Bootstrap:** at startup, if there is no active key an **RSA-2048** key is generated and persisted
+  (`Bootstrap`/`generateAndStore`). The private key (`private_pem`) is encrypted at rest at the
+  column level in prod (KMS/pgcrypto).
+- **Public JWKS:** `PublicJWKS()` publishes **all** non-retired keys at
+  `/.well-known/jwks.json`; every token carries a `kid`. Validating services cache the JWKS with
+  periodic refresh (`platform/pkg/authn/verifier.go`, `jwk.NewCache` + `WithMinRefreshInterval`,
+  15 min by default; initial preload that **fails fast** if Sytue ID is unreachable).
+- **Zero-downtime rotation (key rollover):** `Rotate()` marks the `active` key as `next`, generates
+  a new `active` one in the same transaction and reloads it in memory. Already-issued tokens keep
+  validating against the `next` key (still published in the JWKS) until they expire; afterwards it becomes `retired`
+  and is removed from the JWKS. States in `signing_keys.status ∈ {active, next, retired}`.
+- **Algorithms:** asymmetric **RS256** signing (ES256/EdDSA supported by design); **never** `none`
+  or HMAC with a secret shared between services. The private key lives only in Sytue ID;
+  validators only see the public key via JWKS.
+- **Periodic rotation** (≤ 90 days) of signing keys, service credentials, OIDC client
+  secrets, DKIM keys and the LiveKit secret; **immediate** upon suspected compromise (with revocation
+  of tokens/sessions, §4.4).
+- **Least privilege:** each surface/BFF has its own OIDC client secret (Argon2id hash in
+  `oauth_clients.secret_hash`); each Go service has its PostgreSQL/S3 credentials scoped to its
+  schema/prefix.
+- **Rotation operation:** run by Sytue Admin / cron with prior validation; audited
+  (`rotación de claves JWKS` in the Sytue ID log, §7).
 
 ---
 
 <a id="14-sytue-id--idp-propio-go-oidcoauth2-mfawebauthn-y-scim"></a>
 
-### 1.4 Sytue ID — IdP propio (Go), OIDC/OAuth2, MFA/WebAuthn y SCIM
+### 1.4 Sytue ID — in-house IdP (Go), OIDC/OAuth2, MFA/WebAuthn and SCIM
 
-#### 4.1 Núcleo OIDC/OAuth2 (`id.sytue.eu`, dev `8081`) — nuclear
+<a id="41-núcleo-oidcoauth2-idsytueeu-dev-8081--nuclear"></a>
 
-- **Servicio Go propio** (no Keycloak), sobre librerías **Apache-2.0/MIT**. Implementa **OIDC/OAuth2**
-  (Authorization Code + PKCE, refresh con rotación, **JWKS**, discovery
-  `/.well-known/openid-configuration`), **SAML** (opcional), **SCIM** y **MFA/WebAuthn**. Estado en
-  **PostgreSQL** (usuarios, clients, grants, sesiones, claves — `0001_core_identity.up.sql`).
-- **Authorization endpoint** (`services/id/internal/http/authorize.go`), medidas por defecto:
-  - **Validación exacta de `redirect_uri`** contra los registrados del client (`ValidRedirectURI`):
-    `client_id` desconocido o `redirect_uri` no registrado → error directo, **sin redirigir**
+#### 4.1 OIDC/OAuth2 core (`id.sytue.eu`, dev `8081`) — core
+
+- **In-house Go service** (not Keycloak), on **Apache-2.0/MIT** libraries. It implements **OIDC/OAuth2**
+  (Authorization Code + PKCE, refresh with rotation, **JWKS**, discovery
+  `/.well-known/openid-configuration`), **SAML** (optional), **SCIM** and **MFA/WebAuthn**. State in
+  **PostgreSQL** (users, clients, grants, sessions, keys — `0001_core_identity.up.sql`).
+- **Authorization endpoint** (`services/id/internal/http/authorize.go`), default measures:
+  - **Exact `redirect_uri` validation** against the client's registered ones (`ValidRedirectURI`):
+    unknown `client_id` or unregistered `redirect_uri` → direct error, **no redirect**
     (anti open-redirect, OAuth 2.0 Security BCP).
-  - **PKCE obligatorio** cuando el client lo exige (`RequirePKCE`, por defecto `true` para todos):
-    `code_challenge` presente y `code_challenge_method = S256` (se rechaza `plain`/ausente).
-  - **Validación de scopes** contra los permitidos del client (`AllowsScope`); grant permitido
-    (`AllowsGrant`); `response_type=code` únicamente.
-  - **`state`** (anti-CSRF) y **`nonce`** (OIDC, anti-replay de ID Token) propagados intactos.
-  - **Código de un solo uso, corta vida**: se persiste solo `HashToken(code)` (SHA-256), con
-    `expires_at` y `consumed_at` (`auth_codes`).
-- **Token endpoint** (`token.go`): autenticación de client (§4.5), `grant_type ∈
-{authorization_code, refresh_token, client_credentials}`, `Cache-Control: no-store`. Verificación
-  PKCE con `VerifyPKCE` (constant-time), comprobación de pertenencia del código al client y al
-  `redirect_uri` usado en `/authorize`.
-- **Validación distribuida:** ningún producto gestiona credenciales propias; cada servicio Go
-  **valida los JWT de Sytue ID vía JWKS** con `platform/pkg/authn` (`RequireAuth`).
-- **Clients OIDC confidenciales por superficie (BFF):** `sytue-one`, `sytue-console`, `sytue-cloud`
+  - **Mandatory PKCE** when the client requires it (`RequirePKCE`, `true` by default for all):
+    `code_challenge` present and `code_challenge_method = S256` (`plain`/missing is rejected).
+  - **Scope validation** against the client's allowed scopes (`AllowsScope`); allowed grant
+    (`AllowsGrant`); `response_type=code` only.
+  - **`state`** (anti-CSRF) and **`nonce`** (OIDC, ID Token anti-replay) propagated intact.
+  - **Single-use, short-lived code**: only `HashToken(code)` (SHA-256) is persisted, with
+    `expires_at` and `consumed_at` (`auth_codes`).
+- **Token endpoint** (`token.go`): client authentication (§4.5), `grant_type ∈
+{authorization_code, refresh_token, client_credentials}`, `Cache-Control: no-store`. PKCE
+  verification with `VerifyPKCE` (constant-time), check that the code belongs to the client and to the
+  `redirect_uri` used in `/authorize`.
+- **Distributed validation:** no product manages its own credentials; each Go service
+  **validates Sytue ID JWTs via JWKS** with `platform/pkg/authn` (`RequireAuth`).
+- **Confidential OIDC clients per surface (BFF):** `sytue-one`, `sytue-console`, `sytue-cloud`
   (+ `sytue-cloud-api`), `sytue-mail`, `sytue-drive`, `sytue-calendar`, `sytue-contacts`,
-  `sytue-docs`, `sytue-rooms`, `sytue-hub`. Sin clients de federación (ya no hay motores).
-- **SSO** mediante la sesión host-only de Sytue ID y cookies BFF **host-only `__Host-`**
-  (`Secure`, `SameSite`). OAuth hace transparente el salto entre apps; ninguna cookie de
-  autenticación se comparte con el apex. El `token_hash` (SHA-256) se persiste, nunca la cookie
-  en claro (`sessions`).
+  `sytue-docs`, `sytue-rooms`, `sytue-hub`. No federation clients (there are no engines anymore).
+- **SSO** through the Sytue ID host-only session and **host-only `__Host-`** BFF cookies
+  (`Secure`, `SameSite`). OAuth makes the jump between apps transparent; no
+  authentication cookie is shared with the apex. The `token_hash` (SHA-256) is persisted, never the cookie
+  in clear text (`sessions`).
 
 #### 4.2 MFA / WebAuthn
 
-- **MFA obligatorio** para roles `admin` y `owner`: `authorize.go` fuerza **step-up**
-  (`requiresStepUp`) cuando la sesión no incluye MFA en el `AMR` y el usuario tiene rol elevado
+- **Mandatory MFA** for the `admin` and `owner` roles: `authorize.go` forces **step-up**
+  (`requiresStepUp`) when the session does not include MFA in the `AMR` and the user has an elevated role
   (`domain.Role.RequiresMFA`).
-- **WebAuthn / FIDO2** (passkeys) como segundo factor preferente
-  (`services/id/internal/webauthn/*`, `webauthn_credentials`): `public_key` COSE, `sign_count`
-  para **detección de clonado**, retos de un solo uso y corta vida (`webauthn_challenges`).
-- **TOTP** (RFC 6238) como alternativa, con secreto **cifrado en columna** (`totp_secrets.secret`).
-- **Recovery codes** de un solo uso (hash en BD). Contraseñas con **Argon2id**
-  (`services/id/internal/domain/secret.go`, perfil OWASP: 64 MiB, t=3, p=2, sal de 16 B, clave de
-  32 B, formato PHC), verificación **constant-time** (`subtle.ConstantTimeCompare`).
-- **Anti-enumeración de usuarios:** login siempre responde error genérico
-  (`services/id/internal/http/login.go`, `loginFail`), tanto si el usuario no existe como si la
-  contraseña falla; cada fallo se audita (`auth.login.failed`).
+- **WebAuthn / FIDO2** (passkeys) as the preferred second factor
+  (`services/id/internal/webauthn/*`, `webauthn_credentials`): COSE `public_key`, `sign_count`
+  for **clone detection**, single-use, short-lived challenges (`webauthn_challenges`).
+- **TOTP** (RFC 6238) as an alternative, with the secret **encrypted in its column** (`totp_secrets.secret`).
+- Single-use **recovery codes** (hashed in the DB). Passwords with **Argon2id**
+  (`services/id/internal/domain/secret.go`, OWASP profile: 64 MiB, t=3, p=2, 16 B salt, 32 B
+  key, PHC format), **constant-time** verification (`subtle.ConstantTimeCompare`).
+- **User anti-enumeration:** login always responds with a generic error
+  (`services/id/internal/http/login.go`, `loginFail`), whether the user does not exist or the
+  password is wrong; every failure is audited (`auth.login.failed`).
 
-#### 4.3 Rate-limiting y anti-fuerza-bruta
+<a id="43-rate-limiting-y-anti-fuerza-bruta"></a>
 
-- **Coste computacional por diseño:** Argon2id (64 MiB) encarece cada intento de contraseña.
-- **Rate-limit del edge** (Traefik middleware) por IP/ruta para `/login`, `/token`, `/authorize`.
-- **Bloqueo progresivo** sobre tablas PostgreSQL (contador de fallos por cuenta/IP con backoff
-  incremental), auditado. Los códigos de autorización y sesiones tienen TTL corto e índice de
-  expiración para purga (`auth_codes_expires_idx`, `sessions_expires_idx`).
+#### 4.3 Rate limiting and anti-brute-force
 
-#### 4.4 Baja inmediata (deprovisioning) y revocación
+- **Computational cost by design:** Argon2id (64 MiB) makes each password attempt expensive.
+- **Edge rate limit** (Traefik middleware) per IP/route for `/login`, `/token`, `/authorize`.
+- **Progressive lockout** on PostgreSQL tables (failure counter per account/IP with incremental
+  backoff), audited. Authorization codes and sessions have a short TTL and an expiry
+  index for purging (`auth_codes_expires_idx`, `sessions_expires_idx`).
 
-- **Desactivación/borrado en Sytue ID** → `user.Active()` es `false` → deja de emitir/refrescar
-  tokens de inmediato (`grantRefresh` rechaza usuario no activo).
-- **Rotación y detección de reuso de refresh tokens** (`token.go`, `grantRefresh`): cada refresh
-  emite un sucesor y enlaza `rotated_to`; si llega un refresh **ya rotado/revocado**, se marca
-  reuso, se **revoca toda la familia** (`RevokeRefreshChain`) y se audita
-  `oauth.refresh.reuse_detected`. Los `access_token` de vida corta expiran solos.
-- **Mapeo de grupos/roles:** `org/<slug>` y `owner/admin/member/billing` → filas/esquemas por
-  tenant en PostgreSQL (RLS), prefijos S3 y namespaces Kapsule `tenant-<slug>` (base del
-  aislamiento multi-tenant, §5).
+<a id="44-baja-inmediata-deprovisioning-y-revocación"></a>
 
-**Interruptor de emergencia (corte global, fuera de banda).** Vive en el binario y no en la
-consola a propósito: el escenario en el que se usa es aquel en el que la consola —o la propia
-cuenta— es lo que ha fallado. Son **tres piezas y hacen falta las tres**, porque cada una cierra
-algo que las otras no:
+#### 4.4 Immediate offboarding (deprovisioning) and revocation
 
-| Pieza                                              | Qué invalida                                                                                                                                                                                                                                                     | Por qué no basta sola                                                             |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `id revoke-all`                                    | Todo access/ID token emitido: rota la clave de firma y **retira la anterior en el acto** (sin ventana de gracia), así que ninguna firma previa verifica contra el JWKS                                                                                           | No impide **volver a emitir**: quien tenga la credencial entra un segundo después |
-| `02b-secretos.sh <entorno> --rotate-cookie-secret` | La cookie de sesión de las diez superficies (el `cookie-secret` que la sella) y reinicia los frontends, que solo lo leen al arrancar                                                                                                                             | Deja intacta la sesión SSO del IdP y la emisión                                   |
-| `id lockdown on --reason "…"`                      | Nada ya emitido: **cierra la emisión**. Marca de fila única (mig `0035`) consultada en la BASE en los dos puntos de emisión —`createSession` (los cinco métodos de login) y el token endpoint (503 `temporarily_unavailable`)—. Un error de consulta **deniega** | No expulsa a quien ya tiene token o cookie: para eso están las otras dos          |
+- **Deactivation/deletion in Sytue ID** → `user.Active()` is `false` → it immediately stops issuing/refreshing
+  tokens (`grantRefresh` rejects an inactive user).
+- **Refresh token rotation and reuse detection** (`token.go`, `grantRefresh`): each refresh
+  issues a successor and links `rotated_to`; if an **already rotated/revoked** refresh arrives, reuse is
+  flagged, the **whole family is revoked** (`RevokeRefreshChain`) and
+  `oauth.refresh.reuse_detected` is audited. Short-lived `access_token`s expire on their own.
+- **Group/role mapping:** `org/<slug>` and `owner/admin/member/billing` → rows/schemas per
+  tenant in PostgreSQL (RLS), S3 prefixes and Kapsule `tenant-<slug>` namespaces (the basis of
+  multi-tenant isolation, §5).
 
-El bloqueo se retira con `id lockdown off --reason "…"`, y **el rescate es la razón de que sea un
-subcomando**: con el interruptor puesto nadie abre sesión, así que una consola web para quitarlo
-sería una puerta cerrada por dentro con la llave dentro. Solo necesita el DSN. Ambos movimientos
-exigen motivo escrito y quedan auditados, por lo mismo que en §4.9: un corte total sin motivo es
-indistinguible de un error seis meses después.
+**Emergency switch (global cut-off, out of band).** It lives in the binary and not in the
+console on purpose: the scenario in which it is used is the one in which the console —or the
+account itself— is what has failed. There are **three pieces and all three are needed**, because each one closes
+something the others do not:
 
-Se consulta en la EMISIÓN y no en la validación de cada petición a propósito: la introspección por
-petición convertiría al IdP en dependencia dura de toda llamada de todo servicio, y el producto se
-dimensiona para cientos de miles de usuarios. Lo ya emitido lo invalida `revoke-all`, que no cuesta
-nada en el camino caliente.
+| Piece                                              | What it invalidates                                                                                                                                                                                                                                           | Why it is not enough on its own                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `id revoke-all`                                    | Every issued access/ID token: it rotates the signing key and **retires the previous one on the spot** (no grace window), so no earlier signature verifies against the JWKS                                                                                    | It does not prevent **issuing again**: whoever holds the credential gets in a second later     |
+| `02b-secretos.sh <entorno> --rotate-cookie-secret` | The session cookie of the ten surfaces (the `cookie-secret` that seals it) and restarts the frontends, which only read it at startup                                                                                                                          | It leaves the IdP's SSO session and issuance intact                                            |
+| `id lockdown on --reason "…"`                      | Nothing already issued: it **closes issuance**. A single-row flag (mig `0035`) checked in the DATABASE at the two issuance points —`createSession` (the five login methods) and the token endpoint (503 `temporarily_unavailable`)—. A query error **denies** | It does not kick out whoever already has a token or cookie: that is what the other two are for |
 
-#### 4.5 Autenticación de clients (token endpoint)
+The lockdown is lifted with `id lockdown off --reason "…"`, and **the rescue is the reason it is a
+subcommand**: with the switch on nobody can sign in, so a web console to turn it off
+would be a door locked from the inside with the key inside. It only needs the DSN. Both actions
+require a written reason and are audited, for the same reason as in §4.9: a total cut-off without a reason is
+indistinguishable from a mistake six months later.
+
+It is checked at ISSUANCE and not when validating each request, on purpose: per-request
+introspection would turn the IdP into a hard dependency of every call from every service, and the product is
+sized for hundreds of thousands of users. What has already been issued is invalidated by `revoke-all`, which costs
+nothing on the hot path.
+
+<a id="45-autenticación-de-clients-token-endpoint"></a>
+
+#### 4.5 Client authentication (token endpoint)
 
 `services/id/internal/http/clientauth.go`:
 
-- **Confidencial:** `client_secret_basic`/`client_secret_post`; el secreto se compara con
-  `oauth_clients.secret_hash` (**Argon2id**) mediante `VerifyPassword` (constant-time). Sin
-  `secret_hash` configurado el client queda **deshabilitado** (deny-by-default) hasta que el deploy
-  fije su secreto.
-- **Público (PKCE puro):** `token_endpoint_auth_method = none`; la seguridad recae en PKCE + el
-  `redirect_uri` exacto. `client_credentials` **prohibido** para clients públicos.
+- **Confidential:** `client_secret_basic`/`client_secret_post`; the secret is compared with
+  `oauth_clients.secret_hash` (**Argon2id**) through `VerifyPassword` (constant-time). Without a
+  configured `secret_hash` the client stays **disabled** (deny-by-default) until the deployment
+  sets its secret.
+- **Public (pure PKCE):** `token_endpoint_auth_method = none`; security rests on PKCE + the
+  exact `redirect_uri`. `client_credentials` is **forbidden** for public clients.
 
-#### 4.6 Auditoría de seguridad OBLIGATORIA del IdP propio antes de producción
+<a id="46-auditoría-de-seguridad-obligatoria-del-idp-propio-antes-de-producción"></a>
 
-Por ser **código de autenticación propio** (clean-room), **Sytue ID no se despliega en producción
-sin superar una auditoría de seguridad independiente**. Es un **gate de release** (bloquea la
-promoción a prod), no una recomendación. Ver el plan detallado en §14. Alcance mínimo:
+#### 4.6 MANDATORY security audit of the in-house IdP before production
 
-- **OWASP ASVS** nivel objetivo **L2**, con **L3** para los componentes críticos de
-  autenticación/criptografía (gestión de sesión, tokens, claves). Checklist en
+Because it is **in-house authentication code** (clean-room), **Sytue ID is not deployed to production
+without passing an independent security audit**. It is a **release gate** (it blocks
+promotion to prod), not a recommendation. See the detailed plan in §14. Minimum scope:
+
+- **OWASP ASVS** target level **L2**, with **L3** for the critical
+  authentication/cryptography components (session management, tokens, keys). Checklist in
   [`docs/security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2).
-- **OWASP Top 10** y, para los flujos OAuth/OIDC, **OAuth 2.0 Security BCP (RFC 9700)** y **OAuth
-  2.0 for Browser-Based Apps**: PKCE obligatorio, validación exacta de `redirect_uri`, `state`,
-  `nonce`, rotación y detección de reuso de refresh, `no-store` en respuestas de token.
-- **Revisión de claves/JWKS:** rotación con rollover, `kid`, algoritmos (RS256, no `alg:none`),
-  no HMAC compartido, cifrado en reposo de la clave privada.
-- **Revisión criptográfica** del código Go: Argon2id (parámetros), aleatoriedad
-  (`crypto/rand`), comparaciones **constant-time** (`subtle`/`hmac.Equal`), formato PHC.
-- **Pentest externo** de los endpoints públicos (`/authorize`, `/token`, `/login`, `/userinfo`,
-  `/scim`, WebAuthn) + revisión de manejo de sesión (fijación/expiración/rotación).
-- **Cierre de los `TODO` de seguridad pendientes** marcados en el código como bloqueantes de prod
-  (p. ej. binding de estado del segundo paso MFA en `login.go`/`handleMFAVerify`).
+- **OWASP Top 10** and, for the OAuth/OIDC flows, **OAuth 2.0 Security BCP (RFC 9700)** and **OAuth
+  2.0 for Browser-Based Apps**: mandatory PKCE, exact `redirect_uri` validation, `state`,
+  `nonce`, refresh rotation and reuse detection, `no-store` on token responses.
+- **Key/JWKS review:** rotation with rollover, `kid`, algorithms (RS256, no `alg:none`),
+  no shared HMAC, encryption at rest of the private key.
+- **Cryptographic review** of the Go code: Argon2id (parameters), randomness
+  (`crypto/rand`), **constant-time** comparisons (`subtle`/`hmac.Equal`), PHC format.
+- **External pentest** of the public endpoints (`/authorize`, `/token`, `/login`, `/userinfo`,
+  `/scim`, WebAuthn) + review of session handling (fixation/expiry/rotation).
+- **Closing the pending security `TODO`s** marked in the code as prod blockers
+  (e.g. state binding for the second MFA step in `login.go`/`handleMFAVerify`).
 
-El alcance, hallazgos y su remediación se registran en [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room)
-y en el ROPA/registro de cumplimiento. El resultado (con remediación verificada) es prerrequisito
-del primer despliegue prod.
+The scope, findings and their remediation are recorded in [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room)
+and in the ROPA/compliance register. The result (with verified remediation) is a prerequisite
+for the first prod deployment.
 
-#### 4.7 SCIM y aprovisionamiento interno (un alta = toda la suite)
+<a id="47-scim-y-aprovisionamiento-interno-un-alta--toda-la-suite"></a>
 
-- **Sytue ID es la fuente de identidad.** Un alta + los **claims de tenant/rol** (`tenant`/`org`,
-  `roles`) que viajan en el `access_token` dan acceso inmediato a todos los servicios Go. La
-  autorización es **token-driven** (`platform/pkg/authn/claims.go`); no hay proyección a motores.
-- **SCIM 2.0** (RFC 7643/7644) en `services/id/internal/scim` para que IdP/directorios corporativos
-  del cliente (o la Console) aprovisionen/desaprovisionen cuentas y membresías.
-- **Provisión "lazy" por servicio:** en la primera petición autenticada, cada servicio Go crea/
-  resuelve el registro local del usuario en su esquema de tenant (idempotente) a partir de los
-  claims. Eventos de directorio relevantes se publican vía **Sytue Hub** (p. ej. crear buzón en Mail).
+#### 4.7 SCIM and internal provisioning (one sign-up = the whole suite)
 
-#### 4.8 Controles enterprise de acceso (resumen; SoT en `architecture.md#6-identidad-enterprise-y-cumplimiento`)
+- **Sytue ID is the identity source.** A sign-up + the **tenant/role claims** (`tenant`/`org`,
+  `roles`) that travel in the `access_token` give immediate access to all Go services.
+  Authorization is **token-driven** (`platform/pkg/authn/claims.go`); there is no projection into engines.
+- **SCIM 2.0** (RFC 7643/7644) in `services/id/internal/scim` so that the customer's corporate IdPs/directories
+  (or the Console) can provision/deprovision accounts and memberships.
+- **"Lazy" provisioning per service:** on the first authenticated request, each Go service creates/
+  resolves the user's local record in its tenant schema (idempotent) from the
+  claims. Relevant directory events are published via **Sytue Hub** (e.g. creating a mailbox in Mail).
 
-Sobre el núcleo anterior, Sytue ID implementa los controles que exige una organización grande.
-El **detalle funcional, las rutas y las migraciones** viven en
-[`architecture.md#6-identidad-enterprise-y-cumplimiento`](./architecture.md#6-identidad-enterprise-y-cumplimiento); aquí solo su lugar en el modelo de seguridad:
+<a id="48-controles-enterprise-de-acceso-resumen-sot-en-architecturemd6-identidad-enterprise-y-cumplimiento"></a>
 
-| Control                                                                                               | Migración | Dónde se aplica                                                                                                                                                                                                                                                                          |
-| ----------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Acceso Condicional** (usuario/grupo/IP/cliente/horario/dispositivo → `allow`/`require_mfa`/`block`) | `0018`    | En `createSession`, el **único** punto de creación de sesión de todos los métodos de login ⇒ no hay camino que lo esquive. Gana la regla más restrictiva; sin políticas, `allow`.                                                                                                        |
-| **Roles personalizados / admin delegada** (claim `perms`, 9 permisos, `roles.manage` no delegable)    | `0019`    | Middleware `requirePermission` en cada ruta admin; `perms` solo en el **access token**.                                                                                                                                                                                                  |
-| **PIM** — elevación _just-in-time_ con justificación y caducidad                                      | `0020`    | Caducidad **perezosa** evaluada en cada emisión de token ⇒ la latencia máxima de una revocación es el TTL del access token (15 min por defecto).                                                                                                                                         |
-| **Grupos dinámicos** por reglas de atributos                                                          | `0021`    | Materializados en `group_members` ⇒ el claim `groups` y el SCIM no cambian.                                                                                                                                                                                                              |
-| **Dispositivos de confianza** (cookie HMAC derivada de la KEK, `trusted=false` de origen)             | `0022`    | Alimenta la condición `require_trusted_device`. **Decisión explícita:** un fallo del store de dispositivos es **fail-open** (se trata como de confianza) para no dejar a la organización fuera de su suite; tenerlo en cuenta en `security.md#2-modelo-de-amenazas-stride-por-servicio`. |
+#### 4.8 Enterprise access controls (summary; SoT in `architecture.md#6-identidad-enterprise-y-cumplimiento`)
 
-#### 4.9 Administración de PLATAFORMA (alcance global)
+On top of the core above, Sytue ID implements the controls that a large organization requires.
+The **functional detail, routes and migrations** live in
+[`architecture.md#6-identidad-enterprise-y-cumplimiento`](./architecture.md#6-identidad-enterprise-y-cumplimiento); here only their place in the security model:
 
-Hasta la migración `0031` no existía ninguna autorización que atravesara organizaciones: cada
-decisión se anclaba a una y ningún rol veía más de una. Esa propiedad **sigue intacta para todos
-los roles de organización**; lo que se abre es una puerta separada y estrecha para que soporte y
-dirección puedan operar la plataforma (altas manuales, suspensión, fusión, medición de uso y
-plazas gratuitas).
+| Control                                                                                         | Migration | Where it is applied                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Conditional Access** (user/group/IP/client/schedule/device → `allow`/`require_mfa`/`block`)   | `0018`    | In `createSession`, the **only** session-creation point for all login methods ⇒ there is no path that bypasses it. The most restrictive rule wins; without policies, `allow`.                                                                                                   |
+| **Custom roles / delegated admin** (`perms` claim, 9 permissions, `roles.manage` not delegable) | `0019`    | `requirePermission` middleware on every admin route; `perms` only in the **access token**.                                                                                                                                                                                      |
+| **PIM** — _just-in-time_ elevation with justification and expiry                                | `0020`    | **Lazy** expiry evaluated on every token issuance ⇒ the maximum latency of a revocation is the access token TTL (15 min by default).                                                                                                                                            |
+| **Dynamic groups** by attribute rules                                                           | `0021`    | Materialized in `group_members` ⇒ the `groups` claim and SCIM do not change.                                                                                                                                                                                                    |
+| **Trusted devices** (HMAC cookie derived from the KEK, `trusted=false` initially)               | `0022`    | Feeds the `require_trusted_device` condition. **Explicit decision:** a failure of the device store is **fail-open** (treated as trusted) so as not to lock the organization out of its suite; take this into account in `security.md#2-modelo-de-amenazas-stride-por-servicio`. |
 
-| Decisión                                                                                                                   | Por qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Allowlist propia (`platform_admins`), no un rol**                                                                        | El robo de una sesión de admin de un cliente sigue sin conceder nada global. «¿Quién tiene plataforma?» se responde con un `SELECT`, no razonando sobre pertenencias.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Se consulta la BD en CADA petición** (`requirePlatformAdmin`), no un claim                                               | Retirar el alcance tiene efecto inmediato y no espera a que caduque un token. Un error de consulta **deniega** (fail-closed explícito).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **Segundo factor SIEMPRE**, tenga o no rol elevado                                                                         | Es la superficie más poderosa del producto. Para poder exigirlo, el claim `amr` pasa a emitirse también en el **access token** (antes solo en el ID Token).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **Y una ELEVACIÓN viva** (`platform_activations`, mig `0043`): estar en la allowlist ya no autoriza, solo permite elevarse | Un alcance concedido «para una migración» seguía vivo meses después sin que nada lo dijera. Ahora `platform_admins` es **elegibilidad** y la autorización la da una activación con motivo y ventana (5 min – 8 h) que **caduca sola**. Las tres rutas de la elevación (`/platform/activation`, `/activate`, `/deactivate`) van **fuera** del gate, o nadie podría elevarse nunca. Los tres candados devuelven 403 con `code` distinto (`forbidden`, `mfa_required`, `activation_required`) porque se arreglan en tres sitios distintos.                                                                                                                                                                                                 |
-| **Ninguna API de organización escribe la tabla**                                                                           | El alcance global solo lo concede el bootstrap del despliegue o otro admin global, y ambos quedan auditados con actor y motivo.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Toda escritura exige motivo** y se audita                                                                                | Una suspensión o veinte plazas regaladas sin motivo escrito son indistinguibles de un error seis meses después.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **No se puede quedar sin admins**                                                                                          | Revocar al último, o a uno mismo, se rechaza: recuperarlo exigiría volver a ejecutar el bootstrap del despliegue.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **DOS PERSONAS** (`platform_approvals`, mig `0046`) para suspender, fusionar **y conceder el propio alcance global**       | Repetir el identificador protege del despiste, no de una cuenta comprometida ni de una decisión tomada a solas de madrugada. Pedir crea la solicitud (409 `approval_required`) y **aprobar ejecuta**, revalidando contra el estado de ese momento: entre pedir y firmar cabe un día. Quien pide no puede firmar; rechazar sí, que retirar lo propio no ejecuta nada. Conceder el alcance se sumó porque el riesgo estaba invertido: suspender a UN cliente —reversible— exigía dos firmas y repartir el permiso que suspende a TODOS bastaba con una. Con un solo admin elegible se sigue adelante y queda escrito (`platform.approval.solo`): exigir dos deja la plataforma sin poder actuar nunca, y eso se descubre el día que urge. |
-| **Superficie separada**: `platform.<dominio>` (client OIDC `sytue-platform`), no la consola de organización                | Es la misma imagen, pero administrar la plataforma no es administrar una organización. En `admin.<dominio>` la sección **no existe** (404) ni se ofrece en el menú: servirla allí dejaba una pantalla que hacía ocho llamadas para acabar en 403 y le sugería a un admin cliente que hay una puerta a la plataforma desde su consola. La superficie se deriva del `client_id`, que el chart ya fija por despliegue —una bandera aparte se queda sin poner—. **Solo decide qué se ofrece**: quien entra lo siguen decidiendo los cuatro candados de arriba.                                                                                                                                                                              |
+<a id="49-administración-de-plataforma-alcance-global"></a>
 
-**Fusión de organizaciones.** Mueve las filas de las **diez** bases de servicio y después la
-identidad. Bajo `FORCE ROW LEVEL SECURITY` una transacción normal no ve las filas del origen, así
-que el `UPDATE` afectaría a cero filas **sin fallar**: por eso existe una política `PERMISSIVE`
-acotada a la variable propia `app.merge` (no se reutiliza `app.maintenance`, que ampliaría en
-silencio lo que puede hacer cualquier transacción de mantenimiento ya escrita) y un **preflight**
-que exige esa política en cada tabla con columna `tenant` antes de tocar la primera fila. Las
-colisiones de unicidad **fallan**: inventar una desambiguación sería perder datos de un cliente
-sin que nadie lo decidiera.
+#### 4.9 PLATFORM administration (global scope)
 
-**Y después se cuenta, antes de tocar la identidad.** Que los diez servicios se movieran sin error
-no demuestra que no quede nada: cada uno reetiqueta las tablas que el catálogo listaba al abrir su
-transacción, y **el origen sigue vivo mientras tanto** —sus usuarios entran y escriben hasta que se
-mueve la identidad—, así que una fila insertada después de que su tabla pasara por el `UPDATE` se
-queda con el tenant viejo sin que nada falle. `merge.Verify` recorre las diez bases y cuenta lo que
-todavía es del origen; si queda algo, la fusión **se para sin mover la identidad** y el fallo nombra
-servicio, tabla y filas.
+Until migration `0031` there was no authorization that crossed organizations: every
+decision was anchored to one and no role saw more than one. That property **remains intact for all
+organization roles**; what opens is a separate, narrow door so that support and
+management can operate the platform (manual sign-ups, suspension, merging, usage metering and
+free seats).
 
-Ese orden es deliberado y es el plan de aborto: hasta la identidad, el origen sigue siendo una
-organización operativa y la fusión se puede reanudar —el criterio es `tenant = origen`, así que
-barre lo que llegó tarde— o dejar parada sin que nadie se quede fuera. Después de la identidad no
-hay vuelta atrás: los usuarios ya están en el destino, el origen queda `merged` y las filas de
-ambas organizaciones son indistinguibles. **No existe un «deshacer»**, y por eso la verificación va
-donde va. El recuento se hace dentro de `app.merge` por la misma razón que la reescritura: sin esa
-variable la RLS filtra las filas del origen y el recuento sale cero, o sea que un verificador
-descuidado no es que no compruebe nada — es que **confirma** la fusión. Hay un test que cuenta lo
-mismo con y sin la variable y exige que discrepen.
+| Decision                                                                                                                             | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Its own allowlist (`platform_admins`), not a role**                                                                                | Stealing a customer admin's session still grants nothing global. "Who has platform access?" is answered with a `SELECT`, not by reasoning about memberships.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **The DB is checked on EVERY request** (`requirePlatformAdmin`), not a claim                                                         | Removing the scope takes effect immediately and does not wait for a token to expire. A query error **denies** (explicit fail-closed).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Second factor ALWAYS**, whether or not the user has an elevated role                                                               | It is the most powerful surface in the product. To be able to require it, the `amr` claim is now also issued in the **access token** (previously only in the ID Token).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **And a LIVE ELEVATION** (`platform_activations`, mig `0043`): being on the allowlist no longer authorizes, it only allows elevating | A scope granted "for a migration" was still alive months later without anything saying so. Now `platform_admins` is **eligibility** and authorization is given by an activation with a reason and a window (5 min – 8 h) that **expires on its own**. The three elevation routes (`/platform/activation`, `/activate`, `/deactivate`) sit **outside** the gate, or nobody could ever elevate. The three locks return 403 with a different `code` (`forbidden`, `mfa_required`, `activation_required`) because they are fixed in three different places.                                                                                                                                                                                                                                                                              |
+| **No organization API writes the table**                                                                                             | Global scope is only granted by the deployment bootstrap or another global admin, and both are audited with actor and reason.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Every write requires a reason** and is audited                                                                                     | A suspension or twenty seats given away without a written reason are indistinguishable from a mistake six months later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **It cannot be left without admins**                                                                                                 | Revoking the last one, or oneself, is rejected: recovering would require running the deployment bootstrap again.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **TWO PEOPLE** (`platform_approvals`, mig `0046`) to suspend, merge **and grant global scope itself**                                | Repeating the identifier protects against carelessness, not against a compromised account or a decision taken alone in the middle of the night. Requesting creates the request (409 `approval_required`) and **approving executes**, revalidating against the state at that moment: a day can pass between requesting and signing. The requester cannot sign; they can reject, since withdrawing one's own request executes nothing. Granting the scope was added because the risk was inverted: suspending ONE customer —reversible— required two signatures, while handing out the permission that suspends EVERYONE needed only one. With a single eligible admin it goes ahead and is recorded (`platform.approval.solo`): requiring two leaves the platform unable to ever act, and that is discovered on the day it is urgent. |
+| **Separate surface**: `platform.<dominio>` (OIDC client `sytue-platform`), not the organization console                              | It is the same image, but administering the platform is not administering an organization. On `admin.<dominio>` the section **does not exist** (404) and is not offered in the menu: serving it there left a screen that made eight calls only to end in 403 and suggested to a customer admin that there is a door to the platform from their console. The surface is derived from the `client_id`, which the chart already sets per deployment —a separate flag ends up unset—. **It only decides what is offered**: who gets in is still decided by the four locks above.                                                                                                                                                                                                                                                         |
 
-**Lo que no se puede mover: S/MIME.** `smime_authorities` tiene `PRIMARY KEY (tenant)` —una autoridad
-por organización—, así que si las dos partes tienen la suya el `UPDATE` choca con la clave primaria y
-aborta la fusión. Moverla tampoco arreglaría nada: los dispositivos de la organización resultante
-tienen instalado el ancla del **destino**, y un correo firmado por una autoridad que ya no existe se
-muestra como no confiable, que es peor que uno sin firmar. La autoridad del origen se **descarta** con
-los certificados que emitió, y `smime.Service` los re-emite solo —es perezoso: si un buzón no tiene
-certificado, se lo emite al enviar, con la autoridad de su organización, que tras la fusión ya es la
-del destino—. Se pierde la clave privada anterior del buzón, y eso se dice explícitamente: no es una
-política nueva (la renovación anual ya la sobrescribe) y hoy el servicio solo firma, no descifra, así
-que ningún correo deja de poder leerse. Si el destino **no** tiene autoridad no se toca nada y la del
-origen se mueve tal cual: es el caso del renombrado de una organización, donde descartar sería tirar
-una autoridad válida sin motivo. Cada descarte queda auditado (`platform.merge.discarded`) con el
-servicio, el motivo y cuántos buzones afecta: que la decisión sea correcta no la hace invisible.
+**Organization merging.** It moves the rows of the **ten** service databases and then the
+identity. Under `FORCE ROW LEVEL SECURITY` a normal transaction does not see the source's rows, so
+the `UPDATE` would affect zero rows **without failing**: that is why there is a `PERMISSIVE` policy
+scoped to its own variable `app.merge` (`app.maintenance` is not reused, since it would silently
+broaden what any already-written maintenance transaction can do) and a **preflight**
+that requires that policy on every table with a `tenant` column before touching the first row.
+Uniqueness collisions **fail**: inventing a disambiguation would mean losing a customer's data
+without anyone deciding it.
 
-Esa regla la declara **cada base** en una migración suya, como una función `platform_merge_prepare
-(origen, destino)` que el motor llama —si existe— dentro de la misma transacción de fusión. Así el
-motor sigue sin saber nada de ningún servicio, que es lo que le permite vivir en Sytue ID sin
-endpoints ni credenciales nuevas. La función exige `app.merge` en su primera línea, y **no es
-decorativo**: la RLS por sí sola no la protege, porque una conexión de negocio lleva su `app.tenant`
-fijado y ve sus propias filas, de modo que sin esa guarda bastaba llamarla con origen = destino =
-la propia organización para dejarla sin S/MIME. Un `GRANT` no sirve de defensa aquí: la fusión usa
-las mismas credenciales que el servicio.
+**And then it counts, before touching the identity.** That the ten services moved without error
+does not prove that nothing is left: each one relabels the tables that the catalog listed when opening its
+transaction, and **the source is still alive in the meantime** —its users sign in and write until the
+identity is moved—, so a row inserted after its table went through the `UPDATE`
+keeps the old tenant without anything failing. `merge.Verify` walks the ten databases and counts what
+still belongs to the source; if anything is left, the merge **stops without moving the identity** and the failure names
+service, table and rows.
 
-El preflight reconoce la política por **lo que hace** —ser `PERMISSIVE` sobre todos los comandos y
-mirar `app.merge`— y no por cómo se llama. Exigir el nombre `<tabla>_platform_merge` convertía una
-convención en un requisito de funcionamiento: una tabla con su política correcta bajo otro nombre
-abortaba la fusión entera, y una política con el nombre correcto y la condición equivocada la
-pasaba. Que cada tabla nueva traiga la suya no se recuerda, se comprueba: el gate de
-`platform/pkg/migcheck` rechaza una migración que dé columna `tenant` a una tabla sin que ninguna
-migración de ese servicio le dé política de fusión. La migración de barrido por servicio solo vio
-las tablas que existían el día que se escribió, y las creadas después nacían fuera de la fusión sin
-que nada lo dijera hasta que alguien intentaba fusionar.
+That order is deliberate and it is the abort plan: until the identity, the source is still an
+operational organization and the merge can be resumed —the criterion is `tenant = origen`, so it
+sweeps up what arrived late— or left stopped without anyone being locked out. After the identity there
+is no going back: the users are already in the destination, the source becomes `merged` and the rows of
+both organizations are indistinguishable. **There is no "undo"**, and that is why verification goes
+where it goes. The count is done inside `app.merge` for the same reason as the rewrite: without that
+variable RLS filters out the source's rows and the count comes out zero, meaning that a
+careless verifier does not merely check nothing — it **confirms** the merge. There is a test that counts the
+same thing with and without the variable and requires them to disagree.
 
-Cumplimiento operativo asociado (legal hold + eDiscovery no destructivos en Mail y Drive,
-auditoría unificada con export SIEM): también en
-[`architecture.md#6-identidad-enterprise-y-cumplimiento`](./architecture.md#6-identidad-enterprise-y-cumplimiento) §8–§9; complementa §7 (auditoría y logging)
-y §8 (retención) de este documento.
+**What cannot be moved: S/MIME.** `smime_authorities` has `PRIMARY KEY (tenant)` —one authority
+per organization—, so if both parties have their own the `UPDATE` collides with the primary key and
+aborts the merge. Moving it would not fix anything either: the devices of the resulting organization
+have the **destination's** anchor installed, and a mail signed by an authority that no longer exists is
+shown as untrusted, which is worse than an unsigned one. The source's authority is **discarded** along with
+the certificates it issued, and `smime.Service` re-issues them by itself —it is lazy: if a mailbox has no
+certificate, it issues one when sending, with its organization's authority, which after the merge is already
+the destination's—. The mailbox's previous private key is lost, and this is stated explicitly: it is not a
+new policy (the yearly renewal already overwrites it) and today the service only signs, it does not decrypt, so
+no mail becomes unreadable. If the destination does **not** have an authority nothing is touched and the
+source's one is moved as is: that is the case of an organization being renamed, where discarding would mean throwing away
+a valid authority for no reason. Each discard is audited (`platform.merge.discarded`) with the
+service, the reason and how many mailboxes it affects: the decision being correct does not make it invisible.
+
+That rule is declared by **each database** in a migration of its own, as a function `platform_merge_prepare
+(origen, destino)` that the engine calls —if it exists— inside the same merge transaction. That way the
+engine still knows nothing about any service, which is what allows it to live in Sytue ID without
+new endpoints or credentials. The function requires `app.merge` on its first line, and **it is not
+decorative**: RLS alone does not protect it, because a business connection carries its `app.tenant`
+set and sees its own rows, so without that guard it was enough to call it with source = destination =
+one's own organization to strip it of S/MIME. A `GRANT` is no defense here: the merge uses
+the same credentials as the service.
+
+The preflight recognizes the policy by **what it does** —being `PERMISSIVE` on all commands and
+looking at `app.merge`— and not by what it is called. Requiring the name `<tabla>_platform_merge` turned a
+convention into an operational requirement: a table with its correct policy under another name
+aborted the whole merge, and a policy with the right name and the wrong condition
+passed it. That every new table brings its own is not remembered, it is checked: the
+`platform/pkg/migcheck` gate rejects a migration that gives a `tenant` column to a table unless some
+migration of that service gives it a merge policy. The per-service sweep migration only saw
+the tables that existed on the day it was written, and those created later were born outside the merge without
+anything saying so until someone tried to merge.
+
+Associated operational compliance (non-destructive legal hold + eDiscovery in Mail and Drive,
+unified audit with SIEM export): also in
+[`architecture.md#6-identidad-enterprise-y-cumplimiento`](./architecture.md#6-identidad-enterprise-y-cumplimiento) §8–§9; it complements §7 (auditing and logging)
+and §8 (retention) of this document.
 
 ---
 
 <a id="15-aislamiento-multi-tenant"></a>
 
-### 1.5 Aislamiento multi-tenant
+### 1.5 Multi-tenant isolation
 
-Modelo: **Organización (tenant) → Workspace → Usuarios**, con correspondencia `org/<slug>`
-(Sytue ID) ⇄ `tenant-<slug>` (namespace Kapsule) ⇄ **esquema/filas por tenant en PostgreSQL con
-RLS** ⇄ buckets/prefijos S3 dedicados (`tenancy.Tenant` en `platform/pkg/tenancy/tenancy.go` es el
-origen único del identificador).
+Model: **Organization (tenant) → Workspace → Users**, with the mapping `org/<slug>`
+(Sytue ID) ⇄ `tenant-<slug>` (Kapsule namespace) ⇄ **per-tenant schema/rows in PostgreSQL with
+RLS** ⇄ dedicated S3 buckets/prefixes (`tenancy.Tenant` in `platform/pkg/tenancy/tenancy.go` is the
+single origin of the identifier).
 
-#### 5.1 Datos — RLS en PostgreSQL (defensa principal)
+<a id="51-datos--rls-en-postgresql-defensa-principal"></a>
 
-- **Row-Level Security** activada y **forzada** (`FORCE ROW LEVEL SECURITY`, aplica incluso al owner
-  de la tabla) en las tablas multi-tenant de cada servicio: política
-  `USING (tenant = current_setting('app.tenant', true)) WITH CHECK (...)` — filtra lectura y
-  **bloquea escritura** cruzada (ver `services/drive/db/migrations/0001_init.up.sql`, replicado en
-  todos los servicios).
-- **Propagación segura del tenant:** `RequireAuth` extrae el claim de tenant validado
-  (`Claims.TenantOrEmpty`, que valida el slug) y lo pone en contexto (`tenancy.Into`); en cada
-  transacción de negocio `pg.InTenantTx` ejecuta `SetTenant`, que fija la GUC vía
-  `set_config('app.tenant', $1, true)` **con parámetro** (no interpolación) y **solo tras validar el
-  slug** (`tenancy.ValidSlug`) → sin inyección SQL ni fuga entre tenants aunque haya un bug de
-  aplicación. El ajuste es `LOCAL`: vive solo dentro de la transacción.
-- **Roles de BD** sin `BYPASSRLS`; el rol de migraciones es distinto del rol de runtime. Esquemas/
-  instancias separados por tenant donde el contrato lo exija.
-- **Los tests lo EJERCITAN de verdad** (`platform/pkg/pgtest`): el Pool conecta como `sytue_app`,
-  `NOSUPERUSER NOBYPASSRLS` y con privilegios mínimos. Hasta el 2026-07-28 conectaba como
-  superusuario, y PostgreSQL **no evalúa ninguna política RLS para un superusuario**: es decir,
-  ninguna política de ninguna migración se ejecutó jamás en los tests, y un test de aislamiento
-  verde no demostraba nada. `services/drive/internal/store/rls_scope_integration_test.go` es la red
-  de seguridad: habla SQL crudo contra el pool sin pasar por el store, así que lo único que puede
-  esconder una fila es la política; falla si alguien la borra de una migración o si el harness
-  volviera a ser superusuario.
-- **Trampa conocida — `COPY FROM` es incompatible con la RLS.** PostgreSQL rechaza el protocolo
-  COPY sobre una tabla con RLS activa para un rol sin `BYPASSRLS`
-  («COPY FROM not supported with row-level security», SQLSTATE `0A000`). Como el runtime NO tiene
-  `BYPASSRLS`, `pgx.CopyFrom` **falla siempre en producción** sobre cualquier tabla multi-tenant.
-  Así estuvo `CopyFolder` de Sytue Drive hasta que el harness dejó de ser superusuario y lo
-  destapó. Para insertar en bloque bajo RLS: `INSERT ... SELECT FROM unnest($1::t[], …)`, que es una
-  sola ida y vuelta y no consume un parámetro por columna y fila (el tope de PostgreSQL son 65535).
-- **S3:** prefijos por tenant (`tenancy.StoragePrefix()` → `tenants/<slug>/`) + credenciales IAM
-  acotadas.
+#### 5.1 Data — RLS in PostgreSQL (primary defense)
 
-#### 5.2 Red — NetworkPolicy
+- **Row-Level Security** enabled and **forced** (`FORCE ROW LEVEL SECURITY`, applies even to the table
+  owner) on each service's multi-tenant tables: policy
+  `USING (tenant = current_setting('app.tenant', true)) WITH CHECK (...)` — it filters reads and
+  **blocks cross-tenant writes** (see `services/drive/db/migrations/0001_init.up.sql`, replicated in
+  all services).
+- **Safe tenant propagation:** `RequireAuth` extracts the validated tenant claim
+  (`Claims.TenantOrEmpty`, which validates the slug) and puts it in the context (`tenancy.Into`); in every
+  business transaction `pg.InTenantTx` runs `SetTenant`, which sets the GUC via
+  `set_config('app.tenant', $1, true)` **with a parameter** (no interpolation) and **only after validating the
+  slug** (`tenancy.ValidSlug`) → no SQL injection or leakage between tenants even if there is an
+  application bug. The setting is `LOCAL`: it lives only inside the transaction.
+- **DB roles** without `BYPASSRLS`; the migrations role is different from the runtime role. Separate schemas/
+  instances per tenant where the contract requires it.
+- **The tests really EXERCISE it** (`platform/pkg/pgtest`): the Pool connects as `sytue_app`,
+  `NOSUPERUSER NOBYPASSRLS` and with minimal privileges. Until 2026-07-28 it connected as a
+  superuser, and PostgreSQL **does not evaluate any RLS policy for a superuser**: that is,
+  no policy from any migration was ever executed in the tests, and a green isolation test
+  proved nothing. `services/drive/internal/store/rls_scope_integration_test.go` is the safety
+  net: it speaks raw SQL against the pool without going through the store, so the only thing that can
+  hide a row is the policy; it fails if someone removes it from a migration or if the harness
+  went back to being a superuser.
+- **Known trap — `COPY FROM` is incompatible with RLS.** PostgreSQL rejects the COPY
+  protocol on a table with active RLS for a role without `BYPASSRLS`
+  («COPY FROM not supported with row-level security», SQLSTATE `0A000`). Since the runtime does NOT have
+  `BYPASSRLS`, `pgx.CopyFrom` **always fails in production** on any multi-tenant table.
+  That is how Sytue Drive's `CopyFolder` was until the harness stopped being a superuser and
+  uncovered it. To bulk insert under RLS: `INSERT ... SELECT FROM unnest($1::t[], …)`, which is a
+  single round trip and does not consume one parameter per column and row (PostgreSQL's cap is 65535).
+- **S3:** per-tenant prefixes (`tenancy.StoragePrefix()` → `tenants/<slug>/`) + scoped IAM
+  credentials.
 
-- **Deny-by-default:** cada namespace `tenant-<slug>` tiene una `NetworkPolicy` que **deniega todo
-  el ingress/egress** y solo abre lo explícitamente permitido.
-- Tráfico entre tenants **bloqueado**; comunicación solo con el ingress (Traefik), los servicios
-  compartidos autorizados (Sytue ID, Sytue Hub) y egress controlado (DNS, PostgreSQL, S3, LiveKit).
-- Etiquetas `sytue.eu/tenant` y selectores de namespace acotan el alcance.
+<a id="52-red--networkpolicy"></a>
 
-#### 5.3 Cuotas — ResourceQuota / LimitRange
+#### 5.2 Network — NetworkPolicy
 
-- **`ResourceQuota`** por namespace (CPU, memoria, almacenamiento, nº de objetos) → previene
-  _noisy neighbor_ y agotamiento (defensa DoS interno). En Drive, además, cuota de almacenamiento
-  por tenant mantenida transaccionalmente (`quotas.used_bytes`, RLS-aislada).
-- **`LimitRange`** para defaults/máximos por pod y contenedor.
+- **Deny-by-default:** each `tenant-<slug>` namespace has a `NetworkPolicy` that **denies all
+  ingress/egress** and only opens what is explicitly allowed.
+- Traffic between tenants is **blocked**; communication only with the ingress (Traefik), the authorized shared
+  services (Sytue ID, Sytue Hub) and controlled egress (DNS, PostgreSQL, S3, LiveKit).
+- `sytue.eu/tenant` labels and namespace selectors limit the scope.
 
-#### 5.4 Autorización — RBAC
+<a id="53-cuotas--resourcequota--limitrange"></a>
 
-- **RBAC de Kubernetes** con privilegio mínimo: `Role`/`RoleBinding` por namespace; sin
-  `cluster-admin` para cargas de tenant. **ServiceAccounts** dedicadas; tokens SA no auto-montados
-  salvo necesidad.
-- **RBAC de aplicación** derivado de los roles de Sytue ID, evaluado en cada servicio Go
-  (`RequireRole`/`RequireScope` en `platform/pkg/authn`). En Docs, resolución de rol efectivo con
-  **deny-by-default** y máximo entre ACL de usuario/grupo/tenant (`ResolveRole`).
+#### 5.3 Quotas — ResourceQuota / LimitRange
+
+- **`ResourceQuota`** per namespace (CPU, memory, storage, number of objects) → prevents
+  _noisy neighbor_ and exhaustion (internal DoS defense). In Drive, in addition, a per-tenant storage
+  quota maintained transactionally (`quotas.used_bytes`, RLS-isolated).
+- **`LimitRange`** for defaults/maximums per pod and container.
+
+<a id="54-autorización--rbac"></a>
+
+#### 5.4 Authorization — RBAC
+
+- **Kubernetes RBAC** with least privilege: `Role`/`RoleBinding` per namespace; no
+  `cluster-admin` for tenant workloads. Dedicated **ServiceAccounts**; SA tokens not auto-mounted
+  unless needed.
+- **Application RBAC** derived from Sytue ID roles, evaluated in each Go service
+  (`RequireRole`/`RequireScope` in `platform/pkg/authn`). In Docs, effective role resolution with
+  **deny-by-default** and the maximum among user/group/tenant ACLs (`ResolveRole`).
 
 <a id="matriz-acl"></a>
 
-#### 5.5 Matriz ACL única: quién puede qué (Docus, Calcus, Diapos, CertiPDF y enlaces de Docs y Drive)
+<a id="55-matriz-acl-única-quién-puede-qué-docus-calcus-diapos-certipdf-y-enlaces-de-docs-y-drive"></a>
 
-Una sola tabla por superficie, en lugar de leerla de cada manejador. Las de **documentos de
-Docs** y de **enlaces** las recorre un test (más abajo), así que no se pueden desviar del
-código sin que falle; las de CertiPDF y Drive son lectura del código, con su referencia.
+#### 5.5 Single ACL matrix: who can do what (Docus, Calcus, Diapos, CertiPDF and Docs and Drive links)
 
-**Roles de un documento** (`domain.Role`, orden estricto): `viewer` < `commenter` < `editor` <
-`owner`. Se resuelven por documento: el propietario (`owner_sub`) siempre es `owner`; para los
-demás, el **máximo** entre sus permisos de usuario, de grupo y de organización
-(`ResolveRole`). Sin ningún permiso: **403** (deny-by-default). Los grupos son los roles de la
-sesión más `org/<tenant>`; en la organización anfitriona de un documento (ADR 0052) una persona
-externa no es nada más que ella misma. La tabla es **idéntica para los tres tipos**
-(Docus `document`, Calcus `spreadsheet`, Diapos `presentation`): lo que cambia por tipo no es
-quién puede, sino qué más se comprueba al escribir (ver «Protección dentro del documento»).
+One single table per surface, instead of reading it from each handler. The ones for **Docs
+documents** and for **links** are walked by a test (below), so they cannot drift from the
+code without it failing; the CertiPDF and Drive ones are readings of the code, with their reference.
 
-##### A. Documentos de Docs (REST, y WebSocket con los mismos roles)
+**Roles of a document** (`domain.Role`, strict order): `viewer` < `commenter` < `editor` <
+`owner`. They are resolved per document: the owner (`owner_sub`) is always `owner`; for
+everyone else, the **maximum** among their user, group and organization permissions
+(`ResolveRole`). Without any permission: **403** (deny-by-default). The groups are the session's
+roles plus `org/<tenant>`; in a document's host organization (ADR 0052) an external
+person is nothing more than themselves. The table is **identical for the three types**
+(Docus `document`, Calcus `spreadsheet`, Diapos `presentation`): what changes by type is not
+who can, but what else is checked when writing (see “Protection inside the document”).
+
+<a id="a-documentos-de-docs-rest-y-websocket-con-los-mismos-roles"></a>
+
+##### A. Docs documents (REST, and WebSocket with the same roles)
 
 <!-- matriz-acl:documentos:inicio -->
 
-| Ruta                                                | Acción                                | Rol mínimo  | Notas                                                                                                                 |
-| --------------------------------------------------- | ------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `GET /documents/{id}`                               | Abrir el documento y ver su rol       | `viewer`    |                                                                                                                       |
-| `PATCH /documents/{id}`                             | Renombrar                             | `editor`    |                                                                                                                       |
-| `DELETE /documents/{id}`                            | Enviar a la papelera                  | `owner`     |                                                                                                                       |
-| `PUT /documents/{id}/star`                          | Marcar favorito (por persona)         | `viewer`    |                                                                                                                       |
-| `GET /documents/{id}/state`                         | Estado completo                       | `viewer`    | Las contraseñas de protección heredadas en claro salen redactadas                                                     |
-| `POST /documents/{id}/ops`                          | Editar (también por WebSocket)        | `editor`    | Reautoriza dentro de la transacción; pasa por la protección de hojas y secciones                                      |
-| `GET /documents/{id}/ops`                           | Reproducir operaciones                | `viewer`    | Redactadas igual que el estado                                                                                        |
-| `PUT /documents/{id}/presence`                      | Publicar presencia                    | `viewer`    |                                                                                                                       |
-| `GET /documents/{id}/versions`                      | Listar versiones                      | `viewer`    |                                                                                                                       |
-| `POST /documents/{id}/versions`                     | Crear una versión                     | `editor`    |                                                                                                                       |
-| `POST /documents/{id}/versions/{versionId}/restore` | Restaurar una versión                 | `editor`    | Escribe por la misma puerta que `/ops`: la protección también aplica                                                  |
-| `GET /documents/{id}/comments`                      | Leer comentarios                      | `viewer`    |                                                                                                                       |
-| `POST /documents/{id}/comments`                     | Comentar                              | `commenter` |                                                                                                                       |
-| `POST /documents/{id}/comments/import`              | Guardar los comentarios importados    | `commenter` | Los guarda quien importa; no avisa a nadie                                                                            |
-| `PUT /documents/{id}/comments/{commentId}/resolve`  | Resolver o reabrir un comentario      | `commenter` |                                                                                                                       |
-| `DELETE /documents/{id}/comments/{commentId}`       | Borrar un comentario o respuesta      | `commenter` | Solo su autor; un `editor` o el `owner` borran cualquiera (comentarios importados de Word: su autor es quien importó) |
-| `GET /documents/{id}/permissions`                   | Ver quién tiene acceso                | `owner`     |                                                                                                                       |
-| `PUT /documents/{id}/permissions`                   | Conceder o cambiar un permiso         | `owner`     |                                                                                                                       |
-| `DELETE /documents/{id}/permissions`                | Revocar un permiso                    | `owner`     | Corta el canal en vivo                                                                                                |
-| `GET /documents/{id}/shares`                        | Listar enlaces                        | `owner`     |                                                                                                                       |
-| `POST /documents/{id}/shares`                       | Crear un enlace                       | `owner`     | `viewer`, `commenter` o `editor`; nunca `owner`                                                                       |
-| `DELETE /documents/{id}/shares/{linkId}`            | Revocar un enlace                     | `owner`     | Corta el canal de quien lo canjeó                                                                                     |
-| `PUT /documents/{id}/shares/{linkId}/password`      | Poner, cambiar o quitar su contraseña | `owner`     | Se guarda solo el hash (Argon2id); cambiarla invalida lo ya desbloqueado                                              |
-| `POST /documents/{id}/edit-requests`                | Pedir permiso de edición              | `viewer`    | Idempotente; quien ya edita recibe `requested: false`                                                                 |
-| `GET /documents/{id}/edit-requests`                 | Ver las peticiones                    | `owner`     |                                                                                                                       |
-| `POST /documents/{id}/edit-requests/{sub}/grant`    | Conceder una petición                 | `owner`     | Solo a quien la pidió                                                                                                 |
-| `DELETE /documents/{id}/edit-requests/{sub}`        | Rechazar una petición                 | `owner`     |                                                                                                                       |
-| `GET /documents/{id}/filter-views`                  | Leer mis vistas de filtro (Calcus)    | `viewer`    | Solo las de quien llama: ni el propietario ve las de otra persona                                                     |
-| `PUT /documents/{id}/filter-views`                  | Guardar mis vistas de filtro          | `viewer`    | Filtrar es ver: no escribe el modelo; tope de 64 KiB, 256 hojas y 50 vistas/hoja                                      |
-| `GET /documents/{id}/exports`                       | Listar exportaciones                  | `viewer`    |                                                                                                                       |
-| `POST /documents/{id}/exports`                      | Exportar (OOXML, ODF, PDF, HTML, MD)  | `viewer`    | Lo que ve, lo puede sacar                                                                                             |
-| `GET /documents/{id}/exports/{blobId}`              | Descargar una exportación             | `viewer`    |                                                                                                                       |
+| Route                                               | Action                               | Minimum role | Notes                                                                                                                       |
+| --------------------------------------------------- | ------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET /documents/{id}`                               | Open the document and see one's role | `viewer`     |                                                                                                                             |
+| `PATCH /documents/{id}`                             | Rename                               | `editor`     |                                                                                                                             |
+| `DELETE /documents/{id}`                            | Move to trash                        | `owner`      |                                                                                                                             |
+| `PUT /documents/{id}/star`                          | Mark as favorite (per person)        | `viewer`     |                                                                                                                             |
+| `GET /documents/{id}/state`                         | Full state                           | `viewer`     | Inherited protection passwords in clear text come out redacted                                                              |
+| `POST /documents/{id}/ops`                          | Edit (also over WebSocket)           | `editor`     | Reauthorizes inside the transaction; goes through sheet and section protection                                              |
+| `GET /documents/{id}/ops`                           | Replay operations                    | `viewer`     | Redacted the same way as the state                                                                                          |
+| `PUT /documents/{id}/presence`                      | Publish presence                     | `viewer`     |                                                                                                                             |
+| `GET /documents/{id}/versions`                      | List versions                        | `viewer`     |                                                                                                                             |
+| `POST /documents/{id}/versions`                     | Create a version                     | `editor`     |                                                                                                                             |
+| `POST /documents/{id}/versions/{versionId}/restore` | Restore a version                    | `editor`     | Writes through the same door as `/ops`: protection also applies                                                             |
+| `GET /documents/{id}/comments`                      | Read comments                        | `viewer`     |                                                                                                                             |
+| `POST /documents/{id}/comments`                     | Comment                              | `commenter`  |                                                                                                                             |
+| `POST /documents/{id}/comments/import`              | Save imported comments               | `commenter`  | Saved by whoever imports; notifies nobody                                                                                   |
+| `PUT /documents/{id}/comments/{commentId}/resolve`  | Resolve or reopen a comment          | `commenter`  |                                                                                                                             |
+| `DELETE /documents/{id}/comments/{commentId}`       | Delete a comment or reply            | `commenter`  | Only its author; an `editor` or the `owner` delete any (comments imported from Word: their author is whoever imported them) |
+| `GET /documents/{id}/permissions`                   | See who has access                   | `owner`      |                                                                                                                             |
+| `PUT /documents/{id}/permissions`                   | Grant or change a permission         | `owner`      |                                                                                                                             |
+| `DELETE /documents/{id}/permissions`                | Revoke a permission                  | `owner`      | Cuts the live channel                                                                                                       |
+| `GET /documents/{id}/shares`                        | List links                           | `owner`      |                                                                                                                             |
+| `POST /documents/{id}/shares`                       | Create a link                        | `owner`      | `viewer`, `commenter` or `editor`; never `owner`                                                                            |
+| `DELETE /documents/{id}/shares/{linkId}`            | Revoke a link                        | `owner`      | Cuts the channel of whoever redeemed it                                                                                     |
+| `PUT /documents/{id}/shares/{linkId}/password`      | Set, change or remove its password   | `owner`      | Only the hash is stored (Argon2id); changing it invalidates what was already unlocked                                       |
+| `POST /documents/{id}/edit-requests`                | Request edit permission              | `viewer`     | Idempotent; whoever already edits gets `requested: false`                                                                   |
+| `GET /documents/{id}/edit-requests`                 | See the requests                     | `owner`      |                                                                                                                             |
+| `POST /documents/{id}/edit-requests/{sub}/grant`    | Grant a request                      | `owner`      | Only to whoever requested it                                                                                                |
+| `DELETE /documents/{id}/edit-requests/{sub}`        | Reject a request                     | `owner`      |                                                                                                                             |
+| `GET /documents/{id}/filter-views`                  | Read my filter views (Calcus)        | `viewer`     | Only the caller's: not even the owner sees another person's                                                                 |
+| `PUT /documents/{id}/filter-views`                  | Save my filter views                 | `viewer`     | Filtering is viewing: it does not write the model; cap of 64 KiB, 256 sheets and 50 views/sheet                             |
+| `GET /documents/{id}/exports`                       | List exports                         | `viewer`     |                                                                                                                             |
+| `POST /documents/{id}/exports`                      | Export (OOXML, ODF, PDF, HTML, MD)   | `viewer`     | What you can see, you can take out                                                                                          |
+| `GET /documents/{id}/exports/{blobId}`              | Download an export                   | `viewer`     |                                                                                                                             |
 
 <!-- matriz-acl:documentos:fin -->
 
 Test: `services/docs/internal/http/matriz_acl_test.go` (`TestMatrizACLDeDocumentosCoincideConElServicio`)
-lee esta tabla, ejercita cada ruta con cada rol y cada tipo de documento, y falla si el servicio
-concede o deniega algo distinto, o si una ruta existe en la tabla y no en el test (o al revés). La
-matriz por WebSocket (`collab.TestOpsRoleMatrix`) y las ediciones (`TestPostOpsRoleMatrix`) tienen
-los suyos.
+reads this table, exercises each route with each role and each document type, and fails if the service
+grants or denies anything different, or if a route exists in the table and not in the test (or vice versa). The
+WebSocket matrix (`collab.TestOpsRoleMatrix`) and edits (`TestPostOpsRoleMatrix`) have
+their own.
 
-**Protección dentro del documento** (lo que añade restringir a un `editor`; se evalúa en
-`store.AppendOps`, dentro de la transacción que bloquea el documento, y por tanto vale para
-`/ops`, WebSocket y restaurar versión):
+**Protection inside the document** (what restricting an `editor` adds; it is evaluated in
+`store.AppendOps`, inside the transaction that locks the document, and therefore applies to
+`/ops`, WebSocket and version restore):
 
-| Tipo   | Qué protege                                                                                                                                                                                                                                                                                                                                                                                        | Quién puede saltársela                                                                                                                                                                                          |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Calcus | Hoja y libro protegidos: celdas bloqueadas, opciones del cuadro «Proteger hoja», estructura del libro                                                                                                                                                                                                                                                                                              | El propietario; un editor solo con la contraseña, verificada en el servidor (se guarda solo su hash SHA-512 con sal, esquema OOXML)                                                                             |
-| Calcus | Tablas, tablas dinámicas y datos externos (`tables`, `pivots`, `externalTables`) de una hoja protegida: no tocan celdas, y sin esta regla se reescribían con una escritura directa a la API. No hay permiso que los conceda; las tablas pasan solo con un permiso estructural (insertar o borrar filas o columnas), porque se desplazan con ellas (`domain/proteccion.go`, `camposSiempreVetados`) | El propietario; un editor solo con la contraseña                                                                                                                                                                |
-| Calcus | Rangos editables por persona o grupo dentro de una hoja protegida (`protect.ranges`)                                                                                                                                                                                                                                                                                                               | Quien figura en el rango (por `sub` o por grupo) escribe esas celdas; cambiar los rangos es cambiar la protección                                                                                               |
-| Docus  | Secciones protegidas (`data-sytue-seccion`, `data-sytue-puede`, `data-sytue-grupos`), en el registro `doc:html` **y en la secuencia por carácter** (insert/delete)                                                                                                                                                                                                                                 | El propietario; en cada sección, solo quien figura. Crear, quitar o cambiar el marcado de una sección es solo del propietario                                                                                   |
-| Diapos | Diapositivas bloqueadas (contenido fijo, no se borran), cajas bloqueadas (quedan como están y en su diapositiva) y patrón, diseños, tema y tamaño del lienzo (`SlidesModel.protect`)                                                                                                                                                                                                               | El propietario; un editor solo con la contraseña, verificada en el servidor (solo su hash SHA-512 con sal). Proteger una presentación sin protección es de cualquier editor; cambiar o quitar la protección, no |
+| Type   | What it protects                                                                                                                                                                                                                                                                                                                                                                                       | Who can bypass it                                                                                                                                                                                          |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Calcus | Protected sheet and workbook: locked cells, options of the «Proteger hoja» (Protect sheet) dialog, workbook structure                                                                                                                                                                                                                                                                                  | The owner; an editor only with the password, verified on the server (only its salted SHA-512 hash is stored, OOXML scheme)                                                                                 |
+| Calcus | Tables, pivot tables and external data (`tables`, `pivots`, `externalTables`) of a protected sheet: they do not touch cells, and without this rule they were rewritten with a direct write to the API. No permission grants them; tables only pass with a structural permission (inserting or deleting rows or columns), because they shift with them (`domain/proteccion.go`, `camposSiempreVetados`) | The owner; an editor only with the password                                                                                                                                                                |
+| Calcus | Ranges editable per person or group inside a protected sheet (`protect.ranges`)                                                                                                                                                                                                                                                                                                                        | Whoever is listed in the range (by `sub` or by group) writes those cells; changing the ranges is changing the protection                                                                                   |
+| Docus  | Protected sections (`data-sytue-seccion`, `data-sytue-puede`, `data-sytue-grupos`), in the `doc:html` register **and in the per-character sequence** (insert/delete)                                                                                                                                                                                                                                   | The owner; in each section, only whoever is listed. Creating, removing or changing the markup of a section is for the owner only                                                                           |
+| Diapos | Locked slides (fixed content, cannot be deleted), locked boxes (they stay as they are and on their slide) and master, layouts, theme and canvas size (`SlidesModel.protect`)                                                                                                                                                                                                                           | The owner; an editor only with the password, verified on the server (only its salted SHA-512 hash). Protecting an unprotected presentation is up to any editor; changing or removing the protection is not |
 
-Secciones de Docus y operaciones por carácter: el editor refleja el HTML en una secuencia RGA con
-un elemento por carácter y los co-editores pintan esa secuencia, de modo que escribir `insert`/
-`delete` a mano enseñaba a los demás una sección ajena cambiada (y el guardado de quien sí tiene
-permiso la convertía en contenido real). En los documentos con secciones, y solo en ellos, el
-almacén guarda una copia de la secuencia (`doc_proteccion.secuencia`, migración 0017); cada lote
-con ops por carácter se aplica a una copia y el texto resultante se compara con las secciones con
-la misma regla que `doc:html` (`domain/proteccion_secuencia.go`). Cubre teclear dentro de una
-sección ajena, partirla, borrarla o saltarla con un `set` limpio de `doc:html` más ops sucias.
-Coste: lineal en el tamaño del documento por lote, solo en los documentos con secciones.
+Docus sections and per-character operations: the editor mirrors the HTML into an RGA sequence with
+one element per character and co-editors render that sequence, so writing `insert`/
+`delete` by hand showed the others a changed section that belonged to someone else (and the save of someone who does have
+permission turned it into real content). In documents with sections, and only in them, the
+store keeps a copy of the sequence (`doc_proteccion.secuencia`, migration 0017); each batch
+with per-character ops is applied to a copy and the resulting text is compared with the sections using
+the same rule as `doc:html` (`domain/proteccion_secuencia.go`). It covers typing inside someone else's
+section, splitting it, deleting it or skipping it with a clean `set` of `doc:html` plus dirty ops.
+Cost: linear in the document size per batch, only in documents with sections.
 
-Protección de Calcus en ficheros (`domain/proteccion_fichero.go`, `proteccion_ooxml.go`,
-`proteccion_ods.go`): el .xlsx lleva `sheetProtection` por hoja y `workbookProtection` (estructura)
-y el .ods `table:protected` y `table:structure-protected`, con los permisos del cuadro «Proteger
-hoja» y la protección de celda (`locked`/`hidden`). Se invierte el sentido de OOXML (1 = bloqueado)
-y todo lo que no cabe se pierde hacia el lado seguro (más bloqueado): los rangos editables por
-persona o grupo no salen. **Al exportar no sale ni la contraseña ni su hash**: las exportaciones se
-guardan y las descarga cualquier lector, y un hash se ataca sin conexión y sin el límite de intentos
-del servicio. **Al importar**, el hash SHA-512 con sal de un .xlsx de Excel (el mismo esquema que
-guarda el servicio) se devuelve aparte (`ImportResult.Hashes`) y el cliente lo manda en
-`proteccion.hashes` al sembrar el contenido: se trata como una contraseña nueva (de cualquier
-editor en un ámbito sin proteger; del propietario o con la contraseña en uno protegido) y las
-vueltas se acotan (1 000 000). Un hash de otro tipo (SHA-1, la clave de 16 bits antigua, LibreOffice)
-se importa sin contraseña: más vale que la quite quien importa, que es el propietario.
+Calcus protection in files (`domain/proteccion_fichero.go`, `proteccion_ooxml.go`,
+`proteccion_ods.go`): the .xlsx carries `sheetProtection` per sheet and `workbookProtection` (structure)
+and the .ods carries `table:protected` and `table:structure-protected`, with the permissions of the «Proteger
+hoja» dialog and cell protection (`locked`/`hidden`). The OOXML sense is inverted (1 = locked)
+and everything that does not fit is lost toward the safe side (more locked): ranges editable per
+person or group are not exported. **On export neither the password nor its hash is included**: exports are
+stored and any reader can download them, and a hash can be attacked offline and without the service's
+attempt limit. **On import**, the salted SHA-512 hash of an Excel .xlsx (the same scheme that
+the service stores) is returned separately (`ImportResult.Hashes`) and the client sends it in
+`proteccion.hashes` when seeding the content: it is treated as a new password (from any
+editor in an unprotected scope; from the owner or with the password in a protected one) and the
+iterations are capped (1 000 000). A hash of another type (SHA-1, the old 16-bit key, LibreOffice)
+is imported without a password: better that it is removed by whoever imports, who is the owner.
 
-##### B. CertiPDF (PDF y firmas)
+<a id="b-certipdf-pdf-y-firmas"></a>
 
-No hay ACL por documento: el fichero lo aporta quien llama y no se guarda estado propio. Todas las
-rutas `/api/v1/pdf/*` exigen sesión y organización (`RequireAuth` + `RequireTenant`).
+##### B. CertiPDF (PDF and signatures)
 
-| Acción                                                                                                                               | Quién                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| Operaciones sobre un PDF (páginas, anotar, formulario, proteger, firmar con certificado propio, comparar, herramientas, editar, OCR) | Cualquier persona autenticada de la organización, sobre el fichero que ella misma sube                         |
-| Firmar con el certificado del sistema (dos pasos)                                                                                    | La persona autenticada; entre `prepare` y `complete` firma su equipo                                           |
-| Pedir firma a otra persona                                                                                                           | Quien pide debe poder ver el fichero (PDF) en Drive; el destinatario puede ser de otra organización (ADR 0057) |
-| Firmar, rechazar, abrir, traer lo firmado, bloquear a quien pide                                                                     | Solo el destinatario de la petición (`peticionEnAnfitrion`)                                                    |
-| Cancelar una petición                                                                                                                | Quien la pidió                                                                                                 |
-| Ver y cambiar la política de la organización para las peticiones de fuera                                                            | Roles `owner` o `admin`                                                                                        |
+There is no per-document ACL: the file is supplied by the caller and no state of its own is stored. All
+`/api/v1/pdf/*` routes require a session and an organization (`RequireAuth` + `RequireTenant`).
 
-##### C. Enlaces de Docs
+| Action                                                                                                           | Who                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Operations on a PDF (pages, annotate, form, protect, sign with one's own certificate, compare, tools, edit, OCR) | Any authenticated person in the organization, on the file they upload themselves                                       |
+| Sign with the system certificate (two steps)                                                                     | The authenticated person; between `prepare` and `complete` their device signs                                          |
+| Request a signature from another person                                                                          | The requester must be able to see the file (PDF) in Drive; the recipient may belong to another organization (ADR 0057) |
+| Sign, reject, open, fetch the signed result, block the requester                                                 | Only the recipient of the request (`peticionEnAnfitrion`)                                                              |
+| Cancel a request                                                                                                 | Whoever requested it                                                                                                   |
+| See and change the organization's policy for requests from outside                                               | `owner` or `admin` roles                                                                                               |
 
-| Propiedad                      | Regla                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Roles que concede              | `viewer`, `commenter` o `editor`; **nunca** `owner` (se rechaza al crear y al resolver, también ante datos heredados)                                                                                                                                                                                                                                                                                             |
-| Quién los crea, lista y revoca | Solo el propietario del documento                                                                                                                                                                                                                                                                                                                                                                                 |
-| Credencial                     | Un token opaco de alta entropía; se guarda **solo su hash** y se devuelve en claro una única vez                                                                                                                                                                                                                                                                                                                  |
-| Caducidad                      | **Con techo por organización** (`doc_org_politica_enlaces.max_dias`): 365 días si nadie lo ha fijado; lo cambia quien administra la organización (`owner`/`admin`, `PUT /link-policy`), y solo `0` = «sin techo» permite enlaces sin caducidad. Sin fecha, el enlace caduca en el techo; una fecha pasada o más allá del techo se rechaza (`400`). Caduca en el instante exacto: vale mientras `now < expires_at` |
-| Sin sesión                     | Con un enlace se **ve** (vista HTML en un iframe con sandbox y sin scripts); no se edita ni se comenta                                                                                                                                                                                                                                                                                                            |
-| Con sesión (canje, ADR 0052)   | `commenter` y `editor` se canjean por un permiso `externo` ligado al enlace; cae cuando el enlace caduca, se revoca o se bloquea a la persona                                                                                                                                                                                                                                                                     |
-| Contraseña                     | **Opcional**, de 8 a 128 caracteres. Se guarda solo su hash Argon2id con sal (`platform/pkg/clave`, el mismo esquema que Drive); no se devuelve nunca, solo `has_password`. Un enlace con contraseña no se abre con el token solo: la ficha, la vista y el canje exigen la **prueba** que da `POST /share/unlock` a quien acierta (derivada del hash: cambiar o quitar la contraseña la invalida)                 |
-| Intentos de contraseña         | Acotados antes de verificar, por enlace (5, y uno más cada 30 s: bloqueo temporal para todos) y por IP (20, uno cada 5 s), con `429` y `Retry-After`; Argon2id simultáneos acotados a 8. En memoria, por réplica                                                                                                                                                                                                  |
-| Fallo de contraseña            | La misma respuesta (`403 share_password_wrong`) y el mismo trabajo (un Argon2id) para contraseña errónea, enlace inexistente, caducado, revocado o sin contraseña: no dice si el enlace existe. Fallos, aciertos y bloqueos van al log estructurado con el id del enlace y la IP                                                                                                                                  |
+<a id="c-enlaces-de-docs"></a>
 
-##### D. Enlaces y comparticiones de Drive
+##### C. Docs links
 
-| Propiedad                          | Regla                                                                                                                                                                                                                                                                                                                                                   |
+| Property                              | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Roles it grants                       | `viewer`, `commenter` or `editor`; **never** `owner` (rejected on creation and on resolution, also for legacy data)                                                                                                                                                                                                                                                                                                                               |
+| Who creates, lists and revokes them   | Only the document owner                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Credential                            | A high-entropy opaque token; **only its hash** is stored and it is returned in clear text exactly once                                                                                                                                                                                                                                                                                                                                            |
+| Expiry                                | **With a per-organization ceiling** (`doc_org_politica_enlaces.max_dias`): 365 days if nobody has set it; it is changed by whoever administers the organization (`owner`/`admin`, `PUT /link-policy`), and only `0` = “no ceiling” allows links without expiry. Without a date, the link expires at the ceiling; a past date or one beyond the ceiling is rejected (`400`). It expires at the exact instant: it is valid while `now < expires_at` |
+| Without a session                     | With a link you can **view** (HTML view in a sandboxed iframe without scripts); you cannot edit or comment                                                                                                                                                                                                                                                                                                                                        |
+| With a session (redemption, ADR 0052) | `commenter` and `editor` are redeemed for an `externo` permission tied to the link; it falls when the link expires, is revoked or the person is blocked                                                                                                                                                                                                                                                                                           |
+| Password                              | **Optional**, 8 to 128 characters. Only its salted Argon2id hash is stored (`platform/pkg/clave`, the same scheme as Drive); it is never returned, only `has_password`. A password-protected link does not open with the token alone: the details page, the view and redemption require the **proof** that `POST /share/unlock` gives to whoever gets it right (derived from the hash: changing or removing the password invalidates it)          |
+| Password attempts                     | Capped before verifying, per link (5, and one more every 30 s: temporary lockout for everyone) and per IP (20, one every 5 s), with `429` and `Retry-After`; concurrent Argon2id capped at 8. In memory, per replica                                                                                                                                                                                                                              |
+| Password failure                      | The same response (`403 share_password_wrong`) and the same work (one Argon2id) for a wrong password, nonexistent link, expired, revoked or without a password: it does not say whether the link exists. Failures, successes and lockouts go to the structured log with the link id and the IP                                                                                                                                                    |
+
+<a id="d-enlaces-y-comparticiones-de-drive"></a>
+
+##### D. Drive links and shares
+
+| Property                           | Rule                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tipos (`kind`)                     | `link` (público), `user` (una persona) y `group` (un grupo)                                                                                                                                                                                                                                                                                             |
-| Permisos                           | `read` y `write`; el más fuerte gana si hay varios sobre el mismo recurso                                                                                                                                                                                                                                                                               |
-| Enlace público                     | Solo lectura y navegación; el token se guarda hasheado; **contraseña opcional** (Argon2id) y caducidad opcional                                                                                                                                                                                                                                         |
-| Etiqueta de sensibilidad           | Una etiqueta con `BlockExternalShare` impide crear el enlace público (`403`); compartir dentro de la organización sigue funcionando                                                                                                                                                                                                                     |
-| Escritura en lo compartido contigo | Subir a una carpeta compartida (`SharedUpload`) exige `write`; copiar, restaurar una versión y cambiar la etiqueta también lo exigen en el servicio, y un `read` recibe `ErrPermission`. Las rutas de la unidad propia pasan `write` porque no consultan comparticiones: el aislamiento ahí es el de la organización (RLS), no el de un ACL por fichero |
+| Types (`kind`)                     | `link` (public), `user` (one person) and `group` (a group)                                                                                                                                                                                                                                                                                              |
+| Permissions                        | `read` and `write`; the strongest wins if there are several on the same resource                                                                                                                                                                                                                                                                        |
+| Public link                        | Read-only and browsing; the token is stored hashed; **optional password** (Argon2id) and optional expiry                                                                                                                                                                                                                                                |
+| Sensitivity label                  | A label with `BlockExternalShare` prevents creating the public link (`403`); sharing within the organization keeps working                                                                                                                                                                                                                              |
+| Writing to what is shared with you | Uploading to a shared folder (`SharedUpload`) requires `write`; copying, restoring a version and changing the label also require it in the service, and a `read` gets `ErrPermission`. The routes of one's own drive pass `write` because they do not consult shares: the isolation there is that of the organization (RLS), not that of a per-file ACL |
 
-##### E. Caducidad de los enlaces: dónde se comprueba
+<a id="e-caducidad-de-los-enlaces-dónde-se-comprueba"></a>
 
-La regla es la misma en todo el sistema: una compartición cuenta mientras no esté revocada **y**
+##### E. Link expiry: where it is checked
+
+The rule is the same throughout the system: a share counts while it is not revoked **and**
 `expires_at IS NULL OR expires_at > now()`.
 
-| Lugar                                                                                                         | Comprueba la caducidad                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Docs: `docs_resolve_share`, `docs_canjear_enlace` (resolver y canjear)                                        | Sí                                                                                                                             |
-| Docs: `docs_permiso_vivo`, `docs_anfitrion` (permisos canjeados y organización anfitriona)                    | Sí, a través del enlace de origen                                                                                              |
-| Docs: `ShareLink.Active` (dominio)                                                                            | Sí, mismo límite exacto                                                                                                        |
-| Drive: enlace público (`ResolveLink`), `recipientPred` (user/group, «compartido conmigo», `ShareForResource`) | Sí                                                                                                                             |
-| Drive: avisos históricos de comparticiones                                                                    | Sí                                                                                                                             |
-| Drive: **conceder una petición de edición** (`puedeConceder`)                                                 | **No lo hacía; corregido** en esta ola. Quien compartió algo podía seguir concediendo edición con una compartición ya caducada |
+| Place                                                                                                  | Checks expiry                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Docs: `docs_resolve_share`, `docs_canjear_enlace` (resolve and redeem)                                 | Yes                                                                                                                                |
+| Docs: `docs_permiso_vivo`, `docs_anfitrion` (redeemed permissions and host organization)               | Yes, through the originating link                                                                                                  |
+| Docs: `ShareLink.Active` (domain)                                                                      | Yes, same exact boundary                                                                                                           |
+| Drive: public link (`ResolveLink`), `recipientPred` (user/group, “shared with me”, `ShareForResource`) | Yes                                                                                                                                |
+| Drive: historical share notifications                                                                  | Yes                                                                                                                                |
+| Drive: **granting an edit request** (`puedeConceder`)                                                  | **It did not; fixed** in this wave. Someone who had shared something could keep granting edit access with an already expired share |
 
-**Techo de caducidad (Docs, 2026-10-04).** El techo se aplica en el servidor en tres sitios, para
-que ni la interfaz ni el BFF sean quienes lo imponen:
+**Expiry ceiling (Docs, 2026-10-04).** The ceiling is enforced on the server in three places, so
+that neither the interface nor the BFF is what imposes it:
 
-| Dónde                                                                          | Qué hace                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Al crear (`Service.CreateShare`, `domain.CaducidadDeEnlace`)                   | Pone la caducidad en el techo si no se pide, y rechaza la que lo supera o ya pasó. No recorta en silencio                                                                                                                                                                                      |
-| Al comprobar (`docs_resolve_share`, `docs_canjear_enlace`)                     | Un enlace sin caducidad solo vale si su organización está «sin techo». Cubre una fila que escapara de lo anterior (una carrera con un cambio de política, un dato heredado)                                                                                                                    |
-| Al cambiar la política (`store.GuardarPoliticaEnlaces`) y en la migración 0024 | Los enlaces vivos que ya no cumplen **no se revocan ni se borran**: pasan a caducar en su techo (contado desde que se crearon) y nunca antes de un plazo de gracia (30 días, o el techo si es menor), y quedan marcados (`ajustado_por_politica_at`) para que el diálogo de compartir lo avise |
+| Where                                                                         | What it does                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| On creation (`Service.CreateShare`, `domain.CaducidadDeEnlace`)               | Sets the expiry at the ceiling if none is requested, and rejects one that exceeds it or has already passed. It does not silently trim                                                                                                                                                                                  |
+| On checking (`docs_resolve_share`, `docs_canjear_enlace`)                     | A link without expiry is only valid if its organization has “no ceiling”. It covers a row that escaped the above (a race with a policy change, legacy data)                                                                                                                                                            |
+| On changing the policy (`store.GuardarPoliticaEnlaces`) and in migration 0024 | Live links that no longer comply **are neither revoked nor deleted**: they are set to expire at their ceiling (counted from when they were created) and never before a grace period (30 days, or the ceiling if smaller), and they are flagged (`ajustado_por_politica_at`) so that the share dialog can warn about it |
 
-Como el techo queda escrito en `expires_at`, lo cumplen sin cambios las comprobaciones de arriba
-(`docs_permiso_vivo`, `docs_anfitrion`, `ShareLink.Active`). Subir o quitar el techo no alarga lo ya
-acortado. Crear, revocar y cambiar la política dejan traza en el log estructurado (`auditoria=enlace.creado`,
-`enlace.revocado`, `enlaces.politica.cambiada`, con actor y organización); Docs no tiene tabla de
-auditoría (§1.7), así que no es una traza consultable. Pruebas: `TestTechoDeCaducidadDeEnlaces`,
-`TestLaMigracionDelTechoNoRompeLosEnlacesQueYaExistian` (ejecuta el bloque de la migración tal cual),
-`TestTechoDeCaducidadPorLaAPI` (API directa) y `apps/frontend/packages/office/test/bff-seguridad.test.ts` (BFF).
+Since the ceiling is written into `expires_at`, the checks above comply with it without changes
+(`docs_permiso_vivo`, `docs_anfitrion`, `ShareLink.Active`). Raising or removing the ceiling does not lengthen what has already been
+shortened. Creating, revoking and changing the policy leave a trace in the structured log (`auditoria=enlace.creado`,
+`enlace.revocado`, `enlaces.politica.cambiada`, with actor and organization); Docs has no audit
+table (§1.7), so it is not a queryable trace. Tests: `TestTechoDeCaducidadDeEnlaces`,
+`TestLaMigracionDelTechoNoRompeLosEnlacesQueYaExistian` (runs the migration block as is),
+`TestTechoDeCaducidadPorLaAPI` (direct API) and `apps/frontend/packages/office/test/bff-seguridad.test.ts` (BFF).
 
-**Drive no comparte esta política**: tiene su base, su servicio y ninguna tabla de ajustes por
-organización, así que sus enlaces siguen pudiendo no caducar (ver F.4).
+**Drive does not share this policy**: it has its own database, its own service and no per-organization
+settings table, so its links can still never expire (see F.4).
 
-##### F. Decisiones propuestas (cambian lo que ve el usuario): lo aplicado y lo que queda
+<a id="f-decisiones-propuestas-cambian-lo-que-ve-el-usuario-lo-aplicado-y-lo-que-queda"></a>
 
-1. **Contraseña en los enlaces de Docs.** **Aplicado (2026-10-04):** opcional, con el mismo esquema
-   que Drive (Argon2id, ahora compartido en `platform/pkg/clave`), verificada en el servidor, con
-   límite de intentos y sin decir si el enlace existe (ver C). Migración 0025. Pruebas:
-   `TestClaveDeEnlacePorLaAPI`, `TestClaveDeEnlaceLimitaLosIntentos` y el bloque de enlaces de
-   `apps/frontend/packages/office/test/bff-seguridad.test.ts`. Lo canjeado antes de poner o cambiar la
-   contraseña se conserva: la contraseña protege la entrada, no retira permisos ya dados (para eso
-   está revocar el enlace).
-2. **Borrar comentarios.** ~~Cualquier comentarista borraba cualquier comentario.~~ **Aplicado
-   (2026-10-04):** solo lo borra su autor o quien edita o administra el documento; un comentarista
-   solo borra los suyos (`store.DeleteComment`: la regla va en la sentencia, sin carrera entre
-   comprobar y borrar; prueba `TestBorrarComentariosPorRol`).
-3. **ACL por documento de CertiPDF y roles de Drive. NO aplicado: queda fuera por decisión del dueño
-   (2026-10-04) y como propuesta.** CertiPDF no tiene ACL por documento (B): el fichero lo aporta
-   quien llama y no hay estado que autorizar; solo las peticiones de firma tienen destinatario.
-   Drive tiene dos niveles (`read`/`write`) frente a los cuatro de Docs, no existe «comentar», y
-   dentro de la unidad propia no hay ACL por fichero (el acceso es el de la organización).
-   Propuesta: dejarlo así mientras Drive sea almacén y no edición y CertiPDF no guarde documentos;
-   decidir antes de abrir carpetas de equipo con roles (o de que CertiPDF tenga documentos propios)
-   si el modelo pasa a ser el de Docs, con su matriz y su test tabulado.
-4. **Techo de caducidad de los enlaces.** **Aplicado en Docs (2026-10-04):** máximo por organización,
-   365 días por defecto, «sin caducidad» solo si quien administra la organización quita el techo
-   (ver C y E). **Queda Drive:** sus enlaces pueden no caducar nunca. Propuesta: la misma regla, con
-   una tabla de política por organización en Drive (o una política de enlaces común en Sytue ID que
-   lean los dos servicios, que evitaría configurarlo dos veces); es un cambio de producto de Drive y
-   no se ha hecho aquí.
+##### F. Proposed decisions (they change what the user sees): what was applied and what remains
+
+1. **Password on Docs links.** **Applied (2026-10-04):** optional, with the same scheme
+   as Drive (Argon2id, now shared in `platform/pkg/clave`), verified on the server, with
+   an attempt limit and without saying whether the link exists (see C). Migration 0025. Tests:
+   `TestClaveDeEnlacePorLaAPI`, `TestClaveDeEnlaceLimitaLosIntentos` and the links block of
+   `apps/frontend/packages/office/test/bff-seguridad.test.ts`. What was redeemed before setting or changing the
+   password is kept: the password protects the entrance, it does not withdraw permissions already given (that is what
+   revoking the link is for).
+2. **Deleting comments.** ~~Any commenter could delete any comment.~~ **Applied
+   (2026-10-04):** only its author or whoever edits or administers the document can delete it; a commenter
+   only deletes their own (`store.DeleteComment`: the rule is in the statement, with no race between
+   checking and deleting; test `TestBorrarComentariosPorRol`).
+3. **Per-document ACL for CertiPDF and Drive roles. NOT applied: left out by the owner's decision
+   (2026-10-04) and kept as a proposal.** CertiPDF has no per-document ACL (B): the file is supplied
+   by the caller and there is no state to authorize; only signature requests have a recipient.
+   Drive has two levels (`read`/`write`) compared with Docs' four, there is no “comment”, and
+   within one's own drive there is no per-file ACL (access is that of the organization).
+   Proposal: leave it like this while Drive is storage and not editing and CertiPDF does not store documents;
+   decide before opening team folders with roles (or before CertiPDF has documents of its own)
+   whether the model becomes that of Docs, with its matrix and its tabulated test.
+4. **Link expiry ceiling.** **Applied in Docs (2026-10-04):** a per-organization maximum,
+   365 days by default, “no expiry” only if whoever administers the organization removes the ceiling
+   (see C and E). **Drive remains:** its links may never expire. Proposal: the same rule, with
+   a per-organization policy table in Drive (or a common link policy in Sytue ID that
+   both services read, which would avoid configuring it twice); it is a Drive product change and
+   has not been done here.
 
 ---
 
 <a id="16-seguridad-del-correo-sytue-mail--servicio-go"></a>
 
-### 1.6 Seguridad del correo (Sytue Mail — servicio Go)
+### 1.6 Mail security (Sytue Mail — Go service)
 
-Servidor **Sytue Mail** (Go: **SMTP/IMAP/JMAP** sobre `emersion/go-smtp`, `go-imap`, `go-message`
+**Sytue Mail** server (Go: **SMTP/IMAP/JMAP** on `emersion/go-smtp`, `go-imap`, `go-message`
 
-- JMAP propio), MX `mx.sytue.eu`. Verificación de entrantes en `services/mail/internal/auth/`.
+- in-house JMAP), MX `mx.sytue.eu`. Inbound verification in `services/mail/internal/auth/`.
 
-| Control       | Propósito                      | Implementación                                                                                                              |
-| ------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| **SPF**       | Autoriza orígenes de envío     | `verify.go` (`VerifySPF`, evaluador clean-room RFC 7208 con límite de 10 lookups); registro TXT `v=spf1 ... -all`.          |
-| **DKIM**      | Firma criptográfica saliente   | `services/mail/internal/auth/dkim.go`; clave privada como secreto cifrado (§3), firma en el servidor Go.                    |
-| **DMARC**     | Alineación SPF/DKIM + política | `verify.go` (`VerifyDMARC`, alineamiento relajado por dominio organizacional); `p=reject` (tras monitorización cuarentena). |
-| **MTA-STS**   | Fuerza TLS en SMTP entrante    | Policy `mode: enforce` en `mta-sts.sytue.eu` + TXT.                                                                         |
-| **TLS-RPT**   | Informes de fallos TLS         | TXT `v=TLSRPTv1; rua=mailto:...`.                                                                                           |
-| **DANE/TLSA** | TLS verificado vía DNSSEC      | TLSA del MX cuando hay DNSSEC.                                                                                              |
+| Control       | Purpose                          | Implementation                                                                                                     |
+| ------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **SPF**       | Authorizes sending origins       | `verify.go` (`VerifySPF`, clean-room RFC 7208 evaluator with a limit of 10 lookups); TXT record `v=spf1 ... -all`. |
+| **DKIM**      | Outbound cryptographic signature | `services/mail/internal/auth/dkim.go`; private key as an encrypted secret (§3), signing in the Go server.          |
+| **DMARC**     | SPF/DKIM alignment + policy      | `verify.go` (`VerifyDMARC`, relaxed alignment by organizational domain); `p=reject` (after quarantine monitoring). |
+| **MTA-STS**   | Forces TLS on inbound SMTP       | Policy `mode: enforce` at `mta-sts.sytue.eu` + TXT.                                                                |
+| **TLS-RPT**   | TLS failure reports              | TXT `v=TLSRPTv1; rua=mailto:...`.                                                                                  |
+| **DANE/TLSA** | TLS verified via DNSSEC          | TLSA for the MX when there is DNSSEC.                                                                              |
 
-- IMAP 993 / submission 465/587 sobre TLS; puerto 25 con STARTTLS para MX. Anti **open relay**:
-  auth obligatoria en submission (`services/mail/internal/smtp/submission.go`).
-- **Verificación de entrante:** SPF/DKIM/DMARC en recepción (resultados RFC 8601 persistidos),
-  filtrado antispam/antimalware y _rate limiting_ de envío.
-- Buzones/índices en **PostgreSQL** (UE); cuerpos/adjuntos como blobs en **S3 UE cifrado**. Claves
-  DKIM rotadas (§3.2). Consultas DNS a resolvers UE (soberanía, §2.1).
+- IMAP 993 / submission 465/587 over TLS; port 25 with STARTTLS for MX. Anti **open relay**:
+  mandatory auth on submission (`services/mail/internal/smtp/submission.go`).
+- **Inbound verification:** SPF/DKIM/DMARC on reception (RFC 8601 results persisted),
+  anti-spam/anti-malware filtering and sending _rate limiting_.
+- Mailboxes/indexes in **PostgreSQL** (EU); bodies/attachments as blobs in **encrypted EU S3**. DKIM
+  keys rotated (§3.2). DNS queries to EU resolvers (sovereignty, §2.1).
 
 ---
 
 <a id="17-auditoria-y-logging-por-componente"></a>
 
-### 1.7 Auditoría y logging por componente
+<a id="17-auditoría-y-logging-por-componente"></a>
 
-Toda acción relevante de seguridad y tratamiento se registra (`slog` estructurado) con marca de
-tiempo, actor, recurso, `request-id` (`platform/pkg/httpx/middleware.go`, cabecera `X-Request-Id`
-generada/propagada) y resultado. Logs centralizados en el control plane (UE), sin salida fuera de
-la UE. La auditoría de Sytue ID es **append-only** (`audit_log`, `GENERATED ALWAYS AS IDENTITY`,
-`store.Audit`); nunca contiene datos personales sensibles en claro.
+### 1.7 Auditing and logging per component
 
-> **ESTADO POR COMPONENTE (2026-08-14).** La tabla que sigue describe el destino, no
-> lo que hay. Medido sobre el código: **traza en base de datos** la escriben hoy
-> Sytue ID (amplia), Sytue Cloud (22 puntos: deploys, secretos, servicios gestionados)
-> y Sytue Integrations. Sytue **Drive** y Sytue **Mail** tienen la tabla `audit_log`
-> con RLS forzada, pero solo la escriben desde **cumplimiento** (legal hold y
-> eDiscovery): **el acceso ordinario a datos de cliente —quién descargó, abrió o
-> compartió un fichero o un mensaje— NO deja traza**, y como «Mi unidad» es legible
-> por toda la organización a propósito, una fuga interna no es reconstruible a
-> posteriori. Docs, Rooms, Calendar, Contacts, Hub y Analytics **no tienen tabla de
-> auditoría**: lo que hay es el log estructurado del proceso (`slog`), que no es una
-> traza consultable ni append-only.
+Every relevant security and processing action is logged (structured `slog`) with a
+timestamp, actor, resource, `request-id` (`platform/pkg/httpx/middleware.go`, `X-Request-Id` header
+generated/propagated) and result. Logs centralized in the control plane (EU), never leaving
+the EU. The Sytue ID audit is **append-only** (`audit_log`, `GENERATED ALWAYS AS IDENTITY`,
+`store.Audit`); it never contains sensitive personal data in clear text.
+
+> **STATUS PER COMPONENT (2026-08-14).** The table below describes the target, not
+> what exists. Measured against the code: a **database trail** is written today by
+> Sytue ID (extensive), Sytue Cloud (22 points: deploys, secrets, managed services)
+> and Sytue Integrations. Sytue **Drive** and Sytue **Mail** have the `audit_log` table
+> with forced RLS, but only write to it from **compliance** (legal hold and
+> eDiscovery): **ordinary access to customer data —who downloaded, opened or
+> shared a file or a message— leaves NO trail**, and since «Mi unidad» (My drive) is readable
+> by the whole organization on purpose, an internal leak cannot be reconstructed
+> after the fact. Docs, Rooms, Calendar, Contacts, Hub and Analytics **have no audit
+> table**: what exists is the process's structured log (`slog`), which is not a
+> queryable or append-only trail.
 >
-> Lo pendiente y su camino —punto de estrangulamiento por servicio, retención y qué
-> caminos de descarga cubre— está en el backlog. Se deja escrito aquí porque un
-> auditor externo lee esta tabla como una afirmación de control vigente, y para seis
-> de los diez servicios **no lo es**.
+> What is pending and its path —choke point per service, retention and which
+> download paths it covers— is in the backlog. It is written down here because an
+> external auditor reads this table as a statement of a control in force, and for six
+> of the ten services **it is not**.
 
-| Componente (servicio Go)      | Eventos auditados                                                                                                                                                                                                                                                                 | Estado                                         |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| **Sytue ID**                  | Login/logout, MFA/WebAuthn, fallos (`auth.login.failed`), emisión/refresh/rotación/revocación de tokens (`oauth.token.issued`, `oauth.refresh.reuse_detected`), `oauth.authorize`, `oauth.client_credentials`, cambios de cuenta/rol/grupo, admin, SCIM, rotación de claves JWKS. | Implementado                                   |
-| **Sytue Drive**               | Accesos a ficheros, compartición, cambios de permisos, operaciones WebDAV, tokens de enlace.                                                                                                                                                                                      | **Solo cumplimiento** (legal hold, eDiscovery) |
-| **Sytue Docs**                | Apertura/edición colaborativa, cambios de permisos, exportaciones, tokens de enlace.                                                                                                                                                                                              | **No implementado**                            |
-| **Sytue Rooms / Meet**        | Acciones admin, gestión de canales/salas, accesos; minteo/expiración de JWT LiveKit (Meet).                                                                                                                                                                                       | **No implementado**                            |
-| **Sytue Mail**                | Autenticación, envío/recepción, decisiones SPF/DKIM/DMARC, TLS, accesos JMAP/IMAP.                                                                                                                                                                                                | **Solo cumplimiento** (eDiscovery)             |
-| **Sytue Calendar / Contacts** | Operaciones CalDAV/CardDAV, compartición, cambios de permisos.                                                                                                                                                                                                                    | **No implementado**                            |
-| **Sytue Hub**                 | Búsqueda federada, intents cross-app, notificaciones, presencia, autorización de tokens.                                                                                                                                                                                          | **No implementado**                            |
-| **Sytue Cloud (PaaS)**        | Deploys, builds (Kaniko), creación de servicios gestionados, accesos/descifrado de secretos.                                                                                                                                                                                      | Implementado                                   |
-| **Control plane (Kapsule)**   | API audit log de Kubernetes (RBAC, cambios de recursos).                                                                                                                                                                                                                          | Del proveedor                                  |
-| **Edge (Traefik)**            | Accesos, certificados, denegaciones; sin datos sensibles en URL.                                                                                                                                                                                                                  | `accessLog` apagado por defecto                |
+| Component (Go service)        | Audited events                                                                                                                                                                                                                                                            | Status                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Sytue ID**                  | Login/logout, MFA/WebAuthn, failures (`auth.login.failed`), token issuance/refresh/rotation/revocation (`oauth.token.issued`, `oauth.refresh.reuse_detected`), `oauth.authorize`, `oauth.client_credentials`, account/role/group changes, admin, SCIM, JWKS key rotation. | Implemented                                  |
+| **Sytue Drive**               | File access, sharing, permission changes, WebDAV operations, link tokens.                                                                                                                                                                                                 | **Compliance only** (legal hold, eDiscovery) |
+| **Sytue Docs**                | Collaborative opening/editing, permission changes, exports, link tokens.                                                                                                                                                                                                  | **Not implemented**                          |
+| **Sytue Rooms / Meet**        | Admin actions, channel/room management, access; minting/expiry of LiveKit JWTs (Meet).                                                                                                                                                                                    | **Not implemented**                          |
+| **Sytue Mail**                | Authentication, sending/receiving, SPF/DKIM/DMARC decisions, TLS, JMAP/IMAP access.                                                                                                                                                                                       | **Compliance only** (eDiscovery)             |
+| **Sytue Calendar / Contacts** | CalDAV/CardDAV operations, sharing, permission changes.                                                                                                                                                                                                                   | **Not implemented**                          |
+| **Sytue Hub**                 | Federated search, cross-app intents, notifications, presence, token authorization.                                                                                                                                                                                        | **Not implemented**                          |
+| **Sytue Cloud (PaaS)**        | Deploys, builds (Kaniko), creation of managed services, access to/decryption of secrets.                                                                                                                                                                                  | Implemented                                  |
+| **Control plane (Kapsule)**   | Kubernetes API audit log (RBAC, resource changes).                                                                                                                                                                                                                        | From the provider                            |
+| **Edge (Traefik)**            | Access, certificates, denials; no sensitive data in URLs.                                                                                                                                                                                                                 | `accessLog` off by default                   |
 
-Prácticas: retención según §8, integridad (append-only donde sea posible), **minimización** (no se
-registran contenidos de mensajes/ficheros ni secretos; `RequestLogger` no vuelca cuerpos) y
-correlación por `request-id` / `sytue.eu/tenant`. Almacenamiento de auditoría en PostgreSQL (tablas
-append-only) y/o bucket WORM versionado.
+Practices: retention according to §8, integrity (append-only where possible), **minimization** (message/file
+contents and secrets are not logged; `RequestLogger` does not dump bodies) and
+correlation by `request-id` / `sytue.eu/tenant`. Audit storage in PostgreSQL (append-only
+tables) and/or a versioned WORM bucket.
 
 ---
 
 <a id="18-backups-dr-y-retencion"></a>
 
-### 1.8 Backups, DR y retención
+<a id="18-backups-dr-y-retención"></a>
 
-- **Object Storage versionado (S3):** versionado para protección frente a borrado y ransomware;
-  ciclo de vida con expiración de versiones antiguas.
-- **Dumps de base de datos:** PostgreSQL (RDB) con backups automáticos + dumps lógicos a un
-  **bucket de backups aparte, aislado y cifrado** (separación de privilegios). Como **único
-  datastore** (estado + colas + caché), su backup cubre también colas y sesiones.
-- **DR:** réplica/copia en `nl-ams` (UE) para recuperación regional.
-- **Cifrado:** todos los backups cifrados en reposo (SSE) + claves gestionadas como secretos (§3).
-- **Pruebas de restauración** periódicas documentadas en [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion).
+### 1.8 Backups, DR and retention
 
-#### 8.1 Política de retención (parametrizable por tenant)
+- **Versioned Object Storage (S3):** versioning for protection against deletion and ransomware;
+  lifecycle with expiry of old versions.
+- **Database dumps:** PostgreSQL (RDB) with automatic backups + logical dumps to a
+  **separate, isolated and encrypted backup bucket** (separation of privileges). As the **single
+  datastore** (state + queues + cache), its backup also covers queues and sessions.
+- **DR:** replica/copy in `nl-ams` (EU) for regional recovery.
+- **Encryption:** all backups encrypted at rest (SSE) + keys managed as secrets (§3).
+- Periodic **restore tests** documented in [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion).
 
-| Dato                               | Retención por defecto                 | Acción al expirar               |
-| ---------------------------------- | ------------------------------------- | ------------------------------- |
-| Backups de BD (PostgreSQL)         | 30 días                               | Rotación/expiración automática. |
-| Versiones de objetos S3            | 30–90 días                            | Expiración por ciclo de vida.   |
-| Logs de auditoría de seguridad     | 12 meses                              | Archivado/eliminación.          |
-| Logs de acceso del edge            | 90 días                               | Eliminación.                    |
-| Códigos de autorización / sesiones | TTL corto (min./horas)                | Purga por índice de expiración. |
-| Datos de cuenta tras baja          | Hasta solicitud DSR / fin de contrato | Borrado/anonimización (§11.4).  |
+<a id="81-política-de-retención-parametrizable-por-tenant"></a>
 
-> La retención se define caso por caso según base jurídica y obligaciones legales (p. ej. fiscal),
-> documentándose en la ROPA (§11.2). Minimización RGPD art. 25 (art. 5.1.b/c/e).
+#### 8.1 Retention policy (configurable per tenant)
+
+| Data                           | Default retention                     | Action on expiry                |
+| ------------------------------ | ------------------------------------- | ------------------------------- |
+| DB backups (PostgreSQL)        | 30 days                               | Automatic rotation/expiry.      |
+| S3 object versions             | 30–90 days                            | Expiry by lifecycle.            |
+| Security audit logs            | 12 months                             | Archiving/deletion.             |
+| Edge access logs               | 90 days                               | Deletion.                       |
+| Authorization codes / sessions | Short TTL (min./hours)                | Purge by expiry index.          |
+| Account data after offboarding | Until a DSR request / end of contract | Deletion/anonymization (§11.4). |
+
+> Retention is defined case by case according to the legal basis and legal obligations (e.g. tax),
+> and documented in the ROPA (§11.2). GDPR minimization art. 25 (art. 5.1.b/c/e).
 
 ---
 
@@ -833,31 +895,33 @@ append-only) y/o bucket WORM versionado.
 
 #### 9.1 Kubernetes (CIS Kubernetes Benchmark)
 
-- **Pod Security Admission** `restricted` en namespaces de tenant: contenedores **non-root**,
+- **Pod Security Admission** `restricted` in tenant namespaces: **non-root** containers,
   `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, `drop ALL` capabilities,
-  `seccompProfile: RuntimeDefault`, sin `hostNetwork`/`hostPID`/`hostPath`.
-- **La excepción a distroless: `services/ocr`.** El motor de reconocimiento es Tesseract 5
-  (Apache-2.0), un binario en C con sus datos de idioma, y distroless no trae gestor de
-  paquetes con el que instalarlo ([ADR-0034](./decisions.md#0034)). La imagen usa
-  `debian:bookworm-slim` **fijada por digest**, con `--no-install-recommends`, sin cachés de
-  apt, `USER 65532` (el mismo uid que usa distroless en el resto), `readOnlyRootFilesystem`
-  y el temporal de cada página en un `emptyDir` **en memoria**: una nómina escaneada no
-  llega a tocar el disco del nodo. Su `NetworkPolicy` solo permite salir hacia Sytue ID
-  (JWKS) y Cockpit —el modelo va dentro de la imagen y no hay ninguna llamada a un proveedor
-  externo—, así que **tráfico saliente desde ese pod es un incidente, no una configuración
-  que falta**. Y no tiene ingress: solo lo alcanza Sytue Docs.
-- **Imágenes mínimas:** binarios Go en **`gcr.io/distroless/static:nonroot`** (multi-stage desde
-  `golang:1.26`, `CGO_ENABLED=0`, `-trimpath -ldflags="-s -w"`), sin shell ni gestor de paquetes →
-  superficie de ataque mínima (`services/*/Dockerfile`).
-- **RBAC mínimo** (§5.4); sin `cluster-admin` para cargas; SA tokens no auto-montados por defecto.
-- **NetworkPolicy deny-by-default** (§5.2); API audit log habilitado.
-- **Imágenes** desde Scaleway Registry (UE), escaneadas (`trivy`/`grype`); builds **Kaniko
-  rootless**; pinning por digest (CONVENTIONS §3); sin `latest` en producción.
-- Recursos `requests`/`limits` siempre definidos; `ResourceQuota`/`LimitRange` (§5.3).
+  `seccompProfile: RuntimeDefault`, no `hostNetwork`/`hostPID`/`hostPath`.
+- **The exception to distroless: `services/ocr`.** The recognition engine is Tesseract 5
+  (Apache-2.0), a C binary with its language data, and distroless has no package
+  manager to install it with ([ADR-0034](./decisions.md#0034)). The image uses
+  `debian:bookworm-slim` **pinned by digest**, with `--no-install-recommends`, no apt
+  caches, `USER 65532` (the same uid distroless uses elsewhere), `readOnlyRootFilesystem`
+  and each page's temporary file in an **in-memory** `emptyDir`: a scanned payslip never
+  touches the node's disk. Its `NetworkPolicy` only allows egress to Sytue ID
+  (JWKS) and Cockpit —the model is inside the image and there is no call to an external
+  provider—, so **outbound traffic from that pod is an incident, not a missing
+  configuration**. And it has no ingress: only Sytue Docs reaches it.
+- **Minimal images:** Go binaries on **`gcr.io/distroless/static:nonroot`** (multi-stage from
+  `golang:1.26`, `CGO_ENABLED=0`, `-trimpath -ldflags="-s -w"`), no shell or package manager →
+  minimal attack surface (`services/*/Dockerfile`).
+- **Minimal RBAC** (§5.4); no `cluster-admin` for workloads; SA tokens not auto-mounted by default.
+- **Deny-by-default NetworkPolicy** (§5.2); API audit log enabled.
+- **Images** from Scaleway Registry (EU), scanned (`trivy`/`grype`); **rootless Kaniko**
+  builds; pinning by digest (CONVENTIONS §3); no `latest` in production.
+- `requests`/`limits` resources always defined; `ResourceQuota`/`LimitRange` (§5.3).
 
-#### 9.2 Cabeceras de seguridad HTTP (edge / Traefik)
+<a id="92-cabeceras-de-seguridad-http-edge--traefik"></a>
 
-Middleware en Traefik para todas las superficies:
+#### 9.2 HTTP security headers (edge / Traefik)
+
+Traefik middleware for all surfaces:
 
 ```
 Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
@@ -869,9 +933,11 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Resource-Policy: same-origin
 ```
 
-#### 9.3 CSP del frontend (Astro + Preact)
+<a id="93-csp-del-frontend-astro--preact"></a>
 
-Política base, ajustada por superficie (Mail, Drive, Docs/colab WS, Meet/WebRTC):
+#### 9.3 Frontend CSP (Astro + Preact)
+
+Base policy, adjusted per surface (Mail, Drive, Docs/collab WS, Meet/WebRTC):
 
 ```
 Content-Security-Policy:
@@ -888,142 +954,154 @@ Content-Security-Policy:
   upgrade-insecure-requests;
 ```
 
-- **Sin scripts ni iframes de terceros** (coherente con "sin motores AGPL"): los editores (Docs)
-  son **propios**; no hay `frame-src` a editores externos.
-- WebRTC (Sytue Rooms): se añaden orígenes `connect-src`/`media-src` de **LiveKit** según despliegue.
-- **Origin allow-list en WebSocket:** las conexiones WS (Chat, Docs colab) validan el origen contra
+- **No third-party scripts or iframes** (consistent with "no AGPL engines"): the editors (Docs)
+  are **in-house**; there is no `frame-src` to external editors.
+- WebRTC (Sytue Rooms): **LiveKit** `connect-src`/`media-src` origins are added depending on the deployment.
+- **Origin allow-list on WebSocket:** WS connections (Chat, Docs collab) validate the origin against
   `AllowedOrigins` (`services/rooms/internal/http/ws.go`, `websocket.AcceptOptions.OriginPatterns`)
-  → defensa contra Cross-Site WebSocket Hijacking. El token del WS se valida antes de aceptar.
-- Cookies de sesión `httpOnly`, `Secure`, `SameSite`; CSRF mitigado por patrón BFF + `SameSite`
-  - `state`/`nonce` en OIDC.
+  → defense against Cross-Site WebSocket Hijacking. The WS token is validated before accepting.
+- `httpOnly`, `Secure`, `SameSite` session cookies; CSRF mitigated by the BFF pattern + `SameSite`
+  - `state`/`nonce` in OIDC.
 
-#### 9.4 Manejo de errores y superficie de API
+<a id="94-manejo-de-errores-y-superficie-de-api"></a>
 
-- Errores JSON canónicos (`platform/pkg/httpx/errors.go`): mensajes deny-by-default y sin fuga de
-  detalles internos; el `Recoverer` convierte panics en 500 sin exponer stack al cliente (queda en
-  logs con `request_id`).
-- Timeouts de petición y sondas `/healthz` (liveness, no toca dependencias) y `/readyz` (readiness,
-  chequeos en paralelo con timeout) — `platform/pkg/httpx/router.go`.
+#### 9.4 Error handling and API surface
+
+- Canonical JSON errors (`platform/pkg/httpx/errors.go`): deny-by-default messages with no leakage of
+  internal details; the `Recoverer` turns panics into 500 without exposing the stack to the client (it stays in
+  logs with `request_id`).
+- Request timeouts and `/healthz` probes (liveness, does not touch dependencies) and `/readyz` (readiness,
+  parallel checks with timeout) — `platform/pkg/httpx/router.go`.
 
 ---
 
 <a id="110-plan-de-respuesta-a-incidentes"></a>
 
-### 1.10 Plan de respuesta a incidentes
+### 1.10 Incident response plan
 
-Ciclo estándar (NIST-like): **preparación → detección → contención → erradicación → recuperación →
-lecciones aprendidas**. Detalle operativo (comandos, contactos, plantillas) en
+Standard cycle (NIST-like): **preparation → detection → containment → eradication → recovery →
+lessons learned**. Operational detail (commands, contacts, templates) in
 [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion).
 
-1. **Preparación:** on-call definido; runbook actualizado; secretos rotables (§3); backups probados
-   (§8); severidades y SLA de respuesta acordados.
-2. **Detección y triaje:** alertas de auditoría/observabilidad (§7), señales como
-   `oauth.refresh.reuse_detected`, picos de `auth.login.failed`, anomalías de red. Se asigna
-   severidad (SEV1–SEV4) y se abre registro de incidente.
-3. **Contención:** revocar sesiones/tokens comprometidos (§4.4), **rotar la clave JWKS afectada**
-   (§3.2, `KeyManager.Rotate`), rotar secretos, aislar por NetworkPolicy, deshabilitar un client
-   OIDC. Contención sin destruir evidencia (preservar logs append-only).
-4. **Erradicación:** parchear la causa raíz; `govulncheck`/`osv-scanner`/`trivy` para localizar la
-   vulnerabilidad; invalidar credenciales expuestas.
-5. **Recuperación:** restaurar desde backup verificado (§8) si procede; reintroducir servicio con
-   monitorización reforzada.
-6. **Post-mortem sin culpa:** cronología, impacto, causa raíz, acciones correctivas con dueño y
-   fecha. Si el incidente es una **brecha de datos personales**, se dispara §11.5 (72 h).
+1. **Preparation:** defined on-call; up-to-date runbook; rotatable secrets (§3); tested backups
+   (§8); agreed severities and response SLAs.
+2. **Detection and triage:** audit/observability alerts (§7), signals such as
+   `oauth.refresh.reuse_detected`, spikes in `auth.login.failed`, network anomalies. A
+   severity (SEV1–SEV4) is assigned and an incident record is opened.
+3. **Containment:** revoke compromised sessions/tokens (§4.4), **rotate the affected JWKS key**
+   (§3.2, `KeyManager.Rotate`), rotate secrets, isolate via NetworkPolicy, disable an OIDC
+   client. Containment without destroying evidence (preserve append-only logs).
+4. **Eradication:** patch the root cause; `govulncheck`/`osv-scanner`/`trivy` to locate the
+   vulnerability; invalidate exposed credentials.
+5. **Recovery:** restore from a verified backup (§8) if applicable; reintroduce the service with
+   reinforced monitoring.
+6. **Blameless post-mortem:** timeline, impact, root cause, corrective actions with an owner and a
+   date. If the incident is a **personal data breach**, §11.5 is triggered (72 h).
 
-**Vínculo RGPD:** cualquier incidente que afecte a datos personales activa la evaluación de brecha
-(art. 33/34) del §11.5 en paralelo a la respuesta técnica.
+**GDPR link:** any incident that affects personal data triggers the breach assessment
+(art. 33/34) of §11.5 in parallel with the technical response.
 
 ---
 
 <a id="111-plan-de-cumplimiento-rgpd"></a>
 
-### 1.11 Plan de cumplimiento RGPD
+### 1.11 GDPR compliance plan
 
-**Roles:** Sytue es **encargado del tratamiento** (processor) para los datos que los clientes
-(responsables/controllers) tratan en la suite, y **responsable** (controller) para los datos
-estrictamente necesarios de la relación de cliente (facturación, soporte, cuentas admin).
-Subprocesadores: **Scaleway** (UE, infraestructura) y **Mollie** (UE, cobro de suscripciones).
+**Roles:** Sytue is the **processor** for the data that customers
+(controllers) process in the suite, and the **controller** for the data
+strictly necessary for the customer relationship (billing, support, admin accounts).
+Subprocessors: **Scaleway** (EU, infrastructure) and **Mollie** (EU, subscription billing).
 
-#### 11.1 Base jurídica del tratamiento
+<a id="111-base-jurídica-del-tratamiento"></a>
 
-| Tratamiento                                            | Base jurídica (art. 6 RGPD)                                     |
-| ------------------------------------------------------ | --------------------------------------------------------------- |
-| Prestación del servicio a clientes (datos de usuarios) | **Ejecución de contrato** (art. 6.1.b) + DPA (encargado).       |
-| Cuentas de administración / autenticación (Sytue ID)   | **Ejecución de contrato** / **interés legítimo** (seguridad).   |
-| Logs de seguridad y auditoría                          | **Interés legítimo** (art. 6.1.f): seguridad de la información. |
-| Facturación y obligaciones fiscales                    | **Obligación legal** (art. 6.1.c).                              |
-| Comunicaciones comerciales (sitio público)             | **Consentimiento** (art. 6.1.a), revocable.                     |
+#### 11.1 Legal basis for processing
 
-> Categorías especiales (art. 9): no se tratan por defecto; si un cliente las introduce en sus
-> datos, es el responsable quien debe disponer de base habilitante (art. 9.2).
+| Processing                                          | Legal basis (art. 6 GDPR)                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| Provision of the service to customers (user data)   | **Performance of a contract** (art. 6.1.b) + DPA (processor).       |
+| Administration / authentication accounts (Sytue ID) | **Performance of a contract** / **legitimate interest** (security). |
+| Security and audit logs                             | **Legitimate interest** (art. 6.1.f): information security.         |
+| Billing and tax obligations                         | **Legal obligation** (art. 6.1.c).                                  |
+| Commercial communications (public site)             | **Consent** (art. 6.1.a), revocable.                                |
 
-#### 11.2 ROPA — Registro de Actividades de Tratamiento (resumen, art. 30)
+> Special categories (art. 9): not processed by default; if a customer introduces them into their
+> data, it is the controller who must have an enabling basis (art. 9.2).
 
-| Actividad                        | Categorías de datos                                                       | Interesados         | Finalidad                      | Conservación            | Destinatarios                      |
-| -------------------------------- | ------------------------------------------------------------------------- | ------------------- | ------------------------------ | ----------------------- | ---------------------------------- |
-| Gestión de identidad (Sytue ID)  | Identificadores, credenciales (hash Argon2id), MFA/WebAuthn, grupos/roles | Usuarios de tenants | Autenticación/SSO/autorización | Mientras dure la cuenta | Servicios Go internos (vía claims) |
-| Correo (Sytue Mail)              | Contenido de email, metadatos, direcciones                                | Usuarios            | Servicio de correo             | Según política tenant   | Destinatarios del correo           |
-| Archivos (Sytue Drive)           | Ficheros, metadatos de compartición                                       | Usuarios            | Almacenamiento/colaboración    | Según política tenant   | Usuarios autorizados               |
-| Documentos (Sytue Docs)          | Documentos, historial de colaboración                                     | Usuarios            | Ofimática colaborativa         | Según política tenant   | Colaboradores autorizados          |
-| Mensajería (Chat) / Vídeo (Meet) | Mensajes, presencia, metadatos de llamada                                 | Usuarios            | Comunicación de equipo         | Según política tenant   | Miembros del equipo                |
-| Calendario / Contactos           | Eventos, asistentes, fichas de contacto                                   | Usuarios            | Agenda/directorio              | Según política tenant   | Usuarios autorizados               |
-| PaaS (Sytue Cloud)               | Datos de apps de cliente, secretos (cifrados)                             | Clientes            | Hosting/PaaS                   | Según contrato          | —                                  |
-| Logs de seguridad                | IP, user-id, eventos                                                      | Usuarios/admins     | Seguridad/auditoría            | 12 meses (§8.1)         | —                                  |
-| Facturación                      | Datos de contacto/fiscales                                                | Clientes            | Facturación legal              | Plazo legal fiscal      | Autoridades (si procede)           |
+<a id="112-ropa--registro-de-actividades-de-tratamiento-resumen-art-30"></a>
 
-> La ROPA completa y por tenant se mantiene como documento vivo del DPO; este resumen cumple el
-> propósito documental del repositorio.
+#### 11.2 ROPA — Record of Processing Activities (summary, art. 30)
 
-#### 11.3 DPA con clientes (Data Processing Agreement)
+| Activity                        | Data categories                                                      | Data subjects | Purpose                          | Retention                       | Recipients                        |
+| ------------------------------- | -------------------------------------------------------------------- | ------------- | -------------------------------- | ------------------------------- | --------------------------------- |
+| Identity management (Sytue ID)  | Identifiers, credentials (Argon2id hash), MFA/WebAuthn, groups/roles | Tenant users  | Authentication/SSO/authorization | For the lifetime of the account | Internal Go services (via claims) |
+| Mail (Sytue Mail)               | Email content, metadata, addresses                                   | Users         | Mail service                     | Per tenant policy               | Mail recipients                   |
+| Files (Sytue Drive)             | Files, sharing metadata                                              | Users         | Storage/collaboration            | Per tenant policy               | Authorized users                  |
+| Documents (Sytue Docs)          | Documents, collaboration history                                     | Users         | Collaborative office suite       | Per tenant policy               | Authorized collaborators          |
+| Messaging (Chat) / Video (Meet) | Messages, presence, call metadata                                    | Users         | Team communication               | Per tenant policy               | Team members                      |
+| Calendar / Contacts             | Events, attendees, contact cards                                     | Users         | Calendar/directory               | Per tenant policy               | Authorized users                  |
+| PaaS (Sytue Cloud)              | Customer app data, secrets (encrypted)                               | Customers     | Hosting/PaaS                     | Per contract                    | —                                 |
+| Security logs                   | IP, user-id, events                                                  | Users/admins  | Security/auditing                | 12 months (§8.1)                | —                                 |
+| Billing                         | Contact/tax data                                                     | Customers     | Legal invoicing                  | Legal tax period                | Authorities (if applicable)       |
 
-- **Contrato de encargo** (art. 28) por cliente responsable: objeto, duración, naturaleza/finalidad,
-  tipos de datos, obligaciones del encargado, **medidas técnicas y organizativas** (este documento),
-  **subprocesadores** (Scaleway y Mollie, UE) con autorización y notificación de cambios, asistencia en DSR y
-  brechas, y devolución/borrado al finalizar.
-- **Soberanía contractual:** sin transferencias internacionales (todo en UE) → no se requieren SCC.
-- Anexo de medidas de seguridad = referencia a §§1–10 de este documento.
+> The complete per-tenant ROPA is maintained as a living document by the DPO; this summary fulfills the
+> repository's documentation purpose.
 
-#### 11.4 Procedimiento DSR (Derechos de los Interesados, arts. 15–22)
+<a id="113-dpa-con-clientes-data-processing-agreement"></a>
 
-Derechos: **acceso, rectificación, supresión ("olvido"), limitación, portabilidad y oposición**.
-Canal: solicitud a través del responsable/tenant o `privacy@sytue.eu`.
+#### 11.3 DPA with customers (Data Processing Agreement)
 
-> **ESTADO: DISEÑO, NO IMPLEMENTADO (2026-08-10).** Lo que sigue —el diagrama de
-> secuencia, la orquestación desde `services/hub` y los formatos de exportación—
-> describe el circuito **previsto**, no uno que exista hoy en el código: no hay
-> endpoint DSR, ni job, ni tabla de solicitudes, ni orquestador; `services/hub`
-> no expone ninguna ruta relacionada. Lo único implementado hoy es la **baja
-> lógica** de la cuenta (`SetUserStatus`) y la **purga por retención** de cada
-> servicio, que no son ni exportación ni supresión.
+- **Processing contract** (art. 28) per controller customer: subject matter, duration, nature/purpose,
+  data types, processor obligations, **technical and organizational measures** (this document),
+  **subprocessors** (Scaleway and Mollie, EU) with authorization and notification of changes, assistance with DSRs and
+  breaches, and return/deletion at termination.
+- **Contractual sovereignty:** no international transfers (everything in the EU) → no SCCs required.
+- Security measures annex = reference to §§1–10 of this document.
+
+<a id="114-procedimiento-dsr-derechos-de-los-interesados-arts-1522"></a>
+
+#### 11.4 DSR procedure (Data Subject Rights, arts. 15–22)
+
+Rights: **access, rectification, erasure ("to be forgotten"), restriction, portability and objection**.
+Channel: request through the controller/tenant or `privacy@sytue.eu`.
+
+> **STATUS: DESIGN, NOT IMPLEMENTED (2026-08-10).** What follows —the sequence
+> diagram, the orchestration from `services/hub` and the export formats—
+> describes the **planned** circuit, not one that exists in the code today: there is no
+> DSR endpoint, job, request table or orchestrator; `services/hub`
+> exposes no related route. The only things implemented today are the account's **logical
+> deactivation** (`SetUserStatus`) and each service's **retention purge**,
+> which are neither export nor erasure.
 >
-> **Actualización (2026-09-15): la portabilidad en autoservicio SÍ existe.**
-> Cualquier persona descarga desde el portal («Tus datos», `/one/datos`) un ZIP
-> con todo lo suyo: Sytue Hub (`GET /api/v1/export`) abre a la vez la entrega de
-> cada producto (`platform/pkg/portabilidad`: .eml, .ics, .vcf y archivos tal
-> cual; las tablas en JSON, CSV o XML, a elección) y las escribe en orden, con un
-> `summary` que dice qué salió completo. La salida directa de lo propio a Google
-> Workspace o Microsoft 365 (Sytue Admin, Migraciones) lee esas mismas entregas
-> con la sesión de quien la lanza: no usa la delegación de la organización ni
-> puede leer lo de otra persona. Lo que sigue pendiente es lo que el
-> diagrama describe desde el lado del RESPONSABLE: la solicitud en nombre de
-> otra persona desde la consola, el borrado físico y el registro de solicitudes.
+> **Update (2026-09-15): self-service portability DOES exist.**
+> Anyone can download from the portal («Tus datos» (Your data), `/one/datos`) a ZIP
+> with everything of theirs: Sytue Hub (`GET /api/v1/export`) opens each product's
+> delivery at once (`platform/pkg/portabilidad`: .eml, .ics, .vcf and files as
+> they are; tables in JSON, CSV or XML, as chosen) and writes them in order, with a
+> `summary` that says what came out complete. The direct export of one's own data to Google
+> Workspace or Microsoft 365 (Sytue Admin, Migrations) reads those same deliveries
+> with the session of whoever launches it: it does not use the organization's delegation and
+> cannot read another person's data. What remains pending is what the
+> diagram describes from the CONTROLLER's side: the request on behalf of
+> another person from the console, physical deletion and the request register.
 >
-> **Actualización (2026-09-26): la supresión de la PROPIA cuenta también existe**
-> ([ADR 0054](./decisions.md#0054)). En `https://id.sytue.eu/account/delete`, con
-> reautenticación, cualquiera borra su cuenta: las credenciales al instante, lo que
-> los otros servicios guardan de esa persona (avisos, push, borradores...) en minutos
-> y, pasados los 30 días de gracia, la ficha se anonimiza. Lo de la organización se
-> queda en la organización. Sigue siendo MANUAL el borrado del contenido de una
-> cuenta personal (su correo, sus archivos) al vencer la ventana: el barrido lo avisa
-> en el log a nivel error.
+> **Update (2026-09-26): erasure of one's OWN account also exists**
+> ([ADR 0054](./decisions.md#0054)). At `https://id.sytue.eu/account/delete`, with
+> reauthentication, anyone can delete their account: credentials instantly, what
+> the other services keep about that person (notifications, push, drafts...) within minutes
+> and, after the 30-day grace period, the profile is anonymized. What belongs to the organization
+> stays with the organization. Deleting the content of a
+> personal account (its mail, its files) when the window expires is still MANUAL: the sweep reports it
+> in the log at error level.
 >
-> Se deja escrito porque es el diseño acordado y la ola tiene que construirlo,
-> pero un auditor externo lee esta sección como una afirmación de control
-> vigente y **no lo es**. Mientras tanto, una solicitud de los arts. 15/17/20 se
-> atiende **manualmente** y hay que dejar constancia de ello en la ROPA. El
-> seguimiento vive en el backlog.
+> It is written down because it is the agreed design and the wave has to build it,
+> but an external auditor reads this section as a statement of a control
+> in force and **it is not**. Meanwhile, a request under arts. 15/17/20 is
+> handled **manually** and this must be recorded in the ROPA. The
+> follow-up lives in the backlog.
 
-##### Flujo Detallado de Ejecución y Orquestación de DSR (diseño)
+<a id="flujo-detallado-de-ejecución-y-orquestación-de-dsr-diseño"></a>
+
+##### Detailed DSR execution and orchestration flow (design)
 
 ```mermaid
 sequenceDiagram
@@ -1064,225 +1142,240 @@ sequenceDiagram
     HUB-->>Admin: Erasure Confirmation Report
 ```
 
-1. **Recepción y verificación de identidad** (vía Sytue ID). El interesado o el administrador inicia la solicitud. Sytue ID requiere autenticación multifactor (MFA WebAuthn) para validar la identidad antes de procesar el DSR.
-2. **Localización y Orquestación gRPC/SSE:** El microservicio `services/hub` actúa como el orquestador maestro del DSR. Llama a las APIs internas de cada servicio (`mail`, `drive`, `docs`, `calendar`, `contacts`, `chat`) enviando el identificador del usuario `user_sub`.
-3. **Formatos de Salida Estándar para Portabilidad y Acceso:**
-   - **Sytue Mail:** Generación de un archivo en formato **MBOX** (RFC 4155) que contiene los mensajes completos junto con un dump en formato JMAP JSON estructurado para el árbol de etiquetas y metadatos.
-   - **Sytue Drive & Docs:** Un archivo estructurado **ZIP** con los ficheros binarios organizados por carpetas, convirtiendo los documentos de Sytue Docs de formato interno CRDT a **OpenDocument Format (ODF - .odt, .ods)** o **Office Open XML (OOXML - .docx, .xlsx)**.
-   - **Sytue Calendar / Contacts:** Exportación completa de calendarios a archivos **iCalendar (.ics)** (RFC 5545) y agendas a archivos **vCard (.vcf)** (vCard 4.0, RFC 6350).
-   - **Sytue ID:** Un archivo JSON con el perfil de usuario, registro de logins y configuraciones de seguridad.
-4. **Política de Borrado Físico (Right to be Forgotten - DSR-Erasure):**
-   - **PostgreSQL:** Ejecución de transacciones SQL para el borrado duro (`DELETE`) de filas asociadas al `user_sub` en las tablas de negocio principales. Las políticas RLS garantizan que el borrado solo afecte al tenant correspondiente.
-   - **S3 Object Storage:** Borrado explícito de todos los blobs en S3 referenciados por los nodos de Drive y los adjuntos de Mail pertenecientes al usuario.
-   - **Cachés y colas:** Purga de todas las sesiones activas en Dragonfly y colas en memoria.
-   - **Excepciones de Backups:** Conforme a la directiva europea sobre copias de seguridad de solo lectura, la eliminación de backups no se realiza quirúrgicamente por imposibilidad técnica de mutar archivos de backup cifrados. La ROPA documenta que los datos de backups se sobrescriben por ciclo de vida de rotación en 30 días, garantizando la destrucción física definitiva tras este periodo.
-5. **Respuesta** al interesado **en 1 mes** (prorrogable 2 meses en casos complejos, art. 12.3).
-6. **Registro** de la solicitud y su resolución (auditoría, §7). Runbook en [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion).
+1. **Reception and identity verification** (via Sytue ID). The data subject or the administrator starts the request. Sytue ID requires multi-factor authentication (WebAuthn MFA) to validate the identity before processing the DSR.
+2. **gRPC/SSE location and orchestration:** The `services/hub` microservice acts as the master DSR orchestrator. It calls the internal APIs of each service (`mail`, `drive`, `docs`, `calendar`, `contacts`, `chat`) sending the user identifier `user_sub`.
+3. **Standard output formats for portability and access:**
+   - **Sytue Mail:** Generation of a file in **MBOX** format (RFC 4155) containing the full messages together with a dump in structured JMAP JSON format for the label tree and metadata.
+   - **Sytue Drive & Docs:** A structured **ZIP** archive with the binary files organized by folders, converting Sytue Docs documents from the internal CRDT format to **OpenDocument Format (ODF - .odt, .ods)** or **Office Open XML (OOXML - .docx, .xlsx)**.
+   - **Sytue Calendar / Contacts:** Full export of calendars to **iCalendar (.ics)** files (RFC 5545) and address books to **vCard (.vcf)** files (vCard 4.0, RFC 6350).
+   - **Sytue ID:** A JSON file with the user profile, login record and security settings.
+4. **Physical deletion policy (Right to be Forgotten - DSR-Erasure):**
+   - **PostgreSQL:** Execution of SQL transactions for the hard deletion (`DELETE`) of rows associated with the `user_sub` in the main business tables. RLS policies guarantee that the deletion only affects the corresponding tenant.
+   - **S3 Object Storage:** Explicit deletion of all S3 blobs referenced by the user's Drive nodes and Mail attachments.
+   - **Caches and queues:** Purge of all active sessions in Dragonfly and in-memory queues.
+   - **Backup exceptions:** In accordance with the European directive on read-only backups, deletion from backups is not performed surgically because it is technically impossible to mutate encrypted backup files. The ROPA documents that backup data is overwritten by the 30-day rotation lifecycle, guaranteeing definitive physical destruction after this period.
+5. **Response** to the data subject **within 1 month** (extendable by 2 months in complex cases, art. 12.3).
+6. **Recording** of the request and its resolution (auditing, §7). Runbook in [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion).
 
-##### 11.4.1 Modelo de Clasificación de Datos y Ciclo de Seguridad de APIs
+<a id="1141-modelo-de-clasificación-de-datos-y-ciclo-de-seguridad-de-apis"></a>
 
-Para garantizar la confidencialidad en tránsito y reposo según el art. 32 del RGPD, Sytue One implementa cinco niveles de clasificación aplicados a metadatos, adjuntos y transmisiones:
+##### 11.4.1 Data classification model and API security lifecycle
 
-| Nivel de Sensibilidad | Almacenamiento en Reposo                                           | Cifrado en Tránsito                                                             | Restricción de Acceso en API (PEP/PDP)                                                                                     | AI Gateway Policy                                            |
-| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `public`              | S3 / RDB estándar (SSE)                                            | TLS 1.3                                                                         | Acceso público sin token                                                                                                   | Lectura permitida libremente                                 |
-| `internal`            | S3 / RDB estándar (SSE)                                            | TLS 1.3                                                                         | Token JWT válido en Sytue ID                                                                                               | Lectura permitida para indexación de búsqueda                |
-| `confidential`        | S3 SSE-S3 (AES-256 con clave del proveedor)<sup>(1)</sup> + BD RLS | TLS 1.3 con Cipher Suites Fuertes                                               | Sesión de usuario válida<sup>(2)</sup>                                                                                     | Redacción de PII activa; sin persistencia                    |
-| `restricted`          | Cifrado con llave KMS del Tenant                                   | TLS 1.3 + mTLS interno obligatorio _(diseño: el mTLS no está desplegado, §2.2)_ | Requiere `device_trust` `standard` o `managed`. **Móviles sin Sytue Android bloqueados** (reciben solo placeholder/teaser) | Bloqueo absoluto: el API Gateway deniega la llamada de la IA |
-| `value_ip`            | Partición física/esquema dedicado + Llaves KMS dedicadas           | TLS 1.3 estricto con curvas elípticas aprobadas                                 | Requiere `device_trust=managed` (exclusivo Sytue Linux o Sytue Android). Bloqueo total de exportación                      | Prohibido: bloqueo duro a nivel de código; IA no puede leer  |
+To guarantee confidentiality in transit and at rest under art. 32 GDPR, Sytue One implements five classification levels applied to metadata, attachments and transmissions:
 
-> **QUÉ DE ESTA TABLA ESTÁ IMPLEMENTADO (2026-08-10).** Lo que hay hoy es el
-> cifrado en reposo de los buckets, RLS en las bases de los servicios de datos y
-> TLS 1.3. Los niveles `restricted` y `value_ip`, el PDP/PEP y las condiciones
-> de acceso por antigüedad de sesión o por confianza del dispositivo son
-> **diseño**, no control vigente. En detalle:
+| Sensitivity level | Storage at rest                                              | Encryption in transit                                                    | API access restriction (PEP/PDP)                                                                                                           | AI Gateway Policy                                    |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `public`          | Standard S3 / RDB (SSE)                                      | TLS 1.3                                                                  | Public access without a token                                                                                                              | Reading freely allowed                               |
+| `internal`        | Standard S3 / RDB (SSE)                                      | TLS 1.3                                                                  | Valid JWT token in Sytue ID                                                                                                                | Reading allowed for search indexing                  |
+| `confidential`    | S3 SSE-S3 (AES-256 with provider key)<sup>(1)</sup> + DB RLS | TLS 1.3 with strong cipher suites                                        | Valid user session<sup>(2)</sup>                                                                                                           | PII redaction active; no persistence                 |
+| `restricted`      | Encrypted with the tenant's KMS key                          | TLS 1.3 + mandatory internal mTLS _(design: mTLS is not deployed, §2.2)_ | Requires `device_trust` `standard` or `managed`. **Mobile devices without Sytue Android blocked** (they only receive a placeholder/teaser) | Absolute block: the API Gateway denies the AI's call |
+| `value_ip`        | Physical partition/dedicated schema + dedicated KMS keys     | Strict TLS 1.3 with approved elliptic curves                             | Requires `device_trust=managed` (Sytue Linux or Sytue Android only). Total export block                                                    | Forbidden: hard block at code level; AI cannot read  |
+
+> **WHAT IN THIS TABLE IS IMPLEMENTED (2026-08-10).** What exists today is
+> encryption at rest of the buckets, RLS in the data services' databases and
+> TLS 1.3. The `restricted` and `value_ip` levels, the PDP/PEP and the access
+> conditions based on session age or device trust are
+> **design**, not a control in force. In detail:
 >
-> 1. Los buckets llevan **SSE-S3** (`sse_algorithm = "AES256"`, clave del
->    proveedor), no SSE-KMS con clave propia: no hay ningún `kms_master_key_id`
->    ni recurso de clave en `infra/terraform/`. SSE-KMS en Scaleway es un
->    parámetro del mismo recurso; hasta que se ponga, la celda no puede decir KMS.
-> 2. **No existe reautenticación por antigüedad de sesión (step-up)** en ninguna
->    superficie: `auth_time` viaja en el token de Sytue ID pero ningún servicio
->    lo consulta. El control sería un `RequireFreshAuth` en `platform/pkg/authn`.
-> 3. El **PDP `services/govern` no existe** como servicio; la autorización real
->    vive en el middleware de cada servicio sobre los claims de Sytue ID.
-> 4. `device_trust` **no es un claim emitido ni evaluado** hoy en el código.
+> 1. The buckets carry **SSE-S3** (`sse_algorithm = "AES256"`, provider
+>    key), not SSE-KMS with an own key: there is no `kms_master_key_id`
+>    or key resource in `infra/terraform/`. SSE-KMS on Scaleway is a
+>    parameter of the same resource; until it is set, the cell cannot say KMS.
+> 2. **There is no reauthentication based on session age (step-up)** on any
+>    surface: `auth_time` travels in the Sytue ID token but no service
+>    checks it. The control would be a `RequireFreshAuth` in `platform/pkg/authn`.
+> 3. The **`services/govern` PDP does not exist** as a service; real authorization
+>    lives in each service's middleware on top of the Sytue ID claims.
+> 4. `device_trust` **is not a claim issued or evaluated** in the code today.
 >
-> Seguimiento en el backlog. Las filas se irán marcando conforme aterricen.
+> Follow-up in the backlog. The rows will be checked off as they land.
 
-- **PDP (Policy Decision Point) — previsto:** un evaluador de políticas (`services/govern`, sin implementar) resolvería el nivel de sensibilidad del recurso contra los claims de sesión del token JWT (`device_trust`, `auth_strength`, `roles`, `tenant`).
-- **PEP (Policy Enforcement Point):** el punto de aplicación **existe** —`platform/pkg/authn/middleware.go` intercepta toda petición autenticada y verifica token, organización y Acceso Condicional—, pero **no aplica niveles de sensibilidad**: la degradación del payload a _teaser_ para un recurso `restricted` en un móvil sin Sytue Android es diseño, no comportamiento actual.
+- **PDP (Policy Decision Point) — planned:** a policy evaluator (`services/govern`, not implemented) would resolve the resource's sensitivity level against the session claims of the JWT token (`device_trust`, `auth_strength`, `roles`, `tenant`).
+- **PEP (Policy Enforcement Point):** the enforcement point **exists** —`platform/pkg/authn/middleware.go` intercepts every authenticated request and verifies token, organization and Conditional Access—, but it **does not apply sensitivity levels**: degrading the payload to a _teaser_ for a `restricted` resource on a mobile device without Sytue Android is design, not current behavior.
 
-#### 11.5 Notificación de brechas de seguridad (arts. 33–34)
+<a id="115-notificación-de-brechas-de-seguridad-arts-3334"></a>
 
-- **Detección** vía monitorización/auditoría (§7) y respuesta a incidentes (§10).
-- **Evaluación de riesgo** para los derechos y libertades de los interesados (DPO/equipo).
-- **Notificación a la autoridad de control en ≤ 72 h** desde el conocimiento (art. 33), salvo
-  improbabilidad de riesgo.
-- **Como encargado:** notificación **sin dilación indebida** al cliente responsable para que cumpla
-  su plazo de 72 h.
-- **Comunicación a los interesados** sin dilación si hay **alto riesgo** (art. 34).
-- **Documentación** de toda brecha (hechos, efectos, medidas) en el registro de incidentes (§10).
+#### 11.5 Security breach notification (arts. 33–34)
+
+- **Detection** via monitoring/auditing (§7) and incident response (§10).
+- **Risk assessment** for the rights and freedoms of data subjects (DPO/team).
+- **Notification to the supervisory authority within ≤ 72 h** of becoming aware (art. 33), unless
+  a risk is unlikely.
+- **As processor:** notification **without undue delay** to the controller customer so that it can meet
+  its 72 h deadline.
+- **Communication to data subjects** without delay if there is a **high risk** (art. 34).
+- **Documentation** of every breach (facts, effects, measures) in the incident register (§10).
 
 <a id="116-sello-de-tiempo-izenpe"></a>
 
-#### 11.6 Sello de tiempo cualificado: Izenpe recibe una huella, no datos
+<a id="116-sello-de-tiempo-cualificado-izenpe-recibe-una-huella-no-datos"></a>
 
-Las firmas de CertiPDF llevan un sello de tiempo cualificado (PAdES-B-T) de **Izenpe S.A.**
-(`http://tsa.izenpe.com`, sector público vasco, en la lista de confianza de la UE como QTST),
-[ADR 0051](decisions.md#0051). Lo que viaja a Izenpe es **una huella SHA-256 del valor de la
-firma** y un nonce aleatorio: ni el documento, ni la firma, ni el certificado, ni quién firma ni
-desde dónde (la petición sale del servicio de Docs, no del equipo de la persona). De una huella
-no se recupera nada de lo anterior, así que **Izenpe no trata datos personales por cuenta de
-Sytue y no es subencargado** (art. 28): no entra en la lista de §11.3 ni en la ROPA.
+#### 11.6 Qualified timestamp: Izenpe receives a fingerprint, not data
 
-La respuesta se **autentica** contra la raíz de Izenpe fijada en la configuración
-(`SELLO_ANCLAS`, obligatoria con `SELLO_URL`): el canal es HTTP plano, como el de todas las
-autoridades de sellado, y sin ancla un intermediario podría colar un token fabricado. El token
-tiene que declarar SHA-256, sellar la huella pedida y traer el nonce de la petición.
+CertiPDF signatures carry a qualified timestamp (PAdES-B-T) from **Izenpe S.A.**
+(`http://tsa.izenpe.com`, Basque public sector, on the EU trusted list as a QTST),
+[ADR 0051](decisions.md#0051). What travels to Izenpe is **a SHA-256 fingerprint of the signature
+value** and a random nonce: not the document, the signature, the certificate, who signs or
+from where (the request leaves from the Docs service, not from the person's device). Nothing of the above
+can be recovered from a fingerprint, so **Izenpe does not process personal data on behalf of
+Sytue and is not a sub-processor** (art. 28): it is not in the §11.3 list or in the ROPA.
+
+The response is **authenticated** against the Izenpe root pinned in the configuration
+(`SELLO_ANCLAS`, mandatory with `SELLO_URL`): the channel is plain HTTP, like that of all
+timestamping authorities, and without an anchor an intermediary could slip in a fabricated token. The token
+must declare SHA-256, stamp the requested fingerprint and carry the request's nonce.
 
 ---
 
 <a id="112-cadena-de-suministro-y-verificacion-en-ci"></a>
 
-### 1.12 Cadena de suministro y verificación en CI
+<a id="112-cadena-de-suministro-y-verificación-en-ci"></a>
 
-- **Dependencias de producto:** política "última estable" (CONVENTIONS §3); solo librerías
-  permisivas; Renovate/Dependabot mantienen los pisos. Tooling e infraestructura tienen inventarios
-  separados, sin mezclarse con el grafo del artefacto.
-- **Gates que rompen el build:** `govulncheck` (Go), `osv-scanner`/`bun audit` (JS), `trivy`/`grype`
-  (imágenes), **SBOM CycloneDX/SPDX** por artefacto y gate de licencias del producto (sin
-  AGPL/SSPL/BSL en el artefacto).
-- **SAST/DAST:** análisis estático (`go vet`, `golangci-lint`, SAST) en cada PR; DAST sobre entornos
-  de staging antes de release.
-- **Firma de artefactos** y pinning por digest (imágenes) para integridad de la cadena.
+### 1.12 Supply chain and verification in CI
+
+- **Product dependencies:** "latest stable" policy (CONVENTIONS §3); only permissive
+  libraries; Renovate/Dependabot maintain the floors. Tooling and infrastructure have separate
+  inventories, not mixed with the artifact's graph.
+- **Build-breaking gates:** `govulncheck` (Go), `osv-scanner`/`bun audit` (JS), `trivy`/`grype`
+  (images), **CycloneDX/SPDX SBOM** per artifact and the product license gate (no
+  AGPL/SSPL/BSL in the artifact).
+- **SAST/DAST:** static analysis (`go vet`, `golangci-lint`, SAST) on every PR; DAST on staging
+  environments before release.
+- **Artifact signing** and pinning by digest (images) for supply chain integrity.
 
 <a id="suministro-fyne-upstream"></a>
 
-**2026-10-16 · Manifiesto de auditoría de Fyne (FYP-04).** Se reconcilian en
-`compliance/supply-chain/blocked-baseline.tsv` las dos parejas de `proxy.golang.org`
-y `sum.golang.org` con `apps/fyne/upstream/go.mod`, omitidas al añadir ese manifiesto
-en `ab9fe6355`. El fichero registra los originales de los tres forks para que
-OSV detecte sus avisos; no se compila. Ambos canales de Go ya estaban inventariados
-para `apps/fyne/go.mod` y conservan el estado `blocked`. La decisión se limita a
-esa ruta: el gate sigue rechazando cualquier pareja nueva o referencia obsoleta,
-y `GOPRIVATE` mantiene protegidos los módulos privados.
+**2026-10-16 · Fyne audit manifest (FYP-04).** The two `proxy.golang.org`
+and `sum.golang.org` pairs for `apps/fyne/upstream/go.mod`, omitted when that manifest was added
+in `ab9fe6355`, are reconciled in `compliance/supply-chain/blocked-baseline.tsv`. The file records the originals of the three forks so that
+OSV detects their advisories; it is not compiled. Both Go channels were already inventoried
+for `apps/fyne/go.mod` and keep the `blocked` status. The decision is limited to
+that path: the gate still rejects any new pair or stale reference,
+and `GOPRIVATE` keeps private modules protected.
 
 ---
 
 <a id="113-matriz-de-controles--articulos-rgpd"></a>
 
-### 1.13 Matriz de controles ↔ artículos RGPD
+<a id="113-matriz-de-controles--artículos-rgpd"></a>
 
-| Control técnico/organizativo (Sytue One)                                                                        | Sección                                                                                                          | Artículo(s) RGPD                         |
-| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Residencia/soberanía UE, sin transferencias                                                                     | §2.1                                                                                                             | Cap. V (arts. 44–49); art. 5.1.f         |
-| Cifrado en tránsito (TLS 1.3) y en reposo (SSE-S3 + columnas + AES-GCM; SSE-KMS con clave propia **pendiente**) | §2.2–2.3                                                                                                         | art. 32.1.a; art. 5.1.f                  |
-| Gestión de secretos (Secret Manager → Secret de Kubernetes) y JWKS/rotación                                     | §3                                                                                                               | art. 32.1; art. 25 (por diseño)          |
-| Sytue ID (IdP Go), OIDC/PKCE, redirect exacto, control de acceso                                                | §4.1                                                                                                             | art. 32.1.b; art. 5.1.f                  |
-| MFA/WebAuthn para admin/owner                                                                                   | §4.2                                                                                                             | art. 32.1.b                              |
-| Rate-limiting / anti-fuerza-bruta / anti-enumeración                                                            | §4.3                                                                                                             | art. 32.1.b                              |
-| Deprovisioning + rotación/reuso de refresh tokens                                                               | §4.4                                                                                                             | art. 5.1.e; art. 17 (supresión); art. 32 |
-| Auditoría de seguridad obligatoria del IdP (ASVS/OAuth BCP)                                                     | §4.6, §14                                                                                                        | art. 32.1.d; art. 25                     |
-| SCIM + aprovisionamiento token-driven                                                                           | §4.7                                                                                                             | art. 5.1.e; art. 32                      |
-| Aislamiento multi-tenant (RLS `FORCE` + NetworkPolicy + Quota + RBAC)                                           | §5                                                                                                               | art. 32.1.b; art. 25.2 (por defecto)     |
-| Seguridad del correo (SPF/DKIM/DMARC/MTA-STS/TLS-RPT)                                                           | §6                                                                                                               | art. 32.1; art. 5.1.f                    |
-| Auditoría y logging por componente (append-only, sin PII)                                                       | §7                                                                                                               | art. 5.2; art. 30; art. 33               |
-| Backups, DR y retención (PostgreSQL + S3)                                                                       | §8                                                                                                               | art. 32.1.c; art. 5.1.e                  |
-| Hardening (CIS k8s, distroless, headers, CSP, WS origin)                                                        | §9                                                                                                               | art. 32.1.b; art. 25.1 (por diseño)      |
-| Plan de respuesta a incidentes                                                                                  | §10                                                                                                              | art. 32.1.d; art. 33/34                  |
-| Cadena de suministro (SBOM, escáneres, SAST/DAST)                                                               | §12                                                                                                              | art. 32.1; art. 25                       |
-| Base jurídica del tratamiento                                                                                   | §11.1                                                                                                            | art. 6 (y art. 9 si aplica)              |
-| ROPA                                                                                                            | §11.2                                                                                                            | art. 30                                  |
-| DPA con clientes / subprocesadores UE                                                                           | §11.3                                                                                                            | art. 28; Cap. V                          |
-| Procedimiento DSR — **PENDIENTE**, hoy manual (§11.4 documenta el diseño, no un control vigente)                | §11.4                                                                                                            | arts. 12–22                              |
-| Notificación de brechas (72 h)                                                                                  | §11.5                                                                                                            | arts. 33–34                              |
-| Modelado de amenazas por servicio (STRIDE)                                                                      | [`security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio) | art. 32.1; art. 25.1                     |
-| Verificación ASVS L2 mapeada al repo                                                                            | [`security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2)                               | art. 32.1.d                              |
+### 1.13 Controls ↔ GDPR articles matrix
+
+| Technical/organizational control (Sytue One)                                                               | Section                                                                                                          | GDPR article(s)                        |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| EU residency/sovereignty, no transfers                                                                     | §2.1                                                                                                             | Ch. V (arts. 44–49); art. 5.1.f        |
+| Encryption in transit (TLS 1.3) and at rest (SSE-S3 + columns + AES-GCM; SSE-KMS with own key **pending**) | §2.2–2.3                                                                                                         | art. 32.1.a; art. 5.1.f                |
+| Secrets management (Secret Manager → Kubernetes Secret) and JWKS/rotation                                  | §3                                                                                                               | art. 32.1; art. 25 (by design)         |
+| Sytue ID (Go IdP), OIDC/PKCE, exact redirect, access control                                               | §4.1                                                                                                             | art. 32.1.b; art. 5.1.f                |
+| MFA/WebAuthn for admin/owner                                                                               | §4.2                                                                                                             | art. 32.1.b                            |
+| Rate limiting / anti-brute-force / anti-enumeration                                                        | §4.3                                                                                                             | art. 32.1.b                            |
+| Deprovisioning + refresh token rotation/reuse                                                              | §4.4                                                                                                             | art. 5.1.e; art. 17 (erasure); art. 32 |
+| Mandatory security audit of the IdP (ASVS/OAuth BCP)                                                       | §4.6, §14                                                                                                        | art. 32.1.d; art. 25                   |
+| SCIM + token-driven provisioning                                                                           | §4.7                                                                                                             | art. 5.1.e; art. 32                    |
+| Multi-tenant isolation (`FORCE` RLS + NetworkPolicy + Quota + RBAC)                                        | §5                                                                                                               | art. 32.1.b; art. 25.2 (by default)    |
+| Mail security (SPF/DKIM/DMARC/MTA-STS/TLS-RPT)                                                             | §6                                                                                                               | art. 32.1; art. 5.1.f                  |
+| Auditing and logging per component (append-only, no PII)                                                   | §7                                                                                                               | art. 5.2; art. 30; art. 33             |
+| Backups, DR and retention (PostgreSQL + S3)                                                                | §8                                                                                                               | art. 32.1.c; art. 5.1.e                |
+| Hardening (CIS k8s, distroless, headers, CSP, WS origin)                                                   | §9                                                                                                               | art. 32.1.b; art. 25.1 (by design)     |
+| Incident response plan                                                                                     | §10                                                                                                              | art. 32.1.d; art. 33/34                |
+| Supply chain (SBOM, scanners, SAST/DAST)                                                                   | §12                                                                                                              | art. 32.1; art. 25                     |
+| Legal basis for processing                                                                                 | §11.1                                                                                                            | art. 6 (and art. 9 if applicable)      |
+| ROPA                                                                                                       | §11.2                                                                                                            | art. 30                                |
+| DPA with customers / EU subprocessors                                                                      | §11.3                                                                                                            | art. 28; Ch. V                         |
+| DSR procedure — **PENDING**, manual today (§11.4 documents the design, not a control in force)             | §11.4                                                                                                            | arts. 12–22                            |
+| Breach notification (72 h)                                                                                 | §11.5                                                                                                            | arts. 33–34                            |
+| Threat modeling per service (STRIDE)                                                                       | [`security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio) | art. 32.1; art. 25.1                   |
+| ASVS L2 verification mapped to the repo                                                                    | [`security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2)                               | art. 32.1.d                            |
 
 ---
 
 <a id="114-auditoria-de-seguridad-obligatoria-del-idp-propio-antes-de-produccion-plan"></a>
 
-### 1.14 Auditoría de seguridad obligatoria del IdP propio antes de producción (plan)
+<a id="114-auditoría-de-seguridad-obligatoria-del-idp-propio-antes-de-producción-plan"></a>
 
-Sytue ID es la **pieza nuclear** y **código de autenticación propio**; su auditoría es un **gate de
-release bloqueante** (CONVENTIONS §0.7). Plan formal:
+### 1.14 Mandatory security audit of the in-house IdP before production (plan)
 
-1. **Alcance:** todo `services/id` (OIDC/OAuth2/JWKS, sesión, MFA/WebAuthn, SCIM), `platform/pkg/authn`
-   (verificación distribuida de tokens) y las superficies de login/consent. Objetivo **ASVS L2**
-   (L3 en autenticación/criptografía/sesión).
-2. **Fase 1 — revisión de diseño y clean-room:** confirmar que no hay código portado de motores AGPL
-   (registro en [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room)); revisar el modelo de amenazas
-   del IdP ([`security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio) §id).
-3. **Fase 2 — revisión de código** guiada por [`security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2):
-   criptografía (Argon2id, `crypto/rand`, `subtle`/`hmac.Equal`, RS256, cifrado de `private_pem`),
-   OAuth/OIDC BCP (PKCE, `redirect_uri` exacto, `state`/`nonce`, rotación/reuso de refresh,
-   `no-store`), gestión de sesión (httpOnly/Secure/SameSite, expiración, fijación) y RLS de tenant.
-4. **Fase 3 — pruebas dinámicas:** DAST + **pentest externo** de endpoints públicos; fuzzing de los
-   parsers de token/JWT/WebAuthn; pruebas de rate-limit/anti-fuerza-bruta.
-5. **Fase 4 — remediación verificada:** todos los hallazgos **High/Critical** cerrados y
-   **re-testeados**; los `TODO` de seguridad marcados como bloqueantes (p. ej. binding del segundo
-   paso MFA en `login.go`) resueltos.
-6. **Gate:** sin informe de auditoría con remediación verificada, **el pipeline no promueve Sytue ID
-   a producción**. El informe y su cierre se archivan en el registro de cumplimiento.
+Sytue ID is the **core piece** and **in-house authentication code**; its audit is a **blocking release
+gate** (CONVENTIONS §0.7). Formal plan:
 
-Auditorías recurrentes: repetición ante cambios mayores del núcleo de auth y, como mínimo, anual.
+1. **Scope:** all of `services/id` (OIDC/OAuth2/JWKS, session, MFA/WebAuthn, SCIM), `platform/pkg/authn`
+   (distributed token verification) and the login/consent surfaces. Target **ASVS L2**
+   (L3 in authentication/cryptography/session).
+2. **Phase 1 — design and clean-room review:** confirm there is no code ported from AGPL engines
+   (record in [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room)); review the IdP's threat
+   model ([`security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio) §id).
+3. **Phase 2 — code review** guided by [`security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2):
+   cryptography (Argon2id, `crypto/rand`, `subtle`/`hmac.Equal`, RS256, `private_pem` encryption),
+   OAuth/OIDC BCP (PKCE, exact `redirect_uri`, `state`/`nonce`, refresh rotation/reuse,
+   `no-store`), session management (httpOnly/Secure/SameSite, expiry, fixation) and tenant RLS.
+4. **Phase 3 — dynamic testing:** DAST + **external pentest** of public endpoints; fuzzing of the
+   token/JWT/WebAuthn parsers; rate-limit/anti-brute-force tests.
+5. **Phase 4 — verified remediation:** all **High/Critical** findings closed and
+   **re-tested**; the security `TODO`s marked as blockers (e.g. binding of the second
+   MFA step in `login.go`) resolved.
+6. **Gate:** without an audit report with verified remediation, **the pipeline does not promote Sytue ID
+   to production**. The report and its closure are archived in the compliance register.
+
+Recurring audits: repeated upon major changes to the auth core and, at a minimum, yearly.
 
 ---
 
 <a id="115-resumen-de-responsabilidades"></a>
 
-### 1.15 Resumen de responsabilidades
+### 1.15 Summary of responsibilities
 
-- **DPO / cumplimiento:** ROPA, DPA, DSR, brechas, contacto con la autoridad de control.
-- **Plataforma (SRE):** cifrado, secretos/JWKS, hardening, RLS/NetworkPolicy/Quota/RBAC, backups,
-  mTLS interno, respuesta a incidentes (§10), cadena de suministro (§12).
-- **Sytue ID (servicio Go):** identidad, MFA/WebAuthn, SCIM, emisión/rotación de claves,
-  deprovisioning — pieza nuclear; **auditoría de seguridad obligatoria antes de prod** (§4.6, §14).
-- **Cada servicio Go:** validación JWT vía JWKS (`platform/pkg/authn`), RLS por tenant
-  (`pg.InTenantTx`), auditoría de su dominio.
-- **Sytue Hub (servicio Go):** eventos de directorio, búsqueda federada para DSR, notificaciones,
-  presencia e intents — auditoría cross-app.
+- **DPO / compliance:** ROPA, DPA, DSR, breaches, contact with the supervisory authority.
+- **Platform (SRE):** encryption, secrets/JWKS, hardening, RLS/NetworkPolicy/Quota/RBAC, backups,
+  internal mTLS, incident response (§10), supply chain (§12).
+- **Sytue ID (Go service):** identity, MFA/WebAuthn, SCIM, key issuance/rotation,
+  deprovisioning — core piece; **mandatory security audit before prod** (§4.6, §14).
+- **Each Go service:** JWT validation via JWKS (`platform/pkg/authn`), per-tenant RLS
+  (`pg.InTenantTx`), auditing of its domain.
+- **Sytue Hub (Go service):** directory events, federated search for DSR, notifications,
+  presence and intents — cross-app auditing.
 
-> Contacto de privacidad: `privacy@sytue.eu`. Operativa de incidentes y DSR en
-> [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion). Modelo de amenazas en [`docs/security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio).
-> Checklist ASVS L2 en [`docs/security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2). Matriz de licencias en
-> [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento). Política clean-room en [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room).
+> Privacy contact: `privacy@sytue.eu`. Incident and DSR operations in
+> [`docs/operations.md#1-runbook-de-operacion`](./operations.md#1-runbook-de-operacion). Threat model in [`docs/security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio).
+> ASVS L2 checklist in [`docs/security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2). License matrix in
+> [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento). Clean-room policy in [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room).
 
 ---
 
 <a id="2-modelo-de-amenazas-stride-por-servicio"></a>
 
-## 2. Modelo de amenazas (STRIDE por servicio)
+## 2. Threat model (STRIDE per service)
 
-> Modelado de amenazas de la suite **Sytue One**, requisito de "seguridad reforzada" de
-> [`docs/CONVENTIONS.md`](./CONVENTIONS.md) §0.7. Metodología **STRIDE** (Spoofing, Tampering,
-> Repudiation, Information disclosure, Denial of service, Elevation of privilege) aplicada por
-> servicio, con la **mitigación real** (fichero/mecanismo) para cada amenaza. Complementa
-> [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd) y [`docs/security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2).
+> Threat modeling of the **Sytue One** suite, a "hardened security" requirement of
+> [`docs/CONVENTIONS.md`](./CONVENTIONS.md) §0.7. **STRIDE** methodology (Spoofing, Tampering,
+> Repudiation, Information disclosure, Denial of service, Elevation of privilege) applied per
+> service, with the **actual mitigation** (file/mechanism) for each threat. It complements
+> [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd) and [`docs/security.md#3-checklist-owasp-asvs-l2`](./security.md#3-checklist-owasp-asvs-l2).
 
-Stack: `Go + Astro/Preact + PostgreSQL`, Scaleway UE, IdP propio **Sytue ID**.
-Servicios modelados en detalle: **id, drive, mail, chat, cloud**; el resto (docs, calendar,
-contacts, rooms, hub) comparte los controles transversales del §1.
+Stack: `Go + Astro/Preact + PostgreSQL`, Scaleway EU, in-house IdP **Sytue ID**.
+Services modeled in detail: **id, drive, mail, chat, cloud**; the rest (docs, calendar,
+contacts, rooms, hub) share the cross-cutting controls of §1.
 
 ---
 
 <a id="20-alcance-activos-y-confianza"></a>
 
-### 2.0 Alcance, activos y confianza
+### 2.0 Scope, assets and trust
 
-#### 0.1 Activos a proteger
+<a id="01-activos-a-proteger"></a>
 
-- **Credenciales e identidad** (contraseñas hash Argon2id, secretos MFA/TOTP, claves WebAuthn).
-- **Claves de firma OIDC/JWKS** (RSA privada de Sytue ID) y secretos de plataforma (DKIM, LiveKit,
-  `SECRET_ENC_KEY` de Cloud, DSN de PostgreSQL, claves S3).
-- **Tokens** (access/ID/refresh, códigos de autorización, tokens de sesión y de enlace).
-- **Datos de tenant** (correo, ficheros, documentos, mensajes, calendario, contactos) — aislados por
+#### 0.1 Assets to protect
+
+- **Credentials and identity** (Argon2id-hashed passwords, MFA/TOTP secrets, WebAuthn keys).
+- **OIDC/JWKS signing keys** (Sytue ID's private RSA key) and platform secrets (DKIM, LiveKit,
+  Cloud's `SECRET_ENC_KEY`, PostgreSQL DSN, S3 keys).
+- **Tokens** (access/ID/refresh, authorization codes, session and link tokens).
+- **Tenant data** (mail, files, documents, messages, calendar, contacts) — isolated per
   tenant (RLS).
-- **Auditoría inmutable** (integridad probatoria).
+- **Immutable audit** (evidentiary integrity).
 
-#### 0.2 Límites de confianza (trust boundaries)
+<a id="02-límites-de-confianza-trust-boundaries"></a>
+
+#### 0.2 Trust boundaries
 
 ```
 [ Internet ] ──TLS 1.3──> [ Traefik edge (HSTS, headers, rate-limit) ]
@@ -1294,126 +1387,134 @@ contacts, rooms, hub) comparte los controles transversales del §1.
      └───────── PostgreSQL (RLS, FORCE) ── S3 (prefijos por tenant) ── LiveKit (UE) ─┘
 ```
 
-Fronteras: Internet↔edge, edge↔BFF, BFF↔Sytue ID, servicio↔servicio (NetworkPolicy; mTLS en diseño,
-§2.2), servicio↔PostgreSQL
-(RLS), servicio↔S3 (IAM), Cloud↔cargas de cliente (aislamiento de build/deploy), tenant↔tenant
-(NetworkPolicy + RLS + prefijos S3).
+Boundaries: Internet↔edge, edge↔BFF, BFF↔Sytue ID, service↔service (NetworkPolicy; mTLS in design,
+§2.2), service↔PostgreSQL
+(RLS), service↔S3 (IAM), Cloud↔customer workloads (build/deploy isolation), tenant↔tenant
+(NetworkPolicy + RLS + S3 prefixes).
 
-#### 0.3 Atacantes considerados
+<a id="03-atacantes-considerados"></a>
 
-Externo anónimo; usuario autenticado de un tenant que intenta acceder a otro; client OIDC malicioso/
-comprometido; insider con acceso parcial; adversario en red interna del clúster; remitente de correo
-suplantador; código de cliente hostil en Sytue Cloud.
+#### 0.3 Attackers considered
+
+Anonymous external attacker; authenticated user of one tenant trying to access another; malicious/
+compromised OIDC client; insider with partial access; adversary on the cluster's internal network; spoofing
+mail sender; hostile customer code in Sytue Cloud.
 
 ---
 
 <a id="21-controles-transversales-aplican-a-todos-los-servicios"></a>
 
-### 2.1 Controles transversales (aplican a todos los servicios)
+### 2.1 Cross-cutting controls (apply to all services)
 
-| STRIDE | Amenaza genérica                          | Mitigación (implementación)                                                                                                                                                                                                   |
-| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S**  | Suplantar a un usuario/servicio           | JWT de Sytue ID validados vía JWKS (`platform/pkg/authn/verifier.go`: firma+issuer+audience+exp+skew); `RequireAuth` (deny sin token). Entre servicios, NetworkPolicy por chart — **no** mTLS: está en diseño (§2.2, V9.2.1). |
-| **T**  | Manipular petición/datos en tránsito o BD | TLS 1.3 + HSTS (edge); consultas parametrizadas `pgx`; `WITH CHECK` en políticas RLS; checksums SHA-256 (Drive/Mail).                                                                                                         |
-| **R**  | Negar una acción realizada                | Auditoría append-only con actor/IP/`request-id` (`platform/pkg/httpx` request-id + `store.Audit`).                                                                                                                            |
-| **I**  | Fuga de datos entre tenants o al exterior | RLS `FORCE` por `app.tenant` (`pg.InTenantTx`); prefijos S3 por tenant; logs sin PII/cuerpos; errores JSON sin stack (`Recoverer`).                                                                                           |
-| **D**  | Agotar recursos / DoS                     | `ResourceQuota`/`LimitRange`; timeouts de petición; rate-limit del edge; sondas `/readyz`.                                                                                                                                    |
-| **E**  | Escalar privilegios                       | `RequireRole`/`RequireScope` (deny-by-default); roles sin `BYPASSRLS`; RBAC k8s mínimo; contenedores non-root distroless.                                                                                                     |
+| STRIDE | Generic threat                                        | Mitigation (implementation)                                                                                                                                                                                                              |
+| ------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**  | Impersonating a user/service                          | Sytue ID JWTs validated via JWKS (`platform/pkg/authn/verifier.go`: signature+issuer+audience+exp+skew); `RequireAuth` (deny without a token). Between services, NetworkPolicy per chart — **not** mTLS: it is in design (§2.2, V9.2.1). |
+| **T**  | Tampering with a request/data in transit or in the DB | TLS 1.3 + HSTS (edge); parameterized `pgx` queries; `WITH CHECK` in RLS policies; SHA-256 checksums (Drive/Mail).                                                                                                                        |
+| **R**  | Denying an action that was performed                  | Append-only audit with actor/IP/`request-id` (`platform/pkg/httpx` request-id + `store.Audit`).                                                                                                                                          |
+| **I**  | Data leakage between tenants or to the outside        | `FORCE` RLS by `app.tenant` (`pg.InTenantTx`); per-tenant S3 prefixes; logs without PII/bodies; JSON errors without stack (`Recoverer`).                                                                                                 |
+| **D**  | Exhausting resources / DoS                            | `ResourceQuota`/`LimitRange`; request timeouts; edge rate limit; `/readyz` probes.                                                                                                                                                       |
+| **E**  | Escalating privileges                                 | `RequireRole`/`RequireScope` (deny-by-default); roles without `BYPASSRLS`; minimal k8s RBAC; non-root distroless containers.                                                                                                             |
 
-Estas mitigaciones no se repiten abajo salvo matiz específico del servicio.
+These mitigations are not repeated below unless there is a service-specific nuance.
 
 ---
 
 <a id="22-sytue-id--servicio-de-identidad-servicesid--critico"></a>
 
-### 2.2 Sytue ID — servicio de identidad (`services/id`) · CRÍTICO
+<a id="22-sytue-id--servicio-de-identidad-servicesid--crítico"></a>
 
-Superficie más sensible: emite y valida todo. Sujeta a **auditoría de seguridad obligatoria antes de
-producción** (security-gdpr §14).
+### 2.2 Sytue ID — identity service (`services/id`) · CRITICAL
 
-| STRIDE | Amenaza                                                       | Mitigación (implementación)                                                                                                                                                                                                                                                                  |
-| ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S**  | Robo de credenciales / fuerza bruta / enumeración de usuarios | Argon2id 64 MiB (`domain/secret.go`, encarece cada intento); verificación constant-time (`subtle.ConstantTimeCompare`); respuesta de login **genérica** (`http/login.go` `loginFail`, no enumera); auditoría `auth.login.failed`; rate-limit edge + bloqueo progresivo (security-gdpr §4.3). |
-| **S**  | Robo/replay de tokens; `alg:none`; audiencia cruzada          | Firma RS256 con `kid`, **nunca** `none`/HMAC compartido (`oidc/keys.go`); verificación con `WithValidate/WithIssuer/WithAudience` (`authn/verifier.go`); `nonce` OIDC anti-replay de ID Token; ID/access de vida corta.                                                                      |
-| **S**  | Open redirect / robo de código vía `redirect_uri`             | Validación **exacta** de `redirect_uri` registrado (`http/authorize.go` `ValidRedirectURI`); `client_id` desconocido → error **sin** redirigir.                                                                                                                                              |
-| **S**  | Interceptación del authorization code (client público)        | **PKCE S256 obligatorio** (`RequirePKCE`; se rechaza `plain`/ausente); code de un solo uso; verificación `VerifyPKCE` (constant-time) en `token.go`.                                                                                                                                         |
-| **S**  | Client secret robado / client suplantado                      | `client_secret` con hash Argon2id (`clientauth.go` `VerifyPassword`); client sin `secret_hash` **deshabilitado** (deny-by-default); `client_credentials` prohibido a públicos.                                                                                                               |
-| **T**  | Manipular código/refresh persistido                           | Solo se persiste el **hash** SHA-256 (`HashToken`) de códigos, sesiones y refresh; `WITH CHECK`/constraints en el esquema.                                                                                                                                                                   |
-| **T**  | Falsear membresías/roles                                      | Roles resueltos server-side (`RolesForUserInOrg`) y firmados en el token; el cliente no elige sus roles.                                                                                                                                                                                     |
-| **R**  | Negar login/consentimiento/emisión                            | Auditoría append-only (`audit_log`, `GENERATED ALWAYS AS IDENTITY`): `oauth.authorize`, `oauth.token.issued`, `auth.login.*`, rotación JWKS.                                                                                                                                                 |
-| **I**  | Filtración de la clave privada de firma o secretos MFA        | `signing_keys.private_pem`, `totp_secrets.secret` y WebAuthn **cifrados en reposo** a nivel de columna (KMS/pgcrypto); clave privada solo en Sytue ID; JWKS expone solo pública.                                                                                                             |
-| **I**  | Fuga de tokens en logs/URL                                    | `Cache-Control: no-store` en respuestas de token; logs sin secretos; códigos por query solo en el redirect exacto.                                                                                                                                                                           |
-| **D**  | Fuerza bruta / flood a `/token`,`/authorize`,`/login`         | Rate-limit edge; Argon2id como coste; TTL corto + índices de expiración (`auth_codes_expires_idx`, `sessions_expires_idx`) para purga.                                                                                                                                                       |
-| **E**  | Elevación por refresh reusado o sesión sin MFA                | **Rotación de refresh + detección de reuso** → revoca la familia (`token.go` `RevokeRefreshChain`, audita `oauth.refresh.reuse_detected`); **step-up MFA** forzado para `owner/admin` (`authorize.go` `requiresStepUp`, `Role.RequiresMFA`).                                                 |
-| **E**  | Passkey clonada                                               | `sign_count` monotónico anti-clonado en WebAuthn (`webauthn_credentials`).                                                                                                                                                                                                                   |
+The most sensitive surface: it issues and validates everything. Subject to a **mandatory security audit before
+production** (security-gdpr §14).
 
-**Riesgo abierto (bloqueante de prod):** el binding de estado del segundo paso MFA/TOTP está marcado
-como pendiente en `http/login.go`/`handleMFAVerify`; debe cerrarse y re-testearse en la auditoría
-(security-gdpr §14, paso 5).
+| STRIDE | Threat                                                            | Mitigation (implementation)                                                                                                                                                                                                                                                                         |
+| ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**  | Credential theft / brute force / user enumeration                 | Argon2id 64 MiB (`domain/secret.go`, makes each attempt expensive); constant-time verification (`subtle.ConstantTimeCompare`); **generic** login response (`http/login.go` `loginFail`, does not enumerate); `auth.login.failed` audit; edge rate limit + progressive lockout (security-gdpr §4.3). |
+| **S**  | Token theft/replay; `alg:none`; cross-audience                    | RS256 signature with `kid`, **never** `none`/shared HMAC (`oidc/keys.go`); verification with `WithValidate/WithIssuer/WithAudience` (`authn/verifier.go`); OIDC `nonce` for ID Token anti-replay; short-lived ID/access tokens.                                                                     |
+| **S**  | Open redirect / code theft via `redirect_uri`                     | **Exact** validation of the registered `redirect_uri` (`http/authorize.go` `ValidRedirectURI`); unknown `client_id` → error **without** redirecting.                                                                                                                                                |
+| **S**  | Interception of the authorization code (public client)            | **Mandatory PKCE S256** (`RequirePKCE`; `plain`/missing is rejected); single-use code; `VerifyPKCE` verification (constant-time) in `token.go`.                                                                                                                                                     |
+| **S**  | Stolen client secret / impersonated client                        | `client_secret` with Argon2id hash (`clientauth.go` `VerifyPassword`); client without `secret_hash` **disabled** (deny-by-default); `client_credentials` forbidden for public clients.                                                                                                              |
+| **T**  | Tampering with a persisted code/refresh token                     | Only the SHA-256 **hash** (`HashToken`) of codes, sessions and refresh tokens is persisted; `WITH CHECK`/constraints in the schema.                                                                                                                                                                 |
+| **T**  | Forging memberships/roles                                         | Roles resolved server-side (`RolesForUserInOrg`) and signed in the token; the client does not choose its roles.                                                                                                                                                                                     |
+| **R**  | Denying login/consent/issuance                                    | Append-only audit (`audit_log`, `GENERATED ALWAYS AS IDENTITY`): `oauth.authorize`, `oauth.token.issued`, `auth.login.*`, JWKS rotation.                                                                                                                                                            |
+| **I**  | Leakage of the private signing key or MFA secrets                 | `signing_keys.private_pem`, `totp_secrets.secret` and WebAuthn **encrypted at rest** at the column level (KMS/pgcrypto); private key only in Sytue ID; JWKS exposes only the public one.                                                                                                            |
+| **I**  | Token leakage in logs/URLs                                        | `Cache-Control: no-store` on token responses; logs without secrets; codes in the query string only on the exact redirect.                                                                                                                                                                           |
+| **D**  | Brute force / flooding `/token`,`/authorize`,`/login`             | Edge rate limit; Argon2id as a cost; short TTL + expiry indexes (`auth_codes_expires_idx`, `sessions_expires_idx`) for purging.                                                                                                                                                                     |
+| **E**  | Elevation through a reused refresh token or a session without MFA | **Refresh rotation + reuse detection** → revokes the family (`token.go` `RevokeRefreshChain`, audits `oauth.refresh.reuse_detected`); **MFA step-up** enforced for `owner/admin` (`authorize.go` `requiresStepUp`, `Role.RequiresMFA`).                                                             |
+| **E**  | Cloned passkey                                                    | Monotonic anti-cloning `sign_count` in WebAuthn (`webauthn_credentials`).                                                                                                                                                                                                                           |
+
+**Open risk (prod blocker):** the state binding of the second MFA/TOTP step is marked
+as pending in `http/login.go`/`handleMFAVerify`; it must be closed and re-tested in the audit
+(security-gdpr §14, step 5).
 
 ---
 
 <a id="23-sytue-drive--archivos-y-comparticion-servicesdrive"></a>
 
-### 2.3 Sytue Drive — archivos y compartición (`services/drive`)
+<a id="23-sytue-drive--archivos-y-compartición-servicesdrive"></a>
 
-| STRIDE | Amenaza                                                     | Mitigación (implementación)                                                                                                                                                                                                             |
-| ------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S**  | Acceso con identidad falsa                                  | `RequireAuth` (JWT Sytue ID) en toda la API/WebDAV.                                                                                                                                                                                     |
-| **S**  | Adivinar/robar token de enlace público                      | Token de enlace aleatorio de alta entropía indexado solo si activo (`shares_token_idx WHERE token IS NOT NULL AND revoked_at IS NULL`); `password_hash` opcional (Argon2/bcrypt) y `expires_at`; enlace revocado/caducado → sin acceso. |
-| **T**  | Alterar ficheros/metadatos o cruzar carpetas de otro tenant | `checksum` SHA-256 por fichero (integridad); RLS `FORCE` (`files/folders/shares/quotas` con `USING`+`WITH CHECK` sobre `app.tenant`); `storage_key` sin el prefijo de tenant (lo añade `objectstore` desde `tenancy.StoragePrefix`).    |
-| **R**  | Negar accesos/comparticiones                                | Auditoría de accesos, compartición y cambios de permisos (security-gdpr §7).                                                                                                                                                            |
-| **I**  | Leer blobs de otro tenant en S3                             | Prefijos S3 por tenant + credenciales IAM acotadas; SSE en reposo; metadatos aislados por RLS.                                                                                                                                          |
-| **I**  | IDOR sobre `file_id`/`folder_id`                            | RLS impide resolver filas fuera del tenant activo; ACL de `shares` por sujeto/grupo/link.                                                                                                                                               |
-| **D**  | Llenar el almacenamiento (abuso de cuota)                   | `quotas.limit_bytes`/`used_bytes` por tenant mantenido transaccionalmente (RLS-aislado) + `ResourceQuota` k8s.                                                                                                                          |
-| **E**  | Elevar de `read` a `write`                                  | `permission ∈ {read,write}` con `CHECK`; el permiso viaja en la ACL, no en el cliente; validación server-side por operación.                                                                                                            |
+### 2.3 Sytue Drive — files and sharing (`services/drive`)
 
-Amenaza de contenido: subida de malware → escaneo antimalware y `Content-Type` controlado; los blobs
-se sirven con `Content-Disposition` adecuado y CSP estricta (no ejecución en el origen de la app).
+| STRIDE | Threat                                                            | Mitigation (implementation)                                                                                                                                                                                                   |
+| ------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**  | Access with a false identity                                      | `RequireAuth` (Sytue ID JWT) across the whole API/WebDAV.                                                                                                                                                                     |
+| **S**  | Guessing/stealing a public link token                             | Random high-entropy link token indexed only if active (`shares_token_idx WHERE token IS NOT NULL AND revoked_at IS NULL`); optional `password_hash` (Argon2/bcrypt) and `expires_at`; revoked/expired link → no access.       |
+| **T**  | Altering files/metadata or crossing into another tenant's folders | SHA-256 `checksum` per file (integrity); `FORCE` RLS (`files/folders/shares/quotas` with `USING`+`WITH CHECK` on `app.tenant`); `storage_key` without the tenant prefix (`objectstore` adds it from `tenancy.StoragePrefix`). |
+| **R**  | Denying access/shares                                             | Auditing of access, sharing and permission changes (security-gdpr §7).                                                                                                                                                        |
+| **I**  | Reading another tenant's blobs in S3                              | Per-tenant S3 prefixes + scoped IAM credentials; SSE at rest; metadata isolated by RLS.                                                                                                                                       |
+| **I**  | IDOR on `file_id`/`folder_id`                                     | RLS prevents resolving rows outside the active tenant; `shares` ACL by subject/group/link.                                                                                                                                    |
+| **D**  | Filling up storage (quota abuse)                                  | Per-tenant `quotas.limit_bytes`/`used_bytes` maintained transactionally (RLS-isolated) + k8s `ResourceQuota`.                                                                                                                 |
+| **E**  | Elevating from `read` to `write`                                  | `permission ∈ {read,write}` with `CHECK`; the permission travels in the ACL, not in the client; server-side validation per operation.                                                                                         |
+
+Content threat: malware upload → anti-malware scanning and controlled `Content-Type`; blobs
+are served with an appropriate `Content-Disposition` and strict CSP (no execution in the app's origin).
 
 ---
 
 <a id="24-sytue-mail--correo-servicesmail"></a>
 
-### 2.4 Sytue Mail — correo (`services/mail`)
+### 2.4 Sytue Mail — mail (`services/mail`)
 
-Servidor SMTP/IMAP/JMAP Go. Amenazas específicas de la mensajería de correo.
+Go SMTP/IMAP/JMAP server. Threats specific to email messaging.
 
-| STRIDE | Amenaza                                            | Mitigación (implementación)                                                                                                                                                      |
-| ------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S**  | Suplantación de remitente (spoofing/phishing)      | Verificación de **SPF** (`auth/verify.go` `VerifySPF`, RFC 7208, 10 lookups máx.), **DKIM** (`auth/dkim.go`) y **DMARC** con alineamiento (`VerifyDMARC`); política `p=reject`.  |
-| **S**  | Autenticación de buzón robada                      | Submission con auth obligatoria sobre TLS (`smtp/submission.go`); credenciales validadas contra Sytue ID (`internal/idauth`).                                                    |
-| **T**  | Manipular el mensaje en tránsito                   | STARTTLS obligatorio + **MTA-STS `enforce`** + DANE/TLSA (DNSSEC); DKIM firma la integridad del cuerpo saliente.                                                                 |
-| **R**  | Negar envío/recepción                              | Persistencia de resultados de autenticación (RFC 8601) y auditoría de envío/recepción/TLS (security-gdpr §7).                                                                    |
-| **I**  | Fuga de cuerpos/adjuntos o metadatos entre tenants | Cuerpos/adjuntos como blobs **cifrados en S3 UE**; índices/buzones en PostgreSQL aislados por tenant; DNS a resolvers **UE** (`net.DefaultResolver`) → soberanía.                |
-| **D**  | Ser open relay / spam / bomba de recursos          | Anti **open-relay** (auth en submission); rate-limiting de envío; límite de lookups DNS del evaluador SPF (`budget=10`) contra amplificación; antispam/antimalware en recepción. |
-| **E**  | Escalar a otro buzón/tenant                        | Autorización por buzón ligada al `sub`/tenant del token; RLS en el esquema de Mail.                                                                                              |
+| STRIDE | Threat                                                    | Mitigation (implementation)                                                                                                                                                      |
+| ------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**  | Sender impersonation (spoofing/phishing)                  | **SPF** verification (`auth/verify.go` `VerifySPF`, RFC 7208, max 10 lookups), **DKIM** (`auth/dkim.go`) and **DMARC** with alignment (`VerifyDMARC`); `p=reject` policy.        |
+| **S**  | Stolen mailbox authentication                             | Submission with mandatory auth over TLS (`smtp/submission.go`); credentials validated against Sytue ID (`internal/idauth`).                                                      |
+| **T**  | Tampering with the message in transit                     | Mandatory STARTTLS + **MTA-STS `enforce`** + DANE/TLSA (DNSSEC); DKIM signs the integrity of the outbound body.                                                                  |
+| **R**  | Denying sending/receiving                                 | Persistence of authentication results (RFC 8601) and auditing of sending/receiving/TLS (security-gdpr §7).                                                                       |
+| **I**  | Leakage of bodies/attachments or metadata between tenants | Bodies/attachments as blobs **encrypted in EU S3**; indexes/mailboxes in PostgreSQL isolated per tenant; DNS to **EU** resolvers (`net.DefaultResolver`) → sovereignty.          |
+| **D**  | Being an open relay / spam / resource bomb                | Anti **open-relay** (auth on submission); sending rate limiting; DNS lookup limit in the SPF evaluator (`budget=10`) against amplification; anti-spam/anti-malware on reception. |
+| **E**  | Escalating to another mailbox/tenant                      | Per-mailbox authorization tied to the token's `sub`/tenant; RLS in the Mail schema.                                                                                              |
 
-Nota de robustez: el evaluador SPF/DMARC es **clean-room** y cubre el camino feliz + hardening
-básico; para prod se recomienda envolver/sustituir por una librería permisiva auditada (documentado
-en `auth/verify.go`). Ítem de la auditoría de dependencias.
+Robustness note: the SPF/DMARC evaluator is **clean-room** and covers the happy path + basic
+hardening; for prod it is recommended to wrap/replace it with an audited permissive library (documented
+in `auth/verify.go`). An item of the dependency audit.
 
 ---
 
 <a id="25-sytue-rooms--mensajeria-y-videollamada-servicesrooms"></a>
 
-### 2.5 Sytue Rooms — mensajería tiempo real (`services/rooms`)
+<a id="25-sytue-rooms--mensajería-tiempo-real-servicesrooms"></a>
 
-WebSocket + REST. Amenazas propias del canal en tiempo real.
+### 2.5 Sytue Rooms — real-time messaging (`services/rooms`)
 
-| STRIDE | Amenaza                                                 | Mitigación (implementación)                                                                                                                                                                    |
-| ------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S**  | Conexión WS sin/ con identidad falsa                    | El WS valida el JWT **antes** de aceptar (`http/ws.go`: `bearerFromHeader` o `?access_token=`, `verifier.Verify`); token sin tenant válido → 403 (`TenantOrEmpty`).                            |
-| **S**  | Cross-Site WebSocket Hijacking (CSWSH)                  | **Allow-list de origen** en el handshake (`websocket.AcceptOptions.OriginPatterns = cfg.AllowedOrigins`).                                                                                      |
-| **T**  | Falsear/alterar mensajes o suscribirse a canales ajenos | Autorización de suscripción por tenant + membresía de canal; el token (Bearer) se propaga en contexto (`service.WithBearer`) para resolver adjuntos de Drive con la identidad real.            |
-| **R**  | Negar mensajes/acciones admin                           | Auditoría de acciones admin y gestión de canales (security-gdpr §7).                                                                                                                           |
-| **I**  | Leer mensajes de otro tenant/canal                      | RLS por tenant en `channels/messages/reactions`; el contexto de la conexión porta tenant fijo (`tenancy.Into`).                                                                                |
-| **D**  | Flood de conexiones/mensajes; fan-out abusivo           | Rate-limit por conexión; `ResourceQuota`; fan-out sobre PostgreSQL `LISTEN/NOTIFY` (Valkey opcional solo si mide, §0.1).                                                                       |
-| **E**  | Enviar/administrar sin permiso                          | Autorización por rol/membresía server-side; el `access_token` de vida corta expira aunque la conexión persista (`context.WithoutCancel` conserva tenant/token pero no otorga permisos nuevos). |
+WebSocket + REST. Threats specific to the real-time channel.
 
-Riesgo de token en query string: el `?access_token=` es necesario (el navegador no fija cabeceras en
-el handshake WS); se mitiga con TLS (no viaja en claro), TTL corto del access token y no registrar la
-query con secretos en logs.
+| STRIDE | Threat                                                              | Mitigation (implementation)                                                                                                                                                                      |
+| ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **S**  | WS connection without / with a false identity                       | The WS validates the JWT **before** accepting (`http/ws.go`: `bearerFromHeader` or `?access_token=`, `verifier.Verify`); token without a valid tenant → 403 (`TenantOrEmpty`).                   |
+| **S**  | Cross-Site WebSocket Hijacking (CSWSH)                              | **Origin allow-list** in the handshake (`websocket.AcceptOptions.OriginPatterns = cfg.AllowedOrigins`).                                                                                          |
+| **T**  | Forging/altering messages or subscribing to other people's channels | Subscription authorization by tenant + channel membership; the token (Bearer) is propagated in context (`service.WithBearer`) to resolve Drive attachments with the real identity.               |
+| **R**  | Denying messages/admin actions                                      | Auditing of admin actions and channel management (security-gdpr §7).                                                                                                                             |
+| **I**  | Reading another tenant's/channel's messages                         | Per-tenant RLS on `channels/messages/reactions`; the connection context carries a fixed tenant (`tenancy.Into`).                                                                                 |
+| **D**  | Flooding connections/messages; abusive fan-out                      | Per-connection rate limit; `ResourceQuota`; fan-out over PostgreSQL `LISTEN/NOTIFY` (Valkey optional only if it measures, §0.1).                                                                 |
+| **E**  | Sending/administering without permission                            | Server-side authorization by role/membership; the short-lived `access_token` expires even if the connection persists (`context.WithoutCancel` keeps tenant/token but grants no new permissions). |
+
+Token-in-query-string risk: `?access_token=` is necessary (the browser does not set headers on
+the WS handshake); it is mitigated with TLS (it does not travel in clear text), the short access token TTL and not logging the
+query with secrets.
 
 ---
 
@@ -1421,896 +1522,948 @@ query con secretos en logs.
 
 ### 2.6 Sytue Cloud — PaaS / control plane (`services/cloud`)
 
-Superficie con la mayor exposición a **código de cliente hostil** (builds/deploys) y secretos de
-proyecto.
+The surface with the greatest exposure to **hostile customer code** (builds/deploys) and project
+secrets.
 
-| STRIDE | Amenaza                                               | Mitigación (implementación)                                                                                                                                                                                                                                                                            |
-| ------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **S**  | Deploy/rollback con identidad falsa; webhook falso    | `RequireAuth` en la API; firma de webhooks **obligatoria y fail-closed** (`internal/service/webhooks.go`: sin secreto se RECHAZA, y `WEBHOOK_SECRET` es requisito de arranque en prod) con secreto **por proyecto** cifrado en reposo; minteo/validación de credenciales acotadas por proyecto/tenant. |
-| **T**  | Manipular artefactos de build o inyectar en la imagen | Builds **Kaniko rootless** en Jobs aislados; imágenes a Scaleway Registry (UE) escaneadas; pinning por digest; sin acceso al host.                                                                                                                                                                     |
-| **R**  | Negar un deploy/acceso a secretos                     | Auditoría de deploys, builds y **accesos/descifrado de secretos** (security-gdpr §7).                                                                                                                                                                                                                  |
-| **I**  | Robo de secretos de proyecto (env/credenciales)       | Secretos cifrados **AES-256-GCM** en reposo (`internal/crypto/crypto.go` `Sealer`, nonce por valor, tag AEAD); `SECRET_ENC_KEY` en Secret Manager; nunca en logs/respuestas; apertura falla cerrada (`ErrCiphertextInvalid`).                                                                          |
-| **I**  | Fuga entre proyectos/tenants                          | RLS por tenant; namespaces `tenant-<slug>` con NetworkPolicy deny-by-default; prefijos S3/registry acotados.                                                                                                                                                                                           |
-| **D**  | Build/deploy que agota el clúster                     | `ResourceQuota`/`LimitRange` por namespace; Jobs de build con límites; aislamiento de cargas de cliente.                                                                                                                                                                                               |
-| **E**  | Escape del sandbox de build a nodo/otros tenants      | Kaniko **rootless** (sin privilegios de root/daemon), `securityContext` restrictivo, PSA `restricted`, sin `hostPath`/`hostNetwork`; RBAC k8s mínimo por namespace.                                                                                                                                    |
+| STRIDE | Threat                                                     | Mitigation (implementation)                                                                                                                                                                                                                                                                                      |
+| ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**  | Deploy/rollback with a false identity; fake webhook        | `RequireAuth` on the API; webhook signature **mandatory and fail-closed** (`internal/service/webhooks.go`: without a secret it is REJECTED, and `WEBHOOK_SECRET` is a startup requirement in prod) with a **per-project** secret encrypted at rest; minting/validation of credentials scoped per project/tenant. |
+| **T**  | Tampering with build artifacts or injecting into the image | **Rootless Kaniko** builds in isolated Jobs; images to Scaleway Registry (EU), scanned; pinning by digest; no host access.                                                                                                                                                                                       |
+| **R**  | Denying a deploy/secret access                             | Auditing of deploys, builds and **access to/decryption of secrets** (security-gdpr §7).                                                                                                                                                                                                                          |
+| **I**  | Theft of project secrets (env/credentials)                 | Secrets encrypted with **AES-256-GCM** at rest (`internal/crypto/crypto.go` `Sealer`, nonce per value, AEAD tag); `SECRET_ENC_KEY` in Secret Manager; never in logs/responses; opening fails closed (`ErrCiphertextInvalid`).                                                                                    |
+| **I**  | Leakage between projects/tenants                           | Per-tenant RLS; `tenant-<slug>` namespaces with deny-by-default NetworkPolicy; scoped S3/registry prefixes.                                                                                                                                                                                                      |
+| **D**  | Build/deploy that exhausts the cluster                     | `ResourceQuota`/`LimitRange` per namespace; build Jobs with limits; isolation of customer workloads.                                                                                                                                                                                                             |
+| **E**  | Escape from the build sandbox to the node/other tenants    | **Rootless** Kaniko (no root/daemon privileges), restrictive `securityContext`, PSA `restricted`, no `hostPath`/`hostNetwork`; minimal k8s RBAC per namespace.                                                                                                                                                   |
 
-Amenaza específica: **SSRF/egress desde código de cliente** → NetworkPolicy de egress controlado
-(solo destinos permitidos: DNS, PostgreSQL gestionado, S3, servicios de plataforma), sin salida
-lateral a otros tenants.
+Specific threat: **SSRF/egress from customer code** → controlled egress NetworkPolicy
+(only allowed destinations: DNS, managed PostgreSQL, S3, platform services), no
+lateral egress to other tenants.
 
-**Terminal y logs en Kubernetes.** El rol de `cloud-api` es un catálogo sin
-`ClusterRoleBinding`: el reconciliador crea `sytue-cloud-runtime` como `RoleBinding`
-solo en namespaces `tenant-<slug>` cuya identidad y etiquetas de propiedad coinciden.
-También revisa los namespaces existentes en cada ciclo. El controlador tiene `bind`
-solo sobre ese rol nominal, sin `escalate`, escritura de `ClusterRoleBindings` ni
-`pods/exec` propios. Así, las credenciales de Cloud API no permiten ejecutar en la
-plataforma, `kube-system` ni namespaces ajenos al PaaS. Cloud API sigue siendo un
-proceso compartido con acceso a los tenants gestionados: se mantienen la autorización
-humana admin/owner, la comprobación de tenant/proyecto y el contenedor fijo `app`.
+**Terminal and logs in Kubernetes.** The `cloud-api` role is a catalog without a
+`ClusterRoleBinding`: the reconciler creates `sytue-cloud-runtime` as a `RoleBinding`
+only in `tenant-<slug>` namespaces whose identity and ownership labels match.
+It also reviews existing namespaces on every cycle. The controller has `bind`
+only on that named role, without `escalate`, writing of `ClusterRoleBindings` or
+its own `pods/exec`. Thus, the Cloud API credentials do not allow executing in the
+platform, `kube-system` or namespaces outside the PaaS. Cloud API is still a
+shared process with access to the managed tenants: human admin/owner
+authorization, the tenant/project check and the fixed `app` container are kept.
 
 ---
 
 <a id="27-servicios-restantes-resumen"></a>
 
-### 2.7 Servicios restantes (resumen)
+### 2.7 Remaining services (summary)
 
-- **Sytue Docs** (`services/docs`): STRIDE-E cubierto por `ResolveRole`/`ResolveShare`
-  (deny-by-default, máximo entre ACL usuario/grupo/tenant; `public` solo por token de enlace). Colab
-  WS con las mismas defensas de origen/token que Chat. RLS por tenant en `documents/permissions/
+- **Sytue Docs** (`services/docs`): STRIDE-E covered by `ResolveRole`/`ResolveShare`
+  (deny-by-default, maximum among user/group/tenant ACLs; `public` only through a link token). Collab
+  WS with the same origin/token defenses as Chat. Per-tenant RLS on `documents/permissions/
 operations/comments`.
-- **Sytue Calendar/Contacts:** CalDAV/CardDAV con `RequireAuth`, RLS por tenant, ACL de compartición;
-  parsers iCal/vCard robustos (fuzzing en la auditoría).
-- **Sytue Rooms** (`services/rooms`): el JWT de LiveKit se mintea **solo tras validar Sytue ID**
-  (`livekit/token.go` `AccessToken`, HS256, grants mínimos por sala, TTL); webhooks verificados con
-  firma HS256 constant-time (`hmac.Equal`) + hash del cuerpo (anti-replay/integridad).
-- **Sytue Hub** (`services/hub`): búsqueda federada/intents con propagación de token; es un punto
-  sensible de **agregación** (STRIDE-I) → cada conector reautoriza contra el servicio destino con la
-  identidad del usuario; no elude las ACL de los servicios subyacentes.
+- **Sytue Calendar/Contacts:** CalDAV/CardDAV with `RequireAuth`, per-tenant RLS, sharing ACL;
+  robust iCal/vCard parsers (fuzzing in the audit).
+- **Sytue Rooms** (`services/rooms`): the LiveKit JWT is minted **only after validating Sytue ID**
+  (`livekit/token.go` `AccessToken`, HS256, minimal per-room grants, TTL); webhooks verified with a
+  constant-time HS256 signature (`hmac.Equal`) + body hash (anti-replay/integrity).
+- **Sytue Hub** (`services/hub`): federated search/intents with token propagation; it is a sensitive
+  **aggregation** point (STRIDE-I) → each connector reauthorizes against the target service with the
+  user's identity; it does not bypass the ACLs of the underlying services.
 
 ---
 
 <a id="28-riesgos-residuales-y-seguimiento"></a>
 
-### 2.8 Riesgos residuales y seguimiento
+### 2.8 Residual risks and follow-up
 
-| #   | Riesgo residual                                                           | Estado                             | Acción                                                                            |
-| --- | ------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
-| R1  | Binding de estado del segundo paso MFA/TOTP incompleto en Sytue ID        | Abierto (bloqueante prod)          | Cerrar y re-testear en auditoría (security-gdpr §14).                             |
-| R2  | Evaluador SPF/DMARC clean-room (cobertura camino feliz)                   | Aceptado con seguimiento           | Evaluar librería permisiva auditada o ampliar cobertura + fuzzing.                |
-| R3  | `access_token` por query en handshake WS                                  | Aceptado                           | TLS + TTL corto + no registrar la query; revisar en auditoría.                    |
-| R4  | Cifrado de columna sensible depende de despliegue (KMS/pgcrypto)          | Config de prod                     | Verificar que `private_pem`/`totp_secrets`/WebAuthn están cifrados antes de prod. |
-| R5  | Egress/SSRF desde cargas de cliente en Cloud                              | Mitigado por NetworkPolicy         | Auditar reglas de egress por tenant en cada release.                              |
-| R6  | «Mi cuenta» (app Astro) comparte origen con Sytue ID y recibe sus cookies | Aceptado por el dueño (2026-09-24) | Ver [el riesgo aceptado](#riesgo-aceptado-mi-cuenta-en-el-origen-del-idp).        |
+| #   | Residual risk                                                                               | Status                             | Action                                                                       |
+| --- | ------------------------------------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------- |
+| R1  | Incomplete state binding of the second MFA/TOTP step in Sytue ID                            | Open (prod blocker)                | Close and re-test in the audit (security-gdpr §14).                          |
+| R2  | Clean-room SPF/DMARC evaluator (happy-path coverage)                                        | Accepted with follow-up            | Evaluate an audited permissive library or expand coverage + fuzzing.         |
+| R3  | `access_token` in the query string on the WS handshake                                      | Accepted                           | TLS + short TTL + not logging the query; review in the audit.                |
+| R4  | Sensitive column encryption depends on the deployment (KMS/pgcrypto)                        | Prod config                        | Verify that `private_pem`/`totp_secrets`/WebAuthn are encrypted before prod. |
+| R5  | Egress/SSRF from customer workloads in Cloud                                                | Mitigated by NetworkPolicy         | Audit per-tenant egress rules on every release.                              |
+| R6  | «Mi cuenta» (My account, Astro app) shares an origin with Sytue ID and receives its cookies | Accepted by the owner (2026-09-24) | See [the accepted risk](#riesgo-aceptado-mi-cuenta-en-el-origen-del-idp).    |
 
 <a id="riesgo-aceptado-mi-cuenta-en-el-origen-del-idp"></a>
 
-#### 2.8.1 Riesgo aceptado: «Mi cuenta» en el origen de Sytue ID
+<a id="281-riesgo-aceptado-mi-cuenta-en-el-origen-de-sytue-id"></a>
 
-**Qué se acepta.** La app «Mi cuenta» (`apps/frontend/apps/account`, Astro con BFF) se
-sirve en `https://id.<dominio>/account`, el mismo origen que el IdP. La cuenta es de la
-persona y no de una organización, así que su dirección es global (decisión del dueño,
-2026-09-24). Como consecuencia, el navegador le manda las cookies de Sytue ID
-—`__Host-sytue_id_session` (la sesión SSO) y `__Host-sytue_device`—, y un script que
-llegara a ejecutarse en la app correría en el origen del IdP: podría llamar a
-`/oauth2/authorize` con la sesión SSO o enviar los formularios de `/account/*`.
+#### 2.8.1 Accepted risk: «Mi cuenta» (My account) on the Sytue ID origin
 
-**Cómo se reparte el host** (`deploy/production/tests/ingress-comodin-test.sh` lo
-comprueba sobre el render, y falla si una ruta de Go vuelve a caer en la app):
+**What is accepted.** The «Mi cuenta» app (`apps/frontend/apps/account`, Astro with a BFF) is
+served at `https://id.<dominio>/account`, the same origin as the IdP. The account belongs to the
+person and not to an organization, so its address is global (owner's decision,
+2026-09-24). As a consequence, the browser sends it the Sytue ID cookies
+—`__Host-sytue_id_session` (the SSO session) and `__Host-sytue_device`—, and a script that
+managed to run in the app would run on the IdP's origin: it could call
+`/oauth2/authorize` with the SSO session or submit the `/account/*` forms.
 
-| Ruta en `id.<dominio>`                                                                                                                                           | Quién la sirve                                   | Prioridad en Traefik      |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------- |
-| Las 16 rutas de Go bajo `/account/` (avatar, perfil de Apple, sesiones, perfil, contraseña, MFA, contraseñas de aplicación, passkeys, confianza del dispositivo) | Sytue ID (`id`, `ingress.rutasDeCuenta`)         | 200, exactas              |
-| `/account` y el resto de `/account/…` (página, BFF, assets)                                                                                                      | «Mi cuenta» (`sytue-frontend`, `globalHost: id`) | 100                       |
-| Todo lo demás (`/login`, `/oauth2`, `/api/v1`, `/avatar`, iconos…)                                                                                               | Sytue ID                                         | 38 (longitud de la regla) |
-| `<slug>.<dominio>/account…`                                                                                                                                      | Redirección 302 a `id.<dominio>/account…`        | 2 (comodín)               |
+**How the host is split** (`deploy/production/tests/ingress-comodin-test.sh`
+checks it on the render, and fails if a Go route falls into the app again):
 
-**Lo que depende de nosotros, y está hecho:**
+| Route on `id.<dominio>`                                                                                                             | Who serves it                                    | Priority in Traefik |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------- |
+| The 16 Go routes under `/account/` (avatar, Apple profile, sessions, profile, password, MFA, app passwords, passkeys, device trust) | Sytue ID (`id`, `ingress.rutasDeCuenta`)         | 200, exact          |
+| `/account` and the rest of `/account/…` (page, BFF, assets)                                                                         | «Mi cuenta» (`sytue-frontend`, `globalHost: id`) | 100                 |
+| Everything else (`/login`, `/oauth2`, `/api/v1`, `/avatar`, icons…)                                                                 | Sytue ID                                         | 38 (rule length)    |
+| `<slug>.<dominio>/account…`                                                                                                         | 302 redirect to `id.<dominio>/account…`          | 2 (wildcard)        |
 
-- **El BFF no lee ni reenvía las cookies del IdP.** Todas sus llamadas a Sytue ID van
-  por `cabecerasConToken`, que borra la cabecera `cookie` y se autentica solo con el
-  token de la sesión de la app. Ningún fichero de la app nombra esas cookies. Lo
-  comprueba `apps/frontend/apps/account/src/lib/cabeceras.test.ts`. Marcar de confianza
-  «este dispositivo», que exige la cookie de dispositivo, lo hace el navegador contra
-  Go (`POST /account/devices/trust`, ruta exacta de Sytue ID), no el BFF.
-- **CSP estricta de scripts, sin terceros.** La app activa `security.csp` de Astro:
-  `script-src 'self'` más los hashes de los scripts que procesa. Los dos de arranque
-  del layout (prefijo de `/api` y tema) se sirven como fichero de este origen
-  (`src/pages/arranque.js.ts`) y no en línea. Ningún script de otro origen ni
-  inyectado en línea se ejecuta: comprobado en Chromium, con un `<script>` inyectado
-  que no corre. Los estilos quedan con
-  `'unsafe-inline'`: un estilo no ejecuta código. A esa política se suma la base de
-  la suite (`object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`,
-  `form-action 'self'`), y el navegador aplica las dos.
-- **Las cookies no chocan.** Las de la app se llaman `__Host-sytue_session` y
-  `__Host-sytue_oidc_state`, y las del IdP `__Host-sytue_id_*` y `__Host-sytue_device`.
-  Todas son host-only, sin `Domain`.
-- **Los formularios de Go siguen protegidos por sí mismos:** exigen sesión y `Origin`
-  permitido (`account_guard_integration_test.go`), y los que verifican secretos van
-  limitados como el login.
+**What depends on us, and is done:**
 
-**Lo que no se puede evitar.** Con el mismo origen, la política del mismo origen no
-separa la app del IdP: la mitigación es que la app no ejecute nada ajeno, no una
-frontera del navegador. Si algún día hace falta esa frontera, la salida es servir la
-app solo en `account.<dominio>`, donde no le llegan las cookies del IdP.
+- **The BFF neither reads nor forwards the IdP's cookies.** All its calls to Sytue ID go
+  through `cabecerasConToken`, which removes the `cookie` header and authenticates only with the
+  app session's token. No file in the app names those cookies. This is
+  checked by `apps/frontend/apps/account/src/lib/cabeceras.test.ts`. Marking
+  “this device” as trusted, which requires the device cookie, is done by the browser against
+  Go (`POST /account/devices/trust`, an exact Sytue ID route), not by the BFF.
+- **Strict script CSP, no third parties.** The app enables Astro's `security.csp`:
+  `script-src 'self'` plus the hashes of the scripts it processes. The layout's two bootstrap
+  scripts (`/api` prefix and theme) are served as a file from this origin
+  (`src/pages/arranque.js.ts`) and not inline. No script from another origin or
+  injected inline runs: verified in Chromium, with an injected `<script>`
+  that does not run. Styles keep
+  `'unsafe-inline'`: a style does not execute code. On top of that policy comes the suite's
+  base policy (`object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`,
+  `form-action 'self'`), and the browser applies both.
+- **The cookies do not collide.** The app's are called `__Host-sytue_session` and
+  `__Host-sytue_oidc_state`, and the IdP's `__Host-sytue_id_*` and `__Host-sytue_device`.
+  All are host-only, without `Domain`.
+- **The Go forms are still protected on their own:** they require a session and an allowed
+  `Origin` (`account_guard_integration_test.go`), and those that verify secrets are
+  rate-limited like the login.
 
-> Este modelo se **revisa por release mayor** y ante cambios del núcleo de autenticación. Las
-> mitigaciones se verifican de forma continua con los `*_test.go` de `platform/pkg/{authn,tenancy,pg}`
-> y `services/id/internal/*`, y con los gates de CI (SAST/DAST, `govulncheck`, SBOM) de
+**What cannot be avoided.** With the same origin, the same-origin policy does not
+separate the app from the IdP: the mitigation is that the app runs nothing foreign, not a
+browser boundary. If that boundary is ever needed, the way out is to serve the
+app only on `account.<dominio>`, where the IdP's cookies do not reach it.
+
+> This model is **reviewed on every major release** and upon changes to the authentication core. The
+> mitigations are verified continuously with the `*_test.go` files of `platform/pkg/{authn,tenancy,pg}`
+> and `services/id/internal/*`, and with the CI gates (SAST/DAST, `govulncheck`, SBOM) of
 > security-gdpr §12.
 
 ---
 
 <a id="3-checklist-owasp-asvs-l2"></a>
 
-## 3. Checklist OWASP ASVS L2
+## 3. OWASP ASVS L2 checklist
 
-> Verificación de seguridad de la suite **Sytue One** contra **OWASP ASVS** (Application Security
-> Verification Standard), nivel objetivo **L2** (y **L3** en los componentes críticos de
-> autenticación/criptografía de **Sytue ID**), tal como exige [`docs/CONVENTIONS.md`](./CONVENTIONS.md)
-> §0.7 y [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd) §4.6/§14. Cada requisito se **mapea a su
-> evidencia real** en `platform/pkg/*` / `services/<svc>`.
+> Security verification of the **Sytue One** suite against **OWASP ASVS** (Application Security
+> Verification Standard), target level **L2** (and **L3** for the critical
+> authentication/cryptography components of **Sytue ID**), as required by [`docs/CONVENTIONS.md`](./CONVENTIONS.md)
+> §0.7 and [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd) §4.6/§14. Each requirement is **mapped to its
+> actual evidence** in `platform/pkg/*` / `services/<svc>`.
 
-Estados: **✅ implementado** · **◑ parcial / pendiente de auditoría** · **☐ operativo (infra/CI, no
-código de app)**. Este checklist es el guion de la **auditoría de seguridad obligatoria del IdP**
-antes de producción y del _Definition of Done_ de seguridad de cada PR. Referencia de dominios ASVS
-(V1–V14) numerados de forma estable; la redacción se adapta al alcance de Sytue One.
+Statuses: **✅ implemented** · **◑ partial / pending audit** · **☐ operational (infra/CI, not
+app code)**. This checklist is the script for the **mandatory security audit of the IdP**
+before production and for each PR's security _Definition of Done_. ASVS domain references
+(V1–V14) are numbered stably; the wording is adapted to the scope of Sytue One.
 
 ---
 
 <a id="v1--arquitectura-diseno-y-modelado-de-amenazas"></a>
 
-### V1 — Arquitectura, diseño y modelado de amenazas
+<a id="v1--arquitectura-diseño-y-modelado-de-amenazas"></a>
 
-| Req   | Verificación                                            | Estado | Evidencia                                                                                                                                                        |
-| ----- | ------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V1.1  | Existe un modelo de amenazas por servicio               | ✅     | [`docs/security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio) (STRIDE id/drive/mail/chat/cloud + resto). |
-| V1.2  | Autenticación centralizada, no reinventada por servicio | ✅     | Sytue ID único IdP; servicios validan JWT vía `platform/pkg/authn`.                                                                                              |
-| V1.4  | Confianza aplicada en cada límite (deny-by-default)     | ✅     | `RequireAuth`/`RequireRole`/`RequireScope`; RLS `FORCE`; NetworkPolicy.                                                                                          |
-| V1.5  | Datos clasificados y protegidos según sensibilidad      | ✅     | Cifrado de columnas sensibles + AES-GCM Cloud; ROPA (security-gdpr §11.2).                                                                                       |
-| V1.9  | Comunicaciones cifradas entre componentes               | ✅/☐   | ✅ TLS 1.3 + HSTS en el edge. ☐ Este-oeste: HTTP plano acotado por NetworkPolicy; el mTLS es diseño (§2.2, V9.2.1).                                              |
-| V1.14 | Segregación de componentes/tenants documentada          | ✅     | `tenancy` + RLS + namespaces `tenant-<slug>` (security-gdpr §5).                                                                                                 |
+### V1 — Architecture, design and threat modeling
+
+| Req   | Verification                                           | Status | Evidence                                                                                                                                                        |
+| ----- | ------------------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1.1  | A threat model exists per service                      | ✅     | [`docs/security.md#2-modelo-de-amenazas-stride-por-servicio`](./security.md#2-modelo-de-amenazas-stride-por-servicio) (STRIDE id/drive/mail/chat/cloud + rest). |
+| V1.2  | Centralized authentication, not reinvented per service | ✅     | Sytue ID as the single IdP; services validate JWTs via `platform/pkg/authn`.                                                                                    |
+| V1.4  | Trust enforced at every boundary (deny-by-default)     | ✅     | `RequireAuth`/`RequireRole`/`RequireScope`; `FORCE` RLS; NetworkPolicy.                                                                                         |
+| V1.5  | Data classified and protected according to sensitivity | ✅     | Encryption of sensitive columns + Cloud AES-GCM; ROPA (security-gdpr §11.2).                                                                                    |
+| V1.9  | Encrypted communications between components            | ✅/☐   | ✅ TLS 1.3 + HSTS at the edge. ☐ East-west: plain HTTP restricted by NetworkPolicy; mTLS is design (§2.2, V9.2.1).                                              |
+| V1.14 | Segregation of components/tenants documented           | ✅     | `tenancy` + RLS + `tenant-<slug>` namespaces (security-gdpr §5).                                                                                                |
 
 <a id="v2--autenticacion"></a>
 
-### V2 — Autenticación
+<a id="v2--autenticación"></a>
 
-| Req     | Verificación                                                         | Estado | Evidencia                                                                           |
-| ------- | -------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------- |
-| V2.1.1  | Contraseñas ≥ mínimo, sin límite superior arbitrario                 | ◑      | Política en Sytue ID; verificar en auditoría.                                       |
-| V2.1.7  | Sin pistas que permitan enumerar usuarios                            | ✅     | `http/login.go` `loginFail` (mensaje genérico) + `auth.login.failed`.               |
-| V2.2.1  | Anti-automatización / anti-fuerza-bruta                              | ◑      | Argon2id como coste; rate-limit edge + bloqueo progresivo (security-gdpr §4.3).     |
-| V2.4.1  | Almacenamiento de contraseñas con función de derivación fuerte y sal | ✅     | Argon2id (64 MiB, t=3, p=2, sal 16 B) formato PHC — `id/internal/domain/secret.go`. |
-| V2.4.5  | Comparación de contraseñas en tiempo constante                       | ✅     | `subtle.ConstantTimeCompare` en `VerifyPassword`.                                   |
-| V2.5.x  | Recuperación de credenciales segura; recovery codes de un solo uso   | ◑      | Recovery codes hasheados de un solo uso (security-gdpr §4.2); flujo a auditar.      |
-| V2.8.1  | MFA soportado; segundo factor resistente                             | ✅     | WebAuthn/FIDO2 (`id/internal/webauthn/*`) + TOTP RFC 6238; step-up por rol.         |
-| V2.8.4  | Anti-clonado del autenticador                                        | ✅     | `sign_count` monotónico en `webauthn_credentials`.                                  |
-| V2.10.x | Secretos de autenticación (TOTP/WebAuthn) protegidos en reposo       | ✅     | `totp_secrets.secret` / WebAuthn cifrados en columna (KMS/pgcrypto).                |
+### V2 — Authentication
+
+| Req     | Verification                                                   | Status | Evidence                                                                            |
+| ------- | -------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| V2.1.1  | Passwords ≥ minimum, no arbitrary upper limit                  | ◑      | Policy in Sytue ID; verify in the audit.                                            |
+| V2.1.7  | No hints that allow user enumeration                           | ✅     | `http/login.go` `loginFail` (generic message) + `auth.login.failed`.                |
+| V2.2.1  | Anti-automation / anti-brute-force                             | ◑      | Argon2id as a cost; edge rate limit + progressive lockout (security-gdpr §4.3).     |
+| V2.4.1  | Password storage with a strong, salted key derivation function | ✅     | Argon2id (64 MiB, t=3, p=2, 16 B salt) PHC format — `id/internal/domain/secret.go`. |
+| V2.4.5  | Constant-time password comparison                              | ✅     | `subtle.ConstantTimeCompare` in `VerifyPassword`.                                   |
+| V2.5.x  | Secure credential recovery; single-use recovery codes          | ◑      | Hashed single-use recovery codes (security-gdpr §4.2); flow to be audited.          |
+| V2.8.1  | MFA supported; resistant second factor                         | ✅     | WebAuthn/FIDO2 (`id/internal/webauthn/*`) + TOTP RFC 6238; step-up by role.         |
+| V2.8.4  | Authenticator anti-cloning                                     | ✅     | Monotonic `sign_count` in `webauthn_credentials`.                                   |
+| V2.10.x | Authentication secrets (TOTP/WebAuthn) protected at rest       | ✅     | `totp_secrets.secret` / WebAuthn encrypted at the column level (KMS/pgcrypto).      |
 
 <a id="v3--gestion-de-sesion"></a>
 
-### V3 — Gestión de sesión
+<a id="v3--gestión-de-sesión"></a>
 
-| Req    | Verificación                                              | Estado | Evidencia                                                                                    |
-| ------ | --------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
-| V3.2.1 | Tokens de sesión generados con CSPRNG                     | ✅     | `domain.GenerateToken` (`crypto/rand`, base64url).                                           |
-| V3.2.3 | Solo se almacena el hash del token de sesión              | ✅     | `sessions.token_hash` = SHA-256 (`HashToken`), nunca en claro.                               |
-| V3.3.1 | Sesión expira; logout invalida                            | ✅     | `sessions.expires_at`/`revoked_at` + índice de expiración; logout en `http/logout.go`.       |
-| V3.4.1 | Cookies `Secure`, `HttpOnly`, `SameSite`, dominio acotado | ✅     | Cookie SSO `.sytue.eu` (security-gdpr §4.1).                                                 |
-| V3.5.x | Tokens OAuth: refresh con rotación y detección de reuso   | ✅     | `token.go` `RotateRefreshToken`/`RevokeRefreshChain` + audit `oauth.refresh.reuse_detected`. |
-| V3.5.3 | Access tokens de vida corta / revocables                  | ✅     | TTL corto; usuario inactivo rechazado en `grantRefresh`.                                     |
+### V3 — Session management
+
+| Req    | Verification                                            | Status | Evidence                                                                                     |
+| ------ | ------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| V3.2.1 | Session tokens generated with a CSPRNG                  | ✅     | `domain.GenerateToken` (`crypto/rand`, base64url).                                           |
+| V3.2.3 | Only the hash of the session token is stored            | ✅     | `sessions.token_hash` = SHA-256 (`HashToken`), never in clear text.                          |
+| V3.3.1 | Session expires; logout invalidates                     | ✅     | `sessions.expires_at`/`revoked_at` + expiry index; logout in `http/logout.go`.               |
+| V3.4.1 | `Secure`, `HttpOnly`, `SameSite` cookies, scoped domain | ✅     | `.sytue.eu` SSO cookie (security-gdpr §4.1).                                                 |
+| V3.5.x | OAuth tokens: refresh with rotation and reuse detection | ✅     | `token.go` `RotateRefreshToken`/`RevokeRefreshChain` + `oauth.refresh.reuse_detected` audit. |
+| V3.5.3 | Short-lived / revocable access tokens                   | ✅     | Short TTL; inactive user rejected in `grantRefresh`.                                         |
 
 <a id="v4--control-de-acceso"></a>
 
-### V4 — Control de acceso
+### V4 — Access control
 
-| Req    | Verificación                                               | Estado | Evidencia                                                                                             |
-| ------ | ---------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
-| V4.1.1 | Reglas de acceso aplicadas en el servidor, deny-by-default | ✅     | `RequireRole`/`RequireScope`; `docs/.../access.go` `ResolveRole` parte de "sin acceso".               |
-| V4.1.3 | Mínimo privilegio por rol                                  | ✅     | Roles `owner/admin/member/billing`; `Role.RequiresMFA` para elevados.                                 |
-| V4.2.1 | Protección contra IDOR / referencia directa insegura       | ✅     | RLS por tenant impide resolver filas ajenas (Drive/Docs/etc.).                                        |
-| V4.3.1 | Interfaces admin con control reforzado (MFA)               | ✅     | Step-up MFA para `admin/owner` (`authorize.go` `requiresStepUp`).                                     |
-| V4.3.x | Aislamiento multi-tenant efectivo                          | ✅     | RLS `ENABLE`+`FORCE` (`services/*/db/migrations/0001_*.up.sql`) sobre `app.tenant` (`pg.InTenantTx`). |
+| Req    | Verification                                               | Status | Evidence                                                                                           |
+| ------ | ---------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
+| V4.1.1 | Access rules enforced on the server, deny-by-default       | ✅     | `RequireRole`/`RequireScope`; `docs/.../access.go` `ResolveRole` starts from "no access".          |
+| V4.1.3 | Least privilege per role                                   | ✅     | Roles `owner/admin/member/billing`; `Role.RequiresMFA` for elevated ones.                          |
+| V4.2.1 | Protection against IDOR / insecure direct object reference | ✅     | Per-tenant RLS prevents resolving other tenants' rows (Drive/Docs/etc.).                           |
+| V4.3.1 | Admin interfaces with reinforced control (MFA)             | ✅     | MFA step-up for `admin/owner` (`authorize.go` `requiresStepUp`).                                   |
+| V4.3.x | Effective multi-tenant isolation                           | ✅     | RLS `ENABLE`+`FORCE` (`services/*/db/migrations/0001_*.up.sql`) on `app.tenant` (`pg.InTenantTx`). |
 
 <a id="v5--validacion-saneado-y-codificacion"></a>
 
-### V5 — Validación, saneado y codificación
+<a id="v5--validación-saneado-y-codificación"></a>
 
-| Req    | Verificación                                  | Estado | Evidencia                                                                                          |
-| ------ | --------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
-| V5.1.x | Validación de entrada en servidor             | ✅     | `tenancy.ValidSlug` (regex), `CHECK` en columnas, validación de scopes/redirect en `authorize.go`. |
-| V5.2.x | Saneado de contenido / anti-XSS               | ✅     | `html.EscapeString` en fallback de login; frontend Astro/Preact con escape por defecto + CSP.      |
-| V5.3.4 | Consultas parametrizadas (anti-SQLi)          | ✅     | `pgx` con args posicionales en todo el store; `set_config(...,$1,...)`; sin SQL dinámico.          |
-| V5.3.6 | Protección contra inyección en cabeceras/JSON | ✅     | Respuestas JSON canónicas (`httpx.respond`); sin reflejo directo de entrada.                       |
-| V5.5.x | Deserialización segura de tokens/JWT/WebAuthn | ◑      | Parsers `jwx`/CBOR; fuzzing pendiente en auditoría (threat-model R2).                              |
+### V5 — Validation, sanitization and encoding
+
+| Req    | Verification                                | Status | Evidence                                                                                         |
+| ------ | ------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| V5.1.x | Server-side input validation                | ✅     | `tenancy.ValidSlug` (regex), `CHECK` on columns, scope/redirect validation in `authorize.go`.    |
+| V5.2.x | Content sanitization / anti-XSS             | ✅     | `html.EscapeString` in the login fallback; Astro/Preact frontend with escaping by default + CSP. |
+| V5.3.4 | Parameterized queries (anti-SQLi)           | ✅     | `pgx` with positional args throughout the store; `set_config(...,$1,...)`; no dynamic SQL.       |
+| V5.3.6 | Protection against header/JSON injection    | ✅     | Canonical JSON responses (`httpx.respond`); no direct reflection of input.                       |
+| V5.5.x | Safe deserialization of tokens/JWT/WebAuthn | ◑      | `jwx`/CBOR parsers; fuzzing pending in the audit (threat-model R2).                              |
 
 <a id="v6--criptografia-en-reposo"></a>
 
-### V6 — Criptografía en reposo
+<a id="v6--criptografía-en-reposo"></a>
 
-| Req    | Verificación                                            | Estado | Evidencia                                                                                               |
-| ------ | ------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| V6.1.1 | Datos sensibles cifrados en reposo                      | ✅     | AES-256-GCM (`services/cloud/internal/crypto/crypto.go`); columnas cifradas en Sytue ID; SSE S3/RDB.    |
-| V6.2.1 | Algoritmos modernos y modos autenticados (AEAD)         | ✅     | GCM (AEAD, nonce por valor, tag); RS256 firma; Argon2id derivación.                                     |
-| V6.2.2 | CSPRNG para claves/nonces/tokens                        | ✅     | `crypto/rand` en `secret.go`, `crypto.go` (`io.ReadFull(rand.Reader,...)`), `keys.go`.                  |
-| V6.3.1 | Comparaciones constant-time en cripto                   | ✅     | `subtle.ConstantTimeCompare` (PKCE/pwd), `hmac.Equal` (webhook LiveKit).                                |
-| V6.4.1 | Gestión y rotación de claves; secretos fuera del código | ✅     | Secret Manager → Secret de Kubernetes (§3); rotación JWKS `KeyManager.Rotate`; `config` solo desde env. |
+### V6 — Cryptography at rest
+
+| Req    | Verification                                         | Status | Evidence                                                                                             |
+| ------ | ---------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| V6.1.1 | Sensitive data encrypted at rest                     | ✅     | AES-256-GCM (`services/cloud/internal/crypto/crypto.go`); encrypted columns in Sytue ID; SSE S3/RDB. |
+| V6.2.1 | Modern algorithms and authenticated modes (AEAD)     | ✅     | GCM (AEAD, nonce per value, tag); RS256 signing; Argon2id derivation.                                |
+| V6.2.2 | CSPRNG for keys/nonces/tokens                        | ✅     | `crypto/rand` in `secret.go`, `crypto.go` (`io.ReadFull(rand.Reader,...)`), `keys.go`.               |
+| V6.3.1 | Constant-time comparisons in crypto                  | ✅     | `subtle.ConstantTimeCompare` (PKCE/pwd), `hmac.Equal` (LiveKit webhook).                             |
+| V6.4.1 | Key management and rotation; secrets out of the code | ✅     | Secret Manager → Kubernetes Secret (§3); JWKS rotation `KeyManager.Rotate`; `config` only from env.  |
 
 <a id="v7--manejo-de-errores-y-logging"></a>
 
-### V7 — Manejo de errores y logging
+### V7 — Error handling and logging
 
-| Req    | Verificación                                             | Estado | Evidencia                                                                                  |
-| ------ | -------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
-| V7.1.1 | Logs no contienen credenciales/datos sensibles           | ✅     | `RequestLogger` (método/ruta/estado/duración/IP, sin cuerpos); auditoría sin PII/secretos. |
-| V7.1.2 | Cada log de seguridad con contexto (actor, `request-id`) | ✅     | `X-Request-Id` (`httpx/middleware.go`); `store.Audit` con actor/IP.                        |
-| V7.3.1 | Eventos de seguridad auditados de forma íntegra          | ✅     | `audit_log` append-only (`GENERATED ALWAYS AS IDENTITY`); eventos OAuth/login/JWKS.        |
-| V7.4.1 | Errores genéricos, sin fuga de detalles internos         | ✅     | Errores JSON canónicos; `Recoverer` → 500 sin stack al cliente.                            |
+| Req    | Verification                                         | Status | Evidence                                                                                |
+| ------ | ---------------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| V7.1.1 | Logs do not contain credentials/sensitive data       | ✅     | `RequestLogger` (method/path/status/duration/IP, no bodies); audit without PII/secrets. |
+| V7.1.2 | Each security log with context (actor, `request-id`) | ✅     | `X-Request-Id` (`httpx/middleware.go`); `store.Audit` with actor/IP.                    |
+| V7.3.1 | Security events audited with integrity               | ✅     | Append-only `audit_log` (`GENERATED ALWAYS AS IDENTITY`); OAuth/login/JWKS events.      |
+| V7.4.1 | Generic errors, no leakage of internal details       | ✅     | Canonical JSON errors; `Recoverer` → 500 without stack to the client.                   |
 
 <a id="v8--proteccion-de-datos-y-privacidad"></a>
 
-### V8 — Protección de datos y privacidad
+<a id="v8--protección-de-datos-y-privacidad"></a>
 
-| Req    | Verificación                              | Estado | Evidencia                                                                        |
-| ------ | ----------------------------------------- | ------ | -------------------------------------------------------------------------------- |
-| V8.1.1 | Minimización de datos (solo lo necesario) | ✅     | RGPD art. 25 (security-gdpr §1, §11); auditoría sin contenidos.                  |
-| V8.2.2 | Caché sin datos sensibles                 | ✅     | `Cache-Control: no-store`/`Pragma: no-cache` en respuestas de token.             |
-| V8.3.x | Derechos del interesado (DSR) soportados  | ✅     | Procedimiento DSR + exportación estándar (security-gdpr §11.4).                  |
-| V8.3.7 | Borrado/retención con expiración          | ✅     | Retención parametrizable + purga (security-gdpr §8.1); deprovisioning inmediato. |
+### V8 — Data protection and privacy
+
+| Req    | Verification                               | Status | Evidence                                                                       |
+| ------ | ------------------------------------------ | ------ | ------------------------------------------------------------------------------ |
+| V8.1.1 | Data minimization (only what is necessary) | ✅     | GDPR art. 25 (security-gdpr §1, §11); audit without contents.                  |
+| V8.2.2 | Cache without sensitive data               | ✅     | `Cache-Control: no-store`/`Pragma: no-cache` on token responses.               |
+| V8.3.x | Data subject rights (DSR) supported        | ✅     | DSR procedure + standard export (security-gdpr §11.4).                         |
+| V8.3.7 | Deletion/retention with expiry             | ✅     | Configurable retention + purge (security-gdpr §8.1); immediate deprovisioning. |
 
 <a id="v9--comunicaciones"></a>
 
-### V9 — Comunicaciones
+### V9 — Communications
 
-| Req    | Verificación                                         | Estado | Evidencia                                                              |
-| ------ | ---------------------------------------------------- | ------ | ---------------------------------------------------------------------- |
-| V9.1.1 | TLS en todas las conexiones cliente                  | ☐      | TLS 1.3 en edge + HSTS (security-gdpr §2.2).                           |
-| V9.1.2 | Suites/versiones seguras; TLS 1.0/1.1 deshabilitados | ☐      | Config Traefik (security-gdpr §2.2).                                   |
-| V9.2.1 | Conexiones internas cifradas y autenticadas          | ☐      | mTLS este-oeste + NetworkPolicy (security-gdpr §2.2, §5.2).            |
-| V9.2.x | Validación de origen en WebSocket                    | ✅     | `websocket.AcceptOptions.OriginPatterns` (`chat/internal/http/ws.go`). |
+| Req    | Verification                                     | Status | Evidence                                                               |
+| ------ | ------------------------------------------------ | ------ | ---------------------------------------------------------------------- |
+| V9.1.1 | TLS on all client connections                    | ☐      | TLS 1.3 at the edge + HSTS (security-gdpr §2.2).                       |
+| V9.1.2 | Secure suites/versions; TLS 1.0/1.1 disabled     | ☐      | Traefik config (security-gdpr §2.2).                                   |
+| V9.2.1 | Encrypted and authenticated internal connections | ☐      | East-west mTLS + NetworkPolicy (security-gdpr §2.2, §5.2).             |
+| V9.2.x | Origin validation on WebSocket                   | ✅     | `websocket.AcceptOptions.OriginPatterns` (`chat/internal/http/ws.go`). |
 
 <a id="v10--codigo-malicioso-y-cadena-de-suministro"></a>
 
-### V10 — Código malicioso y cadena de suministro
+<a id="v10--código-malicioso-y-cadena-de-suministro"></a>
 
-| Req     | Verificación                                              | Estado | Evidencia                                                                                                                                                                                          |
-| ------- | --------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V10.3.2 | Dependencias verificadas / sin vulnerabilidades conocidas | ☐      | `govulncheck`, `osv-scanner`/`bun audit`, `trivy`/`grype` (gate CI, security-gdpr §12).                                                                                                            |
-| V10.3.3 | SBOM por artefacto                                        | ☐      | CycloneDX/SPDX (CONVENTIONS §3).                                                                                                                                                                   |
-| V10.x   | Artefactos de producto sin AGPL/SSPL/BSL                  | ✅     | Gate SBOM del perímetro A; el tooling autónomo se controla en inventario separado ([`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento)). |
+### V10 — Malicious code and supply chain
+
+| Req     | Verification                                     | Status | Evidence                                                                                                                                                                                         |
+| ------- | ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| V10.3.2 | Verified dependencies / no known vulnerabilities | ☐      | `govulncheck`, `osv-scanner`/`bun audit`, `trivy`/`grype` (CI gate, security-gdpr §12).                                                                                                          |
+| V10.3.3 | SBOM per artifact                                | ☐      | CycloneDX/SPDX (CONVENTIONS §3).                                                                                                                                                                 |
+| V10.x   | Product artifacts without AGPL/SSPL/BSL          | ✅     | Perimeter A SBOM gate; standalone tooling is controlled in a separate inventory ([`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento)). |
 
 <a id="v11--logica-de-negocio"></a>
 
-### V11 — Lógica de negocio
+<a id="v11--lógica-de-negocio"></a>
 
-| Req     | Verificación                         | Estado | Evidencia                                                     |
-| ------- | ------------------------------------ | ------ | ------------------------------------------------------------- |
-| V11.1.x | Flujos con límites/secuencia forzada | ✅     | Auth code un solo uso; refresh rotación; step-up MFA por rol. |
-| V11.1.4 | Anti-abuso / rate-limit por flujo    | ◑      | Rate-limit edge + cuotas; ampliar en auditoría.               |
+### V11 — Business logic
+
+| Req     | Verification                        | Status | Evidence                                                     |
+| ------- | ----------------------------------- | ------ | ------------------------------------------------------------ |
+| V11.1.x | Flows with limits/enforced sequence | ✅     | Single-use auth code; refresh rotation; MFA step-up by role. |
+| V11.1.4 | Anti-abuse / rate limit per flow    | ◑      | Edge rate limit + quotas; expand in the audit.               |
 
 <a id="v12--ficheros-y-recursos"></a>
 
-### V12 — Ficheros y recursos
+### V12 — Files and resources
 
-| Req     | Verificación                                      | Estado | Evidencia                                                                          |
-| ------- | ------------------------------------------------- | ------ | ---------------------------------------------------------------------------------- |
-| V12.1.1 | Tamaño/tipo de subida controlados y por cuota     | ✅     | `quotas` por tenant (Drive); `content_type`/`size_bytes` con `CHECK`.              |
-| V12.3.x | Rutas/claves de almacenamiento sin path traversal | ✅     | `storage_key` gestionado + prefijo de tenant por `objectstore` (no input directo). |
-| V12.4.1 | Ficheros de otro tenant inaccesibles              | ✅     | Prefijos S3 por tenant + RLS de metadatos.                                         |
+| Req     | Verification                                     | Status | Evidence                                                                  |
+| ------- | ------------------------------------------------ | ------ | ------------------------------------------------------------------------- |
+| V12.1.1 | Upload size/type controlled and subject to quota | ✅     | Per-tenant `quotas` (Drive); `content_type`/`size_bytes` with `CHECK`.    |
+| V12.3.x | Storage paths/keys without path traversal        | ✅     | Managed `storage_key` + tenant prefix by `objectstore` (no direct input). |
+| V12.4.1 | Another tenant's files inaccessible              | ✅     | Per-tenant S3 prefixes + metadata RLS.                                    |
 
 <a id="v13--api-y-servicios-web"></a>
 
-### V13 — API y servicios web
+### V13 — API and web services
 
-| Req     | Verificación                                      | Estado | Evidencia                                                                                                 |
-| ------- | ------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
-| V13.1.1 | Autenticación/autorización en todos los endpoints | ✅     | `RequireAuth` + rol/scope; sondas `/healthz`/`/readyz` públicas por diseño.                               |
-| V13.1.3 | Métodos HTTP restringidos; 405 canónico           | ✅     | `httpx.NewRouter` (`MethodNotAllowed`, `NotFound`).                                                       |
-| V13.2.x | OAuth/OIDC conforme a BCP                         | ◑      | PKCE, `redirect_uri` exacto, `state`/`nonce`, rotación refresh; validación final en auditoría (RFC 9700). |
-| V13.4.1 | WebSocket autenticado antes de aceptar            | ✅     | `ws.go`: `verifier.Verify` antes de `websocket.Accept`.                                                   |
+| Req     | Verification                                  | Status | Evidence                                                                                                 |
+| ------- | --------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- |
+| V13.1.1 | Authentication/authorization on all endpoints | ✅     | `RequireAuth` + role/scope; `/healthz`/`/readyz` probes public by design.                                |
+| V13.1.3 | Restricted HTTP methods; canonical 405        | ✅     | `httpx.NewRouter` (`MethodNotAllowed`, `NotFound`).                                                      |
+| V13.2.x | OAuth/OIDC compliant with the BCP             | ◑      | PKCE, exact `redirect_uri`, `state`/`nonce`, refresh rotation; final validation in the audit (RFC 9700). |
+| V13.4.1 | WebSocket authenticated before accepting      | ✅     | `ws.go`: `verifier.Verify` before `websocket.Accept`.                                                    |
 
 <a id="v14--configuracion-y-despliegue"></a>
 
-### V14 — Configuración y despliegue
+<a id="v14--configuración-y-despliegue"></a>
 
-| Req     | Verificación                               | Estado | Evidencia                                                                                                                                                              |
-| ------- | ------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V14.1.1 | Build reproducible y endurecido            | ✅/☐   | `-trimpath -ldflags="-s -w"`, `CGO_ENABLED=0` (`services/*/Dockerfile`).                                                                                               |
-| V14.1.3 | Contenedores non-root / mínimos            | ✅     | `gcr.io/distroless/static:nonroot`, `USER nonroot`. `services/ocr` va sobre `debian:bookworm-slim` por digest (necesita Tesseract), non-root e igual de acotado: §9.1. |
-| V14.2.1 | Sin componentes/versiones EOL o con CVE    | ☐      | Política "última estable" + Renovate + escáneres (CONVENTIONS §3).                                                                                                     |
-| V14.3.2 | Cabeceras de seguridad presentes           | ☐      | HSTS/CSP/`X-Content-Type-Options`/`X-Frame-Options`/COOP/CORP (security-gdpr §9.2–9.3).                                                                                |
-| V14.4.1 | Secretos gestionados, nunca en git         | ✅     | Secret Manager → Secret de Kubernetes; `config` solo desde env; `.env` ignorado.                                                                                       |
-| V14.5.1 | Superficie de red mínima (deny-by-default) | ☐      | NetworkPolicy por namespace (security-gdpr §5.2).                                                                                                                      |
+### V14 — Configuration and deployment
+
+| Req     | Verification                                 | Status | Evidence                                                                                                                                                                        |
+| ------- | -------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V14.1.1 | Reproducible and hardened build              | ✅/☐   | `-trimpath -ldflags="-s -w"`, `CGO_ENABLED=0` (`services/*/Dockerfile`).                                                                                                        |
+| V14.1.3 | Non-root / minimal containers                | ✅     | `gcr.io/distroless/static:nonroot`, `USER nonroot`. `services/ocr` runs on `debian:bookworm-slim` pinned by digest (it needs Tesseract), non-root and equally restricted: §9.1. |
+| V14.2.1 | No EOL components/versions or ones with CVEs | ☐      | "Latest stable" policy + Renovate + scanners (CONVENTIONS §3).                                                                                                                  |
+| V14.3.2 | Security headers present                     | ☐      | HSTS/CSP/`X-Content-Type-Options`/`X-Frame-Options`/COOP/CORP (security-gdpr §9.2–9.3).                                                                                         |
+| V14.4.1 | Managed secrets, never in git                | ✅     | Secret Manager → Kubernetes Secret; `config` only from env; `.env` ignored.                                                                                                     |
+| V14.5.1 | Minimal network surface (deny-by-default)    | ☐      | NetworkPolicy per namespace (security-gdpr §5.2).                                                                                                                               |
 
 ---
 
 <a id="resumen-de-brechas-a-cerrar-antes-de-produccion-sytue-id-objetivo-l2l3"></a>
 
-### Resumen de brechas a cerrar antes de producción (Sytue ID, objetivo L2/L3)
+<a id="resumen-de-brechas-a-cerrar-antes-de-producción-sytue-id-objetivo-l2l3"></a>
 
-1. **V2.2.1 / V11.1.4** — Formalizar rate-limit/anti-fuerza-bruta y anti-abuso por flujo (bloqueo
-   progresivo sobre PostgreSQL) y probarlo. → threat-model R1 relacionado.
-2. **V2.5.x / V2.8** — Cerrar el **binding de estado del segundo paso MFA/TOTP** (`http/login.go`,
-   `handleMFAVerify`), hoy marcado como pendiente/bloqueante. → **bloqueante de prod**.
-3. **V5.5.x** — Fuzzing de los parsers de JWT/token/WebAuthn/CBOR y de iCal/vCard.
-4. **V6.1.1 / V6.4.1** — Verificar que el **cifrado de columna** (`private_pem`, `totp_secrets`,
-   WebAuthn) está activo en el despliegue de prod (KMS/pgcrypto), no solo previsto. → threat-model R4.
-5. **V9.x / V14.x** — Confirmar en staging la aplicación efectiva de TLS/HSTS/CSP, mTLS interno,
-   NetworkPolicy deny-by-default y los escáneres/SBOM como **gate de CI**.
-6. **V13.2.x** — Revisión final OAuth 2.0 Security BCP (RFC 9700) y OAuth 2.0 for Browser-Based Apps
-   sobre `authorize.go`/`token.go`/`clientauth.go`.
+### Summary of gaps to close before production (Sytue ID, target L2/L3)
 
-> Los ítems ☐ son controles de **infraestructura/CI** (Traefik, Helm, NetworkPolicy, pipelines):
-> se verifican en el despliegue de staging antes de promover a producción. Los ítems ◑ son el
-> núcleo del alcance de la **auditoría de seguridad obligatoria del IdP** (security-gdpr §14). La
-> evidencia de cierre se archiva en el registro de cumplimiento y en
+1. **V2.2.1 / V11.1.4** — Formalize rate limiting/anti-brute-force and per-flow anti-abuse (progressive
+   lockout on PostgreSQL) and test it. → related to threat-model R1.
+2. **V2.5.x / V2.8** — Close the **state binding of the second MFA/TOTP step** (`http/login.go`,
+   `handleMFAVerify`), currently marked as pending/blocking. → **prod blocker**.
+3. **V5.5.x** — Fuzzing of the JWT/token/WebAuthn/CBOR parsers and of iCal/vCard.
+4. **V6.1.1 / V6.4.1** — Verify that **column encryption** (`private_pem`, `totp_secrets`,
+   WebAuthn) is active in the prod deployment (KMS/pgcrypto), not just planned. → threat-model R4.
+5. **V9.x / V14.x** — Confirm in staging the effective application of TLS/HSTS/CSP, internal mTLS,
+   deny-by-default NetworkPolicy and the scanners/SBOM as a **CI gate**.
+6. **V13.2.x** — Final review against OAuth 2.0 Security BCP (RFC 9700) and OAuth 2.0 for Browser-Based Apps
+   of `authorize.go`/`token.go`/`clientauth.go`.
+
+> The ☐ items are **infrastructure/CI** controls (Traefik, Helm, NetworkPolicy, pipelines):
+> they are verified in the staging deployment before promoting to production. The ◑ items are the
+> core of the scope of the **mandatory security audit of the IdP** (security-gdpr §14). The
+> closure evidence is archived in the compliance register and in
 > [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room).
 
 ---
 
 <a id="4-politica-de-reimplementacion-clean-room"></a>
 
-## 4. Política de reimplementación clean-room
+<a id="4-política-de-reimplementación-clean-room"></a>
 
-> **Documento normativo y vinculante.** Fuente de verdad: [`docs/CONVENTIONS.md`](./CONVENTIONS.md)
-> §0.6 y §12. Define **cómo** se construyen los productos Sytue-native: reimplementación **original**
-> (clean-room) sobre **estándares abiertos** y **librerías permisivas**, con **firewall** estricto
-> frente al código **AGPL/source-available** de terceros, para garantizar que cada producto es **obra
-> propia (© Sytue)** y **no obra derivada**.
+## 4. Clean-room reimplementation policy
+
+> **Normative and binding document.** Source of truth: [`docs/CONVENTIONS.md`](./CONVENTIONS.md)
+> §0.6 and §12. It defines **how** Sytue-native products are built: **original** reimplementation
+> (clean-room) on **open standards** and **permissive libraries**, with a strict **firewall**
+> against third-party **AGPL/source-available** code, to guarantee that each product is **our own
+> work (© Sytue)** and **not a derivative work**.
 >
-> Matriz de licencias y gate de CI: [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento).
+> License matrix and CI gate: [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento).
 
 <a id="40-principio-rector"></a>
 
-### 4.0 Principio rector
+### 4.0 Guiding principle
 
-En **v4 "Sytue Native"** **no se despliega ningún motor de terceros AGPL** (Keycloak, Nextcloud,
-OnlyOffice, Stalwart, Mattermost quedan fuera — ver `security.md#5-licencias-propiedad-y-cumplimiento` §6). Cada producto (Sytue ID,
-Drive, Docs, Mail, Calendar, Contacts, Chat, Meet, Hub, Cloud) es una **reimplementación limpia**
-construida **desde cero** sobre:
+In **v4 "Sytue Native"** **no third-party AGPL engine is deployed** (Keycloak, Nextcloud,
+OnlyOffice, Stalwart, Mattermost are out — see `security.md#5-licencias-propiedad-y-cumplimiento` §6). Each product (Sytue ID,
+Drive, Docs, Mail, Calendar, Contacts, Chat, Meet, Hub, Cloud) is a **clean reimplementation**
+built **from scratch** on:
 
-- **Estándares y RFCs públicos:** OIDC/OAuth2, SAML, SCIM, WebDAV (RFC 4918), CalDAV (RFC 4791),
+- **Public standards and RFCs:** OIDC/OAuth2, SAML, SCIM, WebDAV (RFC 4918), CalDAV (RFC 4791),
   CardDAV (RFC 6352), iCalendar (RFC 5545), vCard (RFC 6350), SMTP (RFC 5321), IMAP (RFC 9051),
-  JMAP (RFC 8620/8621), WebSocket (RFC 6455), WebAuthn (W3C), formatos OOXML/ODF (ECMA/ISO).
-- **Librerías Go permisivas** (MIT/BSD/Apache-2.0) que implementan esos estándares de forma genérica
+  JMAP (RFC 8620/8621), WebSocket (RFC 6455), WebAuthn (W3C), OOXML/ODF formats (ECMA/ISO).
+- **Permissive Go libraries** (MIT/BSD/Apache-2.0) that implement those standards generically
   (`emersion/*`, `golang.org/x/net`, `ory/fosite`/`zitadel/oidc`, etc.).
 
-**Regla absoluta:** está **prohibido copiar, traducir, descompilar o portar** código fuente AGPL/GPL
-o _source-available_. Quien implementa trabaja **exclusivamente** desde especificaciones y APIs
-públicas; **nunca** desde el código fuente de un motor de terceros con licencia incompatible.
+**Absolute rule:** it is **forbidden to copy, translate, decompile or port** AGPL/GPL
+or _source-available_ source code. Whoever implements works **exclusively** from public specifications and
+APIs; **never** from the source code of a third-party engine with an incompatible license.
 
 ---
 
 <a id="41-el-firewall-clean-room"></a>
 
-### 4.1 El firewall clean-room
+### 4.1 The clean-room firewall
 
-Para que la reimplementación sea legalmente "limpia", separamos las funciones que pueden contaminarse:
+For the reimplementation to be legally "clean", we separate the roles that can become contaminated:
 
-- **Persona que IMPLEMENTA (lado limpio).** Escribe el código Sytue. Su **única entrada** permitida
-  son: RFCs/specs públicas, documentación de API/protocolo, mensajes de protocolo observados sobre
-  el cable (capturas de tráfico de un cliente estándar contra un servidor estándar), y librerías
-  permisivas. **No puede** leer, abrir, clonar ni inspeccionar el **código fuente** de ningún motor
-  AGPL/source-available, ni copiar su estructura interna, nombres internos o comentarios.
-- **Persona que ESPECIFICA (lado de requisitos), si es necesaria.** Puede observar el
-  **comportamiento externo** de un producto de referencia (qué hace, no cómo está escrito) y
-  redactar **requisitos funcionales en prosa propia**. Entrega al implementador **solo** specs y
-  RFCs, **nunca** fragmentos de código ajeno.
-- **Sin contaminación cruzada.** El implementador no recibe código ajeno por ningún canal. Si en una
-  revisión surge la duda de "¿de dónde salió esto?", la respuesta debe ser siempre una **fuente
-  pública registrada** (§4).
+- **The person who IMPLEMENTS (clean side).** Writes the Sytue code. Their **only** permitted inputs
+  are: public RFCs/specs, API/protocol documentation, protocol messages observed on
+  the wire (traffic captures of a standard client against a standard server), and permissive
+  libraries. They **may not** read, open, clone or inspect the **source code** of any
+  AGPL/source-available engine, nor copy its internal structure, internal names or comments.
+- **The person who SPECIFIES (requirements side), if needed.** May observe the
+  **external behavior** of a reference product (what it does, not how it is written) and
+  write **functional requirements in their own prose**. They hand the implementer **only** specs and
+  RFCs, **never** fragments of someone else's code.
+- **No cross-contamination.** The implementer receives no foreign code through any channel. If in a
+  review the question "where did this come from?" arises, the answer must always be a **registered public
+  source** (§4).
 
-> En la práctica, como reimplementamos sobre **estándares abiertos** con **librerías permisivas que
-> ya implementan el protocolo**, el riesgo es bajo: el implementador casi nunca necesita mirar un
-> motor de referencia. Cuando deba comprobar un comportamiento, lo hace **probando el protocolo**
-> (cliente↔servidor), no leyendo fuente AGPL.
+> In practice, since we reimplement on **open standards** with **permissive libraries that
+> already implement the protocol**, the risk is low: the implementer almost never needs to look at a
+> reference engine. When they must check a behavior, they do it by **testing the protocol**
+> (client↔server), not by reading AGPL source.
 
 ---
 
 <a id="42-que-es-y-que-no-es-protegible-por-copyright"></a>
 
-### 4.2 Qué es y qué NO es protegible por copyright
+<a id="42-qué-es-y-qué-no-es-protegible-por-copyright"></a>
 
-Distinguir esto es la base de la legalidad del clean-room. **El copyright protege la expresión
-concreta del código, no las ideas ni la funcionalidad.**
+### 4.2 What is and is NOT protectable by copyright
 
-**NO protegible (libre de reimplementar):**
+Distinguishing this is the basis of the clean-room's legality. **Copyright protects the concrete
+expression of the code, not ideas or functionality.**
 
-- **Ideas, conceptos y funcionalidad** (qué hace un producto).
-- **Protocolos, formatos de datos y APIs** (interfaces): OIDC, WebDAV, CalDAV, CardDAV, JMAP,
-  IMAP/SMTP, OOXML/ODF, los endpoints REST, los nombres de campos del protocolo. Las interfaces de
-  interoperabilidad no son copyrightables como expresión.
-- **Look & feel y comportamiento de UI** (disposición sidebar+topbar, flujos de usuario): se
-  reimplementa con diseño propio Sytue (`@sytue/ui`).
-- **Algoritmos y métodos** generales (no patentados).
-- **Hechos y estándares** (RFCs, specs).
+**NOT protectable (free to reimplement):**
 
-**SÍ protegible (prohibido usar/copiar):**
+- **Ideas, concepts and functionality** (what a product does).
+- **Protocols, data formats and APIs** (interfaces): OIDC, WebDAV, CalDAV, CardDAV, JMAP,
+  IMAP/SMTP, OOXML/ODF, the REST endpoints, the protocol's field names. Interoperability
+  interfaces are not copyrightable as expression.
+- **Look & feel and UI behavior** (sidebar+topbar layout, user flows): it is
+  reimplemented with Sytue's own design (`@sytue/ui`).
+- General **algorithms and methods** (not patented).
+- **Facts and standards** (RFCs, specs).
 
-- **El código fuente concreto** de cualquier motor de terceros (su redacción específica,
-  estructura de archivos no obligada por el estándar, nombres internos, comentarios).
-- **Recursos artísticos** de terceros (iconos, ilustraciones, fuentes con licencia restringida,
-  cadenas de texto propias del producto ajeno).
-- **Marcas y nombres comerciales** de terceros.
+**Protectable (forbidden to use/copy):**
 
-> Por tanto: **podemos** implementar JMAP, WebDAV, etc., y emular su **funcionalidad** y su **look &
-> feel** moderno; **no podemos** copiar la **expresión** del código de Stalwart, Nextcloud,
-> OnlyOffice, Mattermost o Keycloak.
+- **The concrete source code** of any third-party engine (its specific wording,
+  file structure not dictated by the standard, internal names, comments).
+- Third-party **artistic assets** (icons, illustrations, fonts with a restricted license,
+  text strings specific to the other product).
+- Third-party **trademarks and trade names**.
+
+> Therefore: we **can** implement JMAP, WebDAV, etc., and emulate their **functionality** and their modern **look &
+> feel**; we **cannot** copy the **expression** of the code of Stalwart, Nextcloud,
+> OnlyOffice, Mattermost or Keycloak.
 
 ---
 
 <a id="43-marcas-y-atribucion"></a>
 
-### 4.3 Marcas y atribución
+<a id="43-marcas-y-atribución"></a>
 
-- La marca de cara al usuario es **Sytue** en toda la suite. No se usan marcas, logotipos ni nombres
-  comerciales de terceros en el producto.
-- Los nombres de los protocolos/estándares (OIDC, WebDAV, JMAP…) se usan de forma **descriptiva**,
-  no como marca.
-- Las **librerías permisivas** incorporadas conservan su atribución (NOTICE/copyright) según
-  `security.md#5-licencias-propiedad-y-cumplimiento` §3-§4; eso es atribución de dependencia, no uso de marca de producto.
-- No se sugiere afiliación, respaldo ni compatibilidad oficial con ningún motor de terceros.
+### 4.3 Trademarks and attribution
+
+- The user-facing brand is **Sytue** across the whole suite. No third-party trademarks, logos or trade
+  names are used in the product.
+- The names of protocols/standards (OIDC, WebDAV, JMAP…) are used **descriptively**,
+  not as a brand.
+- Incorporated **permissive libraries** keep their attribution (NOTICE/copyright) according to
+  `security.md#5-licencias-propiedad-y-cumplimiento` §3-§4; that is dependency attribution, not use of a product trademark.
+- No affiliation, endorsement or official compatibility with any third-party engine is suggested.
 
 ---
 
 <a id="44-registro-de-fuentes-y-decisiones-audit-trail"></a>
 
-### 4.4 Registro de fuentes y decisiones (audit trail)
+### 4.4 Record of sources and decisions (audit trail)
 
-Toda reimplementación de un estándar/protocolo deja **rastro auditable**. Por servicio se mantiene un
-registro (en el `README` del servicio o en `docs/decisions.md`) con:
+Every reimplementation of a standard/protocol leaves an **auditable trail**. For each service a
+record is kept (in the service's `README` or in `docs/decisions.md`) with:
 
-| Campo                           | Contenido                                                         |
-| ------------------------------- | ----------------------------------------------------------------- |
-| **Producto/servicio**           | p. ej. `services/mail`                                            |
-| **Estándar/RFC base**           | p. ej. RFC 8620/8621 (JMAP), RFC 5321 (SMTP)                      |
-| **Librerías permisivas usadas** | p. ej. `emersion/go-message` (MIT), `emersion/go-smtp` (MIT)      |
-| **Fuentes consultadas**         | enlaces a RFC/spec/documentación de API pública                   |
-| **Decisiones de diseño**        | resúmenes propios; nunca citas de código ajeno                    |
-| **Confirmación de firewall**    | declaración: "no se consultó código fuente AGPL/source-available" |
-| **Fecha y autor**               | trazabilidad                                                      |
+| Field                         | Content                                                         |
+| ----------------------------- | --------------------------------------------------------------- |
+| **Product/service**           | e.g. `services/mail`                                            |
+| **Base standard/RFC**         | e.g. RFC 8620/8621 (JMAP), RFC 5321 (SMTP)                      |
+| **Permissive libraries used** | e.g. `emersion/go-message` (MIT), `emersion/go-smtp` (MIT)      |
+| **Sources consulted**         | links to RFCs/specs/public API documentation                    |
+| **Design decisions**          | own summaries; never quotes of foreign code                     |
+| **Firewall confirmation**     | statement: "no AGPL/source-available source code was consulted" |
+| **Date and author**           | traceability                                                    |
 
-Este registro permite, ante cualquier disputa, demostrar que la implementación deriva de **fuentes
-públicas** y no del código de un motor de terceros.
+This record makes it possible, in any dispute, to show that the implementation derives from **public
+sources** and not from a third-party engine's code.
 
 <a id="441-formatos-de-iwork"></a>
 
-#### 4.4.1 Registro: formatos de iWork (.pages, .numbers, .key) en `services/docs`
+<a id="441-registro-formatos-de-iwork-pages-numbers-key-en-servicesdocs"></a>
 
-Abrir los ficheros de Pages, Numbers y Keynote al convertirlos a Docus, Calcus o Diapos
-(`services/docs/internal/domain/import_iwork*.go`). Apple **no publica** el formato de 2013 en
-adelante; el de '09 lo documentó en parte.
+#### 4.4.1 Record: iWork formats (.pages, .numbers, .key) in `services/docs`
 
-| Campo                           | Contenido                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Producto/servicio**           | `services/docs` (importación)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **Estándar base**               | Ninguno oficial para 2013+. Para '09, la _iWork Programming Guide_ de Apple (2005, Keynote 2.x y Pages 1.x, «open, easily accessible file format») y la TN2067 con `APXL.xsd`. Snappy: `format_description.txt` y `framing_format.txt` de Google (BSD-3). Protobuf: la descripción de la codificación de protobuf.dev (CC BY 4.0)                                                                                                                                                                                                                                 |
-| **Librerías permisivas usadas** | Ninguna nueva: biblioteca estándar de Go (`archive/zip`, `encoding/binary`, `encoding/xml`, `image/jpeg`)                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Fuentes consultadas**         | Documentación de Sean Patrick O'Brien, `obriensp/iWorkFileFormat` (MIT): disposición del paquete y marco IWA. SheetJS `modules/83_numbers.ts` (Apache-2.0): almacenamiento de las celdas de Numbers. Apache Tika `tika-parser-apple-module` (Apache-2.0): detección y lectura de '09. `dunhamsteve/iwork` (MIT). Como **mapa** de números de campo y de tipos: los esquemas publicados en `psobot/keynote-parser` (MIT), `obriensp/iWorkFileFormat` (MIT) y `dunhamsteve/iwork` (MIT)                                                                             |
-| **Decisiones de diseño**        | Ver abajo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Confirmación de firewall**    | No se consultó código fuente AGPL, GPL, LGPL ni _source-available_. Excluidas a propósito: libetonyek (MPL/LGPL) y los importadores de LibreOffice y Calligra; Stingray-Reader (su `LICENSE` dice MIT y su documentación, CC BY-NC-SA 4.0 con uso comercial de pago); `numbers-parser/docs/api/file-format.rst` (CC BY-NC-SA 4.0) y, por prudencia, el resto del código de numbers-parser, que declara derivar de él; `SheetJS/test_files`, bloqueado en GitHub por datos personales. No se ejecutó ninguna herramienta de extracción sobre los binarios de Apple |
-| **Fecha y autor**               | 2026-10-12, Claude (agente) por encargo del dueño                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+Opening Pages, Numbers and Keynote files by converting them to Docus, Calcus or Diapos
+(`services/docs/internal/domain/import_iwork*.go`). Apple **does not publish** the format from 2013
+onward; it partly documented the '09 one.
 
-**Los esquemas, solo como mapa (decisión del dueño, 2026-10-12).** Las únicas descripciones
-completas de los mensajes de 2013+ —números de campo y tabla de tipos— son descriptores que
-terceros extrajeron de los binarios de Apple; la licencia MIT de esos repositorios no cubre ese
-material. Por eso:
+| Field                         | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Product/service**           | `services/docs` (import)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Base standard**             | None official for 2013+. For '09, Apple's _iWork Programming Guide_ (2005, Keynote 2.x and Pages 1.x, «open, easily accessible file format») and TN2067 with `APXL.xsd`. Snappy: Google's `format_description.txt` and `framing_format.txt` (BSD-3). Protobuf: the description of the protobuf encoding at protobuf.dev (CC BY 4.0)                                                                                                                                                                                                            |
+| **Permissive libraries used** | No new ones: Go standard library (`archive/zip`, `encoding/binary`, `encoding/xml`, `image/jpeg`)                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Sources consulted**         | Documentation by Sean Patrick O'Brien, `obriensp/iWorkFileFormat` (MIT): package layout and IWA framing. SheetJS `modules/83_numbers.ts` (Apache-2.0): storage of Numbers cells. Apache Tika `tika-parser-apple-module` (Apache-2.0): detection and reading of '09. `dunhamsteve/iwork` (MIT). As a **map** of field numbers and types: the schemas published in `psobot/keynote-parser` (MIT), `obriensp/iWorkFileFormat` (MIT) and `dunhamsteve/iwork` (MIT)                                                                                 |
+| **Design decisions**          | See below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Firewall confirmation**     | No AGPL, GPL, LGPL or _source-available_ source code was consulted. Deliberately excluded: libetonyek (MPL/LGPL) and the LibreOffice and Calligra importers; Stingray-Reader (its `LICENSE` says MIT and its documentation CC BY-NC-SA 4.0 with paid commercial use); `numbers-parser/docs/api/file-format.rst` (CC BY-NC-SA 4.0) and, out of caution, the rest of the numbers-parser code, which states that it derives from it; `SheetJS/test_files`, blocked on GitHub due to personal data. No extraction tool was run on Apple's binaries |
+| **Date and author**           | 2026-10-12, Claude (agent) on behalf of the owner                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
-- **No se incorpora ningún `.proto`** al repositorio **ni se genera código** a partir de ellos.
-- Los campos que se leen se escriben a mano, con **nombres propios**. Cada uno se **comprueba**
-  contra ficheros de prueba antes de usarlo, y la prueba queda en el repositorio.
-- **Base legal.** Los formatos de datos y los nombres de campo no son expresión protegible
-  (§4.2 de esta política). El TJUE lo dijo en el asunto **C-406/10, SAS Institute contra World
-  Programming**: el formato de los ficheros de datos no está protegido. La **Directiva
-  2009/24/CE** permite observar, estudiar y probar el programa (art. 5.3) y descompilar para
-  interoperar (art. 6), y anula las cláusulas contractuales que lo impidan (art. 8).
-- **Pendiente: la firma del responsable legal (§4.5).** Mientras no esté, este punto sigue
-  abierto.
+**The schemas, only as a map (owner's decision, 2026-10-12).** The only complete
+descriptions of the 2013+ messages —field numbers and type table— are descriptors that
+third parties extracted from Apple's binaries; the MIT license of those repositories does not cover that
+material. Therefore:
 
-**Fórmulas de Numbers.** La tabla que traduce el índice de cada función a su nombre solo existe
-extraída del binario. Se generará **por observación**, con ficheros creados en las propias apps.
-Hasta entonces, Numbers se importa con los **valores calculados** y un aviso dentro del documento.
+- **No `.proto` is incorporated** into the repository **and no code is generated** from them.
+- The fields that are read are written by hand, with **our own names**. Each one is **checked**
+  against test files before being used, and the test stays in the repository.
+- **Legal basis.** Data formats and field names are not protectable expression
+  (§4.2 of this policy). The CJEU said so in case **C-406/10, SAS Institute v World
+  Programming**: the format of data files is not protected. **Directive
+  2009/24/EC** allows observing, studying and testing the program (art. 5.3) and decompiling in order to
+  interoperate (art. 6), and voids contractual clauses that prevent it (art. 8).
+- **Pending: the legal officer's sign-off (§4.5).** Until it is in place, this point remains
+  open.
 
-**El escalón que no falla.** Si no se puede convertir, se abre la imagen de muestra que guarda el
-propio fichero, con un aviso en el idioma de quien lo abre. Si es un documento con contraseña o
-no trae imagen, se abre solo el aviso. El original no se modifica nunca: devolver los cambios al
-fichero no está ofrecido para estas extensiones.
+**Numbers formulas.** The table that maps each function's index to its name only exists
+extracted from the binary. It will be generated **by observation**, with files created in the apps themselves.
+Until then, Numbers is imported with the **calculated values** and a notice inside the document.
+
+**The fallback step that never fails.** If it cannot be converted, the preview image that the
+file itself stores is opened, with a notice in the language of whoever opens it. If it is a password-protected document or
+it has no image, only the notice is opened. The original is never modified: writing changes back to the
+file is not offered for these extensions.
 
 ---
 
 <a id="45-revision-legal-y-gate-de-ci"></a>
 
-### 4.5 Revisión legal y gate de CI
+<a id="45-revisión-legal-y-gate-de-ci"></a>
 
-1. **Revisión legal por producto.** Antes de liberar un servicio nuevo (o un cambio de protocolo
-   sustancial), se revisa que: (a) el firewall se respetó; (b) el registro §4 está completo; (c) no
-   se incorporó ninguna dependencia no permisiva.
-2. **Gate de licencias (SBOM) en CI.** Como en `security.md#5-licencias-propiedad-y-cumplimiento` §4: el árbol de dependencias completo
-   se analiza; **falla el build** ante AGPL/GPL/LGPL o _source-available_ (SSPL/BSL/BUSL/RSAL/
-   Elastic/MSL). El alcance es cada artefacto de producto: esto **bloquea técnicamente** que entre
-   código de un motor retirado sin confundirlo con los ejecutables autónomos del host de CI.
-3. **Cabecera SPDX propietaria.** Lint verifica que cada archivo Go lleva
+### 4.5 Legal review and CI gate
+
+1. **Legal review per product.** Before releasing a new service (or a substantial protocol
+   change), it is reviewed that: (a) the firewall was respected; (b) the §4 record is complete; (c) no
+   non-permissive dependency was incorporated.
+2. **License gate (SBOM) in CI.** As in `security.md#5-licencias-propiedad-y-cumplimiento` §4: the complete dependency tree
+   is analyzed; **the build fails** on AGPL/GPL/LGPL or _source-available_ (SSPL/BSL/BUSL/RSAL/
+   Elastic/MSL). The scope is each product artifact: this **technically blocks** code from a
+   retired engine from coming in, without confusing it with the CI host's standalone executables.
+3. **Proprietary SPDX header.** Lint verifies that each Go file carries
    `SPDX-License-Identifier: Apache-2.0` + `SPDX-FileCopyrightText: <año> Sytue`.
-4. **Auditoría de seguridad de la auth crítica.** Sytue ID se somete a auditoría antes de producción
-   (CONVENTIONS §10), que también verifica la procedencia clean-room de su implementación.
+4. **Security audit of critical auth.** Sytue ID undergoes an audit before production
+   (CONVENTIONS §10), which also verifies the clean-room provenance of its implementation.
 
 ---
 
 <a id="46-excepcion-livekit-no-aplica-clean-room"></a>
 
-### 4.6 Excepción: LiveKit (no aplica clean-room)
+<a id="46-excepción-livekit-no-aplica-clean-room"></a>
 
-**LiveKit** (Apache-2.0, Go) es la **única aplicación de terceros desplegada en el runtime de
-cliente**, como **SFU de medios WebRTC** de _Sytue Rooms_. Reconstruir un SFU de medios no procede y
-**Apache-2.0 es permisiva**, por lo que **no requiere** proceso clean-room: se integra conservando
-su `NOTICE`. El servicio `sytue-rooms` mintea el JWT de LiveKit tras validar OIDC. Todo lo demás
-(señalización, salas, control) es servicio Go propio.
+### 4.6 Exception: LiveKit (clean-room does not apply)
+
+**LiveKit** (Apache-2.0, Go) is the **only third-party application deployed in the customer
+runtime**, as the **WebRTC media SFU** of _Sytue Rooms_. Rebuilding a media SFU is not warranted and
+**Apache-2.0 is permissive**, so it **does not require** a clean-room process: it is integrated keeping
+its `NOTICE`. The `sytue-rooms` service mints the LiveKit JWT after validating OIDC. Everything else
+(signaling, rooms, control) is an in-house Go service.
 
 ---
 
 <a id="47-referencias"></a>
 
-### 4.7 Referencias
+### 4.7 References
 
-- Contrato canónico: [`docs/CONVENTIONS.md`](./CONVENTIONS.md) (§0.2, §0.6, §12).
-- Licencias y gate de CI: [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento).
-- Seguridad y soberanía UE: [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd).
-- Estrategia de forks (deprecada): [`docs/roadmap.md#7-historico-la-migracion-a-sytue-native`](./roadmap.md#7-historico-la-migracion-a-sytue-native).
+- Canonical contract: [`docs/CONVENTIONS.md`](./CONVENTIONS.md) (§0.2, §0.6, §12).
+- Licensing and CI gate: [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](./security.md#5-licencias-propiedad-y-cumplimiento).
+- EU security and sovereignty: [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd).
+- Forks strategy (deprecated): [`docs/roadmap.md#7-historico-la-migracion-a-sytue-native`](./roadmap.md#7-historico-la-migracion-a-sytue-native).
 
 ---
 
 <a id="5-licencias-propiedad-y-cumplimiento"></a>
 
-## 5. Licencias, propiedad y cumplimiento
+## 5. Licensing, ownership and compliance
 
-> **Documento normativo.** Fuente de verdad: [`docs/CONVENTIONS.md`](./CONVENTIONS.md) §12.
-> Modelo **v4 "Sytue Native"**: todos los productos son **obra original y PROPIETARIA de Sytue**
-> (© Sytue), reimplementados **clean-room** sobre **estándares abiertos**. Las **dependencias** de
-> terceros incorporadas deben llevar una **licencia permisiva aprobada** (Apache-2.0, MIT, BSD,
-> ISC, PostgreSQL, MPL-2.0). **Prohibido** incorporar código **AGPL/GPL** o _source-available_
-> (SSPL/BSL/BUSL/RSAL/Elastic/MSL). LGPL no pertenece a la allowlist general: solo puede aparecer
-> como biblioteca/runtime autónomo del perímetro B con ADR y obligaciones de reemplazo/relink
-> satisfechas. El tooling interno autónomo se rige por §5.0.1.
+> **Normative document.** Source of truth: [`docs/CONVENTIONS.md`](./CONVENTIONS.md) §12.
+> **v4 "Sytue Native"** model: all products are **original and PROPRIETARY works of Sytue**
+> (© Sytue), reimplemented **clean-room** on **open standards**. Incorporated third-party
+> **dependencies** must carry an **approved permissive license** (Apache-2.0, MIT, BSD,
+> ISC, PostgreSQL, MPL-2.0). It is **forbidden** to incorporate **AGPL/GPL** or _source-available_ code
+> (SSPL/BSL/BUSL/RSAL/Elastic/MSL). LGPL is not on the general allowlist: it may only appear
+> as a standalone library/runtime of perimeter B with an ADR and with the replacement/relink obligations
+> satisfied. Standalone internal tooling is governed by §5.0.1.
 >
-> Proceso de reimplementación limpia, firewall y registro de decisiones:
+> Clean reimplementation process, firewall and decision record:
 > [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room).
 
 <a id="50-politica-de-licencias-resumen-ejecutivo"></a>
 
-### 5.0 Política de licencias (resumen ejecutivo)
+<a id="50-política-de-licencias-resumen-ejecutivo"></a>
 
-1. **Código de producto Sytue = Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr)).** No copyleft; sin obligación de publicar la
-   fuente. Cada archivo Go lleva cabecera SPDX propietaria; cada paquete frontend lleva su `LICENSE`
-   propietaria. Ver §2 y §5.
-2. **Dependencias de terceros: solo permisivas.** Licencias permitidas para **incorporar** al
-   producto: **Apache-2.0**, **MIT**, **BSD (2/3-clause)**, **ISC**, **PostgreSQL License** y
-   **MPL-2.0** (copyleft débil por archivo, aceptable). Se conservan avisos (`LICENSE`/`NOTICE`).
-3. **Prohibido copyleft fuerte y source-available en producto.** **No** se incorpora, enlaza,
-   empaqueta ni redistribuye con el código de producto **AGPL/GPL** ni _source-available_ no OSI
-   (**SSPL, BSL/BUSL, RSAL, Elastic License, MSL, Confluent Community**, etc.). **LGPL** es
-   copyleft débil, pero queda fuera de la allowlist de A: solo se admite en B como runtime o
-   biblioteca autónoma, nunca enlazada estáticamente por código Sytue, con ADR y cumplimiento
-   verificable. Esto incluye los motores de terceros AGPL retirados del modelo v4 (ver §6).
-4. **Clean-room obligatorio.** Como NO desplegamos motores de terceros, cada producto es una
-   **reimplementación original** sobre RFCs/specs/APIs públicas. **Prohibido copiar, traducir o
-   portar código AGPL.** El firewall y el registro de fuentes están en
+### 5.0 License policy (executive summary)
+
+1. **Sytue product code = Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr)).** No copyleft; no obligation to publish the
+   source. Each Go file carries a proprietary SPDX header; each frontend package carries its proprietary
+   `LICENSE`. See §2 and §5.
+2. **Third-party dependencies: permissive only.** Licenses allowed to be **incorporated** into the
+   product: **Apache-2.0**, **MIT**, **BSD (2/3-clause)**, **ISC**, **PostgreSQL License** and
+   **MPL-2.0** (weak per-file copyleft, acceptable). Notices (`LICENSE`/`NOTICE`) are kept.
+3. **Strong copyleft and source-available forbidden in the product.** **AGPL/GPL** or non-OSI _source-available_
+   code (**SSPL, BSL/BUSL, RSAL, Elastic License, MSL, Confluent Community**, etc.) is **not** incorporated, linked,
+   packaged or redistributed with the product code. **LGPL** is
+   weak copyleft, but it is outside the allowlist of A: it is only accepted in B as a standalone runtime or
+   library, never statically linked by Sytue code, with an ADR and verifiable
+   compliance. This includes the third-party AGPL engines retired from the v4 model (see §6).
+4. **Mandatory clean-room.** Since we do NOT deploy third-party engines, each product is an
+   **original reimplementation** on public RFCs/specs/APIs. **It is forbidden to copy, translate or
+   port AGPL code.** The firewall and the source record are in
    [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room).
-5. **Única aplicación de terceros en el runtime de cliente: LiveKit (Apache-2.0).** Es el SFU de
-   medios WebRTC de _Sytue Rooms_; reconstruir un SFU no procede. Se despliega como dependencia
-   permisiva (NOTICE). Las herramientas internas no son aplicaciones del runtime de cliente.
-6. **PostgreSQL como fuente de verdad; Valkey OPCIONAL por rendimiento.** El datastore principal es
-   **PostgreSQL** (estado, colas y caché por defecto). **Valkey (BSD-3-Clause)** —licencia
-   permisiva, **no** incumple la política— **se permite como capa de caché/cola opcional** cuando
-   aporte una **mejora de rendimiento medible** (no sustituye a Postgres como fuente de verdad).
-   **Redis queda excluido** (licencia no-OSI: RSALv2/SSPL).
-7. **Soberanía UE.** Ortogonal a licencias pero obligatoria: solo regiones UE de Scaleway
-   (CONVENTIONS §10), sin proveedores US para datos personales.
-8. **Avisos.** Para cada dependencia permisiva redistribuida cumplimos sus obligaciones de
-   atribución (NOTICE, copyright, no-endoso de BSD). Ver §3 y §4.
-9. **Tooling interno separado.** Ejecutables y servicios autónomos de ingeniería pueden usar
-   GPL/AGPL bajo los controles de §5.0.1. _Source-available_ sigue bloqueado salvo ADR específico.
-10. **Origen UE independiente.** Una licencia aceptable no acredita soberanía: producto,
-    infraestructura y tooling pasan por separado el inventario y gate de origen UE.
+5. **Only third-party application in the customer runtime: LiveKit (Apache-2.0).** It is the WebRTC media
+   SFU of _Sytue Rooms_; rebuilding an SFU is not warranted. It is deployed as a permissive
+   dependency (NOTICE). Internal tools are not customer-runtime applications.
+6. **PostgreSQL as the source of truth; Valkey OPTIONAL for performance.** The main datastore is
+   **PostgreSQL** (state, queues and cache by default). **Valkey (BSD-3-Clause)** —a permissive
+   license, it does **not** breach the policy— **is allowed as an optional cache/queue layer** when it
+   brings a **measurable performance improvement** (it does not replace Postgres as the source of truth).
+   **Redis is excluded** (non-OSI license: RSALv2/SSPL).
+7. **EU sovereignty.** Orthogonal to licensing but mandatory: only Scaleway EU regions
+   (CONVENTIONS §10), no US providers for personal data.
+8. **Notices.** For each redistributed permissive dependency we fulfill its
+   attribution obligations (NOTICE, copyright, BSD non-endorsement). See §3 and §4.
+9. **Separate internal tooling.** Standalone engineering executables and services may use
+   GPL/AGPL under the controls of §5.0.1. _Source-available_ remains blocked unless there is a specific ADR.
+10. **Independent EU origin.** An acceptable license does not establish sovereignty: product,
+    infrastructure and tooling separately go through the EU-origin inventory and gate.
 
 <a id="501-perimetros-de-licencia"></a>
 
-### 5.0.1 Perímetros de licencia
+<a id="501-perímetros-de-licencia"></a>
 
-| Perímetro                           | Incluye                                                                                                                                      | Política                                                                                                                                                                                                                                          |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A — Producto entregado**          | Código Go/JS Sytue, librerías enlazadas o incluidas, bundles, instaladores y assets redistribuidos                                           | Solo propietario + allowlist permisiva/MPL-2.0 aprobada. Copyleft fuerte y _source-available_ rompen el build.                                                                                                                                    |
-| **B — Infraestructura del runtime** | Motores, intérpretes, runtimes y servicios autónomos que atienden peticiones o procesan datos de clientes, incluso si comparten imagen con A | Preferencia permisiva; cualquier excepción exige ADR, términos compatibles, aislamiento, origen UE, inventario y plan de salida. La imagen final solo puede contener A + entradas B aprobadas. No hereda el permiso de C.                         |
-| **C — Tooling interno**             | VCS, forja, CI, compiladores, linters, escáneres y administración usados solo por el equipo                                                  | GPL/AGPL permitido únicamente como proceso o servicio autónomo, sin enlace, incorporación ni redistribución con A/B; uso no ofrecido a clientes, versión/origen/licencia inventariados y obligaciones cumplidas. _Source-available_ requiere ADR. |
+### 5.0.1 License perimeters
 
-Controles del perímetro C:
+| Perimeter                      | Includes                                                                                                                                 | Policy                                                                                                                                                                                                                                               |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — Delivered product**      | Sytue Go/JS code, linked or included libraries, bundles, installers and redistributed assets                                             | Only proprietary + approved permissive/MPL-2.0 allowlist. Strong copyleft and _source-available_ break the build.                                                                                                                                    |
+| **B — Runtime infrastructure** | Engines, interpreters, runtimes and standalone services that serve requests or process customer data, even if they share an image with A | Permissive preferred; any exception requires an ADR, compatible terms, isolation, EU origin, inventory and an exit plan. The final image may only contain A + approved B entries. It does not inherit C's permission.                                |
+| **C — Internal tooling**       | VCS, forge, CI, compilers, linters, scanners and administration used only by the team                                                    | GPL/AGPL allowed only as a standalone process or service, without linking, incorporation or redistribution with A/B; use not offered to customers, version/origin/license inventoried and obligations fulfilled. _Source-available_ requires an ADR. |
 
-1. **Separación técnica.** La herramienta vive fuera de los módulos de producto y de sus imágenes
-   finales. En builds multi-stage se verifica que binarios, librerías y archivos de licencia del
-   tooling no aparezcan en la etapa final salvo que estén aprobados para A.
-2. **Salida no presumida.** Que una herramienta genere código o binarios no vuelve su salida
-   copyleft automáticamente, pero cada herramienta se revisa por sus términos concretos; plantillas,
-   runtimes o librerías copiadas por el generador sí entran en el SBOM del producto.
-3. **Cumplimiento GPL/AGPL.** Se conserva licencia y copyright; toda modificación se registra. Si
-   la licencia obliga a entregar u ofrecer fuente —incluido uso por red bajo AGPL— se proporciona
-   el código correspondiente a quienes interactúen con la herramienta. Sin cumplimiento no se usa.
-4. **Inventario y aislamiento.** Se registra versión/digest, fuente verificable, usuarios, datos a
-   los que accede, modificaciones, obligaciones y responsable. Credenciales de tooling no pasan a
-   builds no confiables; runners efímeros y egreso mínimo cuando corresponda.
-5. **Doble gate.** El inventario de tooling comprueba licencia, vulnerabilidades y origen UE; el
-   SBOM de producto comprueba de forma independiente que nada no permitido haya cruzado el límite.
-6. **Firewall clean-room intacto.** Poder ejecutar una herramienta GPL/AGPL no autoriza a consultar,
-   copiar, traducir o portar el código de los motores de producto retirados. Las reimplementaciones
-   siguen trabajando exclusivamente desde RFCs, especificaciones y APIs públicas documentadas.
+Perimeter C controls:
+
+1. **Technical separation.** The tool lives outside the product modules and their final
+   images. In multi-stage builds it is verified that the tooling's binaries, libraries and license files
+   do not appear in the final stage unless they are approved for A.
+2. **Output not presumed.** That a tool generates code or binaries does not automatically make its output
+   copyleft, but each tool is reviewed for its specific terms; templates,
+   runtimes or libraries copied by the generator do go into the product SBOM.
+3. **GPL/AGPL compliance.** License and copyright are kept; every modification is recorded. If
+   the license requires delivering or offering the source —including network use under AGPL— the
+   corresponding code is provided to those who interact with the tool. Without compliance it is not used.
+4. **Inventory and isolation.** Version/digest, verifiable source, users, data it
+   accesses, modifications, obligations and owner are recorded. Tooling credentials do not pass into
+   untrusted builds; ephemeral runners and minimal egress where appropriate.
+5. **Double gate.** The tooling inventory checks license, vulnerabilities and EU origin; the
+   product SBOM independently checks that nothing disallowed has crossed the boundary.
+6. **Clean-room firewall intact.** Being able to run a GPL/AGPL tool does not authorize consulting,
+   copying, translating or porting the code of the retired product engines. Reimplementations
+   keep working exclusively from RFCs, specifications and documented public APIs.
 
 ---
 
 <a id="51-matriz-de-dependencias--backend-go-servicios-sytue-native"></a>
 
-### 5.1 Matriz de dependencias — backend Go (servicios Sytue-native)
+### 5.1 Dependency matrix — Go backend (Sytue-native services)
 
-> Todos los **servicios** son código **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)**. La tabla lista las **librerías Go de
-> terceros** que se incorporan como dependencias permisivas, y el estándar/RFC sobre el que se
-> reimplementa cada producto.
+> All **services** are **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)** code. The table lists the **third-party Go
+> libraries** that are incorporated as permissive dependencies, and the standard/RFC on which
+> each product is reimplemented.
 
-| Dependencia (Go)                            | Uso en Sytue One                                                               | Licencia                 | Tipo      | Obligaciones clave                                               |
-| ------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ | --------- | ---------------------------------------------------------------- |
-| `go-chi/chi`                                | Router HTTP de todos los servicios                                             | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `jackc/pgx`                                 | Driver/pool PostgreSQL                                                         | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `sqlc` (gen)                                | Generación de acceso a datos (build-time)                                      | **MIT**                  | Permisiva | Herramienta de build; conservar aviso.                           |
-| `pressly/goose` / `golang-migrate/migrate`  | Migraciones SQL                                                                | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `ory/fosite` **o** `zitadel/oidc`           | OIDC/OAuth2 de **Sytue ID**                                                    | **Apache-2.0**           | Permisiva | `LICENSE` + `NOTICE`; documentar cambios; concesión de patentes. |
-| `go-webauthn/webauthn`                      | MFA/WebAuthn (Sytue ID)                                                        | **BSD-3-Clause**         | Permisiva | Conservar copyright + no-endoso.                                 |
-| `golang.org/x/net` (`webdav`)               | WebDAV (Sytue Drive)                                                           | **BSD-3-Clause**         | Permisiva | Conservar copyright Google + no-endoso.                          |
-| `emersion/go-webdav`                        | WebDAV/CalDAV/CardDAV helpers                                                  | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `emersion/go-ical`, `emersion/go-vcard`     | iCalendar/vCard (Calendar/Contacts)                                            | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `emersion/go-smtp`, `go-imap`, `go-message` | SMTP/IMAP/MIME (Sytue Mail)                                                    | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `coder/websocket` (o `gorilla/websocket`)   | WebSocket (Chat, Docs colab, Hub SSE/WS)                                       | **MIT** (Gorilla: BSD-3) | Permisiva | Conservar aviso.                                                 |
-| `aws/aws-sdk-go-v2` (S3)                    | Object Storage S3 (Scaleway/MinIO)                                             | **Apache-2.0**           | Permisiva | `LICENSE` + `NOTICE`.                                            |
-| `livekit/protocol`, `livekit/server-sdk-go` | Minteo de JWT y control de LiveKit (Meet)                                      | **Apache-2.0**           | Permisiva | `LICENSE` + `NOTICE`.                                            |
-| `golang-jwt/jwt`                            | Validación/firma de JWT (authn middleware)                                     | **MIT**                  | Permisiva | Conservar aviso MIT.                                             |
-| `redis/go-redis/v9`                         | Cliente del cache/pub-sub efímero (`platform/pkg/cache` → DragonflyDB por red) | **BSD-2-Clause**         | Permisiva | Conservar copyright + aviso BSD.                                 |
-| `alicebob/miniredis/v2`                     | Servidor Redis en memoria SOLO para tests de `platform/pkg/cache`              | **MIT**                  | Permisiva | Conservar aviso MIT (no se distribuye; test-only).               |
+| Dependency (Go)                             | Use in Sytue One                                                                             | License                  | Type       | Key obligations                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------ | ---------- | ----------------------------------------------------- |
+| `go-chi/chi`                                | HTTP router for all services                                                                 | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `jackc/pgx`                                 | PostgreSQL driver/pool                                                                       | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `sqlc` (gen)                                | Data access generation (build-time)                                                          | **MIT**                  | Permissive | Build tool; keep notice.                              |
+| `pressly/goose` / `golang-migrate/migrate`  | SQL migrations                                                                               | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `ory/fosite` **or** `zitadel/oidc`          | OIDC/OAuth2 for **Sytue ID**                                                                 | **Apache-2.0**           | Permissive | `LICENSE` + `NOTICE`; document changes; patent grant. |
+| `go-webauthn/webauthn`                      | MFA/WebAuthn (Sytue ID)                                                                      | **BSD-3-Clause**         | Permissive | Keep copyright + non-endorsement.                     |
+| `golang.org/x/net` (`webdav`)               | WebDAV (Sytue Drive)                                                                         | **BSD-3-Clause**         | Permissive | Keep Google copyright + non-endorsement.              |
+| `emersion/go-webdav`                        | WebDAV/CalDAV/CardDAV helpers                                                                | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `emersion/go-ical`, `emersion/go-vcard`     | iCalendar/vCard (Calendar/Contacts)                                                          | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `emersion/go-smtp`, `go-imap`, `go-message` | SMTP/IMAP/MIME (Sytue Mail)                                                                  | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `coder/websocket` (or `gorilla/websocket`)  | WebSocket (Chat, Docs collab, Hub SSE/WS)                                                    | **MIT** (Gorilla: BSD-3) | Permissive | Keep notice.                                          |
+| `aws/aws-sdk-go-v2` (S3)                    | S3 Object Storage (Scaleway/MinIO)                                                           | **Apache-2.0**           | Permissive | `LICENSE` + `NOTICE`.                                 |
+| `livekit/protocol`, `livekit/server-sdk-go` | JWT minting and LiveKit control (Meet)                                                       | **Apache-2.0**           | Permissive | `LICENSE` + `NOTICE`.                                 |
+| `golang-jwt/jwt`                            | JWT validation/signing (authn middleware)                                                    | **MIT**                  | Permissive | Keep MIT notice.                                      |
+| `redis/go-redis/v9`                         | Client for the ephemeral cache/pub-sub (`platform/pkg/cache` → DragonflyDB over the network) | **BSD-2-Clause**         | Permissive | Keep copyright + BSD notice.                          |
+| `alicebob/miniredis/v2`                     | In-memory Redis server ONLY for `platform/pkg/cache` tests                                   | **MIT**                  | Permissive | Keep MIT notice (not distributed; test-only).         |
 
 ---
 
 <a id="52-matriz-de-dependencias--frontend-infra-y-tooling"></a>
 
-### 5.2 Matriz de dependencias — frontend, infra y tooling
+### 5.2 Dependency matrix — frontend, infra and tooling
 
-| Dependencia                            | Uso                                                                        | Licencia                                                                                                            | Tipo                                                            | Obligaciones                                                                                                                                                                                                                                                                                                                         |
-| -------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Astro** 7.x                          | Framework de superficies web                                               | **MIT**                                                                                                             | Permisiva                                                       | Conservar aviso MIT.                                                                                                                                                                                                                                                                                                                 |
-| **Preact** 10.29.x                     | Islands UI                                                                 | **MIT**                                                                                                             | Permisiva                                                       | Conservar aviso MIT.                                                                                                                                                                                                                                                                                                                 |
-| **Tailwind CSS** 4.x                   | Estilos / tokens `@sytue/ui`                                               | **MIT**                                                                                                             | Permisiva                                                       | Conservar aviso MIT.                                                                                                                                                                                                                                                                                                                 |
-| **Bun** (última estable)               | Runtime de producción (B) + gestor/bundler interno (C)                     | **MIT**; [enlaza estáticamente JavaScriptCore/WebKit LGPL-2](https://bun.sh/docs/project/license) y otras librerías | **Excepción cerrada: solo `v0.1.6` interna; expira 2026-10-01** | [ADR 0027](./decisions.md#0027) permite el binario oficial sin modificar únicamente para la primera validación interna (máximo diez testers, sin clientes). Licencia/fuente/instrucciones de relink, SBOM y firma son obligatorios. Bun pertenece a Anthropic (EE. UU.); sigue bloqueado para cualquier release posterior y para GA. |
-| **TypeScript**                         | Tipado FE (build)                                                          | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE. Herramienta de build.                                                                                                                                                                                                                                                                                                        |
-| **LiveKit web SDK** (`livekit-client`) | Cliente WebRTC de Sytue Rooms                                              | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE + atribución.                                                                                                                                                                                                                                                                                                                 |
-| **LiveKit** (servidor SFU)             | SFU de medios de Sytue Rooms (única app de terceros en runtime de cliente) | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE; autohospedado en UE. JWT minteado por `sytue-rooms`.                                                                                                                                                                                                                                                                         |
-| **PostgreSQL** 16                      | Datastore único (estado/colas/caché)                                       | **PostgreSQL License** (estilo BSD/MIT)                                                                             | Permisiva                                                       | Conservar aviso del PostgreSQL Global Development Group.                                                                                                                                                                                                                                                                             |
-| **Traefik** 3.x                        | Ingress/TLS (canónico)                                                     | **MIT**                                                                                                             | Permisiva                                                       | Conservar aviso MIT.                                                                                                                                                                                                                                                                                                                 |
-| **cert-manager** 1.16                  | Emisión de certificados TLS                                                | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE + atribución.                                                                                                                                                                                                                                                                                                                 |
-| **Kubernetes / Kapsule** 1.31          | Orquestación (servicio gestionado Scaleway, UE)                            | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE + atribución.                                                                                                                                                                                                                                                                                                                 |
-| **Helm** 3.x                           | Empaquetado de despliegue                                                  | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE (herramienta).                                                                                                                                                                                                                                                                                                                |
-| **Kaniko**                             | Build de imágenes del PaaS (rootless)                                      | **Apache-2.0**                                                                                                      | Permisiva                                                       | NOTICE + atribución.                                                                                                                                                                                                                                                                                                                 |
-| **Git**                                | Control de versiones interno                                               | **GPL-2.0-only**                                                                                                    | Tooling interno (perímetro C)                                   | Ejecutable autónomo; no se enlaza ni redistribuye con Sytue. Inventariar versión, origen y licencia; verificar que no entra en artefactos.                                                                                                                                                                                           |
-| **MinIO** (solo dev)                   | Object Storage S3 en dev                                                   | **AGPL-3.0** ⇒ **NO redistribuido**                                                                                 | Copyleft de red                                                 | Solo **dev local**, sin modificar ni redistribuir; en prod = **Scaleway Object Storage** (gestionado). No se incorpora al producto. Alternativa: SeaweedFS (Apache-2.0) si se quiere dev 100% permisivo.                                                                                                                             |
-| **DragonflyDB**                        | Cache/pub-sub **efímero** interno (presencia TTL, fan-out)                 | **BSL 1.1** (⇒ Apache-2.0 en su Change Date)                                                                        | Source-available (imagen de **infra**, NO código incorporado)   | Uso **interno**, nunca as-a-service (Additional Use Grant); sin modificar. Ver sección «DragonflyDB (componente de infra)» abajo.                                                                                                                                                                                                    |
-| **provider `scaleway/scaleway`**       | IaC (Terraform/OpenTofu)                                                   | **MPL-2.0**                                                                                                         | Copyleft débil por archivo                                      | Conservar avisos; publicar solo los archivos MPL que modifiquemos (no el proyecto).                                                                                                                                                                                                                                                  |
-| **OpenTofu**                           | CLI IaC (recomendado, 100% OSI)                                            | **MPL-2.0**                                                                                                         | Copyleft débil                                                  | Herramienta de orquestación; no se redistribuye. Preferida frente a Terraform CLI (BUSL-1.1, no OSI). Ver §5.                                                                                                                                                                                                                        |
+| Dependency                             | Use                                                                      | License                                                                                                           | Type                                                             | Obligations                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Astro** 7.x                          | Web surfaces framework                                                   | **MIT**                                                                                                           | Permissive                                                       | Keep MIT notice.                                                                                                                                                                                                                                                                                               |
+| **Preact** 10.29.x                     | UI islands                                                               | **MIT**                                                                                                           | Permissive                                                       | Keep MIT notice.                                                                                                                                                                                                                                                                                               |
+| **Tailwind CSS** 4.x                   | Styles / `@sytue/ui` tokens                                              | **MIT**                                                                                                           | Permissive                                                       | Keep MIT notice.                                                                                                                                                                                                                                                                                               |
+| **Bun** (latest stable)                | Production runtime (B) + internal package manager/bundler (C)            | **MIT**; [statically links JavaScriptCore/WebKit LGPL-2](https://bun.sh/docs/project/license) and other libraries | **Closed exception: internal `v0.1.6` only; expires 2026-10-01** | [ADR 0027](./decisions.md#0027) allows the unmodified official binary solely for the first internal validation (maximum ten testers, no customers). License/source/relink instructions, SBOM and signature are mandatory. Bun belongs to Anthropic (USA); it remains blocked for any later release and for GA. |
+| **TypeScript**                         | FE typing (build)                                                        | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE. Build tool.                                                                                                                                                                                                                                                                                            |
+| **LiveKit web SDK** (`livekit-client`) | Sytue Rooms WebRTC client                                                | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE + attribution.                                                                                                                                                                                                                                                                                          |
+| **LiveKit** (SFU server)               | Sytue Rooms media SFU (the only third-party app in the customer runtime) | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE; self-hosted in the EU. JWT minted by `sytue-rooms`.                                                                                                                                                                                                                                                    |
+| **PostgreSQL** 16                      | Single datastore (state/queues/cache)                                    | **PostgreSQL License** (BSD/MIT style)                                                                            | Permissive                                                       | Keep the PostgreSQL Global Development Group notice.                                                                                                                                                                                                                                                           |
+| **Traefik** 3.x                        | Ingress/TLS (canonical)                                                  | **MIT**                                                                                                           | Permissive                                                       | Keep MIT notice.                                                                                                                                                                                                                                                                                               |
+| **cert-manager** 1.16                  | TLS certificate issuance                                                 | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE + attribution.                                                                                                                                                                                                                                                                                          |
+| **Kubernetes / Kapsule** 1.31          | Orchestration (Scaleway managed service, EU)                             | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE + attribution.                                                                                                                                                                                                                                                                                          |
+| **Helm** 3.x                           | Deployment packaging                                                     | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE (tool).                                                                                                                                                                                                                                                                                                 |
+| **Kaniko**                             | PaaS image builds (rootless)                                             | **Apache-2.0**                                                                                                    | Permissive                                                       | NOTICE + attribution.                                                                                                                                                                                                                                                                                          |
+| **Git**                                | Internal version control                                                 | **GPL-2.0-only**                                                                                                  | Internal tooling (perimeter C)                                   | Standalone executable; not linked or redistributed with Sytue. Inventory version, origin and license; verify that it does not enter artifacts.                                                                                                                                                                 |
+| **MinIO** (dev only)                   | S3 Object Storage in dev                                                 | **AGPL-3.0** ⇒ **NOT redistributed**                                                                              | Network copyleft                                                 | Only **local dev**, unmodified and not redistributed; in prod = **Scaleway Object Storage** (managed). Not incorporated into the product. Alternative: SeaweedFS (Apache-2.0) if a 100% permissive dev setup is wanted.                                                                                        |
+| **DragonflyDB**                        | Internal **ephemeral** cache/pub-sub (TTL presence, fan-out)             | **BSL 1.1** (⇒ Apache-2.0 on its Change Date)                                                                     | Source-available (**infra** image, NOT incorporated code)        | **Internal** use, never as-a-service (Additional Use Grant); unmodified. See the “DragonflyDB (infrastructure component)” section below.                                                                                                                                                                       |
+| **provider `scaleway/scaleway`**       | IaC (Terraform/OpenTofu)                                                 | **MPL-2.0**                                                                                                       | Weak per-file copyleft                                           | Keep notices; publish only the MPL files we modify (not the project).                                                                                                                                                                                                                                          |
+| **OpenTofu**                           | IaC CLI (recommended, 100% OSI)                                          | **MPL-2.0**                                                                                                       | Weak copyleft                                                    | Orchestration tool; not redistributed. Preferred over the Terraform CLI (BUSL-1.1, not OSI). See §5.                                                                                                                                                                                                           |
 
-| Paquete/servicio PROPIETARIO © Sytue                                                                                    | Licencia                             |
-| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `@sytue/ui`, `@sytue/shell`, `@sytue/auth`, `@sytue/api-clients`, `@sytue/config`                                       | **Propietaria © 2026 Daniel Delgado Ramos (thinkddr)** (Apache-2.0) |
-| Apps Astro (`portal`, `console`, `cloud-dashboard`, `mail`, `drive`, `calendar`, `contacts`, `docs`, `rooms`, `www`)    | **Propietaria © Sytue**              |
-| Servicios Go (`id`, `drive`, `docs`, `mail`, `calendar`, `contacts`, `chat`, `meet`, `hub`, `cloud`) y `platform/pkg/*` | **Propietaria © Sytue**              |
-| Módulos Terraform/Helm propios                                                                                          | **Propietaria © Sytue**              |
+| PROPRIETARY package/service © Sytue                                                                                      | License                                                             |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `@sytue/ui`, `@sytue/shell`, `@sytue/auth`, `@sytue/api-clients`, `@sytue/config`                                        | **Proprietary © 2026 Daniel Delgado Ramos (thinkddr)** (Apache-2.0) |
+| Astro apps (`portal`, `console`, `cloud-dashboard`, `mail`, `drive`, `calendar`, `contacts`, `docs`, `rooms`, `www`)     | **Proprietary © Sytue**                                             |
+| Go services (`id`, `drive`, `docs`, `mail`, `calendar`, `contacts`, `chat`, `meet`, `hub`, `cloud`) and `platform/pkg/*` | **Proprietary © Sytue**                                             |
+| Own Terraform/Helm modules                                                                                               | **Proprietary © Sytue**                                             |
 
-#### DragonflyDB (componente de infra)
+<a id="dragonflydb-componente-de-infra"></a>
 
-**DragonflyDB** es el almacén en memoria que Sytue One usa como **cache/pub-sub efímero**
-(presencia con claves TTL, fan-out pub/sub entre réplicas). Licencia: **BSL 1.1**
-(_Business Source License_, **source-available**, no OSI): cada versión **revierte a
-Apache-2.0** al llegar su _Change Date_. Su **Additional Use Grant** permite usar el software
-**salvo ofrecer Dragonfly como servicio de base de datos a terceros** (un «Database Service»
-gestionado/comercial). **Sytue lo usa exclusivamente como cache/pub-sub INTERNO de su propia
-plataforma** —jamás se ofrece a clientes acceso a Dragonfly como producto— por lo que el uso
-**cumple el grant**.
+#### DragonflyDB (infrastructure component)
 
-Encuadre en la política de licencias:
+**DragonflyDB** is the in-memory store that Sytue One uses as an **ephemeral cache/pub-sub**
+(presence with TTL keys, pub/sub fan-out between replicas). License: **BSL 1.1**
+(_Business Source License_, **source-available**, not OSI): each version **reverts to
+Apache-2.0** when it reaches its _Change Date_. Its **Additional Use Grant** allows using the software
+**except offering Dragonfly as a database service to third parties** (a managed/commercial
+“Database Service”). **Sytue uses it exclusively as an INTERNAL cache/pub-sub of its own
+platform** —customers are never offered access to Dragonfly as a product— so the use
+**complies with the grant**.
 
-- Es un **servicio de RED** (imagen Docker `docker.dragonflydb.io/dragonflydb/dragonfly`, tag
-  fija), desplegado como Postgres/MinIO/LiveKit y hablado por red vía **protocolo Redis**. **NO
-  es una dependencia de código linkeada**: no se compila, enlaza ni redistribuye código BSL en
-  ningún binario Sytue.
-- El **código** solo depende del **cliente `redis/go-redis/v9` (BSD-2-Clause, permisiva)** —
-  ver §1. Nunca se incorpora un cliente no-permisivo.
-- La regla «solo permisivas / sin _source-available_» (§0.2–0.3) aplica al **perímetro A**: las
-  dependencias y artefactos incorporados al producto. Dragonfly pertenece al **perímetro B** y su
-  imagen de infraestructura se documenta y aprueba **caso por caso** en este documento. No debe
-  confundirse con la autorización limitada del tooling interno del perímetro C.
-- **Redis (el servidor)** sigue **excluido** (RSALv2/SSPL). Dragonfly es la elección para la capa
-  efímera; **PostgreSQL sigue siendo la única fuente de verdad** (estado durable, colas, outbox
-  transaccional en `platform/pkg/events`). `platform/pkg/cache` **degrada a no-op** si Dragonfly
-  no está configurado o cae: ningún servicio depende de él para funcionar.
-- **Vigilancia:** al fijar versión nueva se revisa que el grant no cambie (§5); si algún día se
-  quisiera ofrecer un data-store gestionado a terceros, Dragonfly quedaría fuera de ese producto.
+Fit within the license policy:
+
+- It is a **NETWORK service** (Docker image `docker.dragonflydb.io/dragonflydb/dragonfly`, pinned
+  tag), deployed like Postgres/MinIO/LiveKit and spoken to over the network via the **Redis protocol**. It is **NOT
+  a linked code dependency**: no BSL code is compiled, linked or redistributed in
+  any Sytue binary.
+- The **code** only depends on the **`redis/go-redis/v9` client (BSD-2-Clause, permissive)** —
+  see §1. A non-permissive client is never incorporated.
+- The “permissive only / no _source-available_” rule (§0.2–0.3) applies to **perimeter A**: the
+  dependencies and artifacts incorporated into the product. Dragonfly belongs to **perimeter B** and its
+  infrastructure image is documented and approved **case by case** in this document. It must not be
+  confused with the limited authorization for internal tooling in perimeter C.
+- **Redis (the server)** remains **excluded** (RSALv2/SSPL). Dragonfly is the choice for the ephemeral
+  layer; **PostgreSQL remains the single source of truth** (durable state, queues, transactional
+  outbox in `platform/pkg/events`). `platform/pkg/cache` **degrades to a no-op** if Dragonfly
+  is not configured or goes down: no service depends on it to work.
+- **Monitoring:** when pinning a new version it is checked that the grant has not changed (§5); if someday
+  we wanted to offer a managed data store to third parties, Dragonfly would stay out of that product.
 
 ---
 
 <a id="53-obligaciones-por-tipo-de-licencia-solo-permisivas--propietaria"></a>
 <a id="53-obligaciones-por-perimetro-y-tipo-de-licencia"></a>
 
-### 5.3 Obligaciones por perímetro y tipo de licencia
+<a id="53-obligaciones-por-perímetro-y-tipo-de-licencia"></a>
 
-#### Permisivas incorporadas (Apache-2.0, MIT, BSD, ISC, PostgreSQL, MPL-2.0)
+### 5.3 Obligations by perimeter and license type
 
-- **MIT / BSD / ISC / PostgreSQL:** conservar el aviso de copyright y el texto de licencia en las
-  distribuciones (incluido el aviso de **no-endoso/no-promoción** en BSD-3-Clause).
-- **Apache-2.0:** conservar `LICENSE` y, si existe, `NOTICE`; documentar cambios significativos en
-  los archivos modificados; **no eliminar** la concesión de patentes.
-- **MPL-2.0** (provider Scaleway): copyleft **por archivo** — si modificamos un archivo MPL,
-  publicamos ese archivo modificado bajo MPL-2.0; el resto del proyecto sigue **propietario**.
+<a id="permisivas-incorporadas-apache-20-mit-bsd-isc-postgresql-mpl-20"></a>
 
-#### Código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)
+#### Incorporated permissive licenses (Apache-2.0, MIT, BSD, ISC, PostgreSQL, MPL-2.0)
 
-- **Cabecera SPDX por archivo Go:** `SPDX-License-Identifier: Apache-2.0` +
-  `SPDX-FileCopyrightText: <año> Sytue`. Paquetes frontend con `LICENSE` propietaria.
-- **Sin obligación de oferta de fuente** (no es copyleft). El binario distribuido es cerrado.
-- **Compatibilidad:** las licencias permisivas (Apache/MIT/BSD/ISC/PostgreSQL/MPL) **sí** pueden
-  combinarse dentro de un producto propietario conservando sus avisos. **NUNCA** se mezcla código
-  AGPL/GPL. LGPL solo puede aprobarse como componente autónomo de B bajo §5.0.1; no se enlaza
-  estáticamente con código Sytue.
+- **MIT / BSD / ISC / PostgreSQL:** keep the copyright notice and the license text in
+  distributions (including the **non-endorsement/non-promotion** notice in BSD-3-Clause).
+- **Apache-2.0:** keep `LICENSE` and, if present, `NOTICE`; document significant changes in
+  the modified files; **do not remove** the patent grant.
+- **MPL-2.0** (Scaleway provider): **per-file** copyleft — if we modify an MPL file,
+  we publish that modified file under MPL-2.0; the rest of the project remains **proprietary**.
 
-#### GPL/AGPL en tooling interno autónomo
+<a id="código-apache-20--2026-daniel-delgado-ramos-thinkddr"></a>
 
-- Se ejecuta como proceso o servicio separado; no se enlaza, incorpora, empaqueta ni redistribuye
-  con los binarios, imágenes, instaladores o assets del producto.
-- Se conserva la licencia y el copyright, se registran las modificaciones y se facilita el código
-  fuente correspondiente cuando la licencia lo exija, incluido el uso por red cubierto por AGPL.
-- No se ofrece la herramienta como función a clientes. Su versión, artefacto, procedencia, origen y
-  licencia constan en el inventario de tooling; el origen UE sigue siendo un gate independiente.
-- Un build multi-stage demuestra que la herramienta y sus librerías no llegan a la etapa final. Las
-  licencias de sus **salidas** se evalúan por el contenido generado, no se heredan automáticamente.
+#### Apache-2.0 code © 2026 Daniel Delgado Ramos (thinkddr)
 
-#### Compatibilidad con la cláusula de patentes (Apache-2.0)
+- **SPDX header per Go file:** `SPDX-License-Identifier: Apache-2.0` +
+  `SPDX-FileCopyrightText: <año> Sytue`. Frontend packages with a proprietary `LICENSE`.
+- **No obligation to offer source** (it is not copyleft). The distributed binary is closed.
+- **Compatibility:** permissive licenses (Apache/MIT/BSD/ISC/PostgreSQL/MPL) **can** be
+  combined within a proprietary product while keeping their notices. AGPL/GPL code is **NEVER**
+  mixed in. LGPL can only be approved as a standalone B component under §5.0.1; it is not statically
+  linked with Sytue code.
 
-Las dependencias Apache-2.0 (fosite/zitadel, LiveKit, cert-manager, AWS SDK, Kubernetes/Helm/Kaniko,
-TypeScript) incluyen una concesión de patentes que se conserva intacta; no se redistribuyen
-modificadas sin documentar el cambio.
+<a id="gplagpl-en-tooling-interno-autónomo"></a>
+
+#### GPL/AGPL in standalone internal tooling
+
+- It runs as a separate process or service; it is not linked, incorporated, packaged or redistributed
+  with the product's binaries, images, installers or assets.
+- The license and copyright are kept, modifications are recorded and the corresponding source
+  code is provided when the license requires it, including network use covered by AGPL.
+- The tool is not offered as a feature to customers. Its version, artifact, provenance, origin and
+  license are recorded in the tooling inventory; EU origin remains an independent gate.
+- A multi-stage build demonstrates that the tool and its libraries do not reach the final stage. The
+  licenses of its **outputs** are assessed by the generated content, they are not inherited automatically.
+
+<a id="compatibilidad-con-la-cláusula-de-patentes-apache-20"></a>
+
+#### Compatibility with the patent clause (Apache-2.0)
+
+Apache-2.0 dependencies (fosite/zitadel, LiveKit, cert-manager, AWS SDK, Kubernetes/Helm/Kaniko,
+TypeScript) include a patent grant that is kept intact; they are not redistributed
+modified without documenting the change.
 
 ---
 
 <a id="54-plan-de-cumplimiento-operativo"></a>
 
-### 5.4 Plan de cumplimiento operativo
+### 5.4 Operational compliance plan
 
-1. **Inventario SBOM del producto (gate de licencias en CI).** Generar un SBOM **CycloneDX/SPDX** por imagen y
-   por app en CI (Go: `cyclonedx-gomod`; JS: `cyclonedx-npm`). **Fallar el build** si aparece
-   cualquier licencia fuera de la allowlist (Apache-2.0, MIT, BSD-2/3, ISC, PostgreSQL, MPL-2.0,
-   `MIT`). **Denylist explícita:** AGPL/GPL/LGPL, SSPL, BSL/BUSL, RSAL,
+1. **Product SBOM inventory (license gate in CI).** Generate a **CycloneDX/SPDX** SBOM per image and
+   per app in CI (Go: `cyclonedx-gomod`; JS: `cyclonedx-npm`). **Fail the build** if
+   any license outside the allowlist appears (Apache-2.0, MIT, BSD-2/3, ISC, PostgreSQL, MPL-2.0,
+   `MIT`). **Explicit denylist:** AGPL/GPL/LGPL, SSPL, BSL/BUSL, RSAL,
    Elastic, MSL, Confluent Community.
-2. **Cabeceras SPDX.** Todo archivo de código propio lleva la cabecera propietaria (§3). Lint de CI
-   verifica su presencia.
-3. **THIRD_PARTY_NOTICES.** Agregar automáticamente los `LICENSE`/`NOTICE` de las dependencias
-   permisivas en un fichero de avisos por artefacto/imagen distribuida (Go: `go-licenses`).
-4. **NOTICE de LiveKit y Apache-2.0.** Incluir el `NOTICE` de LiveKit y demás dependencias
-   Apache-2.0 en los artefactos de Meet y de cada servicio que las use.
-5. **Verificación por release.** Antes de cada release se confirma que las versiones fijadas
-   (CONVENTIONS §3) **no han cambiado de licencia upstream** (ver §5).
-6. **Registro clean-room.** Toda reimplementación de un protocolo/estándar registra sus fuentes
-   (RFC/spec/API) en el log de [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room); el gate de CI
-   no acepta dependencias derivadas de motores AGPL.
-7. **Inventario de tooling e infraestructura.** Mantener separado del SBOM de producto el
-   inventario de ejecutables/servicios de build, VCS, forja, CI y operación: versión, licencia,
-   origen, hash, modificaciones, obligaciones y responsable. El gate comprueba que están aprobados,
-   que la evidencia sigue vigente y que ningún fichero suyo entra en la imagen o instalador final.
-8. **Soberanía de origen.** Aplicar el gate de origen UE por separado a los perímetros A, B y C. Una
-   licencia permitida no compensa un origen no aprobado, ni un origen UE compensa una licencia o
-   forma de uso incompatible.
-9. **Marcas.** La marca de cara al usuario es **Sytue**; no se usan marcas de terceros salvo
-   atribución descriptiva exigida por una licencia permisiva.
+2. **SPDX headers.** Every file of our own code carries the proprietary header (§3). A CI lint
+   verifies its presence.
+3. **THIRD_PARTY_NOTICES.** Automatically aggregate the `LICENSE`/`NOTICE` files of the permissive
+   dependencies into a notices file per distributed artifact/image (Go: `go-licenses`).
+4. **LiveKit and Apache-2.0 NOTICE.** Include the `NOTICE` of LiveKit and the other
+   Apache-2.0 dependencies in the artifacts of Meet and of every service that uses them.
+5. **Per-release verification.** Before each release it is confirmed that the pinned versions
+   (CONVENTIONS §3) **have not changed license upstream** (see §5).
+6. **Clean-room record.** Every reimplementation of a protocol/standard records its sources
+   (RFC/spec/API) in the log of [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room); the CI gate
+   does not accept dependencies derived from AGPL engines.
+7. **Tooling and infrastructure inventory.** Keep separate from the product SBOM the
+   inventory of build, VCS, forge, CI and operations executables/services: version, license,
+   origin, hash, modifications, obligations and owner. The gate checks that they are approved,
+   that the evidence is still current and that none of their files enters the final image or installer.
+8. **Origin sovereignty.** Apply the EU-origin gate separately to perimeters A, B and C. An
+   allowed license does not compensate for an unapproved origin, nor does an EU origin compensate for an incompatible license or
+   form of use.
+9. **Trademarks.** The user-facing brand is **Sytue**; third-party trademarks are not used except for
+   descriptive attribution required by a permissive license.
 
 ---
 
 <a id="541-gifs-libres-de-rooms"></a>
 
-### 5.4.1 Biblioteca de GIF de Rooms
+<a id="541-biblioteca-de-gif-de-rooms"></a>
 
-La biblioteca web y nativa consulta el índice completo de Wikimedia Commons bajo
-búsqueda y paginación, sin mantener una lista fija de GIF ni cargarla en memoria.
-Commons tiene licencias distintas por archivo: se exige **CC0 1.0**, una URI de
-licencia válida, `AttributionRequired=false` y ninguna restricción declarada.
-Se excluyen CC-BY/CC-BY-SA y «Public domain» sin jurisdicción acreditada. La guía
-[de reutilización de Commons](https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia/en)
-y la [dedicación CC0](https://creativecommons.org/publicdomain/zero/1.0/)
-son las fuentes de este filtro; no se interpreta «estar en Commons» como permiso
-uniforme. La ficha de origen y la licencia siguen visibles antes de elegir.
+### 5.4.1 Rooms GIF library
 
-Rooms hace de proxy con los límites SSRF compartidos: solo los hosts fijados de
-Commons y sus originales, sin reenvío de identidad, cookies, mensajes ni archivos
-de una organización. Se envían únicamente los términos que la persona busca.
-Ambos hosts quedan inventariados como proveedores fuera de la UE con su baseline.
-Las páginas contienen como máximo 24 resultados; las miniaturas permanecen quietas
-y únicamente se anima el GIF que la persona abre. La caché conserva hasta 256
-metadatos durante cinco minutos, nunca originales. Cada archivo debe ser GIF
-realmente animado, de hasta 8 MiB, 1024 px por lado y 16 millones de píxeles de
-lienzo compuesto. La importación reutiliza Drive y el catálogo de emoji del tenant:
-el GIF elegido queda disponible para el equipo y se envía como su atajo existente.
+The web and native library queries the full Wikimedia Commons index through
+search and pagination, without keeping a fixed list of GIFs or loading it into memory.
+Commons has different licenses per file: **CC0 1.0**, a valid license
+URI, `AttributionRequired=false` and no declared restriction are required.
+CC-BY/CC-BY-SA and “Public domain” without an established jurisdiction are excluded. The
+[Commons reuse guide](https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia/en)
+and the [CC0 dedication](https://creativecommons.org/publicdomain/zero/1.0/)
+are the sources of this filter; “being on Commons” is not interpreted as a uniform
+permission. The source page and the license remain visible before choosing.
+
+Rooms acts as a proxy with the shared SSRF limits: only the pinned
+Commons hosts and their originals, without forwarding identity, cookies, messages or files
+of an organization. Only the terms the person searches for are sent.
+Both hosts are inventoried as non-EU providers with their baseline.
+Pages contain at most 24 results; thumbnails stay still
+and only the GIF the person opens is animated. The cache keeps up to 256
+metadata entries for five minutes, never originals. Each file must be a GIF
+that is actually animated, up to 8 MiB, 1024 px per side and 16 million pixels of
+composited canvas. Importing reuses Drive and the tenant's emoji catalog:
+the chosen GIF becomes available to the team and is sent as its existing shortcut.
 
 ---
 
 <a id="55-riesgos-y-vigilancia-de-licencias-upstream"></a>
 
-### 5.5 Riesgos y vigilancia de licencias upstream
+### 5.5 Risks and monitoring of upstream licenses
 
-- **Cambios de licencia upstream.** Si una dependencia incorporada al producto migra a
-  SSPL/BSL/Elastic/AGPL se trata como bloqueante: se **congela** en la última versión permisiva y se
-  evalúa alternativa, o se sustituye. Un cambio equivalente en tooling o infraestructura fuerza
-  una nueva revisión de su perímetro y forma de uso; nunca queda aprobado automáticamente.
-- **Terraform CLI (BUSL-1.1, no OSI).** No se redistribuye, pero por alineación estricta con la
-  política se usa **OpenTofu (MPL-2.0)** como CLI de IaC. Decisión registrada como ADR.
-- **MinIO (AGPL) en dev.** Solo herramienta de desarrollo local; nunca se redistribuye ni se expone
-  como servicio de producto. En prod se usa Scaleway Object Storage (gestionado). Si se requiere dev
-  100% permisivo se evalúa SeaweedFS (Apache-2.0).
-- **fosite vs zitadel/oidc.** Ambas Apache-2.0; la elección se fija en un ADR. Vigilar que no
-  introduzcan dependencias transitivas copyleft.
-- **Dependencias transitivas.** El gate SBOM analiza el **árbol completo del artefacto**, no solo
-  las directas; una transitiva AGPL/GPL incorporada bloquea el build igual que una directa. Las
-  dependencias de una herramienta autónoma se controlan en su inventario, sin contaminar el SBOM
-  del producto y sin permitir que lleguen a la etapa final de la imagen.
+- **Upstream license changes.** If a dependency incorporated into the product moves to
+  SSPL/BSL/Elastic/AGPL it is treated as blocking: it is **frozen** at the last permissive version and an
+  alternative is evaluated, or it is replaced. An equivalent change in tooling or infrastructure forces
+  a new review of its perimeter and form of use; it is never approved automatically.
+- **Terraform CLI (BUSL-1.1, not OSI).** It is not redistributed, but for strict alignment with the
+  policy **OpenTofu (MPL-2.0)** is used as the IaC CLI. Decision recorded as an ADR.
+- **MinIO (AGPL) in dev.** Only a local development tool; it is never redistributed or exposed
+  as a product service. In prod Scaleway Object Storage (managed) is used. If a 100% permissive dev
+  setup is required, SeaweedFS (Apache-2.0) is evaluated.
+- **fosite vs zitadel/oidc.** Both Apache-2.0; the choice is fixed in an ADR. Watch that they do not
+  introduce copyleft transitive dependencies.
+- **Transitive dependencies.** The SBOM gate analyzes the **artifact's complete tree**, not only
+  direct ones; an incorporated AGPL/GPL transitive dependency blocks the build just like a direct one. The
+  dependencies of a standalone tool are controlled in its inventory, without contaminating the product
+  SBOM and without allowing them to reach the final stage of the image.
 
 ---
 
 <a id="56-motores-de-terceros-agpl--retirados-del-modelo-v4"></a>
 
-### 5.6 Motores de terceros AGPL — **RETIRADOS** del modelo v4
+### 5.6 Third-party AGPL engines — **RETIRED** from the v4 model
 
-> En versiones previas la suite envolvía motores de terceros bajo **AGPL-3.0** (con clientes
-> clean-room y/o tematización). En **v4 "Sytue Native"** estos motores se **RETIRARON por completo**:
-> ya **no se despliega, compila ni ejecuta ninguno en el runtime de producto**. Su funcionalidad la dan **servicios
-> Sytue-native en Go** reimplementados clean-room sobre estándares abiertos + **PostgreSQL**.
+> In previous versions the suite wrapped third-party engines under **AGPL-3.0** (with clean-room
+> clients and/or theming). In **v4 "Sytue Native"** these engines were **RETIRED completely**:
+> **none of them is deployed, compiled or run in the product runtime** anymore. Their functionality is provided by **Sytue-native
+> services in Go** reimplemented clean-room on open standards + **PostgreSQL**.
 
-| Motor retirado   | Antes cubría            | Licencia (motivo de retirada)      | Reemplazo Sytue-native (Go, propietario)                              |
-| ---------------- | ----------------------- | ---------------------------------- | --------------------------------------------------------------------- |
-| **Keycloak**     | Identidad/SSO           | Apache-2.0, pero motor de terceros | **Sytue ID** (Go: OIDC/OAuth2/SAML/SCIM con `fosite`/`zitadel/oidc`)  |
-| **Nextcloud**    | Drive/Calendar/Contacts | **AGPL-3.0**                       | **Sytue Drive/Calendar/Contacts** (Go: WebDAV/CalDAV/CardDAV propios) |
-| **OnlyOffice**   | Ofimática (Docs)        | **AGPL-3.0**                       | **Sytue Docs** (Go + editor propio, colab CRDT/OT)                    |
-| **Stalwart**     | Correo (SMTP/IMAP/JMAP) | **AGPL-3.0**                       | **Sytue Mail** (Go: `emersion/*` MIT + JMAP propio)                   |
-| **Mattermost**   | Chat                    | **AGPL-3.0** (+ `enterprise/` MSL) | **Sytue Rooms** (Go: WebSocket + API REST propia)                     |
-| **Redis/Valkey** | Cache/colas             | (técnico + licencia)               | **PostgreSQL** (LISTEN/NOTIFY, colas sobre Postgres)                  |
+| Retired engine   | Previously covered      | License (reason for retirement)      | Sytue-native replacement (Go, proprietary)                             |
+| ---------------- | ----------------------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| **Keycloak**     | Identity/SSO            | Apache-2.0, but a third-party engine | **Sytue ID** (Go: OIDC/OAuth2/SAML/SCIM with `fosite`/`zitadel/oidc`)  |
+| **Nextcloud**    | Drive/Calendar/Contacts | **AGPL-3.0**                         | **Sytue Drive/Calendar/Contacts** (Go: in-house WebDAV/CalDAV/CardDAV) |
+| **OnlyOffice**   | Office suite (Docs)     | **AGPL-3.0**                         | **Sytue Docs** (Go + in-house editor, CRDT/OT collab)                  |
+| **Stalwart**     | Mail (SMTP/IMAP/JMAP)   | **AGPL-3.0**                         | **Sytue Mail** (Go: `emersion/*` MIT + in-house JMAP)                  |
+| **Mattermost**   | Chat                    | **AGPL-3.0** (+ `enterprise/` MSL)   | **Sytue Rooms** (Go: WebSocket + in-house REST API)                    |
+| **Redis/Valkey** | Cache/queues            | (technical + license)                | **PostgreSQL** (LISTEN/NOTIFY, queues on Postgres)                     |
 
-> **Nota:** Keycloak es Apache-2.0 (no AGPL), pero se retira por el principio v4 de **no desplegar
-> motores de terceros**; Sytue ID es obra propia. El resto se retiran adicionalmente por su licencia
-> **AGPL** (incompatible con la política del runtime de producto). Toda la antigua matriz de obligaciones AGPL §13
-> (oferta de _corresponding source_ de Nextcloud/OnlyOffice/Stalwart/Mattermost/MinIO) queda
-> **derogada**: ya no hay motores AGPL en el producto.
+> **Note:** Keycloak is Apache-2.0 (not AGPL), but it is retired because of the v4 principle of **not deploying
+> third-party engines**; Sytue ID is our own work. The rest are additionally retired because of their
+> **AGPL** license (incompatible with the product runtime policy). The whole former AGPL obligations matrix §13
+> (offering the _corresponding source_ of Nextcloud/OnlyOffice/Stalwart/Mattermost/MinIO) is
+> **repealed**: there are no longer AGPL engines in the product.
 
 ---
 
 <a id="57-resumen-de-cumplimiento"></a>
 
-### 5.7 Resumen de cumplimiento
+### 5.7 Compliance summary
 
-- **Código de producto:** **PROPIETARIO © Sytue** — sin copyleft, con cabeceras SPDX, sin oferta de
-  fuente.
-- **Incorporado al producto:** únicamente dependencias **permisivas** (Apache-2.0, MIT, BSD, ISC,
-  PostgreSQL, MPL-2.0). Única app de terceros en el runtime de cliente: **LiveKit (Apache-2.0)**.
-- **Prohibido en el perímetro A:** AGPL/GPL/LGPL y _source-available_
-  (SSPL/BSL/BUSL/RSAL/Elastic/MSL). Verificado por el **gate de licencias SBOM** en CI (§4).
-- **Perímetro B:** un runtime autónomo con LGPL u otra excepción no permisiva requiere ADR, origen
-  UE, cumplimiento y salida; Bun está bloqueado hasta resolver ambos gates.
-- **Tooling interno:** GPL/AGPL puede usarse como ejecutable o servicio autónomo bajo §5.0.1,
-  inventariado, sin ofrecerse a clientes ni entrar en artefactos; _source-available_ requiere ADR.
-- **Origen UE:** gate independiente para producto, infraestructura y tooling; no se deduce de la
-  licencia ni de la región donde se aloje.
-- **Motores AGPL:** **RETIRADOS** (§6); reemplazados por servicios Go Sytue-native sobre PostgreSQL.
-- **Sin Redis (servidor):** estado/colas/outbox sobre **PostgreSQL**; lo **efímero**
-  (presencia TTL, fan-out) sobre **DragonflyDB** como servicio de infra interno (BSL 1.1 con
-  Additional Use Grant cumplido; código solo con cliente `go-redis` BSD-2 — ver §2).
-- **Clean-room:** reimplementación original desde RFCs/specs; firewall y registro en
+- **Product code:** **PROPRIETARY © Sytue** — no copyleft, with SPDX headers, no source
+  offer.
+- **Incorporated into the product:** only **permissive** dependencies (Apache-2.0, MIT, BSD, ISC,
+  PostgreSQL, MPL-2.0). The only third-party app in the customer runtime: **LiveKit (Apache-2.0)**.
+- **Forbidden in perimeter A:** AGPL/GPL/LGPL and _source-available_
+  (SSPL/BSL/BUSL/RSAL/Elastic/MSL). Verified by the **SBOM license gate** in CI (§4).
+- **Perimeter B:** a standalone runtime with LGPL or another non-permissive exception requires an ADR, EU
+  origin, compliance and an exit; Bun is blocked until both gates are resolved.
+- **Internal tooling:** GPL/AGPL may be used as a standalone executable or service under §5.0.1,
+  inventoried, without being offered to customers or entering artifacts; _source-available_ requires an ADR.
+- **EU origin:** an independent gate for product, infrastructure and tooling; it is not inferred from the
+  license or from the region where it is hosted.
+- **AGPL engines:** **RETIRED** (§6); replaced by Sytue-native Go services on PostgreSQL.
+- **No Redis (server):** state/queues/outbox on **PostgreSQL**; the **ephemeral** layer
+  (TTL presence, fan-out) on **DragonflyDB** as an internal infra service (BSL 1.1 with the
+  Additional Use Grant complied with; code only with the BSD-2 `go-redis` client — see §2).
+- **Clean-room:** original reimplementation from RFCs/specs; firewall and record in
   [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room).
 
-> Cualquier incorporación nueva debe pasar el **gate de licencias** de CI (§4). Ver también
-> [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room) (proceso de reimplementación) y
-> [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd) (soberanía UE).
+> Any new addition must pass the CI **license gate** (§4). See also
+> [`docs/security.md#4-politica-de-reimplementacion-clean-room`](./security.md#4-politica-de-reimplementacion-clean-room) (reimplementation process) and
+> [`docs/security.md#1-seguridad-y-rgpd`](./security.md#1-seguridad-y-rgpd) (EU sovereignty).
 
 ---

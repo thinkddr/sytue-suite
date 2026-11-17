@@ -8,7 +8,17 @@
  * dato la fila siga diciendo algo cierto. Ejecutar: `bun test`.
  */
 import { expect, test } from 'bun:test';
-import { conversacionAbierta, groupByThread } from './utils.js';
+import { readdirSync, readFileSync } from 'node:fs';
+import {
+  ATRIBUCIONES_DE_CITA,
+  OPCIONES_BUSQUEDA_VACIAS,
+  componerConsulta,
+  conversacionAbierta,
+  desmontarConsulta,
+  groupByThread,
+  separarCita,
+  type OpcionesBusqueda,
+} from './utils.js';
 import type { EmailSummary } from '@sytue/api-clients';
 
 function correo(id: string, threadId: string, threadCount?: number): EmailSummary {
@@ -95,3 +105,114 @@ test('un hilo abierto por enlace se arma con el hilo completo si no está en la 
   expect(conv?.latest.id).toBe('v2'); // lo más reciente arriba, como en la lista
   expect(conversacionAbierta(lista, null, hilo)).toBeNull();
 });
+
+/*
+ * separarCita — el pliegue de la cita en los mensajes del hilo. Los casos los comparte
+ * con `cita.go` (apps/fyne/apps/mail/testdata/cita.json, que recorre
+ * `TestLaCitaSeSeparaComoEnLaWeb`).
+ *
+ * VISTO EN ROJO (2026-11-09): sin la coma opcional, la cabecera de Gmail en inglés
+ * no se reconocía; sin unir dos líneas, la atribución partida se quedaba en lo nuevo;
+ * sin el «no queda nada nuevo», un mensaje que era solo cita salía vacío. Deshecho.
+ */
+const vectoresCita = JSON.parse(
+  readFileSync(
+    new URL('../../../../../fyne/apps/mail/testdata/cita.json', import.meta.url),
+    'utf8',
+  ),
+) as { casos: { nombre: string; texto: string; cuerpo: string; cita: string }[] };
+
+test('hay casos de cita que recorrer', () => {
+  expect(vectoresCita.casos.length).toBeGreaterThanOrEqual(10);
+});
+
+for (const c of vectoresCita.casos) {
+  test(`separarCita: ${c.nombre}`, () => {
+    expect(separarCita(c.texto)).toEqual({ cuerpo: c.cuerpo, cita: c.cita });
+  });
+}
+
+test('las atribuciones de cita son las de reader.quoteHeader de los 26 catálogos', async () => {
+  const dir = new URL('../i18n/messages/', import.meta.url);
+  const ficheros = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+  expect(ficheros.length).toBe(26);
+  const plantillas = new Set<string>();
+  for (const f of ficheros) {
+    const mod = (await import(new URL(f, dir).href)) as Record<string, Record<string, string>>;
+    const catalogo = mod[f.replace(/\.ts$/, '')]!;
+    plantillas.add(catalogo['reader.quoteHeader']!);
+  }
+  expect(new Set(ATRIBUCIONES_DE_CITA)).toEqual(plantillas);
+  expect(ATRIBUCIONES_DE_CITA.length).toBe(plantillas.size);
+});
+
+test('separarCita reconoce la cabecera que escribe la propia respuesta en cada idioma', () => {
+  for (const p of ATRIBUCIONES_DE_CITA) {
+    const cabecera = p.replace('{date}', '5 ene 2026, 10:00').replace('{name}', 'Ana Ruiz');
+    const { cuerpo } = separarCita(`Vale.\n\n${cabecera}\n> Hola`);
+    expect(cuerpo).toBe('Vale.');
+  }
+});
+
+/*
+ * VISTO EN ROJO (2026-11-09): sin el tope de largo, una línea de 8 000 caracteres sin
+ * saltos justo encima de la cita tardaba más de 7 s en `separarCita` (la expresión de
+ * la atribución probaba todos los repartos de sus huecos), y colgaba el lector. Deshecho.
+ */
+test('una línea larga encima de la cita no cuelga separarCita', () => {
+  const largo = 'a, b '.repeat(4000);
+  const t0 = performance.now();
+  const { cuerpo, cita } = separarCita(`Hola\n${largo}\n${largo}\n> cita`);
+  expect(performance.now() - t0).toBeLessThan(500);
+  expect(cita).toBe('> cita');
+  expect(cuerpo).toBe(`Hola\n${largo}\n${largo}`.trimEnd());
+});
+
+/*
+ * VISTO EN ROJO (2026-11-09): con el tope de 256 caracteres pero los espacios de la
+ * plantilla como `\s*`, una línea «a␣…␣b» de 252 caracteres encima de la cita aún tardaba
+ * 1,3 s (el `\s*` y los huecos `.+` se disputaban cada espacio). Deshecho.
+ */
+test('una racha de espacios dentro del tope tampoco cuelga separarCita', () => {
+  const linea = `a${' '.repeat(250)}b`;
+  const t0 = performance.now();
+  for (let i = 0; i < 5; i++) expect(separarCita(`Hola\n${linea}\n> cita`).cita).toBe('> cita');
+  expect(performance.now() - t0).toBeLessThan(250);
+});
+
+/*
+ * componerConsulta / desmontarConsulta — el panel «Opciones de búsqueda». Los casos los
+ * comparte con `consulta.go` (apps/fyne/apps/mail/testdata/consulta-busqueda.json, que
+ * recorren `TestLaConsultaSeComponeComoEnLaWeb` y el parser del servicio).
+ *
+ * VISTO EN ROJO (2026-11-13): escribiendo «Hasta» tal cual, el 28 de febrero se quedaba
+ * fuera (before excluye su día); sin quitar las comillas de dentro, `subject:"el "plan" B"`
+ * partía la consulta en tres. Deshecho.
+ */
+type CasoConsulta = { nombre: string; opciones: Partial<OpcionesBusqueda>; consulta: string };
+const vectoresConsulta = JSON.parse(
+  readFileSync(
+    new URL('../../../../../fyne/apps/mail/testdata/consulta-busqueda.json', import.meta.url),
+    'utf8',
+  ),
+) as { componer: CasoConsulta[]; desmontar: CasoConsulta[] };
+
+test('hay casos de consulta que recorrer', () => {
+  expect(vectoresConsulta.componer.length).toBeGreaterThanOrEqual(10);
+  expect(vectoresConsulta.desmontar.length).toBeGreaterThanOrEqual(10);
+});
+
+for (const c of vectoresConsulta.componer) {
+  test(`componerConsulta: ${c.nombre}`, () => {
+    expect(componerConsulta({ ...OPCIONES_BUSQUEDA_VACIAS, ...c.opciones })).toBe(c.consulta);
+  });
+}
+
+for (const c of vectoresConsulta.desmontar) {
+  test(`desmontarConsulta: ${c.nombre}`, () => {
+    const o = desmontarConsulta(c.consulta);
+    expect(o).toEqual({ ...OPCIONES_BUSQUEDA_VACIAS, ...c.opciones });
+    // Aplicar el panel sin tocar nada no cambia lo que se busca.
+    expect(desmontarConsulta(componerConsulta(o))).toEqual(o);
+  });
+}

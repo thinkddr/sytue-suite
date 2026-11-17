@@ -48,7 +48,7 @@
  */
 
 /*
- * LAS LISTAS. Son las mismas que las de `services/docs/internal/domain/saneado_html.go`,
+ * LAS LISTAS. Son las mismas que las de `apps/nucleo/saneado/saneado.go`,
  * y `apps/docs/test/saneado-lienzos.test.ts` lo comprueba leyendo aquel fichero: si
  * cambias una aquí sin cambiarla allí, o al revés, esa prueba falla.
  */

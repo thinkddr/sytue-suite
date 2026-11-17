@@ -80,6 +80,8 @@ type fakeSvc struct {
 	addHost string
 	rmDom   error
 	ingress string
+	// Resultado del «Comprobar ahora» de un dominio.
+	domCheck domain.DomainCheck
 
 	env       domain.EnvVar
 	envs      []domain.EnvVar
@@ -298,6 +300,11 @@ func (f *fakeSvc) RemoveDomain(context.Context, uuid.UUID) error { return f.rmDo
 func (f *fakeSvc) SetDomainPrimary(_ context.Context, _ uuid.UUID) (domain.Domain, error) {
 	return f.dom, nil
 }
+
+func (f *fakeSvc) VerifyDomainNow(context.Context, uuid.UUID) (domain.Domain, domain.DomainCheck, error) {
+	return f.dom, f.domCheck, f.domErr
+}
+
 func (f *fakeSvc) CancelBuild(context.Context, uuid.UUID) error { return nil }
 
 // Auditoría: el fake captura los criterios recibidos para poder afirmar que los
@@ -1206,6 +1213,44 @@ func TestRemoveDomain(t *testing.T) {
 	h.RemoveDomain(rr, req(http.MethodDelete, "/domains/x", validUUID, ""))
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("status=%d", rr.Code)
+	}
+}
+
+// «Comprobar ahora» contesta con el motivo y el dominio ya actualizado: el panel
+// pinta las dos cosas sin recargar la lista.
+func TestVerifyDomainDevuelveElMotivo(t *testing.T) {
+	f := &fakeSvc{
+		dom: domain.Domain{Hostname: "www.example.com", Status: domain.DomainVerified},
+		domCheck: domain.DomainCheck{
+			Verified: true, Reason: domain.DomainCheckCNAMEMismatch,
+			Expected: "ingress.sytue.eu", Found: "otro.example",
+		},
+	}
+	rr := httptest.NewRecorder()
+	newHandlers(f).VerifyDomain(rr, req(http.MethodPost, "/domains/x/verify", validUUID, ""))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	m := decodeEnvelope(t, rr)
+	check, _ := m["check"].(map[string]any)
+	if check["reason"] != "cname_distinto" || check["found"] != "otro.example" || check["verified"] != true {
+		t.Errorf("check = %v", m["check"])
+	}
+	if d, _ := m["domain"].(map[string]any); d["status"] != "verified" {
+		t.Errorf("domain = %v", m["domain"])
+	}
+}
+
+// El tope se dice con 429 y Retry-After: el cliente sabe cuánto esperar.
+func TestVerifyDomainTope(t *testing.T) {
+	rr := httptest.NewRecorder()
+	newHandlers(&fakeSvc{domErr: domain.ErrTooSoon}).
+		VerifyDomain(rr, req(http.MethodPost, "/domains/x/verify", validUUID, ""))
+	if rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("status=%d; quiero 429", rr.Code)
+	}
+	if got := rr.Header().Get("Retry-After"); got != "10" {
+		t.Errorf("Retry-After = %q; quiero 10", got)
 	}
 }
 

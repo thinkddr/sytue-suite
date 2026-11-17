@@ -23,6 +23,11 @@ export interface DocsOptions {
 /** Tipo de documento ofimatico. */
 export type DocKind = 'document' | 'spreadsheet' | 'presentation';
 
+/** Alcance por propiedad del listado: los que posees o los que otros comparten contigo. */
+export type DocListScope = 'mine' | 'shared';
+/** Orden del listado: por fecha de modificación (defecto) o por título. */
+export type DocListSort = 'updated' | 'title';
+
 export interface DocumentMeta {
   id: string;
   title: string;
@@ -39,6 +44,10 @@ export interface DocumentMeta {
   /** Fichero del que nacio el documento («drive:<uuid>»), si vino de fuera. Lo que
    *  hace que abrirlo otra vez desde Drive vuelva aqui en vez de dejar otra copia. */
   sourceRef?: string;
+  /** Secuencia con la que el servicio dibujó la miniatura de la portada (la primera
+   *  página, hoja o diapositiva). Ausente = sin miniatura todavía: la portada pinta el
+   *  glifo del tipo. Va en la URL de la imagen, que así se cachea mientras no cambie. */
+  thumbnailSeq?: number;
 }
 
 export interface CreateDocumentInput {
@@ -137,7 +146,7 @@ export interface DocTemplatesResponse {
 
 /**
  * Qué puede hacer quien abre un documento. Los nombres son los del servicio
- * (`services/docs/internal/domain`), no unos propios: dos vocabularios para lo
+ * (`apps/nucleo/office/model`), no unos propios: dos vocabularios para lo
  * mismo se desincronizan a la primera.
  */
 export type DocumentRole = 'owner' | 'editor' | 'commenter' | 'viewer' | 'none';
@@ -187,6 +196,11 @@ export class DocsClient {
      *  paginacion keyset, filtrar la pagina traida enseñaria «ninguno» mientras
      *  los destacados esperan tres paginas mas alla. */
     starred?: boolean;
+    /** «Míos» (`mine`) o «Compartidos conmigo» (`shared`); sin él, todos. */
+    scope?: DocListScope;
+    /** `title`: A→Z sin mayúsculas ni acentos. El cursor de la página siguiente es
+     *  entonces de título: no vale para seguir el orden por fecha. */
+    sort?: DocListSort;
   }): Promise<{ documents: DocumentMeta[]; nextCursor?: string }> {
     const r = await this.http.json<{ documents: RawDocument[]; next_cursor?: string }>({
       path: '/documents',
@@ -196,6 +210,8 @@ export class DocsClient {
         limit: options?.limit ?? 50,
         cursor: options?.cursor,
         ...(options?.starred ? { starred: '1' } : {}),
+        ...(options?.scope ? { scope: options.scope } : {}),
+        ...(options?.sort === 'title' ? { sort: 'title' } : {}),
       },
     });
     return {
@@ -393,6 +409,7 @@ interface RawDocument {
   updated_at: string;
   starred?: boolean;
   source_ref?: string;
+  thumbnail_seq?: number;
 }
 
 /** Mapea el shape del servicio Go al DocumentMeta del SDK (camelCase). */
@@ -407,5 +424,8 @@ function toMeta(d: RawDocument): DocumentMeta {
     version: d.seq,
     starred: d.starred === true,
     ...(d.source_ref ? { sourceRef: d.source_ref } : {}),
+    ...(typeof d.thumbnail_seq === 'number' && d.thumbnail_seq > 0
+      ? { thumbnailSeq: d.thumbnail_seq }
+      : {}),
   };
 }

@@ -38,6 +38,12 @@ type NoteReminderInput struct {
 
 // ListReminders son mis recordatorios pendientes: el indicador de cada fila.
 func (n *Notes) ListReminders(ctx context.Context) ([]NoteReminder, error) {
+	if n.data != nil {
+		if views, ok := n.data.(NotesViewsData); ok {
+			return views.ListReminders(ctx)
+		}
+		return nil, ErrPrivateNotesOperation
+	}
 	r, err := JSON[struct {
 		Reminders []NoteReminder `json:"reminders"`
 	}](ctx, n.c, Request{Path: "/reminders"})

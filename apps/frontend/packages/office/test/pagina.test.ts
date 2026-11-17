@@ -58,3 +58,26 @@ test('un tamaño propio y lo que no se entiende', () => {
   expect(medidasPagina(raro)).toEqual({ w: 600, h: 900 });
   expect(raro.color).toBeUndefined();
 });
+
+test('el idioma del documento viaja en la capa, detrás del color', () => {
+  const html =
+    '<div data-sytue-page="" data-width="794" data-height="1123" data-margins="96 96 96 96" data-color="#FFF2CC" data-lang="de" contenteditable="false" aria-hidden="true"></div>';
+  const p = leerPagina(capa(html));
+  expect(p.lang).toBe('de');
+  expect(paginaHtml(p)).toBe(html);
+  // Solo el idioma ya merece capa: si no, al recargar se perdería.
+  expect(paginaHtml({ ...PAGINA_POR_DEFECTO, lang: 'fr' })).toBe(
+    '<div data-sytue-page="" data-width="794" data-height="1123" data-margins="96 96 96 96" data-lang="fr" contenteditable="false" aria-hidden="true"></div>',
+  );
+  expect(leerPagina(capa(paginaHtml({ ...PAGINA_POR_DEFECTO, lang: 'fr' }))).lang).toBe('fr');
+});
+
+test('un idioma que no es de la suite no se lee ni se escribe', () => {
+  const raro = leerPagina(capa('<div data-sytue-page="" data-lang="xx" data-width="794"></div>'));
+  expect(raro.lang).toBeUndefined();
+  const inyectado = leerPagina(
+    capa('<div data-sytue-page="" data-lang="es&quot; onload=x"></div>'),
+  );
+  expect(inyectado.lang).toBeUndefined();
+  expect(paginaHtml({ ...PAGINA_POR_DEFECTO, lang: 'x"y' as never })).toBe('');
+});

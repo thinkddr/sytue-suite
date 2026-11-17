@@ -81,7 +81,7 @@ func TestLaMiniaturaDejaPasarLosAtajosDelEditor(t *testing.T) {
 	}
 }
 
-// TestElCarrilAñadeDuplicaYBorra: los tres botones del pie del carril, con el diálogo
+// TestElCarrilAñadeDuplicaYBorra: los botones del pie del carril, con el diálogo
 // de confirmación del borrado, y cada cambio marca el documento como sin guardar y
 // avisa a quien guarda.
 func TestElCarrilAñadeDuplicaYBorra(t *testing.T) {
@@ -101,7 +101,11 @@ func TestElCarrilAñadeDuplicaYBorra(t *testing.T) {
 	if len(e.Modelo().Diapos) != 3 || e.Activa() != 2 {
 		t.Fatalf("«Duplicar» deja %d diapositivas y la activa en %d", len(e.Modelo().Diapos), e.Activa())
 	}
-	test.Tap(e.carril.pie[2].(*editor.BotonCinta)) // eliminar: pregunta
+	test.Tap(e.carril.pie[2].(*editor.BotonCinta)) // ocultar: el orden del pie es el de la web
+	if !e.Modelo().Diapos[2].EstaOculta() || len(e.Modelo().Diapos) != 3 {
+		t.Fatal("«Ocultar diapositiva» no ha ocultado la activa")
+	}
+	test.Tap(e.carril.pie[3].(*editor.BotonCinta)) // eliminar: pregunta
 	capas := w.Canvas().Overlays().List()
 	if len(capas) != 1 || len(e.Modelo().Diapos) != 3 {
 		t.Fatalf("eliminar tiene que PREGUNTAR antes (%d capas, %d diapositivas)", len(capas), len(e.Modelo().Diapos))
@@ -207,9 +211,13 @@ func TestLaPresentacionRevelaPorPasos(t *testing.T) {
 	if p.Diapo != 1 || p.Paso != 0 {
 		t.Errorf("AvPág lleva a (%d, %d) y salta a la siguiente entera: (1, 0)", p.Diapo, p.Paso)
 	}
+	p.Tecla(fyne.KeyUp)
+	if p.Diapo != 0 || p.Paso != 1 {
+		t.Errorf("↑ retrocede paso a paso, como ←: (%d, %d) y tocaba (0, 1)", p.Diapo, p.Paso)
+	}
 	p.Tecla(fyne.KeyDown)
-	if p.Diapo != 1 {
-		t.Error("↓ no hace nada en la web, y aquí tampoco")
+	if p.Diapo != 1 || p.Paso != 0 {
+		t.Errorf("↓ avanza paso a paso, como →: (%d, %d) y tocaba (1, 0)", p.Diapo, p.Paso)
 	}
 	salido := false
 	p.AlSalir = func() { salido = true }

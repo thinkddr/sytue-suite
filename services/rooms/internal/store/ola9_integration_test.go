@@ -28,7 +28,7 @@ func TestThreadAutoFollowAndUnread(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	for _, sub := range []string{"bob", "carol"} {
 		if err := st.AddTeamMember(ctx, tm.ID, "alice", sub, sub, domain.RoleMember); err != nil {
 			t.Fatalf("AddTeamMember %s: %v", sub, err)
@@ -50,7 +50,7 @@ func TestThreadAutoFollowAndUnread(t *testing.T) {
 	}
 
 	// alice sigue el hilo y tiene 1 respuesta no leída (la de bob).
-	al := findThread(t, listThreads(t, st, ctx, "alice"), root.ID)
+	al := findThread(t, listThreads(ctx, t, st, "alice"), root.ID)
 	if al.UnreadReplies != 1 {
 		t.Fatalf("alice unread=%d, quiero 1", al.UnreadReplies)
 	}
@@ -58,7 +58,7 @@ func TestThreadAutoFollowAndUnread(t *testing.T) {
 		t.Fatalf("alice root.ReplyCount=%d, quiero 1", al.Root.ReplyCount)
 	}
 	// bob sigue el hilo pero su propia respuesta no le cuenta como no leída.
-	bo := findThread(t, listThreads(t, st, ctx, "bob"), root.ID)
+	bo := findThread(t, listThreads(ctx, t, st, "bob"), root.ID)
 	if bo.UnreadReplies != 0 {
 		t.Fatalf("bob unread=%d, quiero 0 (su propia respuesta no cuenta)", bo.UnreadReplies)
 	}
@@ -67,10 +67,10 @@ func TestThreadAutoFollowAndUnread(t *testing.T) {
 	if _, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: ch.ID, ParentID: &root.ID, AuthorSub: "carol", AuthorName: "Carol", Body: "respuesta 2"}); err != nil {
 		t.Fatalf("CreateMessage respuesta carol: %v", err)
 	}
-	if al := findThread(t, listThreads(t, st, ctx, "alice"), root.ID); al.UnreadReplies != 2 {
+	if al := findThread(t, listThreads(ctx, t, st, "alice"), root.ID); al.UnreadReplies != 2 {
 		t.Fatalf("alice unread=%d tras carol, quiero 2", al.UnreadReplies)
 	}
-	if bo := findThread(t, listThreads(t, st, ctx, "bob"), root.ID); bo.UnreadReplies != 1 {
+	if bo := findThread(t, listThreads(ctx, t, st, "bob"), root.ID); bo.UnreadReplies != 1 {
 		t.Fatalf("bob unread=%d tras carol, quiero 1", bo.UnreadReplies)
 	}
 
@@ -78,7 +78,7 @@ func TestThreadAutoFollowAndUnread(t *testing.T) {
 	if _, _, err := st.ListThread(ctx, root.ID, "alice"); err != nil {
 		t.Fatalf("ListThread alice: %v", err)
 	}
-	if al := findThread(t, listThreads(t, st, ctx, "alice"), root.ID); al.UnreadReplies != 0 {
+	if al := findThread(t, listThreads(ctx, t, st, "alice"), root.ID); al.UnreadReplies != 0 {
 		t.Fatalf("alice unread=%d tras abrir, quiero 0", al.UnreadReplies)
 	}
 }
@@ -88,7 +88,7 @@ func TestThreadFollowedOrderingAndAccessFilter(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember bob: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestThreadFollowedOrderingAndAccessFilter(t *testing.T) {
 		t.Fatalf("reply r2: %v", err)
 	}
 	// r2 fue el último con actividad → primero en la lista de bob.
-	list := listThreads(t, st, ctx, "bob")
+	list := listThreads(ctx, t, st, "bob")
 	if len(list) != 2 || list[0].Root.ID != r2.ID || list[1].Root.ID != r1.ID {
 		t.Fatalf("orden por actividad inesperado: %+v", threadIDs(list))
 	}
@@ -111,7 +111,7 @@ func TestThreadFollowedOrderingAndAccessFilter(t *testing.T) {
 	if _, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: ch.ID, ParentID: &r1.ID, AuthorSub: "alice", Body: "c"}); err != nil {
 		t.Fatalf("reply r1 de nuevo: %v", err)
 	}
-	if list := listThreads(t, st, ctx, "bob"); list[0].Root.ID != r1.ID {
+	if list := listThreads(ctx, t, st, "bob"); list[0].Root.ID != r1.ID {
 		t.Fatalf("r1 debería subir al principio tras nueva actividad: %+v", threadIDs(list))
 	}
 
@@ -138,13 +138,13 @@ func TestThreadFollowedOrderingAndAccessFilter(t *testing.T) {
 	if _, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: priv.ID, ParentID: &pr.ID, AuthorSub: "bob", Body: "sigo"}); err != nil {
 		t.Fatalf("reply priv bob: %v", err)
 	}
-	if _, ok := tryFindThread(listThreads(t, st, ctx, "bob"), pr.ID); !ok {
+	if _, ok := tryFindThread(listThreads(ctx, t, st, "bob"), pr.ID); !ok {
 		t.Fatal("bob debe ver su hilo privado siendo miembro")
 	}
 	if err := st.LeaveChannel(ctx, priv.ID, "bob"); err != nil {
 		t.Fatalf("LeaveChannel: %v", err)
 	}
-	if _, ok := tryFindThread(listThreads(t, st, ctx, "bob"), pr.ID); ok {
+	if _, ok := tryFindThread(listThreads(ctx, t, st, "bob"), pr.ID); ok {
 		t.Fatal("tras abandonar el canal, el hilo debe filtrarse de la vista global")
 	}
 }
@@ -154,7 +154,7 @@ func TestFollowUnfollowAndValidation(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestFollowUnfollowAndValidation(t *testing.T) {
 	}
 
 	// No-miembro de un canal privado no puede seguir su hilo → ErrForbidden.
-	_, priv := seedPrivateChannel(t, ctx, st, "owner")
+	_, priv := seedPrivateChannel(ctx, t, st, "owner")
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "owner", "Owner", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember owner: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestFollowUnfollowAndValidation(t *testing.T) {
 }
 
 // listThreads lista los hilos seguidos del usuario (primera página) o falla el test.
-func listThreads(t *testing.T, st *store.Store, ctx context.Context, subject string) []domain.ThreadSummary {
+func listThreads(ctx context.Context, t *testing.T, st *store.Store, subject string) []domain.ThreadSummary {
 	t.Helper()
 	list, _, err := st.ListFollowedThreads(ctx, subject, nil, 50)
 	if err != nil {

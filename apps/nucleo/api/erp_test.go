@@ -101,6 +101,11 @@ func TestERPListaFiltradaYSusRecuentos(t *testing.T) {
 			_, _ = io.WriteString(w, `{"modelo":"factura_venta","total":42,"por_estado":{"pagado":40,"borrador":2},"suma_dinero":1210000}`)
 		case "DELETE /api/v1/factura_venta/r1", "POST /api/v1/factura_venta/r1/restaurar":
 			w.WriteHeader(http.StatusNoContent)
+		case "POST /api/v1/presupuesto/p1/convertir":
+			if cuerpo, _ := io.ReadAll(r.Body); string(cuerpo) != "{}" {
+				t.Errorf("cuerpo de convertir = %s", cuerpo)
+			}
+			_, _ = io.WriteString(w, `{"id":"pv1","modelo":"pedido_venta","ref":"PV-2026-00007","estado":"borrador","data":{}}`)
 		case "POST /api/v1/factura_venta/r1/duplicar":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `{"id":"r2","estado":"borrador","data":{},"creado_en":"2026-09-22T10:00:00Z"}`)
@@ -140,6 +145,11 @@ func TestERPListaFiltradaYSusRecuentos(t *testing.T) {
 	copia, err := c.Duplicar(ctx, "factura_venta", "r1")
 	if err != nil || copia.ID != "r2" || copia.CreadoEn.IsZero() {
 		t.Fatalf("duplicar: %+v, %v", copia, err)
+	}
+	// Convertir devuelve el documento NUEVO —otro modelo, otro id—, no el de origen.
+	pedido, err := c.Convertir(ctx, "presupuesto", "p1")
+	if err != nil || pedido.ID != "pv1" || pedido.Modelo != "pedido_venta" || pedido.Ref != "PV-2026-00007" {
+		t.Fatalf("convertir: %+v, %v", pedido, err)
 	}
 }
 
@@ -216,6 +226,7 @@ func TestLosCamposDelERPSonLosDelServicio(t *testing.T) {
 		`mod.Post("/{id}/estado", h.CambiarEstado)`,
 		`mod.Get("/estadisticas", h.Estadisticas)`, `mod.Delete("/{id}", h.Borrar)`,
 		`mod.Post("/{id}/restaurar", h.Restaurar)`, `mod.Post("/{id}/duplicar", h.Duplicar)`,
+		`mod.Post("/{id}/convertir", h.ConvertirVenta)`,
 		// La factura de cara afuera: lo que se imprime, lo que se manda y lo que la ley
 		// obliga a registrar desde el 1-1-2027.
 		`mod.Get("/{id}/ubl", h.UBL)`, `mod.Get("/{id}/facturae", h.Facturae)`,
@@ -345,5 +356,21 @@ func TestERPPermisosConservaVerbosEfectivos(t *testing.T) {
 		if got := p.PuedeAccion(c.modulo, c.verbo); got != c.permitido {
 			t.Errorf("PuedeAccion(%q, %q) = %v; quiere %v", c.modulo, c.verbo, got, c.permitido)
 		}
+	}
+}
+
+// La búsqueda de registros de la paleta: `GET /search?q=&limit=` y los `items` que
+// devuelve, que el servicio ya ha filtrado por permiso.
+func TestERPBuscar(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/search" || r.URL.RawQuery != "limit=8&q=FV-2026" {
+			t.Errorf("petición = %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = io.WriteString(w, `{"items":[{"id":"f12","modelo":"factura_venta","ref":"FV-2026-0012","etiqueta":"Acme S.L.","data":{}}]}`)
+	}))
+	defer srv.Close()
+	regs, err := NewERP(srv.URL, nil, nil, "es").Buscar(context.Background(), "FV-2026", 8)
+	if err != nil || len(regs) != 1 || regs[0].Ref != "FV-2026-0012" || regs[0].Modelo != "factura_venta" {
+		t.Fatalf("buscar: %+v, %v", regs, err)
 	}
 }

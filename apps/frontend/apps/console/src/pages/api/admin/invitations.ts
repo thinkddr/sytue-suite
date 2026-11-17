@@ -12,6 +12,10 @@
  *       Emite una invitación: Sytue ID genera un token de un solo uso y envía el
  *       enlace de aceptación por email. Rol admin/owner.
  *
+ *   POST /api/admin/invitations   body { emails: string[], role: SytueRole }
+ *       Invita a VARIAS personas a la vez (hasta 25) y contesta 200 con
+ *       { sent, results: [{ email, status, … }] }, una fila por dirección.
+ *
  * Proxya a Sytue ID (POST /api/v1/admin/invitations, Go) con el access token
  * httpOnly; propaga el status del servicio (403/409/400/502). El token nunca sale
  * al cliente.
@@ -19,7 +23,15 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@sytue/auth/server';
 import { getBff, toBffContext } from '../../../server/bff.js';
-import { inviteUser, listInvitations, proxyStatus, revokeInvitation } from '../../../lib/admin.js';
+import {
+  inviteUser,
+  inviteUsers,
+  listInvitations,
+  proxyError,
+  proxyStatus,
+  revokeInvitation,
+} from '../../../lib/admin.js';
+import type { SytueSession } from '@sytue/auth';
 import type { SytueRole } from '../../../lib/types.js';
 
 export const prerender = false;
@@ -84,10 +96,16 @@ export const POST: APIRoute = async (ctx) => {
   }
   const body = (await ctx.request.json().catch(() => null)) as {
     email?: unknown;
+    emails?: unknown;
     role?: unknown;
     mailbox_local?: unknown;
     password?: unknown;
   } | null;
+  // `in` con un primitivo lanza: un cuerpo JSON que no es un objeto («"hola"», 7)
+  // cae a la rama de una sola dirección y sale con su 400, no con un 500.
+  if (body && typeof body === 'object' && 'emails' in body) {
+    return invitarVarias(guard.session, body.emails, body.role);
+  }
   const email = typeof body?.email === 'string' ? body.email.trim() : '';
   const role = body?.role;
   // Espejo mínimo de la validación para el UX; la política real la aplica Sytue ID.
@@ -110,3 +128,30 @@ export const POST: APIRoute = async (ctx) => {
     return json({ error: 'upstream' }, proxyStatus(e));
   }
 };
+
+/**
+ * La tanda: se reenvían las direcciones TAL CUAL (separarlas, deduplicarlas y
+ * aplicar el tope lo hace Sytue ID, con las mismas reglas que el alta inicial) y
+ * solo se comprueba la forma. El error de Sytue ID se devuelve con su mensaje:
+ * «25 maximum» o «owner no se reparte» es justo lo que hay que corregir.
+ */
+async function invitarVarias(
+  session: SytueSession,
+  emails: unknown,
+  role: unknown,
+): Promise<Response> {
+  const lista = Array.isArray(emails)
+    ? emails.filter((e): e is string => typeof e === 'string').map((e) => e.trim())
+    : [];
+  if (!Array.isArray(emails) || lista.length !== emails.length || !lista.some(Boolean)) {
+    return json({ error: 'bad_request', message: 'Faltan los correos.' }, 400);
+  }
+  if (typeof role !== 'string' || !ROLES.includes(role as SytueRole)) {
+    return json({ error: 'bad_request', message: 'Rol inválido.' }, 400);
+  }
+  try {
+    return json(await inviteUsers(session, lista.filter(Boolean), role as SytueRole));
+  } catch (e) {
+    return json(proxyError(e), proxyStatus(e));
+  }
+}

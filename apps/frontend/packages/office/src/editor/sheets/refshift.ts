@@ -33,10 +33,21 @@
  *
  * Self-test: packages/office/test/sheets-refshift.test.ts (bun test).
  */
-import type { SheetAutoFilter, SheetData } from '../types';
+import type { SheetAutoFilter, SheetData, SheetGroup } from '../types';
 import type { FilterView } from './filtro';
+import type { SheetPivot } from './pivot';
 import { extractRefs } from './formula-edit';
-import { escapeHtml, isFormula, parseCell, rawText, renderCellHtml } from './format';
+import {
+  escapeHtml,
+  isFormula,
+  isPermissionGranted,
+  parseCell,
+  parseRangeRef,
+  rawText,
+  renderCellHtml,
+  shiftRefs,
+} from './format';
+import { moveSpans } from './ocultas';
 
 /** Lo que le pasa a la rejilla: un tramo que se abre o que se cierra. */
 export interface Desplazamiento {
@@ -48,7 +59,18 @@ export interface Desplazamiento {
   cantidad: number;
   /** Tope de la rejilla en ese eje (filas o columnas). Lo que rebosa deja de existir. */
   tope: number;
+  /**
+   * La hoja en la que se abre o se cierra el tramo. Con ella, una fórmula solo mueve
+   * las referencias que apuntan a ESA hoja —las suyas sin prefijo si vive en ella, y
+   * las `Hoja!A1` que la nombran desde cualquier otra—: `=Resumen!A5` escrita en
+   * «Ventas» no se mueve porque en «Ventas» se inserte una fila. Sin ella (los usos que
+   * no saben de libros, como los tests de una sola hoja) se mueven todas.
+   */
+  hoja?: string;
 }
+
+/** ¿Son la misma hoja? Como en Excel, sin distinguir mayúsculas: `ventas!B4` es «Ventas». */
+const mismaHoja = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 /** Lo que devuelve `#¡REF!` en el texto de una fórmula. */
 export const REF_ROTA = '#¡REF!';
@@ -56,11 +78,16 @@ export const REF_ROTA = '#¡REF!';
 /**
  * Nuevo índice de una posición, o null si deja de existir.
  *
- * `dentro` distingue los dos usos: para una celda suelta, caer en lo borrado
+ * `dentro` distingue los usos: para una celda suelta, caer en lo borrado
  * significa desaparecer; para el extremo de un rango, significa pegarse al
  * borde de lo que queda — que es como el rango se encoge en vez de romperse.
+ * El INICIO se pega a la primera que sigue al corte y el FIN, a la última que
+ * lo precede: `A1:A5` sin las filas 3-5 es `A1:A2`, no `A1:A3`, que ya sería
+ * la antigua fila 6, un dato ajeno.
  */
-function mover(i: number, d: Desplazamiento, dentro: 'muere' | 'sujeta'): number | null {
+type Dentro = 'muere' | 'sujeta' | 'sujetaFin';
+
+function mover(i: number, d: Desplazamiento, dentro: Dentro): number | null {
   if (d.cantidad > 0) {
     if (i < d.desde) return i;
     const nuevo = i + d.cantidad;
@@ -70,7 +97,10 @@ function mover(i: number, d: Desplazamiento, dentro: 'muere' | 'sujeta'): number
   }
   const n = -d.cantidad;
   if (i < d.desde) return i;
-  if (i < d.desde + n) return dentro === 'sujeta' ? d.desde : null;
+  if (i < d.desde + n) {
+    if (dentro === 'muere') return null;
+    return dentro === 'sujeta' ? d.desde : d.desde - 1;
+  }
   return i - n;
 }
 
@@ -118,7 +148,7 @@ function indiceACol(n: number, comoElOriginal: string): string {
  * columna entera): en ese caso el eje ausente no se toca, porque una referencia
  * a la columna A sigue siendo la columna A por muchas filas que se inserten.
  */
-function moverExtremo(e: Extremo, d: Desplazamiento, dentro: 'muere' | 'sujeta'): Extremo | null {
+function moverExtremo(e: Extremo, d: Desplazamiento, dentro: Dentro): Extremo | null {
   if (d.eje === 'fila') {
     if (!e.fila) return e;
     const i = mover(Number(e.fila) - 1, d, dentro);
@@ -160,25 +190,38 @@ export function moverReferencia(ref: string, d: Desplazamiento): string {
   if (moverExtremo(a, d, 'muere') === null && moverExtremo(b, d, 'muere') === null) {
     return REF_ROTA;
   }
-  const na = moverExtremo(a, d, 'sujeta');
-  const nb = moverExtremo(b, d, 'sujeta');
+  // Cuál es el fin en el eje que se mueve: quien escribe `A5:A1` también tiene
+  // derecho a que su rango se encoja por el lado bueno.
+  const pos = (e: Extremo): number =>
+    d.eje === 'fila' ? Number(e.fila || 0) : e.col ? colAIndice(e.col) : 0;
+  const aEsFin = pos(a) > pos(b);
+  const na = moverExtremo(a, d, aEsFin ? 'sujetaFin' : 'sujeta');
+  const nb = moverExtremo(b, d, aEsFin ? 'sujeta' : 'sujetaFin');
   if (!na || !nb) return REF_ROTA;
   return `${hoja}${pintar(na)}:${pintar(nb)}`;
 }
 
 /**
- * Reescribe TODAS las referencias de una fórmula.
+ * Reescribe las referencias de una fórmula que apuntan a la hoja del desplazamiento
+ * (`d.hoja`; todas si no la dice). `base` es la hoja en la que VIVE la fórmula, a la
+ * que pertenecen sus referencias sin prefijo: por defecto, la del desplazamiento.
  *
  * Se sustituye de derecha a izquierda para que las posiciones que devolvió
  * `extractRefs` sigan siendo válidas mientras se reemplaza: hacerlo al revés
  * desplaza el texto bajo los pies de las sustituciones siguientes.
  */
-export function reescribirFormula(texto: string, d: Desplazamiento): string {
+export function reescribirFormula(
+  texto: string,
+  d: Desplazamiento,
+  base: string | undefined = d.hoja,
+): string {
   if (!texto.startsWith('=')) return texto;
   const refs = extractRefs(texto);
   if (refs.length === 0) return texto;
   let out = texto;
   for (const r of [...refs].sort((x, y) => y.start - x.start)) {
+    const de = r.sheet ?? base;
+    if (d.hoja !== undefined && (de === undefined || !mismaHoja(de, d.hoja))) continue;
     const nuevo = moverReferencia(r.text, d);
     if (nuevo !== r.text) out = out.slice(0, r.start) + nuevo + out.slice(r.end);
   }
@@ -196,12 +239,17 @@ export function reescribirFormula(texto: string, d: Desplazamiento): string {
 export function reescribirCelda(
   html: string,
   d: Desplazamiento | ((formula: string) => string),
+  base?: string,
 ): string {
   if (html === '' || !isFormula(html)) return html;
-  const p = parseCell(html);
   const raw = rawText(html);
   // Una función: otro reescrito de la fórmula (p. ej. renombrar un nombre definido).
-  p.inner = escapeHtml(typeof d === 'function' ? d(raw) : reescribirFormula(raw, d));
+  const nuevo = typeof d === 'function' ? d(raw) : reescribirFormula(raw, d, base ?? d.hoja);
+  // Sin cambios, el HTML tal cual: las celdas de las otras hojas casi nunca citan la
+  // que se mueve, y recomponerlas todas cambiaría texto que nadie ha tocado.
+  if (nuevo === raw) return html;
+  const p = parseCell(html);
+  p.inner = escapeHtml(nuevo);
   return renderCellHtml(p);
 }
 
@@ -223,6 +271,58 @@ function moverFila(r: number, d: Desplazamiento): number | null {
 function esUnaCelda(r: string): boolean {
   const [a, b] = r.split(':');
   return a === b;
+}
+
+/** Un rango que se ha quedado en una celda se escribe como la celda: «B5», no «B5:B5». */
+function compacto(r: string): string {
+  return esUnaCelda(r) ? r.split(':')[0]! : r;
+}
+
+/**
+ * La fórmula de una regla de formato condicional o de una validación tras el
+ * desplazamiento. Está escrita respecto a la celda de ARRIBA A LA IZQUIERDA de su
+ * rango, así que sus referencias se mueven como las de cualquier fórmula… salvo
+ * cuando lo borrado se lleva esa celda: entonces la de arriba a la izquierda pasa a
+ * ser otra, la primera superviviente, y la fórmula tiene que ser la que le tocaba a
+ * ella. Primero se «copia» la fórmula a esa celda (como el autorrelleno, donde los
+ * `$` sí eximen) y luego se aplica el desplazamiento. Sin esto, borrar la primera
+ * fila de una regla `=B2>5` sobre `B2:B10` la dejaría en `=#¡REF!>5`, apagada.
+ */
+function moverFormulaAnclada(formula: string, rango: string, d: Desplazamiento): string {
+  const r = parseRangeRef(rango);
+  if (!r || !formula.startsWith('=')) return reescribirFormula(formula, d);
+  const n = -d.cantidad;
+  const ancla = d.eje === 'fila' ? r.r1 : r.c1;
+  if (n > 0 && ancla >= d.desde && ancla < d.desde + n) {
+    const salto = d.desde + n - ancla;
+    const copiada = shiftRefs(
+      formula,
+      d.eje === 'columna' ? salto : 0,
+      d.eje === 'fila' ? salto : 0,
+    );
+    // Una copia hacia abajo o a la derecha no se sale nunca por arriba ni por la
+    // izquierda; si la fórmula no parsea, `shiftRefs` la devuelve tal cual.
+    if (copiada.startsWith('=')) return reescribirFormula(copiada, d);
+  }
+  return reescribirFormula(formula, d);
+}
+
+/**
+ * Un grupo de esquema tras el desplazamiento, con las reglas de un rango: crece si
+ * se inserta DENTRO de su detalle, encoge si se le borra un trozo y desaparece si se
+ * le borra entero. Insertar justo en su primera fila lo baja entero, como a una
+ * fórmula; y su fila de resumen (end+1) queda fuera, así que insertar ahí no lo
+ * estira.
+ */
+function moverGrupo(g: SheetGroup, d: Desplazamiento): SheetGroup | null {
+  const ref =
+    d.eje === 'fila'
+      ? `A${g.start + 1}:A${g.end + 1}`
+      : `${indiceACol(g.start, 'A')}1:${indiceACol(g.end, 'A')}1`;
+  const r = parseRangeRef(moverReferencia(ref, d));
+  if (!r) return null;
+  const [start, end] = d.eje === 'fila' ? [r.r1, r.r2] : [r.c1, r.c2];
+  return { ...g, start, end };
 }
 
 /**
@@ -260,11 +360,86 @@ export function moverVista(v: FilterView, d: Desplazamiento): FilterView {
 }
 
 /**
+ * Las TABLAS DINÁMICAS siguen a sus datos, con las reglas de un rango: su origen
+ * (`source`) se mueve con la hoja de la que lee —la suya, o `sourceSheet` si es otra—,
+ * y su esquina y lo que ocupó la última vez (`anchor`, `range`) con la hoja que la aloja
+ * (`propia`). Antes se quedaban quietos: insertar una fila encima de los datos dejaba la
+ * tabla leyendo una fila de cabeceras que ya era de datos y perdiendo la última, y al
+ * actualizarla se escribía sobre lo que hubiera bajado a su antigua esquina.
+ *
+ * Si se borra el origen entero, o la esquina y todo lo que ocupaba, la tabla dinámica
+ * desaparece como un gráfico sin datos (su resultado queda en las celdas como valores, y
+ * sus segmentaciones pasan a «inactivas»); si solo se borra su esquina, pasa a la primera
+ * celda que queda de lo que ocupaba.
+ *
+ * Con la hoja que la ALOJA protegida no se toca: el servidor veta cualquier cambio de
+ * `pivots` (camposSiempreVetados, apps/nucleo/office/model/proteccion.go) y rechazaría el
+ * guardado entero. Devuelve la misma lista si nada cambia.
+ */
+function moverDinamicas(
+  s: SheetData,
+  d: Desplazamiento,
+  propia: boolean,
+): SheetPivot[] | undefined {
+  if (!s.pivots || s.protect) return s.pivots;
+  const vivo = (ref: string): string | null => {
+    const r = moverReferencia(ref, d);
+    return r === REF_ROTA ? null : r;
+  };
+  let cambia = false;
+  const pivots = s.pivots.flatMap((p) => {
+    const q: SheetPivot = { ...p };
+    // El nombre de `sourceSheet` es el que se guardó, no uno tecleado: se compara tal
+    // cual, como al leer el origen (pivot-hoja.ts).
+    if (d.hoja === undefined || (p.sourceSheet ?? s.name) === d.hoja) {
+      const source = vivo(p.source);
+      if (!source) {
+        cambia = true;
+        return [];
+      }
+      q.source = source;
+    }
+    if (propia) {
+      const range = p.range === undefined ? null : vivo(p.range);
+      const anchor = vivo(p.anchor) ?? (range ? range.split(':')[0]! : null);
+      if (!anchor) {
+        cambia = true;
+        return [];
+      }
+      q.anchor = anchor;
+      if (range) q.range = range;
+      else delete q.range;
+    }
+    if (q.source !== p.source || q.anchor !== p.anchor || q.range !== p.range) cambia = true;
+    return [q];
+  });
+  if (!cambia) return s.pivots;
+  return pivots.length > 0 ? pivots : undefined;
+}
+
+/**
  * Los OBJETOS de la hoja siguen a sus celdas al insertar o borrar filas y columnas,
- * con las mismas reglas que las fórmulas: una tabla, un minigráfico o un gráfico
- * cuyo rango queda dentro de lo insertado crece; si se le borra un trozo, encoge; y
- * si se le borra entero, desaparece (su dato ya no existe). El autofiltro y sus
- * exclusiones, y la columna de cada segmentación, se mueven igual.
+ * con las mismas reglas que las fórmulas: una tabla, un minigráfico, un gráfico, una
+ * tabla dinámica (`moverDinamicas`), una regla de formato condicional, una validación o
+ * una combinada cuyo rango queda
+ * dentro de lo insertado crece; si se le borra un trozo, encoge; y si se le borra
+ * entero, desaparece (su dato ya no existe). El autofiltro y sus exclusiones, la
+ * columna de cada segmentación, los grupos de esquema y los anchos y altos se mueven
+ * igual.
+ *
+ * Con la hoja PROTEGIDA, lo que gobierna un permiso no concedido no se toca: el
+ * formato condicional, las validaciones, los gráficos, los minigráficos y las
+ * segmentaciones sin `objects`, y el autofiltro sin `autoFilter`. Es lo que veta el
+ * servidor (services/docs/internal/domain/proteccion.go, `camposPorPermiso`):
+ * moverlos haría que rechazara el guardado entero, y con él las celdas movidas. Que
+ * la regla se quede donde estaba es el mal menor, y es lo que hace Excel.
+ *
+ * Los rangos editables por persona o grupo (`protect.ranges`) SÍ viajan con sus celdas:
+ * si se quedaran atrás, el rango de alguien pasaría a cubrir el contenido bloqueado que
+ * ha llegado a sus filas y dejaría fuera parte del suyo. Crecen, encogen o desaparecen
+ * como cualquier rango. El servidor solo lo acepta de quien no es propietario si
+ * reproduce el mismo desplazamiento con las celdas movidas igual
+ * (services/docs/internal/domain/proteccion_desplazar.go).
  *
  * Antes conservaban su rango y se quedaban mirando datos que ya estaban en otro
  * sitio: la tabla pintaba sus bandas sobre filas ajenas y el gráfico cambiaba de
@@ -278,6 +453,52 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     const r = moverReferencia(ref, d);
     return r === REF_ROTA ? null : r;
   };
+  const objetos = isPermissionGranted(s.protect, 'objects');
+  if (s.protect?.ranges) {
+    const ranges = s.protect.ranges.flatMap((g) => {
+      const ref = vivo(g.ref);
+      return ref ? [{ ...g, ref: compacto(ref) }] : [];
+    });
+    const { ranges: _previos, ...resto } = s.protect;
+    out.protect = ranges.length > 0 ? { ...resto, ranges } : resto;
+  }
+  if (s.condFormats && objetos) {
+    const condFormats = s.condFormats.flatMap((c) => {
+      const range = vivo(c.range);
+      if (!range) return [];
+      const regla = { ...c, range: compacto(range) };
+      if (c.formula !== undefined) regla.formula = moverFormulaAnclada(c.formula, c.range, d);
+      return [regla];
+    });
+    if (condFormats.length > 0) out.condFormats = condFormats;
+    else delete out.condFormats;
+  }
+  if (s.validations && objetos) {
+    const validations = s.validations.flatMap((v) => {
+      const range = vivo(v.range);
+      if (!range) return [];
+      const regla = { ...v, range: compacto(range) };
+      if (v.formula !== undefined) regla.formula = moverFormulaAnclada(v.formula, v.range, d);
+      return [regla];
+    });
+    if (validations.length > 0) out.validations = validations;
+    else delete out.validations;
+  }
+  const grupos = (
+    gs: SheetGroup[] | undefined,
+    eje: Desplazamiento['eje'],
+    clave: 'rowGroups' | 'colGroups',
+  ) => {
+    if (!gs || d.eje !== eje) return;
+    const movidos = gs.flatMap((g) => {
+      const m = moverGrupo(g, d);
+      return m ? [m] : [];
+    });
+    if (movidos.length > 0) out[clave] = movidos;
+    else delete out[clave];
+  };
+  grupos(s.rowGroups, 'fila', 'rowGroups');
+  grupos(s.colGroups, 'columna', 'colGroups');
   if (s.tables) {
     const tables = s.tables.flatMap((t) => {
       const range = vivo(t.range);
@@ -310,7 +531,14 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
   const rh = medidas(s.rowHeights, 'fila');
   if (rh) out.rowHeights = rh;
   else delete out.rowHeights;
-  if (s.sparklines) {
+  // Las filas y columnas ocultas a mano siguen a su fila o columna (sheets/ocultas.ts).
+  const campoOcultas = d.eje === 'fila' ? 'hiddenRows' : 'hiddenCols';
+  if (s[campoOcultas]) {
+    const ocultas = moveSpans(s[campoOcultas], d.desde, d.cantidad, d.tope);
+    if (ocultas.length > 0) out[campoOcultas] = ocultas;
+    else delete out[campoOcultas];
+  }
+  if (s.sparklines && objetos) {
     const sparklines = s.sparklines.flatMap((sp) => {
       const cell = vivo(sp.cell);
       const range = vivo(sp.range);
@@ -319,7 +547,7 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     if (sparklines.length > 0) out.sparklines = sparklines;
     else delete out.sparklines;
   }
-  if (s.charts) {
+  if (s.charts && objetos) {
     const charts = s.charts.flatMap((ch) => {
       const range = vivo(ch.range);
       return range ? [{ ...ch, range }] : [];
@@ -327,7 +555,7 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     if (charts.length > 0) out.charts = charts;
     else delete out.charts;
   }
-  if (s.slicers) {
+  if (s.slicers && objetos) {
     const slicers = s.slicers.flatMap((sl) => {
       if (sl.pivot) return [sl]; // su `col` es un campo del origen, no una columna
       const col = moverColumna(sl.col, d);
@@ -336,7 +564,10 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     if (slicers.length > 0) out.slicers = slicers;
     else delete out.slicers;
   }
-  if (s.autofilter) {
+  const pivots = moverDinamicas(s, d, true);
+  if (pivots) out.pivots = pivots;
+  else delete out.pivots;
+  if (s.autofilter && isPermissionGranted(s.protect, 'autoFilter')) {
     const af = s.autofilter;
     const a1 = `${indiceACol(af.c1, 'A')}${af.row + 1}:${indiceACol(af.c2, 'A')}${af.row + 1}`;
     const m = /^([A-Z]+)(\d+):([A-Z]+)\d+$/.exec(vivo(a1) ?? '');
@@ -353,4 +584,59 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     }
   }
   return out;
+}
+
+/**
+ * Una hoja que NO es la del desplazamiento: sus fórmulas que citan aquella
+ * (`=Ventas!B4`, `SUMA('Hoja 2'!A1:A9)`) siguen a su dato con las mismas reglas —se
+ * desplazan, se encogen o pasan a `#¡REF!`— y todo lo demás queda igual. Antes solo se
+ * reescribía la hoja activa, y «Resumen» se quedaba sumando la fila de al lado sin
+ * avisar: el mismo error silencioso que motivó este fichero, una hoja más allá.
+ *
+ * Cubre las celdas, las fórmulas del formato condicional y de las validaciones (una
+ * lista `=Ventas!A1:A9`) y el origen de las tablas dinámicas que leen de aquella hoja;
+ * sus RANGOS son de esta hoja y no se mueven. Los nombres
+ * definidos van aparte (`moverNombres`, nombres.ts).
+ *
+ * Con la hoja PROTEGIDA se reescriben TODAS sus celdas, también las bloqueadas y las
+ * de los rangos editables de otras personas: seguir a su dato no es editar la fórmula,
+ * y el servidor lo acepta cuando el cambio es exactamente este desplazamiento
+ * (apps/nucleo/office/model/proteccion_ajenas.go). Dejar unas sí y otras no es lo que
+ * rechazaría. Las reglas de formato condicional y validación siguen necesitando
+ * `objects`, como en `moverObjetos`.
+ */
+export function moverReferenciasAjenas(s: SheetData, d: Desplazamiento): SheetData {
+  if (d.hoja === undefined || mismaHoja(s.name, d.hoja)) return s;
+  const out: SheetData = { ...s };
+  let cambia = false;
+  let celdas: Record<string, string> | null = null;
+  for (const ref in s.cells) {
+    const html = s.cells[ref]!;
+    const nuevo = reescribirCelda(html, d, s.name);
+    if (nuevo !== html) (celdas ??= { ...s.cells })[ref] = nuevo;
+  }
+  if (celdas) {
+    out.cells = celdas;
+    cambia = true;
+  }
+  const reglas = <T extends { formula?: string }>(rs: T[]): T[] =>
+    rs.map((r) => {
+      if (r.formula === undefined) return r;
+      const f = reescribirFormula(r.formula, d, s.name);
+      if (f === r.formula) return r;
+      cambia = true;
+      return { ...r, formula: f };
+    });
+  if (isPermissionGranted(s.protect, 'objects')) {
+    if (s.condFormats) out.condFormats = reglas(s.condFormats);
+    if (s.validations) out.validations = reglas(s.validations);
+  }
+  // Las tablas dinámicas que leen de aquella hoja (`sourceSheet`) mueven su origen.
+  const pivots = moverDinamicas(s, d, false);
+  if (pivots !== s.pivots) {
+    cambia = true;
+    if (pivots) out.pivots = pivots;
+    else delete out.pivots;
+  }
+  return cambia ? out : s;
 }

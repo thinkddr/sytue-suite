@@ -50,6 +50,12 @@ assert "runtime.KeepAlive([]any{" in fuente, "las referencias de FileProvider de
 for nombre in ("ArchivosDisponible", "GuardarCredencialArchivos", "HayCredencialArchivos", "RegistrarArchivos", "AbrirArchivos", "OlvidarArchivos"):
     assert "sistema." + nombre + "," in fuente, "falta la referencia de FileProvider: " + nombre
     assert not re.search(r"sistema\." + nombre + r"\s*\(", fuente), "el canario no debe invocar APIs de FileProvider"
+# La galería de Photos y el selector de Fotos: el Objective-C de PhotoKit, ImageIO,
+# Network y PHPicker solo lo compila un SDK de Apple. Referencias, nunca llamadas.
+for ref in ("carrete.Disponible", "carrete.EstadoPermiso", "carrete.PedirPermiso", "carrete.Listar", "carrete.Abrir",
+            "carrete.Guardar", "carrete.Convertir", "carrete.RedMedida", "ficheros.ElegirImagenes", "sistema.SeguirEnFondo"):
+    assert ref + "," in fuente, "falta la referencia de la galería: " + ref
+    assert not re.search(re.escape(ref) + r"\s*\(", fuente), "el canario no debe invocar la galería: " + ref
 PYTHON
 while [ "$1" != -o ]; do shift; done
 shift

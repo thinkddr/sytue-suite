@@ -244,10 +244,12 @@ func (x *papelera) pintar() {
 	var hijos []fyne.CanvasObject
 	switch {
 	case x.cargando:
-		// ponytail: la rueda no anuncia su `label` («Cargando papelera»): `ui.Rueda` no
-		// es `fyne.Accessible` todavía.
+		// La rueda se anuncia con el `label` de la web («Cargando papelera»), no con el
+		// «Cargando» genérico.
+		rueda := ui.NuevaRueda(LadoRuedaMenu, "text-muted", v)
+		rueda.Rotulo = p.t("trash.loading", nil)
 		hijos = []fyne.CanvasObject{container.New(ui.Margen{Arr: RellenoRuedaDialogo, Abj: RellenoRuedaDialogo},
-			container.NewCenter(ui.NuevaRueda(LadoRuedaMenu, "text-muted", v)))}
+			container.NewCenter(rueda))}
 	case x.fallo:
 		hijos = []fyne.CanvasObject{avisoCentrado(p.t("trash.loadFailed", nil))}
 	case len(x.elementos) == 0:
@@ -471,39 +473,47 @@ func (a *App) verPapelera() *papelera {
 	if lienzo == nil || a.svc == nil {
 		return nil
 	}
+	scope := a.capturar()
 	x := a.Pantalla.nuevaPapelera(lienzo)
 	x.alRestaurar = func(it api.TrashItem, listo func(error)) {
-		a.peticion(func(ctx context.Context) error { return a.svc.Restore(ctx, it.ID) },
+		a.peticion(scope, func(ctx context.Context) error { return a.svc.Restore(ctx, it.ID) },
 			"trash.restored", "trash.restoreFailed", "common.tryAgain", func(err error) {
 				listo(err)
 				if err == nil {
-					a.recargarTodo()
+					a.recargarTodoEn(scope)
 				}
 			})
 	}
 	x.alPurgar = func(it api.TrashItem, listo func(error)) {
-		a.peticion(func(ctx context.Context) error { return a.svc.Purge(ctx, it.ID) },
+		a.peticion(scope, func(ctx context.Context) error { return a.svc.Purge(ctx, it.ID) },
 			"trash.purged", "trash.purgeFailed", "common.tryAgain", func(err error) {
 				listo(err)
 				if err == nil {
-					a.recargarTodo()
+					a.recargarTodoEn(scope)
 				}
 			})
 	}
 	a.mostrarEscritura("papelera", x.d, lienzo)
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		elementos, err := a.svc.Trash(ctx, 0) // sin tope: el del servicio, como la web
 		fin()
-		fyne.Do(func() { x.cargada(elementos, err) })
+		fyne.Do(func() {
+			if a.vigente(scope) {
+				x.cargada(elementos, err)
+			}
+		})
 	})
 	return x
 }
 
 // recargarTodo es el `onChanged` de la papelera: la libreta y los destacados.
-func (a *App) recargarTodo() {
-	if a.Pantalla.Activa != nil {
-		a.recargar(*a.Pantalla.Activa)
+func (a *App) recargarTodoEn(scope cargaContacts) {
+	if !a.vigente(scope) {
+		return
 	}
-	a.enFondo(a.cargarFavoritos)
+	if a.Pantalla.Activa != nil {
+		a.recargarEn(scope, *a.Pantalla.Activa)
+	}
+	a.programarEn(scope, a.cargarFavoritosEn)
 }

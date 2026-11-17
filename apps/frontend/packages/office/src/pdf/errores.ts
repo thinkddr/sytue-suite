@@ -43,6 +43,10 @@ export const ERRORES: Record<string, DocsKey> = {
   pdf_signature_request_not_found: 'pdf.error.signatureRequest.gone',
   pdf_signature_requests_unavailable: 'pdf.error.signatureRequest.unavailable',
   pdf_signature_request_too_many: 'pdf.error.signatureRequest.tooMany',
+  // Varias personas en orden (mig. 0034).
+  pdf_signature_chain_external: 'pdf.error.signatureRequest.chainExternal',
+  pdf_signature_chain_repeated: 'pdf.error.signatureRequest.chainRepeated',
+  pdf_signature_chain_too_long: 'pdf.error.signatureRequest.chainTooLong',
   // A alguien de otra organización (ADR 0057).
   pdf_signature_share_blocked: 'pdf.error.signatureRequest.shareBlocked',
   pdf_signature_request_link_gone: 'pdf.error.signatureRequest.linkGone',

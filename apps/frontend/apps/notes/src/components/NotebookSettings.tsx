@@ -17,9 +17,20 @@
  */
 import type { JSX } from 'preact';
 import { useId, useState } from 'preact/hooks';
-import { Button, Checkbox, FieldGroup, Input, Modal, Switch, cx, useToast } from '@sytue/ui';
+import {
+  Button,
+  Checkbox,
+  FieldGroup,
+  Input,
+  Modal,
+  SelectorDeColor,
+  Switch,
+  cx,
+  useToast,
+} from '@sytue/ui';
 import type { NoteVisibility, Notebook, NotebookInput, NotebookLayout } from '@sytue/api-clients';
-import { appUrl } from '@sytue/config';
+import { PALETA_DE_USUARIO, appUrl, claveDeColorDeUsuario, colorDeUsuario } from '@sytue/config';
+import { useI18n } from '@sytue/i18n/preact';
 import type { T } from '../i18n/index.js';
 import type { NotesCrypto } from '../client/crypto.js';
 import { Glyph, type GlyphName } from './glyphs.js';
@@ -55,21 +66,13 @@ const LAYOUTS: { key: NotebookLayout; glyph: GlyphName }[] = [
   { key: 'columns', glyph: 'layoutColumns' },
 ];
 
-/** Paleta de cuadernos. Doce tonos medidos para llevar texto blanco encima. */
-const COLORES = [
-  '#86198f',
-  '#be123c',
-  '#c2410c',
-  '#a16207',
-  '#4d7c0f',
-  '#146a47',
-  '#0f766e',
-  '#0e7490',
-  '#1c58d9',
-  '#4c1d95',
-  '#7e22ce',
-  '#3a4a5e',
-];
+/**
+ * Los tonos de un cuaderno: la paleta de colores de usuario de la suite (la misma de
+ * las etiquetas, los calendarios y las etiquetas de Mail), medida en los cuatro modos y
+ * con texto blanco encima. Un cuaderno guardado con la paleta de antes se ve y se marca
+ * con su tono más cercano, y no se reescribe hasta que se elige otro.
+ */
+const COLOR_NUEVO = PALETA_DE_USUARIO.find((c) => c.id === 'plum')!.valor;
 
 export function NotebookSettings({
   t,
@@ -83,12 +86,14 @@ export function NotebookSettings({
   puedeCambiarAcceso = notebook === null,
 }: Props): JSX.Element {
   const toast = useToast();
+  // El nombre de cada tono es del catálogo común: lo comparten todas las apps.
+  const tc = useI18n().t;
   const base = useId();
   const idEmoji = `${base}-emoji`;
   const idTitulo = `${base}-titulo`;
   const [title, setTitle] = useState(notebook?.title ?? '');
   const [emoji, setEmoji] = useState(notebook?.emoji ?? '');
-  const [color, setColor] = useState(notebook?.color ?? COLORES[0]!);
+  const [color, setColor] = useState(notebook?.color ?? COLOR_NUEVO);
   const [layout, setLayout] = useState<NotebookLayout>(notebook?.layout ?? 'list');
   const [visibility, setVisibility] = useState<NoteVisibility>(notebook?.visibility ?? 'personal');
   const [indexable, setIndexable] = useState(notebook?.indexable ?? true);
@@ -205,24 +210,19 @@ export function NotebookSettings({
           </div>
 
           <fieldset>
-            <legend class="text-text mb-1.5 text-base font-medium">{t('notebook.color')}</legend>
-            <div class="flex flex-wrap gap-1.5 pointer-coarse:gap-4">
-              {COLORES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  aria-label={c}
-                  aria-pressed={color === c}
-                  onClick={() => setColor(c)}
-                  style={{ background: c }}
-                  class={cx(
-                    // Con el dedo, el blanco es de 44 (`after:-inset-2`) y el paso también.
-                    "sytue-focus-ring relative h-7 w-7 rounded-full transition-transform duration-150 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']",
-                    color === c && 'ring-text ring-2 ring-offset-2 ring-offset-[var(--sytue-bg)]',
-                  )}
-                />
-              ))}
-            </div>
+            <legend id={`${base}-color`} class="text-text mb-1.5 text-base font-medium">
+              {t('notebook.color')}
+            </legend>
+            <SelectorDeColor
+              colores={PALETA_DE_USUARIO.map(({ id, valor }) => ({
+                valor,
+                nombre: tc(claveDeColorDeUsuario(id)),
+              }))}
+              // Un color de la paleta de antes se marca como su tono más cercano.
+              valor={colorDeUsuario(color) ?? color}
+              onChange={setColor}
+              etiquetadoPor={`${base}-color`}
+            />
           </fieldset>
 
           <fieldset>

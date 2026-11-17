@@ -189,6 +189,10 @@ export function applySecurityHeaders(
     ...overrides,
   })) {
     if (value === '') continue;
+    // OAuth/SSO callbacks deliberately suppress even same-origin referrers:
+    // the document URL can still contain a one-use code before its script runs.
+    // Preserve this strictly stronger route policy, never an arbitrary upstream value.
+    if (name === 'referrer-policy' && headers.get(name) === 'no-referrer') continue;
     if (name === 'content-security-policy' && cspPrevia && !hayOverrideCsp) {
       headers.append(name, value);
       continue;

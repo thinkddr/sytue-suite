@@ -16,6 +16,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/llamada"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada/camara"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -581,4 +582,144 @@ func TestLaAntesalaMideYEligeDispositivo(t *testing.T) {
 	if a.Micro || a.Nivel != 0 {
 		t.Errorf("apagado el micro, el medidor marca %.2f", a.Nivel)
 	}
+}
+
+// elementoMas busca una entrada del «…» por su rótulo.
+func elementoMas(v *VistaLlamada, rotulo string) *ui.ElementoMenu {
+	for _, o := range v.elementosMas() {
+		if e, ok := o.(*ui.ElementoMenu); ok && e.Texto == rotulo {
+			return e
+		}
+	}
+	return nil
+}
+
+// A solas en la llamada se ve «Todavía no hay nadie más» con «Copiar enlace», que
+// copia el de la reunión y dice «Copiado» dos segundos; en cuanto entra alguien, el
+// aviso se va. Y el «…» alterna la pantalla completa de la ventana, igual que F11, y
+// Escape la deja.
+//
+// VISTO EN ROJO (2026-11-13): sin el aviso, la llamada a solas no ofrecía invitar; sin la
+// entrada ni los atajos, la ventana no salía nunca de su tamaño.
+func TestLaSalaVaciaYLaPantallaCompletaDeLaLlamada(t *testing.T) {
+	base := servicioConDos()
+	s := &conLlamada{conReuniones: &conReuniones{servicioFalso: base}}
+	sa, relojes, _ := salaEn(t, base, 1280)
+	sa.S = s
+	var copiados []string
+	sa.Copiar = func(u string) { copiados = append(copiados, u) }
+	en := &enCursoFalsa{ps: []llamada.Participante{{Identidad: "yo", Nombre: "Yo", Yo: true}}}
+	sa.Conectar = func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, error) { return en, nil }
+	sa.Arrancar(context.Background())
+	sa.Elegir(sa.P.Lateral.Canales[0])
+	sa.P.Canal.Cabecera.AlLlamar()
+	sa.ventanaLlamada.Content().(*Antesala).AlEntrar()
+	v := sa.ventanaLlamada.Content().(*VistaLlamada)
+	tr := test.WidgetRenderer(v)
+	v.Resize(fyne.NewSize(1280, 720))
+
+	t.Run("a solas, el aviso invita y copia el enlace", func(t *testing.T) {
+		if v.avisoObj == nil || !estaEntre(tr.Objects(), v.avisoObj) {
+			t.Fatal("con una sola tesela no se ve «Todavía no hay nadie más»")
+		}
+		if v.aviso.Texto != "Todavía no hay nadie más aquí. Comparte el enlace para invitar a alguien." {
+			t.Errorf("texto del aviso: %q", v.aviso.Texto)
+		}
+		if v.aviso.Boton == nil || v.aviso.Boton.Texto != "Copiar enlace" {
+			t.Fatalf("el aviso no ofrece copiar el enlace: %+v", v.aviso.Boton)
+		}
+		// El aviso cae dentro del escenario, centrado y bajo la cabecera.
+		p, m := v.aviso.Position(), v.aviso.Size()
+		if p.Y < AltoCabeceraLlamada || m.Width <= 0 || absf(p.X+m.Width/2-640) > 1 {
+			t.Errorf("aviso en %v de %v", p, m)
+		}
+		test.Tap(v.aviso.Boton)
+		if len(copiados) != 1 || copiados[0] != sa.EnlaceReunion("sala-c1") {
+			t.Fatalf("copiar no copia el enlace de la reunión: %v", copiados)
+		}
+		if v.aviso.Boton.Texto != "Copiado" || elementoMas(v, "Copiado") == nil {
+			t.Errorf("tras copiar, el aviso dice %q", v.aviso.Boton.Texto)
+		}
+		vuelta := relojes[DuracionCopiado]
+		if vuelta == nil {
+			t.Fatal("«Copiado» no vuelve a «Copiar enlace»")
+		}
+		vuelta()
+		if v.aviso.Boton.Texto != "Copiar enlace" {
+			t.Errorf("pasados 2 s sigue diciendo %q", v.aviso.Boton.Texto)
+		}
+	})
+
+	t.Run("en un teléfono estrecho, el botón baja bajo el texto", func(t *testing.T) {
+		if v.aviso.EnFila(320) {
+			t.Fatal("en 320 px el texto y el botón no caben en una fila")
+		}
+		m := v.aviso.Medida(320 - 2*AireEscenario)
+		if m.Width > 320 || m.Height <= v.aviso.Boton.MinSize().Height+tema.TextoSM.Linea {
+			t.Errorf("aviso partido: %v", m)
+		}
+	})
+
+	t.Run("con alguien más, el aviso se va", func(t *testing.T) {
+		en.ps = append(en.ps, llamada.Participante{Identidad: "ana", Nombre: "Ana"})
+		v.Refresh()
+		if v.avisoObj != nil || estaEntre(tr.Objects(), v.aviso) {
+			t.Error("con dos teselas sigue el aviso de la sala vacía")
+		}
+	})
+
+	t.Run("la pantalla completa alterna", func(t *testing.T) {
+		w := sa.ventanaLlamada
+		if v.Ventana != w {
+			t.Fatal("la vista no conoce su ventana")
+		}
+		tecla := func(k fyne.KeyName) {
+			t.Helper()
+			f := w.Canvas().OnTypedKey()
+			if f == nil {
+				t.Fatal("la ventana de la llamada no escucha el teclado")
+			}
+			f(&fyne.KeyEvent{Name: k})
+		}
+		entrar := elementoMas(v, "Pantalla completa")
+		if entrar == nil {
+			t.Fatal("el «…» no ofrece «Pantalla completa»")
+		}
+		entrar.AlPulsar()
+		if !w.FullScreen() || elementoMas(v, "Salir de pantalla completa") == nil {
+			t.Fatal("«Pantalla completa» no pone la ventana a pantalla completa")
+		}
+		tecla(fyne.KeyEscape)
+		if w.FullScreen() {
+			t.Error("Escape no sale de la pantalla completa")
+		}
+		tecla(fyne.KeyEscape)
+		if w.FullScreen() || en.colgada != 0 {
+			t.Error("Escape sin pantalla completa hace algo")
+		}
+		tecla(fyne.KeyF11)
+		if !w.FullScreen() {
+			t.Error("F11 no entra en pantalla completa")
+		}
+		tecla(fyne.KeyF11)
+		if w.FullScreen() {
+			t.Error("F11 no sale de la pantalla completa")
+		}
+	})
+}
+
+func estaEntre(objs []fyne.CanvasObject, o fyne.CanvasObject) bool {
+	for _, x := range objs {
+		if x == o {
+			return true
+		}
+	}
+	return false
+}
+
+func absf(x float32) float32 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }

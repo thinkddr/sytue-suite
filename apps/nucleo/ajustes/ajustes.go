@@ -37,6 +37,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -100,6 +101,13 @@ type Ajustes struct {
 	// sin el sujeto en claro): con otra persona dentro cuenta como apagado, aunque la
 	// sesión anterior se acabara sin salir.
 	DespertarDe string `json:"despertar_de,omitempty"`
+	// PrimerosPasosOcultos son las huellas de quienes han pulsado «Ocultar» en la
+	// tarjeta «Primeros pasos» del Hub (HuellaPrimerosPasos): es el `localStorage` por
+	// persona y organización de la portada web. Huellas y no identificadores, como
+	// DespertarDe: el fichero no dice quién ha entrado en este equipo. Separadas por
+	// espacios y no en una lista: `Ajustes` se compara con `==` para saber si otra app
+	// ha cambiado algo (Vigilar), y una lista lo dejaría de poder comparar.
+	PrimerosPasosOcultos string `json:"primeros_pasos_ocultos,omitempty"`
 }
 
 // Estado es todo lo transversal que otra app de la suite puede haber cambiado.
@@ -260,23 +268,74 @@ func escribirProtegido(destino string, datos []byte, soloNuevo bool, proteger fu
 
 // EscribirEnRaiz comparte la escritura duradera y atómica de preferencias, pero
 // conserva el confinamiento del descriptor os.Root para las cachés cifradas.
+// AbrirCreandoEnRaiz abre un fichero dentro de una raíz ya resuelta, creándolo si
+// falta, con reintentos acotados.
+//
+// En darwin, el openat con O_CREAT puede fallar con ENOENT de forma TRANSITORIA
+// cuando otro proceso o hilo renombra ficheros en el mismo directorio —el churn
+// de EscribirEnRaiz, temporal y Rename—: el directorio existe, el nombre existe,
+// la llamada simplemente pierde una carrera del VFS y no se reintenta sola. Linux
+// revuelve dentro del syscall y no le pasa. Sin esto, dos apps abriendo la misma
+// caché a la vez —o un write de un registro mientras otro abre su cerrojo— fallan
+// con «no such file» sobre un fichero que está ahí. Medido el 2026-11-01 con
+// TestConcurrentAppOpenKeepsOneCacheKey, que lo reproducía en cada iteración.
+func AbrirCreandoEnRaiz(raiz *os.Root, nombre string, banderas int, perm fs.FileMode) (*os.File, error) {
+	var (
+		f   *os.File
+		err error
+	)
+	for intento := 0; ; intento++ {
+		f, err = raiz.OpenFile(nombre, banderas|os.O_CREATE, perm)
+		if err == nil || !errors.Is(err, fs.ErrNotExist) || intento == 7 {
+			return f, err
+		}
+		time.Sleep(time.Duration(1<<intento) * time.Millisecond)
+	}
+}
+
 func EscribirEnRaiz(raiz *os.Root, destino string, datos []byte) error {
+	return escribirEnRaizConRenombre(raiz, destino, datos, raiz.Rename)
+}
+
+func escribirEnRaizConRenombre(raiz *os.Root, destino string, datos []byte, renombrar func(string, string) error) error {
+	_, err := escribirEnRaizDetalle(raiz, destino, datos, renombrar, nil, nil, false)
+	return err
+}
+
+// El booleano indica que ya se intentó renombrar: su resultado puede ser incierto.
+func escribirEnRaizDetalle(raiz *os.Root, destino string, datos []byte, renombrar func(string, string) error, syncFile, closeFile func(*os.File) error, retenerTrasFallo bool) (bool, error) {
 	if err := raiz.MkdirAll(filepath.Dir(destino), permisoCarpeta); err != nil {
-		return err
+		return false, err
 	}
 	temporal := destino + ".tmp-" + rand.Text()
-	tmp, err := raiz.OpenFile(temporal, os.O_CREATE|os.O_EXCL|os.O_WRONLY, permisoFichero)
+	tmp, err := AbrirCreandoEnRaiz(raiz, temporal, os.O_EXCL|os.O_WRONLY, permisoFichero)
 	if err != nil {
-		return err
+		return false, err
 	}
-	defer func() { _ = raiz.Remove(temporal) }()
-	if err := llenarTemporal(tmp, datos); err != nil {
-		return err
+	pendiente := true
+	defer func() {
+		if pendiente {
+			_ = raiz.Remove(temporal)
+		}
+	}()
+	if err := llenarTemporalConSync(tmp, datos, syncFile, closeFile); err != nil {
+		return false, err
 	}
-	return raiz.Rename(temporal, destino)
+	if err := renombrar(temporal, destino); err != nil {
+		if retenerTrasFallo {
+			pendiente = false
+		}
+		return true, err
+	}
+	pendiente = false
+	return true, nil
 }
 
 func llenarTemporal(tmp *os.File, datos []byte) error {
+	return llenarTemporalConSync(tmp, datos, nil, nil)
+}
+
+func llenarTemporalConSync(tmp *os.File, datos []byte, syncFile, closeFile func(*os.File) error) error {
 	if _, err := tmp.Write(datos); err != nil {
 		_ = tmp.Close()
 		return err
@@ -286,11 +345,17 @@ func llenarTemporal(tmp *os.File, datos []byte) error {
 		return err
 	}
 	// Persistir el contenido antes de que su nombre sustituya al anterior.
-	if err := tmp.Sync(); err != nil {
+	if syncFile == nil {
+		syncFile = (*os.File).Sync
+	}
+	if err := syncFile(tmp); err != nil {
 		_ = tmp.Close()
 		return err
 	}
-	return tmp.Close()
+	if closeFile == nil {
+		closeFile = (*os.File).Close
+	}
+	return closeFile(tmp)
 }
 
 // Cerrojo excluye procesos mediante un bloqueo del sistema operativo. El fichero es
@@ -325,12 +390,22 @@ func CerrojoSesion(ctx context.Context) (soltar func(), err error) {
 // mechanism as the suite locks. It takes ownership of f: release or any error closes
 // it. A separate file avoids coupling cache writes to OIDC/preferences locks.
 func CerrojoFichero(ctx context.Context, f *os.File) (soltar func(), err error) {
+	return cerrojoFichero(ctx, f, false)
+}
+
+// CerrojoFicheroCompartido admits independent readers of one native scope. A
+// shutdown takes the exclusive form without holding the global OIDC lock.
+func CerrojoFicheroCompartido(ctx context.Context, f *os.File) (func(), error) {
+	return cerrojoFichero(ctx, f, true)
+}
+
+func cerrojoFichero(ctx context.Context, f *os.File, compartido bool) (func(), error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			_ = f.Close()
 			return nil, err
 		}
-		libre, err := intentarCerrojo(f)
+		libre, err := intentarCerrojo(f, compartido)
 		if err != nil {
 			_ = f.Close()
 			return nil, err

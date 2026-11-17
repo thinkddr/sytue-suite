@@ -6,6 +6,7 @@ package calendario
 import (
 	"cmp"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -42,8 +44,12 @@ type Edicion struct {
 	Zona                                    string
 	Lugar, Descripcion, Color, Videollamada string
 	Regla                                   *Recurrencia
-	Invitados                               []string
-	SoloLectura                             bool
+	// ReglaCruda es la RRULE que el formulario no sabe editar (BYMONTH, 2MO…), tal
+	// cual llegó: «Repetir» dice «Personalizada» y al guardar viaja intacta. Vacía si
+	// no la hay o si el usuario eligió otra repetición. Excluye a Regla.
+	ReglaCruda  string
+	Invitados   []string
+	SoloLectura bool
 	// UID es el del evento que se edita, o el que se generó en esta sesión del
 	// formulario para ligar la videollamada al evento que se va a guardar.
 	UID string
@@ -65,28 +71,34 @@ func (e Edicion) origen() string {
 	return e.desde
 }
 
-// PaletaCalendario es `CALENDAR_PALETTE`: los catorce tonos joya de la suite, en hex
-// porque el servicio guarda el color tal cual (#RRGGBB).
-var PaletaCalendario = []struct{ Clave, Hex string }{
-	{"colour.terracotta", "#b0470f"},
-	{"colour.slate", "#334155"},
-	{"colour.pine", "#146a47"},
-	{"colour.inkBlue", "#1e50a8"},
-	{"colour.jade", "#0f7052"},
-	{"colour.ochre", "#94590f"},
-	{"colour.garnet", "#a31f38"},
-	{"colour.plum", "#6b3e9e"},
-	{"colour.petrol", "#0e6c84"},
-	{"colour.orchid", "#a23e8c"},
-	{"colour.purple", "#8446a8"},
-	{"colour.indigo", "#4338ca"},
-	{"colour.steel", "#2e5a8c"},
-	{"colour.viridian", "#0e7268"},
+// PaletaCalendario es `CALENDAR_PALETTE`: la paleta de colores de usuario de la suite
+// (`tokens.PaletaDeUsuario`), la misma de las etiquetas de Mail y los cuadernos de Notes,
+// con el nombre de cada tono del catálogo común. En hex porque el servicio guarda el
+// color tal cual (#RRGGBB).
+var PaletaCalendario = func() []struct{ Clave, Hex string } {
+	out := make([]struct{ Clave, Hex string }, 0, len(tokens.PaletaDeUsuario))
+	for _, c := range tokens.PaletaDeUsuario {
+		out = append(out, struct{ Clave, Hex string }{c.Clave(), c.Valor})
+	}
+	return out
+}()
+
+// El tono de un calendario nuevo y el de una suscripción: `COLOR_NUEVO` y
+// `COLOR_SUSCRIPCION` de CalendarModal.tsx.
+var (
+	ColorNuevo       = tonoPorID("blue")
+	ColorSuscripcion = tonoPorID("plum")
+)
+
+func tonoPorID(id string) string {
+	c, _ := tokens.TonoDeUsuario(id)
+	return c.Valor
 }
 
-// Los valores de «Repetir» y de «Termina», en el orden de sus `<option>`.
+// Los valores de «Repetir» y de «Termina», en el orden de sus `<option>`. «WEEKDAYS» es
+// «cada día laborable», que se guarda como semanal de lunes a viernes.
 var (
-	frecuencias = []string{"", "DAILY", "WEEKLY", "MONTHLY"}
+	frecuencias = []string{"", "DAILY", "WEEKLY", "MONTHLY", "YEARLY", "WEEKDAYS"}
 	finesSerie  = []string{"never", "count", "until"}
 )
 
@@ -132,7 +144,12 @@ type formulario struct {
 	titulo, inicio, fin, lugar, correo, cuenta, hasta *ui.Entrada
 	descripcion                                       *ui.AreaTexto
 	calendario, zona, repetir, finSerie               *ui.Selector
-	todoElDia                                         *ui.Conmutador
+	// dias son los días elegidos de una semanal (`repeatDays`); nil, el del inicio.
+	dias []string
+	// reglaCruda es la RRULE personalizada con la que se abrió el formulario, para
+	// devolverla si se vuelve a elegir «Personalizada» tras probar otra opción.
+	reglaCruda string
+	todoElDia  *ui.Conmutador
 	// Los errores que van junto a su campo; vacíos, sin error.
 	errTitulo, errFin, errCorreo string
 	guardar, eliminar, cancelar  *ui.Boton
@@ -258,7 +275,12 @@ func (f *formulario) construir() {
 	f.anadirRec = ui.NuevoBoton(p.t("event.reminderAdd", nil), f.anadirRecordatorio).
 		Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Mas, iconos.TallaSM)
 	if f.e.Recordatorios == nil && f.nuevo && f.a.Recordatorios == nil {
-		f.e.Recordatorios = &[]int{} // un evento nuevo empieza sin ninguno
+		// Un evento nuevo empieza con el recordatorio de los ajustes, o sin ninguno.
+		l := []int{}
+		if r := p.ajustes().Recordatorio; r != nil {
+			l = append(l, *r)
+		}
+		f.e.Recordatorios = &l
 	}
 	f.construirRecordatorios()
 	f.construirRecursos()
@@ -314,17 +336,37 @@ func (f *formulario) construirZona() {
 // construirRepeticion son «Repetir», «Termina» y el número de veces o la fecha.
 func (f *formulario) construirRepeticion() {
 	p, e := f.p, f.e
-	f.repetir = ui.NuevoSelector([]string{
+	opciones := []string{
 		p.t("event.repeatNever", nil), p.t("event.repeatDaily", nil),
 		p.t("event.repeatWeekly", nil), p.t("event.repeatMonthly", nil),
-	}, func(i int) {
-		if frecuencias[i] == "" {
+		p.t("event.repeatYearly", nil), p.t("event.repeatWeekdays", nil),
+	}
+	// Una regla que no se sabe editar sale como una opción más, «Personalizada», detrás
+	// de las de siempre: elegirla la conserva y cualquier otra la sustituye, como en
+	// EventModal (`event.repeatCustom`).
+	f.reglaCruda = e.ReglaCruda
+	if f.reglaCruda != "" {
+		opciones = append(opciones, p.t("event.repeatCustom", nil))
+	}
+	f.repetir = ui.NuevoSelector(opciones, func(i int) {
+		f.e.ReglaCruda = ""
+		switch {
+		case i >= len(frecuencias):
+			f.e.Regla, f.e.ReglaCruda = nil, f.reglaCruda
+		case frecuencias[i] == "":
 			f.e.Regla = nil
-		} else {
+		default:
 			if f.e.Regla == nil {
 				f.e.Regla = &Recurrencia{}
 			}
-			f.e.Regla.Freq = frecuencias[i]
+			f.e.Regla.Freq, f.e.Regla.Dias = frecuencias[i], nil
+			switch frecuencias[i] {
+			case "WEEKDAYS":
+				// Siempre cada semana: «cada 2 semanas, de lunes a viernes» no es esto.
+				f.e.Regla.Freq, f.e.Regla.Dias, f.e.Regla.Intervalo = "WEEKLY", slices.Clone(Laborables), 0
+			case "WEEKLY":
+				f.e.Regla.Dias = f.diasRegla()
+			}
 		}
 		f.rehacer()
 	})
@@ -332,20 +374,17 @@ func (f *formulario) construirRepeticion() {
 		p.t("event.repeatEndNever", nil), p.t("event.repeatEndCount", nil), p.t("event.repeatEndUntil", nil),
 	}, f.cambiarFinSerie)
 	if r := e.Regla; r != nil {
-		for i, fr := range frecuencias {
-			if fr == r.Freq {
-				f.repetir.Elegida = i
-			}
-		}
-		switch {
-		case r.Cuenta > 0:
-			f.finSerie.Elegida = 1
-		case r.Hasta != "":
-			f.finSerie.Elegida = 2
-		}
+		f.elegirRegla(*r)
+	} else if f.reglaCruda != "" {
+		f.repetir.Elegida = len(frecuencias)
 	}
 	f.cuenta = ui.NuevaEntrada("")
 	f.cuenta.AlCambiar(func(s string) {
+		// Solo con «Termina: tras N veces». Rellenar el campo al abrir (las 4 de
+		// partida) también avisa, y sin esto una serie sin fin se guardaba con COUNT=4.
+		if f.finSerie.Elegida != 1 {
+			return
+		}
 		if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil && f.e.Regla != nil {
 			f.e.Regla.Cuenta = max(1, n)
 		}
@@ -357,11 +396,96 @@ func (f *formulario) construirRepeticion() {
 		}
 	})
 	if r := e.Regla; r != nil {
-		f.cuenta.PonerTexto(strconv.Itoa(max(r.Cuenta, 4)))
+		// Las veces de la serie, o 4 de partida si no tiene (`repeatCount`). Era
+		// max(Cuenta, 4) y una serie de 2 se reabría, y se guardaba, con 4.
+		cuenta := r.Cuenta
+		if cuenta <= 0 {
+			cuenta = 4
+		}
+		f.cuenta.PonerTexto(strconv.Itoa(cuenta))
 		if t, err := time.Parse(time.DateOnly, r.Hasta); err == nil {
 			f.hasta.PonerTexto(ui.EscribirFecha(t))
 		}
 	}
+}
+
+// elegirRegla deja «Repetir», los días y «Termina» como los dice la regla con la que se
+// abre el formulario: lunes a viernes vuelve como «cada día laborable».
+func (f *formulario) elegirRegla(r Recurrencia) {
+	f.repetir.Elegida = max(0, slices.Index(frecuencias, r.Freq))
+	if r.EsLaborable() {
+		f.repetir.Elegida = slices.Index(frecuencias, "WEEKDAYS")
+	} else if r.Freq == "WEEKLY" && len(r.Dias) > 0 {
+		f.dias = slices.Clone(r.Dias)
+	}
+	switch {
+	case r.Cuenta > 0:
+		f.finSerie.Elegida = 1
+	case r.Hasta != "":
+		f.finSerie.Elegida = 2
+	}
+}
+
+// diasRegla es el BYDAY de la semanal con los días elegidos: nil si no se tocaron o si
+// solo está el del inicio, que es la semanal de siempre y sigue al evento si cambia
+// de día (`buildRecurrence`).
+func (f *formulario) diasRegla() []string {
+	dias := normalizarDias(f.dias)
+	if len(dias) == 0 || (len(dias) == 1 && dias[0] == diaDe(f.e.Inicio)) {
+		return nil
+	}
+	return dias
+}
+
+// diasElegidos son los días encendidos en el selector: los elegidos o el del inicio.
+func (f *formulario) diasElegidos() []string {
+	if len(f.dias) == 0 {
+		return []string{diaDe(f.e.Inicio)}
+	}
+	return normalizarDias(f.dias)
+}
+
+// semanal dice si «Repetir» está en «Semanalmente» (no en «cada día laborable»).
+func (f *formulario) semanal() bool {
+	i := f.repetir.Elegida
+	return f.e.Regla != nil && i >= 0 && i < len(frecuencias) && frecuencias[i] == "WEEKLY"
+}
+
+// bloqueDias es `WeekdayPicker`: «Se repite el» y las siete iniciales como botones que
+// se encienden (primario) y se apagan (fantasma). El lector de pantalla oye el nombre
+// entero; el último día encendido no se apaga.
+func (f *formulario) bloqueDias() fyne.CanvasObject {
+	l := f.p.locale()
+	iniciales, nombres := i18n.WeekdaysNarrow(l), i18n.WeekdaysLong(l)
+	elegidos := f.diasElegidos()
+	botones := make([]fyne.CanvasObject, 0, len(DiasSemana))
+	for i, d := range DiasSemana {
+		encendido := slices.Contains(elegidos, d)
+		b := ui.NuevoBoton(iniciales[i], func() {
+			switch {
+			case encendido && len(elegidos) == 1:
+				return
+			case encendido:
+				f.dias = slices.DeleteFunc(slices.Clone(elegidos), func(x string) bool { return x == d })
+			default:
+				f.dias = normalizarDias(append(slices.Clone(elegidos), d))
+			}
+			if f.e.Regla != nil {
+				f.e.Regla.Dias = f.diasRegla()
+			}
+			f.rehacer()
+		})
+		v := ui.Fantasma
+		if encendido {
+			v = ui.Primario
+		}
+		b.Con(v, ui.TallaSM)
+		b.Ancho, b.Rotulo = tema.Espacio(8), nombres[i]
+		botones = append(botones, b)
+	}
+	return container.New(ui.Columna{Hueco: tema.Espacio(1.5)},
+		alto(rotuloFuerte(f.p.t("event.repeatOn", nil)), tema.TextoSM.Linea),
+		container.New(ui.Flujo{Hueco: tema.Espacio(1)}, botones...))
 }
 
 func (f *formulario) cambiarFinSerie(i int) {
@@ -536,6 +660,9 @@ func (f *formulario) rehacerFilas() {
 		fila = append(fila, ui.GrupoCampo(p.t("event.repeatEnds", nil), false, f.finSerie, "", ""))
 	}
 	filas = append(filas, container.New(&dosColumnas{Hueco: tema.Espacio(4), Corte: CorteSM, ventana: f.ventana}, fila...))
+	if f.semanal() {
+		filas = append(filas, f.bloqueDias())
+	}
 	if e.Regla != nil && f.finSerie.Elegida == 1 {
 		filas = append(filas, ui.GrupoCampo(p.t("event.repeatCount", nil), false, f.cuenta, "", ""))
 	}
@@ -762,7 +889,7 @@ func (f *formulario) enviar() {
 		return
 	}
 	f.leerFechas()
-	if f.e.Fin.Before(f.e.Inicio) {
+	if f.e.FinAntesDelInicio(p.zona()) {
 		f.errFin, f.fin.Invalida = p.t("event.endBeforeStart", nil), true
 		f.rehacer()
 		return
@@ -818,12 +945,19 @@ func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 	in.Color, in.ConferenceURL = e.Color, e.Videollamada
 	in.AllDay = e.TodoElDia
 	if e.TodoElDia {
-		// Día completo: FLOTANTE, a las 00:00 UTC de su fecha y sin zona.
+		// Día completo: FLOTANTE, a las 00:00 UTC de su fecha y sin zona. El «Fin» del
+		// formulario es el ÚLTIMO día y el DTEND es exclusivo (RFC 5545 §3.6.1): «8 → 10
+		// nov» guarda el 11, y un día suelto —o un fin que no pasa del inicio— el día
+		// siguiente, nunca DTEND = DTSTART.
 		d := func(t time.Time) time.Time {
 			t = t.In(p.zona())
 			return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 		}
-		in.Start, in.End, in.TZID = d(e.Inicio), d(e.Fin), ""
+		ini, ultimo := d(e.Inicio), d(e.Fin)
+		if e.Fin.IsZero() || ultimo.Before(ini) {
+			ultimo = ini
+		}
+		in.Start, in.End, in.TZID = ini, ultimo.AddDate(0, 0, 1), ""
 	} else {
 		// La hora del formulario es la de PARED en la zona elegida.
 		loc, err := time.LoadLocation(e.Zona)
@@ -837,8 +971,11 @@ func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 		in.Start, in.End, in.TZID = pared(e.Inicio), pared(e.Fin), e.Zona
 	}
 	in.RRule = ""
-	if e.Regla != nil && e.Regla.Freq != "" {
+	switch {
+	case e.Regla != nil && e.Regla.Freq != "":
 		in.RRule = e.Regla.RRule()
+	case e.ReglaCruda != "":
+		in.RRule = e.ReglaCruda
 	}
 	// Los invitados que ya estaban conservan su respuesta; los nuevos entran a la espera.
 	previos := map[string]api.Attendee{}
@@ -864,9 +1001,36 @@ func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 	return in
 }
 
+// FinAntesDelInicio es el aviso «el fin es anterior al inicio» de `handleSave`. En un
+// día completo cuentan solo las fechas: los campos conservan una hora que no se ve (la
+// de antes de encender «Todo el día»), y un 8 22:00 → 8 01:00 no es un fin anterior.
+func (e Edicion) FinAntesDelInicio(loc *time.Location) bool {
+	if e.TodoElDia {
+		return inicioDelDia(e.Fin, loc).Before(inicioDelDia(e.Inicio, loc))
+	}
+	return e.Fin.Before(e.Inicio)
+}
+
+// finInclusivo es el de dates.ts: el último día de un día completo a partir de su
+// DTEND exclusivo, que es lo que enseña el campo «Fin» (un «8–10» de Apple se abría con
+// fin el 11). Sin fin, o con uno que no pasa del inicio —de otros clientes, o de los
+// guardados antes con el fin inclusivo—, el último día es el del inicio.
+func finInclusivo(inicio, fin time.Time) time.Time {
+	if fin.IsZero() {
+		return inicio
+	}
+	if ultimo := fin.AddDate(0, 0, -1); !ultimo.Before(inicio) {
+		return ultimo
+	}
+	return inicio
+}
+
 // EdicionDe es `editingDe`: la ocurrencia tal y como la entiende el formulario.
 func (p *Pantalla) EdicionDe(o Ocurrencia) Edicion {
 	ini, fin := ocurrenciaInstantes(o, p.zona())
+	if o.Event.AllDay {
+		fin = finInclusivo(ini, fin)
+	}
 	e := Edicion{
 		O: &o, CalendarioID: o.CalendarioID, Titulo: o.Event.Summary,
 		Inicio: ini, Fin: fin, TodoElDia: o.Event.AllDay, Zona: o.Event.TZID,
@@ -875,6 +1039,8 @@ func (p *Pantalla) EdicionDe(o Ocurrencia) Edicion {
 	}
 	if r, ok := LeerRRule(o.Event.RRule); ok {
 		e.Regla = &r
+	} else if strings.TrimSpace(o.Event.RRule) != "" {
+		e.ReglaCruda = o.Event.RRule
 	}
 	for _, a := range o.Event.Attendees {
 		e.Invitados = append(e.Invitados, a.Email)

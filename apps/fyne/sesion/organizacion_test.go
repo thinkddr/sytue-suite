@@ -63,3 +63,21 @@ func TestCambiarDeOrganizacionEsVolverAEntrar(t *testing.T) {
 		t.Errorf("con el cambio rechazado se ha seguido: %v", doble.pasos)
 	}
 }
+
+func TestCambiarOrganizacionNoEnviaPeticionConLoginEnCurso(t *testing.T) {
+	aparte(t)
+	a := test.NewApp()
+	defer a.Quit()
+	s := Abrir(a, "sytue.eu")
+	doble := &organizadorDoble{}
+	s.orgs = doble
+	s.mu.Lock()
+	s.entrando = true
+	s.mu.Unlock()
+	if err := s.CambiarOrganizacion(t.Context(), "o2"); !errors.Is(err, ErrYaEntrando) {
+		t.Fatal(err)
+	}
+	if len(doble.pasos) != 0 {
+		t.Fatal("changed organization while login was already in progress", doble.pasos)
+	}
+}

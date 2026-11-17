@@ -54,7 +54,12 @@ var destructivas = []struct {
 	{"DROP SCHEMA", regexp.MustCompile(`(?is)\bDROP\s+SCHEMA\b`)},
 	{"DROP SEQUENCE", regexp.MustCompile(`(?is)\bDROP\s+SEQUENCE\b`)},
 	{"DROP TYPE", regexp.MustCompile(`(?is)\bDROP\s+TYPE\b`)},
-	{"TRUNCATE", regexp.MustCompile(`(?is)\bTRUNCATE\b`)},
+	// El TRUNCATE de una SENTENCIA va anclado a su inicio (^, tras «;», tras
+	// «$$» o «BEGIN»): es la única forma en que se ejecuta. El «BEFORE/AFTER
+	// TRUNCATE ON» de CREATE TRIGGER es un evento de disparo y no trunca nada
+	// —al contrario, el disparador de 0013 que vigila cast_private_storage lo
+	// PROHIBE—, y con el patrón suelto el gate lo daba por destructivo.
+	{"TRUNCATE", regexp.MustCompile(`(?is)(?:^|;|\$\$|\bBEGIN\b)\s*TRUNCATE\b`)},
 	// Cualquier RENAME (tabla, columna o constraint) deja al binario anterior
 	// consultando un nombre inexistente.
 	{"RENAME", regexp.MustCompile(`(?is)\bRENAME\b`)},
@@ -219,8 +224,17 @@ func MergePolicyTables(src string) []string {
 			out = append(out, strings.ToLower(sql[loc[2]:loc[3]]))
 		}
 	}
+	for _, loc := range reScopeMergeRegistration.FindAllStringSubmatchIndex(src, -1) {
+		if reScopeMergeCall.MatchString(sql[loc[0]:loc[1]]) {
+			out = append(out, strings.ToLower(src[loc[2]:loc[3]]))
+		}
+	}
 	return out
 }
+
+var reScopeMergeCall = regexp.MustCompile(`(?im)^\s*SELECT\s+sytue_scope_merge_register\(`)
+
+var reScopeMergeRegistration = regexp.MustCompile(`(?im)^\s*SELECT\s+sytue_scope_merge_register\('([a-z][a-z0-9_]*)'::regclass\)\s*;`)
 
 // MergeSetting es la variable de sesión que habilita las políticas de fusión.
 // Se repite aquí en vez de importarla de platform/pkg/pg para que este gate no

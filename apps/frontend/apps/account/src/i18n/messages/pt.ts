@@ -7,6 +7,23 @@ import type { en } from './en.js';
 
 export const pt: AppCatalog<typeof en> = {
   'app.title': 'A minha conta',
+  'app.description': 'A minha conta — perfil, segurança e acessos da sua conta Sytue.',
+  'app.lead': 'O seu perfil, como inicia sessão e protege a conta, e onde está aberta.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Verificação de segurança',
+  'checkup.all_good': 'Tudo em ordem: a sua conta está bem protegida.',
+  'checkup.dos_pasos':
+    'A verificação em dois passos está desativada: basta a palavra-passe para entrar.',
+  'checkup.recuperacion':
+    'Sem e-mail nem telemóvel de recuperação: se perder o acesso, não haverá forma de voltar.',
+  'checkup.sesiones': 'Sessões abertas noutros dispositivos: {count}',
+  'checkup.contrasenas_app': 'Palavras-passe de aplicação sem uso há 90 dias: {count}',
+  'checkup.dispositivos': 'Dispositivos de confiança não vistos há 90 dias: {count}',
+  'checkup.turn_on': 'Ativar',
+  'checkup.add': 'Adicionar',
+  'checkup.review': 'Rever',
+
   'profile.title': 'Perfil',
   'profile.name': 'Nome a mostrar',
   'profile.name.hint': 'Como aparece em toda a suite.',
@@ -30,25 +47,55 @@ export const pt: AppCatalog<typeof en> = {
   'photo.errorRead': 'Não foi possível ler a imagem.',
   'sessions.title': 'Sessões abertas',
   'sessions.current': 'Este dispositivo',
+  'sessions.signed_in': 'Iniciada {time}',
   'sessions.close_one': 'Terminar esta sessão',
+  'sessions.close_named': 'Terminar a sessão em {device}',
+  'sessions.close_one_confirm':
+    '{device} será desligado e terá de iniciar sessão novamente para usar a sua conta.',
   'sessions.close_others': 'Fechar todas as sessões',
   'sessions.close_others_note': 'Esta incluída: terá de entrar novamente.',
+  'sessions.close_all_confirm':
+    'Todas as sessões serão terminadas, incluindo esta. Terá de iniciar sessão novamente em cada dispositivo.',
   'sessions.empty': 'Não há outras sessões abertas.',
   'sessions.failed': 'Não foi possível carregar as suas sessões.',
   'common.loading': 'A carregar…',
+  'common.retry': 'Tentar novamente',
   'devices.title': 'Dispositivos',
   'devices.current': 'Este dispositivo',
   'devices.trusted': 'Fiável',
   'devices.trust': 'Marcar como fiável',
   'devices.forget': 'Esquecer este dispositivo',
+  'devices.forget_named': 'Esquecer {device}',
+  'devices.forget_confirm':
+    '{device} deixará de ser reconhecido e perderá o estado de confiança. Um novo início de sessão a partir dele contará como um dispositivo novo.',
   'devices.empty': 'Ainda não há dispositivos reconhecidos.',
   'devices.failed': 'Não foi possível carregar os seus dispositivos.',
+  'signature.title': 'Assinatura guardada',
+  'signature.help':
+    'A assinatura que pediu ao CertiPDF para lembrar ao assinar à mão. É guardada cifrada na sua conta.',
+  'signature.empty':
+    'Não tem nenhuma assinatura guardada. Ao assinar à mão no CertiPDF, marque «Lembrar a minha assinatura».',
+  'signature.failed': 'Não foi possível carregar a sua assinatura guardada.',
+  'signature.preview': 'A sua assinatura guardada',
+  'signature.saved_on': 'Guardada a {date}',
+  'signature.delete': 'Apagar a assinatura guardada',
+  'signature.delete_confirm':
+    'A sua assinatura guardada será apagada. Os documentos que já assinou mantêm-na; da próxima vez que assinar à mão terá de a desenhar de novo.',
   'security.title': 'Segurança',
   'security.failed': 'Algo correu mal. Tente de novo.',
   'security.password.title': 'Palavra-passe',
   'security.password.warning': 'Alterá-la termina a sessão em todo o lado, incluindo aqui.',
   'security.password.current': 'Palavra-passe atual',
   'security.password.new': 'Nova palavra-passe',
+  'security.password.requirements': 'Requisitos da nova palavra-passe:',
+  'security.password.req_length': {
+    one: 'Pelo menos {count} carácter',
+    other: 'Pelo menos {count} caracteres',
+  },
+  'security.password.req_complexity': 'Letras e pelo menos um número',
+  'security.password.req_different': 'Diferente da palavra-passe atual',
+  'security.password.req_met': 'Cumprido',
+  'security.password.req_pending': 'Ainda não',
   'security.password.submit': 'Alterar palavra-passe',
   'security.password.done':
     'Palavra-passe alterada. Todas as sessões foram terminadas, incluindo esta.',
@@ -72,6 +119,44 @@ export const pt: AppCatalog<typeof en> = {
   'security.codes.once':
     'Mostrados uma só vez. Guarde-os num sítio seguro: cada um funciona uma única vez.',
   'security.codes.saved': 'Já os guardei',
+  'security.codes.regenerate_confirm':
+    'Os seus códigos de recuperação atuais deixam de funcionar de imediato, incluindo os que tenha impresso ou guardado.',
+  'security.mfa.step.need': 'Antes de começar',
+  'security.mfa.step.need.heading': 'O que precisa',
+  'security.mfa.step.need.desc':
+    'Uma aplicação de autenticação no telemóvel. Mostra um novo código de seis algarismos a cada 30 segundos.',
+  'security.mfa.step.need.apps_title': 'Serve qualquer aplicação de autenticação',
+  'security.mfa.step.need.apps':
+    'Por exemplo: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Se não tiver nenhuma, instale-a antes de continuar.',
+  'security.mfa.step.need.next': 'Começar',
+  'security.mfa.step.scan': 'Digitalizar',
+  'security.mfa.step.scan.heading': 'Adicione a sua conta à aplicação',
+  'security.mfa.key_label': 'Chave de configuração',
+  'security.mfa.step.code': 'Código',
+  'security.mfa.step.code.heading': 'Escreva o código da aplicação',
+  'security.mfa.step.code.desc':
+    'Assim confirma-se que a aplicação e a conta coincidem antes de a ativar.',
+  'security.mfa.code.hint': 'Seis algarismos. Se mudar enquanto escreve, use o novo.',
+  'security.mfa.step.codes.heading': 'Guarde os seus códigos de recuperação',
+  'security.codes.copy': 'Copiar todos',
+  'security.codes.copied': 'Códigos copiados.',
+  'security.codes.copy_failed': 'Não foi possível copiar. Selecione os códigos e copie-os à mão.',
+  'security.codes.download': 'Transferir .txt',
+  'security.codes.file_title': 'Códigos de recuperação Sytue',
+  'security.codes.file_account': 'Conta: {account}',
+  'security.codes.file_date': 'Gerados: {date}',
+  'security.codes.file_note':
+    'Cada código só funciona uma vez. Guarde este ficheiro num local seguro, longe do telemóvel.',
+  'security.mfa.step.done': 'Concluído',
+  'security.mfa.step.done.heading': 'A verificação em dois passos está ativa',
+  'security.mfa.step.done.desc': 'Da próxima vez que entrar, será pedido um código da aplicação.',
+  'security.mfa.passkey_tip.title': 'Adicione também uma chave de acesso',
+  'security.mfa.passkey_tip':
+    'Uma chave de acesso permite entrar com a impressão digital, o rosto ou o bloqueio do ecrã, sem escrever códigos.',
+  'security.mfa.passkey_tip.action': 'Adicionar chave de acesso',
+  'security.mfa.close': 'Fechar',
+  'security.mfa.disable_title': 'Desativar a verificação em dois passos?',
+  'security.mfa.disable_warning': 'A palavra-passe voltará a bastar para abrir a conta.',
   'common.cancel': 'Cancelar',
   'profile.given_name': 'Nome próprio',
   'profile.family_name': 'Apelido',
@@ -82,6 +167,8 @@ export const pt: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Usado em todo o Sytue e nas mensagens que lhe enviamos.',
   'security.passkeys.title': 'Chaves de acesso',
   'security.passkeys.remove': 'Remover',
+  'security.passkeys.remove_named': 'Remover {name}',
+  'security.passkeys.remove_confirm': 'Deixará de poder iniciar sessão com {name}.',
   'security.passkeys.unnamed': 'Chave sem nome',
   'app_passwords.title': 'Palavras-passe de aplicação',
   'app_passwords.hint':
@@ -90,6 +177,9 @@ export const pt: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Por exemplo: correio do portátil, telemóvel.',
   'app_passwords.create': 'Criar palavra-passe',
   'app_passwords.revoke': 'Revogar',
+  'app_passwords.revoke_named': 'Revogar {label}',
+  'app_passwords.revoke_confirm':
+    'As aplicações que usam {label} deixarão de conseguir iniciar sessão. Não é possível anular.',
   'app_passwords.empty': 'Ainda não há palavras-passe de aplicação.',
   'app_passwords.failed': 'Não foi possível carregar as suas palavras-passe de aplicação.',
   'app_passwords.unnamed': 'Sem nome',

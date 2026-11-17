@@ -1,7 +1,8 @@
-# GitHub self-hosted (GitHub Enterprise Server) — alta en Sytue Platform
-**Qué conecta**: tu instancia GHES por OIDC/identidad y API.
-1. En GHES: **Admin → OAuth Apps → New OAuth App** con callback `https://integrations.sytue.eu/api/v1/oauth/callback`.
-2. Copia Client ID/Secret de GHES.
-3. Sytue Platform → Integraciones → **GitHub (self-hosted)**: rellena **Host** (`https://gh.tuempresa.com`), Client ID y Secret → «Conectar».
-**Verificar**: la ficha resuelve tu usuario de GHES.
-**Errores**: TLS no confiable = el certificado de GHES no está en el almacén del gateway (añádelo al bundle de CA).
+<a id="github-self-hosted-github-enterprise-server--alta-en-sytue-platform"></a>
+# GitHub self-hosted (GitHub Enterprise Server) — setup in Sytue Platform
+**What it connects**: your GHES instance via OIDC/identity and API.
+1. In GHES: **Admin → OAuth Apps → New OAuth App** with callback `https://integrations.sytue.eu/api/v1/oauth/callback`.
+2. Copy the GHES Client ID/Secret.
+3. Sytue Platform → Integrations → **GitHub (self-hosted)**: fill in **Host** (`https://gh.tuempresa.com`), Client ID and Secret → “Connect”.
+**Verify**: the listing resolves your GHES user.
+**Errors**: untrusted TLS = the GHES certificate is not in the gateway's trust store (add it to the CA bundle).

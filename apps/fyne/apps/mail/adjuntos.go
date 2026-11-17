@@ -218,9 +218,6 @@ var AltoEnlaceAdjunto = 2*tema.Borde + 2*margenYEnlace + tema.TextoSM.Linea
 // AltoOriginal es el enlace «Original (.eml)»: `py-1.5` y la línea de `text-sm`.
 var AltoOriginal = 2*margenYOriginal + tema.TextoSM.Linea
 
-// DescargaD es `download` de glyphs.tsx: no es la flecha del catálogo compartido.
-const DescargaD = "M12 3v12M7 10l5 5 5-5M5 21h14"
-
 // enlaceAdjunto es el `<a download>` de un adjunto: la píldora con el nombre, el
 // tamaño y la flecha. Encima, `hover:border-border-strong hover:bg-bg`.
 type enlaceAdjunto struct {

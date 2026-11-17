@@ -385,6 +385,10 @@ func FormatTimeAgo(l Locale, cuando, ahora time.Time) string {
 // cabe en las siete columnas del mini-calendario del menú.
 func WeekdaysNarrow(l Locale) [7]string { return fechas[l].DiasEstrechos }
 
+// WeekdaysLong son los mismos siete días con su nombre entero (`weekdayLongLabels`): lo
+// que oye un lector de pantalla cuando en pantalla solo cabe la inicial.
+func WeekdaysLong(l Locale) [7]string { return fechas[l].DiasLargos }
+
 func componer(patron []parteFecha, f formatoFecha, t time.Time) string {
 	doceHoras := false
 	for _, p := range patron {

@@ -62,8 +62,11 @@ func TestLaSeccionDeCuentasExternasEsLaDeLaWeb(t *testing.T) {
 		}
 	}
 	// El alta ya no se esconde en los ajustes plegados: la web no la tiene ahí.
-	for _, a := range ajustes {
-		if a.texto == "externalMail.title" {
+	for _, g := range gruposAjustes {
+		for _, a := range g.filas {
+			if a.titulo != "externalMail.title" {
+				continue
+			}
 			t.Fatal("«Cuentas de correo externas» sigue también en «Ajustes»")
 		}
 	}
@@ -302,6 +305,11 @@ func TestUnaCuentaQuePerdioElPermisoLoDiceEnSuSitio(t *testing.T) {
 	b := correoDePrueba(t, s).b
 	b.cargarExternas()
 	tr := b.P.T
+	// Con dos cuentas arrancan plegadas (MAIL-15); se despliegan con la flecha.
+	for _, rotulo := range []string{"ana@gmail.com", "ana@trabajo.eu"} {
+		f, _ := ramaDe(t, b.P.Menu.seccionExternas(tema.Claro), rotulo)
+		f.TypedKey(&fyne.KeyEvent{Name: fyne.KeyRight})
+	}
 	sec := b.P.Menu.seccionExternas(tema.Claro)
 	_, caducada := ramaDe(t, sec, "ana@gmail.com")
 	_, lenta := ramaDe(t, sec, "ana@trabajo.eu")

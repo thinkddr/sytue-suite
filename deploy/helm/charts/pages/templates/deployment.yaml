@@ -22,6 +22,9 @@ spec:
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           ports: [{ name: http, containerPort: {{ .Values.service.targetPort }} }]
           env:
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu); GO.Values.resources.limits.memoryLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "pages" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
             - { name: ENV, value: {{ include "sytue-pages.env" . | quote }} }
             - { name: PORT, value: {{ .Values.service.targetPort | quote }} }
             - { name: LOG_LEVEL, value: {{ .Values.config.logLevel | quote }} }

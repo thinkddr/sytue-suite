@@ -28,6 +28,11 @@ var iconosDeTipo = map[string]iconos.Icono{
 	api.BasesKindLink:        iconos.Enlace,
 	api.BasesKindFormula:     iconos.Codigo,
 	api.BasesKindAttachment:  iconos.Copias,
+	api.BasesKindURL:         iconos.Globo,
+	api.BasesKindEmail:       iconos.Correo,
+	api.BasesKindPhone:       iconos.Dispositivo,
+	api.BasesKindCurrency:    iconos.Recibo,
+	api.BasesKindRating:      iconos.Corazon,
 }
 
 // iconoDeTipo es el glifo de un tipo de campo; uno que no se conoce lleva el de texto.
@@ -68,7 +73,8 @@ func tonoDeBase(id string) ui.TonoTarjeta {
 }
 
 // alineaALaDerecha dice si la columna es numérica (`text-right tabular-nums`): un número
-// o una fórmula que da un número.
+// o una fórmula que da un número, o un importe. Una valoración no: sus estrellas se leen
+// de izquierda a derecha, como en la web (`esNumerico`).
 func alineaALaDerecha(campo api.BasesField) bool {
-	return efectivo(campo).Kind == api.BasesKindNumber
+	return campo.Kind != api.BasesKindRating && efectivo(campo).Kind == api.BasesKindNumber
 }

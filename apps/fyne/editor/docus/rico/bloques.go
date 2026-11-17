@@ -25,7 +25,7 @@ const (
 	Cita
 	Regla       // <hr>
 	SaltoPagina // el `<div data-page-break>` de «Insertar → Salto de página»
-	Figura      // una forma o un gráfico (`figure[data-shape]`, `figure[data-chart]`)
+	Figura      // una forma, un gráfico, un diagrama o un bloque atómico (un dibujo, un informe)
 )
 
 // Bloque es una línea del documento: lo que se pinta —y se edita— de una vez. Es una
@@ -89,6 +89,7 @@ type Celda struct {
 	// o "bottom".
 	Vertical string
 	nodo     *html.Node
+	fila     *html.Node // su <tr>: el fondo de la fila (las bandas de «Cabecera alternada»)
 }
 
 // Lugar es dónde vive el bloque en el árbol: los hijos de `cont` que van de `primero` a
@@ -114,7 +115,10 @@ type Tramo struct {
 	// Campo es el de una ficha de combinación de correspondencia: la vista previa le pone el
 	// valor de un registro en Rotulo.
 	Campo string
-	nodo  *html.Node // el del objeto
+	// Formulario es el campo de formulario (`span[data-formfield]`) que es este objeto; la
+	// vista lo pinta con su valor y, al rellenar, lo cambia con [Documento.RellenarCampo].
+	Formulario *CampoFormulario
+	nodo       *html.Node // el del objeto
 	// cadena son los elementos en línea que envuelven al texto, de fuera adentro. Son los
 	// NODOS del documento, no una traducción: al reescribir un bloque editado vuelven tal
 	// cual, con atributos que este paquete no necesita entender para no perderlos.
@@ -197,6 +201,23 @@ type lista struct {
 	// número ni viñeta, y sin sangría salvo las subentradas del índice (`sangra`).
 	sinMarca, sangra bool
 	vineta           string // la de `list-style-type` con una cadena; "" es «•»
+	casillas         bool   // lista de casillas del editor (`ul[data-checklist]`)
+}
+
+// Las marcas de un elemento de una lista de casillas (`ul[data-checklist] > li`, con
+// `data-checked="1"` si está hecho). No son texto: el folio las DIBUJA, como la casilla
+// del `::before` de editor.css.
+const (
+	CasillaVacia = "☐"
+	CasillaHecha = "☑"
+)
+
+// EsMarcaDeCasilla dice si la marca de un bloque es la de una casilla.
+func EsMarcaDeCasilla(m string) bool { return m == CasillaVacia || m == CasillaHecha }
+
+// esCasilla dice si n es un elemento de una lista de casillas.
+func esCasilla(n *html.Node) bool {
+	return n.DataAtom == atom.Li && n.Parent != nil && n.Parent.DataAtom == atom.Ul && tieneAtributo(n.Parent, "data-checklist")
 }
 
 type caminante struct {
@@ -306,7 +327,7 @@ func (c *caminante) emitir(b Bloque) {
 	case b.Tipo == SaltoPagina:
 		b.Arriba, b.Abajo = 24, 24 // `margin: 1.5em 0`
 	case b.Tipo == Figura:
-		b.Arriba, b.Abajo = 16, 16 // `margin: 1em auto`
+		b.Arriba, b.Abajo = margenFigura(b.Ilustracion)
 	case b.cont != nil && esEntradaBib(b.cont):
 		b.Arriba, b.Abajo = 0.35*b.Base.Tamano, 0.35*b.Base.Tamano // `margin:.35em 0`
 	case b.cont != nil && esLeyenda(b.cont):
@@ -408,6 +429,7 @@ func (c *caminante) lista(n *html.Node, dentro Estilo, tipo Tipo, nivel, prof in
 	l.sangra = ul && estilo == estiloSubIndice && enIndice(n)
 	if ul {
 		l.vineta = vinetaCSS(estilo)
+		l.casillas = tieneAtributo(n, "data-checklist")
 	}
 	if inicio, err := strconv.Atoi(atributo(n, "start")); err == nil {
 		l.n = inicio - 1
@@ -440,6 +462,10 @@ func (c *caminante) marcaDe(li *html.Node) string {
 	switch {
 	case l.sinMarca:
 		return ""
+	case l.casillas && atributo(li, "data-checked") == "1":
+		return CasillaHecha
+	case l.casillas:
+		return CasillaVacia
 	case l.ordenada:
 		return strconv.Itoa(l.n) + "."
 	case l.vineta != "":
@@ -468,8 +494,11 @@ func vinetaCSS(estilo string) string {
 func (c *caminante) tabla(n *html.Node, e Estilo, prof int) {
 	t := leerRejilla(n, prof)
 	for _, cel := range t.Celdas {
-		// El fondo y la alineación vertical son de la CAJA de la celda: no se heredan.
-		dentro := aplicar(e, cel.nodo)
+		// El fondo y la alineación vertical son de la CAJA de la celda: no se heredan. La
+		// celda sin fondo propio deja ver el de su fila (`tr { background-color }`).
+		base := e
+		base.Fondo = aplicar(e, cel.fila).Fondo
+		dentro := aplicar(base, cel.nodo)
 		cel.Fondo, cel.Vertical = dentro.Fondo, dentro.valign
 		dentro.Fondo, dentro.valign = e.Fondo, ""
 		if cel.Vertical == "" || cel.Vertical == "baseline" {
@@ -514,7 +543,7 @@ func leerRejilla(n *html.Node, prof int) *Tabla {
 				col++
 			}
 			cel := &Celda{
-				Tabla: t, Fila: f, Col: col, Cabecera: td.DataAtom == atom.Th, nodo: td,
+				Tabla: t, Fila: f, Col: col, Cabecera: td.DataAtom == atom.Th, nodo: td, fila: tr,
 				Cols: tramoCelda(td, "colspan", 1000), Filas: min(tramoCelda(td, "rowspan", 65534), len(filas)-f),
 			}
 			ocupar(ocupado, cel)
@@ -596,6 +625,9 @@ func (a *aplanador) nodo(n *html.Node, e Estilo, cadena []*html.Node, prof int) 
 		}
 		if esCampoCombinacion(n) {
 			t.Campo = atributo(n, "data-mergefield")
+		}
+		if esCampoFormulario(n) {
+			t.Formulario, t.Estilo = campoDe(n), aplicar(e, n)
 		}
 		if n.DataAtom == atom.Img && n.Namespace == "" {
 			t.Imagen = leerImagen(n)

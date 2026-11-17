@@ -121,9 +121,13 @@ function Aro({ hechas, total, rotulo }: { hechas: number; total: number; rotulo:
 /** El texto de una captura pendiente, sin HTML: es lo que se escribió. */
 export function textoPendiente(c: CapturaPendiente): string {
   const i = c.input;
-  if (i.title) return i.title;
+  if (!i || typeof i !== 'object') return '';
+  if (typeof i.title === 'string' && i.title) return i.title;
   if (i.content_cipher) return '';
-  return new DOMParser().parseFromString(i.content ?? '', 'text/html').body.textContent ?? '';
+  return (
+    new DOMParser().parseFromString(typeof i.content === 'string' ? i.content : '', 'text/html')
+      .body.textContent ?? ''
+  );
 }
 
 const fecha = (dia: string) => new Date(`${dia}T12:00:00`);

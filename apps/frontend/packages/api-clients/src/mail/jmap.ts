@@ -75,8 +75,15 @@ export interface EmailSummary {
   from: EmailAddress[];
   to: EmailAddress[];
   cc: EmailAddress[];
+  /** Copia oculta: el servicio solo la tiene si la cabecera `Bcc` viajó en el MIME,
+   *  que en la práctica es lo propio (Borradores y la copia de Enviados). */
+  bcc?: EmailAddress[];
   preview: string;
   receivedAt: string;
+  /** Cuándo volvió de «Pospuestos» al vencer la fecha (`unsnoozed_at` del servicio).
+   *  Las listas se ordenan por ella cuando la hay —lo devuelto sube arriba, como en
+   *  Gmail— y la fila la enseña en lugar de `receivedAt`. */
+  unsnoozedAt?: string;
   /** Keywords JMAP ($seen, $flagged, ...). */
   keywords: Record<string, boolean>;
   hasAttachment: boolean;
@@ -87,6 +94,30 @@ export interface EmailSummary {
    *  DESHACER un movimiento desde una búsqueda o una etiqueta, que cruzan carpetas:
    *  cada mensaje vuelve a la suya y no a la de la vista. */
   mailboxId?: string;
+  /** Veredictos SPF/DKIM/DMARC (RFC 8601) que dio el MX de Sytue al recibirlo. Solo
+   *  en correo entrante; lo propio y lo importado no los traen. */
+  senderAuth?: SenderAuth;
+}
+
+/** Resultado de un mecanismo de autenticación del remitente (RFC 8601). */
+export type AuthVerdict = 'pass' | 'fail' | 'softfail' | 'neutral' | 'temperror' | 'permerror';
+
+/** Lo que el MX comprobó del remitente; un mecanismo ausente no se evaluó. */
+export interface SenderAuth {
+  spf?: AuthVerdict;
+  dkim?: AuthVerdict;
+  dmarc?: AuthVerdict;
+}
+
+/** Los `auth_*` del sobre del servicio → `senderAuth`; nada si no trae ninguno. */
+export function senderAuthDe(m: { auth_spf?: string; auth_dkim?: string; auth_dmarc?: string }): {
+  senderAuth?: SenderAuth;
+} {
+  const a: SenderAuth = {};
+  if (m.auth_spf) a.spf = m.auth_spf as AuthVerdict;
+  if (m.auth_dkim) a.dkim = m.auth_dkim as AuthVerdict;
+  if (m.auth_dmarc) a.dmarc = m.auth_dmarc as AuthVerdict;
+  return Object.keys(a).length ? { senderAuth: a } : {};
 }
 
 /** Adjunto saliente: se codifica base64 inline en el MIME multipart/mixed. */
@@ -110,6 +141,15 @@ export interface OutgoingEmail {
   from: EmailAddress;
   to: EmailAddress[];
   cc?: EmailAddress[];
+  /**
+   * Copia oculta. Solo se escribe al guardar un BORRADOR (`saveDraft` /
+   * `updateDraft`), como cabecera `Bcc`: el borrador vive en el buzón propio y
+   * es la única forma de que la CCO vuelva al reabrirlo (el servicio ya la lee
+   * de ahí al indexar). `send` la ignora a propósito: una cabecera `Bcc` en lo
+   * que se entrega revelaría a los ocultos, y el sobre de `send` es solo To+Cc
+   * — el envío con CCO lo compone el BFF de Mail (`lib/rfc5322.ts`).
+   */
+  bcc?: EmailAddress[];
   subject: string;
   textBody?: string;
   htmlBody?: string;
@@ -151,6 +191,12 @@ export interface MessageBody {
   text: string;
   /** Cuerpo text/html crudo (el consumidor decide cómo aislarlo/sanearlo). */
   html: string;
+  /**
+   * iCalendar de la primera parte `text/calendar` (o `application/ics`) del mensaje,
+   * venga como alternativa del cuerpo (Outlook) o como `invite.ics` adjunto (Google):
+   * es la invitación iMIP (RFC 6047) que el lector ofrece contestar. Ausente si no hay.
+   */
+  calendar?: string;
 }
 
 /** Contenido editable de un borrador, para rehidratar el compositor al reabrirlo. */
@@ -159,6 +205,8 @@ export interface DraftContent {
   to: string;
   /** Cabecera Cc cruda. */
   cc: string;
+  /** Cabecera Bcc cruda (solo los borradores la llevan; ver `OutgoingEmail.bcc`). */
+  bcc: string;
   subject: string;
   textBody: string;
   /** Cuerpo text/html crudo, si el borrador lo tenía (formato enriquecido). */
@@ -615,7 +663,7 @@ export class JmapClient {
       body: JSON.stringify({
         from: email.from.email,
         recipients,
-        ...(await this.rawPayload(buildRfc5322(email))),
+        ...(await this.rawPayload(buildRfc5322(email, { conCco: true }))),
       }),
     });
     return { id: res.id };
@@ -635,7 +683,7 @@ export class JmapClient {
       body: JSON.stringify({
         from: email.from.email,
         recipients,
-        ...(await this.rawPayload(buildRfc5322(email))),
+        ...(await this.rawPayload(buildRfc5322(email, { conCco: true }))),
       }),
     });
     return { id: res.id };
@@ -739,11 +787,15 @@ interface RawEmail {
   from_name?: string;
   to?: string[];
   cc?: string[];
+  bcc?: string[];
   preview?: string;
   received_at?: string;
   keywords?: string[];
   has_attachment?: boolean;
   mailbox_id?: string;
+  auth_spf?: string;
+  auth_dkim?: string;
+  auth_dmarc?: string;
 }
 
 /** Flag IMAP (\Seen) → keyword JMAP ($seen). El resto se pasa en minúsculas. */
@@ -812,11 +864,13 @@ function mapEmail(e: RawEmail): EmailSummary {
     from: e.from ? [{ ...(e.from_name ? { name: e.from_name } : {}), email: e.from }] : [],
     to: (e.to ?? []).map((email) => ({ email })),
     cc: (e.cc ?? []).map((email) => ({ email })),
+    ...(e.bcc?.length ? { bcc: e.bcc.map((email) => ({ email })) } : {}),
     preview: e.preview ?? '',
     receivedAt: e.received_at ?? '',
     keywords: flagsToKeywords(e.keywords),
     hasAttachment: Boolean(e.has_attachment),
     ...(e.mailbox_id ? { mailboxId: e.mailbox_id } : {}),
+    ...senderAuthDe(e),
   };
 }
 
@@ -852,8 +906,12 @@ function headerText(v: string): string {
 /**
  * Compone un mensaje RFC 5322 (html o texto, utf-8 8bit). Con adjuntos usa
  * multipart/mixed: el cuerpo como primera parte y cada adjunto como parte base64.
+ *
+ * `conCco` escribe la cabecera `Bcc`: SOLO para un borrador, que nadie más que
+ * su autor llega a leer. Por defecto no, para que ningún camino de envío pueda
+ * olvidarse de quitarla.
  */
-function buildRfc5322(email: OutgoingEmail): string {
+function buildRfc5322(email: OutgoingEmail, { conCco = false } = {}): string {
   const isHtml = email.htmlBody != null;
   const body = (isHtml ? email.htmlBody : email.textBody) ?? '';
   const bodyType = isHtml ? 'text/html' : 'text/plain';
@@ -862,6 +920,7 @@ function buildRfc5322(email: OutgoingEmail): string {
     `From: ${formatAddr(email.from)}`,
     `To: ${email.to.map(formatAddr).join(', ')}`,
     ...(email.cc?.length ? [`Cc: ${email.cc.map(formatAddr).join(', ')}`] : []),
+    ...(conCco && email.bcc?.length ? [`Bcc: ${email.bcc.map(formatAddr).join(', ')}`] : []),
     `Subject: ${headerText(email.subject)}`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${crypto.randomUUID()}@mail.sytue>`,
@@ -945,7 +1004,7 @@ export function parseAttachments(raw: Uint8Array | string): ParsedAttachment[] {
 }
 
 /**
- * Extrae el contenido editable (To/Cc/Asunto/cuerpo, formato y adjuntos) de un
+ * Extrae el contenido editable (To/Cc/Bcc/Asunto/cuerpo, formato y adjuntos) de un
  * borrador RFC 5322 crudo para rehidratar el compositor. Reutiliza el MISMO
  * walker MIME que ya usan `parseAttachments`/`parseMessageBody` para un correo
  * LEÍDO: un borrador guardado por `saveDraft`/`updateDraft` (con `htmlBody` +
@@ -963,6 +1022,7 @@ export function parseDraftContent(raw: Uint8Array | string): DraftContent {
   return {
     to: decodeEncodedWords(headers['to'] ?? ''),
     cc: decodeEncodedWords(headers['cc'] ?? ''),
+    bcc: decodeEncodedWords(headers['bcc'] ?? ''),
     subject: decodeEncodedWords(headers['subject'] ?? ''),
     // Normaliza CRLF→LF: el <textarea> del compositor trabaja con \n.
     textBody: extractTextBody(headers, body).replace(/\r\n/g, '\n'),
@@ -979,11 +1039,37 @@ export function parseDraftContent(raw: Uint8Array | string): DraftContent {
 export function parseMessageBody(raw: Uint8Array | string): MessageBody {
   const bin = typeof raw === 'string' ? raw : bytesToBinary(raw);
   const { headers, body } = splitHeaderBody(bin);
+  const calendar = extractCalendar(headers, body);
   return {
     // El lector y el compositor trabajan con LF.
     text: extractBody(headers, body, 'text/plain').replace(/\r\n/g, '\n'),
     html: extractBody(headers, body, 'text/html'),
+    ...(calendar ? { calendar } : {}),
   };
+}
+
+/** Tope del iCalendar que se devuelve: el mismo que aplican Mail y Calendar. */
+const MAX_CALENDAR = 256 << 10;
+
+/**
+ * Primera parte de calendario del mensaje, adjunta o no. A diferencia de extractBody
+ * NO salta los adjuntos: Google manda la invitación solo como `invite.ics` adjunto.
+ */
+function extractCalendar(headers: Record<string, string>, body: string): string {
+  const ct = headers['content-type'] ?? 'text/plain';
+  const boundary = mimeParam(ct, 'boundary');
+  if (/^multipart\//i.test(ct.trim()) && boundary) {
+    for (const part of splitParts(body, boundary)) {
+      const { headers: ph, body: pb } = splitHeaderBody(part);
+      const nested = extractCalendar(ph, pb);
+      if (nested) return nested;
+    }
+    return '';
+  }
+  if (!/^\s*(text\/calendar|application\/ics)\b/i.test(ct)) return '';
+  const cte = (headers['content-transfer-encoding'] ?? '7bit').trim().toLowerCase();
+  const ics = decodeText(decodePartBody(body, cte), mimeParam(ct, 'charset'));
+  return ics.length <= MAX_CALENDAR ? ics : '';
 }
 
 /** Primer cuerpo text/plain de un mensaje (recorre multipart anidado). */

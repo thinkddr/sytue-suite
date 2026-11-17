@@ -13,12 +13,13 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // Medidas del carril de miniaturas (§7.2 de SlidesCanvas.tsx). Van en PÍXELES y no en
 // rem, y ese detalle costó dinero: lo de dentro se escala a THUMB_W píxeles, así que
-// medir la caja en rem la ata al tamaño de letra de la raíz. Con la raíz en 14 —el
-// ajuste que tiene la suite— `w-40` daba 139 px y `w-32` 112, mientras el contenido
+// medir la caja en rem la ata al tamaño de letra de la raíz. Cuando la suite tenía 1 rem
+// en 14 px, `w-40` daba 139 px y `w-32` 112, mientras el contenido
 // seguía midiendo 128: cada miniatura recortaba 16 px de su lado derecho, medido en las
 // tres ventanas de escritorio.
 const (
@@ -50,6 +51,9 @@ type Miniatura struct {
 	// AlAtajo recibe antes que nada los atajos con modificador y dice si eran suyos: los
 	// del marco (Ctrl/⌘+P y el zoom), que con el foco aquí no le llegarían a la ventana.
 	AlAtajo func(*desktop.CustomShortcut) bool
+	// AlOcultar alterna «oculta al presentar» con Ctrl/⌘+Mayús+H, el atajo de
+	// PowerPoint. nil = no se deja (solo lectura).
+	AlOcultar func()
 	// Rotulo traduce una clave del catálogo (para el nombre accesible).
 	Rotulo   func(clave string, n, total int) string
 	Variante tema.Variante
@@ -118,6 +122,12 @@ func (t *Miniatura) TypedShortcut(s fyne.Shortcut) {
 	if ok && t.AlAtajo != nil && t.AlAtajo(c) {
 		return
 	}
+	if ok && EsAtajoOcultar(c) {
+		if t.AlOcultar != nil {
+			t.AlOcultar()
+		}
+		return
+	}
 	if !ok || t.AlMover == nil || c.Modifier&fyne.KeyModifierShift == 0 ||
 		c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) == 0 {
 		return
@@ -136,13 +146,35 @@ func (t *Miniatura) TypedShortcut(s fyne.Shortcut) {
 	}
 }
 
-// AccessibilityLabel es el `aria-label` de la web: «Diapositiva {n} de {total}».
+// AccessibilityLabel es el `aria-label` de la web: «Diapositiva {n} de {total}», y
+// «…, oculta» si se salta al presentar.
 func (t *Miniatura) AccessibilityLabel() string {
-	if t.Rotulo == nil {
-		return "slides.aria.slideOf"
+	clave := "slides.aria.slideOf"
+	if t.oculta() {
+		clave = "slides.aria.slideOfHidden"
 	}
-	return t.Rotulo("slides.aria.slideOf", t.Indice+1, len(t.M.Diapos))
+	if t.Rotulo == nil {
+		return clave
+	}
+	return t.Rotulo(clave, t.Indice+1, len(t.M.Diapos))
 }
+
+// oculta dice si su diapositiva se salta al presentar (la marca, no `Saltables`: en el
+// carril se ve lo que hay marcado aunque estén todas).
+func (t *Miniatura) oculta() bool {
+	return t.Indice >= 0 && t.Indice < len(t.M.Diapos) && t.M.Diapos[t.Indice].EstaOculta()
+}
+
+// EsAtajoOcultar es `isHideSlideKey`: Ctrl (⌘ en Mac) + Mayús + H, sin Alt.
+func EsAtajoOcultar(c *desktop.CustomShortcut) bool {
+	return c.KeyName == fyne.KeyH && c.Modifier&fyne.KeyModifierShift != 0 &&
+		c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) != 0 &&
+		c.Modifier&fyne.KeyModifierAlt == 0
+}
+
+// atenuadoOculta es el `opacity-40` de la miniatura oculta: un velo del color del carril
+// al 60 % deja ver la diapositiva al 40 %, que es lo que pinta la web.
+const atenuadoOculta = 0.6
 
 // AccessibilityRole es botón: elegir una diapositiva es una acción.
 func (t *Miniatura) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
@@ -163,13 +195,17 @@ func (t *Miniatura) CreateRenderer() fyne.WidgetRenderer {
 		// La web pinta el anillo con `box-shadow: 0 0 0 2px`, que va POR FUERA. `Aro`
 		// es esa misma receta y ya la tiene medida.
 		aro:   ui.NuevoAroCon("primary", tema.RadioSM, 0, t.Variante),
+		velo:  canvas.NewRectangle(tokens.ConAlfa(tema.Color("surface", t.Variante), atenuadoOculta)),
 		placa: placa,
 		num:   num,
+		// `line-through` del número de una oculta: una raya de 1 px a media altura.
+		tachon: canvas.NewRectangle(tema.Color("text-muted", t.Variante)),
 	}
 	// El aro va al PRINCIPIO: `foco.go` lo dice y aquí se ve — puesto detrás del
 	// lienzo se ve el anillo de 2 px que sobresale; puesto delante, el rectángulo del
-	// anillo TAPA la miniatura entera, que es lo que pasó la primera vez.
-	r.objetos = append(r.aro.Objetos(), l, placa, num)
+	// anillo TAPA la miniatura entera, que es lo que pasó la primera vez. El velo va
+	// sobre el lienzo y bajo el número, que en la web no se atenúa.
+	r.objetos = append(r.aro.Objetos(), l, r.velo, placa, num, r.tachon)
 	return r
 }
 
@@ -177,8 +213,10 @@ type miniaturaRenderer struct {
 	t       *Miniatura
 	lienzo  *Lienzo
 	aro     *ui.Aro
+	velo    *canvas.Rectangle
 	placa   *canvas.Rectangle
 	num     *canvas.Text
+	tachon  *canvas.Rectangle
 	objetos []fyne.CanvasObject
 }
 
@@ -199,6 +237,12 @@ func (r *miniaturaRenderer) Layout(t fyne.Size) {
 	r.placa.Resize(fyne.NewSize(ancho, alto))
 	r.placa.Move(fyne.NewPos(x, y))
 	ui.ColocarTexto(r.num, tema.Escalon{Tam: tema.Texto2XS.Tam, Linea: alto}, x+tema.Espacio(1), y)
+
+	oculta := r.t.oculta()
+	r.velo.Hidden, r.tachon.Hidden = !oculta, !oculta
+	r.velo.Resize(t)
+	r.tachon.Resize(fyne.NewSize(m.Width, 1))
+	r.tachon.Move(fyne.NewPos(x+tema.Espacio(1), y+alto/2))
 }
 
 func (r *miniaturaRenderer) Refresh() {
@@ -206,6 +250,8 @@ func (r *miniaturaRenderer) Refresh() {
 	r.aro.Pintar(r.t.Variante)
 	r.placa.FillColor = tema.Color("bg-subtle", r.t.Variante)
 	r.num.Color = tema.Color("text-muted", r.t.Variante)
+	r.velo.FillColor = tokens.ConAlfa(tema.Color("surface", r.t.Variante), atenuadoOculta)
+	r.tachon.FillColor = r.num.Color
 	r.Layout(r.t.Size())
 	canvas.Refresh(r.t)
 }

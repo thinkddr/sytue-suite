@@ -1,26 +1,28 @@
 # @sytue/api-clients
 
-SDKs TypeScript tipados a los **servicios Go propios** de Sytue One. Un cliente por
-servicio; cada uno habla el estándar/protocolo abierto del servicio Go
-correspondiente. Sin motores AGPL de terceros (implementación _clean-room_).
+Typed TypeScript SDKs for Sytue One's **own Go services**. One client per
+service; each one speaks the open standard/protocol of the corresponding
+Go service. No third-party AGPL engines (_clean-room_ implementation).
 
-> Fuente de verdad: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) (v4).
-> Código **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)**.
+> Source of truth: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) (v4).
+> Code **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)**.
 
-## Autorización
+<a id="autorización"></a>
+## Authorization
 
-Todos los clientes reciben un `AuthProvider` que devuelve el **access token de
-Sytue ID** (JWT). Cada servicio Go lo valida vía JWKS. El SDK **no** gestiona
-credenciales: el token lo provee la app/BFF (`@sytue/auth`, OIDC+PKCE).
+All clients receive an `AuthProvider` that returns the **Sytue ID access
+token** (JWT). Each Go service validates it via JWKS. The SDK does **not** manage
+credentials: the token is provided by the app/BFF (`@sytue/auth`, OIDC+PKCE).
 
 ```ts
 import { bearer } from '@sytue/api-clients';
 const auth = bearer(() => session.accessToken); // string | () => string | Promise<string>
 ```
 
-## Clientes (subpath exports)
+<a id="clientes-subpath-exports"></a>
+## Clients (subpath exports)
 
-| Import                        | Servicio Go       | Dominio (dev)               | Protocolo                 |
+| Import                        | Go service        | Domain (dev)                | Protocol                  |
 | ----------------------------- | ----------------- | --------------------------- | ------------------------- |
 | `@sytue/api-clients/id`       | Sytue ID          | `id.sytue.eu` (:8081)       | OIDC/OAuth2, JWKS         |
 | `@sytue/api-clients/drive`    | Sytue Drive       | `drive.sytue.eu` (:8082)    | REST + WebDAV             |
@@ -33,9 +35,10 @@ const auth = bearer(() => session.accessToken); // string | () => string | Promi
 | `@sytue/api-clients/cloud`    | Sytue DevX (PaaS) | `cloud.sytue.eu` (:8090)    | REST control plane        |
 | `@sytue/api-clients/hub`      | Sytue Hub         | `hub.sytue.eu` (:8092)      | REST + SSE                |
 
-Todos están también re-exportados desde la raíz `@sytue/api-clients`.
+All of them are also re-exported from the `@sytue/api-clients` root.
 
-## Uso
+<a id="uso"></a>
+## Usage
 
 ```ts
 import { DriveClient, MailClient, MeetClient, bearer } from '@sytue/api-clients';
@@ -56,21 +59,23 @@ const conn = await meet.joinRoom('standup');
 // new Room().connect(conn.serverUrl, conn.token)  // livekit-client (Apache-2.0)
 ```
 
-### Tiempo real (WS / SSE)
+<a id="tiempo-real-ws--sse"></a>
+### Real time (WS / SSE)
 
-Los canales WebSocket (Docs colab, Chat) y SSE (Hub, Cloud logs) pasan el token por
-query (los navegadores no permiten cabeceras en `WebSocket`/`EventSource`); el
-servicio Go lo valida vía JWKS de Sytue ID.
+The WebSocket (Docs collab, Chat) and SSE (Hub, Cloud logs) channels pass the token in the
+query string (browsers do not allow headers on `WebSocket`/`EventSource`); the
+Go service validates it via Sytue ID's JWKS.
 
 ```ts
 const chat = new ChatClient({ baseUrl: 'https://rooms.sytue.eu', auth });
 const ws = await chat.connect(); // WebSocket de eventos en vivo
 ```
 
-## DAV en Node (SSR)
+<a id="dav-en-node-ssr"></a>
+## DAV in Node (SSR)
 
-Los clientes DAV (`CalDavClient`, `CardDavClient`) parsean XML con `DOMParser`. En
-el navegador funciona directamente; en SSR (Node) inyecta un parser compatible:
+The DAV clients (`CalDavClient`, `CardDavClient`) parse XML with `DOMParser`. In
+the browser it works directly; in SSR (Node), inject a compatible parser:
 
 ```ts
 import { setXmlParser } from '@sytue/api-clients';
@@ -81,4 +86,4 @@ setXmlParser(new DOMParser());
 ## Scripts
 
 - `pnpm build` — `tsc -p tsconfig.lib.json`
-- `pnpm typecheck` — typecheck sin emitir
+- `pnpm typecheck` — typecheck without emitting

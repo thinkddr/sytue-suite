@@ -7,6 +7,22 @@ import type { en } from './en.js';
 
 export const es: AppCatalog<typeof en> = {
   'app.title': 'Mi cuenta',
+  'app.description': 'Mi cuenta — perfil, seguridad y accesos de tu cuenta de Sytue.',
+  'app.lead': 'Tu perfil, cómo entras y proteges la cuenta, y dónde la tienes abierta.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Revisión de seguridad',
+  'checkup.all_good': 'Todo en orden: tu cuenta está bien protegida.',
+  'checkup.dos_pasos':
+    'La verificación en dos pasos está desactivada: basta tu contraseña para entrar.',
+  'checkup.recuperacion':
+    'Sin correo ni móvil de recuperación: si pierdes el acceso, no habrá forma de volver.',
+  'checkup.sesiones': 'Sesiones abiertas en otros equipos: {count}',
+  'checkup.contrasenas_app': 'Contraseñas de aplicación sin uso en 90 días: {count}',
+  'checkup.dispositivos': 'Dispositivos de confianza sin verse en 90 días: {count}',
+  'checkup.turn_on': 'Activar',
+  'checkup.add': 'Añadir',
+  'checkup.review': 'Revisar',
 
   'profile.title': 'Perfil',
   'profile.name': 'Nombre visible',
@@ -33,12 +49,19 @@ export const es: AppCatalog<typeof en> = {
   // --- Sesiones ---
   'sessions.title': 'Sesiones abiertas',
   'sessions.current': 'Este dispositivo',
+  'sessions.signed_in': 'Iniciada {time}',
   'sessions.close_one': 'Cerrar esta sesión',
+  'sessions.close_named': 'Cerrar la sesión de {device}',
+  'sessions.close_one_confirm':
+    '{device} saldrá de tu cuenta y tendrá que volver a iniciar sesión para usarla.',
   'sessions.close_others': 'Cerrar todas las sesiones',
   'sessions.close_others_note': 'Esta incluida: tendrás que volver a entrar.',
+  'sessions.close_all_confirm':
+    'Se cerrarán todas las sesiones, también esta. Tendrás que volver a entrar en cada dispositivo.',
   'sessions.empty': 'No hay otras sesiones abiertas.',
   'sessions.failed': 'No se han podido cargar las sesiones.',
   'common.loading': 'Cargando…',
+  'common.retry': 'Reintentar',
 
   // --- Dispositivos ---
   'devices.title': 'Dispositivos',
@@ -46,8 +69,22 @@ export const es: AppCatalog<typeof en> = {
   'devices.trusted': 'De confianza',
   'devices.trust': 'Marcar de confianza',
   'devices.forget': 'Olvidar este dispositivo',
+  'devices.forget_named': 'Olvidar {device}',
+  'devices.forget_confirm':
+    '{device} dejará de reconocerse y perderá la confianza. Si vuelves a entrar desde él, contará como un dispositivo nuevo.',
   'devices.empty': 'Todavía no hay dispositivos reconocidos.',
   'devices.failed': 'No se han podido cargar los dispositivos.',
+  'signature.title': 'Firma guardada',
+  'signature.help':
+    'La firma que pediste a CertiPDF que recordara al firmar a mano. Se guarda cifrada en tu cuenta.',
+  'signature.empty':
+    'No tienes ninguna firma guardada. Al firmar a mano en CertiPDF, marca «Recordar mi firma».',
+  'signature.failed': 'No se ha podido cargar tu firma guardada.',
+  'signature.preview': 'Tu firma guardada',
+  'signature.saved_on': 'Guardada el {date}',
+  'signature.delete': 'Borrar la firma guardada',
+  'signature.delete_confirm':
+    'Se borrará tu firma guardada. Los documentos que ya firmaste la conservan; la próxima vez que firmes a mano tendrás que dibujarla de nuevo.',
 
   // --- Seguridad ---
   'security.title': 'Seguridad',
@@ -56,6 +93,15 @@ export const es: AppCatalog<typeof en> = {
   'security.password.warning': 'Cambiarla cierra la sesión en todas partes, también aquí.',
   'security.password.current': 'Contraseña actual',
   'security.password.new': 'Contraseña nueva',
+  'security.password.requirements': 'Requisitos de la contraseña nueva:',
+  'security.password.req_length': {
+    one: 'Al menos {count} carácter',
+    other: 'Al menos {count} caracteres',
+  },
+  'security.password.req_complexity': 'Letras y al menos un número',
+  'security.password.req_different': 'Distinta de la contraseña actual',
+  'security.password.req_met': 'Cumplido',
+  'security.password.req_pending': 'Pendiente',
   'security.password.submit': 'Cambiar la contraseña',
   'security.password.done':
     'Contraseña cambiada. Se han cerrado todas las sesiones, esta incluida.',
@@ -79,6 +125,45 @@ export const es: AppCatalog<typeof en> = {
   'security.codes.once':
     'Se enseñan una vez. Guárdalos en sitio seguro: cada uno sirve una sola vez.',
   'security.codes.saved': 'Ya los he guardado',
+  'security.codes.regenerate_confirm':
+    'Los códigos de recuperación actuales dejarán de valer al momento, también los que tengas impresos o guardados.',
+  'security.mfa.step.need': 'Antes de empezar',
+  'security.mfa.step.need.heading': 'Qué necesitas',
+  'security.mfa.step.need.desc':
+    'Una aplicación de autenticación en el móvil. Muestra un código nuevo de seis cifras cada 30 segundos.',
+  'security.mfa.step.need.apps_title': 'Vale cualquier aplicación de autenticación',
+  'security.mfa.step.need.apps':
+    'Por ejemplo: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Si no tienes ninguna, instálala antes de seguir.',
+  'security.mfa.step.need.next': 'Empezar',
+  'security.mfa.step.scan': 'Escanear',
+  'security.mfa.step.scan.heading': 'Añade tu cuenta a la aplicación',
+  'security.mfa.key_label': 'Clave de configuración',
+  'security.mfa.step.code': 'Código',
+  'security.mfa.step.code.heading': 'Escribe el código de la aplicación',
+  'security.mfa.step.code.desc':
+    'Así se comprueba que la aplicación y tu cuenta coinciden antes de activarla.',
+  'security.mfa.code.hint': 'Seis cifras. Si cambia mientras lo escribes, usa el nuevo.',
+  'security.mfa.step.codes.heading': 'Guarda tus códigos de recuperación',
+  'security.codes.copy': 'Copiar todos',
+  'security.codes.copied': 'Códigos copiados.',
+  'security.codes.copy_failed': 'No se han podido copiar. Selecciónalos y cópialos a mano.',
+  'security.codes.download': 'Descargar .txt',
+  'security.codes.file_title': 'Códigos de recuperación de Sytue',
+  'security.codes.file_account': 'Cuenta: {account}',
+  'security.codes.file_date': 'Generados: {date}',
+  'security.codes.file_note':
+    'Cada código sirve una sola vez. Guarda este fichero en un lugar seguro, lejos del móvil.',
+  'security.mfa.step.done': 'Hecho',
+  'security.mfa.step.done.heading': 'La verificación en dos pasos está activada',
+  'security.mfa.step.done.desc':
+    'La próxima vez que entres se te pedirá un código de la aplicación.',
+  'security.mfa.passkey_tip.title': 'Añade también una clave de acceso',
+  'security.mfa.passkey_tip':
+    'Una clave de acceso te deja entrar con la huella, la cara o el bloqueo de pantalla, sin escribir códigos.',
+  'security.mfa.passkey_tip.action': 'Añadir clave de acceso',
+  'security.mfa.close': 'Cerrar',
+  'security.mfa.disable_title': '¿Desactivar la verificación en dos pasos?',
+  'security.mfa.disable_warning': 'Volverá a bastar tu contraseña para entrar en la cuenta.',
   'common.cancel': 'Cancelar',
 
   // --- Perfil: el resto de la ficha ---
@@ -93,6 +178,8 @@ export const es: AppCatalog<typeof en> = {
   // --- Passkeys ---
   'security.passkeys.title': 'Claves de acceso',
   'security.passkeys.remove': 'Quitar',
+  'security.passkeys.remove_named': 'Quitar {name}',
+  'security.passkeys.remove_confirm': 'Ya no podrás iniciar sesión con {name}.',
   'security.passkeys.unnamed': 'Clave sin nombre',
 
   // --- Contraseñas de aplicación ---
@@ -103,6 +190,9 @@ export const es: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Por ejemplo: correo del portátil, móvil.',
   'app_passwords.create': 'Crear contraseña',
   'app_passwords.revoke': 'Revocar',
+  'app_passwords.revoke_named': 'Revocar {label}',
+  'app_passwords.revoke_confirm':
+    'Las aplicaciones que usen {label} dejarán de poder entrar. No se puede deshacer.',
   'app_passwords.empty': 'Todavía no hay contraseñas de aplicación.',
   'app_passwords.failed': 'No se han podido cargar las contraseñas de aplicación.',
   'app_passwords.unnamed': 'Sin nombre',

@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -393,5 +394,101 @@ func TestBloqueosYPoliticaDeFirma(t *testing.T) {
 		return err
 	}); err == nil {
 		t.Error("platform_merge_prepare fuera de una fusión")
+	}
+}
+
+// TestCadenaDeFirmasEnLaBase (mig. 0034): una cadena de tres; solo la del turno está
+// pendiente y solo ella la ve su destinatario; al firmar, el turno pasa a la siguiente
+// con el firmado; rechazar cierra la cadena. Y el barrido encuentra lo vencido y lo
+// que toca recordar en todas las organizaciones, pero lo cambia en la suya.
+func TestCadenaDeFirmasEnLaBase(t *testing.T) {
+	h := harnessComoEnProduccion(t)
+	st := store.New(h.Pool)
+	acme, globex := tenantCtx("acme"), tenantCtx("globex")
+	fila := func(dest string) store.PeticionFirma {
+		return store.PeticionFirma{Solicitante: "ana", SolicitanteNombre: "Ana", Destinatario: dest,
+			Fichero: "f1", Ruta: "/PDF/a.pdf", RecordarDias: 2}
+	}
+	if _, err := st.CrearCadenaFirma(acme, []store.PeticionFirma{fila("irati")}); err == nil {
+		t.Error("una cadena de una")
+	}
+	c, err := st.CrearCadenaFirma(acme, []store.PeticionFirma{fila("irati"), fila("jon"), fila("leire")})
+	if err != nil || len(c) != 3 || c[0].Circuito == "" || c[0].Circuito != c[2].Circuito ||
+		c[0].Estado != store.FirmaPendiente || c[1].Estado != store.FirmaEnEspera || c[2].Orden != 2 {
+		t.Fatalf("crear: %+v %v", c, err)
+	}
+	if r, _, _ := st.PeticionesFirma(acme, "jon"); len(r) != 0 {
+		t.Errorf("jon ve la suya antes de su turno: %+v", r)
+	}
+	if _, s, _ := st.PeticionesFirma(acme, "ana"); len(s) != 3 {
+		t.Errorf("ana ve %d de su cadena", len(s))
+	}
+	if _, err := st.ResolverPeticionFirma(acme, c[1].ID, "jon", store.FirmaFirmada, "f2", "/PDF/b.pdf", nil, ""); !errors.Is(err, store.ErrPeticionFirmaNoEsta) {
+		t.Errorf("jon firma antes de su turno: %v", err)
+	}
+	f, err := st.ResolverPeticionFirma(acme, c[0].ID, "irati", store.FirmaFirmada, "f2", "/PDF/a (firmado).pdf", nil, "")
+	if err != nil || f.Siguiente == nil || f.Siguiente.ID != c[1].ID || f.Siguiente.Estado != store.FirmaPendiente ||
+		f.Siguiente.Fichero != "f2" || f.Siguiente.Ruta != "/PDF/a (firmado).pdf" {
+		t.Fatalf("firmar irati: %+v %v", f.Siguiente, err)
+	}
+	if r, _, _ := st.PeticionesFirma(acme, "jon"); len(r) != 1 || r[0].Fichero != "f2" {
+		t.Errorf("jon, en su turno: %+v", r)
+	}
+	if _, err := st.ResolverPeticionFirma(acme, c[1].ID, "jon", store.FirmaRechazada, "", "", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if r, _, _ := st.PeticionesFirma(acme, "leire"); len(r) != 1 || r[0].Estado != store.FirmaCancelada {
+		t.Errorf("leire tras rechazar jon: %+v", r)
+	}
+
+	// Una cadena de globex que caduca y una suelta de acme a la que le toca recordar.
+	ayer := time.Now().Add(-24 * time.Hour)
+	vencida := []store.PeticionFirma{fila("irati"), fila("jon")}
+	for i := range vencida {
+		vencida[i].Caduca = &ayer
+	}
+	cg, err := st.CrearCadenaFirma(globex, vencida)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cg[0].Estado != store.FirmaCaducada {
+		t.Errorf("pasada su fecha se lee caducada aunque no haya pasado el barrido: %+v", cg[0])
+	}
+	if _, err := st.ResolverPeticionFirma(globex, cg[0].ID, "irati", store.FirmaFirmada, "f2", "/PDF/b.pdf", nil, ""); !errors.Is(err, store.ErrPeticionFirmaNoEsta) {
+		t.Errorf("firmar una caducada: %v", err)
+	}
+	suelta, err := st.CrearPeticionFirma(acme, store.PeticionFirma{Solicitante: "ana", Destinatario: "jon", Fichero: "f9", Ruta: "/x.pdf", RecordarDias: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Pool.InTx(acme, func(tx pgx.Tx) error {
+		_, err := tx.Exec(acme, `SELECT set_config('app.merge', 'on', true)`)
+		if err == nil {
+			_, err = tx.Exec(acme, `UPDATE pdf_peticiones_firma SET avisada = now() - interval '25 hours' WHERE id = $1`, suelta.ID)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	v, r, err := st.PeticionesFirmaPorBarrer(acme)
+	if err != nil || len(v) != 2 || v[0].Tenant != "globex" || len(r) != 1 || r[0].Peticion.ID != suelta.ID || r[0].Tenant != "acme" {
+		t.Fatalf("por barrer: %+v %+v %v", v, r, err)
+	}
+	if _, err := st.CaducarPeticionFirma(acme, v[0].Peticion.ID); !errors.Is(err, store.ErrPeticionFirmaNoEsta) {
+		t.Errorf("caducar desde otra organización: %v", err)
+	}
+	for _, x := range v {
+		if p, err := st.CaducarPeticionFirma(globex, x.Peticion.ID); err != nil || p.Estado != store.FirmaCaducada || p.Resuelta == nil {
+			t.Errorf("caducar: %+v %v", p, err)
+		}
+	}
+	if p, err := st.RecordarPeticionFirma(acme, suelta.ID); err != nil || time.Since(p.Avisada) > time.Minute {
+		t.Errorf("recordar: %+v %v", p, err)
+	}
+	if _, err := st.RecordarPeticionFirma(acme, suelta.ID); !errors.Is(err, store.ErrPeticionFirmaNoEsta) {
+		t.Errorf("recordar dos veces seguidas: %v", err)
+	}
+	if v, r, err := st.PeticionesFirmaPorBarrer(acme); err != nil || len(v) != 0 || len(r) != 0 {
+		t.Errorf("la segunda vuelta: %+v %+v %v", v, r, err)
 	}
 }

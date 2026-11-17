@@ -30,7 +30,7 @@ func TestChannelNotifyLevelDerivesMuted(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	// Por defecto: notify_level='all', sin silenciar.
 	if list, _ := st.ListChannels(ctx, tm.ID, "alice", false); findChannel(t, list, ch.ID).NotifyLevel != domain.NotifyLevelAll {
@@ -57,7 +57,7 @@ func TestChannelNotifyLevelDerivesMuted(t *testing.T) {
 		t.Fatalf("none: level=%q muted=%v, quiero none/true", got.NotifyLevel, got.Muted)
 	}
 	// ListChannels refleja notify_level y el Muted derivado.
-	if c := findChannel(t, mustList(t, st, ctx, tm.ID, "alice"), ch.ID); c.NotifyLevel != domain.NotifyLevelNone || !c.Muted {
+	if c := findChannel(t, mustList(ctx, t, st, tm.ID, "alice"), ch.ID); c.NotifyLevel != domain.NotifyLevelNone || !c.Muted {
 		t.Fatalf("ListChannels: level=%q muted=%v, quiero none/true", c.NotifyLevel, c.Muted)
 	}
 
@@ -110,7 +110,7 @@ func TestNotifyPrefsRoundTrip(t *testing.T) {
 	}
 }
 
-func mustList(t *testing.T, st *store.Store, ctx context.Context, teamID uuid.UUID, subject string) []domain.Channel {
+func mustList(ctx context.Context, t *testing.T, st *store.Store, teamID uuid.UUID, subject string) []domain.Channel {
 	t.Helper()
 	list, err := st.ListChannels(ctx, teamID, subject, false)
 	if err != nil {

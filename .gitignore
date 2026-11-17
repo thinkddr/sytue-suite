@@ -149,6 +149,9 @@ deploy/helm/**/charts/*.tgz
 deploy/helm/.vendor/
 deploy/helm/values-custom.yaml
 deploy/helm/apply-secrets.sh
+# Generados por `./sytue-deploy --mode helm`: llevan contraseñas de BD y del propietario.
+deploy/helm/create-databases.sh
+deploy/helm/bootstrap-admin.sh
 # Generados por `./sytue-deploy --integrations`: llevan client secrets de terceros.
 deploy/helm/apply-integrations.sh
 deploy/helm/values-integrations.yaml

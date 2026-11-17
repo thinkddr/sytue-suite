@@ -140,6 +140,8 @@ export interface TokenSet {
 
 /** Sesion del lado servidor (almacenada cifrada en la cookie de sesion). */
 export interface SytueSession {
+  /** Stable per authenticated owner; omitted only by pre-slot cookies. */
+  generation?: string;
   user: SytueUser;
   tokens: TokenSet;
   /** Client OIDC con el que se inicio (p.ej. `sytue-one`). */

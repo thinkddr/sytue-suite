@@ -243,7 +243,7 @@ export default function TableBrowser({
                       </div>
                     ) : error ? (
                       <EmptyState
-                        illustration={<Icon name="warning" size={24} />}
+                        tone="error"
                         title={t('db.rowsFail.title')}
                         description={t('db.rowsFail.desc')}
                         action={
@@ -296,7 +296,7 @@ export default function TableBrowser({
         ) : (
           <div class="grid flex-1 place-items-center">
             <EmptyState
-              illustration={<Icon name="table" size={24} />}
+              icon="table"
               title={t('db.pickTable.title')}
               description={t('db.pickTable.desc')}
             />

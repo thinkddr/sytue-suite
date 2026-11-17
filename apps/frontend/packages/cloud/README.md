@@ -1,7 +1,7 @@
 # @sytue/cloud
 
-El SDK de las apps que corren en **Sytue DevX**. Guardar y leer datos sin SQL,
-sin cadena de conexión y **sin configurar nada**.
+The SDK for apps that run on **Sytue DevX**. Store and read data with no SQL,
+no connection string and **nothing to configure**.
 
 ```js
 import { sytue } from '@sytue/cloud';
@@ -10,26 +10,30 @@ const posts = await sytue.table('posts').newest().limit(10).all();
 await sytue.table('posts').add({ titulo: 'Hola mundo' });
 ```
 
-Eso es todo el arranque. No hay URL que copiar del panel, ni clave que pegar en
-un `.env`, ni fichero de configuración.
+That is the whole setup. There is no URL to copy from the dashboard, no key to paste
+into a `.env`, and no configuration file.
 
-## Por qué no hay que configurar nada
+<a id="por-qué-no-hay-que-configurar-nada"></a>
 
-En cualquier otro servicio parecido, el primer paso es «copia la URL y la clave
-del panel y pégalas en tu proyecto». Ese paso es donde se atasca quien empieza —y
-donde se filtra la primera credencial, porque acaba en un commit—.
+## Why there is nothing to configure
 
-En Sytue DevX no hace falta: cuando despliegas, el control-plane **escribe las
-credenciales de tus servicios en el entorno de tu app**. El SDK las lee. Por eso
-`sytue` ya viene listo nada más importarlo.
+In any other similar service, the first step is “copy the URL and the key from
+the dashboard and paste them into your project”. That step is where beginners get
+stuck —and where the first credential leaks, because it ends up in a commit—.
 
-> Si acabas de crear la base de datos y tu app ya estaba corriendo, **vuelve a
-> desplegar**: las credenciales se inyectan al desplegar, no antes. El SDK te lo
-> dice con esas palabras si te pasa.
+On Sytue DevX it is not needed: when you deploy, the control plane **writes your
+services' credentials into your app's environment**. The SDK reads them. That is why
+`sytue` is ready as soon as you import it.
 
-## La base de datos
+> If you have just created the database and your app was already running, **deploy
+> again**: credentials are injected on deploy, not before. The SDK tells you so in
+> those very words if it happens to you.
 
-Una tabla se usa con los verbos de siempre:
+<a id="la-base-de-datos"></a>
+
+## The database
+
+A table is used with the usual verbs:
 
 ```js
 const t = sytue.table('posts');
@@ -42,7 +46,7 @@ await t.remove(3); // true si existía
 await t.count(); // cuántas hay
 ```
 
-Y se filtra encadenando:
+And you filter by chaining:
 
 ```js
 await sytue
@@ -56,23 +60,27 @@ await sytue
 await sytue.table('posts').where({ autor: 'ana' }).first(); // uno o null
 ```
 
-Si tu columna identificadora no se llama `id`:
+If your identifier column is not called `id`:
 
 ```js
 await sytue.table('usuarios', { key: 'email' }).find('ana@ejemplo.com');
 ```
 
-### Lo que el SDK no te deja hacer
+<a id="lo-que-el-sdk-no-te-deja-hacer"></a>
 
-`update` y `remove` **exigen el identificador de la fila**. No existe la forma de
-actualizar o vaciar una tabla entera de un descuido, que es el accidente más caro
-—y más frecuente— de quien está aprendiendo. Si de verdad necesitas una operación
-masiva, es SQL desde el panel, donde se ve lo que va a pasar.
+### What the SDK does not let you do
 
-### Encadenar no arrastra nada
+`update` and `remove` **require the row identifier**. There is no way to update
+or empty an entire table by accident, which is the most expensive —and most
+frequent— accident for someone who is learning. If you really need a bulk
+operation, it is SQL from the dashboard, where you can see what is going to happen.
 
-Cada método devuelve una consulta **nueva**. Puedes guardar una base y reutilizarla
-sin que se le peguen los filtros de la vez anterior:
+<a id="encadenar-no-arrastra-nada"></a>
+
+### Chaining carries nothing over
+
+Each method returns a **new** query. You can store a base query and reuse it
+without the filters from the previous time sticking to it:
 
 ```js
 const mios = sytue.table('posts').where({ autor: 'ana' });
@@ -80,28 +88,31 @@ await mios.where({ publicado: true }).all(); // ana + publicados
 await mios.all(); // solo ana
 ```
 
-## Errores que dicen qué hacer
+<a id="errores-que-dicen-qué-hacer"></a>
 
-Es la razón de ser del paquete. En vez de `error: relation "postss" does not
+## Errors that say what to do
+
+This is the package's reason for being. Instead of `error: relation "postss" does not
 exist`:
 
-> No existe la tabla «postss». Revisa el nombre o créala desde el panel
-> (Base de datos → SQL).
+> There is no table called “postss”. Check the name or create it from the dashboard
+> (Database → SQL).
 
-En vez de un `403` sin más:
+Instead of a bare `403`:
 
-> Sin permiso para «posts». Suele ser una política de seguridad de fila (RLS) que
-> no deja ver ni tocar estas filas; revísala en el panel (Base de datos → Tablas).
+> No permission on “posts”. This is usually a row-level security (RLS) policy hiding
+> or blocking these rows; review it in the dashboard (Database → Tables).
 
-Los mensajes vienen en **inglés, español, francés, alemán e italiano**. El idioma
-sale de `SYTUE_LANG` o `LANG` (que tu contenedor ya trae) y se puede fijar a mano:
+The messages come in **English, Spanish, French, German and Italian**. The language
+comes from `SYTUE_LANG` or `LANG` (which your container already has) and can be set
+by hand:
 
 ```js
 import { createClient } from '@sytue/cloud';
 const sytue = createClient({ language: 'fr' });
 ```
 
-La respuesta cruda del servidor sigue estando ahí para quien la quiera:
+The raw server response is still there for anyone who wants it:
 
 ```js
 try {
@@ -112,7 +123,9 @@ try {
 }
 ```
 
-## Saber dónde estás
+<a id="saber-dónde-estás"></a>
+
+## Knowing where you are
 
 ```js
 sytue.hasDatabase; // ¿hay base de datos conectada?
@@ -120,13 +133,15 @@ sytue.project; // slug del proyecto, como en el panel
 sytue.isPreview; // true en un despliegue de vista previa (una rama, un PR)
 ```
 
-`isPreview` es útil para no mandar correos de verdad ni cobrar de verdad desde la
-vista previa de un pull request.
+`isPreview` is useful to avoid sending real emails or charging for real from the
+preview of a pull request.
 
-## Desarrollar en tu ordenador
+<a id="desarrollar-en-tu-ordenador"></a>
 
-Fuera de Sytue DevX no hay entorno que leer, así que hay que decírselo. Es el
-único caso en el que se pasan argumentos:
+## Developing on your computer
+
+Outside Sytue DevX there is no environment to read, so you have to tell it. It is the
+only case in which arguments are passed:
 
 ```js
 import { createClient } from '@sytue/cloud';
@@ -137,20 +152,24 @@ const sytue = createClient({
 });
 ```
 
-Esos dos valores los ves en el panel del proyecto. Apunta a la base de una **vista
-previa**, no a la de producción.
+You can see those two values in the project dashboard. Point it at the database of a
+**preview**, not the production one.
 
-## Requisitos
+<a id="requisitos"></a>
 
-Node 18+, Bun o Deno. **Cero dependencias**: solo usa `fetch`.
+## Requirements
 
-## Lo que aún no cubre
+Node 18+, Bun or Deno. **Zero dependencies**: it only uses `fetch`.
 
-Ficheros (Storage) y sesión de usuario (Auth) todavía no tienen API en este
-paquete; se usan por sus variables de entorno (`S3_*`, `OIDC_*`). Están en la
-lista de lo siguiente.
+<a id="lo-que-aún-no-cubre"></a>
+
+## What it does not cover yet
+
+Files (Storage) and user sessions (Auth) do not have an API in this package yet;
+they are used through their environment variables (`S3_*`, `OIDC_*`). They are on
+the list of what comes next.
 
 ---
 
-Para **crear proyectos y desplegar** desde una herramienta —no desde la app— el
-paquete es `@sytue/api-clients`, que habla con el control-plane.
+To **create projects and deploy** from a tool —not from the app— the
+package is `@sytue/api-clients`, which talks to the control plane.

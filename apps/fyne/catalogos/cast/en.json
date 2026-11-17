@@ -7,6 +7,7 @@
   "block.short": "Block",
   "card.untitledOwner": "Unknown author",
   "card.watch": "Watch {title}",
+  "card.watched": "{percent}% watched",
   "channel.count": {
     "one": "{count} public video",
     "other": "{count} public videos"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Auto",
   "player.qualityAutoNow": "Auto ({quality})",
   "player.region": "Video player",
+  "player.restart": "Start from the beginning",
+  "player.resumedAt": "Continuing from {time}",
   "player.seek": "Position",
+  "player.speed": "Speed",
+  "player.speedNormal": "Normal",
+  "player.speedNow": "Speed {rate}",
   "player.unmute": "Unmute",
   "player.volume": "Volume",
   "quality.approximate": "Rough estimate: the length of the video is not known yet.",

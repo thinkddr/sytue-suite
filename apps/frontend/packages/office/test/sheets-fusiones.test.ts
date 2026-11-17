@@ -9,11 +9,18 @@ import { expect, test } from 'bun:test';
 import { moverObjetos } from '../src/editor/sheets/refshift';
 import {
   MAX_FUSIONES,
+  celdasCubiertas,
+  combinar,
+  combinarHoja,
+  combinarPierdeDatos,
+  fusionARango,
   fusionEn,
   fusionesEnVentana,
   moverPorFusiones,
   parseFusiones,
+  separar,
 } from '../src/editor/sheets/fusiones';
+import { PROTECT_CONTENT_CMDS } from '../src/editor/sheets/SheetCanvas';
 
 test('parseFusiones: solo rangos de más de una celda y sin solaparse (la primera gana)', () => {
   const fs = parseFusiones(['A1', 'A1:B2', 'B2:C3', 'C3:D4', 'basura', 'D1:C1']);
@@ -80,4 +87,80 @@ test('moverObjetos: las combinadas y las medidas siguen a sus celdas al insertar
     { eje: 'columna', desde: 1, cantidad: -1, tope: 1000 },
   );
   expect(dos.merges).toBeUndefined();
+});
+
+/** B2:D2 en coordenadas 0-based. */
+const B2D2 = { c1: 1, r1: 1, c2: 3, r2: 1 };
+
+test('combinar: añade la combinada y deja una sola celda (no concatena)', () => {
+  expect(fusionARango(B2D2)).toBe('B2:D2');
+  const r = combinar(undefined, B2D2);
+  expect(r?.merges).toEqual(['B2:D2']);
+  expect(r?.fusion).toEqual(B2D2);
+  // Una sola celda no se combina.
+  expect(combinar(['A1:B1'], { c1: 4, r1: 4, c2: 4, r2: 4 })).toBeNull();
+});
+
+test('combinar: las combinadas solapadas se sustituyen y la selección se agranda (Excel)', () => {
+  // C2:C3 asoma por debajo de B2:D2: la nueva es B2:D3 y la vieja desaparece.
+  const r = combinar(['A10:B10', 'C2:C3', 'basura'], B2D2);
+  expect(r?.merges).toEqual(['A10:B10', 'basura', 'B2:D3']);
+  // Cadena: al agrandar se alcanza otra combinada, que también se engloba.
+  const c = combinar(['D2:E2', 'E3:F4'], { c1: 1, r1: 1, c2: 3, r2: 2 });
+  expect(c?.merges).toEqual(['B2:F4']);
+  // Lo que resulta lo pinta el lienzo tal cual: sin solapes.
+  expect(parseFusiones(c?.merges)).toHaveLength(1);
+});
+
+test('separar: quita la combinada que toca la selección; null si no había', () => {
+  const merges = ['A1:C1', 'B3:D4', 'F1:G1'];
+  // Basta con el ancla seleccionada.
+  expect(separar(merges, { c1: 1, r1: 2, c2: 1, r2: 2 })).toEqual(['A1:C1', 'F1:G1']);
+  // Una selección que toca dos las quita las dos.
+  expect(separar(merges, { c1: 0, r1: 0, c2: 5, r2: 0 })).toEqual(['B3:D4']);
+  expect(separar(merges, { c1: 9, r1: 9, c2: 9, r2: 9 })).toBeNull();
+  expect(separar(undefined, B2D2)).toBeNull();
+  // Combinar y separar es volver a la lista de antes.
+  const ida = combinar(['A1:C1'], B2D2)!;
+  expect(separar(ida.merges, B2D2)).toEqual(['A1:C1']);
+});
+
+test('combinarHoja: conserva B2, vacía C2:D2, centra el ancla y deja el formato', () => {
+  const cells = { B2: 'Total', C2: 'x', D2: '<b>42</b>', E2: 'fuera', B3: 'debajo' };
+  expect(celdasCubiertas(cells, B2D2).sort()).toEqual(['C2', 'D2']);
+  expect(combinarPierdeDatos(cells, B2D2)).toBe(true);
+  const r = combinarHoja({ cells, merges: [] }, B2D2, true)!;
+  expect(r.merges).toEqual(['B2:D2']);
+  expect(Object.keys(r.cells).sort()).toEqual(['B2', 'B3', 'E2']);
+  expect(r.cells.B2).toContain('Total');
+  expect(r.cells.B2).toContain('center');
+  // La hoja de partida no se toca: deshacer vuelve a ella.
+  expect(cells.C2).toBe('x');
+  // Sin centrar, el ancla queda como estaba.
+  const sin = combinarHoja({ cells, merges: [] }, B2D2, false)!;
+  expect(sin.cells.B2).toBe('Total');
+});
+
+test('combinarPierdeDatos: no avisa si lo cubierto está vacío o solo tiene etiquetas', () => {
+  expect(combinarPierdeDatos({ B2: 'Total', C2: '', D2: '<b></b>' }, B2D2)).toBe(false);
+  expect(combinarPierdeDatos({ A1: 'x', E2: 'y' }, B2D2)).toBe(false);
+});
+
+test('combinar sigue vetado con la hoja protegida', () => {
+  expect(PROTECT_CONTENT_CMDS.has('merge')).toBe(true);
+});
+
+test('combinar: con la hoja en el tope de combinadas no combina (no vaciaría celdas en balde)', () => {
+  // MAX_FUSIONES combinadas de dos celdas, una por fila, en A:B.
+  const llenas = Array.from({ length: MAX_FUSIONES }, (_, i) => `A${i + 1}:B${i + 1}`);
+  expect(combinar(llenas, { c1: 3, r1: 0, c2: 4, r2: 0 })).toBeNull();
+  expect(
+    combinarHoja(
+      { cells: { D1: 'a', E1: 'b' }, merges: llenas },
+      { c1: 3, r1: 0, c2: 4, r2: 0 },
+      true,
+    ),
+  ).toBeNull();
+  // Sustituir una que ya está sí cabe: la lista no crece.
+  expect(combinar(llenas, { c1: 0, r1: 0, c2: 2, r2: 0 })?.merges).toHaveLength(MAX_FUSIONES);
 });

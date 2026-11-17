@@ -84,7 +84,7 @@ func relaxSSRF(t *testing.T) {
 
 // --- IdP upstream simulado (firma RS256 real) ---
 
-type fedIdP struct {
+type fedIDP struct {
 	srv      *httptest.Server
 	priv     jwk.Key
 	set      jwk.Set
@@ -93,7 +93,7 @@ type fedIdP struct {
 	userinfo map[string]any
 }
 
-func newFedIdP(t *testing.T) *fedIdP {
+func newFedIDP(t *testing.T) *fedIDP {
 	t.Helper()
 	raw, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -109,7 +109,7 @@ func newFedIdP(t *testing.T) *fedIdP {
 	set := jwk.NewSet()
 	_ = set.AddKey(pub)
 
-	f := &fedIdP{priv: priv, set: set, clientID: "cli-1"}
+	f := &fedIDP{priv: priv, set: set, clientID: "cli-1"}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -127,7 +127,7 @@ func newFedIdP(t *testing.T) *fedIdP {
 	return f
 }
 
-func (f *fedIdP) sign(t *testing.T, aud, nonce, email string, verified bool) string {
+func (f *fedIDP) sign(t *testing.T, aud, nonce, email string, verified bool) string {
 	t.Helper()
 	tok, err := jwt.NewBuilder().
 		Issuer(f.srv.URL).Subject("ext-sub-1").Audience([]string{aud}).
@@ -146,7 +146,7 @@ func (f *fedIdP) sign(t *testing.T, aud, nonce, email string, verified bool) str
 
 // seedProvider crea una org y un provider apuntando al IdP simulado (endpoints ya
 // resueltos), habilitado. Devuelve (orgID, provider).
-func (h *fedHarness) seedProvider(t *testing.T, f *fedIdP, slug string, domains []string) (string, domain.IdentityProvider) {
+func (h *fedHarness) seedProvider(t *testing.T, f *fedIDP, slug string, domains []string) (string, domain.IdentityProvider) {
 	t.Helper()
 	org, err := h.st.CreateOrg(h.ctx, nil, domain.Organization{Slug: slug, Name: strings.ToUpper(slug)})
 	if err != nil {
@@ -168,7 +168,7 @@ func (h *fedHarness) seedProvider(t *testing.T, f *fedIdP, slug string, domains 
 
 // login ejecuta /start (extrae state+nonce+cookie), firma el id_token con ese
 // nonce y ejecuta /callback. Devuelve el recorder del callback.
-func (h *fedHarness) login(t *testing.T, f *fedIdP, providerID, email string, verified bool) *httptest.ResponseRecorder {
+func (h *fedHarness) login(t *testing.T, f *fedIDP, providerID, email string, verified bool) *httptest.ResponseRecorder {
 	t.Helper()
 	startRec := httptest.NewRecorder()
 	h.mux.ServeHTTP(startRec, httptest.NewRequest(http.MethodGet, "/federated/"+providerID+"/start", http.NoBody))
@@ -213,7 +213,7 @@ func hasSessionCookie(rec *httptest.ResponseRecorder) bool {
 
 func TestFederation_SecretEncryptedAtRest(t *testing.T) {
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	_, p := h.seedProvider(t, f, "acme", []string{"acme.example"})
 
 	// La columna en BD DEBE guardar el sobre cifrado (encv1:…), nunca el claro.
@@ -239,7 +239,7 @@ func TestFederation_SecretEncryptedAtRest(t *testing.T) {
 
 func TestFederation_OrgIsolation(t *testing.T) {
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	_, p := h.seedProvider(t, f, "acme", []string{"acme.example"})
 	other, err := h.st.CreateOrg(h.ctx, nil, domain.Organization{Slug: "beta", Name: "Beta"})
 	if err != nil {
@@ -265,7 +265,7 @@ func TestFederatedCallback_JITProvision(t *testing.T) {
 	relaxSSRF(t)
 	defer federation.SetInsecureForTest()()
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	orgID, p := h.seedProvider(t, f, "acme", []string{"acme.example"})
 
 	rec := h.login(t, f, p.ID, "ada@acme.example", true)
@@ -291,7 +291,7 @@ func TestFederatedCallback_FindByFederatedIdentity(t *testing.T) {
 	relaxSSRF(t)
 	defer federation.SetInsecureForTest()()
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	_, p := h.seedProvider(t, f, "acme", []string{"acme.example"})
 
 	_ = h.login(t, f, p.ID, "ada@acme.example", true) // primer login (JIT)
@@ -310,7 +310,7 @@ func TestFederatedCallback_FindByVerifiedEmail(t *testing.T) {
 	relaxSSRF(t)
 	defer federation.SetInsecureForTest()()
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	orgID, p := h.seedProvider(t, f, "acme", []string{"acme.example"})
 
 	// Usuario preexistente MIEMBRO de la org (sin enlace federado aún).
@@ -334,10 +334,10 @@ func TestFederatedCallback_EmailUnverifiedRefused(t *testing.T) {
 	relaxSSRF(t)
 	defer federation.SetInsecureForTest()()
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	_, p := h.seedProvider(t, f, "acme", nil) // sin restricción de dominio
 
-	rec := h.login(t, f, p.ID, "ada@acme.example", false) // email_verified=false
+	rec := h.login(t, f, p.ID, "ada@acme.example", false) // El proveedor no verificó el correo.
 	if rec.Code == http.StatusFound || hasSessionCookie(rec) {
 		t.Fatalf("aceptó un email NO verificado (takeover): code=%d", rec.Code)
 	}
@@ -350,7 +350,7 @@ func TestFederatedCallback_CrossOrgRefused(t *testing.T) {
 	relaxSSRF(t)
 	defer federation.SetInsecureForTest()()
 	h := newFedHarness(t)
-	f := newFedIdP(t)
+	f := newFedIDP(t)
 	orgA, p := h.seedProvider(t, f, "acme", nil) // provider de la org A
 
 	// Un usuario que YA existe y es miembro SOLO de la org B, con el mismo email.

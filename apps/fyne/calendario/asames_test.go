@@ -58,6 +58,22 @@ func TestAlturasDelAsa(t *testing.T) {
 	if a, b, c := AlturaArrastre(PosMes, 50, 5), AlturaArrastre(PosAgenda, -30, 5), AlturaArrastre(PosSemana, -10, 5); a != 224 || b != 0 || c != 54 {
 		t.Errorf("B2: %v %v %v", a, b, c)
 	}
+	// B4 estiron-elastico
+	for _, c := range []struct {
+		desde PosicionAsa
+		dy    float32
+		want  float32
+	}{{PosMes, 48, 248}, {PosMes, 0, 224}, {PosSemana, 100, 164}, {PosSemana, 208, 248}, {PosAgenda, -30, 0}} {
+		if got := AlturaVisible(c.desde, c.dy, 5); got != c.want {
+			t.Errorf("B4 %d%+v: %v y es %v", c.desde, c.dy, got, c.want)
+		}
+	}
+	if got := AlturaVisible(PosMes, 100000, 5); got >= 224+EstironMax {
+		t.Errorf("B4: el estirón llega a %v", got)
+	}
+	if got := AlturaVisible(PosMes, 0.001, 5) - 224; got >= 0.01 {
+		t.Errorf("B4: salta %v al pasar del mes", got)
+	}
 	// B3 geometria-continua
 	for _, c := range []struct {
 		h              float32

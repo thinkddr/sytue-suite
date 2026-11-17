@@ -304,15 +304,15 @@ func TestElMenuDeLaNotaEsElDeLaWeb(t *testing.T) {
 	quiero := []string{
 		tr("note.setIcon", nil),
 		tr("tags.apply", nil), tr("reminder.set", nil), tr("note.pin", nil), tr("note.rename", nil), tr("note.duplicate", nil),
-		tr("tree.newInside", nil), tr("note.moveTo", nil), tr("note.export", nil), tr("backlinks.title", nil),
-		tr("note.attach", nil), "---", tr("note.delete", nil),
+		tr("tree.newInside", nil), tr("note.moveTo", nil), tr("note.export", nil), tr("note.info", nil),
+		tr("backlinks.title", nil), tr("note.attach", nil), "---", tr("note.delete", nil),
 	}
 	if got := claves(p.menuNota(n, false)); strings.Join(got, "|") != strings.Join(quiero, "|") {
 		t.Errorf("el menú es\n%v\ny en la web\n%v", got, quiero)
 	}
 	// El del árbol es el mismo con «Renombrar» en su clave y sin adjuntar (NoteTree.tsx).
 	quiero[4] = tr("tree.rename", nil)
-	quiero = slices.Delete(quiero, 10, 11)
+	quiero = slices.Delete(quiero, 11, 12)
 	if got := claves(p.menuNota(n, true)); strings.Join(got, "|") != strings.Join(quiero, "|") {
 		t.Errorf("el menú del árbol es\n%v\ny en la web\n%v", got, quiero)
 	}

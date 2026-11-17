@@ -269,6 +269,20 @@ func (m *Modelo) AlternarPatron(i int) {
 	}
 }
 
+// AlternarOculta es `toggleSlideHidden`: oculta o vuelve a enseñar esa diapositiva al
+// presentar. Quitarlo borra el campo; ponerlo escribe `true`.
+func (m *Modelo) AlternarOculta(i int) {
+	if !m.valida(i) {
+		return
+	}
+	if d := &m.Diapos[i]; d.EstaOculta() {
+		d.Oculta = nil
+	} else {
+		si := true
+		d.Oculta = &si
+	}
+}
+
 // PonerTamano es `setSlideSize` con `sanitizeSlideSize`: 16:9 (o cualquier cosa no
 // válida) = sin campo.
 func (m *Modelo) PonerTamano(t *Tamano) { m.Tamano = sanearTamano(t) }

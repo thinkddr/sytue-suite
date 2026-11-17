@@ -13,8 +13,8 @@ package editor
 //
 // `TestLosGlifosDeLaPortadaSonLosDeLaWeb` los compara ruta a ruta contra ese `.tsx`.
 const (
-	// GlifoDocumento es la hoja con la esquina doblada y tres renglones.
-	GlifoDocumento = "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4"
+	// GlifoDocumento es la hoja con la esquina doblada y dos renglones.
+	GlifoDocumento = "M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5M8.5 13h7M8.5 16.5h4.5"
 	// GlifoHoja es la rejilla: la tabla se reconoce por sus divisiones.
 	GlifoHoja = "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14"
 	// GlifoPresentacion es el lienzo apaisado sobre pie.
@@ -36,7 +36,7 @@ const (
 	// GlifoCompartir son los tres nodos unidos.
 	GlifoCompartir = "M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm12 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 13.5l6.8 3.9M15.4 6.6 8.6 10.5"
 	// GlifoEstrella es la estrella de «Destacar»: el mismo trazado que la de Drive.
-	GlifoEstrella = "m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.4L12 17.8l-5.8 3 1.1-6.4-4.7-4.6 6.5-.9Z"
+	GlifoEstrella = "M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z"
 )
 
 // FuenteGlifos es el `.tsx` del que salen, relativo a la raíz del repositorio.

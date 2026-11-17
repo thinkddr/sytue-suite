@@ -16,6 +16,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // Paridad web: apps/frontend/apps/notes/src/components/NotebookSettings.tsx.
@@ -24,15 +25,15 @@ import (
 // puede verlo, si entra en la búsqueda de la suite y si va cifrado. Es también el
 // diálogo de «nuevo cuaderno»: la web usa el mismo con `notebook = null`.
 //
-// Medidas, de la hoja con el rem de 14 (diálogo `md`, 560 de ancho máximo):
+// Medidas, de la hoja con el rem de 16 (diálogo `md`, 560 de ancho máximo):
 //
-//	cuerpo            `grid gap-4`                                        14
-//	icono + nombre    `grid-cols-[5rem_1fr] gap-3`                        70 | resto, 10,5
-//	leyendas          `text-base font-medium mb-1.5`                      5,25 debajo
-//	muestras          `h-7 w-7 rounded-full`, `gap-1.5`                    24,5, 5,25
-//	disposiciones     `grid-cols-3 gap-2`, cada una `p-2.5 gap-1 border`   7, 10,5, 3,5
-//	visibilidades     `grid gap-1.5`, cada una `p-2.5 gap-2.5 border`      5,25, 10,5, 8,75
-//	caja del índice   `rounded-md border p-3 grid gap-3`                   10,5, 10,5
+//	cuerpo            `grid gap-4`                                        16
+//	icono + nombre    `grid-cols-[5rem_1fr] gap-3`                        80 | resto, 12
+//	leyendas          `text-base font-medium mb-1.5`                      6 debajo
+//	muestras          `h-7 w-7 rounded-full`, `gap-1.5`                    28, 6
+//	disposiciones     `grid-cols-3 gap-2`, cada una `p-2.5 gap-1 border`   8, 10, 4
+//	visibilidades     `grid gap-1.5`, cada una `p-2.5 gap-2.5 border`      6, 10, 10
+//	caja del índice   `rounded-md border p-3 grid gap-3`                   12, 12
 const (
 	HuecoAjustes      = 4 * 0.25 * tema.Rem
 	AnchoIconoAjustes = 5 * tema.Rem
@@ -50,11 +51,23 @@ const (
 	SangriaAyudaInterruptor = 12 * 0.25 * tema.Rem
 )
 
-// ColoresCuaderno es la paleta de NotebookSettings.tsx: doce tonos medidos para llevar
-// texto blanco encima. El primero es el de un cuaderno nuevo.
-var ColoresCuaderno = []string{
-	"#86198f", "#be123c", "#c2410c", "#a16207", "#4d7c0f", "#146a47",
-	"#0f766e", "#0e7490", "#1c58d9", "#4c1d95", "#7e22ce", "#3a4a5e",
+// ColoresCuaderno es la paleta de NotebookSettings.tsx: la de colores de usuario de la
+// suite (`tokens.PaletaDeUsuario`), medida en los cuatro modos y con texto blanco encima.
+var ColoresCuaderno = func() []string {
+	out := make([]string, 0, len(tokens.PaletaDeUsuario))
+	for _, c := range tokens.PaletaDeUsuario {
+		out = append(out, c.Valor)
+	}
+	return out
+}()
+
+// ColorCuadernoNuevo es `COLOR_NUEVO` de NotebookSettings.tsx: el de un cuaderno nuevo.
+var ColorCuadernoNuevo = colorPorID("plum")
+
+// colorPorID es el hex de un tono de la paleta por su id.
+func colorPorID(id string) string {
+	c, _ := tokens.TonoDeUsuario(id)
+	return c.Valor
 }
 
 // Disposiciones son las cuatro con su glifo, LA LISTA PRIMERO: es la de serie y las
@@ -131,7 +144,7 @@ func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
 		return
 	}
 	t := p.tr.T
-	f := formAjustes{color: ColoresCuaderno[0], disposicion: Lista.Clave(), visibilidad: "personal", indexable: true}
+	f := formAjustes{color: ColorCuadernoNuevo, disposicion: Lista.Clave(), visibilidad: "personal", indexable: true}
 	if c != nil {
 		f = formAjustes{
 			color: c.Color, disposicion: c.Vista.Clave(), visibilidad: c.Publico,
@@ -157,7 +170,11 @@ func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
 			p.confirmar(t("notebook.delete", nil), t("notebook.deleteConfirm", i18n.Vars{"title": c.Titulo}),
 				t("common.delete", nil), func() {
 					p.cerrarAjustes()
-					go p.borrarCuaderno(*c)
+					{
+						notaFuncion := p.borrarCuaderno
+						notaArgumento0 := *c
+						p.iniciar(func() { notaFuncion(notaArgumento0) })
+					}
 				})
 		}).Con(ui.Peligro, ui.TallaMD)
 	}
@@ -173,7 +190,12 @@ func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
 		}
 		archivar := ui.NuevoBoton(t(clave, nil), func() {
 			p.cerrarAjustes()
-			go p.archivar(*c, !c.Archivado)
+			{
+				notaFuncion := p.archivar
+				notaArgumento0 := *c
+				notaArgumento1 := !c.Archivado
+				p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+			}
 		}).Con(ui.Secundario, ui.TallaMD)
 		acciones = append(acciones, archivar)
 	}
@@ -214,16 +236,16 @@ func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
 			id = c.ID
 		}
 		in := entradaAjustes(c, padre, titulo.Texto(), strings.TrimSpace(emoji.Texto()), f)
-		go func() {
+		p.iniciar(func() {
 			err := p.guardarCuaderno(id, in)
-			enHilo(func() {
+			p.enHilo(func() {
 				guardar.Cargando = false
 				guardar.Refresh()
 				if err == nil {
 					p.cerrarAjustes()
 				}
 			})
-		}()
+		})
 	}
 	pintar()
 	p.mostrar(d)
@@ -278,11 +300,13 @@ func (p *Pantalla) cuerpoAjustes(c *Cuaderno, emoji, titulo *ui.Entrada, f *form
 		grupoCampo(t("notebook.title", nil), titulo, v))
 
 	// Color.
-	muestras := make([]fyne.CanvasObject, 0, len(ColoresCuaderno))
-	for _, hex := range ColoresCuaderno {
-		m := NuevaMuestra(hexO(hex, tema.Color("primary", v)), LadoMuestra, 2, hex,
+	// Un cuaderno guardado con la paleta de antes se marca en su tono más cercano.
+	muestras := make([]fyne.CanvasObject, 0, len(tokens.PaletaDeUsuario))
+	for _, c := range tokens.PaletaDeUsuario {
+		hex := c.Valor
+		m := NuevaMuestra(c.NRGBA(), LadoMuestra, 2, t(c.Clave(), nil),
 			func() { f.color = hex; repintar() })
-		m.Activa = strings.EqualFold(f.color, hex)
+		m.Activa = tonoO(f.color, color.NRGBA{}) == c.NRGBA()
 		muestras = append(muestras, m)
 	}
 	hm := conCeldaTactil(muestras, HuecoMuestras)

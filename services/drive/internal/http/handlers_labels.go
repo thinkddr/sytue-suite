@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 )
@@ -115,6 +117,12 @@ func (h *Handlers) ClearFileLabel(w http.ResponseWriter, r *http.Request) {
 // taxonomía de la org del usuario, para que la UI de Drive pinte el selector sin
 // necesitar una URL de Sytue ID ni otro token. Mismo Bearer, mismo aislamiento.
 func (h *Handlers) ListSensitivityLabels(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	// Existing clients remain headerless. Private repositories pin their account
+	// before asynchronous authorization and must not adopt another org's policy.
+	if len(r.Header.Values(storage.ScopeHeader)) > 0 && !storageRequestScope(w, r, "drive") {
+		return
+	}
 	labels, err := h.fetchTaxonomy(r)
 	if err != nil {
 		httpx.Fail(w, r, err)

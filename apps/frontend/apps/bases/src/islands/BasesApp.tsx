@@ -3,9 +3,12 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * «Mis bases»: la lista de bases a las que se tiene acceso y el alta de una nueva.
+ * La búsqueda filtra en el navegador (la lista ya está entera) por nombre y
+ * descripción con la regla `plegar` de la suite: «cafe» encuentra «Café».
  */
 import type { JSX } from 'preact';
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 import { Badge, Button, CardIcon, EmptyState, FieldGroup, Icon, Input, Skeleton } from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
@@ -13,6 +16,7 @@ import type { BasesBase } from '@sytue/api-clients/bases';
 import { Marco } from '../components/Marco.js';
 import { useT } from '../i18n/index.js';
 import { cliente, mensajeDeError } from '../lib/api.js';
+import { filtrarBases } from '../lib/actividad.js';
 import { tonoDeBase } from '../lib/aspecto.js';
 import { ruta } from '../lib/rutas.js';
 
@@ -22,13 +26,29 @@ interface Props {
   hubBaseUrl: string;
 }
 
-export function BasesApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
+export function BasesApp(props: Props): JSX.Element {
+  return (
+    <MatrixStorageGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      product="bases"
+      deviceName="Sytue Bases · Web"
+    >
+      <BasesAppBody {...props} />
+    </MatrixStorageGate>
+  );
+}
+
+function BasesAppBody({ locale, user, hubBaseUrl }: Props): JSX.Element {
   const t = useT(locale);
   const [bases, setBases] = useState<BasesBase[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [nombre, setNombre] = useState('');
   const [creando, setCreando] = useState(false);
+  const [q, setQ] = useState('');
+  const vistas = useMemo(() => filtrarBases(bases, q), [bases, q]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -106,37 +126,61 @@ export function BasesApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
             </div>
           ) : bases.length === 0 && !error ? (
             <EmptyState
-              illustration={<Icon name="database" size={28} />}
+              icon="database"
               title={t('bases.empty.title')}
               description={t('bases.empty.body')}
             />
           ) : (
-            <ul class="flex flex-col gap-2">
-              {bases.map((b) => (
-                <li key={b.id}>
-                  <a
-                    href={ruta(`/base/${b.id}`)}
-                    class="border-border bg-surface hover:bg-bg-subtle sytue-focus-ring flex w-full min-w-0 items-center gap-3 rounded-lg border p-4"
-                  >
-                    <CardIcon tone={tonoDeBase(b.id)} class="h-10 w-10 rounded-lg">
-                      <Icon name="database" size={20} />
-                    </CardIcon>
-                    <span class="flex min-w-0 flex-1 flex-col gap-1">
-                      <span class="text-text truncate font-semibold" title={b.name}>
-                        {b.name}
+            <div class="flex flex-col gap-3">
+              {bases.length > 1 || q ? (
+                <div role="search">
+                  <Input
+                    type="search"
+                    value={q}
+                    aria-label={t('bases.search')}
+                    placeholder={t('bases.search')}
+                    leadingIcon={<Icon name="search" size={16} />}
+                    onInput={(e) => setQ(e.currentTarget.value)}
+                  />
+                </div>
+              ) : null}
+              {vistas.length === 0 && q.trim() ? (
+                <p role="status" class="text-text-muted text-sm">
+                  {t('bases.noMatches', { q: q.trim() })}
+                </p>
+              ) : null}
+              <ul class="flex flex-col gap-2">
+                {vistas.map((b) => (
+                  <li key={b.id}>
+                    <a
+                      href={ruta(`/base/${b.id}`)}
+                      class="border-border bg-surface hover:bg-bg-subtle sytue-focus-ring flex w-full min-w-0 items-center gap-3 rounded-lg border p-4"
+                    >
+                      <CardIcon tone={tonoDeBase(b.id)} class="h-10 w-10 rounded-lg">
+                        <Icon name="database" size={20} />
+                      </CardIcon>
+                      <span class="flex min-w-0 flex-1 flex-col gap-1">
+                        <span class="text-text truncate font-semibold" title={b.name}>
+                          {b.name}
+                        </span>
+                        {b.description ? (
+                          <span class="text-text-muted line-clamp-2 text-sm" title={b.description}>
+                            {b.description}
+                          </span>
+                        ) : null}
+                        <span class="text-text-muted text-sm">
+                          {t('bases.updated', { date: formatDate(locale, b.updated_at) })}
+                          {b.host_org ? ` · ${t('bases.external', { org: b.host_org })}` : ''}
+                        </span>
                       </span>
-                      <span class="text-text-muted text-sm">
-                        {t('bases.updated', { date: formatDate(locale, b.updated_at) })}
-                        {b.host_org ? ` · ${t('bases.external', { org: b.host_org })}` : ''}
-                      </span>
-                    </span>
-                    <Badge tone={b.role === 'owner' ? 'primary' : 'neutral'} class="shrink-0">
-                      {b.role ? t(`role.${b.role}`) : t('bases.partial')}
-                    </Badge>
-                  </a>
-                </li>
-              ))}
-            </ul>
+                      <Badge tone={b.role === 'owner' ? 'primary' : 'neutral'} class="shrink-0">
+                        {b.role ? t(`role.${b.role}`) : t('bases.partial')}
+                      </Badge>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       </div>

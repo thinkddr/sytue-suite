@@ -23,7 +23,8 @@ import {
   Spinner,
   useToast,
 } from '@sytue/ui';
-import { getVacation, saveVacation } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
+import type { Vacation } from '../client/mailApi.js';
 import { formatDate, type Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 
@@ -69,7 +70,7 @@ function humanDate(locale: Locale, value: string): string {
 }
 
 /** En qué situación está la autorespuesta AHORA, en lenguaje llano. */
-interface Status {
+export interface Status {
   tone: 'success' | 'warning' | 'neutral';
   label: string;
   detail: string;
@@ -107,8 +108,18 @@ function statusOf(t: T, locale: Locale, enabled: boolean, start: string, end: st
   };
 }
 
+/**
+ * La misma frase de estado, para quien solo tiene la configuración guardada: la
+ * página de ajustes la enseña junto a «Vacaciones» sin abrir el diálogo, y así las
+ * dos dicen lo mismo con las mismas palabras.
+ */
+export function estadoVacaciones(t: T, locale: Locale, v: Vacation): Status {
+  return statusOf(t, locale, v.enabled, toDateInput(v.startsAt), toDateInput(v.endsAt));
+}
+
 export function VacationModal({ locale, open, onClose }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { getVacation, saveVacation } = usePrivateMailApi();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,7 +152,7 @@ export function VacationModal({ locale, open, onClose }: Props): JSX.Element | n
     return () => {
       active = false;
     };
-  }, [open, reload]);
+  }, [open, reload, getVacation]);
 
   // Validación en vivo: el fallo típico es poner la vuelta antes de la salida, o
   // dejar un período ya pasado (la autorespuesta no se dispararía nunca).

@@ -11,6 +11,12 @@
  * un botón de 32 en una pantalla de 390 tapaba lo que se estaba mirando y dejaba las
  * acciones a la altura del pulgar solo por casualidad (barrido de diálogos y menús,
  * 2026-10-16). El teclado, el foco y el cierre son los mismos.
+ *
+ * MODO CONTROLADO (`abiertoEn` + `onCerrar`): el menú contextual. Sin disparador, se abre
+ * en un PUNTO de la ventana (donde se hizo clic derecho, o la celda activa con Mayús+F10)
+ * y lo abre y lo cierra quien lo usa. Es el mismo menú —encaje en la ventana, teclado,
+ * hoja en el teléfono—, no un segundo componente: al cerrar con Escape, Tab o una acción,
+ * el foco vuelve a lo que lo tenía al abrirse (la rejilla de Calcus).
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -21,6 +27,7 @@ import { tecladoEnOtraSuperposicion } from '../lib/atajos.js';
 import { limitesViewport, observarViewport } from '../lib/viewport.js';
 import { useMobileBack } from '../lib/useMobileBack.js';
 import { useEnHoja } from '../lib/useEnHoja.js';
+import { useUltimo } from '../lib/useUltimo.js';
 import { Icon } from './Icon.js';
 
 /** Aire mínimo entre el panel y el borde de la ventana (px). */
@@ -77,9 +84,34 @@ export function encajarPanel(
   };
 }
 
+/**
+ * Dónde se abre el menú controlado, en px de la ventana (`clientX`/`clientY`). Un punto
+ * (el puntero) o, con `ancho` y `alto`, una caja (la celda activa con Mayús+F10), de la
+ * que el panel cuelga como de un botón, sin taparla.
+ */
+export interface PuntoDeMenu {
+  x: number;
+  y: number;
+  ancho?: number | undefined;
+  alto?: number | undefined;
+}
+
+/**
+ * La caja de un PUNTO para `encajarPanel`: el panel sale con la esquina en el punto
+ * (abajo y a la derecha, o arriba si no cabe), sin los 6 px que separan el panel de un
+ * botón. Un menú contextual se abre donde está el puntero, no al lado.
+ */
+export const cajaDePunto = (p: PuntoDeMenu): Lados =>
+  p.alto === undefined
+    ? { top: p.y + 6, bottom: p.y - 6, left: p.x, right: p.x }
+    : { top: p.y, bottom: p.y + p.alto, left: p.x, right: p.x + (p.ancho ?? 0) };
+
 export interface DropdownProps {
-  /** Disparador: recibe props para accesibilidad (aria-expanded, onClick). */
-  trigger: (props: {
+  /**
+   * Disparador: recibe props para accesibilidad (aria-expanded, onClick). Opcional solo
+   * en el modo controlado (`abiertoEn`), donde lo abre quien lo usa.
+   */
+  trigger?: (props: {
     onClick: () => void;
     'aria-expanded': boolean;
     'aria-haspopup': 'menu';
@@ -108,6 +140,13 @@ export interface DropdownProps {
    * se desplaza.
    */
   panelClass?: string;
+  /**
+   * MODO CONTROLADO, el menú contextual: con un punto, abierto ahí; con `null`, cerrado.
+   * Sin la prop (undefined), el menú es el de siempre y lo abre su disparador.
+   */
+  abiertoEn?: PuntoDeMenu | null;
+  /** Lo llama el menú controlado para cerrarse: Escape, Tab, clic fuera o una acción. */
+  onCerrar?: () => void;
 }
 
 /**
@@ -123,6 +162,16 @@ const HOJA_MENU = cx(
   '[&_[role=menuitem]]:min-h-11',
 );
 
+/**
+ * Los ítems del menú que mueven las flechas: las acciones y también las opciones
+ * marcables (`menuitemradio`, `menuitemcheckbox`), que es como WAI-ARIA llama a una
+ * paleta o a una lista de casillas DENTRO de un menú (los colores de la pestaña de
+ * hoja). Sin ellas, las muestras quedaban fuera del recorrido del teclado.
+ */
+const ITEMS = ['menuitem', 'menuitemradio', 'menuitemcheckbox'].map((r) => `[role="${r}"]`);
+const SELECTOR_ITEMS = ITEMS.join(',');
+const SELECTOR_VIVOS = ITEMS.map((s) => `${s}:not([disabled])`).join(',');
+
 /** Texto comparable para «escribir para saltar»: sin mayúsculas ni tildes («e» encuentra «Español»). */
 const plano = (s: string): string => plegar(s).trim();
 
@@ -134,13 +183,41 @@ export function Dropdown({
   label,
   class: cls,
   panelClass,
+  abiertoEn,
+  onCerrar,
 }: DropdownProps): JSX.Element {
-  const [open, setOpen] = useState(false);
-  useMobileBack(open, () => setOpen(false), { nivel: 2 });
+  const controlado = abiertoEn !== undefined;
+  const [abiertoPropio, setOpen] = useState(false);
+  const open = controlado ? abiertoEn !== null : abiertoPropio;
+  /** Cierra el menú; en el controlado, avisando a quien lo abrió. */
+  const cerrar = (): void => {
+    if (controlado) onCerrar?.();
+    else setOpen(false);
+  };
+  const cerrarRef = useUltimo(cerrar);
+  useMobileBack(open, () => cerrarRef.current(), { nivel: 2 });
   const enHoja = useEnHoja();
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tecleado = useRef({ texto: '', hasta: 0 });
+  // EL FOCO DEL MENÚ CONTROLADO, DE VUELTA A LA CELDA. Lo que tenía el foco al abrirse se
+  // apunta ANTES de que el efecto de abajo lo mueva al primer ítem (uno de layout corre
+  // antes que los normales), y al cerrarse —ya fuera el panel— recupera el foco si se ha
+  // quedado en el body: es lo que pasa tras una acción, que cierra y quita el ítem
+  // enfocado. Si la acción abrió un diálogo, el foco ya es suyo y no se le quita. Va en
+  // la limpieza de un efecto de layout, que Preact corre al confirmar el cierre, y no en
+  // el `close` que reciben los hijos: ese se crea durante el render.
+  useLayoutEffect(() => {
+    if (!controlado || !open) return;
+    const activo = document.activeElement;
+    const previo = activo instanceof HTMLElement ? activo : null;
+    return () => {
+      const ahora = document.activeElement;
+      if (previo?.isConnected && (ahora === null || ahora === document.body)) {
+        previo.focus({ preventScroll: true });
+      }
+    };
+  }, [controlado, open]);
   const esMenuPuro = (): boolean =>
     !menuRef.current?.querySelector('input,select,textarea,[contenteditable="true"]');
 
@@ -154,24 +231,35 @@ export function Dropdown({
 
   useEffect(() => {
     if (!open) return;
+    // Lo que tenía el foco al abrirse (aún no se ha movido al primer ítem): adonde vuelve
+    // con Escape o Tab en el modo controlado. En el otro, el disparador.
+    const activo = document.activeElement;
+    const previo = controlado && activo instanceof HTMLElement ? activo : null;
+    const volver = (): void => {
+      const destino = controlado
+        ? previo
+        : triggerRef.current?.querySelector<HTMLElement>('button,a,[tabindex]');
+      if (destino?.isConnected) destino.focus({ preventScroll: true });
+    };
+    // Dentro del menú, el clic derecho (o Mayús+F10 sobre un ítem) no abre el del navegador
+    // encima del nuestro.
+    const sinMenuNativo = (e: MouseEvent): void => {
+      if (menuRef.current?.contains(e.target as Node)) e.preventDefault();
+    };
     const onClickOutside = (e: MouseEvent) => {
       const t = e.target as Node;
       if (!menuRef.current?.contains(t) && !triggerRef.current?.contains(t)) {
-        setOpen(false);
+        cerrarRef.current();
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (tecladoEnOtraSuperposicion(menuRef.current)) return;
-      const volver = (): void =>
-        triggerRef.current
-          ?.querySelector<HTMLElement>('button,a,[tabindex]')
-          ?.focus({ preventScroll: true });
       if (e.key === 'Escape') {
         // Solo cierra el menú: sin esto, dentro de un <dialog> modal el mismo
         // Escape cerraba también el diálogo (el visor de Fotos entero).
         e.preventDefault();
         e.stopImmediatePropagation();
-        setOpen(false);
+        cerrarRef.current();
         volver();
         return;
       }
@@ -181,7 +269,7 @@ export function Dropdown({
         // sin esto Tab saltaba del menú a la barra de direcciones. Un panel con
         // controles de formulario (el <select> de idioma del menú de cuenta)
         // conserva el Tab nativo: es la única forma de llegar a ellos.
-        setOpen(false);
+        cerrarRef.current();
         volver();
         return;
       }
@@ -197,7 +285,7 @@ export function Dropdown({
         return;
       }
       const items = Array.from(
-        menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [],
+        menuRef.current?.querySelectorAll<HTMLElement>(SELECTOR_VIVOS) ?? [],
       );
       if (items.length === 0) return;
       const idx = items.indexOf(document.activeElement as HTMLElement);
@@ -233,26 +321,28 @@ export function Dropdown({
     };
     document.addEventListener('mousedown', onClickOutside);
     document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('contextmenu', sinMenuNativo);
     // Foco itinerante en un menú puro: los items salen del orden de Tab y el foco
     // lo mueven las flechas. Se hace aquí y no en MenuItem porque MenuItem
     // también se usa suelto (la cinta de Docs, el menú de mensaje de Rooms), con
     // su propio Tab.
     if (esMenuPuro()) {
       menuRef.current
-        ?.querySelectorAll<HTMLElement>('[role="menuitem"]')
+        ?.querySelectorAll<HTMLElement>(SELECTOR_ITEMS)
         .forEach((el) => (el.tabIndex = -1));
     }
     // Foco al item marcado como actual (el idioma en uso) o, si no hay, al
     // primero. `focus()` además lo desplaza a la vista dentro del panel.
     (
       menuRef.current?.querySelector<HTMLElement>('[role="menuitem"][aria-current="true"]') ??
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')
+      menuRef.current?.querySelector<HTMLElement>(SELECTOR_ITEMS)
     )?.focus();
     return () => {
       document.removeEventListener('mousedown', onClickOutside);
       document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('contextmenu', sinMenuNativo);
     };
-  }, [open]);
+  }, [open, controlado, cerrarRef]);
 
   // EL PANEL VA A UN PORTAL, Y NO ES UN ADORNO.
   //
@@ -291,10 +381,19 @@ export function Dropdown({
     setDialogo(triggerRef.current?.closest('dialog') ?? null);
   }, []);
 
+  const puntoX = abiertoEn?.x;
+  const puntoY = abiertoEn?.y;
+  const puntoAncho = abiertoEn?.ancho;
+  const puntoAlto = abiertoEn?.alto;
   useLayoutEffect(() => {
     if (!open || enHoja) return;
     const colocar = (e?: Event): void => {
-      const d = triggerRef.current?.getBoundingClientRect();
+      // En el controlado, el «disparador» es el punto: no se mueve con el desplazamiento
+      // (el menú contextual se queda donde se pidió, como en el escritorio).
+      const d =
+        puntoX !== undefined && puntoY !== undefined
+          ? cajaDePunto({ x: puntoX, y: puntoY, ancho: puntoAncho, alto: puntoAlto })
+          : triggerRef.current?.getBoundingClientRect();
       const el = menuRef.current;
       if (!d || !el) return;
       // El desplazamiento DEL PROPIO PANEL no mueve a su disparador, y recolocar aquí lo
@@ -327,7 +426,8 @@ export function Dropdown({
         { ancho: el.offsetWidth, alto },
         { ancho: v.width, alto: v.height },
         side,
-        align,
+        // Desde un punto, el panel crece hacia la derecha (y vuelve si no cabe).
+        controlado ? 'start' : align,
       );
       if (alto > altoMaximo) el.style.maxHeight = `${altoMaximo}px`;
       // Lo mismo al recolocar por un cambio de fuera (la ventana, la página): lo ya
@@ -341,7 +441,7 @@ export function Dropdown({
     // un div interno. Sin `true` el panel se quedaba clavado mientras la fila a
     // la que pertenece se iba hacia arriba.
     return observarViewport(colocar);
-  }, [open, side, align, enHoja]);
+  }, [open, side, align, enHoja, controlado, puntoX, puntoY, puntoAncho, puntoAlto]);
 
   const panel = open ? (
     <div
@@ -374,7 +474,7 @@ export function Dropdown({
             }
       }
     >
-      {typeof children === 'function' ? children(() => setOpen(false)) : children}
+      {typeof children === 'function' ? children(cerrar) : children}
       {masAbajo ? (
         // El aviso: el borde inferior se funde con la superficie y lleva una flecha. Va
         // pegado al pie de lo que se ve (`sticky`) y no ocupa sitio (`-mt-8`); al llegar
@@ -390,10 +490,10 @@ export function Dropdown({
   ) : null;
 
   return (
-    <div class={cx('relative inline-flex', cls)}>
-      <div ref={triggerRef} class="inline-flex">
-        {trigger({
-          onClick: () => setOpen((v) => !v),
+    <div class={cx(trigger ? 'relative inline-flex' : 'contents', cls)}>
+      <div ref={triggerRef} class={trigger ? 'inline-flex' : 'contents'}>
+        {trigger?.({
+          onClick: () => (controlado ? cerrar() : setOpen((v) => !v)),
           'aria-expanded': open,
           'aria-haspopup': 'menu',
         })}

@@ -50,6 +50,7 @@ import type {
   DbTable,
   Deployment,
   Domain,
+  DomainCheckResult,
   EnvVar,
   Framework,
   LogLine,
@@ -1556,6 +1557,34 @@ export async function removeDomain(session: SytueSession, domainId: string): Pro
   } catch (err) {
     if (httpErrorInfo(err)) throw err; // error real del control-plane: propágalo a la UI
     return false; // sin backend vivo (fetch rechazado/red): degrada a demostración
+  }
+}
+
+/**
+ * «Comprobar ahora» el DNS de un dominio propio: el motivo exacto de lo que falta
+ * y, si el TXT es correcto, el dominio ya verificado sin esperar al bucle del
+ * control-plane. Sin backend vivo no hay DNS que comprobar: `live:false` y sin
+ * resultado (no se inventa un «ok»). El tope (429) y el resto de errores reales
+ * se propagan a la UI con su código.
+ */
+export async function verifyDomain(
+  session: SytueSession,
+  domainId: string,
+): Promise<{ live: boolean; check?: DomainCheckResult }> {
+  try {
+    const { check } = await client(session).verifyDomain(domainId);
+    return {
+      live: true,
+      check: {
+        verified: check.verified,
+        reason: check.reason,
+        ...(check.expected ? { expected: check.expected } : {}),
+        ...(check.found ? { found: check.found } : {}),
+      },
+    };
+  } catch (err) {
+    if (httpErrorInfo(err)) throw err; // error real del control-plane: propágalo a la UI
+    return { live: false }; // sin backend vivo: degrada a demostración
   }
 }
 

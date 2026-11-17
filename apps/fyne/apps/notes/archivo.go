@@ -138,15 +138,15 @@ func estadoDeFase(tr *i18n.Translator, fase Fase, titulo, vacio string, v tema.V
 
 // cargarFijadas pide las notas fijadas de todos los cuadernos.
 func (p *Pantalla) cargarFijadas() {
-	enHilo(func() { p.fijadas.Fase = Cargando; p.Repintar() })
+	p.enHilo(func() { p.fijadas.Fase = Cargando; p.Repintar() })
 	if !p.hayRed() || p.svc == nil {
-		enHilo(func() { p.fijadas.Fase = SinConexion; p.Repintar() })
+		p.enHilo(func() { p.fijadas.Fase = SinConexion; p.Repintar() })
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	res, err := p.svc.PinnedNotes(ctx)
-	enHilo(func() {
+	p.enHilo(func() {
 		p.fijadas.Notas = res
 		p.fijadas.Fase = FaseDe(err, p.hayRed(), len(res))
 		p.Repintar()
@@ -174,7 +174,7 @@ func (p *Pantalla) archivar(c Cuaderno, si bool) {
 		clave = "archive.done"
 	}
 	p.avisar(ui.AvisoExito, p.tr.T(clave, nil), "")
-	enHilo(func() {
+	p.enHilo(func() {
 		if si && p.activo.ID == c.ID {
 			p.activo, p.notas, p.lienzo.Seleccionada = Cuaderno{}, nil, ""
 		}

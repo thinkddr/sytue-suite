@@ -62,12 +62,19 @@ func NewRouter(d Deps) http.Handler {
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
 	h := &Handlers{svc: d.Service, cfg: d.Cfg}
+	authority := storageAuthorityHandlers{svc: d.Service}
+	publications := storagePublicationHandlers{svc: d.Service}
+	mountPublicationOrigin(r, d.Cfg.MatrixPublicationSecret, d.Service)
+	mountResourceSessionOrigin(r, d.Cfg.ResourceSessionDocsSecret, d.Service)
 	gifs := newGifHandlers()
 	ih := &intHandlers{
 		svc: d.Service, publicURL: strings.TrimRight(d.Cfg.PublicURL, "/"), internalSecret: d.Cfg.InternalSecret,
 		channelMailDomain: d.Cfg.ChannelMailDomain,
 	}
 	wsh := &wsHandler{svc: d.Service, hub: d.Hub, verifier: d.Verifier, cfg: d.Cfg}
+
+	// Compiler artifacts are public; every data route keeps its tenant session.
+	r.Get("/api/v1/client-core/{asset}", ClientCore)
 
 	// API REST autenticada bajo /api/v1.
 	r.Route("/api/v1", func(api chi.Router) {
@@ -82,12 +89,35 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Service.Hub().TrasEscribir(sinSenalDeCambios, "rooms"))
 		api.Get("/matrix/bootstrap", h.MatrixBootstrap)
 		api.Get("/matrix/storage/bootstrap", h.MatrixStorageBootstrap)
+		api.Get("/matrix/storage/{product}/authority", authority.get)
+		api.Post("/matrix/storage/{product}/publications/reserve", publications.reserve)
+		api.Post("/matrix/storage/{product}/publications/cancel", publications.cancel)
+		api.Get("/matrix/storage/{product}/publications", publications.get)
+		api.Get("/matrix/storage/{product}/publications/recovery", publications.getRecovery)
+		api.Post("/matrix/storage/{product}/authority/challenge", authority.challenge)
+		api.Post("/matrix/storage/{product}/authority/confirm", authority.confirm)
+		api.Get("/matrix/storage/{product}/migration", h.MatrixStorageMigration)
+		api.Post("/matrix/storage/{product}/migration", h.BeginMatrixStorageMigration)
+		api.Post("/matrix/storage/{product}/migration/complete", h.CompleteMatrixStorageMigration)
 		api.Get("/matrix/recovery-key", h.MatrixRecoveryKey)
 		api.Post("/matrix/recovery-key", h.StoreMatrixRecoveryKey)
+		api.Get("/matrix/recovery-wrappers", h.MatrixRecoveryWrappers)
+		api.Put("/matrix/recovery-wrappers", h.PutMatrixRecoveryWrapper)
 		api.Post("/matrix/native/start", h.MatrixNativeStart)
 		api.Get("/matrix/native/preview", h.MatrixNativePreview)
 		api.Post("/matrix/native/accept", h.MatrixNativeAccept)
 		api.Post("/matrix/native/finish", h.MatrixNativeFinish)
+		api.Post("/matrix/native/approve", h.MatrixResourceNativeApprove)
+		api.Post("/matrix/resources/native/start", h.MatrixResourceNativeStart)
+		api.Post("/matrix/resources/native/finish", h.MatrixResourceNativeFinish)
+		api.Get("/matrix/resources/{product}/bootstrap", h.MatrixResourceBootstrap)
+		if d.Cfg.ResourceSourceDocsURL != "" && d.Cfg.ResourceSourceDocsSecret != "" {
+			api.Post("/matrix/resources/{product}/bootstrap/source", h.MatrixResourceBootstrapSource)
+		}
+		api.Post("/matrix/resources/{product}/consent", h.MatrixResourceWebConsent)
+		api.Post("/matrix/resources/{product}/session/challenge", h.MatrixResourceSessionChallenge)
+		api.Post("/matrix/resources/{product}/session/confirm", h.ConfirmMatrixResourceSession)
+		api.Get("/matrix/resources/{product}/session", h.MatrixResourceSession)
 		// Catálogo CC0 público consultado desde el servidor; medios y sesión viajan
 		// siempre por Rooms. El limitador compartido evita descargar sin límite.
 		api.Group(func(lib chi.Router) {
@@ -128,6 +158,8 @@ func NewRouter(d Deps) http.Handler {
 		// accesos de cada salto, en el `Referer` y en el historial. Por QUERY va en
 		// el cuerpo. GET se queda como respaldo para los clientes ya desplegados.
 		httpx.GetYQuery(api, "/search", h.SearchAll)
+		api.Get("/messages/metadata", h.MessageMetadata)
+		api.Post("/messages/metadata/visible", h.MessageMetadataVisible)
 
 		// Personas de OTRA organización (ADR 0040): encontrarlas por @usuario o
 		// correo, y las conversaciones de fuera de quien pregunta.
@@ -374,6 +406,11 @@ func NewRouter(d Deps) http.Handler {
 		// Drive). Sin secreto configurado no se monta y Drive queda fail-closed: los
 		// adjuntos con ámbito de canal no se sirven a nadie.
 		r.With(ih.internalAuth).Get("/internal/channel-access", ih.ChannelAccess)
+		r.With(ih.internalAuth).Post("/internal/storage-authority/verify", authority.verifyInternal)
+		r.With(ih.internalAuth).Post("/internal/storage-authority/state", authority.stateInternal)
+		r.With(ih.internalAuth).Post("/internal/storage-authority/receipt", authority.receiptInternal)
+		r.With(ih.internalAuth).Post("/internal/storage-authority/device-fence", authority.deviceFenceInternal)
+		r.With(ih.internalAuth).Post("/internal/storage-authority/device-fence/state", authority.deviceFenceStateInternal)
 	}
 
 	// Publicación de BOTS (Ola 15): token Bearer bot_… (NO JWT). Alcance MÍNIMO —

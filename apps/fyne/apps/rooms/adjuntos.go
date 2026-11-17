@@ -50,7 +50,7 @@ import (
 
 // glifos de Attachments.tsx (los de `glyphs.tsx`).
 const (
-	glifoFichero   = `<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" /><path d="M14 3v5h5" />`
+	glifoFichero   = `<path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5" />`
 	glifoDescargar = `<path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M5 21h14" />`
 	glifoSubir     = `<path d="M12 15V3" /><path d="M7 8l5-5 5 5" /><path d="M5 21h14" />`
 )
@@ -567,8 +567,7 @@ type Pendiente struct {
 // ponytail: sin el tope de 2 GB por fichero en el cliente: el que manda es el de Drive,
 // que contesta 413.
 func (sa *Sala) SubirDelEquipo() {
-	canal, t := sa.abierto, sa.P.T
-	c := sa.P.Canal.Compositor
+	canal := sa.abierto
 	if canal == "" || sa.Ficheros == nil || sa.ElegirFicheros == nil {
 		return
 	}
@@ -577,21 +576,82 @@ func (sa *Sala) SubirDelEquipo() {
 		if err != nil || len(rutas) == 0 || !sa.adjuntoVigente(ambito) {
 			return
 		}
-		sitio := MaxAdjuntos - len(c.Pendientes)
-		if sitio <= 0 || len(rutas) > sitio {
-			c.PonerAvisoComando(t.T("composer.maxAttachments", i18n.Vars{"count": MaxAdjuntos}))
-		}
-		for _, ruta := range rutas[:max(0, min(len(rutas), sitio))] {
-			sa.subir(ambito, ruta)
-		}
+		sa.adjuntarRutas(ambito, rutas)
 	})
+}
+
+// adjuntarRutas sube esas rutas a la caja del ámbito hasta el tope por mensaje; las que
+// no caben se quedan fuera y la caja lo dice (`composer.maxAttachments`), como el
+// `addFiles` de la web, que es el mismo para el selector y para soltar.
+func (sa *Sala) adjuntarRutas(ambito ambitoSubida, rutas []string) {
+	c := ambito.compositor
+	sitio := MaxAdjuntos - len(c.Pendientes)
+	if sitio <= 0 || len(rutas) > sitio {
+		c.PonerAvisoComando(sa.P.T.T("composer.maxAttachments", i18n.Vars{"count": MaxAdjuntos}))
+	}
+	for _, ruta := range rutas[:max(0, min(len(rutas), sitio))] {
+		sa.subir(ambito, ruta)
+	}
+}
+
+// puedeSoltarAdjuntos dice si soltar ficheros adjunta algo: con un canal abierto, Drive
+// a mano y la caja encendida. Sin conexión o sin permiso de escritura la web tampoco
+// acepta el arrastre (`networkDisabled` en su `onDragOver`).
+func (sa *Sala) puedeSoltarAdjuntos() bool {
+	return sa.abierto != "" && sa.Ficheros != nil && sa.P.Canal.Compositor != nil && !sa.P.Canal.Compositor.Inerte
+}
+
+// AdjuntarSoltados es el `onDrop` del compositor: los ficheros soltados sobre la ventana
+// se suben al canal abierto como los de «Subir desde tu equipo», con su ficha y su
+// porcentaje y el mismo tope por mensaje. Sin canal abierto no hace nada.
+func (sa *Sala) AdjuntarSoltados(rutas []string) {
+	sa.Arrastrando(false)
+	if len(rutas) == 0 || !sa.puedeSoltarAdjuntos() {
+		return
+	}
+	sa.adjuntarRutas(sa.ambitoAdjunto(), rutas)
+}
+
+// Soltado recibe lo de `Window.SetOnDropped`: de las URI, solo los ficheros locales.
+// Una carpeta soltada se queda fuera: `os.Open` la abre, pero leerla falla, y dejaría
+// una ficha fallida con su nombre ocupando uno de los huecos del mensaje.
+func (sa *Sala) Soltado(_ fyne.Position, uris []fyne.URI) {
+	var rutas []string
+	for _, u := range uris {
+		if u == nil || u.Scheme() != "file" {
+			continue
+		}
+		if fi, err := os.Stat(u.Path()); err == nil && fi.Mode().IsRegular() {
+			rutas = append(rutas, u.Path())
+		}
+	}
+	sa.AdjuntarSoltados(rutas)
+}
+
+// Arrastrando es lo que avisa `soltar.AlArrastrar`: con ficheros encima de la ventana
+// el compositor enseña «Suelta para adjuntar», si hay dónde adjuntarlos.
+func (sa *Sala) Arrastrando(encima bool) {
+	if c := sa.P.Canal.Compositor; c != nil {
+		c.PonerArrastrando(encima && sa.puedeSoltarAdjuntos())
+	}
+}
+
+// SoltarTexto es soltar texto o un enlace (`soltar.AlSoltar`) sobre el compositor: entra
+// en la caja, por donde cae si cae en el área de texto. Fuera del compositor, o sin
+// canal, no hace nada y devuelve false.
+func (sa *Sala) SoltarTexto(texto string, pos fyne.Position) bool {
+	c := sa.P.Canal.Compositor
+	if sa.abierto == "" || c == nil {
+		return false
+	}
+	return c.SoltarTexto(texto, pos)
 }
 
 // Los glifos de DrivePickerModal: `FolderGlyph` y `FileGlyph` en una sola `d`, que es lo
 // que pide el selector de la suite.
 const (
-	rutaCarpetaDrive = "M3 7a2 2 0 0 1 2-2h3.5l2 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
-	rutaFicheroDrive = "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z M14 3v5h5"
+	rutaCarpetaDrive = "M3.5 6.5A1.5 1.5 0 0 1 5 5h4.4l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5ZM3.5 10.5h17"
+	rutaFicheroDrive = "M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5"
 )
 
 // ElegirDeDrive es «Elegir de Sytue Drive» (`DrivePickerModal`): el selector de la suite

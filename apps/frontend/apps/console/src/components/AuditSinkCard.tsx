@@ -20,6 +20,7 @@ import {
   CardBody,
   CardHeader,
   CardTitle,
+  InlineHelp,
   Input,
   Switch,
   ToastProvider,
@@ -103,9 +104,9 @@ function Inner({ sink, locale, t }: { sink: AuditSink | null; locale: Locale; t:
           arreglarlo: casi siempre es un 401 del SIEM o un certificado caducado.
         */}
         {sink?.last_error ? (
-          <p class="bg-danger-bg text-danger-text mb-3 rounded-md px-3 py-2 text-sm">
+          <InlineHelp tone="danger" class="mb-3">
             {sink.last_error}
-          </p>
+          </InlineHelp>
         ) : null}
         {sink?.last_sent_at ? (
           <p class="sytue-meta mb-3">

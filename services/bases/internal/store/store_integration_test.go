@@ -397,6 +397,10 @@ func TestVistasYFiltros(t *testing.T) {
 	if _, err := e.s.CrearVista(e.ctx, ana, e.tabl.ID, "Tablero", domain.VistaKanban, domain.ConfigVista{GroupBy: sel.ID}); err != nil {
 		t.Errorf("kanban: %v", err)
 	}
+	// Galería (0034 amplía el CHECK): se guarda con su filtro y su orden, como la rejilla.
+	if g, err := e.s.CrearVista(e.ctx, ana, e.tabl.ID, "Galería", domain.VistaGaleria, domain.ConfigVista{Sort: []domain.Orden{{Field: e.txt.ID, Dir: "asc"}}}); err != nil || g.Kind != domain.VistaGaleria {
+		t.Errorf("galería: %+v %v", g, err)
+	}
 	if _, err := e.s.CrearVista(e.ctx, ana, e.tabl.ID, "Mal", domain.VistaRejilla, domain.ConfigVista{Filters: []domain.Filtro{{Field: uuid.NewString(), Op: "eq", Value: j("x")}}}); !errors.Is(err, domain.ErrInvalido) {
 		t.Errorf("filtro sobre campo inexistente: %v", err)
 	}

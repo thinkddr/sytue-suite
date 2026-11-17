@@ -154,7 +154,7 @@ for (const [tema, nombre] of [
         filas: document.querySelectorAll('[id^="sytue-mes-"] > div:not([inert])').length,
         lista: document.querySelector('section h2')?.textContent ?? null,
         buscador: document.querySelector('input[type="search"]') !== null,
-        cajon: [...document.querySelectorAll('[role="group"] [aria-pressed="true"]')]
+        cajon: [...document.querySelectorAll('[role="radiogroup"] [aria-checked="true"]')]
           .map((b) => b.textContent)
           .find((x) => ['Mes', 'Semana', 'Día', 'Agenda'].includes(x)),
       };
@@ -206,6 +206,68 @@ for (const [tema, nombre] of [
   exigir(suelta.valor === 'Semana' && suelta.alto === 64, `${nombre}: soltar a 144 lleva a la semana`);
   await asa.press('Home');
   await asentar();
+
+  // El asa y tirar para refrescar no se pisan, con TOQUES de verdad (CDP): un tirón desde
+  // el asa en el mes estira la hoja y vuelve sin refrescar; desde un día, tampoco
+  // refresca; desde la lista en lo alto, sí, sin mover el asa. El refresco se cuenta en
+  // `sytue:refresh` (anulado para que el banco no se recargue).
+  await page.evaluate(() => {
+    window.__refrescos = 0;
+    window.addEventListener('sytue:refresh', (e) => {
+      window.__refrescos++;
+      e.preventDefault();
+    });
+  });
+  const cdp = await page.context().newCDPSession(page);
+  const dedo = async (tipo, x, y) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type: tipo,
+      touchPoints: tipo === 'touchEnd' ? [] : [{ x, y, id: 1 }],
+    });
+  const tirar = async (x, y0, dy, { foto, soltar = true } = {}) => {
+    await dedo('touchStart', x, y0);
+    for (let i = 1; i <= 12; i++) {
+      await dedo('touchMove', x, y0 + (dy * i) / 12);
+      await page.waitForTimeout(16);
+    }
+    if (foto) await page.screenshot({ path: join(out, foto) });
+    const medio = await hoja();
+    if (soltar) {
+      await page.waitForTimeout(150);
+      await dedo('touchEnd', x, y0 + dy);
+      await asentar();
+    }
+    return medio;
+  };
+  const refrescos = () => page.evaluate(() => window.__refrescos);
+  const cajaAsa = await asa.boundingBox();
+  const asaX = cajaAsa.x + cajaAsa.width / 2;
+  const asaY = cajaAsa.y + cajaAsa.height / 2;
+  const estiron = await tirar(asaX, asaY, 120, { foto: `calendar-asa-estiron-${nombre}.png` });
+  exigir(
+    estiron.alto > 264 && estiron.alto < 264 + 48,
+    `${nombre}: el asa en el mes estira con resistencia (${estiron.alto})`,
+  );
+  const tras = await hoja();
+  exigir(
+    (await refrescos()) === 0 && tras.alto === 264 && tras.valor === 'Mes',
+    `${nombre}: tirar del asa no refresca y la hoja vuelve (${await refrescos()}, ${JSON.stringify(tras)})`,
+  );
+  const trece = await page
+    .locator('[id^="sytue-mes-"] button', { hasText: /^13$/ })
+    .first()
+    .boundingBox();
+  await tirar(trece.x + trece.width / 2, trece.y + 10, 160);
+  exigir((await refrescos()) === 0, `${nombre}: tirar desde un día no refresca`);
+  const titulo2 = await page.locator('section h2').boundingBox();
+  const lista = await tirar(195, titulo2.y + 10, 200, {
+    foto: `calendar-lista-refresca-${nombre}.png`,
+  });
+  exigir(
+    lista.alto === 264 && (await refrescos()) === 1,
+    `${nombre}: desde la lista refresca sin mover el asa (${await refrescos()}, ${lista.alto})`,
+  );
+  await cdp.detach();
 
   if (tema === 'dark') {
     // El cajón, con el bloque de vista y el aviso de pendientes en ☰.
@@ -443,8 +505,8 @@ for (const l of LOCALES) {
   await page.locator('header[role="banner"] button[aria-controls]').first().tap();
   await page.waitForTimeout(350);
   const g = await page.evaluate(() => {
-    const grupo = [...document.querySelectorAll('[role="group"]')].find(
-      (x) => !x.id && x.querySelector('[aria-pressed]'),
+    const grupo = [...document.querySelectorAll('[role="radiogroup"]')].find((x) =>
+      x.closest('[id^="sytue-app-nav-"]'),
     );
     const cajon = grupo?.closest('[id^="sytue-app-nav-"]');
     if (!grupo || !cajon) return null;

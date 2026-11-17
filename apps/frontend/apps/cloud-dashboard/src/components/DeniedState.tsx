@@ -15,7 +15,7 @@
  *
  * Sin JS: se renderiza en el servidor (no lleva `client:*`).
  */
-import { Card, CardBody, EmptyState, Icon } from '@sytue/ui';
+import { Card, CardBody, EmptyState } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
 
@@ -25,11 +25,7 @@ export default function DeniedState({ locale }: { locale: Locale }) {
     <div class="cloud-content">
       <Card>
         <CardBody class="p-0">
-          <EmptyState
-            illustration={<Icon name="lock" size={24} />}
-            title={t('denied.title')}
-            description={t('demo.denied')}
-          />
+          <EmptyState icon="lock" title={t('denied.title')} description={t('demo.denied')} />
         </CardBody>
       </Card>
     </div>

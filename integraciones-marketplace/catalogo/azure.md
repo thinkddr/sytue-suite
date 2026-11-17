@@ -1,9 +1,10 @@
-# Azure (Entra) — alta en Sytue Platform
-**Qué conecta**: gestión de inquilino Entra ID desde la suite (OAuth con `user_impersonation` sobre ARM).
-1. portal.azure.com → **Microsoft Entra ID → App registrations → New registration**; nombre «Sytue», tipos de cuenta «Single tenant».
+<a id="azure-entra--alta-en-sytue-platform"></a>
+# Azure (Entra) — onboarding in Sytue Platform
+**What it connects**: Entra ID tenant management from the suite (OAuth with `user_impersonation` over ARM).
+1. portal.azure.com → **Microsoft Entra ID → App registrations → New registration**; name “Sytue”, account types “Single tenant”.
 2. **Redirect URI (Web)**: `https://integrations.sytue.eu/api/v1/oauth/callback`.
-3. «API permissions» → **Azure Service Management** → delegated `user_impersonation` → **Grant admin consent**.
-4. Copia **Application (client) ID**; crea un **Client secret** y copia el VALOR.
-5. Sytue Platform → Integraciones → **Azure**: rellena **Tenant** (dominio o GUID), Client ID y Secret → «Conectar».
-**Verificar**: la ficha pasa a activa; el panel de Azure del gateway lista el tenant.
-**Errores**: `AADSTS700016` = client_id mal; `AADSTS650051` = falta el permiso ARM con consent.
+3. “API permissions” → **Azure Service Management** → delegated `user_impersonation` → **Grant admin consent**.
+4. Copy the **Application (client) ID**; create a **Client secret** and copy its VALUE.
+5. Sytue Platform → Integraciones (Integrations) → **Azure**: fill in **Tenant** (domain or GUID), Client ID and Secret → «Conectar» (Connect).
+**Verify**: the detail card becomes active; the gateway's Azure panel lists the tenant.
+**Errors**: `AADSTS700016` = wrong client_id; `AADSTS650051` = the ARM permission with consent is missing.

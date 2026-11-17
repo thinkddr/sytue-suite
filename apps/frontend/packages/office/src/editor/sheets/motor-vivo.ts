@@ -17,6 +17,7 @@ import type { SheetAutoFilter, SheetData, SheetModel } from '../types';
 import { hiddenByFilter } from './filtro';
 import { formatCellValue, rawText } from './format';
 import { defineNames } from './nombres';
+import { spanUnits } from './ocultas';
 import { hiddenUnits } from './outline';
 import { collectResolvableTables, compileTables, resolveStructuredRef } from './table';
 import type { ResolvableTable } from './table';
@@ -104,7 +105,7 @@ function firmaDe(model: SheetModel, tablas: ResolvableTable[]): string {
   return JSON.stringify([model.sheets.map((s) => s.name), t, model.names ?? []]);
 }
 
-/** Texto de lo que ocultan el esquema y el filtro de una hoja ('' si nada). */
+/** Texto de lo que ocultan el esquema, el filtro y la mano de una hoja ('' si nada). */
 function ocultasDe(
   model: SheetModel,
   engine: Engine,
@@ -112,6 +113,11 @@ function ocultasDe(
 ): { manual: Set<number>; filtrado: Set<number>; firma: string } {
   const s = model.sheets[i]!;
   const manual = hiddenUnits(s.rowGroups ?? []);
+  // Las ocultas a mano también son «manuales» para SUBTOTAL(10x): solo hasta la última fila
+  // con datos, que más allá no hay nada que contar y un tramo puede llegar al millón.
+  if (s.hiddenRows) {
+    for (const r of spanUnits(s.hiddenRows, engine.usedRange(s.name).maxRow + 1)) manual.add(r);
+  }
   const totals = new Set<number>();
   for (const ct of compileTables(s.tables ?? [])) if (ct.totals) totals.add(ct.rect.r2);
   const filtrado = s.autofilter
@@ -135,7 +141,7 @@ function aplicarOcultas(vivo: MotorVivo, model: SheetModel): void {
   model.sheets.forEach((s, i) => {
     const previa = vivo.ocultas.get(s.name) ?? '';
     // Sin esquema ni filtro y sin nada que limpiar: ni se evalúa.
-    if (previa === '' && !s.autofilter && (s.rowGroups ?? []).length === 0) return;
+    if (previa === '' && !s.autofilter && (s.rowGroups ?? []).length === 0 && !s.hiddenRows) return;
     const { manual, filtrado, firma } = ocultasDe(model, vivo.engine, i);
     if (firma === previa) return;
     vivo.engine.setHiddenRows(s.name, filtrado, manual);

@@ -3,7 +3,8 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * El menú de calidad del reproductor (sobre un hls.js de mentira: el de verdad
- * necesita MediaSource) y la tecla P de imagen dentro de imagen.
+ * necesita MediaSource), el de velocidad con sus teclas < y >, y la tecla P de imagen
+ * dentro de imagen.
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, mock, test } from 'bun:test';
@@ -39,6 +40,7 @@ class HlsFalso {
 void mock.module('hls.js', () => ({ default: HlsFalso }));
 
 const { Player } = await import('./Player.js');
+const { I18nProvider } = await import('@sytue/i18n/preact');
 // Alias: `useT` no es un hook de verdad (no guarda estado), y aquí se llama fuera de un componente.
 const { useT: traductor } = await import('../i18n/index.js');
 const t = traductor('es');
@@ -49,17 +51,27 @@ afterEach(() => {
   host.remove();
 });
 
-async function montar(): Promise<HTMLElement> {
+async function montar(fuente: 'hls' | 'webm' = 'hls'): Promise<HTMLElement> {
   host = document.createElement('div');
   document.body.appendChild(host);
   // happy-dom no reproduce HLS: así el reproductor va por hls.js.
   HTMLMediaElement.prototype.canPlayType = () => '';
   creados.length = 0;
   await act(() => {
-    render(<Player t={t} hls="/media/v/t/hls/master.m3u8" titulo="Prueba" />, host);
+    render(
+      // El idioma de la página: la velocidad se escribe con su separador decimal.
+      <I18nProvider locale="es">
+        {fuente === 'hls' ? (
+          <Player t={t} hls="/media/v/t/hls/master.m3u8" titulo="Prueba" />
+        ) : (
+          <Player t={t} hls={null} webm="/media/v/t/video.webm" titulo="Prueba" />
+        )}
+      </I18nProvider>,
+      host,
+    );
   });
   // hls.js se carga a demanda (import dinámico): se espera a que el reproductor lo cree.
-  for (let i = 0; i < 100 && !ultimo(); i++)
+  for (let i = 0; fuente === 'hls' && i < 100 && !ultimo(); i++)
     await act(async () => {
       await new Promise((r) => setTimeout(r, 10));
     });
@@ -104,4 +116,107 @@ test('P abre la imagen dentro de imagen, como el botón', async () => {
     region.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true }));
   });
   expect(pedida).toBe(1);
+});
+
+const botonVelocidad = (h: HTMLElement): HTMLButtonElement =>
+  h.querySelector<HTMLButtonElement>('[aria-label^="Velocidad:"]')!;
+const pulsar = async (h: HTMLElement, key: string): Promise<void> => {
+  await act(() => {
+    h.querySelector('[role="region"]')!.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true }),
+    );
+  });
+};
+
+test('el menú de velocidad va de 0,5× a 2×, cambia el vídeo y lo anuncia', async () => {
+  const h = await montar();
+  const v = h.querySelector('video')!;
+  const boton = botonVelocidad(h);
+  expect(boton.textContent).toBe('1×');
+  expect(boton.getAttribute('aria-label')).toBe('Velocidad: 1×');
+  expect(h.querySelector('[role="status"]')?.textContent).toBe(''); // al cargar, nada
+  await act(() => boton.click());
+  const menu = h.querySelector('[role="menu"][aria-label="Velocidad"]')!;
+  const opciones = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
+  expect(opciones.map((o) => o.textContent)).toEqual([
+    '0,5×',
+    '0,75×',
+    'Normal',
+    '1,25×',
+    '1,5×',
+    '1,75×',
+    '2×',
+  ]);
+  expect(opciones[2]!.getAttribute('aria-checked')).toBe('true');
+  opciones[4]!.focus();
+  await act(() => opciones[4]!.click());
+  expect(v.playbackRate).toBe(1.5);
+  // El foco vuelve al botón, no al `body`: las teclas del reproductor siguen.
+  expect(document.activeElement).toBe(botonVelocidad(h));
+  // También la por defecto: un `load()` (otra fuente, recuperarse) no la devuelve a 1×.
+  expect(v.defaultPlaybackRate).toBe(1.5);
+  expect(h.querySelector('[role="menu"]')).toBeNull();
+  expect(botonVelocidad(h).textContent).toBe('1,5×');
+  expect(h.querySelector('[role="status"]')?.textContent).toBe('Velocidad 1,5×');
+  await act(() => botonVelocidad(h).click());
+  expect(h.querySelector('[role="menuitemradio"][aria-checked="true"]')?.textContent).toBe('1,5×');
+  // Escape lo cierra, como el de calidad, y devuelve el foco al botón.
+  h.querySelector<HTMLButtonElement>('[role="menuitemradio"]')!.focus();
+  await pulsar(h, 'Escape');
+  expect(h.querySelector('[role="menu"]')).toBeNull();
+  expect(document.activeElement).toBe(botonVelocidad(h));
+});
+
+test('< y > bajan y suben la velocidad un peldaño, sin dar la vuelta', async () => {
+  const h = await montar();
+  const v = h.querySelector('video')!;
+  await pulsar(h, '>');
+  await pulsar(h, '>');
+  expect(v.playbackRate).toBe(1.5);
+  expect(h.querySelector('[role="status"]')?.textContent).toBe('Velocidad 1,5×');
+  await pulsar(h, '<');
+  expect(v.playbackRate).toBe(1.25);
+  for (let i = 0; i < 6; i++) await pulsar(h, '>');
+  expect(v.playbackRate).toBe(2);
+  for (let i = 0; i < 9; i++) await pulsar(h, '<');
+  expect(v.playbackRate).toBe(0.5);
+  expect(botonVelocidad(h).textContent).toBe('0,5×');
+});
+
+test('la velocidad está también sin hls.js (el WebM de respaldo), donde no hay calidad', async () => {
+  const h = await montar('webm');
+  expect(h.querySelector('[aria-label="Calidad"]')).toBeNull();
+  expect(botonVelocidad(h)).not.toBeNull();
+  await pulsar(h, '>');
+  expect(h.querySelector('video')!.playbackRate).toBe(1.25);
+});
+
+test('abrir un menú cierra el otro', async () => {
+  const h = await montar();
+  await act(() => ultimo()!.emitir('manifest'));
+  await act(() => botonVelocidad(h).click());
+  await act(() => h.querySelector<HTMLButtonElement>('[aria-label="Calidad"]')!.click());
+  expect(h.querySelectorAll('[role="menu"]').length).toBe(1);
+  expect(h.querySelector('[role="menu"]')!.getAttribute('aria-label')).toBe('Calidad');
+  await act(() => botonVelocidad(h).click());
+  expect(h.querySelectorAll('[role="menu"]').length).toBe(1);
+  expect(h.querySelector('[role="menu"]')!.getAttribute('aria-label')).toBe('Velocidad');
+});
+
+test('con un menú abierto la barra no se esconde aunque el vídeo siga', async () => {
+  const h = await montar();
+  const v = h.querySelector('video')!;
+  // happy-dom no reproduce: se finge que el vídeo va.
+  Object.defineProperty(v, 'paused', { configurable: true, get: () => false });
+  // `play` arranca el temporizador que esconde la barra.
+  await act(() => {
+    v.dispatchEvent(new Event('play'));
+  });
+  await act(() => botonVelocidad(h).click());
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 2700));
+  });
+  const barra = botonVelocidad(h).closest('.transition-opacity')!;
+  expect(barra.className).toContain('opacity-100');
+  expect(h.querySelector('[role="menu"]')).not.toBeNull();
 });

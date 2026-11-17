@@ -25,11 +25,11 @@ func TestLaVistaPreviaEsSoloParaLoQueNoTieneApp(t *testing.T) {
 		"notas.md": "texto", "main.go": "texto", "foto.webp": "imagen", "logo.svg": "", "foto.avif": "imagen",
 		"informe.pdf": "", "playa.jpg": "", "acta.docx": "", "copia.zip": "",
 	} {
-		if got := TipoVista(Elemento{Nombre: nombre, Tamano: 10}); got != quiero {
+		if got := TipoVista(Elemento{Nombre: nombre, Tamano: 10}, false); got != quiero {
 			t.Errorf("%s: %q y quiero %q", nombre, got, quiero)
 		}
 	}
-	if TipoVista(Elemento{Nombre: "enorme.log", Tamano: TopeVistaTexto + 1}) != "" {
+	if TipoVista(Elemento{Nombre: "enorme.log", Tamano: TopeVistaTexto + 1}, false) != "" {
 		t.Error("un texto de más de 1 MB se enseñaría: tiene que descargarse")
 	}
 }

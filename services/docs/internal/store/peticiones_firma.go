@@ -48,6 +48,18 @@ type PeticionFirma struct {
 	// Silenciada: se «envió» pero no llega (bloqueo o política, mig. 0013). Quien
 	// pidió no la distingue de otra; por eso no sale por la API.
 	Silenciada bool `json:"-"`
+	// Cadena (mig. 0034): las de un mismo Circuito se firman por Orden, desde 0; la
+	// del turno está pendiente y las siguientes «en_espera». Caduca, si no es nil, es
+	// cuándo deja de poder firmarse; RecordarDias, cada cuántos días se le recuerda a
+	// quien tiene el turno (0 = nunca), y Avisada, cuándo se le avisó por última vez.
+	Circuito     string     `json:"chain,omitempty"`
+	Orden        int        `json:"step,omitempty"`
+	Caduca       *time.Time `json:"expires_at,omitempty"`
+	RecordarDias int        `json:"remind_every_days,omitempty"`
+	Avisada      time.Time  `json:"-"`
+	// Siguiente es la de la cadena a la que acaba de llegarle el turno al firmar ésta
+	// ([Store.ResolverPeticionFirma]); nil si no hay cadena o era la última.
+	Siguiente *PeticionFirma `json:"-"`
 }
 
 // Estados de una petición de firma.
@@ -56,6 +68,21 @@ const (
 	FirmaFirmada   = "firmada"
 	FirmaRechazada = "rechazada"
 	FirmaCancelada = "cancelada"
+	// FirmaEnEspera: de una cadena, aún no le toca (mig. 0034).
+	FirmaEnEspera = "en_espera"
+	// FirmaCaducada: pasó su fecha sin firmarse (mig. 0034).
+	FirmaCaducada = "caducada"
+)
+
+// Topes de una cadena de firmas (mig. 0034).
+const (
+	// MaxFirmantesEnCadena: cada una es un aviso y un correo; diez personas firmando
+	// un mismo PDF ya es un circuito muy largo.
+	MaxFirmantesEnCadena = 10
+	// MaxCaducidadDias y MaxRecordarDias son lo más lejos que se puede poner la
+	// caducidad y el recordatorio.
+	MaxCaducidadDias = 90
+	MaxRecordarDias  = 30
 )
 
 var (
@@ -90,17 +117,32 @@ const (
 	MaxPendientesDeFuera = 20
 )
 
+// El estado sale ya «caducada» si pasó su fecha y el barrido de cada hora aún no ha
+// llegado: nadie ve como pendiente algo que ya no se puede firmar.
 const columnasPeticionFirma = `id::text, solicitante, solicitante_nombre, destinatario, destinatario_correo, fichero, ruta, mensaje,
-	estado, creada, resuelta, coalesce(firmado, ''), coalesce(firmado_ruta, ''),
+	CASE WHEN estado IN ('pendiente', 'en_espera') AND caduca <= now() THEN 'caducada' ELSE estado END, creada, resuelta, coalesce(firmado, ''), coalesce(firmado_ruta, ''),
 	externo, enlace, coalesce(enlace_share, ''), coalesce(copia, ''), coalesce(copia_ruta, ''),
-	coalesce(huella, ''), coalesce(firmado_huella, ''), silenciada`
+	coalesce(huella, ''), coalesce(firmado_huella, ''), silenciada,
+	coalesce(circuito::text, ''), orden, caduca, recordar_dias, avisada`
 
 func escanearPeticionFirma(f pgx.CollectableRow) (PeticionFirma, error) {
 	var p PeticionFirma
-	return p, f.Scan(&p.ID, &p.Solicitante, &p.SolicitanteNombre, &p.Destinatario, &p.DestinatarioCorreo, &p.Fichero, &p.Ruta,
-		&p.Mensaje, &p.Estado, &p.Creada, &p.Resuelta, &p.Firmado, &p.FirmadoRuta,
-		&p.Externo, &p.Enlace, &p.EnlaceShare, &p.Copia, &p.CopiaRuta, &p.Huella, &p.FirmadoHuella, &p.Silenciada)
+	err := f.Scan(destinosPeticionFirma(&p)...)
+	return p, err
 }
+
+// destinosPeticionFirma son los campos de `p` en el orden de [columnasPeticionFirma].
+func destinosPeticionFirma(p *PeticionFirma) []any {
+	return []any{
+		&p.ID, &p.Solicitante, &p.SolicitanteNombre, &p.Destinatario, &p.DestinatarioCorreo, &p.Fichero, &p.Ruta,
+		&p.Mensaje, &p.Estado, &p.Creada, &p.Resuelta, &p.Firmado, &p.FirmadoRuta,
+		&p.Externo, &p.Enlace, &p.EnlaceShare, &p.Copia, &p.CopiaRuta, &p.Huella, &p.FirmadoHuella, &p.Silenciada,
+		&p.Circuito, &p.Orden, &p.Caduca, &p.RecordarDias, &p.Avisada,
+	}
+}
+
+// abierta: sigue pendiente (o esperando turno) y no ha pasado su fecha.
+const abierta = `(caduca IS NULL OR caduca > now())`
 
 // ParaQuienFirma es la fila como la ve su destinatario de FUERA: «el PDF» es su copia
 // —la franja y la entrega van con ella— y del original solo sabe el nombre, no dónde
@@ -131,7 +173,9 @@ func (p PeticionFirma) ParaQuienPide() PeticionFirma {
 // Devuelve `llena` si la persona de fuera ya tiene su tope de pendientes: esa no se
 // rechaza, se crea SILENCIADA. Con un 429 quien pide podría contar, llenando el tope
 // desde otras cuentas, cuáles de sus peticiones le han llegado y cuáles no (ADR 0059).
-func comprobarPeticionFirma(ctx context.Context, tx pgx.Tx, p PeticionFirma) (llena bool, err error) {
+//
+// `n` es cuántas filas se van a crear (una cadena cuenta entera contra el tope por hora).
+func comprobarPeticionFirma(ctx context.Context, tx pgx.Tx, p PeticionFirma, n int) (llena bool, err error) {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('pdf-firma:' || $1)),
 		pg_advisory_xact_lock(hashtext('pdf-firma-a:' || $2))`, p.Solicitante, p.Destinatario); err != nil {
 		return false, err
@@ -149,7 +193,7 @@ func comprobarPeticionFirma(ctx context.Context, tx pgx.Tx, p PeticionFirma) (ll
 	// Estos tres cuentan TODO lo de quien pide, llegara o no: los podría contar él
 	// mismo, así que no dicen nada que no sepa.
 	switch {
-	case ultimaHora >= MaxPeticionesFirmaPorHora:
+	case ultimaHora+n > MaxPeticionesFirmaPorHora:
 		return false, ErrDemasiadasPeticionesFirma
 	case repetida > 0:
 		return false, ErrPeticionFirmaRepetida
@@ -181,7 +225,7 @@ func errorAlCrear(err error) error {
 // no crear en Drive un enlace que haya que quitar enseguida.
 func (s *Store) PuedePedirFirma(ctx context.Context, p PeticionFirma) error {
 	if err := s.tenantTx(ctx, func(tx pgx.Tx) error {
-		_, err := comprobarPeticionFirma(ctx, tx, p)
+		_, err := comprobarPeticionFirma(ctx, tx, p, 1)
 		return err
 	}); err != nil {
 		return errorAlCrear(err)
@@ -193,7 +237,7 @@ func (s *Store) PuedePedirFirma(ctx context.Context, p PeticionFirma) error {
 func (s *Store) CrearPeticionFirma(ctx context.Context, p PeticionFirma) (PeticionFirma, error) {
 	var out PeticionFirma
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
-		llena, err := comprobarPeticionFirma(ctx, tx, p)
+		llena, err := comprobarPeticionFirma(ctx, tx, p, 1)
 		if err != nil {
 			return err
 		}
@@ -202,12 +246,12 @@ func (s *Store) CrearPeticionFirma(ctx context.Context, p PeticionFirma) (Petici
 		rows, err := tx.Query(ctx, `
 			INSERT INTO pdf_peticiones_firma
 			    (tenant, solicitante, solicitante_nombre, destinatario, destinatario_correo, fichero, ruta, mensaje,
-			     externo, enlace, enlace_share, huella, silenciada)
+			     externo, enlace, enlace_share, huella, silenciada, caduca, recordar_dias)
 			VALUES (current_setting('app.tenant', true), $1, $2, $3, $4, $5, $6, $7, $8, $9, nullif($10, ''), nullif($11, ''),
-			        $8 AND ($12 OR docs_firma_bloqueado($3, $1)))
+			        $8 AND ($12 OR docs_firma_bloqueado($3, $1)), $13, $14)
 			RETURNING `+columnasPeticionFirma,
 			p.Solicitante, p.SolicitanteNombre, p.Destinatario, p.DestinatarioCorreo, p.Fichero, p.Ruta, p.Mensaje,
-			p.Externo, p.Enlace, p.EnlaceShare, p.Huella, p.Silenciada || llena)
+			p.Externo, p.Enlace, p.EnlaceShare, p.Huella, p.Silenciada || llena, p.Caduca, p.RecordarDias)
 		if err != nil {
 			return err
 		}
@@ -216,6 +260,56 @@ func (s *Store) CrearPeticionFirma(ctx context.Context, p PeticionFirma) (Petici
 	})
 	if err != nil {
 		return PeticionFirma{}, errorAlCrear(err)
+	}
+	return out, nil
+}
+
+// CrearCadenaFirma crea una cadena: `filas` en el orden en que se firma, todas del
+// mismo fichero y de dentro de la organización. La primera queda pendiente y las
+// demás esperando turno; los topes cuentan la cadena entera, y la repetida se mira
+// con la primera, que es la única que avisa ahora.
+func (s *Store) CrearCadenaFirma(ctx context.Context, filas []PeticionFirma) ([]PeticionFirma, error) {
+	if len(filas) < 2 || len(filas) > MaxFirmantesEnCadena {
+		return nil, fmt.Errorf("store: una cadena de firmas es de 2 a %d personas", MaxFirmantesEnCadena)
+	}
+	out := make([]PeticionFirma, 0, len(filas))
+	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
+		if _, err := comprobarPeticionFirma(ctx, tx, filas[0], len(filas)); err != nil {
+			return err
+		}
+		var circuito string
+		if err := tx.QueryRow(ctx, `SELECT gen_random_uuid()::text`).Scan(&circuito); err != nil {
+			return err
+		}
+		for i, p := range filas {
+			if p.Externo {
+				return errors.New("store: en una cadena firma solo gente de la organización")
+			}
+			estado := FirmaPendiente
+			if i > 0 {
+				estado = FirmaEnEspera
+			}
+			rows, err := tx.Query(ctx, `
+				INSERT INTO pdf_peticiones_firma
+				    (tenant, solicitante, solicitante_nombre, destinatario, destinatario_correo, fichero, ruta, mensaje,
+				     circuito, orden, estado, caduca, recordar_dias)
+				VALUES (current_setting('app.tenant', true), $1, $2, $3, $4, $5, $6, $7, $8::uuid, $9, $10, $11, $12)
+				RETURNING `+columnasPeticionFirma,
+				p.Solicitante, p.SolicitanteNombre, p.Destinatario, p.DestinatarioCorreo, p.Fichero, p.Ruta, p.Mensaje,
+				circuito, i, estado, p.Caduca, p.RecordarDias)
+			if err != nil {
+				return err
+			}
+			fila, err := pgx.CollectExactlyOneRow(rows, escanearPeticionFirma)
+			if err != nil {
+				return err
+			}
+			out = append(out, fila)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errorAlCrear(err)
 	}
 	return out, nil
 }
@@ -230,7 +324,7 @@ func (s *Store) PeticionesFirma(ctx context.Context, sub string) (recibidas, ped
 		for _, lado := range []struct {
 			cond string
 			dest *[]PeticionFirma
-		}{{"destinatario = $1 AND NOT silenciada", &recibidas}, {"solicitante = $1", &pedidas}} {
+		}{{"destinatario = $1 AND NOT silenciada AND estado <> 'en_espera'", &recibidas}, {"solicitante = $1", &pedidas}} {
 			rows, err := tx.Query(ctx, `SELECT `+columnasPeticionFirma+` FROM pdf_peticiones_firma
 				WHERE `+lado.cond+` ORDER BY creada DESC LIMIT $2`, sub, maxPeticionesFirma)
 			if err != nil {
@@ -281,7 +375,8 @@ func (s *Store) PeticionesFirma(ctx context.Context, sub string) (recibidas, ped
 func (s *Store) ResolverPeticionFirma(ctx context.Context, id, quien, estado, firmado, firmadoRuta string, enlace []byte, firmadoHuella string) (PeticionFirma, error) {
 	// A quien recibe, lo silenciado no le llega: no lo firma ni lo rechaza. Quien
 	// pidió sí la cancela, como cualquier otra.
-	columna, silencio := "destinatario", " AND NOT silenciada"
+	// Ni firma ni rechaza lo que ya ha caducado, aunque el barrido no haya pasado.
+	columna, silencio := "destinatario", " AND NOT silenciada AND "+abierta
 	if estado == FirmaCancelada {
 		columna, silencio = "solicitante", ""
 	}
@@ -296,7 +391,13 @@ func (s *Store) ResolverPeticionFirma(ctx context.Context, id, quien, estado, fi
 		if err != nil {
 			return err
 		}
-		out, err = pgx.CollectExactlyOneRow(rows, escanearPeticionFirma)
+		if out, err = pgx.CollectExactlyOneRow(rows, escanearPeticionFirma); err != nil || out.Circuito == "" {
+			return err
+		}
+		sig, hay, err := seguirCadena(ctx, tx, out)
+		if hay {
+			out.Siguiente = &sig
+		}
 		return err
 	})
 	if isNoRows(err) {
@@ -308,12 +409,36 @@ func (s *Store) ResolverPeticionFirma(ctx context.Context, id, quien, estado, fi
 	return out, nil
 }
 
+// seguirCadena es lo que le pasa a la cadena de `p` cuando ésta se cierra, en la misma
+// transacción: firmada, le llega el turno a la siguiente, que firma sobre el firmado
+// (se devuelve, con `hay`, para avisarla); rechazada o cancelada, las que esperaban se
+// cancelan.
+func seguirCadena(ctx context.Context, tx pgx.Tx, p PeticionFirma) (sig PeticionFirma, hay bool, err error) {
+	if p.Estado != FirmaFirmada {
+		_, err := tx.Exec(ctx, `UPDATE pdf_peticiones_firma SET estado = 'cancelada', resuelta = now()
+			WHERE circuito = $1::uuid AND estado = 'en_espera'`, p.Circuito)
+		return sig, false, err
+	}
+	rows, err := tx.Query(ctx, `
+		UPDATE pdf_peticiones_firma SET estado = 'pendiente', fichero = $3, ruta = $4, avisada = now()
+		WHERE circuito = $1::uuid AND orden = $2 + 1 AND estado = 'en_espera'
+		RETURNING `+columnasPeticionFirma, p.Circuito, p.Orden, p.Firmado, p.FirmadoRuta)
+	if err != nil {
+		return sig, false, err
+	}
+	sig, err = pgx.CollectExactlyOneRow(rows, escanearPeticionFirma)
+	if isNoRows(err) {
+		return sig, false, nil // era la última
+	}
+	return sig, err == nil, err
+}
+
 // PeticionFirmaPendiente es la pendiente `id` si `destinatario` es a quien se pidió.
 func (s *Store) PeticionFirmaPendiente(ctx context.Context, id, destinatario string) (PeticionFirma, error) {
 	var out PeticionFirma
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT `+columnasPeticionFirma+` FROM pdf_peticiones_firma
-			WHERE id = $1::uuid AND destinatario = $2 AND estado = 'pendiente' AND NOT silenciada`, id, destinatario)
+			WHERE id = $1::uuid AND destinatario = $2 AND estado = 'pendiente' AND NOT silenciada AND `+abierta, id, destinatario)
 		if err != nil {
 			return err
 		}
@@ -344,7 +469,7 @@ func (s *Store) AnfitrionPeticionFirma(ctx context.Context, id, sub string) (str
 // enlace del firmado). Dos a la vez dejarían dos copias: la segunda recibe
 // [ErrPeticionFirmaOcupada]. La reserva caduca sola a los dos minutos.
 func (s *Store) OcuparPeticionFirma(ctx context.Context, id, sub string, recibida bool) (PeticionFirma, error) {
-	cond := `destinatario = $2 AND estado = 'pendiente' AND NOT silenciada`
+	cond := `destinatario = $2 AND estado = 'pendiente' AND NOT silenciada AND ` + abierta
 	if !recibida {
 		cond = `solicitante = $2 AND estado = 'firmada' AND enlace IS NOT NULL`
 	}
@@ -432,6 +557,94 @@ func (s *Store) OlvidarEnlaceFirma(ctx context.Context, id, solicitante string) 
 			WHERE id = $1::uuid AND solicitante = $2`, id, solicitante)
 		return err
 	})
+}
+
+// # El barrido de cada hora: caducidad y recordatorios (mig. 0034)
+
+// PorBarrer es una petición de cualquier organización que el barrido tiene que
+// caducar o recordar. Estado es el de la fila, sin el «caducada» que le pone la
+// lectura: dice si era la del turno.
+type PorBarrer struct {
+	Tenant   string
+	Estado   string
+	Peticion PeticionFirma
+}
+
+// maxPorBarrer es cuántas mira cada vuelta del barrido de cada lado; lo que quede, a
+// la siguiente hora.
+const maxPorBarrer = 500
+
+// PeticionesFirmaPorBarrer son, de TODAS las organizaciones, las abiertas que ya
+// pasaron su fecha y las pendientes a las que les toca recordatorio. Solo lee (la
+// política de la 0034): cada una se cambia luego en una transacción de su
+// organización, con [Store.CaducarPeticionFirma] o [Store.RecordarPeticionFirma].
+func (s *Store) PeticionesFirmaPorBarrer(ctx context.Context) (vencidas, recordar []PorBarrer, err error) {
+	err = s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+		for _, lado := range []struct {
+			cond string
+			dest *[]PorBarrer
+		}{
+			{`estado IN ('pendiente', 'en_espera') AND caduca <= now() ORDER BY caduca`, &vencidas},
+			{`estado = 'pendiente' AND recordar_dias > 0 AND NOT silenciada AND ` + abierta + `
+			  AND avisada <= now() - make_interval(days => recordar_dias) ORDER BY avisada`, &recordar},
+		} {
+			rows, err := tx.Query(ctx, `SELECT tenant, estado, `+columnasPeticionFirma+` FROM pdf_peticiones_firma
+				WHERE `+lado.cond+` LIMIT $1`, maxPorBarrer)
+			if err != nil {
+				return err
+			}
+			if *lado.dest, err = pgx.CollectRows(rows, func(f pgx.CollectableRow) (PorBarrer, error) {
+				var b PorBarrer
+				return b, f.Scan(append([]any{&b.Tenant, &b.Estado}, destinosPeticionFirma(&b.Peticion)...)...)
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("store: peticiones de firma por barrer: %w", err)
+	}
+	return vencidas, recordar, nil
+}
+
+// CaducarPeticionFirma pasa a «caducada» la petición `id` de la organización del
+// contexto si sigue abierta y pasó su fecha. El token del enlace se va con ella, como
+// al rechazarla; el enlace de Drive lo revoca quien pidió al listar.
+// [ErrPeticionFirmaNoEsta] si ya no toca (otra réplica, o se firmó a tiempo).
+func (s *Store) CaducarPeticionFirma(ctx context.Context, id string) (PeticionFirma, error) {
+	return s.barrerUna(ctx, `UPDATE pdf_peticiones_firma
+		SET estado = 'caducada', resuelta = now(), enlace = NULL, ocupada = NULL
+		WHERE id = $1::uuid AND estado IN ('pendiente', 'en_espera') AND caduca <= now()
+		RETURNING `+columnasPeticionFirma, id)
+}
+
+// RecordarPeticionFirma apunta que se le recuerda ahora a quien tiene el turno de
+// `id`, si le toca. Lo cambia UNA réplica: la que lo consigue es la que avisa.
+func (s *Store) RecordarPeticionFirma(ctx context.Context, id string) (PeticionFirma, error) {
+	return s.barrerUna(ctx, `UPDATE pdf_peticiones_firma SET avisada = now()
+		WHERE id = $1::uuid AND estado = 'pendiente' AND recordar_dias > 0 AND NOT silenciada AND `+abierta+`
+		  AND avisada <= now() - make_interval(days => recordar_dias)
+		RETURNING `+columnasPeticionFirma, id)
+}
+
+func (s *Store) barrerUna(ctx context.Context, sql, id string) (PeticionFirma, error) {
+	var out PeticionFirma
+	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, sql, id)
+		if err != nil {
+			return err
+		}
+		out, err = pgx.CollectExactlyOneRow(rows, escanearPeticionFirma)
+		return err
+	})
+	if isNoRows(err) {
+		return PeticionFirma{}, ErrPeticionFirmaNoEsta
+	}
+	if err != nil {
+		return PeticionFirma{}, fmt.Errorf("store: barrer la petición de firma: %w", err)
+	}
+	return out, nil
 }
 
 // # Bloqueos y política de las peticiones de fuera (mig. 0013, ADR 0059)

@@ -53,7 +53,7 @@ func FiltrarConversaciones(cs []Conversacion, f FiltroRapido, abierta string) []
 	return out
 }
 
-// Las medidas de la franja: `flex items-center gap-1 border-b px-4 py-1.5` con botones
+// Las medidas de la franja: `flex flex-wrap items-center gap-1 border-b px-4 py-1.5` con botones
 // `size="xs"` (24 de alto).
 const (
 	rellenoFiltros float32 = 1.5 * 0.25 * tema.Rem

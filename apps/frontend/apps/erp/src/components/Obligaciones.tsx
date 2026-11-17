@@ -25,7 +25,6 @@ import {
   Button,
   EmptyState,
   Icon,
-  Illustration,
   InlineHelp,
   Spinner,
   cx,
@@ -624,19 +623,14 @@ export function Obligaciones({
         </div>
       ) : null}
 
-      {error ? (
-        <p class="bg-danger-bg text-danger-text rounded-md px-4 py-3 text-sm">{error}</p>
-      ) : null}
+      {error ? <InlineHelp tone="danger">{error}</InlineHelp> : null}
 
       {cargando && !datos ? (
         <div class="flex justify-center py-12">
           <Spinner size={24} />
         </div>
       ) : mesesProximos.length + mesesVencidos.length + mesesArchivados.length === 0 ? (
-        <EmptyState
-          title={t('obligations.empty', { year: String(anio) })}
-          illustration={<Illustration name="emptyCalendar" size={96} />}
-        />
+        <EmptyState title={t('obligations.empty', { year: String(anio) })} spot="emptyCalendar" />
       ) : (
         <>
           {pintarMeses(mesesProximos)}

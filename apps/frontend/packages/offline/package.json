@@ -10,7 +10,11 @@
     "./preact": "./src/preact.ts",
     "./worker": "./src/worker.ts",
     "./matrix": "./src/matrix/index.ts",
-    "./matrix/types": "./src/matrix/types.ts"
+    "./matrix/types": "./src/matrix/types.ts",
+    "./matrix/auth": "./src/matrix/auth.ts",
+    "./pqc/runtime": "./src/pqc/runtime.ts",
+    "./session-owner": "./src/session-owner.ts",
+    "./pqc/framing": "./src/pqc/host-codec.ts"
   },
   "files": [
     "src"
@@ -21,10 +25,14 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0",
+    "@sytue/api-clients": "workspace:*",
     "@sytue/config": "workspace:*",
-    "preact": "10.29.8",
+    "another-json": "0.2.0",
+    "hash-wasm": "4.12.0",
+    "lossless-json": "4.3.3",
     "matrix-js-sdk": "45.0.0",
-    "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0"
+    "preact": "10.29.8"
   },
   "devDependencies": {
     "@types/node": "catalog:",

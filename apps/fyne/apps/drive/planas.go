@@ -65,6 +65,9 @@ type BotonFila struct {
 	// Rotulo es el `aria-label`.
 	Rotulo string
 	Inerte bool
+	// Menu marca el «⋯» de la fila: el clic derecho sobre cualquier punto de la fila lo
+	// dispara, como `onContextMenu` en la web. Como mucho uno por fila.
+	Menu bool
 	// AlPulsar recibe la caja del botón, de la que se cuelga un menú.
 	AlPulsar func(disparador fyne.CanvasObject)
 }
@@ -186,10 +189,11 @@ type FilaPlana struct {
 }
 
 var (
-	_ fyne.Widget       = (*FilaPlana)(nil)
-	_ fyne.Tappable     = (*FilaPlana)(nil)
-	_ fyne.Focusable    = (*FilaPlana)(nil)
-	_ desktop.Hoverable = (*FilaPlana)(nil)
+	_ fyne.Widget            = (*FilaPlana)(nil)
+	_ fyne.Tappable          = (*FilaPlana)(nil)
+	_ fyne.SecondaryTappable = (*FilaPlana)(nil)
+	_ fyne.Focusable         = (*FilaPlana)(nil)
+	_ desktop.Hoverable      = (*FilaPlana)(nil)
 )
 
 // NuevaFilaPlana crea la fila.
@@ -325,6 +329,20 @@ func (f *FilaPlana) Tapped(e *fyne.PointEvent) {
 		b := f.Botones[z-1]
 		if !b.Inerte && b.AlPulsar != nil && f.verBoton(b) {
 			b.AlPulsar(f.r.zonas[z-1])
+		}
+	}
+}
+
+// TappedSecondary es el clic derecho (o mantener pulsado): dispara el botón marcado como
+// Menu aunque sea «al pasar» y no se vea aún. Sin él, o inerte, no hace nada.
+func (f *FilaPlana) TappedSecondary(*fyne.PointEvent) {
+	if f.r == nil {
+		return
+	}
+	for i, b := range f.Botones {
+		if b.Menu && !b.Inerte && b.AlPulsar != nil && i < len(f.r.zonas) {
+			b.AlPulsar(f.r.zonas[i])
+			return
 		}
 	}
 }

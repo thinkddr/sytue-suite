@@ -18,11 +18,12 @@ import (
 )
 
 type matrixGate struct {
-	err      error
-	rooms    []string
-	members  [][]string
-	readOnly []bool
-	invite   []bool
+	storageRevocations [][2]string
+	err                error
+	rooms              []string
+	members            [][]string
+	readOnly           []bool
+	invite             []bool
 }
 
 func (g *matrixGate) Reconcile(_ context.Context, room string, subjects []string, readOnly, invite bool) error {
@@ -32,8 +33,14 @@ func (g *matrixGate) Reconcile(_ context.Context, room string, subjects []string
 	g.members = append(g.members, subjects)
 	return g.err
 }
+
+func (g *matrixGate) RevokeStorageAccess(_ context.Context, subject, tenant string) error {
+	g.storageRevocations = append(g.storageRevocations, [2]string{subject, tenant})
+	return g.err
+}
+
 func (g *matrixGate) Redact(context.Context, domain.MatrixEventRef) error { return g.err }
-func bindMatrix(t *testing.T, st *store.Store, ctx context.Context, ch uuid.UUID, actor string) string {
+func bindMatrix(ctx context.Context, t *testing.T, st *store.Store, ch uuid.UUID, actor string) string {
 	t.Helper()
 	room := "!" + ch.String() + ":matrix.sytue.eu"
 	_, err := st.EnsureMatrixChannel(ctx, ch, actor, func(_ context.Context, state store.MatrixChannel) (string, error) { return room, nil })
@@ -47,8 +54,8 @@ func TestMatrixReferenceStoresNoPlaintextAndRetriesOnce(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
-	room := bindMatrix(t, st, ctx, ch.ID, "alice")
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
+	room := bindMatrix(ctx, t, st, ch.ID, "alice")
 	legacy, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: ch.ID, AuthorSub: "alice", Body: "pre-encryption history"})
 	if err != nil {
 		t.Fatal(err)
@@ -85,14 +92,14 @@ func TestMatrixRemoteRevocationFailureRollsBackMembership(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPrivate)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPrivate)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.AddChannelMember(ctx, ch.ID, "alice", "bob", "Bob"); err != nil {
 		t.Fatal(err)
 	}
-	bindMatrix(t, st, ctx, ch.ID, "alice")
+	bindMatrix(ctx, t, st, ch.ID, "alice")
 	gate := &matrixGate{err: domain.ErrMatrixUnavailable}
 	st.SetMatrixGate(gate)
 	if err := st.RemoveChannelMember(ctx, ch.ID, "alice", "bob"); !errors.Is(err, domain.ErrMatrixUnavailable) {
@@ -118,6 +125,7 @@ func TestMatrixRemoteRevocationFailureRollsBackMembership(t *testing.T) {
 func TestMatrixLifecycleRejectsStaleActivationAndRetainsDenial(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
+	st.SetMatrixGate(&matrixGate{})
 	ctx := tenantCtx("acme")
 	calls := 0
 	apply := func(context.Context) error { calls++; return nil }
@@ -198,11 +206,11 @@ func TestDeleteChannelClosesBoundMatrixAndRollsBackRemoteFailure(t *testing.T) {
 			h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 			st := store.New(h.Pool, nil)
 			ctx := tenantCtx("acme")
-			tm, ch := seedTeamChannel(t, ctx, st, "alice", kind)
+			tm, ch := seedTeamChannel(ctx, t, st, "alice", kind)
 			if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 				t.Fatal(err)
 			}
-			room := bindMatrix(t, st, ctx, ch.ID, "alice")
+			room := bindMatrix(ctx, t, st, ch.ID, "alice")
 			gate := &matrixGate{err: domain.ErrMatrixUnavailable}
 			st.SetMatrixGate(gate)
 			if err := st.DeleteChannel(ctx, ch.ID, "bob"); !errors.Is(err, domain.ErrForbidden) {

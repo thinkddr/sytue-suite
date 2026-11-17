@@ -286,7 +286,7 @@ function Panel({
 
         {members.length === 0 ? (
           <EmptyState
-            illustration={<Icon name="users" size={24} />}
+            icon="users"
             title={t('members.empty.title')}
             description={t('members.empty.desc')}
           />

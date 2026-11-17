@@ -37,6 +37,9 @@ export interface PopoverProps {
   open?: boolean;
   /** Aviso de cambio de apertura (modo controlado o telemetría). */
   onOpenChange?: (open: boolean) => void;
+  /** Clases del envoltorio del disparador: `min-w-0` para que un disparador de texto
+   *  con `truncate` dentro de una fila flex pueda encogerse en vez de desbordarla. */
+  class?: string;
 }
 
 // Mismos focusables que Modal: define los extremos del atrapado de Tab.
@@ -55,6 +58,7 @@ export function Popover({
   label,
   open: openProp,
   onOpenChange,
+  class: clase,
 }: PopoverProps): JSX.Element {
   const controlled = openProp !== undefined;
   const [openState, setOpenState] = useState(false);
@@ -251,8 +255,8 @@ export function Popover({
   ) : null;
 
   return (
-    <div class="relative inline-flex">
-      <div ref={triggerRef} class="inline-flex">
+    <div class={cx('relative inline-flex', clase)}>
+      <div ref={triggerRef} class="inline-flex min-w-0">
         {trigger({
           onClick: () => setOpen(!open),
           'aria-expanded': open,

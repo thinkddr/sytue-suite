@@ -18,7 +18,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Modal, Spinner, cx, useToast } from '@sytue/ui';
+import { Button, cx, EmptyState, Icon, InlineHelp, Modal, Spinner, useToast } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { formatDate } from '@sytue/i18n';
 import { appUrl, orgActual, rutaConOrg } from '@sytue/config';
@@ -193,9 +193,7 @@ export function Banco({
         <p class="text-text-muted max-w-prose px-4 pb-4 text-sm">{t('bank.howToBody')}</p>
       </details>
 
-      {error ? (
-        <p class="bg-danger-bg text-danger-text rounded-md px-4 py-3 text-sm">{error}</p>
-      ) : null}
+      {error ? <InlineHelp tone="danger">{error}</InlineHelp> : null}
 
       {!datos ? (
         <div class="flex justify-center py-12">
@@ -205,7 +203,7 @@ export function Banco({
         <EmptyState
           title={t('bank.allDone')}
           description={t('bank.allDoneHint')}
-          illustration={<Illustration name="emptyCalendar" size={96} />}
+          spot="emptyCalendar"
         />
       ) : (
         <section aria-labelledby="banco-pendientes" class="space-y-2">

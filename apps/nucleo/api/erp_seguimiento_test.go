@@ -155,3 +155,66 @@ func TestERPSeguimientoHablaElIdiomaDelServicio(t *testing.T) {
 		}
 	}
 }
+
+// TestERPCierrePideLoQueLaWeb: el cierre del ejercicio va a las rutas y con los cuerpos
+// de Libro.tsx, y lee el historial con su `hasta` como instante (puede faltar: la
+// reapertura que abre el libro entero).
+//
+// VISTO EN ROJO: sin estas tres llamadas no compilaba; con `Hasta` como cadena, el
+// instante RFC 3339 del servicio se leía entero y la pantalla pintaba la hora.
+func TestERPCierrePideLoQueLaWeb(t *testing.T) {
+	var vistas []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cuerpo, _ := io.ReadAll(r.Body)
+		vistas = append(vistas, r.Method+" "+r.URL.Path+" "+string(cuerpo))
+		if r.Method == http.MethodGet {
+			_, _ = io.WriteString(w, `{"cerrado_hasta":"2025-12-31","historial":[`+
+				`{"hasta":"2025-12-31T00:00:00Z","accion":"cierre","en":"2026-02-01T09:00:00Z"},`+
+				`{"accion":"reapertura","motivo":"Corregir","en":"2025-06-01T09:00:00Z"}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer srv.Close()
+	c, ctx := NewERP(srv.URL, nil, nil, "es"), context.Background()
+
+	e, err := c.Cierre(ctx)
+	if err != nil || e.CerradoHasta != "2025-12-31" || len(e.Historial) != 2 {
+		t.Fatalf("cierre: %+v, %v", e, err)
+	}
+	if h := e.Historial[0].Hasta; h == nil || h.Format("2006-01-02") != "2025-12-31" {
+		t.Errorf("el hasta del cierre: %v", h)
+	}
+	if e.Historial[1].Hasta != nil || e.Historial[1].Motivo != "Corregir" {
+		t.Errorf("la reapertura entera: %+v", e.Historial[1])
+	}
+	if err := c.Cerrar(ctx, "2026-10-31"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Reabrir(ctx, "", "Factura mal fechada"); err != nil {
+		t.Fatal(err)
+	}
+	quiero := []string{
+		"GET /api/v1/contabilidad/cierre ",
+		`POST /api/v1/contabilidad/cierre {"hasta":"2026-10-31"}`,
+		`POST /api/v1/contabilidad/reapertura {"hasta":"","motivo":"Factura mal fechada"}`,
+	}
+	if strings.Join(vistas, "\n") != strings.Join(quiero, "\n") {
+		t.Errorf("peticiones:\n%s\nquiero:\n%s", strings.Join(vistas, "\n"), strings.Join(quiero, "\n"))
+	}
+	// Los nombres del servicio, leídos de su código.
+	for fichero, literales := range map[string][]string{
+		"services/syerp/internal/http/cierre.go":  {`"cerrado_hasta"`, `"historial"`, `json:"hasta"`, `json:"motivo"`},
+		"services/syerp/internal/store/cierre.go": {`json:"hasta,omitempty"`, `json:"accion"`, `json:"en"`},
+		"services/syerp/internal/http/server.go": {
+			`Get("/contabilidad/cierre"`, `Post("/contabilidad/cierre"`, `Post("/contabilidad/reapertura"`,
+		},
+	} {
+		codigo := webref.Read(t, fichero)
+		for _, l := range literales {
+			if !strings.Contains(codigo, l) {
+				t.Errorf("%s ya no dice %s", fichero, l)
+			}
+		}
+	}
+}

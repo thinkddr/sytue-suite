@@ -87,7 +87,7 @@ func TestElSalienteSinCanalNoEscuchaPrivadosNiDirectos(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, testCipher(t))
 	acme := tenantCtx("acme")
-	tm, publico := seedTeamChannel(t, acme, st, "alice", domain.ChannelPublic)
+	tm, publico := seedTeamChannel(acme, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(acme, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatal(err)
 	}

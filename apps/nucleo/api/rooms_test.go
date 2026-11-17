@@ -337,7 +337,8 @@ func TestLosCamposDeRoomsSonLosDelServicio(t *testing.T) {
 		`json:"emoji"`, `json:"count"`, `json:"subs,omitempty"`, `json:"collapsed"`, `json:"purpose,omitempty"`,
 		`json:"subject"`, `json:"role"`, `json:"role,omitempty"`, `json:"external,omitempty"`, `json:"mentions,omitempty"`,
 		`json:"root"`, `json:"last_activity"`, `json:"unread_replies"`, `json:"parent_id,omitempty"`,
-		`json:"send_at"`, `json:"file_ids,omitempty"`,
+		`json:"send_at"`, `json:"file_ids,omitempty"`, `json:"also_in_channel,omitempty"`,
+		`json:"last_reply_at,omitempty"`, `json:"thread_participants,omitempty"`, `json:"sub"`,
 	} {
 		if !strings.Contains(dominio, campo) {
 			t.Errorf("services/rooms ya no declara %s: revisar internal/api/rooms.go", campo)

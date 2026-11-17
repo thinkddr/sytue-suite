@@ -209,12 +209,7 @@ func (x *ProcesoObligacion) Elegir(paso int) {
 func (x *ProcesoObligacion) Cuerpo(v tema.Variante, ancho float32) fyne.CanvasObject {
 	p := &pila{}
 	if x.Fallo != "" {
-		a := ui.NuevoParrafo(x.Fallo, tema.TextoBase, ui.Normal, "danger-text", v)
-		l := &lienzo{}
-		h := ui.AltoParrafo(a, max(ancho-2*tema.Espacio(3), 0)) + 2*tema.Espacio(3)
-		l.caja(ui.NuevaCaja(tema.Color("danger-bg", v), sinColor, tema.RadioMD), ancho, h)
-		l.poner(a, tema.Espacio(3), tema.Espacio(3), max(ancho-2*tema.Espacio(3), 0), h-2*tema.Espacio(3))
-		o, _ := l.objeto(h)
+		o, h := cajaPeligro(x.Fallo, tema.TextoBase, v, ancho)
 		p.add(o, h, 0)
 	}
 	if x.Progreso == nil {

@@ -35,6 +35,7 @@ spec:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
           env:
+            {{- include "sytue.storageIngressEnv" . | nindent 12 }}
             {{- if (.Values.global).otlp }}
             {{- if (.Values.global).otlp.endpoint }}
             # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.

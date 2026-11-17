@@ -32,7 +32,7 @@
  *
  * Además de fusionar, el cliente puede mandar solo lo que cambió: `cambios` (celda, caja,
  * diapositiva) como operación `patch`, que el servidor aplica sobre lo último que tiene, en
- * orden de seq y sin 409 (services/docs/internal/domain/parche.go). Lo que no se deja decir así
+ * orden de seq y sin 409 (apps/nucleo/office/model/parche.go). Lo que no se deja decir así
  * (`diferencias` da null) sigue yendo como registro entero con la fusión de arriba.
  *
  * Las hojas van por `id` (SheetData.id, sheets/idhoja.ts): renombrar una hoja mientras
@@ -148,7 +148,7 @@ function fusionarListas(
 /** Un tramo de la ruta de un cambio: clave de objeto, o elemento de lista por `id`. */
 export type Tramo = string | { id: string };
 
-/** Mismo contrato que `domain.Cambio` del servicio (services/docs/internal/domain/parche.go). */
+/** Mismo contrato que `domain.Cambio` del servicio (apps/nucleo/office/model/parche.go). */
 export interface Cambio {
   path: Tramo[];
   value?: unknown;

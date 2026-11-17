@@ -133,8 +133,13 @@ type Bienvenida struct {
 	Ventana float32
 	// Recientes son los modelos abiertos hace poco, el más reciente primero.
 	Recientes []Modelo
-	// Resumen son los indicadores; nil, todavía no han llegado (se pinta igual).
+	// Resumen son los indicadores; nil, todavía no han llegado o no llegarán.
 	Resumen *api.ERPResumen
+	// CargandoResumen dice que el resumen está en camino: las cifras son barras y no un
+	// «0 €» que parece un dato. Si no llega, se pinta lo neutro de siempre.
+	CargandoResumen bool
+	// Facturacion es la de los doce últimos meses, que va bajo los indicadores.
+	Facturacion FacturacionMensual
 	// Tareas son las propias de hoy o vencidas; SinJustificar, los movimientos del
 	// banco que esperan su factura.
 	Tareas, SinJustificar int
@@ -239,7 +244,7 @@ func (b *Bienvenida) ModeloFactura() (Modelo, bool) {
 // Objeto arma la portada.
 func (b *Bienvenida) Objeto(v tema.Variante) fyne.CanvasObject {
 	if b.Fase == Cargando {
-		return centrado(ui.NuevaRueda(24, "text-muted", v), AltoEsqueleto)
+		return b.esqueleto(v)
 	}
 	ancho := anchoUtilDe(b.Ventana, AnchoContenidoLista)
 	p := &pila{}
@@ -435,6 +440,9 @@ func seccionCon(v tema.Variante, titulo string, der *pieza, ancho float32) (fyne
 	return l.objeto(alto)
 }
 
+// FilasEsqueletoProximas son las filas de carga de las próximas obligaciones (`rows={3}`).
+const FilasEsqueletoProximas = 3
+
 // proximas son las cuatro obligaciones que vienen, con «Ver el calendario completo».
 func (b *Bienvenida) proximas(v tema.Variante, ancho float32) (fyne.CanvasObject, float32) {
 	p := &pila{}
@@ -444,10 +452,12 @@ func (b *Bienvenida) proximas(v tema.Variante, ancho float32) (fyne.CanvasObject
 	p.add(o, a, 0)
 	switch {
 	case b.Proximas == nil:
-		r := ui.NuevaRueda(16, "text-muted", v)
-		l := &lienzo{}
-		l.poner(r, 0, 0, 16, 16)
-		o, alto := l.objeto(16)
+		// Las filas de carga comunes (`SkeletonRows` en la web) en la misma caja que las
+		// de verdad, con sus dos líneas y la fecha a la derecha: no una rueda suelta.
+		f := ui.NuevasFilasEsqueleto(FilasEsqueletoProximas, ui.SinDelantero, 2)
+		f.Filete, f.SinUltimoFilete = true, true
+		f.Meta = []ui.MetaEsqueleto{{Ancho: 6 * tema.Rem}}
+		o, alto := listaEnCaja(v, []bloque{{f, f.MinSize().Height, 0}}, radioTarjeta())
 		p.add(o, alto, SeparaSeccion)
 	case len(b.Proximas) == 0:
 		o := ui.NuevoParrafo(b.t("dashboard.upcomingEmpty"), tema.TextoSM, ui.Normal, "text-muted", v)
@@ -565,11 +575,16 @@ func (b *Bienvenida) resumen(v tema.Variante, ancho float32) (fyne.CanvasObject,
 	w := rej.AnchoColumna(ancho)
 	celdas := make([]celdaRejilla, 0, len(ks))
 	for _, k := range ks {
-		o, alto := tarjetaKPI(v, k.rotulo, k.valor, k.pista, k.insignia, k.tono, w, k.al)
+		o, alto := tarjetaKPI(v, k.rotulo, k.valor, k.pista, k.insignia, k.tono, w, k.al, b.CargandoResumen && r == nil)
 		celdas = append(celdas, celdaRejilla{o, alto})
 	}
 	o, alto := enRejilla(rej, cols, ancho, celdas)
 	p.add(o, alto, SeparaSeccion)
+	// Cuándo se facturó, no solo cuánto: a lo ancho de la rejilla (`sm:col-span-3`),
+	// a su `gap-3` de las cifras.
+	if o, alto := b.tarjetaFacturacion(v, ancho); o != nil {
+		p.add(o, alto, HuecoTarjetas)
+	}
 	return p.objeto()
 }
 
@@ -578,7 +593,7 @@ func (b *Bienvenida) resumen(v tema.Variante, ancho float32) (fyne.CanvasObject,
 var AltoKPI = 2*tema.Borde + 2*TarjetaPX + ui.MedidaInsignia("").Height + HuecoUno + tema.TextoXL.Linea + HuecoUno + tema.TextoXS.Linea
 
 // tarjetaKPI es un indicador del resumen: se pulsa entera y abre lo suyo.
-func tarjetaKPI(v tema.Variante, rotulo, valor, pista, insignia string, tono ui.Tono, ancho float32, al func()) (fyne.CanvasObject, float32) {
+func tarjetaKPI(v tema.Variante, rotulo, valor, pista, insignia string, tono ui.Tono, ancho float32, al func(), cargando bool) (fyne.CanvasObject, float32) {
 	dentro := ancho - 2*tema.Borde - 2*TarjetaPX
 	x0 := tema.Borde + TarjetaPX
 	l := &lienzo{}
@@ -595,9 +610,13 @@ func tarjetaKPI(v tema.Variante, rotulo, valor, pista, insignia string, tono ui.
 	ui.Truncar(r, rotulo, tema.TextoXS, ui.Medio, max(dentro-wi-HuecoDos, 0))
 	l.texto(r, x0, x0+1.5)
 	y := x0 + ui.MedidaInsignia("").Height + HuecoUno
-	c := ui.Texto(valor, tema.TextoXL, ui.SemiNegrita, tema.Color("text", v))
-	ui.Truncar(c, valor, tema.TextoXL, ui.SemiNegrita, dentro)
-	l.texto(c, x0, y)
+	if cargando {
+		cifraCargando(l, x0, y, dentro)
+	} else {
+		c := ui.Texto(valor, tema.TextoXL, ui.SemiNegrita, tema.Color("text", v))
+		ui.Truncar(c, valor, tema.TextoXL, ui.SemiNegrita, dentro)
+		l.texto(c, x0, y)
+	}
 	y += tema.TextoXL.Linea + HuecoUno
 	pi := ui.Texto(pista, tema.TextoXS, ui.Normal, tema.Color("text-subtle", v))
 	ui.Truncar(pi, pista, tema.TextoXS, ui.Normal, dentro)
@@ -931,20 +950,12 @@ const (
 	LupaHueco float32 = 3 * 0.25 * tema.Rem
 )
 
-// La tecla es `<kbd class="ml-1 rounded px-1.5 py-0.5 font-mono text-xs">`: la mono es
-// la del navegador del arnés, la misma que lleva la referencia de la tabla.
-const (
-	TeclaLupaPX float32 = 1.5 * 0.25 * tema.Rem
-	TeclaLupaPY float32 = 0.5 * 0.25 * tema.Rem
-)
-
 // textoTecla es la tecla del sistema: «⌘K» en un Mac y «Ctrl K» en lo demás. La web la
 // escribe siempre «⌘K», así que la prueba de medidas la fija a esa para comparar.
 var textoTecla = ui.AtajoDelSistema("Ctrl K")
 
-func medidaTeclaLupa() fyne.Size {
-	return fyne.NewSize(medirTexto(textoTecla, tema.TextoXS, true, ui.Normal)+2*TeclaLupaPX, tema.TextoXS.Linea+2*TeclaLupaPY)
-}
+// medidaTeclaLupa es la de `<Kbd class="ml-1">`, la tecla del papel (ui.TeclaSuperficie).
+func medidaTeclaLupa() fyne.Size { return ui.MedidaTecla(ui.TeclaSuperficie(textoTecla)) }
 
 // MinSize es la lupa, el hueco y la tecla con el `px-3`. Medido: 68,66×28.
 func (b *BotonLupa) MinSize() fyne.Size {
@@ -959,10 +970,8 @@ func (b *BotonLupa) CreateRenderer() fyne.WidgetRenderer {
 		b: b, aro: ui.NuevoAro(tema.Forma("radius-control"), ui.SinHueco, v).Abierto(),
 		caja:  ui.NuevaCaja(color.NRGBA{}, color.NRGBA{}, tema.Forma("radius-control")),
 		lupa:  iconos.Trazo(iconos.Buscar, 14, "text-muted", v),
-		tecla: ui.NuevaCaja(tema.Color("bg-subtle", v), color.NRGBA{}, 1*0.25*tema.Rem),
-		letra: canvas.NewText(textoTecla, tema.Color("text-subtle", v)),
+		tecla: ui.TeclaSuperficie(textoTecla),
 	}
-	r.letra.TextSize, r.letra.TextStyle = tema.TextoXS.Tam, fyne.TextStyle{Monospace: true}
 	r.Refresh()
 	return r
 }
@@ -972,13 +981,12 @@ type lupaRenderer struct {
 	aro   *ui.Aro
 	caja  *ui.Caja
 	lupa  *iconos.Dibujo
-	tecla *ui.Caja
-	letra *canvas.Text
+	tecla *ui.Tecla
 }
 
 func (r *lupaRenderer) MinSize() fyne.Size { return r.b.MinSize() }
 func (r *lupaRenderer) Objects() []fyne.CanvasObject {
-	return append(append(append(r.aro.Objetos(), r.caja.Objetos()...), r.lupa.Objeto()), append(r.tecla.Objetos(), r.letra)...)
+	return append(append(r.aro.Objetos(), r.caja.Objetos()...), r.lupa.Objeto(), r.tecla)
 }
 func (r *lupaRenderer) Destroy() {}
 
@@ -988,12 +996,8 @@ func (r *lupaRenderer) Layout(t fyne.Size) {
 	r.lupa.Colocar(LupaPX, (t.Height-14)/2, 14)
 	m := medidaTeclaLupa()
 	x, y := LupaPX+14+LupaHueco, (t.Height-m.Height)/2
-	r.tecla.Redimensionar(m)
-	for _, o := range r.tecla.Objetos() {
-		o.Move(o.Position().Add(fyne.NewPos(x, y)))
-	}
-	r.letra.Move(fyne.NewPos(x+TeclaLupaPX, y+TeclaLupaPY))
-	r.letra.Resize(fyne.NewSize(m.Width-2*TeclaLupaPX, tema.TextoXS.Linea))
+	r.tecla.Resize(m)
+	r.tecla.Move(fyne.NewPos(x, y))
 }
 
 func (r *lupaRenderer) Refresh() {

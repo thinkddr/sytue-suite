@@ -176,15 +176,10 @@ export const tienda = {
   'store.mode_test_help':
     'Íocaíochtaí insamhailte le heochracha tástála an tsoláthraí. Ní ghearrtar táille ar aon duine.',
   'store.mode_live_help': 'Fíor-íocaíochtaí ó do chustaiméirí leis na heochracha táirgthe.',
-  'store.webhook_title': 'Céim 1: seoladh an webhook',
   'store.webhook_help': 'Greamaigh an seoladh seo i bpainéal {nombre}.',
   'store.webhook_label': 'Seoladh an webhook',
   'store.webhook_error':
     'Níorbh fhéidir seoladh an webhook a fháil. Dún an dialóg agus bain triail eile as.',
-  'store.copy': 'Cóipeáil',
-  'store.copied': 'Cóipeáladh an seoladh.',
-  'store.credentials_title': 'Dintiúir',
-  'store.credentials_step': 'Céim 2: dintiúir',
   'store.f_api_key': 'Eochair API',
   'store.f_api_key_mode': 'Eochair API ({modo})',
   'store.f_profile_id': 'Aitheantas próifíle (roghnach)',
@@ -202,6 +197,48 @@ export const tienda = {
   'store.gateway_save': 'Sábháil agus tástáil',
   'store.gateway_saved': 'Tástáladh agus sábháladh an geata {nombre}.',
   'store.gateway_save_error': 'Níorbh fhéidir dintiúir an gheata a bhailíochtú.',
+  'store.wz_progress': 'Céimeanna chun an tseirbhís íocaíochta a nascadh',
+  'store.wz_step_mode': 'Mód',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Eochracha',
+  'store.wz_step_check': 'Seiceáil',
+  'store.wz_step_done': 'Déanta',
+  'store.wz_mode_heading': 'Íocaíochtaí tástála nó íocaíochtaí fíora?',
+  'store.wz_mode_desc':
+    'Tosaigh sa mhód tástála; nuair a oibríonn gach rud, oscail an draoi seo arís agus roghnaigh an mód beo.',
+  'store.wz_webhook_heading': 'Inis do {nombre} cá háit le fógraí íocaíochta a sheoladh',
+  'store.wz_keys_heading': 'Do chuid eochracha {nombre}',
+  'store.wz_keys_desc':
+    'Stóráiltear eochracha rúnda séalaithe agus ní thaispeántar arís iad: chun ceann a athrú, clóscríobh arís é.',
+  'store.wz_keys_rejected': 'Níor ghlac {nombre} leis na heochracha seo',
+  'store.wz_check_heading': 'Seiceáil agus sábháil',
+  'store.wz_check_desc':
+    'Déanann Sytue Web tástáil ar na heochracha le {nombre} sula gcuirtear an tseirbhís íocaíochta ar siúl. Ní shábháiltear aon rud go dtí go n-éiríonn leis an tástáil.',
+  'store.wz_secret_hidden': 'Clóscríofa (i bhfolach)',
+  'store.wz_empty_value': 'Gan sonrú',
+  'store.wz_done_heading': 'Tá {nombre} réidh',
+  'store.wz_finish': 'Críochnaigh',
+  'store.hint_mollie_api_key':
+    'In Mollie: Developers › API keys. Tosaíonn eochracha tástála le test_ agus eochracha beo le live_.',
+  'store.hint_mollie_profile':
+    'In Mollie: Settings › Website profiles. Tosaíonn sé le pfl_; fág folamh é chun do phróifíl réamhshocraithe a úsáid.',
+  'store.hint_adyen_api_key':
+    'In Adyen Customer Area: Developers › API credentials › do dhintiúr › API key.',
+  'store.hint_adyen_merchant':
+    'In Adyen Customer Area, sa roghnóir cuntais ag an mbarr: an cuntas ceannaí, ní cuntas na cuideachta.',
+  'store.hint_adyen_hmac': 'In Adyen: Developers › Webhooks › do webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'In Adyen (beo): Developers › API URLs. Is é an chuid den seoladh roimh -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Tugann do bhanc duit é leis an gconradh POS fíorúil; tá sé freisin i dtairseach riaracháin Redsys.',
+  'store.hint_redsys_terminal':
+    'I dtairseach riaracháin Redsys, in aice le cód an cheannaí. De ghnáth is 1 é.',
+  'store.hint_redsys_secret':
+    'I dtairseach riaracháin Redsys: sonraí an cheannaí › eochair SHA-256. Tá an eochair tástála agus an eochair bheo difriúil.',
+  'store.hint_stripe_secret':
+    'In Stripe: Developers › API keys › Secret key. Tosaíonn sí le sk_test_ nó sk_live_.',
+  'store.hint_stripe_webhook':
+    'In Stripe: Developers › Webhooks › do chríochphointe › Signing secret. Tosaíonn sé le whsec_.',
   'orders.subtitle': 'Orduithe agus ceannacháin a rinneadh ar do shuíomh gréasáin.',
   'orders.count': {
     one: '{count} ordú',

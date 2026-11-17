@@ -36,6 +36,12 @@ import {
 } from '../client/meetApi.js';
 import type { T } from '../i18n/index.js';
 import { CallEncryption } from '../client/callEncryption.js';
+import {
+  enableAuthorizedMedia,
+  endAutomaticReconnect,
+  finishFailedCall,
+  registerReconnectBarrier,
+} from '../client/callMedia.js';
 import type { PreJoinChoice } from './PreJoin.js';
 import { ordenarPorProtagonista, protagonista, type ModoEscenario } from '../lib/escenario.js';
 import { pegaEsteVideo } from '../lib/pistas.js';
@@ -215,6 +221,7 @@ function EncryptedVideoRoom({
   const reconnectingRef = useRef(false);
   const mediaChoiceRef = useRef({ mic: choice.micOn, cam: choice.camOn });
   const [state, setState] = useState<ConnState>('connecting');
+  const [rejoinRequired, setRejoinRequired] = useState(false);
   const [tiles, setTiles] = useState<TileModel[]>([]);
   // Arrancan como el usuario los dejó en la pantalla previa, no en `true`: de lo
   // contrario la barra diría «micro abierto» mientras el micro está cerrado.
@@ -610,8 +617,8 @@ function EncryptedVideoRoom({
       })
       .on(RoomEvent.EncryptionError, failEncryptedCall)
       .on(RoomEvent.DataReceived, onData)
-      .on(RoomEvent.Reconnecting, () => setState('reconnecting'))
       .on(RoomEvent.Reconnected, () => {
+        if (reconnectingRef.current) return;
         void encryptionRef.current
           ?.refresh()
           .then(() => {
@@ -627,14 +634,37 @@ function EncryptedVideoRoom({
         } else setState('failed');
       });
 
+    registerReconnectBarrier((event, listener) => room.on(event, listener), stopAutomaticReconnect);
+
+    function stopAutomaticReconnect(): void {
+      if (cancelled || ended || reconnectingRef.current) return;
+      const encryption = encryptionRef.current;
+      if (!encryption) {
+        failEncryptedCall();
+        return;
+      }
+      const tracks = [...room.localParticipant.trackPublications.values()]
+        .map((publication) => publication.track)
+        .filter((track) => track !== undefined);
+      setRejoinRequired(true);
+      // LiveKit can restart tracks during automatic reconnect before teardown
+      // settles. Stop them and end the call; rejoining creates a fresh worker.
+      endAutomaticReconnect(tracks, () => encryption.suspendForReconnect(), failEncryptedCall);
+    }
+
     function failEncryptedCall(): void {
       if (cancelled || ended) return;
       ended = true;
-      encryptionRef.current?.close();
-      encryptionRef.current = null;
-      worker.terminate();
-      void room.disconnect();
-      setState('failed');
+      finishFailedCall(
+        () => {
+          const encryption = encryptionRef.current;
+          encryptionRef.current = null;
+          encryption?.close();
+        },
+        () => worker.terminate(),
+        () => room.disconnect(),
+        () => setState('failed'),
+      );
     }
     async function connectEncrypted(next: LiveKitConnection): Promise<void> {
       reconnectingRef.current = true;
@@ -689,13 +719,23 @@ function EncryptedVideoRoom({
           connect: connectEncrypted,
           ready: async () => {
             if (cancelled || ended) return;
+            const guard = encryptionRef.current?.publicationGuard();
+            if (!guard || !guard()) return;
+            const authorized = (): boolean =>
+              !cancelled && !ended && guard() && !!room.localParticipant.permissions?.canPublish;
             setState('connected');
             onPubChange();
             syncTiles();
             await new Promise<void>((resolve) => {
               let checks = 0;
               const check = (): void => {
-                if (cancelled || room.localParticipant.permissions?.canPublish || checks++ >= 20) {
+                if (
+                  cancelled ||
+                  ended ||
+                  !guard() ||
+                  room.localParticipant.permissions?.canPublish ||
+                  checks++ >= 20
+                ) {
                   resolve();
                   return;
                 }
@@ -703,7 +743,7 @@ function EncryptedVideoRoom({
               };
               check();
             });
-            if (cancelled) return;
+            if (cancelled || ended || !guard()) return;
             if (!room.localParticipant.permissions?.canPublish) {
               setMicOn(false);
               setCamOn(false);
@@ -712,9 +752,21 @@ function EncryptedVideoRoom({
             }
             try {
               await aplicarDispositivos(room, choice);
-              if (mediaChoiceRef.current.mic)
-                await room.localParticipant.setMicrophoneEnabled(true);
-              if (mediaChoiceRef.current.cam) await room.localParticipant.setCameraEnabled(true);
+              if (!authorized()) return;
+              if (
+                mediaChoiceRef.current.mic &&
+                !(await enableAuthorizedMedia(authorized, (enabled) =>
+                  room.localParticipant.setMicrophoneEnabled(enabled),
+                ))
+              )
+                return;
+              if (
+                mediaChoiceRef.current.cam &&
+                !(await enableAuthorizedMedia(authorized, (enabled) =>
+                  room.localParticipant.setCameraEnabled(enabled),
+                ))
+              )
+                return;
               if (!cancelled) syncTiles();
             } catch {
               if (!cancelled) {
@@ -753,10 +805,19 @@ function EncryptedVideoRoom({
 
   async function toggleMic(): Promise<void> {
     const next = !micOn;
-    if (next && !encryptionRef.current?.ready) return;
+    const guard = encryptionRef.current?.publicationGuard();
+    if (next && !guard?.()) return;
     // Activar el micro puede fallar sin permisos/dispositivo: no rompas la sala.
     try {
-      await room.localParticipant.setMicrophoneEnabled(next);
+      if (next) {
+        if (
+          !(await enableAuthorizedMedia(
+            () => !!guard?.() && !!room.localParticipant.permissions?.canPublish,
+            (enabled) => room.localParticipant.setMicrophoneEnabled(enabled),
+          ))
+        )
+          return;
+      } else await room.localParticipant.setMicrophoneEnabled(false);
       setMicOn(next);
       mediaChoiceRef.current.mic = next;
     } catch {
@@ -767,9 +828,18 @@ function EncryptedVideoRoom({
 
   async function toggleCam(): Promise<void> {
     const next = !camOn;
-    if (next && !encryptionRef.current?.ready) return;
+    const guard = encryptionRef.current?.publicationGuard();
+    if (next && !guard?.()) return;
     try {
-      await room.localParticipant.setCameraEnabled(next);
+      if (next) {
+        if (
+          !(await enableAuthorizedMedia(
+            () => !!guard?.() && !!room.localParticipant.permissions?.canPublish,
+            (enabled) => room.localParticipant.setCameraEnabled(enabled),
+          ))
+        )
+          return;
+      } else await room.localParticipant.setCameraEnabled(false);
       setCamOn(next);
       mediaChoiceRef.current.cam = next;
     } catch {
@@ -780,13 +850,22 @@ function EncryptedVideoRoom({
 
   async function toggleShare(): Promise<void> {
     const next = !sharing;
-    if (next && !encryptionRef.current?.ready) return;
+    const guard = encryptionRef.current?.publicationGuard();
+    if (next && !guard?.()) return;
     try {
       // `{ audio: true }` pide TAMBIÉN el audio de lo que se comparte. Sin esto,
       // quien pone un vídeo lo comparte mudo y no entiende por qué. El navegador
       // que no sepa hacerlo (Firefox, Safari) simplemente no publica pista de
       // audio: no es un error, es una capacidad que no está.
-      await room.localParticipant.setScreenShareEnabled(next, { audio: true });
+      if (next) {
+        if (
+          !(await enableAuthorizedMedia(
+            () => !!guard?.() && !!room.localParticipant.permissions?.canPublish,
+            (enabled) => room.localParticipant.setScreenShareEnabled(enabled, { audio: true }),
+          ))
+        )
+          return;
+      } else await room.localParticipant.setScreenShareEnabled(false);
       setSharing(next);
     } catch {
       setSharing(false);
@@ -1109,7 +1188,11 @@ function EncryptedVideoRoom({
             </span>
             <div class="space-y-1">
               <p class="text-md text-neutral-0 font-semibold">{t('meet.connectFailed')}</p>
-              <p class="text-sm text-neutral-400">{t('error.checkConnection')}</p>
+              <p class="text-sm text-neutral-400">
+                {rejoinRequired
+                  ? `${t('meet.backToLobby')} → ${t('meet.prejoin.join')}`
+                  : t('error.checkConnection')}
+              </p>
             </div>
             <Button variant="secondary" onClick={onLeave}>
               {t('meet.backToLobby')}

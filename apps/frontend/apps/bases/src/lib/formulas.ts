@@ -9,10 +9,27 @@
  * Pura, para probarla sin navegador.
  */
 import type { BasesField, BasesTable } from '@sytue/api-clients/bases';
+import type { T } from '../i18n/index.js';
 
-/** El campo tal como se filtra, ordena y pinta: una fórmula se comporta como su resultado. */
+/**
+ * El campo tal como se filtra, ordena y agrega: una fórmula se comporta como su
+ * resultado, y un campo con formato como el número o el texto que guarda (igual que
+ * `Campo.Efectivo` en el servicio).
+ */
 export function efectivo(c: BasesField): BasesField {
-  return c.kind === 'formula' ? { ...c, kind: c.result ?? 'number' } : c;
+  switch (c.kind) {
+    case 'formula':
+      return { ...c, kind: c.result ?? 'number' };
+    case 'currency':
+    case 'rating':
+      return { ...c, kind: 'number' };
+    case 'url':
+    case 'email':
+    case 'phone':
+      return { ...c, kind: 'text' };
+    default:
+      return c;
+  }
 }
 
 /** Sustituye cada `{…}` que esté FUERA de un texto entre comillas; null si alguna no se resuelve. */
@@ -98,4 +115,59 @@ export function referenciasDeFormula(
     }
   }
   return out;
+}
+
+/**
+ * Lo que se envía al EDITAR la fórmula de un campo: la expresión con ids, o null si un
+ * nombre no existe. `cambia` es falso si no hay nada que guardar (vacía o la misma que
+ * había), para no mandar una petición que solo recalcularía la tabla entera.
+ */
+export function formulaEditada(
+  texto: string,
+  campo: BasesField,
+  propios: readonly BasesField[],
+  tablas: readonly BasesTable[],
+): { ids: string | null; cambia: boolean } {
+  if (texto.trim() === '') return { ids: null, cambia: false };
+  const ids = formulaAIds(texto, propios, tablas);
+  return { ids, cambia: ids !== null && ids.trim() !== (campo.formula ?? '').trim() };
+}
+
+/**
+ * Las fórmulas que usan un campo —de su tabla, o de otra a través de un enlace—, por
+ * nombre. El servicio no deja borrar un campo así (la fórmula quedaría apuntando a nada,
+ * `BorrarCampo` en `store/estructura.go`); aquí se sabe antes, para decir CUÁLES son.
+ */
+export function formulasQueUsan(campo: BasesField, tablas: readonly BasesTable[]): string[] {
+  const out: string[] = [];
+  for (const t of tablas) {
+    for (const c of t.fields) {
+      if (c.kind !== 'formula' || c.id === campo.id || !c.formula) continue;
+      let usa = false;
+      sustituir(c.formula, (dentro) => {
+        if (dentro.split('.').includes(campo.id)) usa = true;
+        return dentro;
+      });
+      if (usa) out.push(t.id === campo.table_id ? c.name : `${t.name}.${c.name}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * El aviso antes de borrar un campo, y si se puede: borrar se lleva sus valores de
+ * todos los registros, y lo que usa una fórmula no se borra hasta cambiarla.
+ */
+export function avisoBorrarCampo(
+  t: T,
+  campo: BasesField,
+  tablas: readonly BasesTable[],
+): { mensaje: string; bloqueado: boolean } {
+  const usan = formulasQueUsan(campo, tablas);
+  return usan.length > 0
+    ? {
+        mensaje: t('field.deleteBlocked', { name: campo.name, formulas: usan.join(', ') }),
+        bloqueado: true,
+      }
+    : { mensaje: t('field.deleteConfirm', { name: campo.name }), bloqueado: false };
 }

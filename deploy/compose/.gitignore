@@ -5,3 +5,7 @@
 
 # Certificados TLS locales (mkcert)
 traefik/certs/*.pem
+
+# ./sytue-deploy --mode servidor: compose renderizado para tu dominio, alias y
+# configuración de Let's Encrypt (se regeneran en cada ejecución).
+.servidor/

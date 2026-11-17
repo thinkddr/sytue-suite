@@ -296,6 +296,9 @@ func run(ctx context.Context, cfg idhttp.Config, logger *slog.Logger, capturados
 		defer func() { _ = c.Close() }()
 	}
 
+	// Recover existing jobs only after all server policy/cache dependencies are configured.
+	go srv.RunMergeRecovery(ctx)
+
 	// Limpieza periódica de tokens/retos caducados (sobre PostgreSQL, sin colas externas).
 	go cleanupLoop(ctx, st, logger)
 

@@ -19,10 +19,11 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // LOS GUARDIANES DE LOS DIÁLOGOS. Las medidas son de la HOJA —las clases de Tailwind con
-// el rem de 14—, no de un barrido de producción: estos diálogos no están en
+// el rem de 16—, no de un barrido de producción: estos diálogos no están en
 // `test/e2e/medidas-web.mjs`. Se dice así para que nadie las lea como medidas.
 
 func cerca(t *testing.T, que string, tengo, quiero float32) {
@@ -49,8 +50,11 @@ func TestLasFilasDeLosDialogosMidenLoDeLaHoja(t *testing.T) {
 
 	pildora := pildoraEstado(api.TagState{ID: "s1", Name: "Alta", Color: "#b0413a"}, true, nil, v)
 	cerca(t, "la píldora de estado", MedidaOpcion(pildora).Height, 32)
-	if pildora.FondoActivo != hexO("#b0413a", tema.Color("primary", v)) {
-		t.Error("el estado puesto no lleva de fondo el color del estado")
+	// El estado se guardó con la paleta de antes: se pinta con su tono más cercano de la
+	// paleta de colores de usuario, el rojo, sin reescribir lo guardado.
+	rojo, _ := tokens.TonoDeUsuario("red")
+	if pildora.FondoActivo != rojo.NRGBA() {
+		t.Errorf("el estado puesto lleva de fondo %v, y su tono de la paleta es %v", pildora.FondoActivo, rojo.NRGBA())
 	}
 }
 
@@ -154,6 +158,10 @@ func TestLosDialogosSePintan(t *testing.T) {
 		{"retroenlaces", func() { p.dialogoRetroenlaces(n) }, []string{
 			p.tr.T("backlinks.title", nil),
 		}},
+		{"informacion", func() { p.dialogoInformacion(n) }, []string{
+			p.tr.T("note.info", nil), "Presupuesto", p.tr.T("noteInfo.words", nil),
+			p.tr.T("noteInfo.reading", nil), p.tr.T("noteInfo.notebook", nil), "Mudanza",
+		}},
 		{"clave-abrir", func() { p.dialogoClave(false, nil, func(string) error { return nil }) }, []string{
 			p.tr.T("crypto.unlock", nil), p.tr.T("crypto.unlockHint", nil), p.tr.T("crypto.passphrase", nil),
 		}},
@@ -161,7 +169,7 @@ func TestLosDialogosSePintan(t *testing.T) {
 			p.tr.T("crypto.title", nil), p.tr.T("crypto.passphraseRepeat", nil), p.tr.T("crypto.enable", nil),
 		}},
 		{"importar", func() {
-			p.dialogoImportar([]byte("{}"), api.VistaPreviaVolcado{
+			p.dialogoImportar([]byte("{}"), "copia.onex", api.VistaPreviaVolcado{
 				Notebook: api.Notebook{Title: "Mudanza vieja"}, Descartadas: 2,
 				Notas: []api.Note{
 					{ID: "a", Kind: "text", Title: "Cajas", Content: "<p>Veinte <b>grandes</b>.</p>"},

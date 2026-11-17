@@ -14,19 +14,20 @@ package ficheros
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 // Las rutas elegidas, una por línea, o NULL si se canceló. `extensiones` va separada por
-// comas (vacía, cualquier fichero). Quien llama libera el resultado.
+// comas (vacía, cualquier fichero). Con `carpeta`, se elige UNA carpeta y no ficheros.
+// Quien llama libera el resultado.
 //
 // EN EL HILO PRINCIPAL, que es donde AppKit deja enseñar un panel: el bucle de Fyne
 // atiende la cola principal (es por donde ya van `escritorio.Aparecer` y el atajo
 // global), y `runModal` se queda ahí hasta que la persona cierra el panel.
-static char *sytueElegir(const char *titulo, const char *extensiones) {
+static char *sytueElegir(const char *titulo, const char *extensiones, int carpeta) {
 	__block char *salida = NULL;
 	void (^panel)(void) = ^{
 		@autoreleasepool {
 			NSOpenPanel *p = [NSOpenPanel openPanel];
-			p.canChooseFiles = YES;
-			p.canChooseDirectories = NO;
-			p.allowsMultipleSelection = YES;
+			p.canChooseFiles = carpeta ? NO : YES;
+			p.canChooseDirectories = carpeta ? YES : NO;
+			p.allowsMultipleSelection = carpeta ? NO : YES;
 			if (titulo[0] != 0) {
 				p.message = [NSString stringWithUTF8String:titulo];
 			}
@@ -78,11 +79,25 @@ func init() {
 		t, e := C.CString(titulo), C.CString(strings.Join(extensiones, ","))
 		defer C.free(unsafe.Pointer(t))
 		defer C.free(unsafe.Pointer(e))
-		salida := C.sytueElegir(t, e)
+		salida := C.sytueElegir(t, e, 0)
 		if salida == nil {
 			return nil, nil // cancelar no es un error
 		}
 		defer C.free(unsafe.Pointer(salida))
 		return rutasDe(C.GoString(salida)), nil
+	}
+	panelCarpetaPropio = func(titulo string) (string, error) {
+		t, e := C.CString(titulo), C.CString("")
+		defer C.free(unsafe.Pointer(t))
+		defer C.free(unsafe.Pointer(e))
+		salida := C.sytueElegir(t, e, 1)
+		if salida == nil {
+			return "", nil
+		}
+		defer C.free(unsafe.Pointer(salida))
+		if rutas := rutasDe(C.GoString(salida)); len(rutas) > 0 {
+			return rutas[0], nil
+		}
+		return "", nil
 	}
 }

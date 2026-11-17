@@ -30,6 +30,12 @@ export const ALTO_SEMANA = 40;
 export const RECORRIDO_TOQUE = 6;
 /** La velocidad al soltar se mide sobre los últimos milisegundos del gesto. */
 export const VENTANA_VELOCIDAD = 100;
+/**
+ * Lo más que estira la hoja por debajo del mes: tirar del asa hacia abajo con la rejilla
+ * entera no refresca nunca (eso es de la lista); la hoja cede con resistencia, como la
+ * goma del desplazamiento de iOS, y al soltar vuelve.
+ */
+export const ESTIRON_MAX = 48;
 
 /** Alto de la hoja (sin el asa) en una posición, con `filas` semanas en el mes. */
 export function alturaHoja(pos: PosicionAsa, filas: number): number {
@@ -41,6 +47,17 @@ export function alturaHoja(pos: PosicionAsa, filas: number): number {
 /** El alto mientras se arrastra: el de partida más lo recorrido, sin salirse. */
 export function alturaArrastre(desde: PosicionAsa, dy: number, filas: number): number {
   return Math.min(Math.max(alturaHoja(desde, filas) + dy, 0), alturaHoja('mes', filas));
+}
+
+/**
+ * El alto que SE VE mientras se arrastra: el de `alturaArrastre`, más el estirón elástico
+ * por debajo del mes (tiende a ESTIRON_MAX sin llegar). Al soltar decide `alturaArrastre`.
+ */
+export function alturaVisible(desde: PosicionAsa, dy: number, filas: number): number {
+  const tope = alturaHoja('mes', filas);
+  const exceso = alturaHoja(desde, filas) + dy - tope;
+  if (exceso <= 0) return alturaArrastre(desde, dy, filas);
+  return tope + (ESTIRON_MAX * exceso) / (exceso + ESTIRON_MAX);
 }
 
 /**

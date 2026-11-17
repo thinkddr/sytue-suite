@@ -5,7 +5,61 @@
 import type { Catalog } from './catalog.js';
 
 export const ga: Catalog = {
+  'matrix.reset': 'Níl gléas eile agam',
+  'matrix.resetAction': 'Athshocraigh an criptiú',
+  'matrix.resetBody':
+    'Athshocrófar criptiú do chuntais. Ní bheidh teachtaireachtaí criptithe níos sine inléite ach ar ghléasanna a bhfuil siad orthu cheana, agus beidh ort do ghléasanna eile agus do theagmhálaithe a fhíorú arís.',
+  'matrix.resetUnderstood':
+    'Tuigim go bhféadfainn rochtain ar theachtaireachtaí criptithe níos sine a chailleadh',
+  'matrix.unknownKey':
+    'Criptíodh an cuntas seo sular chosain Sytue a eochair le do shíniú isteach. Fíoraigh an gléas seo ó ghléas eile ina bhfuil tú sínithe isteach cheana.',
+  'matrix.unlockTitle': 'Oscail do shonraí criptithe',
+  'matrix.unlockBody':
+    'Deimhnigh gur tusa atá ann le d’eochair rochtana nó le do phasfhocal Sytue. Seiceáiltear é ar an ngléas seo: ní féidir le duine ar bith eile do shonraí a oscailt.',
+  'matrix.protectTitle': 'Cosain do shonraí criptithe',
+  'matrix.protectBody':
+    'Roghnaigh conas a osclóidh tú do shonraí criptithe ar do ghléasanna eile: le d’eochair rochtana nó le do phasfhocal Sytue. Is tusa amháin a bheidh in ann iad a oscailt.',
+  'matrix.usePasskey': 'Úsáid eochair rochtana',
+  'matrix.usePassword': 'Úsáid pasfhocal',
+  'matrix.password': 'Pasfhocal Sytue',
+  'matrix.passwordConfirm': 'Athscríobh an pasfhocal',
+  'matrix.passwordMismatch': 'Ní hionann na pasfhocail.',
+  'matrix.unlockWrong': 'Níor oibrigh sé sin. Bain triail eile as.',
+  'matrix.passkeyUnsupported':
+    'Ní féidir leis an eochair rochtana seo sonraí criptithe a oscailt. Úsáid do phasfhocal.',
+  // Device verification and recovery shared by the suite.
+  'matrix.allowStorageTitle': 'Ceadaigh próiseáil chriptithe',
+  'matrix.allowStorageBody':
+    'Ceadaigh don ghléas fíoraithe seo sonraí criptithe nua don aip seo a phróiseáil.',
+  'matrix.allowStorageAction': 'Ceadaigh an gléas seo',
+  'matrix.choosePerson': 'Roghnaigh duine sa chainéal seo',
+  'matrix.notices': 'Ceadúnais tríú páirtí',
+  'action.cancel': 'Cealaigh',
+  'action.done': 'Déanta',
+  'matrix.auth': 'Deimhnigh d’aitheantas',
+  'matrix.authContinue': 'Tá mé logáilte isteach',
+  'matrix.compare': 'Cuir na emoji seo i gcomparáid ar an dá ghléas.',
+  'matrix.connect': 'Socraigh an gléas seo',
+  'matrix.devices': 'Do ghléasanna',
+  'matrix.failed': 'Níorbh fhéidir an criptiú a shocrú. Bain triail eile as.',
+  'matrix.incoming': 'Fíoraigh an gléas seo',
+  'matrix.match': 'Tá siad mar an gcéanna',
+  'matrix.mismatch': 'Níl siad mar an gcéanna',
+  'matrix.revoke': 'Logáil an gléas amach',
+  'matrix.subtitle':
+    'Criptítear teachtaireachtaí agus comhaid ar do ghléasanna. Ní féidir ach le gléasanna fíoraithe iad a léamh.',
+  'matrix.tab': 'Tá Rooms oscailte i gcluaisín eile. Dún é chun an gléas seo a úsáid anseo.',
+  'matrix.title': 'Criptiú ó cheann ceann',
+  'matrix.trusted': 'Gléas fíoraithe',
+  'matrix.verify': 'Fíoraigh le gléas eile',
+  'matrix.verifyPeopleFirst':
+    'Fíoraigh na daoine sa chomhrá seo sula seolann tú do chéad teachtaireacht.',
+  'matrix.verifyPerson': 'Fíoraigh duine',
+  'matrix.waiting': 'Ag fanacht leis an ngléas eile…',
+  'state.loading': 'Á lódáil…',
+
   'action.retry': 'Bain triail eile as',
+  'account.connectFailed': 'Níorbh fhéidir an cuntas seo a nascadh.',
   'error.connection': 'Seiceáil do nasc agus bain triail eile as.',
   'ui.save': 'Sábháil',
   'ui.cancel': 'Cealaigh',
@@ -17,6 +71,7 @@ export const ga: Catalog = {
   'ui.mainNav': 'Príomhnascleanúint',
   'ui.openNav': 'Oscail an nascleanúint',
   'ui.closeNav': 'Dún an nascleanúint',
+  'ui.settingsIndex': 'Ranna ar an leathanach seo',
   'ui.backToList': 'Ar ais chuig an liosta',
   'ui.suiteOpen': 'Sytue: aipeanna, cuardach, fógraí agus cuntas',
   'ui.suiteClose': 'Ar ais chuig an aip',
@@ -25,6 +80,14 @@ export const ga: Catalog = {
   'ui.meter.full': 'lán',
   'ui.bulk.region': 'Gníomhartha don roghnú',
   'ui.bulk.clear': 'Glan an roghnú',
+
+  'ui.copy.copy': 'Cóipeáil',
+  'ui.copy.copyLabel': 'Cóipeáil: {label}',
+  'ui.copy.copied': 'Cóipeáilte',
+  'ui.copy.copiedLabel': 'Cóipeáilte: {label}',
+  'ui.copy.failed': 'Níorbh fhéidir é a chóipeáil. Roghnaigh an luach agus cóipeáil de láimh é.',
+  'ui.copy.secret': 'rúnda',
+  'ui.migas.ocultas': 'Taispeáin na fillteáin fholaithe',
   'ui.wizard.back': 'Siar',
   'ui.wizard.next': 'Lean ar aghaidh',
   'ui.wizard.cancel': 'Cealaigh',
@@ -36,6 +99,13 @@ export const ga: Catalog = {
   'shell.appSwitcher': 'Sytue One — aipeanna na sraithe',
   'shell.apps': 'Aipeanna Sytue One',
   'shell.shortcutHint': 'Aicearra: {keys}',
+  'shell.shortcuts.title': 'Aicearraí méarchláir',
+  'shell.shortcuts.group': 'An sraith ar fad',
+  'shell.shortcuts.search': 'Cuardaigh in Sytue One',
+  'shell.shortcuts.help': 'Taispeáin an liosta seo',
+  'shell.shortcuts.close': 'Dún dialóg nó roghchlár',
+  'shell.shortcuts.contextMenu': 'Oscail an roghchlár comhthéacs',
+  'shell.shortcuts.key.shift': 'Shift',
   'shell.launchAtLogin': 'Oscail ag logáil isteach',
   'shell.mountDrive': 'Ceangail Drive leis an ríomhaire seo',
   'shell.update.check': 'Seiceáil le haghaidh nuashonruithe',
@@ -62,6 +132,10 @@ export const ga: Catalog = {
   'shell.lock.reasonNotebook': 'do leabhar nótaí criptithe a oscailt',
   'shell.lock.faceIdUsage':
     'Úsáideann Sytue Face ID chun do sheisiún a dhíghlasáil nuair a osclaíonn tú an aip.',
+  'shell.photos.libraryUsage':
+    'Léann Sytue na grianghraif agus na físeáin ar an ngléas seo chun cúltaca a dhéanamh díobh i do Sytue Drive.',
+  'shell.photos.libraryAddUsage':
+    'Sábhálann Sytue na grianghraif a íoslódálann tú i do leabharlann grianghraf.',
   'shell.widgets.wake': 'Nuashonraigh na giuirléidí nuair atá an aip dúnta',
   'shell.widgets.wakeHelp':
     'Nuair a athraíonn rud éigin de do chuid, dúisíonn Sytue an aip le fógra folamh ó Apple ionas go n-athnuafaidh sí a giuirléid. Feiceann Apple cén aip agus cathain, ach ní fheiceann sé riamh cad a d’athraigh.',
@@ -120,6 +194,13 @@ export const ga: Catalog = {
   'search.kind.contact': 'teagmhálaithe',
   'search.kind.note': 'nótaí',
   'search.kind.channel': 'cainéil',
+  'suitePalette.dialog': 'Téigh go dtí nó cuardaigh',
+  'suitePalette.input': 'Cuardaigh nó téigh go dtí',
+  'suitePalette.placeholder': 'Cuardaigh Sytue One nó téigh go dtí…',
+  'suitePalette.typeToSearch': 'Clóscríobh chun Sytue One ar fad a chuardach',
+  'suitePalette.hint.move': 'bog',
+  'suitePalette.hint.open': 'oscail',
+  'suitePalette.hint.close': 'dún',
   'notifications.title': 'Fógraí',
   'notifications.viewAll': 'Féach ar gach fógra',
   'notifications.historic': 'Roimh loga na bhfógraí',
@@ -163,6 +244,9 @@ export const ga: Catalog = {
   'notifications.kind.docs.signature.requested': 'Tá {actor} ag iarraidh ort “{name}” a shíniú',
   'notifications.kind.docs.signature.completed': 'Shínigh {actor} “{name}”',
   'notifications.kind.docs.signature.declined': 'Dhiúltaigh {actor} “{name}” a shíniú',
+  'notifications.kind.docs.signature.expired':
+    'Chuaigh an t-iarratas chun “{name}” a shíniú in éag',
+  'notifications.kind.docs.signature.reminder': 'Tá {actor} fós ag fanacht leat “{name}” a shíniú',
   'notifications.kind.docs.access.granted':
     'Thug {actor} rochtain eagarthóireachta duit ar “{name}”',
   'notifications.kind.erp.task.assigned': 'Shann {actor} “{title}” duit',
@@ -206,6 +290,18 @@ export const ga: Catalog = {
   'account.color.petroleo': 'Gorm peitril',
   'account.color.cobalto': 'Gorm cóbailt',
   'account.color.app': 'De réir aip',
+  'userColor.red': 'Dearg',
+  'userColor.clay': 'Oráiste',
+  'userColor.brass': 'Ócar',
+  'userColor.sage': 'Ológ',
+  'userColor.green': 'Glas',
+  'userColor.teal': 'Glasghorm',
+  'userColor.cyan': 'Peitreal',
+  'userColor.blue': 'Gorm',
+  'userColor.indigo': 'Indeagó',
+  'userColor.plum': 'Corcra',
+  'userColor.rose': 'Bándearg',
+  'userColor.slate': 'Liath',
   'account.forma': 'Cruth',
   'account.forma.marco': 'Fráma',
   'account.forma.carril': 'Ráille',
@@ -316,6 +412,7 @@ export const ga: Catalog = {
     'Tá an bhileog seo cosanta: ní féidir a cealla a athrú go dtí go mbaintear an cosaint di.',
   'readOnly.password': 'Pasfhocal',
   'notifications.kind.erp.access.requested': 'Tá {actor} ag iarraidh “{name}” a chur in eagar',
+  'notifications.kind.erp.approval.requested': 'Tá {actor} ag iarraidh ort “{name}” a cheadú',
   'notifications.kind.erp.access.granted':
     'Thug {actor} rochtain eagarthóireachta duit ar “{name}”',
   'readOnly.module': 'Inléite amháin in “{name}”: is féidir leat é a fheiceáil, ach ní é a athrú.',
@@ -400,4 +497,7 @@ export const ga: Catalog = {
     'Chun “{name}” a oscailt, uaslódálfar chuig do chuntas Sytue One é.',
   'localFile.confirmUpload.remember': 'Cuimhnigh ar mo rogha ar an ngléas seo',
   'localFile.confirmUpload.confirm': 'Uaslódáil agus oscail',
+  'action.back': 'Siar',
+  'action.close': 'Dún',
+  'action.copy': 'Cóipeáil',
 };

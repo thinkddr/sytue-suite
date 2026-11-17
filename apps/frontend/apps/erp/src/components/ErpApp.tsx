@@ -22,42 +22,54 @@
  */
 import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import type { JSX, TargetedSubmitEvent } from 'preact';
-import { FranjaPeticion, SytueShell } from '@sytue/shell';
+import {
+  abrirPaleta,
+  FranjaPeticion,
+  SytueShell,
+  useCapaDePaleta,
+  usePaletaDeLaSuite,
+  type ComandoDeApp,
+} from '@sytue/shell';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 import { getAccessToken } from '@sytue/auth/client';
 import {
-  Modal,
   Badge,
+  BarraMovil,
   Button,
   Card,
+  Checkbox,
+  cx,
+  DURACION_DESHACER,
   EmptyState,
+  esAtajoDeApp,
   FILA_UNICA_EN_MOVIL,
   Icon,
-  useLongPress,
+  InlineHelp,
+  Kbd,
   MASCARA_SCROLL_X,
-  PaletaDeComandos,
+  Modal,
+  ShortcutsModal,
+  SinBarraUnica,
+  SkeletonRows,
   Spinner,
-  cx,
-  useScrollRestante,
-  esAtajoDeApp,
   ToastProvider,
+  useAtajo,
   useConfirm,
-  useNavDrawer,
+  useLongPress,
   useMobileBack,
+  useNavDrawer,
   usePrompt,
+  useScrollRestante,
   useToast,
   withBase,
-  Checkbox,
-  useAtajo,
-  DURACION_DESHACER,
-  BarraMovil,
-  SinBarraUnica,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
-import { contiene, formatDate, translate } from '@sytue/i18n';
+import { formatDate, translate } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { useT } from '../i18n/index.js';
 import type {
   Actividad,
+  Aprobacion,
   Asiento,
   Campo,
   Catalogo,
@@ -86,6 +98,7 @@ import {
 } from './formato.js';
 import { api, baseDeLaApp, consulta, ErrorApi, mensajeDeError, esSinPermiso } from '../lib/api.js';
 import { claveDeFicha } from '../lib/ficha';
+import { hayCambios, useAvisoAlSalir, useGuardaDeFicha } from '../lib/cambios.js';
 import {
   importarLeidos,
   leerFicheros,
@@ -103,6 +116,7 @@ import {
   type AccionDeLote,
 } from '../lib/papelera.js';
 import { invalidarModelo, type ListaAbierta } from '../lib/invalidar.js';
+import { accionDeTecla, gruposDeAtajos } from '../lib/atajos.js';
 import { vacioDeLista } from './vacio.js';
 import { SelectorRelacion } from './SelectorRelacion.js';
 import { AsientoCompacto, Balance, LibroDiario } from './Libro.js';
@@ -113,6 +127,7 @@ import { AltasContext } from './AltasContext.js';
 import { PuntoVenta } from './PuntoVenta.js';
 import { AsistenteFacturas } from './AsistenteFacturas.js';
 import { Tareas } from './Tareas.js';
+import { Aprobaciones, puedeResolver } from './Aprobaciones.js';
 import {
   DocumentosRegistro,
   HistorialRegistro,
@@ -120,8 +135,12 @@ import {
   TareasRegistro,
   hoyISO,
 } from './Seguimiento.js';
+import { CifraCargando, EsqueletoFicha, EsqueletoKPIs, EsqueletoLista } from './Esqueletos.js';
 import { PanelIA, RellenarIA, VistaTablero } from './SytueIA.js';
 import { EstadoVerifactuFactura, TarjetaVerifactu } from './Verifactu.js';
+import { AsistenteImportarDesde } from './ImportarDesde.js';
+import { EnviarFactura } from './EnviarFactura.js';
+import { FacturacionMes } from './FacturacionMes.js';
 
 export interface ErpAppProps {
   user: SytueUser;
@@ -139,6 +158,13 @@ export interface ErpAppProps {
 const CLAVE_RECIENTES = 'sytue-erp-recent-models';
 
 /**
+ * Las columnas de la tabla que se esboza antes de tener el catálogo: aún no se sabe
+ * cuántas tiene el modelo, y cuatro es lo que tienen casi todos (ref, nombre, una cifra
+ * y el estado).
+ */
+const COLUMNAS_ESQUELETO_CATALOGO = 4;
+
+/**
  * Envuelve la app en el proveedor de avisos.
  *
  * `useToast()` devuelve un no-op cuando no hay proveedor, así que sin esto los
@@ -147,6 +173,21 @@ const CLAVE_RECIENTES = 'sytue-erp-recent-models';
  * la ficha, que es quien más avisa— comparta la misma pila.
  */
 export function ErpApp(props: ErpAppProps): JSX.Element {
+  return (
+    <MatrixStorageGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      product="erp"
+      deviceName="Sytue ERP · Web"
+    >
+      <ErpAppBody {...props} />
+    </MatrixStorageGate>
+  );
+}
+
+/** La app ya dentro de la puerta del almacenamiento cifrado; exportada para los tests. */
+export function ErpAppBody(props: ErpAppProps): JSX.Element {
   return (
     <ToastProvider>
       <ErpAppInterna {...props} />
@@ -168,6 +209,7 @@ function ErpAppInterna({
     { modelo: Modelo; creado: (r: Registro) => void; semilla?: Registro['data'] }[]
   >([]);
   const [asistenciaFacturas, setAsistenciaFacturas] = useState(false);
+  const [importandoDesde, setImportandoDesde] = useState(false);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [pagina, setPagina] = useState<Pagina | null>(null);
   const [cargandoLista, setCargandoLista] = useState(false);
@@ -194,11 +236,25 @@ function ErpAppInterna({
   // vuelve a pedir sus estadísticas cuando cambia, y no en cada búsqueda.
   const [revision, setRevision] = useState(0);
   const [ficha, setFicha] = useState<Registro | 'nueva' | null>(null);
+  // Todo lo que saca de la ficha abierta —cerrarla, abrir otra, cambiar de modelo o
+  // de vista— pasa por `dejarFicha`: si hay algo escrito sin guardar, pregunta antes.
+  const {
+    marcar: marcarFicha,
+    dejar: dejarFicha,
+    dialogo: dialogoDescarte,
+    descartes,
+  } = useGuardaDeFicha({
+    titulo: t('form.discardTitle'),
+    mensaje: t('form.discardMessage'),
+    descartar: t('form.discard'),
+    seguir: t('form.keepEditing'),
+  });
   // De dónde copiar al crear. Duplicar un documento es LA acción que ahorra más
   // tiempo en un ERP —la factura de este mes es la del anterior con otra fecha—
   // y hasta ahora había que teclearlo todo otra vez.
   const [semilla, setSemilla] = useState<Registro | null>(null);
-  const [paleta, setPaleta] = useState(false);
+  // La hoja de atajos de teclado («?»).
+  const [atajos, setAtajos] = useState(false);
   // Sytue AI: el panel, los tableros guardados y el que se está viendo.
   const [panelIA, setPanelIA] = useState(false);
   const [tableros, setTableros] = useState<Tablero[]>([]);
@@ -276,6 +332,31 @@ function ErpAppInterna({
   }, []);
   useEffect(contarTareas, [contarTareas]);
 
+  // Las aprobaciones las resuelve quien tiene `aprobar` en contabilidad (lo que
+  // exige la ruta) y los umbrales, quien tiene `administrar`: a nadie más se le
+  // ofrece la cola, que para él sería una lista sin botones.
+  const puedeAprobar = puedeAccion('contabilidad', 'aprobar');
+  const puedeUmbrales = puedeAccion('contabilidad', 'administrar');
+  // Cerrar y reabrir el ejercicio piden lo mismo que la ruta: NIVEL administrador en
+  // contabilidad y además el verbo `administrar`. Con solo el verbo, el servicio
+  // contestaría 403 al confirmar, que es el peor momento para enterarse.
+  const puedeCerrarPeriodo =
+    permisos?.modulos.contabilidad === 'administrador' &&
+    puedeAccion('contabilidad', 'administrar');
+  const [aprobacionesPendientes, setAprobacionesPendientes] = useState(0);
+  const contarAprobaciones = useCallback(() => {
+    if (!puedeAprobar) return;
+    api<{ aprobaciones: Aprobacion[] | null }>(`aprobaciones${consulta({ estado: 'pendiente' })}`)
+      // Solo las que esta persona puede resolver: las suyas esperan a otra.
+      .then((r) =>
+        setAprobacionesPendientes(
+          (r.aprobaciones ?? []).filter((a) => puedeResolver(a, user.id)).length,
+        ),
+      )
+      .catch(() => undefined);
+  }, [puedeAprobar, user.id]);
+  useEffect(contarAprobaciones, [contarAprobaciones]);
+
   // --- Catálogo: una vez, al entrar ---------------------------------------
   useEffect(() => {
     let vivo = true;
@@ -300,7 +381,13 @@ function ErpAppInterna({
     // Un enlace de un correo o de una notificación puede traer la vista
     // («?vista=obligaciones», «?vista=tareas»).
     const pedida = new URLSearchParams(window.location.search).get('vista');
-    if (pedida === 'tareas' || pedida === 'obligaciones' || pedida === 'banco') setVista(pedida);
+    if (
+      pedida === 'tareas' ||
+      pedida === 'aprobaciones' ||
+      pedida === 'obligaciones' ||
+      pedida === 'banco'
+    )
+      setVista(pedida);
     api<Organizacion>('organizacion')
       .then((o) => vivo && setOrganizacion(o))
       .catch((err) => {
@@ -449,42 +536,52 @@ function ErpAppInterna({
     return () => clearTimeout(id);
   }, [modelo, busqueda, estado, orden, papelera, cargarLista]);
 
-  // Deep-link `?r=`: abre la ficha en cuanto la lista la trae.
+  // Deep-link `?r=`: abre la ficha en cuanto la lista la trae. Hasta entonces se
+  // esboza su panel; si la primera página no lo trae, se deja de esperar.
+  const [esperandoFicha, setEsperandoFicha] = useState(Boolean(registroInicial));
   useEffect(() => {
     if (!registroInicial || !pagina?.registros) return;
     const r = pagina.registros.find((x) => x.id === registroInicial);
     if (r) setFicha(r);
+    setEsperandoFicha(false);
   }, [registroInicial, pagina]);
+  // Un 403 `sin_permiso` deja `error` vacío y la página a null: sin mirarlo, el panel
+  // se quedaría latiendo para siempre junto al estado vacío del candado.
+  useEffect(() => {
+    if (error || sinPermiso) setEsperandoFicha(false);
+  }, [error, sinPermiso]);
 
-  // --- ⌘K -----------------------------------------------------------------
+  // --- «/», «n» y «?» ----------------------------------------------------------
+  // Las teclas salen de la tabla de `lib/atajos.ts`, que es también la de la hoja
+  // de «?». ⌘K y Escape están en la tabla pero no se atienden aquí: abren y cierran
+  // la paleta de la suite (@sytue/shell), donde el ERP registra sus capas
+  // (`ComandosDelErp`).
   useEffect(() => {
     const alPulsar = (ev: KeyboardEvent): void => {
-      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
-        ev.preventDefault();
-        setPaleta(true);
-        return;
-      }
-      if (ev.key === 'Escape') {
-        setPaleta(false);
-        return;
-      }
+      const accion = accionDeTecla(ev);
+      if (accion === 'paleta' || accion === 'cerrar') return;
       // Las teclas sueltas solo mandan si no se está escribiendo y no hay nada
       // flotando delante. `esAtajoDeApp` lo comprueba en un sitio para toda la
       // suite: sin ella, teclear «n» en el nombre de un cliente abriría una ficha
-      // nueva encima.
+      // nueva encima, y «?» en un concepto abriría la hoja de atajos.
       if (!esAtajoDeApp(ev)) return;
-      if (ev.key === 'n' && modelo && vista === 'modelo') {
+      if (accion === 'nueva' && modelo && vista === 'modelo') {
         ev.preventDefault();
-        setSemilla(null);
-        setFicha('nueva');
-      } else if (ev.key === '/') {
+        dejarFicha(() => {
+          setSemilla(null);
+          setFicha('nueva');
+        });
+      } else if (accion === 'buscar') {
         ev.preventDefault();
         document.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+      } else if (accion === 'ayuda') {
+        ev.preventDefault();
+        setAtajos(true);
       }
     };
     window.addEventListener('keydown', alPulsar);
     return () => window.removeEventListener('keydown', alPulsar);
-  }, [modelo, vista]);
+  }, [modelo, vista, dejarFicha]);
 
   useEffect(() => {
     try {
@@ -511,7 +608,8 @@ function ErpAppInterna({
     });
   }, []);
 
-  const abrirModelo = useCallback(
+  // Sin preguntar: para cuando ya se ha pasado por `dejarFicha`.
+  const abrirModeloDirecto = useCallback(
     (m: Modelo) => {
       recordarModelo(m);
       setCajon(false);
@@ -525,7 +623,6 @@ function ErpAppInterna({
       setOrden(null);
       setPapelera(false);
       setFicha(null);
-      setPaleta(false);
       // Lo de ESTE modelo, o nada. Sin esta línea se quedaban en pantalla las filas
       // del modelo anterior mientras llegaba la nueva lista, pintadas con las
       // columnas del nuevo: una tabla de guiones que parecía un error de datos.
@@ -533,18 +630,42 @@ function ErpAppInterna({
     },
     [recordarModelo],
   );
+  const abrirModelo = useCallback(
+    (m: Modelo) => dejarFicha(() => abrirModeloDirecto(m)),
+    [dejarFicha, abrirModeloDirecto],
+  );
+  // Cambiar de vista desde la navegación: la ficha solo se pinta en la vista de
+  // modelo, así que irse a otra también la cierra.
+  const irAVista = useCallback(
+    (v: Vista, antes?: () => void) =>
+      dejarFicha(() => {
+        antes?.();
+        setVista(v);
+      }),
+    [dejarFicha],
+  );
+  const irAInicio = useCallback(
+    () =>
+      dejarFicha(() => {
+        setVista('modelo');
+        setModelo(null);
+      }),
+    [dejarFicha],
+  );
 
   // Abrir el registro del que cuelga una tarea: su lista y su ficha.
   const abrirRegistro = useCallback(
     (clave: string, id: string) => {
       const m = modelos.find((x) => x.clave === clave);
       if (!m) return;
-      abrirModelo(m);
-      api<Registro>(`${clave}/${id}`)
-        .then(setFicha)
-        .catch(() => aviso.notify({ tone: 'danger', title: t('error.generic') }));
+      dejarFicha(() => {
+        abrirModeloDirecto(m);
+        api<Registro>(`${clave}/${id}`)
+          .then(setFicha)
+          .catch(() => aviso.notify({ tone: 'danger', title: t('error.generic') }));
+      });
     },
-    [modelos, abrirModelo, aviso, t],
+    [modelos, dejarFicha, abrirModeloDirecto, aviso, t],
   );
 
   const activos = catalogo?.activos ?? null;
@@ -559,6 +680,33 @@ function ErpAppInterna({
     () => (catalogo?.modulos ?? []).filter((m) => activos?.includes(m.clave) && puedeLeer(m.clave)),
     [catalogo, activos, puedeLeer],
   );
+  // Las pantallas a las que lleva ⌘K: las mismas que enseña la barra lateral y con
+  // las mismas condiciones, para que la paleta no ofrezca lo que el menú esconde.
+  const vistasPaleta = useMemo((): DestinoVista[] => {
+    const vistas: DestinoVista[] = [
+      { vista: 'modelo', rotulo: t('nav.home') },
+      { vista: 'tareas', rotulo: t('nav.tasks') },
+    ];
+    if (puedeAprobar || puedeUmbrales)
+      vistas.push({ vista: 'aprobaciones', rotulo: t('nav.approvals') });
+    if (
+      modulosVisibles.some((m) => m.clave === 'tpv') &&
+      puedeLeer('facturacion') &&
+      puedeLeer('productos')
+    ) {
+      vistas.push({ vista: 'tpv', rotulo: t('pos.title') });
+    }
+    if (puedeLeer('contabilidad')) vistas.push({ vista: 'banco', rotulo: t('nav.bank') });
+    if (puedeLeer('obligaciones'))
+      vistas.push({ vista: 'obligaciones', rotulo: t('nav.obligations') });
+    if (puedeLeer('contabilidad')) {
+      vistas.push(
+        { vista: 'libro', rotulo: t('nav.ledger') },
+        { vista: 'balance', rotulo: t('nav.balance') },
+      );
+    }
+    return vistas;
+  }, [modulosVisibles, puedeLeer, puedeAprobar, puedeUmbrales, t]);
 
   /**
    * Encender o APAGAR un módulo. La interfaz solo sabía encender, así que activar
@@ -688,10 +836,7 @@ function ErpAppInterna({
               title={t('nav.home')}
               aria-label={t('nav.home')}
               aria-current={vista === 'modelo' && !modelo ? 'page' : undefined}
-              onClick={() => {
-                setVista('modelo');
-                setModelo(null);
-              }}
+              onClick={irAInicio}
             >
               <Icon name="grid" size={20} />
             </button>
@@ -701,7 +846,7 @@ function ErpAppInterna({
               title={t('nav.tasks')}
               aria-label={t('nav.tasks')}
               aria-current={vista === 'tareas' ? 'page' : undefined}
-              onClick={() => setVista('tareas')}
+              onClick={() => irAVista('tareas')}
             >
               <Icon name="check" size={20} />
               {tareasHoy > 0 ? (
@@ -719,7 +864,7 @@ function ErpAppInterna({
                 title={t('pos.title')}
                 aria-label={t('pos.title')}
                 aria-current={vista === 'tpv' ? 'page' : undefined}
-                onClick={() => setVista('tpv')}
+                onClick={() => irAVista('tpv')}
               >
                 <Icon name="receipt" size={20} />
               </button>
@@ -731,7 +876,7 @@ function ErpAppInterna({
                 title={t('nav.bank')}
                 aria-label={t('nav.bank')}
                 aria-current={vista === 'banco' ? 'page' : undefined}
-                onClick={() => setVista('banco')}
+                onClick={() => irAVista('banco')}
               >
                 <Icon name="building" size={20} />
               </button>
@@ -745,7 +890,7 @@ function ErpAppInterna({
                 aria-current={
                   vista === 'obligaciones' || vista === 'onboarding' ? 'page' : undefined
                 }
-                onClick={() => setVista('obligaciones')}
+                onClick={() => irAVista('obligaciones')}
               >
                 <Icon name="audit" size={20} />
               </button>
@@ -756,7 +901,7 @@ function ErpAppInterna({
                 class="erp-rail-action sytue-focus-ring"
                 title={t('palette.placeholder')}
                 aria-label={t('palette.placeholder')}
-                onClick={() => setPaleta(true)}
+                onClick={abrirPaleta}
               >
                 <Icon name="search" size={20} />
               </button>
@@ -783,16 +928,15 @@ function ErpAppInterna({
             onCerrar={() => setCajon(false)}
             onInicio={() => {
               setCajon(false);
-              setVista('modelo');
-              setModelo(null);
+              irAInicio();
             }}
             onVista={(v) => {
               setCajon(false);
-              setVista(v);
+              irAVista(v);
             }}
             onPaleta={() => {
               setCajon(false);
-              setPaleta(true);
+              abrirPaleta();
             }}
             tableros={tableros}
             tableroActivo={vista === 'tablero' ? tablero : null}
@@ -801,11 +945,11 @@ function ErpAppInterna({
               setPanelIA(true);
             }}
             tareas={tareasHoy}
+            aprobaciones={puedeAprobar || puedeUmbrales ? aprobacionesPendientes : null}
             puedeLeer={puedeLeer}
             onTablero={(tb) => {
               setCajon(false);
-              setTablero(tb);
-              setVista('tablero');
+              irAVista('tablero', () => setTablero(tb));
             }}
             t={t}
           />
@@ -869,15 +1013,24 @@ function ErpAppInterna({
                 </button>
               </SinBarraUnica>
               {error ? (
-                <p class="bg-danger-bg text-danger-text mx-6 mt-4 rounded-md px-4 py-3 text-sm">
+                <InlineHelp tone="danger" class="mx-6 mt-4">
                   {error}
-                </p>
+                </InlineHelp>
               ) : null}
 
               {!catalogo ? (
-                <div class="flex h-full items-center justify-center">
-                  <Spinner size={24} />
-                </div>
+                // La forma de lo que viene: la tabla si se entra a un modelo, los
+                // indicadores si se entra a la portada. Si el catálogo falla, la banda
+                // de arriba lo dice y no se queda nada latiendo para siempre.
+                error ? null : (
+                  <div class="mx-auto max-w-5xl px-6 py-6" aria-busy="true">
+                    {modeloInicial ? (
+                      <EsqueletoLista columnas={COLUMNAS_ESQUELETO_CATALOGO} />
+                    ) : (
+                      <EsqueletoKPIs />
+                    )}
+                  </div>
+                )
               ) : vista === 'onboarding' || (vista === 'obligaciones' && !organizacion) ? (
                 <Onboarding
                   locale={locale}
@@ -912,6 +1065,17 @@ function ErpAppInterna({
                 />
               ) : vista === 'tareas' ? (
                 <Tareas locale={locale} t={t} onAbrir={abrirRegistro} onCambio={contarTareas} />
+              ) : vista === 'aprobaciones' ? (
+                <Aprobaciones
+                  locale={locale}
+                  t={t}
+                  yo={user.id}
+                  puedeAprobar={puedeAprobar}
+                  puedeAdministrar={puedeUmbrales}
+                  rotuloModelo={(c) => modelos.find((m) => m.clave === c)?.etiqueta ?? c}
+                  onAbrir={abrirRegistro}
+                  onCambio={contarAprobaciones}
+                />
               ) : vista === 'tpv' ? (
                 <PuntoVenta
                   key={`${user.tenant}:${user.id}`}
@@ -948,7 +1112,7 @@ function ErpAppInterna({
                   onTareas={contarTareas}
                 />
               ) : vista === 'libro' ? (
-                <LibroDiario locale={locale} t={t} />
+                <LibroDiario locale={locale} t={t} puedeCerrar={puedeCerrarPeriodo} />
               ) : vista === 'balance' ? (
                 <Balance locale={locale} t={t} />
               ) : vista === 'tablero' && tablero ? (
@@ -1016,9 +1180,9 @@ function ErpAppInterna({
                     onEstado={setEstado}
                     onOrden={setOrden}
                     onPapelera={setPapelera}
-                    onAbrir={setFicha}
-                    onDuplicar={(r) => {
-                      if (modelo) {
+                    onAbrir={(r) => dejarFicha(() => setFicha(r))}
+                    onDuplicar={(r) =>
+                      dejarFicha(() => {
                         api<Registro>(`${modelo.clave}/${r.id}/duplicar`, { method: 'POST' })
                           .then((nuevaCopia) => {
                             aviso.notify({ tone: 'success', title: t('toast.created') });
@@ -1028,15 +1192,14 @@ function ErpAppInterna({
                             setSemilla(r);
                             setFicha('nueva');
                           });
-                      } else {
-                        setSemilla(r);
+                      })
+                    }
+                    onNueva={() =>
+                      dejarFicha(() => {
+                        setSemilla(null);
                         setFicha('nueva');
-                      }
-                    }}
-                    onNueva={() => {
-                      setSemilla(null);
-                      setFicha('nueva');
-                    }}
+                      })
+                    }
                     onMas={() => void cargarMas()}
                     soloLectura={!puedeEscribir(modelo.modulo)}
                     revision={revision}
@@ -1053,16 +1216,21 @@ function ErpAppInterna({
                   locale={locale}
                   onCambiar={cambiarModulo}
                   onAbrirModelo={abrirModelo}
-                  onNuevaFicha={(m) => {
-                    abrirModelo(m);
-                    setSemilla(null);
-                    setFicha('nueva');
-                  }}
+                  onNuevaFicha={(m) =>
+                    dejarFicha(() => {
+                      abrirModeloDirecto(m);
+                      setSemilla(null);
+                      setFicha('nueva');
+                    })
+                  }
                   onVista={setVista}
-                  onPaleta={() => setPaleta(true)}
+                  onPaleta={abrirPaleta}
                   userName={user?.name || user?.email || ''}
                   organizacion={organizacion ?? null}
                   onConfigurar={() => setVista('onboarding')}
+                  {...(permisos?.administrador
+                    ? { onImportar: () => setImportandoDesde(true) }
+                    : {})}
                   tareas={tareasHoy}
                   verObligaciones={puedeLeer('obligaciones')}
                   t={t}
@@ -1074,8 +1242,10 @@ function ErpAppInterna({
               <Ficha
                 // Cada registro, cada alta y cada duplicado es una ficha DISTINTA: su
                 // formulario nace de su registro al montarse, y sin esta clave lo de una
-                // ficha se quedaba en la siguiente (lib/ficha.ts).
-                key={claveDeFicha(modelo.clave, ficha, semilla)}
+                // ficha se quedaba en la siguiente (lib/ficha.ts). Descartar los
+                // cambios también la vuelve a montar, aunque siga siendo la misma
+                // (lib/cambios.ts).
+                key={claveDeFicha(modelo.clave, ficha, semilla, descartes)}
                 modelo={modelo}
                 registro={ficha === 'nueva' ? null : ficha}
                 semilla={ficha === 'nueva' ? semilla : null}
@@ -1086,13 +1256,18 @@ function ErpAppInterna({
                 requisitos={requisitos}
                 soloLectura={!puedeEscribir(modelo.modulo)}
                 onTareas={contarTareas}
-                onCerrar={() => setFicha(null)}
+                onCambios={marcarFicha}
+                onCerrar={() => dejarFicha(() => setFicha(null))}
                 onConvertido={(r) => abrirRegistro(r.modelo, r.id)}
-                onDuplicar={(r) => {
-                  setSemilla(r);
-                  setFicha('nueva');
-                }}
+                onDuplicar={(r) =>
+                  dejarFicha(() => {
+                    setSemilla(r);
+                    setFicha('nueva');
+                  })
+                }
                 onGuardado={() => {
+                  // Lo escrito ya está guardado: cerrar ahora no pierde nada.
+                  marcarFicha(false);
                   setFicha(null);
                   // Lo escrito invalida lo cacheado de ESE modelo —todas sus
                   // búsquedas—: servir una lista vieja justo después de crear algo es
@@ -1102,7 +1277,10 @@ function ErpAppInterna({
                 onInvalidar={invalidar}
                 t={t}
               />
+            ) : esperandoFicha && modelo && vista === 'modelo' ? (
+              <FichaCargando etiqueta={modelo.etiqueta} />
             ) : null}
+            {dialogoDescarte}
           </div>
 
           {panelIA ? (
@@ -1133,16 +1311,32 @@ function ErpAppInterna({
             />
           ) : null}
 
-          {paleta ? (
-            <Paleta
-              modelos={modelos}
-              modulos={catalogo?.modulos ?? []}
-              onElegir={abrirModelo}
-              onCerrar={() => setPaleta(false)}
-              t={t}
-            />
-          ) : null}
+          <ComandosDelErp
+            vistas={vistasPaleta}
+            modelos={modelos}
+            modulos={catalogo?.modulos ?? []}
+            onElegir={abrirModelo}
+            onVista={(v) => {
+              if (v === 'modelo') irAInicio();
+              else irAVista(v);
+            }}
+            onRegistro={(r) => abrirRegistro(r.modelo, r.id)}
+            t={t}
+          />
+          <ShortcutsModal
+            open={atajos}
+            title={t('shortcuts.title')}
+            groups={gruposDeAtajos(t)}
+            onClose={() => setAtajos(false)}
+          />
         </div>
+        {importandoDesde ? (
+          <AsistenteImportarDesde
+            t={t}
+            onCerrar={() => setImportandoDesde(false)}
+            onImportado={() => setRevision((r) => r + 1)}
+          />
+        ) : null}
         {asistenciaFacturas ? (
           <AsistenteFacturas
             t={t}
@@ -1205,7 +1399,7 @@ function ErpAppInterna({
 type Traducir = ReturnType<typeof useT>;
 
 /** Qué ocupa el panel principal. */
-type Vista =
+export type Vista =
   | 'modelo'
   | 'libro'
   | 'balance'
@@ -1214,6 +1408,7 @@ type Vista =
   | 'tablero'
   | 'banco'
   | 'tareas'
+  | 'aprobaciones'
   | 'tpv';
 
 /** Columna por la que se ordena y en qué sentido. */
@@ -1264,6 +1459,7 @@ function BarraLateral({
   tableroActivo,
   onIA,
   tareas,
+  aprobaciones,
   puedeLeer,
   onTablero,
   t,
@@ -1282,6 +1478,8 @@ function BarraLateral({
   onIA: () => void;
   /** Tareas propias para hoy o vencidas. */
   tareas: number;
+  /** Aprobaciones que esta persona puede resolver; null = no ve la cola. */
+  aprobaciones: number | null;
   puedeLeer: (modulo: string) => boolean;
   onTablero: (t: Tablero) => void;
   t: Traducir;
@@ -1293,7 +1491,7 @@ function BarraLateral({
       tabIndex={-1}
       class={cx(
         // El ancho del menú de la suite (`--spacing-sidebar`, 260 px), como `Sidebar`. Era
-        // `w-60`, que con la raíz a 14 son 210 px: el ERP era la única app con el menú
+        // `w-60`, que con 1 rem en 14 px eran 210: el ERP era la única app con el menú
         // 50 px más estrecho (medido en producción, 2026-09-21).
         'sytue-nav-drawer border-border-subtle bg-sidebar text-sidebar-fg w-[var(--spacing-sidebar)] shrink-0 overflow-auto border-r px-3 py-4 focus-visible:outline-none',
         // En <768px es un panel flotante bajo la topbar; en ≥768px vuelve al
@@ -1319,11 +1517,9 @@ function BarraLateral({
         class="border-chrome-border bg-chrome-hover text-sidebar-fg-muted hover:bg-chrome-active hover:text-sidebar-fg sytue-focus-ring-chrome rounded-control mb-4 flex w-full items-center justify-between border px-3 py-2 text-sm transition-colors focus-visible:outline-none"
       >
         <span aria-hidden="true">{t('palette.placeholder')}</span>
-        {/* El `<kbd>` es decoración: se lee en el `aria-label` de arriba, donde
-            además se nombra la tecla sin depender de que se entienda el símbolo. */}
-        <kbd aria-hidden="true" class="text-sidebar-fg-muted text-xs">
-          {atajoPaleta}
-        </kbd>
+        {/* La tecla es decoración: se lee en el `aria-label` de arriba, donde
+            además se nombra sin depender de que se entienda el símbolo. */}
+        <Kbd tone="chrome">{atajoPaleta}</Kbd>
       </button>
 
       {/* Sytue AI arriba y en TODAS las pantallas: se entiende sobre lo que haya
@@ -1364,6 +1560,23 @@ function BarraLateral({
             </span>
           </Entrada>
         </li>
+        {aprobaciones !== null ? (
+          <li>
+            <Entrada activa={vista === 'aprobaciones'} onClick={() => onVista('aprobaciones')}>
+              <span class="flex items-center justify-between gap-2">
+                {t('nav.approvals')}
+                {aprobaciones > 0 ? (
+                  <Badge
+                    tone="warning"
+                    aria-label={t('nav.approvalsWaiting', { count: aprobaciones })}
+                  >
+                    {aprobaciones}
+                  </Badge>
+                ) : null}
+              </span>
+            </Entrada>
+          </li>
+        ) : null}
         {modulos.some((m) => m.clave === 'tpv') &&
         puedeLeer('facturacion') &&
         puedeLeer('productos') ? (
@@ -1483,7 +1696,7 @@ function FiltroEstado({
   );
 }
 
-function Lista({
+export function Lista({
   modelo,
   pagina,
   cargando,
@@ -1740,7 +1953,7 @@ function Lista({
   }
 
   return (
-    <div class="mx-auto max-w-5xl space-y-4 px-6 py-6">
+    <div class="mx-auto max-w-5xl space-y-4 px-6 py-6" aria-busy={cargando}>
       {/* UNA FILA QUE SALTA, y no `flex-col` + `sm:flex-row`. El punto de corte mira la
           VENTANA, pero con la ficha abierta a la lista le queda una fracción: a 880 px
           eran 278, la cabecera seguía en fila, el título se partía palabra a palabra
@@ -2016,20 +2229,18 @@ function Lista({
       </div>
 
       {cargando && registros.length === 0 ? (
-        <div class="py-16 text-center">
-          <Spinner size={22} />
-        </div>
+        <EsqueletoLista columnas={modelo.lista.length} />
       ) : sinPermiso ? (
         <EmptyState
           title={t('error.sinPermiso.titulo')}
           description={t('error.sinPermiso')}
-          illustration={<Icon name="lock" size={32} class="text-text-subtle" />}
+          icon="lock"
         />
       ) : registros.length === 0 ? (
         <EmptyState
           title={t(vacio.titulo)}
           {...(vacio.pista ? { description: t(vacio.pista, { action: t('action.new') }) } : {})}
-          illustration={<Icon name={vacio.icono} size={32} class="text-text-subtle" />}
+          icon={vacio.icono}
           action={
             vacio.accion === 'limpiar' ? (
               <Button
@@ -2289,48 +2500,72 @@ function Lista({
             </table>
           </div>
 
-          {/* EN MÓVIL, TARJETAS RESUMEN */}
+          {/* EN MÓVIL, TARJETAS RESUMEN. Sin casillas a la vista: en el teléfono no
+              caben y el gesto del lote es mantener pulsada la fila (como en la tabla, las
+              tarjetas y la lista de Fyne). Con algo ya marcado sí aparece la casilla de
+              cada fila, para sumar o quitar con un toque sin perder la pulsación normal,
+              que sigue abriendo la ficha. */}
           <ul class="divide-border-subtle divide-y md:hidden">
-            {registros.map((r) => (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => onAbrir(r)}
-                  class="sytue-focus-ring hover:bg-bg-subtle w-full px-2 py-3 text-left transition-colors"
+            {registros.map((r) => {
+              const seleccionado = seleccionados.has(r.id);
+              return (
+                <li
+                  key={r.id}
+                  class={cx('flex items-stretch', seleccionado && 'bg-surface-raised')}
                 >
-                  <span class="flex items-baseline gap-2">
-                    <span class="text-text mr-auto truncate text-sm font-semibold">
-                      {nombreDe(r)}
+                  {marcadas.length > 0 ? (
+                    <label class="grid min-h-[44px] min-w-[44px] shrink-0 cursor-pointer place-items-center">
+                      <Checkbox
+                        checked={seleccionado}
+                        disabled={ejecutandoLote}
+                        onChange={() => toggleFila(r.id)}
+                        aria-label={nombreDe(r)}
+                        class="border-border text-primary cursor-pointer rounded"
+                      />
+                    </label>
+                  ) : null}
+                  <button
+                    type="button"
+                    onPointerDown={(e) => mantenerRegistro.iniciar(e, r.id)}
+                    onClickCapture={mantenerRegistro.onClickCapture}
+                    onContextMenuCapture={mantenerRegistro.onContextMenuCapture}
+                    onClick={() => onAbrir(r)}
+                    class="sytue-focus-ring hover:bg-bg-subtle min-w-0 flex-1 px-2 py-3 text-left transition-colors"
+                  >
+                    <span class="flex items-baseline gap-2">
+                      <span class="text-text mr-auto truncate text-sm font-semibold">
+                        {nombreDe(r)}
+                      </span>
+                      {r.estado ? (
+                        <Badge tone={tonoDeEstado(r.estado)}>
+                          {modelo.estados?.find((e) => e.valor === r.estado)?.etiqueta ?? r.estado}
+                        </Badge>
+                      ) : null}
                     </span>
-                    {r.estado ? (
-                      <Badge tone={tonoDeEstado(r.estado)}>
-                        {modelo.estados?.find((e) => e.valor === r.estado)?.etiqueta ?? r.estado}
-                      </Badge>
-                    ) : null}
-                  </span>
-                  <span class="text-text-muted mt-1 flex flex-wrap gap-x-3 text-xs">
-                    {modelo.lista
-                      .filter((col) => col !== 'estado' && col !== 'ref')
-                      .map((col) => porClave.get(col))
-                      .filter((campo): campo is Campo => campo !== undefined)
-                      .map((campo) => {
-                        const v = celda(
-                          campo,
-                          r.data[campo.clave],
-                          locale,
-                          pagina?.etiquetas ?? {},
-                        );
-                        return v === '—' ? null : (
-                          <span key={campo.clave}>
-                            <span class="text-text-subtle">{campo.etiqueta}: </span>
-                            <span class="text-text font-medium">{v}</span>
-                          </span>
-                        );
-                      })}
-                  </span>
-                </button>
-              </li>
-            ))}
+                    <span class="text-text-muted mt-1 flex flex-wrap gap-x-3 text-xs">
+                      {modelo.lista
+                        .filter((col) => col !== 'estado' && col !== 'ref')
+                        .map((col) => porClave.get(col))
+                        .filter((campo): campo is Campo => campo !== undefined)
+                        .map((campo) => {
+                          const v = celda(
+                            campo,
+                            r.data[campo.clave],
+                            locale,
+                            pagina?.etiquetas ?? {},
+                          );
+                          return v === '—' ? null : (
+                            <span key={campo.clave}>
+                              <span class="text-text-subtle">{campo.etiqueta}: </span>
+                              <span class="text-text font-medium">{v}</span>
+                            </span>
+                          );
+                        })}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
@@ -2385,12 +2620,13 @@ function tonoDeEstado(estado?: string): 'success' | 'info' | 'danger' | 'neutral
  * sigue visible detrás, así que se ve en qué se está trabajando y cerrar no
  * desorienta. Un solo botón principal.
  */
-function Ficha({
+export function Ficha({
   modelo,
   registro,
   semilla,
   etiquetas,
   locale,
+  onCambios,
   onCerrar,
   onDuplicar,
   onConvertido,
@@ -2409,6 +2645,8 @@ function Ficha({
   semilla: Registro | null;
   etiquetas: Record<string, string>;
   locale: Locale;
+  /** Si lo escrito difiere de con lo que nació la ficha; al desmontarse, `false`. */
+  onCambios?: (sucia: boolean) => void;
   onCerrar: () => void;
   onDuplicar: (r: Registro) => void;
   onConvertido: (r: Registro) => void;
@@ -2428,13 +2666,21 @@ function Ficha({
 }): JSX.Element {
   const altas = useContext(AltasContext);
   useMobileBack(true, onCerrar, { nivel: 2 });
-  const [valores, setValores] = useState<Record<string, string>>(() =>
-    // `registro ?? semilla`: al duplicar se copian los VALORES pero no la
-    // identidad. El documento nuevo no hereda ni el id ni la referencia —esa la
-    // asigna la secuencia al guardar—, así que sale como lo que es: otro
-    // documento, no una copia del mismo.
+  // `registro ?? semilla`: al duplicar se copian los VALORES pero no la
+  // identidad. El documento nuevo no hereda ni el id ni la referencia —esa la
+  // asigna la secuencia al guardar—, así que sale como lo que es: otro
+  // documento, no una copia del mismo.
+  const [iniciales] = useState<Record<string, string>>(() =>
     valoresIniciales(modelo, registro ?? semilla),
   );
+  const [valores, setValores] = useState<Record<string, string>>(iniciales);
+  // Lo que se perdería al cerrar: quien la cierra pregunta antes (lib/cambios.ts).
+  const sucia = useMemo(() => hayCambios(iniciales, valores), [iniciales, valores]);
+  useAvisoAlSalir(sucia);
+  useEffect(() => {
+    onCambios?.(sucia);
+  }, [onCambios, sucia]);
+  useEffect(() => () => onCambios?.(false), [onCambios]);
   // El nombre legible de cada relación. Arranca con lo que resolvió la lista y
   // se completa al elegir en el selector: sin esto, acabar de elegir un cliente
   // dejaba el control enseñando un identificador hasta recargar.
@@ -2445,6 +2691,9 @@ function Ficha({
   const [rellenando, setRellenando] = useState(false);
   const [aviso, setAviso] = useState('');
   const [fallo, setFallo] = useState('');
+  // El asiento contestó 409 `requiere_aprobacion`: en vez de dejar el error a
+  // secas, se ofrece pedirla desde aquí mismo.
+  const [faltaAprobacion, setFaltaAprobacion] = useState(false);
   // Los asientos que generó ESTE documento. Solo para los modelos que llevan
   // libro, y solo si el documento ya existe: una factura sin guardar no ha
   // generado nada todavía.
@@ -2452,6 +2701,10 @@ function Ficha({
   // Sube con cada documento subido: sus tareas se vuelven a pedir (una subida puede
   // haber cerrado la de «sube la factura»).
   const [docs, setDocs] = useState(0);
+  // El diálogo de enviar la factura por correo, y cuántas han salido (refresca el
+  // historial, donde queda apuntado el envío).
+  const [enviarAbierto, setEnviarAbierto] = useState(false);
+  const [enviadas, setEnviadas] = useState(0);
   // Qué campo falló, para pintarlo DEBAJO de él. El 422 del servicio los trae
   // uno a uno; antes se aplastaban en una frase única arriba del formulario y
   // quien rellenaba diez campos tenía que releerlos todos para dar con los dos
@@ -2596,6 +2849,26 @@ function Ficha({
       // Y se enseña, no solo se anuncia: el asiento aparece debajo en el acto.
       cargarAsientos();
     } catch (err) {
+      if (err instanceof ErrorApi && err.codigo === 'requiere_aprobacion') {
+        setFaltaAprobacion(true);
+      } else {
+        setFallo(mensajeDeError(err, t));
+      }
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  /** Abre la solicitud: el importe lo calcula el servicio del propio documento. */
+  async function pedirAprobacion(): Promise<void> {
+    if (!registro) return;
+    setGuardando(true);
+    setFallo('');
+    try {
+      await api(`${modelo.clave}/${registro.id}/aprobacion`, { method: 'POST', body: '{}' });
+      setFaltaAprobacion(false);
+      setAviso(t('form.approvalRequested'));
+    } catch (err) {
       setFallo(mensajeDeError(err, t));
     } finally {
       setGuardando(false);
@@ -2676,20 +2949,7 @@ function Ficha({
   }
 
   return (
-    <aside
-      class={cx(
-        // Las esquinas de la DERECHA de la hoja (en <768px va fija encima y no toca ninguna).
-        'sytue-side-panel sytue-sheet-corners [--sytue-sheet-bl:0px] [--sytue-sheet-tl:0px] max-md:[--sytue-sheet-tr:0px]',
-        'border-border bg-surface w-full max-w-md shrink-0 overflow-auto border-l',
-        // EN MÓVIL, ENCIMA Y A PANTALLA COMPLETA. Al lado de la lista, en 375 px
-        // los dos quedaban aplastados: una tabla ilegible junto a un formulario
-        // de campos de dos centímetros. Arranca bajo la topbar, igual que el
-        // cajón de navegación, para no tapar el cromo de la Sytue Shell.
-        'max-md:fixed max-md:inset-x-0 max-md:top-[var(--spacing-topbar)] max-md:bottom-0 max-md:w-auto',
-        'max-md:z-[var(--z-modal)] max-md:max-w-none max-md:bg-[var(--sytue-menu-surface)]',
-      )}
-      aria-label={modelo.etiqueta}
-    >
+    <aside class={CLASE_PANEL_FICHA} aria-label={modelo.etiqueta}>
       <form
         ref={panel}
         onSubmit={(e) => {
@@ -2731,6 +2991,29 @@ function Ficha({
             >
               <Icon name="receipt" size={14} />
             </a>
+          ) : null}
+          {/* Enviar es escribir (POST): quien solo lee ventas recibiría un 403. */}
+          {registro && modelo.clave === 'factura_venta' && !enPapelera && !soloLectura ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              title={t('send.action')}
+              aria-label={t('send.action')}
+              aria-haspopup="dialog"
+              onClick={() => setEnviarAbierto(true)}
+            >
+              <Icon name="mail" size={14} />
+            </Button>
+          ) : null}
+          {enviarAbierto && registro ? (
+            <EnviarFactura
+              facturaId={registro.id}
+              referencia={registro.ref || nombreDe(registro)}
+              t={t}
+              onCerrar={() => setEnviarAbierto(false)}
+              onEnviada={() => setEnviadas((n) => n + 1)}
+            />
           ) : null}
           {registro && modelo.cobro && facturae ? (
             <Button
@@ -2877,10 +3160,33 @@ function Ficha({
         ) : null}
 
         {fallo ? (
-          <p class="bg-danger-bg text-danger-text mb-3 rounded-md px-3 py-2 text-sm">{fallo}</p>
+          <InlineHelp tone="danger" class="mb-3">
+            {fallo}
+          </InlineHelp>
+        ) : null}
+        {faltaAprobacion ? (
+          <InlineHelp
+            tone="warning"
+            class="mb-3"
+            action={
+              <Button
+                size="xs"
+                variant="secondary"
+                type="button"
+                loading={guardando}
+                onClick={() => void pedirAprobacion()}
+              >
+                {t('form.requestApproval')}
+              </Button>
+            }
+          >
+            {t('form.approvalNeeded')}
+          </InlineHelp>
         ) : null}
         {aviso ? (
-          <p class="bg-success-bg text-success-text mb-3 rounded-md px-3 py-2 text-sm">{aviso}</p>
+          <InlineHelp tone="success" class="mb-3">
+            {aviso}
+          </InlineHelp>
         ) : null}
 
         <div class="flex-1 space-y-3">
@@ -2970,7 +3276,7 @@ function Ficha({
               soloLectura={soloLectura || enPapelera}
               locale={locale}
               etiquetas={rotulos}
-              revision={`${estadoActual}:${docs}`}
+              revision={`${estadoActual}:${docs}:${enviadas}`}
               t={t}
             />
           </div>
@@ -3294,55 +3600,175 @@ function aCuerpo(modelo: Modelo, valores: Record<string, string>): Record<string
 
 // ---------------------------------------------------------------------------
 
+const CLASE_PANEL_FICHA = cx(
+  // Las esquinas de la DERECHA de la hoja (en <768px va fija encima y no toca ninguna).
+  'sytue-side-panel sytue-sheet-corners [--sytue-sheet-bl:0px] [--sytue-sheet-tl:0px] max-md:[--sytue-sheet-tr:0px]',
+  'border-border bg-surface w-full max-w-md shrink-0 overflow-auto border-l',
+  // EN MÓVIL, ENCIMA Y A PANTALLA COMPLETA. Al lado de la lista, en 375 px
+  // los dos quedaban aplastados: una tabla ilegible junto a un formulario
+  // de campos de dos centímetros. Arranca bajo la topbar, igual que el
+  // cajón de navegación, para no tapar el cromo de la Sytue Shell.
+  'max-md:fixed max-md:inset-x-0 max-md:top-[var(--spacing-topbar)] max-md:bottom-0 max-md:w-auto',
+  'max-md:z-[var(--z-modal)] max-md:max-w-none max-md:bg-[var(--sytue-menu-surface)]',
+);
+
 /**
- * La paleta (⌘K). Sustituye a los menús anidados: no hay que saber en qué
- * submenú vive «albaranes», basta con escribirlo.
- *
- * Busca sobre los rótulos YA TRADUCIDOS que vinieron del servicio, así que
- * funciona igual en los cinco idiomas sin diccionario propio.
+ * El panel de la ficha mientras llega su registro (un enlace `?r=` abre la ficha en
+ * cuanto la lista lo trae): el mismo hueco a la derecha, con bloques de campos, para que
+ * la lista no se ensanche y luego se encoja de golpe.
  */
-function Paleta({
+export function FichaCargando({ etiqueta }: { etiqueta: string }): JSX.Element {
+  return (
+    <aside class={CLASE_PANEL_FICHA} aria-label={etiqueta} aria-busy="true">
+      <div class="px-6 py-5">
+        <EsqueletoFicha />
+      </div>
+    </aside>
+  );
+}
+
+/** Una pantalla a la que la paleta sabe ir: la vista y su nombre ya traducido. */
+export interface DestinoVista {
+  vista: Vista;
+  rotulo: string;
+}
+
+/** Lo que pide la paleta al servicio: como mucho estos registros por consulta. */
+export const MAX_REGISTROS_PALETA = 8;
+/** Ni una petición por tecla: se espera a que se deje de escribir. */
+export const ESPERA_BUSQUEDA_PALETA = 200;
+
+/**
+ * Lo que el ERP pone en la paleta de la suite (⌘K). Sustituye a los menús anidados: no
+ * hay que saber en qué submenú vive «albaranes», basta con escribirlo.
+ *
+ * Llega a los tres sitios a los que se va en un ERP, en este orden y agrupados, cada
+ * uno en su capa: las PANTALLAS que no son modelos (Libro diario, Banco, Tareas…,
+ * solo las que esta persona puede ver, que son las de la barra lateral), las ÁREAS
+ * del catálogo y los REGISTROS («FV-2026-0012», «Acme S.L.»). Las dos primeras las
+ * filtra la paleta sobre los rótulos YA TRADUCIDOS, así que funcionan igual en todos
+ * los idiomas sin diccionario propio; los registros los busca el servicio, que es
+ * quien sabe qué puede abrir cada uno (`GET /search` filtra por permiso de lectura).
+ * La capa visual, el teclado y el foco son los de la paleta de la suite.
+ */
+export function ComandosDelErp({
+  vistas,
   modelos,
   modulos,
   onElegir,
-  onCerrar,
+  onVista,
+  onRegistro,
   t,
 }: {
+  vistas: DestinoVista[];
   modelos: Modelo[];
   /** Para la pista: el nombre del área, no su clave interna («consolidacion»). */
   modulos: Modulo[];
   onElegir: (m: Modelo) => void;
-  onCerrar: () => void;
+  onVista: (v: Vista) => void;
+  onRegistro: (r: Registro) => void;
   t: Traducir;
-}): JSX.Element {
-  const [q, setQ] = useState('');
-  const coincidencias = useMemo(() => {
-    // Sin tildes: quien busca «fabricacion» espera encontrar «Fabricación».
-    return modelos.filter((m) => contiene(m.etiqueta, q)).slice(0, 12);
-  }, [modelos, q]);
+}): null {
+  const { abierta, consulta: escrito } = usePaletaDeLaSuite();
+  const q = escrito.trim();
+  // Los registros van con la consulta que los trajo: al cambiar la búsqueda, los de la
+  // anterior no se enseñan mientras llega la respuesta nueva (la paleta dice «buscando»).
+  const [resultado, setResultado] = useState<{ q: string; registros: Registro[] }>({
+    q: '',
+    registros: [],
+  });
+  const [buscando, setBuscando] = useState(false);
+  const registros = useMemo(() => (resultado.q === q ? resultado.registros : []), [resultado, q]);
 
-  // La capa, el teclado y el foco son los de la paleta común (la misma de Sytue Cloud):
-  // el velo, la superficie y el radio de un diálogo, y en el teléfono la hoja.
-  return (
-    <PaletaDeComandos
-      open
-      onClose={onCerrar}
-      etiqueta={t('palette.placeholder')}
-      rotuloCampo={t('palette.placeholder')}
-      placeholder={t('palette.placeholder')}
-      rotuloResultados={t('palette.placeholder')}
-      sinResultados={() => t('relation.empty')}
-      consulta={q}
-      onConsulta={setQ}
-      opciones={coincidencias.map((m) => ({
-        id: m.clave,
+  // Los registros, al servicio. Con una letra casaría media base de datos y no le
+  // diría nada a nadie: desde dos. El antirrebote ahorra una consulta por tecla, y
+  // abortar la anterior evita que una respuesta lenta de «ac» pise a la de «acme».
+  useEffect(() => {
+    if (!abierta || q.length < 2) {
+      setResultado({ q: '', registros: [] });
+      setBuscando(false);
+      return;
+    }
+    setBuscando(true);
+    const abortar = new AbortController();
+    const espera = setTimeout(() => {
+      api<{ items: Registro[] | null }>(`search${consulta({ q, limit: MAX_REGISTROS_PALETA })}`, {
+        signal: abortar.signal,
+      })
+        .then((r) => {
+          setResultado({ q, registros: r.items ?? [] });
+          setBuscando(false);
+        })
+        .catch(() => {
+          // Una búsqueda que no llega no es un error que haya que contar: quedan las
+          // pantallas y las áreas, y la paleta sigue sirviendo para ir a ellas.
+          if (abortar.signal.aborted) return;
+          setResultado({ q, registros: [] });
+          setBuscando(false);
+        });
+    }, ESPERA_BUSQUEDA_PALETA);
+    return () => {
+      clearTimeout(espera);
+      abortar.abort();
+    };
+  }, [abierta, q]);
+
+  const capaVistas = useMemo(() => {
+    const grupo = t('palette.groupViews');
+    return {
+      comandos: vistas.map((v): ComandoDeApp => ({
+        id: `vista:${v.vista}`,
+        rotulo: v.rotulo,
+        grupo,
+        ejecutar: () => onVista(v.vista),
+      })),
+    };
+  }, [vistas, onVista, t]);
+
+  const capaAreas = useMemo(() => {
+    const grupo = t('palette.groupAreas');
+    return {
+      comandos: modelos.map((m): ComandoDeApp => ({
+        id: `modelo:${m.clave}`,
         rotulo: m.etiqueta,
+        grupo,
         pista: modulos.find((x) => x.clave === m.modulo)?.etiqueta ?? m.modulo,
-        modelo: m,
-      }))}
-      onElegir={(o) => onElegir(o.modelo)}
-    />
-  );
+        ejecutar: () => onElegir(m),
+      })),
+      // Doce como mucho: el catálogo tiene cientos de modelos y la lista no es un índice.
+      limite: 12,
+    };
+  }, [modelos, modulos, onElegir, t]);
+
+  const capaRegistros = useMemo(() => {
+    const grupo = t('palette.groupRecords');
+    const porClave = new Map(modelos.map((m) => [m.clave, m]));
+    // Solo lo que se puede abrir aquí: un registro de un modelo que el catálogo no
+    // trae no tendría ficha que enseñar.
+    const comandos = (q.length < 2 ? [] : registros).flatMap((r): ComandoDeApp[] => {
+      const m = porClave.get(r.modelo);
+      if (!m) return [];
+      const rotulo = r.etiqueta || r.ref || r.id;
+      return [
+        {
+          id: `registro:${r.modelo}:${r.id}`,
+          rotulo,
+          grupo,
+          pista: r.ref && r.ref !== rotulo ? `${r.ref} · ${m.etiqueta}` : m.etiqueta,
+          // Ya los ha buscado el servicio con esta consulta.
+          yaFiltrado: true,
+          ejecutar: () => onRegistro(r),
+        },
+      ];
+    });
+    // Mientras el servicio contesta, la paleta no afirma que no haya nada.
+    return { comandos, buscando };
+  }, [registros, buscando, modelos, onRegistro, q, t]);
+
+  useCapaDePaleta('erp:vistas', capaVistas);
+  useCapaDePaleta('erp', capaAreas);
+  useCapaDePaleta('erp:registros', capaRegistros);
+  return null;
 }
 
 /**
@@ -3397,7 +3823,33 @@ const ROTULO_CATEGORIA = {
   finance: 'dashboard.categoryFinance',
 } as const;
 
-function Bienvenida({
+/**
+ * Lo que hace de una tarjeta entera un botón: foco con Tab, Intro y Espacio la abren, y
+ * el lector la anuncia como tal (WCAG 2.1.1). No se envuelve en `<button>` porque dentro
+ * van bloques (`div`, `p`) que un botón no admite, y así el aspecto no cambia. Sin acción
+ * —el modelo de facturas no está activo— no es pulsable ni entra en el orden de Tab.
+ * Las clases van aparte (`TARJETA_PULSABLE`): el `Card` reparte el resto DESPUÉS de su
+ * `class`, y una `class` aquí pisaría la suya.
+ */
+const TARJETA_PULSABLE = 'sytue-focus-ring-inset hover:border-border-strong cursor-pointer';
+
+function tarjetaPulsable(accion: (() => void) | null): JSX.HTMLAttributes<HTMLDivElement> {
+  if (!accion) return {};
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onClick: accion,
+    onKeyDown: (e) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        accion();
+      }
+    },
+  };
+}
+
+export function Bienvenida({
   modulos,
   activos,
   recientes,
@@ -3410,6 +3862,7 @@ function Bienvenida({
   userName,
   organizacion,
   onConfigurar,
+  onImportar,
   tareas,
   verObligaciones,
   t,
@@ -3427,6 +3880,8 @@ function Bienvenida({
   /** Nulo = aún no se ha hecho el asistente: se ofrece arriba del todo. */
   organizacion: Organizacion | null;
   onConfigurar: () => void;
+  /** Solo para quien administra: traer los datos de Holded, Odoo… */
+  onImportar?: () => void;
   /** Tareas propias para hoy o vencidas. */
   tareas: number;
   /** Sin lectura en Obligaciones no se enseñan sus fechas (el servicio daría 403). */
@@ -3435,6 +3890,9 @@ function Bienvenida({
 }): JSX.Element {
   const atajoPaleta = useAtajo('Ctrl K');
   const [resumen, setResumen] = useState<ResumenOperativo | null>(null);
+  // Mientras el resumen viene, las cifras son barras y no un «0 €» que miente. Si no
+  // llega, se queda lo neutro de siempre: una barra latiendo sin fin también miente.
+  const [cargandoResumen, setCargandoResumen] = useState(true);
   const [proximas, setProximas] = useState<Obligacion[] | null>(null);
   const [sinJustificar, setSinJustificar] = useState(0);
 
@@ -3459,6 +3917,9 @@ function Bienvenida({
       })
       .catch(() => {
         // Sin resumen la portada sigue sirviendo: se pinta lo que hay.
+      })
+      .finally(() => {
+        if (montado) setCargandoResumen(false);
       });
     return () => {
       montado = false;
@@ -3489,6 +3950,43 @@ function Bienvenida({
     };
   }, [organizacion, verObligaciones]);
 
+  // Pulsar un modelo de un área apagada la enciende, y encender es para toda la
+  // organización: la barra lateral de todos cambia. Un clic que parece «abrir» no
+  // puede hacer eso sin preguntar; el botón «Encender» de la tarjeta, en cambio, ya
+  // dice lo que hace y no pide confirmación.
+  const { confirmar: confirmarEncender, dialogo: dialogoEncender } = useConfirm();
+  async function abrirModeloDeArea(area: Modulo, encendida: boolean, x: Modelo): Promise<void> {
+    if (!encendida) {
+      // Las dependencias apagadas se encienden con ella: el servicio arrastra las
+      // transitivas (las de sus dependencias también), así que se recorren igual.
+      // Se nombran ya, no en un aviso cuando ya no hay vuelta atrás.
+      const vistas = new Set<string>([area.clave]);
+      const pendientes = [...(area.dependencias ?? [])];
+      const arrastradas: string[] = [];
+      for (let dep = pendientes.shift(); dep !== undefined; dep = pendientes.shift()) {
+        if (vistas.has(dep)) continue;
+        vistas.add(dep);
+        const mod = modulos.find((x) => x.clave === dep);
+        pendientes.push(...(mod?.dependencias ?? []));
+        if (!activos.includes(dep)) arrastradas.push(mod?.etiqueta ?? dep);
+      }
+      const mensaje = [
+        t('welcome.enableConfirmBody', { module: area.etiqueta }),
+        ...(arrastradas.length > 0
+          ? [t('welcome.enableConfirmDeps', { deps: arrastradas.join(', ') })]
+          : []),
+      ].join(' ');
+      const si = await confirmarEncender({
+        titulo: t('welcome.enableConfirmTitle', { module: area.etiqueta }),
+        mensaje,
+        confirmLabel: t('welcome.enable'),
+      });
+      if (!si) return;
+      await onCambiar(area, true);
+    }
+    onAbrirModelo(x);
+  }
+
   const todosLosModelos = useMemo(() => modulos.flatMap((m) => m.modelos), [modulos]);
   const modeloPorClave = useMemo(
     () => new Map(todosLosModelos.map((m) => [m.clave, m])),
@@ -3497,6 +3995,10 @@ function Bienvenida({
   const modeloFactura = useMemo(
     () => todosLosModelos.find((m) => m.clave === 'factura_venta' || m.clave.includes('factura')),
     [todosLosModelos],
+  );
+  const conFacturasVenta = useMemo(
+    () => todosLosModelos.some((m) => m.clave === 'factura_venta' && activos.includes(m.modulo)),
+    [todosLosModelos, activos],
   );
   const modelosRecientes = useMemo(
     () =>
@@ -3563,9 +4065,7 @@ function Bienvenida({
             title={t('palette.placeholder')}
           >
             <Icon name="search" size={14} />
-            <kbd class="border-border bg-bg-subtle text-text-subtle ml-1 rounded px-1.5 py-0.5 font-mono text-xs">
-              {atajoPaleta}
-            </kbd>
+            <Kbd class="ml-1">{atajoPaleta}</Kbd>
           </Button>
         </div>
       </div>
@@ -3596,6 +4096,18 @@ function Bienvenida({
         </Card>
       ) : null}
 
+      {onImportar ? (
+        <Card class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0">
+            <h2 class="text-text text-sm font-semibold">{t('migrate.cta')}</h2>
+            <p class="text-text-muted mt-1 text-sm">{t('migrate.ctaBody')}</p>
+          </div>
+          <Button variant="secondary" size="sm" class="shrink-0" onClick={onImportar}>
+            {t('migrate.title')}
+          </Button>
+        </Card>
+      ) : null}
+
       {/* 3. Perfil: o el asistente, o las próximas obligaciones */}
       {organizacion === null ? (
         <Card class="border-primary/40 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3618,7 +4130,13 @@ function Bienvenida({
             </Button>
           </div>
           {proximas === null ? (
-            <Spinner size={16} />
+            <SkeletonRows
+              class="border-border rounded-card border"
+              rowClass="border-border border-b last:border-b-0"
+              rows={3}
+              lines={2}
+              meta={[{ width: '6rem' }]}
+            />
           ) : proximas.length === 0 ? (
             <p class="text-text-muted text-sm">{t('dashboard.upcomingEmpty')}</p>
           ) : (
@@ -3669,7 +4187,7 @@ function Bienvenida({
       ) : null}
 
       {/* 4. Resumen operativo */}
-      <section aria-labelledby="heading-resumen" class="space-y-2">
+      <section aria-labelledby="heading-resumen" aria-busy={cargandoResumen} class="space-y-2">
         <h2 id="heading-resumen" class="sytue-overline text-text-subtle">
           {t('dashboard.summaryTitle')}
         </h2>
@@ -3677,11 +4195,9 @@ function Bienvenida({
           <Card
             class={cx(
               'flex flex-col justify-between p-4 transition-colors',
-              modeloFactura && 'hover:border-border-strong cursor-pointer',
+              modeloFactura && TARJETA_PULSABLE,
             )}
-            onClick={() => {
-              if (modeloFactura) onAbrirModelo(modeloFactura);
-            }}
+            {...tarjetaPulsable(modeloFactura ? () => onAbrirModelo(modeloFactura) : null)}
           >
             <div>
               <div class="mb-1 flex items-baseline justify-between">
@@ -3692,16 +4208,20 @@ function Bienvenida({
                   </Badge>
                 ) : null}
               </div>
-              <div class="text-text text-xl font-semibold tabular-nums">
-                {dinero(resumen?.facturacion.total_centimos ?? 0)}
-              </div>
+              {cargandoResumen ? (
+                <CifraCargando />
+              ) : (
+                <div class="text-text text-xl font-semibold tabular-nums">
+                  {dinero(resumen?.facturacion.total_centimos ?? 0)}
+                </div>
+              )}
               <p class="text-text-subtle mt-1 text-xs">{t('dashboard.kpiSalesHint')}</p>
             </div>
           </Card>
 
           <Card
-            class="hover:border-border-strong flex cursor-pointer flex-col justify-between p-4 transition-colors"
-            onClick={() => onVista('libro')}
+            class={cx('flex flex-col justify-between p-4 transition-colors', TARJETA_PULSABLE)}
+            {...tarjetaPulsable(() => onVista('libro'))}
           >
             <div>
               <div class="mb-1 flex items-baseline justify-between">
@@ -3714,11 +4234,15 @@ function Bienvenida({
                   </Badge>
                 ) : null}
               </div>
-              <div class="text-text text-xl font-semibold tabular-nums">
-                {resumen
-                  ? t('dashboard.entries', { count: resumen.contabilidad.total_asientos })
-                  : t('dashboard.doubleEntry')}
-              </div>
+              {cargandoResumen ? (
+                <CifraCargando />
+              ) : (
+                <div class="text-text text-xl font-semibold tabular-nums">
+                  {resumen
+                    ? t('dashboard.entries', { count: resumen.contabilidad.total_asientos })
+                    : t('dashboard.doubleEntry')}
+                </div>
+              )}
               <p class="text-text-subtle mt-1 text-xs">
                 {resumen
                   ? t('dashboard.debitCredit', { amount: dinero(resumen.contabilidad.total_debe) })
@@ -3730,11 +4254,9 @@ function Bienvenida({
           <Card
             class={cx(
               'flex flex-col justify-between p-4 transition-colors',
-              modeloFactura && 'hover:border-border-strong cursor-pointer',
+              modeloFactura && TARJETA_PULSABLE,
             )}
-            onClick={() => {
-              if (modeloFactura) onAbrirModelo(modeloFactura);
-            }}
+            {...tarjetaPulsable(modeloFactura ? () => onAbrirModelo(modeloFactura) : null)}
           >
             <div>
               <div class="mb-1 flex items-baseline justify-between">
@@ -3749,9 +4271,13 @@ function Bienvenida({
                   </Badge>
                 ) : null}
               </div>
-              <div class="text-text text-xl font-semibold tabular-nums">
-                {dinero(resumen?.facturacion.pendiente_cobro_centimos ?? 0)}
-              </div>
+              {cargandoResumen ? (
+                <CifraCargando />
+              ) : (
+                <div class="text-text text-xl font-semibold tabular-nums">
+                  {dinero(resumen?.facturacion.pendiente_cobro_centimos ?? 0)}
+                </div>
+              )}
               <p class="text-text-subtle mt-1 text-xs">
                 {resumen?.facturacion.proximo_vencimiento
                   ? t('dashboard.nextDue', { date: fecha(resumen.facturacion.proximo_vencimiento) })
@@ -3759,6 +4285,13 @@ function Bienvenida({
               </p>
             </div>
           </Card>
+
+          {/* Cuándo se facturó, no solo cuánto: a lo ancho de la rejilla, así queda a
+              `gap-3` de las cifras. Solo con las facturas de venta encendidas: sin
+              ellas el servicio contestaría «fuente desconocida». */}
+          {conFacturasVenta ? (
+            <FacturacionMes locale={locale} t={t} class="min-w-0 sm:col-span-3" />
+          ) : null}
         </div>
       </section>
 
@@ -3869,10 +4402,7 @@ function Bienvenida({
                           <button
                             key={x.clave}
                             type="button"
-                            onClick={() => {
-                              if (!encendido) void onCambiar(m, true);
-                              onAbrirModelo(x);
-                            }}
+                            onClick={() => void abrirModeloDeArea(m, encendido, x)}
                             class={cx(
                               'sytue-focus-ring rounded-control min-h-7 border px-2.5 py-1 text-sm transition-colors',
                               encendido
@@ -3904,6 +4434,7 @@ function Bienvenida({
           </div>
         ))}
       </section>
+      {dialogoEncender}
     </div>
   );
 }

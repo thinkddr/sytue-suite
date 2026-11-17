@@ -14,6 +14,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
@@ -85,8 +86,15 @@ type FilaEvento struct {
 
 	Hora    string
 	Resumen string
+	// Lugar es el `location`, apagado en `text-xs` tras el resumen (`max-w-[40%]`).
+	Lugar string
 	// Pasado es `opacity-60`.
 	Pasado bool
+	// Marca es la insignia del final de la fila: «Ahora» (tono primario) o «Siguiente»
+	// (neutro); api.EventoSinEstado, ninguna.
+	Marca api.EstadoDeEvento
+
+	insignia *ui.Insignia
 }
 
 var _ fyne.Widget = (*FilaEvento)(nil)
@@ -97,7 +105,7 @@ func (f *FilaEvento) lineasHora() []string {
 }
 
 // nuevaFilaEvento construye la fila a partir del evento y de la hora actual.
-func nuevaFilaEvento(v tema.Variante, t *i18n.Translator, e EventoDeHoy, ahora time.Time, alPulsar func()) *FilaEvento {
+func nuevaFilaEvento(v tema.Variante, t *i18n.Translator, e EventoDeHoy, ahora time.Time, marca api.EstadoDeEvento, alPulsar func()) *FilaEvento {
 	hora := i18n.FormatTime(t.Locale(), e.Inicio)
 	if e.TodoElDia {
 		hora = t.T("today.allDay", nil)
@@ -106,8 +114,23 @@ func nuevaFilaEvento(v tema.Variante, t *i18n.Translator, e EventoDeHoy, ahora t
 	if resumen == "" {
 		resumen = t.T("today.untitled", nil)
 	}
-	f := &FilaEvento{Hora: hora, Resumen: resumen, Pasado: e.HaTerminado(ahora)}
+	f := &FilaEvento{Hora: hora, Resumen: resumen, Lugar: e.Lugar, Pasado: e.HaTerminado(ahora), Marca: marca}
 	f.Nombre = hora + " " + resumen
+	if f.Lugar != "" {
+		f.Nombre += ", " + f.Lugar
+	}
+	switch marca {
+	case api.EventoAhora:
+		f.insignia = ui.NuevaInsignia(t.T("today.now", nil), ui.InsigniaPrimaria)
+	case api.EventoSiguiente:
+		f.insignia = ui.NuevaInsignia(t.T("today.next", nil), ui.InsigniaNeutra)
+	case api.EventoSinEstado, api.EventoPasado:
+		// Sin insignia.
+	}
+	if f.insignia != nil {
+		// La insignia comunica con palabras: el lector de pantalla la oye con la fila.
+		f.Nombre += ", " + f.insignia.Texto
+	}
 	f.AlPulsar = alPulsar
 	f.ExtendBaseWidget(f)
 	_ = v
@@ -127,6 +150,13 @@ func (f *FilaEvento) CreateRenderer() fyne.WidgetRenderer {
 		resumen: ui.Texto(f.Resumen, tema.TextoSM, ui.Normal, f.tinta(v, "text")),
 	}
 	r.objetos = append(r.aro.Objetos(), r.fondo, r.resumen)
+	if f.Lugar != "" {
+		r.lugar = ui.Texto(f.Lugar, tema.TextoXS, ui.Normal, f.tinta(v, "text-muted"))
+		r.objetos = append(r.objetos, r.lugar)
+	}
+	if f.insignia != nil {
+		r.objetos = append(r.objetos, f.insignia)
+	}
 	for _, l := range f.lineasHora() {
 		h := ui.Texto(l, tema.TextoXS, ui.Normal, f.tinta(v, "text-muted"))
 		r.hora = append(r.hora, h)
@@ -159,6 +189,7 @@ type eventoRenderer struct {
 	aro     *ui.Aro
 	hora    []*canvas.Text // una por línea
 	resumen *canvas.Text
+	lugar   *canvas.Text // nil sin lugar
 	objetos []fyne.CanvasObject
 }
 
@@ -182,8 +213,30 @@ func (r *eventoRenderer) Layout(t fyne.Size) {
 		ui.ColocarTexto(h, tema.TextoXS, MargenEvento, y+sangriaHora()+float32(i)*tema.TextoXS.Linea)
 	}
 	x := MargenEvento + AnchoHora + HuecoEvento
-	ui.Truncar(r.resumen, r.f.Resumen, tema.TextoSM, ui.Normal, t.Width-x-MargenEvento)
+	fin := t.Width - MargenEvento
+	// La insignia va al final (`ml-auto shrink-0 self-center`) y no cede.
+	if in := r.f.insignia; in != nil {
+		m := ui.MedidaInsignia(in.Texto)
+		in.Resize(m)
+		in.Move(fyne.NewPos(fin-m.Width, (t.Height-m.Height)/2))
+		fin -= m.Width + HuecoEvento
+	}
+	cabe := max(fin-x, 0)
+	// El lugar (`max-w-[40%] shrink-0 truncate`) se queda con lo suyo hasta el 40 % de
+	// la fila; el resumen (`min-w-0 truncate`) cede primero.
+	anchoLugar := float32(0)
+	if r.lugar != nil {
+		natural := ui.Medir(r.f.Lugar, tema.TextoXS, ui.Normal).Width
+		anchoLugar = min(natural, 0.4*(t.Width-2*MargenEvento))
+		cabe = max(cabe-anchoLugar-HuecoEvento, 0)
+	}
+	ancho := ui.Truncar(r.resumen, r.f.Resumen, tema.TextoSM, ui.Normal, cabe)
 	ui.ColocarTexto(r.resumen, tema.TextoSM, x, y)
+	if r.lugar != nil {
+		xl := x + ancho + HuecoEvento
+		ui.Truncar(r.lugar, r.f.Lugar, tema.TextoXS, ui.Normal, min(anchoLugar, max(fin-xl, 0)))
+		ui.ColocarTexto(r.lugar, tema.TextoXS, xl, y+sangriaHora())
+	}
 }
 
 // Refresh repinta con los tokens del tema actual y el estado del puntero y del foco.
@@ -199,6 +252,13 @@ func (r *eventoRenderer) Refresh() {
 	}
 	r.resumen.Color = r.f.tinta(v, "text")
 	r.resumen.Refresh()
+	if r.lugar != nil {
+		r.lugar.Color = r.f.tinta(v, "text-muted")
+		r.lugar.Refresh()
+	}
+	if r.f.insignia != nil {
+		r.f.insignia.Refresh()
+	}
 }
 
 // ---- Pie de correo ----
@@ -223,18 +283,27 @@ func MedidaCorreo() float32 {
 	return tema.Borde + 2*altoPieCorreo() + max(iconos.MarcaXS, tema.TextoSM.Linea)
 }
 
-// FilaCorreo es el pie de «Hoy»: la marca de Mail y los no leídos.
+// FilaCorreo es una línea del pie de «Hoy»: la marca de un producto y un texto. Es la
+// de Mail con los no leídos y, encima, la de Calendar con el «+N más en el calendario»
+// (la misma clase en Launcher.tsx).
 type FilaCorreo struct {
 	ui.Pulsable
 
 	Texto string
+	// Producto es la marca de la izquierda: Mail si no se dice otra.
+	Producto iconos.Producto
 }
 
 var _ fyne.Widget = (*FilaCorreo)(nil)
 
-// NuevaFilaCorreo crea el pie.
+// NuevaFilaCorreo crea el pie de Mail.
 func NuevaFilaCorreo(texto string, alPulsar func()) *FilaCorreo {
-	f := &FilaCorreo{Texto: texto}
+	return NuevaFilaPie(iconos.Mail, texto, alPulsar)
+}
+
+// NuevaFilaPie crea una línea del pie con la marca de ese producto.
+func NuevaFilaPie(p iconos.Producto, texto string, alPulsar func()) *FilaCorreo {
+	f := &FilaCorreo{Texto: texto, Producto: p}
 	f.Nombre = texto
 	f.AlPulsar = alPulsar
 	f.ExtendBaseWidget(f)
@@ -249,7 +318,7 @@ func (f *FilaCorreo) CreateRenderer() fyne.WidgetRenderer {
 		fondo:  canvas.NewRectangle(f.fondo(v)),
 		filete: canvas.NewRectangle(tema.Color("border", v)),
 		aro:    ui.NuevoAro(0, ui.SinHueco, v).Abierto(),
-		marca:  iconos.Marca(iconos.Mail, iconos.MarcaXS, v),
+		marca:  iconos.Marca(f.Producto, iconos.MarcaXS, v),
 		texto:  ui.Texto(f.Texto, tema.TextoSM, ui.Normal, tema.Color("text", v)),
 	}
 	r.objetos = append(r.aro.Objetos(), r.fondo, r.filete, r.marca.Objeto(), r.texto)
@@ -317,4 +386,12 @@ func enlace(texto string, p ui.Peso, alPulsar func()) *ui.Enlace {
 	e := ui.NuevoEnlace(texto, tema.TextoSM, p, "primary-text", alPulsar)
 	e.Sangria = SangriaEnlace
 	return e
+}
+
+// ---- Aviso de agenda incompleta ----
+
+// MedidaAvisoHoy es el alto de la línea `border-b px-4 py-2 text-xs` que avisa de que
+// algún calendario no contestó: 7 + 14 + 7 y el filete.
+func MedidaAvisoHoy() float32 {
+	return 2*AltoEvento + tema.TextoXS.Linea + tema.Borde
 }

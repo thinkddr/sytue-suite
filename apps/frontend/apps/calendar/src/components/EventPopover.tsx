@@ -3,7 +3,8 @@
  * (en cualquier vista) se abre junto a él en vez de saltar directo al modal:
  * muestra título, hora (o «todo el día»), lugar y descripción con el color del
  * evento, y ofrece «Editar» (abre el EventModal completo) y «Eliminar». Los
- * eventos de solo lectura (suscripciones ICS) no muestran esas acciones.
+ * eventos de solo lectura (suscripciones ICS) no muestran esas acciones. «Descargar
+ * .ics» sale en todos los que traen su `ical`, de solo lectura incluidos.
  *
  * No modal (contextual): se ancla al rectángulo del evento con posición `fixed`
  * (evita el recorte de las celdas `overflow-hidden` del mes, donde el Popover
@@ -35,7 +36,8 @@ import {
 } from '@sytue/ui';
 import { EventNotes } from './EventNotes.js';
 import { GuestList } from './GuestList.js';
-import { parseGuests, parseOrganizer } from '../lib/ical.js';
+import { parseGuests, parseOrganizer, type GuestStatus } from '../lib/ical.js';
+import { descargarIcs } from '../lib/icsDescarga.js';
 import type { GridEvent } from './CalendarGrid.js';
 import { eventInstant, parseTzid } from './dates.js';
 import { formatWhen } from '../lib/search.js';
@@ -68,6 +70,31 @@ interface Props {
    * hay invitación que contestar.
    */
   onResponder?: (event: GridEvent, status: 'accepted' | 'tentative' | 'declined') => void;
+  /**
+   * Lo que ya ha contestado quien mira (de su ATTENDEE en el .ics). Su botón sale
+   * pulsado y es el único primario: si los tres salen iguales, no se sabe si la
+   * respuesta se guardó ni cuál fue. «pending» o sin dato: ninguno marcado.
+   */
+  respuesta?: GuestStatus | undefined;
+}
+
+/**
+ * Aspecto de un botón de «¿vas a ir?»: pulsado (`aria-pressed`), primario y con la
+ * marca ✓ solo el de la respuesta dada. La marca no sobra: en la casa el secundario
+ * es el mismo relleno con borde, y el cambio de variante solo no se distingue a
+ * simple vista. Sin respuesta, los tres secundarios: un «Sí» primario sin pulsar se
+ * leería como «ya has dicho que sí».
+ */
+function aspectoRespuesta(
+  estado: 'accepted' | 'tentative' | 'declined',
+  respuesta: GuestStatus | undefined,
+): { variant: 'primary' | 'secondary'; 'aria-pressed': boolean; leadingIcon?: JSX.Element } {
+  if (estado !== respuesta) return { variant: 'secondary', 'aria-pressed': false };
+  return {
+    variant: 'primary',
+    'aria-pressed': true,
+    leadingIcon: <Icon name="check" size={16} />,
+  };
 }
 
 const MARGIN = 8; // margen mínimo al borde del viewport
@@ -102,6 +129,7 @@ export function EventPopover({
   onDelete,
   onDuplicate,
   onResponder,
+  respuesta,
 }: Props): JSX.Element | null {
   const panelRef = useRef<HTMLDivElement>(null);
   // Elemento a devolver el foco al cerrar por teclado; sí por Esc/X, no por clic
@@ -248,11 +276,27 @@ export function EventPopover({
   const when = whenLabel(t, locale, event);
   const readOnly = Boolean(event.readOnly);
   const titulo = event.summary || t('event.untitled');
+  // Llevarse el evento fuera (a otro calendario, a alguien de fuera de la organización):
+  // el .ics tal cual lo guarda el servidor, también el de una suscripción de solo
+  // lectura. Sin `ical` no hay nada fiel que guardar y el botón no sale.
+  const conIcs = Boolean(event.ical?.trim());
+  const botonIcs = (size?: 'sm'): JSX.Element | null =>
+    conIcs ? (
+      <Button
+        variant="ghost"
+        {...(size ? { size } : {})}
+        leadingIcon={<Icon name="download" size={16} />}
+        onClick={() => descargarIcs(event.summary, event.ical)}
+      >
+        {t('popover.downloadIcs')}
+      </Button>
+    ) : null;
   // Las acciones de la hoja, en el pie del diálogo: «Eliminar» arriba y la pareja
   // Duplicar | Editar debajo, con el principal abajo a la derecha.
   const acciones = (): JSX.Element =>
     readOnly ? (
       <>
+        {botonIcs()}
         {onDuplicate ? (
           <Button
             variant="secondary"
@@ -277,6 +321,7 @@ export function EventPopover({
         >
           {t('common.delete')}
         </Button>
+        {botonIcs()}
         {onDuplicate ? (
           <Button
             variant="secondary"
@@ -307,7 +352,7 @@ export function EventPopover({
         onClose={onClose}
         title={titulo}
         size="sm"
-        footer={readOnly && !onDuplicate ? undefined : acciones()}
+        footer={readOnly && !onDuplicate && !conIcs ? undefined : acciones()}
       >
         <div class="flex flex-col gap-3">
           <dl class="flex flex-col gap-1.5">
@@ -351,11 +396,11 @@ export function EventPopover({
           {onResponder ? (
             <div class="border-border-subtle flex flex-col gap-2 border-t pt-3">
               <span class="sytue-meta">{t('popover.respond')}</span>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-3 gap-2" role="group" aria-label={t('popover.respond')}>
                 {(['accepted', 'tentative', 'declined'] as const).map((estado) => (
                   <Button
                     key={estado}
-                    variant={estado === 'accepted' ? 'primary' : 'secondary'}
+                    {...aspectoRespuesta(estado, respuesta)}
                     onClick={() => onResponder(event, estado)}
                   >
                     {t(
@@ -473,12 +518,16 @@ export function EventPopover({
           lectura: la invitación de otro no se edita, pero sí se contesta — y
           contestarla es justo lo único que se puede hacer con ella. */}
       {onResponder ? (
-        <div class="border-border mt-3 flex flex-wrap items-center gap-2 border-t pt-2.5">
+        <div
+          class="border-border mt-3 flex flex-wrap items-center gap-2 border-t pt-2.5"
+          role="group"
+          aria-label={t('popover.respond')}
+        >
           <span class="sytue-meta w-full">{t('popover.respond')}</span>
           {(['accepted', 'tentative', 'declined'] as const).map((estado) => (
             <Button
               key={estado}
-              variant={estado === 'accepted' ? 'primary' : 'secondary'}
+              {...aspectoRespuesta(estado, respuesta)}
               size="sm"
               onClick={() => {
                 shouldRestoreRef.current = false;
@@ -500,7 +549,7 @@ export function EventPopover({
       {readOnly ? (
         <div class="border-border mt-3 flex flex-wrap items-center gap-2 border-t pt-2.5">
           <p class="sytue-meta w-full">{t('popover.readOnly')}</p>
-          {/* Lo único que se puede hacer con el evento de otro: copiártelo. La
+          {/* Con el evento de otro solo cabe copiártelo o llevártelo en .ics. La
               exportación a .ics del calendario entero vive en el menú «⋮» del
               calendario, en la barra lateral. */}
           {onDuplicate ? (
@@ -515,6 +564,7 @@ export function EventPopover({
               {t('popover.copyToMine')}
             </Button>
           ) : null}
+          {botonIcs('sm')}
         </div>
       ) : (
         // `flex-wrap`: tres botones con la etiqueta larga de algunos idiomas
@@ -553,6 +603,7 @@ export function EventPopover({
           >
             {t('common.delete')}
           </Button>
+          {botonIcs('sm')}
         </div>
       )}
     </div>

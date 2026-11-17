@@ -303,8 +303,13 @@ func TestPapelera_restaurarDevuelveLaFotoASuSitio(t *testing.T) {
 	if err := st.ALaPapelera(ctx, a.ID, "u1"); err != nil {
 		t.Fatal(err)
 	}
-	if lista, _ := st.Papelera(ctx, "u1"); len(lista) != 1 || lista[0].ID != a.ID {
+	lista, _ := st.Papelera(ctx, "u1")
+	if len(lista) != 1 || lista[0].ID != a.ID {
 		t.Fatalf("papelera: %v", lista)
+	}
+	// Con cuándo se borró: sin eso la interfaz no puede decir cuándo se va.
+	if b := lista[0].BorradaEn; b == nil || time.Since(*b) > time.Minute {
+		t.Fatalf("la papelera no dice cuándo se borró la foto: %v", b)
 	}
 	if fotos, _ := st.FotosDelAlbum(ctx, al.ID, "u1"); len(fotos) != 0 {
 		t.Fatalf("en la papelera no se ve en el álbum: %v", ids(fotos))
@@ -895,8 +900,8 @@ func TestVectores_organizacionExcluidaDelLote(t *testing.T) {
 func TestDuplicadas_agrupaLasRafagasYRespetaElTiempo(t *testing.T) {
 	st, ctx := nuevoStore(t)
 	const modelo = "siglip2-so400m"
-	en := func(min int) *time.Time {
-		x := time.Date(2026, 7, 1, 12, min, 0, 0, time.UTC)
+	en := func(minutes int) *time.Time {
+		x := time.Date(2026, 7, 1, 12, minutes, 0, 0, time.UTC)
 		return &x
 	}
 	// Tres disparos del mismo momento (casi el mismo vector) y una foto
@@ -1374,5 +1379,48 @@ func TestVectores_loteIdiomaYSinPisar(t *testing.T) {
 	}
 	if got[a.ID] != "Escrita a mano" || got[b.ID] != "Une plage" {
 		t.Fatalf("descripciones: %v", got)
+	}
+}
+
+// Saltar a una fecha: la barra de años cuenta con la MISMA fecha que ordena, y
+// un cursor en el primer instante del año siguiente (el que compone `desde=`)
+// empieza justo por la última foto del año pedido, sin colar la de las 00:00.
+func TestAnyosDeLaLinea_yElSaltoAUnAnyo(t *testing.T) {
+	st, ctx := nuevoStore(t)
+	el := func(anyo int, mes time.Month, dia, hora int) *time.Time {
+		x := time.Date(anyo, mes, dia, hora, 0, 0, 0, time.UTC)
+		return &x
+	}
+	_, _ = st.Ingerir(ctx, foto("2021.jpg", "a1", el(2021, 3, 1, 10)))
+	fin19, _ := st.Ingerir(ctx, foto("2019-dic.jpg", "a2", el(2019, 12, 31, 23)))
+	_, _ = st.Ingerir(ctx, foto("2019-ene.jpg", "a3", el(2019, 1, 2, 10)))
+	_, _ = st.Ingerir(ctx, foto("2020-medianoche.jpg", "a4", el(2020, 1, 1, 0)))
+
+	anyos, err := st.AnyosDeLaLinea(ctx, "u1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quiero := []store.AnyoDeLinea{{2021, 1}, {2020, 1}, {2019, 2}}
+	if len(anyos) != len(quiero) {
+		t.Fatalf("años: %v", anyos)
+	}
+	for i := range quiero {
+		if anyos[i] != quiero[i] {
+			t.Fatalf("año %d: %v, se esperaba %v", i, anyos[i], quiero[i])
+		}
+	}
+	if fav, err := st.AnyosDeLaLinea(ctx, "u1", true); err != nil || len(fav) != 0 {
+		t.Fatalf("sin favoritas no hay años: %v %v", fav, err)
+	}
+
+	pagina, _, err := st.LineaDeTiempo(ctx, store.FiltroLinea{
+		Duenyo: "u1",
+		Desde:  &store.Cursor{Fecha: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), ID: uuid.Nil},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pagina) != 2 || pagina[0].ID != fin19.ID {
+		t.Fatalf("2019 empieza por la del 31 de diciembre y no trae la de 2020: %v", ids(pagina))
 	}
 }

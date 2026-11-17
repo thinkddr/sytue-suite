@@ -195,6 +195,106 @@ func TestImportarCSVPorHTTP(t *testing.T) {
 	}
 }
 
+// Editar una vista guardada cambia lo que devuelve sin tocar su id (los enlaces y las
+// conexiones cuelgan de él), valida contra los campos igual que al crearla, no deja
+// cambiar el tipo ni a quien solo lee, y queda en la traza con el antes y el después.
+func TestEditarVistaPorHTTP(t *testing.T) {
+	srv := servidor(t)
+	base := idDeRespuesta(t, llamar(t, srv, "ana", "acme", "POST", "/bases", `{"name":"Tienda"}`))
+	tabla := idDeRespuesta(t, llamar(t, srv, "ana", "acme", "POST", "/bases/"+base+"/tables", `{"name":"Pedidos"}`))
+	nombre := idDeRespuesta(t, llamar(t, srv, "ana", "acme", "POST", "/tables/"+tabla+"/fields", `{"name":"Cliente","kind":"text"}`))
+	importe := idDeRespuesta(t, llamar(t, srv, "ana", "acme", "POST", "/tables/"+tabla+"/fields", `{"name":"Importe","kind":"number"}`))
+	for _, r := range []string{`{"data":{"` + nombre + `":"Ana","` + importe + `":10}}`, `{"data":{"` + nombre + `":"Bea","` + importe + `":50}}`, `{"data":{"` + nombre + `":"Cris","` + importe + `":30}}`} {
+		llamar(t, srv, "ana", "acme", "POST", "/tables/"+tabla+"/records", r)
+	}
+	vista := idDeRespuesta(t, llamar(t, srv, "ana", "acme", "POST", "/tables/"+tabla+"/views",
+		`{"name":"Grandes","kind":"grid","config":{"filters":[{"field":"`+importe+`","op":"gt","value":20}]}}`))
+	nombres := func() []string {
+		t.Helper()
+		w := llamar(t, srv, "ana", "acme", "GET", "/tables/"+tabla+"/records?view="+vista, "")
+		var p struct {
+			Records []struct {
+				Data map[string]any `json:"data"`
+			} `json:"records"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &p); err != nil {
+			t.Fatalf("registros: %d %s", w.Code, w.Body)
+		}
+		out := []string{}
+		for _, r := range p.Records {
+			s, _ := r.Data[nombre].(string)
+			out = append(out, s)
+		}
+		return out
+	}
+	if got := strings.Join(nombres(), ","); got != "Bea,Cris" && got != "Cris,Bea" {
+		t.Fatalf("antes de editar: %s", got)
+	}
+
+	// Nuevo nombre, nuevo filtro y orden descendente por importe.
+	w := llamar(t, srv, "ana", "acme", "PATCH", "/views/"+vista,
+		`{"name":"  Medianos ","config":{"filters":[{"field":"`+importe+`","op":"lt","value":40}],"sort":[{"field":"`+importe+`","dir":"desc"}]}}`)
+	if w.Code != 200 {
+		t.Fatalf("editar: %d %s", w.Code, w.Body)
+	}
+	var v struct {
+		ID, Name, Kind string
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &v)
+	if v.ID != vista || v.Name != "Medianos" || v.Kind != "grid" {
+		t.Errorf("vista editada: %+v", v)
+	}
+	if got := strings.Join(nombres(), ","); got != "Cris,Ana" {
+		t.Errorf("después de editar: %s", got)
+	}
+	// Solo el nombre: la configuración se queda como estaba.
+	if c := llamar(t, srv, "ana", "acme", "PATCH", "/views/"+vista, `{"name":"Hasta 40"}`).Code; c != 200 {
+		t.Errorf("solo el nombre: %d", c)
+	}
+	if got := strings.Join(nombres(), ","); got != "Cris,Ana" {
+		t.Errorf("renombrar cambió la configuración: %s", got)
+	}
+	if l := llamar(t, srv, "ana", "acme", "GET", "/tables/"+tabla+"/views", "").Body.String(); !strings.Contains(l, `"name":"Hasta 40"`) || strings.Contains(l, "Grandes") {
+		t.Errorf("lista de vistas: %s", l)
+	}
+
+	// Lo que no se acepta: cuerpo vacío, tipo, filtro imposible, campo de otra tabla,
+	// nombre vacío, vista inexistente y quien solo lee.
+	for _, c := range []struct {
+		cuerpo string
+		quiero int
+	}{
+		{`{}`, 422},
+		{`{"kind":"kanban"}`, 400},
+		{`{"config":{"filters":[{"field":"` + nombre + `","op":"gt","value":"x"}]}}`, 422},
+		{`{"config":{"sort":[{"field":"00000000-0000-0000-0000-000000000000","dir":"asc"}]}}`, 422},
+		{`{"name":"   "}`, 422},
+	} {
+		if got := llamar(t, srv, "ana", "acme", "PATCH", "/views/"+vista, c.cuerpo).Code; got != c.quiero {
+			t.Errorf("%s: %d, quiero %d", c.cuerpo, got, c.quiero)
+		}
+	}
+	if c := llamar(t, srv, "ana", "acme", "PATCH", "/views/00000000-0000-0000-0000-000000000000", `{"name":"x"}`).Code; c != 404 {
+		t.Errorf("vista inexistente: %d", c)
+	}
+	if c := llamar(t, srv, "gus", "globex", "PATCH", "/views/"+vista, `{"name":"x"}`).Code; c != 404 {
+		t.Errorf("otra organización: %d", c)
+	}
+	llamar(t, srv, "ana", "acme", "POST", "/bases/"+base+"/permissions", `{"principal_kind":"user","principal_id":"bea","role":"viewer"}`)
+	if c := llamar(t, srv, "bea", "acme", "PATCH", "/views/"+vista, `{"name":"x"}`).Code; c != 403 {
+		t.Errorf("lector edita una vista: %d", c)
+	}
+
+	// La traza: dos `view.update`, la primera con el filtro de antes y el de después.
+	a := llamar(t, srv, "ana", "acme", "GET", "/bases/"+base+"/audit?limit=200", "").Body.String()
+	if n := strings.Count(a, `"action":"view.update"`); n != 2 {
+		t.Errorf("ediciones auditadas: %d en %s", n, a)
+	}
+	if !strings.Contains(a, `"Grandes"`) || !strings.Contains(a, `"Medianos"`) {
+		t.Errorf("la traza no guarda el antes y el después: %s", a)
+	}
+}
+
 // publico llama a las rutas sin sesión (las que usa el BFF por quien abre un enlace).
 func publico(t *testing.T, srv http.Handler, metodo, ruta, cuerpo string) *httptest.ResponseRecorder {
 	t.Helper()

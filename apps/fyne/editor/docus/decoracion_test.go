@@ -131,3 +131,38 @@ func TestLaPaginaDelDocumento(t *testing.T) {
 		t.Errorf("la página por defecto no necesita capa: %.200s", got)
 	}
 }
+
+// TestElIdiomaDelDocumento: el idioma de la barra de estado se guarda en la capa de la
+// página, se deshace como ella y sobrevive a cambiar la página en la cinta.
+func TestElIdiomaDelDocumento(t *testing.T) {
+	f := folioCon(t, `<p>Hola</p>`)
+	if idioma, editable := f.IdiomaDocumento(); idioma != "" || !editable {
+		t.Fatalf("sin capa el idioma es %q (editable %v)", idioma, editable)
+	}
+	f.PonerIdiomaDocumento("it")
+	capa := `<div data-sytue-page="" data-width="794" data-height="1123" data-margins="96 96 96 96" data-lang="it" contenteditable="false" aria-hidden="true"></div>`
+	if got := f.Serializar(); got != capa+`<p>Hola</p>` {
+		t.Fatalf("el idioma no se guarda como en la web: %s", got)
+	}
+	p := f.Pagina()
+	p.Margen = 48
+	f.GuardarPagina(p)
+	if got := f.Serializar(); !strings.Contains(got, `data-margins="48 48 48 48" data-lang="it"`) {
+		t.Errorf("cambiar los márgenes pierde el idioma: %.200s", got)
+	}
+	f.Mandar(editor.Deshacer, "")
+	f.Mandar(editor.Deshacer, "")
+	if idioma, _ := f.IdiomaDocumento(); idioma != "" || strings.Contains(f.Serializar(), "data-sytue-page") {
+		t.Errorf("deshacer no quita el idioma: %q, %.200s", idioma, f.Serializar())
+	}
+	f.PonerIdiomaDocumento("xx")
+	if strings.Contains(f.Serializar(), "data-sytue-page") {
+		t.Error("un idioma que no es de la suite se guarda")
+	}
+
+	// Un documento que ya lo guarda se abre editable y con él.
+	g := folioCon(t, capa+`<p>Ciao</p>`)
+	if idioma, editable := g.IdiomaDocumento(); idioma != "it" || !editable {
+		t.Fatalf("abre con %q (editable %v)", idioma, editable)
+	}
+}

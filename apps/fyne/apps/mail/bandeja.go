@@ -90,6 +90,9 @@ type Bandeja struct {
 	AlSeguirFiltro func()
 	// AbiertaID es el hilo que el lector está enseñando.
 	AbiertaID string
+	// Vuelven es cuándo vuelve cada hilo en «Pospuestos»: su fila dice eso, con el
+	// reloj, y no cuándo llegó. Nil fuera de ella.
+	Vuelven map[string]time.Time
 	// Marcadas son los hilos con la casilla puesta.
 	Marcadas map[string]bool
 	// SoloLectura esconde las casillas y el triaje: un buzón compartido o sin red no
@@ -245,6 +248,10 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 		}
 	}).Con(ui.Fantasma, ui.TallaSM)
 	r.limpiar.Rotulo, r.limpiar.Icono, r.limpiar.TamIcono = b.T.T("list.clearSearch", nil), iconos.Cerrar, 16
+	// «Opciones de búsqueda»: el embudo `iconOnly` que abre el panel. Va ANTES de
+	// «Limpiar» para no cambiar de sitio cuando este aparece al escribir.
+	r.opciones = botonIconoCabecera(b.T.T("list.searchOptions", nil), FiltroD, "", false, nil)
+	r.opciones.AlPulsar = func() { b.abrirOpcionesBusqueda(r.opciones) }
 	r.seleccion = nuevaBarraSeleccion(b.T, b.Lote)
 	r.filtros = b.botonesFiltro()
 
@@ -271,11 +278,11 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 	r.lista = lista
 	r.cuerpo = ui.EnvolverLista(lista)
 
-	r.esqueleto = nuevoEsqueleto()
+	r.esqueleto = nuevoEsqueleto(b.T.T("list.loading", nil))
 	r.vacio = ui.NuevoVacio("", "")
 	b.r = r
 	r.objetos = []fyne.CanvasObject{
-		r.fondo, r.cabecera, r.busqueda, r.limpiar, r.lineaBusqueda, r.lineaFiltros,
+		r.fondo, r.cabecera, r.busqueda, r.opciones, r.limpiar, r.lineaBusqueda, r.lineaFiltros,
 	}
 	for _, f := range r.filtros {
 		r.objetos = append(r.objetos, f)
@@ -297,6 +304,7 @@ func (b *Bandeja) rellenar(f *FilaConversacion, i int, c Conversacion) {
 	f.Marcada = b.Marcadas[c.HiloID]
 	f.SeleccionActiva = !b.SoloLectura && b.hayMarcadas()
 	f.SinLeerTexto = b.T.T("list.unreadPrefix", nil)
+	f.RespondidaTexto = b.T.T("list.answered", nil)
 	f.T = b.T
 	f.Acciones = nil
 	if !b.SoloLectura {
@@ -317,8 +325,21 @@ func (b *Bandeja) rellenar(f *FilaConversacion, i int, c Conversacion) {
 			b.AlMarcar(c, i)
 		}
 	}
-	f.Poner(c, NombreVisible(b.T, c.Ultimo.De), asunto,
-		FechaCorta(b.Locale, c.Ultimo.Recibido, b.Ahora()))
+	// La fecha de la fila es la de orden: lo vuelto de «Pospuestos» enseña cuándo
+	// volvió (con el reloj, como la etiqueta «Pospuesto» de Gmail), que es por lo que
+	// está arriba; si no, la de llegada.
+	fecha := FechaCorta(b.Locale, c.Ultimo.FechaDeOrden(), b.Ahora())
+	vuelve, pospuesta := b.Vuelven[c.HiloID]
+	if pospuesta {
+		fecha = FechaCorta(b.Locale, vuelve.In(time.Local), b.Ahora())
+	}
+	f.Pospuesta = pospuesta
+	f.Vuelta = !pospuesta && !c.Ultimo.Vuelto.IsZero()
+	f.VueltaTexto = ""
+	if f.Vuelta {
+		f.VueltaTexto = b.T.T("snooze.returned", i18n.Vars{"date": FechaLarga(b.Locale, c.Ultimo.Vuelto.In(time.Local))})
+	}
+	f.Poner(c, NombreVisible(b.T, c.Ultimo.De), asunto, fecha)
 }
 
 type bandejaRenderer struct {
@@ -328,13 +349,15 @@ type bandejaRenderer struct {
 	cabecera                                   *ui.CabeceraApp
 	conteo                                     *ui.Rotulo
 	busqueda                                   *ui.Entrada
+	opciones                                   *ui.Boton
 	limpiar                                    *ui.Boton
 	vaciar                                     *botonVaciar
 	seleccion                                  *BarraSeleccion
 	lista                                      *widget.List
 	cuerpo                                     fyne.CanvasObject
-	esqueleto                                  *Esqueleto
+	esqueleto                                  *ui.FilasEsqueleto
 	vacio                                      *ui.Vacio
+	marcaVacio                                 marcaVacio // con qué se pintó `vacio`
 	objetos                                    []fyne.CanvasObject
 	// altos son las filas a las que se ha dado un alto propio (las que llevan chips),
 	// para devolverlas a los 83 cuando dejan de llevarlos.
@@ -359,12 +382,22 @@ func (r *bandejaRenderer) Layout(t fyne.Size) {
 	r.cabecera.Resize(fyne.NewSize(dentro, AltoCabeceraLista))
 	y := AltoCabeceraLista
 
+	// Los botones van con `gap-2` detrás del campo, centrados en la franja
+	// (`items-center`). El campo mide sus 184 mientras quepa; si no, encoge, como el
+	// envoltorio `min-w-0` del Input de la web.
+	hueco := tema.Espacio(2)
+	mo, ml := r.opciones.MinSize(), r.limpiar.MinSize()
+	botones := hueco + mo.Width
+	if r.limpiar.Visible() {
+		botones += hueco + ml.Width
+	}
+	ancho := max(min(AnchoBusqueda, dentro-2*MargenBusqueda-botones), 0)
 	r.busqueda.Move(fyne.NewPos(MargenBusqueda, y+RellenoBusqueda))
-	r.busqueda.Resize(fyne.NewSize(AnchoBusqueda, ui.AltoCampo(ui.CampoMD)))
-	// `gap-2` detrás del campo, centrado en la franja (`items-center`).
-	ml := r.limpiar.MinSize()
-	r.limpiar.Move(fyne.NewPos(MargenBusqueda+AnchoBusqueda+tema.Espacio(2),
-		y+(AltoBusqueda-tema.Borde-ml.Height)/2))
+	r.busqueda.Resize(fyne.NewSize(ancho, ui.AltoCampo(ui.CampoMD)))
+	x := MargenBusqueda + ancho + hueco
+	r.opciones.Move(fyne.NewPos(x, y+(AltoBusqueda-tema.Borde-mo.Height)/2))
+	r.opciones.Resize(mo)
+	r.limpiar.Move(fyne.NewPos(x+mo.Width+hueco, y+(AltoBusqueda-tema.Borde-ml.Height)/2))
 	r.limpiar.Resize(ml)
 	r.lineaBusqueda.Move(fyne.NewPos(0, y+AltoBusqueda-tema.Borde))
 	r.lineaBusqueda.Resize(fyne.NewSize(dentro, tema.Borde))
@@ -511,124 +544,51 @@ func (r *bandejaRenderer) ponerVacio() {
 		}
 	case Cargando, Listo:
 	}
-	if nuevo := ponerEstado(r.vacio, titulo, desc, accion); nuevo != r.vacio {
+	if nuevo := ponerEstado(r.vacio, &r.marcaVacio, titulo, desc, accion, ilustracionDeEstado(b.Estado)); nuevo != r.vacio {
 		cambiar(r.objetos, r.vacio, nuevo)
 		r.vacio = nuevo
 	}
-	// ponytail: sin ilustración. Las trece de `branding/illustrations` usan
-	// `var(--sytue-primary-500)` SIN valor de reserva y eso tumba el fichero entero en
-	// `oksvg`: es uno de los huecos medidos del catálogo (`docs/roadmap.md`). En
-	// cuanto se sustituya el token por su hex al leer, es una línea aquí.
 }
 
-// Esqueleto son las ocho filas grises de la carga, con la geometría de la fila real.
-type Esqueleto struct {
-	widget.BaseWidget
-}
+// Proporciones de las barras del esqueleto, las mismas `width` que escribe la web.
+// Son fracciones de la columna de texto ENTERA: desde 7ee588aa la meta vive en la
+// línea del remitente y las líneas 2 y 3 ocupan todo el ancho, como en la fila real.
+const (
+	parteL1Esqueleto   float32 = 0.45
+	parteL2Esqueleto   float32 = 0.80
+	parteL3Esqueleto   float32 = 0.65
+	anchoMetaEsqueleto float32 = 36
+)
 
-var _ fyne.Widget = (*Esqueleto)(nil)
-
-func nuevoEsqueleto() *Esqueleto {
-	e := &Esqueleto{}
-	e.ExtendBaseWidget(e)
-	return e
-}
-
-// AccessibilityLabel: la web lo marca `aria-hidden` y anuncia «Cargando…» aparte. Lo
-// anunciable es el estado, no los rectángulos.
-func (e *Esqueleto) AccessibilityLabel() string { return "" }
-
-// AccessibilityRole implementa fyne.Accessible.
-func (e *Esqueleto) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleContainer }
-
-// CreateRenderer compone las ocho filas.
-func (e *Esqueleto) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &esqueletoRenderer{e: e}
-	for range FilasEsqueleto {
-		f := filaEsqueleto{
-			filete: canvas.NewRectangle(tema.Color("border", v)),
-			avatar: ui.NuevoEsqueletoRedondo(ui.MedidaAvatar(ui.AvatarMD).Width),
-			l1:     ui.NuevoEsqueleto(0, 0),
-			l2:     ui.NuevoEsqueleto(0, 0),
-			l3:     ui.NuevoEsqueleto(0, 0),
-			meta:   ui.NuevoEsqueleto(0, 0),
-		}
-		r.filas = append(r.filas, f)
-		r.objetos = append(r.objetos, f.filete, f.avatar, f.l1, f.l2, f.l3, f.meta)
-	}
-	return r
-}
-
-type filaEsqueleto struct {
-	filete           *canvas.Rectangle
-	avatar           *ui.Esqueleto
-	l1, l2, l3, meta *ui.Esqueleto
-}
-
-type esqueletoRenderer struct {
-	e       *Esqueleto
-	filas   []filaEsqueleto
-	objetos []fyne.CanvasObject
-}
-
-func (r *esqueletoRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(ui.AnchoPanelBase, FilasEsqueleto*AltoEsqueleto)
-}
-
-func (r *esqueletoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *esqueletoRenderer) Destroy()                     {}
-
-// Layout copia el marcado de la web: `h-[83px] gap-3 px-3` con el punto de 7, el
-// avatar de 40 y tres barras de 14/12/12 en la columna de texto. Todo se centra en la
-// caja de CONTENIDO, que es la fila menos su `border-b` (`box-sizing: border-box`).
-func (r *esqueletoRenderer) Layout(t fyne.Size) {
+// nuevoEsqueleto son las ocho filas grises de la carga, con la geometría de la fila
+// real: `h-[83px] gap-3 px-3` con el punto de 7, el avatar de 40 y una columna `flex-1`
+// cuya primera línea es `justify-between items-center` (remitente al 45 % y meta de
+// 36 px a la derecha, centrada con él) y después dos barras de 12 px al 80 % y 65 % de
+// la columna, con el `mt-2` entre ellas. Todo se centra en la caja de CONTENIDO, que
+// es la fila menos su `border-b`.
+//
+// Es `ui.FilasEsqueleto` con la receta de la bandeja: un solo latido para las ocho y un
+// solo «Cargando conversaciones…», que es el `sr-only role="status"` de la web.
+func nuevoEsqueleto(rotulo string) *ui.FilasEsqueleto {
 	const (
-		altoL1    float32 = 14
-		altoL2    float32 = 12
-		aire      float32 = 2 * 0.25 * tema.Rem // el `mt-2` entre barras
-		anchoMeta float32 = 36
+		altoL1 float32 = 14
+		altoL2 float32 = 12
 	)
-	contenido := AltoEsqueleto - tema.Borde
-	for i, f := range r.filas {
-		y := float32(i) * AltoEsqueleto
-		f.filete.Move(fyne.NewPos(0, y+AltoEsqueleto-tema.Borde))
-		f.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
-
-		x := ui.InicioFila() + PuntoSinLeer + HuecoDelantero
-		lado := ui.MedidaAvatar(ui.AvatarMD)
-		f.avatar.Move(fyne.NewPos(x, y+(contenido-lado.Height)/2))
-		f.avatar.Resize(lado)
-		x += lado.Width + HuecoBloque
-
-		derecha := t.Width - MargenFila
-		f.meta.Move(fyne.NewPos(derecha-anchoMeta, y+(contenido-altoL2)/2))
-		f.meta.Resize(fyne.NewSize(anchoMeta, altoL2))
-		derecha -= anchoMeta + HuecoBloque
-
-		util := max(derecha-x, 0)
-		bloque := altoL1 + aire + altoL2 + aire + altoL2
-		by := y + (contenido-bloque)/2
-		for _, b := range []struct {
-			r     *ui.Esqueleto
-			parte float32
-			alto  float32
-		}{{f.l1, 0.45, altoL1}, {f.l2, 0.80, altoL2}, {f.l3, 0.65, altoL2}} {
-			b.r.Move(fyne.NewPos(x, by))
-			b.r.Resize(fyne.NewSize(util*b.parte, b.alto))
-			by += b.alto + aire
-		}
-	}
-}
-
-func (r *esqueletoRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	// Los bloques se recolorean solos: `ui.Esqueleto` lee el tema en su Refresh. Aquí
-	// solo queda el filete, que no es esqueleto sino el `divide-y` de la lista.
-	for _, f := range r.filas {
-		f.filete.FillColor = tema.Color("border", v)
-	}
-	for _, o := range r.objetos {
-		o.Refresh()
-	}
+	f := ui.NuevasFilasEsqueleto(FilasEsqueleto, ui.DelanteroAvatar, 3).ConReceta(ui.RecetaEsqueleto{
+		Alto:           AltoEsqueleto,
+		Izq:            ui.InicioFila() + PuntoSinLeer + HuecoDelantero,
+		Der:            MargenFila,
+		Delantero:      ui.MedidaAvatar(ui.AvatarMD),
+		HuecoDelantero: HuecoBloque,
+		Rayas: []ui.RayaEsqueleto{
+			// El remitente no puede comerse la meta: en la web el `justify-between` con
+			// `gap-3` encoge la barra antes que solaparlas.
+			{Alto: altoL1, Partes: []float32{parteL1Esqueleto}, Cola: fyne.NewSize(anchoMetaEsqueleto, altoL2)},
+			{Alto: altoL2, Partes: []float32{parteL2Esqueleto}},
+			{Alto: altoL2, Partes: []float32{parteL3Esqueleto}},
+		},
+		HuecoRayas: 2 * 0.25 * tema.Rem, // el `mt-2` entre barras
+	}).ConRotulo(rotulo)
+	f.Filete = true // el `divide-y` de la lista
+	return f
 }

@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -72,6 +73,69 @@ func TestLaAppEmpiezaEnLaPortadaYVuelve(t *testing.T) {
 		t.Error("un 403 al abrir es «sin permiso»")
 	}
 	sinRelojDeCabecera(w)
+}
+
+// TestLaProteccionNoSeConfundeConElPermiso: una presentación con algo que este lienzo
+// todavía no conserva se abre en solo lectura diciendo qué no sabe editar, con «Editar en
+// la web» en la franja y sin «Pedir acceso», que no lo arreglaría. Sin permiso, o sin
+// dónde guardar, la franja es la de siempre. Y `protect`, que ya se conserva, se edita.
+func TestLaProteccionNoSeConfundeConElPermiso(t *testing.T) {
+	const protegida = `{"slides":[{"id":"s","boxes":[]}],"protect":{"master":true}}`
+	const rara = `{"slides":[{"id":"s","boxes":[]}],"futuro":{"x":true}}`
+	a := NuevaApp(traductor(t), "es", nil, nil)
+	a.lanzar = func(f func()) { f() }
+	w := test.NewWindow(a.Objeto())
+	w.Resize(fyne.NewSize(1280, 800))
+	a.Arrancar()
+	a.AbrirContenido("Protegida", protegida, true, func(string) error { return nil })
+	if c := a.Contexto(); c.SoloLectura {
+		t.Errorf("la protección ya se conserva y se edita: %q %v", c.MotivoSoloLectura, c.NoEditable)
+	}
+	enLaWeb := 0
+	a.AbrirContenido("Rara", rara, true, func(string) error { return nil })
+	c := a.Contexto()
+	if !c.SoloLectura || c.MotivoSoloLectura != editor.MotivoNoSabeEditar ||
+		!slices.Equal(c.NoEditable, []string{"editor.readOnly.what.other"}) {
+		t.Fatalf("lo que no sabe editar no se explica: %v %q %v", c.SoloLectura, c.MotivoSoloLectura, c.NoEditable)
+	}
+	if !slices.Contains(a.Editor().NoEntendido(), "futuro") {
+		t.Errorf("el registro no sabría qué falta: %v", a.Editor().NoEntendido())
+	}
+	c.EnLaWeb = func() { enLaWeb++ }
+	c.Refrescar()
+	f := buscarFranja(w.Canvas().Content())
+	if f == nil || !strings.Contains(f.Texto, "parte de su contenido o formato") || f.Accion == nil || f.Accion.Texto != "Editar en la web" {
+		t.Fatalf("la franja no dice qué ni lleva a la web: %+v", f)
+	}
+	test.Tap(f.Accion)
+	if enLaWeb != 1 {
+		t.Error("«Editar en la web» no abre la web")
+	}
+	a.AbrirContenido("Ajena", rara, false, nil)
+	if c := a.Contexto(); !c.SoloLectura || c.MotivoSoloLectura != "" {
+		t.Errorf("sin permiso manda el permiso: %q", c.MotivoSoloLectura)
+	}
+	sinRelojDeCabecera(w)
+}
+
+// buscarFranja es la franja de solo lectura que haya en pantalla.
+func buscarFranja(o fyne.CanvasObject) *ui.FranjaSoloLectura {
+	if f, ok := o.(*ui.FranjaSoloLectura); ok {
+		return f
+	}
+	var hijos []fyne.CanvasObject
+	switch x := o.(type) {
+	case *fyne.Container:
+		hijos = x.Objects
+	case fyne.Widget:
+		hijos = test.WidgetRenderer(x).Objects()
+	}
+	for _, h := range hijos {
+		if f := buscarFranja(h); f != nil {
+			return f
+		}
+	}
+	return nil
 }
 
 // TestElMenuArchivoDeDiaposCreaYAbre: con servicio, «Nuevo» del menú Archivo es el

@@ -153,11 +153,17 @@ type Comando string
 // correspondencia, macros, notas al final, campos de formulario); lo que no está aquí
 // no está en la cinta nativa todavía.
 const (
-	Negrita      Comando = "bold"
-	Cursiva      Comando = "italic"
-	Subrayado    Comando = "underline"
-	Tachado      Comando = "strike"
-	SinFormato   Comando = "clearFormat"
+	Negrita    Comando = "bold"
+	Cursiva    Comando = "italic"
+	Subrayado  Comando = "underline"
+	Tachado    Comando = "strike"
+	SinFormato Comando = "clearFormat"
+	// CopiarFormato es la brocha: la primera pulsación copia el formato de carácter del
+	// cursor y la deja armada; la selección siguiente lo recibe (`brocha.ts`).
+	CopiarFormato Comando = "formatPainter"
+	// Mayusculas es «Cambiar mayúsculas y minúsculas». Valor: «sentence», «lower», «upper»
+	// o «title» (`mayusculas.ts`).
+	Mayusculas   Comando = "changeCase"
 	AlinearIzq   Comando = "alignLeft"
 	AlinearCen   Comando = "alignCenter"
 	AlinearDer   Comando = "alignRight"
@@ -245,6 +251,9 @@ type Formato struct {
 	// Imagen es `imageSelected`: hay una imagen seleccionada, y la cinta enseña sus
 	// herramientas.
 	Imagen bool
+	// Brocha es «Copiar formato» armado: el botón sale pulsado hasta que se pinta o se
+	// cancela. No es del `FormatState` de la web, que lo lleva en `brocha.ts`.
+	Brocha bool
 }
 
 // Pestana es una pestaña de la cinta: el rótulo de la tira de arriba y los grupos de
@@ -405,8 +414,15 @@ type Contexto struct {
 	// también cuando el permiso es de lectura. Mientras esté encendido, la cinta no
 	// manda comandos de edición y no se guarda.
 	SoloLectura bool
-	// MotivoSoloLectura es la clave de catálogo que explica por qué. Vacío = permiso.
+	// MotivoSoloLectura es la clave de catálogo que explica por qué. Vacío = permiso;
+	// [MotivoNoSabeEditar] = el lienzo no entiende el documento (lo pone NoSabeEditar).
 	MotivoSoloLectura string
+	// NoEditable son las claves de lo que el editor nativo aún no sabe editar de este
+	// documento («dibujos», «campos de formulario»…), para la franja de MotivoNoSabeEditar.
+	NoEditable []string
+	// EnLaWeb abre este documento en la web, que lo edita entero: es el botón de la franja
+	// cuando el lienzo no lo entiende. nil = no hay dirección (un fichero suelto).
+	EnLaWeb func()
 	// Peticion es la salida de la franja (petición del dueño, 2026-09-25): «Pedir
 	// acceso de edición» cuando el motivo es el permiso y, para el dueño, quién se lo
 	// pide. Lo rellena EngancharPeticionEdicion.
@@ -497,6 +513,11 @@ type Contexto struct {
 	// deja el de por defecto. Se llama en cada recomposición: si el cuerpo tiene estado
 	// —lo tecleado en «Buscar»— tiene que devolver SIEMPRE el mismo objeto.
 	Paneles func(Panel) fyne.CanvasObject
+	// PanelAjustes da el cuerpo del panel derecho «Ajustes» cuando el producto sabe llenarlo
+	// (Docus: espaciado, interlineado y sangrías del párrafo, o bordes, cabecera y ancho de
+	// la tabla, como `SettingsPanel.tsx`). nil deja el genérico, de alineación. Como
+	// Paneles, se llama en cada recomposición y debe devolver SIEMPRE el mismo objeto.
+	PanelAjustes func() fyne.CanvasObject
 	// Colaboración: comentar, el historial de versiones y compartir. Versiones pide
 	// la lista y llama a `listo` en el hilo de la interfaz; RestaurarVersion ya viene
 	// confirmado por quien pregunta. nil: el botón sale inerte.
@@ -527,11 +548,26 @@ type Contexto struct {
 	Sepia              bool
 	// Avisar enseña un aviso en la pila de la ventana (el `toast` de la web). Nil, nada.
 	Avisar func(titulo, texto string)
-	// Loc es el idioma de las fechas (el historial).
+	// Loc es el idioma de las fechas (el historial) y de las cifras del recuento.
 	Loc i18n.Locale
+	// AbrirRecuento abre el «Recuento de palabras» (Ctrl/Cmd+Mayús+C). Lo pone la
+	// [BarraEstado] de Docus, que es donde está la cifra que también lo abre; nil fuera
+	// de Docus.
+	AbrirRecuento func()
+	// Reintentar vuelve a pedir el documento: el «Reintentar» del estado de error
+	// ([PantallaFallo]). Lo pone quien sabe de dónde viene; nil: el botón no sale.
+	Reintentar func()
 	// Volver y EnfocarTitulo los pone el [Marco]: «Volver» del menú y «Renombrar».
 	Volver        func()
 	EnfocarTitulo func()
+	// Atajos abre o cierra la hoja «Atajos de teclado» (Ctrl/Cmd+/ y Vista); lo pone el
+	// [Marco], que es quien tiene la ventana. nil: el botón sale inerte.
+	Atajos func()
+	// AtajosPropios son los apartados que solo tiene este producto (en Diapos, las teclas
+	// de presentar): van al final de la hoja. nil, ninguno.
+	AtajosPropios func() []ui.GrupoDeAtajos
+	// hojaAtajos es la hoja abierta, para que Ctrl+/ la cierre.
+	hojaAtajos *ui.Dialogo
 }
 
 // Producto es la marca del conmutador que corresponde a este tipo (`TESELA_POR_KIND`).

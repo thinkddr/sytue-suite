@@ -28,6 +28,15 @@ import { direccionDelRender } from '../lib/direccion.js';
 import {
   legalFaltante,
   exigeRegistro,
+  CAMPOS_SECCION_LEGAL,
+  SECCIONES_LEGAL,
+  conCampoLegal,
+  faltanEnSeccion,
+  fusionarSeccionLegal,
+  leerCampoLegal,
+  seccionLegalCambiada,
+  type CampoFicha,
+  type SeccionLegal,
   ejecutarPublicacion,
   leerFallo,
   lineas,
@@ -455,6 +464,7 @@ function Versiones({
           </div>
         ) : estado === 'error' ? (
           <EmptyState
+            tone="error"
             title={t('versions.load_error')}
             description={t('sites.load_error_help')}
             action={
@@ -711,6 +721,7 @@ export function Dominios({
           </div>
         ) : estado === 'error' ? (
           <EmptyState
+            tone="error"
             title={t('domains.load_error')}
             description={
               fallo?.status === 403 ? t('domains.err_forbidden') : t('sites.load_error_help')
@@ -891,7 +902,7 @@ export function Dominios({
             })}
           </ul>
         ) : (
-          <p class="text-text-muted text-sm">{t('domains.empty')}</p>
+          <EmptyState compact title={t('domains.empty')} />
         )}
       </div>
 
@@ -940,6 +951,7 @@ function Resumen({ siteId, locale, t }: { siteId: string; locale: Locale; t: T }
   if (estado === 'error' || !datos) {
     return (
       <EmptyState
+        tone="error"
         title={t('analytics.load_error')}
         description={t(fallo?.status === 503 ? 'analytics.unavailable' : 'sites.load_error_help')}
         action={
@@ -1115,6 +1127,105 @@ function Exportar({
 /* Datos legales                                                                               */
 /* ------------------------------------------------------------------------------------------ */
 
+/** Cómo se pinta cada campo de la ficha legal: etiqueta, id, autocompletado y ejemplo. */
+interface MetaCampoLegal {
+  id: string;
+  etiqueta: ClaveMensaje;
+  ayuda?: ClaveMensaje;
+  tipo?: 'email' | 'tel';
+  autocompletar?: string;
+  /** Clave del catálogo para el ejemplo, o el ejemplo tal cual si no depende del idioma. */
+  ejemplo?: { clave: ClaveMensaje } | { literal: string };
+  maxLength?: number;
+  ancho?: boolean;
+  obligatorio?: boolean;
+}
+
+const META_CAMPO_LEGAL: Record<CampoFicha, MetaCampoLegal> = {
+  holder_name: {
+    id: 'legal-titular',
+    etiqueta: 'legal.holder_name',
+    autocompletar: 'organization',
+    ejemplo: { clave: 'legal.ph_holder' },
+    obligatorio: true,
+  },
+  tax_id: {
+    id: 'legal-nif',
+    etiqueta: 'legal.tax_id',
+    ejemplo: { literal: 'B12345678' },
+    obligatorio: true,
+  },
+  registry: {
+    id: 'legal-registro',
+    etiqueta: 'legal.registry',
+    ayuda: 'legal.registry_help',
+    ejemplo: { clave: 'legal.ph_registry' },
+    ancho: true,
+  },
+  country: {
+    id: 'legal-pais',
+    etiqueta: 'legal.country',
+    ayuda: 'legal.country_help',
+    autocompletar: 'country',
+    ejemplo: { literal: 'ES' },
+    maxLength: 2,
+    obligatorio: true,
+  },
+  street: {
+    id: 'legal-calle',
+    etiqueta: 'legal.street',
+    autocompletar: 'street-address',
+    ejemplo: { clave: 'legal.ph_street' },
+    ancho: true,
+    obligatorio: true,
+  },
+  postal_code: {
+    id: 'legal-cp',
+    etiqueta: 'legal.postal_code',
+    autocompletar: 'postal-code',
+    ejemplo: { literal: '28001' },
+    obligatorio: true,
+  },
+  city: {
+    id: 'legal-ciudad',
+    etiqueta: 'legal.city',
+    autocompletar: 'address-level2',
+    ejemplo: { clave: 'legal.ph_city' },
+    obligatorio: true,
+  },
+  region: { id: 'legal-region', etiqueta: 'legal.region', autocompletar: 'address-level1' },
+  email: {
+    id: 'legal-correo',
+    etiqueta: 'legal.email',
+    tipo: 'email',
+    autocompletar: 'email',
+    ejemplo: { clave: 'legal.ph_email' },
+    obligatorio: true,
+  },
+  phone: {
+    id: 'legal-telefono',
+    etiqueta: 'legal.phone',
+    tipo: 'tel',
+    autocompletar: 'tel',
+    ejemplo: { literal: '+34 912 345 678' },
+  },
+  privacy_contact: {
+    id: 'legal-privacidad',
+    etiqueta: 'legal.privacy_contact',
+    tipo: 'email',
+    ejemplo: { clave: 'legal.ph_privacy' },
+  },
+};
+
+const TEXTOS_SECCION_LEGAL: Record<
+  SeccionLegal,
+  { titulo: ClaveMensaje; descripcion: ClaveMensaje }
+> = {
+  titular: { titulo: 'legal.section_holder', descripcion: 'legal.section_holder_desc' },
+  direccion: { titulo: 'legal.section_address', descripcion: 'legal.section_address_desc' },
+  contacto: { titulo: 'legal.section_contact', descripcion: 'legal.section_contact_desc' },
+};
+
 function Legal({
   siteId,
   sitio,
@@ -1131,172 +1242,143 @@ function Legal({
   /** Los datos legales los cambia quien administra la organización: el servicio niega al resto. */
   administra: boolean;
 }): JSX.Element {
+  // Un solo borrador para toda la ficha (el registro depende del país y del NIF, que están en
+  // secciones distintas), pero cada sección guarda solo lo suyo sobre lo ya guardado.
   // El país se enseña como «ES» cuando está vacío: se guarda lo que se ve, no un vacío.
   const [legal, setLegal] = useState<DatosLegales>(() => ({
     ...sitio.legal,
     country: sitio.legal?.country || 'ES',
   }));
-  const [guardando, setGuardando] = useState(false);
-  const [aviso, setAviso] = useState<Resultado | null>(null);
+  const [guardando, setGuardando] = useState<SeccionLegal | null>(null);
+  const [avisos, setAvisos] = useState<Partial<Record<SeccionLegal, Resultado>>>({});
+  const faltanGuardado = legalFaltante(sitio.legal);
+  const nombres = (campos: readonly CampoLegal[]) =>
+    formatList(
+      locale,
+      campos.map((c) => t(NOMBRE_CAMPO[c]).toLowerCase()),
+    );
 
-  const campo = (k: Exclude<keyof DatosLegales, 'address'>) => ({
-    value: legal[k] ?? '',
-    onInput: (e: JSX.TargetedInputEvent<HTMLInputElement>) =>
-      setLegal({ ...legal, [k]: e.currentTarget.value }),
-  });
-  const direccion = (k: 'street' | 'postal_code' | 'city' | 'region') => ({
-    value: legal.address?.[k] ?? '',
-    onInput: (e: JSX.TargetedInputEvent<HTMLInputElement>) =>
-      setLegal({ ...legal, address: { ...legal.address, [k]: e.currentTarget.value } }),
-  });
-
-  const guardar = async (event: Event) => {
+  const guardar = async (event: Event, seccion: SeccionLegal) => {
     event.preventDefault();
-    setGuardando(true);
-    setAviso(null);
-    const res = await guardarSitio(siteId, { legal });
-    setGuardando(false);
+    setGuardando(seccion);
+    setAvisos((a) => ({ ...a, [seccion]: undefined }));
+    const res = await guardarSitio(siteId, {
+      // El país vacío se envía como el «ES» que se ve, como antes de partir la ficha: si no, la
+      // regla del Registro Mercantil (país + NIF) no se aplicaría al guardar solo el titular.
+      legal: fusionarSeccionLegal(
+        { ...sitio.legal, country: sitio.legal?.country || 'ES' },
+        legal,
+        seccion,
+      ),
+    });
+    setGuardando(null);
     if (!('sitio' in res)) {
-      setAviso({ tono: 'error', texto: t('legal.err_generic') });
+      setAvisos((a) => ({ ...a, [seccion]: { tono: 'error', texto: t('legal.err_generic') } }));
       return;
     }
     onSitio(res.sitio);
     const faltan = legalFaltante(res.sitio.legal);
-    setAviso(
+    const aviso: Resultado =
       faltan.length === 0
         ? { tono: 'exito', texto: t('legal.saved') }
-        : {
-            tono: 'info',
-            texto: t('legal.saved_incomplete', {
-              campos: formatList(
-                locale,
-                faltan.map((c) => t(NOMBRE_CAMPO[c]).toLowerCase()),
-              ),
-            }),
-          },
-    );
+        : { tono: 'info', texto: t('legal.saved_incomplete', { campos: nombres(faltan) }) };
+    // El aviso de las demás secciones hablaba de un estado que ya no es el actual.
+    setAvisos({ [seccion]: aviso });
   };
 
   return (
     <Seccion titulo={t('legal.title')} descripcion={t('legal.intro')} estrecha>
-      <form
-        onSubmit={(e) => {
-          void guardar(e);
-        }}
-      >
-        <p class="text-text-muted mb-4 text-xs">{t('legal.required_note')}</p>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FieldGroup label={t('legal.holder_name')} htmlFor="legal-titular" required>
-            <Input
-              id="legal-titular"
-              autocomplete="organization"
-              placeholder={t('legal.ph_holder')}
-              {...campo('holder_name')}
-            />
-          </FieldGroup>
-          <FieldGroup label={t('legal.tax_id')} htmlFor="legal-nif" required>
-            <Input id="legal-nif" placeholder="B12345678" {...campo('tax_id')} />
-          </FieldGroup>
-          <FieldGroup
-            label={t('legal.country')}
-            htmlFor="legal-pais"
-            help={t('legal.country_help')}
-            required
-          >
-            <Input
-              id="legal-pais"
-              maxLength={2}
-              autocomplete="country"
-              placeholder="ES"
-              {...campo('country')}
-            />
-          </FieldGroup>
-          <FieldGroup label={t('legal.email')} htmlFor="legal-correo" required>
-            <Input
-              id="legal-correo"
-              type="email"
-              autocomplete="email"
-              placeholder={t('legal.ph_email')}
-              {...campo('email')}
-            />
-          </FieldGroup>
-          <FieldGroup
-            label={t('legal.street')}
-            htmlFor="legal-calle"
-            required
-            class="min-w-0 sm:col-span-2"
-          >
-            <Input
-              id="legal-calle"
-              autocomplete="street-address"
-              placeholder={t('legal.ph_street')}
-              {...direccion('street')}
-            />
-          </FieldGroup>
-          <FieldGroup label={t('legal.postal_code')} htmlFor="legal-cp" required>
-            <Input
-              id="legal-cp"
-              autocomplete="postal-code"
-              placeholder="28001"
-              {...direccion('postal_code')}
-            />
-          </FieldGroup>
-          <FieldGroup label={t('legal.city')} htmlFor="legal-ciudad" required>
-            <Input
-              id="legal-ciudad"
-              autocomplete="address-level2"
-              placeholder={t('legal.ph_city')}
-              {...direccion('city')}
-            />
-          </FieldGroup>
-          <FieldGroup label={t('legal.region')} htmlFor="legal-region">
-            <Input id="legal-region" autocomplete="address-level1" {...direccion('region')} />
-          </FieldGroup>
-          <FieldGroup label={t('legal.phone')} htmlFor="legal-telefono">
-            <Input
-              id="legal-telefono"
-              type="tel"
-              autocomplete="tel"
-              placeholder="+34 912 345 678"
-              {...campo('phone')}
-            />
-          </FieldGroup>
-          <FieldGroup label={t('legal.privacy_contact')} htmlFor="legal-privacidad">
-            <Input
-              id="legal-privacidad"
-              type="email"
-              placeholder={t('legal.ph_privacy')}
-              {...campo('privacy_contact')}
-            />
-          </FieldGroup>
-          <FieldGroup
-            label={t('legal.registry')}
-            htmlFor="legal-registro"
-            help={t('legal.registry_help')}
-            required={exigeRegistro(legal)}
-            class="min-w-0 sm:col-span-2"
-          >
-            <Input
-              id="legal-registro"
-              placeholder={t('legal.ph_registry')}
-              {...campo('registry')}
-            />
-          </FieldGroup>
-        </div>
-        {aviso ? (
-          <Aviso tono={aviso.tono} class="mt-5">
-            {aviso.texto}
-          </Aviso>
-        ) : null}
-        {puedeCambiar ? null : (
-          <Aviso tono="info" class="mt-5">
-            {t('settings.admin_only')}
-          </Aviso>
-        )}
-        <Button type="submit" class="mt-5" loading={guardando} disabled={!puedeCambiar}>
-          {t('legal.save')}
-        </Button>
-      </form>
+      <p class="text-text-muted mb-4 text-xs">{t('legal.required_note')}</p>
+      {puedeCambiar ? null : (
+        <Aviso tono="info" class="mb-4">
+          {t('settings.admin_only')}
+        </Aviso>
+      )}
+      <div class="space-y-4">
+        {SECCIONES_LEGAL.map((seccion) => {
+          const textos = TEXTOS_SECCION_LEGAL[seccion];
+          const idTitulo = `legal-seccion-${seccion}`;
+          const cambiada = seccionLegalCambiada(sitio.legal, legal, seccion);
+          const faltan = faltanEnSeccion(faltanGuardado, seccion);
+          const aviso = avisos[seccion];
+          return (
+            <form
+              key={seccion}
+              aria-labelledby={idTitulo}
+              class="border-border min-w-0 rounded-lg border p-4"
+              onSubmit={(e) => {
+                void guardar(e, seccion);
+              }}
+            >
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <h3 id={idTitulo} class="text-text text-sm font-semibold">
+                    {t(textos.titulo)}
+                  </h3>
+                  <p class="text-text-muted mt-0.5 text-xs">{t(textos.descripcion)}</p>
+                </div>
+                {faltan.length === 0 ? (
+                  <Badge tone="success">{t('legal.section_complete')}</Badge>
+                ) : (
+                  <Badge tone="warning">{t('legal.section_incomplete')}</Badge>
+                )}
+              </div>
+              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {CAMPOS_SECCION_LEGAL[seccion].map((k) => {
+                  const m = META_CAMPO_LEGAL[k];
+                  const ejemplo = m.ejemplo
+                    ? 'clave' in m.ejemplo
+                      ? t(m.ejemplo.clave)
+                      : m.ejemplo.literal
+                    : undefined;
+                  return (
+                    <FieldGroup
+                      key={k}
+                      label={t(m.etiqueta)}
+                      htmlFor={m.id}
+                      {...(m.ayuda ? { help: t(m.ayuda) } : {})}
+                      required={k === 'registry' ? exigeRegistro(legal) : (m.obligatorio ?? false)}
+                      {...(m.ancho ? { class: 'min-w-0 sm:col-span-2' } : {})}
+                    >
+                      <Input
+                        id={m.id}
+                        type={m.tipo}
+                        autocomplete={m.autocompletar}
+                        placeholder={ejemplo}
+                        maxLength={m.maxLength}
+                        value={leerCampoLegal(legal, k)}
+                        onInput={(e: JSX.TargetedInputEvent<HTMLInputElement>) => {
+                          const v = e.currentTarget.value;
+                          setLegal((l) => conCampoLegal(l, k, v));
+                        }}
+                      />
+                    </FieldGroup>
+                  );
+                })}
+              </div>
+              {aviso ? (
+                <Aviso tono={aviso.tono} class="mt-4">
+                  {aviso.texto}
+                </Aviso>
+              ) : null}
+              <div class="mt-4 flex flex-wrap items-center gap-3">
+                <Button
+                  type="submit"
+                  loading={guardando === seccion}
+                  disabled={!puedeCambiar || (guardando !== null && guardando !== seccion)}
+                >
+                  {t('legal.save_section')}
+                </Button>
+                {cambiada ? (
+                  <span role="status" class="text-text-muted text-xs">
+                    {t('legal.unsaved')}
+                  </span>
+                ) : null}
+              </div>
+            </form>
+          );
+        })}
+      </div>
     </Seccion>
   );
 }
@@ -1699,6 +1781,7 @@ export function SitioDetalleApp({ siteId, locale, user, hubBaseUrl }: Props): JS
           />
         ) : (
           <EmptyState
+            tone="error"
             title={t('ficha.load_error')}
             description={t('sites.load_error_help')}
             action={

@@ -233,6 +233,7 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/projects/{id}/domains", h.ListDomains)
 			api.Post("/projects/{id}/domains", h.AddDomain)
 			api.Patch("/domains/{id}", h.PatchDomain)
+			api.Post("/domains/{id}/verify", h.VerifyDomain)
 			api.Delete("/domains/{id}", h.RemoveDomain)
 
 			// Monitorización de uptime (sondas HTTP por proyecto).

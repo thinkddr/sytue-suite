@@ -3,6 +3,8 @@
 
 package mail
 
+import "time"
+
 // Acciones son los manejadores del TRIAJE: `onToggleFlag`, `onArchive`, `onTrash`… de
 // MailApp.tsx, que la web reparte por props a la lista y al lector. Aquí los monta el
 // Buzón según la vista y los leen la fila, la barra de lote y el lector.
@@ -28,6 +30,27 @@ type Acciones struct {
 	Etiquetas []Etiqueta
 	// CrearRegla abre el asistente de reglas con el remitente puesto.
 	CrearRegla func(Conversacion)
+	// Bloquear es «Bloquear a …»: la regla «de esta dirección → Spam» y el hilo a Spam,
+	// en un clic. PuedeBloquear dice si se ofrece para ese remitente (no a uno mismo).
+	// Nil fuera del buzón propio y dentro de Spam.
+	Bloquear      func(Conversacion)
+	PuedeBloquear func(correo string) bool
+	// BuscarRemitente es «Buscar correos de esta persona»: busca lo que ha mandado esa
+	// dirección.
+	BuscarRemitente func(correo string)
+	// FichaDe dice si se ofrece «Añadir a Contactos» para ese remitente y, si ya tiene
+	// ficha, su id («Ver en Contactos»). AnadirAContactos la crea y VerEnContactos la
+	// abre en Sytue Contacts. Nil: sin Contacts que lo atienda (libreta.go).
+	FichaDe          func(correo string) (id string, ofrecer bool)
+	AnadirAContactos func(nombre, correo string)
+	VerEnContactos   func(id string)
+	// Posponer saca el hilo de Recibidos hasta una fecha (o se la cambia desde
+	// «Pospuestos»), QuitarPosposicion es «Volver a Recibidos» y Silenciar silencia o
+	// deja de silenciar el hilo (posponer.go). Nil donde no se ofrece: fuera del buzón
+	// propio y en el modo privado.
+	Posponer          func(Conversacion, time.Time)
+	QuitarPosposicion func(Conversacion)
+	Silenciar         func(c Conversacion, silenciar bool)
 }
 
 // EtiquetasDe es `conversationLabels`: las etiquetas del registro que lleva ALGÚN

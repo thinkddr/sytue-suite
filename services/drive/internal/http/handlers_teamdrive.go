@@ -236,7 +236,8 @@ func (h *Handlers) RemoveTeamDriveMember(w http.ResponseWriter, r *http.Request)
 // ---------------------------------------------------------------------------
 
 // ListTeamDriveChildren lista subcarpetas + página de ficheros de una carpeta de la
-// unidad (?folder=<id> vacío = raíz), con el rol del usuario. Cualquier miembro lee.
+// unidad (?folder=<id> vacío = raíz), con el rol del usuario y en el orden pedido
+// (?orden=&sentido=, como ListChildren). Cualquier miembro lee.
 func (h *Handlers) ListTeamDriveChildren(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r)
 	if err != nil {
@@ -248,9 +249,14 @@ func (h *Handlers) ListTeamDriveChildren(w http.ResponseWriter, r *http.Request)
 		httpx.Fail(w, r, err)
 		return
 	}
+	orden, err := ordenDeLaPeticion(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
 	cursor := strings.TrimSpace(r.URL.Query().Get("cursor"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	listing, err := h.svc.TeamListChildren(r.Context(), id, subFromCtx(r), folderID, cursor, limit)
+	listing, err := h.svc.TeamListChildren(r.Context(), id, subFromCtx(r), folderID, orden, cursor, limit)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return

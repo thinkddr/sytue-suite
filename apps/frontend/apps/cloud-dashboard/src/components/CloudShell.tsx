@@ -6,15 +6,24 @@
  * si no, muestra la navegación global. docs/CONVENTIONS.md §5, §11, §14.
  */
 import type { ComponentChildren } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
-import { SytueShell } from '@sytue/shell';
+import { useEffect } from 'preact/hooks';
+import { abrirPaleta, SytueShell } from '@sytue/shell';
 import { getAccessToken } from '@sytue/auth/client';
-import { AdminShell, Sidebar, SidebarSection, SidebarItem, Icon, Badge, useAtajo } from '@sytue/ui';
+import {
+  Kbd,
+  AdminShell,
+  Sidebar,
+  SidebarSection,
+  SidebarItem,
+  Icon,
+  Badge,
+  useAtajo,
+} from '@sytue/ui';
 import type { IconName } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import { MARCA_ORG, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
 import type { Locale } from '@sytue/i18n';
-import CommandPalette from './CommandPalette.js';
+import ComandosDeCloud from './ComandosDeCloud.js';
 import type { PaletteCommand } from '../lib/palette.js';
 import { useT, type T } from '../i18n/index.js';
 import { r } from '../lib/rutas.js';
@@ -115,7 +124,6 @@ export default function CloudShell({
 }: CloudShellProps) {
   const t = useT(locale);
   const entries = project ? projectNav(t, project) : globalNav(t);
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const metaHint = useAtajo('Ctrl K');
 
   // --- La barra de direcciones converge a la canónica (ADR 0056) -----------
@@ -166,15 +174,13 @@ export default function CloudShell({
           funciona en toda la app; este botón lo hace descubrible. */}
       <button
         type="button"
-        onClick={() => setPaletteOpen(true)}
+        onClick={abrirPaleta}
         aria-keyshortcuts="Meta+K Control+K"
         class="text-sidebar-fg-muted hover:bg-sidebar-hover hover:text-sidebar-fg border-chrome-border bg-chrome-hover rounded-control mb-3 flex w-full items-center gap-2 border px-2.5 py-2 text-sm transition-colors duration-150"
       >
         <Icon name="search" size={16} />
         <span class="min-w-0 flex-1 truncate text-left">{t('shell.searchTrigger')}</span>
-        <kbd class="border-chrome-divider rounded border px-1.5 py-0.5 font-sans text-xs leading-none tabular-nums">
-          {metaHint}
-        </kbd>
+        <Kbd tone="chrome">{metaHint}</Kbd>
       </button>
       {project ? (
         <SidebarSection title={t('shell.sectionProject')}>
@@ -219,14 +225,8 @@ export default function CloudShell({
       <AdminShell sidebar={sidebar} {...(project ? { title: project } : {})}>
         {children}
       </AdminShell>
-      <CommandPalette
-        locale={locale}
-        nav={navCommands}
-        project={project}
-        metaHint={metaHint}
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-      />
+      {/* La paleta es la de la suite (⌘K); Cloud solo le pone su capa. */}
+      <ComandosDeCloud locale={locale} nav={navCommands} project={project} />
     </SytueShell>
   );
 }

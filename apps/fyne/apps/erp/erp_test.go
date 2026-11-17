@@ -251,32 +251,6 @@ func TestElOrdenCiclaComoLaWeb(t *testing.T) {
 	}
 }
 
-// TestLaPaletaBuscaSinTildes: quien escribe «fabricacion» encuentra «Fabricación», que
-// es lo que hace el `normalize('NFD')` de la web.
-func TestLaPaletaBuscaSinTildes(t *testing.T) {
-	p := NuevaPaleta(traductor(t), []Modelo{
-		{Clave: "orden", Etiqueta: "Órdenes de fabricación"},
-		{Clave: "cliente", Etiqueta: "Clientes"},
-	})
-	p.Escribir("fabricacion")
-	c := p.Coincidencias()
-	if len(c) != 1 || c[0].Clave != "orden" {
-		t.Fatalf("«fabricacion» encuentra %v, se esperaba solo la orden", claves(c))
-	}
-	p.Escribir("")
-	if len(p.Coincidencias()) != 2 {
-		t.Error("sin consulta se enseñan todos")
-	}
-}
-
-func claves(ms []Modelo) []string {
-	out := make([]string, 0, len(ms))
-	for _, m := range ms {
-		out = append(out, m.Clave)
-	}
-	return out
-}
-
 // TestElMenuNoEnsenaLoQueElServicioVaAProhibir: los permisos son POR MÓDULO y un área
 // sin lectura NO se ofrece. Enseñarla es prometer algo que el servicio va a contestar
 // con un 403, y es lo que tenía la pantalla medida.
@@ -428,7 +402,7 @@ func pantallaDePrueba(t *testing.T) *Pantalla {
 	t.Helper()
 	p := NuevaPantalla(traductor(t), nil, nil)
 	p.Catalogo = catalogoEjemplo()
-	p.paleta.Modelos = p.Modelos()
+	p.ponerCapas()
 	return p
 }
 
@@ -554,15 +528,17 @@ func TestLaListaConFilasSePinta(t *testing.T) {
 	}
 }
 
-// TestLaPaletaSePinta guarda la paleta abierta.
+// TestLaPaletaSePinta guarda la paleta abierta sobre el ERP: la de la suite con las
+// capas del ERP encima.
 func TestLaPaletaSePinta(t *testing.T) {
 	p := pantallaDePrueba(t)
 	p.Fase = Exito
-	p.abierta = true
-	p.paleta.Escribir("cli")
 	w := test.NewWindow(p.Objeto())
 	defer w.Close()
 	w.Resize(fyne.NewSize(1280, 744))
+	p.Atajos(w.Canvas(), nil)
+	p.AbrirPaleta()
+	p.paleta.Escribir("cli")
 	img := w.Canvas().Capture()
 	guardarPNG(t, img, "erp-paleta.png")
 	// El velo ATENÚA lo de detrás. Se comprueba contra la misma pantalla sin paleta,
@@ -580,8 +556,14 @@ func TestLaPaletaSePinta(t *testing.T) {
 	// «cli» casa también con «Facturas de cliente»: la web filtra por `includes`, no
 	// por prefijo, y eso es lo que hace que la paleta encuentre lo que no se sabe
 	// nombrar entero.
-	if c := p.paleta.Coincidencias(); len(c) != 2 {
-		t.Errorf("«cli» encuentra %v, se esperaban los dos que llevan «cliente»", claves(c))
+	var areas []string
+	for _, o := range p.paleta.Opciones() {
+		if o.Comando != nil && strings.HasPrefix(o.Comando.ID, "modelo:") {
+			areas = append(areas, o.Comando.ID)
+		}
+	}
+	if len(areas) != 2 {
+		t.Errorf("«cli» encuentra %v, se esperaban los dos que llevan «cliente»", areas)
 	}
 }
 
@@ -620,12 +602,9 @@ func TestNingunRotuloSeComeASiMismo(t *testing.T) {
 	b.Ventana = 1280
 	b.Fase = Exito
 
-	p := NuevaPaleta(tr, b.Modulos[0].Modelos)
-
 	casos := map[string]fyne.CanvasObject{
 		"lista":    l.Objeto(tema.Claro),
 		"portada":  b.Objeto(tema.Claro),
-		"paleta":   p.Objeto(tema.Claro, fyne.NewSize(1280, 744)),
 		"cabecera": cabeceraDe(l),
 	}
 	for nombre, obj := range casos {

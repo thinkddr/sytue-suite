@@ -13,7 +13,34 @@
  *               ruta→ID caminando el árbol desde /folders/root.
  * WebDAV base:  /dav
  */
-import { HttpClient, HttpError, ResponseTooLargeError, type AuthProvider } from '../core/http.js';
+import {
+  CipherBlobError,
+  decodeCipherBlobReceipt,
+  isCipherBlobID,
+  encodeStorageScopeHeader,
+  storageScopeHeader,
+  maxCipherBlockBytes,
+  type MatrixStorageScope,
+  type CipherBlobReceipt,
+  decodeLegacyMigrationState,
+  decodeLegacySourcePage,
+  isMigrationEpoch,
+  legacySourceCursor,
+  StorageMigrationError,
+  type LegacyMigrationState,
+  type LegacySourcePage,
+  type LegacySourceCursor,
+} from '@sytue/config/matrix';
+// El recibo del cable es la plomería compartida de config/matrix: el SDK lo
+// reexporta para quien consuma la superficie pública de api-clients.
+export type { CipherBlobReceipt } from '@sytue/config/matrix';
+import {
+  HttpClient,
+  HttpError,
+  ResponseTooLargeError,
+  exactResponseLength,
+  type AuthProvider,
+} from '../core/http.js';
 export {
   driveQuotaFromResponse,
   hasCompleteExternalCapacity,
@@ -43,14 +70,7 @@ export const CIPHER_STORAGE_PRODUCTS = [
 export type CipherStorageProduct = (typeof CIPHER_STORAGE_PRODUCTS)[number];
 
 /** Maximum size of a single encrypted block accepted by `/cipher/blobs/{product}/{id}` (8 MiB). */
-export const MAX_CIPHER_BLOB_BYTES = 8 * 1024 * 1024;
-
-export interface CipherBlobReceipt {
-  id: string;
-  product: CipherStorageProduct;
-  size_bytes: number;
-  sha256: string;
-}
+export const MAX_CIPHER_BLOB_BYTES = maxCipherBlockBytes;
 
 export function isCipherStorageProduct(value: unknown): value is CipherStorageProduct {
   return (
@@ -232,7 +252,8 @@ export function createBffCipherBlobGateway(
 export interface DriveOptions {
   /** URL base, p.ej. https://drive.sytue.eu */
   baseUrl: string;
-  auth: AuthProvider;
+  /** Bearer for native/server clients; omit only for the app's same-origin cookie BFF. */
+  auth?: AuthProvider;
   fetchImpl?: typeof fetch | undefined;
 }
 
@@ -337,6 +358,48 @@ interface RawLabel {
   block_external_share: boolean;
 }
 
+/** Versión del historial de un fichero tal y como la emite el servicio Go. */
+export interface RawVersion {
+  version: number;
+  size_bytes?: number;
+  content_type?: string;
+  author_sub?: string;
+  is_current?: boolean;
+  created_at?: string;
+}
+
+/**
+ * Versión del historial en el vocabulario de las interfaces (camelCase). Vive aquí y
+ * no en cada app porque la leen el explorador de Drive y CertiPDF: dos mapeos a mano
+ * acabarían diciendo cosas distintas de la misma versión.
+ */
+export interface FileVersion {
+  version: number;
+  sizeBytes: number;
+  isCurrent: boolean;
+  contentType?: string;
+  /** El `sub` de quien la subió, tal cual lo guarda el servicio. */
+  author?: string;
+  createdAt?: string;
+}
+
+export function toFileVersion(v: RawVersion): FileVersion {
+  return {
+    version: v.version,
+    sizeBytes: v.size_bytes ?? 0,
+    isCurrent: Boolean(v.is_current),
+    ...(v.content_type ? { contentType: v.content_type } : {}),
+    ...(v.author_sub ? { author: v.author_sub } : {}),
+    ...(v.created_at ? { createdAt: v.created_at } : {}),
+  };
+}
+
+/** Una página del historial: la primera empieza por la versión actual. */
+export interface FileVersionPage {
+  versions: FileVersion[];
+  nextCursor?: string;
+}
+
 /** Fichero tal y como lo emite el servicio Go. */
 interface RawFile {
   id: string;
@@ -432,8 +495,19 @@ export function nodeResource(n: RawNode): DriveResource {
   };
 }
 
+/** Un número de versión que puede ir en la ruta: entero positivo, nada más. */
+function versionValida(version: number): number {
+  if (!Number.isInteger(version) || version <= 0) {
+    throw new HttpError(400, 'Bad Request', String(version), 'Versión inválida.');
+  }
+  return version;
+}
+
 export class DriveClient {
   private readonly http: HttpClient;
+  private readonly cipherHttp: HttpClient;
+  private readonly cipherPrefix: string;
+  private readonly migrationPrefix: string;
   private readonly base: string;
   /** Raiz WebDAV (RFC 4918) para clientes de sync. */
   readonly davRoot: string;
@@ -447,7 +521,208 @@ export class DriveClient {
       auth: options.auth,
       fetchImpl: options.fetchImpl,
     });
+    // /api/v1 belongs to the Go ingress. Cookie clients must stay on the BFF
+    // namespace, while authenticated native/server clients use the backend API.
+    this.cipherHttp = options.auth
+      ? this.http
+      : new HttpClient({
+          baseUrl: `${this.base}/api/matrix/storage`,
+          fetchImpl: options.fetchImpl,
+        });
+    this.cipherPrefix = options.auth ? '/cipher/blobs' : '/blobs';
+    this.migrationPrefix = options.auth ? '/private-storage/migration' : '/migration';
     this.davRoot = `${this.base}/dav`;
+  }
+
+  private cipherRequest(scope: MatrixStorageScope, id: string) {
+    const value = encodeStorageScopeHeader(scope),
+      product = scope.product;
+    if (!isCipherBlobID(id)) throw new CipherBlobError();
+    return {
+      path: `${this.cipherPrefix}/${product}/${id}`,
+      headers: { [storageScopeHeader]: value },
+      product,
+    };
+  }
+  /** The suite gateway receives ciphertext only; metadata and attachment keys stay in Matrix. */
+  async putCipherBlob(
+    scope: MatrixStorageScope,
+    id: string,
+    ciphertext: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<CipherBlobReceipt> {
+    const { path, headers, product } = this.cipherRequest(scope, id);
+    if (ciphertext.byteLength > maxCipherBlockBytes) throw new CipherBlobError();
+    const data = ciphertext.slice();
+    const result = decodeCipherBlobReceipt(
+      await this.cipherHttp.json<unknown>({
+        method: 'PUT',
+        path,
+        body: data,
+        headers: { ...headers, 'content-type': 'application/octet-stream' },
+        maxResponseBytes: 4096,
+        ...(signal ? { signal } : {}),
+      }),
+      product,
+      id,
+    );
+    if (result.size_bytes !== data.byteLength) throw new CipherBlobError();
+    return result;
+  }
+  async cipherBlob(
+    scope: MatrixStorageScope,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<CipherBlobReceipt> {
+    const { path, headers, product } = this.cipherRequest(scope, id);
+    return decodeCipherBlobReceipt(
+      await this.cipherHttp.json<unknown>({
+        path,
+        headers,
+        maxResponseBytes: 4096,
+        ...(signal ? { signal } : {}),
+      }),
+      product,
+      id,
+    );
+  }
+  async readCipherBlob(
+    scope: MatrixStorageScope,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    const { path, headers } = this.cipherRequest(scope, id);
+    return this.cipherHttp.bytes({
+      path: path + '/content',
+      headers,
+      maxResponseBytes: maxCipherBlockBytes,
+      ...(signal ? { signal } : {}),
+    });
+  }
+  async deleteCipherBlob(
+    scope: MatrixStorageScope,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const { path, headers } = this.cipherRequest(scope, id);
+    const result = await this.cipherHttp.request({
+      method: 'DELETE',
+      path,
+      headers,
+      maxResponseBytes: 4096,
+      ...(signal ? { signal } : {}),
+    });
+    await result.body?.cancel();
+  }
+
+  private migrationRequest(scope: MatrixStorageScope) {
+    const value = encodeStorageScopeHeader(scope);
+    if (scope.product !== 'drive') throw new StorageMigrationError();
+    return {
+      path: this.migrationPrefix,
+      headers: { [storageScopeHeader]: value },
+      pinned: { ...scope },
+    };
+  }
+  async privateStorageState(
+    scope: MatrixStorageScope,
+    signal?: AbortSignal,
+  ): Promise<LegacyMigrationState> {
+    const { path, headers, pinned } = this.migrationRequest(scope);
+    return decodeLegacyMigrationState(
+      await this.cipherHttp.json<unknown>({
+        path,
+        headers,
+        maxResponseBytes: 4096,
+        ...(signal ? { signal } : {}),
+      }),
+      pinned,
+    );
+  }
+  async beginPrivateStorageMigration(
+    scope: MatrixStorageScope,
+    epoch: string,
+    signal?: AbortSignal,
+  ): Promise<LegacyMigrationState> {
+    const { path, headers, pinned } = this.migrationRequest(scope);
+    if (!isMigrationEpoch(epoch)) throw new StorageMigrationError();
+    const state = decodeLegacyMigrationState(
+      await this.cipherHttp.json<unknown>({
+        path,
+        headers: { ...headers, 'content-type': 'application/json' },
+        method: 'POST',
+        body: JSON.stringify({ epoch }),
+        maxResponseBytes: 4096,
+        ...(signal ? { signal } : {}),
+      }),
+      pinned,
+    );
+    if (state.mode !== 'frozen' || state.epoch !== epoch) throw new StorageMigrationError();
+    return state;
+  }
+  async privateStorageSourcePage(
+    scope: MatrixStorageScope,
+    epoch: string,
+    after?: LegacySourceCursor,
+    signal?: AbortSignal,
+  ): Promise<LegacySourcePage> {
+    const { path, headers, pinned } = this.migrationRequest(scope);
+    if (!isMigrationEpoch(epoch)) throw new StorageMigrationError();
+    const cursor = after === undefined ? undefined : legacySourceCursor(after);
+    const query = cursor
+      ? {
+          after: btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(cursor))))
+            .replaceAll('+', '-')
+            .replaceAll('/', '_')
+            .replace(/=+$/, ''),
+        }
+      : {};
+    return decodeLegacySourcePage(
+      await this.cipherHttp.json<unknown>({
+        path: path + '/' + epoch + '/rows',
+        headers,
+        query,
+        maxResponseBytes: 5 << 20,
+        ...(signal ? { signal } : {}),
+      }),
+      pinned,
+      epoch,
+      cursor,
+    );
+  }
+  /** Stream the retained original; the importer verifies length and both hashes before any retirement. */
+  async openPrivateStorageSource(
+    scope: MatrixStorageScope,
+    epoch: string,
+    kind: 'file' | 'version',
+    id: string,
+    size: number,
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    const { path, headers } = this.migrationRequest(scope);
+    if (
+      !isMigrationEpoch(epoch) ||
+      (kind !== 'file' && kind !== 'version') ||
+      !isMigrationEpoch(id) ||
+      !Number.isSafeInteger(size) ||
+      size < 0
+    )
+      throw new StorageMigrationError();
+    const response = await this.cipherHttp.request({
+      path: path + '/' + epoch + '/blobs/' + kind + '/' + id,
+      headers,
+      maxResponseBytes: 4096,
+      ...(signal ? { signal } : {}),
+    });
+    if (
+      response.status !== 200 ||
+      response.headers.get('content-type') !== 'application/octet-stream' ||
+      response.headers.has('content-encoding')
+    ) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new StorageMigrationError();
+    }
+    return exactResponseLength(response, size);
   }
 
   // --- Resolución ruta→ID (el backend indexa por ID/árbol) -------------------
@@ -565,12 +840,23 @@ export class DriveClient {
    */
   async listPage(
     path = '/',
-    opts: { cursor?: string | undefined; limit?: number | undefined } = {},
+    opts: {
+      cursor?: string | undefined;
+      limit?: number | undefined;
+      /** `nombre` (por defecto), `modificado` o `tamano`: lo ordena el servicio, keyset. */
+      orden?: string | undefined;
+      sentido?: 'asc' | 'desc' | undefined;
+    } = {},
   ): Promise<{ items: DriveResource[]; nextCursor?: string }> {
     const id = await this.resolveFolderId(path);
     const r = await this.http.json<RawChildren>({
       path: `/folders/${encodeURIComponent(id)}/children`,
-      query: { cursor: opts.cursor || undefined, limit: opts.limit },
+      query: {
+        cursor: opts.cursor || undefined,
+        limit: opts.limit,
+        orden: opts.orden || undefined,
+        sentido: opts.sentido,
+      },
     });
     const base = path === '' ? '/' : path;
     return {
@@ -638,14 +924,24 @@ export class DriveClient {
    *
    * Cabeceras útiles ya resueltas por el servicio: `content-type`, `content-length`
    * (exacto, del metadato) y `etag` (checksum).
+   *
+   * `range`/`ifRange` se reenvían tal cual al servicio, que responde 206 con el tramo
+   * pedido: es lo que necesita un `<video>` o `<audio>` para buscar sin bajarse todo.
    */
-  async openDownload(path: string): Promise<Response> {
+  async openDownload(
+    path: string,
+    opts: { range?: string | null; ifRange?: string | null } = {},
+  ): Promise<Response> {
     const entry = await this.resolveEntry(path);
     if (entry.kind !== 'file') {
       throw new HttpError(400, 'Bad Request', path, 'No es un fichero.');
     }
+    const headers: Record<string, string> = {};
+    if (opts.range) headers['range'] = opts.range;
+    if (opts.ifRange) headers['if-range'] = opts.ifRange;
     return this.http.request({
       path: `/files/${encodeURIComponent(entry.file.id)}/content`,
+      headers,
     });
   }
 
@@ -779,6 +1075,49 @@ export class DriveClient {
         ...when(f.deleted_at),
       })),
     ];
+  }
+
+  // --- Versiones de un fichero (por ID) ----------------------------------------
+
+  /**
+   * Una página del historial de versiones de un fichero, la ACTUAL primero y luego
+   * las archivadas de la más nueva a la más antigua. `cursor` es el `nextCursor` de
+   * la página anterior.
+   */
+  async versions(
+    id: string,
+    opts: { cursor?: string | undefined; limit?: number | undefined } = {},
+  ): Promise<FileVersionPage> {
+    const r = await this.http.json<{ versions?: RawVersion[]; next_cursor?: string }>({
+      path: `/files/${encodeURIComponent(id)}/versions`,
+      query: { cursor: opts.cursor || undefined, limit: opts.limit },
+    });
+    return {
+      versions: (r.versions ?? []).map(toFileVersion),
+      ...(r.next_cursor ? { nextCursor: r.next_cursor } : {}),
+    };
+  }
+
+  /**
+   * Abre el contenido de una versión ARCHIVADA sin leerlo (como `openDownload`): quien
+   * solo la reenvía encadena el stream. La actual se baja por su ruta.
+   */
+  async openVersionDownload(id: string, version: number): Promise<Response> {
+    return this.http.request({
+      path: `/files/${encodeURIComponent(id)}/versions/${versionValida(version)}/content`,
+    });
+  }
+
+  /**
+   * Hace actual una versión archivada. No destruye nada: lo que era actual pasa a ser
+   * una versión más del historial, así que se puede volver atrás otra vez. El servicio
+   * solo deja hacerlo a quien puede editar (403 al resto).
+   */
+  async restoreVersion(id: string, version: number): Promise<void> {
+    await this.http.request({
+      method: 'POST',
+      path: `/files/${encodeURIComponent(id)}/versions/${versionValida(version)}/restore`,
+    });
   }
 
   /** Restaura un elemento de la papelera a su carpeta original (por ID). */
@@ -964,86 +1303,5 @@ export class DriveClient {
   davUrl(path = '/'): string {
     const clean = path.startsWith('/') ? path : `/${path}`;
     return `${this.davRoot}${clean.split('/').map(encodeURIComponent).join('/')}`;
-  }
-
-  private cipherBlobPath(product: CipherStorageProduct, id: string): string {
-    if (!isCipherStorageProduct(product) || !isCipherBlobId(id)) {
-      throw new RangeError('Invalid cipher blob product or identifier');
-    }
-    return `/cipher/blobs/${encodeURIComponent(product)}/${encodeURIComponent(id)}`;
-  }
-
-  /** Stores already-encrypted opaque bytes (<= 8 MiB) in Sytue Drive cipher storage. */
-  async putCipherBlob(
-    product: CipherStorageProduct,
-    id: string,
-    ciphertext: Uint8Array,
-    signal?: AbortSignal,
-  ): Promise<CipherBlobReceipt> {
-    const path = this.cipherBlobPath(product, id);
-    if (ciphertext.byteLength > MAX_CIPHER_BLOB_BYTES) {
-      throw new RangeError('Cipher blob exceeds 8 MiB maximum');
-    }
-    const receipt = await this.http.json<unknown>({
-      method: 'PUT',
-      path,
-      headers: { 'content-type': 'application/octet-stream' },
-      body: ciphertext as BodyInit,
-      maxResponseBytes: 4096,
-      ...(signal ? { signal } : {}),
-    });
-    if (
-      !isValidCipherBlobReceipt(receipt, product, id) ||
-      receipt.size_bytes !== ciphertext.byteLength
-    ) {
-      throw new Error('Invalid cipher blob receipt');
-    }
-    return receipt;
-  }
-
-  /** Fetches the authenticated receipt metadata for an opaque ciphertext blob. */
-  async cipherBlob(
-    product: CipherStorageProduct,
-    id: string,
-    signal?: AbortSignal,
-  ): Promise<CipherBlobReceipt> {
-    const path = this.cipherBlobPath(product, id);
-    const receipt = await this.http.json<unknown>({
-      path,
-      maxResponseBytes: 4096,
-      ...(signal ? { signal } : {}),
-    });
-    if (!isValidCipherBlobReceipt(receipt, product, id)) {
-      throw new Error('Invalid cipher blob receipt');
-    }
-    return receipt;
-  }
-
-  /** Downloads the raw ciphertext bytes (bounded to <= 8 MiB) for an opaque blob. */
-  async readCipherBlob(
-    product: CipherStorageProduct,
-    id: string,
-    signal?: AbortSignal,
-  ): Promise<Uint8Array<ArrayBuffer>> {
-    const path = this.cipherBlobPath(product, id);
-    const res = await this.http.request({
-      path: `${path}/content`,
-      ...(signal ? { signal } : {}),
-    });
-    return readBoundedBytes(res, MAX_CIPHER_BLOB_BYTES);
-  }
-
-  /** Deletes an opaque ciphertext blob. */
-  async deleteCipherBlob(
-    product: CipherStorageProduct,
-    id: string,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    const path = this.cipherBlobPath(product, id);
-    await this.http.request({
-      method: 'DELETE',
-      path,
-      ...(signal ? { signal } : {}),
-    });
   }
 }

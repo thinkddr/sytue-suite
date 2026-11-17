@@ -68,14 +68,6 @@ export const fr: AppCatalog<typeof en> = {
   'palette.group.navigation': 'Navigation',
   'palette.group.actions': 'Actions',
   'palette.group.projects': 'Projets',
-  'palette.dialog': 'Palette de commandes',
-  'palette.inputLabel': 'Rechercher des commandes, des projets et des actions',
-  'palette.placeholder': 'Rechercher ou accéder à…',
-  'palette.results': 'Résultats',
-  'palette.noResults': 'Aucun résultat pour « {query} ».',
-  'palette.hint.move': 'se déplacer',
-  'palette.hint.open': 'ouvrir',
-  'palette.hint.close': 'fermer',
   'palette.createProject': 'Créer un projet',
   'palette.createProject.keywords': 'nouveau dépôt connecter deploy git',
   'palette.redeploy': 'Redéployer',
@@ -330,6 +322,24 @@ export const fr: AppCatalog<typeof en> = {
   'domains.dns.txtValue': 'TXT · valeur',
   'domains.dns.after':
     'Nous vérifions toutes les quelques minutes. Dès que votre DNS s’est propagé, le domaine passe en vérifié et le certificat est émis tout seul.',
+  'domains.check': 'Vérifier maintenant',
+  'domains.check.ok.title': 'Domaine vérifié',
+  'domains.check.ok.desc':
+    'L’enregistrement TXT est en place et {host} pointe vers Sytue. Le certificat est en cours d’émission.',
+  'domains.check.txtMissing.title': 'Enregistrement TXT introuvable',
+  'domains.check.txtMissing.desc':
+    'Nous ne trouvons pas {record}. Créez-le avec la valeur ci-dessus ; si vous venez de le faire, la propagation DNS peut prendre quelques minutes.',
+  'domains.check.txtMismatch.title': 'L’enregistrement TXT a une autre valeur',
+  'domains.check.txtMismatch.desc':
+    '{record} existe, mais sa valeur n’est pas le jeton de ce domaine. Remplacez-la par la valeur ci-dessus.',
+  'domains.check.cname.title': 'Vérifié, mais le trafic va ailleurs',
+  'domains.check.cname.desc':
+    '{host} pointe vers {found}. Faites pointer son CNAME vers {expected} : le certificat ne sera pas émis avant.',
+  'domains.check.cname.descNone':
+    '{host} ne se résout pas encore. Faites pointer son CNAME vers {expected} : le certificat ne sera pas émis avant.',
+  'domains.check.tooSoon': 'Attendez quelques secondes avant de vérifier à nouveau.',
+  'domains.check.fail': 'Impossible de vérifier le domaine. Réessayez.',
+  'domains.check.demo': 'En mode démonstration, il n’y a pas de DNS à vérifier.',
   'domains.deleted': 'Domaine supprimé',
   'domains.deleted.desc': '{host} ne sert plus de trafic dans ce projet.',
   'domains.delete.fail': 'Impossible de supprimer le domaine',
@@ -658,15 +668,9 @@ export const fr: AppCatalog<typeof en> = {
   'tasks.confirm.body':
     '{name} cesse de s’exécuter à partir de maintenant. Ce qui a déjà tourné n’est pas annulé.',
 
-  'copy.secret': 'secret',
   'copy.manage': 'Gérer',
   'copy.manageLabel': 'Gérer {label} dans Variables et secrets',
   'copy.copy': 'Copier',
-  'copy.copyLabel': 'Copier {label}',
-  'copy.copied': 'Copié',
-  'copy.copied.desc': '{label} copié dans le presse-papiers.',
-  'copy.fail': 'Impossible de copier',
-  'copy.fail.desc': 'Copiez la valeur manuellement.',
 
   'billing.subtitle':
     'Votre forfait, la dépense de la période et vos factures. Des prix simples à l’unité, sans surprise.',
@@ -870,6 +874,55 @@ export const fr: AppCatalog<typeof en> = {
   'tplw.create.fail': 'Le projet n’a pas pu être créé',
   'tplw.demo': 'Aucun control plane connecté',
   'tplw.demo.desc': 'Rien n’a été créé. Réessayez quand le backend sera disponible.',
+  'npw.subtitle': 'De votre dépôt à une adresse en ligne, étape par étape.',
+  'npw.step.origin': 'Source',
+  'npw.step.origin.heading': 'Où se trouve votre code ?',
+  'npw.step.origin.desc':
+    'Collez l’adresse de votre dépôt Git. Nous l’examinons pour remplir le reste à votre place.',
+  'npw.step.configure': 'Configurer',
+  'npw.step.configure.heading': 'Nommez-le et vérifiez comment il est construit',
+  'npw.step.configure.desc':
+    'Le nom deviendra son adresse web. Les réglages de build viennent de votre dépôt : ne les modifiez que s’ils sont incorrects.',
+  'npw.step.variables': 'Variables',
+  'npw.step.variables.heading': 'Votre application a-t-elle besoin de variables ?',
+  'npw.step.variables.desc':
+    'Clés d’API, adresses de base de données… Ajoutez-les maintenant et le premier déploiement les aura déjà. Vous pouvez aussi les ajouter plus tard.',
+  'npw.vars.add': 'Ajouter une variable',
+  'npw.vars.skip': 'Continuer sans variables',
+  'npw.vars.empty':
+    'Aucune variable pour l’instant. Ce n’est pas grave si votre application n’en a pas besoin.',
+  'npw.vars.keyLabel': 'Clé de la variable {n}',
+  'npw.vars.valueLabel': 'Valeur de la variable {n}',
+  'npw.vars.remove': 'Supprimer la variable {n}',
+  'npw.vars.duplicate': 'Cette clé apparaît plusieurs fois : n’en gardez qu’une.',
+  'npw.vars.scope':
+    'Elles s’appliquent à la production et aux aperçus. Vous pourrez restreindre chacune plus tard dans Variables.',
+  'npw.review.vars': 'Variables',
+  'npw.review.vars.none': 'Aucune pour l’instant',
+  'npw.review.deploy.value': 'Démarre dès la création du projet, et vous pouvez le suivre ici.',
+  'npw.review.order': 'Dans cet ordre',
+  'npw.review.order.desc':
+    'Nous créons le projet, enregistrons ses variables et lançons le premier déploiement. Si une étape échoue, nous nous arrêtons là et vous disons pourquoi ; rien de ce qui est déjà fait n’est perdu.',
+  'npw.step.deploy': 'Déployer',
+  'npw.task.project': 'Créer le projet',
+  'npw.task.vars': 'Enregistrer les variables ({done} sur {total})',
+  'npw.task.deploy': 'Lancer le premier déploiement',
+  'npw.task.build': 'Construire et publier',
+  'npw.task.build.status': 'Construire et publier : {status}',
+  'npw.task.state.pending': 'en attente',
+  'npw.task.state.running': 'en cours',
+  'npw.task.state.done': 'terminé',
+  'npw.task.state.failed': 'échec',
+  'npw.fail.vars': 'Impossible d’enregistrer {key}',
+  'npw.fail.deploy': 'Le premier déploiement n’a pas pu démarrer',
+  'npw.fail.keep': 'Le projet existe déjà : réessayer reprend à partir d’ici.',
+  'npw.logs.title': 'Journal de build',
+  'npw.logs.waiting': 'En attente du démarrage du build…',
+  'npw.result.ready': 'Votre application est en ligne',
+  'npw.result.ready.desc': 'Elle répond sur {url}.',
+  'npw.result.error': 'Le build a échoué',
+  'npw.result.error.desc':
+    'Les dernières lignes du journal indiquent souvent ce qui manque. Corrigez-le et poussez un commit, ou redéployez depuis le projet.',
 
   'monitoring.subtitle':
     'Sondes de disponibilité de vos URL et alertes par événement vers Slack, Discord ou un webhook.',

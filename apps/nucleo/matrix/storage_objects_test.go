@@ -12,7 +12,7 @@ import (
 )
 
 type changedRecordReply struct {
-	fileRecordFixture
+	*fileRecordFixture
 	change func(*storage.Record)
 }
 
@@ -29,7 +29,7 @@ func TestStorageRecordConfirmationRequiresExactAuthenticatedRevision(t *testing.
 	record := storage.Record{Version: 1, Scope: scope, ObjectID: "object", RevisionID: "revision", Role: "content", Payload: []byte(`{"integer":9007199254740993}`), Previous: []string{"$parent"}}
 	for _, field := range []string{"scope", "object", "revision", "role", "payload", "parents"} {
 		t.Run(field, func(t *testing.T) {
-			fixture := &changedRecordReply{change: func(rec *storage.Record) {
+			fixture := &changedRecordReply{fileRecordFixture: newFileRecordFixture(), change: func(rec *storage.Record) {
 				switch field {
 				case "scope":
 					rec.Scope.Subject = "mallory"

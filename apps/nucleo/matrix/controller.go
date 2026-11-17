@@ -5,6 +5,8 @@ package matrix
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 
 	mxcrypto "maunium.net/go/mautrix/crypto"
@@ -19,12 +21,19 @@ type controllerStore struct {
 	mxcrypto.Store
 	controller id.UserID
 	ownerOnly  id.UserID
+	sqlStore   *mxcrypto.SQLCryptoStore
+	policy     string
 }
 
 func (c *Client) devicePolicy(store mxcrypto.Store) mxcrypto.Store {
 	policy := controllerStore{Store: store, controller: id.UserID(c.cfg.Bootstrap.ControllerUserID)}
 	if c.cfg.Bootstrap.StorageProduct != "" {
 		policy.ownerOnly = c.cli.UserID
+	}
+	if sqlStore, ok := store.(*mxcrypto.SQLCryptoStore); ok {
+		policy.sqlStore = sqlStore
+		sum := sha256.Sum256([]byte("sytue-recipient-policy-v1\x00" + policy.controller.String() + "\x00" + policy.ownerOnly.String() + "\x00cross-signed-verified\x00no-key-share"))
+		policy.policy = hex.EncodeToString(sum[:])
 	}
 	return policy
 }
@@ -53,27 +62,26 @@ func (c *Client) UserForSubject(subject string) (string, error) {
 	return "@sytue_" + subject + ":" + domain, nil
 }
 
-// rotateRestoredOutbound discards cached sending sessions before using a restored
-// device under the current recipient policy. Inbound history is preserved; the
-// maintained SDK creates fresh sending sessions for the current trusted roster.
+// rotateRestoredOutbound migrates sessions created under an older recipient
+// policy. Current policy/SID evidence lives in the SAME SDK SQLite. Restart is
+// not a membership change and must not discard a durably prepared operation.
 func (c *Client) rotateRestoredOutbound(ctx context.Context) error {
-	rooms := map[string]struct{}{}
+	policy, err := c.currentOutboundRecipientPolicy()
+	if err != nil {
+		return err
+	}
+	rooms := map[id.RoomID]struct{}{}
 	for _, binding := range c.cfg.Bootstrap.Channels {
-		rooms[binding.RoomID] = struct{}{}
+		rooms[id.RoomID(binding.RoomID)] = struct{}{}
 	}
-	rooms[c.cfg.Bootstrap.DraftRoomID] = struct{}{}
+	rooms[id.RoomID(c.cfg.Bootstrap.DraftRoomID)] = struct{}{}
 	for _, room := range c.cfg.Bootstrap.DraftRoomIDs {
-		rooms[room] = struct{}{}
+		rooms[id.RoomID(room)] = struct{}{}
 	}
-	rooms[c.cfg.Bootstrap.StorageRoomID] = struct{}{}
+	rooms[id.RoomID(c.cfg.Bootstrap.StorageRoomID)] = struct{}{}
 	for _, room := range c.cfg.Bootstrap.StorageRoomIDs {
-		rooms[room] = struct{}{}
+		rooms[id.RoomID(room)] = struct{}{}
 	}
 	delete(rooms, "")
-	for room := range rooms {
-		if err := c.crypto.Machine().CryptoStore.RemoveOutboundGroupSession(ctx, id.RoomID(room)); err != nil {
-			return err
-		}
-	}
-	return nil
+	return policy.ensureOutboundRecipientPolicy(ctx, rooms)
 }

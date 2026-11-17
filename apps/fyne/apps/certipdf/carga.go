@@ -337,6 +337,10 @@ var erroresPDF = map[string]string{
 	"pdf_signature_request_not_found":    "pdf.error.signatureRequest.gone",
 	"pdf_signature_requests_unavailable": "pdf.error.signatureRequest.unavailable",
 	"pdf_signature_request_too_many":     "pdf.error.signatureRequest.tooMany",
+	// Varias personas en orden (mig. 0034).
+	"pdf_signature_chain_external": "pdf.error.signatureRequest.chainExternal",
+	"pdf_signature_chain_repeated": "pdf.error.signatureRequest.chainRepeated",
+	"pdf_signature_chain_too_long": "pdf.error.signatureRequest.chainTooLong",
 	// A alguien de otra organización (ADR 0057).
 	"pdf_signature_share_blocked":          "pdf.error.signatureRequest.shareBlocked",
 	"pdf_signature_request_link_gone":      "pdf.error.signatureRequest.linkGone",
@@ -511,6 +515,12 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 	}
 	po.AlPeticion = func(x api.PDFPeticionFirma, recibida bool) { p.abrirPeticion(pdf, x, recibida) }
 	po.AlDesbloquear = func(sub string) { p.desbloquear(pdf, sub) }
+	po.AlReintentar = func() {
+		// Solo la lista: la portada, el filtro y las peticiones de firma se quedan.
+		po.Lista, po.Fallo = nil, false
+		po.Recomponer()
+		p.cargarRecientes(pdf)
+	}
 	p.doc, p.Contenido, p.visor, p.hojas = nil, nil, nil, nil
 	p.Estado = editor.Vacio
 	po.Lista, po.Fallo, po.Peticiones = nil, false, nil
@@ -527,6 +537,16 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 		}
 		fyne.Do(func() { po.Peticiones = &ps; po.Recomponer() })
 	}()
+	p.cargarRecientes(pdf)
+}
+
+// cargarRecientes trae los recientes de la portada: al abrirla y al pulsar «Reintentar»
+// tras un fallo.
+func (p *Pantalla) cargarRecientes(pdf *api.PDF) {
+	po := p.Portada
+	if pdf == nil || po == nil {
+		return
+	}
 	go func() {
 		ctx, parar := context.WithTimeout(p.ctx, plazo)
 		defer parar()

@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,11 +25,21 @@ var ExtensionesImagen = []string{"jpg", "jpeg", "png", "gif", "webp", "heic", "h
 // a [ElegirImagenes] espera rutas. Cancelar devuelve nil, nil.
 var EnElMovil func(extensiones []string) ([]string, error)
 
+// EnFotos es el selector de la FOTOTECA del sistema donde la hay y es otro que el de
+// ficheros: en iOS, el de la app Fotos (PHPicker) y no el de «Archivos». Lo usa
+// [ElegirImagenes]; devuelve rutas de copias, como [EnElMovil]. nil: no lo hay.
+var EnFotos func() ([]string, error)
+
 // panelPropio, si está, es el panel de abrir del sistema DENTRO de este proceso. Solo lo
 // pone la variante de la Mac App Store (elegir_tienda_darwin.go): con el App Sandbox, el
 // permiso sobre lo elegido es de quien enseña el panel, y un `osascript` hijo se lo
 // quedaría sin poder dárselo a la app.
 var panelPropio func(titulo string, extensiones []string) ([]string, error)
+
+// porPortalElegir es el selector de repuesto cuando no hay programa que lanzar: en Linux,
+// el portal de escritorio de XDG (sistema_linux.go). Devuelve ErrNoDisponible si tampoco
+// lo hay. nil donde no existe.
+var porPortalElegir func(titulo string, extensiones []string) ([]string, error)
 
 // ElegirImagenes abre el selector de ficheros DEL SISTEMA, con varios a la vez, y
 // devuelve las rutas elegidas. Cancelar no es un error: devuelve nil, nil.
@@ -37,9 +49,15 @@ var panelPropio func(titulo string, extensiones []string) ([]string, error)
 // sistema—, elige un fichero cada vez y además arrastra una dependencia nueva de fuera
 // de la UE (github.com/FyshOS) solo por abrirse.
 //
-// En el móvil es [EnElMovil]. Donde no hay selector (el navegador, un Linux sin zenity
-// ni kdialog), devuelve ErrNoDisponible y la app lo trata como «no se ofrece».
+// En el móvil es [EnElMovil]. Donde no hay selector (el navegador, un Linux sin zenity,
+// kdialog ni portal de escritorio), devuelve ErrNoDisponible y la app lo trata como «no se ofrece».
+//
+// Donde el sistema tiene un selector propio de la fototeca ([EnFotos], iOS), es ese: ahí
+// están las fotos, con sus álbumes, y no en «Archivos».
 func ElegirImagenes(titulo string) ([]string, error) {
+	if EnFotos != nil {
+		return EnFotos()
+	}
 	return ElegirConTipos(titulo, ExtensionesImagen...)
 }
 
@@ -52,6 +70,9 @@ func ElegirConTipos(titulo string, extensiones ...string) ([]string, error) {
 		return panelPropio(titulo, extensiones)
 	}
 	orden, args, err := ordenElegir(titulo, extensiones)
+	if errors.Is(err, ErrNoDisponible) && porPortalElegir != nil {
+		return porPortalElegir(titulo, extensiones)
+	}
 	if errors.Is(err, ErrNoDisponible) && EnElMovil != nil {
 		return EnElMovil(extensiones)
 	}
@@ -69,6 +90,49 @@ func ElegirConTipos(titulo string, extensiones ...string) ([]string, error) {
 		return nil, err
 	}
 	return rutasDe(string(salida)), nil
+}
+
+// panelCarpetaPropio es [panelPropio] para elegir una carpeta: solo la variante de la
+// Mac App Store, por lo mismo (el permiso del App Sandbox es de quien enseña el panel).
+var panelCarpetaPropio func(titulo string) (string, error)
+
+// porPortalCarpeta es [porPortalElegir] para una carpeta: el portal de XDG en Linux.
+var porPortalCarpeta func(titulo string) (string, error)
+
+// ElegirCarpeta abre el selector de CARPETAS del sistema y devuelve la ruta elegida, sin
+// barra final. Cancelar no es un error: devuelve "", nil.
+//
+// Es el `<input type="file" webkitdirectory>` de la web: subir una carpeta entera sin
+// tener que arrastrarla, que en un portátil sin ratón cuesta. `choose folder` en macOS,
+// el FolderBrowserDialog de Windows, zenity o kdialog en Linux —y si no, el portal—. En
+// el móvil devuelve ErrNoDisponible y la app no lo ofrece: el selector del sistema elige
+// ficheros, no carpetas que recorrer.
+func ElegirCarpeta(titulo string) (string, error) {
+	if panelCarpetaPropio != nil {
+		return panelCarpetaPropio(titulo)
+	}
+	orden, args, err := ordenElegirCarpeta(titulo)
+	if errors.Is(err, ErrNoDisponible) && porPortalCarpeta != nil {
+		return porPortalCarpeta(titulo)
+	}
+	if err != nil {
+		return "", err
+	}
+	salida, err := exec.CommandContext(context.Background(), orden, args...).Output() //nolint:gosec // G204: la orden es fija por sistema y el título no pasa por un intérprete
+	var salidaMala *exec.ExitError
+	if errors.As(err, &salidaMala) {
+		return "", nil // cancelar
+	}
+	if err != nil {
+		return "", err
+	}
+	rutas := rutasDe(string(salida))
+	if len(rutas) == 0 {
+		return "", nil
+	}
+	// `POSIX path of` acaba en «/»: sin limpiarla, quien la recorra tomaría la propia
+	// carpeta por su padre y el árbol subiría sin su nombre arriba.
+	return filepath.Clean(rutas[0]), nil
 }
 
 // rutasDe parte la salida del selector: una ruta por línea, sin las vacías.
@@ -106,4 +170,20 @@ func guionElegirWindows(titulo string, extensiones []string) string {
 func guionCopiarImagenWindows(ruta string) string {
 	return "Add-Type -AssemblyName System.Windows.Forms, System.Drawing;" +
 		"[System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile(" + cadenaPowerShell(ruta) + "))"
+}
+
+// guionCarpetaWindows es el FolderBrowserDialog: el «Buscar carpeta» del sistema. El
+// título va en Base64, como en [guionElegirWindows] (FYS-12).
+func guionCarpetaWindows(titulo string) string {
+	return "Add-Type -AssemblyName System.Windows.Forms;" +
+		"$d = New-Object System.Windows.Forms.FolderBrowserDialog;" +
+		"$d.Description = " + cadenaPowerShell(titulo) + ";" +
+		"$d.ShowNewFolderButton = $false;" +
+		"if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath } else { exit 1 }"
+}
+
+// guionCarpetaApple es `choose folder` de AppleScript: el panel NATIVO del Finder para
+// una carpeta, que devuelve su ruta POSIX. Cancelar sale con error (-128), que es «nada».
+func guionCarpetaApple(titulo string) string {
+	return fmt.Sprintf("return POSIX path of (choose folder with prompt %q)", titulo)
 }

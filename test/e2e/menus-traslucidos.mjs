@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Contraste de los componentes REALES y del CSS generado por Tailwind en el runner.
 // No levanta aplicaciones ni usa sesión. Incluye una mutación: quitar la exclusión
-// del tooltip tiene que reproducir la tinta oscura sobre fondo oscuro de Marco.
+// del tooltip tiene que reproducir la tinta oscura sobre fondo oscuro de Marco en la
+// ayuda de un <dialog> dentro de una tarjeta (la única que no va en portal al body).
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -413,9 +414,15 @@ try {
   console.log(
     '✓ Mutación detectada: opciones deshabilitadas con la misma tinta que las disponibles',
   );
-  await mutada.getByRole('button', { name: 'Ayuda de tarjeta', exact: true }).hover();
-  const ayudaRota = mutada.getByRole('tooltip', { name: 'Ayuda de tarjeta' });
+  // La ayuda va en portal al body; solo la de un <dialog> dentro de la tarjeta cae
+  // bajo `.sytue-card-tone`, que es donde la guarda sigue siendo necesaria.
+  await mutada.getByRole('button', { name: 'Ayuda de diálogo en tarjeta', exact: true }).hover();
+  const ayudaRota = mutada.getByRole('tooltip', { name: 'Ayuda de diálogo en tarjeta' });
   await ayudaRota.waitFor();
+  exigir(
+    await ayudaRota.evaluate((el) => el.closest('.sytue-card-tone') !== null),
+    'la ayuda de la mutación no está dentro de la tarjeta de color',
+  );
   const roto = await medir(ayudaRota);
   exigir(roto.razon < 4.5, `la mutación NO fue detectada: ${roto.razon.toFixed(2)}:1`);
   await mutada.screenshot({ path: join(out, 'mutacion-tooltip.png') });
@@ -532,25 +539,27 @@ try {
           await paneles(page, nombre);
           await page.keyboard.press('Escape');
           await panel.waitFor({ state: 'detached' });
-          await page.getByRole('button', { name: `Ayuda de ${contexto}`, exact: true }).hover();
-          const ayuda = page.getByRole('tooltip', { name: `Ayuda de ${contexto}` });
-          await ayuda.waitFor();
-          await legible(ayuda, `${nombre}, ayuda de ${contexto}`, true);
-          const flecha = await medir(ayuda.locator('.sytue-tooltip-arrow'));
-          const caja = await medir(ayuda);
-          exigir(
-            flecha.fondo === caja.fondo,
-            `${nombre}: la flecha hereda el color de ${contexto}`,
-          );
-          if (
-            color === 'petroleo' &&
-            forma === 'marco' &&
-            contexto === 'tarjeta' &&
-            tema !== 'light'
-          ) {
-            await page.screenshot({ path: join(out, `${tema}-marco.png`) });
+          const ayudas =
+            contexto === 'tarjeta' ? ['tarjeta', 'diálogo en tarjeta'] : [contexto];
+          for (const lugar of ayudas) {
+            await page.getByRole('button', { name: `Ayuda de ${lugar}`, exact: true }).hover();
+            const ayuda = page.getByRole('tooltip', { name: `Ayuda de ${lugar}` });
+            await ayuda.waitFor();
+            await legible(ayuda, `${nombre}, ayuda de ${lugar}`, true);
+            const flecha = await medir(ayuda.locator('.sytue-tooltip-arrow'));
+            const caja = await medir(ayuda);
+            exigir(flecha.fondo === caja.fondo, `${nombre}: la flecha hereda el color de ${lugar}`);
+            if (
+              color === 'petroleo' &&
+              forma === 'marco' &&
+              lugar === 'diálogo en tarjeta' &&
+              tema !== 'light'
+            ) {
+              await page.screenshot({ path: join(out, `${tema}-marco.png`) });
+            }
+            await page.mouse.move(0, 0);
+            await ayuda.waitFor({ state: 'detached' });
           }
-          await page.mouse.move(0, 0);
         }
         await page.close();
         console.log(`✓ ${nombre}`);

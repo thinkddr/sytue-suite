@@ -52,6 +52,8 @@ func TestERPIAPideLoQueLaWeb(t *testing.T) {
 			_, _ = io.WriteString(w, `{"creados":[{"id":"g1","modelo":"gasto","etiqueta":"Claude Code","data":{}}],"actividades":[]}`)
 		case "/api/v1/gasto/ia/rellenar":
 			_, _ = io.WriteString(w, `{"data":{"importe":18000,"proveedor":"c1"},"etiquetas":{"c1":"Anthropic"}}`)
+		case "/api/v1/factura_compra/asistencia/leer":
+			_, _ = io.WriteString(w, `{"data":{"base":10000},"etiquetas":{},"contacto":{"nombre":"Lobo SL","nif":"B12345678"},"numero_origen":"F-7","existente":{"id":"fc1","modelo":"factura_compra","etiqueta":"F-7","data":{}}}`)
 		default:
 			w.WriteHeader(http.StatusNoContent)
 		}
@@ -94,6 +96,10 @@ func TestERPIAPideLoQueLaWeb(t *testing.T) {
 	if _, err := c.RellenarFichaPDF(ctx, "gasto", []byte("%PDF")); err != nil {
 		t.Errorf("rellenar con PDF: %v", err)
 	}
+	if fx, err := c.LeerFacturaXML(ctx, []byte("<Invoice/>")); err != nil || fx.NumeroOrigen != "F-7" ||
+		fx.Contacto["nif"] != "B12345678" || fx.Existente == nil || fx.Existente.ID != "fc1" {
+		t.Errorf("leer XML: %+v, %v", fx, err)
+	}
 
 	informe := `{"informe":{"titulo":"Ventas","partes":[{"titulo":"Por cliente","vista":"barras","consulta":` + consulta + `}]}}`
 	quiero := []string{
@@ -107,6 +113,7 @@ func TestERPIAPideLoQueLaWeb(t *testing.T) {
 		`POST /api/v1/ia/acciones/crear application/json {"pasos":[{"ref":"p1","modelo":"gasto","data":{"importe":18000},"faltan":["fecha"]}]}`,
 		`POST /api/v1/gasto/ia/rellenar application/json {"texto":"Factura de Anthropic por 180 €"}`,
 		`POST /api/v1/gasto/ia/rellenar application/pdf %PDF`,
+		`POST /api/v1/factura_compra/asistencia/leer application/xml <Invoice/>`,
 	}
 	mu.Lock()
 	defer mu.Unlock()
@@ -123,6 +130,11 @@ func TestERPIAHablaElIdiomaDelServicio(t *testing.T) {
 			`largas.Post("/ia/informe"`, `largas.Post("/ia/acciones"`, `api.Post("/ia/acciones/crear"`,
 			`api.Post("/informes/datos"`, `api.Post("/informes/excel"`, `api.Get("/tableros"`,
 			`api.Post("/tableros"`, `api.Delete("/tableros/{id}"`, `mod.Post("/ia/rellenar"`,
+			`mod.Post("/asistencia/leer"`,
+		},
+		"services/syerp/internal/http/asistencia_facturas.go": {
+			`json:"contacto,omitempty"`, `json:"numero_origen"`, `json:"existente,omitempty"`,
+			`m.Clave != "factura_compra"`,
 		},
 		"services/syerp/internal/http/handlers_ia.go": {
 			`json:"peticion"`, `json:"para"`, `json:"modelo"`, `"informe": inf`, `"datos": h.tablas(`,

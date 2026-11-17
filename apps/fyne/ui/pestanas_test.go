@@ -12,20 +12,20 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
-// TestLaPestanaMide35Coma25 ata la pestaña a los números de Tabs.tsx convertidos con el
-// rem de 14, que es el único sitio del que pueden salir: `py-2.5` son 8,75 por lado,
-// la caja de línea de `text-sm` es 15,75 y el `border-b-2` son 2.
+// TestLaPestanaMide40 ata la pestaña a los números de Tabs.tsx convertidos con el rem
+// de 16, que es el único sitio del que pueden salir: `py-2.5` son 10 por lado, la caja
+// de línea de `text-sm` es 18 y el `border-b-2` son 2.
 //
 // El subrayado lo llevan TODAS, transparente en las inactivas: así cambiar de pestaña
 // no mueve el rótulo dos píxeles, que es el defecto clásico de este componente.
-func TestLaPestanaMide35Coma25(t *testing.T) {
+func TestLaPestanaMide40(t *testing.T) {
 	p := NuevaPestana("Álbumes", nil)
 	m := MedidaPestana(p)
 	if m.Height != 40 {
-		t.Errorf("la pestaña mide %v de alto y `py-2.5` sobre `text-sm` con `border-b-2` son 35,25", m.Height)
+		t.Errorf("la pestaña mide %v de alto y `py-2.5` sobre `text-sm` con `border-b-2` son 40", m.Height)
 	}
 	if AltoTiraPestanas != 41 {
-		t.Errorf("la tira mide %v y con su `border-b` de 1 son 36,25", AltoTiraPestanas)
+		t.Errorf("la tira mide %v y con su `border-b` de 1 son 41", AltoTiraPestanas)
 	}
 	if got := p.MinSize(); got != m {
 		t.Errorf("MinSize() = %v y MedidaPestana dice %v", got, m)

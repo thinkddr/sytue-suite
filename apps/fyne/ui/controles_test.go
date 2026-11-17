@@ -213,7 +213,7 @@ func TestLaEntradaMideLoQueLaWeb(t *testing.T) {
 }
 
 // TestLaEntradaSMMideVeinticuatro es la talla del cromo denso: `h-6 min-h-[24px] px-1.5
-// text-xs`. Medía 21 (`h-6` con la raíz a 14) hasta el PR #841 de la web.
+// text-xs`. Medía 21 (`h-6` cuando 1 rem eran 14 px) hasta el PR #841 de la web.
 func TestLaEntradaSMMideVeinticuatro(t *testing.T) {
 	const m, altoWeb, textoEnX = 10, 24, 1 + 6
 

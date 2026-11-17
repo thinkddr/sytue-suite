@@ -7,6 +7,7 @@
   "block.short": "Αποκλεισμός",
   "card.untitledOwner": "Άγνωστο όνομα",
   "card.watch": "Προβολή: {title}",
+  "card.watched": "Προβλήθηκε {percent}%",
   "channel.count": {
     "one": "{count} δημόσιο βίντεο",
     "other": "{count} δημόσια βίντεο"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Αυτόματη",
   "player.qualityAutoNow": "Αυτόματη ({quality})",
   "player.region": "Πρόγραμμα αναπαραγωγής βίντεο",
+  "player.restart": "Έναρξη από την αρχή",
+  "player.resumedAt": "Συνέχεια από {time}",
   "player.seek": "Θέση",
+  "player.speed": "Ταχύτητα",
+  "player.speedNormal": "Κανονική",
+  "player.speedNow": "Ταχύτητα {rate}",
   "player.unmute": "Ενεργοποίηση ήχου",
   "player.volume": "Ένταση",
   "quality.approximate": "Κατά προσέγγιση: η διάρκεια του βίντεο δεν είναι ακόμη γνωστή.",

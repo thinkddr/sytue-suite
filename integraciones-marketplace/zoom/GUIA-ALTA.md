@@ -1,43 +1,48 @@
-# Guía de alta — Zoom ⇄ Sytue
+<a id="guía-de-alta--zoom--sytue"></a>
+# Setup guide — Zoom ⇄ Sytue
 
-Tiempo: ~20 min. Permisos: admin de la cuenta Zoom (vanity URL). Resultado:
-inicio de sesión único SAML y acceso OAuth a reuniones desde la suite.
+Time: ~20 min. Permissions: Zoom account admin (vanity URL). Result:
+SAML single sign-on and OAuth access to meetings from the suite.
 
-## A. SAML SSO (identidad)
+<a id="a-saml-sso-identidad"></a>
+## A. SAML SSO (identity)
 
-1. Entra en <https://zoom.us> como admin → «Advanced» → «Security» →
-   «Sign In Method» → activa «Pre-authenticate my domain» si procede.
-2. «Advanced» → «Single Sign-On» → «Edit»/«Add Configuration».
-3. Rellena con los datos de tu instancia de Sytue ID:
-   - **Sign-in page URL** y **Entity ID**: los metadatos SAML de Sytue ID
-     (Sytue Platform → Integraciones → Zoom → «Descargar metadatos»).
+1. Go to <https://zoom.us> as an admin → “Advanced” → “Security” →
+   “Sign In Method” → enable “Pre-authenticate my domain” if applicable.
+2. “Advanced” → “Single Sign-On” → “Edit”/“Add Configuration”.
+3. Fill in the data from your Sytue ID instance:
+   - **Sign-in page URL** and **Entity ID**: the Sytue ID SAML metadata
+     (Sytue Platform → Integrations → Zoom → “Download metadata”).
    - **Name ID format**: `email`.
-   - **ACS URL** (lo que Sytue ID debe conocer como destino):
-     `https://{vanity}.zoom.us/saml/SSO` — sustituye `{vanity}` por el tuyo.
-4. Descarga el certificado de firma de Zoom y cárgalo en Sytue ID.
-5. Prueba el SSO en una ventana privada antes de activarlo para todos.
+   - **ACS URL** (what Sytue ID must know as the destination):
+     `https://{vanity}.zoom.us/saml/SSO` — replace `{vanity}` with yours.
+4. Download Zoom's signing certificate and load it into Sytue ID.
+5. Test SSO in a private window before enabling it for everyone.
 
-## B. OAuth para reuniones
+<a id="b-oauth-para-reuniones"></a>
+## B. OAuth for meetings
 
-1. <https://marketplace.zoom.us> → «Develop» → «Build App» → **OAuth**.
-2. Nombre «Sytue», tipo «User-managed» (o «Account-level» si tu plan lo
-   permite).
-3. «Redirect URL for OAuth» y «Allow list»:
+1. <https://marketplace.zoom.us> → “Develop” → “Build App” → **OAuth**.
+2. Name “Sytue”, type “User-managed” (or “Account-level” if your plan
+   allows it).
+3. “Redirect URL for OAuth” and “Allow list”:
    `https://integrations.sytue.eu/api/v1/oauth/callback`.
-4. Scopes (solo lectura/escritura de reuniones, nada más):
+4. Scopes (meeting read/write only, nothing else):
    - `meeting:read`
    - `meeting:write`
-5. Copia **Client ID** y **Client Secret**.
+5. Copy the **Client ID** and **Client Secret**.
 
-## C. Conectar desde Sytue Platform
+<a id="c-conectar-desde-sytue-platform"></a>
+## C. Connect from Sytue Platform
 
-1. Sytue Platform → Integraciones → «Zoom».
-2. Rellena **Vanity URL** (el de `https://VANITY.zoom.us`), Client ID y
-   Client Secret → «Conectar» y autoriza.
+1. Sytue Platform → Integrations → “Zoom”.
+2. Fill in the **Vanity URL** (the one in `https://VANITY.zoom.us`), Client ID and
+   Client Secret → “Connect” and authorize.
 
-## Problemas frecuentes
+<a id="problemas-frecuentes"></a>
+## Common problems
 
-- «This app is not available for your account»: el vanity del campo y el de la
-  cuenta no coinciden.
-- El SSO no redirige: el ACS de Sytue ID no usa exactamente
+- “This app is not available for your account”: the vanity in the field and the one of the
+  account do not match.
+- SSO does not redirect: the Sytue ID ACS does not use exactly
   `https://{vanity}.zoom.us/saml/SSO`.

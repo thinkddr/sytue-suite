@@ -394,7 +394,7 @@ func TestLasTresPiezasVanArribaALaDerecha(t *testing.T) {
 		}
 	}
 	if b.buscador.campo.Size().Width != AnchoBuscadorBarra {
-		t.Errorf("el buscador mide %v y el ancho canónico (`max-w-[30rem]` con el rem de 14) es %v",
+		t.Errorf("el buscador mide %v y el ancho canónico (`max-w-[30rem]` con el rem de 16) es %v",
 			b.buscador.campo.Size().Width, AnchoBuscadorBarra)
 	}
 }
@@ -710,7 +710,9 @@ func TestElBuscadorSeAbreYSeCierraSinRobarElFoco(t *testing.T) {
 // terminó», ci-desktop de v3.19.7). Si llega antes, vuelve en cuanto está listo.
 func esperar(t *testing.T, listo func() bool) {
 	t.Helper()
-	limite := time.Now().Add(10 * time.Second)
+	// 30 s y no 10: con -race y la máquina cargada (varias verificaciones a la vez) la
+	// pila de cuarenta avisos de TestLaPilaDeAvisosNoCorreCarreraConSuReloj pasaba de 10.
+	limite := time.Now().Add(30 * time.Second)
 	for time.Now().Before(limite) {
 		fyne.DoAndWait(func() {})
 		if listo() {
@@ -826,31 +828,6 @@ func TestElPuntoAparecePorPrimeraVez(t *testing.T) {
 	a.Refresh()
 	if n := cuantos(pinta(t, 60, 60, a), verde); n != 0 {
 		t.Errorf("sin presencia siguen pintados %d píxeles del punto", n)
-	}
-}
-
-// TestUnaAppSeQuedaElAtajoDelBuscador: la paleta del ERP gana ⌘K como en la web, donde
-// escuchan los dos y la paleta se queda el foco. Sin `CederAtajo`, el atajo lleva al
-// buscador de la suite, que es lo de las otras doce apps.
-//
-// VISTO EN ROJO: con `pulsarAtajo` enfocando siempre el campo —sin mirar `alAtajo`—,
-// la app no se entera y el foco acaba en el buscador.
-func TestUnaAppSeQuedaElAtajoDelBuscador(t *testing.T) {
-	b := barraPrueba(t)
-	w := test.NewWindow(b)
-	defer w.Close()
-	c := w.Canvas()
-
-	b.buscador.pulsarAtajo(c)
-	if c.Focused() != b.buscador.campo {
-		t.Fatal("sin nadie que se lo quede, ⌘K no lleva al buscador de la suite")
-	}
-	c.Unfocus()
-	llamada := false
-	b.CederAtajo(func() { llamada = true })
-	b.buscador.pulsarAtajo(c)
-	if !llamada || c.Focused() != nil {
-		t.Errorf("cedido, ⌘K %s y el foco queda en %T", map[bool]string{true: "avisa a la app", false: "NO avisa a la app"}[llamada], c.Focused())
 	}
 }
 

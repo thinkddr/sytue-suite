@@ -1,9 +1,10 @@
 /*
  * BFF de Sytue Admin — directorio de usuarios (paginación keyset).
  *
- *   GET /api/admin/users[?cursor=<opaco>&limit=N&tenant=<slug>]
+ *   GET /api/admin/users[?cursor=<opaco>&limit=N&tenant=<slug>&q=<texto>&filter=<estado>]
  *       Página siguiente del directorio de la organización activa. Devuelve
- *       { live, items, nextCursor } con nextCursor '' al agotar.
+ *       { live, items, nextCursor } con nextCursor '' al agotar. `filter` es uno
+ *       de los estados de lib/filtros-usuarios.ts; otro valor es un 400.
  *
  * Proxya al endpoint admin de Sytue ID (GET /api/v1/admin/users, Go) con el
  * access token de la sesión httpOnly; exige rol admin/owner. El token NUNCA
@@ -13,6 +14,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@sytue/auth/server';
 import { getBff, toBffContext } from '../../../server/bff.js';
 import { loadUsers } from '../../../lib/admin.js';
+import { esFiltroUsuarios, filtroDeParametro } from '../../../lib/filtros-usuarios.js';
 
 export const prerender = false;
 
@@ -41,6 +43,13 @@ export const GET: APIRoute = async (ctx) => {
   const limit = Number.parseInt(params.get('limit') ?? '', 10);
   const tenant = params.get('tenant')?.trim() || undefined;
   const q = params.get('q')?.trim() || '';
+  const filtroPedido = params.get('filter')?.trim() || '';
+  // Un filtro desconocido no se convierte en «todas»: quien pide las suspendidas
+  // con una errata y recibe a todo el mundo cree que lo están todas.
+  if (filtroPedido && !esFiltroUsuarios(filtroPedido)) {
+    return json({ error: 'invalid_filter' }, 400);
+  }
+  const filter = filtroDeParametro(filtroPedido);
 
   // El servicio Go valida el cursor (opaco), acota limit (1..200) y recorta `q`;
   // aquí solo se descartan valores sin sentido para no propagar basura.
@@ -48,6 +57,7 @@ export const GET: APIRoute = async (ctx) => {
     ...(cursor ? { cursor } : {}),
     ...(Number.isFinite(limit) && limit > 0 ? { limit } : {}),
     ...(q ? { q } : {}),
+    ...(filter ? { filter } : {}),
   });
   return json({ live, items: data.items, nextCursor: data.nextCursor });
 };

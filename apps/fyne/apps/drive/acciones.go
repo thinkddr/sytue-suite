@@ -32,13 +32,14 @@ import (
 //     suite; en nativo no hay esquema al que llamar (ver `api.abre`).
 //   - «Abrir en Docus/Calcus/Diapos»: en la web el rótulo va escrito a mano en castellano,
 //     sin clave de catálogo; aquí pulsar la fila ya lo abre en su app.
+//   - «Organizar páginas»: diferencia deliberada (anotada en BACKLOG-FYNE.md). En nativo
+//     el PDF se abre en Sytue CertiPDF, que ya organiza las páginas
+//     (`apps/certipdf/dialogos.go`); repetir el diálogo aquí sería una segunda copia.
 //
-// ponytail: falta «Organizar páginas», que es un diálogo propio y entra con él: un
-// elemento de menú que no abre nada es peor que no tenerlo. (Las versiones van en la web
-// detrás de «Compartir enlace» y delante de lo de PDF; aquí también, con «Copiar enlace»
-// en medio.) Detrás de lo de PDF
-// van «Clasificar» y «Resumir», y luego «Adjuntar a un correo» y «Compartir en Rooms»,
-// que llaman a la otra app por su esquema (entreapps.go), juntas, como en la web.
+// Las versiones van en la web detrás de «Compartir enlace» y delante de lo de PDF; aquí
+// también, con «Copiar enlace» en medio. Detrás de lo de PDF van «Clasificar» y
+// «Resumir», y luego «Adjuntar a un correo» y «Compartir en Rooms», que llaman a la otra
+// app por su esquema (entreapps.go), juntas, como en la web.
 
 // accionMenu es una fila del menú: su rótulo, su glifo y qué hace.
 type accionMenu struct {
@@ -65,6 +66,9 @@ func (p *Pantalla) AccionesDe(el Elemento, sinRed, favorito bool) []accionMenu {
 	add(el.Carpeta && el.ID != "" && !sinRed, accionMenu{texto: t("action.downloadZip"), cuerpo: glifoDescargar, hacer: func() {
 		go p.bajarZip(nil, []string{el.ID}, el.Nombre)
 	}})
+	// Solo en un resultado de búsqueda, que cruza el árbol: en una carpeta ya se está en
+	// la suya.
+	add(p.explor.EnBusqueda && p.ubicable(el, sinRed), accionMenu{texto: t("action.showInFolder"), cuerpo: glifoCarpeta, hacer: func() { p.mostrarEnSuCarpeta(el) }})
 	add(!sinRed, accionMenu{texto: t("action.rename"), cuerpo: glifoLapiz, hacer: func() { p.pedirRenombrar(el) }})
 	add(!sinRed, accionMenu{texto: t("action.move"), cuerpo: glifoMover, hacer: func() { p.pedirMover(el) }})
 	add(!sinRed, accionMenu{texto: t("action.copy"), cuerpo: glifoCopia, hacer: func() { go p.copiar(el) }})
@@ -75,6 +79,9 @@ func (p *Pantalla) AccionesDe(el Elemento, sinRed, favorito bool) []accionMenu {
 	add(el.Carpeta || el.ID != "", accionMenu{texto: t("action.copyLink"), icono: iconos.Copias, hacer: func() { p.copiarEnlace(el) }})
 	// El historial es LECTURA: la web lo ofrece también sin red.
 	add(fichero && el.ID != "", accionMenu{texto: t("action.versions"), cuerpo: glifoReloj, hacer: func() { p.pedirVersiones(el) }})
+	// «Detalles» (detalles.go), detrás del historial como en la web. Lo reúne el servicio
+	// a partir del id: sin id no hay a quién preguntar, y sin red no hay servicio.
+	add(conDetalles(el, sinRed), accionMenu{texto: t("details.action"), icono: iconos.Informacion, hacer: func() { p.pedirDetalles(el) }})
 	// «Abrir en Sytue PDF» va con el verbo del producto: ahí se ve, se anota, se rellena
 	// y se firma. El enlace lo arma `api.RutaDeApertura`, que es el de la web.
 	add(!sinRed && fichero && Extension(el.Nombre) == "pdf",
@@ -103,6 +110,9 @@ func (p *Pantalla) AccionesDe(el Elemento, sinRed, favorito bool) []accionMenu {
 	add(!sinRed, accionMenu{texto: t("action.delete"), cuerpo: glifoPapelera, peligro: true, hacer: func() { go p.aLaPapelera(el) }})
 	return out
 }
+
+// conDetalles dice si el «⋯» ofrece «Detalles».
+func conDetalles(el Elemento, sinRed bool) bool { return !sinRed && el.ID != "" }
 
 // menuElemento abre el «⋯» colgado de su disparador.
 func (p *Pantalla) menuElemento(el Elemento, disparador fyne.CanvasObject) {
@@ -133,20 +143,89 @@ func elementosMenu(acciones []accionMenu) []fyne.CanvasObject {
 	return out
 }
 
-// menuNuevo es el desplegable de «Nuevo»: la carpeta y, tras el separador, los tres
-// tipos de Sytue Docs. Antes solo había «Nueva carpeta» y para empezar un documento
-// había que salir a Docs.
+// menuNuevo es el desplegable de «Nuevo»: la carpeta; tras el separador, los tres tipos
+// de Sytue Docs, y tras otro, la vista de Sytue Bases, en el orden de la web. Antes solo
+// había «Nueva carpeta» y para empezar un documento había que salir a Docs.
 func (p *Pantalla) menuNuevo(disparador fyne.CanvasObject) {
+	m := ui.NuevoMenu(p.elementosNuevo()...)
+	m.Rotulo = p.tr.T("files.new", nil)
+	m.Mostrar(disparador)
+}
+
+// elementosNuevo es lo que lleva «Nuevo». «Subir carpeta» va junto a «Carpeta», como en
+// la web, y solo donde hay selector de carpetas: en el móvil `ElegirCarpeta` es nil.
+func (p *Pantalla) elementosNuevo() []fyne.CanvasObject {
 	t := func(clave string) string { return p.tr.T(clave, nil) }
-	m := ui.NuevoMenu(
+	out := []fyne.CanvasObject{
 		ui.NuevoElementoMenu(t("files.new.folder"), iconos.DriveCarpeta, p.pedirCarpeta),
+	}
+	if p.ElegirCarpeta != nil {
+		out = append(out, ui.NuevoElementoMenu(t("files.upload.folder"), iconos.Subir, p.elegirCarpetaYSubir))
+	}
+	return append(out,
 		ui.NuevoSeparadorMenu(),
 		ui.NuevoElementoMenu(t("files.new.document"), iconos.DriveDocumento, func() { p.nuevoDoc(api.DocText) }),
 		ui.NuevoElementoMenu(t("files.new.spreadsheet"), iconos.DriveHoja, func() { p.nuevoDoc(api.DocSheet) }),
 		ui.NuevoElementoMenu(t("files.new.presentation"), iconos.DrivePresentacion, func() { p.nuevoDoc(api.DocSlides) }),
+		ui.NuevoSeparadorMenu(),
+		// El mismo glifo de hoja que la web: lo que llega es una tabla en CSV.
+		ui.NuevoElementoMenu(t("files.new.bases"), iconos.DriveHoja, p.pedirVistaDeBases),
 	)
-	m.Rotulo = t("files.new")
-	m.Mostrar(disparador)
+}
+
+// pedirVistaDeBases es «Nuevo → Vista de Sytue Bases» (`importarDeBases` de la web): pide
+// el token de una conexión de solo lectura concedida a Sytue Drive y deja el CSV en la
+// carpeta abierta. El campo es secreto y el token no se guarda en ningún sitio: refrescar
+// la vista es volver a exportarla.
+func (p *Pantalla) pedirVistaDeBases() {
+	if p.win == nil || p.svc == nil || p.explor.SinRed() || p.ocupado.Load() {
+		return
+	}
+	t := func(clave string) string { return p.tr.T(clave, nil) }
+	carpeta := p.carpetaActual()
+	d := ui.PreguntaCon(t("files.bases.prompt"), "", t("ui.cancel"), t("files.bases.confirm"), t("ui.required"),
+		ui.OpcionesPregunta{Titulo: t("files.new.bases"), Secreto: true, Lienzo: p.win.Canvas().Size()},
+		func(token string) {
+			if token = strings.TrimSpace(token); token != "" {
+				go p.exportarVistaDeBases(carpeta, token)
+			}
+		})
+	d.Mostrar(p.win.Canvas())
+}
+
+// exportarVistaDeBases pide al servicio el CSV y lo dice. Corre fuera de la interfaz.
+// Como la web, solo dos motivos se dicen con nombre: la conexión no vale (y la salida es
+// pedir otra) o no cabe (y la salida es liberar espacio); lo demás es «no se pudo».
+func (p *Pantalla) exportarVistaDeBases(carpeta, token string) {
+	if !p.ocupar() {
+		return
+	}
+	defer p.soltar()
+	ctx, cancelar := p.ctx()
+	defer cancelar()
+	if carpeta == "" {
+		raiz, err := p.svc.Root(ctx)
+		if err != nil {
+			p.avisar(ui.AvisoPeligro, p.tr.T("files.bases.failed", nil), "")
+			return
+		}
+		carpeta = raiz.ID
+	}
+	f, err := p.svc.ExportBasesView(ctx, carpeta, token)
+	if err != nil {
+		clave := "files.bases.failed"
+		var e *api.Error
+		switch {
+		case errors.As(err, &e) && e.Status == http.StatusUnprocessableEntity && e.Code() == api.CodigoBasesConexionInvalida:
+			clave = "files.bases.invalid"
+		case codigo(err) == http.StatusInsufficientStorage:
+			clave = "files.bases.quota"
+		}
+		p.avisar(ui.AvisoPeligro, p.tr.T(clave, nil), "")
+		return
+	}
+	p.avisar(ui.AvisoExito, p.tr.T("files.bases.done", i18n.Vars{"name": f.Name}), "")
+	go p.recargarVista()
 }
 
 // TituloNuevoDoc es el título con el que nace un documento creado desde Drive: el

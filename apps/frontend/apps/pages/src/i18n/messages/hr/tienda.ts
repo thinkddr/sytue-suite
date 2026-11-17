@@ -176,15 +176,10 @@ export const tienda = {
   'store.mode_test_help':
     'Simulirane naplate s testnim ključevima pružatelja. Nikome se ništa ne naplaćuje.',
   'store.mode_live_help': 'Stvarne naplate vašim kupcima s produkcijskim ključevima.',
-  'store.webhook_title': 'Korak 1: adresa webhooka',
   'store.webhook_help': 'Zalijepite ovu adresu u nadzornu ploču sustava {nombre}.',
   'store.webhook_label': 'Adresa webhooka',
   'store.webhook_error':
     'Adresu webhooka nije bilo moguće dohvatiti. Zatvorite dijaloški okvir i pokušajte ponovno.',
-  'store.copy': 'Kopiraj',
-  'store.copied': 'Adresa je kopirana.',
-  'store.credentials_title': 'Vjerodajnice',
-  'store.credentials_step': 'Korak 2: vjerodajnice',
   'store.f_api_key': 'API ključ',
   'store.f_api_key_mode': 'API ključ ({modo})',
   'store.f_profile_id': 'ID profila (neobavezno)',
@@ -202,6 +197,48 @@ export const tienda = {
   'store.gateway_save': 'Spremi i isprobaj',
   'store.gateway_saved': 'Platni sustav {nombre} je isproban i spremljen.',
   'store.gateway_save_error': 'Vjerodajnice platnog sustava nije bilo moguće potvrditi.',
+  'store.wz_progress': 'Koraci za povezivanje platnog pristupnika',
+  'store.wz_step_mode': 'Način',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Ključevi',
+  'store.wz_step_check': 'Provjeri',
+  'store.wz_step_done': 'Gotovo',
+  'store.wz_mode_heading': 'Testna ili stvarna plaćanja?',
+  'store.wz_mode_desc':
+    'Počnite u testnom načinu; kad sve radi, ponovno otvorite ovaj čarobnjak i odaberite stvarni način.',
+  'store.wz_webhook_heading': 'Recite {nombre} kamo slati obavijesti o plaćanju',
+  'store.wz_keys_heading': 'Vaši ključevi za {nombre}',
+  'store.wz_keys_desc':
+    'Tajni ključevi spremaju se zapečaćeni i više se nikad ne prikazuju: za promjenu ključ upišite ponovno.',
+  'store.wz_keys_rejected': '{nombre} nije prihvatio ove ključeve',
+  'store.wz_check_heading': 'Provjeri i spremi',
+  'store.wz_check_desc':
+    'Sytue Web testira ključeve kod {nombre} prije uključivanja pristupnika. Ništa se ne sprema dok test ne uspije.',
+  'store.wz_secret_hidden': 'Upisano (skriveno)',
+  'store.wz_empty_value': 'Nije navedeno',
+  'store.wz_done_heading': '{nombre} je spreman',
+  'store.wz_finish': 'Završi',
+  'store.hint_mollie_api_key':
+    'U Mollieju: Developers › API keys. Testni ključevi počinju s test_, a stvarni s live_.',
+  'store.hint_mollie_profile':
+    'U Mollieju: Settings › Website profiles. Počinje s pfl_; ostavite prazno za zadani profil.',
+  'store.hint_adyen_api_key':
+    'U Adyen Customer Area: Developers › API credentials › vaša vjerodajnica › API key.',
+  'store.hint_adyen_merchant':
+    'U Adyen Customer Area, u odabiru računa na vrhu: trgovački račun, a ne račun tvrtke.',
+  'store.hint_adyen_hmac': 'U Adyenu: Developers › Webhooks › vaš webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'U Adyenu (stvarni način): Developers › API URLs. To je dio adrese prije -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Dobit ćete ga od banke uz ugovor za virtualni POS; prikazan je i na administracijskom portalu Redsysa.',
+  'store.hint_redsys_terminal':
+    'Na administracijskom portalu Redsysa, uz šifru trgovca. Obično je 1.',
+  'store.hint_redsys_secret':
+    'Na administracijskom portalu Redsysa: podaci trgovca › ključ SHA-256. Testni i stvarni ključ se razlikuju.',
+  'store.hint_stripe_secret':
+    'U Stripeu: Developers › API keys › Secret key. Počinje s sk_test_ ili sk_live_.',
+  'store.hint_stripe_webhook':
+    'U Stripeu: Developers › Webhooks › vaša krajnja točka › Signing secret. Počinje s whsec_.',
   'orders.subtitle': 'Narudžbe i kupnje ostvarene na vašem web-mjestu.',
   'orders.count': {
     one: '{count} narudžba',

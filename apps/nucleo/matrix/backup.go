@@ -41,13 +41,19 @@ func (c *Client) recoveryStorageKey(ctx context.Context, recovery string) (*ssss
 // prepareBackup shares the standard SSSS backup secret with other verified clients.
 // It never replaces an existing backup when its secret is absent or inconsistent.
 func (c *Client) prepareBackup(ctx context.Context, recovery string) error {
+	return c.setupBackup(ctx, recovery, false)
+}
+
+// setupBackup with fresh ignores the backup secret sealed by a forgotten key
+// (ResetRecovery has already deleted its server versions) and creates a new one.
+func (c *Client) setupBackup(ctx context.Context, recovery string, fresh bool) error {
 	machine := c.crypto.Machine()
 	storageKey, err := c.recoveryStorageKey(ctx, recovery)
 	if err != nil {
 		return err
 	}
 	defer clear(storageKey.Key)
-	privateKey, err := machine.SSSS.GetDecryptedAccountData(ctx, event.AccountDataMegolmBackupKey, storageKey)
+	privateKey, err := c.storedBackupKey(ctx, storageKey, fresh)
 	if errors.Is(err, mautrix.MNotFound) {
 		if _, latestErr := c.cli.GetKeyBackupLatestVersion(ctx); !errors.Is(latestErr, mautrix.MNotFound) {
 			if latestErr != nil {
@@ -108,6 +114,15 @@ func (c *Client) prepareBackup(ctx context.Context, recovery string) error {
 	return c.saveBackupSecret(ctx, versionInfo.Version, privateKey)
 }
 
+// storedBackupKey reads the backup secret from secret storage; fresh reports it
+// as absent so that a reset never reuses one sealed for a forgotten identity.
+func (c *Client) storedBackupKey(ctx context.Context, storageKey *ssss.Key, fresh bool) ([]byte, error) {
+	if fresh {
+		return nil, mautrix.MNotFound
+	}
+	return c.crypto.Machine().SSSS.GetDecryptedAccountData(ctx, event.AccountDataMegolmBackupKey, storageKey)
+}
+
 func (c *Client) saveBackupSecret(ctx context.Context, version id.KeyBackupVersion, privateKey []byte) error {
 	secret, err := json.Marshal(backupSecret{Version: version, Key: privateKey})
 	if err != nil {
@@ -158,10 +173,22 @@ func (c *Client) Backup(ctx context.Context) error {
 	if c.closed.Load() {
 		return ErrClosed
 	}
-	c.backupMu.Lock()
-	defer c.backupMu.Unlock()
+	release, err := c.lockBackup(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
+	return c.backupSessions(ctx)
+}
+
+// Caller holds backupMu and stateMu. The maintained SDK still owns every
+// session export, encryption, upload and acknowledged backup-version marker.
+func (c *Client) backupSessions(ctx context.Context) error {
+	if err := c.backfillRoomSessionProvenanceOnce(ctx); err != nil {
+		return err
+	}
 	key, version, err := c.readBackup(ctx)
 	if err != nil {
 		return err
@@ -170,7 +197,7 @@ func (c *Client) Backup(ctx context.Context) error {
 	for {
 		var batch []*mxcrypto.InboundGroupSession
 		err = machine.CryptoStore.GetGroupSessionsWithoutKeyBackupVersion(ctx, version).Iter(func(session *mxcrypto.InboundGroupSession) (bool, error) {
-			if c.allowedRoom(session.RoomID.String()) {
+			if c.allowedRoomContext(ctx, session.RoomID.String()) {
 				batch = append(batch, session)
 			}
 			return len(batch) < 100, nil
@@ -229,8 +256,11 @@ func (c *Client) RestoreBackup(ctx context.Context) error {
 	if c.closed.Load() {
 		return ErrClosed
 	}
-	c.backupMu.Lock()
-	defer c.backupMu.Unlock()
+	release, err := c.lockBackup(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	return c.restoreBackup(ctx)
@@ -246,7 +276,7 @@ func (c *Client) restoreBackup(ctx context.Context) error {
 		return err
 	}
 	for roomID, room := range stored.Rooms {
-		if !c.allowedRoom(roomID.String()) {
+		if !c.allowedRoomContext(ctx, roomID.String()) {
 			continue
 		}
 		for sessionID, encrypted := range room.Sessions {

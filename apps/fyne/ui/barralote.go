@@ -6,6 +6,8 @@ package ui
 // paridad-web: apps/frontend/packages/ui/src/components/BulkActionBar.tsx
 
 import (
+	"math"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
@@ -161,23 +163,16 @@ func lineasLote(b *BarraDeLote, ancho float32) [][]int {
 		canalon = rellenoLoteX
 	}
 	cabe := ancho - 2*canalon
-	var lineas [][]int
-	linea := make([]int, 0, len(anchos))
-	usado := float32(0)
-	for i, w := range anchos {
-		// El `flex-1` cuenta como un elemento más: su hueco va aunque no mida nada.
-		hueco := huecoLote
-		if i == 1 {
-			hueco = 2 * huecoLote
-		}
-		if len(linea) > 0 && ancho > 0 && usado+hueco+w > cabe {
-			lineas, linea, usado = append(lineas, linea), make([]int, 0, len(anchos)), 0
-		} else if len(linea) > 0 {
-			usado += hueco
-		}
-		linea, usado = append(linea, i), usado+w
+	if ancho <= 0 { // sin ancho aún, una sola línea
+		cabe = float32(math.Inf(1))
 	}
-	return append(lineas, linea)
+	// El `flex-1` cuenta como un elemento más: su hueco va aunque no mida nada.
+	return RepartirEnLineas(anchos, cabe, func(i int) float32 {
+		if i == 1 {
+			return 2 * huecoLote
+		}
+		return huecoLote
+	})
 }
 
 // Escapar vacía la selección. Es público porque en la web esto lo escucha el DOCUMENTO

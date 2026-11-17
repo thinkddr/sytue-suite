@@ -90,7 +90,7 @@ func (l *Libro) ColocarBloque(crudo string, c, f int) bool {
 	}
 	pos, caja, ok := b.extension()
 	dc, df := c-caja.C1, f-caja.R1
-	if !ok || caja.C2+dc >= Columnas || caja.R2+df >= Filas {
+	if !ok || caja.C2+dc >= MaxColumnas || caja.R2+df >= MaxFilas {
 		return false
 	}
 	en := func(ref string) Celda { return Celda{C: pos[ref].C + dc, F: pos[ref].F + df} }

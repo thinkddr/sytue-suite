@@ -4,6 +4,7 @@
 package contactos
 
 import (
+	"context"
 	"log/slog"
 
 	"fyne.io/fyne/v2"
@@ -36,14 +37,18 @@ func (a *App) deshacerPapelera(uids []string, tirados int) {
 	if a.svc == nil || len(uids) == 0 {
 		return
 	}
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+	scope := a.capturar()
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		restaurados, err := a.svc.BatchRestore(ctx, uids)
 		fin()
 		if err != nil {
 			slog.Warn("contactos: no se pudo deshacer", "error", err)
 		}
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
 			switch {
 			case err == nil && restaurados >= tirados:
 				a.avisar(ui.AvisoExito, "trash.undone", "")
@@ -52,8 +57,8 @@ func (a *App) deshacerPapelera(uids []string, tirados int) {
 			default:
 				a.avisar(ui.AvisoPeligro, "trash.undoFailed", "trash.undoFailedHint")
 			}
-			a.recargarTodo()
-			a.enFondo(a.cargarEtiquetas)
+			a.recargarTodoEn(scope)
+			a.programarEn(scope, a.cargarEtiquetasEn)
 		})
 	})
 }

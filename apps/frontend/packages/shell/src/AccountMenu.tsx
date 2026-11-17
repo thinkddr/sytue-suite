@@ -12,11 +12,11 @@ import {
   LanguageSelect,
   MenuItem,
   MenuSeparator,
+  SegmentedControl,
   THEME_COLORS,
   THEME_FORMAS,
   themeColorSwatch,
   useTheme,
-  cx,
   useToast,
 } from '@sytue/ui';
 import { login, logout } from '@sytue/auth/client';
@@ -39,7 +39,10 @@ interface MyOrg {
 /** Sistema primero: es el valor por defecto y el que la mayoría no toca. */
 const APARIENCIAS = ['light', 'translucent', 'dark', 'system'] as const;
 
-/** Un grupo de opciones excluyentes en línea: la apariencia, el color y la forma. */
+/**
+ * Un grupo de opciones excluyentes con su etiqueta: la apariencia, el color y la forma.
+ * El grupo es el `SegmentedControl` pequeño de `@sytue/ui` (radios con flechas).
+ */
 function Segmentado<T extends string>({
   etiqueta,
   opciones,
@@ -59,36 +62,17 @@ function Segmentado<T extends string>({
   return (
     <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <span class="text-text text-sm">{etiqueta}</span>
-      <div
-        role="radiogroup"
+      <SegmentedControl
+        size="sm"
         aria-label={etiqueta}
-        class="bg-bg-subtle flex flex-wrap rounded-md p-0.5"
-      >
-        {opciones.map((o) => (
-          <button
-            key={o}
-            type="button"
-            role="radio"
-            aria-checked={valor === o}
-            onClick={() => elegir(o)}
-            class={cx(
-              'sytue-focus-ring rounded-control flex items-center gap-1.5 px-2 py-1 text-xs font-medium transition-colors duration-150',
-              valor === o
-                ? 'bg-surface text-text shadow-[var(--shadow-xs)]'
-                : 'text-text-muted hover:text-text',
-            )}
-          >
-            {muestra && (
-              <span
-                aria-hidden="true"
-                class="size-2.5 rounded-full"
-                style={{ background: muestra(o) }}
-              />
-            )}
-            {rotulo(o)}
-          </button>
-        ))}
-      </div>
+        opciones={opciones.map((o) => ({
+          valor: o,
+          rotulo: rotulo(o),
+          muestra: muestra?.(o),
+        }))}
+        valor={valor}
+        onChange={elegir}
+      />
     </div>
   );
 }

@@ -139,16 +139,28 @@ export class CardDavClient {
 export function parseVcard(
   vcard: string,
 ): Pick<Contact, 'uid' | 'fullName' | 'emails' | 'phones' | 'organization'> {
-  const lines = vcard.split(/\r?\n/);
+  // RFC 6350: the CRLF and the first whitespace of a folded line are not data.
+  const lines = vcard.replace(/\r?\n[ \t]/g, '').split(/\r?\n/);
   const emails: string[] = [];
   const phones: string[] = [];
   let uid = '';
   let fullName = '';
   let organization: string | undefined;
   for (const line of lines) {
-    const [rawKey, ...rest] = line.split(':');
-    if (!rawKey) continue;
-    const value = rest.join(':').trim();
+    // A parameter value can contain a colon inside quotes. Only the first
+    // unquoted colon separates the property and its value.
+    let quoted = false;
+    let separator = -1;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') quoted = !quoted;
+      else if (line[i] === ':' && !quoted) {
+        separator = i;
+        break;
+      }
+    }
+    if (separator <= 0) continue;
+    const rawKey = line.slice(0, separator);
+    const value = line.slice(separator + 1).trim();
     const key = rawKey.split(';')[0]?.toUpperCase();
     if (key === 'UID') uid = value;
     else if (key === 'FN') fullName = value;

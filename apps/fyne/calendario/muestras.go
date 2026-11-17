@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -17,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -58,6 +58,8 @@ func huecoMuestras() float32 {
 	return HuecoMuestras
 }
 
+// paridad-web: apps/frontend/packages/ui/src/components/SelectorDeColor.tsx
+//
 // grupoMuestras es el `role="radiogroup"`: las flechas mueven la elección.
 type grupoMuestras struct {
 	widget.BaseWidget
@@ -74,10 +76,15 @@ func nuevasMuestras(p *Pantalla, valor string, ninguno bool, alElegir func(hex s
 	if ninguno {
 		items = append([]struct{ Clave, Hex string }{{"colour.inherit", ""}}, items...)
 	}
+	// Un color guardado fuera de la paleta se ve, y se marca, como su tono más cercano.
+	pintado := ""
+	if c, ok := tokens.TonoDeUsuario(valor); ok {
+		pintado = c.Valor
+	}
 	for i, it := range items {
 		m := &muestraCal{g: g, i: i, hex: it.Hex, nombre: p.t(it.Clave, nil)}
 		m.ExtendBaseWidget(m)
-		if strings.EqualFold(it.Hex, valor) {
+		if it.Hex == pintado {
 			g.elegida = i
 		}
 		g.muestras = append(g.muestras, m)
@@ -102,7 +109,7 @@ func (g *grupoMuestras) MinSize() fyne.Size {
 }
 
 func (g *grupoMuestras) AltoPara(ancho float32) float32 {
-	return (&envolver{Hueco: huecoMuestras(), Ancho: ancho}).MinSize(g.objetos()).Height
+	return (ui.Flujo{Hueco: huecoMuestras(), Ancho: ancho}).MinSize(g.objetos()).Height
 }
 
 func (g *grupoMuestras) objetos() []fyne.CanvasObject {
@@ -114,7 +121,7 @@ func (g *grupoMuestras) objetos() []fyne.CanvasObject {
 }
 
 func (g *grupoMuestras) CreateRenderer() fyne.WidgetRenderer {
-	return &grupoMuestrasRenderer{g: g, c: container.New(&envolver{Hueco: huecoMuestras()}, g.objetos()...)}
+	return &grupoMuestrasRenderer{g: g, c: container.New(ui.Flujo{Hueco: huecoMuestras()}, g.objetos()...)}
 }
 
 type grupoMuestrasRenderer struct {
@@ -284,72 +291,17 @@ func (r *muestraRenderer) Refresh() {
 
 // ---- Las píldoras de los invitados ----
 
-// pildoraInvitado es un `<li>` de la lista de invitados:
-//
-//	rounded-pill border border-border bg-bg-subtle text-sm py-0.5 pr-1 pl-2.5 gap-1
-//	<span class="max-w-[16rem] truncate">{email}</span>
-//	<button class="h-5 w-5 rounded-full text-text-muted hover:bg-danger-bg
-//	               hover:text-danger-text"><Icon close 14/></button>
-func nuevaPildoraInvitado(p *Pantalla, correo, partstat string, alQuitar func()) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	quitar := ui.NuevoBotonIcono(iconos.Cerrar, p.t("event.guestRemove", i18n.Vars{"email": correo}), alQuitar)
-	quitar.Lado, quitar.TamIcono, quitar.Radio = tema.Espacio(5), 14, tema.Forma("radius-control")
-	caja := ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioPill)
-	texto := ui.Texto(correo, tema.TextoSM, ui.Normal, tema.Color("text", v))
-	l := &pildoraLayout{caja: caja, texto: texto, correo: correo, boton: quitar}
-	objetos := append(caja.Objetos(), texto, quitar)
-	// La respuesta que ya dio, si la dio: la insignia entre la dirección y el aspa. Los
-	// recién añadidos no tienen y no la enseñan.
+// nuevaPildoraInvitado es un `<li>` de la lista de invitados: la `<Tag>` de EventModal.tsx
+// con el correo en `max-w-[16rem]`, la respuesta que ya dio como `trailing` y el aspa que
+// lo quita. El aspa es la de la Etiqueta común: la copia local se quedó en 20 px.
+func nuevaPildoraInvitado(p *Pantalla, correo, partstat string, alQuitar func()) *ui.Etiqueta {
+	e := ui.NuevaEtiqueta(correo)
+	e.Tope = tema.Espacio(64)
+	// Los recién añadidos no han respondido y no llevan insignia.
 	if partstat != "" {
-		l.insignia = p.insigniaInvitado(partstat)
-		objetos = append(objetos, l.insignia)
+		e.ConAnexo(p.insigniaInvitado(partstat))
 	}
-	return container.New(l, objetos...)
-}
-
-type pildoraLayout struct {
-	caja     *ui.Caja
-	texto    *canvas.Text
-	correo   string
-	boton    *ui.BotonIcono
-	insignia *ui.Insignia
-}
-
-// anchoTexto es el del correo con su `max-w-[16rem]`.
-func (l *pildoraLayout) anchoTexto() float32 {
-	return min(ui.Medir(l.correo, tema.TextoSM, ui.Normal).Width, tema.Espacio(64))
-}
-
-// anchoInsignia es la insignia y su `gap-1`; cero sin ella.
-func (l *pildoraLayout) anchoInsignia() float32 {
-	if l.insignia == nil {
-		return 0
-	}
-	return l.insignia.MinSize().Width + tema.Espacio(1)
-}
-
-func (l *pildoraLayout) MinSize([]fyne.CanvasObject) fyne.Size {
-	b := l.boton.MinSize()
-	return fyne.NewSize(2*tema.Borde+espacio2p5+l.anchoTexto()+l.anchoInsignia()+tema.Espacio(1)+b.Width+tema.Espacio(1),
-		2*tema.Borde+2*espacio0p5+max(tema.TextoSM.Linea, b.Height))
-}
-
-func (l *pildoraLayout) Layout(_ []fyne.CanvasObject, t fyne.Size) {
-	l.caja.Redimensionar(t)
-	x := tema.Borde + espacio2p5
-	b := l.boton.MinSize()
-	w := min(l.anchoTexto(), max(t.Width-x-l.anchoInsignia()-tema.Espacio(1)-b.Width-tema.Espacio(1)-tema.Borde, 0))
-	ui.Truncar(l.texto, l.correo, tema.TextoSM, ui.Normal, w)
-	ui.ColocarTexto(l.texto, tema.TextoSM, x, (t.Height-tema.TextoSM.Linea)/2)
-	x += w
-	if l.insignia != nil {
-		m := l.insignia.MinSize()
-		l.insignia.Move(fyne.NewPos(x+tema.Espacio(1), (t.Height-m.Height)/2))
-		l.insignia.Resize(m)
-		x += l.anchoInsignia()
-	}
-	l.boton.Move(fyne.NewPos(x+tema.Espacio(1), (t.Height-b.Height)/2))
-	l.boton.Resize(b)
+	return e.ConAspa(p.t("event.guestRemove", i18n.Vars{"email": correo}), alQuitar)
 }
 
 // uuidV4 es `crypto.randomUUID()`.

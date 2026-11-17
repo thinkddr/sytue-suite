@@ -175,15 +175,10 @@ export const tienda = {
   'store.mode_test_help':
     'Simulierte Zahlungen mit den Testschlüsseln des Anbieters. Niemandem wird etwas berechnet.',
   'store.mode_live_help': 'Echte Zahlungen Ihrer Kundschaft mit den Produktivschlüsseln.',
-  'store.webhook_title': 'Schritt 1: Webhook-Adresse',
   'store.webhook_help': 'Fügen Sie diese Adresse im Dashboard von {nombre} ein.',
   'store.webhook_label': 'Webhook-Adresse',
   'store.webhook_error':
     'Die Webhook-Adresse konnte nicht abgerufen werden. Schließen Sie den Dialog und versuchen Sie es erneut.',
-  'store.copy': 'Kopieren',
-  'store.copied': 'Adresse kopiert.',
-  'store.credentials_title': 'Zugangsdaten',
-  'store.credentials_step': 'Schritt 2: Zugangsdaten',
   'store.f_api_key': 'API-Schlüssel',
   'store.f_api_key_mode': 'API-Schlüssel ({modo})',
   'store.f_profile_id': 'Profil-ID (optional)',
@@ -202,6 +197,48 @@ export const tienda = {
   'store.gateway_save': 'Speichern und testen',
   'store.gateway_saved': 'Zahlungsanbieter {nombre} getestet und gespeichert.',
   'store.gateway_save_error': 'Die Zugangsdaten des Anbieters konnten nicht bestätigt werden.',
+  'store.wz_progress': 'Schritte zum Verbinden des Zahlungsanbieters',
+  'store.wz_step_mode': 'Modus',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Schlüssel',
+  'store.wz_step_check': 'Prüfen',
+  'store.wz_step_done': 'Fertig',
+  'store.wz_mode_heading': 'Testzahlungen oder echte Zahlungen?',
+  'store.wz_mode_desc':
+    'Beginnen Sie im Testmodus; wenn alles funktioniert, öffnen Sie diesen Assistenten erneut und wählen Sie den Live-Modus.',
+  'store.wz_webhook_heading': 'Teilen Sie {nombre} mit, wohin Zahlungsbenachrichtigungen gehen',
+  'store.wz_keys_heading': 'Ihre Schlüssel für {nombre}',
+  'store.wz_keys_desc':
+    'Geheime Schlüssel werden versiegelt gespeichert und nie wieder angezeigt: Um einen zu ändern, geben Sie ihn erneut ein.',
+  'store.wz_keys_rejected': '{nombre} hat diese Schlüssel nicht akzeptiert',
+  'store.wz_check_heading': 'Prüfen und speichern',
+  'store.wz_check_desc':
+    'Sytue Web prüft die Schlüssel bei {nombre}, bevor der Zahlungsanbieter aktiviert wird. Gespeichert wird erst, wenn die Prüfung erfolgreich ist.',
+  'store.wz_secret_hidden': 'Eingegeben (verborgen)',
+  'store.wz_empty_value': 'Nicht angegeben',
+  'store.wz_done_heading': '{nombre} ist bereit',
+  'store.wz_finish': 'Fertigstellen',
+  'store.hint_mollie_api_key':
+    'In Mollie: Developers › API keys. Testschlüssel beginnen mit test_, Live-Schlüssel mit live_.',
+  'store.hint_mollie_profile':
+    'In Mollie: Settings › Website profiles. Sie beginnt mit pfl_; leer lassen, um Ihr Standardprofil zu verwenden.',
+  'store.hint_adyen_api_key':
+    'Im Adyen Customer Area: Developers › API credentials › Ihre Zugangsdaten › API key.',
+  'store.hint_adyen_merchant':
+    'Im Adyen Customer Area, in der Kontoauswahl oben: das Händlerkonto, nicht das Unternehmenskonto.',
+  'store.hint_adyen_hmac': 'In Adyen: Developers › Webhooks › Ihr Webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'In Adyen (live): Developers › API URLs. Es ist der Teil der Adresse vor -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Ihre Bank stellt ihn mit dem Vertrag für das virtuelle Terminal bereit; er steht auch im Redsys-Verwaltungsportal.',
+  'store.hint_redsys_terminal':
+    'Im Redsys-Verwaltungsportal neben dem Händlercode. Meist ist es 1.',
+  'store.hint_redsys_secret':
+    'Im Redsys-Verwaltungsportal: Händlerdaten › SHA-256-Schlüssel. Test- und Live-Schlüssel sind unterschiedlich.',
+  'store.hint_stripe_secret':
+    'In Stripe: Developers › API keys › Secret key. Er beginnt mit sk_test_ oder sk_live_.',
+  'store.hint_stripe_webhook':
+    'In Stripe: Developers › Webhooks › Ihr Endpunkt › Signing secret. Es beginnt mit whsec_.',
   'orders.subtitle': 'Bestellungen und Käufe auf Ihrer Website.',
   'orders.count': { one: '{count} Bestellung', other: '{count} Bestellungen' },
   'orders.loading': 'Bestellungen werden geladen',

@@ -6,8 +6,17 @@ package rooms
 import (
 	"context"
 	"encoding/json"
+	"slices"
+	"strconv"
 	"testing"
+	"time"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/test"
+
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -102,5 +111,79 @@ func TestSumaNoVisto(t *testing.T) {
 		SumaNoVisto(true, ajeno, "yo", Canal{Silenciado: true}) ||
 		SumaNoVisto(true, ajeno, "yo", Canal{Nivel: AvisarNada}) {
 		t.Error("suman los que no deben: a la vista, propios, de hilo, silenciados o con avisos a nada")
+	}
+}
+
+// TestSaltarANoLeidos es el «Saltar a no leído» de MessageView: con separador de
+// «Nuevos mensajes» el botón primario flota arriba; pulsarlo deja el separador arriba
+// del todo y retira el botón; cargar otra vez el canal (otro separador) lo devuelve. Y
+// cede su sitio a la píldora de «cargando anteriores».
+func TestSaltarANoLeidos(t *testing.T) {
+	s := servicioConDos()
+	base := time.Date(2026, 9, 22, 9, 0, 0, 0, time.UTC)
+	for i := range 40 {
+		s.mensajes["c1"] = append(s.mensajes["c1"], api.RoomsMessage{
+			ID: "n" + strconv.Itoa(i), AuthorSub: "ana", AuthorName: "Ana", Body: "línea", CreatedAt: base.Add(time.Duration(i) * time.Minute),
+		})
+	}
+	s.pend = []api.RoomsUnread{{ChannelID: "c1", Unread: 30}}
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	h := sa.P.Canal.Historial
+	visible := func() bool {
+		return slices.Contains(h.objetos, fyne.CanvasObject(h.salto)) && h.salto.Visible()
+	}
+	if h.IndiceNoLeidos < 0 {
+		t.Fatal("abierto con 30 sin leer no hay separador")
+	}
+	if !visible() {
+		t.Fatal("con separador de no leídos no se ofrece «Saltar a no leído»")
+	}
+	if h.salto.Texto != h.T.T("message.jumpToUnread", nil) || h.salto.Variante != ui.Primario || h.salto.Talla != ui.TallaSM {
+		t.Errorf("el botón es %q en variante %d y talla %d", h.salto.Texto, h.salto.Variante, h.salto.Talla)
+	}
+	if b := h.salto.Position(); b.Y != tema.Espacio(2) || b.X+h.salto.Size().Width/2 != h.Size().Width/2 {
+		t.Errorf("el botón está en %v y va arriba y centrado (ancho %v)", b, h.Size().Width)
+	}
+	sc := h.cuerpo.(*container.Scroll)
+	if !alFondo(sc) {
+		t.Fatal("el canal no se abre por el final")
+	}
+	var sep *Separador
+	for _, o := range sc.Content.(*fyne.Container).Objects {
+		if x, ok := o.(*Separador); ok && x.Acento {
+			sep = x
+		}
+	}
+	if sep == nil {
+		t.Fatal("no se pinta «Nuevos mensajes»")
+	}
+
+	test.Tap(h.salto)
+	if sc.Offset.Y != sep.Position().Y {
+		t.Errorf("tras saltar la vista está en y = %v y el separador en %v", sc.Offset.Y, sep.Position().Y)
+	}
+	if visible() || !h.SaltoUsado {
+		t.Error("usado, el botón sigue ahí")
+	}
+	h.Refresh() // un repintado cualquiera (llega algo) no lo devuelve ni mueve la vista
+	sc = h.cuerpo.(*container.Scroll)
+	if visible() || sc.Offset.Y != sep.Position().Y {
+		t.Errorf("tras repintar: botón %v, vista en %v", visible(), sc.Offset.Y)
+	}
+
+	sa.cargarMensajes("c1", 10)
+	if !visible() {
+		t.Error("con otro separador el botón no vuelve")
+	}
+	h.CargandoAnteriores = true
+	h.Refresh()
+	if visible() || !slices.Contains(h.objetos, fyne.CanvasObject(h.pildora)) {
+		t.Error("cargando anteriores, el botón no cede el hueco a la píldora")
+	}
+	h.CargandoAnteriores = false
+	sa.cargarMensajes("c1", 0)
+	if visible() {
+		t.Error("sin no leídos se ofrece saltar")
 	}
 }

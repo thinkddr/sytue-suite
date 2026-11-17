@@ -6,6 +6,7 @@ package bases
 import (
 	"image/color"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -34,12 +35,18 @@ type rejillaRenderer struct {
 	glifos           []fyne.CanvasObject
 	titulos, numeros []*canvas.Text
 	abrir            []*ui.Boton
+	// menus[col] es el botón ▾ de la cabecera de cada campo, con el menú de lo que se
+	// hace con él; vacío para quien no puede cambiar el esquema.
+	menus []*ui.BotonIcono
 	// textos[fila][col] es el texto de la celda; nil donde va una casilla o chips.
 	textos   [][]*canvas.Text
 	casillas map[celda]fyne.CanvasObject
 	chips    map[celda][]*ui.Insignia
 	masChips map[celda]*ui.Insignia
-	objetos  []fyne.CanvasObject
+	// otros[celda] es la marca de una celda en la que está otra persona: el recuadro y
+	// la etiqueta con su nombre.
+	otros   map[celda]*marcaPresente
+	objetos []fyne.CanvasObject
 
 	anchos       []float32
 	ancho0, alto float32
@@ -84,19 +91,29 @@ func (r *rejillaRenderer) armar() {
 	r.alto = 2*tema.Espacio(1.5) + r.ladoBoton
 
 	r.anchos = make([]float32, len(g.Campos))
-	r.titulos, r.glifos = r.titulos[:0], r.glifos[:0]
+	r.titulos, r.glifos, r.menus = r.titulos[:0], r.glifos[:0], r.menus[:0]
 	for i, c := range g.Campos {
 		glifo := iconos.Trazo(iconoDeTipo(c.Kind), ladoIconoCabeza, "text-muted", v).Objeto()
 		titulo := ui.Texto(c.Name, tema.TextoSM, ui.SemiNegrita, tinta)
 		r.glifos, r.titulos = append(r.glifos, glifo), append(r.titulos, titulo)
 		r.objetos = append(r.objetos, glifo, titulo)
 		r.anchos[i] = ladoIconoCabeza + huecoCabeza + ui.Medir(c.Name, tema.TextoSM, ui.SemiNegrita).Width
+		if g.AlCampo != nil {
+			// Un botón de verdad y no una zona pintada: Tab llega a él y el lector lo
+			// anuncia como «Opciones del campo …», que es lo que no dice un glifo.
+			menu := ui.NuevoBotonIcono(iconos.ChevronAbajo, g.t("field.actions", i18n.Vars{"name": c.Name}), func() { g.menuCampo(i) })
+			menu.Lado, menu.TamIcono = ladoMenuCampo, iconoMenuCampo
+			r.menus = append(r.menus, menu)
+			r.objetos = append(r.objetos, menu)
+			r.anchos[i] += huecoCabeza + ladoMenuCampo
+		}
 	}
 
 	r.fondos, r.lineas, r.numeros, r.abrir, r.textos = r.fondos[:0], r.lineas[:0], r.numeros[:0], r.abrir[:0], r.textos[:0]
 	r.casillas = map[celda]fyne.CanvasObject{}
 	r.chips = map[celda][]*ui.Insignia{}
 	r.masChips = map[celda]*ui.Insignia{}
+	r.otros = map[celda]*marcaPresente{}
 	anchoNumero := r.armarFilas(tinta, apagada)
 	for i := range r.anchos {
 		r.anchos[i] = min(max(r.anchos[i]+2*margenCelda, minCelda), maxCelda)
@@ -167,9 +184,14 @@ func (r *rejillaRenderer) armarFilas(tinta, apagada color.NRGBA) float32 {
 				r.anchos[col] = max(r.anchos[col], ancho)
 			default:
 				completo := g.textoCelda(reg, c)
-				textos[col] = ui.Texto(completo, tema.TextoSM, ui.Normal, tinta)
+				textos[col] = ui.Texto(completo, tema.TextoSM, ui.Normal, tintaDe(c, tinta, v))
 				r.objetos = append(r.objetos, textos[col])
 				r.anchos[col] = max(r.anchos[col], ui.Medir(completo, tema.TextoSM, ui.Normal).Width)
+			}
+			if quienes := g.Presentes[reg.ID+":"+c.ID]; len(quienes) > 0 {
+				m := nuevaMarcaPresente(strings.Join(quienes, ", "), v)
+				r.otros[celda{fila, col}] = m
+				r.objetos = append(r.objetos, m.recuadro, m.fondo, m.texto)
 			}
 		}
 		r.textos = append(r.textos, textos)
@@ -221,7 +243,7 @@ func (r *rejillaRenderer) MinSize() fyne.Size {
 	for _, a := range r.anchos {
 		ancho += a
 	}
-	return fyne.NewSize(ancho, altoCabeza+float32(len(r.g.Registros))*r.alto)
+	return fyne.NewSize(ancho, r.g.altoCab()+float32(len(r.g.Registros))*r.alto)
 }
 
 // columna es dónde empieza la columna `col` y cuánto mide, ya estirada.
@@ -239,23 +261,33 @@ func (r *rejillaRenderer) cajaDe(c celda) (fyne.Position, fyne.Size) {
 		return fyne.Position{}, fyne.Size{}
 	}
 	x, ancho := r.columna(c.col)
-	return fyne.NewPos(x, altoCabeza+float32(c.fila)*r.alto), fyne.NewSize(ancho, r.alto)
+	return fyne.NewPos(x, r.g.altoCab()+float32(c.fila)*r.alto), fyne.NewSize(ancho, r.alto)
 }
 
 func (r *rejillaRenderer) celdaEn(p fyne.Position) (celda, bool) {
-	if p.Y < altoCabeza || p.X < r.ancho0 || r.alto <= 0 {
+	cab := r.g.altoCab()
+	if p.Y < cab || p.X < r.ancho0 || r.alto <= 0 {
 		return celda{}, false
 	}
-	fila := int((p.Y - altoCabeza) / r.alto)
+	fila := int((p.Y - cab) / r.alto)
 	if fila >= len(r.g.Registros) {
 		return celda{}, false
 	}
+	col, ok := r.columnaEn(p.X)
+	return celda{fila, col}, ok
+}
+
+// columnaEn es la columna de campos que hay a esa distancia del borde izquierdo.
+func (r *rejillaRenderer) columnaEn(px float32) (int, bool) {
+	if px < r.ancho0 {
+		return 0, false
+	}
 	for col := range r.anchos {
-		if x, ancho := r.columna(col); p.X >= x && p.X < x+ancho {
-			return celda{fila, col}, true
+		if x, ancho := r.columna(col); px >= x && px < x+ancho {
+			return col, true
 		}
 	}
-	return celda{}, false
+	return 0, false
 }
 
 func (r *rejillaRenderer) Layout(t fyne.Size) {
@@ -266,27 +298,16 @@ func (r *rejillaRenderer) Layout(t fyne.Size) {
 		r.estirado = sobra / float32(len(r.anchos))
 	}
 	interior := max(t.Width-2*tema.Borde, 0)
+	cab := g.altoCab()
 	r.marco.Resize(t)
 	r.resalte.Resize(t)
 	r.resalte.Hidden = !g.resaltada
 	r.cabeza.Move(fyne.NewPos(tema.Borde, tema.Borde))
-	r.cabeza.Resize(fyne.NewSize(interior, altoCabeza-tema.Borde))
-	yGlifo := (altoCabeza - ladoIconoCabeza) / 2
-	for i := range g.Campos {
-		x, ancho := r.columna(i)
-		xg := x + margenCelda
-		medido := ui.Truncar(r.titulos[i], g.Campos[i].Name, tema.TextoSM, ui.SemiNegrita, max(ancho-2*margenCelda-ladoIconoCabeza-huecoCabeza, 0))
-		if alineaALaDerecha(g.Campos[i]) {
-			// `justify-end`: la cabecera de un número va sobre sus cifras.
-			xg = x + ancho - margenCelda - medido - huecoCabeza - ladoIconoCabeza
-		}
-		r.glifos[i].Move(fyne.NewPos(xg, yGlifo))
-		r.glifos[i].Resize(fyne.NewSquareSize(ladoIconoCabeza))
-		ui.ColocarTexto(r.titulos[i], tema.TextoSM, xg+ladoIconoCabeza+huecoCabeza, tema.Espacio(2))
-	}
+	r.cabeza.Resize(fyne.NewSize(interior, cab-tema.Borde))
+	r.colocarCabeza(cab)
 	yTexto := (r.alto - tema.TextoSM.Linea) / 2
 	for fila := range g.Registros {
-		y := altoCabeza + float32(fila)*r.alto
+		y := cab + float32(fila)*r.alto
 		r.fondos[fila].Move(fyne.NewPos(tema.Borde, y))
 		r.fondos[fila].Resize(fyne.NewSize(interior, r.alto))
 		r.lineas[fila].Move(fyne.NewPos(tema.Borde, y))
@@ -300,24 +321,29 @@ func (r *rejillaRenderer) Layout(t fyne.Size) {
 		for col, c := range g.Campos {
 			x, ancho := r.columna(col)
 			cd := celda{fila, col}
+			// La etiqueta de quien está en la celda va al final y le quita sitio al valor.
+			var ocupa float32
+			if m, ok := r.otros[cd]; ok {
+				ocupa = m.colocar(x, y, ancho, r.alto)
+			}
 			if o, ok := r.casillas[cd]; ok {
 				o.Move(fyne.NewPos(x+margenCelda, y+(r.alto-ladoCasilla)/2))
 				o.Resize(fyne.NewSquareSize(ladoCasilla))
 				continue
 			}
 			if chips, ok := r.chips[cd]; ok {
-				r.colocarChips(chips, r.masChips[cd], x+margenCelda, x+ancho-margenCelda, y)
+				r.colocarChips(chips, r.masChips[cd], x+margenCelda, x+ancho-margenCelda-ocupa, y)
 				continue
 			}
 			txt := r.textos[fila][col]
 			if txt == nil {
 				continue
 			}
-			disponible := ancho - 2*margenCelda
+			disponible := max(ancho-2*margenCelda-ocupa, 0)
 			medido := ui.Truncar(txt, g.textoCelda(g.Registros[fila], c), tema.TextoSM, ui.Normal, disponible)
 			xt := x + margenCelda
 			if alineaALaDerecha(c) {
-				xt = x + ancho - margenCelda - medido
+				xt = x + ancho - margenCelda - ocupa - medido
 			}
 			ui.ColocarTexto(txt, tema.TextoSM, xt, y+yTexto)
 		}
@@ -336,6 +362,35 @@ func (r *rejillaRenderer) Layout(t fyne.Size) {
 		alto := g.editor.MinSize().Height
 		g.editor.Move(fyne.NewPos(pos.X+tema.Espacio(1), pos.Y+(tam.Height-alto)/2))
 		g.editor.Resize(fyne.NewSize(max(tam.Width-2*tema.Espacio(1), 0), alto))
+	}
+}
+
+// colocarCabeza pone el glifo de tipo, el nombre y el menú ▾ de cada campo en la cabecera.
+func (r *rejillaRenderer) colocarCabeza(cab float32) {
+	g := r.g
+	yGlifo := (cab - ladoIconoCabeza) / 2
+	// El menú ▾ va detrás del nombre con el mismo `gap-2`, y lo que ocupa se le quita al
+	// nombre, que se trunca antes.
+	var conMenu float32
+	if len(r.menus) == len(g.Campos) && len(r.menus) > 0 {
+		conMenu = huecoCabeza + ladoMenuCampo
+	}
+	for i := range g.Campos {
+		x, ancho := r.columna(i)
+		xg := x + margenCelda
+		medido := ui.Truncar(r.titulos[i], g.Campos[i].Name, tema.TextoSM, ui.SemiNegrita, max(ancho-2*margenCelda-ladoIconoCabeza-huecoCabeza-conMenu, 0))
+		if alineaALaDerecha(g.Campos[i]) {
+			// `justify-end`: la cabecera de un número va sobre sus cifras.
+			xg = x + ancho - margenCelda - conMenu - medido - huecoCabeza - ladoIconoCabeza
+		}
+		r.glifos[i].Move(fyne.NewPos(xg, yGlifo))
+		r.glifos[i].Resize(fyne.NewSquareSize(ladoIconoCabeza))
+		xt := xg + ladoIconoCabeza + huecoCabeza
+		ui.ColocarTexto(r.titulos[i], tema.TextoSM, xt, (cab-tema.TextoSM.Linea)/2)
+		if conMenu > 0 {
+			r.menus[i].Move(fyne.NewPos(xt+medido+huecoCabeza, (cab-ladoMenuCampo)/2))
+			r.menus[i].Resize(fyne.NewSquareSize(ladoMenuCampo))
+		}
 	}
 }
 
@@ -397,4 +452,57 @@ func (r *rejillaRenderer) Refresh() {
 	}
 	r.Layout(r.g.Size())
 	canvas.Refresh(r.g)
+}
+
+// tintaDe es el color del texto de una celda: una URL, un correo o un teléfono con el
+// del enlace (`text-primary`) y una valoración con el de aviso, como en la web.
+func tintaDe(c api.BasesField, tinta color.NRGBA, v tema.Variante) color.NRGBA {
+	switch c.Kind {
+	case api.BasesKindURL, api.BasesKindEmail, api.BasesKindPhone:
+		return tema.Color("primary", v)
+	case api.BasesKindRating:
+		return tema.Color("warning-text", v)
+	}
+	return tinta
+}
+
+// marcaPresente es lo que lleva una celda en la que está otra persona (Rejilla.tsx): el
+// recuadro `ring-2 ring-primary ring-inset` y, al final, la etiqueta con su nombre
+// (`bg-selected text-primary-text text-xs rounded px-1 max-w-32 truncate`).
+type marcaPresente struct {
+	recuadro, fondo *canvas.Rectangle
+	texto           *canvas.Text
+	completo        string
+}
+
+// Las medidas de la etiqueta: `px-1`, `max-w-32` y el `ml-2` que la separa del valor.
+var (
+	margenPresente = tema.Espacio(1)
+	maxPresente    = tema.Espacio(32)
+	huecoPresente  = tema.Espacio(2)
+)
+
+func nuevaMarcaPresente(nombres string, v tema.Variante) *marcaPresente {
+	m := &marcaPresente{completo: nombres}
+	m.recuadro = canvas.NewRectangle(color.Transparent)
+	m.recuadro.StrokeWidth, m.recuadro.StrokeColor = tema.AnilloFoco, tema.Color("primary", v)
+	m.fondo = canvas.NewRectangle(tema.Color("selected", v))
+	m.fondo.CornerRadius = tema.RadioSM
+	m.texto = ui.Texto(nombres, tema.TextoXS, ui.Normal, tema.Color("primary-text", v))
+	return m
+}
+
+// colocar pone la marca en la celda que empieza en `x`, `y` y devuelve lo que ocupa la
+// etiqueta con su hueco: lo que el valor tiene que dejar libre.
+func (m *marcaPresente) colocar(x, y, ancho, alto float32) float32 {
+	m.recuadro.Move(fyne.NewPos(x, y))
+	m.recuadro.Resize(fyne.NewSize(ancho, alto))
+	cabe := min(maxPresente, max(ancho-2*margenCelda-huecoPresente, 0)) - 2*margenPresente
+	medido := ui.Truncar(m.texto, m.completo, tema.TextoXS, ui.Normal, max(cabe, 0))
+	w, h := medido+2*margenPresente, tema.TextoXS.Linea
+	x0 := x + ancho - margenCelda - w
+	m.fondo.Move(fyne.NewPos(x0, y+(alto-h)/2))
+	m.fondo.Resize(fyne.NewSize(w, h))
+	ui.ColocarTexto(m.texto, tema.TextoXS, x0+margenPresente, y+(alto-h)/2)
+	return w + huecoPresente
 }

@@ -6,6 +6,7 @@ package calendario
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,6 +19,8 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/calendar/event"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -126,13 +129,93 @@ func TestCrearUnCalendarioPideSuNombre(t *testing.T) {
 	nombre.PonerTexto("Equipo")
 	guardar.Tapped(nil)
 	hechas, cuerpos := s.apuntadas()
-	if len(hechas) != 1 || hechas[0] != "POST /api/v1/calendars" || cuerpos[0]["display_name"] != "Equipo" || cuerpos[0]["color"] != PaletaCalendario[0].Hex {
+	if len(hechas) != 1 || hechas[0] != "POST /api/v1/calendars" || cuerpos[0]["display_name"] != "Equipo" || cuerpos[0]["color"] != ColorNuevo {
 		t.Fatalf("alta: %v %v", hechas, cuerpos)
 	}
-	if nombre, ok := cuerpos[0]["name"].(string); !ok {
-		t.Errorf("falta el nombre de colección: %v", cuerpos[0]["name"])
+	if nombre, ok := cuerpos[0]["name"].(string); !ok || !event.ValidName(nombre) {
+		t.Errorf("falta un nombre de colección aceptado por Calendar: %v", cuerpos[0]["name"])
 	} else if _, err := uuid.Parse(nombre); err != nil {
 		t.Errorf("el nombre de colección no es un UUID: %q", nombre)
+	}
+}
+
+// calendarioPrivado simula el puerto de datos de la fachada privada, no un
+// servidor: comprueba lo que sale del formulario antes de admitir la escritura.
+type calendarioPrivado struct {
+	api.CalendarData
+	intentos []api.CalendarInput
+}
+
+func (*calendarioPrivado) PrivateStorageScope() storage.Scope {
+	return storage.Scope{Tenant: "tenant", Subject: "owner", Product: "calendar"}
+}
+
+func (p *calendarioPrivado) CreateCalendar(_ context.Context, in api.CalendarInput) (api.Calendar, error) {
+	p.intentos = append(p.intentos, in)
+	if !event.ValidName(in.Name) {
+		return api.Calendar{}, event.ErrInvalidName
+	}
+	if len(p.intentos) == 1 {
+		return api.Calendar{}, errors.New("fallo antes de aceptar")
+	}
+	return api.Calendar{Name: in.Name, DisplayName: in.DisplayName, Color: in.Color}, nil
+}
+
+func (*calendarioPrivado) List(context.Context) ([]api.Calendar, error) { return nil, nil }
+func (*calendarioPrivado) SharedWithMe(context.Context) ([]api.Calendar, error) {
+	return nil, errors.New("compartición privada no disponible")
+}
+
+func TestCrearCalendarioPrivadoConservaColeccionEntreIntentos(t *testing.T) {
+	servidor := &escrituras{}
+	a, w := appConVentana(t, servidor)
+	datos := &calendarioPrivado{}
+	privado, err := a.Cal.WithPrivateData(datos)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Cal = privado
+
+	crear := func(reintentar bool) {
+		t.Helper()
+		a.formularioCalendario(nil)
+		var nombre *ui.Entrada
+		var guardar *ui.Boton
+		enCapas(w.Canvas(), func(o fyne.CanvasObject) {
+			switch v := o.(type) {
+			case *ui.Entrada:
+				nombre = v
+			case *ui.Boton:
+				if v.Texto == a.P.t("common.save", nil) {
+					guardar = v
+				}
+			}
+		})
+		if nombre == nil || guardar == nil {
+			t.Fatal("no está el formulario")
+		}
+		nombre.PonerTexto("Equipo / investigación 漢字")
+		guardar.Tapped(nil)
+		if reintentar {
+			guardar.Tapped(nil)
+		}
+	}
+	crear(true)
+	crear(false)
+	if len(datos.intentos) != 3 {
+		t.Fatalf("intentos de creación: %d", len(datos.intentos))
+	}
+	primero, segundo, siguiente := datos.intentos[0], datos.intentos[1], datos.intentos[2]
+	if _, err := uuid.Parse(primero.Name); err != nil || primero.Name != segundo.Name || primero.Name == siguiente.Name {
+		t.Fatalf("identidad de colección no conservada o reutilizada: %q %q %q", primero.Name, segundo.Name, siguiente.Name)
+	}
+	for _, in := range datos.intentos {
+		if in.DisplayName != "Equipo / investigación 漢字" || in.Color != ColorNuevo {
+			t.Fatalf("título o color alterados: %+v", in)
+		}
+	}
+	if hechas, _ := servidor.apuntadas(); len(hechas) != 0 {
+		t.Fatalf("la fachada privada escribió en el transporte anterior: %v", hechas)
 	}
 }
 
@@ -171,10 +254,11 @@ func TestCrearCalendarioIgnoraDobleIntroYPermiteReintento(t *testing.T) {
 	})
 	var lanzados atomic.Int32
 	devolverUI := make(chan func(), 4)
-	a.lanzar = func(f func()) {
+	a.lanzar = func(f func(context.Context)) bool {
 		lanzados.Add(1)
 		trabajos.Add(1)
-		go func() { defer trabajos.Done(); f() }()
+		go func() { defer trabajos.Done(); f(a.vida) }()
+		return true
 	}
 	a.enUI = func(f func()) { devolverUI <- f }
 	a.formularioCalendario(nil)
@@ -360,9 +444,8 @@ func TestEnElTelefonoLaCabeceraSeDesplazaYSaleElBotonFlotante(t *testing.T) {
 	if r.tira == nil || r.tira.AnchoContenido() <= r.tira.Size().Width {
 		t.Fatal("la cabecera no conserva los controles en una tira desplazable")
 	}
-	grupo := cab.Derecha[len(cab.Derecha)-1].(*GrupoVista)
-	gr := test.WidgetRenderer(grupo).(*grupoVistaRenderer)
-	gr.botones[3].FocusGained()
+	grupo := cab.Derecha[len(cab.Derecha)-1].(*ui.Segmentado)
+	grupo.FocusGained()
 	if r.tira.Desplazamiento() <= 0 {
 		t.Error("no se puede alcanzar el conmutador de vista")
 	}
@@ -430,8 +513,8 @@ func TestLaCabeceraNoRecortaHoyConControlesDe44(t *testing.T) {
 					t.Errorf("%s a %g: el grupo izquierdo recorta %T", modo, ancho, o)
 				}
 			}
-			grupoVista := cab.Derecha[len(cab.Derecha)-1].(*GrupoVista)
-			test.WidgetRenderer(grupoVista).(*grupoVistaRenderer).botones[3].FocusGained()
+			grupoVista := cab.Derecha[len(cab.Derecha)-1].(*ui.Segmentado)
+			grupoVista.FocusGained()
 			if r.tira.Desplazamiento() <= 0 {
 				t.Error("no se alcanza la vista Agenda")
 			}

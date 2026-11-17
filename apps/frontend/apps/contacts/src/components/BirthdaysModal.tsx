@@ -4,7 +4,7 @@
  * el contacto. Lo que Google Contacts enseña en su portada y aquí faltaba.
  */
 import type { JSX } from 'preact';
-import { Avatar, Modal } from '@sytue/ui';
+import { Avatar, Modal, EmptyState } from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { Contact } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
@@ -34,7 +34,7 @@ export function BirthdaysModal({
   return (
     <Modal open={open} onClose={onClose} title={t('birthdays.title')} size="md">
       {cumpleanos.length === 0 ? (
-        <p class="text-text-muted text-sm">{t('birthdays.empty')}</p>
+        <EmptyState compact icon="calendar" title={t('birthdays.empty')} />
       ) : (
         <ul class="divide-border/60 border-border max-h-[60dvh] divide-y overflow-y-auto rounded-md border">
           {cumpleanos.map((c) => (

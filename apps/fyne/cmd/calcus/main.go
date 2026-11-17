@@ -13,6 +13,7 @@
 // abrir una, el editor con el cromo compartido y el lienzo de la hoja, que se guarda en
 // el servicio. Un fichero de fuera —de Drive o de la máquina— se enseña convertido y en
 // solo lectura.
+// paridad-web: apps/frontend/apps/calcus/src/pages/auth/matrix/callback.astro
 package main
 
 // La portada y la papelera son las de `editor` (portada.go, papelera.go), compartidas por
@@ -34,6 +35,8 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/calcus"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
+	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -41,6 +44,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
 func main() {
@@ -50,6 +55,8 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// Las macros grabadas son de quien ha entrado, como en la web (una clave por `sub`).
+	editor.Personal = s.PorPersona()
 	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
 	// pruebas que abren sesión comprueban también el cromo de color.
 	tema.ElegirCromo(tema.CromoPapel)
@@ -66,9 +73,19 @@ func main() {
 	// FyneApp.toml, donde ya está declarado una vez para las cinco plataformas.
 	w := a.NewWindow(a.Metadata().Name)
 	w.SetPadded(false)
-	// La portada y el editor hablan con el servicio con la sesión TRANSVERSAL: sin
-	// sesión, la portada lo dice y ofrece entrar; no se abre el navegador por sorpresa.
-	c := calcus.NuevaApp(tr.T, tr.Locale(), api.NewDocs(s.URL("docs"), s.Sesion, s.ClienteConAviso(nil)))
+	// La portada y el editor hablan con el repositorio privado cifrado; nunca se
+	// entrega un cliente HTTP en claro a la vista.
+	c := calcus.NuevaApp(tr.T, tr.Locale(), api.NewPrivateDocs())
+	setSheetsClient := func(client *api.Docs) {
+		if client == nil {
+			client = api.NewPrivateDocs()
+		}
+		c.Svc = client
+		if p := c.Portada(); p != nil {
+			p.Svc = client
+		}
+		c.ImportarAlAbrir(s.Importar)
+	}
 	// Lo que copia «Compartir»: la página del documento en la web y la de un enlace
 	// público, `/s/<token>` bajo el prefijo de Docs (la vista de solo lectura de la web).
 	// La organización activa encabeza el enlace al editor (ADR 0056); el del enlace
@@ -101,18 +118,44 @@ func main() {
 			}
 		}()
 	}
-	// Entrar o salir desde el menú de cuenta de ESTA o de otra app recarga la lista.
-	dentro := s.Estado().Dentro()
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() != dentro {
-			dentro = e.Dentro()
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*office.Repository]{
+		Suite:       s,
+		Application: a,
+		Window:      w,
+		Product:     "sheets",
+		Translate:   func(key string) string { return tr.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*office.Repository], error) {
+			return calcusPlan(ctx, resources, s)
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *office.Repository) (cifrado.ApplicationView, error) {
+			facade, err := api.NewDocs(s.URL("docs"), resources.HTTP(), nil).WithPrivateData(repository)
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			setSheetsClient(facade)
 			c.Arrancar()
-		}
+			return cifrado.ApplicationView{
+				Object: c.Objeto(),
+				Detach: func() {
+					setSheetsClient(nil)
+				},
+			}, nil
+		},
 	})
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Sheets).ConSinSesionPropia().Montar(c.Objeto()))
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Sheets).ConSinSesionPropia().Montar(private.Objeto()))
+		w.SetOnClosed(private.Close)
+	}
 	w.Resize(fyne.NewSize(1280, 800))
 	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
-	s.CuandoHayaEscena(c.Arrancar)
+	s.CuandoHayaEscena(func() {
+		if private != nil {
+			private.Start()
+		}
+	})
 
 	// `sytue-sheets:/edit?id=…` es el documento del servicio, el mismo que abre la web en
 	// `/calcus/edit?id=…` (el Hub lo emite desde lo reciente y la búsqueda): se lee y se
@@ -135,6 +178,7 @@ func main() {
 			return fmt.Errorf("calcus: %q no es una hoja de cálculo (%s)", imp.Title, imp.Kind)
 		}
 		entendida := make(chan bool, 1)
+		//nolint:contextcheck // abrir monta el lienzo; lo que recarga luego (comentarios) lo lanza un clic con su propio plazo
 		fyne.Do(func() { entendida <- c.AbrirConvertido(imp.Title, imp.Content) })
 		select {
 		case ok := <-entendida:

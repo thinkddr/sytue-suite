@@ -18,7 +18,11 @@
     "./tailwind": "./src/tailwind.ts",
     "./tokens": "./src/tokens.ts",
     "./theme.css": "./src/theme.css",
-    "./astro-middleware": "./src/astro-middleware.ts"
+    "./astro-middleware": "./src/astro-middleware.ts",
+    "./matrix": "./src/matrix.ts",
+    "./base-path": "./src/base-path.ts",
+    "./client-core": "./src/client-core.ts",
+    "./session-owner": "./src/session-owner.ts"
   },
   "files": [
     "src",

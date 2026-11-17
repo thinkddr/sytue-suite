@@ -121,7 +121,7 @@ function Inner({ locale, myDevices, orgDevices, live }: DevicesPanelProps) {
           <EmptyState
             title={t('devices.mine.emptyTitle')}
             description={t('devices.mine.emptyDescription')}
-            illustration={<Icon name="lock" size={28} />}
+            icon="lock"
           />
         ) : (
           <div class="border-border bg-surface overflow-hidden rounded-lg border">
@@ -180,7 +180,7 @@ function Inner({ locale, myDevices, orgDevices, live }: DevicesPanelProps) {
           <EmptyState
             title={t('devices.org.emptyTitle')}
             description={t('devices.org.emptyDescription')}
-            illustration={<Icon name="users" size={28} />}
+            icon="users"
           />
         ) : (
           <div class="border-border bg-surface overflow-hidden rounded-lg border">

@@ -27,6 +27,7 @@ import {
   nombreCorto,
   Glifo,
   Icon,
+  useFitInViewport,
 } from '@sytue/ui';
 import { permsFromAccessToken } from '@sytue/auth/client';
 import { sinAdminPorPlan, soloOrganizacion } from '@sytue/auth';
@@ -52,6 +53,10 @@ export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): 
   const [open, setOpen] = useState(false);
   const [falloLogo, setFalloLogo] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  // En la barra del teléfono el panel se abre hacia la izquierda desde un botón que no
+  // está en el borde: a 320-360 px empezaba 18 px fuera de la ventana, recortado.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFitInViewport(panelRef, open);
   // Quién sirve cada producto en ESTA organización. Se pide al abrir por primera vez;
   // vacío ⇒ todo apunta al producto nativo, que es la degradación correcta.
   const { map, load } = useProductMap(accessToken);
@@ -218,7 +223,8 @@ export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): 
       )}
       {open ? (
         <div
-          class={`sytue-pop-in absolute top-[calc(100%+6px)] ${compacto ? 'right-0' : 'left-0'}`}
+          ref={panelRef}
+          class={`sytue-pop-in absolute top-[calc(100%+6px)] max-w-[calc(100vw-16px)] ${compacto ? 'right-0' : 'left-0'}`}
           style={{ zIndex: 'var(--z-popover)' }}
         >
           <AppGrid apps={apps} current={currentApp} onClose={close} />

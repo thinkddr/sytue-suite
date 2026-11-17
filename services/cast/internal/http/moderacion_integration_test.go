@@ -43,8 +43,10 @@ func TestDenunciaSinSesionExigeLaPruebaDeTrabajo(t *testing.T) {
 	// Dos réplicas: cada una con su verificador, las dos sobre la misma tabla de
 	// soluciones usadas (migración 0012), como en cmd/cast.
 	replica := func() http.Handler {
-		return NewRouter(Deps{Store: st, Servicio: svc, Social: soc,
-			Altcha: altcha.New(clave, altcha.ConRepeticiones(altcha.EnTabla(h.Pool, "altcha_used")))})
+		return NewRouter(Deps{
+			Store: st, Servicio: svc, Social: soc,
+			Altcha: altcha.New(clave, altcha.ConRepeticiones(altcha.EnTabla(h.Pool, "altcha_used"))),
+		})
 	}
 	router, otraReplica := replica(), replica()
 
@@ -154,7 +156,7 @@ func TestColaDelOperadorPorHTTP(t *testing.T) {
 		pedidos = append(pedidos, a)
 		return respuesta
 	}}
-	llamar := func(aud []string, roles []string, metodo, id, cuerpo string) *httptest.ResponseRecorder {
+	llamar := func(aud, roles []string, metodo, id, cuerpo string) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(metodo, "/x", strings.NewReader(cuerpo))
 		req.Header.Set("Authorization", "Bearer tok")

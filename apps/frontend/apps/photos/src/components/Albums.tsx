@@ -3,17 +3,8 @@
  * de UNA línea para crear uno. Cada tarjeta enlaza a `album?id=` bajo el prefijo de la app.
  */
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
-import {
-  Button,
-  Checkbox,
-  EmptyState,
-  Icon,
-  Illustration,
-  Input,
-  Spinner,
-  usePrompt,
-} from '@sytue/ui';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { Badge, Button, Checkbox, EmptyState, Icon, Input, Select, usePrompt } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import {
   albumes,
@@ -29,14 +20,25 @@ import {
   type Foto,
 } from '../client/photosApi.js';
 import { tituloSugerido } from '../lib/tituloAlbum.js';
+import {
+  guardarOrdenAlbumes,
+  leerOrdenAlbumes,
+  ORDENES_ALBUM,
+  ordenarAlbumes,
+  type OrdenAlbum,
+} from '../lib/ordenAlbumes.js';
 import { RUTA } from '../lib/ruta.js';
-import { useT } from '../i18n/index.js';
+import { useT, type T } from '../i18n/index.js';
+import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
 import { Marco } from './Marco.js';
 import type { SytueUser } from '@sytue/auth';
 import { Nav } from './Nav.js';
 import { CAMPO_TACTIL } from '../lib/tactil.js';
+import { EsqueletoAlbumes } from './Esqueletos.js';
 
-export function Albums({
+export const Albums = conAvisos(Albumes);
+
+function Albumes({
   locale,
   user,
   hubBaseUrl,
@@ -48,7 +50,8 @@ export function Albums({
   const t = useT(locale);
   const [lista, setLista] = useState<Album[] | null>(null);
   const [titulo, setTitulo] = useState('');
-  const [error, setError] = useState('');
+  const [fallo, setFallo] = useState<unknown>(null);
+  const avisarFallo = useAvisoDeFallo(locale);
   // `null` es «todavía no se han pedido» y `[]` es «se pidieron y no hay».
   // Distinguirlos es lo que deja decir «no encontramos ninguno» en vez de
   // dejar la sección en blanco como si estuviera cargando para siempre.
@@ -57,6 +60,18 @@ export function Albums({
   const [ajustes, setAjustes] = useState<AjustesOrganizacion | null>(null);
   const [guardandoAjustes, setGuardandoAjustes] = useState(false);
   const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
+  // «Recientes» en el primer pintado: es el orden del servidor, así que la página no
+  // salta entre el HTML del servidor y la hidratación; el guardado se lee al montar.
+  const [orden, setOrden] = useState<OrdenAlbum>('recent');
+  useEffect(() => setOrden(leerOrdenAlbumes()), []);
+  const ordenados = useMemo(
+    () => (lista === null ? null : ordenarAlbumes(lista, orden, locale)),
+    [lista, orden, locale],
+  );
+  const ordenar = (o: OrdenAlbum) => {
+    setOrden(o);
+    guardarOrdenAlbumes(o);
+  };
 
   const cambiarExclusionLote = async (excluir: boolean) => {
     setGuardandoAjustes(true);
@@ -64,7 +79,7 @@ export function Albums({
       const nuevos = await guardarAjustesOrganizacion(excluir);
       setAjustes(nuevos);
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     } finally {
       setGuardandoAjustes(false);
     }
@@ -76,7 +91,7 @@ export function Albums({
     try {
       setMontones(await pedirTemas());
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     } finally {
       setBuscando(false);
     }
@@ -103,14 +118,16 @@ export function Albums({
       // álbumes iguales.
       setMontones((m) => (m ?? []).filter((g) => g !== fotos));
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
+  const cargar = () => {
+    setFallo(null);
+    albumes().then(setLista).catch(setFallo);
+  };
   useEffect(() => {
-    albumes()
-      .then(setLista)
-      .catch((e) => setError(String(e)));
+    cargar();
     obtenerAjustesOrganizacion()
       .then(setAjustes)
       .catch(() => {});
@@ -125,7 +142,7 @@ export function Albums({
       setLista((l) => [nuevo, ...(l ?? [])]);
       setTitulo('');
     } catch (err) {
-      setError(String(err));
+      avisarFallo(err);
     }
   };
 
@@ -153,11 +170,6 @@ export function Albums({
             {t('albums.create')}
           </Button>
         </form>
-        {error ? (
-          <p class="text-danger-text mb-4 text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
         {/* Las sugerencias van ARRIBA y solo si se piden. Recorrer los vectores
             de la biblioteca para proponer montones no es gratis, y nadie abre
             «álbumes» para que le adivinen: quien lo quiere, lo pulsa. */}
@@ -239,47 +251,104 @@ export function Albums({
             ))}
           </ul>
         </section>
-        {lista === null ? (
-          <Spinner />
+        {fallo !== null ? (
+          <FalloDeCarga locale={locale} fallo={fallo} alReintentar={cargar} />
+        ) : lista === null ? (
+          <EsqueletoAlbumes />
         ) : lista.length === 0 ? (
           <EmptyState
             class="flex-1"
             title={t('albums.empty.title')}
             description={t('albums.empty.description')}
-            illustration={<Illustration name="emptyPhotos" />}
+            spot="emptyPhotos"
           />
         ) : (
-          <ul class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-6">
-            {lista.map((al) => (
-              <li key={al.id}>
-                <a
-                  href={`${RUTA}album?id=${encodeURIComponent(al.id)}`}
-                  class="sytue-focus-ring block rounded-sm"
-                >
-                  <div class="bg-bg-subtle border-border-subtle flex aspect-[4/3] items-center justify-center overflow-hidden rounded-sm border">
-                    {al.coverAssetId ? (
-                      <img
-                        src={urlDeVariante(al.coverAssetId, 'miniatura')}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        class="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Icon name="album" size={32} class="text-text-subtle" />
-                    )}
-                  </div>
-                  <div class="text-text mt-2 truncate text-sm font-semibold">{al.title}</div>
-                  <div class="text-text-muted text-xs">
-                    {t('albums.count', { count: al.count })}
-                  </div>
-                </a>
-              </li>
-            ))}
-          </ul>
+          <>
+            {/* Con un solo álbum no hay nada que ordenar: el selector solo sería ruido. */}
+            {lista.length > 1 ? (
+              <div class="mb-3 flex justify-end">
+                <SelectorOrdenAlbumes t={t} orden={orden} alCambiar={ordenar} />
+              </div>
+            ) : null}
+            <ul class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-6">
+              {(ordenados ?? lista).map((al) => (
+                <li key={al.id}>
+                  <TarjetaAlbum t={t} album={al} />
+                </li>
+              ))}
+            </ul>
+          </>
         )}
         {dialogoPreguntar}
       </div>
     </Marco>
+  );
+}
+
+/** «Ordenar por», con su rótulo visible: un `<select>` sin nombre no dice qué ordena. */
+export function SelectorOrdenAlbumes({
+  t,
+  orden,
+  alCambiar,
+}: {
+  t: T;
+  orden: OrdenAlbum;
+  alCambiar: (o: OrdenAlbum) => void;
+}): JSX.Element {
+  return (
+    <label class="text-text-muted flex items-center gap-2 text-xs">
+      {t('albums.sort.label')}
+      <Select
+        size="sm"
+        value={orden}
+        class={CAMPO_TACTIL}
+        onChange={(e) => alCambiar(e.currentTarget.value as OrdenAlbum)}
+      >
+        {ORDENES_ALBUM.map((o) => (
+          <option key={o} value={o}>
+            {t(`albums.sort.${o}`)}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
+}
+
+/**
+ * Una tarjeta de «Álbumes»: portada 4:3, título y recuento. Si el álbum tiene enlace
+ * público lo dice con la insignia «Compartido» sobre la portada: que un enlace siga
+ * vivo es lo primero que hay que poder ver al repasar los álbumes, y antes solo se
+ * sabía abriéndolos uno a uno. Va encima de la portada y no en el pie para no cambiar
+ * la altura de la tarjeta, que es la de la rejilla y la del esqueleto.
+ */
+export function TarjetaAlbum({ t, album: al }: { t: T; album: Album }): JSX.Element {
+  return (
+    <a
+      href={`${RUTA}album?id=${encodeURIComponent(al.id)}`}
+      class="sytue-focus-ring block rounded-sm"
+    >
+      <div class="bg-bg-subtle border-border-subtle relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-sm border">
+        {al.coverAssetId ? (
+          <img
+            src={urlDeVariante(al.coverAssetId, 'miniatura')}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            class="h-full w-full object-cover"
+          />
+        ) : (
+          <Icon name="album" size={32} class="text-text-subtle" />
+        )}
+        {/* Tono `info` y no `primary`: el relleno de `primary` (`selected`) es
+            translúcido y sobre una portada la insignia desaparecía. */}
+        {al.shared ? (
+          <Badge tone="info" class="absolute start-2 top-2">
+            {t('album.shared')}
+          </Badge>
+        ) : null}
+      </div>
+      <div class="text-text mt-2 truncate text-sm font-semibold">{al.title}</div>
+      <div class="text-text-muted text-xs">{t('albums.count', { count: al.count })}</div>
+    </a>
   );
 }

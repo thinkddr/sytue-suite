@@ -24,7 +24,8 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { render } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { UMBRAL_ACTUALIZAR, usePullToRefresh } from '@sytue/ui';
 import { act } from 'preact/test-utils';
 // `useT` no es un hook: devuelve el traductor ya atado a un idioma.
 import { useT as traductor } from '../i18n/index.js';
@@ -67,11 +68,12 @@ interface Llamadas {
   mover: number[];
   abrir: string[];
   posicion: PosicionAsa[];
+  refrescos: number;
 }
 
 /** El mes con su cursor en estado (como CalendarApp) y las llamadas apuntadas. */
 function montar(over: Partial<MesCompactoProps> & { inicial?: Date } = {}) {
-  const ll: Llamadas = { elegir: [], mover: [], abrir: [], posicion: [] };
+  const ll: Llamadas = { elegir: [], mover: [], abrir: [], posicion: [], refrescos: 0 };
   // Lo que cambia desde FUERA del mes: un atajo global (`n`, `p`, `t`) o el selector de
   // vista del cajón (`m`, `w`, `a`), que mueve el asa.
   const fuera = { cursor: (_: Date): void => {}, posicion: (_: PosicionAsa): void => {} };
@@ -82,31 +84,36 @@ function montar(over: Partial<MesCompactoProps> & { inicial?: Date } = {}) {
       fuera.cursor = setCursor;
       fuera.posicion = setPosicion;
     }, []);
+    // El tirar para refrescar de AppShell, alrededor como en la app.
+    const hojaRef = useRef<HTMLDivElement>(null);
+    usePullToRefresh(hojaRef, { alActualizar: () => void ll.refrescos++ });
     return (
-      <MesCompacto
-        t={t}
-        locale="es"
-        cursor={cursor}
-        hoy={HOY}
-        events={EVENTOS}
-        posicion={posicion}
-        onPosicion={(p) => {
-          ll.posicion.push(p);
-          setPosicion(p);
-        }}
-        agenda={<p data-agenda>agenda</p>}
-        cargando={false}
-        onElegir={(d) => {
-          ll.elegir.push(d);
-          setCursor(d);
-        }}
-        onMoverMes={(d) => {
-          ll.mover.push(d);
-          setCursor((c) => (posicion === 'semana' ? addDays(c, 7 * d) : addMonthsClamped(c, d)));
-        }}
-        onSelectEvent={(e) => ll.abrir.push(e.summary)}
-        {...over}
-      />
+      <div ref={hojaRef}>
+        <MesCompacto
+          t={t}
+          locale="es"
+          cursor={cursor}
+          hoy={HOY}
+          events={EVENTOS}
+          posicion={posicion}
+          onPosicion={(p) => {
+            ll.posicion.push(p);
+            setPosicion(p);
+          }}
+          agenda={<p data-agenda>agenda</p>}
+          cargando={false}
+          onElegir={(d) => {
+            ll.elegir.push(d);
+            setCursor(d);
+          }}
+          onMoverMes={(d) => {
+            ll.mover.push(d);
+            setCursor((c) => (posicion === 'semana' ? addDays(c, 7 * d) : addMonthsClamped(c, d)));
+          }}
+          onSelectEvent={(e) => ll.abrir.push(e.summary)}
+          {...over}
+        />
+      </div>
     );
   }
   const host = document.createElement('div');
@@ -144,6 +151,25 @@ function puntero(el: Element, tipo: string, x: number, pointerType: string, y = 
   act(() => {
     el.dispatchEvent(e);
   });
+}
+
+/** Un toque de un dedo (los TouchEvent que escucha `usePullToRefresh`). */
+function toque(el: Element, tipo: 'touchstart' | 'touchmove' | 'touchend', y: number): Event {
+  const punto = { identifier: 1, clientX: 195, clientY: y };
+  const ev = new Event(tipo, { bubbles: true, cancelable: tipo === 'touchmove' });
+  Object.defineProperty(ev, 'touches', { value: tipo === 'touchend' ? [] : [punto] });
+  Object.defineProperty(ev, 'changedTouches', { value: [punto] });
+  act(() => {
+    el.dispatchEvent(ev);
+  });
+  return ev;
+}
+
+/** Un tirón hacia abajo con el dedo desde `el`, de sobra para refrescar. */
+function tirarAbajo(el: Element, soltar = true): void {
+  toque(el, 'touchstart', 300);
+  for (let i = 1; i <= 4; i++) toque(el, 'touchmove', 300 + ((UMBRAL_ACTUALIZAR + 60) * i) / 4);
+  if (soltar) toque(el, 'touchend', 300 + UMBRAL_ACTUALIZAR + 60);
 }
 
 /** Arrastra el asa en vertical: de y=300 a y=300+dy en pasos de `paso` ms. */
@@ -411,6 +437,68 @@ describe('el mes compacto', () => {
     expect(lista.getAttribute('aria-busy')).toBe('true');
     expect(lista.querySelector('.sytue-skeleton')).not.toBeNull();
     expect(lista.querySelectorAll('button')).toHaveLength(0);
+    m.fin();
+  });
+});
+
+/*
+ * EL ASA Y TIRAR PARA REFRESCAR NO SE PISAN. Un gesto que empieza en la hoja (asa,
+ * iniciales, rejilla) es del asa o del deslizar; refresca solo la lista de debajo, en lo
+ * alto. Vistos en ROJO sin `data-sin-refresco` en la hoja (tirar desde un día refrescaba),
+ * sin `alturaVisible` (en el mes el asa no cedía al tirar hacia abajo) y sin
+ * `data-gesto-en-curso` (un segundo dedo en la lista refrescaba con el asa agarrada).
+ */
+describe('el asa y tirar para refrescar', () => {
+  test('desde el asa: es del asa, nunca refresca', () => {
+    const m = montar();
+    // El dedo llega al asa como puntero y como toque: el puntero la arrastra, el toque
+    // no lo recoge el refresco.
+    puntero(m.asa(), 'pointerdown', 195, 'touch', 300, 1000);
+    tirarAbajo(m.asa(), false);
+    puntero(m.asa(), 'pointermove', 195, 'touch', 348, 1100);
+    // En el mes no hay adónde bajar: la hoja cede con resistencia (264 + 24).
+    expect(m.hoja().style.height).toBe('288px');
+    toque(m.asa(), 'touchend', 348);
+    puntero(m.asa(), 'pointerup', 195, 'touch', 348, 1400);
+    expect(m.ll.refrescos).toBe(0);
+    // Al soltar vuelve a su sitio, en el mes.
+    expect(m.hoja().style.height).toBe('264px');
+    expect(m.ll.posicion).toEqual([]);
+    m.fin();
+  });
+
+  test('desde la rejilla (un día, las iniciales): nunca refresca', () => {
+    const m = montar();
+    tirarAbajo(m.dia(13));
+    tirarAbajo(m.host.querySelector('[aria-hidden="true"].h-6') ?? m.dia(2));
+    expect(m.ll.refrescos).toBe(0);
+    m.fin();
+  });
+
+  test('desde la lista en lo alto: refresca, y el asa no se mueve', async () => {
+    const m = montar();
+    tirarAbajo(m.host.querySelector('section h2')!);
+    expect(m.ll.refrescos).toBe(1);
+    expect(m.hoja().style.height).toBe('264px');
+    expect(m.asa().getAttribute('aria-valuetext')).toBe('Mes');
+    // En la agenda, igual desde su lista (tras recogerse el disco del refresco anterior).
+    await new Promise((r) => setTimeout(r, 300));
+    act(() => m.fuera.posicion('agenda'));
+    tirarAbajo(m.host.querySelector('[data-agenda]')!);
+    expect(m.ll.refrescos).toBe(2);
+    m.fin();
+  });
+
+  test('con el asa agarrada, un segundo dedo en la lista no refresca', async () => {
+    const m = montar();
+    puntero(m.asa(), 'pointerdown', 195, 'touch', 300, 1000);
+    expect(m.asa().hasAttribute('data-gesto-en-curso')).toBe(true);
+    tirarAbajo(m.host.querySelector('section h2')!);
+    expect(m.ll.refrescos).toBe(0);
+    puntero(m.asa(), 'pointerup', 195, 'touch', 300, 1100);
+    expect(m.asa().hasAttribute('data-gesto-en-curso')).toBe(false);
+    tirarAbajo(m.host.querySelector('section h2')!);
+    expect(m.ll.refrescos).toBe(1);
     m.fin();
   });
 });

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -187,7 +186,9 @@ type dialogoPedirFirma struct {
 }
 
 func nuevoDialogoPedirFirma(a *dialogoAbierto) *dialogoPedirFirma {
-	d := &dialogoPedirFirma{a: a, email: entradaDialogo("", 0)}
+	// Los campos son los de la suite tal cual (`<Input>` y `<Textarea>` en un
+	// `FieldGroup`), no los compactos del resto de diálogos: así está la web.
+	d := &dialogoPedirFirma{a: a, email: ui.NuevaEntrada("")}
 	d.email.AlCambiar(func(string) {
 		if d.fuera != "" {
 			d.fuera, d.confirmar = "", ""
@@ -196,8 +197,6 @@ func nuevoDialogoPedirFirma(a *dialogoAbierto) *dialogoPedirFirma {
 	})
 	d.mensaje = ui.NuevaAreaTexto("")
 	d.mensaje.Filas = 3
-	d.mensaje.ConPropia(campoDialogo())
-	d.mensaje.Radio = tema.RadioMD
 	d.recargar()
 	return d
 }
@@ -301,41 +300,63 @@ func (d *dialogoPedirFirma) cancelar(id string) {
 	}()
 }
 
+// tonoDeEstado es `tonoDeEstado` de la web: lo que espera respuesta en informativo, lo
+// firmado en éxito, lo rechazado en peligro, lo caducado en aviso y lo que ya no corre
+// —cancelada, o esperando su turno— en neutro.
+func tonoDeEstado(estado string) ui.Tono {
+	switch estado {
+	case api.PDFFirmaPendiente:
+		return ui.InsigniaInfo
+	case api.PDFFirmaFirmada:
+		return ui.InsigniaExito
+	case api.PDFFirmaRechazada:
+		return ui.InsigniaPeligro
+	case "caducada": // el barrido la deja así (mig. 0034); nucleo aún no tiene constante
+		return ui.InsigniaAviso
+	default:
+		return ui.InsigniaNeutra
+	}
+}
+
 func (d *dialogoPedirFirma) vista(ancho float32) fyne.CanvasObject {
 	a := d.a
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	d.email.Ancho, d.mensaje.Ancho = ancho, ancho
 	partes := []fyne.CanvasObject{
 		ui.NuevoParrafo(a.t("pdf.dialog.pedirFirma.help"), tema.TextoXS, ui.Normal, "text-muted", v).A(ancho),
-		conRotulo(a.t("pdf.dialog.pedirFirma.email"), d.email),
-		conRotulo(a.t("pdf.dialog.pedirFirma.message"), d.mensaje),
+		ui.GrupoCampo(a.t("pdf.dialog.pedirFirma.email"), false, d.email, "", ""),
+		ui.GrupoCampo(a.t("pdf.dialog.pedirFirma.message"), false, d.mensaje, "", ""),
 	}
+	// El error y lo hecho son `FieldHint` de peligro y de éxito: con su icono, no solo
+	// con el color.
 	if d.error != "" {
-		partes = append(partes, ui.NuevoParrafo(d.error, tema.TextoXS, ui.Normal, "danger-text", v).A(ancho))
+		pista := ui.NuevaPistaCampo(d.error).ConTono(ui.AyudaPeligro)
+		pista.Ancho = ancho
+		partes = append(partes, pista)
 	}
 	if d.hecho != "" {
-		partes = append(partes, ui.NuevoParrafo(d.hecho, tema.TextoXS, ui.Normal, "success-text", v).A(ancho))
+		pista := ui.NuevaPistaCampo(d.hecho).ConTono(ui.AyudaExito)
+		pista.Ancho = ancho
+		partes = append(partes, pista)
 	}
 	cancelar := a.cerrar
 	rotulo := a.t("pdf.dialog.pedirFirma.send")
 	if d.fuera != "" {
-		// `bg-info-bg text-info-text rounded-md p-3`: quién es y qué va a pasar.
-		dentro := ancho - 2*tema.Espacio(3)
-		aviso := container.New(ui.Columna{Hueco: tema.Espacio(1)},
-			ui.NuevoParrafo(a.p.tv("pdf.dialog.pedirFirma.external.title", i18n.Vars{"name": d.fuera}), tema.TextoXS, ui.SemiNegrita, "info-text", v).A(dentro),
-			ui.NuevoParrafo(a.t("pdf.dialog.pedirFirma.external.help"), tema.TextoXS, ui.Normal, "info-text", v).A(dentro))
-		fondo := canvas.NewRectangle(tema.Color("info-bg", v))
-		fondo.CornerRadius = tema.RadioMD
-		partes = append(partes, container.NewStack(fondo, container.New(ui.Margen{Izq: tema.Espacio(3), Der: tema.Espacio(3), Arr: tema.Espacio(3), Abj: tema.Espacio(3)}, aviso)))
+		// `InlineHelp tone="info"`: quién es y qué va a pasar.
+		aviso := ui.NuevaAyudaEnLinea(a.t("pdf.dialog.pedirFirma.external.help")).
+			ConTono(ui.AyudaInfo).
+			ConTitulo(a.p.tv("pdf.dialog.pedirFirma.external.title", i18n.Vars{"name": d.fuera}))
+		// Se mide ya a su ancho: su alto depende de en cuántas líneas se reparte.
+		aviso.Resize(ui.MedidaAyudaEnLinea(aviso, ancho))
+		partes = append(partes, aviso)
 		cancelar = func() { d.fuera, d.confirmar = "", ""; a.rehacer() }
 		rotulo = a.t("pdf.dialog.pedirFirma.external.confirm")
 	}
-	cerrar := botonPanel(a.t("pdf.cancel"), tema.TextoXS, tema.Espacio(1.5), cancelar)
-	cerrar.PX = tema.Espacio(3)
+	cerrar := ui.NuevoBoton(a.t("pdf.cancel"), cancelar).Con(ui.Fantasma, ui.TallaSM)
 	if d.enviando {
 		rotulo = a.t("pdf.working")
 	}
-	enviar := botonPrimario(rotulo, tema.TextoXS, tema.Espacio(3), tema.Espacio(1.5), d.enviar)
+	enviar := ui.NuevoBoton(rotulo, d.enviar).Con(ui.Primario, ui.TallaSM)
 	enviar.Inerte = d.enviando
 	a.enviar = d.enviar
 	fila := container.New(ui.Fila{Hueco: tema.Espacio(2)}, cerrar, enviar)
@@ -353,31 +374,36 @@ func (d *dialogoPedirFirma) vista(ancho float32) fyne.CanvasObject {
 	return container.New(ui.Columna{Hueco: tema.Espacio(3)}, partes...)
 }
 
-// fila es una pedida: a quién, cómo va y lo que se puede hacer con ella.
+// fila es una pedida: a quién, cómo va (su insignia) y lo que se puede hacer con ella,
+// con los botones fantasma `xs` de la web.
 func (d *dialogoPedirFirma) fila(x api.PDFPeticionFirma) fyne.CanvasObject {
 	a := d.a
-	estado := ui.NuevoRotulo(a.t("pdf.signatureRequest.status."+x.Estado), tema.TextoXS, ui.Normal, "text-muted")
+	estado := ui.NuevaInsignia(a.t("pdf.signatureRequest.status."+x.Estado), tonoDeEstado(x.Estado))
 	acciones := []fyne.CanvasObject{estado}
+	boton := func(clave string, alPulsar func()) {
+		acciones = append(acciones, ui.NuevoBoton(a.t(clave), alPulsar).Con(ui.Fantasma, ui.TallaXS))
+	}
 	switch x.Estado {
 	case api.PDFFirmaFirmada:
 		if x.Externo && x.RutaFirmada == "" {
 			id := x.ID
-			acciones = append(acciones, accionDeFranja(a.t("pdf.dialog.pedirFirma.fetchSigned"), "text", false, func() { d.traer(id) }))
+			boton("pdf.dialog.pedirFirma.fetchSigned", func() { d.traer(id) })
 		}
 		if x.RutaFirmada != "" {
 			ruta := x.RutaFirmada
-			acciones = append(acciones, accionDeFranja(a.t("pdf.dialog.pedirFirma.openSigned"), "text", false, func() {
+			boton("pdf.dialog.pedirFirma.openSigned", func() {
 				a.cerrar()
 				if a.p.AlAbrirRuta != nil {
 					a.p.AlAbrirRuta(ruta)
 				}
-			}))
+			})
 		}
 	case api.PDFFirmaPendiente:
 		id := x.ID
-		acciones = append(acciones, accionDeFranja(a.t("pdf.dialog.pedirFirma.cancel"), "text", false, func() { d.cancelar(id) }))
+		boton("pdf.dialog.pedirFirma.cancel", func() { d.cancelar(id) })
 	}
-	derecha := container.New(ui.Fila{Hueco: tema.Espacio(2)}, acciones...)
+	derecha := container.New(filaCentrada{hueco: tema.Espacio(2)}, acciones...)
 	quien := ui.NuevoRotulo(x.CorreoDestino, tema.TextoXS, ui.Normal, "text")
-	return container.NewBorder(nil, nil, quien, derecha)
+	// `items-center`: el correo a media altura de la insignia y los botones.
+	return container.NewBorder(nil, nil, container.NewCenter(quien), derecha)
 }

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ type calendarService interface {
 	EsInvitadoDeEvento(ctx context.Context, uid string) (bool, error)
 
 	SetAttendeePartStat(ctx context.Context, eventID uuid.UUID, email string, partstat domain.ParticipationStatus) (domain.Attendee, error)
+	ResponderEvento(ctx context.Context, uid, email string, partstat domain.ParticipationStatus) (domain.Attendee, error)
 	FreeBusy(ctx context.Context, ownerSub string, from, to time.Time) ([]domain.FreeBusyPeriod, error)
 	SuggestSlots(ctx context.Context, users []string, from, to time.Time, dur time.Duration, loc *time.Location, wh domain.WorkingHours, limit int) ([]domain.FreeSlot, error)
 
@@ -67,6 +69,9 @@ type calendarService interface {
 	RespondInvitation(ctx context.Context, id uuid.UUID, status domain.InvitationStatus) (domain.Invitation, error)
 	// RecibirRespuesta aplica el REPLY de una invitación contestada por correo.
 	RecibirRespuesta(ctx context.Context, remitente, ics string) error
+	// ImportarInvitacion contesta el REQUEST de un organizador de fuera llegado por
+	// correo: lo guarda en el calendario por defecto y manda el REPLY (D-MAIL-04).
+	ImportarInvitacion(ctx context.Context, ics string, partstat domain.ParticipationStatus) (service.InvitacionImportada, error)
 
 	// Compartir calendarios con ACL (solo el dueño gestiona; el acceso a lo
 	// compartido va por la verja CalendarAccess dentro del servicio).
@@ -627,22 +632,48 @@ type partStatReq struct {
 	// siempre del usuario autenticado (email del JWT), nunca del cuerpo.
 	Email    string `json:"email"`
 	PartStat string `json:"partstat"`
+	// UID identifica el evento por el UID de su .ics en vez de por el id de la ruta:
+	// es lo que conoce la web, que lee CalDAV. Hace falta en el cuerpo porque un UID
+	// puede tener forma de UUID (los generan así muchos clientes) y en la ruta se
+	// tomaría por el id interno.
+	UID string `json:"uid"`
 }
+
+// maxUIDLen acota el UID que se acepta: RFC 5545 no pone límite, pero uno de
+// kilobytes no es de ningún cliente real y solo serviría para inflar la consulta.
+const maxUIDLen = 512
 
 // SetPartStat fija el PARTSTAT (RSVP) del PROPIO usuario autenticado en el
 // evento {id}. El asistente se identifica SIEMPRE por el email del JWT
 // verificado, nunca por el cuerpo (nadie responde por otro). Si el usuario no
 // es asistente del evento → 404. El organizador/delegado edita PARTSTAT de
 // terceros via PUT /events/{id} bajo la verja CalendarAccess.
+//
+// {id} es el id interno (UUID) del evento o, si no lo es, su UID; el `uid` del
+// cuerpo, si viene, manda sobre la ruta. Por UID la respuesta se escribe en el
+// .ics (ver service.ResponderEvento); por id, como siempre, en los asistentes.
 func (h *Handlers) SetPartStat(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseUUID(r)
-	if !ok {
-		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid event id."))
-		return
-	}
 	var req partStatReq
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)
+		return
+	}
+	uid := strings.TrimSpace(req.UID)
+	var id uuid.UUID
+	if uid == "" {
+		param := chi.URLParam(r, "id")
+		if parsed, err := uuid.Parse(param); err == nil {
+			id = parsed
+		} else if crudo, err := url.PathUnescape(param); err == nil {
+			// chi entrega el segmento escapado si la ruta lo venía (un UID con «@»).
+			uid = strings.TrimSpace(crudo)
+		}
+		if id == uuid.Nil && !uidValido(uid) {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid event id."))
+			return
+		}
+	} else if !uidValido(uid) {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid event uid."))
 		return
 	}
 	email := userEmail(r)
@@ -650,12 +681,35 @@ func (h *Handlers) SetPartStat(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("The token carries no email address, so invitations cannot be answered."))
 		return
 	}
-	a, err := h.svc.SetAttendeePartStat(r.Context(), id, email, domain.ParticipationStatus(req.PartStat))
+	partstat := domain.ParticipationStatus(strings.ToUpper(strings.TrimSpace(req.PartStat)))
+	var (
+		a   domain.Attendee
+		err error
+	)
+	if id != uuid.Nil {
+		a, err = h.svc.SetAttendeePartStat(r.Context(), id, email, partstat)
+	} else {
+		a, err = h.svc.ResponderEvento(r.Context(), uid, email, partstat)
+	}
 	if err != nil {
 		fail(w, r, err)
 		return
 	}
 	httpx.JSON(w, r, http.StatusOK, a)
+}
+
+// uidValido: un UID que se puede buscar. Sin caracteres de control: un salto de
+// línea en un UID es una inyección de propiedades en el .ics, no un evento.
+func uidValido(uid string) bool {
+	if uid == "" || len(uid) > maxUIDLen {
+		return false
+	}
+	for _, c := range uid {
+		if c < 0x20 || c == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 // --- Free/Busy --------------------------------------------------------------
@@ -805,6 +859,41 @@ func (h *Handlers) RespondInvitation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, r, http.StatusOK, inv)
+}
+
+// maxInvitacionICS acota el iCalendar de una invitación por correo: el mismo tope
+// que Mail aplica al leer una parte `text/calendar`.
+const maxInvitacionICS = 256 << 10
+
+type importInvitationReq struct {
+	ICS      string `json:"ics"`
+	PartStat string `json:"partstat"` // ACCEPTED | TENTATIVE | DECLINED
+}
+
+// ImportInvitation contesta desde el lector de Mail una invitación de un organizador
+// de FUERA de la suite (iMIP): el evento entra en el calendario por defecto con la
+// respuesta y el REPLY sale por correo. Quien contesta sale del JWT, nunca del
+// cuerpo; si ninguna de sus direcciones está invitada → 404.
+func (h *Handlers) ImportInvitation(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxInvitacionICS+4<<10)
+	var req importInvitationReq
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if strings.TrimSpace(req.ICS) == "" || len(req.ICS) > maxInvitacionICS {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Missing or too large iCalendar."))
+		return
+	}
+	res, err := h.svc.ImportarInvitacion(r.Context(), req.ICS, domain.ParticipationStatus(req.PartStat))
+	switch {
+	case errors.Is(err, service.ErrNoInvitado):
+		httpx.Fail(w, r, httpx.ErrNotFound.WithMessage("You are not an attendee of this invitation."))
+	case err != nil:
+		fail(w, r, err)
+	default:
+		httpx.JSON(w, r, http.StatusOK, res)
+	}
 }
 
 // --- Recordatorios in-app ---------------------------------------------------

@@ -44,16 +44,19 @@ function byOrderThenName(a: Channel, b: Channel): number {
 }
 
 /**
- * No-leídos agregados de la sección para el badge de notificación, respetando el nivel
- * de aviso por canal (Ola 13): 'none' (⟺ muted) no cuenta; 'mentions' cuenta solo las
- * @menciones; 'all' (o sin fijar) cuenta todos los no-leídos.
+ * Lo que un canal suma al badge de su sección, respetando su nivel de aviso (Ola 13):
+ * 'none' (⟺ muted) no cuenta; 'mentions' cuenta solo las @menciones; 'all' (o sin
+ * fijar) cuenta todos los no-leídos. Gemelo en Fyne: `api.PendientesRooms`.
  */
+export function pendientesDe(c: Channel): number {
+  if (c.notifyLevel === 'none' || c.muted) return 0;
+  if (c.notifyLevel === 'mentions') return c.mentions ?? 0;
+  return c.unread ?? 0;
+}
+
+/** No-leídos agregados de la sección para el badge de notificación (`pendientesDe`). */
 function unreadOf(list: Channel[]): number {
-  return list.reduce((n, c) => {
-    if (c.notifyLevel === 'none' || c.muted) return n;
-    if (c.notifyLevel === 'mentions') return n + (c.mentions ?? 0);
-    return n + (c.unread ?? 0);
-  }, 0);
+  return list.reduce((n, c) => n + pendientesDe(c), 0);
 }
 
 /**

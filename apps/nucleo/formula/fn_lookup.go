@@ -495,6 +495,32 @@ var funcionesBusqueda = map[string]fn{
 
 func init() { registrar(funcionesBusqueda) }
 
+// DestinoHyperlink es el DESTINO de la celda si su fórmula es un `=HYPERLINK(destino; …)`
+// de raíz (el valor de la celda es el nombre visible, así que el destino hay que pedirlo
+// aparte). Se evalúa con el contexto de la celda: `HYPERLINK(A1&"/x")` sigue a A1. false si
+// la celda no es eso o el destino no es un texto. El editor decide si el esquema se abre;
+// el motor no sabe de enlaces seguros.
+func (e *Engine) DestinoHyperlink(sheet string, col, row int) (destino string, ok bool) {
+	c := e.cells[celdaK(sheet, col, row)]
+	if c == nil || c.ast == nil || c.ast.clase != nCall || !strings.EqualFold(c.ast.str, "HYPERLINK") {
+		return "", false
+	}
+	if len(c.ast.args) < 1 || len(c.ast.args) > 2 {
+		return "", false
+	}
+	if !sinRed {
+		defer func() {
+			if recover() != nil {
+				destino, ok = "", false
+			}
+		}()
+	}
+	e.refrescarVolatiles()
+	env := &entorno{hoja: sheet, col: col, fila: row, ctx: &FnCtx{e, Here{sheet, col, row}}}
+	s, esTexto := e.evalNode(c.ast.args[0], env).(string)
+	return s, esTexto
+}
+
 // index es INDEX(matriz, fila, [col]), 1-based. Fila o columna 0 devuelve la columna o la
 // fila entera; en una matriz de una sola fila o columna el único índice la recorre.
 func index(_ *FnCtx, args []*Arg) any {

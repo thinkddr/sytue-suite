@@ -6,6 +6,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	"github.com/jackc/pgx/v5"
@@ -42,12 +43,13 @@ func leerCampo(rows pgx.Rows) (domain.Campo, error) {
 		return c, err
 	}
 	var o struct {
-		Choices []string    `json:"choices"`
-		Formula string      `json:"formula"`
-		Result  domain.Tipo `json:"result"`
+		Choices  []string    `json:"choices"`
+		Formula  string      `json:"formula"`
+		Result   domain.Tipo `json:"result"`
+		Currency string      `json:"currency"`
 	}
 	_ = json.Unmarshal(opts, &o)
-	c.Choices, c.Formula, c.Result = o.Choices, o.Formula, o.Result
+	c.Choices, c.Formula, c.Result, c.Currency = o.Choices, o.Formula, o.Result, o.Currency
 	return c, nil
 }
 
@@ -179,7 +181,7 @@ func (s *Store) CrearCampo(ctx context.Context, a domain.Actor, tabla string, in
 	if err != nil {
 		return domain.Campo{}, err
 	}
-	c := domain.Campo{TableID: tabla, Name: in.Name, Kind: in.Kind, Choices: in.Choices, LinkTableID: in.LinkTableID, Formula: in.Formula, Result: in.Result}
+	c := domain.Campo{TableID: tabla, Name: in.Name, Kind: in.Kind, Choices: in.Choices, LinkTableID: in.LinkTableID, Formula: in.Formula, Result: in.Result, Currency: in.Currency}
 	err = s.en(ctx, a, func(tx pgx.Tx) error {
 		base, err := autorizarTabla(ctx, tx, a, tabla, domain.AccEsquema)
 		if err != nil {
@@ -238,6 +240,8 @@ func crearCampo(ctx context.Context, tx pgx.Tx, a domain.Actor, base string, c *
 		opciones = jsonDe(map[string][]string{"choices": c.Choices})
 	case domain.TipoFormula:
 		opciones = jsonDe(map[string]any{"formula": c.Formula, "result": c.Result})
+	case domain.TipoMoneda:
+		opciones = jsonDe(map[string]string{"currency": c.Currency})
 	}
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO base_fields (tenant, base_id, table_id, name, kind, options, link_table_id, position)
@@ -310,5 +314,82 @@ func (s *Store) BorrarCampo(ctx context.Context, a domain.Actor, campo string) e
 			return err
 		}
 		return auditar(ctx, tx, a, base, &tabla, nil, &campo, "field.delete", nil, nil)
+	})
+}
+
+// CambiarOpciones sustituye las opciones de un campo de selección (propietario), en
+// el orden dado. Una opción que se quita NO se borra de los registros: el valor se
+// queda (y los clientes lo pintan como «opción retirada») hasta que alguien lo cambie.
+// Así quitar una opción por error no destruye datos y volver a añadirla lo deshace.
+func (s *Store) CambiarOpciones(ctx context.Context, a domain.Actor, campo string, opciones []string) error {
+	opciones, err := domain.ValidarOpciones(opciones)
+	if err != nil {
+		return err
+	}
+	return s.en(ctx, a, func(tx pgx.Tx) error {
+		tabla, base, err := tablaDeCampo(ctx, tx, a, campo)
+		if err != nil {
+			return err
+		}
+		if err := autorizar(ctx, tx, a, base, tabla, domain.AccEsquema); err != nil {
+			return err
+		}
+		var tipo domain.Tipo
+		var antes []byte
+		if err := tx.QueryRow(ctx, `SELECT kind, options->'choices' FROM base_fields WHERE id = $1 AND tenant = $2`, campo, a.Tenant).Scan(&tipo, &antes); err != nil {
+			return errNoFilas(err)
+		}
+		if tipo != domain.TipoSeleccion && tipo != domain.TipoMultiple {
+			return fmt.Errorf("%w: no es un campo de selección", domain.ErrInvalido)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE base_fields SET options = options || jsonb_build_object('choices', $3::jsonb) WHERE id = $1 AND tenant = $2`,
+			campo, a.Tenant, jsonDe(opciones)); err != nil {
+			return err
+		}
+		return auditar(ctx, tx, a, base, &tabla, nil, &campo, "field.options", antes, jsonDe(opciones))
+	})
+}
+
+// ReordenarCampos fija el orden de los campos de una tabla (propietario). `ids` ha de
+// ser exactamente el conjunto de campos de la tabla: un orden parcial o con un campo
+// que otro acaba de crear o borrar es un conflicto, no algo que adivinar.
+func (s *Store) ReordenarCampos(ctx context.Context, a domain.Actor, tabla string, ids []string) error {
+	if len(ids) == 0 || len(ids) > domain.MaxCamposPorTabla {
+		return domain.ErrInvalido
+	}
+	return s.en(ctx, a, func(tx pgx.Tx) error {
+		base, err := autorizarTabla(ctx, tx, a, tabla, domain.AccEsquema)
+		if err != nil {
+			return err
+		}
+		campos, err := camposDe(ctx, tx, a, tabla)
+		if err != nil {
+			return err
+		}
+		if len(campos) != len(ids) {
+			return domain.ErrConflicto
+		}
+		pedidos := slices.Clone(ids)
+		slices.Sort(pedidos)
+		if len(slices.Compact(pedidos)) != len(ids) {
+			return domain.ErrInvalido
+		}
+		antes := make([]string, len(campos))
+		for i, c := range campos {
+			antes[i] = c.ID
+			if _, ok := slices.BinarySearch(pedidos, c.ID); !ok {
+				return domain.ErrConflicto
+			}
+		}
+		if slices.Equal(antes, ids) {
+			return nil
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE base_fields f SET position = o.n - 1
+			  FROM unnest($3::uuid[]) WITH ORDINALITY AS o(id, n)
+			 WHERE f.id = o.id AND f.tenant = $1 AND f.table_id = $2`, a.Tenant, tabla, ids); err != nil {
+			return err
+		}
+		return auditar(ctx, tx, a, base, &tabla, nil, nil, "field.reorder", jsonDe(antes), jsonDe(ids))
 	})
 }

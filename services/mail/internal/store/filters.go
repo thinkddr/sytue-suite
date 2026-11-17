@@ -37,31 +37,36 @@ func (s *Store) ListActiveFilters(ctx context.Context, accountID uuid.UUID) ([]d
 }
 
 func (s *Store) queryFilters(ctx context.Context, accountID uuid.UUID, onlyEnabled bool) ([]domain.Filter, error) {
-	// Defensa en profundidad: filtrar por tenant en la consulta ADEMÁS de RLS
-	// (mismo criterio que AccountBySubject). Aísla incluso bajo un rol con BYPASSRLS
-	// (superuser o mantenimiento), donde la política RLS no aplica.
-	q := `SELECT ` + selectFilterCols + ` FROM mail_filters WHERE account_id = $1 AND tenant = $2`
-	if onlyEnabled {
-		q += ` AND enabled`
-	}
-	q += ` ORDER BY priority ASC, created_at ASC`
-	var out []domain.Filter
+	var result []domain.Filter
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, q, accountID, tenantOf(ctx))
-		if err != nil {
-			return fmt.Errorf("store: list filters: %w", err)
-		}
-		defer rows.Close()
-		for rows.Next() {
-			f, err := scanFilter(rows)
-			if err != nil {
-				return err
-			}
-			out = append(out, f)
-		}
-		return rows.Err()
+		var err error
+		result, err = queryFiltersTx(ctx, tx, accountID, onlyEnabled)
+		return err
 	})
-	return out, err
+	return result, err
+}
+
+func queryFiltersTx(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, onlyEnabled bool) ([]domain.Filter, error) {
+	// Explicit tenant predicate remains in addition to RLS, including maintenance callers.
+	query := `SELECT ` + selectFilterCols + ` FROM mail_filters WHERE account_id=$1 AND tenant=$2`
+	if onlyEnabled {
+		query += ` AND enabled`
+	}
+	query += ` ORDER BY priority ASC,created_at ASC`
+	rows, err := tx.Query(ctx, query, accountID, tenantOf(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("store: list filters: %w", err)
+	}
+	defer rows.Close()
+	var result []domain.Filter
+	for rows.Next() {
+		filter, err := scanFilter(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, filter)
+	}
+	return result, rows.Err()
 }
 
 // CreateFilter inserta una regla nueva. Valida el modelo de dominio y, si trae

@@ -158,3 +158,54 @@ test('sin filtro, el cuaderno vacío sigue siendo el de siempre', () => {
   expect(el.textContent).toContain('empty.noNotes.title');
   expect(el.textContent).not.toContain('filter.noMatches');
 });
+
+function cargando(layout: Notebook['layout'], llenar = false) {
+  host = document.createElement('div');
+  document.body.append(host);
+  render(
+    <NoteCanvas
+      t={((key: string) => key) as never}
+      notebook={{ id: 'nb', layout } as Notebook}
+      notes={[]}
+      cargando
+      llenar={llenar}
+      claro={{}}
+      bloqueado={false}
+      seleccionada={null}
+      onSelect={noop}
+      onChange={noop}
+      onMove={noop}
+      onDelete={noop}
+      onDuplicate={noop}
+      onTogglePin={noop}
+      onShare={noop}
+      onTags={noop}
+      onBacklinks={noop}
+    />,
+    host,
+  );
+  return host;
+}
+
+test('mientras carga enseña la forma de la disposición, no una rueda', () => {
+  const casos: Array<[Notebook['layout'], boolean, string]> = [
+    ['list', false, 'filas'],
+    ['columns', false, 'tarjetas'],
+    ['free', false, 'tarjetas'],
+    // En árbol el panel principal es la hoja de UNA nota, que llega como lista.
+    ['list', true, 'hoja'],
+  ];
+  for (const [layout, llenar, forma] of casos) {
+    const el = cargando(layout, llenar);
+    const zona = el.querySelector('[aria-busy="true"]');
+    expect(zona?.getAttribute('data-esqueleto')).toBe(forma);
+    expect(zona!.querySelectorAll('.sytue-skeleton').length).toBeGreaterThan(2);
+    // Ninguna rueda: el `Spinner` de @sytue/ui es un `role="status"` que gira.
+    expect(el.querySelector('[role="status"], .animate-spin')).toBeNull();
+    // Ni el vacío: «no hay notas» mientras llegan sería mentira.
+    expect(el.textContent).not.toContain('empty.noNotes.title');
+    render(null, host!);
+    host!.remove();
+    host = null;
+  }
+});

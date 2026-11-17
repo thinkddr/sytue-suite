@@ -22,6 +22,16 @@ func Carpeta() (string, error) {
 	return filepath.Join(casa, "Downloads"), nil
 }
 
+// CarpetaImagenes es «~/Pictures», por lo mismo que [Carpeta]. La fototeca de la app
+// Fotos NO es esta carpeta: a esa se llega con PhotoKit (`apps/nucleo/carrete`).
+func CarpetaImagenes() (string, error) {
+	casa, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(casa, "Pictures"), nil
+}
+
 // Revelar abre el Finder con el fichero ya seleccionado (`open -R`). Es parte del sistema:
 // no hay caso de fallback que valga la pena, y si `open` fallara vuelve su error.
 func Revelar(ruta string) error {

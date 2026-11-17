@@ -122,7 +122,7 @@ func leerAdjunto(ruta string, ahora time.Time) (Adjunto, error) {
 // adjuntar es «Adjuntar archivos…»: el selector del sistema y, con lo elegido, los
 // adjuntos nuevos al final de los que ya tenga.
 func (p *Pantalla) adjuntar(n Nota) {
-	go func() {
+	p.iniciar(func() {
 		rutas, err := ficheros.Elegir()
 		if err != nil || len(rutas) == 0 {
 			return // cancelar el selector no es un error
@@ -137,12 +137,12 @@ func (p *Pantalla) adjuntar(n Nota) {
 			nuevos = append(nuevos, a)
 		}
 		_ = p.cambiarAdjuntos(n.ID, func(as []Adjunto) []Adjunto { return append(as, nuevos...) })
-	}()
+	})
 }
 
 // quitarAdjunto es `eliminarAdjunto`.
 func (p *Pantalla) quitarAdjunto(n Nota, a Adjunto) {
-	lanzar(func() error {
+	p.lanzar(func() error {
 		return p.cambiarAdjuntos(n.ID, func(as []Adjunto) []Adjunto {
 			return slices.DeleteFunc(slices.Clone(as), func(x Adjunto) bool { return x.ID == a.ID })
 		})
@@ -154,7 +154,7 @@ func (p *Pantalla) quitarAdjunto(n Nota, a Adjunto) {
 func (p *Pantalla) cambiarAdjuntos(id string, f func([]Adjunto) []Adjunto) error {
 	var datos json.RawMessage
 	hay := false
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		if n, ok := p.nota(id); ok {
 			datos, hay = n.Datos, true
 		}
@@ -172,14 +172,14 @@ func (p *Pantalla) cambiarAdjuntos(id string, f func([]Adjunto) []Adjunto) error
 
 // descargarAdjunto es el `<a download>`: el fichero, a la carpeta de descargas.
 func (p *Pantalla) descargarAdjunto(a Adjunto) {
-	go func() {
+	p.iniciar(func() {
 		b, err := a.contenido()
 		if err != nil {
 			p.avisar(ui.AvisoPeligro, p.tr.T("error.loadFailed", nil), "")
 			return
 		}
 		p.descargar(a.Name, bytes.NewReader(b))
-	}()
+	})
 }
 
 // Medidas del bloque de adjuntos, de sus clases.

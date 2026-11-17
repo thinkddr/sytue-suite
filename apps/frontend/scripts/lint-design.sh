@@ -375,8 +375,9 @@ if [ -n "$sin_ui" ]; then
 fi
 
 # --- 9) `min-h-6` / `min-w-6` para el mínimo de 24 px -----------------------
-# La raíz de la suite está en 14 px (`theme.css`), así que `min-h-6` son 1,5 rem =
-# 21 px, no los 24 de WCAG 2.5.8. Se escribía así con el comentario «(24px)» al
+# `min-h-6` son 1,5 rem: 24 px solo si la base de letra está en 16. Cuando 1 rem eran
+# 14 px (`theme.css`) medían 21, no los 24 de WCAG 2.5.8, y con cualquier base menor
+# vuelve a pasar. Se escribía así con el comentario «(24px)» al
 # lado y medía 21 en producción (2026-09-21): el disparador del canal de Rooms, el
 # enlace de Apple de Account y los «×» del compositor. Un suelo de objetivo va en
 # px: `min-h-[24px]`, como en `IconButton` y `SIDEBAR_ACTION_CLASS`.
@@ -385,7 +386,7 @@ fi
 MIN6="$(grep -rnE "(^|[\"'\` :])min-[hw]-6([\"'\` ]|$)" "${BUSCAR[@]}" 2>/dev/null |
   grep -vE -e "\.test\." -e "^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{/\*)" -e "^packages/ui/src/components/ShortcutsModal\.tsx:" || true)"
 if [ -n "$MIN6" ]; then
-  echo "✗ 'min-h-6'/'min-w-6' son 21 px con la raíz a 14, no 24. Usa 'min-h-[24px]'/'min-w-[24px]':"
+  echo "✗ 'min-h-6'/'min-w-6' dependen de la base de letra (con 14 son 21 px, no 24). Usa 'min-h-[24px]'/'min-w-[24px]':"
   printf '%s\n' "$MIN6" | sed 's/^/    /'
   fallos=$((fallos + 1))
   echo

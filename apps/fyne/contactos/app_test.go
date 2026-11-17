@@ -20,11 +20,9 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/test"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
 // servicioFalso es Sytue Contacts por HTTP, con las rutas que usa la app. Se prueba el
@@ -248,7 +246,7 @@ func TestLaAppCargaYOrdenaComoElIdioma(t *testing.T) {
 	a.Cargar()
 	p := a.Pantalla
 
-	if p.Estado != agenda.Exito || p.CargandoLibretas || p.ErrorLibretas {
+	if p.Estado != ui.EstadoExito || p.CargandoLibretas || p.ErrorLibretas {
 		t.Fatalf("tras cargar: estado %v, cargando %v, error %v", p.Estado, p.CargandoLibretas, p.ErrorLibretas)
 	}
 	if p.Activa == nil || p.Activa.ID != "l1" {
@@ -364,7 +362,7 @@ func TestSinServicioLasLibretasDicenQueFallaron(t *testing.T) {
 	a := NuevaApp(traductor(t), api.NewContacts(srv.URL, nil, nil))
 	a.enFondo = func(f func()) { f() }
 	a.Cargar()
-	if !a.Pantalla.ErrorLibretas || a.Pantalla.Estado != agenda.Error {
+	if !a.Pantalla.ErrorLibretas || a.Pantalla.Estado != ui.EstadoError {
 		t.Errorf("error de libretas %v, estado %v", a.Pantalla.ErrorLibretas, a.Pantalla.Estado)
 	}
 }

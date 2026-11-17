@@ -18,9 +18,9 @@ import (
 // línea de un píxel que recorre toda la tira.
 //
 //	pestaña   `px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.06em] border-b-2`
-//	          → 15,75 de caja de línea + 17,5 de relleno + 2 de subrayado = 35,25
-//	tira      `flex gap-1 border-b` → 3,5 entre pestañas y 1 de línea: 36,25 en total
-//	panel     `pt-4` → 14
+//	          → 18 de caja de línea + 20 de relleno + 2 de subrayado = 40
+//	tira      `flex gap-1 border-b` → 4 entre pestañas y 1 de línea: 41 en total
+//	panel     `pt-4` → 16
 //
 // El subrayado de la pestaña y la línea de la tira SE APILAN, igual que en el
 // navegador: el `border-b` es del contenedor y se pinta debajo de sus hijos, así que en
@@ -38,10 +38,10 @@ var (
 const SubrayadoPestana float32 = 2
 
 // AltoPestana es lo que ocupa una pestaña: `py-2.5` sobre la caja de línea de
-// `text-sm`, más su subrayado. Con el rem de 14 son 35,25.
+// `text-sm`, más su subrayado. Con el rem de 16 son 40.
 var AltoPestana = tema.TextoSM.Linea + 2*pestanaPY + SubrayadoPestana
 
-// AltoTiraPestanas es la tira entera, con la línea de un píxel de debajo: 36,25.
+// AltoTiraPestanas es la tira entera, con la línea de un píxel de debajo: 41.
 var AltoTiraPestanas = AltoPestana + tema.Borde
 
 // altoPestana y altoTiraPestanas son los de arriba con el suelo del dedo: 44 con

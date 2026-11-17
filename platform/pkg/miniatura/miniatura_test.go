@@ -5,10 +5,13 @@ package miniatura_test
 
 import (
 	"bytes"
+	"errors"
 	"hash/crc32"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
+	"os"
 	"testing"
 
 	"git.sytue.eu/sytue/one/platform/pkg/miniatura"
@@ -140,5 +143,110 @@ func TestElTopeEsDeMemoriaNoDePixeles(t *testing.T) {
 	gris := image.Config{ColorModel: color.GrayModel, Width: 6000, Height: 6000}
 	if !miniatura.Cabe(gris) {
 		t.Fatalf("una imagen gris de 36 MP cabe (coste %d MB)", miniatura.Coste(gris)>>20)
+	}
+}
+
+// webpVP8X fabrica la cabecera de un WebP extendido (VP8X) que DECLARA ancho×alto,
+// con o sin alfa. Basta para DecodeConfig: es lo que usa la guarda antes de decodificar.
+func webpVP8X(ancho, alto int, alfa bool) []byte {
+	var flags byte
+	if alfa {
+		flags = 1 << 4
+	}
+	w, h := ancho-1, alto-1
+	chunk := []byte{flags, 0, 0, 0, byte(w), byte(w >> 8), byte(w >> 16), byte(h), byte(h >> 8), byte(h >> 16)}
+	var b bytes.Buffer
+	b.WriteString("RIFF")
+	tam := 4 + 8 + len(chunk)
+	b.Write([]byte{byte(tam), byte(tam >> 8), byte(tam >> 16), byte(tam >> 24)})
+	b.WriteString("WEBPVP8X")
+	b.Write([]byte{byte(len(chunk)), 0, 0, 0})
+	b.Write(chunk)
+	return b.Bytes()
+}
+
+// TestRenderAceptaWebP: el decodificador WebP de x/image está registrado y la
+// miniatura conserva el alfa al salir en PNG (D-DRIVE-03).
+func TestRenderAceptaWebP(t *testing.T) {
+	datos, err := os.ReadFile("testdata/rosa-con-alfa.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := miniatura.Render(datos, 128, "image/png")
+	if err != nil {
+		t.Fatalf("Render(webp): %v", err)
+	}
+	img, err := png.Decode(bytes.NewReader(out))
+	if err != nil {
+		t.Fatalf("la miniatura no es PNG: %v", err)
+	}
+	if b := img.Bounds(); b.Dx() != 128 || b.Dy() > 128 {
+		t.Fatalf("miniatura %dx%d, quiero 128 de lado mayor", b.Dx(), b.Dy())
+	}
+	transparente := false
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y && !transparente; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			if _, _, _, a := img.At(x, y).RGBA(); a < 0xffff {
+				transparente = true
+				break
+			}
+		}
+	}
+	if !transparente {
+		t.Fatal("el alfa del WebP se ha perdido en la miniatura")
+	}
+}
+
+// TestElWebPConAlfaCuestaLoMedido: un WebP con alfa pide ~7 B/px al decodificar
+// (el alfa pasa por un NRGBA intermedio). Con la tarifa del JPEG (3 B/px), uno de
+// 20 MP cabía en MaxBytes y pedía el doble; se rechaza por la cabecera, sin decodificar.
+func TestElWebPConAlfaCuestaLoMedido(t *testing.T) {
+	if _, err := miniatura.Render(webpVP8X(5000, 4000, true), 512, "image/png"); !errors.Is(err, miniatura.ErrMedioNoSoportado) {
+		t.Fatalf("WebP con alfa de 20 MP: err=%v, quiero ErrMedioNoSoportado", err)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(webpVP8X(5000, 4000, false)))
+	if err != nil || !miniatura.Cabe(cfg) {
+		t.Fatalf("WebP opaco de 20 MP debe caber (err=%v)", err)
+	}
+	if _, err := miniatura.Render(webpVP8X(20000, 20000, false), 512, "image/png"); !errors.Is(err, miniatura.ErrMedioNoSoportado) {
+		t.Fatalf("bomba WebP de 400 MP: err=%v, quiero ErrMedioNoSoportado", err)
+	}
+}
+
+// TestElWebPExtendidoSinAlfaCuestaComoSinPerdida: un VP8X sin la marca de alfa se
+// anuncia como YCbCr, pero puede llevar dentro un VP8L sin pérdida que decodifica a
+// NRGBA (4 B/px). Uno de 25 MP cabía a 3 B/px y pedía más que MaxBytes.
+func TestElWebPExtendidoSinAlfaCuestaComoSinPerdida(t *testing.T) {
+	cfg, formato, err := miniatura.Cabecera(webpVP8X(5000, 5000, false))
+	if err != nil || formato != "webp" || cfg.ColorModel != color.NRGBAModel {
+		t.Fatalf("Cabecera(VP8X opaco) = %v, %q, %v; quiero NRGBA", cfg.ColorModel, formato, err)
+	}
+	if _, err := miniatura.Render(webpVP8X(5000, 5000, false), 512, "image/png"); !errors.Is(err, miniatura.ErrMedioNoSoportado) {
+		t.Fatalf("WebP VP8X opaco de 25 MP: err=%v, quiero ErrMedioNoSoportado", err)
+	}
+	// El JPEG del mismo tamaño no cambia de tarifa.
+	if !miniatura.Cabe(image.Config{ColorModel: color.YCbCrModel, Width: 5000, Height: 5000}) {
+		t.Fatal("un JPEG de 25 MP debe seguir cabiendo")
+	}
+}
+
+// TestLaMiniaturaJPEGDeUnaImagenConAlfaSaleSobreBlanco: el JPEG no tiene alfa; lo
+// transparente de un PNG o WebP se aplana sobre blanco, no sobre negro.
+func TestLaMiniaturaJPEGDeUnaImagenConAlfaSaleSobreBlanco(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 64, 64)) // todo transparente
+	var in bytes.Buffer
+	if err := png.Encode(&in, src); err != nil {
+		t.Fatal(err)
+	}
+	out, err := miniatura.Render(in.Bytes(), 32, "image/jpeg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := jpeg.Decode(bytes.NewReader(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, g, b, _ := img.At(16, 16).RGBA(); r>>8 < 0xf0 || g>>8 < 0xf0 || b>>8 < 0xf0 {
+		t.Fatalf("lo transparente sale (%d,%d,%d), quiero blanco", r>>8, g>>8, b>>8)
 	}
 }

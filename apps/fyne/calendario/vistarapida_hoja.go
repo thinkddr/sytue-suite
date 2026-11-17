@@ -77,8 +77,8 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 		hueco := container.New(ui.Columna{})
 		hijos = append(hijos, hueco)
 		uid := o.Event.UID
-		a.lanzar(func() {
-			l, err := a.notasDe(uid)
+		a.lanzar(func(vida context.Context) {
+			l, err := a.notasDe(vida, uid)
 			a.enUI(func() {
 				if err != nil {
 					return
@@ -94,19 +94,10 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 			})
 		})
 	}
-	if a.meHanInvitado(o) {
-		botones := make([]fyne.CanvasObject, 0, 3)
-		for _, r := range []struct {
-			clave, estado string
-			variante      ui.Variante
-		}{
-			{"popover.yes", "accepted", ui.Primario},
-			{"popover.maybe", "tentative", ui.Secundario},
-			{"popover.no", "declined", ui.Secundario},
-		} {
-			estado := r.estado
-			botones = append(botones, ui.NuevoBoton(p.t(r.clave, nil), cerrar(func() { a.responder(o, estado) })).Con(r.variante, ui.TallaMD))
-		}
+	if respuesta := a.miRespuesta(o); respuesta != "" {
+		botones := p.botonesRespuesta(respuesta, ui.TallaMD, func(estado string) {
+			cerrar(func() { a.responder(o, estado) })()
+		})
 		// `border-border-subtle border-t pt-3`, como en la web.
 		filete := canvas.NewRectangle(tema.Color("border-subtle", v))
 		hijos = append(hijos, container.New(&conFileteArriba{Pad: tema.Espacio(3)}, filete,
@@ -118,12 +109,12 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 		hijos = append(hijos, ui.NuevoParrafo(p.t("popover.readOnly", nil), tema.TextoXS, ui.Normal, "text-subtle", v).A(ancho))
 	}
 	d.CambiarCuerpo(container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...))
-	d.Mostrar(c)
+	a.mostrarDialogo(d, c)
 }
 
 // notasDe pide a Notepads las notas de un evento, con el mismo plazo que el panel.
-func (a *App) notasDe(uid string) ([]api.Note, error) {
-	ctx, parar := context.WithTimeout(context.Background(), plazo)
+func (a *App) notasDe(vida context.Context, uid string) ([]api.Note, error) {
+	ctx, parar := context.WithTimeout(vida, plazo)
 	defer parar()
 	return a.Notas(ctx, uid)
 }

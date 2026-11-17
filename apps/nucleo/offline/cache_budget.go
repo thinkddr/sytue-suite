@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"os"
 	"path"
 	"slices"
 	"strings"
@@ -71,7 +72,7 @@ func (s *Store) writeHTTP(ctx context.Context, owner, product, id string, produc
 }
 
 func (f ficheros) lockHTTP(ctx context.Context) (func(), error) {
-	file, err := openRootLockFile(f.raiz, ".http-cache-lock")
+	file, err := ajustes.AbrirCreandoEnRaiz(f.raiz, ".http-cache-lock", os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}

@@ -23,12 +23,13 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   Button,
   Card,
+  cx,
+  formatBytes,
   Icon,
+  InlineHelp,
   Meter,
   ProgressBar,
   SectionHeader,
-  cx,
-  formatBytes,
   useListReorder,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
@@ -272,9 +273,9 @@ function SubirFicheros({ locale, user, hubBaseUrl }: Omit<Props, 'drive'>): JSX.
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div class="flex min-w-0 flex-col gap-6">
             {!enLinea ? (
-              <p class="bg-warning-bg text-warning-text rounded-md px-4 py-3 text-sm" role="status">
-                {t('errors.offline.title')}. {t('errors.offline.description')}
-              </p>
+              <InlineHelp tone="warning" title={t('errors.offline.title')}>
+                {t('errors.offline.description')}
+              </InlineHelp>
             ) : null}
             {/* La zona de soltar: también un botón, para quien no arrastra. */}
             <div

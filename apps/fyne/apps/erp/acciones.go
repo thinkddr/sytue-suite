@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -31,19 +32,121 @@ import (
 // quedabas mirando la lista sin saber si había entrado. Las llamadas van en `fondo`
 // (otra rutina) y lo que contestan se pinta en la de la interfaz (`enHilo`).
 
-// MensajeDeError es `mensajeDeError` de lib/api.ts: `sin_permiso` se traduce, y el
-// resto es el mensaje del servicio o, sin él, «algo ha ido mal».
+// Errores es `ERRORES` de lib/api.ts: el `code` del servicio y la clave de catálogo
+// que lo cuenta. La frase que acompaña al código es un respaldo en inglés y no se
+// enseña; sin fila, «algo ha ido mal». El test compara esta tabla con la de la web
+// fila a fila, así que se amplían las dos a la vez.
+var Errores = map[string]string{
+	// Acceso.
+	"sin_permiso": "error.sinPermiso",
+	"cuatro_ojos": "error.code.fourEyes",
+	// VERI*FACTU.
+	"certificado_invalido":        "vf.error.invalidCertificate",
+	"certificado_nif_no_coincide": "vf.error.certificateTaxIdMismatch",
+	"certificado_contrasena":      "vf.error.wrongPassword",
+	"verifactu_no_disponible":     "error.code.verifactuUnavailable",
+	"factura_emitida":             "error.code.invoiceIssued",
+	"verifactu_pendiente":         "error.code.verifactuPending",
+	"nada_que_subsanar":           "error.code.nothingToCorrect",
+	"nif_con_verifactu":           "error.code.taxIdWithVerifactu",
+	// El libro y los documentos.
+	"periodo_cerrado":             "error.code.periodClosed",
+	"cierre_hacia_atras":          "error.code.closeBackwards",
+	"requiere_aprobacion":         "error.code.approvalRequired",
+	"aprobacion_resuelta":         "error.code.approvalResolved",
+	"modelo_desconocido":          "error.code.unknownModel",
+	"estado_invalido":             "error.code.invalidStatus",
+	"no_contable":                 "error.code.notPostable",
+	"ya_asentado":                 "error.code.alreadyPosted",
+	"referencia_duplicada":        "error.code.duplicateReference",
+	"accion_invalida":             "error.code.invalidAction",
+	"sin_ids":                     "error.code.noIds",
+	"ids_invalidos":               "error.code.invalidIds",
+	"factura_ilegible":            "error.code.unreadableInvoice",
+	"modules_disabled":            "error.code.modulesDisabled",
+	"organizacion_no_configurada": "error.code.orgNotConfigured",
+	"no_calculable":               "error.code.notComputable",
+	// Adjuntos, importación y conectores.
+	"adjunto_tipo":             "error.code.attachmentType",
+	"adjunto_grande":           "error.code.attachmentTooLarge",
+	"csv_invalido":             "error.code.invalidCsv",
+	"csv_sin_columnas":         "error.code.csvNoColumns",
+	"importacion_no_simulable": "error.code.importNotSimulable",
+	"ya_revertida":             "error.code.alreadyReverted",
+	"conector_desconocido":     "error.code.unknownConnector",
+	"conexion_bases_invalida":  "error.code.invalidBasesConnection",
+	// Banco.
+	"ya_justificado":     "error.code.alreadyJustified",
+	"no_justificado":     "error.code.notJustified",
+	"factura_no_abierta": "error.code.invoiceNotOpen",
+	"sentido_factura":    "error.code.invoiceDirection",
+	"motivo_desconocido": "error.code.unknownReason",
+	// Sytue AI.
+	"ia_no_disponible": "error.code.aiUnavailable",
+	"ia_limite":        "error.code.aiLimit",
+	"ia_sin_informe":   "error.code.aiNoReport",
+	"ia_sin_plan":      "error.code.aiNoPlan",
+	"informe_invalido": "error.code.invalidReport",
+	"informe_ocupado":  "error.code.reportBusy",
+	"pdf_sin_texto":    "error.code.pdfNoText",
+	// Enviar la factura por correo.
+	"correo_no_configurado": "send.unavailable",
+	"factura_no_enviable":   "send.notIssued",
+	"destinatario_invalido": "send.invalidTo",
+	"correo_no_enviado":     "send.failed",
+	// Los canónicos de la plataforma. Su respaldo en inglés a veces es concreto
+	// («hasta: expected a date…»), pero sigue siendo inglés: se dice lo que pasa.
+	"bad_request":            "error.code.badRequest",
+	"empty_body":             "error.code.badRequest",
+	"invalid_json":           "error.code.badRequest",
+	"multiple_json_objects":  "error.code.badRequest",
+	"unsupported_media_type": "error.code.badRequest",
+	"body_too_large":         "error.code.tooLarge",
+	"unauthorized":           "error.code.sessionExpired",
+	// El BFF contesta así cuando la cookie de sesión ya no vale.
+	"unauthenticated":        "error.code.sessionExpired",
+	"forbidden":              "error.code.forbidden",
+	"no_active_organization": "error.code.noActiveOrg",
+	"not_found":              "error.code.notFound",
+	"unprocessable":          "error.code.unprocessable",
+	"too_many_requests":      "error.code.tooManyRequests",
+	"unavailable":            "error.offline",
+	// El BFF, cuando el servicio no contesta (502).
+	"upstream_unavailable": "error.offline",
+}
+
+// prefijoSinVerbo es la familia `sin_verbo_<verbo>`: el rol alcanza el módulo pero no
+// el gesto (asentar, conciliar…).
+const prefijoSinVerbo = "sin_verbo_"
+
+// ClaveDeError es `claveDeError`: un 422 con el detalle campo a campo manda a mirar los
+// campos, que la ficha pinta debajo de cada uno.
+func ClaveDeError(e *api.Error) string {
+	codigo := e.Code()
+	switch {
+	case strings.HasPrefix(codigo, prefijoSinVerbo):
+		return "error.code.actionNotAllowed"
+	case codigo == "unprocessable" && len(e.Campos()) > 0:
+		return "error.code.checkFields"
+	}
+	if clave, ok := Errores[codigo]; ok {
+		return clave
+	}
+	// Sin código —el 401 de una sesión que ya no renueva, que ni llega a salir— el
+	// estado es lo único que hay.
+	if codigo == "" && e.Status == http.StatusUnauthorized {
+		return "error.code.sessionExpired"
+	}
+	return "error.generic"
+}
+
+// MensajeDeError es `mensajeDeError` de lib/api.ts: lo que dice el servicio, por su
+// código y en el idioma de quien mira; lo que no es del servicio —la red, el disco—,
+// «algo ha ido mal».
 func MensajeDeError(err error, tr *i18n.Translator) string {
 	var e *api.Error
-	switch {
-	case errors.As(err, &e) && e.Code() == "sin_permiso":
-		return tr.T("error.sinPermiso", nil)
-	case errors.As(err, &e) && e.Code() == "certificado_invalido":
-		return tr.T("vf.error.invalidCertificate", nil)
-	case errors.As(err, &e) && e.Code() == "certificado_nif_no_coincide":
-		return tr.T("vf.error.certificateTaxIdMismatch", nil)
-	case errors.As(err, &e) && e.Message() != "":
-		return e.Message()
+	if errors.As(err, &e) {
+		return tr.T(ClaveDeError(e), nil)
 	}
 	return tr.T("error.generic", nil)
 }
@@ -65,17 +168,60 @@ func (p *Pantalla) PuedeAccion(modulo, verbo string) bool {
 	return p.SabePermisos && p.Permisos.PuedeAccion(modulo, verbo)
 }
 
+// PuedeCrear es el `puedeCrear` de la web: el modelo existe, su módulo está activo y
+// el servicio ha concedido «crear» en él (que ya exige escritura en el módulo). A
+// diferencia de PuedeEscribir, no se ofrece mientras no se sepan los permisos: crear
+// en OTRO modelo no es lo que se está mirando.
+func (p *Pantalla) PuedeCrear(clave string) bool {
+	for _, m := range p.Modelos() {
+		if m.Clave == clave {
+			return slices.Contains(p.Catalogo.Activos, m.Modulo) && p.PuedeAccion(m.Modulo, "crear")
+		}
+	}
+	return false
+}
+
 // facturae es si la organización es española: sale Facturae y VERI*FACTU.
 func (p *Pantalla) facturae() bool { return p.Organizacion != nil && p.Organizacion.Pais == "ES" }
 
 // AbrirFicha abre el registro en el panel de la derecha y pide lo que cuelga de él.
+// Si la ficha que había tiene cambios sin guardar, pregunta antes (`dejarFicha`).
 func (p *Pantalla) AbrirFicha(r Registro) {
 	reg := r
-	p.abrirFicha(&reg, nil)
+	p.dejarFicha(func() { p.abrirFicha(&reg, nil) })
 }
 
 // NuevaFicha abre la ficha en blanco, o con los valores de `semilla` (duplicar).
-func (p *Pantalla) NuevaFicha(semilla *Registro) { p.abrirFicha(nil, semilla) }
+func (p *Pantalla) NuevaFicha(semilla *Registro) {
+	p.dejarFicha(func() { p.abrirFicha(nil, semilla) })
+}
+
+// dejarFicha es la puerta por la que pasa todo lo que saca de la ficha abierta
+// —cerrarla, Escape, «atrás», abrir otra, cambiar de modelo o de vista—: sin cambios
+// sigue en el acto; con algo escrito sin guardar, pregunta antes. Cerrar tiraba lo
+// tecleado sin avisar, y media factura se perdía por un clic en el menú.
+//
+// Es el `useGuardaDeFicha` de la web (lib/cambios.ts), con los mismos textos.
+func (p *Pantalla) dejarFicha(seguir func()) {
+	f := p.ficha
+	if f == nil || !f.Cambiada() || p.lienzo == nil {
+		seguir()
+		return
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	cuerpo := ui.NuevoParrafo(p.t("form.discardMessage"), tema.TextoBase, ui.Normal, "text-muted", v)
+	var d *ui.Dialogo
+	d = ui.Confirmacion(p.t("form.discardTitle"), p.t("form.keepEditing"), p.t("form.discard"), true, cuerpo,
+		func() { d.Cerrar() },
+		func() {
+			d.Cerrar()
+			// Lo de esta ficha se descarta aunque `seguir` no la cierre en el acto.
+			f.descartar()
+			seguir()
+		})
+	d.RotuloCerrar = p.tr.T("ui.close", nil)
+	d.Mostrar(p.lienzo)
+}
 
 func (p *Pantalla) abrirFicha(r, semilla *Registro) {
 	m := p.lista.Modelo
@@ -166,13 +312,16 @@ func vacioSiFalla[T any](xs []T, err error) []T {
 
 // engancharFicha conecta los botones de la ficha con el servicio.
 func (p *Pantalla) engancharFicha(f *Ficha) {
-	f.AlCerrar = p.cerrarFicha
+	f.AlCerrar = func() { p.dejarFicha(p.cerrarFicha) }
 	f.AlGuardar = func() { p.guardar(f) }
 	f.AlEstado = func(e string) { p.cambiarEstado(f, e) }
 	f.AlAsentar = func() { p.asentar(f) }
+	f.AlPedirAprobacion = func() { p.pedirAprobacion(f) }
 	f.AlAnular = func(a api.ERPAsiento) { p.pedirAnular(f, a) }
 	f.AlBorrar = func() { p.pedirBorrar(f) }
 	f.AlRestaurar = func() { p.restaurar(f) }
+	f.PuedeCrear = p.PuedeCrear
+	f.AlConvertir = func() { p.convertir(f) }
 	f.AlDuplicar = func() {
 		if f.Registro != nil {
 			semilla := *f.Registro
@@ -289,6 +438,45 @@ func (p *Pantalla) guardar(f *Ficha) {
 	})
 }
 
+// convertir es «Crear pedido» / «Crear factura»: el servidor crea el documento siguiente
+// y se abre, como el `onConvertido` de la web. Si falla, la ficha sigue abierta con el
+// motivo en su banda roja.
+func (p *Pantalla) convertir(f *Ficha) {
+	if p.svc == nil || f.Registro == nil || f.Guardando {
+		return
+	}
+	f.Guardando, f.Fallo = true, ""
+	p.Repintar()
+	m, id := f.Modelo, f.Registro.ID
+	destino := DestinoConversion(m.Clave, f.EstadoActual)
+	p.fondo(func() {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		nuevo, err := p.svc.Convertir(ctx, m.Clave, id)
+		enHilo(func() {
+			f.Guardando = false
+			if err != nil {
+				f.Fallo = MensajeDeError(err, p.tr)
+				p.Repintar()
+				return
+			}
+			if nuevo.Modelo != "" {
+				destino = nuevo.Modelo
+			}
+			// Lo cacheado del destino ya no tiene el documento nuevo, y el origen puede
+			// haber cambiado de estado al convertirse. Se olvida aunque la ficha ya se
+			// haya cerrado: el documento se creó igual y la lista no debe esconderlo.
+			p.olvidar(m.Clave)
+			p.olvidar(destino)
+			if !p.esta(f) {
+				p.Repintar()
+				return
+			}
+			p.abrirRegistro(destino, nuevo.ID)
+		})
+	})
+}
+
 // cambiarEstado mueve el registro de etapa. Como en la web, cierra la ficha.
 func (p *Pantalla) cambiarEstado(f *Ficha, estado string) {
 	if p.svc == nil || f.Registro == nil {
@@ -327,7 +515,7 @@ func (p *Pantalla) asentar(f *Ficha) {
 	if p.svc == nil || f.Registro == nil {
 		return
 	}
-	f.Guardando, f.Fallo = true, ""
+	f.Guardando, f.Fallo, f.FaltaAprobacion = true, "", false
 	p.Repintar()
 	m, id := f.Modelo, f.Registro.ID
 	p.fondo(func() {
@@ -340,9 +528,14 @@ func (p *Pantalla) asentar(f *Ficha) {
 		}
 		enHilo(func() {
 			f.Guardando = false
-			if err != nil {
+			var e *api.Error
+			switch {
+			case errors.As(err, &e) && e.Code() == "requiere_aprobacion":
+				// Pasa del umbral: en vez del error a secas, se ofrece pedirla.
+				f.FaltaAprobacion = true
+			case err != nil:
 				f.Fallo = MensajeDeError(err, p.tr)
-			} else {
+			default:
 				f.Aviso, f.Asientos = p.t("form.posted", i18n.Vars{"ref": ref}), asientos
 			}
 			p.Repintar()
@@ -483,7 +676,14 @@ func (p *Pantalla) escribirRegistro(f *Ficha, avisar func(), llamar func(context
 
 // duplicarDeLista es «Duplicar» en una fila: la copia la hace el SERVIDOR (borrador con
 // referencia nueva) y se abre; si falla, se abre una ficha nueva con los valores.
+//
+// Pregunta por la ficha abierta ANTES de pedir la copia, como la web: «Seguir editando»
+// no puede dejar un borrador nuevo en el servidor que nadie ha llegado a ver.
 func (p *Pantalla) duplicarDeLista(r Registro) {
+	p.dejarFicha(func() { p.duplicarEnServidor(r) })
+}
+
+func (p *Pantalla) duplicarEnServidor(r Registro) {
 	m := p.lista.Modelo
 	if p.svc == nil {
 		p.NuevaFicha(&r)
@@ -1010,22 +1210,27 @@ func (p *Pantalla) abrirRegistro(modelo, id string) {
 	if m.Clave == "" {
 		return
 	}
-	p.Abrir(m)
-	if p.svc == nil {
-		return
-	}
-	p.fondo(func() {
-		ctx, cancelar := p.ctx()
-		defer cancelar()
-		r, err := p.svc.Obtener(ctx, modelo, id)
-		enHilo(func() {
-			if err != nil {
-				p.avisar(ui.AvisoPeligro, p.t("error.generic"))
-				return
-			}
-			if p.lista.Modelo.Clave == modelo {
-				p.AbrirFicha(r)
-			}
+	// La pregunta por la ficha va antes de pedir el registro, como en la web: si se
+	// pidiera a la vez, «Descartar» llegaba tarde —el registro ya había vuelto con la
+	// lista todavía en el otro modelo— y la ficha pedida no se abría nunca.
+	p.dejarFicha(func() {
+		p.abrir(m)
+		if p.svc == nil {
+			return
+		}
+		p.fondo(func() {
+			ctx, cancelar := p.ctx()
+			defer cancelar()
+			r, err := p.svc.Obtener(ctx, modelo, id)
+			enHilo(func() {
+				if err != nil {
+					p.avisar(ui.AvisoPeligro, p.t("error.generic"))
+					return
+				}
+				if p.lista.Modelo.Clave == modelo {
+					p.AbrirFicha(r)
+				}
+			})
 		})
 	})
 }
@@ -1233,6 +1438,8 @@ func (p *Pantalla) cargarPortada() {
 	}
 	b := p.inicio
 	conPerfil := p.Organizacion != nil && p.PuedeLeer("obligaciones")
+	b.CargandoResumen = true
+	p.cargarFacturacion()
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
@@ -1243,6 +1450,7 @@ func (p *Pantalla) cargarPortada() {
 			proximas = p.proximasObligaciones(ctx)
 		}
 		enHilo(func() {
+			b.CargandoResumen = false
 			if errR == nil {
 				b.Resumen = &r
 			}
@@ -1295,6 +1503,11 @@ func (p *Pantalla) cambiarModulo(m Modulo, activo bool) {
 				return
 			}
 			p.Catalogo.Activos = res.Activos
+			// Encender las facturas desde la portada trae su gráfico al momento, como en
+			// la web, que lo decide al pintar; sin esto no salía hasta recargarla.
+			if f := p.inicio.Facturacion; !f.Cargando && f.Serie == nil {
+				p.cargarFacturacion()
+			}
 			nombres := func(claves []string) string {
 				out := make([]string, len(claves))
 				for i, c := range claves {
@@ -1454,6 +1667,9 @@ func (p *Pantalla) conTarjetaVF(v tema.Variante, lista fyne.CanvasObject) fyne.C
 		AlDeclaracion: func() { p.bajarVF(p.svc.DeclaracionVerifactu) },
 		AlExportar:    func() { p.bajarVF(p.svc.ExportarVerifactu) },
 	}
+	if p.svc != nil && p.lienzo != nil {
+		t.AlCertificado = p.abrirCertificadoVF
+	}
 	o, alto := t.Objeto(v, max(ancho-2*mx, 0))
 	return container.New(&conTarjeta{tarjeta: o, alto: alto, mx: mx, lista: lista}, o, lista)
 }
@@ -1516,6 +1732,111 @@ func (p *Pantalla) activarVF() {
 	})
 }
 
+// TamMaxCertificado acota lo que se lee del disco: un `.p12` con su cadena ronda los
+// 10 KiB, y el servicio no acepta más de 256 KiB de cuerpo (en base64, un tercio más).
+const TamMaxCertificado = 128 << 10
+
+// abrirCertificadoVF abre el asistente para subir el certificado de la organización.
+func (p *Pantalla) abrirCertificadoVF() {
+	if p.lienzo == nil || p.svc == nil {
+		return
+	}
+	c := NuevoCertificadoVF(p.tr)
+	c.Ventana = p.Ventana.Width
+	var d *ui.Dialogo
+	cerrar := func() {
+		if !c.Enviando {
+			d.Cerrar()
+		}
+	}
+	// Los gestos van antes de pintar: el cuerpo se arma con ellos.
+	if p.ElegirFicheros != nil {
+		elegir := func(extensiones []string, poner func(nombre string, datos []byte)) func() {
+			return func() {
+				p.ElegirFicheros(func(rutas []string) {
+					ruta, ok := primeroCon(rutas, extensiones)
+					if !ok {
+						return
+					}
+					p.fondo(func() {
+						datos, err := leerAcotado(ruta, TamMaxCertificado)
+						enHilo(func() {
+							if err != nil {
+								c.Fallo = p.t("vf.error.invalidCertificate")
+								c.cambio()
+								return
+							}
+							poner(ruta, datos)
+						})
+					})
+				})
+			}
+		}
+		c.AlElegirFichero = elegir(ExtensionesCertificado, c.PonerFichero)
+		c.AlElegirClave = elegir(ExtensionesClave, c.PonerClave)
+	}
+	c.AlGuardar = func() { p.guardarCertificadoVF(c) }
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	ancho := anchoCuerpoDialogo(ui.DialogoMD, p.Ventana.Width)
+	cuerpo, pie := nuevoVivo(c.Cuerpo(v, ancho)), nuevoVivo(c.Pie(cerrar))
+	d = ui.NuevoDialogo(p.t("vf.cert.title"), cuerpo.c).Con(ui.DialogoMD, pie.c)
+	d.RotuloCerrar = p.tr.T("ui.close", nil)
+	c.AlCambio = func() {
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		cuerpo.poner(c.Cuerpo(v, ancho))
+		pie.poner(c.Pie(cerrar))
+		// `dismissable={!enviando}`: con el fichero en vuelo no se cierra a medias.
+		d.NoDescartable = c.Enviando
+		d.Recolocar()
+	}
+	d.Mostrar(p.lienzo)
+}
+
+// guardarCertificadoVF lo manda y, si entra, la tarjeta pasa a decir de quién es.
+func (p *Pantalla) guardarCertificadoVF(c *CertificadoVF) {
+	if p.svc == nil || c.Enviando || !c.PuedeGuardar() {
+		return
+	}
+	peticion := c.Peticion()
+	c.Enviando, c.Fallo, c.FalloContrasena = true, "", ""
+	c.cambio()
+	p.fondo(func() {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		e, err := p.svc.SubirCertificadoVerifactu(ctx, peticion)
+		enHilo(func() {
+			if err != nil {
+				var ae *api.Error
+				c.Fallido(errors.As(err, &ae) && ae.Code() == "certificado_contrasena", MensajeDeError(err, p.tr))
+				return
+			}
+			c.Hecho(e)
+			p.verifactu = &e
+			p.Repintar()
+		})
+	})
+}
+
+// leerAcotado lee un fichero elegido en el selector, sin pasar de `tope` bytes: uno más
+// grande no es un certificado.
+func leerAcotado(ruta string, tope int64) ([]byte, error) {
+	f, err := os.Open(ruta) //nolint:gosec // G304: la ruta la eligió quien usa la app en el selector del sistema
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	datos, err := io.ReadAll(io.LimitReader(f, tope+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(datos)) > tope {
+		return nil, errFicheroGrande
+	}
+	return datos, nil
+}
+
+var errFicheroGrande = errors.New("erp: el fichero es demasiado grande para ser un certificado")
+
 // bajarVF baja la declaración o los registros y los abre.
 func (p *Pantalla) bajarVF(bajar func(context.Context) (io.ReadCloser, string, error)) {
 	if p.svc == nil {
@@ -1562,14 +1883,7 @@ func (p *Pantalla) subirDocumento(modelo, registro string, estado func(subiendo 
 		estado(true)
 		p.Repintar()
 		p.fondo(func() {
-			datos, err := os.ReadFile(ruta) //nolint:gosec // G304: la ruta la eligió quien usa la app en el selector del sistema
-			cerradas := 0
-			if err == nil {
-				ctx, cancelar := p.ctx()
-				defer cancelar()
-				cerradas, err = p.svc.SubirAdjunto(ctx, modelo, registro, filepath.Base(ruta),
-					mime.TypeByExtension(strings.ToLower(filepath.Ext(ruta))), datos)
-			}
+			cerradas, err := p.subirRuta(modelo, registro, ruta)
 			enHilo(func() {
 				switch {
 				case err != nil:
@@ -1585,6 +1899,19 @@ func (p *Pantalla) subirDocumento(modelo, registro string, estado func(subiendo 
 			})
 		})
 	})
+}
+
+// subirRuta lee un fichero ya elegido y lo adjunta al registro; devuelve las tareas que
+// cerró. Va en `p.fondo`: lee del disco y habla con la red.
+func (p *Pantalla) subirRuta(modelo, registro, ruta string) (int, error) {
+	datos, err := os.ReadFile(ruta) //nolint:gosec // G304: la ruta la eligió quien usa la app en el selector del sistema
+	if err != nil {
+		return 0, err
+	}
+	ctx, cancelar := p.ctx()
+	defer cancelar()
+	return p.svc.SubirAdjunto(ctx, modelo, registro, filepath.Base(ruta),
+		mime.TypeByExtension(strings.ToLower(filepath.Ext(ruta))), datos)
 }
 
 // importar elige uno o varios ficheros y los importa en el modelo abierto: CSV y, en
@@ -1652,6 +1979,7 @@ func (p *Pantalla) importarDeVerdad(m Modelo, leidos []ficheroLeido) {
 // quien monta la app, después de crear la pantalla.
 func (p *Pantalla) conFicheros() {
 	p.engancharBanco()
+	p.engancharTPV()
 	if p.ElegirFicheros == nil {
 		p.lista.AlImportar, p.tareas.AlSubir, p.oblig.AlSubirDoc = nil, nil, nil
 		return

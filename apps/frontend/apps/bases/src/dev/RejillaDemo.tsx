@@ -12,6 +12,7 @@ import type { Locale } from '@sytue/i18n';
 import type { BasesField, BasesRecord, BasesValue } from '@sytue/api-clients/bases';
 import { Rejilla } from '../components/Rejilla.js';
 import { DialogoVarios } from '../components/Dialogos.js';
+import { FichaRegistro } from '../components/FichaRegistro.js';
 import { useT } from '../i18n/index.js';
 
 const campo = (id: string, name: string, kind: BasesField['kind'], extra = {}): BasesField => ({
@@ -70,6 +71,7 @@ export function RejillaDemo({
     reg(3, { nombre: 'Cleo y Gus', alta: '2026-03-04' }),
   ]);
   const [varios, setVarios] = useState<{ r: BasesRecord; c: BasesField } | null>(null);
+  const [ficha, setFicha] = useState<BasesRecord | null>(null);
 
   return (
     <div class="bg-bg text-text p-4">
@@ -91,7 +93,7 @@ export function RejillaDemo({
         }}
         onElegirVarios={(r, c) => setVarios({ r, c })}
         onAdjuntos={() => undefined}
-        onBorrar={(r) => setRegistros((rs) => rs.filter((x) => x.id !== r.id))}
+        onAbrir={setFicha}
         onNuevo={() => setRegistros((rs) => [...rs, reg(rs.length + 4, {})])}
         desde={0}
         hayAntes={false}
@@ -99,6 +101,31 @@ export function RejillaDemo({
         hayMas={false}
         onMas={() => undefined}
       />
+      {ficha ? (
+        <FichaRegistro
+          t={t}
+          campos={CAMPOS}
+          registro={ficha}
+          actual={ficha}
+          n={registros.findIndex((x) => x.id === ficha.id) + 1}
+          nuevo={false}
+          puedeEditar={!soloLectura}
+          opciones={{}}
+          etiquetas={{}}
+          onGuardar={(datos) => {
+            setRegistros((rs) =>
+              rs.map((x) => (x.id === ficha.id ? { ...x, data: { ...x.data, ...datos } } : x)),
+            );
+            setFicha(null);
+          }}
+          onBorrar={() => {
+            setRegistros((rs) => rs.filter((x) => x.id !== ficha.id));
+            setFicha(null);
+          }}
+          onAdjuntos={() => undefined}
+          onCerrar={() => setFicha(null)}
+        />
+      ) : null}
       {varios ? (
         <DialogoVarios
           t={t}

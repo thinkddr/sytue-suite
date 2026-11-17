@@ -336,3 +336,55 @@ func TestRoomsPideSoloLosPermisosQueConsume(t *testing.T) {
 		t.Fatalf("faltan plantillas de Rooms: %v", want)
 	}
 }
+
+// TestOAuth_siemprePreguntaLaCuenta: al añadir una cuenta, el proveedor tiene que
+// enseñar su selector aunque el navegador ya tenga una sesión abierta. Sin el
+// parámetro, Microsoft y Google conectan en silencio la cuenta que ya estaba iniciada
+// y la persona acaba con la cuenta equivocada sin haber elegido nada.
+//
+// Los proveedores que no aparecen aquí (Slack, Zoom, Atlassian…) no publican un
+// parámetro para forzar el selector; su pantalla de permisos ya muestra la cuenta.
+func TestOAuth_siemprePreguntaLaCuenta(t *testing.T) {
+	list, err := seeds.Load()
+	if err != nil {
+		t.Fatalf("seeds.Load: %v", err)
+	}
+	// host de autorización → parámetro y valor que fuerzan el selector.
+	exige := map[string][2]string{
+		"login.microsoftonline.com": {"prompt", "select_account"},
+		"accounts.google.com":       {"prompt", "select_account"},
+		"github.com":                {"prompt", "select_account"},
+		"www.dropbox.com":           {"force_reauthentication", "true"},
+	}
+	vistos := map[string]bool{}
+	for _, s := range list {
+		m, err := manifest.Parse(s.Manifest)
+		if err != nil || m.OAuth == nil {
+			continue
+		}
+		// Las URLs con {campo} (Salesforce, ServiceNow…) son por instancia y no
+		// parsean hasta resolverse; ninguno de los hosts de arriba las usa.
+		u, err := url.Parse(m.OAuth.AuthorizeURL)
+		if err != nil {
+			continue
+		}
+		regla, ok := exige[u.Host]
+		if !ok {
+			continue
+		}
+		vistos[u.Host] = true
+		valor := m.OAuth.AuthorizeParams[regla[0]]
+		if valor == "" {
+			valor = u.Query().Get(regla[0])
+		}
+		// prompt admite varios valores separados por espacio (Google: «consent select_account»).
+		if !strings.Contains(" "+valor+" ", " "+regla[1]+" ") {
+			t.Errorf("%s: falta %s=%s en la autorización (tiene %q): conectaría la cuenta ya iniciada sin preguntar", s.Key, regla[0], regla[1], valor)
+		}
+	}
+	for host := range exige {
+		if !vistos[host] {
+			t.Errorf("ninguna plantilla usa %s: la regla sobra o el host ha cambiado", host)
+		}
+	}
+}

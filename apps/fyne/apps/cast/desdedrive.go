@@ -162,17 +162,18 @@ func PantallaDesdeDrive(v Vista, d DesdeDrive) *fyne.Container {
 }
 
 // esqueletoDrive es la tarjeta del fichero en esqueleto y, al lado, el hueco de la
-// visibilidad.
+// visibilidad: un solo grupo de carga, que late a una.
 func esqueletoDrive(v Vista) fyne.CanvasObject {
+	carga := ui.NuevosBloquesEsqueleto()
 	barra := func(alto float32) fyne.CanvasObject {
-		return container.New(&altoFijo{alto: alto}, ui.NuevoEsqueleto(0, 0))
+		return container.New(&altoFijo{alto: alto}, carga.Bloque(0, 0))
 	}
 	tarjeta := Recuadro(v, "", ui.PilaBloques(
 		ui.Bloque{Obj: barra(1.25 * tema.Rem), Margen: tema.Espacio(4)},
 		ui.Bloque{Obj: barra(2.25 * tema.Rem), Margen: tema.Espacio(4)},
 		ui.Bloque{Obj: barra(0.75 * tema.Rem)},
 	))
-	return enDosDrive(v, tarjeta, barra(16*tema.Rem))
+	return carga.Con(enDosDrive(v, tarjeta, barra(16*tema.Rem)))
 }
 
 // enDosDrive es `lg:grid-cols-[minmax(0,1fr)_20rem] gap-6`; debajo de lg, en columna.

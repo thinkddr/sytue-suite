@@ -38,7 +38,7 @@ import (
 func encuestaSembrada(t *testing.T, st *store.Store, multi bool) (domain.Team, domain.Channel, domain.Message) {
 	t.Helper()
 	ctx := tenantCtx("acme")
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	card := domain.Card{Kind: domain.CardPoll, Options: []string{"lunes", "martes", "miércoles"}, Multi: multi}
 	m, err := st.CreateMessage(ctx, store.NewMessageRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice",
@@ -52,7 +52,7 @@ func encuestaSembrada(t *testing.T, st *store.Store, multi bool) (domain.Team, d
 
 // alEquipo mete a alguien en el equipo. Hace falta para votar: en un canal PÚBLICO
 // el acceso es la pertenencia al equipo (requireChannelAccess), no la del canal.
-func alEquipo(t *testing.T, ctx context.Context, st *store.Store, teamID uuid.UUID, sub, nombre string) {
+func alEquipo(ctx context.Context, t *testing.T, st *store.Store, teamID uuid.UUID, sub, nombre string) {
 	t.Helper()
 	if err := st.AddTeamMember(ctx, teamID, "alice", sub, nombre, domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember(%s): %v", sub, err)
@@ -146,7 +146,7 @@ func TestEncuestaDeRespuestaUnicaSustituyeElVoto(t *testing.T) {
 	}
 
 	// Otra persona SÍ suma, y los subs viajan para saber quién votó qué.
-	alEquipo(t, ctx, st, tm.ID, "bob", "Bob")
+	alEquipo(ctx, t, st, tm.ID, "bob", "Bob")
 	if _, votes, err = st.SetCardVote(ctx, m.ID, "bob", "2"); err != nil {
 		t.Fatalf("voto de bob: %v", err)
 	}
@@ -210,8 +210,8 @@ func TestTareaHechaYReabierta(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
-	alEquipo(t, ctx, st, tm.ID, "bob", "Bob")
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
+	alEquipo(ctx, t, st, tm.ID, "bob", "Bob")
 	card := domain.Card{Kind: domain.CardTask, AssigneeSub: "bob", AssigneeName: "Bob"}
 	m, err := st.CreateMessage(ctx, store.NewMessageRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice", Body: "Enviar el informe", Card: &card,
@@ -245,8 +245,8 @@ func TestVotosDeVariosMensajesNoSeMezclan(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
-	alEquipo(t, ctx, st, tm.ID, "bob", "Bob")
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
+	alEquipo(ctx, t, st, tm.ID, "bob", "Bob")
 	nueva := func(pregunta string) domain.Message {
 		card := domain.Card{Kind: domain.CardPoll, Options: []string{"sí", "no"}}
 		m, err := st.CreateMessage(ctx, store.NewMessageRecord{
@@ -293,7 +293,7 @@ func TestVotosAisladosPorOrganizacion(t *testing.T) {
 	st := store.New(h.Pool, nil)
 
 	acme := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, acme, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(acme, t, st, "alice", domain.ChannelPublic)
 	card := domain.Card{Kind: domain.CardPoll, Options: []string{"sí", "no"}}
 	m, err := st.CreateMessage(acme, store.NewMessageRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice", Body: "¿Vamos?", Card: &card,

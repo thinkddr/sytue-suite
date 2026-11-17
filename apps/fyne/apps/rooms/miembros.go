@@ -263,7 +263,7 @@ func (p *PanelRoster) construirCuerpo() fyne.CanvasObject {
 	case p.Estado == Error:
 		cosas = append(cosas, NuevoAvisoHilo(t.T("members.loadFailed", nil), t.T("action.retry", nil), p.AlReintentar))
 	case p.Estado == Cargando:
-		cosas = append(cosas, nuevoEsqueletoMiembros())
+		cosas = append(cosas, nuevoEsqueletoMiembros(t.T("members.loading", nil)))
 	case p.Anadiendo && len(vis) == 0 && PareceIdentificador(p.consulta):
 	case p.Anadiendo && len(vis) == 0:
 		clave := "members.teamAllIn"
@@ -350,31 +350,19 @@ func (p *PanelRoster) fila(m Miembro) fyne.CanvasObject {
 }
 
 // nuevoEsqueletoMiembros son las tres filas de «cargando»: `flex items-center gap-3
-// px-4 py-2`, el cuadro de `2rem` y una barra de `0.75rem` al 55, 42 y 60 %.
-func nuevoEsqueletoMiembros() fyne.CanvasObject {
-	filas := make([]fyne.CanvasObject, 0, 4)
-	filas = append(filas, hueco(tema.Espacio(2)))
-	for _, parte := range []float32{0.55, 0.42, 0.60} {
-		filas = append(filas, container.New(&filaEsqueleto{parte: parte},
-			ui.NuevoEsqueleto(LadoEsqueletoAvatar, LadoEsqueletoAvatar), ui.NuevoEsqueleto(0, AltoEsqueletoTexto)))
-	}
-	return container.New(ui.Columna{Hueco: tema.Espacio(3)}, filas...)
-}
-
-// filaEsqueleto coloca el cuadro y la barra de una fila de «cargando».
-type filaEsqueleto struct{ parte float32 }
-
-func (f *filaEsqueleto) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, LadoEsqueletoAvatar)
-}
-
-func (f *filaEsqueleto) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	x := CanalonFilaHilo
-	objs[0].Move(fyne.NewPos(x, 0))
-	objs[0].Resize(fyne.NewSize(LadoEsqueletoAvatar, LadoEsqueletoAvatar))
-	x += LadoEsqueletoAvatar + tema.Espacio(3)
-	objs[1].Move(fyne.NewPos(x, (LadoEsqueletoAvatar-AltoEsqueletoTexto)/2))
-	objs[1].Resize(fyne.NewSize(max(t.Width-x-CanalonFilaHilo, 0)*f.parte, AltoEsqueletoTexto))
+// px-4 py-2`, el cuadro de `2rem` y una barra de `0.75rem` al 55, 42 y 60 %, con el
+// `py-2` y el `gap-3` de la columna encima. Es `ui.FilasEsqueleto` con esa receta.
+func nuevoEsqueletoMiembros(nombre string) *ui.FilasEsqueleto {
+	return ui.NuevasFilasEsqueleto(3, ui.DelanteroTesela, 1).ConReceta(ui.RecetaEsqueleto{
+		Alto:           LadoEsqueletoAvatar,
+		Hueco:          tema.Espacio(3),
+		Encima:         tema.Espacio(2) + tema.Espacio(3),
+		Izq:            CanalonFilaHilo,
+		Der:            CanalonFilaHilo,
+		Delantero:      fyne.NewSize(LadoEsqueletoAvatar, LadoEsqueletoAvatar),
+		HuecoDelantero: tema.Espacio(3),
+		Rayas:          []ui.RayaEsqueleto{{Alto: AltoEsqueletoTexto, Partes: []float32{0.55, 0.42, 0.60}}},
+	}).ConRotulo(nombre)
 }
 
 // CreateRenderer monta el panel.

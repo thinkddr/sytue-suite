@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
-import { Button, Checkbox, Modal, Spinner, Wizard, withBase } from '@sytue/ui';
+import { Button, Checkbox, InlineHelp, Modal, Spinner, withBase, Wizard } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
 import { api, baseDeLaApp, consulta, mensajeDeError } from '../lib/api.js';
@@ -218,9 +218,9 @@ export function ProcesoObligacion({
       dismissable={!busy}
     >
       {error ? (
-        <p role="alert" class="bg-danger-bg text-danger-text mb-4 rounded-md p-3">
+        <InlineHelp tone="danger" class="mb-4">
           {error}
-        </p>
+        </InlineHelp>
       ) : null}
       {!progreso ? (
         <div class="space-y-3 py-8">

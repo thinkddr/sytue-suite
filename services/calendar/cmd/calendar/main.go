@@ -23,6 +23,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
+	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
 	"git.sytue.eu/sytue/one/platform/pkg/correo"
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -203,11 +204,12 @@ func run() error {
 	}
 
 	router := calendarhttp.NewRouter(calendarhttp.Deps{
-		Cfg:      cfg,
-		Service:  svc,
-		Verifier: verifier,
-		CalDAV:   caldavBackend.Handler(),
-		Hub:      notifier,
+		Cfg:            cfg,
+		Service:        svc,
+		Verifier:       verifier,
+		CalDAV:         caldavBackend.Handler(),
+		PrivateIngress: st.PrivateIngressQueue(callaccess.New(cfg.RoomsURL, cfg.RoomsInternalSecret)),
+		Hub:            notifier,
 		ReadyCheckers: []httpx.Checker{
 			httpx.CheckerFunc{Label: "postgres", Fn: st.Healthz},
 		},

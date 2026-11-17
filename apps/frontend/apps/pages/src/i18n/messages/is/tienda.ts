@@ -175,14 +175,9 @@ export const tienda = {
   'store.mode_test_help':
     'Hermdar greiðslur með prófunarlyklum þjónustuaðilans. Enginn er rukkaður.',
   'store.mode_live_help': 'Raunverulegar greiðslur frá viðskiptavinum með raunlyklum.',
-  'store.webhook_title': 'Skref 1: slóð vefkróks (webhook)',
   'store.webhook_help': 'Límdu þessa slóð inn í stjórnborðið hjá {nombre}.',
   'store.webhook_label': 'Slóð vefkróks',
   'store.webhook_error': 'Ekki tókst að sækja slóð vefkróksins. Lokaðu glugganum og reyndu aftur.',
-  'store.copy': 'Afrita',
-  'store.copied': 'Slóð afrituð.',
-  'store.credentials_title': 'Skilríki',
-  'store.credentials_step': 'Skref 2: skilríki',
   'store.f_api_key': 'API-lykill',
   'store.f_api_key_mode': 'API-lykill ({modo})',
   'store.f_profile_id': 'Prófílauðkenni (valfrjálst)',
@@ -200,6 +195,49 @@ export const tienda = {
   'store.gateway_save': 'Vista og prófa',
   'store.gateway_saved': 'Gáttin {nombre} prófuð og vistuð.',
   'store.gateway_save_error': 'Ekki tókst að sannreyna skilríki gáttarinnar.',
+  'store.wz_progress': 'Skref til að tengja greiðslugáttina',
+  'store.wz_step_mode': 'Hamur',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Lyklar',
+  'store.wz_step_check': 'Athuga',
+  'store.wz_step_done': 'Lokið',
+  'store.wz_mode_heading': 'Prófunargreiðslur eða raunverulegar greiðslur?',
+  'store.wz_mode_desc':
+    'Byrjaðu í prófunarham; þegar allt virkar skaltu opna þennan leiðarvísi aftur og velja raunham.',
+  'store.wz_webhook_heading': 'Segðu {nombre} hvert á að senda greiðslutilkynningar',
+  'store.wz_keys_heading': 'Lyklarnir þínir frá {nombre}',
+  'store.wz_keys_desc':
+    'Leynilyklar eru geymdir innsiglaðir og aldrei sýndir aftur: til að breyta lykli skaltu slá hann inn aftur.',
+  'store.wz_keys_rejected': '{nombre} samþykkti ekki þessa lykla',
+  'store.wz_check_heading': 'Athuga og vista',
+  'store.wz_check_desc':
+    'Sytue Web prófar lyklana hjá {nombre} áður en greiðslugáttin er virkjuð. Ekkert er vistað fyrr en prófið tekst.',
+  'store.wz_secret_hidden': 'Sleginn inn (falinn)',
+  'store.wz_empty_value': 'Ekki gefið upp',
+  'store.wz_done_heading': '{nombre} er tilbúið',
+  'store.wz_finish': 'Ljúka',
+  'store.hint_mollie_api_key':
+    'Í Mollie: Developers › API keys. Prófunarlyklar byrja á test_ og raunlyklar á live_.',
+  'store.hint_mollie_profile':
+    'Í Mollie: Settings › Website profiles. Það byrjar á pfl_; skildu það eftir autt til að nota sjálfgefna sniðið.',
+  'store.hint_adyen_api_key':
+    'Í Adyen Customer Area: Developers › API credentials › auðkennið þitt › API key.',
+  'store.hint_adyen_merchant':
+    'Í Adyen Customer Area, í reikningsvalinu efst: söluaðilareikningurinn, ekki fyrirtækjareikningurinn.',
+  'store.hint_adyen_hmac':
+    'Í Adyen: Developers › Webhooks › webhook-inn þinn › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Í Adyen (raunhamur): Developers › API URLs. Það er sá hluti slóðarinnar sem er á undan -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Bankinn þinn lætur þig fá það með samningnum um sýndarposa; það birtist líka í stjórnborði Redsys.',
+  'store.hint_redsys_terminal':
+    'Í stjórnborði Redsys, við hliðina á söluaðilakóðanum. Yfirleitt er það 1.',
+  'store.hint_redsys_secret':
+    'Í stjórnborði Redsys: upplýsingar um söluaðila › SHA-256-lykill. Prófunar- og raunlykillinn eru ólíkir.',
+  'store.hint_stripe_secret':
+    'Í Stripe: Developers › API keys › Secret key. Hann byrjar á sk_test_ eða sk_live_.',
+  'store.hint_stripe_webhook':
+    'Í Stripe: Developers › Webhooks › endapunkturinn þinn › Signing secret. Það byrjar á whsec_.',
   'orders.subtitle': 'Pantanir og kaup sem gerð eru á vefsvæðinu þínu.',
   'orders.count': { one: '{count} pöntun', other: '{count} pantanir' },
   'orders.loading': 'Hleður pöntunum',

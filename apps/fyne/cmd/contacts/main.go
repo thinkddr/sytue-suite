@@ -4,8 +4,9 @@
 // Command contacts es Sytue Contacts de escritorio y móvil.
 //
 // Su propio binario, como Calendar: cada producto de la suite se instala por separado
-// también aquí (`docs/CONVENTIONS.md` §13.6). Comparten el paquete `apps/fyne/agenda`
+// también aquí (`docs/CONVENTIONS.md` §13.6). Comparten los estados de pantalla
 // y el catálogo de `apps/fyne/ui`, no el ejecutable.
+// paridad-web: apps/frontend/apps/contacts/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -22,12 +23,15 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/fyne/vinculados"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	privateContacts "git.sytue.eu/sytue/one/apps/nucleo/contacts"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/contactos"
@@ -51,83 +55,86 @@ func main() {
 		panic(err)
 	}
 
-	// Sin conexión, solo lectura: la caché «red primero» y su monitor son de la sesión.
-	// «Exportar tus datos» y el CSV son descargas, no listados, y no se guardan.
-	red, cliente := s.Conexion("contacts", "/api/v1/export")
-	c := contactos.NuevaApp(t, api.NewContacts(s.URL("contacts"), s.Sesion, s.ClienteConAviso(cliente)))
 	// El widget nativo lo lee su propia Fuente, SIN la caché de trabajar sin conexión:
 	// lo que enseña tiene que ser lo que hay en el servicio.
 	s.PublicadorWidget(s.FuenteWidget(t))
-	c.Conexion(red)
-	// La libreta «Organización» sale de la agenda de Sytue ID. Sin la caché: es una
-	// sincronización, no un listado que haya que ver sin red.
-	c.Directorio, c.Yo = api.NewDirectorio(s.URL("id"), s.Sesion, nil), s.Sesion.Subject
-	// «Rellenar» del formulario: Sytue AI, sin la caché (el asistente es una
-	// conversación, no un dato; la web tampoco guarda `/api/ai`).
-	c.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)
-	// «Trae tus contactos», en el pie del menú (si la organización tiene conectado
-	// Google o Microsoft 365).
-	c.ConImportar(api.NewIntegraciones(s.URL("integrations"), s.Sesion, nil))
-	c.Apex = s.Apex()
-	c.Org = s.Sesion.Organizacion
-	// «Importar» (vCard y CSV) y «Subir una foto…» abren el selector del sistema.
-	switch runtime.GOOS {
-	case "js":
-	default:
-		c.ElegirFichero = elegirFichero
-	}
 	// El nombre del producto (FyneApp.toml), como las demás: «Contacts» a secas no decía
 	// de qué suite era la ventana.
 	w := a.NewWindow(a.Metadata().Name)
 	w.SetPadded(false)
-	c.ConServiciosVinculados(vinculados.Nuevo(s, w, t, "contacts").Abrir)
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Contacts).Montar(c.Objeto()))
 	w.Resize(fyne.NewSize(1280, 800))
-	// La «n» crea un contacto, como en la web. Solo llega sin nada enfocado.
-	w.Canvas().SetOnTypedRune(c.Atajo)
-	// `sytue-contacts:/contacts/{id}` —un resultado del buscador de la suite, un intent
-	// del Hub— abre la ficha de ese contacto en su libreta.
-	s.RutaPropia(func(u *url.URL) bool { return contactos.IDDeEnlace(u) != "" })
-	s.AlAbrirURL(func(u *url.URL) {
-		if id := contactos.IDDeEnlace(u); id != "" {
-			go c.AbrirContacto(id)
+	var current *contactos.App
+	var pendingID string
+	mount := func(resources *cifrado.Resources[*mx.Client], repository *privateContacts.Repository) (cifrado.ApplicationView, error) {
+		facade, err := api.NewContacts(s.URL("contacts"), resources.HTTP(), nil).WithPrivateData(repository)
+		if err != nil {
+			return cifrado.ApplicationView{}, err
 		}
-	})
-
-	// La libreta se carga al entrar, y otra vez si se vuelve a entrar desde otra de
-	// las trece apps. Sin sesión se abre Sytue ID, que es lo que hace la web: su
-	// página redirige al login antes de pintar nada.
-	identidad := func(e sesion.Estado) string {
-		if !e.Dentro() {
-			return ""
+		c := contactos.NuevaApp(t, facade)
+		subject := resources.PrivateStorageScope().Subject
+		c.Directorio, c.Yo = api.NewDirectorio(s.URL("id"), resources.HTTP(), nil), func() string { return subject }
+		c.Apex = s.Apex()
+		organization := resources.PrivateStorageScope().Tenant
+		c.Org = func() string { return organization }
+		if runtime.GOOS != "js" {
+			c.ElegirFichero = elegirFichero
 		}
-		return s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
+		c.ConServiciosVinculados(vinculados.Nuevo(s, w, t, "contacts").Abrir)
+		// Private contacts are never sent to the server-side AI/import endpoint.
+		// The verified repository is the only personal data client in this view.
+		current = c
+		c.IniciarCarga()
+		if pendingID != "" {
+			id := pendingID
+			pendingID = ""
+			c.SolicitarContacto(id)
+		}
+		return cifrado.ApplicationView{Object: c.Objeto(), Detach: func() {
+			c.Cerrar()
+			if current == c {
+				current = nil
+			}
+		}, Join: c.Esperar}, nil
 	}
-	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar no carga; la
-	// escena carga con la identidad que ya ha apuntado (sesion.CuandoHayaEscena).
-	actual, conEscena := identidad(s.Estado()), false
-	s.AlCambiar(func(e sesion.Estado) {
-		siguiente := identidad(e)
-		if siguiente == actual {
-			return
-		}
-		actual = siguiente
-		c.Vaciar()
-		if siguiente != "" && conEscena {
-			go c.Cargar()
-		}
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateContacts.Repository]{
+		Suite: s, Application: a, Window: w, Product: "contacts", Translate: func(key string) string { return t.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateContacts.Repository], error) {
+			return contactsPlan(ctx, resources, s)
+		},
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateContacts.Repository) (cifrado.ApplicationView, error) {
+			return mount(resources, repository) //nolint:contextcheck // This view retains its own presenter/resource lifetime; future gestures must not inherit the mount request.
+		},
 	})
-	// Con interfaz: lanzada por iOS solo para el widget, ni se carga ni se abre el
-	// navegador para entrar.
-	s.CuandoHayaEscena(func() {
-		conEscena = true
-		if actual != "" {
-			go c.Cargar()
-		} else {
-			go func() { _ = s.Entrar(context.Background()) }()
-		}
-	})
-	w.SetOnClosed(c.Cerrar)
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Contacts).Montar(private.Objeto()))
+		// Las letras de la web (n, j, k, /, e, s, x, ?). Llegan sin nada enfocado o desde
+		// la fila de la lista, que las deja subir.
+		w.Canvas().SetOnTypedRune(func(r rune) {
+			if current != nil {
+				current.Atajo(r)
+			}
+		})
+		s.RutaPropia(func(u *url.URL) bool { return contactos.IDDeEnlace(u) != "" })
+		s.AlAbrirURL(func(u *url.URL) {
+			if id := contactos.IDDeEnlace(u); id != "" {
+				fyne.Do(func() {
+					if current != nil {
+						current.SolicitarContacto(id)
+					} else {
+						pendingID = id
+					}
+				})
+			}
+		})
+		w.SetOnClosed(private.Close)
+		// Con interfaz: lanzada por iOS solo para el widget, ni se carga ni se abre el
+		// navegador para entrar.
+		s.CuandoHayaEscena(func() {
+			private.Start()
+		})
+	}
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

@@ -172,14 +172,9 @@ export const tienda = {
   'store.gateway_mode': 'Gateway-tilstand',
   'store.mode_test_help': 'Simulerede betalinger med udbyderens testnøgler. Ingen bliver opkrævet.',
   'store.mode_live_help': 'Reelle betalinger fra dine kunder med produktionsnøglerne.',
-  'store.webhook_title': 'Trin 1: webhook-adresse',
   'store.webhook_help': 'Indsæt denne adresse i kontrolpanelet hos {nombre}.',
   'store.webhook_label': 'Webhook-adresse',
   'store.webhook_error': 'Webhook-adressen kunne ikke hentes. Luk dialogen, og prøv igen.',
-  'store.copy': 'Kopiér',
-  'store.copied': 'Adresse kopieret.',
-  'store.credentials_title': 'Legitimationsoplysninger',
-  'store.credentials_step': 'Trin 2: legitimationsoplysninger',
   'store.f_api_key': 'API-nøgle',
   'store.f_api_key_mode': 'API-nøgle ({modo})',
   'store.f_profile_id': 'Profil-ID (valgfrit)',
@@ -197,6 +192,48 @@ export const tienda = {
   'store.gateway_save': 'Gem og test',
   'store.gateway_saved': 'Gatewayen {nombre} er testet og gemt.',
   'store.gateway_save_error': 'Gatewayens legitimationsoplysninger kunne ikke valideres.',
+  'store.wz_progress': 'Trin til at forbinde betalingsudbyderen',
+  'store.wz_step_mode': 'Tilstand',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Nøgler',
+  'store.wz_step_check': 'Kontrollér',
+  'store.wz_step_done': 'Færdig',
+  'store.wz_mode_heading': 'Testbetalinger eller rigtige betalinger?',
+  'store.wz_mode_desc':
+    'Start i testtilstand; når alt virker, så åbn denne guide igen og vælg live.',
+  'store.wz_webhook_heading': 'Fortæl {nombre}, hvor betalingsbeskeder skal sendes hen',
+  'store.wz_keys_heading': 'Dine nøgler fra {nombre}',
+  'store.wz_keys_desc':
+    'Hemmelige nøgler gemmes forseglet og vises aldrig igen: skriv en nøgle igen for at ændre den.',
+  'store.wz_keys_rejected': '{nombre} accepterede ikke disse nøgler',
+  'store.wz_check_heading': 'Kontrollér og gem',
+  'store.wz_check_desc':
+    'Sytue Web tester nøglerne hos {nombre}, før betalingsudbyderen slås til. Intet gemmes, før testen lykkes.',
+  'store.wz_secret_hidden': 'Indtastet (skjult)',
+  'store.wz_empty_value': 'Ikke angivet',
+  'store.wz_done_heading': '{nombre} er klar',
+  'store.wz_finish': 'Afslut',
+  'store.hint_mollie_api_key':
+    'I Mollie: Developers › API keys. Testnøgler starter med test_ og live-nøgler med live_.',
+  'store.hint_mollie_profile':
+    'I Mollie: Settings › Website profiles. Det starter med pfl_; lad feltet stå tomt for at bruge din standardprofil.',
+  'store.hint_adyen_api_key':
+    'I Adyen Customer Area: Developers › API credentials › din credential › API key.',
+  'store.hint_adyen_merchant':
+    'I Adyen Customer Area, i kontovælgeren øverst: forhandlerkontoen, ikke virksomhedskontoen.',
+  'store.hint_adyen_hmac': 'I Adyen: Developers › Webhooks › din webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'I Adyen (live): Developers › API URLs. Det er den del af adressen, der står før -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Din bank giver dig den sammen med aftalen om den virtuelle betalingsterminal; den står også i Redsys’ administrationsportal.',
+  'store.hint_redsys_terminal':
+    'I Redsys’ administrationsportal ved siden af forhandlerkoden. Normalt er det 1.',
+  'store.hint_redsys_secret':
+    'I Redsys’ administrationsportal: forhandleroplysninger › SHA-256-nøgle. Test- og live-nøglen er forskellige.',
+  'store.hint_stripe_secret':
+    'I Stripe: Developers › API keys › Secret key. Den starter med sk_test_ eller sk_live_.',
+  'store.hint_stripe_webhook':
+    'I Stripe: Developers › Webhooks › dit endpoint › Signing secret. Den starter med whsec_.',
   'orders.subtitle': 'Ordrer og køb foretaget på dit websted.',
   'orders.count': { one: '{count} ordre', other: '{count} ordrer' },
   'orders.loading': 'Indlæser ordrer',

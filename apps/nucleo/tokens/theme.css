@@ -281,9 +281,21 @@
   --z-toast: 1090;
   --z-tooltip: 1100;
 
-  /* ---- Motion ---- */
+  /* ---- Motion ----
+     Las curvas son utilidades (`ease-standard`, `ease-exit`); las duraciones, variables
+     para `duration-(--duration-base)` y el CSS a mano. La tabla de qué usa cada
+     interacción está en docs/design.md (§2.1, «Motion»), y `tokens-coherentes.test.ts`
+     las compara con branding/tokens/spacing.json. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  /* La de `transition-*` (hover, foco, pulsado). Tailwind trae `cubic-bezier(0.4, 0, 0.2,
+     1)`; §1.5 pide la de la casa en todos los estados, así que se reasigna aquí y todas
+     las `transition-colors` de la suite la heredan sin tocar una clase. La lee también
+     `ui.CurvaColores` en apps/fyne (su test compara con esta línea). */
+  --default-transition-timing-function: var(--ease-standard);
+  --duration-fast: 120ms;
+  --duration-base: 150ms;
+  --duration-slow: 240ms;
 }
 
 /* Sombras intensificadas en modo oscuro (misma geometría, más alpha para que la
@@ -466,7 +478,7 @@ html:lang(bg) {
 /* Base de superficie de la suite. */
 :where(html) {
   font-family: var(--font-sans);
-  /* Una raíz de 16px mantiene text-base en 14px y text-sm en 13px, sin una
+  /* 1 rem = 16px. Con él text-base mide 14px y text-sm 13px, sin una
      segunda reducción. Comparada con tema.Rem por el guardián nativo.
      :where() permite a los documentos y lienzos usar su propia escala. */
   font-size: 16px;

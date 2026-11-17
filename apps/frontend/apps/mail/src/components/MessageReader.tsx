@@ -9,9 +9,10 @@
 import type { JSX } from 'preact';
 import { imagenesEnLinea, resolverCidsEnLinea } from '../lib/cid.js';
 import { neutralizarProxyEnCuerpo, reescribirImagenesRemotas } from '../lib/remoteImage.js';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Avatar,
+  Badge,
   Button,
   Card,
   Dropdown,
@@ -20,10 +21,12 @@ import {
   MenuItem,
   Skeleton,
   useToast,
-  Illustration,
+  InlineHelp,
   cx,
   useTheme,
+  Tag,
 } from '@sytue/ui';
+import { detalleRemitente, resumenRemitente } from '../lib/autenticacionRemitente.js';
 import type {
   AttachmentMeta,
   EmailSummary,
@@ -42,12 +45,17 @@ import {
   listAttachments,
   unsubscribe,
   senderLogoUrl,
+  anadirAContactos,
+  contactoDelRemitente,
 } from '../client/mailApi.js';
+import { nombreDelContacto, ofrecerContacto } from '../lib/contactoRemitente.js';
+import { ofrecerBloqueo } from '../lib/bloqueoRemitente.js';
 import type { Locale } from '@sytue/i18n';
 import type { ExternalMailAttachment } from '@sytue/api-clients';
-import { orgActual } from '@sytue/config';
+import { appUrl, orgActual } from '@sytue/config';
 import { useT, type T } from '../i18n/index.js';
 import {
+  addressToField,
   displayName,
   joinAddresses,
   fullDate,
@@ -63,7 +71,26 @@ import {
   type ReplyMode,
 } from './utils.js';
 import { Glyph } from './glyphs.js';
+import { TextoConCita } from './TextoConCita.js';
+import { InvitacionCalendario } from './InvitacionCalendario.js';
+import { leerInvitacion } from '../lib/invitacion.js';
+import {
+  CSP_CUERPO_CORREO,
+  documentoDeImpresion,
+  imprimirEnMarco,
+  type MensajeParaImprimir,
+} from './imprimirCorreo.js';
+import { atajoConMayus } from './hojaDeAtajos.js';
 import { origenExterno, type OrigenExterno } from './vistaExterna.js';
+import { PosponerMenu } from './PosponerMenu.js';
+import {
+  ConfianzaImagenes,
+  SIN_CONFIANZA,
+  imagenesSinPreguntar,
+  remitenteConfiable,
+  type ConfianzaDeImagenes,
+  type ContextoDelRemitente,
+} from './confianzaImagenes.js';
 
 /**
  * Un mensaje de una cuenta externa, leído del proveedor (`GET /external-mail/{id}/message`):
@@ -124,11 +151,23 @@ interface Props {
   onReply: (email: EmailSummary, mode: ReplyMode, bodyText?: string) => void;
   /** Abre la redaccion (CTA del estado vacio del lector). */
   onCompose: () => void;
+  /**
+   * Escribe a una dirección desde Sytue: la de un enlace `mailto:` del cuerpo. Sin
+   * ella, el enlace lo abre el programa de correo del sistema.
+   */
+  onWriteTo?: ((address: string) => void) | undefined;
   /** Triaje del hilo: estrella, no leído, archivar/papelera (null = sin destino) y «Mover a…». */
   onToggleFlag: (conv: Conversation) => void;
   onMarkUnread: (conv: Conversation) => void;
   /** «Crear una regla para este remitente»: abre el asistente de reglas ya relleno. */
   onCreateRule?: ((conv: Conversation) => void) | undefined;
+  /**
+   * «Bloquear a …»: crea la regla «de esta dirección → Spam» y mueve el hilo a Spam
+   * (MAIL-13). Null o ausente donde no aplica: buzón compartido, cuenta externa, Spam.
+   */
+  onBlock?: ((conv: Conversation) => void) | null | undefined;
+  /** «Buscar correos de esta persona»: busca lo que ha mandado esa dirección. */
+  onSearchSender?: ((email: string) => void) | undefined;
   onArchive: ((conv: Conversation) => void) | null;
   onTrash: ((conv: Conversation) => void) | null;
   /** «Marcar como spam» (mueve el hilo a Spam); null si no aplica (ya en Spam). */
@@ -152,6 +191,46 @@ interface Props {
    * de baja, compartir en Rooms, reglas, etiquetas, guardar en Drive y el original.
    */
   cuerpoExterno?: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined;
+  /**
+   * «Posponer» el hilo hasta una fecha (sale de Recibidos y vuelve entonces, sin
+   * leer). null/ausente: no se ofrece (fuera de Recibidos y de Pospuestos, en una
+   * cuenta externa, en un buzón compartido).
+   */
+  onSnooze?: ((conv: Conversation, until: Date) => void) | null | undefined;
+  /** Hasta cuándo está pospuesto el hilo abierto (ISO), para la franja; null si no lo está. */
+  snoozedUntil?: string | null | undefined;
+  /** «Volver a Recibidos»: quita la posposición ya. Sale en la franja del pospuesto. */
+  onUnsnooze?: ((conv: Conversation) => void) | null | undefined;
+  /** El hilo abierto está silenciado: franja con «Dejar de silenciar». */
+  muted?: boolean;
+  /** Silenciar o dejar de silenciar el hilo; null/ausente: no se ofrece. */
+  onMute?: ((conv: Conversation, muted: boolean) => void) | null | undefined;
+  /**
+   * Remitentes de confianza de la cuenta y cómo añadir uno: sus imágenes se abren sin
+   * preguntar. Ausente, nadie lo es y no se ofrece (ver confianzaImagenes.ts).
+   */
+  confianza?: ConfianzaDeImagenes | undefined;
+  /**
+   * Pasar a la conversación de al lado sin volver a la lista: lo que hacen j/k, en
+   * dos botones para quien lee con el dedo. `null` en un extremo apaga ese botón;
+   * `cargando` es la página siguiente en camino tras pulsar «Más antigua» en la
+   * última cargada. Ausente, no se pintan.
+   */
+  navegacion?: NavegacionDelLector | undefined;
+  /**
+   * Las direcciones propias (principal, alias, buzones con envío y cuentas externas):
+   * a uno mismo no se le ofrece «Añadir a Contactos». Ausente, ninguna.
+   */
+  propias?: readonly string[] | undefined;
+}
+
+const SIN_PROPIAS: readonly string[] = [];
+
+/** Los botones «Más reciente» / «Más antigua» de la cabecera (ver la prop). */
+export interface NavegacionDelLector {
+  anterior: (() => void) | null;
+  siguiente: (() => void) | null;
+  cargando?: boolean;
 }
 
 export function MessageReader({
@@ -161,9 +240,12 @@ export function MessageReader({
   threadMessages = null,
   onReply,
   onCompose,
+  onWriteTo,
   onToggleFlag,
   onMarkUnread,
   onCreateRule,
+  onBlock,
+  onSearchSender,
   onArchive,
   onTrash,
   onSpam,
@@ -175,11 +257,20 @@ export function MessageReader({
   labels,
   onToggleLabel,
   cuerpoExterno,
+  onSnooze = null,
+  snoozedUntil = null,
+  onUnsnooze = null,
+  muted = false,
+  onMute = null,
+  confianza,
+  navegacion,
+  propias = SIN_PROPIAS,
 }: Props): JSX.Element {
   const t = useT(locale);
   const toast = useToast();
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [sharingRooms, setSharingRooms] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   // Mensajes que se PINTAN, reciente→antiguo: el hilo completo si el servidor lo
   // dio (atraviesa carpetas), y si no los de la carpeta. Las acciones siguen
@@ -196,6 +287,31 @@ export function MessageReader({
   // Un mensaje de una cuenta externa: lo de Sytue (eventos, baja, Rooms, etiquetas)
   // no existe para él.
   const externo = latestId !== null && origenExterno(latestId) !== null;
+  // Quien escribe el hilo según la carpeta que se mira, como «Crear una regla»: el
+  // último del hilo completo podría ser tu propia respuesta desde Enviados.
+  const remitente = conversation?.latest.from[0]?.email?.trim() ?? '';
+  const nombreRemitente = conversation?.latest.from[0]?.name ?? '';
+
+  // «Añadir a Contactos» / «Ver en Contactos» (MAIL-12). Se pregunta a Contacts al abrir
+  // el hilo si ya lo tiene: con ficha, la entrada abre esa ficha; sin ella, la crea.
+  // Mientras no contesta se ofrece «Añadir», que no duplica (el BFF mira antes de crear).
+  const ofreceContacto = !readOnly && ofrecerContacto(remitente, { enSpam, propias });
+  const ofreceBloqueo = !readOnly && !externo && ofrecerBloqueo(remitente, { enSpam, propias });
+  const [fichaRemitente, setFichaRemitente] = useState<{ correo: string; id: string } | null>(null);
+  const [anadiendoContacto, setAnadiendoContacto] = useState(false);
+  const idFicha =
+    fichaRemitente && fichaRemitente.correo === remitente.toLowerCase() ? fichaRemitente.id : null;
+  useEffect(() => {
+    if (!ofreceContacto) return;
+    let vigente = true;
+    const correo = remitente.toLowerCase();
+    void contactoDelRemitente(remitente).then((id) => {
+      if (vigente && id) setFichaRemitente({ correo, id });
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [remitente, ofreceContacto]);
   const [latestBody, setLatestBody] = useState<CuerpoLeido | null>(null);
   // El lector externo por ref: MailApp lo crea en cada pintada, y como dependencia
   // volvería a pedir el cuerpo en cada una.
@@ -258,13 +374,47 @@ export function MessageReader({
     }
   }
 
+  function verContacto(id: string): void {
+    window.open(
+      appUrl(
+        'contacts',
+        `/contacts/${encodeURIComponent(id)}`,
+        orgActual(import.meta.env.BASE_URL),
+      ),
+      '_blank',
+      'noopener',
+    );
+  }
+
+  async function handleAnadirContacto(): Promise<void> {
+    if (anadiendoContacto || !remitente) return;
+    const correo = remitente.toLowerCase();
+    setAnadiendoContacto(true);
+    try {
+      const { id } = await anadirAContactos(
+        nombreDelContacto(nombreRemitente, remitente),
+        remitente,
+      );
+      setFichaRemitente({ correo, id });
+      toast.notify({
+        tone: 'success',
+        title: t('reader.addedToContacts'),
+        action: { label: t('reader.viewContact'), onClick: () => verContacto(id) },
+      });
+    } catch {
+      toast.notify({ tone: 'danger', title: t('reader.addToContactsFailed') });
+    } finally {
+      setAnadiendoContacto(false);
+    }
+  }
+
   if (!conversation || !latest) {
     return (
       <EmptyState
         class="h-full"
         title={t('reader.emptyTitle')}
         description={t('reader.emptyDescription')}
-        illustration={<Illustration name="emptyMail" />}
+        spot="emptyMail"
         action={
           <Button
             variant="primary"
@@ -347,6 +497,41 @@ export function MessageReader({
 
   // Mensajes en orden de lectura (antiguo → reciente). La lista viene reciente→antiguo.
   const ordered = [...shown].reverse();
+
+  // «Imprimir»: el hilo ENTERO, también los mensajes plegados, como Gmail. Los
+  // cuerpos que el lector no ha abierto se piden ahora; el que falle sale con su
+  // extracto antes que dejar sin imprimir el resto (ver imprimirCorreo.ts).
+  async function handlePrint(): Promise<void> {
+    if (!latest || printing) return;
+    setPrinting(true);
+    try {
+      const mensajes = await Promise.all(
+        ordered.map((msg) =>
+          mensajeParaImprimir({
+            t,
+            locale,
+            email: msg,
+            cuerpo: msg.id === latest.id ? latestBody : null,
+            cuerpoExterno: cuerpoExternoRef.current,
+            confiados: (confianza ?? SIN_CONFIANZA).confiados,
+            enSpam,
+          }),
+        ),
+      );
+      await imprimirEnMarco(
+        documentoDeImpresion({
+          idioma: locale,
+          asunto: latest.subject || t('common.noSubject'),
+          mensajes,
+        }),
+      );
+    } catch {
+      toast.notify({ tone: 'danger', title: t('reader.printFailed') });
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   const count = ordered.length;
 
   // Etiquetas aplicadas al hilo (unión de las de sus mensajes) y su conjunto de
@@ -369,6 +554,39 @@ export function MessageReader({
           {count > 1 ? (
             <span class="text-text-subtle shrink-0 text-sm tabular-nums">
               {t('reader.messageCount', { count })}
+            </span>
+          ) : null}
+          {/* En la fila del asunto y no en la barra de acciones: la barra ya está al
+              límite de ancho (ver el menú «⋯») y dos botones más la partían en otra
+              fila en un portátil. Aquí, arriba a la derecha, es donde los ponen Gmail
+              y Apple Mail, y caben también en un teléfono, que es quien más los
+              necesita: sin ellos, pasar a la siguiente era volver a la lista.
+              `self-start`: con `items-baseline` un botón sin texto se apoyaría por
+              su borde de abajo en la línea base del asunto. */}
+          {navegacion ? (
+            <span class="flex shrink-0 gap-1 self-start">
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                aria-label={t('reader.newer')}
+                // El atajo en el tooltip, como el resto de la cabecera.
+                title={`${t('reader.newer')} (K)`}
+                leadingIcon={<Icon name="chevronUp" size={16} />}
+                disabled={!navegacion.anterior}
+                onClick={() => navegacion.anterior?.()}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                aria-label={t('reader.older')}
+                title={`${t('reader.older')} (J)`}
+                leadingIcon={<Icon name="chevronDown" size={16} />}
+                disabled={!navegacion.siguiente}
+                loading={navegacion.cargando ?? false}
+                onClick={() => navegacion.siguiente?.()}
+              />
             </span>
           ) : null}
         </div>
@@ -459,6 +677,15 @@ export function MessageReader({
                   onClick={() => onArchive(conversation)}
                 />
               ) : null}
+              {/* Posponer, junto a archivar: es la otra forma de sacar algo de la
+                  Entrada, con fecha de vuelta. Ya pospuesto, cambia la fecha. */}
+              {onSnooze ? (
+                <PosponerMenu
+                  locale={locale}
+                  {...(snoozedUntil ? { rotulo: t('snooze.change') } : {})}
+                  onPosponer={(fecha) => onSnooze(conversation, fecha)}
+                />
+              ) : null}
               {onTrash ? (
                 <Button
                   size="sm"
@@ -504,8 +731,20 @@ export function MessageReader({
                   />
                 )}
               >
-                <MenuItem icon={<Glyph name="unread" />} onClick={() => onMarkUnread(conversation)}>
+                <MenuItem
+                  icon={<Glyph name="unread" />}
+                  // Los atajos, en el tooltip como los botones de arriba (Gmail).
+                  title={`${t('action.markUnread')} (${atajoConMayus(t, 'U')})`}
+                  onClick={() => onMarkUnread(conversation)}
+                >
                   {t('action.markUnread')}
+                </MenuItem>
+                <MenuItem
+                  icon={<Glyph name="print" />}
+                  disabled={printing}
+                  onClick={() => void handlePrint()}
+                >
+                  {t('reader.print')}
                 </MenuItem>
                 {!externo ? (
                   <MenuItem
@@ -524,8 +763,56 @@ export function MessageReader({
                     {t('reader.createRule')}
                   </MenuItem>
                 ) : null}
+                {onMute ? (
+                  <MenuItem
+                    icon={<Glyph name="mute" />}
+                    onClick={() => onMute(conversation, !muted)}
+                  >
+                    {muted ? t('mute.unmute') : t('mute.action')}
+                  </MenuItem>
+                ) : null}
+                {/* La búsqueda es la del servicio de Sytue: lo de una cuenta externa no
+                    está en ella, y ofrecerlo daría «sin resultados» por respuesta. */}
+                {onSearchSender && !externo && remitente ? (
+                  <MenuItem
+                    icon={<Icon name="search" size={16} />}
+                    onClick={() => onSearchSender(remitente)}
+                  >
+                    {t('reader.searchFromSender')}
+                  </MenuItem>
+                ) : null}
+                {/* Ni en Spam, ni a un no-reply, ni a uno mismo (ver contactoRemitente.ts). */}
+                {ofreceContacto ? (
+                  idFicha ? (
+                    <MenuItem
+                      icon={<Icon name="userCheck" size={16} />}
+                      onClick={() => verContacto(idFicha)}
+                    >
+                      {t('reader.viewInContacts')}
+                    </MenuItem>
+                  ) : (
+                    <MenuItem
+                      icon={<Icon name="user" size={16} />}
+                      disabled={anadiendoContacto}
+                      onClick={() => void handleAnadirContacto()}
+                    >
+                      {t('reader.addToContacts')}
+                    </MenuItem>
+                  )
+                ) : null}
+                {/* «Bloquear a …» va junto a «Marcar como spam», que es su pariente:
+                    esto además manda a Spam lo que esa dirección escriba después. */}
+                {onBlock && ofreceBloqueo ? (
+                  <MenuItem icon={<Glyph name="spam" />} onClick={() => onBlock(conversation)}>
+                    {t('reader.block', { sender: nombreRemitente.trim() || remitente })}
+                  </MenuItem>
+                ) : null}
                 {onSpam ? (
-                  <MenuItem icon={<Glyph name="spam" />} onClick={() => onSpam(conversation)}>
+                  <MenuItem
+                    icon={<Glyph name="spam" />}
+                    title={`${t('action.spam')} (!)`}
+                    onClick={() => onSpam(conversation)}
+                  >
                     {t('action.spam')}
                   </MenuItem>
                 ) : null}
@@ -624,8 +911,50 @@ export function MessageReader({
                 </Dropdown>
               ) : null}
             </span>
-          ) : null}
+          ) : (
+            // En solo lectura no hay triaje ni menú «Más acciones», pero imprimir
+            // no cambia nada en el servidor: se sigue ofreciendo, a la derecha.
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              class="ms-auto"
+              aria-label={t('reader.print')}
+              title={t('reader.print')}
+              loading={printing}
+              leadingIcon={<Glyph name="print" />}
+              onClick={() => void handlePrint()}
+            />
+          )}
         </div>
+
+        {/* El estado del hilo, con su salida a mano: sin la franja, un hilo
+            pospuesto o silenciado no se distingue de uno cualquiera, y nadie
+            recuerda dónde se deshacía. */}
+        {snoozedUntil ? (
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <InlineHelp tone="info" class="min-w-0 flex-1">
+              {t('snooze.banner', { date: fullDate(locale, snoozedUntil) })}
+            </InlineHelp>
+            {onUnsnooze ? (
+              <Button size="sm" variant="secondary" onClick={() => onUnsnooze(conversation)}>
+                {t('snooze.unsnooze')}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {muted ? (
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <InlineHelp tone="info" class="min-w-0 flex-1">
+              {t('mute.banner')}
+            </InlineHelp>
+            {onMute ? (
+              <Button size="sm" variant="secondary" onClick={() => onMute(conversation, false)}>
+                {t('mute.unmute')}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {appliedLabels.length > 0 ? (
           <div
@@ -633,34 +962,31 @@ export function MessageReader({
             role="group"
             aria-label={t('reader.conversationLabels')}
           >
-            {appliedLabels.map((l) => (
-              <span
-                key={l.id}
-                class="border-border bg-bg-subtle text-text-muted rounded-pill inline-flex items-center gap-1.5 border py-0.5 ps-2 pe-1 text-xs"
-              >
-                <span
-                  class="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: labelDot(l.color) }}
-                  aria-hidden="true"
-                />
-                <span class="max-w-[12rem] truncate">{l.name}</span>
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    // 24 px de diana (WCAG 2.5.8), como el resto de la suite: este
-                    // botón copió clases en vez de usar el componente y se quedó en
-                    // 16. El `-my-1` devuelve la altura exacta del chip, así que la
-                    // fila de etiquetas no cambia de densidad.
-                    class="hover:text-danger-text sytue-focus-ring rounded-control -my-1 grid h-6 w-6 shrink-0 place-items-center transition-colors duration-150"
-                    aria-label={t('reader.removeLabel', { label: l.name })}
-                    title={t('reader.removeLabel', { label: l.name })}
-                    onClick={() => onToggleLabel(conversation, l.id, false)}
-                  >
-                    <Icon name="close" size={12} />
-                  </button>
-                ) : null}
-              </span>
-            ))}
+            {appliedLabels.map((l) =>
+              readOnly ? (
+                <Tag
+                  key={l.id}
+                  size="xs"
+                  tone="muted"
+                  dot={labelDot(l.color)}
+                  maxWidth="max-w-[12rem]"
+                >
+                  {l.name}
+                </Tag>
+              ) : (
+                <Tag
+                  key={l.id}
+                  size="xs"
+                  tone="muted"
+                  dot={labelDot(l.color)}
+                  maxWidth="max-w-[12rem]"
+                  onRemove={() => onToggleLabel(conversation, l.id, false)}
+                  removeLabel={t('reader.removeLabel', { label: l.name })}
+                >
+                  {l.name}
+                </Tag>
+              ),
+            )}
           </div>
         ) : null}
       </header>
@@ -676,19 +1002,22 @@ export function MessageReader({
           El fondo es el de la hoja: sobre papel, `bg-bg` es el gris del lienzo. */}
       <div class="@container min-h-0 flex-1 overflow-y-auto bg-[var(--sytue-sheet-bg)] px-6 py-6 xl:px-8 2xl:px-10">
         <div class="mx-auto flex w-full max-w-[min(100%,clamp(44rem,92cqw,88rem))] flex-col gap-3">
-          {ordered.map((msg) => (
-            <ThreadMessage
-              key={msg.id}
-              t={t}
-              locale={locale}
-              email={msg}
-              defaultExpanded={msg.id === latest.id}
-              prefetchedBody={msg.id === latest.id ? latestBody : null}
-              onReply={onReply}
-              cuerpoExterno={cuerpoExterno}
-              enSpam={enSpam}
-            />
-          ))}
+          <ConfianzaImagenes.Provider value={confianza ?? SIN_CONFIANZA}>
+            {ordered.map((msg) => (
+              <ThreadMessage
+                key={msg.id}
+                t={t}
+                locale={locale}
+                email={msg}
+                defaultExpanded={msg.id === latest.id}
+                prefetchedBody={msg.id === latest.id ? latestBody : null}
+                onReply={onReply}
+                onWriteTo={onWriteTo}
+                cuerpoExterno={cuerpoExterno}
+                enSpam={enSpam}
+              />
+            ))}
+          </ConfianzaImagenes.Provider>
         </div>
       </div>
     </div>
@@ -707,6 +1036,7 @@ function ThreadMessage({
   defaultExpanded,
   prefetchedBody,
   onReply,
+  onWriteTo,
   cuerpoExterno,
   enSpam,
 }: {
@@ -717,6 +1047,7 @@ function ThreadMessage({
   defaultExpanded: boolean;
   prefetchedBody: CuerpoLeido | null;
   onReply: (email: EmailSummary, mode: ReplyMode, bodyText?: string) => void;
+  onWriteTo?: ((address: string) => void) | undefined;
   cuerpoExterno?: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined;
   enSpam: boolean;
 }): JSX.Element {
@@ -733,6 +1064,7 @@ function ThreadMessage({
   // vuelve a pulsar y lo guarda dos veces.
   const [savingTo, setSavingTo] = useState<number | null>(null);
   const toast = useToast();
+  const invitacion = useMemo(() => leerInvitacion(body?.calendar), [body?.calendar]);
   const { resolved } = useTheme();
 
   async function guardarEnDrive(index: number, name: string): Promise<void> {
@@ -800,6 +1132,7 @@ function ThreadMessage({
   }, [expanded, email.hasAttachment, email.id, externo]);
 
   const unread = !email.keywords.$seen;
+  const resumen = resumenRemitente(email.senderAuth);
 
   // La firma criptográfica es parte del SOBRE, no un fichero que nadie decidiera
   // mandar: ofrecer «signature.asc · 0,8 kB ⬇» invita a bajar algo que no se abre
@@ -857,17 +1190,40 @@ function ThreadMessage({
           </span>
           {expanded ? (
             <>
-              <span class="text-text-muted block truncate text-sm" title={email.from[0]?.email}>
-                {email.from[0]?.email}
-              </span>
-              {email.to.length ? (
-                <span
-                  class="text-text-subtle block truncate text-sm"
-                  title={t('reader.to', { addresses: joinAddresses(email.to) })}
-                >
-                  {t('reader.to', { addresses: joinAddresses(email.to) })}
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="text-text-muted truncate text-sm" title={email.from[0]?.email}>
+                  {email.from[0]?.email}
                 </span>
-              ) : null}
+                {resumen === 'verificado' && email.senderAuth ? (
+                  <Badge
+                    tone="success"
+                    class="shrink-0 gap-1"
+                    title={detalleRemitente(email.senderAuth)}
+                  >
+                    <Icon name="shield" size={12} aria-hidden="true" />
+                    {t('reader.senderVerified')}
+                  </Badge>
+                ) : null}
+              </span>
+              {/* Para, Cc y —en lo propio que la traiga— Cco: sin el Cc no se sabía a
+                  quién iba a llegar «Responder a todos». Una lista vacía no deja hueco. */}
+              {(
+                [
+                  ['reader.to', email.to],
+                  ['reader.cc', email.cc],
+                  ['reader.bcc', email.bcc],
+                ] as const
+              ).map(([clave, lista]) =>
+                lista?.length ? (
+                  <span
+                    key={clave}
+                    class="text-text-subtle block truncate text-sm"
+                    title={t(clave, { addresses: joinAddresses(lista) })}
+                  >
+                    {t(clave, { addresses: joinAddresses(lista) })}
+                  </span>
+                ) : null,
+              )}
             </>
           ) : (
             <span class="text-text-subtle block truncate text-sm">
@@ -884,12 +1240,35 @@ function ThreadMessage({
 
       {expanded ? (
         <div class="px-5 pt-1 pb-5">
+          {resumen === 'aviso' ? (
+            // Antes del cuerpo y no en un tooltip: es lo que hay que leer ANTES de
+            // pulsar un enlace del mensaje.
+            <InlineHelp tone="warning" class="mb-3">
+              {t('reader.senderWarning', {
+                domain: email.from[0]?.email.split('@').pop() ?? '',
+              })}
+            </InlineHelp>
+          ) : null}
+          {/* Una invitación de fuera se contesta aquí (D-MAIL-04). En spam no: ahí
+              no se ofrece actuar sobre lo que mande quien sea. Las cuentas externas
+              no pasan por el BFF que relee el mensaje. */}
+          {invitacion && !externo && !enSpam ? (
+            <InvitacionCalendario
+              t={t}
+              locale={locale}
+              emailId={email.id}
+              invitacion={invitacion}
+            />
+          ) : null}
           <MessageBodyView
             t={t}
             body={body}
             preview={email.preview}
             emailId={email.id}
             adjuntos={attachments}
+            remitente={email.from[0]?.email}
+            contexto={{ enSpam, autenticacion: resumen }}
+            onWriteTo={onWriteTo}
           />
           {externo && body?.adjuntos?.length ? (
             <div class="border-border mt-6 border-t pt-4">
@@ -1019,6 +1398,88 @@ function leerCuerpo(
 }
 
 /**
+ * Un mensaje del hilo tal como se imprime: lo mismo que pinta el lector al
+ * expandirlo. El HTML pasa por los mismos pasos que en `MessageBodyView` y
+ * `HtmlBody` (imágenes en línea, proxy neutralizado) y las remotas solo se
+ * cargan si el remitente es de confianza: el permiso de «Mostrar imágenes» es de
+ * la vista de ese mensaje y no se traslada a otro documento.
+ */
+async function mensajeParaImprimir({
+  t,
+  locale,
+  email,
+  cuerpo,
+  cuerpoExterno,
+  confiados,
+  enSpam,
+}: {
+  t: T;
+  locale: Locale;
+  email: EmailSummary;
+  /** El cuerpo que el lector ya tiene, si lo tiene: no se vuelve a pedir. */
+  cuerpo: CuerpoLeido | null;
+  cuerpoExterno: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined;
+  confiados: ReadonlySet<string>;
+  enSpam: boolean;
+}): Promise<MensajeParaImprimir> {
+  const externo = origenExterno(email.id) !== null;
+  const [body, partes] = await Promise.all([
+    cuerpo ?? leerCuerpo(email.id, cuerpoExterno).catch(() => null),
+    !externo && email.hasAttachment
+      ? listAttachments(email.id)
+          .then((r) => r.attachments)
+          .catch(() => [] as AttachmentMeta[])
+      : Promise.resolve([] as AttachmentMeta[]),
+  ]);
+  const remitente = email.from[0]?.email;
+  const contexto: ContextoDelRemitente = {
+    enSpam,
+    autenticacion: resumenRemitente(email.senderAuth),
+  };
+
+  let html: string | null = null;
+  if (body?.html?.trim()) {
+    html = neutralizarProxyEnCuerpo(
+      resolverCidsEnLinea(body.html, partes, (i) => attachmentDownloadUrl(email.id, i, true)),
+    );
+    if (imagenesSinPreguntar(remitente, contexto, confiados)) {
+      html = reescribirImagenesRemotas(html, remoteImageProxyUrl);
+    }
+  }
+  const imagenes = html
+    ? []
+    : imagenesEnLinea(partes).map(([a, i]) => ({
+        src: attachmentDownloadUrl(email.id, i, true),
+        alt: a.name || t('reader.attachments'),
+      }));
+  const nombres = externo
+    ? (body?.adjuntos ?? []).map((a) => a.name)
+    : partes.filter((a) => !esFirmaDeSobre(a)).map((a) => a.name);
+
+  return {
+    remitente: email.from[0]
+      ? t('reader.from', { address: addressToField(email.from[0]) })
+      : t('reader.unknownSender'),
+    fecha: fullDate(locale, email.receivedAt),
+    destinatarios: (
+      [
+        ['reader.to', email.to],
+        ['reader.cc', email.cc],
+        ['reader.bcc', email.bcc],
+      ] as const
+    ).flatMap(([clave, lista]) =>
+      lista?.length ? [t(clave, { addresses: joinAddresses(lista) })] : [],
+    ),
+    html,
+    texto: body?.text || email.preview,
+    imagenes,
+    adjuntos: nombres.length
+      ? { titulo: t('reader.attachmentCount', { count: nombres.length }), nombres }
+      : null,
+  };
+}
+
+/**
  * Cuerpo del correo. Prioridad: HTML completo (aislado en un iframe sandbox, sin
  * scripts) → texto completo → extracto del sobre mientras carga o si falla.
  *
@@ -1036,6 +1497,9 @@ function MessageBodyView({
   preview,
   emailId,
   adjuntos,
+  remitente,
+  contexto,
+  onWriteTo,
 }: {
   t: T;
   body: MessageBody | null;
@@ -1043,6 +1507,10 @@ function MessageBodyView({
   emailId: string;
   /** Partes del mensaje: de ahí salen las imágenes en línea que el cuerpo cita. */
   adjuntos: readonly AttachmentMeta[];
+  /** La dirección del remitente: decide si sus imágenes se abren sin preguntar. */
+  remitente?: string | undefined;
+  contexto?: ContextoDelRemitente | undefined;
+  onWriteTo?: ((address: string) => void) | undefined;
 }): JSX.Element {
   // `trim()`: una parte HTML que solo trae saltos de línea no es un cuerpo, y
   // pintaría un marco vacío tapando el texto que sí llegó.
@@ -1054,14 +1522,12 @@ function MessageBodyView({
     const html = resolverCidsEnLinea(body.html, adjuntos, (i) =>
       attachmentDownloadUrl(emailId, i, true),
     );
-    return <HtmlBody t={t} html={html} />;
+    return <HtmlBody t={t} html={html} remitente={remitente} contexto={contexto} />;
   }
   if (body?.text) {
     return (
       <>
-        <p class="text-text text-base leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
-          {body.text}
-        </p>
+        <TextoConCita t={t} texto={body.text} alEscribirA={onWriteTo} />
         <ImagenesDelCuerpo t={t} emailId={emailId} adjuntos={adjuntos} />
       </>
     );
@@ -1222,21 +1688,44 @@ function inversionNocturna(): string {
   );
 }
 
-function HtmlBody({ t, html }: { t: T; html: string }): JSX.Element {
+/** Sin contexto (vistas de prueba): nada de qué fiarse. */
+const SIN_CONTEXTO: ContextoDelRemitente = { enSpam: true, autenticacion: null };
+
+export function HtmlBody({
+  t,
+  html,
+  remitente,
+  contexto = SIN_CONTEXTO,
+}: {
+  t: T;
+  html: string;
+  remitente?: string | undefined;
+  contexto?: ContextoDelRemitente | undefined;
+}): JSX.Element {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(240);
-  const [remoteAllowed, setRemoteAllowed] = useState(false);
+  const [permitidoAqui, setPermitidoAqui] = useState(false);
   const remote = hasRemoteContent(html);
+  // Remitente de confianza (Ajustes → Lectura): sus imágenes se abren sin pulsar
+  // nada. Va SUMADO al permiso de este mensaje y no en su lugar: dejar de confiar
+  // con el correo abierto no vuelve a esconder lo que ya se pidió ver.
+  const confianza = useContext(ConfianzaImagenes);
+  const deConfianza = imagenesSinPreguntar(remitente, contexto, confianza.confiados);
+  const remoteAllowed = permitidoAqui || deConfianza;
+  const confiar =
+    confianza.confiar && remitente && remitenteConfiable(remitente, contexto)
+      ? confianza.confiar
+      : null;
 
   // Cambiar de mensaje NO arrastra el permiso del anterior: cada correo se abre
   // bloqueado (el componente se reutiliza entre mensajes del hilo).
-  useEffect(() => setRemoteAllowed(false), [html]);
+  useEffect(() => setPermitidoAqui(false), [html]);
 
   // `img-src data: 'self'` deja pasar las imágenes incrustadas en el propio
   // mensaje (`/api/attachments`) y, cuando la persona pulsa «Mostrar imágenes»,
   // las remotas reescritas hacia nuestro proxy (`/api/remote-image`), sin abrir
   // nunca `https:` en la CSP ni exponer la IP del navegador al remitente.
-  const csp = "default-src 'none'; img-src data: 'self'; style-src 'unsafe-inline'; font-src data:";
+  const csp = CSP_CUERPO_CORREO;
   const htmlSeguro = neutralizarProxyEnCuerpo(html);
   const htmlCuerpo = remoteAllowed
     ? reescribirImagenesRemotas(htmlSeguro, remoteImageProxyUrl)
@@ -1271,9 +1760,23 @@ function HtmlBody({ t, html }: { t: T; html: string }): JSX.Element {
         <div class="border-border bg-surface-sunken mb-3 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2">
           <Icon name="shield" size={16} class="text-text-subtle shrink-0" aria-hidden="true" />
           <p class="text-text-subtle min-w-0 flex-1 text-sm">{t('reader.remoteContentBlocked')}</p>
-          <Button variant="secondary" size="sm" onClick={() => setRemoteAllowed(true)}>
-            {t('reader.remoteContentShow')}
-          </Button>
+          <div class="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPermitidoAqui(true)}>
+              {t('reader.remoteContentShow')}
+            </Button>
+            {confiar && remitente ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                // El rótulo no repite la dirección (ya está en la cabecera del
+                // mensaje); el nombre accesible sí, que se oye fuera de contexto.
+                aria-label={t('reader.remoteContentAlwaysFor', { address: remitente })}
+                onClick={() => confiar(remitente)}
+              >
+                {t('reader.remoteContentAlways')}
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
       <iframe

@@ -12,6 +12,19 @@ function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => voi
   });
   return { promise, resolve };
 }
+async function within<T>(promise: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('worker test deadline')), 3000);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 class MemoryCache {
   values = new Map<string, Response>();
   beforePut?: (key: string) => Promise<void>;
@@ -36,10 +49,17 @@ class MemoryCache {
 async function harness(
   workerSource?: string,
   existingCaches?: Map<string, MemoryCache>,
+  deleteDatabase?: (name: string) => {
+    onsuccess?: () => void;
+    onerror?: () => void;
+    onblocked?: () => void;
+  },
 ): Promise<{
   caches: Map<string, MemoryCache>;
+  deletions: string[];
   initialise: (tenant?: string, scope?: string) => Promise<void>;
   initialiseFields: (fields: Record<string, unknown>) => Promise<void>;
+  message: (data: Record<string, unknown>, clientId?: string | null) => Promise<void>;
   request: (
     request?: Request,
     clientId?: string,
@@ -47,6 +67,7 @@ async function harness(
   setFetch: (fetcher: (request: Request) => Promise<Response>) => void;
 }> {
   const handlers = new Map<string, (event: never) => void>();
+  const deletions: string[] = [];
   const caches = existingCaches ?? new Map<string, MemoryCache>();
   let fetcher = async (): Promise<Response> => new Response('artificial');
   const storage = {
@@ -69,7 +90,9 @@ async function harness(
     skipWaiting: async () => undefined,
   };
   const indexedDB = {
-    deleteDatabase: () => {
+    deleteDatabase: (name: string) => {
+      deletions.push(name);
+      if (deleteDatabase) return deleteDatabase(name);
       const deletion: { onsuccess?: () => void } = {};
       queueMicrotask(() => deletion.onsuccess?.());
       return deletion;
@@ -105,26 +128,34 @@ async function harness(
       },
     };
   }
-  async function initialiseFields(fields: Record<string, unknown>): Promise<void> {
+  async function message(
+    data: Record<string, unknown>,
+    clientId: string | null = 'window-a',
+  ): Promise<void> {
     const pending: Promise<unknown>[] = [];
     handlers.get('message')!({
-      source: { id: 'window-a' },
-      data: {
-        type: 'INITIALISE',
-        ownerId: 'ada',
-        scopeId: 'one',
-        product: 'mail',
-        ...fields,
-      },
+      source: clientId === null ? null : { id: clientId },
+      data,
       waitUntil: (p: Promise<unknown>) => pending.push(p),
     } as never);
     while (pending.length) await Promise.all(pending.splice(0));
   }
+  async function initialiseFields(fields: Record<string, unknown>): Promise<void> {
+    await message({
+      type: 'INITIALISE',
+      ownerId: 'ada',
+      scopeId: 'one',
+      product: 'mail',
+      ...fields,
+    });
+  }
   return {
     caches,
+    deletions,
     initialise: (tenant = 'acme', scope = 'one') =>
       initialiseFields({ tenantId: tenant, scopeId: scope }),
     initialiseFields,
+    message,
     request: (request = new Request(api), clientId = 'window-a') =>
       event('fetch', { request, clientId }),
     setFetch: (value) => {
@@ -148,6 +179,219 @@ function navigation(path = '/'): Request {
 }
 
 describe('native worker running its served source', () => {
+  test.each(['script', 'style', 'font'])(
+    'an API response requested as %s never uses the shared static cache',
+    async (destination) => {
+      const app = await harness();
+      await app.initialise();
+      const shared = new MemoryCache();
+      app.caches.set('sytue-native-v2-static-v2', shared);
+      const paths = [
+        '/api/photo',
+        '/contacts/api/photo',
+        '/api',
+        '/contacts/api',
+        '/contacts/acme/api/photo',
+        '/contacts/%61pi/photo',
+        '/contacts/acme/',
+      ];
+      for (const path of paths) {
+        const url = new URL(path, ORIGIN).href;
+        // A prior worker could have incorrectly saved an authenticated response.
+        await shared.put(
+          url,
+          new Response('other account', { headers: { 'x-sytue-cache-bytes': '13' } }),
+        );
+        const request = new Request(url);
+        Object.defineProperty(request, 'destination', { value: destination });
+        app.setFetch(
+          async () =>
+            new Response('current account', {
+              headers: { 'cache-control': 'private, max-age=3600' },
+            }),
+        );
+        const work = app.request(request);
+        expect(await (await work.response).text()).toBe('current account');
+        await work.settled();
+        // Neither a hit nor an overwrite: entries created by the old worker
+        // remain inaccessible through the new worker's shared-cache path.
+        expect(await (await shared.match(url))!.text()).toBe('other account');
+      }
+    },
+  );
+
+  test('an API request cannot fall back to an old shared entry when offline', async () => {
+    const app = await harness();
+    const shared = new MemoryCache();
+    app.caches.set('sytue-native-v2-static', shared);
+    const url = `${ORIGIN}/contacts/acme/`;
+    await shared.put(url, new Response('other account'));
+    app.setFetch(async () => {
+      throw new Error('offline');
+    });
+    const request = new Request(url);
+    Object.defineProperty(request, 'destination', { value: 'style' });
+    const work = app.request(request);
+    await expect(work.response).rejects.toThrow('offline');
+    await work.settled();
+  });
+
+  test('a bundled URL does not reuse the legacy shared cache', async () => {
+    const app = await harness();
+    const old = new MemoryCache();
+    const url = `${ORIGIN}/mail/_astro/app.js`;
+    await old.put(url, new Response('unattributed', { headers: { 'x-sytue-cache-bytes': '12' } }));
+    app.caches.set('sytue-native-v2-static', old);
+    app.setFetch(async () => new Response('bundled'));
+    const work = app.request(new Request(url));
+    expect(await (await work.response).text()).toBe('bundled');
+    await work.settled();
+    expect(await (await old.match(url))!.text()).toBe('unattributed');
+    expect(await (await app.caches.get('sytue-native-v2-static-v2')!.match(url))!.text()).toBe(
+      'bundled',
+    );
+  });
+
+  test('precache excludes bare and prefixed API paths but keeps ordinary static assets', async () => {
+    const app = await harness();
+    const fetched: string[] = [];
+    app.setFetch(async (request) => {
+      fetched.push(new URL(request.url).pathname);
+      return new Response('asset');
+    });
+    await app.initialiseFields({
+      tenantId: 'acme',
+      assetUrls: [
+        '/api',
+        '/api/photo',
+        '/contacts/api',
+        '/contacts/api/photo',
+        '/contacts/acme/api/photo',
+        '/contacts/%61pi/photo',
+        '/contacts/acme/auth/session',
+        '/_astro/app.js',
+      ],
+    });
+    expect(fetched).toEqual(['/_astro/app.js']);
+    const shared = app.caches.get('sytue-native-v2-static-v2');
+    expect(await (await shared!.match(`${ORIGIN}/_astro/app.js`))!.text()).toBe('asset');
+  });
+
+  test.each(['private', 'no-cache', 'no-store', 'vary-cookie', 'redirected'])(
+    'a bundled URL does not cache a %s response globally',
+    async (kind) => {
+      const app = await harness();
+      const url = `${ORIGIN}/mail/_astro/app.js`;
+      app.setFetch(async () => {
+        const headers =
+          kind === 'vary-cookie'
+            ? { vary: 'Accept-Encoding, Cookie' }
+            : { 'cache-control': kind === 'redirected' ? 'public' : kind };
+        const response = new Response('response', { headers });
+        if (kind === 'redirected') Object.defineProperty(response, 'redirected', { value: true });
+        return response;
+      });
+      const work = app.request(new Request(url));
+      expect(await (await work.response).text()).toBe('response');
+      await work.settled();
+      expect(await app.caches.get('sytue-native-v2-static-v2')?.match(url)).toBeUndefined();
+    },
+  );
+
+  test('non-bundled precache remains owner-scoped and respects no-store even with offline=1', async () => {
+    const app = await harness();
+    const ordinary = `${ORIGIN}/contacts/acme/stylesheet`;
+    const forbidden = `${ORIGIN}/contacts/acme/sensitive?offline=1`;
+    app.setFetch(
+      async (request) =>
+        new Response('private', {
+          headers: request.url === forbidden ? { 'cache-control': 'no-store' } : {},
+        }),
+    );
+    await app.initialiseFields({ tenantId: 'acme', assetUrls: [ordinary, forbidden] });
+    const shared = app.caches.get('sytue-native-v2-static-v2');
+    expect(await shared?.match(ordinary)).toBeUndefined();
+    const ownerCaches = privateCaches(app.caches);
+    expect(
+      (await Promise.all(ownerCaches.map((cache) => cache.match(ordinary)))).filter(Boolean),
+    ).toHaveLength(1);
+    expect(
+      (await Promise.all(ownerCaches.map((cache) => cache.match(forbidden)))).filter(Boolean),
+    ).toHaveLength(0);
+  });
+
+  test('prefixed organization and decoded protected paths are never precached', async () => {
+    const app = await harness();
+    const fetched: string[] = [];
+    app.setFetch(async (request) => {
+      fetched.push(request.url);
+      return new Response('secret', { headers: { 'cache-control': 'no-store' } });
+    });
+    const protectedPaths = [
+      '/contacts/acme/auth/session',
+      '/contacts/acme/api/token',
+      '/contacts/api/%74oken',
+    ];
+    await app.initialiseFields({ tenantId: 'acme', privateUrls: protectedPaths });
+    expect(fetched).toEqual([]);
+    for (const path of protectedPaths) {
+      const work = app.request(new Request(new URL(path, ORIGIN)));
+      expect(await (await work.response).text()).toBe('secret');
+      await work.settled();
+    }
+    expect(cachedCount(app.caches)).toBe(0);
+  });
+
+  test('logout requests deletion of both databases without any window clients', async () => {
+    const app = await harness();
+    const logout = app.request(new Request(`${ORIGIN}/mail/auth/logout`));
+    await logout.response;
+    await logout.settled();
+    expect(app.deletions).toEqual(['sytue-offline', 'sytue-offline-cas-v2']);
+  });
+
+  test('a blocked database does not prevent attempting the other database', async () => {
+    const requests = new Map<
+      string,
+      { onsuccess?: () => void; onerror?: () => void; onblocked?: () => void }
+    >();
+    const app = await harness(undefined, undefined, (name) => {
+      const request = {};
+      requests.set(name, request);
+      return request;
+    });
+    const logout = app.request(new Request(`${ORIGIN}/mail/auth/logout`));
+    await logout.response;
+    await Promise.resolve();
+    expect(app.deletions).toEqual(['sytue-offline', 'sytue-offline-cas-v2']);
+    const legacy = requests.get('sytue-offline')!;
+    const cas = requests.get('sytue-offline-cas-v2')!;
+    let finished = false;
+    const settled = logout.settled().then(() => {
+      finished = true;
+    });
+    cas.onblocked?.();
+    legacy.onsuccess?.();
+    await Promise.resolve();
+    expect(finished).toBe(false);
+    cas.onsuccess?.();
+    await settled;
+    expect(finished).toBe(true);
+  });
+
+  test('a synchronous failure opening one deletion still attempts the other', async () => {
+    const app = await harness(undefined, undefined, (name) => {
+      if (name === 'sytue-offline') throw new Error('denied');
+      const request: { onsuccess?: () => void } = {};
+      queueMicrotask(() => request.onsuccess?.());
+      return request;
+    });
+    const logout = app.request(new Request(`${ORIGIN}/mail/auth/logout`));
+    await logout.response;
+    await logout.settled();
+    expect(app.deletions).toEqual(['sytue-offline', 'sytue-offline-cas-v2']);
+  });
+
   test('returns and completes the body before a slow Cache.put, then caches an intact EOF', async () => {
     const app = await harness();
     await app.initialise();
@@ -495,6 +739,81 @@ describe('native worker running its served source', () => {
     });
     await expect(app.request(new Request(api), 'window-b').response).rejects.toThrow('offline');
   });
+
+  test('a stale invalidation cannot retire a newer context while persisted metadata loads', async () => {
+    const original = await harness();
+    await original.initialise('acme', 'old-scope');
+    const metadata = original.caches.get('sytue-native-v2-meta')!;
+    const originalMatch = metadata.match.bind(metadata);
+    const entered = deferred();
+    const release = deferred();
+    metadata.match = async (key) => {
+      const old = await originalMatch(key);
+      entered.resolve();
+      await release.promise;
+      return old;
+    };
+    const restarted = await harness(undefined, original.caches);
+    const stale = restarted.message({ type: 'INVALIDATE', scopeId: 'old-scope' });
+    try {
+      // The restarted worker has captured old persisted metadata, but has not
+      // yet resumed its INVALIDATE handler when the new mount is installed.
+      await within(entered.promise);
+      await within(restarted.initialise('acme', 'new-scope'));
+      release.resolve();
+      await within(stale);
+    } finally {
+      release.resolve();
+      metadata.match = originalMatch;
+      await within(stale);
+    }
+    restarted.setFetch(async () => new Response('new session'));
+    const online = restarted.request();
+    await (await online.response).text();
+    await online.settled();
+
+    // Verify both live context and persisted context after a worker restart.
+    restarted.setFetch(async () => {
+      throw new Error('offline');
+    });
+    const cached = restarted.request();
+    expect(await (await cached.response).text()).toBe('new session');
+    await cached.settled();
+    const again = await harness(undefined, original.caches);
+    again.setFetch(async () => {
+      throw new Error('offline');
+    });
+    const recovered = again.request();
+    expect(await (await recovered.response).text()).toBe('new session');
+    await recovered.settled();
+  }, 12000);
+
+  test('only the owning client can invalidate its scope, including after restart', async () => {
+    const original = await harness();
+    await original.initialise('acme', 'owned');
+    const restarted = await harness(undefined, original.caches);
+    await within(restarted.message({ type: 'INVALIDATE', scopeId: 'owned' }, 'window-b'));
+    await within(restarted.message({ type: 'INVALIDATE', scopeId: 'owned' }, null));
+    await within(restarted.message({ type: 'INVALIDATE', scopeId: 'other' }, 'window-a'));
+    restarted.setFetch(async () => new Response('owned session'));
+    const online = restarted.request();
+    await (await online.response).text();
+    await online.settled();
+    restarted.setFetch(async () => {
+      throw new Error('offline');
+    });
+    const cached = restarted.request();
+    expect(await (await cached.response).text()).toBe('owned session');
+    await cached.settled();
+
+    await within(restarted.message({ type: 'INVALIDATE', scopeId: 'owned' }, 'window-a'));
+    await expect(restarted.request().response).rejects.toThrow('offline');
+    const again = await harness(undefined, original.caches);
+    again.setFetch(async () => {
+      throw new Error('offline');
+    });
+    await expect(again.request().response).rejects.toThrow('offline');
+  }, 15000);
 
   for (const base of ['', '/mail']) {
     test.each([

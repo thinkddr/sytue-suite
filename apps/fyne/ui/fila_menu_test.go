@@ -109,3 +109,42 @@ func TestLaCabeceraDeDriveEscondeLasColumnasQueNoCaben(t *testing.T) {
 		}
 	}
 }
+
+// TestElClicDerechoDeLaFilaDriveAbreSuMenu: en un explorador el clic derecho (mantener
+// pulsado en el móvil) es el gesto de pedir acciones. Abre el menú del «⋯» colgado de su
+// caja, aunque el botón aún no se vea, y no abre la fila. Sin menú no pasa nada.
+//
+// VISTO EN ROJO (2026-11-08): sin `TappedSecondary`, la fila no es SecondaryTappable y
+// el clic derecho no abre nada.
+func TestElClicDerechoDeLaFilaDriveAbreSuMenu(t *testing.T) {
+	const ancho = 999
+	f := NuevaFilaDrive("Contrato.pdf", "pdf")
+	var abierta, menus int
+	var colgado fyne.CanvasObject
+	f.AlAbrir = func() { abierta++ }
+	f.AlMenu = func(d fyne.CanvasObject) { menus++; colgado = d }
+	colocar(t, f, ancho)
+
+	var obj fyne.CanvasObject = f
+	sec, ok := obj.(fyne.SecondaryTappable)
+	if !ok {
+		t.Fatal("la fila no responde al clic derecho")
+	}
+	test.TapSecondary(sec)
+	if menus != 1 || abierta != 0 {
+		t.Fatalf("el clic derecho abre %d menús y %d filas; quiero 1 y 0", menus, abierta)
+	}
+	if o, _ := cajaMas(f.Size()); colgado == nil || colgado.Position() != o {
+		t.Errorf("el menú no cuelga del «⋯»: %v", colgado)
+	}
+
+	sin := NuevaFilaDrive("Viejo.pdf", "pdf")
+	sin.AlAbrir = func() { abierta++ }
+	colocar(t, sin, ancho)
+	if sec, ok := any(sin).(fyne.SecondaryTappable); ok {
+		test.TapSecondary(sec)
+	}
+	if abierta != 0 {
+		t.Error("sin menú, el clic derecho abre la fila")
+	}
+}

@@ -29,6 +29,9 @@ const PATHS = {
   textColor: 'm5.5 17 5.2-12h2.6l5.2 12 M8.2 11.5h7.6',
   highlight: 'M4 20h4L18.6 9.4a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16Z M13.1 7.9l3 3',
   clearFormat: 'M5 5h12 M11 5v14 M15.5 15.5 20 20 M20 15.5l-4.5 4.5',
+  formatPainter:
+    'M5.5 4h11a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z M17.5 6.5H20v5h-8v3.5 M11 15h2v5h-2Z',
+  changeCase: 'M3.5 18 8 6l4.5 12 M5 14h6 M20 15.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z M20 13v5',
   /* --- Párrafo --- */
   alignLeft: 'M4 6h16 M4 10h10 M4 14h16 M4 18h10',
   alignCenter: 'M4 6h16 M7 10h10 M4 14h16 M7 18h10',
@@ -37,9 +40,14 @@ const PATHS = {
   listBullet: 'M4 6h.01 M4 12h.01 M4 18h.01 M9 6h11 M9 12h11 M9 18h11',
   listNumber:
     'M4 5.5 5.3 4.5v4.5 M3.8 13.3c0-.9.7-1.5 1.6-1.5 1 0 1.7.6 1.7 1.5 0 1.6-3.2 2.1-3.2 4.2h3.4 M10 6h10 M10 12h10 M10 18h10',
+  // Lista de casillas: una casilla marcada y otra vacía, cada una con su renglón.
+  listCheck:
+    'M4.5 4.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-4A.5.5 0 0 1 4 9V5a.5.5 0 0 1 .5-.5Z M5.3 7l1 1 1.6-1.9 M4.5 14.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-4A.5.5 0 0 1 4 19v-4a.5.5 0 0 1 .5-.5Z M12 7h8 M12 17h8',
   indent: 'M4 5.5h16 M12 9.5h8 M12 13.5h8 M4 17.5h16 M4 9.5l3 2-3 2',
   outdent: 'M4 5.5h16 M12 9.5h8 M12 13.5h8 M4 17.5h16 M7 9.5l-3 2 3 2',
   lineHeight: 'M11 6h9 M11 12h9 M11 18h9 M5 5.5v13 M2.8 7.7 5 5.5l2.2 2.2 M2.8 16.3 5 18.5l2.2-2.2',
+  // Autoformato Markdown: la almohadilla de un título con el destello de lo automático.
+  markdown: 'M8 5 6.5 19 M13.5 5 12 19 M4.5 9.5h11 M4 14.5h11 M18.5 3.5v4 M16.5 5.5h4',
   /* --- Insertar --- */
   table:
     'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM3 9.5h18M9.5 5.5V18.5M14.5 5.5V18.5',
@@ -97,6 +105,10 @@ const PATHS = {
   rowBelow: 'M4 3.5h16V11H4Z M4 7.25h16 M12 14.5v7 M9 18.5l3 3 3-3',
   colLeft: 'M13.5 4h7v16h-7Z M17 4v16 M10.5 12h-7 M6.5 9l-3 3 3 3',
   colRight: 'M3.5 4h7v16h-7Z M7 4v16 M13.5 12h7 M17.5 9l3 3-3 3',
+  // Ancho de columna: dos bordes verticales y una flecha doble entre ellos.
+  colWidth: 'M4 4v16 M20 4v16 M7 12h10 M9.5 9.5 7 12l2.5 2.5 M14.5 9.5 17 12l-2.5 2.5',
+  // Alto de fila: dos bordes horizontales y una flecha doble entre ellos.
+  rowHeight: 'M4 4h16 M4 20h16 M12 7v10 M9.5 9.5 12 7l2.5 2.5 M9.5 14.5 12 17l2.5-2.5',
   /* --- Disposición --- */
   pagePortrait: 'M7 3.5h10v17H7Z',
   pageLandscape: 'M3.5 7h17v10h-17Z',
@@ -130,6 +142,9 @@ const PATHS = {
     'M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-7l-4 3.5V15.5H5A1.5 1.5 0 0 1 3.5 14V6A1.5 1.5 0 0 1 5 4.5Z',
   /* Dibujo (canvas-1): puntero de selección y lápiz. */
   eye: 'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z M12 9.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4Z',
+  /* Ocultar diapositiva (se salta al presentar): el ojo tachado. */
+  eyeOff:
+    'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z M12 9.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4Z M4 4l16 16',
   eraser:
     'M8 19h11 M4.5 14.5 13 6a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L10.5 19H8l-3.5-3.5a1.4 1.4 0 0 1 0-1Z',
   pointer: 'M5.5 3.5 18.5 10l-5.6 1.9L10.7 18Z',
@@ -322,6 +337,9 @@ const PATHS = {
     'M4.5 19.5 4 20l.5-4L15 5.5a1.8 1.8 0 0 1 2.6 0l.9.9a1.8 1.8 0 0 1 0 2.6L8 19.5Z M13.5 7l3.5 3.5',
   // Nombre definido: etiqueta colgante con su ojal y una línea de texto.
   definedName: 'M3.5 12 8.5 6.5h12v11h-12Z M7.5 12h.01 M11.5 12h5.5',
+  // Teclado: la caja con dos filas de teclas y la barra espaciadora (hoja de atajos).
+  keyboard:
+    'M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 16V8A1.5 1.5 0 0 1 4 6.5Z M6.5 10h.01 M10 10h.01 M14 10h.01 M17.5 10h.01 M8 14h8',
   /* --- Asistente de IA --- */
   // Destellos: una estrella de cuatro puntas grande + otra pequeña (lenguaje
   // universal de «IA/magia», sin caer en el logotipo de nadie: trazado propio).

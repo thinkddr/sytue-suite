@@ -134,7 +134,9 @@ func TestLasClavesDeLaPantallaExistenEnElCatalogo(t *testing.T) {
 	}
 	for _, c := range []string{
 		"pdf.menu.organize", "pdf.menu.tools", "pdf.menu.stamp",
-		"pdf.menu.compare", "pdf.menu.protect", "pdf.menu.sign",
+		"pdf.menu.compare", "pdf.menu.versions", "pdf.menu.protect", "pdf.menu.sign",
+		"pdf.menu.download", "pdf.menu.print", "pdf.blocked.print",
+		"pdf.download.done", "pdf.download.failed",
 	} {
 		pedidas[c] = true
 	}

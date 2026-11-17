@@ -3,15 +3,28 @@
  *
  * POST   /api/event  -> crea o actualiza: { calendarUrl, eventInput, href?, etag? }
  *                       Si no hay href, se genera <calendarUrl>/<uid>.ics.
+ * PUT    /api/event  -> restaura un evento recién borrado («Deshacer»): { href, ical }
  * DELETE /api/event  -> elimina: { href }
  *
  * El cuerpo iCalendar (VEVENT) lo genera el servidor con buildVevent (no se
- * confia en el cliente para el .ics). Proxy BFF autorizado por cookie.
+ * confia en el cliente para el .ics). Al editar (con href) se lee antes el
+ * recurso guardado y se funde (fundirVevent): el formulario solo sustituye lo
+ * que gestiona, y lo demás —una RRULE con BYDAY, las excepciones de la serie,
+ * CLASS, CATEGORIES, los CN de los invitados…— se queda. Proxy BFF autorizado
+ * por cookie.
  */
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
+import { HttpError } from '@sytue/api-clients';
 import { calDavClient, fallo, json, rutaDav } from '../../lib/caldav.js';
-import { buildVevent, newUid, type EventInput } from '../../lib/ical.js';
+import {
+  buildVevent,
+  esRRuleSegura,
+  fundirVevent,
+  newUid,
+  type EventInput,
+} from '../../lib/ical.js';
+import { icsRestaurable } from '../../lib/deshacer.js';
 
 export const prerender = false;
 
@@ -73,6 +86,12 @@ export const POST: APIRoute = async (ctx) => {
     typeof body.eventInput.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(body.eventInput.color)
       ? body.eventInput.color
       : undefined;
+  // RRULE que el formulario no sabe editar: solo una regla con forma de RRULE (se
+  // inyecta como línea del .ics, igual que el TZID).
+  const rruleRaw =
+    typeof body.eventInput.rruleRaw === 'string' && esRRuleSegura(body.eventInput.rruleRaw)
+      ? body.eventInput.rruleRaw
+      : undefined;
   const event: EventInput = {
     uid,
     summary: body.eventInput.summary,
@@ -83,6 +102,8 @@ export const POST: APIRoute = async (ctx) => {
     location: body.eventInput.location,
     description: body.eventInput.description,
     recurrence: body.eventInput.recurrence,
+    ...(rruleRaw ? { rruleRaw } : {}),
+    ...(body.eventInput.recurrenceUnchanged === true ? { recurrenceUnchanged: true } : {}),
     ...(color ? { color } : {}),
     // ORGANIZER = usuario autenticado (el navegador no dicta el organizador).
     // Solo emitimos ORGANIZER/ATTENDEE si hay invitados, para no marcar como
@@ -91,12 +112,58 @@ export const POST: APIRoute = async (ctx) => {
     ...(alarms.length ? { alarms } : {}),
     ...(exdates.length ? { exdates } : {}),
   };
-  const ical = buildVevent(event);
   const href = body.href ?? `${calendarUrl.replace(/\/$/, '')}/${encodeURIComponent(uid)}.ics`;
 
   try {
-    await calDavClient(session.accessToken, session.user.id).putEvent(href, ical, body.etag);
+    const cliente = calDavClient(session.accessToken, session.user.id);
+    // Editar: fundir sobre lo guardado. Una petición más por guardado, a cambio de no
+    // borrar lo que el formulario no ve. Si el recurso ya no está (404), se escribe
+    // como hasta ahora y el If-Match del navegador decide.
+    const guardado = body.href ? await leer(cliente, body.href) : null;
+    const ical = guardado ? fundirVevent(guardado.ical, event) : buildVevent(event);
+    // El ETag que vio el navegador manda: si otro cambió el evento después, el PUT
+    // da 412 en vez de pisarlo. Sin él, el de lo que se acaba de leer.
+    const etag = body.etag ?? guardado?.etag;
+    await cliente.putEvent(href, ical, etag);
     return json({ ok: true, href, uid });
+  } catch (err) {
+    return fallo(err, 'caldav_error');
+  }
+};
+
+/** El recurso guardado, o null si ya no existe. */
+async function leer(
+  cliente: ReturnType<typeof calDavClient>,
+  href: string,
+): Promise<{ ical: string; etag?: string | undefined } | null> {
+  try {
+    return await cliente.getEvent(href);
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * «Deshacer» un borrado: vuelve a escribir el .ics que tenía el evento, con su UID,
+ * su href y sus VALARM, en vez de regenerarlo desde un formulario que no los ve.
+ * Es el único .ics que esta puerta no genera ella, así que `icsRestaurable` lo
+ * acota (sin ORGANIZER/ATTENDEE: nada que mande correos a terceros) y el PUT va con
+ * `If-None-Match: *`: solo RE-crea; si en ese href ya hay algo —otro cliente lo
+ * volvió a crear—, el servicio contesta 412 y no se pisa.
+ */
+export const PUT: APIRoute = async (ctx) => {
+  const session = await getApiSession(ctx);
+  if (!session) return json({ error: 'unauthenticated' }, 401);
+
+  const body = (await ctx.request.json().catch(() => ({}))) as { href?: unknown; ical?: unknown };
+  const href = rutaDav(body.href);
+  const ical = icsRestaurable(body.ical);
+  if (!href || !ical) return json({ error: 'invalid_payload' }, 400);
+
+  try {
+    await calDavClient(session.accessToken, session.user.id).putEvent(href, ical);
+    return json({ ok: true, href });
   } catch (err) {
     return fallo(err, 'caldav_error');
   }

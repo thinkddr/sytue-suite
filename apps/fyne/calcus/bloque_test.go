@@ -59,7 +59,7 @@ func TestColocarBloque(t *testing.T) {
 			t.Errorf("%q no es un bloque y se colocó", malo)
 		}
 	}
-	if l.ColocarBloque(`{"cells":{"A1":"x","B1":"y"}}`, Columnas-1, 0) {
+	if l.ColocarBloque(`{"cells":{"A1":"x","B1":"y"}}`, MaxColumnas-1, 0) {
 		t.Error("un bloque que no cabe en la rejilla no se coloca")
 	}
 }

@@ -57,6 +57,12 @@ func editorConFuentes(t *testing.T, cifrado bool) (*Pantalla, *EditorNota, *atom
 	p.AppURL = func(r string) string { return "https://notes.sytue.test" + r }
 	p.Directorio = api.NewDirectorio(dir.URL, nil, nil)
 	p.activo.Cifrado = cifrado
+	if cifrado {
+		// Una nota cifrada solo se edita con un destino durable cifrado para el borrador.
+		p.Almacen = almacenDePrueba(t)
+		p.Yo = func() string { return "alice" }
+		p.Org = func() string { return "acme" }
+	}
 	n, _ := p.nota("n")
 	p.abrirEditor(n)
 	if p.edicion == nil {

@@ -79,6 +79,7 @@ func (s *Store) BorradosCaducados(ctx context.Context, gracia time.Duration, des
 		rows, err := tx.Query(ctx, `
 			SELECT id, tenant, deleted_at FROM videos
 			 WHERE deleted_at IS NOT NULL AND deleted_at < now() - $1::interval
+               AND NOT public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,tenant,owner_sub)
 			   AND ($2::timestamptz IS NULL OR (deleted_at, id) > ($2::timestamptz, $3::uuid))
 			 ORDER BY deleted_at, id
 			 LIMIT $4`, gracia, fecha, id, limite)
@@ -130,6 +131,7 @@ func (s *Store) CaducarSubidas(ctx context.Context, plazo time.Duration, limite 
 			   SET status = 'failed', failure = $3, updated_at = now()
 			 WHERE id IN (SELECT id FROM videos
 			               WHERE status = 'uploading' AND deleted_at IS NULL
+                             AND NOT public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,tenant,owner_sub)
 			                 AND updated_at < now() - $1::interval
 			               ORDER BY updated_at
 			               FOR UPDATE SKIP LOCKED

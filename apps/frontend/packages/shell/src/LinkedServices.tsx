@@ -7,6 +7,7 @@ import {
   Button,
   Checkbox,
   ChoiceCard,
+  EmptyState,
   FieldGroup,
   Icon,
   InlineHelp,
@@ -826,7 +827,7 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
                   ))}
                 </ul>
                 {!loading && !items.length ? (
-                  <p class="text-text-muted py-4 text-sm">{t('ui.noResults')}</p>
+                  <EmptyState compact title={t('ui.noResults')} />
                 ) : null}
                 {cursor ? (
                   <Button

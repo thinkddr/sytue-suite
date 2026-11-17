@@ -2,6 +2,8 @@
  * POST /api/domains
  *   { project, hostname }           -> añade dominio
  *   { project, domain_id, delete: true } -> elimina dominio
+ *   { project, domain_id, verify: true } -> «Comprobar ahora»: { check } con el
+ *                                           motivo exacto (429 si se repite antes de 10 s)
  *
  * Devuelve { ok, live }. live=false en modo demostración.
  *
@@ -13,7 +15,7 @@
  */
 import type { APIRoute } from 'astro';
 import { bff, toBffContext } from '../../lib/auth.js';
-import { addDomain, removeDomain, httpErrorInfo } from '../../lib/cloud.js';
+import { addDomain, removeDomain, verifyDomain, httpErrorInfo } from '../../lib/cloud.js';
 
 export const prerender = false;
 
@@ -31,6 +33,7 @@ export const POST: APIRoute = async (ctx) => {
     domain_id?: unknown;
     delete?: unknown;
     set_primary?: unknown;
+    verify?: unknown;
   };
   try {
     body = (await ctx.request.json()) as typeof body;
@@ -47,6 +50,13 @@ export const POST: APIRoute = async (ctx) => {
       if (!domainId) return json({ error: 'missing_domain_id' }, 400);
       const live = await removeDomain(session, domainId);
       return json({ ok: true, live });
+    }
+
+    if (body.verify === true) {
+      const domainId = typeof body.domain_id === 'string' ? body.domain_id.trim() : '';
+      if (!domainId) return json({ error: 'missing_domain_id' }, 400);
+      const res = await verifyDomain(session, domainId);
+      return json({ ok: true, live: res.live, ...(res.check ? { check: res.check } : {}) });
     }
 
     if (body.set_primary === true) {

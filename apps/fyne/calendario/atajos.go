@@ -22,6 +22,7 @@ const (
 	atajoHoy    accionAtajo = "today"
 	atajoSig    accionAtajo = "next"
 	atajoAnt    accionAtajo = "prev"
+	atajoIrA    accionAtajo = "goto"
 	atajoMes    accionAtajo = "month"
 	atajoSemana accionAtajo = "week"
 	atajoDia    accionAtajo = "day"
@@ -45,6 +46,7 @@ var gruposAtajos = []struct {
 		{[]rune{'t'}, atajoHoy, "shortcuts.today"},
 		{[]rune{'n', 'j'}, atajoSig, "shortcuts.next"},
 		{[]rune{'p', 'k'}, atajoAnt, "shortcuts.prev"},
+		{[]rune{'g'}, atajoIrA, "shortcuts.goToDate"},
 	}},
 	{"shortcuts.group.views", []filaAtajo{
 		{[]rune{'m'}, atajoMes, "view.month"},
@@ -78,6 +80,9 @@ func accionDeTecla(r rune) accionAtajo {
 // el foco —un campo o un diálogo se quedan su tecla—, que es lo que hace `esAtajoDeApp`
 // en la web. Devuelve si la tecla era suya.
 func (a *App) Atajo(r rune) bool {
+	if a.vida.Err() != nil {
+		return false
+	}
 	p := a.P
 	switch accionDeTecla(r) {
 	case atajoHoy:
@@ -94,6 +99,8 @@ func (a *App) Atajo(r rune) bool {
 		p.navegar(1)
 	case atajoAnt:
 		p.navegar(-1)
+	case atajoIrA:
+		return a.irAFecha()
 	case atajoCrear:
 		p.AbrirNuevoEvento()
 	case atajoBuscar:
@@ -133,6 +140,7 @@ func (a *App) verAtajos() bool {
 		return false
 	}
 	p := a.P
-	ui.MostrarHojaAtajos(lienzo, p.t("shortcuts.title", nil), p.t("common.close", nil), p.hojaDeAtajos())
+	// La hoja es la de la suite: los de Calendar y, detrás, ⌘K, «?» y Esc.
+	ui.MostrarHojaAtajosDeSuite(lienzo, p.T.Locale(), p.hojaDeAtajos())
 	return true
 }

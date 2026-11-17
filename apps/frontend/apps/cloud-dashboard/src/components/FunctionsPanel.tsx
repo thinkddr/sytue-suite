@@ -176,7 +176,7 @@ function Inner({ project, functions, images, live, locale, error }: Props) {
           <Card class="mb-6">
             <CardBody class="p-0">
               <EmptyState
-                illustration={<Icon name="code" size={24} />}
+                icon="code"
                 title={t('functions.noImages.title')}
                 description={t('functions.noImages.desc')}
                 action={
@@ -271,7 +271,7 @@ function Inner({ project, functions, images, live, locale, error }: Props) {
           <Card>
             <CardBody class="p-0">
               <EmptyState
-                illustration={<Icon name="code" size={24} />}
+                icon="code"
                 title={t('functions.empty.title')}
                 description={t('functions.empty.desc')}
               />

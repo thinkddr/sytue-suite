@@ -233,11 +233,12 @@ func (a *App) describirSeleccion() {
 func (a *App) describirLote(gen int, lote []api.Photo, i, hechas int, topado bool) {
 	if i >= len(lote) || a.g.parar {
 		a.g.lote = nil
-		aviso := a.v.T.T("gallery.described", i18n.Vars{"count": hechas})
+		// El progreso va en línea mientras dura; lo acabado, en el aviso.
+		detalle := ""
 		if topado {
-			aviso += " · " + a.v.T.T("gallery.describeCapped", i18n.Vars{"count": TopeDescribir})
+			detalle = a.v.T.T("gallery.describeCapped", i18n.Vars{"count": TopeDescribir})
 		}
-		a.g.aviso = aviso
+		a.avisar(ui.AvisoExito, a.v.T.T("gallery.described", i18n.Vars{"count": hechas}), detalle)
 		a.pintar()
 		return
 	}

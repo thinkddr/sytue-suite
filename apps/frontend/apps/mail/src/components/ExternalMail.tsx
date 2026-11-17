@@ -32,6 +32,7 @@ import {
   Spinner,
   Wizard,
   type WizardStep,
+  EmptyState,
 } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import { externalMailClient } from '../client/externalMail.js';
@@ -765,7 +766,7 @@ export function ExternalMail({
           <div ref={listRef} class="space-y-3">
             <p class="text-text-muted text-sm">{t('externalMail.body')}</p>
             {data.items.length === 0 ? (
-              <p class="text-text-muted text-sm">{t('externalMail.empty')}</p>
+              <EmptyState compact title={t('externalMail.empty')} />
             ) : null}
             {data.items.map((account) => (
               <div

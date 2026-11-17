@@ -7,6 +7,23 @@ import type { en } from './en.js';
 
 export const fr: AppCatalog<typeof en> = {
   'app.title': 'Mon compte',
+  'app.description': 'Mon compte — profil, sécurité et accès de votre compte Sytue.',
+  'app.lead':
+    'Votre profil, la façon dont vous vous connectez et protégez le compte, et où il est ouvert.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Contrôle de sécurité',
+  'checkup.all_good': 'Tout va bien : votre compte est bien protégé.',
+  'checkup.dos_pasos':
+    'La validation en deux étapes est désactivée : votre mot de passe suffit pour entrer.',
+  'checkup.recuperacion':
+    'Aucun e-mail ni téléphone de récupération : si vous perdez l’accès, impossible de revenir.',
+  'checkup.sesiones': 'Sessions ouvertes sur d’autres appareils : {count}',
+  'checkup.contrasenas_app': 'Mots de passe d’application inutilisés depuis 90 jours : {count}',
+  'checkup.dispositivos': 'Appareils de confiance non vus depuis 90 jours : {count}',
+  'checkup.turn_on': 'Activer',
+  'checkup.add': 'Ajouter',
+  'checkup.review': 'Vérifier',
 
   'profile.title': 'Profil',
   'profile.name': 'Nom affiché',
@@ -33,12 +50,19 @@ export const fr: AppCatalog<typeof en> = {
   // --- Sesiones ---
   'sessions.title': 'Sessions ouvertes',
   'sessions.current': 'Cet appareil',
+  'sessions.signed_in': 'Connecté {time}',
   'sessions.close_one': 'Fermer cette session',
+  'sessions.close_named': 'Fermer la session sur {device}',
+  'sessions.close_one_confirm':
+    '{device} sera déconnecté et devra se reconnecter pour accéder à votre compte.',
   'sessions.close_others': 'Fermer toutes les sessions',
   'sessions.close_others_note': 'Celle-ci comprise : vous devrez vous reconnecter.',
+  'sessions.close_all_confirm':
+    'Toutes les sessions seront fermées, y compris celle-ci. Vous devrez vous reconnecter sur chaque appareil.',
   'sessions.empty': 'Aucune autre session ouverte.',
   'sessions.failed': 'Impossible de charger les sessions.',
   'common.loading': 'Chargement…',
+  'common.retry': 'Réessayer',
 
   // --- Dispositivos ---
   'devices.title': 'Appareils',
@@ -46,8 +70,22 @@ export const fr: AppCatalog<typeof en> = {
   'devices.trusted': 'De confiance',
   'devices.trust': 'Marquer comme fiable',
   'devices.forget': 'Oublier cet appareil',
+  'devices.forget_named': 'Oublier {device}',
+  'devices.forget_confirm':
+    '{device} ne sera plus reconnu et perdra son statut de confiance. Une nouvelle connexion depuis cet appareil le traitera comme un nouvel appareil.',
   'devices.empty': 'Aucun appareil reconnu pour le moment.',
   'devices.failed': 'Impossible de charger les appareils.',
+  'signature.title': 'Signature enregistrée',
+  'signature.help':
+    'La signature que vous avez demandé à CertiPDF de mémoriser en signant à la main. Elle est stockée chiffrée dans votre compte.',
+  'signature.empty':
+    'Vous n’avez aucune signature enregistrée. En signant à la main dans CertiPDF, cochez «Mémoriser ma signature».',
+  'signature.failed': 'Impossible de charger votre signature enregistrée.',
+  'signature.preview': 'Votre signature enregistrée',
+  'signature.saved_on': 'Enregistrée le {date}',
+  'signature.delete': 'Supprimer la signature enregistrée',
+  'signature.delete_confirm':
+    'Votre signature enregistrée sera supprimée. Les documents déjà signés la conservent ; la prochaine fois que vous signerez à la main, il faudra la redessiner.',
 
   // --- Seguridad ---
   'security.title': 'Sécurité',
@@ -56,6 +94,15 @@ export const fr: AppCatalog<typeof en> = {
   'security.password.warning': 'Le changer ferme la session partout, ici compris.',
   'security.password.current': 'Mot de passe actuel',
   'security.password.new': 'Nouveau mot de passe',
+  'security.password.requirements': 'Exigences pour le nouveau mot de passe :',
+  'security.password.req_length': {
+    one: 'Au moins {count} caractère',
+    other: 'Au moins {count} caractères',
+  },
+  'security.password.req_complexity': 'Des lettres et au moins un chiffre',
+  'security.password.req_different': 'Différent du mot de passe actuel',
+  'security.password.req_met': 'Respecté',
+  'security.password.req_pending': 'Pas encore',
   'security.password.submit': 'Changer le mot de passe',
   'security.password.done':
     'Mot de passe changé. Toutes les sessions ont été fermées, celle-ci comprise.',
@@ -80,6 +127,45 @@ export const fr: AppCatalog<typeof en> = {
   'security.codes.once':
     'Affichés une seule fois. Gardez-les en lieu sûr : chacun ne sert qu’une fois.',
   'security.codes.saved': 'Je les ai enregistrés',
+  'security.codes.regenerate_confirm':
+    'Vos codes de secours actuels cesseront de fonctionner immédiatement, y compris ceux que vous avez imprimés ou enregistrés.',
+  'security.mfa.step.need': 'Avant de commencer',
+  'security.mfa.step.need.heading': 'Ce dont vous avez besoin',
+  'security.mfa.step.need.desc':
+    'Une application d’authentification sur votre téléphone. Elle affiche un nouveau code à six chiffres toutes les 30 secondes.',
+  'security.mfa.step.need.apps_title': 'Toute application d’authentification convient',
+  'security.mfa.step.need.apps':
+    'Par exemple : Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Si vous n’en avez pas, installez-en une avant de continuer.',
+  'security.mfa.step.need.next': 'Commencer',
+  'security.mfa.step.scan': 'Scanner',
+  'security.mfa.step.scan.heading': 'Ajoutez votre compte à l’application',
+  'security.mfa.key_label': 'Clé de configuration',
+  'security.mfa.step.code': 'Code',
+  'security.mfa.step.code.heading': 'Saisissez le code de l’application',
+  'security.mfa.step.code.desc':
+    'Cela vérifie que l’application et votre compte concordent avant l’activation.',
+  'security.mfa.code.hint': 'Six chiffres. S’il change pendant la saisie, utilisez le nouveau.',
+  'security.mfa.step.codes.heading': 'Enregistrez vos codes de secours',
+  'security.codes.copy': 'Tout copier',
+  'security.codes.copied': 'Codes copiés.',
+  'security.codes.copy_failed': 'Copie impossible. Sélectionnez les codes et copiez-les à la main.',
+  'security.codes.download': 'Télécharger le .txt',
+  'security.codes.file_title': 'Codes de secours Sytue',
+  'security.codes.file_account': 'Compte : {account}',
+  'security.codes.file_date': 'Créés le : {date}',
+  'security.codes.file_note':
+    'Chaque code ne sert qu’une fois. Conservez ce fichier en lieu sûr, loin de votre téléphone.',
+  'security.mfa.step.done': 'Terminé',
+  'security.mfa.step.done.heading': 'La validation en deux étapes est activée',
+  'security.mfa.step.done.desc':
+    'À votre prochaine connexion, un code de l’application vous sera demandé.',
+  'security.mfa.passkey_tip.title': 'Ajoutez aussi une clé d’accès',
+  'security.mfa.passkey_tip':
+    'Une clé d’accès permet de vous connecter avec votre empreinte, votre visage ou le verrouillage de l’écran, sans saisir de code.',
+  'security.mfa.passkey_tip.action': 'Ajouter une clé d’accès',
+  'security.mfa.close': 'Fermer',
+  'security.mfa.disable_title': 'Désactiver la validation en deux étapes ?',
+  'security.mfa.disable_warning': 'Votre mot de passe suffira de nouveau pour ouvrir le compte.',
   'common.cancel': 'Annuler',
 
   // --- Perfil: el resto de la ficha ---
@@ -95,6 +181,8 @@ export const fr: AppCatalog<typeof en> = {
   // --- Passkeys ---
   'security.passkeys.title': "Clés d'accès",
   'security.passkeys.remove': 'Retirer',
+  'security.passkeys.remove_named': 'Retirer {name}',
+  'security.passkeys.remove_confirm': 'Vous ne pourrez plus vous connecter avec {name}.',
   'security.passkeys.unnamed': 'Clé sans nom',
 
   // --- Contraseñas de aplicación ---
@@ -105,6 +193,9 @@ export const fr: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Par exemple : messagerie du portable, téléphone.',
   'app_passwords.create': 'Créer un mot de passe',
   'app_passwords.revoke': 'Révoquer',
+  'app_passwords.revoke_named': 'Révoquer {label}',
+  'app_passwords.revoke_confirm':
+    'Les applications qui utilisent {label} ne pourront plus se connecter. Cette action est irréversible.',
   'app_passwords.empty': "Aucun mot de passe d'application pour le moment.",
   'app_passwords.failed': "Impossible de charger les mots de passe d'application.",
   'app_passwords.unnamed': 'Sans nom',

@@ -22,7 +22,7 @@ func TestServiceLogs(t *testing.T) {
 	st, ctx := newStore(t)
 	ahora := time.Now()
 
-	lote := []plog.Entry{}
+	lote := make([]plog.Entry, 0, 7)
 	// El mismo error de Mail cinco veces, en la última hora.
 	for i := range 5 {
 		lote = append(lote, plog.Entry{

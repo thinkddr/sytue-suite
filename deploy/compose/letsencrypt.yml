@@ -1,0 +1,19 @@
+# Sytue Suite — certificados de Let's Encrypt (overlay del modo servidor único) ==
+# Añade a servidor.yml el emisor ACME: Traefik pide un certificado por cada
+# <app>.<dominio> con el reto HTTP-01 y lo renueva solo. Requisitos: DNS de tu
+# dominio apuntando a este servidor y el puerto 80 accesible desde Internet.
+# La configuración estática la genera ./sytue-deploy desde
+# traefik/traefik-letsencrypt.yml.tpl (con tu correo) en .servidor/traefik.yml.
+name: sytue-one-dev
+
+services:
+  traefik:
+    volumes: !override
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./.servidor/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/dynamic-servidor:/etc/traefik/dynamic:ro"
+      - "./traefik/certs:/etc/traefik/certs:ro"
+      - "acme:/acme"
+
+volumes:
+  acme:

@@ -11,7 +11,14 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { Button, DialogosDelEditor, EmptyState, Icon, ToastProvider } from '@sytue/ui';
+import {
+  Button,
+  DialogosDelEditor,
+  EmptyState,
+  ShortcutsModal,
+  ToastProvider,
+  type GrupoDeAtajos,
+} from '@sytue/ui';
 import { fetchSession } from '@sytue/auth/client';
 import { FranjaPeticion } from '@sytue/shell';
 import { driveFolderUrl } from '@sytue/config';
@@ -33,8 +40,10 @@ import { Ribbon } from './ribbon/Ribbon';
 import { PageCanvas } from './canvas/PageCanvas';
 import { SheetCanvas } from './sheets/SheetCanvas';
 import { FranjaHojaProtegida } from './sheets/FranjaHojaProtegida';
-import { SlidesCanvas } from './slides/SlidesCanvas';
+import { atajosPropiosDeHoja } from './sheets/atajosHoja';
+import { SlidesCanvas, presentShortcuts } from './slides/SlidesCanvas';
 import { useAtajosDelEditor } from './atajos';
+import { gruposDeAtajos } from './atajosAyuda';
 
 /** Throttle del reflejo de formato bajo el cursor (§4.4: 100 ms). */
 const FMT_THROTTLE_MS = 100;
@@ -77,6 +86,18 @@ export function EditorApp({
       <DialogosDelEditor />
     </ToastProvider>
   );
+}
+
+/** Los atajos que solo tiene un tipo de documento: en Calcus, los de la rejilla, y en
+ *  Diapos, los de presentar, con la pestaña delante para que «Navegar» no se lea como
+ *  algo del editor. */
+function propiosDe(kind: EditorContext['kind'], t: EditorContext['t']): GrupoDeAtajos[] {
+  if (kind === 'spreadsheet') return atajosPropiosDeHoja(t);
+  if (kind !== 'presentation') return [];
+  return presentShortcuts(t).map((g) => ({
+    ...g,
+    titulo: `${t('ribbon.tab.present')} › ${g.titulo}`,
+  }));
 }
 
 /** Igualdad campo a campo de FormatState (13 escalares): evita re-render por tick. */
@@ -262,7 +283,7 @@ function EditorShell({
         <EmptyState
           title={t('editor.error.title')}
           description={t('editor.error.description')}
-          illustration={<Icon name="warning" size={40} class="text-danger" />}
+          tone="error"
           action={
             <div class="flex flex-wrap items-center justify-center gap-2">
               <Button size="sm" onClick={() => window.location.reload()}>
@@ -369,6 +390,14 @@ function EditorShell({
           settings={<SettingsPanel ctx={ctx} />}
           status={<StatusBar ctx={ctx} />}
           panelOpen={ui.panel !== null || ui.settingsOpen}
+        />
+        {/* La hoja de atajos (Ctrl+/ y Vista): sale del registro, así que se arma solo
+         * al abrirla. Escape la cierra y el Modal devuelve el foco a quien lo tenía. */}
+        <ShortcutsModal
+          open={ui.atajos === true}
+          onClose={() => setUi({ atajos: false })}
+          title={t('view.shortcuts')}
+          groups={ui.atajos ? gruposDeAtajos(ctx.kind, t, propiosDe(ctx.kind, t)) : []}
         />
       </EditorCtx.Provider>
     </EditorI18nCtx.Provider>

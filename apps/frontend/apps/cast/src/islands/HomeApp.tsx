@@ -8,13 +8,14 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Input, SectionHeader, useSondeo } from '@sytue/ui';
+import { Button, EmptyState, Icon, Input, SectionHeader, useSondeo } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 import { useT, type T } from '../i18n/index.js';
 import { Marco } from '../components/Marco.js';
 import { CargandoRejilla, Fallo, REJILLA, useEnLinea } from '../components/Estados.js';
-import { VideoCard } from '../components/VideoCard.js';
+import { VideoCard, useVistos } from '../components/VideoCard.js';
 import { biblioteca, compartidos } from '../client/castApi.js';
 import { tipoDeFallo, type TipoDeFallo } from '../lib/fallo.js';
 import { ruta } from '../lib/rutas.js';
@@ -33,9 +34,24 @@ interface Datos {
   compartidos: Video[];
 }
 
-export function HomeApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
+export function HomeApp(props: Props): JSX.Element {
+  return (
+    <MatrixStorageGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      product="cast"
+      deviceName="Sytue Cast · Web"
+    >
+      <HomeAppBody {...props} />
+    </MatrixStorageGate>
+  );
+}
+
+function HomeAppBody({ locale, user, hubBaseUrl }: Props): JSX.Element {
   const t = useT(locale);
   const enLinea = useEnLinea();
+  const visto = useVistos(user.id);
   const [datos, setDatos] = useState<Datos | null>(null);
   const [fallo, setFallo] = useState<TipoDeFallo | null>(null);
   const [q, setQ] = useState('');
@@ -138,7 +154,7 @@ export function HomeApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
           <CargandoRejilla etiqueta={t('player.loading')} />
         ) : vacio ? (
           <EmptyState
-            illustration={<Illustration name="spotUpload" size={160} />}
+            spot="spotUpload"
             title={t('home.empty.title')}
             description={t('home.empty.description')}
             action={
@@ -166,7 +182,7 @@ export function HomeApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
               <Seccion t={t} titulo={t('home.liveNow')}>
                 <div class={REJILLA}>
                   {datos.directos.map((v) => (
-                    <VideoCard key={v.id} t={t} locale={locale} video={v} />
+                    <VideoCard key={v.id} t={t} locale={locale} video={v} visto={visto(v.id)} />
                   ))}
                 </div>
               </Seccion>
@@ -196,7 +212,14 @@ export function HomeApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
               ) : (
                 <div class={REJILLA}>
                   {datos.mios.videos.map((v) => (
-                    <VideoCard key={v.id} t={t} locale={locale} video={v} propia />
+                    <VideoCard
+                      key={v.id}
+                      t={t}
+                      locale={locale}
+                      video={v}
+                      visto={visto(v.id)}
+                      propia
+                    />
                   ))}
                 </div>
               )}
@@ -216,7 +239,7 @@ export function HomeApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
               <Seccion t={t} titulo={t('home.shared')}>
                 <div class={REJILLA}>
                   {datos.compartidos.map((v) => (
-                    <VideoCard key={v.id} t={t} locale={locale} video={v} />
+                    <VideoCard key={v.id} t={t} locale={locale} video={v} visto={visto(v.id)} />
                   ))}
                 </div>
               </Seccion>
@@ -226,7 +249,7 @@ export function HomeApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
               <Seccion t={t} titulo={t('home.org')}>
                 <div class={REJILLA}>
                   {datos.org.map((v) => (
-                    <VideoCard key={v.id} t={t} locale={locale} video={v} />
+                    <VideoCard key={v.id} t={t} locale={locale} video={v} visto={visto(v.id)} />
                   ))}
                 </div>
               </Seccion>

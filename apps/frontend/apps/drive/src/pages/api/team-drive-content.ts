@@ -6,6 +6,7 @@
  * contenido por unidad (RLS) y gatea por rol (viewer lee; editor+ escribe).
  *
  *   GET    /api/team-drive-content?id=&folder=&cursor=   → navegar (subcarpetas+ficheros+rol)
+ *          [&orden=nombre|modificado|tamano&sentido=asc|desc]  orden del servicio
  *   GET    /api/team-drive-content?id=&file=<id>         → descargar un fichero (blob)
  *   POST   /api/team-drive-content?id=  { parent_id?, name }  → crear subcarpeta (editor+)
  *   PUT    /api/team-drive-content?id=&folder=&name=&type=    → subir fichero (editor+)
@@ -16,6 +17,7 @@
  */
 import type { APIRoute } from 'astro';
 import { driveFetch } from '../../lib/auth';
+import { ordenDeLaPeticion } from '../../lib/orden';
 
 export const prerender = false;
 
@@ -126,6 +128,10 @@ export const GET: APIRoute = async (ctx) => {
   if (folder) qs.set('folder', folder);
   const cursor = params.get('cursor')?.trim();
   if (cursor) qs.set('cursor', cursor);
+  // El orden lo aplica el servicio (keyset por columna); solo pasan valores conocidos.
+  const { orden, sentido } = ordenDeLaPeticion(params);
+  if (orden) qs.set('orden', orden);
+  if (sentido) qs.set('sentido', sentido);
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const res = await driveFetch(
     ctx,

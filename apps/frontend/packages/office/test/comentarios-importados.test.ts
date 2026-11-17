@@ -52,3 +52,30 @@ test('sin comentarios no queda ningún mark', async () => {
   expect(r.fallo).toBe(false);
   expect(r.content).not.toContain('data-comment-id');
 });
+
+test('los comentarios de una hoja se guardan con su celda y el contenido va tal cual', async () => {
+  const hoja = '{"active":0,"sheets":[{"name":"Ventas","cells":{"B4":"10"}}]}';
+  const celda = { hoja: 'h:Ventas', fila: 't3', col: 't1', text: 'B4' };
+  let enviados: ComentarioImportado[] = [];
+  const r = await guardarComentarios(
+    {
+      kind: 'spreadsheet',
+      content: hoja,
+      comments: [{ id: 'aa', text: 'Ana: ¿Cifra?', anchored: false, cell: celda }],
+    },
+    async (cs) => {
+      enviados = cs;
+      return [];
+    },
+  );
+  expect(r).toEqual({ content: hoja, fallo: false });
+  expect(enviados[0]?.cell).toEqual(celda);
+
+  const fallida = await guardarComentarios(
+    { kind: 'spreadsheet', content: hoja, comments: [{ id: 'aa', text: 'x', anchored: false }] },
+    async () => {
+      throw new Error('red');
+    },
+  );
+  expect(fallida).toEqual({ content: hoja, fallo: true });
+});

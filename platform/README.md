@@ -3,50 +3,54 @@ SPDX-License-Identifier: Apache-2.0
 Copyright (c) 2026 Daniel Delgado Ramos
 -->
 
-# Sytue One — Núcleo Go (`platform/`)
+<a id="sytue-one--núcleo-go-platform"></a>
+# Sytue One — Go core (`platform/`)
 
-Librerías compartidas del **módulo Go único** `git.sytue.eu/sytue/one` (con `go.mod`
-en la **raíz** del repo). Todos los servicios de la suite (`services/<svc>/`) las
-reutilizan para mantener un comportamiento idéntico en config, logging, HTTP,
-acceso a datos, identidad, eventos y almacenamiento.
+Shared libraries of the **single Go module** `git.sytue.eu/sytue/one` (with `go.mod`
+at the repo **root**). All of the suite's services (`services/<svc>/`)
+reuse them to keep identical behavior in config, logging, HTTP,
+data access, identity, events and storage.
 
-> Stack canónico (ver [`docs/CONVENTIONS.md`](../docs/CONVENTIONS.md) v4):
-> **Go 1.26 + PostgreSQL 18** como datastore **único** y fuente de verdad (estado,
-> colas y caché sobre Postgres; **Valkey** solo opcional donde mida §0.1; **nunca
-> Redis**), blobs en **Object Storage S3** (MinIO dev / Scaleway prod), identidad
-> vía **Sytue ID** (OIDC). Dependencias de terceros **solo permisivas**
-> (MIT/BSD/Apache). Código de producto **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)** (cabecera SPDX por archivo).
+> Canonical stack (see [`docs/CONVENTIONS.md`](../docs/CONVENTIONS.md) v4):
+> **Go 1.26 + PostgreSQL 18** as the **single** datastore and source of truth (state,
+> queues and cache on Postgres; **Valkey** only optional where §0.1 measures it; **never
+> Redis**), blobs in **S3 Object Storage** (MinIO dev / Scaleway prod), identity
+> via **Sytue ID** (OIDC). Third-party dependencies **permissive only**
+> (MIT/BSD/Apache). Product code **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)** (SPDX header per file).
 >
-> **Seguridad y privacidad por defecto y reforzadas** (CONVENTIONS §0.7): estas
-> librerías materializan deny-by-default, mínimo privilegio, RLS multi-tenant,
-> cabeceras de seguridad + CSP + HSTS, CSRF, rate-limiting, cookies
-> HttpOnly/Secure/SameSite, validación/saneado, consultas parametrizadas,
-> observabilidad OTel correlacionada y logs **sin PII** (RGPD art. 25).
+> **Security and privacy by default, and hardened** (CONVENTIONS §0.7): these
+> libraries implement deny-by-default, least privilege, multi-tenant RLS,
+> security headers + CSP + HSTS, CSRF, rate limiting, HttpOnly/Secure/SameSite
+> cookies, validation/sanitization, parameterized queries,
+> correlated OTel observability and logs **without PII** (GDPR art. 25).
 
-## Paquetes (`platform/pkg/*`)
+<a id="paquetes-platformpkg"></a>
+## Packages (`platform/pkg/*`)
 
-| Paquete        | Propósito |
+| Package        | Purpose |
 |----------------|-----------|
-| `config`       | Carga de configuración **tipada** desde el entorno (12-factor) con prefijos, defaults, validación y acumulación de errores. `Base` común a todos los servicios. |
-| `log`          | Logger estructurado con `log/slog` (JSON en prod, texto en dev). Propagación por `context.Context`. |
-| `telemetry`    | Observabilidad **correlacionada** (traces + metrics + logs): spans W3C Trace Context (propagación `traceparent`), contadores/histogramas agregados, **exporter OTLP/HTTP** hacia el colector (sin arrastrar el SDK OTel), inyección de `trace_id`/`span_id` en el logger y **pprof protegido** (deny-by-default, requiere Guard de autorización). |
-| `httpx`        | Router **chi** con cadena de middlewares **SEGURA por defecto**: request-id, logging, recovery, **cabeceras de seguridad** (CSP configurable, HSTS solo TLS, nosniff, X-Frame-Options/frame-ancestors, Referrer-Policy, Permissions-Policy, COOP/CORP/COEP), **CORS** restrictivo (allowlist), **límite de body**, **rate-limiting** token-bucket, **CSRF** double-submit, timeout. Helpers de **cookies HttpOnly/Secure/SameSite=strict**, respuestas/errores **JSON canónicos**, decodificación+validación de cuerpos y sondas `/healthz`/`/readyz`. Servidor con apagado *graceful* y timeouts seguros. |
-| `pg`           | Pool **pgx** con límites, helpers de transacción (`InTx`, `InTenantTx`, `InRLSTx`), **runner de migraciones**, tenancy/**RLS** (`SetTenant`/`WithTenant` vía `set_config('app.tenant', …, true)`, generador de políticas `TenantRLSPolicySQL` con `FORCE ROW LEVEL SECURITY` deny-by-default) y **rate-limiter compartido** sobre Postgres. Consultas siempre **parametrizadas**. |
-| `objectstore`  | Cliente **S3** compatible MinIO/Scaleway (minio-go): put/get/delete, URLs prefirmadas, *health*. Aislamiento por tenant mediante **prefijos de clave**. |
-| `validation`   | **Validación y saneado** de entrada reutilizable: `Validator` acumulativo (required/len/email/slug/allowlist/regex), saneado de texto (control chars, BiDi/zero-width anti *Trojan Source*), truncado por runes. Se integra con `httpx.FailValidation` (422 con detalles por campo). |
-| `authn`        | Verificador **OIDC** de los JWT de Sytue ID: **JWKS** con caché/rotación (jwx), validación de firma/issuer/audiencia/**exp/nbf/iat**, **allowlist de algoritmos** (asimétricos; nunca `none` ni HS*), `kid` obligatorio, extracción de claims **sin PII** (`Claims.LogValue`), middlewares `RequireAuth` / `RequireRole` / `RequireTenant` / `RequireScope`. |
-| `events`       | **Bus de eventos sobre PostgreSQL** (sin Redis): patrón **outbox** transaccional + **LISTEN/NOTIFY**. `Dispatcher` (entrega *at-least-once* con `FOR UPDATE SKIP LOCKED` y poll de respaldo) y `Subscriber` (NOTIFY efímero en tiempo real). |
-| `tenancy`      | Contexto de **tenant** (organización). Slug canónico ⇄ `org/<slug>` (Sytue ID) ⇄ `tenant-<slug>` (Kapsule) ⇄ prefijo S3. |
+| `config`       | **Typed** configuration loading from the environment (12-factor) with prefixes, defaults, validation and error accumulation. `Base` common to all services. |
+| `log`          | Structured logger with `log/slog` (JSON in prod, text in dev). Propagation via `context.Context`. |
+| `telemetry`    | **Correlated** observability (traces + metrics + logs): W3C Trace Context spans (`traceparent` propagation), aggregated counters/histograms, **OTLP/HTTP exporter** to the collector (without pulling in the OTel SDK), injection of `trace_id`/`span_id` into the logger and **protected pprof** (deny-by-default, requires an authorization Guard). |
+| `httpx`        | **chi** router with a middleware chain that is **SECURE by default**: request-id, logging, recovery, **security headers** (configurable CSP, HSTS only over TLS, nosniff, X-Frame-Options/frame-ancestors, Referrer-Policy, Permissions-Policy, COOP/CORP/COEP), restrictive **CORS** (allowlist), **body limit**, token-bucket **rate limiting**, double-submit **CSRF**, timeout. Helpers for **HttpOnly/Secure/SameSite=strict cookies**, **canonical JSON** responses/errors, body decoding+validation and `/healthz`/`/readyz` probes. Server with *graceful* shutdown and safe timeouts. |
+| `pg`           | **pgx** pool with limits, transaction helpers (`InTx`, `InTenantTx`, `InRLSTx`), **migration runner**, tenancy/**RLS** (`SetTenant`/`WithTenant` via `set_config('app.tenant', …, true)`, `TenantRLSPolicySQL` policy generator with deny-by-default `FORCE ROW LEVEL SECURITY`) and a **shared rate limiter** on Postgres. Queries are always **parameterized**. |
+| `objectstore`  | MinIO/Scaleway-compatible **S3** client (minio-go): put/get/delete, presigned URLs, *health*. Per-tenant isolation through **key prefixes**. |
+| `validation`   | Reusable input **validation and sanitization**: accumulating `Validator` (required/len/email/slug/allowlist/regex), text sanitization (control chars, BiDi/zero-width anti *Trojan Source*), truncation by runes. Integrates with `httpx.FailValidation` (422 with per-field details). |
+| `authn`        | **OIDC** verifier for Sytue ID JWTs: **JWKS** with caching/rotation (jwx), signature/issuer/audience/**exp/nbf/iat** validation, **algorithm allowlist** (asymmetric; never `none` or HS*), mandatory `kid`, claim extraction **without PII** (`Claims.LogValue`), `RequireAuth` / `RequireRole` / `RequireTenant` / `RequireScope` middlewares. |
+| `events`       | **Event bus on PostgreSQL** (no Redis): transactional **outbox** pattern + **LISTEN/NOTIFY**. `Dispatcher` (*at-least-once* delivery with `FOR UPDATE SKIP LOCKED` and fallback polling) and `Subscriber` (ephemeral real-time NOTIFY). |
+| `tenancy`      | **Tenant** (organization) context. Canonical slug ⇄ `org/<slug>` (Sytue ID) ⇄ `tenant-<slug>` (Kapsule) ⇄ S3 prefix. |
 
-## Convenciones
+<a id="convenciones"></a>
+## Conventions
 
-- **Capas por servicio:** `cmd/<svc>/main.go` + `internal/{http,domain,store}`.
-- **Cabecera SPDX propietaria** en cada archivo Go (`MIT`).
-- **`context.Context`** en todo I/O; errores envueltos con `%w`.
-- **Migraciones** versionadas por servicio (`db/migrations/*.up.sql` / `*.down.sql`),
-  embebidas con `//go:embed` y aplicadas con `pg.MigrateUp`.
+- **Layers per service:** `cmd/<svc>/main.go` + `internal/{http,domain,store}`.
+- **Proprietary SPDX header** in every Go file (`MIT`).
+- **`context.Context`** in all I/O; errors wrapped with `%w`.
+- Per-service versioned **migrations** (`db/migrations/*.up.sql` / `*.down.sql`),
+  embedded with `//go:embed` and applied with `pg.MigrateUp`.
 
-## Ejemplo de cableado de un servicio
+<a id="ejemplo-de-cableado-de-un-servicio"></a>
+## Example of wiring a service
 
 ```go
 // services/<svc>/cmd/<svc>/main.go
@@ -105,10 +109,10 @@ _ = srv.Run(ctx) // bloquea; apagado graceful al cancelar el contexto
 
 ## Tests
 
-Cada paquete incluye tests unitarios que **no** requieren servicios externos
-(PostgreSQL/MinIO/Sytue ID): validación de config, slugs de tenant, contrato de
-errores/respuestas JSON, sondas de salud, derivaciones de claves S3, claims y
-extracción de Bearer. Las rutas que tocan red se prueban en integración por servicio.
+Each package includes unit tests that do **not** require external services
+(PostgreSQL/MinIO/Sytue ID): config validation, tenant slugs, JSON
+error/response contract, health probes, S3 key derivations, claims and
+Bearer extraction. Paths that touch the network are tested in per-service integration tests.
 
 ```sh
 go test ./platform/...

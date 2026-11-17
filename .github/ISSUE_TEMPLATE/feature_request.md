@@ -1,13 +1,13 @@
 ---
-name: Solicitud de funcionalidad (Feature request)
-about: Proponer una nueva funcionalidad o mejora
+name: Feature request
+about: Propose a new feature or improvement
 title: '[FEATURE]: '
 labels: enhancement
 assignees: ''
 ---
 
-**Descripción de la propuesta**
-Descripción clara y concisa de la funcionalidad o mejora propuesta.
+**Description of the proposal**
+A clear and concise description of the proposed feature or improvement.
 
-**Motivación o caso de uso**
-¿Por qué sería útil para la suite?
+**Motivation or use case**
+Why would it be useful for the suite?

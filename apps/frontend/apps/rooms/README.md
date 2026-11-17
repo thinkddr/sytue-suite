@@ -1,43 +1,49 @@
 # Sytue Chat
 
-Mensajería en tiempo real de la suite **Sytue One** en **Astro 7 + Preact 10**,
-repuntada al servicio **Go propio Sytue Chat** (REST + WebSocket; PostgreSQL como
-único datastore). Producto **Sytue-native**, original y **propietario** (© Sytue):
-reimplementación _clean-room_ sobre estándares abiertos y librerías permisivas —
-sin motores de terceros AGPL y sin Redis. Soberanía 100 % UE (Scaleway).
+Real-time messaging for the **Sytue One** suite in **Astro 7 + Preact 10**,
+re-pointed to the **in-house Go service Sytue Chat** (REST + WebSocket; PostgreSQL as
+the only datastore). A **Sytue-native**, original and **proprietary** product (© Sytue):
+a _clean-room_ reimplementation on open standards and permissive libraries —
+no third-party AGPL engines and no Redis. 100% EU sovereignty (Scaleway).
 
-Canales (públicos / privados / DMs), vista de canal con histórico y redacción.
-Lenguaje visual **Sytue**, modo claro/oscuro y WCAG AA del design system. Monta la
-**Sytue Shell** (`@sytue/shell`) y usa exclusivamente `@sytue/ui`.
+Channels (public / private / DMs), channel view with history and composing.
+**Sytue** visual language, light/dark mode and WCAG AA from the design system. It mounts the
+**Sytue Shell** (`@sytue/shell`) and uses `@sytue/ui` exclusively.
 
-## Arquitectura
+<a id="arquitectura"></a>
 
-- **BFF + OIDC/PKCE** (`@sytue/auth`): `src/pages/auth/*` (client confidencial
-  `sytue-chat` de **Sytue ID**, discovery OIDC estándar). Cookie de sesión httpOnly
-  `.sytue.eu`. El secreto del client y el access token viven sólo en el servidor.
-- **BFF REST** (`src/pages/api/*`): proxy same-origin (cookie) → servicio Go Sytue
-  Chat con el access token (`src/lib/chat.ts`). Endpoints: `channels`, `messages`
-  (histórico + paginación), `send` (publicar), `ws-ticket` (emite un ticket de
-  corta duración para el WebSocket). El token nunca toca el navegador como dato.
-- **Tiempo real** (`src/client/chatApi.ts`): WebSocket directo navegador ↔ servicio
-  Go (`/ws`), autorizado con el ticket del BFF; reconexión con backoff.
-- **Islas Preact** (`src/components/*`): `ChatApp` (raíz: sidebar de canales +
-  panel de canal + realtime + envío optimista), `MessageView` (histórico agrupado),
-  `Composer` (redacción, Enter envía / Shift+Enter salto de línea).
+## Architecture
 
-## Desarrollo
+- **BFF + OIDC/PKCE** (`@sytue/auth`): `src/pages/auth/*` (confidential client
+  `sytue-chat` of **Sytue ID**, standard OIDC discovery). httpOnly session cookie on
+  `.sytue.eu`. The client secret and the access token live only on the server.
+- **REST BFF** (`src/pages/api/*`): same-origin (cookie) proxy → Sytue Chat Go
+  service with the access token (`src/lib/chat.ts`). Endpoints: `channels`, `messages`
+  (history + pagination), `send` (publish), `ws-ticket` (issues a short-lived
+  ticket for the WebSocket). The token never reaches the browser as data.
+- **Real time** (`src/client/chatApi.ts`): direct browser ↔ Go service WebSocket
+  (`/ws`), authorized with the BFF ticket; reconnection with backoff.
+- **Preact islands** (`src/components/*`): `ChatApp` (root: channel sidebar +
+  channel panel + realtime + optimistic sending), `MessageView` (grouped history),
+  `Composer` (composing, Enter sends / Shift+Enter inserts a line break).
 
-Puerto dev `4330` (ver `docs/CONVENTIONS.md` §6); dominio `rooms.sytue.localhost`
-(Sytue Rooms = Chat+Meet unificados; `chat.*` y `meet.*` responden 301 permanente).
-Backend Go Sytue Chat en `:8085` (REST + WS).
+<a id="desarrollo"></a>
+
+## Development
+
+Dev port `4330` (see `docs/CONVENTIONS.md` §6); domain `rooms.sytue.localhost`
+(Sytue Rooms = Chat+Meet unified; `chat.*` and `meet.*` respond with a permanent 301).
+Sytue Chat Go backend on `:8085` (REST + WS).
 
 ```bash
 bun run --filter @sytue/chat dev
 ```
 
-Copia `.env.example` a `.env` (sólo placeholders; secretos reales fuera de git).
+Copy `.env.example` to `.env` (placeholders only; real secrets stay out of git).
 
-## Producción
+<a id="producción"></a>
 
-`Dockerfile` multi-stage con **Bun** (salida `standalone` de Astro). Desplegado por
-el umbrella chart `sytue-one` en Kapsule (Scaleway, regiones UE).
+## Production
+
+Multi-stage `Dockerfile` with **Bun** (Astro `standalone` output). Deployed by
+the `sytue-one` umbrella chart on Kapsule (Scaleway, EU regions).

@@ -1,36 +1,37 @@
-# Paquetes para los marketplaces de los vendors
+<a id="paquetes-para-los-marketplaces-de-los-vendors"></a>
+# Packages for the vendors' marketplaces
 
-Lo que un administrador de cliente sube al portal de CADA vendor para conectar
-esa plataforma con Sytue (Integration Gateway, `services/integrations`). Los
-valores derivan de las semillas del propio catálogo
-(`services/integrations/db/seeds/templates/*.json`): mismos endpoints OAuth y
-mismos scopes, para que lo que el vendor acepta sea exactamente lo que el
-gateway espera.
+What a customer administrator uploads to EACH vendor's portal to connect
+that platform with Sytue (Integration Gateway, `services/integrations`). The
+values derive from the catalog's own seeds
+(`services/integrations/db/seeds/templates/*.json`): same OAuth endpoints and
+same scopes, so that what the vendor accepts is exactly what the
+gateway expects.
 
-**Redirect URI común** (la que cada vendor pide pegar):
+**Common redirect URI** (the one each vendor asks you to paste):
 
     https://integrations.sytue.eu/api/v1/oauth/callback
 
-**Guías de alta**: cada vendor lleva su `GUIA-ALTA.md` (paso a paso completo,
-con rutas exactas de cada portal, problemas frecuentes y verificación final)
-DENTRO del zip. Las siete de arriba están escritas y **el RESTO del catálogo
-también**: una guía paso a paso por conector en `catalogo/<clave>.md`
-(33 ficheros, uno por semilla de
-`services/integrations/db/seeds/templates/`), derivada de los scopes/fields
-reales de cada semilla.
+**Onboarding guides**: each vendor carries its `GUIA-ALTA.md` (complete step-by-step,
+with exact paths in each portal, common problems and final verification)
+INSIDE the zip. The seven above are written and **so is the REST of the catalog**:
+a step-by-step guide per connector in `catalogo/<clave>.md`
+(33 files, one per seed in
+`services/integrations/db/seeds/templates/`), derived from the real
+scopes/fields of each seed.
 
-**Publicación**: `bash scripts/empaquetar-marketplace.sh` produce
-`dist-marketplace/<vendor>.zip`; el workflow `release-marketplace.yml` los sube
-como assets de una release de GitHub (`publicar-asset.sh`), de donde los sirve
-Sytue Platform. Un bundle se vuelve a generar en cualquier momento; no se
-editan los zip a mano.
+**Publishing**: `bash scripts/empaquetar-marketplace.sh` produces
+`dist-marketplace/<vendor>.zip`; the `release-marketplace.yml` workflow uploads them
+as assets of a GitHub release (`publicar-asset.sh`), from where
+Sytue Platform serves them. A bundle can be regenerated at any time; the zips
+are never edited by hand.
 
-| Vendor | Paquete | Dónde se carga |
+| Vendor | Package | Where it is uploaded |
 |---|---|---|
-| Slack | `slack/app-manifest.yml` | api.slack.com/apps → «Create from manifest» |
-| Microsoft Teams | `microsoft-teams/` (zip con manifest + iconos) | admin.teams.com → Teams apps → «Upload» |
+| Slack | `slack/app-manifest.yml` | api.slack.com/apps → “Create from manifest” |
+| Microsoft Teams | `microsoft-teams/` (zip with manifest + icons) | admin.teams.com → Teams apps → “Upload” |
 | Google Drive | `google-drive/` | console.cloud.google.com (OAuth client) |
 | OneDrive | `onedrive/` | portal.azure.com → Entra → App registrations |
-| Zoom | `zoom/` | marketplace.zoom.us → «Develop → Build App» |
+| Zoom | `zoom/` | marketplace.zoom.us → “Develop → Build App” |
 | Google Meet | `google-meet/` | console.cloud.google.com (OAuth client) |
 | Google Chat | `google-chat/` | console.cloud.google.com → Chat API config |

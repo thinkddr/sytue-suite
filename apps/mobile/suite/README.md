@@ -1,37 +1,41 @@
-# Apps moviles de Sytue (Capacitor 8)
+<a id="apps-moviles-de-sytue-capacitor-8"></a>
 
-> **⚠️ ESTE PROYECTO YA NO PUBLICA NADA (2026-09-21).** Las apps moviles de la suite son
-> las de **Fyne** (`apps/fyne/cmd/*`, empaquetadas por
-> [`apps/fyne/scripts/empaquetar.sh`](../../fyne/scripts/empaquetar.sh)), nativas y sin
-> webview: Android en [`release-mobile.yml`](../../../.github/workflows/release-mobile.yml),
-> iOS y macOS en [`release-desktop.yml`](../../../.github/workflows/release-desktop.yml).
-> Codemagic esta retirado. Entre el 2026-09-21 y el 2026-09-23 lo
-> fueron las de Gio, retiradas del repositorio. Ni `release-mobile.yml` ni
-> `ci-mobile.yml` llaman ya a nada de aqui.
+# Sytue mobile apps (Capacitor 8)
+
+> **⚠️ THIS PROJECT NO LONGER PUBLISHES ANYTHING (2026-09-21).** The suite's mobile apps are
+> the **Fyne** ones (`apps/fyne/cmd/*`, packaged by
+> [`apps/fyne/scripts/empaquetar.sh`](../../fyne/scripts/empaquetar.sh)), native and with no
+> webview: Android in [`release-mobile.yml`](../../../.github/workflows/release-mobile.yml),
+> iOS and macOS in [`release-desktop.yml`](../../../.github/workflows/release-desktop.yml).
+> Codemagic is retired. Between 2026-09-21 and 2026-09-23 the
+> Gio ones were, and they have been removed from the repository. Neither `release-mobile.yml` nor
+> `ci-mobile.yml` calls anything from here any longer.
 >
-> **Se conserva sin borrar a proposito**, y el motivo esta escrito en
+> **It is kept, deliberately not deleted**, and the reason is written in
 > [`docs/operations.md` §2.1b](../../../docs/operations.md#21b-clientes-moviles-una-sola-tecnologia):
-> su coste de mantenimiento es COMPARTIDO con [`../rooms`](../rooms), otro proyecto
-> Capacitor conservado, asi que borrarlo no apaga ninguna herramienta ni ningun gate. Alli esta
-> tambien la lista exacta de ficheros que hay que tocar EN EL MISMO COMMIT para darlo de
-> baja. **Lo de abajo describe como era, no como se publica hoy.**
+> its maintenance cost is SHARED with [`../rooms`](../rooms), another
+> Capacitor project that is kept, so deleting it does not switch off any tool or any gate. That
+> section also has the exact list of files that must be touched IN THE SAME COMMIT to
+> retire it. **What follows describes how it used to be, not how things are published today.**
 
-Shells nativos para **iOS, iPadOS y Android**. Envuelven la **misma web** (codigo unico)
-en un webview nativo con [Capacitor](https://capacitorjs.com) (**MIT**): presencia en App
-Store / Play Store y, en fases siguientes, APIs nativas (compartir, ficheros, camara). No
-reimplementan editores; son clientes de marca —mismo enfoque que el escritorio de Wails,
-retirado el 2026-09-23— sobre el backend Go de Sytue.
+Native shells for **iOS, iPadOS and Android**. They wrap the **same web** (a single codebase)
+in a native webview with [Capacitor](https://capacitorjs.com) (**MIT**): presence in the App
+Store / Play Store and, in later phases, native APIs (share, files, camera). They do not
+reimplement editors; they are branded clients —the same approach as the Wails desktop,
+retired on 2026-09-23— on top of Sytue's Go backend.
 
-## UN proyecto, DIEZ apps
+<a id="un-proyecto-diez-apps"></a>
 
-Cada producto se publica **por separado**: su identificador de paquete, su nombre, su
-icono y su esquema de deep link. Lo que comparten es este proyecto, porque diez carpetas
-serian diez `package.json`, diez `node_modules` y diez sitios donde repetir cada
-arreglo. Se elige con `SYTUE_APP` (tabla en [`products.ts`](products.ts)):
+## ONE project, TEN apps
 
-| `SYTUE_APP` | App            | Paquete             | Web                | Esquema             |
+Each product is published **separately**: its own package identifier, name,
+icon and deep link scheme. What they share is this project, because ten folders
+would be ten `package.json`, ten `node_modules` and ten places to repeat every
+fix. It is selected with `SYTUE_APP` (table in [`products.ts`](products.ts)):
+
+| `SYTUE_APP` | App            | Package             | Web                | Scheme              |
 | ----------- | -------------- | ------------------- | ------------------ | ------------------- |
-| _(vacio)_   | Sytue One      | `eu.sytue.one`      | `one.*`            | `sytue://`          |
+| _(empty)_   | Sytue One      | `eu.sytue.one`      | `one.*`            | `sytue://`          |
 | `mail`      | Sytue Mail     | `eu.sytue.mail`     | `mail.*`           | `sytue-mail://`     |
 | `drive`     | Sytue Drive    | `eu.sytue.drive`    | `drive.*`          | `sytue-drive://`    |
 | `docs`      | Sytue Docs     | `eu.sytue.docs`     | `docus.*/docus/`   | `sytue-docs://`     |
@@ -42,104 +46,112 @@ arreglo. Se elige con `SYTUE_APP` (tabla en [`products.ts`](products.ts)):
 | `cloud`     | Sytue Cloud    | `eu.sytue.cloud`    | `cloud.*`          | `sytue-cloud://`    |
 | `admin`     | Sytue Admin    | `eu.sytue.admin`    | `admin.*`          | `sytue-admin://`    |
 
-Contacts comparte CardDAV con las sugerencias de Mail, pero se publica como app propia.
-**Rooms tampoco esta aqui**: vive en [`apps/mobile/rooms`](../rooms), con push nativo,
-badge de no leidos y su propio canal, que el resto no necesita.
+Contacts shares CardDAV with Mail's suggestions, but it is published as its own app.
+**Rooms is not here either**: it lives in [`apps/mobile/rooms`](../rooms), with native push,
+an unread badge and its own channel, which the rest do not need.
 
 ```bash
 SYTUE_APP=mail npx cap sync android    # produce Sytue Mail
 npx cap sync android                   # sin variable: la suite
 ```
 
-Una clave desconocida **falla**: construir en silencio la app equivocada y subirla a la
-tienda seria mucho peor que un error.
+An unknown key **fails**: silently building the wrong app and uploading it to the
+store would be much worse than an error.
 
-La **PWA instalable** (manifest + service worker en [`apps/frontend/apps/portal`](../../frontend/apps/portal))
-es la base: da instalacion, icono y shell offline sin tiendas. Capacitor anade la
-presencia en tiendas sobre esa misma web.
+The **installable PWA** (manifest + service worker in [`apps/frontend/apps/portal`](../../frontend/apps/portal))
+is the foundation: it provides installation, an icon and an offline shell without stores. Capacitor adds
+store presence on top of that same web.
 
-Decision y fases: [`docs/decisions.md#0024`](../../../docs/decisions.md#0024).
+Decision and phases: [`docs/decisions.md#0024`](../../../docs/decisions.md#0024).
 
-## Estado
+<a id="estado"></a>
 
-- **Hecho:** shell que carga la suite (`server.url`), navegacion restringida a dominios
-  Sytue, icono/splash y experiencia offline compartida por cuenta. Tras una primera
-  apertura conectada, el service worker conserva shell, pantallas y lecturas; IndexedDB
-  conserva documentos y borradores. **El primer arranque y el inicio de sesion requieren
-  red**: no se persisten tokens en almacenamiento cliente.
-- **Pendiente (follow-up, no implementado):**
-  - **APIs nativas**: compartir, ficheros, camara, notificaciones push
+## Status
+
+- **Done:** a shell that loads the suite (`server.url`), navigation restricted to Sytue
+  domains, icon/splash and an offline experience shared per account. After a first
+  connected launch, the service worker keeps the shell, screens and reads; IndexedDB
+  keeps documents and drafts. **The first launch and sign-in require a
+  network**: no tokens are persisted in client storage.
+- **Pending (follow-up, not implemented):**
+  - **Native APIs**: share, files, camera, push notifications
     (`@capacitor/share`, `@capacitor/filesystem`, `@capacitor/push-notifications`…).
-  - **Sesion nativa segura** y endurecido de CSP para webview embebido (ADR-0024).
-  - **iOS/iPadOS: la ruta de build EXISTE pero no se ha ejecutado nunca.** El job
-    `ios-apps` de `.sygit/workflows/release-mobile.yml` archiva y exporta los once `.ipa`
-    (diez productos + Rooms), pero **se salta entero mientras no haya credenciales de
-    Apple** — que hoy no existen. Que hace falta exactamente:
-    [§Publicar en iOS](#publicar-en-ios-app-store). Android publica once APK y
-    escritorio 33 artefactos (11 apps × 3 plataformas).
+  - **Secure native session** and CSP hardening for the embedded webview (ADR-0024).
+  - **iOS/iPadOS: the build path EXISTS but has never been run.** The
+    `ios-apps` job in `.sygit/workflows/release-mobile.yml` archives and exports the eleven `.ipa`
+    (ten products + Rooms), but **it is skipped entirely as long as there are no Apple
+    credentials** — which do not exist today. What exactly is needed:
+    [§Publish on iOS](#publicar-en-ios-app-store). Android publishes eleven APKs and
+    desktop 33 artifacts (11 apps × 3 platforms).
 
-## iPadOS: que hereda y que no
+<a id="ipados-que-hereda-y-que-no"></a>
 
-iPadOS **no es una plataforma aparte en Capacitor**: se construye desde el mismo proyecto
-`ios/`. Lo que sigue esta **verificado sobre la plantilla real** que genera `cap add ios`
-(Capacitor 8.5.0, `node_modules/@capacitor/cli/assets/ios-pods-template.tar.gz`), no
-supuesto.
+## iPadOS: what it inherits and what it does not
 
-**Ya funciona sin tocar nada** (defaults de la plantilla, no configuracion nuestra):
+iPadOS **is not a separate platform in Capacitor**: it is built from the same
+`ios/` project. What follows is **verified against the real template** that `cap add ios` generates
+(Capacitor 8.5.0, `node_modules/@capacitor/cli/assets/ios-pods-template.tar.gz`), not
+assumed.
 
-| Capacidad                   | Clave                                                  | Valor de la plantilla                                  |
+**Already works without touching anything** (template defaults, not our configuration):
+
+| Capability                  | Key                                                    | Template value                                         |
 | --------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| Se instala en iPad          | `TARGETED_DEVICE_FAMILY` (`project.pbxproj`)           | `"1,2"` = iPhone **+ iPad**                            |
-| Las cuatro orientaciones    | `UISupportedInterfaceOrientations~ipad` (`Info.plist`) | portrait, upside-down, landscape L y R                 |
-| **Split View** / Slide Over | `UIRequiresFullScreen`                                 | **ausente** ⇒ la app participa                         |
-| Pellizco para ampliar       | `ios.zoomEnabled` (`capacitor.config.ts`)              | Capacitor lo trae en `false`; **lo ponemos en `true`** |
+| Installs on iPad            | `TARGETED_DEVICE_FAMILY` (`project.pbxproj`)           | `"1,2"` = iPhone **+ iPad**                            |
+| All four orientations       | `UISupportedInterfaceOrientations~ipad` (`Info.plist`) | portrait, upside-down, landscape L and R               |
+| **Split View** / Slide Over | `UIRequiresFullScreen`                                 | **absent** ⇒ the app takes part                        |
+| Pinch to zoom               | `ios.zoomEnabled` (`capacitor.config.ts`)              | Capacitor ships it as `false`; **we set it to `true`** |
 
-Ese ultimo **no** era un default aceptable: con `zoomEnabled:false` Capacitor cancela el
-gesto (`WebViewDelegationHandler.scrollViewWillBeginZooming`) y, como WKWebView tampoco
-atiende Dynamic Type para contenido web, el usuario se queda **sin ninguna forma de
-agrandar**. Incumple WCAG 1.4.4 —que la casa exige (ADR-0004)— y se nota justo donde mas
-importa: un PDF, un plano o una hoja de calculo en iPad.
+That last one was **not** an acceptable default: with `zoomEnabled:false` Capacitor cancels the
+gesture (`WebViewDelegationHandler.scrollViewWillBeginZooming`) and, since WKWebView does not
+honor Dynamic Type for web content either, the user is left **with no way at all to
+enlarge**. It violates WCAG 1.4.4 —which the house requires (ADR-0004)— and it shows exactly where it
+matters most: a PDF, a plan or a spreadsheet on an iPad.
 
-**Lo que NO hereda, y por que:**
+**What it does NOT inherit, and why:**
 
-- **Multi-ventana (dos Sytue Docs en paralelo) y Stage Manager completo.** La plantilla
-  trae `UIApplicationSupportsMultipleScenes: false`, y **no es un flag que se pueda
-  girar**: el `SceneDelegateProxy` de Capacitor 8 es un **singleton**
-  (`SceneDelegateProxy.shared`, con `lastURL` compartido), asi que varias escenas
-  compartirian un puente. Split View con **otra** app si funciona; dos ventanas **de la
-  misma** app, no. Requiere soporte multi-escena aguas arriba en Capacitor.
-- **Apple Pencil.** No hay nada que configurar aqui, y conviene no fingir lo contrario:
-  en un webview el lapiz llega como **Pointer Events con `pointerType: "pen"`** (presion
-  en `pressure`, inclinacion en `tiltX`/`tiltY`), y quien tiene que atenderlos es la
-  **web** (`apps/frontend`), con `touch-action: none` en el lienzo. Lo que un webview
-  **no** puede recibir es la API nativa de `UIPencilInteraction` (doble toque y
-  «squeeze» del Pencil 2/Pro) ni PencilKit: eso exige un plugin nativo que hoy no existe.
-- **Modo de contenido.** `ios.preferredContentMode` no se fija, asi que vale
-  `'recommended'`: en iPad grande WKWebView pide el sitio en modo **escritorio**. Es lo
-  que queremos para editores, pero conviene saberlo — la cinta de Docs/Sheets mide
-  ~1.242 px y un iPad Mini tiene 768 (medido, `docs/design.md`), asi que el recorte de
-  cinta se ve **antes** en iPad que en un portatil.
-- **Descargas.** La pagina publica ofrece a un visitante de iPad el **DMG de macOS**:
-  `detectPlatform` (`apps/frontend/apps/www/src/lib/downloads.ts`) desempata por user
-  agent y iPadOS 13+ se anuncia como `Macintosh`. El propio comentario dice que lo
-  resuelve el soporte tactil, pero el codigo no lo comprueba. Fuera de este directorio.
+- **Multi-window (two Sytue Docs side by side) and full Stage Manager.** The template
+  ships `UIApplicationSupportsMultipleScenes: false`, and **it is not a flag that can be
+  flipped**: Capacitor 8's `SceneDelegateProxy` is a **singleton**
+  (`SceneDelegateProxy.shared`, with a shared `lastURL`), so several scenes
+  would share one bridge. Split View with **another** app does work; two windows **of the
+  same** app do not. It requires upstream multi-scene support in Capacitor.
+- **Apple Pencil.** There is nothing to configure here, and it is better not to pretend otherwise:
+  in a webview the pencil arrives as **Pointer Events with `pointerType: "pen"`** (pressure
+  in `pressure`, tilt in `tiltX`/`tiltY`), and the one that has to handle them is the
+  **web** (`apps/frontend`), with `touch-action: none` on the canvas. What a webview
+  **cannot** receive is the native `UIPencilInteraction` API (double tap and
+  “squeeze” on Pencil 2/Pro) or PencilKit: that requires a native plugin that does not exist today.
+- **Content mode.** `ios.preferredContentMode` is not set, so it is
+  `'recommended'`: on a large iPad, WKWebView requests the site in **desktop** mode. That is
+  what we want for editors, but it is worth knowing — the Docs/Sheets ribbon measures
+  ~1,242 px and an iPad Mini is 768 (measured, `docs/design.md`), so ribbon clipping
+  shows up **earlier** on an iPad than on a laptop.
+- **Downloads.** The public page offers an iPad visitor the **macOS DMG**:
+  `detectPlatform` (`apps/frontend/apps/www/src/lib/downloads.ts`) breaks the tie by user
+  agent and iPadOS 13+ announces itself as `Macintosh`. The comment itself says that
+  touch support resolves it, but the code does not check it. Outside this directory.
 
-## Requisitos
+<a id="requisitos"></a>
 
-- **Node** (LTS) o **Bun** — para la CLI de Capacitor (`npm install` aqui).
-- **iOS / iPadOS:** **macOS + Xcode** (+ CocoaPods) y una cuenta de Apple Developer para
-  firmar/publicar. **Un solo proyecto `ios/` cubre las dos**; el iPad se prueba con un
-  simulador de iPad (`npx cap run ios --target <udid de iPad>`) o con el dispositivo.
-- **Android:** **Android Studio** + Android SDK (JDK 17). `ANDROID_HOME` configurado.
-- **ImageMagick** (`magick`) solo si regeneras iconos/splash (`scripts/gen-icons.sh`).
+## Requirements
 
-Este paquete esta **a proposito fuera** del workspace Bun del frontend
-(`apps/frontend`): solo necesita la CLI de Capacitor, no las deps del monorepo.
-`node_modules/`, `ios/` y `android/` estan en `.gitignore` (se generan).
+- **Node** (LTS) or **Bun** — for the Capacitor CLI (`npm install` here).
+- **iOS / iPadOS:** **macOS + Xcode** (+ CocoaPods) and an Apple Developer account to
+  sign/publish. **A single `ios/` project covers both**; the iPad is tested with an
+  iPad simulator (`npx cap run ios --target <udid de iPad>`) or with the device.
+- **Android:** **Android Studio** + Android SDK (JDK 17). `ANDROID_HOME` configured.
+- **ImageMagick** (`magick`) only if you regenerate icons/splash (`scripts/gen-icons.sh`).
 
-## Comandos
+This package is **deliberately outside** the frontend Bun workspace
+(`apps/frontend`): it only needs the Capacitor CLI, not the monorepo deps.
+`node_modules/`, `ios/` and `android/` are in `.gitignore` (they are generated).
 
-Desde `apps/mobile/suite/`:
+<a id="comandos"></a>
+
+## Commands
+
+From `apps/mobile/suite/`:
 
 ```bash
 npm install                 # trae @capacitor/core|cli|ios|android (gitignored)
@@ -160,91 +172,99 @@ npx cap run ios             # build + deploy a simulador/dispositivo
 npx cap run android
 ```
 
-> Compilar y firmar iOS/Android exige el toolchain nativo (Xcode / Android SDK) y
-> cuentas de las tiendas; se documentara en `docs/operations.md#2-cicd-y-cadena-de-suministro`
-> (ADR-0024). El shell local muestra el arranque; la web autenticada remota mantiene
-> una sola base de codigo y se vuelve a abrir desde su caché tras haberla usado con red.
+> Building and signing iOS/Android requires the native toolchain (Xcode / Android SDK) and
+> store accounts; it will be documented in `docs/operations.md#2-cicd-y-cadena-de-suministro`
+> (ADR-0024). The local shell shows the startup; the remote authenticated web keeps
+> a single codebase and reopens from its cache after it has been used online.
 
-## Publicar en iOS (App Store)
+<a id="publicar-en-ios-app-store"></a>
 
-**RETIRADO el 2026-09-21.** El job `ios-apps` que se describia aqui ya no existe: pedia
-`runs-on: sytue-macos`, una etiqueta que ningun runner de git.gay atendia, asi que sus doce
-trabajos se encolaban para siempre. Su relevo intermedio en Codemagic tambien esta retirado.
-El flujo vigente es [`release-desktop.yml`](../../../.github/workflows/release-desktop.yml),
-que construye **Fyne** desde `apps/fyne`, sin compilar este proyecto Capacitor.
-Lo que sigue vale solo como historial de la ruta vieja, incluidas las referencias a cuentas
-y credenciales que faltaban entonces.
+## Publish on iOS (App Store)
 
-> **Nunca se ha ejecutado.** No hay cuenta de Apple Developer Program, ni certificado, ni
-> App Store Connect: **los secretos estan vacios y el job se salta entero**, igual que
-> Android se salta sin keystore. Esta escrito para que la ruta exista el dia que existan
-> las credenciales — no porque este probado. Ni el `.ipa` ni el archive se han producido
-> jamas en ningun sitio.
+**RETIRED on 2026-09-21.** The `ios-apps` job described here no longer exists: it requested
+`runs-on: sytue-macos`, a label that no git.gay runner served, so its twelve
+jobs were queued forever. Its interim replacement on Codemagic is also retired.
+The current flow is [`release-desktop.yml`](../../../.github/workflows/release-desktop.yml),
+which builds **Fyne** from `apps/fyne`, without compiling this Capacitor project.
+What follows is valid only as the history of the old path, including the references to accounts
+and credentials that were missing at the time.
 
-El `.ipa` se adjunta a la release pero **no** se copia al bucket publico de descargas: iOS
-no permite instalar fuera de la tienda, asi que ofrecerlo en la web seria un enlace inutil.
-Su destino es App Store Connect.
+> **It has never been run.** There is no Apple Developer Program account, no certificate and no
+> App Store Connect: **the secrets are empty and the job is skipped entirely**, just as
+> Android is skipped without a keystore. It is written so that the path exists the day the
+> credentials exist — not because it is tested. Neither the `.ipa` nor the archive has ever
+> been produced anywhere.
 
-### Lo que tiene que aportar el propietario
+The `.ipa` is attached to the release but is **not** copied to the public downloads bucket: iOS
+does not allow installing outside the store, so offering it on the web would be a useless link.
+Its destination is App Store Connect.
 
-Sin esto, todo lo demas es papel. **Nada de esto lo puede resolver el repositorio.**
+<a id="lo-que-tiene-que-aportar-el-propietario"></a>
 
-1. **Apple Developer Program**, ~99 USD/ano. Como **organizacion** (no personal) exige
-   numero **D-U-N-S** de la entidad legal y verificacion por Apple: son **dias o semanas**,
-   no minutos. Es el cuello de botella real.
-2. **Certificado de distribucion** (_Apple Distribution_) exportado como **`.p12`** con su
-   contrasena. Se genera una vez desde la cuenta; el CI lo importa en un llavero efimero.
-3. **Clave de API de App Store Connect** (`.p8`) con rol **App Manager** o superior, mas su
-   **Key ID** e **Issuer ID**. Es lo que permite firma **automatica**: Xcode registra los
-   App ID y crea/renueva los perfiles de aprovisionamiento solo. Sin ella harian falta
-   **once** `.mobileprovision`, cada uno caducando por su cuenta cada doce meses.
-4. **Team ID** (10 caracteres, en la pagina de pertenencia de la cuenta).
-5. **Once registros de app en App Store Connect**, uno por identificador de paquete:
+### What the owner has to provide
+
+Without this, everything else is paper. **None of this can be solved by the repository.**
+
+1. **Apple Developer Program**, ~99 USD/year. As an **organization** (not personal) it requires
+   the legal entity's **D-U-N-S** number and verification by Apple: that takes **days or weeks**,
+   not minutes. It is the real bottleneck.
+2. **Distribution certificate** (_Apple Distribution_) exported as a **`.p12`** with its
+   password. It is generated once from the account; the CI imports it into an ephemeral keychain.
+3. **App Store Connect API key** (`.p8`) with the **App Manager** role or higher, plus its
+   **Key ID** and **Issuer ID**. This is what enables **automatic** signing: Xcode registers the
+   App IDs and creates/renews the provisioning profiles by itself. Without it,
+   **eleven** `.mobileprovision` files would be needed, each one expiring on its own every twelve months.
+4. **Team ID** (10 characters, on the account's membership page).
+5. **Eleven app records in App Store Connect**, one per package identifier:
    `eu.sytue.one`, `.mail`, `.drive`, `.docs`, `.sheets`, `.slides`, `.calendar`,
-   `.contacts`, `.cloud`, `.admin` y `eu.sytue.rooms`. El archive puede crear el App ID,
-   pero el **registro de la app** (nombre, categoria, ficha) se hace a mano una vez.
+   `.contacts`, `.cloud`, `.admin` and `eu.sytue.rooms`. The archive can create the App ID,
+   but the **app record** (name, category, store listing) is done by hand once.
 
-### Secretos del repositorio
+<a id="secretos-del-repositorio"></a>
 
-Todos en Secret Manager, como `ANDROID_KEYSTORE_*`. **Si falta cualquiera de los tres
-primeros, el job se salta y la release sale igual** (sin iOS):
+### Repository secrets
 
-| Secreto                        | Que es                                                      |
-| ------------------------------ | ----------------------------------------------------------- |
-| `APPLE_CERTIFICATE_P12_BASE64` | el `.p12` de distribucion, en base64 (`base64 -i cert.p12`) |
-| `APPLE_CERTIFICATE_PASSWORD`   | contrasena con la que se exporto ese `.p12`                 |
-| `APPLE_TEAM_ID`                | Team ID de 10 caracteres                                    |
-| `APPLE_API_KEY_P8_BASE64`      | la clave `.p8` de App Store Connect, en base64              |
-| `APPLE_API_KEY_ID`             | Key ID de esa clave                                         |
-| `APPLE_API_ISSUER_ID`          | Issuer ID de App Store Connect (UUID, uno por equipo)       |
+All in Secret Manager, like `ANDROID_KEYSTORE_*`. **If any of the first three
+is missing, the job is skipped and the release goes out anyway** (without iOS):
 
-### Lo que este job NO hace, a proposito
+| Secret                         | What it is                                                |
+| ------------------------------ | --------------------------------------------------------- |
+| `APPLE_CERTIFICATE_P12_BASE64` | the distribution `.p12`, in base64 (`base64 -i cert.p12`) |
+| `APPLE_CERTIFICATE_PASSWORD`   | password with which that `.p12` was exported              |
+| `APPLE_TEAM_ID`                | 10-character Team ID                                      |
+| `APPLE_API_KEY_P8_BASE64`      | the App Store Connect `.p8` key, in base64                |
+| `APPLE_API_KEY_ID`             | Key ID of that key                                        |
+| `APPLE_API_ISSUER_ID`          | App Store Connect Issuer ID (UUID, one per team)          |
 
-- **No sube nada a App Store Connect.** `destination: export` deja el `.ipa` en disco.
-  Publicar (TestFlight, revision, fecha de salida) es una decision de producto, no un
-  efecto secundario de cortar un tag.
-- **No configura capabilities.** Rooms necesita **Push Notifications** (`aps-environment`)
-  y **Associated Domains** para universal links; la plantilla de Capacitor no trae esos
-  entitlements y el archive saldra **sin push**. Arreglarlo pide anadir un
-  `App.entitlements` al proyecto generado — mismo patron que `scripts/setup-deeplinks.sh`,
-  todavia sin escribir. Ver [`../rooms/README.md`](../rooms/README.md).
-- **No cubre requisitos de ficha**: manifiesto de privacidad, cumplimiento de exportacion,
-  capturas por tamano de pantalla. Se resuelven en App Store Connect, no en YAML.
-- **No hay iPad como plataforma aparte**: el mismo `.ipa` cubre iPhone y iPad
-  (`TARGETED_DEVICE_FAMILY "1,2"`). Que hereda y que no:
+<a id="lo-que-este-job-no-hace-a-proposito"></a>
+
+### What this job does NOT do, on purpose
+
+- **It does not upload anything to App Store Connect.** `destination: export` leaves the `.ipa` on disk.
+  Publishing (TestFlight, review, release date) is a product decision, not a
+  side effect of cutting a tag.
+- **It does not configure capabilities.** Rooms needs **Push Notifications** (`aps-environment`)
+  and **Associated Domains** for universal links; the Capacitor template does not include those
+  entitlements and the archive will come out **without push**. Fixing it requires adding an
+  `App.entitlements` to the generated project — same pattern as `scripts/setup-deeplinks.sh`,
+  not yet written. See [`../rooms/README.md`](../rooms/README.md).
+- **It does not cover store listing requirements**: privacy manifest, export compliance,
+  screenshots per screen size. They are resolved in App Store Connect, not in YAML.
+- **There is no iPad as a separate platform**: the same `.ipa` covers iPhone and iPad
+  (`TARGETED_DEVICE_FAMILY "1,2"`). What it inherits and what it does not:
   [§iPadOS](#ipados-que-hereda-y-que-no).
 
 ## Deep links
 
-«Abrir en la aplicacion» en la web emite `sytue-<producto>://open?url=<https>` —el mismo
-gesto que `ms-word:ofe|u|…` de Office Online— y el sistema lo entrega a la app instalada.
+“Open in the app” on the web emits `sytue-<producto>://open?url=<https>` —the same
+gesture as Office Online's `ms-word:ofe|u|…`— and the system hands it to the installed app.
 
-**Cada app registra SOLO su esquema.** Si todas declararan `sytue://`, el sistema operativo
-elegiria una arbitrariamente y el enlace abriria la que no toca.
+**Each app registers ONLY its own scheme.** If they all declared `sytue://`, the operating system
+would pick one arbitrarily and the link would open the wrong one.
 
-Como `ios/` y `android/` los **genera** `cap add` (estan en `.gitignore`), su manifest no se
-puede versionar: el registro lo aplica un script **idempotente** con el esquema del producto
-activo.
+Since `ios/` and `android/` are **generated** by `cap add` (they are in `.gitignore`), their manifest cannot
+be versioned: the registration is applied by an **idempotent** script with the scheme of the active
+product.
 
 ```bash
 SYTUE_APP=mail npx cap add android
@@ -252,51 +272,57 @@ SYTUE_APP=mail npm run deeplinks    # intent-filter (Android) + CFBundleURLTypes
 SYTUE_APP=mail npx cap sync
 ```
 
-La URL entrante llega por `appUrlOpen` (`@capacitor/app`) y la atiende la **Sytue Shell**
-(`listenForDeepLinks` en `@sytue/shell`), que navega el webview al documento. **El destino
-se valida siempre** contra el dominio de la suite antes de navegar: un `sytue://` lo puede
-emitir cualquiera y el sistema operativo no comprueba quien, asi que sin esa verja bastaria
-un enlace para llevarse el webview —con la sesion dentro— a un sitio ajeno.
+The incoming URL arrives through `appUrlOpen` (`@capacitor/app`) and is handled by the **Sytue Shell**
+(`listenForDeepLinks` in `@sytue/shell`), which navigates the webview to the document. **The destination
+is always validated** against the suite's domain before navigating: anyone can emit a `sytue://`
+and the operating system does not check who, so without that fence a single
+link would be enough to take the webview —with the session inside— to a foreign site.
 
-## Configuracion de la URL
+<a id="configuracion-de-la-url"></a>
 
-Cada app compone su URL contra el **apex** de la suite, derivado de `SYTUE_URL` (mismo
-convenio que tenia el escritorio de Wails). Asi el mismo proyecto sirve en produccion y en dev sin
-ramificar:
+## URL configuration
 
-| `SYTUE_URL`                   | Apex              | `SYTUE_APP=drive` carga          |
+Each app builds its URL against the suite's **apex**, derived from `SYTUE_URL` (the same
+convention the Wails desktop had). That way the same project works in production and in dev without
+branching:
+
+| `SYTUE_URL`                   | Apex              | `SYTUE_APP=drive` loads          |
 | ----------------------------- | ----------------- | -------------------------------- |
-| _(sin definir)_               | `sytue.eu`        | `https://drive.sytue.eu/`        |
+| _(unset)_                     | `sytue.eu`        | `https://drive.sytue.eu/`        |
 | `https://one.sytue.localhost` | `sytue.localhost` | `https://drive.sytue.localhost/` |
 
 ```bash
 SYTUE_URL=https://one.sytue.localhost SYTUE_APP=drive npx cap run ios   # dev
 ```
 
-`server.allowNavigation` lista los hosts que permanecen dentro del webview; cualquier otro
-enlace abre en el navegador del sistema, sin arrastrar la sesion.
+`server.allowNavigation` lists the hosts that stay inside the webview; any other
+link opens in the system browser, without carrying the session along.
 
-En dev, instala la CA de mkcert (`mkcert -install`) para que el webview confie en
-el TLS local de `*.sytue.localhost`.
+In dev, install the mkcert CA (`mkcert -install`) so that the webview trusts
+the local TLS of `*.sytue.localhost`.
 
-## Iconos y splash
+<a id="iconos-y-splash"></a>
 
-Se generan desde los SVG de producto de `@sytue/ui` —los mismos que usan el conmutador de
-apps y las apps de escritorio; no se inventan logos—. `scripts/gen-icons.sh` produce las
-**fuentes** del producto activo en `resources/`:
+## Icons and splash
 
-- `resources/icon.png` (1024) — marca centrada sobre grafito a sangre (maskable-safe).
-- `resources/splash.png` / `splash-dark.png` (2732) — marca sobre marfil / grafito.
+They are generated from the `@sytue/ui` product SVGs —the same ones used by the app
+switcher and the desktop apps; no logos are invented—. `scripts/gen-icons.sh` produces the
+**sources** of the active product in `resources/`:
+
+- `resources/icon.png` (1024) — mark centered on full-bleed graphite (maskable-safe).
+- `resources/splash.png` / `splash-dark.png` (2732) — mark on ivory / graphite.
 
 ```bash
 SYTUE_APP=mail bash scripts/gen-icons.sh   # icono y splash de Sytue Mail
 SYTUE_APP=mail npm run assets              # assets nativos por plataforma
 ```
 
-`resources/` guarda los del **ultimo producto generado**: es un artefacto de build, no una
-fuente por app. Regeneralo al cambiar de `SYTUE_APP`.
+`resources/` holds those of the **last product generated**: it is a build artifact, not a
+per-app source. Regenerate it when you change `SYTUE_APP`.
 
-## Estructura
+<a id="estructura"></a>
+
+## Structure
 
 ```
 apps/mobile/suite/

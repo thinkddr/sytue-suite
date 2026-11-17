@@ -1,14 +1,17 @@
-# Destino: WooCommerce (WordPress Block Theme)
+<a id="destino-woocommerce-wordpress-block-theme"></a>
+# Target: WooCommerce (WordPress Block Theme)
 
-Ficha técnica y normativa para la exportación de sitios a temas de bloques para WordPress y WooCommerce.
+Technical and normative spec sheet for exporting sites to block themes for WordPress and WooCommerce.
 
-## 1. Versiones y Herramientas
+<a id="1-versiones-y-herramientas"></a>
+## 1. Versions and Tools
 
-- Versión del tema: `{{v.woocommerce_theme_version}}`
-- Versión de WooCommerce compatible: `{{v.woocommerce_version}}`
-- Versión mínima de WordPress: `{{v.wordpress_version}}`
+- Theme version: `{{v.woocommerce_theme_version}}`
+- Compatible WooCommerce version: `{{v.woocommerce_version}}`
+- Minimum WordPress version: `{{v.wordpress_version}}`
 
-## 2. Árbol de Directorios Permitido
+<a id="2-árbol-de-directorios-permitido"></a>
+## 2. Allowed Directory Tree
 
 ```text
 ├── style.css
@@ -26,10 +29,11 @@ Ficha técnica y normativa para la exportación de sitios a temas de bloques par
 └── README.md
 ```
 
-## 3. Restricciones y Reglas de Exportación
+<a id="3-restricciones-y-reglas-de-exportación"></a>
+## 3. Export Constraints and Rules
 
-- **Tema de Bloques y theme.json**: El tema se estructura como tema de bloques FSE (Full Site Editing) con especificación versión 3 de `theme.json`.
-- **Comentarios de bloque equilibrados**: Toda plantilla HTML contiene comentarios de bloques WordPress equilibrados (`<!-- wp:nombre -->` y `<!-- /wp:nombre -->` o auto-cerrados `<!-- wp:nombre /-->`).
-- **Soporte de WooCommerce**: `functions.php` declara `add_theme_support('woocommerce')` y compatibilidad con plantillas de bloques.
-- **Imagen de vista previa**: `screenshot.png` se genera de forma determinista con `image/png` utilizando la paleta cromática principal del sitio.
-- **Catálogo de productos**: Exportación en CSV listo para el importador nativo de WooCommerce.
+- **Block theme and theme.json**: The theme is structured as an FSE (Full Site Editing) block theme using version 3 of the `theme.json` specification.
+- **Balanced block comments**: Every HTML template contains balanced WordPress block comments (`<!-- wp:nombre -->` and `<!-- /wp:nombre -->`, or self-closing `<!-- wp:nombre /-->`).
+- **WooCommerce support**: `functions.php` declares `add_theme_support('woocommerce')` and compatibility with block templates.
+- **Preview image**: `screenshot.png` is generated deterministically with `image/png` using the site's main color palette.
+- **Product catalog**: CSV export ready for WooCommerce's native importer.

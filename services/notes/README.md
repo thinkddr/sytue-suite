@@ -1,40 +1,48 @@
-# Sytue Notepads (servicio Go)
+<a id="sytue-notepads-servicio-go"></a>
 
-Backend de **Sytue Notepads** (`notes.sytue.eu`, dev `:8089`): cuadernos anidados,
-notas heterogéneas, etiquetas con estado, búsqueda y referencias cruzadas con el
-resto de la suite. Estado en **PostgreSQL** (única fuente de verdad); auth con los
-JWT de **Sytue ID** validados por JWKS.
+# Sytue Notepads (Go service)
 
-Implementación **clean-room**: modelo propio. La inspiración funcional
-—contenedores anidados de notas de distinto tipo, etiquetas con estado, filtro—
-son ideas, y las ideas no tienen copyright; no se ha consultado ni portado código
-de terceros (docs/CONVENTIONS.md §12).
+Backend of **Sytue Notepads** (`notes.sytue.eu`, dev `:8089`): nested notebooks,
+heterogeneous notes, tags with state, search and cross-references with the
+rest of the suite. State in **PostgreSQL** (single source of truth); auth with
+**Sytue ID** JWTs validated via JWKS.
 
-## Modelo
+**Clean-room** implementation: our own model. The functional inspiration
+—nested containers of notes of different types, tags with state, filtering—
+consists of ideas, and ideas are not copyrightable; no third-party code has been
+consulted or ported (docs/CONVENTIONS.md §12).
 
-| Tabla                                     | Qué guarda                                                                                                                                      |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `notebooks`                               | El árbol de cuadernos: título, icono, color, disposición, visibilidad, indexación, cifrado, sala de Rooms vinculada y token del enlace público. |
-| `notes`                                   | Las notas: tipo, contenido (HTML **saneado** o criptograma), posición, agrupación y las sobreescrituras de visibilidad/indexación.              |
-| `tags` / `tag_states` / `note_tag_states` | Etiquetas con estados excluyentes y sus marcas.                                                                                                 |
-| `note_links`                              | Enlaces a objetos de la suite. Es la tabla que responde la consulta INVERSA («¿qué notas cuelgan de este evento?»).                             |
+<a id="modelo"></a>
 
-## Las tres invariantes que sostiene el esquema
+## Model
 
-1. **Aislamiento por organización**: RLS `ENABLE` + `FORCE` en las seis tablas.
-   La separación entre PERSONAS de la misma organización la aplican las cláusulas
-   de visibilidad de `internal/store`, en cada consulta.
-2. **Cifrado y búsqueda son incompatibles**: `notebook_cifrado_no_indexa`. No hay
-   texto en claro que indexar, y una comprobación en el servicio se puede olvidar.
-3. **O en claro o cifrado, nunca las dos cosas**: `note_o_claro_o_cifrado`. Guardar
-   el título «por si acaso» publicaría lo más revelador de una nota cifrada.
+| Table                                     | What it stores                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `notebooks`                               | The notebook tree: title, icon, color, layout, visibility, indexing, encryption, linked Rooms room and public-link token. |
+| `notes`                                   | The notes: type, content (**sanitized** HTML or ciphertext), position, grouping and the visibility/indexing overrides.    |
+| `tags` / `tag_states` / `note_tag_states` | Tags with mutually exclusive states and their marks.                                                                      |
+| `note_links`                              | Links to suite objects. It is the table that answers the REVERSE query (“which notes hang off this event?”).              |
 
-## Saneado del texto enriquecido
+<a id="las-tres-invariantes-que-sostiene-el-esquema"></a>
 
-`internal/domain/html.go` reduce el HTML a una **allowlist** cerrada con
-`golang.org/x/net/html` (ya en el módulo: lo usa el unfurl de Rooms). Se hace en
-el servidor porque el contenido de un cuaderno de organización lo pinta el
-navegador de OTRA persona: saneado en cliente no es saneado.
+## The three invariants the schema upholds
+
+1. **Isolation per organization**: RLS `ENABLE` + `FORCE` on the six tables.
+   Separation between PEOPLE in the same organization is enforced by the visibility
+   clauses in `internal/store`, on every query.
+2. **Encryption and search are incompatible**: `notebook_cifrado_no_indexa`. There is no
+   plaintext to index, and a check in the service can be forgotten.
+3. **Either plaintext or encrypted, never both**: `note_o_claro_o_cifrado`. Storing
+   the title “just in case” would publish the most revealing part of an encrypted note.
+
+<a id="saneado-del-texto-enriquecido"></a>
+
+## Sanitizing rich text
+
+`internal/domain/html.go` reduces the HTML to a closed **allowlist** with
+`golang.org/x/net/html` (already in the module: the Rooms unfurl uses it). It is done on
+the server because the content of an organization notebook is rendered by ANOTHER
+person's browser: client-side sanitizing is not sanitizing.
 
 ## Endpoints
 
@@ -55,7 +63,9 @@ GET|POST|PUT|DELETE /api/v1/tags[/{id}]         etiquetas con sus estados
 GET           /public/notebooks/{token}         cuaderno publicado, SIN sesión
 ```
 
-## Desarrollo
+<a id="desarrollo"></a>
+
+## Development
 
 ```bash
 SYTUE_ENV=dev \

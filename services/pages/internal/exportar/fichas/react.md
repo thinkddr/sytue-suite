@@ -1,19 +1,22 @@
-# Destino: React (Vite + TypeScript)
+<a id="destino-react-vite--typescript"></a>
+# Target: React (Vite + TypeScript)
 
-Ficha técnica y normativa para la exportación de sitios a aplicaciones SPA en React con Vite y TypeScript.
+Technical and normative specification for exporting sites to React SPA applications with Vite and TypeScript.
 
-## 1. Versiones y Herramientas
+<a id="1-versiones-y-herramientas"></a>
+## 1. Versions and Tools
 
 - React: `{{v.react_version}}`
 - React DOM: `{{v.react_dom_version}}`
 - Vite: `{{v.vite_version}}`
-- Plugin React para Vite: `{{v.vite_plugin_react_version}}`
+- React plugin for Vite: `{{v.vite_plugin_react_version}}`
 - TypeScript: `{{v.typescript_version}}`
-- Tipos de React: `{{v.types_react_version}}`
-- Tipos de React DOM: `{{v.types_react_dom_version}}`
-- Tipos de Node: `{{v.types_node_version}}`
+- React types: `{{v.types_react_version}}`
+- React DOM types: `{{v.types_react_dom_version}}`
+- Node types: `{{v.types_node_version}}`
 
-## 2. Árbol de Directorios Permitido
+<a id="2-árbol-de-directorios-permitido"></a>
+## 2. Allowed Directory Tree
 
 ```text
 ├── index.html
@@ -34,9 +37,10 @@ Ficha técnica y normativa para la exportación de sitios a aplicaciones SPA en 
 └── README.md
 ```
 
-## 3. Restricciones y Reglas de Exportación
+<a id="3-restricciones-y-reglas-de-exportación"></a>
+## 3. Export Restrictions and Rules
 
-- **Conexión a la API Pública**: Todas las operaciones dinámicas (catálogo, disponibilidad, reservas de compra, formularios de contacto y denuncias) se realizan exclusivamente a través de `src/api/pages-api.ts`.
-- **Dependencias exactas**: `package.json` declara versiones fijas y exactas de acuerdo con la tabla normativa de dependencias, sin comodines ni prefijos de rango.
-- **Sin CDN ni recursos externos no permitidos**: Prohibido enlazar scripts externos o estilos desde CDNs en `index.html`.
-- **Resolución de ALTCHA en cliente**: El componente `Formulario.tsx` y el flujo de compra resuelven retos ALTCHA en segundo plano mediante `resolverAltcha` antes de enviar peticiones mutables.
+- **Connection to the Public API**: All dynamic operations (catalog, availability, purchase reservations, contact forms and whistleblower reports) are performed exclusively through `src/api/pages-api.ts`.
+- **Exact dependencies**: `package.json` declares fixed, exact versions according to the normative dependency table, with no wildcards or range prefixes.
+- **No CDNs or disallowed external resources**: Linking external scripts or styles from CDNs in `index.html` is forbidden.
+- **Client-side ALTCHA resolution**: The `Formulario.tsx` component and the purchase flow solve ALTCHA challenges in the background via `resolverAltcha` before sending mutating requests.

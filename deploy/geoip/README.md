@@ -1,14 +1,17 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# Ubicación aproximada de los accesos
 
-«Accesos recientes» y «Sesiones activas» de Sytue ID pueden mostrar de dónde vino
-cada acceso. Una IP no le dice a nadie si un acceso fue suyo; «Valencia, España»
-sí, y esa es justo la pregunta de quien entra a revisar su cuenta.
+<a id="ubicación-aproximada-de-los-accesos"></a>
+# Approximate location of sign-ins
 
-**Es opcional.** La tabla nace vacía y, vacía, la interfaz omite la ubicación sin
-errores ni huecos.
+Sytue ID's «Accesos recientes» (Recent sign-ins) and «Sesiones activas» (Active sessions) can show where
+each sign-in came from. An IP tells nobody whether a sign-in was theirs; “Valencia, Spain”
+does, and that is exactly the question of whoever comes in to review their account.
 
-## Cargar los datos
+**It is optional.** The table starts empty and, while empty, the interface omits the location without
+errors or gaps.
+
+<a id="cargar-los-datos"></a>
+## Loading the data
 
 ```bash
 # Descargar y cargar el mes en curso
@@ -18,42 +21,45 @@ deploy/geoip/cargar.py --dsn "$SYTUE_ID_DATABASE_DSN" --descargar 2026-08
 deploy/geoip/cargar.py --dsn "$SYTUE_ID_DATABASE_DSN" --fichero dbip-city-lite.csv.gz
 ```
 
-Tarda unos minutos (varios millones de rangos). La carga va a una tabla temporal
-y se intercambia al final **dentro de la misma transacción**: mientras dura, la
-tabla en uso sigue respondiendo, y si algo falla la anterior queda intacta.
+It takes a few minutes (several million ranges). The load goes into a temporary table
+and is swapped at the end **within the same transaction**: while it runs, the
+table in use keeps answering, and if something fails the previous one stays intact.
 
-Conviene repetirlo cada pocos meses: los rangos se reasignan y una base vieja
-empieza a situar accesos donde no son.
+It is worth repeating every few months: ranges get reassigned and an old database
+starts placing sign-ins where they are not.
 
-## Atribución obligatoria
+<a id="atribución-obligatoria"></a>
+## Mandatory attribution
 
-Los datos son de **[DB-IP](https://db-ip.com)**, base *IP to City Lite*,
-publicada bajo **[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)**.
+The data comes from **[DB-IP](https://db-ip.com)**, *IP to City Lite* database,
+published under **[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)**.
 
 > IP Geolocation by DB-IP — https://db-ip.com
 
-Esa atribución es **condición de la licencia**, no una cortesía: hay que
-mantenerla visible allí donde se publique el producto que la usa. Si algún día se
-cambia de fuente, hay que revisar qué exige la nueva.
+That attribution is a **condition of the license**, not a courtesy: it must be
+kept visible wherever the product that uses it is published. If the source is ever
+changed, check what the new one requires.
 
-**No se usa GeoLite2 de MaxMind**: desde 2019 exige cuenta, aceptar su EULA y una
-clave de licencia para descargarla, lo que la hace inservible para un despliegue
-que un cliente deba poder reproducir por su cuenta.
+**MaxMind's GeoLite2 is not used**: since 2019 it requires an account, accepting its EULA and a
+license key to download it, which makes it useless for a deployment
+that a customer must be able to reproduce on their own.
 
-## Por qué en PostgreSQL y no con una librería
+<a id="por-qué-en-postgresql-y-no-con-una-librería"></a>
+## Why in PostgreSQL and not with a library
 
-Leer un fichero MMDB significa añadir una dependencia al binario del IdP —que hoy
-solo usa la stdlib y pgx— y montar el fichero en cada réplica. PostgreSQL ya está
-desplegado, ya sabe comparar direcciones con el tipo `inet`, y un índice resuelve
-la búsqueda en microsegundos. Los datos quedan además dentro de nuestra
-infraestructura, que es lo que se le promete a un cliente europeo.
+Reading an MMDB file means adding a dependency to the IdP binary —which today
+only uses the stdlib and pgx— and mounting the file on every replica. PostgreSQL is already
+deployed, already knows how to compare addresses with the `inet` type, and an index resolves
+the lookup in microseconds. The data also stays inside our
+infrastructure, which is what a European customer is promised.
 
-## Qué no hace
+<a id="qué-no-hace"></a>
+## What it does not do
 
-- **No es prueba de dónde estuvo alguien.** El país acierta casi siempre; la
-  ciudad, bastante menos. Una VPN, un móvil o el proxy de una operadora la
-  desplazan cientos de kilómetros.
-- **No se guardan coordenadas ni región.** El cargador las descarta: no se
-  muestran, así que no se almacenan.
-- **No sale del servidor.** La resolución ocurre contra nuestra propia base de
-  datos; no se consulta ningún servicio externo con las IP de los usuarios.
+- **It is not proof of where someone was.** The country is almost always right; the
+  city, much less so. A VPN, a mobile phone or a carrier's proxy can
+  shift it by hundreds of kilometers.
+- **No coordinates or region are stored.** The loader discards them: they are not
+  shown, so they are not stored.
+- **It does not leave the server.** The lookup runs against our own
+  database; no external service is queried with users' IPs.

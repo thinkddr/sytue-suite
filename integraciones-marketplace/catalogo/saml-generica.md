@@ -1,7 +1,8 @@
-# SAML genérico — cualquier proveedor que no tenga ficha propia
-Para proveedores SAML 2.0 sin plantilla (ERP a medida, portales internos…):
-1. En el proveedor: activa SAML y copia su **Entity ID** y **ACS URL**.
-2. Sytue Platform → Integraciones → **SAML genérico**: pégalos.
-3. En el proveedor, carga los metadatos de Sytue ID (Platform → «Metadatos IdP»): Entity/Login/Certificado.
-4. Name ID `email` salvo que el proveedor exija otra cosa.
-**Verificar**: siempre en ventana privada y con «SAML + contraseña» antes de «SAML only».
+<a id="saml-genérico--cualquier-proveedor-que-no-tenga-ficha-propia"></a>
+# Generic SAML — any provider without its own integration page
+For SAML 2.0 providers without a template (custom ERP, internal portals…):
+1. In the provider: enable SAML and copy its **Entity ID** and **ACS URL**.
+2. Sytue Platform → Integrations → **Generic SAML**: paste them.
+3. In the provider, load the Sytue ID metadata (Platform → “IdP metadata”): Entity/Login/Certificate.
+4. Name ID `email` unless the provider requires something else.
+**Verify**: always in a private window and with “SAML + password” before “SAML only”.

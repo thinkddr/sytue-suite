@@ -1,38 +1,41 @@
 # Sytue Admin (`console`)
 
-Superficie de **administracion** de Sytue One (`admin.sytue.eu`): organizaciones
-(tenants), usuarios, grupos/roles y auditoria, consumiendo la **API de
-administracion de Sytue ID** (identidad/SCIM) y **Sytue Hub**. **Astro 7 + Preact
-10**, SSR sobre **Bun**, **Tailwind v4** y tokens de marca. Monta la **Sytue
-Shell** y usa **solo** `@sytue/ui`. Soberanía **100 % UE**. Código **propietario
-© 2026 Daniel Delgado Ramos (thinkddr)** (Apache-2.0).
+**Administration** surface of Sytue One (`admin.sytue.eu`): organizations
+(tenants), users, groups/roles and audit, consuming the **Sytue ID
+administration API** (identity/SCIM) and **Sytue Hub**. **Astro 7 + Preact
+10**, SSR on **Bun**, **Tailwind v4** and brand tokens. It mounts the **Sytue
+Shell** and uses **only** `@sytue/ui`. **100 % EU** sovereignty. **Proprietary**
+code **© 2026 Daniel Delgado Ramos (thinkddr)** (Apache-2.0).
 
-> Contrato: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) §8, §9, §11.
-> Puerto dev: **4322**. Client OIDC: **`sytue-console`**. Acceso: rol `admin`/`owner`.
+> Contract: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) §8, §9, §11.
+> Dev port: **4322**. OIDC client: **`sytue-console`**. Access: `admin`/`owner` role.
 
-## Pantallas
+<a id="pantallas"></a>
+## Screens
 
-- **Panel** (`/`) — métricas de identidad, organizaciones y actividad reciente.
-- **Organizaciones** (`/tenants`, `/tenants/:slug`) — tenants ⇄ grupo `org/<slug>` ⇄ namespace; alta y ficha.
-- **Usuarios** (`/users`) — directorio con roles, MFA y **aprovisionamiento por servicio Sytue** (SCIM), detalle y acciones.
-- **Grupos y roles** (`/groups`) — jerarquía `org/<slug>` y mapeos a workspace de Sytue Chat, carpeta de grupo de Sytue Drive, dominio de correo y namespace.
-- **Auditoría** (`/audit`) — eventos de Sytue ID / Hub / servicios Sytue (requisito RGPD).
+- **Dashboard** (`/`) — identity, organization and recent activity metrics.
+- **Organizations** (`/tenants`, `/tenants/:slug`) — tenants ⇄ group `org/<slug>` ⇄ namespace; creation and detail page.
+- **Users** (`/users`) — directory with roles, MFA and **per-Sytue-service provisioning** (SCIM), detail and actions.
+- **Groups and roles** (`/groups`) — `org/<slug>` hierarchy and mappings to the Sytue Chat workspace, Sytue Drive group folder, mail domain and namespace.
+- **Audit** (`/audit`) — events from Sytue ID / Hub / Sytue services (GDPR requirement).
 
-## Autenticación (BFF)
+<a id="autenticación-bff"></a>
+## Authentication (BFF)
 
-Endpoints Astro en `src/pages/auth/` (`@sytue/auth/server`). El `ConsoleLayout`
-aplica `requireSession(..., { roles: ['admin','owner'] })`. Cookie host-only
-`__Host-`, httpOnly. Sin secretos en el cliente.
+Astro endpoints in `src/pages/auth/` (`@sytue/auth/server`). The `ConsoleLayout`
+applies `requireSession(..., { roles: ['admin','owner'] })`. Host-only cookie
+`__Host-`, httpOnly. No secrets on the client.
 
-## Variables de entorno
+<a id="variables-de-entorno"></a>
+## Environment variables
 
-Inyectadas por entorno (Secret Manager / Sealed Secrets) — **nunca** en git.
-Ver `.env.example`: `SYTUE_OIDC_*`, `SYTUE_SESSION_SECRET`,
+Injected per environment (Secret Manager / Sealed Secrets) — **never** in git.
+See `.env.example`: `SYTUE_OIDC_*`, `SYTUE_SESSION_SECRET`,
 `SYTUE_HUB_URL`, `SYTUE_ADMIN_API_URL`.
 
 ## Scripts
 
-Runtime/instalación/bundler con **Bun** (sustituye a Node.js + pnpm).
+Runtime/installation/bundler with **Bun** (replaces Node.js + pnpm).
 
 ```bash
 bun install
@@ -41,5 +44,5 @@ bun --filter @sytue/app-console build
 bun --filter @sytue/app-console typecheck
 ```
 
-> Mientras se integra el control-plane, las vistas usan datos de ejemplo
-> (`src/lib/data.ts`) sin secretos reales.
+> While the control plane is being integrated, the views use sample data
+> (`src/lib/data.ts`) with no real secrets.

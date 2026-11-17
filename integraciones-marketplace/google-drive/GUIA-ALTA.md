@@ -1,43 +1,49 @@
-# Guía de alta — Google Drive ⇄ Sytue
+<a id="guía-de-alta--google-drive--sytue"></a>
+# Onboarding guide — Google Drive ⇄ Sytue
 
-Tiempo: ~15 min. Permisos: acceso a Google Cloud Console de tu organización.
-Resultado: los archivos nuevos de Sytue Drive se guardan en tu Google Drive.
+Time: ~15 min. Permissions: access to your organization's Google Cloud Console.
+Result: new files in Sytue Drive are saved to your Google Drive.
 
-## 1. Crear el proyecto OAuth
+<a id="1-crear-el-proyecto-oauth"></a>
+## 1. Create the OAuth project
 
-1. <https://console.cloud.google.com> → selector de proyectos → «New project»
-   → nombre «Sytue Integration Gateway».
-2. «APIs & Services» → «Library» → busca **Google Drive API** → «Enable».
-3. «OAuth consent screen»: tipo **Internal** (Workspace) o **External**;
-   rellena nombre de app «Sytue», correo de soporte y dominio `sytue.eu`.
-   Añade el scope `.../auth/drive.file` a la lista declarada.
-4. Si es External y está en «Testing», añade a los usuarios de prueba.
+1. <https://console.cloud.google.com> → project selector → “New project”
+   → name “Sytue Integration Gateway”.
+2. “APIs & Services” → “Library” → search for **Google Drive API** → “Enable”.
+3. “OAuth consent screen”: type **Internal** (Workspace) or **External**;
+   fill in the app name “Sytue”, the support email and the domain `sytue.eu`.
+   Add the scope `.../auth/drive.file` to the declared list.
+4. If it is External and in “Testing”, add the test users.
 
-## 2. Crear el cliente OAuth
+<a id="2-crear-el-cliente-oauth"></a>
+## 2. Create the OAuth client
 
-1. «Credentials» → «Create credentials» → «OAuth client ID» → **Web
+1. “Credentials” → “Create credentials” → “OAuth client ID” → **Web
    application**.
-2. «Authorized redirect URIs» → añade EXACTAMENTE:
+2. “Authorized redirect URIs” → add EXACTLY:
    `https://integrations.sytue.eu/api/v1/oauth/callback`.
-3. Crea y copia **Client ID** y **Client secret**.
+3. Create it and copy the **Client ID** and **Client secret**.
 
-## 3. Conectar desde Sytue Platform
+<a id="3-conectar-desde-sytue-platform"></a>
+## 3. Connect from Sytue Platform
 
-1. Sytue Platform → Integraciones → «Google Drive».
-2. Pega Client ID y Client Secret → «Conectar».
-3. Google pide consentimiento con `access_type=offline` y `prompt=consent`
-   (ya configurado): el gateway guarda un refresh token y la conexión queda
-   activa sin re-autorizar.
+1. Sytue Platform → Integrations → “Google Drive”.
+2. Paste the Client ID and Client Secret → “Connect”.
+3. Google asks for consent with `access_type=offline` and `prompt=consent`
+   (already configured): the gateway stores a refresh token and the connection
+   stays active without re-authorizing.
 
-## 4. Verificar y operar
+<a id="4-verificar-y-operar"></a>
+## 4. Verify and operate
 
-- En Sytue Drive, «subir copia a Google Drive» sobre un fichero; revisa que
-  aparece en la carpeta raíz del Drive del usuario conectado.
-- La ficha de la integración muestra la última sincronización.
-- Para revocar: Google Account → Security → Third-party access, o «Eliminar»
-  en la ficha (el gateway llama al revoke_url de la semilla).
+- In Sytue Drive, use “upload copy to Google Drive” on a file; check that it
+  appears in the root folder of the connected user's Drive.
+- The integration page shows the last sync.
+- To revoke: Google Account → Security → Third-party access, or “Remove”
+  on the integration page (the gateway calls the seed's revoke_url).
 
-## Problemas frecuentes
+<a id="problemas-frecuentes"></a>
+## Common problems
 
-- `redirect_uri_mismatch`: el URI no coincide byte a byte (sin barra final).
-- `access_denied`: la app está en Testing y el usuario no es tester.
+- `redirect_uri_mismatch`: the URI does not match byte for byte (no trailing slash).
+- `access_denied`: the app is in Testing and the user is not a tester.

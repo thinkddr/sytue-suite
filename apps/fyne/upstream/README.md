@@ -1,286 +1,298 @@
-# El parche de URL entrantes, listo para enviar a Fyne
+<a id="el-parche-de-url-entrantes-listo-para-enviar-a-fyne"></a>
+# The incoming URL patch, ready to send to Fyne
 
-`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.7`
-(alojado en GitHub desde el 2026-09-27; antes en git.gay, con las mismas ramas y tags)
-(ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
-hace falta para quitarlo, que es que el parche entre aguas arriba.
+`apps/fyne/go.mod` replaces Fyne with `github.com/thinkddr/fyne/v2 v2.8.2-sytue.7`
+(hosted on GitHub since 2026-09-27; previously on git.gay, with the same branches and tags)
+(the «URL entrante» (incoming URL) ADR in `docs/decisions.md`). A fork is debt: this folder holds what
+is needed to remove it, which is getting the patch accepted upstream.
 
-## Bucle por eventos en escritorio (2026-11-17, `v2.8.2-sytue.7`)
+<a id="bucle-por-eventos-en-escritorio-2026-11-17-v282-sytue7"></a>
+## Event-driven loop on desktop (2026-11-17, `v2.8.2-sytue.7`)
 
 `0018-desktop-event-driven-loop.patch`: commit
 [`caa879f`](https://github.com/thinkddr/fyne/commit/caa879f9051c9c0ba6b82662ce50c64a00b921d0),
-etiquetado `v2.8.2-sytue.7` en `main` del fork sobre `v2.8.2-sytue.6`, que a su vez trae
-`RenderOffscreen` del driver de software. `apps/fyne/go.mod` lo usa desde el mismo día, y
-con él `ci-desktop.yml`, `ci-mobile.yml`, `.github/tests/fyne-cli-test.sh` y
+tagged `v2.8.2-sytue.7` on the fork's `main` on top of `v2.8.2-sytue.6`, which in turn brings
+`RenderOffscreen` from the software driver. `apps/fyne/go.mod` has used it since the same day, and
+with it `ci-desktop.yml`, `ci-mobile.yml`, `.github/tests/fyne-cli-test.sh` and
 `scripts/empaquetar-test.sh`.
 
-`v2.8.2-sytue.7` se etiquetó antes de que terminara Static Analysis, que salió en rojo por
-un único aviso de estilo (staticcheck ST1022: el comentario de `WakeHook` debe empezar por
-su nombre). No cambia el comportamiento: los otros cuatro flujos están en verde. El
-arreglo, [`715ab78`](https://github.com/thinkddr/fyne/commit/715ab788ac20410c29cfe25547d13be9c0052a64),
-está en la rama del fork y entrará en `main` con la próxima etiqueta.
+`v2.8.2-sytue.7` was tagged before Static Analysis finished, and it came out red because of
+a single style warning (staticcheck ST1022: the comment on `WakeHook` must start with
+its name). It does not change behavior: the other four workflows are green. The
+fix, [`715ab78`](https://github.com/thinkddr/fyne/commit/715ab788ac20410c29cfe25547d13be9c0052a64),
+is on the fork's branch and will reach `main` with the next tag.
 
-**Qué arregla.** El driver GLFW atendía la entrada y pintaba con un reloj fijo de 60 Hz.
-Cada tecla, clic o resultado de red (`fyne.Do`) esperaba al siguiente tic: 8 ms de media
-y hasta 17 ms antes de pintarse. Además, una app en reposo se despertaba 60 veces por
-segundo. Ahora el bucle duerme en `glfw.WaitEventsTimeout` y lo despiertan la entrada,
-`fyne.Do` (`glfw.PostEmptyEvent`), un `Refresh` (`Canvas.SetDirty`) o una animación.
-Pinta en el acto si el último fotograma tiene al menos un intervalo, y durante la
-interacción continua nunca más rápido que la pantalla principal (de 60 a 240 Hz). En
-móvil se pide el fotograma justo después del toque o la tecla, sin esperar al reloj.
+**What it fixes.** The GLFW driver handled input and painted on a fixed 60 Hz clock.
+Every key, click or network result (`fyne.Do`) waited for the next tick: 8 ms on average
+and up to 17 ms before being painted. In addition, an idle app woke up 60 times per
+second. Now the loop sleeps in `glfw.WaitEventsTimeout` and is woken by input,
+`fyne.Do` (`glfw.PostEmptyEvent`), a `Refresh` (`Canvas.SetDirty`) or an animation.
+It paints immediately if the last frame is at least one interval old, and during
+continuous interaction never faster than the main display (60 to 240 Hz). On
+mobile the frame is requested right after the touch or key, without waiting for the clock.
 
-**Medido** con Xvfb y Mesa, desde una tecla sintética (XTest) hasta leer el píxel
-cambiado en el servidor X, con 150 muestras:
+**Measured** with Xvfb and Mesa, from a synthetic key press (XTest) to reading the changed
+pixel on the X server, with 150 samples:
 
-| | Antes | Después |
+| | Before | After |
 | --- | --- | --- |
-| Tecla → píxel (media / p90 / máx.) | 10,5 / 16,7 / 18,8 ms | 1,8 / 2,0 / 4–7 ms |
-| `fyne.Do` → píxel (media) | 10,7 ms | 1,6 ms |
-| CPU de una ventana en reposo | 35 ms cada 2 s | ~1 ms cada 2 s |
+| Key → pixel (mean / p90 / max.) | 10.5 / 16.7 / 18.8 ms | 1.8 / 2.0 / 4–7 ms |
+| `fyne.Do` → pixel (mean) | 10.7 ms | 1.6 ms |
+| CPU of an idle window | 35 ms every 2 s | ~1 ms every 2 s |
 
-`go test -race ./...` del fork pasa entero (etiquetas de escritorio y `mobile`). Las pruebas
-nuevas cubren el despertar y el cálculo de la espera: `TestRunOnMainWakesIdleLoop` falla
-(~950 ms por llamada) si se quita el despertar. Las apps de `apps/fyne` compilan contra él
-(`go vet -tags goolm ./...`) y sus pruebas de `ui`, `calcus`, `notes` y `photos` pasan.
+The fork's `go test -race ./...` passes in full (desktop and `mobile` tags). The new
+tests cover the wake-up and the wait calculation: `TestRunOnMainWakesIdleLoop` fails
+(~950 ms per call) if the wake-up is removed. The apps in `apps/fyne` build against it
+(`go vet -tags goolm ./...`) and their `ui`, `calcus`, `notes` and `photos` tests pass.
 
-## `v2.8.2-sytue.4` y `v2.8.2-sytue.5` (2026-11-07): refresco y avisos de fondo en iOS
+<a id="v282-sytue4-y-v282-sytue5-2026-11-07-refresco-y-avisos-de-fondo-en-ios"></a>
+## `v2.8.2-sytue.4` and `v2.8.2-sytue.5` (2026-11-07): background refresh and notifications on iOS
 
-Las dos tags apuntan a la misma fuente,
+Both tags point to the same source,
 [`5438e4c86769e1f5936adacedb29c4436d15cbdc`](https://github.com/thinkddr/fyne/commit/5438e4c86769e1f5936adacedb29c4436d15cbdc):
-`.4` es la que trae `0016` funcionando y `.5` añade `0017`. Sus arreglos van ya dentro de
-`0016-ios-background-refresh.patch` y `0017-ios-remote-notifications.patch`, regenerados
-con `git format-patch` sobre `v2.8.2-sytue.3`. Aplicados con `git am`, dan el árbol de la
-fuente etiquetada salvo `.github/ios-geometry/run.sh`, que es CI del fork y no va aguas
-arriba. Las matrices de los parches tal y como estaban sacaron dos fallos:
+`.4` is the one that brings `0016` working and `.5` adds `0017`. Their fixes are already included in
+`0016-ios-background-refresh.patch` and `0017-ios-remote-notifications.patch`, regenerated
+with `git format-patch` on top of `v2.8.2-sytue.3`. Applied with `git am`, they give the tree of the
+tagged source except `.github/ios-geometry/run.sh`, which is the fork's CI and does not go
+upstream. The matrices on the patches as they were turned up two failures:
 
-- **La app moría al arrancar en iOS** (`GeometryUITests`: el informe no aparecía; con el
-  diagnóstico nuevo de `run.sh`, `SIGSEGV` en `runApp`). cgo compila `darwin_ios.m`
-  **sin ARC**. Un arranque normal conecta la escena sin adjuntar y aplaza la conexión, y
-  `sceneWillEnterForeground` soltaba las opciones antes de usarlas. Ahora se sueltan
-  después, y `sceneDidBecomeActive` conecta también una escena pendiente.
-- **Windows**: el `.m` se extrae con CRLF y los contratos de fuente cortaban con -1. Ahora
-  leen con LF, fallan nombrando el marcador que falta y `.gitattributes` fija LF en
-  `*.m`, `*.h` y `*.c`.
+- **The app died on startup on iOS** (`GeometryUITests`: the report did not appear; with the
+  new diagnostics in `run.sh`, `SIGSEGV` in `runApp`). cgo compiles `darwin_ios.m`
+  **without ARC**. A normal startup connects the scene without attaching and defers the connection, and
+  `sceneWillEnterForeground` released the options before using them. Now they are released
+  afterwards, and `sceneDidBecomeActive` also connects a pending scene.
+- **Windows**: the `.m` is extracted with CRLF and the source contracts cut at -1. Now
+  they read with LF, fail naming the missing marker, and `.gitattributes` forces LF on
+  `*.m`, `*.h` and `*.c`.
 
-Además, `didReceiveRemoteNotification:fetchCompletionHandler:` solo se añade al delegado
-(en `runApp`) si el `Info.plist` declara `remote-notification`: antes UIKit avisaba en
-todas las apps. Y el `completionHandler` ya no se pierde (se retenía dos veces).
+In addition, `didReceiveRemoteNotification:fetchCompletionHandler:` is only added to the delegate
+(in `runApp`) if the `Info.plist` declares `remote-notification`: previously UIKit warned in
+every app. And the `completionHandler` is no longer leaked (it was retained twice).
 
-Pasaron, sobre la fuente etiquetada:
+Passed, on the tagged source:
 
 - [Web](https://github.com/thinkddr/fyne/actions/runs/42379644977)
 - [Static Analysis](https://github.com/thinkddr/fyne/actions/runs/42379645045)
 - [Mobile](https://github.com/thinkddr/fyne/actions/runs/42379645039)
-- [Platform](https://github.com/thinkddr/fyne/actions/runs/42379645027), con Windows
+- [Platform](https://github.com/thinkddr/fyne/actions/runs/42379645027), with Windows
 - [CodeQL](https://github.com/thinkddr/fyne/actions/runs/42379644935)
-- [Fork conformance](https://github.com/thinkddr/fyne/actions/runs/42379645040): el driver
-  UIKit compilado y enlazado para dispositivo y simulador, y la app arrancada en el
-  simulador de iPhone y de iPad con sus 32 medidas y toques.
+- [Fork conformance](https://github.com/thinkddr/fyne/actions/runs/42379645040): the
+  UIKit driver compiled and linked for device and simulator, and the app started in the
+  iPhone and iPad simulators with its 32 measurements and taps.
 
-No acreditan una tarea de refresco ni un aviso de APNs reales (el simulador no los lanza),
-ni un iPhone físico, ni App Review.
+They do not prove a real refresh task or a real APNs notification (the simulator does not trigger them),
+nor a physical iPhone, nor App Review.
 
-## Refresco en segundo plano de iOS (2026-11-07, `v2.8.2-sytue.4`)
+<a id="refresco-en-segundo-plano-de-ios-2026-11-07-v282-sytue4"></a>
+## iOS background refresh (2026-11-07, `v2.8.2-sytue.4`)
 
-`0016-ios-background-refresh.patch` añade la interfaz opcional
-`mobile.BackgroundDriver`, que el driver móvil implementa. Sirve al widget nativo con la
-app cerrada ([enmienda del ADR 0078](../../../docs/decisions.md#0078)):
+`0016-ios-background-refresh.patch` adds the optional interface
+`mobile.BackgroundDriver`, which the mobile driver implements. It serves the native widget with the
+app closed ([amendment to ADR 0078](../../../docs/decisions.md#0078)):
 
-- `LaunchedInBackground`: UIKit lanzó el proceso sin escena (tarea de refresco o aviso
-  de fondo).
-- `OnFirstScene`: lo que necesita interfaz corre al conectar la primera escena, en el
-  hilo principal y antes de las URL de esa escena; fuera de iOS, en el acto. Si UIKit
-  conecta la escena fuera del primer plano (lo puede hacer durante un trabajo de fondo),
-  eso y sus URL esperan a `sceneWillEnterForeground`: sin nadie mirando, el Face ID del
-  bloqueo fallaría y la app saldría.
-- `ProtectedDataAvailable`: falso con el dispositivo bloqueado. Cada tarea se lo vuelve a
-  preguntar a UIKit (`isProtectedDataAvailable`, en el hilo principal) antes de correr el
-  manejador: los avisos del delegado pueden llegarle tarde a una app suspendida.
-- `OnBackgroundRefresh`: el manejador de la tarea que nombra la primera entrada de
-  `BGTaskSchedulerPermittedIdentifiers`. Se registra antes de acabar el lanzamiento, se
-  vuelve a pedir al pasar a segundo plano y al terminar, y se completa una sola vez: si
-  el sistema la corta, se cancela el contexto y falla en cuanto el manejador vuelve, o a
-  los 500 ms si no vuelve; y si la corta antes de que el manejador empiece (el hilo
-  principal ocupado), falla en el acto y el manejador no corre: Go la conoce desde que
-  iOS la entrega, antes de poner su `expirationHandler`. Ese margen es para que suelte el cerrojo de `ajustes` (un
-  `flock` en el App Group): iOS mata con 0xdead10cc a la app que se suspende con un
-  cerrojo de fichero tomado en un contenedor compartido.
+- `LaunchedInBackground`: UIKit launched the process without a scene (refresh task or background
+  notification).
+- `OnFirstScene`: whatever needs UI runs when the first scene connects, on the
+  main thread and before that scene's URLs; outside iOS, immediately. If UIKit
+  connects the scene outside the foreground (it can do so during background work),
+  that and its URLs wait for `sceneWillEnterForeground`: with nobody looking, the lock's Face ID
+  would fail and the app would exit.
+- `ProtectedDataAvailable`: false with the device locked. Each task asks UIKit again
+  (`isProtectedDataAvailable`, on the main thread) before running the
+  handler: the delegate's notifications can reach a suspended app late.
+- `OnBackgroundRefresh`: the handler of the task named by the first entry of
+  `BGTaskSchedulerPermittedIdentifiers`. It is registered before launch finishes, it is
+  requested again when moving to the background and on completion, and it completes only once: if
+  the system cuts it short, the context is cancelled and it fails as soon as the handler returns, or after
+  500 ms if it does not return; and if it is cut short before the handler starts (the main
+  thread busy), it fails immediately and the handler does not run: Go knows about it from the moment
+  iOS delivers it, before setting its `expirationHandler`. That margin is so that it releases the `ajustes` lock (a
+  `flock` in the App Group): iOS kills with 0xdead10cc any app that suspends while holding a
+  file lock in a shared container.
 
-Una app sin esas claves en el `Info.plist` se comporta como antes. La parte portable
-tiene pruebas en todas las plataformas; el puente de Objective-C se fija con contratos
-de fuente, porque no compila fuera de Xcode. Se ha comprobado aquí: `go vet` y
-`go test` de `driver/mobile`, `internal/driver/mobile` e `internal/driver/mobile/app` en
-Linux, y que `apps/fyne/sesion` compila contra el fork parcheado con la interfaz idéntica
-a la suya. El `.m` lo compila y arranca en el simulador la matriz de UIKit (arriba); no se
-ha corrido en un iPhone.
+An app without those keys in its `Info.plist` behaves as before. The portable part
+has tests on every platform; the Objective-C bridge is pinned with source
+contracts, because it does not compile outside Xcode. Checked here: `go vet` and
+`go test` of `driver/mobile`, `internal/driver/mobile` and `internal/driver/mobile/app` on
+Linux, and that `apps/fyne/sesion` compiles against the patched fork with an interface identical
+to its own. The UIKit matrix (above) compiles the `.m` and starts it in the simulator; it has not
+been run on an iPhone.
 
-La suite lo usa por aserción sobre el driver (`sesion/fondo.go`). **Encendido** el
-2026-11-07: el `replace` de `apps/fyne/go.mod` usa `v2.8.2-sytue.5`, y en el mismo commit se
-subieron las referencias de `ci-desktop.yml`, `ci-mobile.yml`, `empaquetar-test.sh`,
-`BACKLOG-FYNE.md` y `docs/CONVENTIONS.md` y se puso `SYTUE_REFRESCO_APPLE = YES` en
-`apps/fyne/xcode/Sytue.xcconfig`. Ese es también el camino para un tag futuro.
+The suite uses it through an assertion on the driver (`sesion/fondo.go`). **Switched on**
+on 2026-11-07: the `replace` in `apps/fyne/go.mod` uses `v2.8.2-sytue.5`, and in the same commit
+the references in `ci-desktop.yml`, `ci-mobile.yml`, `empaquetar-test.sh`,
+`BACKLOG-FYNE.md` and `docs/CONVENTIONS.md` were bumped and `SYTUE_REFRESCO_APPLE = YES` was set in
+`apps/fyne/xcode/Sytue.xcconfig`. That is also the path for a future tag.
 
-## Avisos silenciosos de iOS (2026-11-07, `v2.8.2-sytue.5`)
+<a id="avisos-silenciosos-de-ios-2026-11-07-v282-sytue5"></a>
+## iOS silent notifications (2026-11-07, `v2.8.2-sytue.5`)
 
-`0017-ios-remote-notifications.patch` va **encima de `0016`** y añade la interfaz
-opcional `mobile.RemoteNotificationDriver`. Sirve al despertar del widget con la app
-cerrada: el Hub manda un aviso vacío de APNs cuando cambia algo del producto
-([enmiendas del ADR 0039 y 0078](../../../docs/decisions.md#0039)):
+`0017-ios-remote-notifications.patch` goes **on top of `0016`** and adds the optional
+interface `mobile.RemoteNotificationDriver`. It serves to wake the widget with the app
+closed: the Hub sends an empty APNs notification when something in the product changes
+([amendments to ADR 0039 and 0078](../../../docs/decisions.md#0039)):
 
-- `RemoteNotificationsAvailable`: el `Info.plist` declara `remote-notification` en
-  `UIBackgroundModes`. Se puede leer desde `main`, antes de que UIKit arranque.
-- `RegisterForRemoteNotifications`: pide a UIKit el token del aparato, sin diálogo de
-  permiso (un aviso sin alerta no lo necesita), y lo entrega en hexadecimal en minúsculas a
-  todos los que lo esperan, o el error de UIKit. Las peticiones a la vez comparten una.
-- `OnRemoteNotification`: el manejador de
-  `application:didReceiveRemoteNotification:fetchCompletionHandler:`. El contenido no se
-  lee nunca. El manejador recibe un contexto que se cancela a los 25 s, y el
-  `completionHandler` se llama una sola vez: con datos nuevos, sin datos o fallo según
-  lo que devuelva, fallo si se canceló el contexto, o fallo a los 500 ms de gracia si el
-  manejador no vuelve (iOS mata la app que no lo llama). Antes de correr el manejador se
-  pregunta a UIKit, en el hilo principal, si los datos protegidos están disponibles. Sin
-  manejador, el aviso falla en el acto.
+- `RemoteNotificationsAvailable`: the `Info.plist` declares `remote-notification` in
+  `UIBackgroundModes`. It can be read from `main`, before UIKit starts.
+- `RegisterForRemoteNotifications`: asks UIKit for the device token, without a permission
+  dialog (a notification without an alert does not need one), and delivers it in lowercase hexadecimal to
+  everyone waiting for it, or UIKit's error. Concurrent requests share a single one.
+- `OnRemoteNotification`: the handler of
+  `application:didReceiveRemoteNotification:fetchCompletionHandler:`. The payload is never
+  read. The handler receives a context that is cancelled after 25 s, and the
+  `completionHandler` is called only once: with new data, no data or failure depending on
+  what it returns, failure if the context was cancelled, or failure after a 500 ms grace period if the
+  handler does not return (iOS kills the app that does not call it). Before running the handler,
+  UIKit is asked, on the main thread, whether protected data is available. Without a
+  handler, the notification fails immediately.
 
-Una app sin ese modo de fondo se comporta como antes. Como con `0016`, la máquina de
-estados portable tiene pruebas en todas las plataformas y el puente de Objective-C se fija
-con contratos de fuente. Se ha comprobado aquí: `go vet` y `go test` de `driver/mobile`,
-`internal/driver/mobile` e `internal/driver/mobile/app` en Linux sobre `0016` y que
-`apps/fyne/sesion` compila contra el fork con la interfaz idéntica a la suya
-(`conductorAvisos`, `sesion/despertar.go`). El `.m` lo compila la matriz de UIKit; no se
-ha recibido un aviso en un iPhone.
+An app without that background mode behaves as before. As with `0016`, the portable state
+machine has tests on every platform and the Objective-C bridge is pinned
+with source contracts. Checked here: `go vet` and `go test` of `driver/mobile`,
+`internal/driver/mobile` and `internal/driver/mobile/app` on Linux on top of `0016`, and that
+`apps/fyne/sesion` compiles against the fork with an interface identical to its own
+(`conductorAvisos`, `sesion/despertar.go`). The UIKit matrix compiles the `.m`; no
+notification has been received on an iPhone.
 
-La suite lo usa por aserción sobre el driver. El fork ya lo trae: `apps/fyne/go.mod` usa
-`v2.8.2-sytue.5` desde el 2026-11-07. `SYTUE_DESPERTAR_APPLE = YES` desde el mismo día (decisión del dueño); faltan los pasos
-del dueño del [runbook](../../../docs/operations.md#despertar-widgets-ios): la clave, la
-capacidad Push en los quince App ID, los perfiles regenerados y el Secret del Hub.
-`empaquetar-test.sh` no deja encenderlo con `.4` o anterior.
+The suite uses it through an assertion on the driver. The fork already includes it: `apps/fyne/go.mod` has used
+`v2.8.2-sytue.5` since 2026-11-07. `SYTUE_DESPERTAR_APPLE = YES` since the same day (the owner's decision); the owner's
+steps from the [runbook](../../../docs/operations.md#despertar-widgets-ios) are still missing: the key, the
+Push capability on the fifteen App IDs, the regenerated profiles and the Hub's Secret.
+`empaquetar-test.sh` does not allow switching it on with `.4` or earlier.
 
-## Ciclo completo del toque móvil (2026-11-02)
+<a id="ciclo-completo-del-toque-móvil-2026-11-02"></a>
+## Full mobile touch cycle (2026-11-02)
 
-El tag [`v2.8.2-sytue.3`](https://github.com/thinkddr/fyne/tree/v2.8.2-sytue.3)
-añade la interfaz opcional `mobile.TouchObserverCanvas`. Su observador recibe
-el ciclo físico completo aunque un `TouchFilter` haya devuelto `FilterPass`;
-observar no captura ni retrasa los eventos. Esto permite mostrar el estado
-pulsado sin impedir que se desplace una lista.
+The tag [`v2.8.2-sytue.3`](https://github.com/thinkddr/fyne/tree/v2.8.2-sytue.3)
+adds the optional interface `mobile.TouchObserverCanvas`. Its observer receives
+the complete physical cycle even if a `TouchFilter` has returned `FilterPass`;
+observing neither captures nor delays the events. This makes it possible to show the pressed
+state without preventing a list from scrolling.
 
-Al cambiar el contenido, las capas, la geometría o el observador, la cancelación
-se entrega antes del `DragEnd` del driver. La suite la usa para descartar los
-movimientos provisionales, sin persistirlos como si el usuario hubiera soltado.
-Las rutas observadas no retienen el árbol anterior de objetos.
+When the content, the layers, the geometry or the observer change, the cancellation
+is delivered before the driver's `DragEnd`. The suite uses it to discard
+provisional movements, without persisting them as if the user had released.
+The observed paths do not retain the previous object tree.
 
-La fuente etiquetada es `b3cbd9833ac5018dd93e0789fd4f50d24da9be07`.
-Pasaron las matrices de Web, Mobile, Platform, análisis estático y CodeQL,
-además de [Fork conformance](https://github.com/thinkddr/fyne/actions/runs/41372869526)
-con UIKit en iPhone e iPad. Las pruebas del driver cubren `FilterPass`, replay,
-multitáctil y el orden de cancelación; no acreditan el uso en un dispositivo físico.
+The tagged source is `b3cbd9833ac5018dd93e0789fd4f50d24da9be07`.
+The Web, Mobile, Platform, static analysis and CodeQL matrices passed,
+as well as [Fork conformance](https://github.com/thinkddr/fyne/actions/runs/41372869526)
+with UIKit on iPhone and iPad. The driver tests cover `FilterPass`, replay,
+multi-touch and the cancellation order; they do not prove use on a physical device.
 
-## Geometría de iOS y actualización a Fyne 2.8.2 (2026-10-25)
+<a id="geometría-de-ios-y-actualización-a-fyne-282-2026-10-25"></a>
+## iOS geometry and update to Fyne 2.8.2 (2026-10-25)
 
-La [release estable `v2.8.2-sytue.2`](https://github.com/thinkddr/fyne/releases/tag/v2.8.2-sytue.2)
-parte de Fyne 2.8.2 y conserva todos los cambios de `.21`. La ventana sigue el tamaño
-y la escala de la vista UIKit a la que está unida, incluidos sus márgenes seguros al
-girar y al reducir su viewport. Go conserva los píxeles ya orientados; los toques y el
-rectángulo del teclado se convierten al espacio de la vista. Un teclado flotante o
-separado del borde inferior no encoge todo el lienzo.
+The [stable release `v2.8.2-sytue.2`](https://github.com/thinkddr/fyne/releases/tag/v2.8.2-sytue.2)
+starts from Fyne 2.8.2 and keeps all the changes from `.21`. The window follows the size
+and scale of the UIKit view it is attached to, including its safe area insets when
+rotating and when its viewport shrinks. Go keeps the already-oriented pixels; touches and the
+keyboard rectangle are converted to the view's space. A floating keyboard or one
+detached from the bottom edge does not shrink the whole canvas.
 
-`0015-ios-window-geometry.patch` recoge únicamente el cambio del driver y sus pruebas
-portables sobre `v2.8.2-sytue.1`. Los avisos BSD-3-Clause del original y Apache-2.0 de
-las modificaciones se conservan. La suite fija también typesetting `v0.3.5-sytue.1`
-y GLFW `v0.1.0-sytue.4`, rebases de los originales 0.3.5 y 0.1.0-pre.2, y actualiza el
-inventario de originales que consulta OSV.
+`0015-ios-window-geometry.patch` contains only the driver change and its portable
+tests on top of `v2.8.2-sytue.1`. The BSD-3-Clause notices of the original and the Apache-2.0 notices of
+the modifications are kept. The suite also pins typesetting `v0.3.5-sytue.1`
+and GLFW `v0.1.0-sytue.4`, rebases of the originals 0.3.5 and 0.1.0-pre.2, and updates the
+inventory of originals that OSV queries.
 
-La fuente final pasó las cinco matrices del fork. Con Xcode 27.0 y Go 1.27.3 se
-compiló y enlazó el driver para dispositivo y simulador iOS arm64. Los simuladores de
-iPhone 18 Pro e iPad Pro de 13 pulgadas recorrieron cuatro estados de rotación y
-cuatro tamaños/posiciones de la vista por estado: 32 medidas y 32 toques UIKit
-correctos. El arnés desactiva las animaciones UIKit y lo declara en sus informes;
-el bucle de renderizado y el driver de producción no cambian. Se verificaron además
-24 casos portables de geometría/teclado. No se automatizan los gestos de Stage Manager
-ni la ejecución en un dispositivo físico. La instalación limpia del tag pasó en
+The final source passed the fork's five matrices. With Xcode 27.0 and Go 1.27.3 the
+driver was compiled and linked for iOS arm64 device and simulator. The
+iPhone 18 Pro and 13-inch iPad Pro simulators went through four rotation states and
+four view sizes/positions per state: 32 measurements and 32 correct UIKit
+taps. The harness disables UIKit animations and states so in its reports;
+the render loop and the production driver do not change. In addition,
+24 portable geometry/keyboard cases were verified. Stage Manager gestures
+and running on a physical device are not automated. The clean install of the tag passed in
 [`public-install`](https://github.com/thinkddr/fyne/actions/runs/40198336656/job/121183936450):
-Go 1.27.3, descarga del módulo publicado, sumas verificadas y build externo limpio.
+Go 1.27.3, download of the published module, verified sums and a clean external build.
 
-## Actualización a Fyne 2.8.2 (2026-10-23)
+<a id="actualización-a-fyne-282-2026-10-23"></a>
+## Update to Fyne 2.8.2 (2026-10-23)
 
-El fork integra la versión estable de upstream conservando las URL entrantes,
-los gestos móviles y los pintores opcionales de la suite. Incluye las correcciones
-del teclado y el ciclo de dibujo de iOS, los permisos de lectura del selector de
-Android y las coordenadas al soltar archivos en escritorio. La prueba del selector
-ejecuta el Java real y su callback JNI, con selección múltiple y proveedores que
-rechazan el permiso persistente.
+The fork integrates the stable upstream version while keeping the suite's incoming URLs,
+mobile gestures and optional painters. It includes the fixes
+for the iOS keyboard and draw cycle, the read permissions of the Android
+picker and the coordinates when dropping files on desktop. The picker test
+runs the real Java and its JNI callback, with multiple selection and providers that
+reject the persistable permission.
 
-También se actualizan las bases reales de los reemplazos: typesetting
-`v0.3.5-sytue.1` conserva las medidas fraccionarias y declara el módulo canónico;
-GLFW `v0.1.0-sytue.4` incorpora la base `v0.1.0-pre.2` y mantiene los callbacks de
-texto, enlaces y arrastre de archivos. Sus tags anteriores siguen intactos. La
-suite descarga estos dos forks directamente; la visibilidad pública de un
-repositorio y `GOPRIVATE` son propiedades distintas.
+The real bases of the replacements are also updated: typesetting
+`v0.3.5-sytue.1` keeps fractional measurements and declares the canonical module;
+GLFW `v0.1.0-sytue.4` incorporates the `v0.1.0-pre.2` base and keeps the text,
+link and file drag callbacks. Their previous tags remain intact. The
+suite downloads these two forks directly; a repository's public visibility
+and `GOPRIVATE` are different properties.
 
-La referencia visual del submenú se actualiza por el ajuste a la altura del
-lienzo de upstream. La comparación de píxeles conserva las etiquetas de la raíz;
-no motivó ningún cambio adicional de layout ni de conformado de texto. Los
-contratos de gestos y renderizado mantienen sus comprobaciones y umbrales.
+The visual reference of the submenu is updated because of upstream's adjustment to the canvas
+height. The pixel comparison keeps the root labels;
+it did not lead to any additional layout or text shaping change. The
+gesture and rendering contracts keep their checks and thresholds.
 
-## Gestos móviles y mantenimiento del fork (2026-10-23)
+<a id="gestos-móviles-y-mantenimiento-del-fork-2026-10-23"></a>
+## Mobile gestures and fork maintenance (2026-10-23)
 
-El tag `v2.8.1-sytue.21` añade `mobile.TouchFilterCanvas`, una interfaz opcional que
-permite decidir un gesto antes de entregar el toque a las filas o a los editores.
-Reproduce los eventos rechazados con sus tiempos originales, conserva el multitáctil
-y cancela al cambiar la raíz, una capa, la geometría o el filtro. iOS entrega
-`touchesCancelled` y mantiene el identificador de cada dedo; Android distingue
-`ACTION_CANCEL` de una pulsación terminada. `fyne.Canvas` conserva su contrato.
+The tag `v2.8.1-sytue.21` adds `mobile.TouchFilterCanvas`, an optional interface that
+makes it possible to decide on a gesture before delivering the touch to rows or editors.
+It replays the rejected events with their original timings, keeps multi-touch
+and cancels when the root, a layer, the geometry or the filter changes. iOS delivers
+`touchesCancelled` and keeps each finger's identifier; Android distinguishes
+`ACTION_CANCEL` from a completed press. `fyne.Canvas` keeps its contract.
 
-Incluye los cambios anteriores del pintor de imágenes, la sincronización de la
-caducidad de caché y los contratos opcionales de texto y rectángulos del pintor de
-software. [La comparación con `.16`](https://github.com/thinkddr/fyne/compare/v2.8.1-sytue.16...v2.8.1-sytue.21)
-contiene el cambio completo. La versión de rectángulos documentada como `.20` no
-se ha vuelto a etiquetar.
+It includes the earlier changes to the image painter, the synchronization of the
+cache expiry and the optional text and rectangle contracts of the software
+painter. [The comparison with `.16`](https://github.com/thinkddr/fyne/compare/v2.8.1-sytue.16...v2.8.1-sytue.21)
+contains the full change. The rectangle version documented as `.20` has not
+been re-tagged.
 
-La fuente `bf85664117f0a3acc2cf3388e07fd7dee32a3d38` pasó las cinco matrices del
-fork: carrera, análisis, plataformas, web y móvil. Su descarga se verificó en
-Scaleway mediante `proxy.golang.org` y `sum.golang.org`, sin excluir el módulo de la
-verificación pública. La suite fija el tag y las dos sumas junto a sus guardianes
-de empaquetado. Las pruebas del driver no acreditan la interacción física con los
-gestos reservados por cada sistema operativo.
+The source `bf85664117f0a3acc2cf3388e07fd7dee32a3d38` passed the fork's five
+matrices: race, analysis, platforms, web and mobile. Its download was verified on
+Scaleway through `proxy.golang.org` and `sum.golang.org`, without excluding the module from
+public verification. The suite pins the tag and the two sums next to their packaging
+guards. The driver tests do not prove physical interaction with the
+gestures reserved by each operating system.
 
-El código original conserva BSD-3-Clause. Las modificaciones actuales del fork
-se publican bajo Apache-2.0; el aviso de licencias del fork conserva la atribución
-de upstream. El parche histórico de URL de esta carpeta mantiene su licencia.
+The original code keeps BSD-3-Clause. The fork's current modifications
+are published under Apache-2.0; the fork's license notice keeps the attribution
+to upstream. The historical URL patch in this folder keeps its license.
 
-## Parche histórico de URL entrantes
+<a id="parche-histórico-de-url-entrantes"></a>
+## Historical incoming URL patch
 
-- **`0001-receive-incoming-urls.patch`** — el parche, exportado del commit `2430cc176a`
-  de la rama `sytue` del fork. 13 ficheros, **235 líneas añadidas y ninguna borrada**:
-  no cambia el comportamiento de nadie que no lo pida. Incluye su prueba
-  (`internal/urlhandler/urlhandler_test.go`) y está redactado en inglés, como el resto
-  del proyecto.
-- El código del parche es de Fyne y sale **bajo la BSD-3-Clause de Fyne**, no bajo la
-  licencia del resto de este repositorio.
+- **`0001-receive-incoming-urls.patch`** — the patch, exported from commit `2430cc176a`
+  on the fork's `sytue` branch. 13 files, **235 lines added and none deleted**:
+  it does not change the behavior of anyone who does not ask for it. It includes its test
+  (`internal/urlhandler/urlhandler_test.go`) and is written in English, like the rest
+  of the project.
+- The patch code belongs to Fyne and is released **under Fyne's BSD-3-Clause**, not under the
+  license of the rest of this repository.
 
-## Qué falta para abrirla, y por qué no está abierta
+<a id="qué-falta-para-abrirla-y-por-qué-no-está-abierta"></a>
+## What is missing to open it, and why it is not open
 
-La PR la tiene que abrir **la cuenta personal del dueño en GitHub**: una PR aguas arriba
-va firmada por una persona, no por un agente. Todo lo demás está hecho.
+The PR has to be opened by **the owner's personal GitHub account**: an upstream PR
+is signed by a person, not by an agent. Everything else is done.
 
-Pasos, cuando se abra:
+Steps, when it is opened:
 
 1. `git clone https://github.com/fyne-io/fyne && cd fyne && git switch develop`
-   — Fyne integra por `develop`; el parche se exportó sobre `v2.8.1`, así que puede
-   pedir un rebase trivial en `app/app.go`.
-2. `git am ../0001-receive-incoming-urls.patch` y `go test ./...`.
-3. Enlazar la issue existente **[#1847 «Register URL Protocol
-   Handler»](https://github.com/fyne-io/fyne/issues/1847)** (abierta, es justo esto) y la
-   cerrada **[#5812 «Write apps that can handle URL
-   schemes»](https://github.com/fyne-io/fyne/issues/5812)**. No hay ninguna PR abierta
-   que lo resuelva (búsqueda del 2026-09-22 en `fyne-io/fyne`).
-4. Cuando se acepte: borrar el `replace` de `apps/fyne/go.mod`, los cuatro guardianes de
-   los workflows que lo exigen y esta carpeta. **Antes**, mirar que Fyne lleve también
-   los otros dos parches del fork, que no son de URL: la caducidad de la caché de
-   renderers (`.3`) y la cola del driver de pruebas (`.4`,
-   `TestElFyneDoDeOtraRutinaEsperaAlTest` en `apps/fyne/ui`). Sin ellos vuelven los
-   rojos que dependen de la semilla de `-shuffle`.
+   — Fyne integrates through `develop`; the patch was exported on top of `v2.8.1`, so it may
+   need a trivial rebase in `app/app.go`.
+2. `git am ../0001-receive-incoming-urls.patch` and `go test ./...`.
+3. Link the existing issue **[#1847 “Register URL Protocol
+   Handler”](https://github.com/fyne-io/fyne/issues/1847)** (open, it is exactly this) and the
+   closed **[#5812 “Write apps that can handle URL
+   schemes”](https://github.com/fyne-io/fyne/issues/5812)**. There is no open PR
+   that solves it (search of 2026-09-22 in `fyne-io/fyne`).
+4. When it is accepted: delete the `replace` in `apps/fyne/go.mod`, the four workflow
+   guards that require it and this folder. **Before that**, check that Fyne also includes
+   the fork's other two patches, which are not about URLs: the renderer cache
+   expiry (`.3`) and the test driver queue (`.4`,
+   `TestElFyneDoDeOtraRutinaEsperaAlTest` in `apps/fyne/ui`). Without them, the
+   reds that depend on the `-shuffle` seed come back.
 
-## Texto de la PR (en inglés, para pegar tal cual)
+<a id="texto-de-la-pr-en-inglés-para-pegar-tal-cual"></a>
+## PR text (in English, to paste as is)
 
 **Title:** `feat: receive URLs opened by the operating system`
 
@@ -330,271 +342,285 @@ Pasos, cuando se abra:
 > all. Happy to split the mobile bridges into a second commit, or to rename the
 > interface, if that suits the review better.
 
-# El parche de texto soltado, en el fork de GLFW
+<a id="el-parche-de-texto-soltado-en-el-fork-de-glfw"></a>
+# The dropped-text patch, in the GLFW fork
 
-`apps/fyne/go.mod` reemplaza también `github.com/go-gl/glfw/v3.4/glfw` por
-`github.com/thinkddr/glfw/v3.4/glfw`, con la versión indicada arriba. El tag
-`v0.1.0-sytue.3` (rama `sytue-3`, commit
-`a55430400fa2b9bdefa234806fe15dbd6b87d037`, encima de `2a407d02d01a`, que es justo el
-que requería Fyne v2.8.1) es su base histórica. Antes: `v0.1.0-sytue.2` (`3ac371eb6815`) sin el aviso de
-arrastre, y `v0.1.0-sytue.1` (`0806cc00ff97`), solo X11 y Wayland. El CI descarga el
-repositorio con `.github/actions/toolchain/forks.sh`, como los otros dos.
+`apps/fyne/go.mod` also replaces `github.com/go-gl/glfw/v3.4/glfw` with
+`github.com/thinkddr/glfw/v3.4/glfw`, at the version given above. The tag
+`v0.1.0-sytue.3` (branch `sytue-3`, commit
+`a55430400fa2b9bdefa234806fe15dbd6b87d037`, on top of `2a407d02d01a`, which is exactly the
+one Fyne v2.8.1 required) is its historical base. Before: `v0.1.0-sytue.2` (`3ac371eb6815`) without the
+drag notification, and `v0.1.0-sytue.1` (`0806cc00ff97`), X11 and Wayland only. The CI downloads the
+repository with `.github/actions/toolchain/forks.sh`, like the other two.
 
-**Por qué.** GLFW solo acepta FICHEROS soltados, y la web acepta también texto y enlaces
-(el cuaderno de Notepads crea con ellos una nota). En X11 y en Wayland el protocolo lo
-atiende la conexión de GLFW —el XDnD en `x11_window.c`, el `wl_data_device` en
-`wl_window.c`— y desde fuera no hay forma de verlo: los mensajes nunca salen de GLFW.
-Así que se parchea su C, y macOS y Windows van en el mismo parche aunque ahí sí se
-podría llegar desde fuera (`RunNative`): desde fuera habría que cambiar en tiempo de
-ejecución un método de la clase privada `GLFWContentView` de Cocoa, y en Windows un
-segundo destino OLE fuera de GLFW se llevaría los ficheros que hoy entrega su
-`WM_DROPFILES`, y habría que volver a entregarlos por otro camino. Dentro de GLFW todo
-llega por la misma retrollamada y los ficheros no cambian de camino.
+**Why.** GLFW only accepts dropped FILES, and the web also accepts text and links
+(the Notepads notebook creates a note from them). On X11 and on Wayland the protocol is
+handled by GLFW's connection —XDnD in `x11_window.c`, `wl_data_device` in
+`wl_window.c`— and there is no way to see it from outside: the messages never leave GLFW.
+So its C is patched, and macOS and Windows go in the same patch even though there it
+would be possible to reach it from outside (`RunNative`): from outside you would have to change at
+runtime a method of Cocoa's private `GLFWContentView` class, and on Windows a
+second OLE target outside GLFW would take the files that its
+`WM_DROPFILES` delivers today, and they would have to be delivered again by another path. Inside GLFW everything
+arrives through the same callback and the files do not change path.
 
-**Qué hace** (`glfw-0001-drop-text.patch`, los tres commits, en inglés, como GLFW):
+**What it does** (`glfw-0001-drop-text.patch`, the three commits, in English, like GLFW):
 
-- `glfwSetDropTextCallback`: una ventana con esa retrollamada acepta además texto
-  (`text/plain;charset=utf-8`, `UTF8_STRING` o `text/plain`) y URL que no son ficheros.
-  Una ventana sin ella se comporta EXACTAMENTE como antes.
-- Una lista de URI se reparte: los `file:` siguen a la retrollamada de rutas de siempre
-  —Fyne los entrega por `SetOnDropped` sin cambiar nada— y el resto va a la nueva.
-- macOS: la vista se registra también para cadenas y, si no hay ficheros, entrega las
-  URL (`NSURL`) o el texto (`NSPasteboardTypeString`). Sin retrollamada de texto, un
-  arrastre sin URL se rechaza en `draggingEntered:`, como antes.
-- Windows: un `IDropTarget` de OLE en cada ventana. Una ventana registrada para OLE deja
-  de recibir `WM_DROPFILES` del Explorador, así que el destino entrega también los
-  ficheros (`CF_HDROP`) por el mismo camino que `WM_DROPFILES`; los enlaces con
-  `UniformResourceLocatorW` y el texto con `CF_UNICODETEXT`. Si el hilo ya estaba en el
-  apartamento multihilo, `OleInitialize` falla y la ventana se queda con
-  `WM_DROPFILES`, como sin el parche.
-- En Go, `glfw.SetDropTextCallback` pone una retrollamada para TODAS las ventanas,
-  presentes y futuras, porque Fyne no deja ver su `*glfw.Window`; `apps/fyne/soltar`
-  reconoce la ventana por su identificador nativo.
-- Dos arreglos en el mismo camino: X11 ya no llama a la retrollamada de rutas con cero
-  rutas (salta la aserción de `_glfwInputDrop`), y el `XdndEnter` de Wayland ya no
-  desreferencia una ventana nula cuando lo soltado cae en una superficie ajena.
-- Desde `.3`, el aviso de arrastre, para el «Suelta para añadir» de Photos:
-  `glfwSetDragCallback` dice cuándo un arrastre de FICHEROS entra en la ventana y cuándo
-  deja de estar encima (sale, se cancela o se suelta, y en ese caso antes de entregar
-  las rutas), una vez por cambio. X11: `XdndEnter` con `text/uri-list`, `XdndLeave` y
-  `XdndDrop`; Cocoa: `draggingEntered:` con `NSPasteboardTypeFileURL`,
-  `draggingExited:`, `draggingEnded:` y el principio de `performDragOperation:`; Win32:
-  `DragEnter` con `CF_HDROP`, `DragLeave` y `Drop`. En Go, `glfw.SetDragCallback`, y en
-  la suite `soltar.AlArrastrar`. Límites: en X11 una lista de URI cuenta antes de saber si
-  trae ficheros o enlaces (el protocolo no lo dice hasta soltar); Wayland no avisa. El
-  primer borrador lo dejó el agente de SyPhotos; se ajustó a lo aprobado (solo ficheros,
-  X11 en `XdndEnter`, sin Wayland).
+- `glfwSetDropTextCallback`: a window with that callback also accepts text
+  (`text/plain;charset=utf-8`, `UTF8_STRING` or `text/plain`) and URLs that are not files.
+  A window without it behaves EXACTLY as before.
+- A URI list is split: the `file:` ones go on to the usual paths callback
+  —Fyne delivers them through `SetOnDropped` without changing anything— and the rest go to the new one.
+- macOS: the view also registers for strings and, if there are no files, delivers the
+  URLs (`NSURL`) or the text (`NSPasteboardTypeString`). Without a text callback, a
+  drag without URLs is rejected in `draggingEntered:`, as before.
+- Windows: an OLE `IDropTarget` on each window. A window registered for OLE stops
+  receiving `WM_DROPFILES` from Explorer, so the target also delivers the
+  files (`CF_HDROP`) through the same path as `WM_DROPFILES`; links with
+  `UniformResourceLocatorW` and text with `CF_UNICODETEXT`. If the thread was already in the
+  multithreaded apartment, `OleInitialize` fails and the window keeps
+  `WM_DROPFILES`, as without the patch.
+- In Go, `glfw.SetDropTextCallback` sets a callback for ALL windows,
+  present and future, because Fyne does not expose its `*glfw.Window`; `apps/fyne/soltar`
+  recognizes the window by its native identifier.
+- Two fixes on the same path: X11 no longer calls the paths callback with zero
+  paths (it trips the `_glfwInputDrop` assertion), and Wayland's `XdndEnter` no longer
+  dereferences a null window when the drop lands on a foreign surface.
+- Since `.3`, the drag notification, for Photos' «Suelta para añadir» (Drop to add):
+  `glfwSetDragCallback` says when a drag of FILES enters the window and when
+  it stops being over it (it leaves, is cancelled or is dropped, and in that case before delivering
+  the paths), once per change. X11: `XdndEnter` with `text/uri-list`, `XdndLeave` and
+  `XdndDrop`; Cocoa: `draggingEntered:` with `NSPasteboardTypeFileURL`,
+  `draggingExited:`, `draggingEnded:` and the start of `performDragOperation:`; Win32:
+  `DragEnter` with `CF_HDROP`, `DragLeave` and `Drop`. In Go, `glfw.SetDragCallback`, and in
+  the suite `soltar.AlArrastrar`. Limits: on X11 a URI list counts before knowing whether
+  it carries files or links (the protocol does not say until the drop); Wayland does not notify. The
+  first draft was left by the SyPhotos agent; it was adjusted to what was approved (files only,
+  X11 in `XdndEnter`, no Wayland).
 
-**Probado.** X11, de verdad: `apps/fyne/soltar/soltar_x11_test.go` arranca Xvfb, abre una
-ventana de Fyne y le suelta texto, un enlace y un fichero con un origen XDnD escrito para
-la prueba (`testdata/origen.c`). Con los backends sin parchear, rojo: el texto se rechaza
-en el `XdndStatus` y el enlace llega a `SetOnDropped` como un fichero inventado
-(`file:///…/https:/sytue.eu/notes%3Fx=1`). El aviso de arrastre, en la misma prueba: un
-fichero da «entra», «sale» y las rutas, en ese orden; uno que se va sin soltar
-(`origen --salir`), «entra» y «sale»; un texto, nada. Rojo sin las tres llamadas de
-X11: no llega ningún aviso. Wayland compila y está revisado a mano, pero no se ha visto
-soltar nada: haría falta un compositor sin pantalla con un puntero virtual que empiece
-el arrastre.
+**Tested.** X11, for real: `apps/fyne/soltar/soltar_x11_test.go` starts Xvfb, opens a
+Fyne window and drops text, a link and a file onto it with an XDnD source written for
+the test (`testdata/origen.c`). With the unpatched backends, red: the text is rejected
+in the `XdndStatus` and the link reaches `SetOnDropped` as a made-up file
+(`file:///…/https:/sytue.eu/notes%3Fx=1`). The drag notification, in the same test: a
+file gives “enter”, “leave” and the paths, in that order; one that goes away without being dropped
+(`origen --salir`), “enter” and “leave”; a text, nothing. Red without the three
+X11 calls: no notification arrives. Wayland compiles and has been reviewed by hand, but nothing has been seen
+being dropped: it would need a headless compositor with a virtual pointer that starts
+the drag.
 
-Windows: compila con cgo para amd64 (mingw-w64) y arm64 (llvm-mingw), y se ha visto con
-Wine 8.0 (arm64) en el contenedor de los agentes: el XDnD de Wine termina en el
-`IDropTarget` de la ventana, y el mismo origen de la prueba de X11 suelta texto (llega
-entero y en su sitio, pasado a coordenadas de la ventana) y un fichero (llega por la
-retrollamada de rutas, `Z:\tmp\acta.docx`). Dos límites del entorno, no del parche: el
-arnés es C sin Go, porque Wine 8.0 en arm64 entra en `IDropTarget::Drop` sin restaurar
-`x18` (el TEB) y el runtime de Go cae al leerlo —en Windows `x18` es siempre el TEB—; y
-el enlace no se puede probar ahí, porque Wine convierte toda `text/uri-list` en
-`CF_HDROP` y nunca ofrece `UniformResourceLocatorW`. El aviso de arrastre, con el mismo
-arnés: el fichero da «entra», «sale» y las rutas; el que se va, «entra» y «sale»; el
-texto, nada. Rojo sin las tres llamadas de Win32. (El arnés imprime con `fputs`: el
-`ucrtbase` de Wine 8 en arm64 lee mal los argumentos variables de `printf`.)
+Windows: it compiles with cgo for amd64 (mingw-w64) and arm64 (llvm-mingw), and it has been seen with
+Wine 8.0 (arm64) in the agents' container: Wine's XDnD ends up in the
+window's `IDropTarget`, and the same source from the X11 test drops text (it arrives
+whole and in place, converted to window coordinates) and a file (it arrives through the
+paths callback, `Z:\tmp\acta.docx`). Two limits of the environment, not of the patch: the
+harness is C without Go, because Wine 8.0 on arm64 enters `IDropTarget::Drop` without restoring
+`x18` (the TEB) and the Go runtime crashes when reading it —on Windows `x18` is always the TEB—; and
+the link cannot be tested there, because Wine turns every `text/uri-list` into
+`CF_HDROP` and never offers `UniformResourceLocatorW`. The drag notification, with the same
+harness: the file gives “enter”, “leave” and the paths; the one that goes away, “enter” and “leave”; the
+text, nothing. Red without the three Win32 calls. (The harness prints with `fputs`: Wine 8's
+`ucrtbase` on arm64 misreads `printf`'s variadic arguments.)
 
-macOS: `apps/fyne/soltar/testdata/cocoa.m` se ejecuta en un Mac, sin nadie delante:
-crea una ventana de GLFW oculta y le manda a su vista lo que mandaría AppKit
-(`draggingEntered:`, `draggingExited:`, `draggingEnded:`, `performDragOperation:`) con un
-`NSDraggingInfo` falso sobre un `NSPasteboard` de verdad. Pasa entero: un fichero avisa y
-llega por la retrollamada de rutas; el que se va avisa y no entrega; un texto y un
-enlace llegan en su sitio (40, 40) sin avisar de arrastre; sin retrollamada de texto, un
-texto se rechaza como antes del parche. Rojo con dos sabotajes: sin la condición de
-`NSPasteboardTypeFileURL` el texto y el enlace encienden el aviso, y sin el aviso del
-principio de `performDragOperation:` el «sale» llega después de las rutas. Lo que no
-prueba es el arrastre de un ratón de verdad desde el Finder. `go vet` del fork en un Mac
-compila además el Objective-C contra el SDK de Apple.
+macOS: `apps/fyne/soltar/testdata/cocoa.m` runs on a Mac, with nobody in front of it:
+it creates a hidden GLFW window and sends its view what AppKit would send
+(`draggingEntered:`, `draggingExited:`, `draggingEnded:`, `performDragOperation:`) with a
+fake `NSDraggingInfo` over a real `NSPasteboard`. It passes in full: a file notifies and
+arrives through the paths callback; the one that goes away notifies and is not delivered; a text and a
+link arrive in place (40, 40) without a drag notification; without a text callback, a
+text is rejected as before the patch. Red with two sabotages: without the
+`NSPasteboardTypeFileURL` condition the text and the link trigger the notification, and without the notification at the
+start of `performDragOperation:` the “leave” arrives after the paths. What it does not
+test is dragging with a real mouse from the Finder. The fork's `go vet` on a Mac
+also compiles the Objective-C against Apple's SDK.
 
-**Para quitarlo**: que GLFW acepte texto soltado (la PR la abriría la cuenta del dueño
-en GitHub, como la de Fyne), que go-gl lo exponga, y borrar el `replace`, `glfw` de
-`forks.sh`, este apartado y el parche.
+**To remove it**: GLFW must accept dropped text (the PR would be opened by the owner's account
+on GitHub, like the Fyne one), go-gl must expose it, and then delete the `replace`, `glfw` from
+`forks.sh`, this section and the patch.
 
-## `v2.8.1-sytue.5` (2026-09-24): capas no modales y foco acotado
+<a id="v281-sytue5-2026-09-24-capas-no-modales-y-foco-acotado"></a>
+## `v2.8.1-sytue.5` (2026-09-24): non-modal layers and scoped focus
 
-Commit `faf352b9c` de la rama `sytue`, encima de `.4` (`e337b0f2b`); el parche exportado es
-**`0003-taps-and-wheel-through-overlays-and-focus-scopes.patch`** (7 ficheros, 302 líneas añadidas). Tres
-interfaces OPCIONALES, así que no cambia nada para quien no las declare:
+Commit `faf352b9c` on the `sytue` branch, on top of `.4` (`e337b0f2b`); the exported patch is
+**`0003-taps-and-wheel-through-overlays-and-focus-scopes.patch`** (7 files, 302 lines added). Three
+OPTIONAL interfaces, so nothing changes for anyone who does not declare them:
 
-- `TapThrough() bool` en una capa: el clic o el toque que la cierra llega también a lo que tapaba (un menú
-  que se cierra al apretar, no un diálogo modal). En glfw, `processMouseClicked` vuelve a despachar ese clic;
-  en el móvil se reenvía el toque.
-- `ScrollThrough() bool` en una capa: la rueda desplaza lo que hay debajo y la capa se refresca después,
-  para que un menú siga a lo que se movió.
-- `FocusScope() fyne.CanvasObject`: mientras devuelve un subárbol, el Tab no sale de él (el cajón móvil).
+- `TapThrough() bool` on a layer: the click or tap that closes it also reaches what it covered (a menu
+  that closes when pressed, not a modal dialog). In glfw, `processMouseClicked` dispatches that click again;
+  on mobile the tap is forwarded.
+- `ScrollThrough() bool` on a layer: the wheel scrolls what is underneath and the layer is refreshed afterwards,
+  so that a menu follows what moved.
+- `FocusScope() fyne.CanvasObject`: while it returns a subtree, Tab does not leave it (the mobile drawer).
 
-Con él, `apps/fyne/ui` retira el clic cruzado y el Tab del cajón que se hacían a mano. Candidato a
-proponerse aguas arriba junto con el de URL entrantes.
+With it, `apps/fyne/ui` drops the pass-through click and the drawer Tab handling that were done by hand. A candidate to
+be proposed upstream together with the incoming URL one.
 
-## `v2.8.1-sytue.6` (2026-09-25): varios ficheros en el móvil, tamaño de un `content://` y recortes anidados
+<a id="v281-sytue6-2026-09-25-varios-ficheros-en-el-móvil-tamaño-de-un-content-y-recortes-anidados"></a>
+## `v2.8.1-sytue.6` (2026-09-25): multiple files on mobile, size of a `content://` and nested clips
 
-Etiqueta anotada sobre `cbbc17d78` de la rama `sytue-transversal-2`, encima de `.5` (`faf352b9c`); el parche
-exportado es **`0004-multiple-file-pick-content-size-and-nested-clips.patch`** (11 ficheros, 192 líneas
-añadidas y 10 borradas). Dos commits:
+Annotated tag on `cbbc17d78` of the `sytue-transversal-2` branch, on top of `.5` (`faf352b9c`); the exported
+patch is **`0004-multiple-file-pick-content-size-and-nested-clips.patch`** (11 files, 192 lines
+added and 10 deleted). Two commits:
 
-- `6bd31abe9`: `dialog.ShowFileOpenMultiple` elige varios ficheros donde el selector del sistema deja
-  (Android, `EXTRA_ALLOW_MULTIPLE` y `ClipData`); en el resto es `ShowFileOpen` con un lector en un slice.
-  La URI de Android gana `Size() int64` (`OpenableColumns.SIZE`, -1 si el proveedor no lo sabe), que se
-  pide con una aserción a `interface{ Size() int64 }`: no ensancha `fyne.URI`.
-- `cbbc17d78`: `walkObjectTree` intersecta el recorte de un objeto con el de su padre en vez de sustituirlo,
-  como ya hacía el `ClipStack` de GL. Con el pintor de software, un desplazador dentro de otro (la `Entrada`
-  de un diálogo desplazado, la marca de agua de Rooms) pintaba y recibía toques fuera de él.
+- `6bd31abe9`: `dialog.ShowFileOpenMultiple` picks several files where the system picker allows it
+  (Android, `EXTRA_ALLOW_MULTIPLE` and `ClipData`); elsewhere it is `ShowFileOpen` with one reader in a slice.
+  The Android URI gains `Size() int64` (`OpenableColumns.SIZE`, -1 if the provider does not know it), which is
+  requested with an assertion to `interface{ Size() int64 }`: it does not widen `fyne.URI`.
+- `cbbc17d78`: `walkObjectTree` intersects an object's clip with its parent's instead of replacing it,
+  as GL's `ClipStack` already did. With the software painter, a scroller inside another one (the `Entrada`
+  of a scrolled dialog, Rooms' watermark) painted and received taps outside it.
 
-Con él, Drive sube desde el móvil varios ficheros a la vez y con porcentaje.
+With it, Drive uploads several files at once from mobile, with a percentage.
 
-## `v2.8.1-sytue.7` (2026-09-25): el interlineado de un `Entry` multilínea
+<a id="v281-sytue7-2026-09-25-el-interlineado-de-un-entry-multilínea"></a>
+## `v2.8.1-sytue.7` (2026-09-25): the line spacing of a multi-line `Entry`
 
-Etiqueta anotada sobre `a353ee549` de la rama `sytue-interlineado`, encima de `.6` (`cbbc17d78`); el parche
-exportado es **`0005-multi-line-entry-line-spacing.patch`** (45 ficheros, 256 líneas añadidas y 125 borradas;
-casi todo son las referencias de prueba de `Entry`).
+Annotated tag on `a353ee549` of the `sytue-interlineado` branch, on top of `.6` (`cbbc17d78`); the exported
+patch is **`0005-multi-line-entry-line-spacing.patch`** (45 files, 256 lines added and 125 deleted;
+almost all of them are `Entry` test references).
 
-`RichText` solo sumaba `SizeNameLineSpacing` entre párrafos, nunca entre las filas de un mismo segmento en
-línea, que es todo el texto de un `Entry`: sus filas avanzaban lo que mide la letra, dijera lo que dijera el
-tema. Ahora un `Entry` multilínea pide el hueco entre todas sus filas (`RichText.spaceRows`), y el
-maquetado, el tamaño mínimo, el cursor, la selección y el toque avanzan letra + interlineado, como un
-`line-height` de CSS. Un `Entry` de una línea y el resto de `RichText` no cambian.
+`RichText` only added `SizeNameLineSpacing` between paragraphs, never between the rows of a single inline
+segment, which is all the text of an `Entry`: its rows advanced by the height of the font, whatever the
+theme said. Now a multi-line `Entry` asks for the gap between all its rows (`RichText.spaceRows`), and the
+layout, the minimum size, the cursor, the selection and the tap advance font + line spacing, like a CSS
+`line-height`. A single-line `Entry` and the rest of `RichText` do not change.
 
-Medido contra un `textarea` de Chromium: `text-sm` avanza 15,75 px por línea y `text-base` 19,25; con `.6`
-Fyne avanzaba 13,66 y 14,70, y con `.7` lo mismo que la web. Las referencias de prueba de `Entry` con varias
-filas bajan 4 px por fila (el interlineado del tema de pruebas).
+Measured against a Chromium `textarea`: `text-sm` advances 15.75 px per line and `text-base` 19.25; with `.6`
+Fyne advanced 13.66 and 14.70, and with `.7` the same as the web. The `Entry` test references with several
+rows move down 4 px per row (the line spacing of the test theme).
 
-## `v2.8.1-sytue.8` (2026-09-25): el pintor de software redondea las posiciones
+<a id="v281-sytue8-2026-09-25-el-pintor-de-software-redondea-las-posiciones"></a>
+## `v2.8.1-sytue.8` (2026-09-25): the software painter rounds positions
 
-Etiqueta anotada sobre `4d4ebf890` de la rama `sytue-redondeo`, encima de `.7` (`a353ee549`); el parche
-exportado es **`0006-software-painter-rounds-positions.patch`** (18 ficheros, 59 líneas añadidas y 21
-borradas; 15 son referencias de prueba).
+Annotated tag on `4d4ebf890` of the `sytue-redondeo` branch, on top of `.7` (`a353ee549`); the exported
+patch is **`0006-software-painter-rounds-positions.patch`** (18 files, 59 lines added and 21
+deleted; 15 are test references).
 
-El pintor de software pasaba también las POSICIONES por `scale.ToScreenCoordinate`, que redondea hacia
-arriba: todo lo que caía en una coordenada fraccionaria salía un píxel más abajo o más a la derecha que en el
-pintor de GL (`roundToPixel`, al más cercano) y que en el navegador. La ventana real ya estaba bien; las
-capturas y los tests, no. Ahora las posiciones y el origen del recorte redondean al más cercano y los tamaños
-siguen hacia arriba, para que nada pierda su último píxel parcial.
+The software painter also passed POSITIONS through `scale.ToScreenCoordinate`, which rounds
+up: everything that fell on a fractional coordinate came out one pixel lower or further right than in the
+GL painter (`roundToPixel`, to the nearest) and than in the browser. The real window was already fine; the
+screenshots and the tests were not. Now positions and the clip origin round to the nearest and sizes
+keep rounding up, so that nothing loses its last partial pixel.
 
-Medido contra Chromium con Figtree en ocho alturas fraccionarias: la línea base del texto coincide en las
-ocho (con el techo fallaban tres). Las referencias que cambian mueven un texto o un borde un píxel.
+Measured against Chromium with Figtree at eight fractional heights: the text baseline matches at all
+eight (with ceiling, three failed). The references that change move a text or a border by one pixel.
 
-## `v2.8.1-sytue.9` (2026-09-25): los Universal Links de iOS llegan al manejador de URL
+<a id="v281-sytue9-2026-09-25-los-universal-links-de-ios-llegan-al-manejador-de-url"></a>
+## `v2.8.1-sytue.9` (2026-09-25): iOS Universal Links reach the URL handler
 
-Etiqueta anotada sobre `80f85dbc8` de la rama `sytue-universal-links`, encima de `.8` (`4d4ebf890`); el
-parche exportado es **`0007-ios-universal-links.patch`** (1 fichero, 12 líneas añadidas).
+Annotated tag on `80f85dbc8` of the `sytue-universal-links` branch, on top of `.8` (`4d4ebf890`); the
+exported patch is **`0007-ios-universal-links.patch`** (1 file, 12 lines added).
 
-Un enlace https asociado a la app (el de una reunión de Rooms, `rooms.<dominio>/?rooms=<id>`, con
-`apple-app-site-association` y el derecho `associated-domains`) no llega por `openURL`: iOS lo entrega como
-`NSUserActivity` de tipo `BrowsingWeb` a `application:continueUserActivity:restorationHandler:`, que el
-delegado no implementaba, así que el enlace abría la app y se perdía. Ahora su `webpageURL` va a
-`urlOpened`, lo mismo que un esquema propio, en arranque en frío y con la app abierta. Comprobado con
-`clang -fsyntax-only` contra UIKit (Mac Catalyst); falta verlo en un iPhone, que pide firma y el derecho.
+An https link associated with the app (that of a Rooms meeting, `rooms.<dominio>/?rooms=<id>`, with
+`apple-app-site-association` and the `associated-domains` entitlement) does not arrive through `openURL`: iOS delivers it as an
+`NSUserActivity` of type `BrowsingWeb` to `application:continueUserActivity:restorationHandler:`, which the
+delegate did not implement, so the link opened the app and was lost. Now its `webpageURL` goes to
+`urlOpened`, the same as a custom scheme, on cold start and with the app open. Checked with
+`clang -fsyntax-only` against UIKit (Mac Catalyst); it still has to be seen on an iPhone, which requires signing and the entitlement.
 
-## `v2.8.1-sytue.10` (2026-09-25): los `fyne.Do` de antes del bucle de eventos, en el hilo principal
+<a id="v281-sytue10-2026-09-25-los-fynedo-de-antes-del-bucle-de-eventos-en-el-hilo-principal"></a>
+## `v2.8.1-sytue.10` (2026-09-25): `fyne.Do` calls from before the event loop, on the main thread
 
-Etiqueta anotada sobre `ae1ae7880` de la rama `sytue-cola-temprana`, encima de `.9`; el parche exportado es
-**`0008-mobile-queue-early-fyne-do.patch`** (2 ficheros, con su prueba en `driver_test.go`).
+Annotated tag on `ae1ae7880` of the `sytue-cola-temprana` branch, on top of `.9`; the exported patch is
+**`0008-mobile-queue-early-fyne-do.patch`** (2 files, with its test in `driver_test.go`).
 
-En el móvil, una rutina que terminaba ANTES de que `Run` creara la cola ejecutaba su `fyne.Do` en su propia
-rutina, a la vez que el hilo principal, y reventaba en el conformador de texto (CertiPDF en el Simulador de iOS:
-una petición que falla nada más arrancar). Ahora la cola existe desde `NewGoMobileDriver` y esas llamadas corren
-en el hilo principal en cuanto arranca el bucle.
+On mobile, a goroutine that finished BEFORE `Run` created the queue ran its `fyne.Do` in its own
+goroutine, at the same time as the main thread, and crashed in the text shaper (CertiPDF in the iOS Simulator:
+a request that fails right at startup). Now the queue exists from `NewGoMobileDriver` and those calls run
+on the main thread as soon as the loop starts.
 
-## `v2.8.1-sytue.11` (2026-09-25): iOS adopta el ciclo de vida por escenas
+<a id="v281-sytue11-2026-09-25-ios-adopta-el-ciclo-de-vida-por-escenas"></a>
+## `v2.8.1-sytue.11` (2026-09-25): iOS adopts the scene-based lifecycle
 
-Etiqueta anotada sobre `417dce3e8`, la cabeza de `sytue-cola-temprana`; el parche exportado es
-**`0009-ios-scene-lifecycle.patch`** (1 fichero, `darwin_ios.m`). Desde el 2026-09-25 la rama `sytue` del fork
-apunta aquí (avance rápido desde `.5`, sin commit de fusión), así que la próxima versión sale de `sytue`.
+Annotated tag on `417dce3e8`, the head of `sytue-cola-temprana`; the exported patch is
+**`0009-ios-scene-lifecycle.patch`** (1 file, `darwin_ios.m`). Since 2026-09-25 the fork's `sytue` branch
+points here (fast-forward from `.5`, without a merge commit), so the next version comes from `sytue`.
 
-Compiladas con el SDK de iOS 27, las apps que no adoptan `UIScene` mueren al arrancar en
-`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` (las trece en el Simulador de iOS 27). El
-delegado de la aplicación entrega cada sesión a `GoAppSceneDelegate`, dueño de la ventana, que recibe lo que las
-escenas quitan al delegado: las URL entrantes (`scene:openURLContexts:` y las de `connectionOptions` en frío), los
-Universal Links (`continueUserActivity`) y el paso a primer y segundo plano. Para probarlo sin cuenta de Apple:
+Built with the iOS 27 SDK, apps that do not adopt `UIScene` die on startup in
+`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` (all thirteen in the iOS 27 Simulator). The
+application delegate hands each session to `GoAppSceneDelegate`, the owner of the window, which receives what the
+scenes take away from the delegate: incoming URLs (`scene:openURLContexts:` and those in `connectionOptions` on cold start), the
+Universal Links (`continueUserActivity`) and the transitions to foreground and background. To test it without an Apple account:
 `bash apps/fyne/scripts/empaquetar.sh iossimulator <app>`.
 
-## `v2.8.1-sytue.16` (2026-10-04): mantenimiento de Entry y validación del fork
+<a id="v281-sytue16-2026-10-04-mantenimiento-de-entry-y-validación-del-fork"></a>
+## `v2.8.1-sytue.16` (2026-10-04): Entry maintenance and fork validation
 
-[Release estable](https://github.com/thinkddr/fyne/releases/tag/v2.8.1-sytue.16) y
-[comparación completa con `.15`](https://github.com/thinkddr/fyne/compare/v2.8.1-sytue.15...v2.8.1-sytue.16).
-El refresco de `Entry` recalcula el desplazamiento cuando Deshacer devuelve texto que cabe en el área visible.
-La identidad de la caché de fuentes conserva la dirección de sus bytes sin usar `unsafe`; el tratamiento del
-foco y del clic que cierra una capa se extrae en helpers sin cambiar sus condiciones. El resto son pruebas,
-referencias visuales revisadas, CI y documentación del fork. No cambian el módulo canónico, sus dependencias,
-`LICENSE` ni `AUTHORS`; sigue siendo BSD-3-Clause. No añade soporte de arrastrar y soltar en iOS ni cambia
-los bridges nativos. Las pruebas de software no sustituyen una prueba en ventana o dispositivo.
+[Stable release](https://github.com/thinkddr/fyne/releases/tag/v2.8.1-sytue.16) and
+[full comparison with `.15`](https://github.com/thinkddr/fyne/compare/v2.8.1-sytue.15...v2.8.1-sytue.16).
+The `Entry` refresh recalculates the scroll offset when Undo restores text that fits in the visible area.
+The identity of the font cache keeps the address of its bytes without using `unsafe`; the handling of
+focus and of the click that closes a layer is extracted into helpers without changing their conditions. The rest are tests,
+reviewed visual references, CI and fork documentation. The canonical module, its dependencies,
+`LICENSE` and `AUTHORS` do not change; it is still BSD-3-Clause. It does not add drag-and-drop support on iOS or change
+the native bridges. Software tests are no substitute for a test in a window or on a device.
 
-## `v2.8.1-sytue.15` (2026-09-28): una tecla soltada ya no se escribe otra vez en Android
+<a id="v281-sytue15-2026-09-28-una-tecla-soltada-ya-no-se-escribe-otra-vez-en-android"></a>
+## `v2.8.1-sytue.15` (2026-09-28): a released key is no longer typed again on Android
 
-`.14` más `d943ebc78` («fix(mobile/android): map key event actions, not key states, to directions»), en la
-rama `sytue-teclado-android`. `processKey` comparaba `AKeyEvent_getAction` —`AKEY_EVENT_ACTION_DOWN` (0) y
-`_UP` (1)— con `AKEY_STATE_DOWN` (1) y `_UP` (0), que son estados de tecla y valen al revés: cada tecla
-soltada llegaba como pulsada. Con el teclado en pantalla abierto el IME escribe la pulsación por el
-`TextWatcher` y la suelta volvía como una segunda pulsación, así que un teclado físico (o `adb shell input
-text`) escribía cada letra dos veces («MMuuyy bbuueennoo», medido en el emulador de la API 36). Parche
-exportado: **`0013-android-key-direction.patch`**; `TestKeyDirection` falla con la comparación vieja.
+`.14` plus `d943ebc78` (“fix(mobile/android): map key event actions, not key states, to directions”), on the
+`sytue-teclado-android` branch. `processKey` compared `AKeyEvent_getAction` —`AKEY_EVENT_ACTION_DOWN` (0) and
+`_UP` (1)— with `AKEY_STATE_DOWN` (1) and `_UP` (0), which are key states and have the opposite values: every
+released key arrived as pressed. With the on-screen keyboard open the IME types the press through the
+`TextWatcher` and the release came back as a second press, so a physical keyboard (or `adb shell input
+text`) typed every letter twice («MMuuyy bbuueennoo», measured on the API 36 emulator). Exported
+patch: **`0013-android-key-direction.patch`**; `TestKeyDirection` fails with the old comparison.
 
-## `v2.8.1-sytue.14` (2026-09-28): una fuente del tema se reconoce por sus bytes
+<a id="v281-sytue14-2026-09-28-una-fuente-del-tema-se-reconoce-por-sus-bytes"></a>
+## `v2.8.1-sytue.14` (2026-09-28): a theme font is identified by its bytes
 
-`.13` más `bec3cd530` («painter: identify a theme font by its bytes, not by the Resource value»): la caché de
-fuentes de `.13` usaba como clave el `fyne.Resource` que da el tema, y dos recursos distintos con los mismos
-bytes contaban como dos fuentes. Es la versión de la release. Parche exportado:
-**`0012-font-cache-keyed-by-bytes.patch`** (`internal/painter/font.go` y su prueba). Un `Resource` de tipo no
-comparable además reventaba como clave de mapa; `TestCachedFontFace_FreshResourceSameBytes` y
-`TestCachedFontFace_ResourceNotComparable` fallan con `.13`.
+`.13` plus `bec3cd530` (“painter: identify a theme font by its bytes, not by the Resource value”): the font
+cache in `.13` used the `fyne.Resource` given by the theme as its key, and two different resources with the same
+bytes counted as two fonts. It is the release version. Exported patch:
+**`0012-font-cache-keyed-by-bytes.patch`** (`internal/painter/font.go` and its test). A `Resource` of a non-comparable
+type also crashed as a map key; `TestCachedFontFace_FreshResourceSameBytes` and
+`TestCachedFontFace_ResourceNotComparable` fail with `.13`.
 
-## `v2.8.1-sytue.13` (2026-09-28): la memoria de lo que se tematiza y el alfa del framebuffer
+<a id="v281-sytue13-2026-09-28-la-memoria-de-lo-que-se-tematiza-y-el-alfa-del-framebuffer"></a>
+## `v2.8.1-sytue.13` (2026-09-28): the memory of what is themed and the framebuffer alpha
 
-Etiqueta anotada sobre `5a25290db` de la rama `sytue-13` de `github.com/thinkddr/fyne`, encima de `.12`
-(`b2a8bdfcb`). Dos parches, exportados juntos en **`0011-theme-override-memory-and-opaque-framebuffer.patch`**:
+Annotated tag on `5a25290db` of the `sytue-13` branch of `github.com/thinkddr/fyne`, on top of `.12`
+(`b2a8bdfcb`). Two patches, exported together in **`0011-theme-override-memory-and-opaque-framebuffer.patch`**:
 
-- **`77c580ac4` — memoria.** Todo objeto puesto bajo un `ThemeOverride` quedaba vivo hasta el final del
-  proceso: el tema que se guarda contra cada objeto apuntaba al contenedor (que contiene esos objetos), el
-  mapa de ámbitos guardaba los objetos mismos, y la caché de fuentes iba por ámbito, así que cada override
-  nuevo volvía a analizar texto, emoji y símbolos y se quedaba la copia. Medido con los tests de Mail: al
-  acabar seguían vivas las 78 pantallas (1 GB, +180 MB por cada `-count`, y el OOM con `-race -count=20`);
-  con el parche queda una y 44 MB, y no crece. En el recorrido de calendario (55 modales, `-race`), el heap vivo al
-  acabar baja de 1553 MB a 168 MB y el RSS máximo de 8,4 GB a 1,1 GB. Guardianes `TestThemeOverride_DoesNotRetainContent` y
-  `TestCachedFontFace_SharedAcrossOverrideScopes`, vistos en rojo con cada cambio deshecho.
-- **`5a25290db` — alfa opaco.** `BlendFuncSeparate(src, dst, ONE, dst)`: el color con los factores de
-  siempre y el alfa acumulando hacia 1. Con `srcAlpha/oneMinusSrcAlpha` también en el alfa, cada borde
-  suavizado dejaba alfa < 1 sobre color no premultiplicado y KWin, que compone premultiplicado, pintaba
-  flecos de color en todo borde redondeado. Comprobado en un Plasma real; por eso se quita el forzado de
-  XWayland en KDE (`apps/fyne/sesion/plataforma_linux.go`).
+- **`77c580ac4` — memory.** Every object placed under a `ThemeOverride` stayed alive until the end of the
+  process: the theme stored against each object pointed to the container (which contains those objects), the
+  scope map stored the objects themselves, and the font cache was per scope, so every new override
+  re-analyzed text, emoji and symbols and kept the copy. Measured with the Mail tests: at the
+  end all 78 screens were still alive (1 GB, +180 MB per `-count`, and OOM with `-race -count=20`);
+  with the patch one remains and 44 MB, and it does not grow. In the calendar walkthrough (55 modals, `-race`), the live heap at the
+  end drops from 1553 MB to 168 MB and the maximum RSS from 8.4 GB to 1.1 GB. Guards `TestThemeOverride_DoesNotRetainContent` and
+  `TestCachedFontFace_SharedAcrossOverrideScopes`, seen red with each change undone.
+- **`5a25290db` — opaque alpha.** `BlendFuncSeparate(src, dst, ONE, dst)`: color with the usual
+  factors and alpha accumulating towards 1. With `srcAlpha/oneMinusSrcAlpha` on alpha as well, every
+  anti-aliased edge left alpha < 1 over non-premultiplied color and KWin, which composites premultiplied, painted
+  colored fringes on every rounded edge. Checked on a real Plasma; that is why forcing
+  XWayland on KDE is removed (`apps/fyne/sesion/plataforma_linux.go`).
 
-La suite del fork falla lo mismo que con `.12` (las imágenes de referencia, en ARM64), `go vet` pasa con y sin
+The fork's suite fails the same as with `.12` (the reference images, on ARM64); `go vet` passes with and without
 `gles`.
 
-## `v2.8.1-sytue.12` (2026-09-26): macOS entrega los documentos abiertos
+<a id="v281-sytue12-2026-09-26-macos-entrega-los-documentos-abiertos"></a>
+## `v2.8.1-sytue.12` (2026-09-26): macOS delivers opened documents
 
-Etiqueta anotada sobre `b2a8bdfcb` de la rama `sytue-abrir-documentos`, encima de `.11` (`417dce3e8`); el parche
-exportado es **`0010-macos-open-documents.patch`** (2 ficheros, `app/incoming_urls_darwin.{go,m}`, 39 líneas
-añadidas).
+Annotated tag on `b2a8bdfcb` of the `sytue-abrir-documentos` branch, on top of `.11` (`417dce3e8`); the exported
+patch is **`0010-macos-open-documents.patch`** (2 files, `app/incoming_urls_darwin.{go,m}`, 39 lines
+added).
 
-El Finder, `open fichero` y «Abrir con» no pasan argumentos: mandan el Apple Event `kAEOpenDocuments` con una
-lista de ficheros, y el fork solo atendía `kAEGetURL`. Ahora cada fichero entra como `file://` por el mismo
-`urlhandler`. El manejador se instala en `applicationWillFinishLaunching` (y además al registrar, por si ya
-terminó de arrancar): AppKit pone el suyo al terminar de arrancar y pisaría uno instalado antes, y los
-documentos del arranque llegan justo después. Es lo que necesitan los `CFBundleDocumentTypes` de #1128.
+The Finder, `open fichero` and “Open With” do not pass arguments: they send the `kAEOpenDocuments` Apple Event with a
+list of files, and the fork only handled `kAEGetURL`. Now each file comes in as `file://` through the same
+`urlhandler`. The handler is installed in `applicationWillFinishLaunching` (and also on registration, in case it has already
+finished launching): AppKit installs its own when it finishes launching and would overwrite one installed earlier, and the
+startup documents arrive right after. It is what the `CFBundleDocumentTypes` of #1128 need.
 
-## `0014-ios-document-picker-import-mode.patch`: selector de documentos en iOS sin iCloud
+<a id="0014-ios-document-picker-import-modepatch-selector-de-documentos-en-ios-sin-icloud"></a>
+## `0014-ios-document-picker-import-mode.patch`: document picker on iOS without iCloud
 
-Exportado en **`0014-ios-document-picker-import-mode.patch`** (2 ficheros, `darwin_ios.m` y `file_ios.m`).
+Exported in **`0014-ios-document-picker-import-mode.patch`** (2 files, `darwin_ios.m` and `file_ios.m`).
 
-`UIDocumentPickerModeOpen` y `UIDocumentPickerModeMoveToService` exigen el derecho de contenedor de iCloud
-(`com.apple.developer.icloud-container-identifiers`). Al invocarse en una app sin ese derecho (todas las
-apps que abren ficheros de terceros), UIKit lanza `NSInternalInconsistencyException` y mata el proceso.
-Cambiando a `UIDocumentPickerModeImport` y `UIDocumentPickerModeExportToService`, el selector del sistema
-permite abrir y guardar ficheros desde Archivos, iCloud Drive, proveedores en la nube y almacenamiento local
-sin exigir el derecho de iCloud. Además, se añade `startAccessingSecurityScopedResource` para que la lectura
-de URL de sandbox funcione con seguridad y sin violaciones de acceso.
+`UIDocumentPickerModeOpen` and `UIDocumentPickerModeMoveToService` require the iCloud container entitlement
+(`com.apple.developer.icloud-container-identifiers`). When invoked in an app without that entitlement (all the
+apps that open third-party files), UIKit throws `NSInternalInconsistencyException` and kills the process.
+By switching to `UIDocumentPickerModeImport` and `UIDocumentPickerModeExportToService`, the system picker
+allows opening and saving files from Files, iCloud Drive, cloud providers and local storage
+without requiring the iCloud entitlement. In addition, `startAccessingSecurityScopedResource` is added so that reading
+sandboxed URLs works securely and without access violations.

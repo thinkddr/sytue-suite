@@ -1,27 +1,30 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright (c) 2026 Daniel Delgado Ramos (thinkddr) -->
 
-# Instalar Sytue Suite
+<a id="instalar-sytue-suite"></a>
+# Install Sytue Suite
 
-Tres comandos y un asistente que hace el resto: comprueba los requisitos, genera todas
-las contraseñas y claves, construye la suite, la arranca, crea tu cuenta de
-administrador y verifica que todo responde.
+Three commands and a wizard that does the rest: it checks the requirements, generates all
+the passwords and keys, builds the suite, starts it, creates your
+administrator account and verifies that everything responds.
 
 ---
 
-## 1. Antes de empezar
+<a id="1-antes-de-empezar"></a>
+## 1. Before you start
 
-| Necesitas | Cómo comprobarlo | Si no lo tienes |
+| You need | How to check | If you don't have it |
 | --- | --- | --- |
-| **Docker** con **4 GB de memoria** (la suite completa arrancada usa ~1,4 GB; la primera construcción compila en paralelo y agradece 8 GB) | `docker info` | [Docker Desktop](https://docs.docker.com/get-docker/) (macOS/Windows) o Docker Engine (Linux). En Docker Desktop: *Settings → Resources → Memory*. |
-| **mkcert** (HTTPS local de confianza) | `mkcert -version` | macOS: `brew install mkcert nss` · Debian/Ubuntu: `sudo apt install mkcert libnss3-tools` · Windows: `choco install mkcert` |
-| **git**, **bash** y **openssl** | `git --version` | Vienen con macOS y Linux. En Windows, usa WSL 2. |
+| **Docker** with **4 GB of memory** (the full suite, once running, uses ~1.4 GB; the first build compiles in parallel and benefits from 8 GB) | `docker info` | [Docker Desktop](https://docs.docker.com/get-docker/) (macOS/Windows) or Docker Engine (Linux). In Docker Desktop: *Settings → Resources → Memory*. |
+| **mkcert** (trusted local HTTPS) | `mkcert -version` | macOS: `brew install mkcert nss` · Debian/Ubuntu: `sudo apt install mkcert libnss3-tools` · Windows: `choco install mkcert` |
+| **git**, **bash** and **openssl** | `git --version` | They come with macOS and Linux. On Windows, use WSL 2. |
 
-Unos **30 GB de disco** libres (la primera construcción llega a ~25 GB entre imágenes y caché) y los puertos **80** y **443** de tu equipo sin usar.
+About **30 GB of free disk space** (the first build reaches ~25 GB between images and cache) and ports **80** and **443** on your machine unused.
 
 ---
 
-## 2. Instalar
+<a id="2-instalar"></a>
+## 2. Install
 
 ```bash
 git clone https://github.com/thinkddr/sytue-suite.git
@@ -29,43 +32,44 @@ cd sytue-suite
 ./sytue-deploy
 ```
 
-Pulsa **Enter** en cada pregunta para quedarte con la opción recomendada. El asistente
-recorre cinco pasos:
+Press **Enter** at each question to keep the recommended option. The wizard
+walks through five steps (its prompts are printed in Spanish; the step and option names below are quoted exactly as shown):
 
-1. **Dónde instalar** → *En este equipo con Docker* (para un servidor con tu dominio, mira la [sección 6](#6-instalar-en-un-servidor-con-tu-dominio)).
-2. **Requisitos** → comprueba Docker, su memoria, mkcert y los puertos. Si falta algo, te
-   dice cómo instalarlo y se detiene sin tocar nada.
-3. **Servicios** → *Suite completa*, *Ofimática* (menos memoria), *Mínimo* o *A medida*.
-4. **Configuración y secretos** → elige la contraseña del administrador (Enter = una
-   aleatoria) y, si quieres, un proveedor para Sytue AI. Genera `deploy/compose/.env` con
-   claves únicas para tu equipo (permisos 0600, Git lo ignora).
-5. **Construcción y arranque** → crea el certificado HTTPS local, construye las imágenes
-   (**la primera vez tarda entre 15 y 40 minutos**; después es casi inmediato), arranca los
-   contenedores, crea tu administrador en Sytue ID, espera a que todos los servicios estén
-   sanos y lanza una verificación de extremo a extremo.
+1. **Dónde instalar** (where to install) → *En este equipo con Docker* (on this machine with Docker) (for a server with your domain, see [section 6](#6-instalar-en-un-servidor-con-tu-dominio)).
+2. **Requisitos** (requirements) → checks Docker, its memory, mkcert and the ports. If something is missing, it
+   tells you how to install it and stops without touching anything.
+3. **Servicios** (services) → *Suite completa* (full suite), *Ofimática* (office; less memory), *Mínimo* (minimal) or *A medida* (custom).
+4. **Configuración y secretos** (configuration and secrets) → choose the administrator password (Enter = a
+   random one) and, if you want, a provider for Sytue AI. It generates `deploy/compose/.env` with
+   keys unique to your machine (permissions 0600, ignored by Git).
+5. **Construcción y arranque** (build and startup) → creates the local HTTPS certificate, builds the images
+   (**the first time takes between 15 and 40 minutes**; afterwards it is almost immediate), starts the
+   containers, creates your administrator in Sytue ID, waits for all services to be
+   healthy and runs an end-to-end verification.
 
-¿Sin preguntas? `./sytue-deploy --yes` instala la suite completa con los valores
-recomendados (`--profile office` para la versión ligera).
+No questions? `./sytue-deploy --yes` installs the full suite with the recommended
+values (`--profile office` for the lightweight version).
 
 ---
 
-## 3. Entrar
+<a id="3-entrar"></a>
+## 3. Sign in
 
-Al terminar, el asistente muestra tus credenciales. Abre **https://one.sytue.localhost**:
+When it finishes, the wizard shows your credentials. Open **https://one.sytue.localhost**:
 
-| Campo | Valor |
+| Field | Value |
 | --- | --- |
-| Correo | `admin@sytue.localhost` |
-| Contraseña | la que elegiste o la que generó el asistente (está en `deploy/compose/.env`, variable `SYTUE_ID_DEV_SEED_PASSWORD`) |
-| Código de verificación | la cuenta de administración pide un segundo factor: añade a tu app de autenticación (Google Authenticator, 1Password, Aegis…) la clave **`JBSWY3DPEHPK3PXP`** |
+| Email | `admin@sytue.localhost` |
+| Password | the one you chose or the one the wizard generated (it is in `deploy/compose/.env`, variable `SYTUE_ID_DEV_SEED_PASSWORD`) |
+| Verification code | the administration account asks for a second factor: add the key **`JBSWY3DPEHPK3PXP`** to your authenticator app (Google Authenticator, 1Password, Aegis…) |
 
-En la pantalla de acceso, marca la casilla de **verificación humana** antes de pulsar
-*Continuar* (se resuelve sola en un segundo). `member@sytue.localhost`, con la misma
-contraseña y sin segundo factor, es una cuenta de usuario normal (sin acceso a Sytue Admin).
+On the sign-in screen, tick the **human verification** checkbox before pressing
+*Continue* (it solves itself in a second). `member@sytue.localhost`, with the same
+password and no second factor, is a regular user account (without access to Sytue Admin).
 
-Cada aplicación vive en su subdominio:
+Each application lives on its own subdomain:
 
-| Aplicación | Dirección |
+| Application | Address |
 | --- | --- |
 | Sytue One (portal) | https://one.sytue.localhost |
 | Sytue Admin | https://admin.sytue.localhost |
@@ -74,94 +78,98 @@ Cada aplicación vive en su subdominio:
 | Rooms · Notepads | https://rooms.sytue.localhost · https://notes.sytue.localhost |
 | SyERP · Cast · Web · Bases | https://erp.sytue.localhost · https://cast.sytue.localhost · https://web.sytue.localhost · https://bases.sytue.localhost |
 | Sytue Cloud | https://cloud.sytue.localhost |
-| Sitio público | https://www.sytue.localhost |
+| Public website | https://www.sytue.localhost |
 
-`*.sytue.localhost` apunta a tu propio equipo sin configurar nada: los navegadores
-resuelven `.localhost` a `127.0.0.1`.
+`*.sytue.localhost` points to your own machine without any configuration: browsers
+resolve `.localhost` to `127.0.0.1`.
 
-> **Limitación conocida del modo local.** Varias apps guardan tus datos cifrados en el
-> dispositivo con claves custodiadas por el servidor de mensajería cifrada (Matrix), que
-> producción despliega y el entorno local **todavía no incluye**. Hasta entonces, en local
-> funcionan Sytue Admin, Sytue Web, Sytue Cloud y Sytue Cast; Mail, Drive, Docus, Calcus,
-> Diapos, CertiPDF, Calendar, Contacts, Notepads, Rooms, SyERP, Bases y la portada del
-> portal se quedan en «Cargando…». Lo mismo ocurre en el entorno local de sytue-one.
+> **Known limitation of local mode.** Several apps store your data encrypted on the
+> device with keys held by the encrypted messaging server (Matrix), which
+> production deploys and the local environment **does not include yet**. Until then, locally
+> Sytue Admin, Sytue Web, Sytue Cloud and Sytue Cast work; Mail, Drive, Docus, Calcus,
+> Diapos, CertiPDF, Calendar, Contacts, Notepads, Rooms, SyERP, Bases and the portal's
+> home page stay on “Loading…”. The same happens in the sytue-one local environment.
 
 ---
 
-## 4. Día a día
+<a id="4-día-a-día"></a>
+## 4. Day to day
 
-| Quiero… | Comando |
+| I want to… | Command |
 | --- | --- |
-| Parar la suite (conserva los datos) | `make dev-down` |
-| Volver a arrancarla | `make dev-up` |
-| Ver el estado de cada servicio | `make dev-ps` |
-| Ver los logs de un servicio | `make dev-logs SVC=id` |
-| Actualizar a la última versión | `git pull && ./sytue-deploy` (reutiliza tu configuración y tus datos) |
-| Cargar datos de ejemplo | `make dev-demo` |
-| Empezar de cero (**borra todos los datos**) | `./sytue-deploy --reset` |
+| Stop the suite (keeps the data) | `make dev-down` |
+| Start it again | `make dev-up` |
+| See the status of each service | `make dev-ps` |
+| See a service's logs | `make dev-logs SVC=id` |
+| Update to the latest version | `git pull && ./sytue-deploy` (reuses your configuration and your data) |
+| Load sample data | `make dev-demo` |
+| Start from scratch (**deletes all data**) | `./sytue-deploy --reset` |
 
 ---
 
-## 5. Si algo falla
+<a id="5-si-algo-falla"></a>
+## 5. If something fails
 
-- **«Docker está instalado pero no responde»** → abre Docker Desktop (o `colima start`,
-  o `sudo systemctl start docker`) y vuelve a ejecutar `./sytue-deploy`.
-- **El navegador avisa de un certificado no válido** → ejecuta `mkcert -install` y
-  reinicia el navegador.
-- **Un servicio se queda reiniciándose** → `make dev-ps` para ver cuál y
-  `make dev-logs SVC=<servicio>` para ver por qué. Si es por memoria, sube la de Docker o
-  instala la versión ligera: `./sytue-deploy --profile office`.
-- **«password authentication failed» tras borrar `deploy/compose/.env`** → las
-  contraseñas de las bases de datos se fijan la primera vez; sin aquel `.env`, empieza de
-  cero con `./sytue-deploy --reset`.
-- **Comprobar que todo responde** → `scripts/e2e/smoke.sh` (el asistente lo ejecuta al
-  final y guarda el resultado en `deploy/compose/.verificacion.log`).
+- **«Docker está instalado pero no responde»** (Docker is installed but not responding) → open Docker Desktop (or `colima start`,
+  or `sudo systemctl start docker`) and run `./sytue-deploy` again.
+- **The browser warns about an invalid certificate** → run `mkcert -install` and
+  restart the browser.
+- **A service keeps restarting** → `make dev-ps` to see which one and
+  `make dev-logs SVC=<servicio>` to see why. If it is due to memory, increase Docker's memory or
+  install the lightweight version: `./sytue-deploy --profile office`.
+- **“password authentication failed” after deleting `deploy/compose/.env`** → the
+  database passwords are set the first time; without that `.env`, start from
+  scratch with `./sytue-deploy --reset`.
+- **Check that everything responds** → `scripts/e2e/smoke.sh` (the wizard runs it at the
+  end and saves the result in `deploy/compose/.verificacion.log`).
 
 ---
 
-## 6. Instalar en un servidor con tu dominio
+<a id="6-instalar-en-un-servidor-con-tu-dominio"></a>
+## 6. Install on a server with your domain
 
-Toda la suite en **una sola máquina Linux con Docker**, accesible como
-`https://<app>.tu-dominio` y con certificados de **Let's Encrypt** que se renuevan solos.
+The whole suite on **a single Linux machine with Docker**, reachable as
+`https://<app>.tu-dominio` and with **Let's Encrypt** certificates that renew themselves.
 
-**Antes:** un registro DNS comodín `*.suite.tuempresa.eu` (y `suite.tuempresa.eu`)
-apuntando a la IP del servidor, y abiertos los puertos `80` y `443/TCP` (web y
-certificados), `7881/TCP` y `50000-50100/UDP` (videollamadas). No hace falta mkcert.
+**Beforehand:** a wildcard DNS record `*.suite.tuempresa.eu` (and `suite.tuempresa.eu`)
+pointing to the server's IP, and ports `80` and `443/TCP` open (web and
+certificates), plus `7881/TCP` and `50000-50100/UDP` (video calls). mkcert is not needed.
 
 ```bash
 ./sytue-deploy --mode servidor --domain suite.tuempresa.eu --acme-email tu@tuempresa.eu
 ```
 
-El asistente te pregunta además:
+The wizard also asks you:
 
-- **Quién la usa** (`--usuarios`):
-  - `uno`: solo tu cuenta, sin registro público. Ideal para uso personal.
-  - `varios` (por defecto): un equipo. Invitas a cada persona desde
-    `https://admin.suite.tuempresa.eu`; con `--registro-abierto`, además, cualquiera puede
-    crearse una cuenta en `https://id.suite.tuempresa.eu/signup` (`--registro-cerrado` lo
-    vuelve a cerrar).
-- **Propietario** (`--admin-email`) y **organización** (`--org-slug`). La contraseña del
-  propietario se genera y queda en `deploy/compose/.env` (`SYTUE_PROPIETARIO_PASSWORD`).
-  Al entrar por primera vez, activa la verificación en dos pasos en
+- **Who uses it** (`--usuarios`):
+  - `uno`: only your account, no public sign-up. Ideal for personal use.
+  - `varios` (default): a team. You invite each person from
+    `https://admin.suite.tuempresa.eu`; with `--registro-abierto`, in addition, anyone can
+    create an account at `https://id.suite.tuempresa.eu/signup` (`--registro-cerrado`
+    closes it again).
+- **Owner** (`--admin-email`) and **organization** (`--org-slug`). The owner's password
+  is generated and stored in `deploy/compose/.env` (`SYTUE_PROPIETARIO_PASSWORD`).
+  When you sign in for the first time, enable two-step verification at
   `https://id.suite.tuempresa.eu/account`.
 
-Para una **red local o pruebas** sin Internet, usa `--tls interno` (certificados de
-mkcert: cada equipo que entre debe confiar en su CA, `mkcert -CAROOT`).
+For a **local network or testing** without Internet, use `--tls interno` (mkcert
+certificates: every machine that connects must trust its CA, `mkcert -CAROOT`).
 
-Volver a ejecutar el mismo comando es seguro: reutiliza la configuración, construye solo lo
-que cambió y vuelve a levantar lo que estuviera parado. Así se cambia también el modo de
-usuarios (`--usuarios uno|varios`) sin tocar los datos. `--reset` empieza de cero
-**borrando los datos**.
+Running the same command again is safe: it reuses the configuration, builds only what
+changed and brings back up whatever was stopped. This is also how you change the
+user mode (`--usuarios uno|varios`) without touching the data. `--reset` starts from scratch
+**deleting the data**.
 
-> SMTP e IMAP para clientes de correo externos no se publican en este modo: el correo web
-> funciona completo. Para publicar un servidor de correo, usa el clúster (sección 8).
+> SMTP and IMAP for external mail clients are not published in this mode: webmail
+> works fully. To publish a mail server, use the cluster (section 8).
 
 ---
 
-## 7. Todo en un solo contenedor
+<a id="7-todo-en-un-solo-contenedor"></a>
+## 7. Everything in a single container
 
-El mismo modo servidor, empaquetado en **un contenedor y un volumen**: dentro corre su
-propio Docker (Docker in Docker, por eso pide `--privileged`) con toda la suite.
+The same server mode, packaged in **one container and one volume**: inside it runs its
+own Docker (Docker in Docker, which is why it needs `--privileged`) with the whole suite.
 
 ```bash
 docker build -f deploy/todo-en-uno/Dockerfile -t sytue-suite .
@@ -174,25 +182,26 @@ docker run -d --name sytue --privileged --restart unless-stopped \
 docker logs -f sytue          # la primera vez construye la suite dentro (20-60 min)
 ```
 
-Sin `SYTUE_DOMINIO`, se queda en `https://one.suite.localhost` para probarla en tu propio
-equipo (certificados internos: `docker cp sytue:/datos/ca/rootCA.pem .` e impórtalo
-como autoridad de confianza). Todas las variables están en la cabecera de
-[`deploy/todo-en-uno/Dockerfile`](deploy/todo-en-uno/Dockerfile). Todo lo que hay que
-conservar vive en el volumen `sytue-datos`: borrar el contenedor no borra la suite.
+Without `SYTUE_DOMINIO`, it stays on `https://one.suite.localhost` so you can try it on your own
+machine (internal certificates: `docker cp sytue:/datos/ca/rootCA.pem .` and import it
+as a trusted authority). All the variables are in the header of
+[`deploy/todo-en-uno/Dockerfile`](deploy/todo-en-uno/Dockerfile). Everything that must be
+kept lives in the `sytue-datos` volume: deleting the container does not delete the suite.
 
 ---
 
-## 8. Instalar en un clúster Kubernetes (avanzado)
+<a id="8-instalar-en-un-clúster-kubernetes-avanzado"></a>
+## 8. Install on a Kubernetes cluster (advanced)
 
-Para producción con tu propio dominio. Necesitas `kubectl`, `helm`, un registro de
-imágenes, PostgreSQL 16+ y almacenamiento S3.
+For production with your own domain. You need `kubectl`, `helm`, an image
+registry, PostgreSQL 16+ and S3 storage.
 
 ```bash
 ./sytue-deploy --mode helm
 ```
 
-El asistente pide dominio, registro, PostgreSQL, S3 y el propietario inicial, y genera en
-`deploy/helm/` (fuera de Git) todo lo necesario. Al final imprime los siete comandos a
-ejecutar en orden: publicar las imágenes en tu registro, crear las bases de datos,
-aplicar los Secrets, instalar el chart y crear el propietario. Detalle y referencia de
-variables: [`docs/operations.md`](docs/operations.md#13-prod-en-scaleway-terraform--helm).
+The wizard asks for the domain, registry, PostgreSQL, S3 and the initial owner, and generates in
+`deploy/helm/` (outside Git) everything needed. At the end it prints the seven commands to
+run in order: push the images to your registry, create the databases,
+apply the Secrets, install the chart and create the owner. Details and variable
+reference: [`docs/operations.md`](docs/operations.md#13-prod-en-scaleway-terraform--helm).

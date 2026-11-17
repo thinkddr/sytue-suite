@@ -1,41 +1,43 @@
 # Sytue Contacts (`services/contacts`)
 
-Servidor de contactos **Sytue-native** de la suite **Sytue One**: libretas de
-direcciones, contactos y grupos. Reimplementación **clean-room** sobre estándares
-abiertos (**vCard 4.0 — RFC 6350** y **CardDAV — RFC 6352**) con una **API REST
-propia**. Código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas
-(BSD/MIT/Apache): `emersion/go-webdav` (CardDAV) y `emersion/go-vcard` (MIT).
+**Sytue-native** contacts server of the **Sytue One** suite: address
+books, contacts and groups. A **clean-room** reimplementation on open standards
+(**vCard 4.0 — RFC 6350** and **CardDAV — RFC 6352**) with its **own REST
+API**. Code Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); permissive third-party dependencies only
+(BSD/MIT/Apache): `emersion/go-webdav` (CardDAV) and `emersion/go-vcard` (MIT).
 
-- **Puerto:** `8088` (HTTP + CardDAV) · **Subdominio:** `contacts.sytue.eu`
-- **Datastore:** PostgreSQL (libretas, tarjetas, contactos, grupos, outbox de
-  eventos) — única fuente de verdad. **Sin Redis/Valkey. Sin Object Storage**
-  (las fotos se referencian por URL, no se embeben).
-- **Auth:** JWT de **Sytue ID** validado vía JWKS (`platform/pkg/authn`).
-- **Multi-tenant:** aislamiento por **RLS** en PostgreSQL (`app.tenant`).
+- **Port:** `8088` (HTTP + CardDAV) · **Subdomain:** `contacts.sytue.eu`
+- **Datastore:** PostgreSQL (address books, cards, contacts, groups, event
+  outbox) — single source of truth. **No Redis/Valkey. No Object Storage**
+  (photos are referenced by URL, not embedded).
+- **Auth:** **Sytue ID** JWT validated via JWKS (`platform/pkg/authn`).
+- **Multi-tenant:** isolation via **RLS** in PostgreSQL (`app.tenant`).
 
-## Capacidades
+<a id="capacidades"></a>
+## Capabilities
 
-- **Libretas de direcciones (colecciones CardDAV):** por usuario/tenant, libreta
-  por defecto autogestionada, crear / renombrar / borrar (soft); `ctag` +
-  `sync_token` para sincronización incremental (RFC 6578).
-- **Contactos (vCard 4.0):** crear / leer / actualizar (condicional por
-  **If-Match**/ETag) / borrar; proyección normalizada (N, FN, ORG, TITLE,
-  NICKNAME, BDAY, NOTE) más **correos** y **teléfonos** con `TYPE`/`PREF`. El BDAY
-  sin año (`--0215`, o el año de relleno de Apple) va en `birthday_no_year`. Sitios
-  web (`urls`, solo http/https), personas relacionadas (`related`, RELATED de texto) y
-  aniversario (`anniversary`, fecha completa); lo que no se proyecta se conserva.
-  Exportación de la vCard canónica (`text/vcard; version=4.0`).
-- **Grupos (vCard `KIND=group`):** miembros por `UID` (propiedad `MEMBER`,
-  RFC 6350 6.6.5), crear / leer / actualizar / borrar.
-- **Búsqueda:** full-text (`tsvector` GIN) sobre nombre, organización, apodo y
-  notas, dentro del tenant (opcionalmente acotada a una libreta).
-- **CardDAV (RFC 6352):** montado en `/dav` con el mismo Bearer JWT, sobre
-  `emersion/go-webdav/carddav`. Descubrimiento por `/.well-known/carddav`
-  (RFC 6764). Compatible con clientes estándar (iOS/macOS, Thunderbird, Evolution,
+- **Address books (CardDAV collections):** per user/tenant, a self-managed default
+  address book, create / rename / delete (soft); `ctag` +
+  `sync_token` for incremental synchronization (RFC 6578).
+- **Contacts (vCard 4.0):** create / read / update (conditional on
+  **If-Match**/ETag) / delete; normalized projection (N, FN, ORG, TITLE,
+  NICKNAME, BDAY, NOTE) plus **emails** and **phones** with `TYPE`/`PREF`. A BDAY
+  without a year (`--0215`, or Apple's placeholder year) goes in `birthday_no_year`. Web
+  sites (`urls`, http/https only), related people (`related`, text RELATED) and
+  anniversary (`anniversary`, full date); whatever is not projected is preserved.
+  Export of the canonical vCard (`text/vcard; version=4.0`).
+- **Groups (vCard `KIND=group`):** members by `UID` (`MEMBER` property,
+  RFC 6350 6.6.5), create / read / update / delete.
+- **Search:** full-text (`tsvector` GIN) over name, organization, nickname and
+  notes, within the tenant (optionally scoped to one address book).
+- **CardDAV (RFC 6352):** mounted at `/dav` with the same Bearer JWT, on top of
+  `emersion/go-webdav/carddav`. Discovery via `/.well-known/carddav`
+  (RFC 6764). Compatible with standard clients (iOS/macOS, Thunderbird, Evolution,
   DAVx⁵).
-- **Eventos:** publicación en el **outbox** sobre PostgreSQL (`platform/pkg/events`).
+- **Events:** publishing to the **outbox** on PostgreSQL (`platform/pkg/events`).
 
-## Estructura
+<a id="estructura"></a>
+## Structure
 
 ```
 services/contacts/
@@ -51,23 +53,25 @@ services/contacts/
 └── Dockerfile                   # multi-stage golang:1.26 -> distroless/static
 ```
 
-## Configuración (variables de entorno)
+<a id="configuración-variables-de-entorno"></a>
+## Configuration (environment variables)
 
-| Variable | Defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8088` | Puerto HTTP/CardDAV |
-| `PUBLIC_URL` | `https://contacts.sytue.localhost` | URL pública |
-| `DATABASE_URL` | — (obligatoria) | DSN PostgreSQL |
-| `DB_MAX_CONNS` | `10` | Tamaño máximo del pool pgx |
-| `OIDC_ISSUER` | `https://id.sytue.localhost` | Issuer de Sytue ID |
-| `OIDC_JWKS_URL` | `<issuer>/.well-known/jwks.json` | Endpoint JWKS |
-| `OIDC_AUDIENCE` | `sytue-contacts` | Audiencia esperada del token |
-| `LOG_LEVEL` / `LOG_FORMAT` | `info` / `json` | Logging estructurado |
+| `PORT` | `8088` | HTTP/CardDAV port |
+| `PUBLIC_URL` | `https://contacts.sytue.localhost` | Public URL |
+| `DATABASE_URL` | — (required) | PostgreSQL DSN |
+| `DB_MAX_CONNS` | `10` | Maximum pgx pool size |
+| `OIDC_ISSUER` | `https://id.sytue.localhost` | Sytue ID issuer |
+| `OIDC_JWKS_URL` | `<issuer>/.well-known/jwks.json` | JWKS endpoint |
+| `OIDC_AUDIENCE` | `sytue-contacts` | Expected token audience |
+| `LOG_LEVEL` / `LOG_FORMAT` | `info` / `json` | Structured logging |
 
-No hay secretos en el repositorio: las credenciales llegan por entorno
-(Scaleway Secret Manager / Sealed Secrets en prod).
+There are no secrets in the repository: credentials arrive via the environment
+(Scaleway Secret Manager / Sealed Secrets in prod).
 
-## Ejecución
+<a id="ejecución"></a>
+## Running
 
 ```sh
 # Migraciones + servidor (las migraciones se aplican también al arrancar).
@@ -77,17 +81,17 @@ go run ./services/contacts/cmd/contacts
 go run ./services/contacts/cmd/contacts migrate
 ```
 
-En la suite completa se levanta con `make dev-up` (Docker Compose); el contexto
-de build de la imagen es la **raíz del repo** (módulo único `git.sytue.eu/sytue/one`).
+In the full suite it is brought up with `make dev-up` (Docker Compose); the image's build
+context is the **repo root** (single module `git.sytue.eu/sytue/one`).
 
 ## Endpoints
 
-REST bajo `/api/v1` (ver [`openapi.yaml`](./openapi.yaml)); CardDAV bajo `/dav`;
-descubrimiento en `/.well-known/carddav`; sondas `/healthz` y `/readyz`.
+REST under `/api/v1` (see [`openapi.yaml`](./openapi.yaml)); CardDAV under `/dav`;
+discovery at `/.well-known/carddav`; `/healthz` and `/readyz` probes.
 
 ### CardDAV (RFC 6352)
 
-El árbol de recursos sigue el modelo estándar:
+The resource tree follows the standard model:
 
 ```
 /dav/principals/{sub}/                      # principal del usuario
@@ -96,14 +100,15 @@ El árbol de recursos sigue el modelo estándar:
 /dav/addressbooks/{sub}/{libreta}/{uid}.vcf  # recurso vCard (contacto o grupo)
 ```
 
-Soporta `PROPFIND`, `REPORT` (`addressbook-query`, `addressbook-multiget`,
-`sync-collection`), `GET`/`PUT`/`DELETE` con `If-Match`/`If-None-Match`, y
-`MKCOL` extendido para crear libretas.
+Supports `PROPFIND`, `REPORT` (`addressbook-query`, `addressbook-multiget`,
+`sync-collection`), `GET`/`PUT`/`DELETE` with `If-Match`/`If-None-Match`, and
+extended `MKCOL` to create address books.
 
-## Seguridad
+<a id="seguridad"></a>
+## Security
 
-Deny-by-default: toda la API y el árbol CardDAV exigen JWT de Sytue ID; el
-aislamiento entre tenants lo garantiza **RLS** en PostgreSQL (variable de sesión
-`app.tenant` fijada por transacción). Consultas siempre parametrizadas; cuerpos
-limitados; tamaño máximo de vCard acotado (`max-resource-size`); escritura
-condicional por ETag. Sin datos personales en logs.
+Deny-by-default: the whole API and the CardDAV tree require a Sytue ID JWT;
+isolation between tenants is guaranteed by **RLS** in PostgreSQL (session variable
+`app.tenant` set per transaction). Queries are always parameterized; bodies are
+limited; maximum vCard size is capped (`max-resource-size`); writes are
+conditional on ETag. No personal data in logs.

@@ -3,43 +3,46 @@
 
 # Sytue ID
 
-Proveedor de identidad **nuclear** de **Sytue One** (`id.sytue.eu`, puerto dev **8081**).
-Servicio **Go** propio que implementa **OIDC/OAuth2**, **SCIM 2.0** y **MFA/WebAuthn**
-sobre **PostgreSQL** (datastore único, sin Redis/Valkey).
+**Core** identity provider of **Sytue One** (`id.sytue.eu`, dev port **8081**).
+Sytue's own **Go** service implementing **OIDC/OAuth2**, **SCIM 2.0** and **MFA/WebAuthn**
+on top of **PostgreSQL** (single datastore, no Redis/Valkey).
 
-> ⚠️ **AVISO DE SEGURIDAD — AUDITORÍA OBLIGATORIA ANTES DE PRODUCCIÓN.**
-> Sytue ID es la pieza de autenticación crítica de la suite. Conforme a
-> `docs/CONVENTIONS.md` §0.7 / §8 / §10, **debe superar una auditoría de
-> seguridad independiente** (OWASP ASVS, modelado de amenazas, revisión del
-> binding de estado MFA y de la verificación completa de attestation WebAuthn)
-> **antes de desplegarse en producción**. Esta implementación es clean-room y
-> funcional, pero NO está aún auditada.
+> ⚠️ **SECURITY NOTICE — MANDATORY AUDIT BEFORE PRODUCTION.**
+> Sytue ID is the suite's critical authentication component. In accordance with
+> `docs/CONVENTIONS.md` §0.7 / §8 / §10, **it must pass an independent security
+> audit** (OWASP ASVS, threat modeling, review of the MFA state binding and of
+> the full WebAuthn attestation verification) **before being deployed to
+> production**. This implementation is clean-room and functional, but it is NOT
+> audited yet.
 
-## Alcance (clean-room, estándares abiertos)
+<a id="alcance-clean-room-estándares-abiertos"></a>
+## Scope (clean-room, open standards)
 
-Reimplementación original sobre **OIDC Core 1.0**, **OAuth2** (RFC 6749/6750/7636/7009),
+Original reimplementation on top of **OIDC Core 1.0**, **OAuth2** (RFC 6749/6750/7636/7009),
 **OIDC Discovery** (RFC 8414), **JOSE** (RFC 7515/7517/7519), **SCIM 2.0**
-(RFC 7643/7644) y **WebAuthn L2**, con librerías **permisivas** (jwx — MIT;
-pgx — MIT; chi — MIT; x/crypto — BSD). **No** deriva de Keycloak ni de ningún
-motor AGPL (`docs/CONVENTIONS.md` §3, §12). Cabecera SPDX Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr).
+(RFC 7643/7644) and **WebAuthn L2**, with **permissive** libraries (jwx — MIT;
+pgx — MIT; chi — MIT; x/crypto — BSD). It does **not** derive from Keycloak or from any
+AGPL engine (`docs/CONVENTIONS.md` §3, §12). SPDX header Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr).
 
-### Funcionalidad
+<a id="funcionalidad"></a>
+### Features
 
 - **OAuth2 / OIDC**
-  - Authorization Code + **PKCE** (S256), `refresh_token` con **rotación y
-    detección de reuso** (revoca la familia completa), `client_credentials`.
-  - `id_token` y `access_token` JWT firmados (RS256) con **JWKS** y rotación de claves.
+  - Authorization Code + **PKCE** (S256), `refresh_token` with **rotation and
+    reuse detection** (revokes the whole family), `client_credentials`.
+  - Signed JWT `id_token` and `access_token` (RS256) with **JWKS** and key rotation.
   - `/.well-known/openid-configuration`, `/.well-known/jwks.json`, `userinfo`,
     `revoke` (RFC 7009), `logout` (RP-Initiated).
-- **Identidad / tenancy**: usuarios (login global por email), organizaciones
-  (`org/<slug>`), **roles** `owner|admin|member|billing`, grupos. MFA obligatorio
-  para `owner`/`admin` (step-up).
-- **SCIM 2.0**: recurso `User` (list/create/get/replace/patch/delete) +
-  `ServiceProviderConfig`/`ResourceTypes`/`Schemas`, protegido por bearer estático.
-- **MFA / WebAuthn (passkeys)**: registro (`begin`/`finish`) con verificación de
-  `clientDataJSON`, origen, `rpIdHash`, flags y parseo CBOR del `attestationObject`.
+- **Identity / tenancy**: users (global login by email), organizations
+  (`org/<slug>`), **roles** `owner|admin|member|billing`, groups. MFA is mandatory
+  for `owner`/`admin` (step-up).
+- **SCIM 2.0**: `User` resource (list/create/get/replace/patch/delete) +
+  `ServiceProviderConfig`/`ResourceTypes`/`Schemas`, protected by a static bearer.
+- **MFA / WebAuthn (passkeys)**: registration (`begin`/`finish`) with verification of
+  `clientDataJSON`, origin, `rpIdHash`, flags and CBOR parsing of the `attestationObject`.
 
-## Estructura
+<a id="estructura"></a>
+## Structure
 
 ```
 services/id/
@@ -57,63 +60,67 @@ services/id/
 └── README.md
 ```
 
-## Clients OIDC sembrados (`db/migrations/0002_seed_clients.up.sql`)
+<a id="clients-oidc-sembrados-dbmigrations0002_seed_clientsupsql"></a>
+## Seeded OIDC clients (`db/migrations/0002_seed_clients.up.sql`)
 
 `sytue-one`, `sytue-console`, `sytue-cloud` (+`sytue-cloud-api`), `sytue-mail`,
 `sytue-drive`, `sytue-calendar`, `sytue-contacts`, `sytue-docus`, `sytue-calcus`, `sytue-diapos`, `sytue-certipdf`, `sytue-chat`,
-`sytue-meet`, `sytue-hub` — con `redirect_uri` a `*.sytue.eu`, `*.sytue.localhost`
-y `localhost:43xx`. **Los secretos NO se siembran** (nunca secretos en git): el
-`secret_hash` queda `NULL` y el token endpoint rechaza al client hasta que el
-deploy fije su secreto (Secret Manager / consola).
+`sytue-meet`, `sytue-hub` — with `redirect_uri` to `*.sytue.eu`, `*.sytue.localhost`
+and `localhost:43xx`. **Secrets are NOT seeded** (never secrets in git): the
+`secret_hash` stays `NULL` and the token endpoint rejects the client until the
+deploy sets its secret (Secret Manager / console).
 
-## Configuración (entorno, prefijo `SYTUE_ID_`)
+<a id="configuración-entorno-prefijo-sytue_id_"></a>
+## Configuration (environment, `SYTUE_ID_` prefix)
 
-| Variable | Por defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `SYTUE_ID_DATABASE_DSN` | — (obligatorio) | DSN PostgreSQL |
-| `SYTUE_ID_HTTP_ADDR` | `:8081` | dirección de escucha |
-| `SYTUE_ID_ISSUER` | `https://id.sytue.localhost` | issuer OIDC (sin barra final) |
-Las cookies SSO son host-only (`__Host-` en HTTPS). `SYTUE_ID_COOKIE_DOMAIN` se
-rechaza: compartir una cookie con `.sytue.eu` la expondría a publicaciones Cloud.
-| `SYTUE_ID_COOKIE_SECURE` | `true` | flag Secure (false solo dev http) |
-| `SYTUE_ID_TRUSTED_PROXIES` | redes privadas | CIDR/IP (CSV) cuyo `X-Forwarded-For` se cree; `none` = ninguno |
-| `SYTUE_ID_ACCESS_TOKEN_TTL` | `15m` | vida del access token |
-| `SYTUE_ID_ID_TOKEN_TTL` | `1h` | vida del ID token |
-| `SYTUE_ID_REFRESH_TOKEN_TTL` | `720h` | vida del refresh token |
-| `SYTUE_ID_AUTH_CODE_TTL` | `60s` | vida del código de autorización |
-| `SYTUE_ID_SCIM_BEARER_TOKEN` | — | token del provisioner SCIM (Secret Manager) |
+| `SYTUE_ID_DATABASE_DSN` | — (required) | PostgreSQL DSN |
+| `SYTUE_ID_HTTP_ADDR` | `:8081` | listen address |
+| `SYTUE_ID_ISSUER` | `https://id.sytue.localhost` | OIDC issuer (no trailing slash) |
+SSO cookies are host-only (`__Host-` over HTTPS). `SYTUE_ID_COOKIE_DOMAIN` is
+rejected: sharing a cookie with `.sytue.eu` would expose it to Cloud publications.
+| `SYTUE_ID_COOKIE_SECURE` | `true` | Secure flag (false only in http dev) |
+| `SYTUE_ID_TRUSTED_PROXIES` | private networks | CIDR/IP (CSV) whose `X-Forwarded-For` is trusted; `none` = none |
+| `SYTUE_ID_ACCESS_TOKEN_TTL` | `15m` | access token lifetime |
+| `SYTUE_ID_ID_TOKEN_TTL` | `1h` | ID token lifetime |
+| `SYTUE_ID_REFRESH_TOKEN_TTL` | `720h` | refresh token lifetime |
+| `SYTUE_ID_AUTH_CODE_TTL` | `60s` | authorization code lifetime |
+| `SYTUE_ID_SCIM_BEARER_TOKEN` | — | SCIM provisioner token (Secret Manager) |
 | `SYTUE_ID_WEBAUTHN_RP_ID` | `sytue.localhost` | Relying Party ID |
-| `SYTUE_ID_WEBAUTHN_RP_ORIGINS` | issuer | orígenes permitidos (CSV) |
+| `SYTUE_ID_WEBAUTHN_RP_ORIGINS` | issuer | allowed origins (CSV) |
 
-Sin secretos en código ni logs (`docs/CONVENTIONS.md` §0.7). En prod, todos los
-secretos provienen de **Scaleway Secret Manager**.
+No secrets in code or logs (`docs/CONVENTIONS.md` §0.7). In prod, all
+secrets come from **Scaleway Secret Manager**.
 
-## Seguridad por defecto
+<a id="seguridad-por-defecto"></a>
+## Secure by default
 
-Argon2id para contraseñas y secretos de client; tokens opacos **hasheados**
-(SHA-256) en reposo (solo el hash se persiste); PKCE S256 obligatorio; validación
-**exacta** de `redirect_uri` y de `post_logout_redirect_uri` (anti open-redirect,
-también en el registro dinámico); `return_to` restringido a rutas internas
-—rechazando `\` y caracteres de control, que el navegador reinterpreta—;
-`state`/`nonce`; rotación de refresh con detección de reuso; cookies
-`HttpOnly`/`Secure`/`SameSite=Lax` host-only; verificación de origen
-(`Sec-Fetch-Site`/`Origin`) en **todos** los POST de formulario, login incluido;
-CSP estricta y cabeceras de seguridad; auditoría inmutable; consultas
-parametrizadas.
+Argon2id for passwords and client secrets; opaque tokens **hashed**
+(SHA-256) at rest (only the hash is persisted); mandatory PKCE S256; **exact**
+validation of `redirect_uri` and `post_logout_redirect_uri` (anti open-redirect,
+also in dynamic registration); `return_to` restricted to internal paths
+—rejecting `\` and control characters, which the browser reinterprets—;
+`state`/`nonce`; refresh rotation with reuse detection; host-only
+`HttpOnly`/`Secure`/`SameSite=Lax` cookies; origin verification
+(`Sec-Fetch-Site`/`Origin`) on **all** form POSTs, login included;
+strict CSP and security headers; immutable audit log; parameterized
+queries.
 
-**IP del cliente.** `X-Forwarded-For` solo se cree cuando quien conecta está en
-`SYTUE_ID_TRUSTED_PROXIES`, y dentro de la cabecera se lee de derecha a izquierda
-(ver `domain.TrustedProxies`). De ahí cuelgan los buckets por IP del login y de
-`/oauth2/*`, las condiciones por IP del Acceso Condicional y la IP del registro de
-auditoría: leer la cabecera sin más los hacía falsificables desde fuera.
+**Client IP.** `X-Forwarded-For` is only trusted when the connecting peer is in
+`SYTUE_ID_TRUSTED_PROXIES`, and within the header it is read from right to left
+(see `domain.TrustedProxies`). The per-IP buckets of the login and of
+`/oauth2/*`, the per-IP Conditional Access conditions and the IP in the audit
+log all depend on it: reading the header blindly made them spoofable from outside.
 
-## Notas pendientes para la auditoría
+<a id="notas-pendientes-para-la-auditoría"></a>
+## Pending notes for the audit
 
-- Completar los formatos de **attestation** WebAuthn (`packed`/`tpm`/…); el
-  registro actual usa `attestation: none`. La verificación de **assertion**
-  (login con passkey) sí está completa: tipo, reto, origen, `rpIdHash`, flags,
-  `signCount` y firma ES256/RS256.
-- El binding de estado del segundo factor (`/login/mfa`), el cifrado en reposo de
-  `signing_keys.private_pem` y `totp_secrets.secret`, y el rate-limiting de
-  `/login` y `/oauth2/token` **ya están implementados** (migraciones 0003 y 0005;
+- Complete the WebAuthn **attestation** formats (`packed`/`tpm`/…); the
+  current registration uses `attestation: none`. **Assertion** verification
+  (login with a passkey) is complete: type, challenge, origin, `rpIdHash`, flags,
+  `signCount` and ES256/RS256 signature.
+- The second-factor state binding (`/login/mfa`), encryption at rest of
+  `signing_keys.private_pem` and `totp_secrets.secret`, and rate limiting of
+  `/login` and `/oauth2/token` **are already implemented** (migrations 0003 and 0005;
   `beginMFAStepUp`/`ConsumeMFAContinuation`; `pg.NewRateLimiter`).

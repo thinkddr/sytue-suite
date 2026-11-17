@@ -89,7 +89,7 @@ resume from that PR when the allowance resets.
 
 ## Local executor with ChatGPT Pro
 
-The automation named **Resolver findings de sytue-suite con Pro** is active in
+The automation named **Resolver findings de sytue-suite con Pro** ("Resolve sytue-suite findings with Pro") is active in
 this account and attached to this Codex chat. It checks the queue every six hours
 and fixes at most one pending task per run, using the GitHub credentials already
 connected. **The Codex app must be open**. While it is closed, GitHub continues
@@ -192,33 +192,35 @@ Official references: [tasks with @codex in GitHub](https://learn.chatgpt.com/doc
 [Dependabot REST API](https://docs.github.com/en/rest/dependabot/alerts),
 [GitHub Actions events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
 
-### Verificación de acceso a Dependabot
+<a id="verificación-de-acceso-a-dependabot"></a>
+### Verifying Dependabot access
 
-La presencia de un secreto no demuestra que pueda leer alertas. Antes de una
-selección automática o manual de Dependabot, el workflow prueba únicamente lectura
-en la API de este repositorio. Prefiere `SECURITY_ALERTS_TOKEN`; si falta o la API
-rechaza su autorización con 401/403, prueba primero el token de lectura del job y
-después el `CODEX_PR_TOKEN` ya configurado.
-Este último necesita también **Dependabot alerts: read** para servir de alternativa.
-La selección y preparación usan la misma credencial comprobada. Los outputs solo
-contienen `primary`, `job` o `connector`, nunca el token ni el cuerpo de las alertas.
-No hay reintentos con otra credencial ante errores de red, redirecciones, límites
-de uso o errores del servidor. Si ninguna tiene permiso, el workflow falla con el
-permiso requerido; no informa que no haya alertas. La selección manual de Code
-Scanning sigue usando el token del job y no depende del acceso a Dependabot.
+The presence of a secret does not prove that it can read alerts. Before an
+automatic or manual Dependabot selection, the workflow tests read-only access
+to this repository's API. It prefers `SECURITY_ALERTS_TOKEN`; if it is missing or the API
+rejects its authorization with 401/403, it tries the job's read token first and
+then the already configured `CODEX_PR_TOKEN`.
+The latter also needs **Dependabot alerts: read** to serve as a fallback.
+Selection and preparation use the same verified credential. The outputs only
+contain `primary`, `job` or `connector`, never the token or the alert bodies.
+There are no retries with another credential on network errors, redirects, rate
+limits or server errors. If none has permission, the workflow fails stating the
+required permission; it does not report that there are no alerts. Manual Code
+Scanning selection keeps using the job token and does not depend on Dependabot access.
 
-### Inventario de otros repositorios de la cuenta
+<a id="inventario-de-otros-repositorios-de-la-cuenta"></a>
+### Inventory of the account's other repositories
 
-`security-account-inventory.yml` es un despacho manual de solo lectura. Descubre
-repositorios del mismo propietario y comprueba Code Scanning, Dependabot y Secret
-Scanning. La cifra esperada de repositorios impide confundir una credencial con
-visibilidad parcial con una cuenta sin alertas. Los permisos denegados y funciones
-no habilitadas aparecen como estados distintos, nunca como inventarios vacíos.
+`security-account-inventory.yml` is a read-only manual dispatch. It discovers
+repositories of the same owner and checks Code Scanning, Dependabot and Secret
+Scanning. The expected repository count prevents mistaking a credential with
+partial visibility for an account without alerts. Denied permissions and features
+that are not enabled appear as distinct states, never as empty inventories.
 
-Este repositorio es público: los metadatos de repositorios privados no se escriben
-en logs ni en artefactos legibles. El destinatario aporta únicamente su clave RSA
-pública. El informe se cifra con AES-256-GCM y la clave de sesión se protege con
-RSA-OAEP-SHA256 antes de subir el artefacto, que dura un día. La clave privada
-permanece fuera de GitHub Actions. Los valores de secretos detectados se excluyen
-del informe antes de cifrarlo. Una cobertura incompleta hace fallar el job pero
-conserva el informe cifrado para diagnosticar los permisos que faltan.
+This repository is public: private repository metadata is not written
+to logs or to readable artifacts. The recipient provides only their public RSA
+key. The report is encrypted with AES-256-GCM and the session key is protected with
+RSA-OAEP-SHA256 before uploading the artifact, which lasts one day. The private key
+stays outside GitHub Actions. Detected secret values are excluded
+from the report before encrypting it. Incomplete coverage makes the job fail but
+keeps the encrypted report to diagnose the missing permissions.

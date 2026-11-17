@@ -1,33 +1,37 @@
-# Guía de alta — Google Chat ⇄ Sytue
+<a id="guía-de-alta--google-chat--sytue"></a>
+# Onboarding guide — Google Chat ⇄ Sytue
 
-Tiempo: ~15 min. Permisos: admin de Workspace y acceso a Google Cloud Console.
-Resultado: leer espacios y mensajes de Chat desde la búsqueda y avisos de la
-suite (solo lectura).
+Time: ~15 min. Permissions: Workspace admin and access to Google Cloud Console.
+Result: read Chat spaces and messages from the suite's search and
+notifications (read-only).
 
-> Nota honesta: semilla del catálogo pendiente de la ola de Chat; scopes y
-> callback estándar, no cambian.
+> Honest note: catalog seed pending the Chat wave; scopes and
+> callback are standard and do not change.
 
-## 1. Configurar la app de Chat
+<a id="1-configurar-la-app-de-chat"></a>
+## 1. Configure the Chat app
 
-1. <https://console.cloud.google.com> → proyecto → «APIs & Services» →
-   habilita **Google Chat API**.
-2. «Chat configuration»:
-   - App name «Sytue», avatar de la marca, descripción.
-   - **Connection**: «HTTP endpoint» → URL del Integration Gateway
-     (`https://integrations.sytue.eu/api/v1/chat` en tu despliegue).
-   - «Verify» el dominio `sytue.eu` en Search Console si Google lo pide.
-3. Visibility: los usuarios/grupos de tu Workspace que podrán usarla.
+1. <https://console.cloud.google.com> → project → “APIs & Services” →
+   enable **Google Chat API**.
+2. “Chat configuration”:
+   - App name “Sytue”, brand avatar, description.
+   - **Connection**: “HTTP endpoint” → Integration Gateway URL
+     (`https://integrations.sytue.eu/api/v1/chat` in your deployment).
+   - “Verify” the `sytue.eu` domain in Search Console if Google asks for it.
+3. Visibility: the users/groups in your Workspace that will be able to use it.
 
-## 2. OAuth para lectura
+<a id="2-oauth-para-lectura"></a>
+## 2. OAuth for reading
 
-1. «Credentials» → «OAuth client ID» → **Web application** con redirect URI
+1. “Credentials” → “OAuth client ID” → **Web application** with redirect URI
    `https://integrations.sytue.eu/api/v1/oauth/callback`.
-2. Scopes delegados:
+2. Delegated scopes:
    - `https://www.googleapis.com/auth/chat.spaces.readonly`
    - `https://www.googleapis.com/auth/chat.messages.readonly`
-3. Copia Client ID y Client secret.
+3. Copy the Client ID and Client secret.
 
-## 3. Conectar y verificar
+<a id="3-conectar-y-verificar"></a>
+## 3. Connect and verify
 
-1. Sytue Platform → Integraciones → «Google Chat» → credenciales → «Conectar».
-2. Los espacios del usuario aparecen en la federación de búsqueda de la suite.
+1. Sytue Platform → Integrations → “Google Chat” → credentials → “Connect”.
+2. The user's spaces appear in the suite's search federation.

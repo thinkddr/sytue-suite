@@ -1,6 +1,7 @@
-# GitLab (SaaS) — SAML SSO por GRUPO (plan Premium+)
-1. Tu grupo en gitlab.com → **Settings → SAML SSO for GitLab.com Groups**.
-2. Pega los metadatos de Sytue ID en «IdP URL»/certificado; **Name ID** `email`.
-3. Copia el **GitLab group SAML URL** (ACS) y el **Identifier** (Entity ID) del grupo a la ficha de Sytue Platform.
-4. «Test SAML» y asigna membresías por defecto.
-**Errores**: `audience mismatch` = el Identifier no coincide exactamente con el Entity ID emitido.
+<a id="gitlab-saas--saml-sso-por-grupo-plan-premium"></a>
+# GitLab (SaaS) — SAML SSO per GROUP (Premium+ plan)
+1. Your group on gitlab.com → **Settings → SAML SSO for GitLab.com Groups**.
+2. Paste the Sytue ID metadata into “IdP URL”/certificate; **Name ID** `email`.
+3. Copy the group's **GitLab group SAML URL** (ACS) and **Identifier** (Entity ID) to the Sytue Platform integration page.
+4. “Test SAML” and assign default memberships.
+**Errors**: `audience mismatch` = the Identifier does not exactly match the issued Entity ID.

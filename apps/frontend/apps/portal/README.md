@@ -1,29 +1,33 @@
 # Sytue One — Portal (`one.sytue.eu`)
 
-Portal y lanzador unificado de la suite **Sytue One**. Es la cara de la suite:
-saludo personalizado, rejilla de lanzadores hacia todos los productos, accesos
-rapidos cross-app y actividad reciente federada del **Sytue Hub**. Montado sobre
-la **Sytue Shell** (topbar global, app switcher de 9 puntos, busqueda global,
-notificaciones, presencia y cuenta).
+Unified portal and launcher of the **Sytue One** suite. It is the face of the suite:
+a personalized greeting, a grid of launchers to every product, cross-app quick
+links and federated recent activity from the **Sytue Hub**. Built on top of
+the **Sytue Shell** (global topbar, 9-dot app switcher, global search,
+notifications, presence and account).
 
-- **Stack:** Astro 7 + Preact 10 (islands), Tailwind v4 con tokens de `@sytue/ui`.
-  Runtime / build / gestor de paquetes con **Bun** (sustituye a Node.js + pnpm).
-- **Diseno:** lenguaje visual Sytue, modo claro/oscuro, WCAG AA.
-- **Identidad:** OIDC Authorization Code + PKCE contra **Sytue ID**
-  (client confidencial `sytue-one`) via el BFF de `@sytue/auth`. Cookie host-only
-  `__Host-`, httpOnly; el IdP aporta el SSO entre subdominios mediante OAuth.
+- **Stack:** Astro 7 + Preact 10 (islands), Tailwind v4 with tokens from `@sytue/ui`.
+  Runtime / build / package manager with **Bun** (replaces Node.js + pnpm).
+- **Design:** Sytue visual language, light/dark mode, WCAG AA.
+- **Identity:** OIDC Authorization Code + PKCE against **Sytue ID**
+  (confidential client `sytue-one`) through the `@sytue/auth` BFF. Host-only
+  `__Host-` cookie, httpOnly; the IdP provides SSO across subdomains via OAuth.
 
-## Paquetes consumidos
+<a id="paquetes-consumidos"></a>
+
+## Packages consumed
 
 - `@sytue/ui` — design system (AppGrid, Card, EmptyState, Spinner, Icon…).
-- `@sytue/shell` — Sytue Shell montada en el layout.
-- `@sytue/auth` — BFF OIDC/PKCE (endpoints `src/pages/auth/*`).
-- `@sytue/api-clients` — `HubClient` para la actividad reciente.
-- `@sytue/config` — tokens, tema Tailwind v4, tsconfig estricto.
+- `@sytue/shell` — Sytue Shell mounted in the layout.
+- `@sytue/auth` — OIDC/PKCE BFF (endpoints `src/pages/auth/*`).
+- `@sytue/api-clients` — `HubClient` for recent activity.
+- `@sytue/config` — tokens, Tailwind v4 theme, strict tsconfig.
 
-## Desarrollo
+<a id="desarrollo"></a>
 
-Puerto dev **4321** (`*.sytue.localhost` via Traefik, ver `docs/CONVENTIONS.md` §6).
+## Development
+
+Dev port **4321** (`*.sytue.localhost` via Traefik, see `docs/CONVENTIONS.md` §6).
 
 ```bash
 bun run --filter @sytue/portal dev        # http://localhost:4321
@@ -31,19 +35,23 @@ bun run --filter @sytue/portal build
 bun run --filter @sytue/portal typecheck
 ```
 
-## Variables de entorno (BFF, solo servidor — nunca secretos en git)
+<a id="variables-de-entorno-bff-solo-servidor--nunca-secretos-en-git"></a>
 
-| Variable                    | Ejemplo                                                  |
+## Environment variables (BFF, server only — never secrets in git)
+
+| Variable                    | Example                                                  |
 | --------------------------- | -------------------------------------------------------- |
 | `SYTUE_OIDC_ISSUER`         | `https://id.sytue.eu` (dev `https://id.sytue.localhost`) |
 | `SYTUE_OIDC_CLIENT_ID`      | `sytue-one`                                              |
 | `SYTUE_OIDC_CLIENT_SECRET`  | _(Scaleway Secret Manager / Sealed Secrets)_             |
 | `SYTUE_OIDC_REDIRECT_URI`   | `https://one.sytue.eu/auth/callback`                     |
-| `SYTUE_SESSION_SECRET`      | _(>= 32 caracteres)_                                     |
+| `SYTUE_SESSION_SECRET`      | _(>= 32 characters)_                                     |
 | `PUBLIC_SYTUE_HUB_BASE_URL` | `https://hub.sytue.eu`                                   |
-| `SYTUE_SECURE_COOKIES`      | `false` solo en dev local sobre http                     |
+| `SYTUE_SECURE_COOKIES`      | `false` only in local dev over http                      |
 
-## Endpoints BFF
+<a id="endpoints-bff"></a>
+
+## BFF endpoints
 
 `GET /auth/login` · `GET /auth/callback` · `POST|GET /auth/logout` ·
 `GET /auth/session` · `POST /auth/refresh` · `GET /auth/token`.

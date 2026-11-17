@@ -1,22 +1,22 @@
 ---
-name: Reporte de incidencia (Bug report)
-about: Informar sobre un problema o comportamiento inesperado
+name: Bug report
+about: Report a problem or unexpected behavior
 title: '[BUG]: '
 labels: bug
 assignees: ''
 ---
 
-**Descripción de la incidencia**
-Descripción clara y concisa de lo que sucede.
+**Description of the issue**
+A clear and concise description of what happens.
 
-**Pasos para reproducir el comportamiento**
-1. Ir a '...'
-2. Ejecutar '...'
-3. Ver el resultado inesperado
+**Steps to reproduce the behavior**
+1. Go to '...'
+2. Run '...'
+3. See the unexpected result
 
-**Comportamiento esperado**
-Descripción de lo que debería suceder.
+**Expected behavior**
+A description of what should happen.
 
-**Entorno / Versión**
-- Componente / Servicio:
-- Sistema Operativo / Navegador:
+**Environment / Version**
+- Component / Service:
+- Operating system / Browser:

@@ -518,6 +518,7 @@
   "dialog.merge.reset": "Skjalinu verður skipt út fyrir {total} sameinuð afrit. Sniðmátið og gagnagjafinn glatast. Halda áfram?",
   "dialog.sheet.delete": "Eyða blaðinu „{name}“? Innihald þess glatast.",
   "dialog.sheet.mergeLoses": "Við sameiningu heldst aðeins gildi efsta vinstra hólfsins ({ref}); hin hólfin á svæðinu eru tæmd. Til að sameina allan textann í því hólfi skaltu nota „Sameina innihald“.",
+  "dialog.sheet.nameTaken": "Það er þegar til blað sem heitir „{name}“ (heiti gera ekki greinarmun á há- og lágstöfum).",
   "dialog.sheet.rename": "Heiti blaðs:",
   "dialog.slide.delete": "Eyða glæru {n}?",
   "doc.msg.exportFailed": "Ekki tókst að flytja út",

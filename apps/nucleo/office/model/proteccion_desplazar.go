@@ -280,10 +280,20 @@ func (rs rangosEditables) contieneCelda(col, fila int) bool {
 	return false
 }
 
+// otrosDesplazados es lo que, además de los rangos y del contenido, tiene que explicar
+// el MISMO desplazamiento de la hoja protegida: sus tablas dinámicas
+// (proteccion_dinamicas.go). Sus bordes (base uno) dan candidatos a la búsqueda.
+type otrosDesplazados interface {
+	bordes(filas bool) (antes, despues []int)
+	explica(d desplazamiento) bool
+}
+
 // rangosHojaMovidos decide si el cambio de `protect.ranges` de una hoja protegida lo
 // explica una inserción o un borrado con su permiso concedido (ver arriba). pp y np son
-// el `protect` previo y el nuevo; p y n, la hoja.
-func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject) bool {
+// el `protect` previo y el nuevo; p y n, la hoja. Con `otros`, el mismo desplazamiento
+// tiene que explicarlos también (los rangos pueden no haber cambiado: entonces tienen
+// que seguir donde ese desplazamiento los deja).
+func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject, otros otrosDesplazados) bool {
 	previos, ok1 := rangosCrudos(pp["ranges"])
 	nuevos, ok2 := rangosCrudos(np["ranges"])
 	pc, ok3 := celdas(p)
@@ -302,13 +312,13 @@ func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject) b
 		}
 		prev := hojaEnLineas{l: lp, rangos: viejos, filas: filas}
 		nuevo := hojaEnLineas{l: ln, rangos: nuevosQuien, filas: filas}
-		for _, cant := range candidatas(lp, ln, previos, nuevos, filas) {
+		for _, cant := range candidatas(lp, ln, previos, nuevos, filas, otros) {
 			for _, signo := range []int{1, -1} {
 				d := desplazamiento{filas: filas, n: signo * cant}
 				if !dice(pp, d.permiso(), true) {
 					continue
 				}
-				if buscarDesde(d, prev, nuevo, previos, nuevos) {
+				if buscarDesde(d, prev, nuevo, previos, nuevos, otros) {
 					return true
 				}
 			}
@@ -319,7 +329,7 @@ func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject) b
 
 // candidatas son las cantidades de filas (o columnas) que vale la pena probar: lo que
 // creció o menguó la hoja y lo que se movió cada extremo de cada rango.
-func candidatas(lp, ln map[int]map[int]celdaHoja, previos, nuevos []map[string]json.RawMessage, filas bool) []int {
+func candidatas(lp, ln map[int]map[int]celdaHoja, previos, nuevos []map[string]json.RawMessage, filas bool, otros otrosDesplazados) []int {
 	extremos := func(l map[int]map[int]celdaHoja, rs []map[string]json.RawMessage) (int, []int) {
 		ult := 0
 		for k := range l {
@@ -342,6 +352,10 @@ func candidatas(lp, ln map[int]map[int]celdaHoja, previos, nuevos []map[string]j
 	}
 	up, bp := extremos(lp, previos)
 	un, bn := extremos(ln, nuevos)
+	if otros != nil {
+		a, b := otros.bordes(filas)
+		bp, bn = append(bp, a...), append(bn, b...)
+	}
 	set := map[int]bool{}
 	for _, x := range bp {
 		for _, y := range bn {
@@ -378,7 +392,7 @@ const (
 // sus bordes, así que basta con probar esos puntos.
 //
 //nolint:gocognit,gocyclo // los tres modos de cada línea y el cruce con los rangos, juntos.
-func buscarDesde(d desplazamiento, prev, nuevo hojaEnLineas, previos, nuevos []map[string]json.RawMessage) bool {
+func buscarDesde(d desplazamiento, prev, nuevo hojaEnLineas, previos, nuevos []map[string]json.RawMessage, otros otrosDesplazados) bool {
 	tope := d.tope()
 	m := abs(d.n)
 	// Líneas en las que algún modo puede fallar: las que tienen algo en el modelo nuevo
@@ -433,25 +447,33 @@ func buscarDesde(d desplazamiento, prev, nuevo hojaEnLineas, previos, nuevos []m
 	for _, f := range nuevasMal {
 		cand = append(cand, f+1)
 	}
+	var bordes []int
 	for _, g := range previos {
 		if r, ok := refDe(g); ok {
 			a, b := r.c1, r.c2
 			if d.filas {
 				a, b = r.f1, r.f2
 			}
-			for _, x := range []int{a, b} {
-				for _, dx := range []int{-m, -m + 1, -m + 2, -1, 0, 1} {
-					cand = append(cand, x+dx)
-				}
-			}
+			bordes = append(bordes, a, b)
 		}
 	}
+	if otros != nil {
+		a, _ := otros.bordes(d.filas)
+		bordes = append(bordes, a...)
+	}
+	for _, x := range bordes {
+		for _, dx := range []int{-m, -m + 1, -m + 2, -1, 0, 1} {
+			cand = append(cand, x+dx)
+		}
+	}
+	probados := map[int]bool{}
 	for _, r := range cand {
-		if !valido(r) {
+		if probados[r] || !valido(r) {
 			continue
 		}
+		probados[r] = true
 		d.desde = r
-		if rangosMovidos(previos, nuevos, d) {
+		if rangosMovidos(previos, nuevos, d) && (otros == nil || otros.explica(d)) {
 			return true
 		}
 	}

@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const is: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Heiti blaðs:',
+  'dialog.sheet.nameTaken':
+    'Það er þegar til blað sem heitir „{name}“ (heiti gera ekki greinarmun á há- og lágstöfum).',
   'dialog.sheet.delete': 'Eyða blaðinu „{name}“? Innihald þess glatast.',
   'dialog.sheet.mergeLoses':
     'Við sameiningu heldst aðeins gildi efsta vinstra hólfsins ({ref}); hin hólfin á svæðinu eru tæmd. Til að sameina allan textann í því hólfi skaltu nota „Sameina innihald“.',

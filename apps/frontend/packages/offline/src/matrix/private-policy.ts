@@ -19,6 +19,30 @@ export function matrixLifetimeFetch(lifetime?: AbortSignal, send: Fetch = global
   });
 }
 
+const WITHHELD = 'm.room_key.withheld';
+const WITHHELD_FIELDS = new Set([
+  'algorithm',
+  'code',
+  'reason',
+  'room_id',
+  'session_id',
+  'sender_key',
+  'from_device',
+  // The Rust SDK tags to-device messages with an opaque tracing id.
+  'org.matrix.msgid',
+]);
+
+/** A withheld notice: only plain strings, only the fields the spec defines. */
+function isWithheldNotice(content: unknown): boolean {
+  if (!content || typeof content !== 'object' || Array.isArray(content)) return false;
+  const fields = Object.entries(content as Record<string, unknown>);
+  return (
+    fields.length > 0 &&
+    fields.every(([key, value]) => WITHHELD_FIELDS.has(key) && typeof value === 'string') &&
+    typeof (content as { code?: unknown }).code === 'string'
+  );
+}
+
 /**
  * Private storage must never deliver a room key to another person, even if that
  * person is verified for Rooms and joins between the UI's membership check and
@@ -73,7 +97,8 @@ export function privateDeviceFetch(
       (type !== 'm.room.encrypted' &&
         !type.startsWith('m.key.verification.') &&
         type !== 'm.room_key_request' &&
-        type !== 'm.secret.request')
+        type !== 'm.secret.request' &&
+        type !== WITHHELD)
     )
       throw new MatrixSecurityError('unsupported');
     const body = init.body;
@@ -94,6 +119,16 @@ export function privateDeviceFetch(
     for (const [user, devices] of Object.entries(messages as Record<string, unknown>)) {
       if (user !== own || !devices || typeof devices !== 'object' || Array.isArray(devices))
         throw new MatrixSecurityError('identity');
+      // A withheld notice tells the owner's OTHER devices —unverified ones, by
+      // definition— that they will not get this session's key. It carries no key
+      // material, so it needs no verified recipient; but it may carry nothing but
+      // the notice's own fields, so a key can never ride along in it.
+      if (type === WITHHELD) {
+        for (const [device, content] of Object.entries(devices as Record<string, unknown>)) {
+          if (!isMatrixDeviceId(device) || device === '*' || !isWithheldNotice(content))
+            throw new MatrixSecurityError('identity');
+        }
+      }
       if (type === 'm.room.encrypted') {
         for (const device of Object.keys(devices)) {
           if (

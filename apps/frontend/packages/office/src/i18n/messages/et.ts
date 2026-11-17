@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const et: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Lehe nimi:',
+  'dialog.sheet.nameTaken':
+    'Leht nimega „{name}” on juba olemas (nimedes ei eristata suur- ja väiketähti).',
   'dialog.sheet.delete': 'Kas kustutada leht „{name}”? Selle sisu läheb kaotsi.',
   'dialog.sheet.mergeLoses':
     'Ühendamisel säilib ainult ülemise vasakpoolse lahtri ({ref}) väärtus; vahemiku ülejäänud lahtrid tühjendatakse. Kogu teksti ühendamiseks sellesse lahtrisse kasutage valikut „Ühenda sisu“.',

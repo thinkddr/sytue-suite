@@ -88,6 +88,59 @@ test('la ventana de atajos sigue nombrando las teclas al lector', () => {
 });
 
 /*
+ * UNA COLUMNA DE TECLAS PARA TODA LA HOJA. Con una fila `flex` por atajo, cada
+ * descripción empezaba donde acababan SUS teclas y la hoja se leía en zigzag (en el
+ * muestrario, «Ver los atajos» tras «?» y «Buscar» tras «Ctrl K» empezaban a unos 40 px
+ * una de otra). La rejilla es de la hoja y todo lo de dentro la hereda con `subgrid`:
+ * si un nivel deja de heredarla, sus filas vuelven a tener columnas propias.
+ */
+test('la hoja de atajos comparte una sola columna de teclas entre grupos y filas', () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  render(
+    <ShortcutsModal
+      open
+      title="Atajos"
+      groups={[
+        { titulo: 'General', atajos: [{ teclas: ['?'], descripcion: 'Ver los atajos' }] },
+        {
+          titulo: 'Edición',
+          atajos: [
+            { teclas: ['Ctrl', 'Mayús', 'Z'], descripcion: 'Rehacer' },
+            { teclas: ['Ctrl', 'Alt', 'Mayús', 'V'], descripcion: 'Pegar sin formato' },
+          ],
+        },
+      ]}
+      onClose={() => {}}
+      container={host}
+    />,
+    host,
+  );
+  const secciones = [...document.querySelectorAll('[data-sytue-dialog-body] section')];
+  expect(secciones).toHaveLength(2);
+  const hoja = secciones[0]!.parentElement as HTMLElement;
+  expect(clases(hoja)).toContain('grid');
+  // `fit-content(50%)`: lo que la combinación más ancha, sin pasar de media hoja.
+  expect(clases(hoja)).toContain('grid-cols-[fit-content(50%)_minmax(0,1fr)]');
+  const heredan = [
+    ...secciones,
+    ...document.querySelectorAll('[data-sytue-dialog-body] dl'),
+    ...[...document.querySelectorAll('[data-sytue-dialog-body] dt')].map((dt) => dt.parentElement!),
+  ] as HTMLElement[];
+  expect(heredan).toHaveLength(2 + 2 + 3);
+  for (const el of heredan) {
+    expect(clases(el)).toContain('grid-cols-subgrid');
+    expect(clases(el)).toContain('col-span-full');
+  }
+  // Una combinación que no cabe en media hoja baja de línea en vez de empujar el texto.
+  for (const dt of document.querySelectorAll('[data-sytue-dialog-body] dt')) {
+    expect(clases(dt as HTMLElement)).toContain('flex-wrap');
+  }
+  render(null, host);
+  host.remove();
+});
+
+/*
  * GUARDIÁN DE TRINQUETE. Había una receta de `<kbd>` por sitio y ninguna se parecía a
  * la de al lado; la cuenta permitida es CERO y no sube: una tecla nueva se pinta con
  * `Kbd` (y si su aspecto no encaja, se añade un tono allí, no una receta aquí).

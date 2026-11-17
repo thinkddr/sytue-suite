@@ -17,7 +17,8 @@ import (
 )
 
 // piezasDeCarga cuenta los bloques de esqueleto sueltos, las filas de carga
-// (`ui.FilasEsqueleto`) y las ruedas de lo que se pinta.
+// (`ui.FilasEsqueleto`) y los bloques de un grupo (`ui.BloquesEsqueleto`), y las ruedas
+// de lo que se pinta.
 func piezasDeCarga(o fyne.CanvasObject) (esqueletos []*ui.Esqueleto, filas, ruedas int) {
 	recorrerInterno(o, func(x fyne.CanvasObject) {
 		switch y := x.(type) {
@@ -25,6 +26,8 @@ func piezasDeCarga(o fyne.CanvasObject) (esqueletos []*ui.Esqueleto, filas, rued
 			esqueletos = append(esqueletos, y)
 		case *ui.FilasEsqueleto:
 			filas += y.Filas
+		case *ui.BloquesEsqueleto:
+			filas += len(y.Bloques())
 		case *ui.Rueda:
 			ruedas++
 		}
@@ -70,8 +73,10 @@ func TestCargarUnCuadernoEnseñaSuFormaYNoUnaRueda(t *testing.T) {
 			}
 			o := l.Objeto(tema.Claro)
 			esqueletos, filas, ruedas := piezasDeCarga(o)
-			if len(esqueletos)+filas < 3 || ruedas != 0 {
-				t.Fatalf("cargando pinta %d esqueletos, %d filas de carga y %d ruedas: la forma del cuaderno, sin rueda", len(esqueletos), filas, ruedas)
+			// Y todo en piezas comunes: un solo latido y un solo «Cargando». VISTO EN
+			// ROJO con la hoja y las tarjetas de antes: 6 y 5 esqueletos sueltos.
+			if len(esqueletos) != 0 || filas < 3 || ruedas != 0 {
+				t.Fatalf("cargando pinta %d esqueletos sueltos, %d bloques de carga y %d ruedas: la forma del cuaderno en piezas comunes, sin rueda", len(esqueletos), filas, ruedas)
 			}
 		})
 	}

@@ -17,6 +17,7 @@ const PUBLIC_CODES = new Set([
   'login_request_failed',
   'login_failed',
   'login_timeout',
+  'native_consent',
 ]);
 
 class LoginError extends Error {
@@ -108,6 +109,47 @@ export function validarRetorno(authorization, value) {
   ) {
     reject('callback_parameters');
   }
+  return target.href;
+}
+
+/**
+ * El «Permitir» de la pantalla de consentimiento de las apps nativas (NAT-02,
+ * services/id/internal/http/authorize_nativa.go): la primera vez en cada dispositivo
+ * Sytue ID pregunta antes de dar el código, y el arnés estrena dispositivo en cada
+ * tirada. El enlace solo se sigue si es LA MISMA autorización —mismo origen y ruta,
+ * los mismos parámetros con los mismos valores— con `sytue_consent` añadido y nada más.
+ */
+export function enlaceDeConsentimiento(authorization, html) {
+  const original = new URL(validarAutorizacion(authorization));
+  const hallado = /<a class="cta" href="([^"]+)"/.exec(String(html ?? ''));
+  if (!hallado) reject('native_consent');
+  // `html.EscapeString` de Go: &amp; &lt; &gt; &#39; &#34;, y &amp; la última.
+  const href = hallado[1]
+    .replaceAll('&#34;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&');
+  const target = url(new URL(href, ID_ORIGIN).href, 'native_consent');
+  if (
+    target.origin !== ID_ORIGIN ||
+    target.pathname !== original.pathname ||
+    target.username ||
+    target.password ||
+    target.hash
+  )
+    reject('native_consent');
+  const claves = new Set([...original.searchParams.keys(), ...target.searchParams.keys()]);
+  for (const clave of claves) {
+    const antes = original.searchParams.getAll(clave);
+    const ahora = target.searchParams.getAll(clave);
+    if (clave === 'sytue_consent') {
+      if (antes.length !== 0 || ahora.length !== 1 || !ahora[0]) reject('native_consent');
+    } else if (antes.length !== ahora.length || antes.some((v, i) => v !== ahora[i])) {
+      reject('native_consent');
+    }
+  }
+  if (!target.searchParams.has('sytue_consent')) reject('native_consent');
   return target.href;
 }
 
@@ -222,7 +264,12 @@ export async function autorizarDesktop(
         await page.waitForURL((target) => target.hostname !== 'id.sytue.eu', { timeout: 60_000 });
         await activarOrganizacion(page);
       }
-      const response = await ctx.request.get(destination, { maxRedirects: 0 });
+      let response = await ctx.request.get(destination, { maxRedirects: 0 });
+      // Sin Location y con página: la pregunta de NAT-02. Se dice que sí a ESTA petición.
+      if (!response.headers().location && response.status?.() === 200) {
+        const permitir = enlaceDeConsentimiento(destination, await response.text());
+        response = await ctx.request.get(permitir, { maxRedirects: 0 });
+      }
       return validarRetorno(destination, response.headers().location ?? '');
     };
     const expiry = new Promise((_, fail) => {

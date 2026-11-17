@@ -475,8 +475,10 @@ func tarjetaDirectos(v Vista, d Emitir) fyne.CanvasObject {
 	case d.Directos == nil && d.SinConexion:
 		cuerpo = append(cuerpo, Parrafo(v, v.Traduce("errors.offline.description"), tema.TextoSM, ui.Normal, "text-muted"))
 	case d.Directos == nil:
-		cuerpo = append(cuerpo, container.New(&altoFijo{alto: 2.5 * tema.Rem}, ui.NuevoEsqueleto(0, 0)),
-			container.New(&altoFijo{alto: 2.5 * tema.Rem}, ui.NuevoEsqueleto(0, 0)))
+		// Las dos barras, en UN grupo de carga con el mismo `gap-3` que tenían sueltas.
+		carga := ui.NuevosBloquesEsqueleto()
+		cuerpo = append(cuerpo, carga.Con(container.New(ui.Columna{Hueco: tema.Espacio(3)},
+			carga.Bloque(0, 2.5*tema.Rem), carga.Bloque(0, 2.5*tema.Rem))))
 	case len(d.Directos) == 0:
 		cuerpo = append(cuerpo, Parrafo(v, v.Traduce("studio.lives.empty"), tema.TextoSM, ui.Normal, "text-muted"))
 	}

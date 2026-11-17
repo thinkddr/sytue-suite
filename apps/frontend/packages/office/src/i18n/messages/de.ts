@@ -15,6 +15,8 @@ import type { en } from './en';
 
 export const de: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Name des Blatts:',
+  'dialog.sheet.nameTaken':
+    'Es gibt bereits ein Blatt namens „{name}“ (Namen unterscheiden nicht zwischen Groß- und Kleinschreibung).',
   'dialog.sheet.delete': 'Blatt „{name}“ löschen? Der Inhalt geht verloren.',
   'dialog.sheet.mergeLoses':
     'Beim Verbinden bleibt nur der Wert der Zelle oben links ({ref}) erhalten; die übrigen Zellen des Bereichs werden geleert. Um alle Texte in dieser Zelle zusammenzuführen, verwenden Sie „Inhalte verbinden“.',

@@ -309,6 +309,13 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // paleta propia y registra `erp:vistas`, `erp` y `erp:registros` como la web; Cloud y
     // Admin, las otras dos apps con capa en la web, no tienen app de Fyne. Tests del driver
     // y sección «paleta» del muestrario; sin ventana real aún.
+    // 2026-11-17 (VENTANA-REAL-CI, ventana-real.yml 43985202886: Xvfb, llvmpipe de Mesa
+    // 22.3.6): vista en ventana real la parte de Sytue One. Ctrl+K abre la paleta en Hub,
+    // ERP y Mail; con dos letras busca en el Hub y agrupa por producto (Drive, Contacts);
+    // las flechas mueven la opción activa e Intro abre la elegida (sytue-contacts:…). Las
+    // capas del ERP NO se han visto: cada tirada estrena dispositivo y el ERP se queda en
+    // «Configurar este dispositivo» (cliente cifrado), que en solo lectura no se completa.
+    // Sigue en `planificado` hasta verlas.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -674,6 +681,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // silenciar»). Posponer, silenciar y lo vuelto arriba de Recibidos revisados en las
     // capturas del driver (TestLasCapturasDePosponerYSilenciar); el listón de 'si' es la
     // ventana real, que necesita la cuenta de auditoría: sigue en `planificado`.
+    // 2026-11-17 (VENTANA-REAL-CI): la cuenta de auditoría ya tiene los tres hilos
+    // (pospuesto, silenciado y vuelto; los deja sembrar-auditoria.mjs) y ventana-real.yml
+    // los recorre, pero Mail en la ventana real (43985202886) se queda en «Cifrado de
+    // extremo a extremo · Configurar este dispositivo»: dispositivo nuevo en cada tirada y
+    // configurarlo escribe, que el solo lectura corta. No se ha visto: sigue en `planificado`.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

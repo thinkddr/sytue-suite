@@ -197,16 +197,18 @@ func CuerpoDeEstado(v Vista, vacio *ui.Vacio) fyne.CanvasObject {
 }
 
 // Esqueletos es la rejilla mientras carga: tarjetas grises del tamaño de las de
-// verdad, para que la página no dé un salto cuando llegan.
-func Esqueletos(v Vista, n int) fyne.CanvasObject {
+// verdad, para que la página no dé un salto cuando llegan. Todos los bloques son de UN
+// `ui.BloquesEsqueleto`: laten a una y la rejilla dice «Cargando» una vez.
+func Esqueletos(v Vista, n int) *ui.BloquesEsqueleto {
+	b := ui.NuevosBloquesEsqueleto()
 	hijos := make([]fyne.CanvasObject, n)
 	for i := range hijos {
-		poster := ui.NuevoEsqueleto(0, 0)
-		poster.Radio = radioTarjeta()
+		poster := b.Bloque(0, 0)
+		poster.CornerRadius = radioTarjeta()
 		hijos[i] = container.New(&esqueletoLayout{},
-			poster, ui.NuevoEsqueleto(0, 0), ui.NuevoEsqueleto(0, 0), ui.NuevoEsqueleto(0, 0))
+			poster, b.Bloque(0, 0), b.Bloque(0, 0), b.Bloque(0, 0))
 	}
-	return Rejilla(v, hijos...)
+	return b.Con(Rejilla(v, hijos...))
 }
 
 // esqueletoLayout reparte el póster, la línea del título y la de los datos como en una

@@ -63,6 +63,21 @@
 # guarda en un gnome-keyring propio de esta tirada, así que las otras doce ya entran
 # solas, y se borra al salir.
 #
+# EN EL CI lo corre `.github/workflows/ventana-real.yml` (a mano, `workflow_dispatch`) en
+# un runner del frontal con Xvfb y el GL de Mesa: siembra antes la cuenta con
+# `test/e2e/sembrar-auditoria.mjs` —también los hilos pospuesto, silenciado y vuelto que
+# Mail necesita enseñar, porque en solo lectura no se pueden crear desde aquí—, pasa
+# `VENTANA_LOGIN` con `ventana-real-login.mjs` y sube las capturas como artefacto.
+#
+# EL CIFRADO SE QUEDA FUERA, y con él el contenido de las apps cifradas. Cada tirada
+# estrena dispositivo (llavero y carpeta de usar y tirar) y las apps de cliente cifrado
+# —Mail, Hub y ERP, medido el 2026-11-17 en ventana-real 43985202886— se quedan en
+# «Cifrado de extremo a extremo · Configurar este dispositivo». Configurarlo da de alta un
+# dispositivo de Matrix en la cuenta, que es escribir, y el solo lectura lo corta antes
+# de la red. Lo que sí se ve: la barra de la suite, su paleta (⌘K) y los menús. Ver el
+# contenido pide una decisión del dueño (dejar escribir solo ese alta, o conservar un
+# dispositivo de la cuenta de auditoría entre tiradas); hasta entonces, no se intenta.
+#
 # Nada se queda encendido: el `trap` mata el servidor gráfico, el llavero y las apps.
 set -euo pipefail
 
@@ -296,12 +311,49 @@ escribir() { # <ventana> <texto>
 # son de la ventana y salen de las capturas de la tirada anterior; si una pantalla se
 # mueve, se ve en la foto siguiente, que sale mal. `app@forma` es un paso de esa forma
 # nada más: en la otra, lo que hay en esas coordenadas es otra cosa.
+#
+# Lo de Mail tras abrir el primer correo (que es el hilo VUELTO de Pospuestos, arriba de
+# Recibidos con su reloj): el menú del reloj, la carpeta «Pospuestos» y su hilo con la
+# franja «Pospuesto hasta…», y el hilo silenciado —buscado, porque silenciar lo archiva—
+# con la suya; en los dos, «Más acciones». Esos tres hilos los deja la siembra. Lo de la
+# paleta (⌘K): en el Hub, la búsqueda en Sytue One desde dos letras, las flechas e Intro
+# (lo que abre queda en `abiertas.txt`); en el ERP, sus capas `erp:vistas`, `erp` y
+# `erp:registros`. Coordenadas medidas con el driver de Fyne en Marco a 1280 × 744 (la
+# fila 450,233; el buscador 373,128; «Pospuestos» y «Recibidos» del lateral 130,293 y
+# 130,253; el reloj y «Más acciones» del lector 904,177 y 976,177).
 pasos() {
   awk -v app="$1" -v escribe="$escribe" -v forma="${FORMA:-marco}" '$1 == app || $1 == "*" || $1 == app "@" forma || (escribe == "si" && $1 == app "!") { $1 = ""; print substr($0, 2) }' <<'FIN'
 * foto inicio
-mail clic 420 175
+mail clic 450 233
 mail espera 3
 mail foto abrir-correo
+mail clic 904 177
+mail espera 1
+mail foto posponer-menu
+mail tecla Escape
+mail clic 130 293
+mail espera 4
+mail foto pospuestos
+mail clic 450 233
+mail espera 4
+mail foto pospuesto-franja
+mail clic 976 177
+mail espera 1
+mail foto pospuesto-mas-acciones
+mail tecla Escape
+mail clic 373 128
+mail escribir silenciado
+mail espera 4
+mail foto silenciado-buscado
+mail clic 450 233
+mail espera 4
+mail foto silenciado-franja
+mail clic 976 177
+mail espera 1
+mail foto silenciado-mas-acciones
+mail tecla Escape
+mail clic 130 253
+mail espera 3
 mail! clic 130 72
 mail! foto redactar
 mail! tecla Escape
@@ -402,6 +454,35 @@ mail tecla Escape
 * espera 3
 * foto buscar
 * tecla Escape
+hub tecla ctrl+k
+hub espera 2
+hub foto paleta
+hub escribir au
+hub espera 1
+hub foto paleta-buscando
+hub espera 4
+hub foto paleta-dos-letras
+hub tecla Down
+hub tecla Down
+hub foto paleta-flechas
+hub tecla Return
+hub espera 2
+hub foto paleta-saltar
+hub tecla Escape
+erp tecla ctrl+k
+erp espera 2
+erp foto paleta-capas
+erp tecla Down
+erp tecla Down
+erp foto paleta-capas-flechas
+erp escribir fa
+erp espera 1
+erp foto paleta-buscando
+erp espera 4
+erp foto paleta-registros
+erp tecla Up
+erp foto paleta-registros-flecha
+erp tecla Escape
 FIN
 }
 recorrer() { # <app> <ventana>
@@ -423,8 +504,10 @@ recorrer() { # <app> <ventana>
 entrar() { # espera la URL de login, la completa y vuelve a la app
   for _ in $(seq 20); do [ -s "$SALIDA/login-url" ] && break; sleep 1; done
   [ "$sesion" = si ] && [ -s "$SALIDA/login-url" ] || return 0 # ya había sesión, o no se quiere
-  if [ -n "${VENTANA_LOGIN:-}" ]; then
-    $VENTANA_LOGIN "$(cat "$SALIDA/login-url")" >"$SALIDA/login-vuelta"
+  if [ -n "${VENTANA_LOGIN:-}" ] && ! $VENTANA_LOGIN "$(cat "$SALIDA/login-url")" >"$SALIDA/login-vuelta"; then
+    # Sin sesión todas las capturas serían la pantalla de entrar: se para aquí, y dicho.
+    echo "login: VENTANA_LOGIN no completó el acceso (su motivo, arriba)" >&2
+    return 1
   fi
   echo "login: esperando $SALIDA/login-vuelta" >&2
   for _ in $(seq 300); do [ -s "$SALIDA/login-vuelta" ] && break; sleep 1; done

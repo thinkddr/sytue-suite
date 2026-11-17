@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const pt: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Nome da folha:',
+  'dialog.sheet.nameTaken':
+    'Já existe uma folha chamada «{name}» (os nomes não distinguem maiúsculas de minúsculas).',
   'dialog.sheet.delete': 'Eliminar a folha «{name}»? O seu conteúdo será perdido.',
   'dialog.sheet.mergeLoses':
     'Ao unir, só se mantém o valor da célula do canto superior esquerdo ({ref}); as restantes células do intervalo ficam vazias. Para juntar todos os textos nessa célula, use «Unir conteúdo».',

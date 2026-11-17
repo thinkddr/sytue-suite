@@ -200,7 +200,7 @@ func errorDeDominio(err error) bool {
 	return errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrProtegido) ||
 		errors.Is(err, domain.ErrClaveProteccion) || errors.Is(err, domain.ErrProteccionPendiente) ||
 		errors.Is(err, domain.ErrSecuenciaPendiente) ||
-		errors.Is(err, domain.ErrStaleSeq)
+		errors.Is(err, domain.ErrStaleSeq) || errors.Is(err, domain.ErrHojaGemela)
 }
 
 // La misma fila bloqueada serializa las escrituras y las mutaciones de ACL.
@@ -376,9 +376,10 @@ type registroVigente struct {
 	lamport   uint64
 }
 
-// leerVigente devuelve el valor ganador (LWW) del registro `clave`: mayor Lamport
-// y, a igualdad, mayor Dot, que es el orden de State.Apply.
-func leerVigente(ctx context.Context, tx pgx.Tx, docID, clave string) (*registroVigente, error) {
+// opVigente devuelve la operación ganadora (LWW) del registro `clave`: mayor Lamport y,
+// a igualdad, mayor Dot, que es el orden de State.Apply. nil si el registro no tiene
+// ninguna.
+func opVigente(ctx context.Context, tx pgx.Tx, docID, clave string) (*domain.Op, error) {
 	var raw []byte
 	err := tx.QueryRow(ctx, `
 		SELECT op FROM doc_operations
@@ -386,7 +387,7 @@ func leerVigente(ctx context.Context, tx pgx.Tx, docID, clave string) (*registro
 		ORDER BY lamport DESC, (op->'dot'->>'c')::numeric DESC, op->'dot'->>'a' DESC
 		LIMIT 1`, docID, clave).Scan(&raw)
 	if isNoRows(err) {
-		return nil, fmt.Errorf("%w: no hay contenido sobre el que aplicar el parche", domain.ErrInvalidOp)
+		return nil, nil //nolint:nilnil // sin escrituras: el registro aún no tiene valor
 	}
 	if err != nil {
 		return nil, fmt.Errorf("leer registro vigente: %w", err)
@@ -394,6 +395,28 @@ func leerVigente(ctx context.Context, tx pgx.Tx, docID, clave string) (*registro
 	var op domain.Op
 	if err := json.Unmarshal(raw, &op); err != nil {
 		return nil, fmt.Errorf("deserializar registro vigente: %w", err)
+	}
+	return &op, nil
+}
+
+// valorVigente es el valor del registro `clave` (nil si no tiene ninguno).
+func valorVigente(ctx context.Context, tx pgx.Tx, docID, clave string) (json.RawMessage, error) {
+	op, err := opVigente(ctx, tx, docID, clave)
+	if op == nil || err != nil {
+		return nil, err
+	}
+	return op.Value, nil
+}
+
+// leerVigente devuelve el contenido y el Lamport del registro `clave`, sobre el que se
+// aplica un parche.
+func leerVigente(ctx context.Context, tx pgx.Tx, docID, clave string) (*registroVigente, error) {
+	op, err := opVigente(ctx, tx, docID, clave)
+	if err != nil {
+		return nil, err
+	}
+	if op == nil {
+		return nil, fmt.Errorf("%w: no hay contenido sobre el que aplicar el parche", domain.ErrInvalidOp)
 	}
 	var contenido string
 	if err := json.Unmarshal(op.Value, &contenido); err != nil {

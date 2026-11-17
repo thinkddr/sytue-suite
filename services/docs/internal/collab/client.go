@@ -178,6 +178,8 @@ func (c *Client) handle(ctx context.Context, h Handler, msg ClientMessage) {
 				c.enqueue(errorMessage("protected", "Esta hoja o este libro están protegidos."))
 			case errors.Is(err, domain.ErrClaveProteccion):
 				c.enqueue(errorMessage("protection_password", "La contraseña de protección no es correcta."))
+			case errors.Is(err, domain.ErrHojaGemela):
+				c.enqueue(errorMessage("sheet_name_taken", "Ya hay otra hoja con ese nombre (las mayúsculas no cuentan)."))
 			default:
 				c.enqueue(errorMessage("apply_failed", "No se pudieron aplicar los cambios."))
 			}

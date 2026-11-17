@@ -35,7 +35,8 @@
  */
 import type { SheetAutoFilter, SheetData, SheetGroup } from '../types';
 import type { FilterView } from './filtro';
-import { extractRefs } from './formula-edit';
+import type { SheetPivot } from './pivot';
+import { esDeOtroLibro, extractRefs } from './formula-edit';
 import {
   escapeHtml,
   isFormula,
@@ -219,6 +220,8 @@ export function reescribirFormula(
   if (refs.length === 0) return texto;
   let out = texto;
   for (const r of [...refs].sort((x, y) => y.start - x.start)) {
+    // Una referencia a otro libro apunta a SUS filas, que aquí no se mueven nunca.
+    if (r.sheet !== undefined && esDeOtroLibro(r.sheet)) continue;
     const de = r.sheet ?? base;
     if (d.hoja !== undefined && (de === undefined || !mismaHoja(de, d.hoja))) continue;
     const nuevo = moverReferencia(r.text, d);
@@ -359,9 +362,70 @@ export function moverVista(v: FilterView, d: Desplazamiento): FilterView {
 }
 
 /**
+ * Las TABLAS DINÁMICAS siguen a sus datos, con las reglas de un rango: su origen
+ * (`source`) se mueve con la hoja de la que lee —la suya, o `sourceSheet` si es otra—,
+ * y su esquina y lo que ocupó la última vez (`anchor`, `range`) con la hoja que la aloja
+ * (`propia`). Antes se quedaban quietos: insertar una fila encima de los datos dejaba la
+ * tabla leyendo una fila de cabeceras que ya era de datos y perdiendo la última, y al
+ * actualizarla se escribía sobre lo que hubiera bajado a su antigua esquina.
+ *
+ * Si se borra el origen entero, o la esquina y todo lo que ocupaba, la tabla dinámica
+ * desaparece como un gráfico sin datos (su resultado queda en las celdas como valores, y
+ * sus segmentaciones pasan a «inactivas»); si solo se borra su esquina, pasa a la primera
+ * celda que queda de lo que ocupaba.
+ *
+ * Con la hoja que la aloja PROTEGIDA se mueve igual: no se puede crear ni cambiar una
+ * tabla dinámica, pero seguir a sus datos no es cambiarla, y el servidor acepta
+ * exactamente este desplazamiento y nada más (apps/nucleo/office/model/
+ * proteccion_dinamicas.go). Dejarla quieta la dejaba leyendo una fila de más o de menos.
+ * Devuelve la misma lista si nada cambia.
+ */
+function moverDinamicas(
+  s: SheetData,
+  d: Desplazamiento,
+  propia: boolean,
+): SheetPivot[] | undefined {
+  if (!s.pivots) return s.pivots;
+  const vivo = (ref: string): string | null => {
+    const r = moverReferencia(ref, d);
+    return r === REF_ROTA ? null : r;
+  };
+  let cambia = false;
+  const pivots = s.pivots.flatMap((p) => {
+    const q: SheetPivot = { ...p };
+    // El nombre de `sourceSheet` es el que se guardó, no uno tecleado: se compara tal
+    // cual, como al leer el origen (pivot-hoja.ts).
+    if (d.hoja === undefined || (p.sourceSheet ?? s.name) === d.hoja) {
+      const source = vivo(p.source);
+      if (!source) {
+        cambia = true;
+        return [];
+      }
+      q.source = source;
+    }
+    if (propia) {
+      const range = p.range === undefined ? null : vivo(p.range);
+      const anchor = vivo(p.anchor) ?? (range ? range.split(':')[0]! : null);
+      if (!anchor) {
+        cambia = true;
+        return [];
+      }
+      q.anchor = anchor;
+      if (range) q.range = range;
+      else delete q.range;
+    }
+    if (q.source !== p.source || q.anchor !== p.anchor || q.range !== p.range) cambia = true;
+    return [q];
+  });
+  if (!cambia) return s.pivots;
+  return pivots.length > 0 ? pivots : undefined;
+}
+
+/**
  * Los OBJETOS de la hoja siguen a sus celdas al insertar o borrar filas y columnas,
  * con las mismas reglas que las fórmulas: una tabla, un minigráfico, un gráfico, una
- * regla de formato condicional, una validación o una combinada cuyo rango queda
+ * tabla dinámica (`moverDinamicas`), una regla de formato condicional, una validación o
+ * una combinada cuyo rango queda
  * dentro de lo insertado crece; si se le borra un trozo, encoge; y si se le borra
  * entero, desaparece (su dato ya no existe). El autofiltro y sus exclusiones, la
  * columna de cada segmentación, los grupos de esquema y los anchos y altos se mueven
@@ -504,6 +568,9 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     if (slicers.length > 0) out.slicers = slicers;
     else delete out.slicers;
   }
+  const pivots = moverDinamicas(s, d, true);
+  if (pivots) out.pivots = pivots;
+  else delete out.pivots;
   if (s.autofilter && isPermissionGranted(s.protect, 'autoFilter')) {
     const af = s.autofilter;
     const a1 = `${indiceACol(af.c1, 'A')}${af.row + 1}:${indiceACol(af.c2, 'A')}${af.row + 1}`;
@@ -530,14 +597,17 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
  * reescribía la hoja activa, y «Resumen» se quedaba sumando la fila de al lado sin
  * avisar: el mismo error silencioso que motivó este fichero, una hoja más allá.
  *
- * Cubre las celdas y las fórmulas del formato condicional y de las validaciones (una
- * lista `=Ventas!A1:A9`); sus RANGOS son de esta hoja y no se mueven. Los nombres
+ * Cubre las celdas, las fórmulas del formato condicional y de las validaciones (una
+ * lista `=Ventas!A1:A9`) y el origen de las tablas dinámicas que leen de aquella hoja;
+ * sus RANGOS son de esta hoja y no se mueven. Los nombres
  * definidos van aparte (`moverNombres`, nombres.ts).
  *
- * Con la hoja PROTEGIDA se respeta lo que veta el servidor (ver `moverObjetos`): solo
- * se reescriben las celdas desbloqueadas, y las reglas solo con `objects` concedido.
- * Una fórmula bloqueada que se queda mirando la celda vieja es el mal menor frente a
- * que el servidor rechace el guardado entero.
+ * Con la hoja PROTEGIDA se reescriben TODAS sus celdas, también las bloqueadas y las
+ * de los rangos editables de otras personas: seguir a su dato no es editar la fórmula,
+ * y el servidor lo acepta cuando el cambio es exactamente este desplazamiento
+ * (apps/nucleo/office/model/proteccion_ajenas.go). Dejar unas sí y otras no es lo que
+ * rechazaría. Las reglas de formato condicional y validación siguen necesitando
+ * `objects`, como en `moverObjetos`.
  */
 export function moverReferenciasAjenas(s: SheetData, d: Desplazamiento): SheetData {
   if (d.hoja === undefined || mismaHoja(s.name, d.hoja)) return s;
@@ -546,7 +616,6 @@ export function moverReferenciasAjenas(s: SheetData, d: Desplazamiento): SheetDa
   let celdas: Record<string, string> | null = null;
   for (const ref in s.cells) {
     const html = s.cells[ref]!;
-    if (s.protect && s.styles?.[ref]?.locked !== false) continue;
     const nuevo = reescribirCelda(html, d, s.name);
     if (nuevo !== html) (celdas ??= { ...s.cells })[ref] = nuevo;
   }
@@ -565,6 +634,13 @@ export function moverReferenciasAjenas(s: SheetData, d: Desplazamiento): SheetDa
   if (isPermissionGranted(s.protect, 'objects')) {
     if (s.condFormats) out.condFormats = reglas(s.condFormats);
     if (s.validations) out.validations = reglas(s.validations);
+  }
+  // Las tablas dinámicas que leen de aquella hoja (`sourceSheet`) mueven su origen.
+  const pivots = moverDinamicas(s, d, false);
+  if (pivots !== s.pivots) {
+    cambia = true;
+    if (pivots) out.pivots = pivots;
+    else delete out.pivots;
   }
   return cambia ? out : s;
 }

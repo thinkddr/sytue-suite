@@ -31,6 +31,45 @@ export function conColorDePestana(model: SheetModel, i: number, color: string | 
   };
 }
 
+/**
+ * ¿Son dos nombres de hoja el mismo salvo mayúsculas («Ventas» y «VENTAS»)? Excel y
+ * LibreOffice no dejan tener los dos en un libro, y el servidor rechaza el guardado que
+ * los crea (`nombrehoja.GemelaNueva`, con `strings.EqualFold` de Go). Por eso se mira
+ * también en mayúsculas y no solo en minúsculas como `mismaHoja`: «ſ» y «s», o «ϑ» y «θ»,
+ * son la misma letra para EqualFold y no en minúsculas; así la web nunca deja pasar lo
+ * que el servidor rechazaría.
+ */
+export function nombresGemelos(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase() || a.toUpperCase() === b.toUpperCase();
+}
+
+/**
+ * La hoja de `nombres`, distinta de `excepto`, que se llama como `nombre` salvo
+ * mayúsculas; -1 si ninguna. Es `HojaGemela` de Fyne.
+ */
+export function hojaGemela(nombres: readonly string[], nombre: string, excepto = -1): number {
+  return nombres.findIndex((n, i) => i !== excepto && nombresGemelos(n, nombre));
+}
+
+/**
+ * El primer nombre de la serie `nombrar(desde)`, `nombrar(desde + 1)`… que no es gemelo
+ * de ninguna hoja: «Hoja 3», o «Hoja 4» si ya hay una «hoja 3»; «Datos (2)», o «Datos
+ * (3)» si ya hay una «DATOS (2)». `nombrar` da un nombre distinto para cada número.
+ */
+export function nombreLibreDeHoja(
+  nombres: readonly string[],
+  nombrar: (n: number) => string,
+  desde: number,
+): string {
+  // Cada hoja ocupa a lo sumo un nombre de la serie: con length + 1 intentos hay uno libre.
+  let n = desde;
+  for (; n < desde + nombres.length; n++) {
+    const s = nombrar(n);
+    if (hojaGemela(nombres, s) < 0) return s;
+  }
+  return nombrar(n);
+}
+
 /** Qué opciones del menú de la pestaña `i` están vivas. */
 export interface OpcionesPestana {
   renombrar: boolean;

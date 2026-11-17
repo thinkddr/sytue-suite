@@ -236,7 +236,9 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 		}
 		return Celda{C: n, F: k.F}, ok
 	}
+	l.antesDeEstructura(true)
 	l.anotar()
+	l.pasado[len(l.pasado)-1].estructural = true
 	h := l.h()
 	// Solo se mueven las referencias que apuntan a esta hoja, estén donde estén.
 	d.Hoja = h.nombre
@@ -278,6 +280,7 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	}
 	l.f.nombres = moverNombres(l.f.nombres, h.nombre, l.f.hojas[0].nombre, d)
 	l.restaurar(l.f)
+	l.trasEstructura(true)
 }
 
 // moverReferenciasAjenas es `moverReferenciasAjenas` de refshift.ts: en una hoja que NO
@@ -285,19 +288,16 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 // —las celdas y las del formato condicional y las validaciones; sus rangos son de esta
 // hoja y no se mueven—. Antes «Resumen» se quedaba mirando la celda vieja sin avisar.
 //
-// Con la hoja protegida se respeta lo que veta el servidor, como en `moverObjetos`: solo
-// las celdas desbloqueadas, y las reglas solo con `objects` concedido.
+// Con la hoja protegida se reescriben TODAS las celdas, también las bloqueadas: seguir a
+// su dato no es editarlas, y el servidor lo acepta cuando el cambio es exactamente este
+// desplazamiento (apps/nucleo/office/model/proteccion_ajenas.go). Las reglas siguen
+// necesitando `objects`, como en `moverObjetos`.
 func moverReferenciasAjenas(h *hojaLibro, d formula.Desplazamiento) {
 	if strings.EqualFold(h.nombre, d.Hoja) {
 		return
 	}
 	var celdas map[Celda]string
 	for k, html := range h.celdas {
-		if h.proteccion != nil {
-			if b := h.estilos[k].Bloqueada; b == nil || *b {
-				continue
-			}
-		}
 		if nuevo := reescribirCeldaEn(html, d, h.nombre); nuevo != html {
 			if celdas == nil {
 				celdas = maps.Clone(h.celdas)
@@ -308,6 +308,8 @@ func moverReferenciasAjenas(h *hojaLibro, d formula.Desplazamiento) {
 	if celdas != nil {
 		h.celdas = celdas
 	}
+	// Las tablas dinámicas que leen de aquella hoja (`sourceSheet`) mueven su origen.
+	h.dinamicas = moverDinamicas(h, d, false)
 	if h.proteccion != nil && !h.proteccion.Objects {
 		return
 	}
@@ -329,7 +331,7 @@ func moverReferenciasAjenas(h *hojaLibro, d formula.Desplazamiento) {
 }
 
 // moverObjetos es `moverObjetos` de `refshift.ts`: las tablas, los minigráficos, los
-// gráficos, las segmentaciones, el autofiltro, el formato condicional, las validaciones,
+// gráficos, las tablas dinámicas (`moverDinamicas`), las segmentaciones, el autofiltro, el formato condicional, las validaciones,
 // el esquema, las combinadas y los anchos y altos siguen a sus celdas con las reglas de
 // las fórmulas; lo que se queda sin dato desaparece.
 //
@@ -349,6 +351,7 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 	columna := func(c int) (int, bool) { return moverColumna(c, d) }
 	moverEstructura(h, d, vivo)
 	h.tablas = moverTablas(h.tablas, vivo)
+	h.dinamicas = moverDinamicas(h, d, true)
 	if h.proteccion == nil || h.proteccion.AutoFilter {
 		h.filtro = moverAutofiltro(h.filtro, vivo, columna)
 	}
@@ -384,6 +387,68 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 		}
 	}
 	h.minis, h.graficos, h.segs = minis, graficos, segs
+}
+
+// moverDinamicas es `moverDinamicas` de refshift.ts: el origen de cada tabla dinámica
+// sigue a la hoja de la que lee (la suya, o `SourceSheet`, comparado tal cual como en
+// hojaOrigen) y, en la hoja que la aloja (`propia`), su esquina y lo que ocupó. Sin
+// origen, o sin esquina ni nada de lo que ocupaba, desaparece; sin esquina pero con
+// algo de lo que ocupaba, pasa a la primera celda que queda. Con la hoja protegida se
+// mueve igual: seguir a sus datos no es cambiarla, y el servidor acepta exactamente este
+// desplazamiento (apps/nucleo/office/model/proteccion_dinamicas.go). Devuelve la misma
+// lista si nada cambia (la foto de deshacer la comparte).
+func moverDinamicas(h *hojaLibro, d formula.Desplazamiento, propia bool) []analisis.Dinamica {
+	if len(h.dinamicas) == 0 {
+		return h.dinamicas
+	}
+	vivo := func(ref string) (string, bool) {
+		r := d.MoverReferencia(ref)
+		return r, r != formula.RefRota
+	}
+	cambia := false
+	var out []analisis.Dinamica
+	for _, p := range h.dinamicas {
+		q := p
+		origen := p.SourceSheet
+		if origen == "" {
+			origen = h.nombre
+		}
+		if d.Hoja == "" || origen == d.Hoja {
+			src, ok := vivo(p.Source)
+			if !ok {
+				cambia = true
+				continue
+			}
+			q.Source = src
+		}
+		if propia {
+			rango, conRango := "", false
+			if p.Range != "" {
+				rango, conRango = vivo(p.Range)
+			}
+			esquina, ok := vivo(p.Anchor)
+			if !ok && conRango {
+				esquina, _, _ = strings.Cut(rango, ":")
+				ok = true
+			}
+			if !ok {
+				cambia = true
+				continue
+			}
+			q.Anchor, q.Range = esquina, ""
+			if conRango {
+				q.Range = rango
+			}
+		}
+		if q.Source != p.Source || q.Anchor != p.Anchor || q.Range != p.Range {
+			cambia = true
+		}
+		out = append(out, q)
+	}
+	if !cambia {
+		return h.dinamicas
+	}
+	return out
 }
 
 func moverTablas(ts []TablaFmt, vivo func(string) (string, bool)) []TablaFmt {
@@ -610,17 +675,7 @@ func reescribirCelda(html string, d formula.Desplazamiento) string {
 // reescribirCeldaEn es `reescribirCelda` con la hoja en la que vive la celda (`base`).
 // Sin cambios, el HTML sale tal cual, como en la web.
 func reescribirCeldaEn(html string, d formula.Desplazamiento, base string) string {
-	if html == "" || !esFormula(html) {
-		return html
-	}
-	raw := textoPlano(html)
-	nuevo := d.ReescribirFormulaEn(raw, base)
-	if nuevo == raw {
-		return html
-	}
-	p := leerCelda(html)
-	p.dentro = escaparHTML(nuevo)
-	return p.html()
+	return d.ReescribirCeldaEn(html, base)
 }
 
 // Rellenar es `applyFill` (el asa de autorrelleno): copia el bloque origen sobre el

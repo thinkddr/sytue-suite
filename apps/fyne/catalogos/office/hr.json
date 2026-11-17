@@ -520,6 +520,7 @@
   "dialog.merge.reset": "Dokument će se zamijeniti s {total} spojenih kopija. Predložak i izvor podataka bit će izgubljeni. Nastaviti?",
   "dialog.sheet.delete": "Izbrisati list „{name}”? Njegov sadržaj bit će izgubljen.",
   "dialog.sheet.mergeLoses": "Pri spajanju zadržava se samo vrijednost gornje lijeve ćelije ({ref}); ostale ćelije raspona se prazne. Da biste sav tekst objedinili u toj ćeliji, upotrijebite „Spoji sadržaj”.",
+  "dialog.sheet.nameTaken": "List naziva „{name}” već postoji (nazivi ne razlikuju velika i mala slova).",
   "dialog.sheet.rename": "Naziv lista:",
   "dialog.slide.delete": "Izbrisati slajd {n}?",
   "doc.msg.exportFailed": "Izvoz nije uspio",

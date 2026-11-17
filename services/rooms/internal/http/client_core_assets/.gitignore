@@ -1,3 +1,4 @@
-/core.wasm
-/wasm_exec.js
-/GO-LICENSE
+# Los genera scripts/client-core-assets.sh (core aquí; office/ y mail/ debajo).
+core.wasm
+wasm_exec.js
+GO-LICENSE

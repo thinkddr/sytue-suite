@@ -242,6 +242,7 @@ func TestLosSeisEstadosSePintan(t *testing.T) {
 			if !hayTinta(img, int(tema.AnchoLateral)+20, filaFileteCab+20, int(ventana)-20, int(altoUtil)-20) {
 				t.Errorf("el estado %q deja el contenido en blanco", c.nombre)
 			}
+			guardar(t, img, "calendario-estado-"+c.nombre)
 		})
 	}
 }

@@ -604,7 +604,11 @@ func (s *Service) RestoreVersion(ctx context.Context, subj Subject, docID, versi
 
 	// La restauración escribe por la misma puerta que cualquier edición: restaurar una
 	// versión sin protección sobre una hoja protegida exige ser propietario o traer la
-	// contraseña, como quitarla a mano.
+	// contraseña, como quitarla a mano. Lo que no se le pide es no traer hojas gemelas:
+	// la versión puede ser de cuando el libro las tenía (hojas_gemelas.go).
+	p := ProteccionDe(ctx)
+	p.Restaurando = true
+	ctx = context.WithValue(ctx, ctxProteccion{}, p)
 	seqd, newSeq, err := s.appendProtegido(ctx, doc, subj, ops, nil)
 	if err != nil {
 		return nil, err

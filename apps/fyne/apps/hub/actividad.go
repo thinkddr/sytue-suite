@@ -163,6 +163,7 @@ type actividadRenderer struct {
 	grupos    []grupoPintado
 	aviso     *ui.Vacio
 	esqueleto []fyne.CanvasObject
+	carga     *ui.BloquesEsqueleto // el grupo de `esqueleto`
 	objetos   []fyne.CanvasObject
 }
 
@@ -183,7 +184,7 @@ func (r *actividadRenderer) rehacer() {
 	r.cabecera = nuevaCabecera(v, t.T("activity.overline", nil), t.T("activity.heading", nil),
 		t.T("activity.intro", nil))
 	r.cabecera.preparar(v, ancho)
-	r.filtros, r.grupos, r.aviso, r.esqueleto = nil, nil, nil, nil
+	r.filtros, r.grupos, r.aviso, r.esqueleto, r.carga = nil, nil, nil, nil, nil
 
 	// Los filtros solo salen si hay más de un producto en la tanda o ya hay uno
 	// puesto: ofrecer un filtro que no filtra es ruido.
@@ -202,9 +203,12 @@ func (r *actividadRenderer) rehacer() {
 
 	switch a.Estado {
 	case Cargando:
+		// Las cinco filas son UN grupo: laten a una y dicen «Cargando» una vez.
+		g := ui.NuevosBloquesEsqueleto()
 		for range 5 {
-			r.esqueleto = append(r.esqueleto, ui.NuevoEsqueleto(0, MedidaActividad(true)))
+			r.esqueleto = append(r.esqueleto, g.Bloque(0, MedidaActividad(true)))
 		}
+		r.carga = g.AMano()
 	case SinNada:
 		r.aviso = Aviso(t, v, SinNada, textosActividad, nil)
 	case Fallo, SinConexion, Prohibido:
@@ -281,7 +285,9 @@ func (r *actividadRenderer) recomponer() {
 	for _, p := range r.filtros {
 		r.objetos = append(r.objetos, p)
 	}
-	r.objetos = append(r.objetos, r.esqueleto...)
+	if r.carga != nil {
+		r.objetos = append(r.objetos, r.carga)
+	}
 	if r.aviso != nil {
 		r.objetos = append(r.objetos, r.aviso)
 	}
@@ -347,7 +353,9 @@ func (r *actividadRenderer) Layout(t fyne.Size) {
 	if t.Width <= 0 {
 		return
 	}
-	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width))))
+	tam := fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width)))
+	r.fondo.Resize(tam)
+	r.carga.Cubrir(tam)
 	x, ancho := CajaContenido(t.Width)
 	y := r.cabecera.colocar(x) + MargenCabeceraActividad
 

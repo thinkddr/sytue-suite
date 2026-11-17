@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const sv: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Bladets namn:',
+  'dialog.sheet.nameTaken':
+    'Det finns redan ett blad som heter ”{name}” (namn skiljer inte på versaler och gemener).',
   'dialog.sheet.delete': 'Ta bort bladet ”{name}”? Innehållet går förlorat.',
   'dialog.sheet.mergeLoses':
     'Vid sammanfogning behålls bara värdet i cellen längst upp till vänster ({ref}); övriga celler i området töms. Använd ”Sammanfoga innehåll” om du vill samla all text i den cellen.',

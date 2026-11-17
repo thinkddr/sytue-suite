@@ -1058,6 +1058,15 @@ function DialogoAtajos({ abierta }: { abierta: boolean }) {
               { teclas: ['Ctrl', 'K'], descripcion: 'Buscar' },
             ],
           },
+          {
+            // Un segundo grupo con una combinación más ancha: las descripciones de los
+            // dos tienen que caer en la misma vertical.
+            titulo: 'Edición',
+            atajos: [
+              { teclas: ['Ctrl', 'Mayús', 'Z'], descripcion: 'Rehacer' },
+              { teclas: ['Ctrl', 'Alt', 'Mayús', 'V'], descripcion: 'Pegar sin formato' },
+            ],
+          },
         ]}
       />
     </>

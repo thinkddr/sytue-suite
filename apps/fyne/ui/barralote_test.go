@@ -262,7 +262,7 @@ func TestLaPilaReservaLaBarraDeLoteAlAnchoActual(t *testing.T) {
 						NuevoBoton("Mover", nil).Con(Secundario, TallaSM),
 						NuevoBoton("Descargar", nil).Con(Secundario, TallaSM),
 						NuevoBoton("Papelera", nil).Con(Peligro, TallaSM),
-					}, nil).Con(tema.Espacio(4))
+					}, nil).Con(tema.Espacio(4)).ConNumero(3) // como Drive
 				cabecera := canvas.NewRectangle(tema.Color("bg-subtle", tema.Claro))
 				cabecera.SetMinSize(fyne.NewSize(0, 40))
 				cuerpo := canvas.NewRectangle(tema.Color("surface", tema.Claro))
@@ -283,6 +283,13 @@ func TestLaPilaReservaLaBarraDeLoteAlAnchoActual(t *testing.T) {
 					}
 					for _, accion := range b.controles() {
 						caja := fyne.NewSize(b.Size().Width, b.Size().Height-tema.Borde)
+						if tactil && accion == b.quitar {
+							// El aspa no va en la tira: queda fija en la barra.
+							if p, m := accion.Position(), accion.Size(); p.X < 0 || p.X+m.Width > caja.Width+0.01 || m.Height < 44 {
+								t.Fatalf("a %g el aspa queda fuera de la barra: %v/%v en %v", ancho, p, m, caja)
+							}
+							continue
+						}
 						if tactil {
 							if r.tira == nil || accion.Size().Height < 44 || r.tira.Position().Y+r.tira.Size().Height > b.Size().Height-tema.Borde {
 								t.Fatal("la barra perdió su tira y su alto táctil")
@@ -325,9 +332,9 @@ func TestElDobleClicDelDeslizador(t *testing.T) {
 
 // TestLaBarraDeLoteSeDeslizaEnTactil: en un teléfono la barra NO se reparte en
 // líneas —en el panel de Contactos, a 279, sus cinco acciones ocupaban tres y se
-// comían la lista que hay debajo—. Es UNA fila que se desplaza de lado, la misma
-// respuesta que la web en móvil. VISTO EN ROJO quitando la rama de `esTactil` de
-// `MedidaBarraDeLoteEn`: la barra volvía a medir tres líneas.
+// comían la lista que hay debajo—. Es UNA fila cuyas acciones se desplazan de lado,
+// la misma respuesta que la web en móvil. VISTO EN ROJO quitando la rama de `esTactil`
+// de `MedidaBarraDeLoteEn`: la barra volvía a medir tres líneas.
 func TestLaBarraDeLoteSeDeslizaEnTactil(t *testing.T) {
 	si := true
 	tactilDePrueba = &si
@@ -360,10 +367,16 @@ func TestLaBarraDeLoteSeDeslizaEnTactil(t *testing.T) {
 	if tira == nil {
 		t.Fatal("en táctil la barra no monta la tira deslizable")
 	}
-	// Recuento + cuatro acciones + el aspa: todo dentro de la tira, ninguno
-	// suelto fuera.
-	if len(tira.Objetos) != 6 {
-		t.Errorf("la tira lleva %d objetos y son el recuento, cuatro acciones y el aspa", len(tira.Objetos))
+	// Solo las cuatro acciones van en la tira: el recuento y el aspa quedan fijos en
+	// los extremos (`BulkActionBar.tsx`). VISTO EN ROJO con la fila entera en la tira:
+	// el aspa empezaba en 487,5 px a 279, 320 y 390 de ancho, fuera de la barra.
+	if len(tira.Objetos) != 4 {
+		t.Errorf("la tira lleva %d objetos y son las cuatro acciones", len(tira.Objetos))
+	}
+	for _, o := range tira.Objetos {
+		if o == fyne.CanvasObject(b.quitar) {
+			t.Error("el aspa va dentro de la tira: se desliza fuera de la vista")
+		}
 	}
 	// Y su contenido NO cabe: por eso se desplaza, que es el punto.
 	if tira.AnchoContenido() <= ancho-2*rellenoLoteX {
@@ -372,14 +385,79 @@ func TestLaBarraDeLoteSeDeslizaEnTactil(t *testing.T) {
 	for _, ancho := range []float32{279, 320, 375, 390} {
 		b.Resize(MedidaBarraDeLoteEn(b, ancho))
 		r.Layout(b.Size())
+		aspa := b.quitar
+		if aspa.Position().X < tira.Position().X+tira.Size().Width ||
+			aspa.Position().X+aspa.Size().Width > ancho-rellenoLoteX+0.5 {
+			t.Errorf("a %g el aspa va en %v (%v): no queda fija a la derecha, tras la tira que acaba en %g",
+				ancho, aspa.Position(), aspa.Size(), tira.Position().X+tira.Size().Width)
+		}
+		if aspa.Size().Height < 44 {
+			t.Errorf("a %g el aspa mide %v: menos que el suelo táctil", ancho, aspa.Size())
+		}
+		if texto := Medir("3 archivos seleccionados", tema.TextoSM, Medio).Width; tira.Position().X < rellenoLoteX+texto {
+			t.Errorf("a %g la tira empieza en %g, encima del recuento (%g)", ancho, tira.Position().X, rellenoLoteX+texto)
+		}
 		if fin := tira.Position().Y + tira.Size().Height; fin > b.Size().Height-tema.Borde {
 			t.Errorf("a %g la tira acaba en %g fuera de la barra de %g", ancho, fin, b.Size().Height)
 		}
-		for _, accion := range b.controles() {
+		for _, accion := range b.Acciones {
 			if accion.Size().Height < 44 || accion.Position().Y < 0 || accion.Position().Y+accion.Size().Height > tira.Size().Height {
 				t.Errorf("a %g la acción %q queda recortada: %v/%v en una tira de %v", ancho,
 					accion.Texto, accion.Position(), accion.Size(), tira.Size())
 			}
 		}
+	}
+}
+
+// Con pocas acciones que caben, van a la derecha, junto al aspa, como en escritorio (el
+// `ms-auto` de `BulkActionBar.tsx`): la tira no estira un hueco vacío detrás de ellas.
+func TestEnTactilLasAccionesQueCabenVanALaDerecha(t *testing.T) {
+	si := true
+	tactilDePrueba = &si
+	t.Cleanup(func() { tactilDePrueba = nil })
+	b := NuevaBarraDeLote("1 seleccionado", "Acciones", "Quitar la selección",
+		[]*Boton{NuevoBoton("Borrar", nil).Con(Peligro, TallaSM)}, nil)
+	const ancho float32 = 390
+	b.Resize(MedidaBarraDeLoteEn(b, ancho))
+	r := b.CreateRenderer()
+	defer r.Destroy()
+	r.Layout(b.Size())
+	borrar := b.Acciones[0]
+	var tira *TiraDeslizable
+	for _, o := range r.Objects() {
+		if v, ok := o.(*TiraDeslizable); ok {
+			tira = v
+		}
+	}
+	if tira == nil {
+		t.Fatal("en táctil la barra no monta la tira deslizable")
+	}
+	finBorrar := tira.Position().X + borrar.Position().X + borrar.Size().Width
+	if hueco := b.quitar.Position().X - finBorrar; hueco < huecoLote-0.5 || hueco > huecoLote+0.5 {
+		t.Errorf("entre «Borrar» y el aspa quedan %g px y son los %g de `gap-1.5`", hueco, huecoLote)
+	}
+}
+
+// En táctil, con Numero, se ve solo el número (`BulkActionBar.tsx` en el teléfono) y la
+// frase pasa al nombre accesible; en escritorio, la frase de siempre.
+func TestEnTactilElRecuentoEsElNumero(t *testing.T) {
+	for _, tactil := range []bool{false, true} {
+		antes := tactilDePrueba
+		tactilDePrueba = &tactil
+		b := NuevaBarraDeLote("12 archivos seleccionados", "Acciones", "Quitar la selección",
+			[]*Boton{NuevoBoton("Borrar", nil).Con(Peligro, TallaSM)}, nil).ConNumero(12)
+		b.Resize(MedidaBarraDeLoteEn(b, 320))
+		r := test.WidgetRenderer(b).(*barraLoteRenderer)
+		want := "12 archivos seleccionados"
+		if tactil {
+			want = "12"
+		}
+		if r.texto.Text != want {
+			t.Errorf("tactil=%v: la barra enseña %q, no %q", tactil, r.texto.Text, want)
+		}
+		if got := b.AccessibilityLabel(); got != "Acciones: 12 archivos seleccionados" {
+			t.Errorf("tactil=%v: el nombre accesible es %q y pierde la frase", tactil, got)
+		}
+		tactilDePrueba = antes
 	}
 }

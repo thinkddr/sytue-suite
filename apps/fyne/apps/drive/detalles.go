@@ -430,13 +430,16 @@ func (dd *dialogoDetalles) pintar() {
 
 // esqueletoDetalles son las ocho líneas de la espera: rótulo al 35 % y valor al 45 %,
 // a `gap-4`, y las filas a `gap-3`.
+//
+// Las dieciséis rayas son UN grupo de carga: laten a una y dicen «Cargando» una vez.
 func esqueletoDetalles(ancho float32) fyne.CanvasObject {
+	b := ui.NuevosBloquesEsqueleto()
 	filas := make([]fyne.CanvasObject, 0, FilasEsqueletoDetalles)
 	for range FilasEsqueletoDetalles {
 		filas = append(filas, container.New(ui.Fila{Hueco: tema.Espacio(4)},
-			ui.NuevoEsqueleto(0.35*ancho, AltoEsqueletoDetalles), ui.NuevoEsqueleto(0.45*ancho, AltoEsqueletoDetalles)))
+			b.Bloque(0.35*ancho, AltoEsqueletoDetalles), b.Bloque(0.45*ancho, AltoEsqueletoDetalles)))
 	}
-	return container.New(ui.Columna{Hueco: tema.Espacio(3)}, filas...)
+	return b.Con(container.New(ui.Columna{Hueco: tema.Espacio(3)}, filas...))
 }
 
 // listaDetalles es la `dl`: `grid-cols-[minmax(8rem,auto)_1fr] gap-x-4`, filas en

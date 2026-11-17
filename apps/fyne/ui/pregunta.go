@@ -47,6 +47,11 @@ type OpcionesPregunta struct {
 	// línea se PARTE, como el `<label>` de la web; sin él, va en una sola línea (el
 	// rótulo corto de siempre: «Nombre de la hoja»).
 	Lienzo fyne.Size
+	// Validar es `validar`: recibe lo escrito sin espacios a los lados y devuelve el
+	// error que se pinta bajo el campo —la línea de error de GrupoCampo, con el campo en
+	// rojo— y que apaga aceptar, o "" si vale. Con el campo vacío no se llama: eso ya
+	// apaga aceptar. El nombre de una hoja que ya tiene otra.
+	Validar func(string) string
 }
 
 // PreguntaCon es Pregunta con las opciones de PreguntarOpciones que no son de todos los
@@ -82,11 +87,43 @@ func preguntaCon(mensaje, valor, rotuloCancelar, rotuloAceptar, obligatorio stri
 		}
 		asterisco.ExtendBaseWidget(asterisco)
 	}
-	cuerpo := container.New(Columna{Hueco: tema.Espacio(1.5)}, etiquetaPregunta(mensaje, asterisco, o.Lienzo), campo) // `gap-1.5`
+	etiqueta := etiquetaPregunta(mensaje, asterisco, o.Lienzo)
+	cuerpo := container.New(Columna{Hueco: tema.Espacio(1.5)}, etiqueta, campo) // `gap-1.5`
 
 	var d *Dialogo
 	var aceptar *Boton
-	falta := func() bool { return !permitirVacio && strings.TrimSpace(campo.Texto()) == "" }
+	// errorDe es lo que dice Validar de lo escrito ("" si vale o no hay que validar).
+	errorDe := func() string {
+		s := strings.TrimSpace(campo.Texto())
+		if o.Validar == nil || s == "" {
+			return ""
+		}
+		return o.Validar(s)
+	}
+	falta := func() bool {
+		return (!permitirVacio && strings.TrimSpace(campo.Texto()) == "") || errorDe() != ""
+	}
+	// avisar pinta (o quita) la línea de error bajo el campo, como el `error` de
+	// FieldGroup, y vuelve a medir el diálogo, que crece una línea.
+	avisado := ""
+	avisar := func() {
+		e := errorDe()
+		if e == avisado {
+			return
+		}
+		avisado = e
+		campo.Invalida = e != ""
+		campo.Refresh()
+		cuerpo.Objects = []fyne.CanvasObject{etiqueta, campo}
+		if e != "" {
+			// Partido al ancho del cuerpo: el aviso suele ser una frase larga.
+			cuerpo.Objects = append(cuerpo.Objects, LineaErrorA(e, AnchoCuerpoDialogo(d, d.lienzo)))
+		}
+		cuerpo.Refresh()
+		if d != nil {
+			d.Recolocar()
+		}
+	}
 	enviar := func() {
 		if falta() {
 			return
@@ -96,8 +133,10 @@ func preguntaCon(mensaje, valor, rotuloCancelar, rotuloAceptar, obligatorio stri
 	}
 	d, aceptar = confirmacion(titulo, rotuloCancelar, rotuloAceptar, false, cuerpo,
 		func() { d.Cerrar() }, enviar)
+	avisar()
 	aceptar.Inerte = falta()
 	campo.AlCambiar(func(string) {
+		avisar()
 		aceptar.Inerte = falta()
 		aceptar.Refresh()
 	})

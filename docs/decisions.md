@@ -1,940 +1,1004 @@
-# Decisiones de arquitectura (ADR) — Sytue One
+<a id="decisiones-de-arquitectura-adr--sytue-one"></a>
 
-Registro único de las decisiones arquitectónicas significativas: **qué** se decidió,
-**por qué**, qué se descartó y qué consecuencias tiene. Sustituye al antiguo directorio
-`docs/adr/` (un fichero por decisión).
+# Architecture decisions (ADR) — Sytue One
 
-> El **porqué** vive aquí. El **qué** normativo (nombres, dominios, puertos, versiones,
-> licencias) vive en [`CONVENTIONS.md`](CONVENTIONS.md) y prevalece si divergen.
+Single record of the significant architectural decisions: **what** was decided,
+**why**, what was ruled out, and what consequences it has. It replaces the old
+`docs/adr/` directory (one file per decision).
 
-**Reglas:** numeración secuencial e inmutable; una decisión por entrada; una decisión
-aceptada no se edita para cambiarla — se añade otra que la supersede. Decisiones triviales
-o reversibles sin coste no necesitan entrada.
+> The **why** lives here. The normative **what** (names, domains, ports, versions,
+> licenses) lives in [`CONVENTIONS.md`](CONVENTIONS.md) and prevails if they diverge.
+
+**Rules:** sequential, immutable numbering; one decision per entry; an accepted
+decision is not edited to change it — another one is added that supersedes it. Trivial
+decisions, or ones reversible at no cost, do not need an entry.
 
 <a id="indice"></a>
 
-## Índice
+<a id="índice"></a>
 
-| #    | Decisión                                                                                                                                                     | Estado                                                                               |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| 0001 | [Soberanía 100 % UE sobre Scaleway](#0001)                                                                                                                   | accepted                                                                             |
-| 0002 | [Keycloak como IdP nuclear](#0002)                                                                                                                           | superseded → 0020                                                                    |
-| 0003 | [Nextcloud + OnlyOffice para archivos y ofimática](#0003)                                                                                                    | superseded → 0017                                                                    |
-| 0004 | [Astro + Preact como stack de frontend](#0004)                                                                                                               | accepted                                                                             |
-| 0005 | [Mattermost para chat y vídeo](#0005)                                                                                                                        | superseded → 0017, 0021                                                              |
-| 0006 | [Stalwart como servidor de correo](#0006)                                                                                                                    | superseded → 0017                                                                    |
-| 0007 | [Sytue Shell + Sytue Hub](#0007)                                                                                                                             | accepted (reconciliado)                                                              |
-| 0008 | [Valkey en lugar de Redis](#0008)                                                                                                                            | superseded → 0019                                                                    |
-| 0009 | [Todo FOSS libre y estrategia de fork](#0009)                                                                                                                | superseded → 0017, 0018                                                              |
-| 0010 | [Clientes propios sobre la UI upstream](#0010)                                                                                                               | superseded → 0017                                                                    |
-| 0011 | [Modelo PaaS y multi-tenancy](#0011)                                                                                                                         | accepted                                                                             |
-| 0012 | [Servicios gestionados de Sytue Cloud](#0012)                                                                                                                | accepted (reconciliado)                                                              |
-| 0013 | [Pipeline de build con Kaniko](#0013)                                                                                                                        | accepted (⚠ revisión pendiente)                                                      |
-| 0014 | [IaC dual: Compose local + Helm/Terraform](#0014)                                                                                                            | accepted                                                                             |
-| 0015 | [Licenciamiento AGPL-3.0 del código propio](#0015)                                                                                                           | superseded → 0018                                                                    |
-| 0016 | [Stack único: Go + Astro/Preact + PostgreSQL](#0016)                                                                                                         | accepted                                                                             |
-| 0017 | [Reimplementación nativa clean-room](#0017)                                                                                                                  | accepted                                                                             |
-| 0018 | [Licenciamiento Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))](#0018)                                                                                                                | accepted                                                                             |
-| 0019 | [PostgreSQL como datastore único](#0019)                                                                                                                     | accepted                                                                             |
-| 0020 | [Sytue ID como IdP nativo en Go](#0020)                                                                                                                      | accepted                                                                             |
-| 0021 | [LiveKit como SFU de medios de Meet](#0021)                                                                                                                  | accepted                                                                             |
-| 0023 | [Eliminación de los motores AGPL de terceros](#0023)                                                                                                         | accepted                                                                             |
-| 0023 | [Sustrato de Sytue Cloud: Kapsule](#0023)                                                                                                                    | accepted                                                                             |
-| 0024 | [Apps de escritorio (Fyne) y móvil (PWA + Capacitor)](#0024)                                                                                                 | accepted                                                                             |
-| 0025 | [Sytue Rooms: mensajería y videollamada, un servicio y una base](#0025)                                                                                      | accepted                                                                             |
-| 0026 | [Sytue Analytics: anonimato por construcción, medición en primera parte](#0026)                                                                              | accepted                                                                             |
-| 0027 | [Excepción temporal Bun/Kaniko para v0.1.6 interna](#0027)                                                                                                   | accepted · expira 2026-10-01                                                         |
-| 0028 | [Benchmarks anónimos entre clientes de Sytue Cloud](#0028)                                                                                                   | accepted                                                                             |
-| 0029 | [Apps open-source como servicio: catálogo cerrado, no imagen libre](#0029)                                                                                   | accepted                                                                             |
-| 0030 | [Firma digital: qué se promete bajo eIDAS y de dónde sale la clave](#0030)                                                                                   | accepted                                                                             |
-| 0031 | [Crossplane adopta la infraestructura por riesgo; RDB y Kapsule se quedan fuera](#0031)                                                                      | accepted                                                                             |
-| 0032 | [Productos open-source en Sytue Cloud: copyleft sí, «source available» no; y quién se publica](#0032)                                                        | accepted                                                                             |
-| 0033 | [Sytue PDF se dibuja en SVG, no se rasteriza](#0033)                                                                                                         | accepted (ampliado)                                                                  |
-| 0034 | [OCR: Tesseract autoalojado en un servicio propio; la capa de texto la escribe Sytue PDF](#0034)                                                             | accepted · **el motor de OCR lo revisa el [0035](#0035)**                            |
-| 0035 | [Sytue AI: dos modelos en Scaleway, tope blando por usuario y OCR por modelo de visión](#0035)                                                               | accepted                                                                             |
-| 0036 | [Cloudflare fuera: el portal entra por Pangolin y el DNS lo sirve Scaleway](#0036)                                                                           | accepted                                                                             |
-| 0037 | [La plomería compartida se comparte de verdad](#0037)                                                                                                        | accepted                                                                             |
-| 0038 | [Cuentas personales: registro gratuito con 5 GB y plan de 1 TB](#0038)                                                                                       | accepted · **el alta la revisa el [0040](#0040)**                                    |
-| 0040 | [@usuario global y conversaciones con personas de otras organizaciones](#0040)                                                                               | accepted · **el alta la revisa el [0041](#0041)**                                    |
-| 0041 | [Móvil verificado por SMS en el alta y cuatro identificadores de acceso](#0041)                                                                              | accepted                                                                             |
-| 0042 | [España sin gestoría: el banco entra por Norma 43 y presentar por ti espera al certificado y a VeriFactu](#0042)                                             | accepted · **el PDF de la factura y el aviso por correo los añade el [0043](#0043)** |
-| 0043 | [El ERP es de toda la organización: permisos por módulo, tareas y documentos, y Sytue AI que crea con confirmación](#0043)                                   | accepted                                                                             |
-| 0044 | [VERI*FACTU dentro del ERP: la base garantiza la cadena y el envío sale con un certificado del servicio](#0044)                                              | accepted                                                                             |
-| 0045 | [Una sola interfaz en Gio para web, escritorio y móvil: sytue.com en Gio, sytue.eu en la actual](#0045)                                                      | superseded → 0048 (escritorio y móvil) y → 0049 (sytue.com)                          |
-| 0046 | [Los medios de Rooms no se escriben en Go: el transporte sí, los códecs y la captura no](#0046)                                                              | accepted · acota el [0045](#0045) · enmendado el 2026-09-25 (voz y vídeo nativos)    |
-| 0047 | [Los avisos de Android salen del SSE del Hub, y el empaquetador va parcheado](#0047)                                                                         | accepted · implementa el [0039](#0039)                                               |
-| 0048 | [La interfaz nativa se rehace en Fyne con widgets propios, y lo que no es del toolkit sale a `apps/nucleo`](#0048)                                           | accepted · supersede al [0045](#0045) en escritorio y móvil                          |
-| 0049 | [`sytue.com` sirve la suite Astro con un segundo juego de imágenes, no la de Gio](#0049)                                                                     | accepted · supersede al [0045](#0045) en la web                                      |
-| 0050 | [Un solo inicio de sesión para las trece apps nativas: llavero para el secreto, carpeta compartida para las preferencias, servidor para la presencia](#0050) | accepted · implementa el [0048](#0048)                                               |
-| 0051 | [Firma con el certificado del sistema, en dos pasos, con sello cualificado de Izenpe, y «Pedir firma»](#0051)                                                | accepted · desarrolla el [0030](#0030)                                               |
-| 0052 | [Canjear un enlace de Docs, también desde otra organización](#0052)                                                                                          | accepted · aplica el [0040](#0040) a los documentos                                  |
-| 0053 | [Un aviso es de la persona: la campana enseña los de todas sus organizaciones](#0053)                                                                        | accepted · completa el [0040](#0040) y el [0052](#0052)                              |
-| 0054 | [«Borrar mi cuenta»: la persona se da de baja sola, con 30 días para deshacerlo, y se borra lo suyo y no lo de su organización](#0054)                       | accepted                                                                             |
-| 0055 | [La URL canónica de cada producto es su host de producto; la organización va al PATH, no al subdominio](#0055)                                               | accepted                                                                             |
-| 0056 | [La organización como segmento de PATH dentro de cada producto](#0056)                                                                                       | accepted                                                                             |
-| 0057 | [Pedir firma a alguien de otra organización: el PDF sale por un enlace de Drive](#0057)                                                                      | accepted · completa el [0051](#0051) §7 · aplica el [0040](#0040)                    |
-| 0058 | [El CI corre en GitHub Actions; los workflows se portan sin cambiar lo que comprueban](#0058)                                                                | accepted · puntos 1 y 5 sustituidos por el [0060](#0060)                             |
-| 0059 | [Peticiones de firma de fuera: quien recibe bloquea y su organización decide, sin que quien pide se entere](#0059)                                           | accepted · completa el [0057](#0057)                                                 |
-| 0060 | [Runners propios en el frontal, imágenes en ghcr.io y forks en GitHub](#0060)                                                                                | accepted · sustituye los puntos 1 y 5 del [0058](#0058)                              |
-| 0061 | [Sytue Cast: vídeo bajo demanda y directo, con portada pública y cuota de Drive](#0061)                                                                      | accepted                                                                             |
-| 0066 | [El CI construye con un BuildKit sin root y propio, no con el builder clásico por el proxy de Docker](#0066)                                                 | accepted · completa el [0060](#0060)                                                 |
-| 0077 | [Rooms cifra en los dispositivos mediante Matrix; los canales externos conservan la protección real de su proveedor](#0077)                                  | accepted · excepción expresa a 0016, 0018 y retirada de motores AGPL                 |
-| 0078 | [Widgets nativos: contadores con caducidad en un App Group, Apple tras un interruptor y nada en Windows/Linux](#0078)                                        | accepted                                                                             |
-| 0079 | [Sytue Notepads sobre «papel»: un cromo neutro elegido por la app](#0079)                                                                                    | accepted                                                                             |
-| 0080 | [Toda la suite sobre «papel»: el cromo de Notepads pasa a las quince apps](#0080)                                                                            | accepted · amplía la [0079](#0079)                                                   |
-| 0081 | [La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC](#0081)                                                                            | superseded → 0082                                                                    |
-| 0082 | [La clave de recuperación de Matrix, envuelta en el dispositivo con la contraseña o la passkey](#0082)                                                       | accepted · sustituye a la [0081](#0081)                                              |
+## Index
+
+| #    | Decision                                                                                                                                                | Status                                                                         |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 0001 | [100 % EU sovereignty on Scaleway](#0001)                                                                                                               | accepted                                                                       |
+| 0002 | [Keycloak as the core IdP](#0002)                                                                                                                       | superseded → 0020                                                              |
+| 0003 | [Nextcloud + OnlyOffice for files and office suite](#0003)                                                                                              | superseded → 0017                                                              |
+| 0004 | [Astro + Preact as the frontend stack](#0004)                                                                                                           | accepted                                                                       |
+| 0005 | [Mattermost for chat and video](#0005)                                                                                                                  | superseded → 0017, 0021                                                        |
+| 0006 | [Stalwart as the mail server](#0006)                                                                                                                    | superseded → 0017                                                              |
+| 0007 | [Sytue Shell + Sytue Hub](#0007)                                                                                                                        | accepted (reconciled)                                                          |
+| 0008 | [Valkey instead of Redis](#0008)                                                                                                                        | superseded → 0019                                                              |
+| 0009 | [All free FOSS and fork strategy](#0009)                                                                                                                | superseded → 0017, 0018                                                        |
+| 0010 | [Own clients on top of the upstream UI](#0010)                                                                                                          | superseded → 0017                                                              |
+| 0011 | [PaaS model and multi-tenancy](#0011)                                                                                                                   | accepted                                                                       |
+| 0012 | [Sytue Cloud managed services](#0012)                                                                                                                   | accepted (reconciled)                                                          |
+| 0013 | [Build pipeline with Kaniko](#0013)                                                                                                                     | accepted (⚠ review pending)                                                    |
+| 0014 | [Dual IaC: local Compose + Helm/Terraform](#0014)                                                                                                       | accepted                                                                       |
+| 0015 | [AGPL-3.0 licensing of our own code](#0015)                                                                                                             | superseded → 0018                                                              |
+| 0016 | [Single stack: Go + Astro/Preact + PostgreSQL](#0016)                                                                                                   | accepted                                                                       |
+| 0017 | [Native clean-room reimplementation](#0017)                                                                                                             | accepted                                                                       |
+| 0018 | [Apache-2.0 licensing (© 2026 Daniel Delgado Ramos (thinkddr))](#0018)                                                                                  | accepted                                                                       |
+| 0019 | [PostgreSQL as the single datastore](#0019)                                                                                                             | accepted                                                                       |
+| 0020 | [Sytue ID as a native IdP in Go](#0020)                                                                                                                 | accepted                                                                       |
+| 0021 | [LiveKit as the media SFU for Meet](#0021)                                                                                                              | accepted                                                                       |
+| 0023 | [Removal of third-party AGPL engines](#0023)                                                                                                            | accepted                                                                       |
+| 0023 | [Sytue Cloud substrate: Kapsule](#0023)                                                                                                                 | accepted                                                                       |
+| 0024 | [Desktop (Fyne) and mobile (PWA + Capacitor) apps](#0024)                                                                                               | accepted                                                                       |
+| 0025 | [Sytue Rooms: messaging and video calls, one service and one database](#0025)                                                                           | accepted                                                                       |
+| 0026 | [Sytue Analytics: anonymity by construction, first-party measurement](#0026)                                                                            | accepted                                                                       |
+| 0027 | [Temporary Bun/Kaniko exception for internal v0.1.6](#0027)                                                                                             | accepted · expires 2026-10-01                                                  |
+| 0028 | [Anonymous benchmarks across Sytue Cloud customers](#0028)                                                                                              | accepted                                                                       |
+| 0029 | [Open-source apps as a service: closed catalog, not any image](#0029)                                                                                   | accepted                                                                       |
+| 0030 | [Digital signatures: what is promised under eIDAS and where the key comes from](#0030)                                                                  | accepted                                                                       |
+| 0031 | [Crossplane adopts infrastructure by risk; RDB and Kapsule stay out](#0031)                                                                             | accepted                                                                       |
+| 0032 | [Open-source products on Sytue Cloud: copyleft yes, “source available” no; and who gets published](#0032)                                               | accepted                                                                       |
+| 0033 | [Sytue PDF is drawn in SVG, not rasterized](#0033)                                                                                                      | accepted (extended)                                                            |
+| 0034 | [OCR: self-hosted Tesseract in our own service; the text layer is written by Sytue PDF](#0034)                                                          | accepted · **the OCR engine is revised by [0035](#0035)**                      |
+| 0035 | [Sytue AI: two models on Scaleway, soft per-user cap and OCR via a vision model](#0035)                                                                 | accepted                                                                       |
+| 0036 | [Cloudflare out: the portal comes in through Pangolin and DNS is served by Scaleway](#0036)                                                             | accepted                                                                       |
+| 0037 | [Shared plumbing is truly shared](#0037)                                                                                                                | accepted                                                                       |
+| 0038 | [Personal accounts: free sign-up with 5 GB and a 1 TB plan](#0038)                                                                                      | accepted · **sign-up is revised by [0040](#0040)**                             |
+| 0040 | [Global @username and conversations with people from other organizations](#0040)                                                                        | accepted · **sign-up is revised by [0041](#0041)**                             |
+| 0041 | [Mobile number verified by SMS at sign-up and four sign-in identifiers](#0041)                                                                          | accepted                                                                       |
+| 0042 | [Spain without an accounting agency: the bank comes in via Norma 43 and filing on your behalf waits for the certificate and VeriFactu](#0042)           | accepted · **the invoice PDF and the email notice are added by [0043](#0043)** |
+| 0043 | [The ERP belongs to the whole organization: per-module permissions, tasks and documents, and Sytue AI that creates with confirmation](#0043)            | accepted                                                                       |
+| 0044 | [VERI\*FACTU inside the ERP: the database guarantees the chain and submission goes out with a service certificate](#0044)                               | accepted                                                                       |
+| 0045 | [A single Gio interface for web, desktop and mobile: sytue.com in Gio, sytue.eu in the current one](#0045)                                              | superseded → 0048 (desktop and mobile) and → 0049 (sytue.com)                  |
+| 0046 | [Rooms media is not written in Go: transport yes, codecs and capture no](#0046)                                                                         | accepted · bounds [0045](#0045) · amended 2026-09-25 (native voice and video)  |
+| 0047 | [Android notifications come from the Hub SSE, and the packager is patched](#0047)                                                                       | accepted · implements [0039](#0039)                                            |
+| 0048 | [The native interface is rebuilt in Fyne with our own widgets, and what is not part of the toolkit moves to `apps/nucleo`](#0048)                       | accepted · supersedes [0045](#0045) on desktop and mobile                      |
+| 0049 | [`sytue.com` serves the Astro suite with a second set of images, not the Gio one](#0049)                                                                | accepted · supersedes [0045](#0045) on the web                                 |
+| 0050 | [A single sign-in for the thirteen native apps: keychain for the secret, shared folder for preferences, server for presence](#0050)                     | accepted · implements [0048](#0048)                                            |
+| 0051 | [Signing with the system certificate, in two steps, with a qualified Izenpe timestamp, and “Request signature”](#0051)                                  | accepted · develops [0030](#0030)                                              |
+| 0052 | [Redeeming a Docs link, also from another organization](#0052)                                                                                          | accepted · applies [0040](#0040) to documents                                  |
+| 0053 | [A notification belongs to the person: the bell shows those from all their organizations](#0053)                                                        | accepted · completes [0040](#0040) and [0052](#0052)                           |
+| 0054 | [“Delete my account”: the person unsubscribes on their own, with 30 days to undo it, and their own data is deleted but not their organization's](#0054) | accepted                                                                       |
+| 0055 | [The canonical URL of each product is its product host; the organization goes in the PATH, not the subdomain](#0055)                                    | accepted                                                                       |
+| 0056 | [The organization as a PATH segment within each product](#0056)                                                                                         | accepted                                                                       |
+| 0057 | [Requesting a signature from someone in another organization: the PDF goes out through a Drive link](#0057)                                             | accepted · completes [0051](#0051) §7 · applies [0040](#0040)                  |
+| 0058 | [CI runs on GitHub Actions; workflows are ported without changing what they check](#0058)                                                               | accepted · points 1 and 5 replaced by [0060](#0060)                            |
+| 0059 | [Signature requests from outside: the recipient blocks and their organization decides, without the requester finding out](#0059)                        | accepted · completes [0057](#0057)                                             |
+| 0060 | [Our own runners on the front node, images on ghcr.io and forks on GitHub](#0060)                                                                       | accepted · replaces points 1 and 5 of [0058](#0058)                            |
+| 0061 | [Sytue Cast: on-demand and live video, with a public front page and Drive quota](#0061)                                                                 | accepted                                                                       |
+| 0066 | [CI builds with our own rootless BuildKit, not with the classic builder through the Docker proxy](#0066)                                                | accepted · completes [0060](#0060)                                             |
+| 0077 | [Rooms encrypts on devices through Matrix; external channels keep their provider's real protection](#0077)                                              | accepted · explicit exception to 0016, 0018 and the removal of AGPL engines    |
+| 0078 | [Native widgets: expiring counters in an App Group, Apple behind a switch and nothing on Windows/Linux](#0078)                                          | accepted                                                                       |
+| 0079 | [Sytue Notepads on “paper”: a neutral chrome chosen by the app](#0079)                                                                                  | accepted                                                                       |
+| 0080 | [The whole suite on “paper”: the Notepads chrome moves to all fifteen apps](#0080)                                                                      | accepted · extends [0079](#0079)                                               |
+| 0081 | [The Matrix recovery key is held by Rooms for the OIDC session](#0081)                                                                                  | superseded → 0082                                                              |
+| 0082 | [The Matrix recovery key, wrapped on the device with the password or the passkey](#0082)                                                                | accepted · replaces [0081](#0081)                                              |
 
 <a id="el-pivote-sytue-native-2026-07-01"></a>
 
-### El pivote «Sytue Native» (2026-07-01)
+### The “Sytue Native” pivot (2026-07-01)
 
-Las decisiones **0016–0022** formalizan el giro a un **stack único** (Go + Astro/Preact +
-PostgreSQL), **productos propietarios reimplementados clean-room** y la **eliminación de
-todos los motores AGPL de terceros** (Keycloak, Nextcloud, OnlyOffice, Mattermost,
-Stalwart) y de Redis/Valkey. En consecuencia 0002, 0003, 0005, 0006, 0008, 0009, 0010 y
-0015 quedan superseded — se conservan resumidas como memoria histórica del _porqué_.
+Decisions **0016–0022** formalize the shift to a **single stack** (Go + Astro/Preact +
+PostgreSQL), **proprietary products reimplemented clean-room** and the **removal of
+all third-party AGPL engines** (Keycloak, Nextcloud, OnlyOffice, Mattermost,
+Stalwart) and of Redis/Valkey. As a result 0002, 0003, 0005, 0006, 0008, 0009, 0010 and
+0015 are superseded — they are kept in summary form as a historical record of the _why_.
 
-- **0016** es la decisión madre: condiciona 0017, 0019, 0020, 0021, 0022.
-- **0022** retira los motores; habilita **0017** (cómo se reimplementa) y **0018** (licencia).
-- **0021** (LiveKit) es la única excepción a «sin apps de terceros en el runtime de cliente»,
-  acotada al plano de medios.
-- **0001** (soberanía UE) condiciona toda elección de proveedor y región.
-- **0007** y **0012** siguen vigentes con nota de reconciliación: la decisión de producto se
-  mantiene, su implementación se realinea al stack del pivote.
+- **0016** is the parent decision: it conditions 0017, 0019, 0020, 0021, 0022.
+- **0022** retires the engines; it enables **0017** (how things are reimplemented) and **0018** (license).
+- **0021** (LiveKit) is the only exception to “no third-party apps in the customer runtime”,
+  bounded to the media plane.
+- **0001** (EU sovereignty) conditions every choice of provider and region.
+- **0007** and **0012** remain in force with a reconciliation note: the product decision
+  stands, its implementation is realigned to the pivot stack.
 
 ---
 
 <a id="0001"></a>
 
-## 0001 — Soberanía 100 % UE sobre Scaleway
+<a id="0001--soberanía-100--ue-sobre-scaleway"></a>
+
+## 0001 — 100 % EU sovereignty on Scaleway
 
 `accepted` · 2026-06-30 · infra, gdpr, sovereignty
 
-**Contexto.** La propuesta de valor frente a Google/Microsoft es la soberanía digital
-verificable: ningún dato personal sale de la UE ni queda sujeto a acceso extraterritorial
-(_US CLOUD Act_). Hace falta un proveedor UE con Kubernetes gestionado, Postgres, S3,
-registry, DNS, LB, secretos y un provider Terraform maduro.
+**Context.** The value proposition against Google/Microsoft is verifiable digital
+sovereignty: no personal data leaves the EU or is subject to extraterritorial access
+(_US CLOUD Act_). We need an EU provider with managed Kubernetes, Postgres, S3,
+registry, DNS, LB, secrets and a mature Terraform provider.
 
-**Decisión.** **Scaleway** como proveedor único de producción, solo regiones UE: principal
-`fr-par` (zonas 1/2/3), DR en `nl-ams`. Cómputo en **Kapsule**, datos en **RDB
-(PostgreSQL)**, blobs en **Object Storage S3** versionado, imágenes en **Container
-Registry**, secretos en **Secret Manager**, materializados directamente como `Secret`
-de Kubernetes por el bootstrap de producción (nunca en git). Ningún
-proveedor estadounidense para datos personales; ninguna transferencia fuera de la UE.
+**Decision.** **Scaleway** as the single production provider, EU regions only: primary
+`fr-par` (zones 1/2/3), DR in `nl-ams`. Compute on **Kapsule**, data on **RDB
+(PostgreSQL)**, blobs on versioned **Object Storage S3**, images on **Container
+Registry**, secrets on **Secret Manager**, materialized directly as Kubernetes `Secret`
+objects by the production bootstrap (never in git). No
+US provider for personal data; no transfer outside the EU.
 
-**Descartado.** Hyperscalers US (CLOUD Act, incompatible con el principio nuclear);
-OVHcloud (válido y soberano, peor encaje de catálogo/DX — queda como ruta de portabilidad);
-Hetzner (sin K8s gestionado ni catálogo PaaS); multi-cloud desde el día uno (complejidad
-que diluye el time-to-market).
+**Ruled out.** US hyperscalers (CLOUD Act, incompatible with the core principle);
+OVHcloud (valid and sovereign, worse catalog/DX fit — it remains as a portability path);
+Hetzner (no managed K8s or PaaS catalog); multi-cloud from day one (complexity
+that dilutes time-to-market).
 
-**Consecuencias.** Cumplimiento RGPD por diseño y mensaje comercial diferenciador; a cambio,
-**lock-in** de proveedor mitigado usando primitivas portables (K8s, S3, PostgreSQL, OIDC),
-catálogo menor que un hyperscaler (algunas piezas se construyen en casa) y DR limitada a
-`nl-ams`. Toda decisión posterior de infraestructura queda acotada a «¿existe y es soberano
-en Scaleway UE?».
+**Consequences.** GDPR compliance by design and a differentiating sales message; in exchange,
+provider **lock-in**, mitigated by using portable primitives (K8s, S3, PostgreSQL, OIDC),
+a smaller catalog than a hyperscaler (some pieces are built in-house) and DR limited to
+`nl-ams`. Every later infrastructure decision is bounded by “does it exist and is it sovereign
+on Scaleway EU?”.
 
 ---
 
 <a id="0002"></a>
 
-## 0002 — Keycloak como IdP nuclear · superseded por [0020](#0020)
+<a id="0002--keycloak-como-idp-nuclear--superseded-por-0020"></a>
+
+## 0002 — Keycloak as the core IdP · superseded by [0020](#0020)
 
 `superseded` · 2026-06-30 · identity, sso
 
-**Decisión (histórica).** **Keycloak 26** como IdP nuclear (marca Sytue ID, realm único
-`sytue`), con clients OIDC por superficie, clients de federación por motor
-(nextcloud/mattermost/onlyoffice/stalwart), aprovisionamiento SCIM/eventos vía Sytue Hub,
-grupos `org/<tenant>` con roles `owner`/`admin`/`member`/`billing`, MFA/WebAuthn obligatorio
-para admin y owner, y cookies host-only `__Host-` con SSO OAuth mediante Sytue ID.
+**Decision (historical).** **Keycloak 26** as the core IdP (Sytue ID brand, single realm
+`sytue`), with OIDC clients per surface, federation clients per engine
+(nextcloud/mattermost/onlyoffice/stalwart), SCIM/event provisioning via Sytue Hub,
+`org/<tenant>` groups with `owner`/`admin`/`member`/`billing` roles, mandatory MFA/WebAuthn
+for admin and owner, and host-only `__Host-` cookies with OAuth SSO through Sytue ID.
 
-**Descartado entonces.** Ory (Hydra/Kratos) por coste de ensamblaje; Authentik/Zitadel por
-madurez; SaaS US (Auth0/Okta/Entra) por soberanía; IdP propio por riesgo — criterio que el
-pivote acabó revirtiendo con librerías OIDC probadas.
+**Ruled out at the time.** Ory (Hydra/Kratos) for assembly cost; Authentik/Zitadel for
+maturity; US SaaS (Auth0/Okta/Entra) for sovereignty; our own IdP for risk — a criterion the
+pivot ended up reversing with proven OIDC libraries.
 
-**Por qué cayó.** El pivote elimina los motores federados y unifica el backend en Go: un
-motor Java de terceros como pieza nuclear contradice el stack único. Ver [0020](#0020).
+**Why it fell.** The pivot removes the federated engines and unifies the backend in Go: a
+third-party Java engine as a core piece contradicts the single stack. See [0020](#0020).
 
 ---
 
 <a id="0003"></a>
 
-## 0003 — Nextcloud + OnlyOffice · superseded por [0017](#0017)
+<a id="0003--nextcloud--onlyoffice--superseded-por-0017"></a>
+
+## 0003 — Nextcloud + OnlyOffice · superseded by [0017](#0017)
 
 `superseded` · 2026-06-30 · drive, docs
 
-**Decisión (histórica).** **Nextcloud 30** como motor de Drive (WebDAV/OCS) y backend de
-Calendar (CalDAV) y Contacts (CardDAV); **OnlyOffice Document Server 8.2** como motor de
-ofimática, embebido en un cliente propio. Sin exponer sus UIs nativas.
+**Decision (historical).** **Nextcloud 30** as the Drive engine (WebDAV/OCS) and backend for
+Calendar (CalDAV) and Contacts (CardDAV); **OnlyOffice Document Server 8.2** as the
+office-suite engine, embedded in our own client. Without exposing their native UIs.
 
-**Descartado entonces.** Seafile (CalDAV/CardDAV limitados), ownCloud/OCIS (madurez),
-servidores DAV dedicados (más piezas), Collabora (menor fidelidad OOXML), CryptPad
-(modelo de documento distinto).
+**Ruled out at the time.** Seafile (limited CalDAV/CardDAV), ownCloud/OCIS (maturity),
+dedicated DAV servers (more pieces), Collabora (lower OOXML fidelity), CryptPad
+(different document model).
 
-**Por qué cayó.** Motores AGPL de terceros; se reimplementan como servicios Go propios.
+**Why it fell.** Third-party AGPL engines; they are reimplemented as our own Go services.
 
 ---
 
 <a id="0004"></a>
 
-## 0004 — Astro + Preact como stack de frontend
+<a id="0004--astro--preact-como-stack-de-frontend"></a>
+
+## 0004 — Astro + Preact as the frontend stack
 
 `accepted` · 2026-06-30 · frontend, design-system
 
-**Contexto.** Todas las superficies deben verse y comportarse como **una sola aplicación**,
-mezclando páginas de marketing y apps interactivas ricas, con JS mínimo por defecto y un
-patrón BFF para OIDC+PKCE.
+**Context.** All surfaces must look and behave like **a single application**,
+mixing marketing pages and rich interactive apps, with minimal JS by default and a
+BFF pattern for OIDC+PKCE.
 
-**Decisión.** **Astro + Preact** (islands) obligatorio en todas las superficies web, con
-**Tailwind** y los tokens de `@sytue/ui`. Monorepo en `apps/frontend/` con paquetes
-compartidos `@sytue/{ui,shell,auth,api-clients,config}` y una app por producto. Los
-**endpoints Astro actúan de BFF**: tras OIDC+PKCE emiten una cookie httpOnly de dominio
-`.sytue.eu` que permite saltar entre subdominios sin re-login; **ningún secreto en el
-cliente**. Modo claro/oscuro y **WCAG AA** obligatorios.
+**Decision.** **Astro + Preact** (islands) mandatory on all web surfaces, with
+**Tailwind** and the `@sytue/ui` tokens. Monorepo in `apps/frontend/` with shared
+packages `@sytue/{ui,shell,auth,api-clients,config}` and one app per product. The
+**Astro endpoints act as the BFF**: after OIDC+PKCE they issue an httpOnly cookie for the
+`.sytue.eu` domain that allows jumping between subdomains without logging in again; **no secrets on the
+client**. Light/dark mode and **WCAG AA** are mandatory.
 
-**Descartado.** Next.js/React (más JS por defecto), SvelteKit (ecosistema, design system
-duplicado), SPA pura sin SSR (SEO/rendimiento inicial), Preact solo (reinventar routing/SSR).
+**Ruled out.** Next.js/React (more JS by default), SvelteKit (ecosystem, duplicated design
+system), pure SPA without SSR (SEO/initial performance), Preact alone (reinventing routing/SSR).
 
-**Consecuencias.** Rendimiento y accesibilidad excelentes por defecto; un solo stack y un
-solo design system. Riesgo de divergencia visual si una app crea componentes ad-hoc:
-prohibido — los componentes canónicos viven **una sola vez** en `@sytue/ui`. Con el pivote,
-las apps se repuntan a los servicios Go; el framework no cambia.
+**Consequences.** Excellent performance and accessibility by default; a single stack and a
+single design system. Risk of visual divergence if an app creates ad-hoc components:
+forbidden — canonical components live **only once** in `@sytue/ui`. With the pivot,
+the apps are repointed to the Go services; the framework does not change.
 
 ---
 
 <a id="0005"></a>
 
-## 0005 — Mattermost para chat y vídeo · superseded por [0017](#0017), [0021](#0021)
+<a id="0005--mattermost-para-chat-y-vídeo--superseded-por-0017-0021"></a>
+
+## 0005 — Mattermost for chat and video · superseded by [0017](#0017), [0021](#0021)
 
 `superseded` · 2026-06-30 · chat, meet
 
-**Decisión (histórica).** **Mattermost Team Edition** como motor de Chat y **Mattermost
-Calls + rtcd** para Meet, con la webapp tematizada/forkeada para montar la Sytue Shell.
-Excepción deliberada a «cliente propio desde cero»: su UI _era_ la referencia estética.
+**Decision (historical).** **Mattermost Team Edition** as the Chat engine and **Mattermost
+Calls + rtcd** for Meet, with the webapp themed/forked to build the Sytue Shell.
+A deliberate exception to “own client from scratch”: its UI _was_ the aesthetic reference.
 
-**Descartado entonces.** Matrix/Element (alineación estética y operación de Synapse),
-Rocket.Chat (licencias de add-ons), Zulip (UX distinta), Jitsi (segundo producto separado).
+**Ruled out at the time.** Matrix/Element (aesthetic alignment and operating Synapse),
+Rocket.Chat (add-on licensing), Zulip (different UX), Jitsi (a second, separate product).
 
-**Por qué cayó.** Se retira el motor: Chat pasa a servicio Go (WebSocket) y Meet combina
-señalización Go + LiveKit como SFU.
+**Why it fell.** The engine is retired: Chat becomes a Go service (WebSocket) and Meet combines
+Go signaling + LiveKit as the SFU.
 
 ---
 
 <a id="0006"></a>
 
-## 0006 — Stalwart como servidor de correo · superseded por [0017](#0017)
+<a id="0006--stalwart-como-servidor-de-correo--superseded-por-0017"></a>
+
+## 0006 — Stalwart as the mail server · superseded by [0017](#0017)
 
 `superseded` · 2026-06-30 · mail
 
-**Decisión (histórica).** **Stalwart** como servidor único SMTP/IMAP/**JMAP** y un cliente
-Astro+Preact propio tipo Gmail sobre JMAP, con SPF/DKIM/DMARC/MTA-STS/TLS-RPT y almacén
-cifrado.
+**Decision (historical).** **Stalwart** as the single SMTP/IMAP/**JMAP** server and our own
+Gmail-like Astro+Preact client on top of JMAP, with SPF/DKIM/DMARC/MTA-STS/TLS-RPT and an
+encrypted store.
 
-**Descartado entonces.** Postfix+Dovecot+puente JMAP (superficie operativa), Cyrus
-(complejidad), Mailu/Mailcow (sin JMAP nativo), webmails existentes (imposible alinear UX).
+**Ruled out at the time.** Postfix+Dovecot+JMAP bridge (operational surface), Cyrus
+(complexity), Mailu/Mailcow (no native JMAP), existing webmails (impossible to align UX).
 
-**Por qué cayó.** Motor de terceros: Mail se reimplementa en Go (`emersion/*` MIT + JMAP
-propio). Es el reto de mayor magnitud del pivote.
+**Why it fell.** Third-party engine: Mail is reimplemented in Go (`emersion/*` MIT + our own
+JMAP). It is the largest challenge of the pivot.
 
 ---
 
 <a id="0007"></a>
 
-## 0007 — Sytue Shell + Sytue Hub para integración seamless
+<a id="0007--sytue-shell--sytue-hub-para-integración-seamless"></a>
 
-`accepted` (reconciliado por el pivote) · 2026-06-30 · integration, shell, hub
+## 0007 — Sytue Shell + Sytue Hub for seamless integration
 
-**Contexto.** Integración seamless estilo Google Workspace: login único, shell común,
-conmutador de apps, búsqueda y notificaciones globales, presencia y acciones cruzadas, sin
-que cada app reinvente la topbar ni la lógica cross-app.
+`accepted` (reconciled by the pivot) · 2026-06-30 · integration, shell, hub
 
-**Decisión.** Dos piezas complementarias:
+**Context.** Seamless Google Workspace-style integration: single login, common shell,
+app switcher, global search and notifications, presence and cross actions, without
+each app reinventing the topbar or the cross-app logic.
 
-1. **Sytue Shell** (`@sytue/shell`) — topbar unificada, app switcher, búsqueda global,
-   centro de notificaciones, presencia y menú de cuenta. Se monta en **cada** app.
-2. **Sytue Hub** — servicio de integración con búsqueda federada, notificaciones unificadas
-   (SSE/WebSocket), presencia e **intents cross-app** (adjuntar de Drive, crear evento desde
-   un correo, compartir en Chat).
+**Decision.** Two complementary pieces:
 
-Ninguna app habla directamente con los backends para funciones transversales.
+1. **Sytue Shell** (`@sytue/shell`) — unified topbar, app switcher, global search,
+   notification center, presence and account menu. It is mounted in **every** app.
+2. **Sytue Hub** — integration service with federated search, unified notifications
+   (SSE/WebSocket), presence and **cross-app intents** (attach from Drive, create an event from
+   an email, share in Chat).
 
-**Descartado.** Que cada app implemente lo suyo (divergencia), Shell sin Hub (acoplamiento y
-secretos dispersos), monolito único (rompe despliegue independiente).
+No app talks directly to the backends for cross-cutting functions.
 
-**Reconciliación (pivote).** El Hub es un **servicio Go** (no TypeScript/Fastify), federa
-los servicios Go propios, **desaparece el puente SCIM hacia motores**, autoriza con JWT de
-Sytue ID y usa **PostgreSQL** —sin Valkey— para caché/eventos.
+**Ruled out.** Each app implementing its own (divergence), Shell without Hub (coupling and
+scattered secrets), a single monolith (breaks independent deployment).
 
-**Consecuencias.** El Hub es servicio crítico y posible cuello de botella: HA, diseño
-asíncrono y degradación elegante de la búsqueda federada.
+**Reconciliation (pivot).** The Hub is a **Go service** (not TypeScript/Fastify), it federates
+our own Go services, **the SCIM bridge to engines disappears**, it authorizes with Sytue ID
+JWTs and uses **PostgreSQL** —without Valkey— for cache/events.
+
+**Consequences.** The Hub is a critical service and a possible bottleneck: HA, asynchronous
+design and graceful degradation of federated search.
 
 ---
 
 <a id="0008"></a>
 
-## 0008 — Valkey en lugar de Redis · superseded por [0019](#0019)
+<a id="0008--valkey-en-lugar-de-redis--superseded-por-0019"></a>
+
+## 0008 — Valkey instead of Redis · superseded by [0019](#0019)
 
 `superseded` · 2026-06-30 · cache, licensing
 
-**Decisión (histórica).** **Valkey** (fork BSD de Redis, Linux Foundation) como caché y cola,
-tras el cambio de Redis a RSALv2/SSPL — no libre y por tanto incompatible con el principio
-FOSS de entonces. Descartados KeyDB (impulso), DragonflyDB (BSL) y brokers no-Redis
-(reescribir integraciones).
+**Decision (historical).** **Valkey** (BSD fork of Redis, Linux Foundation) as cache and queue,
+after Redis switched to RSALv2/SSPL — not free and therefore incompatible with the
+FOSS principle of the time. Ruled out KeyDB (momentum), DragonflyDB (BSL) and non-Redis brokers
+(rewriting integrations).
 
-**Por qué cayó.** Desaparecen los consumidores que exigían la API de Redis; el datastore
-único es Postgres.
+**Why it fell.** The consumers that required the Redis API disappear; the single
+datastore is Postgres.
 
 ---
 
 <a id="0009"></a>
 
-## 0009 — Todo FOSS libre y estrategia de fork · superseded por [0017](#0017), [0018](#0018)
+<a id="0009--todo-foss-libre-y-estrategia-de-fork--superseded-por-0017-0018"></a>
+
+## 0009 — All free FOSS and fork strategy · superseded by [0017](#0017), [0018](#0018)
 
 `superseded` · 2026-06-30 · licensing, strategy
 
-**Decisión (histórica).** Todo el stack FOSS libre (Apache-2.0/MIT/AGPL-3.0/BSD) con una
-**estrategia de personalización graduada**: (1) tematización, (2) cliente propio sobre
-API/protocolo libre, (3) fork del frontend cuando la integración lo exigía — manteniendo el
-backend upstream. Prohibidas SSPL/BSL/source-available.
+**Decision (historical).** The entire stack free FOSS (Apache-2.0/MIT/AGPL-3.0/BSD) with a
+**graduated customization strategy**: (1) theming, (2) our own client on top of a free
+API/protocol, (3) forking the frontend when the integration required it — keeping the
+upstream backend. SSPL/BSL/source-available were forbidden.
 
-**Por qué cayó.** Sin motores que forkear y con obra original propia, la política pasa a
-producto propietario con dependencias solo permisivas.
+**Why it fell.** With no engines to fork and with original work of our own, the policy becomes
+a proprietary product with permissive-only dependencies.
 
 ---
 
 <a id="0010"></a>
 
-## 0010 — Clientes propios sobre la UI upstream · superseded por [0017](#0017)
+<a id="0010--clientes-propios-sobre-la-ui-upstream--superseded-por-0017"></a>
+
+## 0010 — Own clients on top of the upstream UI · superseded by [0017](#0017)
 
 `superseded` · 2026-06-30 · frontend, ux
 
-**Decisión (histórica).** Para Drive, Mail, Calendar, Contacts y Docs, **clientes propios
-Astro+Preact desde cero** consumiendo solo los protocolos libres del motor (WebDAV/OCS,
-JMAP, CalDAV, CardDAV, editor embebido), con `@sytue/shell` + `@sytue/ui`. Excepción:
-Chat/Meet reutilizaba la webapp de Mattermost.
+**Decision (historical).** For Drive, Mail, Calendar, Contacts and Docs, **our own
+Astro+Preact clients from scratch** consuming only the engine's free protocols (WebDAV/OCS,
+JMAP, CalDAV, CardDAV, embedded editor), with `@sytue/shell` + `@sytue/ui`. Exception:
+Chat/Meet reused the Mattermost webapp.
 
-**Descartado entonces.** Tematizar la UI nativa (techo de personalización bajo), forkear
-cinco frontends (mantenimiento), iframes (frágil y sin cross-app), monolito único.
+**Ruled out at the time.** Theming the native UI (low customization ceiling), forking
+five frontends (maintenance), iframes (fragile and no cross-app), a single monolith.
 
-**Por qué cayó.** Ya no hay «UI upstream»: los clientes consumen servicios Go propios. El
-stack de frontend ([0004](#0004)) sigue vigente.
+**Why it fell.** There is no longer an “upstream UI”: the clients consume our own Go services. The
+frontend stack ([0004](#0004)) remains in force.
 
 ---
 
 <a id="0011"></a>
 
-## 0011 — Modelo PaaS y multi-tenancy
+<a id="0011--modelo-paas-y-multi-tenancy"></a>
+
+## 0011 — PaaS model and multi-tenancy
 
 `accepted` · 2026-06-30 · paas, multi-tenant, k8s
 
-**Decisión.** Modelo jerárquico **Organización (tenant) → Workspace → Usuarios**, con mapeo
-1:1 a través de toda la pila: `tenant <slug>` ⇄ grupo de identidad `org/<slug>` ⇄ **namespace
-Kapsule `tenant-<slug>`** (con `ResourceQuota` + `NetworkPolicy`) ⇄ almacenamiento del
-tenant (buckets/prefijos S3) ⇄ superficies de producto del tenant.
+**Decision.** Hierarchical model **Organization (tenant) → Workspace → Users**, with a 1:1
+mapping across the whole stack: `tenant <slug>` ⇄ identity group `org/<slug>` ⇄ **Kapsule
+namespace `tenant-<slug>`** (with `ResourceQuota` + `NetworkPolicy`) ⇄ tenant storage
+(S3 buckets/prefixes) ⇄ the tenant's product surfaces.
 
-- Roles `owner`, `admin`, `member`, `billing` dentro del grupo de la organización.
-- Aislamiento de cómputo por namespace, con labels normativas
+- Roles `owner`, `admin`, `member`, `billing` within the organization's group.
+- Compute isolation per namespace, with normative labels
   (`app.kubernetes.io/part-of=sytue-one`, `sytue.eu/env`, `sytue.eu/tenant`).
-- PaaS: `git push → webhook → build rootless → registry → deploy → URL con TLS`. Apps en
-  `<app>.apps.sytue.eu`, previews en `<proyecto>-pr-<n>.preview.sytue.eu`, dominios propios
-  por CNAME a `ingress.sytue.eu`.
-- Cuotas, métricas y facturación **por tenant**.
+- PaaS: `git push → webhook → build rootless → registry → deploy → URL con TLS`. Apps at
+  `<app>.apps.sytue.eu`, previews at `<proyecto>-pr-<n>.preview.sytue.eu`, custom domains
+  via CNAME to `ingress.sytue.eu`.
+- Quotas, metrics and billing **per tenant**.
 
-**Descartado.** Multi-tenancy solo por `tenant_id` en tablas compartidas (aislamiento débil),
-un clúster por tenant (coste), namespaces sin NetworkPolicy/quota (vecino ruidoso), un
-modelo de tenancy distinto por producto (rompe «un alta = acceso a todo»).
+**Ruled out.** Multi-tenancy only via `tenant_id` in shared tables (weak isolation),
+one cluster per tenant (cost), namespaces without NetworkPolicy/quota (noisy neighbor), a
+different tenancy model per product (breaks “one sign-up = access to everything”).
 
-**Consecuencias.** Aislamiento real apto para RGPD y facturación por consumo; a cambio,
-reconciliación idempotente del mapeo, overhead por tenant (automatizar el onboarding) y
-presión sobre el plano de control al crecer los namespaces (ver la célula/sharding de
+**Consequences.** Real isolation suitable for GDPR and usage-based billing; in exchange,
+idempotent reconciliation of the mapping, per-tenant overhead (automate onboarding) and
+pressure on the control plane as namespaces grow (see the cell/sharding of
 [0023](#0023)).
 
 ---
 
 <a id="0012"></a>
 
-## 0012 — Servicios gestionados de Sytue Cloud (Vercel × Supabase)
+<a id="0012--servicios-gestionados-de-sytue-cloud-vercel--supabase"></a>
 
-`accepted` (reconciliado por el pivote) · 2026-06-30 · paas, dx
+## 0012 — Sytue Cloud managed services (Vercel × Supabase)
 
-**Decisión.** Sytue Cloud combina un **flujo de deploy estilo Vercel** (conectar repo →
-build → preview por PR → promoción a prod → rollback, con dominios y TLS automáticos) con un
-**catálogo de servicios gestionados estilo Supabase**, todos soberanos y con paridad
-dev/prod:
+`accepted` (reconciled by the pivot) · 2026-06-30 · paas, dx
 
-- **Sytue Postgres** — PostgreSQL gestionado con **API REST automática (PostgREST)**,
-  pooling (PgBouncer), backups y branching de datos.
-- **Sytue DB Studio** — explorador de tablas, editor SQL y generador de API/credenciales,
-  con diseño Sytue, embebido en el dashboard.
-- **Sytue Storage** (S3 por proyecto), **Cache/Queue**, **Functions**, **Cron**,
-  **Secrets/Env** y **Auth gestionada** opcional para apps de cliente.
-- **Conexión cero-fricción:** crear un servicio inyecta automáticamente sus credenciales en
-  los deployments del proyecto. Observabilidad en lenguaje claro, sin jerga cloud.
+**Decision.** Sytue Cloud combines a **Vercel-style deploy flow** (connect repo →
+build → preview per PR → promotion to prod → rollback, with automatic domains and TLS) with a
+**Supabase-style catalog of managed services**, all sovereign and with dev/prod
+parity:
 
-**Descartado.** Usar Vercel/Supabase/GCP reales (US, propietarios); adoptar una PaaS FOSS
-existente como producto (ninguna integra el catálogo con nuestro tenancy/IdP — se reutilizan
-ideas y componentes); exponer Kubernetes crudo (contradice «más simple que Google Cloud»);
-Hasura en vez de PostgREST (más pesado para la simplicidad buscada).
+- **Sytue Postgres** — managed PostgreSQL with an **automatic REST API (PostgREST)**,
+  pooling (PgBouncer), backups and data branching.
+- **Sytue DB Studio** — table explorer, SQL editor and API/credentials generator,
+  with Sytue design, embedded in the dashboard.
+- **Sytue Storage** (S3 per project), **Cache/Queue**, **Functions**, **Cron**,
+  **Secrets/Env** and optional **managed Auth** for customer apps.
+- **Zero-friction connection:** creating a service automatically injects its credentials into
+  the project's deployments. Observability in plain language, without cloud jargon.
 
-**Reconciliación (pivote).** El control plane es **Go** (`services/cloud/`); Cache/Queue es
-**PostgreSQL**, no Valkey; la Auth gestionada se respalda en **Sytue ID**; el código es
-propietario. PostgREST/PgBouncer se mantienen.
+**Ruled out.** Using the real Vercel/Supabase/GCP (US, proprietary); adopting an existing FOSS
+PaaS as the product (none integrates the catalog with our tenancy/IdP — ideas and
+components are reused); exposing raw Kubernetes (contradicts “simpler than Google Cloud”);
+Hasura instead of PostgREST (heavier for the simplicity we seek).
+
+**Reconciliation (pivot).** The control plane is **Go** (`services/cloud/`); Cache/Queue is
+**PostgreSQL**, not Valkey; managed Auth is backed by **Sytue ID**; the code is
+proprietary. PostgREST/PgBouncer are kept.
 
 ---
 
 <a id="0013"></a>
 
-## 0013 — Pipeline de build con Kaniko
+<a id="0013--pipeline-de-build-con-kaniko"></a>
 
-`accepted` · 2026-06-30 · paas, ci, build · ⚠ **revisión pendiente**
+## 0013 — Build pipeline with Kaniko
 
-**Contexto.** Construir imágenes dentro del clúster con Docker `build` exige demonio y
-privilegios: inaceptable en multi-tenant.
+`accepted` · 2026-06-30 · paas, ci, build · ⚠ **review pending**
 
-**Decisión.** **Kaniko** como herramienta de build del PaaS: cada build es un **Job de
-Kubernetes rootless** que toma el repo tras el webhook, detecta framework o usa el
-Dockerfile, construye la imagen OCI **sin demonio ni privilegios**, la publica en el
-registry UE y dispara el deploy. Build-cache en bucket S3 versionado.
+**Context.** Building images inside the cluster with Docker `build` requires a daemon and
+privileges: unacceptable in multi-tenant.
 
-**Descartado.** Docker-in-Docker / socket del host (escape a host), BuildKit rootless
-(mejor caché pero un daemon más que operar — vigilado), Buildah (encaje algo peor como Job
-efímero), Buildpacks (complementario, no sustituto), CI SaaS externo (soberanía).
+**Decision.** **Kaniko** as the PaaS build tool: each build is a **rootless Kubernetes
+Job** that takes the repo after the webhook, detects the framework or uses the
+Dockerfile, builds the OCI image **without a daemon or privileges**, publishes it to the
+EU registry and triggers the deploy. Build cache in a versioned S3 bucket.
 
-**⚠ Seguimiento.** **Kaniko fue archivado por Google (2025)**: procede una decisión de
-corrección para migrar a **BuildKit rootless** o al fork mantenido **antes de GA** — ejecuta
-código de clientes, y CVEs sin parche es inaceptable. El contrato externo (push → URL) no
-cambia.
+**Ruled out.** Docker-in-Docker / host socket (escape to host), rootless BuildKit
+(better caching but one more daemon to operate — under watch), Buildah (somewhat worse fit as an ephemeral
+Job), Buildpacks (complementary, not a substitute), external SaaS CI (sovereignty).
+
+**⚠ Follow-up.** **Kaniko was archived by Google (2025)**: a corrective decision is due
+to migrate to **rootless BuildKit** or to the maintained fork **before GA** — it runs
+customer code, and unpatched CVEs are unacceptable. The external contract (push → URL) does not
+change.
 
 ---
 
 <a id="0014"></a>
 
-## 0014 — IaC dual: Compose local + Helm/Terraform en Scaleway
+<a id="0014--iac-dual-compose-local--helmterraform-en-scaleway"></a>
+
+## 0014 — Dual IaC: local Compose + Helm/Terraform on Scaleway
 
 `accepted` · 2026-06-30 · infra, devex, iac
 
-**Decisión.** **Paridad lógica** con dos herramientas:
+**Decision.** **Logical parity** with two tools:
 
-- **Desarrollo = LOCAL con Docker Compose.** `make dev-up` levanta la suite entera en
-  `deploy/compose/`, bajo `*.sytue.localhost` con **TLS local (mkcert)** vía **Traefik**, con
-  datos de ejemplo. Los servicios gestionados de Cloud tienen equivalente local (PostgreSQL +
+- **Development = LOCAL with Docker Compose.** `make dev-up` brings up the whole suite in
+  `deploy/compose/`, under `*.sytue.localhost` with **local TLS (mkcert)** via **Traefik**, with
+  sample data. The Cloud managed services have a local equivalent (PostgreSQL +
   PostgREST + MinIO).
-- **Producción = SCALEWAY.** **Terraform** aprovisiona la infraestructura en
-  `infra/terraform/` con módulos reutilizables (`network`, `kapsule`, `database`,
-  `object-storage`, `registry`, `dns`, `secrets`, `loadbalancer`) y entornos
-  dev/staging/prod; **Helm** despliega el umbrella chart `sytue-one` en Kapsule desde
-  `deploy/helm/`. Estado de Terraform en backend S3.
-- **Misma configuración lógica** (dominios, clients OIDC, variables) parametrizada por
-  entorno: cambian endpoints y escala, **no la arquitectura**. Secretos nunca en git.
+- **Production = SCALEWAY.** **Terraform** provisions the infrastructure in
+  `infra/terraform/` with reusable modules (`network`, `kapsule`, `database`,
+  `object-storage`, `registry`, `dns`, `secrets`, `loadbalancer`) and
+  dev/staging/prod environments; **Helm** deploys the `sytue-one` umbrella chart on Kapsule from
+  `deploy/helm/`. Terraform state in an S3 backend.
+- **Same logical configuration** (domains, OIDC clients, variables) parameterized per
+  environment: endpoints and scale change, **not the architecture**. Secrets never in git.
 
-**Descartado.** K8s local (kind/k3d) por defecto (arranque pesado, peor DX — queda como
-perfil avanzado), solo nube (caro y lento), Helmfile/Kustomize como base, Pulumi, y forzar
-una sola herramienta para ambos entornos.
+**Ruled out.** Local K8s (kind/k3d) by default (heavy startup, worse DX — kept as an
+advanced profile), cloud only (expensive and slow), Helmfile/Kustomize as the base, Pulumi, and forcing
+a single tool for both environments.
 
-**Consecuencias.** Onboarding rápido y menos «funciona en mi máquina»; a cambio, **dos
-definiciones que mantener** (riesgo de divergencia: todo servicio nuevo se añade a la vez a
-Compose y al chart) y fallos que solo aparecen en Kapsule (NetworkPolicy, quotas,
-scheduling) → staging antes de prod.
+**Consequences.** Fast onboarding and less “works on my machine”; in exchange, **two
+definitions to maintain** (risk of divergence: every new service is added to both
+Compose and the chart at the same time) and failures that only show up on Kapsule (NetworkPolicy, quotas,
+scheduling) → staging before prod.
 
 ---
 
 <a id="0015"></a>
 
-## 0015 — Licenciamiento AGPL-3.0 del código propio · superseded por [0018](#0018)
+<a id="0015--licenciamiento-agpl-30-del-código-propio--superseded-por-0018"></a>
+
+## 0015 — AGPL-3.0 licensing of our own code · superseded by [0018](#0018)
 
 `superseded` · 2026-06-30 · licensing
 
-**Decisión (histórica).** Código propio bajo **AGPL-3.0**: la cláusula de red obliga a
-publicar el fuente a quien ofrezca una versión modificada como servicio, cerrando el
-«agujero ASP» de la GPL. Compatible con los motores libres de entonces. Descartadas
-permisivas (permitirían SaaS cerrado sin contrapartida), GPL-3.0 (no cubre servicio),
-open core (partes no libres) y source-available (no OSI).
+**Decision (historical).** Our own code under **AGPL-3.0**: the network clause forces
+anyone offering a modified version as a service to publish the source, closing the GPL's
+“ASP loophole”. Compatible with the free engines of the time. Ruled out
+permissive licenses (they would allow closed SaaS with nothing in return), GPL-3.0 (does not cover services),
+open core (non-free parts) and source-available (not OSI).
 
-**Por qué cayó.** Sin motores AGPL y siendo cada producto obra original, el copyleft deja de
-ser necesario y limita el negocio.
+**Why it fell.** With no AGPL engines and each product being original work, copyleft is no longer
+necessary and it limits the business.
 
 ---
 
 <a id="0016"></a>
 
-## 0016 — Stack único y total: Go + Astro/Preact + PostgreSQL
+<a id="0016--stack-único-y-total-go--astropreact--postgresql"></a>
 
-`accepted` · 2026-07-01 · **decisión madre del pivote**
+## 0016 — A single, total stack: Go + Astro/Preact + PostgreSQL
 
-**Contexto.** El diseño 0002–0015 ensamblaba motores de terceros: stack poliglota (PHP,
-Rust, Java, TypeScript, Go), cinco motores AGPL que operar/tematizar/forkear/federar, y un
-datastore en memoria además de Postgres.
+`accepted` · 2026-07-01 · **parent decision of the pivot**
 
-**Decisión.** Stack **único y total**, sin excepciones de lenguaje en backend:
+**Context.** The 0002–0015 design assembled third-party engines: a polyglot stack (PHP,
+Rust, Java, TypeScript, Go), five AGPL engines to operate/theme/fork/federate, and an
+in-memory datastore in addition to Postgres.
 
-- **Backend = Go.** Módulo único `git.sytue.eu/sytue/one`; librerías compartidas en
-  `platform/pkg/*`; un binario por servicio en `services/<svc>/cmd/<svc>/main.go`; capas
-  `internal/{http,domain,store}`; `pgx` + `sqlc`, migraciones `goose`/`golang-migrate`,
-  router `chi`, logs `slog`, `context` en todo I/O; Dockerfile multi-stage a distroless;
-  cabecera SPDX propietaria por archivo.
-- **Frontend = Astro + Preact** (islands), Tailwind — ver [0004](#0004); los SDKs de
-  `@sytue/api-clients` apuntan ahora a los servicios Go.
-- **Datastore ÚNICO = PostgreSQL.** Estado, colas y caché sobre Postgres ([0019](#0019)).
-- **Blobs grandes** en Object Storage S3 (Scaleway prod / MinIO dev).
+**Decision.** A **single, total** stack, with no language exceptions in the backend:
 
-Única excepción de aplicación de terceros: **LiveKit** ([0021](#0021)).
+- **Backend = Go.** Single module `git.sytue.eu/sytue/one`; shared libraries in
+  `platform/pkg/*`; one binary per service in `services/<svc>/cmd/<svc>/main.go`; layers
+  `internal/{http,domain,store}`; `pgx` + `sqlc`, `goose`/`golang-migrate` migrations,
+  `chi` router, `slog` logs, `context` in all I/O; multi-stage Dockerfile to distroless;
+  proprietary SPDX header per file.
+- **Frontend = Astro + Preact** (islands), Tailwind — see [0004](#0004); the
+  `@sytue/api-clients` SDKs now point to the Go services.
+- **SINGLE datastore = PostgreSQL.** State, queues and cache on Postgres ([0019](#0019)).
+- **Large blobs** in Object Storage S3 (Scaleway prod / MinIO dev).
 
-**Descartado.** Mantener el stack poliglota; backend en TypeScript/Node (peor encaje para
-servidores de larga vida y protocolos SMTP/IMAP/DAV); Rust (curva y ecosistema de groupware
-permisivo menos maduro); conservar Valkey; permitir «islas» de otros lenguajes por servicio.
+The only third-party application exception: **LiveKit** ([0021](#0021)).
 
-**Consecuencias.** Un solo modelo mental y superficie operativa mínima (un datastore, un
-runtime, un stack de front); a cambio, hay que **reimplementar** lo que daban los motores —
-esfuerzo grande, con riesgo de quedarse por debajo del upstream en casos límite (antispam,
-recurrencias CalDAV, fidelidad OOXML). Todo backend nuevo nace como `services/<svc>/` en Go.
+**Ruled out.** Keeping the polyglot stack; a TypeScript/Node backend (worse fit for
+long-lived servers and SMTP/IMAP/DAV protocols); Rust (learning curve and a less mature permissive
+groupware ecosystem); keeping Valkey; allowing “islands” of other languages per service.
+
+**Consequences.** A single mental model and a minimal operational surface (one datastore, one
+runtime, one front stack); in exchange, what the engines provided must be **reimplemented** —
+a large effort, with the risk of falling short of upstream in edge cases (antispam,
+CalDAV recurrences, OOXML fidelity). Every new backend is born as `services/<svc>/` in Go.
 
 ---
 
 <a id="0017"></a>
 
-## 0017 — Reimplementación nativa clean-room sobre estándares abiertos
+<a id="0017--reimplementación-nativa-clean-room-sobre-estándares-abiertos"></a>
 
-`accepted` · 2026-07-01 · supersede 0003, 0005, 0006, 0009, 0010
+## 0017 — Native clean-room reimplementation on open standards
 
-**Contexto.** Con los motores retirados, hace falta una política de ingeniería que produzca
-**código original propietario** que interopere con clientes estándar sin incurrir en obra
-derivada de código copyleft.
+`accepted` · 2026-07-01 · supersedes 0003, 0005, 0006, 0009, 0010
 
-**Decisión.** Cada producto se reimplementa en Go como **obra original mediante proceso
-clean-room** sobre estándares y RFCs abiertos, usando **solo librerías permisivas**
+**Context.** With the engines retired, we need an engineering policy that produces
+**original proprietary code** that interoperates with standard clients without creating a
+derivative work of copyleft code.
+
+**Decision.** Each product is reimplemented in Go as **original work through a
+clean-room process** on open standards and RFCs, using **only permissive libraries**
 (MIT/BSD/Apache/ISC):
 
-| Producto                     | Estándar implementado                                  | Librerías de apoyo                                        |
-| ---------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
-| **Sytue ID**                 | OIDC/OAuth2 (Auth Code+PKCE), JWKS, SCIM, MFA/WebAuthn | `ory/fosite` o `zitadel/oidc`                             |
-| **Sytue Drive**              | WebDAV + API REST propia                               | `x/net/webdav`, `emersion/go-webdav`                      |
-| **Sytue Docs/Sheets/Slides** | modelo documental OOXML/ODF + colab CRDT/OT (WS)       | editor propio + `coder/websocket`                         |
-| **Sytue Mail**               | SMTP/IMAP/JMAP                                         | `emersion/go-smtp`, `go-imap`, `go-message` + JMAP propio |
-| **Sytue Calendar**           | CalDAV + API REST                                      | `emersion/go-webdav`, `emersion/go-ical`                  |
-| **Sytue Contacts**           | CardDAV + API REST                                     | `emersion/go-webdav`, `emersion/go-vcard`                 |
-| **Sytue Rooms**              | WebSocket + API REST                                   | `coder/websocket`                                         |
+| Product                      | Standard implemented                                   | Supporting libraries                                       |
+| ---------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| **Sytue ID**                 | OIDC/OAuth2 (Auth Code+PKCE), JWKS, SCIM, MFA/WebAuthn | `ory/fosite` or `zitadel/oidc`                             |
+| **Sytue Drive**              | WebDAV + our own REST API                              | `x/net/webdav`, `emersion/go-webdav`                       |
+| **Sytue Docs/Sheets/Slides** | OOXML/ODF document model + CRDT/OT collab (WS)         | our own editor + `coder/websocket`                         |
+| **Sytue Mail**               | SMTP/IMAP/JMAP                                         | `emersion/go-smtp`, `go-imap`, `go-message` + our own JMAP |
+| **Sytue Calendar**           | CalDAV + REST API                                      | `emersion/go-webdav`, `emersion/go-ical`                   |
+| **Sytue Contacts**           | CardDAV + REST API                                     | `emersion/go-webdav`, `emersion/go-vcard`                  |
+| **Sytue Rooms**              | WebSocket + REST API                                   | `coder/websocket`                                          |
 
-**Reglas clean-room (vinculantes).**
+**Clean-room rules (binding).**
 
-- **No se consulta el código fuente de los motores AGPL.** Se trabaja desde RFCs,
-  especificaciones y APIs públicas: las ideas, la funcionalidad, el _look & feel_ y los
-  protocolos no tienen copyright; el **código sí**. Prohibido copiar, traducir o portar.
-- Las librerías enlazadas deben ser permisivas (gate de licencias en CI); se conservan
-  avisos NOTICE.
-- Cada implementación registra su **estándar de referencia** y sus **librerías**; cabecera
-  SPDX propietaria por archivo.
-- **Interoperabilidad como criterio de aceptación**: cada servicio se valida contra clientes
-  estándar de su protocolo, no contra el motor que reemplaza.
+- **The source code of the AGPL engines is not consulted.** Work is done from RFCs,
+  specifications and public APIs: ideas, functionality, _look & feel_ and
+  protocols are not copyrighted; **code is**. Copying, translating or porting is forbidden.
+- Linked libraries must be permissive (license gate in CI); NOTICE
+  files are preserved.
+- Each implementation records its **reference standard** and its **libraries**; proprietary
+  SPDX header per file.
+- **Interoperability as an acceptance criterion**: each service is validated against standard
+  clients of its protocol, not against the engine it replaces.
 
-**Descartado.** Mantener motores y construir solo clientes; reescribir «leyendo el código
-AGPL como referencia» (obra derivada — riesgo legal inaceptable); adquirir una base
-propietaria de terceros; implementar protocolos cerrados en vez de estándares.
+**Ruled out.** Keeping the engines and building only clients; rewriting “reading the AGPL
+code as a reference” (derivative work — unacceptable legal risk); acquiring a third-party
+proprietary codebase; implementing closed protocols instead of standards.
 
-**Riesgos (magnitud explícita).** **Correo es el reto mayor** (entregabilidad, antispam,
-colas, reputación de IP, SPF/DKIM/DMARC/MTA-STS/TLS-RPT); **ofimática es el segundo**
-(fidelidad OOXML/ODF + colaboración). Mitigación: alcance por fases, librerías permisivas
-probadas y suites de interoperabilidad por protocolo.
+**Risks (explicit magnitude).** **Mail is the biggest challenge** (deliverability, antispam,
+queues, IP reputation, SPF/DKIM/DMARC/MTA-STS/TLS-RPT); **the office suite is the second**
+(OOXML/ODF fidelity + collaboration). Mitigation: phased scope, proven permissive
+libraries and interoperability suites per protocol.
 
 ---
 
 <a id="0018"></a>
 
-## 0018 — Licenciamiento propietario del código de producto (© Sytue)
+<a id="0018--licenciamiento-propietario-del-código-de-producto--sytue"></a>
 
-`accepted` · 2026-07-01 · supersede 0015
+## 0018 — Proprietary licensing of the product code (© Sytue)
 
-**Decisión.** El código de producto de Sytue es **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))**, sin copyleft ni
-obligación de publicar fuente: cubre `services/*`, `platform/pkg/*`, las superficies
-Astro+Preact y los paquetes `@sytue/*`.
+`accepted` · 2026-07-01 · supersedes 0015
 
-- **Cabecera SPDX por archivo Go:** `MIT` + `© Sytue`; cada paquete
-  frontend con su `LICENSE` propietario.
-- **Dependencias incorporadas al producto: solo permisivas** — MIT/BSD/Apache-2.0/ISC/
-  PostgreSQL y, con cautela, MPL-2.0. Se conservan avisos LICENSE/NOTICE.
-- **Prohibido AGPL/GPL y source-available** (SSPL/BSL/MSL/Elastic/RSAL) como dependencia
-  enlazada, incorporada o motor del producto entregado al cliente. Los servicios de
-  infraestructura operativa requieren decisión individual y nunca se presumen permitidos.
-- **LiveKit (Apache-2.0)** es la única aplicación de terceros permitida en el runtime de cliente.
-- **Gate de licencias de producto en CI** con SBOM (CycloneDX/SPDX): cualquier dependencia no
-  permitida que llegue al artefacto rompe el build. Una licencia desconocida exige decisión; el
-  copyleft fuerte y _source-available_ permanecen prohibidos en el perímetro de producto.
+**Decision.** Sytue's product code is **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))**, with no copyleft or
+obligation to publish source: it covers `services/*`, `platform/pkg/*`, the
+Astro+Preact surfaces and the `@sytue/*` packages.
 
-**Enmienda de alcance — 2026-08-01.** Las herramientas internas de ingeniería se evalúan en
-un perímetro distinto. Un ejecutable o servicio GPL/AGPL puede usarse para control de versiones,
-forja, CI, análisis o administración cuando sea autónomo, no se enlace ni empaquete con artefactos
-Sytue, no se ofrezca como funcionalidad a clientes, se inventaríe y se cumplan íntegramente sus
-obligaciones (incluida la oferta de fuente y modificaciones cuando aplique). Su salida no se
-considera automáticamente derivada: el gate verifica que nada de la herramienta entre en los
-binarios, imágenes o instaladores. Las licencias _source-available_ siguen bloqueadas por defecto
-también para tooling y exigen ADR específico. Esta separación no relaja la política de origen UE,
-que se aplica de forma independiente a producto, infraestructura y tooling.
+- **SPDX header per Go file:** `MIT` + `© Sytue`; each frontend
+  package with its proprietary `LICENSE`.
+- **Dependencies incorporated into the product: permissive only** — MIT/BSD/Apache-2.0/ISC/
+  PostgreSQL and, with caution, MPL-2.0. LICENSE/NOTICE files are preserved.
+- **AGPL/GPL and source-available (SSPL/BSL/MSL/Elastic/RSAL) are forbidden** as a linked
+  or incorporated dependency or as an engine of the product delivered to the customer. Operational
+  infrastructure services require an individual decision and are never presumed allowed.
+- **LiveKit (Apache-2.0)** is the only third-party application allowed in the customer runtime.
+- **Product license gate in CI** with SBOM (CycloneDX/SPDX): any non-allowed
+  dependency that reaches the artifact breaks the build. An unknown license requires a decision;
+  strong copyleft and _source-available_ remain forbidden in the product perimeter.
 
-**Descartado.** Seguir con AGPL, permisiva para el código propio, open core, source-available.
+**Scope amendment — 2026-08-01.** Internal engineering tools are evaluated in
+a separate perimeter. A GPL/AGPL executable or service may be used for version control,
+forge, CI, analysis or administration when it is standalone, is not linked or packaged with Sytue
+artifacts, is not offered as functionality to customers, is inventoried and all its
+obligations are fully met (including offering source and modifications where applicable). Its output is not
+automatically considered derivative: the gate verifies that nothing from the tool gets into the
+binaries, images or installers. _Source-available_ licenses remain blocked by default
+for tooling too and require a specific ADR. This separation does not relax the EU-origin policy,
+which applies independently to product, infrastructure and tooling.
 
-**Consecuencias.** Control total del producto y del modelo de negocio; a cambio, disciplina
-de cumplimiento estricta (cabeceras, SBOM, NOTICE) y riesgo de arrastrar copyleft transitivo
-→ bloqueo automatizado en CI. No afecta a los datos ni al código de los clientes.
+**Ruled out.** Staying with AGPL, a permissive license for our own code, open core, source-available.
+
+**Consequences.** Full control of the product and the business model; in exchange, strict
+compliance discipline (headers, SBOM, NOTICE) and the risk of pulling in transitive copyleft
+→ automated blocking in CI. It does not affect customers' data or code.
 
 ---
 
 <a id="0019"></a>
 
-## 0019 — PostgreSQL como datastore único (colas y caché sobre Postgres)
+<a id="0019--postgresql-como-datastore-único-colas-y-caché-sobre-postgres"></a>
 
-`accepted` · 2026-07-01 · supersede 0008
+## 0019 — PostgreSQL as the single datastore (queues and cache on Postgres)
 
-**Decisión.** **PostgreSQL es el datastore ÚNICO**: estado, colas y caché sobre Postgres. Se
-elimina Valkey/Redis del stack.
+`accepted` · 2026-07-01 · supersedes 0008
 
-- **Colas / trabajos en background:** `riverqueue` o `pgmq` (colas transaccionales) y/o
-  `LISTEN`/`NOTIFY` para fan-out; workers Go, _at-least-once_, reintentos y dead-letter.
-- **Caché:** tablas con TTL/invalidación o caché en proceso dentro de cada servicio.
-- **Realtime/pub-sub:** `LISTEN`/`NOTIFY` como bus ligero; WebSocket/SSE hacia el cliente
-  desde los propios servicios Go.
-- **Blobs grandes:** a Object Storage, **no** a Postgres.
-- **Multi-tenant:** esquema/RLS por tenant; prefijos S3 por tenant.
+**Decision.** **PostgreSQL is the SINGLE datastore**: state, queues and cache on Postgres.
+Valkey/Redis is removed from the stack.
 
-**Descartado.** Conservar Valkey (pieza extra sin consumidores que la exijan), volver a
-Redis (licencia), broker dedicado (NATS/RabbitMQ/Kafka — sobredimensionado; reconsiderable
-con una decisión nueva si la escala lo exige), caché distribuida propia.
+- **Queues / background jobs:** `riverqueue` or `pgmq` (transactional queues) and/or
+  `LISTEN`/`NOTIFY` for fan-out; Go workers, _at-least-once_, retries and dead-letter.
+- **Cache:** tables with TTL/invalidation or in-process cache within each service.
+- **Realtime/pub-sub:** `LISTEN`/`NOTIFY` as a lightweight bus; WebSocket/SSE to the client
+  from the Go services themselves.
+- **Large blobs:** to Object Storage, **not** to Postgres.
+- **Multi-tenant:** schema/RLS per tenant; S3 prefixes per tenant.
 
-**Consecuencias.** Una sola pieza de datos que operar y respaldar, y **colas
-transaccionales** (encolar en la misma transacción que el cambio de estado elimina el
-«commit en BD pero no en la cola»); a cambio, techo de rendimiento distinto al de un KV en
-memoria → `LISTEN/NOTIFY` en vez de polling agresivo, autovacuum e índices afinados,
-particionado/archivado de las tablas de cola y caché en proceso para _hot paths_.
+**Ruled out.** Keeping Valkey (an extra piece with no consumers that require it), going back to
+Redis (license), a dedicated broker (NATS/RabbitMQ/Kafka — oversized; can be reconsidered
+with a new decision if scale demands it), our own distributed cache.
 
-> **Nota posterior (vigente).** El invariante de escala llevó a adoptar **DragonflyDB** como
-> caché/pub-sub a gran escala para uso interno; ver `CONVENTIONS.md`. La regla «sin KV
-> externo» de esta decisión queda acotada a lo que Postgres cubre bien.
+**Consequences.** A single data piece to operate and back up, and **transactional
+queues** (enqueuing in the same transaction as the state change eliminates
+“committed in the DB but not in the queue”); in exchange, a different performance ceiling than an in-memory
+KV → `LISTEN/NOTIFY` instead of aggressive polling, tuned autovacuum and indexes,
+partitioning/archiving of the queue tables and in-process cache for _hot paths_.
+
+> **Later note (in force).** The scale invariant led to adopting **DragonflyDB** as
+> large-scale cache/pub-sub for internal use; see `CONVENTIONS.md`. The “no external
+> KV” rule of this decision is limited to what Postgres covers well.
 
 ---
 
 <a id="0020"></a>
 
-## 0020 — Sytue ID como IdP nativo en Go (OIDC/OAuth2/SCIM/MFA)
+<a id="0020--sytue-id-como-idp-nativo-en-go-oidcoauth2scimmfa"></a>
 
-`accepted` · 2026-07-01 · supersede 0002
+## 0020 — Sytue ID as a native IdP in Go (OIDC/OAuth2/SCIM/MFA)
 
-**Decisión.** **Sytue ID** es un servicio Go propio que implementa, sobre librerías
-Apache-2.0 (`ory/fosite` o `zitadel/oidc`): **OIDC/OAuth2** Authorization Code + **PKCE**,
-refresh tokens, **JWKS**, discovery, **SCIM** y **MFA/WebAuthn** (SAML según necesidad
-enterprise). Datos de identidad en PostgreSQL.
+`accepted` · 2026-07-01 · supersedes 0002
 
-- **Clients OIDC** (BFF confidencial por superficie): uno por app. No hay clients de
-  federación de motores.
-- **Cada servicio Go valida los JWT vía JWKS** con el middleware `authn` de
-  `platform/pkg/authn`, y aplica autorización por roles/tenant.
-- **Grupos/roles:** `org/<tenant>` con `owner`, `admin`, `member`, `billing`; **MFA/WebAuthn
-  obligatorio** para `admin`/`owner`. Un alta en Sytue ID → acceso a toda la suite.
-- **SSO:** cookie host-only `__Host-` por BFF tras OIDC+PKCE; Sytue ID evita repetir credenciales.
-- El BFF de Meet mintea el JWT de LiveKit **tras** validar OIDC.
+**Decision.** **Sytue ID** is our own Go service that implements, on top of
+Apache-2.0 libraries (`ory/fosite` or `zitadel/oidc`): **OIDC/OAuth2** Authorization Code + **PKCE**,
+refresh tokens, **JWKS**, discovery, **SCIM** and **MFA/WebAuthn** (SAML as needed for
+enterprise). Identity data in PostgreSQL.
 
-**Descartado.** Mantener Keycloak (motor Java de terceros como pieza nuclear); otro IdP de
-terceros desplegado (sí usamos sus librerías); SaaS de identidad US; implementar OIDC «a
-mano» sin librería madura (riesgo de seguridad altísimo).
+- **OIDC clients** (confidential BFF per surface): one per app. There are no engine
+  federation clients.
+- **Each Go service validates JWTs via JWKS** with the `authn` middleware from
+  `platform/pkg/authn`, and applies authorization by roles/tenant.
+- **Groups/roles:** `org/<tenant>` with `owner`, `admin`, `member`, `billing`; **MFA/WebAuthn
+  mandatory** for `admin`/`owner`. One sign-up in Sytue ID → access to the whole suite.
+- **SSO:** host-only `__Host-` cookie per BFF after OIDC+PKCE; Sytue ID avoids re-entering credentials.
+- The Meet BFF mints the LiveKit JWT **after** validating OIDC.
 
-**Riesgo dominante.** Es la **decisión de mayor riesgo de seguridad de la suite**: un fallo
-en tokens, sesiones, PKCE, refresh, JWKS o WebAuthn compromete a **todos** los productos.
-Mitigación obligatoria: librerías probadas para los flujos criptográficos, **auditoría de
-seguridad externa antes de producción**, conformidad OIDC y pentest. Además es punto único
-de fallo del SSO → HA, Postgres replicado y runbook de recuperación prioritario.
+**Ruled out.** Keeping Keycloak (a third-party Java engine as a core piece); another deployed
+third-party IdP (we do use their libraries); US identity SaaS; implementing OIDC “by
+hand” without a mature library (extremely high security risk).
+
+**Dominant risk.** It is the **highest security-risk decision in the suite**: a flaw
+in tokens, sessions, PKCE, refresh, JWKS or WebAuthn compromises **all** products.
+Mandatory mitigation: proven libraries for the cryptographic flows, **external security
+audit before production**, OIDC conformance and pentest. It is also a single point
+of failure for SSO → HA, replicated Postgres and a priority recovery runbook.
 
 ---
 
 <a id="0021"></a>
 
-## 0021 — LiveKit (Apache-2.0) como SFU de medios de Sytue Rooms
+<a id="0021--livekit-apache-20-como-sfu-de-medios-de-sytue-rooms"></a>
+
+## 0021 — LiveKit (Apache-2.0) as the media SFU for Sytue Rooms
 
 `accepted` · 2026-07-01 · meet, webrtc
 
-**Contexto.** La señalización y las salas pueden ser un servicio Go propio, pero el **plano
-de medios WebRTC** —un SFU con simulcast, control de congestión, gestión de pérdidas,
-TURN/ICE— es ingeniería especializada de años.
+**Context.** Signaling and rooms can be our own Go service, but the **WebRTC media
+plane** —an SFU with simulcast, congestion control, loss handling,
+TURN/ICE— is years of specialized engineering.
 
-**Decisión.** **Sytue Rooms** = **servicio Go propio de señalización/salas** (salas, permisos,
-presencia y estado en PostgreSQL, OIDC contra Sytue ID) + **LiveKit** (Apache-2.0, escrito
-en Go) como **SFU de medios**, la **única aplicación de terceros permitida en el runtime de
-cliente**. El BFF mintea
-el JWT de LiveKit tras validar OIDC; el frontend usa el SDK web dentro de la app Astro.
+**Decision.** **Sytue Rooms** = **our own Go signaling/rooms service** (rooms, permissions,
+presence and state in PostgreSQL, OIDC against Sytue ID) + **LiveKit** (Apache-2.0, written
+in Go) as the **media SFU**, the **only third-party application allowed in the customer
+runtime**. The BFF mints
+the LiveKit JWT after validating OIDC; the frontend uses the web SDK inside the Astro app.
 
-**Descartado.** Reimplementar el SFU (años de trabajo y altísimo riesgo), Mattermost
-Calls/rtcd (acoplado al motor retirado), Jitsi (stack Java y producto completo que no
-encaja), construir sobre Pion (recae en reimplementar el SFU), SaaS de vídeo US.
+**Ruled out.** Reimplementing the SFU (years of work and extremely high risk), Mattermost
+Calls/rtcd (coupled to the retired engine), Jitsi (Java stack and a complete product that does not
+fit), building on Pion (amounts to reimplementing the SFU), US video SaaS.
 
-**Consecuencias.** Vídeo de calidad de producción sin asumir el riesgo del SFU; a cambio,
-dependencia de un componente de terceros (versión fijada, CVEs, NOTICE) y operación WebRTC
-exigente (TURN/ICE, NAT, rango UDP). Excepción **acotada**: ninguna otra app de terceros sin
-decisión registrada. El estado vive en Postgres; LiveKit solo transporta medios.
+**Consequences.** Production-quality video without taking on the SFU risk; in exchange,
+dependency on a third-party component (pinned version, CVEs, NOTICE) and demanding WebRTC
+operations (TURN/ICE, NAT, UDP range). A **bounded** exception: no other third-party app without
+a recorded decision. State lives in Postgres; LiveKit only transports media.
 
 ---
 
 <a id="0022"></a>
 
-## 0023 — Eliminación de los motores AGPL de terceros
+<a id="0023--eliminación-de-los-motores-agpl-de-terceros"></a>
+
+## 0023 — Removal of third-party AGPL engines
 
 `accepted` · 2026-07-01 · engines, licensing
 
-**Decisión.** Se eliminan del stack **todos** los motores de terceros AGPL — Keycloak,
-Nextcloud, OnlyOffice, Mattermost y Stalwart — más Valkey/Redis:
+**Decision.** **All** third-party AGPL engines are removed from the stack — Keycloak,
+Nextcloud, OnlyOffice, Mattermost and Stalwart — plus Valkey/Redis:
 
-| Motor retirado   | Función                     | Sustituto Sytue-native (Go)                             |
-| ---------------- | --------------------------- | ------------------------------------------------------- |
-| **Keycloak**     | Identidad/SSO/SCIM/MFA      | **Sytue ID** ([0020](#0020))                            |
-| **Nextcloud**    | Archivos + CalDAV + CardDAV | **Drive** + **Calendar** + **Contacts** ([0017](#0017)) |
-| **OnlyOffice**   | Ofimática colaborativa      | **Docs/Sheets/Slides** ([0017](#0017))                  |
-| **Stalwart**     | Correo SMTP/IMAP/JMAP       | **Sytue Mail** ([0017](#0017))                          |
-| **Mattermost**   | Chat + vídeo                | **Sytue Rooms** ([0017](#0017), [0021](#0021))          |
-| **Valkey/Redis** | Caché/cola                  | **PostgreSQL** ([0019](#0019))                          |
+| Retired engine   | Function                   | Sytue-native replacement (Go)                           |
+| ---------------- | -------------------------- | ------------------------------------------------------- |
+| **Keycloak**     | Identity/SSO/SCIM/MFA      | **Sytue ID** ([0020](#0020))                            |
+| **Nextcloud**    | Files + CalDAV + CardDAV   | **Drive** + **Calendar** + **Contacts** ([0017](#0017)) |
+| **OnlyOffice**   | Collaborative office suite | **Docs/Sheets/Slides** ([0017](#0017))                  |
+| **Stalwart**     | SMTP/IMAP/JMAP mail        | **Sytue Mail** ([0017](#0017))                          |
+| **Mattermost**   | Chat + video               | **Sytue Rooms** ([0017](#0017), [0021](#0021))          |
+| **Valkey/Redis** | Cache/queue                | **PostgreSQL** ([0019](#0019))                          |
 
-Fuera del repo quedan la configuración de Keycloak, el Hub y la PaaS en TypeScript y los
-temas de los motores; sin charts de motores AGPL ni clients OIDC de federación.
+The Keycloak configuration, the TypeScript Hub and PaaS and the engine themes are left out
+of the repo; no charts for AGPL engines and no federation OIDC clients.
 
-**Descartado.** Mantener los motores; **retirar solo algunos** (mantendría un motor ajeno en el
-runtime de cliente, sus obligaciones y la heterogeneidad que se quiere eliminar); sustituirlos por
-otros motores de terceros permisivos, salvo LiveKit.
+**Ruled out.** Keeping the engines; **retiring only some** (it would keep a foreign engine in the
+customer runtime, its obligations and the heterogeneity we want to eliminate); replacing them with
+other permissive third-party engines, except LiveKit.
 
-**Consecuencias.** Cero dependencia AGPL incorporada al producto y cero motor AGPL en su runtime;
-stack único sin rebases de forks; a cambio, pérdida de funcionalidad madura que hay que reconstruir
-(ver magnitudes en [0017](#0017)) y **riesgo de cumplimiento clean-room**: garantizar que nadie
-consulta la fuente AGPL. Esta decisión no regula ejecutables autónomos de tooling interno, cuyo
-perímetro quedó separado en la enmienda de [0018](#0018).
+**Consequences.** Zero AGPL dependencies incorporated into the product and zero AGPL engines in its runtime;
+a single stack with no fork rebases; in exchange, loss of mature functionality that must be rebuilt
+(see magnitudes in [0017](#0017)) and **clean-room compliance risk**: guaranteeing that nobody
+consults the AGPL source. This decision does not govern standalone internal tooling executables, whose
+perimeter was separated in the amendment to [0018](#0018).
 
 ---
 
 <a id="0023"></a>
 
-## 0023 — Sustrato de Sytue Cloud: Kapsule, Coolify como referencia, Firecracker como escotilla
+<a id="0023--sustrato-de-sytue-cloud-kapsule-coolify-como-referencia-firecracker-como-escotilla"></a>
+
+## 0023 — Sytue Cloud substrate: Kapsule, Coolify as a reference, Firecracker as an escape hatch
 
 `accepted` · 2026-07-10 · paas, substrate
 
-**Contexto.** ¿Puede un Coolify refactorizado servir de base para Sytue Cloud? ¿Es
-Kubernetes/Kapsule el sustrato correcto, o conviene **Firecracker** (modelo Fly.io) para el
-aislamiento multi-tenant hostil? La decisión afecta al invariante de escala (cientos de
-miles de usuarios), a «backend siempre Go» y al modelo de tenancy ya fijado.
+**Context.** Can a refactored Coolify serve as the base for Sytue Cloud? Is
+Kubernetes/Kapsule the right substrate, or is **Firecracker** (the Fly.io model) better for
+hostile multi-tenant isolation? The decision affects the scale invariant (hundreds of
+thousands of users), “backend always Go” and the tenancy model already set.
 
-**Decisión.**
+**Decision.**
 
-1. **Coolify: referencia de dominio, no fuente. Sin atajo MVP.** Se descarta portarlo o
-   forkearlo, y también correr Coolify real tras la UI Astro vía su API: aporta ~cero código
-   reutilizable a un stack Go (su valor es el motor agnóstico que orquesta, que Go maneja
-   nativamente), su arquitectura es **single-tenant** y el atajo viola «backend siempre Go» +
-   escala. Se toma su **modelo de dominio** (apps/servicios/envs/deploys/preview/catálogo
-   one-click) como referencia.
-2. **Sustrato: Kubernetes gestionado (Kapsule)**, reafirmando [0011](#0011) — tenant →
-   namespace con ResourceQuota + NetworkPolicy. Ya en producción en el repo:
-   `services/cloud/internal/controller/kubeplatform.go` (Server-Side Apply de
-   Deployment/Service/Ingress/HPA), el builder OCI sin demonio, los charts y los módulos
-   Terraform. Kapsule aporta el plano de control mutualizado; el ecosistema es permisivo.
-3. **Firecracker: rechazado como sustrato inicial, preservado como escotilla.** Un
-   orquestador tipo `flyd` son 2-3 años-ingeniero de sistemas distribuidos que K8s ya pagó, y
-   tiraría el `services/cloud` que ya funciona. La opción se preserva vía la interfaz
-   **`controller.Platform`**: una célula Firecracker/Kata futura se enchufa sin tocar el plano
-   de control. El kernel compartido es la debilidad honesta de K8s; se mitiga (no se iguala)
-   con PodSecurity `restricted`, seccomp, `automountServiceAccountToken=false`,
-   NetworkPolicy y **pools dedicados por plan**.
+1. **Coolify: a domain reference, not a source. No MVP shortcut.** Porting or
+   forking it is ruled out, and so is running the real Coolify behind the Astro UI via its API: it contributes ~zero
+   reusable code to a Go stack (its value is the agnostic engine it orchestrates, which Go handles
+   natively), its architecture is **single-tenant** and the shortcut violates “backend always Go” +
+   scale. Its **domain model** (apps/services/envs/deploys/preview/one-click
+   catalog) is taken as a reference.
+2. **Substrate: managed Kubernetes (Kapsule)**, reaffirming [0011](#0011) — tenant →
+   namespace with ResourceQuota + NetworkPolicy. Already in production in the repo:
+   `services/cloud/internal/controller/kubeplatform.go` (Server-Side Apply of
+   Deployment/Service/Ingress/HPA), the daemonless OCI builder, the charts and the Terraform
+   modules. Kapsule provides the pooled control plane; the ecosystem is permissive.
+3. **Firecracker: rejected as the initial substrate, preserved as an escape hatch.** A
+   `flyd`-style orchestrator is 2-3 engineer-years of distributed systems that K8s already paid for, and
+   it would throw away the `services/cloud` that already works. The option is preserved via the
+   **`controller.Platform`** interface: a future Firecracker/Kata cell plugs in without touching the control
+   plane. The shared kernel is K8s's honest weakness; it is mitigated (not matched)
+   with PodSecurity `restricted`, seccomp, `automountServiceAccountToken=false`,
+   NetworkPolicy and **dedicated pools per plan**.
 
-**Descartado.** Fork/port de Coolify; Firecracker primario; **Nomad** (BSL 1.1).
+**Ruled out.** Fork/port of Coolify; Firecracker as primary; **Nomad** (BSL 1.1).
 
-**Seguimiento (huecos detectados, por valor).**
+**Follow-up (gaps detected, by value).**
 
-1. **Static-first offload:** servir sitios estáticos desde S3 vía un `cloud-edge` compartido
-   en vez de un contenedor siempre-on por sitio (~10× más barato a 100k sitios).
-2. **Egress de `NetworkPolicy`:** permitir Internet **excepto** RFC1918, CIDR del clúster y
-   `169.254.169.254`, para que un tenant no alcance servicios internos.
-3. **`LimitRange` por namespace de tenant**, además de la `ResourceQuota`.
-4. **Escala de listados:** cursores **keyset** (no OFFSET) + cron de purga/rollup de
-   builds/webhooks/outbox/previews retirados/usage.
-5. **Sharding en células:** columna `organizations.cell` para repartir orgs entre clústers.
-6. **`scale-to-zero`** de previews/free con KEDA (prod de pago `minReplicas≥1`).
-7. ⚠ **Kaniko archivado** → migrar a BuildKit rootless antes de GA (ver [0013](#0013)).
+1. **Static-first offload:** serve static sites from S3 via a shared `cloud-edge`
+   instead of an always-on container per site (~10× cheaper at 100k sites).
+2. **`NetworkPolicy` egress:** allow the Internet **except** RFC1918, the cluster CIDR and
+   `169.254.169.254`, so that a tenant cannot reach internal services.
+3. **`LimitRange` per tenant namespace**, in addition to the `ResourceQuota`.
+4. **Listing scale:** **keyset** cursors (not OFFSET) + a purge/rollup cron for
+   builds/webhooks/outbox/retired previews/usage.
+5. **Sharding into cells:** an `organizations.cell` column to distribute orgs across clusters.
+6. **`scale-to-zero`** of previews/free with KEDA (paid prod `minReplicas≥1`).
+7. ⚠ **Kaniko archived** → migrate to rootless BuildKit before GA (see [0013](#0013)).
 
 ---
 
 <a id="0024"></a>
 
-## 0024 — Apps de escritorio (Fyne) y móvil (PWA + Capacitor)
+<a id="0024--apps-de-escritorio-fyne-y-móvil-pwa--capacitor"></a>
 
-`accepted` · 2026-07-11 (revisada 2026-09-20) · desktop, mobile
+## 0024 — Desktop (Fyne) and mobile (PWA + Capacitor) apps
 
-**Contexto.** Para la paridad con OnlyOffice hacen falta apps de escritorio y móvil, con
-restricciones: **código único** (no mantener editores nativos aparte), clean-room permisivo,
-soberanía, offline razonable y **un solo lenguaje de sistema (Go)**.
+`accepted` · 2026-07-11 (revised 2026-09-20) · desktop, mobile
 
-**Decisión.** Mantener el dominio y las APIs compartidas, con interfaces nativas donde se
-instalan como aplicación:
+**Context.** Parity with OnlyOffice requires desktop and mobile apps, with
+constraints: **single codebase** (no separate native editors to maintain), permissive clean-room,
+sovereignty, reasonable offline support and **a single systems language (Go)**.
 
-- **Escritorio → Fyne 2.8.1** (Go, BSD-3). Las vistas se renderizan de forma nativa en
-  macOS, Windows y Linux, sin WebView2, WKWebView, WebKitGTK ni Chromium. El shell y sus
-  vistas están en `apps/desktop/shell/gui/`; consumen las mismas APIs autenticadas de Sytue
-  ID y los servicios Go que las apps web.
-- **Móvil → PWA instalable como base, Capacitor (MIT) para tiendas** y APIs nativas,
-  reutilizando la misma web app.
-- **Offline por capacidad, no por plataforma.** Las apps Fyne guardan su estado local y lo
-  sincronizan con las APIs al reconectar; las apps móviles mantienen su estrategia PWA/
-  Capacitor. Acciones irreversibles o dependientes de verdad en tiempo real no se simulan. El
-  backend Go **no** se empaqueta en el cliente. Contrato: `docs/roadmap.md#offline-native`.
+**Decision.** Keep the shared domain and APIs, with native interfaces where they are
+installed as an application:
 
-**Descartado.** **Tauri 2** (core en Rust: segundo lenguaje de sistema, sin ventaja neta
-frente a Fyne), **Wails** (depende de un WebView), **Electron** (empaqueta Chromium, 100+ MB),
-React Native / nativo / Flutter (base de código separada → duplicar los editores), solo PWA sin
-Capacitor (sin tiendas).
+- **Desktop → Fyne 2.8.1** (Go, BSD-3). Views are rendered natively on
+  macOS, Windows and Linux, without WebView2, WKWebView, WebKitGTK or Chromium. The shell and its
+  views live in `apps/desktop/shell/gui/`; they consume the same authenticated Sytue
+  ID APIs and Go services as the web apps.
+- **Mobile → installable PWA as the base, Capacitor (MIT) for the stores** and native APIs,
+  reusing the same web app.
+- **Offline by capability, not by platform.** The Fyne apps keep their local state and
+  sync it with the APIs on reconnect; the mobile apps keep their PWA/
+  Capacitor strategy. Irreversible actions, or ones that depend on real-time truth, are not simulated. The
+  Go backend is **not** packaged in the client. Contract: `docs/roadmap.md#offline-native`.
 
-**Coste / seguimiento.** Pipelines nuevos (firma de código, notarización macOS, Xcode/Android
-SDK y cuentas de tienda); mantener tests de recuperación/conflictos, OIDC PKCE, deep links
-`sytue://` y almacenamiento local seguro.
+**Ruled out.** **Tauri 2** (Rust core: a second systems language, no net advantage
+over Fyne), **Wails** (depends on a WebView), **Electron** (bundles Chromium, 100+ MB),
+React Native / native / Flutter (separate codebase → duplicating the editors), PWA only without
+Capacitor (no stores).
+
+**Cost / follow-up.** New pipelines (code signing, macOS notarization, Xcode/Android
+SDK and store accounts); maintain tests for recovery/conflicts, OIDC PKCE, `sytue://` deep
+links and secure local storage.
 
 ---
 
 <a id="0025"></a>
 
-## 0025 — Sytue Rooms: mensajería y videollamada, un servicio y una base
+<a id="0025--sytue-rooms-mensajería-y-videollamada-un-servicio-y-una-base"></a>
 
-`accepted` · 2026-07-28 · rooms, arquitectura
+## 0025 — Sytue Rooms: messaging and video calls, one service and one database
 
-**Contexto.** Chat y Meet nacieron como dos servicios Go con dos bases de datos, y desde el
-primer día tuvieron que hablarse: la llamada arranca DESDE un canal, así que el vídeo debe
-preguntar «¿puede esta persona leer el canal?» antes de abrir la sala, y al colgar debe
-publicar la tarjeta de «llamada finalizada» EN ese canal. Esa conversación viajaba por HTTP
-entre procesos con un secreto compartido.
+`accepted` · 2026-07-28 · rooms, architecture
 
-El acoplamiento no era teórico: si el secreto faltaba en un entorno, el puente quedaba a nil y
-la verja del canal fallaba **cerrada** — abrir una llamada devolvía 403 sin explicación posible
-para quien lo sufría. Pasó en dev y en el chart. Y la tarjeta de fin de llamada nunca podrá ser
-atómica con el mensaje mientras sean dos bases.
+**Context.** Chat and Meet were born as two Go services with two databases, and from the
+first day they had to talk to each other: the call starts FROM a channel, so the video must
+ask “can this person read the channel?” before opening the room, and on hanging up it must
+post the “call ended” card IN that channel. That conversation traveled over HTTP
+between processes with a shared secret.
 
-Para el usuario, además, nunca fueron dos productos: la llamada es un botón del canal.
+The coupling was not theoretical: if the secret was missing in an environment, the bridge was left nil and
+the channel gate failed **closed** — opening a call returned 403 with no possible explanation
+for whoever hit it. It happened in dev and in the chart. And the end-of-call card can never be
+atomic with the message while there are two databases.
 
-**Decisión.** **Un servicio** (`services/rooms`) y **una base** (`sytue_rooms`). La mensajería
-vive en `internal/`, la videollamada en `internal/media/`, y el puente entre ambas es una
-llamada en proceso (`media/service.InProcessNotifier`) dentro de la misma transacción. Un solo
-`events_outbox`, un solo despliegue, un solo host (`rooms.<dominio>`: el frontend sirve `/` y el
-servicio Go `/api`, `/ws` y `/hooks`). El SFU LiveKit sigue siendo un componente aparte
-([0021](#0021)) en `rooms-sfu.<dominio>`: transporta medios, no guarda estado.
+For the user, moreover, they were never two products: the call is a button in the channel.
 
-**Descartado.** Mantener los dos servicios arreglando el secreto (deja en pie la imposibilidad
-de la atomicidad y dos despliegues que versionar juntos); una base compartida entre dos
-servicios (peor: acoplamiento de esquema sin la ventaja de la transacción); un monolito de la
-suite entera (Rooms se fusiona porque comparte dominio —el canal—, no por moda).
+**Decision.** **One service** (`services/rooms`) and **one database** (`sytue_rooms`). Messaging
+lives in `internal/`, video calls in `internal/media/`, and the bridge between them is an
+in-process call (`media/service.InProcessNotifier`) within the same transaction. A single
+`events_outbox`, a single deployment, a single host (`rooms.<dominio>`: the frontend serves `/` and the
+Go service `/api`, `/ws` and `/hooks`). The LiveKit SFU remains a separate component
+([0021](#0021)) at `rooms-sfu.<dominio>`: it transports media, it does not store state.
 
-**Consecuencias.** Desaparecen `CHAT_INTERNAL_SECRET` en este camino, un chart, una imagen y
-una base. El escalado del vídeo deja de ser independiente del de la mensajería — se acepta
-porque el trabajo pesado del vídeo lo hace el SFU, no este proceso, que solo orquesta salas,
-tokens y avisos. La migración de un entorno ya desplegado es con parada y está escrita en
+**Ruled out.** Keeping the two services and fixing the secret (leaves standing the impossibility
+of atomicity and two deployments to version together); a database shared between two
+services (worse: schema coupling without the advantage of the transaction); a monolith of the
+entire suite (Rooms is merged because it shares a domain —the channel—, not as a fad).
+
+**Consequences.** `CHAT_INTERNAL_SECRET` disappears on this path, along with a chart, an image and
+a database. Video scaling is no longer independent of messaging scaling — this is accepted
+because the heavy lifting of video is done by the SFU, not by this process, which only orchestrates rooms,
+tokens and notifications. Migrating an already-deployed environment requires downtime and is written up in
 [`operations.md` §1.4.4](./operations.md#44-fusión-de-sytue_chat--sytue_meet--sytue_rooms-una-sola-vez-por-entorno);
-volver atrás después de la primera escritura pierde datos.
+rolling back after the first write loses data.
 
 ---
 
 <a id="0026"></a>
 
-## 0026 — Sytue Analytics: anonimato por construcción, medición en primera parte
+<a id="0026--sytue-analytics-anonimato-por-construcción-medición-en-primera-parte"></a>
+
+## 0026 — Sytue Analytics: anonymity by construction, first-party measurement
 
 `accepted` · 2026-07-29 · analytics, gdpr, privacy, cloud
 
-**Contexto.** Quien despliega una app en Sytue Cloud no tiene forma de saber cuánta gente la
-visita. Adoptar algo existente está descartado antes de empezar, y no por gusto:
-**Plausible (AGPL) y Matomo (GPL)** son aplicaciones de analítica que entrarían en el
-**perímetro B** (runtime que procesa datos de clientes), no simples herramientas internas. §12 no
-afirma que un servicio separado vuelva copyleft el producto, pero exige ADR, aislamiento,
-cumplimiento de fuente, origen UE y plan de salida; además romperían el principio de no añadir otro
-motor de producto. **Umami** es MIT, luego la licencia no es el problema, pero es Node y
-[`§0`](./CONVENTIONS.md#0-principios-nucleares-en-orden-de-prioridad) principio 1 cierra la puerta
-—«sin excepciones de lenguaje en backend»—; **GA4, PostHog, Fathom, Vercel Analytics** son
-procesadores US y chocan con [0001](#0001) y con `security.md §1` («no se emplean servicios US de
-analítica»). **Se construye en Go, en el monorepo.**
+**Context.** Whoever deploys an app on Sytue Cloud has no way of knowing how many people
+visit it. Adopting something existing is ruled out before we even start, and not out of preference:
+**Plausible (AGPL) and Matomo (GPL)** are analytics applications that would fall into
+**perimeter B** (runtime that processes customer data), not mere internal tools. §12 does not
+claim that a separate service makes the product copyleft, but it requires an ADR, isolation,
+source compliance, EU origin and an exit plan; moreover, they would break the principle of not adding another
+product engine. **Umami** is MIT, so the license is not the problem, but it is Node and
+[`§0`](./CONVENTIONS.md#0-principios-nucleares-en-orden-de-prioridad) principle 1 closes the door
+—“no language exceptions in the backend”—; **GA4, PostHog, Fathom, Vercel Analytics** are
+US processors and clash with [0001](#0001) and with `security.md §1` (“no US analytics
+services are used”). **It is built in Go, in the monorepo.**
 
-Lo que queda por decidir es todo lo demás, y **una sola pieza lo decide**: contar visitantes
-únicos sin cookies y sin guardar IPs.
+What remains to be decided is everything else, and **a single piece decides it**: counting unique
+visitors without cookies and without storing IPs.
 
-### 1. Identidad efímera: HMAC con sal diaria que se destruye
+<a id="1-identidad-efímera-hmac-con-sal-diaria-que-se-destruye"></a>
 
-`visitor = HMAC-SHA256(sal_del_día, site_id ‖ ip ‖ user_agent)`, truncado a 16 bytes. HMAC y no
-`hash(sal‖datos)`: es la primitiva correcta para hashear con clave, está en la stdlib
-(`crypto/hmac`) y no cuesta nada. **La sal se genera una vez al día, se guarda cifrada con
-[`platform/pkg/keycrypto`](../platform/pkg/keycrypto/keycrypto.go) en una fila de
-`sytue_analytics`, se cachea en proceso y el cron la BORRA al cambiar el día.** Cifrada porque un
-volcado de Postgres sin la KEK del gestor de secretos no permite recalcular ningún hash; en
-Postgres y no en Valkey porque §0.1 exige justificación de rendimiento y aquí es **una lectura al
-día**, no un camino caliente.
+### 1. Ephemeral identity: HMAC with a daily salt that is destroyed
 
-Esto no es una política de privacidad: es lo que el producto **puede** y **no puede** hacer.
+`visitor = HMAC-SHA256(sal_del_día, site_id ‖ ip ‖ user_agent)`, truncated to 16 bytes. HMAC and not
+`hash(sal‖datos)`: it is the right primitive for keyed hashing, it is in the stdlib
+(`crypto/hmac`) and it costs nothing. **The salt is generated once a day, stored encrypted with
+[`platform/pkg/keycrypto`](../platform/pkg/keycrypto/keycrypto.go) in a row of
+`sytue_analytics`, cached in process, and the cron DELETES it when the day changes.** Encrypted because a
+Postgres dump without the KEK from the secret manager does not allow recomputing any hash; in
+Postgres and not in Valkey because §0.1 requires a performance justification and here it is **one read per
+day**, not a hot path.
 
-1. **Sin la sal no hay correlación entre días.** Nadie —ni Sytue con acceso root— puede
-   reconstruir a un visitante de ayer. El perfilado a largo plazo deja de estar prohibido y pasa
-   a ser **imposible**. Su precio, que se acepta y se documenta en la interfaz: **no existen
-   «visitantes únicos del mes», ni retorno, ni cohortes.** Un rango largo muestra **suma de
-   únicos diarios**, etiquetado como tal — nunca un único mensual deduplicado, que sería mentira.
-   Una visita que cruza medianoche cuenta como dos.
-2. **`site_id` dentro del HMAC.** La misma persona en los sitios de dos clientes produce
-   identificadores **incorrelacionables**, y no por contrato sino porque el dato para cruzarlos no
-   existe. «Sin seguimiento fuera de los servicios de cada cliente» es aquí una **imposibilidad
-   estructural**.
-3. **Sin cookies no hace falta banner** — pero solo si de verdad no se toca el dispositivo, así
-   que se convierte en invariante de código, no en promesa: **prohibido `document.cookie`,
-   `localStorage`, `sessionStorage`, `IndexedDB`, Cache API y cualquier huella activa** (canvas,
-   WebGL, fuentes, `hardwareConcurrency`, `deviceMemory`) — **incluido `screen.*`**, que las
-   Directrices EDPB 2/2023 tratan como acceso al equipo terminal; el tipo de dispositivo se deduce
-   del user-agent, que el navegador ya envía. **Un test de CI busca esos identificadores en el
-   script COMPILADO y rompe el build.** Honestidad sobre el alcance: durante 24 h el hash es dato
-   personal seudonimizado (base jurídica: interés legítimo); **destruida la sal, es anónimo**. El
-   texto legal exacto lo firma el dueño con asesoría (ver «Decisiones de negocio» del informe).
+This is not a privacy policy: it is what the product **can** and **cannot** do.
 
-### 2. Minimización como esquema: lo que no se escribe no se filtra
+1. **Without the salt there is no correlation across days.** Nobody —not even Sytue with root access— can
+   reconstruct yesterday's visitor. Long-term profiling stops being forbidden and becomes
+   **impossible**. Its price, which is accepted and documented in the interface: **there are no
+   “unique visitors for the month”, no returning visitors, no cohorts.** A long range shows the **sum of
+   daily uniques**, labeled as such — never a deduplicated monthly unique, which would be a lie.
+   A visit that crosses midnight counts as two.
+2. **`site_id` inside the HMAC.** The same person on the sites of two customers produces
+   **uncorrelatable** identifiers, and not by contract but because the data to cross them does not
+   exist. “No tracking outside each customer's services” is here a **structural
+   impossibility**.
+3. **Without cookies no banner is needed** — but only if the device is truly not touched, so
+   it becomes a code invariant, not a promise: **`document.cookie`,
+   `localStorage`, `sessionStorage`, `IndexedDB`, the Cache API and any active fingerprinting (canvas,
+   WebGL, fonts, `hardwareConcurrency`, `deviceMemory`) are forbidden** — **including `screen.*`**, which the
+   EDPB Guidelines 2/2023 treat as access to the terminal equipment; the device type is deduced
+   from the user-agent, which the browser already sends. **A CI test searches for those identifiers in the
+   COMPILED script and breaks the build.** Honesty about the scope: for 24 h the hash is pseudonymized
+   personal data (legal basis: legitimate interest); **once the salt is destroyed, it is anonymous**. The
+   exact legal text is signed by the owner with legal advice (see “Business decisions” in the report).
 
-| Se guarda                 | Origen                 | Regla                                                 |
-| ------------------------- | ---------------------- | ----------------------------------------------------- |
-| `visitor`                 | HMAC del §1            | `bytea(16)`, vive 48 h                                |
-| `path`                    | `location.pathname`    | **sin query string**, ≤255 chars                      |
-| `referrer_host`           | `Referer`              | **solo el host**; si es el propio sitio → `NULL`      |
-| `utm_*`, `ref`            | query string           | **allowlist de 6 claves** exactas, ≤64 chars cada una |
-| `country`                 | IP, en memoria         | ISO-3166-1 alpha-2; desconocido → `ZZ`                |
-| `browser`, `os`, `device` | user-agent, en memoria | 3 enums pequeños                                      |
-| `event`                   | atributo declarado     | **allowlist por sitio**, ≤50 nombres                  |
+<a id="2-minimización-como-esquema-lo-que-no-se-escribe-no-se-filtra"></a>
 
-**Nunca, en ninguna tabla ni log: la IP** (ni hasheada, ni truncada a /24 — sigue identificando),
-**la URL completa, el `Referer` completo, el user-agent crudo, el idioma** (un bit de
-reidentificación que no aporta nada al producto) ni identificador alguno de la app del cliente.
+### 2. Minimization as a schema: what is not written cannot leak
 
-- **La query string se descarta EN EL NAVEGADOR**, no en el servidor. Un `?email=`, un
-  `?reset_token=` o un id de sesión que llegue al servidor ya ha cruzado la red y ha pasado por un
-  log de acceso o un volcado. El servidor **además** corta por `?` todo lo que reciba, porque el
-  colector es público y cualquiera puede enviarle lo que quiera. Los dos, y el del navegador
-  primero.
-- **País sin IP.** Fichero **DB-IP IP-to-Country Lite (CC BY 4.0)** empotrado en la imagen,
-  búsqueda binaria sobre rangos `net/netip` ordenados (~40 líneas, cero dependencias, IPv4 e IPv6
-  igual). La IP es una **variable local** del handler: entra en el HMAC, entra en la búsqueda de
-  país, entra en el rate-limit y **no se asigna a ningún campo que se persista**. Consecuencia
-  operativa que hay que cumplir o el producto miente: **los logs de acceso de Traefik del hostname
-  de ingestión no retienen IP de cliente.**
-- **Cardinalidad de rutas:** no se normaliza automáticamente (adivinar es peor); lo que acota el
-  crecimiento es que el agregado guarda **top-N por día** más un cajón `(otras)`.
+| Stored                    | Source                | Rule                                             |
+| ------------------------- | --------------------- | ------------------------------------------------ |
+| `visitor`                 | HMAC from §1          | `bytea(16)`, lives 48 h                          |
+| `path`                    | `location.pathname`   | **no query string**, ≤255 chars                  |
+| `referrer_host`           | `Referer`             | **host only**; if it is the site itself → `NULL` |
+| `utm_*`, `ref`            | query string          | **allowlist of 6 exact keys**, ≤64 chars each    |
+| `country`                 | IP, in memory         | ISO-3166-1 alpha-2; unknown → `ZZ`               |
+| `browser`, `os`, `device` | user-agent, in memory | 3 small enums                                    |
+| `event`                   | declared attribute    | **per-site allowlist**, ≤50 names                |
 
-### 3. Volumen: partición diaria + agregados, y el panel nunca toca el crudo
+**Never, in any table or log: the IP** (neither hashed nor truncated to /24 — it still identifies),
+**the full URL, the full `Referer`, the raw user-agent, the language** (a bit of
+re-identification that adds nothing to the product), nor any identifier from the customer's app.
 
-Mismo patrón que el rollup de `usage_records`
-([`store/purge.go`](../services/cloud/internal/store/purge.go)): detalle corto, agregado largo.
+- **The query string is discarded IN THE BROWSER**, not on the server. An `?email=`, a
+  `?reset_token=` or a session id that reaches the server has already crossed the network and gone through an
+  access log or a dump. The server **also** cuts at `?` everything it receives, because the
+  collector is public and anyone can send it whatever they want. Both, and the browser's
+  first.
+- **Country without IP.** **DB-IP IP-to-Country Lite (CC BY 4.0)** file embedded in the image,
+  binary search over sorted `net/netip` ranges (~40 lines, zero dependencies, IPv4 and IPv6
+  alike). The IP is a **local variable** of the handler: it goes into the HMAC, into the country
+  lookup, into the rate limit, and **is not assigned to any field that is persisted**. An operational
+  consequence that must be met or the product lies: **the Traefik access logs for the ingestion
+  hostname do not retain client IPs.**
+- **Path cardinality:** it is not normalized automatically (guessing is worse); what bounds
+  growth is that the aggregate keeps **top-N per day** plus an `(otras)` (“others”) bucket.
 
-- `analytics_events` **particionada por RANGE en `ts`, una partición por día**; el cron crea 7 días
-  por delante y **`DROP TABLE`** las caducadas — borrar millones de filas sin vacuum ni WAL.
-- **Retención del crudo: 48 h.** Deliberadamente corta: es donde vive el hash seudónimo. Coste
-  aceptado y explícito: **las definiciones de los agregados no se pueden cambiar
-  retroactivamente.**
-- `analytics_hourly` y `analytics_daily` (totales) + `analytics_daily_breakdown`
-  `(site, day, dim, value, pageviews, visitors)`. Dos tablas de totales y no una porque **los
-  únicos no se suman**: el día se calcula sobre el crudo, no sumando horas. Los agregados **no
-  contienen ningún identificador de visitante** — son anónimos, y por eso pueden vivir años.
-- **Las visitas se reconstruyen en el rollup** (mismo `visitor`, hueco < 30 min), no en el
-  navegador: **no hay cookie de sesión ni id de sesión enviado**, y la reconstrucción muere con el
-  crudo.
-- **Trampa concreta:** bajo `FORCE ROW LEVEL SECURITY`, PostgreSQL **rechaza `COPY … FROM`**. El
-  diseño obvio de firehose no está disponible: se escribe con **`INSERT` multi-fila** por lotes
-  (~1 s o N eventos).
+<a id="3-volumen-partición-diaria--agregados-y-el-panel-nunca-toca-el-crudo"></a>
 
-### 4. Multi-tenant: el que escribe no puede leer
+### 3. Volume: daily partitioning + aggregates, and the dashboard never touches the raw data
 
-`ENABLE` + `FORCE` + predicado explícito, como el resto. Además, dos políticas por comando —el
-proceso de ingestión es intrínsecamente cross-tenant y no tiene ninguna razón para leer:
+The same pattern as the `usage_records` rollup
+([`store/purge.go`](../services/cloud/internal/store/purge.go)): short detail, long aggregate.
+
+- `analytics_events` **partitioned by RANGE on `ts`, one partition per day**; the cron creates 7 days
+  ahead and **`DROP TABLE`s** the expired ones — deleting millions of rows without vacuum or WAL.
+- **Raw data retention: 48 h.** Deliberately short: it is where the pseudonymous hash lives. An
+  accepted and explicit cost: **the definitions of the aggregates cannot be changed
+  retroactively.**
+- `analytics_hourly` and `analytics_daily` (totals) + `analytics_daily_breakdown`
+  `(site, day, dim, value, pageviews, visitors)`. Two totals tables and not one because **uniques
+  do not add up**: the day is computed over the raw data, not by summing hours. The aggregates **contain
+  no visitor identifier** — they are anonymous, and that is why they can live for years.
+- **Visits are reconstructed in the rollup** (same `visitor`, gap < 30 min), not in the
+  browser: **there is no session cookie and no session id sent**, and the reconstruction dies with the
+  raw data.
+- **A concrete trap:** under `FORCE ROW LEVEL SECURITY`, PostgreSQL **rejects `COPY … FROM`**. The
+  obvious firehose design is not available: writes use batched **multi-row `INSERT`**
+  (~1 s or N events).
+
+<a id="4-multi-tenant-el-que-escribe-no-puede-leer"></a>
+
+### 4. Multi-tenant: the writer cannot read
+
+`ENABLE` + `FORCE` + an explicit predicate, like the rest. In addition, two policies per command —the
+ingestion process is intrinsically cross-tenant and has no reason at all to read:
 
 ```sql
 CREATE POLICY analytics_events_tenant ON analytics_events
@@ -943,5124 +1007,5271 @@ CREATE POLICY analytics_events_ingest ON analytics_events
     FOR INSERT WITH CHECK (current_setting('app.ingest', true) = 'on');
 ```
 
-El rollup y la purga corren bajo `app.maintenance='on'`, idéntico a `runtime_logs` y a
-`PurgeExpired`. **Nunca un rol con `BYPASSRLS`.**
+The rollup and the purge run under `app.maintenance='on'`, identical to `runtime_logs` and
+`PurgeExpired`. **Never a role with `BYPASSRLS`.**
 
-### 5. Dónde vive: `services/analytics`, y por qué NO dentro de `services/cloud`
+<a id="5-dónde-vive-servicesanalytics-y-por-qué-no-dentro-de-servicescloud"></a>
 
-**Servicio propio**, base `sytue_analytics`, dos binarios: `analytics-ingest` (público, sin auth,
-superficie mínima) y `analytics-api` (JWT vía `platform/pkg/authn` + crons). El argumento decisivo
-no es la pureza sino el **radio de explosión**: el colector es el endpoint **público, no
-autenticado y de mayor volumen de toda la plataforma** —recibe el tráfico agregado de las apps de
-todos los clientes— y `services/cloud` tiene en memoria `SECRET_ENC_KEY`, credenciales de
-Kubernetes y la facturación. Un fallo en el parser del beacon no puede estar a un salto de eso. A
-ello se suma que su base es la que decide si se puede desplegar, y no puede depender de un
+### 5. Where it lives: `services/analytics`, and why NOT inside `services/cloud`
+
+**Its own service**, database `sytue_analytics`, two binaries: `analytics-ingest` (public, no auth,
+minimal surface) and `analytics-api` (JWT via `platform/pkg/authn` + crons). The decisive argument
+is not purity but the **blast radius**: the collector is the **public, unauthenticated,
+highest-volume endpoint of the whole platform** —it receives the aggregated traffic of all
+customers' apps— and `services/cloud` holds `SECRET_ENC_KEY`, Kubernetes
+credentials and billing in memory. A bug in the beacon parser cannot be one hop away from that. On
+top of that, its database is the one that decides whether a deploy can happen, and it cannot depend on a
 firehose.
 
-No es el caso de [0025](#0025): allí la fusión la exigía **una transacción** (el mensaje y la
-tarjeta de fin de llamada). Aquí no hay ninguna transacción que cruce. La composición —crear el
-sitio, activar el interruptor— la hace el **BFF del dashboard con el token del usuario**, en dos
-llamadas: **no se crea ningún secreto interno compartido**, que era la lección de 0025.
+This is not the case of [0025](#0025): there the merge was required by **a transaction** (the message and the
+end-of-call card). Here there is no transaction that crosses over. The composition —creating the
+site, turning on the switch— is done by the **dashboard BFF with the user's token**, in two
+calls: **no shared internal secret is created**, which was the lesson of 0025.
 
-**El frontend NO es una app nueva**: es una sección de `cloud-dashboard`
-(`/projects/[slug]/analytics`). Un dominio, un client OIDC y una entrada de switcher menos.
+**The frontend is NOT a new app**: it is a section of `cloud-dashboard`
+(`/projects/[slug]/analytics`). One fewer domain, OIDC client and switcher entry.
 
-### 6. En primera parte: `/_sytue/` en el propio dominio del cliente
+<a id="6-en-primera-parte-_sytue-en-el-propio-dominio-del-cliente"></a>
 
-**El script y el colector se sirven bajo el dominio del propio sitio**, no desde un host de Sytue.
-`applyIngress` ya construye las reglas del Ingress
-([`kubeplatform.go`](../services/cloud/internal/controller/kubeplatform.go)): activar analítica
-**añade una segunda ruta `/_sytue` (Prefix)** que Traefik prioriza sobre `/` por ser más
-específica, apuntando a un `Service` `ExternalName` del namespace del tenant hacia
-`analytics-ingest`. Se paga con `allowExternalNameServices=true` en Traefik — acotado porque los
-tenants no tienen acceso a la API de Kubernetes: los Ingress los escribe solo el control plane.
+### 6. First-party: `/_sytue/` on the customer's own domain
 
-Lo que compra, y es mucho más de lo que parece:
+**The script and the collector are served under the site's own domain**, not from a Sytue host.
+`applyIngress` already builds the Ingress rules
+([`kubeplatform.go`](../services/cloud/internal/controller/kubeplatform.go)): turning on analytics
+**adds a second `/_sytue` (Prefix) route** that Traefik prioritizes over `/` because it is more
+specific, pointing to an `ExternalName` `Service` in the tenant namespace towards
+`analytics-ingest`. The price is `allowExternalNameServices=true` in Traefik — bounded because
+tenants have no access to the Kubernetes API: Ingresses are written only by the control plane.
 
-- **Nada de terceros**: ningún dominio externo que bloquear, **cero peticiones cross-origin, cero
-  CORS, y el cliente no tiene que abrir su CSP** — un script de analítica de terceros obliga a
-  todos sus clientes a relajar `script-src`.
-- **El sitio se identifica por el `Host`**, así que **el script no lleva ningún identificador**: el
-  snippet es una etiqueta sin configurar. Y desaparece por construcción toda la clase de ataques
-  «inflar los números de otro cliente falsificando su `site_id`»: **no se puede apuntar el beacon a
-  A diciendo que eres B, porque el sitio ES el hostname.**
-- El suelo honesto que queda: **quien pueda enviar peticiones HTTP a un sitio puede inflar sus
-  cuentas.** Es irreducible en cualquier colector público sin cookies. Se amortigua con
-  `Sec-Fetch-Site: cross-site` → rechazo (cabecera prohibida, el JS no puede falsificarla),
-  `Origin`/`Host` discordantes → rechazo, `POST` obligatorio (nada de píxel GET: se cachea y se
-  prefetchea, y ensucia), límite de cuerpo con `httpx.limits` y **token-bucket en memoria por IP**
-  (`httpx.TokenBucket`; techo conocido: N réplicas → N× el límite, suficiente para amortiguar
-  abuso, y sin un viaje a Postgres por evento).
+What it buys, and it is much more than it seems:
 
-### 7. Inyección: interruptor en el panel, y en tiempo de BUILD
+- **Nothing third-party**: no external domain to block, **zero cross-origin requests, zero
+  CORS, and the customer does not have to open up their CSP** — a third-party analytics script forces
+  all its customers to relax `script-src`.
+- **The site is identified by the `Host`**, so **the script carries no identifier**: the
+  snippet is an unconfigured tag. And the whole class of attacks
+  “inflate another customer's numbers by forging their `site_id`” disappears by construction: **you cannot point the beacon at
+  A while claiming to be B, because the site IS the hostname.**
+- The honest floor that remains: **anyone who can send HTTP requests to a site can inflate its
+  counts.** It is irreducible in any public cookieless collector. It is dampened with
+  `Sec-Fetch-Site: cross-site` → rejection (a forbidden header, JS cannot forge it),
+  mismatched `Origin`/`Host` → rejection, mandatory `POST` (no GET pixel: it gets cached and
+  prefetched, and pollutes), a body limit with `httpx.limits` and an **in-memory token bucket per IP**
+  (`httpx.TokenBucket`; known ceiling: N replicas → N× the limit, enough to dampen
+  abuse, and without a trip to Postgres per event).
 
-De las tres opciones reales, **ninguna sirve sola**:
+<a id="7-inyección-interruptor-en-el-panel-y-en-tiempo-de-build"></a>
 
-- _Que la plantilla lo traiga activado_ — `domain.TemplateManifest` es un **esquema cerrado**
-  (`DisallowUnknownFields`) que declara build, env y servicios, **no ficheros**: el HTML viene del
-  repo del usuario. Sirve para proyectos nuevos y no hace nada por los existentes.
-- _Interruptor que inyecta una variable de entorno_ — `SYTUE_ANALYTICS_*` no hace nada por sí
-  sola: alguien tiene que leerla y emitir la etiqueta. **Eso es un SDK con otro nombre**, y no
-  existe para un sitio estático.
-- _Inyección en el borde (Traefik)_ — **descartada**: no hay proxy que modifique respuestas y
-  construirlo obliga a bufferizar o parsear el HTML de todas las apps, descomprimir y recomprimir,
-  romper el streaming del SSR y el `Content-Length`, y modificar en silencio la salida del cliente.
+### 7. Injection: a switch in the dashboard, and at BUILD time
 
-**El interruptor hace dos cosas de verdad, y hay un tercer camino manual:**
+Of the three real options, **none works on its own**:
 
-1. **Publica `/_sytue` en el Ingress del proyecto** — la parte que la app no puede hacer sola.
-2. **Inyecta `<script defer src="/_sytue/s.js"></script>` antes de `</head>` en tiempo de build**,
-   sobre los ficheros que **produce la propia plataforma** (`detect.go` ya genera el Dockerfile que
-   copia `dist/` a nginx). Determinista, coste cero en petición, y **funciona en proyectos ya
-   existentes en su siguiente despliegue**.
-3. Para SSR y apps con servidor, donde no hay artefacto estático que tocar: **el snippet de una
-   línea**, con botón de copiar en el panel. Sin claves, sin configuración.
+- _Having the template ship with it enabled_ — `domain.TemplateManifest` is a **closed schema**
+  (`DisallowUnknownFields`) that declares build, env and services, **not files**: the HTML comes from the
+  user's repo. It works for new projects and does nothing for existing ones.
+- _A switch that injects an environment variable_ — `SYTUE_ANALYTICS_*` does nothing on its
+  own: someone has to read it and emit the tag. **That is an SDK under another name**, and it does not
+  exist for a static site.
+- _Injection at the edge (Traefik)_ — **ruled out**: there is no proxy that modifies responses and
+  building one forces buffering or parsing the HTML of every app, decompressing and recompressing,
+  breaking SSR streaming and `Content-Length`, and silently modifying the customer's output.
 
-### 8. El script, los bots y las señales del navegador
+**The switch does two real things, and there is a third, manual path:**
 
-- **Presupuesto: < 1,5 KB gzip, con budget que rompe el build en CI** (§0.8 ya lo hace con
-  bundles). `navigator.sendBeacon` (no bloquea la navegación, sobrevive al `unload`, y con
-  `text/plain` no dispara preflight), `fetch(…, {keepalive:true})` de reserva. Engancha
-  `pushState`/`popstate` para SPAs. `try/catch` mudo: **jamás rompe la página del cliente**.
-- **DNT y GPC: innegociables, sin interruptor.** `navigator.globalPrivacyControl === true` o
-  `navigator.doNotTrack === '1'` → **el script no envía nada**; y el servidor honra también
-  `Sec-GPC: 1`, por si alguien esquiva el script. Motivo: el producto entero se vende como
-  «privacidad por imposibilidad, no por política», y un interruptor para ignorar GPC
-  **reintroduce exactamente la política que quitamos**; además obligaría a explicar al cliente que
-  puede aumentar sus números apagándolo, que es la conversación que no queremos tener. Cuesta unos
-  puntos de conteo y compra la afirmación entera.
-- **Bots.** Sin filtrar, los números son basura. Lista **`crawler-user-agents` (MIT)** empotrada,
-  cotejada contra el user-agent **antes de cualquier escritura**; se descarta, no se marca (marcar
-  es guardar más). Ceiling honesto y escrito: **el filtrado por user-agent lo derrota cualquiera
-  que quiera derrotarlo** — quita la basura sincera (crawlers, monitores, previsualizadores), no a
-  un atacante. El filtrado por rangos de datacenter (segundo dataset, ASN) **queda fuera hasta que
-  un cliente reporte números inflados desde nubes**.
-- **Clics y eventos sin SDK.** Automáticos y sin tocar nada: **enlaces salientes** (solo el host
-  destino), **descargas** (extensión en lista fija) y `mailto:`/`tel:`. Para lo demás, **un
-  atributo HTML**: `data-sytue-event="alta"`, con **un solo listener delegado**. Y la parte que lo
-  hace GUI de verdad: **objetivos por patrón de ruta** (`/gracias*`) declarados en el panel, que se
-  calculan sobre datos que ya existen y **no requieren ni una línea en la app del cliente**. Los
-  nombres de evento son **allowlist por sitio**: sin ella, `data-sytue-event="pepe@correo.com"`
-  convierte el almacén «anónimo» en un canal de exfiltración. **No hay API JS** (`window.sytue(…)`)
-  en v1; se añadiría solo si aparece algo que no sea ni una página ni un clic.
+1. **It publishes `/_sytue` in the project's Ingress** — the part the app cannot do on its own.
+2. **It injects `<script defer src="/_sytue/s.js"></script>` before `</head>` at build time**,
+   into the files that **the platform itself produces** (`detect.go` already generates the Dockerfile that
+   copies `dist/` to nginx). Deterministic, zero per-request cost, and **it works on already
+   existing projects on their next deployment**.
+3. For SSR and apps with a server, where there is no static artifact to touch: **the one-line
+   snippet**, with a copy button in the dashboard. No keys, no configuration.
 
-**Descartado.** Plausible y Matomo (AGPL/GPL y motores adicionales en el perímetro B: obligaciones,
-operación y salida innecesarias frente al servicio propio); Umami (MIT pero Node — la licencia
-vale, el lenguaje no, §0 principio 1); GA4/PostHog/
-Fathom/Vercel Analytics (procesadores US, [0001](#0001)); **ClickHouse** como almacén (Apache-2.0,
-así que la licencia no es el problema: es un **segundo datastore que operar** para una función
-gratuita, contra [0019](#0019) — el particionado + rollup mantiene a Postgres en pie, y el gatillo
-para reabrirlo está escrito abajo); cookies, `localStorage` y huella digital; guardar la IP en
-cualquier forma; identidad de visitante entre días; **inyección en el borde reescribiendo HTML**;
-un SDK de JavaScript; un dominio de script de terceros (`t.sytue.eu`) — que solo se construirá si
-el negocio decide vender esto a sitios **fuera** de Sytue Cloud.
+<a id="8-el-script-los-bots-y-las-señales-del-navegador"></a>
 
-**Consecuencias.**
+### 8. The script, bots and browser signals
 
-- Un servicio, una base y dos binarios más que operar; **ninguna dependencia nueva de terceros**
-  salvo dos ficheros de datos (DB-IP CC BY 4.0, `crawler-user-agents` MIT) que exigen
-  **atribución en NOTICE**.
-- El panel **nunca consulta el crudo**, que además solo vive 48 h — y por eso **las métricas
-  históricas no se pueden redefinir a posteriori**.
-- **Faltan primitivas de gráfico:** no existe **ninguna** en el repo (`@sytue/ui` no tiene ni una;
-  el `Chart.tsx` de Sheets son 980 líneas atadas al motor de fórmulas). Hay que crear en
-  `@sytue/ui` —una sola vez, como manda [0004](#0004)— tres piezas mínimas en SVG sin
-  dependencias: serie temporal, lista de barras y tesela de estadística (que `usage.astro` ya
-  improvisa en línea y también arregla).
-- **Requiere actualizar [`CONVENTIONS.md`](./CONVENTIONS.md)**: fila de producto en §1, puertos
-  **8094** (api) y **8095** (ingest) en §6, y `ANALYTICS_DB_NAME=sytue_analytics`. Sin eso, el
-  contrato canónico y el código divergen.
-- Los **5 idiomas** (EN base + ES/FR/DE/IT) son condición de terminado
-  ([§13.1](./CONVENTIONS.md#13-1-idiomas-de-producto)), incluidos los nombres de métrica y los
-  textos que explican qué NO se puede medir.
-- **Gatillos escritos para reabrir esta decisión:** si el crudo de un solo día no cabe en una
-  partición manejable en Postgres (o el rollup no cierra el día dentro de la hora), vuelve
-  ClickHouse a la mesa con una decisión nueva; si aparecen números inflados desde rangos de nube,
-  entra el filtrado por ASN; si un cliente exige cifras certificadas, la lista IAB/ABC es de pago
-  y es decisión de negocio.
+- **Budget: < 1.5 KB gzip, with a budget that breaks the build in CI** (§0.8 already does this with
+  bundles). `navigator.sendBeacon` (does not block navigation, survives `unload`, and with
+  `text/plain` does not trigger a preflight), `fetch(…, {keepalive:true})` as a fallback. It hooks
+  `pushState`/`popstate` for SPAs. Silent `try/catch`: **it never breaks the customer's page**.
+- **DNT and GPC: non-negotiable, no switch.** `navigator.globalPrivacyControl === true` or
+  `navigator.doNotTrack === '1'` → **the script sends nothing**; and the server also honors
+  `Sec-GPC: 1`, in case someone bypasses the script. Reason: the whole product is sold as
+  “privacy by impossibility, not by policy”, and a switch to ignore GPC
+  **reintroduces exactly the policy we removed**; it would also force us to explain to the customer that
+  they can increase their numbers by turning it off, which is the conversation we do not want to have. It costs a few
+  points of counting and buys the whole claim.
+- **Bots.** Without filtering, the numbers are garbage. The **`crawler-user-agents` (MIT)** list is embedded,
+  matched against the user-agent **before any write**; they are discarded, not flagged (flagging
+  means storing more). An honest, written-down ceiling: **user-agent filtering is defeated by anyone
+  who wants to defeat it** — it removes the honest garbage (crawlers, monitors, previewers), not
+  an attacker. Filtering by datacenter ranges (a second dataset, ASN) **stays out until
+  a customer reports numbers inflated from clouds**.
+- **Clicks and events without an SDK.** Automatic, without touching anything: **outbound links** (only the destination
+  host), **downloads** (extension from a fixed list) and `mailto:`/`tel:`. For everything else, **an
+  HTML attribute**: `data-sytue-event="alta"`, with **a single delegated listener**. And the part that makes it
+  a real GUI: **goals by path pattern** (`/gracias*`) declared in the dashboard, which are
+  computed over data that already exists and **do not require a single line in the customer's app**. Event
+  names are a **per-site allowlist**: without it, `data-sytue-event="pepe@correo.com"`
+  turns the “anonymous” store into an exfiltration channel. **There is no JS API** (`window.sytue(…)`)
+  in v1; it would be added only if something appears that is neither a page nor a click.
+
+**Ruled out.** Plausible and Matomo (AGPL/GPL and additional engines in perimeter B: obligations,
+operations and exit that are unnecessary compared with our own service); Umami (MIT but Node — the license
+is fine, the language is not, §0 principle 1); GA4/PostHog/
+Fathom/Vercel Analytics (US processors, [0001](#0001)); **ClickHouse** as the store (Apache-2.0,
+so the license is not the problem: it is a **second datastore to operate** for a free
+feature, against [0019](#0019) — partitioning + rollup keeps Postgres standing, and the trigger
+to reopen it is written below); cookies, `localStorage` and fingerprinting; storing the IP in
+any form; visitor identity across days; **edge injection rewriting HTML**;
+a JavaScript SDK; a third-party script domain (`t.sytue.eu`) — which will only be built if
+the business decides to sell this to sites **outside** Sytue Cloud.
+
+**Consequences.**
+
+- One more service, one more database and two more binaries to operate; **no new third-party dependency**
+  except two data files (DB-IP CC BY 4.0, `crawler-user-agents` MIT) that require
+  **attribution in NOTICE**.
+- The dashboard **never queries the raw data**, which moreover only lives 48 h — and that is why **historical
+  metrics cannot be redefined after the fact**.
+- **Chart primitives are missing:** there are **none** in the repo (`@sytue/ui` has not a single one;
+  Sheets' `Chart.tsx` is 980 lines tied to the formula engine). Three minimal dependency-free SVG pieces must be created in
+  `@sytue/ui` —only once, as [0004](#0004) mandates—: a time series, a bar list and a statistic
+  tile (which `usage.astro` already improvises inline and which this also fixes).
+- **Requires updating [`CONVENTIONS.md`](./CONVENTIONS.md)**: a product row in §1, ports
+  **8094** (api) and **8095** (ingest) in §6, and `ANALYTICS_DB_NAME=sytue_analytics`. Without that, the
+  canonical contract and the code diverge.
+- The **5 languages** (EN base + ES/FR/DE/IT) are a condition of done
+  ([§13.1](./CONVENTIONS.md#13-1-idiomas-de-producto)), including metric names and the
+  texts that explain what CANNOT be measured.
+- **Written triggers to reopen this decision:** if a single day's raw data does not fit in a
+  manageable partition in Postgres (or the rollup does not close the day within the hour),
+  ClickHouse comes back to the table with a new decision; if numbers inflated from cloud ranges appear,
+  ASN filtering comes in; if a customer demands certified figures, the IAB/ABC list is paid
+  and is a business decision.
 
 ---
 
 <a id="0027"></a>
 
-## 0027 — Excepción temporal Bun/Kaniko para `v0.1.6` interna
+<a id="0027--excepción-temporal-bunkaniko-para-v016-interna"></a>
 
-`accepted` · 2026-08-01 · seguridad, soberanía, release · **expira 2026-10-01**
+## 0027 — Temporary Bun/Kaniko exception for internal `v0.1.6`
 
-**Contexto.** La primera producción real tendrá como máximo diez usuarios internos, ningún cliente
-y sirve para validar iteraciones. El candidato `v0.1.6` ha superado build, tests, integración con
-PostgreSQL, escaneo de vulnerabilidades, secretos, licencias y generación de SBOM; el workflow de
-release exige además firmar cada imagen antes de publicar el borrador. Aun así, el frontend
-SSR/BFF ejecuta Bun —producto bajo control de Anthropic (EE. UU.)— y la construcción OCI usa
-Kaniko —originado por Google y archivado—. La política general solo exceptúa GitHub y por tanto
-impediría publicar el candidato sin una decisión expresa del propietario.
+`accepted` · 2026-08-01 · security, sovereignty, release · **expires 2026-10-01**
 
-**Decisión.** Se autoriza **una sola excepción**, exclusivamente para producir y operar
-`v0.1.6` en la validación interna de Sytue One:
+**Context.** The first real production will have at most ten internal users, no customers,
+and serves to validate iterations. The `v0.1.6` candidate has passed build, tests, PostgreSQL
+integration, vulnerability scanning, secrets, licenses and SBOM generation; the release
+workflow also requires signing each image before publishing the draft. Even so, the
+SSR/BFF frontend runs Bun —a product under the control of Anthropic (USA)— and the OCI build uses
+Kaniko —originated by Google and archived—. The general policy only exempts GitHub and would therefore
+prevent publishing the candidate without an express decision by the owner.
 
-- Bun puede permanecer como runtime de los frontends de `v0.1.6` y como herramienta de build.
-- Kaniko puede construir las imágenes de esa release y los builds de prueba de Sytue Cloud.
-- La excepción incluye descargar sus imágenes oficiales fijadas por digest dentro de GitHub
-  Actions; todas las imágenes resultantes viven privadas en Scaleway Registry, con SBOM y firma.
-- No autoriza clientes, GA, nuevas dependencias de origen extracomunitario, ampliar Sytue Cloud a
-  cargas de terceros ni reutilizar la excepción para `v0.1.7` o cualquier release posterior.
+**Decision.** **A single exception** is authorized, exclusively to produce and operate
+`v0.1.6` in the internal validation of Sytue One:
 
-**Controles compensatorios.** Registro privado UE; imágenes y Actions fijadas; firma cosign;
-SBOM CycloneDX; escaneo OSV/Trivy/gitleaks; ejecución rootless, seccomp, capacidades eliminadas,
-filesystem de solo lectura y egress acotado. Los proveedores de origen no procesan datos de
-clientes: el runtime se ejecuta en Scaleway y esta fase no tiene clientes.
+- Bun may remain as the runtime of the `v0.1.6` frontends and as a build tool.
+- Kaniko may build the images of that release and the Sytue Cloud test builds.
+- The exception includes downloading their official images pinned by digest within GitHub
+  Actions; all resulting images live privately in Scaleway Registry, with SBOM and signature.
+- It does not authorize customers, GA, new dependencies of non-EU origin, extending Sytue Cloud to
+  third-party workloads, or reusing the exception for `v0.1.7` or any later release.
 
-**Salida obligatoria.** Antes de otra release se trasladan los BFF/SSR a Go y se generan
-frontends estáticos sin Bun en runtime; Kaniko se reemplaza por una cadena mantenida y aprobada por
-el gate de origen. El 2026-10-01 la excepción caduca aunque no exista sustituto. Renovarla exige
-otra ADR y una nueva aprobación expresa; el silencio no la prorroga.
+**Compensating controls.** Private EU registry; pinned images and Actions; cosign signature;
+CycloneDX SBOM; OSV/Trivy/gitleaks scanning; rootless execution, seccomp, dropped capabilities,
+read-only filesystem and bounded egress. The providers of origin do not process customer
+data: the runtime runs on Scaleway and this phase has no customers.
+
+**Mandatory exit.** Before another release, the BFF/SSR are moved to Go and
+static frontends are generated without Bun at runtime; Kaniko is replaced by a maintained chain approved by
+the origin gate. On 2026-10-01 the exception expires even if no replacement exists. Renewing it requires
+another ADR and a new express approval; silence does not extend it.
 
 <a id="0028"></a>
 
-## 0028 — Benchmarks anónimos entre clientes de Sytue Cloud
+<a id="0028--benchmarks-anónimos-entre-clientes-de-sytue-cloud"></a>
 
-- **Fecha:** 2026-08-05
-- **Estado:** accepted
-- **Contexto:** ADR 0023 (Kapsule), ADR 0026 (Analytics), `services/cloud/internal/domain/benchmark.go`
+## 0028 — Anonymous benchmarks across Sytue Cloud customers
 
-**Contexto.** El motor de ajuste de tamaño (`RecommendInstanceSize`) decide con el histórico del
-propio proyecto y exige tres días de observación para proponer una bajada. Eso deja un hueco justo
-donde más dinero se pierde: los primeros días, cuando el cliente eligió tamaño a ciegas y casi
-siempre se pasó. Durante esa ventana la única respuesta honesta que sabíamos dar era «aún estamos
-midiendo».
+- **Date:** 2026-08-05
+- **Status:** accepted
+- **Context:** ADR 0023 (Kapsule), ADR 0026 (Analytics), `services/cloud/internal/domain/benchmark.go`
 
-El dato que llenaría el hueco existe, pero es de otros clientes: cientos de proyectos con el mismo
-framework, los mismos servicios y el mismo tamaño ya nos dicen cuánto consume una app así. Usarlo
-choca de frente con el invariante que sostiene la plataforma —la RLS existe precisamente para que
-los datos de un inquilino no lleguen a otro—, de modo que no basta con «anonimizar»: hay que
-decidir bajo qué condiciones se cruza esa línea y dejarlas verificables.
+**Context.** The sizing engine (`RecommendInstanceSize`) decides with the project's own
+history and requires three days of observation to propose a downsize. That leaves a gap exactly
+where the most money is lost: the first days, when the customer chose a size blindly and almost
+always overshot. During that window the only honest answer we knew how to give was “we are still
+measuring”.
 
-**Decisión.** Se autoriza la agregación entre inquilinos **solo** para publicar percentiles de
-ocupación de memoria por cohorte, y bajo cinco condiciones que son parte de la decisión, no de la
-implementación:
+The data that would fill the gap exists, but it belongs to other customers: hundreds of projects with the same
+framework, the same services and the same size already tell us how much an app like that consumes. Using it
+collides head-on with the invariant that holds up the platform —RLS exists precisely so that
+one tenant's data does not reach another—, so “anonymizing” is not enough: we have to
+decide under what conditions that line is crossed and make them verifiable.
 
-1. **Cohorte = framework + servicios + tamaño.** Nada de identificadores, nombres, dominios ni
-   trazas de actividad. La clave describe la forma técnica de una app, no a quién pertenece.
-2. **Umbral de k-anonimato de 5 EMPRESAS distintas**, contadas por inquilino y no por proyecto.
-   Contar proyectos convertiría el umbral en un adorno: a un solo cliente le bastaría con crear
-   cinco proyectos para «anonimizarse» a sí mismo.
-3. **El umbral se aplica al PUBLICAR, no al consultar.** Una cohorte que no lo alcanza no se
-   escribe, así que el camino de lectura no puede filtrarla mal porque no existe. La tabla
-   `sizing_benchmarks` no tiene columna `tenant` —una fila no pertenece a nadie— y el umbral está
-   replicado como `CHECK (tenants >= 5)`: cambiarlo obliga a tocar el código y la migración.
-4. **Solo porcentajes sobre el límite del tamaño**, nunca cifras absolutas. Saber que la mediana de
-   una cohorte es el 12 % no permite deducir el consumo de ninguna empresa concreta.
-5. **Reemplazo completo en cada recálculo.** Una cohorte que hoy reúne cuatro empresas porque la
-   quinta se dio de baja desaparece. Con `upsert` seguiría publicada para siempre con las cifras
-   del día en que sí llegó al umbral.
+**Decision.** Cross-tenant aggregation is authorized **only** to publish memory occupancy
+percentiles per cohort, and under five conditions that are part of the decision, not of the
+implementation:
 
-Y dos límites sobre lo que la cohorte puede hacer con la recomendación:
+1. **Cohort = framework + services + size.** No identifiers, names, domains or
+   activity traces. The key describes the technical shape of an app, not who it belongs to.
+2. **k-anonymity threshold of 5 distinct COMPANIES**, counted by tenant and not by project.
+   Counting projects would turn the threshold into decoration: a single customer would only need to create
+   five projects to “anonymize” itself.
+3. **The threshold is applied when PUBLISHING, not when querying.** A cohort that does not reach it is not
+   written, so the read path cannot filter it wrongly because it does not exist. The
+   `sizing_benchmarks` table has no `tenant` column —a row belongs to nobody— and the threshold is
+   replicated as `CHECK (tenants >= 5)`: changing it requires touching the code and the migration.
+4. **Only percentages of the size limit**, never absolute figures. Knowing that the median of
+   a cohort is 12 % does not allow deducing the consumption of any specific company.
+5. **Full replacement on each recomputation.** A cohort that today gathers four companies because the
+   fifth unsubscribed disappears. With `upsert` it would remain published forever with the figures
+   from the day it did reach the threshold.
 
-- **El histórico propio siempre gana.** La cohorte solo rellena `insufficient_data`; en cuanto el
-  proyecto tiene datos suyos, mandan los suyos.
-- **La cohorte NUNCA propone subir, y baja un solo escalón.** Subir por el consumo de terceros es
-  cobrarle más a alguien de quien no sabemos nada; y con cero datos propios, saltar de `pro` a
-  `basic` de un clic es una apuesta. Un escalón se corrige solo al día siguiente y el ahorro llega
-  igual. Además exige el mismo margen que el motor con datos propios: el p90 de la cohorte tiene
-  que caber holgado en el tamaño menor.
+And two limits on what the cohort can do with the recommendation:
 
-La razón que ve la interfaz es `cohort_over_provisioned`, distinta de `over_provisioned` a
-propósito: la pantalla no puede decir «hemos medido tu app» cuando lo que hemos medido son las de
-otros, y el texto nombra cuántas empresas hay detrás para que el cliente pueda contrastarlo.
+- **The project's own history always wins.** The cohort only fills in `insufficient_data`; as soon as the
+  project has its own data, its own data rules.
+- **The cohort NEVER proposes upsizing, and downsizes by a single step.** Upsizing based on third-party consumption is
+  charging more to someone we know nothing about; and with zero own data, jumping from `pro` to
+  `basic` in one click is a gamble. One step corrects itself the next day and the savings arrive
+  all the same. It also requires the same margin as the engine with its own data: the cohort's p90 has
+  to fit comfortably in the smaller size.
 
-**Consecuencias.** Un proyecto recién creado recibe una recomendación de ahorro accionable el día
-cero en vez de esperar tres días, que era el momento en que el sobredimensionado se convertía en
-factura. A cambio, la plataforma mantiene una tabla global sin dueño: es la única de Sytue Cloud
-que se lee sin predicado de inquilino, y por eso su política de escritura es de mantenimiento y su
-contenido está acotado por `CHECK`. El recálculo recorre todos los inquilinos y es la consulta más
-cara del reconciliador; va espaciada a seis horas y con ventana de siete días para que el fin de
-semana no haga oscilar la recomendación.
+The reason the interface sees is `cohort_over_provisioned`, deliberately different from `over_provisioned`:
+the screen cannot say “we have measured your app” when what we have measured are those of
+others, and the text names how many companies are behind it so the customer can check it.
 
-**Alternativas descartadas.** Publicar el agregado sin umbral (una cohorte de dos clientes ES un
-cliente); calcular la cohorte al vuelo en cada petición (obligaría a leer filas crudas de otros
-inquilinos en el camino de lectura del usuario, que es exactamente lo que la RLS impide); pedir
-consentimiento explícito para participar (el resultado sería una muestra sesgada hacia quien ya
-está optimizado, es decir, un benchmark que empeora el consejo de quien más lo necesita).
+**Consequences.** A newly created project receives an actionable savings recommendation on day
+zero instead of waiting three days, which was the moment when over-provisioning turned into an
+invoice. In exchange, the platform maintains an ownerless global table: it is the only one in Sytue Cloud
+that is read without a tenant predicate, and that is why its write policy is maintenance-only and its
+content is bounded by `CHECK`. The recomputation goes through all tenants and is the most
+expensive query of the reconciler; it is spaced six hours apart and uses a seven-day window so that the
+weekend does not make the recommendation oscillate.
+
+**Alternatives ruled out.** Publishing the aggregate without a threshold (a cohort of two customers IS a
+customer); computing the cohort on the fly on each request (it would require reading raw rows from other
+tenants on the user's read path, which is exactly what RLS prevents); asking for
+explicit consent to participate (the result would be a sample biased towards those who are already
+optimized, that is, a benchmark that worsens the advice for those who need it most).
 
 <a id="0029"></a>
 
-## 0029 — Apps open-source como servicio: catálogo cerrado, no imagen libre
+<a id="0029--apps-open-source-como-servicio-catálogo-cerrado-no-imagen-libre"></a>
 
-- **Fecha:** 2026-08-05
-- **Estado:** accepted
-- **Contexto:** ADR 0022 (motores AGPL fuera), ADR 0023 (Kapsule), `internal/domain/appcatalog.go`
+## 0029 — Open-source apps as a service: closed catalog, not any image
 
-**Contexto.** La promesa de Sytue Cloud es componer: levantar una caché, un buscador o una cola
-junto a tu app, de uno en uno, y que se conecten solos. La forma obvia de implementarlo —«dime el
-nombre de una imagen y la arranco»— convierte el control-plane en un **ejecutor de código
-arbitrario de terceros dentro del clúster**, y eso no se arregla después con políticas de red: el
-contenedor ya corre, ya tiene las variables del proyecto y ya está dentro del namespace del
-cliente.
+- **Date:** 2026-08-05
+- **Status:** accepted
+- **Context:** ADR 0022 (AGPL engines out), ADR 0023 (Kapsule), `internal/domain/appcatalog.go`
 
-**Decisión.** El cliente **elige del catálogo, no escribe una imagen**. El catálogo es código
-—`services/cloud/internal/domain/apps/*.json`, embebido y revisado— y cada entrada cumple cuatro
-invariantes que se comprueban en un test, no de palabra:
+**Context.** Sytue Cloud's promise is composition: bring up a cache, a search engine or a queue
+next to your app, one at a time, and have them connect on their own. The obvious way to implement it —“tell me the
+name of an image and I'll start it”— turns the control plane into an **executor of arbitrary
+third-party code inside the cluster**, and that cannot be fixed afterwards with network policies: the
+container is already running, already has the project's variables and is already inside the customer's
+namespace.
 
-1. **Digest, nunca etiqueta.** `valkey:8` apunta hoy a un contenido y mañana a otro, así que lo
-   que se revisó no es lo que corre. Un `@sha256:…` es el único identificador que no cambia bajo
-   nuestros pies, y es lo que permite firmar y auditar.
-2. **Nuestro registro.** Todas las imágenes se replican al registro de la UE. Depender de Docker
-   Hub en el camino de aprovisionamiento es depender de su rate limit para que un cliente pueda
-   crear un servicio.
-3. **Licencia comprobada, por allowlist.** Apache-2.0, BSD-2/3, ISC, MIT, MPL-2.0 y
-   PostgreSQL. AGPL quedaba fuera por lo mismo que en la [0022](#0022) —**revisado por la
-   [0032](#0032)**, que la admite junto a GPL/LGPL para imágenes que corren sin modificar—; y
-   también las «source available» que se anuncian como open source y no lo son —SSPL, BUSL,
-   Elastic v2, Sustainable Use—, porque **prohíben exactamente esto**: ofrecerlas como servicio
-   gestionado, y eso sigue igual. Es allowlist y no denylist porque esas licencias aparecen más
-   rápido de lo que se actualizaría una lista de prohibidas.
-4. **Sin privilegios posibles.** El manifiesto no tiene campo para `privileged`, `hostPath`,
-   `hostNetwork` ni capacidades. No es que se validen: es que no se pueden expresar.
+**Decision.** The customer **chooses from the catalog, does not write an image**. The catalog is code
+—`services/cloud/internal/domain/apps/*.json`, embedded and reviewed— and each entry satisfies four
+invariants that are checked in a test, not by word of mouth:
 
-La integración entre servicios —lo de «se conectan aunque los crees de uno en uno»— la resuelve
-`exports`: cada entrada declara qué variables inyecta en la app del cliente (`VALKEY_URL`,
-`MEILI_URL`…). Su valor es una plantilla con **dos** sustituciones, `{host}` y `{port}`, y ninguna
-más. Deliberadamente no es un lenguaje: ese valor acaba dentro de la app del cliente, y cada
-capacidad que se añadiera —leer otro servicio, componer una credencial, mirar el entorno— sería
-una vía nueva para que una entrada del catálogo filtre algo que no le corresponde.
+1. **Digest, never tag.** `valkey:8` points to one content today and another tomorrow, so what
+   was reviewed is not what runs. A `@sha256:…` is the only identifier that does not change under
+   our feet, and it is what allows signing and auditing.
+2. **Our registry.** All images are replicated to the EU registry. Depending on Docker
+   Hub on the provisioning path means depending on its rate limit for a customer to be able to
+   create a service.
+3. **License checked, by allowlist.** Apache-2.0, BSD-2/3, ISC, MIT, MPL-2.0 and
+   PostgreSQL. AGPL was out for the same reason as in [0022](#0022) —**revised by
+   [0032](#0032)**, which admits it along with GPL/LGPL for images that run unmodified—; and
+   so were the “source available” licenses that are advertised as open source and are not —SSPL, BUSL,
+   Elastic v2, Sustainable Use—, because **they forbid exactly this**: offering them as a managed
+   service, and that stays the same. It is an allowlist and not a denylist because those licenses appear faster
+   than a list of forbidden ones would be updated.
+4. **No privileges possible.** The manifest has no field for `privileged`, `hostPath`,
+   `hostNetwork` or capabilities. It is not that they are validated: they cannot be expressed.
 
-Los límites de CPU, memoria y disco son **obligatorios** en cada entrada y tienen tope. Un
-servicio sin techo se come la cuota del proyecto y tumba la app a la que venía a ayudar.
+Integration between services —the “they connect even if you create them one at a time”— is solved by
+`exports`: each entry declares which variables it injects into the customer's app (`VALKEY_URL`,
+`MEILI_URL`…). Its value is a template with **two** substitutions, `{host}` and `{port}`, and no
+more. It is deliberately not a language: that value ends up inside the customer's app, and every
+capability added —reading another service, composing a credential, looking at the environment— would be
+a new way for a catalog entry to leak something that does not belong to it.
 
-**Consecuencias.** No se puede desplegar «cualquier cosa de Docker Hub», y eso es una limitación
-real frente a un Coolify o un Dokku. A cambio, todo lo que corre en el clúster está revisado,
-fijado y auditado, y el cliente no tiene que entender licencias para no meterse en un problema
-legal. Ampliar el catálogo es un pull request con una imagen replicada: barato, pero con revisión.
+CPU, memory and disk limits are **mandatory** in each entry and are capped. A
+service without a ceiling eats the project's quota and brings down the app it came to help.
 
-Una entrada escrita cuya imagen **aún no está replicada** se carga, se valida y se publica como
-`pendiente de espejo` —no se ofrece y tampoco se esconde—: ofrecerla fallaría al tirar de la
-imagen, después de haberle prometido el servicio al cliente; esconderla haría que nadie replicase
-nunca la imagen porque nadie la echaría de menos.
+**Consequences.** You cannot deploy “anything from Docker Hub”, and that is a real limitation
+compared with Coolify or Dokku. In exchange, everything that runs in the cluster is reviewed,
+pinned and audited, and the customer does not have to understand licenses to stay out of legal
+trouble. Expanding the catalog is a pull request with a replicated image: cheap, but reviewed.
 
-**El registro no se escribe en el catálogo.** Cada entrada guarda el digest de nuestra copia
-(`mirrored_digest`) y NADA del host: la referencia la compone `ImageRef()` con el `REGISTRY_URL` del
-despliegue. Escribirlo en el manifiesto lo dejaba apuntando a un namespace que en producción se
-llama distinto —el del PaaS es `sytue-<env>-paas`, no el defecto de dev—, y el fallo no aparecía
-hasta que un cliente intentaba crear el servicio. Vacío = pendiente de espejo.
+A written entry whose image **is not yet replicated** is loaded, validated and published as
+`pendiente de espejo` (“pending mirror”) —it is not offered and not hidden either—: offering it would fail when pulling the
+image, after having promised the service to the customer; hiding it would mean nobody would ever replicate
+the image because nobody would miss it.
 
-**El espejo lo hace CI, no un portátil.** `.sygit/workflows/mirror-catalog.yml` (y su gemelo de
-GitHub) replica lo que falte y anota el digest en el manifiesto. Se dispara al cambiar el catálogo,
-no con la release: añadir una app no tiene por qué esperar a la siguiente versión de la suite. La
-razón de que no sea manual es concreta: empujar exige una credencial con
-`ContainerRegistryFullAccess`, y la alternativa era repartir una clave de escritura de producción
-entre portátiles para una tarea que se hace tres veces al año.
+**The registry is not written in the catalog.** Each entry stores the digest of our copy
+(`mirrored_digest`) and NOTHING about the host: the reference is composed by `ImageRef()` with the deployment's
+`REGISTRY_URL`. Writing it in the manifest left it pointing to a namespace that in production is
+named differently —the PaaS one is `sytue-<env>-paas`, not the dev default—, and the failure did not show up
+until a customer tried to create the service. Empty = pending mirror.
 
-**El espejo es un comando, y verifica lo que escribe.** `scripts/mirror-catalog-images.sh` copia
-con `crane` —nunca `docker pull` + `push`, que reconstruye el manifiesto, sube una sola
-arquitectura y por tanto CAMBIA el digest—, comprueba que el digest se conservó y solo entonces lo
-fija en el manifiesto. Así «el catálogo dice replicada» y «está replicada» son lo mismo. Cada
-entrada guarda además `upstream` y `upstream_digest`, de modo que el espejo se puede auditar y
-rehacer sin adivinar nada.
+**Mirroring is done by CI, not a laptop.** `.sygit/workflows/mirror-catalog.yml` (and its GitHub
+twin) replicates whatever is missing and records the digest in the manifest. It is triggered when the catalog changes,
+not with the release: adding an app has no reason to wait for the next version of the suite. The
+reason it is not manual is concrete: pushing requires a credential with
+`ContainerRegistryFullAccess`, and the alternative was handing out a production write key
+among laptops for a task done three times a year.
 
-**Lo que la primera tanda enseñó, y por qué la lista salió más corta.** Al resolver las imágenes
-de verdad —versiones, digests, usuario y volúmenes leídos del registro, no de la memoria— dos
-candidatas se cayeron solas:
+**The mirror is a command, and it verifies what it writes.** `scripts/mirror-catalog-images.sh` copies
+with `crane` —never `docker pull` + `push`, which rebuilds the manifest, uploads a single
+architecture and therefore CHANGES the digest—, checks that the digest was preserved and only then
+pins it in the manifest. That way “the catalog says replicated” and “it is replicated” are the same thing. Each
+entry also stores `upstream` and `upstream_digest`, so that the mirror can be audited and
+redone without guessing anything.
 
-- **OpenSearch** exige `vm.max_map_count=262144`, un sysctl de NODO. PodSecurity `restricted` no
-  permite pedirlo desde el pod, y ponerlo en todos los nodos por un servicio de un inquilino no es
-  una decisión que le corresponda. Meilisearch cubre la búsqueda sin nada de eso.
-- **Ghost** necesita MySQL para funcionar en producción, así que como servicio suelto no arranca:
-  entraría cuando el catálogo sepa componer una entrada con su base de datos.
+**What the first batch taught us, and why the list came out shorter.** When resolving the images
+for real —versions, digests, user and volumes read from the registry, not from memory— two
+candidates fell off on their own:
 
-Y una tercera lección quedó en el manifiesto: cuatro de las cinco imágenes **no declaran usuario**
-—corren como root— y bajo `restricted` no arrancarían. Por eso `run_as_user` es obligatorio, y por
-eso su valor se lee del `/etc/passwd` de la imagen en vez de suponerlo: el de RabbitMQ es **100**,
-no el 999 que la convención sugería. `writable_paths` nació de lo mismo: el arranque de RabbitMQ
-genera su configuración en `/etc/rabbitmq`, y con la raíz de solo lectura moriría.
+- **OpenSearch** requires `vm.max_map_count=262144`, a NODE sysctl. PodSecurity `restricted` does not
+  allow requesting it from the pod, and setting it on all nodes for one tenant's service is not
+  a decision that is theirs to make. Meilisearch covers search without any of that.
+- **Ghost** needs MySQL to work in production, so as a standalone service it does not start:
+  it would come in when the catalog knows how to compose an entry with its database.
 
-**Alternativas descartadas.** Imagen libre con escaneo previo (el escaneo no dice nada de lo que
-el contenedor HACE en tiempo de ejecución); imagen libre en un namespace aislado sin acceso a los
-servicios del proyecto (entonces no compone nada, que era el objetivo); catálogo con denylist de
-licencias (llega siempre tarde).
+And a third lesson stayed in the manifest: four of the five images **do not declare a user**
+—they run as root— and under `restricted` they would not start. That is why `run_as_user` is mandatory, and
+that is why its value is read from the image's `/etc/passwd` instead of being assumed: RabbitMQ's is **100**,
+not the 999 the convention suggested. `writable_paths` was born from the same thing: RabbitMQ's startup
+generates its configuration in `/etc/rabbitmq`, and with a read-only root it would die.
+
+**Alternatives ruled out.** Any image with prior scanning (scanning says nothing about what
+the container DOES at runtime); any image in an isolated namespace without access to the
+project's services (then it composes nothing, which was the goal); a catalog with a license
+denylist (always arrives late).
 
 ---
 
 <a id="0030"></a>
 
-## 0030 — Firma digital: qué se promete bajo eIDAS y de dónde sale la clave
+<a id="0030--firma-digital-qué-se-promete-bajo-eidas-y-de-dónde-sale-la-clave"></a>
 
-- **Fecha:** 2026-08-08
-- **Estado:** accepted · **3 decisiones del propietario abiertas** (ver el final)
-- **Contexto:** [`roadmap.md#3`](./roadmap.md) «Transversal — FALTA: firma digital»; ola **P3** de
-  Sytue PDF («firma con certificado (PKI)», lo que separa la edición Pro de la básica);
-  ADR [0001](#0001) (EU-only), [0017](#0017)/[0018](#0018) (clean-room, propietario),
-  [0023](#0023) (sin motores de terceros), [0024](#0024) (apps de escritorio);
+## 0030 — Digital signatures: what is promised under eIDAS and where the key comes from
+
+- **Date:** 2026-08-08
+- **Status:** accepted · **3 owner decisions open** (see the end)
+- **Context:** [`roadmap.md#3`](./roadmap.md) «Transversal — FALTA: firma digital» (“Cross-cutting — MISSING: digital signatures”); wave **P3** of
+  Sytue PDF (“signing with a certificate (PKI)”, what separates the Pro edition from the basic one);
+  ADR [0001](#0001) (EU-only), [0017](#0017)/[0018](#0018) (clean-room, proprietary),
+  [0023](#0023) (no third-party engines), [0024](#0024) (desktop apps);
   `services/mail/internal/smime`, `platform/pkg/cms`, `platform/pkg/keycrypto`
 
-**Contexto.** «Firma digital» es una casilla en el roadmap, y debajo hay **tres productos
-distintos con consecuencias legales distintas**. Confundirlos es el fallo caro: no cuesta nada
-poner un botón que diga «firmar», y cuesta mucho que un cliente lo use creyendo que tiene el valor
-de una firma manuscrita y descubra en un juicio que no. El producto es EU-only, así que quien
-decide qué vale es **eIDAS** (Reglamento UE 910/2014, revisado por el 2024/1183), y el nivel que
-se promete cambia el diseño entero: la firma, el almacenamiento y hasta quién puede tener la clave.
+**Context.** “Digital signature” is a checkbox in the roadmap, and underneath it there are **three
+different products with different legal consequences**. Confusing them is the expensive mistake: it costs nothing
+to put up a button that says “sign”, and it costs a lot for a customer to use it believing it has the value
+of a handwritten signature and discover in court that it does not. The product is EU-only, so what
+decides what is valid is **eIDAS** (EU Regulation 910/2014, revised by 2024/1183), and the level that
+is promised changes the whole design: the signature, the storage and even who may hold the key.
 
-Además, esto llega a un repo donde **ya se firma**: `services/mail/internal/smime` construye un
-CMS SignedData a mano con `encoding/asn1` desde agosto, y se verifica en sus tests con `openssl`.
-Así que la pregunta «¿se puede sin dependencias?» no es abierta para la mitad del problema — ya
-está contestada por código que funciona.
+Moreover, this arrives in a repo where **signing already happens**: `services/mail/internal/smime` builds a
+CMS SignedData by hand with `encoding/asn1` since August, and it is verified in its tests with `openssl`.
+So the question “can it be done without dependencies?” is not open for half of the problem — it is already
+answered by working code.
 
-### 1. Qué se promete: firma **avanzada** (AdES), y se dice con esas palabras
+<a id="1-qué-se-promete-firma-avanzada-ades-y-se-dice-con-esas-palabras"></a>
 
-eIDAS define tres niveles, y solo el tercero equivale a la firma manuscrita:
+### 1. What is promised: **advanced** signatures (AdES), and it is said in those words
 
-| Nivel                 | Qué exige                                                                                                                                                                                                | Dónde está en el producto                 |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **Simple (SES)**      | Nada más que ser electrónica. Art. 25.1: no se le puede negar efecto jurídico _por ser_ electrónica, pero quien la invoca carga con probar que es del firmante                                           | La firma **dibujada** ya prevista en P3   |
-| **Avanzada (AdES)**   | Art. 26: ligada unívocamente al firmante, permite identificarlo, creada con datos que el firmante usa **bajo su control exclusivo**, y detecta cualquier cambio posterior del documento                  | **Lo que promete Sytue**                  |
-| **Cualificada (QES)** | AdES + **certificado cualificado** de un prestador de la lista de confianza de la UE + **QSCD** (dispositivo cualificado de creación). Art. 25.2: efecto equivalente a la firma manuscrita en toda la UE | **No se promete**: no depende de nosotros |
+eIDAS defines three levels, and only the third is equivalent to a handwritten signature:
 
-**Decisión: se promete AdES**, y la interfaz **nombra el nivel en cada firma**. QES queda fuera
-del alcance hasta que haya contrato con un prestador cualificado, porque no es una cuestión de
-código: exige un tercero acreditado y auditado, y no hay forma de fabricarla en casa.
+| Level               | What it requires                                                                                                                                                                                      | Where it is in the product                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| **Simple (SES)**    | Nothing more than being electronic. Art. 25.1: it cannot be denied legal effect _for being_ electronic, but whoever invokes it bears the burden of proving it belongs to the signer                   | The **drawn** signature already planned in P3 |
+| **Advanced (AdES)** | Art. 26: uniquely linked to the signer, capable of identifying them, created using data the signer uses **under their sole control**, and detects any subsequent change to the document               | **What Sytue promises**                       |
+| **Qualified (QES)** | AdES + a **qualified certificate** from a provider on the EU trusted list + **QSCD** (qualified signature creation device). Art. 25.2: effect equivalent to a handwritten signature throughout the EU | **Not promised**: it does not depend on us    |
 
-De aquí sale la regla dura, que aplica a la UI y al material comercial: **nunca se dice «firma
-legal» ni «firma válida» a secas.** Se dice qué nivel es, quién emitió el certificado, y contra
-qué anclas se comprobó. Un «✓ Firmado» verde sobre una firma que el receptor no puede verificar es
-una mentira con estilo.
+**Decision: AdES is promised**, and the interface **names the level on every signature**. QES stays out
+of scope until there is a contract with a qualified provider, because it is not a matter of
+code: it requires an accredited and audited third party, and there is no way to manufacture it in-house.
 
-### 2. De dónde sale la clave: **no la custodiamos**
+From this comes the hard rule, which applies to the UI and to sales material: **we never say “legal
+signature” or “valid signature” on its own.** We say what level it is, who issued the certificate, and against
+which anchors it was checked. A green “✓ Signed” on a signature the recipient cannot verify is
+a lie with style.
 
-Tres orígenes posibles, y el orden importa porque el primero es el que desbloquea P3:
+<a id="2-de-dónde-sale-la-clave-no-la-custodiamos"></a>
 
-- **(a) Certificado del propio usuario, en tránsito y nunca en reposo.** Sube su PKCS#12 en el
-  momento de firmar, la clave vive en memoria durante la operación y se destruye al terminar. No
-  hay columna, no hay copia de seguridad, no hay rotación: no hay nada que rotar.
-- **(b) Prestador cualificado remoto (QTSP) con firma en la nube.** La clave nace y muere dentro
-  del QSCD del prestador; nosotros enviamos el resumen y recibimos la firma. Es el **único** camino
-  a QES y el único que además no nos convierte en custodios de nada.
-- **(c) Tarjeta o eID nacional (DNIe y equivalentes).** Exige middleware PKCS#11 en la máquina del
-  usuario: el navegador no llega. Su hogar natural es la **app de escritorio Fyne** de
-  [ADR-0024](#0024), no la web. Queda anotado, no planificado.
+### 2. Where the key comes from: **we do not hold it**
 
-**Y lo que NO se hace, que es la parte importante: Sytue no guarda la clave privada de firma de
-una persona.** Ni siquiera cifrada con `platform/pkg/keycrypto`, que técnicamente podríamos hacer
-esta tarde. Tres razones, dichas en voz alta:
+Three possible sources, and the order matters because the first is the one that unblocks P3:
 
-1. **Rompe el art. 26.c.** «Control exclusivo» significa que el firmante, y solo él, puede firmar.
-   Si nosotros tenemos la clave, podemos firmar sin él; y esa es literalmente la primera pregunta
-   que hace un perito cuando alguien repudia una firma. Una AdES custodiada por el proveedor es
-   más débil que una AdES de verdad, y la diferencia no se arregla con un aviso legal.
-2. **Es el objetivo más valioso que tendría la plataforma.** Un almacén con las claves de firma de
-   miles de organizaciones no se remedia rotando un secreto cuando se filtra: se remedia
-   **repudiando firmas ya emitidas**, hacia atrás, y sin saber cuáles.
-3. **Guardar la clave privada de alguien es una responsabilidad, no una funcionalidad.** Se
-   presenta siempre como comodidad («firma con un clic, sin subir nada cada vez») y esa comodidad
-   es real; lo que se está comprando con ella es un riesgo que no se puede deshacer.
+- **(a) The user's own certificate, in transit and never at rest.** They upload their PKCS#12 at the
+  moment of signing, the key lives in memory during the operation and is destroyed when it finishes. There
+  is no column, no backup, no rotation: there is nothing to rotate.
+- **(b) Remote qualified provider (QTSP) with cloud signing.** The key is born and dies inside
+  the provider's QSCD; we send the digest and receive the signature. It is the **only** path
+  to QES and the only one that also does not make us custodians of anything.
+- **(c) Card or national eID (DNIe and equivalents).** Requires PKCS#11 middleware on the
+  user's machine: the browser cannot reach it. Its natural home is the **Fyne desktop app** of
+  [ADR-0024](#0024), not the web. Noted, not planned.
 
-> **Por qué la CA de S/MIME no es precedente.** `services/mail/internal/smime/ca.go` sí custodia
-> claves, y está bien: son claves que **emitimos nosotros** para una identidad de buzón de la
-> organización, con nuestra propia ancla, y jamás se presentan como firma avanzada de una persona
-> física. Allí la alternativa era _no firmar el correo en absoluto_. Aquí la alternativa es una
-> firma que el receptor rechaza, que es peor que ninguna.
+**And what is NOT done, which is the important part: Sytue does not store a person's private signing
+key.** Not even encrypted with `platform/pkg/keycrypto`, which technically we could do
+this afternoon. Three reasons, said out loud:
 
-### 3. Cero dependencias nuevas: qué sale con la stdlib y qué no
+1. **It breaks art. 26.c.** “Sole control” means that the signer, and only the signer, can sign.
+   If we have the key, we can sign without them; and that is literally the first question
+   an expert witness asks when someone repudiates a signature. An AdES held by the provider is
+   weaker than a real AdES, and the difference is not fixed with a legal notice.
+2. **It is the most valuable target the platform would have.** A store with the signing keys of
+   thousands of organizations is not remedied by rotating a secret when it leaks: it is remedied by
+   **repudiating signatures already issued**, retroactively, and without knowing which ones.
+3. **Storing someone's private key is a liability, not a feature.** It is
+   always presented as convenience (“sign with one click, without uploading anything each time”) and that convenience
+   is real; what is being bought with it is a risk that cannot be undone.
 
-Determinado pieza a pieza, no de memoria:
+> **Why the S/MIME CA is not a precedent.** `services/mail/internal/smime/ca.go` does hold
+> keys, and that is fine: they are keys that **we issue** for an organization's mailbox identity,
+> with our own anchor, and they are never presented as the advanced signature of a natural
+> person. There the alternative was _not signing the email at all_. Here the alternative is a
+> signature the recipient rejects, which is worse than none.
 
-| Pieza                                    | ¿Solo stdlib?                 | Evidencia                                                                                                                                    |
-| ---------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Empaquetado CMS/PKCS#7 SignedData**    | **Sí**                        | `platform/pkg/cms` (entregado con este ADR): `encoding/asn1` + `crypto/x509`. Cruzado con `openssl cms` en **las dos direcciones**           |
-| **Verificación de una firma ajena**      | **Sí**                        | ídem: resumen, atributos firmados, `signing-certificate-v2` y cadena                                                                         |
-| Cadena, caducidad y usos del certificado | **Sí**                        | `x509.Certificate.Verify`                                                                                                                    |
-| Revocación por CRL                       | **Sí**                        | `x509.ParseRevocationList`                                                                                                                   |
-| Revocación por OCSP                      | **Sí, sin dependencia nueva** | `golang.org/x/crypto/ocsp`, ya directa en `go.mod`                                                                                           |
-| Petición y validación de sello RFC 3161  | **Sí (el código)**            | ASN.1 sobre HTTP; el token **es** un CMS SignedData que `platform/pkg/cms` ya verifica. Lo que falta no es código, es el TSA — §4            |
-| Incrustar la firma en el PDF (PAdES)     | **Sí**                        | actualización incremental + `/ByteRange`; el motor de `services/docs` ya lee (`pdfread.go`) y escribe (`export_pdf.go`) PDF sin dependencias |
-| **Leer un PKCS#12 real**                 | **NO**                        | ver abajo                                                                                                                                    |
-| **Firma cualificada (QES)**              | **NO, y no por código**       | exige QTSP + QSCD                                                                                                                            |
+<a id="3-cero-dependencias-nuevas-qué-sale-con-la-stdlib-y-qué-no"></a>
 
-**El único hueco técnico es PKCS#12, y no es el que parece.** La respuesta cómoda —«ya está,
-`golang.org/x/crypto/pkcs12` viene con una dependencia que tenemos»— es **falsa**, y se comprobó
-en vez de suponerse. Ese paquete está **congelado** (su propia documentación dice que no acepta
-funcionalidad nueva y remite a otro) y solo entiende el cifrado de los años noventa:
+### 3. Zero new dependencies: what the stdlib can do and what it cannot
 
-- Un `.p12` exportado por **OpenSSL 3 con sus valores por defecto** falla con
-  `pkcs12: unknown digest algorithm: 2.16.840.1.101.3.4.2.1` — ni siquiera acepta que el MAC sea
-  SHA-256, y menos aún PBES2/AES.
-- Y uno generado con `-legacy` **pero con la cadena del emisor dentro** (que es lo que entrega
-  cualquier CA) falla con `pkcs12: expected exactly two safe bags in the PFX PDU`.
+Determined piece by piece, not from memory:
 
-Es decir: el fichero que un usuario real tiene hoy en el escritorio no se lee. Salidas posibles,
-las tres honestas:
+| Piece                                      | Stdlib only?                    | Evidence                                                                                                                                         |
+| ------------------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **CMS/PKCS#7 SignedData packaging**        | **Yes**                         | `platform/pkg/cms` (delivered with this ADR): `encoding/asn1` + `crypto/x509`. Cross-checked with `openssl cms` in **both directions**           |
+| **Verifying someone else's signature**     | **Yes**                         | same: digest, signed attributes, `signing-certificate-v2` and chain                                                                              |
+| Certificate chain, expiry and usages       | **Yes**                         | `x509.Certificate.Verify`                                                                                                                        |
+| Revocation via CRL                         | **Yes**                         | `x509.ParseRevocationList`                                                                                                                       |
+| Revocation via OCSP                        | **Yes, no new dependency**      | `golang.org/x/crypto/ocsp`, already direct in `go.mod`                                                                                           |
+| RFC 3161 timestamp request and validation  | **Yes (the code)**              | ASN.1 over HTTP; the token **is** a CMS SignedData that `platform/pkg/cms` already verifies. What is missing is not code, it is the TSA — §4     |
+| Embedding the signature in the PDF (PAdES) | **Yes**                         | incremental update + `/ByteRange`; the `services/docs` engine already reads (`pdfread.go`) and writes (`export_pdf.go`) PDF without dependencies |
+| **Reading a real PKCS#12**                 | **NO**                          | see below                                                                                                                                        |
+| **Qualified signature (QES)**              | **NO, and not because of code** | requires QTSP + QSCD                                                                                                                             |
 
-1. **`software.sslmate.com/src/go-pkcs12`** (BSD-3, permisiva, dentro de la allowlist de
-   `security.md §5`). Es la que recomienda la propia documentación de la stdlib congelada.
-2. **Escribirlo en casa.** PBES2 es **PBKDF2 + AES-CBC**, y las dos están en la stdlib
-   (`crypto/pbkdf2` desde Go 1.24, `crypto/aes`): no sería inventar criptografía, sería parsear un
-   sobre. Pero son varios cientos de líneas de ASN.1 sobre un formato hostil, y toda esa superficie
-   de parseo la alimenta **un fichero que sube un desconocido**.
-3. **No leer PKCS#12 nunca**: el origen de clave es (b) o (c) de §2, y se depende del QTSP antes.
+**The only technical gap is PKCS#12, and it is not the one it seems.** The comfortable answer —“done,
+`golang.org/x/crypto/pkcs12` comes with a dependency we already have”— is **false**, and this was checked
+instead of assumed. That package is **frozen** (its own documentation says it does not accept
+new functionality and refers to another one) and it only understands 1990s encryption:
 
-**Recomendación: la 1**, acotada a una función de importación aislada. Pero la decisión de
-dependencia es del propietario, no de quien escribe el ADR — y **hasta que se tome, P3 avanza
-entero salvo la importación de certificado propio**: verificar, empaquetar, incrustar y firmar
-desde (b) o (c) no dependen de esto.
+- A `.p12` exported by **OpenSSL 3 with its default values** fails with
+  `pkcs12: unknown digest algorithm: 2.16.840.1.101.3.4.2.1` — it does not even accept the MAC being
+  SHA-256, let alone PBES2/AES.
+- And one generated with `-legacy` **but with the issuer's chain inside** (which is what
+  any CA delivers) fails with `pkcs12: expected exactly two safe bags in the PFX PDU`.
 
-### 4. Sello de tiempo: sin él la firma caduca con el certificado
+That is: the file a real user has on their desktop today cannot be read. Possible ways out,
+all three honest:
 
-Una firma se puede verificar mientras el certificado esté vigente y se pueda comprobar que no
-estaba revocado. El día que el certificado caduca —dos o tres años— un verificador ya **no puede
-distinguir «se firmó cuando el certificado valía» de «se firmó después»**, y la firma deja de
-sostener nada. Un contrato firmado hoy tiene que seguir siendo verificable en 2040.
+1. **`software.sslmate.com/src/go-pkcs12`** (BSD-3, permissive, within the allowlist of
+   `security.md §5`). It is the one recommended by the frozen stdlib package's own documentation.
+2. **Writing it in-house.** PBES2 is **PBKDF2 + AES-CBC**, and both are in the stdlib
+   (`crypto/pbkdf2` since Go 1.24, `crypto/aes`): it would not be inventing cryptography, it would be parsing an
+   envelope. But it is several hundred lines of ASN.1 over a hostile format, and all that parsing surface
+   is fed by **a file uploaded by a stranger**.
+3. **Never reading PKCS#12**: the key source is (b) or (c) from §2, and we depend on the QTSP sooner.
 
-Lo que lo arregla son dos cosas, y ninguna es opcional a largo plazo:
+**Recommendation: option 1**, limited to an isolated import function. But the dependency
+decision belongs to the owner, not to whoever writes the ADR — and **until it is made, P3 advances
+entirely except for importing your own certificate**: verifying, packaging, embedding and signing
+from (b) or (c) do not depend on this.
 
-- **Sello de tiempo RFC 3161** de un tercero, que es quien fija el _cuándo_ de forma que no dependa
-  del reloj del firmante ni del nuestro.
-- **Datos de validación incrustados** (OCSP/CRL dentro del documento, el DSS de PAdES): permiten
-  comprobar la revocación dentro de diez años, cuando el servidor OCSP del emisor lleve tiempo
-  apagado.
+<a id="4-sello-de-tiempo-sin-él-la-firma-caduca-con-el-certificado"></a>
 
-**Perfil objetivo: PAdES-B-LT** (firma + sello + datos de validación). PAdES-B-LTA —el sello de
-archivo que se re-sella periódicamente— queda para cuando existan documentos que de verdad vivan
-décadas; añadirlo después es una capa más, no una reescritura.
+### 4. Timestamp: without it the signature expires with the certificate
 
-**El cliente RFC 3161 está ENTREGADO** (2026-08-14, `services/docs/internal/domain/pdftimestamp.go`):
-petición, validación del `PKIStatus`, nonce contra reenvíos, `certReq` para que el token se sostenga
-solo dentro del fichero, y el token colgado de la firma como atributo **no firmado** —el único sitio
-donde cabe, porque el sello se calcula SOBRE la firma y no existe hasta que la firma está hecha—.
-El chart pasa `SYTUE_DOCS_SELLO_URL` siempre y la credencial va por Secret.
+A signature can be verified while the certificate is valid and it can be checked that it was not
+revoked. The day the certificate expires —two or three years— a verifier can **no longer
+distinguish “it was signed while the certificate was valid” from “it was signed afterwards”**, and the signature stops
+holding up anything. A contract signed today has to remain verifiable in 2040.
 
-> **Revisado por el [0051](#0051) (2026-09-26):** la autoridad es ahora **Izenpe**, cualificada
-> (Certum gratuito no lo es), el token se autentica contra su raíz, y en la firma en dos pasos un
-> fallo de la autoridad NO firma sin sello a escondidas: se pregunta. El origen de clave (c) de §2
-> —tarjeta, DNIe y los almacenes del sistema— lo desarrolla el mismo ADR: el servicio de los dos
-> pasos está entregado y los almacenes de cada plataforma llegan uno a uno.
+What fixes it are two things, and neither is optional in the long term:
 
-**El TSA elegido (2026-08-14): CERTUM**, `http://time.certum.pl` — Asseco Data Systems S.A.,
-Polonia. Es el **único servicio de sellado gratuito operado por un prestador que está en la lista de
-confianza de la UE**, así que cumple el invariante de soberanía ([ADR-0001](#0001)) sin coste y sin
-contrato, y su raíz está en los almacenes habituales: un validador muestra un sello reconocido y no
-un «emisor desconocido». Verificado contra el servicio real, y también contra Izenpe
-(`tsa.izenpe.com`) y QuoVadis/DigiCert Europe (`ts.quovadisglobal.com/eu`), que quedan como
-alternativas — la primera es sector público vasco y su servicio libre no está pensado para uso
-comercial; la segunda tiene matriz estadounidense, que es lo que la descarta frente a Certum.
+- **An RFC 3161 timestamp** from a third party, which is what fixes the _when_ in a way that does not depend
+  on the signer's clock or ours.
+- **Embedded validation data** (OCSP/CRL inside the document, the PAdES DSS): they allow
+  checking revocation ten years from now, when the issuer's OCSP server has long been
+  switched off.
 
-**La letra pequeña, y no es menor: el servicio gratuito NO emite sellos CUALIFICADOS.** Los
-gratuitos nunca lo son — un sello cualificado (eIDAS art. 42) es un servicio de pago. Lo que se gana
-igualmente es lo TÉCNICO, que es la mayor parte del problema: la firma sigue verificándose cuando el
-certificado caduque. Lo que NO se gana es la presunción legal de exactitud de la fecha (art. 41.2);
-sigue siendo prueba admisible, pero sin esa presunción. **Subir a cualificado es cambiar la URL por
-la del servicio de pago del MISMO proveedor: ni una línea de código.** Eso convierte lo que era una
-decisión bloqueante en una decisión de cuándo.
+**Target profile: PAdES-B-LT** (signature + timestamp + validation data). PAdES-B-LTA —the archive
+timestamp that is re-stamped periodically— is left for when there are documents that truly live
+for decades; adding it later is one more layer, not a rewrite.
 
-**Y una consecuencia operativa que hubo que resolver: las TSA hablan HTTP PLANO.** Todas — ninguna
-de las tres ofrece HTTPS, y es defendible, porque de ida viaja un hash y de vuelta algo firmado por
-la autoridad. Lo que sí puede hacer un intermediario es **sustituir el token por otro auténtico de
-OTRA huella**, y contra eso está `comprobarToken`: se valida que el TSTInfo del token sella la
-huella pedida y lleva el nonce de esta petición. Sin esa comprobación el PDF se guardaría con un
-sello que no cubre su firma, sin dar ningún error, y se descubriría el día en que hiciera falta la
-prueba. El chart abre el puerto 80 solo para esto, con el motivo escrito al lado.
+**The RFC 3161 client is DELIVERED** (2026-08-14, `services/docs/internal/domain/pdftimestamp.go`):
+request, `PKIStatus` validation, nonce against replays, `certReq` so the token stands on its own
+inside the file, and the token attached to the signature as an **unsigned** attribute —the only place
+where it fits, because the timestamp is computed OVER the signature and does not exist until the signature is done—.
+The chart always passes `SYTUE_DOCS_SELLO_URL` and the credential goes through a Secret.
 
-**Y una decisión de diseño que importa más de lo que parece: un fallo del TSA NO impide firmar.** Si
-la autoridad está caída o tarda más del plazo, la firma se emite SIN sello. Lo contrario convertiría
-un tercero en un punto único de fallo del producto: nadie podría firmar un contrato porque un
-servidor ajeno no responde. Tiene su propio check.
+> **Revised by [0051](#0051) (2026-09-26):** the authority is now **Izenpe**, qualified
+> (free Certum is not), the token is authenticated against its root, and in two-step signing an
+> authority failure does NOT silently sign without a timestamp: the user is asked. Key source (c) from §2
+> —card, DNIe and the system stores— is developed by the same ADR: the two-step service
+> is delivered and each platform's stores arrive one by one.
 
-**La regla mientras no haya TSA** —y esto es lo que evita el problema del «✓ verde»—: una firma sin
-sello se emite, se guarda y **se muestra diciendo que no lo tiene**: «sin sello de tiempo:
-verificable hasta _(fecha de caducidad del certificado)_». No se pinta un reloj que no existe. En
-la misma línea, `signing-time` es **lo que declara el firmante**, no una prueba, y así está
-comentado en el código que lo lee.
+**The chosen TSA (2026-08-14): CERTUM**, `http://time.certum.pl` — Asseco Data Systems S.A.,
+Poland. It is the **only free timestamping service operated by a provider that is on the EU
+trusted list**, so it meets the sovereignty invariant ([ADR-0001](#0001)) at no cost and without a
+contract, and its root is in the usual stores: a validator shows a recognized timestamp and not
+an “unknown issuer”. Verified against the real service, and also against Izenpe
+(`tsa.izenpe.com`) and QuoVadis/DigiCert Europe (`ts.quovadisglobal.com/eu`), which remain as
+alternatives — the first is the Basque public sector and its free service is not intended for commercial
+use; the second has a US parent company, which is what rules it out compared with Certum.
 
-### 5. Dónde vive cada cosa, y por qué así no bloquea nada
+**The fine print, and it is not minor: the free service does NOT issue QUALIFIED timestamps.** Free
+ones never are — a qualified timestamp (eIDAS art. 42) is a paid service. What is gained
+anyway is the TECHNICAL part, which is most of the problem: the signature keeps verifying when the
+certificate expires. What is NOT gained is the legal presumption of accuracy of the date (art. 41.2);
+it remains admissible evidence, but without that presumption. **Upgrading to qualified means changing the URL to
+the paid service of the SAME provider: not a single line of code.** That turns what was a
+blocking decision into a decision of when.
 
-- **`platform/pkg/cms`** (nuevo, entregado con este ADR) es el envoltorio común: una firma S/MIME,
-  una firma dentro de un PDF y un sello RFC 3161 son **los tres** un CMS SignedData. Lo que cambia
-  entre ellos es dónde se pega el resultado, no qué se firma.
-- **La incrustación PAdES va en `services/docs`**, que es donde está el motor de PDF.
-- **El origen de la clave se enchufa como `crypto.Signer`** —la interfaz de la stdlib, no una
-  nuestra—, y esa es la pieza que hace que §2 no bloquee a §3: una clave efímera en memoria, un
-  HSM por PKCS#11 y un QTSP remoto son los tres un `crypto.Signer`. Se decide después sin
-  reescribir nada.
-- `services/mail/internal/smime` conserva su CMS propio hasta que migre, con el mismo precedente
-  que `platform/pkg/keycrypto` frente a `services/id`. No se toca desde aquí.
+**And an operational consequence that had to be solved: TSAs speak PLAIN HTTP.** All of them — none
+of the three offers HTTPS, and it is defensible, because a hash travels outbound and something signed by
+the authority comes back. What an intermediary can do is **replace the token with another authentic one for
+ANOTHER digest**, and against that there is `comprobarToken`: it validates that the token's TSTInfo stamps the
+requested digest and carries this request's nonce. Without that check the PDF would be saved with a
+timestamp that does not cover its signature, without any error, and it would be discovered the day the
+evidence was needed. The chart opens port 80 only for this, with the reason written next to it.
 
-Una consecuencia de diseño que merece nombre propio: **`cms.Verify` se niega a verificar si no le
-dicen contra qué anclas confía** (`ErrSinAnclas`). El almacén de raíces del sistema **no** es la
-lista de confianza de la UE, y dejar que la función caiga en él sería tomar la decisión de
-confianza en silencio, con lo que trajera la imagen del contenedor.
+**And a design decision that matters more than it seems: a TSA failure does NOT prevent signing.** If
+the authority is down or takes longer than the timeout, the signature is issued WITHOUT a timestamp. The opposite would turn
+a third party into a single point of failure for the product: nobody could sign a contract because a
+foreign server is not responding. It has its own check.
 
-**Consecuencias.**
+**The rule while there is no TSA** —and this is what avoids the “green ✓” problem—: a signature without a
+timestamp is issued, stored and **shown saying it does not have one**: «sin sello de tiempo:
+verificable hasta _(fecha de caducidad del certificado)_» (“no timestamp: verifiable until _(certificate expiry date)_”). A clock that does not exist is not drawn. Along
+the same line, `signing-time` is **what the signer declares**, not proof, and that is how it is
+commented in the code that reads it.
 
-- **La verificación deja de estar bloqueada hoy.** Abrir un PDF firmado por un cliente y decir
-  quién lo firmó, con qué certificado y contra qué ancla, no depende de ninguna de las tres
-  decisiones abiertas. Es la mitad del valor de P3 y ya está.
-- P3 puede entregar la firma dibujada (SES) y la verificación de firmas ajenas de inmediato, y
-  AdES en cuanto haya un origen de clave.
-- **No se anuncia QES en ningún material comercial** hasta que exista contrato con un QTSP.
-- Sytue **no ofrece «guardar mi certificado»** como funcionalidad. Si un cliente lo pide, la
-  respuesta es (b), no una casilla.
+<a id="5-dónde-vive-cada-cosa-y-por-qué-así-no-bloquea-nada"></a>
 
-**Alternativas descartadas.**
+### 5. Where each thing lives, and why this way nothing is blocked
 
-- **Custodiar la clave del usuario cifrada con `keycrypto`.** Era lo cómodo y lo barato: firma con
-  un clic, sin subir nada cada vez, y la maquinaria de cifrado en reposo ya existe. Rompe el
-  control exclusivo del art. 26.c, convierte la plataforma en el objetivo más valioso que tendría,
-  y su fallo no se remedia rotando un secreto sino repudiando firmas ya emitidas.
-- **Emitir nosotros los certificados de firma con una CA propia**, como sí se hace en S/MIME.
-  Descartada para documentos: una CA nuestra no está en ninguna lista de confianza, así que la
-  firma solo valdría dentro de casa — y lo que P3 vende es exactamente que valga **fuera**.
-- **Traer una librería de PDF que ya firme** (PDFBox, iText, PDF.js…). AGPL o licencia comercial,
-  contra [0017](#0017) y [0022](#0022), y contra el hecho de que el motor propio ya lee y escribe.
-- **Implementar PBES2 dentro de `platform/pkg/cms` sin preguntar**, para tapar el hueco de PKCS#12
-  y poder enseñar la función terminada. Descartada por el invariante: la decisión de dependencia
-  es del propietario, y esconderla dentro de otro paquete es justamente la manera de que nadie la
-  revise. **El hueco se documenta, no se rellena.**
-- **Revender un servicio de firma de terceros no cualificado** de los que se anuncian como «firma
-  legal» sin estar en la lista de confianza. Descartada: es exactamente la confusión que este ADR
-  existe para no cometer, y con nuestra marca encima.
-- **Esperar a tener QTSP para empezar.** Descartada: el empaquetado y la verificación no dependen
-  de esa decisión, y dejarlos parados habría mantenido «firma digital — FALTA» otro trimestre por
-  una razón que no era técnica.
+- **`platform/pkg/cms`** (new, delivered with this ADR) is the common envelope: an S/MIME signature,
+  a signature inside a PDF and an RFC 3161 timestamp are **all three** a CMS SignedData. What changes
+  between them is where the result is attached, not what is signed.
+- **PAdES embedding goes in `services/docs`**, which is where the PDF engine is.
+- **The key source plugs in as a `crypto.Signer`** —the stdlib interface, not one of
+  ours—, and that is the piece that keeps §2 from blocking §3: an ephemeral in-memory key, an
+  HSM via PKCS#11 and a remote QTSP are all three a `crypto.Signer`. It is decided later without
+  rewriting anything.
+- `services/mail/internal/smime` keeps its own CMS until it migrates, with the same precedent
+  as `platform/pkg/keycrypto` versus `services/id`. It is not touched from here.
 
-**Lo que tiene que decidir el propietario.**
+A design consequence that deserves its own name: **`cms.Verify` refuses to verify unless it is
+told which anchors it trusts** (`ErrSinAnclas`). The system root store is **not** the
+EU trusted list, and letting the function fall back to it would be making the trust decision
+silently, with whatever the container image happened to bring.
 
-1. **PKCS#12** — (i) añadir `software.sslmate.com/src/go-pkcs12` (BSD-3), (ii) escribir el parseo
-   de PBES2 en casa sobre `crypto/pbkdf2` + `crypto/aes`, o (iii) no leer P12 nunca y depender del
-   QTSP. **Recomendación: (i).** Bloquea solo la importación de certificado propio.
-2. **Prestador cualificado (QTSP/TSA)** — cuál, de la lista de confianza de la UE y alojado en la
-   UE, para sello de tiempo; y si además se quiere QES, para firma remota. Contrato y coste por
-   sello.
-3. **Lista de confianza** — si se ingiere la LOTL europea (XML firmado, con su mantenimiento) o
-   cada despliegue declara sus anclas. Determina qué se le puede decir a un usuario que abre un
-   PDF firmado fuera de Sytue.
+**Consequences.**
+
+- **Verification is no longer blocked today.** Opening a PDF signed by a customer and saying
+  who signed it, with which certificate and against which anchor, does not depend on any of the three
+  open decisions. It is half the value of P3 and it is done.
+- P3 can deliver the drawn signature (SES) and verification of others' signatures immediately, and
+  AdES as soon as there is a key source.
+- **QES is not advertised in any sales material** until there is a contract with a QTSP.
+- Sytue **does not offer “store my certificate”** as a feature. If a customer asks for it, the
+  answer is (b), not a checkbox.
+
+**Alternatives ruled out.**
+
+- **Holding the user's key encrypted with `keycrypto`.** It was the comfortable and cheap option: sign with
+  one click, without uploading anything each time, and the encryption-at-rest machinery already exists. It breaks the
+  sole control of art. 26.c, turns the platform into the most valuable target it would have,
+  and its failure is not remedied by rotating a secret but by repudiating signatures already issued.
+- **Issuing the signing certificates ourselves with our own CA**, as is done for S/MIME.
+  Ruled out for documents: a CA of ours is not on any trusted list, so the
+  signature would only be valid in-house — and what P3 sells is exactly that it is valid **outside**.
+- **Bringing in a PDF library that already signs** (PDFBox, iText, PDF.js…). AGPL or a commercial license,
+  against [0017](#0017) and [0022](#0022), and against the fact that our own engine already reads and writes.
+- **Implementing PBES2 inside `platform/pkg/cms` without asking**, to plug the PKCS#12 gap
+  and be able to show the function finished. Ruled out by the invariant: the dependency decision
+  belongs to the owner, and hiding it inside another package is precisely the way to make sure nobody
+  reviews it. **The gap is documented, not filled.**
+- **Reselling a non-qualified third-party signing service** of the kind advertised as “legal
+  signature” without being on the trusted list. Ruled out: it is exactly the confusion this ADR
+  exists to avoid, with our brand on top.
+- **Waiting for a QTSP to start.** Ruled out: packaging and verification do not depend
+  on that decision, and leaving them on hold would have kept “digital signature — MISSING” another quarter for
+  a reason that was not technical.
+
+**What the owner has to decide.**
+
+1. **PKCS#12** — (i) add `software.sslmate.com/src/go-pkcs12` (BSD-3), (ii) write the PBES2
+   parsing in-house on top of `crypto/pbkdf2` + `crypto/aes`, or (iii) never read P12 and depend on the
+   QTSP. **Recommendation: (i).** It only blocks importing your own certificate.
+2. **Qualified provider (QTSP/TSA)** — which one, from the EU trusted list and hosted in the
+   EU, for timestamps; and if QES is also wanted, for remote signing. Contract and cost per
+   timestamp.
+3. **Trusted list** — whether the European LOTL is ingested (signed XML, with its maintenance) or
+   each deployment declares its anchors. It determines what can be said to a user who opens a
+   PDF signed outside Sytue.
 
 ---
 
 <a id="0031"></a>
 
-## 0031 — Crossplane adopta la infraestructura por riesgo; RDB y Kapsule se quedan fuera
+<a id="0031--crossplane-adopta-la-infraestructura-por-riesgo-rdb-y-kapsule-se-quedan-fuera"></a>
+
+## 0031 — Crossplane adopts infrastructure by risk; RDB and Kapsule stay out
 
 `accepted` · 2026-08-10 · infra, iac, crossplane
 
-**Contexto.** [0014](#0014) puso la infraestructura de producción en Terraform/OpenTofu.
-Funciona, pero el estado vive en un bucket S3 y el despliegue depende de él: `02b-secretos.sh`
-y `03-desplegar.sh` leen **8 valores** con `tofu output` (el endpoint del RDB, los dos
-endpoints del Registry, la IP de ingress, la IP de medios de LiveKit, el CIDR privado, el
-endpoint S3 y el kubeconfig). Sin credencial del bucket de estado no se puede desplegar —de
-ahí el modo de recuperación `SYTUE_INFRA_FROM_ENV=1`—, y un `tofu init` en `environments/prod`
-tarda más de 30 minutos porque arrastra un provider de AWS de 1,4 GB que ningún recurso usa.
+**Context.** [0014](#0014) put the production infrastructure in Terraform/OpenTofu.
+It works, but the state lives in an S3 bucket and the deployment depends on it: `02b-secretos.sh`
+and `03-desplegar.sh` read **8 values** with `tofu output` (the RDB endpoint, the two
+Registry endpoints, the ingress IP, the LiveKit media IP, the private CIDR, the
+S3 endpoint and the kubeconfig). Without a credential for the state bucket you cannot deploy —hence
+the recovery mode `SYTUE_INFRA_FROM_ENV=1`—, and a `tofu init` in `environments/prod`
+takes more than 30 minutes because it drags in a 1.4 GB AWS provider that no resource uses.
 
-Crossplane pone la reconciliación dentro del clúster y elimina el estado externo. La pregunta
-no era si migrar, sino **qué** migrar y **en qué orden**, con todos los recursos ya sirviendo
-tráfico.
+Crossplane puts reconciliation inside the cluster and eliminates the external state. The question
+was not whether to migrate, but **what** to migrate and **in what order**, with all resources already serving
+traffic.
 
-**Decisión.**
+**Decision.**
 
-1. **Se genera un provider propio con Upjet** a partir del provider de Terraform de Scaleway
-   (2.80.0, el mismo que fija el lock de OpenTofu), en modo **no-fork**: los recursos se
-   reconcilian con el esquema Go dentro del proceso, sin ejecutar Terraform ni empaquetar su
-   binario. Así **no entra BUSL en la cadena de suministro**.
-2. **Los recursos se generan en orden de riesgo si se recrean**, no de comodidad:
-   DNS → Object Storage y Registry → red/IP/máquinas/secretos. Van 5 de 22 tipos.
-3. **RDB (`scaleway_rdb_*`) y Kapsule (`scaleway_k8s_*`) se quedan fuera**, y no como «para
-   más adelante»: como decisión. Crossplane corre **en** Kapsule, así que gestionar el clúster
-   desde dentro es circular —un fallo de reconciliación puede dejar el pool sin nodos y el
-   controlador que lo arreglaría está en esos nodos— y el `kapsule_kubeconfig` es justamente
-   la credencial para llegar allí. Y `scaleway_rdb_instance` no es un recurso que «se recree»:
-   se lleva los datos. No hay beneficio operativo que compense ese riesgo.
-4. **La adopción es siempre en dos tiempos**: `managementPolicies: ["Observe"]` primero,
-   comprobar que `spec.forProvider` coincide con `status.atProvider`, `tofu state rm` después,
-   y solo entonces conceder `Create`/`Update`. **`Delete` no se concede** a los buckets con
-   datos de cliente. El procedimiento completo, con qué mirar antes y después de cada paso,
-   está en [`infra/crossplane/ADOPCION.md`](../infra/crossplane/ADOPCION.md).
-5. **Los `output` se sustituyen por un ConfigMap** `sytue-infra-salidas` que publica
-   `infra/crossplane/publicar-salidas.sh` leyendo los `status.atProvider`, **con los mismos
-   nombres de clave** que los outputs de OpenTofu para que migrar un consumidor sea cambiar de
-   dónde lee, no qué formato lee.
+1. **Our own provider is generated with Upjet** from the Scaleway Terraform provider
+   (2.80.0, the same one pinned by the OpenTofu lock), in **no-fork** mode: resources are
+   reconciled with the Go schema inside the process, without running Terraform or bundling its
+   binary. That way **BUSL does not enter the supply chain**.
+2. **Resources are generated in order of risk if recreated**, not of convenience:
+   DNS → Object Storage and Registry → network/IP/machines/secrets. 5 of 22 types are done.
+3. **RDB (`scaleway_rdb_*`) and Kapsule (`scaleway_k8s_*`) stay out**, and not as “for
+   later”: as a decision. Crossplane runs **on** Kapsule, so managing the cluster
+   from inside is circular —a reconciliation failure can leave the pool without nodes and the
+   controller that would fix it is on those nodes— and the `kapsule_kubeconfig` is precisely
+   the credential to get there. And `scaleway_rdb_instance` is not a resource that “gets recreated”:
+   it takes the data with it. There is no operational benefit that compensates for that risk.
+4. **Adoption is always in two stages**: `managementPolicies: ["Observe"]` first,
+   check that `spec.forProvider` matches `status.atProvider`, `tofu state rm` afterwards,
+   and only then grant `Create`/`Update`. **`Delete` is not granted** on buckets with
+   customer data. The full procedure, with what to look at before and after each step,
+   is in [`infra/crossplane/ADOPCION.md`](../infra/crossplane/ADOPCION.md).
+5. **The `output`s are replaced by a ConfigMap** `sytue-infra-salidas` published by
+   `infra/crossplane/publicar-salidas.sh` reading the `status.atProvider`, **with the same
+   key names** as the OpenTofu outputs so that migrating a consumer means changing where it
+   reads from, not what format it reads.
 
-**Alternativas descartadas.**
+**Alternatives ruled out.**
 
-- **Migrarlo todo de golpe.** El provider de Scaleway tiene cientos de recursos; generarlos
-  todos da un módulo que nadie revisa, y adoptar 55 bloques a la vez hace que el primer error
-  de external-name se descubra cuando ya hay varios recursos recreados.
-- **Usar el provider de Crossplane de Scaleway de un tercero.** No hay uno mantenido con la
-  cobertura que hace falta, y un provider de terceros en la ruta de aprovisionamiento es un
-  actor más con credenciales de administración del proyecto.
-- **Modo CLI de Upjet** (cada reconciliación lanza un binario de Terraform). Mete Terraform y
-  el provider de Scaleway **binarios** en la imagen, con BUSL detrás, para hacer lo mismo.
-- **Instalar `crossplane-contrib/provider-kubernetes`** y publicar las salidas con un `Object`
-  y `spec.references[].patchesFrom`, que las mantendría al día solo. Es la solución de manual,
-  pero cuesta otro provider en el clúster y en la cadena de suministro para refrescar valores
-  que solo se leen al desplegar. Se reconsidera el día que algo dentro del clúster los
-  necesite en caliente.
-- **Adoptar también el bucket `tfstate`.** Es el estado del propio OpenTofu: mientras OpenTofu
-  gestione algo, la dependencia es circular.
+- **Migrating everything at once.** The Scaleway provider has hundreds of resources; generating them
+  all yields a module nobody reviews, and adopting 55 blocks at once means the first
+  external-name error is discovered when several resources have already been recreated.
+- **Using a third party's Scaleway Crossplane provider.** There is no maintained one with the
+  coverage needed, and a third-party provider on the provisioning path is one more
+  actor with administrative credentials for the project.
+- **Upjet CLI mode** (each reconciliation launches a Terraform binary). It puts Terraform and
+  the Scaleway provider **binaries** into the image, with BUSL behind them, to do the same thing.
+- **Installing `crossplane-contrib/provider-kubernetes`** and publishing the outputs with an `Object`
+  and `spec.references[].patchesFrom`, which would keep them up to date on their own. It is the textbook solution,
+  but it costs another provider in the cluster and in the supply chain to refresh values
+  that are only read at deploy time. It will be reconsidered the day something inside the cluster
+  needs them live.
+- **Also adopting the `tfstate` bucket.** It is OpenTofu's own state: as long as OpenTofu
+  manages something, the dependency is circular.
 
-**Consecuencias.**
+**Consequences.**
 
-- **OpenTofu no desaparece.** Aunque se adoptara todo lo adoptable, `environments/prod` seguiría
-  existiendo para RDB y Kapsule, y el despliegue seguiría sacando el kubeconfig de su estado.
-  El objetivo no es «Crossplane sustituye a OpenTofu», es **«OpenTofu solo toca lo que no se
-  puede recrear»**.
-- **Se pierde el `plan`.** OpenTofu enseña lo que va a pasar antes de que pase; Crossplane no.
-  La fase Observe es el sustituto, y es manual: no escala a decenas de objetos. Es el coste
-  reconocido de esta decisión.
-- **Dos definiciones de la misma infraestructura mientras dure la migración**, con el mismo
-  riesgo de divergencia que ya señalaba [0014](#0014) para Compose y Helm. Se acota con la
-  regla de que un recurso sale del `.tf` (bloque `removed` con `destroy = false`) en el mismo
-  cambio en el que entra en Crossplane.
-- **Hoy Crossplane no gestiona nada en producción.** Lo que hay es el pipeline de generación,
-  cinco tipos de recurso, manifiestos en Observe y el procedimiento. Nada aplicado.
+- **OpenTofu does not disappear.** Even if everything adoptable were adopted, `environments/prod` would still
+  exist for RDB and Kapsule, and the deployment would still take the kubeconfig from its state.
+  The goal is not “Crossplane replaces OpenTofu”, it is **“OpenTofu only touches what cannot
+  be recreated”**.
+- **The `plan` is lost.** OpenTofu shows what is going to happen before it happens; Crossplane does not.
+  The Observe phase is the substitute, and it is manual: it does not scale to dozens of objects. It is the
+  acknowledged cost of this decision.
+- **Two definitions of the same infrastructure for as long as the migration lasts**, with the same
+  risk of divergence that [0014](#0014) already pointed out for Compose and Helm. It is bounded by the
+  rule that a resource leaves the `.tf` (a `removed` block with `destroy = false`) in the same
+  change in which it enters Crossplane.
+- **Today Crossplane manages nothing in production.** What exists is the generation pipeline,
+  five resource types, manifests in Observe and the procedure. Nothing applied.
 
-## 0032 — Crossplane al 100 % no es viable, y al máximo posible sale caro en cadena de suministro
+<a id="0032--crossplane-al-100--no-es-viable-y-al-máximo-posible-sale-caro-en-cadena-de-suministro"></a>
 
-**Fecha**: 2026-08-10 · **Estado**: aceptada · **Sustituye parcialmente a**: 0031
+## 0032 — Crossplane at 100 % is not viable, and at the maximum possible it is expensive in supply chain
 
-### El contexto que faltaba
+**Date**: 2026-08-10 · **Status**: accepted · **Partially replaces**: 0031
 
-El ADR 0031 decidió adoptar la infraestructura por riesgo y dejar RDB y Kapsule
-fuera. Esa decisión sigue en pie, pero se tomó sin medir lo que Crossplane AÑADE
-al stack. Con el criterio de mantener la superficie de suministro lo más pequeña
-posible, ese número manda sobre los demás.
+<a id="el-contexto-que-faltaba"></a>
 
-### Lo medido
+### The missing context
 
-**Crossplane con Upjet no sustituye a Terraform: lo empaqueta.** El provider
-generado declara `github.com/scaleway/terraform-provider-scaleway/v2 v2.80.0` y
-`github.com/hashicorp/terraform-plugin-sdk/v2` como dependencias DIRECTAS. Lo que
-hoy es un binario que se ejecuta y termina pasaría a ser una biblioteca que corre
-dentro de un pod, siempre encendido, con permisos sobre toda la cuenta de Scaleway.
+ADR 0031 decided to adopt the infrastructure by risk and leave RDB and Kapsule
+out. That decision still stands, but it was made without measuring what Crossplane ADDS
+to the stack. With the criterion of keeping the supply surface as small as
+possible, that number outweighs the others.
 
-|                                      | Módulos en el árbol |
-| ------------------------------------ | ------------------- |
-| Toda la suite Sytue (doce servicios) | 526                 |
-| **El provider de Crossplane, solo**  | **483**             |
-| De ellos, NUEVOS en nuestro stack    | **286**             |
+<a id="lo-medido"></a>
 
-Duplicar la superficie de suministro auditada para gestionar diecinueve recursos
-de infraestructura no es una mejora de mantenimiento, es lo contrario. Y los 286
-nuevos no son código de nicho: 29 módulos de HashiCorp, 21 de go-openapi, **14 de
-AWS** —en una infraestructura que no tiene un solo recurso de AWS—, 7 de sigstore
-y 5 de etcd.
+### What was measured
 
-El binario resultante son 99 MB. `tofu` es un binario que no vive en el clúster y
-que solo descarga providers cuando se ejecuta.
+**Crossplane with Upjet does not replace Terraform: it bundles it.** The generated
+provider declares `github.com/scaleway/terraform-provider-scaleway/v2 v2.80.0` and
+`github.com/hashicorp/terraform-plugin-sdk/v2` as DIRECT dependencies. What
+today is a binary that runs and exits would become a library running
+inside a pod, always on, with permissions over the whole Scaleway account.
 
-**Y hay un coste permanente**: Crossplane exige su núcleo (`crossplane` +
-`rbac-manager`) y el pod del provider corriendo siempre, más ~3 CRDs por tipo de
-recurso —15 con cinco tipos, así que los 22 serían unos 66—. En un clúster de dos
-nodos con un presupuesto de 100 EUR/mes, eso son pods y memoria que hoy no se
-gastan.
+|                                         | Modules in the tree |
+| --------------------------------------- | ------------------- |
+| The whole Sytue suite (twelve services) | 526                 |
+| **The Crossplane provider, alone**      | **483**             |
+| Of those, NEW to our stack              | **286**             |
 
-### La decisión
+Doubling the audited supply surface to manage nineteen infrastructure
+resources is not a maintenance improvement, it is the opposite. And the 286
+new ones are not niche code: 29 HashiCorp modules, 21 from go-openapi, **14 from
+AWS** —in an infrastructure that does not have a single AWS resource—, 7 from sigstore
+and 5 from etcd.
 
-**No se persigue el 100 %, ni el máximo posible.** Crossplane se queda como está:
-DNS, Object Storage y Registry generados, con el procedimiento de adopción escrito
-(`infra/crossplane/ADOPCION.md`) y sin instalar en producción, disponible el día
-que haya un motivo que supere a este coste.
+The resulting binary is 99 MB. `tofu` is a binary that does not live in the cluster and
+only downloads providers when it runs.
 
-**OpenTofu sigue siendo la herramienta de infraestructura.** Es un binario, sin
-nada corriendo, con tres providers fijados por lockfile y verificados por hash.
+**And there is a permanent cost**: Crossplane requires its core (`crossplane` +
+`rbac-manager`) and the provider pod always running, plus ~3 CRDs per resource
+type —15 with five types, so the 22 would be about 66—. In a two-node
+cluster with a budget of 100 EUR/month, those are pods and memory that are not spent
+today.
 
-### Lo que sí hay que hacer, y es la mitad del beneficio por una centésima del coste
+<a id="la-decisión"></a>
 
-El motivo original para migrar era que `tofu init` tarda **más de 30 minutos** y
-bloquea todo despliegue. Eso NO lo causa OpenTofu: lo causa un provider de AWS de
-1,4 GB declarado en `environments/prod/providers.tf` para leer del estado módulos
-ya retirados, **sin un solo recurso `aws_*` en el repo**. La propia nota del
-fichero dice que debía eliminarse «tras ese apply y comprobar `tofu providers`».
-Nadie lo hizo.
+### The decision
 
-Quitarlo, junto con la caché de plugins compartida, recupera casi todo el tiempo
-perdido. Es una tarde de trabajo contra las semanas de una migración que además
-duplicaría la superficie de suministro.
+**Neither 100 % nor the maximum possible is pursued.** Crossplane stays as it is:
+DNS, Object Storage and Registry generated, with the adoption procedure written
+(`infra/crossplane/ADOPCION.md`) and not installed in production, available the day
+there is a reason that outweighs this cost.
 
-**Hecho el mismo día, y medido:**
+**OpenTofu remains the infrastructure tool.** It is a binary, with
+nothing running, with three providers pinned by lockfile and verified by hash.
 
-|                                  | Antes   | Después   |
-| -------------------------------- | ------- | --------- |
-| `tofu init` en limpio            | >30 min | **2,7 s** |
-| Providers en el lockfile de prod | 3       | 1         |
-| `.terraform` en disco            | 3,7 GB  | 204 MB    |
+<a id="lo-que-sí-hay-que-hacer-y-es-la-mitad-del-beneficio-por-una-centésima-del-coste"></a>
 
-El estado remoto ya no los referencía —de 37 recursos con 3 de `aws` y 2 de
-`random` (serial 27) a 34, todos de Scaleway (serial 50)—, así que la declaración
-solo servía para descargar. `tofu validate` pasa con el árbol podado. Los otros
-tres entornos (dev, staging, sytue-git) nunca tuvieron el lastre.
+### What does need to be done, and it is half the benefit for a hundredth of the cost
 
-Dos cosas se añadieron para que no vuelva:
+The original reason to migrate was that `tofu init` takes **more than 30 minutes** and
+blocks every deployment. That is NOT caused by OpenTofu: it is caused by a 1.4 GB AWS provider
+declared in `environments/prod/providers.tf` to read already-retired modules from the state,
+**without a single `aws_*` resource in the repo**. The file's own note
+says it should be removed “after that apply and checking `tofu providers`”.
+Nobody did it.
 
-- **Un gate**, en `deploy/production/tests/deriva-infra-test.sh`: falla si el
-  lockfile de cualquier entorno fija un provider sin un solo recurso suyo en el
-  código. Mira el LOCKFILE y no solo el `.tf`, porque es el que manda en lo que se
-  descarga y una entrada puede sobrevivir ahí a que se limpie la declaración.
-- **Caché de plugins compartida** (`TF_PLUGIN_CACHE_DIR`) en
-  `lib-tofu-backend.sh`. El aislamiento por `TF_DATA_DIR` se mantiene —es
-  correcto y evita que una caché histórica reclame providers retirados— pero el
-  binario se guarda una sola vez en vez de una por directorio.
+Removing it, together with the shared plugin cache, recovers almost all the lost
+time. It is an afternoon of work versus the weeks of a migration that would also
+double the supply surface.
 
-Al escribir ese gate salió una trampa que no tenía nada que ver y vale para todo
-el repo: `«$var»` **mata el script**. El `»` son los bytes `C2 BB`, bajo locale C
-bash se los traga como parte del nombre de la variable, y con `set -u` eso es un
-`unbound variable`. Lo peor es dónde vive: en las ramas de error, o sea que solo
-explota cuando el gate acaba de detectar algo y se lleva el diagnóstico por
-delante. Había otro caso igual en `runner-flota-test.sh`. **Variable pegada a
-« »: llaves siempre.**
+**Done the same day, and measured:**
 
-### Cuándo reconsiderarlo
+|                                | Before  | After     |
+| ------------------------------ | ------- | --------- |
+| Clean `tofu init`              | >30 min | **2.7 s** |
+| Providers in the prod lockfile | 3       | 1         |
+| `.terraform` on disk           | 3.7 GB  | 204 MB    |
 
-- Si la infraestructura pasa a definirse por API en vez de por ficheros —clientes
-  que crean recursos a demanda—, que es el caso de uso para el que Crossplane
-  existe y que hoy no tenemos.
-- Si Scaleway publica un provider NATIVO de Crossplane, sin Upjet ni el SDK de
-  Terraform dentro. Ahí desaparece la mayor parte de los 286 módulos.
-- Si OpenTofu deja de mantenerse o cambia de licencia.
+The remote state no longer references them —from 37 resources with 3 `aws` and 2
+`random` (serial 27) to 34, all Scaleway (serial 50)—, so the declaration
+only served to download. `tofu validate` passes with the pruned tree. The other
+three environments (dev, staging, sytue-git) never had the dead weight.
 
-Ninguna de las tres depende de nosotros, y por eso el trabajo hecho se conserva en
-vez de borrarse: el día que ocurra, el pipeline ya funciona.
+Two things were added so it does not come back:
+
+- **A gate**, in `deploy/production/tests/deriva-infra-test.sh`: it fails if the
+  lockfile of any environment pins a provider without a single resource of its own in the
+  code. It looks at the LOCKFILE and not only at the `.tf`, because it is what governs what gets
+  downloaded and an entry can survive there after the declaration is cleaned up.
+- **A shared plugin cache** (`TF_PLUGIN_CACHE_DIR`) in
+  `lib-tofu-backend.sh`. Isolation via `TF_DATA_DIR` is kept —it is
+  correct and prevents a historical cache from claiming retired providers— but the
+  binary is stored only once instead of once per directory.
+
+While writing that gate a trap came up that had nothing to do with it and applies to the whole
+repo: `«$var»` **kills the script**. The `»` is the bytes `C2 BB`; under the C locale
+bash swallows them as part of the variable name, and with `set -u` that is an
+`unbound variable`. The worst part is where it lives: in the error branches, that is, it only
+blows up when the gate has just detected something, and it takes the diagnosis down
+with it. There was another identical case in `runner-flota-test.sh`. **A variable stuck to
+« »: always use braces.**
+
+<a id="cuándo-reconsiderarlo"></a>
+
+### When to reconsider it
+
+- If the infrastructure comes to be defined by API instead of by files —customers
+  creating resources on demand—, which is the use case Crossplane
+  exists for and which we do not have today.
+- If Scaleway publishes a NATIVE Crossplane provider, without Upjet or the Terraform
+  SDK inside. Then most of the 286 modules disappear.
+- If OpenTofu stops being maintained or changes its license.
+
+None of the three depends on us, and that is why the work done is kept instead of
+being deleted: the day it happens, the pipeline already works.
 
 <a id="0032"></a>
 
-## 0032 — Productos open-source en Sytue Cloud: copyleft sí, «source available» no; y quién se publica
+<a id="0032--productos-open-source-en-sytue-cloud-copyleft-sí-source-available-no-y-quién-se-publica"></a>
 
-- **Fecha:** 2026-08-12
-- **Estado:** accepted
-- **Contexto:** ADR [0022](#0022) (motores AGPL fuera de la suite), ADR [0029](#0029) (catálogo
-  cerrado), `services/cloud/internal/domain/appcatalog.go`
+## 0032 — Open-source products on Sytue Cloud: copyleft yes, “source available” no; and who gets published
 
-**Contexto.** El catálogo de la 0029 nació para levantar piezas de APOYO junto a la app del
-cliente: una caché, un buscador, una cola. La siguiente vuelta del producto pide otra cosa —elegir
-VARIOS productos completos, tipo Nextcloud o un CMS, y que los que se integran entre sí arranquen ya
-conectados—, y ahí la 0029 chocaba consigo misma en dos puntos:
+- **Date:** 2026-08-12
+- **Status:** accepted
+- **Context:** ADR [0022](#0022) (AGPL engines out of the suite), ADR [0029](#0029) (closed
+  catalog), `services/cloud/internal/domain/appcatalog.go`
 
-- Su allowlist era solo permisiva, y **prácticamente todo el software libre de producto es
-  GPL o AGPL**: Nextcloud, WordPress, Grafana, Metabase, Vaultwarden, Mastodon. Con la lista tal
-  cual, el catálogo no podía salir nunca de la infraestructura.
-- Ninguna entrada tenía Ingress, a propósito. Correcto para una caché; para un CMS significa
-  desplegarlo y no poder abrirlo.
+**Context.** The 0029 catalog was born to bring up SUPPORTING pieces next to the customer's
+app: a cache, a search engine, a queue. The next turn of the product asks for something else —choosing
+SEVERAL complete products, like Nextcloud or a CMS, and having those that integrate with each other start already
+connected—, and there 0029 clashed with itself on two points:
 
-**Decisión 1 — entran AGPL, GPL y LGPL; siguen fuera las «source available».**
+- Its allowlist was permissive-only, and **practically all free product software is
+  GPL or AGPL**: Nextcloud, WordPress, Grafana, Metabase, Vaultwarden, Mastodon. With the list as
+  it was, the catalog could never get beyond infrastructure.
+- No entry had an Ingress, on purpose. Correct for a cache; for a CMS it means
+  deploying it and not being able to open it.
 
-La [0022](#0022) retira los motores AGPL de DENTRO de la suite, y esa decisión no se toca: allí el
-código propietario de Sytue se integra con ellos, y esa combinación es lo que el copyleft alcanza.
-Aquí el caso es otro: la imagen corre **tal cual, sin modificar**, en el namespace del cliente, sin
-que nada nuestro se enlace con ella. Eso es agregación, no obra derivada.
+**Decision 1 — AGPL, GPL and LGPL come in; “source available” stays out.**
 
-Y «sin modificar» no es una promesa de intenciones: es lo que ya comprobaba `validateAppMirror`
-—`mirrored_digest` tiene que ser **idéntico** a `upstream_digest`—. Una copia con un byte cambiado
-no cumple esa igualdad y no entra en el catálogo, así que la premisa de la que depende todo lo
-anterior la verifica una máquina en cada carga.
+[0022](#0022) removes the AGPL engines from INSIDE the suite, and that decision is not touched: there,
+Sytue's proprietary code integrates with them, and that combination is what copyleft reaches.
+Here the case is different: the image runs **as is, unmodified**, in the customer's namespace, without
+anything of ours being linked with it. That is aggregation, not a derivative work.
 
-La obligación que sí queda —AGPL §13 y GPL §6: quien usa el servicio puede obtener el fuente— se
-cumple con un campo nuevo, `source`, **obligatorio** cuando la licencia es copyleft y que la interfaz
-enseña al lado de la licencia. Es obligatorio en la validación porque la alternativa era confiar en
-que quien añade una entrada AGPL se acuerde.
+And “unmodified” is not a statement of intent: it is what `validateAppMirror` already checked
+—`mirrored_digest` has to be **identical** to `upstream_digest`—. A copy with one byte changed
+does not satisfy that equality and does not enter the catalog, so the premise on which everything
+above depends is verified by a machine on every load.
 
-Las «source available» (SSPL, BUSL, Elastic v2, Sustainable Use) siguen fuera y por el motivo
-contrario: no es que su copyleft nos alcance, es que **prohíben expresamente ofrecerlas como
-servicio gestionado**.
+The obligation that does remain —AGPL §13 and GPL §6: whoever uses the service can obtain the source— is
+met with a new field, `source`, **mandatory** when the license is copyleft and which the interface
+shows next to the license. It is mandatory in validation because the alternative was trusting
+that whoever adds an AGPL entry remembers.
 
-**Decisión 2 — publicar en internet lo decide el catálogo (`web_port`), nunca el cliente.**
+“Source available” licenses (SSPL, BUSL, Elastic v2, Sustainable Use) stay out, and for the opposite
+reason: it is not that their copyleft reaches us, it is that **they expressly forbid offering them as a
+managed service**.
 
-Una entrada declara por qué puerto se publica, o no lo declara y entonces solo se alcanza desde
-dentro del proyecto. Con `web_port`, el aprovisionador crea Ingress + TLS de cert-manager en
+**Decision 2 — publishing to the internet is decided by the catalog (`web_port`), never by the customer.**
+
+An entry declares which port it is published on, or does not declare it and then it is only reachable from
+inside the project. With `web_port`, the provisioner creates Ingress + cert-manager TLS at
 `<app>-<proyecto>.<dominio de apps>`.
 
-Un interruptor «publicar» en el panel habría sido más flexible y es lo que hace un Coolify. También
-habría puesto el panel de administración de RabbitMQ en internet —con la contraseña que la
-plataforma acaba de generar— el día que alguien marcara la casilla sin saber que el 15672 es un
-panel. Se revisa una vez por entrada, al escribirla, y ya no hay clic que equivocarse.
+A “publish” switch in the dashboard would have been more flexible and it is what Coolify does. It would also
+have put the RabbitMQ admin panel on the internet —with the password the
+platform has just generated— the day someone ticked the box without knowing that 15672 is a
+panel. It is reviewed once per entry, when it is written, and then there is no click to get wrong.
 
-Hizo falta además una NetworkPolicy propia (`allow-published-apps`): la que había abre desde Traefik
-**solo** los puertos 3000 y 8080, así que un Nextcloud escuchando en el 80 habría tenido Ingress,
-certificado emitido y timeout, sin nada en los logs que apuntara a la red.
+Our own NetworkPolicy (`allow-published-apps`) was also needed: the existing one opens from Traefik
+**only** ports 3000 and 8080, so a Nextcloud listening on 80 would have had an Ingress,
+an issued certificate and a timeout, with nothing in the logs pointing to the network.
 
-**Decisión 3 — las apps se integran entre sí, y funciona en cualquier orden.**
+**Decision 3 — apps integrate with each other, and it works in any order.**
 
-Una entrada declara `integrations`: con qué OTRA app del catálogo se conecta, **la URL de la
-documentación oficial que lo describe** y qué variables recibe. `docs` es obligatorio y es lo que
-separa una integración de una conjetura: sin ese ancla, «Sytue las conecta solas» acabaría siendo
-Sytue inventando la configuración de un proyecto ajeno, y el fallo aparecería al arrancar un
-contenedor en casa de un cliente.
+An entry declares `integrations`: which OTHER catalog app it connects to, **the URL of the
+official documentation that describes it** and which variables it receives. `docs` is mandatory and it is what
+separates an integration from a guess: without that anchor, “Sytue connects them on its own” would end up being
+Sytue inventing the configuration of someone else's project, and the failure would show up when starting a
+container at a customer's site.
 
-El aprovisionador resuelve la integración MIRANDO qué hay levantado en el proyecto (etiquetas
-`sytue.eu/app-id` + `sytue.eu/project-id`), no una relación guardada. El filtro por proyecto no es
-opcional: el namespace es del TENANT y dentro caben varios proyectos, así que sin él la app de uno
-se conectaría a la caché de otro y ninguna de las dos partes se enteraría.
+The provisioner resolves the integration by LOOKING at what is running in the project (labels
+`sytue.eu/app-id` + `sytue.eu/project-id`), not a stored relationship. The project filter is not
+optional: the namespace belongs to the TENANT and several projects fit inside it, so without it one project's app
+would connect to another's cache and neither party would notice.
 
-Y el orden no importa, que es la parte que costó: `reconcileServices` **solo** aprovisiona lo que
-está en `provisioning`, o sea que un servicio `ready` no se vuelve a mirar jamás. Sin nada más,
-crear la caché DESPUÉS del CMS no le habría llegado nunca al CMS —sin error, sin aviso, sin
-conexión—. Por eso dar de alta o borrar una app **reencola** las hermanas que se integran con ella
-(`ReprovisionServices`), y por eso solo se admite **una instancia de cada app por proyecto**: con
-dos, «la caché del proyecto» dejaría de ser una y la integración elegiría por orden de listado.
+And order does not matter, which is the part that was hard: `reconcileServices` **only** provisions what
+is in `provisioning`, that is, a `ready` service is never looked at again. With nothing more,
+creating the cache AFTER the CMS would never have reached the CMS —no error, no warning, no
+connection—. That is why adding or deleting an app **re-enqueues** the sibling apps that integrate with it
+(`ReprovisionServices`), and that is why only **one instance of each app per project** is allowed: with
+two, “the project's cache” would stop being one and the integration would choose by listing order.
 
-**Consecuencias.** El catálogo puede contener productos completos, y el cliente ve la licencia, el
-fuente y si tendrá URL antes de crear nada. A cambio: cada entrada nueva exige comprobar que su
-imagen arranca **no-root y bajo PodSecurity `restricted`**, y ahí se caen bastantes candidatas
-—la imagen oficial de Nextcloud arranca como root para ajustar permisos, así que entrará por otra
-imagen o no entrará—. Añadir una app sigue siendo un pull request con revisión, y ahora también con
-una comprobación de UID y de puerto.
+**Consequences.** The catalog can contain complete products, and the customer sees the license, the
+source and whether it will have a URL before creating anything. In exchange: each new entry requires checking that its
+image starts **non-root and under PodSecurity `restricted`**, and quite a few candidates fall there
+—the official Nextcloud image starts as root to adjust permissions, so it will come in through another
+image or not at all—. Adding an app is still a pull request with review, and now also with
+a UID and port check.
 
 ---
 
 <a id="0033"></a>
 
-## 0033 — Sytue PDF se dibuja en SVG, no se rasteriza
+<a id="0033--sytue-pdf-se-dibuja-en-svg-no-se-rasteriza"></a>
+
+## 0033 — Sytue PDF is drawn in SVG, not rasterized
 
 `accepted` · 2026-08-13 · pdf, docs, frontend
 
-**Contexto.** Sytue PDF necesita un lienzo: sin ver el documento no se puede anotar, ni
-rellenar, ni firmar donde toca. La forma evidente de conseguirlo es rasterizar cada página a
-imagen, que es lo que hacen casi todos los visores. Con nuestros invariantes eso significa
-escribir un motor de gráficos entero —curvas, tramas, antialiasing, composición y, sobre
-todo, interpretar cada formato de fuente incrustada para dibujar sus contornos— porque no se
-puede meter PDF.js (AGPL), ni wkhtmltopdf, ni un binario externo.
+**Context.** Sytue PDF needs a canvas: without seeing the document you cannot annotate,
+fill in, or sign in the right place. The obvious way to get it is to rasterize each page to an
+image, which is what almost every viewer does. With our invariants that means
+writing an entire graphics engine —curves, patterns, antialiasing, compositing and, above
+all, interpreting every embedded font format to draw its outlines— because
+PDF.js (AGPL), wkhtmltopdf or an external binary cannot be brought in.
 
-**Decisión.** Traducir el flujo de contenido del PDF a **SVG** en el servidor y dejar que
-rasterice el motor del navegador. La correspondencia es casi uno a uno: `m/l/c/re` son un
-`<path>`, `cm` es un `transform` —la matriz `[a b c d e f]` de PDF y `matrix(a b c d e f)`
-de SVG son literalmente la misma función—, `Do` sobre una imagen es un `<image>`, y `sh` es
-un `<linearGradient>`. El SVG se inserta en el DOM, no en un `<img>`.
+**Decision.** Translate the PDF content stream to **SVG** on the server and let the
+browser engine rasterize it. The correspondence is almost one to one: `m/l/c/re` are a
+`<path>`, `cm` is a `transform` —the PDF matrix `[a b c d e f]` and SVG's `matrix(a b c d e f)`
+are literally the same function—, `Do` on an image is an `<image>`, and `sh` is
+a `<linearGradient>`. The SVG is inserted into the DOM, not into an `<img>`.
 
-Sale gratis lo que una imagen no da:
+What an image does not give comes for free:
 
-- **el texto es TEXTO**: se selecciona, se copia y lo lee un lector de pantalla. Resaltar es
-  tomar los rectángulos de la selección del navegador, que es lo que hace un visor de
-  escritorio y que sobre un mapa de bits habría que reinventar peor;
-- **el zoom no pierde calidad** ni obliga a volver a pedir la página;
-- **una sola representación vectorial sirve de referencia** para las seis plataformas de
-  ADR-0024; el escritorio Fyne la renderiza de forma nativa y el móvil Capacitor la muestra
-  dentro de su cliente web;
-- la capa de anotaciones **comparte sistema de coordenadas** con el documento.
+- **text is TEXT**: it can be selected, copied, and read by a screen reader. Highlighting is
+  taking the rectangles of the browser's selection, which is what a desktop viewer
+  does and which on a bitmap would have to be reinvented, worse;
+- **zooming does not lose quality** nor require requesting the page again;
+- **a single vector representation serves as the reference** for the six platforms of
+  ADR-0024; the Fyne desktop renders it natively and the Capacitor mobile app shows it
+  inside its web client;
+- the annotation layer **shares the coordinate system** with the document.
 
-**Lo que hubo que resolver, y no era obvio.** Una fuente compuesta con codificación
-Identity-H trae la tabla `cmap` vacía —el PDF nunca la necesita, sus códigos son índices de
-glifo— así que el navegador no encuentra nada y pinta cuadritos. Se **reconstruye** esa tabla
-invirtiendo /ToUnicode, y con eso un documento de InDesign o de LaTeX se ve con SU tipografía
-y además se puede copiar. Cuando no hay forma —Type1 antiguo, CFF suelto— se sustituye por
-una familia genérica y `textLength` mantiene la línea cuadrada.
+**What had to be solved, and it was not obvious.** A composite font with
+Identity-H encoding comes with an empty `cmap` table —the PDF never needs it, its codes are glyph
+indices— so the browser finds nothing and draws little boxes. That table is **rebuilt**
+by inverting /ToUnicode, and with that an InDesign or LaTeX document is shown with ITS typeface
+and can also be copied. When there is no way —old Type1, standalone CFF— it is replaced with
+a generic family and `textLength` keeps the line square.
 
-**Descartado.** **Rasterizar en Go** (el motor de gráficos y el de fuentes, decenas de miles
-de líneas, y el resultado no es seleccionable); **PDF.js** (AGPL, incompatible con el
-clean-room permisivo de `security.md#4`); **un binario externo** (rompe el invariante de cero
-dependencias y añade una superficie de ataque en el camino de un fichero de fuera); **Canvas
-en el cliente** (haría falta el mismo intérprete pero en JavaScript, y perdería la selección
-de texto igual que una imagen).
+**Ruled out.** **Rasterizing in Go** (the graphics engine and the font engine, tens of thousands
+of lines, and the result is not selectable); **PDF.js** (AGPL, incompatible with the
+permissive clean-room of `security.md#4`); **an external binary** (breaks the zero-dependency
+invariant and adds an attack surface on the path of an outside file); **Canvas
+on the client** (it would need the same interpreter but in JavaScript, and would lose text selection
+just like an image).
 
-**Coste / seguimiento.** Lo que SVG no expresa degrada a algo visible y nunca a un hueco
-mudo: los patrones de mosaico se traducen a `<pattern>`, los sombreados de malla se aproximan
-por su color medio, y CCITT, JBIG2 y JPEG 2000 —que ningún navegador decodifica— dejan un
-recuadro gris en su sitio. El SVG de una página compleja pesa cientos de kilobytes, así que
-se sirve por lotes y con un tope de 24 MiB por página. Un decodificador CCITT propio es la
-deuda más clara: es el formato de casi todo lo escaneado, y hoy esas páginas no se ven.
+**Cost / follow-up.** What SVG cannot express degrades to something visible and never to a silent
+gap: tiling patterns are translated to `<pattern>`, mesh shadings are approximated
+by their average color, and CCITT, JBIG2 and JPEG 2000 —which no browser decodes— leave a
+gray box in their place. The SVG of a complex page weighs hundreds of kilobytes, so
+it is served in batches and with a cap of 24 MiB per page. Our own CCITT decoder is the
+clearest debt: it is the format of almost everything scanned, and today those pages do not show.
 
-**Una salida MÁS, la página rasterizada (2026-09-22).** Esta decisión NO se deshace: sin
-`formato`, o con `formato=svg`, `op: render` sigue entregando el SVG con `<text>`, y la web
-sigue usándolo para seleccionar, buscar y leer en voz alta. Lo que se añade es
-`formato=png` para el cliente que no tiene un motor de SVG con texto detrás. Es el
-escritorio Fyne: todo SVG pasa por `oksvg`, que no implementa `<text>` —medido a 120×120,
-un `<rect>` pinta 10.000 píxeles y un `<text>` pinta 0—, así que CertiPDF nativo enseñaba el
-papel y las rayas de una factura sin una sola cifra.
+**One MORE output, the rasterized page (2026-09-22).** This decision is NOT undone: without
+`formato`, or with `formato=svg`, `op: render` still delivers the SVG with `<text>`, and the web
+still uses it to select, search and read aloud. What is added is
+`formato=png` for the client that has no SVG engine with text behind it. That is the
+Fyne desktop: all SVG goes through `oksvg`, which does not implement `<text>` —measured at 120×120,
+a `<rect>` paints 10,000 pixels and a `<text>` paints 0—, so native CertiPDF showed the
+paper and the lines of an invoice without a single figure.
 
-- **No es el motor que aquí se descartó.** El intérprete, los colores, las tipografías, las
-  imágenes y el recorte ya existían: el MISMO recorrido del flujo pinta además en un mapa
-  de bits (`pdfraster.go`, menos de mil líneas) con `x/image/vector`, y los glifos salen de
-  `x/image/font/sfnt` sobre la misma tipografía que el SVG incrusta. `x/image` ya estaba
-  en `go.mod`: cero dependencias nuevas. En modo PNG no se construye el SVG.
-- **Lo que el PNG no hace y el SVG sí:** regla par-impar (`f*` sale como no-cero), modos de
-  fusión, mosaicos (no se pintan) y sombreados (su color medio). Type1 y CFF sueltos, que
-  `sfnt` no lee, se dibujan con las Go Fonts, cada glifo en su sitio y con el avance del PDF.
-- **Coste, medido en el frontal** (ARM64, no la máquina de producción, con carga 7-68 en
-  6 núcleos; CPU de proceso, mediana de 5, dos tandas que coinciden; A4 a ×2 ≈ 1,9 Mpx;
-  siete documentos reales; `pdfraster_medida_test.go`): dibujar 13-183 ms, codificar el
-  PNG 21-98 ms con `BestSpeed` (30-142 con la compresión por defecto, que era del 40 al
-  85 % de la CPU de la página, a cambio de hasta un 3 % menos de bytes: no compensa), y
-  el SVG de la misma página 1-92 ms. Se reservan 10-35 MiB por página (el SVG, 0,6-24),
-  de los que 7,4 son el propio mapa de bits RGBA. Pesa 45-710 KiB, del orden del SVG
-  (64-1.182 KiB).
-- **Caché y tamaño.** El servidor NO guarda nada: la promesa de `/pdf/*` es que el fichero
-  se procesa en memoria y se devuelve (`no-store`), y un PNG de un contrato sigue siendo el
-  contrato. La caché es del cliente, por (documento, página, escala). El cliente pide la
-  escala EXACTA de su pantalla (zoom × factor HiDPI) para no reescalar, y solo la ventana
-  que se mira: lotes de 8 como máximo, no los 20 del SVG. Tope de 16 Mpx por página
-  (64 MiB, un A4 a ×5,6), comprobado antes de reservar.
-- **Fidelidad**, contra poppler como vara de medir (no se usa en el servicio): en páginas
-  con tipografía TrueType o CID incrustada se apartan más de 64 niveles entre el 0,3 y el
-  5,8 % de los píxeles —el antialiasing de los bordes del texto—; con Type1 sustituida,
-  un 10 %, y se lee.
-- **Lo que salió al medir, en el intérprete COMPARTIDO:** `Q` restauraba el estado del `q`
-  ANTERIOR y no el suyo. Con una matriz puesta antes del `q` —Google Slides abre así todas
-  sus páginas— todo lo posterior al primer `Q` caía fuera de la hoja, **también en el SVG
-  de la web**. Arreglado. Y queda uno sin arreglar: el decodificador de JPEG 2000 devuelve
-  los colores cambiados (verde y magenta) en los escaneos de archive.org, en las dos
-  salidas por igual, y tarda de 1,2 s (x86) a 15 s (el frontal) y reserva 1,7 GiB por página.
+- **It is not the engine that was ruled out here.** The interpreter, the colors, the typefaces, the
+  images and the clipping already existed: the SAME traversal of the stream also paints into a
+  bitmap (`pdfraster.go`, under a thousand lines) with `x/image/vector`, and the glyphs come from
+  `x/image/font/sfnt` over the same typeface the SVG embeds. `x/image` was already
+  in `go.mod`: zero new dependencies. In PNG mode the SVG is not built.
+- **What the PNG does not do and the SVG does:** even-odd rule (`f*` comes out as non-zero), blend
+  modes, tilings (not painted) and shadings (their average color). Standalone Type1 and CFF, which
+  `sfnt` does not read, are drawn with the Go Fonts, each glyph in its place and with the PDF's advance.
+- **Cost, measured on the front node** (ARM64, not the production machine, with load 7-68 on
+  6 cores; process CPU, median of 5, two batches that agree; A4 at ×2 ≈ 1.9 Mpx;
+  seven real documents; `pdfraster_medida_test.go`): drawing 13-183 ms, encoding the
+  PNG 21-98 ms with `BestSpeed` (30-142 with the default compression, which was 40 to
+  85 % of the page's CPU, in exchange for up to 3 % fewer bytes: not worth it), and
+  the SVG of the same page 1-92 ms. 10-35 MiB are reserved per page (the SVG, 0.6-24),
+  of which 7.4 are the RGBA bitmap itself. It weighs 45-710 KiB, on the order of the SVG
+  (64-1,182 KiB).
+- **Cache and size.** The server stores NOTHING: the promise of `/pdf/*` is that the file
+  is processed in memory and returned (`no-store`), and a PNG of a contract is still the
+  contract. The cache is the client's, by (document, page, scale). The client requests the
+  EXACT scale of its screen (zoom × HiDPI factor) so as not to rescale, and only the window
+  being viewed: batches of 8 at most, not the 20 of the SVG. Cap of 16 Mpx per page
+  (64 MiB, an A4 at ×5.6), checked before allocating.
+- **Fidelity**, against poppler as the yardstick (it is not used in the service): on pages
+  with embedded TrueType or CID typefaces, between 0.3 and
+  5.8 % of the pixels differ by more than 64 levels —the antialiasing of text edges—; with substituted Type1,
+  10 %, and it is readable.
+- **What came out while measuring, in the SHARED interpreter:** `Q` restored the state of the
+  PREVIOUS `q` and not its own. With a matrix set before the `q` —Google Slides opens all
+  its pages that way— everything after the first `Q` fell off the sheet, **also in the web
+  SVG**. Fixed. And one remains unfixed: the JPEG 2000 decoder returns
+  the colors swapped (green and magenta) in archive.org scans, in both
+  outputs equally, and takes from 1.2 s (x86) to 15 s (the front node) and allocates 1.7 GiB per page.
 
 ---
 
 <a id="0034"></a>
 
-## 0034 — OCR: Tesseract autoalojado en un servicio propio; la capa de texto la escribe Sytue PDF
+<a id="0034--ocr-tesseract-autoalojado-en-un-servicio-propio-la-capa-de-texto-la-escribe-sytue-pdf"></a>
 
-`accepted` · 2026-08-13 · pdf, ocr, infra · **sustituye a la primera redacción del mismo día**
+## 0034 — OCR: self-hosted Tesseract in our own service; the text layer is written by Sytue PDF
 
-**Contexto.** El OCR es la última pieza de la ola P8 y la única de todo Sytue PDF sin camino
-evidente en la biblioteca estándar. Reconocer caracteres es un problema de visión por
-computador: no es «unas tablas más», es un modelo.
+`accepted` · 2026-08-13 · pdf, ocr, infra · **replaces the first draft from the same day**
 
-**La observación que ordena la decisión:** «OCR» son DOS cosas que se confunden porque
-llegan juntas.
+**Context.** OCR is the last piece of wave P8 and the only one in all of Sytue PDF with no obvious
+path in the standard library. Recognizing characters is a computer vision
+problem: it is not “a few more tables”, it is a model.
 
-1. **Reconocer**: de píxeles a caracteres con su posición. Es el modelo.
-2. **Escribir la capa**: meter ese texto en el PDF como texto INVISIBLE (modo de render 3)
-   exactamente encima de donde está dibujado, para que el documento se pueda buscar,
-   seleccionar y copiar sin que cambie ni un píxel de lo que se ve.
+**The observation that orders the decision:** “OCR” is TWO things that get confused because
+they arrive together.
 
-Solo la primera necesita un modelo. **La segunda es formato de PDF y ya se sabe hacer.**
+1. **Recognizing**: from pixels to characters with their position. That is the model.
+2. **Writing the layer**: putting that text into the PDF as INVISIBLE text (render mode 3)
+   exactly on top of where it is drawn, so that the document can be searched,
+   selected and copied without changing a single pixel of what is seen.
 
-**Decisión del fundador (2026-08-13), que reemplaza la primera redacción de este ADR:** el
-motor tiene que ser **software libre y autoalojable**. Nada de llamar a un proveedor de IA,
-ni soberano. Con eso, la decisión de negocio que este ADR dejaba abierta **desaparece**: no
-hay proveedor que elegir ni coste por página que negociar.
+Only the first one needs a model. **The second is PDF formatting and we already know how to do it.**
 
-**Decisión.**
+**Founder's decision (2026-08-13), which replaces the first draft of this ADR:** the
+engine has to be **free software and self-hostable**. No calling an AI provider,
+not even a sovereign one. With that, the business decision this ADR left open **disappears**: there
+is no provider to choose and no per-page cost to negotiate.
 
-- **El motor es [Tesseract 5](https://github.com/tesseract-ocr/tesseract), Apache-2.0**,
-  dentro de la imagen. Licencia permisiva —mejor de lo que el fundador pedía, que admitía
-  GPL—, más de cien idiomas y el estándar de facto desde hace veinte años.
-- **Vive en un servicio propio, `services/ocr`** (Go, puerto 8096, ClusterIP **sin
-  ingress**). Es el binario de Tesseract con una capa HTTP delante: entra una imagen, salen
-  palabras con su caja. No sabe nada de PDF.
-- **La capa de texto la escribe Sytue Docs**, con el motor de la casa y sin nada nuevo
-  (`CapaDeTextoPDF` en `pdfocr.go`). Docs también hace **la conversión de coordenadas**, que
-  es lo que traduce los píxeles del reconocedor al espacio del PDF (`ImagenColocada.RectDePDF`).
-- **La imagen que se reconoce sale del PROPIO PDF**, no de un rasterizado. En un documento
-  escaneado la página **es** una imagen incrustada, así que se extrae con su matriz de
-  colocación (`ImagenDeEscaneo`) y se manda tal cual. Sin pérdida de calidad, sin viaje al
-  cliente y sin rasterizador — que es lo que [ADR-0033](#0033) decidió no escribir.
-- **La credencial es el JWT del usuario**, que Docs reenvía. Ni secreto compartido entre
-  servicios ni confianza en la red: un reconocimiento queda atribuido a quien lo pidió.
-- **El endpoint que ESCRIBE la capa sigue aceptando texto reconocido venga de donde venga.**
-  No pide saber quién lo reconoció, así que un escaneo procesado fuera se puede incorporar.
+**Decision.**
 
-**Por qué un servicio y no una biblioteca.** Enlazar `libtesseract` con cgo metería C en un
-binario que hoy es estático sobre distroless, y los ~100 MB de datos de idioma viajarían en
-**cada réplica de Docs** para una función que usa una petición de cada mil. Aparte, el OCR es
-CPU pura a ráfagas: como servicio escala solo, sin arrastrar al editor.
+- **The engine is [Tesseract 5](https://github.com/tesseract-ocr/tesseract), Apache-2.0**,
+  inside the image. A permissive license —better than what the founder asked for, which allowed
+  GPL—, more than a hundred languages and the de facto standard for twenty years.
+- **It lives in its own service, `services/ocr`** (Go, port 8096, ClusterIP **without
+  ingress**). It is the Tesseract binary with an HTTP layer in front: an image goes in, words
+  with their box come out. It knows nothing about PDF.
+- **The text layer is written by Sytue Docs**, with the in-house engine and nothing new
+  (`CapaDeTextoPDF` in `pdfocr.go`). Docs also does **the coordinate conversion**, which
+  is what translates the recognizer's pixels to PDF space (`ImagenColocada.RectDePDF`).
+- **The image that is recognized comes from the PDF ITSELF**, not from a rasterization. In a scanned
+  document the page **is** an embedded image, so it is extracted with its placement
+  matrix (`ImagenDeEscaneo`) and sent as is. No loss of quality, no round trip to the
+  client and no rasterizer — which is what [ADR-0033](#0033) decided not to write.
+- **The credential is the user's JWT**, which Docs forwards. No secret shared between
+  services and no trust in the network: a recognition is attributed to whoever requested it.
+- **The endpoint that WRITES the layer still accepts recognized text wherever it comes from.**
+  It does not ask to know who recognized it, so a scan processed elsewhere can be incorporated.
 
-**El precio, dicho aquí para que no se descubra tarde.** Es la **única imagen de la suite que
-no es distroless**: Tesseract necesita un gestor de paquetes que distroless no tiene. Se
-compensa con base `debian:bookworm-slim` fijada por digest, `--no-install-recommends`, sin
-cachés de apt, proceso no-root con el mismo uid 65532 que el resto,
-`readOnlyRootFilesystem` y el temporal de cada página en un `emptyDir` **en memoria** —para
-que una nómina escaneada no llegue a tocar el disco del nodo—. La `NetworkPolicy` solo
-permite salir hacia Sytue ID (JWKS) y Cockpit: **si algún día apareciera tráfico saliente
-desde este pod, sería un incidente, no una configuración que falta.**
+**Why a service and not a library.** Linking `libtesseract` with cgo would put C into a
+binary that today is static on distroless, and the ~100 MB of language data would travel in
+**every Docs replica** for a feature used by one request in a thousand. Besides, OCR is
+pure CPU in bursts: as a service it scales on its own, without dragging the editor along.
 
-**Descartado.**
+**The price, stated here so it is not discovered late.** It is the **only image in the suite that
+is not distroless**: Tesseract needs a package manager that distroless does not have. This is
+compensated with a `debian:bookworm-slim` base pinned by digest, `--no-install-recommends`, no
+apt caches, a non-root process with the same uid 65532 as the rest,
+`readOnlyRootFilesystem` and each page's temporary file in an **in-memory** `emptyDir` —so
+that a scanned payslip never touches the node's disk—. The `NetworkPolicy` only
+allows egress to Sytue ID (JWKS) and Cockpit: **if outbound traffic ever appeared
+from this pod, it would be an incident, not a missing configuration.**
 
-- **Un proveedor de IA (incluso soberano)**, que era la decisión anterior: el fundador la
-  revocó. Añadía un coste por página, una dependencia externa y una decisión de negocio
-  pendiente, a cambio de nada que Tesseract no dé autoalojado.
-- **Rasterizar en el cliente y subir PNG**, que planteaba la primera redacción: funciona,
-  pero para un escaneo es peor —la imagen ya está dentro del PDF— y hace inviable el lote de
-  un expediente de trescientas páginas.
-- **Tesseract compilado a WASM en el navegador** (tesseract.js, Apache-2.0). Es tentador
-  porque no añade ningún sistema y el documento no sale del dispositivo. Se descarta por el
-  lote y por el móvil: descargar ~15 MB de modelo y reconocer trescientas páginas en una
-  pestaña no es un producto. Queda anotado como camino si algún día se quiere un modo
-  «sin servidor».
-- **Un motor propio.** Es un proyecto de investigación, no una ola.
-- **Enviar el PDF a un servicio de OCR de terceros**: es exactamente lo que Sytue existe para
-  evitar; ahí acaban las nóminas.
+**Ruled out.**
 
-**Consecuencias.** La herramienta se ofrece **solo si hay servicio detrás**: `/pdf/ocr`
-devuelve `disponible` y la interfaz esconde el botón cuando es falso, con la misma disciplina
-que el asistente de IA — pero al revés que aquel, aquí el chart **sí** existe y `ocr.enabled`
-viene en `true`, así que en un despliegue normal está encendido. Los idiomas instalados son
-los cinco de producto (`spa`, `eng`, `fra`, `deu`, `ita`) más `osd` para detectar
-orientación; pedir uno que no esté se **rechaza** en vez de caer al inglés, porque reconocer
-un documento en español con el modelo inglés no da un error: da un texto plausible y mal, que
-nadie revisa. Y un matiz que conviene recordar: un PDF escaneado que YA venga con capa de OCR
-se busca y se copia en Sytue PDF sin hacer nada, porque el render conserva el texto invisible
-en vez de descartarlo.
+- **An AI provider (even a sovereign one)**, which was the previous decision: the founder
+  revoked it. It added a per-page cost, an external dependency and a pending business
+  decision, in exchange for nothing that self-hosted Tesseract does not provide.
+- **Rasterizing on the client and uploading PNGs**, which the first draft proposed: it works,
+  but for a scan it is worse —the image is already inside the PDF— and it makes batch processing of
+  a three-hundred-page case file unworkable.
+- **Tesseract compiled to WASM in the browser** (tesseract.js, Apache-2.0). It is tempting
+  because it adds no system and the document does not leave the device. It is ruled out because of
+  batches and mobile: downloading ~15 MB of model and recognizing three hundred pages in a
+  tab is not a product. It is noted as a path if a “serverless” mode is ever
+  wanted.
+- **Our own engine.** That is a research project, not a wave.
+- **Sending the PDF to a third-party OCR service**: it is exactly what Sytue exists to
+  avoid; that is where payslips end up.
+
+**Consequences.** The tool is offered **only if there is a service behind it**: `/pdf/ocr`
+returns `disponible` and the interface hides the button when it is false, with the same discipline
+as the AI assistant — but unlike that one, here the chart **does** exist and `ocr.enabled`
+defaults to `true`, so in a normal deployment it is on. The installed languages are
+the five product ones (`spa`, `eng`, `fra`, `deu`, `ita`) plus `osd` to detect
+orientation; requesting one that is not present is **rejected** instead of falling back to English, because recognizing
+a Spanish document with the English model does not give an error: it gives plausible but wrong text that
+nobody reviews. And a nuance worth remembering: a scanned PDF that ALREADY comes with an OCR layer
+can be searched and copied in Sytue PDF without doing anything, because the render keeps the invisible text
+instead of discarding it.
 
 <a id="0035"></a>
 
-## 0035 — Sytue AI: dos modelos en Scaleway, tope blando por usuario y OCR por modelo de visión
+<a id="0035--sytue-ai-dos-modelos-en-scaleway-tope-blando-por-usuario-y-ocr-por-modelo-de-visión"></a>
 
-`accepted` · 2026-09-09 · ai, infra, pdf, fotos · **revisa el motor de OCR del [0034](#0034)**
+## 0035 — Sytue AI: two models on Scaleway, soft per-user cap and OCR via a vision model
 
-**Contexto.** `services/ai` llevaba meses escrito y sin desplegar: `POST /api/v1/assist`,
-defensa anti-inyección, límite de tasa y tests. Lo que faltaba no era código, era **elegir
-proveedor**, y eso bloqueaba también el panel del editor, que se oculta solo cuando el BFF no
-ve `SYTUE_AI_URL`.
+`accepted` · 2026-09-09 · ai, infra, pdf, fotos · **revises the OCR engine of [0034](#0034)**
 
-**Lo que se midió, que es lo que ordena todo lo demás.** Contra Scaleway Generative APIs
-(fr-par), el 2026-09-09, con tres repeticiones por tarea y sin tope de salida, sobre cuatro
-tareas reales de la suite (respuesta de Mail, fórmula de Calcus, extracción de factura de
-certiDocs, titular de Notepads) más la receta de revelado de Fotos:
+**Context.** `services/ai` had been written for months and not deployed: `POST /api/v1/assist`,
+anti-injection defense, rate limiting and tests. What was missing was not code, it was **choosing a
+provider**, and that also blocked the editor panel, which hides itself when the BFF does not
+see `SYTUE_AI_URL`.
 
-| modelo                | €/10.000   | latencia  | fórmula         | revelado                    |
-| --------------------- | ---------- | --------- | --------------- | --------------------------- |
-| mistral-small-3.2-24b | **0,59 €** | **0,6 s** | mal 3 de 3      | +1 paso (el doble)          |
-| pixtral-12b           | 1,15 €     | 0,5 s     | mal 3 de 3      | +2 pasos (revienta la foto) |
-| gpt-oss-120b          | 1,71 €     | 2,8 s     | bien 3 de 3     | +1/+0,5/+1                  |
-| gemma-4-26b           | 5,66 €     | 14,0 s    | **bien 3 de 3** | **+0,5/+0,1/+0,3**          |
+**What was measured, which is what orders everything else.** Against Scaleway Generative APIs
+(fr-par), on 2026-09-09, with three repetitions per task and no output cap, on four
+real suite tasks (Mail reply, Calcus formula, invoice extraction from
+certiDocs, Notepads headline) plus the Photos development recipe:
 
-**Decisión.**
+| model                 | €/10,000  | latency   | formula          | development                    |
+| --------------------- | --------- | --------- | ---------------- | ------------------------------ |
+| mistral-small-3.2-24b | **€0.59** | **0.6 s** | wrong 3 of 3     | +1 stop (double)               |
+| pixtral-12b           | €1.15     | 0.5 s     | wrong 3 of 3     | +2 stops (blows out the photo) |
+| gpt-oss-120b          | €1.71     | 2.8 s     | right 3 of 3     | +1/+0.5/+1                     |
+| gemma-4-26b           | €5.66     | 14.0 s    | **right 3 of 3** | **+0.5/+0.1/+0.3**             |
 
-- **Dos modelos, y el modo lo elige quien llama** (`"modo":"calidad"`), no el servicio
-  adivinando desde la acción: un panel en línea sabe que su usuario está mirando el cursor y
-  un trabajo de fondo sabe que no hay nadie esperando. `mistral-small-3.2-24b` atiende lo
-  interactivo; `gemma-4-26b` lo que puede esperar y tiene que salir bien.
-- **`reasoning_effort: high` en el modelo de calidad**, que es contraintuitivo y por eso queda
-  escrito: sale más barato (5,43 €/10.000), más rápido (8,1 s) y más certero (9 de 9) que el
-  defecto sin fijar. `low` y `medium` divagan. Y `none` es OCHO veces más barato con el mismo
-  acierto **en texto**, pero se deja la exposición al analizar una foto: por eso el esfuerzo
-  se puede pedir por petición y no es un ajuste global.
-- **Tope blando de 1,50 € por usuario y mes sobre el modelo caro.** Al agotarlo NO se corta:
-  la petición se sirve con el modelo rápido y la respuesta lo dice (`degradado: true`). El
-  contador vive en la caché compartida, con el mes dentro de la clave para que se reinicie
-  solo. Es blando en tres sentidos asumidos: se comprueba antes y se cobra después —la
-  petición que cruza el tope se sirve entera—, un vaciado de caché regala el mes, y sin caché
-  no hay tope. Se degrada ABIERTO a propósito: quedarse sin asistente por una pieza opcional
-  es peor que gastar de más, y el servicio lo avisa al arrancar.
-- **Whisper-large-v3 para audio** (0,003 €/minuto: una reunión de una hora, 18 céntimos) y
-  **qwen3-embedding-8b para vectores** (0,10 €/millón). Ninguno pasa por el presupuesto: no se
-  facturan por token de salida y su gasto no se dispara solo.
+**Decision.**
 
-**El motor de OCR: esto revisa el 0034, y conviene decirlo claro.** El 0034 decidió que el
-motor «tiene que ser software libre y autoalojable. Nada de llamar a un proveedor de IA, ni
-soberano». **El fundador lo revisa el 2026-09-09**: el OCR pasa a hacerse con el modelo de
-visión —Gemma 4 mientras haya presupuesto, Mistral Small después—, con una condición explícita
-de vuelta: **si la calidad no acompaña, se regresa a Tesseract**. El chart `ocr` y el servicio
-NO se retiran, precisamente para que esa vuelta sea cambiar quién llama y no reconstruir nada.
+- **Two models, and the mode is chosen by the caller** (`"modo":"calidad"`), not by the service
+  guessing from the action: an inline panel knows its user is watching the cursor and
+  a background job knows nobody is waiting. `mistral-small-3.2-24b` handles the
+  interactive; `gemma-4-26b` what can wait and has to come out right.
+- **`reasoning_effort: high` on the quality model**, which is counterintuitive and that is why it is
+  written down: it comes out cheaper (€5.43/10,000), faster (8.1 s) and more accurate (9 of 9) than the
+  unset default. `low` and `medium` ramble. And `none` is EIGHT times cheaper with the same
+  accuracy **on text**, but it misses the exposure when analyzing a photo: that is why the effort
+  can be requested per request and is not a global setting.
+- **Soft cap of €1.50 per user per month on the expensive model.** When it is exhausted it is NOT cut off:
+  the request is served with the fast model and the response says so (`degradado: true`). The
+  counter lives in the shared cache, with the month inside the key so that it resets
+  on its own. It is soft in three accepted ways: it is checked before and charged after —the
+  request that crosses the cap is served in full—, a cache flush gives away the month, and without a cache
+  there is no cap. It degrades OPEN on purpose: being left without an assistant because of an optional piece
+  is worse than overspending, and the service warns about it on startup.
+- **Whisper-large-v3 for audio** (€0.003/minute: a one-hour meeting, 18 cents) and
+  **qwen3-embedding-8b for vectors** (€0.10/million). Neither goes through the budget: they are not
+  billed per output token and their spending does not spike on its own.
 
-Lo medido el mismo día sobre una factura sintética limpia: los tres transcriben el texto
-íntegro y sin error —Gemma con `esfuerzo: none` en 0,8 s y 0,011 céntimos, Gemma con `high` en
-2,3 s y 0,025, Mistral en 0,7 s y 0,006—. Para OCR, `none` es lo correcto: el doble de barato
-y el triple de rápido con salida idéntica. **Lo que esa prueba NO cubre** es el caso que de
-verdad decide: un escaneo torcido, con sombra o a baja resolución. Ahí es donde Tesseract, que
-lleva veinte años en ese problema, puede seguir ganando. La condición de vuelta del párrafo
-anterior existe por eso.
+**The OCR engine: this revises 0034, and it is worth saying clearly.** 0034 decided that the
+engine “has to be free software and self-hostable. No calling an AI provider, not even a
+sovereign one”. **The founder revised it on 2026-09-09**: OCR is now done with the vision
+model —Gemma 4 while there is budget, Mistral Small afterwards—, with an explicit condition
+for going back: **if the quality is not there, we return to Tesseract**. The `ocr` chart and the service
+are NOT retired, precisely so that going back means changing who calls and not rebuilding anything.
 
-**Lo que Scaleway NO tiene, y hay que saberlo antes de prometer nada.** No hay ningún modelo
-de imagen: ni en Generative APIs (15 modelos) ni en Managed Inference (57). Las etiquetas de
-tarea son `chat, instruct, code, vision, reasoning, embeddings, audio_transcription`, y
-`/v1/images/generations`, `/v1/images/edits` y `/v1/videos/generations` responden 404. `vision`
-es imagen de ENTRADA. Por eso la IA de Sytue Photos **no edita píxeles: escribe la receta** que ya
-sabe aplicar `services/syphotos/internal/service/receta.go`, con las mismas fórmulas en Go y
-en el navegador. Editar de verdad —borrar un objeto, rellenar fondo— exigiría un modelo de
-difusión en una GPU propia, que se paga por hora encendida y no por uso: es otra decisión y no
-está tomada.
+What was measured the same day on a clean synthetic invoice: all three transcribe the text
+in full and without errors —Gemma with `esfuerzo: none` in 0.8 s and 0.011 cents, Gemma with `high` in
+2.3 s and 0.025, Mistral in 0.7 s and 0.006—. For OCR, `none` is right: half the price
+and three times faster with identical output. **What that test does NOT cover** is the case that
+truly decides: a skewed scan, with shadows or at low resolution. That is where Tesseract, which
+has spent twenty years on that problem, may keep winning. The return condition in the previous
+paragraph exists for that reason.
 
-**Consecuencias.**
+**What Scaleway does NOT have, and it must be known before promising anything.** There is no image
+model at all: neither in Generative APIs (15 models) nor in Managed Inference (57). The task
+labels are `chat, instruct, code, vision, reasoning, embeddings, audio_transcription`, and
+`/v1/images/generations`, `/v1/images/edits` and `/v1/videos/generations` respond 404. `vision`
+is INPUT image. That is why Sytue Photos' AI **does not edit pixels: it writes the recipe** that
+`services/syphotos/internal/service/receta.go` already knows how to apply, with the same formulas in Go and
+in the browser. Real editing —removing an object, filling in background— would require a
+diffusion model on our own GPU, paid per hour switched on and not per use: that is another decision and it has not
+been made.
 
-- Chart `ai` en el umbrella, con `global.ai.enabled` como ÚNICO interruptor: lo miran el chart
-  del servicio y el del frontend, y con uno por subchart se podrían contradecir.
-- La clave del proveedor va en un Secret con `optional: true`, y es **la secret key sola, no
-  el par**: Scaleway emite las API keys como access key + secret key, pero Generative APIs solo
-  acepta la secret key como Bearer —comprobado el 2026-09-09: con la access key devuelve 403, y
-  con las dos juntas también—. Es la convención que ya sigue el repo para las APIs REST de
-  Scaleway. Sin ella el servicio arranca
-  sano y responde 503 `ai_not_configured`, que es lo que el panel ya sabe leer para ocultarse.
-  Un secreto obligatorio dejaría el pod en `CreateContainerConfigError`, que no se parece en
-  nada a «falta configurar la IA».
-- El tope de salida del modelo de calidad es cuatro veces el del rápido y no es holgura: los
-  tokens de razonamiento salen por ahí. Con 1024, Gemma devuelve la respuesta **vacía**, que
-  llega como un 502 sin causa visible. Por eso `finish_reason: "length"` tiene su propio error
-  (`ai_truncated`) y se comprueba ANTES que el vacío.
+**Consequences.**
+
+- `ai` chart in the umbrella, with `global.ai.enabled` as the ONLY switch: both the service chart
+  and the frontend chart look at it, and with one per subchart they could contradict each other.
+- The provider key goes in a Secret with `optional: true`, and it is **the secret key alone, not
+  the pair**: Scaleway issues API keys as access key + secret key, but Generative APIs only
+  accepts the secret key as a Bearer —checked on 2026-09-09: with the access key it returns 403, and
+  with both together too—. It is the convention the repo already follows for Scaleway's REST
+  APIs. Without it the service starts
+  healthy and responds 503 `ai_not_configured`, which is what the panel already knows how to read to hide itself.
+  A mandatory secret would leave the pod in `CreateContainerConfigError`, which looks
+  nothing like “AI needs to be configured”.
+- The output cap of the quality model is four times that of the fast one and it is not slack: the
+  reasoning tokens come out that way. With 1024, Gemma returns an **empty** response, which
+  arrives as a 502 with no visible cause. That is why `finish_reason: "length"` has its own error
+  (`ai_truncated`) and is checked BEFORE the empty case.
 
 <a id="0036"></a>
 
-## 0036 — Cloudflare fuera: el portal entra por Pangolin y el DNS lo sirve Scaleway
+<a id="0036--cloudflare-fuera-el-portal-entra-por-pangolin-y-el-dns-lo-sirve-scaleway"></a>
 
-`accepted` · 2026-09-10 · infra, dns, correo, certificados
+## 0036 — Cloudflare out: the portal comes in through Pangolin and DNS is served by Scaleway
 
-**Contexto.** El portal de `sytue.eu` entraba por **Cloudflare Tunnel** y su zona DNS vivía en
-Cloudflare. De ahí colgaban cinco cosas que no se parecen entre sí y que había que mover a la
-vez o no moverlas: la entrada del tráfico web, el reto DNS-01 de los certificados, el DDNS que
-persigue la IP doméstica, el guardián que repone los MX y el comodín que emite el frontal.
+`accepted` · 2026-09-10 · infra, dns, mail, certificates
 
-**La decisión.** Ninguna pieza de la instalación habla ya con Cloudflare. Queda esto:
+**Context.** The `sytue.eu` portal came in through **Cloudflare Tunnel** and its DNS zone lived in
+Cloudflare. Five things hung from there that do not resemble each other and that had to be moved at
+the same time or not at all: web traffic ingress, the DNS-01 challenge for certificates, the DDNS that
+chases the home IP, the guardian that restores the MX records and the wildcard issued by the front node.
 
-| Lo que hacía Cloudflare           | Quién lo hace ahora                                                                         |
-| --------------------------------- | ------------------------------------------------------------------------------------------- |
-| Túnel de entrada al portal        | **Pangolin** (Traefik + WireGuard) en la máquina de medios, con el agente `newt` en el nodo |
-| Zona DNS autoritativa             | **Scaleway DNS** (`ns0`/`ns1.dom.scw.cloud`)                                                |
-| DDNS del registro `mx`            | `bin/ddns.sh`, contra la API de Scaleway                                                    |
-| MX, SPF, DMARC y TLS-RPT          | `bin/mx-dns.sh`, contra la API de Scaleway                                                  |
-| Reto DNS-01 de cert-manager       | webhook `acme.scaleway.com` + `ClusterIssuer` con `ACME_SOLVER=dns01-scaleway`              |
-| Comodín `*.<dominio>` del frontal | Traefik del frontal con `provider: scaleway`                                                |
+**The decision.** No piece of the installation talks to Cloudflare anymore. This is what remains:
 
-**Lo que se aprendió moviéndolo, que es lo que no se ve en un diagrama.**
+| What Cloudflare did               | Who does it now                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| Ingress tunnel to the portal      | **Pangolin** (Traefik + WireGuard) on the media machine, with the `newt` agent on the node |
+| Authoritative DNS zone            | **Scaleway DNS** (`ns0`/`ns1.dom.scw.cloud`)                                               |
+| DDNS for the `mx` record          | `bin/ddns.sh`, against the Scaleway API                                                    |
+| MX, SPF, DMARC and TLS-RPT        | `bin/mx-dns.sh`, against the Scaleway API                                                  |
+| cert-manager DNS-01 challenge     | `acme.scaleway.com` webhook + `ClusterIssuer` with `ACME_SOLVER=dns01-scaleway`            |
+| Front node `*.<dominio>` wildcard | Front node Traefik with `provider: scaleway`                                               |
 
-**El proveedor de DNS se averigua, no se configura.** Una variable dice lo que alguien creyó el
-día que la escribió. El día de la migración, el DDNS siguió actualizando la zona vieja cada
-cinco minutos **sin un solo error** mientras la buena se quedaba con la IP anterior. Ahora
-`ns_autoritativos()` pregunta con `dig +trace`, que baja desde la raíz: ni caché, ni validación,
-ni la opinión de un resolutor que resulta ser autoritativo de la zona que se acaba de abandonar
-—`1.1.1.1` seguía contestando los NS antiguos horas después de cambiar la delegación—.
+**What was learned by moving it, which is what you do not see in a diagram.**
 
-**La API de DNS de Scaleway tiene tres trampas, y las tres contestan `200`:**
+**The DNS provider is discovered, not configured.** A variable says what someone believed the
+day they wrote it. On migration day, the DDNS kept updating the old zone every
+five minutes **without a single error** while the right one stayed with the previous IP. Now
+`ns_autoritativos()` asks with `dig +trace`, which descends from the root: no cache, no validation,
+and not the opinion of a resolver that turns out to be authoritative for the zone just abandoned
+—`1.1.1.1` kept answering the old NS records hours after the delegation changed—.
 
-1. el `name` es el **label relativo** y el apex es la cadena vacía; con el nombre completo, las
-   consultas devuelven cero registros como si no existieran, y las escrituras aterrizan en el
-   apex de la zona;
-2. un destino **sin punto final es relativo**: un MX hacia `mx.sytue.eu` se guarda como
-   `mx.sytue.eu.sytue.eu.`, que no resuelve;
-3. la **prioridad del MX viaja dentro de `data`** (`10 mx.sytue.eu.`) además de en su campo, así
-   que comparar contra el destino a secas hace creer que hay un MX ajeno.
+**The Scaleway DNS API has three traps, and all three answer `200`:**
 
-Ninguna de las tres da error. Por eso los dos guiones que escriben DNS **comprueban lo que
-devuelve la API**, y `mx-dns.sh` tiene `--dry`: un guion que toca el DNS del correo tiene que
-poder ensayarse.
+1. the `name` is the **relative label** and the apex is the empty string; with the full name,
+   queries return zero records as if they did not exist, and writes land on the
+   zone apex;
+2. a target **without a trailing dot is relative**: an MX pointing to `mx.sytue.eu` is stored as
+   `mx.sytue.eu.sytue.eu.`, which does not resolve;
+3. the **MX priority travels inside `data`** (`10 mx.sytue.eu.`) as well as in its own field, so
+   comparing against the bare target makes it look as if there is a foreign MX.
 
-**Un rojo que no significa nada enseña a no mirar los rojos.** Mientras un guion no sabía
-escribir en el proveedor nuevo, dejaba su timer en rojo cada quince minutos. Se prefirió que
-saliera con 0 avisando, y que quien vigile de verdad sea `bin/verify.sh` contra el DNS público
-—que es lo que ve quien entrega el correo—.
+None of the three gives an error. That is why the two scripts that write DNS **check what
+the API returns**, and `mx-dns.sh` has `--dry`: a script that touches the mail DNS has to
+be able to be rehearsed.
 
-**Dos detalles del frontal que se afinaron al terminar (2026-09-10).** El reto del
-comodín pregunta el TXT a **los autoritativos de la zona** —`ns0`/`ns1.dom.scw.cloud`—
-y no a un resolver público: lego solo los usa para ver si su propio reto ya está
-publicado, así que preguntarlo en el origen evita esperar a cachés ajenas y no
-depende de terceros. Y el contenedor recibe **`SCALEWAY_PROJECT_ID`** además de la
-secret key: para lego es opcional —solo exige la clave—, pero la zona se busca
-dentro de un proyecto, y sin él va al de por defecto de la credencial; el día que
-esa clave sirva a dos proyectos, el TXT del reto se publicaría en el equivocado.
+**A red that means nothing teaches you not to look at reds.** While a script did not know how to
+write to the new provider, it left its timer red every fifteen minutes. We preferred that it
+exit with 0 while warning, and that the one who really keeps watch be `bin/verify.sh` against public DNS
+—which is what whoever delivers the mail sees—.
 
-**Lo que NO cambió, y no por olvido.** El asistente de dominio propio del portal
-(`apps/frontend/apps/portal`) sigue ofreciendo Cloudflare: ahí el token es **del cliente**, para
-su zona, y no tiene nada que ver con la nuestra.
+**Two details of the front node that were fine-tuned at the end (2026-09-10).** The
+wildcard challenge asks for the TXT from **the zone's authoritative servers** —`ns0`/`ns1.dom.scw.cloud`—
+and not from a public resolver: lego only uses them to see whether its own challenge is already
+published, so asking at the source avoids waiting for other people's caches and does not
+depend on third parties. And the container receives **`SCALEWAY_PROJECT_ID`** in addition to the
+secret key: for lego it is optional —it only requires the key—, but the zone is looked up
+within a project, and without it it goes to the credential's default one; the day that
+key serves two projects, the challenge TXT would be published in the wrong one.
 
-**Cuándo reconsiderarlo.** Si el frontal deja de ser Pangolin o la zona vuelve a moverse, lo que
-hay que revisar es la tabla de arriba entera: son seis piezas que dependen de las dos primeras
-filas, y moverlas de una en una es como se llega a escribir en una zona que ya no manda.
+**What did NOT change, and not by oversight.** The portal's custom domain wizard
+(`apps/frontend/apps/portal`) still offers Cloudflare: there the token is **the customer's**, for
+their zone, and it has nothing to do with ours.
+
+**When to reconsider it.** If the front node stops being Pangolin or the zone moves again, what
+has to be reviewed is the whole table above: there are six pieces that depend on the first two
+rows, and moving them one at a time is how you end up writing to a zone that is no longer in charge.
 
 <a id="0037"></a>
 
-## 0037 — La plomería compartida se comparte de verdad: catálogo, guardianes y reglas de eficiencia
+<a id="0037--la-plomería-compartida-se-comparte-de-verdad-catálogo-guardianes-y-reglas-de-eficiencia"></a>
 
-`accepted` · 2026-09-12 · código, mantenimiento, rendimiento
+## 0037 — Shared plumbing is truly shared: catalog, guardians and efficiency rules
 
-**Contexto.** Cada producto de esta suite se ha creado copiando el anterior. Es la forma más
-rápida de arrancar y la más cara de mantener, porque lo copiado **diverge solo** y lo hace por
-donde nadie mira. No es una preocupación teórica; todo lo de abajo está medido en este repo:
+`accepted` · 2026-09-12 · code, maintenance, performance
 
-| Lo copiado                                                                                  | Cómo había divergido                                                                                      |
-| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| El endpoint de auditoría de compliance, en Mail y Drive                                     | ~490 líneas idénticas salvo 36, y una validación contestaba **en español en uno y en inglés en el otro**  |
-| El `middleware.ts` de doce superficies, con un «copia este fichero tal cual» en su cabecera | Al medirlo, solo **cinco de doce** seguían siendo iguales byte a byte                                     |
-| El getter de access token, en tres apps                                                     | **Márgenes de caducidad distintos** (60 s contra 30 s): así es como una app manda tokens ya caducados     |
-| Los siete endpoints de `/auth/*`, en doce apps                                              | 82 ficheros y 927 líneas; el GET del logout escrito de dos formas y el JSON de `/auth/token` de otras dos |
+**Context.** Every product in this suite was created by copying the previous one. It is the fastest
+way to get started and the most expensive to maintain, because what is copied **diverges on its own** and does so
+where nobody is looking. This is not a theoretical concern; everything below is measured in this repo:
 
-**La decisión.** La plomería vive una vez, con su catálogo escrito y con tests que fallan cuando
-alguien vuelve a copiarla.
+| What was copied                                                                     | How it had diverged                                                                                           |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| The compliance audit endpoint, in Mail and Drive                                    | ~490 identical lines except 36, and one validation answered **in Spanish in one and in English in the other** |
+| The `middleware.ts` of twelve surfaces, with a “copy this file as is” in its header | When measured, only **five of twelve** were still byte-for-byte identical                                     |
+| The access token getter, in three apps                                              | **Different expiry margins** (60 s versus 30 s): that is how an app sends already-expired tokens              |
+| The seven `/auth/*` endpoints, in twelve apps                                       | 82 files and 927 lines; the logout GET written in two ways and the `/auth/token` JSON in another two          |
 
-1. **Catálogo normativo** en [`CONVENTIONS.md` §13.2](CONVENTIONS.md#13-2-lo-que-ya-existe): los
-   22 paquetes de `platform/pkg/` y los 10 de `apps/frontend/packages/`, cada uno con para qué
-   sirve. Antes de escribir plomería se busca ahí; si existe y no encaja, se **amplía**, no se
-   copia.
-2. **Guardianes que comparan por igualdad**, no por pertenencia
-   (`plomeria-compartida.test.ts`, `rutas-auth-reexportan.test.ts`). Así fallan también cuando una
-   excepción se deduplica y nadie borra su entrada: una lista blanca que nadie poda deja de
-   proteger en dos refactores. `rutas-auth-reexportan` ya se puso en rojo por eso mismo, al
-   unificar el `/auth/token` de Docs, Drive y Portal.
-3. **Reglas de eficiencia** en [§13.3](CONVENTIONS.md#13-3-eficiencia), cada una salida de un
-   fallo concreto, no de un principio general.
+**The decision.** The plumbing lives once, with its written catalog and with tests that fail when
+someone copies it again.
 
-**Lo que NO se unifica, que es la mitad de la decisión.** Duplicación no es lo mismo que
-variación deliberada, y confundirlas produce abstracciones peores que el copia-pega. Se midieron
-tres candidatos y **los tres se dejaron separados a propósito**:
+1. **Normative catalog** in [`CONVENTIONS.md` §13.2](CONVENTIONS.md#13-2-lo-que-ya-existe): the
+   22 packages in `platform/pkg/` and the 10 in `apps/frontend/packages/`, each with what it is
+   for. Before writing plumbing you look there; if it exists and does not fit, it is **extended**, not
+   copied.
+2. **Guardians that compare by equality**, not by membership
+   (`plomeria-compartida.test.ts`, `rutas-auth-reexportan.test.ts`). That way they also fail when an
+   exception is deduplicated and nobody deletes its entry: an allowlist nobody prunes stops
+   protecting within two refactors. `rutas-auth-reexportan` already went red for exactly that reason, when
+   unifying the `/auth/token` of Docs, Drive and Portal.
+3. **Efficiency rules** in [§13.3](CONVENTIONS.md#13-3-eficiencia), each one born from a
+   concrete failure, not from a general principle.
 
-- `ValidName` existe en cuatro servicios con tres implementaciones, y las tres son correctas: 128
-  bytes en Calendar/Contacts, 255 en Drive porque son nombres de fichero, y 100 runas en Rooms,
-  que valida **nombres de canal** y por eso no rechaza `/` ni `..`. Unificarlas pediría un
-  parámetro de longitud y un flag de «seguro para rutas».
-- `googleReason`/`graphCode` difieren entre Calendar, Contacts y Drive porque cada uno mapea los
-  estados HTTP que **de verdad emite**: Drive los de subida (413/415/507), los otros el 412 de
-  peticiones condicionales. Se comprobó servicio por servicio que cada omisión encaja.
-- El listado de auditoría de **Sytue ID** no entra en el paquete común: empuja filtros y keyset a
-  una consulta del store en vez de filtrar en memoria, que es otra arquitectura.
+**What is NOT unified, which is half the decision.** Duplication is not the same as
+deliberate variation, and confusing them produces worse abstractions than copy-paste. Three
+candidates were measured and **all three were deliberately left separate**:
 
-El criterio: si la diferencia es de **dominio** (qué significa un nombre aquí), quédense
-separadas; si es de **accidente** (un comentario reflowado, un mensaje traducido, un número que
-alguien tocó en un sitio), es duplicación.
+- `ValidName` exists in four services with three implementations, and all three are correct: 128
+  bytes in Calendar/Contacts, 255 in Drive because they are file names, and 100 runes in Rooms,
+  which validates **channel names** and therefore does not reject `/` or `..`. Unifying them would require a
+  length parameter and a “safe for paths” flag.
+- `googleReason`/`graphCode` differ between Calendar, Contacts and Drive because each maps the
+  HTTP statuses it **actually emits**: Drive those of uploads (413/415/507), the others the 412 of
+  conditional requests. It was checked service by service that each omission fits.
+- The **Sytue ID** audit listing does not go into the common package: it pushes filters and keyset into
+  a store query instead of filtering in memory, which is a different architecture.
 
-**Lo que se aprendió, y es lo que no se ve en el diff.**
+The criterion: if the difference is one of **domain** (what a name means here), keep them
+separate; if it is one of **accident** (a reflowed comment, a translated message, a number that
+someone touched in one place), it is duplication.
 
-**Definir algo no lo aplica.** El middleware de compresión `sytue-compress` llevaba **siete días
-desplegado** en el clúster, bien escrito, con `zstd`/`br`/`gzip` y `text/event-stream` excluido
-para no bufferizar los SSE — y **no lo referenciaba ni uno de los 49 ingresses**. La plataforma
-servía 345 kB en claro. Un manifiesto puede enseñar un objeto perfectamente formado que es
-decorado. Ahora un gate del render exige que todo Middleware con `compress` aparezca en el
-argumento del entrypoint de Traefik.
+**What was learned, and it is what does not show in the diff.**
 
-**Optimizar lo que no se ejecuta es trabajo perdido con aspecto de progreso.** Un `setInterval`
-de refresco de sesión venía anotado como pendiente de arreglar —le faltaba la pausa por
-visibilidad—. Al ir a ponérsela: **no lo llamaba nadie**, y el refresco real lo hace el servidor
-bajo demanda, que es estrictamente mejor. Se borró en vez de arreglarse.
+**Defining something does not apply it.** The `sytue-compress` compression middleware had been **deployed
+for seven days** in the cluster, well written, with `zstd`/`br`/`gzip` and `text/event-stream` excluded
+so as not to buffer SSE — and **not one of the 49 ingresses referenced it**. The platform
+was serving 345 kB uncompressed. A manifest can show a perfectly formed object that is
+scenery. Now a render gate requires every Middleware with `compress` to appear in the
+argument of the Traefik entrypoint.
 
-**El cuello no está donde se supone.** Se buscaban 700 ms de hilo principal en el portal. Medido:
-1146 tareas y **ninguna pasaba de 50 ms**, con TBT 0 y cero CSS o JS sin usar. Lo que había era
-que nada iba comprimido. Y las siete llamadas a API «de la cadena crítica» resultaron **no estar
-en el camino del LCP**: su desglose son TTFB y render delay, sin fase de carga de recurso.
+**Optimizing what does not run is wasted work that looks like progress.** A session refresh `setInterval`
+was annotated as pending a fix —it lacked the visibility
+pause—. When going to add it: **nobody called it**, and the real refresh is done by the server
+on demand, which is strictly better. It was deleted instead of fixed.
 
-**Consecuencias medidas.**
+**The bottleneck is not where it is assumed to be.** We were looking for 700 ms of main thread in the portal. Measured:
+1146 tasks and **none exceeded 50 ms**, with TBT 0 and zero unused CSS or JS. What was really there was
+that nothing was compressed. And the seven API calls “on the critical chain” turned out **not to be
+on the LCP path**: their breakdown is TTFB and render delay, with no resource load phase.
 
-|                                             |                                                                                   |
-| ------------------------------------------- | --------------------------------------------------------------------------------- |
-| Auditoría: dos ficheros de 247 y 245 líneas | 57 y 56, con la lógica en `platform/pkg/auditlog` y **con pruebas, que no tenía** |
-| `/auth/token` y su getter                   | Una implementación para las doce superficies (antes tres a mano)                  |
-| Resolver una ruta de WebDAV                 | De **seis transacciones a dos**, y ya no crece con la profundidad                 |
-| Añadir 200 fotos a un álbum                 | De 200 sentencias con 200 `max(position)` a **una**                               |
-| Portal, bytes transferidos                  | 345.712 → **104.978 B**; LCP 1.792 → 1.172 ms; Performance 100                    |
+**Measured consequences.**
 
-**Cuándo reconsiderarlo.** El catálogo de §13.2 se desfasa solo: lo generan las carpetas, no un
-acuerdo. Si al mirar el repo no coincide, manda el repo. Y las 136 consultas de store sin `LIMIT`
-que quedan anotadas **no se priorizaron a propósito**: las bases del piloto pesan entre 8 y 18 MB
-y elegir cuál arreglar sería adivinar. Se revisan cuando haya volumen real, midiendo
-`pg_stat_user_tables`, no antes.
+|                                       |                                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Audit: two files of 247 and 245 lines | 57 and 56, with the logic in `platform/pkg/auditlog` and **with tests, which it did not have** |
+| `/auth/token` and its getter          | One implementation for all twelve surfaces (previously three by hand)                          |
+| Resolving a WebDAV path               | From **six transactions to two**, and it no longer grows with depth                            |
+| Adding 200 photos to an album         | From 200 statements with 200 `max(position)` to **one**                                        |
+| Portal, bytes transferred             | 345,712 → **104,978 B**; LCP 1,792 → 1,172 ms; Performance 100                                 |
+
+**When to reconsider it.** The §13.2 catalog goes stale on its own: it is generated by the folders, not by an
+agreement. If it does not match when looking at the repo, the repo rules. And the 136 store queries without `LIMIT`
+that remain noted **were deliberately not prioritized**: the pilot databases weigh between 8 and 18 MB
+and choosing which one to fix would be guessing. They will be reviewed when there is real volume, by measuring
+`pg_stat_user_tables`, not before.
 
 <a id="0038"></a>
 
-## 0038 — Cuentas personales: registro gratuito con 5 GB y plan de 1 TB por 5 EUR al mes
+<a id="0038--cuentas-personales-registro-gratuito-con-5-gb-y-plan-de-1-tb-por-5-eur-al-mes"></a>
 
-`accepted` · 2026-09-13 · producto, identidad, cuotas, facturación
+## 0038 — Personal accounts: free sign-up with 5 GB and a 1 TB plan for 5 EUR a month
 
-**Contexto.** Hasta aquí nadie podía entrar en Sytue One por su cuenta: las cuentas nacían por
-invitación de una organización o por un IdP externo, y la web pública decía «Empezar gratis —
-sin tarjeta» en un botón que llevaba a una pantalla de login. Se quiere que una persona sola pueda
-registrarse, tener 5 GB gratis para todos los productos y, si necesita más, pagar 5 EUR al mes por
-1 TB. Sin organización propia —su organización es su correo—, y por tanto sin Sytue Admin ni SyERP.
+`accepted` · 2026-09-13 · product, identity, quotas, billing
 
-**La decisión.** Una cuenta personal ES una organización de una persona, en el modelo de datos de
-siempre —el alta guiada ya lo había decidido así (mig 0027)—, distinguida por dos columnas nuevas
+**Context.** Until now nobody could get into Sytue One on their own: accounts were born by
+invitation from an organization or through an external IdP, and the public website said «Empezar gratis —
+sin tarjeta» (“Start for free — no card”) on a button that led to a login screen. We want a single person to be able to
+sign up, get 5 GB free for all products and, if they need more, pay 5 EUR a month for
+1 TB. Without their own organization —their organization is their email—, and therefore without Sytue Admin or SyERP.
+
+**The decision.** A personal account IS a one-person organization, in the usual data
+model —guided onboarding had already decided it that way (mig 0027)—, distinguished by two new columns
 (mig 0063):
 
-| Columna                                                      | Qué decide                                                                                                                                     |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `organizations.kind` = `personal`                            | Que no hay Sytue Admin ni SyERP. **No puede apoyarse en el rol**: la persona es `owner` de su propia organización, y por rol entraría en todo. |
-| `org_subscriptions.plan` = `personal_free` \| `personal_1tb` | La cuota. 5 GiB de Drive y 1 GiB de buzón gratis; 1 TiB y 25 GiB pagando.                                                                      |
+| Column                                                       | What it decides                                                                                                                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `organizations.kind` = `personal`                            | That there is no Sytue Admin or SyERP. **It cannot rely on the role**: the person is `owner` of their own organization, and by role they would get into everything. |
+| `org_subscriptions.plan` = `personal_free` \| `personal_1tb` | The quota. 5 GiB of Drive and 1 GiB of mailbox free; 1 TiB and 25 GiB when paying.                                                                                  |
 
-Y de ahí salen cinco piezas, cada una en el sitio que ya existía para lo suyo:
+And five pieces come out of that, each in the place that already existed for its purpose:
 
-1. **`/signup` en Sytue ID.** Crea la persona y su organización personal en una transacción, con el
-   contrato gratuito y el alta guiada ya hecha. El slug se deriva del correo
-   (`domain.PersonalSlug`: `p-` + resumen), porque un correo no es un slug válido y el slug es
-   subdominio y namespace. El prefijo `p-` queda reservado: una organización no puede tomarlo.
-2. **La única defensa es la verificación del correo.** No se puede iniciar sesión hasta demostrar
-   control del buzón. Sin eso cualquiera abriría cuentas —con su espacio— a nombre de direcciones
-   ajenas. Y el alta no revela si una dirección ya existe: la respuesta es la misma.
-3. **El plan viaja en el token** (`org_kind`, `plan`, `storage_bytes`, `mailbox_bytes`) y cada
-   servicio lo aplica sin preguntar: Drive fija su cuota, Mail la del buzón, SyERP y Sytue Admin
-   rechazan a las personales (`authn.RequireOrgKind`). Un token sin los claims se lee como
-   organización: es anterior a la distinción, y lo que había antes eran organizaciones.
-4. **Una cuenta personal nunca se queda fuera.** La gratuita no paga, y la de 1 TB que deja de pagar
-   **vuelve a ser gratuita**: lo que cambia es la cuota, no la puerta. Cerrarle la sesión a alguien
-   por un recibo devuelto sería cerrarle su propio correo.
-5. **El cobro reutiliza Mollie tal cual.** Un checkout personal fija plan e importe en el servidor
-   —los asientos que mande el navegador se ignoran— y el webhook exige que lo cobrado sea
-   exactamente el precio del plan contratado; un plan gratuito no cobra nunca.
+1. **`/signup` in Sytue ID.** It creates the person and their personal organization in one transaction, with the
+   free contract and the guided onboarding already done. The slug is derived from the email
+   (`domain.PersonalSlug`: `p-` + digest), because an email is not a valid slug and the slug is a
+   subdomain and a namespace. The `p-` prefix is reserved: an organization cannot take it.
+2. **The only defense is email verification.** You cannot sign in until you prove
+   control of the mailbox. Without that anyone could open accounts —with their storage— in the name of other people's
+   addresses. And sign-up does not reveal whether an address already exists: the response is the same.
+3. **The plan travels in the token** (`org_kind`, `plan`, `storage_bytes`, `mailbox_bytes`) and each
+   service applies it without asking: Drive sets its quota, Mail the mailbox one, SyERP and Sytue Admin
+   reject personal ones (`authn.RequireOrgKind`). A token without the claims is read as an
+   organization: it predates the distinction, and what existed before were organizations.
+4. **A personal account is never locked out.** The free one does not pay, and the 1 TB one that stops paying
+   **becomes free again**: what changes is the quota, not the door. Closing someone's session
+   over a bounced payment would be closing their own email.
+5. **Billing reuses Mollie as is.** A personal checkout sets plan and amount on the server
+   —the seats the browser sends are ignored— and the webhook requires that what is charged be
+   exactly the price of the contracted plan; a free plan never charges.
 
-**Lo que se decidió NO hacer, y por qué.**
+**What was decided NOT to do, and why.**
 
-- **Un solo contador para «todas las apps».** Se pidió 5 GB _totales_. Hoy son **dos contadores**:
-  Drive —donde viven ficheros, fotos (sus originales) y documentos, así que una cifra los cubre— y
-  el buzón de Mail, que lleva el suyo. Un contador único pediría un libro mayor entre servicios
-  que no existe, y la alternativa —que Mail reserve contra Drive en cada mensaje— acopla dos
-  servicios por algo que se resuelve declarando el reparto en un sitio (`platform/pkg/commerce`).
-  Si algún día hace falta el contador único, el bus de eventos ya está.
-- **Aprovisionar almacenamiento «en Scaleway» al comprar.** No es cómo funciona el sistema: el
-  object storage es un endpoint por despliegue con un prefijo por tenant, no un bucket por persona.
-  Lo que sí existe es la capacidad del despliegue: **los blobs de los tenants `p-*` van desde el
-  primer día a un bucket propio en Scaleway One Zone** (segundo backend de `objectstore`,
-  `S3_PERSONAL_*`), que crece con el uso y cuesta cero vacío, mientras las organizaciones siguen en
-  el disco del piloto. Las tarifas medidas y el detalle están en
-  [`roadmap.md`](roadmap.md#almacenamiento-de-cuentas-personales-en-scaleway). Con esos números
-  el plan de 1 TB por 5 EUR está **por debajo de coste si se llena** (8,22 EUR/mes en la clase
-  barata): vive de que el uso medio quede lejos del techo.
-- **DNS por cuenta personal.** Cada organización recibe `<slug>.<dominio>`; una personal no lo
-  necesita —entra por `one.<dominio>`— y publicar un registro por cada alta gratuita sería
-  regalar la zona. Consecuencia: en el piloto no hay MX para ellas, y por tanto no reciben correo
-  entrante. Es la misma limitación que hoy tiene cualquier organización del piloto sin
-  `tenantDNSAddress`.
+- **A single counter for “all the apps”.** 5 GB _in total_ was requested. Today there are **two counters**:
+  Drive —where files, photos (their originals) and documents live, so one figure covers them— and
+  the Mail mailbox, which keeps its own. A single counter would require a ledger across services
+  that does not exist, and the alternative —Mail reserving against Drive on every message— couples two
+  services for something that is solved by declaring the split in one place (`platform/pkg/commerce`).
+  If the single counter is ever needed, the event bus is already there.
+- **Provisioning storage “on Scaleway” on purchase.** That is not how the system works: the
+  object storage is one endpoint per deployment with a prefix per tenant, not a bucket per person.
+  What does exist is the deployment's capacity: **the blobs of the `p-*` tenants go from the
+  first day to their own bucket in Scaleway One Zone** (second `objectstore` backend,
+  `S3_PERSONAL_*`), which grows with usage and costs nothing when empty, while organizations stay on
+  the pilot's disk. The measured rates and the details are in
+  [`roadmap.md`](roadmap.md#almacenamiento-de-cuentas-personales-en-scaleway). With those numbers
+  the 1 TB plan for 5 EUR is **below cost if it fills up** (8.22 EUR/month in the
+  cheap class): it lives on average usage staying far from the ceiling.
+- **DNS per personal account.** Each organization gets `<slug>.<dominio>`; a personal one does not
+  need it —it comes in through `one.<dominio>`— and publishing a record for each free sign-up would be
+  giving the zone away. Consequence: in the pilot there is no MX for them, and therefore they do not receive incoming
+  mail. It is the same limitation any pilot organization without
+  `tenantDNSAddress` has today.
 
-**Lo que se aprendió midiendo antes de escribir.** Tres cosas parecían necesarias y ya existían: el
-recorrido «individual» del alta guiada, la verificación de correo con su token firmado, y la
-pasarela de pago con su webhook. Y una discrepancia que no es de esta decisión pero conviene
-dejar anotada: la web dice «5 € por usuario y mes» para organizaciones y `commerce` cobra 600.
+**What was learned by measuring before writing.** Three things seemed necessary and already existed: the
+“individual” path of guided onboarding, email verification with its signed token, and the
+payment gateway with its webhook. And a discrepancy that is not part of this decision but is worth
+noting: the website says “€5 per user per month” for organizations and `commerce` charges 600.
 
-**Consecuencias.** Tres migraciones de comportamiento en `RequirePaidSubscription`: las cuentas
-personales siempre tienen derecho de uso; el precio unitario admite 0 y 500; y `Entitled` ya no es
-solo «pagado y con asientos». En el piloto no hay Mollie configurado, así que el plan de 1 TB
-responde «pagos no disponibles» hasta que se configure —la cuenta gratuita funciona completa—.
+**Consequences.** Three behavioral migrations in `RequirePaidSubscription`: personal
+accounts always have the right of use; the unit price allows 0 and 500; and `Entitled` is no longer
+just “paid and with seats”. In the pilot there is no Mollie configured, so the 1 TB plan
+responds “payments not available” until it is configured —the free account works fully—.
 
-Y desde el 2026-09-13 el paso a 1 TB está **cerrado en todas las instalaciones**, no solo donde
-falta Mollie: `commerce.PersonalUpgradeAvailable = false` hace que Sytue ID rechace el checkout de
-una cuenta personal (503), que el estado del contrato lo diga (`upgrade_available`) y que la app
-de Cuenta no ofrezca el botón; www anuncia el precio como «próximamente». El registro gratuito
-sale antes que el cobro; abrirlo es cambiar esa constante cuando se decida vender.
+And since 2026-09-13 the move to 1 TB is **closed on all installations**, not only where
+Mollie is missing: `commerce.PersonalUpgradeAvailable = false` makes Sytue ID reject the checkout of
+a personal account (503), the contract status say so (`upgrade_available`) and the Account app
+not offer the button; www announces the price as “coming soon”. Free sign-up
+ships before billing; opening it means changing that constant when it is decided to sell.
 
-**Precios finales (2026-09-13, misma tarde):** tres planes y los mismos productos en los tres —
-`personal_free` (una persona, 5 GB), `standard` (5 EUR por usuario y mes, 200 GB por usuario) y
-`pro` (20 EUR por usuario y mes, 1 TB por usuario)—, para organizaciones (por asiento) y para
-personas solas. El asiento de 6 EUR con 500 GB desaparece; lo contratado pasa a `standard` (mig
-0063). Todos los planes permiten conectar almacenamiento S3 propio (Drive, `external_storage`), que
-no cuenta en la cuota. Y dos matices sobre la cuenta personal: **sí entra en Sytue Admin**, solo
-para integrar aplicaciones y migrar datos (`requireOrgKind` cierra usuarios, grupos, roles,
-dominios e invitaciones), y **su buzón cuelga del dominio padre** (`nombre@sytue.eu`), que se
-administra en platform.<dominio>: un subdominio con su hash sería una dirección que nadie sabría
-teclear. Y todo el almacenamiento nuevo —de cualquier tenant— va a Scaleway One Zone, con las
-versiones anteriores en Glacier como copia; solo los tenants listados en `S3_LOCAL_TENANTS` se
-quedan en el disco del piloto.
+**Final prices (2026-09-13, same afternoon):** three plans and the same products in all three —
+`personal_free` (one person, 5 GB), `standard` (5 EUR per user per month, 200 GB per user) and
+`pro` (20 EUR per user per month, 1 TB per user)—, for organizations (per seat) and for
+individuals. The 6 EUR seat with 500 GB disappears; what was contracted moves to `standard` (mig
+0063). All plans allow connecting your own S3 storage (Drive, `external_storage`), which
+does not count towards the quota. And two nuances about the personal account: **it does get into Sytue Admin**, only
+to integrate applications and migrate data (`requireOrgKind` closes users, groups, roles,
+domains and invitations), and **its mailbox hangs off the parent domain** (`nombre@sytue.eu`), which is
+administered in platform.<dominio>: a subdomain with its hash would be an address nobody would know how
+to type. And all new storage —of any tenant— goes to Scaleway One Zone, with
+previous versions in Glacier as a copy; only the tenants listed in `S3_LOCAL_TENANTS`
+stay on the pilot's disk.
 
-**Nombres finales y condiciones (2026-09-14):** el de 5 EUR se llama **Pro** y el de 20 EUR
-**Enterprise**, que incluye **Soporte Premium**; las **instituciones educativas** tienen el Pro al
-50 % (`organizations.education`, lo concede la plataforma con motivo y auditoría; el checkout y la
-comprobación del pago usan `commerce.Plan.UnitPriceCents(education)`); y la **revalorización
-comprometida de por vida** es de 0,50 EUR por usuario cada cuatro años, y nada más. El alta
-gratuita va protegida por el captcha ALTCHA del propio Sytue (`services/id/internal/captcha`,
-prueba de trabajo sin terceros ni cookies) y el limitador por IP. El **almacenamiento conectado**
-admite un bucket S3, un servidor WebDAV (Nextcloud/ownCloud, la CLI de Internxt), **Google Drive**
-y **OneDrive** por consentimiento OAuth en el servicio de integraciones, y **el NAS del cliente por
-el túnel de Sytue Cloud**: Drive crea el sitio, el recurso y el destino en el proxy de la
-plataforma por su API de integración, y el cliente solo ejecuta un comando en su NAS —nunca ve el
-proxy—; el destino se acota a su red (IP privada o nombre local) para que el túnel no pueda servir
-un sitio cualquiera bajo nuestro certificado. Todas las clases exigen aceptar en cada conexión el
-aviso de responsabilidad: las copias de seguridad y la recuperación de lo que vive en un almacén
-conectado son del cliente (usted), y Sytue® queda liberada de toda responsabilidad por su pérdida.
-Proton Drive no tiene API pública (cifrado de extremo a extremo con protocolo propio) y no se
-anuncia hasta que la tenga.
+**Final names and conditions (2026-09-14):** the 5 EUR one is called **Pro** and the 20 EUR one
+**Enterprise**, which includes **Premium Support**; **educational institutions** get Pro at
+50 % (`organizations.education`, granted by the platform with a reason and an audit trail; the checkout and the
+payment check use `commerce.Plan.UnitPriceCents(education)`); and the **lifetime committed
+price increase** is 0.50 EUR per user every four years, and nothing more. Free
+sign-up is protected by Sytue's own ALTCHA captcha (`services/id/internal/captcha`,
+proof of work without third parties or cookies) and the per-IP limiter. **Connected storage**
+supports an S3 bucket, a WebDAV server (Nextcloud/ownCloud, the Internxt CLI), **Google Drive**
+and **OneDrive** via OAuth consent in the integrations service, and **the customer's NAS through
+the Sytue Cloud tunnel**: Drive creates the site, the resource and the target in the
+platform's proxy through its integration API, and the customer only runs a command on their NAS —they never see the
+proxy—; the target is restricted to their network (private IP or local name) so that the tunnel cannot serve
+an arbitrary site under our certificate. All classes require accepting, on each connection, the
+liability notice: backups and recovery of what lives in a connected
+store are the customer's (you), and Sytue® is released from all liability for its loss.
+Proton Drive has no public API (end-to-end encryption with its own protocol) and will not be
+announced until it has one.
 
 <a id="0039"></a>
 
-## 0039 — Aviso a móvil: Android no sale de la UE, iOS sale con lo mínimo que existe
+<a id="0039--aviso-a-móvil-android-no-sale-de-la-ue-ios-sale-con-lo-mínimo-que-existe"></a>
+
+## 0039 — Mobile notifications: Android does not leave the EU, iOS leaves with the minimum that exists
 
 `accepted` · 2026-09-14 · push, mobile, privacy, gdpr, sovereignty
 
-**Contexto.** La suite ya avisa con el navegador cerrado por **Web Push** (RFC 8030/8291,
-`services/rooms`): el contenido va cifrado extremo a extremo y el servicio de push del
-fabricante —Google, Mozilla o Apple— no puede leerlo, pero **sí ve el endpoint** (un
-identificador seudónimo del aparato) **y cuándo** llega cada aviso. Ninguno de esos tres está
-en la UE. Al llevar la suite a apps nativas hay que decidir por dónde entra el aviso, y la
-respuesta no es la misma en las dos plataformas.
+**Context.** The suite already sends notifications with the browser closed via **Web Push** (RFC 8030/8291,
+`services/rooms`): the content is end-to-end encrypted and the vendor's push service
+—Google, Mozilla or Apple— cannot read it, but it **does see the endpoint** (a
+pseudonymous device identifier) **and when** each notification arrives. None of those three is
+in the EU. When bringing the suite to native apps we have to decide where the notification comes in through, and the
+answer is not the same on the two platforms.
 
-**Android: no hace falta ningún tercero.** La app puede mantener abierto el **flujo SSE del
-hub** que ya consume el shell web (`NotificationCenter.tsx` con `EventSource`) desde un
-servicio en primer plano. El aviso nace en nuestro clúster y muere en el aparato: ni FCM, ni
-Google Play Services, ni un identificador fuera de la UE. Funciona además en los teléfonos sin
-servicios de Google, donde FCM sencillamente no existe.
+**Android: no third party is needed.** The app can keep the **hub SSE
+stream** that the web shell already consumes (`NotificationCenter.tsx` with `EventSource`) open from a
+foreground service. The notification is born in our cluster and dies on the device: no FCM, no
+Google Play Services, no identifier outside the EU. It also works on phones without
+Google services, where FCM simply does not exist.
 
-**UnifiedPush queda para después, y no lo necesitamos.** UnifiedPush resuelve que _varias_ apps
-compartan _una_ conexión que mantiene un distribuidor. Como aquí solo nos avisamos a nosotros
-mismos, un distribuidor añade una pieza —y un servidor de push que mantener— sin quitar
-ninguna. Si algún día interesa compartir la conexión, el emisor actual **ya vale**: UnifiedPush
-3 habla Web Push, y `validatePushEndpoint` no tiene lista blanca de fabricantes, solo exige
-`https` y la barrera antiSSRF. Se apuntaría el endpoint y ya.
+**UnifiedPush is left for later, and we do not need it.** UnifiedPush solves _several_ apps
+sharing _one_ connection maintained by a distributor. Since here we only notify
+ourselves, a distributor adds a piece —and a push server to maintain— without removing
+any. If sharing the connection is ever of interest, the current sender **already works**: UnifiedPush
+3 speaks Web Push, and `validatePushEndpoint` has no vendor allowlist, it only requires
+`https` and the anti-SSRF barrier. The endpoint would be registered and that's it.
 
-**iOS: no hay alternativa, así que se decide qué se cuenta.** El sistema mata la conexión al
-pasar a segundo plano y **APNs es el único camino** para despertar una app; Apple no tiene
-región europea. Lo que se elige es el contenido, y se elige el mínimo que existe:
+**iOS: there is no alternative, so we decide what is told.** The system kills the connection when
+going to the background and **APNs is the only way** to wake an app; Apple has no
+European region. What is chosen is the content, and the minimum that exists is chosen:
 
-- El aviso es una **constante**, `{"aps":{"content-available":1}}`, con
-  `apns-push-type: background`. Sin título, sin texto, sin autor, sin canal, sin contador.
-- La app despierta y **pide el mensaje a nuestros servidores**, que sí están en la UE, y pinta
-  ella la notificación.
-- Apple puede saber que ese aparato recibió algo y cuándo. **No qué, ni de quién.**
-- Que el cuerpo sea una constante y no algo que se compone es deliberado: impide que nadie le
-  añada un campo «solo para depurar» sin ver lo que está publicando. Lo fija el test
+- The notification is a **constant**, `{"aps":{"content-available":1}}`, with
+  `apns-push-type: background`. No title, no text, no author, no channel, no counter.
+- The app wakes up and **asks our servers for the message**, which are in the EU, and draws
+  the notification itself.
+- Apple can know that that device received something and when. **Not what, nor from whom.**
+- That the body is a constant and not something composed is deliberate: it prevents anyone from
+  adding a field “just for debugging” without seeing what they are publishing. It is pinned by the test
   `TestAPNSNoMandaNadaMasQueElDespertar`.
 
-**Consecuencia para lo que prometemos.** «Ningún dato personal sale de la UE» (§1.2 de
-`security.md`) deja de ser cierto sin matices en cuanto hay avisos con la app cerrada, y no
-solo en iOS: el **Web Push que ya está en producción** enseña el endpoint y los tiempos a
-Google, Mozilla o Apple. Se corrige la afirmación en vez de dejarla; un texto legal que no se
-cumple es peor que una excepción escrita. Quien no quiera ni eso puede apagar los avisos:
-`POST /me/push/apns/forget` y `POST /me/push/unsubscribe` borran el aparato.
+**Consequence for what we promise.** “No personal data leaves the EU” (§1.2 of
+`security.md`) is no longer true without nuance as soon as there are notifications with the app closed, and not
+only on iOS: the **Web Push already in production** shows the endpoint and the timing to
+Google, Mozilla or Apple. The claim is corrected instead of being left as is; a legal text that is not
+met is worse than a written exception. Whoever does not want even that can turn off notifications:
+`POST /me/push/apns/forget` and `POST /me/push/unsubscribe` delete the device.
 
-**Alternativas descartadas.** _FCM en Android_ (identificador y metadatos a Google sin
-necesidad, y no funciona sin Play Services). _Push de contenido en iOS_ con el texto en el aviso
-(se lo daríamos a Apple a cambio de ahorrar una petición). _Refresco en segundo plano_ sin APNs
-(lo decide iOS, tarda de minutos a horas: no sirve para una llamada ni para un DM).
+**Alternatives ruled out.** _FCM on Android_ (identifier and metadata to Google without
+need, and it does not work without Play Services). _Content push on iOS_ with the text in the notification
+(we would be giving it to Apple in exchange for saving a request). _Background refresh_ without APNs
+(iOS decides it, it takes from minutes to hours: it is useless for a call or a DM).
 
-**Enmienda (2026-11-06): un único registro de aparatos, en el Hub, para despertar los
-widgets** (pieza 5 del [ADR 0078](#0078); escrita el 2026-11-07). El dueño decidió que,
-con la app cerrada, «la app se despierta en segundo plano» para que su widget enseñe lo de
-ahora. El refresco periódico (pieza 4) lo decide iOS y puede tardar horas; para que un
-evento creado en la web llegue al widget en minutos, el único camino en iOS sigue siendo
-APNs. Hasta ahora **ningún cliente registraba un token** (`push_apns` de Rooms estaba vacía)
-y el servidor no sabía qué aparatos tenía nadie.
+**Amendment (2026-11-06): a single device registry, in the Hub, to wake the
+widgets** (piece 5 of [ADR 0078](#0078); written on 2026-11-07). The owner decided that,
+with the app closed, “the app wakes up in the background” so that its widget shows what is happening
+now. Periodic refresh (piece 4) is decided by iOS and can take hours; for an
+event created on the web to reach the widget within minutes, the only path on iOS is still
+APNs. Until now **no client registered a token** (Rooms' `push_apns` was empty)
+and the server did not know what devices anyone had.
 
-1. **Un registro, en el Hub** (`aparatos_apns`, mig. 0010): `tenant, subject, bundle, token,
-creado, visto, ultimo_push, pendiente`, con clave `(tenant, bundle, token)` —APNs da un
-   token por app y aparato—, RLS deny-by-default y la política de fusión. **Rooms pierde
-   `push_apns`** (mig. 0062; no había filas que mudar) y despierta, con la señal de cambios
-   del Hub y sin ruta nueva, a quien le cambia el contador del widget de Rooms
-   (`api.PendientesRooms`): los miembros del canal con el nivel por defecto, y con
-   «menciones» los mencionados (o todos, con @channel); silenciado, nadie. **No son los
-   destinatarios del Web Push** (mencionados y DM): aquél es una alerta, y esto, un aviso
-   vacío para que el contador no se quede atrás; por eso tampoco miran la pausa de avisos
-   ni los bloqueos (lo no leído de un bloqueado también suma), y lo escrito por una
-   integración o una tarjeta de sistema despierta aunque no avise. Como mucho 50 por
-   mensaje, los mencionados primero: en un canal mayor, los demás esperan al refresco
-   periódico (revisión del 2026-11-07; antes seguía al Web Push y un mensaje sin mención en
-   un canal no movía el widget). El enviador **se mueve** a `platform/pkg/apns`,
-   con el `apns-topic` en cada envío; `TestAPNSNoMandaNadaMasQueElDespertar` se muda con él
-   y ahora comprueba también que no sale ninguna cabecera `apns-*` de más.
-2. **Rutas.** `POST /api/v1/me/push/apns {bundle, token}` registra (bundle de la lista
-   cerrada de las quince apps, token hexadecimal; un token delegado no registra);
-   **`POST /api/v1/me/push/apns/forget`** borra: con `{token}`, ese; **sin cuerpo, todos los
-   aparatos de la persona** en esa organización. Un token delegado tampoco olvida (403):
-   sin cuerpo borraría todos los iPhone de la persona representada. Las rutas homónimas de Rooms redirigen
-   **308** al Hub hasta su baja, y solo dicen dónde está ahora: el Hub es otro host,
-   `Authorization` no sigue la redirección (net/http y fetch la quitan) y un `forget`
-   seguido sin token recibe un 401. Quien llame a Rooms repite la llamada al Hub con su
-   token; las apps ya llaman al Hub, y la promesa de arriba —«`forget` borra el aparato»—
-   vale en la URL del Hub. Y el borrado de cuenta
-   (ADR 0054) se lleva `aparatos_apns`.
-3. **Qué despierta.** La señal de cambios (`datos`, `{"producto"}` de lista cerrada) que el
-   Hub ya recibe de cada escritura: la réplica que la atiende busca los aparatos de la
-   persona con la app de ese producto (y One, `eu.sytue.one`, con lo que sale en su widget:
-   `mail` y `calendar` por sus contadores y su agenda, y lo que llena la actividad reciente
-   del Hub —Drive y lo que vive en él, Docus, Calcus, Diapos, certiDocs y Photos, más
-   Bases, ERP y Notes—; Contacts, Rooms y Cast no dan actividad reciente y no la despiertan).
-   **Como mucho un despertar cada 5 min por aparato**, reservado en la base de datos y no en
-   memoria —el Hub corre con dos réplicas—: un cambio marca `pendiente` y manda quien consigue
-   la fila con `UPDATE … WHERE ultimo_push < now() - 5 min RETURNING`; lo de dentro de la
-   ventana lo recoge un barrido cada minuto con la misma reserva (`SKIP LOCKED`). Lo fija una
-   prueba con dos pools contra el mismo PostgreSQL. `apns-expiration` a 1 h, el cuerpo de
-   siempre, y un 410 o `BadDeviceToken` borra el aparato. A quien solo se conoce por su correo
-   (un invitado de Calendar) no se le despierta: el registro va por sujeto.
-4. **Qué ve Apple, además de lo de arriba: qué app de la suite tiene algo nuevo** en ese
-   aparato (el `apns-topic`), y por tanto, aproximadamente, cuándo cambió el calendario o el
-   correo de esa persona. Sigue sin ver qué, ni de quién, ni cuánto.
-5. **Solo si la persona lo enciende.** «Actualizar los widgets con la app cerrada» está
-   **apagado por defecto**, vive en el menú de la cuenta de cada app (en iOS no hay bandeja
-   donde poner el de `ElementoBloqueo`) y solo aparece en compilaciones con
-   `SYTUE_DESPERTAR_APPLE = YES`; su texto de ayuda dice qué ve Apple. La app solo se
-   registra con el interruptor encendido, un widget suyo puesto, sesión y sin el bloqueo de
-   la suite; y se **olvida** (`forget` con su token) al salir —antes de revocar la sesión—, al
-   poner el bloqueo, al apagar el interruptor, antes de cambiar de organización (las filas
-   son de cada una y `forget` borra en la del token; al volver a entrar se registra en la
-   nueva) y al quitar su último widget. Los cuatro primeros son de las quince: la app en que ocurren olvida los tokens de todas, que guarda cada una en
-   `despertar-<bundle>` del **grupo del llavero de la suite** (en el privado de cada app, la
-   que salía solo veía el suyo); la lista es la cerrada de las quince y no el índice del
-   almacén, que es de cada app. Con sesión (apagar, el bloqueo), un token que el Hub no ha
-   olvidado —sin red— se queda y la app lo reintenta al volver; al salir se borra igual. **Salir
-   apaga el interruptor**: es el consentimiento de quien lo encendió, no del aparato, y se
-   guarda con su huella (`ajustes.DespertarDe`): con otra persona dentro cuenta como apagado
-   aunque la sesión de antes caducara sin salir. Un registro que sigue en camino cuando
-   llega el olvido se corta y su token se olvida también. Un aparato que no se vuelve a
-   registrar en 30 días se purga. **Lo que queda abierto:** si la sesión se acaba sin salir
-   (caduca o se revoca) y entra otra persona, las filas de la anterior siguen en el Hub —el
-   olvido va por sujeto y la sesión nueva no puede borrar las de otro—, y el aparato se
-   despierta con los cambios de la anterior hasta la purga, hasta que ella salga en otro
-   aparato (el `forget` sin cuerpo) o hasta que Apple dé el token por caduco. Lo que lee al
-   despertar es de la sesión nueva; lo que se filtra es cuándo cambian los datos de la otra
+1. **One registry, in the Hub** (`aparatos_apns`, mig. 0010): `tenant, subject, bundle, token,
+creado, visto, ultimo_push, pendiente`, with key `(tenant, bundle, token)` —APNs gives one
+   token per app and device—, deny-by-default RLS and the merge policy. **Rooms loses
+   `push_apns`** (mig. 0062; there were no rows to move) and wakes, with the Hub's change
+   signal and without a new route, whoever has their Rooms widget counter change
+   (`api.PendientesRooms`): channel members with the default level, and with
+   “mentions” those mentioned (or everyone, with @channel); muted, nobody. **They are not the
+   Web Push recipients** (those mentioned and DMs): that one is an alert, and this is an empty
+   notification so the counter does not fall behind; that is also why they do not look at the notification pause
+   or blocks (the unread of a blocked person also counts), and what is written by an
+   integration or a system card wakes even if it does not notify. At most 50 per
+   message, those mentioned first: in a larger channel, the rest wait for the periodic
+   refresh (revision of 2026-11-07; previously it followed Web Push and a message without a mention in
+   a channel did not move the widget). The sender **moves** to `platform/pkg/apns`,
+   with the `apns-topic` on each send; `TestAPNSNoMandaNadaMasQueElDespertar` moves with it
+   and now also checks that no extra `apns-*` header goes out.
+2. **Routes.** `POST /api/v1/me/push/apns {bundle, token}` registers (bundle from the closed
+   list of the fifteen apps, hexadecimal token; a delegated token does not register);
+   **`POST /api/v1/me/push/apns/forget`** deletes: with `{token}`, that one; **without a body, all the
+   person's devices** in that organization. A delegated token does not forget either (403):
+   without a body it would delete all the iPhones of the represented person. Rooms' homonymous routes redirect
+   **308** to the Hub until they are removed, and they only say where it is now: the Hub is another host,
+   `Authorization` does not follow the redirect (net/http and fetch strip it) and a `forget`
+   followed without a token gets a 401. Whoever calls Rooms repeats the call to the Hub with their
+   token; the apps already call the Hub, and the promise above —“`forget` deletes the device”—
+   holds at the Hub URL. And account deletion
+   (ADR 0054) takes `aparatos_apns` with it.
+3. **What wakes.** The change signal (`datos`, `{"producto"}` from a closed list) that the
+   Hub already receives from every write: the replica that handles it looks up the person's devices
+   with the app of that product (and One, `eu.sytue.one`, with what appears in its widget:
+   `mail` and `calendar` for their counters and agenda, and what fills the Hub's recent
+   activity —Drive and what lives in it, Docus, Calcus, Diapos, certiDocs and Photos, plus
+   Bases, ERP and Notes—; Contacts, Rooms and Cast do not produce recent activity and do not wake it).
+   **At most one wake every 5 min per device**, reserved in the database and not in
+   memory —the Hub runs with two replicas—: a change marks `pendiente` and whoever gets
+   the row with `UPDATE … WHERE ultimo_push < now() - 5 min RETURNING` sends; what falls inside the
+   window is picked up by a sweep every minute with the same reservation (`SKIP LOCKED`). It is pinned by a
+   test with two pools against the same PostgreSQL. `apns-expiration` at 1 h, the usual
+   body, and a 410 or `BadDeviceToken` deletes the device. Someone known only by their email
+   (a Calendar guest) is not woken: registration is by subject.
+4. **What Apple sees, in addition to the above: which app of the suite has something new** on that
+   device (the `apns-topic`), and therefore, approximately, when that person's calendar or
+   mail changed. It still does not see what, from whom, or how much.
+5. **Only if the person turns it on.** «Actualizar los widgets con la app cerrada» (“Update widgets with the app closed”) is
+   **off by default**, lives in each app's account menu (on iOS there is no tray
+   to put the `ElementoBloqueo` one in) and only appears in builds with
+   `SYTUE_DESPERTAR_APPLE = YES`; its help text says what Apple sees. The app only
+   registers with the switch on, one of its widgets placed, a session and without the suite
+   lock; and it **forgets** (`forget` with its token) on sign-out —before revoking the session—, when
+   setting the lock, when turning off the switch, before switching organization (the rows
+   belong to each one and `forget` deletes in the token's one; on signing in again it registers in the
+   new one) and when removing its last widget. The first four apply to all fifteen: the app in which they happen forgets the tokens of all of them, which each one stores in
+   `despertar-<bundle>` of the **suite's keychain group** (in each app's private one, the
+   one signing out only saw its own); the list is the closed one of the fifteen and not the
+   store's index, which belongs to each app. With a session (turning off, the lock), a token the Hub has not
+   forgotten —no network— stays and the app retries on return; on sign-out it is deleted anyway. **Signing out
+   turns off the switch**: it is the consent of whoever turned it on, not of the device, and it is
+   stored with their fingerprint (`ajustes.DespertarDe`): with another person signed in it counts as off
+   even if the previous session expired without signing out. A registration still in flight when
+   the forget arrives is cut off and its token is forgotten too. A device that does not
+   register again within 30 days is purged. **What remains open:** if the session ends without signing out
+   (it expires or is revoked) and another person signs in, the previous person's rows remain in the Hub —the
+   forget is by subject and the new session cannot delete someone else's—, and the device
+   wakes with the previous person's changes until the purge, until she signs out on another
+   device (the bodiless `forget`) or until Apple considers the token expired. What it reads on
+   waking belongs to the new session; what leaks is when the other person's data changes
    (security.md#apns-despertar).
-6. **La línea base UE crece, y esta es la decisión que lo documenta**
+6. **The EU baseline grows, and this is the decision that documents it**
    (`compliance/supply-chain/README.md`: «solo puede disminuir … sin una decisión
-   documentada»). `api.push.apple.com` (y su `sandbox`) entran en `providers.tsv` y
-   `blocked-baseline.tsv`, y `platform/pkg/apns` en `runtimeProviderSource`. **No es un
-   proveedor nuevo**: es el mismo envío que este ADR ya aceptaba, que hasta ahora vivía en
-   Rooms sin que el gate lo mirase.
+   documentada» (“it can only decrease … without a documented decision”)). `api.push.apple.com` (and its `sandbox`) go into `providers.tsv` and
+   `blocked-baseline.tsv`, and `platform/pkg/apns` into `runtimeProviderSource`. **It is not a
+   new provider**: it is the same sending that this ADR already accepted, which until now lived in
+   Rooms without the gate looking at it.
 
-Sigue igual: el cuerpo constante, `background` y prioridad 5; Android sin terceros (ni FCM
-ni UnifiedPush); los tokens de sesión, solo en la app; macOS no aplica (`content-available`
-no lanza una app cerrada). **Estado**: el servidor está hecho y sin credenciales de Apple no
-despierta a nadie; en la app, el registro y el olvido van tras el parche `0017` del fork y
-`SYTUE_DESPERTAR_APPLE = YES` desde el 2026-11-07 (decisión del dueño, antes de sus pasos en
-Apple y en el Hub). Lo que falta es del dueño:
-[runbook](operations.md#despertar-widgets-ios). Seguridad: [§1.2](security.md#apns-despertar).
+What stays the same: the constant body, `background` and priority 5; Android without third parties (no FCM
+and no UnifiedPush); session tokens, only in the app; macOS does not apply (`content-available`
+does not launch a closed app). **Status**: the server is done and without Apple credentials it does
+not wake anyone; in the app, registration and forgetting are behind patch `0017` of the fork and
+`SYTUE_DESPERTAR_APPLE = YES` since 2026-11-07 (the owner's decision, ahead of their steps at
+Apple and in the Hub). What is missing is up to the owner:
+[runbook](operations.md#despertar-widgets-ios). Security: [§1.2](security.md#apns-despertar).
 
 ---
 
 <a id="0040"></a>
 
-## 0040 — @usuario global y conversaciones con personas de otras organizaciones
+<a id="0040--usuario-global-y-conversaciones-con-personas-de-otras-organizaciones"></a>
 
-`accepted` · 2026-09-14 · identidad, rooms, multi-tenancy, privacidad · **revisa el alta del [0038](#0038)**
+## 0040 — Global @username and conversations with people from other organizations
 
-**Contexto.** Rooms solo hablaba dentro de una organización: cada fila con su `tenant` y su RLS,
-y las verjas exigiendo el equipo. Y el alta autoservicio pedía un correo ajeno que había que
-verificar antes de entrar. Se pidieron dos cosas: que todo usuario tenga un **@usuario** con el
-que le encuentre alguien de otra organización —y que el alta pida ese @usuario en vez de un
-correo, porque es la parte delantera de su dirección: **@ana es ana@sytue.eu**—, y poder **abrir
-canales, mensajes directos y reuniones con gente de fuera** escribiendo solo su correo o su
-@usuario.
+`accepted` · 2026-09-14 · identity, rooms, multi-tenancy, privacy · **revises the sign-up of [0038](#0038)**
 
-**Decisión: el @usuario (Sytue ID).**
+**Context.** Rooms only talked within one organization: each row with its `tenant` and its RLS,
+and the gates requiring the team. And self-service sign-up asked for an outside email that had to be
+verified before getting in. Two things were requested: that every user have an **@username** by
+which someone from another organization can find them —and that sign-up ask for that @username instead of an
+email, because it is the front part of their address: **@ana is ana@sytue.eu**—, and being able to **open
+channels, direct messages and meetings with outside people** by typing only their email or their
+@username.
 
-1. **`users.username`, global y único sin mayúsculas** (mig 0065). Comparte espacio de nombres
-   con las direcciones del dominio raíz, así que sus reglas son las de una parte local de buzón
-   (`domain.ValidUsername` es un punto fijo de la normalización de direcciones), los reservados
-   son los de `platform/pkg/mailaddr` y **no se asigna un @usuario cuya dirección en el dominio
-   raíz es de otra persona**.
-2. **El alta pide @usuario, nombre y contraseña.** La cuenta nace con `usuario@<dominio>` como
-   correo de acceso y como buzón exacto (`store.ReserveMailbox`; si está cogido, no se crea
-   nada), **verificada**, y entra al momento. La verificación del 0038 existía porque la
-   dirección era AJENA; esta es nuestra. Y decir «ese @usuario no está disponible» no filtra
-   nada: un @usuario es público por definición. Lo que protege el alta sigue siendo el captcha y
-   el limitador por IP. Las cuentas antiguas con correo sin verificar siguen como estaban.
-3. **Quien no lo elige recibe uno** —invitación, SCIM, SSO—: `nombre.apellidos`, y
-   `nombre.apellidos2` si está cogido. Lo pone `store.CreateUser`, que es la única vía por la que
-   pasan las seis altas. La columna nace anulable para no romper las altas de los pods del
-   binario anterior durante el despliegue; a esas y a todas las cuentas previas se lo da un
-   barrido (`AsignarUsernamesPendientes`) con la misma regla, y **las direcciones del dominio
-   raíz van primero**. El `NOT NULL` es el paso de contract de la versión siguiente.
-4. **Se entra con el correo o con el @usuario** (con o sin arroba).
-5. **`POST /api/v1/people:resolve`** encuentra a alguien de cualquier organización, con cuatro
-   barreras: exacto (ni prefijos ni listados), lo mínimo (identificador, nombre y @usuario;
-   **nunca** el correo de acceso —puede ser un Gmail— ni la organización), por persona y con
-   tope, y solo cuentas activas. Es lo que `directory:resolve` no hace a propósito.
+**Decision: the @username (Sytue ID).**
 
-**Decisión: conversaciones con gente de fuera (Rooms).**
+1. **`users.username`, global and unique case-insensitively** (mig 0065). It shares a namespace
+   with the addresses of the root domain, so its rules are those of a mailbox local part
+   (`domain.ValidUsername` is a fixed point of address normalization), the reserved ones
+   are those of `platform/pkg/mailaddr` and **an @username whose address in the root
+   domain belongs to someone else is not assigned**.
+2. **Sign-up asks for @username, name and password.** The account is born with `usuario@<dominio>` as the
+   sign-in email and as the exact mailbox (`store.ReserveMailbox`; if it is taken, nothing is
+   created), **verified**, and gets in immediately. The verification of 0038 existed because the
+   address was SOMEONE ELSE'S; this one is ours. And saying “that @username is not available” leaks
+   nothing: an @username is public by definition. What protects sign-up is still the captcha and
+   the per-IP limiter. Old accounts with an unverified email remain as they were.
+3. **Whoever does not choose one gets one** —invitation, SCIM, SSO—: `nombre.apellidos`, and
+   `nombre.apellidos2` if it is taken. It is set by `store.CreateUser`, which is the only path that
+   all six sign-up flows go through. The column is born nullable so as not to break sign-ups from pods of the
+   previous binary during deployment; those and all prior accounts get one from a
+   sweep (`AsignarUsernamesPendientes`) with the same rule, and **root-domain addresses
+   go first**. The `NOT NULL` is the contract step of the next version.
+4. **You sign in with the email or with the @username** (with or without the at sign).
+5. **`POST /api/v1/people:resolve`** finds someone from any organization, with four
+   barriers: exact (no prefixes or listings), the minimum (identifier, name and @username;
+   **never** the sign-in email —it may be a Gmail— nor the organization), per person and capped,
+   and only active accounts. It is what `directory:resolve` deliberately does not do.
 
-1. **La conversación vive en la organización de quien la abre**, con sus filas, su RLS y su
-   retención. La persona de fuera es una fila más de `channel_members` con **`externo`** (mig
-   0036), y esa marca sustituye al requisito del equipo en las verjas de lectura y escritura,
-   **solo en ese canal**. Todas las verjas pasan por `requireChannelAccess` y
-   `requireWriteAccess`: el cambio está en dos funciones.
-2. **Su nombre lo da Sytue ID, no el navegador** de quien la añade: es como la verán todos. Rooms
-   pregunta con el token de quien llama, así que el límite por persona de Sytue ID se aplica.
-3. **Su token trae SU organización.** Las rutas de un canal, un mensaje o una sala concretos
-   pasan a la organización anfitriona cuando allí está como externa (`chathttp.EnAnfitrion`), y
-   **sin los roles de su token**: un owner de la suya no es nada en la anfitriona, y con los
-   roles puestos el vídeo le daría la moderación y las grabaciones. El tiempo real suscribe cada
-   canal en la sala de su organización. La única consulta entre organizaciones es «¿en qué
-   organizaciones está esta persona como externa?», y va por una política de mantenimiento de
-   **solo lectura que solo ve las filas `externo`**.
-4. **Un grupo de personas tiene una sola conversación**, la abra quien la abra: el slug de un DM
-   es el del conjunto y no depende de la organización, así que antes de crear se busca donde el
-   que abre ya está como externo.
-5. **Reuniones.** La llamada de esas conversaciones —DM, grupo o canal— es la reunión con gente
-   de fuera, con la misma sala de espera y el mismo bloqueo. Una reunión suelta de la
-   organización anfitriona **no** se abre a nadie de fuera por estar en uno de sus DM.
+**Decision: conversations with outside people (Rooms).**
 
-**Revisado el 2026-10-16 (decisión del dueño: «Que acepte primero»).** La persona de fuera ya
-no entra al añadirla: recibe una invitación (`invitaciones_canal`, mig 0041 de Rooms, tabla
-aparte de `channel_members`) y no lee, no escribe ni le llega nada hasta aceptarla; puede
-rechazarla. Vale para canales, DM y grupos, y abrir ella misma el DM es aceptarlo. Quien ya
-estaba dentro antes de la 0041 sigue dentro.
+1. **The conversation lives in the organization of whoever opens it**, with its rows, its RLS and its
+   retention. The outside person is one more row in `channel_members` with **`externo`** (mig
+   0036), and that flag replaces the team requirement in the read and write gates,
+   **only in that channel**. All the gates go through `requireChannelAccess` and
+   `requireWriteAccess`: the change is in two functions.
+2. **Their name is given by Sytue ID, not by the browser** of whoever adds them: it is how everyone will see them. Rooms
+   asks with the caller's token, so Sytue ID's per-person limit applies.
+3. **Their token carries THEIR organization.** The routes of a specific channel, message or room
+   switch to the host organization when they are there as an external (`chathttp.EnAnfitrion`), and
+   **without the roles of their token**: an owner of their own organization is nothing in the host one, and with the
+   roles in place the video would give them moderation and recordings. Real time subscribes to each
+   channel in their organization's room. The only cross-organization query is “in which
+   organizations is this person an external?”, and it goes through a maintenance policy that is
+   **read-only and only sees the `externo` rows**.
+4. **A group of people has a single conversation**, whoever opens it: a DM's slug
+   is that of the set and does not depend on the organization, so before creating it a search is made where the
+   opener is already an external.
+5. **Meetings.** The call of those conversations —DM, group or channel— is the meeting with outside
+   people, with the same waiting room and the same lock. A standalone meeting of the
+   host organization is **not** opened to anyone from outside just because they are in one of its DMs.
 
-**Lo que no se hizo, y por qué** (pendiente en
+**Revised on 2026-10-16 (owner's decision: «Que acepte primero» (“Have them accept first”)).** The outside person no
+longer gets in when added: they receive an invitation (`invitaciones_canal`, Rooms mig 0041, a table
+separate from `channel_members`) and they do not read, write or receive anything until they accept it; they can
+reject it. It applies to channels, DMs and groups, and opening the DM themselves means accepting it. Whoever was
+already inside before 0041 stays inside.
+
+**What was not done, and why** (pending in
 [`roadmap.md`](roadmap.md#conversaciones-con-personas-de-otras-organizaciones-lo-que-falta)).
 
-- **Adjuntos** en esas conversaciones: el fichero es del Drive de la anfitriona y Drive resuelve
-  por el tenant del token.
-- **Avisos push** a la persona de fuera: sus suscripciones están en su organización.
-- **«Guardados», «Hilos», borradores y programados** de esas conversaciones no salen en sus
-  listas, que se leen por organización.
-- **Recuperar la contraseña** de una cuenta creada por @usuario: el enlace va a su propio buzón.
-  Resuelto en el [0041](#0041).
-- **Cambiar el @usuario**, y una **política de organización** para cerrar el contacto con fuera.
+- **Attachments** in those conversations: the file belongs to the host's Drive and Drive resolves
+  by the token's tenant.
+- **Push notifications** to the outside person: their subscriptions are in their organization.
+- **“Saved”, “Threads”, drafts and scheduled messages** of those conversations do not appear in their
+  lists, which are read per organization.
+- **Recovering the password** of an account created by @username: the link goes to its own mailbox.
+  Solved in [0041](#0041).
+- **Changing the @username**, and an **organization policy** to close contact with outside people.
 
-**Descartado.** _Pedir además un correo externo_ (devolvía la verificación y la enumeración).
-_Un tenant «compartido» para las conversaciones entre organizaciones_ (no tendría dueño que
-decidiera retención ni eDiscovery). _Copiar la conversación en cada organización_ (ediciones,
-reacciones e hilos divergirían). _Cambiar de organización por una cabecera_ (con una sola fila
-externa, quien la tuviera entraría en las reuniones sueltas de la anfitriona, que admiten a
-cualquiera de la organización). _Dar a todo el mundo su @usuario como alias en el dominio raíz_ (es una decisión de
-correo de cada organización, no un efecto secundario de tener nombre).
+**Ruled out.** _Also asking for an external email_ (it brought back verification and enumeration).
+_A “shared” tenant for cross-organization conversations_ (it would have no owner to
+decide retention or eDiscovery). _Copying the conversation into each organization_ (edits,
+reactions and threads would diverge). _Switching organization via a header_ (with a single external
+row, whoever had it would get into the host's standalone meetings, which admit
+anyone from the organization). _Giving everyone their @username as an alias in the root domain_ (it is a mail
+decision for each organization, not a side effect of having a name).
 
 <a id="0041"></a>
 
-## 0041 — Móvil verificado por SMS en el alta y cuatro identificadores de acceso
+<a id="0041--móvil-verificado-por-sms-en-el-alta-y-cuatro-identificadores-de-acceso"></a>
 
-`accepted` · 2026-09-15 · identidad, privacidad, terceros, ux · **revisa el alta del [0040](#0040)**
+## 0041 — Mobile number verified by SMS at sign-up and four sign-in identifiers
 
-**Contexto.** Con el [0040](#0040) el alta pedía @usuario, nombre y contraseña, y la cuenta
-nacía al momento: nada ataba una cuenta a una persona, y quien perdía la contraseña de una cuenta
-creada por @usuario no tenía por dónde recuperarla —el enlace iba a su propio buzón—. Se pidió
-que el alta **exija un móvil verificado con un código de un solo uso por SMS**, que el **correo
-de recuperación** sea opcional y se ponga en Sytue ID, y que se pueda **entrar con el @usuario,
-la dirección de Sytue, el correo de recuperación o el móvil**, siempre con la misma contraseña.
+`accepted` · 2026-09-15 · identity, privacy, third parties, ux · **revises the sign-up of [0040](#0040)**
 
-**Decisión.**
+**Context.** With [0040](#0040) sign-up asked for @username, name and password, and the account
+was born immediately: nothing tied an account to a person, and whoever lost the password of an account
+created by @username had no way to recover it —the link went to its own mailbox—. It was requested
+that sign-up **require a mobile number verified with a one-time code by SMS**, that the **recovery
+email** be optional and set in Sytue ID, and that it be possible to **sign in with the @username,
+the Sytue address, the recovery email or the mobile number**, always with the same password.
 
-1. **La cuenta no nace sin el código.** El alta guarda lo rellenado en `signup_phone_codes` (mig
-   0066; la contraseña ya en Argon2id) y manda un código de seis dígitos. Diez minutos, cinco
-   intentos —gastados antes de comparar, en la misma sentencia que comprueba el tope—, reenvío
-   tras un minuto, y el hash del código ligado a su alta. El SMS lleva la línea
-   `@<emisor> #<código>` para que Android e iOS lo rellenen solo en Sytue ID.
-2. **Que un móvil ya tenga cuenta no se dice en el formulario**, que sería decirle a cualquiera de
-   quién es un número: se manda el SMS igual y se dice tras el código, a quien ha demostrado que
-   el número es suyo. Con el correo de recuperación, igual: se dice al abrir el enlace.
-3. **Los SMS cuestan dinero y son la puerta del fraude de tarificación.** Además del captcha y el
-   limitador del formulario, dos limitadores compartidos: 3 SMS seguidos por número (luego uno
-   cada 20 minutos) y 10 por IP (luego uno cada 5).
-4. **Sweego manda los SMS** (`api.sweego.io/send`, SMS transaccional). Lo opera Mindbaz SAS
-   (Lille) con alojamiento en Francia (OVHcloud y Scaleway); recibe solo el número y el código,
-   y el aviso de privacidad lo nombra. Scaleway no tiene API de SMS. Frente a Brevo, que ya
-   estaba aprobado para el relé de correo, sale un 20 % más barato: 0,035 € por SMS a España
-   (Portugal 0,0225 €, Francia 0,040 €, Alemania 0,078 €; sin IVA, sin cuota), unos 42 € al mes
-   con mil altas. Una eSIM propia en un móvil sale más barata a partir de ~300 SMS al mes, pero
-   el «SMS ilimitado» de las tarifas es para uso entre personas, no cubre números extranjeros y
-   deja el alta en manos de un teléfono encendido.
-5. **Sin clave no hay alta.** `SYTUE_ID_SMS_SWEEGO_API_KEY` (secreto `sytue-id`, clave
-   `sms-sweego-api-key`; en el piloto, `SMS_SWEEGO_API_KEY` en `.secrets.env`) es opcional para
-   arrancar: sin ella, en producción `/signup` responde que el alta no está disponible y el resto
-   del IdP sigue igual. En desarrollo el SMS se escribe en el log.
-6. **Cuatro identificadores, una contraseña.** `userByLogin` resuelve el móvil (E.164; se admiten
-   espacios y el prefijo 00, nunca un número sin prefijo de país), el @usuario, cualquier
-   dirección de Sytue de la persona —buzón o correo de acceso— y el correo de recuperación, en ese
-   orden: una dirección de un buzón gana a la recuperación de otra cuenta. Vale igual para
-   passkeys y «olvidé mi contraseña», que manda el enlace al correo de acceso **y** al de
-   recuperación.
-7. **El correo de recuperación pide la contraseña y se confirma por enlace** (`PUT
-/api/v1/me/recovery-email`, tarjeta «Acceso y recuperación» de Mi cuenta). Con una sesión
-   robada, poner un correo propio y pedir el reseteo sería quedarse la cuenta. No vale una
-   dirección del dominio de la suite ni el correo de acceso; al confirmarlo, una dirección que ya
-   da acceso a otra cuenta se rechaza. Los enlaces de verificación llevan ahora su propósito.
-8. **El login con contraseña lleva el mismo captcha ALTCHA que el alta** (`LOGIN_CAPTCHA_ENABLED`,
-   activo por defecto; reto en `/login/captcha`). Se resuelve solo al pulsar «Continuar» —la
-   casilla ya no es obligatoria en ninguno de los dos— y el servidor lo comprueba antes de mirar
-   la cuenta, así que un envío sin reto no gasta un Argon2id ni el cupo de intentos de nadie.
-   Las passkeys no lo llevan: no hay nada que adivinar.
-9. **El alta es un recorrido de tres pasos con su barra de progreso**: tus datos (una frase bajo
-   cada campo que dice para qué es), el código del móvil y **«Todo listo»**, que resume @usuario,
-   correo y móvil, recuerda que se entra con cualquiera de ellos y lleva a **Sytue Hub** —o a la
-   app que pidió entrar, si el alta empezó en una—.
+**Decision.**
 
-**Lo que no se hizo, y por qué** (pendiente en
+1. **The account is not born without the code.** Sign-up stores what was filled in in `signup_phone_codes` (mig
+   0066; the password already in Argon2id) and sends a six-digit code. Ten minutes, five
+   attempts —spent before comparing, in the same statement that checks the cap—, resend
+   after one minute, and the code hash bound to its sign-up. The SMS carries the line
+   `@<emisor> #<código>` so that Android and iOS autofill it only in Sytue ID.
+2. **That a mobile number already has an account is not said in the form**, which would be telling anyone
+   whose number it is: the SMS is sent anyway and it is said after the code, to whoever has proven that
+   the number is theirs. With the recovery email, the same: it is said when opening the link.
+3. **SMS cost money and are the gateway to toll fraud.** In addition to the captcha and the
+   form limiter, two shared limiters: 3 SMS in a row per number (then one
+   every 20 minutes) and 10 per IP (then one every 5).
+4. **Sweego sends the SMS** (`api.sweego.io/send`, transactional SMS). It is operated by Mindbaz SAS
+   (Lille) with hosting in France (OVHcloud and Scaleway); it receives only the number and the code,
+   and the privacy notice names it. Scaleway has no SMS API. Compared with Brevo, which was already
+   approved for the mail relay, it comes out 20 % cheaper: €0.035 per SMS to Spain
+   (Portugal €0.0225, France €0.040, Germany €0.078; excluding VAT, no fee), about €42 a month
+   with a thousand sign-ups. Our own eSIM in a phone is cheaper from ~300 SMS a month onward, but
+   the “unlimited SMS” of the plans is for person-to-person use, does not cover foreign numbers and
+   leaves sign-up in the hands of a phone that is switched on.
+5. **No key, no sign-up.** `SYTUE_ID_SMS_SWEEGO_API_KEY` (secret `sytue-id`, key
+   `sms-sweego-api-key`; in the pilot, `SMS_SWEEGO_API_KEY` in `.secrets.env`) is optional to
+   start: without it, in production `/signup` responds that sign-up is not available and the rest
+   of the IdP stays the same. In development the SMS is written to the log.
+6. **Four identifiers, one password.** `userByLogin` resolves the mobile number (E.164; spaces and
+   the 00 prefix are allowed, never a number without a country prefix), the @username, any
+   Sytue address of the person —mailbox or sign-in email— and the recovery email, in that
+   order: a mailbox address beats another account's recovery email. The same applies to
+   passkeys and “forgot my password”, which sends the link to the sign-in email **and** to the
+   recovery one.
+7. **The recovery email asks for the password and is confirmed by link** (`PUT
+/api/v1/me/recovery-email`, the «Acceso y recuperación» (“Access and recovery”) card in My account). With a stolen
+   session, setting one's own email and requesting a reset would mean taking over the account. An
+   address in the suite's domain or the sign-in email is not allowed; on confirming it, an address that already
+   gives access to another account is rejected. Verification links now carry their purpose.
+8. **Password sign-in carries the same ALTCHA captcha as sign-up** (`LOGIN_CAPTCHA_ENABLED`,
+   on by default; challenge at `/login/captcha`). It is solved only when pressing «Continuar» (“Continue”) —the
+   checkbox is no longer mandatory in either of the two— and the server checks it before looking at
+   the account, so a submission without a challenge does not spend an Argon2id or anyone's attempt quota.
+   Passkeys do not carry it: there is nothing to guess.
+9. **Sign-up is a three-step flow with its progress bar**: your details (a sentence under
+   each field that says what it is for), the mobile code and **«Todo listo»** (“All set”), which summarizes @username,
+   email and mobile number, reminds you that you can sign in with any of them and takes you to **Sytue Hub** —or to the
+   app that asked to sign in, if the sign-up started in one—.
+
+**What was not done, and why** (pending in
 [`roadmap.md`](roadmap.md#conversaciones-con-personas-de-otras-organizaciones-lo-que-falta)).
-Cambiar el móvil desde Mi cuenta (pide volver a verificar el número nuevo), pedir un móvil a las
-cuentas anteriores, y un tope global de SMS por hora.
+Changing the mobile number from My account (requires verifying the new number again), asking older
+accounts for a mobile number, and a global cap of SMS per hour.
 
-**Descartado.** _Adivinar el prefijo de país_ por el idioma o la IP (daría de alta el número de
-otra persona). _Decir en el formulario que el móvil ya tiene cuenta_ (enumeración de teléfonos).
-_Negarse a arrancar sin clave de SMS_, como con el SMTP (el día del despliegue tiraría el IdP
-entero por una función que se puede apagar sola). _Recuperar la contraseña por SMS_ (no se pidió,
-y el SMS es el factor más fácil de secuestrar con un duplicado de SIM). _Una pregunta por pantalla_
-en el alta (obligaba a llevar la contraseña de una pantalla a otra dentro de la página o a guardar
-estado por paso; tres pasos dan la misma claridad).
+**Ruled out.** _Guessing the country prefix_ from the language or the IP (it would sign up someone
+else's number). _Saying in the form that the mobile number already has an account_ (phone enumeration).
+_Refusing to start without an SMS key_, as with SMTP (on deployment day it would bring down the entire IdP
+for a feature that can turn itself off). _Recovering the password by SMS_ (it was not requested,
+and SMS is the easiest factor to hijack with a SIM swap). _One question per screen_
+at sign-up (it would force carrying the password from one screen to another within the page or storing
+state per step; three steps give the same clarity).
 
 <a id="0042"></a>
 
-## 0042 — España sin gestoría: el banco entra por Norma 43 y presentar por ti espera al certificado y a VeriFactu
+<a id="0042--españa-sin-gestoría-el-banco-entra-por-norma-43-y-presentar-por-ti-espera-al-certificado-y-a-verifactu"></a>
 
-`accepted` · 2026-09-15 · erp, fiscal, banca, ux · diseño completo en [`architecture.md` §7.5](architecture.md#75-españa-sin-gestoría-banco-obligaciones-guiadas-y-presentación)
+## 0042 — Spain without an accounting agency: the bank comes in via Norma 43 and filing on your behalf waits for the certificate and VeriFactu
 
-**Contexto.** Se pidió que un empresario sin conocimientos de impuestos, contabilidad ni
-informática pueda llevar todas sus obligaciones desde Sytue ERP: guiado paso a paso, con avisos
-semanales, con una fecha propia cuatro días hábiles antes de la que da la administración, con
-cada movimiento del banco convertido en tarea y casado solo cuando se pueda, integrado con los
-bancos y las administraciones españolas, con el certificado de la empresa y presentando «lo que
-haya» en la fecha límite. Y que se diseñe para empresarios, no para gestorías.
+`accepted` · 2026-09-15 · erp, tax, banking, ux · full design in [`architecture.md` §7.5](architecture.md#75-españa-sin-gestoría-banco-obligaciones-guiadas-y-presentación)
 
-**Decisión.**
+**Context.** It was requested that a business owner with no knowledge of taxes, accounting or
+IT be able to handle all their obligations from Sytue ERP: guided step by step, with weekly
+reminders, with their own date four business days before the one given by the administration, with
+each bank transaction turned into a task and matched automatically whenever possible, integrated with
+Spanish banks and administrations, with the company's certificate and filing “whatever
+there is” on the deadline. And that it be designed for business owners, not for accounting agencies.
 
-1. **El banco entra por Norma 43, no por PSD2.** Todos los bancos españoles lo dan desde la
-   banca de empresas y leerlo no pide contrato ni licencia; PSD2 exige un proveedor con licencia
-   de información de cuentas, con coste, contrato y datos que salen a un tercero. El casado es el
-   mismo para los dos: cuando se elija proveedor, sus movimientos entran por él.
-2. **Cada movimiento es una tarea hasta que tiene factura o motivo**, y se casa solo con criterio
-   de contable prudente: importe exacto, fecha razonable, una prueba en el concepto y ninguna
-   alternativa igual de probable, y solo contra facturas confirmadas. Un cobro mal asignado es
-   peor que una pregunta. Todo se deshace con un asiento anulado, nunca borrando.
-3. **La fecha que se enseña es «tu fecha»**: cuatro días hábiles antes del último día útil, que
-   es el de domiciliación cuando el pago se puede domiciliar. Los festivos salen de la resolución
-   anual del BOE; el límite legal se corre solo con los nacionales y el margen cuenta también los
-   de la comunidad, que es el lado seguro en los dos casos.
-4. **Recordatorio semanal por calendario importado**, no suscrito: Google descarta siempre las
-   alarmas de un calendario suscrito y Apple lo hace por defecto. El aviso por correo o push
-   espera a que el ERP tenga identidad de servicio.
-5. **Presentar por ti queda en fase 2, detrás de VeriFactu y del certificado.** Presentar exige la
-   conformidad de quien declara, lo presentado no se anula y el fichero de cada modelo hay que
-   validarlo contra la Agencia Tributaria antes de enviarlo; hacerlo sin eso sería presentar a
-   ciegas en nombre de alguien. VeriFactu va antes porque es obligatorio para el propio producto
-   desde el 1 de enero de 2027.
+**Decision.**
 
-**Consecuencias.** El ERP ya calcula el 130 como el formulario (acumulado menos lo pagado) y sabe
-qué le falta a cada obligación. El dato de España crece: calendario laboral, territorios, guías y
-el 184. Una sociedad vasca o navarra ve la Seguridad Social y el Registro, no sus impuestos, y la
-pantalla le dice por qué.
+1. **The bank comes in via Norma 43, not via PSD2.** All Spanish banks provide it from
+   business banking and reading it requires no contract or license; PSD2 requires a provider with an
+   account information license, with cost, a contract and data going out to a third party. Matching is the
+   same for both: when a provider is chosen, its transactions come in through it.
+2. **Each transaction is a task until it has an invoice or a reason**, and it is matched automatically only with the criteria
+   of a prudent accountant: exact amount, reasonable date, evidence in the description and no
+   equally likely alternative, and only against confirmed invoices. A misallocated payment is
+   worse than a question. Everything is undone with a reversed entry, never by deleting.
+3. **The date shown is “your date”**: four business days before the last valid day, which
+   is the direct-debit date when the payment can be direct-debited. Holidays come from the annual
+   BOE resolution; the legal deadline is moved only by national holidays and the margin also counts
+   regional ones, which is the safe side in both cases.
+4. **Weekly reminder through an imported calendar**, not a subscribed one: Google always discards the
+   alarms of a subscribed calendar and Apple does so by default. Email or push notification
+   waits until the ERP has a service identity.
+5. **Filing on your behalf stays in phase 2, behind VeriFactu and the certificate.** Filing requires the
+   consent of the declarant, what is filed cannot be cancelled, and each form's file has to be
+   validated against the Tax Agency before sending it; doing it without that would be filing
+   blindly on someone's behalf. VeriFactu goes first because it is mandatory for the product itself
+   from January 1, 2027.
 
-**Lo que no se hizo, y por qué.** Certificado, presentación directa y DEHú (fase 2 y 3 en
-§7.5); el proveedor PSD2 (decisión de contrato y privacidad); el adjunto del PDF de la factura
-(el catálogo no tiene tipo fichero); los tipos de IVA por línea (hacen falta para el 303
-presentado, no para el calculado); y separar en el cargo de la Tesorería la cuota del autónomo de
-la de sus trabajadores (hoy va entera a 642).
+**Consequences.** The ERP already computes form 130 like the form does (accumulated minus what was paid) and knows
+what each obligation is missing. The Spain data grows: work calendar, territories, guides and
+form 184. A Basque or Navarrese company sees Social Security and the Registry, not its taxes, and the
+screen tells it why.
 
-**Descartado.** _Suscripción webcal_ con token de capacidad (ruta pública, ingreso nuevo y, aun
-así, sin alarmas). _Casar por importe solo_ (dos recibos iguales del mismo mes). _Presentar sin
-mandato registrado_. _Contar festivos regionales para correr el límite legal_ (si la
-administración no los aplica, se presentaría tarde).
+**What was not done, and why.** Certificate, direct filing and DEHú (phases 2 and 3 in
+§7.5); the PSD2 provider (a contract and privacy decision); attaching the invoice PDF
+(the catalog has no file type); VAT rates per line (needed for the filed 303,
+not for the computed one); and separating, in the Treasury charge, the self-employed person's contribution from
+that of their employees (today it all goes to 642).
+
+**Ruled out.** _webcal subscription_ with a capability token (a public route, a new ingress and, even
+so, no alarms). _Matching by amount alone_ (two identical receipts in the same month). _Filing without
+a registered mandate_. _Counting regional holidays to move the legal deadline_ (if the
+administration does not apply them, the filing would be late).
 
 <a id="0043"></a>
 
-## 0043 — El ERP es de toda la organización: permisos por módulo, tareas y documentos, y Sytue AI que crea con confirmación
+<a id="0043--el-erp-es-de-toda-la-organización-permisos-por-módulo-tareas-y-documentos-y-sytue-ai-que-crea-con-confirmación"></a>
 
-`accepted` · 2026-09-15 · erp, ia, permisos, correo · diseño en [`architecture.md` §7.6](architecture.md#76-el-erp-de-toda-la-organización-permisos-tareas-documentos-y-sytue-ai-que-crea)
+## 0043 — The ERP belongs to the whole organization: per-module permissions, tasks and documents, and Sytue AI that creates with confirmation
 
-**Contexto.** Se pidió que Sytue AI cree registros de cualquier módulo, varios a la vez y con
-todo lo relacionado (un gasto de Claude Code de 180 € crea el proveedor Anthropic si no existe),
-consultando internet para los datos, y que deje la tarea de subir el PDF con vencimiento hoy; que
-en cada cargo del banco diga desde dónde se descarga la factura o a quién pedírsela y con qué
-correo; que el ERP sea de toda la organización, con permisos por módulo al estilo de Odoo desde
-Sytue Admin; que al subir una factura o un documento se diga qué tiene que llevar; que
-Obligaciones esté siempre activo tras el asistente; y que el aviso de los diez días llegue por
-correo a quien tenga permiso en Obligaciones.
+`accepted` · 2026-09-15 · erp, ai, permissions, mail · design in [`architecture.md` §7.6](architecture.md#76-el-erp-de-toda-la-organización-permisos-tareas-documentos-y-sytue-ai-que-crea)
 
-**Decisión.**
+**Context.** It was requested that Sytue AI create records in any module, several at once and with
+everything related (a €180 Claude Code expense creates the supplier Anthropic if it does not exist),
+consulting the internet for the data, and that it leave the task of uploading the PDF due today; that
+on each bank charge it say where the invoice is downloaded from or whom to ask for it and with which
+email; that the ERP belong to the whole organization, with Odoo-style per-module permissions from
+Sytue Admin; that when uploading an invoice or a document it say what it has to include; that
+Obligations always be active after the wizard; and that the ten-day notice arrive by
+email to whoever has permission in Obligations.
 
-1. **Proponer y confirmar, en dos pasos.** La IA propone un plan; el servicio lo valida, lo
-   completa con lo que ya existe y lo comprueba; la persona lo ve y lo crea en una transacción.
-   Guardar lo que conteste el modelo pondría en el libro datos que nadie ha mirado.
-2. **Internet son comprobaciones, no navegación.** VIES para el NIF-IVA, HEAD/GET para páginas y
-   MX para correos, desde el servicio y con barrera SSRF. El modelo no busca en la web: Sytue AI
-   no navega y un buscador sería un tercero nuevo con las consultas de la organización. Lo que el
-   modelo sabe de memoria se comprueba y lo que no se confirma se deja vacío.
-3. **Los permisos viven en el ERP y se editan en Sytue Admin.** El ERP es quien los aplica en cada
-   petición y los módulos son de su catálogo. Cuatro niveles como los grupos de acceso de Odoo,
-   un defecto por módulo y solo lo distinto guardado.
-4. **Tareas y documentos en tablas propias**, no como campos del catálogo: cuelgan de cualquier
-   registro y también de las obligaciones, que no son registros, y subir el documento cierra la
-   tarea. Los ficheros en Postgres con tope de 10 MiB: una factura pesa cientos de kilobytes y
-   así heredan RLS y copia de seguridad sin otro almacén ni otro permiso.
-5. **El correo sale por el MSA propio con un buzón de servicio**, desde un planificador dentro del
-   servicio que reclama cada envío en la base de datos: una vez por obligación y periodo aunque
-   haya varias réplicas.
+**Decision.**
 
-**Consecuencias.** Un miembro nuevo ya no ve la contabilidad ni las nóminas hasta que se le dé
-acceso; owner y admin no notan nada. El ERP necesita un buzón de servicio para avisar y, sin él,
-no avisa. El VIES recibe el NIF-IVA de los proveedores europeos que proponga la IA.
+1. **Propose and confirm, in two steps.** The AI proposes a plan; the service validates it,
+   completes it with what already exists and checks it; the person sees it and creates it in one transaction.
+   Storing whatever the model answers would put data nobody has looked at into the ledger.
+2. **The internet means checks, not browsing.** VIES for the VAT number, HEAD/GET for pages and
+   MX for emails, from the service and with an SSRF barrier. The model does not search the web: Sytue AI
+   does not browse, and a search engine would be a new third party with the organization's queries. What the
+   model knows from memory is checked and what is not confirmed is left empty.
+3. **Permissions live in the ERP and are edited in Sytue Admin.** The ERP is what applies them on each
+   request and the modules are from its catalog. Four levels like Odoo's access groups,
+   a default per module and only what differs is stored.
+4. **Tasks and documents in their own tables**, not as catalog fields: they hang from any
+   record and also from obligations, which are not records, and uploading the document closes the
+   task. The files go in Postgres with a 10 MiB cap: an invoice weighs hundreds of kilobytes and
+   that way they inherit RLS and backup without another store or another permission.
+5. **Mail goes out through our own MSA with a service mailbox**, from a scheduler inside the
+   service that claims each send in the database: once per obligation and period even if
+   there are several replicas.
 
-**Lo que no se hizo, y por qué.** Reglas por fila (las «record rules» de Odoo: ver solo lo propio
-dentro de un módulo), historial de cambios por registro y seguidores, OCR del PDF subido para
-rellenar la factura, y leer el correo de facturas entrante. Van después en la paridad con Odoo.
+**Consequences.** A new member no longer sees the accounting or the payroll until they are given
+access; owner and admin notice nothing. The ERP needs a service mailbox to send notices and, without it,
+it does not send them. VIES receives the VAT numbers of the European suppliers the AI proposes.
 
-**Descartado.** _Crear directamente lo que conteste el modelo_. _Un buscador web para la IA_
-(tercero nuevo y sin forma de comprobar lo que devuelve). _Guardar los PDF en Drive o S3_ (otro
-almacén y otro permiso para ficheros pequeños que son de la organización, no de una persona).
-_Permisos como scopes de Sytue ID_ (el ERP tendría que preguntar a ID en cada petición por
-módulos que ID no conoce). _Aviso por push en vez de correo_ (se pidió correo, y el push solo
-llega a quien tiene la app instalada).
+**What was not done, and why.** Row-level rules (Odoo's “record rules”: seeing only your own
+within a module), per-record change history and followers, OCR of the uploaded PDF to
+fill in the invoice, and reading incoming invoice email. They come later in the parity with Odoo.
+
+**Ruled out.** _Directly creating whatever the model answers_. _A web search engine for the AI_
+(a new third party with no way to check what it returns). _Storing the PDFs in Drive or S3_ (another
+store and another permission for small files that belong to the organization, not to a person).
+_Permissions as Sytue ID scopes_ (the ERP would have to ask ID on each request about
+modules ID does not know). _Push notification instead of email_ (email was requested, and push only
+reaches whoever has the app installed).
 
 <a id="0044"></a>
 
-## 0044 — VERI*FACTU dentro del ERP: la base garantiza la cadena y el envío sale con un certificado del servicio
+<a id="0044--verifactu-dentro-del-erp-la-base-garantiza-la-cadena-y-el-envío-sale-con-un-certificado-del-servicio"></a>
 
-`accepted` · 2026-09-15 · erp, fiscal, verifactu · diseño en [`architecture.md` §7.7](architecture.md#77-verifactu-cada-factura-registrada-en-la-agencia-tributaria-al-emitirla)
+## 0044 — VERI\*FACTU inside the ERP: the database guarantees the chain and submission goes out with a service certificate
 
-**Contexto.** Desde el 1-1-2027 (sociedades) y el 1-7-2027 (resto), todo programa con el que un
-empresario español factura tiene que cumplir el Reglamento de sistemas informáticos de
-facturación, y quien lo produce responde con hasta 150.000 € por año y tipo de programa si no.
-Se pidió avanzar en todo lo necesario con la modalidad VERI*FACTU.
+`accepted` · 2026-09-15 · erp, tax, verifactu · design in [`architecture.md` §7.7](architecture.md#77-verifactu-cada-factura-registrada-en-la-agencia-tributaria-al-emitirla)
 
-**Decisión.**
+**Context.** From 1-1-2027 (companies) and 1-7-2027 (everyone else), every program with which a
+Spanish business owner invoices has to comply with the Regulation on invoicing computer
+systems, and whoever produces it is liable for up to €150,000 per year and type of program if not.
+It was requested to move forward on everything needed with the VERI\*FACTU mode.
 
-1. **Solo VERI\*FACTU**, sin la modalidad que conserva y firma registros sin enviarlos: el
-   producto es en la nube, la Agencia Tributaria guarda la copia que da fe, y sin firma de
-   registros ni registro de eventos hay menos que puede fallar.
-2. **El registro se genera en la transacción que emite la factura** y **la base impide lo que no
-   se puede deshacer**: registros inalterables, cadena sin bifurcaciones y factura emitida sin
-   retoques, con triggers y restricciones en la migración. Así un camino nuevo que emita una
-   factura sin pasar por `emitirVerifactu` falla en vez de dejar un hueco.
-3. **Una cadena y un número de instalación por organización**, porque cada una es un obligado
-   distinto (FAQ de la AEAT para desarrolladores, apartado 4): `TipoUsoPosibleMultiOT=S` e
+**Decision.**
+
+1. **VERI\*FACTU only**, without the mode that keeps and signs records without sending them: the
+   product is in the cloud, the Tax Agency keeps the copy that serves as proof, and without record signing
+   or an event log there is less that can fail.
+2. **The record is generated in the transaction that issues the invoice** and **the database prevents what cannot
+   be undone**: immutable records, a chain without forks and an issued invoice without
+   retouching, with triggers and constraints in the migration. That way a new path that issues an
+   invoice without going through `emitirVerifactu` fails instead of leaving a gap.
+3. **One chain and one installation number per organization**, because each one is a different
+   obligated party (AEAT FAQ for developers, section 4): `TipoUsoPosibleMultiOT=S` and
    `IndicadorMultiplesOT=N`.
-4. **El envío sale desde syerp con TLS mutuo y un certificado del servicio**, no por el
-   Integration Gateway: es SOAP con certificado de cliente a un organismo público, y llevar el
-   certificado al gateway sería otro sitio donde guardarlo. El control de flujo lo guarda la base
-   para que dos réplicas no se salten la espera.
-5. **La factura dice lo que falta antes de emitirse** (NIF, tipo de IVA vigente, régimen sin IVA):
-   lo que la AEAT rechazaría después obliga a subsanar, y un empresario sin conocimientos no sabe
-   qué es un alta por rechazo.
+4. **Submission goes out from syerp with mutual TLS and a service certificate**, not through the
+   Integration Gateway: it is SOAP with a client certificate to a public body, and taking the
+   certificate to the gateway would be another place to store it. Flow control is kept by the database
+   so that two replicas do not skip the wait.
+5. **The invoice says what is missing before it is issued** (VAT number, current VAT rate, VAT-exempt regime):
+   what the AEAT would reject later forces a correction, and a business owner without knowledge does not know
+   what a “registration after rejection” is.
 
-**Consecuencias.** Una factura confirmada ya no se edita ni se borra: se corrige con una
-rectificativa o, si la AEAT la rechazó, se corrige y se vuelve a enviar. Los contactos necesitan
-NIF para facturarles. El ERP tiene por primera vez una factura imprimible.
+**Consequences.** A confirmed invoice is no longer edited or deleted: it is corrected with a
+corrective invoice or, if the AEAT rejected it, it is corrected and sent again. Contacts need a
+VAT number to be invoiced. The ERP has a printable invoice for the first time.
 
-**Lo que falta, y es del dueño.** El **certificado**: de Sytue como colaborador social (convenio
-con la AEAT, que permite presentar por los clientes sin apoderamiento uno a uno) o como apoderado
-de cada cliente; sin él no se envía nada. **Suscribir la declaración responsable** de cada
-versión (`verifactu.DeclaracionFecha`), sin la cual producción no se puede activar.
+**What is missing, and it is up to the owner.** The **certificate**: Sytue's as a social collaborator (an agreement
+with the AEAT, which allows filing on behalf of customers without power of attorney one by one) or as the attorney-in-fact
+of each customer; without it nothing is sent. **Signing the responsible declaration** for each
+version (`verifactu.DeclaracionFecha`), without which production cannot be activated.
 
-**Lo que no se hizo, y por qué.** Factura simplificada (F2): el modelo exige cliente. IGIC e
-IPSI: Canarias, Ceuta y Melilla quedan fuera hasta que las facturas tengan su impuesto. Varias
-líneas con tipos distintos: la factura del ERP tiene una base y un IVA. Rectificativa por
-sustitución y facturas emitidas por terceros. Consultar en la AEAT lo presentado.
+**What was not done, and why.** Simplified invoice (F2): the model requires a customer. IGIC and
+IPSI: the Canary Islands, Ceuta and Melilla stay out until invoices have their tax. Several
+lines with different rates: the ERP invoice has one base and one VAT. Corrective invoice by
+substitution and invoices issued by third parties. Querying what was submitted at the AEAT.
 
-**Descartado.** _Generar el registro después, en segundo plano_ (la norma lo pide al expedir y la
-factura podría salir sin él). _Guardar el certificado de cada cliente_ (un empresario sin
-conocimientos no sabe exportarlo y custodiarlos es un riesgo que no hace falta). _Pasar el
-envío por el Integration Gateway_. _Dejar editar una factura aceptada y subsanar sin más_ (la
-norma solo admite subsanar lo que no exige rectificativa, y distinguirlo no es cosa de quien
-factura).
+**Ruled out.** _Generating the record afterwards, in the background_ (the rule requires it at issuance and the
+invoice could go out without it). _Storing each customer's certificate_ (a business owner without
+knowledge does not know how to export it, and holding them is an unnecessary risk). _Routing the
+submission through the Integration Gateway_. _Allowing an accepted invoice to be edited and simply corrected_ (the
+rule only allows correcting what does not require a corrective invoice, and telling them apart is not up to whoever
+invoices).
 
 <a id="0045"></a>
 
-## 0045 — Una sola interfaz en Gio para web, escritorio y móvil: sytue.com en Gio, sytue.eu en la actual
+<a id="0045--una-sola-interfaz-en-gio-para-web-escritorio-y-móvil-sytuecom-en-gio-sytueeu-en-la-actual"></a>
 
-`superseded` → [0048](#0048) en escritorio y móvil · 2026-09-20 · frontend, escritorio, móvil, gio · código en `apps/gio/`
+## 0045 — A single Gio interface for web, desktop and mobile: sytue.com in Gio, sytue.eu in the current one
 
-> **Superado el 2026-09-21 por el [0048](#0048)**, que devuelve escritorio y móvil a Fyne con
-> widgets propios y deja la web en Astro + Preact. `apps/gio` **no se borra**: sirve hoy
-> `sytue.com` en producción y se queda hasta que el dueño decida qué publica ese dominio. Lo de
-> abajo se conserva porque explica de dónde vienen `apps/gio/` y el reparto de ficheros.
+`superseded` → [0048](#0048) on desktop and mobile · 2026-09-20 · frontend, desktop, mobile, gio · code in `apps/gio/`
+
+> **Superseded on 2026-09-21 by [0048](#0048)**, which returns desktop and mobile to Fyne with
+> our own widgets and leaves the web on Astro + Preact. `apps/gio` **is not deleted**: today it serves
+> `sytue.com` in production and stays until the owner decides what that domain publishes. What is
+> below is kept because it explains where `apps/gio/` and the file layout come from.
 >
-> **Sustituido por Fyne y retirado del repositorio el 2026-09-23**: la suite en Gio, su
-> servidor web y el escritorio de Wails que la abría salen del árbol (`sytue.com` ya es un 301
-> a sytue.eu). La copia del código queda en `gio-archivado/`, fuera de git.
+> **Replaced by Fyne and removed from the repository on 2026-09-23**: the Gio suite, its
+> web server and the Wails desktop that opened it leave the tree (`sytue.com` is now a 301
+> to sytue.eu). The copy of the code remains in `gio-archivado/`, outside git.
 
-**Contexto.** Se pidió migrar la suite entera —las catorce apps Astro + Preact de `apps/frontend/`
-y el escritorio Fyne de `apps/desktop/shell/gui/`— a [Gio](https://gioui.org), un único código Go
-que compila a WebAssembly, escritorio y móvil, «píxel a píxel» y sin webview. Medido antes de
-empezar: son **unas 440.000 líneas** de aplicación más 36.000 de paquetes compartidos. No es una
-tarea; es un programa de trabajo, y este ADR deja escrito a dónde va, en qué orden y con qué
-reglas.
+**Context.** It was requested to migrate the entire suite —the fourteen Astro + Preact apps in `apps/frontend/`
+and the Fyne desktop in `apps/desktop/shell/gui/`— to [Gio](https://gioui.org), a single Go codebase
+that compiles to WebAssembly, desktop and mobile, “pixel for pixel” and without a webview. Measured before
+starting: it is **about 440,000 lines** of application plus 36,000 of shared packages. It is not a
+task; it is a work program, and this ADR writes down where it goes, in what order and with what
+rules.
 
-**Decisión.** La tomó el dueño el 2026-09-20, con los cuatro costes de más abajo a la vista:
+**Decision.** The owner made it on 2026-09-20, with the four costs below in view:
 
-- **Gio es el destino en los tres sitios** —web, escritorio y móvil—, con **un solo código**. No
-  «Gio en nativo y Astro en la web»: la razón de hacerlo es dejar de mantener dos interfaces.
-- **Primero, convivir en el repositorio.** `apps/gio/` vive junto a `apps/frontend/` y
-  `apps/desktop/`, y no se borra nada de lo que hay. Mientras dure, la web es la fuente de tokens,
-  catálogos y reglas, y Gio la lee o la compara.
-- **Y al acabar, convivir en producción, por dominio.** Cuando las fases estén completas,
-  **`sytue.com` publica la versión Gio entera y `sytue.eu` sigue con la actual** (Astro + Preact
-  - Go). No hay relevo que borre nada: son dos frentes sobre los mismos servicios y los mismos
-    datos, y el [0004](#0004) sigue vigente para `sytue.eu`.
+- **Gio is the destination in all three places** —web, desktop and mobile—, with **a single codebase**. Not
+  “Gio on native and Astro on the web”: the reason for doing it is to stop maintaining two interfaces.
+- **First, coexist in the repository.** `apps/gio/` lives next to `apps/frontend/` and
+  `apps/desktop/`, and nothing that exists is deleted. While it lasts, the web is the source of tokens,
+  catalogs and rules, and Gio reads it or compares against it.
+- **And when finished, coexist in production, by domain.** When the phases are complete,
+  **`sytue.com` publishes the entire Gio version and `sytue.eu` stays with the current one** (Astro + Preact
+  - Go). There is no handover that deletes anything: they are two fronts on the same services and the same
+    data, and [0004](#0004) remains in force for `sytue.eu`.
 
-  > **Esto dejó de ser cierto el 2026-09-21.** El port a Gio se canceló —escritorio y móvil van
-  > a Fyne, la web sigue en Astro + Preact + Go— y `sytue.com` pasa a servir **la suite Astro**,
-  > con un segundo juego de imágenes desplegado en el frontal: [ADR 0049](#0049). Lo demás de
-  > este ADR (el reparto de ficheros, `apps/gio/`) se conserva porque explica de dónde viene lo
-  > que sigue en el repositorio.
+  > **This stopped being true on 2026-09-21.** The Gio port was cancelled —desktop and mobile go
+  > to Fyne, the web stays on Astro + Preact + Go— and `sytue.com` now serves **the Astro suite**,
+  > with a second set of images deployed on the front node: [ADR 0049](#0049). The rest of
+  > this ADR (the file layout, `apps/gio/`) is kept because it explains where what
+  > remains in the repository comes from.
 
-- **Fyne se sustituye, no se borra en seco.** Es hoy el cliente de Windows y Linux, y solo
-  `shell.Run` lo llama (`gui.RunGUI`). Desde el 2026-09-20 queda **congelado** —ni se amplía ni se
-  arregla— y desaparece en la MISMA PR que ponga la shell de Gio en ese punto, para que no haya una
-  release sin escritorio. La tubería de publicación, `bundles.json` y las descargas no se tocan.
-  El contrato declarativo de pantallas (`packages/ui/src/native/`, el árbol `NodoUI`) se conserva:
-  cambia quién lo pinta.
-- **No es un calco: se porta y se mejora.** Lo que el puerto vaya encontrando mejorable —función,
-  interfaz, experiencia o diseño— se implementa por el camino, y queda apuntado en
-  [`roadmap.md` §Gio](roadmap.md#gio-mejoras-identificadas-durante-el-puerto) con su decisión:
-  qué se cambió, si va solo en Gio o también en la suite actual, y por qué. Una mejora sin
-  apuntar es una divergencia entre los dos dominios que nadie sabrá explicar. Donde NO se toca
-  nada es en lo que tiene que dar el mismo resultado: fórmulas, plurales, fechas, permisos.
-- `ci-gio.yml` vigila el módulo —build nativo y WASM, vet, test sin ninguno saltado, lint y
-  catálogos al día—, porque `go build ./...` en la raíz no entra en un módulo aparte.
+- **Fyne is replaced, not deleted abruptly.** Today it is the Windows and Linux client, and only
+  `shell.Run` calls it (`gui.RunGUI`). From 2026-09-20 it is **frozen** —neither extended nor
+  fixed— and it disappears in the SAME PR that puts the Gio shell at that point, so that there is no
+  release without a desktop. The publishing pipeline, `bundles.json` and the downloads are not touched.
+  The declarative screen contract (`packages/ui/src/native/`, the `NodoUI` tree) is kept:
+  what changes is who paints it.
+- **It is not a tracing: it is ported and improved.** Whatever the port finds improvable —functionality,
+  interface, experience or design— is implemented along the way, and is noted in
+  [`roadmap.md` §Gio](roadmap.md#gio-mejoras-identificadas-durante-el-puerto) with its decision:
+  what was changed, whether it goes only in Gio or also in the current suite, and why. An unnoted
+  improvement is a divergence between the two domains that nobody will be able to explain. Where NOTHING
+  is touched is in what has to give the same result: formulas, plurals, dates, permissions.
+- `ci-gio.yml` watches the module —native and WASM build, vet, tests with none skipped, lint and
+  up-to-date catalogs—, because `go build ./...` at the root does not enter a separate module.
 
-**Con qué reglas se construye (fase 1, ya hecha, sin interfaz).**
+**The rules it is built with (phase 1, already done, without an interface).**
 
-1. **Mandan las fuentes, no el encargo.** El encargo traía valores que no están en el código y
-   se portó lo que hay: la curva estándar es `(0.2, 0, 0, 1)`, `fade-in` es solo opacidad,
-   `drawer-in` entra desde −100 % sin tocar la opacidad, el pulso del skeleton es 1 → 0,55 → 1,
-   `accent-700` es `#224656`, son 26 idiomas y no 24, los cortes son los de Tailwind (640/768/1024)
-   y Gio estable es la v0.10.2. También pedía APIs que son de Fyne y no de Gio
+1. **The sources rule, not the brief.** The brief brought values that are not in the code and
+   what exists was ported: the standard curve is `(0.2, 0, 0, 1)`, `fade-in` is opacity only,
+   `drawer-in` enters from −100 % without touching opacity, the skeleton pulse is 1 → 0.55 → 1,
+   `accent-700` is `#224656`, there are 26 languages and not 24, the breakpoints are Tailwind's (640/768/1024)
+   and stable Gio is v0.10.2. It also asked for APIs that are Fyne's and not Gio's
    (`canvas.Rectangle`, `app.Settings().ThemeVariant()`).
-2. **Lo que se puede leer no se copia** ([0037](#0037)). Los colores salen de la MISMA hoja que
-   la web: `scripts/sync-branding.sh` deja una copia de `branding/tokens/colors.css` y
-   `internal/theme` la interpreta al arrancar, con el tema oscuro como reasignación sobre `:root`.
-   Lo que sí hubo que escribir a mano (escala, radios, sombras, keyframes, reglas de caché,
-   claves de catálogo) tiene un test que busca cada valor, literal, en su fuente de la web.
-3. **Donde la web se apoya en el navegador, la referencia es el navegador.** Plural y formato de
-   números se comparan contra vectores sacados del `Intl` real: `golang.org/x/text` lleva CLDR 32
-   y ya no contesta lo mismo (maltés, islandés, «1234» sin punto en español, U+202F en francés).
-4. **Una sesión y un margen de caducidad.** Nativo: Authorization Code + PKCE al loopback con el
-   cliente `sytue-desktop` de la migración 0069, y el refresh token en el llavero del sistema. Web:
-   **el token no baja al navegador** —ni a memoria—; lo guarda el BFF y lo pone él (ver la
-   partida 3). El encargo pedía `sessionStorage` y un redirect `sytue://` que el IdP no tiene
-   registrado; no se hizo ninguna de las dos cosas.
-5. **Se porta lo que existe.** `@sytue/offline` no tiene cola de mutaciones; se portó el almacén
-   por dueño, la conectividad y la caché «red primero» con sus reglas de privacidad.
+2. **What can be read is not copied** ([0037](#0037)). The colors come from the SAME stylesheet as
+   the web: `scripts/sync-branding.sh` leaves a copy of `branding/tokens/colors.css` and
+   `internal/theme` interprets it at startup, with the dark theme as a reassignment over `:root`.
+   What did have to be written by hand (scale, radii, shadows, keyframes, cache rules,
+   catalog keys) has a test that looks for each value, literally, in its web source.
+3. **Where the web relies on the browser, the browser is the reference.** Plurals and number
+   formatting are compared against vectors taken from the real `Intl`: `golang.org/x/text` carries CLDR 32
+   and no longer answers the same (Maltese, Icelandic, “1234” without a dot in Spanish, U+202F in French).
+4. **One session and one expiry margin.** Native: Authorization Code + PKCE to loopback with the
+   `sytue-desktop` client from migration 0069, and the refresh token in the system keychain. Web:
+   **the token does not go down to the browser** —not even into memory—; the BFF stores it and sets it itself (see
+   item 3). The brief asked for `sessionStorage` and a `sytue://` redirect that the IdP does not have
+   registered; neither was done.
+5. **What exists is ported.** `@sytue/offline` has no mutation queue; what was ported is the store
+   per owner, connectivity and the “network first” cache with its privacy rules.
 
-**Dos hallazgos medidos, que valen aunque esto no siga.**
+**Two measured findings, which hold even if this does not continue.**
 
-- **En la web 1 rem son 14 px, no 16.** `theme.css` fija `html { font-size: var(--text-base) }`
-  y eso reescala todo lo declarado en rem: tipografía y espaciado de Tailwind salen al 87,5 % de
-  lo que dicen los comentarios de la hoja. Medido con Playwright contra `www.sytue.eu`: `html`
-  14 px y el `h1` de `--text-4xl` a 42 px, no a 48. `text-sm` se ve a 11,4 px. Gio porta lo que
-  se ve (`theme.Rem = 14`); si resulta que fue un accidente, es una línea en cada lado.
-- **Los `Figtree-*.ttf` del escritorio Fyne son páginas HTML de GitHub**, no fuentes
-  (`750188b16`: se bajó la URL `blob`). El binario lleva 1,3 MB de HTML embebidos como tipografía.
+- **On the web 1 rem is 14 px, not 16.** `theme.css` sets `html { font-size: var(--text-base) }`
+  and that rescales everything declared in rem: Tailwind typography and spacing come out at 87.5 % of
+  what the stylesheet comments say. Measured with Playwright against `www.sytue.eu`: `html`
+  14 px and the `--text-4xl` `h1` at 42 px, not 48. `text-sm` shows at 11.4 px. Gio ports what
+  is seen (`theme.Rem = 14`); if it turns out to have been an accident, it is one line on each side.
+- **The Fyne desktop's `Figtree-*.ttf` files are GitHub HTML pages**, not fonts
+  (`750188b16`: the `blob` URL was downloaded). The binary carries 1.3 MB of HTML embedded as a typeface.
 
-**Lo que la decisión obliga a construir, y no estaba en el encargo.** No son motivos para no
-hacerlo —ya está decidido—; son las cinco partidas que más pesan, para que ninguna aparezca como
-sorpresa.
+**What the decision forces us to build, and was not in the brief.** They are not reasons not to
+do it —it is already decided—; they are the five items that weigh most, so that none appears as a
+surprise.
 
-1. **Un editor.** `gioui.org/x/richtext` pinta texto con estilos; **no edita**. Docs, Hojas,
-   Diapos, PDF y Notas son 90.000 líneas sobre `contenteditable`. En Gio no se portan: se escribe
-   un motor de edición y composición de texto. Es la partida más grande del programa.
-2. **Accesibilidad y SEO de la web.** Gio en WASM pinta en un `<canvas>`: sin lector de pantalla,
-   sin selección ni búsqueda del navegador, IME limitado y nada que indexar. La web en Gio
-   necesita un espejo semántico en el DOM (el árbol de `io/semantic` de Gio, que en escritorio ya
-   alimenta a los lectores) y `www` necesita HTML que un buscador pueda leer. Hasta que exista y
-   se mida, esas superficies no se relevan: la Directiva (UE) 2019/882 obliga desde junio de 2025.
-3. **El BFF.** Las apps Astro no son solo interfaz: guardan la sesión tras la cookie httpOnly. El
-   de Gio es `services/gioweb`, **hecho** ([arquitectura](architecture.md#gioweb)): sirve el
-   WebAssembly y guarda la sesión SELLADA (AES-256-GCM) en una cookie `__Host-` httpOnly. Va un
-   paso más allá que el de Astro, que entrega el token a la página por `/auth/token`: aquí la API
-   se pide al mismo origen (`/svc/<producto>/api/…`) y el `Authorization` lo pone el servidor, así
-   que ningún script de la página alcanza un token y los servicios no necesitan CORS nuevo.
-4. **El login en el móvil.** iOS y Android no pueden volver a un loopback; piden un cliente OIDC
-   con redirect propio, o sea una migración en `services/id`.
+1. **An editor.** `gioui.org/x/richtext` paints styled text; **it does not edit**. Docs, Sheets,
+   Slides, PDF and Notes are 90,000 lines on top of `contenteditable`. In Gio they are not ported: a
+   text editing and layout engine is written. It is the biggest item of the program.
+2. **Web accessibility and SEO.** Gio in WASM paints into a `<canvas>`: no screen reader,
+   no browser selection or search, limited IME and nothing to index. The web in Gio
+   needs a semantic mirror in the DOM (Gio's `io/semantic` tree, which on desktop already
+   feeds screen readers) and `www` needs HTML that a search engine can read. Until it exists and
+   is measured, those surfaces are not handed over: Directive (EU) 2019/882 is binding since June 2025.
+3. **The BFF.** The Astro apps are not only interface: they keep the session behind the httpOnly cookie. The
+   Gio one is `services/gioweb`, **done** ([architecture](architecture.md#gioweb)): it serves the
+   WebAssembly and stores the SEALED session (AES-256-GCM) in an httpOnly `__Host-` cookie. It goes one
+   step further than the Astro one, which hands the token to the page via `/auth/token`: here the API
+   is requested from the same origin (`/svc/<producto>/api/…`) and the `Authorization` is set by the server, so
+   no script on the page can reach a token and the services do not need new CORS.
+4. **Login on mobile.** iOS and Android cannot return to a loopback; they require an OIDC client
+   with its own redirect, that is, a migration in `services/id`.
 
-5. **`sytue.com` como segundo frente.** Hoy `sytue.com` responde 301 a `sytue.eu`
-   (`sytue-com-redirect`, `bc3000c15`): el día de publicar hay que retirarlo. La cookie de sesión
-   de la suite es de `.sytue.eu` y no viaja a `.sytue.com`, así que el frente Gio necesita su
-   propio BFF y su cliente OIDC con redirect en `sytue.com`. **Hecho, salvo el relevo:** UN
-   cliente confidencial para toda la suite (`sytue-gio`, migración 0070, con su audiencia en
-   `firstPartyAudiences` —sin eso todos los servicios contestan 401, que es lo que le pasó a
-   Fotos—); UN host canónico, porque la cookie `__Host-` es de un solo host y el `redirect_uri`
-   es literal (los alias reciben un 308 hacia él); los servicios no aceptan ningún origen nuevo,
-   porque el navegador solo habla con `gioweb`; y `sytue.com` ya está en el inventario.
-   **Mientras el puerto no esté completo vive en `gio.sytue.eu`**, que entra por el comodín del
-   frontal sin tocar nada, y `sytue.com` sigue con su 301. El relevo es cambiar `GIO_HOST` y el
-   frontal: [runbook](operations.md#gio-el-segundo-frente).
+5. **`sytue.com` as a second front.** Today `sytue.com` responds 301 to `sytue.eu`
+   (`sytue-com-redirect`, `bc3000c15`): on publishing day it has to be removed. The suite's session cookie
+   is for `.sytue.eu` and does not travel to `.sytue.com`, so the Gio front needs its
+   own BFF and its OIDC client with a redirect at `sytue.com`. **Done, except for the handover:** ONE
+   confidential client for the whole suite (`sytue-gio`, migration 0070, with its audience in
+   `firstPartyAudiences` —without that all services answer 401, which is what happened to
+   Photos—); ONE canonical host, because the `__Host-` cookie is for a single host and the `redirect_uri`
+   is literal (the aliases get a 308 towards it); the services do not accept any new origin,
+   because the browser only talks to `gioweb`; and `sytue.com` is already in the inventory.
+   **While the port is not complete it lives at `gio.sytue.eu`**, which comes in through the front node's
+   wildcard without touching anything, and `sytue.com` keeps its 301. The handover is changing `GIO_HOST` and the
+   front node: [runbook](operations.md#gio-el-segundo-frente).
 
-Esto **sustituye** a lo decidido el 2026-09-13 (PR #429), que entendía «nativo» como lo que rodea
-a la ventana de una web: con Gio la interfaz entera es nativa.
+This **replaces** what was decided on 2026-09-13 (PR #429), which understood “native” as what surrounds
+the window of a web app: with Gio the entire interface is native.
 
-**Consecuencias.** `apps/gio/` es un módulo aparte, dentro de osv-scanner y govulncheck. Nada de
-la web actual cambia por esto, salvo los defectos que el puerto destape en ella, que se arreglan
-también allí.
+**Consequences.** `apps/gio/` is a separate module, inside osv-scanner and govulncheck. Nothing in
+the current web changes because of this, except the defects the port uncovers in it, which are also fixed
+there.
 
-**Lo que falta de la fase 1.** El motor de fórmulas: 11.400 líneas y unas 360 funciones, con 1.877
-aserciones en sus tests. Portarlo «casi igual» es peor que no portarlo —una hoja de cálculo que
-diverge en el decimoquinto decimal no avisa—, así que va con el mismo método que `Intl`: vectores
-generados por el motor TypeScript y el puerto Go comparado contra ellos, fichero a fichero.
-También el formato de fechas (no hay CLDR de fechas en `x/text`) e Inter para griego y búlgaro.
+**What is left of phase 1.** The formula engine: 11,400 lines and about 360 functions, with 1,877
+assertions in its tests. Porting it “almost the same” is worse than not porting it —a spreadsheet that
+diverges in the fifteenth decimal place does not warn you—, so it goes with the same method as `Intl`: vectors
+generated by the TypeScript engine and the Go port compared against them, file by file.
+Also date formatting (there is no date CLDR in `x/text`) and Inter for Greek and Bulgarian.
 
-**Descartado.** _bbolt para el almacén offline_ (bloquea su fichero para un proceso y la suite
-son varios binarios a la vez). _Un espejo tipado de los colores_ (es lo que ya son `tokens.ts` y
-el `theme.go` de Fyne, y los dos hay que acordarse de tocarlos). _`x/text/message` para los
-números_ (CLDR 32). _Guardar el access token_ (dura minutos y con él la entrada no cabe en el
-Credential Manager de Windows).
+**Ruled out.** _bbolt for the offline store_ (it locks its file to one process and the suite
+is several binaries at once). _A typed mirror of the colors_ (that is what `tokens.ts` and
+Fyne's `theme.go` already are, and both have to be remembered to be touched). _`x/text/message` for
+numbers_ (CLDR 32). _Storing the access token_ (it lasts minutes and with it the entry does not fit in the
+Windows Credential Manager).
 
 <a id="0046"></a>
 
-## 0046 — Los medios de Rooms no se escriben en Go: el transporte sí, los códecs y la captura no
+<a id="0046--los-medios-de-rooms-no-se-escriben-en-go-el-transporte-sí-los-códecs-y-la-captura-no"></a>
 
-`accepted` · 2026-09-21 · rooms, gio, móvil, escritorio, medios · acota el [0045](#0045), no lo
-cambia · guardián en `apps/gio/internal/medios/vp8_test.go`
+## 0046 — Rooms media is not written in Go: transport yes, codecs and capture no
 
-**Contexto.** El [0045](#0045) manda que la interfaz sea Gio en los tres sitios, sin webview. Hoy
-las videollamadas de Rooms las hace el navegador: `apps/mobile/rooms` (Capacitor) y
-`apps/desktop/rooms` (Wails) no tienen **ni una línea** de `livekit|webrtc|getUserMedia|RTCPeer`;
-quien habla con el SFU es `livekit-client` dentro del webview. Se pidió evaluar —y si salía,
-escribir— un cliente WebRTC/LiveKit nativo en Go con captura de cámara, micrófono y pantalla, para
-quitar ese webview. Esto es lo que se midió antes de escribir nada.
+`accepted` · 2026-09-21 · rooms, gio, mobile, desktop, media · bounds [0045](#0045), does not
+change it · guardian in `apps/gio/internal/medios/vp8_test.go`
 
-**Lo medido** (2026-09-21, piloto: Ryzen 5 5600X, Go 1.27.1; SFU LiveKit v1.13.7, el pin del repo).
+**Context.** [0045](#0045) mandates that the interface be Gio in all three places, without a webview. Today
+Rooms video calls are done by the browser: `apps/mobile/rooms` (Capacitor) and
+`apps/desktop/rooms` (Wails) have **not a single line** of `livekit|webrtc|getUserMedia|RTCPeer`;
+what talks to the SFU is `livekit-client` inside the webview. It was requested to evaluate —and if it worked out,
+write— a native WebRTC/LiveKit client in Go with camera, microphone and screen capture, to
+remove that webview. This is what was measured before writing anything.
 
-_1. El transporte funciona, y es barato._ `github.com/livekit/server-sdk-go/v2` v2.18.1 sobre
-`pion/webrtc` v4 conecta a un LiveKit real: señalización, ICE, DTLS y SRTP, y recibe las pistas de
-los demás. Con un publicador escribiendo muestras VP8 ya codificadas a 30 fps, el suscriptor gasta:
+**What was measured** (2026-09-21, pilot: Ryzen 5 5600X, Go 1.27.1; LiveKit SFU v1.13.7, the repo's pin).
 
-| participantes | pistas | CPU (1 núcleo) | RSS    | recibido  |
-| ------------- | ------ | -------------- | ------ | --------- |
-| 1             | 2      | 1,1 %          | 38 MiB | 1,6 Mbps  |
-| 4             | 8      | 3,4 %          | 39 MiB | 6,4 Mbps  |
-| 9             | 18     | 8,6 %          | 41 MiB | 14,5 Mbps |
-| 16            | 32     | 14,6 %         | 42 MiB | 25,7 Mbps |
+_1. The transport works, and it is cheap._ `github.com/livekit/server-sdk-go/v2` v2.18.1 on top of
+`pion/webrtc` v4 connects to a real LiveKit: signaling, ICE, DTLS and SRTP, and receives the others'
+tracks. With a publisher writing already-encoded VP8 samples at 30 fps, the subscriber spends:
 
-Lineal, ~0,9 % de un núcleo por participante y memoria plana. Emitir cuesta ~1,6 % de CPU y
-40-60 MiB por conexión de sala. El binario mínimo —sin interfaz y sin captura— son **26,5 MiB**
-con `-s -w`, y arrastra **193 módulos**. Compila con CGO desactivado a Linux, macOS y Windows;
-**Android necesita `-ldflags=-checklinkname=0`** porque `wlynxg/anet` v0.0.5 (vía `pion/ice`)
-enlaza por `//go:linkname` a `net.zoneCache`, que Go 1.27 ya no permite; `js/wasm` no compila
-(paquete `e2ee`).
+| participants | tracks | CPU (1 core) | RSS    | received  |
+| ------------ | ------ | ------------ | ------ | --------- |
+| 1            | 2      | 1.1 %        | 38 MiB | 1.6 Mbps  |
+| 4            | 8      | 3.4 %        | 39 MiB | 6.4 Mbps  |
+| 9            | 18     | 8.6 %        | 41 MiB | 14.5 Mbps |
+| 16           | 32     | 14.6 %       | 42 MiB | 25.7 Mbps |
 
-_2. No existe ni un códec de vídeo en Go puro, ni para descodificar._ `golang.org/x/image/vp8` es
-el único descodificador VP8 en Go, y **rechaza todo fotograma que no sea clave**: «Golden / AltRef
-frames are not implemented», con el comentario de upstream «only used for video, not still
-images». Es el descodificador de WebP. En una videollamada uno de cada sesenta fotogramas es
-clave, así que no descodifica nada. `pion/opus` v0.1.0 solo descodifica: tampoco hay codificador
-Opus. El propio pion lo dice: lleva empaquetadores, no códecs, y su `getUserMedia` «requires Cgo».
+Linear, ~0.9 % of a core per participant and flat memory. Publishing costs ~1.6 % CPU and
+40-60 MiB per room connection. The minimal binary —no interface and no capture— is **26.5 MiB**
+with `-s -w`, and pulls in **193 modules**. It compiles with CGO disabled for Linux, macOS and Windows;
+**Android needs `-ldflags=-checklinkname=0`** because `wlynxg/anet` v0.0.5 (via `pion/ice`)
+links via `//go:linkname` to `net.zoneCache`, which Go 1.27 no longer allows; `js/wasm` does not compile
+(`e2ee` package).
 
-_3. Con cgo el rendimiento sobra; el problema no es la velocidad._ libvpx descodifica 720p en
-**0,74 ms** por fotograma y 360p en **0,23 ms** (un hilo). Nueve participantes a 360p30 son el
-6,2 % de un núcleo. Lo que falta no es potencia: es que ese código está en C y hay que cruzarlo a
-cinco plataformas.
+_2. There is not a single pure-Go video codec, not even for decoding._ `golang.org/x/image/vp8` is
+the only VP8 decoder in Go, and **it rejects every frame that is not a keyframe**: “Golden / AltRef
+frames are not implemented”, with the upstream comment “only used for video, not still
+images”. It is the WebP decoder. In a video call one in sixty frames is a
+keyframe, so it decodes nothing. `pion/opus` v0.1.0 only decodes: there is no Opus encoder
+either. Pion itself says so: it carries packetizers, not codecs, and its `getUserMedia` “requires Cgo”.
 
-_4. La captura no está escrita para las plataformas que importan._ Gio v0.10.2 **no tiene nada de
-medios** —ni audio, ni cámara, ni pantalla— aunque sí expone el puente JNI en Android.
-`pion/mediadevices` v0.10.0 cubre cámara en Linux/macOS/Windows, micrófono por miniaudio y
-pantalla **solo en X11**; todo con cgo, y **sin un solo driver de Android ni de iOS** (con
-`GOOS=android` selecciona por error el fichero de X11 y no compila). Lo que habría que escribir:
+_3. With cgo there is performance to spare; the problem is not speed._ libvpx decodes 720p in
+**0.74 ms** per frame and 360p in **0.23 ms** (one thread). Nine participants at 360p30 are
+6.2 % of a core. What is missing is not power: it is that this code is in C and has to be cross-compiled for
+five platforms.
 
-|                | Android          | iOS          | macOS            | Linux           | Windows      |
-| -------------- | ---------------- | ------------ | ---------------- | --------------- | ------------ |
-| cámara         | Camera2 / JNI    | AVFoundation | mediadevices     | v4l2            | mediadevices |
-| micrófono      | AudioRecord      | AudioUnit    | miniaudio        | miniaudio       | miniaudio    |
-| altavoz        | AAudio           | AudioUnit    | por escribir     | por escribir    | por escribir |
-| pantalla       | MediaProjection  | ReplayKit    | ScreenCaptureKit | PipeWire+portal | DXGI         |
-| codificar V    | MediaCodec       | VideoToolbox | libvpx           | libvpx          | libvpx       |
-| descodificar V | MediaCodec       | VideoToolbox | libvpx           | libvpx          | libvpx       |
-| Opus           | libopus          | libopus      | libopus          | libopus         | libopus      |
-| eco (AEC/NS)   | APM de libwebrtc | ídem         | ídem             | ídem            | ídem         |
+_4. Capture is not written for the platforms that matter._ Gio v0.10.2 **has nothing for
+media** —no audio, no camera, no screen— although it does expose the JNI bridge on Android.
+`pion/mediadevices` v0.10.0 covers camera on Linux/macOS/Windows, microphone via miniaudio and
+screen **only on X11**; all with cgo, and **without a single Android or iOS driver** (with
+`GOOS=android` it mistakenly selects the X11 file and does not compile). What would have to be written:
 
-Cuarenta casillas; `mediadevices` cubre ocho, y ninguna de las dieciséis de móvil. La fila del
-eco es la que más se olvida: sin cancelación de eco una llamada con altavoz es inusable, y la
-única implementación seria es el APM de libwebrtc, que es C++.
+|               | Android         | iOS          | macOS            | Linux           | Windows       |
+| ------------- | --------------- | ------------ | ---------------- | --------------- | ------------- |
+| camera        | Camera2 / JNI   | AVFoundation | mediadevices     | v4l2            | mediadevices  |
+| microphone    | AudioRecord     | AudioUnit    | miniaudio        | miniaudio       | miniaudio     |
+| speaker       | AAudio          | AudioUnit    | to be written    | to be written   | to be written |
+| screen        | MediaProjection | ReplayKit    | ScreenCaptureKit | PipeWire+portal | DXGI          |
+| encode V      | MediaCodec      | VideoToolbox | libvpx           | libvpx          | libvpx        |
+| decode V      | MediaCodec      | VideoToolbox | libvpx           | libvpx          | libvpx        |
+| Opus          | libopus         | libopus      | libopus          | libopus         | libopus       |
+| echo (AEC/NS) | libwebrtc APM   | same         | same             | same            | same          |
 
-_5. Nadie lo hace así, ni LiveKit._ Su SDK de cliente en Rust no implementa medios: depende de
-`libwebrtc` (vía `webrtc-sys`), y por debajo están también los de Flutter, Swift y Kotlin. El de
-Go se llama **server**-sdk-go precisamente porque está pensado para agentes de servidor, que no
-capturan nada.
+Forty cells; `mediadevices` covers eight, and none of the sixteen for mobile. The echo
+row is the one most often forgotten: without echo cancellation a speakerphone call is unusable, and the
+only serious implementation is libwebrtc's APM, which is C++.
 
-**Decisión.** **No se escribe un cliente de medios en Go.** El encargo era «evaluar y, si la
-medición lo respalda, implementar»; no lo respalda. Se para aquí, con la medición escrita, y
-Rooms sigue haciendo las llamadas como hoy. Esto **acota** el [0045](#0045): la interfaz de Rooms
-se porta a Gio como el resto de la suite; la **llamada** no, y no es deuda de nadie.
+_5. Nobody does it this way, not even LiveKit._ Its Rust client SDK does not implement media: it depends on
+`libwebrtc` (via `webrtc-sys`), and the Flutter, Swift and Kotlin ones sit on top of it too. The
+Go one is called **server**-sdk-go precisely because it is intended for server agents, which do not
+capture anything.
 
-**Si algún día hay que hacerlo, el camino no es Go puro.** Es cgo contra libwebrtc —por
-`livekit-ffi`, que es lo que ya usa el SDK de Rust—, aceptando lo que eso trae: una biblioteca
-nativa por arquitectura, una cadena de compilación cruzada por plataforma, y las clases Java de
-Android conviviendo con la actividad de Gio. Es un encargo propio, no un remate de este.
+**Decision.** **A media client is not written in Go.** The brief was “evaluate and, if the
+measurement supports it, implement”; it does not support it. We stop here, with the measurement written down, and
+Rooms keeps making calls as it does today. This **bounds** [0045](#0045): the Rooms interface
+is ported to Gio like the rest of the suite; the **call** is not, and it is nobody's debt.
 
-**Y la condición que cualquier implementación futura tiene que cumplir.** Captura de cámara,
-micrófono o pantalla **solo con consentimiento continuo y visible**, permiso pedido en el momento
-de usarlo y no antes, explicando función, dato, duración e impacto, y el rechazo degradando de
-forma segura —entrar a la llamada sin cámara, no quedarse fuera—. Es lo que ya hace la pantalla
-previa de la web (`PreJoin`): se publica **exactamente** lo que el usuario eligió, en vez de
-llamar a `enableCameraAndMicrophone()`.
+**If it ever has to be done, the path is not pure Go.** It is cgo against libwebrtc —via
+`livekit-ffi`, which is what the Rust SDK already uses—, accepting what that brings: a native
+library per architecture, a cross-compilation toolchain per platform, and Android's Java classes
+coexisting with the Gio activity. It is a brief of its own, not a finishing touch to this one.
 
-**Cuándo reconsiderarlo, y quién avisa.** `apps/gio/internal/medios/vp8_test.go` descodifica un
-interfotograma VP8 real con `golang.org/x/image/vp8` y comprueba que falla por el motivo medido.
-El día que upstream implemente Golden/AltRef, ese test se pone en rojo: es la señal de reabrir
-esto, no de borrar el test. Lo otro que lo reabriría es que aparezca un codificador Opus o VP8/AV1
-en Go puro, o drivers de Android/iOS en `pion/mediadevices`.
+**And the condition any future implementation has to meet.** Camera,
+microphone or screen capture **only with continuous and visible consent**, permission requested at the moment
+of use and not before, explaining function, data, duration and impact, and refusal degrading
+safely —joining the call without a camera, not being left out—. It is what the web's pre-join
+screen (`PreJoin`) already does: it publishes **exactly** what the user chose, instead of
+calling `enableCameraAndMicrophone()`.
 
-**Descartado.** _Implementar solo la recepción_ (sin descodificador tampoco se pinta, y media
-llamada no es una llamada). _`pion/mediadevices` tal cual_ (no tiene móvil, y su pantalla es
-X11: ni Wayland, ni macOS, ni Windows). _Seguir con el webview dentro de Gio_ (lo prohíbe el
-encargo, y con razón: sería la tercera interfaz).
+**When to reconsider it, and who gives notice.** `apps/gio/internal/medios/vp8_test.go` decodes a
+real VP8 interframe with `golang.org/x/image/vp8` and checks that it fails for the measured reason.
+The day upstream implements Golden/AltRef, that test goes red: it is the signal to reopen
+this, not to delete the test. The other thing that would reopen it is a pure-Go Opus or VP8/AV1 encoder
+appearing, or Android/iOS drivers in `pion/mediadevices`.
 
-**Enmienda del 2026-09-25 — se reabre, y por la puerta que el propio ADR dejaba.** El dueño
-decidió llevar audio y vídeo a la app nativa de Rooms (ahora Fyne, [0048](#0048)) en escritorio y
-en móvil. Dos de las condiciones de «cuándo reconsiderarlo» se cumplen ya: hay **codificador Opus
-en Go puro** (`github.com/tphakala/go-opus` v1.1.0, BSD-3, transliteración de libopus;
-codifica solo CELT, que a 32 kbps mono basta para voz, y descodifica los tres modos) y **VP8 en Go
-puro con interfotogramas** (`github.com/thesyncim/govpx`, BSD-3, codificador y descodificador;
-en su medida, 1,8 ms por fotograma de 720p al descodificar). La fila del códec deja de ser C.
+**Ruled out.** _Implementing reception only_ (without a decoder nothing is painted either, and half a
+call is not a call). _`pion/mediadevices` as is_ (it has no mobile, and its screen is
+X11: not Wayland, not macOS, not Windows). _Keeping the webview inside Gio_ (the brief
+forbids it, and rightly so: it would be the third interface).
 
-Lo que queda escrito así:
+**Amendment of 2026-09-25 — it is reopened, and through the door this ADR itself left open.** The owner
+decided to bring audio and video to the native Rooms app (now Fyne, [0048](#0048)) on desktop and
+on mobile. Two of the “when to reconsider it” conditions are already met: there is a **pure-Go Opus
+encoder** (`github.com/tphakala/go-opus` v1.1.0, BSD-3, a transliteration of libopus;
+it encodes only CELT, which at 32 kbps mono is enough for voice, and decodes all three modes) and **pure-Go VP8
+with interframes** (`github.com/thesyncim/govpx`, BSD-3, encoder and decoder;
+by its own measurement, 1.8 ms per 720p frame when decoding). The codec row stops being C.
 
-- **Transporte**: `livekit/server-sdk-go/v2` v2.18.1 sobre `pion/webrtc` v4.2.21, como se midió
-  arriba. `livekit/protocol` se queda en v1.49.0 porque v1.52 rompe la compilación del SDK.
-  Android sigue pidiendo `-ldflags=-checklinkname=0` (anet); lo pone `empaquetar.sh` por GOFLAGS.
-- **Micrófono y altavoz**: miniaudio por `gen2brain/malgo` (cgo sin bibliotecas que enlazar),
-  que cubre las cinco plataformas —CoreAudio, WASAPI, PulseAudio/ALSA, AAudio/OpenSL ES—. Es la
-  única pieza con C, y va aparte (`apps/fyne/llamada/altavoz`) para que el resto se pruebe sin
-  tarjeta.
-- **El token y el SFU son los de la web**: `POST /rooms/{id}/join` del servicio (y
-  `from-source`/`by-source` + `knock` para los canales), sin endpoint propio. Los medios van al SFU
-  de la suite, no a terceros.
-- **Guardián**: `apps/fyne/llamada/sfu_test.go` levanta el mismo `livekit-server` que se despliega
-  y comprueba que la voz de una persona llega como tono a la otra, que su cámara llega como imagen
-  y que colgar libera el sitio en el acto. Se vio en rojo quitando cada una de las tres cosas.
+What remains written as follows:
 
-**Segunda enmienda, 2026-09-26: la captura también.** La cámara y la pantalla se leen con la
-API de cada sistema (AVFoundation y ScreenCaptureKit, Media Foundation y GDI, V4L2 y X11,
-Camera2), en `apps/fyne/llamada/camara`, y el eco lo quita el sistema: VoiceProcessingIO en macOS
-e iOS y el DSP de captura de voz en Windows. Es la primera fila de la tabla de arriba que se
-escribe; la de la pantalla del móvil sigue sin estar. Lo que se ha probado y dónde, en el roadmap.
+- **Transport**: `livekit/server-sdk-go/v2` v2.18.1 on top of `pion/webrtc` v4.2.21, as measured
+  above. `livekit/protocol` stays at v1.49.0 because v1.52 breaks the SDK build.
+  Android still requires `-ldflags=-checklinkname=0` (anet); `empaquetar.sh` sets it via GOFLAGS.
+- **Microphone and speaker**: miniaudio via `gen2brain/malgo` (cgo with no libraries to link),
+  which covers all five platforms —CoreAudio, WASAPI, PulseAudio/ALSA, AAudio/OpenSL ES—. It is the
+  only piece with C, and it is kept separate (`apps/fyne/llamada/altavoz`) so that the rest can be tested without a
+  sound card.
+- **The token and the SFU are the web's**: the service's `POST /rooms/{id}/join` (and
+  `from-source`/`by-source` + `knock` for channels), without its own endpoint. Media goes to the suite's SFU,
+  not to third parties.
+- **Guardian**: `apps/fyne/llamada/sfu_test.go` brings up the same `livekit-server` that is deployed
+  and checks that one person's voice reaches the other as a tone, that their camera arrives as an image
+  and that hanging up frees the slot immediately. It was seen red by removing each of the three things.
 
-**Lo que sigue sin estar, y por qué** (el detalle, en [roadmap](./roadmap.md#llamadas-nativas)):
-la **captura de cámara y de pantalla** —la fila de «cámara» y «pantalla» de la tabla sigue siendo
-por plataforma y no tiene código en Go—; la **cancelación de eco** en escritorio —se pide la del
-sistema donde se puede (AAudio «comunicación de voz», categoría «reproducir y grabar» de iOS), y
-en escritorio no la hay: con altavoces, auriculares—. Recibir la cámara y la pantalla de los demás
-sí funciona, porque solo pide descodificar.
+**Second amendment, 2026-09-26: capture too.** The camera and the screen are read with each
+system's API (AVFoundation and ScreenCaptureKit, Media Foundation and GDI, V4L2 and X11,
+Camera2), in `apps/fyne/llamada/camara`, and echo is removed by the system: VoiceProcessingIO on macOS
+and iOS and the voice capture DSP on Windows. It is the first row of the table above that gets
+written; the mobile screen one is still missing. What has been tested and where, in the roadmap.
 
-**La condición del consentimiento sigue en pie**: la antesala publica solo lo que se eligió, el
-permiso del micrófono se pide al abrirla (Android) o al abrir la captura (macOS e iOS, con
-`NSMicrophoneUsageDescription`), y sin permiso se entra a escuchar. El test de `vp8_test.go` que se
-citaba arriba se fue con Gio; su papel lo hace ahora `sfu_test.go`.
+**What is still missing, and why** (the details, in the [roadmap](./roadmap.md#llamadas-nativas)):
+**camera and screen capture** —the “camera” and “screen” rows of the table are still
+per platform and have no Go code—; **echo cancellation** on desktop —the system's is requested
+where possible (AAudio “voice communication”, iOS “play and record” category), and
+on desktop there is none: with speakers, use headphones—. Receiving the others' camera and screen
+does work, because it only requires decoding.
+
+**The consent condition still stands**: the waiting room publishes only what was chosen, the
+microphone permission is requested when opening it (Android) or when opening capture (macOS and iOS, with
+`NSMicrophoneUsageDescription`), and without permission you join to listen. The `vp8_test.go` test that was
+cited above went away with Gio; its role is now played by `sfu_test.go`.
 
 ---
 
 <a id="0047"></a>
 
-## 0047 — Los avisos de Android salen del SSE del Hub, y el empaquetador va parcheado hasta que gogio lo acepte
+<a id="0047--los-avisos-de-android-salen-del-sse-del-hub-y-el-empaquetador-va-parcheado-hasta-que-gogio-lo-acepte"></a>
 
-`accepted` · 2026-09-21 · móvil, gio, avisos, empaquetado, soberanía · **implementa el
-[0039](#0039)** para Android
+## 0047 — Android notifications come from the Hub SSE, and the packager is patched until gogio accepts it
 
-**Contexto.** El [0039](#0039) ya decidió por dónde entra un aviso en Android: el **flujo SSE
-del Hub** que la web consume con `EventSource`, sostenido por un **servicio en primer plano**.
-Sin FCM, sin Play Services y sin ningún identificador fuera de la UE. Lo que faltaba era poder
-hacerlo, y lo que lo impedía no era el código nuestro sino **gogio**: escribe él el
-`AndroidManifest.xml` desde una plantilla cerrada donde no cabe ni `POST_NOTIFICATIONS`
-—obligatorio desde `targetSdk 33`, y los APK salen con 35— ni un `<service>`.
+`accepted` · 2026-09-21 · mobile, gio, notifications, packaging, sovereignty · **implements
+[0039](#0039)** for Android
 
-Mientras tanto, `@capacitor/push-notifications` en `apps/mobile/rooms` era **el único sitio de
-toda la suite donde un mensaje avisa con la app cerrada**, y por eso ese envoltorio no se podía
-apagar.
+**Context.** [0039](#0039) already decided where a notification comes in on Android: the **Hub SSE
+stream** that the web consumes with `EventSource`, sustained by a **foreground service**.
+No FCM, no Play Services and no identifier outside the EU. What was missing was being able to
+do it, and what prevented it was not our code but **gogio**: it writes the
+`AndroidManifest.xml` itself from a closed template where there is room for neither `POST_NOTIFICATIONS`
+—mandatory since `targetSdk 33`, and the APKs ship with 35— nor a `<service>`.
 
-**Decisión 1: parche, no bifurcación, y con huecos genéricos.** `gogio-avisos.patch` son **doce
-líneas** repartidas en tres ficheros de gogio, y no añaden una bandera por caso sino **dos
-huecos**: `-permissions` (permisos extra tal cual) y `-appmanifest` (XML literal dentro de
-`<application>`). Así gogio no necesita otra bandera la próxima vez, que es la forma en que esto
-se puede mandar aguas arriba en vez de arrastrarlo.
+Meanwhile, `@capacitor/push-notifications` in `apps/mobile/rooms` was **the only place in
+the whole suite where a message notifies with the app closed**, and that is why that wrapper could not be
+turned off.
 
-Y **no hay fork que mantener**: nada que clonar ni que alojar. `gogio-sytue.sh` coge de la caché
-de módulos la versión EXACTA que fija `versions.env`, le aplica el parche en un temporal y
-compila. Subir de versión es cambiar ese número; si el parche deja de aplicar, el guion **falla**
-y eso es justo el aviso de que gogio ha tocado esa zona. El día que lo acepten, se borran el
-guion y el `.patch` y se vuelve a `gogio` a secas.
+**Decision 1: a patch, not a fork, and with generic slots.** `gogio-avisos.patch` is **twelve
+lines** spread across three gogio files, and it does not add a flag per case but **two
+slots**: `-permissions` (extra permissions as is) and `-appmanifest` (literal XML inside
+`<application>`). That way gogio does not need another flag next time, which is how this
+can be sent upstream instead of being dragged along.
 
-Se rechazó **bajar a `-targetsdk 32`**, que lo desbloquearía hoy sin tocar nada: Play Store exige
-≥ 34, así que sería cambiar un bloqueo visible por uno que aparece el día de publicar.
+And **there is no fork to maintain**: nothing to clone or host. `gogio-sytue.sh` takes from the
+module cache the EXACT version pinned by `versions.env`, applies the patch to it in a temporary directory and
+compiles. Upgrading is changing that number; if the patch stops applying, the script **fails**
+and that is precisely the warning that gogio has touched that area. The day they accept it, the
+script and the `.patch` are deleted and we go back to plain `gogio`.
 
-**Decisión 2: la capa nativa es solo presentación, y se mide.** El criterio del dueño es limitar
-al máximo lo específico de cada plataforma. Aquí eso se reparte así:
+**Dropping to `-targetsdk 32`** was rejected, which would unblock it today without touching anything: the Play Store requires
+≥ 34, so it would be trading a visible blocker for one that shows up on publishing day.
 
-- **En Go, una vez para las catorce apps y las tres plataformas** (`apps/gio/apps/avisos`): el
-  cliente SSE y su reconexión con espera creciente, qué merece interrumpir, el descarte de
-  repetidos, los textos —los del Hub, ya traducidos—, a dónde lleva cada aviso y el número del
-  badge.
-- **En Java, cuarenta líneas sin una sola decisión** (`internal/sistema/Avisos.java`):
-  «enseña esto», «pon este número», y el envoltorio del servicio en primer plano. Recibe la
-  notificación permanente ya construida, como `Parcelable` en el `Intent`.
+**Decision 2: the native layer is presentation only, and it is measured.** The owner's criterion is to limit
+platform-specific code as much as possible. Here that is split like this:
 
-La prueba de que está bien repartido es que **la capa de iOS pueda ser igual de fina**:
-`sistema.Avisar`, `Callar` y `PedirAvisos` son las mismas tres funciones, con
-`UNUserNotificationCenter` detrás y sin repetir ninguna regla.
+- **In Go, once for the fourteen apps and the three platforms** (`apps/gio/apps/avisos`): the
+  SSE client and its reconnection with increasing backoff, what deserves an interruption, discarding
+  duplicates, the texts —the Hub's, already translated—, where each notification leads and the
+  badge number.
+- **In Java, forty lines without a single decision** (`internal/sistema/Avisos.java`):
+  “show this”, “set this number”, and the foreground service wrapper. It receives the
+  permanent notification already built, as a `Parcelable` in the `Intent`.
 
-**Decisión 3: `specialUse` y no `dataSync`.** Desde Android 15 un servicio en primer plano de
-tipo `dataSync` tiene un **tope de seis horas al día** —el sistema llama a `onTimeout()`—, y una
-conexión de avisos que se apaga a media tarde no es una conexión de avisos. `specialUse` no tiene
-tope; a cambio Google Play pide una justificación, que va declarada en el propio manifiesto
-(`PROPERTY_SPECIAL_USE_FGS_SUBTYPE`) y es la de verdad.
+The proof that it is well split is that **the iOS layer can be just as thin**:
+`sistema.Avisar`, `Callar` and `PedirAvisos` are the same three functions, with
+`UNUserNotificationCenter` behind them and without repeating any rule.
 
-**Permisos, que son tres y los únicos.** `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE` y
-`FOREGROUND_SERVICE_SPECIAL_USE`, justificados uno a uno —función, dato, duración, impacto y
-alternativa, como pide el encargo v4 §5— en `permisosDelManifiesto`. El de avisar **se pide en
-contexto**: al abrir la campana por primera vez, no al arrancar; y si la persona dice que no, la
-campana sigue contando y marcando.
+**Decision 3: `specialUse` and not `dataSync`.** Since Android 15 a foreground service of
+type `dataSync` has a **cap of six hours a day** —the system calls `onTimeout()`—, and a
+notification connection that shuts down in the middle of the afternoon is not a notification connection. `specialUse` has no
+cap; in exchange Google Play asks for a justification, which is declared in the manifest itself
+(`PROPERTY_SPECIAL_USE_FGS_SUBTYPE`) and is the real one.
 
-**Qué está verificado y qué no, dicho como es.** El APK está construido en el piloto y
-**verificado en el artefacto** con `aapt2`: el manifiesto declara los tres permisos y ninguno
-más, el `<service eu.sytue.gio.Avisos>` con `foregroundServiceType` `specialUse`, y la clase está
-en `classes.dex`. **No se ha visto correr en un teléfono**: no hay dispositivo ni emulador (el
-piloto no tiene `/dev/kvm`). Los guardianes cubren lo que sí se puede ver en rojo sin teléfono
-—que el nombre del servicio y la firma JNI no diverjan entre el XML, el Java y el Go, y que los
-permisos no crezcan— porque esas tres cadenas sueltas son lo que el compilador no relaciona y lo
-que fallaría solo en el aparato.
+**Permissions, of which there are three and only three.** `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE` and
+`FOREGROUND_SERVICE_SPECIAL_USE`, justified one by one —function, data, duration, impact and
+alternative, as brief v4 §5 requires— in `permisosDelManifiesto`. The notification one **is requested in
+context**: when opening the bell for the first time, not at startup; and if the person says no, the
+bell keeps counting and marking.
 
-**Descartado.** _Un `.jar` versionado en el repositorio_ (`empaquetar-movil.sh` compila el `.java`
-con el `javac` que gogio ya exige, y gogio recoge los `*.jar` del directorio de cada paquete Go:
-un hueco menos que parchearle). _Parchear gogio para que compile `.java` nuestros_ (por lo mismo:
-se resuelve desde nuestro lado). _`START_STICKY` en el servicio_ (resucitarlo sin el Go que lo
-alimenta es una notificación permanente delante de una conexión que no existe). _Pedir
-`POST_NOTIFICATIONS` al arrancar_ (el diálogo sin contexto que el v4 §5 no quiere).
+**What is verified and what is not, stated as it is.** The APK is built on the pilot and
+**verified in the artifact** with `aapt2`: the manifest declares the three permissions and no
+others, the `<service eu.sytue.gio.Avisos>` with `foregroundServiceType` `specialUse`, and the class is
+in `classes.dex`. **It has not been seen running on a phone**: there is no device or emulator (the
+pilot has no `/dev/kvm`). The guardians cover what can be seen going red without a phone
+—that the service name and the JNI signature do not diverge between the XML, the Java and the Go, and that the
+permissions do not grow— because those three loose strings are what the compiler does not relate and what
+would fail only on the device.
 
-**Addendum (2026-09-27, Fyne).** Con Gio retirado, el servicio es
-`eu.sytue.nativo.Avisos` y lo declara solo el manifiesto del Hub (`empaquetar.sh`), que avisa
-por las trece. La CLI de Fyne tampoco sabe escribir `foregroundServiceType`: lo añade
-`android-binario.py` al manifiesto compilado y `verificar_aab` lo exige en el AAB. Los
-permisos del Hub son esos tres más `USE_BIOMETRIC`, que llevan las trece por BiometricPrompt
-(el bloqueo de la sesión y los cuadernos de Notepads).
+**Ruled out.** _A versioned `.jar` in the repository_ (`empaquetar-movil.sh` compiles the `.java`
+with the `javac` that gogio already requires, and gogio picks up the `*.jar` from each Go package's directory:
+one less slot to patch). _Patching gogio to compile our `.java` files_ (for the same reason:
+it is solved from our side). _`START_STICKY` on the service_ (reviving it without the Go that
+feeds it is a permanent notification in front of a connection that does not exist). _Requesting
+`POST_NOTIFICATIONS` at startup_ (the context-free dialog that v4 §5 does not want).
+
+**Addendum (2026-09-27, Fyne).** With Gio retired, the service is
+`eu.sytue.nativo.Avisos` and only the Hub's manifest declares it (`empaquetar.sh`), which notifies
+for all thirteen. The Fyne CLI does not know how to write `foregroundServiceType` either: it is added by
+`android-binario.py` to the compiled manifest and `verificar_aab` requires it in the AAB. The
+Hub's permissions are those three plus `USE_BIOMETRIC`, which all thirteen carry for BiometricPrompt
+(the session lock and the Notepads notebooks).
 
 <a id="0048"></a>
 
-## 0048 — La interfaz nativa se rehace en Fyne con widgets propios, y lo que no es del toolkit sale a `apps/nucleo`
+<a id="0048--la-interfaz-nativa-se-rehace-en-fyne-con-widgets-propios-y-lo-que-no-es-del-toolkit-sale-a-appsnucleo"></a>
 
-`accepted` · 2026-09-21 · escritorio, móvil, fyne, paridad · sustituye al [0045](#0045) en escritorio y móvil; la web sigue con el [0004](#0004) · código en `apps/fyne/` y `apps/nucleo/`
+## 0048 — The native interface is rebuilt in Fyne with our own widgets, and what is not part of the toolkit moves to `apps/nucleo`
 
-**Contexto.** El [0045](#0045) decidió una sola interfaz en Gio para web, escritorio y móvil.
-Un mes después el dueño cambia de destino: **Fyne v2.8.1** (última estable, 2026-08-26) para
-**escritorio y móvil**, con **tema, widgets y layout propios** hasta llegar a **paridad 1:1 a
-nivel de píxel** con las web apps. La web **no** entra: `sytue.eu` sigue siendo Astro + Preact
+`accepted` · 2026-09-21 · desktop, mobile, fyne, parity · supersedes [0045](#0045) on desktop and mobile; the web stays with [0004](#0004) · code in `apps/fyne/` and `apps/nucleo/`
 
-- Go, y por tanto **no hay destino WebAssembly que sostener**, que era uno de los costes del
+**Context.** [0045](#0045) decided on a single Gio interface for web, desktop and mobile.
+A month later the owner changes the destination: **Fyne v2.8.1** (latest stable, 2026-08-26) for
+**desktop and mobile**, with **our own theme, widgets and layout** until reaching **1:1 parity at the
+pixel level** with the web apps. The web does **not** come in: `sytue.eu` stays Astro + Preact
+
+- Go, and therefore **there is no WebAssembly target to sustain**, which was one of the costs of
 
 45.
 
-Es el segundo cambio de toolkit en un mes (Fyne → Gio → Fyne). Eso, y no la elección en sí, es
-el dato que manda en esta decisión.
+It is the second toolkit change in a month (Fyne → Gio → Fyne). That, and not the choice itself, is
+the fact that governs this decision.
 
-**Decisión.**
+**Decision.**
 
-- **Lo que no es del toolkit sale primero, a un módulo con nombre neutral.** `apps/nucleo`
-  reúne las ~19.300 líneas que no tocan ningún toolkit: cliente HTTP/WS de los servicios
-  (`api`), catálogo de idiomas (`i18n`), sesión OIDC y llavero (`auth`), capacidades del
-  sistema (`sistema`), diálogos de fichero (`ficheros`), motor de fórmulas (`formula`), HTML a
-  texto (`htmltext`), cola sin conexión (`offline`) y `webref`. Van también los **tokens de
-  color** —la hoja `colors.css` y las trescientas líneas que la interpretan— y los **cinco
-  .ttf de Figtree**. Estaban bajo `apps/gio/internal/`, donde Fyne no los puede importar; la
-  alternativa era copiarlos, y este repositorio ya sabe lo que cuesta
-  ([0037](#0037)). El nombre no lleva el toolkit **a propósito**.
-- **La interfaz se compone con primitivas, no se configura.** `apps/fyne/ui` no usa un solo
-  widget de serie de Fyne: cada control es una cáscara `fyne.Widget` con su
-  `WidgetRenderer` propio, y dentro solo `canvas.Rectangle`, `canvas.Text`, `canvas.Image` y
-  otros widgets nuestros. Los layouts (`ui.Fila`, `ui.Columna`) también son propios, porque los
-  de serie usan `theme.Padding()` como hueco y ese número lo mueve el ajuste de tamaño de letra
-  del sistema. El patrón completo, con sus seis reglas y el porqué medido de cada una, está en
-  el comentario de paquete de `apps/fyne/ui/ui.go`.
-- **El tema de Fyne existe para dos cosas y nada más**: la LETRA con la que rasteriza
-  `canvas.Text` y el fondo del lienzo. Los colores de los widgets se piden por token
-  (`tema.Color("border-strong", v)`), nunca por `fyne.Theme`: su mapa tiene cuarenta nombres y
-  la hoja ciento cincuenta y pico, y además `theme.Size()` va multiplicado por la escala de
-  letra del usuario, con lo que la geometría dejaría de ser nuestra.
-- **Gio no se borra.** `sytue.com` sirve hoy la suite en Gio y no se puede dejar sin nada. El
-  port a Gio queda **cancelado** —no se añaden apps— pero el árbol `apps/gio` se queda
-  compilando y desplegable hasta que el dueño decida qué sirve ese dominio. El
-  [0045](#0045) queda sustituido en escritorio y móvil, y en suspenso para la web.
+- **What is not part of the toolkit moves out first, to a module with a neutral name.** `apps/nucleo`
+  gathers the ~19,300 lines that do not touch any toolkit: the HTTP/WS client for the services
+  (`api`), the language catalog (`i18n`), OIDC session and keychain (`auth`), system
+  capabilities (`sistema`), file dialogs (`ficheros`), formula engine (`formula`), HTML to
+  text (`htmltext`), offline queue (`offline`) and `webref`. The **color
+  tokens** also go —the `colors.css` stylesheet and the three hundred lines that interpret it— and the **five
+  Figtree .ttf files**. They were under `apps/gio/internal/`, where Fyne cannot import them; the
+  alternative was copying them, and this repository already knows what that costs
+  ([0037](#0037)). The name does not carry the toolkit **on purpose**.
+- **The interface is composed from primitives, not configured.** `apps/fyne/ui` does not use a single
+  stock Fyne widget: each control is a `fyne.Widget` shell with its own
+  `WidgetRenderer`, and inside only `canvas.Rectangle`, `canvas.Text`, `canvas.Image` and
+  other widgets of ours. The layouts (`ui.Fila`, `ui.Columna`) are also our own, because the
+  stock ones use `theme.Padding()` as the gap and that number is moved by the system's font size
+  setting. The complete pattern, with its six rules and the measured why of each, is in
+  the package comment of `apps/fyne/ui/ui.go`.
+- **The Fyne theme exists for two things and nothing more**: the FONT with which
+  `canvas.Text` rasterizes and the canvas background. Widget colors are requested by token
+  (`tema.Color("border-strong", v)`), never through `fyne.Theme`: its map has forty names and
+  the stylesheet a hundred and fifty-odd, and moreover `theme.Size()` is multiplied by the user's font
+  scale, with which the geometry would stop being ours.
+- **Gio is not deleted.** `sytue.com` serves the Gio suite today and cannot be left with nothing. The
+  Gio port is **cancelled** —no apps are added— but the `apps/gio` tree stays
+  compiling and deployable until the owner decides what that domain serves.
+  [0045](#0045) is superseded on desktop and mobile, and suspended for the web.
 
-**Lo que se conserva y no se vuelve a averiguar.** Los números medidos contra producción de las
-seis apps auditadas (Hub, Mail, Drive, Calendar, Notepads, Contacts), los 120 diálogos con su
-talla, y los vectores de color del inspector. **No dependen del toolkit** y son el activo más
-caro que hay en este trabajo.
+**What is kept and does not have to be figured out again.** The numbers measured against production for the
+six audited apps (Hub, Mail, Drive, Calendar, Notepads, Contacts), the 120 dialogs with their
+size, and the inspector's color vectors. **They do not depend on the toolkit** and they are the most
+expensive asset in this work.
 
-**Hasta dónde llega el píxel, medido el 2026-09-21 contra Fyne v2.8.1.** Esto es lo que hay que
-saber antes de portar dieciséis apps, y no se repite en cada PR:
+**How far the pixel goes, measured on 2026-09-21 against Fyne v2.8.1.** This is what has to be
+known before porting sixteen apps, and it is not repeated in each PR:
 
-1. **Color: exacto.** Fyne compone alfa en **sRGB**, igual que el navegador —el fallo que tuvo
-   Gio, que componía en lineal y sacaba todos los bordes a media fuerza, aquí **no existe**—.
-   Queda la cuantización del alfa a un byte: `rgba(ink, .12)` sobre blanco da (228,231,232)
-   contra los (227,230,232) de producción. **±1 nivel de 255**, así que un gate de captura
-   necesita esa tolerancia; el byte a byte no va a salir nunca. Los bordes se guardan aplanados
-   y opacos en `apps/nucleo/tokens` y entonces el píxel sí es exacto.
-2. **Geometría: exacta a partir de ×2 para los medios píxeles.** Fyne cuantiza por coordenada
-   al píxel de dispositivo y **no antialiasea los lados rectos** (las esquinas redondeadas sí).
-   A ×1 un `h-9` (31,5) ocupa 32 filas; a ×2 son 63 clavadas. Los CUARTOS de píxel —19,25 de
-   interlineado, 15,75— no son exactos ni a ×2: harían falta ×4. El error es siempre positivo,
-   así que **se acumula al apilar cajas**. Por eso la escala se declara con sus decimales y
-   **no se redondea en nuestro código**: redondear congela a ×1 un error que la pantalla
-   arregla sola.
-3. **El borde no puede ser `StrokeWidth`.** Fyne lo pinta centrado en el contorno: a ×1 reparte
-   su cobertura entre dos filas y sale a media fuerza. `ui.Caja` lo pinta como dos rectángulos
-   rellenos, que va bien a cualquier escala y además da el `box-sizing: border-box` de la hoja.
-4. **Tipografía: era el único techo que no dependía de nosotros, y ya está quitado.** Ver
-   [«El conformador va parcheado»](#0048-texto) más abajo. `github.com/go-text/typesetting`
-   escalaba la fuente a `ceil(tamaño)` antes de colocar un glifo, así que con el rem de 14
-   —siete de los diez peldaños son fraccionarios— `text-base` (12,25) se conformaba como 13:
-   **+6,12 %**. Hoy el ancho de un texto queda a **≤0,17 px** del que da el navegador.
-5. **La caja de línea hay que imponerla.** `canvas.Text.MinSize().Height` devuelve la caja de
-   la FUENTE, 1,2 em: para `text-base` son 14,70, no la caja CSS de 19,25 que es la que ocupa
-   sitio en el layout de la web. (Antes del parche del conformador daba 15,59, porque ese 1,2 em
-   salía del ppem redondeado a 13; hoy es 1,2 × 12,25 exacto, pero sigue sin ser la caja de
-   CSS.) `ui.Medir` devuelve la caja de CSS y `ui.ColocarTexto` centra el glifo dentro de ella.
+1. **Color: exact.** Fyne composites alpha in **sRGB**, like the browser —the bug Gio had,
+   compositing in linear and drawing all borders at half strength, **does not exist** here—.
+   What remains is the quantization of alpha to one byte: `rgba(ink, .12)` over white gives (228,231,232)
+   versus production's (227,230,232). **±1 level out of 255**, so a screenshot gate
+   needs that tolerance; byte-for-byte will never happen. Borders are stored flattened
+   and opaque in `apps/nucleo/tokens` and then the pixel is exact.
+2. **Geometry: exact from ×2 for half pixels.** Fyne quantizes each coordinate
+   to the device pixel and **does not antialias straight edges** (rounded corners it does).
+   At ×1 an `h-9` (31.5) takes 32 rows; at ×2 it is exactly 63. QUARTER pixels —19.25 of
+   line height, 15.75— are not exact even at ×2: ×4 would be needed. The error is always positive,
+   so **it accumulates when stacking boxes**. That is why the scale is declared with its decimals and
+   **it is not rounded in our code**: rounding freezes at ×1 an error that the screen
+   fixes on its own.
+3. **The border cannot be `StrokeWidth`.** Fyne paints it centered on the outline: at ×1 it spreads
+   its coverage over two rows and comes out at half strength. `ui.Caja` paints it as two filled
+   rectangles, which works at any scale and also gives the stylesheet's `box-sizing: border-box`.
+4. **Typography: it was the only ceiling that did not depend on us, and it has been removed.** See
+   [“The shaper is patched”](#0048-texto) below. `github.com/go-text/typesetting`
+   scaled the font to `ceil(size)` before placing a glyph, so with the 14 rem
+   —seven of the ten steps are fractional— `text-base` (12.25) was shaped as 13:
+   **+6.12 %**. Today the width of a text is within **≤0.17 px** of what the browser gives.
+5. **The line box has to be imposed.** `canvas.Text.MinSize().Height` returns the box of
+   the FONT, 1.2 em: for `text-base` that is 14.70, not the CSS box of 19.25 that is the one that takes
+   space in the web layout. (Before the shaper patch it gave 15.59, because that 1.2 em
+   came from the ppem rounded to 13; today it is exactly 1.2 × 12.25, but it is still not the CSS
+   box.) `ui.Medir` returns the CSS box and `ui.ColocarTexto` centers the glyph within it.
 
-**Consecuencia, y es la decisión de fondo:** **la paridad alcanzable es de un píxel de
-dispositivo en geometría y color, y de dos décimas de píxel en el ancho de un texto**. Las dos
-son tan buenas como el propio navegador.
+**Consequence, and it is the underlying decision:** **the achievable parity is one device
+pixel in geometry and color, and two tenths of a pixel in the width of a text**. Both
+are as good as the browser itself.
 
 <a id="0048-texto"></a>
 
-### El conformador va parcheado: ppem exacto y no `ceil` (2026-09-21)
+<a id="el-conformador-va-parcheado-ppem-exacto-y-no-ceil-2026-09-21"></a>
 
-**Lo que estaba mal.** `github.com/go-text/typesetting` escalaba la fuente a `ceil(tamaño)`
-antes de pedirle los avances a harfbuzz (`shaping/shaping.go`), así que **ningún tamaño
-fraccionario existía**: se conformaba el entero siguiente. Con `1 rem = 14 px` casi toda la
-escala de la suite es fraccionaria y **cada rótulo de la interfaz nativa salía más ancho**.
-Medido en el piloto con el pintor de software, `Guardar cambios` en Figtree Regular:
+### The shaper is patched: exact ppem and not `ceil` (2026-09-21)
 
-| escalón     | px de CSS | antes  | después | error que llevaba         |
-| ----------- | --------- | ------ | ------- | ------------------------- |
-| `text-2xs`  | 9,625     | 76,08  | 73,25   | +3,86 %                   |
-| `text-xs`   | 10,5      | 83,75  | 79,97   | +4,73 %                   |
-| `text-sm`   | 11,375    | 91,39  | 86,59   | +5,54 %                   |
-| `text-base` | 12,25     | 98,97  | 93,25   | **+6,13 %**               |
-| raíz        | 14        | 106,59 | 106,59  | 0 (entero: nunca lo tocó) |
-| `text-lg`   | 15,75     | 121,78 | 119,92  | +1,55 %                   |
-| `text-xl`   | 19,25     | 152,25 | 146,52  | +3,91 %                   |
-| `text-3xl`  | 31,5      | 243,58 | 239,78  | +1,58 %                   |
+**What was wrong.** `github.com/go-text/typesetting` scaled the font to `ceil(size)`
+before asking harfbuzz for the advances (`shaping/shaping.go`), so **no fractional
+size existed**: the next integer was shaped. With `1 rem = 14 px` almost the whole
+scale of the suite is fractional and **every label of the native interface came out wider**.
+Measured on the pilot with the software painter, `Guardar cambios` in Figtree Regular:
 
-**Y no lo arreglaba una pantalla HiDPI**, como decían el ADR y las tres notas del código hasta
-esta fecha. Fyne conforma en **px de CSS** y multiplica por la escala del lienzo **después**
-(`internal/painter/font.go`), así que la extensión de tinta medida se encoge lo mismo a ×1
-(−6,06 %) que a ×2 (−5,61 %). La creencia de que el error «se parte por dos a ×2» era falsa y
-estaba escrita en cuatro sitios.
+| step        | CSS px | before | after  | error it carried              |
+| ----------- | ------ | ------ | ------ | ----------------------------- |
+| `text-2xs`  | 9.625  | 76.08  | 73.25  | +3.86 %                       |
+| `text-xs`   | 10.5   | 83.75  | 79.97  | +4.73 %                       |
+| `text-sm`   | 11.375 | 91.39  | 86.59  | +5.54 %                       |
+| `text-base` | 12.25  | 98.97  | 93.25  | **+6.13 %**                   |
+| root        | 14     | 106.59 | 106.59 | 0 (integer: never touched it) |
+| `text-lg`   | 15.75  | 121.78 | 119.92 | +1.55 %                       |
+| `text-xl`   | 19.25  | 152.25 | 146.52 | +3.91 %                       |
+| `text-3xl`  | 31.5   | 243.58 | 239.78 | +1.58 %                       |
 
-**Decisión: se aplica, con fork alojado.** Una línea:
-`font.XScale = int32(input.Size) << (scaleShift - 6)`. `input.Size` ya es un `fixed.Int26_6`
-—el tamaño por 64— y harfbuzz escala por `XScale/upem`, así que pasarlo en crudo pide el tamaño
-exacto sin perder la precisión de 1/64 px que el desplazamiento por `scaleShift` existe para
-conservar.
+**And a HiDPI screen did not fix it**, as the ADR and the three notes in the code said until
+this date. Fyne shapes in **CSS px** and multiplies by the canvas scale **afterwards**
+(`internal/painter/font.go`), so the measured ink extent shrinks the same at ×1
+(−6.06 %) as at ×2 (−5.61 %). The belief that the error “is halved at ×2” was false and
+was written in four places.
 
-**Contra el navegador, que es la referencia**: 54 medidas (seis rótulos reales × nueve peldaños,
-Figtree Regular) contra `getBoundingClientRect()` del Figtree variable de producción, con el
-hinting de Chromium apagado. Error medio **de +3,30 % a +0,03 %**; el peor caso, **de 8,33 px a
-0,17 px**.
+**Decision: it is applied, with a hosted fork.** One line:
+`font.XScale = int32(input.Size) << (scaleShift - 6)`. `input.Size` is already a `fixed.Int26_6`
+—the size times 64— and harfbuzz scales by `XScale/upem`, so passing it raw requests the exact
+size without losing the 1/64 px precision that the shift by `scaleShift` exists to
+preserve.
 
-**Por qué un fork y no un `.patch` como el de gogio ([0047](#0047)).** gogio es una
-**herramienta** que invoca un guion nuestro, y ese guion puede parchear una copia temporal.
-`typesetting` es una **biblioteca** que entra en cada `go build`, cada `go test` y cada IDE: no
-hay un solo sitio por el que pase todo. Un `replace` a un directorio generado dejaría un clon
-recién hecho sin compilar hasta que alguien corriera un `make`. Así que hay fork, y el precio
-se paga en la política de abajo.
+**Against the browser, which is the reference**: 54 measurements (six real labels × nine steps,
+Figtree Regular) against `getBoundingClientRect()` of production's variable Figtree, with
+Chromium hinting turned off. Mean error **from +3.30 % to +0.03 %**; the worst case, **from 8.33 px to
+0.17 px**.
 
-**Política de actualización del fork.**
+**Why a fork and not a `.patch` like gogio's ([0047](#0047)).** gogio is a
+**tool** invoked by a script of ours, and that script can patch a temporary copy.
+`typesetting` is a **library** that goes into every `go build`, every `go test` and every IDE: there
+is no single place everything goes through. A `replace` pointing to a generated directory would leave a fresh
+clone not compiling until someone ran a `make`. So there is a fork, and the price
+is paid in the policy below.
 
-- Vive en `github.com/thinkddr/typesetting`. La rama **`main` es el espejo intacto de
-  upstream** y **`sytue`** es `v0.3.4` + el parche. El `replace` apunta a un **tag**
-  (`v0.3.4-sytue.1`), nunca a una rama.
-- **Rebasar** = traer upstream a `main`, `git rebase <tag nuevo> sytue`, tag `vX.Y.Z-sytue.1` y
-  cambiar el `replace`. El diff contra upstream son **dos ficheros y 27 líneas** —el parche y el
-  `module`, que cambia porque un `replace` exige que el destino declare la ruta por la que se le
-  requiere—, así que un rebase que no aplique limpio es la señal de que upstream ha tocado esa
-  zona, no un conflicto que resolver a ojo.
-- **Quién lo comprueba:** quien suba `fyne.io/fyne/v2`. Fyne fija la versión de `typesetting` en
-  su go.mod; si sube, el fork se rebasa sobre esa misma versión en el mismo PR. El gate de
-  versiones de `AGENTS.md` §1 ya obliga a mirarlo.
-- **Qué avisa:** `ui.TestElConformadorNoRedondea`, que compara el ancho conformado contra la
-  proporción desde un patrón de 64 px y falla si alguien quita el `replace` o si un rebase
-  pierde el parche. Visto en rojo en las dos direcciones el 2026-09-21.
-- **Aguas arriba:** el parche está escrito para mandarse a `go-text/typesetting` tal cual, con
-  su comentario en inglés. Mientras no lo acepten, el fork se rebasa; el día que lo hagan, se
-  borran el `replace` y el fork.
+**Fork update policy.**
 
-**Soberanía: el fork es PRIVADO a propósito.** Publicarlo mandaría su ruta a `proxy.golang.org`
-y a `sum.golang.org` en cuanto alguien lo resolviera, que es exactamente la fuga que
-`compliance/supply-chain/README.md` §A da por cerrada para los módulos `git.sytue.eu/...`. Como
-`git.gay` ya está inventariado en `providers.tsv` como excepción temporal hasta el 2026-12-31,
-**no hace falta ninguna fila nueva en `blocked-baseline.tsv`**. El precio es que quien compile
-`apps/fyne` necesita `GOPRIVATE=git.gay/*` y credenciales de git.gay —el piloto y el CI ya las
-tienen—, y sin eso el `go mod download` falla en el proxy, no en silencio.
+- It lives at `github.com/thinkddr/typesetting`. The **`main`** branch is the untouched mirror of
+  upstream and **`sytue`** is `v0.3.4` + the patch. The `replace` points to a **tag**
+  (`v0.3.4-sytue.1`), never to a branch.
+- **Rebasing** = bringing upstream into `main`, `git rebase <tag nuevo> sytue`, tag `vX.Y.Z-sytue.1` and
+  changing the `replace`. The diff against upstream is **two files and 27 lines** —the patch and the
+  `module`, which changes because a `replace` requires the target to declare the path by which it is
+  required—, so a rebase that does not apply cleanly is the signal that upstream has touched that
+  area, not a conflict to resolve by eye.
+- **Who checks it:** whoever upgrades `fyne.io/fyne/v2`. Fyne pins the `typesetting` version in
+  its go.mod; if it goes up, the fork is rebased onto that same version in the same PR. The
+  version gate in `AGENTS.md` §1 already forces looking at it.
+- **What gives warning:** `ui.TestElConformadorNoRedondea`, which compares the shaped width against the
+  proportion from a 64 px pattern and fails if someone removes the `replace` or if a rebase
+  loses the patch. Seen red in both directions on 2026-09-21.
+- **Upstream:** the patch is written to be sent to `go-text/typesetting` as is, with
+  its comment in English. As long as they do not accept it, the fork is rebased; the day they do, the
+  `replace` and the fork are deleted.
 
-### URL entrante: fork temporal de Fyne v2.8.1 (2026-09-22)
+**Sovereignty: the fork is PRIVATE on purpose.** Publishing it would send its path to `proxy.golang.org`
+and to `sum.golang.org` as soon as someone resolved it, which is exactly the leak that
+`compliance/supply-chain/README.md` §A considers closed for the `git.sytue.eu/...` modules. Since
+`git.gay` is already inventoried in `providers.tsv` as a temporary exception until 2026-12-31,
+**no new row in `blocked-baseline.tsv` is needed**. The price is that whoever compiles
+`apps/fyne` needs `GOPRIVATE=git.gay/*` and git.gay credentials —the pilot and CI already
+have them—, and without that `go mod download` fails at the proxy, not silently.
 
-Fyne v2.8.1 solo exponía `App.OpenURL`, que abre una URL **hacia fuera**. No había
-contrato ni bridge para la URL que entrega el sistema al volver del navegador, abrir
-otra app por su esquema o iniciar una aplicación cerrada. Eso hacía imposible
-terminar el login móvil RFC 8252 aunque `auth.OIDC.LoginEsquema` y `Vuelta` ya
-existieran: el callback no tenía dónde entrar.
+<a id="url-entrante-fork-temporal-de-fyne-v281-2026-09-22"></a>
 
-Se mantiene la dependencia pública `fyne.io/fyne/v2`, en la versión estable declarada en `apps/fyne/go.mod`, pero se reemplaza por
-el tag público de `github.com/thinkddr/fyne/v2` fijado en `apps/fyne/go.mod` (la historia está en `apps/fyne/upstream/README.md`). Conserva la licencia BSD-3-Clause de upstream y las modificaciones del fork se distribuyen bajo Apache-2.0. Añade la interfaz
-opcional `fyne.URLHandler`, sin ensanchar `fyne.App` ni romper implementaciones de
-terceros. La URL se encola hasta registrar el handler y se entrega en el hilo gráfico.
-Android cubre el intent inicial y `onNewIntent`; iOS, la URL de lanzamiento y
-`application:openURL:options:`; macOS, el Apple Event `kAEGetURL`; Linux y Windows,
-el argumento con que arranca el binario.
+### Incoming URL: temporary fork of Fyne v2.8.1 (2026-09-22)
 
-Los tags originales de upstream se conservan; `main` del fork contiene las modificaciones de Sytue.
-Al actualizar Fyne: integrar el tag estable nuevo, ejecutar los tests del
-fork en CI, crear `vX.Y.Z-sytue.N` y cambiar el `replace` en el mismo cambio. Se
-propondrá el parche aguas arriba; cuando lo acepten, se elimina el fork y el
-`replace`, no se mantiene una API paralela.
+Fyne v2.8.1 only exposed `App.OpenURL`, which opens a URL **outward**. There was no
+contract or bridge for the URL the system delivers when returning from the browser, opening
+another app by its scheme or starting a closed application. That made it impossible
+to finish the RFC 8252 mobile login even though `auth.OIDC.LoginEsquema` and `Vuelta` already
+existed: the callback had nowhere to come in.
 
-**Y un tercer fork, de GLFW (2026-09-23).** `apps/fyne/go.mod` reemplaza también
-`github.com/go-gl/glfw/v3.4/glfw` por el tag de `github.com/thinkddr/glfw/v3.4/glfw` fijado en `apps/fyne/go.mod`
-(privado, bajo las licencias de upstream: BSD-3-Clause el enlace de Go y zlib GLFW), sobre
-la base de go-gl que requiere la versión vigente de Fyne. GLFW solo acepta ficheros soltados, y
-su XDnD de X11 y su `wl_data_device` de Wayland no se ven desde fuera: el parche añade
-texto y enlaces soltados (`glfwSetDropTextCallback`, `apps/fyne/soltar.AlSoltar`) y,
-desde `.3`, el aviso de ficheros arrastrados por encima (`glfwSetDragCallback`,
-`soltar.AlArrastrar`). Las mismas reglas que el de Fyne: una rama con el parche,
-un tag por versión y el `replace` en el mismo cambio; lo que lleva cada
-versión, cómo se probó y cómo quitarlo, en `apps/fyne/upstream/README.md`.
+The public dependency `fyne.io/fyne/v2` is kept, at the stable version declared in `apps/fyne/go.mod`, but it is replaced by
+the public tag of `github.com/thinkddr/fyne/v2` pinned in `apps/fyne/go.mod` (the history is in `apps/fyne/upstream/README.md`). It keeps upstream's BSD-3-Clause license and the fork's modifications are distributed under Apache-2.0. It adds the
+optional `fyne.URLHandler` interface, without widening `fyne.App` or breaking third-party
+implementations. The URL is queued until the handler is registered and is delivered on the UI thread.
+Android covers the initial intent and `onNewIntent`; iOS, the launch URL and
+`application:openURL:options:`; macOS, the `kAEGetURL` Apple Event; Linux and Windows,
+the argument the binary starts with.
 
-**El envío aguas arriba está preparado (2026-09-22)**, en
-[`apps/fyne/upstream/`](../apps/fyne/upstream/README.md): el parche exportado (13
-ficheros, 235 líneas añadidas y ninguna borrada, con su prueba) y el texto de la PR en
-inglés. Falta abrirla, y eso pide la cuenta personal del dueño en GitHub. La issue viva
-que lo pide es `fyne-io/fyne#1847`; no hay ninguna PR abierta que lo resuelva.
+The original upstream tags are preserved; the fork's `main` contains Sytue's modifications.
+When updating Fyne: integrate the new stable tag, run the fork's
+tests in CI, create `vX.Y.Z-sytue.N` and change the `replace` in the same change. The
+patch will be proposed upstream; when they accept it, the fork and the
+`replace` are removed, a parallel API is not maintained.
 
-**Y la otra punta: quién RECIBE el enlace.** El emisor (`apps/nucleo/api/abrir.go`)
-lo tenía todo y no había receptor: el enlace habría llegado a una ventana en blanco.
-`api.LeerApertura` desarma el enlace —es la vuelta de `RutaDeApertura`, atada con él por
-ida y vuelta— y `sesion.Suite.AlAbrirFichero` lo entrega ya desarmado a la app dueña del
-formato, que lo carga en segundo plano. Si no puede —sin sesión, el fichero ya no está,
-un formato que no entiende— el enlace **sigue a la misma página en la web**, que es lo
-que ya hacía Drive con la app sin instalar: nunca una ventana en blanco.
+**And a third fork, of GLFW (2026-09-23).** `apps/fyne/go.mod` also replaces
+`github.com/go-gl/glfw/v3.4/glfw` with the tag of `github.com/thinkddr/glfw/v3.4/glfw` pinned in `apps/fyne/go.mod`
+(private, under upstream's licenses: BSD-3-Clause for the Go binding and zlib for GLFW), on top of
+the go-gl base required by the current Fyne version. GLFW only accepts dropped files, and
+its X11 XDnD and its Wayland `wl_data_device` are not visible from outside: the patch adds
+dropped text and links (`glfwSetDropTextCallback`, `apps/fyne/soltar.AlSoltar`) and,
+since `.3`, notification of files dragged over (`glfwSetDragCallback`,
+`soltar.AlArrastrar`). The same rules as the Fyne one: a branch with the patch,
+a tag per version and the `replace` in the same change; what each
+version carries, how it was tested and how to remove it, in `apps/fyne/upstream/README.md`.
 
-Docus, Calcus y Diapos abren el fichero como lo abre `/open-from-drive`, pero SIN crear
-documento (`api.ImportarDeDrive`): se trae de Drive por id, `POST /api/v1/import` lo
-convierte al modelo de la web —HTML, el JSON de la hoja o el de la presentación— y se
-enseña en **solo lectura**, porque es una conversión y no un documento de Docs, y lo que
-se escribiera encima no tendría dónde guardarse. Photos hace lo de `/abrir`: indexa (es
-idempotente y no copia nada) y enseña la variante grande en el visor. CertiPDF sigue con
-el respaldo web hasta que su pantalla hable con el servicio.
+**The upstream submission is prepared (2026-09-22)**, in
+[`apps/fyne/upstream/`](../apps/fyne/upstream/README.md): the exported patch (13
+files, 235 lines added and none deleted, with its test) and the PR text in
+English. It remains to open it, and that requires the owner's personal GitHub account. The live issue
+requesting it is `fyne-io/fyne#1847`; there is no open PR that solves it.
 
-Al cablearlo salieron dos cosas que no eran del fork y que habrían hecho que nada de
-esto funcionara: los esquemas de esos cuatro binarios se llamaban por su **marca**
-(`sytue-docus`) y no por la **clave del producto** (`sytue-docs`), que es lo que emiten
-las otras apps, lo que declara `PRODUCT_SCHEMES` en la web y lo que Sytue ID tiene dado
-de alta (migración 0071) — el síntoma habría sido «la app nativa no está instalada»;
-y en el móvil la sesión pedía el token con el `client_id` del escritorio. Los dos
-guardianes están en `apps/fyne/sesion`.
+**And the other end: who RECEIVES the link.** The sender (`apps/nucleo/api/abrir.go`)
+had everything and there was no receiver: the link would have arrived at a blank window.
+`api.LeerApertura` takes the link apart —it is the inverse of `RutaDeApertura`, tied to it by a
+round trip— and `sesion.Suite.AlAbrirFichero` delivers it already taken apart to the app that owns the
+format, which loads it in the background. If it cannot —no session, the file is no longer there,
+a format it does not understand— the link **goes on to the same page on the web**, which is
+what Drive already did with the app not installed: never a blank window.
 
-**Una app abierta recibe el enlace; no se abre otra.** En macOS, iOS y Android lo hace el
-sistema —en Android, con `launchMode="singleTask"`, que `empaquetar.sh` pone ya: sin él
-la vuelta del navegador crea otra actividad y `onNewIntent` no se llama—. En Linux y
-Windows abrir un esquema es ejecutar el programa otra vez, así que `sesion` abre un
-enchufe local por aplicación y la segunda copia le pasa la URL a la primera y se va. Y
-el enlace que ARRANCA la app se guarda hasta que el `main` registra su receptor: Fyne lo
-despacha dentro de `sesion.Abrir`, antes de que exista nadie a quien dárselo.
+Docus, Calcus and Diapos open the file as `/open-from-drive` opens it, but WITHOUT creating a
+document (`api.ImportarDeDrive`): it is fetched from Drive by id, `POST /api/v1/import`
+converts it to the web's model —HTML, the sheet's JSON or the presentation's— and it is
+shown **read-only**, because it is a conversion and not a Docs document, and whatever
+was written on top would have nowhere to be saved. Photos does what `/abrir` does: it indexes (it is
+idempotent and copies nothing) and shows the large variant in the viewer. CertiPDF keeps
+the web fallback until its screen talks to the service.
 
-**El hinting no se mueve, y se ha mirado.** `go-text/render` escala el contorno del glifo por el
-tamaño en **coma flotante** y lo rasteriza con `rasterx`, que **no ajusta a rejilla**: el ppem
-del conformador solo gobierna los avances. Comprobado además con los ojos, comparando los PNG
-del pintor de software a ×1 y a ×2 con y sin el parche: mismo grosor de trazo, mismo
-antialiasing, solo el tracking más apretado.
+While wiring it up, two things came out that were not part of the fork and that would have made none of
+this work: the schemes of those four binaries were named after their **brand**
+(`sytue-docus`) and not after the **product key** (`sytue-docs`), which is what the
+other apps emit, what `PRODUCT_SCHEMES` declares on the web and what Sytue ID has
+registered (migration 0071) — the symptom would have been “the native app is not installed”;
+and on mobile the session requested the token with the desktop's `client_id`. The two
+guardians are in `apps/fyne/sesion`.
 
-**Y el Figtree variable de la web contra las instancias estáticas del nativo: son la misma
-fuente.** Era el riesgo abierto que quedaba —la web monta `@fontsource-variable/figtree@5.3.0` y
-`apps/nucleo/fuentes` embebe cinco .ttf estáticos— y nadie lo había medido. Medido ahora, a
-**640 px** para que ni el redondeo del navegador ni el de harfbuzz cuenten, sobre 32
-combinaciones de ocho cadenas por los cuatro pesos (400/500/600/700): la desviación máxima es
-**0,0098 %**, o sea **0,7 px sobre 7.098**. Es ruido. **No hay que embeber el variable**, y la
-diferencia que se veía a tamaños pequeños era la cuantización de avances a píxel entero que hace
-Chromium en Linux, no la fuente.
+**An open app receives the link; another one is not opened.** On macOS, iOS and Android the
+system does it —on Android, with `launchMode="singleTask"`, which `empaquetar.sh` already sets: without it
+the return from the browser creates another activity and `onNewIntent` is not called—. On Linux and
+Windows opening a scheme means running the program again, so `sesion` opens a
+local socket per application and the second copy passes the URL to the first and exits. And
+the link that STARTS the app is held until `main` registers its receiver: Fyne
+dispatches it inside `sesion.Abrir`, before anyone exists to give it to.
 
-**Coste aceptado.**
+**Hinting does not move, and it has been checked.** `go-text/render` scales the glyph outline by the
+size in **floating point** and rasterizes it with `rasterx`, which **does not snap to the grid**: the shaper's
+ppem only governs the advances. Also checked by eye, comparing the software painter's PNGs
+at ×1 and ×2 with and without the patch: same stroke weight, same
+antialiasing, only tighter tracking.
 
-- **Se rehace la capa de presentación por tercera vez.** Lo que sobrevive es
-  `apps/nucleo` y los números medidos; lo que se rehace son las ~4.400 líneas de
-  `apps/gio/internal/ui` y las pantallas de cada app.
-- **`gioui.org` se queda en el go.mod del núcleo** por dos ficheros `//go:build android` (el
-  puente JNI que pide `app.JavaVM()` y `app.AppContext()`). No se compila en ningún destino de
-  escritorio. Se quita con unas veinte líneas el día que se empaquete Android en Fyne, que es
-  cuando habrá con qué probarlo.
-- **Los guardianes de píxel corren a ×2**, que no es la escala en la que se despliega
-  necesariamente: `SetScale` solo existe en el lienzo de software; en el binario real la escala
-  la deciden la pantalla y `FYNE_SCALE`. A ×2 se mide el widget; a ×1 se mediría el redondeo.
+**And the web's variable Figtree versus the native static instances: they are the same
+font.** It was the remaining open risk —the web mounts `@fontsource-variable/figtree@5.3.0` and
+`apps/nucleo/fuentes` embeds five static .ttf files— and nobody had measured it. Measured now, at
+**640 px** so that neither the browser's rounding nor harfbuzz's counts, over 32
+combinations of eight strings by the four weights (400/500/600/700): the maximum deviation is
+**0.0098 %**, that is **0.7 px over 7,098**. It is noise. **There is no need to embed the variable font**, and the
+difference seen at small sizes was the quantization of advances to whole pixels that
+Chromium does on Linux, not the font.
 
-**Descartado.** _Seguir con Gio_ (decisión del dueño; y el `ceil` del texto es el mismo, así que
-no habría ganado nada en el techo que importa). _Configurar los widgets de serie de Fyne_ (su
-tema escala la geometría con la letra del sistema: la paridad se acaba antes de empezar).
-_Copiar los ocho paquetes a `apps/fyne`_ ([0037](#0037), y ya sabemos cómo acaba). _Redondear la
-escala a enteros para que cuadre a ×1_ (congela el error donde la pantalla lo arreglaría).
+**Accepted cost.**
+
+- **The presentation layer is rebuilt for the third time.** What survives is
+  `apps/nucleo` and the measured numbers; what is rebuilt are the ~4,400 lines of
+  `apps/gio/internal/ui` and each app's screens.
+- **`gioui.org` stays in the core's go.mod** because of two `//go:build android` files (the
+  JNI bridge that requires `app.JavaVM()` and `app.AppContext()`). It is not compiled for any desktop
+  target. It is removed with about twenty lines the day Android is packaged in Fyne, which is
+  when there will be something to test it with.
+- **The pixel guardians run at ×2**, which is not necessarily the scale at which it is deployed:
+  `SetScale` only exists on the software canvas; in the real binary the scale
+  is decided by the screen and `FYNE_SCALE`. At ×2 the widget is measured; at ×1 the rounding would be measured.
+
+**Ruled out.** _Staying with Gio_ (the owner's decision; and the text `ceil` is the same, so
+nothing would have been gained in the ceiling that matters). _Configuring Fyne's stock widgets_ (its
+theme scales the geometry with the system font: parity ends before it begins).
+_Copying the eight packages into `apps/fyne`_ ([0037](#0037), and we already know how that ends). _Rounding the
+scale to integers so that it fits at ×1_ (freezes the error where the screen would fix it).
 <a id="0049"></a>
 
-## 0049 — `sytue.com` sirve la suite Astro con un segundo juego de imágenes, no la de Gio
+<a id="0049--sytuecom-sirve-la-suite-astro-con-un-segundo-juego-de-imágenes-no-la-de-gio"></a>
 
-`accepted` · 2026-09-21 · frontend, despliegue, oidc · supersede al [0045](#0045) en la web · código en `deploy/sytue-com/`
+## 0049 — `sytue.com` serves the Astro suite with a second set of images, not the Gio one
 
-**Contexto.** El [0045](#0045) repartía los dos dominios: `sytue.com` publicaría la suite en Gio
-(WebAssembly) y `sytue.eu` seguiría con Astro + Preact. El port a Gio **queda cancelado** —la
-interfaz de escritorio y móvil se migra a Fyne y la web sigue siendo Astro + Preact + Go—, así que
-`sytue.com` se queda sin destino. La decisión del dueño es que **sirva la suite**, no que redirija
-a `sytue.eu`.
+`accepted` · 2026-09-21 · frontend, deployment, oidc · supersedes [0045](#0045) on the web · code in `deploy/sytue-com/`
 
-**La trampa, y es el centro de todo.** Los frontends Astro **hornean las URL públicas en tiempo de
-build**: `scripts/publicar-imagen-frontend.sh` les pasa `PUBLIC_OIDC_ISSUER`, `PUBLIC_HUB_URL`,
-`PUBLIC_SYTUE_DRIVE_BASE_URL` y tres más, todas derivadas de `DOMINIO`. Servir esas mismas
-imágenes en `sytue.com` da una suite que **se ve en `.com` y habla con `.eu`**: login y cookies
-cruzando dominios.
+**Context.** [0045](#0045) split the two domains: `sytue.com` would publish the Gio suite
+(WebAssembly) and `sytue.eu` would stay with Astro + Preact. The Gio port **is cancelled** —the
+desktop and mobile interface is migrated to Fyne and the web remains Astro + Preact + Go—, so
+`sytue.com` is left without a destination. The owner's decision is that it **serves the suite**, not that it redirects
+to `sytue.eu`.
 
-**Decisión.** La tomó el dueño el 2026-09-21: **un segundo juego de las trece imágenes Astro
-construido con `DOMINIO=sytue.com` y desplegado en el frontal** (`sytue-rooms-media`), no en el
-piloto. **Los dos frentes comparten Sytue ID, servicios y base de datos**; lo único que se duplica
-es el frontend.
+**The trap, and it is the center of everything.** The Astro frontends **bake the public URLs in at
+build time**: `scripts/publicar-imagen-frontend.sh` passes them `PUBLIC_OIDC_ISSUER`, `PUBLIC_HUB_URL`,
+`PUBLIC_SYTUE_DRIVE_BASE_URL` and three more, all derived from `DOMINIO`. Serving those same
+images on `sytue.com` gives a suite that **is seen on `.com` and talks to `.eu`**: login and cookies
+crossing domains.
 
-**Lo que costó medir, y lo que la medición cambió.**
+**Decision.** The owner made it on 2026-09-21: **a second set of the thirteen Astro images
+built with `DOMINIO=sytue.com` and deployed on the front node** (`sytue-rooms-media`), not on the
+pilot. **The two fronts share Sytue ID, services and database**; the only thing duplicated
+is the frontend.
 
-- **El horneado casi no existe.** De las ~30 lecturas de `PUBLIC_*` de la suite, **todas menos
-  tres** pasan por `serverEnv()`, que fusiona el entorno de build con `process.env` **dejando
-  ganar al segundo**; el chart ya inyecta cada una por contenedor. Las tres que no:
-  `apps/www/src/lib/downloads.ts` (SSG, y no son dominios de la suite),
-  `packages/config/src/health-endpoint.ts` (versión y commit, que SÍ son de la imagen) y
-  `packages/config/src/tokens.ts`. Esa última es la única que ata la imagen a un dominio: de ella
-  sale `suiteApex` y con él los enlaces entre apps. O sea que el segundo juego existe por **un
-  fichero**.
-- **`PUBLIC_OIDC_ISSUER` y `SYTUE_OIDC_ISSUER` son variables DISTINTAS**, y de ahí sale la pieza
-  que hace viable todo esto. La primera se hornea y solo alimenta `suiteApex`; la segunda es de
-  ejecución y es la que usa el BFF. Así el frente de `.com` hornea sus enlaces en `.com` y a la
-  vez inicia sesión contra el **único** Sytue ID, `id.sytue.eu`. Verificado el 2026-09-21 con la
-  imagen real: `GET /one/auth/login` con `Host: one.sytue.com` responde `302` a
+**What it took to measure, and what the measurement changed.**
+
+- **Baking hardly exists.** Of the suite's ~30 reads of `PUBLIC_*`, **all but
+  three** go through `serverEnv()`, which merges the build environment with `process.env` **letting
+  the latter win**; the chart already injects each one per container. The three that do not:
+  `apps/www/src/lib/downloads.ts` (SSG, and they are not suite domains),
+  `packages/config/src/health-endpoint.ts` (version and commit, which ARE the image's) and
+  `packages/config/src/tokens.ts`. That last one is the only one that ties the image to a domain: from it
+  comes `suiteApex` and with it the links between apps. In other words, the second set exists because of **one
+  file**.
+- **`PUBLIC_OIDC_ISSUER` and `SYTUE_OIDC_ISSUER` are DIFFERENT variables**, and from that comes the piece
+  that makes all this viable. The first is baked in and only feeds `suiteApex`; the second is a
+  runtime one and is what the BFF uses. So the `.com` front bakes its links on `.com` and at the
+  same time signs in against the **single** Sytue ID, `id.sytue.eu`. Verified on 2026-09-21 with the
+  real image: `GET /one/auth/login` with `Host: one.sytue.com` responds `302` to
   `https://id.sytue.eu/oauth2/authorize?…&redirect_uri=https%3A%2F%2Fone.sytue.com%2Fone%2Fauth%2Fcallback`.
-- **Un IdP emite un `iss`.** No hay «Sytue ID de `.com`»: quien entre por `.com` inicia sesión en
-  `id.sytue.eu` y vuelve. `id.sytue.com` y `hub.sytue.com` sí existen como hosts —el `appDomains`
-  horneado los nombra— y se enrutan al piloto reescribiendo el `Host`.
-- **Las cookies no necesitan nada.** Son `__Host-`: host-only y sin `Domain`, y
-  `resolveOidcConfig` **lanza** si alguien define `SYTUE_COOKIE_DOMAIN`. Cada host tiene la suya,
-  así que `.com` no depende de que valga una de `.eu`. La consecuencia, escrita para que nadie la
-  descubra sobre la marcha: **la sesión no se comparte entre los dos frentes**; entrar en `.com`
-  es un login propio que el SSO del IdP resuelve sin volver a pedir contraseña.
-- **El coste del segundo juego es mucho menor de lo temido.** En el registro, la segunda variante
-  de una app añade **~7 MB** y no 647: todas las capas menos el `dist` son las mismas (medido en
-  el piloto con dos builds del portal). En el runner, el juego de `.com` es el **nativo** —los
-  runners son ARM64 y el frontal también—, así que se construye **sin** `bun install --cpu` ni
-  `crane rebase`, al revés que el de `.eu`, que es el cruzado. Referencia medida en la v3.3.9: 13
-  frontends en 30 min 49 s de runner, 2 min 22 s cada uno, el 79 % del total de la publicación.
-- **Y el frontal aguanta.** Un contenedor SSR ocupa 19-46 MiB en reposo y 64 MiB tras 260
-  peticiones; los catorce de producción suman 552 MiB y 17 milicores entre todos. Trece más caben
-  en los 21 GB libres del frontal sin acercarse a Pangolin, al SFU ni a los tres runners.
+- **An IdP issues one `iss`.** There is no “`.com` Sytue ID”: whoever comes in through `.com` signs in at
+  `id.sytue.eu` and comes back. `id.sytue.com` and `hub.sytue.com` do exist as hosts —the baked
+  `appDomains` names them— and are routed to the pilot by rewriting the `Host`.
+- **Cookies need nothing.** They are `__Host-`: host-only and without `Domain`, and
+  `resolveOidcConfig` **throws** if someone defines `SYTUE_COOKIE_DOMAIN`. Each host has its own,
+  so `.com` does not depend on a `.eu` one being valid. The consequence, written down so that nobody
+  discovers it on the fly: **the session is not shared between the two fronts**; signing in on `.com`
+  is a login of its own that the IdP's SSO resolves without asking for the password again.
+- **The cost of the second set is much lower than feared.** In the registry, the second variant
+  of an app adds **~7 MB** and not 647: all layers except `dist` are the same (measured on
+  the pilot with two builds of the portal). On the runner, the `.com` set is the **native** one —the
+  runners are ARM64 and so is the front node—, so it is built **without** `bun install --cpu` or
+  `crane rebase`, the opposite of the `.eu` one, which is the cross-compiled one. Reference measured in v3.3.9: 13
+  frontends in 30 min 49 s of runner time, 2 min 22 s each, 79 % of the total publication.
+- **And the front node can take it.** An SSR container uses 19-46 MiB at rest and 64 MiB after 260
+  requests; the fourteen in production add up to 552 MiB and 17 millicores among all of them. Thirteen more fit
+  in the front node's 21 GB free without getting close to Pangolin, the SFU or the three runners.
 
-**El coste que sí hay que aceptar: la latencia del SSR.** Los BFF del frontal no pueden usar
-nombres del clúster, así que llaman al backend por `https://<producto>.sytue.eu`. Medido desde el
-frontal el 2026-09-21: **33 ms con conexión reutilizada** y **116 ms en frío**, de los que 85 son
-el saludo TLS. **No hay atajo**: `id.sytue.eu` ya resuelve a esa misma máquina (ping 0,06 ms), o
-sea que esos 33 ms son el túnel de Pangolin hasta el piloto — el viaje físico París↔España, no el
-proxy. Una página con llamadas **en cadena** las suma; cuando alguna se note, lo que hay que
-quitar es la cadena, no el salto.
+**The cost that does have to be accepted: SSR latency.** The front node's BFFs cannot use
+cluster names, so they call the backend via `https://<producto>.sytue.eu`. Measured from the
+front node on 2026-09-21: **33 ms with a reused connection** and **116 ms cold**, of which 85 are
+the TLS handshake. **There is no shortcut**: `id.sytue.eu` already resolves to that same machine (ping 0.06 ms), so
+those 33 ms are the Pangolin tunnel to the pilot — the physical Paris↔Spain trip, not the
+proxy. A page with **chained** calls adds them up; when any of them becomes noticeable, what has to be
+removed is the chain, not the hop.
 
-**Lo único que hubo que cambiar en el código** fue añadir `sytue.com` a `SYTUE_ALLOWED_DOMAINS`
-(`@sytue/config/astro-security`). Sin eso el síntoma no es un error claro: Astro deja de creerse
-el `Host`, `Astro.url` cae a `http://localhost:<puerto>`, el BFF salta al host canónico —sacando a
-la persona del dominio— y `checkOrigin` rechaza todo POST, logout y refresco de sesión incluidos.
-Nada de eso falla al desplegar: falla al entrar.
+**The only thing that had to change in the code** was adding `sytue.com` to `SYTUE_ALLOWED_DOMAINS`
+(`@sytue/config/astro-security`). Without that the symptom is not a clear error: Astro stops believing
+the `Host`, `Astro.url` falls back to `http://localhost:<puerto>`, the BFF jumps to the canonical host —taking
+the person out of the domain— and `checkOrigin` rejects every POST, logout and session refresh included.
+None of that fails at deploy time: it fails at sign-in.
 
-**Guardianes** (los dos vistos en rojo a mano antes de darlos por buenos):
+**Guardians** (both seen red by hand before accepting them):
 
-- `apps/frontend/packages/config/src/dominio-horneado.test.ts` compara **por igualdad** los tres
-  ficheros que pueden leer `import.meta.env.PUBLIC_*` sin `serverEnv`. Un cuarto lo para, porque
-  cada lectura nueva engorda el precio de tener dos juegos de imágenes.
-- `TestRedirectUrisDeSytueComCubrenElCompose` (en `make migrate-check`) ata los
-  `SYTUE_OIDC_REDIRECT_URI` que anuncia `deploy/sytue-com/docker-compose.yml` a los registrados en
-  Sytue ID. Es el fallo que no se parece a un fallo: el contenedor arranca, `/healthz` contesta, y
-  lo único que no funciona es entrar, solo por `.com`.
+- `apps/frontend/packages/config/src/dominio-horneado.test.ts` compares **by equality** the three
+  files that may read `import.meta.env.PUBLIC_*` without `serverEnv`. A fourth one stops it, because
+  each new read inflates the price of having two sets of images.
+- `TestRedirectUrisDeSytueComCubrenElCompose` (in `make migrate-check`) ties the
+  `SYTUE_OIDC_REDIRECT_URI`s announced by `deploy/sytue-com/docker-compose.yml` to those registered in
+  Sytue ID. It is the failure that does not look like a failure: the container starts, `/healthz` answers, and
+  the only thing that does not work is signing in, only via `.com`.
 
-**Orden de encendido, y el camino de vuelta.** Primero la migración 0094, luego los contenedores,
-y el bloque de Traefik el último: al revés, `sytue.com` deja de servir Gio antes de que lo nuevo
-pueda iniciar sesión. **Gio no se apaga**; su router sigue puesto con la misma prioridad, así que
-quitar el bloque de `sytue-com` devuelve el dominio a Gio en el acto. Detalle en
+**Power-on order, and the way back.** First migration 0094, then the containers,
+and the Traefik block last: the other way round, `sytue.com` stops serving Gio before the new one
+can sign in. **Gio is not turned off**; its router stays in place with the same priority, so
+removing the `sytue-com` block returns the domain to Gio immediately. Details in
 `deploy/sytue-com/README.md`.
 
-**Descartado.** _Redirigir `sytue.com` a `sytue.eu`_ (el encargo dice servir, no redirigir).
-_Resolver las URL públicas en ejecución desde la cabecera `Host`_: llegó a estar implementado y
-verificado —lista blanca de hosts en el BFF y enlaces entre apps al mismo origen— y se descartó al
-decidir el dueño la vía de las dos imágenes. Sirve para cualquier dominio futuro sin publicar
-nada, pero exige que los enlaces entre apps sean relativos, y eso cambia las URL visibles de toda
-la suite en `sytue.eu`, que es la referencia de paridad. Queda medido por si un tercer dominio lo
-hace rentable: con enlaces absolutos, ir de Mail a Drive cuesta **cuatro redirecciones y una
-vuelta entera por el IdP**, porque las cookies son host-only. _Un solo host en `.com` sirviendo la
-suite por prefijos_, como el host de organización: funciona, pero obliga a lo mismo de arriba.
+**Ruled out.** _Redirecting `sytue.com` to `sytue.eu`_ (the brief says serve, not redirect).
+_Resolving the public URLs at runtime from the `Host` header_: it was actually implemented and
+verified —a host allowlist in the BFF and links between apps on the same origin— and it was ruled out when
+the owner decided on the two-image route. It works for any future domain without publishing
+anything, but it requires links between apps to be relative, and that changes the visible URLs of the whole
+suite on `sytue.eu`, which is the parity reference. It remains measured in case a third domain makes it
+worthwhile: with absolute links, going from Mail to Drive costs **four redirects and a full
+round trip through the IdP**, because the cookies are host-only. _A single host on `.com` serving the
+suite by prefixes_, like the organization host: it works, but it requires the same as above.
 <a id="0050"></a>
 
-## 0050 — Un solo inicio de sesión para las trece apps nativas: llavero para el secreto, carpeta compartida para las preferencias, servidor para la presencia
+<a id="0050--un-solo-inicio-de-sesión-para-las-trece-apps-nativas-llavero-para-el-secreto-carpeta-compartida-para-las-preferencias-servidor-para-la-presencia"></a>
 
-`accepted` · 2026-09-22 · escritorio, móvil, oidc, fyne · código en `apps/nucleo/ajustes`, `apps/nucleo/auth`, `apps/fyne/sesion`
+## 0050 — A single sign-in for the thirteen native apps: keychain for the secret, shared folder for preferences, server for presence
 
-**Contexto.** La suite instalada son **trece binarios**, uno por producto ([0048](#0048) §separación
-de apps). El dueño pide que la sesión sea **transversal**: quien entra en Sytue Mail no vuelve a
-entrar en Drive. Y con ella, la **apariencia**, el **idioma** y la **presencia**. Cuatro cosas que
-la persona ve como una sola —«mi cuenta»— y trece procesos que tienen que coincidir.
+`accepted` · 2026-09-22 · desktop, mobile, oidc, fyne · code in `apps/nucleo/ajustes`, `apps/nucleo/auth`, `apps/fyne/sesion`
 
-**Cuatro cosas, tres sitios.** La tentación es un único almacén. Es un error, y cada uno falla de
-una manera distinta:
+**Context.** The installed suite is **thirteen binaries**, one per product ([0048](#0048) §separation
+of apps). The owner asks for the session to be **cross-cutting**: whoever signs in to Sytue Mail does not sign in
+again to Drive. And with it, the **appearance**, the **language** and the **presence**. Four things that
+the person sees as one —“my account”— and thirteen processes that have to agree.
 
-|                            | dónde                         | por qué ahí y no en otro sitio                                                                                                                                               |
-| -------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sesión** (refresh token) | llavero del sistema           | es un secreto: Keychain en macOS e iOS, Secret Service en Linux, Credential Manager en Windows, Keystore en Android                                                          |
-| **Apariencia**             | `<config>/sytue/ajustes.json` | no es un secreto, y en macOS el llavero **puede pedir autorización**: un arranque que pregunta por el tema es absurdo. Y si el llavero no está, la app tiene que abrir igual |
-| **Idioma**                 | ídem                          | ídem                                                                                                                                                                         |
-| **Presencia**              | el servidor (`api.Hub`)       | **la ven los demás**. Una copia local sería una segunda verdad que se queda vieja en cuanto se cambia desde la web o desde el teléfono                                       |
+**Four things, three places.** The temptation is a single store. It is a mistake, and each one fails in
+a different way:
 
-**`fyne.Preferences` no vale, y no es una opinión.** En `fyne.io/fyne/v2@v2.8.1`, el almacén es
-`filepath.Join(app.RootConfigDir(), a.UniqueID())` (`app/preferences_other.go:18`): una carpeta
-**por `ID` de `FyneApp.toml`**. Trece apps, trece `preferences.json`, trece temas. En Android e iOS
-sí es una sola carpeta (`preferences_android.go:19`, «we are in a sandbox»), pero ahí también hay
-una sola app instalada, así que tampoco comparte nada entre productos. Y es **JSON en claro**, con
-lo que para el secreto queda descartado por partida doble.
+|                             | where                         | why there and not somewhere else                                                                                                                                                         |
+| --------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Session** (refresh token) | system keychain               | it is a secret: Keychain on macOS and iOS, Secret Service on Linux, Credential Manager on Windows, Keystore on Android                                                                   |
+| **Appearance**              | `<config>/sytue/ajustes.json` | it is not a secret, and on macOS the keychain **may ask for authorization**: a startup that asks about the theme is absurd. And if the keychain is not there, the app has to open anyway |
+| **Language**                | same                          | same                                                                                                                                                                                     |
+| **Presence**                | the server (`api.Hub`)        | **others see it**. A local copy would be a second truth that goes stale as soon as it is changed from the web or from the phone                                                          |
 
-**El fichero compartido dice QUÉ ha cambiado, nunca guarda lo que vale en otro sitio.** Es la regla
-que ordena el reparto: de la sesión solo hay una **marca** —un número en nanosegundos, que solo
-sirve para ser distinto del anterior— y quien la ve vuelve a preguntarle al llavero. Un guardián
-recorre la carpeta entera y falla si aparece algo que huela a credencial
+**`fyne.Preferences` does not work, and it is not an opinion.** In `fyne.io/fyne/v2@v2.8.1`, the store is
+`filepath.Join(app.RootConfigDir(), a.UniqueID())` (`app/preferences_other.go:18`): one folder
+**per `ID` in `FyneApp.toml`**. Thirteen apps, thirteen `preferences.json`, thirteen themes. On Android and iOS
+it is a single folder (`preferences_android.go:19`, “we are in a sandbox”), but there there is also
+a single app installed, so it does not share anything between products either. And it is **plain-text JSON**, so
+for the secret it is ruled out twice over.
+
+**The shared file says WHAT has changed, it never stores what lives somewhere else.** It is the rule
+that orders the split: of the session there is only a **marker** —a number in nanoseconds, which only
+serves to be different from the previous one— and whoever sees it asks the keychain again. A guardian
+walks the entire folder and fails if anything that smells like a credential appears
 (`TestLaMarcaDeSesionNoLlevaLaSesion`).
 
-**El aviso entre procesos es UNO: un sondeo de dos segundos** (`ajustes.Vigilar`). Dos lecturas de
-menos de cien bytes, sin dependencia nueva y sin una implementación por plataforma; `inotify` /
-`FSEvents` / `ReadDirectoryChangesW` habrían sido tres. Lo que cada cosa hace con el aviso:
+**The inter-process notification is ONE: a two-second poll** (`ajustes.Vigilar`). Two reads of
+less than a hundred bytes, no new dependency and no per-platform implementation; `inotify` /
+`FSEvents` / `ReadDirectoryChangesW` would have been three. What each thing does with the notification:
 
-- **Cerrar sesión: en el acto**, en las trece. No admite «en el siguiente arranque».
-- **Tema: en caliente.** Cambiarlo en Mail lo cambia en Drive sin reabrir nada.
-- **Idioma: al siguiente arranque.** Las pantallas reciben su traductor al construirse y rehacerlas
-  enteras sería reabrir la app por dentro. Es lo que hace cualquier escritorio, y está dicho aquí
-  en vez de quedarse a medias.
-- **Presencia: no pasa por el fichero.** Se le pregunta al Hub en el mismo latido que la mantiene
-  viva, porque **también hay que enterarse de lo que se cambie desde la web o el teléfono**, y para
-  eso el fichero no sirve. Añadirle una marca sería un segundo mecanismo para un caso que el
-  primero ya cubre.
+- **Sign-out: immediately**, in all thirteen. It does not admit “on the next startup”.
+- **Theme: live.** Changing it in Mail changes it in Drive without reopening anything.
+- **Language: on the next startup.** Screens receive their translator when built, and rebuilding them
+  entirely would be reopening the app from the inside. It is what any desktop does, and it is stated here
+  instead of being left half-done.
+- **Presence: does not go through the file.** The Hub is asked in the same heartbeat that keeps it
+  alive, because **we also need to find out about what is changed from the web or the phone**, and for
+  that the file is useless. Adding a marker to it would be a second mechanism for a case the
+  first one already covers.
 
-**Fyne no deja forzar la variante del tema, y eso cambia el diseño.**
-`settings.ThemeVariant()` devuelve `s.variant`, que sale del sistema operativo, y `SetTheme` **no la
-toca** (`app/settings.go:75-86`). `theme.LightTheme()`/`DarkTheme()` tampoco valdrían: los widgets de
-la suite no piden color por `fyne.Theme` ([0048](#0048) §tema). La elección se resuelve en
-`tema.De`, por donde **ya pasaban los 243 puntos del árbol** que preguntan la variante, en vez de
-cambiar los 243.
+**Fyne does not let you force the theme variant, and that changes the design.**
+`settings.ThemeVariant()` returns `s.variant`, which comes from the operating system, and `SetTheme` **does not
+touch it** (`app/settings.go:75-86`). `theme.LightTheme()`/`DarkTheme()` would not work either: the suite's widgets
+do not request color through `fyne.Theme` ([0048](#0048) §theme). The choice is resolved in
+`tema.De`, through which **the 243 points in the tree** that ask for the variant already went, instead of
+changing all 243.
 
-**El flujo OIDC es el de RFC 8252, y ya estaba.** Authorization Code + PKCE contra un cliente
-**público** —un binario instalado no puede guardar un secreto—, con el navegador **del sistema** y
-no una vista dentro de la app (§8.1): así el dominio y el candado se ven, y la sesión que ya hubiera
-con Sytue ID se reutiliza. La vuelta del navegador es lo único que cambia entre plataformas: en el
-escritorio, un servidor efímero en `127.0.0.1:8921` (§7.3, cliente `sytue-desktop`, migración 0069);
-en el móvil, el esquema propio de cada app (§7.1, cliente `sytue-mobile`, migración 0071, con los
-catorce esquemas registrados uno a uno). **No hace falta migración nueva**: los dos clientes y sus
-`redirect_uri` ya están dados de alta.
+**The OIDC flow is RFC 8252's, and it was already there.** Authorization Code + PKCE against a
+**public** client —an installed binary cannot keep a secret—, with the **system** browser and
+not a view inside the app (§8.1): that way the domain and the padlock are visible, and any existing session
+with Sytue ID is reused. The return from the browser is the only thing that changes between platforms: on
+desktop, an ephemeral server at `127.0.0.1:8921` (§7.3, `sytue-desktop` client, migration 0069);
+on mobile, each app's own scheme (§7.1, `sytue-mobile` client, migration 0071, with the
+fourteen schemes registered one by one). **No new migration is needed**: both clients and their
+`redirect_uri`s are already registered.
 
-**La carrera de la renovación, que era el riesgo de verdad.** Sytue ID **rota** el refresh token en
-cada uso y, si le presentan uno gastado, **revoca la familia entera**. Con trece procesos y una sola
-entrada del llavero, dos apps que caduquen a la vez leen el mismo token, las dos lo presentan y la
-segunda deja fuera a las trece. Mirar lo guardado antes de renovar no basta: hay que impedir que
-dos miren a la vez. `Compartida` envuelve **leer‑renovar‑guardar** en un cerrojo **entre procesos**.
+**The refresh race, which was the real risk.** Sytue ID **rotates** the refresh token on
+each use and, if presented with a spent one, **revokes the entire family**. With thirteen processes and a single
+keychain entry, two apps that expire at the same time read the same token, both present it and the
+second one locks out all thirteen. Looking at what is stored before refreshing is not enough: two must be prevented
+from looking at the same time. `Compartida` wraps **read‑refresh‑store** in an **inter-process** lock.
 
-El cerrojo es un fichero creado con `O_EXCL` y **no `flock`**: `O_EXCL` es la misma llamada en los
-cinco destinos —incluidos Windows y Android— y `flock` habría sido un fichero por plataforma en
-`golang.org/x/sys`. El precio es que un proceso que muera lo deja puesto, y por eso **caduca a los
-diez segundos**. El guardián son **trece procesos de verdad**, no goroutines: sin cerrojo, «el
-contador acabó en 1 y tendría que ser 13».
+The lock is a file created with `O_EXCL` and **not `flock`**: `O_EXCL` is the same call on all
+five targets —including Windows and Android— and `flock` would have been one file per platform in
+`golang.org/x/sys`. The price is that a process that dies leaves it in place, and that is why **it expires after
+ten seconds**. The guardian is **thirteen real processes**, not goroutines: without a lock, «el
+contador acabó en 1 y tendría que ser 13» (“the counter ended at 1 and should be 13”).
 
-**Descartado.** _Un fichero 0600 con el refresh token_ (es lo que hacía el escritorio viejo; un
-secreto en claro no es un llavero, y en un equipo compartido cualquier proceso del mismo usuario lo
-lee). _`fyne.Preferences` para la sesión_ (texto plano) _y para las preferencias_ (por app, que es
-justo lo contrario de lo que se pide). _Un solo almacén para las cuatro cosas_ (el llavero pidiendo
-permiso al arrancar para saber el tema). _Guardar la presencia en local_ (segunda verdad).
-_`singleflight` en vez del cerrojo_ (resuelve la carrera dentro de un proceso, y el problema es
-entre trece). _Avisar con `fsnotify`_ (una dependencia y tres implementaciones para ahorrar dos
-lecturas de cien bytes cada dos segundos; se reconsidera si alguna vez se mide que molesta).
+**Ruled out.** _A 0600 file with the refresh token_ (it is what the old desktop did; a
+plaintext secret is not a keychain, and on a shared computer any process of the same user can
+read it). _`fyne.Preferences` for the session_ (plain text) _and for preferences_ (per app, which is
+exactly the opposite of what is asked). _A single store for the four things_ (the keychain asking for
+permission at startup to know the theme). _Storing presence locally_ (a second truth).
+_`singleflight` instead of the lock_ (it solves the race within one process, and the problem is
+among thirteen). _Notifying with `fsnotify`_ (a dependency and three implementations to save two
+hundred-byte reads every two seconds; it will be reconsidered if it is ever measured to be a nuisance).
 
 <a id="0051"></a>
 
-## 0051 — Firma con el certificado del sistema, en dos pasos, con sello cualificado de Izenpe, y «Pedir firma»
+<a id="0051--firma-con-el-certificado-del-sistema-en-dos-pasos-con-sello-cualificado-de-izenpe-y-pedir-firma"></a>
 
-`accepted` · 2026-09-26 · docs, firma, eIDAS, seguridad · **desarrolla el [0030](#0030) §2 (c)
-y sustituye su §4 en la autoridad de sellado** · código en
+## 0051 — Signing with the system certificate, in two steps, with a qualified Izenpe timestamp, and “Request signature”
+
+`accepted` · 2026-09-26 · docs, signature, eIDAS, security · **develops [0030](#0030) §2 (c)
+and replaces its §4 regarding the timestamping authority** · code in
 `services/docs/internal/domain/pdfsigndospasos.go`, `…/http/pdffirmasistema.go`,
-`…/http/pdfpedirfirma.go`, `apps/nucleo/api/docs_pdf_firma.go`; mig. docs `0007` y `0011`
+`…/http/pdfpedirfirma.go`, `apps/nucleo/api/docs_pdf_firma.go`; docs mig. `0007` and `0011`
 
-**Contexto.** El certificado de firma de la mayoría de la gente en Europa no está en un fichero:
-está en el Llavero de macOS o iOS, en el almacén de Windows, en el KeyChain de Android, en una
-tarjeta o en el DNI electrónico, y **su clave privada no se puede sacar de ahí** —en una tarjeta,
-físicamente—. Hasta ahora CertiPDF firmaba con un `.p12` que se subía al motor, y para lo demás
-remitía a la aplicación oficial del país. El dueño decidió (2026-09-24): firmar con el certificado
-del sistema, en dos pasos, contra **todos** los almacenes, y con sello de tiempo **cualificado**
-de la UE (PAdES-B-T). Y (2026-09-25) que se pueda **pedir la firma a otra persona**.
+**Context.** The signing certificate of most people in Europe is not in a file:
+it is in the macOS or iOS Keychain, in the Windows store, in the Android KeyChain, on a
+card or in the electronic ID card, and **its private key cannot be taken out of there** —on a card,
+physically—. Until now CertiPDF signed with a `.p12` uploaded to the engine, and for everything else
+it referred to the country's official application. The owner decided (2026-09-24): sign with the
+system certificate, in two steps, against **all** stores, and with a **qualified** EU timestamp
+(PAdES-B-T). And (2026-09-25) that it be possible to **request a signature from another person**.
 
-**Decisión.**
+**Decision.**
 
-1. **Dos pasos; la clave no sale del equipo.** El servicio prepara (`POST /api/v1/pdf/sign/prepare`):
-   el PDF con el hueco y el `/ByteRange` escritos, los atributos firmados (content-type,
-   message-digest y signing-certificate-v2, **sin** signing-time: PAdES lo prohíbe) y su resumen
-   SHA-256, más el `DigestInfo` ya envuelto para las funciones «en crudo» (CKM_RSA_PKCS,
-   NONEwithRSA). La app pide al SISTEMA que firme ese resumen con la clave elegida —una llamada a
-   su función de firma, sin escribir ni un byte de ASN.1— y devuelve la firma
-   (`POST /api/v1/pdf/sign/complete`). El servicio monta el CMS y lo incrusta. El motor es UNO: los
-   dos pasos usan las mismas piezas que la firma con `.p12`, con el mismo perfil PAdES
+1. **Two steps; the key does not leave the device.** The service prepares (`POST /api/v1/pdf/sign/prepare`):
+   the PDF with the gap and the `/ByteRange` written, the signed attributes (content-type,
+   message-digest and signing-certificate-v2, **without** signing-time: PAdES forbids it) and their
+   SHA-256 digest, plus the `DigestInfo` already wrapped for the “raw” functions (CKM_RSA_PKCS,
+   NONEwithRSA). The app asks the SYSTEM to sign that digest with the chosen key —a call to
+   its signing function, without writing a single byte of ASN.1— and returns the signature
+   (`POST /api/v1/pdf/sign/complete`). The service builds the CMS and embeds it. The engine is ONE: the
+   two steps use the same pieces as signing with a `.p12`, with the same PAdES profile
    (`/SubFilter /ETSI.CAdES.detached`).
-2. **La ligadura vive en la base, no en el cliente** (mig. 0007). La preparación es de UNA persona
-   de UNA organización (RLS), vale **diez minutos**, se reserva mientras se completa (dos vueltas a
-   la vez no dan dos firmas) y **se gasta** al completar. Se guardan la huella del PDF preparado
-   —el PDF lo devuelve la app: 25 MiB no se aparcan en la base—, los atributos y la cadena. Al
-   completar se exige: misma persona, **el mismo documento byte a byte**, los atributos resumiendo
-   ESE documento y nombrando ESE certificado, y una firma de ESE resumen con ESA clave. Un cliente
-   que mienta no consigue una firma. Cinco preparaciones abiertas por persona como mucho.
-3. **Todo lo que puede fallar después del PIN se comprueba antes.** El certificado tiene que estar
-   vigente, ser de firma (digitalSignature o contentCommitment, el del DNIe), RSA ≥ 2048 o ECDSA
-   P-256/384/521; la cadena que manda la app tiene que ir **en orden** (cada certificado emitido
-   por el siguiente) y **caber** en el hueco con el sello. Descubrirlo después es tirarle el trabajo
-   a quien ya puso el PIN en su tarjeta.
-4. **Lo que ve la persona ANTES de firmar**, del servicio y no de la app: quién firma (el CN del
-   certificado; el nombre que mande la app no cuenta), quién lo emitió, hasta cuándo vale, el nivel
-   («puede ser cualificada» solo si el certificado declara QcCompliance **y** QcSSCD y viene con la
-   cadena de su emisor; si no, «avanzada»: la lista de confianza de la UE no se consulta aquí, así
-   que se promete de menos, [0030](#0030) §1), cuántas páginas y qué autoridad sellará.
-5. **Sello cualificado de Izenpe, y sin sello no se firma en silencio.** La autoridad pasa a ser
-   **Izenpe** (`http://tsa.izenpe.com`), medida el 2026-09-24 contra la lista de confianza de la UE
-   como servicio de sellado CUALIFICADO en vigor; el Certum gratuito del [0030](#0030) §4 **no** es
-   cualificado. El token se autentica contra la raíz «ROOT CA QC IZENPE» fijada en el chart
-   (`SELLO_ANCLAS`, obligatoria con `SELLO_URL`), tiene que declarar SHA-256, sellar la huella del
-   valor de la firma y traer el nonce de la petición. **Esto cambia la regla del 0030 §4 para los
-   dos pasos:** si la autoridad no responde, el servicio contesta `pdf_timestamp_unavailable`, la
-   preparación sigue viva, y **la misma firma** vale para reintentar o para seguir sin sello por
-   decisión explícita (`sin_sello=1`): el sello no entra en lo firmado, así que no hay que volver a
-   pedir el PIN. A Izenpe solo viaja una huella: no es subencargado ([`security.md` §11.6](security.md#116-sello-de-tiempo-izenpe)).
-6. **Los almacenes, uno por plataforma, debajo y fino** ([0024](#0024), la interfaz sigue siendo
-   Fyne): PKCS#11 (tarjetas y DNIe) en los tres escritorios; Llavero en macOS e iOS
-   (Security.framework); almacén de Windows por CNG; KeyChain de Android con una clase Java propia
-   del selector en la APK, junto a las de #983 (decidido por el dueño). ECDSA sale en DER del
-   Llavero y de Android y en r‖s de CNG y PKCS#11: la app dice cuál (`formato=p1363`) y el servicio
-   lo normaliza.
-7. **«Pedir firma»** (mig. 0011). Desde CertiPDF, a otra persona **de la misma organización**, por
-   su correo (lo resuelve Sytue ID con `directory:resolve` y la sesión de quien pide; el navegador
-   nunca elige un `sub`). El PDF no se copia: vive en la unidad de la organización y la petición
-   guarda su id y su ruta, que tiene que acabar en el nombre de ese fichero. Quien la recibe tiene
-   un aviso `docs.signature.requested` de origen `pdf` y un correo desde avisos@, los dos con el
-   enlace al PDF (`/docs/pdf?path=`); al abrirlo, una franja le dice quién pide y qué, con
-   «Rechazar» y «Firmar». Firma como firme siempre (sistema, `.p12` o rúbrica), la copia firmada
-   queda en Drive y **se entrega sola**: el servicio baja original y firmado con la sesión de quien
-   firma y exige más firmas que el original y que la última cubra el documento entero. Entonces
-   quien pidió recibe `docs.signature.completed` con el enlace al firmado (o
-   `docs.signature.declined`). Una pendiente por fichero y persona; treinta peticiones por hora
-   y persona como mucho.
+2. **The binding lives in the database, not in the client** (mig. 0007). The preparation belongs to ONE person
+   of ONE organization (RLS), is valid for **ten minutes**, is reserved while it is completed (two round trips at
+   the same time do not produce two signatures) and **is spent** on completion. What is stored is the digest of the prepared PDF
+   —the app returns the PDF: 25 MiB are not parked in the database—, the attributes and the chain. On
+   completion it requires: the same person, **the same document byte for byte**, the attributes digesting
+   THAT document and naming THAT certificate, and a signature of THAT digest with THAT key. A client
+   that lies does not get a signature. At most five open preparations per person.
+3. **Everything that can fail after the PIN is checked before.** The certificate has to be
+   valid, be a signing one (digitalSignature or contentCommitment, the DNIe's), RSA ≥ 2048 or ECDSA
+   P-256/384/521; the chain the app sends has to be **in order** (each certificate issued
+   by the next) and **fit** in the gap together with the timestamp. Finding out afterwards throws away the work
+   of whoever already entered the PIN on their card.
+4. **What the person sees BEFORE signing**, from the service and not the app: who signs (the
+   certificate's CN; the name the app sends does not count), who issued it, until when it is valid, the level
+   (“may be qualified” only if the certificate declares QcCompliance **and** QcSSCD and comes with its
+   issuer's chain; if not, “advanced”: the EU trusted list is not consulted here, so
+   less is promised, [0030](#0030) §1), how many pages and which authority will timestamp.
+5. **Qualified Izenpe timestamp, and without a timestamp nothing is signed silently.** The authority becomes
+   **Izenpe** (`http://tsa.izenpe.com`), measured on 2026-09-24 against the EU trusted list
+   as a QUALIFIED timestamping service in force; the free Certum of [0030](#0030) §4 is **not**
+   qualified. The token is authenticated against the «ROOT CA QC IZENPE» root pinned in the chart
+   (`SELLO_ANCLAS`, mandatory with `SELLO_URL`), it has to declare SHA-256, stamp the digest of the
+   signature value and carry the request's nonce. **This changes the rule of 0030 §4 for the
+   two steps:** if the authority does not respond, the service answers `pdf_timestamp_unavailable`, the
+   preparation stays alive, and **the same signature** is valid for retrying or for continuing without a timestamp by
+   explicit decision (`sin_sello=1`): the timestamp is not part of what is signed, so there is no need to ask
+   for the PIN again. Only a digest travels to Izenpe: it is not a sub-processor ([`security.md` §11.6](security.md#116-sello-de-tiempo-izenpe)).
+6. **The stores, one per platform, underneath and thin** ([0024](#0024), the interface is still
+   Fyne): PKCS#11 (cards and DNIe) on the three desktops; Keychain on macOS and iOS
+   (Security.framework); Windows store via CNG; Android KeyChain with our own Java selector
+   class in the APK, alongside those of #983 (decided by the owner). ECDSA comes out in DER from the
+   Keychain and from Android and in r‖s from CNG and PKCS#11: the app says which (`formato=p1363`) and the service
+   normalizes it.
+7. **“Request signature”** (mig. 0011). From CertiPDF, to another person **in the same organization**, by
+   their email (resolved by Sytue ID with `directory:resolve` and the requester's session; the browser
+   never chooses a `sub`). The PDF is not copied: it lives in the organization's drive and the request
+   stores its id and its path, which has to end in that file's name. The recipient gets
+   a `docs.signature.requested` notification with origin `pdf` and an email from avisos@, both with the
+   link to the PDF (`/docs/pdf?path=`); on opening it, a banner tells them who is asking and for what, with
+   «Rechazar» (“Decline”) and «Firmar» (“Sign”). They sign however they always sign (system, `.p12` or handwritten signature), the signed copy
+   stays in Drive and **is delivered automatically**: the service downloads the original and the signed one with the signer's
+   session and requires more signatures than the original and that the last one cover the whole document. Then
+   the requester receives `docs.signature.completed` with the link to the signed one (or
+   `docs.signature.declined`). One pending per file and person; at most thirty requests per hour
+   per person.
 
-**Consecuencias.**
+**Consequences.**
 
-- La firma con el certificado del sistema no convierte a Sytue en custodio de nada: por el
-  servicio pasan un resumen, una firma y una cadena pública. El control exclusivo del art. 26.c
-  queda donde estaba, en el equipo o la tarjeta de la persona.
-- Con Izenpe, la fecha de cada firma sellada tiene la presunción del art. 41.2. Su política da un
-  número de sellos al mes gratis y el número no se publica: si se agota, se contrata **sin cambiar
-  código** (credencial por Secret).
-- «Firmada», en una petición, significa «quien la recibió entregó un PDF con una firma nueva que lo
-  cubre entero»; **quién** firmó lo dice el certificado dentro del PDF y CertiPDF lo enseña al
-  abrirlo. No se confunde una cosa con la otra en la interfaz.
+- Signing with the system certificate does not turn Sytue into a custodian of anything: through the
+  service pass a digest, a signature and a public chain. The sole control of art. 26.c
+  stays where it was, on the person's device or card.
+- With Izenpe, the date of each timestamped signature has the presumption of art. 41.2. Its policy gives a
+  number of free timestamps per month and the number is not published: if it runs out, a contract is signed **without changing
+  code** (credential via Secret).
+- “Signed”, in a request, means “the recipient delivered a PDF with a new signature that
+  covers it entirely”; **who** signed is stated by the certificate inside the PDF and CertiPDF shows it on
+  opening it. The two things are not confused in the interface.
 
-**Alternativas descartadas.**
+**Alternatives ruled out.**
 
-- **Un solo paso en el cliente** (la app monta el CMS y sube el PDF firmado). Descartada: el
-  formato criptográfico estaría escrito seis veces, una por plataforma, y el servicio no podría
-  comprobar nada de lo que le llega.
-- **Guardar el PDF preparado en el servidor** en vez de su huella: 25 MiB por preparación en la
-  base o en un bucket, para ahorrar una subida que la app ya tiene hecha.
-- **Firmar sin sello cuando la autoridad cae**, como el [0030](#0030) §4. En dos pasos la persona
-  está delante y acaba de poner el PIN: se le pregunta, no se decide por ella.
-- **Pedir firma a cualquier dirección**, también de fuera. El PDF vive en la unidad de la
-  organización y quien no es de ella no puede abrirlo; hacerlo exige compartirlo antes por Drive.
-  Queda para cuando se decida cómo (DECISIÓN anotada en los pendientes del encargo).
-  **Decidido el 26/09: [0057](#0057)** (primero se comparte por Drive, después se pide).
+- **A single step on the client** (the app builds the CMS and uploads the signed PDF). Ruled out: the
+  cryptographic format would be written six times, once per platform, and the service could not
+  check anything it receives.
+- **Storing the prepared PDF on the server** instead of its digest: 25 MiB per preparation in the
+  database or in a bucket, to save an upload the app has already done.
+- **Signing without a timestamp when the authority is down**, as in [0030](#0030) §4. In two steps the person
+  is right there and has just entered the PIN: they are asked, it is not decided for them.
+- **Requesting a signature from any address**, including outside ones. The PDF lives in the
+  organization's drive and whoever is not part of it cannot open it; doing so requires sharing it first through Drive.
+  Left for when it is decided how (DECISION noted in the brief's pending items).
+  **Decided on 26/09: [0057](#0057)** (first it is shared through Drive, then the signature is requested).
 
 <a id="0052"></a>
 
-## 0052 — Canjear un enlace de Docs, también desde otra organización
+<a id="0052--canjear-un-enlace-de-docs-también-desde-otra-organización"></a>
 
-`accepted` · 2026-09-26 · docs, multi-tenancy, compartir, seguridad · **aplica el [0040](#0040)** · código en `services/docs/internal/http/canje.go`, mig. docs `0009`
+## 0052 — Redeeming a Docs link, also from another organization
 
-**Contexto.** La vista pública `/s/{token}` (#1042) enseña el documento a cualquiera con el
-enlace, en solo lectura. Un enlace de **editor** o de **comentarista** prometía más, y «Abrir en
-el editor» solo abría a quien ya tenía acceso: su organización o una invitación. El dueño decidió
-que el enlace se **canjee** por un permiso de quien lo abre con su sesión, **también si es de otra
-organización**. Un documento vive en la organización de su dueño, con su RLS por `tenant`, y el
-token de quien viene de fuera trae SU organización.
+`accepted` · 2026-09-26 · docs, multi-tenancy, sharing, security · **applies [0040](#0040)** · code in `services/docs/internal/http/canje.go`, docs mig. `0009`
 
-**Decisión.**
+**Context.** The public view `/s/{token}` (#1042) shows the document to anyone with the
+link, read-only. An **editor** or **commenter** link promised more, and «Abrir en
+el editor» (“Open in the editor”) only opened for whoever already had access: their organization or an invitation. The owner decided
+that the link be **redeemed** for a permission of whoever opens it with their session, **also if they are from another
+organization**. A document lives in its owner's organization, with its RLS by `tenant`, and the
+token of whoever comes from outside carries THEIR organization.
 
-1. **Canjear es un POST con sesión** (`POST /api/v1/share/redeem`, el token en el CUERPO para
-   que no quede en el log de peticiones), no abrir una URL: escribe un permiso. En la web lo lanza el botón de `/s/{token}` con un formulario
-   (`/s/{token}/abrir`), con el origen comprobado por Astro y la cookie de sesión que no viaja
-   en un POST de otro sitio. Sin sesión, al login y de vuelta a la vista pública.
-2. **Solo se canjean enlaces de editor o comentarista.** Uno de lector no añade nada a `/s/`.
-3. **Lo canjeado cuelga del enlace** (`doc_permissions.via_link`): la lectura de permisos solo
-   cuenta los de enlaces sin revocar y sin caducar, así que **revocar el enlace quita también lo
-   canjeado**, y borrarlo lo borra (`ON DELETE CASCADE`). Un permiso DIRECTO que la persona ya
-   tuviera no se toca: ni se rebaja ni pasa a depender del enlace (se contesta con el que tiene).
-   Al revés también: lo que el dueño concede a mano —o al aceptar una petición de edición— deja
-   de colgar del enlace. Si ya puede lo mismo o más, no se escribe nada. **Quitar a alguien que
-   entró por un enlace lo BLOQUEA** desde esa hora (`doc_permissions.bloqueado_desde`, mig.
-   0010): no se le canjea ningún enlace que ya existiera —tampoco otro vivo del mismo
-   documento—; uno creado después por el dueño, sí. Qué permiso cuenta lo dice una sola función,
-   `docs_permiso_vivo` (enlace sin revocar ni caducar, y sin bloquear).
-4. **El documento se queda en la organización anfitriona**, como las conversaciones del 0040. Quien
-   viene de fuera es una fila de `doc_permissions` con **`externo`**, escrita en la anfitriona.
-5. **Sus peticiones pasan a la anfitriona SIN nada de su token salvo el `sub`.** El middleware
-   `enAnfitrion` de `/documents/{id}` solo actúa si el documento NO está en la organización del
-   token y la persona es externa en la de su dueño; entonces la petición sigue en esa
-   organización y `subjectFrom` la reduce a su `sub`: ni sus grupos (sus roles de fuera no son
-   nada aquí) ni su organización (un permiso «para toda la organización X» no se le aplica).
-6. **Las lecturas entre organizaciones** son dos `SECURITY DEFINER`: `docs_anfitrion(documento,
-sub)` devuelve el slug de la anfitriona solo si esa persona tiene allí un permiso `externo`
-   vivo sobre ese documento, y `docs_de_fuera(sub, filtros, cursor)` los metadatos de la lista
-   de esos documentos, para que **salgan en la lista de su organización** mezclados por fecha.
-   El canje resuelve el enlace con `docs_canjear_enlace`, la misma superficie que
-   `docs_resolve_share` más el id del enlace. Que un documento es de la organización del token
-   se recuerda cinco minutos, para no pagar una lectura más en cada petición.
-7. **Quitar el acceso corta el canal en vivo.** Revocar el enlace o quitar a la persona le cierra
-   el WebSocket (el `PublishRole` con rol vacío lo cierra). Y lo que no avisa al quitarse —un
-   enlace que caduca, un permiso de grupo o de toda la organización que se retira— también:
-   cada conexión vuelve a preguntar por su rol cada minuto. Y se cierra cuando caduca su token:
-   al reconectar, el nuevo dice lo que vale AHORA (quien salió de la organización ya no trae su
-   `tenant`). Si aún puede entrar por otro lado, al reconectar se autoriza de nuevo.
-8. **En el diálogo de compartir del dueño, la persona de fuera sale con su nombre**: el directorio
-   de su organización no la conoce, y se pregunta a `people:resolve` (0040), que da nombre o
-   @usuario y nunca su correo ni su organización.
+**Decision.**
 
-**Revisión de seguridad** (26/09, antes de fusionar, y otra vez al resolver lo que dejó). Sin
-escaladas ni oráculos entre organizaciones. Todo lo que encontró está resuelto: lo concedido a
-mano no se desprende de un enlace canjeado; la lista no cuenta lo canjeado de un enlace revocado;
-el canje dice el rol real cuando no escribe; quitar a alguien lo bloquea para ese enlace; el
-canal en vivo se corta al quitar el acceso; y **el log de peticiones de TODA la suite registra el
-patrón de la ruta y no la URL** (`httpx.RequestLogger`, con un guardián que falla si un token
-aparece en el log), y **el log de accesos de Traefik no apunta la ruta** (guardián sobre toda
-configuración de Traefik del repositorio que lo active, y sobre todo nginx: `access_log off`). En
-producción ni el Traefik del frontal ni el del clúster ni el nginx del frontal escriben log de
-accesos, y las superficies Astro no registran peticiones. Los
-avisos entre organizaciones son el [0053](#0053).
+1. **Redeeming is a POST with a session** (`POST /api/v1/share/redeem`, the token in the BODY so
+   that it does not end up in the request log), not opening a URL: it writes a permission. On the web it is triggered by the `/s/{token}` button with a form
+   (`/s/{token}/abrir`), with the origin checked by Astro and the session cookie, which does not travel
+   in a POST from another site. Without a session, to login and back to the public view.
+2. **Only editor or commenter links are redeemed.** A reader one adds nothing to `/s/`.
+3. **What is redeemed hangs off the link** (`doc_permissions.via_link`): reading permissions only
+   counts those from links that are not revoked and not expired, so **revoking the link also removes what was
+   redeemed**, and deleting it deletes it (`ON DELETE CASCADE`). A DIRECT permission the person already
+   had is not touched: it is neither downgraded nor made dependent on the link (the answer is the one they have).
+   The other way round too: what the owner grants by hand —or on accepting an edit request— stops
+   hanging off the link. If they can already do the same or more, nothing is written. **Removing someone who
+   came in through a link BLOCKS them** from that time onward (`doc_permissions.bloqueado_desde`, mig.
+   0010): no link that already existed is redeemed for them —not even another live one for the same
+   document—; one created afterwards by the owner, yes. Which permission counts is stated by a single function,
+   `docs_permiso_vivo` (link not revoked or expired, and not blocked).
+4. **The document stays in the host organization**, like the conversations of 0040. Whoever
+   comes from outside is a row in `doc_permissions` with **`externo`**, written in the host.
+5. **Their requests pass to the host WITHOUT anything from their token except the `sub`.** The
+   `enAnfitrion` middleware of `/documents/{id}` only acts if the document is NOT in the token's organization
+   and the person is an external in its owner's organization; then the request continues in that
+   organization and `subjectFrom` reduces it to their `sub`: neither their groups (their outside roles are
+   nothing here) nor their organization (a permission “for the whole organization X” does not apply to them).
+6. **Cross-organization reads** are two `SECURITY DEFINER`s: `docs_anfitrion(documento,
+sub)` returns the host's slug only if that person has a live `externo` permission there
+   on that document, and `docs_de_fuera(sub, filtros, cursor)` the metadata of the list
+   of those documents, so that **they appear in their organization's list** mixed by date.
+   Redemption resolves the link with `docs_canjear_enlace`, the same surface as
+   `docs_resolve_share` plus the link id. That a document belongs to the token's organization
+   is remembered for five minutes, so as not to pay one more read on each request.
+7. **Removing access cuts the live channel.** Revoking the link or removing the person closes
+   their WebSocket (the `PublishRole` with an empty role closes it). And what does not notify on removal —a
+   link that expires, a group or whole-organization permission that is withdrawn— too:
+   each connection asks again for its role every minute. And it is closed when its token expires:
+   on reconnecting, the new one says what is valid NOW (whoever left the organization no longer carries its
+   `tenant`). If they can still get in another way, on reconnecting they are authorized again.
+8. **In the owner's share dialog, the outside person appears with their name**: the directory
+   of their organization does not know them, and `people:resolve` (0040) is asked, which gives the name or
+   @username and never their email or their organization.
 
-**Alternativas descartadas.** _Copiar el documento a la organización de quien lo abre_ (dos
-verdades que divergen al primer cambio). _Mover a la persona a la organización anfitriona_ (le
-daría todo lo que su token no dice). _Una sesión efímera con el token del enlace_ (el WS, los
-comentarios y las ops necesitan una identidad, y el enlace no la tiene). _Que el canje no dependa
-del enlace_ (revocar el enlace dejaría dentro a todos los que lo abrieron).
+**Security review** (26/09, before merging, and again when resolving what it left). No
+escalations or oracles between organizations. Everything it found is resolved: what is granted by
+hand does not detach from a redeemed link; the list does not count what was redeemed from a revoked link;
+redemption reports the real role when it does not write; removing someone blocks them for that link; the
+live channel is cut on removing access; and **the request log of the ENTIRE suite records the
+route pattern and not the URL** (`httpx.RequestLogger`, with a guardian that fails if a token
+appears in the log), and **the Traefik access log does not record the path** (a guardian over every
+Traefik configuration in the repository that enables it, and over every nginx: `access_log off`). In
+production neither the front node's Traefik nor the cluster's nor the front node's nginx write an access
+log, and the Astro surfaces do not log requests. Cross-organization
+notifications are [0053](#0053).
+
+**Alternatives ruled out.** _Copying the document to the opener's organization_ (two
+truths that diverge at the first change). _Moving the person to the host organization_ (it would
+give them everything their token does not say). _An ephemeral session with the link's token_ (the WS, the
+comments and the ops need an identity, and the link does not have one). _Making redemption not depend
+on the link_ (revoking the link would leave everyone who opened it inside).
 
 <a id="0053"></a>
 
-## 0053 — Un aviso es de la persona: la campana enseña los de todas sus organizaciones
+<a id="0053--un-aviso-es-de-la-persona-la-campana-enseña-los-de-todas-sus-organizaciones"></a>
 
-`accepted` · 2026-09-26 · hub, avisos, multi-tenancy, seguridad · **completa el [0040](#0040) y el [0052](#0052)** · código en `services/hub/internal/store/notifications.go`, `services/hub/internal/notify/hub.go`, mig. hub `0005`
+## 0053 — A notification belongs to the person: the bell shows those from all their organizations
 
-**Contexto.** Con el 0040 una persona conversa en Rooms con otra organización, y con el 0052 comenta
-o edita un documento de otra organización. Los avisos de esa actividad —una mención, un
-comentario— los emite el servicio en la organización ANFITRIONA, porque es donde vive el recurso.
-Y la campana del Hub listaba por la organización del token: el invitado no los veía nunca. El
-dueño lo autorizó el 26/09 «con revisión».
+`accepted` · 2026-09-26 · hub, notifications, multi-tenancy, security · **completes [0040](#0040) and [0052](#0052)** · code in `services/hub/internal/store/notifications.go`, `services/hub/internal/notify/hub.go`, hub mig. `0005`
 
-**Decisión.**
+**Context.** With 0040 a person converses in Rooms with another organization, and with 0052 they comment on
+or edit a document from another organization. The notifications of that activity —a mention, a
+comment— are emitted by the service in the HOST organization, because that is where the resource lives.
+And the Hub bell listed by the token's organization: the guest never saw them. The
+owner authorized it on 26/09 “with review”.
 
-1. **Un aviso es de su destinatario, no de la organización.** El `sub` lo emite Sytue ID y es único
-   en toda la suite; la dirección de su organización (`mailbox`) la asigna Sytue ID. Quien recibe
-   un aviso lo ve y lo marca como leído desde la sesión de CUALQUIERA de sus organizaciones.
-2. **La RLS del Hub lo dice con una política propia y estrecha** (`notifications_destinatario_lee`
-   y `_marca`, PERMISSIVE, solo `SELECT` y `UPDATE`): una fila es visible si su destinatario es
-   uno de los buzones de `app.destinatarios`. Crear avisos sigue siendo en la organización del
-   emisor y la purga sigue siendo la de mantenimiento; el aislamiento por organización de todo lo
-   demás (presencia, preferencias) no cambia.
-3. **Entre organizaciones cuentan solo los buzones PERSONALES, y salen del token**
-   (`domain.BuzonesPersonales`): el `sub`, que Sytue ID emite único, y sus direcciones
-   principales en TODAS sus organizaciones activas (`mailbox` y el claim `mailboxes`), que Sytue
-   ID asigna en un dominio verificado, no se repiten entre organizaciones y **deriva en cada
-   emisión del token**: quien sale de una organización deja de tener esa dirección en el
-   siguiente. El claim solo va a las superficies de la suite que pintan la campana (una lista
-   cerrada, `clientesConCampana`, con un guardián que la cruza con los despliegues; la forja o la
-   pasarela, aunque sean globales, no) y nunca en un token delegado: el dominio de cada dirección dice en qué otra organización está, y eso no se le
-   cuenta a una app de terceros ni a quien actúa en nombre de otro (0040). Hasta diez: el token
-   viaja en la cookie de sesión. Y un token **delegado** (`act`) no abre nada de esto en el Hub. **El correo de
-   entrar no, aunque venga con `email_verified`**: ese claim lo pone a true el alta que hace una
-   administración, SAML o una federación, sin que nadie pruebe que la dirección es suya, y con él
-   quien administra una organización leería en todas las demás los avisos a esa dirección (lo
-   encontró la revisión de seguridad). Los avisos al correo de entrar se siguen viendo, como
-   antes, en la organización que los mandó. Sin `sub` no hay buzones y la política no deja ver
-   nada. El separador (`\x1f`) no puede aparecer en un buzón, y uno que lo trajera se descarta.
-4. **Las consultas siguen filtrando por destinatario** además de la RLS: son dos cerraduras, y los
-   tests se ven en rojo quitando cada una.
-5. **El tiempo real, por persona.** El reparto SSE entrega un aviso a un buzón personal en todas
-   las sesiones de esa persona, sea cual sea su organización; uno a su correo de entrar, solo en
-   la organización que lo mandó. Los eventos de ESTADO (el avatar, la
-   franja de solo lectura que se desbloquea) siguen solo en la organización en la que ocurren.
+**Decision.**
 
-**Qué se enseña.** El aviso de otra organización lleva su título, el nombre de quien lo hizo y el
-nombre del recurso: exactamente lo que ese emisor decidió mandar a esa persona. El enlace lleva al
-recurso en la organización anfitriona, donde el 0040 y el 0052 ya deciden si puede abrirlo.
+1. **A notification belongs to its recipient, not to the organization.** The `sub` is issued by Sytue ID and is unique
+   across the whole suite; the address in their organization (`mailbox`) is assigned by Sytue ID. Whoever receives
+   a notification sees it and marks it as read from the session of ANY of their organizations.
+2. **The Hub's RLS says so with its own narrow policy** (`notifications_destinatario_lee`
+   and `_marca`, PERMISSIVE, only `SELECT` and `UPDATE`): a row is visible if its recipient is
+   one of the mailboxes in `app.destinatarios`. Creating notifications is still done in the
+   sender's organization and the purge is still the maintenance one; per-organization isolation of everything
+   else (presence, preferences) does not change.
+3. **Across organizations only PERSONAL mailboxes count, and they come from the token**
+   (`domain.BuzonesPersonales`): the `sub`, which Sytue ID issues as unique, and their primary
+   addresses in ALL their active organizations (`mailbox` and the `mailboxes` claim), which Sytue
+   ID assigns in a verified domain, are not repeated across organizations and **are derived on each
+   token issuance**: whoever leaves an organization stops having that address in the
+   next one. The claim only goes to the suite surfaces that render the bell (a closed
+   list, `clientesConCampana`, with a guardian that cross-checks it with the deployments; the forge or the
+   gateway, even though they are global, do not) and never in a delegated token: the domain of each address says which other organization they are in, and that is not
+   told to a third-party app or to whoever acts on behalf of someone else (0040). Up to ten: the token
+   travels in the session cookie. And a **delegated** token (`act`) opens none of this in the Hub. **Not the sign-in
+   email, even if it comes with `email_verified`**: that claim is set to true by sign-ups done by an
+   administration, SAML or a federation, without anyone proving that the address is theirs, and with it
+   whoever administers one organization would read in all the others the notifications to that address (it was
+   found by the security review). Notifications to the sign-in email are still seen, as
+   before, in the organization that sent them. Without a `sub` there are no mailboxes and the policy shows
+   nothing. The separator (`\x1f`) cannot appear in a mailbox, and one that carried it is discarded.
+4. **Queries still filter by recipient** in addition to RLS: they are two locks, and the
+   tests are seen red by removing each one.
+5. **Real time, per person.** The SSE dispatch delivers a notification to a personal mailbox in all
+   of that person's sessions, whatever their organization; one to their sign-in email, only in
+   the organization that sent it. STATE events (the avatar, the
+   read-only banner that gets unlocked) remain only in the organization where they happen.
 
-6. **Un aviso de fuera se ve como tal.** La campana (web, bandeja del Hub y Fyne) dice de qué
-   organización viene cuando no es la de la sesión (`organization`, que el Hub rellena solo
-   entonces). Y **una organización no puede llenar la campana de nadie**: como mucho 200 avisos
-   por hora a un mismo destinatario (`notify.TopeAvisosPorHora`); pasado el tope, 429.
-7. **De un aviso solo cambia si está leído.** La política de UPDATE es por fila; un trigger
-   (`notifications_solo_se_marca`, mig. 0006) la hace por columna: fuera de la fusión de
-   organizaciones, cambiar cualquier otra cosa falla.
-8. **Lo demás de la persona también es suyo.** Sus reglas de silencio valen para lo que le llega de
-   cualquier organización (basta con que lo calle en una); «Tus datos» lleva sus avisos de todas.
-9. **Una dirección que deja de ser suya deja de abrirle nada.** Cuando Sytue ID retira una
-   dirección, o su titular sale de la organización, el Hub borra sus avisos en todas las
-   organizaciones y la apunta con la hora (`buzones_olvidados`, `/internal/notifications/forget`):
-   un token emitido ANTES —el de quien la tenía vive unos minutos— ya no la usa, y quien la
-   reciba no hereda nada. Sytue ID se lo pide al Hub ANTES de liberar la dirección, y si el Hub
-   no contesta la retirada se reintenta en el siguiente barrido.
-10. **El tope es por tipo** (organización, destinatario, origen y tipo): quien agote uno no calla
-    los demás. Y hay uno total, de 1000 a la hora, para que variar el tipo no lo esquive. Y a OTRA persona, `POST /notifications` contesta 202 sin cuerpo, se entregue o no:
-    devolver el aviso —o no devolverlo cuando lo tiene silenciado— diría qué ha callado.
+**What is shown.** A notification from another organization carries its title, the name of whoever did it and the
+name of the resource: exactly what that sender decided to send to that person. The link leads to the
+resource in the host organization, where 0040 and 0052 already decide whether they can open it.
 
-**Revisión de seguridad** (26/09, antes de fusionar, y otra vez al resolver lo que dejó). Sin fugas
-por la base: la variable sale solo del token, vive en la transacción y la política no amplía
-INSERT ni DELETE. Encontró el hueco del `email_verified` (punto 3) y lo que resuelven los puntos 6
-a 10. La tercera pasada descartó una tabla de buzones recordados (dejaba a quien salía de una
-organización leyendo sus avisos) a favor del claim `mailboxes`, y las dos últimas lo acotaron a las
-superficies de la suite y a tokens no delegados y añadieron el tope total. No queda nada pendiente.
+6. **An outside notification is seen as such.** The bell (web, Hub tray and Fyne) says which
+   organization it comes from when it is not the session's (`organization`, which the Hub fills in only
+   then). And **an organization cannot flood anyone's bell**: at most 200 notifications
+   per hour to the same recipient (`notify.TopeAvisosPorHora`); past the cap, 429.
+7. **The only thing that changes about a notification is whether it is read.** The UPDATE policy is per row; a trigger
+   (`notifications_solo_se_marca`, mig. 0006) makes it per column: outside an organization
+   merge, changing anything else fails.
+8. **The rest of the person's things are also theirs.** Their mute rules apply to what reaches them from
+   any organization (it is enough to mute it in one); “Your data” includes their notifications from all of them.
+9. **An address that stops being theirs stops opening anything for them.** When Sytue ID withdraws an
+   address, or its holder leaves the organization, the Hub deletes its notifications in all
+   organizations and records it with the time (`buzones_olvidados`, `/internal/notifications/forget`):
+   a token issued BEFORE —that of whoever had it lives a few minutes— no longer uses it, and whoever
+   receives it inherits nothing. Sytue ID asks the Hub for this BEFORE releasing the address, and if the Hub
+   does not answer the withdrawal is retried in the next sweep.
+10. **The cap is per type** (organization, recipient, origin and type): whoever exhausts one does not mute
+    the others. And there is a total one, of 1000 per hour, so that varying the type does not get around it. And to ANOTHER person, `POST /notifications` answers 202 with no body, whether delivered or not:
+    returning the notification —or not returning it when they have it muted— would reveal what they have muted.
 
-**Tests (vistos en rojo).** `TestAvisosDeLaPersona` (Postgres de verdad): la destinataria ve y marca
-el suyo desde su organización, y el de su correo de entrar no le cruza; no lo leen, ni lo cuentan, ni lo marcan uno a uno o todos de golpe
-ni otra persona de la misma organización, ni otra de otra organización, ni un token sin buzones.
-En rojo quitando el filtro por destinatario del store, y quitándolo además de la política.
-`TestDispatchPorPersona` (en rojo con el reparto por organización) y
-`TestBuzonesPersonalesSinElCorreoDeEntrar`. `TestAvisosRevision` (Postgres de verdad), en rojo
-quitando cada cosa: el trigger, el tope, las reglas de la persona, el olvido del buzón (y que un
-token anterior no lo use) y los buzones de sus otras organizaciones.
+**Security review** (26/09, before merging, and again when resolving what it left). No leaks
+through the database: the variable comes only from the token, lives in the transaction and the policy does not widen
+INSERT or DELETE. It found the `email_verified` gap (point 3) and what points 6
+to 10 resolve. The third pass ruled out a table of remembered mailboxes (it left whoever left an
+organization reading their notifications) in favor of the `mailboxes` claim, and the last two limited it to the
+suite surfaces and to non-delegated tokens and added the total cap. Nothing is left pending.
 
-**Alternativas descartadas.** _Emitir el aviso en la organización de origen del destinatario_ (el
-emisor no la conoce: el `people:resolve` del 0040 no la revela, a propósito). _Una copia del aviso
-por organización_ (dos que marcar como leídos, y el emisor tendría que saber dónde está cada uno).
-_Una función SECURITY DEFINER_ (hubiera repetido en SQL el filtro por destinatario que la política
-ya expresa, con más superficie).
+**Tests (seen red).** `TestAvisosDeLaPersona` (real Postgres): the recipient sees and marks
+hers from her organization, and the one to her sign-in email does not cross over to her; it is not read, counted, or marked one by one or all at once
+by another person of the same organization, nor another from another organization, nor a token without mailboxes.
+Red when removing the recipient filter from the store, and when also removing it from the policy.
+`TestDispatchPorPersona` (red with per-organization dispatch) and
+`TestBuzonesPersonalesSinElCorreoDeEntrar`. `TestAvisosRevision` (real Postgres), red
+when removing each thing: the trigger, the cap, the person's rules, forgetting the mailbox (and that a
+previous token does not use it) and the mailboxes of their other organizations.
+
+**Alternatives ruled out.** _Emitting the notification in the recipient's home organization_ (the
+sender does not know it: 0040's `people:resolve` does not reveal it, on purpose). _A copy of the notification
+per organization_ (two to mark as read, and the sender would have to know where each one is).
+_A SECURITY DEFINER function_ (it would have repeated in SQL the recipient filter that the policy
+already expresses, with more surface).
 
 <a id="0054"></a>
 
-## 0054 — «Borrar mi cuenta»: la persona se da de baja sola, con 30 días para deshacerlo, y se borra lo suyo y no lo de su organización
+<a id="0054--borrar-mi-cuenta-la-persona-se-da-de-baja-sola-con-30-días-para-deshacerlo-y-se-borra-lo-suyo-y-no-lo-de-su-organización"></a>
 
-`accepted` · 2026-09-26 · id, rgpd, google-play, seguridad · código en `services/id/internal/http/account_delete.go`, `services/id/internal/store/borrado.go`, `services/id/internal/merge/personas.go`, mig. id `0098`
+## 0054 — “Delete my account”: the person unsubscribes on their own, with 30 days to undo it, and their own data is deleted but not their organization's
 
-**Contexto.** Google Play rechazaba la seguridad de los datos de las trece apps: exige declarar
-cómo se crean las cuentas y, si se crean, una web donde pedir que se borren. La cuenta se crea en
-Sytue ID (usuario, contraseña y SMS) y nadie podía borrarla por sí mismo: solo existía la baja
-desde Sytue Admin (mig. 0092) y la de SCIM. El dueño lo pidió el 26/09.
+`accepted` · 2026-09-26 · id, gdpr, google-play, security · code in `services/id/internal/http/account_delete.go`, `services/id/internal/store/borrado.go`, `services/id/internal/merge/personas.go`, id mig. `0098`
 
-**Decisión.**
+**Context.** Google Play rejected the data safety section of the thirteen apps: it requires declaring
+how accounts are created and, if they are created, a web page where deletion can be requested. The account is created in
+Sytue ID (username, password and SMS) and nobody could delete it themselves: only the removal
+from Sytue Admin (mig. 0092) and the SCIM one existed. The owner asked for it on 26/09.
 
-1. **Una página de Go con URL estable**, `https://id.<dominio>/account/delete`, y no de la app
-   «Mi cuenta»: la reautenticación la hace el IdP con su cookie, que la app no ve. La app enlaza
-   a ella desde su tarjeta «Borrar mi cuenta»; Fyne llega por «Mi cuenta», que abre esa misma
-   app. Va en `id.ingress.rutasDeCuenta`, y el test de Ingress lo vigila.
-2. **Confirmación fuerte.** Se escribe la cuenta (@usuario o correo) y se demuestra que es ella
-   ahora: la contraseña, o una identificación de menos de cinco minutos (`frescuraStepUp`). Con
-   segundo factor, la contraseña sola no vale —robarla bastaría para borrar una cuenta que para
-   entrar pide dos—: hay que volver a entrar con los dos o con una passkey
-   (`/login/?return_to=/account/delete`). El POST comprueba el origen y va limitado como el login.
-3. **No se puede dejar una organización sin nadie que la administre.** Si es su única
-   propietaria activa, o la administra y no hay otra propietaria ni administradora activa, se
-   bloquea y se dice cuáles. La comprobación va dentro de la transacción, con las organizaciones
-   bloqueadas `FOR UPDATE`, para que dos copropietarias que se van a la vez no se crucen. La
-   cuenta personal no cuenta: es de la persona.
-4. **Periodo de gracia: el de la baja que ya existía**, 30 días (`retencionBaja`, mig. 0092). La
-   baja propia es la misma baja con `closed_by` = la propia cuenta, que solo se puede escribir
-   así: Sytue Admin no deja darse de baja a uno mismo y SCIM no escribe `closed_by`. **Un
-   administrador no la puede deshacer** —es la supresión que pidió la persona—: `RestoreUser` y
-   el listado de bajas recuperables la excluyen, y solo la deshace privacidad a petición suya
+**Decision.**
+
+1. **A Go page with a stable URL**, `https://id.<dominio>/account/delete`, and not in the
+   “My account” app: reauthentication is done by the IdP with its cookie, which the app does not see. The app links
+   to it from its «Borrar mi cuenta» (“Delete my account”) card; Fyne gets there through “My account”, which opens that same
+   app. It goes in `id.ingress.rutasDeCuenta`, and the Ingress test watches it.
+2. **Strong confirmation.** The account (@username or email) is typed in and the person proves they are its owner
+   now: the password, or an identification less than five minutes old (`frescuraStepUp`). With a
+   second factor, the password alone is not enough —stealing it would be enough to delete an account that requires
+   two to sign in—: you have to sign in again with both or with a passkey
+   (`/login/?return_to=/account/delete`). The POST checks the origin and is rate-limited like login.
+3. **An organization cannot be left without anyone to administer it.** If they are its only
+   active owner, or they administer it and there is no other active owner or administrator, it is
+   blocked and the person is told which ones. The check goes inside the transaction, with the organizations
+   locked `FOR UPDATE`, so that two co-owners leaving at the same time do not cross. The
+   personal account does not count: it belongs to the person.
+4. **Grace period: that of the removal that already existed**, 30 days (`retencionBaja`, mig. 0092). The
+   self-removal is the same removal with `closed_by` = the account itself, which can only be written
+   that way: Sytue Admin does not let you remove yourself and SCIM does not write `closed_by`. **An
+   administrator cannot undo it** —it is the erasure the person asked for—: `RestoreUser` and
+   the listing of recoverable removals exclude it, and only privacy can undo it at their request
    (privacy@sytue.eu).
-5. **Lo que sirve para entrar se borra al confirmar**, en la misma transacción, no al vencer la
-   ventana: sesiones, refresh, códigos, contraseña, passkeys, TOTP, códigos de recuperación,
-   contraseñas de aplicación, dispositivos, enlaces con IdP externos, elevaciones vivas y la foto
-   (también la de las fichas de Contactos). Restaurar devuelve la cuenta, no el acceso: quien
-   vuelve pone contraseña nueva por la recuperación.
-6. **Lo que otros servicios guardan de ESA persona y no de su organización** —avisos y
-   presencia del Hub; push, preferencias, borradores, guardados, lectura, hilos seguidos y
-   categorías de Rooms; favoritos de Drive— se borra en el barrido siguiente (cada diez
-   minutos), por el mismo camino que la fusión: mismas credenciales, `InMergeTx`. La lista es
-   cerrada (`merge.DatosDeLaPersona`) y un test comprueba que cada tabla existe con su
-   `subject` y su política de fusión.
-7. **Lo de la organización se queda en la organización**: correo, archivos (también «Mi unidad»,
-   que es del tenant), eventos, mensajes en canales. Lo decide quien la administra. Las
-   facturas, el plazo legal; el registro de seguridad, doce meses.
-8. **Vencida la ventana, la ficha se anonimiza** (correo, @usuario, nombre, móvil, correo de
-   recuperación, atributos) y se quitan sus membresías. No se borra la fila: la referencian
-   tablas sin cascada, y su buzón —que es de la organización— sigue ocupando la dirección para
-   que nadie se quede con ella y reciba lo que siguen mandándole. Una cuenta purgada no vuelve a
-   recibir @usuario.
-9. **El contenido de una cuenta personal** (su correo, sus archivos, sus fotos) deja de estar
-   accesible al confirmar y su borrado, al vencer la ventana, **es manual**: vive en diez bases y
-   en el almacén de objetos y no hay todavía un borrado de tenant. El barrido lo avisa a nivel
-   error, que dispara la alerta, y corre el mes del art. 12.3 RGPD. Está en `roadmap.md`.
+5. **What serves to sign in is deleted on confirmation**, in the same transaction, not when the
+   window expires: sessions, refresh tokens, codes, password, passkeys, TOTP, recovery codes,
+   app passwords, devices, links with external IdPs, live elevations and the photo
+   (also the one in the Contacts cards). Restoring returns the account, not access: whoever
+   comes back sets a new password through recovery.
+6. **What other services store about THAT person and not about their organization** —Hub notifications and
+   presence; Rooms push, preferences, drafts, saved items, read state, followed threads and
+   categories; Drive favorites— is deleted in the next sweep (every ten
+   minutes), through the same path as the merge: same credentials, `InMergeTx`. The list is
+   closed (`merge.DatosDeLaPersona`) and a test checks that each table exists with its
+   `subject` and its merge policy.
+7. **What belongs to the organization stays in the organization**: mail, files (also “My drive”,
+   which belongs to the tenant), events, messages in channels. Whoever administers it decides. The
+   invoices, the legal period; the security log, twelve months.
+8. **Once the window has expired, the record is anonymized** (email, @username, name, mobile number, recovery
+   email, attributes) and its memberships are removed. The row is not deleted: it is referenced by
+   tables without cascade, and its mailbox —which belongs to the organization— keeps occupying the address so
+   that nobody takes it and receives what people keep sending to it. A purged account never
+   receives an @username again.
+9. **The content of a personal account** (its mail, its files, its photos) stops being
+   accessible on confirmation and its deletion, when the window expires, **is manual**: it lives in ten databases and
+   in the object store and there is no tenant deletion yet. The sweep reports it at
+   error level, which fires the alert, and the one-month period of GDPR art. 12.3 runs. It is in `roadmap.md`.
 
-**Revisión de seguridad (2026-09-26), todo resuelto antes de fusionar.** Una cuenta que ya no
-está activa deja de valer al instante también con un access token vivo: `requireAccessToken` y la
-introspección miran su estado, y la verificación de contraseñas de aplicación de Mail también
-(antes una baja de Sytue Admin o de SCIM seguía abriendo el buzón por IMAP). El recuento de
-propietarias (`CountOrgOwners`) cuenta solo las activas y bloquea la organización, así que una
-baja de Sytue Admin y una baja propia no se cruzan. Una nueva baja borra la marca de datos ya
-borrados; la purga repite el borrado de credenciales; el borrado en otros servicios espera a que
-caduque el access token (los servicios validan el JWT por su cuenta), va en orden aleatorio para
-que una cuenta que falla no tape a las demás, y sus fallos van a nivel error. La contraseña fallada
-consume el mismo cupo por cuenta que el login. La última administradora de la plataforma no se
-puede ir, y la baja quita la administración de plataforma. Con segundo factor, una passkey sin
-verificación de usuario no basta. La cuenta personal purgada se queda con su id como nombre. En la segunda y la tercera vuelta de
-la revisión: los recuentos de propietarias y administradoras cuentan las activas **más la cuenta
-afectada** (si no, no se podía retirar a una propietaria suspendida habiendo otra activa), el
-bloqueo es `FOR NO KEY UPDATE` para no frenar los inicios de sesión, la administración de la
-plataforma se bloquea también, y si no se puede leer el estado de la cuenta el token no vale.
-La tercera vuelta no encontró nada.
+**Security review (2026-09-26), everything resolved before merging.** An account that is no longer
+active stops working instantly even with a live access token: `requireAccessToken` and
+introspection look at its status, and so does Mail's app password verification
+(previously a removal from Sytue Admin or SCIM still opened the mailbox over IMAP). The owner count
+(`CountOrgOwners`) counts only active ones and locks the organization, so a
+Sytue Admin removal and a self-removal do not cross. A new removal clears the mark of data already
+deleted; the purge repeats the credential deletion; deletion in other services waits for
+the access token to expire (the services validate the JWT on their own), goes in random order so
+that a failing account does not hide the others, and its failures go at error level. A failed password
+consumes the same per-account quota as login. The last platform administrator cannot
+leave, and the removal takes away platform administration. With a second factor, a passkey without
+user verification is not enough. The purged personal account keeps its id as its name. In the second and third rounds of
+the review: the owner and administrator counts count the active ones **plus the affected
+account** (otherwise a suspended owner could not be removed when there was another active one), the
+lock is `FOR NO KEY UPDATE` so as not to slow down sign-ins, platform administration
+is locked too, and if the account status cannot be read the token is not valid.
+The third round found nothing.
 
-**Alternativas descartadas.** _La página en la app «Mi cuenta»_ (no ve la cookie del IdP y
-habría que inventar un reto por API). _Borrar la fila de `users`_ (fallaría con las referencias
-sin cascada y liberaría la dirección de correo). _Un endpoint de borrado por servicio_ (diez
-secretos y diez despliegues para borrar unas filas que ya se alcanzan como en la fusión).
-_Esperar a los 30 días para borrar las credenciales_ (una cuenta que su titular ha pedido borrar
-no debe poder usarse ese mes). _Dejar que la contraseña baste siempre_ (rebaja el segundo factor).
+**Alternatives ruled out.** _The page in the “My account” app_ (it does not see the IdP cookie and
+a challenge over the API would have to be invented). _Deleting the `users` row_ (it would fail with the references
+without cascade and would free up the email address). _A deletion endpoint per service_ (ten
+secrets and ten deployments to delete some rows that are already reachable as in the merge).
+_Waiting for the 30 days to delete the credentials_ (an account whose holder has asked for deletion
+must not be usable that month). _Letting the password always be enough_ (it downgrades the second factor).
 
 <a id="0055"></a>
 
-## 0055 — La URL canónica de cada producto es su host de producto; la organización va al PATH, no al subdominio
+<a id="0055--la-url-canónica-de-cada-producto-es-su-host-de-producto-la-organización-va-al-path-no-al-subdominio"></a>
 
-`accepted` · 2026-09-26 · web, id, despliegue · código en mig. id `0099`, `deploy/helm/charts/sytue-frontend/templates/deployment.yaml`, `values.yaml` (`orgHost`), guardián `platform/pkg/migcheck/migcheck_test.go`
+## 0055 — The canonical URL of each product is its product host; the organization goes in the PATH, not the subdomain
 
-**Contexto.** Entra en un producto y el login da vueltas: `rooms.sytue.eu` → 302 a
-`corporate.sytue.eu/rooms` (el host del `redirect_uri` canónico) → IdP → vuelta. La cadena la
-provoca la canónica de organización (mig. 0054): el BFF empieza SIEMPRE el flujo OIDC en el host
-del callback (`bff.ts`), y la cookie de sesión nace ahí. Con más interacciones ENTRE
-organizaciones y con externos (enlaces de reunión, comparticiones, el canje de la 0052), el
-modelo que escala es el host de PRODUCTO —que ya usan los enlaces entre apps (`appUrl`), los
-avisos (`hubnotify`) y las apps nativas (`api.ServiceURL`), los tres sin saltos—, y el lugar de
-la organización es el PATH dentro del producto, no el subdominio: `rooms.sytue.eu/rooms/<org>/…`
-hace la org compartible por enlace y deja los subdominios para productos y para el dominio de
-CORREO.
+`accepted` · 2026-09-26 · web, id, deployment · code in id mig. `0099`, `deploy/helm/charts/sytue-frontend/templates/deployment.yaml`, `values.yaml` (`orgHost`), guardian `platform/pkg/migcheck/migcheck_test.go`
 
-**Decisión.**
+**Context.** You go into a product and the login goes in circles: `rooms.sytue.eu` → 302 to
+`corporate.sytue.eu/rooms` (the host of the canonical `redirect_uri`) → IdP → back. The chain is
+caused by the organization canonical URL (mig. 0054): the BFF ALWAYS starts the OIDC flow on the host
+of the callback (`bff.ts`), and the session cookie is born there. With more interactions BETWEEN
+organizations and with externals (meeting links, shares, the redemption of 0052), the
+model that scales is the PRODUCT host —which links between apps (`appUrl`), notifications
+(`hubnotify`) and the native apps (`api.ServiceURL`) already use, all three without hops—, and the place for
+the organization is the PATH within the product, not the subdomain: `rooms.sytue.eu/rooms/<org>/…`
+makes the org shareable by link and leaves subdomains for products and for the MAIL
+domain.
 
-1. **Canónica = host de producto con prefijo**: `https://mail.sytue.eu/mail/auth/callback`
-   (mig. 0099, trece clients; `platform` sin prefijo, `account` sigue global en
-   `id.<dominio>/account` de la 0097). El chart compone `PUBLIC_URL` y
-   `SYTUE_OIDC_REDIRECT_URI` con el subdominio de la app; entra donde entre el navegador, el
-   login ya no salta de host. NINGÚN BFF cambia: el salto a `SYTUE_OIDC_REDIRECT_URI` era el
-   mecanismo, no el problema.
-2. **El host de organización queda en transición, no se retira.** Sigue sirviendo el MISMO
-   prefijo (el `base` de Astro se hornea) y su callback sigue registrado (0054 y hermanas): un
-   login empezado ahí funciona, con su 302 a producto. La decisión del 2026-08-14 («las dos
-   direcciones válidas») sigue en pie; lo que cambia es CUÁL se anuncia. Cuando la fase 2 ponga
-   la organización como segmento de PATH, el comodín pasa a 301 y se retira; el subdominio
-   sobrevive como dominio de correo.
-3. **El guardián exige la canónica.** `TestRedirectUrisDeLosHostsDeSuiteCubrenElChart`
-   comprueba AHORA TAMBIÉN `https://<subdomain>.<dominio><path>/auth/callback` para cada app
-   del chart, visto en rojo quitando una fila de la 0099. Un `redirect_uri` que no casa no da
-   error de despliegue — da un login que falla solo en ese host.
-4. **La org por path es la FASE 2, app a app**: rutas bajo `[org]/` tras el prefijo de la app,
-   helpers `r()` y `appUrl` org-aware, aviso y deep-link nativo con org, y entrada sin org
-   redirigida a la activa. La sesión no cambia: la organización activa viaja firmada en el
-   token (claim `tenant`) y ningún servicio la lee del host hoy.
+**Decision.**
 
-**Por qué y no otra cosa.** _Segundo juego de imágenes como en `sytue.com`_ (0049) no hace
-falta: no cambia el dominio, solo el host que anuncia cada imagen ya desplegada, y el único
-fichero que ata imagen a dominio (`tokens.ts`) no se toca. _Resolver las URL por cabecera Host_
-lo descartó el 0049 por obligar a enlaces relativos; aquí no se resuelve nada en ejecución: la
-canónica es una constante más del chart. _Cookies de dominio compartido_ para no repetir login
-entre productos rompería el aislamiento deliberado de `__Host-` (`cookies.ts`, riesgo R6) y no
-hace falta: el SSO lo aporta el IdP. _Registrar solo la canónica de producto_ y borrar la de
-organización dejaría sin login a quien entre por el host viejo hasta que la fase 2 termine.
+1. **Canonical = product host with prefix**: `https://mail.sytue.eu/mail/auth/callback`
+   (mig. 0099, thirteen clients; `platform` without prefix, `account` stays global at
+   `id.<dominio>/account` from 0097). The chart composes `PUBLIC_URL` and
+   `SYTUE_OIDC_REDIRECT_URI` with the app's subdomain; wherever the browser comes in, the
+   login no longer jumps hosts. NO BFF changes: the jump to `SYTUE_OIDC_REDIRECT_URI` was the
+   mechanism, not the problem.
+2. **The organization host stays in transition, it is not retired.** It keeps serving the SAME
+   prefix (Astro's `base` is baked in) and its callback stays registered (0054 and siblings): a
+   login started there works, with its 302 to the product. The decision of 2026-08-14 («las dos
+   direcciones válidas», “both addresses valid”) still stands; what changes is WHICH one is announced. When phase 2 puts
+   the organization as a PATH segment, the wildcard becomes a 301 and is retired; the subdomain
+   survives as a mail domain.
+3. **The guardian requires the canonical URL.** `TestRedirectUrisDeLosHostsDeSuiteCubrenElChart`
+   NOW ALSO checks `https://<subdomain>.<dominio><path>/auth/callback` for each app
+   in the chart, seen red by removing a row from 0099. A `redirect_uri` that does not match does not give a
+   deployment error — it gives a login that fails only on that host.
+4. **The org in the path is PHASE 2, app by app**: routes under `[org]/` after the app prefix,
+   org-aware `r()` and `appUrl` helpers, notifications and native deep links with the org, and entry without an org
+   redirected to the active one. The session does not change: the active organization travels signed in the
+   token (`tenant` claim) and no service reads it from the host today.
 
-**Precedentes medidos.** Dev loguea por host de producto desde 0002 (forma raíz), y el frente
-`sytue.com` (0049/0094) loguea por host de producto CON PREFIJO —exactamente la forma de esta
-migración— desde su alta.
+**Why this and not something else.** _A second set of images as for `sytue.com`_ (0049) is not
+needed: the domain does not change, only the host each already-deployed image announces, and the only
+file that ties image to domain (`tokens.ts`) is not touched. _Resolving URLs by Host header_
+was ruled out by 0049 because it forces relative links; here nothing is resolved at runtime: the
+canonical URL is one more chart constant. _Shared-domain cookies_ to avoid repeating login
+between products would break the deliberate isolation of `__Host-` (`cookies.ts`, risk R6) and it is not
+needed: SSO is provided by the IdP. _Registering only the product canonical URL_ and deleting the
+organization one would leave whoever comes in through the old host without login until phase 2 finishes.
+
+**Measured precedents.** Dev has logged in via the product host since 0002 (root form), and the
+`sytue.com` front (0049/0094) logs in via the product host WITH PREFIX —exactly the form of this
+migration— since it was set up.
 
 <a id="0056"></a>
 
-## 0056 — La organización como segmento de PATH dentro de cada producto
+<a id="0056--la-organización-como-segmento-de-path-dentro-de-cada-producto"></a>
 
-`accepted` · 2026-09-26 · web, nativas, avisos · código en `apps/frontend/packages/config/src/organizacion.ts`, `astro-middleware.ts` (`middlewareDeOrganizacion`), mig. none, guardián `middleware-org.test.ts`
+## 0056 — The organization as a PATH segment within each product
 
-**Contexto.** El ADR 0055 dejó la canónica en el host de producto y anunció el norte: con más
-interacciones ENTRE organizaciones y con externos (reuniones, comparticiones, avisos, el canje),
-los enlaces tienen que decir A QUÉ ORGANIZACIÓN apuntan, y el sitio de la org es el PATH
-(`rooms.sytue.eu/rooms/<org>/channels/x`), no el subdominio. La sesión no cambia: la org activa
-viaja en el token (claim `tenant`) y ningún servicio la lee del host.
+`accepted` · 2026-09-26 · web, native, notifications · code in `apps/frontend/packages/config/src/organizacion.ts`, `astro-middleware.ts` (`middlewareDeOrganizacion`), mig. none, guardian `middleware-org.test.ts`
 
-**Decisión.**
+**Context.** ADR 0055 left the canonical URL on the product host and announced the direction: with more
+interactions BETWEEN organizations and with externals (meetings, shares, notifications, redemption),
+links have to say WHICH ORGANIZATION they point to, and the place for the org is the PATH
+(`rooms.sytue.eu/rooms/<org>/channels/x`), not the subdomain. The session does not change: the active org
+travels in the token (`tenant` claim) and no service reads it from the host.
 
-1. **Las páginas NO se mueven.** Un `[org]` en el router de cada app sería un recorrido de
-   trece apps por cientos de ficheros con un solo beneficio tipográfico. Lo que cambia es el
-   middleware compartido (`middlewareDeOrganizacion`, compuesto ANTES del de idioma): una URL
-   con org se sirve por dentro (rewrite a la ruta real, que sigue con su prefijo) con la org en
-   `locals.org`; una URL sin org con sesión se redirige a la canónica con un 302 LOCAL (mismo
-   host, sin IdP); sin sesión pasa, porque la guarda manda al login y al volver el 302 entra
-   solo.
-2. **Idempotente por construcción, no por fe.** El rewrite lleva la marca `?__org=<org>`: si el
-   runtime reejecuta el middleware sobre la petición reescrita, la segunda pasada ve la marca y
-   sirve. No se depende de cómo reejecute (o no) el runtime. El 301 que cierra la transición del
-   host de organización se prepara tras `orgHost.retirarComodin` (chart de frontends), apagado
-   por defecto: es la fase final y la enciende el operador en su despliegue de cierre.
-3. **El primer segmento tras el prefijo es SIEMPRE la org, por construcción.** Distinguir
-   «¿org o ruta?» con una lista de rutas es pedir que una página nueva rompa el parsing en
-   silencio. Las URL sin org son transicionales; las excepciones (`api`, `auth`, assets,
-   `healthz`, y lo que cada app declare: `s` de Docs, `public` de Drive, `p` de Fotos) pasan
-   sin org.
-4. **LA ORG DEL PATH NO AUTORIZA.** Autoriza el token (claim `tenant`) y el servicio. Si la org
-   del path difiere de la de la sesión NO se redirige a ciegas: un externo con enlace de otra
-   organización tiene que aterrizar donde está — el canje (0052), los externos de Rooms (0040)
-   y las comparticiones lo resuelven. Redirigirle a SU org sería romperle el enlace.
-5. **Los enlaces entre apps, los avisos y las nativas llevan la org cuando la conocen**
-   (`appUrl(key, path, org)`, `hubnotify`, `api.AppURL`); los que no la llevan siguen
-   funcionando con el 302 del punto 1. La barra de direcciones converge a la forma con org.
-6. **Interruptor operativo:** `SYTUE_ORG_PATH=off` apaga el comportamiento entero sin
-   desplegar código nuevo.
+**Decision.**
 
-**Por qué y no otra cosa.** _Mover las páginas bajo `[org]/`_: cientos de ficheros y guardianes
-de paridad para el mismo resultado de URL. _Org por query_: no es un path, no se comparte igual
-y el ADR lo pedía como segmento. _Cookie por org para multi-org simultánea_: es otra ola (la
-sesión lleva UNA org activa; dos pestañas de orgs distintas comparten sesión y la verja del
-middleware no lo simula). _Redirigir en desacuerdo org del path ≠ sesión_: rompe el enlace del
-externo (punto 4).
+1. **Pages do NOT move.** An `[org]` in each app's router would be a walk through
+   thirteen apps and hundreds of files with a single typographic benefit. What changes is the
+   shared middleware (`middlewareDeOrganizacion`, composed BEFORE the language one): a URL
+   with an org is served internally (rewrite to the real route, which keeps its prefix) with the org in
+   `locals.org`; a URL without an org with a session is redirected to the canonical one with a LOCAL 302 (same
+   host, no IdP); without a session it passes, because the guard sends to login and on return the 302 kicks in
+   by itself.
+2. **Idempotent by construction, not by faith.** The rewrite carries the `?__org=<org>` marker: if the
+   runtime re-runs the middleware on the rewritten request, the second pass sees the marker and
+   serves. It does not depend on how the runtime re-runs it (or not). The 301 that closes the transition of the
+   organization host is prepared behind `orgHost.retirarComodin` (frontends chart), off
+   by default: it is the final phase and the operator turns it on in their closing deployment.
+3. **The first segment after the prefix is ALWAYS the org, by construction.** Distinguishing
+   “org or route?” with a list of routes is asking for a new page to break the parsing
+   silently. URLs without an org are transitional; the exceptions (`api`, `auth`, assets,
+   `healthz`, and whatever each app declares: Docs' `s`, Drive's `public`, Photos' `p`) pass
+   without an org.
+4. **THE PATH ORG DOES NOT AUTHORIZE.** The token (`tenant` claim) and the service authorize. If the path
+   org differs from the session's it is NOT blindly redirected: an external with a link from another
+   organization has to land where it is — redemption (0052), Rooms externals (0040)
+   and shares resolve it. Redirecting them to THEIR org would break their link.
+5. **Links between apps, notifications and native apps carry the org when they know it**
+   (`appUrl(key, path, org)`, `hubnotify`, `api.AppURL`); those that do not carry it keep
+   working with the 302 of point 1. The address bar converges to the form with the org.
+6. **Operational switch:** `SYTUE_ORG_PATH=off` turns off the entire behavior without
+   deploying new code.
 
-**Ambito de esta ola.** Las doce superficies de producto (no `www`, no `platform`, no `account`,
-que son globales). La retirada del comodín `<org>.sytue.eu` como 301 y la baja de la publicación
-DNS de organizaciones quedan para el despliegue que cierre la transición.
+**Why this and not something else.** _Moving the pages under `[org]/`_: hundreds of files and parity
+guardians for the same URL result. _Org by query_: it is not a path, it is not shared the same way
+and the ADR asked for it as a segment. _Cookie per org for simultaneous multi-org_: that is another wave (the
+session carries ONE active org; two tabs of different orgs share a session and the middleware
+gate does not simulate it). _Redirecting on path org ≠ session mismatch_: breaks the
+external's link (point 4).
+
+**Scope of this wave.** The twelve product surfaces (not `www`, not `platform`, not `account`,
+which are global). Retiring the `<org>.sytue.eu` wildcard as a 301 and removing the organizations' DNS
+publication are left for the deployment that closes the transition.
 
 <a id="0057"></a>
 
-## 0057 — Pedir firma a alguien de otra organización: el PDF sale por un enlace de Drive
+<a id="0057--pedir-firma-a-alguien-de-otra-organización-el-pdf-sale-por-un-enlace-de-drive"></a>
 
-`accepted` · 2026-09-27 · docs, firma, multi-tenancy, compartir, seguridad · **completa el [0051](#0051) §7** (que lo dejó descartado «hasta que se decida cómo») · código en `services/docs/internal/http/pdffirmaexterna.go`, `…/pdfpedirfirma.go`, `services/docs/internal/drive/cliente.go`, `platform/pkg/peticiones/avisos.go` (`DeFuera`), mig. docs `0012`
+## 0057 — Requesting a signature from someone in another organization: the PDF goes out through a Drive link
 
-**Contexto.** «Pedir firma» del [0051](#0051) solo llegaba a gente de la misma organización: el
-PDF vive en la unidad de la organización y quien no es de ella no puede abrirlo. El dueño decidió
-el 26/09 que se pueda pedir también fuera: **primero se comparte el PDF por Drive, reutilizando lo
-que Drive ya tiene, y después se pide la firma**; la interfaz detecta que la persona es de fuera,
-explica el paso y lo hace con confirmación. Sin un sistema de permisos nuevo. Lo único que Drive
-tiene hoy para que algo salga de la organización es el **enlace de solo lectura** (`kind=link`):
-las comparticiones con personas y grupos se resuelven por la organización del token.
+`accepted` · 2026-09-27 · docs, signature, multi-tenancy, sharing, security · **completes [0051](#0051) §7** (which left it ruled out “until it is decided how”) · code in `services/docs/internal/http/pdffirmaexterna.go`, `…/pdfpedirfirma.go`, `services/docs/internal/drive/cliente.go`, `platform/pkg/peticiones/avisos.go` (`DeFuera`), docs mig. `0012`
 
-**Decisión.**
+**Context.** “Request signature” from [0051](#0051) only reached people in the same organization: the
+PDF lives in the organization's drive and whoever is not part of it cannot open it. The owner decided
+on 26/09 that it should be possible to request outside too: **first the PDF is shared through Drive, reusing what
+Drive already has, and then the signature is requested**; the interface detects that the person is from outside,
+explains the step and does it with confirmation. Without a new permission system. The only thing Drive
+has today for something to leave the organization is the **read-only link** (`kind=link`):
+shares with people and groups are resolved by the token's organization.
 
-1. **Quién es de fuera lo dice Sytue ID.** Por correo, primero `directory:resolve` en la
-   organización de quien pide, como siempre; si no está, o si se escribe un @usuario,
-   `people:resolve` del [0040](#0040) (`peticiones.DeFuera`): su `sub` y su nombre, nunca su
-   correo ni su organización. Y si ese `sub` resulta ser de la organización (un @usuario de un
-   compañero), es de dentro. Por `sub` solo se pide dentro. Antes de buscar a nadie se comprueba
-   que el PDF es de quien pide.
-2. **Nada sin confirmar, y a quién.** Con alguien de fuera, el servicio contesta 409
-   `pdf_signature_recipient_external` con su nombre y un `confirm`, y no crea nada. La interfaz
-   (web y Fyne) lo explica —un enlace de Drive de solo lectura que caduca en 30 días, que nadie
-   ve, que deja una copia en la unidad de la otra persona, visible para su organización— y al
-   confirmar manda la misma petición con ese `confirm`: si ya no resuelve a la misma persona, vuelve
-   a preguntar.
-3. **El enlace es de Drive y lo crea quien pide.** El servicio llama a `POST /api/v1/shares` de
-   Drive con la sesión de quien pide: su permiso sobre el fichero y **la verja de etiquetas de
-   Drive** (una etiqueta con `BlockExternalShare` lo bloquea aquí igual:
-   `pdf_signature_share_blocked`). El enlace sale en la lista de comparticiones del fichero en
-   Drive, donde se puede revocar. Los topes se comprueban antes de crearlo.
-4. **El token no lo ve nadie.** Se guarda **cifrado** (`enlace`, con la clave del servicio,
-   `SYTUE_DOCS_SECRET_ENC_KEY`, y **atado a su petición** como dato asociado del AEAD: no vale en
-   otra fila ni para otra cosa; sin clave no se ofrece) y solo lo usa este servicio: cuando quien
-   firma abre la petición (`POST …/{id}/open`), baja el PDF por el enlace y deja una copia en SU
-   unidad (carpeta «Sytue Docs»); si la borra, al abrir otra vez se trae otra. No viaja en el
-   aviso, ni en un correo, ni a ningún navegador, ni a las trazas (`telemetry.Middleware` nombra
-   el span por el patrón de la ruta). Se borra de la fila al cerrarse la petición sin firmar y al
-   traerse el firmado; el enlace del original lo revoca la sesión de quien pidió en cuanto la
-   petición deja de estar pendiente (al cancelar, al traerse el firmado, o la próxima vez que
-   lista las suyas, que es lo único que puede hacerlo tras un rechazo), y la caducidad es la red.
-5. **La petición vive en la organización de quien pide**, como el documento del [0052](#0052):
-   quien firma es una fila con `externo`. Las rutas de una petición (`/signature-requests/{id}/…`)
-   pasan a esa organización para su destinatario de fuera (`peticionEnAnfitrion`), **sin nada de
-   su token salvo el `sub`**, y cada sentencia sigue exigiendo destinatario o solicitante. Las
-   lecturas entre organizaciones son tres `SECURITY DEFINER`: `docs_firma_anfitrion(id, sub)` (solo
-   el slug, solo a su destinatario de fuera), `docs_firmas_de_fuera(sub, tenant)` para su lista,
-   **sin la ruta del original ni su id** (dirían cómo organiza sus carpetas otra organización), y
-   `docs_firmas_pendientes_para(sub)` (un número, para el tope).
-6. **Lo firmado es EL documento.** La petición guarda la huella (SHA-256) del original al pedir.
-   La copia que se trae quien firma tiene que tener esa huella —si el original cambió, no se
-   trae—, y al entregar, su copia también: si la tocó, firmaría otro documento. Lo entregado tiene
-   que tener más firmas, la última cubriéndolo entero ([0051](#0051) §7) y, además, **las mismas
-   páginas con el mismo texto** que el original. Firmar reescribe el fichero la primera vez, así
-   que no se puede exigir que empiece por el original; lo que no cambia es lo que se lee, y sin
-   esto se podría entregar cualquier otro PDF firmado. Esta comprobación vale también para las
-   peticiones de dentro. En un escaneo sin capa de texto solo ata el número de páginas.
-7. **La entrega vuelve igual.** Al entregar, el servicio crea con la sesión de quien firma un
-   enlace a la copia firmada (7 días), cifrado igual, y guarda la huella de lo comprobado. Quien
-   pidió se la trae a SU unidad (`POST …/{id}/fetch-signed`), con el nombre del original y
-   «(firmado)», y tiene que ser exactamente lo entregado: si el fichero cambió después en la otra
-   unidad, no se trae. Hasta entonces quien pidió no ve ni la ruta ni el id del firmado.
-8. **Avisos, sí; correo, no; y nunca el correo de nadie.** El aviso del Hub llega a la persona en
-   cualquiera de sus organizaciones ([0053](#0053)) y lleva a CertiPDF en la SUYA (`/docs/pdf` sin
-   organización ni ruta: la portada, donde está la petición). Sin correo: Sytue ID no da el suyo,
-   y mandar desde avisos@ a la dirección que teclee cualquiera sería prestar el remitente. A cada
-   lado se le nombra por su nombre (o lo que tecleó quien pidió), nunca por el correo de su token.
-9. **Nadie llena la lista de otra persona.** Además de las 30 por hora de quien pide, alguien de
-   fuera puede tener como mucho 5 pendientes de una misma persona y 20 de todas las organizaciones
-   (`pdf_signature_request_recipient_busy`), contadas bajo cerrojo. «Abrir» y «traer» van de una
-   en una por petición (`ocupada`, que caduca a los dos minutos) y con tope por persona, porque
-   cada vuelta baja y sube hasta 25 MiB.
+**Decision.**
 
-**Consecuencias.**
+1. **Who is from outside is said by Sytue ID.** By email, first `directory:resolve` in the
+   requester's organization, as always; if they are not there, or if an @username is typed,
+   [0040](#0040)'s `people:resolve` (`peticiones.DeFuera`): their `sub` and their name, never their
+   email or their organization. And if that `sub` turns out to belong to the organization (a colleague's
+   @username), they are from inside. By `sub` only requests inside are made. Before looking anyone up it is checked
+   that the PDF belongs to the requester.
+2. **Nothing without confirmation, and of whom.** With someone from outside, the service answers 409
+   `pdf_signature_recipient_external` with their name and a `confirm`, and creates nothing. The interface
+   (web and Fyne) explains it —a read-only Drive link that expires in 30 days, that nobody
+   sees, that leaves a copy in the other person's drive, visible to their organization— and on
+   confirming sends the same request with that `confirm`: if it no longer resolves to the same person, it asks
+   again.
+3. **The link is Drive's and the requester creates it.** The service calls Drive's `POST /api/v1/shares`
+   with the requester's session: their permission on the file and **Drive's label
+   gate** (a label with `BlockExternalShare` blocks it here too:
+   `pdf_signature_share_blocked`). The link appears in the file's share list in
+   Drive, where it can be revoked. The caps are checked before creating it.
+4. **Nobody sees the token.** It is stored **encrypted** (`enlace`, with the service key,
+   `SYTUE_DOCS_SECRET_ENC_KEY`, and **bound to its request** as AEAD associated data: it is not valid in
+   another row or for anything else; without a key it is not offered) and only this service uses it: when the
+   signer opens the request (`POST …/{id}/open`), it downloads the PDF through the link and leaves a copy in THEIR
+   drive (“Sytue Docs” folder); if they delete it, opening again fetches another. It does not travel in the
+   notification, nor in an email, nor to any browser, nor to traces (`telemetry.Middleware` names
+   the span by the route pattern). It is deleted from the row when the request closes without being signed and when
+   the signed one is fetched; the original's link is revoked by the requester's session as soon as the
+   request stops being pending (on cancelling, on fetching the signed one, or the next time they
+   list theirs, which is the only thing that can do it after a rejection), and expiry is the safety net.
+5. **The request lives in the requester's organization**, like the document of [0052](#0052):
+   the signer is a row with `externo`. The routes of a request (`/signature-requests/{id}/…`)
+   pass to that organization for its outside recipient (`peticionEnAnfitrion`), **with nothing from
+   their token except the `sub`**, and every statement still requires recipient or requester. The
+   cross-organization reads are three `SECURITY DEFINER`s: `docs_firma_anfitrion(id, sub)` (only
+   the slug, only to its outside recipient), `docs_firmas_de_fuera(sub, tenant)` for their list,
+   **without the original's path or its id** (they would say how another organization organizes its folders), and
+   `docs_firmas_pendientes_para(sub)` (a number, for the cap).
+6. **What is signed is THE document.** The request stores the digest (SHA-256) of the original when requesting.
+   The copy the signer fetches has to have that digest —if the original changed, it is not
+   fetched—, and on delivery, their copy too: if they touched it, they would be signing another document. What is delivered has
+   to have more signatures, the last one covering it entirely ([0051](#0051) §7) and, in addition, **the same
+   pages with the same text** as the original. Signing rewrites the file the first time, so
+   it cannot be required to start with the original; what does not change is what is read, and without
+   this any other signed PDF could be delivered. This check also applies to
+   requests from inside. In a scan without a text layer it only binds the number of pages.
+7. **Delivery comes back the same way.** On delivery, the service creates with the signer's session a
+   link to the signed copy (7 days), encrypted the same way, and stores the digest of what was checked. The
+   requester fetches it to THEIR drive (`POST …/{id}/fetch-signed`), with the original's name and
+   «(firmado)» (“(signed)”), and it has to be exactly what was delivered: if the file changed afterwards in the other
+   drive, it is not fetched. Until then the requester sees neither the path nor the id of the signed one.
+8. **Notifications, yes; email, no; and never anyone's email.** The Hub notification reaches the person in
+   any of their organizations ([0053](#0053)) and leads to CertiPDF in THEIRS (`/docs/pdf` without
+   organization or path: the front page, where the request is). No email: Sytue ID does not give theirs,
+   and sending from avisos@ to whatever address anyone types would be lending out the sender. Each
+   side is named by their name (or what the requester typed), never by their token's email.
+9. **Nobody floods another person's list.** In addition to the requester's 30 per hour, someone from
+   outside can have at most 5 pending from the same person and 20 from all organizations
+   (`pdf_signature_request_recipient_busy`), counted under a lock. “Open” and “fetch” go one
+   at a time per request (`ocupada`, which expires after two minutes) and with a per-person cap, because
+   each round trip downloads and uploads up to 25 MiB.
 
-- La copia de quien firma queda en la unidad de SU organización, que en Drive es un espacio de
-  toda la organización: lo dice la interfaz antes de confirmar y en la fila de la portada.
-- Esto no abre ninguna vía nueva de sacar ficheros: es la misma que el botón «Compartir» de
-  Drive, con el token guardado en vez de enseñado. En Drive cualquiera de la organización puede
-  crear un enlace a un fichero que ve; si una organización quiere limitarlo, es una política de
-  Drive, no de esto.
-- El enlace de la copia firmada vive en la unidad de quien firma y solo lo puede revocar esa
-  persona (desde Drive); su token se borra al traerlo y caduca a los 7 días.
-- La clave del servicio es una sola, como la de los conectores: si se cambia, las peticiones de
-  fuera pendientes dejan de poder abrirse (`pdf_signature_request_link_gone`) y hay que pedirlas de
-  nuevo. Una bajada de la migración 0012 borra las filas de fuera; sus enlaces quedan hasta caducar
-  con un token que ya no tiene nadie.
+**Consequences.**
 
-**Alternativas descartadas.** _Compartir en Drive con la persona (`kind=user`) entre
-organizaciones_: Drive resuelve todo por la organización del token; abrirlo es el sistema de
-permisos nuevo que el dueño descartó. _Mandar el enlace en el aviso o por correo_: sería un
-secreto al portador en el Hub, en un buzón y en el historial. _Guardar el PDF en este servicio_:
-25 MiB en la base por petición, lo mismo que descartó el [0051](#0051). _Exigir que lo firmado
-empiece por el original_: la primera firma reescribe el fichero.
+- The signer's copy stays in THEIR organization's drive, which in Drive is a space for
+  the whole organization: the interface says so before confirming and in the row on the front page.
+- This does not open any new way of getting files out: it is the same as Drive's “Share” button,
+  with the token stored instead of shown. In Drive anyone in the organization can
+  create a link to a file they see; if an organization wants to limit that, it is a Drive
+  policy, not a policy of this.
+- The link to the signed copy lives in the signer's drive and only that
+  person can revoke it (from Drive); its token is deleted on fetching it and expires after 7 days.
+- The service key is a single one, like the connectors' one: if it is changed, pending outside requests
+  can no longer be opened (`pdf_signature_request_link_gone`) and have to be requested
+  again. A down migration of 0012 deletes the outside rows; their links remain until they expire
+  with a token nobody has anymore.
 
-**Revisión de seguridad** (27/09, antes de fusionar, independiente). Sin hallazgos altos. Todo lo
-que encontró está resuelto: lo firmado no se ataba al original (huellas y mismo texto, punto 6);
-nada limitaba cuántas peticiones recibe alguien de fuera (punto 9); un @usuario de un compañero
-salía como de fuera (punto 1); el correo del token llegaba a la otra organización y se intentaba un
-correo con la sesión equivocada (punto 8); enlaces sin revocar tras un rechazo o sin traer (punto
-4); el span de trazas con la URL entera, que llevaría el token de un enlace público (punto 4; el
-middleware no estaba montado en ningún servicio, pero ya no puede); el nombre del firmado lo ponía
-la otra organización (punto 7); una copia borrada dejaba la petición sin salida y dos «abrir» a la
-vez dejaban dos copias (puntos 4 y 9); el token cifrado no iba atado a su fila (punto 4); los topes
-no eran atómicos y el enlace se creaba antes de comprobarlos (puntos 3 y 9); se buscaba a la
-persona antes de comprobar el fichero y la confirmación no decía a quién (puntos 1 y 2); la
-migración no cerraba `copia_ruta` ni los tokens de una petición cerrada (restricciones de la 0012);
-y un 401 de Drive se contaba como «etiqueta que no deja compartir» (`drive.ErrProhibido`). Las dos
-cosas de producto que dejó para el dueño —que alguien pueda **bloquear** a quien le pide firmas y
-que una organización pueda **cerrar** las que llegan de fuera— se decidieron el 27/09: [0059](#0059).
+**Alternatives ruled out.** _Sharing in Drive with the person (`kind=user`) across
+organizations_: Drive resolves everything by the token's organization; opening that up is the new permission
+system the owner ruled out. _Sending the link in the notification or by email_: it would be a
+bearer secret in the Hub, in a mailbox and in the history. _Storing the PDF in this service_:
+25 MiB in the database per request, the same thing [0051](#0051) ruled out. _Requiring what is signed
+to start with the original_: the first signature rewrites the file.
 
-**Tests (vistos en rojo).** `TestPedirFirmaAFuera`, `TestCancelarAFueraQuitaElEnlace`,
-`TestPeticionEnAnfitrion` y `TestElTokenNoValeEnOtraPeticion` (servicio); `TestPeticionesDeFirmaAFuera`
-y `TestNadieLlenaLaListaDeAlguienDeFuera` (Postgres de verdad); `TestElSpanNoLlevaLaURL`
-(telemetría); y los de la web, el SDK y Fyne. Cada guardián se vio en rojo quitando lo que vigila.
+**Security review** (27/09, before merging, independent). No high findings. Everything
+it found is resolved: what was signed was not bound to the original (digests and same text, point 6);
+nothing limited how many requests someone from outside receives (point 9); a colleague's @username
+came out as from outside (point 1); the token's email reached the other organization and an
+email was attempted with the wrong session (point 8); links not revoked after a rejection or not fetched (point
+4); the trace span with the full URL, which would carry a public link's token (point 4; the
+middleware was not mounted in any service, but now it cannot be); the signed file's name was set by
+the other organization (point 7); a deleted copy left the request with no way out and two simultaneous “open”s
+left two copies (points 4 and 9); the encrypted token was not bound to its row (point 4); the caps
+were not atomic and the link was created before checking them (points 3 and 9); the
+person was looked up before checking the file and the confirmation did not say who (points 1 and 2); the
+migration did not close `copia_ruta` or the tokens of a closed request (constraints in 0012);
+and a 401 from Drive was counted as “label that does not allow sharing” (`drive.ErrProhibido`). The two
+product matters it left for the owner —that someone can **block** whoever requests signatures from them and
+that an organization can **close** those arriving from outside— were decided on 27/09: [0059](#0059).
+
+**Tests (seen red).** `TestPedirFirmaAFuera`, `TestCancelarAFueraQuitaElEnlace`,
+`TestPeticionEnAnfitrion` and `TestElTokenNoValeEnOtraPeticion` (service); `TestPeticionesDeFirmaAFuera`
+and `TestNadieLlenaLaListaDeAlguienDeFuera` (real Postgres); `TestElSpanNoLlevaLaURL`
+(telemetry); and those of the web, the SDK and Fyne. Each guardian was seen red by removing what it watches.
 
 <a id="0058"></a>
 
-## 0058 — El CI corre en GitHub Actions; los workflows se portan sin cambiar lo que comprueban
+<a id="0058--el-ci-corre-en-github-actions-los-workflows-se-portan-sin-cambiar-lo-que-comprueban"></a>
 
-`accepted` (los puntos 1 y 5, sustituidos por [0060](#0060)) · 2026-09-27 · CI, operación · código en `.github/workflows/`, `.github/actions/`, `.github/RUNNERS.md`, `deploy/sytue-git/bin/{ci-check,publicar-asset}.sh`, guardianes `deploy/production/tests/release-workflow-test.sh`, `.github/tests/ci-sin-azar-test.sh`, `scripts/check-toolchain-versions.sh`
+## 0058 — CI runs on GitHub Actions; workflows are ported without changing what they check
 
-**Contexto.** El origen del repositorio pasa de git.gay (Forgejo) a
-`github.com/thinkddr/sytue-one`. Los veinticinco workflows de `.forgejo/workflows/` ya
-estaban escritos en la sintaxis de GitHub Actions —contexto `github.*`, `GITHUB_TOKEN`,
-`hashFiles`— porque Forgejo la copia; lo que los ataba a la forja era el entorno (tres
-runners propios en el frontal, con un Docker filtrado y la caché de Go montada del
-host), la plomería que evitaba leer otros repositorios (clonado con `git` a mano,
-`upload-artifact` vendorizada, un guion propio contra el servidor de caché del runner) y
-una docena de llamadas a `/api/v1`.
+`accepted` (points 1 and 5, replaced by [0060](#0060)) · 2026-09-27 · CI, operations · code in `.github/workflows/`, `.github/actions/`, `.github/RUNNERS.md`, `deploy/sytue-git/bin/{ci-check,publicar-asset}.sh`, guardians `deploy/production/tests/release-workflow-test.sh`, `.github/tests/ci-sin-azar-test.sh`, `scripts/check-toolchain-versions.sh`
 
-**Decisión.** Portar los veinticinco tal cual —los mismos gates, los mismos
-`timeout-minutes`, los mismos secretos— cambiando solo lo que GitHub hace distinto:
+**Context.** The repository's origin moves from git.gay (Forgejo) to
+`github.com/thinkddr/sytue-one`. The twenty-five workflows in `.forgejo/workflows/` were already
+written in GitHub Actions syntax —`github.*` context, `GITHUB_TOKEN`,
+`hashFiles`— because Forgejo copies it; what tied them to the forge was the environment (three
+of our own runners on the front node, with a filtered Docker and the Go cache mounted from the
+host), the plumbing that avoided reading other repositories (cloning with `git` by hand,
+a vendored `upload-artifact`, our own script against the runner's cache server) and
+a dozen calls to `/api/v1`.
 
-1. **Runners alojados de GitHub** (`ubuntu-24.04-arm`) y no los tres runners propios
-   re-registrados: registrar el `actions-runner` de GitHub en un host que también sirve
-   producción es un cambio de infraestructura que no se puede probar desde el
-   repositorio, y los alojados no piden ninguna: el repositorio es privado, así que
-   gastan los minutos del plan (y se facturan al agotarlos), que es el precio de no
-   operar máquinas. Cada job corre en
-   el MISMO contenedor por digest que daban los runners de Forgejo (`node:24-bookworm`),
-   para que la plomería que instala herramientas como root siga valiendo sin tocarla.
-   ARM64 y no amd64 porque es la arquitectura sobre la que está medido todo lo que hay.
-2. **Acciones oficiales fijadas por SHA** (`checkout`, `upload-artifact`, `cache`) en
-   lugar del clonado a mano, la copia vendorizada y el guion de caché: la razón para
-   evitarlas (la forja no dejaba leer otros repositorios) ya no existe, y el gate de
-   toolchain exige que cada `uses:` lleve el SHA de `versions.env`.
-3. **API de GitHub donde la forja hablaba otra cosa:** check runs en vez de estados de
-   commit para decidir si un commit está en verde, `git/refs` para marcar una versión
-   como desplegable, `upload_url` y `releases/assets/<id>` para los assets, `pull_requests`
-   del listado de runs para el cancelador, Renovate en modo `github`.
-4. **`permissions:` mínimos por flujo**, que Forgejo ignoraba y GitHub aplica.
-5. **Lo que sigue en git.gay se queda ahí y se nombra:** los forks privados de Fyne
-   (`SYTUE_FORKS_SERVER`, `SYTUE_GIT_FORKS_TOKEN`) y el registro de imágenes de la suite
-   (`DESTINO`, con `vars.SYTUE_REGISTRY` para moverlo). Cambiar el registro es otra
-   decisión, del despliegue, no del CI.
+**Decision.** Port all twenty-five as they are —the same gates, the same
+`timeout-minutes`, the same secrets— changing only what GitHub does differently:
 
-**Alternativas descartadas.** _Runners propios en GitHub_ (el frontal re-registrado): es
-la vía de vuelta documentada en `RUNNERS.md`, no el punto de partida. _`ubuntu-24.04`
-amd64_: iguales de máquina y de precio; se descarta solo por no cambiar dos cosas a la
-vez (la forja y la arquitectura medida). _Reescribir los flujos «a la GitHub»_ (setup-go,
-setup-node, buildx): tiraría los gates de versiones por sha256 y de imágenes por digest
-que existen para que el CI no cambie solo.
+1. **GitHub-hosted runners** (`ubuntu-24.04-arm`) and not our three own runners
+   re-registered: registering GitHub's `actions-runner` on a host that also serves
+   production is an infrastructure change that cannot be tested from the
+   repository, and the hosted ones require none: the repository is private, so
+   they spend the plan's minutes (and are billed once they run out), which is the price of not
+   operating machines. Each job runs in
+   the SAME container by digest that the Forgejo runners provided (`node:24-bookworm`),
+   so that the plumbing that installs tools as root keeps working without touching it.
+   ARM64 and not amd64 because it is the architecture on which everything there is was measured.
+2. **Official actions pinned by SHA** (`checkout`, `upload-artifact`, `cache`) instead of
+   the manual cloning, the vendored copy and the cache script: the reason to
+   avoid them (the forge did not allow reading other repositories) no longer exists, and the
+   toolchain gate requires every `uses:` to carry the SHA from `versions.env`.
+3. **GitHub API where the forge spoke something else:** check runs instead of commit
+   statuses to decide whether a commit is green, `git/refs` to mark a version
+   as deployable, `upload_url` and `releases/assets/<id>` for the assets, `pull_requests`
+   from the runs listing for the canceller, Renovate in `github` mode.
+4. **Minimal `permissions:` per workflow**, which Forgejo ignored and GitHub enforces.
+5. **What stays on git.gay stays there and is named:** the private Fyne forks
+   (`SYTUE_FORKS_SERVER`, `SYTUE_GIT_FORKS_TOKEN`) and the suite's image registry
+   (`DESTINO`, with `vars.SYTUE_REGISTRY` to move it). Changing the registry is another
+   decision, a deployment one, not a CI one.
 
-**Consecuencias.** La caché de Go (~9 GB de módulos) compite con el tope de 10 GB por
-repositorio de `actions/cache`; si expulsa, se cachea solo la de compilación. `schedule:`
-vuelve a funcionar (en git.gay no se disparaba nunca) y el timer del piloto que lo suplía
-sobra. En el inventario de cadena de suministro `github.com` y `api.github.com` quedan
-como `temporary-exception` renovada hasta 2027-03-27: la forja está fuera de la UE y el
-gate obliga a volver a decidirlo cada seis meses, que es lo honesto —`pinned-artifact`
-diría que no sale nada nuestro, y salen el código y las incidencias—. Los secretos se
-dan de alta en GitHub con los mismos
-nombres; el de paquetes y el de los forks siguen siendo de git.gay. `desplegar-forja.yml`
-y `espejo-herramientas.yml` (Sytue Git, retirado) y los flujos contra el registro de
-Scaleway (en baja) se portan a mano y sin disparo automático, pendientes de su baja formal.
+**Alternatives ruled out.** _Our own runners on GitHub_ (the front node re-registered): it is
+the documented way back in `RUNNERS.md`, not the starting point. _amd64 `ubuntu-24.04`_:
+same machine and same price; it is ruled out only so as not to change two things at
+once (the forge and the measured architecture). _Rewriting the workflows “the GitHub way”_ (setup-go,
+setup-node, buildx): it would throw away the sha256 version gates and the digest image gates
+that exist so that CI does not change on its own.
+
+**Consequences.** The Go cache (~9 GB of modules) competes with the 10 GB per-repository cap
+of `actions/cache`; if it evicts, only the build cache is cached. `schedule:`
+works again (on git.gay it never fired) and the pilot timer that stood in for it
+is no longer needed. In the supply-chain inventory `github.com` and `api.github.com` remain
+as a `temporary-exception` renewed until 2027-03-27: the forge is outside the EU and the
+gate forces deciding it again every six months, which is the honest thing —`pinned-artifact`
+would say nothing of ours leaves, and the code and the issues do leave—. The secrets are
+registered in GitHub with the same
+names; the packages one and the forks one remain git.gay's. `desplegar-forja.yml`
+and `espejo-herramientas.yml` (Sytue Git, retired) and the workflows against the Scaleway
+registry (being decommissioned) are ported by hand and without an automatic trigger, pending their formal removal.
 
 <a id="0059"></a>
 
-## 0059 — Peticiones de firma de fuera: quien recibe bloquea y su organización decide, sin que quien pide se entere
+<a id="0059--peticiones-de-firma-de-fuera-quien-recibe-bloquea-y-su-organización-decide-sin-que-quien-pide-se-entere"></a>
 
-`accepted` · 2026-09-27 · docs, firma, multi-tenancy, privacidad, seguridad · **completa el [0057](#0057)** · código en `services/docs/internal/http/pdffirmabloqueos.go`, `services/id/internal/http/internal_organizaciones.go`, `apps/frontend/apps/console/src/components/ExternalSignaturesPanel.tsx`, mig. docs `0013`
+## 0059 — Signature requests from outside: the recipient blocks and their organization decides, without the requester finding out
 
-**Contexto.** Con el [0057](#0057) cualquiera que sepa un @usuario puede pedir una firma a esa
-persona desde otra organización, y abrir la petición deja una copia en la unidad de SU
-organización. La revisión de seguridad del 0057 dejó dos decisiones al dueño, y el 27/09 las tomó:
-**sí** a que una persona bloquee a quien le pide firmas desde fuera —desde la petición recibida, y
-se quita desde sus ajustes—, y **sí** a un ajuste en Sytue Admin para que la organización decida
-qué hace con las que le llegan de fuera: abiertas (por defecto), cerradas o solo de organizaciones
-de confianza. **Quien pide no se entera**: la petición se «envía», pero no llega.
+`accepted` · 2026-09-27 · docs, signature, multi-tenancy, privacy, security · **completes [0057](#0057)** · code in `services/docs/internal/http/pdffirmabloqueos.go`, `services/id/internal/http/internal_organizaciones.go`, `apps/frontend/apps/console/src/components/ExternalSignaturesPanel.tsx`, docs mig. `0013`
 
-**Decisión.**
+**Context.** With [0057](#0057) anyone who knows an @username can request a signature from that
+person from another organization, and opening the request leaves a copy in THEIR
+organization's drive. The 0057 security review left two decisions to the owner, and on 27/09 they made them:
+**yes** to a person being able to block whoever requests signatures from them from outside —from the received request, and
+it is removed from their settings—, and **yes** to a setting in Sytue Admin so that the organization decides
+what it does with those arriving from outside: open (default), closed or only from trusted
+organizations. **The requester does not find out**: the request is “sent”, but it does not arrive.
 
-1. **No llegar es `silenciada`.** Una petición de fuera que no debe llegar se crea igual que
-   cualquier otra —la misma respuesta, el mismo enlace de Drive, la ve en su lista, cuenta en sus
-   topes y la puede cancelar— pero no llega: sin aviso, fuera de la lista de quien firma, sin
-   organización anfitriona y sin poder abrirse, firmarse ni rechazarse (las sentencias de quien
-   firma exigen `NOT silenciada`, además del middleware). Decirle a quien pide que no llegó le
-   contaría a quién le ha bloqueado alguien o en qué organización está una persona, que
-   `people:resolve` calla a propósito ([0040](#0040)). Por lo mismo:
-   - **se decide igual siempre**: primero Sytue ID, luego la política y luego el bloqueo, sin
-     atajos —un bloqueo que cortara antes se notaría en el tiempo y en el 503 de un Sytue ID caído—;
-   - **el tope de 20 pendientes de fuera de quien recibe ya no devuelve 429**: lo que pase de ahí
-     se crea silenciado. Con un 429 quien pide podría llenar ese tope desde otras cuentas y contar
-     cuáles de sus peticiones llegaron. Los topes que cuentan lo de quien pide (por hora y por
-     par) siguen siendo errores: los podría contar él mismo;
-   - lo silenciado no cuenta para ese tope, y el bloqueo se mira otra vez DENTRO del INSERT: uno
-     que llegue entre la comprobación y la creación también silencia.
-2. **El bloqueo es de la persona**, no de una organización: vale desde cualquiera de las suyas y
-   contra quien pide desde cualquiera de las suyas (`pdf_firma_bloqueos`, con `subject` = quien
-   bloquea y un `tenant` que solo dice desde dónde lo hizo). Nadie lo lee directamente: todo pasa
-   por funciones `SECURITY DEFINER` que reciben el `sub` del token de quien bloquea. Bloquear
-   silencia lo que ya estaba pendiente de esa persona en todas las organizaciones; desbloquear no
-   resucita lo silenciado. Hasta 500 por persona, bajo cerrojo.
-3. **Dónde se hace.** En la franja de la petición recibida (web y Fyne), con confirmación en la
-   misma franja y en cualquier estado de la petición —también tras rechazarla o firmarla—; se
-   quita en la portada de CertiPDF, en «Personas bloqueadas», que es donde están sus peticiones:
-   CertiPDF no tiene otra pantalla de ajustes y la lista viaja con las peticiones. Los bloqueos
-   van en «Tus datos» (`signature_blocks`) y «Borrar mi cuenta» se lleva los de la persona
+**Decision.**
+
+1. **Not arriving is `silenciada`.** An outside request that must not arrive is created just like
+   any other —the same response, the same Drive link, they see it in their list, it counts towards their
+   caps and they can cancel it— but it does not arrive: no notification, out of the signer's list, without
+   host organization and without being able to be opened, signed or rejected (the signer's
+   statements require `NOT silenciada`, in addition to the middleware). Telling the requester that it did not arrive would
+   reveal who has blocked them or which organization a person is in, which
+   `people:resolve` keeps quiet on purpose ([0040](#0040)). For the same reason:
+   - **it is always decided the same way**: first Sytue ID, then the policy and then the block, without
+     shortcuts —a block that cut off earlier would be noticeable in the timing and in the 503 of a Sytue ID that is down—;
+   - **the recipient's cap of 20 pending from outside no longer returns 429**: whatever exceeds it
+     is created silenced. With a 429 the requester could fill that cap from other accounts and count
+     which of their requests arrived. The caps that count the requester's things (per hour and per
+     pair) remain errors: they could count them themselves;
+   - silenced ones do not count towards that cap, and the block is checked again INSIDE the INSERT: one
+     that arrives between the check and the creation also silences.
+2. **The block belongs to the person**, not to an organization: it applies from any of theirs and
+   against the requester from any of theirs (`pdf_firma_bloqueos`, with `subject` = the blocker
+   and a `tenant` that only says where it was done from). Nobody reads it directly: everything goes
+   through `SECURITY DEFINER` functions that receive the `sub` of the blocker's token. Blocking
+   silences what was already pending from that person in all organizations; unblocking does not
+   revive what was silenced. Up to 500 per person, under a lock.
+3. **Where it is done.** In the banner of the received request (web and Fyne), with confirmation in the
+   same banner and in any state of the request —also after rejecting or signing it—; it is
+   removed on CertiPDF's front page, in «Personas bloqueadas» (“Blocked people”), which is where their requests are:
+   CertiPDF has no other settings screen and the list travels with the requests. Blocks
+   go into “Your data” (`signature_blocks`) and “Delete my account” takes the person's ones with it
    (`DatosDeLaPersona`, [0054](#0054)).
-4. **La política es de la organización** (`pdf_firma_politica`, con su RLS y su
-   `_platform_merge`); la guarda quien administra (`owner`/`admin`, no delegable) desde «Firmas de
-   fuera» en Sytue Admin, y se aplica en dos momentos:
-   - **Al pedir**, el servicio pregunta a Sytue ID en qué organizaciones activas está quien firma
-     (`POST /internal/people/orgs`, solo desde dentro y con un secreto PROPIO,
-     `sytue-id-orgs-persona`, compartido solo con Docs; sin él no se pide fuera) y llega si
-     **alguna** la admite —abierta o sin fila, o de confianza con la organización de quien pide en
-     su lista— o si la persona tiene **cuenta personal**, donde decide ella con sus bloqueos. La
-     cuenta personal no viaja por su nombre (se deriva de su dirección): Sytue ID solo dice que la
-     hay. Si Sytue ID no contesta, no se crea nada: dejarla llegar se saltaría la política.
-   - **Al mirar, abrir y firmar**: la lista de quien firma solo enseña lo que admite la
-     organización de SU sesión, y abrir o firmar desde una que no lo admite es
-     `pdf_signature_org_closed` —dejaría ficheros en la unidad de esa organización—. Rechazar y
-     bloquear se pueden siempre.
-5. **Las organizaciones de confianza** se escriben por el nombre de su dirección (el `acme` de
-   `…/docs/acme/`), hasta cien, sin la propia. Las organizaciones de Sytue ID no se borran (pasan
-   a `deleted`) y su nombre no se reutiliza, así que la confianza no la hereda nadie. En una fusión
-   (y en un renombrado, que usa el mismo motor) la política del origen se descarta si el destino
-   tiene la suya, y quien confiaba en el origen pasa a confiar en el destino, sin repetidos ni
-   confiar en sí misma (`platform_merge_prepare` de Docs, solo dentro de una fusión).
-6. **Las funciones que cruzan organizaciones, también en producción.** En producción la aplicación
-   y las migraciones usan el MISMO rol, dueño de todo y sin BYPASSRLS; con FORCE ROW LEVEL
-   SECURITY, un `SECURITY DEFINER` por sí solo no salta la RLS (lo encontró Drive en su 0003), y
-   en los tests lo tapaba un dueño superusuario. Era así en TODAS las de Docs: el enlace público
-   de un documento, el canje entre organizaciones ([0052](#0052)) y las peticiones de fuera
-   ([0057](#0057)). Todas llevan ahora `SET app.docs_definer = 'on'` —vale mientras se ejecutan y
-   se restaura solo al salir— y cada tabla que leen tiene una política aditiva que solo abre con
-   ese valor. Los tests de integración de Docs ponen esas funciones en manos del rol de la
-   aplicación, como en producción, para que no vuelva a taparse.
+4. **The policy belongs to the organization** (`pdf_firma_politica`, with its RLS and its
+   `_platform_merge`); it is saved by whoever administers (`owner`/`admin`, not delegable) from «Firmas de
+   fuera» (“Outside signatures”) in Sytue Admin, and it is applied at two moments:
+   - **When requesting**, the service asks Sytue ID which active organizations the signer is in
+     (`POST /internal/people/orgs`, only from inside and with its OWN secret,
+     `sytue-id-orgs-persona`, shared only with Docs; without it nothing is requested outside) and it arrives if
+     **any** admits it —open or without a row, or trusted with the requester's organization in
+     its list— or if the person has a **personal account**, where they decide with their blocks. The
+     personal account does not travel by its name (it is derived from its address): Sytue ID only says that there
+     is one. If Sytue ID does not answer, nothing is created: letting it arrive would skip the policy.
+   - **When viewing, opening and signing**: the signer's list only shows what the
+     organization of THEIR session admits, and opening or signing from one that does not admit it is
+     `pdf_signature_org_closed` —it would leave files in that organization's drive—. Rejecting and
+     blocking are always possible.
+5. **Trusted organizations** are written by the name in their address (the `acme` in
+   `…/docs/acme/`), up to a hundred, excluding one's own. Sytue ID organizations are not deleted (they become
+   `deleted`) and their name is not reused, so nobody inherits the trust. In a merge
+   (and in a rename, which uses the same engine) the source's policy is discarded if the destination
+   has its own, and whoever trusted the source now trusts the destination, without duplicates or
+   trusting itself (Docs' `platform_merge_prepare`, only within a merge).
+6. **The functions that cross organizations, also in production.** In production the application
+   and the migrations use the SAME role, owner of everything and without BYPASSRLS; with FORCE ROW LEVEL
+   SECURITY, a `SECURITY DEFINER` on its own does not skip RLS (Drive found this in its 0003), and
+   in the tests a superuser owner masked it. It was like that in ALL of Docs' functions: a document's public
+   link, cross-organization redemption ([0052](#0052)) and outside requests
+   ([0057](#0057)). All of them now carry `SET app.docs_definer = 'on'` —valid while they run and
+   restored automatically on exit— and each table they read has an additive policy that only opens with
+   that value. Docs' integration tests put those functions in the hands of the application
+   role, as in production, so that it is not masked again.
 
-**Consecuencias.**
+**Consequences.**
 
-- Quien pide ve «pendiente» para siempre en una petición que no llegó; puede cancelarla. Una
-  silenciada por la política sigue así aunque la organización abra después.
-- Si una organización cierra, las peticiones de fuera —también las ya firmadas o rechazadas—
-  dejan de verse desde sus sesiones; desde una cuenta personal se siguen viendo.
-- Un aviso que ya llegó antes del bloqueo se queda en la campana y lleva a la portada de CertiPDF,
-  donde la petición ya no está.
-- La lista de bloqueados guarda el nombre que la persona vio en la petición: es SU registro de a
-  quién bloqueó, y se va con ella.
-- Drive no apunta cuándo se usa un enlace, así que el enlace de una silenciada que nadie usa no
-  dice nada que no diga una petición ignorada.
-- Bajar la migración 0013 cancela las silenciadas: quien las pidió las verá «canceladas».
+- The requester sees “pending” forever on a request that did not arrive; they can cancel it. One
+  silenced by the policy stays that way even if the organization opens later.
+- If an organization closes, outside requests —including those already signed or rejected—
+  stop being visible from its sessions; from a personal account they are still visible.
+- A notification that arrived before the block stays in the bell and leads to CertiPDF's front page,
+  where the request no longer is.
+- The block list stores the name the person saw in the request: it is THEIR record of
+  whom they blocked, and it goes away with them.
+- Drive does not record when a link is used, so the link of a silenced request that nobody uses
+  says nothing that an ignored request does not say.
+- Rolling back migration 0013 cancels the silenced ones: whoever requested them will see them as “cancelled”.
 
-**Alternativas descartadas.** _Decir «bloqueado» o «no admitido» a quien pide_: filtraría el
-bloqueo y las organizaciones de la persona. _No crear el enlace de Drive a una silenciada_: la
-lista de comparticiones del fichero en Drive delataría la diferencia. _Aplicar la política solo al
-mirar_: el aviso ya habría llegado. _Guardar los bloqueos por organización_: bloquear en una no
-serviría en las otras. _Que la cuenta personal no cuente_: alguien no podría recibir nada en lo
-suyo por estar además en una organización cerrada. _Reutilizar el secreto del directorio interno_:
-es de una tarea de mantenimiento que se retira.
+**Alternatives ruled out.** _Telling the requester “blocked” or “not admitted”_: it would leak the
+block and the person's organizations. _Not creating the Drive link for a silenced one_: the
+file's share list in Drive would give away the difference. _Applying the policy only when
+viewing_: the notification would already have arrived. _Storing blocks per organization_: blocking in one would not
+work in the others. _Not counting the personal account_: someone could receive nothing in their own
+because they were also in a closed organization. _Reusing the internal directory secret_:
+it belongs to a maintenance task that is being retired.
 
-**Revisión de seguridad** (27/09, antes de fusionar, independiente). Sin hallazgos altos; todo lo
-que encontró está resuelto: el tope de quien recibe servía de oráculo (punto 1); el bloqueo cortaba
-antes de preguntar a Sytue ID (punto 1); las funciones fallaban abiertas si el dueño no salta la
-RLS, y resultó que TODAS las de Docs estaban así (punto 6); el secreto del directorio pasaba a un
-uso permanente y la cuenta personal viajaba por su nombre (punto 4); el texto de «cerrada»
-prometía de más con las cuentas personales; firmar no miraba la política (punto 4); un bloqueo
-entre la comprobación y el INSERT (punto 1); los bloqueos como datos personales (punto 3); solo se
-bloqueaba desde una pendiente (punto 3); la bajada y su `app.merge`; el tope de bloqueos sin
-cerrojo y el «demasiados» al bloquearse a sí misma; repetidos en la confianza tras una fusión; la
-reutilización de nombres de organización (punto 5); una copia huérfana si la petición desaparece
-mientras se trae (se borra); la sección de la consola a quien no podía usarla (ahora solo
-owner/admin); y la respuesta de Sytue ID leída sin tope. Y los catálogos de Fyne, regenerados.
+**Security review** (27/09, before merging, independent). No high findings; everything
+it found is resolved: the recipient's cap served as an oracle (point 1); the block cut off
+before asking Sytue ID (point 1); the functions failed open if the owner does not skip
+RLS, and it turned out ALL of Docs' were like that (point 6); the directory secret was moving to a
+permanent use and the personal account traveled by its name (point 4); the “closed” text
+promised too much with personal accounts; signing did not look at the policy (point 4); a block
+between the check and the INSERT (point 1); blocks as personal data (point 3); blocking was only
+possible from a pending request (point 3); the rollback and its `app.merge`; the block cap without a
+lock and the “too many” when blocking oneself; duplicates in the trust list after a merge; the
+reuse of organization names (point 5); an orphan copy if the request disappears
+while being fetched (it is deleted); the console section shown to whoever could not use it (now only
+owner/admin); and Sytue ID's response read without a cap. And the Fyne catalogs, regenerated.
 
 <a id="0060"></a>
 
-## 0060 — Runners propios en el frontal, imágenes en ghcr.io y forks en GitHub
+<a id="0060--runners-propios-en-el-frontal-imágenes-en-ghcrio-y-forks-en-github"></a>
 
-`accepted` · 2026-09-27 · CI, despliegue · sustituye los puntos 1 y 5 de [0058](#0058) · código en `deploy/rooms-sfu/{instalar-runners-github.sh,runners/sytue-github-runner.service,drenar-y-reiniciar.sh,podar-ci.sh}`, `.github/workflows/`, `.github/actions/toolchain/forks.sh`, `apps/fyne/go.mod`, `deploy/helm/bin/{actualizar-suite,configurar-git-root,common}.sh`
+## 0060 — Our own runners on the front node, images on ghcr.io and forks on GitHub
 
-**Contexto.** 0058 portó el CI a GitHub con dos cosas pendientes de decidir y una
-contradicción: los jobs iban a runners ALOJADOS de GitHub (`ubuntu-24.04-arm`), que en
-un repositorio privado cobran por minuto y contradicen la decisión del dueño del
-2026-09-23 («el CI va entero en el frontal»), y dejaba en git.gay el registro de
-imágenes y los forks de Fyne. El dueño decidió el 27/09 que git.gay deja de usarse para
-todo y que los forks pasan a `github.com/thinkddr`, privados.
+`accepted` · 2026-09-27 · CI, deployment · replaces points 1 and 5 of [0058](#0058) · code in `deploy/rooms-sfu/{instalar-runners-github.sh,runners/sytue-github-runner.service,drenar-y-reiniciar.sh,podar-ci.sh}`, `.github/workflows/`, `.github/actions/toolchain/forks.sh`, `apps/fyne/go.mod`, `deploy/helm/bin/{actualizar-suite,configurar-git-root,common}.sh`
 
-**Decisión.**
+**Context.** 0058 ported CI to GitHub with two things pending a decision and one
+contradiction: the jobs went to GitHub-HOSTED runners (`ubuntu-24.04-arm`), which in
+a private repository charge per minute and contradict the owner's decision of
+2026-09-23 («el CI va entero en el frontal», “CI runs entirely on the front node”), and it left the image
+registry and the Fyne forks on git.gay. On 27/09 the owner decided that git.gay stops being used for
+everything and that the forks move to `github.com/thinkddr`, private.
 
-1. **Runners:** `actions/runner` de GitHub (ARM64) en el frontal, `sytue-global`, `sytue-second`, `sytue-third` y, desde el 2026-09-28, `sytue-fourth` (el dueño aprobó el cuarto: tres se quedaban cortos para una ronda completa),
-   con la etiqueta `sytue-arm64`, el usuario `sytue-runner` y el Docker del CI sin root
-   de siempre. Cada job en un contenedor de ese Docker (`container: &ci` en el
-   workflow, con el proxy filtrado como socket y la caché de Go del host montados), que
-   es lo que hacía forgejo-runner con su `config.yml`. Registrados una vez con un token
-   de una hora; en el host no queda ningún token de GitHub.
-2. **Registro:** `ghcr.io/<dueño>`, publicado con `GITHUB_TOKEN` (`packages: write`).
-   Paquetes privados, ligados al repositorio.
-3. **Forks:** `thinkddr/{fyne,typesetting,glfw}`, privados, con todas sus ramas y tags;
-   los lee `SYTUE_GIT_FORKS_TOKEN` (fine-grained, solo lectura de los tres). El de
-   typesetting declaraba su ruta de git.gay en `module`, así que lleva un tag nuevo
-   (`v0.3.4-sytue.2`) que solo cambia esa línea.
-4. **Perfil:** cada release publica `completo` (el piloto enciende Cloud), y el
-   actualizador acepta una marca `completo` también en un servidor sin Cloud, porque
-   lleva todas las imágenes de `piloto`.
-5. **Piloto:** mismo mecanismo (marca `desplegable/…` en el remoto, imágenes del
-   registro), con el remoto por SSH a GitHub y la misma clave de despliegue, dada de
-   alta como Deploy key de solo lectura.
+**Decision.**
 
-**Alternativas descartadas.** _Runners alojados_: de pago en privado, y el dueño ya
-había decidido lo contrario. _El runner de GitHub dentro de un contenedor por job
-(efímero)_: más fiel, pero pide un token de administración del repositorio guardado en
-el host para registrarse en cada job; el contenedor por job del propio runner da el
-mismo aislamiento sin esa credencial. _Imágenes públicas en ghcr.io_: ahorran la
-credencial del piloto, pero publican los binarios de un producto privado; es decisión
-del dueño.
+1. **Runners:** GitHub's `actions/runner` (ARM64) on the front node, `sytue-global`, `sytue-second`, `sytue-third` and, since 2026-09-28, `sytue-fourth` (the owner approved the fourth: three fell short for a full round),
+   with the `sytue-arm64` label, the `sytue-runner` user and the usual rootless CI
+   Docker. Each job in a container of that Docker (`container: &ci` in the
+   workflow, with the filtered proxy as a socket and the host's Go cache mounted), which
+   is what forgejo-runner did with its `config.yml`. Registered once with a one-hour
+   token; no GitHub token remains on the host.
+2. **Registry:** `ghcr.io/<dueño>`, published with `GITHUB_TOKEN` (`packages: write`).
+   Private packages, linked to the repository.
+3. **Forks:** `thinkddr/{fyne,typesetting,glfw}`, private, with all their branches and tags;
+   they are read by `SYTUE_GIT_FORKS_TOKEN` (fine-grained, read-only on the three). The
+   typesetting one declared its git.gay path in `module`, so it carries a new tag
+   (`v0.3.4-sytue.2`) that only changes that line.
+4. **Profile:** each release publishes `completo` (the pilot turns on Cloud), and the
+   updater accepts a `completo` marker also on a server without Cloud, because it
+   carries all the `piloto` images.
+5. **Pilot:** same mechanism (`desplegable/…` marker on the remote, images from the
+   registry), with the remote over SSH to GitHub and the same deployment key, registered
+   as a read-only Deploy key.
 
-**Consecuencias.** El runner de GitHub monta siempre `/var/run/docker.sock` en el
-contenedor del job y no tiene opción para evitarlo; en el Docker sin root esa ruta es
-el socket de producción, inaccesible desde el espacio de usuario del CI (medido), y el
-proxy va por `DOCKER_HOST`. Al parar, el runner de GitHub cancela su job (no espera),
-así que `drenar-y-reiniciar.sh` espera a que no haya un `Runner.Worker`. La poda del
-frontal reconoce los jobs de GitHub por su red `github_network_*`. Un flujo solo con
-`workflow_dispatch` no se puede despachar si no está en la rama por defecto, que por
-eso tiene que ser `main` (lo es desde el 2026-09-28). Los runners de Forgejo se retiraron
-del frontal el mismo 27/09 (`retirar-runners-forgejo.sh`; `instalar-runners.sh` los
-devuelve). **git.gay se archiva, no se borra** (dueño, 2026-09-28): repositorio en solo
-lectura y baja de sus registros de runners, pero solo cuando la primera v3.7.x esté en
-producción desplegada desde GitHub. Los pasos, en
+**Alternatives ruled out.** _Hosted runners_: paid for private repositories, and the owner had already
+decided the opposite. _The GitHub runner inside a container per job
+(ephemeral)_: more faithful, but it requires a repository administration token stored on
+the host to register on each job; the runner's own per-job container gives the
+same isolation without that credential. _Public images on ghcr.io_: they save the
+pilot's credential, but they publish the binaries of a private product; that is the
+owner's decision.
+
+**Consequences.** The GitHub runner always mounts `/var/run/docker.sock` in the
+job container and has no option to avoid it; in the rootless Docker that path is
+the production socket, inaccessible from the CI's user space (measured), and the
+proxy goes through `DOCKER_HOST`. When stopping, the GitHub runner cancels its job (it does not wait),
+so `drenar-y-reiniciar.sh` waits until there is no `Runner.Worker`. The front node's
+pruning recognizes GitHub jobs by their `github_network_*` network. A workflow with only
+`workflow_dispatch` cannot be dispatched if it is not on the default branch, which is
+why it has to be `main` (it has been since 2026-09-28). The Forgejo runners were removed
+from the front node the same day, 27/09 (`retirar-runners-forgejo.sh`; `instalar-runners.sh` brings them
+back). **git.gay is archived, not deleted** (owner, 2026-09-28): the repository goes read-only
+and its runner registrations are removed, but only once the first v3.7.x is in
+production deployed from GitHub. The steps, in
 [operations §2.1e](operations.md#21e-archivar-git-gay).
 
 <a id="0061"></a>
 
-## 0061 — Sytue Cast: vídeo bajo demanda y directo, con portada pública y cuota de Drive
+<a id="0061--sytue-cast-vídeo-bajo-demanda-y-directo-con-portada-pública-y-cuota-de-drive"></a>
 
-`accepted` · 2026-09-28 · producto, vídeo, directo, multi-tenancy, almacenamiento · decisiones del dueño del 27/09 · código en `services/cast/**` (mig. cast `0001`–`0003`), `platform/pkg/{livekit,personas}`, `platform/pkg/objectstore/rango.go`, `deploy/helm/charts/cast`, mig. id `0100`, `apps/frontend/apps/cast`, `apps/fyne/{cmd,apps}/cast`
+## 0061 — Sytue Cast: on-demand and live video, with a public front page and Drive quota
 
-**Contexto.** La suite no tenía vídeo. Las grabaciones de Rooms acababan en Drive como
-ficheros sueltos, sin reproductor, y quien quería publicar un vídeo o emitir desde OBS tenía
-que salir a un proveedor de fuera de la UE. El dueño pidió una app «como Vimeo»: subir,
-publicar y ver, emitir en directo, con portada pública y canal por organización, y el listón
-«100 % funcional y bonita».
+`accepted` · 2026-09-28 · product, video, live, multi-tenancy, storage · owner's decisions of 27/09 · code in `services/cast/**` (cast mig. `0001`–`0003`), `platform/pkg/{livekit,personas}`, `platform/pkg/objectstore/rango.go`, `deploy/helm/charts/cast`, id mig. `0100`, `apps/frontend/apps/cast`, `apps/fyne/{cmd,apps}/cast`
 
-**Decisión.**
+**Context.** The suite had no video. Rooms recordings ended up in Drive as
+loose files, without a player, and whoever wanted to publish a video or stream from OBS had
+to go to a provider outside the EU. The owner asked for an app “like Vimeo”: upload,
+publish and watch, stream live, with a public front page and a channel per organization, and the bar
+“100 % functional and beautiful”.
 
-1. **Un servicio, dos procesos.** `services/cast` (:8099) sirve la API, `/media` y el chat.
-   El mismo binario, con el subcomando `transcoder`, toma trabajos de `transcode_jobs` y corre
-   `ffmpeg` en una segunda imagen (debian-slim). La cola es Postgres: `FOR UPDATE SKIP LOCKED`
-   en una transacción de mantenimiento (cruza organizaciones), un solo trabajo activo por vídeo
-   y clase (índice parcial único), tres reintentos con espera de 30 s, 2 min y 8 min, y los
-   trabajos `running` de más de tres horas vuelven a la cola, porque la réplica que los tenía
-   murió. Terminar un trabajo y mover el vídeo pasan en la misma transacción.
-2. **Derivadas:** HLS H.264 (fMP4, segmentos de 4 s) en 1080p (si el original lo da), 720p y
-   360p; WebM VP9/Opus 720p para Fyne; póster. El original se conserva. _Ampliado el
-   2026-09-28:_ las dos escaleras llevan las mismas calidades, las que elige quien sube
-   (`qualities` en el alta y `PUT /videos/{id}/qualities`); el WebM va uno por calidad en
-   `/media/…/webm/<q>p.webm`, y `webm/720p.webm` sigue valiendo; el vídeo expone
-   `qualities`, `hls_qualities` y `webm_qualities`, play `webm_qualities`, y
-   `GET /videos:estimate` da lo que ocupará cada una (migración cast `0007`). Los vídeos
-   de antes reciben la escalera entera (dueño, 28/09: todos), poco a poco desde el barrido
+**Decision.**
+
+1. **One service, two processes.** `services/cast` (:8099) serves the API, `/media` and the chat.
+   The same binary, with the `transcoder` subcommand, takes jobs from `transcode_jobs` and runs
+   `ffmpeg` in a second image (debian-slim). The queue is Postgres: `FOR UPDATE SKIP LOCKED`
+   in a maintenance transaction (it crosses organizations), a single active job per video
+   and class (unique partial index), three retries with waits of 30 s, 2 min and 8 min, and
+   `running` jobs older than three hours go back to the queue, because the replica that had them
+   died. Finishing a job and moving the video happen in the same transaction.
+2. **Derivatives:** H.264 HLS (fMP4, 4 s segments) in 1080p (if the original allows it), 720p and
+   360p; VP9/Opus 720p WebM for Fyne; poster. The original is kept. _Extended on
+   2026-09-28:_ both ladders carry the same qualities, those chosen by the uploader
+   (`qualities` on creation and `PUT /videos/{id}/qualities`); the WebM goes one per quality at
+   `/media/…/webm/<q>p.webm`, and `webm/720p.webm` remains valid; the video exposes
+   `qualities`, `hls_qualities` and `webm_qualities`, play `webm_qualities`, and
+   `GET /videos:estimate` gives how much each one will take (cast migration `0007`). Earlier videos
+   get the whole ladder (owner, 28/09: all of them), little by little from the sweep
    (`CAST_SWEEP_BACKFILL_QUALITIES`).
-3. **Cuatro visibilidades:** `public` (portada y canal, indexable), `unlisted` (con enlace,
-   incrustable), `org` y `people` (personas por @usuario, de cualquier organización, con el
-   criterio de externos de [0040](#0040)). Toda la decisión de acceso vive en
-   `internal/acceso`. La transacción corre siempre en el tenant **del vídeo**, no en el del token.
-4. **`/media` con token propio:** HMAC-SHA256 sobre `vídeo|alcance|caducidad`, 6 h. El alcance
-   (`ver` o `original`) evita que un enlace de reproducción descargue el original. Este punto se
-   aparta del contrato inicial, que solo firmaba vídeo y caducidad.
-5. **Directo:** LiveKit Ingress (RTMP para OBS en `cast-ingest.<dominio>:1935`) y Egress junto
-   al SFU de Rooms. El paquete de LiveKit pasa de Rooms a `platform/pkg/livekit`. La room es
-   `cast-<tenant>-<vídeo>`. La grabación vuelve como vídeo bajo demanda por la misma cola. El
-   egress es **ParticipantEgress** y no TrackComposite: graba al emisor con su audio sin montar
-   una plantilla web.
-6. **Cuota compartida con Drive:** Cast pregunta a Drive por la puerta interna antes de aceptar
-   una subida (507 con `available_bytes` si no cabe) y le informa del uso. Tope de 8 GiB por
-   vídeo. Si Drive contesta que no hay sitio, o rechaza la consulta, no se sube. Si Drive
-   no contesta (red, tiempo agotado o 5xx), la subida se acepta y queda en el registro: una
-   caída de Drive no puede tumbar Cast.
-7. **Lo anónimo** (portada, canal, ficha pública y comentarios públicos) está en
-   `/api/v1/public/*`, que es lo que publica el ingress. El `/public/*` sin prefijo solo se sirve
-   dentro del clúster, al BFF, con su propio limitador por IP.
-8. **Personas por @usuario:** el cliente de `people:resolve` que llevaba Rooms pasa a
-   `platform/pkg/personas`, compartido por los dos.
+3. **Four visibilities:** `public` (front page and channel, indexable), `unlisted` (with link,
+   embeddable), `org` and `people` (people by @username, from any organization, with the
+   externals criterion of [0040](#0040)). The whole access decision lives in
+   `internal/acceso`. The transaction always runs in the **video's** tenant, not the token's.
+4. **`/media` with its own token:** HMAC-SHA256 over `vídeo|alcance|caducidad`, 6 h. The scope
+   (`ver` or `original`) prevents a playback link from downloading the original. This point
+   departs from the initial contract, which only signed video and expiry.
+5. **Live:** LiveKit Ingress (RTMP for OBS at `cast-ingest.<dominio>:1935`) and Egress alongside
+   the Rooms SFU. The LiveKit package moves from Rooms to `platform/pkg/livekit`. The room is
+   `cast-<tenant>-<vídeo>`. The recording comes back as on-demand video through the same queue. The
+   egress is **ParticipantEgress** and not TrackComposite: it records the broadcaster with their audio without setting up
+   a web template.
+6. **Quota shared with Drive:** Cast asks Drive through the internal door before accepting
+   an upload (507 with `available_bytes` if it does not fit) and reports usage to it. Cap of 8 GiB per
+   video. If Drive answers that there is no room, or rejects the query, nothing is uploaded. If Drive
+   does not answer (network, timeout or 5xx), the upload is accepted and logged: a
+   Drive outage cannot bring Cast down.
+7. **Anonymous access** (front page, channel, public page and public comments) is in
+   `/api/v1/public/*`, which is what the ingress publishes. The unprefixed `/public/*` is only served
+   inside the cluster, to the BFF, with its own per-IP limiter.
+8. **People by @username:** the `people:resolve` client that Rooms had moves to
+   `platform/pkg/personas`, shared by both.
 
-**Confirmado por el dueño el 28/09**, tal como está implementado: el aviso de «en directo»
-solo llega a la lista de personas del vídeo; el título improvisado de un directo sin título va
-en español; `usageInDrive` cuenta los bytes del original más las derivadas; los bytes de la
-grabación de un directo cuentan igual que una subida; `poster:frame` sustituye el póster
-propio; y el audio va muxado en cada variante HLS.
+**Confirmed by the owner on 28/09**, as implemented: the “live” notification
+only reaches the video's people list; the improvised title of an untitled live stream is
+in Spanish; `usageInDrive` counts the bytes of the original plus the derivatives; the bytes of a
+live stream recording count the same as an upload; `poster:frame` replaces the custom
+poster; and the audio is muxed into each HLS variant.
 
-**Drive ofrece «Subir a Cast»** (dueño, 28/09) en sus ficheros de vídeo. Es una COPIA explícita
-y no un «abrir en el sitio», como los de Fotos o CertiPDF: el vídeo necesita su
-transcodificación y sus derivadas en Cast, y el fichero de Drive se queda donde está. La copia
-cuenta en la misma cuota del plan. Va en la web y en la app nativa a la vez, como toda función
-de Cast: la paridad 1:1 entre web y Fyne es obligatoria, y la única excepción es el incrustado.
+**Drive offers “Upload to Cast”** (owner, 28/09) on its video files. It is an explicit COPY
+and not an “open in place”, like those of Photos or CertiPDF: the video needs its
+transcoding and its derivatives in Cast, and the Drive file stays where it is. The copy
+counts against the same plan quota. It ships on the web and in the native app at the same time, like every Cast
+feature: 1:1 parity between web and Fyne is mandatory, and the only exception is embedding.
 
-**Decidido por el dueño el 28/09** (la web tal como se entregó):
+**Decided by the owner on 28/09** (the web as delivered):
 
-1. El chat de un directo solo se lee con sesión; sin ella, la ficha muestra «Entra para
-   participar». Es el mismo requisito que pone el servicio: el WebSocket exige token.
-2. Lo que se sube nace con visibilidad `org`. Hacerlo público es un paso explícito de quien
-   lo sube.
-3. Cast figura como `disponible` en el catálogo desde que la web está completa, sin esperar a
-   la app nativa (`nativa: false` hasta que llegue).
+1. A live stream's chat can only be read with a session; without one, the page shows «Entra para
+   participar» (“Sign in to take part”). It is the same requirement the service sets: the WebSocket requires a token.
+2. What is uploaded is born with `org` visibility. Making it public is an explicit step by whoever
+   uploads it.
+3. Cast is listed as `disponible` in the catalog since the web is complete, without waiting for
+   the native app (`nativa: false` until it arrives).
 
-**Ampliado el 2026-10-03: «Presentar con Cast» desde Sytue Diapos** (encargo del roadmap de Office,
-`diapos-cast`; por defecto lo más conservador, a la espera del dueño). Un directo por WebRTC puede
-llevar una presentación:
+**Extended on 2026-10-03: “Present with Cast” from Sytue Diapos** (an Office roadmap item,
+`diapos-cast`; the most conservative option by default, pending the owner). A WebRTC live stream can
+carry a presentation:
 
-1. **Quién emite, dónde.** Diapos programa el directo en Cast (`POST /lives` con `source=webrtc`,
-   visibilidad `org`) desde su BFF (`/api/cast-presentar`, con el token de quien presenta) y abre la
-   página de emitir de Cast con `?live=<id>`, donde se comparte la pantalla como en cualquier directo
-   desde el navegador. La grabación vuelve como vídeo bajo demanda por la misma cola.
-2. **Qué viaja: solo la posición** (número, total y título de la diapositiva, y la referencia
-   `docs:<id>`). Ni el contenido ni las notas del ponente salen de Diapos: las notas siguen en la
-   vista del moderador de quien presenta. El BFF reconstruye cada campo y el servicio rechaza lo que
-   no conoce.
-3. **API** (`services/cast/internal/diapositivas`, migración `0008`): `PUT /lives/{id}/slide`
-   —solo el dueño del directo, programado o en emisión— y `GET /videos/{id}/slides` (y
-   `/public/…`) para quien pueda ver el vídeo por el mismo `acceso` que la reproducción. Cada cambio
-   es un capítulo (`slide_marks`, hasta 2000, con los ms desde que empezó el directo); la
-   presentación (`live_presentations`) guarda quién la lanzó y cuándo, y la primera diapositiva
-   deja una línea en el registro. Cast no tiene registro de auditoría de cumplimiento (el de
-   `platform/pkg/auditlog` es de Mail y Drive): esa fila y esa línea son la huella.
-4. **Quien mira** ve «Diapositiva n de N · título» bajo el directo (sondeo de 3 s, sin sesión si es
-   público) y, en la grabación, la lista de capítulos para saltar a cada diapositiva.
+1. **Who broadcasts, where.** Diapos schedules the live stream in Cast (`POST /lives` with `source=webrtc`,
+   `org` visibility) from its BFF (`/api/cast-presentar`, with the presenter's token) and opens
+   Cast's broadcast page with `?live=<id>`, where the screen is shared as in any browser live stream.
+   The recording comes back as on-demand video through the same queue.
+2. **What travels: only the position** (number, total and title of the slide, and the reference
+   `docs:<id>`). Neither the content nor the speaker notes leave Diapos: the notes stay in the
+   presenter's moderator view. The BFF rebuilds each field and the service rejects what it
+   does not know.
+3. **API** (`services/cast/internal/diapositivas`, migration `0008`): `PUT /lives/{id}/slide`
+   —only the live stream's owner, scheduled or on air— and `GET /videos/{id}/slides` (and
+   `/public/…`) for whoever can see the video through the same `acceso` as playback. Each change
+   is a chapter (`slide_marks`, up to 2000, with the ms since the live stream started); the
+   presentation (`live_presentations`) stores who launched it and when, and the first slide
+   leaves a line in the log. Cast has no compliance audit log (the one in
+   `platform/pkg/auditlog` is Mail's and Drive's): that row and that line are the trace.
+4. **Viewers** see «Diapositiva n de N · título» (“Slide n of N · title”) under the live stream (3 s polling, without a session if it is
+   public) and, in the recording, the list of chapters to jump to each slide.
 
-Solo web: la paridad con la app nativa (Fyne) queda pendiente.
+Web only: parity with the native app (Fyne) is pending.
 
-**Consecuencias.** Hay una base de datos, un bucket y dos Deployments más. El transcodificador
-es el único pod de la suite con `ffmpeg`, así que es el que hay que vigilar en cada CVE de
-ffmpeg. La cuota de Drive pasa a ser de toda la suite, y el día que otro producto guarde
-ficheros tendrá que entrar por la misma puerta. El número de este ADR estaba reservado como
-0057 en el contrato de trabajo, pero se asignó a otra decisión el mismo día. Las referencias
-del código apuntan aquí.
+**Consequences.** There is one more database, one more bucket and two more Deployments. The transcoder
+is the only pod in the suite with `ffmpeg`, so it is the one to watch on every ffmpeg
+CVE. The Drive quota becomes the whole suite's, and the day another product stores
+files it will have to come in through the same door. The number of this ADR was reserved as
+0057 in the work contract, but it was assigned to another decision the same day. The code's
+references point here.
 
 <a id="0062"></a>
 
-## 0062 — Sytue Web usa un IR validado y publicación estática inmutable
+<a id="0062--sytue-web-usa-un-ir-validado-y-publicación-estática-inmutable"></a>
 
-`accepted` · 2026-09-30 · Sytue Web, seguridad, rendimiento
+## 0062 — Sytue Web uses a validated IR and immutable static publishing
 
-El editor, la IA y los exportadores intercambian el mismo IR versionado. La publicación valida
-el IR, bloquea contenido de demostración y datos legales incompletos, y escribe una salida
-estática versionada; una vista previa es otro artefacto con token y caducidad. Así no se ejecuta
-contenido de cliente al publicar ni se mezcla un borrador con la versión viva.
+`accepted` · 2026-09-30 · Sytue Web, security, performance
+
+The editor, the AI and the exporters exchange the same versioned IR. Publishing validates
+the IR, blocks demo content and incomplete legal data, and writes a versioned static
+output; a preview is another artifact with a token and an expiry. That way no customer
+content is executed on publishing and a draft is never mixed with the live version.
 
 <a id="0063"></a>
 
-## 0063 — Los dominios propios se verifican antes de entrar al borde
+<a id="0063--los-dominios-propios-se-verifican-antes-de-entrar-al-borde"></a>
 
-`accepted` · 2026-09-30 · Sytue Web, DNS, seguridad
+## 0063 — Custom domains are verified before entering the edge
 
-Cada dominio exige TXT de control y destino CNAME/A indicado por Sytue Web. Solo los dominios
-verificados pueden pasar por `/_borde/permitido`; el ápex y `www` se mantienen como un par para
-evitar que una variante no verificada capture tráfico.
+`accepted` · 2026-09-30 · Sytue Web, DNS, security
+
+Each domain requires a control TXT record and a CNAME/A target indicated by Sytue Web. Only
+verified domains can pass through `/_borde/permitido`; the apex and `www` are kept as a pair to
+prevent an unverified variant from capturing traffic.
 
 <a id="0064"></a>
 
-## 0064 — La analítica de Sytue Web es de primera parte y visitantes es una estimación diaria
+<a id="0064--la-analítica-de-sytue-web-es-de-primera-parte-y-visitantes-es-una-estimación-diaria"></a>
 
-`accepted` · 2026-09-30 · Analytics, privacidad
+## 0064 — Sytue Web analytics is first-party and visitors is a daily estimate
 
-Sytue Web registra su hostname internamente en Analytics y sirve el colector bajo `/_sytue/`.
-El panel recibe solo agregados y debe llamar «estimación diaria» a visitantes: la sal rota la
-correlación entre días y no se prometen únicos de periodo.
+`accepted` · 2026-09-30 · Analytics, privacy
+
+Sytue Web registers its hostname internally in Analytics and serves the collector under `/_sytue/`.
+The dashboard receives only aggregates and must call visitors a “daily estimate”: the salt rotation breaks
+correlation across days and no period uniques are promised.
 
 <a id="0065"></a>
 
-## 0065 — El código exportado consume el contrato público generado
+<a id="0065--el-código-exportado-consume-el-contrato-público-generado"></a>
 
-`accepted` · 2026-09-30 · Sytue Web, exportación, interoperabilidad
+## 0065 — Exported code consumes the generated public contract
 
-React, Next, Astro y clientes nativos se generan desde la tabla de rutas públicas. Formularios y
-checkout resuelven ALTCHA mediante ese cliente; no se duplican URLs, campos ni secretos en una
-plantilla de destino.
+`accepted` · 2026-09-30 · Sytue Web, export, interoperability
+
+React, Next, Astro and native clients are generated from the public routes table. Forms and
+checkout solve ALTCHA through that client; URLs, fields and secrets are not duplicated in a
+target template.
 
 <a id="0066"></a>
 
-## 0066 — El CI construye con un BuildKit sin root y propio, no con el builder clásico por el proxy de Docker
+<a id="0066--el-ci-construye-con-un-buildkit-sin-root-y-propio-no-con-el-builder-clásico-por-el-proxy-de-docker"></a>
 
-`accepted` · 2026-09-28 · CI, seguridad, disco · decisión del dueño del 28/09 («pasar a BuildKit») · código en `deploy/rooms-sfu/docker-ci/{sytue-buildkit-ci,sytue-buildkit-ci-puente,sytue-docker-ci-proxy,sytue-docker-ci-proxy-unix}.service`, `deploy/rooms-sfu/docker-ci/buildkitd.toml`, `deploy/rooms-sfu/{instalar-docker-ci,podar-ci}.sh`, `scripts/{construir-imagen,publicar-imagen-go,publicar-imagen-frontend}.sh`, `.github/workflows/{imagenes-produccion,security,imagenes-rama}.yml`, `.github/actions/toolchain/accion.sh`
+## 0066 — CI builds with our own rootless BuildKit, not with the classic builder through the Docker proxy
 
-**Contexto.** Los jobs del frontal hablan con Docker por un proxy HTTP de lista cerrada
-(tecnativa/HAProxy): ni contenedores, ni exec, ni volúmenes. BuildKit abre `/session` con
-un _upgrade_ a h2c que HAProxy no puede relayar sin convertir el filtro en un túnel, así
-que se construía con el builder clásico (`DOCKER_BUILDKIT=0`). El clásico no tiene
-leases: su caché son imágenes colgantes, y la poda del host (`podar-ci.sh`, #96) podía
-quitarle a un build en marcha una colgante de más de 2 h que estaba reutilizando. Era un
-riesgo aceptado a cambio de no llenar el disco.
+`accepted` · 2026-09-28 · CI, security, disk · owner's decision of 28/09 («pasar a BuildKit», “move to BuildKit”) · code in `deploy/rooms-sfu/docker-ci/{sytue-buildkit-ci,sytue-buildkit-ci-puente,sytue-docker-ci-proxy,sytue-docker-ci-proxy-unix}.service`, `deploy/rooms-sfu/docker-ci/buildkitd.toml`, `deploy/rooms-sfu/{instalar-docker-ci,podar-ci}.sh`, `scripts/{construir-imagen,publicar-imagen-go,publicar-imagen-frontend}.sh`, `.github/workflows/{imagenes-produccion,security,imagenes-rama}.yml`, `.github/actions/toolchain/accion.sh`
 
-**Opciones, medidas en el frontal.**
+**Context.** The front node's jobs talk to Docker through a closed-list HTTP proxy
+(tecnativa/HAProxy): no containers, no exec, no volumes. BuildKit opens `/session` with
+an h2c _upgrade_ that HAProxy cannot relay without turning the filter into a tunnel, so
+builds used the classic builder (`DOCKER_BUILDKIT=0`). The classic one has no
+leases: its cache is dangling images, and the host pruning (`podar-ci.sh`, #96) could
+take away from a running build a dangling image older than 2 h that it was reusing. It was an
+accepted risk in exchange for not filling the disk.
 
-1. **Abrir `/session` en el proxy.** El tecnativa v0.5 no tiene esa opción: habría que
-   escribir la configuración de HAProxy a mano y relayar el h2c en crudo. Lo que pasa por
-   ese túnel ya no lo ve el filtro: es la API entera de BuildKit dentro de Docker, con los
-   permisos del Docker del CI (el de Docker concede `network.host` por defecto). Y la
-   caché seguiría siendo la del daemon que comparte con los contenedores de los jobs. Se
-   descarta: el filtro deja de filtrar justo en lo que más puede hacer.
-2. **Un `buildkitd` por job, dentro del contenedor** (lo que hacían `imagenes-rama` y
-   `release.yml` en los runners viejos). El contenedor del job no trae `buildkitd` y no
-   puede montar sus capas sin quitarle a TODOS los jobs el perfil seccomp —cualquier rama
-   podría montar—, y cada job empezaría con la caché vacía. Se descarta.
-3. **Un `buildkitd` sin root, compartido, con su propio socket.** Es el elegido. `docker
-buildx --driver remote` y `buildctl` hablan con él igual; se usa `buildctl`, que es un
-   binario estático con su sha256 en `versions.env`, porque el `docker.io` de Debian que
-   instala la imagen de los jobs no trae `buildx`.
+**Options, measured on the front node.**
 
-**Decisión.**
+1. **Opening `/session` in the proxy.** tecnativa v0.5 has no such option: the HAProxy configuration would have to be
+   written by hand and the h2c relayed raw. What goes through
+   that tunnel is no longer seen by the filter: it is the entire BuildKit API inside Docker, with the
+   permissions of the CI Docker (Docker's grants `network.host` by default). And the
+   cache would still be that of the daemon it shares with the jobs' containers. It is
+   ruled out: the filter stops filtering precisely where it can do the most.
+2. **One `buildkitd` per job, inside the container** (what `imagenes-rama` and
+   `release.yml` did on the old runners). The job container does not ship `buildkitd` and cannot
+   mount its layers without taking away the seccomp profile from ALL jobs —any branch
+   could mount—, and every job would start with an empty cache. It is ruled out.
+3. **A shared rootless `buildkitd`, with its own socket.** This is the chosen one. `docker
+buildx --driver remote` and `buildctl` talk to it the same way; `buildctl` is used, which is a
+   static binary with its sha256 in `versions.env`, because the Debian `docker.io` that
+   the jobs' image installs does not ship `buildx`.
 
-1. **`sytue-buildkit-ci.service`:** `buildkitd` v0.33.0 bajo `rootlesskit`, como el usuario
-   **`sytue-buildkit`** (propio, sin shell, con su rango subordinado 265536–331071), con
-   `--net=slirp4netns --disable-host-loopback` y los datos en `/srv/ci/buildkit` (el volumen
-   del CI, 0700). Snapshotter `overlayfs` en el espacio de usuario, `process-mode sandbox`.
-   Sin permisos inseguros (`insecure-entitlements = []`: ni `security.insecure` ni
+**Decision.**
+
+1. **`sytue-buildkit-ci.service`:** `buildkitd` v0.33.0 under `rootlesskit`, as the user
+   **`sytue-buildkit`** (its own, no shell, with its subordinate range 265536–331071), with
+   `--net=slirp4netns --disable-host-loopback` and the data in `/srv/ci/buildkit` (the CI
+   volume, 0700). `overlayfs` snapshotter in user space, `process-mode sandbox`.
+   No insecure entitlements (`insecure-entitlements = []`: neither `security.insecure` nor
    `network.host`).
-2. **El socket de los jobs:** el del demonio es de `sytue-buildkit` con 0660 y los jobs no
-   lo abren. Lo ofrece `sytue-buildkit-ci-puente.service`, un `socat` que corre como
-   `sytue-runner` con el grupo `sytue-buildkit` como único extra, en
-   `/srv/ci/run/buildkitd.sock`; cada flujo que construye lo monta en
-   `/run/sytue-ci/buildkitd.sock` y anuncia `BUILDKIT_HOST`. Nada con root toca a los jobs:
-   el puente del proxy de Docker (`sytue-docker-ci-proxy-unix`), que corría como root, pasa
-   también a `sytue-runner`.
-3. **El proxy de Docker cierra `/build`** (`BUILD=0`): el builder clásico ya no está al
-   alcance de ningún job. Es lo que hace que el riesgo aceptado de la poda desaparezca por
-   construcción y no por disciplina.
-4. **`scripts/construir-imagen.sh`** traduce la forma de `docker build` a `buildctl`
-   (`--push` sube, `--tar` exporta en formato `docker save` para trivy). Medias Docker
-   (`oci-mediatypes=false`) y sin atestaciones, para que `crane append/rebase/index` y el
-   actualizador del piloto no noten el cambio. La imagen no pasa por ningún daemon: se van
-   las etiquetas locales, `soltar_*` y el paso «Borrar las imágenes de este turno».
-5. **La caché se recoge sola** (`buildkitd.toml`: 80 GB como mucho, un 40 % del volumen
-   libre siempre, 10 GB que no se tocan) y la poda del host la baja con
+2. **The jobs' socket:** the daemon's belongs to `sytue-buildkit` with 0660 and the jobs do not
+   open it. It is offered by `sytue-buildkit-ci-puente.service`, a `socat` running as
+   `sytue-runner` with the `sytue-buildkit` group as its only extra, at
+   `/srv/ci/run/buildkitd.sock`; each workflow that builds mounts it at
+   `/run/sytue-ci/buildkitd.sock` and announces `BUILDKIT_HOST`. Nothing running as root touches the jobs:
+   the Docker proxy bridge (`sytue-docker-ci-proxy-unix`), which ran as root, also moves
+   to `sytue-runner`.
+3. **The Docker proxy closes `/build`** (`BUILD=0`): the classic builder is no longer within
+   reach of any job. That is what makes the accepted pruning risk disappear by
+   construction and not by discipline.
+4. **`scripts/construir-imagen.sh`** translates the `docker build` form to `buildctl`
+   (`--push` uploads, `--tar` exports in `docker save` format for trivy). Docker media types
+   (`oci-mediatypes=false`) and no attestations, so that `crane append/rebase/index` and the
+   pilot's updater do not notice the change. The image does not go through any daemon: gone are
+   the local tags, `soltar_*` and the «Borrar las imágenes de este turno» (“Delete this turn's images”) step.
+5. **The cache collects itself** (`buildkitd.toml`: 80 GB at most, 40 % of the volume
+   always free, 10 GB that are not touched) and the host pruning lowers it with
    `buildctl prune --keep-duration <2 h con jobs, 30 min sin ellos o en emergencia>
---free-storage <objetivo>`, que no toca lo que un build tiene en uso. Ningún job poda.
-6. **Multiarquitectura, igual que antes:** los servicios Go se cruzan con `go build` y se
-   montan con `crane`; Analytics construye su Dockerfile en la nativa (`-base-arm64`) y
-   monta encima los binarios amd64 (#86); una etapa de runtime con `RUN` (el `ffmpeg` del
-   transcodificador de Cast, #103) se construye para su arquitectura con `--platform` y la
-   base fijada al digest de esa variante, emulando solo sus `RUN` con el
-   `qemu-user-static` del frontal; los frontends cruzan con `bun install --cpu x64` y
+--free-storage <objetivo>`, which does not touch what a build has in use. No job prunes.
+6. **Multi-architecture, same as before:** Go services are cross-compiled with `go build` and
+   assembled with `crane`; Analytics builds its Dockerfile natively (`-base-arm64`) and
+   puts the amd64 binaries on top (#86); a runtime stage with `RUN` (the Cast
+   transcoder's `ffmpeg`, #103) is built for its architecture with `--platform` and the
+   base pinned to that variant's digest, emulating only its `RUN`s with the front node's
+   `qemu-user-static`; the frontends cross-build with `bun install --cpu x64` and
    `crane rebase`.
 
-**Qué puede hacer un job, antes y después.**
+**What a job can do, before and after.**
 
-|                                             | Builder clásico por el proxy                                                                          | BuildKit del CI                                                                          |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| API de Docker                               | `/build`, `/images`, `/auth`                                                                          | `/images`, `/auth` (sin `/build`)                                                        |
-| Un `RUN` que escapa de su contenedor cae en | el espacio de usuario de `sytue-runner`, dueño del Docker del CI y de las credenciales de los runners | el de `sytue-buildkit`, que no es dueño de nada más                                      |
-| Red de un `RUN`                             | slirp4netns del Docker del CI                                                                         | slirp4netns propio, sin el `127.0.0.1` del frontal (medido: `wget 127.0.0.1:2377` falla) |
-| Podar la caché de todos                     | `POST /build/prune`                                                                                   | `buildctl prune`, con leases; lo prohíbe el gate de `ci-sin-azar`                        |
-| Procesos con root que le hablan             | el `socat` del proxy                                                                                  | ninguno                                                                                  |
+|                                             | Classic builder through the proxy                                                        | CI BuildKit                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Docker API                                  | `/build`, `/images`, `/auth`                                                             | `/images`, `/auth` (no `/build`)                                                                  |
+| A `RUN` that escapes its container lands in | the user space of `sytue-runner`, owner of the CI Docker and of the runners' credentials | that of `sytue-buildkit`, which owns nothing else                                                 |
+| Network of a `RUN`                          | the CI Docker's slirp4netns                                                              | its own slirp4netns, without the front node's `127.0.0.1` (measured: `wget 127.0.0.1:2377` fails) |
+| Pruning everyone's cache                    | `POST /build/prune`                                                                      | `buildctl prune`, with leases; forbidden by the `ci-sin-azar` gate                                |
+| Root processes that talk to it              | the proxy's `socat`                                                                      | none                                                                                              |
 
-**Medido en el frontal el 28/09** (flujo `imagenes-produccion` despachado en una rama
-canario que no se fusiona, con tres a cinco imágenes y sin marcar nada como desplegable;
-comprobado por dentro: `app/*`, `bun`, `ffmpeg` y `ffprobe` son del ELF de su
-arquitectura, y `sharp` es el de x64):
+**Measured on the front node on 28/09** (`imagenes-produccion` workflow dispatched on a canary
+branch that is not merged, with three to five images and without marking anything as deployable;
+checked from the inside: `app/*`, `bun`, `ffmpeg` and `ffprobe` are ELF binaries of their
+architecture, and `sharp` is the x64 one):
 
-| Imagen                                                   | Clásico, caché caliente (v3.8.2) | BuildKit, caché vacía | BuildKit, caché caliente |
-| -------------------------------------------------------- | -------------------------------- | --------------------- | ------------------------ |
-| `sytue-id` (crane, sin Dockerfile)                       | 22 s                             | 20 s                  | 17–20 s                  |
-| `sytue-analytics` (base nativa + binarios amd64)         | 2 min 04 s                       | 1 min 28 s            | 1 min 13 s–1 min 18 s    |
-| `sytue-frontend-portal` (amd64 cruzada + `crane rebase`) | 2 min 32 s                       | 1 min 17 s            | 1 min 03 s–1 min 15 s    |
-| `sytue-frontend-portal-com` (arm64 nativa)               | 2 min 48 s                       | 53 s                  | 21–27 s                  |
-| `sytue-cast-transcoder` (`RUN apt-get` emulado, #103)    | —                                | 5 min 32 s            | —                        |
+| Image                                                        | Classic, warm cache (v3.8.2) | BuildKit, empty cache | BuildKit, warm cache  |
+| ------------------------------------------------------------ | ---------------------------- | --------------------- | --------------------- |
+| `sytue-id` (crane, no Dockerfile)                            | 22 s                         | 20 s                  | 17–20 s               |
+| `sytue-analytics` (native base + amd64 binaries)             | 2 min 04 s                   | 1 min 28 s            | 1 min 13 s–1 min 18 s |
+| `sytue-frontend-portal` (cross-built amd64 + `crane rebase`) | 2 min 32 s                   | 1 min 17 s            | 1 min 03 s–1 min 15 s |
+| `sytue-frontend-portal-com` (native arm64)                   | 2 min 48 s                   | 53 s                  | 21–27 s               |
+| `sytue-cast-transcoder` (emulated `RUN apt-get`, #103)       | —                            | 5 min 32 s            | —                     |
 
-El primer frontend de cada turno con el builder clásico tardaba ~9 min 30 s (v3.7.12, tres
-turnos a la vez); con BuildKit las etapas `deps` y `prod-deps` corren en paralelo y la
-caché es de todos. **Disco:** la publicación entera v3.8.2 (clásico) subió `/srv/ci` de 50
-a 75 GB y dejó 101 imágenes en el daemon, 29 GB de ellas colgantes que solo la poda recoge;
-con BuildKit el daemon no crece con los builds y la caché de BuildKit, tras cuatro
-publicaciones del canario (cinco imágenes), ocupaba 9,8 GB, con un techo de 80 GB y su
-propia recogida.
+The first frontend of each turn with the classic builder took ~9 min 30 s (v3.7.12, three
+turns at once); with BuildKit the `deps` and `prod-deps` stages run in parallel and the
+cache is shared. **Disk:** the entire v3.8.2 publication (classic) took `/srv/ci` from 50
+to 75 GB and left 101 images in the daemon, 29 GB of them dangling, which only pruning collects;
+with BuildKit the daemon does not grow with builds and the BuildKit cache, after four
+canary publications (five images), took up 9.8 GB, with a ceiling of 80 GB and its
+own collection.
 
-**La primera release con BuildKit, v3.8.5** (28/09): los tres turnos de
-`imagenes-produccion` publicaron las 35 imágenes en 8 min 35 s (con el clásico, 43 min en
-la v3.7.12 con los tres turnos a la vez, y 48 en la v3.8.2), `cerrar` comprobó la
-arquitectura de todas y las marcó desplegables, y los tres `trivy image` de `security`
-construyeron y escanearon con `--tar`. El daemon de Docker del CI no ganó ni una imagen; la
-caché de BuildKit quedó en 19 GB. Ese mismo día, con los cuatro runners drenados
-(`sytue-drenar-y-reiniciar --parar`), `instalar-docker-ci.sh proxy` dejó el proxy sin
-`/build` (`POST /build` → 403) y su puente como `sytue-runner`.
+**The first release with BuildKit, v3.8.5** (28/09): the three turns of
+`imagenes-produccion` published the 35 images in 8 min 35 s (with the classic one, 43 min in
+v3.7.12 with the three turns at once, and 48 in v3.8.2), `cerrar` checked the
+architecture of all of them and marked them deployable, and the three `trivy image` jobs of `security`
+built and scanned with `--tar`. The CI Docker daemon did not gain a single image; the
+BuildKit cache ended at 19 GB. That same day, with the four runners drained
+(`sytue-drenar-y-reiniciar --parar`), `instalar-docker-ci.sh proxy` left the proxy without
+`/build` (`POST /build` → 403) and its bridge running as `sytue-runner`.
 
-**Consecuencias.** Una etiqueta cortada ANTES de este cambio no puede reconstruir sus
-imágenes (su `imagenes-produccion` usa `docker build` y el proxy ya no abre `/build`): se
-corta una versión nueva. Los jobs montan los sockets de los puentes por inodo: reiniciar un
-puente les deja sin Docker o sin BuildKit, así que solo se hace sin jobs
-(`instalar-docker-ci.sh proxy` se niega si hay alguno). Ninguno de los dos puentes depende
-con `Requires=` de lo que tiene detrás (el del proxy de Docker lo hacía y pasa a `Wants=`),
-así que el proxy y el demonio sí se pueden reiniciar con jobs en marcha. `imagenes-rama` y `release.yml` publican en el registro de Scaleway, que
-está en baja: `imagenes-rama` ya va por este BuildKit, pero, como `release.yml`, construye la
-arquitectura del runner (arm64) y los nodos de Scaleway son amd64; queda como pregunta al
-dueño si se portan a los publicadores multiarquitectura o se retiran con Scaleway.
-Lo vigilan `deploy/production/tests/buildkit-ci-test.sh` (demonio sin root, sin loopback
-ni permisos inseguros, puente sin root, proxy sin `/build`, flujos que montan el socket),
-`.github/tests/ci-sin-azar-test.sh` (ni builder clásico ni poda del compartido en el CI),
-`podar-ci-test.sh` y los tests de los publicadores, todos vistos en rojo saboteando lo que
-vigilan.
+**Consequences.** A tag cut BEFORE this change cannot rebuild its
+images (its `imagenes-produccion` uses `docker build` and the proxy no longer opens `/build`): a
+new version is cut. The jobs mount the bridges' sockets by inode: restarting a
+bridge leaves them without Docker or without BuildKit, so it is only done with no jobs running
+(`instalar-docker-ci.sh proxy` refuses if there are any). Neither of the two bridges depends
+with `Requires=` on what is behind it (the Docker proxy one did and moves to `Wants=`),
+so the proxy and the daemon can be restarted with jobs running. `imagenes-rama` and `release.yml` publish to the Scaleway registry, which
+is being decommissioned: `imagenes-rama` already goes through this BuildKit, but, like `release.yml`, it builds the
+runner's architecture (arm64) and the Scaleway nodes are amd64; it remains a question for the
+owner whether they are ported to the multi-architecture publishers or retired along with Scaleway.
+They are watched by `deploy/production/tests/buildkit-ci-test.sh` (rootless daemon, no loopback
+or insecure entitlements, rootless bridge, proxy without `/build`, workflows that mount the socket),
+`.github/tests/ci-sin-azar-test.sh` (neither the classic builder nor pruning of the shared one in CI),
+`podar-ci-test.sh` and the publishers' tests, all seen red by sabotaging what they
+watch.
 
 <a id="0067"></a>
 
-## 0067 — El catálogo de plantillas de Sytue Web crece por sector, se genera desde código y lo que hay que cambiar impide publicar
+<a id="0067--el-catálogo-de-plantillas-de-sytue-web-crece-por-sector-se-genera-desde-código-y-lo-que-hay-que-cambiar-impide-publicar"></a>
 
-`accepted` · 2026-10-02 · Sytue Web, plantillas, galería · encargo del dueño («cuantas más plantillas mejor, para los negocios pequeños y medianos de dueños con pocos conocimientos informáticos») · código en `scripts/pages-plantillas/`, `services/pages/internal/plantillas/` y `services/pages/internal/domain/legal.go`
+## 0067 — The Sytue Web template catalog grows by sector, is generated from code, and what has to be changed blocks publishing
 
-- **Una plantilla por sector**, no variantes cosméticas: se escriben pensando en lo que quiere ver el cliente de ese oficio
-  (carta, tarifas, urgencias, pasos, horario, cómo llegar, cita o presupuesto) y con textos reales y llanos en es y en. 14
-  categorías para la galería (`belleza`, `comida`, `comercio`, `oficios`, `motor`, `profesionales`, `salud`, `deporte`,
-  `educacion`, `creativos`, `turismo`, `local`, `comunidad`, `web`). Cada plantilla lleva `category` y `keywords` (sinónimos
-  de uso común por idioma) para el buscador.
-- **Idiomas: es + en**, que es lo único que admite `IDIOMAS_VISITANTE`. Las otras 24 lenguas se añaden con la pieza de
-  traducción, igual que a las diez de partida.
-- **Los JSON se generan**: `lib.py` (piezas), `sectores/<clave>.py` (contenido), `looks.py` (paletas AA) y `generar.py`. El JSON
-  generado es el que manda y lo valida `catalogo_test.go`; `vista-previa.mjs` pinta el IR según §4.2 para revisar el diseño.
-- **Nada inventado que se publique por descuido**: sin imágenes remotas ni de stock (solo rellenos), sin opiniones, cifras,
-  premios ni certificaciones inventados. Nombre, teléfono, correo, dirección, punto del mapa, «Tu ciudad», números de colegiado
-  o de registro (`00-0000`) y toda nota «de ejemplo» llevan un marcador de `domain.TextosDemo`, y la publicación `live` se
-  niega con `demo_content` mientras alguno siga en el sitio. El test exige que todo texto visible que dé instrucciones esté
-  cubierto por un marcador, y prohíbe la jerga de marketing y las promesas sin datos.
-- **Galería**: buscador que entiende «pelu» o «barbero» (sin tildes, plurales, es y en), grupos por categoría y vista previa en un
-  iframe aislado. Sin plantilla preelegida.
+`accepted` · 2026-10-02 · Sytue Web, templates, gallery · owner's brief («cuantas más plantillas mejor, para los negocios pequeños y medianos de dueños con pocos conocimientos informáticos», “the more templates the better, for small and medium businesses whose owners have little IT knowledge”) · code in `scripts/pages-plantillas/`, `services/pages/internal/plantillas/` and `services/pages/internal/domain/legal.go`
+
+- **One template per sector**, not cosmetic variants: they are written thinking of what the customer of that trade wants to see
+  (menu, rates, emergencies, steps, opening hours, how to get there, appointment or quote) and with real, plain texts in es and en. 14
+  categories for the gallery (`belleza`, `comida`, `comercio`, `oficios`, `motor`, `profesionales`, `salud`, `deporte`,
+  `educacion`, `creativos`, `turismo`, `local`, `comunidad`, `web`). Each template carries `category` and `keywords` (commonly used
+  synonyms per language) for the search box.
+- **Languages: es + en**, which is the only thing `IDIOMAS_VISITANTE` allows. The other 24 languages are added with the
+  translation piece, just like for the initial ten.
+- **The JSON files are generated**: `lib.py` (pieces), `sectores/<clave>.py` (content), `looks.py` (AA palettes) and `generar.py`. The
+  generated JSON is authoritative and is validated by `catalogo_test.go`; `vista-previa.mjs` renders the IR according to §4.2 to review the design.
+- **Nothing made up that gets published by mistake**: no remote or stock images (placeholders only), no made-up reviews, figures,
+  awards or certifications. Name, phone, email, address, map pin, «Tu ciudad» (“Your city”), professional association
+  or registration numbers (`00-0000`) and every “example” note carry a `domain.TextosDemo` marker, and `live` publishing
+  refuses with `demo_content` while any of them remains on the site. The test requires every visible text that gives instructions to be
+  covered by a marker, and forbids marketing jargon and promises without data.
+- **Gallery**: a search box that understands «pelu» or «barbero» (without accents, plurals, es and en), groups by category and preview in an
+  isolated iframe. No preselected template.
 
 <a id="0068"></a>
 
-## 0068 — Sytue Bases: tablas relacionales colaborativas como producto propio, con ACL por base y conector de solo lectura
+<a id="0068--sytue-bases-tablas-relacionales-colaborativas-como-producto-propio-con-acl-por-base-y-conector-de-solo-lectura"></a>
 
-`accepted` · 2026-10-04 · Bases, permisos, interoperabilidad · decisión del dueño (2026-10-01: «lanzarlo tras los P0») · fila P1 «Tablas relacionales» de el roadmap de office · código en `services/bases/` (API Go, :8102) y, en las piezas siguientes, `apps/frontend/apps/bases/` (web, :4337)
+## 0068 — Sytue Bases: collaborative relational tables as a product of its own, with per-base ACL and a read-only connector
 
-- **Por qué un producto y no una hoja de Calcus.** Una tabla relacional necesita lo que una hoja no tiene: esquema con tipos que
-  el servidor hace cumplir, relaciones con integridad referencial, permisos y auditoría propios y vistas que no son una
-  rejilla. Ocultarlo dentro de Calcus mezclaría el modelo de celdas con el de registros. Calcus es CONSUMIDOR (pieza D).
-- **Modelo.** base → tablas → campos tipados → registros. Tipos: texto, número, fecha, casilla, selección única y múltiple y
-  enlace a registro de otra tabla de la MISMA base. El tipo de un campo no cambia tras crearse (los datos escritos dejarían de
-  cumplirlo). Los valores van en `base_records.data` (jsonb por id de campo); los enlaces, en `base_links`, que es lo que
-  permite que Postgres garantice la integridad.
-- **Integridad referencial en la base de datos, no solo en el código.** Las claves foráneas son COMPUESTAS `(tenant, id)`:
-  una comprobación de clave foránea la hace el propietario y se salta la RLS, así que sin el tenant en la clave un id ajeno
-  colaría un enlace entre organizaciones. Las de los enlaces llevan además la tabla (`to_table_id` ↔ `link_table_id`), de modo
-  que ni un enlace a un registro de otra tabla es posible. El borrado es seguro: un registro o una tabla a los que apunta un
-  enlace no se borran (409); el propietario puede forzar el de un registro, que quita sus enlaces; borrar la base entera sí
-  arrastra todo (claves diferidas, ver la migración).
-- **ACL coherente con Docs**: propietario > editor > comentarista > lector, por base y opcionalmente por tabla (la entrada de
-  tabla SUMA a la de la base, nunca resta; deny-by-default). El propietario es el `owner_sub` y no se concede por ACL. Los
-  principales son un usuario o TODA la organización; no hay grupos (el token no los lleva) y no se comparte con otras
-  organizaciones. Editor: registros y vistas. Propietario: esquema, importar, permisos, auditoría, borrar. La matriz está en
-  `docs/security.md#bases-acl` y la prueba `TestMatrizACL`. La decisión se toma SIEMPRE en el servidor, dentro de la misma
-  transacción que la operación (una petición, una transacción): no hay hueco entre comprobar y escribir. Sin acceso es 404
-  (no se revela que existe); con acceso insuficiente, 403.
-- **Vistas**: rejilla, Kanban (por un campo de selección) y formulario. Su configuración (filtros, orden, agrupación) se valida
-  contra los campos reales al guardarla y NUNCA se concatena en SQL: los ids de campo y los valores viajan como parámetros, los
-  operadores son una lista cerrada por tipo y la dirección del orden, una de dos constantes (`TestConstruirConsultaNoConcatenaEntrada`).
-  `contains` usa `position()`, no `LIKE`: los comodines no significan nada.
-- **Auditoría** de cada operación (quién, qué registro y campo, antes y después acotados a 1 KiB), también de importar y
-  exportar. Sin claves foráneas: sobrevive al borrado de lo que audita. Solo la lee el propietario.
-- **Importar/exportar CSV.** Importar crea UNA tabla nueva (esquema → propietario) con tipos inferidos por columna (número,
-  fecha ISO, casilla o texto; `+34…`, `0x10` o `1_000` son texto). Límites: 5 MiB, 10.000 filas, 50 columnas, 10.000 caracteres
-  por celda, UTF-8 sin NUL, todo o nada. Un valor que empieza por `=` entra como texto: la defensa de la «inyección de
-  fórmulas» está al EXPORTAR (se antepone `'` a los textos que empiezan por `= + - @`, TAB o CR; los números no se tocan).
-- **Límites** (cada uno protege una consulta o un cuerpo): 200 bases por organización, 50 tablas, 100 campos, 1.000.000 de
-  registros por tabla (eran 50.000 hasta bases-2), 50 vistas, 200 permisos; páginas de 500 como mucho; toda consulta lleva
-  LIMIT y ninguna OFFSET.
-- **Paginación por cursor (bases-2, pieza 1).** Los registros se paginan por cursor (keyset): `GET /tables/{id}/records`
-  devuelve `next_cursor` y lo acepta en `?cursor=`; `offset` ya no existe. El cursor es opaco (base64url de un JSON) y lleva
-  el valor de cada clave del orden de la vista en el último registro entregado más su `created_at` y su id, que desempatan
-  siempre. **No va firmado porque no concede nada**: la autorización es la de cada petición, y quien lo falsifica solo elige
-  desde dónde sigue leyendo una tabla que ya puede leer; sus valores se validan en Go antes de llegar a Postgres (422, nunca
-  un 500) y viajan como parámetros (`TestCursorHostil`). Es **estable con el orden de la vista**: lleva la firma de ese orden
-  y, si la vista cambia de orden entre dos páginas, se rechaza y el cliente vuelve a empezar; borrar el registro en el que se
-  quedó no repite ni se salta nada (`TestCursorEstableAnteCambios`), que es lo que un OFFSET no garantiza. Los textos ordenan
-  por sus primeros 128 caracteres: así la clave cabe en un cursor que viaja en la URL (un texto admite 10.000); los que empatan
-  ahí se desempatan por antigüedad. La auditoría ya iba por id descendente (`?before=`), que es un cursor, y las vistas de una
-  tabla son 50 como mucho y se listan de una vez.
-- **Índices y medidas** (200.000 registros, Postgres de los agentes, mejor de 5, `TestMedirPaginacion` con `BASES_MEDIR=1`):
-  en el orden por defecto la página sale de `base_records_por_tabla (tenant, table_id, created_at, id)` sin ordenar nada —la
-  primera, 1 ms de consulta; una profunda pasa de 92 ms (OFFSET) a 3,6 ms con toda la operación (ACL, campos y enlaces
-  incluidos)—. En una vista ORDENADA por un campo, la página profunda baja de 253 ms a 95 ms y cuesta lo mismo que la primera
-  (86-100 ms): es un recorrido de la tabla con top-N, porque la clave es `data ->> <campo>` con el campo como parámetro y un
-  índice de expresión por campo exigiría DDL por cada campo que alguien ordene. Techo anotado: si las vistas ordenadas de
-  tablas grandes pesan, índice de expresión creado al guardar la vista. El techo de registros se comprobaba contando la tabla
-  en cada alta (64 ms con 200.000); ahora lo lleva `base_tables.record_count`, que mantiene un trigger por sentencia en todas
-  las vías (rejilla, formulario público, importación, cascadas), y la comprobación cuesta 0,5 ms.
-- **Exportación por tramos y enlaces con su valor (bases-2, pieza 2).** Exportar ya no carga la tabla en memoria: recorre
-  la tabla por cursor en tramos de 500, cada uno en una transacción corta que vuelve a autorizar (no queda una transacción
-  abierta mientras alguien descarga despacio, y quitarle el acceso corta la exportación en el tramo siguiente). Se audita al
-  empezar, con el número de registros de la tabla. Si un tramo falla con medio fichero ya enviado, la conexión se corta para
-  que la descarga falle en vez de cerrar bien un fichero incompleto. Un campo de enlace sale con el TEXTO de los registros
-  enlazados (su campo principal: el primero con valor, el mismo que enseña la interfaz y el conector) además de su id: en
-  CSV, dos columnas —`<campo>` con los textos y `<campo> (id)` con los ids—; en JSON, `link_values` junto a `links`, en el
-  mismo orden. El texto de un registro enlazado lo escribió alguien en otra tabla y pasa por la misma neutralización de
-  fórmulas que cualquier otro (`TestExportarEnlacesConValores`).
-- **Campos de fórmula (bases-2, pieza 3).** Un campo de tipo `formula` guarda una expresión y el tipo de su resultado
-  (`number` o `text`, que no cambia, como no cambia el de ningún campo). **Se evalúa en el servidor**, con el motor de
-  fórmulas de la suite (`apps/nucleo/formula`, el de Calcus; no hay un segundo motor), y el resultado **se guarda en el
-  registro** como cualquier otro valor: por eso filtros, orden, cursor, exportación y conector ven lo mismo sin saber que es
-  una fórmula, y el navegador no calcula nada. Nadie lo escribe desde fuera (422). El lenguaje es el de una hoja de cálculo,
-  recortado: las únicas referencias son a campos, entre llaves y POR ID —`{campo}` del mismo registro (un enlace vale el
-  número de registros enlazados) y `{enlace.campo}`, los valores de ese campo en los registros enlazados, para `SUM`,
-  `COUNT`, `MIN`, `MAX`…—; celdas, rangos, nombres y matrices se rechazan (`formula.Inspeccionar`, nuevo en el motor, dice
-  qué usa una fórmula sin evaluarla), y solo valen las 37 funciones de una lista cerrada: puras, sin reloj ni azar (nada
-  volátil), sin red, sin bucles ni matrices y ninguna que fabrique textos enormes. Cada valor entra en el motor como literal
-  tipado: un texto que empieza por `=` es un texto. **Coste acotado por construcción**: 1.000 caracteres, 200 nodos, 20
-  fórmulas por tabla y 100 valores por agregado. **Ciclos**: se rechazan al guardar, entre campos de una tabla y dando la
-  vuelta por otras (grafo de dependencias de toda la base); si aun así apareciera uno, el motor lo deja vacío. Un campo que
-  usa una fórmula no se borra (409). Un error (`#DIV/0!`, desbordamiento) o un resultado de otro tipo quedan vacíos.
-  **Recálculo**: los campos y enlaces del propio registro, en la misma escritura; cuando cambia un registro ENLAZADO, se
-  recalculan los que enlazan con él y los que dependan de esos, en la misma transacción mientras quepan en un presupuesto de
-  500 registros; si no caben —o al crear o cambiar una fórmula en una tabla grande— la tabla se anota en `base_recalc` y un
-  bucle del servicio la recorre por tramos de 500 (`SKIP LOCKED` entre réplicas); entretanto la página lo dice
-  (`recalculating`). Un recálculo no sube `rev` ni se audita: no es una edición de nadie. Definir o cambiar una fórmula es
-  esquema (propietario). Como la etiqueta de un enlace, un agregado enseña a quien lee una tabla un dato derivado de otra
-  que quizá no puede leer: lo decide el propietario al definirla. Techos anotados: la interfaz crea fórmulas pero no las
-  edita (la API sí, `PATCH /fields/{id}`), no hay resultado de tipo fecha y no se guarda el código del error.
-- **Adjuntos (bases-2, pieza 4).** Un campo de tipo `attachment` guarda ficheros. Los bytes van al almacén de objetos de la
-  suite (`platform/pkg/objectstore`, bucket `bases-blobs`, las mismas variables `S3_*` y el mismo cifrado en reposo del
-  proveedor que Drive o Docs; no hay cifrado propio) y en Postgres queda la ficha (`base_attachments`: nombre, tipo, tamaño,
-  SHA-256). **La clave del objeto no la elige nadie**: es `bases/<base>/<adjunto>` bajo el prefijo de la organización. **El
-  tipo lo dice el contenido** (`http.DetectContentType` sobre los bytes; la cabecera `Content-Type` de quien sube ni se
-  mira) y no entra lo que un navegador o un sistema ejecutaría: HTML, SVG, scripts, ejecutables (por contenido y por
-  extensión) ni un fichero cuyo contenido no es lo que promete su nombre (`foto.png` que es un PDF). **Límites**: 20 MiB por
-  fichero, 20 ficheros por registro y campo, 2 GiB por base (cuota), dos subidas a la vez por réplica (el fichero se lee
-  entero en memoria). **La descarga la sirve el servicio**, no una URL firmada: el permiso de leer ese registro se comprueba
-  en cada descarga, el adjunto ha de ser de ESE registro (conocer su id no basta), y sale siempre como descarga
-  (`Content-Disposition: attachment`, `nosniff`, CSP `sandbox`). Subir y borrar es de editor; leer, de lector. Las imágenes
-  PNG, JPEG y GIF de hasta 8 Mpx llevan miniatura (`platform/pkg/miniatura`, con su barrera anti-bomba). **Borrado seguro**:
-  la ficha cae en cascada con su registro, campo, tabla o base, y un trigger anota la clave en `base_attachment_purge`, de
-  donde un bucle del servicio borra el objeto y su miniatura; ninguna vía de borrado tiene que acordarse del almacén. Subir
-  son tres pasos (reservar la clave en esa cola con una hora de margen, subir, confirmar con el registro bloqueado), así que
-  una subida a medias no deja ni ficha sin objeto ni objeto sin dueño. En la exportación sale el nombre de los ficheros
-  (neutralizado como cualquier texto); no se filtra ni se ordena por un campo de adjuntos, y un formulario público no los
-  admite. Sin almacén configurado el servicio arranca y los adjuntos responden 503. Techos anotados: sin antivirus, sin
-  deduplicar por huella, y tras una fusión de organizaciones el objeto se queda bajo el prefijo con el que se subió
+`accepted` · 2026-10-04 · Bases, permissions, interoperability · owner's decision (2026-10-01: «lanzarlo tras los P0», “launch it after the P0s”) · P1 row «Tablas relacionales» (“Relational tables”) of the office roadmap · code in `services/bases/` (Go API, :8102) and, in the following pieces, `apps/frontend/apps/bases/` (web, :4337)
+
+- **Why a product and not a Calcus sheet.** A relational table needs what a sheet does not have: a schema with types that
+  the server enforces, relationships with referential integrity, its own permissions and auditing, and views that are not a
+  grid. Hiding it inside Calcus would mix the cell model with the record model. Calcus is a CONSUMER (piece D).
+- **Model.** base → tables → typed fields → records. Types: text, number, date, checkbox, single and multiple select and
+  link to a record of another table in the SAME base. A field's type does not change after creation (the data written would stop
+  complying with it). Values go in `base_records.data` (jsonb by field id); links, in `base_links`, which is what
+  allows Postgres to guarantee integrity.
+- **Referential integrity in the database, not only in the code.** Foreign keys are COMPOSITE `(tenant, id)`:
+  a foreign key check is done by the owner and skips RLS, so without the tenant in the key a foreign id
+  would slip in a link between organizations. Those of the links also carry the table (`to_table_id` ↔ `link_table_id`), so
+  that not even a link to a record of another table is possible. Deletion is safe: a record or a table pointed to by a
+  link is not deleted (409); the owner can force deleting a record, which removes its links; deleting the entire base does
+  drag everything along (deferred keys, see the migration).
+- **ACL consistent with Docs**: owner > editor > commenter > reader, per base and optionally per table (the table
+  entry ADDS to the base one, never subtracts; deny-by-default). The owner is the `owner_sub` and is not granted by ACL. The
+  principals are a user or the WHOLE organization; there are no groups (the token does not carry them) and nothing is shared with other
+  organizations. Editor: records and views. Owner: schema, import, permissions, audit, delete. The matrix is in
+  `docs/security.md#bases-acl` and the test `TestMatrizACL`. The decision is ALWAYS made on the server, within the same
+  transaction as the operation (one request, one transaction): there is no gap between checking and writing. Without access it is 404
+  (it is not revealed that it exists); with insufficient access, 403.
+- **Views**: grid, Kanban (by a select field) and form. Their configuration (filters, sort, grouping) is validated
+  against the real fields when saved and is NEVER concatenated into SQL: field ids and values travel as parameters, the
+  operators are a closed list per type and the sort direction is one of two constants (`TestConstruirConsultaNoConcatenaEntrada`).
+  `contains` uses `position()`, not `LIKE`: wildcards mean nothing.
+- **Audit** of every operation (who, which record and field, before and after capped at 1 KiB), also of import and
+  export. Without foreign keys: it survives the deletion of what it audits. Only the owner reads it.
+- **CSV import/export.** Importing creates ONE new table (schema → owner) with types inferred per column (number,
+  ISO date, checkbox or text; `+34…`, `0x10` or `1_000` are text). Limits: 5 MiB, 10,000 rows, 50 columns, 10,000 characters
+  per cell, UTF-8 without NUL, all or nothing. A value starting with `=` goes in as text: the defense against “formula
+  injection” is on EXPORT (a `'` is prepended to texts starting with `= + - @`, TAB or CR; numbers are not touched).
+- **Limits** (each one protects a query or a body): 200 bases per organization, 50 tables, 100 fields, 1,000,000
+  records per table (it was 50,000 until bases-2), 50 views, 200 permissions; pages of 500 at most; every query carries
+  LIMIT and none OFFSET.
+- **Cursor pagination (bases-2, piece 1).** Records are paginated by cursor (keyset): `GET /tables/{id}/records`
+  returns `next_cursor` and accepts it in `?cursor=`; `offset` no longer exists. The cursor is opaque (base64url of a JSON) and carries
+  the value of each key of the view's sort in the last record delivered plus its `created_at` and its id, which always
+  break ties. **It is not signed because it grants nothing**: authorization is that of each request, and whoever forges it only chooses
+  where to continue reading a table they can already read; its values are validated in Go before reaching Postgres (422, never
+  a 500) and travel as parameters (`TestCursorHostil`). It is **stable with the view's sort**: it carries the signature of that sort
+  and, if the view changes its sort between two pages, it is rejected and the client starts over; deleting the record where it
+  stopped neither repeats nor skips anything (`TestCursorEstableAnteCambios`), which is what an OFFSET does not guarantee. Texts sort
+  by their first 128 characters: that way the key fits in a cursor that travels in the URL (a text allows 10,000); those that tie
+  there are broken by age. The audit already went by descending id (`?before=`), which is a cursor, and a
+  table's views are 50 at most and are listed at once.
+- **Indexes and measurements** (200,000 records, the agents' Postgres, best of 5, `TestMedirPaginacion` with `BASES_MEDIR=1`):
+  in the default sort the page comes out of `base_records_por_tabla (tenant, table_id, created_at, id)` without sorting anything —the
+  first one, 1 ms of query; a deep one goes from 92 ms (OFFSET) to 3.6 ms for the whole operation (ACL, fields and links
+  included)—. In a view SORTED by a field, the deep page drops from 253 ms to 95 ms and costs the same as the first
+  (86-100 ms): it is a table scan with top-N, because the key is `data ->> <campo>` with the field as a parameter and an
+  expression index per field would require DDL for each field someone sorts by. Noted ceiling: if sorted views of
+  large tables become heavy, an expression index created when saving the view. The record ceiling was checked by counting the table
+  on each insert (64 ms with 200,000); now it is carried by `base_tables.record_count`, maintained by a per-statement trigger on all
+  paths (grid, public form, import, cascades), and the check costs 0.5 ms.
+- **Export in chunks and links with their value (bases-2, piece 2).** Exporting no longer loads the table into memory: it walks
+  the table by cursor in chunks of 500, each in a short transaction that re-authorizes (no transaction remains
+  open while someone downloads slowly, and removing their access cuts the export at the next chunk). It is audited at
+  the start, with the table's record count. If a chunk fails with half the file already sent, the connection is cut so
+  that the download fails instead of cleanly closing an incomplete file. A link field comes out with the TEXT of the linked
+  records (their primary field: the first one with a value, the same one the interface and the connector show) as well as their id: in
+  CSV, two columns —`<campo>` with the texts and `<campo> (id)` with the ids—; in JSON, `link_values` next to `links`, in the
+  same order. The text of a linked record was written by someone in another table and goes through the same formula
+  neutralization as any other (`TestExportarEnlacesConValores`).
+- **Formula fields (bases-2, piece 3).** A field of type `formula` stores an expression and the type of its result
+  (`number` or `text`, which does not change, just as no field's type changes). **It is evaluated on the server**, with the suite's
+  formula engine (`apps/nucleo/formula`, Calcus's; there is no second engine), and the result **is stored in the
+  record** like any other value: that is why filters, sort, cursor, export and connector see the same thing without knowing it is
+  a formula, and the browser computes nothing. Nobody writes it from outside (422). The language is that of a spreadsheet,
+  trimmed down: the only references are to fields, in braces and BY ID —`{campo}` of the same record (a link is worth the
+  number of linked records) and `{enlace.campo}`, the values of that field in the linked records, for `SUM`,
+  `COUNT`, `MIN`, `MAX`…—; cells, ranges, names and arrays are rejected (`formula.Inspeccionar`, new in the engine, says
+  what a formula uses without evaluating it), and only the 37 functions of a closed list are allowed: pure, without clock or randomness (nothing
+  volatile), without network, without loops or arrays and none that produces huge texts. Each value enters the engine as a typed
+  literal: a text starting with `=` is a text. **Cost bounded by construction**: 1,000 characters, 200 nodes, 20
+  formulas per table and 100 values per aggregate. **Cycles**: they are rejected when saving, between fields of a table and going
+  around through others (dependency graph of the whole base); if one appeared anyway, the engine leaves it empty. A field
+  used by a formula is not deleted (409). An error (`#DIV/0!`, overflow) or a result of another type is left empty.
+  **Recalculation**: the fields and links of the record itself, in the same write; when a LINKED record changes, those
+  that link to it and those that depend on them are recalculated, in the same transaction as long as they fit in a budget of
+  500 records; if they do not fit —or when creating or changing a formula in a large table— the table is noted in `base_recalc` and a
+  service loop walks it in chunks of 500 (`SKIP LOCKED` across replicas); meanwhile the page says so
+  (`recalculating`). A recalculation does not bump `rev` nor is it audited: it is nobody's edit. Defining or changing a formula is
+  schema (owner). Like a link's label, an aggregate shows whoever reads a table a piece of data derived from another one
+  they may not be able to read: the owner decides that when defining it. Noted ceilings: the interface creates formulas but does not
+  edit them (the API does, `PATCH /fields/{id}`), there is no date-typed result and the error code is not stored.
+- **Attachments (bases-2, piece 4).** A field of type `attachment` stores files. The bytes go to the suite's object
+  store (`platform/pkg/objectstore`, bucket `bases-blobs`, the same `S3_*` variables and the same provider encryption at
+  rest as Drive or Docs; there is no encryption of our own) and in Postgres the record remains (`base_attachments`: name, type, size,
+  SHA-256). **Nobody chooses the object key**: it is `bases/<base>/<adjunto>` under the organization's prefix. **The
+  type is determined by the content** (`http.DetectContentType` over the bytes; the uploader's `Content-Type` header is not even
+  looked at) and nothing a browser or a system would execute gets in: HTML, SVG, scripts, executables (by content and by
+  extension), nor a file whose content is not what its name promises (`foto.png` that is a PDF). **Limits**: 20 MiB per
+  file, 20 files per record and field, 2 GiB per base (quota), two concurrent uploads per replica (the file is read
+  entirely into memory). **The download is served by the service**, not a signed URL: permission to read that record is checked
+  on each download, the attachment has to belong to THAT record (knowing its id is not enough), and it always comes out as a download
+  (`Content-Disposition: attachment`, `nosniff`, CSP `sandbox`). Uploading and deleting is for editors; reading, for readers. PNG,
+  JPEG and GIF images of up to 8 Mpx get a thumbnail (`platform/pkg/miniatura`, with its anti-bomb barrier). **Safe deletion**:
+  the record cascades with its record, field, table or base, and a trigger notes the key in `base_attachment_purge`, from
+  where a service loop deletes the object and its thumbnail; no deletion path has to remember the store. Uploading
+  is three steps (reserve the key in that queue with an hour's margin, upload, confirm with the record locked), so
+  a half-done upload leaves neither a record without an object nor an object without an owner. In the export the name of the files comes out
+  (neutralized like any text); no filtering or sorting by an attachments field, and a public form does not
+  accept them. Without a configured store the service starts and attachments respond 503. Noted ceilings: no antivirus, no
+  deduplication by digest, and after an organization merge the object stays under the prefix with which it was uploaded
   (`store_tenant`).
-- **Rejilla por ventanas.** La web guarda como mucho tres páginas de 100 (`lib/ventanas.ts`) y recuerda el cursor con el que
-  pidió cada una: «Cargar más» añade la siguiente y suelta la primera; «Cargar anteriores» vuelve a pedir la anterior con su
-  cursor. Con botones y no con desplazamiento infinito: valen igual con teclado y lector, y el rango cargado se anuncia.
-- **Tablero y formulario (pieza C).** El tablero Kanban agrupa por un campo de selección; mover una tarjeta es escribir ese
-  campo, con el selector «Mover a» de la tarjeta (vale igual con ratón, teclado, lector y móvil; sin arrastrar y soltar). El formulario es una vista
-  con los campos que se piden y, para recoger datos de clientes, **enlaces públicos revocables**: token de 32 bytes del que
-  solo se guarda el hash, cupo de envíos por enlace, caducidad opcional y prueba de trabajo ALTCHA (`platform/pkg/altcha`,
-  sin cookies ni terceros) atada al enlace. Solo el propietario publica y revoca. Un formulario público nunca rellena enlaces
-  entre tablas ni campos que la vista no incluya (se rechazan, no se ignoran), y el registro queda auditado con el actor
+- **Windowed grid.** The web keeps at most three pages of 100 (`lib/ventanas.ts`) and remembers the cursor with which it
+  requested each one: «Cargar más» (“Load more”) adds the next one and drops the first; «Cargar anteriores» (“Load previous”) requests the previous one again with its
+  cursor. With buttons and not infinite scrolling: they work equally with keyboard and screen reader, and the loaded range is announced.
+- **Board and form (piece C).** The Kanban board groups by a select field; moving a card means writing that
+  field, with the card's «Mover a» (“Move to”) selector (it works equally with mouse, keyboard, screen reader and mobile; no drag and drop). The form is a view
+  with the requested fields and, to collect customer data, **revocable public links**: a 32-byte token of which
+  only the hash is stored, a submission quota per link, optional expiry and an ALTCHA proof of work (`platform/pkg/altcha`,
+  without cookies or third parties) bound to the link. Only the owner publishes and revokes. A public form never fills in links
+  between tables or fields the view does not include (they are rejected, not ignored), and the record is audited with the actor
   `form:<enlace>`.
-- **Conector de solo lectura hacia Calcus (pieza D).** El propietario concede una CONEXIÓN a una tabla o a una de sus
-  vistas: un token (`sbc_…`, del que solo se guarda el hash) que siempre caduca (90 días por defecto, 365 como mucho), se
-  puede rotar (sube `version`) y revocar. Calcus lo guarda cifrado como credencial de un origen `bases` de sus datos
-  externos y lo manda a una raíz FIJA (config de servicio `BASES_URL`, nunca del usuario). Sytue Bases lo comprueba contra
-  la base en CADA lectura —no hay caché—, así que revocar corta de inmediato. No existe ruta de escritura para un token de
-  conector. Cada lectura devuelve la PROCEDENCIA (base, tabla, vista, quién concedió, cuándo, versión), que Calcus enseña y
-  guarda con la tabla, y queda auditada (`connector.read`, actor `conn:<id>`). Drive, ERP y Pages como consumidores quedan
-  fuera: el mismo token y la misma ruta les valdrían, pero cada uno necesita su pantalla de destino.
-- **Accesibilidad auditada en el CI (bases-2, pieza A).** `test/e2e/accesibilidad-bases.mjs` pasa axe-core (WCAG 2.2 AA),
-  teclado, lector, zoom al 200 % y objetivos táctiles a 320, 390 y 1280 px, en claro y oscuro, sobre los bancos de
-  componentes (`/bases/dev/rejilla`, `/bases/dev/vistas`) y sobre las PANTALLAS ENTERAS (`/bases/dev/app`: las islas reales con
-  el marco y la API contestada por la prueba): lista de bases, base abierta, tablero y compartir. Corre en el job
-  `accesibilidad-office` de `ci-frontend.yml`. Una pantalla nueva se suma con una línea en `PANTALLAS`. El listón táctil es
-  44 × 44 px con puntero grueso (regla en `styles/app.css`); una celda de la rejilla es contenido y queda en 24. La cabecera
-  y la barra lateral son del marco común y no se miden aquí.
-- **Conectores hacia Drive, SyERP y Sytue Web (bases-2, pieza B).** Una conexión es de UN consumidor (`consumer`:
-  `calcus`, `drive`, `erp`, `web`; migración `0020`), y los tres nuevos exigen acotarla a una VISTA: lo que sale de Bases
-  hacia un fichero, un informe o un sitio público es lo que el propietario dejó en una vista, nunca la tabla entera. El
-  consumidor se identifica al leer (`X-Sytue-Consumer`) y dice para qué organización lee (`X-Sytue-Tenant`): si no casan con
-  la conexión, la lectura es el mismo 401 que un token revocado y queda auditada como `connector.denied`. No es autenticación
-  del servicio —la ruta no sale del clúster y la credencial sigue siendo el token—: es lo que impide que el token concedido a
-  un informe publique un sitio, o que se use desde otra organización (Bases no se comparte entre organizaciones). Calcus
-  conserva lo que tenía (tabla entera, sin cabecera de organización) porque sus conexiones son anteriores. El cliente es UNO,
-  `platform/pkg/basesconn` (petición a raíz fija, forma del token antes de mandar nada, topes, procedencia que ha de nombrar al
-  consumidor, y CSV con la defensa de fórmulas): los consumidores lo importan. Pruebas:
-  `TestConectorPorConsumidorVistaYOrganizacion` (un token no lee otra vista ni otra base, ni vale en otro consumidor u
-  organización; revocar corta en el acto) y `TestConectorPorHTTPExigeConsumidorYOrganizacion`.
-- **SyERP consume una vista como fuente de informes.** Administración guarda el token con `POST /conexiones/bases`
-  (sellado con `keycrypto`, como los demás secretos de `conexiones`); el servidor LEE con él antes de guardarlo —así sabe que
-  es para SyERP y para esta organización— y anota las columnas y la procedencia. La fuente `bases` solo existe para
-  owner/admin: el token es de la organización, no de la persona, así que Bases no puede decidir por cada lector y lo decide
-  SyERP con el mismo criterio que para guardarla. Cada informe lee de nuevo (sin caché: revocar en Bases da «no disponible»
-  en la siguiente lectura) y la tabla lleva la procedencia de ESA lectura, que la interfaz enseña bajo la tabla. Techo: una
-  vista por organización (la clave de `conexiones` es el proveedor) y sin pantalla para pegar el token (hoy, por API).
+- **Read-only connector to Calcus (piece D).** The owner grants a CONNECTION to a table or to one of its
+  views: a token (`sbc_…`, of which only the hash is stored) that always expires (90 days by default, 365 at most), can
+  be rotated (bumps `version`) and revoked. Calcus stores it encrypted as the credential of a `bases` source of its external
+  data and sends it to a FIXED root (service config `BASES_URL`, never from the user). Sytue Bases checks it against
+  the database on EVERY read —there is no cache—, so revoking cuts it off immediately. There is no write route for a connector
+  token. Each read returns the PROVENANCE (base, table, view, who granted, when, version), which Calcus shows and
+  stores with the table, and it is audited (`connector.read`, actor `conn:<id>`). Drive, ERP and Pages as consumers are left
+  out: the same token and the same route would work for them, but each one needs its destination screen.
+- **Accessibility audited in CI (bases-2, piece A).** `test/e2e/accesibilidad-bases.mjs` runs axe-core (WCAG 2.2 AA),
+  keyboard, screen reader, 200 % zoom and touch targets at 320, 390 and 1280 px, in light and dark, over the
+  component benches (`/bases/dev/rejilla`, `/bases/dev/vistas`) and over the FULL SCREENS (`/bases/dev/app`: the real islands with
+  the frame and the API answered by the test): list of bases, open base, board and sharing. It runs in the
+  `accesibilidad-office` job of `ci-frontend.yml`. A new screen is added with one line in `PANTALLAS`. The touch bar is
+  44 × 44 px with a coarse pointer (rule in `styles/app.css`); a grid cell is content and stays at 24. The header
+  and the sidebar belong to the common frame and are not measured here.
+- **Connectors to Drive, SyERP and Sytue Web (bases-2, piece B).** A connection belongs to ONE consumer (`consumer`:
+  `calcus`, `drive`, `erp`, `web`; migration `0020`), and the three new ones require scoping it to a VIEW: what leaves Bases
+  towards a file, a report or a public site is what the owner left in a view, never the whole table. The
+  consumer identifies itself when reading (`X-Sytue-Consumer`) and says which organization it reads for (`X-Sytue-Tenant`): if they do not match
+  the connection, the read is the same 401 as a revoked token and is audited as `connector.denied`. It is not service
+  authentication —the route does not leave the cluster and the credential is still the token—: it is what prevents the token granted to
+  a report from publishing a site, or from being used from another organization (Bases is not shared across organizations). Calcus
+  keeps what it had (whole table, without an organization header) because its connections predate this. The client is ONE,
+  `platform/pkg/basesconn` (request to a fixed root, token format checked before sending anything, caps, provenance that has to name the
+  consumer, and CSV with the formula defense): the consumers import it. Tests:
+  `TestConectorPorConsumidorVistaYOrganizacion` (a token does not read another view or another base, nor is it valid for another consumer or
+  organization; revoking cuts it off at once) and `TestConectorPorHTTPExigeConsumidorYOrganizacion`.
+- **SyERP consumes a view as a report source.** Administration stores the token with `POST /conexiones/bases`
+  (sealed with `keycrypto`, like the other `conexiones` secrets); the server READS with it before storing it —that way it knows it
+  is for SyERP and for this organization— and notes the columns and the provenance. The `bases` source only exists for
+  owner/admin: the token belongs to the organization, not to the person, so Bases cannot decide for each reader and
+  SyERP decides it with the same criterion as for storing it. Each report reads again (no cache: revoking in Bases gives “not available”
+  on the next read) and the table carries the provenance of THAT read, which the interface shows under the table. Ceiling: one
+  view per organization (the key of `conexiones` is the provider) and no screen to paste the token (today, via API).
   `TestFuenteBasesDeLosInformes`.
-- **Sytue Drive exporta una vista a una carpeta.** `POST /folders/{id}/imports/bases {token}` («Nuevo → Vista de Sytue
-  Bases»): Drive TIRA de Bases con el token de una conexión concedida a Sytue Drive, escribe un CSV (con la defensa de
-  fórmulas de `basesconn.CSV`; nombre saneado a partir de tabla y vista) por el camino de cualquier subida —cuota,
-  deduplicación, versiones— y anota la PROCEDENCIA por versión en `drive_file_provenance` (migración `0029`, RLS forzada,
-  clave ajena compuesta `(tenant, file_id)`), que se lee con `GET /files/{id}/provenance`. Tirar y no empujar: así la
-  procedencia la dice Bases en su respuesta y no un campo que el llamante pueda inventar, y Bases no gana una dependencia de
-  salida. El token se usa una vez y NO se guarda: refrescar es volver a exportar (versión nueva del mismo fichero), y revocar
-  la conexión impide hacerlo sin tocar lo ya exportado. Techo: solo «Mi unidad» (las unidades de equipo y las carpetas
-  compartidas tienen su propio camino de subida) y la procedencia aún no se enseña en el panel de detalles del fichero.
+- **Sytue Drive exports a view to a folder.** `POST /folders/{id}/imports/bases {token}` («Nuevo → Vista de Sytue
+  Bases», “New → Sytue Bases view”): Drive PULLS from Bases with the token of a connection granted to Sytue Drive, writes a CSV (with the formula
+  defense of `basesconn.CSV`; name sanitized from table and view) through the path of any upload —quota,
+  deduplication, versions— and records the PROVENANCE per version in `drive_file_provenance` (migration `0029`, forced RLS,
+  composite foreign key `(tenant, file_id)`), which is read with `GET /files/{id}/provenance`. Pull and not push: that way the
+  provenance is stated by Bases in its response and not by a field the caller could invent, and Bases does not gain an outbound
+  dependency. The token is used once and is NOT stored: refreshing means exporting again (a new version of the same file), and revoking
+  the connection prevents doing it without touching what was already exported. Ceiling: only “My drive” (team drives and shared
+  folders have their own upload path) and the provenance is not yet shown in the file details panel.
   `TestExportarVistaDeBases`.
-- **Sytue Web lista los registros de una vista en una sección del sitio, como INSTANTÁNEA.** «Insertar → Tabla desde
-  Sytue Bases» pide el token de una conexión concedida a Sytue Web y `POST /sites/{id}/bases/table {token}` devuelve la vista
-  como el cuerpo de un nodo `table` corriente, que entra en el borrador y se pinta y se valida como cualquier otra tabla (cada
-  celda pasa por el escapado del renderizador). No hay nodo nuevo en el IR, ni consulta al servir el sitio, ni token guardado:
-  lo publicado es exactamente lo que quien edita vio. Solo owner/admin (los mismos que publican): lo que entra acaba en una
-  página pública. Una vista que no cabe (50 filas × 8 columnas) se rechaza entera, no se recorta. La procedencia queda en el
-  nombre del nodo (solo se ve en el editor) y en la auditoría de la base. **Revocar la conexión no retira lo ya publicado**
-  —es contenido del sitio—: impide volver a traerlo. Techo: los datos se refrescan volviendo a insertar la tabla; una sección
-  enlazada que se actualice al publicar pide un tipo nuevo en el IR (TS y su espejo en Go), el token sellado por sitio y
-  decidir qué hace una publicación cuando la conexión ya no vale. `TestTablaDesdeBasesExigeAdminYTokenDeConexion`,
+- **Sytue Web lists a view's records in a section of the site, as a SNAPSHOT.** «Insertar → Tabla desde
+  Sytue Bases» (“Insert → Table from Sytue Bases”) asks for the token of a connection granted to Sytue Web and `POST /sites/{id}/bases/table {token}` returns the view
+  as the body of a regular `table` node, which goes into the draft and is rendered and validated like any other table (each
+  cell goes through the renderer's escaping). There is no new node in the IR, no query when serving the site, no stored token:
+  what is published is exactly what the editor saw. Only owner/admin (the same people who publish): what goes in ends up on a
+  public page. A view that does not fit (50 rows × 8 columns) is rejected entirely, not trimmed. The provenance stays in the
+  node's name (only visible in the editor) and in the base's audit. **Revoking the connection does not withdraw what was already published**
+  —it is site content—: it prevents fetching it again. Ceiling: the data is refreshed by inserting the table again; a linked
+  section that updates on publishing would require a new type in the IR (TS and its Go mirror), the token sealed per site and
+  deciding what a publication does when the connection is no longer valid. `TestTablaDesdeBasesExigeAdminYTokenDeConexion`,
   `TestATablaDeSitio`.
-- **Solo web** (`nativa: false` en la paridad): decisión conservadora hasta que el dueño diga lo contrario; es una pantalla
-  de rejilla que en Fyne costaría una pieza propia. **Superado el 2026-10-05**: la pieza se hizo
-  (`apps/fyne/apps/bases`), la app tiene alta (`apps/fyne/cmd/bases`, `nativa: true`, esquema `sytue-bases`, migración
-  0109 de Sytue ID para la vuelta del login en el móvil) y llega a la API por el Ingress del último punto de este ADR.
-  Lo que la web tiene y la nativa no (importar, adjuntos, comentarios, conexiones, scripts, tiempo real) sigue siendo
-  deuda, y en el teléfono solo está vista a 360 de ancho contra el servicio falso.
-- **Fuera de alcance de la primera entrega** (y por qué): grupos de ACL, transferir la propiedad, comentarios por
-  registro (el rol «comentarista» lee igual que el lector hasta que existan). La paginación por cursor llegó en bases-2.
-- **Encendida por defecto (2026-10-04, decisión del dueño).** Se entregó apagada y en `desarrollo`; desde esa fecha el
-  catálogo la da por `disponible`, el chart la despliega (`bases.enabled: true`), el Hub la anuncia y el piloto la levanta
-  salvo `BASES_ENABLED=false`. Apagada sigue sin dejar ni un objeto. Sus dos secretos los rellena `generate-secrets.sh`,
-  que `deploy.sh` ejecuta antes de tocar nada. **Producción y staging (Scaleway) la mantienen apagada** en sus overlays:
-  sus guiones no crean aún los secretos de Bases ni existen su DNS y su certificado, y encenderla a ciegas dejaría el pod
-  sin arrancar; es una decisión pendiente del dueño, con los pasos en
+- **Web only** (`nativa: false` in the parity): a conservative decision until the owner says otherwise; it is a grid
+  screen that in Fyne would cost a piece of its own. **Superseded on 2026-10-05**: the piece was built
+  (`apps/fyne/apps/bases`), the app is registered (`apps/fyne/cmd/bases`, `nativa: true`, scheme `sytue-bases`, Sytue ID
+  migration 0109 for the login return on mobile) and it reaches the API through the Ingress of the last point of this ADR.
+  What the web has and the native app does not (import, attachments, comments, connections, scripts, real time) is still
+  debt, and on the phone it has only been seen at 360 width against the fake service.
+- **Out of scope for the first delivery** (and why): ACL groups, transferring ownership, comments per
+  record (the “commenter” role reads just like the reader until they exist). Cursor pagination arrived in bases-2.
+- **On by default (2026-10-04, owner's decision).** It was delivered off and in `desarrollo`; since that date the
+  catalog lists it as `disponible`, the chart deploys it (`bases.enabled: true`), the Hub announces it and the pilot brings it up
+  unless `BASES_ENABLED=false`. Turned off it still leaves not a single object. Its two secrets are filled in by `generate-secrets.sh`,
+  which `deploy.sh` runs before touching anything. **Production and staging (Scaleway) keep it off** in their overlays:
+  their scripts do not yet create the Bases secrets and its DNS and certificate do not exist, and turning it on blindly would leave the pod
+  unable to start; it is a pending decision for the owner, with the steps in
   [operations.md](operations.md#bases-encendido).
-- **Revisión adversarial (pieza F):** seis hallazgos corregidos y dieciocho mutaciones vistas en rojo, en
+- **Adversarial review (piece F):** six findings fixed and eighteen mutations seen red, in
   [security.md](security.md#bases-adversarial).
-- **Comentarios por registro (bases-2, colaboración A · 2026-10-04).** Cada registro tiene un hilo de comentarios de UN
-  nivel (raíz y respuestas), en `base_comments` con las mismas reglas que el resto: RLS forzada, claves compuestas
-  `(tenant, id)` y, en la respuesta, también el registro —una respuesta no puede colgar de un hilo de otro registro ni de
-  otra organización aunque el código se equivocara—. Con ellos el **comentarista se distingue por fin del lector**: lee y
-  comenta (`AccComentar`), no edita. **Borrar** sigue la regla de Docs (PR #353): quien lo escribió, mientras aún pueda
-  comentar, o quien modera (editor o propietario); una raíz borrada que tiene respuestas deja una lápida sin texto ni autor,
-  para no llevarse por delante lo que escribieron otros, y desaparece con su última respuesta. Texto llano de 1 a 2.000
-  caracteres, 500 comentarios por registro. **Menciones** con la forma de la suite (`@ana@empresa.eu`,
-  `hubnotify.Mencionados`). **Avisos por el Hub** (`bases.comment`, `bases.mention`) a la propietaria de la base y, en una
-  respuesta, a quienes escriben en ese hilo, nunca a quien comenta; y **solo a quien en ese instante puede leer el
-  registro**: los del hilo se filtran en la misma transacción que guarda el comentario, y una mención se resuelve en Sytue
-  ID con la sesión de quien escribe (solo contesta por gente de su organización) y se comprueba contra la ACL antes de
-  avisar —el aviso lleva un trozo del texto, y mandárselo a quien no ve el registro sería enseñárselo—. **Auditoría**:
-  `comment.create` y `comment.delete` con el registro y los ids, SIN el texto (un comentario borrado no sobrevive en la
-  traza). El servicio pasa a necesitar `HUB_BASE_URL`, `HUB_INTERNAL_SECRET` (obligatorio fuera de desarrollo, del Secret
-  `sytue-hub-internal`), `ID_BASE_URL` y `PUBLIC_URL`. En la web, un panel lateral (el `Modal` del sistema en `right`) que se
-  abre desde la fila o la tarjeta y desde el enlace del aviso (`?table=&record=`).
-- **Grupos como principal de la ACL (bases-2, colaboración B · 2026-10-05).** Una entrada puede ser de un **grupo de
-  Sytue ID** (`principal_kind = 'group'`), como en Docs y en Drive. Se investigó de dónde sale la pertenencia: **el token ya
-  la lleva** —Sytue ID emite en el access token el claim `groups` con los nombres de los grupos de la persona en la
-  organización activa, que es lo que Drive usa para compartir por grupo—, así que **no hace falta una consulta servidor a
-  servidor ni tocar Sytue ID**: `authn.Claims.Groups` lo lee (antes Drive releía el payload por su cuenta) y Bases lo pasa a
-  `domain.ResolverRol`. La «caché de caducidad corta» es la vida del propio token: entrar o salir de un grupo surte efecto
-  cuando se renueva, en minutos, y el canal en vivo (pieza C) se cierra al caducar el suyo. Reglas: el grupo se guarda por su
-  NOMBRE, que es lo que trae el token (limitación conocida y anotada para el dueño: renombrar un grupo en Sytue ID deja
-  huérfana la entrada, y un grupo nuevo con el nombre viejo la heredaría; pasar a identificadores exige que el token los
-  emita); solo aplica dentro de su organización (la fila lleva `tenant` y la RLS); las clases no se confunden (un grupo
-  llamado como un `sub` no es esa persona); una clase desconocida no aplica; y como mucho 200 grupos del token entran en la
-  consulta. El aviso de un comentario a alguien que solo accede por un grupo no sale (el servicio no conoce los grupos de un
-  tercero): deny-by-default también para avisar.
-- **Conceder a una persona por su dirección.** `POST …/permissions` con `email` resuelve la dirección en el directorio de
-  Sytue ID con la sesión de quien concede (solo contesta por gente de SU organización) y guarda cómo se llama
-  (`principal_label`) para la lista. Quien no gestiona los permisos no llega a consultar el directorio.
-- **Transferir la propiedad.** El propietario puede dársela a **otra persona de su organización**, identificada SOLO por su
-  dirección —el servicio nunca acepta un `sub` del cliente: que el destino es de la organización lo dice Sytue ID—. Quien la
-  tenía se queda como **editor** (decisión conservadora: no pierde su trabajo de golpe, pero deja de decidir esquema,
-  permisos, conectores y borrado; el nuevo propietario puede quitarlo). La fila de la base se bloquea, así que dos
-  transferencias a la vez no se pisan. Queda en la auditoría (`base.transfer`, antes y después) y el nuevo propietario
-  recibe un aviso por el Hub (`bases.transferred`). En la web pide confirmación con el nombre de la base y la dirección
-  del destino.
-- **Compartir con otras organizaciones** (sobre el [0040](#0040) y el [0052](#0052)). **La base vive en la organización
-  anfitriona**, con sus filas, su RLS, su auditoría y sus límites; la persona de fuera es una entrada más de la ACL, de clase
-  **`external`**, con su `sub`. El propietario la invita por su **@usuario o su dirección**, que el servicio resuelve con
-  `people:resolve` (da el `sub` y cómo se llama; nunca su correo ni su organización); un `sub` pegado por el cliente no se
-  acepta, y si la persona resulta ser de la propia organización no es «de fuera» (`is_member`). **Rol acotado**: lector,
-  comentarista o editor, en la base o en una tabla; nunca propietaria.
-  - **Su token trae SU organización**, así que en qué organización se atiende la petición lo decide el servicio y **nunca
-    el cliente** (ni cabecera, ni consulta, ni cuerpo; el 0040 descartó la cabecera): `enAnfitrion` mira el recurso de la
-    ruta (base, tabla, registro, vista o comentario) y, solo si NO existe en la organización del token y sí en una donde la
-    persona es invitada, la petición sigue en la anfitriona con `Actor.Externo`.
-  - **Allí no es nada más que su `sub`**: `ResolverRol` solo le cuenta las entradas `external` a su nombre. Ni «toda la
-    organización», ni un grupo de la anfitriona que se llame como uno suyo, ni una entrada de persona con su mismo `sub`, ni
-    la propiedad aunque el `sub` coincida. Resolver la anfitriona no concede nada: la ACL de la base se decide después, en la
-    transacción de la operación, así que **no ve nada más de esa organización** (otra base abierta «a toda la organización»
-    le da 404).
-  - **La única lectura entre organizaciones** es «¿en qué organizaciones es invitada esta persona?», por una política de
-    solo lectura (`base_permissions_externo`) que solo enseña las entradas `external` de la persona declarada en la
-    transacción. Se recuerda 30 s por réplica; eso no retrasa una **revocación** —la ACL se comprueba en cada operación y
-    quitar la entrada corta en el acto—, solo que una invitación recién hecha tarde eso en poder abrirse.
-  - **En su lista** la base sale detrás de las suyas, con la anfitriona (`host_org`). **Auditado** en la anfitriona: la
-    invitación, la revocación y todo lo que el invitado hace, con su `sub`.
-  - **Lo que no se hizo, y por qué.** Avisos del Hub a la persona de fuera (su campana está en su organización, como en el 0040) y los nombres de la gente de la anfitriona en los comentarios cuando lee alguien de fuera (el directorio contesta
-    por organización: salen como «Alguien»). Una política de organización para cerrar el compartir con fuera queda para el
-    dueño.
-- **Coedición en tiempo real (bases-2, colaboración C · 2026-10-05).** Se ven al instante los cambios de otras personas
-  en la rejilla y en el tablero, y quién está en cada celda. **El patrón es el de Docs** (PR #284-#305 y #369): contrato
-  versionado, cambios en orden con replay al reconectar, operaciones por celda con identificador e idempotencia, presencia
-  y autorización del servicio. **El transporte no**, y por eso no se ha extraído plomería de `services/docs/internal/collab`
-  a `platform/pkg`: lo que allí hay es un WebSocket con salas en memoria repartidas por DragonflyDB y tipado a operaciones
-  CRDT, y **la API de Bases no tenía Ingress** (así nació; desde el 2026-10-05 sale solo `/api/v1`, ver el último punto
-  de este ADR), así que un navegador no podía abrirle un WebSocket. Lo común que sí existía se importa:
-  `httpx.AbrirSSE` y el `Idempotency-Key` que el proxy del BFF ya deja pasar.
-  - **Flujo de cambios por SSE a través del BFF** (`GET /bases/{id}/events`, contrato `v=1`; otra versión, 400). El registro
-    de cambios es **la propia auditoría**, que toda escritura ya rellena en su transacción: no hay un segundo camino que
-    alguien pueda olvidar. Para seguirla **sin huecos** cada fila lleva la transacción que la escribió (`xact`) y solo se
-    entregan las de transacciones anteriores a la más antigua aún en curso, en orden `(xact, id)`: una transacción lenta que
-    confirma tarde no queda por detrás del cursor (`TestFlujoDeCambiosSinHuecosConTransaccionesLentas`). Funciona tras
-    PgBouncer —LISTEN/NOTIFY no— y la base de datos es el único relé entre réplicas. Latencia: un tic (1 s). **Límite
-    conocido**: ese horizonte es de TODA la instancia de Postgres, así que una transacción de escritura que se quede abierta
-    mucho tiempo en cualquier base de la instancia (una migración que reescribe una tabla, una carga masiva) RETRASA la
-    entrega mientras dure; no pierde ni desordena nada, y editar sigue funcionando por la API. Si llegara a molestar, el
-    camino es una secuencia por base asignada bajo bloqueo, a cambio de serializar las escrituras de cada base.
-  - **Por el flujo no viajan datos**: solo qué ha cambiado (acción, tabla, registro, campo, quién y qué operación). El
-    cliente vuelve a pedir ese registro por la API (`GET /records/{id}`), que autoriza la lectura. Los cambios de permisos
-    salen como `access`, sin quién ni a quién.
-  - **Autorización en cada tanda**: cada tic resuelve la ACL de quien escucha dentro de la transacción que lee, filtra cada
-    cambio por la tabla que puede leer y, si ya no tiene acceso, se despide (`bye access`) y cierra: **un permiso revocado
-    corta el flujo abierto** en el tic siguiente. Tampoco sobrevive a su token (`bye token`; el navegador reconecta con uno
-    nuevo, que dice lo que vale ahora).
-  - **Reconexión con replay**: cada evento lleva su cursor como `id`; `EventSource` reconecta solo y manda `Last-Event-ID`.
-    Quien se queda más de 500 cambios atrás recibe `resync` y recarga.
-  - **Operaciones por celda** (`PUT /records/{rid}/cells/{fid}` con `Idempotency-Key`): no piden la versión del registro,
-    así que dos personas en celdas distintas del mismo registro no se estorban; en la misma celda **gana el último
-    escritor y se le avisa** si pisa un valor que no había visto (`expected` → `conflict`). El identificador queda en la
-    traza con índice único: repetir la operación tras un corte no la aplica dos veces (`replayed`), ni a la vez desde ocho
-    sitios. La edición por versión (`PATCH /records/{id}` con `rev`) sigue existiendo para quien edite un registro entero.
-  - **Presencia** (`PUT /bases/{id}/presence`): la pestaña dice en qué celda está; **quién es lo pone el servicio** (del
-    token), la celda ha de ser de una tabla que puede leer, y nadie usa la pestaña de otra persona. Se guarda en la base de
-    datos con caducidad de 30 s (así la ven todas las réplicas) y cada cual ve la celda de los demás solo en las tablas que
-    lee; en las que no, sabe que la persona está en la base y nada más.
-  - **Límites**: 8 flujos por persona y 200 por réplica (cada flujo es una transacción corta por tic), 100 pestañas
-    presentes por base, 500 cambios por tanda. Techo anotado en el código: una sala por base con un solo sondeo si una base
-    junta muchas pestañas.
-- **Scripts de usuario (bases-2, automatización · 2026-10-05; PR #432, #437 y #439).** Sobre el runtime aislado común del
-  [0069](#0069): el servidor NO ejecuta código; el script corre en el navegador de quien lo lanza y cada cosa que hace es
-  una petición corriente a esta API con SU sesión. **No hay credencial de script ni camino propio**, así que un script
-  nunca puede más que quien lo ejecuta, sin que haya que demostrarlo operación por operación.
-  - **Cuelga de una base.** `base_scripts`, `base_script_versions` y `base_script_runs` (migración `0030`), con las reglas
-    de siempre (RLS forzada, claves compuestas y diferidas). El registro de ejecuciones no lleva claves: sobrevive al
-    borrado del script y de la base. No se escribe en `base_audit` —es el registro de cambios del flujo en vivo y un
-    script no es un cambio de datos—; lo que el script escribe sí queda ahí, a nombre de quien lo ejecutó.
-  - **Versiones inmutables y aprobación.** Una versión es `(código, SHA-256, manifiesto)`; editar crea otra, en borrador,
-    que no hereda la aprobación (un trigger lo impide también por SQL). Un script es `private` (solo su autora; no existe
-    para nadie más, tampoco para la propietaria de la base) o `shared` (lo ejecutan quienes acceden a la base, si la
-    versión está aprobada). **Aprueba la propietaria de la base**, con el hash del código que revisó, y puede aprobar el
-    suyo (la decisión del dueño para Docs, tal cual). No un administrador de la organización: en Bases no tiene acceso
-    implícito a las bases, y dárselo para revisar abriría una lectura nueva; la propietaria ya ve todo en la suya.
-  - **Superficie `sytue.v1`, corta y cerrada**: `tables.list`, `fields.list`, `views.list`, `records.list`,
-    `records.get`, `records.create`, `records.update` y `records.delete` (nunca forzado). Fuera, a propósito: esquema,
-    permisos, compartir, conectores, formularios, adjuntos, comentarios, exportar, importar y la auditoría. La lista vive
-    en `domain.OperacionesDeScript` y en su espejo de la web, atados por una prueba.
-  - **Manifiesto** (`v: 1`): operaciones, tablas de la base (vacío = las que la persona lea), `write`, `max_ops` (hasta
-    500; aquí cada operación es una transacción del servidor) y `max_ms` (hasta 30 s). Un manifiesto que declara una
-    operación que escribe sin `write` se rechaza entero. Sin ejecución desatendida: Bases no tiene disparadores.
-  - **Confinado a su base.** El servidor no distingue una petición de un script de una de la persona, así que el
-    confinamiento lo pone el anfitrión de la web: toda tabla ha de ser de la base del script y todo registro se pide antes
-    y ha de ser de una tabla permitida. Sin eso, un script aprobado podría copiar a su base otra a la que quien lo ejecuta
-    tiene acceso y su autora no. El razonamiento, en [security.md](security.md#bases-scripts).
-  - **Cuotas fijas y registro**: las mismas de Docs (60 ejecuciones por persona y hora, 600 por organización, 10 minutos
-    reservados), bajo cerrojo. Cada ejecución deja quién, qué versión con su hash, resultado, duración, operaciones y un
-    código corto; los intentos denegados también, sin gastar cuota. Lo lee la propietaria.
-  - **Quién**: cualquiera con un rol en la base crea scripts y ejecuta los suyos o los aprobados, también un lector (el
-    servidor le niega los que escriben). Fuera quedan quien viene de otra organización y quien solo accede a alguna tabla.
-  - **En la web**: botón «Scripts» de la base y un panel con lista, código, manifiesto, versiones, proponer, aprobar o
-    rechazar, ejecutar con la salida, la cuota y el registro; el consentimiento se pide antes de la primera ejecución y
-    tras cualquier cambio del manifiesto. En los 26 idiomas. Entra en la auditoría de accesibilidad de Bases.
-  - **Techos anotados**: el código se edita en un área de texto sin numeración (el editor con numeración es de Docs;
-    llevarlo a `@sytue/ui` si hace falta en los dos); el manifiesto se escribe como JSON; un script no se renombra; la
-    lectura es de 100 registros por página y de 256 KiB por respuesta; y no hay disparadores (al guardar un registro, por
-    horario): pedirían ejecución desatendida y otra decisión de quién responde de lo que corre solo. Sin app en Fyne.
-- **La API sale por un Ingress, limitado a `/api/v1` (2026-10-05, decisión del dueño; REVIERTE el «sin Ingress» de este
-  ADR).** Hasta esta fecha la API no tenía Ingress y solo la alcanzaban pods de la suite. Se revierte porque **una app
-  nativa no tiene por dónde entrar**: la de Fyne ya existe (`apps/fyne/apps/bases`) y habla con la API con el token de la
-  persona, como las de Drive y el resto, pero el único camino era el BFF de la web, que solo acepta la cookie de sesión.
-  Se descartó que el BFF aceptara también el token (dos formas de sesión en una pieza pensada para una, y un camino
-  distinto al del resto de servicios con app nativa) y dejar Bases solo en la web. **Qué sale**: `bases.<dominio>/api/v1`
-  y nada más; la ruta va escrita en la plantilla del chart (`deploy/helm/charts/bases/templates/ingress.yaml`), no en los
-  values, porque todo `/api/v1` exige un token de Sytue ID y lo demás que sirve el mismo puerto no lleva sesión. **Qué
-  sigue dentro**: los formularios públicos y el conector de solo lectura (`/_bases/v1/…`), que entran por el BFF y por los
-  consumidores, y las sondas. Comparte host y certificado con la web: `/api/v1` es más específica que el `/api` del BFF,
-  que no tiene rutas propias ahí. **No se abre CORS**: una app nativa no lo necesita y la web habla con su BFF. Lo que
-  cambia al recibir tráfico directo, lo que se revisó y lo que se corrigió (los plazos de subida, descarga y exportación),
-  en [security.md](security.md#bases-api-publica); lo vigila `helm-render-test.sh`, que mira todos los caminos al Service
-  y no solo el Ingress del chart. Producción y staging siguen con Bases apagada: allí no cambia nada.
+- **Comments per record (bases-2, collaboration A · 2026-10-04).** Each record has a ONE-level comment
+  thread (root and replies), in `base_comments` with the same rules as the rest: forced RLS, composite keys
+  `(tenant, id)` and, in the reply, also the record —a reply cannot hang from a thread of another record or of
+  another organization even if the code got it wrong—. With them the **commenter is finally distinguished from the reader**: they read and
+  comment (`AccComentar`), they do not edit. **Deleting** follows the Docs rule (PR #353): whoever wrote it, while they can still
+  comment, or whoever moderates (editor or owner); a deleted root that has replies leaves a tombstone without text or author,
+  so as not to take down what others wrote, and it disappears with its last reply. Plain text of 1 to 2,000
+  characters, 500 comments per record. **Mentions** in the suite's form (`@ana@empresa.eu`,
+  `hubnotify.Mencionados`). **Notifications through the Hub** (`bases.comment`, `bases.mention`) to the base's owner and, on a
+  reply, to those writing in that thread, never to the commenter; and **only to whoever at that instant can read the
+  record**: the thread participants are filtered in the same transaction that saves the comment, and a mention is resolved in Sytue
+  ID with the writer's session (it only answers for people in their organization) and checked against the ACL before
+  notifying —the notification carries a snippet of the text, and sending it to someone who cannot see the record would be showing it to them—. **Audit**:
+  `comment.create` and `comment.delete` with the record and the ids, WITHOUT the text (a deleted comment does not survive in the
+  trail). The service now needs `HUB_BASE_URL`, `HUB_INTERNAL_SECRET` (mandatory outside development, from the
+  `sytue-hub-internal` Secret), `ID_BASE_URL` and `PUBLIC_URL`. On the web, a side panel (the system `Modal` on the `right`) that
+  opens from the row or the card and from the notification link (`?table=&record=`).
+- **Groups as ACL principals (bases-2, collaboration B · 2026-10-05).** An entry can belong to a **Sytue ID
+  group** (`principal_kind = 'group'`), as in Docs and Drive. Where membership comes from was investigated: **the token already
+  carries it** —Sytue ID issues in the access token the `groups` claim with the names of the person's groups in the
+  active organization, which is what Drive uses for sharing by group—, so **no server-to-server query is needed
+  and Sytue ID does not have to be touched**: `authn.Claims.Groups` reads it (previously Drive re-read the payload on its own) and Bases passes it to
+  `domain.ResolverRol`. The “short-expiry cache” is the lifetime of the token itself: joining or leaving a group takes effect
+  when it is renewed, in minutes, and the live channel (piece C) closes when its token expires. Rules: the group is stored by its
+  NAME, which is what the token carries (a known limitation noted for the owner: renaming a group in Sytue ID leaves the
+  entry orphaned, and a new group with the old name would inherit it; moving to identifiers requires the token to
+  emit them); it only applies within its organization (the row carries `tenant` and RLS); the classes are not confused (a group
+  named like a `sub` is not that person); an unknown class does not apply; and at most 200 groups from the token go into the
+  query. A comment notification to someone who only has access through a group does not go out (the service does not know the groups of a
+  third party): deny-by-default for notifications too.
+- **Granting to a person by their address.** `POST …/permissions` with `email` resolves the address in the
+  Sytue ID directory with the granter's session (it only answers for people in THEIR organization) and stores what they are called
+  (`principal_label`) for the list. Whoever does not manage permissions never gets to query the directory.
+- **Transferring ownership.** The owner can give it to **another person in their organization**, identified ONLY by their
+  address —the service never accepts a `sub` from the client: that the target belongs to the organization is stated by Sytue ID—. Whoever
+  had it stays as **editor** (a conservative decision: they do not lose their work all at once, but they stop deciding schema,
+  permissions, connectors and deletion; the new owner can remove them). The base's row is locked, so two
+  simultaneous transfers do not step on each other. It stays in the audit (`base.transfer`, before and after) and the new owner
+  receives a notification through the Hub (`bases.transferred`). On the web it asks for confirmation with the base's name and the target's
+  address.
+- **Sharing with other organizations** (building on [0040](#0040) and [0052](#0052)). **The base lives in the host
+  organization**, with its rows, its RLS, its audit and its limits; the outside person is one more ACL entry, of class
+  **`external`**, with their `sub`. The owner invites them by their **@username or their address**, which the service resolves with
+  `people:resolve` (it gives the `sub` and what they are called; never their email or their organization); a `sub` pasted by the client is not
+  accepted, and if the person turns out to be from the organization itself they are not “from outside” (`is_member`). **Bounded role**: reader,
+  commenter or editor, on the base or on a table; never owner.
+  - **Their token carries THEIR organization**, so which organization serves the request is decided by the service and **never
+    by the client** (no header, no query, no body; 0040 ruled out the header): `enAnfitrion` looks at the route's resource
+    (base, table, record, view or comment) and, only if it does NOT exist in the token's organization and does in one where the
+    person is invited, the request continues in the host with `Actor.Externo`.
+  - **There they are nothing more than their `sub`**: `ResolverRol` only counts the `external` entries in their name. Not “the whole
+    organization”, nor a host group named like one of theirs, nor a person entry with the same `sub`, nor
+    ownership even if the `sub` matches. Resolving the host grants nothing: the base's ACL is decided afterwards, in the
+    operation's transaction, so **they see nothing else of that organization** (another base open “to the whole organization”
+    gives them 404).
+  - **The only cross-organization read** is “in which organizations is this person invited?”, through a
+    read-only policy (`base_permissions_externo`) that only shows the `external` entries of the person declared in the
+    transaction. It is remembered for 30 s per replica; that does not delay a **revocation** —the ACL is checked on every operation and
+    removing the entry cuts off immediately—, only a freshly made invitation takes that long to be openable.
+  - **In their list** the base appears after their own, with the host (`host_org`). **Audited** in the host: the
+    invitation, the revocation and everything the guest does, with their `sub`.
+  - **What was not done, and why.** Hub notifications to the outside person (their bell is in their organization, as in 0040) and the names of the host's people in comments when someone from outside reads (the directory answers
+    per organization: they appear as «Alguien», “Someone”). An organization policy to close sharing with outside people is left for the
+    owner.
+- **Real-time co-editing (bases-2, collaboration C · 2026-10-05).** Other people's changes are seen instantly
+  in the grid and on the board, and who is in each cell. **The pattern is Docs'** (PR #284-#305 and #369): versioned
+  contract, ordered changes with replay on reconnect, per-cell operations with identifier and idempotency, presence
+  and service authorization. **The transport is not**, and that is why no plumbing has been extracted from `services/docs/internal/collab`
+  to `platform/pkg`: what is there is a WebSocket with in-memory rooms distributed through DragonflyDB and typed to CRDT
+  operations, and **the Bases API had no Ingress** (it was born that way; since 2026-10-05 only `/api/v1` goes out, see the last point
+  of this ADR), so a browser could not open a WebSocket to it. What was common and did exist is imported:
+  `httpx.AbrirSSE` and the `Idempotency-Key` that the BFF proxy already lets through.
+  - **Change stream over SSE through the BFF** (`GET /bases/{id}/events`, contract `v=1`; any other version, 400). The change
+    log is **the audit itself**, which every write already fills in within its transaction: there is no second path that
+    someone could forget. To follow it **without gaps** each row carries the transaction that wrote it (`xact`) and only
+    those of transactions older than the oldest still in progress are delivered, in `(xact, id)` order: a slow transaction that
+    commits late does not fall behind the cursor (`TestFlujoDeCambiosSinHuecosConTransaccionesLentas`). It works behind
+    PgBouncer —LISTEN/NOTIFY does not— and the database is the only relay between replicas. Latency: one tick (1 s). **Known
+    limit**: that horizon is for the ENTIRE Postgres instance, so a write transaction left open
+    for a long time in any database of the instance (a migration that rewrites a table, a bulk load) DELAYS
+    delivery while it lasts; it loses or reorders nothing, and editing keeps working through the API. If it ever became a nuisance, the
+    path is a per-base sequence assigned under a lock, at the cost of serializing each base's writes.
+  - **No data travels through the stream**: only what changed (action, table, record, field, who and which operation). The
+    client requests that record again through the API (`GET /records/{id}`), which authorizes the read. Permission changes
+    come out as `access`, without who or to whom.
+  - **Authorization on every batch**: each tick resolves the listener's ACL inside the reading transaction, filters each
+    change by the table they can read and, if they no longer have access, says goodbye (`bye access`) and closes: **a revoked permission
+    cuts the open stream** on the next tick. Nor does it outlive its token (`bye token`; the browser reconnects with a
+    new one, which says what is valid now).
+  - **Reconnection with replay**: each event carries its cursor as `id`; `EventSource` reconnects on its own and sends `Last-Event-ID`.
+    Whoever falls more than 500 changes behind receives `resync` and reloads.
+  - **Per-cell operations** (`PUT /records/{rid}/cells/{fid}` with `Idempotency-Key`): they do not ask for the record's version,
+    so two people in different cells of the same record do not get in each other's way; in the same cell **the last
+    writer wins and is warned** if they overwrite a value they had not seen (`expected` → `conflict`). The identifier stays in the
+    trail with a unique index: repeating the operation after a disconnect does not apply it twice (`replayed`), nor at once from eight
+    places. Version-based editing (`PATCH /records/{id}` with `rev`) still exists for whoever edits an entire record.
+  - **Presence** (`PUT /bases/{id}/presence`): the tab says which cell it is in; **who it is is set by the service** (from the
+    token), the cell has to belong to a table they can read, and nobody uses another person's tab. It is stored in the
+    database with a 30 s expiry (so all replicas see it) and each person sees the others' cell only in the tables they
+    read; in those they cannot, they know the person is in the base and nothing more.
+  - **Limits**: 8 streams per person and 200 per replica (each stream is a short transaction per tick), 100 present
+    tabs per base, 500 changes per batch. Ceiling noted in the code: one room per base with a single poll if a base
+    gathers many tabs.
+- **User scripts (bases-2, automation · 2026-10-05; PR #432, #437 and #439).** On top of the common isolated runtime of
+  [0069](#0069): the server does NOT execute code; the script runs in the browser of whoever launches it and everything it does is
+  an ordinary request to this API with THEIR session. **There is no script credential or path of its own**, so a script
+  can never do more than whoever runs it, without that having to be proven operation by operation.
+  - **It hangs from a base.** `base_scripts`, `base_script_versions` and `base_script_runs` (migration `0030`), with the usual
+    rules (forced RLS, composite and deferred keys). The run log carries no keys: it survives the
+    deletion of the script and the base. It is not written to `base_audit` —that is the live stream's change log and a
+    script is not a data change—; what the script writes does stay there, in the name of whoever ran it.
+  - **Immutable versions and approval.** A version is `(código, SHA-256, manifiesto)`; editing creates another, as a draft,
+    which does not inherit the approval (a trigger also prevents it in SQL). A script is `private` (only its author; it does not exist
+    for anyone else, not even for the base's owner) or `shared` (run by whoever has access to the base, if the
+    version is approved). **The base's owner approves**, with the hash of the code she reviewed, and she can approve her
+    own (the owner's decision for Docs, as is). Not an organization administrator: in Bases they have no implicit
+    access to bases, and giving it to them for review would open a new read; the owner already sees everything in hers.
+  - **`sytue.v1` surface, short and closed**: `tables.list`, `fields.list`, `views.list`, `records.list`,
+    `records.get`, `records.create`, `records.update` and `records.delete` (never forced). Out, on purpose: schema,
+    permissions, sharing, connectors, forms, attachments, comments, export, import and the audit. The list lives
+    in `domain.OperacionesDeScript` and in its web mirror, tied together by a test.
+  - **Manifest** (`v: 1`): operations, tables of the base (empty = those the person can read), `write`, `max_ops` (up to
+    500; here each operation is a server transaction) and `max_ms` (up to 30 s). A manifest that declares a
+    writing operation without `write` is rejected entirely. No unattended execution: Bases has no triggers.
+  - **Confined to its base.** The server does not distinguish a request from a script from one from the person, so the
+    confinement is set by the web host: every table has to belong to the script's base and every record is fetched first
+    and has to belong to an allowed table. Without that, an approved script could copy into its base another one that whoever runs it
+    has access to and its author does not. The reasoning, in [security.md](security.md#bases-scripts).
+  - **Fixed quotas and log**: the same as Docs (60 runs per person per hour, 600 per organization, 10 minutes
+    reserved), under a lock. Each run records who, which version with its hash, result, duration, operations and a
+    short code; denied attempts too, without spending quota. The owner reads it.
+  - **Who**: anyone with a role on the base creates scripts and runs their own or the approved ones, a reader too (the
+    server denies them those that write). Left out are whoever comes from another organization and whoever only has access to some table.
+  - **On the web**: a “Scripts” button on the base and a panel with list, code, manifest, versions, propose, approve or
+    reject, run with output, quota and log; consent is requested before the first run and
+    after any manifest change. In all 26 languages. It is included in the Bases accessibility audit.
+  - **Noted ceilings**: the code is edited in a text area without line numbers (the editor with line numbers belongs to Docs;
+    move it to `@sytue/ui` if both need it); the manifest is written as JSON; a script cannot be renamed; reading
+    is 100 records per page and 256 KiB per response; and there are no triggers (on saving a record, on a
+    schedule): they would require unattended execution and another decision about who answers for what runs on its own. No Fyne app.
+- **The API goes out through an Ingress, limited to `/api/v1` (2026-10-05, owner's decision; REVERSES the “no Ingress” of this
+  ADR).** Until this date the API had no Ingress and only suite pods could reach it. It is reversed because **a native
+  app has no way in**: the Fyne one already exists (`apps/fyne/apps/bases`) and talks to the API with the
+  person's token, like Drive's and the rest, but the only path was the web BFF, which only accepts the session cookie.
+  Having the BFF also accept the token was ruled out (two forms of session in a piece designed for one, and a path
+  different from that of the other services with a native app), as was leaving Bases web-only. **What goes out**: `bases.<dominio>/api/v1`
+  and nothing else; the route is written in the chart template (`deploy/helm/charts/bases/templates/ingress.yaml`), not in the
+  values, because all of `/api/v1` requires a Sytue ID token and the rest served on the same port carries no session. **What
+  stays inside**: the public forms and the read-only connector (`/_bases/v1/…`), which come in through the BFF and through the
+  consumers, and the probes. It shares host and certificate with the web: `/api/v1` is more specific than the BFF's `/api`,
+  which has no routes of its own there. **CORS is not opened**: a native app does not need it and the web talks to its BFF. What
+  changes when receiving direct traffic, what was reviewed and what was fixed (upload, download and export timeouts),
+  in [security.md](security.md#bases-api-publica); it is watched by `helm-render-test.sh`, which looks at all paths to the Service
+  and not only the chart's Ingress. Production and staging still have Bases off: nothing changes there.
 
 <a id="0069"></a>
 
-## 0069 — Los scripts de usuario corren aislados en el navegador, contra una API versionada que se traduce al registro común de comandos
+<a id="0069--los-scripts-de-usuario-corren-aislados-en-el-navegador-contra-una-api-versionada-que-se-traduce-al-registro-común-de-comandos"></a>
 
-`accepted` · 2026-10-04 · Docus, Calcus, Diapos y, desde el 2026-10-05, Bases · ROADMAP-OFFICE `automatizacion-1` · código en `services/docs/internal/{domain,store,http}/scripts*.go`, migración `0022`, `platform/pkg/guiones` y, en el cliente, `apps/frontend/packages/scripts` (el runtime común) y el módulo de scripts de `apps/frontend/apps/docs/src/editor/`
+## 0069 — User scripts run isolated in the browser, against a versioned API that is translated to the common command registry
 
-- **Lo que ya había no es un sandbox y no se anuncia como tal.** El grabador de macros (`macros.ts`) valida pasos contra el
-  registro de comandos y nada más; ejecuta lo que el usuario grabó con sus propios permisos. Los scripts son otra cosa y se
-  construyen ENCIMA del mismo registro (`comandos.json`): es la superficie de la API, no una segunda.
-- **Sin autoridad ambiental.** El código del usuario corre en un `<iframe sandbox="allow-scripts">` SIN `allow-same-origin`
-  (origen opaco: ni cookies, ni storage, ni DOM del anfitrión), con CSP `default-src 'none'` en la página del iframe (sin red,
-  sin `importScripts` de fuera, sin `connect-src`) y, dentro, un Worker que se mata (`terminate`) al pasar el tiempo. Todo lo
-  que cruza es `postMessage` con mensajes de forma fija, validados y de tamaño acotado. El Worker no hereda el origen del
-  iframe: el iframe no tiene, y un Worker `blob:` del iframe tampoco; fetch, XHR y WebSocket mueren por la CSP además de por
-  el origen opaco.
-- **La API es `sytue.v1.*`**, versionada y estable. El script pide; el ANFITRIÓN traduce cada llamada a un comando del
-  registro y lo valida con los validadores de las macros (comando existente, válido para el tipo de documento, permiso de
-  ahora, valor admitido) y, además, contra el manifiesto. Lo que el anfitrión despacha va por los mismos `dispatch` de siempre
-  y acaba en `/ops`, donde el servidor reautoriza ACL y protección en cada escritura: **un script nunca es una vía para
-  saltarse la protección**; si el editor no lo permite a la persona, el script tampoco.
-- **Manifiesto por script** (JSON `v: 1`): comandos permitidos, familias de lectura, escritura sí/no, ámbito (hojas y
-  rangos), `max_ops`, `max_ms`, y si puede correr sin interacción. El consentimiento se pide antes de la primera ejecución y
-  cada cambio del manifiesto lo pide de nuevo. El servidor guarda el manifiesto canónico (listas ordenadas, cotas por defecto)
-  y es lo que se ejecuta; el que se le enseñó a la persona es ese.
-- **Versiones inmutables y revisión.** Una versión es `(código, hash SHA-256, manifiesto)` y no se reescribe (un trigger lo
-  impide también por SQL). Editar crea una versión nueva en borrador. Un script de la organización lo ejecutan otras personas
-  solo si un administrador aprobó ESA versión, y la aprobación lleva el hash del código revisado; el servidor la rechaza si no
-  coincide. El autor puede probar sus borradores. Los scripts privados de otra persona no existen para nadie (404),
-  administradores incluidos.
-- **Quién ejecuta qué.** El servidor autoriza cada ejecución (`POST …/runs`): versión ejecutable, rol en el documento que pide
-  el manifiesto (editor si escribe), tipo de documento y documento del script, y cuota. Devuelve el código y el manifiesto
-  autorizados, que son exactamente lo que el cliente ejecuta, y un id de ejecución que el cliente cierra con el resultado.
-- **Cuotas por hora móvil**: 60 ejecuciones por persona, 600 por organización y 10 minutos de tiempo reservado por persona
-  (cuenta el máximo del manifiesto hasta que se cierra con el medido: abrir y abandonar no sale gratis). Se comprueban y se
-  reservan en la misma transacción, serializada por organización.
-- **Auditoría sin contenido**: quién, qué script y versión (con el hash), qué documento, resultado, duración, operaciones y
-  un código de error corto. Los intentos que el servidor deniega también se anotan y no gastan cuota. Los resultados que
-  cierran la ejecución los informa el cliente (el servidor no ve el código correr): son diagnóstico, no prueba; lo que sí es
-  prueba es que se autorizó y qué versión.
-- **Superficie de `sytue.v1`** (pieza B, `apps/frontend/apps/docs/src/editor/scripts/`): `run(comando, valor?)`,
-  `select(hoja, rango)`, `read.cell|range|text|slides|selection|title()` y `log(...)`. Nada más cruza la frontera: el
-  protocolo (`protocolo.ts`) admite cinco tipos de mensaje con claves exactas, y un objeto con `__proto__`, `constructor` o
-  una clave de más se rechaza. Una llamada denegada ABORTA la ejecución (`denied` con el motivo): un script que intenta lo
-  que no puede no sigue como si nada. Los límites los hace cumplir el anfitrión (`anfitrion.ts`), no el sandbox: tiempo
-  (`timeout`), operaciones, mensajes por segundo, llamadas sin esperar, tamaño de mensaje, de salida y de datos devueltos
-  (`limit`). La memoria de un Worker de otro origen no se puede medir desde fuera: la acota el tiempo.
-- **Ámbito**: las lecturas de celdas y `select` han de caer dentro de las hojas y rangos del manifiesto; en Calcus, un
-  comando que edita exige además que la selección actual esté dentro. En Docus y Diapos el ámbito no acota la escritura
-  (no hay rangos): la acotan la lista de comandos y `write`.
-- **Medido en Chromium real** (`test/e2e/scripts-sandbox.mjs`, 33 casos más un marco impostor, en el contenedor de agentes):
-  fetch, XHR, WebSocket, `importScripts`, `import()`, `eval`, cookies, storage, `parent`/`top`, bucle infinito, memoria,
-  spam de mensajes, mensajes forjados y comandos sin permiso fallan con su código y un servidor canario no recibe ninguna
-  petición. Visto en rojo desactivando a mano cada defensa: sin la CSP el canario recibe tres peticiones (el `fetch` del
-  prototipo, `importScripts` e `import()`: el preludio solo no basta); con `allow-same-origin` nada arranca (el anfitrión
-  solo acepta mensajes de origen `null`); sin el reloj del anfitrión, el bucle de memoria corrió 677 s.
-- **Interfaz** (pieza C): grupo «Scripts» en la pestaña Vista, junto a «Macros» (comando `scriptsManage` del registro
-  común). El panel (`dialogs/ScriptsDialog.tsx`) lista, edita (textarea con numeración, sin dependencias), guarda versiones,
-  cambia el ámbito, propone, aprueba o rechaza, ejecuta y enseña la salida, la cuota de la hora y el registro paginado
-  (el de la organización a un administrador; el del documento a su propietario). «Ejecutar» corre la versión GUARDADA —se
-  apaga con cambios sin guardar— y lo que corre es el código y el manifiesto que el servidor devuelve al autorizar; si ese
-  manifiesto no es el consentido, no se ejecuta y queda anotado (`manifiesto_cambio`). El consentimiento se recuerda por
-  (script, hash del manifiesto canónico) en el navegador de la persona: es una pregunta, no la frontera de seguridad.
-  El BFF (`pages/api/scripts.ts`) reenvía por una tabla CERRADA de rutas (`lib/scriptsRuta.ts`).
-- **La lista de comandos de los scripts es MÁS CORTA que la de las macros** (decisión del dueño, 2026-10-04). El registro
-  común marca con `script: true` lo que un script puede usar, y lo que no lleva la marca no se abre por olvido: dentro,
-  editar contenido y formato, celdas, filas y columnas, ordenar y filtrar, tablas, insertar enlace (pasa por el saneado) y
-  pegar; fuera, la IA (`aifill`, `iafill`, `aiPanel`: gasta cuota y saca datos a un modelo), lo que abre diálogos o gestores
-  (`scriptsManage`, macros, nombres, comentarios, combinación de correspondencia), lo que sale del documento (compartir,
-  presentar, datos externos, imágenes y medios), permisos, protección, versiones, plantillas, marca y deshacer/rehacer. Lo
-  exigen tres sitios: el validador del manifiesto del servidor (`domain.ParseManifiesto`, con la copia embebida del registro
-  que vigila `sync-office-catalog.sh`) al guardar, el del cliente, y el anfitrión al despachar (`comando_vetado`). El
-  servidor vuelve a validar el manifiesto en CADA ejecución: una versión guardada antes con un comando que ya no se admite
-  no se borra ni se toca, pero no se ejecuta (400, auditado como `manifest_not_allowed`) hasta que se guarde otra corregida.
-- **Fuera de alcance**: Fyne (un runtime nativo sería otro diseño), ERP (la API admite más superficies, pero no se
-  conecta aquí), red desde los scripts y bibliotecas de terceros. Bases se conectó después: ver el punto siguiente.
-- **El runtime es común y cada producto aporta su superficie (2026-10-05, PR #432).** Para dar scripts a Sytue Bases no se
-  copió el sandbox: el iframe, la CSP, el Worker, el protocolo y el bucle del anfitrión pasaron a
-  `apps/frontend/packages/scripts` (`@sytue/scripts`), PARAMETRIZADOS. Un producto declara su superficie como datos
-  (`{ op, min, max, json? }`) y el paquete genera `sytue.v1`; el producto no escribe código que corra dentro del sandbox.
-  El bucle (`ejecutarAislado`) recibe la lista cerrada de operaciones, las cotas de esa ejecución y un `atender` que solo
-  contesta valor, rechazo o límite; tiempo, operaciones, ritmo, tamaño, salida, forma de los mensajes y el saneado de lo
-  devuelto se quedan en el paquete, fuera del alcance del producto. Docs conserva su superficie y su traductor
-  (`traducirLlamada`) y sus tres suites pasan sin tocar una línea (56 pruebas), además de las 35 de Chromium. `json` deja
-  viajar un objeto como cadena JSON de tamaño acotado (un registro de Bases) sin ensanchar el protocolo. Las reglas del
-  servidor que no son de un producto —cuotas, estados, quién ejecuta cuál, hash— están en `platform/pkg/guiones`, que
-  importan `services/docs` y `services/bases`. La superficie y el servidor de Bases, en el [0068](#0068).
-- **Para el dueño**: un administrador puede aprobar su propio script (en una organización de una sola persona no habría
-  otra salida); queda en la auditoría quién aprobó. Se puede exigir un segundo administrador si se prefiere.
+`accepted` · 2026-10-04 · Docus, Calcus, Diapos and, since 2026-10-05, Bases · ROADMAP-OFFICE `automatizacion-1` · code in `services/docs/internal/{domain,store,http}/scripts*.go`, migration `0022`, `platform/pkg/guiones` and, on the client, `apps/frontend/packages/scripts` (the common runtime) and the scripts module of `apps/frontend/apps/docs/src/editor/`
+
+- **What already existed is not a sandbox and is not advertised as one.** The macro recorder (`macros.ts`) validates steps against the
+  command registry and nothing else; it runs what the user recorded with their own permissions. Scripts are something else and are
+  built ON TOP of the same registry (`comandos.json`): it is the API surface, not a second one.
+- **No ambient authority.** The user's code runs in an `<iframe sandbox="allow-scripts">` WITHOUT `allow-same-origin`
+  (opaque origin: no cookies, no storage, no host DOM), with CSP `default-src 'none'` on the iframe's page (no network,
+  no outside `importScripts`, no `connect-src`) and, inside, a Worker that is killed (`terminate`) when time runs out. Everything
+  that crosses is `postMessage` with fixed-shape messages, validated and size-bounded. The Worker does not inherit the
+  iframe's origin: the iframe has none, and neither does a `blob:` Worker of the iframe; fetch, XHR and WebSocket die from the CSP as well as from
+  the opaque origin.
+- **The API is `sytue.v1.*`**, versioned and stable. The script asks; the HOST translates each call to a command of the
+  registry and validates it with the macro validators (existing command, valid for the document type, current
+  permission, allowed value) and, in addition, against the manifest. What the host dispatches goes through the usual `dispatch`
+  and ends up in `/ops`, where the server re-authorizes ACL and protection on every write: **a script is never a way to
+  bypass protection**; if the editor does not allow it to the person, the script does not either.
+- **Manifest per script** (JSON `v: 1`): allowed commands, read families, write yes/no, scope (sheets and
+  ranges), `max_ops`, `max_ms`, and whether it can run without interaction. Consent is requested before the first run and
+  each manifest change requests it again. The server stores the canonical manifest (sorted lists, default bounds)
+  and that is what runs; the one shown to the person is that one.
+- **Immutable versions and review.** A version is `(código, hash SHA-256, manifiesto)` and is not rewritten (a trigger also
+  prevents it in SQL). Editing creates a new draft version. An organization script is run by other people
+  only if an administrator approved THAT version, and the approval carries the hash of the reviewed code; the server rejects it if it does not
+  match. The author can test their drafts. Another person's private scripts do not exist for anyone (404),
+  administrators included.
+- **Who runs what.** The server authorizes each run (`POST …/runs`): runnable version, the role on the document that the
+  manifest requires (editor if it writes), document type and the script's document, and quota. It returns the authorized code and manifest,
+  which are exactly what the client runs, and a run id that the client closes with the result.
+- **Rolling-hour quotas**: 60 runs per person, 600 per organization and 10 minutes of reserved time per person
+  (the manifest's maximum counts until it is closed with the measured one: opening and abandoning is not free). They are checked and
+  reserved in the same transaction, serialized per organization.
+- **Audit without content**: who, which script and version (with the hash), which document, result, duration, operations and
+  a short error code. Attempts the server denies are also recorded and do not spend quota. The results that
+  close the run are reported by the client (the server does not see the code run): they are diagnostics, not proof; what is
+  proof is that it was authorized and which version.
+- **`sytue.v1` surface** (piece B, `apps/frontend/apps/docs/src/editor/scripts/`): `run(comando, valor?)`,
+  `select(hoja, rango)`, `read.cell|range|text|slides|selection|title()` and `log(...)`. Nothing else crosses the boundary: the
+  protocol (`protocolo.ts`) allows five message types with exact keys, and an object with `__proto__`, `constructor` or
+  an extra key is rejected. A denied call ABORTS the run (`denied` with the reason): a script that tries what
+  it cannot do does not carry on as if nothing happened. The limits are enforced by the host (`anfitrion.ts`), not the sandbox: time
+  (`timeout`), operations, messages per second, unanswered calls, message size, output size and returned data size
+  (`limit`). The memory of a Worker from another origin cannot be measured from outside: time bounds it.
+- **Scope**: cell reads and `select` have to fall within the manifest's sheets and ranges; in Calcus, an
+  editing command also requires the current selection to be within them. In Docus and Diapos the scope does not bound writing
+  (there are no ranges): the command list and `write` bound it.
+- **Measured in real Chromium** (`test/e2e/scripts-sandbox.mjs`, 33 cases plus an impostor frame, in the agents' container):
+  fetch, XHR, WebSocket, `importScripts`, `import()`, `eval`, cookies, storage, `parent`/`top`, infinite loop, memory,
+  message spam, forged messages and commands without permission fail with their code and a canary server receives no
+  request. Seen red by disabling each defense by hand: without the CSP the canary receives three requests (the prototype's
+  `fetch`, `importScripts` and `import()`: the prelude alone is not enough); with `allow-same-origin` nothing starts (the host
+  only accepts messages from origin `null`); without the host's clock, the memory loop ran for 677 s.
+- **Interface** (piece C): a «Scripts» group in the View tab, next to «Macros» (`scriptsManage` command of the common
+  registry). The panel (`dialogs/ScriptsDialog.tsx`) lists, edits (textarea with line numbers, no dependencies), saves versions,
+  changes the scope, proposes, approves or rejects, runs and shows the output, the hour's quota and the paginated log
+  (the organization's one to an administrator; the document's one to its owner). «Ejecutar» (“Run”) runs the SAVED version —it is
+  disabled with unsaved changes— and what runs is the code and manifest that the server returns on authorization; if that
+  manifest is not the consented one, it does not run and is recorded (`manifiesto_cambio`). Consent is remembered per
+  (script, hash of the canonical manifest) in the person's browser: it is a question, not the security boundary.
+  The BFF (`pages/api/scripts.ts`) forwards through a CLOSED table of routes (`lib/scriptsRuta.ts`).
+- **The scripts' command list is SHORTER than the macros' one** (owner's decision, 2026-10-04). The common
+  registry marks with `script: true` what a script can use, and what does not carry the mark is not opened by oversight: inside,
+  editing content and formatting, cells, rows and columns, sorting and filtering, tables, inserting a link (it goes through sanitizing) and
+  pasting; outside, AI (`aifill`, `iafill`, `aiPanel`: it spends quota and sends data to a model), what opens dialogs or managers
+  (`scriptsManage`, macros, names, comments, mail merge), what leaves the document (sharing,
+  presenting, external data, images and media), permissions, protection, versions, templates, branding and undo/redo. It is
+  enforced in three places: the server's manifest validator (`domain.ParseManifiesto`, with the embedded copy of the registry
+  watched by `sync-office-catalog.sh`) on save, the client's, and the host's on dispatch (`comando_vetado`). The
+  server validates the manifest again on EVERY run: a version saved earlier with a command that is no longer allowed
+  is not deleted or touched, but it does not run (400, audited as `manifest_not_allowed`) until a corrected one is saved.
+- **Out of scope**: Fyne (a native runtime would be a different design), ERP (the API allows more surfaces, but it is not
+  connected here), network access from scripts and third-party libraries. Bases was connected later: see the next point.
+- **The runtime is common and each product contributes its surface (2026-10-05, PR #432).** To give scripts to Sytue Bases the
+  sandbox was not copied: the iframe, the CSP, the Worker, the protocol and the host loop moved to
+  `apps/frontend/packages/scripts` (`@sytue/scripts`), PARAMETERIZED. A product declares its surface as data
+  (`{ op, min, max, json? }`) and the package generates `sytue.v1`; the product does not write code that runs inside the sandbox.
+  The loop (`ejecutarAislado`) receives the closed list of operations, the bounds of that run and an `atender` that only
+  answers value, rejection or limit; time, operations, rate, size, output, message shape and sanitizing of what is
+  returned stay in the package, out of the product's reach. Docs keeps its surface and its translator
+  (`traducirLlamada`) and its three suites pass without touching a line (56 tests), plus the 35 Chromium ones. `json` lets
+  an object travel as a size-bounded JSON string (a Bases record) without widening the protocol. The server
+  rules that do not belong to one product —quotas, states, who runs which, hash— are in `platform/pkg/guiones`, which
+  `services/docs` and `services/bases` import. The Bases surface and server, in [0068](#0068).
+- **For the owner**: an administrator can approve their own script (in a one-person organization there would be no
+  other way out); who approved stays in the audit. A second administrator can be required if preferred.
 
 <a id="0070"></a>
 
-## 0070 — La presencia de Docs se integra con Rooms: la sala de un documento nace del documento y su ACL manda
+<a id="0070--la-presencia-de-docs-se-integra-con-rooms-la-sala-de-un-documento-nace-del-documento-y-su-acl-manda"></a>
 
-`accepted` · 2026-10-04 · Docus, Calcus, Diapos y Sytue Rooms · decisión del dueño · código en `services/rooms/internal/media/service/documento.go`, `apps/frontend/apps/docs/src/pages/api/llamada.ts` y `apps/frontend/apps/docs/src/editor/layout/EditorHeader.tsx`
+## 0070 — Docs presence integrates with Rooms: a document's room is born from the document and its ACL rules
 
-- **Qué se ve.** La cabecera del editor ya mostraba quién está en el documento (`/api/presence`, `state/cursors.ts`, anuncio
-  `aria-live`). Ahora los avatares llevan el nombre cuando se conoce, y si Rooms está disponible aparece «Llamar desde el
-  documento» (o «Unirse a la llamada (n)» si ya hay una). Quien está en la llamada lo marca con un anillo y con su nombre
-  accesible («Ana, en la llamada»). La llamada se abre en la ventana propia de Rooms (`/pip?documento=…`), así que el
-  documento no se abandona.
-- **Qué viaja a Rooms: solo el id y el título del documento.** Es un origen más de las salas (`kind: document`, junto a
-  `calendar` y `chat`), con `ref_id` = UUID del documento. Nunca el contenido ni la lista de personas con acceso. El título lo
-  pide el BFF a Docs con el token de quien llama, no lo manda el navegador.
-- **La ACL del documento manda, en cada petición.** Rooms no replica quién puede ver el documento: al crear la sala, al
-  mirarla (`by-source`, `GET /rooms/{id}`), al unirse, al llamar a la puerta y al listar participantes presenta el token de la
-  persona a `GET /api/v1/documents/{id}` de Docs. Docs aplica su propia resolución de roles (usuario, grupos, organización).
-  Vale lo mismo para el creador, para un administrador del tenant y para quien ya participó: quitar a alguien del documento le
-  cierra la llamada en la siguiente petición. Falla cerrada: sin `DOCS_URL`, sin token, con Docs caído o con 5xx, se deniega.
-  Las salas de documento no salen en `GET /rooms` (su título es el del documento).
-- **Sin acoplamiento duro.** El BFF sondea Rooms con 2,5 s de espera; si no está desplegado, no resuelve o contesta 5xx,
-  responde `available: false` y la cabecera no pinta nada, sin error. Docs no depende de Rooms para abrir ni guardar.
-- **Integración por lo que ya existe.** Reutiliza `from-source` y `by-source` de Rooms y su evento `meet.room.created`, que ahora
-  lleva `created_by`; el fan-out de llamadas de Rooms ignora los orígenes que no son canal. No hay canal nuevo en el Hub.
-- **Auditoría de quién creó la sala.** La sala guarda `created_by` y el origen (`document`, id, título) y el evento de creación
-  lo publica. El panel «Actividad» de Docs sigue siendo el de las operaciones del documento; no se mezclan.
-- **Techo.** El sondeo de quién está en la llamada es cada 15 s con la pestaña visible, no por WebSocket; el botón se oculta
-  por debajo de 768 px, donde la cabecera no cabe. Un aviso del Hub a las personas con acceso cuando alguien abre una llamada
-  queda sin hacer: exigiría resolver la lista de personas desde Docs, justo lo que este diseño evita copiar.
+`accepted` · 2026-10-04 · Docus, Calcus, Diapos and Sytue Rooms · owner's decision · code in `services/rooms/internal/media/service/documento.go`, `apps/frontend/apps/docs/src/pages/api/llamada.ts` and `apps/frontend/apps/docs/src/editor/layout/EditorHeader.tsx`
 
-### Cursores de hoja anclados por identidad
+- **What is seen.** The editor header already showed who is in the document (`/api/presence`, `state/cursors.ts`, an
+  `aria-live` announcement). Now the avatars carry the name when it is known, and if Rooms is available «Llamar desde el
+  documento» (“Call from the document”) appears (or «Unirse a la llamada (n)», “Join the call (n)”, if there is already one). Whoever is in the call is marked with a ring and with their
+  accessible name («Ana, en la llamada», “Ana, in the call”). The call opens in Rooms' own window (`/pip?documento=…`), so the
+  document is not left.
+- **What travels to Rooms: only the document's id and title.** It is one more room origin (`kind: document`, alongside
+  `calendar` and `chat`), with `ref_id` = the document's UUID. Never the content or the list of people with access. The title is
+  requested by the BFF from Docs with the caller's token, it is not sent by the browser.
+- **The document's ACL rules, on every request.** Rooms does not replicate who can see the document: when creating the room,
+  viewing it (`by-source`, `GET /rooms/{id}`), joining, knocking and listing participants it presents the person's token
+  to Docs' `GET /api/v1/documents/{id}`. Docs applies its own role resolution (user, groups, organization).
+  The same applies to the creator, to a tenant administrator and to whoever already took part: removing someone from the document
+  closes the call for them on the next request. It fails closed: without `DOCS_URL`, without a token, with Docs down or with a 5xx, it is denied.
+  Document rooms do not appear in `GET /rooms` (their title is the document's).
+- **No hard coupling.** The BFF probes Rooms with a 2.5 s timeout; if it is not deployed, does not resolve or answers 5xx,
+  it responds `available: false` and the header renders nothing, with no error. Docs does not depend on Rooms to open or save.
+- **Integration through what already exists.** It reuses Rooms' `from-source` and `by-source` and its `meet.room.created` event, which now
+  carries `created_by`; Rooms' call fan-out ignores origins that are not channels. There is no new channel in the Hub.
+- **Audit of who created the room.** The room stores `created_by` and the origin (`document`, id, title) and the creation event
+  publishes it. Docs' «Actividad» (“Activity”) panel remains the document's operations one; they are not mixed.
+- **Ceiling.** Polling for who is in the call is every 15 s with the tab visible, not via WebSocket; the button is hidden
+  below 768 px, where the header does not fit. A Hub notification to the people with access when someone starts a call
+  is not done: it would require resolving the list of people from Docs, precisely what this design avoids copying.
 
-`SheetData` gana `rowIds` y `colIds` (`{ id }[]`, con `rowBase`/`colBase`): identidad de las filas y columnas, implícita
-(`t0`, `t1`…) hasta que alguien inserta o borra. El cursor de hoja viaja además con `sheetId`, `rows` y `cols`; el receptor los
-resuelve contra su modelo y, si falta alguno (cliente anterior, fila borrada), usa los índices de siempre, así que el protocolo
-v1 no cambia. Se guardan como lista con `id` para que `fusionar3` conserve dos inserciones concurrentes.
-Pruebas: `apps/frontend/apps/docs/test/sheets-anclas.test.ts`.
+<a id="cursores-de-hoja-anclados-por-identidad"></a>
+
+### Sheet cursors anchored by identity
+
+`SheetData` gains `rowIds` and `colIds` (`{ id }[]`, with `rowBase`/`colBase`): identity of rows and columns, implicit
+(`t0`, `t1`…) until someone inserts or deletes. The sheet cursor also travels with `sheetId`, `rows` and `cols`; the receiver
+resolves them against its model and, if any is missing (older client, deleted row), uses the usual indices, so protocol
+v1 does not change. They are stored as a list with `id` so that `fusionar3` preserves two concurrent insertions.
+Tests: `apps/frontend/apps/docs/test/sheets-anclas.test.ts`.
 
 <a id="0071"></a>
 
-## 0071 — El color de la suite es elegible: petróleo por defecto y azul cobalto, como eje aparte del modo
+<a id="0071--el-color-de-la-suite-es-elegible-petróleo-por-defecto-y-azul-cobalto-como-eje-aparte-del-modo"></a>
 
-`accepted` · 2026-10-04 · toda la suite (web y nativas) · decisión del dueño · código en `branding/tokens/colors.css`, `branding/tokens/appearance.css`, `apps/frontend/packages/config/src/contraste-paleta.test.ts`, `apps/frontend/packages/ui/src/theme/`, `services/id/internal/http/admin_branding.go`
+## 0071 — The suite color is selectable: petroleum by default and cobalt blue, as an axis separate from the mode
 
-- **Qué se decide.** La suite deja de tener un único color de marca. Ofrece dos, **petróleo** y **azul cobalto**; quien no
-  ha elegido nada ve petróleo. El esmeralda, que fue la marca única durante un día, desaparece como opción. Elige cada
-  persona, con un color por defecto de la organización que fija su administrador.
-- **Por qué dos y por qué estos.** El dueño vio la suite en esmeralda, naranja, teja, azul y petróleo. El petróleo queda
-  por defecto porque la acción deja de parecerse al verde de «éxito»: un botón y una insignia de «Firmado» ya no comparten
-  color. El cobalto es la alternativa viva, y es donde más se ve el ámbar de «estás aquí».
-- **El color es un eje aparte del modo.** `data-color` en la raíz, junto a `data-theme`: dos colores por tres modos (claro,
-  traslúcido, oscuro), más el oscuro del sistema. Petróleo es el valor sin atributo, así que una página que no sabe nada
-  del color pinta bien. No es un cuarto y un quinto tema: mezclarlo con el modo habría dado seis bloques completos en vez de
-  cuatro de petróleo más lo que cambia en cobalto.
-- **El color tiñe también los neutros.** Lienzo, líneas y texto llevan un punto del tono, y los derivados (escala
-  `neutral-*`, `bg-subtle`, `chrome-hover`) se derivan igual para cada color. Los colores de estado, de producto y de
-  persona no cambian. «Info» sigue siendo azul en los dos.
-- **Cómo no se rompe.** `contraste-paleta.test.ts` mide los pares que pinta la interfaz en los dos colores por los cuatro
-  modos, aplicando los bloques como la cascada, y comprueba que cada modo de cobalto repite lo que su bloque claro declara:
-  `[data-color]` y `[data-theme]` pesan lo mismo y a igual peso gana el que va después.
-- **Dónde vive la elección.** En el mismo sitio que la del modo, sin plomería aparte: una cookie cosmética en el apex
-  (`sytue-color`) más el almacenamiento local, leídas por el mismo lector y aplicadas por el mismo script del primer
-  pintado (`packages/ui/src/theme/init.ts`), que es el que también llevan el IdP y las páginas autocontenidas. No es un
-  dato de la cuenta: como el modo, no dice nada de quién es la persona. Seguir a la organización es NO tener elección: la
-  opción del selector que lo dice borra la cookie y el almacenamiento, y el orden de siempre hace el resto. Va una vez,
-  en `useEje`, para el color y para la forma.
-- **El color de la organización.** Columna `organizations.color` (migración 0107 de Sytue ID), que el administrador fija
-  en Sytue Admin (`PUT /api/v1/admin/org/color`). Viaja en el ID token como `org_color` —solo si no es el de la casa— y el
-  BFF la deja junto a la sesión en una cookie legible, `sytue-color-org`, porque el script del primer pintado no ve la
-  sesión. Orden: la persona, luego su organización, luego petróleo. Cambiarlo no invalida sesiones: llega con el siguiente
-  token de cada uno.
-- **La lista de colores vive en tres sitios y dos pruebas la atan.** La hoja de tokens (un bloque `[data-color]` por
-  color), `THEME_COLORS` en la web y `domain.OrgColors` en Sytue ID. La base solo garantiza la forma del valor, para que
-  añadir un color no pida reescribir un `CHECK`. `init.test.ts` y `TestLosColoresDeOrganizacionExistenEnLaHoja` fallan si
-  uno de los lados se queda atrás.
-- **Lo que queda fuera de esta decisión.** Las apps nativas leen hoy solo los bloques de petróleo de la hoja: su lector
-  de tokens no tiene todavía la dimensión del color, así que ni la elección ni el color de la organización les llegan.
+`accepted` · 2026-10-04 · the whole suite (web and native) · owner's decision · code in `branding/tokens/colors.css`, `branding/tokens/appearance.css`, `apps/frontend/packages/config/src/contraste-paleta.test.ts`, `apps/frontend/packages/ui/src/theme/`, `services/id/internal/http/admin_branding.go`
+
+- **What is decided.** The suite stops having a single brand color. It offers two, **petroleum** and **cobalt blue**; whoever has not
+  chosen anything sees petroleum. Emerald, which was the only brand color for a day, disappears as an option. Each
+  person chooses, with an organization default color set by its administrator.
+- **Why two and why these.** The owner saw the suite in emerald, orange, terracotta, blue and petroleum. Petroleum is the
+  default because the action no longer looks like the green of “success”: a button and a “Signed” badge no longer share a
+  color. Cobalt is the lively alternative, and it is where the amber of “you are here” shows best.
+- **Color is an axis separate from the mode.** `data-color` on the root, next to `data-theme`: two colors by three modes (light,
+  translucent, dark), plus the system dark. Petroleum is the value without the attribute, so a page that knows nothing
+  about color renders correctly. It is not a fourth and fifth theme: mixing it with the mode would have produced six complete blocks instead of
+  four for petroleum plus what changes in cobalt.
+- **Color also tints the neutrals.** Canvas, lines and text carry a touch of the hue, and the derived ones (the
+  `neutral-*` scale, `bg-subtle`, `chrome-hover`) are derived the same way for each color. Status, product and
+  person colors do not change. “Info” remains blue in both.
+- **How it does not break.** `contraste-paleta.test.ts` measures the pairs the interface renders in both colors by the four
+  modes, applying the blocks like the cascade, and checks that each cobalt mode repeats what its light block declares:
+  `[data-color]` and `[data-theme]` have the same specificity and at equal specificity the later one wins.
+- **Where the choice lives.** In the same place as the mode one, without separate plumbing: a cosmetic cookie on the apex
+  (`sytue-color`) plus local storage, read by the same reader and applied by the same first-paint
+  script (`packages/ui/src/theme/init.ts`), which is the one the IdP and the self-contained pages also carry. It is not
+  account data: like the mode, it says nothing about who the person is. Following the organization means having NO choice: the
+  selector option that says so clears the cookie and the storage, and the usual order does the rest. It is done once,
+  in `useEje`, for the color and for the shape.
+- **The organization's color.** Column `organizations.color` (Sytue ID migration 0107), which the administrator sets
+  in Sytue Admin (`PUT /api/v1/admin/org/color`). It travels in the ID token as `org_color` —only if it is not the house one— and the
+  BFF leaves it next to the session in a readable cookie, `sytue-color-org`, because the first-paint script does not see the
+  session. Order: the person, then their organization, then petroleum. Changing it does not invalidate sessions: it arrives with each person's next
+  token.
+- **The color list lives in three places and two tests tie it together.** The token stylesheet (one `[data-color]` block per
+  color), `THEME_COLORS` on the web and `domain.OrgColors` in Sytue ID. The database only guarantees the shape of the value, so that
+  adding a color does not require rewriting a `CHECK`. `init.test.ts` and `TestLosColoresDeOrganizacionExistenEnLaHoja` fail if
+  one of the sides falls behind.
+- **What is left out of this decision.** The native apps today read only the petroleum blocks of the stylesheet: their token
+  reader does not yet have the color dimension, so neither the choice nor the organization's color reaches them.
 
 <a id="0072"></a>
 
-## 0072 — «Color de cada app»: tercera opción del eje de color, carril y acción en el color de producto
+<a id="0072--color-de-cada-app-tercera-opción-del-eje-de-color-carril-y-acción-en-el-color-de-producto"></a>
 
-`accepted` · 2026-10-05 · web (las nativas, cuando lean el eje de color) · decisión del dueño · código en `branding/tokens/colors.css`, `branding/tokens/appearance.css`, `apps/frontend/packages/ui/src/theme/init.ts`, `apps/frontend/packages/config/src/contraste-paleta.test.ts`
+## 0072 — “Each app's color”: a third option of the color axis, rail and action in the product color
 
-- **Qué se decide.** El eje de color de [0071](#0071) gana un tercer valor, `app`: cada app pinta el carril y la acción
-  —botón principal, enlace, selección, foco— con su color de producto (`--sytue-product-<app>`). Es una opción más del
-  mismo selector, para la persona y como color por defecto de la organización. Los neutros siguen siendo los de la casa.
-- **Los valores salen de la hoja, no de un cálculo en el cliente.** Cada app aporta una rampa de once pasos derivada de
-  su color de producto, y el reparto por modo se escribe una vez con `var()`: el 600 lleva rótulo blanco (4,7:1), el 700
-  es el carril y el enlace (6,6:1 con blanco), el 400 la acción en oscuro con rótulo oscuro (4,7:1) y el 300 el enlace en
-  oscuro (6:1). Son 13 líneas por app en vez de un tema entero por app y modo. `contraste-paleta.test.ts` mide cada app en
-  los cuatro modos con esos umbrales.
-- **Cómo sabe la hoja qué app es.** `data-app` en la raíz. En la web lo pone el script del primer pintado con el prefijo
-  bajo el que se sirve la app, que ya estaba publicado antes de él: ningún layout cambia y no parpadea. Donde el prefijo
-  no es la clave de producto (`/admin`, `/web`) la hoja lleva el alias, y un guardián lee el `base` de cada app y falla si
-  una se queda sin color al cambiar de prefijo. Una superficie servida en la raíz publica el prefijo vacío y lo dice con la
-  primera etiqueta de su host: es como Sytue Admin toma su color también en `platform.<dominio>`.
-- **Cada editor, su color.** Docus, Calcus, Diapos y CertiPDF comparten `/docs`, así que ahí el prefijo no dice el
-  producto. Su layout —y la vista pública de un enlace compartido— pone `data-app` en el `<html>` desde el servidor, con
-  el producto del documento o de la lista que se enseña, y el script del primer pintado respeta el atributo que ya
-  encuentra: no parpadea. Al abrir otro documento sin recargar lo cambia `aplicarMarca`, que es quien ya cambiaba el icono
-  de la pestaña. Con esto, que PDF y Diapos solo tiñan el carril tiene efecto también en la web.
-- **Las superficies de la casa se quedan en petróleo.** El Hub y Mi cuenta no llevan rampa: son el marco de la suite, y
-  el Hub enseña a la vez las teselas de todas las apps. Con `data-color='app'` y sin rampa propia el reparto da los
-  valores de petróleo. Tampoco la llevan el IdP ni las páginas autocontenidas, que no dicen qué app son.
-- **El ámbar de «estás aquí» vale en todas.** Con el carril a 6,6:1 contra el blanco, el ámbar llega a 3:1 sobre el ítem
-  activo en las 19 apps y en los cuatro modos; no ha hecho falta el blanco de respaldo.
-- **Cinco apps solo tiñen el carril** (decisiones del dueño, 2026-10-05): Mail, PDF, Cast, Diapos y ERP. El color se
-  queda en el carril y el marco; botón principal, enlace, selección y foco van en el primario de la casa. En la hoja esas
-  apps declaran la rampa del carril (`--sytue-rail-*`) y no la del primario, así que la web y las nativas lo recogen sin más
-  código.
-- **La regla: las apps cuyo color se confunde con el de peligro en insignias, enlaces y foco.** No en el botón, que es lo
-  que menos engaña. Con la acción en rojo, en Mail el anillo de foco de un campo parecía un error de validación, «Cerrar
-  sesión» dejaba de distinguirse de un enlace y el botón principal parecía destructivo. En Diapos y ERP, que son naranjas,
-  el botón principal y el de peligro se distinguen juntos, pero la insignia del tono de la app y la de peligro son las dos
-  una píldora rosada con texto rojizo, el campo enfocado y el campo con error se separan más por el grosor del aro que por
-  el color, y el enlace queda pegado al texto de peligro.
-- **Es una lista decidida, no una fórmula, y se dice tal cual.** Ninguna medida separa a las que se confunden de la que no:
+`accepted` · 2026-10-05 · web (native apps, once they read the color axis) · owner's decision · code in `branding/tokens/colors.css`, `branding/tokens/appearance.css`, `apps/frontend/packages/ui/src/theme/init.ts`, `apps/frontend/packages/config/src/contraste-paleta.test.ts`
 
-  | App       | Desvío de tono (OKLCH) respecto a `danger` | ΔE2000 con `danger` | Decisión           |
-  | --------- | ------------------------------------------ | ------------------- | ------------------ |
-  | PDF       | −1,9°                                      | 4,0                 | solo carril        |
-  | Mail      | −11,9°                                     | 9,8                 | solo carril        |
-  | Cast      | −15,5°                                     | 15,5                | solo carril        |
-  | Diapos    | +16,4°                                     | 11,0                | solo carril        |
-  | Bases     | +17,8°                                     | 13,9                | carril y acción    |
-  | ERP       | +19,8°                                     | 14,2                | solo carril        |
-  | Sytue Web | −37,6°                                     | 24,9                | fuera de la franja |
+- **What is decided.** The color axis of [0071](#0071) gains a third value, `app`: each app paints the rail and the action
+  —primary button, link, selection, focus— with its product color (`--sytue-product-<app>`). It is one more option of the
+  same selector, for the person and as the organization's default color. The neutrals remain the house ones.
+- **The values come from the stylesheet, not from a computation on the client.** Each app contributes an eleven-step ramp derived from
+  its product color, and the per-mode assignment is written once with `var()`: 600 carries white text (4.7:1), 700
+  is the rail and the link (6.6:1 with white), 400 the action in dark mode with dark text (4.7:1) and 300 the link in
+  dark mode (6:1). That is 13 lines per app instead of a whole theme per app and mode. `contraste-paleta.test.ts` measures each app in
+  the four modes with those thresholds.
+- **How the stylesheet knows which app it is.** `data-app` on the root. On the web it is set by the first-paint script with the prefix
+  under which the app is served, which was already published before it: no layout changes and there is no flicker. Where the prefix
+  is not the product key (`/admin`, `/web`) the stylesheet carries the alias, and a guardian reads each app's `base` and fails if
+  one is left without a color when its prefix changes. A surface served at the root publishes the empty prefix and says so with the
+  first label of its host: that is how Sytue Admin takes its color also on `platform.<dominio>`.
+- **Each editor, its own color.** Docus, Calcus, Diapos and CertiPDF share `/docs`, so there the prefix does not say the
+  product. Their layout —and the public view of a shared link— sets `data-app` on the `<html>` from the server, with
+  the product of the document or of the list being shown, and the first-paint script respects the attribute it already
+  finds: no flicker. When opening another document without reloading it is changed by `aplicarMarca`, which is what already changed the
+  tab icon. With this, PDF and Diapos tinting only the rail takes effect on the web too.
+- **The house surfaces stay petroleum.** The Hub and My account carry no ramp: they are the suite's frame, and
+  the Hub shows the tiles of all apps at the same time. With `data-color='app'` and no ramp of their own the assignment gives the
+  petroleum values. Neither do the IdP nor the self-contained pages, which do not say which app they are.
+- **The amber of “you are here” works in all of them.** With the rail at 6.6:1 against white, amber reaches 3:1 on the active
+  item in all 19 apps and in the four modes; the white fallback was not needed.
+- **Five apps only tint the rail** (owner's decisions, 2026-10-05): Mail, PDF, Cast, Diapos and ERP. The color
+  stays in the rail and the frame; primary button, link, selection and focus go in the house primary. In the stylesheet those
+  apps declare the rail ramp (`--sytue-rail-*`) and not the primary one, so the web and the native apps pick it up without more
+  code.
+- **The rule: the apps whose color gets confused with the danger color in badges, links and focus.** Not in the button, which is what
+  misleads least. With the action in red, in Mail a field's focus ring looked like a validation error, «Cerrar
+  sesión» (“Sign out”) could no longer be told apart from a link and the primary button looked destructive. In Diapos and ERP, which are orange,
+  the primary button and the danger one can be told apart side by side, but the badge in the app's hue and the danger one are both
+  a pinkish pill with reddish text, the focused field and the field with an error are separated more by the ring's thickness than by
+  color, and the link sits too close to the danger text.
+- **It is a decided list, not a formula, and it is stated as such.** No measurement separates the ones that get confused from the one that does not:
 
-  Bases queda entre Diapos y ERP por tono y más cerca de `danger` que Cast por distancia, y aun así no se confunde: es un
-  marrón chocolate, más oscuro y apagado que el rojo vivo. Lo que decide es mirarlo: la muestra del arnés de capturas (un
-  diálogo de borrado con el botón principal y el de peligro juntos, un campo enfocado, otro con error e insignias, en claro
-  y en oscuro), que es la que vio el dueño de las seis apps de la tabla.
+  | App       | Hue offset (OKLCH) from `danger` | ΔE2000 with `danger` | Decision         |
+  | --------- | -------------------------------- | -------------------- | ---------------- |
+  | PDF       | −1.9°                            | 4.0                  | rail only        |
+  | Mail      | −11.9°                           | 9.8                  | rail only        |
+  | Cast      | −15.5°                           | 15.5                 | rail only        |
+  | Diapos    | +16.4°                           | 11.0                 | rail only        |
+  | Bases     | +17.8°                           | 13.9                 | rail and action  |
+  | ERP       | +19.8°                           | 14.2                 | rail only        |
+  | Sytue Web | −37.6°                           | 24.9                 | outside the band |
 
-- **Lo que sí se mide es quién tiene que pasar por esa decisión.** Una app cuyo color cae a menos de 26° del tono de
-  `--sytue-danger` está en la franja. `contraste-paleta.test.ts` lleva las dos listas —solo carril, y en la franja con
-  acción— y falla si una app con bloque cae en la franja sin estar apuntada en una: no la decide solo, pide la decisión.
+  Bases sits between Diapos and ERP by hue and closer to `danger` than Cast by distance, and even so it does not get confused: it is a
+  chocolate brown, darker and duller than bright red. What decides is looking at it: the sample from the screenshot harness (a
+  delete dialog with the primary and danger buttons together, a focused field, another with an error, and badges, in light
+  and dark), which is the one the owner saw for the six apps in the table.
+
+- **What is measured is who has to go through that decision.** An app whose color falls within 26° of the hue of
+  `--sytue-danger` is in the band. `contraste-paleta.test.ts` carries the two lists —rail only, and in the band with
+  action— and fails if an app with a block falls in the band without being listed in one: it does not decide on its own, it asks for the decision.
 
 <a id="0073"></a>
 
-## 0073 — Rooms: denunciar y bloquear, con el bloqueo aplicado en el servidor y la denuncia en la organización anfitriona
+<a id="0073--rooms-denunciar-y-bloquear-con-el-bloqueo-aplicado-en-el-servidor-y-la-denuncia-en-la-organización-anfitriona"></a>
 
-`accepted` · 2026-10-06 · servicio, web y nativa · decisión del dueño («añade denuncia y bloqueo para rooms y cast y lo marcamos como que existe») · código en `services/rooms/internal/store/moderacion.go`, `services/rooms/internal/http/moderacion.go`, `apps/frontend/apps/rooms/src/components/Moderation.tsx`, `apps/fyne/apps/rooms/moderacion.go` · migración `services/rooms/db/migrations/0038_denuncias_y_bloqueos.up.sql`
+## 0073 — Rooms: reporting and blocking, with blocking enforced on the server and the report in the host organization
 
-- **Por qué ahora.** Google Play pregunta en la clasificación de contenido si la app permite bloquear y denunciar usuarios
-  y contenido, y su política de contenido generado por usuarios lo exige cuando el contenido principal es de usuarios. Rooms
-  no tenía ninguna de las dos cosas: lo único que existía era que el autor o un administrador del canal borrasen un
-  mensaje, y que un administrador expulsara a alguien.
-- **Denunciar.** Se denuncia un mensaje (y con él a su autor) o a una persona en un canal que se comparte con ella. El
-  motivo sale de una lista cerrada —acoso, contenido sexual, violencia, spam, otro— y admite una nota de hasta 500
-  caracteres. La denuncia es **de la organización que aloja la conversación** ([0040](#0040)): quien viene de fuera
-  denuncia ahí, y es ahí donde se modera.
-- **Quién modera.** Los administradores del **equipo** que aloja el canal —que ya podían borrar un mensaje ajeno y
-  expulsar— y los administradores de la **organización** (rol `owner` o `admin` del token). A los del equipo se les avisa
-  por el Hub (`rooms.report`), sin decir quién denuncia ni a quién; los de la organización lo ven al abrir la cola, porque
-  Rooms no sabe quiénes son hasta que entran. La cola ofrece tres acciones y una denuncia se cierra con una: descartar,
-  borrar el mensaje, expulsar del canal (esta última no en un mensaje directo).
-- **Lo que no se revela.** Nadie ve una denuncia contra sí mismo, administre lo que administre. Y quién denunció no sale
-  en ninguna respuesta de la API, tampoco a quien modera: para actuar no hace falta, y es lo que impide que le llegue al
-  denunciado. Está en la base.
-- **Y el operador.** Desde el 2026-10-12 las denuncias llegan también a la cola del operador de la plataforma, que sí ve
-  las que son contra quien administra ([0075](#0075)).
-- **Que no sirva para acosar.** Una persona denuncia cada mensaje una vez, y a otra persona en un canal una vez mientras
-  esa denuncia siga abierta; repetirla devuelve la que había y no avisa a nadie. Hay un límite por persona en la ruta y un
-  tope de 20 denuncias en 24 horas contado en la base, que vale con varias réplicas.
-- **Bloquear es de la persona, no de la organización.** El `sub` de Sytue ID es el mismo en todas las organizaciones, así
-  que el bloqueo vale también en la conversación que dos personas comparten en otra. Por eso `user_blocks` se lee y se
-  escribe por la política de mantenimiento, siempre por el `sub` del token verificado.
-- **Qué hace un bloqueo, en el servidor.** Un mensaje directo de dos personas con un bloqueo en cualquiera de los dos
-  sentidos no admite mensajes nuevos —tampoco los programados ni la tarjeta de una llamada—: el servicio responde 403 con
-  el mismo texto a los dos, sin decir quién bloqueó. Y los avisos (Web Push, APNs, Hub) de un autor no le llegan a quien le
-  ha bloqueado, en ningún canal. En los canales y grupos compartidos el mensaje sigue llegando y el cliente lo enseña
-  **plegado**, con un botón para leerlo: un canal de trabajo no puede tener huecos que solo ve una persona.
-- **Se rechaza, no se esconde.** La alternativa en el directo era aceptar el mensaje y no enseñárselo a quien bloqueó. Se
-  descarta: le mentiría a quien escribe sobre la entrega y dejaría en la retención de la organización mensajes que nadie
-  vio.
-- **Bloquear no borra nada.** La conversación sigue donde estaba, con la retención de la organización que la aloja. El
-  bloqueo sí es un dato de la persona: se borra con su cuenta (`services/id/internal/merge`). Las denuncias, no: son de la
-  organización.
-- **La traza.** La fila de la denuncia dice quién, a quién, sobre qué y cuándo, y quién la resolvió, cómo y cuándo; se
-  resuelve una sola vez y se borra doce meses después de resolverse ([0075](#0075)). Hay además una línea de log por denuncia y por resolución. Ni el texto del mensaje
-  ni la nota van al log, y el texto del mensaje no se copia a la denuncia: la cola lo lee en vivo, así que un mensaje ya
-  borrado no reaparece ahí.
-- **Lo que queda fuera.** No hay bloqueo a nivel de organización (que una organización vete a una persona de fuera), ni
-  apelación del denunciado, ni detección automática de contenido. Una persona bloqueada sigue viendo los mensajes de quien
-  la bloqueó en los canales compartidos: el bloqueo protege a quien bloquea, no esconde a nadie de un canal de trabajo.
+`accepted` · 2026-10-06 · service, web and native · owner's decision («añade denuncia y bloqueo para rooms y cast y lo marcamos como que existe», “add reporting and blocking for rooms and cast and we mark it as existing”) · code in `services/rooms/internal/store/moderacion.go`, `services/rooms/internal/http/moderacion.go`, `apps/frontend/apps/rooms/src/components/Moderation.tsx`, `apps/fyne/apps/rooms/moderacion.go` · migration `services/rooms/db/migrations/0038_denuncias_y_bloqueos.up.sql`
+
+- **Why now.** In the content rating, Google Play asks whether the app allows blocking and reporting users
+  and content, and its user-generated content policy requires it when the main content comes from users. Rooms
+  had neither: the only thing that existed was that the author or a channel administrator could delete a
+  message, and that an administrator could kick someone out.
+- **Reporting.** You report a message (and with it its author) or a person in a channel you share with them. The
+  reason comes from a closed list —harassment, sexual content, violence, spam, other— and allows a note of up to 500
+  characters. The report **belongs to the organization hosting the conversation** ([0040](#0040)): whoever comes from outside
+  reports there, and that is where it is moderated.
+- **Who moderates.** The administrators of the **team** hosting the channel —who could already delete someone else's message and
+  kick people out— and the administrators of the **organization** (`owner` or `admin` role in the token). Team ones are notified
+  through the Hub (`rooms.report`), without saying who reports or whom; organization ones see it when they open the queue, because
+  Rooms does not know who they are until they come in. The queue offers three actions and a report is closed with one: dismiss,
+  delete the message, kick out of the channel (the latter not in a direct message).
+- **What is not revealed.** Nobody sees a report against themselves, whatever they administer. And who reported does not appear
+  in any API response, not even to whoever moderates: it is not needed to act, and it is what prevents it from reaching the
+  reported person. It is in the database.
+- **And the operator.** Since 2026-10-12 reports also reach the platform operator's queue, which does see
+  those against whoever administers ([0075](#0075)).
+- **So that it cannot be used for harassment.** A person reports each message once, and another person in a channel once while
+  that report remains open; repeating it returns the existing one and notifies nobody. There is a per-person limit on the route and a
+  cap of 20 reports in 24 hours counted in the database, which holds with several replicas.
+- **Blocking belongs to the person, not the organization.** The Sytue ID `sub` is the same in all organizations, so
+  the block also applies in the conversation two people share in another one. That is why `user_blocks` is read and
+  written through the maintenance policy, always by the verified token's `sub`.
+- **What a block does, on the server.** A direct message between two people with a block in either
+  direction does not accept new messages —nor scheduled ones nor a call card—: the service answers 403 with
+  the same text to both, without saying who blocked. And an author's notifications (Web Push, APNs, Hub) do not reach whoever has
+  blocked them, in any channel. In shared channels and groups the message still arrives and the client shows it
+  **collapsed**, with a button to read it: a work channel cannot have gaps that only one person sees.
+- **It is rejected, not hidden.** The alternative in DMs was to accept the message and not show it to whoever blocked. It is
+  ruled out: it would lie to the writer about delivery and leave in the organization's retention messages that nobody
+  saw.
+- **Blocking deletes nothing.** The conversation stays where it was, with the retention of the organization hosting it. The
+  block is personal data: it is deleted with their account (`services/id/internal/merge`). Reports are not: they belong to the
+  organization.
+- **The trail.** The report's row says who, whom, about what and when, and who resolved it, how and when; it is
+  resolved only once and deleted twelve months after being resolved ([0075](#0075)). There is also one log line per report and per resolution. Neither the message text
+  nor the note goes to the log, and the message text is not copied into the report: the queue reads it live, so an already
+  deleted message does not reappear there.
+- **What is left out.** There is no organization-level block (an organization banning an outside person), nor
+  an appeal by the reported person, nor automatic content detection. A blocked person still sees the messages of whoever
+  blocked them in shared channels: the block protects whoever blocks, it does not hide anyone from a work channel.
 
 <a id="0074"></a>
 
-## 0074 — Cast: denunciar y bloquear, con la denuncia abierta a quien mira sin cuenta y dos bloqueos aplicados en el servidor
+<a id="0074--cast-denunciar-y-bloquear-con-la-denuncia-abierta-a-quien-mira-sin-cuenta-y-dos-bloqueos-aplicados-en-el-servidor"></a>
 
-`accepted` · 2026-10-06 · servicio, web y nativa · decisión del dueño («añade denuncia y bloqueo para rooms y cast y lo marcamos como que existe») · código en `services/cast/internal/social/denuncias.go`, `services/cast/internal/social/bloqueos.go`, `services/cast/internal/http/moderacion.go`, `apps/frontend/apps/cast/src/components/Moderacion.tsx`, `apps/fyne/apps/cast/moderacion.go` · migración `services/cast/db/migrations/0009_denuncias_bloqueos.up.sql` · hermana de [0073](#0073) (Rooms)
+## 0074 — Cast: reporting and blocking, with reporting open to anonymous viewers and two blocks enforced on the server
 
-- **Por qué ahora.** Lo mismo que en [0073](#0073): Google Play lo exige a una app cuyo contenido es de sus usuarios. En
-  Cast pesa más, porque tiene **portada pública**: lo ve quien no tiene cuenta. Lo único que existía era que el autor, el
-  dueño del vídeo o quien administra la organización borrasen un comentario o un mensaje del chat.
-- **Qué se denuncia.** Un vídeo o directo, un comentario, un mensaje del chat, una persona y un canal. El motivo sale de una
-  lista cerrada —acoso, contenido sexual o desnudos, violencia, spam o engaño, derechos de autor, otro— y admite un texto de
-  hasta 1000 caracteres. De lo denunciado se guarda una foto (de quién es y un extracto de 300 caracteres): el chat se
-  retira a los 30 días y un comentario se puede borrar, y la cola tiene que seguir diciendo qué se denunció. En esto se
-  aparta de Rooms, que lee el mensaje en vivo.
-- **Solo lo que aparece en el vídeo.** Un comentario o un mensaje se denuncian dentro de SU vídeo, y una persona solo si
-  aparece en él (lo publica o ha escrito en él). Así no se puede denunciar ni bloquear un `sub` cualquiera, ni sondear
-  cuáles existen.
-- **Sin cuenta también.** Quien mira la portada pública puede denunciar lo que ve sin cuenta: vídeos públicos o no listados,
-  sus comentarios, quien los publica y el canal. No el chat, que no se lee sin sesión. Va con prueba de trabajo ALTCHA
-  (`platform/pkg/altcha`, la de los formularios públicos de Bases), con un tope por IP compartido entre réplicas, y sin
-  guardar la IP: solo un HMAC para no contar dos veces a la misma. La alternativa —exigir cuenta— dejaba sin puerta
-  justo a quien Google pide que la tenga.
-- **De quién es la denuncia y quién actúa.** Es de la organización dueña del **contenido**, no de la de quien denuncia. La
-  ven y la resuelven quienes administran esa organización (rol `owner` o `admin` del token, que solo vale en su
-  organización). La cola ofrece: descartar; borrar el comentario o el mensaje; retirar el vídeo de la portada pública (pasa
-  a no listado); despublicarlo (pasa a la organización); y bloquear a la persona en toda la organización. Actuar cierra
-  todas las denuncias abiertas sobre lo mismo; descartar, solo esa.
-- **A quién se avisa.** Por el Hub (`cast.report`), a quienes administran la organización **y Cast ha visto**: el Hub
-  entrega por persona y Cast no tiene la lista de miembros, así que apunta a cada administrador cuando abre Cast. Si lo
-  denunciado es de otra persona en un vídeo ajeno, también al dueño del vídeo, que ya podía borrarlo. Nunca al denunciado
-  ni a quien denuncia, y sin decir quién fue.
-- **Lo que no se revela.** Quién denunció no sale en ninguna respuesta de la API: ni en la cola ni en la traza, donde
-  figura como `account` o `anonymous`. Está en la base (`reports.reporter_sub`). Y, como en Rooms, **nadie ve una denuncia
-  contra sí mismo**, administre lo que administre: ni en la cola, ni en la cuenta de abiertas, ni en la traza —cada fila de
-  una denuncia lleva `target_sub` en el detalle, para que siga escondida cuando la denuncia ya se haya purgado—, ni para
-  resolverla. La primera versión se la enseñaba a quien administra («en Cast quien publica es la organización»); el dueño lo
-  cambió el 2026-10-12: si quien publica es quien administra, la denuncia la ven las demás personas que administran y el
-  operador de la plataforma, en su cola ([0075](#0075)).
-- **Que no sirva para acosar.** Una denuncia abierta por persona y objetivo (índice único parcial): repetirla contesta lo
-  mismo y no avisa a nadie. Cinco de golpe y una cada veinte segundos por persona; diez de golpe y una cada treinta
-  segundos por IP sin cuenta. La respuesta es siempre un 204 vacío.
-- **Dos bloqueos, los dos en el servidor.** El **personal**: quien bloquea deja de recibir los comentarios y los mensajes
-  del chat de esa persona (el servicio no los manda, tampoco por el WebSocket) y sus avisos de directo; y esa persona deja
-  de poder comentar y escribir en los vídeos de quien la bloqueó. El **de organización**, que ponen quienes la
-  administran: esa persona no escribe en ningún vídeo de la organización. Es lo que Rooms dejó fuera y aquí hace falta,
-  porque en Cast escribe gente de fuera.
-- **Se rechaza y se dice.** A quien está bloqueado el servicio le contesta 403 `blocked` al escribir, y la app se lo dice.
-  No se le dice quién le bloqueó, pero sabe que no puede escribir ahí: aceptar el comentario y no enseñarlo le mentiría.
-- **Bloquear no borra nada**, y se deshace: el personal, en «Denuncias y bloqueos»; el de organización, quien administra,
-  en la misma pantalla.
-- **La traza.** `moderation_audit`: una fila por denuncia, por acción y por bloqueo de organización, en la misma
-  transacción que lo que audita, con quién actuó. Se lee con los filtros y el CSV de `platform/pkg/auditlog`.
-- **Exportar y borrar.** «Exportar tus datos» de Cast lleva a quién ha bloqueado la persona y las denuncias que ELLA puso,
-  de cualquier organización (qué, por qué, cuándo y si sigue abierta), sin la copia de lo denunciado ni la acción que se
-  tomó, y nunca las que otros pusieron contra ella (política `reports_de_quien_denuncia`, migración 0011). «Borrar mi
-  cuenta» borra sus bloqueos por el mismo camino que `user_blocks` de Rooms (`merge.DatosDeLaPersona`); `subject` es una
-  columna generada sobre `blocker_sub`, porque renombrarla rompería a los pods anteriores durante el despliegue. Los
-  bloqueos que otros le pusieron son de esas personas y se quedan; sus denuncias son de la organización del contenido y
-  se purgan con su plazo ([0075](#0075)).
-- **Varias réplicas.** Cast corre con dos o más. Las soluciones ALTCHA ya usadas se guardan en la base (`altcha_used`,
-  migración 0012, con `altcha.EnTabla`, la misma forma que ya tenían Sytue ID, Bases y Web): una solución vale una vez
-  en todas las réplicas. Y lo que el chat difunde en una —un mensaje, un borrado, un bloqueo recién puesto— le llega a
-  las conexiones de las demás por LISTEN/NOTIFY de PostgreSQL (`Servicio.Relevar`, `events.Notificar`), con su origen
-  para descartar el eco; antes, ni el bloqueo ni los mensajes cruzaban de réplica. El recuento de espectadores sigue
-  siendo el de cada réplica. Si el NOTIFY falla, la trama se queda en su réplica, como antes.
-- **Lo que queda fuera.** No hay apelación, ni detección automática, ni aviso a los administradores que no han abierto
-  Cast nunca. El recuento de espectadores de un directo es el de la réplica de cada cual, no el total.
+`accepted` · 2026-10-06 · service, web and native · owner's decision («añade denuncia y bloqueo para rooms y cast y lo marcamos como que existe», “add reporting and blocking for rooms and cast and we mark it as existing”) · code in `services/cast/internal/social/denuncias.go`, `services/cast/internal/social/bloqueos.go`, `services/cast/internal/http/moderacion.go`, `apps/frontend/apps/cast/src/components/Moderacion.tsx`, `apps/fyne/apps/cast/moderacion.go` · migration `services/cast/db/migrations/0009_denuncias_bloqueos.up.sql` · sibling of [0073](#0073) (Rooms)
+
+- **Why now.** The same as in [0073](#0073): Google Play requires it of an app whose content comes from its users. In
+  Cast it weighs more, because it has a **public front page**: people without an account see it. The only thing that existed was that the author, the
+  video's owner or whoever administers the organization could delete a comment or a chat message.
+- **What is reported.** A video or live stream, a comment, a chat message, a person and a channel. The reason comes from a
+  closed list —harassment, sexual content or nudity, violence, spam or deception, copyright, other— and allows a text of
+  up to 1000 characters. A snapshot of what was reported is stored (whose it is and a 300-character excerpt): the chat is
+  removed after 30 days and a comment can be deleted, and the queue has to keep saying what was reported. In this it
+  departs from Rooms, which reads the message live.
+- **Only what appears in the video.** A comment or a message is reported within ITS video, and a person only if they
+  appear in it (they publish it or have written in it). That way you cannot report or block an arbitrary `sub`, nor probe
+  which ones exist.
+- **Without an account too.** Whoever watches the public front page can report what they see without an account: public or unlisted videos,
+  their comments, whoever publishes them and the channel. Not the chat, which cannot be read without a session. It goes with an ALTCHA proof of work
+  (`platform/pkg/altcha`, the one from Bases' public forms), with a per-IP cap shared across replicas, and without
+  storing the IP: only an HMAC so as not to count the same one twice. The alternative —requiring an account— left without a door
+  precisely those whom Google asks to have one.
+- **Whose report it is and who acts.** It belongs to the organization that owns the **content**, not to the reporter's. It is
+  seen and resolved by whoever administers that organization (`owner` or `admin` role in the token, which is only valid in their
+  organization). The queue offers: dismiss; delete the comment or the message; remove the video from the public front page (it becomes
+  unlisted); unpublish it (it becomes organization-only); and block the person throughout the organization. Acting closes
+  all open reports about the same thing; dismissing, only that one.
+- **Who is notified.** Through the Hub (`cast.report`), those who administer the organization **and whom Cast has seen**: the Hub
+  delivers per person and Cast does not have the member list, so it records each administrator when they open Cast. If what is
+  reported belongs to another person in someone else's video, also the video's owner, who could already delete it. Never the reported person
+  or the reporter, and without saying who it was.
+- **What is not revealed.** Who reported does not appear in any API response: neither in the queue nor in the trail, where
+  they appear as `account` or `anonymous`. It is in the database (`reports.reporter_sub`). And, as in Rooms, **nobody sees a report
+  against themselves**, whatever they administer: not in the queue, not in the open count, not in the trail —each row of
+  a report carries `target_sub` in the detail, so that it stays hidden once the report has been purged—, nor to
+  resolve it. The first version showed it to whoever administers («en Cast quien publica es la organización», “in Cast the publisher is the organization”); the owner
+  changed it on 2026-10-12: if the publisher is whoever administers, the report is seen by the other people who administer and the
+  platform operator, in their queue ([0075](#0075)).
+- **So that it cannot be used for harassment.** One open report per person and target (unique partial index): repeating it answers the
+  same and notifies nobody. Five at once and one every twenty seconds per person; ten at once and one every thirty
+  seconds per IP without an account. The response is always an empty 204.
+- **Two blocks, both on the server.** The **personal** one: whoever blocks stops receiving that person's comments and chat
+  messages (the service does not send them, not over the WebSocket either) and their live notifications; and that person can no longer
+  comment and write on the videos of whoever blocked them. The **organization** one, set by whoever
+  administers it: that person does not write on any video of the organization. It is what Rooms left out and is needed here,
+  because in Cast people from outside write.
+- **It is rejected and said.** To whoever is blocked the service answers 403 `blocked` when writing, and the app tells them.
+  They are not told who blocked them, but they know they cannot write there: accepting the comment and not showing it would lie to them.
+- **Blocking deletes nothing**, and it can be undone: the personal one, in «Denuncias y bloqueos» (“Reports and blocks”); the organization one, by whoever administers,
+  on the same screen.
+- **The trail.** `moderation_audit`: one row per report, per action and per organization block, in the same
+  transaction as what it audits, with who acted. It is read with the filters and CSV of `platform/pkg/auditlog`.
+- **Export and delete.** Cast's “Export your data” includes whom the person has blocked and the reports SHE filed,
+  from any organization (what, why, when and whether it is still open), without the copy of what was reported or the action
+  taken, and never those that others filed against her (policy `reports_de_quien_denuncia`, migration 0011). “Delete my
+  account” deletes her blocks through the same path as Rooms' `user_blocks` (`merge.DatosDeLaPersona`); `subject` is a
+  generated column over `blocker_sub`, because renaming it would break the previous pods during deployment. The
+  blocks others placed on her belong to those people and stay; her reports belong to the content's organization and
+  are purged on their schedule ([0075](#0075)).
+- **Several replicas.** Cast runs with two or more. Already-used ALTCHA solutions are stored in the database (`altcha_used`,
+  migration 0012, with `altcha.EnTabla`, the same form Sytue ID, Bases and Web already had): a solution is valid once
+  across all replicas. And what the chat broadcasts on one —a message, a deletion, a newly placed block— reaches
+  the connections of the others through PostgreSQL LISTEN/NOTIFY (`Servicio.Relevar`, `events.Notificar`), with its origin
+  to discard the echo; before, neither the block nor the messages crossed replicas. The viewer count is still
+  per replica. If the NOTIFY fails, the frame stays on its replica, as before.
+- **What is left out.** There is no appeal, no automatic detection, and no notification to administrators who have never opened
+  Cast. A live stream's viewer count is that of each person's replica, not the total.
 
 <a id="0075"></a>
 
-## 0075 — Cola de denuncias del operador de la plataforma: las mismas filas, el sí de Sytue ID en cada petición y la traza en su registro
+<a id="0075--cola-de-denuncias-del-operador-de-la-plataforma-las-mismas-filas-el-sí-de-sytue-id-en-cada-petición-y-la-traza-en-su-registro"></a>
 
-`accepted` · 2026-10-12 · Cast, Rooms, Sytue ID y consola de plataforma (solo web) · decisión del dueño («cola también para Sytue»; «un administrador no ve las denuncias contra sí mismo; Sytue sí») · código en `platform/pkg/operador`, `services/id/internal/http/platform_moderacion.go`, `services/cast/internal/http/moderacion.go`, `services/rooms/internal/store/operador.go`, `apps/frontend/apps/console/src/components/PlatformModeration.tsx` · migraciones `services/cast/db/migrations/0010_cola_del_operador.up.sql` y `services/rooms/db/migrations/0039_cola_del_operador.up.sql` · completa [0073](#0073) y [0074](#0074)
+## 0075 — The platform operator's report queue: the same rows, Sytue ID's yes on every request and the trail in its log
 
-- **Qué.** Las denuncias de Cast y de Rooms llegan a dos colas: la de quien administra la organización dueña del contenido y
-  la del operador de la plataforma (Sytue), en su consola (`platform.<dominio>/moderacion`). No hay copia: son las mismas
-  filas, así que resolver en una cierra en la otra. `resolved_by` y `resolved_from` (`org` | `platform`) dicen quién y desde
-  dónde, y en Cast la traza de la organización (`moderation_audit`) lleva además `from: platform`.
-- **Qué ve el operador.** Todas las organizaciones, también las denuncias contra quien administra cada una (que esa persona
-  ya no ve). Ve lo que la denuncia guarda o señala, y nada más: en Cast, el extracto de 300 caracteres, el nombre del
-  denunciado y el texto de quien denuncia; en Rooms, el canal, el nombre y el mensaje denunciado recortado a 300
-  caracteres. No hay enlace para entrar en el contenido del cliente, y quién denunció no viaja nunca.
-- **Qué puede hacer.** Lo mismo que la cola de la organización: en Cast, descartar, borrar el comentario o el mensaje,
-  retirar el vídeo de la portada, despublicarlo y bloquear a la persona en la organización; en Rooms, descartar, borrar el
-  mensaje y expulsar del canal. Suspender la organización ya existe en la consola de plataforma, con su segunda persona, y
-  la pantalla lleva allí. **Suspender a una persona a nivel de plataforma no existe** y no se ha inventado: hoy solo la
-  suspende quien administra su organización.
-- **Quién es operador lo dice Sytue ID, en cada petición.** El servicio no lo deduce de un rol ni de un claim: antes de
-  listar o de resolver pregunta a `POST /api/v1/platform/moderation/access` con el token de quien llama y lo que va a hacer
-  (servicio, acción, organización, denuncia). Esa ruta va detrás del mismo gate que el resto de la API de plataforma
-  —allowlist, segundo factor y elevación viva—, escribe la fila del registro y contesta 204. Si no es 204, el servicio no
-  enseña nada; si Sytue ID no puede escribir la fila, deniega. La comprobación y la traza son la misma llamada: no hay
-  lectura sin rastro.
-- **Solo desde la consola de plataforma.** Los servicios exigen además que el token sea del client `sytue-platform`: un
-  operador elevado que navega por la web de Cast no abre ahí la cola de todas las organizaciones. Y la consola de
-  plataforma solo se alcanza por el túnel administrativo.
-- **La traza.** En el registro de Sytue ID, `platform.moderation.<servicio>.<acción>` con el operador, la organización
-  desde la que actúa (`from_org`) y el client; con la organización afectada, la fila sale también en el registro de esa
-  organización, que ve que Sytue resolvió una denuncia suya. Al listar no hay una organización: la fila dice qué se pidió.
-- **Conservación (las dos colas, Cast y Rooms).** Una denuncia abierta se conserva hasta que alguien la resuelve. Resuelta o
-  descartada, se borra **doce meses** después de su resolución, y con ella lo que guarda de lo denunciado: en Cast, el
-  extracto, el nombre y el texto de quien denuncia; en Rooms, que no copia el mensaje, la fila entera (quién, a quién,
-  motivo, nota y resolución). Lo hace un barrido diario de todas las organizaciones (`PurgarDenuncias`, por la política de
-  mantenimiento). La **traza no se purga**: no lleva contenido —identificadores, acción y quién actuó— y
-  `platform/pkg/auditlog` no fija plazo para ninguna traza de la suite; ponerle uno es decisión del dueño (propuesta:
-  24 meses, el doble que la denuncia, para poder reconstruir una resolución discutida). La política de privacidad lo dice
-  en los 26 idiomas.
-- **Tratamiento por cuenta del cliente.** Que el operador lea y actúe sobre denuncias de una organización cliente es
-  tratamiento de datos por cuenta de ese cliente (contenido denunciado, nombres, el texto de quien denuncia). **Tiene que
-  figurar en las condiciones y en el DPA**: es decisión del dueño revisarlo antes de desplegar.
-- **Lo que queda fuera.** Avisos al operador por el Hub (la cola es la verdad y se mira al elevarse), apelación, detección
-  automática y suspensión de personas a nivel de plataforma.
+`accepted` · 2026-10-12 · Cast, Rooms, Sytue ID and platform console (web only) · owner's decision («cola también para Sytue», “a queue for Sytue too”; «un administrador no ve las denuncias contra sí mismo; Sytue sí», “an administrator does not see reports against themselves; Sytue does”) · code in `platform/pkg/operador`, `services/id/internal/http/platform_moderacion.go`, `services/cast/internal/http/moderacion.go`, `services/rooms/internal/store/operador.go`, `apps/frontend/apps/console/src/components/PlatformModeration.tsx` · migrations `services/cast/db/migrations/0010_cola_del_operador.up.sql` and `services/rooms/db/migrations/0039_cola_del_operador.up.sql` · completes [0073](#0073) and [0074](#0074)
+
+- **What.** Cast and Rooms reports reach two queues: that of whoever administers the organization that owns the content and
+  that of the platform operator (Sytue), in its console (`platform.<dominio>/moderacion`). There is no copy: they are the same
+  rows, so resolving in one closes it in the other. `resolved_by` and `resolved_from` (`org` | `platform`) say who and from
+  where, and in Cast the organization's trail (`moderation_audit`) also carries `from: platform`.
+- **What the operator sees.** All organizations, including reports against whoever administers each one (which that person
+  no longer sees). They see what the report stores or points to, and nothing more: in Cast, the 300-character excerpt, the name of the
+  reported person and the reporter's text; in Rooms, the channel, the name and the reported message trimmed to 300
+  characters. There is no link to enter the customer's content, and who reported never travels.
+- **What they can do.** The same as the organization's queue: in Cast, dismiss, delete the comment or the message,
+  remove the video from the front page, unpublish it and block the person in the organization; in Rooms, dismiss, delete the
+  message and kick out of the channel. Suspending the organization already exists in the platform console, with its second person, and
+  the screen links there. **Suspending a person at the platform level does not exist** and has not been invented: today only
+  whoever administers their organization suspends them.
+- **Who is an operator is said by Sytue ID, on every request.** The service does not deduce it from a role or a claim: before
+  listing or resolving it asks `POST /api/v1/platform/moderation/access` with the caller's token and what they are going to do
+  (service, action, organization, report). That route sits behind the same gate as the rest of the platform API
+  —allowlist, second factor and live elevation—, writes the log row and answers 204. If it is not 204, the service
+  shows nothing; if Sytue ID cannot write the row, it denies. The check and the trail are the same call: there is no
+  read without a trace.
+- **Only from the platform console.** The services also require the token to be from the `sytue-platform` client: an
+  elevated operator browsing Cast's website does not open the all-organizations queue there. And the platform
+  console can only be reached through the administrative tunnel.
+- **The trail.** In the Sytue ID log, `platform.moderation.<servicio>.<acción>` with the operator, the organization
+  from which they act (`from_org`) and the client; with the affected organization, the row also appears in that
+  organization's log, which sees that Sytue resolved one of its reports. When listing there is no organization: the row says what was requested.
+- **Retention (both queues, Cast and Rooms).** An open report is kept until someone resolves it. Resolved or
+  dismissed, it is deleted **twelve months** after its resolution, and with it what it stores of what was reported: in Cast, the
+  excerpt, the name and the reporter's text; in Rooms, which does not copy the message, the entire row (who, whom,
+  reason, note and resolution). It is done by a daily sweep of all organizations (`PurgarDenuncias`, through the maintenance
+  policy). **The trail is not purged**: it carries no content —identifiers, action and who acted— and
+  `platform/pkg/auditlog` does not set a period for any trail in the suite; setting one is the owner's decision (proposal:
+  24 months, twice the report's, to be able to reconstruct a disputed resolution). The privacy policy says so
+  in all 26 languages.
+- **Processing on behalf of the customer.** The operator reading and acting on a customer organization's reports is
+  data processing on behalf of that customer (reported content, names, the reporter's text). **It has to
+  appear in the terms and in the DPA**: reviewing that before deploying is the owner's decision.
+- **What is left out.** Hub notifications to the operator (the queue is the source of truth and is checked when elevating), appeal, automatic
+  detection and suspension of people at the platform level.
 
 <a id="0076"></a>
 
-## 0076 — Docs se separa en cuatro productos con app, host y client propios; `docs.<dominio>/docs` desaparece sin redirecciones
+<a id="0076--docs-se-separa-en-cuatro-productos-con-app-host-y-client-propios-docsdominiodocs-desaparece-sin-redirecciones"></a>
 
-`accepted` · 2026-10-12 · Docus, Calcus, Diapos, CertiPDF, Sytue ID y despliegue · decisión del dueño, por preguntas directas
-(«cada editor es un producto con su nombre, su app nativa y su ficha en las tiendas; la URL tiene que decir lo mismo») ·
-código en `apps/frontend/packages/office`, `apps/frontend/apps/{docus,calcus,diapos,certipdf}` · migración
-`services/id/db/migrations/0111_clientes_oidc_de_la_ofimatica.up.sql` · runbook en
-[operations.md](operations.md#ofimatica-una-app-por-producto) · sustituye la decisión del 2026-09-09 de servir los cuatro
-productos bajo `/docs` con `?kind=`
+## 0076 — Docs is split into four products with their own app, host and client; `docs.<dominio>/docs` disappears without redirects
 
-- **Qué.** Cuatro productos con host y prefijo propios, con la organización en la ruta ([ADR 0056](#0056)):
-  `docus.<dominio>/docus` (documentos), `calcus.<dominio>/calcus` (hojas), `diapos.<dominio>/diapos` (presentaciones) y
-  `certipdf.<dominio>/certipdf` (PDF). Las subrutas se conservan: `docs.sytue.eu/docs/corporate/edit?id=<uuid>` de una hoja
-  pasa a `calcus.sytue.eu/calcus/corporate/edit?id=<uuid>`, y el estudio de PDF a `certipdf.sytue.eu/certipdf/<org>/pdf?path=…`.
-- **Cuatro apps, no una compilada cuatro veces.** Cada producto es una app de Astro (`apps/frontend/apps/<producto>`) con
-  su `base`, su BFF y su client OIDC (`sytue-docus`, `sytue-calcus`, `sytue-diapos`, `sytue-certipdf`). Lo común —el editor,
-  CertiPDF, las vistas, el middleware y el BFF que habla con el servicio— sale al paquete `@sytue/office` y no se copia
-  ([ADR 0037](#0037)): las páginas de cada app son finas y dicen qué producto son; los endpoints `/api/*` los inyecta la
-  integración `sytueOffice()`; las rutas de `/auth/*` reexportan como en el resto de la suite.
-- **El servicio Go sigue siendo uno.** Documentos, hojas y presentaciones comparten modelo, colaboración, permisos,
-  papelera y plantillas, y CertiPDF guarda sus ficheros en Drive; partirlo no daría nada y duplicaría la migración de
-  datos. Ya filtra por tipo (`?kind=`), que es lo único que cada app necesita. Su API sigue en `docs.<dominio>/api/v1`:
-  la usan las apps nativas instaladas, Drive (WOPI) y los BFF, y ninguna persona la ve en la barra de direcciones.
-- **Un documento en la app de otro producto se va a la suya.** Si `calcus…/edit?id=` recibe una presentación, el servidor
-  la manda al editor de Diapos con la misma organización y la misma vuelta a Drive: un enlace compuesto sin saber el tipo
-  —un aviso, una búsqueda— no abre una presentación en Calcus.
-- **`docs.<dominio>/docs` desaparece SIN redirecciones** (elegido frente a «redirigir al producto correcto»). **Lo que se
-  pierde:** todo enlace guardado con esa forma —en un correo, un aviso viejo del Hub, un marcador, una nota o un mensaje
-  de Rooms— deja de funcionar y da 404; los avisos ya emitidos no se reescriben. Los que se generan desde este cambio
-  salen con el host del producto.
-- **Sytue ID.** Los cuatro clients nacen en la 0111 sin secreto (lo pone el despliegue), y `docus`, `calcus`, `diapos` y
-  `certipdf` son slugs reservados: una organización con ese nombre chocaría con el host del producto en el comodín. `docs`
-  sigue reservado (host de la API).
+`accepted` · 2026-10-12 · Docus, Calcus, Diapos, CertiPDF, Sytue ID and deployment · owner's decision, through direct questions
+(«cada editor es un producto con su nombre, su app nativa y su ficha en las tiendas; la URL tiene que decir lo mismo», “each editor is a product with its name, its native app and its store listing; the URL has to say the same”) ·
+code in `apps/frontend/packages/office`, `apps/frontend/apps/{docus,calcus,diapos,certipdf}` · migration
+`services/id/db/migrations/0111_clientes_oidc_de_la_ofimatica.up.sql` · runbook in
+[operations.md](operations.md#ofimatica-una-app-por-producto) · replaces the decision of 2026-09-09 to serve the four
+products under `/docs` with `?kind=`
+
+- **What.** Four products with their own host and prefix, with the organization in the path ([ADR 0056](#0056)):
+  `docus.<dominio>/docus` (documents), `calcus.<dominio>/calcus` (spreadsheets), `diapos.<dominio>/diapos` (presentations) and
+  `certipdf.<dominio>/certipdf` (PDF). Subroutes are preserved: `docs.sytue.eu/docs/corporate/edit?id=<uuid>` of a spreadsheet
+  becomes `calcus.sytue.eu/calcus/corporate/edit?id=<uuid>`, and the PDF studio `certipdf.sytue.eu/certipdf/<org>/pdf?path=…`.
+- **Four apps, not one compiled four times.** Each product is an Astro app (`apps/frontend/apps/<producto>`) with
+  its `base`, its BFF and its OIDC client (`sytue-docus`, `sytue-calcus`, `sytue-diapos`, `sytue-certipdf`). What is common —the editor,
+  CertiPDF, the views, the middleware and the BFF that talks to the service— moves to the `@sytue/office` package and is not copied
+  ([ADR 0037](#0037)): each app's pages are thin and say which product they are; the `/api/*` endpoints are injected by the
+  `sytueOffice()` integration; the `/auth/*` routes re-export as in the rest of the suite.
+- **The Go service is still one.** Documents, spreadsheets and presentations share the model, collaboration, permissions,
+  trash and templates, and CertiPDF stores its files in Drive; splitting it would give nothing and would duplicate the data
+  migration. It already filters by type (`?kind=`), which is all each app needs. Its API stays at `docs.<dominio>/api/v1`:
+  it is used by the installed native apps, Drive (WOPI) and the BFFs, and no person sees it in the address bar.
+- **A document in another product's app goes to its own.** If `calcus…/edit?id=` receives a presentation, the server
+  sends it to the Diapos editor with the same organization and the same return to Drive: a link built without knowing the type
+  —a notification, a search— does not open a presentation in Calcus.
+- **`docs.<dominio>/docs` disappears WITHOUT redirects** (chosen over “redirect to the right product”). **What is
+  lost:** every saved link in that form —in an email, an old Hub notification, a bookmark, a note or a Rooms
+  message— stops working and gives a 404; notifications already issued are not rewritten. Those generated since this change
+  come out with the product's host.
+- **Sytue ID.** The four clients are born in 0111 without a secret (the deployment sets it), and `docus`, `calcus`, `diapos` and
+  `certipdf` are reserved slugs: an organization with that name would collide with the product's host in the wildcard. `docs`
+  remains reserved (the API host).
 
 <a id="0077"></a>
 
-## 0077 — Rooms cifra en los dispositivos mediante Matrix; los canales externos conservan la protección real de su proveedor
+<a id="0077--rooms-cifra-en-los-dispositivos-mediante-matrix-los-canales-externos-conservan-la-protección-real-de-su-proveedor"></a>
 
-`accepted` · 2026-10-16 · decisión expresa del titular en esta sesión · acota las
-restricciones de lenguaje y licencia de 0016, 0018 y de la retirada de motores AGPL
+## 0077 — Rooms encrypts on devices through Matrix; external channels keep their provider's real protection
 
-**Problema.** Guardar y procesar texto en el servicio de Rooms impedía ofrecer E2E.
-Añadir un candado al asistente no cambia quién puede leer el mensaje. Además, los
-SDK web y Fyne deben intercambiar mensajes, recuperar historial y retirar dispositivos
-sin entregar sus claves al servidor.
+`accepted` · 2026-10-16 · express decision by the owner in this session · bounds the
+language and license restrictions of 0016, 0018 and the removal of AGPL engines
 
-**Decisión.** El contenido nativo se cifra en los clientes con las implementaciones
-mantenidas de Olm/Megolm: el SDK Matrix web con Rust/WASM y mautrix-go con GoOlm en
-Fyne. Synapse, sin modificaciones, funciona como transporte separado, con base de
-datos y credenciales propias; no se incorpora su código al producto propietario.
-Las versiones están en CONVENTIONS §3 y los manifiestos fijan la imagen por digest.
-Se conservan las licencias, avisos y acceso a las fuentes exactas de estas piezas.
-La excepción MPL se limita a mautrix-go y su dependencia go.mau.fi/util, sin abrir
-el gate a otras dependencias copyleft.
+**Problem.** Storing and processing text in the Rooms service prevented offering E2E.
+Adding a padlock to the assistant does not change who can read the message. In addition, the
+web and Fyne SDKs must exchange messages, recover history and remove devices
+without handing their keys to the server.
 
-Sytue ID sigue siendo la autoridad de identidad. El inicio de sesión Matrix usa OIDC
-y PKCE; las contraseñas, el registro público y la federación se desactivan. El servicio
-Rooms aprovisiona salas privadas según su ACL y conserva referencias opacas a eventos
-cifrados. El controlador administrativo permanece como miembro de metadatos:
-Synapse exige que el administrador siga dentro para gestionar una sala privada, y
-vacía el estado actual cuando sale el último miembro local. No ejecuta un cliente
-criptográfico. Los SDK comparten claves únicamente con dispositivos verificados
-por SAS o firmados por una identidad ya verificada; el MXID fijo del controlador
-queda excluido de verificación y de solicitudes de claves, aunque publique un
-dispositivo autofirmado. Esta separación se comprueba con los motores reales;
-no depende de que la cuenta carezca de dispositivos en el momento del despliegue.
-Las salas nuevas usan la versión 12 y su poder implícito del creador.
+**Decision.** Native content is encrypted on the clients with the maintained
+Olm/Megolm implementations: the Matrix web SDK with Rust/WASM and mautrix-go with GoOlm in
+Fyne. Synapse, unmodified, works as a separate transport, with its own database
+and credentials; its code is not incorporated into the proprietary product.
+The versions are in CONVENTIONS §3 and the manifests pin the image by digest.
+The licenses, notices and access to the exact sources of these pieces are preserved.
+The MPL exception is limited to mautrix-go and its dependency go.mau.fi/util, without opening
+the gate to other copyleft dependencies.
 
-La suspensión de una cuenta y la retirada de una organización revocan el transporte
-antes de confirmar el cambio en ID. Las reactivaciones salen del outbox compartido
-después del commit, con versiones monotónicas y comprobación del estado actual de ID.
-Los fallos no abren una vía de texto en claro. Recuperación, verificación de dispositivos,
-adjuntos y borradores se resuelven en el cliente; el historial anterior se identifica
-como anterior al E2E y no se presenta como cifrado retroactivamente. Las claves de
-llamadas nativas deben circular por eventos Matrix autenticados y cifrados, nunca
-por la señalización legible del SFU.
+Sytue ID remains the identity authority. Matrix sign-in uses OIDC
+and PKCE; passwords, public registration and federation are disabled. The Rooms
+service provisions private rooms according to its ACL and keeps opaque references to encrypted
+events. The administrative controller remains as a metadata member:
+Synapse requires the administrator to stay inside to manage a private room, and
+it clears the current state when the last local member leaves. It does not run a
+cryptographic client. The SDKs share keys only with devices verified
+by SAS or signed by an already verified identity; the controller's fixed MXID
+is excluded from verification and from key requests, even if it publishes a
+self-signed device. This separation is checked with the real engines;
+it does not depend on the account having no devices at deployment time.
+New rooms use version 12 and its implicit creator power.
 
-**Canales externos.** El titular autorizó intercambio completo con Slack, Teams y
-Google mediante consentimiento de cada cuenta, y pidió usar E2E externo cuando exista
-una API oficial compatible. Esas conversaciones se distinguen de Rooms nativo y
-declaran la protección efectiva de su proveedor. No se descifra y reenvía una sala
-nativa por activar una conexión. La opción de enviar solo avisos/enlaces sigue siendo
-válida. Una videollamada que solicita E2E debe comprobar la confirmación del proveedor;
-si no puede activarlo, falla de forma explícita sin reducir la protección a escondidas.
+Suspending an account and removing an organization revoke the transport
+before confirming the change in ID. Reactivations come out of the shared outbox
+after the commit, with monotonic versions and a check of the current state in ID.
+Failures do not open a plaintext path. Recovery, device verification,
+attachments and drafts are resolved on the client; earlier history is identified
+as pre-E2E and is not presented as retroactively encrypted. Native call
+keys must travel through authenticated and encrypted Matrix events, never
+through the SFU's readable signaling.
 
-**Consecuencias.** Se opera un transporte adicional y se mantienen dos SDK compatibles.
-Antes de publicar clientes se exige verificar intercambio web/Fyne, recuperación,
-expulsión de miembros y dispositivos, adjuntos y medios. La aprobación arquitectónica
-no demuestra por sí sola que esa validación esté terminada. La interoperabilidad
-europea de WhatsApp queda aplazada por decisión del titular; la configuración de Meta
-Business queda pendiente hasta disponer de una sesión administrativa autorizada.
+**External channels.** The owner authorized full exchange with Slack, Teams and
+Google through each account's consent, and asked to use external E2E when there is
+a compatible official API. Those conversations are distinguished from native Rooms and
+declare their provider's effective protection. A native room is not decrypted and forwarded
+because a connection is enabled. The option of sending only notifications/links remains
+valid. A video call that requests E2E must check the provider's confirmation;
+if it cannot enable it, it fails explicitly without silently lowering the protection.
 
-**Fuentes.** [Especificación Matrix](https://spec.matrix.org/latest/client-server-api/),
-[OIDC de Synapse](https://element-hq.github.io/synapse/latest/openid.html) y
-[cifrado de reuniones Teams en Microsoft Graph](https://learn.microsoft.com/en-us/graph/api/application-post-onlinemeetings?tabs=http&view=graph-rest-1.0).
+**Consequences.** An additional transport is operated and two compatible SDKs are maintained.
+Before publishing clients it is required to verify web/Fyne exchange, recovery,
+removal of members and devices, attachments and media. Architectural approval
+does not by itself prove that this validation is finished. European WhatsApp
+interoperability is postponed by the owner's decision; the Meta
+Business configuration is pending until an authorized administrative session is available.
+
+**Sources.** [Matrix specification](https://spec.matrix.org/latest/client-server-api/),
+[Synapse OIDC](https://element-hq.github.io/synapse/latest/openid.html) and
+[Teams meeting encryption in Microsoft Graph](https://learn.microsoft.com/en-us/graph/api/application-post-onlinemeetings?tabs=http&view=graph-rest-1.0).
 
 <a id="0078"></a>
 
-## 0078 — Widgets nativos: contadores con caducidad en un App Group, Apple tras un interruptor y nada en Windows/Linux
+<a id="0078--widgets-nativos-contadores-con-caducidad-en-un-app-group-apple-tras-un-interruptor-y-nada-en-windowslinux"></a>
 
-`accepted` · 2026-10-21 · PR #967 · completa la sesión compartida de las apps de Fyne
+## 0078 — Native widgets: expiring counters in an App Group, Apple behind a switch and nothing on Windows/Linux
 
-**Problema.** Las apps de Fyne querían un widget en la pantalla de inicio (iOS, Android) y en
-el escritorio de macOS, con un acceso directo a abrir y buscar. Un widget lo pinta el sistema
-en otro proceso que no tiene ni la sesión, ni la red, ni el Keychain de la app; lo que lea
-tiene que dejárselo la app escrito antes, y eso no puede convertirse en una copia en claro
-de los datos de la persona. Además, en Apple compartir una carpeta entre la app y su
-extensión pide un App Group registrado a mano en Developer Portal: encenderlo sin ese paso
-rompe la firma de iOS, Mac App Store y Developer ID de las quince apps a la vez.
+`accepted` · 2026-10-21 · PR #967 · completes the shared session of the Fyne apps
 
-**Decisión.**
+**Problem.** The Fyne apps wanted a widget on the home screen (iOS, Android) and on
+the macOS desktop, with a shortcut to open and search. A widget is drawn by the system
+in another process that has neither the session, nor the network, nor the app's Keychain; whatever it reads
+has to be left written for it by the app beforehand, and that cannot become a plaintext copy
+of the person's data. Moreover, on Apple sharing a folder between the app and its
+extension requires an App Group registered by hand in the Developer Portal: turning it on without that step
+breaks the iOS, Mac App Store and Developer ID signing of all fifteen apps at once.
 
-- **El formato del snapshot** (`apps/nucleo/widgets`, versión 1): un JSON por app,
-  `widgets/<bundle>.json` dentro de la carpeta de ajustes de la suite, con `version`,
-  `product`, `generation`, `updated_at`, `expires_at`, `active`, hasta doce `counters`
-  `{kind, value}`, hasta ocho `items` visuales saneados (`title`, `subtitle`, `badge`,
-  `color`, `start_at`, `end_at`, `all_day`, `unread`, `done`) y `calendar` opcional
-  (`year`, `month`, `busy_days`, `day_colors`). `kind` sale de una lista cerrada (`unread`,
-  `notes`, `calendars`, `address_books`…) y `value` es un entero acotado. El lector nativo
-  (`Snapshot.swift`, `WidgetSnapshot.java`, `Widgets.java`) rechaza campos de más, nulos,
-  ficheros de más de 16 KiB y cualquier valor fuera de esa forma.
-- **Límites de privacidad (ampliados el 2026-11-01 para widgets visuales).** Las quince
-  apps publican cabeceras visuales acotadas (próximos eventos y días ocupados del mes en
-  Calendar, remitente/asunto en Mail, canales públicos no externos en Rooms, notas/tareas
-  no cifradas en Notes, archivos recientes en Drive/Docus/Calcus/Diapos/CertiPDF/Bases/Photos,
-  contactos, vídeos/directos en Cast, actividades pendientes en ERP y agenda en Hub), nunca
-  cuerpos de mensaje, marcadores de cifrado E2E (`enc:v1:`, rechazados tanto al publicar
-  como al leer), salas privadas/externas ni enlaces arbitrarios. Un snapshot **caduca**
-  (15 min al publicarlo, 30 como máximo) y se ignora caducado, con fecha futura o de otra
-  generación de sesión (`sesion.marca`, opaca, nunca el sujeto ni el correo). Se **borra al
-  cerrar sesión o al activar el bloqueo** de la suite, y el lector comprueba la marca y el
-  bloqueo (`KeyguardManager.isDeviceLocked()` en Android y `NSFileProtectionComplete` +
-  `privacySensitive()` en Apple) aunque el borrado falle. La app publica solo lo que ya ha
-  pedido para su propia pantalla, nunca una petición extra, y captura la sesión **antes**
-  de pedirlo: una respuesta tardía de otra cuenta no se publica. Las extensiones no tienen
-  red ni Keychain.
-- **Dónde vive.** En Android, la carpeta privada del propio APK, que lee su
-  `AppWidgetProvider` (`eu.sytue.nativo.Widgets`). En Apple, el App Group
-  **`group.eu.sytue.suite`** (`ajustes/grupo_apple.go`), común a las quince apps y a sus
-  quince extensiones `eu.sytue.<app>.widgets`, que es también donde pasan a vivir los
-  ajustes de la suite mientras están encendidos. Los tokens siguen en el Keychain (`<equipo>.eu.sytue.suite`), nunca
-  en el App Group.
-- **Apple, tras un interruptor único**: `SYTUE_WIDGETS_APPLE` en
-  `apps/fyne/xcode/Sytue.xcconfig`, **`NO`** hasta que el dueño haga los pasos de
-  [«Activar los widgets de Apple»](operations.md#activar-widgets-apple). Lo leen
-  `empaquetar.sh` (`widgets-apple`), `generar.py`, `widgetkit-apple.py` y
-  `release-desktop.yml`. Apagado, cada host se firma como antes de los widgets: sin
-  extensión dentro, sin App Group, Developer ID sin perfil y la Mac App Store con el grupo
-  `<equipo>.eu.sytue.suite` de siempre. Y si en marcha el sistema no da la carpeta del
-  grupo, `ajustes` vuelve a la anterior sin error. Está en un fichero versionado y no en una
-  variable del repositorio para que **viaje con el tag**: un tag anterior sale apagado, y
-  encenderlo se ve en el diff.
-- **Android, encendido**: no depende de nada externo y su empaquetado lo comprueba
+**Decision.**
+
+- **The snapshot format** (`apps/nucleo/widgets`, version 1): one JSON per app,
+  `widgets/<bundle>.json` inside the suite's settings folder, with `version`,
+  `product`, `generation`, `updated_at`, `expires_at`, `active`, up to twelve `counters`
+  `{kind, value}`, up to eight sanitized visual `items` (`title`, `subtitle`, `badge`,
+  `color`, `start_at`, `end_at`, `all_day`, `unread`, `done`) and an optional `calendar`
+  (`year`, `month`, `busy_days`, `day_colors`). `kind` comes from a closed list (`unread`,
+  `notes`, `calendars`, `address_books`…) and `value` is a bounded integer. The native reader
+  (`Snapshot.swift`, `WidgetSnapshot.java`, `Widgets.java`) rejects extra fields, nulls,
+  files larger than 16 KiB and any value outside that shape.
+- **Privacy limits (extended on 2026-11-01 for visual widgets).** The fifteen
+  apps publish bounded visual headers (upcoming events and the month's busy days in
+  Calendar, sender/subject in Mail, public non-external channels in Rooms, unencrypted notes/tasks
+  in Notes, recent files in Drive/Docus/Calcus/Diapos/CertiPDF/Bases/Photos,
+  contacts, videos/live streams in Cast, pending activities in ERP and agenda in Hub), never
+  message bodies, E2E encryption markers (`enc:v1:`, rejected both when publishing
+  and when reading), private/external rooms or arbitrary links. A snapshot **expires**
+  (15 min when published, 30 at most) and is ignored if expired, future-dated or from another
+  session generation (`sesion.marca`, opaque, never the subject or the email). It is **deleted on
+  sign-out or when the suite lock is activated**, and the reader checks the marker and the
+  lock (`KeyguardManager.isDeviceLocked()` on Android and `NSFileProtectionComplete` +
+  `privacySensitive()` on Apple) even if the deletion fails. The app publishes only what it has already
+  requested for its own screen, never an extra request, and captures the session **before**
+  requesting it: a late response from another account is not published. The extensions have no
+  network or Keychain.
+- **Where it lives.** On Android, the APK's own private folder, read by its
+  `AppWidgetProvider` (`eu.sytue.nativo.Widgets`). On Apple, the App Group
+  **`group.eu.sytue.suite`** (`ajustes/grupo_apple.go`), common to the fifteen apps and their
+  fifteen `eu.sytue.<app>.widgets` extensions, which is also where the suite's settings
+  move to live while it is on. Tokens stay in the Keychain (`<equipo>.eu.sytue.suite`), never
+  in the App Group.
+- **Apple, behind a single switch**: `SYTUE_WIDGETS_APPLE` in
+  `apps/fyne/xcode/Sytue.xcconfig`, **`NO`** until the owner carries out the steps of
+  [«Activar los widgets de Apple»](operations.md#activar-widgets-apple) (“Enable the Apple widgets”). It is read by
+  `empaquetar.sh` (`widgets-apple`), `generar.py`, `widgetkit-apple.py` and
+  `release-desktop.yml`. Off, each host is signed as before the widgets: no
+  extension inside, no App Group, Developer ID without a profile and the Mac App Store with the usual
+  `<equipo>.eu.sytue.suite` group. And if at runtime the system does not provide the group
+  folder, `ajustes` falls back to the previous one without error. It is in a versioned file and not in a
+  repository variable so that **it travels with the tag**: an earlier tag comes out off, and
+  turning it on shows up in the diff.
+- **Android, on**: it does not depend on anything external and its packaging checks it
   (`android-widgets-test.py`, `verificar_aab`).
-- **Windows y Linux, nada.** El tablero de Widgets de Windows 11 pide empaquetar en MSIX, un
-  proveedor COM y Adaptive Cards: otra cadena de distribución para un contador. Linux no tiene
-  una superficie estándar (cada escritorio la suya, o ninguna). Sin un lector, Go **no
-  escribe** snapshots: `widgets.Disponible()` solo es cierto en Android y en un host de Apple
-  que haya cargado el puente de WidgetKit, que `empaquetar.sh` enlaza solo con el
-  interruptor encendido.
+- **Windows and Linux, nothing.** The Windows 11 Widgets board requires MSIX packaging, a
+  COM provider and Adaptive Cards: another distribution chain for a counter. Linux does not have
+  a standard surface (each desktop its own, or none). Without a reader, Go **does not
+  write** snapshots: `widgets.Disponible()` is only true on Android and on an Apple host
+  that has loaded the WidgetKit bridge, which `empaquetar.sh` links only with the
+  switch on.
 
-**Descartado.** _Leer los datos desde la extensión con su propia sesión_: pondría un refresh
-token en un proceso que el sistema arranca cuando quiere y que no puede pedir
-reautenticación. _Títulos y próximos eventos en el widget_: es lo que se vería con el
-teléfono en la mesa; se puede reconsiderar con una decisión expresa. _Una variable de
-repositorio como interruptor_: no viaja con el tag y un re-despacho de una release antigua
-encendería los widgets sobre fuentes que no los traen.
+**Ruled out.** _Reading the data from the extension with its own session_: it would put a refresh
+token in a process the system starts whenever it wants and that cannot request
+reauthentication. _Titles and upcoming events in the widget_: it is what would be seen with the
+phone on the table; it can be reconsidered with an express decision. _A repository
+variable as the switch_: it does not travel with the tag and re-dispatching an old release
+would turn on the widgets on sources that do not include them.
 
-**Consecuencias.** Hasta encender el interruptor, iOS y macOS no tienen widgets, y la Mac
-App Store sigue con el grupo antiguo. Encenderlo es un commit (el interruptor y
-`python3 apps/fyne/xcode/generar.py`) después de los pasos manuales; desde ese tag,
-`release-desktop` trae los perfiles de las apps y de sus widgets con `apple-perfiles.py`.
-Ningún widget se ha visto aún en un dispositivo; lo que falta está en
+**Consequences.** Until the switch is turned on, iOS and macOS have no widgets, and the Mac
+App Store stays with the old group. Turning it on is a commit (the switch and
+`python3 apps/fyne/xcode/generar.py`) after the manual steps; from that tag on,
+`release-desktop` fetches the profiles of the apps and their widgets with `apple-perfiles.py`.
+No widget has been seen on a device yet; what is missing is in the
 [roadmap](roadmap.md#widgets-nativos-lo-que-falta).
 
-**Enmienda (2026-11-06): publicar tras cada cambio.** Petición del dueño: «los widgets
+**Amendment (2026-11-06): publish after every change.** The owner's request: «los widgets
 nativos no se actualizan en tiempo real; al añadir un evento para hoy, no sale en el
-widget». La causa medida no era de ninguna app: `auth.Save` cambia `sesion.marca` en
-**cada** guardado de tokens, y Sytue ID rota el refresh cada ~15 min. La captura de la vista
-(`Capture(generación)`) dejaba de valer en la primera renovación, `PublishDetail` devolvía
-`ErrPrivate` y todas las apps lo descartaban: con Calendar abierta más de 15 min, crear un
-evento de hoy no publicaba nada. Además cada pantalla publicaba lo que tenía a la vista (el
-mes que se miraba, la carpeta abierta), desde rutinas sueltas que podían pisarse.
+widget» (“native widgets do not update in real time; when adding an event for today, it does not show in the widget”). The measured cause was not in any app: `auth.Save` changes `sesion.marca` on
+**every** token save, and Sytue ID rotates the refresh token every ~15 min. The view's capture
+(`Capture(generación)`) stopped being valid at the first renewal, `PublishDetail` returned
+`ErrPrivate` and every app discarded it: with Calendar open for more than 15 min, creating an
+event for today published nothing. In addition each screen published what it had in view (the
+month being looked at, the open folder), from loose routines that could overwrite each other.
 
-Cambia (pieza 1 de 6, hecha):
+What changes (piece 1 of 6, done):
 
-1. **La app publica tras cada cambio, con una lectura propia y acotada.** Sustituye a «la app
-   publica solo lo que ya ha pedido para su pantalla, nunca una petición extra». Cada app da
-   una `Fuente` (`apps/nucleo/widgets/fuentes`, sin Fyne) que lee lo justo para su widget
-   —como mucho 4 + N peticiones por ronda— y un único `widgets.Publicador` decide cuándo:
-   antirrebote de 1,5 s (una ráfaga publica como tarde a los 5 s), una ronda a la vez, y
-   **como mucho una ronda cada 30 s por escrituras**, que solo cuentan si son del cliente del
-   propio producto (`Suite.ClienteConAviso`; nunca presencia, avisos ni preferencias). Lo
-   disparan también entrar, quitar el bloqueo, volver a primer plano, recuperar la red, un
-   aviso del Hub del producto, el vivo de Mail y Rooms (también al reconectar), un latido de
-   10 min con la app viva y la medianoche. **Al pasar al fondo** se publica ya lo que el
-   antirrebote o la ventana de 30 s tuvieran aplazado (`PublicarPendiente`, 4 s): es cuando
-   se mira el widget, e iOS suspende la app segundos después. Las pantallas ya no publican (`TestNadiePublicaWidgetsDesdeLaVista`).
-2. **Lo publicado no depende de la pantalla.** Calendar lee el mes en curso de todos los
-   calendarios, Mail siempre Recibidos, Contacts y Notes la libreta o el cuaderno inicial,
-   Drive la raíz, los editores su lista sin búsqueda ni destacados.
-3. **La marca de la captura es la época de identidad.** `ajustes.MarcarIdentidad` escribe
-   `sesion.epoca` (azar de 128 bits, huellas saladas del emisor, cliente, sujeto y
-   organización, y la marca con la que se confirmó); solo rota si cambia quién o al cerrar
-   sesión. `PublishDetail` exige la época capturada y que esté confirmada con la marca actual,
-   y escribe en `generation` la marca **actual**: los lectores (Swift, Java) no cambian. Una
-   sesión cambiada por una compilación que no conoce la época falla cerrado hasta que otra
-   app la adopte y la confirme. La llaman `auth.Save` y `AlmacenSesion.Guardar` (siempre bajo
-   `CerrojoSesion`, por eso no lo toma ella) y la suite al adoptar una sesión.
-4. **Una sesión rechazada borra el widget de esa app** (`ClearBundleIf`); un fallo de red
-   conserva lo publicado, también si falla una lectura secundaria (la cuota, los directos,
-   los álbumes): solo un 403/404 publica sin ese dato. Un rechazo puntual no rota la época de las quince.
+1. **The app publishes after every change, with its own bounded read.** It replaces “the app
+   publishes only what it has already requested for its screen, never an extra request”. Each app provides
+   a `Fuente` (`apps/nucleo/widgets/fuentes`, without Fyne) that reads just what its widget needs
+   —at most 4 + N requests per round— and a single `widgets.Publicador` decides when:
+   a 1.5 s debounce (a burst publishes at the latest after 5 s), one round at a time, and
+   **at most one round every 30 s due to writes**, which only count if they come from the
+   product's own client (`Suite.ClienteConAviso`; never presence, notifications or preferences). It is
+   also triggered by signing in, removing the lock, returning to the foreground, regaining the network, a
+   Hub notification for the product, the Mail and Rooms live streams (also on reconnect), a 10-min
+   heartbeat with the app alive, and midnight. **When going to the background** whatever the
+   debounce or the 30 s window had deferred is published right away (`PublicarPendiente`, 4 s): that is when
+   the widget is looked at, and iOS suspends the app seconds later. Screens no longer publish (`TestNadiePublicaWidgetsDesdeLaVista`).
+2. **What is published does not depend on the screen.** Calendar reads the current month of all
+   calendars, Mail always Inbox, Contacts and Notes the initial address book or notebook,
+   Drive the root, the editors their list without search or starred items.
+3. **The capture marker is the identity epoch.** `ajustes.MarcarIdentidad` writes
+   `sesion.epoca` (128 random bits, salted fingerprints of the issuer, client, subject and
+   organization, and the marker it was confirmed with); it only rotates if who changes or on
+   sign-out. `PublishDetail` requires the captured epoch and that it be confirmed with the current marker,
+   and writes the **current** marker in `generation`: the readers (Swift, Java) do not change. A
+   session changed by a build that does not know the epoch fails closed until another
+   app adopts and confirms it. It is called by `auth.Save` and `AlmacenSesion.Guardar` (always under
+   `CerrojoSesion`, which is why it does not take it itself) and by the suite when adopting a session.
+4. **A rejected session deletes that app's widget** (`ClearBundleIf`); a network failure
+   keeps what was published, also if a secondary read fails (the quota, the live streams,
+   the albums): only a 403/404 publishes without that data. A one-off rejection does not rotate the epoch of all fifteen.
 
-Sigue igual: sin tokens, red ni Keychain en la extensión o el receptor; saneado y lista
-cerrada de `kind`; borrado al salir y al bloquear; el lector comprueba marca, caducidad y
-bloqueo; se captura antes de pedir; nada en Windows ni Linux; `NSFileProtectionComplete`;
-caducidad de 15 min (30 como máximo).
+What stays the same: no tokens, network or Keychain in the extension or the receiver; sanitizing and the closed list
+of `kind`; deletion on sign-out and on locking; the reader checks marker, expiry and
+lock; capture before requesting; nothing on Windows or Linux; `NSFileProtectionComplete`;
+15-min expiry (30 at most).
 
-Pendiente, cada pieza con su commit: (2) formato v2 con la época como marca, 24 h y
-«Actualizado hace X» en los lectores (hecha: enmienda siguiente); (3) señal `datos` del servidor, también al terminar
-los trabajos asíncronos de Photos, Cast y CertiPDF (hecha: la de la señal de cambios); (4) refresco en segundo plano en iOS
-sin presencia ni SSE (hecha en la suite, se enciende con el tag del fork: la enmienda del refresco); (5) push silencioso con un único registro APNs en el Hub (enmienda del
-[ADR 0039](#0039)); (6) Android sin actividad. Detalle en
+Pending, each piece with its commit: (2) format v2 with the epoch as the marker, 24 h and
+“Updated X ago” in the readers (done: next amendment); (3) the server's `datos` signal, also when the
+asynchronous jobs of Photos, Cast and CertiPDF finish (done: the change-signal one); (4) background refresh on iOS
+without presence or SSE (done in the suite, it is turned on with the fork's tag: the refresh amendment); (5) silent push with a single APNs registry in the Hub (amendment to
+[ADR 0039](#0039)); (6) Android without an activity. Details in the
 [roadmap](roadmap.md#widgets-nativos-lo-que-falta).
 
-**Enmienda (2026-11-07): formato 2, un día de vida y «Actualizado hace X»** (pieza 2 de 6,
-hecha). El dueño pidió que lo publicado no desaparezca a los 15–30 min: el widget enseña el
-último dato y dice de cuándo es.
+**Amendment (2026-11-07): format 2, one day of life and “Updated X ago”** (piece 2 of 6,
+done). The owner asked that what is published not disappear after 15–30 min: the widget shows the
+latest data and says when it is from.
 
-1. **Formato 2.** `generation` lleva la **época** (`sesion.epoca`), no la marca de sesión: una
-   renovación ya no invalida ni la captura ni lo publicado. Los tres lectores (Go
-   `Snapshot.Visible`, `Snapshot.swift`, `WidgetSnapshot.java`) aceptan **solo** la 2 y exigen
-   la misma regla: la época actual; **confirmada con la `sesion.marca` actual** (si la última
-   sesión la cambió una compilación que no conoce la época —las quince apps se actualizan por
-   separado—, se oculta); **ningún `*.cerrada`** en la carpeta; sin bloqueo; y como mucho
-   24 h entre `updated_at` y `expires_at`. Los casos son un único fichero,
-   `apps/nucleo/widgets/testdata/contrato.tsv`, que corren Go, Java y Swift; un test de Go
-   comprueba además que Swift y Java dicen `86400`, `900` y la versión 2.
-2. **24 h de caducidad**, y no menos: los quince widgets enseñan «lo de hoy», y pasado un día
-   enseñarían el hoy de ayer como si fuera el de hoy; con algo más corto (2 h) el widget se
-   vaciaría cada noche, que es lo que se pidió evitar. **Coste reconocido**: si la sesión se
-   revoca desde el servidor y la app no corre, el último dato puede seguir visible hasta 24 h
-   (antes, 30 min). Lo acotan el borrado al rechazarse la sesión, el bloqueo del dispositivo
-   y el despertar de las piezas 4–6 ([seguridad](security.md#widgets-24-h)).
-   `RenovarTras` pasa a 10 min, el latido del Publicador: `updated_at` dice cuándo se
-   comprobó.
-3. **«Actualizado hace X» a partir de 15 min** (`Snapshot.Rancio`). En iOS y macOS, la
-   línea de tiempo se precalcula entera con `.atEnd` —ahora; +15, +30, +45 min y cada hora
-   desde la comprobación; cada medianoche; el fin de cada evento; la caducidad sin datos—,
-   hasta 40 entradas y sin recargas periódicas: recarga la app al publicar. El rótulo es
-   `widgets.updatedAgo` con `RelativeDateTimeFormatter`, calculado para la fecha de cada
-   entrada. Si la lectura falla por la protección de datos (`NSFileProtectionComplete` con el
-   teléfono bloqueado), **no** se devuelve la entrada vacía: se pinta el marco con el marcador
-   y se vuelve a pedir a los 5 min. En Android el rótulo es la **hora absoluta**
-   (`widgets.updatedAt`, «Actualizado: 14:05»), siempre que hay datos: `RemoteViews` se queda
-   con el texto con que se pintó, y nada garantiza repintar al desbloquear, así que «hace X»
-   mentiría. Con el dispositivo bloqueado el receptor **no repinta** la pantalla de inicio
-   (que no se ve), salvo un anfitrión `KEYGUARD`, que se deja en blanco; y una alarma
-   `AlarmManager.RTC` (sin despertar ni permiso) repinta en el próximo cambio: fin de un
-   evento, medianoche o caducidad (a los 5 min si estaba bloqueado).
-4. **Calendar recorta sus filas en el lector** (`widgets.Vigentes`, la misma regla en los
-   tres): un evento con hora vale hasta que termina; uno de día completo es flotante
-   (medianoche UTC) y vale hasta la medianoche local que sigue a su último día. La rejilla es
-   la del mes de la entrada, con los días ocupados solo si el snapshot es de ese mes. La
-   Fuente de Calendar usa la misma regla: hasta ahora corría el día completo una hora en
-   Madrid y marcaba ocupado también el día siguiente.
-5. **Android con la sesión compartida**: el broker da `marca_widgets` =
-   SHA-256(«sytue-widgets\0» ‖ su época), que solo cambia con otra identidad, el bloqueo o
-   una revocación; es la época de los snapshots y lo que compara `Widgets.java`
-   (`SesionCompartida.marcaWidgets`). La época en claro del broker no sale: ata los
-   desafíos del dueño.
+1. **Format 2.** `generation` carries the **epoch** (`sesion.epoca`), not the session marker: a
+   renewal no longer invalidates either the capture or what was published. The three readers (Go
+   `Snapshot.Visible`, `Snapshot.swift`, `WidgetSnapshot.java`) accept **only** version 2 and require
+   the same rule: the current epoch; **confirmed with the current `sesion.marca`** (if the last
+   session was changed by a build that does not know the epoch —the fifteen apps are updated
+   separately—, it is hidden); **no `*.cerrada`** in the folder; no lock; and at most
+   24 h between `updated_at` and `expires_at`. The cases are a single file,
+   `apps/nucleo/widgets/testdata/contrato.tsv`, run by Go, Java and Swift; a Go test
+   also checks that Swift and Java say `86400`, `900` and version 2.
+2. **24 h expiry**, and not less: the fifteen widgets show “today's things”, and after a day
+   they would show yesterday's today as if it were today's; with something shorter (2 h) the widget would
+   empty every night, which is what was asked to avoid. **Acknowledged cost**: if the session is
+   revoked from the server and the app is not running, the latest data can remain visible for up to 24 h
+   (previously, 30 min). It is bounded by deletion when the session is rejected, the device lock
+   and the wake-up of pieces 4–6 ([security](security.md#widgets-24-h)).
+   `RenovarTras` becomes 10 min, the Publisher's heartbeat: `updated_at` says when it was
+   checked.
+3. **“Updated X ago” from 15 min on** (`Snapshot.Rancio`). On iOS and macOS, the
+   timeline is precomputed in full with `.atEnd` —now; +15, +30, +45 min and every hour
+   from the check; every midnight; the end of each event; the expiry with no data—,
+   up to 40 entries and without periodic reloads: the app reloads on publishing. The label is
+   `widgets.updatedAgo` with `RelativeDateTimeFormatter`, computed for each
+   entry's date. If the read fails because of data protection (`NSFileProtectionComplete` with the
+   phone locked), the empty entry is **not** returned: the frame is drawn with the placeholder
+   and it is requested again after 5 min. On Android the label is the **absolute time**
+   (`widgets.updatedAt`, «Actualizado: 14:05», “Updated: 14:05”), whenever there is data: `RemoteViews` keeps
+   the text it was drawn with, and nothing guarantees a repaint on unlock, so “X ago”
+   would lie. With the device locked the receiver **does not repaint** the home screen
+   (which is not visible), except for a `KEYGUARD` host, which is left blank; and an
+   `AlarmManager.RTC` alarm (no wake-up and no permission) repaints at the next change: the end of an
+   event, midnight or expiry (after 5 min if it was locked).
+4. **Calendar trims its rows in the reader** (`widgets.Vigentes`, the same rule in all
+   three): a timed event is valid until it ends; an all-day one is floating
+   (UTC midnight) and is valid until the local midnight following its last day. The grid is
+   that of the entry's month, with busy days only if the snapshot is from that month. The
+   Calendar Fuente uses the same rule: until now it shifted the all-day event by an hour in
+   Madrid and also marked the following day as busy.
+5. **Android with the shared session**: the broker gives `marca_widgets` =
+   SHA-256(«sytue-widgets\0» ‖ its epoch), which only changes with another identity, the lock or
+   a revocation; it is the snapshots' epoch and what `Widgets.java` compares
+   (`SesionCompartida.marcaWidgets`). The broker's plaintext epoch does not leave: it binds the
+   owner's challenges.
 
-Sigue igual que en la enmienda anterior; además, nada nuevo en la extensión o el receptor:
-ni red, ni Keychain, ni sesión. Pendiente: las piezas 3 a 6.
+Everything else stays as in the previous amendment; in addition, nothing new in the extension or the receiver:
+no network, no Keychain, no session. Pending: pieces 3 to 6.
 
-**Enmienda (2026-11-07): la señal de cambios del servidor** (pieza 3 de 6, hecha). Con la
-app abierta, lo que cambiaba fuera de ella —en la web, en otro aparato, por otra persona, al
-acabar un trabajo del servidor— no llegaba al widget hasta el latido de 10 min.
+**Amendment (2026-11-07): the server's change signal** (piece 3 of 6, done). With the
+app open, what changed outside it —on the web, on another device, by another person, when
+a server job finished— did not reach the widget until the 10-min heartbeat.
 
-1. **Un evento de estado nuevo, `datos`**, con `{"producto": "<producto>"}` y nada más: sin
-   título, id ni contenido. El producto es el esquema de la app sin `sytue-` y sale de una
-   lista cerrada (`hubnotify.ProductosDeDatos`, atada a los `FyneApp.toml` por un test); el
-   Hub la valida y reescribe el cuerpo, así que un emisor no puede colar nada más por el
-   flujo. Como `avatar`, no se guarda ni sale en la campana.
-2. **Lo emite cada servicio en sus escrituras**, con un único middleware
-   (`hubnotify.TrasEscribir`, tras `RequireAuth`): un 2xx de POST, PUT, PATCH, DELETE o un
-   verbo WebDAV que escribe, a quien escribe. Lo que escribe a ritmo de tecla o no cambia
-   lo que enseña el widget va sin señal: los borradores y ajustes de Mail, las operaciones y
-   la presencia de un documento, la vista previa de una copia de Notepads, buscar GIF y el
-   borrador del compositor en Rooms (también en el cliente nativo, con `SinAviso`). Va también por CalDAV, CardDAV y WebDAV, que es por donde escribe la web de
-   Calendar y los teléfonos (con `MKCALENDAR`), y por las API de compatibilidad de Drive.
-   Mail la lleva en todas las puertas que cambian el buzón: la REST, `POST /jmap` (un lote
-   que solo lee la apaga con `CambioEn` sin productos), el IMAP y la entrega de un correo
-   nuevo, aparte del aviso de la campana (sale aunque Mail esté silenciado).
-   `TestCadaServicioMandaLaSenalDeCambios` exige que los once servicios lo monten con sus
-   productos (Drive también `pdf`; Docs `docs`, `sheets`, `slides` —la ruta no dice el
-   tipo; al crear sí, y va solo al suyo— y `pdf`).
-3. **Y a quienes ven lo escrito** (`hubnotify.AvisarTambien`): en Calendar, el dueño y cada
-   share del calendario en que se escribe, por REST o por CalDAV (`QuienesVen`, una
-   consulta, solo si hay señal en curso), y quien gana o pierde un share o ve borrar el
-   calendario; en el ERP, la responsable de una actividad que otra persona le pone o le
-   cierra; en CertiPDF, la
-   otra parte de una petición de firma (pedir, firmar, rechazar, cancelar); en Notepads y
-   Bases, la persona con quien se comparte o se deja de compartir.
-4. **Al acabar el trabajo asíncrono**, al dueño de lo procesado: el transcodificador de Cast
-   al terminar un trabajo (o al fallar ya sin reintento), el comienzo y el fin de un directo,
-   la pasada que completa el tipo y el tamaño de las fotos en Photos, y el refresco de una
-   suscripción ICS de Calendar cuyo feed cambió (un 304 no), a su dueño y sus shares; el aviso
-   de no entrega que la cola de Mail deja en la Entrada de quien envió; lo que la papelera de
-   Drive hace con el fichero de un documento (la puerta interna de Docs avisa al widget de su
-   tipo, al dueño), y lo que guarda un editor externo por WOPI, que no lleva el Bearer y no
-   pasa por el middleware (a quien edita y al dueño). Las miniaturas de
-   Photos se generan al pedirlas y el EXIF se lee al indexar, dentro de la escritura: no
-   tienen fin asíncrono que avisar.
-5. **Agrupada** por (organización, persona, producto) en 3 s: la primera sale en el acto y
-   las de dentro de la ventana, en una al cerrarla. En memoria, por réplica: es un ahorro, no
-   un tope.
-6. **La barra de Fyne la reenvía al publicador** (`alEstado` → `Suite.AvisoDelHub`), que solo
-   la atiende si el producto es el suyo (el Hub, también `mail` y `calendar`). La de su propio
-   producto le llega también a quien escribe: dentro de los 6 s de una escritura propia
-   (`VentanaEco`, el doble de la ventana de agrupación) es casi siempre su eco y respeta el
-   mínimo de 30 s (`Publicador.AvisarDelServidor`); fuera, se lee tras el antirrebote. Sin
-   eso, el autoguardado de una nota hacía una ronda cada 3 s. Una ronda que empieza después
-   de todo lo apuntado anula la espera al final de esa ventana: una escritura aislada con su
-   eco es una ronda, no dos. Lo que no se distingue es el cambio ajeno que llega dentro de
-   esos 6 s: espera al final de la ventana, como mucho 30 s.
+1. **A new state event, `datos`**, with `{"producto": "<producto>"}` and nothing else: no
+   title, id or content. The product is the app's scheme without `sytue-` and comes from a
+   closed list (`hubnotify.ProductosDeDatos`, tied to the `FyneApp.toml` files by a test); the
+   Hub validates it and rewrites the body, so a sender cannot slip anything else through the
+   stream. Like `avatar`, it is not stored nor does it appear in the bell.
+2. **Each service emits it on its writes**, with a single middleware
+   (`hubnotify.TrasEscribir`, after `RequireAuth`): a 2xx to POST, PUT, PATCH, DELETE or a
+   writing WebDAV verb, to whoever writes. What is written at keystroke rate or does not change
+   what the widget shows goes without a signal: Mail drafts and settings, a document's operations and
+   presence, the preview of a Notepads copy, GIF search and the
+   Rooms composer draft (also in the native client, with `SinAviso`). It also goes through CalDAV, CardDAV and WebDAV, which is how the Calendar web
+   and phones write (with `MKCALENDAR`), and through Drive's compatibility APIs.
+   Mail carries it on every door that changes the mailbox: REST, `POST /jmap` (a batch
+   that only reads turns it off with `CambioEn` without products), IMAP and the delivery of a new
+   email, apart from the bell notification (it goes out even if Mail is muted).
+   `TestCadaServicioMandaLaSenalDeCambios` requires all eleven services to mount it with their
+   products (Drive also `pdf`; Docs `docs`, `sheets`, `slides` —the route does not say the
+   type; on creation it does, and it goes only to its own— and `pdf`).
+3. **And to those who see what was written** (`hubnotify.AvisarTambien`): in Calendar, the owner and each
+   share of the calendar being written to, via REST or CalDAV (`QuienesVen`, one
+   query, only if there is a signal in progress), and whoever gains or loses a share or sees the
+   calendar deleted; in the ERP, the person responsible for an activity that someone else assigns to them or
+   closes; in CertiPDF, the
+   other party of a signature request (request, sign, reject, cancel); in Notepads and
+   Bases, the person something is shared or unshared with.
+4. **When asynchronous work finishes**, to the owner of what was processed: the Cast transcoder
+   on finishing a job (or on failing with no retry left), the start and end of a live stream,
+   the pass that completes the type and size of photos in Photos, and the refresh of a Calendar ICS
+   subscription whose feed changed (a 304 does not), to its owner and its shares; the
+   non-delivery notice that the Mail queue leaves in the sender's Inbox; what the Drive
+   trash does with a document's file (Docs' internal door notifies the widget of its
+   type, to the owner), and what an external editor saves via WOPI, which does not carry the Bearer and does not
+   go through the middleware (to whoever edits and to the owner). Photos thumbnails
+   are generated on request and EXIF is read on indexing, within the write: they
+   have no asynchronous end to notify.
+5. **Grouped** by (organization, person, product) over 3 s: the first one goes out immediately and
+   those within the window, as one when it closes. In memory, per replica: it is a saving, not
+   a cap.
+6. **The Fyne bar forwards it to the publisher** (`alEstado` → `Suite.AvisoDelHub`), which only
+   handles it if the product is its own (the Hub, also `mail` and `calendar`). The one for its own
+   product also reaches whoever writes: within 6 s of their own write
+   (`VentanaEco`, twice the grouping window) it is almost always their echo and respects the
+   30 s minimum (`Publicador.AvisarDelServidor`); outside it, it is read after the debounce. Without
+   that, a note's autosave made a round every 3 s. A round that starts after
+   everything noted cancels the wait at the end of that window: an isolated write with its
+   echo is one round, not two. What cannot be distinguished is someone else's change arriving within
+   those 6 s: it waits until the end of the window, at most 30 s.
 
-Sigue igual: nada nuevo en la extensión ni en el receptor; la señal no lleva datos de la
-persona; sin la app abierta no hay a quién entregarla hasta las piezas 4–6, que la usarán
-para despertar. Contacts recibe el secreto del Hub en su chart: hasta ahora no avisaba de
-nada.
+What stays the same: nothing new in the extension or the receiver; the signal carries no data about the
+person; without the app open there is nobody to deliver it to until pieces 4–6, which will use it
+to wake up. Contacts receives the Hub secret in its chart: until now it did not notify about
+anything.
 
-**Enmienda (2026-11-07): la app se despierta en iOS para su widget** (pieza 4 de 6, hecha
-en la suite; se enciende con el tag del fork). Con la app cerrada nadie republicaba: el
-widget enseñaba el último dato, con su antigüedad, hasta 24 h. Es la decisión del dueño
-«la app se despierta en segundo plano», en su parte periódica.
+**Amendment (2026-11-07): the app wakes up on iOS for its widget** (piece 4 of 6, done
+in the suite; it is turned on with the fork's tag). With the app closed nobody republished: the
+widget showed the latest data, with its age, for up to 24 h. It is the owner's decision
+«la app se despierta en segundo plano» (“the app wakes up in the background”), in its periodic part.
 
-1. **Una tarea de refresco** (`BGAppRefreshTask`), `<App ID>.refresco`, pedida como mínimo
-   cada 30 min al pasar a segundo plano y tras cada una (`sesion.CadaRefrescoEnFondo`):
-   cuándo corre lo decide iOS por el uso. La declaran `UIBackgroundModes = [fetch]` y
-   `BGTaskSchedulerPermittedIdentifiers` en el `Info.plist` de iOS de cada app con widget,
-   solo con `SYTUE_REFRESCO_APPLE = YES`, que exige `SYTUE_WIDGETS_APPLE = YES` y va aparte
-   porque quien registra la tarea es el fork: con un tag sin el parche, el plist pediría un
-   modo de fondo que nadie usa (App Review 2.5.4) (`empaquetar.sh plist_refresco`, desde
-   `plist_apple`, que escribe ese plist por Xcode y por la CLI: una fuente, no dos). No es un
-   derecho: no pide capacidades ni perfiles.
-2. **La despierta la app, no la extensión.** El driver del fork (parche `0016`,
+1. **A refresh task** (`BGAppRefreshTask`), `<App ID>.refresco`, requested at least
+   every 30 min when going to the background and after each one (`sesion.CadaRefrescoEnFondo`):
+   when it runs is decided by iOS based on usage. It is declared by `UIBackgroundModes = [fetch]` and
+   `BGTaskSchedulerPermittedIdentifiers` in the iOS `Info.plist` of each app with a widget,
+   only with `SYTUE_REFRESCO_APPLE = YES`, which requires `SYTUE_WIDGETS_APPLE = YES` and is separate
+   because the one registering the task is the fork: with a tag without the patch, the plist would request a
+   background mode nobody uses (App Review 2.5.4) (`empaquetar.sh plist_refresco`, from
+   `plist_apple`, which writes that plist via Xcode and via the CLI: one source, not two). It is not an
+   entitlement: it requires no capabilities or profiles.
+2. **The app is woken, not the extension.** The fork's driver (patch `0016`,
    `mobile.BackgroundDriver`: `LaunchedInBackground`, `OnFirstScene`,
-   `ProtectedDataAvailable` y `OnBackgroundRefresh`, en inglés como el resto del fork) da la
-   tarea a `Suite.RefrescarWidgetEnFondo`, la única entrada para todo lo que despierte la app
-   por su widget: la misma Fuente y el mismo Publicador, con el plazo de una ronda (20 s).
-   Si el sistema corta la tarea, se cancela y se le dice que falló en cuanto la ronda
-   vuelve, o a los 500 ms: completarla con el cerrojo de `ajustes` tomado (un `flock` en el
-   App Group) haría que iOS matara la app al suspenderla (0xdead10cc). La suite pide
-   esa API por aserción sobre el driver, y no por una función del fork: así compila con
-   cualquier tag, y sin ella hay escena desde el principio y todo es como antes.
-3. **Lanzada sin escena, la app no hace de app.** iOS corre el `main` entero de
-   `cmd/<app>`; hasta que conecta la primera escena solo corren el widget y el vigilante de
-   lo compartido. Esperan (`Suite.CuandoHayaEscena`) la presencia —un despertar **nunca**
-   publica «En línea»—, los avisos del sistema, el enchufe de URL, el SSE y la ficha de la
-   barra y las cargas de arranque de los quince `cmd`: la pantalla, el importador, el
-   navegador para entrar. Los `AlCambiar` de las apps se retienen y se avisan una vez al
-   conectar, antes que lo que esperaba a la escena; los del widget siguen sin escena. Lo
-   fijan `TestLosCmdCarganTrasLaEscena`, que sigue el `main` de cada `cmd`,
-   `TestLanzadaSinEscenaSoloRefrescaElWidget` y `TestLaBarraNoAbreElFlujoSinEscena`.
-   **Tampoco en caliente**: la app mandada al fondo sin deslizarla sigue en memoria, iOS la
-   reanuda para la tarea y lo que esperaba vuelve a correr —el latido vencido, el SSE que
-   se reconecta—. Por eso en iOS la presencia y el SSE de la barra siguen al **primer
-   plano**, no a la escena (`Suite.PausaEnFondo`): se paran al dejarlo y vuelven con él, y
-   al volver se late en el acto. En el escritorio (fondo es perder el foco) y en Android
-   (los avisos llegan por ese SSE con la app al fondo) no se paran. Lo fijan
-   `TestElDespertarEnCalienteNoLate` y `TestLaBarraCierraElFlujoAlFondoEnIOS`.
-4. **Con el dispositivo bloqueado no se lee nada.** El App Group es
-   `NSFileProtectionComplete` y la app no puede leer ni la sesión ni si la suite está
-   bloqueada: contesta `Aplazado` y pide otra tarea a los 5 min, que iOS no garantiza. En la
-   práctica **el refresco solo ocurre con el teléfono desbloqueado**, en uso con otra app;
-   bloqueado, el widget sigue con el último dato y «Actualizado hace X». No se rebaja la
-   clase de protección: rebajar solo `widgets/` no bastaría (también hay que leer
-   `ajustes.json`, `sesion.marca` y el Keychain) y rebajarlo todo debilita el reposo cifrado
-   de la app. Queda como decisión del dueño. Tampoco se lee sin sesión ni con el bloqueo de
-   la suite. Y **lo que no se ha podido leer no se borra**: lanzada en frío con el teléfono
-   bloqueado, la app queda «fuera» porque no lee la sesión, no porque no la haya. Ni su
-   primer aviso del widget borra (`ilegibleAlAbrir`), ni `ClearIf` borra con
-   `sesion.epoca` ilegible (`ajustes.EpocaLegible`); antes, la época ilegible salía vacía,
-   coincidía con la de «sin sesión» y se iban los widgets de las quince. Lo fijan
-   `TestLanzadaEnFrioBloqueadaNoBorraLosWidgets` y `TestSinPoderLeerLaEpocaNoSeBorraNada`.
-5. **El bloqueo de la suite se pide al conectar la escena, no en `Abrir`.** Sin interfaz no
-   hay Face ID que pedir —fallaría y la app saldría en cada refresco—, y con el teléfono
-   bloqueado ni siquiera se lee si está puesto. Así que, donde la app puede lanzarse sin
-   escena, `Abrir` no verifica: con el bloqueo puesto (o sin poder leerlo) la sesión
-   guardada **no se adopta** —tampoco cuando el vigilante la lee al desbloquear, ni en el
-   refresco, que con el bloqueo puesto no hace nada—, y al conectar la primera escena se
-   pide la verificación con lo que haya en disco, antes de las cargas y de las URL. Sin
-   esto, `UIBackgroundModes=fetch` abría un salto del bloqueo que sin lanzamientos de fondo
-   no existía. Lo fijan `TestElBloqueoSeExigeAlConectarAunqueAbrirNoLoLeyera` y
+   `ProtectedDataAvailable` and `OnBackgroundRefresh`, in English like the rest of the fork) hands the
+   task to `Suite.RefrescarWidgetEnFondo`, the single entry point for everything that wakes the app
+   for its widget: the same Fuente and the same Publicador, with the time limit of one round (20 s).
+   If the system cuts the task short, it is cancelled and reported as failed as soon as the round
+   returns, or after 500 ms: completing it with the `ajustes` lock held (a `flock` in the
+   App Group) would make iOS kill the app on suspending it (0xdead10cc). The suite requests
+   that API through a type assertion on the driver, and not through a fork function: that way it compiles with
+   any tag, and without it there is a scene from the start and everything is as before.
+3. **Launched without a scene, the app does not act as an app.** iOS runs the entire `main` of
+   `cmd/<app>`; until the first scene connects only the widget and the shared-data
+   watcher run. Waiting (`Suite.CuandoHayaEscena`) are presence —a wake-up **never**
+   publishes “Online”—, system notifications, the URL socket, the SSE and the bar's
+   card and the startup loads of the fifteen `cmd`s: the screen, the importer, the
+   browser for signing in. The apps' `AlCambiar`s are held and notified once on
+   connecting, before what was waiting for the scene; those of the widget still run without a scene. This is
+   pinned by `TestLosCmdCarganTrasLaEscena`, which follows the `main` of each `cmd`,
+   `TestLanzadaSinEscenaSoloRefrescaElWidget` and `TestLaBarraNoAbreElFlujoSinEscena`.
+   **Not when warm either**: the app sent to the background without swiping it away stays in memory, iOS
+   resumes it for the task and what was waiting runs again —the overdue heartbeat, the SSE that
+   reconnects—. That is why on iOS presence and the bar's SSE follow the **foreground**,
+   not the scene (`Suite.PausaEnFondo`): they stop when leaving it and come back with it, and
+   on returning a heartbeat is sent immediately. On desktop (background means losing focus) and on Android
+   (notifications arrive through that SSE with the app in the background) they do not stop. This is pinned by
+   `TestElDespertarEnCalienteNoLate` and `TestLaBarraCierraElFlujoAlFondoEnIOS`.
+4. **With the device locked nothing is read.** The App Group is
+   `NSFileProtectionComplete` and the app can read neither the session nor whether the suite is
+   locked: it answers `Aplazado` and requests another task in 5 min, which iOS does not guarantee. In
+   practice **the refresh only happens with the phone unlocked**, in use with another app;
+   locked, the widget keeps the latest data and “Updated X ago”. The protection class is not
+   lowered: lowering only `widgets/` would not be enough (`ajustes.json`, `sesion.marca` and the Keychain
+   also have to be read) and lowering everything weakens the app's encryption at rest.
+   It remains the owner's decision. Nothing is read without a session or with the suite
+   lock either. And **what could not be read is not deleted**: launched cold with the phone
+   locked, the app is “out” because it cannot read the session, not because there is none. Neither does its
+   first widget notification delete (`ilegibleAlAbrir`), nor does `ClearIf` delete with an
+   unreadable `sesion.epoca` (`ajustes.EpocaLegible`); before, the unreadable epoch came out empty,
+   matched the “no session” one and the widgets of all fifteen were wiped. This is pinned by
+   `TestLanzadaEnFrioBloqueadaNoBorraLosWidgets` and `TestSinPoderLeerLaEpocaNoSeBorraNada`.
+5. **The suite lock is requested when the scene connects, not in `Abrir`.** Without an interface there
+   is no Face ID to ask for —it would fail and the app would exit on every refresh—, and with the phone
+   locked it cannot even be read whether it is set. So, where the app can be launched without a
+   scene, `Abrir` does not verify: with the lock set (or unable to read it) the stored session
+   **is not adopted** —neither when the watcher reads it on unlock, nor in the
+   refresh, which with the lock set does nothing—, and on connecting the first scene
+   verification is requested with whatever is on disk, before the loads and the URLs. Without
+   this, `UIBackgroundModes=fetch` opened a lock bypass that did not exist without background
+   launches. This is pinned by `TestElBloqueoSeExigeAlConectarAunqueAbrirNoLoLeyera` and
    `TestLanzadaEnFondoNoVerificaHastaLaEscena`.
 
-Sigue igual: nada nuevo en la extensión; los tokens, solo en la app; macOS sin refresco (no
-tiene `BGAppRefreshTask`); Android sin cambios (pieza 6). Una app cerrada a mano en el
-multitarea no recibe tareas hasta que se vuelve a abrir. **Estado** (2026-11-07):
-encendido. El parche está en el fork (`v2.8.2-sytue.4`; la suite usa `.5`), con su
-Objective-C compilado y arrancado en el simulador por la matriz de UIKit, y
-`SYTUE_REFRESCO_APPLE = YES` ([runbook](operations.md#refresco-widgets-ios)); con un tag
-anterior `empaquetar-test.sh` no deja encenderlo. Sin probar en un iPhone ni pasado por App
-Review. Pendiente: la pieza 6.
+What stays the same: nothing new in the extension; tokens, only in the app; macOS without refresh (it does not
+have `BGAppRefreshTask`); Android unchanged (piece 6). An app closed by hand in the
+app switcher receives no tasks until it is opened again. **Status** (2026-11-07):
+on. The patch is in the fork (`v2.8.2-sytue.4`; the suite uses `.5`), with its
+Objective-C compiled and started in the simulator by the UIKit matrix, and
+`SYTUE_REFRESCO_APPLE = YES` ([runbook](operations.md#refresco-widgets-ios)); with an earlier
+tag `empaquetar-test.sh` does not allow turning it on. Not tested on an iPhone nor through App
+Review. Pending: piece 6.
 
-**Enmienda (2026-11-06), pieza 5: el aviso silencioso despierta la app por la misma
-puerta** (escrita el 2026-11-07). Cuando cambia algo del producto, el Hub manda un aviso
-vacío de APNs y la app lo atiende con `RefrescarWidgetEnFondo`, la misma entrada que el
-refresco periódico: sin presencia, sin SSE, sin leer con el teléfono bloqueado y
-contestando a iOS una sola vez (parche `0017` del fork). El registro de aparatos, el tope
-de un despertar cada 5 min por aparato, el interruptor de la persona (apagado por defecto)
-y lo que ve Apple están en la [enmienda del ADR 0039](#0039). Sigue igual todo lo de
-arriba; la extensión no gana red ni token. **Estado** (2026-11-07): el fork ya trae el parche
-(`v2.8.2-sytue.5`), y `SYTUE_DESPERTAR_APPLE = YES` desde el mismo día por decisión del
-dueño, antes de sus pasos (clave, Push en los App ID, perfiles, Secret del Hub): hasta que
-estén, la firma de iOS falla y el Hub no despierta a nadie ([runbook](operations.md#despertar-widgets-ios)).
+**Amendment (2026-11-06), piece 5: the silent notification wakes the app through the same
+door** (written on 2026-11-07). When something of the product changes, the Hub sends an empty
+APNs notification and the app handles it with `RefrescarWidgetEnFondo`, the same entry point as the
+periodic refresh: no presence, no SSE, no reading with the phone locked and
+answering iOS only once (fork patch `0017`). The device registry, the cap
+of one wake-up every 5 min per device, the person's switch (off by default)
+and what Apple sees are in the [amendment to ADR 0039](#0039). Everything
+above stays the same; the extension gains no network or token. **Status** (2026-11-07): the fork already carries the patch
+(`v2.8.2-sytue.5`), and `SYTUE_DESPERTAR_APPLE = YES` since the same day by the
+owner's decision, ahead of their steps (key, Push in the App IDs, profiles, Hub Secret): until
+they are done, iOS signing fails and the Hub does not wake anyone ([runbook](operations.md#despertar-widgets-ios)).
 
-**Enmienda (2026-11-06), pieza 6: Android se despierta sin Google** (escrita el
-2026-11-07). Sin FCM, UnifiedPush ni ningún tercero (la regla UE de
-`compliance/supply-chain` y el [ADR 0039](#0039)):
+**Amendment (2026-11-06), piece 6: Android wakes up without Google** (written on
+2026-11-07). Without FCM, UnifiedPush or any third party (the EU rule of
+`compliance/supply-chain` and [ADR 0039](#0039)):
 
-1. **Go sin actividad: sale.** `GoNativeActivity` ya carga la biblioteca con
-   `System.loadLibrary` antes de crear la actividad, y eso inicializa Go y corre los `init`
-   sin el `main`. Un `JobService` (`eu.sytue.nativo.RefrescoWidgets`) hace lo mismo y llama a
-   una entrada JNI (`apps/fyne/sesion/fondo_android.go`) que da `RefrescarSinVentana`: lee
-   la sesión guardada como `Abrir` (`leerSesionGuardada`, con el cliente de Sytue ID del
-   móvil), construye la Fuente de `fuentes.Registrada` (la misma que monta cada `cmd`, ahora
-   con `Suite.FuenteWidget`, y lo fija `TestLosCmdUsanLaFuenteRegistrada`) y publica una
-   ronda con un Publicador que se para al acabar. Sin `fyne.App`, sin Suite, sin presencia,
-   sin SSE, sin Hub (`TestSinVentanaPublicaConLaSesionGuardadaYNadaMas`). Con la app abierta
-   en el mismo proceso, se lo deja a su publicador. La puerta a Java, sin actividad, es la
-   de la propia entrada (`conRespaldo`: la de la actividad en cuanto existe). Probado en la
-   JVM del equipo con una `.so` c-shared de esa misma forma (la entrada real, con
-   `sistema` sustituido): sin `main`, llamada dos veces desde un hilo de trabajo, con
-   vuelta a Java desde otra rutina y una excepción de Java recogida como error. **No en un
-   teléfono.**
-2. **Cada hora, y con la señal de cambios.** El trabajo periódico va cada hora con 15 min
-   de holgura, con red y sin batería baja; lo encola el receptor del widget
-   (`Widgets.onUpdate`) y lo quita el último widget (`onDisabled`). Con el teléfono
-   bloqueado no se lee (como el receptor). La señal de cambios llega por el SSE del Hub, que
-   solo One mantiene con todo cerrado (`eu.sytue.nativo.Avisos`): One la **releva** a la app
-   del producto, que encola un trabajo suelto (como mucho uno por minuto; si está bloqueado,
-   se reintenta a los 5 min).
-3. **El relevo no es un broadcast con permiso de firma**, como decía el diseño: cada una de
-   las quince apps va firmada con **su** certificado de Play
-   (`android/session-signers.json`), un permiso `signature` no se puede conceder entre
-   ellas, y declararlo en las quince haría chocar las instalaciones
-   (`INSTALL_FAILED_DUPLICATE_PERMISSION`). Es una llamada **sin datos** al proveedor
-   `eu.sytue.nativo.RelevoWidgets` de la app (`<paquete>.sytue.widgets`), que comprueba al
-   llamante con el mismo límite que la sesión compartida (`SesionAndroid.llamante`: el UID
-   del Binder y el certificado fijado de cada paquete) y solo acepta a One; One, a su vez,
-   solo llama a un paquete del catálogo fijado cuyo proveedor sea ese y cuya firma sea la
-   suya. Lo que pasa de una app a otra es «algo tuyo ha cambiado»: ni producto, ni quién,
-   ni qué.
+1. **Go without an activity: it works.** `GoNativeActivity` already loads the library with
+   `System.loadLibrary` before creating the activity, and that initializes Go and runs the `init`s
+   without `main`. A `JobService` (`eu.sytue.nativo.RefrescoWidgets`) does the same and calls
+   a JNI entry point (`apps/fyne/sesion/fondo_android.go`) that provides `RefrescarSinVentana`: it reads
+   the stored session like `Abrir` (`leerSesionGuardada`, with the mobile Sytue ID
+   client), builds the Fuente from `fuentes.Registrada` (the same one each `cmd` mounts, now
+   with `Suite.FuenteWidget`, pinned by `TestLosCmdUsanLaFuenteRegistrada`) and publishes one
+   round with a Publicador that stops when done. No `fyne.App`, no Suite, no presence,
+   no SSE, no Hub (`TestSinVentanaPublicaConLaSesionGuardadaYNadaMas`). With the app open
+   in the same process, it leaves it to its publisher. The door to Java, without an activity, is
+   that of the entry point itself (`conRespaldo`: the activity's as soon as it exists). Tested in the
+   machine's JVM with a c-shared `.so` built the same way (the real entry point, with
+   `sistema` replaced): without `main`, called twice from a worker thread, with a
+   return to Java from another goroutine and a Java exception caught as an error. **Not on a
+   phone.**
+2. **Every hour, and with the change signal.** The periodic job runs every hour with 15 min
+   of slack, with network and without low battery; it is enqueued by the widget's receiver
+   (`Widgets.onUpdate`) and removed by the last widget (`onDisabled`). With the phone
+   locked nothing is read (like the receiver). The change signal arrives through the Hub's SSE, which
+   only One keeps open with everything closed (`eu.sytue.nativo.Avisos`): One **relays** it to the
+   product's app, which enqueues a one-off job (at most one per minute; if locked,
+   it is retried in 5 min).
+3. **The relay is not a broadcast with a signature permission**, as the design said: each of
+   the fifteen apps is signed with **its own** Play certificate
+   (`android/session-signers.json`), a `signature` permission cannot be granted between
+   them, and declaring it in all fifteen would make the installations collide
+   (`INSTALL_FAILED_DUPLICATE_PERMISSION`). It is a call **with no data** to the app's
+   `eu.sytue.nativo.RelevoWidgets` provider (`<paquete>.sytue.widgets`), which checks the
+   caller with the same boundary as the shared session (`SesionAndroid.llamante`: the Binder
+   UID and each package's pinned certificate) and only accepts One; One, in turn,
+   only calls a package from the pinned catalog whose provider is that one and whose signature is
+   its own. What passes from one app to another is “something of yours has changed”: no product, no who,
+   no what.
 
-Sigue igual: el receptor del widget sin red ni sesión (lee la app); el saneado, la lista
-cerrada de `kind`, la época y el bloqueo; nada con la suite bloqueada. **Estado**: encendido
-el 2026-11-07 por decisión del dueño, antes de la prueba en un teléfono (`FONDO_GO = True` en
-`apps/fyne/scripts/android-widgets.py`, y lo fija un test); antes de esa fecha, apagado
-(`FONDO_GO = False`). Apagado,
-el trabajo periódico solo repinta el rótulo y la caducidad (lo mismo que ya hacían
-`updatePeriodMillis` y la alarma RTC de la pieza 2) y no hay relevo. Se enciende en un
-commit revisado tras la prueba del [runbook](operations.md#widgets-android-fondo), en un
-teléfono: aquí no hay SDK ni NDK de Android, así que el Java se ha compilado contra el
-framework de Android 16 (el `android-all` de Robolectric) y la entrada en C contra el
-`jni.h` del JDK, pero ni el APK ni la `.so` de Android se han construido.
+What stays the same: the widget receiver without network or session (the app reads); sanitizing, the closed
+list of `kind`, the epoch and the lock; nothing with the suite locked. **Status**: turned on
+on 2026-11-07 by the owner's decision, ahead of testing on a phone (`FONDO_GO = True` in
+`apps/fyne/scripts/android-widgets.py`, pinned by a test); before that date, off
+(`FONDO_GO = False`). Off,
+the periodic job only repaints the label and the expiry (the same that
+`updatePeriodMillis` and the piece 2 RTC alarm already did) and there is no relay. It is turned on in a
+reviewed commit after the [runbook](operations.md#widgets-android-fondo) test, on a
+phone: here there is no Android SDK or NDK, so the Java has been compiled against the
+Android 16 framework (Robolectric's `android-all`) and the C entry point against the
+JDK's `jni.h`, but neither the APK nor the Android `.so` has been built.
 
 <a id="0079"></a>
 
-## 0079 — Sytue Notepads sobre «papel»: un cromo neutro elegido por la app
+<a id="0079--sytue-notepads-sobre-papel-un-cromo-neutro-elegido-por-la-app"></a>
 
-`accepted` · 2026-11-05 · rama `claude/epic-brown-cnv5mt` · amplía el eje de forma de la 0072
+## 0079 — Sytue Notepads on “paper”: a neutral chrome chosen by the app
 
-**Problema.** Notepads es una libreta: se abre para escribir una línea y leerla. El marco de
-color de la suite —Marco o Carril, en el color de la casa, en cobalto o en el de la app—
-dominaba la pantalla: un lateral y una barra superior de color fuerte alrededor de unas
-pocas líneas de texto, el día abierto y la casilla hecha en el color de marca, y cada glifo
-de cada barra con su relleno de acento. Lo que se venía a leer era lo que menos se veía.
+`accepted` · 2026-11-05 · branch `claude/epic-brown-cnv5mt` · extends the shape axis of 0072
 
-**Decisión.**
+**Problem.** Notepads is a notebook: it is opened to write a line and read it. The suite's color
+frame —Frame or Rail, in the house color, in cobalt or in the app's color—
+dominated the screen: a strongly colored sidebar and top bar around a few
+lines of text, the open day and the done checkbox in the brand color, and every glyph
+of every bar with its accent fill. What people came to read was what was least visible.
 
-- **Un cuarto eje, el CROMO, que elige la app y no la persona.** `data-cromo="papel"` en el
-  `<html>` de Notepads (`AppLayout.astro`) y `tokens.ElegirCromo("papel")` al montar su
-  pantalla en Fyne. Un solo bloque en `branding/tokens/appearance.css` reasigna el marco, el
-  menú lateral y la barra al fondo de la página con la tinta del texto, deja la hoja en
-  `surface` con un filete en lugar de la sombra y lleva «estás aquí», la acción y el foco al
-  primario. Todo son `var()` de tokens de rol, así que vale en claro, oscuro, del sistema y
-  traslúcido sin un bloque por tema, y el color que elija la persona sigue en la acción.
-- **El bloque gana a cualquier carril** por peso (tres atributos) y por estar el último. El
-  intérprete nativo (`apps/nucleo/tokens`) lo apila también el último, después de la forma.
-- **Glifos de una sola tinta sobre papel.** `--sytue-glyph-fill: transparent` en la web y
-  `tokens.EsPapel()` en `iconos.acentoDeAhora`. Un acento pedido, un icono sobre un relleno
-  de color o una tinta de estado conservan su relleno.
-- **La libreta** (styles/app.css y su espejo en Fyne): cada nota es una línea con su marca
-  en una columna fija —una raya corta, o la casilla de una tarea— y el texto a 16 px; lo
-  hecho se apaga en gris; el día abierto es un círculo de tinta y «hoy», el único color de
-  la cabecera.
+**Decision.**
 
-**Descartado.** _Cambiar el marco de toda la suite_: las demás apps son paneles con mucha
-navegación y el marco de color las ordena; la decisión es de una app. _Una preferencia de la
-persona_: sería un cuarto selector en «Apariencia» para resolver un problema de una sola app.
-_Esconder el menú de la suite y pintar uno propio dentro de la hoja_: duplicaría la
-navegación, el cajón móvil y su accesibilidad.
+- **A fourth axis, the CHROME, chosen by the app and not by the person.** `data-cromo="papel"` on the
+  `<html>` of Notepads (`AppLayout.astro`) and `tokens.ElegirCromo("papel")` when mounting its
+  screen in Fyne. A single block in `branding/tokens/appearance.css` reassigns the frame, the
+  side menu and the bar to the page background with the text ink, leaves the sheet in
+  `surface` with a hairline instead of the shadow and takes “you are here”, the action and the focus to the
+  primary. Everything is `var()` of role tokens, so it works in light, dark, system and
+  translucent without a block per theme, and the color the person chooses stays on the action.
+- **The block beats any rail** by specificity (three attributes) and by being last. The
+  native interpreter (`apps/nucleo/tokens`) also stacks it last, after the shape.
+- **Single-ink glyphs on paper.** `--sytue-glyph-fill: transparent` on the web and
+  `tokens.EsPapel()` in `iconos.acentoDeAhora`. A requested accent, an icon on a colored
+  fill or a status ink keep their fill.
+- **The notebook** (styles/app.css and its Fyne mirror): each note is a line with its mark
+  in a fixed column —a short dash, or a task's checkbox— and the text at 16 px; what is
+  done fades to gray; the open day is an ink circle and “today”, the only color in
+  the header.
 
-**Consecuencias.** Notepads se ve distinto del resto de la suite a propósito; quitar el
-atributo (y la llamada en `NuevaPantalla`) lo devuelve al marco de color sin tocar nada más.
-En Carril, el contenido de Notepads comparte el fondo del menú: solo los separa el filete del
-menú. Lo vigilan `TestElCromoPapelEsUnEjeAparte` (tokens nativos) y
-`TestSobrePapelElGlifoEsDeUnaTinta` (iconos).
+**Ruled out.** _Changing the frame of the whole suite_: the other apps are panels with a lot of
+navigation and the color frame organizes them; the decision belongs to one app. _A person's
+preference_: it would be a fourth selector in “Appearance” to solve a problem of a single app.
+_Hiding the suite menu and drawing our own inside the sheet_: it would duplicate the
+navigation, the mobile drawer and its accessibility.
+
+**Consequences.** Notepads looks different from the rest of the suite on purpose; removing the
+attribute (and the call in `NuevaPantalla`) returns it to the color frame without touching anything else.
+In Rail, the Notepads content shares the menu's background: only the menu's hairline separates
+them. This is watched by `TestElCromoPapelEsUnEjeAparte` (native tokens) and
+`TestSobrePapelElGlifoEsDeUnaTinta` (icons).
 
 <a id="0080"></a>
 
-## 0080 — Toda la suite sobre «papel»: el cromo de Notepads pasa a las quince apps
+<a id="0080--toda-la-suite-sobre-papel-el-cromo-de-notepads-pasa-a-las-quince-apps"></a>
 
-`accepted` · 2026-11-06 · rama `claude/epic-brown-cnv5mt` · amplía la [0079](#0079)
+## 0080 — The whole suite on “paper”: the Notepads chrome moves to all fifteen apps
 
-**Problema.** La 0079 dejó el cromo «papel» solo en Notepads y descartó cambiar el marco de
-toda la suite. Vista la prueba de concepto sobre Drive y Contactos, el dueño pidió el mismo
-cromo en todas las apps (2026-11-06): el marco de color pesaba igual en un panel que en una
-libreta.
+`accepted` · 2026-11-06 · branch `claude/epic-brown-cnv5mt` · extends [0079](#0079)
 
-**Decisión.** `data-cromo="papel"` en el `<html>` de cada app web (los `AppLayout`, el de
-Office, la consola y el panel de la nube; no la web pública) y
-`tema.ElegirCromo(tema.CromoPapel)` en el `main` de cada app nativa, justo después de
-`sesion.Abrir`. El bloque de `appearance.css` y su lectura en `apps/nucleo/tokens` no
-cambian: es el mismo eje, ahora encendido en todas.
+**Problem.** 0079 left the “paper” chrome only in Notepads and ruled out changing the frame of
+the whole suite. Having seen the proof of concept on Drive and Contacts, the owner asked for the same
+chrome in all apps (2026-11-06): the color frame weighed as much in a panel as in a
+notebook.
 
-**Por qué en cada `main` y no en `sesion.Abrir`.** Las pruebas que abren sesión comprueban
-también el cromo de color (el relleno ámbar del carril, el degradado del traslúcido…), y la
-elección de cromo es global al proceso: hecha en `sesion.Abrir` se colaba en esas pruebas.
+**Decision.** `data-cromo="papel"` on the `<html>` of each web app (the `AppLayout`s, the
+Office one, the console and the cloud dashboard; not the public website) and
+`tema.ElegirCromo(tema.CromoPapel)` in the `main` of each native app, right after
+`sesion.Abrir`. The `appearance.css` block and its reading in `apps/nucleo/tokens` do not
+change: it is the same axis, now turned on in all of them.
 
-**Consecuencias.** El marco de color sigue existiendo y probado; volver a él en una app es
-quitar el atributo y la llamada. Las apps que pintan su contenido sobre `bg` dentro de la
-hoja lo enseñan gris dentro del filete blanco de la hoja: se irán pasando a `sheet-bg` al
-tocarlas.
+**Why in each `main` and not in `sesion.Abrir`.** The tests that open a session also check
+the color chrome (the rail's amber fill, the translucent gradient…), and the
+chrome choice is global to the process: done in `sesion.Abrir` it leaked into those tests.
+
+**Consequences.** The color frame still exists and is tested; going back to it in an app means
+removing the attribute and the call. Apps that paint their content on `bg` inside the
+sheet show it gray inside the sheet's white hairline: they will be moved to `sheet-bg` as they
+are touched.
 
 <a id="0081"></a>
 
-## 0081 — La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC · superseded por [0082](#0082)
+<a id="0081--la-clave-de-recuperación-de-matrix-la-custodia-rooms-para-la-sesión-oidc--superseded-por-0082"></a>
 
-`superseded` · 2026-11-08 · rama `sytue-native`
+## 0081 — The Matrix recovery key is held by Rooms for the OIDC session · superseded by [0082](#0082)
 
-**Problema.** Para configurar el cifrado de extremo a extremo de Rooms, cada persona tenía
-que crear una clave de recuperación, guardarla por su cuenta y teclearla en cada dispositivo
-nuevo. Es el paso donde la gente se atasca o pierde la clave, y una clave perdida obliga a
-restablecer el cifrado y a perder el historial cifrado. El dueño pidió (2026-11-08) que la
-clave se guarde ligada al inicio de sesión de Sytue ID, sin que la persona la gestione.
+`superseded` · 2026-11-08 · branch `sytue-native`
 
-**Decisión.** El servicio de Rooms custodia la clave de recuperación de cada persona:
+**Problem.** To set up Rooms end-to-end encryption, each person had
+to create a recovery key, store it on their own and type it on every new
+device. It is the step where people get stuck or lose the key, and a lost key forces
+resetting the encryption and losing the encrypted history. The owner asked (2026-11-08) that the
+key be stored tied to the Sytue ID sign-in, without the person managing it.
 
-- La tabla `matrix_recovery_keys` va por `subject` (la cuenta de Matrix `@sytue_<sub>` es una
-  sola en todas sus organizaciones). Se guarda cifrada con la KEK del servicio
-  (`SYTUE_ROOMS_KEY_ENCRYPTION_KEY`, `encv1:`) y solo se ve en transacciones de mantenimiento.
-  Sin KEK no se guarda nada.
-- `GET`/`POST /api/v1/matrix/recovery-key` sirven y guardan la clave de quien llama. La
-  identidad sale del token OIDC, y pasa la misma comprobación que el bootstrap de Matrix
-  (cuenta y organización activas). Nadie puede pedir la clave de otra persona.
-- El navegador, al abrir Rooms en un dispositivo sin verificar, actúa solo:
-  - Si hay clave custodiada, se recupera con ella.
-  - Si la cuenta no tiene cifrado, lo crea y custodia la clave nueva.
-  - Si la cuenta ya tenía cifrado con una clave que el servicio no conoce, se quedan los
-    botones de siempre. Cuando la persona teclea su clave y funciona, esa clave pasa a
-    custodia.
-  - Restablecer el cifrado sustituye la clave custodiada.
-- Al borrar la cuenta, su clave custodiada se borra en la misma transacción.
+**Decision.** The Rooms service holds each person's recovery key:
 
-**Consecuencias.** El cifrado deja de ser de extremo a extremo frente al operador. Quien
-controle a la vez la base de Rooms y la KEK, o pueda actuar como la persona ante Sytue ID,
-puede leer la clave y, con ella, la copia de seguridad de claves de sus salas. Ante terceros
-nada cambia: Synapse sigue guardando solo texto cifrado, y la clave nunca pasa por Synapse.
-Si un día se quiere volver al modelo anterior para una organización, basta con no llamar a la
-custodia. Las claves custodiadas se borran con `DELETE FROM matrix_recovery_keys`, y quien ya
-tenía la clave en un dispositivo la conserva.
+- The `matrix_recovery_keys` table goes by `subject` (the Matrix account `@sytue_<sub>` is a
+  single one across all their organizations). It is stored encrypted with the service KEK
+  (`SYTUE_ROOMS_KEY_ENCRYPTION_KEY`, `encv1:`) and is only visible in maintenance transactions.
+  Without a KEK nothing is stored.
+- `GET`/`POST /api/v1/matrix/recovery-key` serve and store the caller's key. The
+  identity comes from the OIDC token, and it goes through the same check as the Matrix bootstrap
+  (active account and organization). Nobody can request another person's key.
+- The browser, when opening Rooms on an unverified device, acts on its own:
+  - If there is a held key, it recovers with it.
+  - If the account has no encryption, it creates it and holds the new key.
+  - If the account already had encryption with a key the service does not know, the usual
+    buttons remain. When the person types their key and it works, that key goes into
+    custody.
+  - Resetting the encryption replaces the held key.
+- When the account is deleted, its held key is deleted in the same transaction.
+
+**Consequences.** The encryption stops being end-to-end with respect to the operator. Whoever
+controls both the Rooms database and the KEK, or can act as the person before Sytue ID,
+can read the key and, with it, the key backup of their rooms. With respect to third parties
+nothing changes: Synapse still stores only ciphertext, and the key never goes through Synapse.
+If one day we want to go back to the previous model for an organization, it is enough not to call the
+custody. Held keys are deleted with `DELETE FROM matrix_recovery_keys`, and whoever already
+had the key on a device keeps it.
 
 <a id="0082"></a>
 
-## 0082 — La clave de recuperación de Matrix, envuelta en el dispositivo con la contraseña o la passkey
+<a id="0082--la-clave-de-recuperación-de-matrix-envuelta-en-el-dispositivo-con-la-contraseña-o-la-passkey"></a>
 
-`accepted` · 2026-11-12 · rama `sytue-native` · sustituye a la [0081](#0081)
+## 0082 — The Matrix recovery key, wrapped on the device with the password or the passkey
 
-**Problema.** La [0081](#0081) quitó a la persona el paso de crear, guardar y teclear la clave
-de recuperación, pero lo hizo guardándola en Rooms cifrada con la KEK del servicio: quien
-controle la base y la KEK, o pueda actuar como la persona ante Sytue ID, la lee. El dueño
-(2026-11-12) fijó dos reglas a la vez: «ni crear ni usar clave de recuperación», y «solo el
-usuario debe poder acceder a los datos con su OIDC, nadie más». Además la 0081 iba por
-persona y no por cuenta de Matrix: los productos de almacenamiento con identidad aislada
-(`@sytue_storage_<product>_<tenant>_<sub>`) tienen otra clave, y guardarla en la misma fila
-habría sobrescrito la de Rooms.
+`accepted` · 2026-11-12 · branch `sytue-native` · replaces [0081](#0081)
 
-**Decisión.** La clave se sigue generando en el dispositivo y nunca se enseña, pero lo que
-guarda Rooms es un **envoltorio**: la clave cifrada con una clave que se deriva en el
-dispositivo y que el servicio nunca ve.
+**Problem.** [0081](#0081) took away from the person the step of creating, storing and typing the recovery
+key, but it did so by storing it in Rooms encrypted with the service KEK: whoever
+controls the database and the KEK, or can act as the person before Sytue ID, can read it. The owner
+(2026-11-12) set two rules at once: «ni crear ni usar clave de recuperación» (“neither create nor use a recovery key”), and «solo el
+usuario debe poder acceder a los datos con su OIDC, nadie más» (“only the user must be able to access the data with their OIDC, nobody else”). Moreover 0081 went by
+person and not by Matrix account: storage products with an isolated identity
+(`@sytue_storage_<product>_<tenant>_<sub>`) have another key, and storing it in the same row
+would have overwritten Rooms' one.
 
-- **Por cuenta de Matrix.** Tabla `matrix_recovery_wrappers` (migración 0077 de Rooms): la
-  cuenta de Rooms y el almacenamiento heredado comparten fila (`tenant`/`product` vacíos);
-  cada cuenta aislada tiene la suya (`tenant` + `product`). Varios envoltorios por cuenta:
-  uno de contraseña y uno por passkey, hasta 16. Solo se ve en mantenimiento.
-- **API.** `GET`/`PUT /api/v1/matrix/recovery-wrappers`, con `product` e
-  `identity_version=2` para elegir la cuenta aislada. Misma comprobación que el bootstrap de
-  Matrix y el de almacenamiento: nadie lee los de otra persona ni los de una organización que
-  no es suya, y aunque los leyera no los podría abrir. Guardar un envoltorio de otra
-  `key_id` retira los de la clave anterior (restablecer) en la misma transacción.
-- **Contraseña.** Argon2id (64 MiB, 3 pasadas, 1 hilo, sal de 16 bytes por envoltorio) y HKDF
-  con la etiqueta `sytue-matrix-recovery-wrap-v1/password`. Se pide dos veces al crear (un
-  error al teclearla dejaría la clave sin abrir en los demás dispositivos) y una al abrir.
-- **Passkey.** La extensión PRF de WebAuthn de la passkey de Sytue ID (RP ID de
-  `WEBAUTHN_RP_ID`), con HKDF y la etiqueta `…/passkey`. Es la opción recomendada. En la web
-  la implementa el cliente del navegador; en Fyne no hay todavía una vía de WebAuthn de
-  plataforma en el repositorio, así que el escritorio usa la contraseña y la passkey queda
-  pendiente.
-- **Formato.** AES-256-GCM con el AAD atado a la cuenta de Matrix, al tipo, a la clave de
-  almacenamiento y a la passkey. La especificación está en
-  [architecture.md](architecture.md#custodia-envuelta-de-la-clave-de-recuperacion) y la fijan
-  los vectores de `apps/nucleo/recoverywrap/testdata/vectors.json`, que comprueban Go y la web.
-- **Flujos, sin clave a la vista.** Al crear el cifrado, la clave se envuelve y se guarda
-  **antes** de publicarla; si el servicio no la acepta, no se publica nada y el reintento usa
-  la misma clave (la configuración a medias vive en el llavero del sistema). Un dispositivo
-  nuevo pide la contraseña una vez por cuenta y la abre. Una cuenta con una clave que el
-  servicio no conoce solo ofrece verificar el dispositivo desde otro; ya verificado, si el
-  dispositivo tiene la clave (las cuentas de almacenamiento la guardan), pide la contraseña
-  para envolverla. Restablecer (solo Rooms; el almacenamiento sigue con
-  `ErrResetUnsupported`) envuelve la clave nueva antes de publicar la identidad nueva.
-- **Cambio de contraseña en Sytue ID.** El envoltorio viejo sigue abriendo con la contraseña
-  anterior. Si la persona falla y luego acierta (lo normal tras un cambio), se le pide la
-  actual para envolver otra vez; el envoltorio nuevo sustituye al de contraseña.
-- **Transición desde la 0081.** `POST /matrix/recovery-key` responde 410: ninguna clave nueva
-  entra en claro. `GET` sigue sirviendo la copia con KEK que exista, solo para esto: el
-  cliente la usa una vez para recuperar el dispositivo sin pedir nada y pide la contraseña
-  para envolverla; al guardar el primer envoltorio de la cuenta de Rooms, la copia con KEK se
-  borra en la misma transacción. Las copias que nadie haya envuelto **no** se borran solas,
-  porque esa persona perdería sus datos. Se retirarán con una migración posterior cuando
-  `SELECT count(*) FROM matrix_recovery_keys` llegue a cero o tras un aviso con fecha; hasta
-  entonces la 0081 sigue valiendo para esas filas, y solo para ellas.
+**Decision.** The key is still generated on the device and never shown, but what
+Rooms stores is a **wrapper**: the key encrypted with a key derived on the
+device that the service never sees.
 
-**Consecuencias.** El operador ya no puede leer las claves nuevas: la base solo tiene texto
-cifrado y parámetros públicos, y ni la KEK ni Sytue ID abren un envoltorio. La contraseña
-tiene una salvedad honesta: es la misma que se teclea al iniciar sesión en Sytue ID, así que
-un operador malicioso que capture inicios de sesión podría derivarla. La passkey no tiene
-ese punto débil, y por eso es la recomendada. Un envoltorio se puede atacar sin conexión con
-la contraseña: Argon2id a 64 MiB lo encarece, pero una contraseña débil sigue siendo débil.
-Quien olvide la contraseña y no tenga otro dispositivo verificado ni passkey solo puede
-restablecer (Rooms) y pierde el historial cifrado, como antes de la 0081.
+- **Per Matrix account.** Table `matrix_recovery_wrappers` (Rooms migration 0077): the
+  Rooms account and legacy storage share a row (empty `tenant`/`product`);
+  each isolated account has its own (`tenant` + `product`). Several wrappers per account:
+  one for the password and one per passkey, up to 16. Only visible in maintenance.
+- **API.** `GET`/`PUT /api/v1/matrix/recovery-wrappers`, with `product` and
+  `identity_version=2` to choose the isolated account. The same check as the Matrix and storage
+  bootstraps: nobody reads another person's or those of an organization that
+  is not theirs, and even if they read them they could not open them. Storing a wrapper with a different
+  `key_id` removes those of the previous key (reset) in the same transaction.
+- **Password.** Argon2id (64 MiB, 3 passes, 1 thread, 16-byte salt per wrapper) and HKDF
+  with the label `sytue-matrix-recovery-wrap-v1/password`. It is asked twice on creation (a
+  typo would leave the key unopenable on the other devices) and once on opening.
+- **Passkey.** The WebAuthn PRF extension of the Sytue ID passkey (RP ID from
+  `WEBAUTHN_RP_ID`), with HKDF and the label `…/passkey`. It is the recommended option. On the web
+  it is implemented by the browser client; in Fyne there is not yet a platform WebAuthn path in the
+  repository, so the desktop uses the password and the passkey remains
+  pending.
+- **Format.** AES-256-GCM with the AAD bound to the Matrix account, the type, the storage
+  key and the passkey. The specification is in
+  [architecture.md](architecture.md#custodia-envuelta-de-la-clave-de-recuperacion) and it is pinned by
+  the vectors in `apps/nucleo/recoverywrap/testdata/vectors.json`, which Go and the web check.
+- **Flows, with no key in sight.** When creating the encryption, the key is wrapped and stored
+  **before** publishing it; if the service does not accept it, nothing is published and the retry uses
+  the same key (the half-done setup lives in the system keychain). A new device
+  asks for the password once per account and opens it. An account with a key the
+  service does not know only offers verifying the device from another one; once verified, if the
+  device has the key (storage accounts keep it), it asks for the password
+  to wrap it. Resetting (Rooms only; storage still has
+  `ErrResetUnsupported`) wraps the new key before publishing the new identity.
+- **Password change in Sytue ID.** The old wrapper still opens with the previous
+  password. If the person fails and then gets it right (the normal case after a change), they are asked for the
+  current one to wrap again; the new wrapper replaces the password one.
+- **Transition from 0081.** `POST /matrix/recovery-key` responds 410: no new key
+  comes in in the clear. `GET` still serves any existing KEK copy, only for this: the
+  client uses it once to recover the device without asking for anything and asks for the password
+  to wrap it; when the first wrapper of the Rooms account is stored, the KEK copy is
+  deleted in the same transaction. Copies that nobody has wrapped are **not** deleted automatically,
+  because that person would lose their data. They will be removed with a later migration when
+  `SELECT count(*) FROM matrix_recovery_keys` reaches zero or after a dated notice; until
+  then 0081 remains valid for those rows, and only for them.
+
+**Consequences.** The operator can no longer read the new keys: the database only has
+ciphertext and public parameters, and neither the KEK nor Sytue ID opens a wrapper. The password
+has an honest caveat: it is the same one typed when signing in to Sytue ID, so
+a malicious operator who captures sign-ins could derive it. The passkey does not have
+that weak point, and that is why it is the recommended one. A wrapper can be attacked offline with
+the password: Argon2id at 64 MiB makes it expensive, but a weak password is still weak.
+Whoever forgets the password and has no other verified device or passkey can only
+reset (Rooms) and loses the encrypted history, as before 0081.

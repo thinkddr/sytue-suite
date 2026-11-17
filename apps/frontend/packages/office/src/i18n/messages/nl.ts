@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const nl: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Naam van het blad:',
+  'dialog.sheet.nameTaken':
+    'Er is al een blad met de naam ‘{name}’ (namen maken geen onderscheid tussen hoofdletters en kleine letters).',
   'dialog.sheet.delete': 'Het blad ‘{name}’ verwijderen? De inhoud gaat verloren.',
   'dialog.sheet.mergeLoses':
     'Bij samenvoegen blijft alleen de waarde van de cel linksboven ({ref}) behouden; de andere cellen van het bereik worden leeggemaakt. Gebruik ‘Inhoud samenvoegen’ om alle tekst in die cel samen te brengen.',

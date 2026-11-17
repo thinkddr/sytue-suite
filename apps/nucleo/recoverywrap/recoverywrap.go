@@ -6,6 +6,10 @@
 // el resultado (Wrapper) y sus parámetros públicos: ni la base de datos, ni la KEK,
 // ni Sytue ID bastan para abrirlo.
 //
+// Desde la ADR 0084 la clave que envuelve sale del inicio de sesión de Sytue ID
+// (desbloqueo.go): el tipo `sytue-id`. Los de contraseña y passkey de la 0082 se
+// siguen abriendo para pasar sus claves al tipo nuevo.
+//
 // El formato es el de docs/architecture.md («Custodia envuelta de la clave de
 // recuperación») y lo fijan los vectores de testdata/vectors.json, que también
 // comprueban las pruebas de la web.
@@ -36,12 +40,15 @@ const Version = 1
 const (
 	KindPassword = "password"
 	KindPasskey  = "passkey"
+	// KindSytueID es la clave de desbloqueo de la cuenta de Sytue ID (ADR 0084).
+	KindSytueID = "sytue-id"
 )
 
 // Algoritmos de derivación.
 const (
 	AlgArgon2id   = "argon2id"
 	AlgPasskeyPRF = "webauthn-prf-hkdf-sha256" //nolint:gosec // G101: nombre de un algoritmo, no una credencial.
+	AlgSytueID    = "sytue-id-unlock-hkdf-sha256"
 )
 
 // Parámetros de Argon2id por defecto (RFC 9106 §4, segunda recomendación con p=1
@@ -87,7 +94,8 @@ var (
 
 // KDF son los parámetros públicos de la derivación. Para una contraseña: Alg,
 // Memory, Time, Threads y Salt. Para una passkey: Alg y PRFSalt (la entrada
-// `first` de la extensión PRF de WebAuthn).
+// `first` de la extensión PRF de WebAuthn). Para `sytue-id`: Alg y Hint, la
+// huella de la clave de desbloqueo con la que se cerró (desbloqueo.go).
 type KDF struct {
 	Alg     string `json:"alg"`
 	Memory  uint32 `json:"m,omitempty"`
@@ -95,6 +103,7 @@ type KDF struct {
 	Threads uint8  `json:"p,omitempty"`
 	Salt    []byte `json:"salt,omitempty"`
 	PRFSalt []byte `json:"prf_salt,omitempty"`
+	Hint    []byte `json:"hint,omitempty"`
 }
 
 // Wrapper es lo que viaja al servidor y vuelve: ninguna parte es secreta.
@@ -128,6 +137,10 @@ func (w Wrapper) Validate() error {
 		if !validCredential(w.CredentialID) || !w.KDF.validPasskey() {
 			return ErrInvalid
 		}
+	case KindSytueID:
+		if w.CredentialID != "" || !w.KDF.validSytueID() {
+			return ErrInvalid
+		}
 	default:
 		return ErrInvalid
 	}
@@ -135,14 +148,19 @@ func (w Wrapper) Validate() error {
 }
 
 func (k KDF) validPassword() bool {
-	return k.Alg == AlgArgon2id && len(k.Salt) == saltLen &&
+	return k.Alg == AlgArgon2id && len(k.Salt) == saltLen && len(k.PRFSalt) == 0 && len(k.Hint) == 0 &&
 		k.Memory >= MinMemoryKiB && k.Memory <= MaxMemoryKiB &&
 		k.Time >= MinTime && k.Time <= MaxTime &&
 		k.Threads >= MinThreads && k.Threads <= MaxThreads
 }
 
 func (k KDF) validPasskey() bool {
-	return k.Alg == AlgPasskeyPRF && len(k.PRFSalt) == prfSaltLen && len(k.Salt) == 0 &&
+	return k.Alg == AlgPasskeyPRF && len(k.PRFSalt) == prfSaltLen && len(k.Salt) == 0 && len(k.Hint) == 0 &&
+		k.Memory == 0 && k.Time == 0 && k.Threads == 0
+}
+
+func (k KDF) validSytueID() bool {
+	return k.Alg == AlgSytueID && len(k.Hint) == HintLen && len(k.Salt) == 0 && len(k.PRFSalt) == 0 &&
 		k.Memory == 0 && k.Time == 0 && k.Threads == 0
 }
 
@@ -166,12 +184,31 @@ func AAD(kind, account, keyID, credentialID string) []byte {
 
 // PasswordKey deriva la clave de envoltorio de una contraseña.
 func PasswordKey(password string, kdf KDF) ([]byte, error) {
+	ikm, err := PasswordIKM(password, kdf)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(ikm)
+	return KeyFromIKM(KindPassword, ikm)
+}
+
+// PasswordIKM es el Argon2id de la contraseña con los parámetros del envoltorio,
+// antes del HKDF. Es lo que la página de inicio de sesión de Sytue ID entrega para
+// abrir una vez los envoltorios de contraseña de la ADR 0082 (desbloqueo.go).
+func PasswordIKM(password string, kdf KDF) ([]byte, error) {
 	if password == "" || !kdf.validPassword() {
 		return nil, ErrInvalid
 	}
-	ikm := argon2.IDKey([]byte(password), kdf.Salt, kdf.Time, kdf.Memory, kdf.Threads, keyLen)
-	defer clear(ikm)
-	return hkdf.Key(sha256.New, ikm, nil, Label+"/"+KindPassword, keyLen)
+	return argon2.IDKey([]byte(password), kdf.Salt, kdf.Time, kdf.Memory, kdf.Threads, keyLen), nil
+}
+
+// KeyFromIKM es el HKDF de la ADR 0082: de la salida de Argon2id (contraseña) o
+// de la PRF (passkey) a la clave de envoltorio.
+func KeyFromIKM(kind string, ikm []byte) ([]byte, error) {
+	if len(ikm) != keyLen || (kind != KindPassword && kind != KindPasskey) {
+		return nil, ErrInvalid
+	}
+	return hkdf.Key(sha256.New, ikm, nil, Label+"/"+kind, keyLen)
 }
 
 // PasskeyKey deriva la clave de envoltorio de la salida PRF de una passkey.
@@ -179,7 +216,7 @@ func PasskeyKey(prf []byte) ([]byte, error) {
 	if len(prf) != prfOutputLen {
 		return nil, ErrInvalid
 	}
-	return hkdf.Key(sha256.New, prf, nil, Label+"/"+KindPasskey, keyLen)
+	return KeyFromIKM(KindPasskey, prf)
 }
 
 // NewPasswordKDF elige una sal nueva con los parámetros por defecto.

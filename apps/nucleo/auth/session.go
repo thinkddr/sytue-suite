@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 )
 
 // ErrLoginRequired: no queda nada que renovar; hay que volver a pasar por Sytue ID.
@@ -55,15 +56,25 @@ type guardado struct {
 	// Guardado es cuándo se escribió, en nanosegundos Unix: en un Linux que ha tenido la
 	// sesión a ratos en el llavero y a ratos en el fichero cifrado, manda la más nueva.
 	Guardado int64 `json:"guardado,omitempty"`
+	// Desbloqueo y Legado son la clave de desbloqueo del cifrado de Subject y lo que abre
+	// sus envoltorios de la ADR 0082 (ver Tokens). Van con la sesión porque así llegan a
+	// todas las apps nativas del dispositivo, y se van con ella.
+	Desbloqueo []byte                   `json:"desbloqueo,omitempty"`
+	Legado     []recoverywrap.LegacyIKM `json:"legado,omitempty"`
 }
 
 // serializar y recuperar son ese formato, UNO para las tres plataformas: lo que cambia
 // entre ellas es dónde se deja, no qué.
 func serializar(t Tokens) ([]byte, error) {
-	return json.Marshal(guardado{
+	g := guardado{
 		Refresh: t.Refresh, Issuer: t.Issuer, Cliente: t.Cliente, Subject: t.Subject, Org: organizacionDe(t),
 		OrgColor: t.OrgColor, OrgForma: t.OrgForma, Guardado: time.Now().UnixNano(),
-	})
+	}
+	// Sin refresh no hay sesión que guardar, y la clave no sobrevive a la sesión.
+	if t.Refresh != "" && t.Desbloqueo.valida() {
+		g.Desbloqueo, g.Legado = t.Desbloqueo.Clave, t.Desbloqueo.Legado
+	}
+	return json.Marshal(g)
 }
 
 func recuperar(crudo []byte) (Tokens, error) {
@@ -78,10 +89,14 @@ func recuperarConInstante(crudo []byte) (Tokens, int64, error) {
 	if err := json.Unmarshal(crudo, &g); err != nil {
 		return Tokens{}, 0, err
 	}
-	return Tokens{
+	t := Tokens{
 		Refresh: g.Refresh, Issuer: g.Issuer, Cliente: g.Cliente, Subject: g.Subject, Organizacion: g.Org,
 		OrgColor: nombreDeApariencia(g.OrgColor), OrgForma: nombreDeApariencia(g.OrgForma),
-	}, g.Guardado, nil
+	}
+	if len(g.Desbloqueo) == recoverywrap.UnlockKeyLen {
+		t.Desbloqueo = &Desbloqueo{Clave: g.Desbloqueo, Legado: g.Legado}
+	}
+	return t, g.Guardado, nil
 }
 
 // El SOBRE es el formato del fichero de Android (store_android.go), donde lo guardado
@@ -135,6 +150,10 @@ type Tokens struct {
 	// los suyos. La web los recibe igual y su BFF los deja en una cookie.
 	OrgColor string `json:"org_color,omitempty"`
 	OrgForma string `json:"org_forma,omitempty"`
+	// Desbloqueo es la clave de desbloqueo del cifrado de Subject (ADR 0084). No sale de
+	// este proceso salvo al almacén seguro del sistema, con la sesión (`json:"-"`). Es un
+	// puntero a un valor que no se modifica: así Tokens sigue siendo comparable.
+	Desbloqueo *Desbloqueo `json:"-"`
 	// conIDToken dice que estos tokens vienen con su ID token: sin él, la apariencia de
 	// la organización no se sabe y se conserva la que había (ver conservar).
 	conIDToken bool
@@ -144,6 +163,17 @@ type Tokens struct {
 	persistenciaAtendida bool
 	adopcion             bool // interactive login, never retained in memory or serialized
 }
+
+// Desbloqueo es lo que el relevo de Sytue ID entrega a una app nativa al iniciar sesión,
+// cifrado para la clave efímera de ese inicio de sesión: la clave de desbloqueo de la
+// persona, con la que las apps abren su cifrado sin pedir nada, y lo que abre UNA vez
+// sus envoltorios de la ADR 0082. No se modifica: se sustituye.
+type Desbloqueo struct {
+	Clave  []byte
+	Legado []recoverywrap.LegacyIKM
+}
+
+func (d *Desbloqueo) valida() bool { return d != nil && len(d.Clave) == recoverywrap.UnlockKeyLen }
 
 // nombreDeApariencia deja pasar solo un nombre de color o de forma: letras minúsculas, o
 // nada. Es la misma regla con la que la web lo lleva a una cookie.
@@ -382,6 +412,46 @@ func (s *Session) Sincronizar(t Tokens) {
 	s.tokens.Issuer, s.tokens.Cliente = t.Issuer, t.Cliente
 	s.tokens.Organizacion = t.Organizacion
 	s.tokens.OrgColor, s.tokens.OrgForma = t.OrgColor, t.OrgForma
+	s.tokens.Desbloqueo = t.Desbloqueo
+}
+
+// Desbloqueo es la clave de desbloqueo del cifrado de la persona de la sesión y lo
+// que abre sus envoltorios de la ADR 0082 (copias), o nil si este dispositivo no la
+// tiene: entonces hace falta volver a entrar en Sytue ID (ADR 0084).
+func (s *Session) Desbloqueo() ([]byte, []recoverywrap.LegacyIKM) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tokens.Subject == "" || !s.tokens.Desbloqueo.valida() {
+		return nil, nil
+	}
+	legado := make([]recoverywrap.LegacyIKM, len(s.tokens.Desbloqueo.Legado))
+	for i, l := range s.tokens.Desbloqueo.Legado {
+		l.Salt, l.IKM = append([]byte(nil), l.Salt...), append([]byte(nil), l.IKM...)
+		legado[i] = l
+	}
+	return append([]byte(nil), s.tokens.Desbloqueo.Clave...), legado
+}
+
+// OlvidarLegado retira lo que abría los envoltorios de la ADR 0082 una vez pasados
+// al tipo nuevo, aquí y en el almacén.
+func (s *Session) OlvidarLegado(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.tokens.Desbloqueo.valida() || len(s.tokens.Desbloqueo.Legado) == 0 {
+		return nil
+	}
+	soltar, err := ajustes.CerrojoSesion(ctx)
+	if err != nil {
+		return err
+	}
+	defer soltar()
+	t := s.tokens
+	t.Desbloqueo = &Desbloqueo{Clave: s.tokens.Desbloqueo.Clave}
+	if err := guardarTokens(t, s.guardar); err != nil {
+		return err
+	}
+	s.tokens.Desbloqueo = t.Desbloqueo
+	return nil
 }
 
 // Logout borra la sesión bajo el mismo cerrojo que su renovación. El orden de
@@ -549,6 +619,7 @@ func Compartida(renovar Renewer, cargar func() (Tokens, error), guardar func(Tok
 			actuales.Issuer, actuales.Cliente = guardados.Issuer, guardados.Cliente
 			actuales.Organizacion = guardados.Organizacion
 			actuales.OrgColor, actuales.OrgForma = guardados.OrgColor, guardados.OrgForma
+			actuales.Desbloqueo = guardados.Desbloqueo
 		}
 		nuevos, err := renovar(ctx, actuales)
 		nuevos.persistenciaAtendida = false
@@ -581,6 +652,10 @@ func conservar(nuevos, viejos Tokens) Tokens {
 	// Con ID token, lo que diga —vacío es «la de la casa»—; sin él, lo que se sabía.
 	if !nuevos.conIDToken {
 		nuevos.OrgColor, nuevos.OrgForma = viejos.OrgColor, viejos.OrgForma
+	}
+	// Una renovación no trae la clave de desbloqueo: sigue la de la misma persona.
+	if nuevos.Desbloqueo == nil && nuevos.Subject == viejos.Subject {
+		nuevos.Desbloqueo = viejos.Desbloqueo
 	}
 	return nuevos
 }

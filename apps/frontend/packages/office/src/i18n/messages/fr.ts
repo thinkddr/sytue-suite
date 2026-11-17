@@ -12,6 +12,8 @@ import type { en } from './en';
 
 export const fr: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Nom de la feuille :',
+  'dialog.sheet.nameTaken':
+    'Une feuille s’appelle déjà « {name} » (les noms ne distinguent pas majuscules et minuscules).',
   'dialog.sheet.delete': 'Supprimer la feuille « {name} » ? Son contenu sera perdu.',
   'dialog.sheet.mergeLoses':
     'La fusion ne conserve que la valeur de la cellule en haut à gauche ({ref}) ; les autres cellules de la plage sont vidées. Pour réunir tous les textes dans cette cellule, utilisez « Fusionner le contenu ».',

@@ -29,6 +29,9 @@ HELM_NS      ?= sytue-system
 SVC          ?=
 
 COMPOSE      := docker compose
+# Complemento Matrix (deploy/compose/matrix.yml): entra en todas las órdenes de
+# Compose cuando ./sytue-deploy lo ha activado en el .env (SYTUE_MATRIX=1).
+MATRIX_F     := $(shell grep -qx 'SYTUE_MATRIX=1' $(COMPOSE_DIR)/.env 2>/dev/null && echo "-f $(COMPOSE_DIR)/matrix.yml")
 
 .DEFAULT_GOAL := help
 
@@ -69,8 +72,8 @@ dev-up: ## Levanta toda la suite en local con las apps web COMPILADAS (~2-3 GB d
 	@# BuildKit es obligatorio (los Dockerfile Go usan `RUN --mount=type=cache`). En
 	@# entornos sin el plugin `docker buildx`, `up --build` cae al builder legacy y
 	@# falla; por eso se SEPARA el build (con DOCKER_BUILDKIT) del up.
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml build
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml $(MATRIX_F) build
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml $(MATRIX_F) up -d
 
 .PHONY: dev-up-built
 dev-up-built: dev-up ## Alias de dev-up (las apps compiladas ya son el modo por defecto)
@@ -79,8 +82,8 @@ dev-up-built: dev-up ## Alias de dev-up (las apps compiladas ya son el modo por 
 dev-up-caliente: ## Toda la suite con `astro dev` y recarga en caliente (~12 GB de RAM)
 	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
 	@$(MAKE) dev-certs
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) build
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) up -d
 
 .PHONY: dev-app
 dev-app: ## Solo núcleo + apps concretas (DEV, cabe en 8 GB): make dev-app P=docs,mail
@@ -89,8 +92,8 @@ dev-app: ## Solo núcleo + apps concretas (DEV, cabe en 8 GB): make dev-app P=do
 	@test -n "$(P)" || (echo "ERROR: indica el/los perfiles, p.ej. make dev-app P=docs,mail" && exit 1)
 	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
 	@$(MAKE) dev-certs
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 COMPOSE_PROFILES=$(P) $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
-	COMPOSE_PROFILES=$(P) $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 COMPOSE_PROFILES=$(P) $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) build
+	COMPOSE_PROFILES=$(P) $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) up -d
 
 .PHONY: dev-certs
 dev-certs: ## Genera el certificado TLS local de confianza (mkcert), si aún no existe
@@ -105,19 +108,19 @@ dev-certs: ## Genera el certificado TLS local de confianza (mkcert), si aún no 
 
 .PHONY: dev-down
 dev-down: ## Para la suite local (conserva volúmenes)
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml down
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) down
 
 .PHONY: dev-clean
 dev-clean: ## Para la suite y BORRA volúmenes (reset total)
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml down -v
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) down -v
 
 .PHONY: dev-logs
 dev-logs: ## Sigue los logs (SVC=id para uno concreto)
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml logs -f $(SVC)
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) logs -f $(SVC)
 
 .PHONY: dev-ps
 dev-ps: ## Estado/salud de los servicios locales
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml ps
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml $(MATRIX_F) ps
 
 .PHONY: dev-seed
 dev-seed: ## Crea el usuario admin de desarrollo en Sytue ID

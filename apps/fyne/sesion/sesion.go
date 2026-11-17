@@ -691,7 +691,20 @@ var ErrYaEntrando = errors.New("sesion: ya hay un inicio de sesión abierto en e
 // pedirla.
 func (s *Suite) Entrar(ctx context.Context) error { return s.entrar(ctx, nil) }
 
+// EntrarParaDesbloquear vuelve a entrar en Sytue ID pidiendo que la persona meta su
+// clave aunque la sesión del navegador siga viva (`prompt=login`): es como este
+// dispositivo consigue la clave de desbloqueo del cifrado que le falta (ADR 0084).
+// `legado` son los parámetros públicos de los envoltorios de la ADR 0082 que la página
+// de inicio de sesión debe abrir también. Nunca se pide nada dentro de la app.
+func (s *Suite) EntrarParaDesbloquear(ctx context.Context, legado string) error {
+	return s.entrarCon(ctx, nil, auth.PeticionLogin{Prompt: "login", Legado: legado})
+}
+
 func (s *Suite) entrar(ctx context.Context, transition *privateTransition) error {
+	return s.entrarCon(ctx, transition, auth.PeticionLogin{})
+}
+
+func (s *Suite) entrarCon(ctx context.Context, transition *privateTransition, peticion auth.PeticionLogin) error {
 	var (
 		nuevos auth.Tokens
 		err    error
@@ -740,9 +753,9 @@ func (s *Suite) entrar(ctx context.Context, transition *privateTransition) error
 		if esquema == "" {
 			return errors.New("sesion: FyneApp.toml no declara Development.esquema")
 		}
-		nuevos, err = s.oidc.LoginEsquema(ctx, esquema+"://auth/callback")
+		nuevos, err = s.oidc.LoginEsquemaCon(ctx, esquema+"://auth/callback", peticion)
 	} else {
-		nuevos, err = s.oidc.Login(ctx)
+		nuevos, err = s.oidc.LoginCon(ctx, peticion)
 		if err == nil {
 			aparecer(s.app)
 		}

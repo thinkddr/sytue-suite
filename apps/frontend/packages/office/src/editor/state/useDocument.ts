@@ -128,7 +128,7 @@ export interface UseDocumentResult {
   connection: 'online' | 'offline';
   content: string;
   contentEpoch: number;
-  onContentInput: (next: string) => void;
+  onContentInput: (next: string, aparte?: boolean) => void;
   /** Envía ya el autosave pendiente (pagehide → sendBeacon). */
   flush: () => void;
   /** Adelanta el autosave en cola y lo espera por el camino normal (Ctrl/Cmd+S). */
@@ -202,6 +202,20 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
   const keyRef = useRef(''); // '' = aún sin cargar: no se puede guardar
   /** HTML/JSON pendiente de guardar; null = nada en cola (¡ref!, §4.4). */
   const pendingRef = useRef<string | null>(null);
+  /**
+   * Cambios que van cada uno en SU guardado, en orden, antes que lo pendiente: los de
+   * estructura de una hoja (insertar o borrar filas o columnas, o deshacerlo). En una
+   * hoja protegida el servidor solo reconoce UN desplazamiento por guardado
+   * (apps/nucleo/office/model/proteccion_ajenas.go): dos inserciones en el mismo
+   * autoguardado se rechazaban. Con cola, los guardados salen de uno en uno.
+   */
+  const colaRef = useRef<string[]>([]);
+  /** Guardados en vuelo (sin cola puede haber más de uno, como siempre). */
+  const vuelosRef = useRef(0);
+  /** Lo último que salió hacia el servidor: lo pendiente que ya va en un guardado. */
+  const enviadoRef = useRef<string | null>(null);
+  /** `doSave`, para el reintento programado de `intentar`, que se crea antes. */
+  const doSaveRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const saveTimerRef = useRef<number | undefined>(undefined);
   const retryTimerRef = useRef<number | undefined>(undefined);
   const titleTimerRef = useRef<number | undefined>(undefined);
@@ -389,6 +403,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
       olvidarProteccion();
       clearTimeout(saveTimerRef.current);
       pendingRef.current = null;
+      colaRef.current = []; // lo rechazado y lo que venía detrás se basaban en ello
       opsPendientesRef.current = [];
       try {
         const st = await fetchState();
@@ -444,17 +459,22 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     [fetchState, setSave, toast, t, userId],
   );
 
-  const doSave = useCallback(
-    async (vueltas = 0): Promise<void> => {
-      const value = pendingRef.current;
-      if (value === null || keyRef.current === '') return;
+  /**
+   * Un intento de guardar lo siguiente: lo primero de la cola de cambios aparte o, sin
+   * ella, lo pendiente. true si el servidor lo confirmó.
+   */
+  const intentar = useCallback(
+    async (vueltas = 0): Promise<boolean> => {
+      const value = colaRef.current[0] ?? pendingRef.current;
+      if (value === null || keyRef.current === '') return false;
       if (!navigator.onLine) {
         setConnection('offline');
         setSave('dirty');
-        return;
+        return false;
       }
       setSave('saving');
       try {
+        enviadoRef.current = value;
         const lote = buildOpsBody(value);
         const res = await fetch(`/api/ops?id=${eid}`, {
           method: 'POST',
@@ -473,7 +493,8 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
             collabRef.current?.advance(data.seq, data.ops?.length ?? 0);
             lote.confirmar(data.seq, data.ops);
           }
-          if (pendingRef.current === value) {
+          if (colaRef.current[0] === value) colaRef.current.shift();
+          if (pendingRef.current === value && colaRef.current.length === 0) {
             pendingRef.current = null;
             setSave(pendingTitleRef.current === null ? 'saved' : 'dirty');
             setWords(countWords(value, kindRef.current));
@@ -492,12 +513,12 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
             adoptarModelo();
           }
           // Si se tecleó durante el vuelo, sigue 'dirty' y el debounce ya está rearmado.
-          return;
+          return true;
         }
         if (res.status === 401) {
           // Sesión caducada: sin reintento (§4.4); recargar la página re-autentica.
           setSave('error');
-          return;
+          return false;
         }
         if (res.status === 403) {
           // La protección de hoja/libro la cumple el servidor: si rechazó el cambio, lo
@@ -508,14 +529,14 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
             .catch(() => undefined);
           if (codigo === 'protected' || codigo === 'protection_password') {
             await adoptarServidor(codigo);
-            return;
+            return false;
           }
         }
         if (res.status === 400 && lote.parche) {
           // Un parche que el servidor no entiende (otra versión, contenido que no es el que
           // creíamos): no se insiste; se guarda el registro entero, que es lo de siempre.
           sinParchesRef.current = true;
-          return doSave(vueltas);
+          return intentar(vueltas);
         }
         if (res.status >= 400 && res.status < 500) {
           const conflicto = res.status === 409;
@@ -524,7 +545,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
             if (conflicto) throw new Error('ops 409');
             // 4xx persistente (p. ej. rol sin permiso de escritura): no reintentar en bucle.
             setSave('error');
-            return;
+            return false;
           }
           // p. ej. 409 seq obsoleta: re-GET state, adoptar contadores y reintentar (§4.4).
           // En hojas y presentaciones el 409 es «otro guardó desde tu base»: lo
@@ -534,32 +555,70 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
           lastSeqRef.current = Math.max(lastSeqRef.current, st.seq);
           const reg = registroDe(st, keyRef.current);
           if (reg.dot !== null) modeloRef.current?.recibir(reg.valor, st.seq, reg.lamport, reg.dot);
-          return doSave(vueltas + 1);
+          return intentar(vueltas + 1);
         }
         throw new Error(`ops ${res.status}`); // 5xx → reintento programado
       } catch {
         if (!navigator.onLine) {
           setConnection('offline');
           setSave('dirty');
-          return;
+          return false;
         }
         setSave('error');
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = window.setTimeout(() => {
-          void doSave();
+          void doSaveRef.current();
         }, RETRY_MS);
+        return false;
       }
     },
     [eid, userId, buildOpsBody, fetchState, setSave, adoptarModelo, adoptarServidor],
   );
 
+  /**
+   * Guarda lo siguiente y, si queda cola de cambios aparte, lo que sigue detrás: de uno
+   * en uno y en orden, porque dos a la vez podrían llegar al revés o el segundo
+   * fusionarse con el primero. Con cola y un guardado en vuelo no sale otro: el que
+   * vuela sigue al acabar, también con lo tecleado entretanto (su autoguardado pudo
+   * toparse con la cola en vuelo y no salir).
+   */
+  const doSave = useCallback(async (): Promise<void> => {
+    if (vuelosRef.current > 0 && colaRef.current.length > 0) return;
+    const deCola = colaRef.current.length > 0;
+    vuelosRef.current += 1;
+    let hecho = false;
+    try {
+      hecho = await intentar();
+    } finally {
+      vuelosRef.current -= 1;
+    }
+    if (
+      hecho &&
+      vuelosRef.current === 0 &&
+      (colaRef.current.length > 0 || (deCola && pendingRef.current !== null))
+    ) {
+      return doSave();
+    }
+  }, [intentar]);
+  doSaveRef.current = doSave;
+
   const onContentInput = useCallback(
-    (next: string): void => {
+    (next: string, aparte = false): void => {
       // Segunda mitad de la barrera de solo lectura (la primera es `exec` del
       // contexto): aquí no se persiste nada. Si un cambio colara por otra vía —un
       // pegado, una extensión del navegador—, llegar hasta este punto guardaría el
       // trabajo de alguien que no tiene permiso para escribirlo.
       if (!puedeEscribir(roleRef.current)) return;
+      if (aparte) {
+        // Lo pendiente de antes, en su propio guardado si aún no va en ninguno; y el
+        // cambio, en otro. El lienzo ya lo enseña: la cola es solo del guardado.
+        const cola = colaRef.current;
+        const previo = pendingRef.current;
+        if (previo !== null && previo !== enviadoRef.current && previo !== cola[cola.length - 1]) {
+          cola.push(previo);
+        }
+        cola.push(next);
+      }
       pendingRef.current = next;
       setSave('dirty');
       const meta = metaRef.current;
@@ -571,6 +630,10 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
       // Contador en vivo al teclear (no esperar al autosave debounced de 1,5s).
       setWords(countWords(next, kindRef.current));
       clearTimeout(saveTimerRef.current);
+      if (aparte) {
+        void doSave(); // enseguida; con otro en vuelo, sale cuando acabe
+        return;
+      }
       saveTimerRef.current = window.setTimeout(() => {
         void doSave();
       }, AUTOSAVE_MS);
@@ -660,6 +723,9 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     }
     // Offline: no fingir que sendBeacon guardó nada. Online se envía como
     // best-effort, pero el borrador permanece en IndexedDB hasta recibir un 2xx.
+    // ponytail: con cambios de estructura en cola, el beacon lleva lo último de una vez
+    // (no hay a quién esperar para mandarlos de uno en uno); en una hoja protegida con
+    // dos desplazamientos sin guardar el servidor lo rechaza, como antes de la cola.
     if (navigator.onLine) {
       navigator.sendBeacon(
         `/api/ops?id=${eid}`,
@@ -842,6 +908,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     collabRef.current?.advance(st.seq); // las ops del restore no son «cambio remoto»
     clearTimeout(saveTimerRef.current);
     pendingRef.current = null; // LWW: la restauración manda sobre la edición en vuelo
+    colaRef.current = [];
     setSave('saved');
     const raw = st.state.registers[keyRef.current]?.value;
     const value = typeof raw === 'string' ? raw : '';
@@ -997,6 +1064,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     setStatus('loading');
     setSave('saved');
     pendingRef.current = null;
+    colaRef.current = [];
     pendingTitleRef.current = null;
     metaRef.current = null;
     (async () => {

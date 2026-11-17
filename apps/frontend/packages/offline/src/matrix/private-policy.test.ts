@@ -378,3 +378,51 @@ test('Rooms history requests use the device lifetime without retrying a revoked 
   expect(calls).toBe(1);
   sdk.stopClient();
 });
+
+test('withheld notices reach the owner’s unverified devices, never carrying a key', async () => {
+  // The SDK tells the owner's unverified devices that they will not get the key.
+  // Blocking that notice used to block the room message behind it: every app but
+  // the Hub stayed on «No se pudo configurar el cifrado».
+  const withheld = 'https://matrix.test/_matrix/client/v3/sendToDevice/m.room_key.withheld/opaque';
+  const notice = {
+    algorithm: 'm.megolm.v1.aes-sha2',
+    code: 'm.unverified',
+    reason: 'The sender has disabled encrypting to unverified devices.',
+    room_id: '!private:matrix.test',
+    session_id: 'artificial-session',
+    sender_key: 'artificial-curve25519',
+  };
+  const notices = (user = own, device = 'UNVERIFIED', content: unknown = notice): string =>
+    JSON.stringify({ messages: { [user]: { [device]: content } } });
+  const sent: Request[] = [];
+  const send = (async (input, init) => {
+    sent.push(new Request(input, init));
+    return new Response('{}');
+  }) as typeof fetch;
+  const fetcher = privateDeviceFetch(
+    'https://matrix.test',
+    own,
+    async () => unapproved,
+    () => false,
+    send,
+  );
+  await fetcher(withheld, put(notices()));
+  expect(sent).toHaveLength(1);
+  expect(await sent[0]?.text()).toBe(notices());
+  await expect(fetcher(withheld, put(notices('@verified_coworker:matrix.test')))).rejects.toThrow(
+    'matrix_identity',
+  );
+  for (const content of [
+    { ...notice, session_key: 'artificial-key' },
+    { ...notice, ciphertext: { artificial: true } },
+    { ...notice, code: 7 },
+    { reason: 'no code' },
+    {},
+    'm.unverified',
+  ])
+    await expect(fetcher(withheld, put(notices(own, 'UNVERIFIED', content)))).rejects.toThrow(
+      'matrix_identity',
+    );
+  await expect(fetcher(withheld, put(notices(own, '*')))).rejects.toThrow('matrix_identity');
+  expect(sent).toHaveLength(1);
+});

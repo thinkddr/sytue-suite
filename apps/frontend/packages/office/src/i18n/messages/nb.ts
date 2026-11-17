@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const nb: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Navn på arket:',
+  'dialog.sheet.nameTaken':
+    'Det finnes allerede et ark som heter «{name}» (navn skiller ikke mellom store og små bokstaver).',
   'dialog.sheet.delete': 'Vil du slette arket «{name}»? Innholdet går tapt.',
   'dialog.sheet.mergeLoses':
     'Ved sammenslåing beholdes bare verdien i cellen øverst til venstre ({ref}); de andre cellene i området tømmes. Bruk «Slå sammen innhold» for å samle all teksten i den cellen.',

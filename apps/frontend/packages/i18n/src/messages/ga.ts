@@ -13,20 +13,10 @@ export const ga: Catalog = {
     'Tuigim go bhféadfainn rochtain ar theachtaireachtaí criptithe níos sine a chailleadh',
   'matrix.unknownKey':
     'Criptíodh an cuntas seo sular chosain Sytue a eochair le do shíniú isteach. Fíoraigh an gléas seo ó ghléas eile ina bhfuil tú sínithe isteach cheana.',
-  'matrix.unlockTitle': 'Oscail do shonraí criptithe',
-  'matrix.unlockBody':
-    'Deimhnigh gur tusa atá ann le d’eochair rochtana nó le do phasfhocal Sytue. Seiceáiltear é ar an ngléas seo: ní féidir le duine ar bith eile do shonraí a oscailt.',
-  'matrix.protectTitle': 'Cosain do shonraí criptithe',
-  'matrix.protectBody':
-    'Roghnaigh conas a osclóidh tú do shonraí criptithe ar do ghléasanna eile: le d’eochair rochtana nó le do phasfhocal Sytue. Is tusa amháin a bheidh in ann iad a oscailt.',
-  'matrix.usePasskey': 'Úsáid eochair rochtana',
-  'matrix.usePassword': 'Úsáid pasfhocal',
-  'matrix.password': 'Pasfhocal Sytue',
-  'matrix.passwordConfirm': 'Athscríobh an pasfhocal',
-  'matrix.passwordMismatch': 'Ní hionann na pasfhocail.',
-  'matrix.unlockWrong': 'Níor oibrigh sé sin. Bain triail eile as.',
-  'matrix.passkeyUnsupported':
-    'Ní féidir leis an eochair rochtana seo sonraí criptithe a oscailt. Úsáid do phasfhocal.',
+  'matrix.unlocking': 'Do shonraí criptithe á ndíghlasáil…',
+  'matrix.signIn': 'Sínigh isteach ar Sytue ID',
+  'matrix.signInBody':
+    'Díghlasálann do shíniú isteach ar Sytue ID do shonraí criptithe ar an ngléas seo. Sínigh isteach arís le do phasfhocal nó le d’eochair rochtana chun iad a oscailt anseo.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Ceadaigh próiseáil chriptithe',
   'matrix.allowStorageBody':

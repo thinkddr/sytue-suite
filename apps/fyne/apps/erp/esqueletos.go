@@ -95,9 +95,10 @@ const (
 )
 
 // cifraCargando es `CifraCargando`: la barra centrada en la caja de línea de `text-xl`.
-// Es una sola barra por tarjeta, y por eso un `ui.Esqueleto` suelto.
-func cifraCargando(l *lienzo, x, y, dentro float32) {
-	l.poner(ui.NuevoEsqueletoFraccion(0.5, AltoBarraCifra), x, y+(tema.TextoXL.Linea-AltoBarraCifra)/2, dentro, AltoBarraCifra)
+// Es un bloque del grupo `carga`, el de las tres cifras del resumen: con un
+// `ui.Esqueleto` suelto por tarjeta, las tres barras latían cada una a su aire.
+func cifraCargando(l *lienzo, carga *ui.BloquesEsqueleto, x, y, dentro float32) {
+	l.poner(carga.BloqueFraccion(0.5, AltoBarraCifra), x, y+(tema.TextoXL.Linea-AltoBarraCifra)/2, dentro, AltoBarraCifra)
 }
 
 // tarjetaKPIEsqueleto es `EsqueletoKPI`: la caja de `tarjetaKPI`, a su mismo alto, con

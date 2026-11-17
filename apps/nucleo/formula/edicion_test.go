@@ -129,6 +129,28 @@ func TestExtractRefsEsElDeLaWeb(t *testing.T) {
 			t.Errorf("extractRefs(%q) = %q y la web da %q", texto, got, quiero)
 		}
 	}
+	// Una referencia a OTRO libro lleva su libro en la hoja, sin comillas o con ellas: no
+	// es la «Ventas» de este.
+	for texto, quiero := range map[string]string{
+		"=[Libro.xlsx]Ventas!B4+Ventas!B4": "[Libro.xlsx]Ventas!B4@1:[Libro.xlsx]Ventas Ventas!B4@23:Ventas",
+		"='[Libro.xlsx]Ventas'!B4":         "'[Libro.xlsx]Ventas'!B4@1:[Libro.xlsx]Ventas",
+		"=SUM([1]Ventas!A1:B9)":            "[1]Ventas!A1:B9@5:[1]Ventas",
+	} {
+		var got []string
+		for _, r := range ExtractRefs(texto) {
+			got = append(got, fmt.Sprintf("%s@%d:%s", r.Texto, r.Inicio, r.Hoja))
+		}
+		if strings.Join(got, " ") != quiero {
+			t.Errorf("extractRefs(%q) = %v y la web da %q", texto, got, quiero)
+		}
+	}
+	for hoja, quiero := range map[string]bool{
+		"Ventas": false, "[Libro.xlsx]Ventas": true, `C:\ruta\[Libro.xlsx]Ventas`: true, "[1]Ventas": true, "a]b": false,
+	} {
+		if EsDeOtroLibro(hoja) != quiero {
+			t.Errorf("EsDeOtroLibro(%q) = %v", hoja, !quiero)
+		}
+	}
 	if r := ExtractRefs("=SUM(3:5)"); r[0].Rect.R1 != 2 || r[0].Rect.R2 != 4 || r[0].Rect.C2 < 1000 {
 		t.Errorf("la fila entera 3:5 sale %+v", r[0].Rect)
 	}
@@ -241,6 +263,10 @@ func TestReescribirFormulaSoloLaHojaQueSeMueve(t *testing.T) {
 		{del, "Resumen", "=Ventas!B4", "=" + RefRota},
 		{del, "Resumen", "=SUM(Ventas!B2:B6)", "=SUM(Ventas!B2:B5)"},
 		{del, "Resumen", "=Ventas!B9", "=Ventas!B8"},
+		// Las de otro libro no se mueven nunca: sus filas no son estas.
+		{ins, "Resumen", "=[Libro.xlsx]Ventas!B4+Ventas!B4", "=[Libro.xlsx]Ventas!B4+Ventas!B5"},
+		{ins, "Resumen", "='[Libro.xlsx]Ventas'!B4", "='[Libro.xlsx]Ventas'!B4"},
+		{del, "Resumen", "=SUM([1]Ventas!B2:B6)", "=SUM([1]Ventas!B2:B6)"},
 	} {
 		if got := c.d.ReescribirFormulaEn(c.antes, c.base); got != c.quiero {
 			t.Errorf("%+v en %q sobre %q da %q y la web da %q", c.d, c.base, c.antes, got, c.quiero)
@@ -252,7 +278,42 @@ func TestReescribirFormulaSoloLaHojaQueSeMueve(t *testing.T) {
 	if got := sin.ReescribirFormula("=B4+Resumen!B4"); got != "=B5+Resumen!B5" {
 		t.Errorf("sin hoja: %q", got)
 	}
+	if got := sin.ReescribirFormula("=B4+[Libro.xlsx]Resumen!B4"); got != "=B5+[Libro.xlsx]Resumen!B4" {
+		t.Errorf("sin hoja, otro libro: %q", got)
+	}
 	if got := ins.ReescribirFormula("=B4+Resumen!B4"); got != "=B5+Resumen!B4" {
 		t.Errorf("en la propia hoja: %q", got)
+	}
+}
+
+// Extremos son las posiciones que MoverReferencia lee y mueve: las del eje que se pide,
+// ninguna del eje que la referencia no tiene, y ninguna si no la sabe leer.
+func TestExtremosSonLosDeMoverReferencia(t *testing.T) {
+	for _, c := range []struct {
+		ref         string
+		filas, cols string
+	}{
+		{"B4", "3", "1"},
+		{"Ventas!$B$4:c9", "3,8", "1,2"},
+		{"'Mi hoja'!C9:A2", "8,1", "2,0"},
+		{"A:C", "", "0,2"},
+		{"3:5", "2,4", ""},
+		{"[Libro.xlsx]Ventas!B4", "3", "1"},
+		{"A1:B2:C3", "", ""},
+		{"Tabla[Col]", "", ""},
+	} {
+		texto := func(xs []int) string {
+			s := make([]string, len(xs))
+			for i, x := range xs {
+				s[i] = fmt.Sprint(x)
+			}
+			return strings.Join(s, ",")
+		}
+		if got := texto(Extremos(c.ref, true)); got != c.filas {
+			t.Errorf("Extremos(%q, filas) = %q, quiero %q", c.ref, got, c.filas)
+		}
+		if got := texto(Extremos(c.ref, false)); got != c.cols {
+			t.Errorf("Extremos(%q, columnas) = %q, quiero %q", c.ref, got, c.cols)
+		}
 	}
 }

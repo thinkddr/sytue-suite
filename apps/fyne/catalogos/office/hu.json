@@ -518,6 +518,7 @@
   "dialog.merge.reset": "A dokumentumot {total} egyesített másolat váltja fel. A sablon és az adatforrás elvész. Folytatja?",
   "dialog.sheet.delete": "Törli a(z) „{name}” munkalapot? A tartalma elvész.",
   "dialog.sheet.mergeLoses": "Egyesítéskor csak a bal felső cella ({ref}) értéke marad meg; a tartomány többi cellája kiürül. Ha az összes szöveget abba a cellába szeretné összefűzni, használja a „Tartalom egyesítése” lehetőséget.",
+  "dialog.sheet.nameTaken": "Már van „{name}” nevű munkalap (a nevekben a kis- és nagybetű nem számít).",
   "dialog.sheet.rename": "Munkalap neve:",
   "dialog.slide.delete": "Törli a(z) {n}. diát?",
   "doc.msg.exportFailed": "Nem sikerült exportálni",

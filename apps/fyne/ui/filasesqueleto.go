@@ -70,6 +70,27 @@ type MetaEsqueleto struct {
 	Oculta      bool
 }
 
+// CabeceraEsqueleto es el `header` de SkeletonRows: la fila de rótulos que va encima de
+// las filas, dentro de la misma región que carga (la cabecera de columnas de Drive). Sus
+// rayas son bloques del MISMO latido y del mismo «Cargando» que las filas: montada como
+// un grupo aparte, la lista de Drive eran dos latidos y dos anuncios.
+//
+// Tiene el relleno horizontal de una fila (`px-3`, dentro del Margen) y sus rayas van
+// centradas en su alto.
+type CabeceraEsqueleto struct {
+	// Alto es lo que mide la cabecera, con su filete.
+	Alto float32
+	// Filete es su `border-b`: va DENTRO de Alto, abajo, como el de las filas, y las
+	// rayas se centran en lo que queda encima.
+	Filete bool
+	// Rotulo es la raya de la izquierda (el rótulo de la primera columna).
+	Rotulo MetaEsqueleto
+	// Meta son las rayas de la derecha, de izquierda a derecha y separadas por
+	// HuecoMeta; la Oculta no ocupa sitio, como la columna de las filas que esconde.
+	Meta      []MetaEsqueleto
+	HuecoMeta float32
+}
+
 // RayaEsqueleto es una línea de texto de una fila con receta propia (RecetaEsqueleto).
 type RayaEsqueleto struct {
 	// Alto es el `height` de la raya.
@@ -162,8 +183,12 @@ type FilasEsqueleto struct {
 	// Tinte es el token de los bloques; vacío es `bg-subtle`. Sobre el cromo oscuro del
 	// menú es `sidebar-hover-bg` (SobreCromo), como el Esqueleto suelto.
 	Tinte string
+	// Cabecera es lo que va encima de las filas (ConCabecera); nil, nada.
+	Cabecera *CabeceraEsqueleto
 
 	latidoEsqueleto
+	// rayasCabecera son los bloques de la cabecera del renderer vivo.
+	rayasCabecera []*canvas.Rectangle
 }
 
 // latidoEsqueleto es el ÚNICO latido de un grupo de bloques de carga: una animación que
@@ -233,6 +258,24 @@ func (f *FilasEsqueleto) ConReceta(r RecetaEsqueleto) *FilasEsqueleto {
 	return f
 }
 
+// ConCabecera pone una cabecera encima de las filas y las devuelve, para encadenarlo.
+func (f *FilasEsqueleto) ConCabecera(c CabeceraEsqueleto) *FilasEsqueleto {
+	f.Cabecera = &c
+	return f
+}
+
+// RayasCabecera son los bloques de la cabecera, el rótulo y luego la meta en su orden;
+// existen cuando el widget ya tiene renderer.
+func (f *FilasEsqueleto) RayasCabecera() []*canvas.Rectangle { return f.rayasCabecera }
+
+// altoCabecera es lo que ocupa la cabecera encima de las filas.
+func (f *FilasEsqueleto) altoCabecera() float32 {
+	if f.Cabecera == nil {
+		return 0
+	}
+	return f.Cabecera.Alto
+}
+
 // ConRotulo cambia el «Cargando» por el de la lista («Cargando mensajes…»), ya
 // traducido, y las devuelve.
 func (f *FilasEsqueleto) ConRotulo(rotulo string) *FilasEsqueleto {
@@ -281,6 +324,16 @@ func (f *FilasEsqueleto) CreateRenderer() fyne.WidgetRenderer {
 		r.objetos = append(r.objetos, b)
 		return b
 	}
+	if c := f.Cabecera; c != nil {
+		for range 1 + len(c.Meta) {
+			r.cabecera = append(r.cabecera, nuevo())
+		}
+		if c.Filete {
+			r.fileteCabecera = canvas.NewRectangle(color.NRGBA{})
+			r.objetos = append(r.objetos, r.fileteCabecera)
+		}
+		f.rayasCabecera = r.cabecera
+	}
 	for range max(f.Filas, 0) {
 		var fila filaEsq
 		if f.Delantero != SinDelantero {
@@ -321,6 +374,9 @@ type filasEsqueletoRenderer struct {
 	filas   []filaEsq
 	bloques []*canvas.Rectangle
 	objetos []fyne.CanvasObject
+	// cabecera son las rayas de la cabecera (rótulo y meta) y fileteCabecera su borde.
+	cabecera       []*canvas.Rectangle
+	fileteCabecera *canvas.Rectangle
 }
 
 func (r *filasEsqueletoRenderer) alto() float32 {
@@ -339,12 +395,13 @@ func (r *filasEsqueletoRenderer) paso() (paso, encima float32) {
 }
 
 func (r *filasEsqueletoRenderer) MinSize() fyne.Size {
+	cab := r.f.altoCabecera()
 	n := float32(len(r.filas))
 	if n == 0 {
-		return fyne.NewSize(0, 0)
+		return fyne.NewSize(0, cab)
 	}
 	paso, encima := r.paso()
-	return fyne.NewSize(0, encima+n*paso-(paso-r.alto()))
+	return fyne.NewSize(0, cab+encima+n*paso-(paso-r.alto()))
 }
 
 func (r *filasEsqueletoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
@@ -357,16 +414,18 @@ func ponerBloque(b *canvas.Rectangle, x, y, w, h float32) {
 }
 
 func (r *filasEsqueletoRenderer) Layout(t fyne.Size) {
+	r.layoutCabecera(t)
 	if r.f.Receta != nil {
 		r.layoutReceta(t)
 		return
 	}
+	cab := r.f.altoCabecera()
 	alto := r.alto()
 	izq := r.f.Margen + MargenFila
 	der := t.Width - r.f.Margen - MargenFila
 	lado := LadoDelanteroEsqueleto(r.f.Delantero)
 	for i, fila := range r.filas {
-		y := float32(i) * alto
+		y := cab + float32(i)*alto
 		caja := alto
 		if fila.filete != nil {
 			caja -= tema.Borde
@@ -410,7 +469,7 @@ func (r *filasEsqueletoRenderer) layoutReceta(t fyne.Size) {
 	der := t.Width - r.f.Margen - rc.Der
 	texto := rc.altoRayas()
 	for i, fila := range r.filas {
-		y := encima + float32(i)*paso
+		y := r.f.altoCabecera() + encima + float32(i)*paso
 		caja := rc.Alto
 		if fila.filete != nil {
 			caja -= tema.Borde
@@ -460,6 +519,48 @@ func (r *filasEsqueletoRenderer) layoutReceta(t fyne.Size) {
 	}
 }
 
+// layoutCabecera coloca la cabecera arriba: el rótulo a la izquierda y la meta a la
+// derecha, con el relleno de una fila y centrados encima del filete.
+func (r *filasEsqueletoRenderer) layoutCabecera(t fyne.Size) {
+	c := r.f.Cabecera
+	if c == nil || len(r.cabecera) == 0 {
+		return
+	}
+	caja := c.Alto
+	if r.fileteCabecera != nil {
+		caja -= tema.Borde
+		ponerBloque(r.fileteCabecera, r.f.Margen, caja, t.Width-2*r.f.Margen, tema.Borde)
+	}
+	centro := func(h float32) float32 { return (caja - h) / 2 }
+	alto := func(m MetaEsqueleto) float32 {
+		if m.Alto <= 0 {
+			return AltoSubEsqueleto
+		}
+		return m.Alto
+	}
+	izq := r.f.Margen + MargenFila
+	xm := t.Width - r.f.Margen - MargenFila
+	hay := false
+	for j := len(c.Meta) - 1; j >= 0; j-- {
+		m, b := c.Meta[j], r.cabecera[1+j]
+		b.CornerRadius = tema.RadioMD
+		if m.Oculta {
+			b.Hide()
+			continue
+		}
+		b.Show()
+		if hay {
+			xm -= c.HuecoMeta
+		}
+		xm -= m.Ancho
+		ponerBloque(b, xm, centro(alto(m)), m.Ancho, alto(m))
+		hay = true
+	}
+	b := r.cabecera[0]
+	b.CornerRadius = tema.RadioMD
+	ponerBloque(b, izq, centro(alto(c.Rotulo)), min(c.Rotulo.Ancho, max(xm-izq, 0)), alto(c.Rotulo))
+}
+
 // colocarMeta pone la meta de una fila de derecha a izquierda (la oculta no ocupa
 // sitio) y devuelve dónde acaba el texto.
 func (r *filasEsqueletoRenderer) colocarMeta(fila filaEsq, der float32, centro func(float32) float32) float32 {
@@ -502,6 +603,10 @@ func (r *filasEsqueletoRenderer) tenir() {
 // Refresh vuelve a tenir (el tema puede haber cambiado) y recoloca.
 func (r *filasEsqueletoRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	if r.fileteCabecera != nil {
+		r.fileteCabecera.FillColor = tema.Color("border", v)
+		r.fileteCabecera.Refresh()
+	}
 	for _, fila := range r.filas {
 		if fila.filete != nil {
 			fila.filete.FillColor = tema.Color("border", v)

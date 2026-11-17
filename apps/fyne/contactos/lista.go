@@ -161,7 +161,7 @@ func (p *Pantalla) barraLote() *ui.BarraDeLote {
 	papelera.AlPulsar = func() { p.AlLote(LoteAPapelera, sel, nil) }
 	acciones = append(acciones, papelera)
 	return ui.NuevaBarraDeLote(p.t("batch.selected", i18n.Vars{"count": n}), p.t("batch.region", nil),
-		p.t("ui.bulk.clear", nil), acciones, p.AlSoltarMarcados)
+		p.t("ui.bulk.clear", nil), acciones, p.AlSoltarMarcados).ConNumero(n)
 }
 
 // buscadorVivo es el campo de búsqueda, que NO se rehace al repintar: la pantalla se

@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const cs: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Název listu:',
+  'dialog.sheet.nameTaken':
+    'List s názvem „{name}“ už existuje (názvy nerozlišují velká a malá písmena).',
   'dialog.sheet.delete': 'Odstranit list „{name}“? Jeho obsah bude ztracen.',
   'dialog.sheet.mergeLoses':
     'Při sloučení se zachová jen hodnota levé horní buňky ({ref}); ostatní buňky oblasti se vymažou. Chcete-li spojit všechny texty do této buňky, použijte „Sloučit obsah“.',

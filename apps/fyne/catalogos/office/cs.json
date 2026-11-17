@@ -522,6 +522,7 @@
   "dialog.merge.reset": "Dokument bude nahrazen {total} sloučenými kopiemi. Šablona i zdroj dat budou ztraceny. Pokračovat?",
   "dialog.sheet.delete": "Odstranit list „{name}“? Jeho obsah bude ztracen.",
   "dialog.sheet.mergeLoses": "Při sloučení se zachová jen hodnota levé horní buňky ({ref}); ostatní buňky oblasti se vymažou. Chcete-li spojit všechny texty do této buňky, použijte „Sloučit obsah“.",
+  "dialog.sheet.nameTaken": "List s názvem „{name}“ už existuje (názvy nerozlišují velká a malá písmena).",
   "dialog.sheet.rename": "Název listu:",
   "dialog.slide.delete": "Odstranit snímek {n}?",
   "doc.msg.exportFailed": "Nepodařilo se exportovat",

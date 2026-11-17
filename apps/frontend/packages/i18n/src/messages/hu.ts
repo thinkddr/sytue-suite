@@ -13,20 +13,10 @@ export const hu: Catalog = {
     'Tudomásul veszem, hogy elveszíthetem a hozzáférést a korábbi titkosított üzenetekhez',
   'matrix.unknownKey':
     'Ezt a fiókot még azelőtt titkosították, hogy a Sytue a kulcsát a bejelentkezéseddel védte volna. Ellenőrizd ezt a készüléket egy másikról, amelyen már be vagy jelentkezve.',
-  'matrix.unlockTitle': 'Titkosított adataid megnyitása',
-  'matrix.unlockBody':
-    'Erősítsd meg, hogy te vagy az, a hozzáférési kulcsoddal vagy a Sytue-jelszavaddal. Az ellenőrzés ezen a készüléken történik: más nem nyithatja meg az adataidat.',
-  'matrix.protectTitle': 'Titkosított adataid védelme',
-  'matrix.protectBody':
-    'Válaszd ki, hogyan nyitod meg a titkosított adataidat a többi készülékeden: a hozzáférési kulcsoddal vagy a Sytue-jelszavaddal. Csak te nyithatod meg őket.',
-  'matrix.usePasskey': 'Hozzáférési kulcs használata',
-  'matrix.usePassword': 'Jelszó használata',
-  'matrix.password': 'Sytue-jelszó',
-  'matrix.passwordConfirm': 'Ismételd meg a jelszót',
-  'matrix.passwordMismatch': 'A jelszavak nem egyeznek.',
-  'matrix.unlockWrong': 'Nem sikerült. Próbáld újra.',
-  'matrix.passkeyUnsupported':
-    'Ez a hozzáférési kulcs nem tud titkosított adatokat megnyitni. Használd a jelszavadat.',
+  'matrix.unlocking': 'Titkosított adataid feloldása…',
+  'matrix.signIn': 'Bejelentkezés a Sytue ID-be',
+  'matrix.signInBody':
+    'A Sytue ID-be való bejelentkezés feloldja a titkosított adataidat ezen az eszközön. Jelentkezz be újra a jelszavaddal vagy hozzáférési kulcsoddal, hogy itt megnyisd őket.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Titkosított feldolgozás engedélyezése',
   'matrix.allowStorageBody':

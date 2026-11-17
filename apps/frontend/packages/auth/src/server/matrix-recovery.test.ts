@@ -113,6 +113,37 @@ test('PUT passes only a well-formed v1 wrapper, without extra fields', async () 
   expect(f.state.requests).toHaveLength(1);
 });
 
+test('PUT passes the sytue-id wrapper of ADR 0084, and nothing extra in its kdf', async () => {
+  const f = fixture();
+  const url = 'https://drive.sytue.invalid/drive/api/matrix/recovery-wrappers?identity_version=2';
+  const sytueID = {
+    v: 1,
+    kind: 'sytue-id',
+    key_id: 'K1',
+    credential_id: '',
+    kdf: { alg: 'sytue-id-unlock-hkdf-sha256', hint: 'Wy0QEL3fH/AUY/gTTh3gmQ==' },
+    nonce: 'cHFyc3R1dnd4eXp7',
+    ciphertext: 'GWRz0ee1TKLgjzg3JaE4SFFgrMF4UNwseJ3Y8TGX1wr5',
+  };
+  const ok = await f.call(f.routes.wrappers.PUT, url, {
+    method: 'PUT',
+    body: JSON.stringify({ ...sytueID, kdf: { ...sytueID.kdf, unlock_key: 'leak' } }),
+  });
+  expect(ok.status).toBe(200);
+  expect(await f.state.requests[0]!.json()).toEqual(sytueID);
+  for (const body of [
+    { ...sytueID, credential_id: 'x' },
+    { ...sytueID, kdf: { alg: 'sytue-id-unlock-hkdf-sha256' } },
+    { ...sytueID, kdf: { alg: 'argon2id', hint: sytueID.kdf.hint } },
+  ]) {
+    const refused = await f.call(f.routes.wrappers.PUT, url, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    expect(refused.status).toBe(400);
+  }
+});
+
 test('no session, no access', async () => {
   const f = fixture();
   f.state.session = null;

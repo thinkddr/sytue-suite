@@ -63,7 +63,7 @@ func TestElSelectorDelLoteMideLoDeLaWeb(t *testing.T) {
 // VISTO EN ROJO (frontal, 2026-09-23): con el `Refresh` vacío de antes, el borde se
 // queda en `border` con el puntero encima.
 func TestLasTarjetasDeLaPortadaCambianDeBordeAlPasar(t *testing.T) {
-	o, _ := tarjetaKPI(tema.Claro, "Ventas", "4406,96 €", "Facturas", "", ui.InsigniaNeutra, 300, func() {}, false)
+	o, _ := tarjetaKPI(tema.Claro, "Ventas", "4406,96 €", "Facturas", "", ui.InsigniaNeutra, 300, func() {}, nil)
 	p, ok := o.(*PulsableCon)
 	if !ok || p.caja == nil {
 		t.Fatal("la tarjeta del resumen no lleva la caja de su fondo")

@@ -12,20 +12,10 @@ export const lv: Catalog = {
   'matrix.resetUnderstood': 'Saprotu, ka varu zaudēt piekļuvi iepriekšējām šifrētajām ziņām',
   'matrix.unknownKey':
     'Šis konts tika šifrēts, pirms Sytue aizsargāja tā atslēgu ar tavu pieteikšanos. Verificē šo ierīci no citas, kurā jau esi pieteicies.',
-  'matrix.unlockTitle': 'Atver savus šifrētos datus',
-  'matrix.unlockBody':
-    'Apstiprini, ka tas esi tu, ar savu piekļuves atslēgu vai Sytue paroli. Pārbaude notiek šajā ierīcē: neviens cits nevar atvērt tavus datus.',
-  'matrix.protectTitle': 'Aizsargā savus šifrētos datus',
-  'matrix.protectBody':
-    'Izvēlies, kā atvērsi šifrētos datus citās ierīcēs: ar piekļuves atslēgu vai Sytue paroli. Tikai tu varēsi tos atvērt.',
-  'matrix.usePasskey': 'Izmantot piekļuves atslēgu',
-  'matrix.usePassword': 'Izmantot paroli',
-  'matrix.password': 'Sytue parole',
-  'matrix.passwordConfirm': 'Atkārto paroli',
-  'matrix.passwordMismatch': 'Paroles nesakrīt.',
-  'matrix.unlockWrong': 'Neizdevās. Mēģini vēlreiz.',
-  'matrix.passkeyUnsupported':
-    'Ar šo piekļuves atslēgu nevar atvērt šifrētus datus. Izmanto paroli.',
+  'matrix.unlocking': 'Tavu šifrēto datu atbloķēšana…',
+  'matrix.signIn': 'Pieteikties Sytue ID',
+  'matrix.signInBody':
+    'Pieteikšanās Sytue ID atbloķē tavus šifrētos datus šajā ierīcē. Piesakies vēlreiz ar paroli vai piekļuves atslēgu, lai tos atvērtu šeit.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Atļaut šifrētu datu apstrādi',
   'matrix.allowStorageBody':

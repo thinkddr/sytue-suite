@@ -13,10 +13,11 @@ export {
 export * from './types.js';
 export {
   MatrixCustodyError,
+  type MatrixCustodyState,
   type MatrixKeyCustody,
-  type MatrixUnlockFactor,
   type MatrixUnlockMethod,
 } from './custody.js';
+export type { UnlockBridgeError } from './unlock-bridge.js';
 export * from './storage.js';
 export { StorageRepository, type StorageRecordTransport } from './storage-repository.js';
 

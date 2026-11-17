@@ -82,6 +82,9 @@ Opciones:
   --admin-password <pwd>    Contraseña del administrador (también SYTUE_ADMIN_PASSWORD).
                             Si se omite, se genera una aleatoria
   --skip-verify             (Compose) No ejecuta la verificación final (smoke test)
+  --sin-matrix              Sin el complemento Matrix (cifrado de extremo a extremo; Drive,
+                            Mail y Rooms guardan entonces sus datos en el servidor)
+  --con-matrix              Activa Matrix en una instalación que ya existía sin él
   --sin-erp                 Sin el complemento SyERP (facturación, contabilidad, TPV…)
   --sin-devx                Sin el complemento DevX: Sytue Cloud (PaaS) y Sytue Analytics
   --sms-sweego-key <clave>  Activa el complemento de verificación por SMS (Sweego)
@@ -131,6 +134,7 @@ TLS_MODO=""
 USUARIOS=""
 REGISTRO_ABIERTO=""
 CON_ERP=""
+CON_MATRIX=""
 CON_DEVX=""
 SMS_KEY="${SYTUE_SMS_SWEEGO_API_KEY:-}"
 
@@ -155,6 +159,8 @@ while [ $# -gt 0 ]; do
     --registro-abierto) REGISTRO_ABIERTO="true"; shift ;;
     --registro-cerrado) REGISTRO_ABIERTO="false"; shift ;;
     --sin-erp)         CON_ERP=0; shift ;;
+    --sin-matrix)      CON_MATRIX=0; shift ;;
+    --con-matrix)      CON_MATRIX=1; shift ;;
     --sin-devx)        CON_DEVX=0; shift ;;
     --sms-sweego-key)  need_arg "$@"; SMS_KEY="$2"; shift 2 ;;
     --integrations|integraciones) INTEGRATIONS_ONLY=1; shift ;;
@@ -789,7 +795,7 @@ SYTUE_DEV_CLIENT_SECRET=$(rand_hex 32)
 # --- Complementos -----------------------------------------------------------
 # Productos que ofrece el lanzador (los que levanta esta instalación).
 SYTUE_APPS=$(apps_lanzador "$perfiles")
-# Cifrado de extremo a extremo: necesita un servidor Matrix, que este entorno no trae.
+# Cifrado de extremo a extremo (complemento Matrix): lo ajusta el asistente.
 SYTUE_CIFRADO_E2E=desactivado
 SYTUE_ROOMS_MATRIX_REQUIRED=false
 # Verificación por SMS (Sweego). Vacía: sin SMS (en local el código va al log).
@@ -998,11 +1004,13 @@ instalar_compose() {
       read -r -s -p "  Clave de API de Sweego: " SMS_KEY; echo ""
     fi
   fi
+  [ "$DO_RESET" -eq 1 ] && [ -z "$CON_MATRIX" ] && CON_MATRIX=1
+  decidir_matrix
   CON_ERP="${CON_ERP:-1}"; CON_DEVX="${CON_DEVX:-1}"
   local perfiles
   perfiles="$(perfiles_compose "$PROFILE")"
   ok "Perfiles: ${BOLD}${perfiles}${RESET} · dominio local: ${BOLD}*.${LOCAL_DOMAIN}${RESET}"
-  info "Complementos: ERP $([ "$CON_ERP" = 1 ] && echo sí || echo no) · DevX $([ "$CON_DEVX" = 1 ] && echo sí || echo no) · SMS $([ -n "$SMS_KEY" ] && echo sí || echo no) · cifrado E2E no (necesita un servidor Matrix, que el modo local no incluye)"
+  info "Complementos: Matrix (cifrado E2E) $([ "$CON_MATRIX" = 1 ] && echo sí || echo no) · ERP $([ "$CON_ERP" = 1 ] && echo sí || echo no) · DevX $([ "$CON_DEVX" = 1 ] && echo sí || echo no) · SMS $([ -n "$SMS_KEY" ] && echo sí || echo no)"
 
   # --- Paso 4: configuración y secretos --------------------------------------
   step "Paso 4 de 5 · Configuración y secretos"
@@ -1013,6 +1021,7 @@ instalar_compose() {
     if check_cmd docker && docker info >/dev/null 2>&1 && [ -f "$ENV_FILE" ]; then
       info "Parando la suite y borrando sus volúmenes..."
       dc --profile full down -v --remove-orphans >/dev/null 2>&1 || true
+      docker volume rm -f sytue-one-dev_matrix-data >/dev/null 2>&1 || true
     fi
     [ -f "$ENV_FILE" ] && apartar_env && info "Configuración anterior guardada en deploy/compose/.env.bak"
   fi
@@ -1048,6 +1057,8 @@ instalar_compose() {
     escribir_env "$perfiles"
     ok "Creado ${BOLD}deploy/compose/.env${RESET} (permisos 0600, ignorado por Git)."
   fi
+  env_matrix
+  preparar_matrix "$LOCAL_DOMAIN"
 
   if [ "$ONLY_CONFIG" -eq 1 ]; then
     echo ""
@@ -1064,6 +1075,7 @@ instalar_compose() {
     info "Construyendo las imágenes (servicios Go y apps web compiladas). La primera vez tarda (≈20-60 min según el equipo); después es incremental."
     construir_por_tandas
   fi
+  bd_matrix
   info "Arrancando contenedores..."
   dc up -d --no-build --remove-orphans
   info "Esperando a Sytue ID..."
@@ -1073,6 +1085,8 @@ instalar_compose() {
     sleep 5
   done
   sembrar_admin || die "No se pudo crear el administrador. Reintenta con ${BOLD}make dev-seed${RESET} y revisa ${BOLD}make dev-logs SVC=id${RESET}."
+  oidc_matrix "$LOCAL_DOMAIN"
+  controlador_matrix
   info "Esperando a que el resto de servicios estén sanos..."
   local sanos=1
   esperar_salud 900 || sanos=0
@@ -1396,6 +1410,165 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Complemento Matrix (Synapse): almacenamiento cifrado de extremo a extremo
+# ---------------------------------------------------------------------------
+# El mismo servidor y la misma configuración que producción (deploy/helm/charts/
+# matrix), incrustado en la instalación: Drive, Mail, Rooms y el resto guardan sus
+# datos cifrados en el dispositivo y Rooms usa Matrix como transporte.
+MATRIX_DIR="${COMPOSE_DIR}/.matrix"
+
+matrix_activo() { [ "$(env_get SYTUE_MATRIX)" = "1" ]; }
+
+# Decide el complemento: la opción manda; si no, lo que diga el .env; en una
+# instalación nueva, sí. Un .env anterior sin la variable se queda sin Matrix:
+# encenderlo cambia dónde guardan las apps sus datos, y eso se pide (--con-matrix).
+decidir_matrix() {
+  [ -n "$CON_MATRIX" ] && return 0
+  if [ -f "$ENV_FILE" ]; then
+    CON_MATRIX="$(env_get SYTUE_MATRIX)"; CON_MATRIX="${CON_MATRIX:-0}"
+  elif [ "$NON_INTERACTIVE" -eq 0 ]; then
+    prompt_yes_no "¿Incluir Matrix (cifrado de extremo a extremo; Drive, Mail y Rooms lo usan para sus datos)?" "s" && CON_MATRIX=1 || CON_MATRIX=0
+  else
+    CON_MATRIX=1
+  fi
+}
+
+# Variables del complemento en el .env. Los secretos se crean una vez y no se
+# cambian: la contraseña de la base ya está en PostgreSQL.
+env_matrix() {
+  env_set SYTUE_MATRIX "$CON_MATRIX"
+  if [ "$CON_MATRIX" = 1 ]; then
+    env_set SYTUE_CIFRADO_E2E activado
+    env_set SYTUE_ROOMS_MATRIX_REQUIRED true
+    local v
+    for v in MATRIX_DB_PASSWORD MATRIX_REGISTRATION_SECRET MATRIX_MACAROON_SECRET MATRIX_FORM_SECRET \
+      MATRIX_LIFECYCLE_SECRET ORGS_PERSONA_SECRET; do
+      [ -n "$(env_get "$v")" ] || env_set "$v" "$(rand_hex 32)"
+    done
+  else
+    env_set SYTUE_CIFRADO_E2E desactivado
+    env_set SYTUE_ROOMS_MATRIX_REQUIRED false
+  fi
+}
+
+# La configuración de Synapse para <dominio> y su overlay en la lista de Compose.
+preparar_matrix() { # <dominio>
+  matrix_activo || return 0
+  check_cmd python3 || die "El complemento Matrix necesita python3 para generar su configuración (o usa --sin-matrix)."
+  (umask 077 && mkdir -p "$MATRIX_DIR")
+  DOMINIO="$1" \
+    MATRIX_DB_PASSWORD="$(env_get MATRIX_DB_PASSWORD)" \
+    MATRIX_REGISTRATION_SECRET="$(env_get MATRIX_REGISTRATION_SECRET)" \
+    MATRIX_MACAROON_SECRET="$(env_get MATRIX_MACAROON_SECRET)" \
+    MATRIX_FORM_SECRET="$(env_get MATRIX_FORM_SECRET)" \
+    OIDC_MATRIX="$(env_get SYTUE_DEV_CLIENT_SECRET)" \
+    python3 "${COMPOSE_DIR}/matrix/configurar.py" "${ROOT_DIR}/apps/nucleo/storage/products.txt" \
+    >"${MATRIX_DIR}/homeserver.yaml.nuevo" || die "No se pudo generar la configuración de Matrix."
+  # Synapse corre como uid 991: el fichero se lee dentro; la carpeta (0700) lo esconde fuera.
+  chmod 644 "${MATRIX_DIR}/homeserver.yaml.nuevo"
+  mv "${MATRIX_DIR}/homeserver.yaml.nuevo" "${MATRIX_DIR}/homeserver.yaml"
+  local overlay="${COMPOSE_DIR}/matrix.yml"
+  if [ "$1" != "$LOCAL_DOMAIN" ]; then
+    DOMINIO="$1" perl -pe 's/sytue\.localhost/$ENV{DOMINIO}/g' "$overlay" >"${SERVIDOR_DIR}/matrix.yml"
+    overlay="${SERVIDOR_DIR}/matrix.yml"
+  fi
+  COMPOSE_FILES+=("$overlay")
+}
+
+esperar_servicio() { # <servicio> <segundos>
+  local t=0
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q "$1")" 2>/dev/null)" = "healthy" ]; do
+    t=$((t + 5)); [ "$t" -lt "$2" ] || return 1
+    sleep 5
+  done
+}
+
+# Rol y base propios de Synapse, con locale C (lo exige). Idempotente.
+bd_matrix() {
+  matrix_activo || return 0
+  dc up -d postgres >/dev/null 2>&1
+  esperar_servicio postgres 180 || die "PostgreSQL no arranca. Revisa: ${BOLD}make dev-logs SVC=postgres${RESET}"
+  dc exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(env_get POSTGRES_SUPERUSER || true)" -d postgres -q >/dev/null <<SQL ||
+SELECT format('CREATE ROLE sytue_matrix LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD %L', '$(env_get MATRIX_DB_PASSWORD)')
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'sytue_matrix')\gexec
+SELECT 'CREATE DATABASE sytue_matrix OWNER sytue_matrix ENCODING ''UTF8'' LC_COLLATE ''C'' LC_CTYPE ''C'' TEMPLATE template0'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'sytue_matrix')\gexec
+SQL
+    die "No se pudo crear la base de Matrix (make dev-logs SVC=postgres)."
+  ok "Base de Matrix lista."
+}
+
+# El cliente «sytue-matrix» de Sytue ID: su secreto (el de Synapse) y la vuelta
+# del inicio de sesión en <dominio>. Idempotente.
+oidc_matrix() { # <dominio>
+  matrix_activo || return 0
+  local tmp
+  tmp="$(mktemp -d)"
+  chmod 755 "$tmp"
+  printf '%s' "$(env_get SYTUE_DEV_CLIENT_SECRET)" >"${tmp}/sytue-matrix"
+  chmod 644 "${tmp}/sytue-matrix"
+  if ! dc run --rm --no-deps -T -v "${tmp}:/secretos:ro" id reconcile-client-secrets /secretos >/dev/null 2>&1; then
+    rm -rf "$tmp"
+    die "No se pudo activar el cliente de Matrix en Sytue ID (make dev-logs SVC=id)."
+  fi
+  rm -rf "$tmp"
+  dc exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(env_get POSTGRES_SUPERUSER || true)" -d "$(env_get ID_DB_NAME || true)" -q >/dev/null <<SQL ||
+UPDATE oauth_clients SET redirect_uris = ARRAY(SELECT DISTINCT u FROM unnest(redirect_uris ||
+  ARRAY['https://matrix.$1/_synapse/client/oidc/callback']) u)
+WHERE id = 'sytue-matrix';
+SQL
+    die "No se pudo registrar la vuelta de Matrix en Sytue ID."
+}
+
+# La credencial con la que Rooms administra sus salas en Synapse (como
+# deploy/private-production/bin/matrix.sh controller): se registra una vez por el
+# secreto compartido, que no se publica, y se guarda en el .env.
+controlador_matrix() {
+  matrix_activo || return 0
+  info "Esperando a Matrix..."
+  esperar_servicio matrix 300 || die "Matrix no arranca. Revisa: ${BOLD}make dev-logs SVC=matrix${RESET}"
+  local token
+  token="$(env_get MATRIX_CONTROLLER_TOKEN)"
+  if [ -n "$token" ] && dc exec -T matrix curl -fsS -H "Authorization: Bearer ${token}" \
+    http://localhost:8008/_matrix/client/v3/account/whoami >/dev/null 2>&1; then
+    ok "Matrix listo (cifrado de extremo a extremo activo)."
+    return 0
+  fi
+  token="$(dc exec -T matrix gosu 991:991 python - 2>/dev/null <<'PY'
+import hashlib, hmac, json, os, pathlib, secrets, urllib.error, urllib.request
+cfg = json.loads(pathlib.Path('/config/homeserver.yaml').read_text())
+raiz = 'http://127.0.0.1:8008'
+pendiente = pathlib.Path('/data/controller-token')
+def pedir(ruta, cuerpo=None, token=None):
+    cabeceras = {'Content-Type': 'application/json'}
+    if token: cabeceras['Authorization'] = 'Bearer ' + token
+    datos = None if cuerpo is None else json.dumps(cuerpo).encode()
+    with urllib.request.urlopen(urllib.request.Request(raiz + ruta, data=datos, headers=cabeceras), timeout=15) as r:
+        return json.load(r)
+token = pendiente.read_text().strip() if pendiente.exists() else ''
+if not token:
+    nonce = pedir('/_synapse/admin/v1/register')['nonce']
+    usuario, clave = 'rooms_controller', secrets.token_urlsafe(48)
+    carga = bytes([0]).join(p.encode() for p in [nonce, usuario, clave, 'admin'])
+    mac = hmac.new(cfg['registration_shared_secret'].encode(), carga, hashlib.sha1).hexdigest()
+    token = pedir('/_synapse/admin/v1/register', {'nonce': nonce, 'username': usuario, 'password': clave,
+                                                 'admin': True, 'mac': mac, 'inhibit_login': False})['access_token']
+    fd = os.open(pendiente, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'w') as f:
+        f.write(token)
+yo = pedir('/_matrix/client/v3/account/whoami', token=token)
+if yo['user_id'] != '@rooms_controller:' + cfg['server_name']:
+    raise SystemExit('identidad inesperada')
+print(token, end='')
+PY
+)" || true
+  [ -n "$token" ] || die "Matrix no dio la credencial de Rooms. Revisa: ${BOLD}make dev-logs SVC=matrix${RESET}"
+  env_set MATRIX_CONTROLLER_TOKEN "$token"
+  dc up -d --no-build rooms >/dev/null 2>&1 || true
+  ok "Matrix listo (cifrado de extremo a extremo activo)."
+}
+
+# ---------------------------------------------------------------------------
 # Modo servidor único: toda la suite en una máquina con tu dominio
 # ---------------------------------------------------------------------------
 SERVIDOR_DIR="${COMPOSE_DIR}/.servidor"
@@ -1585,6 +1758,8 @@ instalar_servidor() {
 
   step "Paso 3 de 5 · Servicios y propietario"
   PROFILE="${PROFILE:-full}"
+  [ "$DO_RESET" -eq 1 ] && [ -z "$CON_MATRIX" ] && CON_MATRIX=1
+  decidir_matrix
   CON_ERP="${CON_ERP:-1}"; CON_DEVX="${CON_DEVX:-1}"
   local perfiles
   perfiles="$(perfiles_compose "$PROFILE")"
@@ -1603,6 +1778,7 @@ instalar_servidor() {
     if [ -f "$ENV_FILE" ]; then
       renderizar_servidor
       dc --profile full down -v --remove-orphans >/dev/null 2>&1 || true
+      docker volume rm -f sytue-one-dev_matrix-data >/dev/null 2>&1 || true
       apartar_env
     fi
   fi
@@ -1640,8 +1816,10 @@ instalar_servidor() {
   env_set SYTUE_USUARIOS "$USUARIOS"
   env_set SYTUE_REGISTRO_ABIERTO "$REGISTRO_ABIERTO"
   ADMIN_PASSWORD="$(env_get SYTUE_PROPIETARIO_PASSWORD)"
+  env_matrix
   renderizar_servidor
-  ok "Compose para ${DOMAIN} en deploy/compose/.servidor/"
+  preparar_matrix "$DOMAIN"
+  ok "Compose para ${DOMAIN} en deploy/compose/.servidor/ · Matrix $([ "$CON_MATRIX" = 1 ] && echo sí || echo no)"
   if [ "$ONLY_CONFIG" -eq 1 ]; then
     ok "Configuración lista. Para arrancar: ${BOLD}./sytue-deploy --mode servidor --domain ${DOMAIN}${RESET}"
     exit 0
@@ -1653,6 +1831,7 @@ instalar_servidor() {
     info "Construyendo las imágenes para ${DOMAIN} (la primera vez, 20-60 min)..."
     construir_por_tandas
   fi
+  bd_matrix
   info "Arrancando contenedores..."
   dc up -d --no-build --remove-orphans
   info "Esperando a Sytue ID..."
@@ -1662,7 +1841,9 @@ instalar_servidor() {
     sleep 5
   done
   configurar_clientes_oidc
+  oidc_matrix "$DOMAIN"
   alta_propietario
+  controlador_matrix
   info "Esperando a que el resto de servicios estén sanos..."
   local sanos=1
   esperar_salud 900 || sanos=0

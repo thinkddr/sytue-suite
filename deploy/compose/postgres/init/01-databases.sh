@@ -61,7 +61,7 @@ create_role_db "${ANALYTICS_DB_USER:-sytue_analytics}" "${ANALYTICS_DB_PASSWORD}
 # crean funciones con `SET app.maintenance = 'on'` (y otros app.*): desde
 # PostgreSQL 15 eso exige `GRANT SET ON PARAMETER` a quien no es superusuario. La
 # lista de parámetros es la del piloto, el mismo fichero, montado por el compose
-# (deploy/compose/postgres/conceder-parametros.sql, el mismo que lee deploy/private-production por un enlace): no se copia aquí.
+# (deploy/compose/postgres/conceder-parametros.sql, el mismo que lee el despliegue privado por un enlace): no se copia aquí.
 #
 # Un volumen de dev creado antes de esto no vuelve a pasar por este script. Si un
 # servicio no arranca con «permission denied to set parameter "app.…"», desde la

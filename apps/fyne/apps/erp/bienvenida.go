@@ -573,12 +573,21 @@ func (b *Bienvenida) resumen(v tema.Variante, ancho float32) (fyne.CanvasObject,
 	rej := ui.RejillaTarjetas(b.Ventana, HuecoTarjetas, CortesResumen)
 	cols := max(rej.Columnas(ancho), 1)
 	w := rej.AnchoColumna(ancho)
+	// Con el resumen en camino, las tres cifras son UN grupo de carga: laten a una y
+	// dicen «Cargando» una vez.
+	var carga *ui.BloquesEsqueleto
+	if b.CargandoResumen && r == nil {
+		carga = ui.NuevosBloquesEsqueleto()
+	}
 	celdas := make([]celdaRejilla, 0, len(ks))
 	for _, k := range ks {
-		o, alto := tarjetaKPI(v, k.rotulo, k.valor, k.pista, k.insignia, k.tono, w, k.al, b.CargandoResumen && r == nil)
+		o, alto := tarjetaKPI(v, k.rotulo, k.valor, k.pista, k.insignia, k.tono, w, k.al, carga)
 		celdas = append(celdas, celdaRejilla{o, alto})
 	}
 	o, alto := enRejilla(rej, cols, ancho, celdas)
+	if carga != nil {
+		o = carga.Con(o)
+	}
 	p.add(o, alto, SeparaSeccion)
 	// Cuándo se facturó, no solo cuánto: a lo ancho de la rejilla (`sm:col-span-3`),
 	// a su `gap-3` de las cifras.
@@ -592,8 +601,9 @@ func (b *Bienvenida) resumen(v tema.Variante, ancho float32) (fyne.CanvasObject,
 // cifra text-xl y pista mt-1. Chromium remoto con rem16: 108px.
 var AltoKPI = 2*tema.Borde + 2*TarjetaPX + ui.MedidaInsignia("").Height + HuecoUno + tema.TextoXL.Linea + HuecoUno + tema.TextoXS.Linea
 
-// tarjetaKPI es un indicador del resumen: se pulsa entera y abre lo suyo.
-func tarjetaKPI(v tema.Variante, rotulo, valor, pista, insignia string, tono ui.Tono, ancho float32, al func(), cargando bool) (fyne.CanvasObject, float32) {
+// tarjetaKPI es un indicador del resumen: se pulsa entera y abre lo suyo. Con `carga`,
+// el resumen está en camino y la cifra es un bloque de ese grupo.
+func tarjetaKPI(v tema.Variante, rotulo, valor, pista, insignia string, tono ui.Tono, ancho float32, al func(), carga *ui.BloquesEsqueleto) (fyne.CanvasObject, float32) {
 	dentro := ancho - 2*tema.Borde - 2*TarjetaPX
 	x0 := tema.Borde + TarjetaPX
 	l := &lienzo{}
@@ -610,8 +620,8 @@ func tarjetaKPI(v tema.Variante, rotulo, valor, pista, insignia string, tono ui.
 	ui.Truncar(r, rotulo, tema.TextoXS, ui.Medio, max(dentro-wi-HuecoDos, 0))
 	l.texto(r, x0, x0+1.5)
 	y := x0 + ui.MedidaInsignia("").Height + HuecoUno
-	if cargando {
-		cifraCargando(l, x0, y, dentro)
+	if carga != nil {
+		cifraCargando(l, carga, x0, y, dentro)
 	} else {
 		c := ui.Texto(valor, tema.TextoXL, ui.SemiNegrita, tema.Color("text", v))
 		ui.Truncar(c, valor, tema.TextoXL, ui.SemiNegrita, dentro)

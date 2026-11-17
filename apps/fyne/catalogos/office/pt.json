@@ -518,6 +518,7 @@
   "dialog.merge.reset": "O documento será substituído por {total} cópias intercaladas. O modelo e a origem de dados serão perdidos. Continuar?",
   "dialog.sheet.delete": "Eliminar a folha «{name}»? O seu conteúdo será perdido.",
   "dialog.sheet.mergeLoses": "Ao unir, só se mantém o valor da célula do canto superior esquerdo ({ref}); as restantes células do intervalo ficam vazias. Para juntar todos os textos nessa célula, use «Unir conteúdo».",
+  "dialog.sheet.nameTaken": "Já existe uma folha chamada «{name}» (os nomes não distinguem maiúsculas de minúsculas).",
   "dialog.sheet.rename": "Nome da folha:",
   "dialog.slide.delete": "Eliminar o diapositivo {n}?",
   "doc.msg.exportFailed": "Não foi possível exportar",

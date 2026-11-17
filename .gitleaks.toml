@@ -32,6 +32,12 @@ paths = [
   # Vectores de prueba del envoltorio de la clave de recuperación (ADR 0082): claves de
   # envoltorio sintéticas y deterministas para que Go y JS comprueben el mismo AAD.
   '''apps/nucleo/recoverywrap/testdata/vectors\.json$''',
+  # Y los del desbloqueo con la contraseña de inicio de sesión (E2E-LOGIN-3): contraseña
+  # de ejemplo («correct horse battery staple») y claves derivadas deterministas.
+  '''apps/nucleo/recoverywrap/testdata/desbloqueo\.json$''',
+  # Pruebas de la política de almacenamiento privado de Matrix: sender_key y session_id
+  # son cadenas «artificial-…» de las pruebas, no claves.
+  '''apps/frontend/packages/offline/src/matrix/[^/]+\.test\.ts$''',
   # Certificados PKCS#12 de PRUEBA (clásico y moderno) de los tests de firma y Verifactu:
   # generados para los tests, sin valor fuera de ellos.
   '''(platform/pkg/pkcs12|services/syerp/internal/verifactu)/testdata/(clasico|moderno)\.p12$''',

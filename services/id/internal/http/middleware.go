@@ -73,12 +73,16 @@ var cspStyleHashes = func() string {
 }()
 
 // cspScriptHashes autoriza SOLO los <script> propios del IdP por hash sha256
-// (mismo patrón que los estilos): sin 'unsafe-inline'. Son cinco: el login por
-// passkey, la normalización del campo de identidad —que va en los TRES
-// formularios con correo—, el barrido de cookies del cierre de sesión, el alta
-// de passkeys desde «Mi cuenta» y el captcha ALTCHA del alta.
+// (mismo patrón que los estilos): sin 'unsafe-inline'. El login por passkey, la
+// normalización del campo de identidad —que va en los TRES formularios con
+// correo—, el barrido de cookies del cierre de sesión, el alta de passkeys desde
+// «Mi cuenta», el captcha ALTCHA del alta y los del desbloqueo del cifrado (ADR
+// 0084: Argon2id, lo común, el inicio de sesión, el relevo y el puente).
 var cspScriptHashes = func() string {
-	blocks := []string{themeInitJS, loginScript, emailFieldScript, logoutSweepScript, passkeysScript, altchaScript}
+	blocks := []string{
+		themeInitJS, loginScript, emailFieldScript, logoutSweepScript, passkeysScript, altchaScript,
+		e2eArgon2JS, e2eComunJS, e2eLoginJS, e2eRelayJS, e2eBridgeJS,
+	}
 	parts := make([]string, 0, len(blocks))
 	for _, b := range blocks {
 		sum := sha256.Sum256([]byte(b))

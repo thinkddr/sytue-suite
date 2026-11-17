@@ -151,6 +151,7 @@ func (l *libroXlsx) modelo(p *presupuesto) *sheetModel {
 	}
 	attachXlsxPivots(l.files, model, parts)
 	attachXlsxSlicers(l.files, l.principal, model, parts) // segmentadores de Excel (x14/x15); tras las dinámicas
+	desgemelarHojas(model)                                // «Ventas» y «VENTAS»: la segunda, «VENTAS (2)»
 	return model
 }
 

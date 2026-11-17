@@ -92,6 +92,11 @@ type Server struct {
 	// nativas (NAT-02): sin él, una página ajena podría enlazar la autorización ya
 	// consentida. Derivada de la KEK con su etiqueta, como las de arriba.
 	consentKey []byte
+	// unlockSaltKey inventa la sal del sobre de contraseña de quien aún no tiene
+	// sobre y de las direcciones sin cuenta (desbloqueo.go, ADR 0084): estable
+	// entre réplicas y reinicios, y derivada de la KEK con su etiqueta, como las
+	// de arriba.
+	unlockSaltKey []byte
 
 	// captcha genera y verifica los retos ALTCHA PoW para altas de cuentas.
 	captcha *altcha.Verifier
@@ -188,6 +193,7 @@ func NewServer(cfg Config, logger *slog.Logger, st *store.Store, km *oidc.KeyMan
 		resetKey:       deriveResetKey(cfg.KeyEncryptionKey),
 		deviceKey:      deriveDeviceKey(cfg.KeyEncryptionKey),
 		consentKey:     deriveConsentKey(cfg.KeyEncryptionKey),
+		unlockSaltKey:  deriveUnlockSaltKey(cfg.KeyEncryptionKey),
 		captcha:        altcha.New(deriveCaptchaKey(cfg.KeyEncryptionKey), altcha.ConRepeticiones(st.RegistrarCaptchaResuelto)),
 		loginBypassKey: cfg.LoginBypassKey,
 		resolver:       net.DefaultResolver,
@@ -239,6 +245,14 @@ func deriveDeviceKey(kek []byte) []byte {
 // deriveConsentKey deriva la clave HMAC del consentimiento de las apps nativas.
 func deriveConsentKey(kek []byte) []byte {
 	h := sha256.Sum256(append([]byte("sytue-id/consent-hmac/v1\x00"), kek...))
+	return h[:]
+}
+
+// deriveUnlockSaltKey deriva de la KEK la clave con la que se inventan las sales
+// del desbloqueo (ADR 0084). Con la KEK que cambie, cambian solo las de quien aún
+// no tiene sobre: las de un sobre guardado van dentro de él.
+func deriveUnlockSaltKey(kek []byte) []byte {
+	h := sha256.Sum256(append([]byte("sytue-id/e2e-unlock-salt/v1\x00"), kek...))
 	return h[:]
 }
 
@@ -406,6 +420,11 @@ func (s *Server) Router() http.Handler {
 		r.With(loginRL).Post("/account/delete", s.handleAccountDeletePost)
 
 		// --- OAuth2 / OIDC ---
+		// El desbloqueo del cifrado (ADR 0084): el relevo guarda aquí los sobres
+		// que cierra en el navegador, y las apps web leen la clave por el puente.
+		r.With(loginRL).Put("/e2e/envelopes", s.handleUnlockEnvelopePut)
+		r.Get("/e2e/bridge", s.handleUnlockBridge)
+
 		r.Route("/oauth2", func(r chi.Router) {
 			r.Get("/authorize", s.handleAuthorize)  // Authorization Code + PKCE
 			r.Post("/authorize", s.handleAuthorize) // consentimiento
@@ -438,6 +457,8 @@ func (s *Server) Router() http.Handler {
 			// sesión) y rate-limitada como el login por contraseña.
 			r.With(loginRL).Post("/webauthn/begin", s.handleWebAuthnLoginBegin)
 			r.With(loginRL).Post("/webauthn/finish", s.handleWebAuthnLoginFinish)
+			// La sal pública del sobre de la clave de desbloqueo (ADR 0084).
+			r.With(loginRL).Post("/unlock/salt", s.handleUnlockSalt)
 			// Enrutado por dominio de email hacia el IdP corporativo ("Entrar con tu
 			// organización"). GET pinta el formulario; POST resuelve el provider por
 			// dominio y redirige a su flujo (rate-limitado, sin sesión).

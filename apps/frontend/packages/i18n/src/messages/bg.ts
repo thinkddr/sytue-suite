@@ -12,20 +12,10 @@ export const bg: Catalog = {
   'matrix.resetUnderstood': 'Разбирам, че може да загубя достъп до по-старите шифровани съобщения',
   'matrix.unknownKey':
     'Този профил е шифрован, преди Sytue да защити ключа му с твоя вход. Потвърди това устройство от друго, на което вече си влязъл.',
-  'matrix.unlockTitle': 'Отвори шифрованите си данни',
-  'matrix.unlockBody':
-    'Потвърди, че си ти, с ключа си за достъп или с паролата си за Sytue. Проверката става на това устройство: никой друг не може да отвори данните ти.',
-  'matrix.protectTitle': 'Защити шифрованите си данни',
-  'matrix.protectBody':
-    'Избери как ще отваряш шифрованите си данни на другите си устройства: с ключа си за достъп или с паролата си за Sytue. Само ти ще можеш да ги отваряш.',
-  'matrix.usePasskey': 'Използвай ключ за достъп',
-  'matrix.usePassword': 'Използвай парола',
-  'matrix.password': 'Парола за Sytue',
-  'matrix.passwordConfirm': 'Повтори паролата',
-  'matrix.passwordMismatch': 'Паролите не съвпадат.',
-  'matrix.unlockWrong': 'Не се получи. Опитай отново.',
-  'matrix.passkeyUnsupported':
-    'Този ключ за достъп не може да отваря шифровани данни. Използвай паролата си.',
+  'matrix.unlocking': 'Отключване на шифрованите ти данни…',
+  'matrix.signIn': 'Вход в Sytue ID',
+  'matrix.signInBody':
+    'Входът ти в Sytue ID отключва шифрованите ти данни на това устройство. Влез отново с паролата или ключа си за достъп, за да ги отвориш тук.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Разрешаване на обработка на шифровани данни',
   'matrix.allowStorageBody':

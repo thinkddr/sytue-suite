@@ -16,6 +16,7 @@ import {
   cycleRefAbs,
   cycleRefAt,
   expectsRef,
+  esDeOtroLibro,
   extractRefs,
   funcTokenAt,
   refAtCaret,
@@ -142,6 +143,24 @@ test('extractRefs: rangos, hojas, cadenas y nombres de función', () => {
   const qualified = extractRefs('=Hoja2!A1+A1');
   expect(qualified.map((r) => `${r.text}#${r.colorIndex}`)).toEqual(['Hoja2!A1#0', 'A1#1']);
   expect(qualified[0]!.sheet).toBe('Hoja2');
+
+  // Una referencia a OTRO libro lleva su libro en la hoja, sin comillas o con ellas: no
+  // es la «Ventas» de este.
+  const otro = (t: string): string[] =>
+    extractRefs(t).map((r) => `${r.text}@${r.start}:${r.sheet}`);
+  expect(otro('=[Libro.xlsx]Ventas!B4+Ventas!B4')).toEqual([
+    '[Libro.xlsx]Ventas!B4@1:[Libro.xlsx]Ventas',
+    'Ventas!B4@23:Ventas',
+  ]);
+  expect(otro("='[Libro.xlsx]Ventas'!B4")).toEqual([
+    "'[Libro.xlsx]Ventas'!B4@1:[Libro.xlsx]Ventas",
+  ]);
+  expect(otro('=SUM([1]Ventas!A1:B9)')).toEqual(['[1]Ventas!A1:B9@5:[1]Ventas']);
+  expect(
+    ['Ventas', '[Libro.xlsx]Ventas', 'C:\\ruta\\[Libro.xlsx]Ventas', '[1]Ventas', 'a]b'].map(
+      esDeOtroLibro,
+    ),
+  ).toEqual([false, true, true, true, false]);
 
   expect(extractRefs('="A1"+B1').map((r) => r.text)).toEqual(['B1']); // A1 dentro de comillas se ignora
   expect(extractRefs('=LOG10(2)+A1').map((r) => r.text)).toEqual(['A1']); // LOG10( es función

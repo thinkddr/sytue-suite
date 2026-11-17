@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const da: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Arkets navn:',
+  'dialog.sheet.nameTaken':
+    'Der findes allerede et ark med navnet »{name}« (navne skelner ikke mellem store og små bogstaver).',
   'dialog.sheet.delete': 'Slet arket »{name}«? Indholdet går tabt.',
   'dialog.sheet.mergeLoses':
     'Ved fletning bevares kun værdien i cellen øverst til venstre ({ref}); de øvrige celler i området ryddes. Brug »Flet indhold« for at samle al teksten i den celle.',

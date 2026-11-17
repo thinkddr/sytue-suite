@@ -4,9 +4,11 @@
 package cifrado
 
 // La clave de recuperación de cada cuenta de Matrix la guarda el servicio Rooms
-// ENVUELTA con la contraseña de la persona, en este dispositivo (ADR 0082). Nadie
-// enseña, pide ni guarda la clave: la persona solo teclea su contraseña de Sytue,
-// una vez por cuenta y dispositivo. Ni el operador ni Sytue ID pueden abrirla.
+// ENVUELTA con la clave de desbloqueo de la persona (ADR 0084): la que trae su inicio
+// de sesión en Sytue ID, que es lo único que la persona teclea. Nadie enseña, pide ni
+// guarda la clave de recuperación, y este panel no pide ninguna contraseña: sin clave
+// de desbloqueo en el dispositivo, ofrece volver a entrar en Sytue ID. Ni el operador
+// ni Sytue ID pueden abrir los envoltorios.
 
 import (
 	"context"
@@ -67,7 +69,24 @@ const (
 	// PasoVerificar: la cuenta tiene una clave que el servicio no conoce. Solo
 	// queda verificar el dispositivo desde otro (o, en Rooms, restablecer).
 	PasoVerificar
+	// PasoIniciarSesion: a este dispositivo le falta la clave de desbloqueo de Sytue
+	// ID (o lo que abre los envoltorios de la ADR 0082): se vuelve a entrar en Sytue
+	// ID, que es donde la persona mete su clave.
+	PasoIniciarSesion
 )
+
+// Material es la clave de desbloqueo de la persona (ADR 0084), la que trajo el inicio
+// de sesión en Sytue ID, y lo que abre una vez sus envoltorios de la ADR 0082.
+type Material struct {
+	Clave  []byte
+	Legado []recoverywrap.LegacyIKM
+}
+
+func (m Material) valido() bool { return len(m.Clave) == recoverywrap.UnlockKeyLen }
+
+// ErrSinDesbloqueo es crear, abrir o envolver sin la clave de desbloqueo de Sytue ID
+// (o sin lo que abre un envoltorio de la ADR 0082): toca volver a entrar en Sytue ID.
+var ErrSinDesbloqueo = errors.New("cifrado: falta la clave de desbloqueo de Sytue ID")
 
 // Diagnostico es el resultado de Diagnosticar. La clave de PasoProteger vive solo
 // en memoria hasta que se envuelve; nunca se pinta.
@@ -75,8 +94,14 @@ type Diagnostico struct {
 	Paso        Paso
 	Status      mx.VerificationStatus
 	Envoltorios []recoverywrap.Wrapper
-	clave       string
-	claveID     string
+	// Legado es la petición `sytue_legacy` de los envoltorios de la ADR 0082 de la clave
+	// actual: lo que la página de inicio de sesión de Sytue ID tiene que abrir también.
+	Legado  string
+	clave   string
+	claveID string
+	// migrado: se abrió un envoltorio de la ADR 0082 y ya está envuelta con la clave
+	// de desbloqueo; lo que abría el viejo sobra.
+	migrado bool
 }
 
 // ErrSinCustodia es crear o restablecer el cifrado sin dónde guardar la clave.
@@ -109,9 +134,14 @@ func Diagnosticar(ctx context.Context, client Recuperable, custodia Custodia) (D
 		return d, err
 	}
 	d.Envoltorios = deLaClave(stored.Wrappers, keyID)
+	if !conSytueID(d.Envoltorios) {
+		d.Legado = recoverywrap.LegacyRequest(d.Envoltorios)
+	}
 	if status.Verified {
 		d.Paso = PasoListo
-		if len(d.Envoltorios) == 0 && keyID != "" {
+		// Un dispositivo verificado con la clave a mano la envuelve con la clave de
+		// desbloqueo si aún no lo está (cuentas de la ADR 0082 o de antes).
+		if !conSytueID(d.Envoltorios) && keyID != "" {
 			if localID, key, err := client.LocalRecoveryKey(ctx); err == nil && localID == keyID {
 				d.Paso, d.clave, d.claveID = PasoProteger, key, keyID
 			}
@@ -150,23 +180,36 @@ func pasoSinCustodia(status mx.VerificationStatus) Paso {
 	}
 }
 
-// deLaClave son los envoltorios de contraseña de la clave actual de la cuenta: los
-// de otra clave ya no abren nada.
+// deLaClave son los envoltorios de la clave actual de la cuenta: los de otra clave ya
+// no abren nada.
 func deLaClave(wrappers []recoverywrap.Wrapper, keyID string) []recoverywrap.Wrapper {
 	var out []recoverywrap.Wrapper
 	for _, w := range wrappers {
-		if keyID != "" && w.KeyID == keyID && w.Kind == recoverywrap.KindPassword {
+		if keyID != "" && w.KeyID == keyID {
 			out = append(out, w)
 		}
 	}
 	return out
 }
 
+func conSytueID(wrappers []recoverywrap.Wrapper) bool {
+	for _, w := range wrappers {
+		if w.Kind == recoverywrap.KindSytueID {
+			return true
+		}
+	}
+	return false
+}
+
 // envolver es la custodia que BootstrapRecoveryWrapped y ResetRecoveryWrapped
-// llaman ANTES de publicar la clave.
-func envolver(custodia Custodia, account, password string) mx.RecoveryEscrow {
+// llaman ANTES de publicar la clave: el envoltorio `sytue-id` de la clave de
+// desbloqueo, que se guarda en Rooms.
+func envolver(custodia Custodia, account string, m Material) mx.RecoveryEscrow {
 	return func(ctx context.Context, keyID, recoveryKey string) error {
-		w, err := recoverywrap.WrapPassword(password, account, keyID, recoveryKey)
+		if !m.valido() {
+			return ErrSinDesbloqueo
+		}
+		w, err := recoverywrap.WrapSytueID(m.Clave, account, keyID, recoveryKey)
 		if err != nil {
 			return err
 		}
@@ -175,69 +218,132 @@ func envolver(custodia Custodia, account, password string) mx.RecoveryEscrow {
 	}
 }
 
-// Desbloquear abre la clave con la contraseña y recupera el dispositivo. Una
-// contraseña que no abre ningún envoltorio es recoverywrap.ErrWrongSecret.
-func Desbloquear(ctx context.Context, client Recuperable, envoltorios []recoverywrap.Wrapper, password string) (string, error) {
-	if password == "" {
-		return "", recoverywrap.ErrWrongSecret
+// Desbloquear abre la clave con la clave de desbloqueo (o, una vez, con lo que la
+// página de inicio de sesión calculó para un envoltorio de la ADR 0082) y recupera
+// el dispositivo, que queda verificado por las firmas cruzadas. Sin nada que la abra
+// es ErrSinDesbloqueo; un envoltorio `sytue-id` de otra clave de desbloqueo (la
+// persona empezó de cero) es recoverywrap.ErrWrongSecret. `legado` dice que se abrió
+// uno de la 0082.
+func Desbloquear(ctx context.Context, client Recuperable, envoltorios []recoverywrap.Wrapper, m Material) (key string, legado bool, err error) {
+	if !m.valido() {
+		return "", false, ErrSinDesbloqueo
 	}
+	account := client.AccountUserID()
+	viejo := false
 	for _, w := range envoltorios {
-		key, err := recoverywrap.UnwrapPassword(password, client.AccountUserID(), w)
-		if err != nil {
+		if w.Kind != recoverywrap.KindSytueID {
 			continue
 		}
-		return key, client.Recover(ctx, key)
+		key, err := recoverywrap.UnwrapSytueID(m.Clave, account, w)
+		if err != nil {
+			viejo = true
+			continue
+		}
+		return key, false, client.Recover(ctx, key)
 	}
-	return "", recoverywrap.ErrWrongSecret
+	for _, l := range m.Legado {
+		if key, err := recoverywrap.OpenLegacy(l, account, envoltorios); err == nil {
+			return key, true, client.Recover(ctx, key)
+		}
+	}
+	if viejo {
+		return "", false, recoverywrap.ErrWrongSecret
+	}
+	return "", false, ErrSinDesbloqueo
 }
 
-// Crear configura el cifrado de la cuenta: la clave nueva se envuelve con la
-// contraseña y se guarda antes de publicarla, y no se enseña. Si la custodia
+// Crear configura el cifrado de la cuenta: la clave nueva se envuelve con la clave
+// de desbloqueo y se guarda antes de publicarla, y no se enseña. Si la custodia
 // falla, no se publica nada y el reintento usa la misma clave.
-func Crear(ctx context.Context, client Recuperable, custodia Custodia, password string, uia mautrix.UIACallback) error {
+func Crear(ctx context.Context, client Recuperable, custodia Custodia, m Material, uia mautrix.UIACallback) error {
 	if custodia.Servicio == nil {
 		return ErrSinCustodia
 	}
-	if password == "" {
-		return recoverywrap.ErrInvalid
+	if !m.valido() {
+		return ErrSinDesbloqueo
 	}
-	if err := client.BootstrapRecoveryWrapped(ctx, uia, envolver(custodia, client.AccountUserID(), password)); err != nil {
+	if err := client.BootstrapRecoveryWrapped(ctx, uia, envolver(custodia, client.AccountUserID(), m)); err != nil {
 		return err
 	}
 	return client.AcknowledgeRecoverySetup(ctx)
 }
 
-// Proteger envuelve con la contraseña una clave que este dispositivo ya tiene.
-func Proteger(ctx context.Context, client Recuperable, custodia Custodia, d Diagnostico, password string) error {
+// Proteger envuelve con la clave de desbloqueo una clave que este dispositivo ya tiene.
+func Proteger(ctx context.Context, client Recuperable, custodia Custodia, d Diagnostico, m Material) error {
 	if custodia.Servicio == nil {
 		return ErrSinCustodia
 	}
-	if d.clave == "" || d.claveID == "" || password == "" {
+	if d.clave == "" || d.claveID == "" {
 		return recoverywrap.ErrInvalid
 	}
-	return envolver(custodia, client.AccountUserID(), password)(ctx, d.claveID, d.clave)
+	return envolver(custodia, client.AccountUserID(), m)(ctx, d.claveID, d.clave)
 }
 
 // Restablecer crea identidad y clave nuevas con la clave envuelta antes de
 // publicarlas. La clave nueva no sale de aquí.
-func Restablecer(ctx context.Context, client Restablecible, custodia Custodia, password string, uia mautrix.UIACallback) error {
+func Restablecer(ctx context.Context, client Restablecible, custodia Custodia, m Material, uia mautrix.UIACallback) error {
 	if custodia.Servicio == nil {
 		return ErrSinCustodia
 	}
-	if password == "" {
-		return recoverywrap.ErrInvalid
+	if !m.valido() {
+		return ErrSinDesbloqueo
 	}
-	return client.ResetRecoveryWrapped(ctx, uia, envolver(custodia, client.AccountUserID(), password))
+	return client.ResetRecoveryWrapped(ctx, uia, envolver(custodia, client.AccountUserID(), m))
 }
 
-// contrasenaErronea distingue «otra vez» de «algo ha fallado».
-func contrasenaErronea(err error) bool { return errors.Is(err, recoverywrap.ErrWrongSecret) }
-
-// conClave devuelve un diagnóstico de PasoProteger para una clave recién abierta:
-// tras cambiar la contraseña de Sytue se abre con la vieja y se vuelve a envolver.
-func conClave(d Diagnostico, keyID, key string) Diagnostico {
-	d.Paso, d.clave, d.claveID = PasoProteger, key, keyID
-	return d
+// Resolver hace sin preguntar nada lo que pide el diagnóstico (ADR 0084): crear el
+// cifrado, abrirlo o envolver la clave con la clave de desbloqueo. Sin ella el paso
+// queda en PasoIniciarSesion; con un envoltorio de otra clave de desbloqueo, en
+// PasoVerificar. Un dispositivo ya verificado sin clave de desbloqueo no se bloquea:
+// la envolverá la próxima vez que la tenga.
+func Resolver(ctx context.Context, client Recuperable, custodia Custodia, d Diagnostico, m Material, uia mautrix.UIACallback) (Diagnostico, error) {
+	switch d.Paso {
+	case PasoCrear:
+		if custodia.Servicio != nil && !m.valido() {
+			d.Paso = PasoIniciarSesion
+			return d, nil
+		}
+		if err := Crear(ctx, client, custodia, m, uia); err != nil {
+			return d, err
+		}
+	case PasoDesbloquear:
+		key, legado, err := Desbloquear(ctx, client, d.Envoltorios, m)
+		switch {
+		case errors.Is(err, ErrSinDesbloqueo):
+			d.Paso = PasoIniciarSesion
+			return d, nil
+		case errors.Is(err, recoverywrap.ErrWrongSecret):
+			d.Paso = PasoVerificar
+			return d, nil
+		case err != nil:
+			return d, err
+		}
+		if legado {
+			keyID, err := client.DefaultRecoveryKeyID(ctx)
+			if err != nil {
+				return d, err
+			}
+			if err := envolver(custodia, client.AccountUserID(), m)(ctx, keyID, key); err != nil {
+				return d, err
+			}
+		}
+		next, err := Diagnosticar(ctx, client, custodia)
+		next.migrado = legado
+		return next, err
+	case PasoProteger:
+		if !m.valido() {
+			d.olvidar()
+			d.Paso = PasoListo
+			return d, nil
+		}
+		if err := Proteger(ctx, client, custodia, d, m); err != nil {
+			return d, err
+		}
+		d.olvidar()
+	default:
+		return d, nil
+	}
+	return Diagnosticar(ctx, client, custodia)
 }
 
 // olvidar borra de memoria la clave de un diagnóstico.

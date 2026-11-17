@@ -370,10 +370,17 @@ for (const forma of FORMAS) {
           await page.keyboard.press("Escape");
           await page.waitForTimeout(250);
         }
-        // La suite desplegada.
+        // La suite desplegada. La entrada es el ÚLTIMO botón de la cara de la app (el
+        // avatar, en el sitio del de siempre), y se busca por ese sitio y no por su
+        // nombre: desde que el selector de apps está a la vista en esa cara (decisión
+        // del dueño, 2026-11-08), «Sytue One — aplicaciones…» y «Sytue: aplicaciones,
+        // búsqueda…» empiezan igual, y `aria-label^="Sytue"` pulsaba el selector. Con
+        // él la suite no se desplegaba y todas las superficies daban «sin su marca».
         const entrada = page
-          .locator('header[role="banner"] button[aria-label^="Sytue"]')
-          .first();
+          .locator(
+            'header[role="banner"] button[aria-expanded="false"]:visible',
+          )
+          .last();
         if (w < 768 && (await entrada.isVisible().catch(() => false))) {
           await entrada.click();
           await page.waitForTimeout(250);

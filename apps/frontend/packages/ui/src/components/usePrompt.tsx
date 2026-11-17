@@ -19,7 +19,7 @@ import type { JSX } from 'preact';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { useT } from '@sytue/i18n/preact';
 import { ConfirmDialog } from './ConfirmDialog.js';
-import { FieldGroup, Input } from './Form.js';
+import { FieldGroup, Input, describedBy } from './Form.js';
 
 export interface PreguntarOpciones {
   /** Lo que se pide, en una frase. Hace de etiqueta del campo. */
@@ -34,6 +34,14 @@ export interface PreguntarOpciones {
   permitirVacio?: boolean;
   /** Una contraseña: el campo no enseña lo que se escribe. */
   secreto?: boolean;
+  /**
+   * Comprueba lo escrito (sin espacios a los lados): devuelve el error que se pinta bajo
+   * el campo —el `error` de FieldGroup, con el campo `aria-invalid`— y que apaga
+   * aceptar, o `null` si vale. Con el campo vacío no se llama: eso ya apaga aceptar. El
+   * nombre de una hoja que ya tiene otra. `preguntarEnEditor` sin diálogo montado cae
+   * en `window.prompt`, que no valida: quien pregunta vuelve a mirar lo que recibe.
+   */
+  validar?: (texto: string) => string | null;
 }
 
 interface Pendiente extends PreguntarOpciones {
@@ -71,23 +79,30 @@ export function usePrompt(): {
   };
 
   const vacio = texto.trim() === '';
+  const error = !vacio && pendiente?.validar ? (pendiente.validar(texto.trim()) ?? '') : '';
+  const bloqueado = (vacio && !pendiente?.permitirVacio) || error !== '';
   const dialogo = (
     <ConfirmDialog
       open={pendiente !== null}
       onClose={() => cerrar(null)}
-      onConfirm={() => cerrar(texto)}
+      onConfirm={() => {
+        if (!bloqueado) cerrar(texto);
+      }}
       title={pendiente?.titulo ?? sinDosPuntos(pendiente?.mensaje ?? '')}
       confirmLabel={pendiente?.confirmLabel ?? t('ui.save')}
-      confirmDisabled={vacio && !pendiente?.permitirVacio}
+      confirmDisabled={bloqueado}
     >
       <FieldGroup
         label={sinDosPuntos(pendiente?.mensaje ?? '')}
         htmlFor="sytue-prompt"
         required={!pendiente?.permitirVacio}
+        {...(error ? { error } : {})}
       >
         <Input
           id="sytue-prompt"
           value={texto}
+          invalid={error !== ''}
+          aria-describedby={describedBy('sytue-prompt', undefined, error || undefined)}
           type={pendiente?.secreto ? 'password' : 'text'}
           // El aviso de la regla es correcto en una PÁGINA y falso en un DIÁLOGO:
           // aquí mover el foco al campo es lo que pide el patrón ARIA de modal
@@ -102,7 +117,7 @@ export function usePrompt(): {
           onKeyDown={(e) => {
             if (e.isComposing || e.keyCode === 229) return;
             // Enter acepta, como en el diálogo del navegador.
-            if (e.key === 'Enter' && !(vacio && !pendiente?.permitirVacio)) {
+            if (e.key === 'Enter' && !bloqueado) {
               e.preventDefault();
               cerrar(texto);
             }

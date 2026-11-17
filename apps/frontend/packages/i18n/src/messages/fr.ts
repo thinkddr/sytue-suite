@@ -14,20 +14,10 @@ export const fr: Catalog = {
   'matrix.resetUnderstood': 'Je comprends que je peux perdre l’accès aux anciens messages chiffrés',
   'matrix.unknownKey':
     'Ce compte a été chiffré avant que Sytue ne protège sa clé avec ta connexion. Vérifie cet appareil depuis un autre sur lequel tu es déjà connecté.',
-  'matrix.unlockTitle': 'Ouvrir tes données chiffrées',
-  'matrix.unlockBody':
-    'Confirme que c’est bien toi avec ta clé d’accès ou ton mot de passe Sytue. La vérification a lieu sur cet appareil : personne d’autre ne peut ouvrir tes données.',
-  'matrix.protectTitle': 'Protéger tes données chiffrées',
-  'matrix.protectBody':
-    'Choisis comment tu ouvriras tes données chiffrées sur tes autres appareils : avec ta clé d’accès ou ton mot de passe Sytue. Toi seul pourras les ouvrir.',
-  'matrix.usePasskey': 'Utiliser une clé d’accès',
-  'matrix.usePassword': 'Utiliser le mot de passe',
-  'matrix.password': 'Mot de passe Sytue',
-  'matrix.passwordConfirm': 'Répète le mot de passe',
-  'matrix.passwordMismatch': 'Les mots de passe ne correspondent pas.',
-  'matrix.unlockWrong': 'Cela n’a pas fonctionné. Réessaie.',
-  'matrix.passkeyUnsupported':
-    'Cette clé d’accès ne peut pas ouvrir les données chiffrées. Utilise ton mot de passe.',
+  'matrix.unlocking': 'Déverrouillage de tes données chiffrées…',
+  'matrix.signIn': 'Se connecter à Sytue ID',
+  'matrix.signInBody':
+    'Ta connexion à Sytue ID déverrouille tes données chiffrées sur cet appareil. Reconnecte-toi avec ton mot de passe ou ta clé d’accès pour les ouvrir ici.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Autoriser le traitement chiffré',
   'matrix.allowStorageBody':

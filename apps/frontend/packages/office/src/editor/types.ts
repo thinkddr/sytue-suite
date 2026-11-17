@@ -1518,8 +1518,12 @@ export interface EditorContext {
   content: string;
   /** Incrementa cuando `content` debe re-aplicarse al DOM (carga, adopción remota, restauración). */
   contentEpoch: number;
-  /** El lienzo informa de cada edición; programa el autosave. No re-renderiza el lienzo. */
-  onContentInput: (next: string) => void;
+  /**
+   * El lienzo informa de cada edición; programa el autosave. No re-renderiza el lienzo.
+   * `aparte`: el cambio va en su propio guardado y enseguida, tras lo pendiente y antes
+   * que lo que venga (un cambio de estructura de la hoja: ver `useDocument`).
+   */
+  onContentInput: (next: string, aparte?: boolean) => void;
 
   fmt: FormatState;
   /** exec de canvas/exec.ts, tal cual (§3). */

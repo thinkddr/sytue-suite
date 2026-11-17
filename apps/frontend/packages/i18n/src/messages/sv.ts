@@ -13,20 +13,10 @@ export const sv: Catalog = {
     'Jag förstår att jag kan förlora åtkomsten till äldre krypterade meddelanden',
   'matrix.unknownKey':
     'Det här kontot krypterades innan Sytue skyddade dess nyckel med din inloggning. Verifiera den här enheten från en annan där du redan är inloggad.',
-  'matrix.unlockTitle': 'Öppna dina krypterade data',
-  'matrix.unlockBody':
-    'Bekräfta att det är du med din nyckel eller ditt Sytue-lösenord. Det kontrolleras på den här enheten: ingen annan kan öppna dina data.',
-  'matrix.protectTitle': 'Skydda dina krypterade data',
-  'matrix.protectBody':
-    'Välj hur du öppnar dina krypterade data på dina andra enheter: med din nyckel eller ditt Sytue-lösenord. Bara du kan öppna dem.',
-  'matrix.usePasskey': 'Använd nyckel',
-  'matrix.usePassword': 'Använd lösenord',
-  'matrix.password': 'Sytue-lösenord',
-  'matrix.passwordConfirm': 'Upprepa lösenordet',
-  'matrix.passwordMismatch': 'Lösenorden stämmer inte överens.',
-  'matrix.unlockWrong': 'Det fungerade inte. Försök igen.',
-  'matrix.passkeyUnsupported':
-    'Den här nyckeln kan inte öppna krypterade data. Använd ditt lösenord.',
+  'matrix.unlocking': 'Dina krypterade data låses upp …',
+  'matrix.signIn': 'Logga in på Sytue ID',
+  'matrix.signInBody':
+    'Din inloggning på Sytue ID låser upp dina krypterade data på den här enheten. Logga in igen med ditt lösenord eller din nyckel för att öppna dem här.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Tillåt krypterad behandling',
   'matrix.allowStorageBody':

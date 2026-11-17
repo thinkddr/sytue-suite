@@ -377,6 +377,18 @@ test('desde otra hoja, borrar la fila referida da #¡REF! y un rango se encoge',
   expect(f('=Ventas!B9')).toBe('=Ventas!B8');
 });
 
+test('las referencias a otro libro no se mueven nunca: sus filas no son estas', () => {
+  const ins = enVentas(insFila(1));
+  const f = (t: string, d = ins): string => reescribirFormula(t, d, 'Resumen');
+  expect(f('=[Libro.xlsx]Ventas!B4+Ventas!B4')).toBe('=[Libro.xlsx]Ventas!B4+Ventas!B5');
+  expect(f("='[Libro.xlsx]Ventas'!B4")).toBe("='[Libro.xlsx]Ventas'!B4");
+  expect(f('=SUM([1]Ventas!B2:B6)', enVentas(delFila(3)))).toBe('=SUM([1]Ventas!B2:B6)');
+  // Tampoco sin `hoja`, cuando se mueven todas las demás.
+  expect(reescribirFormula('=B4+[Libro.xlsx]Resumen!B4', insFila(1))).toBe(
+    '=B5+[Libro.xlsx]Resumen!B4',
+  );
+});
+
 test('moverReferenciasAjenas: celdas, formato condicional y validaciones de la otra hoja', () => {
   const resumen: SheetData = {
     name: 'Resumen',
@@ -455,9 +467,12 @@ test('moverObjetos mueve el origen, la esquina y lo que ocupa una tabla dinámic
   expect(moverObjetos(otra as SheetData, enVentasD(insFila(0))).pivots).toEqual([
     dinamica({ sourceSheet: 'Datos', anchor: 'H3', range: 'H3:I6' }),
   ]);
-  // Con la hoja protegida no se toca: el servidor veta cambiar `pivots`.
-  const prot = { ...s, protect: { objects: true } } as SheetData;
-  expect(moverObjetos(prot, enVentasD(insFila(0))).pivots).toEqual([dinamica()]);
+  // Con la hoja protegida se mueve igual: seguir a sus datos no es cambiarla, y el
+  // servidor acepta exactamente este desplazamiento (proteccion_dinamicas.go).
+  const prot = { ...s, protect: { insertRows: true } } as SheetData;
+  expect(moverObjetos(prot, enVentasD(insFila(0))).pivots).toEqual([
+    dinamica({ source: 'A2:C10', anchor: 'H3', range: 'H3:I6' }),
+  ]);
 });
 
 test('moverReferenciasAjenas mueve el origen de las tablas dinámicas que leen de la hoja', () => {
@@ -476,4 +491,10 @@ test('moverReferenciasAjenas mueve el origen de las tablas dinámicas que leen d
   // Si se borra su origen entero, desaparece.
   const sola = { ...s, pivots: [dinamica({ sourceSheet: 'Ventas' })] } as SheetData;
   expect(moverReferenciasAjenas(sola, enVentas(delFila(0, 9))).pivots).toBeUndefined();
+  // Con «Resumen» protegida, también.
+  const prot = { ...s, protect: {} } as SheetData;
+  expect(moverReferenciasAjenas(prot, enVentas(insFila(0))).pivots).toEqual([
+    dinamica({ sourceSheet: 'Ventas', source: 'A2:C10' }),
+    dinamica({ name: 'TD2' }),
+  ]);
 });

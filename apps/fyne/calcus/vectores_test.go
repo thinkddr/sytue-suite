@@ -124,6 +124,17 @@ type vectores struct {
 			Sale json.RawMessage
 		}
 	} `json:"moverObjetos"` //nolint:tagliatelle // el nombre lo fija la web
+	DinamicasProtegidas struct {
+		Hoja  json.RawMessage
+		Casos []struct {
+			D struct {
+				Eje             string
+				Desde, Cantidad int
+				Tope            int
+			}
+			Sale json.RawMessage
+		}
+	} `json:"dinamicasProtegidas"` //nolint:tagliatelle // el nombre lo fija la web
 	ReferenciasAjenas struct {
 		Hojas []json.RawMessage
 		Casos []struct {
@@ -506,6 +517,32 @@ func TestVectoresDeMoverObjetos(t *testing.T) {
 		delete(m, "cells")
 		if want := crudoJSON(c.Sale); !reflect.DeepEqual(m, want) {
 			t.Errorf("moverObjetos(%+v):\n  aquí:   %v\n  la web: %v", c.D, m, want)
+		}
+	}
+}
+
+// TestVectoresDeDinamicasProtegidas: con la hoja protegida, las tablas dinámicas siguen
+// a sus datos igual que la web (el servidor acepta exactamente ese desplazamiento,
+// apps/nucleo/office/model/proteccion_dinamicas.go). VISTO EN ROJO con la hoja protegida
+// dejándolas quietas: los nueve casos.
+func TestVectoresDeDinamicasProtegidas(t *testing.T) {
+	v := leerVectores(t).DinamicasProtegidas
+	if len(v.Casos) == 0 {
+		t.Fatal("calcus.json no trae la sección «dinamicasProtegidas»")
+	}
+	for _, c := range v.Casos {
+		l := libroDePrueba(t, `{"active":0,"sheets":[`+string(v.Hoja)+`]}`).Libro
+		if l.f.hojas[0].proteccion == nil {
+			t.Fatal("la hoja de los vectores tiene que llegar protegida")
+		}
+		d := formula.Desplazamiento{Filas: c.D.Eje == "fila", Desde: c.D.Desde, Cantidad: c.D.Cantidad, Tope: c.D.Tope}
+		moverObjetos(&l.f.hojas[0], d)
+		var got any
+		if p := l.f.hojas[0].serializar().Pivots; len(p) > 0 {
+			got = comoJSON(t, p)
+		}
+		if want := crudoJSON(c.Sale); !reflect.DeepEqual(got, want) {
+			t.Errorf("moverObjetos protegida (%+v):\n  aquí:   %v\n  la web: %v", c.D, got, want)
 		}
 	}
 }

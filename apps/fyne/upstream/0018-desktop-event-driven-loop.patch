@@ -1,0 +1,612 @@
+From caa879f9051c9c0ba6b82662ce50c64a00b921d0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 17 Nov 2026 00:10:37 +0000
+Subject: [PATCH] perf(driver): wake the loop on events instead of a 60 Hz
+ ticker
+
+The GLFW loop polled events and painted on a fixed 60 Hz ticker, so every key
+press, click and fyne.Do result waited for the next tick: 8 ms on average and
+up to 17 ms before anything was painted, and an idle app woke 60 times a
+second for nothing.
+
+- Desktop: the loop waits in glfw.WaitEventsTimeout and is woken by input,
+  by runOnMain/fyne.Do (PostEmptyEvent, with a counter so that work sent while
+  funcQueue forwards it is never missed), by Canvas.SetDirty (WakeHook) and
+  by StartAnimation and Quit. It paints at once when the last frame is at
+  least one frame interval old and otherwise at the next slot, one refresh of
+  the primary monitor (60-240 Hz). Idle windows wake once per second.
+- Mobile: after a touch, a key or a queued function leaves the canvas dirty,
+  ask for a frame right away instead of waiting for the ticker.
+- wasm keeps its previous behaviour.
+
+Measured under Xvfb from an XTest key press to the changed pixel (150
+samples): mean 10.5 -> 1.8 ms, p90 16.7 -> 2.0 ms; fyne.Do 10.7 -> 1.6 ms;
+idle CPU 35 -> ~1 ms per 2 s. go test -race ./... passes (desktop and
+mobile tags); new tests cover the wake-up and the sleep calculation.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01K7a9FMBbbD2TmWCqGFj1QD
+---
+ internal/animation/runner.go         |   9 ++
+ internal/driver/common/canvas.go     |  13 ++
+ internal/driver/glfw/animation.go    |   1 +
+ internal/driver/glfw/driver.go       |   1 +
+ internal/driver/glfw/loop.go         | 217 +++++++++++++++++++++------
+ internal/driver/glfw/loop_desktop.go |  29 ++++
+ internal/driver/glfw/loop_test.go    |  74 ++++++++-
+ internal/driver/glfw/loop_wasm.go    |  17 +++
+ internal/driver/mobile/driver.go     |  22 +++
+ 9 files changed, 338 insertions(+), 45 deletions(-)
+
+diff --git a/internal/animation/runner.go b/internal/animation/runner.go
+index ed23c47..468538f 100644
+--- a/internal/animation/runner.go
++++ b/internal/animation/runner.go
+@@ -53,6 +53,15 @@ func (r *Runner) Start(a *fyne.Animation) {
+ 	}
+ }
+ 
++// Running reports whether any animation is being ticked or waiting to start. The
++// desktop driver uses it to keep painting at the frame rate while something moves
++// and to sleep until the next event otherwise.
++func (r *Runner) Running() bool {
++	r.animationMutex.RLock()
++	defer r.animationMutex.RUnlock()
++	return r.runnerStarted
++}
++
+ // Stop causes an animation to stop ticking (if it was still running) and removes it from the runner.
+ func (r *Runner) Stop(a *fyne.Animation) {
+ 	r.animationMutex.Lock()
+diff --git a/internal/driver/common/canvas.go b/internal/driver/common/canvas.go
+index ff11c14..9dac13d 100644
+--- a/internal/driver/common/canvas.go
++++ b/internal/driver/common/canvas.go
+@@ -314,8 +314,21 @@ func (c *Canvas) CheckDirtyAndClear() bool {
+ // SetDirty sets canvas dirty flag atomically.
+ func (c *Canvas) SetDirty() {
+ 	c.dirty = true
++	if hook := WakeHook; hook != nil {
++		hook()
++	}
++}
++
++// IsDirty reports whether the canvas needs a repaint, without clearing the flag.
++func (c *Canvas) IsDirty() bool {
++	return c.dirty
+ }
+ 
++// WakeHook, when set by a driver, is called every time a canvas is marked dirty so
++// that an event loop sleeping until the next input can wake up and paint. It must be
++// cheap: SetDirty runs for every refresh.
++var WakeHook func()
++
+ // SetMenuTreeAndFocusMgr sets menu tree and focus manager.
+ //
+ // This function does not use the canvas lock.
+diff --git a/internal/driver/glfw/animation.go b/internal/driver/glfw/animation.go
+index ec7d72a..e8dcc09 100644
+--- a/internal/driver/glfw/animation.go
++++ b/internal/driver/glfw/animation.go
+@@ -4,6 +4,7 @@ import "fyne.io/fyne/v2"
+ 
+ func (d *gLDriver) StartAnimation(a *fyne.Animation) {
+ 	d.animation.Start(a)
++	wakeMainLoop()
+ }
+ 
+ func (d *gLDriver) StopAnimation(a *fyne.Animation) {
+diff --git a/internal/driver/glfw/driver.go b/internal/driver/glfw/driver.go
+index 7ac5179..4191f1a 100644
+--- a/internal/driver/glfw/driver.go
++++ b/internal/driver/glfw/driver.go
+@@ -143,6 +143,7 @@ func (d *gLDriver) Quit() {
+ 	// Only call close once to avoid panic.
+ 	if running.CompareAndSwap(true, false) {
+ 		close(d.done)
++		wakeMainLoop()
+ 	}
+ }
+ 
+diff --git a/internal/driver/glfw/loop.go b/internal/driver/glfw/loop.go
+index 4d314a1..c36c55a 100644
+--- a/internal/driver/glfw/loop.go
++++ b/internal/driver/glfw/loop.go
+@@ -23,8 +23,35 @@ type funcData struct {
+ var (
+ 	funcQueue        = async.NewUnboundedChan[funcData]()
+ 	running, drained atomic.Bool
++
++	// queuedFuncs counts the functions sent to funcQueue that the main loop has not
++	// picked up yet. funcQueue forwards through a goroutine, so its Out channel can
++	// still be empty right after a send: the counter is what tells the loop not to
++	// go to sleep with work on its way.
++	queuedFuncs atomic.Int64
++	// sleeping is set while the main loop waits for events, so that the code that
++	// gives it work only posts a wake-up event when one is needed.
++	sleeping atomic.Bool
++)
++
++// The loop paints at most once per frameInterval while something changes and sleeps
++// until the next event otherwise. idleWakeInterval bounds that sleep so that
++// housekeeping that runs with each frame (texture and cache expiry) still happens
++// on an idle window.
++const (
++	defaultFrameInterval = time.Second / 60
++	minFrameInterval     = time.Second / 240
++	idleWakeInterval     = time.Second
+ )
+ 
++// wakeMainLoop interrupts the main loop if it is waiting for events. Safe to call
++// from any goroutine; cheap when the loop is awake.
++func wakeMainLoop() {
++	if sleeping.Load() {
++		postEmptyEvent()
++	}
++}
++
+ // Arrange that main.main runs on main thread.
+ func init() {
+ 	runtime.LockOSThread()
+@@ -45,14 +72,20 @@ func runOnMainWithWait(f func(), wait bool) {
+ 		return
+ 	}
+ 
++	// Count the function BEFORE sending it and check `sleeping` after: with the loop
++	// setting `sleeping` before reading the counter, one of the two always sees the
++	// other and no function waits for the idle timeout.
++	queuedFuncs.Add(1)
+ 	if wait {
+ 		done := common.DonePool.Get()
+ 		defer common.DonePool.Put(done)
+ 
+ 		funcQueue.In() <- funcData{f: f, done: done}
++		wakeMainLoop()
+ 		<-done
+ 	} else {
+ 		funcQueue.In() <- funcData{f: f}
++		wakeMainLoop()
+ 	}
+ }
+ 
+@@ -129,67 +162,163 @@ func (d *gLDriver) runGL() {
+ 		f()
+ 	}
+ 
+-	eventTick := time.NewTicker(time.Second / 60)
++	// Event driven: wait for input (or work sent with fyne.Do, a refresh or an
++	// animation) and paint right away if the last frame is at least one frame
++	// interval old. A fixed 60 Hz ticker made every key press and every network
++	// result wait for the next tick, 8 ms on average and up to 17 ms, and woke the
++	// process 60 times a second while nothing happened.
++	common.WakeHook = wakeMainLoop
++	defer func() { common.WakeHook = nil }()
++	frameInterval := d.frameInterval()
++	var lastFrame time.Time
+ 	for {
+-		select {
+-		case <-d.done:
+-			eventTick.Stop()
+-			d.Terminate()
+-			l := fyne.CurrentApp().Lifecycle().(*app.Lifecycle)
+-			if f := l.OnStopped(); f != nil {
+-				l.QueueEvent(f)
++		if d.runQueuedFuncs() {
++			d.shutdown()
++			return
++		}
++
++		d.waitForEvents(d.nextWake(lastFrame, frameInterval))
++
++		if d.runQueuedFuncs() {
++			d.shutdown()
++			return
++		}
++
++		now := time.Now()
++		if now.Sub(lastFrame) < frameInterval {
++			continue
++		}
++		lastFrame = now
++
++		for i := 0; i < len(d.windows); i++ {
++			w := d.windows[i].(*window)
++			w.ensurePositionProcessed()
++
++			if w.viewport == nil {
++				continue
+ 			}
+ 
+-			// as we are shutting down make sure we drain the pending funcQueue and close it out.
+-			for len(funcQueue.Out()) > 0 {
+-				f := <-funcQueue.Out()
+-				if f.done != nil {
+-					f.done <- struct{}{}
++			if w.viewport.ShouldClose() {
++				d.destroyWindow(w, i)
++				i-- // Trailing windows are moved forward one step.
++				continue
++			}
++
++			expand := w.shouldExpand
++			fullScreen := w.fullScreen
++
++			if expand && !fullScreen {
++				w.fitContent()
++				shouldExpand := w.shouldExpand
++				w.shouldExpand = false
++				view := w.viewport
++
++				if shouldExpand && runtime.GOOS != "js" {
++					view.SetSize(w.shouldWidth, w.shouldHeight)
+ 				}
+ 			}
+-			drained.Store(true)
+-			funcQueue.Close()
+-			return
++		}
++
++		d.animation.TickAnimations()
++		d.drawSingleFrame()
++	}
++}
++
++// runQueuedFuncs runs the functions queued for the main thread and reports whether
++// the driver is shutting down.
++func (d *gLDriver) runQueuedFuncs() (quit bool) {
++	for queuedFuncs.Load() > 0 {
++		select {
++		case <-d.done:
++			return true
+ 		case f := <-funcQueue.Out():
++			queuedFuncs.Add(-1)
+ 			f.f()
+ 			if f.done != nil {
+ 				f.done <- struct{}{}
+ 			}
+-		case <-eventTick.C:
+-			d.pollEvents()
+-			for i := 0; i < len(d.windows); i++ {
+-				w := d.windows[i].(*window)
+-				w.ensurePositionProcessed()
+-
+-				if w.viewport == nil {
+-					continue
+-				}
++		}
++	}
+ 
+-				if w.viewport.ShouldClose() {
+-					d.destroyWindow(w, i)
+-					i-- // Trailing windows are moved forward one step.
+-					continue
+-				}
++	select {
++	case <-d.done:
++		return true
++	default:
++		return false
++	}
++}
+ 
+-				expand := w.shouldExpand
+-				fullScreen := w.fullScreen
++func (d *gLDriver) shutdown() {
++	d.Terminate()
++	l := fyne.CurrentApp().Lifecycle().(*app.Lifecycle)
++	if f := l.OnStopped(); f != nil {
++		l.QueueEvent(f)
++	}
+ 
+-				if expand && !fullScreen {
+-					w.fitContent()
+-					shouldExpand := w.shouldExpand
+-					w.shouldExpand = false
+-					view := w.viewport
++	// as we are shutting down make sure we drain the pending funcQueue and close it out.
++	for len(funcQueue.Out()) > 0 {
++		f := <-funcQueue.Out()
++		queuedFuncs.Add(-1)
++		if f.done != nil {
++			f.done <- struct{}{}
++		}
++	}
++	drained.Store(true)
++	funcQueue.Close()
++}
+ 
+-					if shouldExpand && runtime.GOOS != "js" {
+-						view.SetSize(w.shouldWidth, w.shouldHeight)
+-					}
+-				}
+-			}
++// nextWake is how long the loop may wait for events before it has to run again:
++// until the next frame slot while something is pending, a long idle wait otherwise.
++func (d *gLDriver) nextWake(lastFrame time.Time, frameInterval time.Duration) time.Duration {
++	if queuedFuncs.Load() > 0 {
++		return 0
++	}
++	if d.animation.Running() || d.windowNeedsFrame() {
++		return time.Until(lastFrame.Add(frameInterval))
++	}
++	return idleWakeInterval
++}
+ 
+-			d.animation.TickAnimations()
+-			d.drawSingleFrame()
++// windowNeedsFrame reports whether any window has work for the next frame: a dirty
++// canvas, a pending resize or a mouse move not processed yet.
++func (d *gLDriver) windowNeedsFrame() bool {
++	for _, win := range d.windows {
++		w := win.(*window)
++		if w.closing {
++			continue
+ 		}
++		if w.shouldExpand || !w.mousePosUpdateProcessed || (w.visible && w.canvas.IsDirty()) {
++			return true
++		}
++		if w.viewport != nil && w.viewport.ShouldClose() {
++			return true
++		}
++	}
++	return false
++}
++
++// waitForEvents processes pending window events, waiting up to timeout for one to
++// arrive. A timeout of zero or less only polls.
++func (d *gLDriver) waitForEvents(timeout time.Duration) {
++	if timeout <= 0 {
++		d.pollEvents()
++		return
++	}
++
++	sleeping.Store(true)
++	select {
++	case <-d.done:
++		sleeping.Store(false)
++		return
++	default:
++	}
++	if queuedFuncs.Load() > 0 {
++		sleeping.Store(false)
++		d.pollEvents()
++		return
+ 	}
++	d.waitEvents(timeout)
++	sleeping.Store(false)
+ }
+ 
+ func (d *gLDriver) destroyWindow(w *window, index int) {
+diff --git a/internal/driver/glfw/loop_desktop.go b/internal/driver/glfw/loop_desktop.go
+index 896ecee..8005f7d 100644
+--- a/internal/driver/glfw/loop_desktop.go
++++ b/internal/driver/glfw/loop_desktop.go
+@@ -3,6 +3,8 @@
+ package glfw
+ 
+ import (
++	"time"
++
+ 	"fyne.io/fyne/v2"
+ 	"fyne.io/fyne/v2/internal/build"
+ 
+@@ -40,6 +42,33 @@ func (d *gLDriver) pollEvents() {
+ 	glfw.PollEvents() // This call blocks while window is being resized, which prevents freeDirtyTextures from being called
+ }
+ 
++// waitEvents sleeps until a window event arrives, postEmptyEvent is called or the
++// timeout passes, and processes the events that woke it.
++func (d *gLDriver) waitEvents(timeout time.Duration) {
++	glfw.WaitEventsTimeout(timeout.Seconds())
++}
++
++// postEmptyEvent wakes a waitEvents call from any goroutine.
++func postEmptyEvent() {
++	glfw.PostEmptyEvent()
++}
++
++// frameInterval is the shortest time between two painted frames: one refresh of the
++// primary monitor (a 120 Hz screen gets 8 ms frames while something moves), never
++// slower than 60 Hz nor faster than 240 Hz.
++func (d *gLDriver) frameInterval() time.Duration {
++	monitor := glfw.GetPrimaryMonitor()
++	if monitor == nil {
++		return defaultFrameInterval
++	}
++	mode := monitor.GetVideoMode()
++	if mode == nil || mode.RefreshRate <= 0 {
++		return defaultFrameInterval
++	}
++	interval := time.Second / time.Duration(mode.RefreshRate)
++	return min(max(interval, minFrameInterval), defaultFrameInterval)
++}
++
+ func (d *gLDriver) Terminate() {
+ 	glfw.Terminate()
+ }
+diff --git a/internal/driver/glfw/loop_test.go b/internal/driver/glfw/loop_test.go
+index ce86d2d..6ee6260 100644
+--- a/internal/driver/glfw/loop_test.go
++++ b/internal/driver/glfw/loop_test.go
+@@ -2,7 +2,12 @@
+ 
+ package glfw
+ 
+-import "testing"
++import (
++	"testing"
++	"time"
++
++	"github.com/stretchr/testify/assert"
++)
+ 
+ // BenchmarkRunOnMain measures the cost of calling a function
+ // on the main thread.
+@@ -29,3 +34,70 @@ func BenchmarkRunOnDraw(b *testing.B) {
+ 		w.RunWithContext(f)
+ 	}
+ }
++
++// TestRunOnMainWakesIdleLoop: the loop sleeps until the next event, so work sent
++// from a goroutine must wake it instead of waiting for the idle timeout. Each round
++// leaves the loop idle long enough to be asleep before sending.
++func TestRunOnMainWakesIdleLoop(t *testing.T) {
++	var slowest time.Duration
++	for range 10 {
++		time.Sleep(50 * time.Millisecond)
++		start := time.Now()
++		runOnMain(func() {})
++		slowest = max(slowest, time.Since(start))
++	}
++	if slowest >= idleWakeInterval/2 {
++		t.Fatalf("runOnMain waited %v for a sleeping loop; it should be woken at once", slowest)
++	}
++}
++
++// TestDoFromGoroutineWithoutWaitWakesIdleLoop is the same for fyne.Do without
++// waiting, which is how network results reach the interface.
++func TestDoFromGoroutineWithoutWaitWakesIdleLoop(t *testing.T) {
++	var slowest time.Duration
++	for range 10 {
++		time.Sleep(50 * time.Millisecond)
++		ran := make(chan time.Time, 1)
++		start := time.Now()
++		d.DoFromGoroutine(func() { ran <- time.Now() }, false)
++		select {
++		case at := <-ran:
++			slowest = max(slowest, at.Sub(start))
++		case <-time.After(5 * time.Second):
++			t.Fatal("the queued function never ran")
++		}
++	}
++	if slowest >= idleWakeInterval/2 {
++		t.Fatalf("a queued function waited %v for a sleeping loop", slowest)
++	}
++}
++
++func TestNextWake(t *testing.T) {
++	frame := time.Second / 60
++	var idle time.Duration
++	runOnMain(func() {
++		// Let any pending frame of earlier tests go out first.
++		for i := 0; i < 10 && d.windowNeedsFrame(); i++ {
++			for _, w := range d.windows {
++				w.(*window).ensurePositionProcessed()
++				w.(*window).shouldExpand = false
++			}
++			d.drawSingleFrame()
++		}
++		idle = d.nextWake(time.Now(), frame)
++	})
++	assert.Equal(t, idleWakeInterval, idle, "with nothing to do the loop sleeps until the next event")
++
++	w := createWindow("Next wake")
++	defer w.Close()
++	var soon, overdue time.Duration
++	runOnMain(func() {
++		w.visible = true
++		w.canvas.SetDirty()
++		soon = d.nextWake(time.Now(), frame)
++		overdue = d.nextWake(time.Now().Add(-time.Second), frame)
++	})
++	assert.LessOrEqual(t, soon, frame, "a dirty canvas is painted at the next frame slot")
++	assert.Greater(t, soon, time.Duration(0))
++	assert.LessOrEqual(t, overdue, time.Duration(0), "an overdue frame is painted without waiting")
++}
+diff --git a/internal/driver/glfw/loop_wasm.go b/internal/driver/glfw/loop_wasm.go
+index 6536115..baa64e3 100644
+--- a/internal/driver/glfw/loop_wasm.go
++++ b/internal/driver/glfw/loop_wasm.go
+@@ -3,6 +3,8 @@
+ package glfw
+ 
+ import (
++	"time"
++
+ 	"fyne.io/fyne/v2"
+ 
+ 	"github.com/fyne-io/gl-js"
+@@ -21,6 +23,21 @@ func (d *gLDriver) pollEvents() {
+ 	glfw.PollEvents() // This call blocks while window is being resized, which prevents freeDirtyTextures from being called
+ }
+ 
++// waitEvents cannot block the browser's event loop: it sleeps (which yields to it)
++// for at most one frame and then polls, as the ticker-driven loop did.
++func (d *gLDriver) waitEvents(timeout time.Duration) {
++	time.Sleep(min(timeout, defaultFrameInterval))
++	glfw.PollEvents()
++}
++
++// postEmptyEvent has nothing to interrupt in the browser: waitEvents never sleeps
++// longer than a frame.
++func postEmptyEvent() {}
++
++func (d *gLDriver) frameInterval() time.Duration {
++	return defaultFrameInterval
++}
++
+ func (d *gLDriver) Terminate() {
+ 	glfw.Terminate()
+ }
+diff --git a/internal/driver/mobile/driver.go b/internal/driver/mobile/driver.go
+index 36ac2ff..fd11f36 100644
+--- a/internal/driver/mobile/driver.go
++++ b/internal/driver/mobile/driver.go
+@@ -60,6 +60,7 @@ type driver struct {
+ 	theme           fyne.ThemeVariant
+ 	onConfigChanged func(*Configuration)
+ 	painting        bool
++	lastPaintSent   time.Time
+ 	running         bool
+ 	queuedFuncs     *async.UnboundedChan[func()]
+ }
+@@ -212,6 +213,7 @@ func (d *driver) Run() {
+ 				d.sendPaintEvent()
+ 			case fn := <-d.queuedFuncs.Out():
+ 				fn()
++				d.paintIfIdle()
+ 			case e, ok := <-a.Events():
+ 				if !ok {
+ 					return // events channel closed, app done
+@@ -274,11 +276,30 @@ func (d *driver) Run() {
+ 						d.typeUpCanvas(c, e.Rune, e.Code, e.Modifiers)
+ 					}
+ 				}
++				d.paintIfIdle()
+ 			}
+ 		}
+ 	})
+ }
+ 
++// paintIfIdle asks for a frame right away when a touch, a key or a function queued
++// with fyne.Do has left the canvas dirty and the last frame is at least one tick
++// old. Without it the change waited for the next tick of the 60 Hz draw ticker,
++// 8 ms on average and up to 17 ms after the finger lifted. The ticker still paces
++// continuous changes, so this never paints faster than it.
++func (d *driver) paintIfIdle() {
++	if d.painting || d.glctx == nil || time.Since(d.lastPaintSent) < time.Second/60 {
++		return
++	}
++	current := d.currentWindow()
++	if current == nil {
++		return
++	}
++	if c, ok := current.Canvas().(*canvas); ok && c.IsDirty() {
++		d.sendPaintEvent()
++	}
++}
++
+ func (*driver) SetDisableScreenBlanking(disable bool) {
+ 	setDisableScreenBlank(disable)
+ }
+@@ -421,6 +442,7 @@ func (d *driver) sendPaintEvent() {
+ 	}
+ 	d.app.Send(paint.Event{})
+ 	d.painting = true
++	d.lastPaintSent = time.Now()
+ }
+ 
+ func (d *driver) setTheme(dark bool) {
+-- 
+2.43.0
+

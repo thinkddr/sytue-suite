@@ -5,6 +5,39 @@
 (ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
 hace falta para quitarlo, que es que el parche entre aguas arriba.
 
+## Bucle por eventos en escritorio (2026-11-17, pendiente de etiqueta)
+
+`0018-desktop-event-driven-loop.patch`, commit
+[`caa879f`](https://github.com/thinkddr/fyne/commit/caa879f9051c9c0ba6b82662ce50c64a00b921d0)
+en la rama `claude/sytue-suite-install-setup-39nq19` del fork, sobre `v2.8.2-sytue.6`.
+Todavía **no** tiene etiqueta, así que `go.mod` sigue en `v2.8.2-sytue.5`. Para usarlo:
+fusionar en `main` del fork, que pasen sus cinco flujos, etiquetar `v2.8.2-sytue.7` y
+subir la versión aquí, en `ci-desktop.yml`, `ci-mobile.yml`, `.github/tests/fyne-cli-test.sh`
+y `scripts/empaquetar-test.sh`.
+
+**Qué arregla.** El driver GLFW atendía la entrada y pintaba con un reloj fijo de 60 Hz.
+Cada tecla, clic o resultado de red (`fyne.Do`) esperaba al siguiente tic: 8 ms de media
+y hasta 17 ms antes de pintarse. Además, una app en reposo se despertaba 60 veces por
+segundo. Ahora el bucle duerme en `glfw.WaitEventsTimeout` y lo despiertan la entrada,
+`fyne.Do` (`glfw.PostEmptyEvent`), un `Refresh` (`Canvas.SetDirty`) o una animación.
+Pinta en el acto si el último fotograma tiene al menos un intervalo, y durante la
+interacción continua nunca más rápido que la pantalla principal (de 60 a 240 Hz). En
+móvil se pide el fotograma justo después del toque o la tecla, sin esperar al reloj.
+
+**Medido** con Xvfb y Mesa, desde una tecla sintética (XTest) hasta leer el píxel
+cambiado en el servidor X, con 150 muestras:
+
+| | Antes | Después |
+| --- | --- | --- |
+| Tecla → píxel (media / p90 / máx.) | 10,5 / 16,7 / 18,8 ms | 1,8 / 2,0 / 4–7 ms |
+| `fyne.Do` → píxel (media) | 10,7 ms | 1,6 ms |
+| CPU de una ventana en reposo | 35 ms cada 2 s | ~1 ms cada 2 s |
+
+`go test -race ./...` del fork pasa entero (etiquetas de escritorio y `mobile`). Las pruebas
+nuevas cubren el despertar y el cálculo de la espera: `TestRunOnMainWakesIdleLoop` falla
+(~950 ms por llamada) si se quita el despertar. Las apps de `apps/fyne` compilan contra él
+(`go vet -tags goolm ./...`) y sus pruebas de `ui`, `calcus`, `notes` y `photos` pasan.
+
 ## `v2.8.2-sytue.4` y `v2.8.2-sytue.5` (2026-11-07): refresco y avisos de fondo en iOS
 
 Las dos tags apuntan a la misma fuente,

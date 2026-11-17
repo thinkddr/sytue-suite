@@ -12,19 +12,10 @@ export const cs: Catalog = {
   'matrix.resetUnderstood': 'Rozumím, že mohu ztratit přístup ke starším šifrovaným zprávám',
   'matrix.unknownKey':
     'Tento účet byl zašifrován dřív, než Sytue ochránilo jeho klíč tvým přihlášením. Ověř toto zařízení z jiného, na kterém už jsi přihlášený.',
-  'matrix.unlockTitle': 'Otevři svá šifrovaná data',
-  'matrix.unlockBody':
-    'Potvrď, že jsi to ty, svým přístupovým klíčem nebo heslem Sytue. Ověřuje se na tomto zařízení: nikdo jiný tvá data otevřít nemůže.',
-  'matrix.protectTitle': 'Chraň svá šifrovaná data',
-  'matrix.protectBody':
-    'Vyber, jak budeš otevírat šifrovaná data na dalších zařízeních: přístupovým klíčem nebo heslem Sytue. Otevřít je budeš moct jen ty.',
-  'matrix.usePasskey': 'Použít přístupový klíč',
-  'matrix.usePassword': 'Použít heslo',
-  'matrix.password': 'Heslo Sytue',
-  'matrix.passwordConfirm': 'Zopakuj heslo',
-  'matrix.passwordMismatch': 'Hesla se neshodují.',
-  'matrix.unlockWrong': 'Nepovedlo se. Zkus to znovu.',
-  'matrix.passkeyUnsupported': 'Tento přístupový klíč neumí otevřít šifrovaná data. Použij heslo.',
+  'matrix.unlocking': 'Odemykání tvých šifrovaných dat…',
+  'matrix.signIn': 'Přihlásit se do Sytue ID',
+  'matrix.signInBody':
+    'Přihlášení do Sytue ID odemyká tvá šifrovaná data na tomto zařízení. Přihlas se znovu heslem nebo přístupovým klíčem, abys je tu otevřel.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Povolit zpracování šifrovaných dat',
   'matrix.allowStorageBody':

@@ -13,20 +13,10 @@ export const pl: Catalog = {
     'Rozumiem, że mogę stracić dostęp do wcześniejszych zaszyfrowanych wiadomości',
   'matrix.unknownKey':
     'To konto zostało zaszyfrowane, zanim Sytue zabezpieczyło jego klucz Twoim logowaniem. Zweryfikuj to urządzenie z innego, na którym jesteś już zalogowany.',
-  'matrix.unlockTitle': 'Otwórz swoje zaszyfrowane dane',
-  'matrix.unlockBody':
-    'Potwierdź swoją tożsamość kluczem dostępu lub hasłem Sytue. Sprawdzenie odbywa się na tym urządzeniu: nikt inny nie może otworzyć Twoich danych.',
-  'matrix.protectTitle': 'Chroń swoje zaszyfrowane dane',
-  'matrix.protectBody':
-    'Wybierz, jak będziesz otwierać zaszyfrowane dane na innych urządzeniach: kluczem dostępu lub hasłem Sytue. Tylko Ty będziesz mógł je otworzyć.',
-  'matrix.usePasskey': 'Użyj klucza dostępu',
-  'matrix.usePassword': 'Użyj hasła',
-  'matrix.password': 'Hasło Sytue',
-  'matrix.passwordConfirm': 'Powtórz hasło',
-  'matrix.passwordMismatch': 'Hasła nie są zgodne.',
-  'matrix.unlockWrong': 'Nie udało się. Spróbuj ponownie.',
-  'matrix.passkeyUnsupported':
-    'Ten klucz dostępu nie może otworzyć zaszyfrowanych danych. Użyj hasła.',
+  'matrix.unlocking': 'Odblokowywanie zaszyfrowanych danych…',
+  'matrix.signIn': 'Zaloguj się do Sytue ID',
+  'matrix.signInBody':
+    'Logowanie do Sytue ID odblokowuje Twoje zaszyfrowane dane na tym urządzeniu. Zaloguj się ponownie hasłem lub kluczem dostępu, aby je tu otworzyć.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Zezwól na przetwarzanie zaszyfrowanych danych',
   'matrix.allowStorageBody':

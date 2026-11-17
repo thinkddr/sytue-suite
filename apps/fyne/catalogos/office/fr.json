@@ -518,6 +518,7 @@
   "dialog.merge.reset": "Le document sera remplacé par {total} copies fusionnées. Le modèle et la source de données seront perdus. Continuer ?",
   "dialog.sheet.delete": "Supprimer la feuille « {name} » ? Son contenu sera perdu.",
   "dialog.sheet.mergeLoses": "La fusion ne conserve que la valeur de la cellule en haut à gauche ({ref}) ; les autres cellules de la plage sont vidées. Pour réunir tous les textes dans cette cellule, utilisez « Fusionner le contenu ».",
+  "dialog.sheet.nameTaken": "Une feuille s’appelle déjà « {name} » (les noms ne distinguent pas majuscules et minuscules).",
   "dialog.sheet.rename": "Nom de la feuille :",
   "dialog.slide.delete": "Supprimer la diapositive {n} ?",
   "doc.msg.exportFailed": "Impossible d’exporter",

@@ -38,6 +38,13 @@
 # arranca con el entrypoint de otra versión. El Dockerfile se sigue usando tal
 # cual para construir en local y en el servidor (bin/build-images.sh).
 #
+# Y SU ETAPA DE COMPILACIÓN NO SE PIERDE EN SILENCIO. Aquí no se ejecuta, así que
+# cada RUN suyo tiene que ser algo que este guion sabe reproducir —`go mod
+# download`, el `go build` del servicio, la generación de scripts/client-core-assets.sh—
+# o la publicación se para diciendo cuál. La v3.20.3 salió con Rooms sin el núcleo
+# de cliente que incrusta su binario, y la web sin cifrado de extremo a extremo
+# (docs/operations.md#client-core-vacio).
+#
 # USO:
 #   DESTINO=ghcr.io/thinkddr TAG=v3.2.4 COMMIT=$(git rev-parse HEAD) \
 #     scripts/publicar-imagen-go.sh sytue-id services/id/Dockerfile
@@ -46,6 +53,13 @@
 # dentro, y las dos imágenes sueltas en `:$TAG-amd64` y `:$TAG-arm64`. Las
 # etiquetas por arquitectura NO son basura: son las que hacen falta para montar
 # el índice y las que se miran cuando hay que saber qué se publicó de verdad.
+#
+# ENSAYO, sin registro ni red:
+#   ENSAYO=/tmp/ensayo TAG=v0 ARQUITECTURAS=amd64 \
+#     scripts/publicar-imagen-go.sh sytue-rooms services/rooms/Dockerfile
+# hace todo lo que no habla con el registro —lo que genera la etapa de compilación,
+# los binarios cruzados y el contenido de la capa de cada arquitectura— y lo deja en
+# `$ENSAYO/<arq>/` (p. ej. /tmp/ensayo/amd64/app/rooms). No hace falta DESTINO.
 set -euo pipefail
 
 # shellcheck source=scripts/lib-portabilidad.sh
@@ -54,6 +68,8 @@ construir="$(dirname "${BASH_SOURCE[0]}")/construir-imagen.sh"
 
 nombre="${1:?uso: publicar-imagen-go.sh <nombre-imagen> <dockerfile>}"
 df="${2:?uso: publicar-imagen-go.sh <nombre-imagen> <dockerfile>}"
+ENSAYO="${ENSAYO:-}"
+if [ -n "$ENSAYO" ]; then DESTINO="${DESTINO:-ensayo.invalid}"; fi
 : "${DESTINO:?falta DESTINO (p. ej. ghcr.io/thinkddr)}"
 : "${TAG:?falta TAG}"
 COMMIT="${COMMIT:-}"
@@ -131,6 +147,60 @@ del_contexto="$(grep -E '^(COPY|ADD) ' <<<"$runtime" | grep -v -- '--from=' || t
 ejecuta=0
 grep -qE '^RUN ' <<<"$runtime" && ejecuta=1
 
+# --------------------------------------------- lo que ejecuta la compilación
+# LA ETAPA DE COMPILACIÓN NO SE EJECUTA AQUÍ, así que cada RUN suyo tiene que ser
+# algo que este guion sabe hacer por su cuenta, o se para. La v3.20.3 salió con
+# Rooms contestando 503 «client core unavailable» —la web no podía configurar el
+# cifrado E2E— porque el RUN que generaba los WebAssembly que incrusta su binario
+# estaba ahí y aquí se saltaba sin decir nada (docs/operations.md#client-core-vacio).
+# Lo que se sabe hacer:
+#   · `go mod download`: el `go build` de abajo descarga lo que haga falta.
+#   · el `go build` de los binarios del servicio, SOLO: es el que se cruza abajo,
+#     con su `-ldflags -X` y sus `-tags`. Encadenado a otra orden no se reconoce.
+#   · `scripts/client-core-assets.sh <dir>`: se ejecuta el mismo guion, UNA vez y
+#     antes de cruzar —los wasm no dependen de la arquitectura—.
+#   · otro RUN DESPUÉS del `go build`, solo si la imagen pasa por su Dockerfile
+#     (`ajeno`): no puede entrar en el binario, y lo que deja llega a la imagen por
+#     un COPY --from que construye BuildKit. Es la tabla de países de Analytics.
+# Las instrucciones se leen como las lee Docker: continuaciones `\` unidas y sin
+# las líneas de comentario, que pueden ir en medio de una continuación.
+declare -a generar=()
+etiquetas=""
+compilado=0
+re_genera='^(bash )?scripts/client-core-assets\.sh ([^ ;&|]+)$'
+re_compila='^([A-Z_]+=[^ ]+ )*go build .*\./services/[a-z0-9-]+/cmd/'
+while IFS= read -r instruccion; do
+  case "$instruccion" in "RUN "*) ;; *) continue ;; esac
+  orden="${instruccion#RUN }"
+  # `--mount=…`, `--network=…`: cambian dónde corre, no qué.
+  while [[ "$orden" == --*" "* ]]; do orden="${orden#* }"; done
+  if [ "$orden" = "go mod download" ]; then
+    continue
+  elif [[ "$orden" =~ $re_genera ]]; then
+    generar+=("${BASH_REMATCH[2]}")
+  elif [[ "$orden" =~ $re_compila ]] && [[ "$orden" != *[\;\&\|]* ]]; then
+    compilado=1
+    etiquetas="$({ grep -oE -- '-tags[= ]+[^ ]+' <<<"$orden" || true; } | tail -1 | sed -E "s/^-tags[= ]+//; s/[\"']//g")"
+  elif [ "$compilado" = 1 ] && [ "$ajeno" = 1 ]; then
+    echo "   $nombre: «${orden:0:50}…» va tras el go build y lo ejecuta su Dockerfile"
+  else
+    {
+      echo "$nombre: la etapa de compilación de $df ejecuta algo que este guion no reproduce:"
+      echo "    RUN $orden"
+      echo "  La release monta la imagen sin ejecutar esa etapa, así que la imagen saldría sin"
+      echo "  lo que haga (la v3.20.3 salió así sin el núcleo de cliente de Rooms)."
+      echo "  Si genera algo que el binario necesita, que lo haga un guion de scripts/ que"
+      echo "  llamen el Dockerfile y este guion (como scripts/client-core-assets.sh)."
+    } >&2
+    exit 1
+  fi
+done < <(head -n "$((desde - 1))" "$df" | awk '
+  /^[[:space:]]*#/ { next }
+  { linea = $0
+    if (sub(/\\[[:space:]]*$/, "", linea)) { acumulado = acumulado linea " "; next }
+    print acumulado linea; acumulado = "" }
+  END { if (acumulado != "") print acumulado }' | tr -s ' \t' ' ' | sed 's/ $//')
+
 # ------------------------------------------------------- la configuración final
 # `crane append` conserva la configuración de la base, que es la de distroless:
 # lo que el Dockerfile añade encima hay que ponerlo. Se lee de él, no se escribe.
@@ -152,6 +222,12 @@ done < <(printf '%s\n' "$runtime" | grep -E '^ENV [A-Z_]+=' | sed 's/^ENV //' |
   sed "s/\${VERSION}/$TAG/g; s/\${COMMIT}/$COMMIT/g")
 
 # ------------------------------------------------------------------ construcción
+# Lo que el binario incrusta, antes de cruzarlo: una vez, vale para todas.
+for dir in ${generar[@]+"${generar[@]}"}; do
+  echo "── $nombre: núcleo de cliente en $dir"
+  bash scripts/client-core-assets.sh "$dir"
+done
+
 declare -a publicadas=()
 read -ra arquitecturas <<<"$ARQUITECTURAS"
 for arq in "${arquitecturas[@]}"; do
@@ -160,7 +236,7 @@ for arq in "${arquitecturas[@]}"; do
 
   mkdir -p "$tmp/bin-$arq"
   CGO_ENABLED=0 GOOS=linux GOARCH="$arq" \
-    go build -trimpath -ldflags "-s -w $equis" -o "$tmp/bin-$arq/" "${paquetes[@]}"
+    go build -trimpath ${etiquetas:+-tags "$etiquetas"} -ldflags "-s -w $equis" -o "$tmp/bin-$arq/" "${paquetes[@]}"
 
   etapa="$tmp/fs-$arq"
   for d in "${destinos[@]}"; do
@@ -174,6 +250,15 @@ for arq in "${arquitecturas[@]}"; do
   done
   mapfile -t raices < <(cd "$etapa" && ls)
   tar --owner=0 --group=0 --numeric-owner -C "$etapa" -cf "$tmp/capa-$arq.tar" "${raices[@]}"
+
+  if [ -n "$ENSAYO" ]; then
+    mkdir -p "$ENSAYO/$arq"
+    cp -R "$etapa/." "$ENSAYO/$arq/"
+    echo "   ensayo: la capa de $arq queda en $ENSAYO/$arq (nada publicado)"
+    [ "$ajeno$ejecuta" = 00 ] ||
+      echo "   ensayo: $nombre lleva algo que construye su Dockerfile; eso no está en el ensayo"
+    continue
+  fi
 
   if [ "$ejecuta" = 1 ]; then
     # La base por el digest de SU arquitectura, no el del índice: el constructor
@@ -248,6 +333,8 @@ for arq in "${arquitecturas[@]}"; do
   fi
   publicadas+=("$ref")
 done
+
+[ -z "$ENSAYO" ] || exit 0
 
 # EL ÍNDICE ES LO QUE ARREGLA EL PROBLEMA: un solo `:$TAG` que sirve a los dos
 # destinos, así que el servidor (x86_64) y sytue.com (ARM64) piden lo mismo y

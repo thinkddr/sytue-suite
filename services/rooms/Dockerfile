@@ -19,25 +19,21 @@ RUN go mod download
 # Código fuente (módulo completo; el servicio importa platform/pkg/*).
 COPY . .
 
-RUN cd apps/nucleo && CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" \
-    -o /src/services/rooms/internal/http/client_core_assets/core.wasm ./cmd/pqc-wasm \
-    && cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" /src/services/rooms/internal/http/client_core_assets/wasm_exec.js \
-    && cp "$(go env GOROOT)/LICENSE" /src/services/rooms/internal/http/client_core_assets/GO-LICENSE \
-    && mkdir -p /src/services/rooms/internal/http/client_core_assets/office \
-    && CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" \
-       -o /src/services/rooms/internal/http/client_core_assets/office/core.wasm ./cmd/office-wasm \
-    && cp /src/services/rooms/internal/http/client_core_assets/wasm_exec.js /src/services/rooms/internal/http/client_core_assets/office/wasm_exec.js \
-    && cp /src/services/rooms/internal/http/client_core_assets/GO-LICENSE /src/services/rooms/internal/http/client_core_assets/office/GO-LICENSE \
-    && mkdir -p /src/services/rooms/internal/http/client_core_assets/mail \
-    && CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" \
-       -o /src/services/rooms/internal/http/client_core_assets/mail/core.wasm ./cmd/mail-wasm \
-    && cp /src/services/rooms/internal/http/client_core_assets/wasm_exec.js /src/services/rooms/internal/http/client_core_assets/mail/wasm_exec.js \
-    && cp /src/services/rooms/internal/http/client_core_assets/GO-LICENSE /src/services/rooms/internal/http/client_core_assets/mail/GO-LICENSE
+# El núcleo de cliente que Rooms sirve en /api/v1/client-core/ (los WebAssembly de
+# apps/nucleo: core para el cifrado E2E, office y mail) lo genera UN guion, y este RUN
+# es solo su llamada: scripts/publicar-imagen-go.sh, que en la release no ejecuta esta
+# etapa, reconoce esta línea y ejecuta el mismo guion antes de cruzar el binario. Una
+# receta escrita aquí dentro se la saltaba y la v3.20.3 salió sin núcleo
+# (docs/operations.md#client-core-vacio). Cualquier otro RUN en esta etapa hace fallar
+# la publicación en vez de perderse.
+RUN scripts/client-core-assets.sh services/rooms/internal/http/client_core_assets
 
 ARG VERSION=dev
 # CGO desactivado -> binario estático apto para distroless/static.
+# `-tags imagen`: sin el núcleo de cliente generado el binario NO compila
+# (internal/http/client_core_embed_imagen.go); publicar-imagen-go.sh lee la etiqueta de aquí.
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath \
+    -trimpath -tags imagen \
     -ldflags "-s -w -X git.sytue.eu/sytue/one/services/rooms/internal/config.Version=${VERSION}" \
     -o /out/rooms ./services/rooms/cmd/rooms
 

@@ -126,6 +126,75 @@ func TestLasFilasEsqueletoColocanLaMeta(t *testing.T) {
 	}
 }
 
+// TestLasFilasEsqueletoLlevanSuCabecera: la cabecera (el `header` de SkeletonRows) va
+// encima de las filas, en el MISMO widget: sus rayas laten con las filas —el mismo
+// tono en cada instante—, el rótulo a la izquierda y la meta a la derecha con su hueco
+// (la oculta no ocupa sitio), centradas encima de su filete, y las filas bajan lo que
+// mide.
+//
+// VISTO EN ROJO sin la cabecera en FilasEsqueleto: Drive la montaba en un
+// `BloquesEsqueleto` aparte, con su propio latido y su propio «Cargando».
+func TestLasFilasEsqueletoLlevanSuCabecera(t *testing.T) {
+	f := NuevasFilasEsqueleto(2, DelanteroTesela, 1)
+	f.Margen = 12
+	f.Meta = []MetaEsqueleto{{Ancho: 44}, {Ancho: 76}}
+	sin := f.MinSize().Height
+	f = NuevasFilasEsqueleto(2, DelanteroTesela, 1).ConCabecera(CabeceraEsqueleto{
+		Alto:      30.6,
+		Filete:    true,
+		Rotulo:    MetaEsqueleto{Ancho: 56, Alto: 9.6},
+		Meta:      []MetaEsqueleto{{Ancho: 48, Alto: 9.6}, {Ancho: 72, Alto: 9.6, Oculta: true}},
+		HuecoMeta: 32,
+	})
+	f.Margen = 12
+	f.Meta = []MetaEsqueleto{{Ancho: 44}, {Ancho: 76}}
+	if h := f.MinSize().Height; h != sin+30.6 {
+		t.Errorf("con cabecera las filas piden %g y deberían pedir %g", h, sin+30.6)
+	}
+	f.Resize(fyne.NewSize(600, f.MinSize().Height))
+	r := test.WidgetRenderer(f).(*filasEsqueletoRenderer)
+	defer f.Parar()
+	r.Layout(f.Size())
+	rayas := f.RayasCabecera()
+	if len(rayas) != 3 {
+		t.Fatalf("la cabecera tiene %d rayas y deberían ser 3", len(rayas))
+	}
+	for _, c := range []struct {
+		nombre string
+		r      *canvas.Rectangle
+		pos    fyne.Position
+	}{
+		{"el rótulo", rayas[0], fyne.NewPos(24, 10)},
+		// Con la segunda oculta, la primera se pega al `px-3` de la derecha.
+		{"la meta", rayas[1], fyne.NewPos(600-24-48, 10)},
+	} {
+		if c.r.Position() != c.pos || c.r.Size().Height != 9.6 {
+			t.Errorf("%s cae en %v (alto %g) y debería caer en %v", c.nombre, c.r.Position(), c.r.Size().Height, c.pos)
+		}
+	}
+	if rayas[2].Visible() {
+		t.Error("la raya oculta de la cabecera se pinta")
+	}
+	if p, tam := r.fileteCabecera.Position(), r.fileteCabecera.Size(); p != fyne.NewPos(12, 29.6) || tam != fyne.NewSize(576, tema.Borde) {
+		t.Errorf("el filete de la cabecera cae en %v y mide %v", p, tam)
+	}
+	if y := r.filas[0].delantero.Position().Y; y < 30.6 {
+		t.Errorf("la primera fila empieza en %g, debajo de la cabecera de 30,6", y)
+	}
+	// Un solo latido: las rayas de la cabecera son bloques del renderer como las filas.
+	enLatido := 0
+	for _, b := range r.bloques {
+		for _, q := range rayas {
+			if b == q {
+				enLatido++
+			}
+		}
+	}
+	if enLatido != len(rayas) {
+		t.Errorf("%d de las %d rayas de la cabecera laten con las filas", enLatido, len(rayas))
+	}
+}
+
 // TestLasFilasEsqueletoSeQuedanQuietasSinMovimiento: con `prefers-reduced-motion` no hay
 // latido y los bloques se quedan opacos.
 func TestLasFilasEsqueletoSeQuedanQuietasSinMovimiento(t *testing.T) {

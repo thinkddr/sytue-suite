@@ -2,7 +2,7 @@
 /** SSO/session plumbing shared by private products and the deployed Rooms client.
  * Import this subpath on callbacks: the maintained crypto SDK loads only AFTER URL cleanup. */
 import { acquireMatrixStore } from './lease.js';
-import { prefijoDeApp, suiteApex } from '@sytue/config/tokens';
+import { appDomains, prefijoDeApp } from '@sytue/config/tokens';
 import { BrowserKeyCustody } from './custody-browser.js';
 import type { MatrixClient, ICreateClientOpts } from 'matrix-js-sdk';
 import { readOfflineValue, mutateOfflineValue, deleteOfflineValue } from '../storage.js';
@@ -78,7 +78,7 @@ export class MatrixBrowserAuth implements MatrixSessionAdapter {
   private readonly namespace: string;
   private readonly pendingKey: string;
   private readonly store: MatrixSessionStore;
-  /** The wrapped recovery key of this account (ADR 0081), through the same app's BFF. */
+  /** The wrapped recovery key of this account (ADR 0084), through the same app's BFF. */
   readonly custody: BrowserKeyCustody;
   constructor(private readonly options: MatrixBrowserAuthOptions) {
     if (
@@ -101,7 +101,7 @@ export class MatrixBrowserAuth implements MatrixSessionAdapter {
     this.custody = new BrowserKeyCustody({
       base: this.base,
       isolated: options.identityVersion === 2,
-      rpId: suiteApex,
+      idOrigin: appDomains.id,
     });
   }
   private browser(): MatrixSSOBrowser {

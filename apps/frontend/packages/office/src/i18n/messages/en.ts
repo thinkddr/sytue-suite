@@ -17,6 +17,8 @@ export const en = {
   // Títulos de página (SSR)
   // ---------------------------------------------------------------------------
   'dialog.sheet.rename': 'Sheet name:',
+  'dialog.sheet.nameTaken':
+    'There is already a sheet called “{name}” (names ignore upper and lower case).',
   'dialog.sheet.delete': 'Delete the sheet “{name}”? Its contents will be lost.',
   'dialog.sheet.mergeLoses':
     'Merging keeps only the value of the top-left cell ({ref}); the other cells in the range are cleared. To join all the text in that cell, use “Merge contents”.',

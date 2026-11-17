@@ -11,6 +11,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula/analisis"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/nombrehoja"
 )
 
 // Libro es el modelo que el lienzo enseña: las hojas, el HTML de cada celda con su
@@ -90,6 +91,13 @@ type Libro struct {
 	// rotulo traduce lo poco que el libro PINTA con palabras (el «Total» de la fila de
 	// totales). Lo pone el lienzo; sin él sale la clave.
 	rotulo func(clave string) string
+	// AntesDeEstructura y TrasEstructura avisan de un cambio de estructura —insertar o
+	// borrar filas o columnas, o deshacerlo o rehacerlo—, con el libro aún sin cambiar y
+	// ya cambiado. Quien guarda los manda cada uno en SU guardado: en una hoja protegida
+	// el servidor solo reconoce un desplazamiento por guardado
+	// (apps/nucleo/office/model/proteccion_ajenas.go). Los dos corren en el hilo de la
+	// interfaz, el único que toca el libro.
+	AntesDeEstructura, TrasEstructura func()
 	// resolubles son las tablas del libro con los nombres de sus columnas, para las
 	// referencias estructuradas; se rehacen cuando cambia la versión.
 	resolubles struct {
@@ -107,6 +115,10 @@ type foto struct {
 	// nombres son los nombres definidos del libro (`names`); la lista es inmutable —
 	// cambiarla es poner otra—, así que la foto la comparte.
 	nombres []Nombre
+	// estructural: en el historial, el paso entre esta foto y su vecina hacia el
+	// presente (la siguiente en `pasado`, la anterior en `futuro`) insertó o borró filas
+	// o columnas. Deshacerlo o rehacerlo también lo es.
+	estructural bool
 }
 
 // hojaLibro es una `SheetData`, con las celdas por coordenadas y no por referencia A1.
@@ -626,7 +638,21 @@ func (l *Libro) Activar(i int) {
 	l.f.activa = i
 }
 
-// Anadir crea una hoja vacía al final y la activa.
+// HojaGemela es la hoja, distinta de `excepto`, que se llama como `nombre` sin
+// distinguir mayúsculas («Ventas» y «VENTAS»), o -1. Excel y LibreOffice no dejan tener
+// las dos, y el servidor rechaza el guardado que las crea (nombrehoja).
+func (l *Libro) HojaGemela(nombre string, excepto int) int {
+	return nombrehoja.Gemela(l.Hojas(), strings.TrimSpace(nombre), excepto)
+}
+
+// NombreLibre es el primer nombre de la serie `nombrar(desde)`, `nombrar(desde+1)`…
+// que no es gemelo de ninguna hoja: «Hoja 3», o «Hoja 4» si ya hay una «hoja 3».
+func (l *Libro) NombreLibre(nombrar func(n int) string, desde int) string {
+	return nombrehoja.Libre(l.Hojas(), nombrar, desde)
+}
+
+// Anadir crea una hoja vacía al final y la activa. El nombre lo elige quien llama, libre
+// (NombreLibre).
 func (l *Libro) Anadir(nombre string) {
 	l.anotar()
 	f := l.copia()
@@ -638,19 +664,15 @@ func (l *Libro) Anadir(nombre string) {
 }
 
 // Duplicar copia la hoja activa justo detrás, con un nombre que no choca —«Datos (2)»,
-// «Datos (3)»…—: el motor indexa las hojas por nombre.
+// «Datos (3)»…—, tampoco salvo mayúsculas: el motor indexa las hojas por nombre, y una
+// «DATOS (2)» ya ocupa «Datos (2)».
 func (l *Libro) Duplicar() {
 	l.anotar()
 	f := l.copia()
-	nombres := l.Hojas()
-	src := nombres[f.activa]
-	n := 2
-	for slices.Contains(nombres, src+" ("+strconv.Itoa(n)+")") {
-		n++
-	}
+	src := l.Hojas()[f.activa]
 	i := f.activa + 1
 	nueva := f.hojas[f.activa].clonar()
-	nueva.nombre = src + " (" + strconv.Itoa(n) + ")"
+	nueva.nombre = l.NombreLibre(func(n int) string { return src + " (" + strconv.Itoa(n) + ")" }, 2)
 	nueva.id = nuevoIDHoja()
 	f.hojas = slices.Insert(f.hojas, i, nueva)
 	f.activa = i
@@ -670,11 +692,12 @@ func (l *Libro) Borrar() {
 	l.restaurar(f)
 }
 
-// Renombrar cambia el nombre de una hoja. Un nombre vacío o el mismo no hacen nada,
-// igual que en la web (`if (!name || name === current.name) return`).
+// Renombrar cambia el nombre de una hoja. Un nombre vacío, el mismo o el de otra hoja
+// salvo mayúsculas no hacen nada, igual que en la web.
 func (l *Libro) Renombrar(i int, nombre string) {
 	nombre = strings.TrimSpace(nombre)
-	if i < 0 || i >= len(l.f.hojas) || nombre == "" || nombre == l.f.hojas[i].nombre {
+	if i < 0 || i >= len(l.f.hojas) || nombre == "" || nombre == l.f.hojas[i].nombre ||
+		l.HojaGemela(nombre, i) >= 0 { // el diálogo ya lo dice (PedirRenombrarHoja)
 		return
 	}
 	l.anotar()
@@ -722,9 +745,13 @@ func (l *Libro) Deshacer() bool {
 		return false
 	}
 	ant := l.pasado[len(l.pasado)-1]
+	l.antesDeEstructura(ant.estructural)
 	l.pasado = l.pasado[:len(l.pasado)-1]
-	l.futuro = append(l.futuro, l.copia())
+	ahora := l.copia()
+	ahora.estructural = ant.estructural
+	l.futuro = append(l.futuro, ahora)
 	l.restaurar(ant)
+	l.trasEstructura(ant.estructural)
 	return true
 }
 
@@ -734,10 +761,27 @@ func (l *Libro) Rehacer() bool {
 		return false
 	}
 	sig := l.futuro[len(l.futuro)-1]
+	l.antesDeEstructura(sig.estructural)
 	l.futuro = l.futuro[:len(l.futuro)-1]
-	l.pasado = append(l.pasado, l.copia())
+	ahora := l.copia()
+	ahora.estructural = sig.estructural
+	l.pasado = append(l.pasado, ahora)
 	l.restaurar(sig)
+	l.trasEstructura(sig.estructural)
 	return true
+}
+
+// antesDeEstructura y trasEstructura avisan, si `si`, de un cambio de estructura.
+func (l *Libro) antesDeEstructura(si bool) {
+	if si && l.AntesDeEstructura != nil {
+		l.AntesDeEstructura()
+	}
+}
+
+func (l *Libro) trasEstructura(si bool) {
+	if si && l.TrasEstructura != nil {
+		l.TrasEstructura()
+	}
 }
 
 // anotar guarda el estado ANTERIOR a un cambio y vacía el futuro: si tras deshacer se

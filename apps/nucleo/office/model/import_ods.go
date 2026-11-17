@@ -102,6 +102,7 @@ func (l *libroOds) modelo(p *presupuesto) *sheetModel {
 	}
 	resolverListas(model)
 	attachOdsPivots(l.resto, model)
+	desgemelarHojas(model) // «Ventas» y «VENTAS»: la segunda, «VENTAS (2)»
 	return model
 }
 

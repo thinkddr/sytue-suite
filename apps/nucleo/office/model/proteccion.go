@@ -87,6 +87,14 @@ type Proteccion struct {
 	// (limitadorClaves) y en este lote no se comprueba ninguna, venga por donde venga.
 	// Lo pone el servicio; nunca se lee del cuerpo de la petición.
 	SinIntentos bool `json:"-"`
+	// Vigente lee el valor guardado del registro doc:sheet (nil si aún no hay ninguno). Lo
+	// pone el almacén, dentro de su transacción, y solo se llama cuando un modelo entrante
+	// trae dos hojas gemelas en un libro sin protección, que es cuando hace falta saber si
+	// ya lo eran (hojas_gemelas.go): así no se paga la lectura en cada guardado.
+	Vigente func() (json.RawMessage, error) `json:"-"`
+	// Restaurando: la escritura es la restauración de una versión, que puede devolver las
+	// hojas gemelas que el libro tenía entonces. Lo pone el servicio (RestoreVersion).
+	Restaurando bool `json:"-"`
 }
 
 type ctxProteccion struct{}
@@ -241,6 +249,10 @@ type evaluador struct {
 	// anteriores) o como contraseña nueva. Las tres dicen si se ha acertado, así que
 	// las tres son un intento y las tres cuentan (ver denegar).
 	fallidas map[string]bool
+	// hojas son los nombres de las hojas del último modelo aceptado en este lote: lo
+	// previo para el siguiente, en la regla de las gemelas (hojas_gemelas.go).
+	hojas    []string
+	hayHojas bool
 }
 
 // nuevoEvaluador parte de las claves vigentes; devuelve también una copia para saber, al
@@ -327,6 +339,9 @@ func (c *evaluador) aplicarModelo(est *EstadoProteccion, op *Op) error {
 	if err := c.transicion(prev, nuevo); err != nil {
 		return err
 	}
+	if err := c.gemelas(*est, prev, nuevo); err != nil {
+		return err
+	}
 	if nuevo != nil {
 		if nuevo.normalizar(c.claves) {
 			op.Value = nuevo.valor()
@@ -351,6 +366,7 @@ func ganaRegistro(est EstadoProteccion, op Op) bool {
 //nolint:gocognit,gocyclo // una pasada por ámbito protegido; trocearla esconde el orden de las reglas.
 func (c *evaluador) transicion(prev, nuevo *libro) error {
 	prevA, nuevoA := prev.ambitos(), nuevo.ambitos()
+	ajenas := &ajenasLibro{prev: prev, nuevo: nuevo}
 	for ambito, pp := range prevA {
 		np, sigue := nuevoA[ambito]
 		incl := claveEnClaro(np)
@@ -389,10 +405,15 @@ func (c *evaluador) transicion(prev, nuevo *libro) error {
 			delete(c.claves, ambito)
 		}
 		if !aut {
-			if contenidoProtegido(ambito, prev, nuevo, pp, np, c.p.Quien) != nil {
+			if contenidoProtegido(ambito, prev, nuevo, pp, np, c.p.Quien, ajenas) != nil {
 				return c.denegar(ambito) // con contraseña presentada y mala, lo dice
 			}
 		}
+	}
+	// Las fórmulas bloqueadas que siguen a otra hoja: un mismo desplazamiento para todas
+	// las hojas protegidas a la vez (proteccion_ajenas.go).
+	if ambito := ajenas.resolver(); ambito != "" {
+		return c.denegar(ambito)
 	}
 	for ambito, np := range nuevoA {
 		if _, antes := prevA[ambito]; antes {
@@ -468,7 +489,7 @@ func (c *evaluador) igualVigente(ambito string, n claveNueva) bool {
 
 // contenidoProtegido: lo que NO puede cambiar quien no está autorizado en un ámbito
 // que sigue protegido y con la protección intacta.
-func contenidoProtegido(ambito string, prev, nuevo *libro, pp, np map[string]json.RawMessage, quien Subject) error {
+func contenidoProtegido(ambito string, prev, nuevo *libro, pp, np map[string]json.RawMessage, quien Subject, ajenas *ajenasLibro) error {
 	if ambito == AmbitoLibro {
 		// Estructura: ni añadir, ni borrar, ni renombrar, ni reordenar hojas.
 		if !reflect.DeepEqual(prev.nombres, nuevo.nombres) {
@@ -483,7 +504,7 @@ func contenidoProtegido(ambito string, prev, nuevo *libro, pp, np map[string]jso
 	if p == nil || n == nil || repeticiones(nuevo.nombres, nombre) != 1 {
 		return ErrProtegido
 	}
-	return contenidoHoja(p, n, pp, np, quien, desplazablesDesde(prev, nuevo, nombre))
+	return contenidoHoja(nombre, p, n, pp, np, quien, ajenas)
 }
 
 // permisosEstructurales mueven celdas de sitio: con alguno concedido el contenido
@@ -498,16 +519,46 @@ var camposPorPermiso = map[string][]string{
 }
 
 // camposSiempreVetados no los cambia nadie con la hoja protegida (ver contenidoHoja).
-var camposSiempreVetados = []string{"pivots", "externalTables"}
+// Las tablas dinámicas (`pivots`) tampoco, salvo para seguir a sus celdas
+// (proteccion_dinamicas.go).
+var camposSiempreVetados = []string{"externalTables"}
 
 type estilo = map[string]any
 
+// contenidoHoja aplica las reglas de la hoja protegida `nombre` (p y n, con su `protect`
+// pp y np). Lo que solo se explica con un desplazamiento en otra hoja queda anotado en
+// `ajenas`, que lo decide para todas a la vez; sin `ajenas`, se rechaza.
+//
 //nolint:gocognit,gocyclo // las reglas de una hoja protegida, en el orden en que se explican.
-func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject, ajenas *hojasAjenas) error {
-	// Rangos editables movidos: solo si los explica una inserción o un borrado
-	// concedido, con las celdas movidas igual (proteccion_desplazar.go).
-	if distinto(pp, np, "ranges") && !rangosHojaMovidos(p, n, pp, np, quien) {
+func contenidoHoja(nombre string, p, n, pp, np map[string]json.RawMessage, quien Subject, ajenas *ajenasLibro) error {
+	// Rangos editables y tablas dinámicas movidos: solo si los explica UNA inserción o un
+	// borrado concedido en esta hoja, con las celdas movidas igual
+	// (proteccion_desplazar.go, proteccion_dinamicas.go). Las dinámicas pueden seguir
+	// también a la hoja de la que leen: eso lo decide `ajenas` al final, con el mismo
+	// desplazamiento para todas las hojas protegidas.
+	//
+	// Unas dinámicas que el servidor no sabe leer no se escriben, ni nuevas ni cambiadas;
+	// las que ya estaban pasan si llegan iguales (proteccion_dinamicas.go).
+	if !mismoJSON(p["pivots"], n["pivots"]) && !dinamicasLegibles(n["pivots"]) {
 		return ErrProtegido
+	}
+	cambianRangos, cambianDinamicas := distinto(pp, np, "ranges"), distinto(p, n, "pivots")
+	var propias otrosDesplazados
+	// Con un desplazamiento de la hoja, sus dinámicas quedan donde él las deja aunque no
+	// cambien: si las movía, tenían que llegar movidas. Y si no se leen, no se sabe.
+	if (cambianRangos || cambianDinamicas) && (!dinamicasVacias(p["pivots"]) || !dinamicasVacias(n["pivots"])) {
+		dp, ok := nuevasDinamicasPropias(nombre, p, n)
+		if !ok {
+			return ErrProtegido
+		}
+		propias = dp
+	}
+	dinAjenas := false
+	if (cambianRangos || cambianDinamicas) && !rangosHojaMovidos(p, n, pp, np, quien, propias) {
+		if cambianRangos || ajenas == nil {
+			return ErrProtegido
+		}
+		dinAjenas = true
 	}
 	formato := dice(pp, "formatCells", true)
 	relajado := false
@@ -529,25 +580,38 @@ func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject, ajena
 	// Bloqueo y ocultación: no se cambian sin quitar la protección.
 	desbloq := func(m map[string]estilo) int { return contar(m, "locked", false) }
 	ocultas := func(m map[string]estilo) int { return contar(m, "hidden", true) }
+	marcasQuietas := func() bool {
+		for ref := range union(ps, ns) {
+			if (ps[ref]["locked"] == false) != (ns[ref]["locked"] == false) ||
+				(ps[ref]["hidden"] == true) != (ns[ref]["hidden"] == true) {
+				return false
+			}
+		}
+		return true
+	}
+	// Con un permiso estructural, el contenido o las marcas bloqueadas que cambian de
+	// sitio son un desplazamiento (o un orden) de la hoja, que podría mover sus
+	// dinámicas: si el servidor no las sabe leer, no puede ver que lleguen bien.
+	if relajado && dinamicasIlegibles(p["pivots"]) && (!celdasPermitidas(pc, nc, bloqueada, false) || !marcasQuietas()) {
+		return ErrProtegido
+	}
 	if relajado {
 		// Los estilos viajan con las filas: solo se exige que no haya MÁS celdas
 		// desbloqueadas ni ocultas que antes.
 		if desbloq(ns) > desbloq(ps) || ocultas(ns) > ocultas(ps) {
 			return ErrProtegido
 		}
-	} else {
-		for ref := range union(ps, ns) {
-			if (ps[ref]["locked"] == false) != (ns[ref]["locked"] == false) ||
-				(ps[ref]["hidden"] == true) != (ns[ref]["hidden"] == true) {
-				return ErrProtegido
-			}
-		}
+	} else if !marcasQuietas() {
+		return ErrProtegido
 	}
 
 	// Contenido. Si no pasa tal cual, puede ser que las fórmulas bloqueadas que citan
 	// otra hoja hayan seguido a su dato al insertar o borrar filas allí: se acepta solo
-	// si es EXACTAMENTE ese desplazamiento (proteccion_ajenas.go).
-	if !celdasPermitidas(pc, nc, bloqueada, relajado) && !ajenas.explican(pc, nc, bloqueada, relajado) {
+	// si es EXACTAMENTE ese desplazamiento, el mismo para todas las hojas protegidas, y
+	// eso se decide al final con todas (proteccion_ajenas.go). Igual las tablas
+	// dinámicas que siguen a la hoja de la que leen.
+	necesita := !celdasPermitidas(pc, nc, bloqueada, relajado)
+	if necesita && ajenas == nil {
 		return ErrProtegido
 	}
 
@@ -568,7 +632,8 @@ func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject, ajena
 	// no existe aquí: la web vetaba ya `pivot` en bloque). Los metadatos no tocan celdas,
 	// así que sin esta regla se podían reescribir a escondidas con una escritura directa a
 	// la API. Las tablas admiten un único cambio: que se desplacen con filas o columnas
-	// insertadas o borradas, y por eso con un permiso estructural concedido pasan.
+	// insertadas o borradas, y por eso con un permiso estructural concedido pasan. Las
+	// dinámicas, también, pero solo con EXACTAMENTE ese desplazamiento (arriba).
 	// ponytail: con ese permiso también pasaría una tabla inventada; cerrarlo exigiría
 	// reproducir el desplazamiento en el servidor.
 	for _, f := range camposSiempreVetados {
@@ -590,6 +655,9 @@ func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject, ajena
 				return ErrProtegido
 			}
 		}
+	}
+	if ajenas != nil {
+		ajenas.anotar(nombre, pc, nc, bloqueada, relajado, necesita, leerDinamicasHoja(p, n, dinAjenas))
 	}
 	return nil
 }

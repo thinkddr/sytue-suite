@@ -55,14 +55,25 @@ export function ShortcutsModal({
         </>
       }
     >
-      <div class="flex flex-col gap-5">
+      {/* UNA COLUMNA DE TECLAS PARA TODA LA HOJA. Con una fila `flex` por atajo, cada
+          descripción empezaba donde acababan SUS teclas: «?» y «Ctrl K» dejaban la
+          palabra en dos sitios distintos y la hoja se leía en zigzag. La rejilla es de
+          la hoja entera y grupos, listas y filas la heredan (`subgrid`), así que todas
+          las descripciones caen en la misma vertical. La columna mide lo que la
+          combinación más ancha, hasta media hoja (`fit-content(50%)`): más allá, sus
+          teclas bajan de línea en vez de dejar la descripción en un hilo en el
+          teléfono. Su espejo nativo es `hojaatajos.go`. */}
+      <div class="grid grid-cols-[fit-content(50%)_minmax(0,1fr)] gap-x-4 gap-y-5">
         {groups.map((grupo) => (
-          <section key={grupo.titulo}>
-            <h3 class="sytue-overline text-text-subtle mb-2">{grupo.titulo}</h3>
-            <dl class="divide-border/60 divide-y">
+          <section key={grupo.titulo} class="col-span-full grid grid-cols-subgrid">
+            <h3 class="sytue-overline text-text-subtle col-span-full mb-2">{grupo.titulo}</h3>
+            <dl class="divide-border/60 col-span-full grid grid-cols-subgrid divide-y">
               {grupo.atajos.map((a) => (
-                <div key={a.descripcion} class="flex items-center gap-4 py-1.5">
-                  <dt class="flex shrink-0 items-center gap-1">
+                <div
+                  key={a.descripcion}
+                  class="col-span-full grid grid-cols-subgrid items-center py-1.5"
+                >
+                  <dt class="flex flex-wrap items-center gap-1">
                     {a.teclas.map((tecla) => (
                       // Una tecla se dibuja como una tecla: caja, borde y número
                       // tabular. Con texto suelto, «j k» se lee como una palabra. `Kbd`
@@ -72,7 +83,7 @@ export function ShortcutsModal({
                     ))}
                     <span class="sr-only">{a.teclas.join(' ')}</span>
                   </dt>
-                  <dd class="text-text min-w-0 flex-1 text-sm">{a.descripcion}</dd>
+                  <dd class="text-text min-w-0 text-sm">{a.descripcion}</dd>
                 </div>
               ))}
             </dl>

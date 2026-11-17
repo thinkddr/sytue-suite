@@ -33,9 +33,11 @@
 // de una migracion rompe los tests que dependen de ella.
 //
 // NO garantiza:
-//   - Que las migraciones corran con privilegio minimo: se aplican con el rol
-//     DUENO/superusuario del contenedor (h.DSN). Es lo realista (un DBA migra),
-//     pero implica que este harness no detecta que falte un GRANT en prod.
+//   - Que las migraciones corran con privilegio minimo: New las aplica con el rol
+//     DUENO/superusuario del contenedor (h.DSN), asi que no detecta que falte un
+//     GRANT en prod. Eso lo cubre MigrarComoDueno (dueno.go), que migra como el
+//     piloto con los roles separados: un dueno sin SUPERUSER y los permisos del
+//     despliegue (TestMigracionesConDuenoSinSuperusuario, para cada servicio).
 //   - Que el rol de aplicacion sea BIT A BIT el de produccion: aqui tiene
 //     TRUNCATE (lo necesita Reset) y es miembro de los roles *_app NOLOGIN que
 //     crean las migraciones de docs/integrations, para que su `SET LOCAL ROLE`
@@ -154,9 +156,10 @@ var appRoleGrants = []string{
 	 END $$`,
 }
 
-// startExterno usa un PostgreSQL ya en marcha (PGTEST_DSN) en vez de arrancar un
-// contenedor. Crea una base propia para este harness y la borra al terminar.
-func startExterno(ctx context.Context, fsys fs.FS, dir, dsnBase string) (*Harness, error) {
+// baseExterna usa un PostgreSQL ya en marcha (PGTEST_DSN) en vez de arrancar un
+// contenedor. Crea una base propia, vacía, y devuelve su DSN privilegiado y la
+// función que la borra.
+func baseExterna(ctx context.Context, dsnBase string) (string, func(), error) {
 	// El nombre lo da crypto/rand y no el reloj ni el PID: los tests corren en
 	// paralelo dentro del mismo proceso y con el mismo servidor, y dos harness
 	// que nacieran en el mismo milisegundo compartirían base y se pisarían las
@@ -164,29 +167,37 @@ func startExterno(ctx context.Context, fsys fs.FS, dir, dsnBase string) (*Harnes
 	// solo a veces.
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return nil, fmt.Errorf("pgtest: nombre de base: %w", err)
+		return "", nil, fmt.Errorf("pgtest: nombre de base: %w", err)
 	}
-	base := "pgtest_" + hex.EncodeToString(b[:])
-
-	return startNamedDatabase(ctx, fsys, dir, dsnBase, base)
+	return crearBase(ctx, dsnBase, "pgtest_"+hex.EncodeToString(b[:]))
 }
 
 func startNamedDatabase(ctx context.Context, fsys fs.FS, dir, dsnBase, base string) (*Harness, error) {
+	dsn, terminate, err := crearBase(ctx, dsnBase, base)
+	if err != nil {
+		return nil, err
+	}
+	return terminarDeMontar(ctx, fsys, dir, dsn, nil, terminate)
+}
+
+// crearBase crea la base vacía `base` en el servidor de dsnBase y devuelve su DSN
+// (con el mismo rol privilegiado) y la función que la borra.
+func crearBase(ctx context.Context, dsnBase, base string) (string, func(), error) {
 	admin, err := pgx.Connect(ctx, dsnBase)
 	if err != nil {
-		return nil, fmt.Errorf("pgtest: conectar a PGTEST_DSN: %w", err)
+		return "", nil, fmt.Errorf("pgtest: conectar a PGTEST_DSN: %w", err)
 	}
 	// PostgreSQL does not accept a parameter for a database identifier. Quote
 	// the random harness name and optional service suffix with pgx.Identifier.
 	if _, err := admin.Exec(ctx, `CREATE DATABASE `+pgx.Identifier{base}.Sanitize()); err != nil {
 		_ = admin.Close(ctx)
-		return nil, fmt.Errorf("pgtest: crear base %s: %w", base, err)
+		return "", nil, fmt.Errorf("pgtest: crear base %s: %w", base, err)
 	}
 	_ = admin.Close(ctx)
 
 	dsn, err := conBaseDeDatos(dsnBase, base)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	terminate := func() { //nolint:contextcheck // el teardown corre cuando el contexto del test ya terminó
@@ -202,8 +213,7 @@ func startNamedDatabase(ctx context.Context, fsys fs.FS, dir, dsnBase, base stri
 		// llenando de bases huérfanas a lo largo de una tanda de tests.
 		_, _ = a.Exec(termCtx, `DROP DATABASE IF EXISTS `+pgx.Identifier{base}.Sanitize()+` WITH (FORCE)`)
 	}
-
-	return terminarDeMontar(ctx, fsys, dir, dsn, nil, terminate)
+	return dsn, terminate, nil
 }
 
 // conBaseDeDatos devuelve el mismo DSN apuntando a otra base de datos.
@@ -308,7 +318,14 @@ func traspasarAUnDueno(ctx context.Context, dsn, ruta string) (string, func(), e
 			return
 		}
 		defer func() { _ = a.Close(c) }()
-		_, _ = a.Exec(c, `DROP ROLE IF EXISTS `+dueno)
+		// DROP OWNED antes: si recibió permisos sobre parámetros (MigrarComoDueno),
+		// son del servidor y no se van con la base; sin quitarlos, el rol no se
+		// deja borrar. Va bajo el mismo cerrojo que los concede.
+		parametrosMu.Lock()
+		defer parametrosMu.Unlock()
+		if _, err := a.Exec(c, `DROP OWNED BY `+dueno); err == nil {
+			_, _ = a.Exec(c, `DROP ROLE IF EXISTS `+dueno)
+		}
 	}
 	return u.String(), soltar, nil
 }
@@ -392,8 +409,20 @@ func New(t *testing.T, fsys fs.FS, dir string) *Harness {
 // Cada llamada crea su PROPIA base dentro de ese servidor y la borra al
 // terminar: los tests corren en paralelo y comparten servidor, no datos.
 func Start(ctx context.Context, fsys fs.FS, dir string) (*Harness, error) {
-	if dsn := os.Getenv("PGTEST_DSN"); dsn != "" {
-		return startExterno(ctx, fsys, dir, dsn)
+	dsn, container, terminate, err := baseVacia(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return terminarDeMontar(ctx, fsys, dir, dsn, container, terminate)
+}
+
+// baseVacia da una base de datos nueva, sin migrar, y el DSN de un rol con
+// permisos de dueño sobre ella: en el servidor de PGTEST_DSN si está definida, o
+// en un contenedor propio si no. terminate la borra (o para el contenedor).
+func baseVacia(ctx context.Context) (string, *tcpostgres.PostgresContainer, func(), error) {
+	if dsnBase := os.Getenv("PGTEST_DSN"); dsnBase != "" {
+		dsn, terminate, err := baseExterna(ctx, dsnBase)
+		return dsn, nil, terminate, err
 	}
 	container, err := tcpostgres.Run(ctx, postgresImage,
 		tcpostgres.WithDatabase(testDB),
@@ -415,7 +444,7 @@ func Start(ctx context.Context, fsys fs.FS, dir string) (*Harness, error) {
 		),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("pgtest: run postgres container: %w", err)
+		return "", nil, nil, fmt.Errorf("pgtest: run postgres container: %w", err)
 	}
 
 	// terminate se acumula en el teardown y se usa para limpiar si algo falla.
@@ -428,10 +457,9 @@ func Start(ctx context.Context, fsys fs.FS, dir string) (*Harness, error) {
 	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
 		terminate()
-		return nil, fmt.Errorf("pgtest: connection string: %w", err)
+		return "", nil, nil, fmt.Errorf("pgtest: connection string: %w", err)
 	}
-
-	return terminarDeMontar(ctx, fsys, dir, dsn, container, terminate)
+	return dsn, container, terminate, nil
 }
 
 // terminarDeMontar es lo que ambos caminos —contenedor propio o servidor

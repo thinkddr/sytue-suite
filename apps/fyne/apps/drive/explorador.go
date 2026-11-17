@@ -479,7 +479,7 @@ func (e *Explorador) barraSeleccion(v tema.Variante, n int) fyne.CanvasObject {
 	)
 	recuento := e.t("files.selection.count", i18n.Vars{"count": n})
 	return ui.NuevaBarraDeLote(recuento, e.t("ui.bulk.region"), e.t("files.selection.clear"),
-		acciones, e.limpiarSeleccion).Con(CanalonCabecera(e.Ventana))
+		acciones, e.limpiarSeleccion).Con(CanalonCabecera(e.Ventana)).ConNumero(n)
 }
 
 func (e *Explorador) limpiarSeleccion() {
@@ -1154,68 +1154,36 @@ func (e *Explorador) esqueletoCuerpo(v tema.Variante) fyne.CanvasObject {
 	filas.Margen = CanalonLista
 	filas.Rotulo = e.t("files.loading")
 	filas.Meta = []ui.MetaEsqueleto{{Ancho: 44, Oculta: !haySM}, {Ancho: 76, Oculta: !hayMD}}
-	// La cabecera: tres rayas de `0.6rem` donde van los tres rótulos de columna, en UN
-	// grupo de carga que late a una; las coloca esqueletoLista en las coordenadas de la
-	// lista, porque el grupo la cubre entera.
-	s := &esqueletoLista{haySM: haySM, hayMD: hayMD, filas: filas, grupo: ui.NuevosBloquesEsqueleto()}
-	rayas := make([]fyne.CanvasObject, 0, 3)
-	for _, ancho := range []float32{56, 48, 72} {
-		b := s.grupo.Bloque(ancho, 0.6*tema.Rem)
-		s.cabecera = append(s.cabecera, b)
-		rayas = append(rayas, b)
-	}
-	s.grupo.Con(container.NewWithoutLayout(rayas...))
-	return container.New(s, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), s.grupo, filas)
+	// La cabecera (el `header` de la web): tres rayas de `0.6rem` donde van los tres
+	// rótulos de columna, con `py-2.5` y su `border-b`, la del tamaño a `ml-8` de la de
+	// la fecha. Va DENTRO de las filas: un solo latido y un solo «Cargando».
+	raya := float32(0.6 * tema.Rem)
+	filas.ConCabecera(ui.CabeceraEsqueleto{
+		Alto:      altoCabeceraEsqueleto,
+		Filete:    true,
+		Rotulo:    ui.MetaEsqueleto{Ancho: 56, Alto: raya},
+		Meta:      []ui.MetaEsqueleto{{Ancho: 48, Alto: raya, Oculta: !haySM}, {Ancho: 72, Alto: raya, Oculta: !hayMD}},
+		HuecoMeta: 2 * tema.Espacio(4),
+	})
+	return container.New(esqueletoLista{}, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), filas)
 }
 
-// esqueletoLista coloca la cabecera con `px-3 py-2.5` dentro del `px-3` del contenedor,
-// y debajo las filas.
-type esqueletoLista struct {
-	haySM, hayMD bool
-	grupo        *ui.BloquesEsqueleto
-	cabecera     []*canvas.Rectangle
-	filas        *ui.FilasEsqueleto
-}
+// esqueletoLista pone la hoja debajo y las filas, con su cabecera, encima; no pide
+// nada (la vista ya mide lo suyo) y las filas se alargan si la hoja es más alta.
+type esqueletoLista struct{}
 
-var _ fyne.Layout = (*esqueletoLista)(nil)
+var _ fyne.Layout = esqueletoLista{}
 
-func (s *esqueletoLista) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 0) }
+func (esqueletoLista) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 0) }
 
-// altoCabeceraEsqueleto es `py-2.5` y su `border-b`: 2×8,75 + 8,4 + 1.
+// altoCabeceraEsqueleto es `py-2.5` y su `border-b`: 2×10 + 9,6 + 1.
 var altoCabeceraEsqueleto = 2*(2.5*0.25*tema.Rem) + 0.6*tema.Rem + tema.Borde
 
-func (s *esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	if len(objs) > 0 {
-		objs[0].Move(fyne.NewPos(0, 0))
-		objs[0].Resize(t)
+func (esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	for _, o := range objs {
+		o.Move(fyne.NewPos(0, 0))
+		o.Resize(fyne.NewSize(t.Width, max(t.Height, o.MinSize().Height)))
 	}
-	izq := 2 * CanalonLista // el `px-3` del contenedor más el de la fila
-	der := t.Width - izq
-	if s.grupo != nil {
-		s.grupo.Move(fyne.NewPos(0, 0))
-		s.grupo.Resize(fyne.NewSize(t.Width, altoCabeceraEsqueleto))
-	}
-	poner := func(r *canvas.Rectangle, x, y, w, h float32, visible bool) {
-		if !visible {
-			r.Hide()
-			return
-		}
-		r.Show()
-		r.Move(fyne.NewPos(x, y))
-		r.Resize(fyne.NewSize(w, h))
-	}
-	y := (altoCabeceraEsqueleto - tema.Borde - 0.6*tema.Rem) / 2
-	if len(s.cabecera) == 3 {
-		poner(s.cabecera[0], izq, y, 56, 0.6*tema.Rem, true)
-		poner(s.cabecera[2], der-72, y, 72, 0.6*tema.Rem, s.hayMD)
-		x := der - 72 - 2*tema.Espacio(4)
-		if !s.hayMD {
-			x = der
-		}
-		poner(s.cabecera[1], x-48, y, 48, 0.6*tema.Rem, s.haySM)
-	}
-	s.filas.Move(fyne.NewPos(0, altoCabeceraEsqueleto))
-	s.filas.Resize(fyne.NewSize(t.Width, max(t.Height-altoCabeceraEsqueleto, s.filas.MinSize().Height)))
 }
 
 // ---- La rejilla ----

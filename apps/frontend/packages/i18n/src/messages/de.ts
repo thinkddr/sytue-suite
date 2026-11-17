@@ -13,20 +13,10 @@ export const de: Catalog = {
     'Mir ist klar, dass ich den Zugriff auf ältere verschlüsselte Nachrichten verlieren kann',
   'matrix.unknownKey':
     'Dieses Konto wurde verschlüsselt, bevor Sytue seinen Schlüssel mit deiner Anmeldung geschützt hat. Verifiziere dieses Gerät mit einem anderen, auf dem du bereits angemeldet bist.',
-  'matrix.unlockTitle': 'Verschlüsselte Daten öffnen',
-  'matrix.unlockBody':
-    'Bestätige mit deinem Passkey oder deinem Sytue-Passwort, dass du es bist. Die Prüfung erfolgt auf diesem Gerät: Niemand sonst kann deine Daten öffnen.',
-  'matrix.protectTitle': 'Verschlüsselte Daten schützen',
-  'matrix.protectBody':
-    'Wähle, wie du deine verschlüsselten Daten auf deinen anderen Geräten öffnest: mit deinem Passkey oder deinem Sytue-Passwort. Nur du kannst sie öffnen.',
-  'matrix.usePasskey': 'Passkey verwenden',
-  'matrix.usePassword': 'Passwort verwenden',
-  'matrix.password': 'Sytue-Passwort',
-  'matrix.passwordConfirm': 'Passwort wiederholen',
-  'matrix.passwordMismatch': 'Die Passwörter stimmen nicht überein.',
-  'matrix.unlockWrong': 'Das hat nicht geklappt. Versuche es erneut.',
-  'matrix.passkeyUnsupported':
-    'Dieser Passkey kann keine verschlüsselten Daten öffnen. Verwende dein Passwort.',
+  'matrix.unlocking': 'Deine verschlüsselten Daten werden entsperrt …',
+  'matrix.signIn': 'Bei Sytue ID anmelden',
+  'matrix.signInBody':
+    'Deine Anmeldung bei Sytue ID entsperrt deine verschlüsselten Daten auf diesem Gerät. Melde dich erneut mit deinem Passwort oder Passkey an, um sie hier zu öffnen.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Verschlüsselte Verarbeitung erlauben',
   'matrix.allowStorageBody':

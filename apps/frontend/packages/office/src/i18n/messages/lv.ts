@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const lv: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Lapas nosaukums:',
+  'dialog.sheet.nameTaken':
+    'Lapa ar nosaukumu “{name}” jau pastāv (nosaukumos lielie un mazie burti netiek šķirti).',
   'dialog.sheet.delete': 'Vai dzēst lapu “{name}”? Tās saturs tiks zaudēts.',
   'dialog.sheet.mergeLoses':
     'Sapludinot saglabājas tikai augšējās kreisās šūnas ({ref}) vērtība; pārējās diapazona šūnas tiek notīrītas. Lai visu tekstu apvienotu šajā šūnā, izmantojiet “Sapludināt saturu”.',

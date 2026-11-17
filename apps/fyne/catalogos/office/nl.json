@@ -518,6 +518,7 @@
   "dialog.merge.reset": "Het document wordt vervangen door {total} samengevoegde kopieën. Het sjabloon en de gegevensbron gaan verloren. Doorgaan?",
   "dialog.sheet.delete": "Het blad ‘{name}’ verwijderen? De inhoud gaat verloren.",
   "dialog.sheet.mergeLoses": "Bij samenvoegen blijft alleen de waarde van de cel linksboven ({ref}) behouden; de andere cellen van het bereik worden leeggemaakt. Gebruik ‘Inhoud samenvoegen’ om alle tekst in die cel samen te brengen.",
+  "dialog.sheet.nameTaken": "Er is al een blad met de naam ‘{name}’ (namen maken geen onderscheid tussen hoofdletters en kleine letters).",
   "dialog.sheet.rename": "Naam van het blad:",
   "dialog.slide.delete": "Dia {n} verwijderen?",
   "doc.msg.exportFailed": "Exporteren is niet gelukt",

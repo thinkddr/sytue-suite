@@ -177,6 +177,36 @@ func (d Desplazamiento) MoverReferencia(ref string) string {
 	return hoja + na.String() + ":" + nb.String()
 }
 
+// Extremos son las posiciones (base cero) que un desplazamiento en ese eje mueve de la
+// referencia `ref`: las mismas que lee MoverReferencia, en el mismo orden. Un extremo
+// sin ese eje (la columna entera «A», la fila entera «5») no aporta ninguna, y una
+// referencia que MoverReferencia no sabe leer —y deja tal cual—, tampoco. La protección
+// del servidor las usa para saber qué desplazamientos dan el mismo resultado.
+func Extremos(ref string, filas bool) []int {
+	if i := strings.LastIndexByte(ref, '!'); i >= 0 {
+		ref = ref[i+1:]
+	}
+	partes := strings.Split(ref, ":")
+	if len(partes) > 2 {
+		return nil
+	}
+	out := make([]int, 0, len(partes))
+	for _, p := range partes {
+		e, ok := partirExtremo(p)
+		if !ok {
+			return nil
+		}
+		switch {
+		case filas && e.fila != "":
+			f, _ := strconv.Atoi(e.fila)
+			out = append(out, f-1)
+		case !filas && e.col != "":
+			out = append(out, ColToNum(e.col))
+		}
+	}
+	return out
+}
+
 // ReescribirFormula es `reescribirFormula` para una fórmula que vive en la hoja del
 // desplazamiento: sus referencias sin prefijo son de ella.
 func (d Desplazamiento) ReescribirFormula(texto string) string {
@@ -195,6 +225,10 @@ func (d Desplazamiento) ReescribirFormulaEn(texto, base string) string {
 	slices.SortFunc(refs, func(x, y Referencia) int { return y.Inicio - x.Inicio })
 	out := texto
 	for _, r := range refs {
+		// Una referencia a otro libro apunta a SUS filas, que aquí no se mueven nunca.
+		if EsDeOtroLibro(r.Hoja) {
+			continue
+		}
 		de := r.Hoja
 		if de == "" {
 			de = base

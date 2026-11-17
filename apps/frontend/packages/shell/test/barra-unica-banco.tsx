@@ -6,11 +6,18 @@
 //
 // Rooms va con las mismas piezas que ChatApp pasa a BarraMovil: su app real se queda
 // esperando al cifrado de Matrix sin servidor.
+//
+// Las demás superficies con datos privados (Calendar, Mail, Contacts, Notes…) montan el
+// `MatrixStorageGate` real: van dentro de `MatrixStorageFixture`, el dispositivo
+// sintético y ya verificado de los bancos de desarrollo. Sin él, la puerta pedía su
+// arranque a un homeserver que aquí no hay, se quedaba en «No se pudo configurar el
+// cifrado» y la barra no llegaba a pintarse: el banco entero se paraba en la primera.
 import { render } from 'preact';
 import { useState } from 'preact/hooks';
 import { isLocale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { SytueShell } from '@sytue/shell';
+import { MatrixStorageFixture } from '@sytue/shell/matrix/fixture';
 import { BarraMovil, Button, Glifo, Icon, Sidebar, SidebarItem } from '@sytue/ui';
 import { CalendarApp } from '../../../apps/calendar/src/components/CalendarApp.js';
 import { MailApp } from '../../../apps/mail/src/components/MailApp.js';
@@ -87,7 +94,12 @@ function Rooms() {
 function vista() {
   switch (app) {
     case 'mail':
-      return <MailApp locale={locale} hubBaseUrl={hub} idBaseUrl="/id" user={user} />;
+      // Sin `id`, MailApp monta su cuerpo sin la puerta privada (`PrivateMailGate` no
+      // lee el fixture de los bancos) y habla con la API de siempre, que es la que
+      // contesta este banco. La barra es la misma.
+      return (
+        <MailApp locale={locale} hubBaseUrl={hub} idBaseUrl="/id" user={{ ...user, id: '' }} />
+      );
     case 'contacts':
       return <ContactsApp locale={locale} hubBaseUrl={hub} user={user} />;
     case 'bases':
@@ -177,4 +189,4 @@ function vista() {
 const raiz = document.createElement('div');
 raiz.setAttribute('data-banco-app', '');
 document.body.appendChild(raiz);
-render(vista(), raiz);
+render(<MatrixStorageFixture>{vista()}</MatrixStorageFixture>, raiz);

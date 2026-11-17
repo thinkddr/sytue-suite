@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import type { SheetModel } from '../types';
-import { accionDeTeclaEnPestana, conColorDePestana, opcionesDePestana } from './pestana';
+import {
+  accionDeTeclaEnPestana,
+  conColorDePestana,
+  hojaGemela,
+  nombreLibreDeHoja,
+  nombresGemelos,
+  opcionesDePestana,
+} from './pestana';
 
 const libro = (n: number, extra: Partial<SheetModel> = {}): SheetModel => ({
   active: 0,
@@ -24,6 +31,36 @@ describe('conColorDePestana', () => {
     expect(conColorDePestana(m, 0, null)).toBe(m);
     expect(conColorDePestana(m, 0, 'red')).toBe(m);
     expect(conColorDePestana(m, 5, '#2563EB')).toBe(m);
+  });
+});
+
+describe('hojas gemelas', () => {
+  it('son el mismo nombre salvo mayúsculas, como EqualFold de Go en el servidor', () => {
+    expect(nombresGemelos('Ventas', 'VENTAS')).toBe(true);
+    expect(nombresGemelos('Año 2026', 'AÑO 2026')).toBe(true);
+    expect(nombresGemelos('Ventas', 'Ventas ')).toBe(false);
+    // Letras que EqualFold da por la misma y las minúsculas no: la web no puede ser
+    // más laxa que el servidor, o el guardado fallaría sin aviso.
+    expect(nombresGemelos('ſ', 's')).toBe(true);
+    expect(nombresGemelos('ϑ', 'θ')).toBe(true);
+    expect(nombresGemelos('\u212a', 'k')).toBe(true);
+  });
+
+  it('la gemela es otra hoja: la propia no cuenta', () => {
+    const hojas = ['Ventas', 'Resumen'];
+    expect(hojaGemela(hojas, 'VENTAS')).toBe(0);
+    expect(hojaGemela(hojas, 'ventas', 1)).toBe(0);
+    expect(hojaGemela(hojas, 'VENTAS', 0)).toBe(-1);
+    expect(hojaGemela(hojas, 'Compras')).toBe(-1);
+  });
+
+  it('el nombre libre se salta los ocupados con otras mayúsculas', () => {
+    const hoja = (n: number): string => `Hoja ${n}`;
+    expect(nombreLibreDeHoja([], hoja, 1)).toBe('Hoja 1');
+    expect(nombreLibreDeHoja(['Hoja 1', 'Hoja 2'], hoja, 3)).toBe('Hoja 3');
+    expect(nombreLibreDeHoja(['Hoja 1', 'hoja 3'], hoja, 3)).toBe('Hoja 4');
+    expect(nombreLibreDeHoja(['Hoja 3', 'HOJA 4', 'Hoja 5'], hoja, 3)).toBe('Hoja 6');
+    expect(nombreLibreDeHoja(['Datos', 'DATOS (2)'], (n) => `Datos (${n})`, 2)).toBe('Datos (3)');
   });
 });
 

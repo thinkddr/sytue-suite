@@ -128,6 +128,7 @@ var (
 	ErrForbidden             = shared.ErrForbidden
 	ErrHashInvalido          = shared.ErrHashInvalido
 	ErrHashNoCoincide        = shared.ErrHashNoCoincide
+	ErrHojaGemela            = shared.ErrHojaGemela
 	ErrInvalidFormat         = shared.ErrInvalidFormat
 	ErrInvalidKind           = shared.ErrInvalidKind
 	ErrInvalidOp             = shared.ErrInvalidOp

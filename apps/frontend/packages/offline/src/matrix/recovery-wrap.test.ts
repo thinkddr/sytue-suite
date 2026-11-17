@@ -12,6 +12,8 @@ import {
   recoveryWrapAAD,
   recoveryWrapKeyBytes,
   sealRecoveryKey,
+  sealWithUnlockKey,
+  unlockHint,
   type RecoveryWrapper,
 } from './recovery-wrap.js';
 
@@ -83,3 +85,39 @@ for (const vector of vectors) {
     ).rejects.toEqual(new MatrixCustodyError('wrong'));
   }, 30_000);
 }
+
+/** ADR 0084: the `sytue-id` wrapper, sealed with the unlock key of the Sytue ID sign-in. */
+const unlock = JSON.parse(
+  readFileSync(
+    join(import.meta.dir, '../../../../../nucleo/recoverywrap/testdata/desbloqueo.json'),
+    'utf8',
+  ),
+) as {
+  unlock_key: string;
+  hint: string;
+  account: string;
+  key_id: string;
+  recovery_key: string;
+  sytue_id_wrap_key: string;
+  sytue_id_wrapper: RecoveryWrapper;
+};
+
+test('the sytue-id wrapper matches the Go vector: hint, wrap key and ciphertext', async () => {
+  const key = fromBase64(unlock.unlock_key);
+  expect(await unlockHint(key)).toBe(unlock.hint);
+  expect(hex(await recoveryWrapKeyBytes('sytue-id', key))).toBe(unlock.sytue_id_wrap_key);
+  const sealed = await sealWithUnlockKey({
+    unlockKey: key,
+    account: unlock.account,
+    keyID: unlock.key_id,
+    recoveryKey: unlock.recovery_key,
+    nonce: fromBase64(unlock.sytue_id_wrapper.nonce),
+  });
+  expect(sealed).toEqual(unlock.sytue_id_wrapper);
+  expect(await openRecoveryWrapper(unlock.sytue_id_wrapper, unlock.account, key)).toBe(
+    unlock.recovery_key,
+  );
+  await expect(
+    openRecoveryWrapper(unlock.sytue_id_wrapper, unlock.account, new Uint8Array(32)),
+  ).rejects.toEqual(new MatrixCustodyError('wrong'));
+});

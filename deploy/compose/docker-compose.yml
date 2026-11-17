@@ -300,9 +300,9 @@ services:
       CLOUD_DB_NAME: ${CLOUD_DB_NAME:-sytue_cloud}
       CLOUD_DB_USER: ${CLOUD_DB_USER:-sytue_cloud}
       CLOUD_DB_PASSWORD: ${CLOUD_DB_PASSWORD}
-      # Sytue Analytics: el init crea su rol con esta contraseña. Sin ella el
-      # script de init aborta a mitad («ANALYTICS_DB_PASSWORD: parameter not
-      # set») y PostgreSQL no lo repite al reiniciar: la base no llega a existir.
+      # Lo mismo con analytics, que el script crea después de cloud: sin ellas el
+      # init abortaba ahí y no llegaba ni a PostgREST ni al permiso de los
+      # parámetros app.* de las funciones.
       ANALYTICS_DB_NAME: ${ANALYTICS_DB_NAME:-sytue_analytics}
       ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-sytue_analytics}
       ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD}
@@ -331,7 +331,7 @@ services:
   # ===========================================================================
   # SeaweedFS (Apache-2.0) en modo `mini`: un único proceso con maestro, volumen,
   # filer y pasarela S3, la misma imagen y el mismo modo que el despliegue privado
-  # (deploy/private-production, SEAWEEDFS_IMAGE). Sustituye a MinIO el 2026-11-16:
+  # (su SEAWEEDFS_IMAGE). Sustituye a MinIO el 2026-11-16:
   # minio/minio dejó de existir en Docker Hub («repository does not exist»), así
   # que `docker compose up` fallaba en cualquier equipo nuevo; además MinIO es
   # AGPL-3.0 y llevaba sin imagen nueva desde 2025-09-07.

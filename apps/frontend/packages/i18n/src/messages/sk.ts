@@ -12,19 +12,10 @@ export const sk: Catalog = {
   'matrix.resetUnderstood': 'Rozumiem, že môžem stratiť prístup k starším šifrovaným správam',
   'matrix.unknownKey':
     'Tento účet bol zašifrovaný skôr, ako Sytue ochránilo jeho kľúč tvojím prihlásením. Over toto zariadenie z iného, na ktorom si už prihlásený.',
-  'matrix.unlockTitle': 'Otvor svoje šifrované údaje',
-  'matrix.unlockBody':
-    'Potvrď, že si to ty, prístupovým kľúčom alebo heslom Sytue. Overuje sa na tomto zariadení: nikto iný tvoje údaje otvoriť nemôže.',
-  'matrix.protectTitle': 'Chráň svoje šifrované údaje',
-  'matrix.protectBody':
-    'Vyber, ako budeš otvárať šifrované údaje na ďalších zariadeniach: prístupovým kľúčom alebo heslom Sytue. Otvoriť ich budeš môcť len ty.',
-  'matrix.usePasskey': 'Použiť prístupový kľúč',
-  'matrix.usePassword': 'Použiť heslo',
-  'matrix.password': 'Heslo Sytue',
-  'matrix.passwordConfirm': 'Zopakuj heslo',
-  'matrix.passwordMismatch': 'Heslá sa nezhodujú.',
-  'matrix.unlockWrong': 'Nepodarilo sa. Skús to znova.',
-  'matrix.passkeyUnsupported': 'Tento prístupový kľúč nevie otvoriť šifrované údaje. Použi heslo.',
+  'matrix.unlocking': 'Odomykanie tvojich šifrovaných údajov…',
+  'matrix.signIn': 'Prihlásiť sa do Sytue ID',
+  'matrix.signInBody':
+    'Prihlásenie do Sytue ID odomyká tvoje šifrované údaje v tomto zariadení. Prihlás sa znova heslom alebo prístupovým kľúčom, aby si ich tu otvoril.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Povoliť spracovanie šifrovaných údajov',
   'matrix.allowStorageBody':

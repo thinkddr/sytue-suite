@@ -37,6 +37,10 @@ type authzRequest struct {
 	// cliente volvería a /authorize, la sesión SSO seguiría valiendo y saldría
 	// otro token con el MISMO `auth_time` viejo.
 	MaxAge *int
+	// Unlock (`sytue_unlock=1`, apps web) y UnlockKey (`sytue_unlock_key`, apps
+	// nativas) piden acabar en el relevo del desbloqueo del cifrado (ADR 0084).
+	Unlock    bool
+	UnlockKey string
 }
 
 func parseAuthz(r *http.Request) authzRequest {
@@ -62,6 +66,8 @@ func parseAuthz(r *http.Request) authzRequest {
 		StorageSubject:      q.Get("sytue_subject"),
 		StorageHintInvalid:  (q.Has("sytue_tenant") || q.Has("sytue_subject")) && (len(q["sytue_tenant"]) != 1 || len(q["sytue_subject"]) != 1 || q.Get("sytue_tenant") == "" || q.Get("sytue_subject") == ""),
 		MaxAge:              maxAge,
+		Unlock:              q.Get("sytue_unlock") == "1",
+		UnlockKey:           q.Get("sytue_unlock_key"),
 		ClientID:            q.Get("client_id"),
 		RedirectURI:         q.Get("redirect_uri"),
 		ResponseType:        q.Get("response_type"),
@@ -111,9 +117,14 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ¿Hay sesión SSO válida? Si no, ir a login conservando la petición original.
+	// `prompt=login` (OIDC Core §3.1.2.1) obliga a identificarse aunque la haya: es
+	// como una app pide que la persona meta su clave AQUÍ para desbloquear el
+	// cifrado de un dispositivo (ADR 0084). La vuelta ya no lo lleva, o sería un
+	// bucle.
+	volver := uriSinPrompt(r)
 	sess, ok := s.currentSession(r)
-	if !ok {
-		loginURL := "/login/?" + url.Values{"return_to": {r.URL.RequestURI()}}.Encode()
+	if !ok || pidePromptLogin(r) {
+		loginURL := "/login/?" + url.Values{"return_to": {volver}}.Encode()
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}
@@ -144,7 +155,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	// Va ANTES del step-up de MFA a propósito: si hay que reidentificarse
 	// entera, el segundo factor se pide dentro de ese login y no dos veces.
 	if req.MaxAge != nil && time.Since(sess.AuthTime) > time.Duration(*req.MaxAge)*time.Second {
-		loginURL := "/login/?" + url.Values{"return_to": {r.URL.RequestURI()}}.Encode()
+		loginURL := "/login/?" + url.Values{"return_to": {volver}}.Encode()
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}
@@ -198,7 +209,8 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.store.Audit(r.Context(), nil, auditEntry(sess.UserID, sess.OrgID, "oauth.authorize", client.ID, r))
 
-	// Redirigir con el código (y el state intacto).
+	// Redirigir con el código (y el state intacto), o pasar antes por el relevo del
+	// desbloqueo si la app lo pide (desbloqueo.go).
 	u, _ := url.Parse(req.RedirectURI)
 	v := u.Query()
 	v.Set("code", code)
@@ -206,7 +218,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		v.Set("state", req.State)
 	}
 	u.RawQuery = v.Encode()
-	http.Redirect(w, r, u.String(), http.StatusFound)
+	s.entregarCodigo(w, r, req, client, sess, u.String())
 }
 
 // validarAuthz comprueba lo que se puede comprobar de la petición sin sesión:

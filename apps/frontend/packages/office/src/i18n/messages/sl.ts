@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const sl: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Ime lista:',
+  'dialog.sheet.nameTaken':
+    'List z imenom »{name}« že obstaja (imena ne razlikujejo med velikimi in malimi črkami).',
   'dialog.sheet.delete': 'Želite izbrisati list »{name}«? Njegova vsebina bo izgubljena.',
   'dialog.sheet.mergeLoses':
     'Pri spajanju se ohrani le vrednost zgornje leve celice ({ref}); druge celice obsega se izpraznijo. Če želite vse besedilo združiti v tej celici, uporabite »Spoji vsebino«.',

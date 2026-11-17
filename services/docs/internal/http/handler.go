@@ -550,6 +550,10 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, domain.ErrCaducidadPasada):
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("share_expiry_past").
 			WithMessage("The expiry date must be in the future."))
+	case errors.Is(err, domain.ErrHojaGemela):
+		// Antes que ErrInvalidOp, que la envuelve: el cliente sabe por qué y qué hacer.
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("sheet_name_taken").
+			WithMessage("Another sheet already has that name (upper and lower case count as the same)."))
 	case errors.Is(err, domain.ErrTechoInvalido):
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("max_days must be between 0 and 3650."))
 	case errors.Is(err, domain.ErrInvalidKind), errors.Is(err, domain.ErrInvalidRole),

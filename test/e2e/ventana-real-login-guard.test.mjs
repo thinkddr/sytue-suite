@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   autorizarDesktop,
   codigoPublico,
+  enlaceDeConsentimiento,
   validarAutorizacion,
   validarRetorno,
 } from './ventana-real-login-guard.mjs';
@@ -28,8 +29,18 @@ function fake({
   callbackLocation = returned,
   failedGoto = false,
   foreignPost = false,
+  consentPage,
 } = {}) {
-  const calls = { fills: [], gotos: [], posts: [], aborted: 0, closed: 0, otp: 0, organization: 0 };
+  const calls = {
+    fills: [],
+    gotos: [],
+    posts: [],
+    requests: [],
+    aborted: 0,
+    closed: 0,
+    otp: 0,
+    organization: 0,
+  };
   let current;
   let handler;
   let clicks = 0;
@@ -80,9 +91,15 @@ function fake({
     newPage: async () => page,
     request: {
       get: async (value, options) => {
-        assert.equal(value, authorization());
         assert.deepEqual(options, { maxRedirects: 0 });
-        return { headers: () => ({ location: callbackLocation }) };
+        calls.requests.push(value);
+        // Con `consentPage`, la primera vuelta es la pregunta de NAT-02 y no un 302.
+        if (consentPage !== undefined && calls.requests.length === 1) {
+          assert.equal(value, authorization());
+          return { status: () => 200, headers: () => ({}), text: async () => consentPage };
+        }
+        if (consentPage === undefined) assert.equal(value, authorization());
+        return { status: () => 302, headers: () => ({ location: callbackLocation }) };
       },
     },
   };
@@ -233,4 +250,59 @@ test('errores del navegador nunca publican cuerpo, URL, contraseña ni detalles'
     return true;
   });
   assert.equal(codigoPublico(new Error('synthetic-password')), 'login_failed');
+});
+
+// La pantalla de NAT-02 tal como la escribe el IdP: el enlace con `html.EscapeString`.
+const permitir = `${authorization()}&sytue_consent=synthetic-signature`;
+const pantallaConsentimiento = (href = permitir) =>
+  `<main><p class="sub">synthetic@invalid.test</p><a class="cta" href="${href
+    .replace('https://id.sytue.eu', '')
+    .replaceAll(
+      '&',
+      '&amp;',
+    )}">Permitir</a><p class="alt"><a class="btn-link" href="${callback}?error=access_denied&amp;state=synthetic-state">No</a></p></main>`;
+
+test('el consentimiento nativo (NAT-02) solo acepta la misma autorización con su firma', () => {
+  assert.equal(enlaceDeConsentimiento(authorization(), pantallaConsentimiento()), permitir);
+  // El IdP reordena los parámetros (`url.Values.Encode`): el orden no importa.
+  const ordenada = `https://id.sytue.eu/oauth2/authorize?${new URLSearchParams(
+    [...new URL(permitir).searchParams].sort(([a], [b]) => a.localeCompare(b)),
+  )}`;
+  assert.equal(enlaceDeConsentimiento(authorization(), pantallaConsentimiento(ordenada)), ordenada);
+  for (const html of [
+    '<main>sin enlace</main>',
+    pantallaConsentimiento(authorization()),
+    pantallaConsentimiento(`${permitir}&sytue_consent=second`),
+    pantallaConsentimiento(`${permitir}&scope=extra`),
+    pantallaConsentimiento(permitir.replace('synthetic-state', 'other-state')),
+    pantallaConsentimiento(
+      permitir.replace('code_challenge=synthetic-pkce', 'code_challenge=other'),
+    ),
+    pantallaConsentimiento(
+      permitir.replace(encodeURIComponent(callback), 'https%3A%2F%2Fforeign.test%2F'),
+    ),
+    pantallaConsentimiento(permitir.replace('/oauth2/authorize', '/oauth2/other')),
+    pantallaConsentimiento(`${permitir}#private`),
+    `<a class="cta" href="https://foreign.test/oauth2/authorize?${new URL(permitir).search.slice(1).replaceAll('&', '&amp;')}">`,
+    `<a class="cta" href="//foreign.test/oauth2/authorize?${new URL(permitir).search.slice(1).replaceAll('&', '&amp;')}">`,
+  ])
+    assert.throws(
+      () => enlaceDeConsentimiento(authorization(), html),
+      /native_consent|authorization/,
+    );
+});
+
+test('con la pregunta de NAT-02 el login dice que sí y entrega el callback', async () => {
+  const { context, calls } = fake({ consentPage: pantallaConsentimiento() });
+  assert.equal(await autorizarDesktop(context, authorization(), options()), returned);
+  assert.deepEqual(calls.requests, [authorization(), permitir]);
+  assert.equal(calls.closed, 1);
+});
+
+test('un «Permitir» que no es esta autorización no se sigue', async () => {
+  const { context, calls } = fake({
+    consentPage: pantallaConsentimiento(permitir.replace('synthetic-state', 'other-state')),
+  });
+  await assert.rejects(autorizarDesktop(context, authorization(), options()), /native_consent/);
+  assert.deepEqual(calls.requests, [authorization()]);
 });

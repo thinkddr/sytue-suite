@@ -518,6 +518,7 @@
   "dialog.merge.reset": "Das Dokument wird durch {total} zusammengeführte Kopien ersetzt. Vorlage und Datenquelle gehen verloren. Fortfahren?",
   "dialog.sheet.delete": "Blatt „{name}“ löschen? Der Inhalt geht verloren.",
   "dialog.sheet.mergeLoses": "Beim Verbinden bleibt nur der Wert der Zelle oben links ({ref}) erhalten; die übrigen Zellen des Bereichs werden geleert. Um alle Texte in dieser Zelle zusammenzuführen, verwenden Sie „Inhalte verbinden“.",
+  "dialog.sheet.nameTaken": "Es gibt bereits ein Blatt namens „{name}“ (Namen unterscheiden nicht zwischen Groß- und Kleinschreibung).",
   "dialog.sheet.rename": "Name des Blatts:",
   "dialog.slide.delete": "Folie {n} löschen?",
   "doc.msg.exportFailed": "Export nicht möglich",

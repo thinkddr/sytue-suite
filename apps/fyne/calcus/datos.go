@@ -236,7 +236,9 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 		}
 		return Celda{C: n, F: k.F}, ok
 	}
+	l.antesDeEstructura(true)
 	l.anotar()
+	l.pasado[len(l.pasado)-1].estructural = true
 	h := l.h()
 	// Solo se mueven las referencias que apuntan a esta hoja, estén donde estén.
 	d.Hoja = h.nombre
@@ -278,6 +280,7 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	}
 	l.f.nombres = moverNombres(l.f.nombres, h.nombre, l.f.hojas[0].nombre, d)
 	l.restaurar(l.f)
+	l.trasEstructura(true)
 }
 
 // moverReferenciasAjenas es `moverReferenciasAjenas` de refshift.ts: en una hoja que NO
@@ -390,11 +393,12 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 // sigue a la hoja de la que lee (la suya, o `SourceSheet`, comparado tal cual como en
 // hojaOrigen) y, en la hoja que la aloja (`propia`), su esquina y lo que ocupó. Sin
 // origen, o sin esquina ni nada de lo que ocupaba, desaparece; sin esquina pero con
-// algo de lo que ocupaba, pasa a la primera celda que queda. Con la hoja protegida no se
-// toca: el servidor veta cualquier cambio de `pivots`. Devuelve la misma lista si nada
-// cambia (la foto de deshacer la comparte).
+// algo de lo que ocupaba, pasa a la primera celda que queda. Con la hoja protegida se
+// mueve igual: seguir a sus datos no es cambiarla, y el servidor acepta exactamente este
+// desplazamiento (apps/nucleo/office/model/proteccion_dinamicas.go). Devuelve la misma
+// lista si nada cambia (la foto de deshacer la comparte).
 func moverDinamicas(h *hojaLibro, d formula.Desplazamiento, propia bool) []analisis.Dinamica {
-	if len(h.dinamicas) == 0 || h.proteccion != nil {
+	if len(h.dinamicas) == 0 {
 		return h.dinamicas
 	}
 	vivo := func(ref string) (string, bool) {

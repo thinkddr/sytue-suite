@@ -368,6 +368,16 @@ func seccionEsqueleto(v tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 	filasConAvatar := ui.NuevasFilasEsqueleto(2, ui.DelanteroAvatar, 2)
 	filasConAvatar.Meta = []ui.MetaEsqueleto{{Ancho: 42}}
 	filasConAvatar.Filete = true
+	// La tesela, con cabecera de columnas (el `header` de la lista de Drive): rótulo a la
+	// izquierda, dos columnas a la derecha y su filete, latiendo con las filas.
+	filasConCabecera := ui.NuevasFilasEsqueleto(1, ui.DelanteroTesela, 1).ConCabecera(ui.CabeceraEsqueleto{
+		Alto:      2*tema.Espacio(2.5) + 0.6*tema.Rem + tema.Borde,
+		Filete:    true,
+		Rotulo:    ui.MetaEsqueleto{Ancho: 56, Alto: 0.6 * tema.Rem},
+		Meta:      []ui.MetaEsqueleto{{Ancho: 48, Alto: 0.6 * tema.Rem}, {Ancho: 72, Alto: 0.6 * tema.Rem}},
+		HuecoMeta: 2 * tema.Espacio(4),
+	})
+	filasConCabecera.Meta = []ui.MetaEsqueleto{{Ancho: 44}, {Ancho: 76}}
 	// Lo que no son filas: una semana de la rejilla del mes de Calendar —el círculo del
 	// número, que no se estira con la celda— y dos líneas, una de ancho fijo y otra a una
 	// fracción del ancho. Cada grupo late a una con un solo «Cargando».
@@ -386,7 +396,7 @@ func seccionEsqueleto(v tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 		fila(ancho(420, columna(tema.Espacio(2), ui.NuevoEsqueletoFraccion(1, 12), ui.NuevoEsqueletoFraccion(0.6, 12))),
 			ancho(220, rejilla), ancho(140, lineas)),
 		rotulo("Filas de carga de una lista (SkeletonRows)"),
-		fila(ancho(360, filasConAvatar), ancho(300, ui.NuevasFilasEsqueleto(2, ui.DelanteroTesela, 1))),
+		fila(ancho(340, filasConAvatar), ancho(420, filasConCabecera)),
 		rotulo("Rueda"),
 		fila(ui.NuevaRueda(20, "primary", v), ui.NuevaRueda(28, "text-muted", v))), nil
 }

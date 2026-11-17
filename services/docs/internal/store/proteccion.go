@@ -226,6 +226,9 @@ func protegerEnTx(ctx context.Context, tx pgx.Tx, docID string, kind domain.Kind
 	}
 	p := domain.ProteccionDe(ctx)
 	p.Quien = quien // de la sesión, no del cuerpo: es lo que decide los rangos editables
+	// Lo guardado, por si el lote trae hojas gemelas (domain.ErrHojaGemela): solo se lee
+	// entonces, y con el documento ya bloqueado.
+	p.Vigente = func() (json.RawMessage, error) { return valorVigente(ctx, tx, docID, "doc:sheet") }
 	var res domain.ResultadoProteccion
 	switch kind {
 	case domain.KindDocument:

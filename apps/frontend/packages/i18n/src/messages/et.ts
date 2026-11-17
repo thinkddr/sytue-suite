@@ -13,20 +13,10 @@ export const et: Catalog = {
     'Saan aru, et võin kaotada juurdepääsu varasematele krüpteeritud sõnumitele',
   'matrix.unknownKey':
     'See konto krüptiti enne, kui Sytue kaitses selle võtit sinu sisselogimisega. Kinnita see seade teisest seadmest, kuhu oled juba sisse loginud.',
-  'matrix.unlockTitle': 'Ava oma krüptitud andmed',
-  'matrix.unlockBody':
-    'Kinnita pääsuvõtme või Sytue parooliga, et see oled sina. Kontroll toimub selles seadmes: keegi teine ei saa sinu andmeid avada.',
-  'matrix.protectTitle': 'Kaitse oma krüptitud andmeid',
-  'matrix.protectBody':
-    'Vali, kuidas avad oma krüptitud andmed teistes seadmetes: pääsuvõtme või Sytue parooliga. Ainult sina saad neid avada.',
-  'matrix.usePasskey': 'Kasuta pääsuvõtit',
-  'matrix.usePassword': 'Kasuta parooli',
-  'matrix.password': 'Sytue parool',
-  'matrix.passwordConfirm': 'Korda parooli',
-  'matrix.passwordMismatch': 'Paroolid ei ühti.',
-  'matrix.unlockWrong': 'See ei õnnestunud. Proovi uuesti.',
-  'matrix.passkeyUnsupported':
-    'Selle pääsuvõtmega ei saa krüptitud andmeid avada. Kasuta oma parooli.',
+  'matrix.unlocking': 'Sinu krüpteeritud andmete avamine…',
+  'matrix.signIn': 'Logi sisse Sytue ID-sse',
+  'matrix.signInBody':
+    'Sisselogimine Sytue ID-sse avab sinu krüpteeritud andmed selles seadmes. Logi uuesti sisse oma parooli või pääsuvõtmega, et need siin avada.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Luba krüpteeritud töötlemine',
   'matrix.allowStorageBody':

@@ -518,6 +518,7 @@
   "dialog.merge.reset": "Asiakirja korvataan {total} yhdistetyllä kopiolla. Malli ja tietolähde menetetään. Jatketaanko?",
   "dialog.sheet.delete": "Poistetaanko taulukko ”{name}”? Sen sisältö menetetään.",
   "dialog.sheet.mergeLoses": "Yhdistettäessä säilyy vain vasemman yläsolun ({ref}) arvo; alueen muut solut tyhjennetään. Jos haluat koota kaikki tekstit tähän soluun, valitse ”Yhdistä sisältö”.",
+  "dialog.sheet.nameTaken": "Taulukko nimeltä ”{name}” on jo olemassa (nimissä isoja ja pieniä kirjaimia ei eroteta).",
   "dialog.sheet.rename": "Taulukon nimi:",
   "dialog.slide.delete": "Poistetaanko dia {n}?",
   "doc.msg.exportFailed": "Vienti epäonnistui",

@@ -21,7 +21,7 @@
  * cursor de la cola puede caer en la fila vecina hasta que su dueño vuelva a moverse.
  * Mover filas sin insertar ni borrar (ordenar) no cambia ids.
  */
-import type { SheetData } from '../types';
+import type { SheetData, SheetModel } from '../types';
 
 /** Identidad de una fila o de una columna. */
 export interface Ancla {
@@ -119,4 +119,25 @@ export function conEstructura(
   const e = eje === 'fila' ? ejeFilas(s) : ejeColumnas(s);
   const r = cantidad > 0 ? insertar(e, desde, cantidad) : quitar(e, desde, -cantidad);
   return eje === 'fila' ? { rowIds: r.ids, rowBase: r.base } : { colIds: r.ids, colBase: r.base };
+}
+
+/** ¿Nombran las mismas filas (o columnas) los dos ejes? */
+const mismoEje = (x: Eje, y: Eje): boolean =>
+  (x.base ?? 0) === (y.base ?? 0) &&
+  (x.ids?.length ?? 0) === (y.ids?.length ?? 0) &&
+  (x.ids ?? []).every((a, i) => a.id === y.ids?.[i]?.id);
+
+/**
+ * ¿Se han insertado o borrado filas o columnas en alguna hoja de `a` a `b`? Es lo único que
+ * cambia sus anclas (`conEstructura`), y deshacerlo o rehacerlo las devuelve, así que sirve
+ * también para el historial. Añadir, quitar, renombrar o reordenar hojas no desplaza
+ * celdas y no cuenta.
+ */
+export function estructuraDistinta(a: SheetModel, b: SheetModel): boolean {
+  if (a.sheets.length !== b.sheets.length) return false;
+  return b.sheets.some((s, i) => {
+    const p = a.sheets[i];
+    if (!p || p === s || p.name !== s.name) return false;
+    return !mismoEje(ejeFilas(p), ejeFilas(s)) || !mismoEje(ejeColumnas(p), ejeColumnas(s));
+  });
 }

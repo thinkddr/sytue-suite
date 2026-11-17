@@ -416,6 +416,16 @@ type RawRef = {
 const TABLE_NAME_CH = /[A-Za-z0-9_$.]/;
 
 /**
+ * ¿Es de otro libro la hoja de una referencia? `extractRefs` la da con su libro delante
+ * («[Libro.xlsx]Ventas», o «C:\ruta\[Libro.xlsx]Ventas» en la forma entrecomillada).
+ * Excel no admite corchetes en el nombre de una hoja, así que bastan ellos para saberlo.
+ */
+export function esDeOtroLibro(sheet: string): boolean {
+  const i = sheet.indexOf('[');
+  return i >= 0 && sheet.indexOf(']', i + 1) >= 0;
+}
+
+/**
  * Extrae las referencias y rangos de una fórmula («=…») con sus posiciones y un
  * color por referencia DISTINTA (misma celda/rango y hoja → mismo color,
  * ignorando el anclaje «$»). Ignora lo que va dentro de cadenas y los nombres de
@@ -455,6 +465,15 @@ export function extractRefs(text: string, resolveStructured?: StructuredResolver
     if (prev?.t === 'bang' && (prev2?.t === 'word' || prev2?.t === 'qsheet')) {
       start = prev2.start;
       sheet = sheetNameOf(prev2);
+      // «[Libro.xlsx]Ventas!B4» (o «[1]Ventas!B4», como lo guarda un .xlsx) es la hoja
+      // «Ventas» de OTRO libro: su hoja es «[Libro.xlsx]Ventas», la misma que da la forma
+      // entrecomillada '[Libro.xlsx]Ventas'!B4, y no la «Ventas» de este. Tomarla por la
+      // de aquí la movía al insertar filas en esta (y la resaltaba en ella).
+      const libro = brackets.find((s) => s.close === prev2.start - 1);
+      if (libro) {
+        start = libro.open;
+        sheet = text.slice(libro.open, prev2.start) + sheet;
+      }
     }
 
     // Extensión de rango: «:» + segundo extremo del MISMO tipo (celda/col/fila);

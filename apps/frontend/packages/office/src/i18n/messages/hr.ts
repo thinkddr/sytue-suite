@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const hr: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Naziv lista:',
+  'dialog.sheet.nameTaken':
+    'List naziva „{name}” već postoji (nazivi ne razlikuju velika i mala slova).',
   'dialog.sheet.delete': 'Izbrisati list „{name}”? Njegov sadržaj bit će izgubljen.',
   'dialog.sheet.mergeLoses':
     'Pri spajanju zadržava se samo vrijednost gornje lijeve ćelije ({ref}); ostale ćelije raspona se prazne. Da biste sav tekst objedinili u toj ćeliji, upotrijebite „Spoji sadržaj”.',

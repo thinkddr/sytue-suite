@@ -11,19 +11,10 @@ export const it: Catalog = {
   'matrix.resetUnderstood': 'Capisco che potrei perdere l’accesso ai messaggi cifrati precedenti',
   'matrix.unknownKey':
     'Questo account è stato cifrato prima che Sytue proteggesse la sua chiave con il tuo accesso. Verifica questo dispositivo da un altro su cui hai già effettuato l’accesso.',
-  'matrix.unlockTitle': 'Apri i tuoi dati cifrati',
-  'matrix.unlockBody':
-    'Conferma che sei tu con la tua passkey o con la password di Sytue. Il controllo avviene su questo dispositivo: nessun altro può aprire i tuoi dati.',
-  'matrix.protectTitle': 'Proteggi i tuoi dati cifrati',
-  'matrix.protectBody':
-    'Scegli come aprirai i tuoi dati cifrati sugli altri dispositivi: con la tua passkey o con la password di Sytue. Solo tu potrai aprirli.',
-  'matrix.usePasskey': 'Usa passkey',
-  'matrix.usePassword': 'Usa password',
-  'matrix.password': 'Password di Sytue',
-  'matrix.passwordConfirm': 'Ripeti la password',
-  'matrix.passwordMismatch': 'Le password non coincidono.',
-  'matrix.unlockWrong': 'Non ha funzionato. Riprova.',
-  'matrix.passkeyUnsupported': 'Questa passkey non può aprire i dati cifrati. Usa la password.',
+  'matrix.unlocking': 'Sblocco dei tuoi dati cifrati…',
+  'matrix.signIn': 'Accedi a Sytue ID',
+  'matrix.signInBody':
+    'L’accesso a Sytue ID sblocca i tuoi dati cifrati su questo dispositivo. Accedi di nuovo con la password o la passkey per aprirli qui.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Consenti l’elaborazione cifrata',
   'matrix.allowStorageBody':

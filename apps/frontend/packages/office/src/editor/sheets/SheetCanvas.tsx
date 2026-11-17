@@ -43,6 +43,8 @@ import {
   accionDeTeclaEnPestana,
   conColorDePestana,
   esTeclaDeMenu,
+  hojaGemela,
+  nombreLibreDeHoja,
   opcionesDePestana,
 } from './pestana.js';
 import {
@@ -258,7 +260,7 @@ import {
   tramoPorPosiciones,
   type Vista,
 } from './rejilla';
-import { conEstructura } from './anclas';
+import { conEstructura, estructuraDistinta } from './anclas';
 import {
   combinarHoja,
   combinarPierdeDatos,
@@ -1844,12 +1846,23 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
    * `anota` es false SOLO cuando el cambio viene de deshacer o rehacer: si no,
    * deshacer se anotaría a sí mismo y Ctrl+Z se quedaría rebotando entre los dos
    * últimos estados sin llegar nunca al tercero.
+   *
+   * Un cambio de ESTRUCTURA —insertar o borrar filas o columnas, `estructural`, o
+   * deshacerlo o rehacerlo, que se ve en las anclas— va en su propio guardado, sin lo
+   * pendiente de antes y sin otro igual detrás (`onContentInput` con `aparte`): en una
+   * hoja protegida el servidor solo reconoce UN desplazamiento por guardado
+   * (apps/nucleo/office/model/proteccion_ajenas.go), y dos inserciones en el mismo
+   * autoguardado se rechazaban.
    */
-  const apply = (next: SheetModel, anota = true): void => {
-    if (anota) historialRef.current = anotar(historialRef.current, stateRef.current.model);
+  const apply = (next: SheetModel, anota = true, estructural = false): void => {
+    const prev = stateRef.current.model;
+    if (anota) historialRef.current = anotar(historialRef.current, prev);
     stateRef.current.model = next; // coherencia dentro del mismo tick
     setModel(next);
-    stateRef.current.ctx.onContentInput(JSON.stringify(next));
+    stateRef.current.ctx.onContentInput(
+      JSON.stringify(next),
+      estructural || estructuraDistinta(prev, next),
+    );
   };
 
   const irAtras = (): void => {
@@ -3004,6 +3017,8 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         },
         moverNombres(cur.model.names, s.name, first, desplazamiento),
       ),
+      true,
+      true,
     );
     setExt(null);
   };
@@ -6103,17 +6118,17 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
 
   const addSheet = (): void => {
     if (!guardStructure()) return;
+    // «Hoja N» con N el número de hojas más uno; si ya hay una que se llama así, aunque
+    // sea con otras mayúsculas, el siguiente número libre (Excel no deja tener las dos).
+    const name = nombreLibreDeHoja(
+      model.sheets.map((s) => s.name),
+      (n) => t('sheet.defaultName', { n }),
+      model.sheets.length + 1,
+    );
     apply({
       ...model,
       active: model.sheets.length,
-      sheets: [
-        ...model.sheets,
-        {
-          id: nuevoIdHoja(),
-          name: t('sheet.defaultName', { n: model.sheets.length + 1 }),
-          cells: {},
-        },
-      ],
+      sheets: [...model.sheets, { id: nuevoIdHoja(), name, cells: {} }],
     });
     setSel({ c: 0, r: 0 });
     setExt(null);
@@ -6126,13 +6141,27 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     if (ctx.soloLectura || !guardStructure()) return;
     const current = model.sheets[i];
     if (!current) return;
+    // El nombre de otra hoja salvo mayúsculas («VENTAS» con una «Ventas») no se acepta:
+    // se dice bajo el campo y Guardar se apaga. El suyo propio sí (no cambia nada).
+    const nombres = model.sheets.map((s) => s.name);
+    const gemela = (nombre: string): string | null => {
+      const j = nombre === current.name ? -1 : hojaGemela(nombres, nombre, i);
+      return j < 0 ? null : editorT()('dialog.sheet.nameTaken', { name: nombres[j] ?? '' });
+    };
     const name = (
       await preguntarEnEditor({
         mensaje: editorT()('dialog.sheet.rename'),
         valor: current.name,
+        validar: gemela,
       })
     )?.trim();
     if (!name || name === current.name) return;
+    // Sin el diálogo montado la pregunta cae en `window.prompt`, que no valida.
+    const aviso = gemela(name);
+    if (aviso) {
+      notify({ tone: 'warning', title: aviso });
+      return;
+    }
     apply(
       withNames(
         { ...model, sheets: model.sheets.map((s, j) => (j === i ? { ...s, name } : s)) },
@@ -6147,16 +6176,15 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     if (!guardStructure()) return;
     const src = model.sheets[model.active];
     if (!src) return;
-    // Nombre único: el motor de fórmulas indexa las hojas por nombre.
-    const names = new Set(model.sheets.map((s) => s.name));
-    let n = 2;
-    while (names.has(`${src.name} (${n})`)) n++;
+    // Nombre único, también salvo mayúsculas: el motor de fórmulas indexa las hojas por
+    // nombre, y una «DATOS (2)» ya ocupa «Datos (2)».
+    const name = nombreLibreDeHoja(
+      model.sheets.map((s) => s.name),
+      (n) => `${src.name} (${n})`,
+      2,
+    );
     // structuredClone copia en profundidad cells+formats+condFormats+freeze+charts.
-    const copy: SheetData = {
-      ...structuredClone(src),
-      id: nuevoIdHoja(),
-      name: `${src.name} (${n})`,
-    };
+    const copy: SheetData = { ...structuredClone(src), id: nuevoIdHoja(), name };
     if (copy.charts) copy.charts = copy.charts.map((ch) => ({ ...ch, id: crypto.randomUUID() }));
     if (copy.slicers) copy.slicers = copy.slicers.map((sl) => ({ ...sl, id: crypto.randomUUID() }));
     // ponytail: los nombres de hoja del original no se duplican con ella.

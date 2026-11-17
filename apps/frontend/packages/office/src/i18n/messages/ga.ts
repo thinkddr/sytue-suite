@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const ga: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Ainm na bileoige:',
+  'dialog.sheet.nameTaken':
+    'Tá bileog darb ainm “{name}” ann cheana (ní dhéanann na hainmneacha idirdhealú idir cás uachtair agus cás íochtair).',
   'dialog.sheet.delete': 'Scrios an bhileog “{name}”? Caillfear a hábhar.',
   'dialog.sheet.mergeLoses':
     'Nuair a chumasctar, ní choinnítear ach luach na cille ar barr ar chlé ({ref}); glantar na cealla eile sa raon. Chun an téacs ar fad a chur le chéile sa chill sin, úsáid “Cumaisc an t-ábhar”.',

@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const pl: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Nazwa arkusza:',
+  'dialog.sheet.nameTaken':
+    'Arkusz o nazwie „{name}” już istnieje (nazwy nie rozróżniają wielkich i małych liter).',
   'dialog.sheet.delete': 'Usunąć arkusz „{name}”? Jego zawartość zostanie utracona.',
   'dialog.sheet.mergeLoses':
     'Przy scalaniu zostaje tylko wartość lewej górnej komórki ({ref}); pozostałe komórki zakresu zostaną wyczyszczone. Aby połączyć cały tekst w tej komórce, użyj opcji „Scal zawartość”.',

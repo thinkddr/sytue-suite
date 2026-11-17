@@ -13,20 +13,10 @@ export const pt: Catalog = {
     'Compreendo que posso perder o acesso às mensagens encriptadas anteriores',
   'matrix.unknownKey':
     'Esta conta foi encriptada antes de a Sytue proteger a sua chave com o teu início de sessão. Verifica este dispositivo a partir de outro em que já tenhas sessão iniciada.',
-  'matrix.unlockTitle': 'Abrir os teus dados encriptados',
-  'matrix.unlockBody':
-    'Confirma que és tu com a tua chave de acesso ou a tua palavra-passe da Sytue. A verificação é feita neste dispositivo: mais ninguém pode abrir os teus dados.',
-  'matrix.protectTitle': 'Proteger os teus dados encriptados',
-  'matrix.protectBody':
-    'Escolhe como vais abrir os teus dados encriptados nos teus outros dispositivos: com a tua chave de acesso ou a tua palavra-passe da Sytue. Só tu os poderás abrir.',
-  'matrix.usePasskey': 'Usar chave de acesso',
-  'matrix.usePassword': 'Usar palavra-passe',
-  'matrix.password': 'Palavra-passe da Sytue',
-  'matrix.passwordConfirm': 'Repete a palavra-passe',
-  'matrix.passwordMismatch': 'As palavras-passe não coincidem.',
-  'matrix.unlockWrong': 'Não funcionou. Tenta novamente.',
-  'matrix.passkeyUnsupported':
-    'Esta chave de acesso não consegue abrir dados encriptados. Usa a tua palavra-passe.',
+  'matrix.unlocking': 'A desbloquear os teus dados encriptados…',
+  'matrix.signIn': 'Iniciar sessão no Sytue ID',
+  'matrix.signInBody':
+    'O teu início de sessão no Sytue ID desbloqueia os teus dados encriptados neste dispositivo. Inicia sessão de novo com a tua palavra-passe ou chave de acesso para os abrires aqui.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Permitir o processamento cifrado',
   'matrix.allowStorageBody':

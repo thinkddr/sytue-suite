@@ -13,8 +13,9 @@ import (
 )
 
 // El paso de confirmación avisa de lo que se pierde y no deja restablecer sin
-// marcar la casilla, como el modal de la web. Pide la contraseña que envolverá la
-// clave nueva (dos veces) y nunca enseña ni pide la clave de recuperación.
+// marcar la casilla, como el modal de la web. No pide nada (la clave nueva se
+// envuelve con la clave de desbloqueo de Sytue ID, ADR 0084) y nunca enseña ni pide
+// la clave de recuperación.
 func TestRestablecerPideConfirmacionExplicita(t *testing.T) {
 	sa, _, _ := salaEn(t, &servicioFalso{}, 640)
 	c := NuevoCifrado(sa, nil, mx.Config{}, nil)
@@ -31,17 +32,10 @@ func TestRestablecerPideConfirmacionExplicita(t *testing.T) {
 	if casilla == nil || casilla.Etiqueta != c.t("matrix.resetUnderstood") || casilla.Marcada {
 		t.Fatal("falta la casilla de «Entiendo…» sin marcar")
 	}
-	var campos int
 	for _, o := range cuerpo {
 		if e, ok := o.(*ui.Entrada); ok {
-			campos++
-			if l := e.AccessibilityLabel(); l != c.t("matrix.password") && l != c.t("matrix.passwordConfirm") {
-				t.Fatalf("restablecer pide %q", l)
-			}
+			t.Fatalf("restablecer pide %q: aquí no se teclea nada", e.AccessibilityLabel())
 		}
-	}
-	if campos != 2 {
-		t.Fatalf("restablecer pide %d campos; quiero la contraseña y su repetición", campos)
 	}
 	accion := pie[0].(*ui.Boton)
 	if accion.Texto != c.t("matrix.resetAction") || accion.Variante != ui.Peligro || !accion.Inerte {

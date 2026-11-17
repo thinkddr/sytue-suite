@@ -36,7 +36,7 @@
 import type { SheetAutoFilter, SheetData, SheetGroup } from '../types';
 import type { FilterView } from './filtro';
 import type { SheetPivot } from './pivot';
-import { extractRefs } from './formula-edit';
+import { esDeOtroLibro, extractRefs } from './formula-edit';
 import {
   escapeHtml,
   isFormula,
@@ -220,6 +220,8 @@ export function reescribirFormula(
   if (refs.length === 0) return texto;
   let out = texto;
   for (const r of [...refs].sort((x, y) => y.start - x.start)) {
+    // Una referencia a otro libro apunta a SUS filas, que aquí no se mueven nunca.
+    if (r.sheet !== undefined && esDeOtroLibro(r.sheet)) continue;
     const de = r.sheet ?? base;
     if (d.hoja !== undefined && (de === undefined || !mismaHoja(de, d.hoja))) continue;
     const nuevo = moverReferencia(r.text, d);
@@ -372,16 +374,18 @@ export function moverVista(v: FilterView, d: Desplazamiento): FilterView {
  * sus segmentaciones pasan a «inactivas»); si solo se borra su esquina, pasa a la primera
  * celda que queda de lo que ocupaba.
  *
- * Con la hoja que la ALOJA protegida no se toca: el servidor veta cualquier cambio de
- * `pivots` (camposSiempreVetados, apps/nucleo/office/model/proteccion.go) y rechazaría el
- * guardado entero. Devuelve la misma lista si nada cambia.
+ * Con la hoja que la aloja PROTEGIDA se mueve igual: no se puede crear ni cambiar una
+ * tabla dinámica, pero seguir a sus datos no es cambiarla, y el servidor acepta
+ * exactamente este desplazamiento y nada más (apps/nucleo/office/model/
+ * proteccion_dinamicas.go). Dejarla quieta la dejaba leyendo una fila de más o de menos.
+ * Devuelve la misma lista si nada cambia.
  */
 function moverDinamicas(
   s: SheetData,
   d: Desplazamiento,
   propia: boolean,
 ): SheetPivot[] | undefined {
-  if (!s.pivots || s.protect) return s.pivots;
+  if (!s.pivots) return s.pivots;
   const vivo = (ref: string): string | null => {
     const r = moverReferencia(ref, d);
     return r === REF_ROTA ? null : r;

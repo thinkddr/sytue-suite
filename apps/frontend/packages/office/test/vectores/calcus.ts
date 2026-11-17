@@ -345,6 +345,10 @@ const REFS: string[] = [
   '=B2:B5+Ventas[Ventas]*Hoja2!C3',
   '=Foo[Bar]+Ventas[Region]',
   '=Ventas[Coste',
+  // Las de otro libro llevan su libro en la hoja: no son la «Ventas» de este.
+  '=[Libro.xlsx]Ventas!B4+Ventas!B4',
+  "='[Libro.xlsx]Hoja2'!C3*2",
+  '=SUM([1]Ventas!A1:B9)',
 ];
 
 const MINIS: { valores: number[]; tipo: Sparkline['type'] }[] = [
@@ -880,6 +884,17 @@ const HOJA_OBJETOS: SheetData = {
     },
   ],
 };
+/**
+ * La misma hoja de las tablas dinámicas, PROTEGIDA con los permisos estructurales: se
+ * mueven igual, porque el servidor acepta exactamente este desplazamiento
+ * (apps/nucleo/office/model/proteccion_dinamicas.go).
+ */
+const HOJA_DINAMICAS_PROTEGIDA: SheetData = {
+  name: 'H',
+  cells: {},
+  protect: { insertRows: true, deleteRows: true, insertCols: true, deleteCols: true },
+  pivots: HOJA_OBJETOS.pivots ?? [],
+};
 const DESPLAZAMIENTOS: Desplazamiento[] = [
   { eje: 'fila', desde: 3, cantidad: 1, tope: 100 },
   { eje: 'fila', desde: 0, cantidad: 2, tope: 100 },
@@ -905,6 +920,9 @@ const HOJAS_AJENAS: SheetData[] = [
       A4: "='Hoja 2'!C3+Hoja2!C3",
       A5: '=Ventas!B4:B6',
       A6: 'Ventas!B4',
+      // Las de otro libro no se mueven nunca.
+      A7: '=[Libro.xlsx]Ventas!B4+Ventas!B4',
+      A8: "='[Libro.xlsx]Ventas'!B4",
     },
     condFormats: [{ range: 'A1:A3', kind: 'formula', formula: '=A1>Ventas!$B$4', fill: '#FFEB9C' }],
     validations: [
@@ -939,6 +957,18 @@ const HOJAS_AJENAS: SheetData[] = [
     styles: { A2: { locked: false } },
     protect: {},
     validations: [{ range: 'C1', type: 'formula', formula: '=Ventas!$B$4>0' }],
+    // Protegida, la que lee de «Ventas» también mueve su origen.
+    pivots: [
+      {
+        name: 'TD1',
+        source: 'A2:B8',
+        sourceSheet: 'Ventas',
+        anchor: 'E1',
+        rows: [{ field: 0 }],
+        cols: [],
+        values: [{ field: 1, fn: 'sum' }],
+      },
+    ],
   },
 ];
 const DESPLAZAMIENTOS_AJENOS: Desplazamiento[] = [
@@ -1047,6 +1077,13 @@ export function calcularVectores(): unknown {
           },
         };
       }),
+    },
+    dinamicasProtegidas: {
+      hoja: HOJA_DINAMICAS_PROTEGIDA,
+      casos: DESPLAZAMIENTOS.map((d) => ({
+        d,
+        sale: moverObjetos(HOJA_DINAMICAS_PROTEGIDA, d).pivots ?? null,
+      })),
     },
     referenciasAjenas: {
       hojas: HOJAS_AJENAS,

@@ -316,7 +316,11 @@ func TestElRelojEsElAudio(t *testing.T) {
 	if p := r.Posicion(); p != 500*time.Millisecond {
 		t.Errorf("tras 25 tramos el reloj está en %v y deberían ser 500 ms", p)
 	}
-	esperar(t, func() bool { mu.Lock(); defer mu.Unlock(); return vistos[len(vistos)-1] >= 400*time.Millisecond }, "fotogramas hasta los 400 ms")
+	esperar(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(vistos) > 0 && vistos[len(vistos)-1] >= 400*time.Millisecond
+	}, "fotogramas hasta los 400 ms")
 	mu.Lock()
 	ultimo := vistos[len(vistos)-1]
 	mu.Unlock()
@@ -362,7 +366,11 @@ func TestElReproductorAVelocidadDoble(t *testing.T) {
 	if p := r.Posicion(); p != time.Second {
 		t.Errorf("tras 25 tramos a 2× el reloj está en %v y debería ser 1 s", p)
 	}
-	esperar(t, func() bool { mu.Lock(); defer mu.Unlock(); return vistos[len(vistos)-1] >= 900*time.Millisecond }, "fotogramas hasta los 900 ms")
+	esperar(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(vistos) > 0 && vistos[len(vistos)-1] >= 900*time.Millisecond
+	}, "fotogramas hasta los 900 ms")
 	mu.Lock()
 	if ultimo := vistos[len(vistos)-1]; ultimo > time.Second {
 		t.Errorf("se ha enseñado un fotograma de %v con el reloj en 1 s", ultimo)

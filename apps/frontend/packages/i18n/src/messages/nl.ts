@@ -13,20 +13,10 @@ export const nl: Catalog = {
     'Ik begrijp dat ik de toegang tot eerdere versleutelde berichten kan verliezen',
   'matrix.unknownKey':
     'Dit account werd versleuteld voordat Sytue de sleutel met je aanmelding beschermde. Verifieer dit apparaat vanaf een ander apparaat waarop je al bent aangemeld.',
-  'matrix.unlockTitle': 'Je versleutelde gegevens openen',
-  'matrix.unlockBody':
-    'Bevestig met je passkey of je Sytue-wachtwoord dat jij het bent. Dit wordt op dit apparaat gecontroleerd: niemand anders kan je gegevens openen.',
-  'matrix.protectTitle': 'Je versleutelde gegevens beschermen',
-  'matrix.protectBody':
-    'Kies hoe je je versleutelde gegevens op je andere apparaten opent: met je passkey of je Sytue-wachtwoord. Alleen jij kunt ze openen.',
-  'matrix.usePasskey': 'Passkey gebruiken',
-  'matrix.usePassword': 'Wachtwoord gebruiken',
-  'matrix.password': 'Sytue-wachtwoord',
-  'matrix.passwordConfirm': 'Herhaal het wachtwoord',
-  'matrix.passwordMismatch': 'De wachtwoorden komen niet overeen.',
-  'matrix.unlockWrong': 'Dat werkte niet. Probeer het opnieuw.',
-  'matrix.passkeyUnsupported':
-    'Deze passkey kan geen versleutelde gegevens openen. Gebruik je wachtwoord.',
+  'matrix.unlocking': 'Je versleutelde gegevens worden ontgrendeld…',
+  'matrix.signIn': 'Aanmelden bij Sytue ID',
+  'matrix.signInBody':
+    'Je aanmelding bij Sytue ID ontgrendelt je versleutelde gegevens op dit apparaat. Meld je opnieuw aan met je wachtwoord of passkey om ze hier te openen.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Versleutelde verwerking toestaan',
   'matrix.allowStorageBody':

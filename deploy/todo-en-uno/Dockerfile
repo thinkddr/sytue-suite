@@ -28,7 +28,7 @@
 # vive en /datos: borrar el contenedor no borra la suite; borrar el volumen, sí.
 FROM docker:29-dind
 
-RUN apk add --no-cache bash coreutils curl findutils grep make mkcert nss-tools openssl perl sed tini
+RUN apk add --no-cache bash coreutils curl findutils grep make mkcert nss-tools openssl perl python3 sed tini
 
 WORKDIR /opt/sytue-suite
 COPY . .

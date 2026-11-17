@@ -33,9 +33,9 @@ your administrator and verifies that everything responds. When it finishes, sign
 
 Full guide, credentials, day-to-day use and troubleshooting: **[`QUICKSTART.md`](QUICKSTART.md)**.
 
-> The local setup does not yet include the encrypted messaging server (Matrix) that
-> the apps with on-device encrypted data depend on: today Admin, Web, Cloud
-> and Cast work. Details in [`QUICKSTART.md` § 3](QUICKSTART.md#3-entrar).
+> The installer now embeds the Matrix server (Synapse) that the apps with on-device
+> encrypted data use, in every mode (local, single server and all-in-one container).
+> Some of those apps are still being finished: see [`QUICKSTART.md` § 3](QUICKSTART.md#3-entrar).
 
 ---
 
@@ -56,10 +56,10 @@ On the server and in the single container you also choose **who uses it**: `--us
 Sytue Admin and, with `--registro-abierto`, anyone can create an account). You can change it
 whenever you want by running the wizard again, without touching the data.
 
-**Optional add-ons** (they do not take features away from the other apps): ERP (`--sin-erp`),
-DevX (`--sin-devx`), SMS verification (`--sms-sweego-key`) and end-to-end
-encryption with Matrix (`SYTUE_CIFRADO_E2E=activado` with a Matrix server; without it, data
-is stored encrypted on the server).
+**Optional add-ons** (they do not take features away from the other apps): Matrix end-to-end
+encryption (on by default; `--sin-matrix` stores the data encrypted on the server instead,
+`--con-matrix` turns it on for an existing install), ERP (`--sin-erp`), DevX (`--sin-devx`)
+and SMS verification (`--sms-sweego-key`).
 
 Single server or single container up and running:
 

@@ -83,12 +83,13 @@ Each application lives on its own subdomain:
 `*.sytue.localhost` points to your own machine without any configuration: browsers
 resolve `.localhost` to `127.0.0.1`.
 
-> **Known limitation of local mode.** Several apps store your data encrypted on the
-> device with keys held by the encrypted messaging server (Matrix), which
-> production deploys and the local environment **does not include yet**. Until then, locally
-> Sytue Admin, Sytue Web, Sytue Cloud and Sytue Cast work; Mail, Drive, Docus, Calcus,
-> Diapos, CertiPDF, Calendar, Contacts, Notepads, Rooms, SyERP, Bases and the portal's
-> home page stay on “Loading…”. The same happens in the sytue-one local environment.
+> **End-to-end encryption (Matrix).** Several apps store your data encrypted on the
+> device, with Matrix as the transport. The installer embeds the same Matrix server as
+> production (Synapse, with Sytue ID as its only sign-in) in every mode, unless you pass
+> `--sin-matrix`. The first time you open one of those apps it asks you to set up the
+> device (“Set up this device”), to confirm in Matrix and to protect the key with your
+> password or a passkey. Verified on 2026-11-17: Rooms and Notepads work end to end;
+> Mail and Drive are still being finished in the apps themselves.
 
 ---
 

@@ -1,0 +1,78 @@
+# Sytue Suite — COMPLEMENTO MATRIX (overlay de docker-compose.yml + frontlite.yml) =
+# ---------------------------------------------------------------------------
+# El servidor Matrix (Synapse, excepción expresa del ADR 0077) que da a Drive, Mail,
+# Rooms y el resto su almacenamiento cifrado de extremo a extremo y a Rooms su
+# transporte. Lo añade ./sytue-deploy cuando el complemento está activo (por
+# defecto), en local, en el servidor único y en el contenedor todo en uno.
+#
+# Lo mismo que producción (deploy/helm/charts/matrix): sin registro, sin
+# federación ni directorio, cifrado por defecto, y Sytue ID como único proveedor
+# de identidad. Solo publica la API de cliente, la de medios y el SSO; nada de
+# /_synapse/admin ni federación.
+#
+# Su configuración, con los secretos, la genera ./sytue-deploy con
+# matrix/configurar.py en deploy/compose/.matrix/ (fuera de Git), y la base
+# sytue_matrix (con locale C, como exige Synapse) la crea el asistente.
+# ---------------------------------------------------------------------------
+name: sytue-one-dev
+
+services:
+  matrix:
+    # Imagen oficial de Element, sin modificar: servicio aparte, excepción del ADR 0077.
+    # El espejo oficial en Docker Hub: el mismo digest que ghcr.io/element-hq/synapse.
+    image: docker.io/matrixdotorg/synapse:v1.165.0@sha256:673b4223c81a7634fd07d832b939a58f97081cfdaae7cdd2d1664cdcf7611b62
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    mem_limit: 512m
+    networks: [edge, backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+    # La clave de firma se crea la primera vez; después arranca como uid 991.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        chown -R 991:991 /data &&
+        gosu 991:991 python -m synapse.app.homeserver -c /config/homeserver.yaml --generate-keys &&
+        exec gosu 991:991 python -m synapse.app.homeserver -c /config/homeserver.yaml
+    volumes:
+      - "./.matrix/homeserver.yaml:/config/homeserver.yaml:ro"
+      - "./matrix/log.yaml:/config/log.yaml:ro"
+      - "matrix-data:/data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.matrix.rule=Host(`matrix.sytue.localhost`) && (PathPrefix(`/_matrix/client`) || PathPrefix(`/_matrix/media`) || PathPrefix(`/_synapse/client`) || Path(`/.well-known/matrix/client`))"
+      - "traefik.http.routers.matrix.entrypoints=websecure"
+      - "traefik.http.routers.matrix.tls=true"
+      - "traefik.http.services.matrix.loadbalancer.server.port=8008"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/health >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+      start_interval: 5s
+
+  # Sytue ID avisa a Rooms de las altas y bajas de acceso a Matrix.
+  id:
+    environment:
+      SYTUE_ID_ROOMS_ACCESS_URL: http://rooms:8085
+      SYTUE_ID_MATRIX_LIFECYCLE_SECRET: ${MATRIX_LIFECYCLE_SECRET}
+      SYTUE_ID_ORGS_PERSONA_SECRET: ${ORGS_PERSONA_SECRET}
+
+  # Rooms gestiona las salas y entrega a las apps la dirección del homeserver.
+  rooms:
+    environment:
+      SYTUE_ROOMS_MATRIX_REQUIRED: "true"
+      SYTUE_ROOMS_MATRIX_INTERNAL_URL: http://matrix:8008
+      SYTUE_ROOMS_MATRIX_HOMESERVER_URL: https://matrix.sytue.localhost
+      SYTUE_ROOMS_MATRIX_SERVER_NAME: matrix.sytue.localhost
+      SYTUE_ROOMS_MATRIX_SSO_PROVIDER_ID: oidc-sytue
+      SYTUE_ROOMS_MATRIX_ADMIN_TOKEN: ${MATRIX_CONTROLLER_TOKEN:-}
+      SYTUE_ROOMS_MATRIX_LIFECYCLE_SECRET: ${MATRIX_LIFECYCLE_SECRET}
+      SYTUE_ROOMS_MATRIX_IDENTITY_SECRET: ${ORGS_PERSONA_SECRET}
+      MATRIX_SOURCE_URL: https://github.com/element-hq/synapse/tree/v1.165.0
+
+volumes:
+  matrix-data:

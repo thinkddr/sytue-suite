@@ -55,6 +55,88 @@ func TestLaPreguntaEsUsePrompt(t *testing.T) {
 	}
 }
 
+// TestLaPreguntaValidaLoEscrito es `validar` de usePrompt.tsx: lo que Validar rechaza se
+// dice bajo el campo con la línea de error de FieldGroup, el campo va en rojo y aceptar
+// se apaga (también Intro); al escribir algo que vale, el aviso se va y se acepta. Con
+// el campo vacío no se valida: eso ya apaga aceptar.
+func TestLaPreguntaValidaLoEscrito(t *testing.T) {
+	w := test.NewTempWindow(t, fcanvas.NewRectangle(tema.Color("bg", tema.Claro)))
+	w.Resize(fyne.NewSize(1280, 800))
+
+	var aceptado, validados []string
+	d := PreguntaCon("Nombre de la hoja:", "Resumen", "Cancelar", "Guardar", "(obligatorio)",
+		OpcionesPregunta{Validar: func(s string) string {
+			validados = append(validados, s)
+			if strings.EqualFold(s, "Ventas") {
+				return "Ya hay una hoja llamada «Ventas»"
+			}
+			return ""
+		}},
+		func(s string) { aceptado = append(aceptado, s) })
+	d.Mostrar(w.Canvas())
+	campo := w.Canvas().Focused().(*Entrada)
+	_, aceptar := botonesDelPie(t, d)
+	cuerpo := d.Cuerpo.(*fyne.Container)
+	if len(cuerpo.Objects) != 2 || campo.Invalida || aceptar.Inerte {
+		t.Fatal("con un nombre que vale la pregunta nace con aviso o apagada")
+	}
+	alto := d.Size().Height
+
+	campo.PonerTexto("  VENTAS ")
+	if validados[len(validados)-1] != "VENTAS" {
+		t.Errorf("Validar recibe %q y tiene que recibirlo sin espacios a los lados", validados[len(validados)-1])
+	}
+	if len(cuerpo.Objects) != 3 || !strings.Contains(textoDe(cuerpo.Objects[2]), "Ya hay una hoja llamada «Ventas»") {
+		t.Fatalf("el aviso no está bajo el campo: %d piezas", len(cuerpo.Objects))
+	}
+	if !campo.Invalida || !aceptar.Inerte {
+		t.Errorf("con el aviso el campo va en rojo (%v) y aceptar apagado (%v)", campo.Invalida, aceptar.Inerte)
+	}
+	if d.Size().Height <= alto {
+		t.Errorf("el diálogo no crece con la línea del aviso: %v → %v", alto, d.Size().Height)
+	}
+	campo.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	if len(aceptado) != 0 {
+		t.Errorf("Intro con el aviso puesto ha aceptado %q", aceptado)
+	}
+
+	n := len(validados)
+	campo.PonerTexto("   ")
+	if len(validados) != n || len(cuerpo.Objects) != 2 || !aceptar.Inerte {
+		t.Error("con el campo en blanco se valida o queda el aviso")
+	}
+	campo.PonerTexto("Ventas 2026")
+	if len(cuerpo.Objects) != 2 || campo.Invalida || aceptar.Inerte {
+		t.Error("con un nombre que vale el aviso no se va")
+	}
+	campo.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	if len(aceptado) != 1 || aceptado[0] != "Ventas 2026" {
+		t.Errorf("Intro ha aceptado %q y tenía que aceptar «Ventas 2026»", aceptado)
+	}
+}
+
+// textoDe junta los textos que pinta un objeto.
+func textoDe(o fyne.CanvasObject) string {
+	var b strings.Builder
+	var ir func(fyne.CanvasObject)
+	ir = func(o fyne.CanvasObject) {
+		switch x := o.(type) {
+		case *fcanvas.Text:
+			b.WriteString(x.Text)
+		case *fyne.Container:
+			for _, h := range x.Objects {
+				ir(h)
+			}
+		case fyne.Widget:
+			for _, h := range test.WidgetRenderer(x).Objects() {
+				ir(h)
+			}
+		}
+	}
+	ir(o)
+	return b.String()
+}
+
 // TestLaEtiquetaDeLaPreguntaEsLaDeFieldGroup vigila de dónde salen sus medidas: la
 // etiqueta en `text-sm font-semibold`, el asterisco en `text-danger-text` a `ml-0.5` y
 // el campo a `gap-1.5` por debajo.

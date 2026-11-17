@@ -202,8 +202,11 @@ func TestElPanelDeDetallesEsperaFallaYReintenta(t *testing.T) {
 func cuentaEsqueletos(o fyne.CanvasObject) int {
 	n := 0
 	recorrer(o, func(x fyne.CanvasObject) {
-		if _, ok := x.(*ui.Esqueleto); ok {
+		switch y := x.(type) {
+		case *ui.Esqueleto:
 			n++
+		case *ui.BloquesEsqueleto:
+			n += len(y.Bloques())
 		}
 	})
 	return n

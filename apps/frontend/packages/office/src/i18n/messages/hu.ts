@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const hu: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Munkalap neve:',
+  'dialog.sheet.nameTaken':
+    'Már van „{name}” nevű munkalap (a nevekben a kis- és nagybetű nem számít).',
   'dialog.sheet.delete': 'Törli a(z) „{name}” munkalapot? A tartalma elvész.',
   'dialog.sheet.mergeLoses':
     'Egyesítéskor csak a bal felső cella ({ref}) értéke marad meg; a tartomány többi cellája kiürül. Ha az összes szöveget abba a cellába szeretné összefűzni, használja a „Tartalom egyesítése” lehetőséget.',

@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const sk: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Názov hárka:',
+  'dialog.sheet.nameTaken':
+    'Hárok s názvom „{name}“ už existuje (názvy nerozlišujú veľké a malé písmená).',
   'dialog.sheet.delete': 'Odstrániť hárok „{name}“? Jeho obsah sa stratí.',
   'dialog.sheet.mergeLoses':
     'Pri zlúčení sa zachová iba hodnota ľavej hornej bunky ({ref}); ostatné bunky rozsahu sa vymažú. Ak chcete spojiť všetok text do tejto bunky, použite „Zlúčiť obsah“.',

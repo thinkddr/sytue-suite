@@ -1,0 +1,85 @@
+{
+  "unlock_key": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+  "hint": "Wy0QEL3fH/AUY/gTTh3gmQ==",
+  "user_id": "0f3c9a52-6d1e-4c1a-9b8e-2a7d5c4e1f00",
+  "password": "correct horse battery staple ñ€",
+  "password_kek": "660d63e8979d68f0510d43ff7222f5ee4d672497492d856266589c2cedf25a48",
+  "password_aad": "73797475652d6532652d756e6c6f636b2d76310070617373776f72640030663363396135322d366431652d346331612d396238652d32613764356334653166303000",
+  "password_envelope": {
+    "v": 1,
+    "kind": "password",
+    "credential_id": "",
+    "kdf": {
+      "alg": "argon2id",
+      "m": 65536,
+      "t": 3,
+      "p": 1,
+      "salt": "MDEyMzQ1Njc4OTo7PD0+Pw=="
+    },
+    "hint": "Wy0QEL3fH/AUY/gTTh3gmQ==",
+    "nonce": "UFFSU1RVVldYWVpb",
+    "ciphertext": "nM+RignLhOPCDkL8xrpP+6g7HywVATY4QeIJlBACOY5+tcbvKwH6qLYNDUQtW4qO"
+  },
+  "credential_id": "oKGio6SlpqeoqaqrrK2ur7CxsrM",
+  "prf_input": "S6j2Uo5OIxzFgxjFspPh1DoPj3+Ih6/P9taohG6Ft5U=",
+  "prf_output": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8=",
+  "passkey_kek": "a8c7f24f19771d217e196abf99f26f7be9577eb6072b1cda6485b9150fbeea6a",
+  "passkey_envelope": {
+    "v": 1,
+    "kind": "passkey",
+    "credential_id": "oKGio6SlpqeoqaqrrK2ur7CxsrM",
+    "kdf": {
+      "alg": "webauthn-prf-hkdf-sha256",
+      "prf_salt": "S6j2Uo5OIxzFgxjFspPh1DoPj3+Ih6/P9taohG6Ft5U="
+    },
+    "hint": "Wy0QEL3fH/AUY/gTTh3gmQ==",
+    "nonce": "YGFiY2RlZmdoaWpr",
+    "ciphertext": "9bjxTZ2Bo7oyItq2mXnDybAExWlGvS/PEh/olZVRE405O4NUoIc0nXkcT2Y7mGy6"
+  },
+  "account": "@sytue_0f3c:sytue.eu",
+  "key_id": "gTCx1L6rB9mQ0r2A",
+  "recovery_key": "EsT3 4kza y1Xs efFA tKyi HVwT kdEP 4UEk rvNr dFvy 8nGq AkqP",
+  "sytue_id_wrap_key": "b541c0508de07bee5a6eff593a8a6d175765262f5062e5d00f85673ae9153540",
+  "sytue_id_wrapper": {
+    "v": 1,
+    "kind": "sytue-id",
+    "key_id": "gTCx1L6rB9mQ0r2A",
+    "credential_id": "",
+    "kdf": {
+      "alg": "sytue-id-unlock-hkdf-sha256",
+      "hint": "Wy0QEL3fH/AUY/gTTh3gmQ=="
+    },
+    "nonce": "kJGSk5SVlpeYmZqb",
+    "ciphertext": "Euelp9xX1nFN8Zj15ujr7dzm80z7uyXzsziagGQesAzbYRwYCprtTElhmin2y9OY5b/bIl8X0mmikwxveKkXx5kpPgw53oeWNaGH"
+  },
+  "native": {
+    "app": {
+      "d": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+      "x": "UVw9brnjlrkE0_7Kf1T9zQzB6Ze_N13KUVrQpsO0A18",
+      "y": "RTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q"
+    },
+    "app_public": "BFFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANfRTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q",
+    "ephemeral": {
+      "d": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+      "x": "Jh7701UM8GjvAT7XNmujL11v5Ve0sqvOit5Yy6FopV4",
+      "y": "F4igsppWpqvsQITAyWvT3LymtQfzXb6p6YVwhHnYvck"
+    },
+    "nonce": "sLGys7S1tre4ubq7",
+    "delivery": {
+      "v": 1,
+      "sub": "0f3c9a52-6d1e-4c1a-9b8e-2a7d5c4e1f00",
+      "key": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "legacy": [
+        {
+          "kind": "password",
+          "salt": "EBESExQVFhcYGRobHB0eHw==",
+          "ikm": "0NHS09TV1tfY2drb3N3e3+Dh4uPk5ebn6Onq6+zt7u8="
+        }
+      ]
+    },
+    "blob": "BCYe-9NVDPBo7wE-1zZroy9db-VXtLKrzoreWMuhaKVeF4igsppWpqvsQITAyWvT3LymtQfzXb6p6YVwhHnYvcmwsbKztLW2t7i5urumM8JRy5AWGzixpEqgDRCdkg1rdi8ZXCp8dounL2rXDE3nb7qb4wW6-5Yn6Ej3aUJ-5q_117dqb1BPGAwN4xqrJcsphj68k3VvdKwrstvsHwn3U4RM8Tt6YK4ipHjJ184os1uEx2yKppZDjez4GfP3IxpbPBqhjHu5w0L8j_-cropbnl-_0fZXcoVlO98zUPP6KoE6JlML7JXeiaL5mlacESdxl8Tv8n0ZNhCUap-O6NoFc69Z9-CQ4GxBXMTsN2QFJ9-8IDeARBziK4pfPPP6TcbPw5VkUkPBlxjMqrg4inlpvLFGcE6mF1jRecsdhw",
+    "plaintext": "{\"v\":1,\"sub\":\"0f3c9a52-6d1e-4c1a-9b8e-2a7d5c4e1f00\",\"key\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\",\"legacy\":[{\"kind\":\"password\",\"salt\":\"EBESExQVFhcYGRobHB0eHw==\",\"ikm\":\"0NHS09TV1tfY2drb3N3e3+Dh4uPk5ebn6Onq6+zt7u8=\"}]}",
+    "info": "sytue-e2e-unlock-v1/native"
+  },
+  "legacy_password_ikm": "/0w5IXSHGiVndOMa4KIS5djUgI9zrMdnjHMffX6mgIY="
+}

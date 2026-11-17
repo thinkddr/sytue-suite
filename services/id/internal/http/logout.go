@@ -64,11 +64,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	// tiene que cerrarla en las diez superficies aunque se inicie AQUÍ (el enlace
 	// de /account, que no pasa por ninguna app), y hacerlo desde el IdP es el
 	// único punto por el que pasan todos los cierres, vengan de donde vengan.
+	// La página se pinta SIEMPRE, aunque no haya superficies que barrer: es la que
+	// borra de este navegador la clave de desbloqueo del cifrado (ADR 0084).
 	barrido := s.suiteLogoutURIs(r.Context())
-	if len(barrido) == 0 {
-		http.Redirect(w, r, destino, http.StatusFound)
-		return
-	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(logoutSweepPage(barrido, destino)))
 }
@@ -205,7 +203,7 @@ func logoutSweepPage(uris []string, destino string) string {
 	// Sin JS no hay evento de carga que esperar: el enlace es la salida manual.
 	b.WriteString(`<noscript><p class="alt"><a class="btn-link" href="` +
 		html.EscapeString(destino) + `">Continuar</a></p></noscript>`)
-	b.WriteString(`<script>` + logoutSweepScript + `</script>`)
+	b.WriteString(`<script>` + e2eComunJS + `</script><script>` + logoutSweepScript + `</script>`)
 	return logoutPage("Cerrando sesión", destino, b.String())
 }
 
@@ -214,12 +212,17 @@ func logoutSweepPage(uris []string, destino string) string {
 // nadie atrapado en esta pantalla). El destino viaja en un atributo del <body>
 // —ya validado contra la allowlist del client— para que el script sea una
 // constante y su hash CSP no dependa de la petición.
+//
+// Antes de irse borra el almacén del desbloqueo del cifrado de este navegador
+// (ADR 0084): la clave de desbloqueo no sobrevive a cerrar la sesión.
 const logoutSweepScript = `(function(){` +
-	`var b=document.body,d=b.getAttribute('data-next'),i=document.images,n=i.length,c=0,done=false;` +
+	`var b=document.body,d=b.getAttribute('data-next'),i=document.images,n=i.length,c=0,p=2,done=false,E=window.SytueE2E;` +
 	`function go(){if(done){return;}done=true;location.replace(d);}` +
+	`function one(){if(--p<=0){go();}}` +
+	`function f(){if(++c>=n){one();}}` +
 	`setTimeout(go,2000);` +
-	`if(!n){go();return;}` +
-	`function f(){if(++c>=n){go();}}` +
+	`if(E){E.store.clear().then(one,one);}else{one();}` +
+	`if(!n){one();return;}` +
 	`for(var k=0;k<n;k++){if(i[k].complete){f();}else{i[k].onload=f;i[k].onerror=f;}}` +
 	`})();`
 

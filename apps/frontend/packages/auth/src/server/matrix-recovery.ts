@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
- * The person's wrapped Matrix recovery keys (ADR 0082), reachable from EVERY app with
- * a Matrix gate: each app re-exports these handlers bound to its own product, like
+ * The person's wrapped Matrix recovery keys (ADR 0082, 0084), reachable from EVERY app
+ * with a Matrix gate: each app re-exports these handlers bound to its own product, like
  * `rutaBootstrapMatrixPrivado`. The BFF passes wrappers through and never sees a key:
- * they are wrapped and opened in the browser with the person's passkey or password.
+ * they are wrapped and opened in the browser with the unlock key of the person's Sytue
+ * ID sign-in (and, the older ones, with what that sign-in computed for them).
  *
  * Account: without `identity_version=2` the Rooms account (the one Rooms and the legacy
  * private storage share); with it, this app's isolated storage account. The product
@@ -44,6 +45,22 @@ function wrapperDTO(input: unknown): MatrixRecoveryWrapper | null {
   )
     return null;
   const kdf = w.kdf;
+  if (
+    w.kind === 'sytue-id' &&
+    kdf?.alg === 'sytue-id-unlock-hkdf-sha256' &&
+    w.credential_id === '' &&
+    typeof kdf.hint === 'string' &&
+    base64.test(kdf.hint)
+  )
+    return {
+      v: 1,
+      kind: 'sytue-id',
+      key_id: w.key_id,
+      credential_id: '',
+      kdf: { alg: 'sytue-id-unlock-hkdf-sha256', hint: kdf.hint },
+      nonce: w.nonce,
+      ciphertext: w.ciphertext,
+    };
   if (w.kind === 'password' && kdf?.alg === 'argon2id' && w.credential_id === '') {
     if (
       ![kdf.m, kdf.t, kdf.p].every(Number.isSafeInteger) ||

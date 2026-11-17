@@ -9,15 +9,15 @@
 # asume la pila corriendo bajo *.sytue.localhost (Traefik + TLS mkcert).
 #
 # Mapa de checks (ver docs/operations.md):
-#   1. Salud de CADA servicio Go: /healthz (liveness) y /readyz (readiness).
+#   1. Salud de CADA servicio Go por su puerto local: /healthz y /readyz.
 #   2. OIDC discovery de Sytue ID en /.well-known/openid-configuration
 #      SIN /realms/ (IdP propio, no Keycloak) y con issuer coherente.
 #   3. Flujo OIDC + PKCE básico contra `id`: authorize con code_challenge S256
 #      del client `sytue-one` -> 302 a /login (sin error OAuth). Prueba que el
 #      authorization endpoint acepta una petición PKCE bien formada de extremo
 #      a extremo (sin necesidad de credenciales interactivas).
-#   4. Ping por INGRESS *.sytue.localhost a drive/mail/chat/meet/cloud/hub
-#      (Traefik enruta -> el backend responde HTTP).
+#   4. Cada app web: la raíz redirige a su portada y /auth/login lleva a Sytue
+#      ID (Traefik, el BFF y el cliente OIDC de la app encajan).
 #
 # Uso:
 #   make e2e                       # objetivo sugerido (ver docs/operations.md)
@@ -132,75 +132,56 @@ b64url() {
 }
 
 # ---------------------------------------------------------------------------
-# Servicios Go (backend). Formato: "nombre|host|puerto|ping_ingress(0/1)"
-# El host es el subdominio de ingress *.sytue.localhost (Traefik enruta al Go).
-# cloud-builder es INTERNO (sin ingress): se comprueba solo si E2E_INCLUDE_BUILDER=1
-# y accesible por puerto directo a host (8091), no por Traefik.
+# Servicios Go (backend): "nombre|puerto". Se comprueban por su puerto publicado
+# en 127.0.0.1 y no por el host público: varios hosts públicos (drive, calendar,
+# contacts…) sirven la app web, no el backend, y su /readyz respondía un 302 al
+# login. Rooms no aparece en /readyz: sin servidor Matrix (no lo hay en Compose)
+# responde «not_ready» a propósito, aunque el servicio esté sano.
 # ---------------------------------------------------------------------------
-# Servicios con ingress HTTP por Traefik y sondas /healthz + /readyz.
+LOCAL_HOST="${E2E_LOCAL_HOST:-127.0.0.1}"
 GO_SERVICES=(
-  "id|id.${BASE_DOMAIN}"
-  "drive|drive.${BASE_DOMAIN}"
-  "docs|docs-api.${BASE_DOMAIN}"
-  "chat|chat-api.${BASE_DOMAIN}"
-  "mail|mail-api.${BASE_DOMAIN}"
-  "calendar|calendar.${BASE_DOMAIN}"
-  "contacts|contacts.${BASE_DOMAIN}"
-  "meet|meet-api.${BASE_DOMAIN}"
-  "cloud-api|cloud-api.${BASE_DOMAIN}"
-  "hub|hub.${BASE_DOMAIN}"
+  "id|8081" "drive|8082" "docs|8083" "ai|8084" "rooms|8085" "mail|8086"
+  "calendar|8087" "contacts|8088" "notes|8089" "cloud-api|8090" "cloud-builder|8091"
+  "hub|8092" "analytics-ingest|8094" "analytics-api|8095" "syphotos|8097"
+  "syerp|8098" "cast|8099" "pages|8100" "bases|8102" "cloud-controller|8103"
 )
+SIN_READYZ=" rooms "
 
-# Los seis productos cuyo ping por ingress pide explícitamente la tarea.
-# "etiqueta|host". drive/mail/chat/meet/cloud/hub.
-INGRESS_TARGETS=(
-  "drive|drive.${BASE_DOMAIN}"
-  "mail|mail-api.${BASE_DOMAIN}"
-  "chat|chat-api.${BASE_DOMAIN}"
-  "meet|meet-api.${BASE_DOMAIN}"
-  "cloud|cloud-api.${BASE_DOMAIN}"
-  "hub|hub.${BASE_DOMAIN}"
+# Apps web: "host|base". La raíz del host redirige a su portada (<base>/), que sin
+# sesión manda al login del BFF (/auth/login), que a su vez manda a Sytue ID. Es el
+# camino que recorre cualquiera que abra la app, y el que se rompía.
+WEB_APPS=(
+  "one|/one" "admin|/admin" "mail|/mail" "drive|/drive" "docus|/docus"
+  "calcus|/calcus" "diapos|/diapos" "certipdf|/certipdf" "calendar|/calendar"
+  "contacts|/contacts" "notes|/notes" "rooms|/rooms" "erp|/erp" "cast|/cast"
+  "web|/web" "bases|/bases" "cloud|/cloud"
 )
 
 # ===========================================================================
-# CHECK 1 — Salud de cada servicio Go (/healthz + /readyz vía ingress).
+# CHECK 1 — Salud de cada servicio Go (/healthz + /readyz por su puerto local).
 # ===========================================================================
 check_health() {
-  section "1) Salud de los servicios Go (/healthz + /readyz)"
-  local entry name host base
+  section "1) Salud de los servicios Go (/healthz + /readyz en ${LOCAL_HOST})"
+  local entry name port base code
   for entry in "${GO_SERVICES[@]}"; do
     name="${entry%%|*}"
-    host="${entry##*|}"
-    base="${SCHEME}://${host}"
-
-    local code
+    port="${entry##*|}"
+    base="http://${LOCAL_HOST}:${port}"
     code=$(curl_status "${base}/healthz")
     if [ "$code" = "200" ]; then
       pass "${name} /healthz -> 200"
     else
       fail "${name} /healthz" "esperado 200, obtenido ${code} (${base}/healthz)"
     fi
-
+    case "$SIN_READYZ" in *" ${name} "*) continue ;; esac
     code=$(curl_status "${base}/readyz")
     if [ "$code" = "200" ]; then
       pass "${name} /readyz -> 200"
     else
-      # 503 = servicio vivo pero una dependencia no lista (aún útil distinguir).
+      # 503 = servicio vivo pero una dependencia no lista.
       fail "${name} /readyz" "esperado 200, obtenido ${code} (${base}/readyz)"
     fi
   done
-
-  # cloud-builder es interno (sin ingress). Opcional por puerto directo a host.
-  if [ "${E2E_INCLUDE_BUILDER:-0}" = "1" ]; then
-    local bhost="${E2E_BUILDER_HOST:-127.0.0.1}" bport="${E2E_BUILDER_PORT:-8091}"
-    local code
-    code=$(curl_status "http://${bhost}:${bport}/healthz")
-    if [ "$code" = "200" ]; then
-      pass "cloud-builder /healthz -> 200 (puerto directo ${bport})"
-    else
-      fail "cloud-builder /healthz" "esperado 200, obtenido ${code} (interno :${bport})"
-    fi
-  fi
 }
 
 # ===========================================================================
@@ -351,26 +332,40 @@ url_encode() {
 }
 
 # ===========================================================================
-# CHECK 4 — Ping por ingress *.sytue.localhost a los seis productos.
-# Se comprueba que Traefik enruta y el backend responde HTTP (cualquier código
-# < 500 y != 000 significa "el ingress llega al servicio"; 5xx/000 = fallo).
+# CHECK 4 — Cada app web: raíz -> portada -> login del BFF -> Sytue ID.
 # ===========================================================================
-check_ingress_ping() {
-  section "4) Ping por ingress *.${BASE_DOMAIN} (drive/mail/chat/meet/cloud/hub)"
-  local entry label host code
-  for entry in "${INGRESS_TARGETS[@]}"; do
-    label="${entry%%|*}"
-    host="${entry##*|}"
-    # /healthz es el endpoint más estable y barato tras el ingress.
-    code=$(curl_status "${SCHEME}://${host}/healthz")
-    if [ "$code" = "200" ]; then
-      pass "${label} ingress (${host}) -> 200"
-    elif [ "$code" != "000" ] && [ "$code" -lt 500 ] 2>/dev/null; then
-      # El ingress enruta y el servicio responde (aunque no sea 200 en /healthz).
-      pass "${label} ingress (${host}) -> ${code} (Traefik enruta al servicio)"
+# location URL — cabecera Location de una respuesta (sin seguir redirecciones).
+location_of() {
+  curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time "$TIMEOUT" \
+    "${CURL_TLS_OPTS[@]}" "$1" 2>/dev/null
+}
+
+check_web_apps() {
+  section "4) Apps web (*.${BASE_DOMAIN}): portada, login y enlace con Sytue ID"
+  local entry host base r code dest
+  for entry in "${WEB_APPS[@]}"; do
+    host="${entry%%|*}.${BASE_DOMAIN}"
+    base="${entry##*|}"
+    r=$(location_of "${SCHEME}://${host}/")
+    code="${r%% *}"
+    dest="${r#* }"
+    if [ "${code:0:1}" = "3" ] && [ "$dest" = "${SCHEME}://${host}${base}/" ]; then
+      pass "${host}/ -> ${base}/"
     else
-      fail "${label} ingress (${host})" "sin respuesta útil del ingress: ${code}"
+      fail "${host}/ redirige a su portada" "esperado 30x a ${base}/, obtenido ${r}"
+      continue
     fi
+    r=$(location_of "${SCHEME}://${host}/auth/login")
+    code="${r%% *}"
+    dest="${r#* }"
+    case "$code|$dest" in
+      3*"|${SCHEME}://id.${BASE_DOMAIN}/oauth2/authorize?"*)
+        pass "${host}/auth/login -> Sytue ID (el BFF llega al IdP)"
+        ;;
+      *)
+        fail "${host}/auth/login" "esperado 30x a id.${BASE_DOMAIN}/oauth2/authorize, obtenido ${r:0:160}"
+        ;;
+    esac
   done
 }
 
@@ -392,7 +387,7 @@ main() {
   check_health
   check_oidc_discovery
   check_oidc_pkce
-  check_ingress_ping
+  check_web_apps
 
   # --- Resumen -------------------------------------------------------------
   section "Resumen"

@@ -30,12 +30,15 @@ func (c *Lienzo) CambiarHoja(i int) {
 	c.trasCambiarHoja()
 }
 
-// AnadirHoja crea «Hoja N» al final, con N el número de hojas más uno, como la web.
+// AnadirHoja crea «Hoja N» al final, con N el número de hojas más uno, como la web; si ya
+// hay una que se llama así, aunque sea con otras mayúsculas, el siguiente número libre.
 func (c *Lienzo) AnadirHoja() {
 	if c.Rejilla.SoloLectura || !c.estructura() {
 		return
 	}
-	c.Libro.Anadir(c.t("sheet.defaultName", i18n.Vars{"n": len(c.Libro.Hojas()) + 1}))
+	c.Libro.Anadir(c.Libro.NombreLibre(func(n int) string {
+		return c.t("sheet.defaultName", i18n.Vars{"n": n})
+	}, len(c.Libro.Hojas())+1))
 	c.trasCambiarHoja()
 }
 
@@ -113,16 +116,34 @@ func (c *Lienzo) PedirBorrarHoja() {
 	d.Mostrar(lienzo)
 }
 
-// PedirRenombrarHoja es `renameSheet`: el diálogo de pregunta con el nombre actual.
+// PedirRenombrarHoja es `renameSheet`: el diálogo de pregunta con el nombre actual. El
+// nombre de otra hoja salvo mayúsculas («VENTAS» con una «Ventas») se avisa bajo el
+// campo y apaga Guardar (ValidarNombreHoja).
 func (c *Lienzo) PedirRenombrarHoja(i int) {
 	lienzo := fyne.CurrentApp().Driver().CanvasForObject(c)
 	if lienzo == nil || c.Rejilla.SoloLectura || i < 0 || i >= len(c.Libro.Hojas()) || !c.estructura() {
 		return
 	}
-	d := ui.Pregunta(c.t("dialog.sheet.rename", nil), c.Libro.Hojas()[i], c.t("ui.cancel", nil),
-		c.t("ui.save", nil), c.t("ui.required", nil), func(nombre string) { c.RenombrarHoja(i, nombre) })
+	d := ui.PreguntaCon(c.t("dialog.sheet.rename", nil), c.Libro.Hojas()[i], c.t("ui.cancel", nil),
+		c.t("ui.save", nil), c.t("ui.required", nil),
+		ui.OpcionesPregunta{Validar: func(nombre string) string { return c.ValidarNombreHoja(i, nombre) }},
+		func(nombre string) { c.RenombrarHoja(i, nombre) })
 	d.RotuloCerrar = c.t("ui.close", nil)
 	d.Mostrar(lienzo)
+}
+
+// ValidarNombreHoja es el aviso del diálogo de renombrar la hoja i a `nombre` (ya sin
+// espacios a los lados), o "" si vale: el de otra hoja salvo mayúsculas no, y el suyo
+// propio sí (no cambia nada, aunque el libro ya trajera una gemela suya).
+func (c *Lienzo) ValidarNombreHoja(i int, nombre string) string {
+	hojas := c.Libro.Hojas()
+	if i < 0 || i >= len(hojas) || nombre == hojas[i] {
+		return ""
+	}
+	if j := c.Libro.HojaGemela(nombre, i); j >= 0 {
+		return c.t("dialog.sheet.nameTaken", i18n.Vars{"name": hojas[j]})
+	}
+	return ""
 }
 
 // trasCambiarHoja es lo que la web hace tras cada cambio de hoja: selección a A1, sin

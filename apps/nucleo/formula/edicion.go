@@ -533,6 +533,13 @@ func refEn(texto string, toks []TokFx, k int, corchetes [][2]int) (r Referencia,
 	inicio, hoja := t.Inicio, ""
 	if p, p2 := tok(k-1), tok(k-2); p != nil && p.T == FxBang && p2 != nil && (p2.T == FxWord || p2.T == FxQSheet) {
 		inicio, hoja = p2.Inicio, nombreHoja(*p2)
+		// «[Libro.xlsx]Ventas!B4» (o «[1]Ventas!B4», como lo guarda un .xlsx) es la hoja
+		// «Ventas» de OTRO libro: su hoja es «[Libro.xlsx]Ventas», la misma que da la forma
+		// entrecomillada '[Libro.xlsx]Ventas'!B4, y no la «Ventas» de este. Tomarla por la de
+		// aquí la movía al insertar filas en esta (y la resaltaba en ella).
+		if abre, ok := libroDelante(corchetes, p2.Inicio); ok {
+			inicio, hoja = abre, texto[abre:p2.Inicio]+hoja
+		}
 	}
 	fin := t.Fin
 	if s, s2 := tok(k+1), tok(k+2); s != nil && s.T == FxColon && mismaClase(s2, clase) && !esLParen(tok(k+3)) {
@@ -545,6 +552,26 @@ func refEn(texto string, toks []TokFx, k int, corchetes [][2]int) (r Referencia,
 		return Referencia{}, salto, false
 	}
 	return Referencia{Texto: texto[inicio:fin], Inicio: inicio, Fin: fin, Hoja: hoja, Rect: rect}, salto, true
+}
+
+// libroDelante: el corchete que se cierra justo antes de `p` («[Libro.xlsx]» pegado al
+// nombre de la hoja) y dónde abre.
+func libroDelante(corchetes [][2]int, p int) (int, bool) {
+	for _, s := range corchetes {
+		if s[1] == p-1 {
+			return s[0], true
+		}
+	}
+	return 0, false
+}
+
+// EsDeOtroLibro dice si la hoja de una referencia es la de otro libro: ExtractRefs la da
+// con su libro delante («[Libro.xlsx]Ventas», o «C:\ruta\[Libro.xlsx]Ventas» en la forma
+// entrecomillada). Excel no admite corchetes en el nombre de una hoja, así que bastan
+// ellos para saberlo. Es `esDeOtroLibro` de `sheets/formula-edit.ts`.
+func EsDeOtroLibro(hoja string) bool {
+	i := strings.IndexByte(hoja, '[')
+	return i >= 0 && strings.IndexByte(hoja[i+1:], ']') >= 0
 }
 
 func dentroDeCorchetes(p int, corchetes [][2]int) bool {

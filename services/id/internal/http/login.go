@@ -57,9 +57,10 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 				`<button type="submit">`+html.EscapeString(i18n.T(loc, "mfa.verify"))+`</button></form>`+
 				passkeyBlockHTML(loc)+
 				`<p class="alt"><a class="btn-link" href="`+html.EscapeString(back)+`">`+html.EscapeString(i18n.T(loc, "login.back"))+`</a></p>`+
-				`<script>`+loginScript+`</script>`)))
+				e2eScriptsLogin(false)+`<script>`+loginScript+`</script>`)))
 		return
 	}
+	cspConWasm(w)
 	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "login.title"), loginFormHTML(loc, safeReturn, "", "", s.captchaEnLogin()))))
 }
 
@@ -161,7 +162,7 @@ func loginFormHTML(loc, safeReturn, safeEmail, errMsg string, conCaptcha bool) s
 		`">` + esc(i18n.T(loc, "login.forgot")) + `</a></p>` + captchaBox +
 		`<button type="submit">` + esc(i18n.T(loc, "common.continue")) + `</button></form>` +
 		passkeyBlockHTML(loc) + ssoLinkHTML(loc, safeReturn) + signupLinkHTML(loc, safeReturn) +
-		`<script>` + emailFieldScript + `</script><script>` + loginScript + `</script>`
+		`<script>` + emailFieldScript + `</script>` + e2eScriptsLogin(true) + `<script>` + loginScript + `</script>`
 }
 
 // withReturnTo cuelga ?return_to= de una ruta INTERNA del IdP cuando hay viaje
@@ -202,11 +203,15 @@ func passkeyBlockHTML(loc string) string {
 // sin dependencias: detecta soporte, revela el botón, negocia begin/finish y navega
 // al destino que devuelve el servidor. Su sha256 entra en la CSP (script-src), sin
 // 'unsafe-inline'; si se edita, la CSP se recalcula sola (ver cspScriptHashes).
+//
+// Con el desbloqueo del cifrado (ADR 0084, e2e/login.js) pide además la extensión
+// PRF y guarda en este navegador la KEK que sale de ella ANTES de abrir la sesión:
+// el relevo la usará al volver a la app. Sin ese guion, el acceso es el de siempre.
 const loginScript = `(function(){` +
 	`var b=document.getElementById('passkey-btn');` +
 	`if(!b||!window.PublicKeyCredential||!navigator.credentials||!navigator.credentials.get){return;}` +
-	`b.hidden=false;var err=document.getElementById('passkey-err');` +
-	`function fail(m){if(err){err.textContent=m;err.hidden=false;}b.disabled=false;}` +
+	`b.hidden=false;var err=document.getElementById('passkey-err');var E=window.SytueE2E;` +
+	`function fail(m){if(err){err.textContent=m;err.hidden=false;}b.disabled=false;if(E){E.store.del('pending').catch(function(){});}}` +
 	`function d(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4){s+='=';}var x=atob(s),a=new Uint8Array(x.length),i=0;for(;i<x.length;i++){a[i]=x.charCodeAt(i);}return a.buffer;}` +
 	`function e(buf){var a=new Uint8Array(buf),s='',i=0;for(;i<a.length;i++){s+=String.fromCharCode(a[i]);}return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}` +
 	`b.addEventListener('click',function(){` +
@@ -214,8 +219,9 @@ const loginScript = `(function(){` +
 	`var em=(document.getElementById('email')||{}).value||'';` +
 	`var rt=(document.querySelector('input[name=return_to]')||{}).value||'';` +
 	`fetch('/login/webauthn/begin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em})}).then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){` +
-	`return navigator.credentials.get({publicKey:{challenge:d(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification,allowCredentials:(o.allowCredentials||[]).map(function(c){return{type:'public-key',id:d(c.id)};})}});` +
-	`}).then(function(c){var a=c.response;return fetch('/login/webauthn/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id,rawId:e(c.rawId),type:c.type,response:{authenticatorData:e(a.authenticatorData),clientDataJSON:e(a.clientDataJSON),signature:e(a.signature),userHandle:a.userHandle?e(a.userHandle):''},return_to:rt})});})` +
+	`var pk={challenge:d(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification,allowCredentials:(o.allowCredentials||[]).map(function(c){return{type:'public-key',id:d(c.id)};})};` +
+	`return (E?E.withPRF(pk).catch(function(){return pk;}):Promise.resolve(pk)).then(function(pk){return navigator.credentials.get({publicKey:pk});});` +
+	`}).then(function(c){return (E?E.rememberPasskey(c).catch(function(){}):Promise.resolve()).then(function(){var a=c.response;return fetch('/login/webauthn/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id,rawId:e(c.rawId),type:c.type,response:{authenticatorData:e(a.authenticatorData),clientDataJSON:e(a.clientDataJSON),signature:e(a.signature),userHandle:a.userHandle?e(a.userHandle):''},return_to:rt})});});})` +
 	`.then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){window.location=o.redirect||'/';}).catch(function(){fail(b.dataset.err);});` +
 	`});})();`
 
@@ -675,6 +681,7 @@ func (s *Server) credencialFallida(w http.ResponseWriter, r *http.Request, email
 func (s *Server) loginFail(w http.ResponseWriter, r *http.Request, msg string) {
 	loc := i18n.From(r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	cspConWasm(w)
 	w.WriteHeader(http.StatusUnauthorized)
 	safeReturn := html.EscapeString(r.Form.Get("return_to"))
 	safeEmail := html.EscapeString(domain.NormalizeLogin(r.Form.Get("email")))

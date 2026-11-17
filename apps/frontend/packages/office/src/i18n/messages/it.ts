@@ -11,6 +11,8 @@ import type { en } from './en';
 
 export const it: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Nome del foglio:',
+  'dialog.sheet.nameTaken':
+    'Esiste già un foglio chiamato «{name}» (i nomi non distinguono maiuscole e minuscole).',
   'dialog.sheet.delete': 'Eliminare il foglio «{name}»? Il contenuto andrà perso.',
   'dialog.sheet.mergeLoses':
     "L'unione conserva solo il valore della cella in alto a sinistra ({ref}); le altre celle dell'intervallo vengono svuotate. Per riunire tutti i testi in quella cella, usa «Unisci contenuto».",

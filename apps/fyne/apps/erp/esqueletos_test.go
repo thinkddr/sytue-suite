@@ -4,7 +4,11 @@
 package erp
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -87,22 +91,25 @@ func TestLosEsqueletosMidenLoDeLaWeb(t *testing.T) {
 	cerca(t, "la caja de línea de la cifra (h-7.5)", tema.TextoXL.Linea, 1.875*rem)
 	cerca(t, "la de la pista (h-4)", tema.TextoXS.Linea, rem)
 	cerca(t, "la tarjeta del resumen", AltoKPI, 2*tema.Borde+2*rem+1.25*rem+0.25*rem+1.875*rem+0.25*rem+rem)
-	_, alto := tarjetaKPIEsqueleto(tema.Claro, 280)
+	_, alto := tarjetaKPIEsqueleto(tema.Claro, ui.NuevosBloquesEsqueleto(), 280)
 	cerca(t, "la tarjeta del resumen sin datos", alto, AltoKPI)
 }
 
-// esqueletosDe cuenta los bloques de carga y las ruedas de un objeto.
-func esqueletosDe(o fyne.CanvasObject) (esqueletos, ruedas int, barras []*ui.Esqueleto) {
+// esqueletosDe cuenta las barras de carga —sueltas o de un `ui.BloquesEsqueleto`— y las
+// ruedas de un objeto, y devuelve los grupos.
+func esqueletosDe(o fyne.CanvasObject) (esqueletos, ruedas int, grupos []*ui.BloquesEsqueleto) {
 	recorrer(o, func(x fyne.CanvasObject) {
 		switch e := x.(type) {
 		case *ui.Esqueleto:
 			esqueletos++
-			barras = append(barras, e)
+		case *ui.BloquesEsqueleto:
+			esqueletos += len(e.Bloques())
+			grupos = append(grupos, e)
 		case *ui.Rueda:
 			ruedas++
 		}
 	})
-	return esqueletos, ruedas, barras
+	return esqueletos, ruedas, grupos
 }
 
 // TestLaListaQueCargaPintaLaFormaDeLaTabla: seis filas con una barra por columna de
@@ -121,17 +128,25 @@ func TestLaListaQueCargaPintaLaFormaDeLaTabla(t *testing.T) {
 	w.Resize(fyne.NewSize(900, alto+20))
 	guardarPNG(t, w.Canvas().Capture(), "erp-lista-cargando.png")
 	w.Close()
-	n, ruedas, barras := esqueletosDe(o)
+	n, ruedas, grupos := esqueletosDe(o)
 	if ruedas != 0 {
 		t.Errorf("la lista que carga pinta %d ruedas", ruedas)
 	}
-	if n != FilasEsqueletoLista*cols {
-		t.Errorf("la lista que carga pinta %d barras y deberían ser %d×%d", n, FilasEsqueletoLista, cols)
+	// Todas las barras en UN grupo, que late a una. VISTO EN ROJO con una
+	// `ui.Esqueleto` por barra: «0 grupos».
+	if n != FilasEsqueletoLista*cols || len(grupos) != 1 {
+		t.Fatalf("la lista que carga pinta %d barras en %d grupos y deberían ser %d×%d en uno", n, len(grupos), FilasEsqueletoLista, cols)
 	}
-	for _, b := range barras {
-		if b.Fraccion <= 0 || b.Fraccion >= 1 {
-			t.Errorf("una barra ocupa %g de su celda: todas iguales parecen ladrillos", b.Fraccion)
+	celda := (900 - 2*tema.Borde - 2*EsqueletoPX - float32(cols-1)*EsqueletoHueco) / float32(cols)
+	anchos := map[float32]bool{}
+	for _, b := range grupos[0].Bloques() {
+		anchos[b.Size().Width] = true
+		if w := b.Size().Width; w <= 0 || w >= celda {
+			t.Errorf("una barra mide %g de una celda de %g: todas enteras parecen ladrillos", w, celda)
 		}
+	}
+	if len(anchos) < 3 {
+		t.Errorf("las barras solo tienen %d anchos distintos", len(anchos))
 	}
 	// Con filas ya pintadas, recargar no las cambia por el esqueleto.
 	l.Pagina = paginaEjemplo()
@@ -158,9 +173,9 @@ func TestLaPortadaQueCargaPintaLosIndicadores(t *testing.T) {
 	w.Resize(fyne.NewSize(1000, 240))
 	guardarPNG(t, w.Canvas().Capture(), "erp-portada-cargando.png")
 	w.Close()
-	n, ruedas, _ := esqueletosDe(portada)
-	if ruedas != 0 || n != 3*3 {
-		t.Errorf("la portada que carga pinta %d barras y %d ruedas; deberían ser 9 y 0", n, ruedas)
+	n, ruedas, grupos := esqueletosDe(portada)
+	if ruedas != 0 || n != 3*3 || len(grupos) != 1 {
+		t.Errorf("la portada que carga pinta %d barras en %d grupos y %d ruedas; deberían ser 9 en uno y 0", n, len(grupos), ruedas)
 	}
 
 	b = portadaArnes(t, 1280)
@@ -179,5 +194,103 @@ func TestLaPortadaQueCargaPintaLosIndicadores(t *testing.T) {
 	}
 	if !contiene(textosDe(o), b.t("dashboard.doubleEntry")) {
 		t.Error("sin resumen la portada no vuelve a lo neutro")
+	}
+}
+
+// TestLasCifrasQueCarganLatenAUna: con el resumen en camino, las tres cifras son UN
+// grupo de carga —un latido y un «Cargando»— y cada barra sigue donde estaba la del
+// `ui.Esqueleto` suelto: la mitad del ancho útil de su tarjeta, `1.25rem` de alto y
+// centrada en la caja de línea de `text-xl`. VISTO EN ROJO con la barra suelta: «3
+// barras en 0 grupos».
+func TestLasCifrasQueCarganLatenAUna(t *testing.T) {
+	b := portadaArnes(t, 1280)
+	b.Resumen, b.CargandoResumen = nil, true
+	o, alto := b.resumen(tema.Claro, 854)
+	w := test.NewWindow(o)
+	defer w.Close()
+	w.Resize(fyne.NewSize(854, alto))
+	o.Resize(fyne.NewSize(854, alto))
+	n, _, grupos := esqueletosDe(o)
+	if n != 3 || len(grupos) != 1 {
+		t.Fatalf("con el resumen en camino hay %d barras en %d grupos; deberían ser 3 en uno", n, len(grupos))
+	}
+	rej := ui.RejillaTarjetas(b.Ventana, HuecoTarjetas, CortesResumen)
+	dentro := rej.AnchoColumna(854) - 2*tema.Borde - 2*TarjetaPX
+	xs := make([]float32, 0, len(grupos[0].Bloques()))
+	for _, q := range grupos[0].Bloques() {
+		cerca(t, "el ancho de la cifra que carga", q.Size().Width, float32(int(dentro*0.5+0.5)))
+		cerca(t, "su alto", q.Size().Height, AltoBarraCifra)
+		p := fyne.CurrentApp().Driver().AbsolutePositionForObject(q)
+		xs = append(xs, p.X)
+	}
+	// Las tres barras, una por tarjeta y a una columna de distancia.
+	for i := 1; i < len(xs); i++ {
+		cerca(t, "de una cifra a la siguiente", xs[i]-xs[i-1], rej.AnchoColumna(854)+HuecoTarjetas)
+	}
+}
+
+// TestLaFacturacionQueCargaLateConLasPiezasComunes: mientras llega la serie, la barra
+// de la tarjeta de facturación por mes es un bloque de UN `ui.BloquesEsqueleto` —el
+// pulso común y un «Cargando» que la web dice con el `aria-busy` de la tarjeta— y sigue
+// donde estaba la del `ui.Esqueleto` suelto: bajo el título y su `mb-3`, a todo el ancho
+// útil y al alto de las barras. VISTO EN ROJO con la barra suelta: «1 barras en 0
+// grupos».
+func TestLaFacturacionQueCargaLateConLasPiezasComunes(t *testing.T) {
+	for _, ancho := range []float32{854, 328} {
+		b := portadaArnes(t, 1280)
+		b.Hoy = hoyFacturacion
+		b.Facturacion = FacturacionMensual{Cargando: true}
+		o, alto := b.tarjetaFacturacion(tema.Claro, ancho)
+		if o == nil {
+			t.Fatal("mientras carga la serie la tarjeta no se pinta")
+		}
+		w := test.NewWindow(o)
+		w.Resize(fyne.NewSize(ancho, alto))
+		o.Resize(fyne.NewSize(ancho, alto))
+		n, _, grupos := esqueletosDe(o)
+		if n != 1 || len(grupos) != 1 {
+			w.Close()
+			t.Fatalf("a %g de ancho la facturación que carga pinta %d barras en %d grupos; debería ser una en uno", ancho, n, len(grupos))
+		}
+		if grupos[0].AccessibilityLabel() == "" {
+			t.Error("la facturación que carga no dice «Cargando»")
+		}
+		d := fyne.CurrentApp().Driver()
+		q := grupos[0].Bloques()[0]
+		p := d.AbsolutePositionForObject(q).Subtract(d.AbsolutePositionForObject(o))
+		x0 := tema.Borde + TarjetaPX
+		cerca(t, "la x de la barra que carga", p.X, x0)
+		cerca(t, "su y, bajo el título", p.Y, x0+tema.TextoXS.Linea+TituloParteMB)
+		cerca(t, "su ancho", q.Size().Width, ancho-2*x0)
+		cerca(t, "su alto, el de las barras", q.Size().Height, AltoBarras)
+		w.Close()
+	}
+}
+
+// TestElERPNoMontaEsqueletosSueltos: toda carga del ERP late con las piezas comunes
+// (`ui.FilasEsqueleto`, `ui.BloquesEsqueleto`), que anuncian «Cargando» una vez; un
+// `ui.NuevoEsqueleto*` suelto late a su aire y no dice nada. La barra de la facturación
+// por mes era la última.
+func TestElERPNoMontaEsqueletosSueltos(t *testing.T) {
+	fuentes, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ruta := range fuentes {
+		if strings.HasSuffix(ruta, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(token.NewFileSet(), ruta, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			if s, ok := n.(*ast.SelectorExpr); ok {
+				if x, ok := s.X.(*ast.Ident); ok && x.Name == "ui" && strings.HasPrefix(s.Sel.Name, "NuevoEsqueleto") {
+					t.Errorf("%s monta un ui.%s suelto: va con ui.FilasEsqueleto o ui.BloquesEsqueleto", ruta, s.Sel.Name)
+				}
+			}
+			return true
+		})
 	}
 }

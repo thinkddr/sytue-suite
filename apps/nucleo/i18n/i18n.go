@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
+	"os"
 	"regexp"
 	"slices"
 	"sort"
@@ -166,6 +167,12 @@ type Translator struct {
 // un catálogo le puede faltar el idioma (cae al inglés, como `createAppTranslator`),
 // pero no el inglés.
 func New(l Locale, catalogos ...fs.FS) (*Translator, error) {
+	// Las capturas de las fichas y de la documentación (ui/recorrido, con
+	// SYTUE_CAPTURAS_PLAY) salen en el idioma que pida SYTUE_CAPTURAS_IDIOMA, sea cual sea
+	// el que fije cada prueba. Fuera de un recorrido de capturas no hace nada.
+	if v := os.Getenv("SYTUE_CAPTURAS_IDIOMA"); v != "" && os.Getenv("SYTUE_CAPTURAS_PLAY") != "" && IsLocale(v) {
+		l = Locale(v)
+	}
 	if !IsLocale(string(l)) {
 		return nil, fmt.Errorf("i18n: %q no es un idioma de la suite", l)
 	}

@@ -363,6 +363,26 @@ test('reauth=1 pide a Sytue ID autenticar de nuevo (max_age=0); sin él, no', as
   }
 });
 
+test('todo login pide el relevo del desbloqueo; unlock=1 obliga a meter la clave en Sytue ID', async () => {
+  const pedir = async (query: string) => {
+    const url = new URL(`https://corporate.sytue.eu/docs/auth/login${query}`);
+    const res = await conDiscovery(() =>
+      bffDeDocs().login({ request: new Request(url), url, cookies: cookiesQueApuntan().cookies }),
+    );
+    return new URL(res.headers.get('location') ?? '').searchParams;
+  };
+  let q = await pedir('?returnTo=%2Fdocs%2F');
+  expect(q.get('sytue_unlock')).toBe('1');
+  expect(q.get('prompt')).toBeNull();
+  expect(q.get('sytue_legacy')).toBeNull();
+  q = await pedir('?unlock=1&legacy=p.EBESExQVFhcYGRobHB0eHw~k.oKGi.QEFC&returnTo=%2Fdocs%2F');
+  expect(q.get('prompt')).toBe('login');
+  expect(q.get('sytue_legacy')).toBe('p.EBESExQVFhcYGRobHB0eHw~k.oKGi.QEFC');
+  // Nada que no sean parámetros públicos de un envoltorio llega a la autorización.
+  q = await pedir('?unlock=1&legacy=%3Cscript%3E&returnTo=%2Fdocs%2F');
+  expect(q.get('sytue_legacy')).toBeNull();
+});
+
 test('con el origen de respaldo de Astro (http://localhost) NO salta: sería un bucle', async () => {
   // Si el host de la petición no es de confianza, Astro deja `ctx.url` en
   // http://localhost:<puerto>. Redirigir al host del callback desde ahí volvería a

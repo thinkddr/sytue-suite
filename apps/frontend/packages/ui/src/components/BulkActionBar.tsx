@@ -36,7 +36,10 @@ import { Toolbar } from './Toolbar.js';
 export interface BulkActionBarProps {
   /** Cuántos hay marcados. Cero ⇒ la barra no se pinta. */
   count: number;
-  /** El recuento ya pluralizado por la app: «3 correos seleccionados». */
+  /**
+   * El recuento ya pluralizado por la app: «3 correos seleccionados». En el teléfono se
+   * ve solo `count` y la frase queda para el lector de pantalla.
+   */
   countLabel: string;
   /** Vaciar la selección (el aspa, y Escape). */
   onClear: () => void;
@@ -56,7 +59,7 @@ export function BulkActionBar({
   class: cls,
 }: BulkActionBarProps): JSX.Element | null {
   const t = useT();
-  // La fila se desplaza en móvil en vez de envolver (ver scrollX.ts): con las
+  // Las acciones se desplazan en móvil en vez de envolver (ver scrollX.ts): con las
   // acciones de Mail o Drive, `flex-wrap` a secas apilaba tres filas sobre la
   // lista recién marcada. El hook depende de `count` porque la barra SOLO
   // existe con selección: sin él, su efecto correría con el ref vacío.
@@ -86,28 +89,54 @@ export function BulkActionBar({
   return (
     <Toolbar
       aria-label={label ?? t('ui.bulk.region')}
-      innerRef={ref}
-      data-scroll-x
       class={cx(
         'border-border bg-bg-subtle flex flex-wrap items-center gap-1.5 border-b px-3 py-2',
-        FILA_UNICA_EN_MOVIL,
-        // La última acción asoma cortada bajo el desvanecido: es el aviso de
-        // que la fila se desliza, que en iOS no insinúa nada por sí sola.
-        queda && MASCARA_SCROLL_X,
+        // En el teléfono, UNA fila con tres partes: el recuento y el aspa FIJOS en los
+        // extremos y, entre ellos, solo las acciones deslizándose (ver abajo).
+        'max-md:flex-nowrap',
         cls,
       )}
     >
       {/* Un único `aria-live` en la barra: el recuento se anuncia al cambiar sin
-          robar el foco de la lista, que es donde se sigue marcando. */}
-      <span
-        class="text-text mr-1 text-sm font-medium tabular-nums"
-        role="status"
-        aria-live="polite"
-      >
-        {countLabel}
+          robar el foco de la lista, que es donde se sigue marcando.
+
+          EN EL TELÉFONO SE VE SOLO EL NÚMERO, como en la barra contextual de Material o
+          la de Gmail. Con el recuento y el aspa fijos, «3 archivos seleccionados» deja
+          a 320 px menos sitio que un botón para las acciones (82 px para un «Descargar»
+          de 86, medido en la barra de Drive nativa). La frase sigue entera
+          para el lector (`sr-only`), y la región viva solo la contiene a ella: el número
+          visible va fuera, para que nadie oiga «3 seleccionados 3». */}
+      <span class="text-text mr-1 flex items-center text-sm font-medium tabular-nums max-md:shrink-0">
+        <span class="max-md:sr-only" role="status" aria-live="polite">
+          {countLabel}
+        </span>
+        <span aria-hidden="true" class="text-base font-semibold md:hidden">
+          {count}
+        </span>
       </span>
-      <span class="flex-1" />
-      {children}
+      <span class="flex-1 max-md:hidden" />
+      {/* LAS ACCIONES SE DESLIZAN; EL ASPA NO. Antes la fila entera se desplazaba y,
+          con dos acciones a 320 px, el aspa —la salida, lo que se busca primero al
+          marcar sin querer— quedaba fuera de la pantalla tras un «Eliminar» cortado.
+          Ahora solo se desliza este grupo (con el desvanecido de `queda` en su canto), y
+          su primera acción lleva `ms-auto`: si caben, van a la derecha como siempre, y
+          si no, el margen se anula y se empieza por la primera, sin nada inalcanzable a
+          la izquierda (lo que sí pasaría con `justify-end`). Desde `md` el grupo es
+          `contents` y la barra es la de siempre: cada acción, un elemento más del
+          `flex-wrap`. */}
+      <div
+        ref={ref}
+        data-scroll-x
+        class={cx(
+          'md:contents',
+          'max-md:flex max-md:min-w-0 max-md:flex-1 max-md:items-center max-md:gap-1.5',
+          'max-md:[&>*:first-child]:ms-auto',
+          FILA_UNICA_EN_MOVIL,
+          queda && MASCARA_SCROLL_X,
+        )}
+      >
+        {children}
+      </div>
       <Button
         size="sm"
         variant="ghost"
@@ -116,6 +145,7 @@ export function BulkActionBar({
         title={t('ui.bulk.clear')}
         leadingIcon={<Icon name="close" size={16} />}
         onClick={onClear}
+        class="max-md:shrink-0"
       />
     </Toolbar>
   );

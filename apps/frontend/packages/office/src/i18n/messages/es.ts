@@ -11,6 +11,8 @@ import type { en } from './en';
 
 export const es: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Nombre de la hoja:',
+  'dialog.sheet.nameTaken':
+    'Ya hay una hoja llamada «{name}» (los nombres no distinguen mayúsculas y minúsculas).',
   'dialog.sheet.delete': '¿Eliminar la hoja «{name}»? Su contenido se pierde.',
   'dialog.sheet.mergeLoses':
     'Al combinar solo se conserva el valor de la celda de arriba a la izquierda ({ref}); las demás celdas del rango se vacían. Para unir todos los textos en esa celda, usa «Combinar contenido».',

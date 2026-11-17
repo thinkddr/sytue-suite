@@ -16,19 +16,10 @@ export const en = {
   'matrix.resetUnderstood': 'I understand I may lose access to earlier encrypted messages',
   'matrix.unknownKey':
     'This account was encrypted before Sytue protected its key with your sign-in. Verify this device from another one where you’re already signed in.',
-  'matrix.unlockTitle': 'Open your encrypted data',
-  'matrix.unlockBody':
-    'Confirm it’s you with your passkey or your Sytue password. It is checked on this device: nobody else can open your data.',
-  'matrix.protectTitle': 'Protect your encrypted data',
-  'matrix.protectBody':
-    'Choose how you’ll open your encrypted data on your other devices: with your passkey or your Sytue password. Only you will be able to open it.',
-  'matrix.usePasskey': 'Use passkey',
-  'matrix.usePassword': 'Use password',
-  'matrix.password': 'Sytue password',
-  'matrix.passwordConfirm': 'Repeat the password',
-  'matrix.passwordMismatch': 'The passwords don’t match.',
-  'matrix.unlockWrong': 'That didn’t work. Try again.',
-  'matrix.passkeyUnsupported': 'This passkey can’t open encrypted data. Use your password.',
+  'matrix.unlocking': 'Unlocking your encrypted data…',
+  'matrix.signIn': 'Sign in to Sytue ID',
+  'matrix.signInBody':
+    'Your Sytue ID sign-in unlocks your encrypted data on this device. Sign in again with your password or passkey to open it here.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Allow encrypted processing',
   'matrix.allowStorageBody':

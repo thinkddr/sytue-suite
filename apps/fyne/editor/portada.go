@@ -721,14 +721,16 @@ func (w *vistaPortada) rehacerCuerpo() {
 	w.rejilla = nil
 	switch p.Estado {
 	case Cargando:
+		// Las teselas son UN grupo de carga: laten a una y dicen «Cargando» una vez.
+		g := ui.NuevosBloquesEsqueleto()
 		esqueletos := make([]fyne.CanvasObject, EsqueletosPortada)
 		for i := range esqueletos {
-			e := ui.NuevoEsqueleto(0, AltoEsqueletoPortada)
-			e.Radio = tema.RadioLG
+			e := g.Bloque(0, AltoEsqueletoPortada)
+			e.CornerRadius = tema.RadioLG
 			esqueletos[i] = e
 		}
 		w.rejilla = &rejillaPortada{auto: true, alto: AltoEsqueletoPortada}
-		w.cuerpo = container.New(w.rejilla, esqueletos...)
+		w.cuerpo = g.Con(container.New(w.rejilla, esqueletos...))
 	case Listo:
 		teselas := make([]fyne.CanvasObject, len(p.Docs))
 		acc := AccionesTesela{

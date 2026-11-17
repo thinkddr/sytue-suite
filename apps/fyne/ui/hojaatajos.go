@@ -39,9 +39,10 @@ type GrupoDeAtajos struct {
 // botón `cerrar` («Cerrar», ya traducido) en el pie. Devuelve el diálogo.
 func MostrarHojaAtajos(lienzo fyne.Canvas, titulo, cerrar string, grupos []GrupoDeAtajos) *Dialogo {
 	ancho := AnchoCuerpoTalla(DialogoMD, fyne.NewSize(lienzo.Size().Width, 0))
+	columna := ColumnaTeclasAtajos(grupos, ancho)
 	secciones := make([]fyne.CanvasObject, 0, len(grupos))
 	for _, g := range grupos {
-		secciones = append(secciones, nuevaSeccionAtajos(g, ancho))
+		secciones = append(secciones, nuevaSeccionAtajos(g, ancho, columna))
 	}
 	var d *Dialogo
 	boton := NuevoBoton(cerrar, func() { d.Cerrar() })
@@ -52,8 +53,9 @@ func MostrarHojaAtajos(lienzo fyne.Canvas, titulo, cerrar string, grupos []Grupo
 }
 
 // Las medidas de la hoja: grupos con `gap-5`, el rótulo en `sytue-overline mb-2`, filas
-// `flex items-center gap-4 py-1.5` separadas por `divide-y` a `border/60`, y cada tecla
-// la `<Kbd>` del papel (TeclaSuperficie) con `gap-1` entre ellas.
+// con `py-1.5` separadas por `divide-y` a `border/60`, `gap-x-4` entre las teclas y lo
+// que hacen, y cada tecla la `<Kbd>` del papel (TeclaSuperficie) con `gap-1` entre ellas
+// —también entre líneas, cuando una combinación larga baja de línea—.
 const (
 	huecoGruposAtajos float32 = 5 * 0.25 * tema.Rem
 	bajoRotuloAtajos  float32 = 2 * 0.25 * tema.Rem
@@ -62,26 +64,95 @@ const (
 	huecoTeclas       float32 = 1 * 0.25 * tema.Rem
 )
 
-// AltoFilaAtajo es una fila: su `py-1.5` y lo más alto de la tecla (17,5, que hoy manda)
-// y la línea de `text-sm`.
+// AltoFilaAtajo es una fila de una sola línea: su `py-1.5` y lo más alto de la tecla
+// (17,5, que hoy manda) y la línea de `text-sm`. Una combinación que baja de línea o una
+// descripción que se parte la hacen más alta (ver altoFilaAtajo).
 var AltoFilaAtajo = 2*rellenoFilaAtajo + max(LadoTecla, tema.TextoSM.Linea)
+
+// ColumnaTeclasAtajos es el ancho de la columna de teclas, UNA para toda la hoja: el
+// `grid-cols-[fit-content(50%)_minmax(0,1fr)]` con `subgrid` de `ShortcutsModal.tsx`.
+//
+// Antes cada fila ponía la descripción tras SUS teclas, así que «?» y «Ctrl K» dejaban
+// el texto en dos verticales distintas y la hoja se leía en zigzag. Ahora la columna
+// mide lo que la combinación más ancha, sin pasar de media hoja; y nunca menos que la
+// tecla más ancha, que no se parte (`fit-content`: el mínimo de su contenido manda).
+func ColumnaTeclasAtajos(grupos []GrupoDeAtajos, ancho float32) float32 {
+	var entera, minima float32
+	for _, g := range grupos {
+		for _, a := range g.Atajos {
+			anchos := anchosTeclas(a.Teclas)
+			fila := float32(0)
+			for i, w := range anchos {
+				if i > 0 {
+					fila += huecoTeclas
+				}
+				fila += w
+				minima = max(minima, w)
+			}
+			entera = max(entera, fila)
+		}
+	}
+	return max(minima, min(entera, ancho/2))
+}
+
+// anchosTeclas es lo que mide cada tecla de la combinación, ya dibujada.
+func anchosTeclas(teclas []string) []float32 {
+	anchos := make([]float32, len(teclas))
+	for i, k := range teclas {
+		anchos[i] = MedidaTecla(TeclaSuperficie(k)).Width
+	}
+	return anchos
+}
+
+// lineasTeclas reparte una combinación en la columna: el `flex-wrap` del `<dt>`.
+func lineasTeclas(anchos []float32, columna float32) [][]int {
+	return RepartirEnLineas(anchos, columna, func(int) float32 { return huecoTeclas })
+}
+
+// altoTeclas es lo que ocupan `n` líneas de teclas con su `gap-1` entre ellas.
+func altoTeclas(n int) float32 {
+	if n == 0 {
+		return 0
+	}
+	return float32(n)*LadoTecla + float32(n-1)*huecoTeclas
+}
 
 // seccionAtajos es un grupo de la hoja.
 type seccionAtajos struct {
 	widget.BaseWidget
-	g     GrupoDeAtajos
-	ancho float32
+	g       GrupoDeAtajos
+	ancho   float32
+	columna float32
 }
 
-func nuevaSeccionAtajos(g GrupoDeAtajos, ancho float32) *seccionAtajos {
-	s := &seccionAtajos{g: g, ancho: ancho}
+func nuevaSeccionAtajos(g GrupoDeAtajos, ancho, columna float32) *seccionAtajos {
+	s := &seccionAtajos{g: g, ancho: ancho, columna: columna}
 	s.ExtendBaseWidget(s)
 	return s
 }
 
+// anchoTexto es lo que le queda a la descripción a ese ancho de sección.
+func (s *seccionAtajos) anchoTexto(ancho float32) float32 {
+	return max(ancho-s.columna-huecoFilaAtajo, 0)
+}
+
+// altoFilaAtajo es una fila a ese ancho de descripción: el `py-1.5` y lo más alto de
+// sus dos columnas, teclas (con sus líneas) o descripción (con las suyas).
+func (s *seccionAtajos) altoFilaAtajo(a AtajoDeTeclado, anchoTexto float32) float32 {
+	teclas := altoTeclas(len(lineasTeclas(anchosTeclas(a.Teclas), s.columna)))
+	texto := float32(len(Repartir(a.Descripcion, tema.TextoSM, Normal, anchoTexto))) * tema.TextoSM.Linea
+	return 2*rellenoFilaAtajo + max(teclas, texto, LadoTecla, tema.TextoSM.Linea)
+}
+
 func (s *seccionAtajos) MinSize() fyne.Size {
-	n := float32(len(s.g.Atajos))
-	return fyne.NewSize(s.ancho, tema.TextoXS.Linea+bajoRotuloAtajos+n*AltoFilaAtajo+max(n-1, 0)*tema.Borde)
+	alto := tema.TextoXS.Linea + bajoRotuloAtajos
+	for i, a := range s.g.Atajos {
+		if i > 0 {
+			alto += tema.Borde
+		}
+		alto += s.altoFilaAtajo(a, s.anchoTexto(s.ancho))
+	}
+	return fyne.NewSize(s.ancho, alto)
 }
 
 func (s *seccionAtajos) CreateRenderer() fyne.WidgetRenderer {
@@ -100,7 +171,9 @@ func (s *seccionAtajos) CreateRenderer() fyne.WidgetRenderer {
 			fila = append(fila, tecla)
 			r.objetos = append(r.objetos, tecla)
 		}
-		texto := Texto(a.Descripcion, tema.TextoSM, Normal, tema.Color("text", v))
+		// Un párrafo y no un `canvas.Text`: en la hoja del teléfono una descripción larga
+		// se parte en líneas, como el `<dd>` de la web, en vez de salirse por el canto.
+		texto := NuevoParrafoConTinta(a.Descripcion, tema.TextoSM, Normal, tema.Color("text", v))
 		r.teclas, r.textos = append(r.teclas, fila), append(r.textos, texto)
 		r.objetos = append(r.objetos, texto)
 	}
@@ -113,7 +186,7 @@ type seccionAtajosRenderer struct {
 	rotulo  *Versal
 	filetes []*canvas.Rectangle
 	teclas  [][]*Tecla // las de cada fila
-	textos  []*canvas.Text
+	textos  []*Parrafo
 	objetos []fyne.CanvasObject
 }
 
@@ -123,24 +196,41 @@ func (r *seccionAtajosRenderer) Destroy()                     {}
 func (r *seccionAtajosRenderer) Layout(t fyne.Size) {
 	r.rotulo.Colocar(0, 0)
 	y := tema.TextoXS.Linea + bajoRotuloAtajos
-	for i := range r.teclas {
+	anchoTexto := r.s.anchoTexto(t.Width)
+	for i, a := range r.s.g.Atajos {
 		if i > 0 {
 			r.filetes[i-1].Move(fyne.NewPos(0, y))
 			r.filetes[i-1].Resize(fyne.NewSize(t.Width, tema.Borde))
 			y += tema.Borde
 		}
-		x := float32(0)
-		for j, k := range r.teclas[i] {
-			if j > 0 {
-				x += huecoTeclas
-			}
-			m := k.MinSize()
-			k.Move(fyne.NewPos(x, y+(AltoFilaAtajo-m.Height)/2))
-			k.Resize(m)
-			x += m.Width
+		alto := r.s.altoFilaAtajo(a, anchoTexto)
+		// Las dos columnas van centradas en la fila (`items-center`): una combinación de
+		// dos líneas junto a una descripción de una, y al revés.
+		teclas := r.teclas[i]
+		anchos := make([]float32, len(teclas))
+		for j, k := range teclas {
+			anchos[j] = k.MinSize().Width
 		}
-		ColocarTexto(r.textos[i], tema.TextoSM, x+huecoFilaAtajo, y+(AltoFilaAtajo-tema.TextoSM.Linea)/2)
-		y += AltoFilaAtajo
+		lineas := lineasTeclas(anchos, r.s.columna)
+		yt := y + (alto-altoTeclas(len(lineas)))/2
+		for _, linea := range lineas {
+			x := float32(0)
+			for n, j := range linea {
+				if n > 0 {
+					x += huecoTeclas
+				}
+				m := teclas[j].MinSize()
+				teclas[j].Move(fyne.NewPos(x, yt+(LadoTecla-m.Height)/2))
+				teclas[j].Resize(m)
+				x += m.Width
+			}
+			yt += LadoTecla + huecoTeclas
+		}
+		texto := r.textos[i]
+		m := MedidaParrafo(texto, anchoTexto)
+		texto.Move(fyne.NewPos(r.s.columna+huecoFilaAtajo, y+(alto-m.Height)/2))
+		texto.Resize(m)
+		y += alto
 	}
 }
 
@@ -151,7 +241,7 @@ func (r *seccionAtajosRenderer) Refresh() {
 		f.FillColor = veloAtajos(tema.Color("border", v))
 	}
 	for _, x := range r.textos {
-		x.Color = tema.Color("text", v)
+		x.Tinta = tema.Color("text", v)
 	}
 	for _, o := range r.objetos {
 		o.Refresh()

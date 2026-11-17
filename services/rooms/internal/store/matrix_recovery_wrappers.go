@@ -78,7 +78,7 @@ func (s *Store) MatrixRecoveryWrappers(ctx context.Context, subject string, acco
 // almacenamiento (la clave cambió: ya no abren nada) y, en la cuenta de Rooms, la
 // copia con KEK de ADR 0081: desde aquí, nadie más que la persona puede leerla.
 func (s *Store) PutMatrixRecoveryWrapper(ctx context.Context, subject string, account MatrixRecoveryAccount, kind, credentialID, keyID string, wrapper []byte) (string, error) {
-	if !account.valid() || subject == "" || keyID == "" || len(wrapper) == 0 || (kind == "password") != (credentialID == "") {
+	if !account.valid() || subject == "" || keyID == "" || len(wrapper) == 0 || (kind == "passkey") != (credentialID != "") {
 		return "", domain.ErrInvalidInput
 	}
 	var id string

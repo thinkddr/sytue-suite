@@ -1,0 +1,324 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * Puente del desbloqueo (ADR 0084 y 0085): una página de Sytue ID que una app web de
+ * la suite carga en un iframe oculto para usar la clave de desbloqueo que dejó aquí
+ * el relevo. Así un solo inicio de sesión desbloquea todas las apps de este
+ * navegador sin que la clave pase por ningún servidor.
+ *
+ * Desde la ADR 0085 la clave NO sale de este origen: el puente no la puede leer (es
+ * una CryptoKey no extraíble) y no la entrega. Hace él las dos operaciones que una
+ * app necesita y le devuelve solo su resultado:
+ *
+ * - `sytue-e2e-unwrap`: abre el envoltorio de la clave de recuperación de UNA cuenta
+ *   de Matrix de la persona y devuelve esa clave de recuperación, que el SDK de la
+ *   app necesita igualmente. En la transición, también un envoltorio de la 0082.
+ * - `sytue-e2e-wrap`: envuelve la clave de recuperación de una cuenta de la persona
+ *   y devuelve el envoltorio (público: es lo que guarda Rooms).
+ *
+ * Contesta SOLO a su ventana madre y SOLO si su origen es exactamente el que el
+ * servidor validó y puso en la CSP de esta página (`frame-ancestors`): otro origen,
+ * otra ventana o un iframe anidado no reciben nada. Solo usa la clave de la persona
+ * que la app pide (`sub`) y solo para cuentas de Matrix de ESA persona: la de Rooms
+ * desde cualquier app de la suite y la de almacenamiento aislado de un producto solo
+ * desde la app de ese producto. Y como mucho unas pocas operaciones por segundo.
+ */
+(function (global) {
+  "use strict";
+  var E = global.SytueE2E;
+  if (!E) return;
+  var enc = new TextEncoder();
+  var WRAP_LABEL = "sytue-matrix-recovery-wrap-v1";
+  var VERSION = 2;
+  var MAX_WRAPPERS = 32;
+  var MAX_RECOVERY = 256;
+  var RATE = 10;
+
+  // El host de la app de cada producto con cuenta aislada, si no se llama igual.
+  var HOSTS = {
+    docs: ["docus"],
+    sheets: ["calcus"],
+    slides: ["diapos"],
+    pdf: ["certipdf"],
+    hub: ["hub", "one"],
+  };
+
+  /**
+   * ¿Puede la app de `origin` operar sobre `account` con la clave de `sub`?
+   * Las cuentas de la suite son `@sytue_<sub>:<servidor>` (Rooms) y
+   * `@sytue_storage_<producto>_<organización>_<sub>:<servidor>` (aisladas).
+   */
+  E.accountAllowed = function (origin, sub, account) {
+    if (typeof account !== "string" || account.length > 512) return false;
+    var m = /^@([^:]+):[^:\s]+$/.exec(account);
+    if (!m) return false;
+    var local = m[1];
+    if (local === "sytue_" + sub) return true;
+    var iso = /^sytue_storage_([a-z]+)_(.+)$/.exec(local);
+    if (!iso) return false;
+    var rest = iso[2];
+    if (
+      rest.slice(-(sub.length + 1)) !== "_" + sub ||
+      rest.length <= sub.length + 1
+    )
+      return false;
+    var host = "";
+    try {
+      host = new URL(origin).hostname.split(".")[0];
+    } catch (e) {
+      return false;
+    }
+    return (HOSTS[iso[1]] || [iso[1]]).indexOf(host) >= 0;
+  };
+
+  function aad(kind, account, keyID, cred) {
+    return enc.encode(
+      [WRAP_LABEL, kind, account, keyID, cred || ""].join("\0"),
+    );
+  }
+  function wrapperShape(w) {
+    return (
+      !!w &&
+      typeof w === "object" &&
+      w.v === 1 &&
+      typeof w.kind === "string" &&
+      typeof w.key_id === "string" &&
+      typeof w.credential_id === "string" &&
+      typeof w.nonce === "string" &&
+      typeof w.ciphertext === "string" &&
+      !!w.kdf &&
+      typeof w.kdf === "object"
+    );
+  }
+  function openWith(key, account, w) {
+    return global.crypto.subtle
+      .decrypt(
+        {
+          name: "AES-GCM",
+          iv: E.unb64(w.nonce),
+          additionalData: aad(w.kind, account, w.key_id, w.credential_id),
+        },
+        key,
+        E.unb64(w.ciphertext),
+      )
+      .then(function (plain) {
+        var bytes = new Uint8Array(plain);
+        try {
+          return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        } finally {
+          E.wipe(bytes);
+        }
+      });
+  }
+  /** Prueba en orden; el primero que abre gana. */
+  function first(list, fn) {
+    var chain = Promise.resolve(null);
+    list.forEach(function (x) {
+      chain = chain.then(function (done) {
+        return done !== null
+          ? done
+          : fn(x).catch(function () {
+              return null;
+            });
+      });
+    });
+    return chain;
+  }
+  function legacyFor(sub, now) {
+    return E.load("legacy:" + sub).then(function (old) {
+      if (!old || !Array.isArray(old.items) || now - old.at > E.PENDING_TTL)
+        return [];
+      return old.items.filter(function (l) {
+        return E.sealedKey(l.key);
+      });
+    });
+  }
+
+  /** `sytue-e2e-unwrap`: la clave de recuperación de una cuenta, o por qué no. */
+  E.bridgeUnwrap = function (m, now) {
+    var wrappers = Array.isArray(m.wrappers)
+      ? m.wrappers.slice(0, MAX_WRAPPERS).filter(wrapperShape)
+      : [];
+    return Promise.all([
+      E.load("auk:" + m.sub).catch(function () {
+        return null;
+      }),
+      legacyFor(m.sub, now).catch(function () {
+        return [];
+      }),
+    ]).then(function (r) {
+      var rec = r[0];
+      var legacy = r[1];
+      var stale = false;
+      var mine = wrappers.filter(function (w) {
+        if (
+          w.kind !== "sytue-id" ||
+          w.kdf.alg !== "sytue-id-unlock-hkdf-sha256"
+        )
+          return false;
+        if (rec && w.kdf.hint === rec.hint) return true;
+        // Cerrado con una clave de desbloqueo que la persona ya no tiene.
+        stale = true;
+        return false;
+      });
+      return first(mine, function (w) {
+        return openWith(rec.wrap, m.account, w).then(function (key) {
+          return { recovery_key: key, kind: "sytue-id" };
+        });
+      }).then(function (got) {
+        if (got) return got;
+        var pairs = [];
+        legacy.forEach(function (l) {
+          wrappers.forEach(function (w) {
+            if (
+              w.kind === l.kind &&
+              ((w.kind === "password" &&
+                w.kdf.alg === "argon2id" &&
+                w.kdf.salt === l.salt) ||
+                (w.kind === "passkey" && w.credential_id === l.credential_id))
+            )
+              pairs.push({ key: l.key, w: w });
+          });
+        });
+        return first(pairs, function (p) {
+          return openWith(p.key, m.account, p.w).then(function (key) {
+            return { recovery_key: key, kind: p.w.kind };
+          });
+        }).then(function (old) {
+          if (old) return old;
+          // Sin clave aquí: que entre en Sytue ID. Con una clave que no es la de
+          // sus envoltorios (empezó de cero en otro sitio): se distingue.
+          return { error: rec && stale ? "wrong" : "signin" };
+        });
+      });
+    });
+  };
+
+  /** `sytue-e2e-wrap`: el envoltorio `sytue-id` de una clave de recuperación. */
+  E.bridgeWrap = function (m, now) {
+    if (
+      typeof m.key_id !== "string" ||
+      !m.key_id ||
+      m.key_id.length > 255 ||
+      typeof m.recovery_key !== "string" ||
+      !m.recovery_key ||
+      m.recovery_key.length > MAX_RECOVERY
+    )
+      return Promise.resolve({ error: "invalid" });
+    return Promise.all([
+      E.load("auk:" + m.sub).catch(function () {
+        return null;
+      }),
+      legacyFor(m.sub, now).catch(function () {
+        return [];
+      }),
+    ]).then(function (r) {
+      var rec = r[0];
+      if (!rec) return { error: "signin" };
+      var nonce = E.random(12);
+      var plain = enc.encode(m.recovery_key);
+      return global.crypto.subtle
+        .encrypt(
+          {
+            name: "AES-GCM",
+            iv: nonce,
+            additionalData: aad("sytue-id", m.account, m.key_id, ""),
+          },
+          rec.wrap,
+          plain,
+        )
+        .then(function (ct) {
+          E.wipe(plain);
+          return {
+            wrapper: {
+              v: 1,
+              kind: "sytue-id",
+              key_id: m.key_id,
+              credential_id: "",
+              kdf: { alg: "sytue-id-unlock-hkdf-sha256", hint: rec.hint },
+              nonce: E.b64(nonce),
+              ciphertext: E.b64(new Uint8Array(ct)),
+            },
+            legacy: r[1].length > 0,
+          };
+        });
+    });
+  };
+
+  E.bridge = function (cfg, win, now) {
+    var origin = cfg && cfg.origin;
+    var parent = win.parent;
+    var clock = now || Date.now;
+    if (!origin || !parent || parent === win) return false;
+    var recent = [];
+    function reply(id, body) {
+      body.type = "sytue-e2e-result";
+      body.id = id;
+      parent.postMessage(body, origin);
+    }
+    win.addEventListener("message", function (ev) {
+      if (ev.source !== parent || ev.origin !== origin) return;
+      var m = ev.data;
+      if (
+        !m ||
+        typeof m !== "object" ||
+        typeof m.id !== "string" ||
+        typeof m.sub !== "string" ||
+        !m.sub ||
+        m.sub.length > 255
+      )
+        return;
+      var t = clock();
+      recent = recent.filter(function (x) {
+        return t - x < 1000;
+      });
+      if (recent.length >= RATE) {
+        reply(m.id, { ok: false, error: "busy" });
+        return;
+      }
+      recent.push(t);
+      var op;
+      if (m.type === "sytue-e2e-unwrap" || m.type === "sytue-e2e-wrap") {
+        if (!E.accountAllowed(origin, m.sub, m.account)) {
+          reply(m.id, { ok: false, error: "account" });
+          return;
+        }
+        op =
+          m.type === "sytue-e2e-unwrap"
+            ? E.bridgeUnwrap(m, t)
+            : E.bridgeWrap(m, t);
+      } else if (m.type === "sytue-e2e-forget-legacy") {
+        op = E.migrate()
+          .then(function () {
+            return E.store.del("legacy:" + m.sub);
+          })
+          .then(function () {
+            return {};
+          });
+      } else {
+        // `sytue-e2e-get` (la versión anterior, que entregaba la clave) ya no existe.
+        return;
+      }
+      op.then(
+        function (out) {
+          if (out.error) reply(m.id, { ok: false, error: out.error });
+          else {
+            out.ok = true;
+            reply(m.id, out);
+          }
+        },
+        function () {
+          reply(m.id, { ok: false, error: "unavailable" });
+        },
+      );
+    });
+    // La conversión de lo que hubiera en claro, antes de la primera operación.
+    E.migrate();
+    parent.postMessage({ type: "sytue-e2e-ready", v: VERSION }, origin);
+    return true;
+  };
+
+  var doc = global.document;
+  var el = doc && doc.getElementById("e2e-bridge");
+  if (!el) return;
+  E.bridge(JSON.parse(el.textContent), global);
+})(typeof window !== "undefined" ? window : globalThis);

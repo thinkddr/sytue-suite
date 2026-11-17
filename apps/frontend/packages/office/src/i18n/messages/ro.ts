@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const ro: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Numele foii:',
+  'dialog.sheet.nameTaken':
+    'Există deja o foaie numită „{name}” (numele nu fac diferența între majuscule și minuscule).',
   'dialog.sheet.delete': 'Ștergeți foaia „{name}”? Conținutul ei se va pierde.',
   'dialog.sheet.mergeLoses':
     'La îmbinare se păstrează doar valoarea celulei din stânga sus ({ref}); celelalte celule din zonă se golesc. Pentru a uni tot textul în acea celulă, folosiți „Îmbinați conținutul”.',

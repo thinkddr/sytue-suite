@@ -522,6 +522,7 @@
   "dialog.merge.reset": "Dokument sa nahradí {total} zlúčenými kópiami. Šablóna aj zdroj údajov sa stratia. Pokračovať?",
   "dialog.sheet.delete": "Odstrániť hárok „{name}“? Jeho obsah sa stratí.",
   "dialog.sheet.mergeLoses": "Pri zlúčení sa zachová iba hodnota ľavej hornej bunky ({ref}); ostatné bunky rozsahu sa vymažú. Ak chcete spojiť všetok text do tejto bunky, použite „Zlúčiť obsah“.",
+  "dialog.sheet.nameTaken": "Hárok s názvom „{name}“ už existuje (názvy nerozlišujú veľké a malé písmená).",
   "dialog.sheet.rename": "Názov hárka:",
   "dialog.slide.delete": "Odstrániť snímku {n}?",
   "doc.msg.exportFailed": "Nepodarilo sa exportovať",

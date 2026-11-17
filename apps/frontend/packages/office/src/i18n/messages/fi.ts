@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const fi: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Taulukon nimi:',
+  'dialog.sheet.nameTaken':
+    'Taulukko nimeltä ”{name}” on jo olemassa (nimissä isoja ja pieniä kirjaimia ei eroteta).',
   'dialog.sheet.delete': 'Poistetaanko taulukko ”{name}”? Sen sisältö menetetään.',
   'dialog.sheet.mergeLoses':
     'Yhdistettäessä säilyy vain vasemman yläsolun ({ref}) arvo; alueen muut solut tyhjennetään. Jos haluat koota kaikki tekstit tähän soluun, valitse ”Yhdistä sisältö”.',

@@ -12,20 +12,10 @@ export const sl: Catalog = {
   'matrix.resetUnderstood': 'Razumem, da lahko izgubim dostop do starejših šifriranih sporočil',
   'matrix.unknownKey':
     'Ta račun je bil šifriran, preden je Sytue zaščitil njegov ključ s tvojo prijavo. To napravo preveri z drugo, na kateri si že prijavljen.',
-  'matrix.unlockTitle': 'Odpri svoje šifrirane podatke',
-  'matrix.unlockBody':
-    'Potrdi, da si to ti, s ključem za dostop ali geslom Sytue. Preverjanje poteka na tej napravi: nihče drug ne more odpreti tvojih podatkov.',
-  'matrix.protectTitle': 'Zaščiti svoje šifrirane podatke',
-  'matrix.protectBody':
-    'Izberi, kako boš odpiral šifrirane podatke na drugih napravah: s ključem za dostop ali geslom Sytue. Odpreti jih boš mogel samo ti.',
-  'matrix.usePasskey': 'Uporabi ključ za dostop',
-  'matrix.usePassword': 'Uporabi geslo',
-  'matrix.password': 'Geslo Sytue',
-  'matrix.passwordConfirm': 'Ponovi geslo',
-  'matrix.passwordMismatch': 'Gesli se ne ujemata.',
-  'matrix.unlockWrong': 'Ni uspelo. Poskusi znova.',
-  'matrix.passkeyUnsupported':
-    'S tem ključem za dostop ni mogoče odpreti šifriranih podatkov. Uporabi geslo.',
+  'matrix.unlocking': 'Odklepanje tvojih šifriranih podatkov …',
+  'matrix.signIn': 'Prijava v Sytue ID',
+  'matrix.signInBody':
+    'Prijava v Sytue ID odklene tvoje šifrirane podatke v tej napravi. Znova se prijavi z geslom ali ključem za dostop, da jih odpreš tukaj.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Dovoli obdelavo šifriranih podatkov',
   'matrix.allowStorageBody':

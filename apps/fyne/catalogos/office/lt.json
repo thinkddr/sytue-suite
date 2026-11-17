@@ -522,6 +522,7 @@
   "dialog.merge.reset": "Dokumentas bus pakeistas {total} sulietomis kopijomis. Šablonas ir duomenų šaltinis bus prarasti. Tęsti?",
   "dialog.sheet.delete": "Ištrinti lapą „{name}“? Jo turinys bus prarastas.",
   "dialog.sheet.mergeLoses": "Suliejant išlaikoma tik viršutinio kairiojo langelio ({ref}) reikšmė; kiti srities langeliai išvalomi. Kad visas tekstas būtų sujungtas tame langelyje, naudokite „Sulieti turinį“.",
+  "dialog.sheet.nameTaken": "Lapas pavadinimu „{name}“ jau yra (pavadinimuose didžiosios ir mažosios raidės neskiriamos).",
   "dialog.sheet.rename": "Lapo pavadinimas:",
   "dialog.slide.delete": "Ištrinti skaidrę {n}?",
   "doc.msg.exportFailed": "Nepavyko eksportuoti",

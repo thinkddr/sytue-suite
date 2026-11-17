@@ -62,6 +62,38 @@ func LineaError(texto string) *fyne.Container {
 		NuevoRotulo(texto, tema.TextoXS, Normal, "danger-text"))
 }
 
+// LineaErrorA es LineaError en un hueco de `ancho`: si el texto no cabe en una línea se
+// parte en las de debajo, como el `<p>` de la web, y el icono queda centrado en el bloque
+// (`items-center`). Con un ancho que no se sabe (0), o si cabe, es LineaError. El aviso
+// de una pregunta («Ya hay una hoja llamada…») no cabía en el diálogo de 390.
+func LineaErrorA(texto string, ancho float32) *fyne.Container {
+	sangria := LadoIconoError + HuecoLineaError
+	if ancho <= 0 || Medir(texto, tema.TextoXS, Normal).Width+sangria <= ancho {
+		return LineaError(texto)
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	icono := iconos.Trazo(iconos.Peligro, LadoIconoError, "danger-text", v).Objeto()
+	p := NuevoParrafo(texto, tema.TextoXS, Normal, "danger-text", v).A(ancho - sangria)
+	return container.New(&errorPartido{texto: p}, icono, p)
+}
+
+// errorPartido coloca el icono de un error a la izquierda, centrado en vertical en el
+// párrafo partido que va a su derecha.
+type errorPartido struct{ texto *Parrafo }
+
+func (e *errorPartido) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(LadoIconoError+HuecoLineaError+e.texto.Ancho, AltoParrafo(e.texto, e.texto.Ancho))
+}
+
+func (e *errorPartido) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
+	alto := AltoParrafo(e.texto, e.texto.Ancho)
+	m := objs[0].MinSize()
+	objs[0].Move(fyne.NewPos(0, (alto-m.Height)/2))
+	objs[0].Resize(m)
+	objs[1].Move(fyne.NewPos(LadoIconoError+HuecoLineaError, 0))
+	objs[1].Resize(MedidaParrafo(e.texto, e.texto.Ancho))
+}
+
 // filaCentrada es `flex items-center gap-*`: cada hijo a su tamaño, en fila y centrado
 // en vertical en la más alta.
 type filaCentrada struct{ Hueco float32 }

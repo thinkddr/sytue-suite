@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const lt: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Lapo pavadinimas:',
+  'dialog.sheet.nameTaken':
+    'Lapas pavadinimu „{name}“ jau yra (pavadinimuose didžiosios ir mažosios raidės neskiriamos).',
   'dialog.sheet.delete': 'Ištrinti lapą „{name}“? Jo turinys bus prarastas.',
   'dialog.sheet.mergeLoses':
     'Suliejant išlaikoma tik viršutinio kairiojo langelio ({ref}) reikšmė; kiti srities langeliai išvalomi. Kad visas tekstas būtų sujungtas tame langelyje, naudokite „Sulieti turinį“.',

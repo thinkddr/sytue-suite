@@ -12,20 +12,10 @@ export const lt: Catalog = {
   'matrix.resetUnderstood': 'Suprantu, kad galiu prarasti prieigą prie ankstesnių šifruotų žinučių',
   'matrix.unknownKey':
     'Ši paskyra buvo užšifruota anksčiau, nei Sytue apsaugojo jos raktą tavo prisijungimu. Patvirtink šį įrenginį iš kito, kuriame jau esi prisijungęs.',
-  'matrix.unlockTitle': 'Atverk savo šifruotus duomenis',
-  'matrix.unlockBody':
-    'Patvirtink, kad tai tu, prieigos raktu arba Sytue slaptažodžiu. Tikrinama šiame įrenginyje: niekas kitas negali atverti tavo duomenų.',
-  'matrix.protectTitle': 'Apsaugok savo šifruotus duomenis',
-  'matrix.protectBody':
-    'Pasirink, kaip atversi šifruotus duomenis kituose įrenginiuose: prieigos raktu arba Sytue slaptažodžiu. Atverti juos galėsi tik tu.',
-  'matrix.usePasskey': 'Naudoti prieigos raktą',
-  'matrix.usePassword': 'Naudoti slaptažodį',
-  'matrix.password': 'Sytue slaptažodis',
-  'matrix.passwordConfirm': 'Pakartok slaptažodį',
-  'matrix.passwordMismatch': 'Slaptažodžiai nesutampa.',
-  'matrix.unlockWrong': 'Nepavyko. Bandyk dar kartą.',
-  'matrix.passkeyUnsupported':
-    'Šiuo prieigos raktu negalima atverti šifruotų duomenų. Naudok slaptažodį.',
+  'matrix.unlocking': 'Atrakinami tavo šifruoti duomenys…',
+  'matrix.signIn': 'Prisijungti prie Sytue ID',
+  'matrix.signInBody':
+    'Prisijungimas prie Sytue ID atrakina tavo šifruotus duomenis šiame įrenginyje. Prisijunk dar kartą slaptažodžiu arba prieigos raktu, kad juos čia atvertum.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Leisti šifruotų duomenų apdorojimą',
   'matrix.allowStorageBody':

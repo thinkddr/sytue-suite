@@ -5,6 +5,7 @@ package cifrado
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"runtime"
 
@@ -57,9 +58,13 @@ func configureNativePanel(suite *sesion.Suite, product, consumer string, mobile 
 	}
 	panel.nativeRecovery = product == "drive"
 	// Todos los productos de almacenamiento guardan su clave envuelta en Rooms, por
-	// la cuenta de Matrix de cada panel (ADR 0082). Un solo sitio: nadie lo copia.
+	// la cuenta de Matrix de cada panel, con la clave de desbloqueo de la sesión (ADR
+	// 0084). Un solo sitio: nadie lo copia.
 	if panel.Custodio == nil && suite != nil {
 		panel.Custodio = custodiaDeSesion{roomsURL: suite.URL}
+	}
+	if panel.Desbloqueo == nil {
+		panel.ConSesion(suite)
 	}
 	if consumer != "" {
 		base, err := ajustes.Carpeta()
@@ -81,6 +86,26 @@ func configureNativePanel(suite *sesion.Suite, product, consumer string, mobile 
 		}
 	}
 	return nil
+}
+
+// ConSesion conecta el panel con la sesión de la suite (ADR 0084): la clave de
+// desbloqueo que trajo el inicio de sesión en Sytue ID, guardada con la sesión que las
+// apps nativas del dispositivo comparten (un inicio de sesión desbloquea todas), y
+// volver a entrar en Sytue ID cuando falta.
+func (c *Panel) ConSesion(suite *sesion.Suite) {
+	if c == nil || suite == nil || suite.Sesion == nil {
+		return
+	}
+	c.Desbloqueo = func() Material {
+		clave, legado := suite.Sesion.Desbloqueo()
+		return Material{Clave: clave, Legado: legado}
+	}
+	c.OlvidarLegado = func(ctx context.Context) {
+		if err := suite.Sesion.OlvidarLegado(ctx); err != nil {
+			slog.Warn("cifrado: no se pudo retirar lo que abría los envoltorios de la ADR 0082", "error", err)
+		}
+	}
+	c.IniciarSesion = suite.EntrarParaDesbloquear
 }
 
 type nativeRecoverySecrets struct{}

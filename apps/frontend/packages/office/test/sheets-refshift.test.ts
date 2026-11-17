@@ -377,6 +377,18 @@ test('desde otra hoja, borrar la fila referida da #¡REF! y un rango se encoge',
   expect(f('=Ventas!B9')).toBe('=Ventas!B8');
 });
 
+test('las referencias a otro libro no se mueven nunca: sus filas no son estas', () => {
+  const ins = enVentas(insFila(1));
+  const f = (t: string, d = ins): string => reescribirFormula(t, d, 'Resumen');
+  expect(f('=[Libro.xlsx]Ventas!B4+Ventas!B4')).toBe('=[Libro.xlsx]Ventas!B4+Ventas!B5');
+  expect(f("='[Libro.xlsx]Ventas'!B4")).toBe("='[Libro.xlsx]Ventas'!B4");
+  expect(f('=SUM([1]Ventas!B2:B6)', enVentas(delFila(3)))).toBe('=SUM([1]Ventas!B2:B6)');
+  // Tampoco sin `hoja`, cuando se mueven todas las demás.
+  expect(reescribirFormula('=B4+[Libro.xlsx]Resumen!B4', insFila(1))).toBe(
+    '=B5+[Libro.xlsx]Resumen!B4',
+  );
+});
+
 test('moverReferenciasAjenas: celdas, formato condicional y validaciones de la otra hoja', () => {
   const resumen: SheetData = {
     name: 'Resumen',
@@ -401,7 +413,10 @@ test('moverReferenciasAjenas: celdas, formato condicional y validaciones de la o
   expect(moverReferenciasAjenas(otra, enVentas(insFila(0)))).toBe(otra);
 });
 
-test('moverReferenciasAjenas respeta la protección: solo celdas desbloqueadas', () => {
+// Seguir a su dato no es editar la fórmula: con la hoja protegida se reescriben también
+// las celdas bloqueadas (el servidor acepta exactamente este desplazamiento,
+// proteccion_ajenas.go); las reglas siguen necesitando `objects`.
+test('moverReferenciasAjenas en una hoja protegida mueve también las celdas bloqueadas', () => {
   const s = {
     name: 'Resumen',
     cells: { A1: '=Ventas!B4', A2: '=Ventas!B4' },
@@ -410,6 +425,76 @@ test('moverReferenciasAjenas respeta la protección: solo celdas desbloqueadas',
     validations: [{ range: 'C1', type: 'formula', formula: '=COUNTIF(Ventas!$A$1:$A$9,C1)>0' }],
   } as SheetData;
   const m = moverReferenciasAjenas(s, enVentas(insFila(0)));
-  expect(m.cells).toEqual({ A1: '=Ventas!B4', A2: '=Ventas!B5' });
+  expect(m.cells).toEqual({ A1: '=Ventas!B5', A2: '=Ventas!B5' });
   expect(m.validations?.[0]?.formula).toBe('=COUNTIF(Ventas!$A$1:$A$9,C1)>0');
+});
+
+// Las tablas dinámicas siguen a sus datos: el origen con la hoja de la que leen y la
+// esquina con la suya. Antes se quedaban quietos y leían una fila de más o de menos.
+const dinamica = (extra: Partial<SheetPivotT> = {}): SheetPivotT => ({
+  name: 'TD1',
+  source: 'A1:C9',
+  anchor: 'H2',
+  range: 'H2:I5',
+  rows: [{ field: 0 }],
+  cols: [],
+  values: [{ field: 2, fn: 'sum' }],
+  ...extra,
+});
+type SheetPivotT = NonNullable<SheetData['pivots']>[number];
+
+test('moverObjetos mueve el origen, la esquina y lo que ocupa una tabla dinámica', () => {
+  const s = { name: 'Ventas', cells: {}, pivots: [dinamica()] } as SheetData;
+  const enVentasD = (d: Desplazamiento): Desplazamiento => ({ ...d, hoja: 'Ventas' });
+  expect(moverObjetos(s, enVentasD(insFila(0))).pivots).toEqual([
+    dinamica({ source: 'A2:C10', anchor: 'H3', range: 'H3:I6' }),
+  ]);
+  // Dentro del origen: crece; la esquina, por encima, se queda.
+  expect(moverObjetos(s, enVentasD(insFila(4, 2))).pivots).toEqual([
+    dinamica({ source: 'A1:C11', range: 'H2:I7' }),
+  ]);
+  expect(moverObjetos(s, enVentasD(insCol(1))).pivots).toEqual([
+    dinamica({ source: 'A1:D9', anchor: 'I2', range: 'I2:J5' }),
+  ]);
+  // Borrar la fila de su esquina: pasa a la primera que queda de lo que ocupaba.
+  expect(moverObjetos(s, enVentasD(delFila(1))).pivots).toEqual([
+    dinamica({ source: 'A1:C8', anchor: 'H2', range: 'H2:I4' }),
+  ]);
+  // Sin origen, la tabla dinámica desaparece como un gráfico sin datos.
+  expect(moverObjetos(s, enVentasD(delCol(0, 3))).pivots).toBeUndefined();
+  // Una que lee de otra hoja solo mueve su esquina.
+  const otra = { name: 'Ventas', cells: {}, pivots: [dinamica({ sourceSheet: 'Datos' })] };
+  expect(moverObjetos(otra as SheetData, enVentasD(insFila(0))).pivots).toEqual([
+    dinamica({ sourceSheet: 'Datos', anchor: 'H3', range: 'H3:I6' }),
+  ]);
+  // Con la hoja protegida se mueve igual: seguir a sus datos no es cambiarla, y el
+  // servidor acepta exactamente este desplazamiento (proteccion_dinamicas.go).
+  const prot = { ...s, protect: { insertRows: true } } as SheetData;
+  expect(moverObjetos(prot, enVentasD(insFila(0))).pivots).toEqual([
+    dinamica({ source: 'A2:C10', anchor: 'H3', range: 'H3:I6' }),
+  ]);
+});
+
+test('moverReferenciasAjenas mueve el origen de las tablas dinámicas que leen de la hoja', () => {
+  const s = {
+    name: 'Resumen',
+    cells: {},
+    pivots: [dinamica({ sourceSheet: 'Ventas' }), dinamica({ name: 'TD2' })],
+  } as SheetData;
+  const m = moverReferenciasAjenas(s, enVentas(insFila(0)));
+  // La de «Ventas» mueve su origen, no su esquina; la que lee de «Resumen», nada.
+  expect(m.pivots).toEqual([
+    dinamica({ sourceSheet: 'Ventas', source: 'A2:C10' }),
+    dinamica({ name: 'TD2' }),
+  ]);
+  expect(moverReferenciasAjenas(s, enVentas(insFila(20)))).toBe(s);
+  // Si se borra su origen entero, desaparece.
+  const sola = { ...s, pivots: [dinamica({ sourceSheet: 'Ventas' })] } as SheetData;
+  expect(moverReferenciasAjenas(sola, enVentas(delFila(0, 9))).pivots).toBeUndefined();
+  // Con «Resumen» protegida, también.
+  const prot = { ...s, protect: {} } as SheetData;
+  expect(moverReferenciasAjenas(prot, enVentas(insFila(0))).pivots).toEqual([
+    dinamica({ sourceSheet: 'Ventas', source: 'A2:C10' }),
+    dinamica({ name: 'TD2' }),
+  ]);
 });

@@ -11,8 +11,13 @@
 # ---------------------------------------------------------------------------
 set -eu
 
+# Los roles de servicio que se crean aquí: al final reciben el permiso sobre los
+# parámetros app.* de sus funciones (abajo).
+roles_de_servicio=""
+
 create_role_db() {
   role="$1"; password="$2"; db="$3"
+  roles_de_servicio="${roles_de_servicio:+$roles_de_servicio,}$role"
   # CREATEROLE (dev): algunas migraciones crean roles auxiliares de aplicación
   # (p. ej. Sytue Docs crea `docs_app` NOLOGIN para reforzar RLS y hace
   # `GRANT ... TO current_user`). El dueño de la BD debe poder crear ese rol al
@@ -50,6 +55,21 @@ create_role_db "${HUB_DB_USER:-sytue_hub}"           "${HUB_DB_PASSWORD}"       
 create_role_db "${INTEGRATIONS_DB_USER:-sytue_integrations}" "${INTEGRATIONS_DB_PASSWORD}" "${INTEGRATIONS_DB_NAME:-sytue_integrations}"
 create_role_db "${CLOUD_DB_USER:-sytue_cloud}"       "${CLOUD_DB_PASSWORD}"     "${CLOUD_DB_NAME:-sytue_cloud}"
 create_role_db "${ANALYTICS_DB_USER:-sytue_analytics}" "${ANALYTICS_DB_PASSWORD}" "${ANALYTICS_DB_NAME:-sytue_analytics}"
+
+# --- Los servicios migran con su rol, que no es superusuario ------------------
+# Cada servicio aplica sus migraciones al arrancar con el rol de arriba, y varias
+# crean funciones con `SET app.maintenance = 'on'` (y otros app.*): desde
+# PostgreSQL 15 eso exige `GRANT SET ON PARAMETER` a quien no es superusuario. La
+# lista de parámetros es la del piloto, el mismo fichero, montado por el compose
+# (deploy/compose/postgres/conceder-parametros.sql, el mismo que lee el despliegue privado por un enlace): no se copia aquí.
+#
+# Un volumen de dev creado antes de esto no vuelve a pasar por este script. Si un
+# servicio no arranca con «permission denied to set parameter "app.…"», desde la
+# raíz del repo:
+#   docker compose -f deploy/compose/docker-compose.yml exec -T postgres \
+#     psql -U postgres -d postgres < deploy/compose/postgres/conceder-parametros.sql
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+  -c "SET sytue.roles = '${roles_de_servicio}'" -f /sytue/sql/conceder-parametros.sql
 
 # --- PostgREST: roles para la API REST automática de Sytue Cloud (DB Studio).
 # Sobre la BD de cloud; el control plane Go expone proyectos vía PostgREST.

@@ -10,6 +10,8 @@ import type { en } from './en';
 
 export const mt: AppCatalog<typeof en> = {
   'dialog.sheet.rename': 'Isem il-folja:',
+  'dialog.sheet.nameTaken':
+    'Diġà hemm folja bl-isem “{name}” (l-ismijiet ma jagħmlux distinzjoni bejn ittri kbar u żgħar).',
   'dialog.sheet.delete': 'Tħassar il-folja “{name}”? Il-kontenut tagħha jintilef.',
   'dialog.sheet.mergeLoses':
     'Meta tgħaqqad, jinżamm biss il-valur taċ-ċellola ta’ fuq fuq ix-xellug ({ref}); iċ-ċelloli l-oħra tal-firxa jitbattlu. Biex tiġbor it-test kollu f’dik iċ-ċellola, uża “Għaqqad il-kontenut”.',

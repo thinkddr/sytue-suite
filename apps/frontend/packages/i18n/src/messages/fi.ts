@@ -12,20 +12,10 @@ export const fi: Catalog = {
   'matrix.resetUnderstood': 'Ymmärrän, että voin menettää pääsyn aiempiin salattuihin viesteihin',
   'matrix.unknownKey':
     'Tämä tili salattiin ennen kuin Sytue suojasi sen avaimen kirjautumisellasi. Vahvista tämä laite toiselta laitteelta, jolla olet jo kirjautunut.',
-  'matrix.unlockTitle': 'Avaa salatut tietosi',
-  'matrix.unlockBody':
-    'Vahvista henkilöllisyytesi pääsyavaimella tai Sytue-salasanallasi. Tarkistus tehdään tällä laitteella: kukaan muu ei voi avata tietojasi.',
-  'matrix.protectTitle': 'Suojaa salatut tietosi',
-  'matrix.protectBody':
-    'Valitse, miten avaat salatut tietosi muilla laitteillasi: pääsyavaimella tai Sytue-salasanallasi. Vain sinä voit avata ne.',
-  'matrix.usePasskey': 'Käytä pääsyavainta',
-  'matrix.usePassword': 'Käytä salasanaa',
-  'matrix.password': 'Sytue-salasana',
-  'matrix.passwordConfirm': 'Toista salasana',
-  'matrix.passwordMismatch': 'Salasanat eivät täsmää.',
-  'matrix.unlockWrong': 'Se ei onnistunut. Yritä uudelleen.',
-  'matrix.passkeyUnsupported':
-    'Tällä pääsyavaimella ei voi avata salattuja tietoja. Käytä salasanaasi.',
+  'matrix.unlocking': 'Salattujen tietojesi lukitusta avataan…',
+  'matrix.signIn': 'Kirjaudu Sytue ID:hen',
+  'matrix.signInBody':
+    'Kirjautumisesi Sytue ID:hen avaa salattujen tietojesi lukituksen tällä laitteella. Kirjaudu uudelleen salasanallasi tai pääsyavaimellasi avataksesi ne täällä.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Salli salattu käsittely',
   'matrix.allowStorageBody':

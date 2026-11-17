@@ -51,12 +51,13 @@ export type ChannelType = 'public' | 'private' | 'direct' | 'group';
 export type MatrixRecoveryAccount = { product?: string; identity_version?: 1 | 2 };
 export type MatrixRecoveryWrapperKDF =
   | { alg: 'argon2id'; m: number; t: number; p: number; salt: string }
-  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string };
+  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string }
+  | { alg: 'sytue-id-unlock-hkdf-sha256'; hint: string };
 /** Opaque to the service: format in docs/architecture.md, vectors in apps/nucleo/recoverywrap/testdata. */
 export type MatrixRecoveryWrapper = {
   id?: string;
   v: 1;
-  kind: 'password' | 'passkey';
+  kind: 'sytue-id' | 'password' | 'passkey';
   key_id: string;
   credential_id: string;
   kdf: MatrixRecoveryWrapperKDF;

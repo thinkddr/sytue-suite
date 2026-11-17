@@ -7,6 +7,7 @@ package ui
 
 import (
 	"math"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -57,6 +58,12 @@ type BarraDeLote struct {
 	Acciones []*Boton
 	// AlQuitar vacía la selección. Lo disparan el aspa y Escape.
 	AlQuitar func()
+	// Numero es cuántos hay marcados. En táctil, si lo hay, la barra enseña SOLO el
+	// número y no la frase de Recuento, como `BulkActionBar.tsx` en el teléfono (la
+	// barra contextual de Material): con el recuento y el aspa fijos, «3 archivos
+	// seleccionados» deja a 320 menos sitio que un botón para las acciones (82 px para
+	// el «Descargar» de 86 de Drive). Cero: la frase, como siempre.
+	Numero int
 	// Canalon SUSTITUYE al `px-3` del componente cuando la app pone el suyo: Drive le
 	// pasa `px-4 sm:px-6` desde fuera, y en Tailwind la última clase gana, no se suma.
 	// Cero: el `px-3` de `BulkActionBar.tsx`.
@@ -92,6 +99,30 @@ func NuevaBarraDeLote(recuento, rotulo, rotuloQuitar string, acciones []*Boton, 
 	return b
 }
 
+// ConNumero pone cuántos hay marcados (ver Numero) y devuelve la barra, para encadenarla.
+func (b *BarraDeLote) ConNumero(n int) *BarraDeLote {
+	b.Numero = n
+	return b
+}
+
+// textoVisible es lo que se lee en la barra: el número solo en táctil, si lo hay; si
+// no, la frase.
+func (b *BarraDeLote) textoVisible() string {
+	if b.Numero > 0 && EsTactil() {
+		return strconv.Itoa(b.Numero)
+	}
+	return b.Recuento
+}
+
+// escalonRecuento es el del número del teléfono (`text-base font-semibold`), o el de la
+// frase (`text-sm font-medium`).
+func (b *BarraDeLote) escalonRecuento() (tema.Escalon, Peso) {
+	if b.Numero > 0 && EsTactil() {
+		return tema.TextoBase, SemiNegrita
+	}
+	return tema.TextoSM, Medio
+}
+
 // Con pone el canalón de la app y devuelve la barra, para encadenarla.
 func (b *BarraDeLote) Con(canalon float32) *BarraDeLote {
 	b.Canalon = canalon
@@ -105,8 +136,14 @@ func (b *BarraDeLote) AltoPara(ancho float32) float32 {
 }
 
 // AccessibilityLabel es el nombre de la barra: una barra de herramientas sin nombre se
-// anuncia como «barra de herramientas» a secas.
-func (b *BarraDeLote) AccessibilityLabel() string { return b.Rotulo }
+// anuncia como «barra de herramientas» a secas. Lleva la frase del recuento: en táctil
+// solo se VE el número, y el lector tiene que seguir oyendo «3 archivos seleccionados».
+func (b *BarraDeLote) AccessibilityLabel() string {
+	if b.Recuento == "" {
+		return b.Rotulo
+	}
+	return b.Rotulo + ": " + b.Recuento
+}
 
 // AccessibilityRole: agrupa; lo que se pulsa son sus botones. Fyne 2.8 no tiene rol de
 // barra de herramientas.
@@ -153,7 +190,8 @@ var mrRecuento = tema.Espacio(1)
 // quepa en la primera línea hacia la derecha.
 func lineasLote(b *BarraDeLote, ancho float32) [][]int {
 	anchos := make([]float32, 0, len(b.Acciones)+2)
-	anchos = append(anchos, Medir(b.Recuento, tema.TextoSM, Medio).Width+mrRecuento)
+	e, p := b.escalonRecuento()
+	anchos = append(anchos, Medir(b.textoVisible(), e, p).Width+mrRecuento)
 	for _, a := range b.Acciones {
 		anchos = append(anchos, a.MinSize().Width)
 	}
@@ -243,25 +281,29 @@ func (b *BarraDeLote) CreateRenderer() fyne.WidgetRenderer {
 		b:      b,
 		fondo:  canvas.NewRectangle(tema.Color("bg-subtle", v)),
 		filete: canvas.NewRectangle(tema.Color("border", v)),
-		texto:  Texto(b.Recuento, tema.TextoSM, Medio, tema.Color("text", v)),
 	}
+	e, p := b.escalonRecuento()
+	r.texto = Texto(b.textoVisible(), e, p, tema.Color("text", v))
 	r.objetos = []fyne.CanvasObject{r.fondo, r.filete, r.texto}
-	// EN TÁCTIL los controles van dentro de UNA tira deslizable —la misma pieza
-	// de la barra de selección de Mail (seleccion.go)—: lo que no cabe se
-	// recorta y se alcanza arrastrando, y enfocar un control escondido la
-	// desliza hasta él (lo hace NuevaTiraDeslizable).
+	// EN TÁCTIL las ACCIONES van dentro de UNA tira deslizable —la misma pieza de la
+	// barra de selección de Mail (seleccion.go)—: lo que no cabe se recorta y se
+	// alcanza arrastrando, y enfocar un control escondido la desliza hasta él (lo hace
+	// NuevaTiraDeslizable). El recuento y el aspa NO: quedan fijos en los extremos,
+	// como en `BulkActionBar.tsx`. Con la fila entera en la tira, a 320 el aspa —la
+	// salida, lo primero que se busca al marcar sin querer— quedaba fuera de la vista.
 	if EsTactil() {
 		controles := b.controles()
-		dentro := make([]fyne.CanvasObject, 0, 1+len(controles))
-		dentro = append(dentro, r.texto)
+		dentro := make([]fyne.CanvasObject, 0, len(b.Acciones))
 		for i, c := range controles {
 			c.AlMover = func(delta int, extremo bool) { b.mover(i, delta, extremo) }
 			c.AlEscapar = b.Escapar
-			dentro = append(dentro, c)
+			if c != b.quitar {
+				dentro = append(dentro, c)
+			}
 		}
 		r.tira = NuevaTiraDeslizable(altoFilaLote(b), huecoLote, dentro...)
 		r.tira.AnchoPropio = true
-		r.objetos = []fyne.CanvasObject{r.fondo, r.filete, r.tira}
+		r.objetos = []fyne.CanvasObject{r.fondo, r.filete, r.texto, r.tira, b.quitar}
 		b.Activar(0)
 		r.Refresh()
 		return r
@@ -312,8 +354,7 @@ func (r *barraLoteRenderer) Layout(t fyne.Size) {
 		return m.Width
 	}
 	if r.tira != nil {
-		r.tira.Move(fyne.NewPos(canalon, rellenoLoteY))
-		r.tira.Resize(fyne.NewSize(max(t.Width-2*canalon, 0), max(linea-2*rellenoLoteY, 0)))
+		r.colocarTactil(t, canalon, linea, centrar)
 		return
 	}
 	lineas := lineasLote(r.b, t.Width)
@@ -357,6 +398,22 @@ func (r *barraLoteRenderer) Layout(t fyne.Size) {
 	}
 }
 
+// colocarTactil es la fila del teléfono: el recuento pegado a la izquierda, el aspa a la
+// derecha y, entre los dos, la tira con las acciones. Si caben, van a la derecha, junto
+// al aspa (el `ms-auto` de la primera acción en la web); si no, la tira ocupa todo el
+// hueco y se empieza por la primera, sin nada inalcanzable a la izquierda.
+func (r *barraLoteRenderer) colocarTactil(t fyne.Size, canalon, linea float32, centrar func(fyne.CanvasObject, float32) float32) {
+	desde := canalon + centrar(r.texto, canalon) + mrRecuento + huecoLote
+	quitar := r.b.quitar
+	hasta := t.Width - canalon - quitar.MinSize().Width
+	centrar(quitar, hasta)
+	hasta -= huecoLote
+	hueco := max(hasta-desde, 0)
+	ancho := min(r.tira.AnchoContenido(), hueco)
+	r.tira.Move(fyne.NewPos(hasta-ancho, rellenoLoteY))
+	r.tira.Resize(fyne.NewSize(ancho, max(linea-2*rellenoLoteY, 0)))
+}
+
 // Refresh repinta la franja con los tokens del tema actual.
 func (r *barraLoteRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
@@ -364,7 +421,9 @@ func (r *barraLoteRenderer) Refresh() {
 	r.fondo.Refresh()
 	r.filete.FillColor = tema.Color("border", v)
 	r.filete.Refresh()
-	r.texto.Text = r.b.Recuento
+	r.texto.Text = r.b.textoVisible()
+	e, p := r.b.escalonRecuento()
+	r.texto.TextSize, r.texto.FontSource = e.Tam, p.cara()
 	r.texto.Color = tema.Color("text", v)
 	r.texto.Refresh()
 	r.Layout(r.b.Size())

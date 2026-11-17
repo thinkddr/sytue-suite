@@ -4,7 +4,6 @@
 package calcus
 
 import (
-	"regexp"
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
@@ -34,23 +33,12 @@ type partes struct {
 	dentro  string
 }
 
-var (
-	reEtiqueta = regexp.MustCompile(`<[^>]*>`)
-
-	escapador = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
-	// El orden es el de `stripHtml` y da igual que sea de una pasada: `&amp;` va el
-	// último allí, así que lo que decodifica nunca se vuelve a mirar.
-	desescapador = strings.NewReplacer("&nbsp;", " ", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&amp;", "&")
-)
-
-// escaparHTML es `escapeHtml`.
-func escaparHTML(s string) string { return escapador.Replace(s) }
+// escaparHTML es `escapeHtml` (vive en el motor: lo usa también el servidor).
+func escaparHTML(s string) string { return formula.EscaparHTML(s) }
 
 // textoPlano es `stripHtml` (y `rawText`): quita las etiquetas y decodifica las cinco
 // entidades que escribe un `contenteditable`.
-func textoPlano(html string) string {
-	return desescapador.Replace(reEtiqueta.ReplaceAllString(html, ""))
-}
+func textoPlano(html string) string { return formula.TextoCelda(html) }
 
 // esFormula es `isFormula`: el texto crudo empieza por «=».
 func esFormula(html string) bool { return strings.HasPrefix(textoPlano(html), "=") }
@@ -65,20 +53,7 @@ func leerCelda(html string) partes {
 // html es `renderCellHtml`: lo inverso de leerCelda. Una celda sin texto es "", con
 // formato o sin él, que es como la web decide que una celda está vacía.
 func (p partes) html() string {
-	out := strings.TrimSpace(p.dentro)
-	if out == "" || out == "<br>" {
-		return ""
-	}
-	if p.i {
-		out = "<i>" + out + "</i>"
-	}
-	if p.b {
-		out = "<b>" + out + "</b>"
-	}
-	if p.alinear != "" {
-		out = `<div style="text-align: ` + p.alinear + `;">` + out + "</div>"
-	}
-	return out
+	return formula.PartesCelda{Alinear: p.alinear, Negrita: p.b, Cursiva: p.i, Dentro: p.dentro}.HTML()
 }
 
 // conTexto es el HTML de la celda con OTRO texto crudo y el mismo formato: lo que hace

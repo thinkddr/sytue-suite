@@ -12,20 +12,10 @@ export const ro: Catalog = {
   'matrix.resetUnderstood': 'Înțeleg că pot pierde accesul la mesajele criptate anterioare',
   'matrix.unknownKey':
     'Acest cont a fost criptat înainte ca Sytue să îi protejeze cheia cu autentificarea ta. Verifică acest dispozitiv de pe altul pe care ești deja autentificat.',
-  'matrix.unlockTitle': 'Deschide datele tale criptate',
-  'matrix.unlockBody':
-    'Confirmă că ești tu cu cheia de acces sau cu parola Sytue. Verificarea se face pe acest dispozitiv: nimeni altcineva nu îți poate deschide datele.',
-  'matrix.protectTitle': 'Protejează datele tale criptate',
-  'matrix.protectBody':
-    'Alege cum vei deschide datele criptate pe celelalte dispozitive: cu cheia de acces sau cu parola Sytue. Doar tu le vei putea deschide.',
-  'matrix.usePasskey': 'Folosește cheia de acces',
-  'matrix.usePassword': 'Folosește parola',
-  'matrix.password': 'Parola Sytue',
-  'matrix.passwordConfirm': 'Repetă parola',
-  'matrix.passwordMismatch': 'Parolele nu se potrivesc.',
-  'matrix.unlockWrong': 'Nu a funcționat. Încearcă din nou.',
-  'matrix.passkeyUnsupported':
-    'Această cheie de acces nu poate deschide date criptate. Folosește parola.',
+  'matrix.unlocking': 'Se deblochează datele tale criptate…',
+  'matrix.signIn': 'Autentifică-te în Sytue ID',
+  'matrix.signInBody':
+    'Autentificarea în Sytue ID îți deblochează datele criptate pe acest dispozitiv. Autentifică-te din nou cu parola sau cheia de acces ca să le deschizi aici.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Permite procesarea criptată',
   'matrix.allowStorageBody':

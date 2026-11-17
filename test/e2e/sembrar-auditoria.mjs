@@ -20,6 +20,10 @@
 //
 //   SYTUE_AUDIT_EMAIL=… SYTUE_AUDIT_PASS=… bun run sembrar-auditoria.mjs
 //
+// Y para la VENTANA REAL de las apps nativas (`ventana-real.yml`, que lo corre antes de
+// abrirlas en solo lectura), tres hilos de Mail: pospuesto, silenciado y vuelto de
+// Pospuestos (`sembrarCorreo`). Esa parte avisa y no tumba el resto.
+//
 // En la nube: `mobile.yml` → `workflow_dispatch` con
 // `reproductor=sembrar-auditoria.mjs`. Desde el portátil NO (ver la regla de la
 // casa: lo que decide es dónde corre el navegador).
@@ -540,8 +544,235 @@ async function sembrarFotos() {
   console.log(`creado: álbum «${TITULO_ALBUM}» con ${ids.length} fotos`);
 }
 
+/**
+ * Tres conversaciones de Mail en los estados que la ventana real tiene que enseñar:
+ * una POSPUESTA hasta dentro de un mes (la franja «Pospuesto hasta…» y la carpeta
+ * «Pospuestos»), una SILENCIADA (la franja «Has silenciado…») y una VUELTA de
+ * Pospuestos, arriba de Recibidos con su reloj.
+ *
+ * POR QUÉ AQUÍ. `apps/fyne/scripts/ventana-real.sh` corre las apps en solo lectura
+ * (`SYTUE_SOLO_LECTURA=1`): ni pospone ni silencia, así que el estado tiene que existir
+ * ya en la cuenta. Y es el mismo motivo que el resto de este guion: sin el dato, la
+ * pantalla no se puede medir.
+ *
+ * NO SE ENVÍA NADA. Cada correo nace como BORRADOR de la cuenta (`/api/drafts`, sin
+ * destinatarios) y se mueve a Recibidos; después se pospone o se silencia su hilo. La
+ * primera versión se lo mandaba a sí misma y no servía: todo envío sale por el relay
+ * de salida y vuelve por el MX, la copia no había llegado a Recibidos a los 90 s
+ * (ventana-real 43983314243) y, si llega tarde a un hilo ya pospuesto, lo trae de
+ * vuelta, que es lo que hace una respuesta nueva. Solo se tocan los hilos con uno de
+ * estos asuntos.
+ *
+ * IDEMPOTENTE POR ASUNTO, como lo demás: se buscan antes por la búsqueda del servicio
+ * y en las cien primeras de cada carpeta donde pueden estar, y solo se crea uno si no
+ * hay NINGUNO. Si hay uno pero no está donde hace falta (alguien lo archivó, o es la
+ * copia en Enviados del envío de aquella primera versión), se devuelve a Recibidos.
+ *
+ *   – El VUELTO va primero: si no ha vuelto en las últimas 20 h, se pospone 70 s (el
+ *     servicio pide al menos un minuto) y el servicio lo devuelve al vencer, SIN LEER y
+ *     arriba de Recibidos, mientras el flujo compila las apps.
+ *   – El pospuesto vuelve a posponerse si le quedan menos de 15 días: no vuelve nunca
+ *     solo. Se posponen TODOS sus hilos con algo en Recibidos, también una copia que
+ *     llegara tarde por el relay.
+ *   – El silenciado: todos sus hilos, silenciados.
+ */
+const BASE_MAIL = '/mail';
+const CORREO = {
+  pospuesto: {
+    asunto: 'Auditoría · pospuesto · no borrar',
+    texto:
+      'Lo pospone cada noche el sembrado de la auditoría (test/e2e/sembrar-auditoria.mjs) para ' +
+      'que la ventana real de Mail enseñe la carpeta «Pospuestos» y su franja. No lo muevas.',
+  },
+  silenciado: {
+    asunto: 'Auditoría · silenciado · no borrar',
+    texto:
+      'Lo silencia el sembrado de la auditoría (test/e2e/sembrar-auditoria.mjs) para que la ' +
+      'ventana real de Mail enseñe la franja de una conversación silenciada. No lo toques.',
+  },
+  vuelto: {
+    asunto: 'Auditoría · vuelto de Pospuestos · no borrar',
+    texto:
+      'Lo pospone un momento el sembrado de la auditoría (test/e2e/sembrar-auditoria.mjs) y ' +
+      'el servicio lo devuelve arriba de Recibidos, con su reloj. No lo muevas.',
+  },
+};
+const DIA = 24 * 60 * 60 * 1000;
+
+async function sembrarCorreo() {
+  await page.goto(`https://${HOST_ENTRADA}${BASE_MAIL}/`, { waitUntil: 'domcontentloaded' });
+  // La cookie del BFF de Mail es suya: la primera visita da la vuelta por el IdP (que ya
+  // tiene sesión) antes de quedarse en la app. Se espera a estar de vuelta.
+  await page
+    .waitForURL((u) => u.hostname === HOST_ENTRADA && u.pathname.startsWith(BASE_MAIL), { timeout: 30_000 })
+    .catch(() => {});
+  await page.waitForTimeout(2000);
+  const api = (ruta, cuerpo = null) =>
+    page.evaluate(
+      async ([base, r, c]) => {
+        const res = await fetch(`${base}/api/${r}`, {
+          method: c ? 'POST' : 'GET',
+          headers: { accept: 'application/json', ...(c ? { 'content-type': 'application/json' } : {}) },
+          ...(c ? { body: JSON.stringify(c) } : {}),
+        });
+        return { ok: res.ok, status: res.status, cuerpo: await res.json().catch(() => null) };
+      },
+      [BASE_MAIL, ruta, cuerpo],
+    );
+  const pedir = async (que, ruta, cuerpo) => {
+    const r = await api(ruta, cuerpo);
+    if (!r.ok) throw new Error(`Mail: ${que} HTTP ${r.status} ${JSON.stringify(r.cuerpo ?? {}).slice(0, 200)}`);
+    return r.cuerpo ?? {};
+  };
+
+  const { mailboxes = [] } = await pedir('carpetas', 'mailboxes');
+  const rolDe = new Map(mailboxes.map((m) => [m.id, m.role || 'propia']));
+  const carpeta = (rol) => mailboxes.find((m) => m.role === rol)?.id;
+  const entrada = carpeta('inbox');
+  if (!entrada) throw new Error('Mail: la cuenta no tiene Recibidos');
+
+  // Los hilos con ese asunto EXACTO y su estado: en qué carpeta está cada mensaje, si
+  // está silenciado y hasta cuándo pospuesto. Por la búsqueda y, además, mirando las
+  // carpetas: si la búsqueda no encontrara nada, crear otro cada noche llenaría el buzón.
+  const hilos = async (asunto) => {
+    const ids = new Set();
+    try {
+      const q = encodeURIComponent(`subject:"${asunto}"`);
+      const { emails = [] } = await pedir('buscar', `search?limit=50&q=${q}`);
+      for (const e of emails) if (e.subject === asunto && e.threadId) ids.add(e.threadId);
+    } catch (e) {
+      console.log(`· la búsqueda de «${asunto}» falló (${e.message}); quedan las carpetas`);
+    }
+    for (const rol of ['inbox', 'snoozed', 'archive', 'junk', 'drafts', 'sent']) {
+      const id = carpeta(rol);
+      if (!id) continue;
+      const { emails = [] } = await pedir(`carpeta ${rol}`, `emails?limit=100&mailboxId=${id}`);
+      for (const e of emails) if (e.subject === asunto && e.threadId) ids.add(e.threadId);
+    }
+    const out = [];
+    for (const id of ids) {
+      const h = await pedir('hilo', `thread?threadId=${encodeURIComponent(id)}`);
+      const msgs = (h.emails ?? []).map((e) => ({
+        id: e.id,
+        rol: rolDe.get(e.mailboxId) ?? '?',
+        vuelto: e.unsnoozedAt ? Date.parse(e.unsnoozedAt) : 0,
+      }));
+      const enEntrada = msgs.filter((m) => m.rol === 'inbox');
+      out.push({
+        id,
+        msgs,
+        muted: h.muted === true,
+        hasta: h.snoozedUntil ? Date.parse(h.snoozedUntil) : 0,
+        enEntrada: enEntrada.length > 0,
+        vuelto: Math.max(0, ...enEntrada.map((m) => m.vuelto)),
+      });
+    }
+    return out;
+  };
+  const describir = (hs) =>
+    hs
+      .map(
+        (h) =>
+          `[${h.msgs.map((m) => m.rol).join('+') || 'vacío'}` +
+          `${h.muted ? ', silenciado' : ''}${h.hasta ? `, pospuesto hasta ${new Date(h.hasta).toISOString()}` : ''}` +
+          `${h.vuelto ? `, vuelto el ${new Date(h.vuelto).toISOString()}` : ''}]`,
+      )
+      .join(' ');
+  // Uno nuevo: un borrador sin destinatarios, movido a Recibidos. No sale nada.
+  const crear = async ({ asunto, texto }) => {
+    const { id } = await pedir('borrador', 'drafts', { to: [], subject: asunto, textBody: texto });
+    if (!id) throw new Error(`Mail: el borrador de «${asunto}» no devolvió id`);
+    await pedir('mover a Recibidos', 'message-actions', { emailId: id, moveTo: entrada });
+    console.log(`creado: «${asunto}» en Recibidos`);
+  };
+  // Un hilo que existe sin nada en Recibidos (archivado a mano, o solo la copia de un
+  // envío): uno de sus mensajes vuelve a Recibidos.
+  const rescatar = async (h, asunto) => {
+    const m = ['junk', 'drafts', 'sent', 'archive', 'propia'].map((r) => h?.msgs.find((x) => x.rol === r)).find(Boolean);
+    if (!m) return false;
+    await pedir('mover a Recibidos', 'message-actions', { emailId: m.id, moveTo: entrada });
+    console.log(`devuelto a Recibidos (estaba en ${m.rol}): «${asunto}»`);
+    return true;
+  };
+  const asegurar = async (c) => {
+    let hs = await hilos(c.asunto);
+    if (hs.length === 0) {
+      await crear(c);
+      hs = await hilos(c.asunto);
+      if (hs.length === 0) throw new Error(`Mail: «${c.asunto}» se creó y no aparece`);
+    }
+    console.log(`· «${c.asunto}»: ${hs.length} hilo(s) ${describir(hs)}`);
+    return hs;
+  };
+  const posponer = async (h, hasta, asunto) => {
+    await pedir('posponer', 'snooze', { threadId: h.id, until: new Date(hasta).toISOString() });
+    console.log(`pospuesto: «${asunto}» hasta ${new Date(hasta).toISOString()}`);
+  };
+  const avisos = [];
+
+  // 1. Vuelto de Pospuestos, el primero: es el que tiene que dar tiempo a volver.
+  {
+    const c = CORREO.vuelto;
+    let hs = await asegurar(c);
+    const reciente = hs.find((h) => h.vuelto > Date.now() - 20 * 60 * 60 * 1000);
+    const volviendo = hs.find((h) => h.hasta > 0 && h.hasta - Date.now() < 10 * 60 * 1000);
+    if (reciente) {
+      console.log(`ya estaba: «${c.asunto}» vuelto a Recibidos el ${new Date(reciente.vuelto).toISOString()}`);
+    } else if (volviendo) {
+      console.log(`ya estaba: «${c.asunto}» vuelve a las ${new Date(volviendo.hasta).toISOString()}`);
+    } else {
+      let h = hs.find((x) => x.enEntrada);
+      if (!h && (await rescatar(hs[0], c.asunto))) {
+        hs = await hilos(c.asunto);
+        h = hs.find((x) => x.enEntrada);
+      }
+      if (h) await posponer(h, Date.now() + 70 * 1000, c.asunto);
+      else avisos.push(`«${c.asunto}» no tiene nada que devolver a Recibidos`);
+    }
+  }
+
+  // 2. Pospuesto hasta dentro de un mes, a las 8:00 UTC.
+  {
+    const c = CORREO.pospuesto;
+    let hs = await asegurar(c);
+    if (!hs.some((h) => h.hasta > 0 || h.enEntrada) && (await rescatar(hs[0], c.asunto))) {
+      hs = await hilos(c.asunto);
+    }
+    const mes = new Date(Date.now() + 30 * DIA);
+    mes.setUTCHours(8, 0, 0, 0);
+    let alguno = false;
+    for (const h of hs) {
+      if (h.hasta - Date.now() > 15 * DIA && !h.enEntrada) {
+        console.log(`ya estaba: «${c.asunto}» pospuesto hasta ${new Date(h.hasta).toISOString()}`);
+        alguno = true;
+      } else if (h.hasta > 0 || h.enEntrada) {
+        await posponer(h, mes.getTime(), c.asunto);
+        alguno = true;
+      }
+    }
+    if (!alguno) avisos.push(`«${c.asunto}» no está en Recibidos ni pospuesto, y no hay copia que devolver`);
+  }
+
+  // 3. Silenciado: silenciar archiva lo que tenga en Recibidos.
+  {
+    const c = CORREO.silenciado;
+    for (const h of await asegurar(c)) {
+      if (h.muted) {
+        console.log(`ya estaba: «${c.asunto}» silenciado`);
+      } else {
+        await pedir('silenciar', 'mute', { threadId: h.id, muted: true });
+        console.log(`silenciado: «${c.asunto}»`);
+      }
+    }
+  }
+  return avisos;
+}
+
+// `dentro`: con la sesión abierta, lo de Mail se siembra aunque falle lo de antes (ver abajo).
+let dentro = false;
 try {
   await entrar();
+  dentro = true;
   console.log('sesión en', page.url());
   const docId = await sembrarDocumento();
   if (!docId) throw new Error('no se obtuvo el id del documento');
@@ -552,6 +783,11 @@ try {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForTimeout(3000);
+  // EL EDITOR SE PINTA EN EL NAVEGADOR: a los 3 s puede seguir en su «Cargando…» (38
+  // caracteres el 2026-11-16 a las 23:49, con el mismo documento que esa tarde había
+  // pasado). Se le dan hasta 20 s más a que salga texto antes de dar la ruta por ciega:
+  // lo que se mide es si se resuelve, no lo rápido que carga.
+  await page.waitForFunction(() => document.body.innerText.length >= 50, null, { timeout: 20_000 }).catch(() => {});
   // Se pide la ruta SIN organización y se acepta la canónica CON ella: desde el
   // ADR 0056 el middleware redirige `/docus/edit` a `/docus/<org>/edit` (302 local),
   // y así vale igual para una versión desplegada con o sin ese cambio. Exigir
@@ -572,6 +808,21 @@ try {
 } catch (e) {
   console.error('FALLÓ EL SEMBRADO:', e.message);
   process.exitCode = 1;
+}
+// Lo de Mail va APARTE en los dos sentidos. No tumba el sembrado: solo lo necesita la
+// ventana real de las apps nativas (ventana-real.yml), y los barridos web que corren
+// detrás de este guion cada noche no deben quedarse sin medir porque falle un posponer;
+// se avisa con una anotación del CI, que se ve en el resumen de la ejecución. Y no
+// depende de lo de antes: un editor de Docs lento no es motivo para dejar Mail sin sus
+// hilos.
+try {
+  if (dentro) {
+    const avisos = await sembrarCorreo();
+    for (const a of avisos) console.log(`::warning title=Sembrado de Mail::${a}`);
+    if (avisos.length === 0) console.log('OK: Mail tiene un hilo pospuesto, uno silenciado y uno vuelto de Pospuestos.');
+  }
+} catch (e) {
+  console.log(`::warning title=Sembrado de Mail::${e.message}`);
 } finally {
   await browser.close();
 }

@@ -79,6 +79,11 @@ type abierto struct {
 	// como la web.
 	cambios, guardados uint64
 	pausaTit           *time.Timer
+	// cola son fotos del libro que van cada una en SU guardado, en orden y antes que lo
+	// que haya después: las de un cambio de estructura y lo pendiente de antes de él
+	// (`aparte`). ultimo es lo último que salió o entró en la cola, para no repetirlo.
+	cola   []string
+	ultimo string
 }
 
 // PausaTitulo es el `RENAME_MS` de `useDocument.ts`.
@@ -362,7 +367,7 @@ func (a *App) guardarAntes(ab *abierto) func() error {
 		return nil
 	}
 	ab.mu.Lock()
-	pendiente := ab.cambios > ab.guardados
+	pendiente := ab.cambios > ab.guardados || len(ab.cola) > 0
 	ab.mu.Unlock()
 	if !pendiente {
 		return nil
@@ -480,6 +485,10 @@ func (a *App) poner(ab *abierto, titulo, rol string, cont api.DocContent) {
 	ctx.Titulo = titulo
 	a.titulo(titulo)
 	entendido := ab.lz.Cargar(cont.Value)
+	ultimo := ab.lz.Serializar()
+	ab.mu.Lock()
+	ab.cola, ab.ultimo = nil, ultimo // lo de antes se basaba en otro libro
+	ab.mu.Unlock()
 	escribe := api.CanWrite(rol)
 	ctx.SoloLectura = !entendido || !escribe
 	ab.lz.SoloLectura(ctx.SoloLectura)
@@ -556,6 +565,15 @@ func (a *App) engancharGuardado(ab *abierto) {
 	}
 	// El chip de la cabecera, en error: guarda ya, fuera del hilo de la interfaz.
 	ab.ctx.GuardarYa = func() { a.lanzar(ab.auto.Ahora) }
+	// Un cambio de estructura va en su propio guardado y enseguida, con lo pendiente de
+	// antes en otro: en una hoja protegida el servidor solo reconoce UN desplazamiento
+	// por guardado, y dos inserciones en el mismo autoguardado se rechazaban. Si llega
+	// otro mientras se guarda el primero, espera en la cola sin parar la interfaz.
+	ab.lz.Libro.AntesDeEstructura = func() { a.aparte(ab) }
+	ab.lz.Libro.TrasEstructura = func() {
+		a.aparte(ab)
+		a.lanzar(ab.auto.Ahora)
+	}
 	ab.lz.AlCambiar = func() {
 		ab.mu.Lock()
 		ab.cambios++
@@ -568,31 +586,77 @@ func (a *App) engancharGuardado(ab *abierto) {
 	}
 }
 
-// guardar escribe el libro entero encima de lo último que se leyó o se escribió. Lee el
-// modelo en el hilo de la interfaz, que es el único que lo toca; la red va aquí.
-func (a *App) guardar(ab *abierto) error {
-	var modelo string
-	fyne.DoAndWait(func() {
-		modelo = ab.lz.Serializar()
-		ab.ctx.Guardado = editor.Guardando
-		ab.marco.Recomponer()
-	})
+// aparte pone en la cola el libro tal como está, para que vaya en su propio guardado
+// (si no es ya lo último que sale). Corre en el hilo de la interfaz.
+func (a *App) aparte(ab *abierto) {
+	modelo := ab.lz.Serializar()
 	ab.mu.Lock()
-	ab.guardados = ab.cambios
-	ab.contador++
-	dot := api.DocDot{Actor: ab.actor, Counter: ab.contador}
-	base := ab.base
-	ab.mu.Unlock()
+	defer ab.mu.Unlock()
+	if modelo != ab.ultimo {
+		ab.cola = append(ab.cola, modelo)
+		ab.ultimo = modelo
+	}
+}
+
+// guardar escribe el libro entero encima de lo último que se leyó o se escribió: primero
+// la cola, de una en una (`aparte`), y luego lo de ahora. Lee el modelo en el hilo de
+// la interfaz, que es el único que lo toca; la red va aquí. Si algo falla, lo que queda
+// de la cola sigue ahí para el siguiente intento, en su orden.
+func (a *App) guardar(ab *abierto) error {
+	huboCola := false
+	for {
+		var modelo string
+		deCola := false
+		fyne.DoAndWait(func() {
+			ab.mu.Lock()
+			if len(ab.cola) > 0 {
+				modelo, deCola = ab.cola[0], true
+			}
+			ab.mu.Unlock()
+			if !deCola {
+				// En el mismo hilo que `aparte`: lo que sale ya no vuelve a la cola.
+				modelo = ab.lz.Serializar()
+				ab.mu.Lock()
+				ab.ultimo = modelo
+				ab.mu.Unlock()
+			}
+			ab.ctx.Guardado = editor.Guardando
+			ab.marco.Recomponer()
+		})
+		ab.mu.Lock()
+		if !deCola {
+			ab.guardados = ab.cambios
+		}
+		base := ab.base
+		if !deCola && huboCola && modelo == base.Value {
+			ab.mu.Unlock()
+			return nil // tras la cola no queda nada nuevo
+		}
+		huboCola = huboCola || deCola
+		ab.contador++
+		dot := api.DocDot{Actor: ab.actor, Counter: ab.contador}
+		ab.mu.Unlock()
+		nuevo, err := a.guardarModelo(ab, modelo, base, dot)
+		if err != nil {
+			return err
+		}
+		ab.mu.Lock()
+		ab.base = nuevo
+		if deCola && len(ab.cola) > 0 && ab.cola[0] == modelo {
+			ab.cola = ab.cola[1:]
+		}
+		ab.mu.Unlock()
+		if !deCola {
+			return nil
+		}
+	}
+}
+
+// guardarModelo es un guardado, con su plazo.
+func (a *App) guardarModelo(ab *abierto, modelo string, base api.DocContent, dot api.DocDot) (api.DocContent, error) {
 	c, cancelar := context.WithTimeout(context.Background(), a.Plazo)
 	defer cancelar()
-	nuevo, err := a.Svc.SaveChecked(c, ab.id, ab.ctx.Tipo.ClaveContenido(), modelo, base, dot, false)
-	if err != nil {
-		return err
-	}
-	ab.mu.Lock()
-	ab.base = nuevo
-	ab.mu.Unlock()
-	return nil
+	return a.Svc.SaveChecked(c, ab.id, ab.ctx.Tipo.ClaveContenido(), modelo, base, dot, false)
 }
 
 // renombrar programa el cambio de título tras la pausa de la web. Un título en blanco

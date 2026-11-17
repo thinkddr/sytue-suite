@@ -12,20 +12,10 @@ export const nb: Catalog = {
   'matrix.resetUnderstood': 'Jeg forstår at jeg kan miste tilgangen til eldre krypterte meldinger',
   'matrix.unknownKey':
     'Denne kontoen ble kryptert før Sytue beskyttet nøkkelen med påloggingen din. Bekreft denne enheten fra en annen der du allerede er logget på.',
-  'matrix.unlockTitle': 'Åpne de krypterte dataene dine',
-  'matrix.unlockBody':
-    'Bekreft at det er deg med tilgangsnøkkelen eller Sytue-passordet ditt. Det kontrolleres på denne enheten: ingen andre kan åpne dataene dine.',
-  'matrix.protectTitle': 'Beskytt de krypterte dataene dine',
-  'matrix.protectBody':
-    'Velg hvordan du åpner de krypterte dataene dine på de andre enhetene dine: med tilgangsnøkkelen eller Sytue-passordet ditt. Bare du kan åpne dem.',
-  'matrix.usePasskey': 'Bruk tilgangsnøkkel',
-  'matrix.usePassword': 'Bruk passord',
-  'matrix.password': 'Sytue-passord',
-  'matrix.passwordConfirm': 'Gjenta passordet',
-  'matrix.passwordMismatch': 'Passordene samsvarer ikke.',
-  'matrix.unlockWrong': 'Det fungerte ikke. Prøv igjen.',
-  'matrix.passkeyUnsupported':
-    'Denne tilgangsnøkkelen kan ikke åpne krypterte data. Bruk passordet ditt.',
+  'matrix.unlocking': 'Dataene dine låses opp …',
+  'matrix.signIn': 'Logg på Sytue ID',
+  'matrix.signInBody':
+    'Påloggingen din på Sytue ID låser opp de krypterte dataene dine på denne enheten. Logg på igjen med passordet eller tilgangsnøkkelen din for å åpne dem her.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Tillat kryptert behandling',
   'matrix.allowStorageBody':

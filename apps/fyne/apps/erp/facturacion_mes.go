@@ -197,8 +197,12 @@ func (b *Bienvenida) tarjetaFacturacion(v tema.Variante, ancho float32) (fyne.Ca
 	y += tema.TextoXS.Linea + TituloParteMB
 
 	if f.Cargando {
-		// El mismo alto que las barras y su fila de meses: nada salta al llegar.
-		l.poner(ui.NuevoEsqueletoFraccion(1, AltoBarras), x0, y, dentro, AltoBarras)
+		// El mismo alto que las barras y su fila de meses: nada salta al llegar. Es un
+		// bloque de `ui.BloquesEsqueleto`, como las cifras del resumen: late con el pulso
+		// común y la tarjeta dice «Cargando» (la web pone `aria-busy` en la tarjeta); un
+		// `ui.Esqueleto` suelto no anuncia nada.
+		carga := ui.NuevosBloquesEsqueleto()
+		l.poner(carga.Con(carga.BloqueFraccion(1, AltoBarras)), x0, y, dentro, AltoBarras)
 		y += AltoBarras + AltoEjeBarras
 	} else {
 		puntos := make([]PuntoBarras, len(f.Serie))

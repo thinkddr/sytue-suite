@@ -140,6 +140,12 @@ The office suite is organized into specialized applications that share the colla
 - **SyBases** (`apps/frontend/apps/bases`): Collaborative relational databases with table, kanban, calendar and form views.
 - **Native applications (`apps/fyne`)**: Fifteen applications compiled natively in Go + Fyne that share single sign-on through the operating system keychain ([ADR 0050](decisions.md#0050)).
 
+<a id="apps-nativas-sin-webview--y-paridad-de-superficies-decisión-2026-09-17"></a>
+
+### Native apps without a webview — and surface parity (decision 2026-09-17)
+
+The desktop and mobile apps are native Go + Fyne, without a webview. The rule is **parity first**: every web app feature also reaches desktop and mobile. The registry `apps/frontend/packages/config/src/paridad.ts` lists each feature with its status per surface (`si`, or `planificado` with the debt that points here), and the `ci-desktop` and `ci-mobile` gates check it whenever a web app changes. The TopBar is the only deliberate exception. Operating system integrations are shared by all apps: system notifications, “Add to the system calendar” and mounting Drive in the system.
+
 ---
 
 <a id="6-sytue-cloud--vision-y-workstreams"></a>

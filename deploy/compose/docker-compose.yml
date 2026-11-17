@@ -314,6 +314,9 @@ services:
       # «unused mount»). Así `pg_upgrade --link` no cruza puntos de montaje.
       - "postgres-data:/var/lib/postgresql"
       - "./postgres/init:/docker-entrypoint-initdb.d:ro"
+      # La lista de parámetros app.* que los roles de servicio pueden fijar en sus
+      # funciones: el MISMO fichero que en el piloto, lo ejecuta el init de arriba.
+      - "./postgres/conceder-parametros.sql:/sytue/sql/conceder-parametros.sql:ro"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d postgres"]
       interval: 60s

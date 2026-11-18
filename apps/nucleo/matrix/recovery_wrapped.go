@@ -5,6 +5,7 @@ package matrix
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"maunium.net/go/mautrix"
@@ -31,6 +32,19 @@ func (c *Client) AccountUserID() string { return c.cli.UserID.String() }
 // custodiar (es idempotente). La clave no se devuelve: no hay nada que enseñar.
 // Tras él, AcknowledgeRecoverySetup retira la configuración pendiente.
 func (c *Client) BootstrapRecoveryWrapped(ctx context.Context, uia mautrix.UIACallback, escrow RecoveryEscrow) error {
+	return c.bootstrapRecoveryWrapped(ctx, uia, escrow, false)
+}
+
+// RestartRecoveryWrapped es BootstrapRecoveryWrapped en una cuenta que AbandonedRecovery
+// da por abandonada, comprobado otra vez aquí: su clave de almacenamiento por defecto
+// no protegió nunca nada, así que se configura como una cuenta nueva con otra clave
+// (envuelta antes de publicarla), y lo que este dispositivo guardaba de la vieja (su
+// clave de propietario en el llavero) se olvida. En el servidor no se borra nada.
+func (c *Client) RestartRecoveryWrapped(ctx context.Context, uia mautrix.UIACallback, escrow RecoveryEscrow) error {
+	return c.bootstrapRecoveryWrapped(ctx, uia, escrow, true)
+}
+
+func (c *Client) bootstrapRecoveryWrapped(ctx context.Context, uia mautrix.UIACallback, escrow RecoveryEscrow, abandoned bool) error {
 	if escrow == nil {
 		return ErrNoRecoveryEscrow
 	}
@@ -40,7 +54,10 @@ func (c *Client) BootstrapRecoveryWrapped(ctx context.Context, uia mautrix.UIACa
 		return ErrClosed
 	}
 	machine := c.crypto.Machine()
-	pending, err := c.prepareRecoverySetup(ctx)
+	if err := c.requireAbandoned(ctx, abandoned); err != nil {
+		return err
+	}
+	pending, err := c.prepareRecoverySetupFor(ctx, abandoned)
 	if err != nil {
 		return err
 	}
@@ -65,14 +82,103 @@ func (c *Client) BootstrapRecoveryWrapped(ctx context.Context, uia mautrix.UIACa
 	if err := machine.FlushStore(ctx); err != nil {
 		return err
 	}
-	if err := c.prepareBackup(ctx, recovery); err != nil {
+	// Sin copia en el servidor (comprobado), un secreto de copia que dejara el intento
+	// abandonado va cerrado con la clave vieja: se hace una nueva.
+	if err := c.setupBackup(ctx, recovery, abandoned); err != nil {
 		return err
+	}
+	if abandoned {
+		if err := c.forgetAbandonedOwnerKey(ctx, pending.KeyID); err != nil {
+			return err
+		}
 	}
 	if err := c.saveStorageAuthKey(ctx, pending.storageKey()); err != nil {
 		return err
 	}
 	pending.Complete = true
 	return c.saveRecoverySetup(ctx, pending)
+}
+
+// requireAbandoned comprueba otra vez, ya con el cerrojo, que la cuenta sigue a medias.
+func (c *Client) requireAbandoned(ctx context.Context, abandoned bool) error {
+	if !abandoned {
+		return nil
+	}
+	ok, err := c.abandonedRecovery(ctx)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrRecoveryExists
+	}
+	return nil
+}
+
+// forgetAbandonedOwnerKey: la clave de propietario de la clave vieja no firmó nada (sin
+// identidad nunca hubo un dispositivo verificado que escribiera); la sustituye la nueva.
+func (c *Client) forgetAbandonedOwnerKey(ctx context.Context, keyID string) error {
+	if c.cfg.Bootstrap.StorageProduct == "" {
+		return nil
+	}
+	current, err := c.storageAuthKey(ctx, "")
+	if err != nil {
+		return nil //nolint:nilerr // sin clave de propietario guardada no hay nada que olvidar.
+	}
+	stale := current.ID != keyID
+	clear(current.Key)
+	if stale && c.cfg.Secrets.Delete(c.storageAuthSecretKey()) != nil {
+		return ErrSecureStore
+	}
+	return nil
+}
+
+// AbandonedRecovery dice si la cuenta se quedó a medias (ADR 0084, 0085): tiene una
+// clave de almacenamiento secreto por defecto, pero el homeserver no tiene identidad de
+// firmas cruzadas ni copia de seguridad de claves, y el baúl no tiene secretos. Ningún
+// dispositivo llegó a estar verificado, así que esa clave no protegió nada: la cuenta
+// se configura como nueva. Todo sale del servidor; una consulta fallida es «no».
+func (c *Client) AbandonedRecovery(ctx context.Context) (bool, error) {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.abandonedRecovery(ctx)
+}
+
+func (c *Client) abandonedRecovery(ctx context.Context) (bool, error) {
+	if c.closed.Load() {
+		return false, ErrClosed
+	}
+	if _, err := c.crypto.Machine().SSSS.GetDefaultKeyID(ctx); errors.Is(err, ssss.ErrNoDefaultKeyAccountDataEvent) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	current, err := c.cli.QueryKeys(ctx, &mautrix.ReqQueryKeys{DeviceKeys: mautrix.DeviceKeysRequest{c.cli.UserID: {}}})
+	if err != nil {
+		return false, err
+	}
+	if len(current.Failures) != 0 {
+		return false, nil
+	}
+	_, master := current.MasterKeys[c.cli.UserID]
+	_, self := current.SelfSigningKeys[c.cli.UserID]
+	_, user := current.UserSigningKeys[c.cli.UserID]
+	if master || self || user {
+		return false, nil
+	}
+	if _, err := c.cli.GetKeyBackupLatestVersion(ctx); err == nil {
+		return false, nil
+	} else if !errors.Is(err, mautrix.MNotFound) {
+		return false, err
+	}
+	var vault json.RawMessage
+	err = c.cli.GetAccountData(ctx, ssssVaultEventPrefix+storageSessionsSecretID(c.vaultScope()), &vault)
+	if err == nil {
+		return false, nil
+	}
+	if !errors.Is(err, mautrix.MNotFound) {
+		return false, err
+	}
+	return true, nil
 }
 
 // ResetRecoveryWrapped es ResetRecovery con la clave nueva guardada antes de

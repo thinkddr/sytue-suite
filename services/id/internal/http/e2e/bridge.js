@@ -19,6 +19,18 @@
  *   cambio. Quien sabe la contraseña actual ya podría abrir el sobre; quien no, no
  *   consigue nada.
  *
+ * - LA VUELTA DEL INICIO DE SESIÓN (`handoff`). Safari guarda lo de un iframe
+ *   aparte por cada ORIGEN de la página que lo incrusta: este puente, dentro de
+ *   `calcus.sytue.eu`, no ve lo que el relevo dejó en `id.sytue.eu` a pantalla
+ *   completa, así que tras entrar la app volvía a pedir entrar, sin fin (medido en
+ *   producción, v3.21.0). Cuando no tiene clave, el puente contesta `signin` con la
+ *   parte PÚBLICA de una clave efímera suya (`handoff_key`, la privada no extraíble
+ *   y en SU almacén); la app la lleva al inicio de sesión y el relevo le devuelve la
+ *   clave de desbloqueo cerrada para ella, en el FRAGMENTO de la vuelta (no llega a
+ *   ningún servidor), como a una app nativa. La app se la pasa al puente sin poder
+ *   abrirla (`handoff` en la siguiente petición), y el puente la guarda en su
+ *   almacén. Un solo uso; la clave efímera caduca a la media hora.
+ *
  * Contesta SOLO a su ventana madre y SOLO si su origen es exactamente el que el
  * servidor validó y puso en la CSP de esta página (`frame-ancestors`): otro origen,
  * otra ventana o un iframe anidado no reciben nada. Solo usa la clave de la persona
@@ -283,6 +295,126 @@
     });
   };
 
+  var HANDOFF_TTL = 30 * 60 * 1000;
+  var CURVE = { name: "ECDH", namedCurve: "P-256" };
+  function handoffRecord(h, now) {
+    return (
+      !!h &&
+      h.v === 2 &&
+      !!h.priv &&
+      h.priv.type === "private" &&
+      h.priv.extractable === false &&
+      typeof h.pub === "string" &&
+      typeof h.at === "number" &&
+      now >= h.at &&
+      now - h.at < HANDOFF_TTL
+    );
+  }
+  /** La parte pública de la clave efímera de la vuelta (la crea si no hay una viva). */
+  E.handoffKey = function (now) {
+    return E.store.get("handoff").then(function (h) {
+      if (handoffRecord(h, now)) return h.pub;
+      return global.crypto.subtle
+        .generateKey(CURVE, false, ["deriveBits"])
+        .then(function (pair) {
+          return global.crypto.subtle
+            .exportKey("raw", pair.publicKey)
+            .then(function (raw) {
+              var pub = E.b64u(new Uint8Array(raw));
+              return E.store
+                .put("handoff", {
+                  v: 2,
+                  priv: pair.privateKey,
+                  pub: pub,
+                  at: now,
+                })
+                .then(function () {
+                  return pub;
+                });
+            });
+        });
+    });
+  };
+  /**
+   * Abre la vuelta del relevo con la clave efímera y guarda la clave de desbloqueo de
+   * `sub` (y lo que abre sus envoltorios de la 0082) en el almacén de ESTE puente.
+   * Un solo uso: la clave efímera se borra en cuanto abre una. Nunca rechaza: lo que
+   * no abre se ignora (y no gasta la clave) y la operación sigue como si nada.
+   */
+  E.takeHandoff = function (sub, blob, now) {
+    if (
+      typeof blob !== "string" ||
+      !blob ||
+      blob.length > 16384 ||
+      !/^[A-Za-z0-9_-]+$/.test(blob)
+    )
+      return Promise.resolve(false);
+    return E.store
+      .get("handoff")
+      .then(function (h) {
+        if (!handoffRecord(h, now)) return false;
+        return E.openDelivery(h.priv, h.pub, blob).then(function (d) {
+          var key = d && typeof d.key === "string" ? E.unb64(d.key) : null;
+          // De otra persona (otra cuenta en Sytue ID): ni se guarda ni gasta la clave.
+          if (!d || d.v !== 1 || d.sub !== sub || !key || key.length !== 32) {
+            E.wipe(key);
+            return false;
+          }
+          return E.store.del("handoff").then(function () {
+            var legacy = Array.isArray(d.legacy) ? d.legacy.slice(0, 4) : [];
+            return E.saveUnlock(sub, key)
+              .then(function () {
+                return Promise.all(
+                  legacy
+                    .filter(function (l) {
+                      return (
+                        l &&
+                        typeof l.ikm === "string" &&
+                        typeof l.kind === "string"
+                      );
+                    })
+                    .map(function (l) {
+                      var ikm = E.unb64(l.ikm);
+                      return E.legacyKey(
+                        {
+                          kind: l.kind,
+                          salt: l.salt || "",
+                          credential_id: l.credential_id || "",
+                        },
+                        ikm,
+                      ).then(function (item) {
+                        E.wipe(ikm);
+                        return item;
+                      });
+                    }),
+                );
+              })
+              .then(function (items) {
+                if (!items.length) return undefined;
+                return E.store.put("legacy:" + sub, {
+                  v: 2,
+                  items: items,
+                  at: now,
+                });
+              })
+              .then(
+                function () {
+                  E.wipe(key);
+                  return true;
+                },
+                function (err) {
+                  E.wipe(key);
+                  throw err;
+                },
+              );
+          });
+        });
+      })
+      .catch(function () {
+        return false;
+      });
+  };
+
   E.bridge = function (cfg, win, now) {
     var origin = cfg && cfg.origin;
     var parent = win.parent;
@@ -321,10 +453,14 @@
           reply(m.id, { ok: false, error: "account" });
           return;
         }
-        op =
-          m.type === "sytue-e2e-unwrap"
+        // La vuelta del inicio de sesión, si la trae, antes de la operación.
+        op = (
+          m.handoff ? E.takeHandoff(m.sub, m.handoff, t) : Promise.resolve()
+        ).then(function () {
+          return m.type === "sytue-e2e-unwrap"
             ? E.bridgeUnwrap(m, t)
             : E.bridgeWrap(m, t);
+        });
       } else if (m.type === "sytue-e2e-password" && cfg.password === true) {
         // Solo «Mi cuenta» (el servidor lo dice en `password`): el sobre de la
         // contraseña nueva, si la actual abre el vigente (ADR 0085).
@@ -347,6 +483,16 @@
       }
       op.then(
         function (out) {
+          // Sin clave aquí: la clave efímera con la que el relevo puede devolverla.
+          if (out.error === "signin")
+            return E.handoffKey(t).then(
+              function (pub) {
+                reply(m.id, { ok: false, error: "signin", handoff_key: pub });
+              },
+              function () {
+                reply(m.id, { ok: false, error: "signin" });
+              },
+            );
           if (out.error) reply(m.id, { ok: false, error: out.error });
           else {
             out.ok = true;

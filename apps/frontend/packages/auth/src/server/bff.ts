@@ -17,12 +17,13 @@
  *   GET  /auth/avatar     -> la foto propia de Sytue ID, pedida con el token
  */
 import { ORG_COLOR_COOKIE, ORG_FORMA_COOKIE } from '@sytue/config';
-import { isSessionGeneration } from '@sytue/config/session-owner';
+import { isSessionGeneration, sessionChangedHeader } from '@sytue/config/session-owner';
+import { translate } from '@sytue/i18n';
+import { idiomaDeLaPeticion, paginaDeAviso } from './pagina-aviso.js';
 import {
   SessionSlots,
   newSessionGeneration,
   sessionOwner,
-  sessionChangedResponse,
   type SelectedSession,
 } from './session-slots.js';
 import type { OidcConfig, SytueSession, SytueUser, TokenSet } from '../types.js';
@@ -116,6 +117,8 @@ interface StateExterno {
   /** Destino, tal cual llegó a `/auth/login`. */
   r: string;
   i?: string;
+  /** `1` si este login es el reintento de un callback que no pudo terminar. */
+  n?: 1;
 }
 
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30;
@@ -126,7 +129,17 @@ export function createBff(opts: BffOptions) {
   const maxAge = opts.sessionMaxAge ?? DEFAULT_MAX_AGE;
   const secure = opts.secureCookies ?? true;
   const cookieAttrs = sessionCookieAttributes({ maxAge, secure });
-  const slots = new SessionSlots(sessionSecret, secure, maxAge);
+  // Cada app con sus cookies (ver el constructor de SessionSlots): el client OIDC es
+  // único por app y estable entre despliegues.
+  const slots = new SessionSlots(
+    sessionSecret,
+    secure,
+    maxAge,
+    config.clientId
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .slice(0, 40) || undefined,
+  );
   const stateCookie = hostCookieName(OIDC_STATE_COOKIE, secure);
   // Atributos del BORRADO. `secure` NO es decorativo aqui: el navegador rechaza
   // ENTERO cualquier Set-Cookie de un nombre `__Host-` que no lo lleve —tambien
@@ -228,6 +241,51 @@ export function createBff(opts: BffOptions) {
     return { ...session, user };
   };
 
+  /**
+   * El login otra vez, desde cero, marcado como REINTENTO (`restart=1`): la marca
+   * viaja sellada en el `state` y es la que corta el bucle si el callback de ese
+   * reintento tampoco puede terminar.
+   */
+  const loginDeNuevo = (returnTo: string): string =>
+    `${basePath}/auth/login?${returnTo ? `returnTo=${encodeURIComponent(returnTo)}&` : ''}restart=1`;
+
+  /**
+   * El callback no puede terminar y no hay sesión que leer. ANTES devolvía un
+   * `409 {error:'session_changed'}` en JSON, y el callback es una navegación de
+   * página completa: la persona se quedaba delante de un JSON (Safari: «Failed to
+   * load resource: 409 (callback)») y la app no cargaba nunca.
+   *
+   * - Con sesión legible, a su destino, como siempre.
+   * - Si no hay otro login en curso ni un logout de por medio, y este callback no
+   *   es ya un reintento, se reinicia el login: con el SSO vivo es transparente.
+   * - Si no, una página con un enlace para entrar: no se pisa por sorpresa un
+   *   login más nuevo (otra pestaña) ni se reabre lo que un logout cerró, y no hay
+   *   bucle. Sigue siendo un 409 con la cabecera de sesión cambiada.
+   *
+   * Ninguna rama canjea un code: eso solo pasa con el state y el PKCE del intento
+   * seleccionado.
+   */
+  const sinSalida = async (
+    ctx: BffContext,
+    destination: string,
+    intent: string | undefined,
+    reintento: boolean,
+  ): Promise<Response> => {
+    if (await slots.read(ctx)) return redirect(destination);
+    const login = loginDeNuevo(destination);
+    if (!reintento && !(await slots.superseded(ctx, intent))) return redirect(login);
+    const locale = idiomaDeLaPeticion(ctx);
+    return paginaDeAviso({
+      locale,
+      titulo: translate(locale, 'account.signIn'),
+      descripcion: translate(locale, 'account.signedOutDescription'),
+      accion: translate(locale, 'account.signIn'),
+      href: login,
+      status: 409,
+      headers: { [sessionChangedHeader]: '1' },
+    });
+  };
+
   return {
     /**
      * Prefijo bajo el que se sirve esta app (`/admin`, `/one`… o `` en la raíz).
@@ -288,7 +346,12 @@ export function createBff(opts: BffOptions) {
       const sealed = await seal(state, sessionSecret);
       // El mismo `state` aleatorio que guarda la cookie, más el destino, sellados
       // en el parámetro que el IdP devuelve tal cual (lo trata como opaco).
-      const externo: StateExterno = { s: authReq.state, r: returnTo, i: state.intent };
+      const externo: StateExterno = {
+        s: authReq.state,
+        r: returnTo,
+        i: state.intent,
+        ...(ctx.url.searchParams.get('restart') === '1' ? { n: 1 as const } : {}),
+      };
       const url = new URL(authReq.url);
       url.searchParams.set('state', await seal(externo, sessionSecret));
       // `reauth=1`: una acción sensible ha pedido confirmar la identidad (step-up,
@@ -308,6 +371,11 @@ export function createBff(opts: BffOptions) {
         const legacy = ctx.url.searchParams.get('legacy');
         if (legacy && /^[A-Za-z0-9_.~-]{1,800}$/.test(legacy))
           url.searchParams.set('sytue_legacy', legacy);
+        // La clave efímera (pública) del puente de ESTA app: el relevo le devuelve
+        // la clave de desbloqueo cerrada para él (bridge.js, `handoff`). Sin ella,
+        // en Safari el puente no ve la que el relevo deja en Sytue ID.
+        const key = ctx.url.searchParams.get('key');
+        if (key && /^[A-Za-z0-9_-]{87}$/.test(key)) url.searchParams.set('sytue_unlock_key', key);
       }
       // Cookie de estado efimera (30 min: la gente tarda en el formulario del IdP),
       // host-only, httpOnly. Si aun asi caduca, el callback reinicia el flujo.
@@ -337,13 +405,21 @@ export function createBff(opts: BffOptions) {
         isSessionGeneration(intent);
       const selected = await slots.selection(ctx);
       const destination = safeReturnTo(stored?.returnTo ?? externo?.r ?? '') || `${basePath}/`;
+      const error = ctx.url.searchParams.get('error');
+      // Un login que arrancó a la vez que otro (ver `SessionSlots.adopt`) se queda
+      // con la selección: su code sigue ligado a SU verificador PKCE y a SU state.
+      const adopted =
+        !!code &&
+        !error &&
+        !!matched &&
+        selected?.candidate.id !== intent &&
+        (await slots.adopt(ctx, intent));
       // An old or replayed callback never starts another login over a newer
       // selected intent. In-flight pre-slot flows restart once without redeeming
       // a code whose PKCE state is no longer bound to a selected intent.
-      if (intent && selected?.candidate.id !== intent) {
-        return (await slots.read(ctx)) ? redirect(destination) : sessionChangedResponse();
+      if (!adopted && intent && selected?.candidate.id !== intent) {
+        return sinSalida(ctx, destination, intent, externo?.n === 1);
       }
-      const error = ctx.url.searchParams.get('error');
       if (error) {
         if (matched) {
           slots.cancel(ctx, intent);
@@ -352,17 +428,15 @@ export function createBff(opts: BffOptions) {
         return authErrorResponse(error, ctx.url.searchParams.get('error_description'));
       }
       if (!code || !matched) {
-        if (selected)
-          return (await slots.read(ctx)) ? redirect(destination) : sessionChangedResponse();
+        if (selected) return sinSalida(ctx, destination, intent, externo?.n === 1);
         ctx.cookies.delete(stateName, clearAttrs);
-        return redirect(
-          externo?.r && safeReturnTo(externo.r) !== '/'
-            ? `${basePath}/auth/login?returnTo=${encodeURIComponent(safeReturnTo(externo.r))}`
-            : `${basePath}/auth/login`,
-        );
+        const r = externo?.r ? safeReturnTo(externo.r) : '/';
+        return externo?.n === 1
+          ? sinSalida(ctx, r === '/' ? `${basePath}/` : r, intent, true)
+          : redirect(loginDeNuevo(r === '/' ? '' : r));
       }
-      if (!(await slots.canComplete(ctx, intent)))
-        return (await slots.read(ctx)) ? redirect(destination) : sessionChangedResponse();
+      if (!adopted && !(await slots.canComplete(ctx, intent)))
+        return sinSalida(ctx, destination, intent, externo?.n === 1);
       ctx.cookies.delete(stateName, clearAttrs);
 
       // UN FALLO AQUÍ NO PUEDE ESCAPAR COMO EXCEPCIÓN. Astro la convierte en un

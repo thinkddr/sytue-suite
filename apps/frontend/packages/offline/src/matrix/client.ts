@@ -14,6 +14,7 @@ import {
 } from 'matrix-js-sdk';
 import {
   AllDevicesIsolationMode,
+  CrossSigningKey,
   EventShieldColour,
   EventShieldReason,
   type CryptoApi,
@@ -650,16 +651,99 @@ export class SuiteMatrix {
     )
       throw new MatrixSecurityError('recovery');
     await this.publishRecoveryKey(await this.newRecoveryKey());
+    await this.finishRecoverySetup(false);
+  }
+  /**
+   * What `setupRecovery` does once the new key is the default one: the cross-signing keys
+   * and the backup key go into secret storage under it, and the device signs itself.
+   * `newIdentity`: an account that never published one gets a fresh identity even if
+   * this device kept private keys of an upload that never happened.
+   */
+  private async finishRecoverySetup(newIdentity: boolean): Promise<void> {
     await this.crypto.bootstrapSecretStorage({ setupNewKeyBackup: false });
     await this.ownerKeys?.flush();
     await this.crypto.bootstrapCrossSigning({
       authUploadDeviceSigningKeys: (request) => this.interactiveAuth(request),
+      ...(newIdentity ? { setupNewCrossSigning: true } : {}),
     });
     await this.crypto.getUserDeviceInfo([this.bootstrap.matrix_user_id], true);
     if ((await this.crypto.checkKeyBackupAndEnable()) === null) await this.crypto.resetKeyBackup();
     await this.ownerKeys?.flush();
     if (!(await this.crypto.isSecretStorageReady()) || !(await this.trusted()))
       throw new MatrixSecurityError('device');
+  }
+  /**
+   * The account has a secret storage key that nothing here opens: no wrapper, no copy
+   * the service held, not in this device's owner-key cache. Whether this device can
+   * still protect the account again WITHOUT losing anything that someone could open:
+   *
+   * - `new`: the encryption was never set up. The homeserver has no cross-signing
+   *   identity for the account and no key backup, and secret storage holds no vault
+   *   secret: no device was ever trusted, so the key protected nothing (an attempt
+   *   interrupted under v3.20, ADR 0082). It is set up as for a new account.
+   * - `cached`: this device keeps the account's own cross-signing private keys (the
+   *   published ones) and the decryption key of its current backup, if any: everything
+   *   secret storage protects for the account, except vault secrets, and there are none.
+   *   A storage account also keeps no other owner key here. Those keys are stored again
+   *   under a new secret storage key, wrapped with the Sytue ID unlock key.
+   * - null: anything else. Nothing is replaced.
+   *
+   * Everything is read from the homeserver: a key query that fails is never «no identity».
+   */
+  async orphanedRecovery(): Promise<'new' | 'cached' | null> {
+    if (this.closed) return null;
+    const me = this.bootstrap.matrix_user_id;
+    const keys = await this.client.downloadKeysForUsers([me]);
+    if (this.closed || Object.keys(keys.failures ?? {}).length > 0) return null;
+    if (this.vaultInUse()) return null;
+    const published = !!(
+      keys.master_keys?.[me] ||
+      keys.self_signing_keys?.[me] ||
+      keys.user_signing_keys?.[me]
+    );
+    const backup = await this.crypto.getKeyBackupInfo();
+    if (this.closed) return null;
+    if (!published) return backup ? null : 'new';
+    await this.crypto.getUserDeviceInfo([me], true);
+    // Non-null only with the three private keys here AND matching the published identity.
+    if (!(await this.crypto.getCrossSigningKeyId(CrossSigningKey.Master))) return null;
+    if (backup && !(await this.crypto.isKeyBackupTrusted(backup)).matchesDecryptionKey) return null;
+    if (this.bootstrap.storage_product && (await this.ownerKeys?.cachedID()) != null) return null;
+    return this.closed ? null : 'cached';
+  }
+  /**
+   * Vault secrets (`org.sytue.vault.*`) are sealed with the secret storage key and only
+   * that key opens them: while there are any, the key is never replaced. An account data
+   * store that cannot be listed counts as «in use».
+   */
+  private vaultInUse(): boolean {
+    const data = (this.client.store as { accountData?: unknown }).accountData;
+    if (!(data instanceof Map)) return true;
+    for (const [type, event] of data as Map<string, MatrixEvent>) {
+      if (!type.startsWith(ssssVaultEventPrefix)) continue;
+      const content = event.getContent();
+      if (content && Object.keys(content).length > 0) return true;
+    }
+    return false;
+  }
+  /**
+   * Protects again an account `orphanedRecovery` found safe to protect, checked again
+   * here: a new secret storage key, wrapped with the Sytue ID unlock key BEFORE it is
+   * published (`saveRecoveryKey`), the default from then on. Nothing on the homeserver is
+   * deleted: the old key description stays, and only the secrets this device holds in
+   * the clear are stored again under the new key. This device's Olm account and Megolm
+   * sessions are not touched, so whatever it can read now it still reads.
+   */
+  async restartRecovery(): Promise<void> {
+    if (this.closed) throw new MatrixSecurityError('device');
+    const plan = await this.orphanedRecovery();
+    if (!plan) throw new MatrixSecurityError('recovery');
+    // The key of a setup that never published an identity protected nothing; outside
+    // private storage a cached key is no owner proof either (a storage account with one
+    // is never `cached`, see above).
+    if (plan === 'new' || !this.bootstrap.storage_product) await this.ownerKeys?.discard();
+    await this.publishRecoveryKey(await this.newRecoveryKey());
+    await this.finishRecoverySetup(plan === 'new');
   }
   /**
    * Lost access: a new cross-signing identity, secret storage and key backup for
@@ -765,7 +849,7 @@ export class SuiteMatrix {
     // cross-signing identity. Import requires it; never replace the identity
     // merely because that asynchronous query has not finished yet.
     await this.crypto.getUserDeviceInfo([this.bootstrap.matrix_user_id], true);
-    if (!(await this.crypto.isSecretStorageReady())) throw new MatrixSecurityError('recovery');
+    if (!(await this.crypto.isSecretStorageReady())) await this.completeSecretStorage();
     await this.crypto.bootstrapCrossSigning({
       authUploadDeviceSigningKeys: (request) => this.interactiveAuth(request),
     });
@@ -779,6 +863,33 @@ export class SuiteMatrix {
     if (this.bootstrap.storage_product) {
       await this.loadAttestedStorageSessions(this.vaultScope());
     }
+  }
+  /**
+   * Secret storage without everything it should hold under its current key: a setup cut
+   * short (under v3.20, the backup made but its key never stored). If this device keeps
+   * the missing secrets in the clear — cross-signing keys only when they ARE the
+   * published identity, the backup key only when it opens the current backup — they are
+   * stored under the current key, which this device holds (the caller opened it). Nothing
+   * new is created; otherwise the account stays as it is (`recovery`).
+   */
+  private async completeSecretStorage(): Promise<void> {
+    const status = await this.crypto.getCrossSigningStatus();
+    const cached = status.privateKeysCachedLocally;
+    const identity =
+      cached.masterKey &&
+      cached.selfSigningKey &&
+      cached.userSigningKey &&
+      !!(await this.crypto.getCrossSigningKeyId(CrossSigningKey.Master));
+    const anyCached =
+      cached.masterKey || cached.selfSigningKey || cached.userSigningKey ? identity : true;
+    if (
+      !anyCached ||
+      !(identity || (await this.crypto.getSessionBackupPrivateKey())) ||
+      !(await this.client.secretStorage.hasKey())
+    )
+      throw new MatrixSecurityError('recovery');
+    await this.crypto.bootstrapSecretStorage({ setupNewKeyBackup: false });
+    if (!(await this.crypto.isSecretStorageReady())) throw new MatrixSecurityError('recovery');
   }
   async backup(): Promise<void> {
     if (this.closed || !(await this.trusted())) throw new MatrixSecurityError('device');

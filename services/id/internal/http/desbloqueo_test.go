@@ -150,6 +150,10 @@ func TestElRelevoSoloSiUnaAppDeLaSuiteLoPide(t *testing.T) {
 	}{
 		{"web lo pide", authzRequest{Unlock: true}, web, true, ""},
 		{"web no lo pide", authzRequest{}, web, false, ""},
+		// La clave efímera del puente de la app (Safari aparta su almacén): se usa.
+		{"web con la clave de su puente", authzRequest{Unlock: true, UnlockKey: clave}, web, true, clave},
+		{"web con clave rota", authzRequest{Unlock: true, UnlockKey: "abc"}, web, true, ""},
+		{"web con clave pero sin pedirlo", authzRequest{UnlockKey: clave}, web, false, ""},
 		{"nativa con clave", authzRequest{UnlockKey: clave}, nativa, true, clave},
 		{"nativa con clave rota", authzRequest{UnlockKey: "abc"}, nativa, false, ""},
 		{"nativa sin clave", authzRequest{Unlock: true}, nativa, false, ""},

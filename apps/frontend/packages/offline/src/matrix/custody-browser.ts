@@ -14,6 +14,7 @@ import {
 } from './custody.js';
 import { fromBase64, passwordKDF, toBase64Url, type RecoveryWrapper } from './recovery-wrap.js';
 import {
+  bridgeHandoffKey,
   forgetLegacyMaterial,
   unwrapInBridge,
   wrapInBridge,
@@ -235,6 +236,9 @@ export class BrowserKeyCustody implements MatrixKeyCustody {
   signInURL(returnTo: string, older: string): string {
     const params = new URLSearchParams({ unlock: '1', returnTo });
     if (older) params.set('legacy', older);
+    // The bridge's one-time key: the relay seals the unlock key for it (unlock-bridge.ts).
+    const key = bridgeHandoffKey();
+    if (key) params.set('key', key);
     return `${this.options.base.replace(/\/$/, '')}/auth/login?${params.toString()}`;
   }
 }

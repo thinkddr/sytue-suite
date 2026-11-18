@@ -13,6 +13,10 @@ function values() {
       data = value.slice();
     },
     close: () => {},
+    delete: async () => {
+      data?.fill(0);
+      data = null;
+    },
     destroy: async () => {
       data?.fill(0);
       data = null;
@@ -241,4 +245,30 @@ test('the key a device already holds is handed out only from its own cache, chec
   expect(await second.held('owner', otherDescription)).toBeNull();
   expect(f.asked()).toBe(1);
   await second.destroy();
+});
+
+test('a key that never protected anything can be forgotten, so a new one can be kept', async () => {
+  // Una cuenta a medias de la v3.20: se configura de nuevo con otra clave, que la caché
+  // rechazaría mientras guarde la vieja (rotar exige migrar el historial).
+  const f = await fixture(),
+    first = f.make();
+  expect(await first.cachedID()).toBeNull();
+  await first.get({ owner: f.description });
+  expect(await first.cachedID()).toBe('owner');
+  const otherKey = crypto.getRandomValues(new Uint8Array(32));
+  const otherDescription = {
+    algorithm: ownerProofAlgorithm,
+    ...(await calculateKeyCheck(otherKey)),
+  };
+  first.remember('other', otherDescription, otherKey);
+  await expect(first.flush()).rejects.toThrow('matrix_recovery');
+  await first.discard();
+  expect(f.storage.data()).toBeNull();
+  expect(f.keys.size).toBe(0);
+  expect(await first.cachedID()).toBeNull();
+  first.remember('other', otherDescription, otherKey);
+  await first.flush();
+  expect(await first.cachedID()).toBe('other');
+  expect(await first.held('other', otherDescription)).toEqual(otherKey);
+  await first.destroy();
 });

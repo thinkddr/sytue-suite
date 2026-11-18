@@ -40,6 +40,8 @@ type Recuperable interface {
 	VerificationStatus(context.Context) (mx.VerificationStatus, error)
 	Recover(context.Context, string) error
 	BootstrapRecoveryWrapped(context.Context, mautrix.UIACallback, mx.RecoveryEscrow) error
+	RestartRecoveryWrapped(context.Context, mautrix.UIACallback, mx.RecoveryEscrow) error
+	AbandonedRecovery(context.Context) (bool, error)
 	AcknowledgeRecoverySetup(context.Context) error
 	DefaultRecoveryKeyID(context.Context) (string, error)
 	LocalRecoveryKey(context.Context) (string, string, error)
@@ -112,6 +114,9 @@ type Diagnostico struct {
 	// migrado: se abrió un envoltorio de la ADR 0082 y ya está envuelta con la clave
 	// de desbloqueo; lo que abría el viejo sobra.
 	migrado bool
+	// rehacer: PasoCrear en una cuenta que se quedó a medias (AbandonedRecovery): su
+	// clave por defecto no protegió nada y se sustituye por una nueva.
+	rehacer bool
 }
 
 // ErrSinCustodia es crear o restablecer el cifrado sin dónde guardar la clave.
@@ -133,6 +138,7 @@ func Diagnosticar(ctx context.Context, client Recuperable, custodia Custodia) (D
 	if status.RecoverySetupPending {
 		// Una configuración a medias se reanuda con su misma clave (y se custodia).
 		d.Paso = PasoCrear
+		d.rehacer = abandonada(ctx, client)
 		return d, nil
 	}
 	stored, err := custodia.Servicio.MatrixRecoveryWrappers(ctx, custodia.Cuenta)
@@ -151,30 +157,64 @@ func Diagnosticar(ctx context.Context, client Recuperable, custodia Custodia) (D
 		d.Paso = PasoListo
 		// Un dispositivo verificado con la clave a mano la envuelve con la clave de
 		// desbloqueo si aún no lo está (cuentas de la ADR 0082 o de antes).
-		if !conSytueID(d.Envoltorios) && keyID != "" {
-			if localID, key, err := client.LocalRecoveryKey(ctx); err == nil && localID == keyID {
-				d.Paso, d.clave, d.claveID = PasoProteger, key, keyID
-			}
+		if !conSytueID(d.Envoltorios) {
+			d.conClaveLocal(ctx, client, keyID)
 		}
+		return d, nil
+	}
+	return d.sinVerificar(ctx, client, custodia, keyID, stored.LegacyEscrow)
+}
+
+// sinVerificar es el paso de un dispositivo sin verificar, sin pedir nada.
+func (d Diagnostico) sinVerificar(ctx context.Context, client Recuperable, custodia Custodia, keyID string, legacyEscrow bool) (Diagnostico, error) {
+	// Una cuenta que se quedó a medias (bajo la v3.20) no se abre con nada, tenga o no
+	// envoltorio: su clave no protegió nada y se configura otra vez, sin pedir nada.
+	if keyID != "" && abandonada(ctx, client) {
+		d.Paso, d.rehacer = PasoCrear, true
 		return d, nil
 	}
 	if len(d.Envoltorios) > 0 {
 		d.Paso = PasoDesbloquear
 		return d, nil
 	}
-	if stored.LegacyEscrow && keyID != "" {
+	if legacyEscrow && keyID != "" {
 		if key, err := custodia.Servicio.MatrixRecoveryKey(ctx); err == nil && key != "" && client.Recover(ctx, key) == nil {
 			d.Paso, d.clave, d.claveID = PasoProteger, key, keyID
 			d.Status, err = client.VerificationStatus(ctx)
 			return d, err
 		}
 	}
-	if !status.HasIdentity {
+	// Sin envoltorio, este dispositivo puede guardar la clave él mismo (las cuentas de
+	// almacenamiento la conservan en el llavero): se abre con ella y se envuelve.
+	if d.conClaveLocal(ctx, client, keyID) {
+		return d, nil
+	}
+	if !d.Status.HasIdentity {
 		d.Paso = PasoCrear
 		return d, nil
 	}
 	d.Paso = PasoVerificar
 	return d, nil
+}
+
+// conClaveLocal pasa a PasoProteger si este dispositivo guarda la clave `keyID` él mismo.
+func (d *Diagnostico) conClaveLocal(ctx context.Context, client Recuperable, keyID string) bool {
+	if keyID == "" {
+		return false
+	}
+	localID, key, err := client.LocalRecoveryKey(ctx)
+	if err != nil || localID != keyID {
+		return false
+	}
+	d.Paso, d.clave, d.claveID = PasoProteger, key, keyID
+	return true
+}
+
+// abandonada: que no se pueda comprobar (sin red) cuenta como «no»; nada se sustituye
+// sin saberlo.
+func abandonada(ctx context.Context, client Recuperable) bool {
+	ok, err := client.AbandonedRecovery(ctx)
+	return err == nil && ok
 }
 
 // pasoSinCustodia: sin servicio no se puede crear (no hay dónde guardar la clave)
@@ -323,6 +363,21 @@ func Crear(ctx context.Context, client Recuperable, custodia Custodia, m Materia
 	return client.AcknowledgeRecoverySetup(ctx)
 }
 
+// Rehacer es Crear en una cuenta que se quedó a medias: la clave por defecto que nada
+// protegió se sustituye por una nueva, envuelta antes de publicarla.
+func Rehacer(ctx context.Context, client Recuperable, custodia Custodia, m Material, uia mautrix.UIACallback) error {
+	if custodia.Servicio == nil {
+		return ErrSinCustodia
+	}
+	if !m.valido() {
+		return ErrSinDesbloqueo
+	}
+	if err := client.RestartRecoveryWrapped(ctx, uia, envolver(custodia, client.AccountUserID(), m)); err != nil {
+		return err
+	}
+	return client.AcknowledgeRecoverySetup(ctx)
+}
+
 // Proteger envuelve con la clave de desbloqueo una clave que este dispositivo ya tiene.
 func Proteger(ctx context.Context, client Recuperable, custodia Custodia, d Diagnostico, m Material) error {
 	if custodia.Servicio == nil {
@@ -358,7 +413,11 @@ func Resolver(ctx context.Context, client Recuperable, custodia Custodia, d Diag
 			d.Paso = PasoIniciarSesion
 			return d, nil
 		}
-		if err := Crear(ctx, client, custodia, m, uia); err != nil {
+		crear := Crear
+		if d.rehacer {
+			crear = Rehacer
+		}
+		if err := crear(ctx, client, custodia, m, uia); err != nil {
 			return d, err
 		}
 	case PasoDesbloquear:
@@ -386,6 +445,20 @@ func Resolver(ctx context.Context, client Recuperable, custodia Custodia, d Diag
 		next.migrado = legado
 		return next, err
 	case PasoProteger:
+		// Sin verificar: este dispositivo guarda la clave sin envoltorio; se abre con
+		// ella primero, y funciona aunque aún no haya con qué envolverla.
+		if !d.Status.Verified {
+			if err := client.Recover(ctx, d.clave); err != nil {
+				d.olvidar()
+				return d, err
+			}
+			status, err := client.VerificationStatus(ctx)
+			if err != nil {
+				d.olvidar()
+				return d, err
+			}
+			d.Status = status
+		}
 		if !m.valido() {
 			d.olvidar()
 			d.Paso = PasoListo

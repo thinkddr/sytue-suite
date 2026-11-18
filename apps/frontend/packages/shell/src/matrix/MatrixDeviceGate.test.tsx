@@ -105,6 +105,14 @@ function custodyFixture(account: Account) {
     older: false,
     /** This device holds the key in its own owner-key cache (verified before ADR 0084). */
     held: false,
+    /**
+     * SuiteMatrix.orphanedRecovery: what this device can still protect when nothing opens
+     * the current key (`new`: never really set up; `cached`: it keeps the identity and
+     * backup keys), or nothing.
+     */
+    orphaned: null as 'new' | 'cached' | null,
+    /** The account was left half set up: its key opens, but there is nothing to recover. */
+    halfSetUp: false,
     subjects: [] as string[],
     signIns: [] as { returnTo: string; older: string }[],
   };
@@ -234,8 +242,25 @@ function fixture() {
         const key = vault.control.held
           ? account.key
           : await ui.readRecoveryKey(account.keyID ? [account.keyID] : undefined);
-        if (key !== account.key) throw new MatrixSecurityError('recovery');
+        if (key !== account.key || vault.control.halfSetUp)
+          throw new MatrixSecurityError('recovery');
         state.recovered = true;
+        state.verified = true;
+      },
+      orphanedRecovery: async () => vault.control.orphaned,
+      // Mirrors SuiteMatrix.restartRecovery: checked again, then a new key wrapped BEFORE
+      // it is published, like a new account.
+      restartRecovery: async () => {
+        if (!vault.control.orphaned) throw new MatrixSecurityError('recovery');
+        await ui.saveRecoveryKey('synthetic-created-key', 'KEY-RESTART');
+        Object.assign(account, {
+          hasKey: true,
+          keyID: 'KEY-RESTART',
+          key: 'synthetic-created-key',
+        });
+        vault.log.push(`publish KEY-RESTART ${vault.control.orphaned}`);
+        vault.control.orphaned = null;
+        vault.control.halfSetUp = false;
         state.verified = true;
       },
       // Mirrors SuiteMatrix.resetRecovery: the new key is handed over first, then the
@@ -640,6 +665,114 @@ test('a key the service does not hold offers only verification from another devi
     expect(findButton('matrix.reset')).toBeUndefined();
     expect(document.querySelector('input[type=password]')).toBeNull();
     expect(document.querySelector('[role=dialog]')).toBeNull();
+    expect(f.vault.log).toEqual([]);
+  } finally {
+    await f.unmount();
+  }
+});
+
+test('an account set up the v3.20.3 way, whose key only this device keeps, opens with no step', async () => {
+  // Producción (Mail, v3.21.0): la clave por defecto no tiene envoltorio que la abra,
+  // pero este dispositivo la guarda en su caché de clave de propietario.
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.control.held = true;
+  try {
+    await f.mount();
+    await until(() => f.root.querySelector('[data-private]') !== null);
+    await until(() => f.vault.wrappers.has('sytue-id'));
+    expect(f.devices[0]!.state.recovered).toBe(true);
+    // Envuelta la clave de siempre: nada se rehace ni se publica.
+    expect(f.vault.wrappers.get('sytue-id')?.keyID).toBe('KEY1');
+    expect(f.vault.log).toEqual(['wrap KEY1 hasKey=true']);
+    expect(document.body.textContent).not.toContain('matrix.unknownKey');
+    expect(f.vault.control.signIns).toEqual([]);
+    expectNothingAsked();
+    expectNoKeyRendered();
+  } finally {
+    await f.unmount();
+  }
+});
+
+test('a device that keeps the account keys protects them again under a new wrapped key, silently', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.control.orphaned = 'cached';
+  try {
+    await f.mount();
+    await until(() => f.root.querySelector('[data-private]') !== null);
+    // Wrapped with the unlock key BEFORE it is published, like a new account.
+    expect(f.vault.log).toEqual(['wrap KEY-RESTART hasKey=true', 'publish KEY-RESTART cached']);
+    expect(document.body.textContent).not.toContain('matrix.unknownKey');
+    expect(findButton('matrix.resetAction')).toBeUndefined();
+    expect(f.devices[0]!.state.resets).toBe(0);
+    expectNothingAsked();
+    expectNoKeyRendered();
+  } finally {
+    await f.unmount();
+  }
+});
+
+test('an account left half set up under v3.20 is set up again, silently, whatever wrapper it kept', async () => {
+  // Producción (Calcus, v3.21.0): sin identidad de firmas cruzadas ni copia de seguridad,
+  // con o sin un envoltorio de una clave que nada protegió.
+  for (const wrapped of [false, true]) {
+    const f = fixture();
+    f.untrusted();
+    if (!wrapped) f.vault.wrappers.clear();
+    f.vault.control.halfSetUp = true;
+    f.vault.control.orphaned = 'new';
+    try {
+      await f.mount();
+      await until(() => f.root.querySelector('[data-private]') !== null);
+      expect(f.vault.log).toEqual([
+        ...(wrapped ? ['unwrap sytue-id'] : []),
+        'wrap KEY-RESTART hasKey=true',
+        'publish KEY-RESTART new',
+      ]);
+      expect([...f.vault.wrappers.values()].map((w) => w.keyID)).toEqual(['KEY-RESTART']);
+      expect(document.body.textContent).not.toContain('matrix.unknownKey');
+      expect(findButton('matrix.resetAction')).toBeUndefined();
+      expectNothingAsked();
+    } finally {
+      await f.unmount();
+    }
+  }
+});
+
+test('a half set up account without the unlock key here goes to Sytue ID and publishes nothing', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.control.orphaned = 'new';
+  f.vault.control.material = false;
+  try {
+    await f.mount();
+    await until(() => findButton('matrix.signIn') !== undefined);
+    expect(f.vault.log).toEqual([]);
+    expect(f.account.keyID).toBe('KEY1');
+    expect(document.body.textContent).not.toContain('matrix.unknownKey');
+  } finally {
+    await f.unmount();
+  }
+});
+
+test('when nobody holds the key of Rooms, starting again is the first way out', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.setData(roomsBootstrap());
+  f.vault.wrappers.clear();
+  try {
+    await f.mount();
+    await until(() => findButton('matrix.reset')?.disabled === false);
+    const labels = Array.from(document.querySelectorAll('button')).map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(labels.indexOf('matrix.reset')).toBeLessThan(labels.indexOf('matrix.verify'));
+    expect(button('matrix.reset').className).not.toContain('bg-transparent');
+    // Nothing happens until the confirmation.
     expect(f.vault.log).toEqual([]);
   } finally {
     await f.unmount();

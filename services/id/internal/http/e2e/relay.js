@@ -283,8 +283,16 @@
    * `package`: si otra app registrara el mismo esquema, el código no le sirve sin el
    * verificador PKCE y la entrega solo la abre la clave efímera de la app que la pidió.
    */
-  E.returnTo = function (next, blob, ua) {
+  E.returnTo = function (next, blob, ua, web) {
     var url = next;
+    // A una app WEB, en el fragmento: el navegador lo conserva al seguir las
+    // redirecciones del callback y no lo manda a ningún servidor ni a sus registros.
+    // Solo lo abre el puente de esa app (bridge.js, `handoff`).
+    if (blob && web)
+      return {
+        auto: url.split("#")[0] + "#sytue_unlock=" + blob,
+        manual: url.split("#")[0] + "#sytue_unlock=" + blob,
+      };
     if (blob)
       url += (url.indexOf("?") < 0 ? "?" : "&") + "sytue_unlock=" + blob;
     var m = /^([a-z][a-z0-9+.-]*):\/\/([^#]*)$/i.exec(url);
@@ -309,6 +317,7 @@
       cfg.next,
       blob,
       global.navigator ? global.navigator.userAgent : "",
+      cfg.web === true,
     );
     if (link) link.href = to.manual;
     // Por si el navegador no deja salir solo hacia el esquema de una app móvil.

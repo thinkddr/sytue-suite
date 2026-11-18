@@ -100,6 +100,12 @@ func (c *Client) saveRecoverySetup(ctx context.Context, pending *recoverySetup) 
 // Query the current server identity before every attempt. A pending setup may
 // resume only its own exact key trio; it never adopts or resets another identity.
 func (c *Client) checkRecoverySetup(ctx context.Context, pending *recoverySetup) error {
+	return c.checkRecoverySetupFor(ctx, pending, false)
+}
+
+// checkRecoverySetupFor con abandoned admite una clave por defecto que AbandonedRecovery
+// acaba de dar por abandonada: la sustituye la nueva (o la pendiente de un reintento).
+func (c *Client) checkRecoverySetupFor(ctx context.Context, pending *recoverySetup, abandoned bool) error {
 	current, err := c.cli.QueryKeys(ctx, &mautrix.ReqQueryKeys{DeviceKeys: mautrix.DeviceKeysRequest{c.cli.UserID: {}}})
 	if err != nil {
 		return err
@@ -108,6 +114,10 @@ func (c *Client) checkRecoverySetup(ctx context.Context, pending *recoverySetup)
 		return err
 	}
 	defaultID, err := c.crypto.Machine().SSSS.GetDefaultKeyID(ctx)
+	if err == nil && abandoned && (pending == nil || defaultID != pending.KeyID) {
+		// La pendiente, si la hay, es la que sustituye a la abandonada (un reintento).
+		return nil
+	}
 	if err == nil {
 		if pending == nil || defaultID != pending.KeyID {
 			return ErrRecoveryExists
@@ -176,11 +186,15 @@ func recoveryPublicKey(value mautrix.CrossSigningKeys, usage id.CrossSigningUsag
 }
 
 func (c *Client) prepareRecoverySetup(ctx context.Context) (*recoverySetup, error) {
+	return c.prepareRecoverySetupFor(ctx, false)
+}
+
+func (c *Client) prepareRecoverySetupFor(ctx context.Context, abandoned bool) (*recoverySetup, error) {
 	pending, err := c.readRecoverySetup()
 	if err != nil && !errors.Is(err, errNoRecoverySetup) {
 		return nil, err
 	}
-	if err := c.checkRecoverySetup(ctx, pending); err != nil {
+	if err := c.checkRecoverySetupFor(ctx, pending, abandoned); err != nil {
 		pending.clear()
 		return nil, err
 	}

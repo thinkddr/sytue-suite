@@ -272,18 +272,28 @@ func claveDeEntrega(v string) bool {
 	return err == nil
 }
 
-// quiereRelevo dice si esta autorización acaba en el relevo y, para una app
-// nativa, con qué clave pública. Solo los clientes de la suite (sin organización):
-// una app de terceros recibe la redirección de siempre.
+// quiereRelevo dice si esta autorización acaba en el relevo y con qué clave pública
+// se le devuelve la clave de desbloqueo. Solo los clientes de la suite (sin
+// organización): una app de terceros recibe la redirección de siempre.
+//
+// Una app WEB también puede traer clave (`sytue_unlock_key`): es la efímera de SU
+// puente (bridge.js, `handoff`). Safari aparta lo que guarda un iframe por cada
+// origen que lo incrusta, así que el puente de `calcus.sytue.eu` no ve lo que el
+// relevo deja en `id.sytue.eu`; con la clave, el relevo se la devuelve cerrada para
+// él, en el fragmento de la vuelta.
 func quiereRelevo(req authzRequest, client domain.Client) (appKey string, ok bool) {
 	if client.OrgID != "" {
 		return "", false
 	}
+	conClave := req.UnlockKey != "" && claveDeEntrega(req.UnlockKey)
 	if client.EsNativa() {
-		if req.UnlockKey != "" && claveDeEntrega(req.UnlockKey) {
+		if conClave {
 			return req.UnlockKey, true
 		}
 		return "", false
+	}
+	if conClave && req.Unlock {
+		return req.UnlockKey, true
 	}
 	return "", req.Unlock
 }
@@ -332,6 +342,8 @@ type relevoDatos struct {
 	Salt      string                  `json:"salt"`
 	Creds     []string                `json:"creds"`
 	AuthAge   int64                   `json:"auth_age"`
+	// Web: la vuelta es a una app web; la entrega (si hay clave) va en el fragmento.
+	Web bool `json:"web"`
 }
 
 // entregarCodigo termina la autorización: la redirección de siempre, o el relevo
@@ -353,6 +365,7 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 		Sub: sess.UserID, Next: destino, AppKey: appKey, Envelopes: envelopes,
 		Salt: base64.StdEncoding.EncodeToString(kdf.Salt), Creds: []string{},
 		AuthAge: time.Since(sess.AuthTime).Milliseconds(),
+		Web:     !client.EsNativa(),
 	}
 	if datos.Envelopes == nil {
 		datos.Envelopes = []recoverywrap.Envelope{}

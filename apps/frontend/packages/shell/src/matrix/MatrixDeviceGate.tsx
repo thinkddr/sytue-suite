@@ -286,8 +286,14 @@ export function MatrixDeviceGate({
    * account whose key is wrapped opens with it, and the device verifies itself through
    * cross-signing. A key still wrapped the ADR 0082 way (or held by the service, ADR
    * 0081) opens once and is wrapped the new way. Without an unlock key in this browser
-   * the person is sent to sign in to Sytue ID; an account whose key nobody here holds
-   * can only be verified from another device.
+   * the person is sent to sign in to Sytue ID.
+   *
+   * A key with no wrapper at all (an account left half set up under v3.20, or set up
+   * before its key was wrapped) does not stop here either: this device opens it with the
+   * copy it keeps itself and wraps it; an account whose encryption was never really set
+   * up is set up again; a device that keeps the account's own cross-signing and backup
+   * keys protects them again under a new key. Only when nobody here holds anything does
+   * the person see the way out (verification, or the reset where it exists).
    */
   const automatic = useCallback(
     async (instance: SuiteMatrix, signal: AbortSignal): Promise<void> => {
@@ -304,24 +310,43 @@ export function MatrixDeviceGate({
         const current = await instance.client.secretStorage.getDefaultKeyId();
         const state = await custody.state(current ? [current] : undefined, signal);
         older = state.older;
-        if (state.methods.length > 0) {
-          await instance.recover();
-          // Opened with what the Sytue ID sign-in page computed for an ADR 0082
-          // wrapper: from now on it opens with the unlock key. Opened from this
-          // device's own cache instead: the same, quietly.
-          if (!state.methods.includes('sytue-id') && current) {
-            if (keyRef.current) await uiRef.current?.saveRecoveryKey(keyRef.current, current);
-            else await upgradeQuietly(instance, custody, instance.bootstrap, signal);
+        try {
+          if (state.methods.length > 0) {
+            await instance.recover();
+            // Opened with what the Sytue ID sign-in page computed for an ADR 0082
+            // wrapper: from now on it opens with the unlock key. Opened from this
+            // device's own cache instead: the same, quietly.
+            if (!state.methods.includes('sytue-id') && current) {
+              if (keyRef.current) await uiRef.current?.saveRecoveryKey(keyRef.current, current);
+              else await upgradeQuietly(instance, custody, instance.bootstrap, signal);
+            }
+            await retireQuietly(instance, custody, instance.bootstrap, signal);
+            return;
           }
-          await retireQuietly(instance, custody, instance.bootstrap, signal);
-          return;
+          const legacy = state.legacy ? await custody.legacyRecoveryKey(signal) : null;
+          if (legacy && current) {
+            keyRef.current = legacy;
+            await instance.recover();
+            // Wrapping it also deletes the copy the service held.
+            await uiRef.current?.saveRecoveryKey(legacy, current);
+            return;
+          }
+          // No wrapper: this device may keep the key itself (its owner-key cache). It
+          // opens the account with it and wraps it, quietly, like a verified device.
+          if (current && (await instance.heldRecoveryKey(current))) {
+            await instance.recover();
+            await upgradeQuietly(instance, custody, instance.bootstrap, signal);
+            return;
+          }
+          throw new MatrixSecurityError('recovery');
+        } catch (failure) {
+          if (!isRecovery(failure)) throw failure;
+          // Nothing opens the current key. Protected again only when that loses
+          // nothing anyone could still open (SuiteMatrix.orphanedRecovery).
+          if (!(await instance.orphanedRecovery())) throw failure;
+          keyRef.current = null;
+          await instance.restartRecovery();
         }
-        const legacy = state.legacy ? await custody.legacyRecoveryKey(signal) : null;
-        if (!legacy || !current) throw new MatrixSecurityError('recovery');
-        keyRef.current = legacy;
-        await instance.recover();
-        // Wrapping it also deletes the copy the service held.
-        await uiRef.current?.saveRecoveryKey(legacy, current);
       } catch (failure) {
         if (isSignIn(failure)) {
           setSignIn({ older });
@@ -692,20 +717,13 @@ export function MatrixDeviceGate({
           ) : null}
           {!verified && manual ? (
             <div class="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() =>
-                  void operation(async () => setRequest(await client.requestVerification()))
-                }
-              >
-                {t('matrix.verify')}
-              </Button>
-              {/* Private storage keeps its vault inside secret storage: the core refuses
-                  to reset it (`unsupported`), so the way out is not offered there. */}
+              {/* Nobody here holds anything that opens the account (the gate already
+                  tried this device's own copies): starting again, behind its explicit
+                  confirmation, is the way out; another device stays the second choice.
+                  Private storage keeps its vault inside secret storage: the core refuses
+                  to reset it (`unsupported`), so the reset is not offered there. */}
               {!client.bootstrap.storage_product ? (
                 <Button
-                  variant="ghost"
                   disabled={busy}
                   onClick={() => {
                     setUnderstood(false);
@@ -715,6 +733,15 @@ export function MatrixDeviceGate({
                   {t('matrix.reset')}
                 </Button>
               ) : null}
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() =>
+                  void operation(async () => setRequest(await client.requestVerification()))
+                }
+              >
+                {t('matrix.verify')}
+              </Button>
             </div>
           ) : null}
           {request ? (

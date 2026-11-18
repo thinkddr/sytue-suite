@@ -69,7 +69,8 @@ export function sessionChangedResponse(): Response {
   );
 }
 /** Tokens are stored under an immutable original slot. Only login START writes
- * the selected intent; callbacks and refreshes can never replace a later login.
+ * the selected intent (plus `adopt`, for two logins that started concurrently and
+ * never saw each other); callbacks and refreshes can never replace a later login.
  * Tombstones are separate cookies, so an old refresh cannot erase revocation. */
 /** Caracteres de sesión sellada por cookie: deja margen al nombre (~90) bajo 4096. */
 const SLOT_CHUNK = 3800;
@@ -79,17 +80,55 @@ export class SessionSlots {
   readonly selectionCookie: string;
   readonly legacyCookie: string;
   private readonly attrs: Record<string, unknown>;
+  private readonly prefix: string;
+  /**
+   * `namespace` (el client OIDC de la app) separa las cookies de cada BFF. Todas son
+   * `__Host-` —Path=/ obligatorio, así que la ruta no puede separarlas— y con el
+   * mismo nombre en todas las apps, las que comparten host (el de organización,
+   * `<org>.<dominio>/mail`, `/calcus`, `/photos`…) se pisaban: el login de una
+   * reescribía la selección de las demás y borraba sus ranuras, y el refresco de
+   * cada una volvía a escribir la suya, así que la cabecera `Cookie` crecía con una
+   * sesión entera por app hasta pasar los límites del navegador y de los proxies.
+   * Sin `namespace`, los nombres de siempre.
+   */
   constructor(
     private readonly secret: string,
     private readonly secure: boolean,
     maxAge: number,
+    namespace?: string,
   ) {
+    if (namespace !== undefined && !/^[a-z0-9-]{1,40}$/.test(namespace))
+      throw Error('invalid session namespace');
+    this.prefix = SESSION_COOKIE + '_' + (namespace ? namespace + '_' : '');
     this.attrs = { path: '/', httpOnly: true, secure, sameSite: 'lax', maxAge };
     this.selectionCookie = this.name('selection');
     this.legacyCookie = hostCookieName(SESSION_COOKIE, secure);
   }
   private name(suffix: string): string {
-    return hostCookieName(SESSION_COOKIE + '_' + suffix, this.secure);
+    return hostCookieName(this.prefix + suffix, this.secure);
+  }
+  /**
+   * Las cookies de la familia de la sesión que esta petición trae y ya no sirven:
+   * las de intentos que no son `keep` en el espacio de esta app y, con espacio
+   * propio, TODAS las del espacio compartido de antes (nadie las lee ya). Solo se
+   * borra: lo peor que puede pasar con una respuesta tardía es tener que volver a
+   * entrar, nunca recuperar una sesión.
+   */
+  private sweep(ctx: BffContext, keep: ReadonlySet<string | undefined>): void {
+    const own = this.name('');
+    const shared = hostCookieName(SESSION_COOKIE + '_', this.secure);
+    const family = /^(?:(slot|completed|cancelled|pending|oidc)_([a-f0-9]{64})(?:\.[1-9])?)$/;
+    const old =
+      /^(?:selection|(?:slot|completed|cancelled|pending|oidc|revoked)_[a-f0-9]{64}(?:\.[1-9])?)$/;
+    for (const field of (ctx.request.headers.get('cookie') ?? '').split(';')) {
+      const name = field.trim().split('=', 1)[0] ?? '';
+      if (name.startsWith(own)) {
+        const match = family.exec(name.slice(own.length));
+        if (match?.[2] && !keep.has(match[2]))
+          ctx.cookies.delete(name, { path: '/', secure: this.secure });
+      } else if (own !== shared && name.startsWith(shared) && old.test(name.slice(shared.length)))
+        ctx.cookies.delete(name, { path: '/', secure: this.secure });
+    }
   }
   stateCookie(id: string): string {
     if (!isSessionGeneration(id)) throw Error('invalid session intent');
@@ -252,17 +291,8 @@ export class SessionSlots {
     // Clean obsolete token/state slots only at login START. Refreshes and
     // callbacks never garbage-collect another intent. Keep revocation tombstones
     // until expiry, since an older response can still carry that slot.
-    const keep = new Set([active?.ref.id, selection.candidate.id]);
-    const prefix = this.name('');
-    for (const field of (ctx.request.headers.get('cookie') ?? '').split(';')) {
-      const name = field.trim().split('=', 1)[0] ?? '';
-      if (!name.startsWith(prefix)) continue;
-      const slot = /^(?:slot|completed|cancelled|pending|oidc)_([a-f0-9]{64})$/.exec(
-        name.slice(prefix.length),
-      );
-      if (slot?.[1] && !keep.has(slot[1]))
-        ctx.cookies.delete(name, { path: '/', secure: this.secure });
-    }
+    // Los trozos (`.1`, `.2`…) de una ranura vieja también: antes se quedaban.
+    this.sweep(ctx, new Set([active?.ref.id, selection.candidate.id]));
     ctx.cookies.set(this.selectionCookie, await seal(selection, this.secret), this.attrs);
     ctx.cookies.delete(this.legacyCookie, { path: '/', secure: this.secure });
     ctx.cookies.set(this.name('pending_' + selection.candidate.id), '1', {
@@ -286,6 +316,13 @@ export class SessionSlots {
     await this.persist(ctx, { ref: { id }, session }, session);
     ctx.cookies.set(this.name('completed_' + id), '1', this.attrs);
     ctx.cookies.delete(this.name('pending_' + id), { path: '/', secure: this.secure });
+    // Completado el intento (el seleccionado: lo comprueba `canComplete` o `adopt`),
+    // la sesión anterior —la de reserva— ya no la lee nadie: `read` solo cae a ella
+    // mientras el intento está pendiente o cancelado. Sin esto, cada vuelta de
+    // desbloqueo (ADR 0084) dejaba DOS sesiones enteras en la cabecera `Cookie`
+    // hasta el siguiente login. Solo se borra lo que trae ESTA petición: un login
+    // empezado después no está aquí y no se toca.
+    this.sweep(ctx, new Set([id]));
   }
   canComplete(ctx: BffContext, id: string): Promise<boolean> {
     return this.selection(ctx).then(
@@ -295,6 +332,57 @@ export class SessionSlots {
         !this.cancelled(ctx.cookies, id) &&
         !this.completed(ctx.cookies, id),
     );
+  }
+  private pending(jar: CookieJar, id: string): boolean {
+    return (
+      jar.get(this.name('pending_' + id))?.value === '1' &&
+      !this.revoked(jar, id) &&
+      !this.cancelled(jar, id) &&
+      !this.completed(jar, id)
+    );
+  }
+  /**
+   * DOS LOGINS QUE EMPEZARON A LA VEZ. Una página sin sesión dispara varios: cada
+   * petición en paralelo que recibe un 401 navega a `/auth/login` (Fotos lanza la
+   * línea de tiempo, los álbumes y la cuenta a la vez), y la puerta del cifrado
+   * puede sumar el suyo. Cada `/auth/login` escribe su intento como seleccionado,
+   * y el navegador guarda las cookies de las respuestas EN EL ORDEN EN QUE LLEGAN,
+   * no en el de las navegaciones: puede quedar seleccionado el intento de una
+   * navegación ya cancelada mientras la que sigue viva vuelve con el suyo. Sin
+   * sesión anterior a la que caer, ese callback acababa en un `409` en JSON a
+   * pantalla completa y la app no llegaba a cargar.
+   *
+   * Se distingue de un callback viejo por las cookies que siguen vivas: un login
+   * que empieza DESPUÉS de otro ve su estado y su `pending_` en la petición y los
+   * borra (`begin`), así que si los dos siguen ahí es que ninguno vio al otro.
+   * Entonces el que vuelve con su code (ligado a su PKCE) pasa a ser el
+   * seleccionado y el otro queda cancelado. Nunca por encima de un intento ya
+   * completado (sería cambiar de cuenta) ni de uno revocado por un logout.
+   */
+  async adopt(ctx: BffContext, id: string): Promise<boolean> {
+    if (!isSessionGeneration(id)) return false;
+    const selected = await this.selection(ctx);
+    if (!selected || selected.candidate.id === id) return false;
+    const other = selected.candidate.id;
+    if (!this.pending(ctx.cookies, id)) return false;
+    if (this.completed(ctx.cookies, other) || this.revoked(ctx.cookies, other)) return false;
+    const adopted: SessionSelection = {
+      v: 1,
+      candidate: { id },
+      ...(selected.fallback ? { fallback: selected.fallback } : {}),
+    };
+    ctx.cookies.set(this.selectionCookie, await seal(adopted, this.secret), this.attrs);
+    this.cancel(ctx, other);
+    ctx.cookies.delete(this.stateCookie(other), { path: '/', secure: this.secure });
+    return true;
+  }
+  /** ¿Hay OTRO login distinto de `id` esperando su callback, o un logout de por medio? */
+  async superseded(ctx: BffContext, id: string | undefined): Promise<boolean> {
+    const selected = await this.selection(ctx);
+    if (!selected) return false;
+    const candidate = selected.candidate.id;
+    if (this.revoked(ctx.cookies, candidate)) return true;
+    return candidate !== id && this.pending(ctx.cookies, candidate);
   }
   cancel(ctx: BffContext, id: string): void {
     if (!isSessionGeneration(id) || this.completed(ctx.cookies, id)) return;

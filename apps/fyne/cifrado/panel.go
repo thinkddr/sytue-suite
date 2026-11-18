@@ -507,15 +507,15 @@ func (c *Panel) pintar() {
 		c.body.Add(c.parrafo(c.t("matrix.failed")))
 		c.footer.Add(c.boton("action.retry", c.Recuperar))
 	default:
-		// La cuenta tiene una clave que el servicio no conoce: nadie la teclea.
-		// Queda verificar este dispositivo desde otro (y, en Rooms, restablecer).
+		// La cuenta tiene una clave que nadie aquí abre: ni envoltorio, ni la copia de
+		// este dispositivo, ni una cuenta a medias que rehacer (Diagnosticar ya lo
+		// intentó). En Rooms la salida principal es empezar de cero, tras su
+		// confirmación; verificar desde otro dispositivo queda de segunda, como en la web.
 		c.body.Add(c.parrafo(c.t("matrix.unknownKey")))
-		c.botonVerificar()
 		if c.status.HasIdentity && !c.nativeRecovery && c.Base.Bootstrap.StorageProduct == "" {
-			reset := c.boton("matrix.reset", c.Restablecer)
-			reset.Variante = ui.Fantasma
-			c.footer.Add(reset)
+			c.footer.Add(c.boton("matrix.reset", c.Restablecer))
 		}
+		c.botonVerificar()
 	}
 	c.actualizar()
 }

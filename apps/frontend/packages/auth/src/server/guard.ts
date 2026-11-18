@@ -4,8 +4,9 @@
  * /auth/login conservando returnTo. Roles owner/admin requieren MFA (la
  * politica MFA la impone Sytue ID; aqui solo autorizamos por rol).
  */
-import { appDomains, brand, fontFamily, returnToCanonico, themeColors } from '@sytue/config';
-import { LOCALE_COOKIE, htmlLangAttrs, isLocale, negotiateLocale, translate } from '@sytue/i18n';
+import { appDomains, returnToCanonico } from '@sytue/config';
+import { translate } from '@sytue/i18n';
+import { idiomaDeLaPeticion, paginaDeAviso } from './pagina-aviso.js';
 import { sinAdminPorPlan } from '../types.js';
 import type { SytuePermission, SytueRole, SytueSession } from '../types.js';
 import { permsFromAccessToken } from '../perms.js';
@@ -102,72 +103,18 @@ export async function requireSession(
  * y sin salida, y eso es lo que veía en producción cualquiera que abriera
  * admin.sytue.eu/sso sin ser admin.
  *
- * ponytail: documento suelto con los tokens en línea, NO componentes de
- * @sytue/ui. El guard es una librería de servidor sin Preact ni el CSS de la app
- * (cada app lo compila con su propio hash), así que no hay bundle que reutilizar;
- * traerse preact-render-to-string y @sytue/ui a `@sytue/auth` por una pantalla de
- * error costaría más que las quince líneas de estilo que hay aquí. Si algún día
- * la suite sirve una hoja de estilo compartida en una URL estable, esto se
- * sustituye por un `<link>` y el marcado se queda igual.
+ * El documento lo pinta `paginaDeAviso`, compartido con el callback.
  */
 function forbiddenPage(ctx: BffContext, motivo?: string): Response {
-  // La preferencia explícita se lee por el JAR de cookies —el mismo por el que el
-  // BFF lee la sesión— y no por la cabecera cruda: `Cookie` es un nombre de
-  // cabecera prohibido, así que hay entornos que la descartan en silencio y el
-  // idioma elegido por el usuario se perdería sin dar la cara. El resto de la
-  // negociación (Accept-Language > inglés) lo sigue decidiendo `negotiateLocale`.
-  const elegida = ctx.cookies.get(LOCALE_COOKIE)?.value;
-  const locale = isLocale(elegida)
-    ? elegida
-    : negotiateLocale(
-        ctx.request.headers.get('accept-language'),
-        ctx.request.headers.get('cookie'),
-      );
-  const { lang, dir } = htmlLangAttrs(locale);
+  const locale = idiomaDeLaPeticion(ctx);
   const esOrgOnly = motivo === 'solo_organizaciones';
-  const titulo = esOrgOnly
-    ? translate(locale, 'forbidden.org_only.title')
-    : translate(locale, 'forbidden.title');
-  const descripcion = esOrgOnly
-    ? translate(locale, 'forbidden.org_only.body')
-    : translate(locale, 'forbidden.description');
-  const accion = esOrgOnly
-    ? translate(locale, 'forbidden.org_only.action')
-    : translate(locale, 'forbidden.action');
-
-  const html = `<!doctype html>
-<html lang="${lang}" dir="${dir}" data-theme="light">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>${titulo} — Sytue One</title>
-<style>
-:root{color-scheme:light;--bg:${themeColors.light.bg};--fg:${themeColors.light.text};--muted:${themeColors.light['text-muted']};--link:${brand.primary[700]};--ring:${brand.primary[500]}}
-*{box-sizing:border-box}
-body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:2rem;
-background:var(--bg);color:var(--fg);font-family:${fontFamily.sans};
--webkit-font-smoothing:antialiased}
-main{max-width:34rem;text-align:center}
-h1{margin:0;font-size:1.5rem;line-height:1.3;font-weight:600;letter-spacing:-0.01em}
-p{margin:0.75rem 0 0;font-size:1rem;line-height:1.6;color:var(--muted)}
-a{display:inline-block;margin-top:1.75rem;color:var(--link);font-size:1rem;font-weight:600;
-text-decoration:underline;text-underline-offset:3px;border-radius:0.25rem}
-a:focus-visible{outline:2px solid var(--ring);outline-offset:3px}
-</style>
-</head>
-<body>
-<main>
-<h1>${titulo}</h1>
-<p>${descripcion}</p>
-<a href="${appDomains.one}/">${accion}</a>
-</main>
-</body>
-</html>`;
-
-  return new Response(html, {
+  return paginaDeAviso({
+    locale,
+    titulo: translate(locale, esOrgOnly ? 'forbidden.org_only.title' : 'forbidden.title'),
+    descripcion: translate(locale, esOrgOnly ? 'forbidden.org_only.body' : 'forbidden.description'),
+    accion: translate(locale, esOrgOnly ? 'forbidden.org_only.action' : 'forbidden.action'),
+    href: `${appDomains.one}/`,
     status: 403,
-    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
 

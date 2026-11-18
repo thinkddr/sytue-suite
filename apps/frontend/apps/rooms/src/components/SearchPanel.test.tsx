@@ -66,7 +66,7 @@ test('la consulta de «Archivos del canal» explica el cifrado y no ofrece reint
     />,
     host,
   );
-  await esperar();
+  await esperarA(() => (host?.textContent ?? '').includes('search.encryptedTitle'));
 
   const texto = host.textContent ?? '';
   expect(texto).toContain('search.encryptedTitle');
@@ -118,7 +118,7 @@ test('con la historia del dispositivo, busca ahí y dice en cuántos mensajes', 
     />,
     host,
   );
-  await esperar();
+  await esperarA(() => (host?.textContent ?? '').includes('presupuesto final'));
 
   const texto = host.textContent ?? '';
   expect(texto).toContain('presupuesto final');

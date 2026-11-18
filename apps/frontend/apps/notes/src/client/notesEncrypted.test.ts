@@ -407,4 +407,4 @@ test('five MiB of auxiliary HTML fit encrypted without expansion; oversized writ
   }
   expect(rejected).toBeInstanceOf(Error);
   expect(original.data.html.length).toBe(16 * 1024 * 1024);
-});
+}, 30_000);

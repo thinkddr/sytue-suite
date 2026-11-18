@@ -168,7 +168,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             # SwiftSupport/iphoneos/iphoneos y disparaba el rechazo 90430 en Apple.
             # Tampoco se pasa --strip-bitcode (retirado en Xcode 16+).
             soporte_swift.mkdir(parents=True, exist_ok=True)
-            os.chmod(soporte_swift, 0o755)
+            os.chmod(soporte_swift, 0o700)
             bibliotecas += ["--unsigned-destination", soporte_swift]
         else:
             bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]

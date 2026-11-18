@@ -114,7 +114,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
                 raise ValueError("el contenido anidado debe quedar dentro del host")
             carpeta.mkdir(parents=True, exist_ok=True)
-            os.chmod(carpeta, 0o755)
+            os.chmod(carpeta, 0o700)
         planes = []
         if incluir_widgets:
             planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",

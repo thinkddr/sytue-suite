@@ -140,7 +140,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             shutil.copyfile(perfil, perfil_destino)
             # El árbol clonado del job Apple y su almacén privado son 0600; instalado
             # pertenece a root y debe poder leerlo quien ejecuta la app (90255).
-            os.chmod(perfil_destino, 0o600)
+            os.chmod(perfil_destino, 0o640)
             hacer_legible_publico(bundle)
             anidadas.append((bundle, derechos))
         puente = None

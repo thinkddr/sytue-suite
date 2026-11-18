@@ -14,7 +14,10 @@ export class MatrixOwnerKeyCache {
   private failure: Error | undefined;
   private closed = false;
   constructor(
-    private readonly values: Pick<EncryptedOfflineValues, 'read' | 'write' | 'close' | 'destroy'>,
+    private readonly values: Pick<
+      EncryptedOfflineValues,
+      'read' | 'write' | 'close' | 'destroy' | 'delete'
+    >,
     private readonly keys: Map<string, Uint8Array<ArrayBuffer>>,
     private readonly checkKey: (
       key: Uint8Array<ArrayBuffer>,
@@ -216,6 +219,36 @@ export class MatrixOwnerKeyCache {
     } finally {
       saved[1].fill(0);
     }
+  }
+  /**
+   * The ID of the key this device keeps (sealed or in memory), whatever it is; null
+   * when it keeps none. It never returns the key.
+   */
+  async cachedID(): Promise<string | null> {
+    this.check();
+    await this.pending;
+    const saved = await this.stored();
+    if (saved) {
+      saved[1].fill(0);
+      return saved[0];
+    }
+    const [first] = this.keys.keys();
+    return first ?? null;
+  }
+  /**
+   * Forgets the key this device keeps. Only for a key that never protected anything: an
+   * account whose encryption was never set up (no cross-signing identity published, so
+   * no device was ever trusted, no owner proof or vault secret was ever sealed with it).
+   * Any other key is the authority of the account's history and is never discarded.
+   */
+  async discard(): Promise<void> {
+    this.check();
+    await this.pending;
+    this.failure = undefined;
+    await this.values.delete('owner');
+    this.check();
+    for (const key of this.keys.values()) key.fill(0);
+    this.keys.clear();
   }
   close(): void {
     this.closed = true;

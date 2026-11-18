@@ -325,9 +325,20 @@ async function oidcFixture() {
     tenant = 'acme',
     gate?: Promise<void>,
   ) {
-    const req = browser.request('/mail/auth/login?returnTo=%2Fmail%2Finbox');
+    const started = await start(browser, id, tenant, gate);
+    started.apply();
+    return started;
+  }
+  /** Un `/auth/login` cuya respuesta (sus cookies) llega cuando lo diga el test. */
+  async function start(
+    browser: BrowserCookies,
+    id = 'alice',
+    tenant = 'acme',
+    gate?: Promise<void>,
+    loginPath = '/mail/auth/login?returnTo=%2Fmail%2Finbox',
+  ) {
+    const req = browser.request(loginPath);
     const res = await bff.login(req.ctx);
-    req.apply();
     const auth = new URL(res.headers.get('location')!);
     const state = auth.searchParams.get('state')!;
     const code = crypto.randomUUID();
@@ -341,11 +352,13 @@ async function oidcFixture() {
     return {
       state,
       path: '/mail/auth/callback?code=' + code + '&state=' + encodeURIComponent(state),
+      apply: req.apply,
     };
   }
   return {
     bff,
     begin,
+    start,
     stop: () => server.stop(true),
     calls: () => tokenCalls,
     setRefreshGate: (gate: Promise<void>) => {
@@ -437,6 +450,130 @@ test('real BFF logout fence wins over an in-flight callback without erasing a la
     const replay = await fixture.bff.callback(browser.request(pending.path).ctx);
     expect(replay.status).toBe(409);
     expect(replay.headers.get('location')).toBeNull();
+    // Una navegación de página completa: nunca un JSON sin salida.
+    expect(replay.headers.get('content-type')).toContain('text/html');
+    expect(replay.headers.get(sessionChangedHeader)).toBe('1');
+    expect(await replay.text()).toContain(
+      'href="/mail/auth/login?returnTo=%2Fmail%2Finbox&#38;restart=1"',
+    );
+  } finally {
+    fixture.stop();
+  }
+});
+
+// Producción (Fotos, tras configurar el cifrado): la sesión ya no se leía, varias
+// peticiones en paralelo recibieron un 401 y cada una navegó a `/auth/login`, y la
+// puerta del cifrado pidió el suyo (`unlock=1`). Las cookies de la respuesta de la
+// navegación CANCELADA llegaron las últimas y dejaron seleccionado su intento; el
+// callback de la que siguió viva contestaba `409 {error:'session_changed'}` en JSON
+// y la app no terminaba de cargar.
+for (const loginPath of [
+  '/mail/auth/login?returnTo=%2Fmail%2Finbox',
+  '/mail/auth/login?unlock=1&returnTo=%2Fmail%2Finbox',
+]) {
+  test(`concurrent logins without a readable session: the surviving callback completes (${loginPath})`, async () => {
+    const fixture = await oidcFixture(),
+      browser = new BrowserCookies();
+    try {
+      // Las dos peticiones salen con las mismas cookies: ninguna ve a la otra.
+      const vivo = await fixture.start(browser, 'alice', 'acme', undefined, loginPath),
+        cancelado = await fixture.start(browser, 'alice', 'acme', undefined, loginPath);
+      vivo.apply();
+      cancelado.apply();
+      const cb = browser.request(vivo.path);
+      const res = await fixture.bff.callback(cb.ctx);
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toBe('/mail/inbox');
+      cb.apply();
+      expect((await fixture.bff.getSession(browser.request().ctx))?.user.id).toBe('alice');
+      // El cancelado ya no puede canjear su code ni pisar la sesión nueva.
+      const before = fixture.calls();
+      const tarde = browser.request(cancelado.path);
+      const late = await fixture.bff.callback(tarde.ctx);
+      tarde.apply();
+      expect(late.status).toBe(302);
+      expect(late.headers.get('location')).toBe('/mail/inbox');
+      expect(fixture.calls()).toBe(before);
+      expect((await fixture.bff.getSession(browser.request().ctx))?.user.id).toBe('alice');
+    } finally {
+      fixture.stop();
+    }
+  });
+}
+
+test('concurrent login never takes over a completed later login (no account switch)', async () => {
+  const fixture = await oidcFixture(),
+    browser = new BrowserCookies();
+  try {
+    const viejo = await fixture.start(browser, 'old', 'acme'),
+      nuevo = await fixture.start(browser, 'bob', 'other');
+    viejo.apply();
+    nuevo.apply();
+    const cbNuevo = browser.request(nuevo.path);
+    expect((await fixture.bff.callback(cbNuevo.ctx)).status).toBe(302);
+    cbNuevo.apply();
+    const before = fixture.calls();
+    const res = await fixture.bff.callback(browser.request(viejo.path).ctx);
+    expect(fixture.calls()).toBe(before);
+    expect(res.status).toBe(302);
+    expect((await fixture.bff.getSession(browser.request().ctx))?.user.id).toBe('bob');
+  } finally {
+    fixture.stop();
+  }
+});
+
+test('a callback that cannot complete restarts the login once, then shows a page (no loop)', async () => {
+  const fixture = await oidcFixture(),
+    browser = new BrowserCookies();
+  try {
+    const primero = await fixture.begin(browser);
+    // La cookie de estado (30 min) caducó en el formulario del IdP.
+    for (const name of browser.values.keys())
+      if (/^sytue_session_[a-z0-9-]+_oidc_/.test(name)) browser.values.delete(name);
+    const res = await fixture.bff.callback(browser.request(primero.path).ctx);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/mail/auth/login?returnTo=%2Fmail%2Finbox&restart=1');
+    const segundo = await fixture.start(
+      browser,
+      'alice',
+      'acme',
+      undefined,
+      res.headers.get('location')!,
+    );
+    segundo.apply();
+    for (const name of browser.values.keys())
+      if (/^sytue_session_[a-z0-9-]+_oidc_/.test(name)) browser.values.delete(name);
+    const otra = await fixture.bff.callback(browser.request(segundo.path).ctx);
+    expect(otra.status).toBe(409);
+    expect(otra.headers.get('location')).toBeNull();
+    expect(otra.headers.get('content-type')).toContain('text/html');
+  } finally {
+    fixture.stop();
+  }
+});
+
+test('a stale callback from another tab shows a sign-in page instead of a JSON 409', async () => {
+  const fixture = await oidcFixture(),
+    browser = new BrowserCookies();
+  try {
+    const pestanaA = await fixture.begin(browser),
+      pestanaB = await fixture.begin(browser);
+    const before = fixture.calls();
+    const res = await fixture.bff.callback(
+      browser.request(pestanaA.path, { 'accept-language': 'es' }).ctx,
+    );
+    expect(fixture.calls()).toBe(before);
+    // Hay otro login en curso (la pestaña B): no se pisa por sorpresa.
+    expect(res.status).toBe(409);
+    expect(res.headers.get('location')).toBeNull();
+    expect(res.headers.get('content-type')).toContain('text/html');
+    const html = await res.text();
+    expect(html).toContain('lang="es"');
+    expect(html).toContain('href="/mail/auth/login?returnTo=%2Fmail%2Finbox&#38;restart=1"');
+    const cbB = browser.request(pestanaB.path);
+    expect((await fixture.bff.callback(cbB.ctx)).status).toBe(302);
+    cbB.apply();
+    expect((await fixture.bff.getSession(browser.request().ctx))?.user.id).toBe('alice');
   } finally {
     fixture.stop();
   }
@@ -526,9 +663,10 @@ test('login start bounds obsolete token cookies while preserving the active fall
   await slots.revokeCurrent(logout.ctx);
   logout.apply();
   for (let index = 0; index < 30; index++) await initial(slots, browser, 'owner-' + index);
+  // Completar un login ya retira la sesión anterior: queda una sola.
   expect(
     [...browser.values.keys()].filter((name) => name.startsWith('__Host-sytue_session_slot_')),
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   expect(browser.values.get('__Host-sytue_session_revoked_' + original)).toBe('1');
   const previous = (await slots.read(browser.request().ctx))!.session.generation;
   const start = browser.request();
@@ -575,4 +713,72 @@ test('a session over the 4096-byte cookie limit is split, read back, shrunk and 
   logout.apply();
   expect([...browser.values.keys()].filter((n) => n.includes('slot_' + id))).toHaveLength(0);
   expect(await slots.read(browser.request().ctx)).toBeNull();
+});
+
+// Producción (v3.21.0, Safari): en el host de organización viven todas las apps
+// (`corporate.sytue.eu/mail`, `/calcus`, `/photos`…) y todas escribían las MISMAS
+// cookies `__Host-` de Path=/: el login de una pisaba la selección de las demás, y el
+// refresco de cada una volvía a escribir su sesión entera. La cabecera `Cookie`
+// pasaba de 8 KB y los recursos de la app contestaban 400.
+test('apps sharing a host keep separate sessions and sweep the old shared cookies', async () => {
+  const mail = new SessionSlots(SECRET, true, 3600, 'sytue-mail'),
+    calcus = new SessionSlots(SECRET, true, 3600, 'sytue-calcus'),
+    browser = new BrowserCookies();
+  // Restos del espacio compartido de antes: una sesión entera troceada y su estado.
+  const viejo = newSessionGeneration();
+  for (const name of [
+    '__Host-sytue_session_selection',
+    '__Host-sytue_session_slot_' + viejo,
+    '__Host-sytue_session_slot_' + viejo + '.1',
+    '__Host-sytue_session_completed_' + viejo,
+    '__Host-sytue_session_revoked_' + newSessionGeneration(),
+  ])
+    browser.values.set(name, 'x'.repeat(name.includes('slot_') ? 3800 : 1));
+  const idMail = await initial(mail, browser, 'alice');
+  expect([...browser.values.keys()].filter((n) => !n.includes('sytue-mail'))).toEqual([]);
+  const idCalcus = await initial(calcus, browser, 'alice');
+  expect((await mail.read(browser.request().ctx))?.session.generation).toBe(idMail);
+  expect((await calcus.read(browser.request().ctx))?.session.generation).toBe(idCalcus);
+  // Un login nuevo en Calcus no toca nada de Mail.
+  const start = browser.request();
+  await calcus.begin(start.ctx);
+  expect(start.writes.filter(([name]) => name.includes('sytue-mail'))).toEqual([]);
+  start.apply();
+  expect((await mail.read(browser.request().ctx))?.session.generation).toBe(idMail);
+});
+
+test('an unlock round trip leaves one session in the Cookie header, not two', async () => {
+  const fixture = await oidcFixture(),
+    browser = new BrowserCookies();
+  const cabecera = () =>
+    [...browser.values].map(([name, value]) => name + '=' + value).join('; ').length;
+  try {
+    const login = await fixture.begin(browser),
+      cb = browser.request(login.path);
+    expect((await fixture.bff.callback(cb.ctx)).status).toBe(302);
+    cb.apply();
+    const antes = cabecera();
+    const unlock = await fixture.start(
+      browser,
+      'alice',
+      'acme',
+      undefined,
+      '/mail/auth/login?unlock=1&returnTo=%2Fmail%2Finbox',
+    );
+    unlock.apply();
+    // Durante el viaje conviven la sesión de reserva y el intento.
+    const vuelta = browser.request(unlock.path);
+    expect((await fixture.bff.callback(vuelta.ctx)).status).toBe(302);
+    vuelta.apply();
+    expect(
+      [...browser.values.keys()].filter((name) => /_slot_[a-f0-9]{64}$/.test(name)),
+    ).toHaveLength(1);
+    expect([...browser.values.keys()].some((name) => name.includes('_oidc_'))).toBe(false);
+    expect([...browser.values.keys()].some((name) => name.includes('_pending_'))).toBe(false);
+    // Del tamaño de antes (una sesión: la nueva generación), no del doble.
+    expect(cabecera()).toBeLessThanOrEqual(antes + 200);
+    expect((await fixture.bff.getSession(browser.request().ctx))?.user.id).toBe('alice');
+  } finally {
+    fixture.stop();
+  }
 });

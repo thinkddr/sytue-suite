@@ -838,6 +838,38 @@ describe('bridge', () => {
     expectNoUnlockKey(sent);
   });
 
+  test('without a key it offers a one-time key; a return sealed for it is kept once, for that person only', async () => {
+    const { win, e2e, sent, message } = bridgeWindow();
+    e2e.bridge({ origin: 'https://mail.sytue.eu' }, win);
+    const unwrap = {
+      type: 'sytue-e2e-unwrap',
+      sub,
+      account: vectors.account,
+      wrappers: [vectors.sytue_id_wrapper],
+    };
+    message({ ...unwrap, id: '1' });
+    await settle(sent, 2);
+    const first = sent[1]!.msg as { error: string; handoff_key: string };
+    expect(first.error).toBe('signin');
+    expect(first.handoff_key).toMatch(/^[A-Za-z0-9_-]{87}$/);
+    // Its private half is a key nobody can read, in this bridge's own store.
+    await expectSealedStore(e2e.store, [key]);
+    // The relay seals the unlock key for it; for another person it is not kept.
+    const sealed = (who: string) =>
+      e2e.sealDelivery(first.handoff_key, { v: 1, sub: who, key: b64(key), legacy: [] });
+    message({ ...unwrap, id: '2', handoff: await sealed('bea') });
+    await settle(sent, 3);
+    expect(sent[2]!.msg).toMatchObject({ ok: false, error: 'signin' });
+    expect(await e2e.load('auk:bea')).toBeNull();
+    const blob = await sealed(sub);
+    message({ ...unwrap, id: '3', handoff: blob });
+    await settle(sent, 4);
+    expect(sent[3]!.msg).toMatchObject({ ok: true, recovery_key: vectors.recovery_key });
+    expect(await e2e.store.get('handoff')).toBeUndefined();
+    expectNoUnlockKey(sent);
+    await expectSealedStore(e2e.store, [key]);
+  });
+
   test('an isolated account only from its own product, and a few operations a second at most', async () => {
     const e2e = load(fakeWindow(), 'comun.js', 'bridge.js');
     const drive = `@sytue_storage_drive_acme_${sub}:sytue.eu`;

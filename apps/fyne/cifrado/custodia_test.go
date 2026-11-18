@@ -34,6 +34,8 @@ type clienteFalso struct {
 	recuperado []string
 	publicadas int
 	ackeadas   int
+	// abandonada: una cuenta que se quedó a medias (AbandonedRecovery).
+	abandonada bool
 }
 
 func (f *clienteFalso) VerificationStatus(context.Context) (mx.VerificationStatus, error) {
@@ -65,6 +67,21 @@ func (f *clienteFalso) publicar(ctx context.Context, escrow mx.RecoveryEscrow, k
 func (f *clienteFalso) BootstrapRecoveryWrapped(ctx context.Context, _ mautrix.UIACallback, escrow mx.RecoveryEscrow) error {
 	return f.publicar(ctx, escrow, "k-nueva", claveNueva)
 }
+
+// RestartRecoveryWrapped, como *mx.Client, lo comprueba otra vez y solo sustituye una
+// cuenta abandonada.
+func (f *clienteFalso) RestartRecoveryWrapped(ctx context.Context, _ mautrix.UIACallback, escrow mx.RecoveryEscrow) error {
+	if !f.abandonada {
+		return mx.ErrRecoveryExists
+	}
+	if err := f.publicar(ctx, escrow, "k-rehecha", claveNueva); err != nil {
+		return err
+	}
+	f.abandonada = false
+	return nil
+}
+
+func (f *clienteFalso) AbandonedRecovery(context.Context) (bool, error) { return f.abandonada, nil }
 
 func (f *clienteFalso) ResetRecoveryWrapped(ctx context.Context, _ mautrix.UIACallback, escrow mx.RecoveryEscrow) error {
 	return f.publicar(ctx, escrow, "k-reset", claveNueva)
@@ -257,6 +274,77 @@ func TestClaveDesconocidaSoloVerificaYDespuesSeEnvuelve(t *testing.T) {
 	}
 	if got, _ := recoverywrap.UnwrapSytueID(m.Clave, cuentaDePrueba, service.envoltorios[0]); got != claveDePrueba {
 		t.Fatal("se envolvió otra clave")
+	}
+}
+
+// Producción (Calcus, v3.21.0): una cuenta que se quedó a medias bajo la v3.20 tiene
+// una clave por defecto que nada abre (con o sin envoltorio), sin identidad ni copia de
+// seguridad. No es «una clave desconocida»: se configura otra vez, sola, con una clave
+// nueva envuelta antes de publicarla; sin clave de desbloqueo, a Sytue ID primero.
+func TestUnaCuentaAMediasSeConfiguraOtraVezSola(t *testing.T) {
+	for _, conEnvoltorio := range []bool{false, true} {
+		m := material(t)
+		client := &clienteFalso{keyID: "k-vieja", abandonada: true}
+		service := &servicioFalso{}
+		if conEnvoltorio {
+			service.envoltorios = []recoverywrap.Wrapper{envoltorio(t, m, "k-vieja", claveDePrueba)}
+		}
+		custodia := Custodia{Servicio: service, Cuenta: cuentaAislada}
+		d, err := Diagnosticar(t.Context(), client, custodia)
+		if err != nil || d.Paso != PasoCrear || !d.rehacer {
+			t.Fatalf("Diagnosticar = %+v, %v; quiero configurarla otra vez", d, err)
+		}
+		if got, err := Resolver(t.Context(), client, custodia, d, Material{}, nil); err != nil || got.Paso != PasoIniciarSesion || client.publicadas != 0 {
+			t.Fatalf("sin clave de desbloqueo no se publica nada: %+v, %v", got, err)
+		}
+		got, err := Resolver(t.Context(), client, custodia, d, m, nil)
+		if err != nil || got.Paso != PasoListo || client.publicadas != 1 || client.ackeadas != 1 || len(client.recuperado) != 0 {
+			t.Fatalf("Resolver = %+v, %v; publicadas=%d", got, err, client.publicadas)
+		}
+		if len(service.envoltorios) != 1 || service.envoltorios[0].KeyID != "k-rehecha" {
+			t.Fatalf("envoltorios: %+v", service.envoltorios)
+		}
+		if key, err := recoverywrap.UnwrapSytueID(m.Clave, cuentaDePrueba, service.envoltorios[0]); err != nil || key != claveNueva {
+			t.Fatalf("lo custodiado no abre la clave nueva: %v", err)
+		}
+	}
+	// Una cuenta que no está abandonada nunca se sustituye: sigue siendo desconocida.
+	client := &clienteFalso{status: mx.VerificationStatus{HasIdentity: true}, keyID: "k1"}
+	d, err := Diagnosticar(t.Context(), client, Custodia{Servicio: &servicioFalso{}, Cuenta: cuentaAislada})
+	if err != nil || d.Paso != PasoVerificar || d.rehacer {
+		t.Fatalf("Diagnosticar = %+v, %v; quiero verificar", d, err)
+	}
+}
+
+// Producción (Mail, v3.21.0): un dispositivo sin verificar de una cuenta cuya clave no
+// tiene envoltorio, pero que la guarda él mismo (la clave de propietario del llavero),
+// se abre con ella y la envuelve, sin pedir nada ni pasar por «verificar».
+func TestLaClaveQueGuardaElDispositivoAbreSinEnvoltorioYSeEnvuelve(t *testing.T) {
+	m := material(t)
+	client := &clienteFalso{status: mx.VerificationStatus{HasIdentity: true}, keyID: "k1", valida: claveDePrueba, local: claveDePrueba}
+	service := &servicioFalso{}
+	custodia := Custodia{Servicio: service, Cuenta: cuentaAislada}
+	d, err := Diagnosticar(t.Context(), client, custodia)
+	if err != nil || d.Paso != PasoProteger {
+		t.Fatalf("Diagnosticar = %+v, %v; quiero abrir con la clave de aquí", d, err)
+	}
+	got, err := Resolver(t.Context(), client, custodia, d, m, nil)
+	if err != nil || got.Paso != PasoListo || !client.status.Verified || len(client.recuperado) != 1 {
+		t.Fatalf("Resolver = %+v, %v", got, err)
+	}
+	if len(service.envoltorios) != 1 || service.envoltorios[0].KeyID != "k1" || client.publicadas != 0 {
+		t.Fatalf("envoltorios=%+v publicadas=%d", service.envoltorios, client.publicadas)
+	}
+	if key, _ := recoverywrap.UnwrapSytueID(m.Clave, cuentaDePrueba, service.envoltorios[0]); key != claveDePrueba {
+		t.Fatal("se envolvió otra clave")
+	}
+	// Sin clave de desbloqueo el dispositivo funciona igual; se envolverá otra vez.
+	client = &clienteFalso{status: mx.VerificationStatus{HasIdentity: true}, keyID: "k1", valida: claveDePrueba, local: claveDePrueba}
+	service = &servicioFalso{}
+	custodia = Custodia{Servicio: service, Cuenta: cuentaAislada}
+	d, _ = Diagnosticar(t.Context(), client, custodia)
+	if got, err := Resolver(t.Context(), client, custodia, d, Material{}, nil); err != nil || got.Paso != PasoListo || !got.Status.Verified || len(service.envoltorios) != 0 {
+		t.Fatalf("sin clave: %+v, %v", got, err)
 	}
 }
 

@@ -324,6 +324,51 @@
     });
   }
 
+  /**
+   * Abre lo que cerró sealDelivery con la clave privada (CryptoKey no extraíble) de
+   * `appPublic`. Lo usa el puente para la vuelta de una app web (bridge.js,
+   * `handoff`); devuelve el JSON de la entrega, con la clave en base64, y quien lo
+   * recibe pone a cero sus bytes.
+   */
+  function openDelivery(priv, appPublic, blob) {
+    var curve = { name: "ECDH", namedCurve: "P-256" };
+    var appRaw = unb64(appPublic);
+    var raw = unb64(blob);
+    if (appRaw.length !== 65 || raw.length < 65 + 12 + 16)
+      return Promise.reject(new Error("delivery"));
+    var ephRaw = raw.slice(0, 65);
+    return subtle
+      .importKey("raw", ephRaw, curve, false, [])
+      .then(function (eph) {
+        return subtle
+          .deriveBits({ name: "ECDH", public: eph }, priv, 256)
+          .then(function (bits) {
+            var shared = new Uint8Array(bits);
+            return hkdfAES(
+              shared,
+              LABEL + "/native",
+              ["decrypt"],
+              concat(ephRaw, appRaw),
+            ).then(function (key) {
+              wipe(shared);
+              return decrypt(
+                key,
+                raw.slice(65, 77),
+                raw.slice(77),
+                enc.encode(LABEL + "/native"),
+              );
+            });
+          })
+          .then(function (plain) {
+            try {
+              return JSON.parse(new TextDecoder().decode(plain));
+            } finally {
+              wipe(plain);
+            }
+          });
+      });
+  }
+
   /*
    * El almacén de este origen. Desde la ADR 0085 todo lo secreto es una CryptoKey
    * no extraíble o va cifrado con una:
@@ -432,6 +477,7 @@
     sealEnvelope: sealEnvelope,
     openEnvelope: openEnvelope,
     sealDelivery: sealDelivery,
+    openDelivery: openDelivery,
     store: store,
   };
 

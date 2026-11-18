@@ -256,7 +256,24 @@ test('el callback sin cookie de estado reinicia el login CON el destino', async 
     cookies: { get: () => undefined, set: () => {}, delete: () => {} },
   });
   expect(res.headers.get('location')).toBe(
-    `/docs/auth/login?returnTo=${encodeURIComponent('/docs/edit?id=X')}`,
+    `/docs/auth/login?returnTo=${encodeURIComponent('/docs/edit?id=X')}&restart=1`,
+  );
+});
+
+test('el reinicio sin cookie de estado es UNO: si vuelve a fallar, una página y no un bucle', async () => {
+  const state = await seal({ s: 'aleatorio', r: '/docs/edit?id=X', n: 1 }, 'x'.repeat(32));
+  const url = new URL(
+    `https://corporate.sytue.eu/docs/auth/callback?code=c&state=${encodeURIComponent(state)}`,
+  );
+  const res = await bffDeDocs().callback({
+    request: new Request(url),
+    url,
+    cookies: { get: () => undefined, set: () => {}, delete: () => {} },
+  });
+  expect(res.headers.get('location')).toBeNull();
+  expect(res.headers.get('content-type')).toContain('text/html');
+  expect(await res.text()).toContain(
+    `href="/docs/auth/login?returnTo=${encodeURIComponent('/docs/edit?id=X')}&#38;restart=1"`,
   );
 });
 
@@ -271,7 +288,7 @@ test('un destino externo colado en el state no sale del origen', async () => {
     cookies: { get: () => undefined, set: () => {}, delete: () => {} },
   });
   // safeReturnTo lo reduce a '/', y entonces no se propaga returnTo ninguno.
-  expect(res.headers.get('location')).toBe('/docs/auth/login');
+  expect(res.headers.get('location')).toBe('/docs/auth/login?restart=1');
 });
 
 test('un state plano (flujo empezado antes del cambio) sigue reiniciando el login', async () => {
@@ -281,7 +298,7 @@ test('un state plano (flujo empezado antes del cambio) sigue reiniciando el logi
     url,
     cookies: { get: () => undefined, set: () => {}, delete: () => {} },
   });
-  expect(res.headers.get('location')).toBe('/docs/auth/login');
+  expect(res.headers.get('location')).toBe('/docs/auth/login?restart=1');
 });
 
 // El login empieza en el host donde va a terminar. Antes, entrar por el host del
@@ -343,9 +360,9 @@ test('el login en el host del callback va directo al IdP con la cookie de estado
     'https://corporate.sytue.eu/docs/auth/callback',
   );
   expect(puestas).toEqual([
-    '__Host-sytue_session_selection',
-    expect.stringMatching(/^__Host-sytue_session_pending_[a-f0-9]{64}$/),
-    expect.stringMatching(/^__Host-sytue_session_oidc_[a-f0-9]{64}$/),
+    '__Host-sytue_session_sytue-docs_selection',
+    expect.stringMatching(/^__Host-sytue_session_sytue-docs_pending_[a-f0-9]{64}$/),
+    expect.stringMatching(/^__Host-sytue_session_sytue-docs_oidc_[a-f0-9]{64}$/),
   ]);
 });
 
@@ -381,6 +398,15 @@ test('todo login pide el relevo del desbloqueo; unlock=1 obliga a meter la clave
   // Nada que no sean parámetros públicos de un envoltorio llega a la autorización.
   q = await pedir('?unlock=1&legacy=%3Cscript%3E&returnTo=%2Fdocs%2F');
   expect(q.get('sytue_legacy')).toBeNull();
+  // La clave efímera del puente de la app (Safari aparta su almacén): pasa tal cual,
+  // solo con su forma (un punto P-256 en base64url) y solo en el desbloqueo.
+  const clave = 'B' + 'A'.repeat(86);
+  q = await pedir(`?unlock=1&key=${clave}&returnTo=%2Fdocs%2F`);
+  expect(q.get('sytue_unlock_key')).toBe(clave);
+  q = await pedir(`?key=${clave}&returnTo=%2Fdocs%2F`);
+  expect(q.get('sytue_unlock_key')).toBeNull();
+  q = await pedir('?unlock=1&key=%3Cscript%3E&returnTo=%2Fdocs%2F');
+  expect(q.get('sytue_unlock_key')).toBeNull();
 });
 
 test('con el origen de respaldo de Astro (http://localhost) NO salta: sería un bucle', async () => {
@@ -485,7 +511,8 @@ async function callbackConCanje(estado: number, error: string) {
       values.delete(name);
     },
   };
-  const slots = new SessionSlots(secreto, true, 3600);
+  // El mismo espacio de cookies que el BFF de Docs (su client OIDC).
+  const slots = new SessionSlots(secreto, true, 3600, 'sytue-docs');
   const start = new URL('https://corporate.sytue.eu/docs/auth/login');
   const selected = await slots.begin({ request: new Request(start), url: start, cookies });
   const intent = selected.candidate.id;
@@ -612,7 +639,7 @@ async function refrescarCon(orgColor: string | undefined, orgForma?: string) {
 test('la sesión deja a su lado el color de la organización, legible y host-only', async () => {
   const { puestas, borradas } = await refrescarCon('cobalto');
   expect(puestas.map((c) => c.name)).toEqual([
-    expect.stringMatching(/^__Host-sytue_session_slot_[a-f0-9]{64}$/),
+    expect.stringMatching(/^__Host-sytue_session_sytue-docs_slot_[a-f0-9]{64}$/),
     'sytue-color-org',
   ]);
   const color = puestas[1];
@@ -625,7 +652,7 @@ test('la sesión deja a su lado el color de la organización, legible y host-onl
 test('y la forma de la organización, por el mismo camino', async () => {
   const { puestas, borradas } = await refrescarCon(undefined, 'carril');
   expect(puestas.map((c) => c.name)).toEqual([
-    expect.stringMatching(/^__Host-sytue_session_slot_[a-f0-9]{64}$/),
+    expect.stringMatching(/^__Host-sytue_session_sytue-docs_slot_[a-f0-9]{64}$/),
     'sytue-forma-org',
   ]);
   expect(puestas[1]?.value).toBe('carril');
@@ -636,7 +663,7 @@ test('y la forma de la organización, por el mismo camino', async () => {
 test('una organización con el color de la casa no deja cookie de color', async () => {
   const { puestas, borradas } = await refrescarCon(undefined);
   expect(puestas.map((c) => c.name)).toEqual([
-    expect.stringMatching(/^__Host-sytue_session_slot_[a-f0-9]{64}$/),
+    expect.stringMatching(/^__Host-sytue_session_sytue-docs_slot_[a-f0-9]{64}$/),
   ]);
   expect(borradas).toEqual(['sytue-color-org', 'sytue-forma-org']);
 });

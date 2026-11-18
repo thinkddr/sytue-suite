@@ -130,3 +130,105 @@ func TestLocalRecoveryKeyOnlyForStorageAccounts(t *testing.T) {
 		t.Fatalf("LocalRecoveryKey = %q, %v", keyID, err)
 	}
 }
+
+// Producción (Calcus, v3.21.0): un cliente de la v3.20 publicó la clave de
+// almacenamiento por defecto de la cuenta y no llegó a publicar la identidad ni la copia
+// de seguridad. Esa clave no protegió nada: la cuenta se configura otra vez, sola, con una
+// clave nueva custodiada antes de publicarla (antes se quedaba en ErrRecoveryExists, y el
+// panel en «verificar con otro dispositivo»). En almacenamiento privado, la clave de
+// propietario que el dispositivo guardaba de la vieja se sustituye.
+func TestRestartRecoveryWrappedReplacesAnAbandonedAccount(t *testing.T) {
+	for _, product := range []string{"", "drive"} {
+		h := &resetHomeserver{accountData: map[string]json.RawMessage{}, deviceKeys: map[string]json.RawMessage{}, bodies: map[string]json.RawMessage{}}
+		server := httptest.NewTLSServer(h)
+		c := newResetClient(t, server, product)
+		ctx := t.Context()
+		machine := c.crypto.Machine()
+		stale, err := machine.SSSS.GenerateAndUploadKey(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := machine.SSSS.SetDefaultKeyID(ctx, stale.ID); err != nil {
+			t.Fatal(err)
+		}
+		if product != "" {
+			if err := c.saveStorageAuthKey(ctx, stale); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if ok, err := c.AbandonedRecovery(ctx); err != nil || !ok {
+			t.Fatalf("%q: AbandonedRecovery = %v, %v", product, ok, err)
+		}
+		accept := func(context.Context, string, string) error { return nil }
+		if err := c.BootstrapRecoveryWrapped(ctx, dummyUIA, accept); !errors.Is(err, ErrRecoveryExists) {
+			t.Fatalf("%q: crear sobre la clave vieja: %v", product, err)
+		}
+		var key, keyID string
+		if err := c.RestartRecoveryWrapped(ctx, dummyUIA, func(_ context.Context, id, value string) error {
+			keyID, key = id, value
+			return nil
+		}); err != nil {
+			t.Fatalf("%q: RestartRecoveryWrapped: %v", product, err)
+		}
+		if err := c.AcknowledgeRecoverySetup(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if id, err := c.DefaultRecoveryKeyID(ctx); err != nil || id != keyID || id == stale.ID {
+			t.Fatalf("%q: DefaultRecoveryKeyID = %q, %v", product, id, err)
+		}
+		if status, err := c.VerificationStatus(ctx); err != nil || !status.Verified {
+			t.Fatalf("%q: no quedó verificado: %+v, %v", product, status, err)
+		}
+		if err := c.Recover(ctx, key); err != nil {
+			t.Fatalf("%q: la clave custodiada no abre la cuenta: %v", product, err)
+		}
+		if product != "" {
+			if local, _, err := c.LocalRecoveryKey(ctx); err != nil || local != keyID {
+				t.Fatalf("clave de propietario = %q, %v", local, err)
+			}
+		}
+		// Ya no está a medias: nada vuelve a sustituirla.
+		if ok, err := c.AbandonedRecovery(ctx); err != nil || ok {
+			t.Fatalf("%q: tras configurarla, AbandonedRecovery = %v, %v", product, ok, err)
+		}
+		if err := c.RestartRecoveryWrapped(ctx, dummyUIA, accept); !errors.Is(err, ErrRecoveryExists) {
+			t.Fatalf("%q: se sustituyó una cuenta configurada: %v", product, err)
+		}
+		server.Close()
+	}
+}
+
+// Lo que alguien pudo cifrar con la clave vieja la salva: con una copia de seguridad en
+// el servidor o secretos en el baúl, la cuenta no está abandonada.
+func TestAbandonedRecoveryKeepsAnythingTheOldKeyProtects(t *testing.T) {
+	for name, prepare := range map[string]func(*resetHomeserver, *Client){
+		"backup": func(h *resetHomeserver, _ *Client) {
+			h.versions, h.bodies["1"] = []string{"1"}, json.RawMessage(`{"version":"1"}`)
+		},
+		"vault": func(h *resetHomeserver, c *Client) {
+			h.accountData[ssssVaultEventPrefix+storageSessionsSecretID(c.vaultScope())] = json.RawMessage(`{"encrypted":{}}`)
+		},
+	} {
+		h := &resetHomeserver{accountData: map[string]json.RawMessage{}, deviceKeys: map[string]json.RawMessage{}, bodies: map[string]json.RawMessage{}}
+		server := httptest.NewTLSServer(h)
+		c := newResetClient(t, server, "drive")
+		ctx := t.Context()
+		stale, err := c.crypto.Machine().SSSS.GenerateAndUploadKey(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := c.crypto.Machine().SSSS.SetDefaultKeyID(ctx, stale.ID); err != nil {
+			t.Fatal(err)
+		}
+		h.mu.Lock()
+		prepare(h, c)
+		h.mu.Unlock()
+		if ok, err := c.AbandonedRecovery(ctx); err != nil || ok {
+			t.Fatalf("%s: AbandonedRecovery = %v, %v", name, ok, err)
+		}
+		if err := c.RestartRecoveryWrapped(ctx, dummyUIA, func(context.Context, string, string) error { return nil }); !errors.Is(err, ErrRecoveryExists) {
+			t.Fatalf("%s: se sustituyó: %v", name, err)
+		}
+		server.Close()
+	}
+}

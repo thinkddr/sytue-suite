@@ -11,7 +11,12 @@ import { join } from 'node:path';
 import { BrowserKeyCustody } from './custody-browser.js';
 import { MatrixCustodyError } from './custody.js';
 import { fromBase64, type RecoveryWrapper } from './recovery-wrap.js';
-import { forgetLegacyMaterial, unwrapInBridge, wrapInBridge } from './unlock-bridge.js';
+import {
+  forgetLegacyMaterial,
+  takeHandoff,
+  unwrapInBridge,
+  wrapInBridge,
+} from './unlock-bridge.js';
 
 const account = '@sytue_storage_drive_acme_0f3c:sytue.eu';
 const subject = '0f3c';
@@ -272,9 +277,96 @@ test('without an unlock key in this browser it asks for the Sytue ID sign-in, ne
     custody.wrap(key, { account: '@sytue_0f3c:sytue.eu', subject, keyID: 'K1' }),
   ).rejects.toEqual(new MatrixCustodyError('signin'));
   expect(s.requests).toEqual([]);
-  expect(custody.signInURL('/rooms/?id=1', '')).toBe(
-    '/rooms/auth/login?unlock=1&returnTo=%2Frooms%2F%3Fid%3D1',
+  // With the bridge's one-time key, for the relay to send the unlock key back sealed for it.
+  expect(custody.signInURL('/rooms/?id=1', '')).toMatch(
+    /^\/rooms\/auth\/login\?unlock=1&returnTo=%2Frooms%2F%3Fid%3D1&key=[A-Za-z0-9_-]{87}$/,
   );
+});
+
+// Production (v3.21.0, Safari): the bridge iframe inside calcus.sytue.eu does not see what
+// the relay stored in id.sytue.eu's own window (Safari keeps an iframe's storage apart per
+// embedding origin), so the sign-in never unlocked and the app asked for it again, forever.
+test('the unlock key comes back to the bridge of THIS app even when its storage is partitioned', async () => {
+  const s = service();
+  // The bridge inside the app: a storage of its own, empty.
+  const partition = sytueID('https://calcus.sytue.eu');
+  const custody = new BrowserKeyCustody({
+    base: '/calcus',
+    isolated: false,
+    idOrigin,
+    fetchImpl: s.fetchImpl,
+    bridge: partition.bridge,
+  });
+  const target = { account: '@sytue_0f3c:sytue.eu', subject, keyID: 'K1' };
+  await expect(custody.wrap(key, target)).rejects.toEqual(new MatrixCustodyError('signin'));
+  const signIn = new URL(custody.signInURL('/calcus/', ''), 'https://calcus.sytue.eu');
+  const appKey = signIn.searchParams.get('key')!;
+  expect(appKey).toMatch(/^[A-Za-z0-9_-]{87}$/);
+
+  // Sytue ID's own window: a storage apart, where this browser already holds the key.
+  const top: Record<string, unknown> = {
+    crypto: globalThis.crypto,
+    location: { origin: idOrigin },
+    navigator: { userAgent: 'Safari' },
+  };
+  new Function('window', script('comun.js'))(top);
+  const relayE2E = top.SytueE2E as Bridge & {
+    store: unknown;
+    hint: (k: Uint8Array) => Promise<Uint8Array>;
+    relay: (cfg: Record<string, unknown>, o: Record<string, unknown>) => Promise<{ blob: string }>;
+    returnTo: (n: string, b: string, ua: string, web: boolean) => { auto: string };
+  };
+  const topData = new Map<string, unknown>();
+  relayE2E.store = {
+    get: async (k: string) => structuredClone(topData.get(k)),
+    put: async (k: string, v: unknown) => void topData.set(k, structuredClone(v)),
+    putIfAbsent: async (k: string, v: unknown) => {
+      if (!topData.has(k)) topData.set(k, structuredClone(v));
+      return structuredClone(topData.get(k));
+    },
+    del: async (k: string) => void topData.delete(k),
+    keys: async () => [...topData.keys()],
+    clear: async () => topData.clear(),
+  };
+  new Function('window', script('relay.js'))(top);
+  await relayE2E.saveUnlock(subject, unlockKey.slice());
+  const next = 'https://calcus.sytue.eu/calcus/auth/callback?code=c&state=s';
+  const relayed = await relayE2E.relay(
+    {
+      sub: subject,
+      next,
+      app_key: appKey,
+      web: true,
+      hint: Buffer.from(await relayE2E.hint(unlockKey)).toString('base64'),
+      envelopes: [],
+      salt: '',
+      creds: [],
+      auth_age: 0,
+    },
+    { fetch: s.fetchImpl, now: () => Date.now() },
+  );
+  const back = new URL(relayE2E.returnTo(next, relayed.blob, 'Safari', true).auto);
+  // In the fragment: the callback's redirect keeps it and no server receives it.
+  expect(back.search).toBe('?code=c&state=s');
+  expect(back.hash).toMatch(/^#sytue_unlock=[A-Za-z0-9_-]+$/);
+
+  // The app page after the callback: it takes the return out of its address.
+  let address = '';
+  takeHandoff(
+    { hash: back.hash, pathname: '/calcus/', search: '' },
+    {
+      state: null,
+      replaceState: (_: unknown, __: string, url?: string | URL | null) =>
+        void (address = String(url)),
+    },
+  );
+  expect(address).toBe('/calcus/');
+  // The next operation hands it to the bridge, which keeps the key in ITS storage.
+  await custody.wrap(key, target);
+  expect(s.requests.some((r) => r.method === 'PUT')).toBe(true);
+  expect(partition.data.has('auk:' + subject)).toBe(true);
+  expect(partition.data.has('handoff')).toBe(false);
+  expectNoUnlockKey(partition.received);
 });
 
 test('a wrapper sealed with an unlock key the person no longer has is told apart', async () => {

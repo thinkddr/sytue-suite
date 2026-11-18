@@ -181,4 +181,9 @@ EXPOSE 8080
 # La selección depende solo del ARG horneado, no de una imagen diferente.
 # `--smol`: el GC de Bun recoge antes. Medido con 1500 peticiones a una app SSR
 # (2026-11-16): 73 -> 67 MiB de pico y 59 -> 54 MiB en reposo, ~8 % menos por pod.
-CMD ["sh", "-c", "if [ \"$SYTUE_FRONTEND_APP\" = www ]; then exec bun --smol ./static-serve.mjs; else exec bun --smol ./dist/server/entry.mjs; fi"]
+# `--max-http-header-size`: Bun corta en 16 KiB y contesta 431 a TODA petición
+# cuya cabecera pase de ahí (medido: 12 KB pasa, 30 KB es 431), también al HTML y
+# a `/auth/callback`. Una sesión troceada ocupa hasta ~15 KB de `Cookie` y en el
+# host de organización viven varias apps: 64 KiB, como el resto de la cadena
+# (Traefik no corta antes y la caché de recursos se subió a 8×64k).
+CMD ["sh", "-c", "if [ \"$SYTUE_FRONTEND_APP\" = www ]; then exec bun --smol --max-http-header-size=65536 ./static-serve.mjs; else exec bun --smol --max-http-header-size=65536 ./dist/server/entry.mjs; fi"]

@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -175,7 +176,12 @@ func TestElPanelNuncaEnsenaNiPideNingunaClave(t *testing.T) {
 		t.Fatalf("falta la explicación: %q", textos(c))
 	}
 	boton(t, c, "matrix.verify")
-	boton(t, c, "matrix.reset")
+	// Nadie aquí abre la clave: empezar de cero va primero y es la acción principal;
+	// verificar desde otro dispositivo, la segunda (como en la web).
+	if reset, todos := boton(t, c, "matrix.reset"), textos(c); reset.Variante != ui.Primario ||
+		slices.Index(todos, c.t("matrix.reset")) > slices.Index(todos, c.t("matrix.verify")) {
+		t.Fatalf("restablecer no es la primera salida: %q", todos)
+	}
 	// Restablecer: casilla obligatoria y ninguna contraseña.
 	c.Restablecer()
 	if got := len(entradas(c)); got != 0 {

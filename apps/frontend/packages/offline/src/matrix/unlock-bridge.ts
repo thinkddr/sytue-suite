@@ -39,6 +39,53 @@ type Answer = { ok: true; data: Record<string, unknown> } | { ok: false; error: 
 
 const errors: readonly UnlockBridgeError[] = ['signin', 'wrong', 'account', 'busy', 'unavailable'];
 
+/*
+ * THE WAY BACK FROM A SIGN-IN (bridge.js, `handoff`). Safari keeps what an iframe stores
+ * apart for every ORIGIN that embeds it, so the bridge inside this app does not see the
+ * unlock key the relay left in Sytue ID's own window: after signing in, the app asked to
+ * sign in again, forever (production, v3.21.0). When the bridge has no key it answers
+ * `signin` with the public half of a one-time key of its own (`handoff_key`); the app
+ * takes it to the sign-in (`/auth/login?unlock=1&key=…`) and the relay sends the unlock
+ * key back sealed for it, in the FRAGMENT of the return (`#sytue_unlock=…`: no server
+ * sees it). This page cannot open it; it hands it to its bridge with the next request.
+ */
+const handoffShape = /^[A-Za-z0-9_-]{1,16384}$/;
+const handoffKeyShape = /^[A-Za-z0-9_-]{87}$/;
+let handoff: string | null = null;
+let handoffKey = '';
+
+/**
+ * Takes the sealed return of a Sytue ID sign-in out of this page's address, so that
+ * nothing (history, a copied link) keeps it. Runs once when this module loads.
+ */
+export function takeHandoff(
+  loc: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = typeof location !== 'undefined'
+    ? location
+    : undefined,
+  hist: Pick<History, 'replaceState' | 'state'> | undefined = typeof history !== 'undefined'
+    ? history
+    : undefined,
+): void {
+  if (!loc?.hash) return;
+  const params = new URLSearchParams(loc.hash.slice(1));
+  const blob = params.get('sytue_unlock');
+  if (!blob) return;
+  if (handoffShape.test(blob)) handoff = blob;
+  params.delete('sytue_unlock');
+  const rest = params.toString();
+  try {
+    hist?.replaceState(hist.state, '', loc.pathname + loc.search + (rest ? '#' + rest : ''));
+  } catch {
+    // An address that cannot be rewritten keeps working; the return is still taken.
+  }
+}
+takeHandoff();
+
+/** The bridge's one-time public key for the next sign-in, if it asked for one. */
+export function bridgeHandoffKey(): string {
+  return handoffKey;
+}
+
 /** Asks the bridge once, in an iframe of its own that is removed afterwards. */
 function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Promise<Answer> {
   const unavailable: Answer = { ok: false, error: 'unavailable' };
@@ -51,6 +98,9 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
   } catch {
     return Promise.resolve(unavailable);
   }
+  // Only the operations that use the unlock key take the return of a sign-in with them.
+  const carries =
+    request.type === 'sytue-e2e-unwrap' || request.type === 'sytue-e2e-wrap' ? handoff : null;
   return new Promise((resolve) => {
     const frame = doc.createElement('iframe');
     const id = crypto.randomUUID();
@@ -74,8 +124,15 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
           finish(unavailable);
           return;
         }
-        frame.contentWindow?.postMessage({ ...request, id, sub: options.subject }, idOrigin);
+        frame.contentWindow?.postMessage(
+          { ...request, ...(carries ? { handoff: carries } : {}), id, sub: options.subject },
+          idOrigin,
+        );
       } else if (data.type === 'sytue-e2e-result' && data.id === id) {
+        // The bridge answered: whatever it did with the return, it is spent.
+        if (carries && handoff === carries) handoff = null;
+        if (typeof data.handoff_key === 'string' && handoffKeyShape.test(data.handoff_key))
+          handoffKey = data.handoff_key;
         if (data.ok === true) finish({ ok: true, data });
         else
           finish({

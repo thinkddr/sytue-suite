@@ -108,7 +108,7 @@ func dominioPropio() string {
 		return ""
 	}
 	for _, r := range d {
-		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '.') {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' && r != '.' {
 			return ""
 		}
 	}

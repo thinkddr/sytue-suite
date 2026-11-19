@@ -253,3 +253,98 @@ test('cached keys that are not the published identity are never stored', async (
     expect(steps).toEqual([]);
   }
 });
+
+function heldOwnerAccount(options: {
+  current?: string;
+  cached?: string | null;
+  heldMatches?: boolean;
+  vaultEncryptedUnder?: string[];
+  recoverFails?: boolean;
+}) {
+  const steps: string[] = [];
+  let defaultKey = options.current ?? 'OLD';
+  const cached = options.cached === undefined ? 'OLDER' : options.cached;
+  const accountData = new Map<string, MatrixEvent>();
+  if (options.vaultEncryptedUnder) {
+    const encrypted: Record<string, unknown> = {};
+    for (const id of options.vaultEncryptedUnder) encrypted[id] = {};
+    accountData.set('org.sytue.vault.pqc_key', new MatrixEvent({ content: { encrypted } }));
+  }
+  const instance = Object.assign(Object.create(SuiteMatrix.prototype), {
+    bootstrap: { matrix_user_id: own, storage_product: 'mail' },
+    closed: false,
+    temporaryKeys: new Map(),
+    ownerKeys: {
+      cachedID: async () => cached,
+      held: async (id: string) =>
+        options.heldMatches !== false && id === cached ? new Uint8Array(32).fill(7) : null,
+      flush: async () => {},
+    },
+    client: {
+      store: { accountData },
+      getDeviceId: () => 'ARTIFICIAL',
+      secretStorage: {
+        getDefaultKeyId: async () => defaultKey,
+        setDefaultKeyId: async (id: string) => {
+          steps.push(`default=${id}`);
+          defaultKey = id;
+        },
+        getKey: async (id: string) =>
+          options.heldMatches !== false && id === cached
+            ? [
+                id,
+                {
+                  algorithm: 'm.secret_storage.v1.aes-hmac-sha2',
+                  iv: 'AAAAAAAAAAAAAAAAAAAAAA==',
+                  mac: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+                },
+              ]
+            : null,
+        checkKey: async () => options.heldMatches !== false,
+      },
+    },
+    recover: async () => {
+      steps.push(`recover:${defaultKey}`);
+      if (options.recoverFails) throw new MatrixSecurityError('recovery');
+    },
+  }) as SuiteMatrix;
+  return { instance, steps, getDefaultKey: () => defaultKey };
+}
+
+test('restoreHeldRecovery restores default_key to held owner key without rotating', async () => {
+  // Mail en producción (BJSLVAPEXY): el dispositivo conserva la clave de propietario OLDER
+  // y los secretos del baúl están cifrados con ella, mientras default_key apunta a OLD.
+  const { instance, steps, getDefaultKey } = heldOwnerAccount({
+    current: 'OLD',
+    cached: 'OLDER',
+    vaultEncryptedUnder: ['OLDER'],
+  });
+  expect(await instance.restoreHeldRecovery()).toBe(true);
+  expect(getDefaultKey()).toBe('OLDER');
+  expect(steps).toEqual(['default=OLDER', 'recover:OLDER']);
+});
+
+test('restoreHeldRecovery refuses when a vault secret is outside the held key or key is not held', async () => {
+  for (const opts of [
+    { current: 'OLD', cached: 'OLDER', vaultEncryptedUnder: ['OLD'] },
+    { current: 'OLD', cached: 'OLDER', heldMatches: false },
+    { current: 'OLD', cached: 'OLD' },
+    { current: 'OLD', cached: null },
+  ]) {
+    const { instance, steps, getDefaultKey } = heldOwnerAccount(opts);
+    expect(await instance.restoreHeldRecovery()).toBe(false);
+    expect(getDefaultKey()).toBe('OLD');
+    expect(steps).toEqual([]);
+  }
+});
+
+test('restoreHeldRecovery rolls back default_key if recover fails', async () => {
+  const { instance, steps, getDefaultKey } = heldOwnerAccount({
+    current: 'OLD',
+    cached: 'OLDER',
+    recoverFails: true,
+  });
+  expect(await instance.restoreHeldRecovery()).toBe(false);
+  expect(getDefaultKey()).toBe('OLD');
+  expect(steps).toEqual(['default=OLDER', 'recover:OLDER', 'default=OLD']);
+});

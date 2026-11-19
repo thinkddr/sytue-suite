@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": "services/cloud/internal/service/mailer.go",
+      "blob": "13829780ba92144f864f60ab69b2e9f0dc26d3d0"
+    },
+    {
+      "path": "services/cloud/internal/service/mailer_message_test.go",
+      "blob": "92788e9b1012010e0ac62d27983b84d3d222a268"
+    },
+    {
+      "path": "services/docs/internal/domain/pdfread.go",
+      "blob": "08b21561c35cf0c84988339d9e8db03f1eec66b3"
+    },
+    {
+      "path": "services/docs/internal/domain/pdffont.go",
+      "blob": "f1ae8425414c9ce51cc5dbec34632015473c732f"
+    },
+    {
+      "path": "services/docs/internal/domain/pdftext.go",
+      "blob": "de29017d311402260a6cb676a4685a2347215ea3"
+    },
+    {
+      "path": "services/docs/internal/domain/pdffont_enteros_test.go",
+      "blob": "4d4518bb1b671352e14326d3d748c09dc96f45bc"
+    },
+    {
+      "path": "services/id/internal/http/authorize.go",
+      "blob": "884c69d15700e2cc3417e8cc53751cf36da4ea95"
+    },
+    {
+      "path": "services/id/internal/http/logout.go",
+      "blob": "c83b2620d75225ac5b0bc080af3bd88ae96089d2"
+    },
+    {
+      "path": "services/id/internal/http/login.go",
+      "blob": "ab58b53854da6c19cf6a7fb0bd17da3eeb288d90"
+    },
+    {
+      "path": "services/id/internal/http/forgot_password.go",
+      "blob": "3b5a1c03b451288654a9a5f6eb362180d596c2e0"
+    },
+    {
+      "path": "services/id/internal/http/redirect_seguro_test.go",
+      "blob": "d396ad342bfc4a772abf61e8a2122a3c6a26ede2"
+    },
+    {
+      "path": "services/id/internal/domain/domain.go",
+      "blob": "f872db7b965e30bee1a7e3888b0830b570253416"
+    },
+    {
+      "path": "services/id/internal/domain/domain_test.go",
+      "blob": "0e8e50ffcdc29604a8c8946345c720911360551f"
+    },
+    {
+      "path": "services/id/internal/http/dcr.go",
+      "blob": "046ec42bb9563e2100b15a87a3f365f2339f90df"
+    },
+    {
+      "path": "platform/pkg/httpx/respond.go",
+      "blob": "4f9c4469e96a9fbca77dd4bbd4f9b364e1a953b5"
+    },
+    {
+      "path": "platform/pkg/httpx/errors.go",
+      "blob": "e3bd30405f00e9c665f00ef5fba9a1a5aff5d2cd"
+    },
+    {
+      "path": "services/cast/internal/diapositivas/diapositivas.go",
+      "blob": "8acf020d3567d06586bf80ded7b583c7c07dc0fb"
+    },
+    {
+      "path": "services/syerp/internal/http/handlers_conectores.go",
+      "blob": "410ddd133f65ab09c895c42052e4fc2530db4cc0"
+    },
+    {
+      "path": "services/syerp/internal/conectores/stripe.go",
+      "blob": "19113d5ef959a518bb5e685f9940e3f9a2275bb4"
+    },
+    {
+      "path": "services/docs/internal/http/enlaces_politica.go",
+      "blob": "a5c0d5bd983f1f3ca39c5ae0bdc8d7c6840d1b56"
+    },
+    {
+      "path": "services/docs/internal/http/permissions.go",
+      "blob": "784f2bf32ad622f83b55211b3d3f964ac12ca582"
+    },
+    {
+      "path": "services/docs/internal/domain/doc.go",
+      "blob": "b27ac9836e48f8bb2d4461aeec5c553656677a27"
+    },
+    {
+      "path": "platform/pkg/logsafe/text.go",
+      "blob": "5b565ebed21ceb6b5ddfe723dbdfdc6773a09139"
+    },
+    {
+      "path": "platform/pkg/logsafe/text_test.go",
+      "blob": "41c4e2bb36357e336fc762fced6d4169acd912d1"
+    },
+    {
+      "path": ".github/scripts/security-review.mjs",
+      "blob": "679e059f304e700bf77e969f3508f06117446a18"
+    },
+    {
+      "path": ".github/scripts/security-review.test.mjs",
+      "blob": "ecca3c170b228861a73fbbf82970a8ce5f06d10a"
+    }
+  ],
+  "reviews": [
+    {
+      "number": 167,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "services/docs/internal/domain/pdffont.go",
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+    },
+    {
+      "number": 168,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "services/docs/internal/domain/pdffont.go",
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+    },
+    {
+      "number": 169,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "services/docs/internal/domain/pdffont.go",
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+    },
+    {
+      "number": 170,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "services/docs/internal/domain/pdffont.go",
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+    },
+    {
+      "number": 175,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "services/docs/internal/domain/pdffont.go",
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+    },
+    {
+      "number": 218,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "services/docs/internal/domain/pdftext.go",
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+    },
+    {
+      "number": 245,
+      "rule": "go/unvalidated-url-redirection",
+      "path": "services/id/internal/http/forgot_password.go",
+      "comment": "False positive: Location has the fixed local prefix /forgot-password?sent=1. return_to is only url.Values-encoded query data; it cannot change the scheme, host or path or add a header.",
+      "evidence": "The destination always starts with the fixed local path /forgot-password?sent=1. Untrusted return_to is appended only through url.Values.Encode as query data. It cannot alter the scheme, authority or path, or introduce a Location header. The taint path does not represent an open redirect."
+    },
+    {
+      "number": 246,
+      "rule": "go/unvalidated-url-redirection",
+      "path": "services/id/internal/http/login.go",
+      "comment": "False positive: rutaInternaSegura permits only internal root-relative paths and rejects //, backslash authority and controls. Invalid input redirects to /. Redirect safety regressions pass.",
+      "evidence": "redirectAfterLogin accepts only internal root-relative paths. rutaInternaSegura rejects scheme-relative destinations, backslash authority and control characters; invalid values redirect to /. TestRutaInternaSeguraRechazaLaBarraInvertida and TestRedirectAfterLoginNoSaleDelIdP cover attacker-controlled destinations."
+    },
+    {
+      "number": 247,
+      "rule": "go/unvalidated-url-redirection",
+      "path": "services/id/internal/http/logout.go",
+      "comment": "False positive: postLogoutTarget requires exact membership in registered client logout URIs plus validRegistrationRedirect syntax. The fallback is service configuration, never request data.",
+      "evidence": "postLogoutTarget requires exact membership in the selected client PostLogoutRedirectURIs and validRegistrationRedirect syntax. Its fallback is trusted service configuration, never request data. The dataflow query does not account for this allowlist guard."
+    },
+    {
+      "number": 248,
+      "rule": "go/unvalidated-url-redirection",
+      "path": "services/id/internal/http/authorize.go",
+      "comment": "False positive: handleAuthorize requires exact client.ValidRedirectURI membership before redirectErr. State/error values are URL-encoded. Exact-match regression tests reject prefixes and wildcards.",
+      "evidence": "handleAuthorize checks exact registered redirect URI membership through client.ValidRedirectURI before redirectErr is reachable. State/error query values are encoded with url.Values. TestClientValidRedirectURI_ExactMatch verifies no wildcard or prefix acceptance. Redirecting to a registered OAuth client is intentional."
+    },
+    {
+      "number": 273,
+      "rule": "go/email-injection",
+      "path": "services/cloud/internal/service/mailer.go",
+      "comment": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass.",
+      "evidence": "Recipient headers are parsed as a single net/mail.Address after rejecting control characters before SMTP. Address.String serializes the header; the body is MIME base64 text/plain. Header injection and MIME round-trip regressions pass. The remaining trace is only the validated To header, not executable HTML or injected header data."
+    },
+    {
+      "number": 400,
+      "rule": "go/log-injection",
+      "path": "services/syerp/internal/http/handlers_conectores.go",
+      "comment": "False positive: cobro.Centimos is int64, not text. A numeric Stripe amount cannot contain CR/LF or inject a log line; structured logging retains its numeric type. The declaration and logging source are pinned.",
+      "evidence": "False positive: cobro.Centimos is int64, not text. A numeric Stripe amount cannot contain CR/LF or inject a log line; structured logging retains its numeric type. The declaration and logging source are pinned."
+    },
+    {
+      "number": 401,
+      "rule": "go/email-injection",
+      "path": "services/cloud/internal/service/mailer.go",
+      "comment": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass.",
+      "evidence": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass."
+    },
+    {
+      "number": 402,
+      "rule": "go/log-injection",
+      "path": "platform/pkg/httpx/respond.go",
+      "comment": "False positive: apiErr.Status is an int field. It cannot contain line breaks or arbitrary log text. JSON/Text slog handlers serialize it as a numeric scalar; Error.Status and the logging source are pinned.",
+      "evidence": "False positive: apiErr.Status is an int field. It cannot contain line breaks or arbitrary log text. JSON/Text slog handlers serialize it as a numeric scalar; Error.Status and the logging source are pinned."
+    },
+    {
+      "number": 403,
+      "rule": "go/log-injection",
+      "path": "services/cast/internal/diapositivas/diapositivas.go",
+      "comment": "False positive: presentation Total is an int, not a string. It cannot inject CR/LF or another record. Its typed declaration and the structured logging call are pinned; numeric fields are intentionally retained as numbers.",
+      "evidence": "False positive: presentation Total is an int, not a string. It cannot inject CR/LF or another record. Its typed declaration and the structured logging call are pinned; numeric fields are intentionally retained as numbers."
+    },
+    {
+      "number": 407,
+      "rule": "js/file-access-to-http",
+      "path": ".github/scripts/security-review.mjs",
+      "comment": "False positive: the only file data sent is reviewed public metadata from the tracked .github/security-reviewed-alerts.json. Requests go only to this repository on api.github.com. No local credential file or token is included in the body; redirects are rejected.",
+      "evidence": "False positive: the only file data sent is reviewed public metadata from the tracked .github/security-reviewed-alerts.json. Requests go only to this repository on api.github.com. No local credential file or token is included in the body; redirects are rejected."
+    },
+    {
+      "number": 409,
+      "rule": "go/clear-text-logging",
+      "path": "services/docs/internal/http/enlaces_politica.go",
+      "comment": "False positive: HasPassword is a boolean indicating link protection, not a password or hash. The audit logs only the con_clave presence flag. The bool declaration, audit call and mixed-field regression tests are pinned.",
+      "evidence": "False positive: HasPassword is a boolean indicating link protection, not a password or hash. The audit logs only the con_clave presence flag. The bool declaration, audit call and mixed-field regression tests are pinned."
+    },
+    {
+      "number": 410,
+      "rule": "go/log-injection",
+      "path": "services/docs/internal/http/enlaces_politica.go",
+      "comment": "False positive after hardening: textual audit values pass through logsafe.Args, which escapes CR/LF (including named strings and errors). Numeric/bool values retain their types and cannot inject text. Mixed-field JSON regressions pass.",
+      "evidence": "False positive after hardening: textual audit values pass through logsafe.Args, which escapes CR/LF (including named strings and errors). Numeric/bool values retain their types and cannot inject text. Mixed-field JSON regressions pass."
+    }
+  ]
+}

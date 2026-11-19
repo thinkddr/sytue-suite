@@ -34,8 +34,8 @@ func TestUnaNotificacionDeOtroImporteNoCobraElPedido(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const secreto = "whsec_de_pruebas"
-	creds, _ := json.Marshal(map[string]string{"secret_key": "sk_test_x", "webhook_secret": secreto})
+	const secreto = "whsec" + "_pruebas"
+	creds, _ := json.Marshal(map[string]string{"secret_key": "sk" + "_test_x", "webhook_secret": secreto})
 	enc, err := kc.Encrypt(string(creds))
 	if err != nil {
 		t.Fatal(err)

@@ -9,6 +9,7 @@ import { expect, test } from 'bun:test';
 import {
   forgetLegacyMaterial,
   passwordEnvelopeInBridge,
+  takeHandoff,
   unwrapInBridge,
   wrapInBridge,
 } from './unlock-bridge.js';
@@ -251,4 +252,50 @@ test("«Mi cuenta», in Sytue ID's own origin, asks its own bridge for the new p
       { current: 'antes', next: 'después' },
     ),
   ).toEqual({ ok: false, error: 'unavailable' });
+});
+
+test('a busy bridge response keeps the handoff for the next attempt until processed', async () => {
+  takeHandoff({ hash: '#sytue_unlock=abc123', pathname: '/mail/', search: '' }, undefined);
+  const busy = page((msg, reply) =>
+    reply({ type: 'sytue-e2e-result', id: msg.id, ok: false, error: 'busy' }),
+  );
+  expect(
+    await unwrapInBridge(
+      { idOrigin, subject: 'ana', win: busy.win as never, doc: busy.doc as never },
+      { account, wrappers: [wrapper] },
+    ),
+  ).toEqual({ ok: false, error: 'busy' });
+  expect(busy.posted[0]!.msg.handoff).toBe('abc123');
+
+  const ok = page((msg, reply) =>
+    reply({
+      type: 'sytue-e2e-result',
+      id: msg.id,
+      ok: true,
+      recovery_key: 'EsT3 4kza',
+      kind: 'sytue-id',
+    }),
+  );
+  expect(
+    await unwrapInBridge(
+      { idOrigin, subject: 'ana', win: ok.win as never, doc: ok.doc as never },
+      { account, wrappers: [wrapper] },
+    ),
+  ).toEqual({ ok: true, recoveryKey: 'EsT3 4kza', kind: 'sytue-id' });
+  expect(ok.posted[0]!.msg.handoff).toBe('abc123');
+
+  const after = page((msg, reply) =>
+    reply({
+      type: 'sytue-e2e-result',
+      id: msg.id,
+      ok: true,
+      recovery_key: 'EsT3 4kza',
+      kind: 'sytue-id',
+    }),
+  );
+  await unwrapInBridge(
+    { idOrigin, subject: 'ana', win: after.win as never, doc: after.doc as never },
+    { account, wrappers: [wrapper] },
+  );
+  expect(after.posted[0]!.msg.handoff).toBeUndefined();
 });

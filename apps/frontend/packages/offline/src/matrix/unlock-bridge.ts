@@ -129,8 +129,8 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
           idOrigin,
         );
       } else if (data.type === 'sytue-e2e-result' && data.id === id) {
-        // The bridge answered: whatever it did with the return, it is spent.
-        if (carries && handoff === carries) handoff = null;
+        // The bridge answered: keep the handoff only if rate-limited before the bridge read it.
+        if (carries && handoff === carries && data.error !== 'busy') handoff = null;
         if (typeof data.handoff_key === 'string' && handoffKeyShape.test(data.handoff_key))
           handoffKey = data.handoff_key;
         if (data.ok === true) finish({ ok: true, data });

@@ -322,6 +322,9 @@ export function createBff(opts: BffOptions) {
         // sola y la ruta rara la atiende (o 404ea) la propia app, nunca fuera.
         const pathname = ctx.url.pathname.replace(/^\/+/, '/');
         const destino = new URL(pathname + ctx.url.search, callback.origin);
+        // La clave efímera (`key`) pertenece al puente del origen donde se abrió la app;
+        // en `callback.origin` su partición no tiene la clave privada para abrir la vuelta.
+        destino.searchParams.delete('key');
         return Response.redirect(destino.toString(), 302);
       }
       clearLegacyDomainCookie(ctx);

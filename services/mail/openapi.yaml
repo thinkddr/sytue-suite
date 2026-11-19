@@ -9,7 +9,7 @@ info:
     una API REST de conveniencia (mismo modelo) que usa @sytue/api-clients.
     Los sobres de mensaje viven en PostgreSQL; los .eml crudos y adjuntos en
     Object Storage S3. SMTP (25/465/587) e IMAPS (993) se sirven aparte para
-    clientes de terceros. Clean-room © Sytue; sin motores de correo AGPL.
+    clientes de terceros. Clean-room, © 2026 Daniel Delgado Ramos (thinkddr); sin motores de correo AGPL.
   version: "1.0.0"
   license:
     name: MIT

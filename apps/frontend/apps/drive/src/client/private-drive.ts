@@ -1,17 +1,16 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import type { DriveClient } from '@sytue/api-clients';
-import { MatrixBrowserAuth } from '@sytue/offline/matrix/auth';
 import {
   MatrixSecurityError,
   PrivateDriveRepository,
-  type SuiteMatrix,
   type StorageRepository,
 } from '@sytue/offline/matrix';
-import type { MatrixGateHost } from '@sytue/shell/matrix';
+import type { PqVault } from '@sytue/offline/vault';
 
-/** One private presenter per verified device; no client is ever rebound to another owner. */
+/** One private presenter per opened post-quantum vault; never rebound to another owner. */
 export interface PrivateDriveSession {
-  readonly client: SuiteMatrix;
+  readonly client: { readonly isClosed: boolean };
+  readonly vault?: PqVault;
   readonly storage: StorageRepository;
   readonly repository: PrivateDriveRepository;
   readonly signal: AbortSignal;
@@ -20,59 +19,66 @@ export interface PrivateDriveSession {
   uploadFailed: boolean;
   resume: () => Promise<void>;
 }
+
 interface Entry {
   value: PrivateDriveSession;
   ready: boolean;
   started: boolean;
 }
+
+export interface PrivateDriveVaultHost {
+  prepare: (vault: PqVault, signal: AbortSignal) => Promise<void>;
+  activate: (vault: PqVault) => void;
+  close: (vault: PqVault) => Promise<void>;
+}
+
 export function createPrivateDriveGate(options: {
   actor: string;
   tenant?: string | undefined;
-  /** Lazy: SSR never touches window, fetch or the SDK store. */
+  /** Lazy: SSR never touches window, fetch or the browser store. */
   source: () => DriveClient;
 }) {
   const owner = Object.freeze({ actor: options.actor, tenant: options.tenant });
   const newSource = options.source;
-  const auth = new MatrixBrowserAuth({ storageProduct: 'drive', deviceName: 'Sytue Drive · Web' });
-  const entries = new Map<SuiteMatrix, Entry>();
-  const current = (client: SuiteMatrix): PrivateDriveSession => {
-    const entry = entries.get(client);
-    if (!entry?.ready || client.isClosed || entry.value.signal.aborted)
+  const entries = new Map<PqVault, Entry>();
+
+  const current = (vault: PqVault): PrivateDriveSession => {
+    const entry = entries.get(vault);
+    if (!entry?.ready || vault.isClosed || entry.value.signal.aborted)
       throw new MatrixSecurityError('device');
     return entry.value;
   };
-  const host: MatrixGateHost = {
-    bootstrap: auth.refreshBootstrap,
-    begin: (bootstrap) => auth.begin(bootstrap),
-    session: auth,
-    prepare: async (client, signal) => {
-      const bootstrap = client.bootstrap;
+
+  const host: PrivateDriveVaultHost = {
+    prepare: async (vault, signal) => {
+      const scope = vault.scope;
       if (
-        bootstrap.actor !== owner.actor ||
-        (owner.tenant !== undefined && bootstrap.tenant !== owner.tenant) ||
-        bootstrap.storage_product !== 'drive'
+        scope.subject !== owner.actor ||
+        (owner.tenant !== undefined && scope.tenant !== owner.tenant) ||
+        scope.product !== 'drive'
       )
         throw new MatrixSecurityError('identity');
       signal.throwIfAborted();
       const source = newSource();
-      const scope = Object.freeze({
-        tenant: bootstrap.tenant,
+      const boundScope = Object.freeze({
+        tenant: scope.tenant,
         subject: owner.actor,
         product: 'drive' as const,
       });
-      const storage = client.storage({
-        read: (id, signal) => source.readCipherBlob(scope, id, signal),
-        write: (id, bytes, signal) => source.putCipherBlob(scope, id, bytes, signal),
+      const storage = vault.storage({
+        read: (id, child) => source.readCipherBlob(boundScope, id, child),
+        write: (id, bytes, child) => source.putCipherBlob(boundScope, id, bytes, child),
       });
       if (
         storage.scope.subject !== owner.actor ||
-        storage.scope.tenant !== bootstrap.tenant ||
+        storage.scope.tenant !== scope.tenant ||
         storage.scope.product !== 'drive'
       )
         throw new MatrixSecurityError('identity');
       const repository = new PrivateDriveRepository(storage);
       const value: PrivateDriveSession = {
-        client,
+        client: vault,
+        vault,
         storage,
         repository,
         signal,
@@ -80,7 +86,7 @@ export function createPrivateDriveGate(options: {
         uploadFailed: false,
         resume: async () => {
           signal.throwIfAborted();
-          if (client.isClosed || entries.get(client)?.value !== value)
+          if (vault.isClosed || entries.get(vault)?.value !== value)
             throw new MatrixSecurityError('device');
           try {
             await repository.resumeUploads(signal);
@@ -89,46 +95,46 @@ export function createPrivateDriveGate(options: {
             value.uploadFailed = true;
             throw error;
           } finally {
-            if (!signal.aborted && !client.isClosed && entries.get(client)?.value === value)
+            if (!signal.aborted && !vault.isClosed && entries.get(vault)?.value === value)
               value.events.dispatchEvent(new Event('change'));
           }
         },
       };
-      const previous = entries.get(client);
+      const previous = entries.get(vault);
       if (previous) {
-        entries.delete(client);
+        entries.delete(vault);
         await previous.value.repository.close();
         signal.throwIfAborted();
       }
       const entry: Entry = { value, ready: false, started: false };
-      entries.set(client, entry);
+      entries.set(vault, entry);
       try {
-        // migrate prepares the owner key before it can read the retained source.
+        // migrate prepares the vault before it can read the retained source.
         await repository.migrate(source, signal);
         signal.throwIfAborted();
-        if (entries.get(client) !== entry || client.isClosed)
-          throw new MatrixSecurityError('device');
+        if (entries.get(vault) !== entry || vault.isClosed) throw new MatrixSecurityError('device');
         entry.ready = true;
       } catch (error) {
-        if (entries.get(client) === entry) entries.delete(client);
+        if (entries.get(vault) === entry) entries.delete(vault);
         await repository.close();
         throw error;
       }
     },
-    activate: (client) => {
-      const entry = entries.get(client);
+    activate: (vault) => {
+      const entry = entries.get(vault);
       if (!entry?.ready || entry.started) return;
       entry.started = true;
       // Replays run after the verified presenter can mount; closing drains them.
-      void current(client)
+      void current(vault)
         .resume()
         .catch(() => {});
     },
-    close: async (client) => {
-      const entry = entries.get(client);
-      entries.delete(client);
+    close: async (vault) => {
+      const entry = entries.get(vault);
+      entries.delete(vault);
       await entry?.value.repository.close();
     },
   };
+
   return { host, current };
 }

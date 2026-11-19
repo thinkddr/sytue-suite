@@ -102,6 +102,9 @@ interface E2E {
   load: (name: string) => Promise<Record<string, unknown> | null>;
   migrate: () => Promise<void>;
   accountAllowed: (origin: string, sub: string, account: string) => boolean;
+  productAllowed: (origin: string, product: string) => boolean;
+  bridgeVaultUnwrap: (m: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  bridgeVaultWrap: (m: Record<string, unknown>) => Promise<Record<string, unknown>>;
   passkeyEnroll: (cfg: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<boolean>;
   passwordEnvelope: (o: {
     sub: string;
@@ -1211,5 +1214,148 @@ describe('the way back to a mobile app (ADR 0085)', () => {
     expect(relay).toContain('E.returnTo(');
     expect(relay).toContain('link.href = to.manual');
     expect(relay).toContain('global.location.replace(to.auto)');
+  });
+});
+
+describe('direct post-quantum vault (ADR 0086)', () => {
+  interface PqVaultVector {
+    unlock_key: string;
+    hint: string;
+    tenant: string;
+    product: string;
+    subject: string;
+    secret: { v: 1; profile: string; identity: string; owner_key: string };
+    wrapper: {
+      v: 1;
+      kind: 'sytue-id';
+      profile: string;
+      key_id: string;
+      recipient: string;
+      kdf: { alg: string; hint: string };
+      nonce: string;
+      ciphertext: string;
+    };
+  }
+  const pqVector = JSON.parse(
+    readFileSync(
+      join(import.meta.dir, '../../../../../nucleo/recoverywrap/testdata/boveda_pq.json'),
+      'utf8',
+    ),
+  ) as PqVaultVector;
+
+  test('bridge unwraps the shared Go vector, keeps keys sealed, and upgrades pre-ADR-0086 records lazily', async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'bridge.js');
+    const auk = unb64(pqVector.unlock_key);
+    await e2e.saveUnlock(pqVector.subject, auk.slice());
+    const opened = await e2e.bridgeVaultUnwrap({
+      sub: pqVector.subject,
+      tenant: pqVector.tenant,
+      product: pqVector.product,
+      wrappers: [pqVector.wrapper],
+    });
+    expect(opened).toEqual({
+      secret: pqVector.secret,
+      key_id: pqVector.wrapper.key_id,
+      recipient: pqVector.wrapper.recipient,
+      profile: pqVector.wrapper.profile,
+    });
+    await expectSealedStore(e2e.store, [auk], [pqVector.secret.identity]);
+
+    // Existing browser logged in before ADR 0086: record lacks `vaultWrap`.
+    const rec = (await e2e.store.get('auk:' + pqVector.subject)) as Record<string, unknown>;
+    delete rec.vaultWrap;
+    await e2e.store.put('auk:' + pqVector.subject, rec);
+
+    const lazy = await e2e.bridgeVaultUnwrap({
+      sub: pqVector.subject,
+      tenant: pqVector.tenant,
+      product: pqVector.product,
+      wrappers: [pqVector.wrapper],
+    });
+    expect(lazy.secret).toEqual(pqVector.secret);
+    const upgraded = (await e2e.store.get('auk:' + pqVector.subject)) as Record<string, unknown>;
+    expect(upgraded.vaultWrap).toBeInstanceOf(CryptoKey);
+    expect((upgraded.vaultWrap as CryptoKey).extractable).toBe(false);
+    await expectSealedStore(e2e.store, [auk], [pqVector.secret.identity]);
+  });
+
+  test('bridge wraps/unwraps per product, rejects cross-product AAD tampering, and checks origin allowlist', async () => {
+    const sent: { msg: Record<string, unknown> }[] = [];
+    const parent = { postMessage: (msg: Record<string, unknown>) => sent.push({ msg }) };
+    const win = fakeWindow({ parent });
+    const e2e = load(win, 'comun.js', 'bridge.js');
+    const auk = unb64(pqVector.unlock_key);
+    await e2e.saveUnlock(pqVector.subject, auk.slice());
+
+    expect(e2e.productAllowed('https://drive.sytue.eu', 'drive')).toBe(true);
+    expect(e2e.productAllowed('https://one.sytue.eu', 'hub')).toBe(true);
+    expect(e2e.productAllowed('https://mi-org.sytue.eu', 'notes')).toBe(true);
+    expect(e2e.productAllowed('https://notes.sytue.eu', 'drive')).toBe(false);
+    expect(e2e.productAllowed('https://drive.sytue.eu', 'invalid')).toBe(false);
+
+    const wrapped = await e2e.bridgeVaultWrap({
+      sub: pqVector.subject,
+      tenant: pqVector.tenant,
+      product: 'notes',
+      profile: pqVector.wrapper.profile,
+      key_id: pqVector.wrapper.key_id,
+      recipient: pqVector.wrapper.recipient,
+      secret: pqVector.secret,
+    });
+    expect(wrapped.wrapper).toBeDefined();
+    const wrongProduct = await e2e.bridgeVaultUnwrap({
+      sub: pqVector.subject,
+      tenant: pqVector.tenant,
+      product: 'drive',
+      wrappers: [wrapped.wrapper],
+    });
+    expect(wrongProduct).toEqual({ error: 'wrong' });
+    const missingSub = await e2e.bridgeVaultUnwrap({
+      sub: 'other-user',
+      tenant: pqVector.tenant,
+      product: 'notes',
+      wrappers: [wrapped.wrapper],
+    });
+    expect(missingSub).toEqual({ error: 'signin' });
+
+    // Origin isolation through postMessage: drive origin cannot touch notes vault.
+    e2e.bridge({ origin: 'https://drive.sytue.eu' }, win);
+    for (const fn of win.listeners.message ?? []) {
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-unwrap',
+          id: 'cross',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'notes',
+          wrappers: [wrapped.wrapper],
+        },
+        origin: 'https://drive.sytue.eu',
+        source: parent,
+      });
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-unwrap',
+          id: 'own',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          wrappers: [pqVector.wrapper],
+        },
+        origin: 'https://drive.sytue.eu',
+        source: parent,
+      });
+    }
+    for (let i = 0; i < 100 && !sent.some((s) => s.msg.id === 'own'); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(sent.find((s) => s.msg.id === 'cross')?.msg).toMatchObject({
+      ok: false,
+      error: 'account',
+    });
+    expect(sent.find((s) => s.msg.id === 'own')?.msg).toMatchObject({
+      ok: true,
+      key_id: pqVector.wrapper.key_id,
+      secret: pqVector.secret,
+    });
   });
 });

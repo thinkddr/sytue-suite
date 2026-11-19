@@ -132,9 +132,10 @@ type Service struct {
 	// de los tests unitarios del camino personal): las unidades se prueban por
 	// integración (store real) y con el fake del SERVICIO en la capa HTTP, así que
 	// no ensucian dataStore ni su fake. Nil en tests unitarios que no las ejercitan.
-	team   *store.Store
-	cipher cipherBlobStore
-	blobs  blobStore
+	team    *store.Store
+	cipher  cipherBlobStore
+	pqVault pqVaultStore
+	blobs   blobStore
 	// router es el mismo blobs, con su tipo: es quien sabe si el tenant tiene
 	// almacén de terceros. nil en los tests que inyectan un fake.
 	router *blobRouter
@@ -187,7 +188,7 @@ func New(cfg config.Config, st *Store, blobs *objectstore.Client, pub EventPubli
 	if cfg.HubBaseURL != "" && cfg.HubInternalSecret != "" {
 		notifier = hubnotify.New(cfg.HubBaseURL, cfg.HubInternalSecret)
 	}
-	return &Service{cfg: cfg, store: st, team: st, cipher: st, blobs: router, router: router, pub: pub, chat: chat, hubNotifier: notifier}
+	return &Service{cfg: cfg, store: st, team: st, cipher: st, pqVault: st, blobs: router, router: router, pub: pub, chat: chat, hubNotifier: notifier}
 }
 
 // Hub es el cliente del Hub del servicio (nil sin Hub): el de los avisos y el de la

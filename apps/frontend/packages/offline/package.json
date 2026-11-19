@@ -15,7 +15,8 @@
     "./matrix/unlock-bridge": "./src/matrix/unlock-bridge.ts",
     "./pqc/runtime": "./src/pqc/runtime.ts",
     "./session-owner": "./src/session-owner.ts",
-    "./pqc/framing": "./src/pqc/host-codec.ts"
+    "./pqc/framing": "./src/pqc/host-codec.ts",
+    "./vault": "./src/vault/index.ts"
   },
   "files": [
     "src"

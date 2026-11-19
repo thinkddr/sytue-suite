@@ -12,6 +12,7 @@ import {
   type MatrixBootstrap,
 } from '@sytue/offline/matrix';
 import { MatrixDeviceGate, type MatrixGateHost } from './MatrixDeviceGate.js';
+import { PqVaultGate } from './PqVaultGate.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
 
 export type MatrixLegacyResolver = (signal: AbortSignal) => Promise<SuiteMatrix>;
@@ -244,9 +245,58 @@ export function MatrixSourceGate({
   );
 }
 
-/** Shared private storage gate for suite products: canonical identity v2 with
- * automatic legacy v1 recovery for record-migrated products, or device-only for PDF. */
+/**
+ * Puerta compartida de almacenamiento cifrado para los productos de la suite.
+ *
+ * ADR 0086: las pantallas de producto usan la bóveda post-cuántica directa
+ * (`PqVaultGate`, `age-MLKEM768-X25519-v1`) sin Synapse/Matrix. Solo se conserva
+ * la vía Matrix si un llamador explícito pide `(client: SuiteMatrix)`.
+ */
 export function MatrixStorageGate({
+  actor,
+  tenant,
+  locale,
+  product,
+  basePath,
+  deviceName,
+  children,
+}: {
+  actor: string;
+  tenant?: string | undefined;
+  locale: Locale;
+  product: MatrixStorageProduct;
+  basePath?: string | undefined;
+  deviceName?: string | undefined;
+  children: ComponentChildren | ((client: SuiteMatrix) => ComponentChildren);
+}): JSX.Element {
+  if (typeof children !== 'function') {
+    return (
+      <PqVaultGate
+        actor={actor}
+        tenant={tenant}
+        locale={locale}
+        product={product}
+        basePath={basePath}
+      >
+        {children}
+      </PqVaultGate>
+    );
+  }
+  return (
+    <MatrixStorageFunctionGate
+      actor={actor}
+      tenant={tenant}
+      locale={locale}
+      product={product}
+      basePath={basePath}
+      deviceName={deviceName}
+    >
+      {children}
+    </MatrixStorageFunctionGate>
+  );
+}
+
+function MatrixStorageFunctionGate({
   actor,
   tenant,
   locale,
@@ -265,7 +315,7 @@ export function MatrixStorageGate({
 }): JSX.Element {
   // Development benches only (MatrixStorageFixture): a synthetic homeserver half.
   const fixture = useContext(MatrixStorageFixtureContext);
-  const gate = useMemo(() => {
+  const host = useMemo(() => {
     const resolvedBasePath = basePath ?? prefijoDeApp(product === 'hub' ? 'one' : product) ?? '/';
     const label = deviceName ?? `Sytue ${product} · Web`;
     const canonical = new MatrixBrowserAuth({
@@ -274,36 +324,12 @@ export function MatrixStorageGate({
       deviceName: label,
     });
     const synthetic = fixture?.({ actor, tenant, product });
-    if (product === 'pdf') {
-      const deviceHost: MatrixGateHost = {
-        bootstrap: canonical.refreshBootstrap,
-        begin: (value) => canonical.begin(value),
-        session: canonical,
-        ...synthetic,
-        prepare: async (suite, signal) => {
-          if (
-            suite.bootstrap.actor !== actor ||
-            (tenant !== undefined && suite.bootstrap.tenant !== tenant) ||
-            suite.bootstrap.storage_product !== product ||
-            suite.bootstrap.storage_identity_version !== 2
-          )
-            throw new MatrixSecurityError('identity');
-          await suite.prepareDeviceStorage({ basePath: resolvedBasePath }, signal);
-        },
-      };
-      return { kind: 'device' as const, deviceHost };
-    }
-    const historical = new MatrixBrowserAuth({
-      storageProduct: product,
-      identityVersion: 1,
-      deviceName: label,
-    });
-    const host: MatrixSourceGateHost = {
+    const deviceHost: MatrixGateHost = {
       bootstrap: canonical.refreshBootstrap,
       begin: (value) => canonical.begin(value),
       session: canonical,
       ...synthetic,
-      prepare: async (suite, signal, resolveLegacy) => {
+      prepare: async (suite, signal) => {
         if (
           suite.bootstrap.actor !== actor ||
           (tenant !== undefined && suite.bootstrap.tenant !== tenant) ||
@@ -311,27 +337,18 @@ export function MatrixStorageGate({
           suite.bootstrap.storage_identity_version !== 2
         )
           throw new MatrixSecurityError('identity');
-        await suite.preparePrivateStorage({ basePath: resolvedBasePath, resolveLegacy }, signal);
+        await suite.prepareDeviceStorage({ basePath: resolvedBasePath }, signal);
       },
     };
-    const legacyHost: MatrixGateHost = {
-      bootstrap: historical.refreshBootstrap,
-      begin: (value) => historical.begin(value),
-      session: historical,
-    };
-    return { kind: 'source' as const, host, legacyHost };
+    return deviceHost;
   }, [actor, tenant, product, basePath, deviceName, fixture]);
-  // ¿Despliegue sin el complemento de cifrado E2E? Se pregunta una vez al BFF de la
-  // app: si responde «desactivado», la app se muestra tal cual y trabaja con sus
-  // rutas en el servidor; si no, sigue el flujo cifrado de siempre (y sus errores).
   const [cifrado, setCifrado] = useState<'comprobando' | 'activado' | 'desactivado'>(
     fixture ? 'activado' : 'comprobando',
   );
   useEffect(() => {
     if (fixture) return;
     let vigente = true;
-    const bootstrap = gate.kind === 'device' ? gate.deviceHost.bootstrap : gate.host.bootstrap;
-    bootstrap().then(
+    host.bootstrap().then(
       () => vigente && setCifrado('activado'),
       (error: unknown) =>
         vigente && setCifrado(error instanceof CifradoDesactivado ? 'desactivado' : 'activado'),
@@ -339,27 +356,11 @@ export function MatrixStorageGate({
     return () => {
       vigente = false;
     };
-  }, [gate, fixture]);
+  }, [host, fixture]);
   if (cifrado === 'comprobando') return <></>;
-  // Una pantalla que necesita el cliente Matrix para pintarse (children como
-  // función) no tiene modo en claro: sigue por la puerta cifrada, que explica el fallo.
-  if (cifrado === 'desactivado' && typeof children !== 'function') return <>{children}</>;
-  if (gate.kind === 'device') {
-    return (
-      <MatrixDeviceGate actor={actor} tenant={tenant} locale={locale} host={gate.deviceHost}>
-        {children}
-      </MatrixDeviceGate>
-    );
-  }
   return (
-    <MatrixSourceGate
-      actor={actor}
-      tenant={tenant}
-      locale={locale}
-      host={gate.host}
-      legacyHost={gate.legacyHost}
-    >
+    <MatrixDeviceGate actor={actor} tenant={tenant} locale={locale} host={host}>
       {children}
-    </MatrixSourceGate>
+    </MatrixDeviceGate>
   );
 }

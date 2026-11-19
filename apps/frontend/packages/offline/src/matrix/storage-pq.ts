@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import type { PqcRuntime, PqcEnvelope, PqcIdentityMaterial } from '../pqc/runtime.js';
-import { type StoragePqKeys, samePrivateBytes } from './storage-pq-keys.js';
+import { samePrivateBytes } from './storage-pq-keys.js';
 import {
   decodeStorageRecord,
   storageReference,
@@ -36,12 +36,19 @@ type SendContent = (transaction: string, content: StoragePqMessage) => Promise<M
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 
+export interface StoragePqKeySource {
+  prepare: () => Promise<void>;
+  key: (requested?: string) => Promise<PqcIdentityMaterial>;
+  close: () => void;
+  destroy: () => Promise<void>;
+}
+
 /** Only transport orchestration lives here. The same Go package used by native
  * apps owns the record frames, hybrid encryption, fragments and wire JSON. */
 export class StoragePq {
   constructor(
     private readonly core: PqcRuntime,
-    readonly keys: StoragePqKeys,
+    readonly keys: StoragePqKeySource,
     private readonly scope: MatrixStorageScope,
     private readonly assertOpen: () => void,
   ) {}

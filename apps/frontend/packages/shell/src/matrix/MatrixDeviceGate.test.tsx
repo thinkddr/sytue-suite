@@ -16,7 +16,12 @@ import {
 import { ToastProvider, useToast } from '@sytue/ui';
 import type { StorageRootService } from '@sytue/config/matrix';
 import { MatrixDeviceGate, type MatrixGateHost } from './MatrixDeviceGate.js';
-import { MatrixSourceGate, type MatrixSourceGateHost } from './MatrixSourceGate.js';
+import {
+  MatrixSourceGate,
+  MatrixStorageGate,
+  type MatrixSourceGateHost,
+} from './MatrixSourceGate.js';
+import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
 const actor = '11111111-1111-4111-8111-111111111111';
@@ -1220,5 +1225,98 @@ test('private storage products do not offer a reset that would orphan their vaul
     expect(findButton('matrix.reset')).toBeUndefined();
   } finally {
     await f.unmount();
+  }
+});
+
+test('bootstrap failure with MatrixSecurityError(login) surfaces a retryable error instead of an eternal spinner', async () => {
+  const f = fixture();
+  let calls = 0;
+  f.host.bootstrap = async () => {
+    calls++;
+    if (calls === 1) throw new MatrixSecurityError('login');
+    return bootstrap();
+  };
+  try {
+    await f.mount();
+    await until(() => findButton('action.retry') !== undefined);
+    expect(f.root.querySelector('[role="alert"]')?.textContent).toContain('matrix.failed');
+    await act(() => button('action.retry').click());
+    await until(() => f.root.querySelector('[data-private]')?.textContent === actor);
+    expect(calls).toBe(2);
+  } finally {
+    await f.unmount();
+  }
+});
+
+test('MatrixStorageGate prepares canonical v2 device storage without mounting a legacy v1 gate', async () => {
+  const root = document.createElement('div');
+  document.body.appendChild(root);
+  const v2: MatrixBootstrap = {
+    ...bootstrap(),
+    storage_product: 'notes',
+    storage_identity_version: 2,
+    matrix_user_id: '@sytue_storage_notes_synthetic-org_' + actor + ':matrix.example',
+  };
+  const deviceCalls: Array<{ basePath?: string }> = [];
+  let legacyCalls = 0;
+  let closed = false;
+  const syntheticClient = {
+    bootstrap: v2,
+    client: {
+      on: () => {},
+      secretStorage: { hasKey: async () => true, getDefaultKeyId: async () => null },
+    },
+    get isClosed() {
+      return closed;
+    },
+    trusted: async () => true,
+    devices: async () => [],
+    unverifiedRecipients: async () => [],
+    canVerifyUser: () => true,
+    heldRecoveryKey: async () => null,
+    prepareDeviceStorage: async (options: { basePath?: string }) => {
+      deviceCalls.push(options);
+    },
+    preparePrivateStorage: async () => {
+      legacyCalls++;
+      throw new Error('legacy_gate_must_not_run');
+    },
+    close: () => {
+      closed = true;
+    },
+    closeAndDrain: async () => {
+      closed = true;
+    },
+    forget: async () => {
+      closed = true;
+    },
+  } as unknown as SuiteMatrix;
+  try {
+    await act(() => {
+      render(
+        <ToastProvider>
+          <MatrixStorageFixtureContext.Provider
+            value={() => ({
+              bootstrap: async () => v2,
+              open: async () => syntheticClient,
+            })}
+          >
+            <MatrixStorageGate actor={actor} tenant="synthetic-org" locale="en" product="notes">
+              {(client) => <p data-storage-ready="true">{client.bootstrap.matrix_user_id}</p>}
+            </MatrixStorageGate>
+          </MatrixStorageFixtureContext.Provider>
+        </ToastProvider>,
+        root,
+      );
+    });
+    await until(() => root.querySelector('[data-storage-ready]') !== null);
+    expect(root.querySelector('[data-storage-ready]')?.textContent).toBe(v2.matrix_user_id);
+    expect(deviceCalls).toEqual([{ basePath: '/notes' }]);
+    expect(legacyCalls).toBe(0);
+  } finally {
+    await act(() => {
+      render(null, root);
+    });
+    root.remove();
   }
 });

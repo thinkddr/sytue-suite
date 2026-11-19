@@ -136,6 +136,7 @@ type driveService interface {
 type Handlers struct {
 	svc       driveService
 	cipher    cipherBlobService
+	pqVault   pqVaultService
 	migration privateStorageService
 	cfg       config.Config
 	// wopi acuña los tokens de acceso del host WOPI. Nil ⇒ el endpoint de acuñación

@@ -129,8 +129,8 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
           idOrigin,
         );
       } else if (data.type === 'sytue-e2e-result' && data.id === id) {
-        // The bridge answered: whatever it did with the return, it is spent.
-        if (carries && handoff === carries) handoff = null;
+        // The bridge answered: keep the handoff only if rate-limited before the bridge read it.
+        if (carries && handoff === carries && data.error !== 'busy') handoff = null;
         if (typeof data.handoff_key === 'string' && handoffKeyShape.test(data.handoff_key))
           handoffKey = data.handoff_key;
         if (data.ok === true) finish({ ok: true, data });
@@ -262,4 +262,126 @@ export async function passwordEnvelopeInBridge(
   )
     return { ok: false, error: 'unavailable' };
   return { ok: true, envelope };
+}
+
+export const pqVaultProfile = 'age-MLKEM768-X25519-v1' as const;
+
+export interface PqVaultSecret {
+  v: 1;
+  profile: typeof pqVaultProfile;
+  identity: string;
+  owner_key: string;
+}
+
+export interface PqVaultWrapper {
+  v: 1;
+  kind: 'sytue-id';
+  profile: typeof pqVaultProfile;
+  key_id: string;
+  recipient: string;
+  kdf: { alg: 'sytue-id-unlock-hkdf-sha256'; hint: string };
+  nonce: string;
+  ciphertext: string;
+}
+
+export type VaultUnwrapResult =
+  | {
+      ok: true;
+      secret: PqVaultSecret;
+      keyID: string;
+      recipient: string;
+      profile: typeof pqVaultProfile;
+    }
+  | { ok: false; error: UnlockBridgeError };
+
+export type VaultWrapResult =
+  { ok: true; wrapper: PqVaultWrapper } | { ok: false; error: UnlockBridgeError };
+
+function isPqVaultSecret(value: unknown): value is PqVaultSecret {
+  if (!value || typeof value !== 'object') return false;
+  const s = value as Record<string, unknown>;
+  return (
+    s.v === 1 &&
+    s.profile === pqVaultProfile &&
+    typeof s.identity === 'string' &&
+    s.identity.length > 0 &&
+    typeof s.owner_key === 'string' &&
+    s.owner_key.length > 0
+  );
+}
+
+/** Opens a direct PQ vault wrapper (ADR 0086) in Sytue ID's origin. */
+export async function unwrapVaultInBridge(
+  options: UnlockBridgeOptions,
+  input: { tenant: string; product: string; wrappers: readonly PqVaultWrapper[] },
+): Promise<VaultUnwrapResult> {
+  const answer = await ask(options, {
+    type: 'sytue-e2e-vault-unwrap',
+    tenant: input.tenant,
+    product: input.product,
+    wrappers: input.wrappers.slice(0, 32),
+  });
+  if (!answer.ok) return answer;
+  const { secret, key_id: keyID, recipient, profile } = answer.data;
+  if (
+    !isPqVaultSecret(secret) ||
+    typeof keyID !== 'string' ||
+    !keyID ||
+    typeof recipient !== 'string' ||
+    !recipient ||
+    profile !== pqVaultProfile
+  )
+    return { ok: false, error: 'unavailable' };
+  return { ok: true, secret, keyID, recipient, profile };
+}
+
+/** Wraps a direct PQ vault identity + owner key (ADR 0086) in Sytue ID's origin. */
+export async function wrapVaultInBridge(
+  options: UnlockBridgeOptions,
+  input: {
+    tenant: string;
+    product: string;
+    profile: typeof pqVaultProfile;
+    keyID: string;
+    recipient: string;
+    secret: PqVaultSecret;
+  },
+): Promise<VaultWrapResult> {
+  const answer = await ask(options, {
+    type: 'sytue-e2e-vault-wrap',
+    tenant: input.tenant,
+    product: input.product,
+    profile: input.profile,
+    key_id: input.keyID,
+    recipient: input.recipient,
+    secret: input.secret,
+  });
+  if (!answer.ok) return answer;
+  const wrapper = answer.data.wrapper as PqVaultWrapper | undefined;
+  if (
+    !wrapper ||
+    wrapper.v !== 1 ||
+    wrapper.kind !== 'sytue-id' ||
+    wrapper.profile !== pqVaultProfile ||
+    wrapper.key_id !== input.keyID ||
+    wrapper.recipient !== input.recipient ||
+    wrapper.kdf?.alg !== 'sytue-id-unlock-hkdf-sha256' ||
+    typeof wrapper.kdf.hint !== 'string' ||
+    typeof wrapper.nonce !== 'string' ||
+    typeof wrapper.ciphertext !== 'string'
+  )
+    return { ok: false, error: 'unavailable' };
+  return {
+    ok: true,
+    wrapper: {
+      v: 1,
+      kind: 'sytue-id',
+      profile: pqVaultProfile,
+      key_id: wrapper.key_id,
+      recipient: wrapper.recipient,
+      kdf: { alg: 'sytue-id-unlock-hkdf-sha256', hint: wrapper.kdf.hint },
+      nonce: wrapper.nonce,
+      ciphertext: wrapper.ciphertext,
+    },
+  };
 }

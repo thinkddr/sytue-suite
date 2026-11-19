@@ -44,10 +44,29 @@
   if (!E) return;
   var enc = new TextEncoder();
   var WRAP_LABEL = "sytue-matrix-recovery-wrap-v1";
+  var VAULT_WRAP_LABEL = "sytue-pq-vault-wrap-v1";
+  var VAULT_PROFILE = "age-MLKEM768-X25519-v1";
   var VERSION = 2;
   var MAX_WRAPPERS = 32;
   var MAX_RECOVERY = 256;
   var RATE = 10;
+  var PRODUCTS = [
+    "hub",
+    "mail",
+    "drive",
+    "docs",
+    "sheets",
+    "slides",
+    "pdf",
+    "calendar",
+    "contacts",
+    "notes",
+    "photos",
+    "rooms",
+    "cast",
+    "erp",
+    "bases",
+  ];
 
   // El host de la app de cada producto con cuenta aislada (`appDomains` de
   // @sytue/config): el suyo propio, si no se llama igual que el producto.
@@ -119,6 +138,24 @@
     }
     if (SUITE_HOSTS.indexOf(host) < 0) return true;
     return (HOSTS[iso[1]] || [iso[1]]).indexOf(host) >= 0;
+  };
+
+  /**
+   * ¿Puede la app de `origin` operar la bóveda post-cuántica de `product` (ADR 0086)?
+   * En un host propio de la suite solo el de ese producto; en un host de organización
+   * (mismo origen para todas sus apps), cualquier producto válido.
+   */
+  E.productAllowed = function (origin, product) {
+    if (typeof product !== "string" || PRODUCTS.indexOf(product) < 0)
+      return false;
+    var host = "";
+    try {
+      host = new URL(origin).hostname.split(".")[0];
+    } catch (e) {
+      return false;
+    }
+    if (SUITE_HOSTS.indexOf(host) < 0) return true;
+    return (HOSTS[product] || [product]).indexOf(host) >= 0;
   };
 
   function aad(kind, account, keyID, cred) {
@@ -295,6 +332,206 @@
     });
   };
 
+  function vaultScopePart(s, max) {
+    return (
+      typeof s === "string" &&
+      s.length > 0 &&
+      s.length <= max &&
+      !/[\0\r\n]/.test(s)
+    );
+  }
+  function vaultAAD(tenant, product, sub, keyID) {
+    return enc.encode(
+      [VAULT_WRAP_LABEL, tenant, product, sub, keyID].join("\0"),
+    );
+  }
+  function vaultWrapperShape(w) {
+    return (
+      !!w &&
+      typeof w === "object" &&
+      w.v === 1 &&
+      w.kind === "sytue-id" &&
+      w.profile === VAULT_PROFILE &&
+      vaultScopePart(w.key_id, 128) &&
+      typeof w.recipient === "string" &&
+      w.recipient.length > 0 &&
+      w.recipient.length <= 4096 &&
+      typeof w.nonce === "string" &&
+      typeof w.ciphertext === "string" &&
+      !!w.kdf &&
+      typeof w.kdf === "object" &&
+      w.kdf.alg === "sytue-id-unlock-hkdf-sha256" &&
+      typeof w.kdf.hint === "string"
+    );
+  }
+  function vaultSecretShape(s) {
+    return (
+      !!s &&
+      typeof s === "object" &&
+      s.v === 1 &&
+      s.profile === VAULT_PROFILE &&
+      typeof s.identity === "string" &&
+      s.identity.length > 0 &&
+      s.identity.length <= 4096 &&
+      typeof s.owner_key === "string" &&
+      s.owner_key.length > 0 &&
+      s.owner_key.length <= 128
+    );
+  }
+  /** Deriva `vaultWrap` bajo demanda para cuentas iniciadas antes de ADR 0086. */
+  function ensureVaultWrap(sub, rec) {
+    if (!rec) return Promise.resolve(null);
+    if (E.sealedKey(rec.vaultWrap)) return Promise.resolve(rec);
+    return E.revealUnlock(sub, rec).then(function (key) {
+      return E.vaultWrapKey(key, ["encrypt", "decrypt"]).then(
+        function (vw) {
+          E.wipe(key);
+          var next = {};
+          Object.keys(rec).forEach(function (k) {
+            next[k] = rec[k];
+          });
+          next.vaultWrap = vw;
+          return E.store.put("auk:" + sub, next).then(function () {
+            return next;
+          });
+        },
+        function (err) {
+          E.wipe(key);
+          throw err;
+        },
+      );
+    });
+  }
+  function openVaultWith(key, tenant, product, sub, w) {
+    return global.crypto.subtle
+      .decrypt(
+        {
+          name: "AES-GCM",
+          iv: E.unb64(w.nonce),
+          additionalData: vaultAAD(tenant, product, sub, w.key_id),
+        },
+        key,
+        E.unb64(w.ciphertext),
+      )
+      .then(function (plain) {
+        var bytes = new Uint8Array(plain);
+        try {
+          var secret = JSON.parse(
+            new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+          );
+          if (!vaultSecretShape(secret)) throw new Error("secret");
+          return secret;
+        } finally {
+          E.wipe(bytes);
+        }
+      });
+  }
+
+  /** `sytue-e2e-vault-unwrap`: abre el envoltorio PQ de un producto (ADR 0086). */
+  E.bridgeVaultUnwrap = function (m) {
+    if (
+      !vaultScopePart(m.tenant, 128) ||
+      typeof m.product !== "string" ||
+      PRODUCTS.indexOf(m.product) < 0
+    )
+      return Promise.resolve({ error: "invalid" });
+    var wrappers = Array.isArray(m.wrappers)
+      ? m.wrappers.slice(0, MAX_WRAPPERS).filter(vaultWrapperShape)
+      : [];
+    return E.load("auk:" + m.sub)
+      .catch(function () {
+        return null;
+      })
+      .then(function (rec) {
+        return ensureVaultWrap(m.sub, rec);
+      })
+      .then(function (rec) {
+        if (!rec) return { error: "signin" };
+        var mine = wrappers.filter(function (w) {
+          return w.kdf.hint === rec.hint;
+        });
+        return first(mine, function (w) {
+          return openVaultWith(
+            rec.vaultWrap,
+            m.tenant,
+            m.product,
+            m.sub,
+            w,
+          ).then(function (secret) {
+            return {
+              secret: secret,
+              key_id: w.key_id,
+              recipient: w.recipient,
+              profile: w.profile,
+            };
+          });
+        }).then(function (got) {
+          if (got) return got;
+          return { error: "wrong" };
+        });
+      });
+  };
+
+  /** `sytue-e2e-vault-wrap`: envuelve una clave de bóveda PQ con la AUK (ADR 0086). */
+  E.bridgeVaultWrap = function (m) {
+    if (
+      !vaultScopePart(m.tenant, 128) ||
+      typeof m.product !== "string" ||
+      PRODUCTS.indexOf(m.product) < 0 ||
+      m.profile !== VAULT_PROFILE ||
+      !vaultScopePart(m.key_id, 128) ||
+      typeof m.recipient !== "string" ||
+      !m.recipient ||
+      m.recipient.length > 4096 ||
+      !vaultSecretShape(m.secret)
+    )
+      return Promise.resolve({ error: "invalid" });
+    return E.load("auk:" + m.sub)
+      .catch(function () {
+        return null;
+      })
+      .then(function (rec) {
+        return ensureVaultWrap(m.sub, rec);
+      })
+      .then(function (rec) {
+        if (!rec) return { error: "signin" };
+        var nonce = E.random(12);
+        var plain = enc.encode(
+          JSON.stringify({
+            v: 1,
+            profile: m.secret.profile,
+            identity: m.secret.identity,
+            owner_key: m.secret.owner_key,
+          }),
+        );
+        return global.crypto.subtle
+          .encrypt(
+            {
+              name: "AES-GCM",
+              iv: nonce,
+              additionalData: vaultAAD(m.tenant, m.product, m.sub, m.key_id),
+            },
+            rec.vaultWrap,
+            plain,
+          )
+          .then(function (ct) {
+            E.wipe(plain);
+            return {
+              wrapper: {
+                v: 1,
+                kind: "sytue-id",
+                profile: m.profile,
+                key_id: m.key_id,
+                recipient: m.recipient,
+                kdf: { alg: "sytue-id-unlock-hkdf-sha256", hint: rec.hint },
+                nonce: E.b64(nonce),
+                ciphertext: E.b64(new Uint8Array(ct)),
+              },
+            };
+          });
+      });
+  };
+
   var HANDOFF_TTL = 30 * 60 * 1000;
   var CURVE = { name: "ECDH", namedCurve: "P-256" };
   function handoffRecord(h, now) {
@@ -460,6 +697,21 @@
           return m.type === "sytue-e2e-unwrap"
             ? E.bridgeUnwrap(m, t)
             : E.bridgeWrap(m, t);
+        });
+      } else if (
+        m.type === "sytue-e2e-vault-unwrap" ||
+        m.type === "sytue-e2e-vault-wrap"
+      ) {
+        if (!E.productAllowed(origin, m.product)) {
+          reply(m.id, { ok: false, error: "account" });
+          return;
+        }
+        op = (
+          m.handoff ? E.takeHandoff(m.sub, m.handoff, t) : Promise.resolve()
+        ).then(function () {
+          return m.type === "sytue-e2e-vault-unwrap"
+            ? E.bridgeVaultUnwrap(m)
+            : E.bridgeVaultWrap(m);
         });
       } else if (m.type === "sytue-e2e-password" && cfg.password === true) {
         // Solo «Mi cuenta» (el servidor lo dice en `password`): el sobre de la

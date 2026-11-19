@@ -20,6 +20,7 @@
   "use strict";
   var LABEL = "sytue-e2e-unlock-v1";
   var WRAP_LABEL = "sytue-matrix-recovery-wrap-v1";
+  var VAULT_WRAP_LABEL = "sytue-pq-vault-wrap-v1";
   var enc = new TextEncoder();
   var subtle = global.crypto && global.crypto.subtle;
   var AES = { name: "AES-GCM", length: 256 };
@@ -204,6 +205,10 @@
   /** La clave de un envoltorio de la clave de recuperación (recoverywrap.KeyFromIKM). */
   function wrapKey(ikm, kind, usages) {
     return hkdfAES(ikm, WRAP_LABEL + "/" + kind, usages);
+  }
+  /** La clave de un envoltorio de bóveda post-cuántica (ADR 0086, recoverywrap.PQVaultKeyFromAUK). */
+  function vaultWrapKey(ikm, usages) {
+    return hkdfAES(ikm, VAULT_WRAP_LABEL + "/sytue-id", usages);
   }
   var prfInput = null;
   /** La entrada `first` de la PRF con la que se evalúa cualquier passkey. */
@@ -473,6 +478,7 @@
     passkeyKEK: passkeyKEK,
     kekFrom: kekFrom,
     wrapKey: wrapKey,
+    vaultWrapKey: vaultWrapKey,
     passkeyPRFInput: passkeyPRFInput,
     sealEnvelope: sealEnvelope,
     openEnvelope: openEnvelope,
@@ -524,9 +530,16 @@
     return Promise.all([
       hint(key),
       wrapKey(key, "sytue-id", ["encrypt", "decrypt"]),
+      vaultWrapKey(key, ["encrypt", "decrypt"]),
       E.hide(key, "auk\0" + sub),
     ]).then(function (r) {
-      return { v: 2, hint: b64(r[0]), wrap: r[1], box: r[2] };
+      return {
+        v: 2,
+        hint: b64(r[0]),
+        wrap: r[1],
+        vaultWrap: r[2],
+        box: r[3],
+      };
     });
   };
   E.saveUnlock = function (sub, key) {

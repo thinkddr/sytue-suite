@@ -669,8 +669,7 @@ export class SuiteMatrix {
     await this.crypto.getUserDeviceInfo([this.bootstrap.matrix_user_id], true);
     if ((await this.crypto.checkKeyBackupAndEnable()) === null) await this.crypto.resetKeyBackup();
     await this.ownerKeys?.flush();
-    if (!(await this.crypto.isSecretStorageReady()) || !(await this.trusted()))
-      throw new MatrixSecurityError('device');
+    if (!(await this.settledTrust())) throw new MatrixSecurityError('device');
   }
   /**
    * The account has a secret storage key that nothing here opens: no wrapper, no copy
@@ -727,6 +726,47 @@ export class SuiteMatrix {
     return false;
   }
   /**
+   * Whether any `org.sytue.vault.*` secret in account data is NOT encrypted under `keyID`
+   * (or account data cannot be listed).
+   */
+  private vaultHasSecretsOutside(keyID: string): boolean {
+    const data = (this.client.store as { accountData?: unknown }).accountData;
+    if (!(data instanceof Map)) return true;
+    for (const [type, event] of data as Map<string, MatrixEvent>) {
+      if (!type.startsWith(ssssVaultEventPrefix)) continue;
+      const content = event.getContent();
+      if (!content || Object.keys(content).length === 0) continue;
+      const encrypted = content.encrypted as Record<string, unknown> | undefined;
+      if (!encrypted || typeof encrypted !== 'object' || !(keyID in encrypted)) return true;
+    }
+    return false;
+  }
+  /**
+   * When secret storage's default key cannot be opened, but this device already holds a
+   * valid owner key (`cached !== current`) that still exists on the homeserver and covers
+   * every `org.sytue.vault.*` secret, restores `m.secret_storage.default_key` to `cached`
+   * and completes recovery under it — preserving historical owner proofs and vault secrets
+   * without rotating the key.
+   */
+  async restoreHeldRecovery(): Promise<boolean> {
+    if (this.closed || !this.ownerKeys) return false;
+    const cached = await this.ownerKeys.cachedID().catch(() => null);
+    if (!cached || this.closed) return false;
+    const current = await this.client.secretStorage.getDefaultKeyId();
+    if (!current || cached === current || this.closed) return false;
+    const held = await this.heldRecoveryKey(cached);
+    if (!held || this.closed) return false;
+    if (this.vaultHasSecretsOutside(cached)) return false;
+    await this.client.secretStorage.setDefaultKeyId(cached);
+    try {
+      await this.recover();
+      return true;
+    } catch {
+      await this.client.secretStorage.setDefaultKeyId(current).catch(() => undefined);
+      return false;
+    }
+  }
+  /**
    * Protects again an account `orphanedRecovery` found safe to protect, checked again
    * here: a new secret storage key, wrapped with the Sytue ID unlock key BEFORE it is
    * published (`saveRecoveryKey`), the default from then on. Nothing on the homeserver is
@@ -778,6 +818,10 @@ export class SuiteMatrix {
       if ((await this.crypto.isSecretStorageReady()) && (await this.trusted())) return true;
       if (attempt >= 10 || this.closed) return false;
       await new Promise((resolve) => setTimeout(resolve, 500));
+      if (this.closed) return false;
+      await this.crypto
+        .getUserDeviceInfo([this.bootstrap.matrix_user_id], true)
+        .catch(() => undefined);
     }
   }
   /**
@@ -859,7 +903,7 @@ export class SuiteMatrix {
     // before checking the device instead of racing the next background sync.
     await this.crypto.getUserDeviceInfo([this.bootstrap.matrix_user_id], true);
     await this.ownerKeys?.flush();
-    if (!(await this.trusted())) throw new MatrixSecurityError('device');
+    if (!(await this.settledTrust())) throw new MatrixSecurityError('device');
     if (this.bootstrap.storage_product) {
       await this.loadAttestedStorageSessions(this.vaultScope());
     }

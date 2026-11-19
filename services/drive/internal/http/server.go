@@ -106,6 +106,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Service != nil {
 		h.bases = d.Service
 		h.cipher = d.Service
+		h.pqVault = d.Service
 		if d.Service.PrivateStorageAvailable() {
 			h.migration = d.Service
 		}
@@ -147,6 +148,12 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/cipher/usage/{product}", h.CipherUsage)
 		api.Get("/cipher/blobs/{product}/{id}/content", h.DownloadCipherBlob)
 		api.Delete("/cipher/blobs/{product}/{id}", h.DeleteCipherBlob)
+		// Bóveda post-cuántica directa (ADR 0086): claves envueltas y registros cifrados.
+		api.Get("/pq-vault/{product}/keys", h.GetPQVaultKeys)
+		api.With(httpx.MaxBodyBytes(16<<10)).Put("/pq-vault/{product}/keys", h.PutPQVaultKey)
+		api.With(httpx.MaxBodyBytes(service.MaxPQVaultRecordBytes+2048)).Post("/pq-vault/{product}/records", h.AppendPQVaultRecord)
+		api.Get("/pq-vault/{product}/records", h.ListPQVaultRecords)
+		api.Get("/pq-vault/{product}/records/{event_id}", h.GetPQVaultRecord)
 		api.Get("/folders/root", h.GetRoot)
 		api.Post("/folders", h.CreateFolder)
 		api.Get("/folders/{id}", h.GetFolder)

@@ -46,6 +46,7 @@ func (h *Handlers) guardLegacyStorageWrites(next http.Handler) http.Handler {
 		path := r.URL.Path
 		if h.migration == nil || r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions ||
 			path == "/api/v1/private-storage/migration" || strings.HasPrefix(path, "/api/v1/cipher/blobs/") ||
+			strings.HasPrefix(path, "/api/v1/pq-vault/") ||
 			path == "/api/v1/storage" || strings.HasPrefix(path, "/api/v1/storage/") || path == "/api/v1/quota" {
 			next.ServeHTTP(w, r)
 			return

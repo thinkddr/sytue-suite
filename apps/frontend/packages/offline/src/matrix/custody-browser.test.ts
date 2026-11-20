@@ -530,3 +530,22 @@ test('an app on its organisation host (acme.sytue.eu/drive) opens its own isolat
   expect(await custody.unwrap({ account, subject, keyIDs: ['K1'] })).toBe(key);
   expectNoUnlockKey(id.received);
 }, 30_000);
+
+test('an unavailable bridge fails as unavailable instead of sending the person into a keyless sign-in loop', async () => {
+  const s = service();
+  const custody = new BrowserKeyCustody({
+    base: '/drive',
+    isolated: true,
+    idOrigin,
+    fetchImpl: s.fetchImpl,
+    bridge: {
+      unwrap: async () => ({ ok: false, error: 'unavailable' }),
+      wrap: async () => ({ ok: false, error: 'unavailable' }),
+      forgetLegacy: async () => undefined,
+    },
+  });
+  await expect(custody.wrap(key, { account, subject, keyID: 'K1' })).rejects.toEqual(
+    new MatrixCustodyError('unavailable'),
+  );
+  expect(s.requests).toEqual([]);
+});

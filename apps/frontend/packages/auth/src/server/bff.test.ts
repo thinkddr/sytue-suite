@@ -347,6 +347,21 @@ test('el login en el host del producto salta al del callback SIN crear la cookie
   expect(puestas).toEqual([]);
 });
 
+test('el salto al host del callback descarta key porque pertenece al puente del otro origen', async () => {
+  const clave = 'B' + 'A'.repeat(86);
+  const url = new URL(
+    `https://docs.sytue.eu/docs/auth/login?unlock=1&returnTo=%2Fdocs%2F&key=${clave}`,
+  );
+  const { cookies } = cookiesQueApuntan();
+  const res = await bffDeDocs().login({ request: new Request(url), url, cookies });
+  expect(res.status).toBe(302);
+  const destino = new URL(res.headers.get('location') ?? '');
+  expect(destino.origin).toBe('https://corporate.sytue.eu');
+  expect(destino.searchParams.get('unlock')).toBe('1');
+  expect(destino.searchParams.get('returnTo')).toBe('/docs/');
+  expect(destino.searchParams.get('key')).toBeNull();
+});
+
 test('el login en el host del callback va directo al IdP con la cookie de estado', async () => {
   const url = new URL('https://corporate.sytue.eu/docs/auth/login?returnTo=%2Fdocs%2F');
   const { puestas, cookies } = cookiesQueApuntan();

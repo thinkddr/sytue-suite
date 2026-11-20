@@ -51,10 +51,10 @@ export interface CustodyBridge {
 }
 
 function bridgeError(error: UnlockBridgeError): MatrixCustodyError {
-  // No answer from the bridge is what it always was: this browser cannot unlock, so the
-  // person signs in to Sytue ID again. `account` and `busy` refuse this request only: the
-  // person must not be sent to sign in for them.
-  if (error === 'signin' || error === 'unavailable') return new MatrixCustodyError('signin');
+  // Solo `signin` significa que este navegador no tiene la clave de desbloqueo (y
+  // trae `handoff_key` para la vuelta). `unavailable` (puente caído o agotado),
+  // `account` y `busy` no deben mandar a iniciar sesión sin clave: sería un bucle.
+  if (error === 'signin') return new MatrixCustodyError('signin');
   return new MatrixCustodyError(error === 'wrong' ? 'wrong' : 'unavailable');
 }
 

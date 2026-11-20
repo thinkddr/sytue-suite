@@ -305,6 +305,9 @@ func TestSoloElPuenteDeLaCuentaRehaceLaContrasena(t *testing.T) {
 	if strings.Contains(page, `"password":true`) || strings.Contains(page, "npmjs.com/package/hash-wasm") || strings.Contains(csp, "wasm") {
 		t.Error("el puente de Mail no debe poder rehacer la contraseña")
 	}
+	if !strings.Contains(csp, "img-src 'self'") {
+		t.Error("la CSP del puente debe permitir img-src 'self' para el favicon declarado en head")
+	}
 	page, csp = pedir(s.handleUnlockBridge, "/e2e/bridge?o="+url.QueryEscape("https://account.sytue.eu"))
 	if !strings.Contains(page, `"password":true`) || !strings.Contains(page, "npmjs.com/package/hash-wasm") || !strings.Contains(csp, "'wasm-unsafe-eval'") {
 		t.Error("el puente del alias de «Mi cuenta» debe poder rehacer la contraseña")

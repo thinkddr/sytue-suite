@@ -53,7 +53,7 @@ crane:
 
 # Cloud Native Buildpacks (deploy sin Dockerfile). CNB_* en config.go; pinneadas por tag.
 cnb:
-  builderImage: paketobuildpacks/builder-jammy-base:0.4.687@sha256:21160df527c20b96d5c394673d675628deee642a4235b3589bfd6b1d580c53aa
+  builderImage: paketobuildpacks/builder-jammy-base:0.4.689@sha256:4d5c2a04fe1d5b5586740b47cf5626db1a7afb2416c9a9a2f43c3ecff3b0556d
   gitImage: alpine/git:2.54.1@sha256:2306e2b05ee0ef99f5d25b0779f645b24ae9f91ba187107503592fcdfe78da3a
   # Base de ejecución fijada junto con el builder, sin depender de latest.
   runImage: "paketobuildpacks/run-jammy-base:0.1.301@sha256:6031575989ab077c94b58a44886353e74224cf61c6f0f571cd3c4037efe2b2ac"

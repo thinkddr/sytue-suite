@@ -490,7 +490,7 @@ func (s *Server) servirPuente(w http.ResponseWriter, _ *http.Request, origen, an
 	// La CSP general dice `frame-ancestors 'none'` y X-Frame-Options DENY: esta es
 	// la única página del IdP que vive en un iframe, y solo en el de ese origen.
 	h.Del("X-Frame-Options")
-	h.Set("Content-Security-Policy", "default-src 'none'; script-src "+wasm+cspScriptHashes+
+	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; script-src "+wasm+cspScriptHashes+
 		"; connect-src 'none'; frame-ancestors "+ancestros+"; base-uri 'none'; form-action 'none'")
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(`<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">` +

@@ -43,12 +43,35 @@ data:
         resources:
           - names: [client]
             compress: false
+    {{- $apex := trimPrefix "matrix." .Values.serverName }}
+    {{- $scheme := regexFind "^https?://" .Values.publicURL | default "https://" }}
     sso:
       client_whitelist:
         - {{ printf "%s/rooms/matrix/callback" .Values.roomsURL | quote }}
         - {{ printf "%s/rooms/matrix/native/callback" .Values.roomsURL | quote }}
+        {{- if ne $apex .Values.serverName }}
+        - {{ printf "%sone.%s/one/auth/matrix/callback" $scheme $apex | quote }}
+        - {{ printf "%shub.%s/one/auth/matrix/callback" $scheme $apex | quote }}
+        {{- range list "mail" "drive" "docus" "calcus" "diapos" "certipdf" "calendar" "contacts" "notes" "photos" "cast" "bases" "erp" }}
+        - {{ printf "%s%s.%s/%s/auth/matrix/callback" $scheme . $apex . | quote }}
+        {{- end }}
+        {{- end }}
         - 'http://127.0.0.1:'
     max_upload_size: 100M
+    # Cada app abre su propia sesión Matrix (una identidad por producto), y en una
+    # organización varias personas entran a la vez tras la misma IP. El límite por
+    # defecto de Synapse (ráfaga de 3, luego uno cada ~6 s) devolvía 429 al abrir
+    # varias apps seguidas. Mismos umbrales que deploy/compose/matrix/configurar.py.
+    rc_login:
+      address:
+        per_second: 1
+        burst_count: 30
+      account:
+        per_second: 0.5
+        burst_count: 10
+      failed_attempts:
+        per_second: 0.17
+        burst_count: 3
     log_config: /config/log.yaml
   log.yaml: |
     version: 1

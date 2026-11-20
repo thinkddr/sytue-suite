@@ -341,6 +341,13 @@ export function MatrixDeviceGate({
           throw new MatrixSecurityError('recovery');
         } catch (failure) {
           if (!isRecovery(failure)) throw failure;
+          // If this device holds an earlier valid owner key still on the server (e.g.
+          // default_key was moved to an unusable key while this device still holds the
+          // real owner key), restore default_key to it without rotating, and wrap it.
+          if (await instance.restoreHeldRecovery?.()) {
+            await upgradeQuietly(instance, custody, instance.bootstrap, signal);
+            return;
+          }
           // Nothing opens the current key. Protected again only when that loses
           // nothing anyone could still open (SuiteMatrix.orphanedRecovery).
           if (!(await instance.orphanedRecovery())) throw failure;

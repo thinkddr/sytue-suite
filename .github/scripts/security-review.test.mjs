@@ -82,11 +82,13 @@ test('invalid review manifests fail before API requests', () => {
     { ...manifest, files: [{ path: 'apps/nucleo/../../secret.go', blob: 'b'.repeat(40) }] },
     { ...manifest, files: [{ path: 'test/e2e/fixtures/secret.json', blob: 'b'.repeat(40) }] },
     { ...manifest, files: [{ path: 'test/e2e/lib/x.mjs', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'services/id/internal/http/e2e/argon2.json', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'services/drive/web/x.js', blob: 'b'.repeat(40) }] },
   ]) assert.throws(() => validateReview(invalid));
 });
 
 test('review evidence may pin the shared core and frontend sources', () => {
-  for (const source of ['apps/nucleo/pdf/pdffont.go', 'apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx', 'test/e2e/matrix-storage-recovery.mjs']) {
+  for (const source of ['apps/nucleo/pdf/pdffont.go', 'apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx', 'test/e2e/matrix-storage-recovery.mjs', 'services/id/internal/http/e2e/passkey.js']) {
     validateReview({ ...manifest, files: [{ path: source, blob: 'b'.repeat(40) }], reviews: [{ ...manifest.reviews[0], path: source }] });
   }
 });

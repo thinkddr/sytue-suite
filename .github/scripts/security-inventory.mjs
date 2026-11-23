@@ -21,7 +21,7 @@ export async function securityInventory({ env = process.env, fetchImpl = globalT
   const seen = new Set();
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = new URL(`https://api.github.com/repos/${repository}/code-scanning/alerts`);
-    url.search = new URLSearchParams({ per_page: '100', page: String(page), ref: env.INVENTORY_REF || `refs/heads/${env.DEFAULT_BRANCH}` }).toString();
+    url.search = new URLSearchParams({ per_page: '100', page: String(page), ref: `refs/heads/${env.DEFAULT_BRANCH}` }).toString();
     const response = await fetchImpl(url, {
       headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
       redirect: 'error', signal: AbortSignal.timeout(30000),
@@ -72,7 +72,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const result = await securityInventory();
     await mkdir(dirname(process.env.INVENTORY_PATH), { recursive: true });
     await writeFile(process.env.INVENTORY_PATH, JSON.stringify(result, null, 2) + '\n', { mode: 0o600 });
-    for (const a of result.alerts.filter(a => a.state === 'open')) console.log(`#${a.number} ${a.rule.severity} ${a.rule.id} ${a.location?.path}:${a.location?.startLine} :: ${(a.message||'').slice(0,300)}`);
     console.log(`Read ${result.alerts.length} alerts; ${result.alerts.filter(a => a.state === 'open').length} open.`);
   } catch (error) {
     console.error(`Security inventory failed: ${error.message}`);

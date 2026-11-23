@@ -95,23 +95,6 @@ id = "GO-2026-5746"
 ignoreUntil = 2026-12-01
 reason = "docker/docker indirecta de los providers de Crossplane y sytuecloud; sin versión corregida publicada y sin uso de ningún demonio Docker"
 
-# Revisadas el 2026-10-03 contra los paquetes npm publicados y los avisos GHSA.
-# No hay versión corregida. braces entra solo por micromatch → @parcel/watcher:
-# los patrones los fija el tooling del build, no una petición ni contenido de usuario.
-[[IgnoredVulns]]
-id = "GHSA-vfj7-8cjw-p6xm"
-ignoreUntil = 2026-12-01
-reason = "braces 3.0.3, sin parche publicado: solo globs del tooling @parcel/watcher; ningún import en código de producto ni patrones controlados por usuarios"
-
-# sprintf-js 1.1.3 llega al árbol fijado de Renovate (tools/renovate/bun.lock, #540) por
-# global-agent → roarr, el registro de su proxy, que solo se activa con GLOBAL_AGENT_* y
-# dependencias.yml no lo define. Sin versión corregida; decisión del dueño (15/10/2026):
-# fusionar CI-02 con esta excepción y que vuelva a avisar a los 60 días.
-[[IgnoredVulns]]
-id = "GHSA-hp3w-g68c-fv3c"
-ignoreUntil = 2026-12-14
-reason = "sprintf-js solo lo usa el registro del proxy de Renovate (global-agent/roarr), inactivo sin GLOBAL_AGENT_*; sin versión corregida"
-
 # deepmerge 4.3.1 entra únicamente en el árbol de Renovate (tools/renovate/bun.lock), que
 # corre en .github/workflows/dependencias.yml sobre la configuración interna del propio
 # repositorio sin recibir objetos controlados por usuarios. 4.3.1 es la última versión
@@ -120,19 +103,6 @@ reason = "sprintf-js solo lo usa el registro del proxy de Renovate (global-agent
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-12-14
 reason = "deepmerge 4.3.1 solo en tools/renovate/bun.lock (tooling de CI sobre configuración propia del repositorio); sin versión corregida publicada"
-
-# minimatch 3.1.5 (GHSA-g3hv-75wg-m249) es lo único que queda tras subir glob a 14.0.3 y
-# minimatch 10.x a 11.0.3 (2026-11-05). La serie 3 no tiene parche: la primera versión
-# corregida es 11.0.1, y forzarla rompe a quien la trae porque 11 ya no exporta una función
-# por defecto (eslint-plugin-jsx-a11y 6.10.2, la última, llama a `minimatch.default`).
-# Entra solo por tooling de desarrollo y CI, nunca con patrones de usuario:
-# eslint-plugin-jsx-a11y y glob@7 (rimraf ← chrome-launcher ← @lhci/cli) en
-# apps/frontend/bun.lock, y glob@6 (rimraf ← mv ← bunyan) en tools/renovate/bun.lock.
-# Vuelve a avisar en un mes por si jsx-a11y o esos consumidores pasan a minimatch ≥ 11.
-[[IgnoredVulns]]
-id = "GHSA-g3hv-75wg-m249"
-ignoreUntil = 2026-12-05
-reason = "minimatch 3.1.5 solo en tooling de lint/CI (eslint-plugin-jsx-a11y, rimraf de @lhci/cli y de Renovate) sin patrones de usuario; sin parche en la serie 3 y la 11 rompe su API por defecto"
 
 # picomatch 2.3.2 y 4.0.7 (GHSA-fc5q-39xc-vjpf, 2026-11): ReDoS con extglobs repetidos de
 # una sola rama (`+(*)`, `+(*a)`). Lo que controla el atacante es el PATRÓN glob. Aquí

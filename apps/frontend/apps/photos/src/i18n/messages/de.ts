@@ -352,4 +352,38 @@ export const de: AppCatalog<typeof en> = {
   'library.savedToPictures': 'In Bilder › Sytue Photos gespeichert: {count}',
   'library.saveFailed': 'Konnte nicht in der Galerie dieses Computers gespeichert werden: {name}',
   'backup.whileOpen': 'Auf diesem Computer läuft die Sicherung, solange Sytue Fotos geöffnet ist.',
+  'backup.encryptedWaitTitle': 'Öffne Sytue Fotos, um die verschlüsselte Sicherung abzuschließen',
+  'backup.encryptedWaitBody':
+    'Dein Drive ist Ende-zu-Ende-verschlüsselt. Neue Fotos werden gesichert, sobald du Sytue Fotos öffnest.',
+  'gallery.uploadedEncrypted': 'Ende-zu-Ende-verschlüsselt in deinem Drive gespeichert: {count}',
+  'gallery.uploadVaultSignIn':
+    'Dein Drive ist Ende-zu-Ende-verschlüsselt. Melde dich erneut an, um ihn zu entsperren, und füge die Fotos noch einmal hinzu.',
+  'gallery.uploadVaultNotReady':
+    'Dein Drive wird noch auf Ende-zu-Ende-Verschlüsselung umgestellt. Öffne Sytue Drive, um das abzuschließen, und füge die Fotos dann noch einmal hinzu.',
+  'gallery.uploadVaultLocked':
+    'Dein Drive ist Ende-zu-Ende-verschlüsselt. Entsperre ihn oben und füge die Fotos noch einmal hinzu.',
+  'gallery.uploadVaultUnavailable':
+    'Dein Drive ist Ende-zu-Ende-verschlüsselt und kann auf diesem Gerät nicht geöffnet werden. Füge die Fotos über Sytue Photos im Web hinzu.',
+  'gallery.encrypted.title': 'In deinem verschlüsselten Drive',
+  'gallery.encrypted.show': 'Anzeigen',
+  'gallery.encrypted.opening': 'Wird entschlüsselt…',
+  'gallery.encrypted.failed': 'Dein verschlüsselter Drive konnte nicht geöffnet werden.',
+  'gallery.encrypted.signIn': 'Erneut anmelden',
+  'gallery.encrypted.empty': 'In deinem verschlüsselten Drive sind noch keine Fotos.',
+  'gallery.encrypted.note':
+    'Ende-zu-Ende-verschlüsselte Fotos werden nur auf diesem Gerät entschlüsselt. Sytue AI, ähnliche Fotos, In der Nähe und Erinnerungen schließen sie nicht ein.',
+  'gallery.encrypted.badge': 'Ende-zu-Ende-verschlüsselt',
+  'gallery.encrypted.open': '{name} öffnen (verschlüsselt)',
+  'gallery.encrypted.notSelectable':
+    'Verschlüsselte Fotos können nicht ausgewählt werden: Öffne eines, um es als Favorit zu markieren oder einem Album hinzuzufügen.',
+  'gallery.encrypted.actionFailed':
+    'Deine verschlüsselte Galerie konnte nicht aktualisiert werden.',
+  'gallery.encrypted.saved':
+    'Als neue verschlüsselte Version gespeichert. Die vorherige bleibt im Versionsverlauf von Drive.',
+  'gallery.encrypted.albums': 'Verschlüsselte Alben',
+  'gallery.encrypted.newAlbum': 'Neues verschlüsseltes Album',
+  'gallery.encrypted.saveVersion': 'Als neue Version speichern',
+  'gallery.encrypted.editHint':
+    'Die Bearbeitung erfolgt auf diesem Gerät und wird verschlüsselt als neue Version des Fotos gespeichert.',
+  'gallery.encrypted.albumEmpty': 'Dieses verschlüsselte Album enthält noch keine Fotos.',
 };

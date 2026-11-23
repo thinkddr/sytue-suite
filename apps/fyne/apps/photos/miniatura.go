@@ -40,6 +40,7 @@ const (
 	rellenoCoraz = 1 * 0.25 * tema.Rem
 	rellenoAprox = 1 * 0.25 * tema.Rem
 	textoAproxPx = float32(10) // `text-[10px]`, literal en la web
+	iconoCandado = float32(12) // `<Icon name="lock" size={12}>` de MiniaturaCifrada
 )
 
 // text-[10px] cambia el tamaño, pero hereda la línea del tema; no lleva leading.
@@ -74,6 +75,9 @@ type Miniatura struct {
 	// sobre la foto, para que una clara no desaparezca contra el fondo. Lo llevan las
 	// teselas de las filas justificadas, no una portada ni una referencia.
 	Filete bool
+	// Cifrada es una foto de la galería cifrada (ADR 0086): lleva el candado arriba a
+	// la derecha, como `MiniaturaCifrada` en la web.
+	Cifrada bool
 
 	AlPulsar   func()
 	AlFavorita func()
@@ -245,6 +249,8 @@ func (m *Miniatura) CreateRenderer() fyne.WidgetRenderer {
 	r.fondoCoraz = ui.NuevaCaja(negro60, color.NRGBA{}, tema.Forma("radius-control"))
 	r.corazon = iconos.TrazoConTinta(iconos.Corazon, iconoTesela, blanco)
 	r.fondoAprox = ui.NuevaCaja(tema.Color(fondoAprox, v), color.NRGBA{}, tema.RadioSM)
+	r.fondoCandado = ui.NuevaCaja(negro60, color.NRGBA{}, tema.RadioPill)
+	r.candado = iconos.TrazoConTinta(iconos.Candado, iconoCandado, blanco)
 	r.aprox = ui.Texto("~", escalonAprox, ui.Normal, tema.Color("text-subtle", v))
 	r.rehacer()
 	r.Refresh() // regla 7 de ui.go: sin esto la foto marcada nace sin su 70 %
@@ -287,7 +293,10 @@ type miniaturaRenderer struct {
 	corazon    *iconos.Dibujo
 	fondoAprox *ui.Caja
 	aprox      *canvas.Text
-	objetos    []fyne.CanvasObject
+	// fondoCandado y candado son la marca de una foto cifrada.
+	fondoCandado *ui.Caja
+	candado      *iconos.Dibujo
+	objetos      []fyne.CanvasObject
 }
 
 // rehacer arma la lista en el orden en que se pinta: los aros al fondo —la caja es
@@ -303,6 +312,8 @@ func (r *miniaturaRenderer) rehacer() {
 	r.objetos = append(r.objetos, r.corazon.Objeto())
 	r.objetos = append(r.objetos, r.fondoAprox.Objetos()...)
 	r.objetos = append(r.objetos, r.aprox)
+	r.objetos = append(r.objetos, r.fondoCandado.Objetos()...)
+	r.objetos = append(r.objetos, r.candado.Objeto())
 }
 
 // generar es lo que Fyne le pide al raster: el mapa de bits en píxeles de DISPOSITIVO.
@@ -386,6 +397,15 @@ func (r *miniaturaRenderer) Layout(t fyne.Size) {
 	} else {
 		r.aprox.Hide()
 	}
+
+	// El candado de una cifrada, arriba a la derecha (`right-1 top-1`), siempre: dice
+	// de un vistazo qué fotos solo se descifran en este dispositivo.
+	ladoCandado := iconoCandado + 2*rellenoCoraz
+	xc := t.Width - margenMarca - ladoCandado
+	ui.MoverCaja(r.fondoCandado, fyne.NewPos(xc, margenMarca), fyne.NewSize(ladoCandado, ladoCandado))
+	verCaja(r.fondoCandado, m.Cifrada)
+	r.candado.Colocar(xc+rellenoCoraz, margenMarca+rellenoCoraz, iconoCandado)
+	r.candado.Ver(m.Cifrada)
 }
 
 // Refresh repinta lo que depende del estado y REHACE la disposición: marcar una foto no
@@ -404,6 +424,7 @@ func (r *miniaturaRenderer) Refresh() {
 	}
 	r.fondoCoraz.Pintar(negro60, color.NRGBA{})
 	r.fondoAprox.Pintar(tema.Color(fondoAprox, v), color.NRGBA{})
+	r.fondoCandado.Pintar(negro60, color.NRGBA{})
 	r.filete.StrokeColor = tokens.Crudo("border-subtle", v)
 	// `opacity-70`: la foto marcada deja ver el `bg-bg-subtle` de debajo, igual que
 	// las de la papelera. Es la mitad de cómo se ve de un vistazo qué va en el lote.

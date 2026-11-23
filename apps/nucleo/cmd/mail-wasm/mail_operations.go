@@ -59,9 +59,19 @@ func mailOpen(ctx context.Context, req js.Value) (any, error) {
 	var input struct {
 		Legacy string `json:"legacy_port"`
 		Writer string `json:"migration_writer_port"`
+		// El anfitrión elige el almacén: "" (Matrix, lo de siempre) o "vault".
+		Store string `json:"store"`
 	}
 	if err = mailInput(req, 8192, &input); err != nil {
 		return nil, err
+	}
+	store := webMail.StoreMatrix
+	switch input.Store {
+	case "":
+	case "vault":
+		store = webMail.StoreVault
+	default:
+		return nil, webport.ErrRejected
 	}
 	ports := webMail.Ports{Isolated: port}
 	if input.Legacy != "" {
@@ -76,7 +86,7 @@ func mailOpen(ctx context.Context, req js.Value) (any, error) {
 			return nil, err
 		}
 	}
-	session, err := coreMail.Open(ctx, ports)
+	session, err := coreMail.OpenStore(ctx, ports, store)
 	if err != nil {
 		return nil, err
 	}

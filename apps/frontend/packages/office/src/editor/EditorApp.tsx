@@ -52,6 +52,8 @@ export interface EditorAppProps {
   documentId: string;
   /** Ámbito local: evita mezclar la caché offline entre cuentas del dispositivo. */
   userId: string;
+  /** Organización de la sesión: con ella se sabe si su Drive está en la bóveda. */
+  tenant?: string | undefined;
   /** Idioma negociado en el servidor (middleware). La isla NO lo detecta por su
    *  cuenta: así el editor y el `<html lang>` no pueden discrepar (§13.1). */
   locale: Locale;
@@ -66,6 +68,7 @@ export interface EditorAppProps {
 export function EditorApp({
   documentId,
   userId,
+  tenant,
   locale,
   aiEnabled,
   volverA,
@@ -76,6 +79,7 @@ export function EditorApp({
       <EditorShell
         documentId={documentId}
         userId={userId}
+        tenant={tenant}
         locale={locale}
         aiEnabled={aiEnabled}
         volverA={volverA}
@@ -123,11 +127,12 @@ function sameFmt(a: FormatState, b: FormatState): boolean {
 function EditorShell({
   documentId,
   userId,
+  tenant,
   locale,
   aiEnabled,
   volverA,
 }: EditorAppProps): JSX.Element {
-  const data = useDocument(documentId, userId);
+  const data = useDocument(documentId, userId, tenant);
   const t = docsT(locale);
 
   const [ui, setUiState] = useState<EditorUi>({
@@ -346,6 +351,7 @@ function EditorShell({
     esPropietario: data.role === 'owner',
     savingToDrive: data.savingToDrive,
     saveToDrive: data.saveToDrive,
+    driveCifrado: data.driveCifrado,
     volverA,
   };
 

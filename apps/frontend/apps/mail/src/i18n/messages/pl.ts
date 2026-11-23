@@ -1006,4 +1006,11 @@ export const pl: AppCatalog<typeof en> = {
     'Wiadomość została przyjęta, ale nie zapisano kopii w folderze Wysłane. Nie wysyłaj jej ponownie.',
   'externalMail.invalidConfiguration':
     'Podaj prawidłowy adres e-mail, nazwy i porty obu serwerów oraz hasło.',
+  'privateMail.handoverOffer': 'Nie możesz otworzyć poczty? Opróżnij ją i przenieś do sejfu',
+  'privateMail.handoverTitle': 'Opróżnij pocztę i przenieś ją do sejfu',
+  'privateMail.handoverBody':
+    'Zaszyfrowanej poczty, której nie możesz już otworzyć, nie da się odzyskać. Od teraz Twoja poczta otwiera się po zalogowaniu do Sytue ID, które być może trzeba będzie powtórzyć.',
+  'privateMail.handoverUnderstood':
+    'Rozumiem, że poczta, której nie mogę otworzyć, zostanie utracona',
+  'privateMail.handoverConfirm': 'Opróżnij i przenieś do sejfu',
 };

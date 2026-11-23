@@ -35,6 +35,7 @@ import (
 	privateBases "git.sytue.eu/sytue/one/apps/nucleo/bases"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 func main() {
@@ -69,51 +70,66 @@ func main() {
 	var current *bases.Pantalla
 	var pendingBase, pendingTabla, pendingRegistro string
 
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateBases.Repository]{
-		Suite:       s,
-		Application: a,
-		Window:      w,
-		Product:     "bases",
-		Translate:   func(key string) string { return t.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateBases.Repository], error) {
-			return basesPlan(ctx, resources, s)
-		},
-		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateBases.Repository) (cifrado.ApplicationView, error) {
-			facade, err := api.NewBases(s.URL("bases"), resources.HTTP(), nil).WithPrivateData(repository)
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	mount := func(resources cifrado.Cuenta, facade *api.Bases) cifrado.ApplicationView {
+		p := bases.NuevaPantalla(t, facade, w)
+		organization := resources.PrivateStorageScope().Tenant
+		p.Org = func() string { return organization }
+		// Quien mira, para contar «Tú» en la actividad de la base.
+		subject := resources.PrivateStorageScope().Subject
+		p.Yo = func() string { return subject }
+		p.URLPublica = func(ruta string) string { return api.AppURL(s.Apex(), "bases", "", ruta) }
+		p.Guardar = func(nombre string, r io.Reader) (string, error) {
+			carpeta, err := ficheros.Carpeta()
 			if err != nil {
-				return cifrado.ApplicationView{}, err
+				return "", err
 			}
-			p := bases.NuevaPantalla(t, facade, w)
-			organization := resources.PrivateStorageScope().Tenant
-			p.Org = func() string { return organization }
-			// Quien mira, para contar «Tú» en la actividad de la base.
-			subject := resources.PrivateStorageScope().Subject
-			p.Yo = func() string { return subject }
-			p.URLPublica = func(ruta string) string { return api.AppURL(s.Apex(), "bases", "", ruta) }
-			p.Guardar = func(nombre string, r io.Reader) (string, error) {
-				carpeta, err := ficheros.Carpeta()
-				if err != nil {
-					return "", err
+			return ficheros.Guardar(carpeta, nombre, r)
+		}
+		p.Elegir = editor.ElegirDelSistema
+		current = p
+		p.Arrancar()
+		if pendingBase != "" {
+			id, tabla, registro := pendingBase, pendingTabla, pendingRegistro
+			pendingBase, pendingTabla, pendingRegistro = "", "", ""
+			p.AbrirEnlace(id, tabla, registro)
+		}
+		return cifrado.ApplicationView{
+			Object: p.Objeto(),
+			Detach: func() {
+				if current == p {
+					current = nil
 				}
-				return ficheros.Guardar(carpeta, nombre, r)
-			}
-			p.Elegir = editor.ElegirDelSistema
-			current = p
-			p.Arrancar()
-			if pendingBase != "" {
-				id, tabla, registro := pendingBase, pendingTabla, pendingRegistro
-				pendingBase, pendingTabla, pendingRegistro = "", "", ""
-				p.AbrirEnlace(id, tabla, registro)
-			}
-			return cifrado.ApplicationView{
-				Object: p.Objeto(),
-				Detach: func() {
-					if current == p {
-						current = nil
-					}
-				},
-			}, nil
+			},
+		}
+	}
+
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*privateBases.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*privateBases.Repository]{
+			Suite:       s,
+			Application: a,
+			Window:      w,
+			Product:     "bases",
+			Translate:   func(key string) string { return t.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateBases.Repository], error) {
+				return basesPlan(ctx, resources, s)
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateBases.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewBases(s.URL("bases"), resources.HTTP(), nil).WithPrivateData(repository)
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return mount(resources, facade), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+			},
+		},
+		Soltar: cifrado.SoltarEn(s.URL("bases")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewBases(s.URL("bases"), session, nil).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewBases(s.URL("bases"), cuenta.HTTP(), nil)), nil
 		},
 	})
 

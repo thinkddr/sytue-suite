@@ -1002,4 +1002,10 @@ export const cs: AppCatalog<typeof en> = {
     'E-mail byl přijat, ale kopii se nepodařilo uložit do Odeslaných. Neodesílejte jej znovu.',
   'externalMail.invalidConfiguration':
     'Zadejte platnou e-mailovou adresu, názvy a porty obou serverů a heslo.',
+  'privateMail.handoverOffer': 'Nemůžete otevřít poštu? Vyprázdněte ji a přesuňte do trezoru',
+  'privateMail.handoverTitle': 'Vyprázdnit poštu a přesunout ji do trezoru',
+  'privateMail.handoverBody':
+    'Šifrovanou poštu, kterou už nemůžete otevřít, nelze obnovit. Od této chvíle se vaše pošta otevírá přihlášením do Sytue ID, které možná budete muset zopakovat.',
+  'privateMail.handoverUnderstood': 'Rozumím, že pošta, kterou nemohu otevřít, bude ztracena',
+  'privateMail.handoverConfirm': 'Vyprázdnit a přesunout do trezoru',
 };

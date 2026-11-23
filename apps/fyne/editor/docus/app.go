@@ -28,6 +28,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/coedicion"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/guardardrive"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
@@ -52,6 +53,10 @@ type App struct {
 	Svc   *api.Docs
 	Red   *offline.Monitor
 	Plazo time.Duration
+	// Drive son los dos Drive de la cuenta para «Guardar en Drive» (el del servidor y
+	// el de la bóveda, ADR 0086); lo pone el binario al montar la cuenta del servicio.
+	// nil: la entrada no sale.
+	Drive *guardardrive.Destinos
 	// Asistir es Sytue AI (`api.IA.Asistir`), con el token de la persona; nil, sin panel
 	// «Asistente». Idioma es la lengua de la sesión, en la que contesta.
 	Asistir func(context.Context, api.PeticionIA) (string, error)
@@ -402,6 +407,14 @@ func (a *App) cargar(ab *abierto) {
 		if a.EnlaceDoc != nil {
 			ctx.Compartir = func(desde fyne.CanvasObject) { a.panelCompartir(ab.id, ab.ctx.Titulo).Mostrar(desde) }
 		}
+		a.servicio().EngancharGuardarEnDrive(ctx, editor.GuardarEnDrive{
+			Destinos: a.Drive, ID: ab.id, Doc: editor.DocumentoDrive(doc, rol, ctx.Tipo),
+			Antes:      func() func() error { return a.guardarAntesDeCopiar(ab) },
+			Recomponer: ab.marco.Recomponer,
+			Avisar: func(tono ui.TonoAviso, titulo, texto string) {
+				a.avisos.Notificar(ui.NuevoAviso(tono, titulo, texto))
+			},
+		})
 		a.configurarComentario(ab, rol)
 		ctx.SinRed = !hayRed
 		ctx.Estado = editor.Listo

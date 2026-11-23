@@ -303,6 +303,21 @@ export const hu: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Mentve a Sytue Drive-ra.',
   'doc.msg.savedToDriveIn': '„{name}” mostantól az Ön módosításait tartalmazza, új verzióként.',
   'doc.msg.saveToDriveFailed': 'Nem sikerült menteni a módosításokat a Drive-ra.',
+  'doc.msg.saveToDriveVault': 'A Drive-ja végpontok között titkosított',
+  'doc.msg.saveToDriveVault.detail':
+    'Innen nem sikerült menteni bele. Töltse le a dokumentumot, és töltse fel a Sytue Drive-ból.',
+  'doc.msg.savedToDriveEncrypted': 'Mentve a titkosított Drive-ra.',
+  'doc.msg.savedToDriveEncryptedIn': '„{name}” titkosítva lett ebben a böngészőben a mentés előtt.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}” titkosítva lett ezen az eszközön a mentés előtt.',
+  'doc.msg.saveToDriveVaultLocked':
+    'A titkosított Drive zárolva van ezen az eszközön. Oldja fel fent, majd mentsen újra.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Jelentkezzen be újra a titkosított Drive feloldásához, majd mentsen újra.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'A Drive még átáll a végpontok közötti titkosításra. Nyissa meg a Sytue Drive-ot a befejezéshez, majd mentsen újra.',
+  'doc.msg.saveToDriveUnsupported':
+    'Ennek a fájlnak a formátuma nem írható újra. Töltse le inkább a dokumentumot.',
   'file.downloadPdf': 'Letöltés PDF formátumban',
   'file.pdfAccessible': 'Akadálymentes PDF (PDF/UA)',
   'file.downloadHtml': 'Letöltés HTML formátumban',
@@ -2669,6 +2684,50 @@ export const hu: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'Az aláírási sorrendben legfeljebb 10 személy lehet.',
   'pdf.error.signatureRequest.busy':
     'Ez a kérés már megnyitás alatt áll. Próbálja újra egy pillanat múlva.',
+  'pdf.error.driveVault':
+    'A Drive végpontok között titkosított: más szervezetek aláírási kérelmeinek másolatai még nem tárolhatók benne. Töltse le inkább a PDF-et.',
+  'pdf.device.title': 'Aláírás ezen az eszközön',
+  'pdf.device.help':
+    'A Drive végpontok között titkosított, ezért a szerver nem tudja olvasni a PDF-jeit. Válasszon egyet: itt visszafejtjük és a tanúsítványával aláírjuk, az aláírt másolat pedig titkosítva kerül az eredeti mellé. Sem a PDF, sem a tanúsítványa nem jut el a szerverre.',
+  'pdf.device.open': 'Titkosított Drive megnyitása',
+  'pdf.device.empty.title': 'Nincs PDF a titkosított Drive-ban',
+  'pdf.device.empty.description': 'Töltse fel őket a Sytue Drive-ból, és itt megjelennek.',
+  'pdf.device.sign': 'Aláírás',
+  'pdf.device.signed': 'Aláírva és titkosítva mentve „{name}” néven.',
+  'pdf.device.stamp.on':
+    'Időbélyeggel ({authority}): az aláírás igazolja, ki és mikor írta alá. A szolgáltató csak az aláírás ujjlenyomatát kapja meg, a PDF-et soha.',
+  'pdf.device.stamp.off':
+    'Időbélyeg nélkül: ennek a szolgáltatásnak nincs időbélyeg-szolgáltatója, így az aláírás azt igazolja, ki írta alá, de azt nem, hogy mikor.',
+  'pdf.device.appearance': 'Az aláírás megjelenése',
+  'pdf.device.appearance.invisible': 'Láthatatlan',
+  'pdf.device.appearance.visible': 'Látható keret',
+  'pdf.device.signedStamped': 'Időbélyeggel aláírva és titkosítva mentve „{name}” néven.',
+  'pdf.device.signedNoStamp':
+    'Aláírva és titkosítva mentve „{name}” néven, de időbélyeg nélkül: az időbélyeg-szolgáltató nem válaszolt.',
+  'pdf.device.error.page':
+    'Az aláírás nem fér el azon az oldalon. Válasszon másik oldalt vagy helyet.',
+  'pdf.device.view': 'Megtekintés',
+  'pdf.vault.help':
+    'Ez a PDF a titkosított Drive-jában van: csak ezen az eszközön fejtjük vissza, hogy megtekinthesse és aláírhassa.',
+  'pdf.vault.serverOnly':
+    'A jegyzetelés, kitöltés, rendezés, szerkesztés, szövegfelismerés és aláíráskérés megköveteli, hogy a szolgáltatás elolvassa a PDF-et, ezért a titkosított Drive-val nem érhetők el.',
+  'pdf.vault.notFound.title': 'Ez a PDF nincs a titkosított Drive-jában',
+  'pdf.vault.notFound.description':
+    'Lehet, hogy áthelyezték vagy törölték. Keresse meg a Sytue Drive-ban.',
+  'pdf.vault.openSigned': 'Az aláírt példány megnyitása',
+  'pdf.device.requests':
+    'Más személyektől vagy szervezetektől aláírást kérni csak a szerver Drive-jával lehet: a szolgáltatásnak el kell olvasnia a PDF-et, hogy elküldje, és ellenőrizze a visszaérkező aláírást. Titkosított Drive-val írja alá itt, és az aláírt PDF-et küldje el saját maga.',
+  'pdf.device.error.signin': 'Jelentkezzen be újra a Sytue ID-ba a titkosított Drive feloldásához.',
+  'pdf.device.error.pending':
+    'A Drive még átáll a végpontok közötti titkosításra. Fejezze be a Sytue Drive-ban.',
+  'pdf.device.error.password': 'Ez a jelszó nem nyitja meg a tanúsítványt.',
+  'pdf.device.error.encrypted': 'Ez a PDF jelszóval védett, ezért ezen az eszközön nem írható alá.',
+  'pdf.device.error.locked':
+    'Ez a PDF minden módosítás ellen tanúsított: egy újabb aláírás érvénytelenítené.',
+  'pdf.device.error.unreadable':
+    'Ez a PDF ezen az eszközön nem írható alá újraírás nélkül. Semmi sem változott.',
+  'pdf.device.error.failed':
+    'A PDF-et nem sikerült aláírni vagy menteni. A Drive-ban semmi sem változott.',
   'pdf.dialog.firmar.help':
     'A tanúsítvány és a kulcs soha nem hagyja el a szervezetét: a kiszolgálón használjuk őket, és nem tároljuk.',
   'pdf.dialog.firmar.cert': 'Tanúsítvány (PEM)',

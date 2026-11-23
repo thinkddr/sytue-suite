@@ -65,13 +65,14 @@ func privateJournalNamespaces(product string) []string {
 		return nil
 	}
 	if product == "drive" {
-		return []string{"drive-private-migration-v1", "drive-identity-migration-v1", PrivateIngressNamespace}
+		// drive-vault-migration-v1 es la copia de Matrix a la bóveda directa (ADR 0086).
+		return []string{"drive-private-migration-v1", "drive-identity-migration-v1", "drive-vault-migration-v1", PrivateIngressNamespace}
 	}
 	if product == "mail" {
 		return []string{MailDraftRevisionNamespace, MailOutboundNamespace, "mail-private-writes-v1", "mail-private-ingest-v1", "mail-private-source-import-v1", IdentityJournalNamespace(product), PrivateIngressNamespace, PrivateIngressEnrollmentNamespace}
 	}
 	namespaces := []string{product + "-private-v1", IdentityJournalNamespace(product), PrivateIngressNamespace}
-	if product == "calendar" {
+	if product == "calendar" || product == "hub" {
 		namespaces = append(namespaces, PrivateIngressEnrollmentNamespace)
 	}
 	return namespaces
@@ -85,13 +86,13 @@ func privateStagingNamespaces(product string) []string {
 		return nil
 	}
 	if product == "drive" {
-		return []string{"drive-private-upload-source-v1", "drive-private-cutover-history-v1", PrivateIngressStagingNamespace}
+		return []string{"drive-private-upload-source-v1", "drive-private-cutover-history-v1", "drive-vault-migration-history-v1", PrivateIngressStagingNamespace}
 	}
 	if product == "mail" {
 		return []string{MailWriteHistoryNamespace, MailDraftRevisionStagingNamespace, MailOutboundStagingNamespace, "mail-private-source-stage-v1", IdentityHistoryNamespace(product), PrivateIngressStagingNamespace, PrivateIngressEnrollmentHistoryNamespace}
 	}
 	namespaces := []string{product + "-private-stage-v1", IdentityHistoryNamespace(product), PrivateIngressStagingNamespace}
-	if product == "calendar" {
+	if product == "calendar" || product == "hub" {
 		namespaces = append(namespaces, PrivateIngressEnrollmentHistoryNamespace)
 	}
 	return namespaces

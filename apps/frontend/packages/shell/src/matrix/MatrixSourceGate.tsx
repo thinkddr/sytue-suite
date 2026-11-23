@@ -12,6 +12,8 @@ import {
   type MatrixBootstrap,
 } from '@sytue/offline/matrix';
 import { MatrixDeviceGate, type MatrixGateHost } from './MatrixDeviceGate.js';
+import { PqVaultGate } from './PqVaultGate.js';
+import { SourceReleaseNotice } from './SourceReleaseNotice.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
 
 export type MatrixLegacyResolver = (signal: AbortSignal) => Promise<SuiteMatrix>;
@@ -244,8 +246,69 @@ export function MatrixSourceGate({
   );
 }
 
-/** Shared private storage gate for suite products: canonical isolated identity v2. */
+/**
+ * Puerta compartida de almacenamiento cifrado para los productos de la suite.
+ *
+ * ADR 0086: las pantallas de producto usan la bóveda post-cuántica directa
+ * (`PqVaultGate`, `age-MLKEM768-X25519-v1`) sin Synapse/Matrix. Solo se conserva
+ * la vía Matrix si un llamador explícito pide `(client: SuiteMatrix)`.
+ */
 export function MatrixStorageGate({
+  actor,
+  tenant,
+  locale,
+  product,
+  basePath,
+  deviceName,
+  children,
+}: {
+  actor: string;
+  tenant?: string | undefined;
+  locale: Locale;
+  product: MatrixStorageProduct;
+  basePath?: string | undefined;
+  deviceName?: string | undefined;
+  children: ComponentChildren | ((client: SuiteMatrix) => ComponentChildren);
+}): JSX.Element {
+  if (typeof children !== 'function') {
+    // La salida de «soltar la fuente» va fuera de la puerta: se ve aunque la
+    // bóveda no abra, que es justo cuando hace falta.
+    return (
+      <>
+        <SourceReleaseNotice
+          actor={actor}
+          tenant={tenant}
+          locale={locale}
+          product={product}
+          basePath={basePath ?? prefijoDeApp(product === 'hub' ? 'one' : product) ?? '/'}
+        />
+        <PqVaultGate
+          actor={actor}
+          tenant={tenant}
+          locale={locale}
+          product={product}
+          basePath={basePath}
+        >
+          {children}
+        </PqVaultGate>
+      </>
+    );
+  }
+  return (
+    <MatrixStorageFunctionGate
+      actor={actor}
+      tenant={tenant}
+      locale={locale}
+      product={product}
+      basePath={basePath}
+      deviceName={deviceName}
+    >
+      {children}
+    </MatrixStorageFunctionGate>
+  );
+}
+
+function MatrixStorageFunctionGate({
   actor,
   tenant,
   locale,
@@ -291,9 +354,6 @@ export function MatrixStorageGate({
     };
     return deviceHost;
   }, [actor, tenant, product, basePath, deviceName, fixture]);
-  // ¿Despliegue sin el complemento de cifrado E2E? Se pregunta una vez al BFF de la
-  // app: si responde «desactivado», la app se muestra tal cual y trabaja con sus
-  // rutas en el servidor; si no, sigue el flujo cifrado de siempre (y sus errores).
   const [cifrado, setCifrado] = useState<'comprobando' | 'activado' | 'desactivado'>(
     fixture ? 'activado' : 'comprobando',
   );
@@ -310,9 +370,6 @@ export function MatrixStorageGate({
     };
   }, [host, fixture]);
   if (cifrado === 'comprobando') return <></>;
-  // Una pantalla que necesita el cliente Matrix para pintarse (children como
-  // función) no tiene modo en claro: sigue por la puerta cifrada, que explica el fallo.
-  if (cifrado === 'desactivado' && typeof children !== 'function') return <>{children}</>;
   return (
     <MatrixDeviceGate actor={actor} tenant={tenant} locale={locale} host={host}>
       {children}

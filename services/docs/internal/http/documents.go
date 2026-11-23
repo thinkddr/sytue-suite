@@ -6,6 +6,7 @@ package http
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -98,15 +99,24 @@ func (h *Handler) createDocument(w http.ResponseWriter, r *http.Request) {
 	// idempotencia que da el índice único de la migración 0006.
 	if sourceRef == "" && h.drive != nil {
 		ref, tituloFinal, err := h.crearFicheroEnDrive(r, req.Kind, titulo, estado)
-		if err != nil {
+		switch {
+		case errors.Is(err, drive.ErrUnidadCifrada):
+			// La unidad de esta persona está cifrada de extremo a extremo (la bóveda
+			// de la ADR 0086): el servidor no puede dejar ahí una copia en claro, ni
+			// debe. El documento se crea igual, solo en Docs y sin ancla, como en un
+			// despliegue sin Drive. Antes, Drive contestaba 409 y no se creaba
+			// ningún documento.
+			slog.InfoContext(r.Context(), "docs: unidad cifrada, documento sin fichero en Drive")
+		case err != nil:
 			errorDeDrive(w, r, err)
 			return
+		default:
+			sourceRef = ref
+			// El título que se guarda es el que quedó tras desambiguar en la unidad,
+			// para que el documento y su fichero se llamen igual. Si no hizo falta
+			// desambiguar —el caso normal— vuelve idéntico.
+			titulo = tituloFinal
 		}
-		sourceRef = ref
-		// El título que se guarda es el que quedó tras desambiguar en la unidad, para
-		// que el documento y su fichero se llamen igual. Si no hizo falta desambiguar
-		// —el caso normal— vuelve idéntico.
-		titulo = tituloFinal
 	}
 
 	doc, creado, err := h.svc.CreateSeeded(r.Context(), subj, req.Kind, titulo, sourceRef, semilla)

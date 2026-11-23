@@ -177,8 +177,11 @@ func (s *HistoricalSource) Prepare(ctx context.Context, state storage.IdentityCu
 	})
 }
 
-func (s *HistoricalSource) retireSourceBegin() error {
-	r := s.repository
+func (s *HistoricalSource) retireSourceBegin() error { return s.repository.retireSourceBegin() }
+
+// retireSourceBegin borra la intención de la época una vez importada. Una
+// intención de otra época o de otro destino no se borra: falla cerrado.
+func (r *Repository) retireSourceBegin() error {
 	owner := r.cfg.Scope.Tenant + "\x00" + r.cfg.Scope.Subject + "\x00mail"
 	var work transfer.SourceBeginIntent
 	found, err := r.cfg.Journal.Read(owner, importNamespace, "snapshot", &work)

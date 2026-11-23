@@ -801,6 +801,9 @@ func traducirError(err error) error {
 	case pgErr.Code == "SY002":
 		// El trigger de la 0010: la factura ya tiene registro de VERI*FACTU.
 		return ErrFacturaEmitida
+	case pgErr.Code == "PST01":
+		// La valla de la 0105: la fuente privada de ese dueño ya no es legacy.
+		return ErrPrivateStorageFrozen
 	}
 	return err
 }

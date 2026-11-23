@@ -58,32 +58,41 @@ type Panel struct {
 	// IniciarSesion vuelve a entrar en Sytue ID pidiendo la clave (prompt=login), y con
 	// `legado` los envoltorios de la ADR 0082 que abrir. Es la ÚNICA forma de
 	// desbloquear que ofrece este panel: aquí no se teclea nada.
-	IniciarSesion       func(ctx context.Context, legado string) error
-	Licencias           string
-	Base                mx.Config
-	Login               func(context.Context, mx.Config) (*mx.Client, error)
-	Abrir               func(string) error
-	AlLista             func(context.Context)
-	AlEvento            func(mx.DecryptedEvent, error)
-	mu                  sync.RWMutex
-	client              *mx.Client
-	closing             <-chan struct{}
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	generation          uint64
-	body, footer        *fyne.Container
-	dialog              *ui.Dialogo
-	busy                bool
-	status              mx.VerificationStatus
-	txn                 id.VerificationTransactionID
-	verifyUser          string
-	diag                Diagnostico
-	comparison          string
-	verificationWaiting bool
-	authWait            chan bool
-	workers             atomic.Pointer[PanelWorkers]
-	localWork           *offline.WorkGate
-	clients             map[*mx.Client]bool
+	IniciarSesion func(ctx context.Context, legado string) error
+	// SoltarFuente es «Vaciar y volver a los datos del servidor» (ADR 0086): la
+	// salida de una app de registros cuando su clave de Matrix no abre. Devuelve la
+	// fuente del servidor a como estaba al congelarse; lo escrito después en
+	// Matrix se pierde. Nil: sin esa salida (Rooms, Drive, Mail).
+	SoltarFuente func(context.Context) error
+	// SoltarSinIdentificar: la salida no pasa por Sytue ID (Drive vuelve a la
+	// copia del servidor dentro de su bóveda, sin tocar el servidor), así que el
+	// paso no avisa de que habrá que volver a iniciar sesión.
+	SoltarSinIdentificar bool
+	Licencias            string
+	Base                 mx.Config
+	Login                func(context.Context, mx.Config) (*mx.Client, error)
+	Abrir                func(string) error
+	AlLista              func(context.Context)
+	AlEvento             func(mx.DecryptedEvent, error)
+	mu                   sync.RWMutex
+	client               *mx.Client
+	closing              <-chan struct{}
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	generation           uint64
+	body, footer         *fyne.Container
+	dialog               *ui.Dialogo
+	busy                 bool
+	status               mx.VerificationStatus
+	txn                  id.VerificationTransactionID
+	verifyUser           string
+	diag                 Diagnostico
+	comparison           string
+	verificationWaiting  bool
+	authWait             chan bool
+	workers              atomic.Pointer[PanelWorkers]
+	localWork            *offline.WorkGate
+	clients              map[*mx.Client]bool
 }
 
 func (c *Panel) Cliente(ctx context.Context) (*mx.Client, error) {
@@ -515,6 +524,9 @@ func (c *Panel) pintar() {
 		if c.status.HasIdentity && !c.nativeRecovery && c.Base.Bootstrap.StorageProduct == "" {
 			c.footer.Add(c.boton("matrix.reset", c.Restablecer))
 		}
+		if c.SoltarFuente != nil {
+			c.footer.Add(c.boton("vault.release", func() { c.ConfirmarSoltarFuente(false) }))
+		}
 		c.botonVerificar()
 	}
 	c.actualizar()
@@ -703,6 +715,61 @@ func (c *Panel) Restablecer() {
 	understood.Escalon = tema.TextoSM
 	understood.AnchoEtiqueta = c.anchoTexto()
 	c.body.Objects = []fyne.CanvasObject{c.parrafo(c.t("matrix.resetBody")), understood}
+	back := c.boton("action.back", c.pintar)
+	back.Variante = ui.Secundario
+	c.footer.Objects = []fyne.CanvasObject{accion, back}
+	c.actualizar()
+}
+
+// ConfirmarSoltarFuente es el paso de confirmación de «Vaciar y volver a los datos
+// del servidor»: qué se pierde, que Sytue ID pedirá identificarse, y una casilla
+// obligatoria antes del botón de peligro. `fallo` repite el paso con el aviso de
+// que no salió. Lo destructivo nunca va a un solo clic.
+func (c *Panel) ConfirmarSoltarFuente(fallo bool) {
+	if c.dialog == nil || c.SoltarFuente == nil {
+		return
+	}
+	var accion *ui.Boton
+	understood := ui.NuevaCasilla(c.t("vault.releaseUnderstood"), func(marcada bool) {
+		accion.Inerte = c.busy || !marcada
+		accion.Refresh()
+	})
+	accion = c.boton("vault.release", func() {
+		if !understood.Marcada || c.busy {
+			return
+		}
+		c.busy = true
+		accion.Inerte = true
+		accion.Refresh()
+		ctx, soltar := c.ctx, c.SoltarFuente
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		go func() {
+			err := soltar(ctx)
+			fyne.Do(func() { //nolint:contextcheck // Fyne actions resume with the device lifecycle context stored in c.ctx.
+				c.busy = false
+				if err != nil {
+					c.ConfirmarSoltarFuente(true)
+					return
+				}
+				// La app ya ha vuelto a la API; el diálogo de Matrix sobra.
+				c.pintar()
+			})
+		}()
+	})
+	accion.Variante = ui.Peligro
+	accion.Inerte = true
+	understood.Escalon = tema.TextoSM
+	understood.AnchoEtiqueta = c.anchoTexto()
+	c.body.Objects = []fyne.CanvasObject{c.parrafo(c.t("vault.releaseBody"))}
+	if !c.SoltarSinIdentificar {
+		c.body.Add(c.parrafo(c.t("vault.releaseSignIn")))
+	}
+	c.body.Add(understood)
+	if fallo {
+		c.body.Add(c.parrafo(c.t("vault.releaseFailed")))
+	}
 	back := c.boton("action.back", c.pintar)
 	back.Variante = ui.Secundario
 	c.footer.Objects = []fyne.CanvasObject{accion, back}

@@ -46,6 +46,7 @@ import (
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // Medidas de la ventana al abrir: el ancho canónico de la suite y un alto que deja ver
@@ -69,8 +70,25 @@ func montarNotepads(ctx context.Context, repository *notepadsRepository, tr *i18
 		return nil, err
 	}
 	p.AbrirCalendar = abrirCalendar
-	// Abrir un cuaderno cifrado con Touch ID, Face ID o Windows Hello, si el sistema los
-	// tiene (decisión del dueño, 2026-09-24): la clave derivada, en el almacén seguro.
+	recordarConBiometria(p, tr)
+	return p, nil
+}
+
+// montarNotepadsAPI es la app sobre la API del servicio, como la web (ADR 0086,
+// «clientes nativos»): para la cuenta cuya fuente de Notes sigue `legacy`. Sin
+// almacén local: la cola y los borradores sin conexión son del diario cifrado, que
+// esta cuenta no usa.
+func montarNotepadsAPI(ctx context.Context, svc *api.Notes, tr *i18n.Translator, l i18n.Locale, red *offline.Monitor, win fyne.Window, abrirCalendar func(string)) *notes.Pantalla {
+	p := notes.NuevaPantallaConContexto(ctx, tr, l, svc, red, win)
+	p.AbrirCalendar = abrirCalendar
+	recordarConBiometria(p, tr)
+	return p
+}
+
+// recordarConBiometria: abrir un cuaderno cifrado con Touch ID, Face ID o Windows
+// Hello, si el sistema los tiene (decisión del dueño, 2026-09-24): la clave
+// derivada, en el almacén seguro.
+func recordarConBiometria(p *notes.Pantalla, tr *i18n.Translator) {
 	if metodo, _ := escritorio.Biometria(); metodo != "" {
 		p.Recordar = &notes.Recordador{
 			Metodo: metodo, Motivo: tr.T("shell.lock.reasonNotebook", nil),
@@ -78,7 +96,6 @@ func montarNotepads(ctx context.Context, repository *notepadsRepository, tr *i18
 			Leer:      auth.LeerSecreto, Guardar: auth.GuardarSecreto, Borrar: auth.BorrarSecreto,
 		}
 	}
-	return p, nil
 }
 
 // interceptarCierre keeps the window and its editor available when a pending
@@ -124,10 +141,10 @@ func main() {
 	// y se vuelve a publicar tras cada escritura de Notepads.
 	s.PublicadorWidget(s.FuenteWidget(tr))
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
-	// Del cliente HTTP de la suite sólo queda el MONITOR de conectividad, para la fase
-	// «sin conexión» con el diario local. El contenido va cifrado por el repositorio
-	// del dispositivo verificado.
-	red, _ := s.Conexion("notes")
+	// El cliente HTTP de la suite y su MONITOR de conectividad. Con la cuenta en Matrix
+	// solo se usa el monitor (el contenido va cifrado por el repositorio del dispositivo
+	// verificado); con la cuenta en la API, el cliente es el de la web.
+	red, cliente := s.Conexion("notes")
 
 	// El presentador privado en curso y el enlace que llegó antes de montarse: se
 	// atiende al montar, como las props `notebookInicial`/`vinculoInicial` de la isla.
@@ -135,39 +152,57 @@ func main() {
 	var pendiente *url.URL
 
 	barra := ui.NuevaBarraSuite(tr, s, iconos.Notes)
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*notepadsRepository]{
-		Suite: s, Application: a, Window: w, Product: "notes",
-		Translate: func(key string) string { return tr.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*notepadsRepository], error) {
-			return notesPlan(ctx, resources, s)
+	// vista engancha lo común de las dos formas de montar: la suite, los servicios
+	// vinculados, los atajos y el enlace que llegó antes de montarse.
+	vista := func(p *notes.Pantalla, check func(context.Context) error) cifrado.ApplicationView {
+		p.VincularAutorizacionSuite(s.Sesion.WithAuthorizationIntent, check)
+		// Las páginas del proveedor sin copiarlas ni convertirlas a notas nativas.
+		p.ConServiciosVinculados(vinculados.Nuevo(s, w, tr, "notes").Abrir)
+		barra.CederAtajoSi(p.EnfocarCaptura)
+		current = p
+		p.Arrancar()
+		if u := pendiente; u != nil {
+			pendiente = nil
+			p.AtenderEnlace(u)
+		}
+		return cifrado.ApplicationView{
+			Object: p.Objeto(),
+			Detach: func() {
+				p.Cerrar()
+				if current == p {
+					current = nil
+				}
+			},
+			Join: p.Join,
+		}
+	}
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*notepadsRepository]{
+		Matrix: cifrado.PrivateApplicationConfig[*notepadsRepository]{
+			Suite: s, Application: a, Window: w, Product: "notes",
+			Translate: func(key string) string { return tr.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*notepadsRepository], error) {
+				return notesPlan(ctx, resources, s)
+			},
+			//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+			Mount: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *notepadsRepository) (cifrado.ApplicationView, error) {
+				organization := repository.PrivateStorageScope().Tenant
+				p, err := montarNotepads(ctx, repository, tr, l, red, w, func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", organization, ruta) }) //nolint:contextcheck // The presenter retains its own mounted lifetime; future gestures must not inherit the mount request.
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return vista(p, resources.Check), nil
+			},
 		},
-		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
-		Mount: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *notepadsRepository) (cifrado.ApplicationView, error) {
-			organization := repository.PrivateStorageScope().Tenant
-			p, err := montarNotepads(ctx, repository, tr, l, red, w, func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", organization, ruta) }) //nolint:contextcheck // The presenter retains its own mounted lifetime; future gestures must not inherit the mount request.
-			if err != nil {
-				return cifrado.ApplicationView{}, err
-			}
-			p.VincularAutorizacionSuite(s.Sesion.WithAuthorizationIntent, resources.Check)
-			// Las páginas del proveedor sin copiarlas ni convertirlas a notas nativas.
-			p.ConServiciosVinculados(vinculados.Nuevo(s, w, tr, "notes").Abrir)
-			barra.CederAtajoSi(p.EnfocarCaptura)
-			current = p
-			p.Arrancar()
-			if u := pendiente; u != nil {
-				pendiente = nil
-				p.AtenderEnlace(u)
-			}
-			return cifrado.ApplicationView{
-				Object: p.Objeto(),
-				Detach: func() {
-					p.Cerrar()
-					if current == p {
-						current = nil
-					}
-				},
-				Join: p.Join,
-			}, nil
+		Soltar: cifrado.SoltarEn(s.URL("notes")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewNotes(s.URL("notes"), session, nil).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			organization := cuenta.PrivateStorageScope().Tenant
+			svc := api.NewNotes(s.URL("notes"), cuenta.HTTP(), cliente)
+			p := montarNotepadsAPI(cuenta.Context(), svc, tr, l, red, w, func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", organization, ruta) })
+			return vista(p, cuenta.Check), nil
 		},
 	})
 	if err != nil {

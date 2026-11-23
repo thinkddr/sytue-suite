@@ -947,4 +947,10 @@ export const nb: AppCatalog<typeof en> = {
     'E-posten er godtatt, men en kopi kunne ikke lagres i Sendt. Ikke send den på nytt.',
   'externalMail.invalidConfiguration':
     'Skriv inn en gyldig e-postadresse, begge servernavnene og portene, og et passord.',
+  'privateMail.handoverOffer': 'Får du ikke åpnet e-posten din? Tøm den og flytt den til hvelvet',
+  'privateMail.handoverTitle': 'Tøm e-posten og flytt den til hvelvet',
+  'privateMail.handoverBody':
+    'Kryptert e-post som du ikke lenger kan åpne, blir ikke gjenopprettet. Fra nå av åpnes e-posten din med Sytue ID-påloggingen din, som du kanskje må gjenta.',
+  'privateMail.handoverUnderstood': 'Jeg forstår at e-posten jeg ikke kan åpne, går tapt',
+  'privateMail.handoverConfirm': 'Tøm og flytt til hvelvet',
 };

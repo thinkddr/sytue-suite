@@ -56,8 +56,8 @@ func TestUnRolNilNoPanica(t *testing.T) {
 // Todo Store que asuma un rol lo construye. Es la comprobación que faltaba: la de
 // arriba prueba que nil no rompe, esta que no llega a haber ningún nil.
 func TestLosConstructoresCreanSuAppRole(t *testing.T) {
-	// Comprobado por inspección en el gate de charts (helm-render-test.sh busca
+	// Comprobado por inspección en el gate de charts (deploy/production/tests/helm_render_*_test.go busca
 	// `pg.NewAppRole(appRole)` en cada store con `const appRole`), porque aquí no
 	// se pueden importar los stores de los servicios sin un ciclo de paquetes.
-	t.Skip("lo verifica deploy/production/tests/helm-render-test.sh sobre el código fuente")
+	t.Skip("lo verifica deploy/production/tests/helm_render_codigo_test.go sobre el código fuente")
 }

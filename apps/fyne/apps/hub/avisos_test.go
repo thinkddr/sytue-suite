@@ -425,6 +425,32 @@ func TestLasReglasConElHubQueFalla(t *testing.T) {
 	}))
 }
 
+// TestRecargarAvisosTraeLoQueGuardoElReceptor: el receptor de la entrada privada guarda
+// un aviso nuevo en el almacén privado y la bandeja abierta lo enseña al recargar; con
+// la bandeja cerrada no se pide nada.
+func TestRecargarAvisosTraeLoQueGuardoElReceptor(t *testing.T) {
+	d := &buzonDoble{items: avisosDePrueba(), flujo: make(chan api.HubNotification)}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).ConBuzon(d)
+	v.RecargarAvisos() // cerrada: nada
+	lee := func(f func(a *Avisos) bool) func() bool {
+		return func() bool {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			return f(v.avisos)
+		}
+	}
+	v.Ir(AAvisos)
+	defer v.Ir(AInicio)
+	antes := len(avisosDePrueba())
+	esperar(t, "la primera carga", lee(func(a *Avisos) bool { return a.Estado == Listo && len(a.Items) == antes }))
+	d.mira(func() bool {
+		d.items = append([]api.HubNotification{{ID: "privado", Source: "drive", Type: "security.storage.released", Title: "Guardado en tu almacén"}}, d.items...)
+		return true
+	})
+	v.RecargarAvisos()
+	esperar(t, "la recarga", lee(func(a *Avisos) bool { return len(a.Items) == antes+1 && a.Items[0].ID == "privado" }))
+}
+
 // buzonDoble es un Hub de mentira para la bandeja, seguro entre gorutinas.
 type buzonDoble struct {
 	falloReglas  error // si no es nil, NotificationPrefs falla

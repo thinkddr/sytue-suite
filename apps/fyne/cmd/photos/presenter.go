@@ -14,17 +14,33 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/carrete"
 	privateDrive "git.sytue.eu/sytue/one/apps/nucleo/drive"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	privatePhotos "git.sytue.eu/sytue/one/apps/nucleo/photos"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
-func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.Suite, translate *i18n.Translator, resources *cifrado.Resources[*mx.Client], repository *privatePhotos.Repository, resolveDrive func(context.Context) (*privateDrive.Repository, error)) (*photosPresenter, error) {
-	client, err := api.NewPhotos(suite.URL("photos"), resources.HTTP(), nil).WithPrivateData(repository)
+// almacenPhotos es dónde lee y escribe la galería de una cuenta: el repositorio
+// cifrado de Matrix con su Drive oculto, o —sin repositorio— la API del servidor,
+// como la web (ADR 0086, «Photos como las apps de registros»).
+type almacenPhotos struct {
+	cuenta     cifrado.Cuenta
+	identity   auth.IdentitySnapshot
+	repository *privatePhotos.Repository
+	// resolveDrive es el Drive oculto de los originales; solo con repositorio.
+	resolveDrive func(context.Context) (*privateDrive.Repository, error)
+	// driveDeSubida, solo por la API: dónde suben las fotos (photos.App.DriveDeSubida).
+	driveDeSubida func(context.Context) (*api.Drive, error)
+	// galeriaCifrada, solo por la API: el Drive de la bóveda para la galería cifrada
+	// (photos.App.GaleriaCifrada).
+	galeriaCifrada func(context.Context, bool) (*api.Drive, error)
+}
+
+func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.Suite, translate *i18n.Translator, almacen almacenPhotos) (*photosPresenter, error) {
+	client, drive, err := clientesPhotos(suite.URL("photos"), suite.URL("drive"), almacen)
 	if err != nil {
 		return nil, err
 	}
@@ -32,13 +48,11 @@ func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.
 	large.Variante = photos.VarianteGrande
 	view := photos.Vista{T: translate, Teca: thumbnails, TecaGrande: large, Ventana: anchoInicial, Variante: tema.De(application.Settings().ThemeVariant())}
 	presenter := photos.Nueva(client, view, window)
-	driveScope := resources.PrivateStorageScope()
-	driveScope.Product = "drive"
-	presenter.Drive, err = api.NewDrive(suite.URL("drive"), resources.HTTP(), nil).WithPrivateData(galeriaDriveData{resolve: resolveDrive, scope: driveScope})
-	if err != nil {
-		presenter.Cerrar()
-		return nil, err
-	}
+	presenter.Drive = drive
+	presenter.DriveDeSubida = almacen.driveDeSubida
+	presenter.GaleriaCifrada = almacen.galeriaCifrada
+	presenter.ClaveEnDispositivo = func() bool { return claveEnDispositivo(suite.Sesion) }
+	resources := almacen.cuenta
 	presenter.Directorio = api.NewDirectorio(suite.URL("id"), resources.HTTP(), nil)
 	presenter.AlEntrar = func() { go func() { _ = suite.Entrar(context.Background()) }() }
 	presenter.AbrirWeb = func(target string) { _ = api.AbrirFuera(application, target) }
@@ -78,9 +92,40 @@ func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.
 	}
 	presenter.AlCambiarCopia = func(aj photos.AjustesCopia) { suite.ProgramarTareaEnFondo(aj.Activa, aj.ConDatos) }
 	presenter.SeguirEnFondo = sistema.SeguirEnFondo
-	presenter.CambiarSesion(resources.Identity.Issuer + "\x00" + resources.Identity.Subject + "\x00" + resources.Identity.Organization)
+	presenter.CambiarSesion(almacen.identity.Issuer + "\x00" + almacen.identity.Subject + "\x00" + almacen.identity.Organization)
 	presenter.Arrancar()
-	return &photosPresenter{app: presenter, repository: repository, resources: resources}, nil
+	return &photosPresenter{app: presenter, client: client, repository: almacen.repository, resources: resources}, nil
+}
+
+// clientesPhotos son los clientes de Photos y de Drive de la galería. Con
+// repositorio, los datos privados: los registros cifrados y el Drive oculto de los
+// originales (bóveda o Matrix, cifrado.AplicacionDrive). Sin él, la API del
+// servidor: los originales van a la carpeta «Fotos» del Drive del servidor y el
+// servicio de Photos los indexa, igual que client/subida.ts en la web.
+func clientesPhotos(photosURL, driveURL string, almacen almacenPhotos) (*api.Photos, *api.Drive, error) {
+	if almacen.cuenta == nil {
+		return nil, nil, cifrado.ErrPrivateResources
+	}
+	session := almacen.cuenta.HTTP()
+	client := api.NewPhotos(photosURL, session, nil)
+	drive := api.NewDrive(driveURL, session, nil)
+	if almacen.repository == nil {
+		return client, drive, nil
+	}
+	if almacen.resolveDrive == nil {
+		return nil, nil, cifrado.ErrPrivateResources
+	}
+	client, err := client.WithPrivateData(almacen.repository)
+	if err != nil {
+		return nil, nil, err
+	}
+	driveScope := almacen.cuenta.PrivateStorageScope()
+	driveScope.Product = "drive"
+	drive, err = drive.WithPrivateData(galeriaDriveData{resolve: almacen.resolveDrive, scope: driveScope})
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, drive, nil
 }
 
 func (h *photosStorage) OpenDriveFile(ctx context.Context, opening api.Apertura) error {
@@ -91,7 +136,17 @@ func (h *photosStorage) OpenDriveFile(ctx context.Context, opening api.Apertura)
 	if err := current.resources.Check(ctx); err != nil {
 		return err
 	}
-	photo, err := current.repository.PhotoForDriveFile(ctx, opening.Ref.ID)
+	var (
+		photo api.Photo
+		err   error
+	)
+	if current.repository != nil {
+		photo, err = current.repository.PhotoForDriveFile(ctx, opening.Ref.ID)
+	} else {
+		// Por la API, como la web: indexar es idempotente y devuelve la foto que ya
+		// hubiera de ese fichero.
+		photo, err = current.client.Indexar(ctx, opening.Ref.ID)
+	}
 	if err != nil {
 		return err
 	}
@@ -102,4 +157,22 @@ func (h *photosStorage) OpenDriveFile(ctx context.Context, opening api.Apertura)
 		}
 	})
 	return nil
+}
+
+// claveEnDispositivo dice si la sesión tiene la clave de desbloqueo de Sytue ID en este
+// dispositivo (photos.App.ClaveEnDispositivo). La copia que devuelve la sesión se borra
+// enseguida: aquí solo se pregunta, y abrir la bóveda sigue siendo cosa de su puerta.
+func claveEnDispositivo(s *auth.Session) bool {
+	if s == nil {
+		return false
+	}
+	clave, legado := s.Desbloqueo()
+	defer func() {
+		clear(clave)
+		for _, l := range legado {
+			clear(l.Salt)
+			clear(l.IKM)
+		}
+	}()
+	return len(clave) > 0
 }

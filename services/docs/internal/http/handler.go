@@ -149,7 +149,10 @@ type Handler struct {
 	ficheros        ficherosDrive
 	// papelera y secretoInterno: la papelera de Docs y su puerta desde Drive
 	// (papelera.go).
-	papelera               papeleraStore
+	papelera papeleraStore
+	// anclaBoveda pone el ancla «vault:<id>» que deja el navegador al guardar en el
+	// Drive de la bóveda (ancla_boveda.go).
+	anclaBoveda            anclaBovedaStore
 	secretoInterno         string
 	resourceSourceSecret   string
 	resourceSourceSessions *resource.SessionProvider
@@ -225,6 +228,7 @@ func New(d Deps) *Handler {
 		ficheros:               ficherosDe(d.Drive),
 		peticionesFirma:        d.Store,
 		papelera:               papeleraDe(d.Store),
+		anclaBoveda:            anclaBovedaDe(d.Store),
 		secretoInterno:         d.SecretoInterno,
 		resourceSourceSecret:   d.ResourceSourceSecret,
 		resourceSourceSessions: d.ResourceSourceSessions,
@@ -356,6 +360,10 @@ func (h *Handler) Mount(r chi.Router) {
 		// prepara y se completa, y entre medias firma el equipo de la persona.
 		pr.Post("/api/v1/pdf/sign/prepare", h.pdfFirmaPreparar)
 		pr.Post("/api/v1/pdf/sign/complete", h.pdfFirmaCompletar)
+		// El sello de tiempo de una firma hecha en el NAVEGADOR (ADR 0086, «Firmar en
+		// el dispositivo»): llega solo el resumen del valor de la firma, nunca el PDF.
+		pr.Get("/api/v1/pdf/timestamp", h.pdfSelloDisponible)
+		pr.Post("/api/v1/pdf/timestamp", h.pdfSellar)
 		// «Pedir firma» a otra persona, de la organización (ADR 0051 §7) o de otra
 		// (ADR 0057): las rutas de una petición pasan a la organización donde vive
 		// para su destinatario de fuera.
@@ -425,6 +433,7 @@ func (h *Handler) Mount(r chi.Router) {
 				idr.Patch("/", h.renameDocument)
 				idr.Delete("/", h.deleteDocument)
 				idr.Put("/star", h.starDocument)
+				idr.Put("/vault-anchor", h.anclarEnBoveda) // ancla_boveda.go
 				idr.Post("/theme", h.aplicarTema)
 				idr.Get("/thumbnail", h.getMiniatura) // la de la portada (miniaturas.go)
 

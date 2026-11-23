@@ -31,6 +31,48 @@ export const nb: Catalog = {
   'matrix.connect': 'Konfigurer denne enheten',
   'matrix.devices': 'Enhetene dine',
   'matrix.failed': 'Krypteringen kunne ikke konfigureres. Prøv igjen.',
+  'vault.wrongKey':
+    'De krypterte dataene i denne appen ble låst med en annen opplåsingsnøkkel for Sytue ID enn den i denne nettleseren. Logg på Sytue ID igjen for å hente den gjeldende nøkkelen hit. Hvis den tidligere nøkkelen er tapt, kan du tømme appens krypterte data og begynne på nytt.',
+  'vault.wrongKeyDevice':
+    'De krypterte dataene i denne appen ble låst med en annen opplåsingsnøkkel for Sytue ID enn den på denne enheten. Logg på Sytue ID igjen for å hente den gjeldende nøkkelen hit. Hvis den tidligere nøkkelen er tapt, kan du tømme appens krypterte data og begynne på nytt.',
+  'vault.release': 'Tøm og gå tilbake til serverdataene',
+  'vault.releaseTitle': 'Gå tilbake til serverdataene',
+  'vault.releaseBody':
+    'Da dataene i denne appen ble kryptert fra en datamaskin- eller mobilapp, tok serveren vare på en kopi nøyaktig slik den var akkurat da. Hvis du ikke kan åpne de krypterte dataene, kan appen gå tilbake til den kopien. Alt som ble skrevet etterpå, på hvilken som helst enhet, går tapt og kan ikke gjenopprettes.',
+  'vault.releaseUnderstood':
+    'Jeg forstår at alt som ble skrevet etter overgangen til kryptering, går tapt',
+  'vault.releaseSignIn': 'For å bekrefte at det er deg, ber Sytue ID deg først logge inn på nytt.',
+  'vault.releaseFailed': 'Kunne ikke gå tilbake til serverdataene. Prøv igjen.',
+  'vault.moveTitle': 'Flytt Drive til det krypterte hvelvet',
+  'vault.moveOffer':
+    'Drive-en din er fortsatt lagret i den tidligere krypteringen. Flytt den til hvelvet som nettet og de andre enhetene dine bruker.',
+  'vault.moveAction': 'Flytt til hvelvet',
+  'vault.moveBody':
+    'Alle filene og mappene dine, med versjonene sine, kopieres til det krypterte hvelvet og kontrolleres én etter én. Ingenting slettes fra den tidligere krypteringen. Hold appen åpen til den er ferdig; hvis den stopper, fortsetter den der den slapp.',
+  'vault.moveUnderstood': 'Jeg forstår at denne Drive-en deretter brukes fra hvelvet',
+  'vault.moveCopying': 'Kopierer og kontrollerer filene dine…',
+  'vault.moveDone': 'Ferdig. Drive-en din ligger nå i det krypterte hvelvet.',
+  'vault.moveFailed':
+    'Kopien kunne ikke fullføres. Filene dine er fortsatt i den tidligere krypteringen. Prøv igjen.',
+  'vault.movePending':
+    'Denne enheten har fortsatt endringer som skal sendes. Vent til de er ferdige, og prøv igjen.',
+  'vault.copyInProgress':
+    'En annen enhet flytter Drive-en din til det krypterte hvelvet. Vent til den er ferdig, og prøv igjen.',
+  'vault.copyCancel': 'Avbryt kopieringen',
+  'vault.copyCancelHint':
+    'Hvis kopieringen har stoppet opp, kan du avbryte den: ingenting slettes, og du kan gjenta den fra den andre enheten.',
+  'vault.releaseNotice':
+    'Dataene i denne appen ble kryptert fra en datamaskin- eller mobilapp. Det du ser her, er kopien serveren tok vare på akkurat da; det som ble skrevet senere, finnes bare i de krypterte dataene. Hvis du ikke lenger kan åpne dem, kan du gå tilbake til serverdataene.',
+  'notifications.kind.security.storage.released':
+    '{name} har gått tilbake til dataene dine på serveren',
+  'vault.signInAgain': 'Logg på Sytue ID igjen',
+  'vault.empty': 'Tøm krypterte data',
+  'vault.emptyTitle': 'Tøm denne appens krypterte data',
+  'vault.emptyBody':
+    'Dataene appen krypterte med den tapte nøkkelen slettes fra Sytue, og en ny nøkkel opprettes. Resten av kontoen din påvirkes ikke. Dette kan ikke angres.',
+  'vault.emptyUnderstood': 'Jeg forstår at data kryptert med den tapte nøkkelen blir slettet',
+  'vault.failed':
+    'De krypterte dataene kunne ikke åpnes. Prøv igjen eller logg på Sytue ID igjen. Hvis nøkkelen er tapt, kan du tømme appens krypterte data.',
   'matrix.incoming': 'Bekreft denne enheten',
   'matrix.match': 'De stemmer overens',
   'matrix.mismatch': 'De stemmer ikke overens',

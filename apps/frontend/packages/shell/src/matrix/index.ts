@@ -10,3 +10,5 @@ export {
   type MatrixSourceGateHost,
   type MatrixLegacyResolver,
 } from './MatrixSourceGate.js';
+export { PqVaultGate, type PqVaultGateProps } from './PqVaultGate.js';
+export { SourceReleaseNotice } from './SourceReleaseNotice.js';

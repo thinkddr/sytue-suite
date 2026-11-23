@@ -162,6 +162,9 @@ type Service struct {
 	hubNotifier *hubnotify.Client
 	nombresOrgs NombresOrgs
 	pushSt      pushStore
+	// recibosBoveda comprueba en Drive el recibo de un ACK del correo que vive en
+	// la bóveda (ADR 0087). nil = esos recibos se rechazan.
+	recibosBoveda RecibosBoveda
 }
 
 // Hub es el cliente del Hub del servicio (nil sin Hub): el de los avisos y el de la

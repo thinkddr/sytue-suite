@@ -140,6 +140,11 @@ type Config struct {
 	// InternalSecret es el secreto compartido para llamadas internas service-to-service
 	// (POST /internal/notifications).
 	InternalSecret string
+	// RoomsInternalSecret abre la autoridad de almacenamiento de Rooms
+	// (callaccess): sin ella la entrada privada de avisos (ADR 0086) no admite altas
+	// ni recibos y responde 503 private_ingress_required. Los avisos no se pierden:
+	// se quedan en la copia hasta que la haya.
+	RoomsInternalSecret string
 	// IDNombresOrgsSecret abre `POST /internal/orgs/names` de Sytue ID: el nombre
 	// visible de las organizaciones de fuera que avisan a la persona. Vacío ⇒ la
 	// campana enseña su identificador.
@@ -248,6 +253,7 @@ func Load() (Config, error) {
 
 		CORSAllowedOrigins:  l.GetCSVDefault("CORS_ALLOWED_ORIGINS", pcfg.FirstPartyCORSOrigins(base.Env)),
 		InternalSecret:      l.HubInternalSecret(base.Env),
+		RoomsInternalSecret: l.Get("ROOMS_INTERNAL_SECRET"),
 		IDNombresOrgsSecret: l.Get("ID_NOMBRES_ORGS_SECRET"),
 		APNs: apns.Config{
 			KeyP8:  l.Get("SYTUE_APNS_KEY_P8"),

@@ -32,6 +32,50 @@ export const nl: Catalog = {
   'matrix.connect': 'Dit apparaat instellen',
   'matrix.devices': 'Je apparaten',
   'matrix.failed': 'De versleuteling kon niet worden ingesteld. Probeer het opnieuw.',
+  'vault.wrongKey':
+    'De versleutelde gegevens van deze app zijn vergrendeld met een andere Sytue ID-ontgrendelsleutel dan die in deze browser. Meld je opnieuw aan bij Sytue ID om de huidige sleutel hierheen te halen. Is de eerdere sleutel kwijt, dan kun je de versleutelde gegevens van deze app legen en opnieuw beginnen.',
+  'vault.wrongKeyDevice':
+    'De versleutelde gegevens van deze app zijn vergrendeld met een andere Sytue ID-ontgrendelsleutel dan die op dit apparaat. Meld je opnieuw aan bij Sytue ID om de huidige sleutel hierheen te halen. Is de eerdere sleutel kwijt, dan kun je de versleutelde gegevens van deze app legen en opnieuw beginnen.',
+  'vault.release': 'Leegmaken en teruggaan naar de servergegevens',
+  'vault.releaseTitle': 'Teruggaan naar de servergegevens',
+  'vault.releaseBody':
+    'Toen de gegevens van deze app vanuit een desktop- of mobiele app werden versleuteld, bewaarde de server een kopie precies zoals ze op dat moment waren. Als je de versleutelde gegevens niet kunt openen, kan deze app teruggaan naar die kopie. Alles wat daarna op welk apparaat dan ook is geschreven, gaat verloren en kan niet worden hersteld.',
+  'vault.releaseUnderstood':
+    'Ik begrijp dat alles wat na de overstap naar versleuteling is geschreven verloren gaat',
+  'vault.releaseSignIn':
+    'Om te bevestigen dat jij het bent, vraagt Sytue ID je eerst opnieuw in te loggen.',
+  'vault.releaseFailed': 'Teruggaan naar de servergegevens is niet gelukt. Probeer het opnieuw.',
+  'vault.moveTitle': 'Drive naar de versleutelde kluis verplaatsen',
+  'vault.moveOffer':
+    'Je Drive staat nog in de vorige versleuteling. Verplaats hem naar de kluis die het web en je andere apparaten gebruiken.',
+  'vault.moveAction': 'Naar de kluis verplaatsen',
+  'vault.moveBody':
+    'Al je bestanden en mappen worden met hun versies naar de versleutelde kluis gekopieerd en één voor één gecontroleerd. Er wordt niets uit de vorige versleuteling verwijderd. Houd de app open tot het klaar is; als het stopt, gaat het verder waar het gebleven was.',
+  'vault.moveUnderstood': 'Ik begrijp dat deze Drive daarna vanuit de kluis wordt gebruikt',
+  'vault.moveCopying': 'Je bestanden worden gekopieerd en gecontroleerd…',
+  'vault.moveDone': 'Klaar. Je Drive staat nu in de versleutelde kluis.',
+  'vault.moveFailed':
+    'De kopie kon niet worden voltooid. Je bestanden staan nog in de vorige versleuteling. Probeer het opnieuw.',
+  'vault.movePending':
+    'Dit apparaat heeft nog wijzigingen om te versturen. Wacht tot ze klaar zijn en probeer het opnieuw.',
+  'vault.copyInProgress':
+    'Een ander apparaat verplaatst je Drive naar de versleutelde kluis. Wacht tot het klaar is en probeer het opnieuw.',
+  'vault.copyCancel': 'Kopiëren annuleren',
+  'vault.copyCancelHint':
+    'Als het kopiëren is vastgelopen, kun je het annuleren: er wordt niets verwijderd en je kunt het vanaf dat apparaat opnieuw doen.',
+  'vault.releaseNotice':
+    'De gegevens van deze app zijn vanuit een desktop- of mobiele app versleuteld. Wat je hier ziet, is de kopie die de server op dat moment bewaarde; wat daarna is geschreven, staat alleen in de versleutelde gegevens. Als je die niet meer kunt openen, kun je teruggaan naar de servergegevens.',
+  'notifications.kind.security.storage.released':
+    '{name} is teruggegaan naar je gegevens op de server',
+  'vault.signInAgain': 'Opnieuw aanmelden bij Sytue ID',
+  'vault.empty': 'Versleutelde gegevens legen',
+  'vault.emptyTitle': 'Versleutelde gegevens van deze app legen',
+  'vault.emptyBody':
+    'De gegevens die deze app met de verloren sleutel heeft versleuteld, worden uit Sytue verwijderd en er wordt een nieuwe sleutel gemaakt. De rest van je account blijft ongemoeid. Dit kan niet ongedaan worden gemaakt.',
+  'vault.emptyUnderstood':
+    'Ik begrijp dat de met de verloren sleutel versleutelde gegevens worden verwijderd',
+  'vault.failed':
+    'De versleutelde gegevens konden niet worden geopend. Probeer het opnieuw of meld je opnieuw aan bij Sytue ID. Is de sleutel kwijt, dan kun je de versleutelde gegevens van deze app legen.',
   'matrix.incoming': 'Dit apparaat verifiëren',
   'matrix.match': 'Ze komen overeen',
   'matrix.mismatch': 'Ze komen niet overeen',

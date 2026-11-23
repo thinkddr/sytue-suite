@@ -36,6 +36,9 @@ type PrivateApplicationConfig[R PrivateRepository] struct {
 	Mount      func(context.Context, *Resources[*mx.Client], R) (ApplicationView, error)
 	State      func(ApplicationState, error)
 	CanStart   func() bool
+	// SoltarFuente lo pone AplicacionRegistros: la salida «Vaciar y volver a los
+	// datos del servidor» del panel cuando la clave no abre (Panel.SoltarFuente).
+	SoltarFuente func(context.Context) error
 }
 
 type PrivateApplication[R PrivateRepository] struct {
@@ -106,6 +109,7 @@ func NewPrivateApplication[R PrivateRepository](cfg PrivateApplicationConfig[R])
 				return mx.Login(ctx, configuration, func(target string) error { return open(ctx, target) })
 			}
 			value.Avisar = func(string) { failed(ErrPrivateResources) }
+			value.SoltarFuente = cfg.SoltarFuente
 			return value
 		}
 		legacy, isolated := panel(), panel()
@@ -163,7 +167,12 @@ func (a *PrivateApplication[R]) Start()                    { a.core.adopt() }
 func (a *PrivateApplication[R]) Retry()                    { a.core.retry() }
 func (a *PrivateApplication[R]) Show()                     { a.core.show() }
 func (a *PrivateApplication[R]) Close()                    { a.core.close() }
-func (a *PrivateApplication[R]) State() ApplicationState   { return a.state }
+
+// Retire suelta la cuenta actual sin cerrar la app: AplicacionRegistros la usa
+// cuando la cuenta deja de ir por Matrix (soltada la fuente). Volver a Matrix es
+// Retry, que la adopta de nuevo.
+func (a *PrivateApplication[R]) Retire()                 { a.core.retire() }
+func (a *PrivateApplication[R]) State() ApplicationState { return a.state }
 
 func (a *PrivateApplication[R]) renderState(cfg PrivateApplicationConfig[R], state ApplicationState, failure error) {
 	a.state = state

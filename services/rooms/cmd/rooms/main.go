@@ -164,8 +164,18 @@ func run() error {
 
 	// Capa de servicio + Hub WebSocket.
 	st := service.NewStore(pool, cipher)
+	// Acciones de entrada firmadas por una bóveda post-cuántica (ADR 0087): la clave
+	// activa la da Sytue ID. Sin secreto, esas acciones se rechazan.
+	if claves := store.NuevasClavesBovedaID(cfg.IDURL, cfg.IDClavesBovedaSecret); claves != nil {
+		st.SetClavesBoveda(claves)
+	}
 	drive := service.NewDriveClient(cfg.DriveURL)
 	svc := service.New(cfg, st, service.NewPoolPublisher(pool), drive)
+	// Recibos de ACK del correo que vive en la bóveda (ADR 0087): los comprueba Drive,
+	// con el secreto que Drive y Rooms ya comparten.
+	if recibos := service.NuevosRecibosBovedaDrive(cfg.DriveURL, cfg.InternalSecret); recibos != nil {
+		svc.SetRecibosBoveda(recibos)
+	}
 	// Personas de otras organizaciones: las encuentra Sytue ID (ADR 0040).
 	if dir := service.NewDirectorioID(cfg.IDURL); dir != nil {
 		svc.SetDirectorio(dir)

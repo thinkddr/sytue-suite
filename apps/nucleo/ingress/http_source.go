@@ -53,7 +53,7 @@ type (
 )
 
 func NewHTTPSource(cfg HTTPSourceConfig) (*HTTPSource, error) {
-	if !cfg.Scope.Valid() || (cfg.Scope.Product != "mail" && cfg.Scope.Product != "calendar") || !storage.MigrationEpoch(cfg.Epoch) || cfg.Control == nil || cfg.Authority == nil || cfg.Signer == nil || cfg.Lease == nil {
+	if !cfg.Scope.Valid() || !contract.Product(cfg.Scope.Product) || !storage.MigrationEpoch(cfg.Epoch) || cfg.Control == nil || cfg.Authority == nil || cfg.Signer == nil || cfg.Lease == nil {
 		return nil, contract.ErrContract
 	}
 	return &HTTPSource{cfg: cfg, proofs: make(map[claimProofKey]contract.ControlProof)}, nil

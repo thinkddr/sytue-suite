@@ -326,6 +326,22 @@ export const fr: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Enregistré dans Sytue Drive.',
   'doc.msg.savedToDriveIn': '« {name} » contient vos modifications, en nouvelle version.',
   'doc.msg.saveToDriveFailed': 'Les modifications n’ont pas pu être enregistrées dans Drive.',
+  'doc.msg.saveToDriveVault': 'Votre Drive est chiffré de bout en bout',
+  'doc.msg.saveToDriveVault.detail':
+    'Impossible d’y enregistrer depuis ici. Téléchargez le document et importez-le depuis Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Enregistré dans votre Drive chiffré.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '« {name} » a été chiffré dans ce navigateur avant d’être enregistré.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '« {name} » a été chiffré sur cet appareil avant d’être enregistré.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Votre Drive chiffré est verrouillé sur cet appareil. Déverrouillez-le ci-dessus, puis enregistrez à nouveau.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Reconnectez-vous pour déverrouiller votre Drive chiffré, puis enregistrez à nouveau.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Votre Drive est encore en cours de passage au chiffrement de bout en bout. Ouvrez Sytue Drive pour terminer, puis enregistrez à nouveau.',
+  'doc.msg.saveToDriveUnsupported':
+    'Le format de ce fichier ne peut pas être réécrit. Téléchargez plutôt le document.',
   'file.downloadPdf': 'Télécharger en PDF',
   'file.pdfAccessible': 'PDF accessible (PDF/UA)',
   'file.downloadHtml': 'Télécharger au format HTML',
@@ -2805,6 +2821,51 @@ export const fr: AppCatalog<typeof en> = {
     'Un ordre de signature peut compter jusqu’à 10 personnes.',
   'pdf.error.signatureRequest.busy':
     'Cette demande est déjà en cours d’ouverture. Réessayez dans un instant.',
+  'pdf.error.driveVault':
+    'Votre Drive est chiffré de bout en bout : les copies des demandes de signature d’autres organisations ne peuvent pas encore y être stockées. Téléchargez plutôt le PDF.',
+  'pdf.device.title': 'Signer sur cet appareil',
+  'pdf.device.help':
+    'Votre Drive est chiffré de bout en bout : le serveur ne peut pas lire vos PDF. Choisissez-en un : il est déchiffré et signé ici avec votre certificat, et la copie signée est enregistrée chiffrée à côté de l’original. Ni le PDF ni votre certificat n’atteignent le serveur.',
+  'pdf.device.open': 'Ouvrir mon Drive chiffré',
+  'pdf.device.empty.title': 'Aucun PDF dans votre Drive chiffré',
+  'pdf.device.empty.description': 'Importez-les depuis Sytue Drive et ils apparaîtront ici.',
+  'pdf.device.sign': 'Signer',
+  'pdf.device.signed': 'Signé et enregistré chiffré sous « {name} ».',
+  'pdf.device.stamp.on':
+    'Avec un horodatage de {authority} : la signature prouve qui a signé et quand. L’autorité ne reçoit que l’empreinte de la signature, jamais le PDF.',
+  'pdf.device.stamp.off':
+    'Sans horodatage : ce service n’a pas d’autorité d’horodatage, la signature prouve donc qui a signé, mais pas quand.',
+  'pdf.device.appearance': 'Apparence de la signature',
+  'pdf.device.appearance.invisible': 'Invisible',
+  'pdf.device.appearance.visible': 'Cadre visible',
+  'pdf.device.signedStamped': 'Signé avec horodatage et enregistré chiffré sous « {name} ».',
+  'pdf.device.signedNoStamp':
+    'Signé et enregistré chiffré sous « {name} », mais sans horodatage : l’autorité d’horodatage n’a pas répondu.',
+  'pdf.device.error.page':
+    'La signature ne tient pas sur cette page. Choisissez une autre page ou position.',
+  'pdf.device.view': 'Voir',
+  'pdf.vault.help':
+    'Ce PDF est dans votre Drive chiffré : il n’est déchiffré que sur cet appareil, pour le consulter et le signer.',
+  'pdf.vault.serverOnly':
+    'Annoter, remplir, organiser, modifier, reconnaître le texte et demander une signature exigent que le service lise le PDF ; ces actions ne sont donc pas disponibles avec votre Drive chiffré.',
+  'pdf.vault.notFound.title': 'Ce PDF n’est pas dans votre Drive chiffré',
+  'pdf.vault.notFound.description':
+    'Il a peut-être été déplacé ou supprimé. Cherchez-le dans Sytue Drive.',
+  'pdf.vault.openSigned': 'Ouvrir la copie signée',
+  'pdf.device.requests':
+    'Demander une signature à d’autres personnes ou organisations nécessite le Drive du serveur : le service doit lire le PDF pour l’envoyer et vérifier la signature qui revient. Avec votre Drive chiffré, signez ici et envoyez vous-même le PDF signé.',
+  'pdf.device.error.signin': 'Reconnectez-vous à Sytue ID pour déverrouiller votre Drive chiffré.',
+  'pdf.device.error.pending':
+    'Votre Drive est encore en cours de passage au chiffrement de bout en bout. Terminez depuis Sytue Drive.',
+  'pdf.device.error.password': 'Ce mot de passe n’ouvre pas le certificat.',
+  'pdf.device.error.encrypted':
+    'Ce PDF est protégé par mot de passe : il ne peut pas être signé sur cet appareil.',
+  'pdf.device.error.locked':
+    'Ce PDF est certifié contre toute modification : une autre signature l’invaliderait.',
+  'pdf.device.error.unreadable':
+    'Ce PDF ne peut pas être signé sur cet appareil sans être réécrit. Rien n’a été modifié.',
+  'pdf.device.error.failed':
+    'Le PDF n’a pas pu être signé ni enregistré. Rien n’a été modifié dans votre Drive.',
   'pdf.dialog.firmar.help':
     'Le certificat et la clé ne quittent pas votre organisation : ils sont utilisés sur le serveur et ne sont pas conservés.',
   'pdf.dialog.firmar.cert': 'Certificat (PEM)',

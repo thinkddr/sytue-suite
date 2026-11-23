@@ -464,8 +464,10 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
           {/* Devolver a Drive: solo si el documento SALIÓ de un fichero de allí. Es
               lo que cierra el viaje de «Abrir con Sytue Docs»; sin esta entrada,
               editar un .docx de Drive deja el original intacto y los cambios en un
-              documento aparte, que no es lo que nadie espera al abrir un fichero. */}
-          {ctx.sourceRef ? (
+              documento aparte, que no es lo que nadie espera al abrir un fichero.
+              Con el Drive en la bóveda (ADR 0086), también sin ancla: el primer
+              guardado crea el fichero cifrado y ancla el documento a él. */}
+          {ctx.sourceRef || ctx.driveCifrado ? (
             <MenuItem
               size="sm"
               disabled={ctx.connection === 'offline' || ctx.savingToDrive}

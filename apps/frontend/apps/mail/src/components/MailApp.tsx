@@ -161,6 +161,8 @@ interface Props {
   idBaseUrl: string;
   /** Idioma ya negociado en el servidor (middleware). Nunca se detecta aquí. */
   locale: Locale;
+  /** Correo privado sobre la bóveda (ADR 0087): `SYTUE_MAIL_BOVEDA=activado`. */
+  correoEnBoveda?: boolean;
 }
 
 /** Tamaño de página del listado/búsqueda (scroll infinito). */
@@ -243,7 +245,12 @@ function PrivateMailProvider({
 export function MailApp(props: Props): JSX.Element {
   if (!props.user.id) return <MailAppBody {...props} />;
   return (
-    <PrivateMailGate actor={props.user.id} tenant={props.user.tenant} locale={props.locale}>
+    <PrivateMailGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      vault={props.correoEnBoveda}
+    >
       {(client) => (
         <PrivateMailProvider client={client}>
           <MailAppBody {...props} />

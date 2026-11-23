@@ -117,6 +117,9 @@ type Galeria struct {
 	Aviso, Error string
 	// Recuerdos es la sección «Tal día como hoy», ya montada; nil, no hay.
 	Recuerdos fyne.CanvasObject
+	// Cifradas es la sección de la galería cifrada (ADR 0086), ya montada; nil, no hay.
+	// Va también con la galería del servidor vacía.
+	Cifradas fyne.CanvasObject
 	// Cargando pinta la rueda del centinela del final: se está pidiendo una página.
 	Cargando bool
 	// Subiendo inertiza «Añadir fotos» mientras dura una subida.
@@ -205,6 +208,9 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	}
 	if e := avisoGaleria(v, d); e != nil {
 		bloques = append(bloques, ui.Bloque{Obj: e, Margen: SeparacionBloque})
+	}
+	if d.Cifradas != nil {
+		bloques = append(bloques, ui.Bloque{Obj: d.Cifradas, Margen: SeparacionSeccion})
 	}
 
 	vacioTitulo, vacioTexto := "gallery.empty.title", "gallery.empty.description"
@@ -416,7 +422,7 @@ func cabeceraMes(v Vista, g GrupoMes, d Galeria) fyne.CanvasObject {
 	}
 	if d.EnSeleccion {
 		todas := true
-		for _, f := range g.Fotos {
+		for _, f := range sinCifradas(g.Fotos) {
 			if !d.Seleccion[f.ID] {
 				todas = false
 				break
@@ -624,6 +630,32 @@ func enlazarFlechas(v Vista, teselas []fyne.CanvasObject) {
 func teselaDe(v Vista, f api.Photo, d Galeria) *Miniatura {
 	m := NuevaMiniatura(f, v.Teca)
 	m.Filete = true
+	m.Cifrada = EsCifrada(f.ID)
+	if m.Cifrada {
+		// Una cifrada (ADR 0086) se abre descifrada en el dispositivo y se marca como
+		// favorita; no va en lote: en el modo selección pulsarla lo dice.
+		m.Rotulo = v.T.T("gallery.encrypted.open", i18n.Vars{"name": f.Name})
+		if d.EnSeleccion {
+			m.Rotulo = v.Traduce("gallery.encrypted.notSelectable")
+		}
+		m.AlPulsar = func() {
+			switch {
+			case d.EnSeleccion && d.AlAlternar != nil:
+				d.AlAlternar(f)
+			case !d.EnSeleccion && d.AlAbrir != nil:
+				d.AlAbrir(f)
+			}
+		}
+		if d.AlFavorita != nil && !d.EnSeleccion {
+			clave := "gallery.favorite"
+			if f.Favorite {
+				clave = "gallery.unfavorite"
+			}
+			m.RotuloFavorita = v.Traduce(clave)
+			m.AlFavorita = func() { d.AlFavorita(f) }
+		}
+		return m
+	}
 	if d.EnSeleccion {
 		m.Seleccionando, m.Seleccionada = true, d.Seleccion[f.ID]
 		m.Rotulo = v.T.T("gallery.selectTile", i18n.Vars{"name": f.Name})
@@ -712,6 +744,10 @@ type Albumes struct {
 	AlBuscar  func()
 	AlGuardar func([]api.Photo)
 	AlVer     func([]api.Photo)
+
+	// Cifrados es la sección de los álbumes cifrados (ADR 0086), ya montada; nil, no
+	// hay. Va también sin álbumes en el servidor.
+	Cifrados fyne.CanvasObject
 }
 
 // PantallaAlbumes monta «Álbumes»: el formulario de crear, las sugerencias y la
@@ -782,7 +818,7 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 		return EsqueletoAlbumes(v, TarjetasEsqueleto, tema.Espacio(6))
 	}); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
-		return Envolver(v, false, ui.PilaBloques(bloques...))
+		return Envolver(v, false, ui.PilaBloques(conCifrados(bloques, d.Cifrados)...))
 	}
 
 	lista := OrdenarAlbumes(d.Lista, d.Orden, v.T.Locale())
@@ -800,7 +836,17 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 		Obj:  container.New(r, tarjetas...),
 		Alto: func(ancho float32) float32 { return r.MinSizeCon(tarjetas, ancho).Height },
 	})
-	return Envolver(v, false, ui.PilaBloques(bloques...))
+	return Envolver(v, false, ui.PilaBloques(conCifrados(bloques, d.Cifrados)...))
+}
+
+// conCifrados pone la sección de los álbumes cifrados al final, separada como una
+// sección (`mt-10` en la web).
+func conCifrados(bloques []ui.Bloque, cifrados fyne.CanvasObject) []ui.Bloque {
+	if cifrados == nil {
+		return bloques
+	}
+	bloques[len(bloques)-1].Margen = SeparacionSeccion
+	return append(bloques, ui.Bloque{Obj: cifrados})
 }
 
 // ladoMonton es el `h-14 w-14` de las fotos de un montón sugerido.
@@ -1387,7 +1433,10 @@ type Encontradas struct {
 	// Varias es que se partió de más de una foto («Más como estas»).
 	Varias bool
 	// Coordenadas es el «41,3851, 2,1734» de la foto de partida; solo en «por aquí».
-	Coordenadas  string
+	Coordenadas string
+	// NotaCifradas dice que las fotos de la galería cifrada (ADR 0086) no entran aquí:
+	// la persona las tiene y el servidor no las ve.
+	NotaCifradas bool
 	Aviso, Error string
 	AlIr         func(Seccion)
 	AlAbrir      func(api.Photo)
@@ -1437,6 +1486,12 @@ func PantallaEncontradas(v Vista, d Encontradas) *fyne.Container {
 	bloques := []ui.Bloque{
 		{Obj: Nav(v, SecFotos, d.AlIr), Margen: SeparacionBloque},
 		{Obj: container.New(ui.FilaAuto{Hueco: tema.Espacio(3), Derecha: derecha}, hijos...), Margen: SeparacionBloque},
+	}
+	if d.NotaCifradas {
+		nota := container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 2},
+			iconos.Trazo(iconos.Candado, iconos.TallaSM, "text-muted", v.Variante).Objeto(),
+			ui.NuevoParrafo(v.Traduce("gallery.encrypted.note"), tema.TextoXS, ui.Normal, "text-muted", v.Variante))
+		bloques = append(bloques, ui.Bloque{Obj: nota, Margen: SeparacionBloque})
 	}
 	for _, p := range [...]struct{ texto, token string }{{d.Aviso, "text-muted"}, {d.Error, "danger-text"}} {
 		if p.texto != "" {

@@ -4,6 +4,8 @@
 package http
 
 import (
+	"crypto/ecdh"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -173,7 +175,7 @@ func TestElRelevoNoSeDejaInyectarPorElDestino(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	page := relevoPage("es", "https://x/cb?code=1&state=2", string(raw))
+	page := relevoPage("es", "https://x/cb?code=1&state=2", "", string(raw))
 	if strings.Contains(page, "<script>alert") {
 		t.Fatal("el destino cierra el bloque de datos")
 	}
@@ -182,7 +184,69 @@ func TestElRelevoNoSeDejaInyectarPorElDestino(t *testing.T) {
 			t.Errorf("al relevo le falta %s", id)
 		}
 	}
+	for _, id := range []string{`id="e2e-confirm"`, `id="e2e-failed"`} {
+		if strings.Contains(page, id) {
+			t.Errorf("sin clave de puente, al relevo le sobra %s", id)
+		}
+	}
 	guionesEnLaCSP(t, page, cspScriptHashes)
+
+	// Con la clave del puente de una app web: la confirmación y la salida tecleada.
+	login := `/oauth2/authorize?client_id=a&prompt=login&x="><script>alert(2)</script>`
+	page = relevoPage("es", "https://x/cb?code=1&state=2", login, string(raw))
+	if strings.Contains(page, "<script>alert") {
+		t.Fatal("la entrada tecleada cierra su atributo")
+	}
+	for _, id := range []string{`id="e2e-confirm" hidden`, `id="e2e-confirm-go"`, `id="e2e-app"`, `id="e2e-failed" hidden`, `id="e2e-retry"`} {
+		if !strings.Contains(page, id) {
+			t.Errorf("al relevo del puente le falta %s", id)
+		}
+	}
+	guionesEnLaCSP(t, page, cspScriptHashes)
+}
+
+// El puente de una app web que trae su clave no obliga a teclear la contraseña si
+// hay sesión: una clave para toda la cuenta, no una entrada por app. La entrada
+// tecleada la pide el relevo, una sola vez, y esa ya no se salta.
+func TestElPuenteDeUnaAppWebNoObligaATeclearDosVeces(t *testing.T) {
+	pub, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clave := base64.RawURLEncoding.EncodeToString(pub.PublicKey().Bytes())
+	web := domain.Client{ID: "sytue-mail", Type: domain.ClientConfidential}
+	nativa := domain.Client{ID: "sytue-desktop", Type: domain.ClientPublic}
+	terceros := domain.Client{ID: "app", Type: domain.ClientPublic, OrgID: "acme"}
+	base := "/oauth2/authorize?client_id=a&prompt=login&state=s&sytue_unlock=1"
+	for _, c := range []struct {
+		nombre string
+		uri    string
+		req    authzRequest
+		client domain.Client
+		quiero bool
+	}{
+		{"web con la clave de su puente", base, authzRequest{Unlock: true, UnlockKey: clave}, web, true},
+		{"web sin clave", base, authzRequest{Unlock: true}, web, false},
+		{"web con clave rota", base, authzRequest{Unlock: true, UnlockKey: "abc"}, web, false},
+		{"la entrada que pide el relevo", base + "&" + paramTecleado + "=1", authzRequest{Unlock: true, UnlockKey: clave}, web, false},
+		{"nativa", base, authzRequest{UnlockKey: clave}, nativa, false},
+		{"terceros", base, authzRequest{Unlock: true, UnlockKey: clave}, terceros, false},
+	} {
+		r := httptest.NewRequest(http.MethodGet, c.uri, http.NoBody)
+		if got := entregaSinTeclear(r, c.req, c.client); got != c.quiero {
+			t.Errorf("%s: %v; quiero %v", c.nombre, got, c.quiero)
+		}
+	}
+	r := httptest.NewRequest(http.MethodGet, "/oauth2/authorize?client_id=a&state=s", http.NoBody)
+	tecleada := httptest.NewRequest(http.MethodGet, uriTecleada(r), http.NoBody)
+	if !pidePromptLogin(tecleada) || tecleada.URL.Query().Get(paramTecleado) != "1" || tecleada.URL.Query().Get("state") != "s" {
+		t.Fatalf("entrada tecleada = %q", tecleada.URL.RequestURI())
+	}
+	// La vuelta del inicio de sesión conserva la marca: no vuelve a saltarse.
+	vuelta := httptest.NewRequest(http.MethodGet, uriSinPrompt(tecleada), http.NoBody)
+	if pidePromptLogin(vuelta) || entregaSinTeclear(vuelta, authzRequest{Unlock: true, UnlockKey: clave}, web) {
+		t.Fatalf("la vuelta = %q vuelve a pedir o a saltarse la entrada", vuelta.URL.RequestURI())
+	}
 }
 
 // `prompt=login` obliga a entrar otra vez, y la vuelta ya no lo lleva: si lo

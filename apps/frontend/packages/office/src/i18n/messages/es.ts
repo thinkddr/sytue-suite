@@ -316,6 +316,21 @@ export const es: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Guardado en Sytue Drive.',
   'doc.msg.savedToDriveIn': '«{name}» ya tiene tus cambios, como versión nueva.',
   'doc.msg.saveToDriveFailed': 'No se han podido guardar los cambios en Drive.',
+  'doc.msg.saveToDriveVault': 'Tu Drive está cifrado de extremo a extremo',
+  'doc.msg.saveToDriveVault.detail':
+    'No se ha podido guardar en él desde aquí. Descarga el documento y súbelo desde Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Guardado en tu Drive cifrado.',
+  'doc.msg.savedToDriveEncryptedIn': '«{name}» se ha cifrado en este navegador antes de guardarse.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '«{name}» se ha cifrado en este dispositivo antes de guardarse.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Tu Drive cifrado está bloqueado en este dispositivo. Desbloquéalo arriba y guarda otra vez.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Vuelve a entrar para desbloquear tu Drive cifrado y guarda otra vez.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Tu Drive aún está pasando al cifrado de extremo a extremo. Ábrelo en Sytue Drive para terminar y guarda otra vez.',
+  'doc.msg.saveToDriveUnsupported':
+    'El formato de este fichero no se puede reescribir. Descarga el documento en su lugar.',
   'file.downloadPdf': 'Descargar como PDF',
   'file.pdfAccessible': 'PDF accesible (PDF/UA)',
   'file.downloadHtml': 'Descargar como HTML',
@@ -2752,6 +2767,49 @@ export const es: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'Una firma por orden admite hasta 10 personas.',
   'pdf.error.signatureRequest.busy':
     'Esta petición ya se está abriendo. Vuelve a intentarlo en un momento.',
+  'pdf.error.driveVault':
+    'Tu Drive está cifrado de extremo a extremo: todavía no se pueden guardar en él las copias de las peticiones de firma de otras organizaciones. Descarga el PDF.',
+  'pdf.device.title': 'Firmar en este dispositivo',
+  'pdf.device.help':
+    'Tu Drive está cifrado de extremo a extremo y el servidor no puede leer tus PDF. Elige uno: se descifra y se firma aquí con tu certificado, y la copia firmada se guarda cifrada junto al original. Ni el PDF ni tu certificado llegan al servidor.',
+  'pdf.device.open': 'Abrir mi Drive cifrado',
+  'pdf.device.empty.title': 'No hay PDF en tu Drive cifrado',
+  'pdf.device.empty.description': 'Súbelos desde Sytue Drive y aparecerán aquí.',
+  'pdf.device.sign': 'Firmar',
+  'pdf.device.signed': 'Firmado y guardado cifrado como «{name}».',
+  'pdf.device.stamp.on':
+    'Con sello de tiempo de {authority}: la firma prueba quién firmó y cuándo. A la autoridad solo le llega la huella de la firma, nunca el PDF.',
+  'pdf.device.stamp.off':
+    'Sin sello de tiempo: este servicio no tiene autoridad de sellado, así que la firma prueba quién firmó, no cuándo.',
+  'pdf.device.appearance': 'Cómo se ve la firma',
+  'pdf.device.appearance.invisible': 'Invisible',
+  'pdf.device.appearance.visible': 'Recuadro visible',
+  'pdf.device.signedStamped': 'Firmado con sello de tiempo y guardado cifrado como «{name}».',
+  'pdf.device.signedNoStamp':
+    'Firmado y guardado cifrado como «{name}», pero sin sello de tiempo: la autoridad de sellado no respondió.',
+  'pdf.device.error.page': 'La firma no cabe en esa página. Elige otra página o posición.',
+  'pdf.device.view': 'Ver',
+  'pdf.vault.help':
+    'Este PDF está en tu Drive cifrado: se descifra solo en este dispositivo, para verlo y firmarlo.',
+  'pdf.vault.serverOnly':
+    'Anotar, rellenar, organizar, editar, reconocer texto y pedir firma necesitan que el servicio lea el PDF, así que no están disponibles con tu Drive cifrado.',
+  'pdf.vault.notFound.title': 'Este PDF no está en tu Drive cifrado',
+  'pdf.vault.notFound.description': 'Puede que se haya movido o borrado. Búscalo en Sytue Drive.',
+  'pdf.vault.openSigned': 'Abrir el firmado',
+  'pdf.device.requests':
+    'Pedir firma a otras personas u organizaciones necesita el Drive del servidor: el servicio tiene que leer el PDF para enviarlo y comprobar la firma que vuelve. Con tu Drive cifrado, firma aquí y envía tú el PDF firmado.',
+  'pdf.device.error.signin': 'Vuelve a entrar en Sytue ID para desbloquear tu Drive cifrado.',
+  'pdf.device.error.pending':
+    'Tu Drive aún está pasando al cifrado de extremo a extremo. Termina desde Sytue Drive.',
+  'pdf.device.error.password': 'Esa contraseña no abre el certificado.',
+  'pdf.device.error.encrypted':
+    'Este PDF está protegido con contraseña y no se puede firmar en este dispositivo.',
+  'pdf.device.error.locked':
+    'Este PDF está certificado contra cualquier cambio: otra firma lo invalidaría.',
+  'pdf.device.error.unreadable':
+    'Este PDF no se puede firmar en este dispositivo sin reescribirlo. No se ha cambiado nada.',
+  'pdf.device.error.failed':
+    'No se pudo firmar ni guardar el PDF. No se ha cambiado nada en tu Drive.',
   'pdf.dialog.firmar.help':
     'El certificado y la clave no salen de tu organización: se usan en el servidor y no se guardan.',
   'pdf.dialog.firmar.cert': 'Certificado (PEM)',

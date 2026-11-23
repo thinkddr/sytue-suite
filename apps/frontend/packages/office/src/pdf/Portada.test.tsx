@@ -32,13 +32,20 @@ const fetchOriginal = globalThis.fetch;
 // (las peticiones de firma) contesta vacío para que no ocupe sitio.
 let recientes: Array<() => Promise<Response>> = [];
 let pedidas = 0;
+// El estado de la fuente de Drive (sin claves) que contesta el BFF de la bóveda.
+let estadoDrive: Record<string, unknown> | null = null;
 let host: HTMLElement | null = null;
 
 beforeEach(() => {
   recientes = [];
   pedidas = 0;
+  estadoDrive = null;
   globalThis.fetch = ((input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
+    if (url.includes('/api/drive-cifrado/') && url.includes('/migration'))
+      return Promise.resolve(
+        estadoDrive ? Response.json(estadoDrive) : new Response('', { status: 404 }),
+      );
     if (url.includes('/api/pdf-recientes')) {
       pedidas++;
       const siguiente = recientes.shift();
@@ -57,11 +64,11 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-function montar(): HTMLElement {
+function montar(quien?: { actor: string; tenant: string }): HTMLElement {
   document.body.innerHTML = '';
   const h = document.createElement('div');
   document.body.appendChild(h);
-  render(<PortadaPdf locale="es" />, h);
+  render(<PortadaPdf locale="es" {...(quien ?? {})} />, h);
   host = h;
   return h;
 }
@@ -117,4 +124,30 @@ test('al reintentar vuelve el esqueleto mientras llega la respuesta', async () =
   await tick();
   expect(raiz.querySelector('[data-recientes-cargando]')).not.toBeNull();
   expect(raiz.querySelector('[data-recientes-fallo]')).toBeNull();
+});
+
+test('con el Drive en la bóveda, ofrece firmar en el dispositivo y dice por qué no se pide firma', async () => {
+  const { privateDriveWriteFixture } =
+    await import('../../../offline/src/matrix/private-drive-fixture.js');
+  const f = await privateDriveWriteFixture();
+  try {
+    estadoDrive = f.state as unknown as Record<string, unknown>;
+    const raiz = montar({ actor: 'owner', tenant: 'acme' });
+    await hasta(() => raiz.textContent?.includes(t('pdf.device.title')) ?? false);
+    expect(raiz.textContent).toContain(t('pdf.device.help'));
+    expect(raiz.textContent).toContain(t('pdf.device.requests'));
+    // La bóveda NO se abre sola: hace falta pulsar.
+    const abrir = [...raiz.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === t('pdf.device.open'),
+    );
+    expect(abrir).toBeDefined();
+  } finally {
+    await f.close();
+  }
+});
+
+test('con el Drive en el servidor (o sin saberlo), la portada de siempre', async () => {
+  const raiz = montar({ actor: 'owner', tenant: 'acme' });
+  await tick(50);
+  expect(raiz.textContent).not.toContain(t('pdf.device.title'));
 });

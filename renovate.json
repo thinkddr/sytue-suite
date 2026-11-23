@@ -145,7 +145,7 @@
       ],
       "groupName": "go modules",
       "commitMessagePrefix": "chore(deps-go):",
-      "description": "Go modules — agrupados. Go toolchain fijado a la línea 1.26.x (§3)."
+      "description": "Go modules — agrupados. El toolchain va aparte, siempre a la última estable (§3)."
     },
     {
       "matchManagers": [
@@ -156,7 +156,7 @@
       ],
       "groupName": "go toolchain",
       "rangeStrategy": "bump",
-      "description": "Go toolchain: seguir la línea estable actual (1.26.x), no saltar de major/minor GA."
+      "description": "Go toolchain: SIEMPRE la última estable publicada (GA), también cuando cambia la menor (1.27 → 1.28). Nunca una rc ni una beta."
     },
     {
       "matchManagers": [

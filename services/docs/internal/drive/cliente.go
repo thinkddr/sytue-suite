@@ -56,6 +56,12 @@ var (
 	// ErrProhibido es un 403: la sesión vale, pero Drive no deja hacer ESO (un permiso
 	// que no alcanza, o una etiqueta que no deja compartir fuera). Es un ErrNoAutorizado.
 	ErrProhibido = fmt.Errorf("%w: prohibido", ErrNoAutorizado)
+	// ErrUnidadCifrada es que la unidad de esta persona ya no admite escrituras del
+	// servidor: sus ficheros viven cifrados de extremo a extremo —en la bóveda
+	// post-cuántica directa o migrándose a ella (ADR 0086)— y Drive contesta 409
+	// `private_storage_migration_required`. Docs no puede dejar ahí un fichero en
+	// claro, y no debe: es justo lo que la persona eligió no tener en el servidor.
+	ErrUnidadCifrada = errors.New("drive: la unidad está cifrada de extremo a extremo")
 )
 
 // Fichero es la vista mínima que Docs necesita de un fichero de Drive.
@@ -148,6 +154,11 @@ func (c *Cliente) ejecutar(req *http.Request, dest any) error {
 		return ErrNoAutorizado
 	case http.StatusForbidden:
 		return ErrProhibido
+	case http.StatusConflict:
+		if codigoDeError(resp.Body) == codigoUnidadCifrada {
+			return ErrUnidadCifrada
+		}
+		return fmt.Errorf("drive: respuesta %d", resp.StatusCode)
 	default:
 		return fmt.Errorf("drive: respuesta %d", resp.StatusCode)
 	}
@@ -158,6 +169,24 @@ func (c *Cliente) ejecutar(req *http.Request, dest any) error {
 		return fmt.Errorf("drive: decodificar: %w", err)
 	}
 	return nil
+}
+
+// codigoUnidadCifrada es el código estable con el que Drive rechaza escribir en una
+// unidad que ya es de extremo a extremo (services/drive, privateStorageAPIError).
+const codigoUnidadCifrada = "private_storage_migration_required"
+
+// codigoDeError lee el código del sobre de error de la suite
+// (`{"error":{"code":…}}`, platform/pkg/httpx). Un cuerpo que no lo trae da "".
+func codigoDeError(body io.Reader) string {
+	var sobre struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.NewDecoder(io.LimitReader(body, 64<<10)).Decode(&sobre) != nil {
+		return ""
+	}
+	return sobre.Error.Code
 }
 
 // hijos son las subcarpetas y ficheros de una carpeta, como los devuelve Drive.

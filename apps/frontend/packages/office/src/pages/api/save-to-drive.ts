@@ -18,10 +18,17 @@
  * se pueden volver a serializar con su forma original, así que devolverlos
  * significaría cambiar el fichero de formato a espaldas de su dueño: se rechaza
  * con `unsupported_format` y la acción ni siquiera se ofrece en el editor.
+ *
+ * LA UNIDAD CIFRADA (ADR 0086). Si el Drive de la persona ya está en la bóveda
+ * cifrada de extremo a extremo, Drive rechaza escribir desde el servidor (409
+ * `private_storage_migration_required`): el servidor no puede dejar ahí un fichero
+ * en claro. Se contesta 409 `drive_private_vault`, distinto del fallo genérico,
+ * para que el editor lo diga y ofrezca descargar en su lugar.
  */
 import type { APIRoute } from 'astro';
 import { DocsClient, DriveClient, bearer } from '@sytue/api-clients';
 import { bff, toBffContext, docsBaseUrl, driveBaseUrl } from '../../lib/auth';
+import { esUnidadCifrada } from '../../lib/unidadCifrada';
 
 export const prerender = false;
 
@@ -78,7 +85,8 @@ export const POST: APIRoute = async (ctx) => {
     const { bytes, contentType } = await docs.downloadExport(id, blob.id);
     await drive.upload(file.path, bytes, blob.contentType || contentType);
     return json({ name: file.name, path: file.path });
-  } catch {
+  } catch (error) {
+    if (esUnidadCifrada(error)) return json({ error: 'drive_private_vault' }, 409);
     return json({ error: 'save_failed' }, 502);
   }
 };

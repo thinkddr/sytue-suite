@@ -63,6 +63,20 @@ func (v *Vista) abrirBandeja() {
 	go v.escucharAvisos(ctx)
 }
 
+// RecargarAvisos vuelve a pedir la lista si la bandeja está abierta. Lo usa el
+// receptor de la entrada privada de One (ADR 0086): al guardar en el almacén privado
+// un aviso nuevo, la lista de la bandeja ya lo tiene y hay que volver a leerla. Con la
+// bandeja cerrada no hace nada: se carga al abrirla.
+func (v *Vista) RecargarAvisos() {
+	v.mu.Lock()
+	ctx := v.ctxBandeja
+	abierta := v.pararFlujo != nil && ctx != nil && ctx.Err() == nil
+	v.mu.Unlock()
+	if abierta {
+		go v.cargarAvisos(ctx)
+	}
+}
+
 // cerrarBandeja corta el flujo. Al volver se carga de nuevo, como al remontar la isla.
 func (v *Vista) cerrarBandeja() {
 	v.mu.Lock()

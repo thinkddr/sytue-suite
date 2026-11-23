@@ -143,14 +143,26 @@ func (s *Service) Create(ctx context.Context, rec domain.NewNotification) (domai
 		} else if hechos >= TopeAvisosTotalPorHora {
 			return domain.ErrTooMany
 		}
-		var e error
+		// Con la fuente de One de la persona congelada o ya privada (ADR 0086), el
+		// aviso no va a `notifications` —la guarda de la 0015 lo rechazaría—: va a su
+		// entrada privada, cifrado si ya tiene clave y retenido si no, hasta que un
+		// aparato lo confirme (store.AdmitirAvisoPrivado). Por el NOTIFY no viaja su
+		// contenido, solo la señal sin datos de que hay algo que reclamar.
+		privado, ok, e := store.AdmitirAvisoPrivado(ctx, tx, t.Slug, rec)
+		if e != nil {
+			return e
+		}
+		if ok {
+			n = privado
+			return nil
+		}
 		n, e = store.InsertNotificationTx(ctx, tx, t.Slug, rec)
 		if e != nil {
 			return e
 		}
 		return publishTx(ctx, tx, wireEnvelope{Tenant: t.Slug, Subject: n.Subject, Notification: n})
 	})
-	return n, err
+	return n, store.PrivateStorageError(err)
 }
 
 // CreateHistorico guarda un aviso RECONSTRUIDO (ruta de mantenimiento, ver
@@ -214,6 +226,12 @@ func (s *Service) CreateHistorico(ctx context.Context, h domain.NewHistorico) (s
 		}
 		return e
 	})
+	if errors.Is(store.PrivateStorageError(err), store.ErrPrivateStorageFrozen) {
+		// La fuente de One de su destinatario está congelada (guarda de la 0015). No es
+		// un aviso en vivo sino una reconstrucción que se puede relanzar: se dice qué
+		// pasó, no se guarda en ningún sitio.
+		return domain.HistoricoCongelado, nil
+	}
 	return resultado, err
 }
 

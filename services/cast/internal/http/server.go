@@ -25,6 +25,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/operador"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/cast/internal/config"
 	"git.sytue.eu/sytue/one/services/cast/internal/diapositivas"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
@@ -52,6 +53,8 @@ type Deps struct {
 	Operador      operador.Autorizar
 	ReadyCheckers []httpx.Checker
 	PrivateSource httpx.PrivateSourcePort
+	// PrivateRelease es «soltar la fuente» (store.PrivateSource.Release). Nil: sin ruta.
+	PrivateRelease soltarfuente.Soltar
 	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
 	// el widget nativo. nil: sin señal.
 	Hub *hubnotify.Client
@@ -116,6 +119,9 @@ func NewRouter(d Deps) http.Handler {
 			// Retained media can be large; the shared stream handler owns limits
 			// and cancellation, outside the legacy REST timeout.
 			mountCastPrivateSource(auth, d.PrivateSource)
+			if d.PrivateRelease != nil {
+				soltarfuente.Montar(auth, soltarfuente.Config{Product: "cast", Soltar: d.PrivateRelease, Avisar: d.Hub.Send})
+			}
 
 			// La subida del original va SIN el timeout de 30 s: dura lo que dure el fichero.
 			auth.Put("/videos/{id}/original", h.SubirOriginal)

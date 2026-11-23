@@ -32,6 +32,7 @@ import (
 	privateCalendar "git.sytue.eu/sytue/one/apps/nucleo/calendar"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 
 	"git.sytue.eu/sytue/one/apps/fyne/calendario"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
@@ -83,11 +84,9 @@ func main() {
 	}
 	s.AlAbrirURL(enlaces.recibir)
 
-	mount := func(resources *cifrado.Resources[*mx.Client], repository *privateCalendar.Repository) (cifrado.ApplicationView, error) {
-		facade, err := api.NewCalendars(s.URL("calendar"), resources.HTTP(), nil).WithPrivateData(repository)
-		if err != nil {
-			return cifrado.ApplicationView{}, err
-		}
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	mount := func(resources cifrado.Cuenta, facade *api.Calendars) cifrado.ApplicationView {
 		p := &calendario.Pantalla{T: t, Cursor: time.Now(), Vista: calendario.VistaMes, Ventana: ventanaInicial}
 		c := calendario.NuevaAppConVida(resources.Context(), p, facade)
 		salas := api.NewRooms(s.URL("rooms"), resources.HTTP(), nil)
@@ -134,17 +133,31 @@ func main() {
 				}
 			},
 			Join: c.Join,
-		}, nil
+		}
 	}
 
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateCalendar.Repository]{
-		Suite: s, Application: a, Window: w, Product: "calendar",
-		Translate: func(key string) string { return t.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateCalendar.Repository], error) {
-			return calendarPlan(ctx, resources, s)
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*privateCalendar.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*privateCalendar.Repository]{
+			Suite: s, Application: a, Window: w, Product: "calendar",
+			Translate: func(key string) string { return t.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateCalendar.Repository], error) {
+				return calendarPlan(ctx, resources, s)
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateCalendar.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewCalendars(s.URL("calendar"), resources.HTTP(), nil).WithPrivateData(repository)
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return mount(resources, facade), nil //nolint:contextcheck // Presenter retains its mounted resource lifetime; future UI gestures must not inherit the mount request.
+			},
 		},
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateCalendar.Repository) (cifrado.ApplicationView, error) {
-			return mount(resources, repository) //nolint:contextcheck // Presenter retains its mounted resource lifetime; future UI gestures must not inherit the mount request.
+		Soltar: cifrado.SoltarEn(s.URL("calendar")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewCalendars(s.URL("calendar"), session, nil).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewCalendars(s.URL("calendar"), cuenta.HTTP(), nil)), nil
 		},
 	})
 	if err != nil {

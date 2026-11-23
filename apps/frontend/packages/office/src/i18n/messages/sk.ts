@@ -312,6 +312,21 @@ export const sk: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Uložené do Sytue Drive.',
   'doc.msg.savedToDriveIn': '„{name}“ teraz obsahuje vaše zmeny ako novú verziu.',
   'doc.msg.saveToDriveFailed': 'Zmeny sa nepodarilo uložiť na Disk.',
+  'doc.msg.saveToDriveVault': 'Váš Drive je šifrovaný end-to-end',
+  'doc.msg.saveToDriveVault.detail':
+    'Odtiaľto sa doň nepodarilo uložiť. Stiahnite dokument a nahrajte ho zo Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Uložené na váš šifrovaný Disk.',
+  'doc.msg.savedToDriveEncryptedIn': '„{name}“ bol pred uložením zašifrovaný v tomto prehliadači.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}“ bol pred uložením zašifrovaný v tomto zariadení.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Váš šifrovaný Disk je v tomto zariadení zamknutý. Odomknite ho vyššie a uložte znova.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Prihláste sa znova, aby ste odomkli šifrovaný Disk, a uložte znova.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Váš Disk ešte prechádza na šifrovanie medzi koncovými bodmi. Dokončite to v Sytue Drive a uložte znova.',
+  'doc.msg.saveToDriveUnsupported':
+    'Formát tohto súboru nemožno prepísať. Stiahnite si namiesto toho dokument.',
   'file.downloadPdf': 'Stiahnuť ako PDF',
   'file.pdfAccessible': 'Prístupné PDF (PDF/UA)',
   'file.downloadHtml': 'Stiahnuť ako HTML',
@@ -2704,6 +2719,50 @@ export const sk: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainRepeated': 'Tá istá osoba je v poradí podpisovania dvakrát.',
   'pdf.error.signatureRequest.chainTooLong': 'Poradie podpisovania môže mať najviac 10 osôb.',
   'pdf.error.signatureRequest.busy': 'Táto žiadosť sa už otvára. Skúste to o chvíľu znova.',
+  'pdf.error.driveVault':
+    'Váš Disk je šifrovaný medzi koncovými bodmi: kópie žiadostí o podpis z iných organizácií doň zatiaľ nemožno uložiť. Stiahnite si PDF.',
+  'pdf.device.title': 'Podpísať na tomto zariadení',
+  'pdf.device.help':
+    'Váš Disk je šifrovaný end-to-end, takže server vaše PDF nemôže čítať. Vyberte jedno: dešifruje sa a podpíše tu vaším certifikátom a podpísaná kópia sa uloží zašifrovaná vedľa originálu. Ani PDF, ani váš certifikát sa na server nedostanú.',
+  'pdf.device.open': 'Otvoriť môj šifrovaný Disk',
+  'pdf.device.empty.title': 'Vo vašom šifrovanom Disku nie sú žiadne PDF',
+  'pdf.device.empty.description': 'Nahrajte ich zo Sytue Drive a zobrazia sa tu.',
+  'pdf.device.sign': 'Podpísať',
+  'pdf.device.signed': 'Podpísané a uložené zašifrované ako „{name}“.',
+  'pdf.device.stamp.on':
+    'S časovou pečiatkou od {authority}: podpis dokazuje, kto a kedy podpísal. Autorita dostane iba odtlačok podpisu, nikdy PDF.',
+  'pdf.device.stamp.off':
+    'Bez časovej pečiatky: táto služba nemá autoritu časových pečiatok, takže podpis dokazuje, kto podpísal, ale nie kedy.',
+  'pdf.device.appearance': 'Ako vyzerá podpis',
+  'pdf.device.appearance.invisible': 'Neviditeľný',
+  'pdf.device.appearance.visible': 'Viditeľný rámček',
+  'pdf.device.signedStamped': 'Podpísané s časovou pečiatkou a uložené zašifrované ako „{name}“.',
+  'pdf.device.signedNoStamp':
+    'Podpísané a uložené zašifrované ako „{name}“, ale bez časovej pečiatky: autorita časových pečiatok neodpovedala.',
+  'pdf.device.error.page': 'Podpis sa na túto stranu nezmestí. Vyberte inú stranu alebo polohu.',
+  'pdf.device.view': 'Zobraziť',
+  'pdf.vault.help':
+    'Toto PDF je vo vašom šifrovanom Disku: dešifruje sa iba v tomto zariadení, aby ste ho mohli zobraziť a podpísať.',
+  'pdf.vault.serverOnly':
+    'Anotácie, vypĺňanie, usporiadanie, úpravy, rozpoznávanie textu a žiadosti o podpis vyžadujú, aby služba PDF prečítala, preto nie sú so šifrovaným Diskom dostupné.',
+  'pdf.vault.notFound.title': 'Toto PDF nie je vo vašom šifrovanom Disku',
+  'pdf.vault.notFound.description':
+    'Možno bolo presunuté alebo odstránené. Vyhľadajte ho v Sytue Drive.',
+  'pdf.vault.openSigned': 'Otvoriť podpísanú kópiu',
+  'pdf.device.requests':
+    'Žiadať o podpis iné osoby alebo organizácie si vyžaduje Disk servera: služba musí PDF prečítať, aby ho odoslala a overila podpis, ktorý sa vráti. So šifrovaným Diskom podpíšte tu a podpísané PDF odošlite sami.',
+  'pdf.device.error.signin': 'Znova sa prihláste do Sytue ID, aby ste odomkli svoj šifrovaný Disk.',
+  'pdf.device.error.pending':
+    'Váš Disk ešte prechádza na šifrovanie end-to-end. Dokončite to v Sytue Drive.',
+  'pdf.device.error.password': 'Toto heslo certifikát neotvorí.',
+  'pdf.device.error.encrypted':
+    'Toto PDF je chránené heslom a na tomto zariadení ho nemožno podpísať.',
+  'pdf.device.error.locked':
+    'Toto PDF je certifikované proti akejkoľvek zmene: ďalší podpis by ho zneplatnil.',
+  'pdf.device.error.unreadable':
+    'Toto PDF nemožno na tomto zariadení podpísať bez prepísania. Nič sa nezmenilo.',
+  'pdf.device.error.failed':
+    'PDF sa nepodarilo podpísať ani uložiť. Vo vašom Disku sa nič nezmenilo.',
   'pdf.dialog.firmar.help':
     'Certifikát a kľúč nikdy neopustia vašu organizáciu: používajú sa na serveri a neukladajú sa.',
   'pdf.dialog.firmar.cert': 'Certifikát (PEM)',

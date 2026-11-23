@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact';
 import { useMemo } from 'preact/hooks';
 import { DriveClient } from '@sytue/api-clients';
 import type { Locale } from '@sytue/i18n';
-import { MatrixDeviceGate } from '@sytue/shell/matrix';
+import { PqVaultGate } from '@sytue/shell/matrix';
 import { withBase } from '@sytue/ui';
 import { createPrivateDriveGate, type PrivateDriveSession } from '../client/private-drive.js';
 
@@ -35,8 +35,17 @@ export function PrivateDriveGate({
     [actor, tenant],
   );
   return (
-    <MatrixDeviceGate actor={actor} tenant={tenant} locale={locale} host={gate.host}>
-      {(client) => children(gate.current(client), browserBaseURL())}
-    </MatrixDeviceGate>
+    <PqVaultGate
+      actor={actor}
+      tenant={tenant}
+      locale={locale}
+      product="drive"
+      basePath={import.meta.env.BASE_URL}
+      prepare={gate.host.prepare}
+      activate={gate.host.activate}
+      close={gate.host.close}
+    >
+      {(vault) => children(gate.current(vault), browserBaseURL())}
+    </PqVaultGate>
   );
 }

@@ -1250,6 +1250,10 @@ services:
       CONTACTS_BASE_URL: http://contacts:8088
       NOTES_BASE_URL: http://notes:8089
       ROOMS_BASE_URL: http://rooms:8085
+      # Autoridad de almacenamiento de Rooms para la entrada privada de avisos (ADR
+      # 0086): altas de clave y recibos de los aparatos. Sin ella, 503
+      # private_ingress_required y los avisos esperan en la copia.
+      ROOMS_INTERNAL_SECRET: ${ROOMS_INTERNAL_SECRET}
       SYERP_BASE_URL: http://syerp:8098
       ERP_BASE_URL: http://syerp:8098
       INTEGRATIONS_BASE_URL: http://integrations:8093

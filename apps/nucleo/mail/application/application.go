@@ -12,6 +12,7 @@ import (
 	privateMail "git.sytue.eu/sytue/one/apps/nucleo/mail"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	contract "git.sytue.eu/sytue/one/apps/nucleo/storage/ingress"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/transfer"
 )
@@ -54,8 +55,21 @@ type Config struct {
 	Isolated               Device
 	Legacy                 privateMail.Crypto
 	RequireLegacy          bool
-	CopyFile               privateMail.CopyPrivateFile
-	Invalid                error
+	// Vault lo elige el anfitrión, nunca el módulo: el correo vive en la bóveda
+	// post-cuántica (ADR 0087). Sin origen histórico ni corte de identidad de
+	// Matrix; el correo retenido del servidor se importa directo en Isolated.
+	Vault    bool
+	CopyFile privateMail.CopyPrivateFile
+	Invalid  error
+}
+
+// validMode: Matrix con origen histórico exige su almacén; la bóveda no admite
+// ninguna pieza de Matrix (origen, ficheros ni copiador): no hay nada que migrar.
+func (cfg Config) validMode() bool {
+	if cfg.Vault {
+		return !cfg.RequireLegacy && cfg.Legacy == nil && cfg.LegacyFiles == nil && cfg.CopyFile == nil
+	}
+	return !cfg.RequireLegacy || cfg.Legacy != nil
 }
 
 // Application is a deferred lifecycle holder, not a MailData
@@ -84,7 +98,7 @@ func New(ctx context.Context, resources ResourceGuard, cfg Config) (*Application
 	if cfg.Invalid == nil {
 		cfg.Invalid = privateMail.ErrRecord
 	}
-	if resources == nil || (cfg.Gateway == nil && cfg.Files == nil) || cfg.Source == nil || cfg.Control == nil || cfg.Rooms == nil || cfg.Journal == nil || !cfg.Journal.Encrypted() || cfg.Isolated == nil || cfg.RequireLegacy && cfg.Legacy == nil || resources.PrivateStorageScope().Product != "mail" {
+	if resources == nil || (cfg.Gateway == nil && cfg.Files == nil) || cfg.Source == nil || cfg.Control == nil || cfg.Rooms == nil || cfg.Journal == nil || !cfg.Journal.Encrypted() || cfg.Isolated == nil || !cfg.validMode() || resources.PrivateStorageScope().Product != "mail" {
 		return nil, cfg.Invalid
 	}
 	if err := resources.Check(ctx); err != nil {
@@ -99,7 +113,7 @@ func New(ctx context.Context, resources ResourceGuard, cfg Config) (*Application
 		return nil, err
 	}
 	holder := &Application{resources: resources, cfg: cfg, life: ctx, scope: scope, gate: offline.NewWorkGateWithLease(ctx, resources.WorkLease())}
-	enrollment, err := ingress.NewEnrollment(ingress.EnrollmentConfig{Context: ctx, Scope: scope, Target: target, Authority: cfg.Authority, Journal: cfg.Journal, Lease: resources.WorkLease(), Device: cfg.Isolated, Authorize: resources.Revalidate, Source: func(epoch string) (ingress.EnrollmentSource, error) { return holder.source(epoch) }})
+	enrollment, err := ingress.NewEnrollment(ingress.EnrollmentConfig{Context: ctx, Scope: scope, Target: target, Authority: cfg.Authority, Journal: cfg.Journal, Lease: resources.WorkLease(), Device: cfg.Isolated, Authorize: resources.Revalidate, Source: func(epoch string) (ingress.EnrollmentSource, error) { return holder.source(epoch) }, Rotate: cfg.Vault})
 	if err != nil {
 		return nil, err
 	}
@@ -193,22 +207,32 @@ func (r *Application) Prepare(parent context.Context) error {
 		return privateMail.ErrNotReady
 	}
 	state := caps.LegacyMigrationState
+	if r.cfg.Vault {
+		if state, err = r.captureVault(ctx, caps); err != nil {
+			return fmt.Errorf("mail vault source: %w", err)
+		}
+	}
 	if r.cfg.RequireLegacy {
 		if err := r.prepareHistorical(ctx, caps); err != nil {
 			return fmt.Errorf("mail historical source: %w", err)
 		}
 		state = r.historical.RetainedState()
 	}
-	if _, err := r.enrollment.Ensure(ctx, state.Epoch); err != nil {
+	plan, err := r.enrollment.Ensure(ctx, state.Epoch)
+	if err != nil {
 		return fmt.Errorf("mail receiver enrollment: %w", err)
 	}
 	if err := r.prepareTarget(ctx, caps, state); err != nil {
 		return fmt.Errorf("mail private destination: %w", err)
 	}
-	if err := r.cutover.Prepare(ctx); err != nil {
+	if r.cfg.Vault {
+		if err := r.core.ImportDirectSource(ctx, r.cfg.Source); err != nil {
+			return fmt.Errorf("mail vault import: %w", err)
+		}
+	} else if err := r.cutover.Prepare(ctx); err != nil {
 		return fmt.Errorf("mail identity cutover: %w", err)
 	}
-	if err := r.prepareWorker(ctx, state.Epoch); err != nil {
+	if err := r.prepareWorker(ctx, state.Epoch, plan); err != nil {
 		return fmt.Errorf("mail receiver setup: %w", err)
 	}
 	if err := r.resources.Revalidate(ctx); err != nil {
@@ -227,6 +251,18 @@ func (r *Application) configuration(caps storage.AppMigrationState, state storag
 		publication = nil
 	}
 	return privateMail.Config{Metadata: r.cfg.Metadata, Usage: r.cfg.Usage, BindPublicationContext: publication, Context: r.life, Scope: r.scope, Crypto: crypto, Gateway: r.cfg.Gateway, Files: files, Journal: r.cfg.Journal, WorkLease: r.resources.WorkLease(), MigrationState: state, MaxMessageBytes: caps.MaxBodyBytes, Submission: submission, AuthorizeSubmission: r.resources.Revalidate}
+}
+
+// captureVault fija la época del correo retenido con la bóveda como destino. Es
+// el mismo Begin que el del origen histórico (precedido por el alta de la clave
+// de entrada de esa época), sin repositorio de Matrix en medio. Una vez creado
+// el repositorio, su época ya no cambia en esta sesión.
+func (r *Application) captureVault(ctx context.Context, caps storage.AppMigrationState) (storage.LegacyMigrationState, error) {
+	if r.core != nil {
+		return r.core.MigrationState(), nil
+	}
+	source := mailIngressSource{Source: r.cfg.Source, invalid: r.cfg.Invalid, enrollment: r.enrollment, scope: r.scope}
+	return privateMail.CaptureDirectSource(ctx, r.configuration(caps, caps.LegacyMigrationState, r.cfg.Isolated, r.cfg.Files), source)
 }
 
 func (r *Application) prepareHistorical(ctx context.Context, caps storage.AppMigrationState) error {
@@ -254,6 +290,9 @@ func (r *Application) prepareTarget(ctx context.Context, caps storage.AppMigrati
 	if err := r.group.Add(ctx, r.core); err != nil {
 		return err
 	}
+	if r.cfg.Vault {
+		return nil
+	}
 	if r.cutover == nil {
 		config := privateMail.IdentityCutoverConfig{Scope: r.scope, Service: r.cfg.Rooms, Legacy: r.historical, Authorize: r.resources.Revalidate}
 		if r.historical != nil {
@@ -269,13 +308,19 @@ func (r *Application) prepareTarget(ctx context.Context, caps storage.AppMigrati
 	return nil
 }
 
-func (r *Application) prepareWorker(ctx context.Context, epoch string) error {
+func (r *Application) prepareWorker(ctx context.Context, epoch string, plan contract.KeyPlan) error {
 	if r.worker == nil {
 		source, err := r.source(epoch)
 		if err != nil {
 			return err
 		}
-		worker, err := ingress.New(ingress.Config{Context: r.life, Scope: r.scope, Epoch: epoch, Journal: r.cfg.Journal, Lease: r.resources.WorkLease(), Source: source, Device: r.cfg.Isolated, Executor: privateMail.IngressExecutor{Repository: r.core}})
+		config := ingress.Config{Context: r.life, Scope: r.scope, Epoch: epoch, Journal: r.cfg.Journal, Lease: r.resources.WorkLease(), Source: source, Device: r.cfg.Isolated, Executor: privateMail.IngressExecutor{Repository: r.core}}
+		if r.cfg.Vault {
+			// La bóveda solo reclama lo cifrado para su clave: tras un traspaso o un
+			// vaciado, lo cifrado para la anterior se queda en la cola, intacto.
+			config.KeyID = plan.KeyID
+		}
+		worker, err := ingress.New(config)
 		if err != nil {
 			return err
 		}

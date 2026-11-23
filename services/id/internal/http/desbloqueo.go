@@ -344,6 +344,48 @@ type relevoDatos struct {
 	AuthAge   int64                   `json:"auth_age"`
 	// Web: la vuelta es a una app web; la entrega (si hay clave) va en el fragmento.
 	Web bool `json:"web"`
+	// Login y Typed solo con la clave del puente de una app web (entregaSinTeclear):
+	// la autorización que obliga a teclear la clave, y si esta ya viene de ella.
+	Login string `json:"login,omitempty"`
+	Typed bool   `json:"typed,omitempty"`
+}
+
+// paramTecleado marca la autorización que el propio relevo pide cuando no tiene
+// nada que entregar: esa sí obliga a teclear la clave (`prompt=login`).
+const paramTecleado = "sytue_unlock_typed"
+
+// entregaSinTeclear dice si un `prompt=login` con sesión viva puede seguir sin
+// volver a pedir la clave. Solo el puente de una app web de la suite que trae su
+// clave efímera, y solo la primera vez.
+//
+// La clave de desbloqueo es UNA para toda la cuenta, pero en Safari el puente de
+// cada app tiene su almacén aparte y cada app mandaba a teclear la contraseña otra
+// vez: trece apps, trece veces, que es como se vivía «un cifrado por app». Si este
+// navegador ya la tiene en el origen de Sytue ID, el relevo se la entrega al puente
+// tras un clic de confirmación AQUÍ (un guion inyectado en la app no puede darlo);
+// si no la tiene, el propio relevo pide la autorización tecleada (uriTecleada).
+func entregaSinTeclear(r *http.Request, req authzRequest, client domain.Client) bool {
+	if r.URL.Query().Get(paramTecleado) == "1" {
+		return false
+	}
+	key, ok := quiereRelevo(req, client)
+	return ok && key != "" && !client.EsNativa()
+}
+
+// obligaAEntrar dice si la petición manda identificarse aunque haya sesión:
+// `prompt=login`, salvo la primera pasada del puente de una app web.
+func obligaAEntrar(r *http.Request, req authzRequest, client domain.Client) bool {
+	return pidePromptLogin(r) && !entregaSinTeclear(r, req, client)
+}
+
+// uriTecleada es esta misma autorización obligando a teclear la clave.
+func uriTecleada(r *http.Request) string {
+	u := *r.URL
+	q := u.Query()
+	q.Set("prompt", "login")
+	q.Set(paramTecleado, "1")
+	u.RawQuery = q.Encode()
+	return u.RequestURI()
 }
 
 // entregarCodigo termina la autorización: la redirección de siempre, o el relevo
@@ -370,6 +412,10 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 	if datos.Envelopes == nil {
 		datos.Envelopes = []recoverywrap.Envelope{}
 	}
+	if appKey != "" && datos.Web {
+		datos.Login = uriTecleada(r)
+		datos.Typed = r.URL.Query().Get(paramTecleado) == "1"
+	}
 	for _, e := range envelopes {
 		datos.Hint = base64.StdEncoding.EncodeToString(e.Hint)
 	}
@@ -386,16 +432,35 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 	}
 	s.recordarPasskeyPrimero(w, envelopes)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(relevoPage(i18n.From(r), destino, string(raw))))
+	_, _ = w.Write([]byte(relevoPage(i18n.From(r), destino, datos.Login, string(raw))))
 }
 
 // relevoPage pinta el relevo: «Desbloqueando…» mientras el guion trabaja, la
 // salida a mano si el navegador no deja ir solo a la app, el aviso de una passkey
 // que aún no abre nada (entrar una vez con la contraseña) y el de que la
-// contraseña ya no abre el sobre (con «empezar de cero» tras confirmar).
-func relevoPage(loc, destino, datos string) string {
+// contraseña ya no abre el sobre (con «empezar de cero» tras confirmar). Con la
+// clave del puente de una app web (`login`), además: la confirmación de entregar la
+// clave que este navegador ya tiene, y el aviso de que no hay ninguna que entregar,
+// con la entrada tecleada. Volver a la app con las manos vacías y sin decir nada
+// era un bucle: la app solo sabía pedir «Iniciar sesión» otra vez.
+func relevoPage(loc, destino, login, datos string) string {
 	esc := html.EscapeString
 	t := func(k string) string { return esc(i18n.T(loc, k)) }
+	puente := ""
+	if login != "" {
+		puente = `<section id="e2e-confirm" hidden>` +
+			`<p class="sub">` + t("e2e.confirm_body") + `</p>` +
+			`<p class="sub"><strong id="e2e-app"></strong></p>` +
+			`<button type="button" id="e2e-confirm-go">` + t("e2e.confirm_action") + `</button>` +
+			`<p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.continue") + `</a></p>` +
+			`</section>` +
+			`<section id="e2e-failed" hidden>` +
+			alertHTML(i18n.T(loc, "e2e.lost_title")) +
+			`<p class="sub">` + t("e2e.failed_body") + `</p>` +
+			`<p class="alt"><a class="btn-link" id="e2e-retry" href="` + esc(login) + `">` + t("e2e.retry") + `</a></p>` +
+			`<p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.continue") + `</a></p>` +
+			`</section>`
+	}
 	body := `<p class="sub" id="e2e-working" role="status">` + t("e2e.unlocking") + `</p>` +
 		`<p class="alt" id="e2e-manual" hidden><a class="btn-link" id="e2e-next" href="` + esc(destino) + `">` + t("e2e.back_to_app") + `</a></p>` +
 		`<noscript><p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.back_to_app") + `</a></p></noscript>` +
@@ -411,6 +476,7 @@ func relevoPage(loc, destino, datos string) string {
 		`<label class="check"><input type="checkbox" id="e2e-understood"> ` + t("e2e.start_over_confirm") + `</label>` +
 		`<button type="button" id="e2e-restart" disabled>` + t("e2e.start_over") + `</button>` +
 		`</section>` +
+		puente +
 		`<script type="application/json" id="e2e-relay">` + datos + `</script>` +
 		`<script>` + e2eComunJS + `</script><script>` + e2eRelayJS + `</script>`
 	return loginPage(loc, i18n.T(loc, "e2e.title"), body)

@@ -33,6 +33,13 @@ type Store struct {
 	callMatrix           CallMatrixGate
 	callMedia            CallMediaTransport
 	documentCallsEnabled bool
+	// clavesBoveda verifica las acciones de entrada firmadas por una bóveda (ADR 0087).
+	clavesBoveda ClavesBoveda
+	// baseBoveda sustituye en pruebas a baseDeBovedaSQL (traspaso_boveda.go).
+	baseBoveda func(ctx context.Context, subject, product string) (int64, error)
+	// traspasoID acota la consulta de traspaso de las cuentas de Matrix (plazo
+	// corto y pausa tras una avería de Sytue ID).
+	traspasoID consultaTraspaso
 }
 
 // New construye un Store sobre el pool dado, con el cifrador de secretos en

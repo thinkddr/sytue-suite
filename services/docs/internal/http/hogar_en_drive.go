@@ -113,6 +113,13 @@ func (h *Handler) crearFicheroEnDrive(r *http.Request, kind domain.Kind, titulo 
 	return "drive:" + f.ID, titulo + drive.SufijoDesambiguador(titulo, ext, f.Name), nil
 }
 
+// errUnidadCifrada es la respuesta cuando lo que se pide es escribir en la unidad de
+// una persona cuyo Drive está cifrado de extremo a extremo (ADR 0086): el servidor
+// no puede dejar ahí nada en claro. Código estable para que el cliente lo diga en
+// su idioma y ofrezca descargar el fichero en su lugar.
+var errUnidadCifrada = httpx.ErrConflict.WithCode("drive_private_vault").
+	WithMessage("Your Drive is end-to-end encrypted; the server cannot save files in it.")
+
 // errorDeDrive traduce el fallo al hablar con Drive en la respuesta que le toca a
 // quien intentaba crear el documento.
 //
@@ -129,6 +136,8 @@ func errorDeDrive(w http.ResponseWriter, r *http.Request, err error) {
 			"There is not enough space left in the drive to create this document."))
 	case errors.Is(err, drive.ErrNoAutorizado):
 		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("Sytue Drive rejected this request."))
+	case errors.Is(err, drive.ErrUnidadCifrada):
+		httpx.Fail(w, r, errUnidadCifrada)
 	case errors.Is(err, domain.ErrInvalidKind):
 		fail(w, r, err)
 	default:

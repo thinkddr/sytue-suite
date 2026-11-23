@@ -1007,4 +1007,10 @@ export const en = {
   'compose.imageTooLarge':
     'That image is too large to put in the message (limit {max} MB). Attach it instead.',
   'editor.imageFile': 'From this device',
+  'privateMail.handoverOffer': "Can't open your mail? Empty it and move it to the vault",
+  'privateMail.handoverTitle': 'Empty your mail and move it to the vault',
+  'privateMail.handoverBody':
+    'Encrypted mail that you can no longer open will not be recovered. From now on your mail opens with your Sytue ID sign-in, which you may be asked to repeat.',
+  'privateMail.handoverUnderstood': 'I understand that the mail I cannot open will be lost',
+  'privateMail.handoverConfirm': 'Empty and move to the vault',
 } satisfies Record<string, MessageEntry>;

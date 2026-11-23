@@ -347,4 +347,37 @@ export const nl: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Bewaard in Afbeeldingen › Sytue Photos: {count}',
   'library.saveFailed': 'Kon niet bewaren in de galerij van deze computer: {name}',
   'backup.whileOpen': 'Op deze computer wordt de back-up gemaakt zolang Sytue Fotos open is.',
+  'backup.encryptedWaitTitle': 'Open Sytue Fotos om de versleutelde back-up af te maken',
+  'backup.encryptedWaitBody':
+    'Je Drive is end-to-end versleuteld. Nieuwe foto’s worden geback-upt zodra je Sytue Fotos opent.',
+  'gallery.uploadedEncrypted': 'End-to-end versleuteld opgeslagen in je Drive: {count}',
+  'gallery.uploadVaultSignIn':
+    'Je Drive is end-to-end versleuteld. Meld je opnieuw aan om hem te ontgrendelen en voeg de foto’s daarna opnieuw toe.',
+  'gallery.uploadVaultNotReady':
+    'Je Drive wordt nog overgezet naar end-to-endversleuteling. Open Sytue Drive om dat af te ronden en voeg de foto’s daarna opnieuw toe.',
+  'gallery.uploadVaultLocked':
+    'Je Drive is end-to-end versleuteld. Ontgrendel hem hierboven en voeg de foto’s daarna opnieuw toe.',
+  'gallery.uploadVaultUnavailable':
+    'Je Drive is end-to-end versleuteld en kan op dit apparaat niet worden geopend. Voeg de foto’s toe via Sytue Photos op het web.',
+  'gallery.encrypted.title': 'In je versleutelde Drive',
+  'gallery.encrypted.show': 'Tonen',
+  'gallery.encrypted.opening': 'Ontsleutelen…',
+  'gallery.encrypted.failed': 'Je versleutelde Drive kon niet worden geopend.',
+  'gallery.encrypted.signIn': 'Opnieuw aanmelden',
+  'gallery.encrypted.empty': 'Er staan nog geen foto’s in je versleutelde Drive.',
+  'gallery.encrypted.note':
+    "End-to-end versleutelde foto's worden alleen op dit apparaat ontsleuteld. Sytue AI, vergelijkbare foto's, In de buurt en herinneringen nemen ze niet mee.",
+  'gallery.encrypted.badge': 'End-to-end versleuteld',
+  'gallery.encrypted.open': '{name} openen (versleuteld)',
+  'gallery.encrypted.notSelectable':
+    "Versleutelde foto's kun je niet selecteren: open er een om hem als favoriet te markeren of aan een album toe te voegen.",
+  'gallery.encrypted.actionFailed': 'Je versleutelde galerij kon niet worden bijgewerkt.',
+  'gallery.encrypted.saved':
+    'Opgeslagen als nieuwe versleutelde versie. De vorige blijft in de versiegeschiedenis van Drive.',
+  'gallery.encrypted.albums': 'Versleutelde albums',
+  'gallery.encrypted.newAlbum': 'Nieuw versleuteld album',
+  'gallery.encrypted.saveVersion': 'Opslaan als nieuwe versie',
+  'gallery.encrypted.editHint':
+    'De bewerking gebeurt op dit apparaat en wordt versleuteld opgeslagen als nieuwe versie van de foto.',
+  'gallery.encrypted.albumEmpty': "Dit versleutelde album bevat nog geen foto's.",
 };

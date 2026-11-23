@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
@@ -60,4 +61,24 @@ func (d *Drive) WithPrivateData(data DriveData) (*Drive, error) {
 		return nil, ErrPrivateDriveOperation
 	}
 	return &Drive{c: privateDataClient(d.c, ErrPrivateDriveOperation), data: data}, nil
+}
+
+// Privado dice si este cliente va por los datos privados (WithPrivateData): lo que
+// sube queda cifrado en el dispositivo y el servidor no puede leerlo, así que
+// ningún servicio (Photos, por ejemplo) puede indexarlo por su id.
+func (d *Drive) Privado() bool { return d != nil && d.data != nil }
+
+// ErrUnidadCifrada: el Drive del servidor de esta persona ya no admite escrituras
+// porque está (o está pasando) en almacenamiento privado; contesta 409 con el
+// código `private_storage_migration_required`. Lo que se suba tiene que ir al
+// Drive privado, cifrado en el dispositivo.
+var ErrUnidadCifrada = errors.New("drive: el Drive del servidor está en almacenamiento privado")
+
+// EsUnidadCifrada reconoce ese 409 por su código; cualquier otro 409 no lo es.
+func EsUnidadCifrada(err error) bool {
+	if errors.Is(err, ErrUnidadCifrada) {
+		return true
+	}
+	var e *Error
+	return errors.As(err, &e) && e.Status == http.StatusConflict && e.Code() == "private_storage_migration_required"
 }

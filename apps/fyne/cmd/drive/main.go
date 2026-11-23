@@ -47,6 +47,7 @@ import (
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	privateStorage "git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/pqvault"
 )
 
 // Medidas de la ventana al abrir: el ancho canónico de la suite y un alto que deja ver
@@ -191,8 +192,43 @@ func main() {
 			return screen, nil
 		},
 	}
+	// ofrecerBoveda: con el Drive de esta cuenta abierto en Matrix, ofrece pasarlo
+	// a la bóveda directa, la misma de la web (ADR 0086). Con confirmación; Matrix
+	// no se toca, y al terminar la app vuelve a elegir y abre la bóveda.
+	ofrecerBoveda := func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *cifrado.PreparedDriveRepository) {
+		pasar := func() {
+			paso := cifrado.NuevoPasoBoveda(ctx, cryptoT)
+			dialogo := ui.NuevoDialogo(cryptoT("vault.moveTitle"), paso.Objeto())
+			dialogo.RotuloCerrar = tr.T("ui.close", nil)
+			paso.Cancelar = dialogo.Cerrar
+			paso.Migrar = func(ctx context.Context) error {
+				fabrica, err := cifrado.NuevaFabricaBoveda(s, "drive")
+				if err != nil {
+					return err
+				}
+				consulta := cifrado.ConsultaDriveDeSesion(s, s.Sesion.SnapshotIdentity())
+				return cifrado.MigrarDriveABoveda(s.Sesion.WithAuthorizationIntent(ctx), cifrado.MigracionDrive{
+					Matrix: repository.Repository, Copiar: cifrado.CopiarDesdeMatrix(resources.Devices.Isolated),
+					AbrirBoveda: func(ctx context.Context, vaciar *api.PQVaultExpect) (*pqvault.Vault, error) {
+						return cifrado.AbrirBovedaDeSesion(ctx, s, "drive", vaciar)
+					},
+					Fabrica: fabrica, DriveURL: s.URL("drive"), Arrendamiento: resources.WorkLease(),
+					PendientesMatrix: consulta.PendientesMatrix,
+				})
+			}
+			//nolint:contextcheck // Volver a elegir abre una vida nueva para la cuenta; la de este Drive de Matrix se cierra.
+			paso.Hecho = func() {
+				dialogo.Cerrar()
+				control.reabrir()
+			}
+			dialogo.Mostrar(w.Canvas())
+		}
+		control.cuandoLista(func(p *drive.Pantalla) {
+			p.OfrecerCifrado(cryptoT("vault.moveTitle"), cryptoT("vault.moveOffer"), cryptoT("vault.moveAction"), pasar)
+		})
+	}
 	var cierreAnterior <-chan struct{}
-	control.iniciar = func(ctx context.Context, ready func(context.Context, repositorioPrivado, func(context.Context) error)) error {
+	iniciarMatrix := func(ctx context.Context, ready func(context.Context, repositorioPrivado, func(context.Context) error)) error {
 		legacy, isolated := nuevoPanel(), nuevoPanel()
 		control.panel = isolated
 		control.instalar() //nolint:contextcheck // UI events retain the original presenter's c.ctx; installing callbacks starts no request.
@@ -224,6 +260,17 @@ func main() {
 			})
 		}
 		legacy.Login, isolated.Login = login, login
+		// Quien no puede abrir Matrix vuelve a la copia que guardó el servidor al
+		// congelar, importada en la bóveda como lo haría la web (ADR 0086). Matrix
+		// no se borra: lo escrito después sigue allí, sin leer.
+		isolated.SoltarFuente = func(ctx context.Context) error {
+			if err := cifrado.AdoptarCopiaDrive(ctx, s); err != nil {
+				return err
+			}
+			fyne.Do(control.reabrir)
+			return nil
+		}
+		isolated.SoltarSinIdentificar = true
 		factory, err := cifrado.NewNativeFactory(s, "drive")
 		if err != nil {
 			return err
@@ -252,13 +299,14 @@ func main() {
 					return
 				}
 				control.autorizarAlmacen(ctx, func(ctx context.Context) error { return consent.BeforeOpenPanel(ctx, resources, isolated) }, func() {
-					var err error
-					repository, err = cifrado.NewDriveRepository(ctx, resources, s.URL("drive"), s.URL("rooms"))
+					prepared, err := cifrado.NewDriveRepository(ctx, resources, s.URL("drive"), s.URL("rooms"))
 					if err != nil {
 						failed(err)
 						return
 					}
+					repository = prepared
 					ready(ctx, repository, resources.Check)
+					ofrecerBoveda(ctx, resources, prepared)
 				})
 			},
 			Failed: failed,
@@ -328,6 +376,121 @@ func main() {
 		} else {
 			start(intent)
 		}
+		return nil
+	}
+	// La bóveda directa (ADR 0086): la misma que usa la web. Se desbloquea con la
+	// clave de Sytue ID del dispositivo (PuertaBoveda), sin Matrix ni contraseña
+	// nueva, y su diario es el suyo (sesion.DiarioBoveda), nunca el de Matrix.
+	var iniciarBoveda func(context.Context, func(context.Context, repositorioPrivado, func(context.Context) error)) error
+	iniciarBoveda = func(ctx context.Context, ready func(context.Context, repositorioPrivado, func(context.Context) error)) error {
+		fabrica, err := cifrado.NuevaFabricaBoveda(s, "drive")
+		if err != nil {
+			return err
+		}
+		failed := func(err error) {
+			if ctx.Err() == nil {
+				notify(err)
+			}
+		}
+		// abierta y fallida solo se tocan en el hilo de la interfaz. fallida: la
+		// puerta ya entregó su bóveda y abrir los recursos falló; reintentar
+		// empieza con una puerta nueva.
+		var abierta *cifrado.RecursosBoveda
+		fallida := false
+		//nolint:contextcheck // La puerta vive lo que la cuenta (Iniciar(ctx)); sus botones no reciben contexto.
+		puerta, err := cifrado.PuertaDriveDeSesion(s, cryptoT, func(entrega context.Context, vault *pqvault.Vault) {
+			if ctx.Err() != nil || abierta != nil {
+				vault.Close()
+				return
+			}
+			go func() {
+				recursos, repository, err := cifrado.AbrirDriveBoveda(entrega, fabrica, s.URL("drive"), vault)
+				fyne.Do(func() {
+					if err != nil {
+						fallida = true
+						failed(err)
+						return
+					}
+					if ctx.Err() != nil || abierta != nil {
+						go func() { repository.Close(); recursos.Close() }()
+						return
+					}
+					abierta = recursos
+					ready(recursos.Context(), repository, recursos.Check) //nolint:contextcheck // El repositorio vive lo que la app sobre esa cuenta (testigo persistente), como Resources.Context en Matrix.
+				})
+			}()
+		})
+		if err != nil {
+			return err
+		}
+		control.panel = nil
+		enseñarPuerta := func() {
+			if control.pantalla == nil {
+				slot.Objects = []fyne.CanvasObject{puerta.Objeto()}
+				slot.Refresh()
+			}
+		}
+		control.reintentar = func() { //nolint:contextcheck // Reintentar usa la vida de la puerta, atada a ctx en Iniciar.
+			switch {
+			case abierta != nil:
+			case fallida:
+				puerta.Cerrar()
+				if err := iniciarBoveda(ctx, ready); err != nil {
+					failed(err)
+				}
+			default:
+				enseñarPuerta()
+				puerta.Reintentar() //nolint:contextcheck // Reintentar usa la vida de la puerta, atada a ctx en Iniciar.
+			}
+		}
+		control.mostrar = enseñarPuerta
+		control.cerrarPaneles = func(drain func()) {
+			puerta.Cerrar()
+			recursos := abierta
+			go func() {
+				if drain != nil {
+					drain()
+				}
+				recursos.Close()
+			}()
+		}
+		enseñarPuerta()
+		puerta.Iniciar(ctx)
+		return nil
+	}
+	// Por cuenta: la bóveda si la web ya llevó ahí su Drive y no quedan subidas de
+	// Matrix por terminar; si no, Matrix como hasta ahora (cifrado.ElegirAlmacenDrive).
+	control.iniciar = func(ctx context.Context, ready func(context.Context, repositorioPrivado, func(context.Context) error)) error {
+		decidiendo := false
+		var decidir func()
+		decidir = func() {
+			if decidiendo || ctx.Err() != nil {
+				return
+			}
+			decidiendo = true
+			control.reintentar, control.mostrar = decidir, decidir
+			go func() {
+				almacen, owner, err := cifrado.ElegirDriveDeSesion(ctx, s)
+				fyne.Do(func() {
+					decidiendo = false
+					if ctx.Err() != nil || s.Sesion.SnapshotIdentity() != owner {
+						return
+					}
+					if err == nil {
+						if almacen == cifrado.DriveEnBoveda {
+							err = iniciarBoveda(ctx, ready)
+						} else {
+							err = iniciarMatrix(ctx, ready)
+						}
+					}
+					if err != nil {
+						control.reintentar, control.mostrar = decidir, decidir
+						notify(err)
+					}
+				})
+			}()
+		}
+		decidir()
 		return nil
 	}
 	conEscena := false

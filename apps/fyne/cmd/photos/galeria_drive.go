@@ -11,7 +11,8 @@ import (
 )
 
 // galeriaDriveData delega en el repositorio Drive oculto de esta app lo único
-// que la galería necesita para subir fotos: «/Fotos» y el original. El resto
+// que la galería necesita para subir fotos y para su galería cifrada: «/Fotos», el
+// original, los ficheros de su índice y la versión nueva de una foto editada. El resto
 // de la fachada falla cerrado —esta no es la app de Drive— y el resolve es el
 // mismo del proveedor de pins: pide el Drive oculto y devuelve ErrNotReady si
 // todavía no está montado.
@@ -54,6 +55,29 @@ func (d galeriaDriveData) Upload(ctx context.Context, folder, name, contentType 
 	return repository.Upload(ctx, folder, name, contentType, input, size)
 }
 
+// Download descifra un fichero del Drive privado: el índice de la galería cifrada, sus
+// miniaturas y el original que se abre (ADR 0086). Solo en el dispositivo.
+func (d galeriaDriveData) Download(ctx context.Context, id string) (io.ReadCloser, error) {
+	repository, err := d.resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return repository.Download(ctx, id)
+}
+
+// ReplaceFile guarda una edición de la galería cifrada como versión nueva de la foto
+// vista (ADR 0086): el repositorio rechaza una versión que otro dispositivo ya cambió
+// en vez de pisarla. Solo para eso; no sube ficheros nuevos.
+func (d galeriaDriveData) ReplaceFile(ctx context.Context, original api.File, contentType string, input io.Reader, size int64) (api.File, error) {
+	repository, err := d.resolve(ctx)
+	if err != nil {
+		return api.File{}, err
+	}
+	return repository.ReplaceFile(ctx, original, contentType, input, size)
+}
+
+var _ api.DriveFileReplacer = galeriaDriveData{}
+
 // Lo que la galería no usa queda cerrado: nada de esta fachada gestiona
 // carpetas ajenas, papelera, versiones ni etiquetas.
 
@@ -63,10 +87,6 @@ func (galeriaDriveData) File(context.Context, string) (api.File, error) {
 
 func (galeriaDriveData) Folder(context.Context, string) (api.Folder, error) {
 	return api.Folder{}, api.ErrPrivateDriveOperation
-}
-
-func (galeriaDriveData) Download(context.Context, string) (io.ReadCloser, error) {
-	return nil, api.ErrPrivateDriveOperation
 }
 
 func (galeriaDriveData) Thumbnail(context.Context, string) (io.ReadCloser, error) {

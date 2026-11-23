@@ -347,4 +347,37 @@ export const bg: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Запазени в Картини › Sytue Photos: {count}',
   'library.saveFailed': 'Неуспешно запазване в галерията на този компютър: {name}',
   'backup.whileOpen': 'На този компютър копирането става, докато Sytue Fotos е отворено.',
+  'backup.encryptedWaitTitle': 'Отворете Sytue Fotos, за да завършите шифрованото копие',
+  'backup.encryptedWaitBody':
+    'Вашият Drive е шифрован от край до край. Новите снимки се копират, щом отворите Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Запазени в Drive с шифроване от край до край: {count}',
+  'gallery.uploadVaultSignIn':
+    'Вашият Drive е шифрован от край до край. Влезте отново, за да го отключите, и добавете снимките пак.',
+  'gallery.uploadVaultNotReady':
+    'Вашият Drive все още преминава към шифроване от край до край. Отворете Sytue Drive, за да завършите, и добавете снимките пак.',
+  'gallery.uploadVaultLocked':
+    'Вашият Drive е шифрован от край до край. Отключете го по-горе и добавете снимките пак.',
+  'gallery.uploadVaultUnavailable':
+    'Вашият Drive е шифрован от край до край и не може да се отвори на това устройство. Добавете снимките от Sytue Photos в уеб.',
+  'gallery.encrypted.title': 'Във вашия шифрован Drive',
+  'gallery.encrypted.show': 'Покажи',
+  'gallery.encrypted.opening': 'Дешифриране…',
+  'gallery.encrypted.failed': 'Шифрованият ви Drive не можа да се отвори.',
+  'gallery.encrypted.signIn': 'Влезте отново',
+  'gallery.encrypted.empty': 'Все още няма снимки във вашия шифрован Drive.',
+  'gallery.encrypted.note':
+    'Снимките с шифроване от край до край се дешифрират само на това устройство. Sytue AI, подобните снимки, Наблизо и спомените не ги включват.',
+  'gallery.encrypted.badge': 'Шифрована от край до край',
+  'gallery.encrypted.open': 'Отваряне на {name} (шифрована)',
+  'gallery.encrypted.notSelectable':
+    'Шифрованите снимки не могат да се избират: отворете една, за да я отбележите като любима или да я добавите в албум.',
+  'gallery.encrypted.actionFailed': 'Шифрованата ви галерия не можа да се обнови.',
+  'gallery.encrypted.saved':
+    'Запазена като нова шифрована версия. Предишната остава в историята на версиите в Drive.',
+  'gallery.encrypted.albums': 'Шифровани албуми',
+  'gallery.encrypted.newAlbum': 'Нов шифрован албум',
+  'gallery.encrypted.saveVersion': 'Запазване като нова версия',
+  'gallery.encrypted.editHint':
+    'Редакцията се прави на това устройство и се запазва шифрована като нова версия на снимката.',
+  'gallery.encrypted.albumEmpty': 'Този шифрован албум все още няма снимки.',
 };

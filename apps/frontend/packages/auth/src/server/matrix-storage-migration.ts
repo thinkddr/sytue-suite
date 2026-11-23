@@ -209,16 +209,19 @@ export function rutaMigracionMatrixPrivada(options: {
     prepararAutenticada: (ctx, session) => {
       const path = (ctx.params.ruta ?? '').slice('migration'.length).replace(/^\//, ''),
         parts = path.split('/'),
-        method = ctx.request.method;
+        method = ctx.request.method,
+        // «Soltar la fuente» (ADR 0086): solo POST, con el mismo cuerpo acotado.
+        release = path === 'release' && product !== 'drive' && product !== 'photos';
       if (
         path !== '' &&
+        !release &&
         !(
           isMigrationEpoch(parts[0]) &&
           ((parts.length === 2 && parts[1] === 'rows') || validMigrationLeaf(product, parts))
         )
       )
         return fail(400, 'private_storage_source_invalid');
-      if (method !== 'GET' && !(path === '' && method === 'POST'))
+      if (release ? method !== 'POST' : method !== 'GET' && !(path === '' && method === 'POST'))
         return fail(405, 'method_not_allowed');
       const query = ctx.url.searchParams;
       if (

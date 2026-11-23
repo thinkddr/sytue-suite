@@ -381,4 +381,38 @@ export const mt: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Issejvjati fi Stampi › Sytue Photos: {count}',
   'library.saveFailed': 'Ma setax tissejvja fil-gallerija ta’ dan il-kompjuter: {name}',
   'backup.whileOpen': 'F’dan il-kompjuter, il-backup isir sakemm Sytue Fotos tkun miftuħa.',
+  'backup.encryptedWaitTitle': 'Iftaħ Sytue Fotos biex tlesti l-backup kriptat',
+  'backup.encryptedWaitBody':
+    'Id-Drive tiegħek huwa kriptat minn tarf għal tarf. Ir-ritratti l-ġodda jsirilhom backup hekk kif tiftaħ Sytue Fotos.',
+  'gallery.uploadedEncrypted':
+    'Issejvjati fid-Drive tiegħek b’kriptaġġ minn tarf għal tarf: {count}',
+  'gallery.uploadVaultSignIn':
+    'Id-Drive tiegħek huwa kriptat minn tarf għal tarf. Idħol mill-ġdid biex tiftħu, imbagħad erġa’ żid ir-ritratti.',
+  'gallery.uploadVaultNotReady':
+    'Id-Drive tiegħek għadu qed jgħaddi għall-kriptaġġ minn tarf għal tarf. Iftaħ Sytue Drive biex tlesti, imbagħad erġa’ żid ir-ritratti.',
+  'gallery.uploadVaultLocked':
+    'Id-Drive tiegħek huwa kriptat minn tarf għal tarf. Iftħu hawn fuq, imbagħad erġa’ żid ir-ritratti.',
+  'gallery.uploadVaultUnavailable':
+    'Id-Drive tiegħek huwa kriptat minn tarf għal tarf u ma jistax jinfetaħ fuq dan l-apparat. Żid ir-ritratti minn Sytue Photos fuq il-web.',
+  'gallery.encrypted.title': 'Fid-Drive kriptat tiegħek',
+  'gallery.encrypted.show': 'Uri',
+  'gallery.encrypted.opening': 'Qed jiġi dekriptat…',
+  'gallery.encrypted.failed': 'Ma setax jinfetaħ id-Drive kriptat tiegħek.',
+  'gallery.encrypted.signIn': 'Idħol mill-ġdid',
+  'gallery.encrypted.empty': 'Għad m’hemmx ritratti fid-Drive kriptat tiegħek.',
+  'gallery.encrypted.note':
+    "Ir-ritratti kriptati minn tarf sa tarf jiġu dekriptati biss f'dan l-apparat. Sytue AI, ritratti simili, Fil-qrib u l-memorji ma jinkluduhomx.",
+  'gallery.encrypted.badge': 'Kriptat minn tarf sa tarf',
+  'gallery.encrypted.open': 'Iftaħ {name} (kriptat)',
+  'gallery.encrypted.notSelectable':
+    "Ir-ritratti kriptati ma jistgħux jintgħażlu: iftaħ wieħed biex timmarkah bħala favorit jew iżżidu ma' album.",
+  'gallery.encrypted.actionFailed': 'Ma setgħetx tiġi aġġornata l-gallerija kriptata tiegħek.',
+  'gallery.encrypted.saved':
+    "Issejvjat bħala verżjoni kriptata ġdida. Ta' qabel tibqa' fl-istorja tal-verżjonijiet ta' Drive.",
+  'gallery.encrypted.albums': 'Albums kriptati',
+  'gallery.encrypted.newAlbum': 'Album kriptat ġdid',
+  'gallery.encrypted.saveVersion': 'Issejvja bħala verżjoni ġdida',
+  'gallery.encrypted.editHint':
+    "L-editjar isir f'dan l-apparat u jiġi ssejvjat kriptat bħala verżjoni ġdida tar-ritratt.",
+  'gallery.encrypted.albumEmpty': "Dan l-album kriptat għad m'għandux ritratti.",
 };

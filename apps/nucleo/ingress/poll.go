@@ -62,7 +62,7 @@ func (w *Worker) Poll(parent context.Context) (PollResult, error) {
 		return result, errors.Join(append(failures, contract.ErrContract)...)
 	}
 	for _, task := range page.Tasks {
-		if attempted[task.ID] {
+		if attempted[task.ID] || w.cfg.KeyID != "" && task.KeyID != w.cfg.KeyID {
 			continue
 		}
 		err := w.pollTask(ctx, task.ID, &result, attempted)

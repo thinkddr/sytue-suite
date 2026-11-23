@@ -378,4 +378,37 @@ export const sk: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Uložené do Obrázky › Sytue Photos: {count}',
   'library.saveFailed': 'Nepodarilo sa uložiť do galérie tohto počítača: {name}',
   'backup.whileOpen': 'Na tomto počítači sa zálohuje, kým je Sytue Fotos otvorená.',
+  'backup.encryptedWaitTitle': 'Otvorte Sytue Fotos a dokončite šifrovanú zálohu',
+  'backup.encryptedWaitBody':
+    'Váš Drive je šifrovaný end-to-end. Nové fotky sa zálohujú, hneď ako otvoríte Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Uložené do Drive so šifrovaním end-to-end: {count}',
+  'gallery.uploadVaultSignIn':
+    'Váš Drive je šifrovaný end-to-end. Prihláste sa znova, aby ste ho odomkli, a fotky pridajte znova.',
+  'gallery.uploadVaultNotReady':
+    'Váš Drive ešte prechádza na šifrovanie end-to-end. Otvorte Sytue Drive, dokončite to a fotky pridajte znova.',
+  'gallery.uploadVaultLocked':
+    'Váš Drive je šifrovaný end-to-end. Odomknite ho vyššie a fotky pridajte znova.',
+  'gallery.uploadVaultUnavailable':
+    'Váš Drive je šifrovaný end-to-end a v tomto zariadení ho nemožno otvoriť. Pridajte fotky zo Sytue Photos na webe.',
+  'gallery.encrypted.title': 'Vo vašom šifrovanom Drive',
+  'gallery.encrypted.show': 'Zobraziť',
+  'gallery.encrypted.opening': 'Dešifrovanie…',
+  'gallery.encrypted.failed': 'Šifrovaný Drive sa nepodarilo otvoriť.',
+  'gallery.encrypted.signIn': 'Prihlásiť sa znova',
+  'gallery.encrypted.empty': 'Vo vašom šifrovanom Drive zatiaľ nie sú žiadne fotky.',
+  'gallery.encrypted.note':
+    'Fotky šifrované end-to-end sa dešifrujú len na tomto zariadení. Sytue AI, podobné fotky, V okolí a spomienky ich nezahŕňajú.',
+  'gallery.encrypted.badge': 'Šifrované end-to-end',
+  'gallery.encrypted.open': 'Otvoriť {name} (šifrovaná)',
+  'gallery.encrypted.notSelectable':
+    'Šifrované fotky nemožno vybrať: otvorte jednu a označte ju ako obľúbenú alebo ju pridajte do albumu.',
+  'gallery.encrypted.actionFailed': 'Šifrovanú galériu sa nepodarilo aktualizovať.',
+  'gallery.encrypted.saved':
+    'Uložené ako nová šifrovaná verzia. Predchádzajúca zostáva v histórii verzií na Drive.',
+  'gallery.encrypted.albums': 'Šifrované albumy',
+  'gallery.encrypted.newAlbum': 'Nový šifrovaný album',
+  'gallery.encrypted.saveVersion': 'Uložiť ako novú verziu',
+  'gallery.encrypted.editHint':
+    'Úprava prebieha na tomto zariadení a uloží sa šifrovane ako nová verzia fotky.',
+  'gallery.encrypted.albumEmpty': 'Tento šifrovaný album zatiaľ nemá žiadne fotky.',
 };

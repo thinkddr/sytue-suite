@@ -88,7 +88,7 @@ func ApplyPrivateIngressAction(ctx context.Context, tx pgx.Tx, cfg AuthorizedPri
 	result.Authorization = authorization
 	switch request.Kind {
 	case "key.enroll":
-		err = EnrollPrivateIngress(ctx, tx, cfg.PrivateIngressConfig, *request.Enrollment, request.Target, authorization.SigningKey)
+		err = EnrollAuthorizedPrivateIngress(ctx, tx, cfg.PrivateIngressConfig, *request.Enrollment, request.Target, authorization)
 	case "task.claim":
 		var claim ingress.Claim
 		claim, err = ClaimPrivateIngress(ctx, tx, cfg.PrivateIngressConfig, request.Claim.TaskID, request.Target, request.Claim.Token, time.Duration(request.Claim.LeaseSeconds)*time.Second)

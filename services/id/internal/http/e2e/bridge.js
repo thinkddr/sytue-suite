@@ -44,10 +44,29 @@
   if (!E) return;
   var enc = new TextEncoder();
   var WRAP_LABEL = "sytue-matrix-recovery-wrap-v1";
+  var VAULT_WRAP_LABEL = "sytue-pq-vault-wrap-v1";
+  var VAULT_PROFILE = "age-MLKEM768-X25519-v1";
   var VERSION = 2;
   var MAX_WRAPPERS = 32;
   var MAX_RECOVERY = 256;
   var RATE = 10;
+  var PRODUCTS = [
+    "hub",
+    "mail",
+    "drive",
+    "docs",
+    "sheets",
+    "slides",
+    "pdf",
+    "calendar",
+    "contacts",
+    "notes",
+    "photos",
+    "rooms",
+    "cast",
+    "erp",
+    "bases",
+  ];
 
   // El host de la app de cada producto con cuenta aislada (`appDomains` de
   // @sytue/config): el suyo propio, si no se llama igual que el producto.
@@ -119,6 +138,51 @@
     }
     if (SUITE_HOSTS.indexOf(host) < 0) return true;
     return (HOSTS[iso[1]] || [iso[1]]).indexOf(host) >= 0;
+  };
+
+  /**
+   * ¿Puede la app de `origin` operar la bóveda post-cuántica de `product` (ADR 0086)?
+   * En un host propio de la suite solo el de ese producto; en un host de organización
+   * (mismo origen para todas sus apps), cualquier producto válido.
+   */
+  E.productAllowed = function (origin, product) {
+    if (typeof product !== "string" || PRODUCTS.indexOf(product) < 0)
+      return false;
+    var host = "";
+    try {
+      host = new URL(origin).hostname.split(".")[0];
+    } catch (e) {
+      return false;
+    }
+    if (SUITE_HOSTS.indexOf(host) < 0) return true;
+    return (HOSTS[product] || [product]).indexOf(host) >= 0;
+  };
+
+  // Las apps que, en su host propio, ABREN (solo abren) la bóveda de otro producto
+  // porque guardan en ella: Photos sube sus originales al Drive de la persona,
+  // Docus, Calcus y Diapos guardan ahí el fichero de un documento («Guardar en
+  // Drive») y CertiPDF firma en el dispositivo los PDF de ese Drive y deja ahí el
+  // firmado; con el Drive en la bóveda lo cifran en el navegador (ADR 0086). Crear,
+  // vaciar o volver a sellar esa bóveda sigue siendo solo de la app del producto.
+  var VAULT_READERS = {
+    drive: ["photos", "docus", "calcus", "diapos", "certipdf"],
+  };
+
+  /**
+   * ¿Puede la app de `origin` ABRIR la bóveda de `product`? Lo mismo que
+   * `productAllowed`, más las apps de `VAULT_READERS` en su host propio.
+   */
+  E.productOpenAllowed = function (origin, product) {
+    if (E.productAllowed(origin, product)) return true;
+    if (!Object.prototype.hasOwnProperty.call(VAULT_READERS, product))
+      return false;
+    var host = "";
+    try {
+      host = new URL(origin).hostname.split(".")[0];
+    } catch (e) {
+      return false;
+    }
+    return VAULT_READERS[product].indexOf(host) >= 0;
   };
 
   function aad(kind, account, keyID, cred) {
@@ -295,6 +359,226 @@
     });
   };
 
+  function vaultScopePart(s, max) {
+    return (
+      typeof s === "string" &&
+      s.length > 0 &&
+      s.length <= max &&
+      !/[\0\r\n]/.test(s)
+    );
+  }
+  function vaultAAD(tenant, product, sub, keyID) {
+    return enc.encode(
+      [VAULT_WRAP_LABEL, tenant, product, sub, keyID].join("\0"),
+    );
+  }
+  function vaultWrapperShape(w) {
+    return (
+      !!w &&
+      typeof w === "object" &&
+      w.v === 1 &&
+      w.kind === "sytue-id" &&
+      w.profile === VAULT_PROFILE &&
+      vaultScopePart(w.key_id, 128) &&
+      typeof w.recipient === "string" &&
+      w.recipient.length > 0 &&
+      w.recipient.length <= 4096 &&
+      typeof w.nonce === "string" &&
+      typeof w.ciphertext === "string" &&
+      !!w.kdf &&
+      typeof w.kdf === "object" &&
+      w.kdf.alg === "sytue-id-unlock-hkdf-sha256" &&
+      typeof w.kdf.hint === "string"
+    );
+  }
+  function vaultSecretShape(s) {
+    return (
+      !!s &&
+      typeof s === "object" &&
+      s.v === 1 &&
+      s.profile === VAULT_PROFILE &&
+      typeof s.identity === "string" &&
+      s.identity.length > 0 &&
+      s.identity.length <= 4096 &&
+      typeof s.owner_key === "string" &&
+      s.owner_key.length > 0 &&
+      s.owner_key.length <= 128 &&
+      // La clave de firma híbrida (ADR 0087) es opcional: las bóvedas de antes no
+      // la tienen. Si viene, son sus dos semillas de 32 bytes en base64.
+      (s.signing_key === undefined ||
+        (typeof s.signing_key === "string" &&
+          /^[A-Za-z0-9+/]{86}==$/.test(s.signing_key)))
+    );
+  }
+  /** El secreto tal como se sella: solo sus campos, en este orden. */
+  function vaultSecretPlain(s) {
+    var out = {
+      v: 1,
+      profile: s.profile,
+      identity: s.identity,
+      owner_key: s.owner_key,
+    };
+    if (s.signing_key !== undefined) out.signing_key = s.signing_key;
+    return out;
+  }
+  /**
+   * Deriva `vaultWrap` bajo demanda para cuentas iniciadas antes de ADR 0086.
+   *
+   * Si la caja de ese registro ya no se puede revelar (otra clave de dispositivo,
+   * almacenamiento a medias), se trata como si no hubiera clave: `signin`, que trae
+   * la vigente con la vuelta del inicio de sesión. Rechazar dejaba el puente en
+   * `unavailable`, un callejón sin salida para quien ya cifraba antes.
+   */
+  function ensureVaultWrap(sub, rec) {
+    if (!rec) return Promise.resolve(null);
+    if (E.sealedKey(rec.vaultWrap)) return Promise.resolve(rec);
+    return E.revealUnlock(sub, rec)
+      .then(function (key) {
+        return E.vaultWrapKey(key, ["encrypt", "decrypt"]).then(
+          function (vw) {
+            E.wipe(key);
+            var next = {};
+            Object.keys(rec).forEach(function (k) {
+              next[k] = rec[k];
+            });
+            next.vaultWrap = vw;
+            return E.store.put("auk:" + sub, next).then(function () {
+              return next;
+            });
+          },
+          function (err) {
+            E.wipe(key);
+            throw err;
+          },
+        );
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+  function openVaultWith(key, tenant, product, sub, w) {
+    return global.crypto.subtle
+      .decrypt(
+        {
+          name: "AES-GCM",
+          iv: E.unb64(w.nonce),
+          additionalData: vaultAAD(tenant, product, sub, w.key_id),
+        },
+        key,
+        E.unb64(w.ciphertext),
+      )
+      .then(function (plain) {
+        var bytes = new Uint8Array(plain);
+        try {
+          var secret = JSON.parse(
+            new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+          );
+          if (!vaultSecretShape(secret)) throw new Error("secret");
+          return secret;
+        } finally {
+          E.wipe(bytes);
+        }
+      });
+  }
+
+  /** `sytue-e2e-vault-unwrap`: abre el envoltorio PQ de un producto (ADR 0086). */
+  E.bridgeVaultUnwrap = function (m) {
+    if (
+      !vaultScopePart(m.tenant, 128) ||
+      typeof m.product !== "string" ||
+      PRODUCTS.indexOf(m.product) < 0
+    )
+      return Promise.resolve({ error: "invalid" });
+    var wrappers = Array.isArray(m.wrappers)
+      ? m.wrappers.slice(0, MAX_WRAPPERS).filter(vaultWrapperShape)
+      : [];
+    return E.load("auk:" + m.sub)
+      .catch(function () {
+        return null;
+      })
+      .then(function (rec) {
+        return ensureVaultWrap(m.sub, rec);
+      })
+      .then(function (rec) {
+        if (!rec) return { error: "signin" };
+        var mine = wrappers.filter(function (w) {
+          return w.kdf.hint === rec.hint;
+        });
+        return first(mine, function (w) {
+          return openVaultWith(
+            rec.vaultWrap,
+            m.tenant,
+            m.product,
+            m.sub,
+            w,
+          ).then(function (secret) {
+            return {
+              secret: secret,
+              key_id: w.key_id,
+              recipient: w.recipient,
+              profile: w.profile,
+            };
+          });
+        }).then(function (got) {
+          if (got) return got;
+          return { error: "wrong" };
+        });
+      });
+  };
+
+  /** `sytue-e2e-vault-wrap`: envuelve una clave de bóveda PQ con la AUK (ADR 0086). */
+  E.bridgeVaultWrap = function (m) {
+    if (
+      !vaultScopePart(m.tenant, 128) ||
+      typeof m.product !== "string" ||
+      PRODUCTS.indexOf(m.product) < 0 ||
+      m.profile !== VAULT_PROFILE ||
+      !vaultScopePart(m.key_id, 128) ||
+      typeof m.recipient !== "string" ||
+      !m.recipient ||
+      m.recipient.length > 4096 ||
+      !vaultSecretShape(m.secret)
+    )
+      return Promise.resolve({ error: "invalid" });
+    return E.load("auk:" + m.sub)
+      .catch(function () {
+        return null;
+      })
+      .then(function (rec) {
+        return ensureVaultWrap(m.sub, rec);
+      })
+      .then(function (rec) {
+        if (!rec) return { error: "signin" };
+        var nonce = E.random(12);
+        var plain = enc.encode(JSON.stringify(vaultSecretPlain(m.secret)));
+        return global.crypto.subtle
+          .encrypt(
+            {
+              name: "AES-GCM",
+              iv: nonce,
+              additionalData: vaultAAD(m.tenant, m.product, m.sub, m.key_id),
+            },
+            rec.vaultWrap,
+            plain,
+          )
+          .then(function (ct) {
+            E.wipe(plain);
+            return {
+              wrapper: {
+                v: 1,
+                kind: "sytue-id",
+                profile: m.profile,
+                key_id: m.key_id,
+                recipient: m.recipient,
+                kdf: { alg: "sytue-id-unlock-hkdf-sha256", hint: rec.hint },
+                nonce: E.b64(nonce),
+                ciphertext: E.b64(new Uint8Array(ct)),
+              },
+            };
+          });
+      });
+  };
+
   var HANDOFF_TTL = 30 * 60 * 1000;
   var CURVE = { name: "ECDH", namedCurve: "P-256" };
   function handoffRecord(h, now) {
@@ -461,6 +745,25 @@
             ? E.bridgeUnwrap(m, t)
             : E.bridgeWrap(m, t);
         });
+      } else if (
+        m.type === "sytue-e2e-vault-unwrap" ||
+        m.type === "sytue-e2e-vault-wrap"
+      ) {
+        var allowed =
+          m.type === "sytue-e2e-vault-unwrap"
+            ? E.productOpenAllowed(origin, m.product)
+            : E.productAllowed(origin, m.product);
+        if (!allowed) {
+          reply(m.id, { ok: false, error: "account" });
+          return;
+        }
+        op = (
+          m.handoff ? E.takeHandoff(m.sub, m.handoff, t) : Promise.resolve()
+        ).then(function () {
+          return m.type === "sytue-e2e-vault-unwrap"
+            ? E.bridgeVaultUnwrap(m)
+            : E.bridgeVaultWrap(m);
+        });
       } else if (m.type === "sytue-e2e-password" && cfg.password === true) {
         // Solo «Mi cuenta» (el servidor lo dice en `password`): el sobre de la
         // contraseña nueva, si la actual abre el vigente (ADR 0085).
@@ -483,14 +786,18 @@
       }
       op.then(
         function (out) {
-          // Sin clave aquí: la clave efímera con la que el relevo puede devolverla.
-          if (out.error === "signin")
+          // Sin clave aquí, o con una que no es la de sus envoltorios: la clave
+          // efímera con la que el relevo puede devolver la vigente. En `wrong` hace
+          // falta igual: un puente apartado (Safari) que guardó una clave de
+          // desbloqueo ANTERIOR solo la sustituye por esta vía; sin ella, volver a
+          // entrar no cambiaba nada y la persona solo podía vaciar sus datos.
+          if (out.error === "signin" || out.error === "wrong")
             return E.handoffKey(t).then(
               function (pub) {
-                reply(m.id, { ok: false, error: "signin", handoff_key: pub });
+                reply(m.id, { ok: false, error: out.error, handoff_key: pub });
               },
               function () {
-                reply(m.id, { ok: false, error: "signin" });
+                reply(m.id, { ok: false, error: out.error });
               },
             );
           if (out.error) reply(m.id, { ok: false, error: out.error });

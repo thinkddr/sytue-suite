@@ -174,6 +174,32 @@ paths:
             schema: { type: object, properties: { starred: { type: boolean } } }
       responses: { '204': { description: Sin contenido } }
 
+  /v1/documents/{id}/vault-anchor:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    put:
+      tags: [documents]
+      summary: Ancla el documento a su fichero del Drive de la bóveda (ADR 0086)
+      description: >
+        Con el Drive del dueño en la bóveda, el fichero lo escribe el navegador, cifrado;
+        aquí solo llega el ancla `vault:<uuid>`. Solo el dueño, solo desde sin ancla o
+        desde otra de la bóveda, y solo si la que hay es `expect`. No cambia `updated_at`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_ref]
+              properties:
+                source_ref: { type: string, example: 'vault:0b5e7a1c-3f2d-4e6b-9a8c-1d2e3f4a5b6c' }
+                expect: { type: string, description: 'El ancla que hay ahora ("" = ninguna)' }
+      responses:
+        '204': { description: Sin contenido (también si ya tenía esa ancla) }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
   /v1/documents/{id}/thumbnail:
     parameters: [ { $ref: '#/components/parameters/DocId' } ]
     get:

@@ -18,6 +18,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/photos/galeriacifrada"
 )
 
 // El editor vivo: el estado que en la web vive en los `useState` de Editor.tsx. Se abre a
@@ -55,16 +56,22 @@ type estadoEditor struct {
 	capa       *capaVisor
 	deshacerAt *desktop.CustomShortcut
 	guardarAt  *desktop.CustomShortcut
+
+	// cifrada es la foto de la galería cifrada que se edita (editor_cifrado.go); nil,
+	// una del servidor.
+	cifrada *galeriacifrada.Foto
 }
 
 // AbrirEditor abre el editor con esa foto. `volver` es la carpeta de Drive de la que se
 // vino, si se vino de allí.
-func (a *App) AbrirEditor(f api.Photo, volver string) {
+func (a *App) AbrirEditor(f api.Photo, volver string) { a.abrirEditorCon(f, volver, nil) }
+
+func (a *App) abrirEditorCon(f api.Photo, volver string, cifrada *galeriacifrada.Foto) {
 	a.cerrarVisor()
 	a.cerrarEditor()
 	e := &estadoEditor{
 		foto: f, volver: volver, receta: api.RecetaVacia(), guardada: api.RecetaVacia(),
-		cargando: true, lienzo: NuevoLienzoEditor(),
+		cargando: true, lienzo: NuevoLienzoEditor(), cifrada: cifrada,
 	}
 	e.peticion = NuevaAreaPeticion(a.v)
 	// «Editar con IA» se enciende al escribir: se repinta solo cuando cambia si hay
@@ -135,6 +142,10 @@ func (e *estadoEditor) editable() bool {
 // vigente lleva la receta horneada, y volver a aplicársela enseñaría cada ajuste dos
 // veces; el original se pide por la huella de la receta vacía.
 func (a *App) cargarEditor(e *estadoEditor) {
+	if e.cifrada != nil {
+		a.cargarEditorCifrado(e)
+		return
+	}
 	if a.cli == nil {
 		return
 	}
@@ -246,7 +257,7 @@ func (a *App) pintarEditor() {
 	d := Editor{
 		Foto: e.foto, Receta: e.receta, Sucia: e.sucia(), Lienzo: e.lienzo,
 		Cargando: e.cargando, Guardando: e.guardando, Pendiente: e.pendiente != nil, Aviso: e.aviso,
-		VolverDrive: e.volver != "", PestanaIA: e.pestanaIA,
+		VolverDrive: e.volver != "", PestanaIA: e.pestanaIA && e.cifrada == nil, Cifrada: e.cifrada != nil,
 		Comparar:   e.comparar,
 		Recortando: e.recortando, HayMarco: e.hayMarco,
 		Proporcion: e.proporcion, Fondo: a.fondoLienzo(),
@@ -361,7 +372,11 @@ func (a *App) cancelarRecorte() {
 // guardarEdicion manda la receta ENTERA. La galería verá lo editado al volver a pedirla.
 func (a *App) guardarEdicion() {
 	e := a.ed
-	if e == nil || e.cargando || e.original == nil || e.guardando || a.cli == nil || !e.sucia() {
+	if e == nil || e.cargando || e.original == nil || e.guardando || a.cli == nil && e.cifrada == nil || !e.sucia() {
+		return
+	}
+	if e.cifrada != nil {
+		a.guardarEdicionCifrada(e)
 		return
 	}
 	e.guardando = true
@@ -410,7 +425,8 @@ func (a *App) guardarEdicion() {
 // propone a la receta: el recorte como un paso más y cada ajuste en su deslizador.
 func (a *App) editarConIA(accion string) {
 	e := a.ed
-	if e == nil || !e.editable() || e.iaCargando || a.cli == nil {
+	// Sytue AI no ve las fotos cifradas: su editor no tiene esa pestaña.
+	if e == nil || !e.editable() || e.iaCargando || a.cli == nil || e.cifrada != nil {
 		return
 	}
 	peticion := strings.TrimSpace(e.peticion.Texto())

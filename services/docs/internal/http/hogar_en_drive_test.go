@@ -21,6 +21,7 @@ import (
 // los bytes recibidos, que es lo que estos tests miran.
 type driveDeMentira struct {
 	estadoSubida int
+	cuerpoSubida string
 	nombre       string
 	bytes        []byte
 	subidas      int
@@ -44,6 +45,7 @@ func (d *driveDeMentira) cliente(t *testing.T) *drive.Cliente {
 		d.bytes, _ = io.ReadAll(r.Body)
 		if d.estadoSubida != 0 {
 			w.WriteHeader(d.estadoSubida)
+			_, _ = io.WriteString(w, d.cuerpoSubida)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -129,6 +131,50 @@ func TestCrearDocumentoConLaUnidadLlena(t *testing.T) {
 
 	if rec.Code != http.StatusInsufficientStorage {
 		t.Fatalf("estado = %d, quiero 507: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// LA UNIDAD EN LA BÓVEDA (ADR 0086). Con el Drive de la persona cifrado de extremo
+// a extremo, Drive rechaza la copia en claro (409 private_storage_migration_required).
+// El documento se crea igual, solo en Docs y sin ancla: antes no se creaba ninguno.
+func TestCrearDocumentoConLaUnidadCifrada(t *testing.T) {
+	d := &driveDeMentira{
+		estadoSubida: http.StatusConflict,
+		cuerpoSubida: `{"error":{"code":"private_storage_migration_required","message":"x"}}`,
+	}
+	h := newHandler(&fakeStore{})
+	h.drive = d.cliente(t)
+
+	rec := httptest.NewRecorder()
+	h.createDocument(rec, peticionCrear(t, `{"kind":"document","title":"Acta"}`))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("estado = %d, quiero 201: %s", rec.Code, rec.Body.String())
+	}
+	var resp documentResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("respuesta: %v", err)
+	}
+	if resp.Document.SourceRef != "" {
+		t.Errorf("source_ref = %q; sin fichero en la unidad no hay ancla", resp.Document.SourceRef)
+	}
+	if resp.Document.Title != "Acta" {
+		t.Errorf("título = %q", resp.Document.Title)
+	}
+}
+
+// Cualquier otro 409 de Drive sigue sin crear el documento: solo la unidad cifrada,
+// dicha por su código, deja crear sin fichero.
+func TestCrearDocumentoConOtroConflictoDeDrive(t *testing.T) {
+	d := &driveDeMentira{estadoSubida: http.StatusConflict, cuerpoSubida: `{"error":{"code":"conflict"}}`}
+	h := newHandler(&fakeStore{})
+	h.drive = d.cliente(t)
+
+	rec := httptest.NewRecorder()
+	h.createDocument(rec, peticionCrear(t, `{"kind":"document","title":"Acta"}`))
+
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Fatalf("estado = %d; con un fallo cualquiera de Drive no se crea el documento", rec.Code)
 	}
 }
 

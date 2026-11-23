@@ -340,4 +340,37 @@ export const nb: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Lagret i Bilder › Sytue Photos: {count}',
   'library.saveFailed': 'Kunne ikke lagre i galleriet på denne datamaskinen: {name}',
   'backup.whileOpen': 'På denne datamaskinen sikkerhetskopieres det mens Sytue Fotos er åpen.',
+  'backup.encryptedWaitTitle': 'Åpne Sytue Fotos for å fullføre den krypterte sikkerhetskopien',
+  'backup.encryptedWaitBody':
+    'Drive-en din er ende-til-ende-kryptert. Nye bilder sikkerhetskopieres så snart du åpner Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Lagret ende-til-ende-kryptert i Drive: {count}',
+  'gallery.uploadVaultSignIn':
+    'Drive er ende-til-ende-kryptert. Logg på igjen for å låse den opp, og legg til bildene på nytt.',
+  'gallery.uploadVaultNotReady':
+    'Drive er fortsatt i ferd med å gå over til ende-til-ende-kryptering. Åpne Sytue Drive for å fullføre, og legg til bildene på nytt.',
+  'gallery.uploadVaultLocked':
+    'Drive er ende-til-ende-kryptert. Lås den opp ovenfor, og legg til bildene på nytt.',
+  'gallery.uploadVaultUnavailable':
+    'Drive er ende-til-ende-kryptert og kan ikke åpnes på denne enheten. Legg til bildene fra Sytue Photos på nettet.',
+  'gallery.encrypted.title': 'I den krypterte Drive-en din',
+  'gallery.encrypted.show': 'Vis',
+  'gallery.encrypted.opening': 'Dekrypterer…',
+  'gallery.encrypted.failed': 'Kunne ikke åpne den krypterte Drive-en din.',
+  'gallery.encrypted.signIn': 'Logg på igjen',
+  'gallery.encrypted.empty': 'Det er ingen bilder i den krypterte Drive-en din ennå.',
+  'gallery.encrypted.note':
+    'Ende-til-ende-krypterte bilder dekrypteres bare på denne enheten. Sytue AI, lignende bilder, I nærheten og minner tar dem ikke med.',
+  'gallery.encrypted.badge': 'Ende-til-ende-kryptert',
+  'gallery.encrypted.open': 'Åpne {name} (kryptert)',
+  'gallery.encrypted.notSelectable':
+    'Krypterte bilder kan ikke velges: Åpne et for å markere det som favoritt eller legge det til i et album.',
+  'gallery.encrypted.actionFailed': 'Kunne ikke oppdatere det krypterte galleriet ditt.',
+  'gallery.encrypted.saved':
+    'Lagret som en ny kryptert versjon. Den forrige blir værende i versjonsloggen i Drive.',
+  'gallery.encrypted.albums': 'Krypterte album',
+  'gallery.encrypted.newAlbum': 'Nytt kryptert album',
+  'gallery.encrypted.saveVersion': 'Lagre som ny versjon',
+  'gallery.encrypted.editHint':
+    'Redigeringen gjøres på denne enheten og lagres kryptert som en ny versjon av bildet.',
+  'gallery.encrypted.albumEmpty': 'Dette krypterte albumet har ingen bilder ennå.',
 };

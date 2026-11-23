@@ -1034,4 +1034,12 @@ export const de: AppCatalog<typeof en> = {
     'Die E-Mail wurde angenommen, aber eine Kopie konnte nicht unter „Gesendet“ gespeichert werden. Sende sie nicht erneut.',
   'externalMail.invalidConfiguration':
     'Gib eine gültige E-Mail-Adresse, die Namen und Ports beider Server und ein Passwort ein.',
+  'privateMail.handoverOffer':
+    'Sie können Ihre E-Mails nicht öffnen? Leeren und in den Tresor übernehmen',
+  'privateMail.handoverTitle': 'E-Mails leeren und in den Tresor übernehmen',
+  'privateMail.handoverBody':
+    'Verschlüsselte E-Mails, die Sie nicht mehr öffnen können, werden nicht wiederhergestellt. Ab jetzt öffnen sich Ihre E-Mails mit Ihrer Sytue-ID-Anmeldung, die Sie eventuell wiederholen müssen.',
+  'privateMail.handoverUnderstood':
+    'Ich verstehe, dass die E-Mails, die ich nicht öffnen kann, verloren gehen',
+  'privateMail.handoverConfirm': 'Leeren und in den Tresor übernehmen',
 };

@@ -11,7 +11,9 @@ import {
   passwordEnvelopeInBridge,
   takeHandoff,
   unwrapInBridge,
+  unwrapVaultInBridge,
   wrapInBridge,
+  wrapVaultInBridge,
 } from './unlock-bridge.js';
 import type { RecoveryWrapper } from './recovery-wrap.js';
 
@@ -298,4 +300,38 @@ test('a busy bridge response keeps the handoff for the next attempt until proces
     { account, wrappers: [wrapper] },
   );
   expect(after.posted[0]!.msg.handoff).toBeUndefined();
+});
+
+test('the post-quantum vault carries the return of a sign-in to its bridge (Safari, ADR 0086)', async () => {
+  // Without it the bridge of each app never stores the key the relay sent back and
+  // answers `signin` again: the loop of v3.21.0, back for every app on the vault.
+  takeHandoff({ hash: '#sytue_unlock=vault123', pathname: '/notes/', search: '' }, undefined);
+  const p = page((msg, reply) =>
+    reply({ type: 'sytue-e2e-result', id: msg.id, ok: false, error: 'wrong' }),
+  );
+  expect(
+    await unwrapVaultInBridge(
+      { idOrigin, subject: 'ana', win: p.win as never, doc: p.doc as never },
+      { tenant: 'acme', product: 'notes', wrappers: [] },
+    ),
+  ).toEqual({ ok: false, error: 'wrong' });
+  expect(p.posted[0]!.msg).toMatchObject({ type: 'sytue-e2e-vault-unwrap', handoff: 'vault123' });
+
+  // One use: the next vault operation goes without it.
+  const next = page((msg, reply) =>
+    reply({ type: 'sytue-e2e-result', id: msg.id, ok: false, error: 'signin' }),
+  );
+  await wrapVaultInBridge(
+    { idOrigin, subject: 'ana', win: next.win as never, doc: next.doc as never },
+    {
+      tenant: 'acme',
+      product: 'notes',
+      profile: 'age-MLKEM768-X25519-v1',
+      keyID: 'a'.repeat(64),
+      recipient: 'age1pq1x',
+      secret: { v: 1, profile: 'age-MLKEM768-X25519-v1', identity: 'AGE', owner_key: 'b3du' },
+    },
+  );
+  expect(next.posted[0]!.msg.type).toBe('sytue-e2e-vault-wrap');
+  expect(next.posted[0]!.msg.handoff).toBeUndefined();
 });

@@ -10,6 +10,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/vaultproof"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
@@ -19,6 +20,15 @@ import (
 // Rooms; only public verification metadata is returned.
 func (s *Store) VerifyMatrixStorageAction(ctx context.Context, subject, product string, expected matrixproof.Action, proof matrixproof.SignedAction) (matrixproof.Authorization, error) {
 	var result matrixproof.Authorization
+	// Una bóveda post-cuántica (ADR 0087) no tiene autoridad en Matrix: se comprueba
+	// contra la clave que Sytue ID tiene registrada. Las dos vías nunca se mezclan.
+	if vaultproof.Signed(proof) {
+		scope, err := cutoverScope(ctx, subject, product)
+		if err != nil {
+			return result, err
+		}
+		return s.verifyVaultStorageAction(ctx, scope, expected, proof)
+	}
 	directory, ok := s.matrixGate.(matrixIngressDirectory)
 	if !ok {
 		return result, domain.ErrMatrixUnavailable
@@ -40,6 +50,10 @@ func verifyMatrixStorageActionTx(ctx context.Context, tx pgx.Tx, scope storage.S
 		return matrixproof.Authorization{}, err
 	}
 	if err := authority.RequireActive(scope, expected.Generation); err != nil {
+		return matrixproof.Authorization{}, err
+	}
+	// Tras un traspaso a la bóveda, ninguna prueba de Matrix del ámbito vale.
+	if err := sinTraspasoTx(ctx, tx, scope, matrixproof.ErrUnverified); err != nil {
 		return matrixproof.Authorization{}, err
 	}
 	if expected.RootKey != authority.RootKey {

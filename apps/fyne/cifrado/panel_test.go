@@ -200,6 +200,66 @@ func TestElPanelNuncaEnsenaNiPideNingunaClave(t *testing.T) {
 	}
 }
 
+// «Vaciar y volver a los datos del servidor» (ADR 0086): solo en una app de
+// registros, solo cuando la clave no abre, y nunca a un clic: casilla obligatoria.
+// Si falla, se queda en la confirmación con el aviso.
+func TestSoltarLaFuenteDesdeElPanelPideConfirmacion(t *testing.T) {
+	c, _ := panelEn(t, 320)
+	c.ctx = t.Context()
+	c.client = &mx.Client{}
+	defer func() { c.client = nil; c.Cerrar() }()
+	c.AbrirPanel()
+	c.Base.Bootstrap.StorageProduct = "notes"
+	c.diag, c.status = Diagnostico{Paso: PasoVerificar}, mx.VerificationStatus{HasIdentity: true}
+	c.pintar()
+	for _, text := range textos(c) {
+		if text == c.t("vault.release") {
+			t.Fatal("sin SoltarFuente no hay salida")
+		}
+	}
+	llamadas := make(chan struct{}, 4)
+	fallar := true
+	c.SoltarFuente = func(context.Context) error {
+		llamadas <- struct{}{}
+		if fallar {
+			return errors.New("sin red")
+		}
+		return nil
+	}
+	c.pintar()
+	boton(t, c, "vault.release").Tapped(nil)
+	accion := boton(t, c, "vault.release")
+	if !accion.Inerte || accion.Variante != ui.Peligro {
+		t.Fatal("soltar sin marcar la casilla")
+	}
+	accion.Tapped(nil)
+	accion.AlPulsar() // ni saltándose el botón inerte
+	esperarLibre(t, c)
+	if len(llamadas) != 0 {
+		t.Fatal("soltó sin confirmar")
+	}
+	cuerpo, _ := c.Objetos()
+	var casilla *ui.Eleccion
+	for _, o := range cuerpo {
+		if e, ok := o.(*ui.Eleccion); ok {
+			casilla = e
+		}
+	}
+	if casilla == nil {
+		t.Fatal("falta la casilla")
+	}
+	casilla.Tapped(nil)
+	boton(t, c, "vault.release").Tapped(nil)
+	esperarLibre(t, c)
+	if len(llamadas) != 1 || !slices.Contains(textos(c), c.t("vault.releaseFailed")) {
+		t.Fatalf("el fallo no se dice: %q", textos(c))
+	}
+	// Al repetir la confirmación, la casilla vuelve a estar sin marcar.
+	if !boton(t, c, "vault.release").Inerte {
+		t.Fatal("tras un fallo, la acción quedó armada")
+	}
+}
+
 // Sin la clave de desbloqueo, el único botón vuelve a Sytue ID (con los parámetros
 // de los envoltorios de la ADR 0082) y, al volver, el panel revisa otra vez solo.
 func TestIniciarSesionVuelveASytueIDYRevisaSolo(t *testing.T) {

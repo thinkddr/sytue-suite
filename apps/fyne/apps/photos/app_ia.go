@@ -68,7 +68,8 @@ func (a *App) describirFoto() {
 	if e == nil || e.describiendo || a.cli == nil {
 		return
 	}
-	f, ok := e.foto()
+	// Una cifrada no pasa por Sytue AI (ADR 0086).
+	f, ok := e.fotoDelServidor()
 	if !ok {
 		return
 	}
@@ -121,7 +122,8 @@ func (a *App) preguntarFoto(pregunta string) {
 	if e == nil || pregunta == "" || e.pensando || a.cli == nil {
 		return
 	}
-	f, ok := e.foto()
+	// Una cifrada no pasa por Sytue AI (ADR 0086).
+	f, ok := e.fotoDelServidor()
 	if !ok {
 		return
 	}
@@ -154,7 +156,8 @@ func (a *App) preguntarFoto(pregunta string) {
 // editarDescripcion abre el área con la descripción de ahora dentro.
 func (a *App) editarDescripcion() {
 	e := a.vis
-	f, ok := e.foto()
+	// Una cifrada no pasa por Sytue AI (ADR 0086).
+	f, ok := e.fotoDelServidor()
 	if !ok {
 		return
 	}
@@ -171,7 +174,7 @@ func (a *App) editarDescripcion() {
 // guardarDescripcion guarda lo escrito a mano, con las etiquetas que ya tenía.
 func (a *App) guardarDescripcion() {
 	e := a.vis
-	f, ok := e.foto()
+	f, ok := e.fotoDelServidor()
 	if !ok || e.guardandoDesc || a.cli == nil || e.campoDesc == nil {
 		return
 	}

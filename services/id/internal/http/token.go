@@ -477,6 +477,8 @@ func (s *Server) buildTokens(ctx context.Context, client domain.Client, user dom
 	common.Nonce = nonce
 	common.AuthTime = authTime
 	common.AMR = amr
+	mfa := user.MFAEnabled
+	common.MFAEnabled = &mfa
 
 	at, err := s.issuer.IssueAccessToken(common, now)
 	if err != nil {

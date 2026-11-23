@@ -955,4 +955,10 @@ export const sv: AppCatalog<typeof en> = {
     'Meddelandet har godkänts, men en kopia kunde inte sparas i Skickat. Skicka det inte igen.',
   'externalMail.invalidConfiguration':
     'Ange en giltig e-postadress, båda servrarnas namn och portar samt ett lösenord.',
+  'privateMail.handoverOffer': 'Kan du inte öppna din e-post? Töm den och flytta den till valvet',
+  'privateMail.handoverTitle': 'Töm e-posten och flytta den till valvet',
+  'privateMail.handoverBody':
+    'Krypterad e-post som du inte längre kan öppna återställs inte. Från och med nu öppnas din e-post med din Sytue ID-inloggning, som du kan behöva upprepa.',
+  'privateMail.handoverUnderstood': 'Jag förstår att e-posten jag inte kan öppna går förlorad',
+  'privateMail.handoverConfirm': 'Töm och flytta till valvet',
 };

@@ -75,10 +75,15 @@ func erpSourceKind(kind string) bool {
 	}
 }
 
+// errPrivateStorageFrozen es la respuesta a la valla de la 0105: la fuente
+// privada del dueño de la fila ya no es legacy y la base rechaza la escritura.
+var errPrivateStorageFrozen = httpx.ErrConflict.WithCode("private_storage_frozen").
+	WithMessage("This data is being moved to private storage and can no longer be changed here.")
+
 func erpSourceError(err error) *httpx.Error {
 	switch {
 	case errors.Is(err, store.ErrPrivateStorageFrozen):
-		return httpx.ErrConflict.WithCode("private_storage_frozen")
+		return errPrivateStorageFrozen
 	case errors.Is(err, store.ErrPrivateStorageEpoch), errors.Is(err, pg.ErrPrivateSource), errors.Is(err, pg.ErrPrivateSnapshotEpoch):
 		return httpx.ErrConflict.WithCode("private_storage_snapshot_changed")
 	case errors.Is(err, pg.ErrPrivateStorageScope):

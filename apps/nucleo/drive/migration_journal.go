@@ -25,6 +25,14 @@ func (r *Repository) finishInitialization(ctx context.Context, state storage.Leg
 		return err
 	}
 	for _, id := range ids {
+		if strings.HasPrefix(id, adoptPrefix) {
+			// La adopción de la copia del servidor (AdoptRetainedSource) ya se
+			// cumplió: el recibo está autenticado.
+			if err := r.cfg.Journal.Delete(r.owner(), migrationNamespace, id); err != nil {
+				return err
+			}
+			continue
+		}
 		if !strings.HasPrefix(id, "begin_") {
 			continue
 		}

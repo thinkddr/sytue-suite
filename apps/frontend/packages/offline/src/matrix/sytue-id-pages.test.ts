@@ -103,6 +103,7 @@ interface E2E {
   migrate: () => Promise<void>;
   accountAllowed: (origin: string, sub: string, account: string) => boolean;
   productAllowed: (origin: string, product: string) => boolean;
+  productOpenAllowed: (origin: string, product: string) => boolean;
   bridgeVaultUnwrap: (m: Record<string, unknown>) => Promise<Record<string, unknown>>;
   bridgeVaultWrap: (m: Record<string, unknown>) => Promise<Record<string, unknown>>;
   passkeyEnroll: (cfg: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<boolean>;
@@ -113,6 +114,10 @@ interface E2E {
   }) => Promise<{ envelope?: Envelope; error?: string }>;
   keepPassword: (sub: string, env: Envelope) => Promise<void>;
   returnTo: (next: string, blob: string, ua: string) => { auto: string; manual: string };
+  relayOutcome: (
+    cfg: Record<string, unknown>,
+    r: RelayResult,
+  ) => 'enroll' | 'lost' | 'go' | 'confirm' | 'login' | 'failed';
   passwordChangeForm: (form: unknown, opts?: Record<string, unknown>) => void;
   PENDING_TTL: number;
 }
@@ -121,6 +126,8 @@ interface RelayResult {
   blob?: string;
   lost?: boolean;
   enroll?: boolean;
+  /** The delivery came from the key this browser already held: nothing was typed now. */
+  stored?: boolean;
   startOver?: () => Promise<RelayResult>;
 }
 
@@ -547,6 +554,61 @@ describe('relay', () => {
     // The web gets nothing in the URL.
     const web = await e2e.relay({ ...base, hint: vectors.hint }, { fetch: f, now: () => now });
     expect(web).toEqual({ unlocked: true, blob: '' });
+  });
+
+  test("a web app's bridge gets the key this browser already holds after a click, never silently", async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
+    await e2e.saveUnlock(vectors.user_id, key.slice());
+    const { f, calls } = recorder();
+    const login = '/oauth2/authorize?prompt=login&sytue_unlock_typed=1';
+    const cfg = {
+      ...base,
+      hint: vectors.hint,
+      app_key: vectors.native.app_public,
+      web: true,
+      login,
+      auth_age: 3_600_000,
+    };
+    // One key for the whole account: no password is typed again for each app.
+    const r = await e2e.relay(cfg, { fetch: f, now: () => now });
+    expect(calls).toEqual([]);
+    expect(r.stored).toBe(true);
+    expect((await openDelivery(r.blob!)).key).toBe(vectors.unlock_key);
+    expect(e2e.relayOutcome(cfg, r)).toBe('confirm');
+    // A key just opened with the password that was typed needs no second question.
+    expect(e2e.relayOutcome(cfg, { unlocked: true, blob: r.blob! })).toBe('go');
+    // A native app and an ordinary web sign-in leave as they always did.
+    expect(e2e.relayOutcome({ ...cfg, web: false }, r)).toBe('go');
+    expect(e2e.relayOutcome({ ...cfg, app_key: '' }, { unlocked: true, blob: '' })).toBe('go');
+  });
+
+  test("a web app's bridge never gets an empty return: the password is asked for, then it is explained", async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
+    const { f } = recorder();
+    const login = '/oauth2/authorize?prompt=login&sytue_unlock_typed=1';
+    const cfg = {
+      ...base,
+      hint: vectors.hint,
+      app_key: vectors.native.app_public,
+      web: true,
+      login,
+      auth_age: 3_600_000,
+    };
+    // No key here and nothing typed: going back empty-handed was the endless «sign in».
+    const r = await e2e.relay(cfg, { fetch: f, now: () => now });
+    expect(r).toEqual({ unlocked: false, blob: '' });
+    expect(e2e.relayOutcome(cfg, r)).toBe('login');
+    // After the typed sign-in (or one made a moment ago) asking again changes nothing.
+    expect(e2e.relayOutcome({ ...cfg, typed: true }, r)).toBe('failed');
+    expect(e2e.relayOutcome({ ...cfg, auth_age: 5_000 }, r)).toBe('failed');
+    expect(e2e.relayOutcome({ ...cfg, login: '' }, r)).toBe('failed');
+    // The ways out that already existed keep their own screens.
+    expect(e2e.relayOutcome(cfg, { ...r, enroll: true })).toBe('enroll');
+    expect(e2e.relayOutcome(cfg, { lost: true })).toBe('lost');
+    const relay = source('relay.js');
+    expect(relay).toContain('global.location.replace(cfg.login)');
+    expect(relay).toContain('show("e2e-failed")');
+    expect(relay).toContain('show("e2e-confirm")');
   });
 
   test('after a password change, the browser that holds the key re-wraps it with the new password', async () => {
@@ -1279,6 +1341,56 @@ describe('direct post-quantum vault (ADR 0086)', () => {
     await expectSealedStore(e2e.store, [auk], [pqVector.secret.identity]);
   });
 
+  test('the vault secret carries the hybrid signing key of ADR 0087 through the bridge, both ways', async () => {
+    // El vector de la firma va dentro de boveda_pq.json (clave «firma»).
+    const firma = (
+      JSON.parse(
+        readFileSync(
+          join(import.meta.dir, '../../../../../nucleo/recoverywrap/testdata/boveda_pq.json'),
+          'utf8',
+        ),
+      ) as {
+        firma: {
+          signing_key: string;
+          unlock_key: string;
+          tenant: string;
+          product: string;
+          subject: string;
+          secret: PqVaultVector['secret'] & { signing_key: string };
+          wrapper: PqVaultVector['wrapper'];
+        };
+      }
+    ).firma;
+    const e2e = load(fakeWindow(), 'comun.js', 'bridge.js');
+    await e2e.saveUnlock(firma.subject, unb64(firma.unlock_key));
+    const scope = { sub: firma.subject, tenant: firma.tenant, product: firma.product };
+    // A vault sealed by the Go core opens here with its signing key untouched.
+    const opened = await e2e.bridgeVaultUnwrap({ ...scope, wrappers: [firma.wrapper] });
+    expect(opened.secret).toEqual(firma.secret);
+    expect((opened.secret as { signing_key: string }).signing_key).toBe(firma.signing_key);
+    // And one sealed here keeps it: sealing used to drop every field but three.
+    const wrap = {
+      ...scope,
+      profile: firma.wrapper.profile,
+      key_id: firma.wrapper.key_id,
+      recipient: firma.wrapper.recipient,
+    };
+    const wrapped = await e2e.bridgeVaultWrap({ ...wrap, secret: firma.secret });
+    const again = await e2e.bridgeVaultUnwrap({ ...scope, wrappers: [wrapped.wrapper] });
+    expect(again.secret).toEqual(firma.secret);
+    // A vault from before ADR 0087 still seals without one, and nothing is invented.
+    const { signing_key: _dropped, ...older } = firma.secret;
+    const plain = await e2e.bridgeVaultWrap({ ...wrap, secret: older });
+    const reopened = await e2e.bridgeVaultUnwrap({ ...scope, wrappers: [plain.wrapper] });
+    expect(reopened.secret).toEqual(older);
+    // A malformed signing key is refused instead of being sealed.
+    for (const signing_key of ['', 'AAAA', firma.signing_key.slice(0, -2), 42]) {
+      expect(await e2e.bridgeVaultWrap({ ...wrap, secret: { ...older, signing_key } })).toEqual({
+        error: 'invalid',
+      });
+    }
+  });
+
   test('bridge wraps/unwraps per product, rejects cross-product AAD tampering, and checks origin allowlist', async () => {
     const sent: { msg: Record<string, unknown> }[] = [];
     const parent = { postMessage: (msg: Record<string, unknown>) => sent.push({ msg }) };
@@ -1357,5 +1469,254 @@ describe('direct post-quantum vault (ADR 0086)', () => {
       key_id: pqVector.wrapper.key_id,
       secret: pqVector.secret,
     });
+  });
+
+  test('Photos, en su host, abre la bóveda de Drive para subir originales, pero no la crea ni abre otras', async () => {
+    const sent: { msg: Record<string, unknown> }[] = [];
+    const parent = { postMessage: (msg: Record<string, unknown>) => sent.push({ msg }) };
+    const win = fakeWindow({ parent });
+    const e2e = load(win, 'comun.js', 'bridge.js');
+    await e2e.saveUnlock(pqVector.subject, unb64(pqVector.unlock_key).slice());
+
+    expect(e2e.productOpenAllowed('https://photos.sytue.eu', 'drive')).toBe(true);
+    expect(e2e.productAllowed('https://photos.sytue.eu', 'drive')).toBe(false);
+    expect(e2e.productOpenAllowed('https://photos.sytue.eu', 'notes')).toBe(false);
+    expect(e2e.productOpenAllowed('https://notes.sytue.eu', 'drive')).toBe(false);
+    expect(e2e.productOpenAllowed('https://drive.sytue.eu', 'drive')).toBe(true);
+    expect(e2e.productOpenAllowed('https://mi-org.sytue.eu', 'drive')).toBe(true);
+    expect(e2e.productOpenAllowed('https://photos.sytue.eu', 'invalid')).toBe(false);
+
+    e2e.bridge({ origin: 'https://photos.sytue.eu' }, win);
+    for (const fn of win.listeners.message ?? []) {
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-unwrap',
+          id: 'abre',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          wrappers: [pqVector.wrapper],
+        },
+        origin: 'https://photos.sytue.eu',
+        source: parent,
+      });
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-wrap',
+          id: 'crea',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          profile: pqVector.wrapper.profile,
+          key_id: pqVector.wrapper.key_id,
+          recipient: pqVector.wrapper.recipient,
+          secret: pqVector.secret,
+        },
+        origin: 'https://photos.sytue.eu',
+        source: parent,
+      });
+    }
+    for (let i = 0; i < 100 && !sent.some((s) => s.msg.id === 'abre'); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(sent.find((s) => s.msg.id === 'crea')?.msg).toMatchObject({
+      ok: false,
+      error: 'account',
+    });
+    expect(sent.find((s) => s.msg.id === 'abre')?.msg).toMatchObject({
+      ok: true,
+      key_id: pqVector.wrapper.key_id,
+    });
+  });
+
+  test('Docus, Calcus y Diapos, en su host, abren la bóveda de Drive para guardar documentos, pero no la crean', async () => {
+    const reglas = load(fakeWindow(), 'comun.js', 'bridge.js');
+    const e2eOpen = reglas.productOpenAllowed;
+    const e2eAllowed = reglas.productAllowed;
+    for (const host of ['docus', 'calcus', 'diapos']) {
+      const origin = `https://${host}.sytue.eu`;
+      expect(e2eOpen(origin, 'drive')).toBe(true);
+      expect(e2eAllowed(origin, 'drive')).toBe(false);
+      // Solo la de Drive: ni la de otro producto ni, desde otro host, la suya.
+      expect(e2eOpen(origin, 'notes')).toBe(false);
+      expect(e2eOpen(origin, 'photos')).toBe(false);
+    }
+
+    const sent: { msg: Record<string, unknown> }[] = [];
+    const parent = { postMessage: (msg: Record<string, unknown>) => sent.push({ msg }) };
+    const win = fakeWindow({ parent });
+    const e2e = load(win, 'comun.js', 'bridge.js');
+    await e2e.saveUnlock(pqVector.subject, unb64(pqVector.unlock_key).slice());
+    e2e.bridge({ origin: 'https://docus.sytue.eu' }, win);
+    for (const fn of win.listeners.message ?? []) {
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-unwrap',
+          id: 'abre',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          wrappers: [pqVector.wrapper],
+        },
+        origin: 'https://docus.sytue.eu',
+        source: parent,
+      });
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-wrap',
+          id: 'crea',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          profile: pqVector.wrapper.profile,
+          key_id: pqVector.wrapper.key_id,
+          recipient: pqVector.wrapper.recipient,
+          secret: pqVector.secret,
+        },
+        origin: 'https://docus.sytue.eu',
+        source: parent,
+      });
+    }
+    for (let i = 0; i < 100 && !sent.some((s) => s.msg.id === 'abre'); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(sent.find((s) => s.msg.id === 'crea')?.msg).toMatchObject({
+      ok: false,
+      error: 'account',
+    });
+    expect(sent.find((s) => s.msg.id === 'abre')?.msg).toMatchObject({
+      ok: true,
+      key_id: pqVector.wrapper.key_id,
+    });
+  });
+
+  test('CertiPDF, en su host, abre la bóveda de Drive para firmar en el dispositivo, pero no la crea ni abre otras', async () => {
+    const reglas = load(fakeWindow(), 'comun.js', 'bridge.js');
+    const origen = 'https://certipdf.sytue.eu';
+    // Abre (solo abre) la de Drive: lee el PDF cifrado y deja el firmado (ADR 0086).
+    expect(reglas.productOpenAllowed(origen, 'drive')).toBe(true);
+    // Crearla, vaciarla o volver a sellarla sigue siendo solo de Drive.
+    expect(reglas.productAllowed(origen, 'drive')).toBe(false);
+    // Su propia bóveda (`pdf`) sí, como siempre; ninguna otra.
+    expect(reglas.productAllowed(origen, 'pdf')).toBe(true);
+    expect(reglas.productOpenAllowed(origen, 'photos')).toBe(false);
+    expect(reglas.productOpenAllowed(origen, 'mail')).toBe(false);
+
+    const sent: { msg: Record<string, unknown> }[] = [];
+    const parent = { postMessage: (msg: Record<string, unknown>) => sent.push({ msg }) };
+    const win = fakeWindow({ parent });
+    const e2e = load(win, 'comun.js', 'bridge.js');
+    await e2e.saveUnlock(pqVector.subject, unb64(pqVector.unlock_key).slice());
+    e2e.bridge({ origin: origen }, win);
+    for (const fn of win.listeners.message ?? []) {
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-unwrap',
+          id: 'abre',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          wrappers: [pqVector.wrapper],
+        },
+        origin: origen,
+        source: parent,
+      });
+      fn({
+        data: {
+          type: 'sytue-e2e-vault-wrap',
+          id: 'crea',
+          sub: pqVector.subject,
+          tenant: pqVector.tenant,
+          product: 'drive',
+          profile: pqVector.wrapper.profile,
+          key_id: pqVector.wrapper.key_id,
+          recipient: pqVector.wrapper.recipient,
+          secret: pqVector.secret,
+        },
+        origin: origen,
+        source: parent,
+      });
+    }
+    for (let i = 0; i < 100 && !sent.some((s) => s.msg.id === 'abre'); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(sent.find((s) => s.msg.id === 'crea')?.msg).toMatchObject({
+      ok: false,
+      error: 'account',
+    });
+    expect(sent.find((s) => s.msg.id === 'abre')?.msg).toMatchObject({
+      ok: true,
+      key_id: pqVector.wrapper.key_id,
+    });
+  });
+
+  test('a pre-ADR-0086 record that cannot be upgraded asks to sign in, never «unavailable» forever', async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'bridge.js');
+    const auk = unb64(pqVector.unlock_key);
+    await e2e.saveUnlock(pqVector.subject, auk.slice());
+    const rec = (await e2e.store.get('auk:' + pqVector.subject)) as Record<string, unknown>;
+    delete rec.vaultWrap;
+    // Its box was sealed with a store key this browser no longer has.
+    rec.box = { iv: b64(new Uint8Array(12)), ct: b64(new Uint8Array(48)) };
+    await e2e.store.put('auk:' + pqVector.subject, rec);
+    const args = {
+      sub: pqVector.subject,
+      tenant: pqVector.tenant,
+      product: pqVector.product,
+    };
+    expect(await e2e.bridgeVaultUnwrap({ ...args, wrappers: [pqVector.wrapper] })).toEqual({
+      error: 'signin',
+    });
+    expect(
+      await e2e.bridgeVaultWrap({
+        ...args,
+        profile: pqVector.wrapper.profile,
+        key_id: pqVector.wrapper.key_id,
+        recipient: pqVector.wrapper.recipient,
+        secret: pqVector.secret,
+      }),
+    ).toEqual({ error: 'signin' });
+  });
+
+  test('a stale unlock key answers «wrong» with a one-time key; the return replaces it and opens', async () => {
+    const sent: { msg: Record<string, unknown> }[] = [];
+    const parent = {
+      postMessage: (msg: Record<string, unknown>) => sent.push({ msg: structuredClone(msg) }),
+    };
+    const win = fakeWindow({ parent });
+    const e2e = load(win, 'comun.js', 'bridge.js');
+    // Safari's bridge in this app kept an EARLIER unlock key of the same person.
+    await e2e.saveUnlock(pqVector.subject, crypto.getRandomValues(new Uint8Array(32)));
+    e2e.bridge({ origin: 'https://drive.sytue.eu' }, win);
+    const ask = (id: string, handoff?: string) => {
+      for (const fn of win.listeners.message ?? [])
+        fn({
+          data: {
+            type: 'sytue-e2e-vault-unwrap',
+            id,
+            sub: pqVector.subject,
+            tenant: pqVector.tenant,
+            product: pqVector.product,
+            wrappers: [pqVector.wrapper],
+            ...(handoff ? { handoff } : {}),
+          },
+          origin: 'https://drive.sytue.eu',
+          source: parent,
+        });
+    };
+    const wait = async (id: string) => {
+      for (let i = 0; i < 200 && !sent.some((s) => s.msg.id === id); i++)
+        await new Promise((r) => setTimeout(r, 5));
+      return sent.find((s) => s.msg.id === id)!.msg;
+    };
+    ask('stale');
+    const stale = (await wait('stale')) as { error: string; handoff_key: string };
+    expect(stale.error).toBe('wrong');
+    expect(stale.handoff_key).toMatch(/^[A-Za-z0-9_-]{87}$/);
+    const blob = await e2e.sealDelivery(stale.handoff_key, {
+      v: 1,
+      sub: pqVector.subject,
+      key: pqVector.unlock_key,
+      legacy: [],
+    });
+    ask('fresh', blob);
+    expect(await wait('fresh')).toMatchObject({ ok: true, secret: pqVector.secret });
   });
 });

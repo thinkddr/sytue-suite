@@ -18,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/calendar/internal/config"
 	"git.sytue.eu/sytue/one/services/calendar/internal/service"
 )
@@ -76,6 +77,9 @@ func NewRouter(d Deps) http.Handler {
 			source = d.Service.Store()
 		}
 		mountCalendarPrivateSource(api, source)
+		if d.Service != nil && d.Service.Store() != nil {
+			soltarfuente.Montar(api, soltarfuente.Config{Product: "calendar", Soltar: d.Service.Store().ReleasePrivateStorage, Avisar: d.Hub.Send})
+		}
 		mountCalendarPrivateIngress(api, d.PrivateIngress, d.Cfg.MaxObjectBytes*2+(128<<10))
 
 		// Calendarios (colecciones).

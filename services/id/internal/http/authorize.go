@@ -120,10 +120,12 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	// `prompt=login` (OIDC Core §3.1.2.1) obliga a identificarse aunque la haya: es
 	// como una app pide que la persona meta su clave AQUÍ para desbloquear el
 	// cifrado de un dispositivo (ADR 0084). La vuelta ya no lo lleva, o sería un
-	// bucle.
+	// bucle. El puente de una app web que trae su clave pasa primero por el relevo
+	// sin teclear nada (entregaSinTeclear): si este navegador ya tiene la clave de
+	// desbloqueo, basta confirmarlo.
 	volver := uriSinPrompt(r)
 	sess, ok := s.currentSession(r)
-	if !ok || pidePromptLogin(r) {
+	if !ok || obligaAEntrar(r, req, client) {
 		loginURL := "/login/?" + url.Values{"return_to": {volver}}.Encode()
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return

@@ -51,6 +51,15 @@ import { cabeEnUnLote, claveLww, CoEdicion } from './coedicion';
 import { CoedicionModelo, mismoContenido, type Registro } from './fusion';
 import type { OpRGA } from './rga';
 import { hacerCopia } from '../../lib/copia';
+import { esAnclaDeBoveda } from './anclaDrive';
+import {
+  abrirDriveCifrado,
+  anclarEnServicio,
+  driveEnBoveda,
+  exportarDocumento,
+  guardarDocumentoEnBoveda,
+  motivoDriveCifrado,
+} from './driveCifrado';
 import {
   cacheLocalContent,
   cacheLocalTitle,
@@ -107,7 +116,7 @@ function registroDe(st: DocStateResponse, key: string): Registro {
 export interface UseDocumentResult {
   status: 'loading' | 'ready' | 'error';
   doc: DocumentMeta | null;
-  /** Origen del documento («drive:<uuid>») o '' si nació en Sytue Docs. */
+  /** Ancla del documento a su fichero («drive:<uuid>» o «vault:<uuid>», `anclaDrive.ts`), o ''. */
   sourceRef: string;
   /** Cursores anclados a la identidad de los caracteres; solo en documentos de texto. */
   cursorDots: CursorDots;
@@ -123,6 +132,8 @@ export interface UseDocumentResult {
   savingToDrive: boolean;
   /** Devuelve lo editado al fichero de Drive del que salió (nueva versión allí). */
   saveToDrive: () => Promise<void>;
+  /** El Drive de quien edita está en la bóveda (ADR 0086): se guarda cifrando aquí. */
+  driveCifrado: boolean;
   title: string;
   setTitle: (next: string) => void;
   save: SaveState;
@@ -155,7 +166,11 @@ export interface UseDocumentResult {
   makeCopy: (title: string) => Promise<string>;
 }
 
-export function useDocument(documentId: string, userId: string): UseDocumentResult {
+export function useDocument(
+  documentId: string,
+  userId: string,
+  tenant?: string,
+): UseDocumentResult {
   const toast = useToast();
   const t = useT();
   const eid = encodeURIComponent(documentId);
@@ -179,6 +194,9 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
   const roleRef = useRef<DocumentRole>('none');
   const [edicionPedida, setEdicionPedida] = useState(false);
   const [savingToDrive, setSavingToDrive] = useState(false);
+  // ¿El Drive de quien edita está en la bóveda? Se mira sin claves (el estado de la
+  // fuente del Drive del servidor); ante la duda, no.
+  const [driveCifrado, setDriveCifrado] = useState(false);
   const [title, setTitleState] = useState('');
   const [save, setSaveState] = useState<SaveState>('saved');
   // 'online' de salida, y el estado real en el efecto de más abajo: este
@@ -1119,34 +1137,100 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     [eid, title, doSave, toast, t],
   );
 
+  useEffect(() => {
+    if (!tenant) return;
+    const vida = new AbortController();
+    void driveEnBoveda(userId, tenant, undefined, vida.signal).then((si) => {
+      if (!vida.signal.aborted) setDriveCifrado(si);
+    });
+    return () => vida.abort();
+  }, [userId, tenant]);
+
+  /**
+   * «Guardar en Drive» con el Drive en la bóveda (ADR 0086): el navegador exporta,
+   * cifra y sube al Drive de la bóveda (`driveCifrado.ts`); el servicio solo recibe
+   * el ancla. Cada motivo de no poder lo dice con su frase.
+   */
+  const guardarCifrado = useCallback(async (): Promise<void> => {
+    try {
+      const r = await guardarDocumentoEnBoveda({
+        ancla: sourceRef,
+        esDueno: roleRef.current === 'owner',
+        titulo: title,
+        kind: kindRef.current,
+        abrir: () => abrirDriveCifrado({ actor: userId, tenant }),
+        exportar: (formato) => exportarDocumento(documentId, formato),
+        anclar: (nueva, antes) => anclarEnServicio(documentId, nueva, antes),
+      });
+      if (r.anclaDelDocumento !== sourceRef) setSourceRef(r.anclaDelDocumento);
+      toast.notify({
+        tone: 'success',
+        title: t('doc.msg.savedToDriveEncrypted'),
+        description: t('doc.msg.savedToDriveEncryptedIn', { name: r.nombre }),
+      });
+    } catch (error) {
+      switch (motivoDriveCifrado(error)) {
+        case 'entrar':
+          toast.notify({ tone: 'warning', title: t('doc.msg.saveToDriveVaultSignIn') });
+          return;
+        case 'pendiente':
+          toast.notify({ tone: 'warning', title: t('doc.msg.saveToDriveVaultNotReady') });
+          return;
+        case 'formato':
+          toast.notify({ tone: 'warning', title: t('doc.msg.saveToDriveUnsupported') });
+          return;
+        default:
+          toast.notify({
+            tone: 'warning',
+            title: t('doc.msg.saveToDriveVault'),
+            description: t('doc.msg.saveToDriveVault.detail'),
+          });
+      }
+    }
+  }, [documentId, sourceRef, title, userId, tenant, toast, t]);
+
   /**
    * Devuelve los cambios al fichero de Drive del que salió el documento.
    *
    * Guarda lo pendiente ANTES, igual que la exportación: el servicio serializa
    * desde el estado del servidor, así que un autosave en cola devolvería a Drive
    * una versión anterior a lo que se está viendo en pantalla.
+   *
+   * Con un ancla del Drive del servidor («drive:») lo hace el BFF; si contesta
+   * 409 `drive_private_vault` (el Drive pasó a la bóveda), o el ancla ya es de la
+   * bóveda, o no hay ancla y el Drive está en la bóveda, lo hace el navegador.
    */
   const saveToDrive = useCallback(async (): Promise<void> => {
-    if (!sourceRef) return;
+    if (!sourceRef && !driveCifrado) return;
     setSavingToDrive(true);
     try {
       requireOnline();
       clearTimeout(saveTimerRef.current);
       await doSave();
-      const res = await fetch(`/api/save-to-drive?id=${eid}`, { method: 'POST' });
-      if (!res.ok) throw new Error(`save-to-drive ${res.status}`);
-      const { name } = (await res.json()) as { name: string };
-      toast.notify({
-        tone: 'success',
-        title: t('doc.msg.savedToDrive'),
-        description: t('doc.msg.savedToDriveIn', { name }),
-      });
+      if (sourceRef && !esAnclaDeBoveda(sourceRef)) {
+        const res = await fetch(`/api/save-to-drive?id=${eid}`, { method: 'POST' });
+        if (res.ok) {
+          const { name } = (await res.json()) as { name: string };
+          toast.notify({
+            tone: 'success',
+            title: t('doc.msg.savedToDrive'),
+            description: t('doc.msg.savedToDriveIn', { name }),
+          });
+          return;
+        }
+        const { error } =
+          res.status === 409
+            ? ((await res.json().catch(() => ({}))) as { error?: string })
+            : { error: undefined };
+        if (error !== 'drive_private_vault') throw new Error(`save-to-drive ${res.status}`);
+      }
+      await guardarCifrado();
     } catch {
       toast.notify({ tone: 'danger', title: t('doc.msg.saveToDriveFailed') });
     } finally {
       setSavingToDrive(false);
     }
-  }, [eid, sourceRef, doSave, toast, t]);
+  }, [eid, sourceRef, driveCifrado, doSave, guardarCifrado, toast, t]);
 
   /* --- Carga inicial + arranque de colaboración (§4.4) --- */
 
@@ -1409,5 +1493,6 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     edicionPedida,
     savingToDrive,
     saveToDrive,
+    driveCifrado,
   };
 }

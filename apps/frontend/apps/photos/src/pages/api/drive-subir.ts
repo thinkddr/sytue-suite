@@ -22,9 +22,10 @@
  * Solo las llamadas de metadatos —resolver o crear la carpeta— pasan por el SDK.
  */
 import type { APIRoute } from 'astro';
-import { DriveClient, bearer } from '@sytue/api-clients';
+import { DriveClient, HttpError, bearer } from '@sytue/api-clients';
 import { serverEnv } from '@sytue/auth/server';
 import { bff, toBffContext } from '../../lib/bff.js';
+import { ERROR_DRIVE_CIFRADO, codigoDeError, esUnidadCifrada } from '../../lib/unidadCifrada.js';
 
 export const prerender = false;
 
@@ -43,6 +44,10 @@ const drive = (
 
 /** Carpeta del Drive donde van los originales que se suben desde la galería. */
 const CARPETA = '/Fotos';
+
+/** El 409 con el que la galería sabe que tiene que subir cifrando (`unidadCifrada.ts`). */
+const unidadCifrada = (): Response =>
+  json({ error: ERROR_DRIVE_CIFRADO, message: 'El Drive de esta persona está en la bóveda.' }, 409);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -76,7 +81,8 @@ export const POST: APIRoute = async (ctx) => {
   } catch {
     try {
       carpeta = await cliente.createFolder(CARPETA);
-    } catch {
+    } catch (e) {
+      if (e instanceof HttpError && esUnidadCifrada(e.status, e.code)) return unidadCifrada();
       return json({ error: 'drive', message: 'No se pudo preparar la carpeta Fotos.' }, 502);
     }
   }
@@ -103,6 +109,8 @@ export const POST: APIRoute = async (ctx) => {
     duplex: 'half',
   });
   if (!res.ok) {
+    if (res.status === 409 && esUnidadCifrada(409, codigoDeError(await res.text().catch(() => ''))))
+      return unidadCifrada();
     // 413 NO ES 502. Traducir «el fichero es demasiado grande» a «Bad Gateway»
     // manda a buscar una avería del servidor cuando lo que hay que hacer es subir
     // algo más pequeño; en la galería salía como «no se pudo subir» a secas.

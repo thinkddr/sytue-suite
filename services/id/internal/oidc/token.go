@@ -56,6 +56,11 @@ type TokenClaims struct {
 	Nonce        string // ID token (replay de la petición de autorización)
 	AuthTime     time.Time
 	AMR          []string // métodos de autenticación (pwd|mfa|webauthn)
+	// MFAEnabled dice si la cuenta tiene segundo factor (claim `mfa_enabled`, solo
+	// en el ACCESS token). Los servicios lo necesitan para exigir «identificación
+	// reciente, y con segundo factor si la cuenta lo tiene» sin preguntar a Sytue
+	// ID (authn.IdentificacionReciente). Nil: no se emite.
+	MFAEnabled *bool
 	// Actor es el client que obtuvo el token ACTUANDO EN NOMBRE del sujeto
 	// (RFC 8693 §4.1, claim `act`). Vacío en la emisión normal: el sujeto se
 	// autenticó él mismo.
@@ -181,6 +186,9 @@ func (i *Issuer) IssueAccessToken(c TokenClaims, now time.Time) (string, error) 
 	// viajó a `main` y a cinco tags antes de salir.
 	if !c.AuthTime.IsZero() {
 		b = b.Claim("auth_time", c.AuthTime.Unix())
+	}
+	if c.MFAEnabled != nil {
+		b = b.Claim("mfa_enabled", *c.MFAEnabled)
 	}
 	if len(c.Roles) > 0 {
 		b = b.Claim("roles", c.Roles)

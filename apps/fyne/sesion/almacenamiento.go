@@ -11,6 +11,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/correo"
 	"git.sytue.eu/sytue/one/apps/nucleo/notas"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
@@ -24,6 +25,14 @@ var ErrSesionCerrada = errors.New("sesion: sesión cerrada")
 // (`storage-file-uploads-v1`).
 func PendientesAlmacenamiento() int {
 	n, _ := contarAlmacen(notas.EspacioCapturas, notas.EspacioBorradores, correo.EspacioRedactor, storage.PendingUploadsNamespace)
+	// Y las subidas a medias de la bóveda directa, que tienen su propio diario.
+	if boveda, err := directoriosDiarioBoveda(); err == nil {
+		for _, diario := range boveda {
+			if count, err := offline.CountDirectory(diario.ruta, storage.PendingUploadsNamespace); err == nil {
+				n += count
+			}
+		}
+	}
 	return n
 }
 

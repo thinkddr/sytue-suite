@@ -970,4 +970,11 @@ export const nl: AppCatalog<typeof en> = {
     'De e-mail is geaccepteerd, maar er kon geen kopie in Verzonden worden opgeslagen. Verstuur de e-mail niet opnieuw.',
   'externalMail.invalidConfiguration':
     'Voer een geldig e-mailadres, de namen en poorten van beide servers en een wachtwoord in.',
+  'privateMail.handoverOffer':
+    'Kun je je e-mail niet openen? Leeg hem en zet hem over naar de kluis',
+  'privateMail.handoverTitle': 'E-mail legen en overzetten naar de kluis',
+  'privateMail.handoverBody':
+    'Versleutelde e-mail die je niet meer kunt openen, wordt niet hersteld. Vanaf nu opent je e-mail met je Sytue ID-aanmelding, die je mogelijk opnieuw moet doen.',
+  'privateMail.handoverUnderstood': 'Ik begrijp dat de e-mail die ik niet kan openen verloren gaat',
+  'privateMail.handoverConfirm': 'Legen en overzetten naar de kluis',
 };

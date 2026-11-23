@@ -4,6 +4,7 @@
 package recoverywrap
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -159,8 +160,26 @@ func TestBovedaPQ_VectoresCompartidos(t *testing.T) {
 			Nonce:        nonce,
 			Wrapper:      w,
 		}
-		raw, err := json.MarshalIndent(v, "", "  ")
+		// Regenera el vector sin perder el de la firma (clave «firma», firma_boveda_test.go).
+		var firma json.RawMessage
+		if raw, err := os.ReadFile(path); err == nil {
+			var previo map[string]json.RawMessage
+			if json.Unmarshal(raw, &previo) == nil {
+				firma = previo["firma"]
+			}
+		}
+		raw, err := json.Marshal(v)
 		if err != nil {
+			t.Fatal(err)
+		}
+		todo := map[string]json.RawMessage{}
+		if err := json.Unmarshal(raw, &todo); err != nil {
+			t.Fatal(err)
+		}
+		if firma != nil {
+			todo["firma"] = firma
+		}
+		if raw, err = json.MarshalIndent(todo, "", "  "); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(path, append(raw, '\n'), 0o644); err != nil {
@@ -189,7 +208,7 @@ func TestBovedaPQ_VectoresCompartidos(t *testing.T) {
 	}
 	gotJSON, _ := json.Marshal(sealed)
 	wantJSON, _ := json.Marshal(v.Wrapper)
-	if string(gotJSON) != string(wantJSON) {
+	if !bytes.Equal(gotJSON, wantJSON) {
 		t.Fatalf("wrapper distinto:\ngot:  %s\nwant: %s", gotJSON, wantJSON)
 	}
 	opened, err := OpenPQVault(v.UnlockKey, v.Tenant, v.Product, v.Subject, v.Wrapper)

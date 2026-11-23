@@ -302,6 +302,22 @@ export const pt: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Guardado no Sytue Drive.',
   'doc.msg.savedToDriveIn': '«{name}» tem agora as suas alterações, como uma nova versão.',
   'doc.msg.saveToDriveFailed': 'Não foi possível guardar as alterações no Drive.',
+  'doc.msg.saveToDriveVault': 'O seu Drive está cifrado de ponta a ponta',
+  'doc.msg.saveToDriveVault.detail':
+    'Não foi possível guardar nele a partir daqui. Transfira o documento e carregue-o a partir do Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Guardado no seu Drive encriptado.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '«{name}» foi encriptado neste navegador antes de ser guardado.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '«{name}» foi encriptado neste dispositivo antes de ser guardado.',
+  'doc.msg.saveToDriveVaultLocked':
+    'O seu Drive encriptado está bloqueado neste dispositivo. Desbloqueie-o acima e volte a guardar.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Inicie sessão novamente para desbloquear o seu Drive encriptado e volte a guardar.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'O seu Drive ainda está a passar para a encriptação ponto a ponto. Abra o Sytue Drive para terminar e volte a guardar.',
+  'doc.msg.saveToDriveUnsupported':
+    'O formato deste ficheiro não pode ser reescrito. Transfira antes o documento.',
   'file.downloadPdf': 'Transferir como PDF',
   'file.pdfAccessible': 'PDF acessível (PDF/UA)',
   'file.downloadHtml': 'Transferir como HTML',
@@ -2666,6 +2682,49 @@ export const pt: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'Uma ordem de assinatura pode ter até 10 pessoas.',
   'pdf.error.signatureRequest.busy':
     'Este pedido já está a ser aberto. Tente de novo dentro de momentos.',
+  'pdf.error.driveVault':
+    'O seu Drive está encriptado ponto a ponto: as cópias de pedidos de assinatura de outras organizações ainda não podem ser guardadas nele. Transfira antes o PDF.',
+  'pdf.device.title': 'Assinar neste dispositivo',
+  'pdf.device.help':
+    'O seu Drive está cifrado de ponta a ponta, por isso o servidor não consegue ler os seus PDF. Escolha um: é decifrado e assinado aqui com o seu certificado, e a cópia assinada é guardada cifrada junto ao original. Nem o PDF nem o seu certificado chegam ao servidor.',
+  'pdf.device.open': 'Abrir o meu Drive cifrado',
+  'pdf.device.empty.title': 'Não há PDF no seu Drive cifrado',
+  'pdf.device.empty.description': 'Carregue-os a partir do Sytue Drive e aparecerão aqui.',
+  'pdf.device.sign': 'Assinar',
+  'pdf.device.signed': 'Assinado e guardado cifrado como «{name}».',
+  'pdf.device.stamp.on':
+    'Com carimbo temporal de {authority}: a assinatura prova quem assinou e quando. A autoridade só recebe a impressão digital da assinatura, nunca o PDF.',
+  'pdf.device.stamp.off':
+    'Sem carimbo temporal: este serviço não tem autoridade de carimbo temporal, pelo que a assinatura prova quem assinou, mas não quando.',
+  'pdf.device.appearance': 'Aspeto da assinatura',
+  'pdf.device.appearance.invisible': 'Invisível',
+  'pdf.device.appearance.visible': 'Caixa visível',
+  'pdf.device.signedStamped': 'Assinado com carimbo temporal e guardado cifrado como «{name}».',
+  'pdf.device.signedNoStamp':
+    'Assinado e guardado cifrado como «{name}», mas sem carimbo temporal: a autoridade de carimbo temporal não respondeu.',
+  'pdf.device.error.page': 'A assinatura não cabe nessa página. Escolha outra página ou posição.',
+  'pdf.device.view': 'Ver',
+  'pdf.vault.help':
+    'Este PDF está no seu Drive cifrado: só é decifrado neste dispositivo, para o ver e assinar.',
+  'pdf.vault.serverOnly':
+    'Anotar, preencher, organizar, editar, reconhecer texto e pedir assinatura exigem que o serviço leia o PDF, por isso não estão disponíveis com o seu Drive cifrado.',
+  'pdf.vault.notFound.title': 'Este PDF não está no seu Drive cifrado',
+  'pdf.vault.notFound.description': 'Pode ter sido movido ou eliminado. Procure-o no Sytue Drive.',
+  'pdf.vault.openSigned': 'Abrir a cópia assinada',
+  'pdf.device.requests':
+    'Pedir assinatura a outras pessoas ou organizações precisa do Drive do servidor: o serviço tem de ler o PDF para o enviar e verificar a assinatura que regressa. Com o seu Drive cifrado, assine aqui e envie você o PDF assinado.',
+  'pdf.device.error.signin': 'Volte a entrar no Sytue ID para desbloquear o seu Drive cifrado.',
+  'pdf.device.error.pending':
+    'O seu Drive ainda está a passar para a cifragem de ponta a ponta. Conclua a partir do Sytue Drive.',
+  'pdf.device.error.password': 'Essa palavra-passe não abre o certificado.',
+  'pdf.device.error.encrypted':
+    'Este PDF está protegido por palavra-passe e não pode ser assinado neste dispositivo.',
+  'pdf.device.error.locked':
+    'Este PDF está certificado contra qualquer alteração: outra assinatura invalidá-lo-ia.',
+  'pdf.device.error.unreadable':
+    'Este PDF não pode ser assinado neste dispositivo sem ser reescrito. Nada foi alterado.',
+  'pdf.device.error.failed':
+    'Não foi possível assinar nem guardar o PDF. Nada foi alterado no seu Drive.',
   'pdf.dialog.firmar.help':
     'O certificado e a chave nunca saem da sua organização: são usados no servidor e não são guardados.',
   'pdf.dialog.firmar.cert': 'Certificado (PEM)',

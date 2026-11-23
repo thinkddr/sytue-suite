@@ -1051,4 +1051,11 @@ export const ga: AppCatalog<typeof en> = {
     'Glacadh leis an ríomhphost, ach níorbh fhéidir cóip a shábháil in Seolta. Ná seol arís é.',
   'externalMail.invalidConfiguration':
     'Cuir isteach seoladh ríomhphoist bailí, ainmneacha agus poirt an dá fhreastalaí, agus pasfhocal.',
+  'privateMail.handoverOffer':
+    'Ní féidir leat do phost a oscailt? Folmhaigh é agus aistrigh go dtí an cruinneachán é',
+  'privateMail.handoverTitle': 'Folmhaigh an post agus aistrigh go dtí an cruinneachán é',
+  'privateMail.handoverBody':
+    'Ní aisghabhfar post criptithe nach féidir leat a oscailt a thuilleadh. As seo amach osclaíonn do phost le do shíniú isteach Sytue ID, agus seans go n-iarrfar ort é a dhéanamh arís.',
+  'privateMail.handoverUnderstood': 'Tuigim go gcaillfear an post nach féidir liom a oscailt',
+  'privateMail.handoverConfirm': 'Folmhaigh agus aistrigh go dtí an cruinneachán',
 };

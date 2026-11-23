@@ -97,6 +97,22 @@ type App struct {
 	// Drive es el cliente de Sytue Drive, donde viven los originales: subir es dejar el
 	// fichero en «/Fotos» y luego indexarlo. nil: no se puede subir.
 	Drive *api.Drive
+	// DriveDeSubida es el Drive donde suben «Añadir fotos» y la copia, preguntado en
+	// cada subida: el del servidor mientras admita escrituras y, cuando ya no (está en
+	// almacenamiento privado, la bóveda de la ADR 0086), el Drive privado de la
+	// persona. Lo que se sube a uno privado va cifrado y la galería del servidor no lo
+	// indexa. nil: siempre [App.Drive].
+	DriveDeSubida func(context.Context) (*api.Drive, error)
+	// GaleriaCifrada es el Drive de la bóveda para la galería cifrada (ADR 0086), con el
+	// índice que comparte con la web (`nucleo/photos/galeriacifrada`). (nil, nil): el
+	// Drive de la persona no está en la bóveda. Sin `abrir`, no pide desbloquearlo:
+	// [ErrDriveCifradoCerrado] si aún no lo está. nil: no hay galería cifrada.
+	GaleriaCifrada func(ctx context.Context, abrir bool) (*api.Drive, error)
+	// ClaveEnDispositivo dice si la clave de desbloqueo de Sytue ID está en este
+	// dispositivo (con la sesión, en el almacén seguro del sistema): con ella, la copia
+	// con la app cerrada puede pedir a la puerta de la bóveda que abra el Drive cifrado
+	// (copia_fondo.go). Solo pregunta; la clave no sale de la sesión. nil: no.
+	ClaveEnDispositivo func() bool
 	// AlEntrar abre Sytue ID. Es lo que ofrece la pantalla cuando no hay sesión.
 	AlEntrar func()
 	// AbrirWeb abre una dirección en el navegador del sistema: el editor de la web, el
@@ -188,6 +204,11 @@ type App struct {
 	ed  *estadoEditor
 	peg estadoPegado
 	rec estadoRecuerdos
+	// cif es la galería cifrada (galeria_cifrada.go); minisCif descifra sus miniaturas
+	// para las Fototecas, y cifDesviadas dice que ya se les enseñó a pedírselas.
+	cif          estadoCifradas
+	minisCif     *miniaturasCifradas
+	cifDesviadas bool
 	// anyos son los años con fotos de la vista abierta: la barra para saltar a uno.
 	anyos []api.TimelineYear
 	pub   estadoPublico
@@ -299,8 +320,9 @@ type estadoRecuerdos struct {
 func Nueva(cli *api.Photos, v Vista, w fyne.Window) *App {
 	a := &App{
 		cli: cli, w: w, v: v, espera: EsperaBusqueda,
-		lanzar: func(f func()) { go f() },
-		avisos: ui.NuevaPilaAvisos(),
+		lanzar:   func(f func()) { go f() },
+		avisos:   ui.NuevaPilaAvisos(),
+		minisCif: &miniaturasCifradas{},
 	}
 	a.vida, a.cancelarVida = context.WithCancel(context.Background())
 	a.buscador = nuevoBuscador(v, "")
@@ -365,6 +387,7 @@ func (a *App) Arrancar() {
 	if a.cerrada {
 		return
 	}
+	a.desviarCifradas()
 	if a.w != nil {
 		a.w.Canvas().SetOnTypedKey(a.teclaSuelta)
 		a.w.Canvas().SetOnTypedRune(a.runaSuelta)
@@ -402,11 +425,17 @@ func (a *App) Ir(r Ruta) {
 		a.cargarMas()
 		a.pedirRecuerdos()
 		a.pedirAnyos()
+		if !a.cif.pedida {
+			a.cargarCifradas(false)
+		}
 	case RutaAlbumes:
 		a.alb = estadoAlbumes{estadoCarga: estadoCarga{cargando: true}}
 		a.pintar()
 		a.pedirAlbumes()
 		a.pedirAjustes()
+		if !a.cif.pedida {
+			a.cargarCifradas(false)
+		}
 	case RutaRepetidas:
 		a.rep = estadoRepetidas{estadoCarga: estadoCarga{cargando: true}}
 		a.pintar()
@@ -624,8 +653,10 @@ func (a *App) pantallaGaleria() fyne.CanvasObject {
 // datosGaleria es lo que la galería enseña, sin montarla todavía.
 func (a *App) datosGaleria() (Vista, Galeria) {
 	g := a.g
+	// La línea que se ve: la del servidor con las cifradas por fecha (ADR 0086).
+	linea := a.lineaMezclada()
 	esperando := g.cargando || g.pendiente
-	v := a.vistaDe(g.estadoCarga, len(g.fotos) == 0, !esperando && len(g.fotos) == 0 && g.fallo == nil && g.texto == "")
+	v := a.vistaDe(g.estadoCarga, len(linea) == 0, !esperando && len(linea) == 0 && g.fallo == nil && g.texto == "")
 	aviso := g.aviso
 	if g.subida != nil {
 		aviso = a.v.T.T("gallery.uploading", i18n.Vars{"done": g.subida[0], "total": g.subida[1]})
@@ -635,9 +666,9 @@ func (a *App) datosGaleria() (Vista, Galeria) {
 	if a.reanudandoImportaciones && g.subida == nil {
 		aviso = a.v.Traduce("ui.loading")
 	}
-	consulta, ampliar := sinResultados(g.texto, esperando, len(g.fotos), g.fallo != nil, len(g.tambien))
+	consulta, ampliar := sinResultados(g.texto, esperando, len(linea), g.fallo != nil, len(g.tambien))
 	d := Galeria{
-		Grupos:        PorMes(g.fotos, a.v.T),
+		Grupos:        PorMes(linea, a.v.T),
 		Buscador:      a.buscador,
 		Busqueda:      g.texto,
 		Anyos:         a.anyos,
@@ -658,10 +689,10 @@ func (a *App) datosGaleria() (Vista, Galeria) {
 		AlBorrarBusqueda: a.borrarBusqueda,
 		Ampliando:        g.ampliando,
 		AlAmpliar:        a.ampliarBusqueda,
-		AlAbrir:          func(f api.Photo) { a.abrirEnGaleria(f.ID) },
+		AlAbrir:          a.abrirDeLinea,
 		AlAlternar:       a.alternar,
 		AlMantener:       a.empezarSeleccion,
-		AlFavorita:       func(f api.Photo) { a.cambiarFavorita(f, !f.Favorite) },
+		AlFavorita:       a.favoritaDeLinea,
 		AlIr:             a.irSeccion,
 		AlAnyadir:        a.elegirFicheros,
 		Copiando:         a.cop.progreso != nil && a.cop.progreso.Total > 0,
@@ -701,6 +732,7 @@ func (a *App) datosGaleria() (Vista, Galeria) {
 	}
 	// Solo en la de todas y sin búsqueda: un recuerdo entre los resultados de «playa»
 	// no es un recuerdo, es ruido.
+	d.Cifradas = a.seccionCifradas()
 	if !a.soloFavoritas() && g.texto == "" && len(a.rec.lista) > 0 && v.Estado == Exito {
 		d.Recuerdos = SeccionRecuerdos(a.v, a.rec.lista, time.Now(), a.abrirRecuerdo, a.ocultarRecuerdos)
 	}
@@ -743,7 +775,9 @@ func (a *App) cargarMas() {
 			a.g.cursor, a.g.fin = siguiente, siguiente == ""
 			if a.g.siguienteAlLlegar && a.vis != nil {
 				a.g.siguienteAlLlegar = false
-				a.vis.i = min(a.vis.i+1, len(a.g.fotos)-1)
+				// La lista del visor es la mezclada: la siguiente puede ser una cifrada que
+				// entra ahora que la línea del servidor ha llegado a su fecha.
+				a.vis.i = min(a.vis.i+1, len(a.vis.lista())-1)
 				a.vis.nuevaFoto()
 			}
 			a.pintar()

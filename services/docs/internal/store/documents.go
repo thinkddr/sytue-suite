@@ -199,6 +199,21 @@ func (s *Store) RenameDocument(ctx context.Context, id, title string) error {
 		 WHERE id = $1 AND deleted_at IS NULL`, id, title)
 }
 
+// AnclarEnBoveda pone `despues` («vault:<id>», ADR 0086) como ancla del documento si
+// la suya sigue siendo `antes` ("" = sin ancla). Sin tocar `updated_at`: anclar no
+// es editar. domain.ErrNotFound si ya no casa; domain.ErrConflict si otro documento
+// vivo de la misma persona ya tiene esa ancla (el índice único de la mig. 0006).
+func (s *Store) AnclarEnBoveda(ctx context.Context, id, antes, despues string) error {
+	err := s.execAffectingDocument(ctx, id, "anclar en la bóveda",
+		`UPDATE documents SET source_ref = $3
+		 WHERE id = $1 AND deleted_at IS NULL AND coalesce(source_ref, '') = $2`,
+		id, antes, despues)
+	if esUnica(err) {
+		return domain.ErrConflict
+	}
+	return err
+}
+
 // SoftDeleteDocument mueve el documento a la papelera (deleted_at).
 func (s *Store) SoftDeleteDocument(ctx context.Context, id string) error {
 	return s.execAffecting(ctx, "borrar documento",

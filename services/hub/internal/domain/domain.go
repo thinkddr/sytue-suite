@@ -340,6 +340,10 @@ type Notification struct {
 	// Historic es un aviso RECONSTRUIDO de algo que pasó antes de que existiera el
 	// registro de avisos (`avisos-historicos`): la campana lo marca como tal.
 	Historic bool `json:"historic,omitempty"`
+	// Private es un aviso que espera en la entrada privada de One (ADR 0086): la fuente
+	// de su destinatario está congelada y ningún aparato lo ha guardado todavía. Se
+	// enseña y se puede marcar leído (en la copia del servidor) como cualquier otro.
+	Private bool `json:"private,omitempty"`
 }
 
 // Antes es el cursor de la lista de avisos: los anteriores a (En, ID). Con la fecha sola,
@@ -485,6 +489,7 @@ const (
 	HistoricoOlvidado   = "olvidado"   // a una dirección que Sytue ID retiró (ADR 0053)
 	HistoricoAntiguo    = "antiguo"    // más viejo que VentanaHistorica
 	HistoricoTope       = "tope"       // su destinatario ya tiene TopeHistoricosPorPersona
+	HistoricoCongelado  = "congelado"  // la fuente de One de su destinatario está congelada
 )
 
 // NewHistorico es un aviso reconstruido: el de siempre, con la fecha en que ocurrió

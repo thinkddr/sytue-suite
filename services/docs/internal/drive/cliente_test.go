@@ -20,6 +20,7 @@ type driveFalso struct {
 	carpetaExiste bool
 	ficheros      string // JSON del array `files` de la carpeta de documentos
 	estadoSubida  int
+	cuerpoSubida  string // cuerpo de la respuesta cuando estadoSubida no es 0
 
 	creoCarpeta  bool
 	nombreSubido string
@@ -61,6 +62,7 @@ func (d *driveFalso) servidor(t *testing.T) *httptest.Server {
 		d.bytesSubidos = len(cuerpo)
 		if d.estadoSubida != 0 {
 			w.WriteHeader(d.estadoSubida)
+			_, _ = io.WriteString(w, d.cuerpoSubida)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -146,6 +148,36 @@ func TestCrearDocumentoSinAutorizacion(t *testing.T) {
 	_, err := c.CrearDocumento(context.Background(), "tok", "Acta", "odt", "text/plain", []byte("x"))
 	if !errors.Is(err, ErrNoAutorizado) {
 		t.Fatalf("error = %v, quiero ErrNoAutorizado", err)
+	}
+}
+
+// La unidad en la bóveda (ADR 0086): Drive rechaza escribir con 409 y el código
+// estable `private_storage_migration_required`. Tiene que llegar DISTINGUIBLE: el
+// handler crea entonces el documento sin fichero en la unidad, en vez de no crearlo.
+func TestCrearDocumentoUnidadCifrada(t *testing.T) {
+	d := &driveFalso{
+		carpetaExiste: true, estadoSubida: http.StatusConflict,
+		cuerpoSubida: `{"error":{"code":"private_storage_migration_required","message":"Use an E2E-capable client."},"request_id":"r1"}`,
+	}
+	c := Nuevo(d.servidor(t).URL, time.Second)
+
+	_, err := c.CrearDocumento(context.Background(), "tok", "Acta", "odt", "text/plain", []byte("x"))
+	if !errors.Is(err, ErrUnidadCifrada) {
+		t.Fatalf("error = %v, quiero ErrUnidadCifrada", err)
+	}
+}
+
+// Otro 409 (otro código, o un cuerpo que no es el sobre de la suite) sigue siendo
+// un fallo de Drive cualquiera: no se toma una duda por «la unidad está cifrada».
+func TestCrearDocumentoOtroConflictoNoEsUnidadCifrada(t *testing.T) {
+	for _, cuerpo := range []string{`{"error":{"code":"name_taken"}}`, `no es json`, ``} {
+		d := &driveFalso{carpetaExiste: true, estadoSubida: http.StatusConflict, cuerpoSubida: cuerpo}
+		c := Nuevo(d.servidor(t).URL, time.Second)
+
+		_, err := c.CrearDocumento(context.Background(), "tok", "Acta", "odt", "text/plain", []byte("x"))
+		if err == nil || errors.Is(err, ErrUnidadCifrada) {
+			t.Fatalf("cuerpo %q: error = %v, quiero un fallo que no sea ErrUnidadCifrada", cuerpo, err)
+		}
 	}
 }
 

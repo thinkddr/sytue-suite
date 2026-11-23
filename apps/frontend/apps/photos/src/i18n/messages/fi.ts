@@ -341,4 +341,37 @@ export const fi: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Tallennettu kansioon Kuvat › Sytue Photos: {count}',
   'library.saveFailed': 'Tämän tietokoneen galleriaan tallentaminen epäonnistui: {name}',
   'backup.whileOpen': 'Tällä tietokoneella varmuuskopioidaan, kun Sytue Fotos on auki.',
+  'backup.encryptedWaitTitle': 'Avaa Sytue Fotos, niin salattu varmuuskopio valmistuu',
+  'backup.encryptedWaitBody':
+    'Drivesi on päästä päähän salattu. Uudet kuvat varmuuskopioidaan heti, kun Sytue Fotos on auki.',
+  'gallery.uploadedEncrypted': 'Tallennettu Driveen päästä päähän salattuna: {count}',
+  'gallery.uploadVaultSignIn':
+    'Drivesi on päästä päähän salattu. Kirjaudu uudelleen sisään avataksesi sen ja lisää kuvat uudelleen.',
+  'gallery.uploadVaultNotReady':
+    'Drivesi siirtyy vielä päästä päähän -salaukseen. Viimeistele se avaamalla Sytue Drive ja lisää kuvat uudelleen.',
+  'gallery.uploadVaultLocked':
+    'Drivesi on päästä päähän salattu. Avaa se yllä ja lisää kuvat uudelleen.',
+  'gallery.uploadVaultUnavailable':
+    'Drivesi on päästä päähän salattu, eikä sitä voi avata tällä laitteella. Lisää kuvat Sytue Photosin verkkoversiosta.',
+  'gallery.encrypted.title': 'Salatussa Drivessasi',
+  'gallery.encrypted.show': 'Näytä',
+  'gallery.encrypted.opening': 'Puretaan salausta…',
+  'gallery.encrypted.failed': 'Salattua Driveasi ei voitu avata.',
+  'gallery.encrypted.signIn': 'Kirjaudu uudelleen',
+  'gallery.encrypted.empty': 'Salatussa Drivessasi ei ole vielä kuvia.',
+  'gallery.encrypted.note':
+    'Päästä päähän salatut kuvat puretaan vain tällä laitteella. Sytue AI, samankaltaiset kuvat, Lähellä ja muistot eivät sisällä niitä.',
+  'gallery.encrypted.badge': 'Päästä päähän salattu',
+  'gallery.encrypted.open': 'Avaa {name} (salattu)',
+  'gallery.encrypted.notSelectable':
+    'Salattuja kuvia ei voi valita: avaa kuva merkitäksesi sen suosikiksi tai lisätäksesi sen albumiin.',
+  'gallery.encrypted.actionFailed': 'Salattua galleriaasi ei voitu päivittää.',
+  'gallery.encrypted.saved':
+    'Tallennettu uutena salattuna versiona. Edellinen jää Driven versiohistoriaan.',
+  'gallery.encrypted.albums': 'Salatut albumit',
+  'gallery.encrypted.newAlbum': 'Uusi salattu albumi',
+  'gallery.encrypted.saveVersion': 'Tallenna uutena versiona',
+  'gallery.encrypted.editHint':
+    'Muokkaus tehdään tällä laitteella ja tallennetaan salattuna kuvan uutena versiona.',
+  'gallery.encrypted.albumEmpty': 'Tässä salatussa albumissa ei ole vielä kuvia.',
 };

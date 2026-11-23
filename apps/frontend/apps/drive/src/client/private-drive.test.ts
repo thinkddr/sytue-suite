@@ -2,7 +2,7 @@
 import { expect, test } from 'bun:test';
 import { DriveClient } from '@sytue/api-clients';
 import type { StorageRepository } from '@sytue/offline/matrix';
-import type { PqVault } from '@sytue/offline/vault';
+import { PqVaultError, type PqVault, type PqVaultCopyMarker } from '@sytue/offline/vault';
 import {
   decodeStorageScopeHeader,
   storageScopeHeader,
@@ -26,7 +26,9 @@ function deferred() {
 async function fixture() {
   const f = await privateDriveWriteFixture();
   let sourceFactories = 0,
-    storageCalls = 0;
+    storageCalls = 0,
+    staleCleared = 0;
+  let marker: PqVaultCopyMarker | null = null;
   const requests: string[] = [];
   const mutableScope: MatrixStorageScope = { ...scope };
   let storage: () => StorageRepository = () => f.repository();
@@ -38,6 +40,11 @@ async function fixture() {
     storage: () => {
       storageCalls++;
       return storage();
+    },
+    copyMarker: () => Promise.resolve(marker),
+    clearStaleCopy: () => {
+      staleCleared++;
+      return Promise.resolve();
     },
   } as unknown as PqVault;
   const source = () => {
@@ -65,6 +72,10 @@ async function fixture() {
     gate,
     requests,
     counts: () => ({ sourceFactories, storageCalls }),
+    staleCleared: () => staleCleared,
+    setMarker: (value: PqVaultCopyMarker | null) => {
+      marker = value;
+    },
     setStorage: (factory: () => StorageRepository) => {
       storage = factory;
     },
@@ -148,6 +159,48 @@ test('cancelling Drive during key preparation drains the job and never opens the
     keys.resolve();
     await pending;
     await closing;
+    await f.f.close();
+  }
+});
+
+const copyMarker = (active: boolean): PqVaultCopyMarker => ({
+  id: 'otro-dispositivo-0000000000',
+  holder: 'native-linux',
+  kind: 'matrix-copy',
+  epoch: 'e',
+  started_at: '2026-11-23T10:00:00Z',
+  expires_at: '2026-11-23T10:05:00Z',
+  active,
+});
+
+test('Drive gate does not import over another device copying Matrix into the vault', async () => {
+  const f = await fixture();
+  f.setMarker(copyMarker(true));
+  try {
+    const failure = await f.gate.host
+      .prepare(f.instance, new AbortController().signal)
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(PqVaultError);
+    expect((failure as PqVaultError).reason).toBe('copy');
+    expect(f.requests).toHaveLength(0);
+    expect(() => f.gate.current(f.instance)).toThrow('matrix_device');
+  } finally {
+    await f.gate.host.close(f.instance);
+    await f.f.close();
+  }
+});
+
+test('Drive gate opens past an expired copy marker and clears it once the receipt is read', async () => {
+  const f = await fixture();
+  f.setMarker(copyMarker(false));
+  const lifetime = new AbortController();
+  try {
+    await f.gate.host.prepare(f.instance, lifetime.signal);
+    expect((await f.gate.current(f.instance).repository.root()).id).toBe('root');
+    expect(f.staleCleared()).toBe(1);
+  } finally {
+    lifetime.abort();
+    await f.gate.host.close(f.instance);
     await f.f.close();
   }
 });

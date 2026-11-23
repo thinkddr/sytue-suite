@@ -177,6 +177,16 @@ spec:
               value: {{ .Values.config.notesUrl | default (printf "http://%s-notes" .Release.Name) | quote }}
             - name: ROOMS_BASE_URL
               value: {{ .Values.config.roomsUrl | default (printf "http://%s-rooms" .Release.Name) | quote }}
+            # La autoridad de almacenamiento de Rooms para la entrada privada de avisos
+            # de One (ADR 0086): el mismo Secret dedicado que Mail y Calendar, nunca el
+            # secreto interno del Hub. Opcional: sin él, 503 private_ingress_required y
+            # los avisos esperan en la copia del servidor, que la campana sigue viendo.
+            - name: ROOMS_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: rooms-internal-secret
+                  optional: true
             - name: ERP_BASE_URL
               value: {{ .Values.config.erpUrl | default (printf "http://%s-syerp" .Release.Name) | quote }}
             # Solo para «Exportar tus datos»: guardan datos de la persona, aunque no se busquen.

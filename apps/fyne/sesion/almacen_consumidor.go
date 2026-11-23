@@ -104,9 +104,28 @@ type almacenCache struct {
 type almacenPrivado struct {
 	ruta      string
 	productos []string
+	// boveda: es el diario propio de la bóveda directa (diario_boveda.go), no
+	// uno de los de Matrix.
+	boveda bool
 }
 
+// directoriosAlmacenPrivado son todos los diarios privados del dispositivo: los
+// de Matrix y, detrás, los de la bóveda directa. Contar pendientes antes de salir
+// y descartar con permiso explícito pasan por aquí, así que el diario de la
+// bóveda bloquea la salida y se borra con el descarte igual que los de Matrix.
 func (s *Suite) directoriosAlmacenPrivado(ctx context.Context) ([]almacenPrivado, error) {
+	dirs, err := s.directoriosDiarioMatrix(ctx)
+	if err != nil {
+		return nil, err
+	}
+	boveda, err := directoriosDiarioBoveda()
+	if err != nil {
+		return nil, err
+	}
+	return append(dirs, boveda...), nil
+}
+
+func (s *Suite) directoriosDiarioMatrix(ctx context.Context) ([]almacenPrivado, error) {
 	legacy, err := s.directorioCacheActual(ctx)
 	if err != nil {
 		return nil, err

@@ -25,3 +25,15 @@ func TestElLoginLlevaMaxAgeSoloSiSePide(t *testing.T) {
 		t.Fatalf("con el bloqueo, max_age=60: %s", destino)
 	}
 }
+
+// TestReautenticarPideIdentificarseDeNuevo: «soltar la fuente» necesita un
+// `auth_time` de ahora; ni la sesión del navegador ni el `max_age` del bloqueo valen.
+func TestReautenticarPideIdentificarseDeNuevo(t *testing.T) {
+	o := &OIDC{Issuer: "https://id.example", MaxAge: 60}
+	o.endpoints.Authorization = "https://id.example/oauth2/authorize"
+	destino, _, _ := o.autorizar("http://127.0.0.1:1/callback", "", nil, PeticionLogin{Reautenticar: true})
+	u, _ := url.Parse(destino)
+	if u.Query().Get("max_age") != "0" || u.Query().Get("prompt") != "login" {
+		t.Fatalf("reautenticar: %s", destino)
+	}
+}

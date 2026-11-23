@@ -14,6 +14,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	contract "git.sytue.eu/sytue/one/apps/nucleo/storage/ingress"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/keyring"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
 )
 
@@ -31,6 +32,7 @@ type enrollmentDeviceFixture struct {
 	known             map[contract.KeyPlan]bool
 	creates, recovers int
 	beforeRecover     func()
+	absent            error // lo que dice el SDK de un plan que no tiene
 }
 
 func (d *enrollmentDeviceFixture) CheckStoragePublicationTarget(target storage.PublicationTarget) error {
@@ -58,6 +60,9 @@ func (d *enrollmentDeviceFixture) RecoverIngressEnrollment(_ context.Context, pl
 		d.beforeRecover()
 	}
 	if !d.known[plan] {
+		if d.absent != nil {
+			return contract.KeyPlan{}, d.absent
+		}
 		return contract.KeyPlan{}, matrix.ErrRecoveryRequired
 	}
 	return plan, nil
@@ -71,6 +76,7 @@ type enrollmentSourceFixture struct {
 	reads, enrolls int
 	loseACK        bool
 	failure        error
+	refuse         error // el servidor rechaza el alta (p. ej. una rotación no autorizada)
 }
 
 func (s *enrollmentSourceFixture) Authority(context.Context, storage.Scope) (matrixproof.Authority, error) {
@@ -89,6 +95,9 @@ func (s *enrollmentSourceFixture) Enroll(_ context.Context, plan contract.KeyPla
 		s.t.Fatal("server enrollment preceded its exact retained SDK plan", retained, err)
 	}
 	s.enrolls++
+	if s.refuse != nil {
+		return s.refuse
+	}
 	if authority != s.authority {
 		return contract.ErrRevoked
 	}
@@ -258,5 +267,62 @@ func TestEnrollmentConfirmedHistoryRestoresSamePlanAndRejectsSilentRotation(t *t
 	history, found, err := e.history(f.epoch)
 	if err != nil || !found || *history.Plan != original {
 		t.Fatal("rotation replaced original enrollment evidence", history, err)
+	}
+}
+
+// Rotación de la clave de entrada (ADR 0087): solo con Rotate, solo si el SDK
+// dice que no tiene el plan vigente, y el candidato se crea una sola vez.
+func TestEnrollmentRotaSoloSiLaBovedaNoTieneElPlanVigente(t *testing.T) {
+	ajena, err := age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	preparar := func(rotate bool, absent error) (*enrollmentFixture, contract.KeyPlan) {
+		f := newEnrollmentFixture(t)
+		f.cfg.Rotate = rotate
+		f.device.absent = absent
+		vigente := contract.KeyPlan{Version: 1, Scope: f.cfg.Scope, Epoch: f.epoch, Generation: 1, Profile: contract.Profile, Recipient: ajena.Recipient().String()}
+		vigente.KeyID = contract.PublicFingerprint(vigente.Recipient)
+		f.source.state = contract.EnrollmentState{Version: 1, Scope: f.cfg.Scope, Epoch: f.epoch, Status: "active", Generation: 1, Plan: &vigente}
+		return f, vigente
+	}
+
+	// Matrix (sin Rotate) o un fallo que no es «no lo tengo»: nada cambia.
+	for nombre, c := range map[string]struct {
+		rotate bool
+		absent error
+	}{
+		"sin Rotate":             {false, keyring.ErrRecoveryRequired},
+		"fallo pasajero":         {true, io.ErrUnexpectedEOF},
+		"recuperación de Matrix": {true, matrix.ErrRecoveryRequired},
+	} {
+		f, vigente := preparar(c.rotate, c.absent)
+		if _, err := f.open(t).Ensure(t.Context(), f.epoch); err == nil {
+			t.Fatalf("%s: el alta salió bien sin tener el plan", nombre)
+		}
+		if f.device.creates != 0 || f.source.enrolls != 0 || *f.source.state.Plan != vigente {
+			t.Fatalf("%s: rotó: %d candidatos, %d altas", nombre, f.device.creates, f.source.enrolls)
+		}
+	}
+
+	// La bóveda sin el plan: propone el siguiente. Si el servidor no lo autoriza,
+	// falla cerrado y el reintento reutiliza el mismo candidato.
+	f, vigente := preparar(true, keyring.ErrRecoveryRequired)
+	f.source.refuse = contract.ErrRevoked
+	e := f.open(t)
+	if _, err := e.Ensure(t.Context(), f.epoch); !errors.Is(err, contract.ErrRevoked) {
+		t.Fatal("una rotación rechazada no falló cerrada", err)
+	}
+	if *f.source.state.Plan != vigente || f.device.creates != 1 {
+		t.Fatal("una rotación rechazada cambió el plan", f.source.state, f.device.creates)
+	}
+	f.source.refuse = nil
+	plan, err := e.Ensure(t.Context(), f.epoch)
+	if err != nil || plan.Generation != 2 || *f.source.state.Plan != plan || f.device.creates != 1 {
+		t.Fatal("la rotación autorizada no dejó el plan 2", plan, err, f.device.creates)
+	}
+	// Ya rotada, abrir otra vez no rota de nuevo.
+	if again, err := e.Ensure(t.Context(), f.epoch); err != nil || again != plan || f.device.creates != 1 {
+		t.Fatal("una segunda apertura volvió a rotar", again, err)
 	}
 }

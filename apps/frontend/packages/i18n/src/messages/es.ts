@@ -32,6 +32,47 @@ export const es: Catalog = {
   'matrix.connect': 'Configurar este dispositivo',
   'matrix.devices': 'Tus dispositivos',
   'matrix.failed': 'No se pudo configurar el cifrado. Vuelve a intentarlo.',
+  'vault.wrongKey':
+    'Los datos cifrados de esta app se cerraron con una clave de desbloqueo de Sytue ID distinta de la de este navegador. Vuelve a entrar en Sytue ID para traer aquí la clave actual. Si la clave anterior se perdió, puedes vaciar los datos cifrados de esta app y empezar de nuevo.',
+  'vault.wrongKeyDevice':
+    'Los datos cifrados de esta app se cerraron con una clave de desbloqueo de Sytue ID distinta de la de este dispositivo. Vuelve a entrar en Sytue ID para traer aquí la clave actual. Si la clave anterior se perdió, puedes vaciar los datos cifrados de esta app y empezar de nuevo.',
+  'vault.release': 'Vaciar y volver a los datos del servidor',
+  'vault.releaseTitle': 'Volver a los datos del servidor',
+  'vault.releaseBody':
+    'Cuando los datos de esta app pasaron al cifrado desde una app de escritorio o del móvil, el servidor guardó una copia tal como estaban en ese momento. Si no puedes abrir los datos cifrados, esta app puede volver a esa copia. Todo lo que se escribió después, en cualquier dispositivo, se pierde y no se puede recuperar.',
+  'vault.releaseUnderstood': 'Entiendo que se pierde todo lo escrito después de pasar al cifrado',
+  'vault.releaseSignIn':
+    'Para confirmar que eres tú, Sytue ID te pedirá antes que vuelvas a iniciar sesión.',
+  'vault.releaseFailed': 'No se ha podido volver a los datos del servidor. Inténtalo de nuevo.',
+  'vault.moveTitle': 'Pasar Drive a la bóveda cifrada',
+  'vault.moveOffer':
+    'Tu Drive sigue guardado en el cifrado anterior. Pásalo a la bóveda que usan la web y tus otros dispositivos.',
+  'vault.moveAction': 'Pasar a la bóveda',
+  'vault.moveBody':
+    'Se copiarán a la bóveda cifrada todos tus archivos y carpetas, con sus versiones, y se comprobarán uno a uno. No se borra nada del cifrado anterior. Deja la app abierta hasta que termine; si se corta, sigue donde lo dejó.',
+  'vault.moveUnderstood': 'Entiendo que, al terminar, este Drive se usará desde la bóveda',
+  'vault.moveCopying': 'Copiando y comprobando tus archivos…',
+  'vault.moveDone': 'Hecho. Tu Drive ya está en la bóveda cifrada.',
+  'vault.moveFailed':
+    'No se pudo terminar la copia. Tus archivos siguen en el cifrado anterior. Vuelve a intentarlo.',
+  'vault.movePending':
+    'Este dispositivo aún tiene cambios por enviar. Espera a que terminen y vuelve a intentarlo.',
+  'vault.copyInProgress':
+    'Otro dispositivo está pasando tu Drive a la bóveda cifrada. Espera a que termine y vuelve a intentarlo.',
+  'vault.copyCancel': 'Cancelar la copia',
+  'vault.copyCancelHint':
+    'Si esa copia se ha quedado parada, puedes cancelarla: no se borra nada y podrás repetirla desde ese dispositivo.',
+  'vault.releaseNotice':
+    'Los datos de esta app pasaron al cifrado desde una app de escritorio o del móvil. Lo que ves aquí es la copia que guardó el servidor en ese momento; lo escrito después solo está en los datos cifrados. Si ya no puedes abrirlos, puedes volver a los datos del servidor.',
+  'notifications.kind.security.storage.released': '{name} ha vuelto a tus datos del servidor',
+  'vault.signInAgain': 'Volver a entrar en Sytue ID',
+  'vault.empty': 'Vaciar los datos cifrados',
+  'vault.emptyTitle': 'Vaciar los datos cifrados de esta app',
+  'vault.emptyBody':
+    'Los datos que esta app cifró con la clave perdida se borrarán de Sytue y se creará una clave nueva. El resto de tu cuenta no se toca. No se puede deshacer.',
+  'vault.emptyUnderstood': 'Entiendo que se borrarán los datos cifrados con la clave perdida',
+  'vault.failed':
+    'No se pudieron abrir los datos cifrados. Vuelve a intentarlo o vuelve a entrar en Sytue ID. Si la clave se perdió, puedes vaciar los datos cifrados de esta app.',
   'matrix.incoming': 'Verificar este dispositivo',
   'matrix.match': 'Coinciden',
   'matrix.mismatch': 'No coinciden',

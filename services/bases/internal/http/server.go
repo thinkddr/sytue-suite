@@ -23,6 +23,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/peticiones"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/bases/internal/config"
 	"git.sytue.eu/sytue/one/services/bases/internal/domain"
 	"git.sytue.eu/sytue/one/services/bases/internal/store"
@@ -147,6 +148,7 @@ func (h *Handlers) montar(r chi.Router) {
 	j.Post("/connections/{cid}/rotate", h.rotarConexion)
 
 	mountBasesPrivateSource(r, h.Store)
+	soltarfuente.Montar(r, soltarfuente.Config{Product: "bases", Soltar: h.Store.ReleasePrivateStorage, Avisar: h.Hub.Send})
 }
 
 // actor es quien llama: su sub, su organización y sus grupos, de los claims ya verificados.
@@ -216,6 +218,11 @@ func id(r *http.Request, nombre string) (string, error) {
 // errorAPI traduce los errores de dominio.
 func errorAPI(err error) error {
 	switch {
+	case errors.Is(store.PrivateStorageError(err), store.ErrPrivateStorageFrozen):
+		// La valla de la fuente privada (migración 0036): el propietario de la base ya
+		// la llevó a sus dispositivos y el servidor no admite más escrituras en ella.
+		return httpx.ErrConflict.WithCode("private_storage_migration_required").
+			WithMessage("Esta base se ha movido al almacenamiento privado de su propietario.")
 	case errors.Is(err, domain.ErrNoExiste):
 		return httpx.ErrNotFound.Wrap(err)
 	case errors.Is(err, domain.ErrSinPermiso):

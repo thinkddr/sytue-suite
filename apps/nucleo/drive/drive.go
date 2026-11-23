@@ -55,6 +55,12 @@ type Config struct {
 	Gateway                *api.Drive
 	Source                 Source
 	Journal                *offline.Store
+	// DirectImport es solo para la bóveda directa (ADR 0086): una identidad
+	// aislada que no es de Matrix y que, como la web, importa ella misma la
+	// fuente del servidor (congelarla, copiar cada fila y dejar el recibo). Sin
+	// él, una identidad aislada nunca importa: en Matrix lo hace el corte de
+	// identidad. Ver initializeDirect.
+	DirectImport bool
 }
 
 // The existing native API facade dispatches personal content to this repository.

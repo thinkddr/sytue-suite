@@ -31,6 +31,48 @@ export const lv: Catalog = {
   'matrix.connect': 'Iestatīt šo ierīci',
   'matrix.devices': 'Tavas ierīces',
   'matrix.failed': 'Neizdevās iestatīt šifrēšanu. Mēģini vēlreiz.',
+  'vault.wrongKey':
+    'Šīs lietotnes šifrētie dati tika bloķēti ar citu Sytue ID atbloķēšanas atslēgu, nevis to, kas ir šajā pārlūkā. Pierakstieties Sytue ID vēlreiz, lai atnestu šeit pašreizējo atslēgu. Ja iepriekšējā atslēga ir zaudēta, varat iztukšot šīs lietotnes šifrētos datus un sākt no jauna.',
+  'vault.wrongKeyDevice':
+    'Šīs lietotnes šifrētie dati tika bloķēti ar citu Sytue ID atbloķēšanas atslēgu, nevis to, kas ir šajā ierīcē. Pierakstieties Sytue ID vēlreiz, lai atnestu šeit pašreizējo atslēgu. Ja iepriekšējā atslēga ir zaudēta, varat iztukšot šīs lietotnes šifrētos datus un sākt no jauna.',
+  'vault.release': 'Iztukšot un atgriezties pie servera datiem',
+  'vault.releaseTitle': 'Atgriešanās pie servera datiem',
+  'vault.releaseBody':
+    'Kad šīs lietotnes dati tika šifrēti datora vai mobilajā lietotnē, serveris saglabāja to kopiju tieši tādu, kāda tā bija tajā brīdī. Ja šifrētos datus nevarat atvērt, šī lietotne var atgriezties pie šīs kopijas. Viss, kas rakstīts vēlāk jebkurā ierīcē, tiek zaudēts, un to nevar atjaunot.',
+  'vault.releaseUnderstood':
+    'Saprotu, ka viss, kas rakstīts pēc pārejas uz šifrēšanu, tiks zaudēts',
+  'vault.releaseSignIn':
+    'Lai apstiprinātu identitāti, Sytue ID vispirms lūgs jums pierakstīties vēlreiz.',
+  'vault.releaseFailed': 'Neizdevās atgriezties pie servera datiem. Mēģiniet vēlreiz.',
+  'vault.moveTitle': 'Pārvietot Drive uz šifrēto glabātuvi',
+  'vault.moveOffer':
+    'Jūsu Drive joprojām glabājas iepriekšējā šifrējumā. Pārvietojiet to uz glabātuvi, ko izmanto tīmeklis un jūsu citas ierīces.',
+  'vault.moveAction': 'Pārvietot uz glabātuvi',
+  'vault.moveBody':
+    'Visi jūsu faili un mapes ar to versijām tiks nokopēti šifrētajā glabātuvē un pārbaudīti pa vienam. No iepriekšējā šifrējuma nekas netiek dzēsts. Turiet lietotni atvērtu līdz beigām; ja tā tiek pārtraukta, tā turpina no vietas, kur apstājās.',
+  'vault.moveUnderstood': 'Es saprotu, ka pēc pabeigšanas šis Drive tiks izmantots no glabātuves',
+  'vault.moveCopying': 'Jūsu faili tiek kopēti un pārbaudīti…',
+  'vault.moveDone': 'Gatavs. Jūsu Drive tagad ir šifrētajā glabātuvē.',
+  'vault.moveFailed':
+    'Kopiju neizdevās pabeigt. Jūsu faili joprojām ir iepriekšējā šifrējumā. Mēģiniet vēlreiz.',
+  'vault.movePending':
+    'Šajā ierīcē vēl ir nenosūtītas izmaiņas. Pagaidiet, līdz tās tiek pabeigtas, un mēģiniet vēlreiz.',
+  'vault.copyInProgress':
+    'Cita ierīce pārvieto jūsu Drive uz šifrēto glabātuvi. Pagaidiet, līdz tā pabeidz, un mēģiniet vēlreiz.',
+  'vault.copyCancel': 'Atcelt kopēšanu',
+  'vault.copyCancelHint':
+    'Ja kopēšana ir apstājusies, varat to atcelt: nekas netiek dzēsts, un to var atkārtot no tās ierīces.',
+  'vault.releaseNotice':
+    'Šīs lietotnes dati tika šifrēti datora vai mobilajā lietotnē. Šeit redzama kopija, ko serveris tajā brīdī saglabāja; tas, kas rakstīts vēlāk, ir tikai šifrētajos datos. Ja tos vairs nevarat atvērt, varat atgriezties pie servera datiem.',
+  'notifications.kind.security.storage.released': '{name}: atgriešanās pie jūsu datiem serverī',
+  'vault.signInAgain': 'Pierakstīties Sytue ID vēlreiz',
+  'vault.empty': 'Iztukšot šifrētos datus',
+  'vault.emptyTitle': 'Iztukšot šīs lietotnes šifrētos datus',
+  'vault.emptyBody':
+    'Dati, ko šī lietotne šifrēja ar zaudēto atslēgu, tiks dzēsti no Sytue, un tiks izveidota jauna atslēga. Pārējais jūsu konts netiek skarts. To nevar atsaukt.',
+  'vault.emptyUnderstood': 'Saprotu, ka ar zaudēto atslēgu šifrētie dati tiks dzēsti',
+  'vault.failed':
+    'Šifrētos datus neizdevās atvērt. Mēģiniet vēlreiz vai pierakstieties Sytue ID vēlreiz. Ja atslēga ir zaudēta, varat iztukšot šīs lietotnes šifrētos datus.',
   'matrix.incoming': 'Verificēt šo ierīci',
   'matrix.match': 'Sakrīt',
   'matrix.mismatch': 'Nesakrīt',

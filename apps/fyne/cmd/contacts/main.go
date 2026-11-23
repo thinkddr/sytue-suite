@@ -65,11 +65,9 @@ func main() {
 	w.Resize(fyne.NewSize(1280, 800))
 	var current *contactos.App
 	var pendingID string
-	mount := func(resources *cifrado.Resources[*mx.Client], repository *privateContacts.Repository) (cifrado.ApplicationView, error) {
-		facade, err := api.NewContacts(s.URL("contacts"), resources.HTTP(), nil).WithPrivateData(repository)
-		if err != nil {
-			return cifrado.ApplicationView{}, err
-		}
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	mount := func(resources cifrado.Cuenta, facade *api.Contacts) cifrado.ApplicationView {
 		c := contactos.NuevaApp(t, facade)
 		subject := resources.PrivateStorageScope().Subject
 		c.Directorio, c.Yo = api.NewDirectorio(s.URL("id"), resources.HTTP(), nil), func() string { return subject }
@@ -94,15 +92,26 @@ func main() {
 			if current == c {
 				current = nil
 			}
-		}, Join: c.Esperar}, nil
+		}, Join: c.Esperar}
 	}
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateContacts.Repository]{
-		Suite: s, Application: a, Window: w, Product: "contacts", Translate: func(key string) string { return t.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateContacts.Repository], error) {
-			return contactsPlan(ctx, resources, s)
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*privateContacts.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*privateContacts.Repository]{
+			Suite: s, Application: a, Window: w, Product: "contacts", Translate: func(key string) string { return t.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateContacts.Repository], error) {
+				return contactsPlan(ctx, resources, s)
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateContacts.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewContacts(s.URL("contacts"), resources.HTTP(), nil).WithPrivateData(repository)
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return mount(resources, facade), nil //nolint:contextcheck // This view retains its own presenter/resource lifetime; future gestures must not inherit the mount request.
+			},
 		},
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateContacts.Repository) (cifrado.ApplicationView, error) {
-			return mount(resources, repository) //nolint:contextcheck // This view retains its own presenter/resource lifetime; future gestures must not inherit the mount request.
+		Soltar: cifrado.SoltarEn(s.URL("contacts")),
+		Modo:   contactsMode(s),
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewContacts(s.URL("contacts"), cuenta.HTTP(), nil)), nil
 		},
 	})
 	if err != nil {

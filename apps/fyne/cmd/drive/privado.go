@@ -125,6 +125,14 @@ func (d *drivePrivado) cambiar() {
 	}
 }
 
+// reabrir cierra lo de esta cuenta y vuelve a elegir dónde vive su Drive: tras
+// pasarlo a la bóveda, o tras volver a la copia del servidor.
+func (d *drivePrivado) reabrir() {
+	d.cerrar()
+	d.cuenta, d.dentro = auth.IdentitySnapshot{}, false
+	d.cambiar()
+}
+
 func (d *drivePrivado) cerrar() {
 	drain := d.retirar()
 	if d.cerrarPaneles != nil {

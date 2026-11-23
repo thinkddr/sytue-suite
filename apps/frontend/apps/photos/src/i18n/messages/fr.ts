@@ -355,4 +355,38 @@ export const fr: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Enregistrées dans Images › Sytue Photos : {count}',
   'library.saveFailed': 'Impossible d’enregistrer dans la galerie de cet ordinateur : {name}',
   'backup.whileOpen': 'Sur cet ordinateur, la sauvegarde se fait tant que Sytue Fotos est ouvert.',
+  'backup.encryptedWaitTitle': 'Ouvrez Sytue Fotos pour terminer la sauvegarde chiffrée',
+  'backup.encryptedWaitBody':
+    'Votre Drive est chiffré de bout en bout. Les nouvelles photos sont sauvegardées dès que vous ouvrez Sytue Fotos.',
+  'gallery.uploadedEncrypted':
+    'Enregistrées dans votre Drive avec un chiffrement de bout en bout : {count}',
+  'gallery.uploadVaultSignIn':
+    'Votre Drive est chiffré de bout en bout. Reconnectez-vous pour le déverrouiller, puis ajoutez de nouveau les photos.',
+  'gallery.uploadVaultNotReady':
+    'Votre Drive passe encore au chiffrement de bout en bout. Ouvrez Sytue Drive pour terminer, puis ajoutez de nouveau les photos.',
+  'gallery.uploadVaultLocked':
+    'Votre Drive est chiffré de bout en bout. Déverrouillez-le ci-dessus, puis ajoutez de nouveau les photos.',
+  'gallery.uploadVaultUnavailable':
+    'Votre Drive est chiffré de bout en bout et ne peut pas être ouvert sur cet appareil. Ajoutez les photos depuis Sytue Photos sur le web.',
+  'gallery.encrypted.title': 'Dans votre Drive chiffré',
+  'gallery.encrypted.show': 'Afficher',
+  'gallery.encrypted.opening': 'Déchiffrement…',
+  'gallery.encrypted.failed': 'Impossible d’ouvrir votre Drive chiffré.',
+  'gallery.encrypted.signIn': 'Se reconnecter',
+  'gallery.encrypted.empty': 'Il n’y a pas encore de photos dans votre Drive chiffré.',
+  'gallery.encrypted.note':
+    'Les photos chiffrées de bout en bout ne sont déchiffrées que sur cet appareil. Sytue AI, les photos similaires, À proximité et les souvenirs ne les incluent pas.',
+  'gallery.encrypted.badge': 'Chiffrée de bout en bout',
+  'gallery.encrypted.open': 'Ouvrir {name} (chiffrée)',
+  'gallery.encrypted.notSelectable':
+    'Les photos chiffrées ne peuvent pas être sélectionnées : ouvrez-en une pour la mettre en favori ou l’ajouter à un album.',
+  'gallery.encrypted.actionFailed': 'Impossible de mettre à jour votre galerie chiffrée.',
+  'gallery.encrypted.saved':
+    'Enregistrée comme nouvelle version chiffrée. La précédente reste dans l’historique des versions de Drive.',
+  'gallery.encrypted.albums': 'Albums chiffrés',
+  'gallery.encrypted.newAlbum': 'Nouvel album chiffré',
+  'gallery.encrypted.saveVersion': 'Enregistrer comme nouvelle version',
+  'gallery.encrypted.editHint':
+    'La retouche se fait sur cet appareil et est enregistrée chiffrée comme nouvelle version de la photo.',
+  'gallery.encrypted.albumEmpty': 'Cet album chiffré ne contient encore aucune photo.',
 };

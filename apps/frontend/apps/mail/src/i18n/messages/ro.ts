@@ -1004,4 +1004,10 @@ export const ro: AppCatalog<typeof en> = {
     'E-mailul a fost acceptat, dar nu s-a putut salva o copie în Trimise. Nu-l trimite din nou.',
   'externalMail.invalidConfiguration':
     'Introdu o adresă de e-mail validă, numele și porturile ambelor servere și o parolă.',
+  'privateMail.handoverOffer': 'Nu îți poți deschide poșta? Golește-o și mut-o în seif',
+  'privateMail.handoverTitle': 'Golește poșta și mut-o în seif',
+  'privateMail.handoverBody':
+    'Poșta criptată pe care nu o mai poți deschide nu va fi recuperată. De acum, poșta ta se deschide cu autentificarea în Sytue ID, pe care s-ar putea să trebuiască să o repeți.',
+  'privateMail.handoverUnderstood': 'Înțeleg că poșta pe care nu o pot deschide se va pierde',
+  'privateMail.handoverConfirm': 'Golește și mută în seif',
 };

@@ -57,6 +57,9 @@ type Editor struct {
 	VolverDrive bool
 	// PestanaIA enseña la pestaña de Sytue AI en vez de la de ajustes.
 	PestanaIA bool
+	// Cifrada es una foto de la galería cifrada (ADR 0086): sin la pestaña de Sytue AI
+	// (que no la ve), y guardar sube una versión nueva cifrada de la foto, como la web.
+	Cifrada bool
 	// Recortando enciende el modo recorte; HayMarco, que ya hay uno que aplicar.
 	Recortando, HayMarco bool
 	// Proporcion es la del recorte (0, libre).
@@ -147,7 +150,11 @@ func cabeceraEditor(v Vista, d Editor) fyne.CanvasObject {
 	deshacer := ui.NuevoBotonIcono(iconos.Deshacer, v.Traduce("editor.undo"), d.AlDeshacer)
 	deshacer.Lado, deshacer.TamIcono = ui.LadoIconoMD, IconoMando
 	deshacer.Inerte = d.Pendiente || d.Guardando || len(d.Receta.Pasos) == 0
-	guardar := ui.NuevoBoton(v.Traduce("editor.save"), d.AlGuardar).Con(ui.Primario, ui.TallaSM)
+	claveGuardar := "editor.save"
+	if d.Cifrada {
+		claveGuardar = "gallery.encrypted.saveVersion"
+	}
+	guardar := ui.NuevoBoton(v.Traduce(claveGuardar), d.AlGuardar).Con(ui.Primario, ui.TallaSM)
 	guardar.Cargando, guardar.Inerte = d.Guardando, !d.Sucia
 	textoEstado := ParrafoEn(estado, tema.TextoXS, ui.Normal, "text-muted", v.Variante)
 	// El nombre es `truncate`: en un teléfono encoge hasta lo que dejan los demás.
@@ -199,14 +206,21 @@ func panelEditor(v Vista, d Editor) fyne.CanvasObject {
 	switch {
 	case d.Pendiente:
 		cuerpo = nil
-	case d.PestanaIA:
+	case d.PestanaIA && !d.Cifrada:
 		cuerpo = pestanaIA(v, d)
 	default:
 		cuerpo = pestanaAjustes(v, d)
 	}
 	bloques := make([]ui.Bloque, 0, 1+len(cuerpo)+2)
-	if !d.Pendiente {
+	if !d.Pendiente && !d.Cifrada {
 		bloques = append(bloques, ui.Bloque{Obj: pestanasEditor(v, d), Margen: tema.Espacio(1) + HuecoPanel})
+	}
+	if d.Cifrada {
+		// Sin las pestañas, el panel empieza con su `p-4` y dice dónde va la edición.
+		pista := ui.NuevoParrafo(v.Traduce("gallery.encrypted.editHint"), tema.TextoXS, ui.Normal, "text-muted", v.Variante)
+		hueco := canvas.NewRectangle(color.Transparent)
+		bloques = append(bloques, ui.Bloque{Obj: hueco, Alto: func(float32) float32 { return 0 }, Margen: RellenoPanel},
+			dentro(bloqueLargo(pista, HuecoPanel)))
 	}
 	for _, b := range cuerpo {
 		b.Margen += HuecoPanel

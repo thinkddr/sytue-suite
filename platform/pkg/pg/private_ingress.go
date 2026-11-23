@@ -40,17 +40,20 @@ var privateIngressEpochV1 []byte
 //go:embed private_ingress_pq_v1.sql
 var privateIngressPQV1 []byte
 
+//go:embed private_ingress_rotation_v1.sql
+var privateIngressRotationV1 []byte
+
 const privateIngressMarkerV1 = "-- sytue:private-ingress-v1"
 
 func WithPrivateIngressDDL(source fs.FS) fs.FS {
-	return withMigrationDDL(source,
-		migrationDDLFragment{marker: privateStorageMarkerV1, sql: privateStorageV1},
+	return withMigrationDDL(source, append(privateStorageFragments(),
 		migrationDDLFragment{marker: privateIngressMarkerV1, sql: append(append([]byte(nil), privateIngressV1...), privateIngressAuthorizationV1...)},
 		migrationDDLFragment{marker: "-- sytue:private-ingress-bodies-v1", sql: privateIngressBodiesV1},
 		migrationDDLFragment{marker: "-- sytue:private-ingress-handoff-v1", sql: privateIngressHandoffV1},
 		migrationDDLFragment{marker: "-- sytue:private-ingress-rejections-v1", sql: privateIngressRejectionsV1},
 		migrationDDLFragment{marker: "-- sytue:private-ingress-epoch-v1", sql: privateIngressEpochV1},
-		migrationDDLFragment{marker: "-- sytue:private-ingress-pq-v1", sql: privateIngressPQV1})
+		migrationDDLFragment{marker: "-- sytue:private-ingress-pq-v1", sql: privateIngressPQV1},
+		migrationDDLFragment{marker: "-- sytue:private-ingress-rotation-v1", sql: privateIngressRotationV1})...)
 }
 
 type PrivateIngressConfig struct {

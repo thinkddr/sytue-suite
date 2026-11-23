@@ -95,6 +95,7 @@ func (a *App) datosAlbumes() Albumes {
 		AlIr:    a.irSeccion, AlCrear: a.crearAlbum, AlBuscar: a.buscarMontones,
 		AlGuardar: a.guardarMonton,
 		AlVer:     func(fotos []api.Photo) { a.AbrirParecidas(idsDe(fotos)) },
+		Cifrados:  a.seccionAlbumesCifrados(),
 	}
 }
 
@@ -596,7 +597,8 @@ func (a *App) datosEncontradas() Encontradas {
 	d := Encontradas{
 		Referencias: e.referencias, Fotos: e.fotos, Cerca: a.ruta == RutaCerca, Varias: len(e.ids) > 1,
 		Coordenadas: e.coordenadas, Aviso: e.aviso, Error: e.error,
-		AlIr: a.irSeccion, AlVolver: func() { a.Ir(RutaFotos) },
+		NotaCifradas: a.hayCifradas(),
+		AlIr:         a.irSeccion, AlVolver: func() { a.Ir(RutaFotos) },
 		AlAbrir: func(f api.Photo) {
 			if i := posicion(a.enc.fotos, f.ID); i >= 0 {
 				a.abrirVisor(desdeEncontradas, i)

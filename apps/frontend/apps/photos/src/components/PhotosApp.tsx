@@ -68,6 +68,17 @@ import {
   type Foto,
 } from '../client/photosApi.js';
 import { esImagen, subirFotos } from '../client/subida.js';
+import { destinoCifrado } from '../client/driveCifrado.js';
+import { buscarCifradas, GaleriaCifrada } from '../client/galeriaCifrada.js';
+import {
+  FotosCifradas,
+  MiniaturaCifrada,
+  VisorCifrado,
+  useAccionesCifradas,
+  useDriveCifrado,
+  useGaleriaCifrada,
+} from './FotosCifradas.js';
+import { mezclarLinea } from '../lib/lineaMezclada.js';
 import type { Receta } from '../editor/receta.js';
 import { Nav } from './Nav.js';
 import { BarraDeAnyos } from './BarraDeAnyos.js';
@@ -172,6 +183,14 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
   const generacion = useRef(0);
   // Subida: progreso, aviso final y la zona de soltar.
   const [subida, setSubida] = useState<{ hechas: number; total: number } | null>(null);
+  // El Drive de la bóveda (ADR 0086): a donde van las fotos si el del servidor ya no
+  // admite escrituras, y de donde se listan aparte (`FotosCifradas`).
+  const cifrado = useDriveCifrado(user.id, user.tenant);
+  // Su índice cifrado (ADR 0086): las fotos de ahí entran en la línea de tiempo, en
+  // favoritas y en la búsqueda, leídas y escritas solo en el navegador.
+  const viva = useGaleriaCifrada(cifrado);
+  const accionesCifradas = useAccionesCifradas(viva, locale);
+  const [abiertaCifrada, setAbiertaCifrada] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
   const selector = useRef<HTMLInputElement>(null);
@@ -560,7 +579,15 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
     }
     setAviso(null);
     setSubida({ hechas: 0, total: ficheros.length });
-    const resultado = await subirFotos(ficheros, (hechas, total) => setSubida({ hechas, total }));
+    const resultado = await subirFotos(ficheros, (hechas, total) => setSubida({ hechas, total }), {
+      cifrado: async () => {
+        const drive = await cifrado.abrir();
+        // Cada foto se apunta en el índice cifrado al subirla (fecha EXIF, medidas,
+        // miniatura cifrada); si falla, se reconstruye al leer la galería.
+        const indice = new GaleriaCifrada(drive.repositorio, { signal: drive.signal });
+        return destinoCifrado(drive, (fila, fichero) => indice.indexar(fila, fichero));
+      },
+    });
     setSubida(null);
     if (resultado.fotos.length > 0) {
       // La línea de tiempo se vuelve a pedir desde el principio: las fotos nuevas
@@ -578,6 +605,27 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
         .then(setAnyos)
         .catch(() => {});
     }
+    if (resultado.cifradas.length > 0) {
+      cifrado.tocar();
+      toast.notify({
+        tone: 'success',
+        title: t('gallery.uploadedEncrypted', { count: resultado.cifradas.length }),
+      });
+    }
+    // Con la bóveda que no abre, el motivo dice qué hacer; el fallo genérico no.
+    if (resultado.motivoCifrado === 'entrar' || resultado.motivoCifrado === 'pendiente') {
+      toast.notify({
+        tone: 'danger',
+        title: t(
+          resultado.motivoCifrado === 'entrar'
+            ? 'gallery.uploadVaultSignIn'
+            : 'gallery.uploadVaultNotReady',
+        ),
+      });
+      return;
+    }
+    // Todo lo que se subió fue cifrado: ya está dicho.
+    if (resultado.fotos.length === 0 && resultado.fallos.length === 0) return;
     // El progreso va en línea; cómo acabó, en el toast.
     toast.notify(
       resultado.fallos.length > 0
@@ -662,7 +710,30 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
    * rótulo. En una galería grande eso se siente al pulsar, que es justo donde
    * no se puede notar nada.
    */
-  const grupos = useMemo(() => porMes(fotos, locale), [fotos, locale]);
+  const cifradas = useMemo(() => {
+    const todas = viva.indice?.fotos ?? [];
+    const suyas = soloFavoritas ? todas.filter((f) => f.entrada.favorita) : todas;
+    return texto.trim()
+      ? buscarCifradas(suyas, texto, (iso) =>
+          formatDateTime(locale, new Date(iso), {
+            month: 'long',
+            year: 'numeric',
+            timeZone: 'UTC',
+          }),
+        )
+      : suyas;
+  }, [viva.indice, soloFavoritas, texto, locale]);
+  const elementos = useMemo(
+    () => mezclarLinea(fotos, cifradas, { fin, anyo, busqueda: texto.trim() !== '' }),
+    [fotos, cifradas, fin, anyo, texto],
+  );
+  const cifradasALaVista = useMemo(
+    () => elementos.flatMap((e) => (e.tipo === 'cifrada' ? [e.foto] : [])),
+    [elementos],
+  );
+  const { pedir: pedirMiniaturas } = viva;
+  useEffect(() => pedirMiniaturas(cifradasALaVista), [pedirMiniaturas, cifradasALaVista]);
+  const grupos = useMemo(() => porMes(elementos, locale), [elementos, locale]);
   /** La posición de cada foto en la lista, para abrir el visor sin recorrerla. */
   const posiciones = useMemo(() => new Map(fotos.map((f, i) => [f.id, i])), [fotos]);
 
@@ -830,7 +901,7 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
     return () => obs.disconnect();
   }, [cargarMas, cargando, fin, fallo]);
 
-  if (!cargando && !pendiente && fotos.length === 0 && !error && !texto) {
+  if (!cargando && !pendiente && elementos.length === 0 && !error && !texto) {
     return (
       <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={t('app.title')}>
         <div
@@ -840,6 +911,7 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
           <Nav t={t} locale={locale} activa={soloFavoritas ? 'favorites' : 'photos'} />
           {selectorDeFicheros}
           {estadoSubida}
+          <FotosCifradas locale={locale} cifrado={cifrado} viva={viva} />
           <EmptyState
             class="h-full"
             title={t(soloFavoritas ? 'favorites.empty.title' : 'gallery.empty.title')}
@@ -1103,6 +1175,9 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
           </p>
         ) : null}
 
+        {/* El Drive de la bóveda: abrirlo, por qué no abre y lo que no incluye a sus
+            fotos (que van en la línea de tiempo, entre las demás). */}
+        <FotosCifradas locale={locale} cifrado={cifrado} viva={viva} />
         {/* Solo en la galería de todas y sin búsqueda: un recuerdo entre los
             resultados de «playa» no es un recuerdo, es ruido. */}
         {!soloFavoritas && !texto.trim() ? (
@@ -1131,7 +1206,7 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
             texto,
             cargando,
             pendiente,
-            fotos: fotos.length,
+            fotos: elementos.length,
             error: error !== null,
             tambien: tambien.length,
           });
@@ -1180,7 +1255,7 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
             mientras se escribe (`pendiente`): la línea se vacía al teclear y la página
             no se pide hasta 250 ms después; sin esto la galería se quedaba en blanco
             ese rato y el esqueleto parpadeaba con cada tecla. */}
-        {(cargando || pendiente) && fotos.length === 0 ? (
+        {(cargando || pendiente) && elementos.length === 0 ? (
           <section class="mb-8">
             <EsqueletoFilas mes cuantas={18} />
           </section>
@@ -1206,7 +1281,9 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
               >
                 {grupo.titulo}
                 {(() => {
-                  const aproximadas = grupo.fotos.filter((f) => !f.takenAtFromExif).length;
+                  const aproximadas = grupo.fotos.filter((e) =>
+                    e.tipo === 'servidor' ? !e.foto.takenAtFromExif : !e.foto.entrada.exif,
+                  ).length;
                   return aproximadas > 0 ? (
                     <span class="text-text-muted text-xs font-normal">
                       {t('gallery.approxCount', { count: aproximadas })}
@@ -1215,7 +1292,7 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
                 })()}
                 {seleccion !== null ? (
                   <BotonDelMes
-                    fotos={grupo.fotos}
+                    fotos={grupo.fotos.flatMap((e) => (e.tipo === 'servidor' ? [e.foto] : []))}
                     seleccion={seleccion}
                     onToggle={alternarMes}
                     t={t}
@@ -1225,21 +1302,35 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
               {/* Filas justificadas (`.filas`, en styles/app.css): cada foto con su
                 proporción, y la fila crece con la pantalla. */}
               <ul class="filas">
-                {grupo.fotos.map((f) => (
-                  <Miniatura
-                    key={f.id}
-                    foto={f}
-                    t={t}
-                    onOpen={() => setAbierta(posiciones.get(f.id) ?? 0)}
-                    onFavorite={() => void cambiarFavorita(f, !f.favorite)}
-                    {...(seleccion !== null
-                      ? {
-                          seleccionada: seleccion.has(f.id),
-                          onToggle: (mayus: boolean) => alternar(f.id, mayus),
-                        }
-                      : { onMantener: () => empezarSeleccion(f.id) })}
-                  />
-                ))}
+                {grupo.fotos.map((e) =>
+                  e.tipo === 'cifrada' ? (
+                    <MiniaturaCifrada
+                      key={`cifrada-${e.id}`}
+                      foto={e.foto}
+                      url={viva.url(e.foto)}
+                      locale={locale}
+                      seleccionando={seleccion !== null}
+                      onOpen={() => setAbiertaCifrada(e.id)}
+                      onFavorite={() =>
+                        void accionesCifradas.favorita(e.foto, !e.foto.entrada.favorita)
+                      }
+                    />
+                  ) : (
+                    <Miniatura
+                      key={e.id}
+                      foto={e.foto}
+                      t={t}
+                      onOpen={() => setAbierta(posiciones.get(e.id) ?? 0)}
+                      onFavorite={() => void cambiarFavorita(e.foto, !e.foto.favorite)}
+                      {...(seleccion !== null
+                        ? {
+                            seleccionada: seleccion.has(e.id),
+                            onToggle: (mayus: boolean) => alternar(e.id, mayus),
+                          }
+                        : { onMantener: () => empezarSeleccion(e.id) })}
+                    />
+                  ),
+                )}
               </ul>
             </section>
           ))}
@@ -1250,6 +1341,16 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
         </div>
 
         {dialogoPreguntar}
+
+        {abiertaCifrada !== null ? (
+          <VisorCifrado
+            locale={locale}
+            viva={viva}
+            fotos={cifradasALaVista}
+            inicial={abiertaCifrada}
+            alCerrar={() => setAbiertaCifrada(null)}
+          />
+        ) : null}
 
         <ShortcutsModal
           open={atajosAbiertos}

@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/photos/galeriacifrada"
 )
 
 // CambiarSesion adopta la identidad issuer/sujeto/organización que usa la suite.
@@ -21,6 +22,10 @@ func (a *App) CambiarSesion(identidad string) {
 	a.refrescando = false
 	a.reanudandoImportaciones = false
 	a.cuenta.Store(identidad)
+	if a.GaleriaCifrada != nil {
+		// La copia con la app cerrada de ESTA cuenta sube a la bóveda por aquí.
+		appEnFondo.Store(a)
+	}
 	a.cancelarVida()
 	a.vida, a.cancelarVida = context.WithCancel(context.Background())
 	if primera {
@@ -45,6 +50,8 @@ func (a *App) CambiarSesion(identidad string) {
 	a.g, a.alb, a.uno = estadoGaleria{}, estadoAlbumes{}, estadoAlbum{}
 	a.pap, a.rep, a.enc = estadoPapelera{}, estadoRepetidas{}, estadoEncontradas{}
 	a.rec, a.pub, a.cmp = estadoRecuerdos{}, estadoPublico{}, estadoCompartidos{}
+	a.cif = estadoCifradas{}
+	a.minisCif.poner(nil, galeriacifrada.Indice{})
 	a.aj = api.PhotosSettings{}
 	// La ronda de la cuenta anterior se corta con su vida; la de esta empieza al acabar
 	// aquella (finRondaCopia).

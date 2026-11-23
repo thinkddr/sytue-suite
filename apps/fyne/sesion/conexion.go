@@ -264,7 +264,21 @@ func (s *Suite) vaciarAlmacenCon(ctx context.Context) error {
 	for _, product := range storage.Products() {
 		namespaces = append(namespaces, storage.PrivateStagingNamespaces(product)...)
 	}
-	return offline.ClearDirectoryKeepingContext(ctx, dir, namespaces...)
+	if err := offline.ClearDirectoryKeepingContext(ctx, dir, namespaces...); err != nil {
+		return err
+	}
+	// Los diarios de la bóveda directa se limpian igual: fuera todo lo que no sea
+	// trabajo duradero de alguna cuenta, que solo se borra con el descarte.
+	boveda, err := directoriosDiarioBoveda()
+	if err != nil {
+		return err
+	}
+	for _, diario := range boveda {
+		if err := offline.ClearDirectoryKeepingContext(ctx, diario.ruta, namespaces...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func directorioAlmacenActivo(ctx context.Context) (string, error) {

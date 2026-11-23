@@ -321,6 +321,20 @@ export const ga: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Sábháilte in Sytue Drive.',
   'doc.msg.savedToDriveIn': 'Tá do chuid athruithe anois in “{name}”, mar leagan nua.',
   'doc.msg.saveToDriveFailed': 'Níorbh fhéidir na hathruithe a shábháil in Drive.',
+  'doc.msg.saveToDriveVault': 'Tá do Drive criptithe ó cheann ceann',
+  'doc.msg.saveToDriveVault.detail':
+    'Níorbh fhéidir é a shábháil ann as seo. Íoslódáil an doiciméad agus uaslódáil é ó Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Sábháilte i do Drive criptithe.',
+  'doc.msg.savedToDriveEncryptedIn': 'Criptíodh “{name}” sa bhrabhsálaí seo sular sábháladh é.',
+  'doc.msg.savedToDriveEncryptedOnDevice': 'Criptíodh “{name}” ar an ngléas seo sular sábháladh é.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Tá do Drive criptithe faoi ghlas ar an ngléas seo. Díghlasáil thuas é, agus sábháil arís.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Sínigh isteach arís chun do Drive criptithe a dhíghlasáil, agus sábháil arís.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Tá do Drive fós ag aistriú go criptiú ó cheann ceann. Oscail Sytue Drive chun é a chríochnú, agus sábháil arís.',
+  'doc.msg.saveToDriveUnsupported':
+    'Ní féidir formáid an chomhaid seo a athscríobh. Íoslódáil an doiciméad ina ionad.',
   'file.downloadPdf': 'Íoslódáil mar PDF',
   'file.pdfAccessible': 'PDF inrochtana (PDF/UA)',
   'file.downloadHtml': 'Íoslódáil mar HTML',
@@ -2726,6 +2740,52 @@ export const ga: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'Is féidir suas le 10 nduine a bheith in ord sínithe.',
   'pdf.error.signatureRequest.busy':
     'Tá an t-iarratas seo á oscailt cheana. Bain triail eile as i gceann nóiméid.',
+  'pdf.error.driveVault':
+    'Tá do Drive criptithe ó cheann ceann: ní féidir cóipeanna d’iarratais sínithe ó eagraíochtaí eile a stóráil ann fós. Íoslódáil an PDF ina ionad.',
+  'pdf.device.title': 'Sínigh ar an ngléas seo',
+  'pdf.device.help':
+    'Tá do Drive criptithe ó cheann ceann, mar sin ní féidir leis an bhfreastalaí do PDFanna a léamh. Roghnaigh ceann: díchriptítear agus sínítear anseo é le do theastas, agus sábháiltear an chóip shínithe criptithe in aice leis an mbunleagan. Ní shroicheann an PDF ná do theastas an freastalaí.',
+  'pdf.device.open': 'Oscail mo Drive criptithe',
+  'pdf.device.empty.title': 'Níl aon PDF i do Drive criptithe',
+  'pdf.device.empty.description': 'Uaslódáil iad ó Sytue Drive agus beidh siad le feiceáil anseo.',
+  'pdf.device.sign': 'Sínigh',
+  'pdf.device.signed': 'Sínithe agus sábháilte criptithe mar “{name}”.',
+  'pdf.device.stamp.on':
+    'Le stampa ama ó {authority}: cruthaíonn an síniú cé a shínigh agus cathain. Ní fhaigheann an t-údarás ach méarlorg an tsínithe, riamh an PDF.',
+  'pdf.device.stamp.off':
+    'Gan stampa ama: níl údarás stampála ama ag an tseirbhís seo, mar sin cruthaíonn an síniú cé a shínigh, ach ní cathain.',
+  'pdf.device.appearance': 'Cuma an tsínithe',
+  'pdf.device.appearance.invisible': 'Dofheicthe',
+  'pdf.device.appearance.visible': 'Bosca infheicthe',
+  'pdf.device.signedStamped': 'Sínithe le stampa ama agus sábháilte criptithe mar “{name}”.',
+  'pdf.device.signedNoStamp':
+    'Sínithe agus sábháilte criptithe mar “{name}”, ach gan stampa ama: níor fhreagair an t-údarás stampála ama.',
+  'pdf.device.error.page':
+    'Ní luíonn an síniú ar an leathanach sin. Roghnaigh leathanach nó suíomh eile.',
+  'pdf.device.view': 'Féach',
+  'pdf.vault.help':
+    'Tá an PDF seo i do Drive criptithe: díchriptítear é ar an ngléas seo amháin, chun é a fheiceáil agus a shíniú.',
+  'pdf.vault.serverOnly':
+    'Teastaíonn ón tseirbhís an PDF a léamh chun nótaí a chur leis, é a líonadh, a eagrú, a chur in eagar, téacs a aithint agus síniú a iarraidh, mar sin níl siad ar fáil le do Drive criptithe.',
+  'pdf.vault.notFound.title': 'Níl an PDF seo i do Drive criptithe',
+  'pdf.vault.notFound.description':
+    'B’fhéidir gur bogadh nó gur scriosadh é. Cuardaigh é in Sytue Drive.',
+  'pdf.vault.openSigned': 'Oscail an chóip shínithe',
+  'pdf.device.requests':
+    'Teastaíonn Drive an fhreastalaí chun síniú a iarraidh ar dhaoine nó ar eagraíochtaí eile: caithfidh an tseirbhís an PDF a léamh chun é a sheoladh agus an síniú a thagann ar ais a sheiceáil. Le do Drive criptithe, sínigh anseo agus seol féin an PDF sínithe.',
+  'pdf.device.error.signin':
+    'Sínigh isteach in Sytue ID arís chun do Drive criptithe a dhíghlasáil.',
+  'pdf.device.error.pending':
+    'Tá do Drive fós ag aistriú go criptiú ó cheann ceann. Críochnaigh é ó Sytue Drive.',
+  'pdf.device.error.password': 'Ní osclaíonn an pasfhocal sin an teastas.',
+  'pdf.device.error.encrypted':
+    'Tá an PDF seo cosanta le pasfhocal agus ní féidir é a shíniú ar an ngléas seo.',
+  'pdf.device.error.locked':
+    'Tá an PDF seo deimhnithe in aghaidh aon athraithe: chuirfeadh síniú eile ó bhail é.',
+  'pdf.device.error.unreadable':
+    'Ní féidir an PDF seo a shíniú ar an ngléas seo gan é a athscríobh. Níor athraíodh aon rud.',
+  'pdf.device.error.failed':
+    'Níorbh fhéidir an PDF a shíniú ná a shábháil. Níor athraíodh aon rud i do Drive.',
   'pdf.dialog.firmar.help':
     'Ní fhágann an deimhniú ná an eochair d’eagraíocht riamh: úsáidtear ar an bhfreastalaí iad agus ní stóráiltear iad.',
   'pdf.dialog.firmar.cert': 'Deimhniú (PEM)',

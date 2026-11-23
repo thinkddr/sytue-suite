@@ -1026,4 +1026,12 @@ export const fr: AppCatalog<typeof en> = {
     'L’e-mail a été accepté, mais sa copie n’a pas pu être enregistrée dans les messages envoyés. Ne l’envoyez pas à nouveau.',
   'externalMail.invalidConfiguration':
     'Saisissez une adresse e-mail valide, les noms et ports des deux serveurs et un mot de passe.',
+  'privateMail.handoverOffer':
+    'Vous ne pouvez pas ouvrir votre courrier ? Videz-le et passez au coffre',
+  'privateMail.handoverTitle': 'Vider le courrier et le passer au coffre',
+  'privateMail.handoverBody':
+    'Le courrier chiffré que vous ne pouvez plus ouvrir ne sera pas récupéré. Désormais, votre courrier s’ouvre avec votre connexion Sytue ID, qu’il faudra peut-être renouveler.',
+  'privateMail.handoverUnderstood':
+    'Je comprends que le courrier que je ne peux pas ouvrir sera perdu',
+  'privateMail.handoverConfirm': 'Vider et passer au coffre',
 };

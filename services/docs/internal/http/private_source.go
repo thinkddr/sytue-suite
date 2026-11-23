@@ -16,6 +16,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/docs/internal/store"
 )
@@ -100,4 +101,31 @@ func (h *Handler) mountPrivateSource(pr chi.Router) {
 	pr.Get("/api/v1/private-storage/migration/source", page)
 	pr.Get("/api/v1/private-storage/migration/{epoch}/source/{kind}/{source}", body)
 	pr.Get("/api/v1/private-storage/migration/source/{kind}/{source}", body)
+	h.mountPrivateRelease(pr, port)
+}
+
+// mountPrivateRelease es «soltar la fuente» (platform/pkg/soltarfuente) para las
+// tres ofimáticas: el producto lo dice la cabecera de ámbito, como en el resto.
+func (h *Handler) mountPrivateRelease(pr chi.Router, port httpx.PrivateSourcePort) {
+	source, ok := port.(*store.PrivateSource)
+	if !ok || source == nil {
+		return
+	}
+	releases := make(map[string]http.HandlerFunc, 3)
+	for _, product := range []string{"docs", "sheets", "slides"} {
+		handler, err := soltarfuente.Handler(soltarfuente.Config{Product: product, Soltar: source.Release, Avisar: h.hubNotifier.Send})
+		if err != nil {
+			panic(err)
+		}
+		releases[product] = handler
+	}
+	pr.Post("/api/v1"+soltarfuente.Ruta, func(w http.ResponseWriter, r *http.Request) {
+		product := "docs"
+		if scope, err := storage.DecodeScopeHeader(r.Header.Get(storage.ScopeHeader)); err == nil {
+			if _, ok := releases[scope.Product]; ok {
+				product = scope.Product
+			}
+		}
+		releases[product](w, r)
+	})
 }

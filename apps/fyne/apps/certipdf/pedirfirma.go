@@ -6,6 +6,7 @@ package certipdf
 import (
 	"cmp"
 	"context"
+	"errors"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -27,12 +28,27 @@ Si es de OTRA organización (ADR 0057), el servicio no crea nada hasta que quien
 confirma: el diálogo explica que el PDF sale por un enlace de Drive de solo lectura y, al
 confirmar, se comparte y se pide en el mismo paso. Quien la recibe se trae el PDF a su
 unidad desde la portada, y quien la pidió, la copia firmada.
+
+Con el PDF en el Drive PRIVADO del dispositivo (la bóveda de la ADR 0086, o Matrix) no se
+pide nada: el servicio tendría que leer el PDF para mandarlo y comprobar la firma que
+vuelve, que es justo lo que el cifrado impide. El diálogo lo dice
+(`pdf.device.requests`, la misma frase que la portada web) sin tocar la red; la firma
+PROPIA sí se hace aquí, en local (`api.PDF.localSign`), como en la web «Firmar en el
+dispositivo».
 */
+
+// sinServidor dice si el PDF abierto vive en el Drive privado del dispositivo: entonces
+// las peticiones de firma, que necesitan que el servicio lea el PDF, no se ofrecen. Lo
+// sabe el propio cliente, sin preguntar a nadie.
+func sinServidor(doc *Documento) bool {
+	return doc != nil && doc.pdf != nil &&
+		errors.Is(doc.pdf.CheckRemoteProcessing(context.Background()), api.ErrPrivatePDFOperation)
+}
 
 // buscarPeticion mira si alguien me ha pedido firmar este PDF. Un fallo no estorba a
 // abrirlo: sin la lista no hay franja, y ya.
 func (p *Pantalla) buscarPeticion(doc *Documento) {
-	if doc == nil || doc.pdf == nil {
+	if doc == nil || doc.pdf == nil || sinServidor(doc) {
 		return
 	}
 	go func() {
@@ -180,6 +196,9 @@ type dialogoPedirFirma struct {
 	enviando     bool
 	pedidas      []api.PDFPeticionFirma
 	cargadas     bool
+	// privado: el PDF está en el Drive privado del dispositivo y no se puede pedir
+	// firma a nadie (ver arriba).
+	privado bool
 	// fuera es el nombre de la persona cuando es de otra organización, mientras se
 	// pregunta si compartir el PDF por Drive, y confirmar lo que se manda si dice que sí.
 	fuera, confirmar string
@@ -188,7 +207,7 @@ type dialogoPedirFirma struct {
 func nuevoDialogoPedirFirma(a *dialogoAbierto) *dialogoPedirFirma {
 	// Los campos son los de la suite tal cual (`<Input>` y `<Textarea>` en un
 	// `FieldGroup`), no los compactos del resto de diálogos: así está la web.
-	d := &dialogoPedirFirma{a: a, email: ui.NuevaEntrada("")}
+	d := &dialogoPedirFirma{a: a, email: ui.NuevaEntrada(""), privado: sinServidor(a.p.doc)}
 	d.email.AlCambiar(func(string) {
 		if d.fuera != "" {
 			d.fuera, d.confirmar = "", ""
@@ -204,7 +223,7 @@ func nuevoDialogoPedirFirma(a *dialogoAbierto) *dialogoPedirFirma {
 // recargar trae las pedidas de ESTE documento.
 func (d *dialogoPedirFirma) recargar() {
 	doc := d.a.p.doc
-	if doc == nil || doc.pdf == nil {
+	if doc == nil || doc.pdf == nil || d.privado {
 		return
 	}
 	go func() {
@@ -228,7 +247,7 @@ func (d *dialogoPedirFirma) recargar() {
 func (d *dialogoPedirFirma) enviar() {
 	doc := d.a.p.doc
 	email := strings.TrimSpace(d.email.Texto())
-	if doc == nil || email == "" || d.enviando {
+	if doc == nil || email == "" || d.enviando || d.privado {
 		return
 	}
 	d.enviando, d.error, d.hecho = true, "", ""
@@ -320,6 +339,15 @@ func tonoDeEstado(estado string) ui.Tono {
 
 func (d *dialogoPedirFirma) vista(ancho float32) fyne.CanvasObject {
 	a := d.a
+	if d.privado {
+		// `InlineHelp tone="info"` con el porqué, y solo «Cerrar»: no hay nada que enviar.
+		aviso := ui.NuevaAyudaEnLinea(a.t("pdf.device.requests")).ConTono(ui.AyudaInfo)
+		aviso.Resize(ui.MedidaAyudaEnLinea(aviso, ancho))
+		cerrar := ui.NuevoBoton(a.t("pdf.cancel"), a.cerrar).Con(ui.Fantasma, ui.TallaSM)
+		fila := container.New(ui.Fila{Hueco: tema.Espacio(2)}, cerrar)
+		return container.New(ui.Columna{Hueco: tema.Espacio(3)}, aviso,
+			container.New(ui.Margen{Izq: ancho - fila.MinSize().Width}, fila))
+	}
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	d.email.Ancho, d.mensaje.Ancho = ancho, ancho
 	partes := []fyne.CanvasObject{

@@ -1003,4 +1003,10 @@ export const es: AppCatalog<typeof en> = {
   'compose.imageTooLarge':
     'Esa imagen es demasiado grande para ponerla en el mensaje (límite {max} MB). Adjúntala en su lugar.',
   'editor.imageFile': 'Desde este dispositivo',
+  'privateMail.handoverOffer': '¿No puedes abrir tu correo? Vacíalo y pásalo a la bóveda',
+  'privateMail.handoverTitle': 'Vaciar el correo y pasarlo a la bóveda',
+  'privateMail.handoverBody':
+    'El correo cifrado que ya no puedes abrir no se recupera. A partir de ahora tu correo se abre con tu inicio de sesión de Sytue ID, que puede que tengas que repetir.',
+  'privateMail.handoverUnderstood': 'Entiendo que se perderá el correo que no puedo abrir',
+  'privateMail.handoverConfirm': 'Vaciar y pasar a la bóveda',
 };

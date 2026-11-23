@@ -346,4 +346,37 @@ export const es: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Guardadas en Imágenes › Sytue Photos: {count}',
   'library.saveFailed': 'No se ha podido guardar en la galería de este equipo: {name}',
   'backup.whileOpen': 'En este equipo, la copia se hace mientras Sytue Fotos está abierta.',
+  'backup.encryptedWaitTitle': 'Abre Sytue Fotos para terminar la copia cifrada',
+  'backup.encryptedWaitBody':
+    'Tu Drive está cifrado de extremo a extremo. Las fotos nuevas se copian en cuanto abras Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Guardadas en tu Drive con cifrado de extremo a extremo: {count}',
+  'gallery.uploadVaultSignIn':
+    'Tu Drive está cifrado de extremo a extremo. Vuelve a entrar para desbloquearlo y añade de nuevo las fotos.',
+  'gallery.uploadVaultNotReady':
+    'Tu Drive aún está pasando al cifrado de extremo a extremo. Abre Sytue Drive para terminar y añade de nuevo las fotos.',
+  'gallery.uploadVaultLocked':
+    'Tu Drive está cifrado de extremo a extremo. Desbloquéalo arriba y añade de nuevo las fotos.',
+  'gallery.uploadVaultUnavailable':
+    'Tu Drive está cifrado de extremo a extremo y no se puede abrir en este dispositivo. Añade las fotos desde Sytue Photos en la web.',
+  'gallery.encrypted.title': 'En tu Drive cifrado',
+  'gallery.encrypted.show': 'Mostrar',
+  'gallery.encrypted.opening': 'Descifrando…',
+  'gallery.encrypted.failed': 'No se pudo abrir tu Drive cifrado.',
+  'gallery.encrypted.signIn': 'Volver a entrar',
+  'gallery.encrypted.empty': 'Aún no hay fotos en tu Drive cifrado.',
+  'gallery.encrypted.note':
+    'Las fotos cifradas de extremo a extremo solo se descifran en este dispositivo. Sytue AI, las fotos parecidas, cerca y los recuerdos no las incluyen.',
+  'gallery.encrypted.badge': 'Cifrada de extremo a extremo',
+  'gallery.encrypted.open': 'Abrir {name} (cifrada)',
+  'gallery.encrypted.notSelectable':
+    'Las fotos cifradas no se pueden seleccionar: abre una para marcarla como favorita o añadirla a un álbum.',
+  'gallery.encrypted.actionFailed': 'No se pudo actualizar tu galería cifrada.',
+  'gallery.encrypted.saved':
+    'Guardada como una versión cifrada nueva. La anterior sigue en el historial de versiones de Drive.',
+  'gallery.encrypted.albums': 'Álbumes cifrados',
+  'gallery.encrypted.newAlbum': 'Álbum cifrado nuevo',
+  'gallery.encrypted.saveVersion': 'Guardar como versión nueva',
+  'gallery.encrypted.editHint':
+    'La edición se hace en este dispositivo y se guarda cifrada como una versión nueva de la foto.',
+  'gallery.encrypted.albumEmpty': 'Este álbum cifrado aún no tiene fotos.',
 };

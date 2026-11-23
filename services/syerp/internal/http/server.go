@@ -27,6 +27,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
 	"git.sytue.eu/sytue/one/services/syerp/internal/conectores"
 	"git.sytue.eu/sytue/one/services/syerp/internal/config"
@@ -241,6 +242,7 @@ func NewRouter(d Deps) http.Handler {
 		api.Post("/tpv/presupuesto", h.PresupuestoTPV)
 
 		mountERPPrivateSource(api, d.Store)
+		soltarfuente.Montar(api, soltarfuente.Config{Product: "erp", Soltar: d.Store.ReleasePrivateStorage, Avisar: h.hub.Send})
 
 		// El CRUD genérico, una vez, para todos los modelos.
 		api.Route("/{modelo}", func(mod chi.Router) {

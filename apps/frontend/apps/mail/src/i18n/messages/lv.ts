@@ -991,4 +991,11 @@ export const lv: AppCatalog<typeof en> = {
     'E-pasts pieņemts, taču neizdevās saglabāt kopiju nosūtīto vēstuļu mapē. Nesūtiet to vēlreiz.',
   'externalMail.invalidConfiguration':
     'Ievadiet derīgu e-pasta adresi, abu serveru nosaukumus un portus un paroli.',
+  'privateMail.handoverOffer':
+    'Nevarat atvērt savu pastu? Iztukšojiet to un pārceliet uz glabātuvi',
+  'privateMail.handoverTitle': 'Iztukšot pastu un pārcelt to uz glabātuvi',
+  'privateMail.handoverBody':
+    'Šifrētais pasts, ko vairs nevarat atvērt, netiks atgūts. Turpmāk jūsu pasts atveras ar jūsu Sytue ID pierakstīšanos, kas, iespējams, būs jāatkārto.',
+  'privateMail.handoverUnderstood': 'Saprotu, ka pasts, ko nevaru atvērt, tiks zaudēts',
+  'privateMail.handoverConfirm': 'Iztukšot un pārcelt uz glabātuvi',
 };

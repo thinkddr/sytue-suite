@@ -342,6 +342,21 @@ export const en = {
   'doc.msg.savedToDrive': 'Saved to Sytue Drive.',
   'doc.msg.savedToDriveIn': '“{name}” now has your changes, as a new version.',
   'doc.msg.saveToDriveFailed': 'The changes could not be saved to Drive.',
+  'doc.msg.saveToDriveVault': 'Your Drive is end-to-end encrypted',
+  'doc.msg.saveToDriveVault.detail':
+    'It could not be saved from here. Download the document and upload it from Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Saved to your encrypted Drive.',
+  'doc.msg.savedToDriveEncryptedIn': '“{name}” was encrypted in this browser before being saved.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '“{name}” was encrypted on this device before being saved.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Your encrypted Drive is locked on this device. Unlock it above, then save again.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Sign in again to unlock your encrypted Drive, then save again.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Your Drive is still moving to end-to-end encryption. Open Sytue Drive to finish, then save again.',
+  'doc.msg.saveToDriveUnsupported':
+    'This file’s format cannot be rewritten. Download the document instead.',
   'file.downloadPdf': 'Download as PDF',
   'file.pdfAccessible': 'Accessible PDF (PDF/UA)',
   'file.downloadHtml': 'Download as HTML',
@@ -2832,6 +2847,51 @@ export const en = {
   'pdf.error.signatureRequest.chainRepeated': 'The same person appears twice in the signing order.',
   'pdf.error.signatureRequest.chainTooLong': 'A signing order can have up to 10 people.',
   'pdf.error.signatureRequest.busy': 'This request is already being opened. Try again in a moment.',
+  'pdf.error.driveVault':
+    'Your Drive is end-to-end encrypted: copies for signature requests from other organisations cannot be stored in it yet. Download the PDF instead.',
+  'pdf.device.title': 'Sign on this device',
+  'pdf.device.help':
+    'Your Drive is end-to-end encrypted, so the server cannot read your PDFs. Choose one: it is decrypted and signed here with your certificate, and the signed copy is saved encrypted next to the original. Neither the PDF nor your certificate reaches the server.',
+  'pdf.device.open': 'Open my encrypted Drive',
+  'pdf.device.empty.title': 'No PDFs in your encrypted Drive',
+  'pdf.device.empty.description': 'Upload them from Sytue Drive and they will appear here.',
+  'pdf.device.sign': 'Sign',
+  'pdf.device.signed': 'Signed and saved encrypted as “{name}”.',
+  'pdf.device.stamp.on':
+    'With a timestamp from {authority}: the signature proves who signed and when. The authority only receives the fingerprint of the signature, never the PDF.',
+  'pdf.device.stamp.off':
+    'No timestamp: this service has no time-stamping authority, so the signature proves who signed, not when.',
+  'pdf.device.appearance': 'How the signature looks',
+  'pdf.device.appearance.invisible': 'Invisible',
+  'pdf.device.appearance.visible': 'Visible box',
+  'pdf.device.signedStamped': 'Signed with a timestamp and saved encrypted as “{name}”.',
+  'pdf.device.signedNoStamp':
+    'Signed and saved encrypted as “{name}”, but without a timestamp: the time-stamping authority did not answer.',
+  'pdf.device.error.page':
+    'The signature does not fit on that page. Choose another page or position.',
+  'pdf.device.view': 'View',
+  'pdf.vault.help':
+    'This PDF is in your encrypted Drive: it is decrypted only on this device, to view and sign it.',
+  'pdf.vault.serverOnly':
+    'Annotating, filling in, organising, editing, recognising text and requesting signatures need the service to read the PDF, so they are not available with your encrypted Drive.',
+  'pdf.vault.notFound.title': 'This PDF is not in your encrypted Drive',
+  'pdf.vault.notFound.description':
+    'It may have been moved or deleted. Look for it in Sytue Drive.',
+  'pdf.vault.openSigned': 'Open the signed copy',
+  'pdf.device.requests':
+    'Asking other people or organisations to sign needs the server Drive: the service has to read the PDF to send it and to check the signature that comes back. With your Drive encrypted, sign here and send the signed PDF yourself.',
+  'pdf.device.error.signin': 'Sign in to Sytue ID again to unlock your encrypted Drive.',
+  'pdf.device.error.pending':
+    'Your Drive is still moving to end-to-end encryption. Finish it from Sytue Drive.',
+  'pdf.device.error.password': 'That password does not open the certificate.',
+  'pdf.device.error.encrypted':
+    'This PDF is password-protected, so it cannot be signed on this device.',
+  'pdf.device.error.locked':
+    'This PDF is certified against any change: another signature would invalidate it.',
+  'pdf.device.error.unreadable':
+    'This PDF cannot be signed on this device without rewriting it. Nothing has been changed.',
+  'pdf.device.error.failed':
+    'The PDF could not be signed or saved. Nothing has been changed in your Drive.',
   'pdf.dialog.firmar.help':
     'The certificate and the key never leave your organisation: they are used on the server and are not stored.',
   'pdf.dialog.firmar.cert': 'Certificate (PEM)',

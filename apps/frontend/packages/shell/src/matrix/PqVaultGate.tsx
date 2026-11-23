@@ -9,14 +9,37 @@ import { I18nProvider } from '@sytue/i18n/preact';
 import { Button, Checkbox, Icon, IconButton, Modal, Spinner, ToastProvider } from '@sytue/ui';
 import {
   bridgeHandoffKey,
+  cancelPqVaultCopy,
   PqVault,
   PqVaultDisabledError,
   PqVaultError,
   pqVaultProfile,
+  readPqVaultCopy,
+  type PqVaultCopyOptions,
+  type PqVaultExpect,
   type PqVaultOpenOptions,
 } from '@sytue/offline/vault';
 import type { MatrixGateMessage } from './MatrixDeviceGate.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
+
+/**
+ * Mensajes de la puerta: los generales de Matrix (título, desbloqueo, inicio de
+ * sesión) más los propios de la bóveda directa. Los de «verifica desde otro
+ * dispositivo» no aplican aquí: en ADR 0086 la clave vive en Sytue ID, no en
+ * otro dispositivo, así que lo que se ofrece es volver a entrar o vaciar.
+ */
+export type PqVaultGateMessage =
+  | MatrixGateMessage
+  | 'vault.wrongKey'
+  | 'vault.signInAgain'
+  | 'vault.empty'
+  | 'vault.emptyTitle'
+  | 'vault.emptyBody'
+  | 'vault.emptyUnderstood'
+  | 'vault.failed'
+  | 'vault.copyInProgress'
+  | 'vault.copyCancel'
+  | 'vault.copyCancelHint';
 
 function normalizeBase(value: string | undefined): string {
   if (!value || value === '/') return '';
@@ -51,11 +74,18 @@ export interface PqVaultGateProps {
   /** Sustituible en pruebas unitarias de la puerta. */
   openVault?: (options: PqVaultOpenOptions) => Promise<PqVault>;
   resetVault?: (options: PqVaultOpenOptions) => Promise<PqVault>;
+  /** Cancela la copia en curso de otro dispositivo (sustituible en pruebas). */
+  cancelCopy?: (options: PqVaultCopyOptions) => Promise<void>;
   children: ComponentChildren | ((vault: PqVault) => ComponentChildren);
 }
 
 const defaultOpenVault = (options: PqVaultOpenOptions): Promise<PqVault> => PqVault.open(options);
 const defaultResetVault = (options: PqVaultOpenOptions): Promise<PqVault> => PqVault.reset(options);
+/** Cancela la marca que haya ahora (la que la persona tiene delante). */
+const defaultCancelCopy = async (options: PqVaultCopyOptions): Promise<void> => {
+  const marker = await readPqVaultCopy(options);
+  if (marker) await cancelPqVaultCopy(options, marker.id);
+};
 
 /**
  * Puerta de cifrado post-cuántico directo (ADR 0086).
@@ -76,6 +106,7 @@ export function PqVaultGate({
   close,
   openVault = defaultOpenVault,
   resetVault = defaultResetVault,
+  cancelCopy = defaultCancelCopy,
   children,
 }: PqVaultGateProps): JSX.Element {
   const fixture = useContext(MatrixStorageFixtureContext);
@@ -84,7 +115,7 @@ export function PqVaultGate({
     [basePath, product],
   );
   const translate = useMemo(() => createTranslate(locale), [locale]);
-  const t = (key: MatrixGateMessage): string => translate(key);
+  const t = (key: PqVaultGateMessage): string => translate(key);
 
   const [vault, setVault] = useState<PqVault | null>(null);
   const [ready, setReady] = useState(false);
@@ -92,7 +123,10 @@ export function PqVaultGate({
   const [busy, setBusy] = useState(!fixture);
   const [needSignIn, setNeedSignIn] = useState(false);
   const [wrongKey, setWrongKey] = useState(false);
-  const [error, setError] = useState<MatrixGateMessage | null>(null);
+  // Otro dispositivo está pasando su Drive de Matrix a esta bóveda (ADR 0086).
+  const [copying, setCopying] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<PqVaultGateMessage | null>(null);
   const [show, setShow] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [understood, setUnderstood] = useState(false);
@@ -100,6 +134,8 @@ export function PqVaultGate({
 
   const liveVaultRef = useRef<PqVault | null>(null);
   const resetRequestedRef = useRef(false);
+  // Lo que se vio de la bóveda cuando la clave no la abrió: vaciar solo vacía eso.
+  const wrongExpectRef = useRef<PqVaultExpect | undefined>(undefined);
   const hasFunctionChildrenRef = useRef(typeof children === 'function');
   const prepareRef = useRef(prepare);
   const activateRef = useRef(activate);
@@ -165,10 +201,13 @@ export function PqVaultGate({
     setBusy(true);
     setNeedSignIn(false);
     setWrongKey(false);
+    setCopying(false);
     setError(null);
 
     const shouldReset = resetRequestedRef.current;
     resetRequestedRef.current = false;
+    const expect = shouldReset ? wrongExpectRef.current : undefined;
+    wrongExpectRef.current = undefined;
     const openFn = shouldReset ? resetVault : openVault;
     void (async () => {
       try {
@@ -178,6 +217,7 @@ export function PqVaultGate({
           product,
           basePath: resolvedBase,
           signal: controller.signal,
+          ...(expect ? { expect } : {}),
         });
         opened = instance;
         if (!mounted || controller.signal.aborted) {
@@ -225,11 +265,18 @@ export function PqVaultGate({
             return;
           }
           if (failure.reason === 'wrong') {
+            wrongExpectRef.current = failure.expect;
             setWrongKey(true);
             return;
           }
+          if (failure.reason === 'copy') {
+            setCopying(true);
+            return;
+          }
         }
-        setError('matrix.failed');
+        // Cualquier otro fallo (clave que no cuadra, bóveda corrupta, migración que
+        // no entra) deja ofrecer reintentar, volver a entrar o vaciar.
+        setError('vault.failed');
       }
     })();
 
@@ -286,17 +333,27 @@ export function PqVaultGate({
           </Button>
         </div>
       ) : null}
-      {!busy && wrongKey ? (
+      {!busy && (wrongKey || error === 'vault.failed') ? (
         <div class="flex flex-col gap-3">
-          <p class="text-text-muted text-sm">{t('matrix.unknownKey')}</p>
+          {wrongKey ? <p class="text-text-muted text-sm">{t('vault.wrongKey')}</p> : null}
           <div class="flex flex-wrap gap-2">
             <Button
+              onClick={() => {
+                window.location.assign(
+                  buildSignInUrl(resolvedBase, window.location.pathname + window.location.search),
+                );
+              }}
+            >
+              {t('vault.signInAgain')}
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => {
                 setUnderstood(false);
                 setResetting(true);
               }}
             >
-              {t('matrix.reset')}
+              {t('vault.empty')}
             </Button>
             <Button variant="secondary" onClick={() => setTick((value) => value + 1)}>
               {t('action.retry')}
@@ -304,8 +361,34 @@ export function PqVaultGate({
           </div>
         </div>
       ) : null}
+      {!busy && copying ? (
+        <div class="flex flex-col gap-3">
+          <p class="text-text-muted text-sm" role="status">
+            {t('vault.copyInProgress')}
+          </p>
+          <p class="text-text-muted text-sm">{t('vault.copyCancelHint')}</p>
+          <div class="flex flex-wrap gap-2">
+            <Button onClick={() => setTick((value) => value + 1)}>{t('action.retry')}</Button>
+            <Button
+              variant="secondary"
+              disabled={cancelling}
+              onClick={() => {
+                setCancelling(true);
+                void cancelCopy({ actor, tenant, product, basePath: resolvedBase })
+                  .catch(() => {})
+                  .finally(() => {
+                    setCancelling(false);
+                    setTick((value) => value + 1);
+                  });
+              }}
+            >
+              {t('vault.copyCancel')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {bound ? <p class="text-success-text">{t('matrix.trusted')}</p> : null}
-      {!busy && !bound && !needSignIn && !wrongKey ? (
+      {!busy && !bound && !needSignIn && !wrongKey && !copying && error !== 'vault.failed' ? (
         <Button variant="secondary" onClick={() => setTick((value) => value + 1)}>
           {t('action.retry')}
         </Button>
@@ -335,13 +418,13 @@ export function PqVaultGate({
       ) : (
         <main class="mx-auto flex w-full max-w-xl flex-col p-6">{contents}</main>
       )}
-      <Modal open={resetting} onClose={() => setResetting(false)} title={t('matrix.resetAction')}>
+      <Modal open={resetting} onClose={() => setResetting(false)} title={t('vault.emptyTitle')}>
         <div class="flex flex-col gap-4">
-          <p class="text-text-muted text-sm">{t('matrix.resetBody')}</p>
+          <p class="text-text-muted text-sm">{t('vault.emptyBody')}</p>
           <Checkbox
             checked={understood}
             onChange={(event) => setUnderstood(event.currentTarget.checked)}
-            label={t('matrix.resetUnderstood')}
+            label={t('vault.emptyUnderstood')}
           />
           <Button
             variant="danger"
@@ -354,7 +437,7 @@ export function PqVaultGate({
               setTick((value) => value + 1);
             }}
           >
-            {t('matrix.resetAction')}
+            {t('vault.empty')}
           </Button>
         </div>
       </Modal>

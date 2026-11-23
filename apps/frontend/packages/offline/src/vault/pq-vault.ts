@@ -28,10 +28,13 @@ import { StoragePq, type StoragePqKeySource } from '../matrix/storage-pq.js';
 import { StorageRepository, type StorageRecordTransport } from '../matrix/storage-repository.js';
 import type { StorageBlobPort } from '../matrix/storage-files.js';
 import {
+  createStorageRecord,
   decodeStorageRecord,
+  storageJSONBytes,
   StorageRecordError,
   type StorageRecord,
   type StorageRecordEntry,
+  type StoragePublicationTarget,
 } from '../matrix/storage.js';
 import { MatrixSecurityError, type MatrixReference } from '../matrix/types.js';
 import {
@@ -43,13 +46,51 @@ import {
   type UnlockBridgeOptions,
 } from '../matrix/unlock-bridge.js';
 
+/**
+ * `copy`: otro dispositivo está pasando el Drive de Matrix a la bóveda (tiene su
+ * marca de copia en curso) y el servidor no deja publicar ni vaciar.
+ * `changed`: se pidió vaciar la bóveda tal como se vio y ya no es esa; no se vació.
+ */
 export type PqVaultReason =
-  'signin' | 'wrong' | 'identity' | 'closed' | 'account' | 'busy' | 'unavailable';
+  | 'signin'
+  | 'wrong'
+  | 'identity'
+  | 'closed'
+  | 'account'
+  | 'busy'
+  | 'unavailable'
+  | 'copy'
+  | 'changed'
+  /** Con `existing`: la bóveda no existe todavía, y quien abre no puede crearla. */
+  | 'missing';
+
+/** Lo que se vio de la bóveda: vaciarla solo vale si sigue así. */
+export interface PqVaultExpect {
+  vault_id: string;
+  version: number;
+}
+
+/**
+ * La marca «copia en curso» de una bóveda (ADR 0086, «pasa Matrix a ella»): la
+ * pone un cliente nativo mientras copia en ella el Drive de Matrix. Mientras está
+ * activa, solo él publica o vacía; caduca si no la renueva.
+ */
+export interface PqVaultCopyMarker {
+  id: string;
+  holder: string;
+  kind: string;
+  epoch: string;
+  started_at: string;
+  expires_at: string;
+  active: boolean;
+}
 
 export class PqVaultError extends Error {
   constructor(
     readonly reason: PqVaultReason,
     message?: string,
+    /** Con `wrong`: la bóveda tal como se vio, para vaciar solo esa. */
+    readonly expect?: PqVaultExpect,
   ) {
     super(message ?? `pq_vault_${reason}`);
     this.name = 'PqVaultError';
@@ -76,6 +117,9 @@ export interface PqVaultStateResponse {
   vault_id: string;
   active_key_id: string;
   keys: PqVaultWrapper[];
+  /** Sube con cada registro y cada vaciado (servidores de antes: ausente). */
+  version?: number;
+  copy?: PqVaultCopyMarker;
 }
 
 interface PqVaultRecordResponse {
@@ -115,7 +159,33 @@ export interface PqVaultOpenOptions {
   /** Sustituible en pruebas para evitar instanciar un Web Worker real. */
   createCore?: ((lease: { signal: AbortSignal; assertOpen: () => void }) => PqcRuntime) | undefined;
   offlinePort?: EncryptedOfflinePort | undefined;
+  /**
+   * Traspaso de la autoridad del correo de Matrix a esta bóveda (ADR 0087): la
+   * clave de firma se registra con la marca `handover`, que Sytue ID solo acepta
+   * con identificación reciente. Solo para `mail`, y solo cuando la persona lo
+   * confirma en la puerta de Matrix («vaciar y pasar a la bóveda»).
+   */
+  handover?: boolean | undefined;
+  /**
+   * Solo con `reset`: lo que se vio de la bóveda al decidir vaciarla (el `expect`
+   * de un PqVaultError `wrong`). Si ya no es esa, `changed` y no se vacía nada.
+   */
+  expect?: PqVaultExpect | undefined;
+  /**
+   * Abrir solo una bóveda que ya existe (ADR 0086, «Photos sube a la bóveda de
+   * Drive»): la usa una app que consume la bóveda de OTRO producto. Nunca la crea,
+   * nunca la reinicia (ni en silencio con la clave equivocada) y nunca vuelve a
+   * sellar ni registra su clave de firma: eso es cosa de la app dueña. Sin bóveda,
+   * `PqVaultError('missing')`.
+   */
+  existing?: boolean | undefined;
 }
+
+/** Lo que hace falta para hablar con la bóveda sin abrirla. */
+export type PqVaultCopyOptions = Pick<
+  PqVaultOpenOptions,
+  'actor' | 'tenant' | 'product' | 'basePath' | 'signal' | 'fetchImpl'
+>;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -218,6 +288,276 @@ export async function fetchPqVaultBootstrap(options: {
   };
 }
 
+function seenState(state: PqVaultStateResponse): PqVaultExpect {
+  return {
+    vault_id: typeof state.vault_id === 'string' ? state.vault_id : '',
+    version: typeof state.version === 'number' ? state.version : 0,
+  };
+}
+
+function copyMarker(state: PqVaultStateResponse): PqVaultCopyMarker | null {
+  const copy = state.copy;
+  if (!copy || typeof copy !== 'object' || typeof copy.id !== 'string' || !copy.id) return null;
+  return copy;
+}
+
+/** El código de error de `services/drive` (`{"error":{"code":…}}`), o "". */
+async function errorCode(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: { code?: unknown } };
+    return typeof body?.error?.code === 'string' ? body.error.code : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Los dos rechazos de la bóveda que el cliente distingue; si no, `unavailable`. */
+async function pqVaultFailure(res: Response): Promise<PqVaultError> {
+  if (res.status === 409) {
+    const code = await errorCode(res);
+    if (code === 'pq_vault_copy_in_progress') return new PqVaultError('copy');
+    if (code === 'pq_vault_changed') return new PqVaultError('changed');
+  }
+  return new PqVaultError('unavailable');
+}
+
+async function copyRequest(
+  options: PqVaultCopyOptions,
+): Promise<{ f: typeof fetch; base: string; scopeHeader: string }> {
+  const f = options.fetchImpl ?? fetch;
+  const base = normalizeBase(options.basePath);
+  const bootstrap = await fetchPqVaultBootstrap({ ...options, basePath: base, fetchImpl: f });
+  const scopeHeader = encodeStorageScopeHeader({
+    tenant: bootstrap.tenant,
+    subject: bootstrap.actor,
+    product: bootstrap.product,
+  });
+  return { f, base, scopeHeader };
+}
+
+async function readCopy(
+  f: typeof fetch,
+  base: string,
+  scopeHeader: string,
+  signal: AbortSignal | undefined,
+): Promise<PqVaultCopyMarker | null> {
+  const res = await f(`${base}/api/pq-vault/keys`, {
+    method: 'GET',
+    credentials: 'same-origin',
+    headers: { [storageScopeHeader]: scopeHeader },
+    ...(signal ? { signal } : {}),
+  });
+  if (!res.ok) throw new PqVaultError('unavailable');
+  return copyMarker((await res.json()) as PqVaultStateResponse);
+}
+
+async function releaseCopy(
+  f: typeof fetch,
+  base: string,
+  scopeHeader: string,
+  id: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  const params = new URLSearchParams({ id });
+  const res = await f(`${base}/api/pq-vault/copy?${params.toString()}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers: { [storageScopeHeader]: scopeHeader },
+    ...(signal ? { signal } : {}),
+  });
+  // Otra marca distinta (`changed`) es que la que se quería retirar ya no está.
+  if (!res.ok) throw await pqVaultFailure(res);
+}
+
+/** La marca de copia en curso de la bóveda (o `null`), sin abrirla. */
+export async function readPqVaultCopy(
+  options: PqVaultCopyOptions,
+): Promise<PqVaultCopyMarker | null> {
+  const { f, base, scopeHeader } = await copyRequest(options);
+  return readCopy(f, base, scopeHeader, options.signal);
+}
+
+/**
+ * Cancela la marca de copia `id` («Cancelar la copia»). No borra nada: la copia
+ * del otro dispositivo se para en su siguiente escritura, lo que ya copió se queda
+ * en la bóveda sin recibo y Matrix sigue entero; desde ese dispositivo se repite.
+ */
+export async function cancelPqVaultCopy(options: PqVaultCopyOptions, id: string): Promise<void> {
+  const { f, base, scopeHeader } = await copyRequest(options);
+  await releaseCopy(f, base, scopeHeader, id, options.signal);
+}
+
+/**
+ * ¿La bóveda no guarda ni un registro? Ante cualquier duda —error de red, respuesta
+ * rara— contesta que no: un reinicio silencioso solo es aceptable si no hay nada que
+ * perder.
+ */
+async function vaultIsEmpty(
+  f: typeof fetch,
+  base: string,
+  vaultId: string,
+  scopeHeader: string,
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  try {
+    const params = new URLSearchParams({ vault_id: vaultId, limit: '1' });
+    const res = await f(`${base}/api/pq-vault/records?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { [storageScopeHeader]: scopeHeader },
+      ...(signal ? { signal } : {}),
+    });
+    if (!res.ok) return false;
+    const page = (await res.json()) as PqVaultRecordPageResponse;
+    return Array.isArray(page.entries) && page.entries.length === 0 && !page.next_cursor;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * La identidad con la que una bóveda aparece ante el correo (ADR 0087): el prefijo
+ * aislado del ámbito, como una cuenta de Matrix, y un servidor que no existe en
+ * Matrix. Es exactamente Go `vaultproof.UserID`.
+ */
+export function pqVaultUserID(scope: MatrixStorageScope): string {
+  return `@sytue_storage_${scope.product}_${scope.tenant}_${scope.subject}:sytue-vault`;
+}
+
+/** Los secretos de entrada del correo (Go `keyring.SecretName`). */
+const ingressSecretName = /^org\.sytue\.ingress\.key\.v1\.([0-9a-f]{64})$/u;
+const maxIngressSecretBytes = 2048;
+
+function ingressSecretHex(name: string): string {
+  const hex = ingressSecretName.exec(name)?.[1];
+  if (!hex) throw new StorageRecordError();
+  return hex;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) return false;
+  let diff = 0;
+  for (let i = 0; i < left.byteLength; i++) diff |= left[i]! ^ right[i]!;
+  return diff === 0;
+}
+
+export type PqVaultSigningKeyStatus = 'registered' | 'reauth' | 'missing' | 'unavailable';
+
+type CoreInvoker = Pick<PqcRuntime, 'invoke'>;
+
+function bytesToText(value: unknown): string {
+  if (value instanceof Uint8Array) {
+    try {
+      return decoder.decode(value);
+    } finally {
+      value.fill(0);
+    }
+  }
+  if (typeof value === 'string') return value;
+  throw new PqVaultError('unavailable');
+}
+
+/** Una clave de firma nueva del núcleo, en la forma en que va dentro del secreto. */
+async function createSigningKey(core: CoreInvoker): Promise<string> {
+  const created = await core.invoke<{ signing_key: unknown }>({
+    operation: 'vault.signing.create',
+  });
+  const key = bytesToText(created.signing_key);
+  if (!/^[A-Za-z0-9+/]{86}==$/.test(key)) throw new PqVaultError('unavailable');
+  return key;
+}
+
+/** Añade la clave de firma a un secreto que no la tiene y guarda el envoltorio nuevo. */
+async function addSigningKey(o: {
+  core: CoreInvoker;
+  bridge: PqVaultBridgePort;
+  bridgeOpts: UnlockBridgeOptions;
+  scope: MatrixStorageScope;
+  keyId: string;
+  recipient: string;
+  secret: PqVaultSecret;
+  put: (wrapper: PqVaultWrapper) => Promise<Response>;
+}): Promise<PqVaultSecret> {
+  const next: PqVaultSecret = { ...o.secret, signing_key: await createSigningKey(o.core) };
+  const wrapped = await o.bridge.wrap(o.bridgeOpts, {
+    tenant: o.scope.tenant,
+    product: o.scope.product,
+    profile: pqVaultProfile,
+    keyID: o.keyId,
+    recipient: o.recipient,
+    secret: next,
+  });
+  if (!wrapped.ok) throw new PqVaultError(wrapped.error);
+  const res = await o.put(wrapped.wrapper);
+  if (!res.ok) throw new PqVaultError('unavailable');
+  return next;
+}
+
+interface SigningKeyView {
+  generation: number;
+  key_id: string;
+  retired_at?: string;
+}
+
+/**
+ * Registra en Sytue ID la clave de firma de la bóveda si no es ya la activa
+ * (ADR 0087). Sin clave activa es un alta; con otra activa, que esta bóveda ya
+ * no puede aprobar porque no la tiene, es un vaciado, y Sytue ID pide entonces
+ * una identificación reciente (`reauth`).
+ */
+async function registerSigningKey(o: {
+  core: CoreInvoker;
+  scope: MatrixStorageScope;
+  signingKey: string;
+  handover?: boolean | undefined;
+  call: (method: 'GET' | 'PUT', body?: unknown) => Promise<Response>;
+}): Promise<PqVaultSigningKeyStatus> {
+  if (o.handover && o.scope.product !== 'mail') return 'unavailable';
+  const listed = await o.call('GET');
+  if (!listed.ok) return 'unavailable';
+  const { keys } = (await listed.json()) as { keys?: SigningKeyView[] };
+  const active = (Array.isArray(keys) ? keys : []).find((k) => !k.retired_at);
+  const raw = encoder.encode(o.signingKey);
+  try {
+    const enroll = await o.core.invoke<{
+      profile: string;
+      key_id: string;
+      ed25519: Uint8Array;
+      mldsa65: Uint8Array;
+      proof: Uint8Array;
+      previous_key_id: string;
+    }>({
+      operation: 'vault.signing.enroll',
+      signing_key: raw.slice(),
+      subject: o.scope.subject,
+      tenant: o.scope.tenant,
+      product: o.scope.product,
+      generation: active ? active.generation + 1 : 1,
+      ...(active ? { previous_key_id: active.key_id } : {}),
+    });
+    // Un traspaso se pide siempre: Sytue ID dice si esa clave ya lo tiene.
+    if (active && active.key_id === enroll.key_id && !o.handover) return 'registered';
+    const res = await o.call('PUT', {
+      public_key: {
+        profile: enroll.profile,
+        ed25519: toBase64(enroll.ed25519),
+        mldsa65: toBase64(enroll.mldsa65),
+      },
+      previous_key_id: enroll.previous_key_id,
+      proof: toBase64(enroll.proof),
+      ...(o.handover ? { handover: true } : {}),
+    });
+    if (res.ok) return 'registered';
+    if (res.status === 403) {
+      const body = (await res.json().catch(() => ({}))) as { code?: string };
+      if (body.code === 'vault_key_reauth') return 'reauth';
+    }
+    return 'unavailable';
+  } finally {
+    raw.fill(0);
+  }
+}
+
 /**
  * Sesión abierta de bóveda post-cuántica directa para `(tenant, subject, product)`.
  *
@@ -232,6 +572,12 @@ export class PqVault {
   readonly vaultId: string;
   readonly keyId: string;
   readonly recipient: string;
+  /**
+   * Si la clave de firma de esta bóveda es la activa en Sytue ID (ADR 0087).
+   * `reauth`: hay otra registrada y sustituirla pide identificarse otra vez; la
+   * bóveda funciona igual, solo lo que firma (el correo entrante) espera.
+   */
+  readonly signingKeyStatus: PqVaultSigningKeyStatus;
   private readonly base: string;
   private readonly fetchImpl: typeof fetch;
   private readonly core: PqcRuntime;
@@ -241,6 +587,8 @@ export class PqVault {
   private readonly jobs = new StorageJobs();
   private readonly storagePq: StoragePq;
   private readonly uploadCache: EncryptedOfflineValues;
+  /** La clave de firma (ADR 0087), en la forma del secreto; se borra al cerrar. */
+  private readonly signingKey: Uint8Array<ArrayBuffer> | undefined;
   private exclusiveQueue: Promise<void> = Promise.resolve();
   private closed = false;
 
@@ -257,7 +605,11 @@ export class PqVault {
     identityBytes: Uint8Array;
     hmacKey: CryptoKey;
     offlinePort?: EncryptedOfflinePort | undefined;
+    signingKeyStatus?: PqVaultSigningKeyStatus | undefined;
+    signingKey?: string | undefined;
   }) {
+    this.signingKeyStatus = params.signingKeyStatus ?? 'missing';
+    this.signingKey = params.signingKey ? encoder.encode(params.signingKey) : undefined;
     this.scope = Object.freeze({ ...params.scope });
     this.idOrigin = params.idOrigin;
     this.vaultId = params.vaultId;
@@ -323,6 +675,7 @@ export class PqVault {
     options: PqVaultOpenOptions,
     forceReset: boolean,
   ): Promise<PqVault> {
+    if (forceReset && options.existing) throw new PqVaultError('missing');
     const f = options.fetchImpl ?? fetch;
     const base = normalizeBase(options.basePath);
     const bridge: PqVaultBridgePort = options.bridge ?? {
@@ -377,24 +730,52 @@ export class PqVault {
       if (!keysRes.ok) throw new PqVaultError('unavailable');
       const state = (await keysRes.json()) as PqVaultStateResponse;
       options.signal?.throwIfAborted();
+      // Lo que se vacía, si se vacía: lo que vio quien decidió vaciar, que tiene
+      // que seguir siendo lo que hay, o lo que se acaba de leer.
+      const seen = seenState(state);
+      if (
+        forceReset &&
+        options.expect &&
+        (options.expect.vault_id !== seen.vault_id || options.expect.version !== seen.version)
+      )
+        throw new PqVaultError('changed');
 
       let vaultId = state.vault_id;
       let keyId: string;
       let recipient: string;
       let secret: PqVaultSecret;
 
-      if (!forceReset && Array.isArray(state.keys) && state.keys.length > 0 && state.vault_id) {
+      let reset = forceReset;
+      let opened: Awaited<ReturnType<PqVaultBridgePort['unwrap']>> | null = null;
+      if (!reset && Array.isArray(state.keys) && state.keys.length > 0 && state.vault_id) {
         // Priorizar la clave activa si aparece en la lista.
         const ordered = [...state.keys].sort((a, b) =>
           a.key_id === state.active_key_id ? -1 : b.key_id === state.active_key_id ? 1 : 0,
         );
-        const opened = await bridge.unwrap(bridgeOpts, {
+        opened = await bridge.unwrap(bridgeOpts, {
           tenant: scope.tenant,
           product: scope.product,
           wrappers: ordered,
         });
         options.signal?.throwIfAborted();
-        if (!opened.ok) throw new PqVaultError(opened.error);
+        // La clave se envolvió con otra clave de desbloqueo (la de antes de ADR 0086 o
+        // una que ya no existe). Si la bóveda no guarda ni un registro, no hay nada que
+        // perder: se reinicia en silencio en vez de dejar la app bloqueada. Es el caso
+        // de las doce apps que pasan por la puerta sin guardar nada en la bóveda.
+        if (!opened.ok && opened.error === 'wrong' && !options.existing) {
+          const empty = await vaultIsEmpty(f, base, state.vault_id, scopeHeader, options.signal);
+          options.signal?.throwIfAborted();
+          if (empty) reset = true;
+        }
+      }
+
+      if (opened && !reset) {
+        if (!opened.ok)
+          throw new PqVaultError(
+            opened.error,
+            undefined,
+            opened.error === 'wrong' ? seen : undefined,
+          );
         secret = opened.secret;
         identityBytes = encoder.encode(secret.identity);
         // Verificar en el núcleo Go/Wasm que la identidad privada coincide con key_id y recipient.
@@ -411,6 +792,8 @@ export class PqVault {
         }
         keyId = pub.key_id;
         recipient = pub.recipient;
+      } else if (options.existing) {
+        throw new PqVaultError('missing');
       } else {
         // Primer uso o reinicio explícito: generar identidad ML-KEM-768 + X25519 en Go/Wasm.
         const created = await core.invoke<{
@@ -434,6 +817,10 @@ export class PqVault {
           identity: decoder.decode(identityBytes),
           owner_key: ownerB64,
         };
+        // La clave de firma nace con la bóveda (ADR 0087). Si el núcleo no la da,
+        // la bóveda se crea igual: se añadirá en la siguiente apertura.
+        const signing = await createSigningKey(core).catch(() => undefined);
+        if (signing) secret.signing_key = signing;
         const wrapped = await bridge.wrap(bridgeOpts, {
           tenant: scope.tenant,
           product: scope.product,
@@ -451,20 +838,70 @@ export class PqVault {
             'content-type': 'application/json',
             [storageScopeHeader]: scopeHeader,
           },
+          // Vaciar va con lo visto: si alguien publicó algo después (el recibo de
+          // una importación, por ejemplo), el servidor no vacía nada.
           body: JSON.stringify({
             wrapper: wrapped.wrapper,
             set_active: true,
-            reset: forceReset,
+            reset,
+            ...(reset ? { expect: seen } : {}),
           }),
           ...(options.signal ? { signal: options.signal } : {}),
         });
-        if (!putRes.ok) throw new PqVaultError('unavailable');
+        if (!putRes.ok) throw await pqVaultFailure(putRes);
         const saved = (await putRes.json()) as PqVaultStateResponse;
         if (!saved.vault_id) throw new PqVaultError('unavailable');
         vaultId = saved.vault_id;
         keyId = created.key_id;
         recipient = created.recipient;
       }
+
+      // Una bóveda de antes de la ADR 0087 gana su clave de firma: se vuelve a sellar
+      // el mismo secreto con ella y se guarda el envoltorio. Nada de esto impide
+      // abrir la bóveda: si falla, se intenta en la siguiente apertura.
+      if (!secret.signing_key && !options.existing) {
+        secret = await addSigningKey({
+          core,
+          bridge,
+          bridgeOpts,
+          scope,
+          keyId,
+          recipient,
+          secret,
+          put: (wrapper) =>
+            f(`${base}/api/pq-vault/keys`, {
+              method: 'PUT',
+              credentials: 'same-origin',
+              headers: { 'content-type': 'application/json', [storageScopeHeader]: scopeHeader },
+              body: JSON.stringify({ wrapper, set_active: true, reset: false }),
+              ...(options.signal ? { signal: options.signal } : {}),
+            }),
+        }).catch(() => secret);
+        options.signal?.throwIfAborted();
+      }
+      const signingKeyStatus: PqVaultSigningKeyStatus = options.existing
+        ? 'unavailable'
+        : secret.signing_key
+          ? await registerSigningKey({
+              core,
+              scope,
+              signingKey: secret.signing_key,
+              handover: options.handover,
+              call: (method, body) =>
+                f(`${base}/api/pq-vault/signing-key`, {
+                  method,
+                  credentials: 'same-origin',
+                  ...(body
+                    ? {
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify(body),
+                      }
+                    : {}),
+                  ...(options.signal ? { signal: options.signal } : {}),
+                }),
+            }).catch((): PqVaultSigningKeyStatus => 'unavailable')
+          : 'missing';
+      options.signal?.throwIfAborted();
 
       const hmacKey = await importHmacKey(secret.owner_key);
       options.signal?.throwIfAborted();
@@ -483,6 +920,8 @@ export class PqVault {
         identityBytes: keptIdentity,
         hmacKey,
         offlinePort: options.offlinePort,
+        signingKeyStatus,
+        signingKey: secret.signing_key,
       });
     } catch (error) {
       identityBytes?.fill(0);
@@ -497,6 +936,147 @@ export class PqVault {
    * directo sobre `/api/pq-vault/records`, sin pasar por Synapse/Matrix.
    */
   storage(blobs?: StorageBlobPort): StorageRepository {
+    return new StorageRepository(
+      this.scope,
+      this.recordTransport().transport,
+      blobs,
+      this.uploadCache,
+    );
+  }
+
+  /** El destino de publicación de la bóveda: su sala y su «dispositivo». */
+  get publicationTarget(): Readonly<StoragePublicationTarget> {
+    return Object.freeze({ room_id: this.vaultId, device_id: `pq-${this.keyId.slice(0, 24)}` });
+  }
+
+  /** La marca de copia en curso de esta bóveda, o `null` (ADR 0086). */
+  async copyMarker(signal?: AbortSignal): Promise<PqVaultCopyMarker | null> {
+    if (this.closed || this.lifetime.signal.aborted) throw new MatrixSecurityError('device');
+    return readCopy(this.fetchImpl, this.base, encodeStorageScopeHeader(this.scope), signal);
+  }
+
+  /**
+   * Retira una marca de copia ya caducada. Solo después de abrir la bóveda con
+   * su recibo: la copia que la puso terminó o se paró, y la marca ya no dice nada.
+   */
+  async clearStaleCopy(signal?: AbortSignal): Promise<void> {
+    const marker = await this.copyMarker(signal);
+    if (!marker || marker.active) return;
+    await releaseCopy(
+      this.fetchImpl,
+      this.base,
+      encodeStorageScopeHeader(this.scope),
+      marker.id,
+      signal,
+    );
+  }
+
+  /** Se aborta al cerrar la bóveda: lo que dependa de ella se retira con ella. */
+  get signal(): AbortSignal {
+    return this.lifetime.signal;
+  }
+
+  /**
+   * La raíz con la que la bóveda aparece ante el correo (Go `vaultproof.RootKey`):
+   * la mitad Ed25519 de su clave de firma, en base64 sin relleno.
+   */
+  async ingressRootKey(signal?: AbortSignal): Promise<string> {
+    if (this.closed || this.lifetime.signal.aborted) throw new MatrixSecurityError('device');
+    if (!this.signingKey) throw new MatrixSecurityError('recovery');
+    const out = await this.core.invoke<{ ed25519: unknown }>(
+      { operation: 'vault.signing.public', signing_key: this.signingKey.slice() },
+      signal,
+    );
+    if (!(out?.ed25519 instanceof Uint8Array) || out.ed25519.byteLength !== 32)
+      throw new MatrixSecurityError('unverified');
+    return toBase64(out.ed25519).replace(/=+$/u, '');
+  }
+
+  /** La identidad de la bóveda ante el correo (Go `vaultproof.UserID`). */
+  get ingressUserID(): string {
+    return pqVaultUserID(this.scope);
+  }
+
+  /**
+   * Firma una acción de entrada del correo (ADR 0087) con la clave de la bóveda, en
+   * el núcleo: `request` son los bytes `{expected, action}` del puerto
+   * `ingress.action.sign`, tal cual. Sin clave registrada en Sytue ID no firma: el
+   * servidor no la aceptaría.
+   */
+  async signIngressAction(
+    request: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    if (this.closed || this.lifetime.signal.aborted) throw new MatrixSecurityError('device');
+    if (!this.signingKey || this.signingKeyStatus !== 'registered')
+      throw new MatrixSecurityError('recovery');
+    const out = await this.core.invoke<{ proof: unknown }>(
+      {
+        operation: 'vault.ingress.sign',
+        signing_key: this.signingKey.slice(),
+        request: request.slice(),
+      },
+      signal,
+    );
+    if (!(out?.proof instanceof Uint8Array)) throw new MatrixSecurityError('unverified');
+    const proof = new Uint8Array(out.proof);
+    out.proof.fill(0);
+    if (this.closed) {
+      proof.fill(0);
+      throw new MatrixSecurityError('device');
+    }
+    return proof;
+  }
+
+  /**
+   * Lee un secreto de entrada del correo guardado en la bóveda (ADR 0087): un
+   * registro `content` cifrado como los demás, escrito una sola vez con el
+   * identificador `ingress_secret_<id>`. `null` si no existe.
+   */
+  async readIngressSecret(
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer> | null> {
+    const hex = ingressSecretHex(name);
+    const record = await this.recordTransport().find(`ingress_secret_${hex}`, signal);
+    if (!record) return null;
+    if (
+      record.object_id !== `ingress_${hex}` ||
+      record.revision_id !== 'v1' ||
+      record.role !== 'content' ||
+      (record.previous ?? []).length
+    )
+      throw new MatrixSecurityError('unverified');
+    return storageJSONBytes(record.payload, maxIngressSecretBytes);
+  }
+
+  /**
+   * Guarda un secreto de entrada del correo. Es de una sola escritura: repetirla
+   * con los mismos bytes no hace nada; con otros, falla (nunca se sustituye una
+   * clave con la que ya se ha podido cifrar correo).
+   */
+  async writeIngressSecret(name: string, value: Uint8Array, signal?: AbortSignal): Promise<void> {
+    const hex = ingressSecretHex(name);
+    if (value.byteLength > maxIngressSecretBytes) throw new StorageRecordError();
+    const records = this.recordTransport();
+    const record = createStorageRecord(this.scope, `ingress_${hex}`, 'v1', 'content', value);
+    try {
+      await records.transport.put(`ingress_secret_${hex}`, record, this.publicationTarget, signal);
+    } catch (error) {
+      // Un reintento tras una escritura que sí llegó choca con su propio cifrado:
+      // vale si lo guardado es lo mismo.
+      const saved = await this.readIngressSecret(name, signal).catch(() => null);
+      if (!saved) throw error;
+      const same = sameBytes(saved, value);
+      saved.fill(0);
+      if (!same) throw error;
+    }
+  }
+
+  private recordTransport(): {
+    transport: StorageRecordTransport;
+    find: (transaction: string, signal?: AbortSignal) => Promise<StorageRecord | null>;
+  } {
     const assertOpen = (): void => {
       if (this.closed || this.lifetime.signal.aborted) throw new MatrixSecurityError('device');
     };
@@ -564,7 +1144,12 @@ export class PqVault {
         }),
         ...(signal ? { signal } : {}),
       });
-      if (!res.ok) throw new StorageRecordError();
+      if (!res.ok) {
+        // Otro dispositivo copia en la bóveda: nada se publicó; se dice tal cual.
+        if (res.status === 409 && (await errorCode(res)) === 'pq_vault_copy_in_progress')
+          throw new PqVaultError('copy');
+        throw new StorageRecordError();
+      }
       const saved = (await res.json()) as PqVaultRecordResponse;
       if (saved.vault_id !== room || typeof saved.event_id !== 'string')
         throw new MatrixSecurityError('reference');
@@ -594,10 +1179,7 @@ export class PqVault {
       return rec.payload;
     };
 
-    const publication = Object.freeze({
-      room_id: this.vaultId,
-      device_id: `pq-${this.keyId.slice(0, 24)}`,
-    });
+    const publication = this.publicationTarget;
 
     const runExclusive = <T>(
       action: (signal: AbortSignal) => Promise<T>,
@@ -729,7 +1311,33 @@ export class PqVault {
       },
     };
 
-    return new StorageRepository(this.scope, transport, blobs, this.uploadCache);
+    const find = async (
+      transaction: string,
+      signal?: AbortSignal,
+    ): Promise<StorageRecord | null> => {
+      assertOpen();
+      const params = new URLSearchParams({ vault_id: this.vaultId, transaction_id: transaction });
+      const res = await this.fetchImpl(`${this.base}/api/pq-vault/records?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { [storageScopeHeader]: scopeHeader },
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok) throw new StorageRecordError();
+      const page = (await res.json()) as PqVaultRecordPageResponse;
+      const entries = Array.isArray(page.entries) ? page.entries : [];
+      if (entries.length === 0) return null;
+      const item = entries[0]!;
+      if (entries.length !== 1 || item.vault_id !== this.vaultId)
+        throw new MatrixSecurityError('reference');
+      const reference: MatrixReference = { room_id: item.vault_id, event_id: item.event_id };
+      const opened = await this.storagePq.open(item.payload, reference, readRaw);
+      if (!opened || 'fragment' in opened) throw new StorageRecordError();
+      await verifyProof(reference.room_id, opened.record, opened.proof);
+      return opened.record;
+    };
+
+    return { transport, find };
   }
 
   close(): void {
@@ -738,6 +1346,7 @@ export class PqVault {
     this.lifetime.abort();
     void this.jobs.close();
     this.identityBytes.fill(0);
+    this.signingKey?.fill(0);
     this.storagePq.close();
     this.uploadCache.close();
     this.core.close();

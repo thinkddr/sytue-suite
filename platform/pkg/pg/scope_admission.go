@@ -70,7 +70,7 @@ func RequireScopeAdmissionCoverage(ctx context.Context, q Querier, inventory Ten
 		for _, table := range group.tables {
 			if group.class == "state" {
 				var immutable bool
-				if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=to_regclass($1) AND NOT t.tgisinternal AND t.tgenabled IN('O','A') AND t.tgtype=27 AND t.tgfoid=to_regprocedure('sytue_private_storage_state_scope_guard()'))`, table).Scan(&immutable); err != nil {
+				if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=to_regclass($1) AND NOT t.tgisinternal AND t.tgenabled IN('O','A') AND t.tgtype=27 AND t.tgfoid IN (to_regprocedure('sytue_private_storage_state_scope_guard()'),to_regprocedure('sytue_private_storage_state_scope_guard_v2()')))`, table).Scan(&immutable); err != nil {
 					return err
 				}
 				if !immutable {

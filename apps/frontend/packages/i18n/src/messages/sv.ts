@@ -32,6 +32,48 @@ export const sv: Catalog = {
   'matrix.connect': 'Konfigurera den här enheten',
   'matrix.devices': 'Dina enheter',
   'matrix.failed': 'Krypteringen kunde inte konfigureras. Försök igen.',
+  'vault.wrongKey':
+    'Den här appens krypterade data låstes med en annan upplåsningsnyckel för Sytue ID än den i den här webbläsaren. Logga in på Sytue ID igen för att hämta hit den aktuella nyckeln. Om den tidigare nyckeln har gått förlorad kan du tömma appens krypterade data och börja om.',
+  'vault.wrongKeyDevice':
+    'Den här appens krypterade data låstes med en annan upplåsningsnyckel för Sytue ID än den på den här enheten. Logga in på Sytue ID igen för att hämta hit den aktuella nyckeln. Om den tidigare nyckeln har gått förlorad kan du tömma appens krypterade data och börja om.',
+  'vault.release': 'Töm och gå tillbaka till serverns data',
+  'vault.releaseTitle': 'Gå tillbaka till serverns data',
+  'vault.releaseBody':
+    'När den här appens data krypterades från en dator- eller mobilapp sparade servern en kopia precis som den var just då. Om du inte kan öppna den krypterade datan kan appen gå tillbaka till den kopian. Allt som skrevs efteråt, på vilken enhet som helst, går förlorat och kan inte återställas.',
+  'vault.releaseUnderstood':
+    'Jag förstår att allt som skrevs efter övergången till kryptering går förlorat',
+  'vault.releaseSignIn': 'För att bekräfta att det är du ber Sytue ID dig först att logga in igen.',
+  'vault.releaseFailed': 'Det gick inte att gå tillbaka till serverns data. Försök igen.',
+  'vault.moveTitle': 'Flytta Drive till det krypterade valvet',
+  'vault.moveOffer':
+    'Din Drive är fortfarande lagrad i den tidigare krypteringen. Flytta den till valvet som webben och dina andra enheter använder.',
+  'vault.moveAction': 'Flytta till valvet',
+  'vault.moveBody':
+    'Alla dina filer och mappar, med sina versioner, kopieras till det krypterade valvet och kontrolleras en i taget. Inget raderas från den tidigare krypteringen. Håll appen öppen tills den är klar; om den avbryts fortsätter den där den slutade.',
+  'vault.moveUnderstood': 'Jag förstår att denna Drive därefter används från valvet',
+  'vault.moveCopying': 'Kopierar och kontrollerar dina filer…',
+  'vault.moveDone': 'Klart. Din Drive finns nu i det krypterade valvet.',
+  'vault.moveFailed':
+    'Kopian kunde inte slutföras. Dina filer finns fortfarande i den tidigare krypteringen. Försök igen.',
+  'vault.movePending':
+    'Den här enheten har fortfarande ändringar att skicka. Vänta tills de är klara och försök igen.',
+  'vault.copyInProgress':
+    'En annan enhet flyttar din Drive till det krypterade valvet. Vänta tills den är klar och försök igen.',
+  'vault.copyCancel': 'Avbryt kopieringen',
+  'vault.copyCancelHint':
+    'Om kopieringen har fastnat kan du avbryta den: inget raderas och du kan göra om den från den andra enheten.',
+  'vault.releaseNotice':
+    'Den här appens data krypterades från en dator- eller mobilapp. Det du ser här är kopian som servern sparade just då; det som skrevs senare finns bara i den krypterade datan. Om du inte längre kan öppna den kan du gå tillbaka till serverns data.',
+  'notifications.kind.security.storage.released':
+    '{name} har gått tillbaka till dina data på servern',
+  'vault.signInAgain': 'Logga in på Sytue ID igen',
+  'vault.empty': 'Töm krypterade data',
+  'vault.emptyTitle': 'Töm den här appens krypterade data',
+  'vault.emptyBody':
+    'De data som appen krypterade med den förlorade nyckeln raderas från Sytue och en ny nyckel skapas. Resten av ditt konto påverkas inte. Det går inte att ångra.',
+  'vault.emptyUnderstood': 'Jag förstår att data som krypterats med den förlorade nyckeln raderas',
+  'vault.failed':
+    'De krypterade data kunde inte öppnas. Försök igen eller logga in på Sytue ID igen. Om nyckeln har gått förlorad kan du tömma appens krypterade data.',
   'matrix.incoming': 'Verifiera den här enheten',
   'matrix.match': 'De stämmer överens',
   'matrix.mismatch': 'De stämmer inte överens',

@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
@@ -23,6 +24,9 @@ func (s *Store) VerifyMatrixStorageReceipt(ctx context.Context, subject, product
 			return err
 		}
 		if err := authority.RequireActive(scope, authority.Generation); err != nil {
+			return err
+		}
+		if err := sinTraspasoTx(ctx, tx, scope, matrixproof.ErrUnverified); err != nil {
 			return err
 		}
 		if err := matrixAuthorityOwnsTarget(ctx, tx, scope, target); err != nil {

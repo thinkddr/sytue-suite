@@ -39,6 +39,7 @@ var rutasACL = map[string]rutaACL{
 	"PATCH /documents/{id}":                             {h: func(h *Handler) http.HandlerFunc { return h.renameDocument }, body: `{"title":"Otro"}`},
 	"DELETE /documents/{id}":                            {h: func(h *Handler) http.HandlerFunc { return h.deleteDocument }},
 	"PUT /documents/{id}/star":                          {h: func(h *Handler) http.HandlerFunc { return h.starDocument }, body: `{"starred":true}`},
+	"PUT /documents/{id}/vault-anchor":                  {h: func(h *Handler) http.HandlerFunc { return h.anclarEnBoveda }, body: `{"source_ref":"vault:0b5e7a1c-3f2d-4e6b-9a8c-1d2e3f4a5b6c","expect":""}`},
 	"GET /documents/{id}/state":                         {h: func(h *Handler) http.HandlerFunc { return h.getState }},
 	"POST /documents/{id}/ops":                          {h: func(h *Handler) http.HandlerFunc { return h.postOps }, body: cuerpoOps},
 	"GET /documents/{id}/ops":                           {h: func(h *Handler) http.HandlerFunc { return h.getOps }},

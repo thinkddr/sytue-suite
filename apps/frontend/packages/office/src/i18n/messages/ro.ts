@@ -314,6 +314,21 @@ export const ro: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Salvat în Sytue Drive.',
   'doc.msg.savedToDriveIn': '„{name}” conține acum modificările dvs., ca versiune nouă.',
   'doc.msg.saveToDriveFailed': 'Modificările nu au putut fi salvate în Drive.',
+  'doc.msg.saveToDriveVault': 'Drive-ul dvs. este criptat integral',
+  'doc.msg.saveToDriveVault.detail':
+    'Nu a putut fi salvat în el de aici. Descărcați documentul și încărcați-l din Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Salvat în Drive-ul dvs. criptat.',
+  'doc.msg.savedToDriveEncryptedIn': '„{name}” a fost criptat în acest browser înainte de salvare.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}” a fost criptat pe acest dispozitiv înainte de salvare.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Drive-ul criptat este blocat pe acest dispozitiv. Deblocați-l mai sus, apoi salvați din nou.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Autentificați-vă din nou pentru a debloca Drive-ul criptat, apoi salvați din nou.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Drive-ul dvs. încă trece la criptarea integrală. Deschideți Sytue Drive pentru a finaliza, apoi salvați din nou.',
+  'doc.msg.saveToDriveUnsupported':
+    'Formatul acestui fișier nu poate fi rescris. Descărcați în schimb documentul.',
   'file.downloadPdf': 'Descărcați ca PDF',
   'file.pdfAccessible': 'PDF accesibil (PDF/UA)',
   'file.downloadHtml': 'Descărcați ca HTML',
@@ -2716,6 +2731,50 @@ export const ro: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'O ordine de semnare poate avea până la 10 persoane.',
   'pdf.error.signatureRequest.busy':
     'Această solicitare se deschide deja. Încercați din nou peste câteva momente.',
+  'pdf.error.driveVault':
+    'Drive-ul dvs. este criptat integral: copiile solicitărilor de semnătură de la alte organizații nu pot fi încă stocate în el. Descărcați în schimb PDF-ul.',
+  'pdf.device.title': 'Semnează pe acest dispozitiv',
+  'pdf.device.help':
+    'Drive-ul tău este criptat integral, așa că serverul nu îți poate citi fișierele PDF. Alege unul: este decriptat și semnat aici cu certificatul tău, iar copia semnată este salvată criptat lângă original. Nici PDF-ul, nici certificatul tău nu ajung la server.',
+  'pdf.device.open': 'Deschide Drive-ul meu criptat',
+  'pdf.device.empty.title': 'Niciun PDF în Drive-ul tău criptat',
+  'pdf.device.empty.description': 'Încarcă-le din Sytue Drive și vor apărea aici.',
+  'pdf.device.sign': 'Semnează',
+  'pdf.device.signed': 'Semnat și salvat criptat ca „{name}”.',
+  'pdf.device.stamp.on':
+    'Cu marcă temporală de la {authority}: semnătura dovedește cine a semnat și când. Autoritatea primește doar amprenta semnăturii, niciodată PDF-ul.',
+  'pdf.device.stamp.off':
+    'Fără marcă temporală: acest serviciu nu are autoritate de marcare temporală, așa că semnătura dovedește cine a semnat, nu și când.',
+  'pdf.device.appearance': 'Cum arată semnătura',
+  'pdf.device.appearance.invisible': 'Invizibilă',
+  'pdf.device.appearance.visible': 'Casetă vizibilă',
+  'pdf.device.signedStamped': 'Semnat cu marcă temporală și salvat criptat ca „{name}”.',
+  'pdf.device.signedNoStamp':
+    'Semnat și salvat criptat ca „{name}”, dar fără marcă temporală: autoritatea de marcare temporală nu a răspuns.',
+  'pdf.device.error.page': 'Semnătura nu încape pe acea pagină. Alegeți altă pagină sau poziție.',
+  'pdf.device.view': 'Vizualizați',
+  'pdf.vault.help':
+    'Acest PDF se află în Drive-ul dvs. criptat: este decriptat doar pe acest dispozitiv, pentru a-l vizualiza și semna.',
+  'pdf.vault.serverOnly':
+    'Adnotarea, completarea, organizarea, editarea, recunoașterea textului și solicitarea semnăturii necesită ca serviciul să citească PDF-ul, așa că nu sunt disponibile cu Drive-ul criptat.',
+  'pdf.vault.notFound.title': 'Acest PDF nu se află în Drive-ul dvs. criptat',
+  'pdf.vault.notFound.description': 'Poate a fost mutat sau șters. Căutați-l în Sytue Drive.',
+  'pdf.vault.openSigned': 'Deschideți copia semnată',
+  'pdf.device.requests':
+    'Solicitarea semnăturii altor persoane sau organizații are nevoie de Drive-ul serverului: serviciul trebuie să citească PDF-ul ca să-l trimită și să verifice semnătura care se întoarce. Cu Drive-ul criptat, semnează aici și trimite chiar tu PDF-ul semnat.',
+  'pdf.device.error.signin':
+    'Autentifică-te din nou în Sytue ID pentru a debloca Drive-ul criptat.',
+  'pdf.device.error.pending':
+    'Drive-ul tău încă trece la criptarea integrală. Finalizează din Sytue Drive.',
+  'pdf.device.error.password': 'Această parolă nu deschide certificatul.',
+  'pdf.device.error.encrypted':
+    'Acest PDF este protejat cu parolă și nu poate fi semnat pe acest dispozitiv.',
+  'pdf.device.error.locked':
+    'Acest PDF este certificat împotriva oricărei modificări: o altă semnătură l-ar invalida.',
+  'pdf.device.error.unreadable':
+    'Acest PDF nu poate fi semnat pe acest dispozitiv fără a fi rescris. Nu s-a modificat nimic.',
+  'pdf.device.error.failed':
+    'PDF-ul nu a putut fi semnat sau salvat. Nu s-a modificat nimic în Drive-ul tău.',
   'pdf.dialog.firmar.help':
     'Certificatul și cheia nu părăsesc niciodată organizația dvs.: sunt folosite pe server și nu se stochează.',
   'pdf.dialog.firmar.cert': 'Certificat (PEM)',

@@ -954,4 +954,10 @@ export const pt: AppCatalog<typeof en> = {
     'O email foi aceite, mas não foi possível guardar uma cópia no correio enviado. Não o envie novamente.',
   'externalMail.invalidConfiguration':
     'Introduza um endereço de email válido, os nomes e portas de ambos os servidores e uma palavra-passe.',
+  'privateMail.handoverOffer': 'Não consegue abrir o seu correio? Esvazie-o e passe-o para o cofre',
+  'privateMail.handoverTitle': 'Esvaziar o correio e passá-lo para o cofre',
+  'privateMail.handoverBody':
+    'O correio cifrado que já não consegue abrir não será recuperado. A partir de agora o seu correio abre com o seu início de sessão no Sytue ID, que poderá ter de repetir.',
+  'privateMail.handoverUnderstood': 'Compreendo que o correio que não consigo abrir será perdido',
+  'privateMail.handoverConfirm': 'Esvaziar e passar para o cofre',
 };

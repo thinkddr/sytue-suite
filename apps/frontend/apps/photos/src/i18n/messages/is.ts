@@ -339,4 +339,36 @@ export const is: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Vistað í Myndir › Sytue Photos: {count}',
   'library.saveFailed': 'Ekki tókst að vista í myndasafn þessarar tölvu: {name}',
   'backup.whileOpen': 'Í þessari tölvu er afritað á meðan Sytue Fotos er opið.',
+  'backup.encryptedWaitTitle': 'Opnaðu Sytue Fotos til að ljúka dulkóðuðu afrituninni',
+  'backup.encryptedWaitBody':
+    'Drive-ið þitt er dulkóðað enda á milli. Nýjar myndir eru afritaðar um leið og þú opnar Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Vistað dulkóðað enda á milli í Drive: {count}',
+  'gallery.uploadVaultSignIn':
+    'Drive-ið þitt er dulkóðað enda á milli. Skráðu þig inn aftur til að aflæsa því og bættu myndunum svo við aftur.',
+  'gallery.uploadVaultNotReady':
+    'Drive-ið þitt er enn að færast yfir í dulkóðun enda á milli. Opnaðu Sytue Drive til að ljúka því og bættu myndunum svo við aftur.',
+  'gallery.uploadVaultLocked':
+    'Drive-ið þitt er dulkóðað enda á milli. Aflæstu því hér fyrir ofan og bættu myndunum svo við aftur.',
+  'gallery.uploadVaultUnavailable':
+    'Drive-ið þitt er dulkóðað enda á milli og ekki er hægt að opna það í þessu tæki. Bættu myndunum við í Sytue Photos á vefnum.',
+  'gallery.encrypted.title': 'Í dulkóðaða Drive-inu þínu',
+  'gallery.encrypted.show': 'Sýna',
+  'gallery.encrypted.opening': 'Afkóðar…',
+  'gallery.encrypted.failed': 'Ekki tókst að opna dulkóðaða Drive-ið þitt.',
+  'gallery.encrypted.signIn': 'Skrá inn aftur',
+  'gallery.encrypted.empty': 'Engar myndir eru enn í dulkóðaða Drive-inu þínu.',
+  'gallery.encrypted.note':
+    'Dulkóðaðar myndir frá enda til enda eru aðeins afkóðaðar á þessu tæki. Sytue AI, svipaðar myndir, Í nágrenninu og minningar taka þær ekki með.',
+  'gallery.encrypted.badge': 'Dulkóðuð frá enda til enda',
+  'gallery.encrypted.open': 'Opna {name} (dulkóðuð)',
+  'gallery.encrypted.notSelectable':
+    'Ekki er hægt að velja dulkóðaðar myndir: opnaðu eina til að merkja hana sem eftirlæti eða bæta henni í albúm.',
+  'gallery.encrypted.actionFailed': 'Ekki tókst að uppfæra dulkóðaða myndasafnið þitt.',
+  'gallery.encrypted.saved': 'Vistað sem ný dulkóðuð útgáfa. Sú fyrri er áfram í útgáfusögu Drive.',
+  'gallery.encrypted.albums': 'Dulkóðuð albúm',
+  'gallery.encrypted.newAlbum': 'Nýtt dulkóðað albúm',
+  'gallery.encrypted.saveVersion': 'Vista sem nýja útgáfu',
+  'gallery.encrypted.editHint':
+    'Breytingin fer fram á þessu tæki og er vistuð dulkóðuð sem ný útgáfa myndarinnar.',
+  'gallery.encrypted.albumEmpty': 'Engar myndir eru enn í þessu dulkóðaða albúmi.',
 };

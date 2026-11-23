@@ -316,6 +316,21 @@ export const mt: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Issejvjat f’Sytue Drive.',
   'doc.msg.savedToDriveIn': '“{name}” issa għandu l-bidliet tiegħek, bħala verżjoni ġdida.',
   'doc.msg.saveToDriveFailed': 'Il-bidliet ma setgħux jiġu ssejvjati fid-Drive.',
+  'doc.msg.saveToDriveVault': 'Id-Drive tiegħek huwa kriptat minn tarf għal tarf',
+  'doc.msg.saveToDriveVault.detail':
+    'Ma setax jiġi ssejvjat minn hawn. Niżżel id-dokument u tellgħu minn Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Issejvjat fid-Drive kriptat tiegħek.',
+  'doc.msg.savedToDriveEncryptedIn': '“{name}” ġie kriptat f’dan il-browser qabel ma ġie ssejvjat.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '“{name}” ġie kriptat f’dan l-apparat qabel ma ġie ssejvjat.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Id-Drive kriptat tiegħek huwa msakkar f’dan l-apparat. Iftħu hawn fuq, u erġa’ ssejvja.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Erġa’ idħol biex tiftaħ id-Drive kriptat tiegħek, u erġa’ ssejvja.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Id-Drive tiegħek għadu għaddej għall-kriptaġġ minn tarf sa tarf. Iftaħ Sytue Drive biex tlesti, u erġa’ ssejvja.',
+  'doc.msg.saveToDriveUnsupported':
+    'Il-format ta’ dan il-fajl ma jistax jerġa’ jinkiteb. Niżżel id-dokument minflok.',
   'file.downloadPdf': 'Niżżel bħala PDF',
   'file.pdfAccessible': 'PDF aċċessibbli (PDF/UA)',
   'file.downloadHtml': 'Niżżel bħala HTML',
@@ -2738,6 +2753,49 @@ export const mt: AppCatalog<typeof en> = {
     'L-istess persuna tidher darbtejn fl-ordni tal-firem.',
   'pdf.error.signatureRequest.chainTooLong': 'Ordni ta’ firem jista’ jkollha sa 10 persuni.',
   'pdf.error.signatureRequest.busy': 'Din it-talba diġà qed tinfetaħ. Erġa’ pprova ftit ieħor.',
+  'pdf.error.driveVault':
+    'Id-Drive tiegħek huwa kriptat minn tarf sa tarf: kopji ta’ talbiet għall-firma minn organizzazzjonijiet oħra għadhom ma jistgħux jinħażnu fih. Niżżel il-PDF minflok.',
+  'pdf.device.title': 'Iffirma fuq dan l-apparat',
+  'pdf.device.help':
+    'Id-Drive tiegħek huwa kriptat minn tarf sa tarf, għalhekk is-server ma jistax jaqra l-PDFs tiegħek. Agħżel wieħed: jiġi dekriptat u ffirmat hawn biċ-ċertifikat tiegħek, u l-kopja ffirmata tiġi ssejvjata kriptata ħdejn l-oriġinal. La l-PDF u lanqas iċ-ċertifikat tiegħek ma jaslu għand is-server.',
+  'pdf.device.open': 'Iftaħ id-Drive kriptat tiegħi',
+  'pdf.device.empty.title': 'M’hemm l-ebda PDF fid-Drive kriptat tiegħek',
+  'pdf.device.empty.description': 'Tellagħhom minn Sytue Drive u jidhru hawn.',
+  'pdf.device.sign': 'Iffirma',
+  'pdf.device.signed': 'Iffirmat u ssejvjat kriptat bħala “{name}”.',
+  'pdf.device.stamp.on':
+    'B’timbru tal-ħin minn {authority}: il-firma tipprova min iffirma u meta. L-awtorità tirċievi biss il-marka tal-firma, qatt il-PDF.',
+  'pdf.device.stamp.off':
+    'Mingħajr timbru tal-ħin: dan is-servizz m’għandux awtorità tat-timbru tal-ħin, għalhekk il-firma tipprova min iffirma, mhux meta.',
+  'pdf.device.appearance': 'Kif tidher il-firma',
+  'pdf.device.appearance.invisible': 'Inviżibbli',
+  'pdf.device.appearance.visible': 'Kaxxa viżibbli',
+  'pdf.device.signedStamped': 'Iffirmat b’timbru tal-ħin u ssejvjat kriptat bħala “{name}”.',
+  'pdf.device.signedNoStamp':
+    'Iffirmat u ssejvjat kriptat bħala “{name}”, iżda mingħajr timbru tal-ħin: l-awtorità tat-timbru tal-ħin ma wieġbitx.',
+  'pdf.device.error.page': 'Il-firma ma tidħolx f’dik il-paġna. Agħżel paġna jew pożizzjoni oħra.',
+  'pdf.device.view': 'Ara',
+  'pdf.vault.help':
+    'Dan il-PDF jinsab fid-Drive kriptat tiegħek: jiġi dekriptat biss fuq dan it-tagħmir, biex tarah u tiffirmah.',
+  'pdf.vault.serverOnly':
+    'L-annotazzjoni, il-mili, l-organizzazzjoni, l-editjar, ir-rikonoxximent tat-test u t-talba għal firma jeħtieġu li s-servizz jaqra l-PDF, għalhekk mhumiex disponibbli bid-Drive kriptat tiegħek.',
+  'pdf.vault.notFound.title': 'Dan il-PDF mhuwiex fid-Drive kriptat tiegħek',
+  'pdf.vault.notFound.description': 'Forsi ġie mċaqlaq jew imħassar. Fittxu f’Sytue Drive.',
+  'pdf.vault.openSigned': 'Iftaħ il-kopja ffirmata',
+  'pdf.device.requests':
+    'Biex titlob firma minn persuni jew organizzazzjonijiet oħra jeħtieġ id-Drive tas-server: is-servizz irid jaqra l-PDF biex jibagħtu u jivverifika l-firma li tirritorna. Bid-Drive kriptat, iffirma hawn u ibgħat int stess il-PDF iffirmat.',
+  'pdf.device.error.signin': 'Erġa’ idħol f’Sytue ID biex tiftaħ id-Drive kriptat tiegħek.',
+  'pdf.device.error.pending':
+    'Id-Drive tiegħek għadu għaddej għall-kriptaġġ minn tarf sa tarf. Lestih minn Sytue Drive.',
+  'pdf.device.error.password': 'Dik il-password ma tiftaħx iċ-ċertifikat.',
+  'pdf.device.error.encrypted':
+    'Dan il-PDF huwa protett b’password u ma jistax jiġi ffirmat fuq dan l-apparat.',
+  'pdf.device.error.locked':
+    'Dan il-PDF huwa ċċertifikat kontra kull bidla: firma oħra tinvalidah.',
+  'pdf.device.error.unreadable':
+    'Dan il-PDF ma jistax jiġi ffirmat fuq dan l-apparat mingħajr ma jinkiteb mill-ġdid. Ma nbidel xejn.',
+  'pdf.device.error.failed':
+    'Il-PDF ma setax jiġi ffirmat jew issejvjat. Ma nbidel xejn fid-Drive tiegħek.',
   'pdf.dialog.firmar.help':
     'Iċ-ċertifikat u ċ-ċavetta qatt ma joħorġu mill-organizzazzjoni tiegħek: jintużaw fuq is-server u ma jinħażnux.',
   'pdf.dialog.firmar.cert': 'Ċertifikat (PEM)',

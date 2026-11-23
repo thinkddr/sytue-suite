@@ -40,7 +40,10 @@ var DatosDeLaPersona = []struct {
 }{
 	// Los aparatos de iOS a los que despertar (mig. 0010 del Hub): el registro único
 	// de la suite desde el 2026-11-06, que sustituye a `push_apns` de Rooms.
-	{"hub", []string{"notifications", "notification_prefs", "presence", "aparatos_apns"}},
+	// Y la copia de los avisos de su entrada privada que ningún aparato confirmó
+	// todavía (mig. 0014 del Hub, ADR 0086). Lo ya cifrado en la cola compartida se
+	// retiene, como en Mail y Calendar: solo lo abre su clave de entrada.
+	{"hub", []string{"notifications", "notification_prefs", "presence", "aparatos_apns", "hub_private_notices"}},
 	{"rooms", []string{
 		"push_subscriptions", "user_notify_prefs",
 		"message_drafts", "message_saves", "read_state", "thread_follows", "channel_categories",

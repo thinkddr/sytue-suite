@@ -6,10 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	contract "git.sytue.eu/sytue/one/apps/nucleo/storage/ingress"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/keyring"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
 )
 
@@ -33,6 +35,9 @@ type EnrollmentConfig struct {
 	Device    EnrollmentDevice
 	Source    func(string) (EnrollmentSource, error)
 	Authorize func(context.Context) error
+	// Rotate lo elige el anfitrión, solo para la bóveda (ADR 0087): si el plan
+	// vigente de la época no está en este dispositivo, propone el siguiente.
+	Rotate bool
 }
 
 // Enrollment owns public routing intent in the encrypted application WAL. Age
@@ -54,7 +59,7 @@ type (
 )
 
 func NewEnrollment(cfg EnrollmentConfig) (*Enrollment, error) {
-	if cfg.Context == nil || !cfg.Scope.Valid() || (cfg.Scope.Product != "mail" && cfg.Scope.Product != "calendar") || !cfg.Target.Valid() || cfg.Authority.RequireActive(cfg.Scope, cfg.Authority.Generation) != nil || !cfg.Journal.Encrypted() || cfg.Lease == nil || cfg.Device == nil || cfg.Source == nil || cfg.Authorize == nil {
+	if cfg.Context == nil || !cfg.Scope.Valid() || !contract.Product(cfg.Scope.Product) || !cfg.Target.Valid() || cfg.Authority.RequireActive(cfg.Scope, cfg.Authority.Generation) != nil || !cfg.Journal.Encrypted() || cfg.Lease == nil || cfg.Device == nil || cfg.Source == nil || cfg.Authorize == nil {
 		return nil, contract.ErrContract
 	}
 	return &Enrollment{cfg: cfg, gate: offline.NewWorkGateWithLease(cfg.Context, cfg.Lease)}, nil
@@ -203,7 +208,10 @@ func (e *Enrollment) selectPlan(ctx context.Context, state contract.EnrollmentSt
 	switch state.Status {
 	case "active":
 		if err := e.recover(ctx, *state.Plan); err != nil {
-			return err
+			if !e.rotates(err) {
+				return err
+			}
+			return e.rotate(ctx, *state.Plan, work)
 		}
 		if work.Plan != nil && *work.Plan != *state.Plan {
 			work.Rejected = append(work.Rejected, *work.Plan)
@@ -229,6 +237,44 @@ func (e *Enrollment) selectPlan(ctx context.Context, state contract.EnrollmentSt
 		return contract.ErrContract
 	}
 	if work.Plan == nil || work.Plan.Validate(e.cfg.Scope, work.Epoch) != nil {
+		return contract.ErrContract
+	}
+	return e.save(*work)
+}
+
+// rotates: solo un dispositivo que puede rotar (la bóveda, ADR 0087) y solo si el
+// SDK dice que NO tiene la clave del plan vigente (no un fallo pasajero). La
+// autorización la decide el servidor: una autoridad de bóveda posterior a la que
+// autorizó el plan vigente; si no, el alta se rechaza y nada cambia.
+func (e *Enrollment) rotates(err error) bool {
+	return e.cfg.Rotate && errors.Is(err, keyring.ErrRecoveryRequired)
+}
+
+// rotate prepara el plan de generación siguiente, una sola vez: un reintento
+// recupera el candidato ya creado en vez de crear otro.
+func (e *Enrollment) rotate(ctx context.Context, current contract.KeyPlan, work *enrollmentIntent) error {
+	next := current.Generation + 1
+	if next >= 1<<53 {
+		return contract.ErrContract
+	}
+	switch {
+	case work.Plan == nil:
+		if err := e.save(*work); err != nil {
+			return err
+		}
+		plan, err := e.cfg.Device.CreateIngressKey(ctx, e.cfg.Scope, work.Epoch, next)
+		if err != nil {
+			return err
+		}
+		work.Plan = &plan
+	case work.Plan.Generation == next:
+		if err := e.recover(ctx, *work.Plan); err != nil {
+			return err
+		}
+	default:
+		return contract.ErrRevoked
+	}
+	if work.Plan.Generation != next || work.Plan.Validate(e.cfg.Scope, work.Epoch) != nil {
 		return contract.ErrContract
 	}
 	return e.save(*work)

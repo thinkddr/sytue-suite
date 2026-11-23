@@ -158,6 +158,33 @@
     return (HOSTS[product] || [product]).indexOf(host) >= 0;
   };
 
+  // Las apps que, en su host propio, ABREN (solo abren) la bóveda de otro producto
+  // porque guardan en ella: Photos sube sus originales al Drive de la persona,
+  // Docus, Calcus y Diapos guardan ahí el fichero de un documento («Guardar en
+  // Drive») y CertiPDF firma en el dispositivo los PDF de ese Drive y deja ahí el
+  // firmado; con el Drive en la bóveda lo cifran en el navegador (ADR 0086). Crear,
+  // vaciar o volver a sellar esa bóveda sigue siendo solo de la app del producto.
+  var VAULT_READERS = {
+    drive: ["photos", "docus", "calcus", "diapos", "certipdf"],
+  };
+
+  /**
+   * ¿Puede la app de `origin` ABRIR la bóveda de `product`? Lo mismo que
+   * `productAllowed`, más las apps de `VAULT_READERS` en su host propio.
+   */
+  E.productOpenAllowed = function (origin, product) {
+    if (E.productAllowed(origin, product)) return true;
+    if (!Object.prototype.hasOwnProperty.call(VAULT_READERS, product))
+      return false;
+    var host = "";
+    try {
+      host = new URL(origin).hostname.split(".")[0];
+    } catch (e) {
+      return false;
+    }
+    return VAULT_READERS[product].indexOf(host) >= 0;
+  };
+
   function aad(kind, account, keyID, cred) {
     return enc.encode(
       [WRAP_LABEL, kind, account, keyID, cred || ""].join("\0"),
@@ -375,32 +402,59 @@
       s.identity.length <= 4096 &&
       typeof s.owner_key === "string" &&
       s.owner_key.length > 0 &&
-      s.owner_key.length <= 128
+      s.owner_key.length <= 128 &&
+      // La clave de firma híbrida (ADR 0087) es opcional: las bóvedas de antes no
+      // la tienen. Si viene, son sus dos semillas de 32 bytes en base64.
+      (s.signing_key === undefined ||
+        (typeof s.signing_key === "string" &&
+          /^[A-Za-z0-9+/]{86}==$/.test(s.signing_key)))
     );
   }
-  /** Deriva `vaultWrap` bajo demanda para cuentas iniciadas antes de ADR 0086. */
+  /** El secreto tal como se sella: solo sus campos, en este orden. */
+  function vaultSecretPlain(s) {
+    var out = {
+      v: 1,
+      profile: s.profile,
+      identity: s.identity,
+      owner_key: s.owner_key,
+    };
+    if (s.signing_key !== undefined) out.signing_key = s.signing_key;
+    return out;
+  }
+  /**
+   * Deriva `vaultWrap` bajo demanda para cuentas iniciadas antes de ADR 0086.
+   *
+   * Si la caja de ese registro ya no se puede revelar (otra clave de dispositivo,
+   * almacenamiento a medias), se trata como si no hubiera clave: `signin`, que trae
+   * la vigente con la vuelta del inicio de sesión. Rechazar dejaba el puente en
+   * `unavailable`, un callejón sin salida para quien ya cifraba antes.
+   */
   function ensureVaultWrap(sub, rec) {
     if (!rec) return Promise.resolve(null);
     if (E.sealedKey(rec.vaultWrap)) return Promise.resolve(rec);
-    return E.revealUnlock(sub, rec).then(function (key) {
-      return E.vaultWrapKey(key, ["encrypt", "decrypt"]).then(
-        function (vw) {
-          E.wipe(key);
-          var next = {};
-          Object.keys(rec).forEach(function (k) {
-            next[k] = rec[k];
-          });
-          next.vaultWrap = vw;
-          return E.store.put("auk:" + sub, next).then(function () {
-            return next;
-          });
-        },
-        function (err) {
-          E.wipe(key);
-          throw err;
-        },
-      );
-    });
+    return E.revealUnlock(sub, rec)
+      .then(function (key) {
+        return E.vaultWrapKey(key, ["encrypt", "decrypt"]).then(
+          function (vw) {
+            E.wipe(key);
+            var next = {};
+            Object.keys(rec).forEach(function (k) {
+              next[k] = rec[k];
+            });
+            next.vaultWrap = vw;
+            return E.store.put("auk:" + sub, next).then(function () {
+              return next;
+            });
+          },
+          function (err) {
+            E.wipe(key);
+            throw err;
+          },
+        );
+      })
+      .catch(function () {
+        return null;
+      });
   }
   function openVaultWith(key, tenant, product, sub, w) {
     return global.crypto.subtle
@@ -496,14 +550,7 @@
       .then(function (rec) {
         if (!rec) return { error: "signin" };
         var nonce = E.random(12);
-        var plain = enc.encode(
-          JSON.stringify({
-            v: 1,
-            profile: m.secret.profile,
-            identity: m.secret.identity,
-            owner_key: m.secret.owner_key,
-          }),
-        );
+        var plain = enc.encode(JSON.stringify(vaultSecretPlain(m.secret)));
         return global.crypto.subtle
           .encrypt(
             {
@@ -702,7 +749,11 @@
         m.type === "sytue-e2e-vault-unwrap" ||
         m.type === "sytue-e2e-vault-wrap"
       ) {
-        if (!E.productAllowed(origin, m.product)) {
+        var allowed =
+          m.type === "sytue-e2e-vault-unwrap"
+            ? E.productOpenAllowed(origin, m.product)
+            : E.productAllowed(origin, m.product);
+        if (!allowed) {
           reply(m.id, { ok: false, error: "account" });
           return;
         }
@@ -735,14 +786,18 @@
       }
       op.then(
         function (out) {
-          // Sin clave aquí: la clave efímera con la que el relevo puede devolverla.
-          if (out.error === "signin")
+          // Sin clave aquí, o con una que no es la de sus envoltorios: la clave
+          // efímera con la que el relevo puede devolver la vigente. En `wrong` hace
+          // falta igual: un puente apartado (Safari) que guardó una clave de
+          // desbloqueo ANTERIOR solo la sustituye por esta vía; sin ella, volver a
+          // entrar no cambiaba nada y la persona solo podía vaciar sus datos.
+          if (out.error === "signin" || out.error === "wrong")
             return E.handoffKey(t).then(
               function (pub) {
-                reply(m.id, { ok: false, error: "signin", handoff_key: pub });
+                reply(m.id, { ok: false, error: out.error, handoff_key: pub });
               },
               function () {
-                reply(m.id, { ok: false, error: "signin" });
+                reply(m.id, { ok: false, error: out.error });
               },
             );
           if (out.error) reply(m.id, { ok: false, error: out.error });

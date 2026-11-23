@@ -31,6 +31,47 @@ export const mt: Catalog = {
   'matrix.connect': 'Ikkonfigura dan it-tagħmir',
   'matrix.devices': 'It-tagħmir tiegħek',
   'matrix.failed': 'Ma setax jiġi kkonfigurat il-kriptaġġ. Erġa’ pprova.',
+  'vault.wrongKey':
+    'Id-data kriptata ta’ din l-app ġiet imsakkra b’ċavetta tal-iftuħ ta’ Sytue ID differenti minn dik f’dan il-browser. Erġa’ idħol f’Sytue ID biex iġġib hawn iċ-ċavetta attwali. Jekk iċ-ċavetta ta’ qabel intilfet, tista’ tbattal id-data kriptata ta’ din l-app u terġa’ tibda.',
+  'vault.wrongKeyDevice':
+    'Id-data kriptata ta’ din l-app ġiet imsakkra b’ċavetta tal-iftuħ ta’ Sytue ID differenti minn dik f’dan it-tagħmir. Erġa’ idħol f’Sytue ID biex iġġib hawn iċ-ċavetta attwali. Jekk iċ-ċavetta ta’ qabel intilfet, tista’ tbattal id-data kriptata ta’ din l-app u terġa’ tibda.',
+  'vault.release': 'Battal u erġa’ għad-data tas-server',
+  'vault.releaseTitle': 'Erġa’ għad-data tas-server',
+  'vault.releaseBody':
+    'Meta d-data ta’ din l-app għaddiet għall-encryption minn app tad-desktop jew tal-mowbajl, is-server żamm kopja eżatt kif kienet f’dak il-mument. Jekk ma tistax tiftaħ id-data encrypted, din l-app tista’ terġa’ lura għal dik il-kopja. Kull ma nkiteb wara, fuq kwalunkwe apparat, jintilef u ma jistax jiġi rkuprat.',
+  'vault.releaseUnderstood': 'Nifhem li kull ma nkiteb wara l-qlib għall-encryption se jintilef',
+  'vault.releaseSignIn': 'Biex tikkonferma li int, Sytue ID se jitolbok l-ewwel tidħol mill-ġdid.',
+  'vault.releaseFailed': 'Ma kienx possibbli li terġa’ lura għad-data tas-server. Erġa’ pprova.',
+  'vault.moveTitle': 'Mexxi Drive għall-kaxxaforti kriptata',
+  'vault.moveOffer':
+    'Id-Drive tiegħek għadu maħżun fil-kriptaġġ preċedenti. Mexxih għall-kaxxaforti li jużaw il-web u l-apparati l-oħra tiegħek.',
+  'vault.moveAction': 'Mexxi għall-kaxxaforti',
+  'vault.moveBody':
+    'Il-fajls u l-folders kollha tiegħek, bil-verżjonijiet tagħhom, se jiġu kkupjati fil-kaxxaforti kriptata u ċċekkjati wieħed wieħed. Xejn ma jitħassar mill-kriptaġġ preċedenti. Żomm l-app miftuħa sakemm jispiċċa; jekk jieqaf, ikompli minn fejn ħalla.',
+  'vault.moveUnderstood': 'Nifhem li, meta jispiċċa, dan id-Drive se jintuża mill-kaxxaforti',
+  'vault.moveCopying': 'Qed jiġu kkupjati u ċċekkjati l-fajls tiegħek…',
+  'vault.moveDone': 'Lest. Id-Drive tiegħek issa qiegħed fil-kaxxaforti kriptata.',
+  'vault.moveFailed':
+    'Il-kopja ma setgħetx titlesta. Il-fajls tiegħek għadhom fil-kriptaġġ preċedenti. Erġa’ pprova.',
+  'vault.movePending':
+    'Dan l-apparat għad għandu bidliet x’jibgħat. Stenna sakemm jispiċċaw u erġa’ pprova.',
+  'vault.copyInProgress':
+    'Apparat ieħor qed imexxi d-Drive tiegħek għall-kaxxaforti kriptata. Stenna sakemm jispiċċa u erġa’ pprova.',
+  'vault.copyCancel': 'Ikkanċella l-kopja',
+  'vault.copyCancelHint':
+    'Jekk dik il-kopja waqfet, tista’ tikkanċellaha: ma jitħassar xejn u tista’ terġa’ tagħmilha minn dak l-apparat.',
+  'vault.releaseNotice':
+    'Id-data ta’ din l-app għaddiet għall-encryption minn app tad-desktop jew tal-mowbajl. Dak li tara hawn hija l-kopja li żamm is-server f’dak il-mument; dak li nkiteb wara jinsab biss fid-data encrypted. Jekk ma tistax tiftaħha aktar, tista’ terġa’ lura għad-data tas-server.',
+  'notifications.kind.security.storage.released':
+    '{name} reġa’ lura għad-data tiegħek fuq is-server',
+  'vault.signInAgain': 'Erġa’ idħol f’Sytue ID',
+  'vault.empty': 'Battal id-data kriptata',
+  'vault.emptyTitle': 'Battal id-data kriptata ta’ din l-app',
+  'vault.emptyBody':
+    'Id-data li din l-app ikkriptat biċ-ċavetta mitlufa titħassar minn Sytue u tinħoloq ċavetta ġdida. Il-bqija tal-kont tiegħek ma jintmessx. Dan ma jistax jitreġġa’ lura.',
+  'vault.emptyUnderstood': 'Nifhem li d-data kriptata biċ-ċavetta mitlufa se titħassar',
+  'vault.failed':
+    'Id-data kriptata ma setgħetx tinfetaħ. Erġa’ pprova jew erġa’ idħol f’Sytue ID. Jekk iċ-ċavetta intilfet, tista’ tbattal id-data kriptata ta’ din l-app.',
   'matrix.incoming': 'Ivverifika dan it-tagħmir',
   'matrix.match': 'Jaqblu',
   'matrix.mismatch': 'Ma jaqblux',

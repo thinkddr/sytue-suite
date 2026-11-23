@@ -68,6 +68,9 @@ type Mailer interface {
 	// alcance de plataforma. `sujeto` es a quién le pasa, `actor` quién lo hizo.
 	// No lleva enlaces: no hay nada que aceptar ni confirmar, solo enterarse.
 	SendPlatformScopeChange(ctx context.Context, to, sujeto, actor, motivo string, concedido bool) error
+	// SendVaultKeyReset avisa de que la bóveda cifrada de `producto` se vació y se
+	// registró una clave nueva (generación `generacion`, ADR 0087). Sin enlaces.
+	SendVaultKeyReset(ctx context.Context, to, producto string, generacion int64) error
 }
 
 // newMailer elige la implementación según la configuración: con SMTP_ADDR ⇒ envío
@@ -174,6 +177,28 @@ func (m *smtpMailer) SendInvitation(ctx context.Context, to, org, link string) e
 func (m *smtpMailer) SendEmailVerification(ctx context.Context, to, link string) error {
 	_ = ctx
 	return m.send(to, buildVerifyEmail(m.from, to, link))
+}
+
+func (m logMailer) SendVaultKeyReset(ctx context.Context, to, producto string, generacion int64) error {
+	m.log.WarnContext(ctx, "SMTP no configurado: aviso de vaciado de bóveda SOLO en el log (dev)",
+		"to", logsafe.Text(to), "producto", producto, "generacion", generacion)
+	return nil
+}
+
+func (m *smtpMailer) SendVaultKeyReset(_ context.Context, to, producto string, generacion int64) error {
+	return m.send(to, buildVaultKeyResetEmail(m.from, to, producto, generacion))
+}
+
+// buildVaultKeyResetEmail es el aviso de un vaciado. No lleva enlaces: no hay nada
+// que hacer desde el correo; quien no lo reconozca cambia su contraseña en Sytue ID.
+func buildVaultKeyResetEmail(from, to, producto string, generacion int64) []byte {
+	var b strings.Builder
+	mailHeaders(&b, from, to, "Se han vaciado tus datos cifrados de "+textoCorreo(producto))
+	fmt.Fprintf(&b, "Se ha registrado una clave nueva para tus datos cifrados de %s (generacion %d)\r\n",
+		textoCorreo(producto), generacion)
+	b.WriteString("porque la anterior ya no se podia abrir. Lo cifrado con la anterior no se recupera.\r\n\r\n")
+	b.WriteString("Si no has sido tu, cambia ya tu contrasena en Sytue ID y revisa tus sesiones abiertas.\r\n")
+	return []byte(b.String())
 }
 
 func (m *smtpMailer) SendPlatformScopeChange(ctx context.Context, to, sujeto, actor, motivo string, concedido bool) error {

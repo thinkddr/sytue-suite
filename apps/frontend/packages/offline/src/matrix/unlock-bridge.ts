@@ -49,6 +49,12 @@ const errors: readonly UnlockBridgeError[] = ['signin', 'wrong', 'account', 'bus
  * key back sealed for it, in the FRAGMENT of the return (`#sytue_unlock=…`: no server
  * sees it). This page cannot open it; it hands it to its bridge with the next request.
  */
+const keyOperations: ReadonlySet<string> = new Set([
+  'sytue-e2e-unwrap',
+  'sytue-e2e-wrap',
+  'sytue-e2e-vault-unwrap',
+  'sytue-e2e-vault-wrap',
+]);
 const handoffShape = /^[A-Za-z0-9_-]{1,16384}$/;
 const handoffKeyShape = /^[A-Za-z0-9_-]{87}$/;
 let handoff: string | null = null;
@@ -98,9 +104,11 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
   } catch {
     return Promise.resolve(unavailable);
   }
-  // Only the operations that use the unlock key take the return of a sign-in with them.
-  const carries =
-    request.type === 'sytue-e2e-unwrap' || request.type === 'sytue-e2e-wrap' ? handoff : null;
+  // Only the operations that use the unlock key take the return of a sign-in with them:
+  // the Matrix wrappers AND the post-quantum vault (ADR 0086). Leaving the vault out
+  // brought back, for every app, the endless «sign in again» of Safari that the
+  // handoff exists to end: the bridge never received the key the relay sent it.
+  const carries = keyOperations.has(request.type as string) ? handoff : null;
   return new Promise((resolve) => {
     const frame = doc.createElement('iframe');
     const id = crypto.randomUUID();
@@ -271,7 +279,14 @@ export interface PqVaultSecret {
   profile: typeof pqVaultProfile;
   identity: string;
   owner_key: string;
+  /**
+   * The vault's hybrid signing key (ADR 0087, Ed25519 + ML-DSA-65): its two 32-byte
+   * seeds in base64. Optional: vaults sealed before it do not have one.
+   */
+  signing_key?: string;
 }
+
+const signingKeyShape = /^[A-Za-z0-9+/]{86}==$/;
 
 export interface PqVaultWrapper {
   v: 1;
@@ -306,7 +321,9 @@ function isPqVaultSecret(value: unknown): value is PqVaultSecret {
     typeof s.identity === 'string' &&
     s.identity.length > 0 &&
     typeof s.owner_key === 'string' &&
-    s.owner_key.length > 0
+    s.owner_key.length > 0 &&
+    (s.signing_key === undefined ||
+      (typeof s.signing_key === 'string' && signingKeyShape.test(s.signing_key)))
   );
 }
 

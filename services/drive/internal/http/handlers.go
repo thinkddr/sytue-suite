@@ -169,6 +169,9 @@ func toAPIError(err error) error {
 	if translated := privateStorageAPIError(err); translated != nil {
 		return translated
 	}
+	if translated := pqVaultAPIError(err); translated != nil {
+		return translated
+	}
 	if translated := cipherBlobAPIError(err); translated != nil {
 		return translated
 	}

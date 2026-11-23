@@ -328,6 +328,22 @@ export const de: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'In Sytue Drive gespeichert.',
   'doc.msg.savedToDriveIn': '„{name}“ enthält jetzt Ihre Änderungen, als neue Version.',
   'doc.msg.saveToDriveFailed': 'Die Änderungen konnten nicht in Drive gespeichert werden.',
+  'doc.msg.saveToDriveVault': 'Ihr Drive ist Ende-zu-Ende-verschlüsselt',
+  'doc.msg.saveToDriveVault.detail':
+    'Es konnte von hier aus nicht darin gespeichert werden. Laden Sie das Dokument herunter und laden Sie es über Sytue Drive hoch.',
+  'doc.msg.savedToDriveEncrypted': 'In Ihrem verschlüsselten Drive gespeichert.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '„{name}“ wurde vor dem Speichern in diesem Browser verschlüsselt.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}“ wurde vor dem Speichern auf diesem Gerät verschlüsselt.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Ihr verschlüsseltes Drive ist auf diesem Gerät gesperrt. Entsperren Sie es oben und speichern Sie erneut.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Melden Sie sich erneut an, um Ihr verschlüsseltes Drive zu entsperren, und speichern Sie erneut.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Ihr Drive wird noch auf Ende-zu-Ende-Verschlüsselung umgestellt. Öffnen Sie Sytue Drive, um das abzuschließen, und speichern Sie erneut.',
+  'doc.msg.saveToDriveUnsupported':
+    'Das Format dieser Datei kann nicht neu geschrieben werden. Laden Sie stattdessen das Dokument herunter.',
   'file.downloadPdf': 'Als PDF herunterladen',
   'file.pdfAccessible': 'Barrierefreies PDF (PDF/UA)',
   'file.downloadHtml': 'Als HTML herunterladen',
@@ -2813,6 +2829,53 @@ export const de: AppCatalog<typeof en> = {
     'Eine Signaturreihenfolge kann bis zu 10 Personen umfassen.',
   'pdf.error.signatureRequest.busy':
     'Diese Anfrage wird bereits geöffnet. Versuchen Sie es gleich noch einmal.',
+  'pdf.error.driveVault':
+    'Ihr Drive ist Ende-zu-Ende-verschlüsselt: Kopien für Signaturanfragen anderer Organisationen können dort noch nicht abgelegt werden. Laden Sie stattdessen das PDF herunter.',
+  'pdf.device.title': 'Auf diesem Gerät signieren',
+  'pdf.device.help':
+    'Ihr Drive ist Ende-zu-Ende-verschlüsselt, daher kann der Server Ihre PDFs nicht lesen. Wählen Sie eines aus: Es wird hier entschlüsselt und mit Ihrem Zertifikat signiert, und die signierte Kopie wird verschlüsselt neben dem Original gespeichert. Weder das PDF noch Ihr Zertifikat erreichen den Server.',
+  'pdf.device.open': 'Mein verschlüsseltes Drive öffnen',
+  'pdf.device.empty.title': 'Keine PDFs in Ihrem verschlüsselten Drive',
+  'pdf.device.empty.description': 'Laden Sie sie in Sytue Drive hoch, dann erscheinen sie hier.',
+  'pdf.device.sign': 'Signieren',
+  'pdf.device.signed': 'Signiert und verschlüsselt gespeichert als „{name}“.',
+  'pdf.device.stamp.on':
+    'Mit Zeitstempel von {authority}: Die Signatur belegt, wer wann unterschrieben hat. Die Stelle erhält nur den Fingerabdruck der Signatur, nie das PDF.',
+  'pdf.device.stamp.off':
+    'Kein Zeitstempel: Dieser Dienst hat keine Zeitstempelstelle, daher belegt die Signatur, wer unterschrieben hat, aber nicht wann.',
+  'pdf.device.appearance': 'So sieht die Signatur aus',
+  'pdf.device.appearance.invisible': 'Unsichtbar',
+  'pdf.device.appearance.visible': 'Sichtbares Feld',
+  'pdf.device.signedStamped':
+    'Mit Zeitstempel signiert und verschlüsselt gespeichert als „{name}“.',
+  'pdf.device.signedNoStamp':
+    'Signiert und verschlüsselt gespeichert als „{name}“, aber ohne Zeitstempel: Die Zeitstempelstelle hat nicht geantwortet.',
+  'pdf.device.error.page':
+    'Die Signatur passt nicht auf diese Seite. Wähle eine andere Seite oder Position.',
+  'pdf.device.view': 'Ansehen',
+  'pdf.vault.help':
+    'Dieses PDF liegt in deinem verschlüsselten Drive: Es wird nur auf diesem Gerät entschlüsselt, um es anzusehen und zu signieren.',
+  'pdf.vault.serverOnly':
+    'Kommentieren, Ausfüllen, Organisieren, Bearbeiten, Texterkennung und Signaturanfragen erfordern, dass der Dienst das PDF liest, und sind daher mit deinem verschlüsselten Drive nicht verfügbar.',
+  'pdf.vault.notFound.title': 'Dieses PDF ist nicht in deinem verschlüsselten Drive',
+  'pdf.vault.notFound.description':
+    'Es wurde vielleicht verschoben oder gelöscht. Suche es in Sytue Drive.',
+  'pdf.vault.openSigned': 'Signierte Kopie öffnen',
+  'pdf.device.requests':
+    'Signaturanfragen an andere Personen oder Organisationen brauchen das Drive des Servers: Der Dienst muss das PDF lesen, um es zu versenden und die zurückkommende Signatur zu prüfen. Mit verschlüsseltem Drive signieren Sie hier und versenden das signierte PDF selbst.',
+  'pdf.device.error.signin':
+    'Melden Sie sich erneut bei Sytue ID an, um Ihr verschlüsseltes Drive zu entsperren.',
+  'pdf.device.error.pending':
+    'Ihr Drive wird noch auf Ende-zu-Ende-Verschlüsselung umgestellt. Schließen Sie das in Sytue Drive ab.',
+  'pdf.device.error.password': 'Dieses Passwort öffnet das Zertifikat nicht.',
+  'pdf.device.error.encrypted':
+    'Dieses PDF ist passwortgeschützt und kann auf diesem Gerät nicht signiert werden.',
+  'pdf.device.error.locked':
+    'Dieses PDF ist gegen jede Änderung zertifiziert: Eine weitere Signatur würde es ungültig machen.',
+  'pdf.device.error.unreadable':
+    'Dieses PDF kann auf diesem Gerät nicht signiert werden, ohne es neu zu schreiben. Es wurde nichts geändert.',
+  'pdf.device.error.failed':
+    'Das PDF konnte nicht signiert oder gespeichert werden. In Ihrem Drive wurde nichts geändert.',
   'pdf.dialog.firmar.help':
     'Zertifikat und Schlüssel verlassen deine Organisation nicht: Sie werden auf dem Server verwendet und nicht gespeichert.',
   'pdf.dialog.firmar.cert': 'Zertifikat (PEM)',

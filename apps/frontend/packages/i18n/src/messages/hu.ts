@@ -32,6 +32,49 @@ export const hu: Catalog = {
   'matrix.connect': 'Készülék beállítása',
   'matrix.devices': 'Készülékeid',
   'matrix.failed': 'Nem sikerült beállítani a titkosítást. Próbáld újra.',
+  'vault.wrongKey':
+    'Az alkalmazás titkosított adatait egy másik Sytue ID feloldókulccsal zárták le, mint ami ebben a böngészőben van. Jelentkezzen be újra a Sytue ID-be, hogy idehozza az aktuális kulcsot. Ha a korábbi kulcs elveszett, kiürítheti az alkalmazás titkosított adatait, és újrakezdheti.',
+  'vault.wrongKeyDevice':
+    'Az alkalmazás titkosított adatait egy másik Sytue ID feloldókulccsal zárták le, mint ami ezen a készüléken van. Jelentkezzen be újra a Sytue ID-be, hogy idehozza az aktuális kulcsot. Ha a korábbi kulcs elveszett, kiürítheti az alkalmazás titkosított adatait, és újrakezdheti.',
+  'vault.release': 'Kiürítés és visszatérés a szerveren lévő adatokhoz',
+  'vault.releaseTitle': 'Visszatérés a szerveren lévő adatokhoz',
+  'vault.releaseBody':
+    'Amikor az alkalmazás adatai titkosításra kerültek egy asztali vagy mobilalkalmazásból, a szerver megőrzött róluk egy másolatot pontosan abban az állapotban. Ha a titkosított adatok nem nyithatók meg, az alkalmazás visszatérhet ehhez a másolathoz. Minden, ami ezután bármelyik eszközön íródott, elvész, és nem állítható vissza.',
+  'vault.releaseUnderstood':
+    'Tudomásul veszem, hogy elvész minden, ami a titkosításra való átállás után íródott',
+  'vault.releaseSignIn':
+    'A személyazonosság megerősítéséhez a Sytue ID először újbóli bejelentkezést kér.',
+  'vault.releaseFailed': 'Nem sikerült visszatérni a szerveren lévő adatokhoz. Próbálja újra.',
+  'vault.moveTitle': 'A Drive áthelyezése a titkosított széfbe',
+  'vault.moveOffer':
+    'A Drive-od még a korábbi titkosításban van tárolva. Helyezd át abba a széfbe, amelyet a web és a többi eszközöd használ.',
+  'vault.moveAction': 'Áthelyezés a széfbe',
+  'vault.moveBody':
+    'Minden fájlod és mappád a verzióikkal együtt a titkosított széfbe másolódik, és egyenként ellenőrizzük őket. A korábbi titkosításból semmi sem törlődik. Hagyd nyitva az alkalmazást, amíg be nem fejeződik; ha megszakad, onnan folytatja, ahol abbahagyta.',
+  'vault.moveUnderstood':
+    'Tudomásul veszem, hogy a befejezés után ezt a Drive-ot a széfből használom',
+  'vault.moveCopying': 'A fájljaid másolása és ellenőrzése…',
+  'vault.moveDone': 'Kész. A Drive-od most már a titkosított széfben van.',
+  'vault.moveFailed':
+    'A másolást nem sikerült befejezni. A fájljaid továbbra is a korábbi titkosításban vannak. Próbáld újra.',
+  'vault.movePending':
+    'Ezen az eszközön még vannak elküldendő módosítások. Várd meg, amíg befejeződnek, és próbáld újra.',
+  'vault.copyInProgress':
+    'Egy másik eszköz éppen áthelyezi a Drive-odat a titkosított széfbe. Várd meg, amíg befejeződik, és próbáld újra.',
+  'vault.copyCancel': 'Másolás megszakítása',
+  'vault.copyCancelHint':
+    'Ha a másolás elakadt, megszakíthatod: semmi sem törlődik, és arról az eszközről újra elindíthatod.',
+  'vault.releaseNotice':
+    'Az alkalmazás adatai titkosításra kerültek egy asztali vagy mobilalkalmazásból. Itt az a másolat látható, amelyet a szerver akkor megőrzött; ami később íródott, csak a titkosított adatokban van meg. Ha azok már nem nyithatók meg, visszatérhet a szerveren lévő adatokhoz.',
+  'notifications.kind.security.storage.released': '{name}: visszatérés a szerveren lévő adataihoz',
+  'vault.signInAgain': 'Újbóli bejelentkezés a Sytue ID-be',
+  'vault.empty': 'Titkosított adatok kiürítése',
+  'vault.emptyTitle': 'Az alkalmazás titkosított adatainak kiürítése',
+  'vault.emptyBody':
+    'Az alkalmazás által az elveszett kulccsal titkosított adatok törlődnek a Sytue-ból, és új kulcs jön létre. A fiókja többi része nem változik. Ez nem vonható vissza.',
+  'vault.emptyUnderstood': 'Megértettem, hogy az elveszett kulccsal titkosított adatok törlődnek',
+  'vault.failed':
+    'A titkosított adatokat nem sikerült megnyitni. Próbálja újra, vagy jelentkezzen be újra a Sytue ID-be. Ha a kulcs elveszett, kiürítheti az alkalmazás titkosított adatait.',
   'matrix.incoming': 'Készülék ellenőrzése',
   'matrix.match': 'Egyeznek',
   'matrix.mismatch': 'Nem egyeznek',

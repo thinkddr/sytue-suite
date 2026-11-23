@@ -26,6 +26,7 @@ import (
 	"git.sytue.eu/sytue/one/services/hub/internal/intents"
 	"git.sytue.eu/sytue/one/services/hub/internal/interpretar"
 	"git.sytue.eu/sytue/one/services/hub/internal/notify"
+	"git.sytue.eu/sytue/one/services/hub/internal/store"
 )
 
 // Las siguientes interfaces son la superficie MÍNIMA que los handlers consumen de
@@ -144,6 +145,10 @@ func toAPIError(err error) error {
 		return httpx.NewError(http.StatusGone, "gone", "This maintenance operation is closed.")
 	case errors.Is(err, domain.ErrTooMany):
 		return httpx.ErrTooManyRequests.WithMessage("Too many notifications for this recipient.")
+	case errors.Is(err, store.ErrPrivateStorageFrozen):
+		// La fuente de One está congelada o ya es privada (guarda de la 0015): lo
+		// guardado aquí ya no cambia; el mismo código que la fuente privada.
+		return httpx.ErrConflict.WithCode("private_storage_frozen")
 	default:
 		return httpx.ErrInternal.Wrap(err)
 	}

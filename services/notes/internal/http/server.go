@@ -21,6 +21,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/notes/internal/config"
 	"git.sytue.eu/sytue/one/services/notes/internal/domain"
 	"git.sytue.eu/sytue/one/services/notes/internal/store"
@@ -78,6 +79,7 @@ func NewRouter(d Deps) http.Handler {
 		api.Post("/private-storage/migration", h.BeginPrivateStorage)
 		api.Get("/private-storage/migration/{epoch}/rows", h.PrivateStoragePage)
 		api.Get("/private-storage/migration/{epoch}/source/{kind}/{source}", h.PrivateStorageBody)
+		soltarfuente.Montar(api, soltarfuente.Config{Product: "notes", Soltar: d.Store.ReleasePrivateStorage, Avisar: h.hub.Send})
 
 		// Cuadernos (el árbol de la barra lateral).
 		// «Exportar tus datos»: la entrega de los cuadernos (platform/pkg/portabilidad).

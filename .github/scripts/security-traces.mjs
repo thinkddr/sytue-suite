@@ -51,6 +51,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const result = goSecurityTraces();
     await writeFile(process.env.TRACES_PATH, JSON.stringify(result, null, 2) + '\n', { mode: 0o600 });
     console.log(`Exported ${result.results.length} Go analysis results.`);
+    for (const r of result.results.filter(r => /reflected-xss|redirect/.test(r.rule || ''))) { console.log(`${r.rule} ${r.location.path}:${r.location.line}`); r.flows.forEach((f, i) => console.log(`  flow ${i}: ` + f.map(s => `${s.path}:${s.line}`).join(' -> '))); }
   } catch (error) {
     console.error(`Security trace export failed: ${error.message}`);
     process.exitCode = 1;

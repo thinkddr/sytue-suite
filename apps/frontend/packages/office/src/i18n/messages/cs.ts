@@ -2730,13 +2730,16 @@ export const cs: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Podpis se na tuto stránku nevejde. Zvolte jinou stránku nebo polohu.',
   'pdf.device.view': 'Zobrazit',
   'pdf.vault.help':
-    'Toto PDF je ve vašem šifrovaném Disku: dešifruje se jen v tomto zařízení, abyste ho mohli zobrazit a podepsat.',
+    'Toto PDF je ve vašem šifrovaném Drive: dešifruje se jen v tomto zařízení, kde ho můžete zobrazit, anotovat, vyplnit, uspořádat a podepsat. Co uložíte, se vrací zašifrované.',
   'pdf.vault.serverOnly':
-    'Anotace, vyplňování, uspořádání, úpravy, rozpoznávání textu a žádosti o podpis vyžadují, aby služba PDF přečetla, proto nejsou se šifrovaným Diskem k dispozici.',
+    'Se šifrovaným Drive zatím nejsou k dispozici žádosti o podpis, ochrana heslem, rozpoznávání textu, začernění, úpravy textu nebo obrázků, razítka a vodoznaky, porovnání, historie verzí ani tisk: vyžadují, aby služba PDF přečetla, nebo se zatím v zařízení nedělají.',
   'pdf.vault.notFound.title': 'Toto PDF není ve vašem šifrovaném Disku',
   'pdf.vault.notFound.description':
     'Možná bylo přesunuto nebo smazáno. Vyhledejte ho v Sytue Drive.',
   'pdf.vault.openSigned': 'Otevřít podepsanou kopii',
+  'pdf.vault.engineUnavailable':
+    'Modul PDF se v tomto zařízení nepodařilo načíst, proto se PDF zobrazuje v prohlížeči: můžete ho zobrazit, stáhnout a podepsat, ale ne upravit.',
+  'pdf.vault.unavailable': 'Se šifrovaným Drive zatím není k dispozici.',
   'pdf.device.requests':
     'Žádat o podpis jiné osoby nebo organizace vyžaduje Disk serveru: služba musí PDF přečíst, aby ho odeslala a ověřila podpis, který se vrátí. Se šifrovaným Diskem podepište zde a podepsané PDF odešlete sami.',
   'pdf.device.error.signin': 'Znovu se přihlaste do Sytue ID, abyste odemkli svůj šifrovaný Disk.',

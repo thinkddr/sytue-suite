@@ -2871,13 +2871,16 @@ export const en = {
     'The signature does not fit on that page. Choose another page or position.',
   'pdf.device.view': 'View',
   'pdf.vault.help':
-    'This PDF is in your encrypted Drive: it is decrypted only on this device, to view and sign it.',
+    'This PDF is in your encrypted Drive: it is decrypted only on this device, where you can view, annotate, fill in, organise and sign it. Whatever you save goes back encrypted.',
   'pdf.vault.serverOnly':
-    'Annotating, filling in, organising, editing, recognising text and requesting signatures need the service to read the PDF, so they are not available with your encrypted Drive.',
+    'With your encrypted Drive, requesting signatures, password protection, text recognition, redaction, editing text or images, stamps and watermarks, comparing, version history and printing are not available yet: they need the service to read the PDF or have not been brought to the device.',
   'pdf.vault.notFound.title': 'This PDF is not in your encrypted Drive',
   'pdf.vault.notFound.description':
     'It may have been moved or deleted. Look for it in Sytue Drive.',
   'pdf.vault.openSigned': 'Open the signed copy',
+  'pdf.vault.engineUnavailable':
+    'The PDF engine could not be loaded on this device, so the PDF is shown in the browser’s viewer: you can view, download and sign it, but not edit it.',
+  'pdf.vault.unavailable': 'Not available with your encrypted Drive yet.',
   'pdf.device.requests':
     'Asking other people or organisations to sign needs the server Drive: the service has to read the PDF to send it and to check the signature that comes back. With your Drive encrypted, sign here and send the signed PDF yourself.',
   'pdf.device.error.signin': 'Sign in to Sytue ID again to unlock your encrypted Drive.',

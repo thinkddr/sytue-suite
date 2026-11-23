@@ -2693,13 +2693,16 @@ export const is: AppCatalog<typeof en> = {
     'Undirskriftin kemst ekki fyrir á þeirri síðu. Veldu aðra síðu eða staðsetningu.',
   'pdf.device.view': 'Skoða',
   'pdf.vault.help':
-    'Þetta PDF-skjal er í dulkóðaða Drifinu þínu: það er aðeins afkóðað á þessu tæki, svo þú getir skoðað það og undirritað.',
+    'Þessi PDF-skrá er í dulkóðaða Drifinu þínu: hún er aðeins afkóðuð í þessu tæki, þar sem þú getur skoðað hana, skrifað athugasemdir, fyllt út, raðað og undirritað. Það sem þú vistar fer dulkóðað til baka.',
   'pdf.vault.serverOnly':
-    'Athugasemdir, útfylling, skipulagning, breytingar, textagreining og beiðnir um undirskrift krefjast þess að þjónustan lesi PDF-skjalið, svo þær eru ekki í boði með dulkóðaða Drifinu.',
+    'Með dulkóðaða Drifinu eru beiðnir um undirritun, aðgangsorðsvörn, textagreining, yfirstrikun, breyting texta eða mynda, stimplar og vatnsmerki, samanburður, útgáfusaga og prentun ekki enn í boði: þjónustan þarf að lesa PDF-skrána eða þetta er ekki enn gert í tækinu.',
   'pdf.vault.notFound.title': 'Þetta PDF-skjal er ekki í dulkóðaða Drifinu þínu',
   'pdf.vault.notFound.description':
     'Það gæti hafa verið fært eða eytt. Leitaðu að því í Sytue Drive.',
   'pdf.vault.openSigned': 'Opna undirritaða afritið',
+  'pdf.vault.engineUnavailable':
+    'Ekki tókst að hlaða PDF-vélinni í þessu tæki, svo PDF-skráin birtist í skoðara vafrans: þú getur skoðað, sótt og undirritað hana, en ekki breytt henni.',
+  'pdf.vault.unavailable': 'Ekki enn í boði með dulkóðaða Drifinu þínu.',
   'pdf.device.requests':
     'Að biðja annað fólk eða aðrar stofnanir um undirritun krefst Drive þjónsins: þjónustan þarf að lesa PDF-skjalið til að senda það og athuga undirritunina sem kemur til baka. Með dulkóðað Drive undirritar þú hér og sendir undirritaða PDF-skjalið sjálf(ur).',
   'pdf.device.error.signin': 'Skráðu þig aftur inn í Sytue ID til að opna dulkóðaða Drive-ið þitt.',

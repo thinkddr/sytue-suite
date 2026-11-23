@@ -2854,13 +2854,16 @@ export const de: AppCatalog<typeof en> = {
     'Die Signatur passt nicht auf diese Seite. Wähle eine andere Seite oder Position.',
   'pdf.device.view': 'Ansehen',
   'pdf.vault.help':
-    'Dieses PDF liegt in deinem verschlüsselten Drive: Es wird nur auf diesem Gerät entschlüsselt, um es anzusehen und zu signieren.',
+    'Dieses PDF liegt in deinem verschlüsselten Drive: Es wird nur auf diesem Gerät entschlüsselt, wo du es ansehen, kommentieren, ausfüllen, organisieren und signieren kannst. Was du speicherst, geht verschlüsselt zurück.',
   'pdf.vault.serverOnly':
-    'Kommentieren, Ausfüllen, Organisieren, Bearbeiten, Texterkennung und Signaturanfragen erfordern, dass der Dienst das PDF liest, und sind daher mit deinem verschlüsselten Drive nicht verfügbar.',
+    'Mit deinem verschlüsselten Drive sind Signaturanfragen, Kennwortschutz, Texterkennung, Schwärzen, Bearbeiten von Text oder Bildern, Stempel und Wasserzeichen, Vergleichen, Versionsverlauf und Drucken noch nicht verfügbar: Sie erfordern, dass der Dienst das PDF liest, oder sind noch nicht auf dem Gerät möglich.',
   'pdf.vault.notFound.title': 'Dieses PDF ist nicht in deinem verschlüsselten Drive',
   'pdf.vault.notFound.description':
     'Es wurde vielleicht verschoben oder gelöscht. Suche es in Sytue Drive.',
   'pdf.vault.openSigned': 'Signierte Kopie öffnen',
+  'pdf.vault.engineUnavailable':
+    'Die PDF-Engine konnte auf diesem Gerät nicht geladen werden, daher wird das PDF im Viewer des Browsers angezeigt: Du kannst es ansehen, herunterladen und signieren, aber nicht bearbeiten.',
+  'pdf.vault.unavailable': 'Mit deinem verschlüsselten Drive noch nicht verfügbar.',
   'pdf.device.requests':
     'Signaturanfragen an andere Personen oder Organisationen brauchen das Drive des Servers: Der Dienst muss das PDF lesen, um es zu versenden und die zurückkommende Signatur zu prüfen. Mit verschlüsseltem Drive signieren Sie hier und versenden das signierte PDF selbst.',
   'pdf.device.error.signin':

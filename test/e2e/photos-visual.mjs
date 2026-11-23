@@ -175,6 +175,23 @@ async function mockBff(context, diagnostics) {
         return json(route, { presence: [] });
       if (path === "fixture-hub/api/v1/apps")
         return json(route, { apps: ["photos"] });
+      // La galería pregunta si el Drive de la persona está en la bóveda: esta fixture es
+      // la de quien no lo ha pasado (`legacy`), con el mismo ámbito que pide el cliente.
+      if (
+        path === "drive-cifrado/api/matrix/storage/migration" &&
+        request.method() === "GET"
+      ) {
+        const scope = JSON.parse(
+          Buffer.from(
+            (request.headers()["x-sytue-storage-scope"] ?? "").replace(
+              /^v1\./,
+              "",
+            ),
+            "base64url",
+          ).toString("utf8"),
+        );
+        return json(route, { scope, mode: "legacy", rows: 0, blobs: 0 });
+      }
       diagnostics.unexpected.push({ method: request.method(), path });
       return json(route, { error: "unmocked_fixture_api" }, 501);
     },

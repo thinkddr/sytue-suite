@@ -66,6 +66,17 @@ test('each app proxies only public versioned core artifacts without a session', 
   });
   expect(office.status).toBe(200);
   expect(seen[1]).toBe('/api/v1/client-core/core.wasm?sha256=' + digest + '&module=office');
+  // El motor de PDF del estudio de la bóveda (ADR 0086): CertiPDF lo pide como un módulo más.
+  const pdfURL = new URL(
+    'https://fixture.test/certipdf/api/client-core/core.wasm?module=pdf&sha256=' + digest,
+  );
+  const pdf = await proxy({
+    params: { asset: 'core.wasm' },
+    url: pdfURL,
+    request: new Request(pdfURL),
+  });
+  expect(pdf.status).toBe(200);
+  expect(seen[2]).toBe('/api/v1/client-core/core.wasm?sha256=' + digest + '&module=pdf');
 });
 test('a changed manifest is rejected instead of serving mixed runtime versions', async () => {
   const server = Bun.serve({

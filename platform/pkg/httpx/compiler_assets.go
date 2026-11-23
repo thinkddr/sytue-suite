@@ -33,6 +33,9 @@ func NewCompilerAssets(source fs.FS, roots map[string]string) *CompilerAssets {
 			maximum = 16 << 20
 		case "office", "mail":
 			maximum = 64 << 20
+		case "pdf":
+			// El motor de PDF del estudio de la bóveda (cmd/pdf-wasm): ~17 MiB hoy.
+			maximum = 32 << 20
 		default:
 			panic("unlisted compiler module")
 		}

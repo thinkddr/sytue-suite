@@ -248,6 +248,24 @@ describe('cabecerasCerradas', () => {
     expect(script({ wasm: true })).not.toContain("'unsafe-eval'");
   });
 
+  // El estudio de un PDF de la bóveda (ADR 0086) dibuja y edita con el motor de PDF en
+  // WebAssembly (`cmd/pdf-wasm`, módulo `pdf` del núcleo de cliente): la ofimática —la
+  // de CertiPDF— no puede apagar `'wasm-unsafe-eval'`, o el motor no compila y el estudio
+  // se queda en el visor del navegador.
+  it('la ofimática (CertiPDF) deja compilar el motor de PDF en WebAssembly', async () => {
+    const fuente = await Bun.file(
+      new URL('../../office/src/middleware.ts', import.meta.url),
+    ).text();
+    expect(fuente).toContain('cabecerasCerradas(hubBaseUrl()');
+    expect(fuente).not.toContain('wasm: false');
+    const csp = cabecerasCerradas(HUB, { conectar: ['wss://docs.ejemplo.test'] })[
+      'content-security-policy'
+    ];
+    expect(csp?.split('; ').find((d) => d.startsWith('script-src '))).toBe(
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+    );
+  });
+
   it('Rooms abre su CSP al servidor de Matrix y a WebAssembly', async () => {
     const fuente = await Bun.file(
       new URL('../../../apps/rooms/src/middleware.ts', import.meta.url),

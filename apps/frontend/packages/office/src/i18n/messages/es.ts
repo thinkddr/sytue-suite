@@ -2790,12 +2790,15 @@ export const es: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'La firma no cabe en esa página. Elige otra página o posición.',
   'pdf.device.view': 'Ver',
   'pdf.vault.help':
-    'Este PDF está en tu Drive cifrado: se descifra solo en este dispositivo, para verlo y firmarlo.',
+    'Este PDF está en tu Drive cifrado: se descifra solo en este dispositivo, donde puedes verlo, anotarlo, rellenarlo, organizarlo y firmarlo. Lo que guardes vuelve cifrado.',
   'pdf.vault.serverOnly':
-    'Anotar, rellenar, organizar, editar, reconocer texto y pedir firma necesitan que el servicio lea el PDF, así que no están disponibles con tu Drive cifrado.',
+    'Con tu Drive cifrado aún no están disponibles pedir firma, proteger con contraseña, reconocer texto, censurar, editar el texto o las imágenes, sellos y marcas de agua, comparar, el historial de versiones ni imprimir: necesitan que el servicio lea el PDF o todavía no se hacen en el dispositivo.',
   'pdf.vault.notFound.title': 'Este PDF no está en tu Drive cifrado',
   'pdf.vault.notFound.description': 'Puede que se haya movido o borrado. Búscalo en Sytue Drive.',
   'pdf.vault.openSigned': 'Abrir el firmado',
+  'pdf.vault.engineUnavailable':
+    'No se pudo cargar el motor de PDF en este dispositivo, así que el PDF se enseña con el visor del navegador: puedes verlo, descargarlo y firmarlo, pero no editarlo.',
+  'pdf.vault.unavailable': 'Aún no está disponible con tu Drive cifrado.',
   'pdf.device.requests':
     'Pedir firma a otras personas u organizaciones necesita el Drive del servidor: el servicio tiene que leer el PDF para enviarlo y comprobar la firma que vuelve. Con tu Drive cifrado, firma aquí y envía tú el PDF firmado.',
   'pdf.device.error.signin': 'Vuelve a entrar en Sytue ID para desbloquear tu Drive cifrado.',

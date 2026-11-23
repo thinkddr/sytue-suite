@@ -2742,13 +2742,16 @@ export const sk: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Podpis sa na túto stranu nezmestí. Vyberte inú stranu alebo polohu.',
   'pdf.device.view': 'Zobraziť',
   'pdf.vault.help':
-    'Toto PDF je vo vašom šifrovanom Disku: dešifruje sa iba v tomto zariadení, aby ste ho mohli zobraziť a podpísať.',
+    'Toto PDF je vo vašom šifrovanom Drive: dešifruje sa len v tomto zariadení, kde ho môžete zobraziť, anotovať, vyplniť, usporiadať a podpísať. Čo uložíte, sa vráti zašifrované.',
   'pdf.vault.serverOnly':
-    'Anotácie, vypĺňanie, usporiadanie, úpravy, rozpoznávanie textu a žiadosti o podpis vyžadujú, aby služba PDF prečítala, preto nie sú so šifrovaným Diskom dostupné.',
+    'So šifrovaným Drive zatiaľ nie sú k dispozícii žiadosti o podpis, ochrana heslom, rozpoznávanie textu, začiernenie, úpravy textu alebo obrázkov, pečiatky a vodoznaky, porovnanie, história verzií ani tlač: vyžadujú, aby služba PDF prečítala, alebo sa zatiaľ v zariadení nerobia.',
   'pdf.vault.notFound.title': 'Toto PDF nie je vo vašom šifrovanom Disku',
   'pdf.vault.notFound.description':
     'Možno bolo presunuté alebo odstránené. Vyhľadajte ho v Sytue Drive.',
   'pdf.vault.openSigned': 'Otvoriť podpísanú kópiu',
+  'pdf.vault.engineUnavailable':
+    'Modul PDF sa v tomto zariadení nepodarilo načítať, preto sa PDF zobrazuje v prehliadači: môžete ho zobraziť, stiahnuť a podpísať, ale nie upraviť.',
+  'pdf.vault.unavailable': 'So šifrovaným Drive zatiaľ nie je k dispozícii.',
   'pdf.device.requests':
     'Žiadať o podpis iné osoby alebo organizácie si vyžaduje Disk servera: služba musí PDF prečítať, aby ho odoslala a overila podpis, ktorý sa vráti. So šifrovaným Diskom podpíšte tu a podpísané PDF odošlite sami.',
   'pdf.device.error.signin': 'Znova sa prihláste do Sytue ID, aby ste odomkli svoj šifrovaný Disk.',

@@ -2707,13 +2707,16 @@ export const lv: AppCatalog<typeof en> = {
     'Paraksts neietilpst šajā lappusē. Izvēlieties citu lappusi vai novietojumu.',
   'pdf.device.view': 'Skatīt',
   'pdf.vault.help':
-    'Šis PDF ir jūsu šifrētajā Diskā: tas tiek atšifrēts tikai šajā ierīcē, lai to skatītu un parakstītu.',
+    'Šis PDF ir jūsu šifrētajā Drive: tas tiek atšifrēts tikai šajā ierīcē, kur varat to skatīt, anotēt, aizpildīt, kārtot un parakstīt. Tas, ko saglabājat, atgriežas šifrēts.',
   'pdf.vault.serverOnly':
-    'Anotēšanai, aizpildīšanai, kārtošanai, rediģēšanai, teksta atpazīšanai un paraksta pieprasīšanai pakalpojumam jāizlasa PDF, tāpēc ar šifrēto Disku tās nav pieejamas.',
+    'Ar šifrēto Drive vēl nav pieejami parakstu pieprasījumi, aizsardzība ar paroli, teksta atpazīšana, aizklāšana, teksta vai attēlu rediģēšana, zīmogi un ūdenszīmes, salīdzināšana, versiju vēsture un drukāšana: tiem nepieciešams, lai pakalpojums nolasa PDF, vai tie vēl netiek veikti ierīcē.',
   'pdf.vault.notFound.title': 'Šis PDF nav jūsu šifrētajā Diskā',
   'pdf.vault.notFound.description':
     'Iespējams, tas ir pārvietots vai izdzēsts. Meklējiet to Sytue Drive.',
   'pdf.vault.openSigned': 'Atvērt parakstīto kopiju',
+  'pdf.vault.engineUnavailable':
+    'PDF dzinēju šajā ierīcē neizdevās ielādēt, tāpēc PDF tiek rādīts pārlūka skatītājā: varat to skatīt, lejupielādēt un parakstīt, bet ne rediģēt.',
+  'pdf.vault.unavailable': 'Ar šifrēto Drive vēl nav pieejams.',
   'pdf.device.requests':
     'Paraksta pieprasīšanai citām personām vai organizācijām vajag servera Drive: pakalpojumam ir jāizlasa PDF, lai to nosūtītu un pārbaudītu atgriezto parakstu. Ar šifrētu Drive parakstiet šeit un parakstīto PDF nosūtiet paši.',
   'pdf.device.error.signin': 'Vēlreiz pierakstieties Sytue ID, lai atbloķētu šifrēto Drive.',

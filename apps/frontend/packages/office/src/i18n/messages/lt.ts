@@ -2754,13 +2754,16 @@ export const lt: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Parašas netelpa tame puslapyje. Pasirinkite kitą puslapį ar vietą.',
   'pdf.device.view': 'Peržiūrėti',
   'pdf.vault.help':
-    'Šis PDF yra jūsų užšifruotame Diske: jis iššifruojamas tik šiame įrenginyje, kad galėtumėte jį peržiūrėti ir pasirašyti.',
+    'Šis PDF yra jūsų šifruotame Drive: jis iššifruojamas tik šiame įrenginyje, kur galite jį peržiūrėti, komentuoti, pildyti, tvarkyti ir pasirašyti. Tai, ką išsaugote, grįžta šifruota.',
   'pdf.vault.serverOnly':
-    'Komentavimui, pildymui, tvarkymui, redagavimui, teksto atpažinimui ir parašo prašymui reikia, kad paslauga perskaitytų PDF, todėl su užšifruotu Disku jie neprieinami.',
+    'Su šifruotu Drive dar negalima prašyti parašo, apsaugoti slaptažodžiu, atpažinti teksto, užtamsinti, redaguoti teksto ar paveikslėlių, dėti antspaudų ir vandenženklių, lyginti, žiūrėti versijų istorijos ir spausdinti: tam reikia, kad paslauga perskaitytų PDF, arba tai dar neatliekama įrenginyje.',
   'pdf.vault.notFound.title': 'Šio PDF nėra jūsų užšifruotame Diske',
   'pdf.vault.notFound.description':
     'Galbūt jis buvo perkeltas arba ištrintas. Ieškokite jo Sytue Drive.',
   'pdf.vault.openSigned': 'Atidaryti pasirašytą kopiją',
+  'pdf.vault.engineUnavailable':
+    'Šiame įrenginyje nepavyko įkelti PDF variklio, todėl PDF rodomas naršyklės peržiūros programoje: galite jį peržiūrėti, atsisiųsti ir pasirašyti, bet ne redaguoti.',
+  'pdf.vault.unavailable': 'Su šifruotu Drive dar negalima.',
   'pdf.device.requests':
     'Prašyti kitų žmonių ar organizacijų parašo galima tik su serverio „Drive“: paslauga turi perskaityti PDF, kad jį išsiųstų ir patikrintų grįžusį parašą. Su šifruotu „Drive“ pasirašykite čia ir pasirašytą PDF išsiųskite patys.',
   'pdf.device.error.signin':

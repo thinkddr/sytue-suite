@@ -2845,13 +2845,16 @@ export const fr: AppCatalog<typeof en> = {
     'La signature ne tient pas sur cette page. Choisissez une autre page ou position.',
   'pdf.device.view': 'Voir',
   'pdf.vault.help':
-    'Ce PDF est dans votre Drive chiffré : il n’est déchiffré que sur cet appareil, pour le consulter et le signer.',
+    'Ce PDF est dans votre Drive chiffré : il n’est déchiffré que sur cet appareil, où vous pouvez le consulter, l’annoter, le remplir, l’organiser et le signer. Ce que vous enregistrez repart chiffré.',
   'pdf.vault.serverOnly':
-    'Annoter, remplir, organiser, modifier, reconnaître le texte et demander une signature exigent que le service lise le PDF ; ces actions ne sont donc pas disponibles avec votre Drive chiffré.',
+    'Avec votre Drive chiffré, demander une signature, protéger par mot de passe, reconnaître le texte, caviarder, modifier le texte ou les images, les tampons et filigranes, comparer, l’historique des versions et l’impression ne sont pas encore disponibles : ils exigent que le service lise le PDF ou ne se font pas encore sur l’appareil.',
   'pdf.vault.notFound.title': 'Ce PDF n’est pas dans votre Drive chiffré',
   'pdf.vault.notFound.description':
     'Il a peut-être été déplacé ou supprimé. Cherchez-le dans Sytue Drive.',
   'pdf.vault.openSigned': 'Ouvrir la copie signée',
+  'pdf.vault.engineUnavailable':
+    'Le moteur PDF n’a pas pu être chargé sur cet appareil, le PDF s’affiche donc dans le lecteur du navigateur : vous pouvez le consulter, le télécharger et le signer, mais pas le modifier.',
+  'pdf.vault.unavailable': 'Pas encore disponible avec votre Drive chiffré.',
   'pdf.device.requests':
     'Demander une signature à d’autres personnes ou organisations nécessite le Drive du serveur : le service doit lire le PDF pour l’envoyer et vérifier la signature qui revient. Avec votre Drive chiffré, signez ici et envoyez vous-même le PDF signé.',
   'pdf.device.error.signin': 'Reconnectez-vous à Sytue ID pour déverrouiller votre Drive chiffré.',

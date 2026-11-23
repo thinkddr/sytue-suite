@@ -24,4 +24,5 @@ import "embed"
 //go:embed client_core_assets/core.wasm client_core_assets/wasm_exec.js
 //go:embed client_core_assets/office/core.wasm client_core_assets/office/wasm_exec.js
 //go:embed client_core_assets/mail/core.wasm client_core_assets/mail/wasm_exec.js
+//go:embed client_core_assets/pdf/core.wasm client_core_assets/pdf/wasm_exec.js
 var clientCoreAssets embed.FS

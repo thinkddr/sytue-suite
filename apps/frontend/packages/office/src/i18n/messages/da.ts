@@ -2705,13 +2705,16 @@ export const da: AppCatalog<typeof en> = {
     'Signaturen kan ikke være på den side. Vælg en anden side eller placering.',
   'pdf.device.view': 'Vis',
   'pdf.vault.help':
-    'Denne PDF ligger i dit krypterede Drev: den dekrypteres kun på denne enhed, så du kan se og underskrive den.',
+    'Denne PDF ligger i dit krypterede Drev: den dekrypteres kun på denne enhed, hvor du kan se, kommentere, udfylde, organisere og underskrive den. Det, du gemmer, går krypteret tilbage.',
   'pdf.vault.serverOnly':
-    'Kommentering, udfyldning, organisering, redigering, tekstgenkendelse og anmodning om underskrift kræver, at tjenesten læser PDF’en, så de er ikke tilgængelige med dit krypterede Drev.',
+    'Med dit krypterede Drev er anmodning om underskrift, adgangskodebeskyttelse, tekstgenkendelse, overstregning, redigering af tekst eller billeder, stempler og vandmærker, sammenligning, versionshistorik og udskrivning endnu ikke tilgængelige: de kræver, at tjenesten læser PDF’en, eller kan endnu ikke udføres på enheden.',
   'pdf.vault.notFound.title': 'Denne PDF er ikke i dit krypterede Drev',
   'pdf.vault.notFound.description':
     'Den er måske flyttet eller slettet. Søg efter den i Sytue Drive.',
   'pdf.vault.openSigned': 'Åbn den underskrevne kopi',
+  'pdf.vault.engineUnavailable':
+    'PDF-motoren kunne ikke indlæses på denne enhed, så PDF’en vises i browserens fremviser: du kan se, downloade og underskrive den, men ikke redigere den.',
+  'pdf.vault.unavailable': 'Endnu ikke tilgængelig med dit krypterede Drev.',
   'pdf.device.requests':
     'At bede andre personer eller organisationer om en underskrift kræver serverens Drive: tjenesten skal læse PDF’en for at sende den og kontrollere den underskrift, der kommer tilbage. Med dit Drive krypteret underskriver du her og sender selv den underskrevne PDF.',
   'pdf.device.error.signin': 'Log ind på Sytue ID igen for at låse dit krypterede Drive op.',

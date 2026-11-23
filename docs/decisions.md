@@ -7574,12 +7574,74 @@ What this second delivery **does not do**, and why:
    engine, which cannot see the PDF. Some browser may download it instead of showing it (the
    WebViews that Drive already noted); “Download” is always at hand. Annotating, filling in or
    organizing a vault PDF on the web would need the PDF engine in the browser (Go/Wasm), and it is
-   still pending; native does it all locally.
+   still pending; native does it all locally. **Resolved in the third delivery**, right below.
 2. **No LTV** (`/DSS` with OCSP/CRL), like the server: the timestamp already makes the signature
    survive the certificate's expiry, which is the main thing.
 3. **The handwritten signature stored in the account is not offered** when signing on the device: it
    is drawn at the moment (or not drawn). Reading it from Sytue ID would be possible, but it is not
    mixed here with signing a PDF the server does not see.
+
+**Signing on the device, third delivery: the PDF engine in the browser (2026-11-23).** The studio of
+a vault PDF stops being “view and sign”: it is drawn with the studio's canvas and is annotated,
+filled in, organized and run through the tools **on the device**, with the SAME engine as the Docs
+service (`apps/nucleo/pdf`) compiled to WebAssembly. Neither the PDF nor anything from it reaches any
+server; what is saved goes back encrypted to the vault.
+
+- **`apps/nucleo/cmd/pdf-wasm`**, one more client-core module (`module_id: "pdf"`), with the same
+  transport as `office-wasm` and `mail-wasm` (`webport.Serve`). It exposes `pdf.abrir`,
+  `pdf.cerrar`, `pdf.render`, `pdf.anotar`, `pdf.formulario`, `pdf.paginas` and `pdf.herramienta`
+  over `pdf.DeviceSession` (`apps/nucleo/pdf/device_session.go`, with no js/wasm build tag so that
+  `go test` covers it): documents the host already decrypted, opened ONCE and referred to by an
+  opaque id (up to 21 —the open one and 20 to merge, the BFF's `MAX_COMBINAR`— and 200 MiB in
+  total), and every operation is the service's, with no parallel engine: `Summary`, `RenderView`,
+  `ApplyAnnotationOperation`, `ApplyFormOperation`, `ApplyPageOperation` and `ApplyToolOperation`.
+  Engine errors come back with their stable code (`pdf_invalidates_signatures`,
+  `pdf_password_required`…), and the confirmation to invalidate signatures is applied to a COPY
+  re-read from the bytes, because `PermitirInvalidarFirmas` cannot be undone and the open document
+  must not keep the permission. It has no network, no keys and no storage.
+- **Size, serving and CSP.** 16.9 MB uncompressed (≈5 MB gzipped), less than `office` (27 MB): a
+  32 MiB cap in `httpx.NewCompilerAssets` and in `clientCoreModuleBounds`.
+  `scripts/client-core-assets.sh` builds it into `client_core_assets/pdf/` (with its `wasm_exec.js`
+  and `GO-LICENSE`); Rooms embeds it (`client_core_embed_imagen.go`: without it the image does not
+  build) and serves it at `/api/v1/client-core/?module=pdf` with manifest and SHA-256 digest; the
+  frontend proxies it through its `/api/client-core/[asset]` like the others. The office CSP
+  already allowed `'wasm-unsafe-eval'`, and a test pins it for CertiPDF (`astro-security.test.ts`);
+  `publicar_imagen_go_test.go` requires the release to build all four modules.
+- **Lazy loading.** `dispositivo/motorPdf.ts` imports `PqcRuntime` with a dynamic `import()` and
+  creates it with the `pdf` module only when the vault studio OPENS a PDF: neither the landing page,
+  nor the server studio, nor the vault studio before “Open” download the wasm. It runs in the usual
+  worker (`pqc/worker.ts`: manifest, digest and cap checked before instantiating) and dies with the
+  studio. If it cannot load (a browser without WebAssembly, a deployment without the module), the
+  studio falls back to the second delivery's browser viewer with its notice
+  (`pdf.vault.engineUnavailable`): viewing, downloading and signing keep working.
+- **The studio** (`EstudioBoveda.tsx`) reuses the usual studio's pieces instead of copying them: the
+  page with its annotation layer (`Hoja`), the ribbon (`Barra.tsx`, with `noDisponible` to show what
+  is not available here disabled and with its reason), the “Organize” and “Tools” dialogs
+  (`Dialogos` in `Paneles.tsx`, with `local`) and the form controls (`CampoEditable`). “Apply” is the
+  BFF's, done on the device (`dispositivo/aplicarLocal.ts`): the SAME table as
+  `pages/api/pdf-aplicar.ts`, and merging opens the other PDFs by their vault path, decrypted here.
+  Saving goes through `dispositivo/editarEnBoveda.ts`: a **new version** of the same file where the
+  server writes over the file —annotate, fill in—, and a **new file** “name (suffix).pdf” where the
+  server leaves a copy —organize, compress, crop, archive—, with a link to open it. A name is never
+  overwritten. A signed PDF asks for confirmation before invalidating its signatures.
+- **What stays disabled, with its reason** (`pdf.vault.unavailable`, `pdf.vault.serverOnly`):
+  requesting a signature and recognizing text need the server; password protection, redaction,
+  editing text and images, stamps and watermarks, creating fields, XFDF import, the outline,
+  compare, version history, print and read aloud **have not been brought** to the device yet, even
+  though most are I/O-free engine operations: they are left for another delivery rather than shown
+  half-done.
+- **Messages** in the 26 languages and the Fyne catalog regenerated; native CertiPDF translates the
+  new `pdf_local_unavailable` code like the web (`TestLosErroresSonLosDeLaWeb`).
+- **Tests.** Go: `device_session_test.go` (render and reorder, rotate, merge, annotate, fill in and
+  compress with the real engine and re-read it; rejections with their code; the
+  invalidate-signatures confirmation does not stick) and the `pdf` module in the compiler-assets,
+  Rooms image and release tests; `GOOS=js GOARCH=wasm` builds and passes `vet`. Frontend:
+  `motorLocal.test.ts` (the message contract, the apply table, the dynamic `import()`) and
+  `EstudioBoveda.test.tsx` with the real repository: **no request body carries the PDF** (nor
+  `%PDF`, nor its first bytes, nor what was typed in the form) and neither `/api/pdf` nor
+  `/api/pdf-aplicar` is called; only ciphertext in the store; and without the engine, the browser
+  viewer. The UI tests use a fake engine: the real one is tested in Go, and its JS glue was run
+  against the compiled `.wasm`.
 
 <a id="0087"></a>
 

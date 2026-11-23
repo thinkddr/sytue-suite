@@ -2708,13 +2708,16 @@ export const hu: AppCatalog<typeof en> = {
     'Az aláírás nem fér el azon az oldalon. Válasszon másik oldalt vagy helyet.',
   'pdf.device.view': 'Megtekintés',
   'pdf.vault.help':
-    'Ez a PDF a titkosított Drive-jában van: csak ezen az eszközön fejtjük vissza, hogy megtekinthesse és aláírhassa.',
+    'Ez a PDF a titkosított Drive-odban van: csak ezen az eszközön fejtjük vissza, ahol megtekintheted, jegyzetelheted, kitöltheted, rendezheted és aláírhatod. Amit mentesz, titkosítva kerül vissza.',
   'pdf.vault.serverOnly':
-    'A jegyzetelés, kitöltés, rendezés, szerkesztés, szövegfelismerés és aláíráskérés megköveteli, hogy a szolgáltatás elolvassa a PDF-et, ezért a titkosított Drive-val nem érhetők el.',
+    'A titkosított Drive-val még nem érhető el az aláíráskérés, a jelszavas védelem, a szövegfelismerés, a kitakarás, a szöveg vagy képek szerkesztése, a bélyegzők és vízjelek, az összehasonlítás, a verzióelőzmények és a nyomtatás: ezekhez a szolgáltatásnak el kell olvasnia a PDF-et, vagy még nem végezhetők el az eszközön.',
   'pdf.vault.notFound.title': 'Ez a PDF nincs a titkosított Drive-jában',
   'pdf.vault.notFound.description':
     'Lehet, hogy áthelyezték vagy törölték. Keresse meg a Sytue Drive-ban.',
   'pdf.vault.openSigned': 'Az aláírt példány megnyitása',
+  'pdf.vault.engineUnavailable':
+    'A PDF-motort nem sikerült betölteni ezen az eszközön, ezért a PDF a böngésző megjelenítőjében látható: megtekintheted, letöltheted és aláírhatod, de nem szerkesztheted.',
+  'pdf.vault.unavailable': 'A titkosított Drive-val még nem érhető el.',
   'pdf.device.requests':
     'Más személyektől vagy szervezetektől aláírást kérni csak a szerver Drive-jával lehet: a szolgáltatásnak el kell olvasnia a PDF-et, hogy elküldje, és ellenőrizze a visszaérkező aláírást. Titkosított Drive-val írja alá itt, és az aláírt PDF-et küldje el saját maga.',
   'pdf.device.error.signin': 'Jelentkezzen be újra a Sytue ID-ba a titkosított Drive feloldásához.',

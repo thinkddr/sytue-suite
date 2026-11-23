@@ -126,6 +126,12 @@ func leerDiapos(valor json.RawMessage) (*presentacion, bool) {
 }
 
 // huellaJSON es el sha256 del JSON canónico (claves ordenadas, números como se escribieron).
+//
+// Es una huella de CONTENIDO para detectar cambios en lo bloqueado (diapositivas, cajas,
+// patrón y el objeto `protect`), no un almacén de contraseñas: huellaProtect quita
+// `password` y `hasPassword` antes de llegar aquí, y la contraseña se deriva aparte con
+// HashClave (sal aleatoria y 100 000 vueltas de SHA-512, el esquema de OOXML). Lo vigila
+// TestHuellaProtectNoDependeDeLaContrasena.
 func huellaJSON(raw json.RawMessage) string {
 	var v any
 	d := json.NewDecoder(bytes.NewReader(raw))

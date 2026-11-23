@@ -76,7 +76,17 @@ test('invalid review manifests fail before API requests', () => {
     { ...manifest, reviews: [{ ...manifest.reviews[0], path: 'services/other.go' }] },
     { ...manifest, reviews: [{ ...manifest.reviews[0], comment: 'a'.repeat(281) }] },
     { ...manifest, files: [{ path: '.github/secrets.env', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'apps/frontend/apps/mail/.env', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'apps/nucleo/pdf/notas.txt', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'apps/fyne/main.go', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'apps/nucleo/../../secret.go', blob: 'b'.repeat(40) }] },
   ]) assert.throws(() => validateReview(invalid));
+});
+
+test('review evidence may pin the shared core and frontend sources', () => {
+  for (const source of ['apps/nucleo/pdf/pdffont.go', 'apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx']) {
+    validateReview({ ...manifest, files: [{ path: source, blob: 'b'.repeat(40) }], reviews: [{ ...manifest.reviews[0], path: source }] });
+  }
 });
 
 test('review evidence may pin a tracked automation source file', () => {

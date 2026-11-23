@@ -2754,12 +2754,15 @@ export const ro: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Semnătura nu încape pe acea pagină. Alegeți altă pagină sau poziție.',
   'pdf.device.view': 'Vizualizați',
   'pdf.vault.help':
-    'Acest PDF se află în Drive-ul dvs. criptat: este decriptat doar pe acest dispozitiv, pentru a-l vizualiza și semna.',
+    'Acest PDF este în Drive-ul tău criptat: este decriptat doar pe acest dispozitiv, unde îl poți vedea, adnota, completa, organiza și semna. Ce salvezi se întoarce criptat.',
   'pdf.vault.serverOnly':
-    'Adnotarea, completarea, organizarea, editarea, recunoașterea textului și solicitarea semnăturii necesită ca serviciul să citească PDF-ul, așa că nu sunt disponibile cu Drive-ul criptat.',
+    'Cu Drive-ul criptat nu sunt încă disponibile cererile de semnătură, protecția cu parolă, recunoașterea textului, înnegrirea, editarea textului sau a imaginilor, ștampilele și filigranele, compararea, istoricul versiunilor și imprimarea: necesită ca serviciul să citească PDF-ul sau nu se fac încă pe dispozitiv.',
   'pdf.vault.notFound.title': 'Acest PDF nu se află în Drive-ul dvs. criptat',
   'pdf.vault.notFound.description': 'Poate a fost mutat sau șters. Căutați-l în Sytue Drive.',
   'pdf.vault.openSigned': 'Deschideți copia semnată',
+  'pdf.vault.engineUnavailable':
+    'Motorul PDF nu a putut fi încărcat pe acest dispozitiv, așa că PDF-ul este afișat în vizualizatorul browserului: îl poți vedea, descărca și semna, dar nu și edita.',
+  'pdf.vault.unavailable': 'Încă nu este disponibil cu Drive-ul tău criptat.',
   'pdf.device.requests':
     'Solicitarea semnăturii altor persoane sau organizații are nevoie de Drive-ul serverului: serviciul trebuie să citească PDF-ul ca să-l trimită și să verifice semnătura care se întoarce. Cu Drive-ul criptat, semnează aici și trimite chiar tu PDF-ul semnat.',
   'pdf.device.error.signin':

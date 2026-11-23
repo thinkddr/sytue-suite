@@ -78,11 +78,28 @@ interface Props {
   progreso?: string | undefined;
   /** Dónde se baja el documento tal como está en Drive (`/api/pdf-descargar`). */
   urlDescarga: string;
+  /** El nombre del fichero al bajarlo, cuando la URL no lo dice (un `blob:` local). */
+  nombreDescarga?: string | undefined;
   onImprimir: () => void;
   panelAbierto: boolean;
   onPanelAbierto: (abierto: boolean) => void;
   /** Carpeta de Drive desde la que se abrió el PDF, si vino de allí. */
   volverA?: string | undefined;
+  /**
+   * Lo que este estudio no puede hacer: el de un PDF de la bóveda (ADR 0086), donde el
+   * motor corre en el dispositivo y lo que solo hace el servidor no está. Se enseña
+   * apagado y con su motivo, como lo que el documento prohíbe.
+   */
+  noDisponible?: NoDisponible | undefined;
+}
+
+export interface NoDisponible {
+  dialogos: readonly Dialogo[];
+  herramientas: readonly Herramienta[];
+  /** Leer en voz alta e imprimir. */
+  leer: boolean;
+  imprimir: boolean;
+  motivo: string;
 }
 
 /**
@@ -166,6 +183,14 @@ export function BarraHerramientas(p: Props) {
   // desliza parece terminar en el borde de la pantalla.
   const { ref, queda } = useScrollRestante<HTMLDivElement>();
   const puedeAnotar = p.permisos.Anotar || !p.permisos.SoloConClaveDeDueno;
+  const sinDialogo = (d: Dialogo) => p.noDisponible?.dialogos.includes(d) ?? false;
+  const sinHerramienta = (h: Herramienta) => p.noDisponible?.herramientas.includes(h) ?? false;
+  /** El botón de un diálogo: apagado mientras se trabaja o, con su motivo, si aquí no está. */
+  const dialogo = (d: Exclude<Dialogo, null>) => ({
+    onClick: () => p.onDialogo(d),
+    disabled: p.trabajando || sinDialogo(d),
+    motivo: sinDialogo(d) ? p.noDisponible?.motivo : undefined,
+  });
 
   const herramientas = EN_PESTANA[pestana]
     .map((id) => HERRAMIENTAS.find((h) => h.id === id))
@@ -275,17 +300,11 @@ export function BarraHerramientas(p: Props) {
           {pestana === 'firmar' && (
             <>
               <RibbonGroup label={t('pdf.panel.signatures')}>
-                <BotonTexto onClick={() => p.onDialogo('firmar')} disabled={p.trabajando}>
-                  {t('pdf.menu.sign')}
-                </BotonTexto>
-                <BotonTexto onClick={() => p.onDialogo('pedirFirma')} disabled={p.trabajando}>
-                  {t('pdf.menu.requestSignature')}
-                </BotonTexto>
+                <BotonTexto {...dialogo('firmar')}>{t('pdf.menu.sign')}</BotonTexto>
+                <BotonTexto {...dialogo('pedirFirma')}>{t('pdf.menu.requestSignature')}</BotonTexto>
               </RibbonGroup>
               <RibbonGroup label={t('pdf.ribbon.group.security')}>
-                <BotonTexto onClick={() => p.onDialogo('proteger')} disabled={p.trabajando}>
-                  {t('pdf.menu.protect')}
-                </BotonTexto>
+                <BotonTexto {...dialogo('proteger')}>{t('pdf.menu.protect')}</BotonTexto>
               </RibbonGroup>
             </>
           )}
@@ -298,8 +317,12 @@ export function BarraHerramientas(p: Props) {
                   activo={p.herramienta === h.id}
                   titulo={t(h.clave)}
                   icono={h.icono}
-                  deshabilitado={h.id !== 'mano' && !puedeAnotar}
-                  motivo={t('pdf.blocked.annotate')}
+                  deshabilitado={(h.id !== 'mano' && !puedeAnotar) || sinHerramienta(h.id)}
+                  motivo={
+                    sinHerramienta(h.id)
+                      ? (p.noDisponible?.motivo ?? '')
+                      : t('pdf.blocked.annotate')
+                  }
                   onClick={() => p.onHerramienta(h.id)}
                 />
               ))}
@@ -343,23 +366,13 @@ export function BarraHerramientas(p: Props) {
 
           {pestana === 'organizar' && (
             <RibbonGroup label={t('pdf.ribbon.group.document')}>
-              <BotonTexto onClick={() => p.onDialogo('organizar')} disabled={p.trabajando}>
-                {t('pdf.menu.organize')}
-              </BotonTexto>
-              <BotonTexto onClick={() => p.onDialogo('herramientas')} disabled={p.trabajando}>
-                {t('pdf.menu.tools')}
-              </BotonTexto>
-              <BotonTexto onClick={() => p.onDialogo('capas')} disabled={p.trabajando}>
-                {t('pdf.menu.stamp')}
-              </BotonTexto>
-              <BotonTexto onClick={() => p.onDialogo('comparar')} disabled={p.trabajando}>
-                {t('pdf.menu.compare')}
-              </BotonTexto>
+              <BotonTexto {...dialogo('organizar')}>{t('pdf.menu.organize')}</BotonTexto>
+              <BotonTexto {...dialogo('herramientas')}>{t('pdf.menu.tools')}</BotonTexto>
+              <BotonTexto {...dialogo('capas')}>{t('pdf.menu.stamp')}</BotonTexto>
+              <BotonTexto {...dialogo('comparar')}>{t('pdf.menu.compare')}</BotonTexto>
               {/* Volver a como estaba antes de un cambio: el visor no tiene «Deshacer»,
                   pero Drive guarda cada escritura como una versión. */}
-              <BotonTexto onClick={() => p.onDialogo('versiones')} disabled={p.trabajando}>
-                {t('pdf.menu.versions')}
-              </BotonTexto>
+              <BotonTexto {...dialogo('versiones')}>{t('pdf.menu.versions')}</BotonTexto>
               {/* Lo que saca el documento de la app, detrás de lo que lo cambia y en el
                   mismo orden que la app nativa. Antes solo se bajaba desde dentro de
                   Firmar → aplicación oficial, que no es donde nadie lo busca, y no se
@@ -367,15 +380,23 @@ export function BarraHerramientas(p: Props) {
                   `<a>` porque es una descarga: el navegador la trata como tal. */}
               <a
                 href={p.urlDescarga}
-                download
+                download={p.nombreDescarga ?? true}
                 class={cx(CLASE_BOTON_TEXTO, 'inline-flex items-center')}
               >
                 {t('pdf.menu.download')}
               </a>
               <BotonTexto
                 onClick={p.onImprimir}
-                disabled={p.trabajando || !puedeImprimir(p.permisos)}
-                motivo={puedeImprimir(p.permisos) ? undefined : t('pdf.blocked.print')}
+                disabled={
+                  p.trabajando || !puedeImprimir(p.permisos) || p.noDisponible?.imprimir === true
+                }
+                motivo={
+                  p.noDisponible?.imprimir
+                    ? p.noDisponible.motivo
+                    : puedeImprimir(p.permisos)
+                      ? undefined
+                      : t('pdf.blocked.print')
+                }
               >
                 {t('pdf.menu.print')}
               </BotonTexto>
@@ -449,6 +470,7 @@ export function BarraHerramientas(p: Props) {
                   activo={p.leyendo}
                   onClick={p.onLeer}
                   icono="voz"
+                  deshabilitado={p.noDisponible?.leer === true}
                 />
               </RibbonGroup>
             </>

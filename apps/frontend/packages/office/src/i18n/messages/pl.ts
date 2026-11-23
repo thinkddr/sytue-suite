@@ -2764,13 +2764,16 @@ export const pl: AppCatalog<typeof en> = {
     'Podpis nie mieści się na tej stronie. Wybierz inną stronę lub położenie.',
   'pdf.device.view': 'Wyświetl',
   'pdf.vault.help':
-    'Ten plik PDF jest na Twoim zaszyfrowanym Dysku: jest odszyfrowywany tylko na tym urządzeniu, aby go wyświetlić i podpisać.',
+    'Ten PDF jest w Twoim zaszyfrowanym Drive: jest odszyfrowywany tylko na tym urządzeniu, gdzie możesz go przeglądać, komentować, wypełniać, porządkować i podpisywać. To, co zapiszesz, wraca zaszyfrowane.',
   'pdf.vault.serverOnly':
-    'Adnotacje, wypełnianie, porządkowanie, edycja, rozpoznawanie tekstu i prośby o podpis wymagają, aby usługa odczytała plik PDF, dlatego nie są dostępne z zaszyfrowanym Dyskiem.',
+    'Z zaszyfrowanym Drive nie są jeszcze dostępne prośby o podpis, ochrona hasłem, rozpoznawanie tekstu, zaczernianie, edycja tekstu lub obrazów, pieczątki i znaki wodne, porównywanie, historia wersji ani drukowanie: wymagają, by usługa odczytała PDF, albo jeszcze nie działają na urządzeniu.',
   'pdf.vault.notFound.title': 'Tego pliku PDF nie ma na Twoim zaszyfrowanym Dysku',
   'pdf.vault.notFound.description':
     'Mógł zostać przeniesiony lub usunięty. Poszukaj go w Sytue Drive.',
   'pdf.vault.openSigned': 'Otwórz podpisaną kopię',
+  'pdf.vault.engineUnavailable':
+    'Nie udało się załadować silnika PDF na tym urządzeniu, więc PDF jest wyświetlany w przeglądarce: możesz go przeglądać, pobrać i podpisać, ale nie edytować.',
+  'pdf.vault.unavailable': 'Jeszcze niedostępne z zaszyfrowanym Drive.',
   'pdf.device.requests':
     'Prośba o podpis do innych osób lub organizacji wymaga Drive serwera: usługa musi odczytać PDF, aby go wysłać i sprawdzić podpis, który wraca. Przy zaszyfrowanym Drive podpisz tutaj i sam wyślij podpisany PDF.',
   'pdf.device.error.signin': 'Zaloguj się ponownie do Sytue ID, aby odblokować zaszyfrowany Drive.',

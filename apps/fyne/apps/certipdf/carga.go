@@ -366,6 +366,8 @@ var erroresPDF = map[string]string{
 	"pdf_certify_signed":       "pdf.error.certifySigned",
 	"pdf_signature_too_large":  "pdf.error.signatureTooLarge",
 	"pdf_archive_not_possible": "pdf.error.archive",
+	// Con el PDF en la bóveda, lo que el motor del dispositivo aún no hace.
+	"pdf_local_unavailable": "pdf.vault.unavailable",
 }
 
 // mensajeDeError es `mensajeDeError`: lo que no llega a ser una respuesta es la RED, no

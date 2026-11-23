@@ -2708,12 +2708,15 @@ export const fi: AppCatalog<typeof en> = {
     'Allekirjoitus ei mahdu tälle sivulle. Valitse toinen sivu tai sijainti.',
   'pdf.device.view': 'Näytä',
   'pdf.vault.help':
-    'Tämä PDF on salatussa Drivessasi: se puretaan vain tällä laitteella, jotta voit katsoa ja allekirjoittaa sen.',
+    'Tämä PDF on salatussa Drivessasi: se puretaan vain tällä laitteella, jossa voit katsoa, merkitä, täyttää, järjestää ja allekirjoittaa sen. Tallentamasi palaa salattuna.',
   'pdf.vault.serverOnly':
-    'Merkinnät, täyttäminen, järjestäminen, muokkaaminen, tekstintunnistus ja allekirjoituspyynnöt edellyttävät, että palvelu lukee PDF-tiedoston, joten ne eivät ole käytettävissä salatun Driven kanssa.',
+    'Salatun Driven kanssa allekirjoituspyynnöt, salasanasuojaus, tekstintunnistus, peittäminen, tekstin tai kuvien muokkaus, leimat ja vesileimat, vertailu, versiohistoria ja tulostus eivät ole vielä käytettävissä: ne vaativat, että palvelu lukee PDF:n, tai niitä ei vielä tehdä laitteella.',
   'pdf.vault.notFound.title': 'Tämä PDF ei ole salatussa Drivessasi',
   'pdf.vault.notFound.description': 'Se on ehkä siirretty tai poistettu. Etsi se Sytue Drivesta.',
   'pdf.vault.openSigned': 'Avaa allekirjoitettu kopio',
+  'pdf.vault.engineUnavailable':
+    'PDF-moottoria ei voitu ladata tälle laitteelle, joten PDF näytetään selaimen katseluohjelmassa: voit katsoa, ladata ja allekirjoittaa sen, mutta et muokata sitä.',
+  'pdf.vault.unavailable': 'Ei vielä käytettävissä salatun Driven kanssa.',
   'pdf.device.requests':
     'Allekirjoituksen pyytäminen muilta ihmisiltä tai organisaatioilta vaatii palvelimen Driven: palvelun on luettava PDF lähettääkseen sen ja tarkistaakseen palaavan allekirjoituksen. Kun Drivesi on salattu, allekirjoita täällä ja lähetä allekirjoitettu PDF itse.',
   'pdf.device.error.signin': 'Kirjaudu uudelleen Sytue ID:hen avataksesi salatun Drivesi.',

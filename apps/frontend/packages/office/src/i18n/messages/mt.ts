@@ -2776,12 +2776,15 @@ export const mt: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Il-firma ma tidħolx f’dik il-paġna. Agħżel paġna jew pożizzjoni oħra.',
   'pdf.device.view': 'Ara',
   'pdf.vault.help':
-    'Dan il-PDF jinsab fid-Drive kriptat tiegħek: jiġi dekriptat biss fuq dan it-tagħmir, biex tarah u tiffirmah.',
+    'Dan il-PDF jinsab fid-Drive kriptat tiegħek: jiġi dekriptat biss fuq dan it-tagħmir, fejn tista’ tarah, tannotah, timlieh, torganizzah u tiffirmah. Dak li tissejvja jmur lura kriptat.',
   'pdf.vault.serverOnly':
-    'L-annotazzjoni, il-mili, l-organizzazzjoni, l-editjar, ir-rikonoxximent tat-test u t-talba għal firma jeħtieġu li s-servizz jaqra l-PDF, għalhekk mhumiex disponibbli bid-Drive kriptat tiegħek.',
+    'Bid-Drive kriptat tiegħek għadhom mhumiex disponibbli talbiet għal firma, protezzjoni b’password, għarfien tat-test, ħassir, editjar ta’ test jew stampi, timbri u marki tal-ilma, tqabbil, l-istorja tal-verżjonijiet u l-istampar: jeħtieġu li s-servizz jaqra l-PDF jew għadhom ma jsirux fuq it-tagħmir.',
   'pdf.vault.notFound.title': 'Dan il-PDF mhuwiex fid-Drive kriptat tiegħek',
   'pdf.vault.notFound.description': 'Forsi ġie mċaqlaq jew imħassar. Fittxu f’Sytue Drive.',
   'pdf.vault.openSigned': 'Iftaħ il-kopja ffirmata',
+  'pdf.vault.engineUnavailable':
+    'Il-magna tal-PDF ma setgħetx tittella’ fuq dan it-tagħmir, għalhekk il-PDF jidher fil-viewer tal-browser: tista’ tarah, tniżżlu u tiffirmah, iżda mhux teditjah.',
+  'pdf.vault.unavailable': 'Għadu mhux disponibbli bid-Drive kriptat tiegħek.',
   'pdf.device.requests':
     'Biex titlob firma minn persuni jew organizzazzjonijiet oħra jeħtieġ id-Drive tas-server: is-servizz irid jaqra l-PDF biex jibagħtu u jivverifika l-firma li tirritorna. Bid-Drive kriptat, iffirma hawn u ibgħat int stess il-PDF iffirmat.',
   'pdf.device.error.signin': 'Erġa’ idħol f’Sytue ID biex tiftaħ id-Drive kriptat tiegħek.',

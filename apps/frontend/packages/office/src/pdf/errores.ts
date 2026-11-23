@@ -57,6 +57,9 @@ export const ERRORES: Record<string, DocsKey> = {
   // copia que se trae de otra organización, y CertiPDF solo abre y firma ficheros del
   // Drive del servidor. Se dice eso y no «no se pudo».
   drive_private_vault: 'pdf.error.driveVault',
+  // Con el PDF en la bóveda, el motor corre en el dispositivo (`dispositivo/aplicarLocal.ts`)
+  // y lo que aún no hace ahí se dice, en vez de intentarlo contra el servicio.
+  pdf_local_unavailable: 'pdf.vault.unavailable',
   pdf_signature_org_closed: 'pdf.error.signatureRequest.orgClosed',
   pdf_signature_blocks_full: 'pdf.error.signatureRequest.blocksFull',
   // Editar un texto cuya fuente no dice qué letras usa.

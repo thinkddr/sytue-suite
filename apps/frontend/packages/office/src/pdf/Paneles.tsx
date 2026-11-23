@@ -141,7 +141,16 @@ export type Dialogo =
   | 'versiones';
 
 /** Devuelve si el cambio se llegó a aplicar. */
-type Aplicar = (cuerpo: Record<string, unknown>, mensaje: string) => Promise<boolean>;
+export type Aplicar = (cuerpo: Record<string, unknown>, mensaje: string) => Promise<boolean>;
+
+/**
+ * El estudio de un PDF de la bóveda (ADR 0086) usa estos mismos diálogos con el motor
+ * EN EL DISPOSITIVO: lo que aquí se pediría al servicio por la ruta lo da él, y lo que
+ * solo sabe hacer el servidor (reconocer texto) no se enseña.
+ */
+export interface DialogosLocales {
+  comprobarArchivo: () => Promise<InformeArchivo>;
+}
 
 /**
  * Las imágenes de la página: sustituir una por otra, o quitarla.
@@ -1364,7 +1373,7 @@ function Campos({
   );
 }
 
-function CampoEditable({
+export function CampoEditable({
   campo,
   valor,
   onValor,
@@ -2281,6 +2290,7 @@ export function Dialogos({
   svgs,
   onRestaurada,
   locale,
+  local,
 }: {
   dialogo: Dialogo;
   onCerrar: () => void;
@@ -2296,6 +2306,8 @@ export function Dialogos({
   onRestaurada: (version: number) => void;
   /** El idioma de las fechas del historial: esta isla no cuelga del contexto de la Shell. */
   locale?: Locale | undefined;
+  /** Con el motor en el dispositivo (el estudio de la bóveda); ver `DialogosLocales`. */
+  local?: DialogosLocales | undefined;
 }) {
   // El pie del diálogo, donde las herramientas con formulario ponen «Cancelar» y
   // «Aplicar» (`BotonesDialogo`, por un portal): al final del cuerpo, en el teléfono
@@ -2377,6 +2389,7 @@ export function Dialogos({
               trabajando={trabajando}
               paginas={contenido.paginas}
               svgs={svgs}
+              local={local}
             />
           )}
         </div>
@@ -4016,6 +4029,7 @@ function Herramientas({
   trabajando,
   paginas,
   svgs,
+  local,
 }: {
   t: ReturnType<typeof docsT>;
   path: string;
@@ -4024,6 +4038,7 @@ function Herramientas({
   trabajando: boolean;
   paginas: Pagina[];
   svgs: Record<number, string>;
+  local?: DialogosLocales | undefined;
 }) {
   const [nivel, setNivel] = useState<'sin-perdida' | 'equilibrada' | 'fuerte'>('equilibrada');
   const [margenes, setMargenes] = useState('20,20,20,20');
@@ -4095,13 +4110,16 @@ function Herramientas({
         </button>
       </section>
 
-      <Reconocer
-        t={t}
-        path={path}
-        onAplicar={onAplicar}
-        onCerrar={onCerrar}
-        trabajando={trabajando}
-      />
+      {/* Reconocer texto necesita el servicio de OCR: con el PDF en la bóveda, no. */}
+      {!local && (
+        <Reconocer
+          t={t}
+          path={path}
+          onAplicar={onAplicar}
+          onCerrar={onCerrar}
+          trabajando={trabajando}
+        />
+      )}
 
       <ExportarImagenes t={t} nombre={baseDeNombre(path)} paginas={paginas} svgs={svgs} />
 
@@ -4112,8 +4130,7 @@ function Herramientas({
           type="button"
           disabled={trabajando}
           onClick={() => {
-            void api
-              .comprobarArchivo(path)
+            void (local ? local.comprobarArchivo() : api.comprobarArchivo(path))
               .then(setInforme)
               .catch(() => setInforme(null));
           }}

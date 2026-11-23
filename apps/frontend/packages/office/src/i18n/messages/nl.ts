@@ -2731,13 +2731,16 @@ export const nl: AppCatalog<typeof en> = {
     'De handtekening past niet op die pagina. Kies een andere pagina of positie.',
   'pdf.device.view': 'Bekijken',
   'pdf.vault.help':
-    'Deze pdf staat in je versleutelde Drive: hij wordt alleen op dit apparaat ontsleuteld, om hem te bekijken en te ondertekenen.',
+    'Deze pdf staat in je versleutelde Drive: hij wordt alleen op dit apparaat ontsleuteld, waar je hem kunt bekijken, annoteren, invullen, ordenen en ondertekenen. Wat je opslaat, gaat versleuteld terug.',
   'pdf.vault.serverOnly':
-    'Aantekeningen maken, invullen, ordenen, bewerken, tekst herkennen en om een handtekening vragen vereisen dat de dienst de pdf leest, dus die zijn niet beschikbaar met je versleutelde Drive.',
+    'Met je versleutelde Drive zijn handtekeningverzoeken, wachtwoordbeveiliging, tekstherkenning, zwartlakken, tekst of afbeeldingen bewerken, stempels en watermerken, vergelijken, versiegeschiedenis en afdrukken nog niet beschikbaar: daarvoor moet de dienst de pdf lezen of ze kunnen nog niet op het apparaat.',
   'pdf.vault.notFound.title': 'Deze pdf staat niet in je versleutelde Drive',
   'pdf.vault.notFound.description':
     'Hij is misschien verplaatst of verwijderd. Zoek hem in Sytue Drive.',
   'pdf.vault.openSigned': 'Ondertekende kopie openen',
+  'pdf.vault.engineUnavailable':
+    'De pdf-engine kon op dit apparaat niet worden geladen, dus de pdf wordt in de viewer van de browser getoond: je kunt hem bekijken, downloaden en ondertekenen, maar niet bewerken.',
+  'pdf.vault.unavailable': 'Nog niet beschikbaar met je versleutelde Drive.',
   'pdf.device.requests':
     'Anderen of andere organisaties om een handtekening vragen vereist de Drive van de server: de dienst moet de pdf lezen om die te versturen en de handtekening te controleren die terugkomt. Met je Drive versleuteld onderteken je hier en verstuur je de ondertekende pdf zelf.',
   'pdf.device.error.signin':

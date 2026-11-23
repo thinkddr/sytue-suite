@@ -2748,13 +2748,16 @@ export const sl: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Podpis ne gre na to stran. Izberite drugo stran ali položaj.',
   'pdf.device.view': 'Ogled',
   'pdf.vault.help':
-    'Ta PDF je v vašem šifriranem Drivu: dešifrira se samo v tej napravi, da si ga lahko ogledate in ga podpišete.',
+    'Ta PDF je v vašem šifriranem Drivu: dešifrira se samo v tej napravi, kjer ga lahko pregledate, označite, izpolnite, uredite in podpišete. Kar shranite, se vrne šifrirano.',
   'pdf.vault.serverOnly':
-    'Pripombe, izpolnjevanje, urejanje strani, urejanje vsebine, prepoznavanje besedila in prošnje za podpis zahtevajo, da storitev prebere PDF, zato s šifriranim Drivom niso na voljo.',
+    'S šifriranim Drivom še niso na voljo zahteve za podpis, zaščita z geslom, prepoznavanje besedila, zakrivanje, urejanje besedila ali slik, žigi in vodni žigi, primerjava, zgodovina različic in tiskanje: zahtevajo, da storitev prebere PDF, ali se v napravi še ne izvajajo.',
   'pdf.vault.notFound.title': 'Tega PDF-ja ni v vašem šifriranem Drivu',
   'pdf.vault.notFound.description':
     'Morda je bil premaknjen ali izbrisan. Poiščite ga v Sytue Drive.',
   'pdf.vault.openSigned': 'Odpri podpisano kopijo',
+  'pdf.vault.engineUnavailable':
+    'Mehanizma PDF v tej napravi ni bilo mogoče naložiti, zato je PDF prikazan v pregledovalniku brskalnika: lahko ga pregledate, prenesete in podpišete, ne pa urejate.',
+  'pdf.vault.unavailable': 'S šifriranim Drivom še ni na voljo.',
   'pdf.device.requests':
     'Prošnja za podpis drugim osebam ali organizacijam potrebuje Drive strežnika: storitev mora PDF prebrati, da ga pošlje in preveri podpis, ki se vrne. S šifriranim Drivom podpišite tukaj in podpisani PDF pošljite sami.',
   'pdf.device.error.signin': 'Znova se prijavite v Sytue ID, da odklenete šifrirani Drive.',

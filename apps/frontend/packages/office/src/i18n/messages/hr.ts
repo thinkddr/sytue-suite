@@ -2708,13 +2708,16 @@ export const hr: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Potpis ne stane na tu stranicu. Odaberite drugu stranicu ili položaj.',
   'pdf.device.view': 'Prikaži',
   'pdf.vault.help':
-    'Ovaj PDF je u vašem šifriranom Driveu: dešifrira se samo na ovom uređaju, kako biste ga pregledali i potpisali.',
+    'Ovaj PDF je u vašem šifriranom Driveu: dešifrira se samo na ovom uređaju, gdje ga možete pregledati, komentirati, ispuniti, organizirati i potpisati. Ono što spremite vraća se šifrirano.',
   'pdf.vault.serverOnly':
-    'Bilješke, ispunjavanje, organiziranje, uređivanje, prepoznavanje teksta i traženje potpisa zahtijevaju da usluga pročita PDF, pa nisu dostupni sa šifriranim Driveom.',
+    'S vašim šifriranim Driveom još nisu dostupni zahtjevi za potpis, zaštita lozinkom, prepoznavanje teksta, zacrnjivanje, uređivanje teksta ili slika, pečati i vodeni žigovi, usporedba, povijest verzija ni ispis: zahtijevaju da usluga pročita PDF ili se još ne rade na uređaju.',
   'pdf.vault.notFound.title': 'Ovaj PDF nije u vašem šifriranom Driveu',
   'pdf.vault.notFound.description':
     'Možda je premješten ili izbrisan. Potražite ga u Sytue Driveu.',
   'pdf.vault.openSigned': 'Otvori potpisanu kopiju',
+  'pdf.vault.engineUnavailable':
+    'PDF mehanizam nije se mogao učitati na ovom uređaju, pa se PDF prikazuje u pregledniku: možete ga pregledati, preuzeti i potpisati, ali ne i urediti.',
+  'pdf.vault.unavailable': 'Još nije dostupno s vašim šifriranim Driveom.',
   'pdf.device.requests':
     'Traženje potpisa od drugih osoba ili organizacija zahtijeva Disk poslužitelja: usluga mora pročitati PDF da bi ga poslala i provjerila potpis koji se vrati. Sa šifriranim Diskom potpišite ovdje i sami pošaljite potpisani PDF.',
   'pdf.device.error.signin':

@@ -198,7 +198,7 @@ export async function firmarEnBoveda(options: {
  * `pendiente`) o cualquier otra cosa (`fallo`).
  */
 /** Baja y descifra en memoria el PDF de la fila `fila` (con el tope de siempre). */
-async function bajarPdf(
+export async function bajarPdf(
   repositorio: Pick<RepositorioFirma, 'download'>,
   fila: Record<string, unknown>,
   signal?: AbortSignal,

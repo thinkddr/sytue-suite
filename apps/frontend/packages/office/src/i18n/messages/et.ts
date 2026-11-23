@@ -2683,13 +2683,16 @@ export const et: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Allkiri ei mahu sellele lehele. Vali teine leht või asukoht.',
   'pdf.device.view': 'Vaata',
   'pdf.vault.help':
-    'See PDF on sinu krüptitud Drive’is: see dekrüptitakse ainult selles seadmes, et saaksid seda vaadata ja allkirjastada.',
+    'See PDF on sinu krüpteeritud Drive’is: see dekrüpteeritakse ainult selles seadmes, kus saad seda vaadata, märkustega varustada, täita, korraldada ja allkirjastada. Mida salvestad, läheb tagasi krüpteerituna.',
   'pdf.vault.serverOnly':
-    'Märkuste tegemine, täitmine, korraldamine, muutmine, tekstituvastus ja allkirja küsimine nõuavad, et teenus loeks PDF-i, seega pole need krüptitud Drive’iga saadaval.',
+    'Krüpteeritud Drive’iga pole veel saadaval allkirjataotlused, paroolikaitse, tekstituvastus, varjamine, teksti või piltide muutmine, templid ja vesimärgid, võrdlemine, versiooniajalugu ega printimine: need vajavad, et teenus loeks PDF-i, või neid ei tehta veel seadmes.',
   'pdf.vault.notFound.title': 'Seda PDF-i pole sinu krüptitud Drive’is',
   'pdf.vault.notFound.description':
     'See võib olla teisaldatud või kustutatud. Otsi seda Sytue Drive’ist.',
   'pdf.vault.openSigned': 'Ava allkirjastatud koopia',
+  'pdf.vault.engineUnavailable':
+    'PDF-mootorit ei õnnestunud selles seadmes laadida, seega kuvatakse PDF brauseri vaaturis: saad seda vaadata, alla laadida ja allkirjastada, kuid mitte muuta.',
+  'pdf.vault.unavailable': 'Krüpteeritud Drive’iga pole veel saadaval.',
   'pdf.device.requests':
     'Teistelt inimestelt või organisatsioonidelt allkirja küsimiseks on vaja serveri Drive’i: teenus peab PDF-i lugema, et see saata ja tagasi tuleva allkirja kontrollida. Krüptitud Drive’iga allkirjastage siin ja saatke allkirjastatud PDF ise.',
   'pdf.device.error.signin': 'Logige uuesti Sytue ID-sse, et krüptitud Drive avada.',

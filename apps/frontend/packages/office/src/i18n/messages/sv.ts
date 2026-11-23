@@ -2704,13 +2704,16 @@ export const sv: AppCatalog<typeof en> = {
     'Signaturen får inte plats på den sidan. Välj en annan sida eller placering.',
   'pdf.device.view': 'Visa',
   'pdf.vault.help':
-    'Den här PDF-filen finns i din krypterade Drive: den dekrypteras bara på den här enheten, så att du kan visa och signera den.',
+    'Den här PDF-filen finns i din krypterade Drive: den dekrypteras bara på den här enheten, där du kan visa, kommentera, fylla i, ordna och signera den. Det du sparar går tillbaka krypterat.',
   'pdf.vault.serverOnly':
-    'Att kommentera, fylla i, ordna, redigera, känna igen text och begära underskrift kräver att tjänsten läser PDF-filen, så de är inte tillgängliga med din krypterade Drive.',
+    'Med din krypterade Drive är signaturförfrågningar, lösenordsskydd, textigenkänning, maskering, redigering av text eller bilder, stämplar och vattenmärken, jämförelse, versionshistorik och utskrift inte tillgängliga än: de kräver att tjänsten läser PDF-filen eller görs ännu inte på enheten.',
   'pdf.vault.notFound.title': 'Den här PDF-filen finns inte i din krypterade Drive',
   'pdf.vault.notFound.description':
     'Den kan ha flyttats eller raderats. Leta efter den i Sytue Drive.',
   'pdf.vault.openSigned': 'Öppna den signerade kopian',
+  'pdf.vault.engineUnavailable':
+    'PDF-motorn kunde inte läsas in på den här enheten, så PDF-filen visas i webbläsarens visare: du kan visa, ladda ned och signera den, men inte redigera den.',
+  'pdf.vault.unavailable': 'Inte tillgängligt än med din krypterade Drive.',
   'pdf.device.requests':
     'Att be andra personer eller organisationer att signera kräver serverns Drive: tjänsten måste läsa pdf-filen för att skicka den och kontrollera signaturen som kommer tillbaka. Med krypterad Drive signerar du här och skickar den signerade pdf-filen själv.',
   'pdf.device.error.signin': 'Logga in på Sytue ID igen för att låsa upp din krypterade Drive.',

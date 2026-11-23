@@ -2764,13 +2764,16 @@ export const ga: AppCatalog<typeof en> = {
     'Ní luíonn an síniú ar an leathanach sin. Roghnaigh leathanach nó suíomh eile.',
   'pdf.device.view': 'Féach',
   'pdf.vault.help':
-    'Tá an PDF seo i do Drive criptithe: díchriptítear é ar an ngléas seo amháin, chun é a fheiceáil agus a shíniú.',
+    'Tá an PDF seo i do Drive criptithe: ní dhíchriptítear é ach ar an ngléas seo, áit ar féidir leat é a fheiceáil, nótaí a chur leis, é a líonadh, a eagrú agus a shíniú. Téann a shábhálann tú ar ais criptithe.',
   'pdf.vault.serverOnly':
-    'Teastaíonn ón tseirbhís an PDF a léamh chun nótaí a chur leis, é a líonadh, a eagrú, a chur in eagar, téacs a aithint agus síniú a iarraidh, mar sin níl siad ar fáil le do Drive criptithe.',
+    'Le do Drive criptithe níl na nithe seo ar fáil fós: síniú a iarraidh, cosaint le pasfhocal, aithint téacs, dubhú, téacs nó íomhánna a chur in eagar, stampaí agus comharthaí uisce, comparáid, stair na leaganacha ná priontáil: teastaíonn ón tseirbhís an PDF a léamh nó ní dhéantar fós ar an ngléas iad.',
   'pdf.vault.notFound.title': 'Níl an PDF seo i do Drive criptithe',
   'pdf.vault.notFound.description':
     'B’fhéidir gur bogadh nó gur scriosadh é. Cuardaigh é in Sytue Drive.',
   'pdf.vault.openSigned': 'Oscail an chóip shínithe',
+  'pdf.vault.engineUnavailable':
+    'Níorbh fhéidir inneall an PDF a luchtú ar an ngléas seo, mar sin taispeántar an PDF in amharcán an bhrabhsálaí: is féidir leat é a fheiceáil, a íoslódáil agus a shíniú, ach ní é a chur in eagar.',
+  'pdf.vault.unavailable': 'Níl sé ar fáil fós le do Drive criptithe.',
   'pdf.device.requests':
     'Teastaíonn Drive an fhreastalaí chun síniú a iarraidh ar dhaoine nó ar eagraíochtaí eile: caithfidh an tseirbhís an PDF a léamh chun é a sheoladh agus an síniú a thagann ar ais a sheiceáil. Le do Drive criptithe, sínigh anseo agus seol féin an PDF sínithe.',
   'pdf.device.error.signin':

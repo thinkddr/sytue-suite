@@ -2705,12 +2705,15 @@ export const pt: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'A assinatura não cabe nessa página. Escolha outra página ou posição.',
   'pdf.device.view': 'Ver',
   'pdf.vault.help':
-    'Este PDF está no seu Drive cifrado: só é decifrado neste dispositivo, para o ver e assinar.',
+    'Este PDF está no teu Drive cifrado: só é decifrado neste dispositivo, onde o podes ver, anotar, preencher, organizar e assinar. O que guardares volta cifrado.',
   'pdf.vault.serverOnly':
-    'Anotar, preencher, organizar, editar, reconhecer texto e pedir assinatura exigem que o serviço leia o PDF, por isso não estão disponíveis com o seu Drive cifrado.',
+    'Com o teu Drive cifrado ainda não estão disponíveis pedir assinaturas, proteger com palavra-passe, reconhecer texto, ocultar, editar texto ou imagens, carimbos e marcas de água, comparar, o histórico de versões nem imprimir: precisam que o serviço leia o PDF ou ainda não se fazem no dispositivo.',
   'pdf.vault.notFound.title': 'Este PDF não está no seu Drive cifrado',
   'pdf.vault.notFound.description': 'Pode ter sido movido ou eliminado. Procure-o no Sytue Drive.',
   'pdf.vault.openSigned': 'Abrir a cópia assinada',
+  'pdf.vault.engineUnavailable':
+    'Não foi possível carregar o motor de PDF neste dispositivo, por isso o PDF é mostrado no visualizador do navegador: podes vê-lo, transferi-lo e assiná-lo, mas não editá-lo.',
+  'pdf.vault.unavailable': 'Ainda não disponível com o teu Drive cifrado.',
   'pdf.device.requests':
     'Pedir assinatura a outras pessoas ou organizações precisa do Drive do servidor: o serviço tem de ler o PDF para o enviar e verificar a assinatura que regressa. Com o seu Drive cifrado, assine aqui e envie você o PDF assinado.',
   'pdf.device.error.signin': 'Volte a entrar no Sytue ID para desbloquear o seu Drive cifrado.',

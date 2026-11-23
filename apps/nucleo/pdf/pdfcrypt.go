@@ -405,6 +405,10 @@ func clavePorXor(clave []byte, v byte) []byte {
 	return out
 }
 
+// rc4Aplicar existe SOLO para LEER documentos de las revisiones 2-4 (§7.6.3.2,
+// algoritmo 1): verificar la contraseña y descifrar objetos de un fichero ya
+// cifrado así. Nunca cifra nada nuevo: el escritor (pdfprotect.go) emite siempre
+// AES-256 (V5/R6, AESV3), y TestProtegerPDFSoloEscribeAES256 lo vigila.
 func rc4Aplicar(clave, datos []byte) []byte {
 	c, err := rc4.NewCipher(clave) //nolint:gosec // G401: lo fija el formato
 	if err != nil {
@@ -450,9 +454,24 @@ func claveV5(d *PDFDoc, enc pdfDict, pwd, o, u []byte) ([]byte, bool, error) {
 	return nil, false, ErrPDFClaveIncorrecta
 }
 
+// Topes de las entradas de hashV5 (ISO 32000-2 §7.6.4.3.3 y §7.6.4.4.7-11).
+const (
+	maxContrasenaV5 = 127
+	maxSalV5        = 8
+	maxDatosUV5     = 48
+)
+
 // hashV5 es SHA-256 en la revisión 5 y el algoritmo 2.B en la 6, que encadena
 // SHA-256/384/512 en un número de vueltas que depende de los propios datos.
 func hashV5(pwd, sal, datosU []byte, r int) []byte {
+	// Las entradas tienen tamaño fijo por norma: contraseña de hasta 127 bytes
+	// (§7.6.4.3.3), sal de 8 y /U de 48. Se comprueba aquí y no solo en quien
+	// llama: el búfer de cada vuelta multiplica su suma por 64, y unas
+	// longitudes hostiles no deben poder desbordar ese cálculo ni reservar a
+	// ciegas. Fuera de rango no hay hash posible: nil no coincide con nada.
+	if len(pwd) > maxContrasenaV5 || len(sal) > maxSalV5 || len(datosU) > maxDatosUV5 {
+		return nil
+	}
 	h := sha256.New()
 	h.Write(pwd)
 	h.Write(sal)
@@ -462,8 +481,12 @@ func hashV5(pwd, sal, datosU []byte, r int) []byte {
 		return k
 	}
 
+	// Un solo búfer para todas las vueltas, de tamaño CONSTANTE: 64 copias de
+	// contraseña ‖ K ‖ /U con cada pieza en su máximo (K llega a 64 bytes con
+	// SHA-512). Ni depende de longitudes del fichero ni se reserva en cada vuelta.
+	k1 := make([]byte, 0, 64*(maxContrasenaV5+sha512.Size+maxDatosUV5))
 	for vuelta := 0; ; vuelta++ {
-		k1 := make([]byte, 0, 64*(len(pwd)+len(k)+len(datosU)))
+		k1 = k1[:0]
 		for i := 0; i < 64; i++ {
 			k1 = append(k1, pwd...)
 			k1 = append(k1, k...)

@@ -32,6 +32,50 @@ export const de: Catalog = {
   'matrix.connect': 'Dieses Gerät einrichten',
   'matrix.devices': 'Deine Geräte',
   'matrix.failed': 'Die Verschlüsselung konnte nicht eingerichtet werden. Versuche es erneut.',
+  'vault.wrongKey':
+    'Die verschlüsselten Daten dieser App wurden mit einem anderen Sytue-ID-Entsperrschlüssel gesperrt als dem in diesem Browser. Melde dich erneut bei Sytue ID an, um den aktuellen Schlüssel hierher zu holen. Ist der frühere Schlüssel verloren, kannst du die verschlüsselten Daten dieser App leeren und neu beginnen.',
+  'vault.wrongKeyDevice':
+    'Die verschlüsselten Daten dieser App wurden mit einem anderen Sytue-ID-Entsperrschlüssel gesperrt als dem auf diesem Gerät. Melde dich erneut bei Sytue ID an, um den aktuellen Schlüssel hierher zu holen. Ist der frühere Schlüssel verloren, kannst du die verschlüsselten Daten dieser App leeren und neu beginnen.',
+  'vault.release': 'Leeren und zu den Serverdaten zurückkehren',
+  'vault.releaseTitle': 'Zu den Serverdaten zurückkehren',
+  'vault.releaseBody':
+    'Als die Daten dieser App von einer Desktop- oder Mobil-App aus verschlüsselt wurden, hat der Server eine Kopie genau in diesem Zustand behalten. Wenn Sie die verschlüsselten Daten nicht öffnen können, kann diese App zu dieser Kopie zurückkehren. Alles, was danach auf irgendeinem Gerät geschrieben wurde, geht verloren und kann nicht wiederhergestellt werden.',
+  'vault.releaseUnderstood':
+    'Mir ist bewusst, dass alles verloren geht, was nach der Umstellung auf Verschlüsselung geschrieben wurde',
+  'vault.releaseSignIn': 'Zur Bestätigung bittet Sytue ID Sie zuerst, sich erneut anzumelden.',
+  'vault.releaseFailed':
+    'Die Rückkehr zu den Serverdaten ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+  'vault.moveTitle': 'Drive in den verschlüsselten Tresor verschieben',
+  'vault.moveOffer':
+    'Dein Drive liegt noch in der bisherigen Verschlüsselung. Verschiebe ihn in den Tresor, den das Web und deine anderen Geräte verwenden.',
+  'vault.moveAction': 'In den Tresor verschieben',
+  'vault.moveBody':
+    'Alle deine Dateien und Ordner werden mit ihren Versionen in den verschlüsselten Tresor kopiert und einzeln geprüft. Aus der bisherigen Verschlüsselung wird nichts gelöscht. Lass die App bis zum Ende geöffnet; wird sie unterbrochen, macht sie dort weiter, wo sie aufgehört hat.',
+  'vault.moveUnderstood': 'Mir ist bewusst, dass dieser Drive danach aus dem Tresor verwendet wird',
+  'vault.moveCopying': 'Deine Dateien werden kopiert und geprüft…',
+  'vault.moveDone': 'Fertig. Dein Drive ist jetzt im verschlüsselten Tresor.',
+  'vault.moveFailed':
+    'Die Kopie konnte nicht abgeschlossen werden. Deine Dateien sind weiterhin in der bisherigen Verschlüsselung. Versuche es erneut.',
+  'vault.movePending':
+    'Dieses Gerät hat noch Änderungen zu senden. Warte, bis sie fertig sind, und versuche es erneut.',
+  'vault.copyInProgress':
+    'Ein anderes Gerät verschiebt dein Drive in den verschlüsselten Tresor. Warte, bis es fertig ist, und versuche es erneut.',
+  'vault.copyCancel': 'Kopieren abbrechen',
+  'vault.copyCancelHint':
+    'Wenn das Kopieren hängen geblieben ist, kannst du es abbrechen: Es wird nichts gelöscht, und du kannst es auf dem anderen Gerät wiederholen.',
+  'vault.releaseNotice':
+    'Die Daten dieser App wurden von einer Desktop- oder Mobil-App aus verschlüsselt. Hier sehen Sie die Kopie, die der Server zu diesem Zeitpunkt behalten hat; was danach geschrieben wurde, steht nur in den verschlüsselten Daten. Wenn Sie diese nicht mehr öffnen können, können Sie zu den Serverdaten zurückkehren.',
+  'notifications.kind.security.storage.released':
+    '{name} ist zu Ihren Daten auf dem Server zurückgekehrt',
+  'vault.signInAgain': 'Erneut bei Sytue ID anmelden',
+  'vault.empty': 'Verschlüsselte Daten leeren',
+  'vault.emptyTitle': 'Verschlüsselte Daten dieser App leeren',
+  'vault.emptyBody':
+    'Die Daten, die diese App mit dem verlorenen Schlüssel verschlüsselt hat, werden aus Sytue gelöscht, und ein neuer Schlüssel wird erstellt. Der Rest deines Kontos bleibt unberührt. Dies kann nicht rückgängig gemacht werden.',
+  'vault.emptyUnderstood':
+    'Ich verstehe, dass die mit dem verlorenen Schlüssel verschlüsselten Daten gelöscht werden',
+  'vault.failed':
+    'Die verschlüsselten Daten konnten nicht geöffnet werden. Versuche es erneut oder melde dich erneut bei Sytue ID an. Ist der Schlüssel verloren, kannst du die verschlüsselten Daten dieser App leeren.',
   'matrix.incoming': 'Dieses Gerät verifizieren',
   'matrix.match': 'Sie stimmen überein',
   'matrix.mismatch': 'Sie stimmen nicht überein',

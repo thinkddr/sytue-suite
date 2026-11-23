@@ -96,6 +96,21 @@ const selectDocByID = `
 	FROM documents
 	WHERE id = $1 AND deleted_at IS NULL`
 
+// Límites del listado: lo que pida el cliente fuera de (0, limiteListaMax] se
+// sustituye por limiteListaPorDefecto.
+const (
+	limiteListaPorDefecto = 50
+	limiteListaMax        = 200
+)
+
+// limiteLista acota el tamaño de página pedido por el cliente.
+func limiteLista(n int) int {
+	if n <= 0 || n > limiteListaMax {
+		return limiteListaPorDefecto
+	}
+	return n
+}
+
 // ListDocuments lista documentos del tenant accesibles por el subject. Combina
 // los que posee y aquellos en los que tiene una entrada de ACL (usuario, grupo
 // o tenant). El filtrado fino por rol se hace en dominio sobre cada documento.
@@ -106,16 +121,16 @@ const selectDocByID = `
 // comparación de fila (updated_at, id) < (cursor) es sargable (PostgreSQL la
 // trunca a updated_at <= cursor como condición de índice y rechequea el resto).
 func (s *Store) ListDocuments(ctx context.Context, subj domain.Subject, f domain.ListFilter) ([]domain.Document, error) {
-	if f.Limit <= 0 || f.Limit > 200 {
-		f.Limit = 50
-	}
+	f.Limit = limiteLista(f.Limit)
 	var cursorA, cursorB any
 	if f.ByTitle {
 		cursorA, cursorB = cursorTituloDe(f)
 	} else {
 		cursorA, cursorB = cursorDe(f)
 	}
-	out := make([]domain.Document, 0, f.Limit)
+	// La capacidad es una constante: el límite lo pide el cliente y, aunque ya va
+	// acotado, la reserva no depende de él (las filas las limita el LIMIT de SQL).
+	out := make([]domain.Document, 0, limiteListaPorDefecto)
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, consultaLista(f.ByTitle),
 			subj.Sub, subj.Groups, subj.Tenant,
@@ -197,6 +212,21 @@ func (s *Store) RenameDocument(ctx context.Context, id, title string) error {
 	return s.execAffecting(ctx, "renombrar documento",
 		`UPDATE documents SET title = $2, updated_at = now()
 		 WHERE id = $1 AND deleted_at IS NULL`, id, title)
+}
+
+// AnclarEnBoveda pone `despues` («vault:<id>», ADR 0086) como ancla del documento si
+// la suya sigue siendo `antes` ("" = sin ancla). Sin tocar `updated_at`: anclar no
+// es editar. domain.ErrNotFound si ya no casa; domain.ErrConflict si otro documento
+// vivo de la misma persona ya tiene esa ancla (el índice único de la mig. 0006).
+func (s *Store) AnclarEnBoveda(ctx context.Context, id, antes, despues string) error {
+	err := s.execAffectingDocument(ctx, id, "anclar en la bóveda",
+		`UPDATE documents SET source_ref = $3
+		 WHERE id = $1 AND deleted_at IS NULL AND coalesce(source_ref, '') = $2`,
+		id, antes, despues)
+	if esUnica(err) {
+		return domain.ErrConflict
+	}
+	return err
 }
 
 // SoftDeleteDocument mueve el documento a la papelera (deleted_at).

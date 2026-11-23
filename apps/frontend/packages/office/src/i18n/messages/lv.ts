@@ -304,6 +304,20 @@ export const lv: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Saglabāts Sytue Drive.',
   'doc.msg.savedToDriveIn': '“{name}” tagad satur jūsu izmaiņas kā jaunu versiju.',
   'doc.msg.saveToDriveFailed': 'Izmaiņas neizdevās saglabāt Drive.',
+  'doc.msg.saveToDriveVault': 'Jūsu Drive ir šifrēts no gala līdz galam',
+  'doc.msg.saveToDriveVault.detail':
+    'No šejienes to neizdevās saglabāt. Lejupielādējiet dokumentu un augšupielādējiet to no Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Saglabāts jūsu šifrētajā Drive.',
+  'doc.msg.savedToDriveEncryptedIn': '“{name}” pirms saglabāšanas tika šifrēts šajā pārlūkā.',
+  'doc.msg.savedToDriveEncryptedOnDevice': '“{name}” pirms saglabāšanas tika šifrēts šajā ierīcē.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Jūsu šifrētais Drive šajā ierīcē ir bloķēts. Atbloķējiet to augšā un saglabājiet vēlreiz.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Piesakieties vēlreiz, lai atbloķētu šifrēto Drive, un saglabājiet vēlreiz.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Jūsu Drive vēl pāriet uz pilnīgu šifrēšanu. Atveriet Sytue Drive, lai to pabeigtu, un saglabājiet vēlreiz.',
+  'doc.msg.saveToDriveUnsupported':
+    'Šī faila formātu nevar pārrakstīt. Tā vietā lejupielādējiet dokumentu.',
   'file.downloadPdf': 'Lejupielādēt kā PDF',
   'file.pdfAccessible': 'Piekļūstams PDF (PDF/UA)',
   'file.downloadHtml': 'Lejupielādēt kā HTML',
@@ -2669,6 +2683,51 @@ export const lv: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'Parakstīšanas secībā var būt līdz 10 personām.',
   'pdf.error.signatureRequest.busy':
     'Šis pieprasījums jau tiek atvērts. Mēģiniet vēlreiz pēc brīža.',
+  'pdf.error.driveVault':
+    'Jūsu Drive ir pilnīgi šifrēts: citu organizāciju parakstīšanas pieprasījumu kopijas tajā vēl nevar saglabāt. Tā vietā lejupielādējiet PDF.',
+  'pdf.device.title': 'Parakstīt šajā ierīcē',
+  'pdf.device.help':
+    'Jūsu Drive ir pilnīgi šifrēts, tāpēc serveris nevar lasīt jūsu PDF failus. Izvēlieties vienu: tas tiek atšifrēts un parakstīts šeit ar jūsu sertifikātu, un parakstītā kopija tiek saglabāta šifrēta blakus oriģinālam. Ne PDF, ne jūsu sertifikāts nenonāk serverī.',
+  'pdf.device.open': 'Atvērt manu šifrēto Drive',
+  'pdf.device.empty.title': 'Jūsu šifrētajā Drive nav PDF failu',
+  'pdf.device.empty.description': 'Augšupielādējiet tos no Sytue Drive, un tie parādīsies šeit.',
+  'pdf.device.sign': 'Parakstīt',
+  'pdf.device.signed': 'Parakstīts un saglabāts šifrēts kā “{name}”.',
+  'pdf.device.stamp.on':
+    'Ar laika zīmogu no {authority}: paraksts pierāda, kas un kad parakstīja. Iestāde saņem tikai paraksta nospiedumu, nekad PDF.',
+  'pdf.device.stamp.off':
+    'Bez laika zīmoga: šim pakalpojumam nav laika zīmogošanas iestādes, tāpēc paraksts pierāda, kas parakstīja, bet ne kad.',
+  'pdf.device.appearance': 'Kā izskatās paraksts',
+  'pdf.device.appearance.invisible': 'Neredzams',
+  'pdf.device.appearance.visible': 'Redzams lodziņš',
+  'pdf.device.signedStamped': 'Parakstīts ar laika zīmogu un saglabāts šifrēts kā “{name}”.',
+  'pdf.device.signedNoStamp':
+    'Parakstīts un saglabāts šifrēts kā “{name}”, bet bez laika zīmoga: laika zīmogošanas iestāde neatbildēja.',
+  'pdf.device.error.page':
+    'Paraksts neietilpst šajā lappusē. Izvēlieties citu lappusi vai novietojumu.',
+  'pdf.device.view': 'Skatīt',
+  'pdf.vault.help':
+    'Šis PDF ir jūsu šifrētajā Diskā: tas tiek atšifrēts tikai šajā ierīcē, lai to skatītu un parakstītu.',
+  'pdf.vault.serverOnly':
+    'Anotēšanai, aizpildīšanai, kārtošanai, rediģēšanai, teksta atpazīšanai un paraksta pieprasīšanai pakalpojumam jāizlasa PDF, tāpēc ar šifrēto Disku tās nav pieejamas.',
+  'pdf.vault.notFound.title': 'Šis PDF nav jūsu šifrētajā Diskā',
+  'pdf.vault.notFound.description':
+    'Iespējams, tas ir pārvietots vai izdzēsts. Meklējiet to Sytue Drive.',
+  'pdf.vault.openSigned': 'Atvērt parakstīto kopiju',
+  'pdf.device.requests':
+    'Paraksta pieprasīšanai citām personām vai organizācijām vajag servera Drive: pakalpojumam ir jāizlasa PDF, lai to nosūtītu un pārbaudītu atgriezto parakstu. Ar šifrētu Drive parakstiet šeit un parakstīto PDF nosūtiet paši.',
+  'pdf.device.error.signin': 'Vēlreiz pierakstieties Sytue ID, lai atbloķētu šifrēto Drive.',
+  'pdf.device.error.pending':
+    'Jūsu Drive vēl pāriet uz pilnīgu šifrēšanu. Pabeidziet to Sytue Drive.',
+  'pdf.device.error.password': 'Šī parole neatver sertifikātu.',
+  'pdf.device.error.encrypted':
+    'Šis PDF ir aizsargāts ar paroli, un to nevar parakstīt šajā ierīcē.',
+  'pdf.device.error.locked':
+    'Šis PDF ir sertificēts pret jebkurām izmaiņām: vēl viens paraksts to padarītu nederīgu.',
+  'pdf.device.error.unreadable':
+    'Šo PDF nevar parakstīt šajā ierīcē, to nepārrakstot. Nekas netika mainīts.',
+  'pdf.device.error.failed':
+    'PDF neizdevās parakstīt vai saglabāt. Jūsu Drive nekas netika mainīts.',
   'pdf.dialog.firmar.help':
     'Sertifikāts un atslēga nekad nepamet jūsu organizāciju: tos izmanto serverī un neglabā.',
   'pdf.dialog.firmar.cert': 'Sertifikāts (PEM)',

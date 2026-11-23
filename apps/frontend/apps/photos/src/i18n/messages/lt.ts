@@ -383,4 +383,37 @@ export const lt: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Įrašyta į Paveikslėliai › Sytue Photos: {count}',
   'library.saveFailed': 'Nepavyko įrašyti į šio kompiuterio galeriją: {name}',
   'backup.whileOpen': 'Šiame kompiuteryje kopijuojama, kol Sytue Fotos atidaryta.',
+  'backup.encryptedWaitTitle': 'Atidarykite Sytue Fotos, kad baigtumėte šifruotą kopijavimą',
+  'backup.encryptedWaitBody':
+    'Jūsų Drive užšifruotas ištisiniu šifravimu. Naujos nuotraukos nukopijuojamos vos atidarius Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Išsaugota jūsų Drive su ištisiniu šifravimu: {count}',
+  'gallery.uploadVaultSignIn':
+    'Jūsų Drive užšifruotas ištisiniu šifravimu. Prisijunkite iš naujo, kad jį atrakintumėte, ir vėl pridėkite nuotraukas.',
+  'gallery.uploadVaultNotReady':
+    'Jūsų Drive dar perkeliamas į ištisinį šifravimą. Atidarykite Sytue Drive, kad tai užbaigtumėte, ir vėl pridėkite nuotraukas.',
+  'gallery.uploadVaultLocked':
+    'Jūsų Drive užšifruotas ištisiniu šifravimu. Atrakinkite jį viršuje ir vėl pridėkite nuotraukas.',
+  'gallery.uploadVaultUnavailable':
+    'Jūsų Drive užšifruotas ištisiniu šifravimu ir šiame įrenginyje jo atidaryti negalima. Pridėkite nuotraukas per Sytue Photos žiniatinklyje.',
+  'gallery.encrypted.title': 'Jūsų užšifruotame Drive',
+  'gallery.encrypted.show': 'Rodyti',
+  'gallery.encrypted.opening': 'Iššifruojama…',
+  'gallery.encrypted.failed': 'Nepavyko atidaryti jūsų užšifruoto Drive.',
+  'gallery.encrypted.signIn': 'Prisijungti iš naujo',
+  'gallery.encrypted.empty': 'Jūsų užšifruotame Drive dar nėra nuotraukų.',
+  'gallery.encrypted.note':
+    'Visapusiškai šifruotos nuotraukos iššifruojamos tik šiame įrenginyje. „Sytue AI“, panašios nuotraukos, „Netoliese“ ir prisiminimai jų neapima.',
+  'gallery.encrypted.badge': 'Visapusiškai šifruota',
+  'gallery.encrypted.open': 'Atidaryti {name} (šifruota)',
+  'gallery.encrypted.notSelectable':
+    'Šifruotų nuotraukų negalima pasirinkti: atidarykite vieną, kad pažymėtumėte ją kaip mėgstamą arba įtrauktumėte į albumą.',
+  'gallery.encrypted.actionFailed': 'Nepavyko atnaujinti jūsų šifruotos galerijos.',
+  'gallery.encrypted.saved':
+    'Išsaugota kaip nauja šifruota versija. Ankstesnė lieka „Drive“ versijų istorijoje.',
+  'gallery.encrypted.albums': 'Šifruoti albumai',
+  'gallery.encrypted.newAlbum': 'Naujas šifruotas albumas',
+  'gallery.encrypted.saveVersion': 'Išsaugoti kaip naują versiją',
+  'gallery.encrypted.editHint':
+    'Redagavimas atliekamas šiame įrenginyje ir išsaugomas šifruotas kaip nauja nuotraukos versija.',
+  'gallery.encrypted.albumEmpty': 'Šiame šifruotame albume dar nėra nuotraukų.',
 };

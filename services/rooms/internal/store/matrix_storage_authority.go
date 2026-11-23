@@ -55,11 +55,27 @@ func matrixAuthorityTx(ctx context.Context, tx pgx.Tx, scope storage.Scope) (mat
 
 func (s *Store) MatrixStorageAuthority(ctx context.Context, subject, product string) (matrixproof.Authority, error) {
 	var result matrixproof.Authority
-	err := s.withMatrixAuthority(ctx, subject, product, func(ctx context.Context, tx pgx.Tx, scope storage.Scope) error {
+	var scope storage.Scope
+	var traspaso estadoTraspaso
+	err := s.withMatrixAuthority(ctx, subject, product, func(ctx context.Context, tx pgx.Tx, current storage.Scope) error {
 		var err error
-		result, err = matrixAuthorityTx(ctx, tx, scope)
+		scope = current
+		result, err = matrixAuthorityTx(ctx, tx, current)
+		if err != nil || s.clavesBoveda == nil {
+			return err
+		}
+		traspaso, err = traspasoTx(ctx, tx, current)
 		return err
 	})
+	if err == nil && scope.Valid() && s.clavesBoveda != nil && productosConEntradaDeBoveda[scope.Product] {
+		// Con autoridad de Matrix: la de la bóveda solo tras un traspaso (ADR 0087).
+		return s.autoridadTraspasada(ctx, subject, product, scope, result, traspaso)
+	}
+	if scope.Valid() {
+		// Sin autoridad de Matrix, la de la bóveda si la hay (ADR 0087). Fuera de la
+		// transacción: es una pregunta a Sytue ID, no una fila de aquí.
+		return autoridadConBoveda(ctx, scope, result, err, s.clavesBoveda)
+	}
 	return result, err
 }
 
@@ -89,6 +105,9 @@ func (s *Store) MatrixRootChallenge(ctx context.Context, subject, product, epoch
 	directory, ok := s.matrixGate.(matrixIngressDirectory)
 	if !ok {
 		return challenge, domain.ErrMatrixUnavailable
+	}
+	if err := s.raizMatrixPermitida(ctx, subject, product); err != nil {
+		return challenge, err
 	}
 	err := s.withMatrixAuthority(ctx, subject, product, func(ctx context.Context, tx pgx.Tx, scope storage.Scope) error {
 		if err := matrixAuthorityOwnsTarget(ctx, tx, scope, target); err != nil {
@@ -128,6 +147,9 @@ func (s *Store) ConfirmMatrixRoot(ctx context.Context, subject, product string, 
 	directory, ok := s.matrixGate.(matrixIngressDirectory)
 	if !ok {
 		return result, domain.ErrMatrixUnavailable
+	}
+	if err := s.raizMatrixPermitida(ctx, subject, product); err != nil {
+		return result, err
 	}
 	err = s.withMatrixAuthority(ctx, subject, product, func(ctx context.Context, tx pgx.Tx, scope storage.Scope) error {
 		var err error

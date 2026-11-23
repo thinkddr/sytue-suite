@@ -369,4 +369,37 @@ export const ro: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Salvate în Imagini › Sytue Photos: {count}',
   'library.saveFailed': 'Nu s-a putut salva în galeria acestui computer: {name}',
   'backup.whileOpen': 'Pe acest computer, copierea se face cât timp Sytue Fotos este deschisă.',
+  'backup.encryptedWaitTitle': 'Deschide Sytue Fotos ca să termini copia criptată',
+  'backup.encryptedWaitBody':
+    'Drive-ul tău este criptat end-to-end. Fotografiile noi se copiază imediat ce deschizi Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Salvate în Drive cu criptare end-to-end: {count}',
+  'gallery.uploadVaultSignIn':
+    'Drive-ul tău este criptat end-to-end. Conectează-te din nou pentru a-l debloca, apoi adaugă din nou fotografiile.',
+  'gallery.uploadVaultNotReady':
+    'Drive-ul tău încă trece la criptarea end-to-end. Deschide Sytue Drive pentru a termina, apoi adaugă din nou fotografiile.',
+  'gallery.uploadVaultLocked':
+    'Drive-ul tău este criptat end-to-end. Deblochează-l mai sus, apoi adaugă din nou fotografiile.',
+  'gallery.uploadVaultUnavailable':
+    'Drive-ul tău este criptat end-to-end și nu poate fi deschis pe acest dispozitiv. Adaugă fotografiile din Sytue Photos pe web.',
+  'gallery.encrypted.title': 'În Drive-ul tău criptat',
+  'gallery.encrypted.show': 'Afișează',
+  'gallery.encrypted.opening': 'Se decriptează…',
+  'gallery.encrypted.failed': 'Drive-ul tău criptat nu a putut fi deschis.',
+  'gallery.encrypted.signIn': 'Conectează-te din nou',
+  'gallery.encrypted.empty': 'Nu există încă fotografii în Drive-ul tău criptat.',
+  'gallery.encrypted.note':
+    'Fotografiile criptate integral sunt decriptate doar pe acest dispozitiv. Sytue AI, fotografiile similare, În apropiere și amintirile nu le includ.',
+  'gallery.encrypted.badge': 'Criptată integral',
+  'gallery.encrypted.open': 'Deschide {name} (criptată)',
+  'gallery.encrypted.notSelectable':
+    'Fotografiile criptate nu pot fi selectate: deschide una pentru a o marca drept favorită sau a o adăuga într-un album.',
+  'gallery.encrypted.actionFailed': 'Galeria ta criptată nu a putut fi actualizată.',
+  'gallery.encrypted.saved':
+    'Salvată ca versiune criptată nouă. Cea anterioară rămâne în istoricul versiunilor din Drive.',
+  'gallery.encrypted.albums': 'Albume criptate',
+  'gallery.encrypted.newAlbum': 'Album criptat nou',
+  'gallery.encrypted.saveVersion': 'Salvează ca versiune nouă',
+  'gallery.encrypted.editHint':
+    'Editarea se face pe acest dispozitiv și se salvează criptat ca versiune nouă a fotografiei.',
+  'gallery.encrypted.albumEmpty': 'Acest album criptat nu are încă fotografii.',
 };

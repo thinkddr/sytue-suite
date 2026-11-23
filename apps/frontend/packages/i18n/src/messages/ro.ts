@@ -31,6 +31,47 @@ export const ro: Catalog = {
   'matrix.connect': 'Configurează acest dispozitiv',
   'matrix.devices': 'Dispozitivele tale',
   'matrix.failed': 'Criptarea nu a putut fi configurată. Încearcă din nou.',
+  'vault.wrongKey':
+    'Datele criptate ale acestei aplicații au fost blocate cu o cheie de deblocare Sytue ID diferită de cea din acest browser. Conectează-te din nou la Sytue ID pentru a aduce aici cheia actuală. Dacă cheia anterioară s-a pierdut, poți goli datele criptate ale acestei aplicații și o poți lua de la capăt.',
+  'vault.wrongKeyDevice':
+    'Datele criptate ale acestei aplicații au fost blocate cu o cheie de deblocare Sytue ID diferită de cea de pe acest dispozitiv. Conectează-te din nou la Sytue ID pentru a aduce aici cheia actuală. Dacă cheia anterioară s-a pierdut, poți goli datele criptate ale acestei aplicații și o poți lua de la capăt.',
+  'vault.release': 'Golește și revino la datele de pe server',
+  'vault.releaseTitle': 'Revenire la datele de pe server',
+  'vault.releaseBody':
+    'Când datele acestei aplicații au fost criptate dintr-o aplicație pentru computer sau mobil, serverul a păstrat o copie exact așa cum erau în acel moment. Dacă nu puteți deschide datele criptate, această aplicație poate reveni la acea copie. Tot ce s-a scris după aceea, pe orice dispozitiv, se pierde și nu poate fi recuperat.',
+  'vault.releaseUnderstood': 'Înțeleg că tot ce s-a scris după trecerea la criptare se pierde',
+  'vault.releaseSignIn':
+    'Pentru confirmarea identității, Sytue ID vă va cere mai întâi să vă conectați din nou.',
+  'vault.releaseFailed': 'Revenirea la datele de pe server nu a reușit. Încercați din nou.',
+  'vault.moveTitle': 'Mută Drive în seiful criptat',
+  'vault.moveOffer':
+    'Drive-ul tău este încă stocat în criptarea anterioară. Mută-l în seiful folosit de web și de celelalte dispozitive ale tale.',
+  'vault.moveAction': 'Mută în seif',
+  'vault.moveBody':
+    'Toate fișierele și dosarele tale, cu versiunile lor, vor fi copiate în seiful criptat și verificate unul câte unul. Nu se șterge nimic din criptarea anterioară. Ține aplicația deschisă până termină; dacă se întrerupe, continuă de unde a rămas.',
+  'vault.moveUnderstood': 'Înțeleg că, la final, acest Drive va fi folosit din seif',
+  'vault.moveCopying': 'Se copiază și se verifică fișierele tale…',
+  'vault.moveDone': 'Gata. Drive-ul tău este acum în seiful criptat.',
+  'vault.moveFailed':
+    'Copia nu a putut fi finalizată. Fișierele tale sunt încă în criptarea anterioară. Încearcă din nou.',
+  'vault.movePending':
+    'Acest dispozitiv mai are modificări de trimis. Așteaptă să se termine și încearcă din nou.',
+  'vault.copyInProgress':
+    'Alt dispozitiv îți mută Drive în seiful criptat. Așteaptă să termine și încearcă din nou.',
+  'vault.copyCancel': 'Anulează copierea',
+  'vault.copyCancelHint':
+    'Dacă acea copiere s-a blocat, o poți anula: nu se șterge nimic și o poți repeta de pe acel dispozitiv.',
+  'vault.releaseNotice':
+    'Datele acestei aplicații au fost criptate dintr-o aplicație pentru computer sau mobil. Aici vedeți copia păstrată de server în acel moment; ce s-a scris ulterior se află doar în datele criptate. Dacă nu le mai puteți deschide, puteți reveni la datele de pe server.',
+  'notifications.kind.security.storage.released': '{name}: revenire la datele dvs. de pe server',
+  'vault.signInAgain': 'Conectează-te din nou la Sytue ID',
+  'vault.empty': 'Golește datele criptate',
+  'vault.emptyTitle': 'Golește datele criptate ale acestei aplicații',
+  'vault.emptyBody':
+    'Datele pe care această aplicație le-a criptat cu cheia pierdută vor fi șterse din Sytue și va fi creată o cheie nouă. Restul contului tău nu este afectat. Acțiunea nu poate fi anulată.',
+  'vault.emptyUnderstood': 'Înțeleg că datele criptate cu cheia pierdută vor fi șterse',
+  'vault.failed':
+    'Datele criptate nu au putut fi deschise. Încearcă din nou sau conectează-te din nou la Sytue ID. Dacă cheia s-a pierdut, poți goli datele criptate ale acestei aplicații.',
   'matrix.incoming': 'Verifică acest dispozitiv',
   'matrix.match': 'Se potrivesc',
   'matrix.mismatch': 'Nu se potrivesc',

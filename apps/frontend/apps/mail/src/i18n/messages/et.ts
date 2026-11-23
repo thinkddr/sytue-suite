@@ -944,4 +944,10 @@ export const et: AppCatalog<typeof en> = {
     'Kiri võeti vastu, kuid koopiat ei saanud saadetud kirjade kausta salvestada. Ära saada seda uuesti.',
   'externalMail.invalidConfiguration':
     'Sisesta kehtiv e-posti aadress, mõlema serveri nimed ja pordid ning parool.',
+  'privateMail.handoverOffer': 'Ei saa oma posti avada? Tühjenda see ja vii hoidlasse',
+  'privateMail.handoverTitle': 'Tühjenda post ja vii see hoidlasse',
+  'privateMail.handoverBody':
+    'Krüptitud posti, mida sa enam avada ei saa, ei taastata. Nüüdsest avaneb sinu post Sytue ID sisselogimisega, mida võidakse paluda korrata.',
+  'privateMail.handoverUnderstood': 'Saan aru, et post, mida ma avada ei saa, läheb kaotsi',
+  'privateMail.handoverConfirm': 'Tühjenda ja vii hoidlasse',
 };

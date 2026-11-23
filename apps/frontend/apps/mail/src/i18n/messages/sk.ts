@@ -1003,4 +1003,10 @@ export const sk: AppCatalog<typeof en> = {
     'E-mail bol prijatý, ale kópiu sa nepodarilo uložiť do Odoslaných. Neodosielajte ho znova.',
   'externalMail.invalidConfiguration':
     'Zadajte platnú e-mailovú adresu, názvy a porty oboch serverov a heslo.',
+  'privateMail.handoverOffer': 'Nemôžete otvoriť poštu? Vyprázdnite ju a presuňte do trezoru',
+  'privateMail.handoverTitle': 'Vyprázdniť poštu a presunúť ju do trezoru',
+  'privateMail.handoverBody':
+    'Šifrovanú poštu, ktorú už nemôžete otvoriť, nie je možné obnoviť. Odteraz sa vaša pošta otvára prihlásením do Sytue ID, ktoré možno budete musieť zopakovať.',
+  'privateMail.handoverUnderstood': 'Rozumiem, že pošta, ktorú nemôžem otvoriť, sa stratí',
+  'privateMail.handoverConfirm': 'Vyprázdniť a presunúť do trezoru',
 };

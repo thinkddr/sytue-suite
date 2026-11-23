@@ -188,9 +188,12 @@ func (s *Server) pintarBorrarCuenta(w http.ResponseWriter, r *http.Request, sess
 	escribirPagina(w, status, loginPage(loc, i18n.T(loc, "delete.title"), b.String()))
 }
 
-// escribirPagina responde HTML sin caché: la página lleva datos de la cuenta.
+// escribirPagina responde HTML sin caché: la página lleva datos de la cuenta. Con
+// nosniff también aquí (aunque lo ponga el middleware): el navegador no adivina
+// otro tipo que el HTML ya escapado.
 func escribirPagina(w http.ResponseWriter, status int, cuerpo string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(cuerpo))

@@ -26,6 +26,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/apns"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
+	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
@@ -207,6 +208,9 @@ func run() error {
 		Instaladores: catalogo,
 		Correo:       correo,
 		Despertador:  despertador,
+		// La entrada privada de avisos (ADR 0086), sobre la autoridad de Rooms como
+		// la de Calendar.
+		PrivateIngress: st.PrivateIngressQueue(callaccess.New(cfg.RoomsBaseURL, cfg.RoomsInternalSecret)),
 		ReadyCheckers: []httpx.Checker{
 			httpx.CheckerFunc{Label: "postgres", Fn: pool.Healthz},
 		},

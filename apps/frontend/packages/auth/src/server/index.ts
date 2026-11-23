@@ -69,3 +69,4 @@ export { clientCoreProxy, roomsServiceBase } from '@sytue/api-clients';
 export { rutaMailPrivado, rutaCorteIdentidadMatrixPrivada } from './mail-private-storage.js';
 
 export { rutaMetadataMailPrivado } from './mail-private-metadata.js';
+export { rutaBovedaPq } from './pq-vault.js';

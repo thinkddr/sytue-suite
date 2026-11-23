@@ -109,6 +109,9 @@ type Config struct {
 	// activas de una persona, para la política de firmas de fuera de Docs (ADR 0059).
 	// Secreto PROPIO (sytue-id-orgs-persona). Vacío ⇒ la ruta no se monta.
 	OrgsPersonaSecret string
+	// ClavesBovedaSecret autoriza `POST /internal/vault-keys/lookup`: la clave de
+	// firma activa de una bóveda (ADR 0087). Secreto PROPIO; vacío ⇒ la ruta no se monta.
+	ClavesBovedaSecret string
 	// EstadoOrgsSecret autoriza `POST /internal/orgs/status`: estado de ciclo de vida
 	// de hasta 500 organizaciones por slug, para que Pages sepa si siguen activas y
 	// puede seguir sirviéndolas (A11). Secreto PROPIO (sytue-id-estado-orgs). Vacío ⇒
@@ -355,6 +358,7 @@ func Load() (Config, error) {
 		HubInternalSecret:       l.Get("HUB_INTERNAL_SECRET"),
 		DirectorioSecret:        l.Get("DIRECTORIO_SECRET"),
 		OrgsPersonaSecret:       l.Get("ORGS_PERSONA_SECRET"),
+		ClavesBovedaSecret:      l.Get("VAULT_KEYS_SECRET"),
 		EstadoOrgsSecret:        l.Get("ESTADO_ORGS_SECRET"),
 		NombresOrgsSecret:       l.Get("NOMBRES_ORGS_SECRET"),
 		AccountAppPath:          l.Get("ACCOUNT_APP_PATH"),

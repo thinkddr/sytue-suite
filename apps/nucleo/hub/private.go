@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// Package hub provides the private client-side notification repository. It does
-// not switch the existing Hub inbox or make server-generated notices private.
+// Package hub provides the private client-side notification repository. While the
+// One source is `legacy` the Hub inbox stays on the server; once it is frozen or
+// private, server-generated notices arrive through the shared private ingress and
+// IngressExecutor stores them here (ADR 0086).
 package hub
 
 import (

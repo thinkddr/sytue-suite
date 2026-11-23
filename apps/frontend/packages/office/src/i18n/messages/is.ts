@@ -299,6 +299,21 @@ export const is: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Vistað í Sytue Drive.',
   'doc.msg.savedToDriveIn': '„{name}“ inniheldur nú breytingarnar þínar, sem nýja útgáfu.',
   'doc.msg.saveToDriveFailed': 'Ekki tókst að vista breytingarnar í Drive.',
+  'doc.msg.saveToDriveVault': 'Drive-ið þitt er dulkóðað enda á milli',
+  'doc.msg.saveToDriveVault.detail':
+    'Ekki tókst að vista í það héðan. Sæktu skjalið og hladdu því upp úr Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Vistað í dulkóðaða Drive-inu þínu.',
+  'doc.msg.savedToDriveEncryptedIn': '„{name}“ var dulkóðað í þessum vafra áður en það var vistað.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}“ var dulkóðað í þessu tæki áður en það var vistað.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Dulkóðaða Drive-ið þitt er læst í þessu tæki. Opnaðu það hér fyrir ofan og vistaðu aftur.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Skráðu þig aftur inn til að opna dulkóðaða Drive-ið og vistaðu aftur.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Drive-ið þitt er enn að færast yfir í enda-til-enda dulkóðun. Opnaðu Sytue Drive til að ljúka því og vistaðu aftur.',
+  'doc.msg.saveToDriveUnsupported':
+    'Ekki er hægt að endurskrifa snið þessarar skráar. Sæktu skjalið í staðinn.',
   'file.downloadPdf': 'Sækja sem PDF',
   'file.pdfAccessible': 'Aðgengilegt PDF (PDF/UA)',
   'file.downloadHtml': 'Sækja sem HTML',
@@ -2654,6 +2669,51 @@ export const is: AppCatalog<typeof en> = {
     'Sami aðili kemur tvisvar fyrir í undirritunarröðinni.',
   'pdf.error.signatureRequest.chainTooLong': 'Í undirritunarröð mega vera allt að 10 manns.',
   'pdf.error.signatureRequest.busy': 'Verið er að opna þessa beiðni. Reyndu aftur eftir augnablik.',
+  'pdf.error.driveVault':
+    'Drive-ið þitt er dulkóðað enda á milli: afrit af undirskriftarbeiðnum frá öðrum stofnunum er ekki enn hægt að geyma þar. Sæktu PDF-skjalið í staðinn.',
+  'pdf.device.title': 'Undirrita á þessu tæki',
+  'pdf.device.help':
+    'Drive-ið þitt er dulkóðað enda á milli, svo þjónninn getur ekki lesið PDF-skjölin þín. Veldu eitt: það er afkóðað og undirritað hér með skilríkinu þínu og undirritaða afritið er vistað dulkóðað við hlið frumritsins. Hvorki PDF-skjalið né skilríkið þitt berst til þjónsins.',
+  'pdf.device.open': 'Opna dulkóðaða Drive-ið mitt',
+  'pdf.device.empty.title': 'Engin PDF-skjöl í dulkóðaða Drive-inu þínu',
+  'pdf.device.empty.description': 'Hladdu þeim upp úr Sytue Drive og þau birtast hér.',
+  'pdf.device.sign': 'Undirrita',
+  'pdf.device.signed': 'Undirritað og vistað dulkóðað sem „{name}“.',
+  'pdf.device.stamp.on':
+    'Með tímastimpli frá {authority}: undirskriftin sannar hver skrifaði undir og hvenær. Stimplunaraðilinn fær aðeins fingrafar undirskriftarinnar, aldrei PDF-skjalið.',
+  'pdf.device.stamp.off':
+    'Án tímastimpils: þessi þjónusta hefur engan tímastimplunaraðila, svo undirskriftin sannar hver skrifaði undir en ekki hvenær.',
+  'pdf.device.appearance': 'Hvernig undirskriftin lítur út',
+  'pdf.device.appearance.invisible': 'Ósýnileg',
+  'pdf.device.appearance.visible': 'Sýnilegur reitur',
+  'pdf.device.signedStamped': 'Undirritað með tímastimpli og vistað dulkóðað sem „{name}“.',
+  'pdf.device.signedNoStamp':
+    'Undirritað og vistað dulkóðað sem „{name}“, en án tímastimpils: tímastimplunaraðilinn svaraði ekki.',
+  'pdf.device.error.page':
+    'Undirskriftin kemst ekki fyrir á þeirri síðu. Veldu aðra síðu eða staðsetningu.',
+  'pdf.device.view': 'Skoða',
+  'pdf.vault.help':
+    'Þetta PDF-skjal er í dulkóðaða Drifinu þínu: það er aðeins afkóðað á þessu tæki, svo þú getir skoðað það og undirritað.',
+  'pdf.vault.serverOnly':
+    'Athugasemdir, útfylling, skipulagning, breytingar, textagreining og beiðnir um undirskrift krefjast þess að þjónustan lesi PDF-skjalið, svo þær eru ekki í boði með dulkóðaða Drifinu.',
+  'pdf.vault.notFound.title': 'Þetta PDF-skjal er ekki í dulkóðaða Drifinu þínu',
+  'pdf.vault.notFound.description':
+    'Það gæti hafa verið fært eða eytt. Leitaðu að því í Sytue Drive.',
+  'pdf.vault.openSigned': 'Opna undirritaða afritið',
+  'pdf.device.requests':
+    'Að biðja annað fólk eða aðrar stofnanir um undirritun krefst Drive þjónsins: þjónustan þarf að lesa PDF-skjalið til að senda það og athuga undirritunina sem kemur til baka. Með dulkóðað Drive undirritar þú hér og sendir undirritaða PDF-skjalið sjálf(ur).',
+  'pdf.device.error.signin': 'Skráðu þig aftur inn í Sytue ID til að opna dulkóðaða Drive-ið þitt.',
+  'pdf.device.error.pending':
+    'Drive-ið þitt er enn að færast yfir í dulkóðun enda á milli. Ljúktu því í Sytue Drive.',
+  'pdf.device.error.password': 'Þetta lykilorð opnar ekki skilríkið.',
+  'pdf.device.error.encrypted':
+    'Þetta PDF-skjal er varið með lykilorði og ekki er hægt að undirrita það á þessu tæki.',
+  'pdf.device.error.locked':
+    'Þetta PDF-skjal er vottað gegn öllum breytingum: önnur undirritun myndi ógilda það.',
+  'pdf.device.error.unreadable':
+    'Ekki er hægt að undirrita þetta PDF-skjal á þessu tæki án þess að endurskrifa það. Engu var breytt.',
+  'pdf.device.error.failed':
+    'Ekki tókst að undirrita eða vista PDF-skjalið. Engu var breytt í Drive-inu þínu.',
   'pdf.dialog.firmar.help':
     'Skilríkið og lykillinn fara aldrei út úr fyrirtækinu: þau eru notuð á þjóninum og ekki geymd.',
   'pdf.dialog.firmar.cert': 'Skilríki (PEM)',

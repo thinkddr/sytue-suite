@@ -845,6 +845,8 @@ func errorDeLectura(err error) error {
 		return errRequiereAprobacion
 	case errors.Is(err, store.ErrCuatroOjos):
 		return errCuatroOjos
+	case errors.Is(store.PrivateStorageError(err), store.ErrPrivateStorageFrozen):
+		return errPrivateStorageFrozen
 	}
 	return err
 }
@@ -882,6 +884,8 @@ func errorDeEscritura(err error) error {
 		return errPeriodoCerrado
 	case errors.Is(err, store.ErrRequiereAprobacion):
 		return errRequiereAprobacion
+	case errors.Is(store.PrivateStorageError(err), store.ErrPrivateStorageFrozen):
+		return errPrivateStorageFrozen
 	case errors.Is(err, store.ErrModulosDesactivados):
 		return httpx.ErrUnprocessable.WithMessage("activa los módulos necesarios antes de continuar")
 	default:

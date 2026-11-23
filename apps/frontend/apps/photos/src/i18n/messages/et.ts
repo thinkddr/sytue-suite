@@ -347,4 +347,37 @@ export const et: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Salvestatud kausta Pildid › Sytue Photos: {count}',
   'library.saveFailed': 'Selle arvuti galeriisse ei õnnestunud salvestada: {name}',
   'backup.whileOpen': 'Selles arvutis varundatakse siis, kui Sytue Fotos on avatud.',
+  'backup.encryptedWaitTitle': 'Avage Sytue Fotos, et krüpteeritud varundus lõpetada',
+  'backup.encryptedWaitBody':
+    'Teie Drive on otspunktkrüpteeritud. Uued fotod varundatakse kohe, kui Sytue Fotos on avatud.',
+  'gallery.uploadedEncrypted': "Salvestatud teie Drive'i otspunktkrüpteeritult: {count}",
+  'gallery.uploadVaultSignIn':
+    'Teie Drive on otspunktkrüpteeritud. Logige uuesti sisse, et see avada, ja lisage fotod uuesti.',
+  'gallery.uploadVaultNotReady':
+    'Teie Drive läheb alles üle otspunktkrüpteerimisele. Avage lõpetamiseks Sytue Drive ja lisage fotod uuesti.',
+  'gallery.uploadVaultLocked':
+    'Teie Drive on otspunktkrüpteeritud. Avage see ülal ja lisage fotod uuesti.',
+  'gallery.uploadVaultUnavailable':
+    'Teie Drive on otspunktkrüpteeritud ja seda ei saa selles seadmes avada. Lisage fotod veebis Sytue Photosi kaudu.',
+  'gallery.encrypted.title': "Teie krüpteeritud Drive'is",
+  'gallery.encrypted.show': 'Näita',
+  'gallery.encrypted.opening': 'Dekrüpteerimine…',
+  'gallery.encrypted.failed': "Teie krüpteeritud Drive'i ei õnnestunud avada.",
+  'gallery.encrypted.signIn': 'Logi uuesti sisse',
+  'gallery.encrypted.empty': "Teie krüpteeritud Drive'is pole veel fotosid.",
+  'gallery.encrypted.note':
+    'Otsast lõpuni krüpteeritud fotod dekrüpteeritakse ainult selles seadmes. Sytue AI, sarnased fotod, Läheduses ja mälestused neid ei hõlma.',
+  'gallery.encrypted.badge': 'Otsast lõpuni krüpteeritud',
+  'gallery.encrypted.open': 'Ava {name} (krüpteeritud)',
+  'gallery.encrypted.notSelectable':
+    'Krüpteeritud fotosid ei saa valida: ava üks, et märkida see lemmikuks või lisada albumisse.',
+  'gallery.encrypted.actionFailed': 'Krüpteeritud galeriid ei õnnestunud uuendada.',
+  'gallery.encrypted.saved':
+    "Salvestatud uue krüpteeritud versioonina. Eelmine jääb Drive'i versiooniajalukku.",
+  'gallery.encrypted.albums': 'Krüpteeritud albumid',
+  'gallery.encrypted.newAlbum': 'Uus krüpteeritud album',
+  'gallery.encrypted.saveVersion': 'Salvesta uue versioonina',
+  'gallery.encrypted.editHint':
+    'Muutmine toimub selles seadmes ja salvestatakse krüpteeritult foto uue versioonina.',
+  'gallery.encrypted.albumEmpty': 'Selles krüpteeritud albumis pole veel fotosid.',
 };

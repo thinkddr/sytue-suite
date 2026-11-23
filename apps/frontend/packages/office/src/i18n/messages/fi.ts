@@ -306,6 +306,20 @@ export const fi: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Tallennettu Sytue Driveen.',
   'doc.msg.savedToDriveIn': '”{name}” sisältää nyt muutoksesi uutena versiona.',
   'doc.msg.saveToDriveFailed': 'Muutoksia ei voitu tallentaa Driveen.',
+  'doc.msg.saveToDriveVault': 'Drivesi on päästä päähän salattu',
+  'doc.msg.saveToDriveVault.detail':
+    'Siihen ei voitu tallentaa täältä. Lataa asiakirja ja lähetä se Sytue Driven kautta.',
+  'doc.msg.savedToDriveEncrypted': 'Tallennettu salattuun Driveesi.',
+  'doc.msg.savedToDriveEncryptedIn': '”{name}” salattiin tässä selaimessa ennen tallennusta.',
+  'doc.msg.savedToDriveEncryptedOnDevice': '”{name}” salattiin tällä laitteella ennen tallennusta.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Salattu Drivesi on lukittu tällä laitteella. Avaa se yläpuolelta ja tallenna uudelleen.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Avaa salattu Drivesi kirjautumalla uudelleen ja tallenna uudelleen.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Drivesi siirtyy vielä päästä päähän -salaukseen. Viimeistele se Sytue Drivessa ja tallenna uudelleen.',
+  'doc.msg.saveToDriveUnsupported':
+    'Tämän tiedoston muotoa ei voi kirjoittaa uudelleen. Lataa asiakirja sen sijaan.',
   'file.downloadPdf': 'Lataa PDF-muodossa',
   'file.pdfAccessible': 'Saavutettava PDF (PDF/UA)',
   'file.downloadHtml': 'Lataa HTML-muodossa',
@@ -2669,6 +2683,51 @@ export const fi: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong':
     'Allekirjoitusjärjestyksessä voi olla enintään 10 henkilöä.',
   'pdf.error.signatureRequest.busy': 'Tätä pyyntöä avataan jo. Yritä hetken päästä uudelleen.',
+  'pdf.error.driveVault':
+    'Drivesi on päästä päähän salattu: muiden organisaatioiden allekirjoituspyyntöjen kopioita ei voi vielä tallentaa sinne. Lataa PDF sen sijaan.',
+  'pdf.device.title': 'Allekirjoita tällä laitteella',
+  'pdf.device.help':
+    'Drivesi on päästä päähän salattu, joten palvelin ei voi lukea PDF-tiedostojasi. Valitse yksi: se puretaan ja allekirjoitetaan täällä varmenteellasi, ja allekirjoitettu kopio tallennetaan salattuna alkuperäisen viereen. PDF tai varmenteesi ei päädy palvelimelle.',
+  'pdf.device.open': 'Avaa salattu Driveni',
+  'pdf.device.empty.title': 'Salatussa Drivessasi ei ole PDF-tiedostoja',
+  'pdf.device.empty.description': 'Lataa ne Sytue Driven kautta, niin ne näkyvät täällä.',
+  'pdf.device.sign': 'Allekirjoita',
+  'pdf.device.signed': 'Allekirjoitettu ja tallennettu salattuna nimellä ”{name}”.',
+  'pdf.device.stamp.on':
+    'Aikaleimalla palvelusta {authority}: allekirjoitus todistaa, kuka allekirjoitti ja milloin. Palvelu saa vain allekirjoituksen tunnisteen, ei koskaan PDF-tiedostoa.',
+  'pdf.device.stamp.off':
+    'Ei aikaleimaa: tällä palvelulla ei ole aikaleimapalvelua, joten allekirjoitus todistaa, kuka allekirjoitti, mutta ei milloin.',
+  'pdf.device.appearance': 'Allekirjoituksen ulkoasu',
+  'pdf.device.appearance.invisible': 'Näkymätön',
+  'pdf.device.appearance.visible': 'Näkyvä ruutu',
+  'pdf.device.signedStamped':
+    'Allekirjoitettu aikaleimalla ja tallennettu salattuna nimellä ”{name}”.',
+  'pdf.device.signedNoStamp':
+    'Allekirjoitettu ja tallennettu salattuna nimellä ”{name}”, mutta ilman aikaleimaa: aikaleimapalvelu ei vastannut.',
+  'pdf.device.error.page':
+    'Allekirjoitus ei mahdu tälle sivulle. Valitse toinen sivu tai sijainti.',
+  'pdf.device.view': 'Näytä',
+  'pdf.vault.help':
+    'Tämä PDF on salatussa Drivessasi: se puretaan vain tällä laitteella, jotta voit katsoa ja allekirjoittaa sen.',
+  'pdf.vault.serverOnly':
+    'Merkinnät, täyttäminen, järjestäminen, muokkaaminen, tekstintunnistus ja allekirjoituspyynnöt edellyttävät, että palvelu lukee PDF-tiedoston, joten ne eivät ole käytettävissä salatun Driven kanssa.',
+  'pdf.vault.notFound.title': 'Tämä PDF ei ole salatussa Drivessasi',
+  'pdf.vault.notFound.description': 'Se on ehkä siirretty tai poistettu. Etsi se Sytue Drivesta.',
+  'pdf.vault.openSigned': 'Avaa allekirjoitettu kopio',
+  'pdf.device.requests':
+    'Allekirjoituksen pyytäminen muilta ihmisiltä tai organisaatioilta vaatii palvelimen Driven: palvelun on luettava PDF lähettääkseen sen ja tarkistaakseen palaavan allekirjoituksen. Kun Drivesi on salattu, allekirjoita täällä ja lähetä allekirjoitettu PDF itse.',
+  'pdf.device.error.signin': 'Kirjaudu uudelleen Sytue ID:hen avataksesi salatun Drivesi.',
+  'pdf.device.error.pending':
+    'Drivesi siirtyy vielä päästä päähän -salaukseen. Viimeistele se Sytue Drivessa.',
+  'pdf.device.error.password': 'Tämä salasana ei avaa varmennetta.',
+  'pdf.device.error.encrypted':
+    'Tämä PDF on suojattu salasanalla, eikä sitä voi allekirjoittaa tällä laitteella.',
+  'pdf.device.error.locked':
+    'Tämä PDF on varmennettu kaikkia muutoksia vastaan: uusi allekirjoitus mitätöisi sen.',
+  'pdf.device.error.unreadable':
+    'Tätä PDF:ää ei voi allekirjoittaa tällä laitteella kirjoittamatta sitä uudelleen. Mitään ei muutettu.',
+  'pdf.device.error.failed':
+    'PDF:n allekirjoittaminen tai tallentaminen epäonnistui. Drivessasi ei muutettu mitään.',
   'pdf.dialog.firmar.help':
     'Varmenne ja avain eivät koskaan poistu organisaatiostasi: niitä käytetään palvelimella eikä niitä tallenneta.',
   'pdf.dialog.firmar.cert': 'Varmenne (PEM)',

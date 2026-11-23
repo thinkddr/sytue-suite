@@ -945,4 +945,10 @@ export const da: AppCatalog<typeof en> = {
     'Mailen er accepteret, men en kopi kunne ikke gemmes i Sendt. Send den ikke igen.',
   'externalMail.invalidConfiguration':
     'Indtast en gyldig mailadresse, begge serveres navne og porte samt en adgangskode.',
+  'privateMail.handoverOffer': 'Kan du ikke åbne din mail? Tøm den og flyt den til boksen',
+  'privateMail.handoverTitle': 'Tøm mailen og flyt den til boksen',
+  'privateMail.handoverBody':
+    'Krypteret mail, som du ikke længere kan åbne, gendannes ikke. Fremover åbner din mail med dit Sytue ID-login, som du måske skal gentage.',
+  'privateMail.handoverUnderstood': 'Jeg forstår, at den mail, jeg ikke kan åbne, går tabt',
+  'privateMail.handoverConfirm': 'Tøm og flyt til boksen',
 };

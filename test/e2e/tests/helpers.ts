@@ -200,7 +200,8 @@ export function esCuentaDelIdPDesdeAdmin(
   const sinBarra = (p: string): string => p.replace(/\/+$/, "");
   return (
     d.hostname === `admin.${dominio}` && sinBarra(d.pathname) === "/admin" &&
-    a.hostname === `id.${dominio}` && sinBarra(a.pathname) === "/account" &&
+    a.hostname === `id.${dominio}` &&
+    (sinBarra(a.pathname) === "/account" || a.pathname.startsWith("/account/")) &&
     porQueNoEntra(actual) === null
   );
 }

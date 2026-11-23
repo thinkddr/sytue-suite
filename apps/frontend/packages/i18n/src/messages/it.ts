@@ -30,6 +30,48 @@ export const it: Catalog = {
   'matrix.connect': 'Configura questo dispositivo',
   'matrix.devices': 'I tuoi dispositivi',
   'matrix.failed': 'Non è stato possibile configurare la crittografia. Riprova.',
+  'vault.wrongKey':
+    'I dati cifrati di questa app sono stati bloccati con una chiave di sblocco Sytue ID diversa da quella di questo browser. Accedi di nuovo a Sytue ID per portare qui la chiave attuale. Se la chiave precedente è andata persa, puoi svuotare i dati cifrati di questa app e ricominciare.',
+  'vault.wrongKeyDevice':
+    'I dati cifrati di questa app sono stati bloccati con una chiave di sblocco Sytue ID diversa da quella di questo dispositivo. Accedi di nuovo a Sytue ID per portare qui la chiave attuale. Se la chiave precedente è andata persa, puoi svuotare i dati cifrati di questa app e ricominciare.',
+  'vault.release': 'Svuota e torna ai dati del server',
+  'vault.releaseTitle': 'Torna ai dati del server',
+  'vault.releaseBody':
+    'Quando i dati di questa app sono passati alla cifratura da un’app desktop o mobile, il server ne ha conservato una copia così com’era in quel momento. Se non riesci ad aprire i dati cifrati, questa app può tornare a quella copia. Tutto ciò che è stato scritto dopo, su qualsiasi dispositivo, va perso e non si può recuperare.',
+  'vault.releaseUnderstood':
+    'Ho capito che tutto ciò che è stato scritto dopo il passaggio alla cifratura andrà perso',
+  'vault.releaseSignIn':
+    'Per confermare la tua identità, Sytue ID ti chiederà prima di accedere di nuovo.',
+  'vault.releaseFailed': 'Non è stato possibile tornare ai dati del server. Riprova.',
+  'vault.moveTitle': 'Sposta Drive nella cassaforte cifrata',
+  'vault.moveOffer':
+    'Il tuo Drive è ancora salvato nella cifratura precedente. Spostalo nella cassaforte usata dal web e dagli altri tuoi dispositivi.',
+  'vault.moveAction': 'Sposta nella cassaforte',
+  'vault.moveBody':
+    'Tutti i tuoi file e cartelle, con le loro versioni, saranno copiati nella cassaforte cifrata e verificati uno per uno. Nulla viene eliminato dalla cifratura precedente. Tieni l’app aperta fino alla fine; se si interrompe, riprende da dove si era fermata.',
+  'vault.moveUnderstood': 'Capisco che, al termine, questo Drive verrà usato dalla cassaforte',
+  'vault.moveCopying': 'Copia e verifica dei tuoi file…',
+  'vault.moveDone': 'Fatto. Il tuo Drive ora è nella cassaforte cifrata.',
+  'vault.moveFailed':
+    'Non è stato possibile completare la copia. I tuoi file sono ancora nella cifratura precedente. Riprova.',
+  'vault.movePending':
+    'Questo dispositivo ha ancora modifiche da inviare. Attendi che finiscano e riprova.',
+  'vault.copyInProgress':
+    'Un altro dispositivo sta spostando il tuo Drive nella cassaforte cifrata. Attendi che finisca e riprova.',
+  'vault.copyCancel': 'Annulla la copia',
+  'vault.copyCancelHint':
+    'Se quella copia si è bloccata, puoi annullarla: non si cancella nulla e potrai ripeterla da quel dispositivo.',
+  'vault.releaseNotice':
+    'I dati di questa app sono passati alla cifratura da un’app desktop o mobile. Qui vedi la copia che il server ha conservato in quel momento; ciò che è stato scritto dopo si trova solo nei dati cifrati. Se non riesci più ad aprirli, puoi tornare ai dati del server.',
+  'notifications.kind.security.storage.released': '{name} è tornato ai tuoi dati sul server',
+  'vault.signInAgain': 'Accedi di nuovo a Sytue ID',
+  'vault.empty': 'Svuota i dati cifrati',
+  'vault.emptyTitle': 'Svuota i dati cifrati di questa app',
+  'vault.emptyBody':
+    'I dati che questa app ha cifrato con la chiave persa verranno eliminati da Sytue e verrà creata una nuova chiave. Il resto del tuo account non viene toccato. L’operazione non può essere annullata.',
+  'vault.emptyUnderstood': 'Ho capito che i dati cifrati con la chiave persa verranno eliminati',
+  'vault.failed':
+    'Impossibile aprire i dati cifrati. Riprova o accedi di nuovo a Sytue ID. Se la chiave è andata persa, puoi svuotare i dati cifrati di questa app.',
   'matrix.incoming': 'Verifica questo dispositivo',
   'matrix.match': 'Corrispondono',
   'matrix.mismatch': 'Non corrispondono',

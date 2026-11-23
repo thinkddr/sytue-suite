@@ -155,15 +155,30 @@ func encodeStorageRecord(record storage.Record, proof []byte) ([]byte, error) {
 		return nil, ErrEnvelope
 	}
 	header, err := json.Marshal(recordHeader{Version: record.Version, ObjectID: record.ObjectID, RevisionID: record.RevisionID, Role: record.Role, Previous: record.Previous, Proof: proof})
-	if err != nil || len(header)+4+len(record.Payload) > MaxEnvelopePayload {
+	if err != nil {
 		return nil, ErrEnvelope
 	}
-	raw := make([]byte, 4+len(header)+len(record.Payload))
+	total, ok := tamanoRegistro(len(header), len(record.Payload))
+	if !ok {
+		return nil, ErrEnvelope
+	}
+	raw := make([]byte, total)
 	// G115: la guarda de arriba acota el total a MaxEnvelopePayload (64 KiB).
 	binary.BigEndian.PutUint32(raw[:4], uint32(len(header))) //nolint:gosec // acotado por la guarda de arriba
 	copy(raw[4:], header)
 	copy(raw[4+len(header):], record.Payload)
 	return raw, nil
+}
+
+// tamanoRegistro calcula 4+cabecera+carga sin desbordar: cada término se acota
+// por separado y con restas antes de sumar, de modo que unos tamaños hostiles
+// (o negativos) no pueden dar la vuelta a int y colarse bajo el tope. El total
+// queda siempre en [4, MaxEnvelopePayload].
+func tamanoRegistro(cabecera, carga int) (int, bool) {
+	if cabecera < 0 || carga < 0 || cabecera > MaxEnvelopePayload-4 || carga > MaxEnvelopePayload-4-cabecera {
+		return 0, false
+	}
+	return 4 + cabecera + carga, true
 }
 
 func decodeStorageRecord(scope storage.Scope, raw []byte) (storage.Record, []byte, error) {

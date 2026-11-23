@@ -42,20 +42,26 @@ func TestGaleriaDriveSubePorElDriveOcultoYCierraElResto(t *testing.T) {
 			_, err := facade.Upload(t.Context(), "carpeta", "foto.png", "image/png", nil, 0)
 			return err
 		}},
+		// La galería cifrada (ADR 0086) lee su índice, sus miniaturas y el original.
+		{"Download", func() error { _, err := facade.Download(t.Context(), "f"); return err }},
+		// Y guarda una edición como versión nueva de la foto vista.
+		{"ReplaceFile", func() error {
+			_, err := facade.ReplaceFile(t.Context(), api.File{ID: "f", Name: "foto.jpg"}, "image/jpeg", nil, 0)
+			return err
+		}},
 	} {
 		if err := subir.llama(); !errors.Is(err, privatePhotos.ErrNotReady) {
 			t.Fatal(subir.nombre, "did not resolve the hidden Drive repository", err)
 		}
 	}
-	if asked != 4 {
-		t.Fatal("facade did not resolve per gallery upload", asked)
+	if asked != 6 {
+		t.Fatal("facade did not resolve per gallery operation", asked)
 	}
 	for _, cerrado := range []struct {
 		nombre string
 		llama  func() error
 	}{
 		{"File", func() error { _, err := facade.File(t.Context(), "f"); return err }},
-		{"Download", func() error { _, err := facade.Download(t.Context(), "f"); return err }},
 		{"Delete", func() error { return facade.Delete(t.Context(), api.DriveKind("folder"), "f") }},
 		{"Trash", func() error { _, err := facade.Trash(t.Context()); return err }},
 		{"Zip", func() error { _, _, err := facade.Zip(t.Context(), nil, nil, "fotos.zip"); return err }},
@@ -64,7 +70,7 @@ func TestGaleriaDriveSubePorElDriveOcultoYCierraElResto(t *testing.T) {
 			t.Fatal(cerrado.nombre, "was not closed on the gallery facade", err)
 		}
 	}
-	if asked != 4 {
+	if asked != 6 {
 		t.Fatal("closed operations resolved the hidden repository", asked)
 	}
 }

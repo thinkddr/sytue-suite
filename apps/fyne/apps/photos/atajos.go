@@ -158,7 +158,8 @@ func (a *App) verAtajos() {
 	enVisor, saltos, papelera := false, true, true
 	if e := a.vis; e != nil {
 		_, conPosicion := posicionVisor(e.i, len(e.lista()), e.origen == desdeGaleria && !a.g.fin)
-		enVisor, saltos, papelera = true, conPosicion, e.origen == desdeGaleria
+		_, delServidor := e.fotoDelServidor()
+		enVisor, saltos, papelera = true, conPosicion, e.origen == desdeGaleria && delServidor
 	}
 	ui.MostrarHojaAtajos(a.w.Canvas(), a.v.Traduce("shortcuts.title"), a.v.Traduce("ui.close"),
 		gruposDeAtajos(a.v, enVisor, saltos, papelera))

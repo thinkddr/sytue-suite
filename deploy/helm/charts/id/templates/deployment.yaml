@@ -354,6 +354,15 @@ spec:
                   name: sytue-id-nombres-orgs
                   key: secret
                   optional: true
+            # La clave de firma activa de una bóveda (ADR 0087, /internal/vault-keys/lookup).
+            # Secreto PROPIO, compartido solo entre Sytue ID y Rooms. Sin él, las
+            # acciones de entrada firmadas por bóvedas se rechazan.
+            - name: SYTUE_ID_VAULT_KEYS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-claves-boveda
+                  key: secret
+                  optional: true
             # Estado de ciclo de vida de orgs por slug (POST /internal/orgs/status):
             # solo para que Pages sepa si una organizacion sigue activa (A11, Pages
             # ENCARGO §6.5). Secreto PROPIO, compartido solo con Pages.

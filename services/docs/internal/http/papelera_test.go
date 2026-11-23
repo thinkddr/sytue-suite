@@ -33,9 +33,11 @@ type driveFalso struct {
 	porRuta map[string]int
 	// resultado es el `result` de una ruta concreta; si no, «done».
 	resultado map[string]string
-	pedidos   []map[string]string
-	rutas     []string
-	secretos  []string
+	// cuerpo sustituye la respuesta entera de una ruta (p. ej., un sobre de error).
+	cuerpo   map[string]string
+	pedidos  []map[string]string
+	rutas    []string
+	secretos []string
 }
 
 func (d *driveFalso) servidor(t *testing.T) *httptest.Server {
@@ -61,6 +63,10 @@ func (d *driveFalso) servidor(t *testing.T) *httptest.Server {
 			res = r2
 		}
 		w.WriteHeader(estado)
+		if cuerpo, ok := d.cuerpo[r.URL.Path]; ok {
+			_, _ = w.Write([]byte(cuerpo))
+			return
+		}
 		_, _ = w.Write([]byte(`{"result":"` + res + `"}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -233,6 +239,68 @@ func TestRestaurarYPurgar(t *testing.T) {
 			cambio := len(pf.restaurados)+len(pf.purgados) > 0
 			if cambio != c.cambia {
 				t.Fatalf("restaurados %v, purgados %v", pf.restaurados, pf.purgados)
+			}
+		})
+	}
+}
+
+// sobreUnidadCifrada es lo que contesta Drive al tocar la copia congelada de una
+// unidad que ya está en la bóveda cifrada (ADR 0086).
+const sobreUnidadCifrada = `{"error":{"code":"private_storage_migration_required","message":"x"}}`
+
+// TestPapeleraConLaUnidadCifrada: con el Drive del dueño en la bóveda, su copia del
+// servidor está congelada. Borrar y restaurar no aplican a ella (y no se toman por
+// «nombre ocupado»); purgar pregunta igual por la retención legal, como sin fichero.
+func TestPapeleraConLaUnidadCifrada(t *testing.T) {
+	const id = "5f3d1f8e-7c2a-4e5b-8f1a-2b3c4d5e6f70"
+	rutaFichero, rutaSinFichero := "/internal/docs/files/"+ficheroID, "/internal/docs/files/"+drive.SinFichero
+	cifrada := func(sinFichero int) *driveFalso {
+		return &driveFalso{
+			porRuta: map[string]int{rutaFichero: http.StatusConflict, rutaSinFichero: sinFichero},
+			cuerpo:  map[string]string{rutaFichero: sobreUnidadCifrada},
+		}
+	}
+
+	t.Run("borrar", func(t *testing.T) {
+		doc := docConFichero("d1")
+		df := cifrada(http.StatusOK)
+		fs := &storeConBorrado{fakeStore: &fakeStore{doc: &doc}}
+		h := handlerConPapelera(t, df, &papeleraFalsa{}, fs)
+		rec := httptest.NewRecorder()
+		h.deleteDocument(rec, conTenant(req(t, "DELETE", "/v1/documents/d1", ownerClaims(), map[string]string{"id": "d1"}, "")))
+		if rec.Code != http.StatusNoContent || fs.borrados != 1 || len(df.rutas) != 1 {
+			t.Fatalf("código %d, borrados %d, a Drive %v", rec.Code, fs.borrados, df.rutas)
+		}
+	})
+	t.Run("restaurar", func(t *testing.T) {
+		df := cifrada(http.StatusOK)
+		pf := &papeleraFalsa{docs: []domain.Document{docConFichero(id)}}
+		h := handlerConPapelera(t, df, pf, &fakeStore{})
+		rec := httptest.NewRecorder()
+		h.restaurarDePapelera(rec, conTenant(req(t, "POST", "/v1/trash/x/restore", ownerClaims(), map[string]string{"id": id}, "")))
+		if rec.Code != http.StatusNoContent || len(pf.restaurados) != 1 {
+			t.Fatalf("código %d (%s), restaurados %v", rec.Code, rec.Body.String(), pf.restaurados)
+		}
+	})
+	for _, c := range []struct {
+		nombre             string
+		sinFichero, codigo int
+		purga              bool
+	}{
+		{"purgar", http.StatusOK, http.StatusNoContent, true},
+		{"purgar con retención legal", http.StatusLocked, http.StatusLocked, false},
+	} {
+		t.Run(c.nombre, func(t *testing.T) {
+			df := cifrada(c.sinFichero)
+			pf := &papeleraFalsa{docs: []domain.Document{docConFichero(id)}}
+			h := handlerConPapelera(t, df, pf, &fakeStore{})
+			rec := httptest.NewRecorder()
+			h.purgarDePapelera(rec, conTenant(req(t, "DELETE", "/v1/trash/x", ownerClaims(), map[string]string{"id": id}, "")))
+			if rec.Code != c.codigo || (len(pf.purgados) == 1) != c.purga {
+				t.Fatalf("código %d (%s), purgados %v", rec.Code, rec.Body.String(), pf.purgados)
+			}
+			if len(df.rutas) != 2 || df.rutas[1] != rutaSinFichero || df.pedidos[1]["action"] != drive.AccionPurgar {
+				t.Fatalf("a Drive llegó %v %v: la retención legal se pregunta siempre", df.rutas, df.pedidos)
 			}
 		})
 	}

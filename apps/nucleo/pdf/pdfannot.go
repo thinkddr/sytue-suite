@@ -154,7 +154,10 @@ func anexarAnotaciones(doc *PDFDoc, porPagina map[int][]Anotacion) ([]byte, erro
 	if err := admiteAnexo(doc, anexoAnotaciones); err != nil {
 		return nil, err
 	}
-	e := nuevoAnexo(doc)
+	e, err := nuevoAnexo(doc)
+	if err != nil {
+		return nil, err
+	}
 	cambiados := map[int]objetoSalida{}
 	for i := 0; i < doc.NumPaginas(); i++ {
 		if len(porPagina[i]) == 0 {

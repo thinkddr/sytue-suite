@@ -332,6 +332,15 @@ export function conectarAvisos(
             /* un evento malformado no tumba la campana */
           }
         });
+        // Un aviso que espera en la entrada privada de One (fuente congelada, ADR
+        // 0086): el evento no trae datos, solo dice que hay algo nuevo; la lista del
+        // Hub ya lo incluye, así que se recarga como al reconectar.
+        es.addEventListener('private_ingress', () => {
+          if (cerrado || flujo !== es) return;
+          seguidos = 0;
+          if (primeraCargaTerminada) cargar();
+          else reconciliarAlFinal = true;
+        });
         es.addEventListener('avatar', (e) => {
           if (cerrado || flujo !== es) return;
           try {

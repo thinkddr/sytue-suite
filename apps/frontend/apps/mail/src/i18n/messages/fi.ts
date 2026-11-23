@@ -952,4 +952,10 @@ export const fi: AppCatalog<typeof en> = {
     'Viesti hyväksyttiin, mutta kopiota ei voitu tallentaa Lähetetyt-kansioon. Älä lähetä sitä uudelleen.',
   'externalMail.invalidConfiguration':
     'Anna kelvollinen sähköpostiosoite, molempien palvelinten nimet ja portit sekä salasana.',
+  'privateMail.handoverOffer': 'Etkö saa postiasi auki? Tyhjennä se ja siirrä holviin',
+  'privateMail.handoverTitle': 'Tyhjennä posti ja siirrä se holviin',
+  'privateMail.handoverBody':
+    'Salattua postia, jota et enää saa auki, ei palauteta. Tästä lähtien postisi avautuu Sytue ID -kirjautumisellasi, joka voidaan pyytää toistamaan.',
+  'privateMail.handoverUnderstood': 'Ymmärrän, että posti, jota en saa auki, menetetään',
+  'privateMail.handoverConfirm': 'Tyhjennä ja siirrä holviin',
 };

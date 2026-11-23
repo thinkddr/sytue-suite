@@ -344,4 +344,37 @@ export const sv: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Sparade i Bilder › Sytue Photos: {count}',
   'library.saveFailed': 'Det gick inte att spara i den här datorns galleri: {name}',
   'backup.whileOpen': 'På den här datorn säkerhetskopieras det medan Sytue Fotos är öppen.',
+  'backup.encryptedWaitTitle': 'Öppna Sytue Fotos för att slutföra den krypterade säkerhetskopian',
+  'backup.encryptedWaitBody':
+    'Din Drive har totalsträckskryptering. Nya foton säkerhetskopieras så snart du öppnar Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Sparade med totalsträckskryptering i din Drive: {count}',
+  'gallery.uploadVaultSignIn':
+    'Din Drive är totalsträckskrypterad. Logga in igen för att låsa upp den och lägg sedan till bilderna igen.',
+  'gallery.uploadVaultNotReady':
+    'Din Drive håller fortfarande på att gå över till totalsträckskryptering. Öppna Sytue Drive för att slutföra och lägg sedan till bilderna igen.',
+  'gallery.uploadVaultLocked':
+    'Din Drive är totalsträckskrypterad. Lås upp den ovan och lägg sedan till bilderna igen.',
+  'gallery.uploadVaultUnavailable':
+    'Din Drive är totalsträckskrypterad och kan inte öppnas på den här enheten. Lägg till bilderna från Sytue Photos på webben.',
+  'gallery.encrypted.title': 'I din krypterade Drive',
+  'gallery.encrypted.show': 'Visa',
+  'gallery.encrypted.opening': 'Dekrypterar…',
+  'gallery.encrypted.failed': 'Det gick inte att öppna din krypterade Drive.',
+  'gallery.encrypted.signIn': 'Logga in igen',
+  'gallery.encrypted.empty': 'Det finns inga foton i din krypterade Drive än.',
+  'gallery.encrypted.note':
+    'Totalkrypterade bilder dekrypteras bara på den här enheten. Sytue AI, liknande bilder, I närheten och minnen tar inte med dem.',
+  'gallery.encrypted.badge': 'Totalkrypterad',
+  'gallery.encrypted.open': 'Öppna {name} (krypterad)',
+  'gallery.encrypted.notSelectable':
+    'Krypterade bilder kan inte markeras: öppna en för att göra den till favorit eller lägga till den i ett album.',
+  'gallery.encrypted.actionFailed': 'Det gick inte att uppdatera ditt krypterade galleri.',
+  'gallery.encrypted.saved':
+    'Sparad som en ny krypterad version. Den tidigare finns kvar i versionshistoriken i Drive.',
+  'gallery.encrypted.albums': 'Krypterade album',
+  'gallery.encrypted.newAlbum': 'Nytt krypterat album',
+  'gallery.encrypted.saveVersion': 'Spara som ny version',
+  'gallery.encrypted.editHint':
+    'Redigeringen görs på den här enheten och sparas krypterad som en ny version av bilden.',
+  'gallery.encrypted.albumEmpty': 'Det här krypterade albumet har inga bilder ännu.',
 };

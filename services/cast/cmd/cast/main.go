@@ -279,12 +279,13 @@ func run(esTranscoder bool) error {
 		return err
 	}
 	router := casthttp.NewRouter(casthttp.Deps{
-		PrivateSource: privateSource,
-		Cfg:           cfg,
-		Store:         st,
-		Servicio:      svc,
-		Social:        soc,
-		Directo:       casthttp.NuevoDirecto(dir),
+		PrivateSource:  privateSource,
+		PrivateRelease: privateSource.Release,
+		Cfg:            cfg,
+		Store:          st,
+		Servicio:       svc,
+		Social:         soc,
+		Directo:        casthttp.NuevoDirecto(dir),
 		// «Presentar con Cast»: la posición de la presentación de un directo.
 		Diapositivas: diapositivas.New(pool, svc, logger),
 		Verifier:     verifier,

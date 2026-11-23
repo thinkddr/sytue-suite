@@ -19,11 +19,16 @@ test('favorite UUID matches the native URL-namespace golden vector', async () =>
   );
 });
 test('personal stars preserve imported IDs, unknown exact numbers and their baseline across removal and re-add', async () => {
+  // Se añaden campos dentro del objeto JSON: se quita su `}` de cierre (el último
+  // carácter, no la primera `}` que aparezca) y se vuelve a cerrar tras ellos.
+  const marca = JSON.stringify(mark('imported'));
+  expect(marca.endsWith('}')).toBe(true);
   const f = await privateDriveWriteFixture(),
-    raw = JSON.stringify(mark('imported')).replace(
-      '}',
-      ',"extension":{"integer":900719925474099512345},"padding":"' + 'x'.repeat(17000) + '"}',
-    );
+    raw =
+      marca.slice(0, -1) +
+      ',"extension":{"integer":900719925474099512345},"padding":"' +
+      'x'.repeat(17000) +
+      '"}';
   await f.addFavorite('imported', raw, epoch);
   const drive = f.open();
   await drive.initialize(f.state);

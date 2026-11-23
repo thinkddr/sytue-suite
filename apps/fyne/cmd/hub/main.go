@@ -46,6 +46,7 @@ import (
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets/fuentes"
 )
 
@@ -159,29 +160,61 @@ func main() {
 	})
 	v.AlMostrar = func(d hub.Destino) { w.SetTitle(t.T(d.ClaveTitulo(), nil)) }
 	w.SetPadded(false)
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateHub.Repository]{
-		Suite:       s,
-		Application: a,
-		Window:      w,
-		Product:     "hub",
-		Translate:   func(key string) string { return t.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateHub.Repository], error) {
-			return hubPlan(ctx, resources, s)
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	mount := func(_ cifrado.Cuenta, facade *api.Hub) cifrado.ApplicationView {
+		v.ConBuzon(facade)
+		v.Arrancar()
+		return cifrado.ApplicationView{
+			Object: container.NewStack(v.Desplazable(), v.Avisos()),
+			Detach: func() {
+				v.ConBuzon(s.Hub)
+			},
+		}
+	}
+
+	// La entrada privada de avisos (ADR 0086): con la fuente de One congelada, lo que
+	// mandan los servicios llega cifrado a la cola del Hub; este aparato da de alta su
+	// clave de entrada (consentimiento de Rooms, como Mail), lo reclama, lo guarda en el
+	// almacén privado y lo confirma.
+	consent := cifrado.NewIngressConsent(s.URL("rooms"))
+	receivers := &hubReceivers{}
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*privateHub.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*privateHub.Repository]{
+			Suite:       s,
+			Application: a,
+			Window:      w,
+			Product:     "hub",
+			Translate:   func(key string) string { return t.T(key, nil) },
+			BeforeOpen: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], approve cifrado.StorageApproval) error {
+				return consent.BeforeOpen(ctx, resources, approve)
+			},
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateHub.Repository], error) {
+				return hubPlan(ctx, resources, s, consent, receivers)
+			},
+			Mount: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *privateHub.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewHub(s.URL("hub"), resources.HTTP(), nil).WithPrivateData(repository)
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				view := mount(resources, facade) //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+				stop, join := runHubReceiver(ctx, receivers.get(repository), v.RecargarAvisos)
+				detach := view.Detach
+				view.Detach = func() {
+					stop()
+					detach()
+				}
+				view.Join = join
+				return view, nil
+			},
 		},
-		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateHub.Repository) (cifrado.ApplicationView, error) {
-			facade, err := api.NewHub(s.URL("hub"), resources.HTTP(), nil).WithPrivateData(repository)
-			if err != nil {
-				return cifrado.ApplicationView{}, err
-			}
-			v.ConBuzon(facade)
-			v.Arrancar()
-			return cifrado.ApplicationView{
-				Object: container.NewStack(v.Desplazable(), v.Avisos()),
-				Detach: func() {
-					v.ConBuzon(s.Hub)
-				},
-			}, nil
+		Soltar: cifrado.SoltarEn(s.URL("hub")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewHub(s.URL("hub"), session, nil).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewHub(s.URL("hub"), cuenta.HTTP(), nil)), nil
 		},
 	})
 	// Los avisos flotantes van por ENCIMA del desplazador: dentro se irían al bajar.

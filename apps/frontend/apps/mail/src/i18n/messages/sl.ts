@@ -1005,4 +1005,10 @@ export const sl: AppCatalog<typeof en> = {
     'E-pošta je bila sprejeta, vendar kopije ni bilo mogoče shraniti v Poslano. Ne pošiljajte je znova.',
   'externalMail.invalidConfiguration':
     'Vnesite veljaven e-poštni naslov, imeni in vrata obeh strežnikov ter geslo.',
+  'privateMail.handoverOffer': 'Ne morete odpreti pošte? Izpraznite jo in jo prestavite v trezor',
+  'privateMail.handoverTitle': 'Izprazni pošto in jo prestavi v trezor',
+  'privateMail.handoverBody':
+    'Šifrirane pošte, ki je ne morete več odpreti, ni mogoče obnoviti. Odslej se vaša pošta odpira s prijavo v Sytue ID, ki jo boste morda morali ponoviti.',
+  'privateMail.handoverUnderstood': 'Razumem, da bo pošta, ki je ne morem odpreti, izgubljena',
+  'privateMail.handoverConfirm': 'Izprazni in prestavi v trezor',
 };

@@ -181,6 +181,19 @@ function urlDe(def, ruta) {
 async function asegurarSesion(page, destino) {
   if (new URL(page.url()).hostname !== IDP) return false;
   if (esCuentaDelIdPDesdeAdmin(destino, page.url(), DOMINIO)) return false;
+  // Solo se rellena el formulario de ACCESO, reconocido por la contraseña (igual
+  // que en `mobile-audit.mjs`). Sin esto, cualquier otra pantalla del IdP
+  // gastaba tres intentos y noventa segundos para acabar en `fill: Timeout`, sin
+  // decir dónde estaba: así salió en rojo `admin /` del 2026-11-20 al 22.
+  const formulario = await page
+    .locator("input[name=password]")
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .then(() => true, () => false);
+  if (!formulario) {
+    const aqui = new URL(page.url());
+    throw new Error(`el IdP muestra ${aqui.pathname}${aqui.search}, que no es el formulario de acceso`);
+  }
   for (let intento = 1; ; intento++) {
     try {
       await page.fill("input[name=email]", CRED.email);
@@ -242,7 +255,9 @@ const DENEGACIONES_ESPERADAS = new Set([
 
 // 404 que el producto da a propósito: sin logo aprovechable para el dominio del
 // remitente, el `<img>` falla y la fila vuelve a las iniciales (mail/api/sender-logo.ts).
-const AUSENCIAS_ESPERADAS = new Set(["/mail/api/sender-logo"]);
+// Y sin rúbrica guardada, la tarjeta de Mi cuenta recibe 404 y ofrece dibujarla
+// (account/src/pages/api/rubrica.ts): la cuenta de auditoría no tiene ninguna.
+const AUSENCIAS_ESPERADAS = new Set(["/mail/api/sender-logo", "/account/api/rubrica"]);
 const esAusenciaEsperada = (url) => {
   try {
     return AUSENCIAS_ESPERADAS.has(new URL(url).pathname);

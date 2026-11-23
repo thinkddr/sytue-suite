@@ -36,6 +36,9 @@ func (a *App) entrarEnSeleccion() {
 // entra en el modo selección con esa foto ya marcada y de ancla, sin abrir el visor.
 // Es el gesto de Google Photos en el móvil, donde «Seleccionar» queda lejos del dedo.
 func (a *App) empezarSeleccion(f api.Photo) {
+	if EsCifrada(f.ID) {
+		return // las cifradas no van en lote (ADR 0086)
+	}
 	if a.g.seleccion != nil {
 		a.alternar(f)
 		return
@@ -58,6 +61,12 @@ var mayusPulsada = ui.Mayus
 // se cuenta sobre `fotos`, el orden en que se ven (los meses la parten, no la reordenan).
 func (a *App) alternar(f api.Photo) {
 	if a.g.seleccion == nil {
+		return
+	}
+	if EsCifrada(f.ID) {
+		// Lo que se hace en lote pasa por el servidor, que no ve las cifradas: se dice
+		// en vez de no hacer nada.
+		a.avisar(ui.AvisoInfo, a.v.Traduce("gallery.encrypted.notSelectable"), "")
 		return
 	}
 	desde := -1
@@ -84,6 +93,7 @@ func (a *App) posicionDe(id string) int {
 
 // alternarMes marca las fotos de un mes o, si ya estaban todas, las desmarca.
 func (a *App) alternarMes(fotos []api.Photo) {
+	fotos = sinCifradas(fotos)
 	todas := true
 	for _, f := range fotos {
 		todas = todas && a.g.seleccion[f.ID]
@@ -96,6 +106,18 @@ func (a *App) alternarMes(fotos []api.Photo) {
 		}
 	}
 	a.pintar()
+}
+
+// sinCifradas son las fotos del servidor de una lista de la línea: las cifradas no se
+// seleccionan.
+func sinCifradas(fotos []api.Photo) []api.Photo {
+	out := make([]api.Photo, 0, len(fotos))
+	for _, f := range fotos {
+		if !EsCifrada(f.ID) {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // seleccionadas son las fotos marcadas, en el orden de la línea de tiempo.
@@ -381,9 +403,11 @@ func (a *App) subir(rutas []string) {
 	a.pintar()
 	gen := a.gen
 	a.enSesion(func(vida context.Context) {
-		d := nuevoDestinoDrive(a.Drive, a.cli)
-		_, err := d.carpetaFotos(vida)
-		var fallos, sinGaleria []string
+		d, err := a.destinoSubida(vida)
+		if err == nil {
+			_, err = d.carpetaFotos(vida)
+		}
+		var res resultadoSubida
 		for i, r := range fotos {
 			if vida.Err() != nil {
 				return
@@ -392,12 +416,7 @@ func (a *App) subir(rutas []string) {
 			if e == nil {
 				e = a.subirUna(vida, d, r)
 			}
-			switch {
-			case errors.Is(e, ErrNoIndexable):
-				sinGaleria = append(sinGaleria, filepath.Base(r))
-			case e != nil:
-				fallos = append(fallos, filepath.Base(r))
-			}
+			res.anotar(filepath.Base(r), e)
 			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 			a.hilo(gen, func() {
 				a.g.subida = &[2]int{i + 1, len(fotos)}
@@ -407,16 +426,10 @@ func (a *App) subir(rutas []string) {
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.subida = nil
-			hechas := len(fotos) - len(fallos) - len(sinGaleria)
-			// El progreso va en línea; cómo acabó, en el aviso. Lo que está en Drive pero la
-			// galería no sabe enseñar NO es un fallo: volver a subirlo no lo arreglaría.
-			switch {
-			case len(fallos) > 0:
-				a.avisar(ui.AvisoPeligro, a.v.T.T("gallery.uploadFailed", i18n.Vars{"name": strings.Join(fallos, ", ")}), "")
-			case len(sinGaleria) > 0:
-				a.avisar(ui.AvisoAdvertencia, a.v.T.T("gallery.uploadedNotShown", i18n.Vars{"name": strings.Join(sinGaleria, ", ")}), "")
-			default:
-				a.avisar(ui.AvisoExito, a.v.T.T("gallery.uploaded", i18n.Vars{"count": hechas}), "")
+			hechas := a.avisarSubida(len(fotos), res)
+			if len(res.cifradas) > 0 {
+				// Ya están en el índice cifrado: la sección las vuelve a leer.
+				a.cargarCifradas(false)
 			}
 			if hechas > 0 {
 				// La línea de tiempo se vuelve a pedir desde el principio: las nuevas
@@ -435,6 +448,78 @@ func (a *App) subir(rutas []string) {
 		})
 	})
 }
+
+// resultadoSubida es cómo acabó cada foto de una subida.
+type resultadoSubida struct {
+	fallos, sinGaleria, cifradas []string
+	// motivo es un fallo con su propio mensaje ([motivoSubida]): qué hacer, no un
+	// «no se pudo» a secas.
+	motivo error
+}
+
+func (r *resultadoSubida) anotar(nombre string, err error) {
+	switch {
+	case err == nil:
+	case errors.Is(err, ErrEnBoveda):
+		r.cifradas = append(r.cifradas, nombre)
+	case errors.Is(err, ErrNoIndexable):
+		r.sinGaleria = append(r.sinGaleria, nombre)
+	default:
+		if motivoSubida(err) != "" {
+			r.motivo = err
+		}
+		r.fallos = append(r.fallos, nombre)
+	}
+}
+
+// avisarSubida dice cómo acabó una subida de `total` fotos y devuelve cuántas entraron
+// en la galería. El progreso va en línea; cómo acabó, en el aviso. Lo que está en
+// Drive pero la galería no sabe enseñar NO es un fallo: volver a subirlo no lo
+// arreglaría; y lo que quedó cifrado en el Drive privado tampoco.
+func (a *App) avisarSubida(total int, r resultadoSubida) int {
+	hechas := total - len(r.fallos) - len(r.sinGaleria) - len(r.cifradas)
+	switch {
+	case r.motivo != nil:
+		a.avisar(ui.AvisoPeligro, a.v.Traduce(motivoSubida(r.motivo)), "")
+	case len(r.cifradas) > 0 && len(r.fallos) == 0:
+		a.avisar(ui.AvisoExito, a.v.T.T("gallery.uploadedEncrypted", i18n.Vars{"count": len(r.cifradas)}), "")
+	case len(r.fallos) > 0:
+		a.avisar(ui.AvisoPeligro, a.v.T.T("gallery.uploadFailed", i18n.Vars{"name": strings.Join(r.fallos, ", ")}), "")
+	case len(r.sinGaleria) > 0:
+		a.avisar(ui.AvisoAdvertencia, a.v.T.T("gallery.uploadedNotShown", i18n.Vars{"name": strings.Join(r.sinGaleria, ", ")}), "")
+	default:
+		a.avisar(ui.AvisoExito, a.v.T.T("gallery.uploaded", i18n.Vars{"count": hechas}), "")
+	}
+	return hechas
+}
+
+// motivoSubida es la clave del mensaje propio de un fallo de subida con el Drive en
+// almacenamiento privado, o "" si es un fallo cualquiera:
+//
+//   - este dispositivo no puede abrir el Drive privado (que se suba desde la web);
+//   - el Drive privado no está abierto todavía (hay que desbloquearlo arriba);
+//   - el del servidor contestó que ya no admite escrituras (pasó a la bóveda con la
+//     galería abierta, o no se pudo saber antes): al volver a añadirlas irán cifradas.
+func motivoSubida(err error) string {
+	switch {
+	case errors.Is(err, ErrDriveCifradoNoDisponible):
+		return "gallery.uploadVaultUnavailable"
+	case errors.Is(err, ErrDriveCifradoCerrado), api.EsUnidadCifrada(err):
+		return "gallery.uploadVaultLocked"
+	default:
+		return ""
+	}
+}
+
+// ErrDriveCifradoCerrado: el Drive de la persona está en almacenamiento privado y
+// este dispositivo aún no lo ha abierto (falta desbloquearlo). Lo devuelve
+// [App.DriveDeSubida]; la galería lo cuenta con su propio mensaje.
+var ErrDriveCifradoCerrado = errors.New("photos: el Drive privado no está abierto")
+
+// ErrDriveCifradoNoDisponible: el Drive de la persona está en almacenamiento privado
+// y este dispositivo no puede abrirlo (no tiene Drive privado). Se dice que se suba
+// desde la web, no un «no se pudo» a secas.
+var ErrDriveCifradoNoDisponible = errors.New("photos: este dispositivo no puede abrir el Drive privado")
 
 // carpetaFotosEn es el id de «/Fotos» en la raíz del Drive, creándola si no está. Con un
 // cliente de Drive cualquiera: también el de la copia con la app cerrada, sin App.
@@ -469,7 +554,10 @@ func carpetaFotosEn(vida context.Context, drive *api.Drive) (string, error) {
 // tal cual y queda en Drive ([ErrNoIndexable]).
 func (a *App) subirUna(vida context.Context, d *destinoDrive, ruta string) error {
 	if d == nil {
-		d = nuevoDestinoDrive(a.Drive, a.cli)
+		var err error
+		if d, err = a.destinoSubida(vida); err != nil {
+			return err
+		}
 	}
 	nombre, tipo := filepath.Base(ruta), tipoDe(ruta)
 	if !SyphotosMide(tipo) && a.Galeria != nil && a.Galeria.Disponible() {
@@ -533,7 +621,7 @@ func (a *App) ocultarRecuerdos() {
 // 2019 puede estar tres mil filas más abajo—, va a su pantalla de parecidas, que la
 // enseña sin arrastrar la línea de tiempo entera.
 func (a *App) abrirRecuerdo(id string) {
-	if i := posicion(a.g.fotos, id); i >= 0 {
+	if i := posicion(a.lineaMezclada(), id); i >= 0 {
 		a.abrirVisor(desdeGaleria, i)
 		return
 	}

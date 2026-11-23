@@ -30,7 +30,7 @@ type (
 )
 
 func (r ControlRequest) Validate(scope storage.Scope, epoch string) error {
-	if r.Version != 1 || r.Scope != scope || !scope.Valid() || (scope.Product != "mail" && scope.Product != "calendar") || r.Epoch != epoch || !storage.MigrationEpoch(epoch) || !r.Target.Valid() {
+	if r.Version != 1 || r.Scope != scope || !scope.Valid() || !Product(scope.Product) || r.Epoch != epoch || !storage.MigrationEpoch(epoch) || !r.Target.Valid() {
 		return ErrContract
 	}
 	var valid bool

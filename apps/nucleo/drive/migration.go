@@ -114,6 +114,12 @@ func (r *Repository) initialize(ctx context.Context) error {
 		StorageIdentityVersion() storage.IdentityVersion
 	})
 	isolated := versioned && identity.StorageIdentityVersion() == storage.IsolatedIdentity
+	if r.cfg.DirectImport {
+		if !isolated {
+			return ErrSource
+		}
+		return r.initializeDirect(ctx, binding, state)
+	}
 	if isolated && state.Mode == "legacy" {
 		return ErrNotReady
 	}

@@ -282,3 +282,13 @@ func ValidPermission(p Permission) bool { return p == PermRead || p == PermWrite
 func ValidShareKind(k ShareKind) bool {
 	return k == ShareLink || k == ShareUser || k == ShareGroup
 }
+
+// Errores de la bóveda post-cuántica (ADR 0086, «pasa Matrix a ella»).
+var (
+	// ErrPQVaultChanged: la bóveda ya no es la que vio quien pide vaciarla (otra
+	// bóveda, o registros publicados después). No se vacía nada.
+	ErrPQVaultChanged = errors.New("drive: la bóveda cambió desde que se leyó")
+	// ErrPQVaultCopyInProgress: otro dispositivo tiene la marca de copia en curso
+	// de la bóveda, o la marca con la que escribe quien copia ya no vale.
+	ErrPQVaultCopyInProgress = errors.New("drive: otro dispositivo está copiando en la bóveda")
+)

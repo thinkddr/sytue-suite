@@ -26,6 +26,7 @@ import { appsDesplegadas, desplegada } from './apps-desplegadas.mjs';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { codigoTOTP, esCuentaDelIdPDesdeAdmin, porQueNoEntra } from './tests/helpers.ts';
+import { PERFIL_CIFRADO, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
 import {
   DETECTOR,
   DETECTOR_DOCUMENTO,
@@ -319,6 +320,54 @@ async function asegurarSesion(page, destino = '') {
       await page.click('button[type=submit]').catch(() => {});
     }
   }
+}
+
+/**
+ * Deja ABIERTA la puerta del cifrado de la app que hay delante (ver
+ * `tests/puerta-cifrado.ts`). Devuelve `abierta` si no había puerta o ya dejaba
+ * pasar, `desbloqueada` si hubo que volver a entrar (la página ya está de vuelta en
+ * la misma ruta) y `cerrada` si sigue sin abrir.
+ *
+ * POR QUÉ HACE FALTA. Solo el PRIMER perfil de cada barrido escribe la contraseña
+ * en este contexto, y es la página de acceso del IdP la que deriva de ella la clave
+ * de desbloqueo y la guarda en el IndexedDB de `id.<dominio>`. Los demás perfiles
+ * arrancan del `storageState` guardado: cookies sí, IndexedDB no —y una `CryptoKey`
+ * no extraíble tampoco se podría copiar—, así que cada app cifrada les enseñaba su
+ * puerta («Volver a entrar en Sytue ID») y el barrido la medía como si fuera la app.
+ * Se vio en el `/edit?id=` de Docus: lo resolvía la ventana mínima 880×600 y nunca
+ * 1280×800 ni 1536×864 (2026-11-19 a 23), y en móvil solo el iPhone SE, el primero
+ * de doce. No era el tamaño: era el ORDEN. La lista de documentos vive detrás de la
+ * puerta y sin ella no hay ni un `<a>`; las demás pantallas salían «ok» midiendo
+ * el aviso de la puerta.
+ *
+ * Se entra como lo haría la persona —el botón de la puerta lleva a
+ * `/auth/login?unlock=1`, que pide la contraseña aunque la sesión siga viva
+ * (`prompt=login`)—, pero por URL y no pulsando: el texto del botón depende del
+ * idioma, y en el estado «clave equivocada» el botón de al lado VACÍA los datos
+ * cifrados. Un acceso por perfil como mucho: la clave queda en el contexto y sirve
+ * a todas las apps del dominio.
+ */
+async function abrirPuertaCifrado(page, app) {
+  const estado = () => page.evaluate(estadoPuertaCifrado, PERFIL_CIFRADO).catch(() => 'abierta');
+  // La puerta pregunta al puente al montarse: se le deja contestar (≤15 s).
+  const asentado = async () => {
+    let e = await estado();
+    for (let i = 0; e === 'abriendo' && i < 30; i++) {
+      await page.waitForTimeout(500);
+      e = await estado();
+    }
+    return e;
+  };
+  if ((await asentado()) !== 'cerrada') return 'abierta';
+  const aqui = new URL(page.url());
+  const volver = aqui.pathname + aqui.search;
+  await navegar(
+    page,
+    `${aqui.origin}${BASES[app] || ''}/auth/login?unlock=1&returnTo=${encodeURIComponent(volver)}`,
+  );
+  await asegurarSesion(page);
+  await page.waitForTimeout(3500);
+  return (await asentado()) === 'cerrada' ? 'cerrada' : 'desbloqueada';
 }
 
 /**
@@ -1106,6 +1155,16 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
           await navegar(page, urlDe(app, host, entrada.desde));
           await page.waitForTimeout(3500);
           await asegurarSesion(page);
+          // EL ENLACE VIVE DETRÁS DE LA PUERTA DEL CIFRADO. El `/edit?id=` de Docus
+          // se resolvía en la ventana mínima y en ninguna de las siguientes
+          // (2026-11-19 a 23), y se tomó por lentitud: se le dio una recarga y 25 s
+          // más, y siguió igual. No era lentitud: desde el segundo perfil la lista
+          // ni se montaba, porque a ese contexto le faltaba la clave de
+          // desbloqueo (ver `abrirPuertaCifrado`). Abierta la puerta, el enlace
+          // está en cuanto llega la lista.
+          if ((await abrirPuertaCifrado(page, app)) === 'cerrada') {
+            throw new Error('la puerta del cifrado no se abrió tras volver a entrar');
+          }
           const href = await page
             .locator(`a[href*="${entrada.enlace}"]`)
             .first()
@@ -1151,6 +1210,33 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
           await ctx.storageState({ path: STORAGE });
           resp = await navegar(page, url);
           await page.waitForTimeout(3500);
+        }
+        // Una app cifrada con la puerta cerrada no es la app: es su aviso de
+        // «Volver a entrar», y medirlo daba «ok» a una pantalla que no se había
+        // visto (todos los perfiles menos el primero; ver `abrirPuertaCifrado`).
+        const puerta = await abrirPuertaCifrado(page, app);
+        if (puerta === 'desbloqueada') {
+          resp = await navegar(page, url);
+          await page.waitForTimeout(3500);
+        } else if (puerta === 'cerrada') {
+          // Lo que dice la puerta (sin datos de la cuenta: es el texto fijo del
+          // estado) para saber POR QUÉ no abre —clave que no abre, importación a
+          // medias, otro dispositivo copiando— sin tener que reproducirlo a mano.
+          const dice = await page
+            .evaluate(() => (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim())
+            .catch(() => '');
+          console.log(
+            `  SALTO   ${nombre.padEnd(20)} ${url.padEnd(46)} la puerta del cifrado no se abrió: se mediría la puerta, no la app`,
+          );
+          console.log(`          la puerta dice: ${dice.slice(0, 300)}`);
+          informe.push({
+            app,
+            ruta,
+            perfil: nombre,
+            salto: 'la puerta del cifrado no se abrió tras volver a entrar: no hay app que medir',
+            puerta: dice.slice(0, 600),
+          });
+          continue;
         }
         // Sin interfaz no hay medida. Un 403 de la consola de administración
         // devuelve «No autorizado para este recurso.» —un párrafo suelto, UN

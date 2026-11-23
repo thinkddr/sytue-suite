@@ -70,12 +70,22 @@ type Task struct {
 	Cipher        storage.StreamSourceRow `json:"cipher"`
 }
 
+// Product dice si un producto recibe por la entrada privada: Mail, Calendar y los
+// avisos de One (hub, ADR 0086). Es la única lista; los demás paquetes la consultan.
+func Product(product string) bool {
+	return product == "mail" || product == "calendar" || product == "hub"
+}
+
 func kindProduct(kind string) string {
 	switch kind {
 	case "mail.receive":
 		return "mail"
 	case "calendar.receive":
 		return "calendar"
+	case "hub.receive":
+		// Un aviso que un servicio deja a una persona cuya fuente de One ya no es
+		// legacy (ADR 0086): el aviso entero va cifrado en los metadatos.
+		return "hub"
 	default:
 		return ""
 	}

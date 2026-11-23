@@ -31,6 +31,47 @@ export const sk: Catalog = {
   'matrix.connect': 'Nastaviť toto zariadenie',
   'matrix.devices': 'Tvoje zariadenia',
   'matrix.failed': 'Šifrovanie sa nepodarilo nastaviť. Skús to znova.',
+  'vault.wrongKey':
+    'Šifrované údaje tejto aplikácie boli uzamknuté iným odomykacím kľúčom Sytue ID, než je ten v tomto prehliadači. Prihláste sa znova do Sytue ID a preneste sem aktuálny kľúč. Ak sa skorší kľúč stratil, môžete šifrované údaje tejto aplikácie vyprázdniť a začať odznova.',
+  'vault.wrongKeyDevice':
+    'Šifrované údaje tejto aplikácie boli uzamknuté iným odomykacím kľúčom Sytue ID, než je ten v tomto zariadení. Prihláste sa znova do Sytue ID a preneste sem aktuálny kľúč. Ak sa skorší kľúč stratil, môžete šifrované údaje tejto aplikácie vyprázdniť a začať odznova.',
+  'vault.release': 'Vyprázdniť a vrátiť sa k údajom na serveri',
+  'vault.releaseTitle': 'Návrat k údajom na serveri',
+  'vault.releaseBody':
+    'Keď boli údaje tejto aplikácie zašifrované v aplikácii pre počítač alebo mobil, server si ponechal ich kópiu presne v tom stave. Ak zašifrované údaje nemožno otvoriť, táto aplikácia sa môže k tejto kópii vrátiť. Všetko, čo bolo zapísané neskôr na akomkoľvek zariadení, sa stratí a nedá sa obnoviť.',
+  'vault.releaseUnderstood':
+    'Beriem na vedomie, že všetko zapísané po prechode na šifrovanie sa stratí',
+  'vault.releaseSignIn': 'Na overenie totožnosti vás Sytue ID najprv požiada o nové prihlásenie.',
+  'vault.releaseFailed': 'Návrat k údajom na serveri sa nepodaril. Skúste to znova.',
+  'vault.moveTitle': 'Presunúť Drive do šifrovaného trezoru',
+  'vault.moveOffer':
+    'Váš Drive je stále uložený v predchádzajúcom šifrovaní. Presuňte ho do trezoru, ktorý používa web a vaše ďalšie zariadenia.',
+  'vault.moveAction': 'Presunúť do trezoru',
+  'vault.moveBody':
+    'Všetky vaše súbory a priečinky aj s ich verziami sa skopírujú do šifrovaného trezoru a jeden po druhom sa skontrolujú. Z predchádzajúceho šifrovania sa nič nemaže. Nechajte aplikáciu otvorenú až do konca; ak sa preruší, pokračuje tam, kde skončila.',
+  'vault.moveUnderstood': 'Rozumiem, že po dokončení sa tento Drive bude používať z trezoru',
+  'vault.moveCopying': 'Kopírujú sa a kontrolujú vaše súbory…',
+  'vault.moveDone': 'Hotovo. Váš Drive je teraz v šifrovanom trezore.',
+  'vault.moveFailed':
+    'Kópiu sa nepodarilo dokončiť. Vaše súbory sú stále v predchádzajúcom šifrovaní. Skúste to znova.',
+  'vault.movePending':
+    'Toto zariadenie má ešte zmeny na odoslanie. Počkajte, kým sa dokončia, a skúste to znova.',
+  'vault.copyInProgress':
+    'Iné zariadenie presúva váš Drive do šifrovaného trezoru. Počkajte, kým skončí, a skúste to znova.',
+  'vault.copyCancel': 'Zrušiť kopírovanie',
+  'vault.copyCancelHint':
+    'Ak sa kopírovanie zastavilo, môžete ho zrušiť: nič sa nevymaže a z toho zariadenia ho môžete zopakovať.',
+  'vault.releaseNotice':
+    'Údaje tejto aplikácie boli zašifrované v aplikácii pre počítač alebo mobil. Tu vidíte kópiu, ktorú si server v tej chvíli ponechal; čo bolo zapísané neskôr, je len v zašifrovaných údajoch. Ak ich už nemožno otvoriť, môžete sa vrátiť k údajom na serveri.',
+  'notifications.kind.security.storage.released': '{name}: návrat k vašim údajom na serveri',
+  'vault.signInAgain': 'Znova sa prihlásiť do Sytue ID',
+  'vault.empty': 'Vyprázdniť šifrované údaje',
+  'vault.emptyTitle': 'Vyprázdniť šifrované údaje tejto aplikácie',
+  'vault.emptyBody':
+    'Údaje, ktoré táto aplikácia zašifrovala strateným kľúčom, sa zo Sytue odstránia a vytvorí sa nový kľúč. Zvyšok vášho účtu zostane bez zmeny. Túto akciu nemožno vrátiť.',
+  'vault.emptyUnderstood': 'Rozumiem, že údaje zašifrované strateným kľúčom sa odstránia',
+  'vault.failed':
+    'Šifrované údaje sa nepodarilo otvoriť. Skúste to znova alebo sa znova prihláste do Sytue ID. Ak sa kľúč stratil, môžete šifrované údaje tejto aplikácie vyprázdniť.',
   'matrix.incoming': 'Overiť toto zariadenie',
   'matrix.match': 'Zhodujú sa',
   'matrix.mismatch': 'Nezhodujú sa',

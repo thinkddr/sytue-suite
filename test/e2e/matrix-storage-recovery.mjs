@@ -16,6 +16,48 @@ const [fixturePath, resultPath] = process.argv.slice(2);
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
 assert.equal(fixture.artificial, true);
 assert.equal(fixture.bootstrap.homeserver_url, 'https://storage.test:18586');
+// La inyección cruda es el único punto en el que datos leídos del fichero salen por
+// HTTP. Destino fijo (el Synapse artificial local) y solo la forma exacta que produce
+// el fixture nativo: sala y token acotados, contenido Megolm sin campos libres
+// enormes. Todo se valida y se prepara aquí, antes de levantar nada.
+const artificialSynapse = 'http://127.0.0.1:18585';
+const artificialInjections = (() => {
+  const room = fixture.reference?.room_id;
+  const token = fixture.session?.access_token;
+  assert(
+    typeof room === 'string' &&
+      /^![A-Za-z0-9._~-]{1,255}(?::[A-Za-z0-9.-]{1,255}(?::\d{1,5})?)?$/.test(room),
+    'artificial room id expected',
+  );
+  assert(
+    typeof token === 'string' && /^[A-Za-z0-9._~+/=-]{16,512}$/.test(token),
+    'artificial access token expected',
+  );
+  const megolm = (content) => {
+    assert(content && typeof content === 'object' && !Array.isArray(content));
+    assert.equal(content.algorithm, 'm.megolm.v1.aes-sha2');
+    assert(typeof content.ciphertext === 'string' && /^[A-Za-z0-9+/]+$/.test(content.ciphertext));
+    assert(typeof content.sender_key === 'string' && typeof content.session_id === 'string');
+    const body = JSON.stringify(content);
+    assert(body.length <= 64 << 10, 'artificial ciphertext too large');
+    return body;
+  };
+  const injection = (which, content) => {
+    const url = new URL(
+      '/_matrix/client/v3/rooms/' +
+        encodeURIComponent(room) +
+        '/send/m.room.encrypted/artificial-raw-' +
+        which,
+      artificialSynapse,
+    );
+    assert.equal(url.origin, artificialSynapse);
+    return { url, authorization: 'Bearer ' + token, body: megolm(content) };
+  };
+  return {
+    forged: injection('forged', fixture.forged_ciphertext),
+    legacy: injection('legacy', fixture.legacy_ciphertext),
+  };
+})();
 const directory = await mkdtemp(path.join(tmpdir(), 'sytue-browser-recovery-'));
 let browser, server;
 try {
@@ -57,23 +99,19 @@ try {
         request.method === 'POST' &&
         ['/inject/forged', '/inject/legacy'].includes(url.pathname)
       ) {
-        const which = url.pathname.slice('/inject/'.length);
-        const response = await fetch(
-          'http://127.0.0.1:18585/_matrix/client/v3/rooms/' +
-            encodeURIComponent(fixture.reference.room_id) +
-            '/send/m.room.encrypted/artificial-raw-' +
-            which,
-          {
-            method: 'PUT',
-            headers: {
-              authorization: 'Bearer ' + fixture.session.access_token,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify(
-              which === 'forged' ? fixture.forged_ciphertext : fixture.legacy_ciphertext,
-            ),
+        const injection =
+          url.pathname === '/inject/forged'
+            ? artificialInjections.forged
+            : artificialInjections.legacy;
+        const response = await fetch(injection.url, {
+          method: 'PUT',
+          redirect: 'error',
+          headers: {
+            authorization: injection.authorization,
+            'content-type': 'application/json',
           },
-        );
+          body: injection.body,
+        });
         assert.equal(response.status, 200, 'fixed artificial injection failed');
         return Response.json(await response.json());
       }

@@ -207,6 +207,9 @@ func (h *Handler) guardarEnDrive(ctx context.Context, token, nombre string, dato
 	if errors.Is(err, drive.ErrCuota) {
 		return f, httpx.NewError(http.StatusInsufficientStorage, "quota_exceeded", "Your Drive is full.")
 	}
+	if errors.Is(err, drive.ErrUnidadCifrada) {
+		return f, errUnidadCifrada
+	}
 	return f, err
 }
 

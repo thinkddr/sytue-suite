@@ -1592,6 +1592,9 @@ export interface EditorContext {
   savingToDrive: boolean;
   /** Devuelve lo editado a su fichero de Drive (queda allí como versión nueva). */
   saveToDrive: () => Promise<void>;
+  /** El Drive de quien edita está en la bóveda (ADR 0086): «Guardar en Drive» se
+   *  ofrece aunque el documento no tenga ancla, y cifra en el navegador. */
+  driveCifrado?: boolean;
   /** Carpeta de Drive de la que vino el documento para volver a ella al salir. */
   volverA?: string | undefined;
 }

@@ -18,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	carddavsrv "git.sytue.eu/sytue/one/services/contacts/internal/carddav"
 	"git.sytue.eu/sytue/one/services/contacts/internal/config"
 	"git.sytue.eu/sytue/one/services/contacts/internal/store"
@@ -71,6 +72,7 @@ func NewRouter(d Deps) http.Handler {
 		api.Post("/private-storage/migration", h.BeginPrivateStorageMigration)
 		api.Get("/private-storage/migration/{epoch}/rows", h.PrivateStorageSourcePage)
 		api.Get("/private-storage/migration/{epoch}/blobs/{kind}/{id}", h.OpenPrivateStorageSource)
+		soltarfuente.Montar(api, soltarfuente.Config{Product: "contacts", Soltar: d.Store.ReleasePrivateStorage, Avisar: d.Hub.Send})
 
 		// «Exportar tus datos»: la entrega de la agenda (platform/pkg/portabilidad).
 		api.Get("/export", h.Export)

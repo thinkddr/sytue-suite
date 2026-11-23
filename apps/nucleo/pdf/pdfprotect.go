@@ -144,6 +144,9 @@ func nuevoCifrador(opts OpcionesProteccion) (*cifradorPDF, error) {
 // envolverClave cifra la clave del fichero con la intermedia: AES-256 en CBC,
 // vector de ceros y sin relleno (§7.6.4.3.3).
 func envolverClave(intermedia, clave []byte) ([]byte, error) {
+	if len(intermedia) < 32 {
+		return nil, fmt.Errorf("pdf: clave intermedia inválida")
+	}
 	bloque, err := aes.NewCipher(intermedia[:32])
 	if err != nil {
 		return nil, err

@@ -49,6 +49,12 @@ const errors: readonly UnlockBridgeError[] = ['signin', 'wrong', 'account', 'bus
  * key back sealed for it, in the FRAGMENT of the return (`#sytue_unlock=…`: no server
  * sees it). This page cannot open it; it hands it to its bridge with the next request.
  */
+const keyOperations: ReadonlySet<string> = new Set([
+  'sytue-e2e-unwrap',
+  'sytue-e2e-wrap',
+  'sytue-e2e-vault-unwrap',
+  'sytue-e2e-vault-wrap',
+]);
 const handoffShape = /^[A-Za-z0-9_-]{1,16384}$/;
 const handoffKeyShape = /^[A-Za-z0-9_-]{87}$/;
 let handoff: string | null = null;
@@ -98,9 +104,11 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
   } catch {
     return Promise.resolve(unavailable);
   }
-  // Only the operations that use the unlock key take the return of a sign-in with them.
-  const carries =
-    request.type === 'sytue-e2e-unwrap' || request.type === 'sytue-e2e-wrap' ? handoff : null;
+  // Only the operations that use the unlock key take the return of a sign-in with them:
+  // the Matrix wrappers AND the post-quantum vault (ADR 0086). Leaving the vault out
+  // brought back, for every app, the endless «sign in again» of Safari that the
+  // handoff exists to end: the bridge never received the key the relay sent it.
+  const carries = keyOperations.has(request.type as string) ? handoff : null;
   return new Promise((resolve) => {
     const frame = doc.createElement('iframe');
     const id = crypto.randomUUID();
@@ -262,4 +270,135 @@ export async function passwordEnvelopeInBridge(
   )
     return { ok: false, error: 'unavailable' };
   return { ok: true, envelope };
+}
+
+export const pqVaultProfile = 'age-MLKEM768-X25519-v1' as const;
+
+export interface PqVaultSecret {
+  v: 1;
+  profile: typeof pqVaultProfile;
+  identity: string;
+  owner_key: string;
+  /**
+   * The vault's hybrid signing key (ADR 0087, Ed25519 + ML-DSA-65): its two 32-byte
+   * seeds in base64. Optional: vaults sealed before it do not have one.
+   */
+  signing_key?: string;
+}
+
+const signingKeyShape = /^[A-Za-z0-9+/]{86}==$/;
+
+export interface PqVaultWrapper {
+  v: 1;
+  kind: 'sytue-id';
+  profile: typeof pqVaultProfile;
+  key_id: string;
+  recipient: string;
+  kdf: { alg: 'sytue-id-unlock-hkdf-sha256'; hint: string };
+  nonce: string;
+  ciphertext: string;
+}
+
+export type VaultUnwrapResult =
+  | {
+      ok: true;
+      secret: PqVaultSecret;
+      keyID: string;
+      recipient: string;
+      profile: typeof pqVaultProfile;
+    }
+  | { ok: false; error: UnlockBridgeError };
+
+export type VaultWrapResult =
+  { ok: true; wrapper: PqVaultWrapper } | { ok: false; error: UnlockBridgeError };
+
+function isPqVaultSecret(value: unknown): value is PqVaultSecret {
+  if (!value || typeof value !== 'object') return false;
+  const s = value as Record<string, unknown>;
+  return (
+    s.v === 1 &&
+    s.profile === pqVaultProfile &&
+    typeof s.identity === 'string' &&
+    s.identity.length > 0 &&
+    typeof s.owner_key === 'string' &&
+    s.owner_key.length > 0 &&
+    (s.signing_key === undefined ||
+      (typeof s.signing_key === 'string' && signingKeyShape.test(s.signing_key)))
+  );
+}
+
+/** Opens a direct PQ vault wrapper (ADR 0086) in Sytue ID's origin. */
+export async function unwrapVaultInBridge(
+  options: UnlockBridgeOptions,
+  input: { tenant: string; product: string; wrappers: readonly PqVaultWrapper[] },
+): Promise<VaultUnwrapResult> {
+  const answer = await ask(options, {
+    type: 'sytue-e2e-vault-unwrap',
+    tenant: input.tenant,
+    product: input.product,
+    wrappers: input.wrappers.slice(0, 32),
+  });
+  if (!answer.ok) return answer;
+  const { secret, key_id: keyID, recipient, profile } = answer.data;
+  if (
+    !isPqVaultSecret(secret) ||
+    typeof keyID !== 'string' ||
+    !keyID ||
+    typeof recipient !== 'string' ||
+    !recipient ||
+    profile !== pqVaultProfile
+  )
+    return { ok: false, error: 'unavailable' };
+  return { ok: true, secret, keyID, recipient, profile };
+}
+
+/** Wraps a direct PQ vault identity + owner key (ADR 0086) in Sytue ID's origin. */
+export async function wrapVaultInBridge(
+  options: UnlockBridgeOptions,
+  input: {
+    tenant: string;
+    product: string;
+    profile: typeof pqVaultProfile;
+    keyID: string;
+    recipient: string;
+    secret: PqVaultSecret;
+  },
+): Promise<VaultWrapResult> {
+  const answer = await ask(options, {
+    type: 'sytue-e2e-vault-wrap',
+    tenant: input.tenant,
+    product: input.product,
+    profile: input.profile,
+    key_id: input.keyID,
+    recipient: input.recipient,
+    secret: input.secret,
+  });
+  if (!answer.ok) return answer;
+  const wrapper = answer.data.wrapper as PqVaultWrapper | undefined;
+  if (
+    !wrapper ||
+    wrapper.v !== 1 ||
+    wrapper.kind !== 'sytue-id' ||
+    wrapper.profile !== pqVaultProfile ||
+    wrapper.key_id !== input.keyID ||
+    wrapper.recipient !== input.recipient ||
+    wrapper.kdf?.alg !== 'sytue-id-unlock-hkdf-sha256' ||
+    typeof wrapper.kdf.hint !== 'string' ||
+    typeof wrapper.nonce !== 'string' ||
+    typeof wrapper.ciphertext !== 'string'
+  )
+    return { ok: false, error: 'unavailable' };
+  return {
+    ok: true,
+    wrapper: {
+      v: 1,
+      kind: 'sytue-id',
+      profile: pqVaultProfile,
+      key_id: wrapper.key_id,
+      recipient: wrapper.recipient,
+      kdf: { alg: 'sytue-id-unlock-hkdf-sha256', hint: wrapper.kdf.hint },
+      nonce: wrapper.nonce,
+      ciphertext: wrapper.ciphertext,
+    },
+  };
 }

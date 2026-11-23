@@ -350,4 +350,37 @@ export const it: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Salvate in Immagini › Sytue Photos: {count}',
   'library.saveFailed': 'Impossibile salvare nella galleria di questo computer: {name}',
   'backup.whileOpen': 'Su questo computer il backup avviene mentre Sytue Fotos è aperta.',
+  'backup.encryptedWaitTitle': 'Apri Sytue Fotos per completare il backup cifrato',
+  'backup.encryptedWaitBody':
+    'Il tuo Drive è crittografato end-to-end. Le nuove foto vengono salvate appena apri Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Salvate nel tuo Drive con crittografia end-to-end: {count}',
+  'gallery.uploadVaultSignIn':
+    'Il tuo Drive è crittografato end-to-end. Accedi di nuovo per sbloccarlo, poi aggiungi di nuovo le foto.',
+  'gallery.uploadVaultNotReady':
+    'Il tuo Drive sta ancora passando alla crittografia end-to-end. Apri Sytue Drive per completare, poi aggiungi di nuovo le foto.',
+  'gallery.uploadVaultLocked':
+    'Il tuo Drive è crittografato end-to-end. Sbloccalo qui sopra, poi aggiungi di nuovo le foto.',
+  'gallery.uploadVaultUnavailable':
+    'Il tuo Drive è crittografato end-to-end e non può essere aperto su questo dispositivo. Aggiungi le foto da Sytue Photos sul web.',
+  'gallery.encrypted.title': 'Nel tuo Drive crittografato',
+  'gallery.encrypted.show': 'Mostra',
+  'gallery.encrypted.opening': 'Decifratura…',
+  'gallery.encrypted.failed': 'Impossibile aprire il tuo Drive crittografato.',
+  'gallery.encrypted.signIn': 'Accedi di nuovo',
+  'gallery.encrypted.empty': 'Non ci sono ancora foto nel tuo Drive crittografato.',
+  'gallery.encrypted.note':
+    'Le foto crittografate end-to-end vengono decifrate solo su questo dispositivo. Sytue AI, le foto simili, Nelle vicinanze e i ricordi non le includono.',
+  'gallery.encrypted.badge': 'Crittografata end-to-end',
+  'gallery.encrypted.open': 'Apri {name} (crittografata)',
+  'gallery.encrypted.notSelectable':
+    'Le foto crittografate non si possono selezionare: aprine una per aggiungerla ai preferiti o a un album.',
+  'gallery.encrypted.actionFailed': 'Impossibile aggiornare la tua galleria crittografata.',
+  'gallery.encrypted.saved':
+    'Salvata come nuova versione crittografata. La precedente resta nella cronologia delle versioni di Drive.',
+  'gallery.encrypted.albums': 'Album crittografati',
+  'gallery.encrypted.newAlbum': 'Nuovo album crittografato',
+  'gallery.encrypted.saveVersion': 'Salva come nuova versione',
+  'gallery.encrypted.editHint':
+    'La modifica avviene su questo dispositivo e viene salvata crittografata come nuova versione della foto.',
+  'gallery.encrypted.albumEmpty': 'Questo album crittografato non contiene ancora foto.',
 };

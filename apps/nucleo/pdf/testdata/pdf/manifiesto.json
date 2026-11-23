@@ -886,6 +886,68 @@
           "alcance": "ninguno"
         }
       ]
+    },
+    {
+      "id": "firmado-en-el-dispositivo",
+      "fichero": "firmado-en-el-dispositivo.pdf",
+      "descripcion": "una firma de pyHanko y, anexada detrás, otra hecha en el NAVEGADOR (TypeScript con WebCrypto y un .p12 3DES, ADR 0086): las dos válidas, la primera solo ve añadirse la segunda",
+      "anclas": [
+        "raiz-a",
+        "empresa-pruebas"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "permitidos"
+        },
+        {
+          "campo": "Sytue.Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "EMPRESA DE PRUEBAS SL",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "firmado-en-el-dispositivo-visible-con-sello",
+      "fichero": "firmado-en-el-dispositivo-visible-con-sello.pdf",
+      "descripcion": "firma VISIBLE con rúbrica (página 2) y SELLO DE TIEMPO hecha en el NAVEGADOR (ADR 0086, PAdES B-T): a la autoridad de OpenSSL solo le llegó la huella del valor de la firma; válida con sello de confianza",
+      "anclas": [
+        "empresa-pruebas"
+      ],
+      "anclas_sello": [
+        "raiz-sello-dispositivo"
+      ],
+      "firmas": [
+        {
+          "campo": "Sytue.Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "EMPRESA DE PRUEBAS SL",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": true,
+            "confianza": "confiable",
+            "autoridad": "TSA de prueba del dispositivo"
+          }
+        }
+      ]
     }
   ]
 }

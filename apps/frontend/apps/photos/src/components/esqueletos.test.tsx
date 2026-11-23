@@ -131,8 +131,9 @@ test('las ocho pantallas cargan con esqueleto y no con la rueda suelta', () => {
     if (f === 'PhotosApp.tsx') {
       expect(s).toContain('cargando && fotos.length > 0 ? <Spinner />');
       // Mientras se escribe la línea está vacía y aún no se ha pedido: el esqueleto
-      // sigue, para que no haya un hueco en blanco entre tecla y tecla.
-      expect(s).toContain('(cargando || pendiente) && fotos.length === 0 ? (');
+      // sigue, para que no haya un hueco en blanco entre tecla y tecla. Cuenta lo que
+      // se ve: las del servidor y las cifradas juntas (`elementos`).
+      expect(s).toContain('(cargando || pendiente) && elementos.length === 0 ? (');
     } else expect(s).not.toContain('<Spinner');
   }
 });

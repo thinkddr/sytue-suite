@@ -979,4 +979,10 @@ export const hr: AppCatalog<typeof en> = {
     'Poruka je prihvaćena, ali kopija nije spremljena u Poslano. Nemojte je ponovno slati.',
   'externalMail.invalidConfiguration':
     'Unesite valjanu adresu e-pošte, nazive i priključke oba poslužitelja te lozinku.',
+  'privateMail.handoverOffer': 'Ne možete otvoriti poštu? Ispraznite je i premjestite u trezor',
+  'privateMail.handoverTitle': 'Isprazni poštu i premjesti je u trezor',
+  'privateMail.handoverBody':
+    'Šifrirana pošta koju više ne možete otvoriti neće se vratiti. Od sada se vaša pošta otvara prijavom u Sytue ID, koju ćete možda morati ponoviti.',
+  'privateMail.handoverUnderstood': 'Razumijem da će se pošta koju ne mogu otvoriti izgubiti',
+  'privateMail.handoverConfirm': 'Isprazni i premjesti u trezor',
 };

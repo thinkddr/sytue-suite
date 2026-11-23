@@ -380,4 +380,37 @@ export const pl: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Zapisano w Obrazy › Sytue Photos: {count}',
   'library.saveFailed': 'Nie udało się zapisać w galerii tego komputera: {name}',
   'backup.whileOpen': 'Na tym komputerze kopia jest tworzona, gdy Sytue Fotos jest otwarte.',
+  'backup.encryptedWaitTitle': 'Otwórz Sytue Fotos, aby dokończyć szyfrowaną kopię',
+  'backup.encryptedWaitBody':
+    'Twój Drive jest szyfrowany end-to-end. Nowe zdjęcia zostaną skopiowane, gdy tylko otworzysz Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Zapisano w Twoim Drive z szyfrowaniem end-to-end: {count}',
+  'gallery.uploadVaultSignIn':
+    'Twój Drive jest szyfrowany end-to-end. Zaloguj się ponownie, aby go odblokować, i dodaj zdjęcia jeszcze raz.',
+  'gallery.uploadVaultNotReady':
+    'Twój Drive wciąż przechodzi na szyfrowanie end-to-end. Otwórz Sytue Drive, aby to dokończyć, i dodaj zdjęcia jeszcze raz.',
+  'gallery.uploadVaultLocked':
+    'Twój Drive jest szyfrowany end-to-end. Odblokuj go powyżej i dodaj zdjęcia jeszcze raz.',
+  'gallery.uploadVaultUnavailable':
+    'Twój Drive jest szyfrowany end-to-end i nie można go otworzyć na tym urządzeniu. Dodaj zdjęcia w Sytue Photos w przeglądarce.',
+  'gallery.encrypted.title': 'W Twoim zaszyfrowanym Drive',
+  'gallery.encrypted.show': 'Pokaż',
+  'gallery.encrypted.opening': 'Odszyfrowywanie…',
+  'gallery.encrypted.failed': 'Nie udało się otworzyć Twojego zaszyfrowanego Drive.',
+  'gallery.encrypted.signIn': 'Zaloguj się ponownie',
+  'gallery.encrypted.empty': 'W Twoim zaszyfrowanym Drive nie ma jeszcze zdjęć.',
+  'gallery.encrypted.note':
+    'Zdjęcia zaszyfrowane end-to-end są odszyfrowywane tylko na tym urządzeniu. Sytue AI, podobne zdjęcia, W pobliżu i wspomnienia ich nie obejmują.',
+  'gallery.encrypted.badge': 'Zaszyfrowane end-to-end',
+  'gallery.encrypted.open': 'Otwórz {name} (zaszyfrowane)',
+  'gallery.encrypted.notSelectable':
+    'Zaszyfrowanych zdjęć nie można zaznaczać: otwórz jedno, aby oznaczyć je jako ulubione lub dodać do albumu.',
+  'gallery.encrypted.actionFailed': 'Nie udało się zaktualizować zaszyfrowanej galerii.',
+  'gallery.encrypted.saved':
+    'Zapisano jako nową zaszyfrowaną wersję. Poprzednia pozostaje w historii wersji na Drive.',
+  'gallery.encrypted.albums': 'Zaszyfrowane albumy',
+  'gallery.encrypted.newAlbum': 'Nowy zaszyfrowany album',
+  'gallery.encrypted.saveVersion': 'Zapisz jako nową wersję',
+  'gallery.encrypted.editHint':
+    'Edycja odbywa się na tym urządzeniu i jest zapisywana w postaci zaszyfrowanej jako nowa wersja zdjęcia.',
+  'gallery.encrypted.albumEmpty': 'Ten zaszyfrowany album nie ma jeszcze zdjęć.',
 };

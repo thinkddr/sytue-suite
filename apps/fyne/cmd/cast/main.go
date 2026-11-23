@@ -43,6 +43,7 @@ import (
 	privateCast "git.sytue.eu/sytue/one/apps/nucleo/cast"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // Ventana inicial: la misma con la que se mide la web (1280×800).
@@ -83,128 +84,143 @@ func main() {
 		views.registerLifecycle(s)
 	}
 
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateCast.Repository]{
-		Suite: s, Application: a, Window: w, Product: "cast",
-		Translate: func(key string) string { return tr.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateCast.Repository], error) {
-			return castPlan(ctx, resources, s)
-		},
-		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
-		Mount: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *privateCast.Repository) (cifrado.ApplicationView, error) {
-			facade, err := api.NewCast(s.URL("cast"), resources.HTTP(), nil).WithPrivateData(repository.Data())
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	mount := func(resources cifrado.Cuenta, facade *api.Cast) cifrado.ApplicationView {
+		teca := photos.NuevaFototeca()
+		v := cast.Vista{T: tr, Ventana: anchoInicial, Variante: tema.De(a.Settings().ThemeVariant()), Teca: teca, Movil: movil}
+		p := cast.Nueva(facade, v, w)
+		p.Movil = movil
+		p.SoltarCopia = sesion.SoltarElegido
+		view := views.mount(p)
+		teca.Pedir = p.PedirPoster
+		// Un póster que llega repinta la página: las tarjetas lo piden a la caché al pintarse.
+		teca.AlLlegar = view.poster(fyne.Do)
+		// El presentador privado ya está dentro: existe sólo con la sesión montada.
+		p.ConSesion = func() bool { return true }
+		p.Yo = func() string { return resources.PrivateStorageScope().Subject }
+		p.AlEntrar = func() { go func() { _ = s.Entrar(context.Background()) }() }
+		p.WebDe = func(ruta string) string { return api.AppURL(s.Apex(), "cast", "", ruta) }
+		organizacion := resources.PrivateStorageScope().Tenant
+		p.AbrirDrive = func() { _ = api.AbrirEn(a, s.Apex(), "drive", organizacion, "/") }
+		p.Elegir = func() ([]string, error) {
+			return ficheros.ElegirConTipos(tr.T("upload.choose", nil), "mp4", "m4v", "mov", "mkv", "webm", "avi")
+		}
+		p.ElegirImagen = func() (string, error) {
+			fs, err := ficheros.ElegirConTipos(tr.T("manage.posterUpload", nil), "jpg", "jpeg", "png", "webp")
+			if err != nil || len(fs) == 0 {
+				return "", err
+			}
+			return fs[0], nil
+		}
+		p.Guardar = func(nombre string, r io.Reader) (string, error) {
+			carpeta, err := ficheros.Carpeta()
 			if err != nil {
-				return cifrado.ApplicationView{}, err
+				return "", err
 			}
-			teca := photos.NuevaFototeca()
-			v := cast.Vista{T: tr, Ventana: anchoInicial, Variante: tema.De(a.Settings().ThemeVariant()), Teca: teca, Movil: movil}
-			p := cast.Nueva(facade, v, w)
-			p.Movil = movil
-			p.SoltarCopia = sesion.SoltarElegido
-			view := views.mount(p)
-			teca.Pedir = p.PedirPoster
-			// Un póster que llega repinta la página: las tarjetas lo piden a la caché al pintarse.
-			teca.AlLlegar = view.poster(fyne.Do)
-			// El presentador privado ya está dentro: existe sólo con la sesión montada.
-			p.ConSesion = func() bool { return true }
-			p.Yo = func() string { return repository.PrivateStorageScope().Subject }
-			p.AlEntrar = func() { go func() { _ = s.Entrar(context.Background()) }() }
-			p.WebDe = func(ruta string) string { return api.AppURL(s.Apex(), "cast", "", ruta) }
-			organizacion := repository.PrivateStorageScope().Tenant
-			p.AbrirDrive = func() { _ = api.AbrirEn(a, s.Apex(), "drive", organizacion, "/") }
-			p.Elegir = func() ([]string, error) {
-				return ficheros.ElegirConTipos(tr.T("upload.choose", nil), "mp4", "m4v", "mov", "mkv", "webm", "avi")
-			}
-			p.ElegirImagen = func() (string, error) {
-				fs, err := ficheros.ElegirConTipos(tr.T("manage.posterUpload", nil), "jpg", "jpeg", "png", "webp")
-				if err != nil || len(fs) == 0 {
-					return "", err
-				}
-				return fs[0], nil
-			}
-			p.Guardar = func(nombre string, r io.Reader) (string, error) {
-				carpeta, err := ficheros.Carpeta()
+			return ficheros.Guardar(carpeta, nombre, r)
+		}
+		// El sonido y el directo: la tarjeta del sistema y la llamada nativa, como Rooms.
+		// La emisión sigue fail-closed en la fachada hasta su versión privada.
+		if llamada.Disponible {
+			p.Audio = altavoz.Sistema{}
+			p.Conectar = func(u, token string, o llamada.Opciones) (cast.Sala, error) {
+				l, err := llamada.Entrar(u, token, o)
 				if err != nil {
-					return "", err
+					return nil, err
 				}
-				return ficheros.Guardar(carpeta, nombre, r)
+				return l, nil
 			}
-			// El sonido y el directo: la tarjeta del sistema y la llamada nativa, como Rooms.
-			// La emisión sigue fail-closed en la fachada hasta su versión privada.
-			if llamada.Disponible {
-				p.Audio = altavoz.Sistema{}
-				p.Conectar = func(u, token string, o llamada.Opciones) (cast.Sala, error) {
-					l, err := llamada.Entrar(u, token, o)
-					if err != nil {
-						return nil, err
-					}
-					return l, nil
-				}
-				p.Camara = func() (camara.Fuente, error) {
-					pedido := camara.PedidoPorOmision
-					pedido.ID = p.CamaraElegida()
-					return camara.Abrir(pedido)
-				}
-				if camara.PantallaDisponible {
-					p.Pantalla = camara.AbrirPantalla
-				}
-				p.Camaras = camara.Dispositivos
-				p.CamaraConcedida = camara.Concedido
-				p.PedirMicro = altavoz.PedirMicro
+			p.Camara = func() (camara.Fuente, error) {
+				pedido := camara.PedidoPorOmision
+				pedido.ID = p.CamaraElegida()
+				return camara.Abrir(pedido)
 			}
-			// En el teléfono: la pantalla no se apaga mientras se ve o se emite, y al irse al
-			// fondo el vídeo se pausa (y vuelve a entrar al directo al volver).
-			if movil {
-				p.PantallaEncendida = func(si bool) { sesion.PantallaEncendida(a, si) }
-				// La imagen dentro de imagen del sistema. Si el teléfono la tiene se pregunta al
-				// abrir cada vídeo: aquí la actividad todavía no existe y la respuesta sería «no».
-				p.PiPMovil = sesion.ImagenEnImagen
-				sesion.AlSucesoPiP(func(que int) { view.pip(que == sesion.PiPCerrada) })
-				// El campo en el que se escribe, por encima del teclado: se mide cuando el teclado
-				// ya ha salido, que tarda lo que tarda su animación (en el emulador, más de 400 ms).
-				ui.AlEscribir = func(c fyne.Canvas) {
-					go func() {
-						// Hasta que el alto deja de crecer: durante la animación el teclado mide
-						// solo lo que lleva, y con esa medida el campo quedaba a medias debajo.
-						antes := float32(-1)
-						for range 20 {
-							time.Sleep(100 * time.Millisecond)
-							// En unidades del lienzo, con la conversión de cada sistema.
-							px := ui.AltoTeclado(c)
-							if px > 0 && px == antes {
-								fyne.Do(func() { p.MostrarCampo(px) })
-								break
-							}
-							antes = px
+			if camara.PantallaDisponible {
+				p.Pantalla = camara.AbrirPantalla
+			}
+			p.Camaras = camara.Dispositivos
+			p.CamaraConcedida = camara.Concedido
+			p.PedirMicro = altavoz.PedirMicro
+		}
+		// En el teléfono: la pantalla no se apaga mientras se ve o se emite, y al irse al
+		// fondo el vídeo se pausa (y vuelve a entrar al directo al volver).
+		if movil {
+			p.PantallaEncendida = func(si bool) { sesion.PantallaEncendida(a, si) }
+			// La imagen dentro de imagen del sistema. Si el teléfono la tiene se pregunta al
+			// abrir cada vídeo: aquí la actividad todavía no existe y la respuesta sería «no».
+			p.PiPMovil = sesion.ImagenEnImagen
+			sesion.AlSucesoPiP(func(que int) { view.pip(que == sesion.PiPCerrada) })
+			// El campo en el que se escribe, por encima del teclado: se mide cuando el teclado
+			// ya ha salido, que tarda lo que tarda su animación (en el emulador, más de 400 ms).
+			ui.AlEscribir = func(c fyne.Canvas) {
+				go func() {
+					// Hasta que el alto deja de crecer: durante la animación el teclado mide
+					// solo lo que lleva, y con esa medida el campo quedaba a medias debajo.
+					antes := float32(-1)
+					for range 20 {
+						time.Sleep(100 * time.Millisecond)
+						// En unidades del lienzo, con la conversión de cada sistema.
+						px := ui.AltoTeclado(c)
+						if px > 0 && px == antes {
+							fyne.Do(func() { p.MostrarCampo(px) })
+							break
 						}
-						// Y cuando se va, fuera el hueco que se le dejó debajo de la página.
-						for sesion.AltoTeclado() > 0 {
-							time.Sleep(300 * time.Millisecond)
-						}
-						fyne.Do(func() { p.MostrarCampo(0) })
-					}()
-				}
-			}
-			// Soltar un vídeo encima de la ventana lo prepara para subir.
-			soltar.AlArrastrar(w, p.Arrastrando)
-			current = p
-			// La portada pública es texto legible del servidor: el presentador privado
-			// abre en los vídeos personales del repositorio cifrado.
-			p.Ir(cast.RutaGestionar)
-			p.Arrancar()
-			if u := pendiente; u != nil {
-				pendiente = nil
-				p.AbrirEnlace(u)
-			}
-			return cifrado.ApplicationView{
-				Object: p.Objeto(),
-				Detach: func() {
-					wasCurrent := view.detach(teca)
-					if wasCurrent && current == p {
-						current = nil
+						antes = px
 					}
-					p.Cerrar()
-				},
-			}, nil
+					// Y cuando se va, fuera el hueco que se le dejó debajo de la página.
+					for sesion.AltoTeclado() > 0 {
+						time.Sleep(300 * time.Millisecond)
+					}
+					fyne.Do(func() { p.MostrarCampo(0) })
+				}()
+			}
+		}
+		// Soltar un vídeo encima de la ventana lo prepara para subir.
+		soltar.AlArrastrar(w, p.Arrastrando)
+		current = p
+		// La portada pública es texto legible del servidor: el presentador privado
+		// abre en los vídeos personales del repositorio cifrado.
+		p.Ir(cast.RutaGestionar)
+		p.Arrancar()
+		if u := pendiente; u != nil {
+			pendiente = nil
+			p.AbrirEnlace(u)
+		}
+		return cifrado.ApplicationView{
+			Object: p.Objeto(),
+			Detach: func() {
+				wasCurrent := view.detach(teca)
+				if wasCurrent && current == p {
+					current = nil
+				}
+				p.Cerrar()
+			},
+		}
+	}
+
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*privateCast.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*privateCast.Repository]{
+			Suite: s, Application: a, Window: w, Product: "cast",
+			Translate: func(key string) string { return tr.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateCast.Repository], error) {
+				return castPlan(ctx, resources, s)
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateCast.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewCast(s.URL("cast"), resources.HTTP(), nil).WithPrivateData(repository.Data())
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return mount(resources, facade), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+			},
+		},
+		Soltar: cifrado.SoltarEn(s.URL("cast")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewCast(s.URL("cast"), session, nil).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewCast(s.URL("cast"), cuenta.HTTP(), nil)), nil
 		},
 	})
 	if err != nil {

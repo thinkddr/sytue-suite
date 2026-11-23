@@ -353,3 +353,51 @@ func TestPedirFirmaConLasPiezasDeLaSuite(t *testing.T) {
 		}
 	})
 }
+
+// TestConElDrivePrivadoNoSePideFirmaYSeDicePorQue: con el PDF en el Drive privado del
+// dispositivo (la bóveda de la ADR 0086), pedir firma necesitaría que el servicio leyera
+// el PDF. El diálogo lo explica con la frase de la web y no toca la red; tampoco se
+// buscan peticiones de ese PDF.
+func TestConElDrivePrivadoNoSePideFirmaYSeDicePorQue(t *testing.T) {
+	s := &servicioDeFirmas{}
+	srv := httptest.NewServer(s)
+	defer srv.Close()
+	pdf, err := api.NewPDF(srv.URL, srv.URL, nil, nil).WithPrivateDrive(&privateDocumentData{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _, _ := dialogoDePrueba(t, DialogoProteger)
+	var d *dialogoPedirFirma
+	fyne.DoAndWait(func() {
+		p.dialogo.cerrar()
+		p.doc = &Documento{pdf: pdf, ruta: "/PDF/Private.pdf", fichero: api.File{Name: "Private.pdf"}}
+		p.buscarPeticion(p.doc)
+		p.abrirDialogo(DialogoPedirFirma)
+		d = nuevoDialogoPedirFirma(p.dialogo)
+		p.dialogo.pintar = d.vista
+		d.email.PonerTexto("irati@acme.eu")
+		d.enviar()
+	})
+	if !d.privado || d.enviando {
+		t.Fatalf("privado = %v, enviando = %v", d.privado, d.enviando)
+	}
+	var avisos []*ui.AyudaEnLinea
+	var botones []*ui.Boton
+	fyne.DoAndWait(func() {
+		v := d.vista(480)
+		avisos, botones = deTipo[*ui.AyudaEnLinea](v), deTipo[*ui.Boton](v)
+	})
+	quiere := d.a.t("pdf.device.requests")
+	if len(avisos) != 1 || !strings.Contains(avisos[0].AccessibilityLabel(), quiere) {
+		t.Fatalf("aviso = %+v, se esperaba %q", avisos, quiere)
+	}
+	if len(botones) != 1 || botones[0].Texto != d.a.t("pdf.cancel") {
+		t.Fatalf("botones = %+v: solo se cierra", botones)
+	}
+	time.Sleep(50 * time.Millisecond)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.vistas) != 0 {
+		t.Errorf("con el Drive privado se habló con el servicio: %v", s.vistas)
+	}
+}

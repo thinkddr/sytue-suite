@@ -369,4 +369,37 @@ export const lv: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Saglabāti mapē Attēli › Sytue Photos: {count}',
   'library.saveFailed': 'Neizdevās saglabāt šī datora galerijā: {name}',
   'backup.whileOpen': 'Šajā datorā dublēšana notiek, kamēr Sytue Fotos ir atvērta.',
+  'backup.encryptedWaitTitle': 'Atveriet Sytue Fotos, lai pabeigtu šifrēto dublēšanu',
+  'backup.encryptedWaitBody':
+    'Jūsu Drive ir pilnīgi šifrēts. Jaunie fotoattēli tiek dublēti, tiklīdz atverat Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Saglabāts jūsu Drive ar pilnīgu šifrēšanu: {count}',
+  'gallery.uploadVaultSignIn':
+    'Jūsu Drive ir pilnīgi šifrēts. Pierakstieties vēlreiz, lai to atbloķētu, un pievienojiet fotoattēlus vēlreiz.',
+  'gallery.uploadVaultNotReady':
+    'Jūsu Drive vēl tiek pārcelts uz pilnīgu šifrēšanu. Atveriet Sytue Drive, lai to pabeigtu, un pievienojiet fotoattēlus vēlreiz.',
+  'gallery.uploadVaultLocked':
+    'Jūsu Drive ir pilnīgi šifrēts. Atbloķējiet to augstāk un pievienojiet fotoattēlus vēlreiz.',
+  'gallery.uploadVaultUnavailable':
+    'Jūsu Drive ir pilnīgi šifrēts, un šajā ierīcē to nevar atvērt. Pievienojiet fotoattēlus Sytue Photos tīmekļa versijā.',
+  'gallery.encrypted.title': 'Jūsu šifrētajā Drive',
+  'gallery.encrypted.show': 'Rādīt',
+  'gallery.encrypted.opening': 'Notiek atšifrēšana…',
+  'gallery.encrypted.failed': 'Neizdevās atvērt jūsu šifrēto Drive.',
+  'gallery.encrypted.signIn': 'Pierakstīties vēlreiz',
+  'gallery.encrypted.empty': 'Jūsu šifrētajā Drive vēl nav fotoattēlu.',
+  'gallery.encrypted.note':
+    'Pilnībā šifrētie fotoattēli tiek atšifrēti tikai šajā ierīcē. Sytue AI, līdzīgie fotoattēli, Tuvumā un atmiņas tos neietver.',
+  'gallery.encrypted.badge': 'Pilnībā šifrēts',
+  'gallery.encrypted.open': 'Atvērt {name} (šifrēts)',
+  'gallery.encrypted.notSelectable':
+    'Šifrētos fotoattēlus nevar atlasīt: atveriet vienu, lai atzīmētu to kā izlasi vai pievienotu albumam.',
+  'gallery.encrypted.actionFailed': 'Neizdevās atjaunināt jūsu šifrēto galeriju.',
+  'gallery.encrypted.saved':
+    'Saglabāts kā jauna šifrēta versija. Iepriekšējā paliek Drive versiju vēsturē.',
+  'gallery.encrypted.albums': 'Šifrētie albumi',
+  'gallery.encrypted.newAlbum': 'Jauns šifrēts albums',
+  'gallery.encrypted.saveVersion': 'Saglabāt kā jaunu versiju',
+  'gallery.encrypted.editHint':
+    'Rediģēšana notiek šajā ierīcē un tiek saglabāta šifrēta kā jauna fotoattēla versija.',
+  'gallery.encrypted.albumEmpty': 'Šajā šifrētajā albumā vēl nav fotoattēlu.',
 };

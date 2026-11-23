@@ -5,6 +5,7 @@ package authn
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -296,6 +297,7 @@ func claimsFromToken(tok jwt.Token) Claims {
 		}
 	}
 	planClaimsFromToken(tok, &c)
+	identificacionFromToken(tok, &c)
 	if v, ok := tok.Get("roles"); ok {
 		c.Roles = toStringSlice(v)
 	}
@@ -315,6 +317,33 @@ func claimTexto(tok jwt.Token, nombre string) string {
 	v, _ := tok.Get(nombre)
 	s, _ := v.(string)
 	return s
+}
+
+// identificacionFromToken lee cuándo y cómo se identificó la persona y si su cuenta
+// tiene segundo factor: lo que exige una acción que no se deshace.
+func identificacionFromToken(tok jwt.Token, c *Claims) {
+	if v, ok := tok.Get("auth_time"); ok {
+		switch t := v.(type) {
+		case time.Time:
+			c.AuthTime = t
+		case json.Number:
+			if n, err := t.Int64(); err == nil && n > 0 {
+				c.AuthTime = time.Unix(n, 0)
+			}
+		default:
+			if n := toInt64(v); n > 0 {
+				c.AuthTime = time.Unix(n, 0)
+			}
+		}
+	}
+	if v, ok := tok.Get("amr"); ok {
+		c.AMR = toStringSlice(v)
+	}
+	if v, ok := tok.Get("mfa_enabled"); ok {
+		if b, ok := v.(bool); ok {
+			c.MFAEnabled = &b
+		}
+	}
 }
 
 // planClaimsFromToken lee la clase de la organización, su plan y las cuotas que

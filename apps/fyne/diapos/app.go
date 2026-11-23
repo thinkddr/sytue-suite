@@ -20,6 +20,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/guardardrive"
 )
 
 // PausaTitulo es el `RENAME_MS` de `useDocument.ts`: el título se manda 800 ms después
@@ -36,6 +37,10 @@ type App struct {
 	// Slides abre y guarda las presentaciones; nil, la app solo enseña lo que le den.
 	Slides *api.Slides
 	Plazo  time.Duration
+	// Drive son los dos Drive de la cuenta para «Guardar en Drive» (el del servidor y
+	// el de la bóveda, ADR 0086); lo pone el binario al montar la cuenta del servicio.
+	// nil: la entrada no sale.
+	Drive *guardardrive.Destinos
 	// ElegirImagen y ElegirMedio son los selectores del sistema que se le pasan al
 	// editor: el de «Imagen» y el de «Subir fichero…» de Multimedia.
 	ElegirImagen func(listo func(datos []byte, jpeg bool))
@@ -284,6 +289,15 @@ func (a *App) AbrirID(id, titulo string) {
 			if ap.Rol == "owner" {
 				ab.ctx.Actividad = func(listo func([]api.DocActividad, error)) { a.servicio().Actividad(id, listo) }
 			}
+			a.servicio().EngancharGuardarEnDrive(ab.ctx, editor.GuardarEnDrive{
+				Destinos: a.Drive, ID: id,
+				Doc:        guardardrive.Documento{Ancla: ap.Ancla, EsDueno: ap.Rol == "owner", Titulo: ap.Titulo, Kind: api.DocSlides},
+				Antes:      func() func() error { return a.guardarAntes(ab) },
+				Recomponer: ab.ctx.Refrescar,
+				Avisar: func(tono ui.TonoAviso, titulo, texto string) {
+					a.avisos.Notificar(ui.NuevoAviso(tono, titulo, texto))
+				},
+			})
 			// La salida de la franja. Diapos no coedita: el canal se abre solo para oír
 			// que el rol ha cambiado, y entonces se vuelve a abrir la presentación.
 			editor.EngancharPeticionEdicion(ab.ctx, a.portada.Svc, id, ap.Rol, true, ab.ctx.Refrescar, func() {

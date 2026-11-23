@@ -48,6 +48,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/office"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/guardardrive"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 func main() {
@@ -74,6 +76,10 @@ func main() {
 	// FyneApp.toml, que es donde ya está declarado una vez para las cinco plataformas.
 	w := a.NewWindow(a.Metadata().Name)
 	w.SetPadded(false)
+	// El Drive de la bóveda para «Guardar en Drive» (ADR 0086): no se abre hasta que
+	// la persona lo pulsa con su Drive en la bóveda, y entonces se ofrece desbloquearlo
+	// encima del editor.
+	driveBoveda := cifrado.NuevoDriveOficina(s, a, w, func(key string) string { return tr.T(key, nil) })
 
 	// La portada de presentaciones y el editor hablan con el repositorio privado
 	// cifrado; nunca se entrega un cliente HTTP en claro a la vista.
@@ -165,36 +171,58 @@ func main() {
 			listo(nombre, datos, false)
 		})
 	}
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*office.Repository]{
-		Suite:       s,
-		Application: a,
-		Window:      w,
-		Product:     "slides",
-		Translate:   func(key string) string { return tr.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*office.Repository], error) {
-			return diaposPlan(ctx, resources, s)
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	// Con la API del servicio, «Guardar en Drive» tiene sus dos Drive; con los datos en
+	// Matrix no hay servicio al que anclar y la entrada no sale.
+	mount := func(_ cifrado.Cuenta, facade *api.Slides, destinos *guardardrive.Destinos) cifrado.ApplicationView {
+		d.Drive = destinos
+		setSlidesClient(facade)
+		d.Arrancar()
+		return cifrado.ApplicationView{
+			Object: driveBoveda.Envolver(d.Objeto()),
+			Detach: func() {
+				d.Drive = nil
+				setSlidesClient(nil)
+			},
+		}
+	}
+
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*office.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*office.Repository]{
+			Suite:       s,
+			Application: a,
+			Window:      w,
+			Product:     "slides",
+			Translate:   func(key string) string { return tr.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*office.Repository], error) {
+				return diaposPlan(ctx, resources, s)
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *office.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewSlides(s.URL("slides"), resources.HTTP(), nil).WithPrivateData(repository)
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return mount(resources, facade, nil), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+			},
 		},
-		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *office.Repository) (cifrado.ApplicationView, error) {
-			facade, err := api.NewSlides(s.URL("slides"), resources.HTTP(), nil).WithPrivateData(repository)
-			if err != nil {
-				return cifrado.ApplicationView{}, err
-			}
-			setSlidesClient(facade)
-			d.Arrancar()
-			return cifrado.ApplicationView{
-				Object: d.Objeto(),
-				Detach: func() {
-					setSlidesClient(nil)
-				},
-			}, nil
+		Soltar: cifrado.SoltarEn(s.URL("slides")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewSlides(s.URL("slides"), session, nil).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewSlides(s.URL("slides"), cuenta.HTTP(), nil), driveBoveda.Destinos(cuenta)), nil
 		},
 	})
 	if err != nil {
 		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Slides).ConSinSesionPropia().Montar(private.Objeto()))
-		w.SetOnClosed(private.Close)
+		w.SetOnClosed(func() {
+			private.Close()
+			driveBoveda.Close()
+		})
 	}
 	w.Resize(fyne.NewSize(1280, 800))
 	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.

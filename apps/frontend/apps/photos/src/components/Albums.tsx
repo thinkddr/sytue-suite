@@ -35,6 +35,7 @@ import type { SytueUser } from '@sytue/auth';
 import { Nav } from './Nav.js';
 import { CAMPO_TACTIL } from '../lib/tactil.js';
 import { EsqueletoAlbumes } from './Esqueletos.js';
+import { AlbumesCifrados } from './AlbumesCifrados.js';
 
 export const Albums = conAvisos(Albumes);
 
@@ -279,6 +280,8 @@ function Albumes({
             </ul>
           </>
         )}
+        {/* Los álbumes de la galería cifrada: solo en la bóveda, nunca en el servidor. */}
+        <AlbumesCifrados locale={locale} user={user} />
         {dialogoPreguntar}
       </div>
     </Marco>

@@ -19,6 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/personas"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/hub/internal/config"
 	"git.sytue.eu/sytue/one/services/hub/internal/connectors"
 	"git.sytue.eu/sytue/one/services/hub/internal/despertar"
@@ -50,8 +51,11 @@ type Deps struct {
 	Correo *connectors.MailConnector
 	// Despertador despierta las apps de iOS cuando llega la señal de cambios. Nil =
 	// sin credenciales de Apple: el registro de aparatos sigue y nadie se despierta.
-	Despertador   *despertar.Despertador
-	ReadyCheckers []httpx.Checker
+	Despertador *despertar.Despertador
+	// PrivateIngress es la cola de entrada privada de avisos (ADR 0086). Nil = sin
+	// montar (pruebas).
+	PrivateIngress httpx.PrivateIngressPort
+	ReadyCheckers  []httpx.Checker
 }
 
 // NewRouter construye el router completo de Sytue Hub.
@@ -160,6 +164,10 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/instaladores/{fichero}", h.BajarInstalador)
 
 		mountHubPrivateSource(api, d.Store)
+		if d.PrivateIngress != nil {
+			mountHubPrivateIngress(api, d.PrivateIngress)
+		}
+		soltarfuente.Montar(api, soltarfuente.Config{Product: "hub", Soltar: d.Store.ReleasePrivateStorage, Avisar: avisoPropio(d.Notify)})
 	})
 
 	// Endpoint INTERNO service-to-service. No público: autentica el secreto

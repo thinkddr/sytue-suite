@@ -342,4 +342,37 @@ export const hu: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Mentve: Képek › Sytue Photos: {count}',
   'library.saveFailed': 'Nem sikerült menteni a számítógép galériájába: {name}',
   'backup.whileOpen': 'Ezen a számítógépen a mentés addig fut, amíg a Sytue Fotos nyitva van.',
+  'backup.encryptedWaitTitle': 'Nyisd meg a Sytue Fotost a titkosított mentés befejezéséhez',
+  'backup.encryptedWaitBody':
+    'A Drive-od végpontok közötti titkosítással védett. Az új fotók mentése a Sytue Fotos megnyitásakor folytatódik.',
+  'gallery.uploadedEncrypted': 'Végpontok közötti titkosítással mentve a Drive-ba: {count}',
+  'gallery.uploadVaultSignIn':
+    'A Drive-od végpontok közötti titkosítással védett. Jelentkezz be újra a feloldásához, majd add hozzá újra a fotókat.',
+  'gallery.uploadVaultNotReady':
+    'A Drive-od még átáll a végpontok közötti titkosításra. A befejezéshez nyisd meg a Sytue Drive-ot, majd add hozzá újra a fotókat.',
+  'gallery.uploadVaultLocked':
+    'A Drive-od végpontok közötti titkosítással védett. Oldd fel fent, majd add hozzá újra a fotókat.',
+  'gallery.uploadVaultUnavailable':
+    'A Drive-od végpontok közötti titkosítással védett, és ezen az eszközön nem nyitható meg. Add hozzá a fotókat a Sytue Photos webes felületén.',
+  'gallery.encrypted.title': 'A titkosított Drive-odban',
+  'gallery.encrypted.show': 'Megjelenítés',
+  'gallery.encrypted.opening': 'Visszafejtés…',
+  'gallery.encrypted.failed': 'Nem sikerült megnyitni a titkosított Drive-odat.',
+  'gallery.encrypted.signIn': 'Bejelentkezés újra',
+  'gallery.encrypted.empty': 'A titkosított Drive-odban még nincsenek fotók.',
+  'gallery.encrypted.note':
+    'A végpontok között titkosított fotók csak ezen az eszközön lesznek visszafejtve. A Sytue AI, a hasonló fotók, a Közelben és az emlékek nem tartalmazzák őket.',
+  'gallery.encrypted.badge': 'Végpontok között titkosított',
+  'gallery.encrypted.open': '{name} megnyitása (titkosított)',
+  'gallery.encrypted.notSelectable':
+    'A titkosított fotók nem jelölhetők ki: nyiss meg egyet, hogy kedvencnek jelöld vagy albumhoz add.',
+  'gallery.encrypted.actionFailed': 'Nem sikerült frissíteni a titkosított galériádat.',
+  'gallery.encrypted.saved':
+    'Új titkosított verzióként mentve. Az előző a Drive verzióelőzményeiben marad.',
+  'gallery.encrypted.albums': 'Titkosított albumok',
+  'gallery.encrypted.newAlbum': 'Új titkosított album',
+  'gallery.encrypted.saveVersion': 'Mentés új verzióként',
+  'gallery.encrypted.editHint':
+    'A szerkesztés ezen az eszközön történik, és titkosítva menti a fotó új verziójaként.',
+  'gallery.encrypted.albumEmpty': 'Ebben a titkosított albumban még nincsenek fotók.',
 };

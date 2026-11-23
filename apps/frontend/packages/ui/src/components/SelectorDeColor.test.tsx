@@ -6,7 +6,7 @@
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from 'preact';
 import type { VNode } from 'preact';
@@ -142,11 +142,14 @@ test('ningún aria-label de la suite tiene forma #rrggbb ni es una variable de c
   // con nombre. La ofimática sí rotula colores sacados del propio documento
   // (filtros por color de celda), que no tienen nombre: ahí solo se veta el literal.
   const recorrer = (dir: string, estricto: boolean): void => {
-    for (const n of readdirSync(dir)) {
+    // Las entradas del directorio ya traen su tipo: sin un `stat` aparte que pueda
+    // quedar desfasado respecto de la lectura posterior (carrera comprobar/usar).
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const n = e.name;
       if (n === 'node_modules' || n === 'dist' || n.startsWith('.')) continue;
       const p = join(dir, n);
-      if (statSync(p).isDirectory()) recorrer(p, estricto);
-      else if (n.endsWith('.tsx') && !n.endsWith('.test.tsx')) {
+      if (e.isDirectory()) recorrer(p, estricto);
+      else if (e.isFile() && n.endsWith('.tsx') && !n.endsWith('.test.tsx')) {
         const s = readFileSync(p, 'utf8');
         const literal = /aria-label=\{?['"`]#[0-9a-f]{3,8}/i.test(s);
         const variable = /aria-label=\{(c|color)\}/.test(s);

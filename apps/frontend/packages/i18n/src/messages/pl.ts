@@ -32,6 +32,48 @@ export const pl: Catalog = {
   'matrix.connect': 'Skonfiguruj to urządzenie',
   'matrix.devices': 'Twoje urządzenia',
   'matrix.failed': 'Nie udało się skonfigurować szyfrowania. Spróbuj ponownie.',
+  'vault.wrongKey':
+    'Zaszyfrowane dane tej aplikacji zostały zablokowane innym kluczem odblokowania Sytue ID niż ten w tej przeglądarce. Zaloguj się ponownie do Sytue ID, aby przenieść tu bieżący klucz. Jeśli wcześniejszy klucz został utracony, możesz opróżnić zaszyfrowane dane tej aplikacji i zacząć od nowa.',
+  'vault.wrongKeyDevice':
+    'Zaszyfrowane dane tej aplikacji zostały zablokowane innym kluczem odblokowania Sytue ID niż ten na tym urządzeniu. Zaloguj się ponownie do Sytue ID, aby przenieść tu bieżący klucz. Jeśli wcześniejszy klucz został utracony, możesz opróżnić zaszyfrowane dane tej aplikacji i zacząć od nowa.',
+  'vault.release': 'Wyczyść i wróć do danych z serwera',
+  'vault.releaseTitle': 'Powrót do danych z serwera',
+  'vault.releaseBody':
+    'Gdy dane tej aplikacji zostały zaszyfrowane w aplikacji na komputer lub telefon, serwer zachował ich kopię w stanie z tamtej chwili. Jeśli nie możesz otworzyć zaszyfrowanych danych, ta aplikacja może wrócić do tej kopii. Wszystko, co zapisano później na dowolnym urządzeniu, zostanie utracone bez możliwości odzyskania.',
+  'vault.releaseUnderstood':
+    'Rozumiem, że wszystko, co zapisano po przejściu na szyfrowanie, zostanie utracone',
+  'vault.releaseSignIn':
+    'Aby potwierdzić tożsamość, Sytue ID najpierw poprosi o ponowne zalogowanie.',
+  'vault.releaseFailed': 'Nie udało się wrócić do danych z serwera. Spróbuj ponownie.',
+  'vault.moveTitle': 'Przenieś Drive do zaszyfrowanego sejfu',
+  'vault.moveOffer':
+    'Twój Drive jest nadal przechowywany w poprzednim szyfrowaniu. Przenieś go do sejfu, którego używa sieć i twoje inne urządzenia.',
+  'vault.moveAction': 'Przenieś do sejfu',
+  'vault.moveBody':
+    'Wszystkie twoje pliki i foldery wraz z ich wersjami zostaną skopiowane do zaszyfrowanego sejfu i sprawdzone jeden po drugim. Z poprzedniego szyfrowania nic nie jest usuwane. Nie zamykaj aplikacji do końca; jeśli zostanie przerwana, wznowi pracę tam, gdzie skończyła.',
+  'vault.moveUnderstood': 'Rozumiem, że po zakończeniu ten Drive będzie używany z sejfu',
+  'vault.moveCopying': 'Kopiowanie i sprawdzanie twoich plików…',
+  'vault.moveDone': 'Gotowe. Twój Drive jest teraz w zaszyfrowanym sejfie.',
+  'vault.moveFailed':
+    'Nie udało się dokończyć kopii. Twoje pliki są nadal w poprzednim szyfrowaniu. Spróbuj ponownie.',
+  'vault.movePending':
+    'To urządzenie ma jeszcze zmiany do wysłania. Poczekaj, aż się zakończą, i spróbuj ponownie.',
+  'vault.copyInProgress':
+    'Inne urządzenie przenosi Twój Drive do zaszyfrowanego sejfu. Poczekaj, aż skończy, i spróbuj ponownie.',
+  'vault.copyCancel': 'Anuluj kopiowanie',
+  'vault.copyCancelHint':
+    'Jeśli kopiowanie utknęło, możesz je anulować: nic nie zostanie usunięte, a kopiowanie możesz powtórzyć z tamtego urządzenia.',
+  'vault.releaseNotice':
+    'Dane tej aplikacji zostały zaszyfrowane w aplikacji na komputer lub telefon. Tutaj widać kopię zachowaną wtedy przez serwer; to, co zapisano później, jest tylko w zaszyfrowanych danych. Jeśli nie da się ich już otworzyć, możesz wrócić do danych z serwera.',
+  'notifications.kind.security.storage.released': '{name}: powrót do danych z serwera',
+  'vault.signInAgain': 'Zaloguj się ponownie do Sytue ID',
+  'vault.empty': 'Opróżnij zaszyfrowane dane',
+  'vault.emptyTitle': 'Opróżnij zaszyfrowane dane tej aplikacji',
+  'vault.emptyBody':
+    'Dane zaszyfrowane przez tę aplikację utraconym kluczem zostaną usunięte z Sytue i zostanie utworzony nowy klucz. Reszta konta pozostaje bez zmian. Tej operacji nie można cofnąć.',
+  'vault.emptyUnderstood': 'Rozumiem, że dane zaszyfrowane utraconym kluczem zostaną usunięte',
+  'vault.failed':
+    'Nie udało się otworzyć zaszyfrowanych danych. Spróbuj ponownie lub zaloguj się ponownie do Sytue ID. Jeśli klucz został utracony, możesz opróżnić zaszyfrowane dane tej aplikacji.',
   'matrix.incoming': 'Zweryfikuj to urządzenie',
   'matrix.match': 'Zgadzają się',
   'matrix.mismatch': 'Nie zgadzają się',

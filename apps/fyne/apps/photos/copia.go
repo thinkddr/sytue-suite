@@ -140,6 +140,12 @@ var (
 	// ErrNoIndexable: syphotos no sabe medir ese fichero (contesta 400). Ya está en
 	// Drive, que es la copia; solo no sale en la galería.
 	ErrNoIndexable = errors.New("photos: la galería no sabe enseñar este fichero")
+	// ErrEnBoveda: subida cifrada al Drive privado de la persona (la bóveda, ADR
+	// 0086), porque el Drive del servidor ya no admite escrituras. El servidor no
+	// puede leerla, así que tampoco indexarla: está a salvo en Drive y no sale en la
+	// galería del servidor. Va siempre junto a [ErrNoIndexable] (no hay nada que
+	// reintentar).
+	ErrEnBoveda = errors.New("photos: guardada cifrada en el Drive privado")
 )
 
 // FallosSeguidosCopia son los fallos seguidos que paran una ronda (regla 6).
@@ -239,6 +245,10 @@ type registroCopia struct {
 	Leido time.Time `json:"leido"`
 	// Ultima es cuándo terminó la última ronda completa.
 	Ultima time.Time `json:"ultima"`
+	// AvisoBoveda es cuándo se avisó por última vez de que la copia con la app cerrada
+	// espera a que se abra la app para subir cifrado (ADR 0086); cero, no espera. Una
+	// ronda completa lo borra.
+	AvisoBoveda time.Time `json:"aviso_boveda,omitzero"`
 }
 
 // ficheroCopia es el registro en disco: los ajustes del dispositivo y uno por cuenta, con
@@ -451,9 +461,42 @@ func (c *Copia) Ronda(ctx context.Context, cuenta string, d DestinoCopia, avisar
 		avisar(p)
 	}
 	if p.Fallidas == 0 {
-		c.con(cuenta, func(r *registroCopia) { r.Ultima = c.ahora() })
+		c.con(cuenta, func(r *registroCopia) { r.Ultima, r.AvisoBoveda = c.ahora(), time.Time{} })
 	}
 	return p, nil
+}
+
+// EsperandoBoveda dice si la copia con la app cerrada dejó fotos esperando a que se
+// abriera el Drive cifrado (y avisó de ello).
+func (c *Copia) EsperandoBoveda(cuenta string) (espera bool) {
+	c.con(cuenta, func(r *registroCopia) { espera = !r.AvisoBoveda.IsZero() })
+	return espera
+}
+
+// CadaAvisoBoveda es cada cuánto, como mucho, se avisa de que la copia con la app
+// cerrada espera a que se abra la app: una vez al día, no en cada despertar.
+const CadaAvisoBoveda = 24 * time.Hour
+
+// EsperaBoveda apunta que una ronda con la app cerrada no ha podido subir porque el
+// Drive cifrado no está abierto en este proceso, y dice si toca avisar: hay algo que
+// subir, la ronda podría correr (galería, permiso, red) y no se ha avisado en el último
+// [CadaAvisoBoveda].
+func (c *Copia) EsperaBoveda(ctx context.Context, cuenta string) (bool, error) {
+	if err := c.puedeEmpezar(); err != nil {
+		// Lo que la para es otra cosa (permiso, red), y ya se ve al abrir la app.
+		return false, nil //nolint:nilerr // no es un fallo de avisar
+	}
+	pendientes, err := c.pendientes(ctx, cuenta)
+	if err != nil || len(pendientes) == 0 {
+		return false, err
+	}
+	avisar := false
+	err = c.guardar(cuenta, func(r *registroCopia) {
+		if r.AvisoBoveda.IsZero() || c.ahora().Sub(r.AvisoBoveda) >= CadaAvisoBoveda {
+			r.AvisoBoveda, avisar = c.ahora(), true
+		}
+	})
+	return avisar, err
 }
 
 // puedeEmpezar es lo que una ronda mira antes de tocar la red.

@@ -2,236 +2,154 @@
   "version": 1,
   "files": [
     {
-      "path": "services/cloud/internal/service/mailer.go",
-      "blob": "13829780ba92144f864f60ab69b2e9f0dc26d3d0"
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "blob": "ef318a959c9e2e8d4457b3e4f42ae483a04eb474"
     },
     {
-      "path": "services/cloud/internal/service/mailer_message_test.go",
-      "blob": "92788e9b1012010e0ac62d27983b84d3d222a268"
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "blob": "3b572a1526186c12b5f53e3b9645a6e96ec222b6"
     },
     {
-      "path": "services/docs/internal/domain/pdfread.go",
-      "blob": "08b21561c35cf0c84988339d9e8db03f1eec66b3"
+      "path": "apps/nucleo/pdf/pdftype3.go",
+      "blob": "7fdf0e4ec5daa2e1763aaf8239725c426ec7be6c"
     },
     {
-      "path": "services/docs/internal/domain/pdffont.go",
-      "blob": "f1ae8425414c9ce51cc5dbec34632015473c732f"
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "blob": "6e6ea42c669a6277dd45f1ab02e3a1b0c6953fe9"
     },
     {
-      "path": "services/docs/internal/domain/pdftext.go",
-      "blob": "de29017d311402260a6cb676a4685a2347215ea3"
+      "path": "apps/nucleo/office/model/proteccion_diapos.go",
+      "blob": "0685ec28b6426f6b70b89d59bd39ede652923a11"
     },
     {
-      "path": "services/docs/internal/domain/pdffont_enteros_test.go",
-      "blob": "4d4518bb1b671352e14326d3d748c09dc96f45bc"
+      "path": "apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx",
+      "blob": "7a201a17fa27161e55f5696849d1b55835a158d0"
     },
     {
-      "path": "services/id/internal/http/authorize.go",
-      "blob": "884c69d15700e2cc3417e8cc53751cf36da4ea95"
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "blob": "1f75ba3ac8b17d3ceb89f329053c308b434206e8"
     },
     {
-      "path": "services/id/internal/http/logout.go",
-      "blob": "c83b2620d75225ac5b0bc080af3bd88ae96089d2"
+      "path": "services/id/internal/http/e2e/passkey.js",
+      "blob": "6ef5075d5043a53b6b1357fc2dbb3efcb4aca34c"
     },
     {
-      "path": "services/id/internal/http/login.go",
-      "blob": "ab58b53854da6c19cf6a7fb0bd17da3eeb288d90"
-    },
-    {
-      "path": "services/id/internal/http/forgot_password.go",
-      "blob": "3b5a1c03b451288654a9a5f6eb362180d596c2e0"
-    },
-    {
-      "path": "services/id/internal/http/redirect_seguro_test.go",
-      "blob": "d396ad342bfc4a772abf61e8a2122a3c6a26ede2"
-    },
-    {
-      "path": "services/id/internal/domain/domain.go",
-      "blob": "f872db7b965e30bee1a7e3888b0830b570253416"
-    },
-    {
-      "path": "services/id/internal/domain/domain_test.go",
-      "blob": "0e8e50ffcdc29604a8c8946345c720911360551f"
-    },
-    {
-      "path": "services/id/internal/http/dcr.go",
-      "blob": "046ec42bb9563e2100b15a87a3f365f2339f90df"
-    },
-    {
-      "path": "platform/pkg/httpx/respond.go",
-      "blob": "4f9c4469e96a9fbca77dd4bbd4f9b364e1a953b5"
-    },
-    {
-      "path": "platform/pkg/httpx/errors.go",
-      "blob": "e3bd30405f00e9c665f00ef5fba9a1a5aff5d2cd"
-    },
-    {
-      "path": "services/cast/internal/diapositivas/diapositivas.go",
-      "blob": "8acf020d3567d06586bf80ded7b583c7c07dc0fb"
-    },
-    {
-      "path": "services/syerp/internal/http/handlers_conectores.go",
-      "blob": "410ddd133f65ab09c895c42052e4fc2530db4cc0"
-    },
-    {
-      "path": "services/syerp/internal/conectores/stripe.go",
-      "blob": "19113d5ef959a518bb5e685f9940e3f9a2275bb4"
-    },
-    {
-      "path": "services/docs/internal/http/enlaces_politica.go",
-      "blob": "a5c0d5bd983f1f3ca39c5ae0bdc8d7c6840d1b56"
-    },
-    {
-      "path": "services/docs/internal/http/permissions.go",
-      "blob": "784f2bf32ad622f83b55211b3d3f964ac12ca582"
-    },
-    {
-      "path": "services/docs/internal/domain/doc.go",
-      "blob": "b27ac9836e48f8bb2d4461aeec5c553656677a27"
-    },
-    {
-      "path": "platform/pkg/logsafe/text.go",
-      "blob": "5b565ebed21ceb6b5ddfe723dbdfdc6773a09139"
-    },
-    {
-      "path": "platform/pkg/logsafe/text_test.go",
-      "blob": "41c4e2bb36357e336fc762fced6d4169acd912d1"
-    },
-    {
-      "path": ".github/scripts/security-review.mjs",
-      "blob": "679e059f304e700bf77e969f3508f06117446a18"
-    },
-    {
-      "path": ".github/scripts/security-review.test.mjs",
-      "blob": "ecca3c170b228861a73fbbf82970a8ce5f06d10a"
+      "path": "services/id/internal/http/e2e/relay.js",
+      "blob": "ba2893a1a640716eda608e56168187083f5529d4"
     }
   ],
   "reviews": [
     {
-      "number": 167,
+      "number": 446,
       "rule": "go/incorrect-integer-conversion",
-      "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
-      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 168,
+      "number": 447,
       "rule": "go/incorrect-integer-conversion",
-      "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
-      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 169,
+      "number": 448,
       "rule": "go/incorrect-integer-conversion",
-      "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
-      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 170,
+      "number": 449,
       "rule": "go/incorrect-integer-conversion",
-      "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
-      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 175,
+      "number": 450,
       "rule": "go/incorrect-integer-conversion",
-      "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
-      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 218,
+      "number": 451,
       "rule": "go/incorrect-integer-conversion",
-      "path": "services/docs/internal/domain/pdftext.go",
-      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
-      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 245,
-      "rule": "go/unvalidated-url-redirection",
-      "path": "services/id/internal/http/forgot_password.go",
-      "comment": "False positive: Location has the fixed local prefix /forgot-password?sent=1. return_to is only url.Values-encoded query data; it cannot change the scheme, host or path or add a header.",
-      "evidence": "The destination always starts with the fixed local path /forgot-password?sent=1. Untrusted return_to is appended only through url.Values.Encode as query data. It cannot alter the scheme, authority or path, or introduce a Location header. The taint path does not represent an open redirect."
+      "number": 452,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 246,
-      "rule": "go/unvalidated-url-redirection",
-      "path": "services/id/internal/http/login.go",
-      "comment": "False positive: rutaInternaSegura permits only internal root-relative paths and rejects //, backslash authority and controls. Invalid input redirects to /. Redirect safety regressions pass.",
-      "evidence": "redirectAfterLogin accepts only internal root-relative paths. rutaInternaSegura rejects scheme-relative destinations, backslash authority and control characters; invalid values redirect to /. TestRutaInternaSeguraRechazaLaBarraInvertida and TestRedirectAfterLoginNoSaleDelIdP cover attacker-controlled destinations."
+      "number": 453,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 247,
-      "rule": "go/unvalidated-url-redirection",
-      "path": "services/id/internal/http/logout.go",
-      "comment": "False positive: postLogoutTarget requires exact membership in registered client logout URIs plus validRegistrationRedirect syntax. The fallback is service configuration, never request data.",
-      "evidence": "postLogoutTarget requires exact membership in the selected client PostLogoutRedirectURIs and validRegistrationRedirect syntax. Its fallback is trusted service configuration, never request data. The dataflow query does not account for this allowlist guard."
+      "number": 454,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftype3.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
     },
     {
-      "number": 248,
-      "rule": "go/unvalidated-url-redirection",
-      "path": "services/id/internal/http/authorize.go",
-      "comment": "False positive: handleAuthorize requires exact client.ValidRedirectURI membership before redirectErr. State/error values are URL-encoded. Exact-match regression tests reject prefixes and wildcards.",
-      "evidence": "handleAuthorize checks exact registered redirect URI membership through client.ValidRedirectURI before redirectErr is reachable. State/error query values are encoded with url.Values. TestClientValidRedirectURI_ExactMatch verifies no wildcard or prefix acceptance. Redirecting to a registered OAuth client is intentional."
+      "number": 430,
+      "rule": "go/weak-cryptographic-algorithm",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: RC4 is only used to READ legacy PDFs (revisions 2-4) as the PDF spec requires. The only writer, cifradorPDF, always emits AES-256 (V5/R6, AESV3).",
+      "evidence": "rc4Aplicar is reached only from password checks for R2-R4 and from criptoPDF.aplicar on decryption; TestProtegerPDFSoloEscribeAES256 fails if writing ever stops using AES-256."
     },
     {
-      "number": 273,
-      "rule": "go/email-injection",
-      "path": "services/cloud/internal/service/mailer.go",
-      "comment": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass.",
-      "evidence": "Recipient headers are parsed as a single net/mail.Address after rejecting control characters before SMTP. Address.String serializes the header; the body is MIME base64 text/plain. Header injection and MIME round-trip regressions pass. The remaining trace is only the validated To header, not executable HTML or injected header data."
+      "number": 443,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/office/model/proteccion_diapos.go",
+      "comment": "False positive: this SHA-256 is a change-detection fingerprint of the locked slide content; huellaProtect strips password/hasPassword before hashing. Passwords use the OOXML KDF.",
+      "evidence": "Passwords are derived by HashClave/derivarClaveOOXML (random 16-byte salt, 100000 SHA-512 rounds); TestHuellaProtectNoDependeDeLaContrasena fixes that the fingerprint ignores the password."
     },
     {
-      "number": 400,
-      "rule": "go/log-injection",
-      "path": "services/syerp/internal/http/handlers_conectores.go",
-      "comment": "False positive: cobro.Centimos is int64, not text. A numeric Stripe amount cannot contain CR/LF or inject a log line; structured logging retains its numeric type. The declaration and logging source are pinned.",
-      "evidence": "False positive: cobro.Centimos is int64, not text. A numeric Stripe amount cannot contain CR/LF or inject a log line; structured logging retains its numeric type. The declaration and logging source are pinned."
+      "number": 437,
+      "rule": "js/xss",
+      "path": "apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx",
+      "comment": "False positive: the HTML is parsed with DOMParser into an inert document (no scripting or browsing context), only body.textContent is read, and it is inserted as plain text.",
+      "evidence": "new DOMParser().parseFromString(b.html, 'text/html') never runs scripts or handlers or loads resources; the text is inserted with execCommand('insertText'), so nothing reaches a live DOM sink."
     },
     {
-      "number": 401,
-      "rule": "go/email-injection",
-      "path": "services/cloud/internal/service/mailer.go",
-      "comment": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass.",
-      "evidence": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass."
-    },
-    {
-      "number": 402,
-      "rule": "go/log-injection",
-      "path": "platform/pkg/httpx/respond.go",
-      "comment": "False positive: apiErr.Status is an int field. It cannot contain line breaks or arbitrary log text. JSON/Text slog handlers serialize it as a numeric scalar; Error.Status and the logging source are pinned.",
-      "evidence": "False positive: apiErr.Status is an int field. It cannot contain line breaks or arbitrary log text. JSON/Text slog handlers serialize it as a numeric scalar; Error.Status and the logging source are pinned."
-    },
-    {
-      "number": 403,
-      "rule": "go/log-injection",
-      "path": "services/cast/internal/diapositivas/diapositivas.go",
-      "comment": "False positive: presentation Total is an int, not a string. It cannot inject CR/LF or another record. Its typed declaration and the structured logging call are pinned; numeric fields are intentionally retained as numbers.",
-      "evidence": "False positive: presentation Total is an int, not a string. It cannot inject CR/LF or another record. Its typed declaration and the structured logging call are pinned; numeric fields are intentionally retained as numbers."
-    },
-    {
-      "number": 407,
+      "number": 477,
       "rule": "js/file-access-to-http",
-      "path": ".github/scripts/security-review.mjs",
-      "comment": "False positive: the only file data sent is reviewed public metadata from the tracked .github/security-reviewed-alerts.json. Requests go only to this repository on api.github.com. No local credential file or token is included in the body; redirects are rejected.",
-      "evidence": "False positive: the only file data sent is reviewed public metadata from the tracked .github/security-reviewed-alerts.json. Requests go only to this repository on api.github.com. No local credential file or token is included in the body; redirects are rejected."
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "comment": "False positive: an artificial-only e2e sends fixture ciphertext to a fixed local Synapse (127.0.0.1:18585). Room, token and Megolm body are validated and size-bound; the origin is asserted before the request.",
+      "evidence": "The fixture is produced by the native test run itself (fixture.artificial is asserted); the PUT is the test's purpose: proving the server rejects pre-encrypted cache without local witnesses."
     },
     {
-      "number": 409,
-      "rule": "go/clear-text-logging",
-      "path": "services/docs/internal/http/enlaces_politica.go",
-      "comment": "False positive: HasPassword is a boolean indicating link protection, not a password or hash. The audit logs only the con_clave presence flag. The bool declaration, audit call and mixed-field regression tests are pinned.",
-      "evidence": "False positive: HasPassword is a boolean indicating link protection, not a password or hash. The audit logs only the con_clave presence flag. The bool declaration, audit call and mixed-field regression tests are pinned."
+      "number": 478,
+      "rule": "js/file-access-to-http",
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "comment": "False positive: an artificial-only e2e sends fixture ciphertext to a fixed local Synapse (127.0.0.1:18585). Room, token and Megolm body are validated and size-bound; the origin is asserted before the request.",
+      "evidence": "The fixture is produced by the native test run itself (fixture.artificial is asserted); the PUT is the test's purpose: proving the server rejects pre-encrypted cache without local witnesses."
     },
     {
-      "number": 410,
-      "rule": "go/log-injection",
-      "path": "services/docs/internal/http/enlaces_politica.go",
-      "comment": "False positive after hardening: textual audit values pass through logsafe.Args, which escapes CR/LF (including named strings and errors). Numeric/bool values retain their types and cannot inject text. Mixed-field JSON regressions pass.",
-      "evidence": "False positive after hardening: textual audit values pass through logsafe.Args, which escapes CR/LF (including named strings and errors). Numeric/bool values retain their types and cannot inject text. Mixed-field JSON regressions pass."
+      "number": 476,
+      "rule": "js/xss-through-dom",
+      "path": "services/id/internal/http/e2e/relay.js",
+      "comment": "False positive: the way back comes from a server-validated JSON block and goes through navigableReturn (comun.js), which rebuilds it with a constant scheme or this page's origin before the path; javascript: and data: are dropped.",
+      "evidence": "sytue-id-pages.test.ts: 'navigableReturn rebuilds the way back with a scheme of its own' and the relay/passkey page tests run every hostile destination and assert no navigation to it."
+    },
+    {
+      "number": 484,
+      "rule": "js/xss-through-dom",
+      "path": "services/id/internal/http/e2e/passkey.js",
+      "comment": "False positive: the way back comes from a server-validated JSON block and goes through navigableReturn (comun.js), which rebuilds it with a constant scheme or this page's origin before the path; javascript: and data: are dropped.",
+      "evidence": "sytue-id-pages.test.ts: 'navigableReturn rebuilds the way back with a scheme of its own' and the relay/passkey page tests run every hostile destination and assert no navigation to it."
     }
   ]
 }

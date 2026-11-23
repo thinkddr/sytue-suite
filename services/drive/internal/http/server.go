@@ -106,6 +106,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Service != nil {
 		h.bases = d.Service
 		h.cipher = d.Service
+		h.pqVault = d.Service
 		if d.Service.PrivateStorageAvailable() {
 			h.migration = d.Service
 		}
@@ -147,6 +148,14 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/cipher/usage/{product}", h.CipherUsage)
 		api.Get("/cipher/blobs/{product}/{id}/content", h.DownloadCipherBlob)
 		api.Delete("/cipher/blobs/{product}/{id}", h.DeleteCipherBlob)
+		// Bóveda post-cuántica directa (ADR 0086): claves envueltas y registros cifrados.
+		api.Get("/pq-vault/{product}/keys", h.GetPQVaultKeys)
+		api.With(httpx.MaxBodyBytes(16<<10)).Put("/pq-vault/{product}/keys", h.PutPQVaultKey)
+		api.With(httpx.MaxBodyBytes(4<<10)).Put("/pq-vault/{product}/copy", h.PutPQVaultCopy)
+		api.Delete("/pq-vault/{product}/copy", h.DeletePQVaultCopy)
+		api.With(httpx.MaxBodyBytes(service.MaxPQVaultRecordBytes+2048)).Post("/pq-vault/{product}/records", h.AppendPQVaultRecord)
+		api.Get("/pq-vault/{product}/records", h.ListPQVaultRecords)
+		api.Get("/pq-vault/{product}/records/{event_id}", h.GetPQVaultRecord)
 		api.Get("/folders/root", h.GetRoot)
 		api.Post("/folders", h.CreateFolder)
 		api.Get("/folders/{id}", h.GetFolder)
@@ -367,6 +376,9 @@ func NewRouter(d Deps) http.Handler {
 	// De servicio a servicio: con X-Forwarded-For (el ingress) es 404, y sin el secreto
 	// de la suite, 401.
 	r.With(httpx.SoloDesdeDentro(d.Cfg.HubInternalSecret)).Post(RutaCopiaFotos, copiaFotos(d.Service))
+	// Rooms comprueba el recibo de un ACK del correo que vive en la bóveda (ADR 0087).
+	// Con el secreto que Drive y Rooms ya comparten; sin él no pasa nadie.
+	r.With(httpx.SoloDesdeDentro(d.Cfg.RoomsInternalSecret)).Post(RutaReciboBoveda, reciboBoveda(d.Service))
 	// Docs tira, restaura o purga el fichero de un documento cuando la persona lo
 	// hace desde Docs (docs_internas.go). Misma frontera que la de Photos, con un
 	// secreto PROPIO de Docs y Drive: esta puerta borra.

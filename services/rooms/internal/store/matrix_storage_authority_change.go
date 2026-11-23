@@ -64,6 +64,9 @@ func (s *Store) MatrixRootChangeChallenge(ctx context.Context, subject, product,
 		if (kind == "root.resume" && current.Status != "revoked") || (kind == "root.rotate" && current.Status != "active") {
 			return domain.ErrConflict
 		}
+		if err := sinTraspasoTx(ctx, tx, scope, domain.ErrConflict); err != nil {
+			return err
+		}
 		origin, err := directory.IngressDeviceOrigin(ctx, scope, target)
 		if err != nil {
 			return err
@@ -94,6 +97,9 @@ func previousMatrixAuthorityTx(ctx context.Context, tx pgx.Tx, current matrixpro
 func confirmMatrixRootChangeTx(ctx context.Context, tx pgx.Tx, scope storage.Scope, retained matrixproof.RootChallenge, consumed *time.Time, proof matrixproof.SignedAction, origin matrixproof.Origin) (matrixproof.Authority, error) {
 	current, err := matrixAuthorityTx(ctx, tx, scope)
 	if err != nil {
+		return current, err
+	}
+	if err := sinTraspasoTx(ctx, tx, scope, domain.ErrConflict); err != nil {
 		return current, err
 	}
 	previous := current

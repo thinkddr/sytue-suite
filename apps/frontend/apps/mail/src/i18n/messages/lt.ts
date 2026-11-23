@@ -1011,4 +1011,10 @@ export const lt: AppCatalog<typeof en> = {
     'Laiškas priimtas, bet kopijos nepavyko išsaugoti išsiųstų laiškų aplanke. Nesiųskite jo dar kartą.',
   'externalMail.invalidConfiguration':
     'Įveskite galiojantį el. pašto adresą, abiejų serverių vardus ir prievadus bei slaptažodį.',
+  'privateMail.handoverOffer': 'Negalite atidaryti pašto? Ištuštinkite jį ir perkelkite į saugyklą',
+  'privateMail.handoverTitle': 'Ištuštinti paštą ir perkelti jį į saugyklą',
+  'privateMail.handoverBody':
+    'Šifruotas paštas, kurio nebegalite atidaryti, nebus atkurtas. Nuo šiol jūsų paštas atsidaro prisijungus prie Sytue ID, ir gali tekti prisijungti dar kartą.',
+  'privateMail.handoverUnderstood': 'Suprantu, kad paštas, kurio negaliu atidaryti, bus prarastas',
+  'privateMail.handoverConfirm': 'Ištuštinti ir perkelti į saugyklą',
 };

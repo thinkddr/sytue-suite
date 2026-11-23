@@ -492,6 +492,11 @@ try {
         })
         .getByRole("button", { name: /Reply in thread/ })
         .click();
+      // Esperar a que el hilo esté abierto antes de escribir y enviar, para no
+      // mandar el mensaje al canal principal bajo carga del runner.
+      await expect(
+        ui.dialog.getByRole("button", { name: "Close thread", exact: true }),
+      ).toBeVisible();
       await ui.dialog
         .getByLabel("Write a message in general", { exact: true })
         .fill("A threaded reply");

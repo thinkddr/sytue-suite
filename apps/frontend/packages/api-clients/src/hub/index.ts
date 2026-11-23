@@ -197,6 +197,11 @@ export interface Notification {
    * nace leído y la campana lo marca como tal.
    */
   historic?: boolean;
+  /**
+   * Espera en la entrada privada de One (la fuente de su destinatario está congelada,
+   * ADR 0086): ningún aparato lo ha guardado todavía. Se lee y se marca como los demás.
+   */
+  private?: boolean;
 }
 
 /** Datos para emitir una notificación (POST /notifications del Hub). */

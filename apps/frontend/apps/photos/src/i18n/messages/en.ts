@@ -343,4 +343,37 @@ export const en = {
   'library.savedToPictures': 'Saved to Pictures › Sytue Photos: {count}',
   'library.saveFailed': 'Could not save to this computer’s gallery: {name}',
   'backup.whileOpen': 'On this computer, backup runs while Sytue Photos is open.',
+  'backup.encryptedWaitTitle': 'Open Sytue Photos to finish the encrypted backup',
+  'backup.encryptedWaitBody':
+    'Your Drive is end-to-end encrypted. New photos are backed up as soon as you open Sytue Photos.',
+  'gallery.uploadedEncrypted': 'Saved end-to-end encrypted in your Drive: {count}',
+  'gallery.uploadVaultSignIn':
+    'Your Drive is end-to-end encrypted. Sign in again to unlock it, then add the photos again.',
+  'gallery.uploadVaultNotReady':
+    'Your Drive is still moving to end-to-end encryption. Open Sytue Drive to finish, then add the photos again.',
+  'gallery.uploadVaultLocked':
+    'Your Drive is end-to-end encrypted. Unlock it above, then add the photos again.',
+  'gallery.uploadVaultUnavailable':
+    "Your Drive is end-to-end encrypted and can't be opened on this device. Add the photos from Sytue Photos on the web.",
+  'gallery.encrypted.title': 'In your encrypted Drive',
+  'gallery.encrypted.show': 'Show',
+  'gallery.encrypted.opening': 'Decrypting…',
+  'gallery.encrypted.failed': 'Could not open your encrypted Drive.',
+  'gallery.encrypted.signIn': 'Sign in again',
+  'gallery.encrypted.empty': 'There are no photos in your encrypted Drive yet.',
+  'gallery.encrypted.note':
+    "End-to-end encrypted photos are only decrypted on this device. Sytue AI, similar photos, nearby and memories don't include them.",
+  'gallery.encrypted.badge': 'End-to-end encrypted',
+  'gallery.encrypted.open': 'Open {name} (encrypted)',
+  'gallery.encrypted.notSelectable':
+    "Encrypted photos can't be selected: open one to mark it as a favourite or add it to an album.",
+  'gallery.encrypted.actionFailed': 'Could not update your encrypted gallery.',
+  'gallery.encrypted.saved':
+    'Saved as a new encrypted version. The previous one stays in the Drive version history.',
+  'gallery.encrypted.albums': 'Encrypted albums',
+  'gallery.encrypted.newAlbum': 'New encrypted album',
+  'gallery.encrypted.saveVersion': 'Save as new version',
+  'gallery.encrypted.editHint':
+    'The edit is done on this device and saved encrypted as a new version of the photo.',
+  'gallery.encrypted.albumEmpty': 'This encrypted album has no photos yet.',
 } as const;

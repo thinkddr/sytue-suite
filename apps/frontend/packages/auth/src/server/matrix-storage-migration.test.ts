@@ -386,6 +386,29 @@ test('foreign sessions, extra routes, unsafe methods and unbounded bodies are re
   expect((await f.send('')).status).toBe(409);
   expect(f.calls).toHaveLength(0);
 });
+test('«soltar la fuente» passes only a bounded POST to release, never on Drive', async () => {
+  const f = fixture('contacts');
+  const body = JSON.stringify({ epoch, discard_private_writes: true });
+  const headers = { 'content-type': 'application/json', 'content-length': String(body.length) };
+  const response = await f.send('release', 'POST', headers, body);
+  expect(response.status).toBe(200);
+  expect(f.calls).toHaveLength(1);
+  expect(new URL(f.calls[0]!.url).pathname).toBe('/api/v1/private-storage/migration/release');
+  expect(await f.calls[0]!.text()).toBe(body);
+  for (const [method, extra, sent] of [
+    ['GET', {}, undefined],
+    ['DELETE', {}, undefined],
+    ['POST', { 'content-length': '129' }, 'x'.repeat(129)],
+    ['POST', { [sessionOwnerHeader]: 'b'.repeat(64) }, body],
+  ] as [string, Record<string, string>, string?][]) {
+    const rejected = await f.send('release', method, { ...headers, ...extra }, sent);
+    expect(rejected.status).toBeGreaterThanOrEqual(400);
+  }
+  expect(f.calls).toHaveLength(1);
+  const drive = fixture('drive');
+  expect((await drive.send('release', 'POST', headers, body)).status).toBe(400);
+  expect(drive.calls).toHaveLength(0);
+});
 test('cookie SDK walks the mounted BFF without exposing its token or materializing a source blob', async () => {
   const f = fixture();
   const sdk = new DriveClient({

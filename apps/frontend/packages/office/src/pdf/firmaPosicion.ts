@@ -218,3 +218,22 @@ export function rectElegido(
 function redondear(n: number): number {
   return Math.round(n * 2) / 2;
 }
+
+// ---- La rúbrica ----
+
+/** El tamaño interno del lienzo de la rúbrica: los trazos se guardan en estas coordenadas. */
+export const ANCHO_LIENZO = 480;
+export const ALTO_LIENZO = 148;
+
+/** Trazos del lienzo → coordenadas de la página, con el eje vertical al derecho. */
+export function trazosAPagina(
+  trazos: [number, number][][],
+  ancho: number,
+  alto: number,
+  rect: Rect,
+): [number, number][][] {
+  const [x0, y0, x1, y1] = rect;
+  const w = x1 - x0;
+  const h = y1 - y0;
+  return trazos.map((t) => t.map(([x, y]) => [x0 + (x / ancho) * w, y1 - (y / alto) * h]));
+}

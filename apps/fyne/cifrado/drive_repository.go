@@ -88,7 +88,7 @@ func NewDriveRepository(ctx context.Context, resources *Resources[*mx.Client], d
 	if err != nil {
 		return nil, err
 	}
-	cycle, err := NewRepositoryCycle(resources, RepositoryConfig[*privateDrive.Repository]{Create: func(context.Context) (*privateDrive.Repository, error) { return plan.Repository, nil }, Prepare: plan.Prepare})
+	cycle, err := NewRepositoryCycle(resources, RepositoryConfig[*privateDrive.Repository]{Create: func(context.Context) (*privateDrive.Repository, error) { return plan.Repository, nil }, Prepare: plan.Prepare}) //nolint:contextcheck // The cycle retains the resources' presenter lifetime, not this constructor request.
 	if err != nil {
 		plan.Repository.Close() //nolint:contextcheck // Construction has started no IO and owns only its repository lifetime.
 		_ = plan.Retire(context.WithoutCancel(ctx))

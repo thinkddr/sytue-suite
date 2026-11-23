@@ -36,6 +36,7 @@ import (
 	privateERP "git.sytue.eu/sytue/one/apps/nucleo/erp"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 func main() {
@@ -87,62 +88,77 @@ func main() {
 		}
 	}
 
-	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateERP.Repository]{
-		Suite:       s,
-		Application: a,
-		Window:      w,
-		Product:     "erp",
-		Translate:   func(key string) string { return t.T(key, nil) },
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateERP.Repository], error) {
-			return erpPlan(ctx, resources, s, string(l))
-		},
-		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateERP.Repository) (cifrado.ApplicationView, error) {
-			facade, err := api.NewERP(s.URL("erp"), resources.HTTP(), nil, string(l)).WithPrivateData(repository)
-			if err != nil {
-				return cifrado.ApplicationView{}, err
-			}
-			p := erp.NuevaPantalla(t, facade, nil)
-			switch runtime.GOOS {
-			case "js":
-			default:
-				p.ElegirFicheros = elegirFicheros
-			}
-			organization := resources.PrivateStorageScope().Tenant
-			// Quien ha entrado: la cola de aprobaciones no le ofrece aprobar lo suyo.
-			subject := resources.PrivateStorageScope().Subject
-			p.Yo = func() string { return subject }
-			p.AbrirApp = func(producto, ruta string) { _ = api.AbrirEn(a, s.Apex(), producto, organization, ruta) }
-			p.Atajos(w.Canvas(), barra)
-			current = p
-			p.Arrancar()
-			go func() {
-				ctx, cancelar := context.WithTimeout(resources.Context(), 15*time.Second)
-				defer cancelar()
-				if yo, err := api.NewAccount(s.URL("id"), resources.HTTP(), nil).Me(ctx); err == nil {
-					nombreCuenta := yo.Name
-					if nombreCuenta == "" {
-						nombreCuenta = yo.Email
-					}
-					fyne.Do(func() {
-						if current == p {
-							p.PonerNombre(nombreCuenta)
-						}
-					})
+	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
+	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
+	mount := func(resources cifrado.Cuenta, facade *api.ERP) cifrado.ApplicationView {
+		p := erp.NuevaPantalla(t, facade, nil)
+		switch runtime.GOOS {
+		case "js":
+		default:
+			p.ElegirFicheros = elegirFicheros
+		}
+		organization := resources.PrivateStorageScope().Tenant
+		// Quien ha entrado: la cola de aprobaciones no le ofrece aprobar lo suyo.
+		subject := resources.PrivateStorageScope().Subject
+		p.Yo = func() string { return subject }
+		p.AbrirApp = func(producto, ruta string) { _ = api.AbrirEn(a, s.Apex(), producto, organization, ruta) }
+		p.Atajos(w.Canvas(), barra)
+		current = p
+		p.Arrancar()
+		go func() {
+			ctx, cancelar := context.WithTimeout(resources.Context(), 15*time.Second)
+			defer cancelar()
+			if yo, err := api.NewAccount(s.URL("id"), resources.HTTP(), nil).Me(ctx); err == nil {
+				nombreCuenta := yo.Name
+				if nombreCuenta == "" {
+					nombreCuenta = yo.Email
 				}
-			}()
-			if u := pendingURL; u != nil {
-				pendingURL = nil
-				atenderURL(p, u)
-			}
-			return cifrado.ApplicationView{
-				Object: p.Objeto(),
-				Detach: func() {
+				fyne.Do(func() {
 					if current == p {
-						current = nil
+						p.PonerNombre(nombreCuenta)
 					}
-				},
-			}, nil
+				})
+			}
+		}()
+		if u := pendingURL; u != nil {
+			pendingURL = nil
+			atenderURL(p, u)
+		}
+		return cifrado.ApplicationView{
+			Object: p.Objeto(),
+			Detach: func() {
+				if current == p {
+					current = nil
+				}
+			},
+		}
+	}
+
+	private, err := cifrado.NuevaAplicacionRegistros(cifrado.AplicacionRegistrosConfig[*privateERP.Repository]{
+		Matrix: cifrado.PrivateApplicationConfig[*privateERP.Repository]{
+			Suite:       s,
+			Application: a,
+			Window:      w,
+			Product:     "erp",
+			Translate:   func(key string) string { return t.T(key, nil) },
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateERP.Repository], error) {
+				return erpPlan(ctx, resources, s, string(l))
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateERP.Repository) (cifrado.ApplicationView, error) {
+				facade, err := api.NewERP(s.URL("erp"), resources.HTTP(), nil, string(l)).WithPrivateData(repository)
+				if err != nil {
+					return cifrado.ApplicationView{}, err
+				}
+				return mount(resources, facade), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+			},
+		},
+		Soltar: cifrado.SoltarEn(s.URL("erp")),
+		Modo: func(ctx context.Context, session api.Session, scope storage.Scope) (string, error) {
+			state, err := api.NewERP(s.URL("erp"), session, nil, string(l)).PrivateStorageState(ctx, scope)
+			return state.Mode, err
+		},
+		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
+			return mount(cuenta, api.NewERP(s.URL("erp"), cuenta.HTTP(), nil, string(l))), nil
 		},
 	})
 

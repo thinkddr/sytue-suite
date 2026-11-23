@@ -305,6 +305,22 @@ export const nl: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Opgeslagen in Sytue Drive.',
   'doc.msg.savedToDriveIn': '‘{name}’ bevat nu je wijzigingen, als nieuwe versie.',
   'doc.msg.saveToDriveFailed': 'De wijzigingen konden niet in Drive worden opgeslagen.',
+  'doc.msg.saveToDriveVault': 'Uw Drive is end-to-end versleuteld',
+  'doc.msg.saveToDriveVault.detail':
+    'Het kon van hieruit niet worden opgeslagen. Download het document en upload het vanuit Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Opgeslagen in je versleutelde Drive.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '‘{name}’ is in deze browser versleuteld voordat het werd opgeslagen.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '‘{name}’ is op dit apparaat versleuteld voordat het werd opgeslagen.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Je versleutelde Drive is op dit apparaat vergrendeld. Ontgrendel hem hierboven en sla opnieuw op.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Meld je opnieuw aan om je versleutelde Drive te ontgrendelen en sla opnieuw op.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Je Drive gaat nog over op end-to-endversleuteling. Open Sytue Drive om dat af te ronden en sla opnieuw op.',
+  'doc.msg.saveToDriveUnsupported':
+    'Het formaat van dit bestand kan niet opnieuw worden geschreven. Download het document in plaats daarvan.',
   'file.downloadPdf': 'Downloaden als PDF',
   'file.pdfAccessible': 'Toegankelijke pdf (PDF/UA)',
   'file.downloadHtml': 'Downloaden als HTML',
@@ -2691,6 +2707,52 @@ export const nl: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong':
     'Een ondertekenvolgorde kan maximaal 10 personen hebben.',
   'pdf.error.signatureRequest.busy': 'Dit verzoek wordt al geopend. Probeer het zo meteen opnieuw.',
+  'pdf.error.driveVault':
+    'Je Drive is end-to-end versleuteld: kopieën voor ondertekeningsverzoeken van andere organisaties kunnen er nog niet in worden opgeslagen. Download de pdf in plaats daarvan.',
+  'pdf.device.title': 'Ondertekenen op dit apparaat',
+  'pdf.device.help':
+    'Je Drive is end-to-end versleuteld, dus de server kan je pdf’s niet lezen. Kies er een: die wordt hier ontsleuteld en met je certificaat ondertekend, en de ondertekende kopie wordt versleuteld naast het origineel opgeslagen. Noch de pdf noch je certificaat bereikt de server.',
+  'pdf.device.open': 'Mijn versleutelde Drive openen',
+  'pdf.device.empty.title': 'Geen pdf’s in je versleutelde Drive',
+  'pdf.device.empty.description': 'Upload ze vanuit Sytue Drive en ze verschijnen hier.',
+  'pdf.device.sign': 'Ondertekenen',
+  'pdf.device.signed': 'Ondertekend en versleuteld opgeslagen als ‘{name}’.',
+  'pdf.device.stamp.on':
+    'Met tijdstempel van {authority}: de handtekening bewijst wie en wanneer heeft ondertekend. De instantie ontvangt alleen de vingerafdruk van de handtekening, nooit de pdf.',
+  'pdf.device.stamp.off':
+    'Geen tijdstempel: deze dienst heeft geen tijdstempelinstantie, dus de handtekening bewijst wie heeft ondertekend, niet wanneer.',
+  'pdf.device.appearance': 'Hoe de handtekening eruitziet',
+  'pdf.device.appearance.invisible': 'Onzichtbaar',
+  'pdf.device.appearance.visible': 'Zichtbaar kader',
+  'pdf.device.signedStamped': 'Ondertekend met tijdstempel en versleuteld opgeslagen als ‘{name}’.',
+  'pdf.device.signedNoStamp':
+    'Ondertekend en versleuteld opgeslagen als ‘{name}’, maar zonder tijdstempel: de tijdstempelinstantie antwoordde niet.',
+  'pdf.device.error.page':
+    'De handtekening past niet op die pagina. Kies een andere pagina of positie.',
+  'pdf.device.view': 'Bekijken',
+  'pdf.vault.help':
+    'Deze pdf staat in je versleutelde Drive: hij wordt alleen op dit apparaat ontsleuteld, om hem te bekijken en te ondertekenen.',
+  'pdf.vault.serverOnly':
+    'Aantekeningen maken, invullen, ordenen, bewerken, tekst herkennen en om een handtekening vragen vereisen dat de dienst de pdf leest, dus die zijn niet beschikbaar met je versleutelde Drive.',
+  'pdf.vault.notFound.title': 'Deze pdf staat niet in je versleutelde Drive',
+  'pdf.vault.notFound.description':
+    'Hij is misschien verplaatst of verwijderd. Zoek hem in Sytue Drive.',
+  'pdf.vault.openSigned': 'Ondertekende kopie openen',
+  'pdf.device.requests':
+    'Anderen of andere organisaties om een handtekening vragen vereist de Drive van de server: de dienst moet de pdf lezen om die te versturen en de handtekening te controleren die terugkomt. Met je Drive versleuteld onderteken je hier en verstuur je de ondertekende pdf zelf.',
+  'pdf.device.error.signin':
+    'Meld je opnieuw aan bij Sytue ID om je versleutelde Drive te ontgrendelen.',
+  'pdf.device.error.pending':
+    'Je Drive gaat nog over naar end-to-endversleuteling. Rond dat af vanuit Sytue Drive.',
+  'pdf.device.error.password': 'Met dat wachtwoord gaat het certificaat niet open.',
+  'pdf.device.error.encrypted':
+    'Deze pdf is met een wachtwoord beveiligd en kan op dit apparaat niet worden ondertekend.',
+  'pdf.device.error.locked':
+    'Deze pdf is gecertificeerd tegen elke wijziging: een extra handtekening zou hem ongeldig maken.',
+  'pdf.device.error.unreadable':
+    'Deze pdf kan op dit apparaat niet worden ondertekend zonder hem te herschrijven. Er is niets gewijzigd.',
+  'pdf.device.error.failed':
+    'De pdf kon niet worden ondertekend of opgeslagen. Er is niets gewijzigd in je Drive.',
   'pdf.dialog.firmar.help':
     'Het certificaat en de sleutel verlaten je organisatie nooit: ze worden op de server gebruikt en niet opgeslagen.',
   'pdf.dialog.firmar.cert': 'Certificaat (PEM)',

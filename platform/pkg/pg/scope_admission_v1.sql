@@ -79,7 +79,7 @@ BEGIN
  WHERE c.oid=scope_table AND n.nspname=current_schema() AND c.relkind='r'
  AND EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attname='tenant' AND a.attnum>0 AND NOT a.attisdropped);
  IF qualified IS NULL THEN RAISE EXCEPTION 'scope admission table invalid' USING ERRCODE='22023'; END IF;
- IF state_only IS NULL OR (state_only AND NOT EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=scope_table AND NOT t.tgisinternal AND t.tgenabled IN('O','A') AND t.tgtype=27 AND t.tgfoid=to_regprocedure('sytue_private_storage_state_scope_guard()')))
+ IF state_only IS NULL OR (state_only AND NOT EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=scope_table AND NOT t.tgisinternal AND t.tgenabled IN('O','A') AND t.tgtype=27 AND t.tgfoid IN (to_regprocedure('sytue_private_storage_state_scope_guard()'),to_regprocedure('sytue_private_storage_state_scope_guard_v2()'))))
  OR (NOT state_only AND NOT EXISTS(SELECT 1 FROM pg_constraint k WHERE k.conrelid=scope_table AND k.conname='scope_bound_merge_contract' AND pg_get_constraintdef(k.oid)='CHECK (sytue_scope_merge_allowed())')) THEN
   RAISE EXCEPTION 'scope admission table role invalid' USING ERRCODE='22023';
  END IF;
@@ -131,12 +131,12 @@ CREATE FUNCTION sytue_scope_admission_tables() RETURNS TABLE(scope_table oid,sta
 LANGUAGE sql STABLE AS $$
  SELECT c.oid,
  EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_proc f ON f.oid=t.tgfoid WHERE t.tgrelid=c.oid AND NOT t.tgisinternal
- AND (f.proname='sytue_private_storage_state_scope_guard' OR (f.proname='sytue_scope_admission_data_guard' AND t.tgargs=convert_to('state','UTF8')||decode('00','hex'))))
+ AND (f.proname IN('sytue_private_storage_state_scope_guard','sytue_private_storage_state_scope_guard_v2') OR (f.proname='sytue_scope_admission_data_guard' AND t.tgargs=convert_to('state','UTF8')||decode('00','hex'))))
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname=current_schema() AND c.relkind IN('r','p') AND NOT c.relispartition
  AND (EXISTS(SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.conname='scope_bound_merge_contract')
  OR EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_proc f ON f.oid=t.tgfoid WHERE t.tgrelid=c.oid AND NOT t.tgisinternal
- AND f.proname IN('sytue_private_storage_state_scope_guard','sytue_scope_admission_data_guard')))
+ AND f.proname IN('sytue_private_storage_state_scope_guard','sytue_private_storage_state_scope_guard_v2','sytue_scope_admission_data_guard')))
  ORDER BY c.relname
 $$;
 

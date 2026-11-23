@@ -1012,4 +1012,10 @@ export const it: AppCatalog<typeof en> = {
     'L’email è stata accettata, ma non è stato possibile salvarne una copia nella posta inviata. Non inviarla di nuovo.',
   'externalMail.invalidConfiguration':
     'Inserisci un indirizzo email valido, i nomi e le porte di entrambi i server e una password.',
+  'privateMail.handoverOffer': 'Non riesci ad aprire la posta? Svuotala e passa alla cassaforte',
+  'privateMail.handoverTitle': 'Svuota la posta e passala alla cassaforte',
+  'privateMail.handoverBody':
+    'La posta cifrata che non puoi più aprire non verrà recuperata. D’ora in poi la tua posta si apre con l’accesso a Sytue ID, che potrebbe esserti chiesto di ripetere.',
+  'privateMail.handoverUnderstood': 'Ho capito che la posta che non posso aprire andrà persa',
+  'privateMail.handoverConfirm': 'Svuota e passa alla cassaforte',
 };

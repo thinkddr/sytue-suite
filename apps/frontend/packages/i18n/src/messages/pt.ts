@@ -32,6 +32,49 @@ export const pt: Catalog = {
   'matrix.connect': 'Configurar este dispositivo',
   'matrix.devices': 'Os teus dispositivos',
   'matrix.failed': 'Não foi possível configurar a encriptação. Tenta novamente.',
+  'vault.wrongKey':
+    'Os dados cifrados desta aplicação foram bloqueados com uma chave de desbloqueio do Sytue ID diferente da deste navegador. Volte a iniciar sessão no Sytue ID para trazer para aqui a chave atual. Se a chave anterior se perdeu, pode esvaziar os dados cifrados desta aplicação e começar de novo.',
+  'vault.wrongKeyDevice':
+    'Os dados cifrados desta aplicação foram bloqueados com uma chave de desbloqueio do Sytue ID diferente da deste dispositivo. Volte a iniciar sessão no Sytue ID para trazer para aqui a chave atual. Se a chave anterior se perdeu, pode esvaziar os dados cifrados desta aplicação e começar de novo.',
+  'vault.release': 'Esvaziar e voltar aos dados do servidor',
+  'vault.releaseTitle': 'Voltar aos dados do servidor',
+  'vault.releaseBody':
+    'Quando os dados desta aplicação passaram para a cifragem a partir de uma aplicação de computador ou móvel, o servidor guardou uma cópia tal como estavam nesse momento. Se não conseguir abrir os dados cifrados, esta aplicação pode voltar a essa cópia. Tudo o que foi escrito depois, em qualquer dispositivo, perde-se e não pode ser recuperado.',
+  'vault.releaseUnderstood':
+    'Compreendo que tudo o que foi escrito depois da passagem para a cifragem se perde',
+  'vault.releaseSignIn':
+    'Para confirmar a sua identidade, o Sytue ID vai pedir-lhe primeiro que inicie sessão novamente.',
+  'vault.releaseFailed': 'Não foi possível voltar aos dados do servidor. Tente novamente.',
+  'vault.moveTitle': 'Mover o Drive para o cofre cifrado',
+  'vault.moveOffer':
+    'O teu Drive continua guardado na cifragem anterior. Move-o para o cofre usado pela web e pelos teus outros dispositivos.',
+  'vault.moveAction': 'Mover para o cofre',
+  'vault.moveBody':
+    'Todos os teus ficheiros e pastas, com as suas versões, serão copiados para o cofre cifrado e verificados um a um. Nada é apagado da cifragem anterior. Mantém a app aberta até terminar; se for interrompida, continua onde parou.',
+  'vault.moveUnderstood':
+    'Compreendo que, no fim, este Drive passará a ser usado a partir do cofre',
+  'vault.moveCopying': 'A copiar e verificar os teus ficheiros…',
+  'vault.moveDone': 'Concluído. O teu Drive já está no cofre cifrado.',
+  'vault.moveFailed':
+    'Não foi possível terminar a cópia. Os teus ficheiros continuam na cifragem anterior. Tenta novamente.',
+  'vault.movePending':
+    'Este dispositivo ainda tem alterações por enviar. Espera que terminem e tenta novamente.',
+  'vault.copyInProgress':
+    'Outro dispositivo está a mover o teu Drive para o cofre cifrado. Espera que termine e tenta novamente.',
+  'vault.copyCancel': 'Cancelar a cópia',
+  'vault.copyCancelHint':
+    'Se essa cópia ficou parada, podes cancelá-la: nada é apagado e podes repeti-la a partir desse dispositivo.',
+  'vault.releaseNotice':
+    'Os dados desta aplicação passaram para a cifragem a partir de uma aplicação de computador ou móvel. O que vê aqui é a cópia que o servidor guardou nesse momento; o que foi escrito depois está apenas nos dados cifrados. Se já não os conseguir abrir, pode voltar aos dados do servidor.',
+  'notifications.kind.security.storage.released': '{name} voltou aos seus dados no servidor',
+  'vault.signInAgain': 'Voltar a iniciar sessão no Sytue ID',
+  'vault.empty': 'Esvaziar os dados cifrados',
+  'vault.emptyTitle': 'Esvaziar os dados cifrados desta aplicação',
+  'vault.emptyBody':
+    'Os dados que esta aplicação cifrou com a chave perdida serão eliminados do Sytue e será criada uma chave nova. O resto da sua conta não é afetado. Não é possível anular.',
+  'vault.emptyUnderstood': 'Compreendo que os dados cifrados com a chave perdida serão eliminados',
+  'vault.failed':
+    'Não foi possível abrir os dados cifrados. Tente novamente ou volte a iniciar sessão no Sytue ID. Se a chave se perdeu, pode esvaziar os dados cifrados desta aplicação.',
   'matrix.incoming': 'Verificar este dispositivo',
   'matrix.match': 'São iguais',
   'matrix.mismatch': 'São diferentes',

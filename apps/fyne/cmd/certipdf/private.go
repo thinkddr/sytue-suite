@@ -35,7 +35,7 @@ type pdfStorage struct {
 	ventana    fyne.Window
 	traductor  *i18n.Translator
 
-	drive   *cifrado.PrivateApplication[*privateDrive.Repository]
+	drive   *cifrado.AplicacionDrive
 	errores error
 	vista   atomic.Pointer[pdfVista]
 }
@@ -43,13 +43,20 @@ type pdfStorage struct {
 func newPDFStorage(suite *sesion.Suite, application fyne.App, window fyne.Window, translate *i18n.Translator) (*pdfStorage, error) {
 	host := &pdfStorage{suite: suite, aplicacion: application, ventana: window, traductor: translate}
 	texto := func(key string) string { return translate.T(key, nil) }
-	host.drive, host.errores = cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateDrive.Repository]{
-		Suite: suite, Application: application, Window: window, Product: "drive", Translate: texto,
-		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateDrive.Repository], error) {
-			return cifrado.NewDriveApplicationPlan(ctx, resources, suite.URL("drive"), suite.URL("rooms"))
+	// El repositorio de Drive va sobre la bóveda directa cuando la web ya llevó
+	// ahí el Drive de esa persona, y si no, sobre Matrix como hasta ahora (ADR 0086).
+	host.drive, host.errores = cifrado.NuevaAplicacionDrive(cifrado.AplicacionDriveConfig{
+		Matrix: cifrado.PrivateApplicationConfig[*privateDrive.Repository]{
+			Suite: suite, Application: application, Window: window, Product: "drive", Translate: texto,
+			Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateDrive.Repository], error) {
+				return cifrado.NewDriveApplicationPlan(ctx, resources, suite.URL("drive"), suite.URL("rooms"))
+			},
+			Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateDrive.Repository) (cifrado.ApplicationView, error) {
+				return host.montar(resources, repository) //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+			},
 		},
-		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateDrive.Repository) (cifrado.ApplicationView, error) {
-			return host.montar(resources, repository) //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		MontarBoveda: func(_ context.Context, cuenta cifrado.Cuenta, repository *privateDrive.Repository) (cifrado.ApplicationView, error) {
+			return host.montar(cuenta, repository) //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
 		},
 	})
 	if host.drive == nil && host.errores == nil {
@@ -62,7 +69,7 @@ func newPDFStorage(suite *sesion.Suite, application fyne.App, window fyne.Window
 // privada de Drive. Lo que sube va al repositorio cifrado y lo que transforma corre
 // en el dispositivo; el servicio de IA sólo recibe lo que la persona le escriba,
 // nunca el documento.
-func (h *pdfStorage) montar(resources *cifrado.Resources[*mx.Client], repository *privateDrive.Repository) (cifrado.ApplicationView, error) {
+func (h *pdfStorage) montar(resources cifrado.Cuenta, repository *privateDrive.Repository) (cifrado.ApplicationView, error) {
 	pdf, err := api.NewPDF(h.suite.URL("docs"), h.suite.URL("drive"), resources.HTTP(), nil).WithPrivateDrive(repository)
 	if err != nil {
 		return cifrado.ApplicationView{}, err

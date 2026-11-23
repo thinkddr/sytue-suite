@@ -30,6 +30,8 @@ func (mailerRoto) SendPlatformScopeChange(context.Context, string, string, strin
 	return nil
 }
 
+func (mailerRoto) SendVaultKeyReset(context.Context, string, string, int64) error { return nil }
+
 func hayRastroDeReseteo(t *testing.T, l *liveServer, userID string) bool {
 	t.Helper()
 	const sql = `SELECT EXISTS (

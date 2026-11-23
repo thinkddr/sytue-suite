@@ -5764,8 +5764,8 @@ What the numbers say, and what they do not:
 - The times are from THIS machine, with someone else's load. They are useful for comparing engine versions
   with one another and for the order of magnitude, not as an absolute guarantee.
 
-**In CI.** The `bench-calcus` job of `ci-frontend.yml` runs the benchmark on every run
-of the workflow (release, schedule, manual), **does not block** (`continue-on-error`) and stores the
+**In CI.** The `bench-calcus` job of `ci-frontend.yml` runs the benchmark when
+`ci-frontend` is dispatched manually (not inside `ci` nor in the release), **does not block** (`continue-on-error`) and stores the
 result: the table in the run summary and the JSON (`runtime`, `maquina`,
 `cargaMedia`, `fecha` and the measurements) as the `bench-calcus-<sha>` artifact with 90-day
 retention, to compare it across releases.

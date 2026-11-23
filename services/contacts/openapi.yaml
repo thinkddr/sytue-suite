@@ -8,7 +8,7 @@ info:
     Gestiona libretas de direcciones, contactos (vCard 4.0) y grupos por tenant.
     El estado vive en PostgreSQL (única fuente de verdad). CardDAV (RFC 6352) se
     expone bajo /dav (no documentado aquí; usa el mismo Bearer JWT).
-    Clean-room © Sytue sobre vCard 4.0 (RFC 6350) y CardDAV (RFC 6352); sin
+    Clean-room, © 2026 Daniel Delgado Ramos (thinkddr) sobre vCard 4.0 (RFC 6350) y CardDAV (RFC 6352); sin
     motores AGPL.
   version: "1.0.0"
   license:

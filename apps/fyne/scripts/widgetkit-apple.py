@@ -138,9 +138,11 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             shutil.copytree(productos / nombre, bundle, symlinks=True)
             perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
             shutil.copyfile(perfil, perfil_destino)
-            # El árbol clonado del job Apple y su almacén privado son 0600; instalado
-            # pertenece a root y debe poder leerlo quien ejecuta la app (90255).
-            os.chmod(perfil_destino, 0o640)
+            # El perfil se copia del almacén privado del job Apple: mientras se monta,
+            # solo para su dueño (0600). Instalado pertenece a root y debe poder leerlo
+            # quien ejecuta la app (90255): esa lectura pública, y solo esa (0444), la
+            # concede después, a propósito y para todo el bundle, hacer_legible_publico.
+            os.chmod(perfil_destino, 0o600)
             hacer_legible_publico(bundle)
             anidadas.append((bundle, derechos))
         puente = None

@@ -1759,17 +1759,15 @@ describe('the way back is never script', () => {
       expect({ url, safe: e2e.safeReturn(url) }).toEqual({ url, safe: '' });
   });
 
-  test("navigableReturn rebuilds the way back with a scheme of its own, never the document's", () => {
+  test('navigableReturn rebuilds the way back with a scheme of its own, never the document\'s', () => {
     const e2e = load(fakeWindow(), 'comun.js');
     const want: Record<string, string> = {
       '/account?pk=ok#claves': 'https://id.sytue.eu/account?pk=ok#claves',
       '/': 'https://id.sytue.eu/',
-      'https://mail.sytue.eu/auth/callback?code=c&state=s':
-        'https://mail.sytue.eu/auth/callback?code=c&state=s',
+      'https://mail.sytue.eu/auth/callback?code=c&state=s': 'https://mail.sytue.eu/auth/callback?code=c&state=s',
       'HTTPS://mail.sytue.eu/x': 'https://mail.sytue.eu/x',
       'http://127.0.0.1:8921/auth/callback?code=c': 'http://127.0.0.1:8921/auth/callback?code=c',
-      'sytue-mail://auth/callback?code=c0de&state=st4te':
-        'sytue-mail://auth/callback?code=c0de&state=st4te',
+      'sytue-mail://auth/callback?code=c0de&state=st4te': 'sytue-mail://auth/callback?code=c0de&state=st4te',
       'sytue://auth/callback': 'sytue://auth/callback',
     };
     for (const [url, href] of Object.entries(want)) expect(e2e.navigableReturn(url)).toBe(href);

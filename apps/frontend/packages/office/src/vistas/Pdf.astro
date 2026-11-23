@@ -8,10 +8,14 @@
  * documento de Docs para poder verlo obligaría a mantener dos copias. La ACL, el
  * historial de versiones y quién puede abrirlo son los de Drive, que es donde el
  * usuario lo guardó.
+ *
+ * Con el Drive en la bóveda (ADR 0086) la misma ruta abre el fichero de la bóveda,
+ * descifrado en memoria en el navegador, para verlo y firmarlo en el dispositivo
+ * (`EstudioBoveda`): el servidor no lo ve, así que tampoco lo dibuja.
  */
 import type { SytueSession } from '@sytue/auth';
 import AppLayout from '../layouts/AppLayout.astro';
-import { PdfApp } from '../pdf/PdfApp';
+import { EstudioPdf } from '../pdf/EstudioBoveda';
 import { PortadaPdf } from '../pdf/Portada';
 import { docsT } from '../i18n';
 import { volverA } from '@sytue/config';
@@ -36,15 +40,22 @@ const nombre = path ? (path.split('/').filter(Boolean).pop() ?? path) : t('pdf.o
 <AppLayout title={`${nombre} — ${t('pdf.title')}`} producto="pdf">
   <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] min-h-0">
     {path ? (
-      <PdfApp
+      <EstudioPdf
         client:only="preact"
         path={path}
         locale={locale}
         autor={session.user.name ?? session.user.email ?? ''}
         volverA={volver}
+        actor={session.user.id}
+        tenant={session.user.tenant}
       />
     ) : (
-      <PortadaPdf client:only="preact" locale={locale} />
+      <PortadaPdf
+        client:only="preact"
+        locale={locale}
+        actor={session.user.id}
+        tenant={session.user.tenant}
+      />
     )}
   </div>
 </AppLayout>

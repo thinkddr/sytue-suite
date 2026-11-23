@@ -145,3 +145,32 @@ func TestWorkerPollReplaysLostAcceptedACKEvenWhenRemotePendingIsEmpty(t *testing
 		t.Fatal("accepted ACK retry changed claim or republished", pending, err, f.source.claims, f.executor.executions)
 	}
 }
+
+// Tras rotar la clave de entrada (ADR 0087), la bóveda no reclama las entregas
+// cifradas para otra clave: se quedan en la cola, sin tocarlas.
+func TestWorkerPollNoReclamaEntregasDeOtraClave(t *testing.T) {
+	f := newWorkerFixture(t)
+	source := &pollingWorkerSource{workerSource: f.source}
+	f.cfg.Source = source
+	f.cfg.KeyID = f.source.task.KeyID
+	ajena := source.task
+	ajena.KeyID = "0000000000000000000000000000000000000000000000000000000000000000"
+	source.task = ajena
+	worker := f.open(t)
+	for range 2 {
+		got, err := worker.Poll(t.Context())
+		if err != nil || got.Attempted != 0 || f.source.claims != 0 {
+			t.Fatal("se reclamó una entrega de otra clave", got, err, f.source.claims)
+		}
+	}
+	ids, err := worker.cfg.Journal.RecordIDs(worker.owner(), storage.PrivateIngressNamespace)
+	if err != nil || len(ids) != 0 {
+		t.Fatal("una entrega de otra clave dejó intención", ids, err)
+	}
+	// Y la de su clave sí se procesa.
+	source.task = f.source.task
+	source.task.KeyID = f.cfg.KeyID
+	if got, _ := worker.Poll(t.Context()); got.Attempted == 0 {
+		t.Fatal("la entrega de su clave no se intentó")
+	}
+}

@@ -53,6 +53,11 @@ type Config struct {
 	Source   Source
 	Device   Device
 	Executor Executor
+	// KeyID, si lo da el anfitrión (la bóveda, ADR 0087), es la clave de entrada
+	// que este dispositivo tiene. Las entregas cifradas para otra (la de Matrix
+	// tras un traspaso, la de antes de vaciar) no se reclaman: se quedan en la
+	// cola, intactas, para quien pueda abrirlas, en vez de bloquearse aquí.
+	KeyID string
 }
 
 type Worker struct {

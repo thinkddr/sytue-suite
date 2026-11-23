@@ -13,6 +13,7 @@ import {
 } from '@sytue/offline/matrix';
 import { MatrixDeviceGate, type MatrixGateHost } from './MatrixDeviceGate.js';
 import { PqVaultGate } from './PqVaultGate.js';
+import { SourceReleaseNotice } from './SourceReleaseNotice.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
 
 export type MatrixLegacyResolver = (signal: AbortSignal) => Promise<SuiteMatrix>;
@@ -270,16 +271,27 @@ export function MatrixStorageGate({
   children: ComponentChildren | ((client: SuiteMatrix) => ComponentChildren);
 }): JSX.Element {
   if (typeof children !== 'function') {
+    // La salida de «soltar la fuente» va fuera de la puerta: se ve aunque la
+    // bóveda no abra, que es justo cuando hace falta.
     return (
-      <PqVaultGate
-        actor={actor}
-        tenant={tenant}
-        locale={locale}
-        product={product}
-        basePath={basePath}
-      >
-        {children}
-      </PqVaultGate>
+      <>
+        <SourceReleaseNotice
+          actor={actor}
+          tenant={tenant}
+          locale={locale}
+          product={product}
+          basePath={basePath ?? prefijoDeApp(product === 'hub' ? 'one' : product) ?? '/'}
+        />
+        <PqVaultGate
+          actor={actor}
+          tenant={tenant}
+          locale={locale}
+          product={product}
+          basePath={basePath}
+        >
+          {children}
+        </PqVaultGate>
+      </>
     );
   }
   return (

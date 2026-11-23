@@ -349,4 +349,37 @@ export const pt: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Guardadas em Imagens › Sytue Photos: {count}',
   'library.saveFailed': 'Não foi possível guardar na galeria deste computador: {name}',
   'backup.whileOpen': 'Neste computador, a cópia é feita enquanto o Sytue Fotos está aberto.',
+  'backup.encryptedWaitTitle': 'Abra o Sytue Fotos para terminar a cópia encriptada',
+  'backup.encryptedWaitBody':
+    'O seu Drive está encriptado de ponta a ponta. As fotos novas são copiadas assim que abrir o Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Guardadas no seu Drive com encriptação de ponta a ponta: {count}',
+  'gallery.uploadVaultSignIn':
+    'O seu Drive está encriptado de ponta a ponta. Inicie sessão novamente para o desbloquear e adicione as fotos de novo.',
+  'gallery.uploadVaultNotReady':
+    'O seu Drive ainda está a passar para a encriptação de ponta a ponta. Abra o Sytue Drive para terminar e adicione as fotos de novo.',
+  'gallery.uploadVaultLocked':
+    'O seu Drive está encriptado de ponta a ponta. Desbloqueie-o acima e adicione as fotos de novo.',
+  'gallery.uploadVaultUnavailable':
+    'O seu Drive está encriptado de ponta a ponta e não pode ser aberto neste dispositivo. Adicione as fotos a partir do Sytue Photos na web.',
+  'gallery.encrypted.title': 'No seu Drive encriptado',
+  'gallery.encrypted.show': 'Mostrar',
+  'gallery.encrypted.opening': 'A desencriptar…',
+  'gallery.encrypted.failed': 'Não foi possível abrir o seu Drive encriptado.',
+  'gallery.encrypted.signIn': 'Iniciar sessão novamente',
+  'gallery.encrypted.empty': 'Ainda não há fotos no seu Drive encriptado.',
+  'gallery.encrypted.note':
+    'As fotos encriptadas ponto a ponto só são desencriptadas neste dispositivo. O Sytue AI, as fotos semelhantes, Por perto e as memórias não as incluem.',
+  'gallery.encrypted.badge': 'Encriptada ponto a ponto',
+  'gallery.encrypted.open': 'Abrir {name} (encriptada)',
+  'gallery.encrypted.notSelectable':
+    'As fotos encriptadas não podem ser selecionadas: abra uma para a marcar como favorita ou adicioná-la a um álbum.',
+  'gallery.encrypted.actionFailed': 'Não foi possível atualizar a sua galeria encriptada.',
+  'gallery.encrypted.saved':
+    'Guardada como nova versão encriptada. A anterior continua no histórico de versões do Drive.',
+  'gallery.encrypted.albums': 'Álbuns encriptados',
+  'gallery.encrypted.newAlbum': 'Novo álbum encriptado',
+  'gallery.encrypted.saveVersion': 'Guardar como nova versão',
+  'gallery.encrypted.editHint':
+    'A edição é feita neste dispositivo e guardada encriptada como nova versão da foto.',
+  'gallery.encrypted.albumEmpty': 'Este álbum encriptado ainda não tem fotos.',
 };

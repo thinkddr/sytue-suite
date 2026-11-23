@@ -297,6 +297,20 @@ export const et: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': "Salvestatud Sytue Drive'i.",
   'doc.msg.savedToDriveIn': '„{name}” sisaldab nüüd teie muudatusi uue versioonina.',
   'doc.msg.saveToDriveFailed': "Muudatusi ei õnnestunud Drive'i salvestada.",
+  'doc.msg.saveToDriveVault': 'Teie Drive on otspunktkrüptitud',
+  'doc.msg.saveToDriveVault.detail':
+    "Siit ei õnnestunud sinna salvestada. Laadige dokument alla ja üles Sytue Drive'ist.",
+  'doc.msg.savedToDriveEncrypted': "Salvestatud teie krüptitud Drive'i.",
+  'doc.msg.savedToDriveEncryptedIn': '„{name}” krüptiti enne salvestamist selles brauseris.',
+  'doc.msg.savedToDriveEncryptedOnDevice': '„{name}” krüptiti enne salvestamist selles seadmes.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Teie krüptitud Drive on selles seadmes lukus. Avage see ülal ja salvestage uuesti.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Logige uuesti sisse, et krüptitud Drive avada, ja salvestage uuesti.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Teie Drive läheb alles üle otspunktkrüptimisele. Avage selle lõpetamiseks Sytue Drive ja salvestage uuesti.',
+  'doc.msg.saveToDriveUnsupported':
+    'Selle faili vormingut ei saa üle kirjutada. Laadige selle asemel dokument alla.',
   'file.downloadPdf': 'Laadi alla PDF-ina',
   'file.pdfAccessible': 'Ligipääsetav PDF (PDF/UA)',
   'file.downloadHtml': 'Laadi alla HTML-ina',
@@ -2645,6 +2659,54 @@ export const et: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong':
     'Allkirjastamise järjekorras võib olla kuni 10 inimest.',
   'pdf.error.signatureRequest.busy': 'Seda taotlust juba avatakse. Proovige hetke pärast uuesti.',
+  'pdf.error.driveVault':
+    'Teie Drive on otspunktkrüptitud: teiste organisatsioonide allkirjataotluste koopiaid ei saa sinna veel salvestada. Laadige PDF alla.',
+  'pdf.device.title': 'Allkirjasta selles seadmes',
+  'pdf.device.help':
+    'Teie Drive on otspunktkrüptitud, nii et server ei saa teie PDF-e lugeda. Valige üks: see dekrüptitakse ja allkirjastatakse siin teie sertifikaadiga ning allkirjastatud koopia salvestatakse krüptituna originaali kõrvale. Ei PDF ega teie sertifikaat ei jõua serverisse.',
+  'pdf.device.open': 'Ava minu krüptitud Drive',
+  'pdf.device.empty.title': 'Teie krüptitud Drive’is pole PDF-e',
+  'pdf.device.empty.description': 'Laadige need üles Sytue Drive’ist ja need ilmuvad siia.',
+  'pdf.device.sign': 'Allkirjasta',
+  'pdf.device.signed': 'Allkirjastatud ja krüptituna salvestatud nimega „{name}“.',
+  'pdf.device.stamp.on':
+    'Ajatempliga teenuselt {authority}: allkiri tõendab, kes ja millal allkirjastas. Teenus saab ainult allkirja sõrmejälje, mitte kunagi PDF-i.',
+  'pdf.device.stamp.off':
+    'Ajatemplita: sellel teenusel pole ajatempliteenust, nii et allkiri tõendab, kes allkirjastas, aga mitte millal.',
+  'pdf.device.appearance': 'Kuidas allkiri välja näeb',
+  'pdf.device.appearance.invisible': 'Nähtamatu',
+  'pdf.device.appearance.visible': 'Nähtav kast',
+  'pdf.device.signedStamped':
+    'Allkirjastatud ajatempliga ja krüptituna salvestatud nimega „{name}“.',
+  'pdf.device.signedNoStamp':
+    'Allkirjastatud ja krüptituna salvestatud nimega „{name}“, kuid ajatemplita: ajatempliteenus ei vastanud.',
+  'pdf.device.error.page': 'Allkiri ei mahu sellele lehele. Vali teine leht või asukoht.',
+  'pdf.device.view': 'Vaata',
+  'pdf.vault.help':
+    'See PDF on sinu krüpteeritud Drive’is: see dekrüpteeritakse ainult selles seadmes, kus saad seda vaadata, märkustega varustada, täita, korraldada ja allkirjastada. Mida salvestad, läheb tagasi krüpteerituna.',
+  'pdf.vault.serverOnly':
+    'Krüpteeritud Drive’iga pole veel saadaval allkirjataotlused, paroolikaitse, tekstituvastus, varjamine, teksti või piltide muutmine, templid ja vesimärgid, võrdlemine, versiooniajalugu ega printimine: need vajavad, et teenus loeks PDF-i, või neid ei tehta veel seadmes.',
+  'pdf.vault.notFound.title': 'Seda PDF-i pole sinu krüptitud Drive’is',
+  'pdf.vault.notFound.description':
+    'See võib olla teisaldatud või kustutatud. Otsi seda Sytue Drive’ist.',
+  'pdf.vault.openSigned': 'Ava allkirjastatud koopia',
+  'pdf.vault.engineUnavailable':
+    'PDF-mootorit ei õnnestunud selles seadmes laadida, seega kuvatakse PDF brauseri vaaturis: saad seda vaadata, alla laadida ja allkirjastada, kuid mitte muuta.',
+  'pdf.vault.unavailable': 'Krüpteeritud Drive’iga pole veel saadaval.',
+  'pdf.device.requests':
+    'Teistelt inimestelt või organisatsioonidelt allkirja küsimiseks on vaja serveri Drive’i: teenus peab PDF-i lugema, et see saata ja tagasi tuleva allkirja kontrollida. Krüptitud Drive’iga allkirjastage siin ja saatke allkirjastatud PDF ise.',
+  'pdf.device.error.signin': 'Logige uuesti Sytue ID-sse, et krüptitud Drive avada.',
+  'pdf.device.error.pending':
+    'Teie Drive alles läheb üle otspunktkrüptimisele. Lõpetage see Sytue Drive’is.',
+  'pdf.device.error.password': 'See parool ei ava sertifikaati.',
+  'pdf.device.error.encrypted':
+    'See PDF on parooliga kaitstud ja seda ei saa selles seadmes allkirjastada.',
+  'pdf.device.error.locked':
+    'See PDF on sertifitseeritud igasuguste muudatuste vastu: uus allkiri muudaks selle kehtetuks.',
+  'pdf.device.error.unreadable':
+    'Seda PDF-i ei saa selles seadmes allkirjastada ilma seda ümber kirjutamata. Midagi ei muudetud.',
+  'pdf.device.error.failed':
+    'PDF-i ei õnnestunud allkirjastada ega salvestada. Teie Drive’is ei muudetud midagi.',
   'pdf.dialog.firmar.help':
     'Sertifikaat ja võti ei lahku kunagi teie organisatsioonist: neid kasutatakse serveris ja ei salvestata.',
   'pdf.dialog.firmar.cert': 'Sertifikaat (PEM)',

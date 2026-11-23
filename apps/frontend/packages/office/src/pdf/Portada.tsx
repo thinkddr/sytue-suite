@@ -26,6 +26,8 @@ import {
   type PeticionesFirma,
 } from './api';
 import { mensajeDeError } from './errores';
+import { driveEnBoveda } from '../editor/state/driveCifrado';
+import { FirmarEnDispositivo } from './FirmarEnDispositivo';
 
 /**
  * Las peticiones de firma, arriba del todo cuando las hay: las que me hacen
@@ -194,8 +196,27 @@ function PeticionesDeFirma({ t, locale }: { t: ReturnType<typeof docsT>; locale:
   );
 }
 
-export function PortadaPdf({ locale }: { locale: Locale }) {
+export function PortadaPdf({
+  locale,
+  actor = '',
+  tenant,
+}: {
+  locale: Locale;
+  /** Quién es y de qué organización: con ellos se mira si su Drive está en la bóveda. */
+  actor?: string;
+  tenant?: string | undefined;
+}) {
   const t = docsT(locale);
+  // Con el Drive en la bóveda (ADR 0086), su propia firma se hace en el dispositivo.
+  // Se mira sin claves, por el estado de la fuente; ante la duda, la portada de siempre.
+  const [enBoveda, setEnBoveda] = useState(false);
+  useEffect(() => {
+    const vida = new AbortController();
+    void driveEnBoveda(actor, tenant, undefined, vida.signal).then((si) => {
+      if (!vida.signal.aborted) setEnBoveda(si);
+    });
+    return () => vida.abort();
+  }, [actor, tenant]);
   const [lista, setLista] = useState<PdfReciente[] | null>(null);
   const [fallo, setFallo] = useState(false);
   const [query, setQuery] = useState('');
@@ -279,6 +300,10 @@ export function PortadaPdf({ locale }: { locale: Locale }) {
           </p>
         ) : null}
       </section>
+
+      {enBoveda ? (
+        <FirmarEnDispositivo t={t} locale={locale} actor={actor} tenant={tenant} />
+      ) : null}
 
       <PeticionesDeFirma t={t} locale={locale} />
 

@@ -125,7 +125,9 @@ func DeLaPersona(ctx context.Context, tx pgx.Tx, subject string, historicos bool
 	}
 	// Dos consultas literales, no un CASE: con plan genérico, el CASE impedía usar
 	// el índice por (subject, created_at) en la ruta caliente de cada aviso en vivo.
-	consulta := `SELECT count(*) FROM notifications WHERE subject = $1 AND created_at > now() - interval '1 hour'`
+	// Los avisos de la entrada privada (0014) cuentan igual mientras su copia exista.
+	consulta := `SELECT (SELECT count(*) FROM notifications WHERE subject = $1 AND created_at > now() - interval '1 hour')
+	                  + (SELECT count(*) FROM hub_private_notices WHERE subject = $1 AND created_at > now() - interval '1 hour')`
 	if historicos {
 		consulta = `SELECT count(*) FROM notifications WHERE subject = $1 AND clave_origen IS NOT NULL`
 	}
@@ -170,13 +172,22 @@ func listarNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios, onl
 	// earlier recipient prefilter alone can be stale under READ COMMITTED. This
 	// does not fence a forget that commits after this statement has started.
 	rows, err := tx.Query(ctx,
-		`SELECT `+notificationCols+` FROM notifications
+		`SELECT * FROM (
+		   SELECT `+notificationCols+`, false AS privado FROM notifications
 			 WHERE ((tenant = $6 AND subject = ANY($1)) OR subject = ANY($7))
 			   AND (subject = $8 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $9))
 			   AND ($2::boolean = false OR read = false)
 			   AND ($3::timestamptz IS NULL OR (created_at, id) < ($3, $5::uuid))
-			 ORDER BY created_at DESC, id DESC
-			 LIMIT $4`,
+		   UNION ALL
+		   -- Los que esperan en la entrada privada (0014): nunca son de un buzón por
+		   -- correo, así que no hay lápida que mirar.
+		   SELECT `+copiaCols+`, true FROM hub_private_notices
+			 WHERE ((tenant = $6 AND subject = ANY($1)) OR subject = ANY($7))
+			   AND ($2::boolean = false OR read_at IS NULL)
+			   AND ($3::timestamptz IS NULL OR (created_at, id) < ($3, $5::uuid))
+		 ) avisos
+		 ORDER BY created_at DESC, id DESC
+		 LIMIT $4`,
 		d.enLaOrganizacion, onlyUnread, antesEn, limit, antesID, d.organizacion, d.deLaPersona, d.subject, d.emitido)
 	if err != nil {
 		return nil, err
@@ -184,13 +195,31 @@ func listarNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios, onl
 	defer rows.Close()
 	var out []domain.Notification
 	for rows.Next() {
-		n, err := scanNotification(rows)
+		n, err := scanAvisoOCopia(rows)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, n)
 	}
 	return out, rows.Err()
+}
+
+// copiaCols son las columnas de notificationCols sobre hub_private_notices.
+const copiaCols = `tenant, id, subject, source, type, level, title, body, url, params, read_at IS NOT NULL, created_at, read_at, false`
+
+func scanAvisoOCopia(row pgx.Row) (domain.Notification, error) {
+	var n domain.Notification
+	var source, level string
+	if err := row.Scan(&n.Tenant, &n.ID, &n.Subject, &source, &n.Type, &level,
+		&n.Title, &n.Body, &n.URL, &n.Params, &n.Read, &n.CreatedAt, &n.ReadAt, &n.Historic, &n.Private); err != nil {
+		return domain.Notification{}, err
+	}
+	if len(n.Params) == 0 {
+		n.Params = nil
+	}
+	n.Source = domain.Source(source)
+	n.Level = domain.NotificationLevel(level)
+	return n, nil
 }
 
 // UnreadCount devuelve el número de notificaciones sin leer de un usuario.
@@ -210,23 +239,27 @@ func (s *Store) UnreadCount(ctx context.Context, subjects []string) (int, error)
 func contarNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios) (int, error) {
 	var count int
 	err := tx.QueryRow(ctx,
-		`SELECT count(*) FROM notifications
+		`SELECT (SELECT count(*) FROM notifications
 			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false
-			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5))`,
+			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5)))
+		      + (SELECT count(*) FROM hub_private_notices
+			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read_at IS NULL)`,
 		d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido).Scan(&count)
 	return count, err
 }
 
 // MarkRead marca una notificación como leída (idempotente). Falla con
 // ErrNotFound si no existe o no pertenece al usuario.
+//
+// Con la fuente de One de esa persona congelada (guarda de la 0015), ErrPrivateStorageFrozen.
 func (s *Store) MarkRead(ctx context.Context, id uuid.UUID, subjects []string) error {
-	return s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
+	return PrivateStorageError(s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
 		d, err := conDestinatarios(ctx, tx, subjects)
 		if err != nil {
 			return err
 		}
 		return marcarNotificacionTx(ctx, tx, id, d)
-	})
+	}))
 }
 
 func marcarNotificacionTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, d destinatarios) error {
@@ -239,6 +272,17 @@ func marcarNotificacionTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, d destin
 		return err
 	}
 	if tag.RowsAffected() == 0 {
+		// Uno que espera en la entrada privada se marca en su copia (0014).
+		copia, err := tx.Exec(ctx,
+			`UPDATE hub_private_notices SET read_at = coalesce(read_at, now())
+				 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4))`,
+			id, d.enLaOrganizacion, d.organizacion, d.deLaPersona)
+		if err != nil {
+			return err
+		}
+		if copia.RowsAffected() == 1 {
+			return nil
+		}
 		// Distinguir "no existe" de "ya leída": comprobar existencia.
 		var exists bool
 		if err := tx.QueryRow(ctx,
@@ -255,7 +299,9 @@ func marcarNotificacionTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, d destin
 }
 
 // MarkAllRead marca todas las notificaciones del usuario como leídas y devuelve
-// cuántas se han actualizado.
+// cuántas se han actualizado. Las que están en una fuente de One congelada (0015) se
+// quedan como están —no pueden cambiar hasta soltarla—, y las que esperan en la
+// entrada privada se marcan en su copia (0014).
 func (s *Store) MarkAllRead(ctx context.Context, subjects []string) (int64, error) {
 	var affected int64
 	err := s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
@@ -266,19 +312,27 @@ func (s *Store) MarkAllRead(ctx context.Context, subjects []string) (int64, erro
 		affected, err = marcarTodasNotificacionesTx(ctx, tx, d)
 		return err
 	})
-	return affected, err
+	return affected, PrivateStorageError(err)
 }
 
 func marcarTodasNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios) (int64, error) {
 	tag, err := tx.Exec(ctx,
 		`UPDATE notifications SET read = true, read_at = now()
 			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false
-			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5))`,
+			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5))
+			   AND NOT hub_private_storage_frozen(tenant, subject)`,
 		d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido)
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	copias, err := tx.Exec(ctx,
+		`UPDATE hub_private_notices SET read_at = now()
+			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read_at IS NULL`,
+		d.enLaOrganizacion, d.organizacion, d.deLaPersona)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected() + copias.RowsAffected(), nil
 }
 
 // A database-wide REPEATABLE READ default would pin the snapshot during the
@@ -300,7 +354,9 @@ func (s *Store) enLecturaDeAvisos(ctx context.Context, fn func(pgx.Tx) error) er
 // PurgeReadBefore borra notificaciones leídas anteriores al instante dado
 // (retención). Devuelve el número de filas eliminadas. No usa tenant del
 // contexto: opera sobre TODOS los tenants (tarea de mantenimiento), por lo que
-// desactiva RLS dentro de una transacción de servicio.
+// desactiva RLS dentro de una transacción de servicio. Se salta los avisos de quien
+// tiene la fuente de One congelada (0015): su guarda rechazaría el DELETE y tumbaría
+// la purga de todos los demás; lo congelado no cambia hasta soltar la fuente.
 func (s *Store) PurgeReadBefore(ctx context.Context, before time.Time) (int64, error) {
 	var affected int64
 	err := s.pool.InTx(ctx, func(tx pgx.Tx) error {
@@ -308,7 +364,8 @@ func (s *Store) PurgeReadBefore(ctx context.Context, before time.Time) (int64, e
 			return err
 		}
 		tag, err := tx.Exec(ctx,
-			`DELETE FROM notifications WHERE read = true AND read_at < $1`, before)
+			`DELETE FROM notifications WHERE read = true AND read_at < $1
+			   AND NOT hub_private_storage_frozen(tenant, subject)`, before)
 		if err != nil {
 			return err
 		}
@@ -501,9 +558,11 @@ func (s *Store) ListNotificationPrefs(ctx context.Context, subject string) ([]do
 // callado, y volver a permitir el origen borra los que quedaran: sin eso, apagar y
 // encender un tipo dejaba una contra-regla muda que, al callar más tarde el producto
 // entero, seguía dejando pasar ese tipo sin que el interruptor del producto lo dijera.
+//
+// Con la fuente de One congelada (0015), ErrPrivateStorageFrozen.
 func (s *Store) SetNotificationPref(ctx context.Context, subject string, p domain.NotificationPref) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return PrivateStorageError(s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		if !p.Muted && p.Kind == "" {
 			_, err := tx.Exec(ctx,
 				`DELETE FROM notification_prefs
@@ -534,7 +593,7 @@ func (s *Store) SetNotificationPref(ctx context.Context, subject string, p domai
 			 DO UPDATE SET muted = EXCLUDED.muted, updated_at = now()`,
 			t.Slug, subject, string(p.Source), p.Kind, p.Muted)
 		return err
-	})
+	}))
 }
 
 // PrefsDeLaPersona son las reglas de silencio de `subject` en TODAS sus organizaciones,
@@ -580,10 +639,14 @@ func (s *Store) PrefsDeLaPersona(ctx context.Context, subject string) ([][]domai
 func AvisosRecientes(ctx context.Context, tx pgx.Tx, tenant, subject string, source domain.Source, tipo string) (int, error) {
 	var n int
 	err := tx.QueryRow(ctx,
-		`SELECT count(*) FROM notifications
-		 WHERE tenant = $1 AND subject = $2
-		   AND ($3 = '' OR (source = $3 AND type = $4))
-		   AND created_at > now() - interval '1 hour'`,
+		`SELECT (SELECT count(*) FROM notifications
+		          WHERE tenant = $1 AND subject = $2
+		            AND ($3 = '' OR (source = $3 AND type = $4))
+		            AND created_at > now() - interval '1 hour')
+		      + (SELECT count(*) FROM hub_private_notices
+		          WHERE tenant = $1 AND subject = $2
+		            AND ($3 = '' OR (source = $3 AND type = $4))
+		            AND created_at > now() - interval '1 hour')`,
 		tenant, subject, string(source), tipo).Scan(&n)
 	return n, err
 }

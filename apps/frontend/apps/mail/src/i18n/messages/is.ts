@@ -950,4 +950,10 @@ export const is: AppCatalog<typeof en> = {
     'Tekið var við tölvupóstinum en ekki tókst að vista afrit í Sent. Ekki senda hann aftur.',
   'externalMail.invalidConfiguration':
     'Sláðu inn gilt netfang, heiti og gáttir beggja netþjóna og aðgangsorð.',
+  'privateMail.handoverOffer': 'Geturðu ekki opnað póstinn þinn? Tæmdu hann og færðu í hvelfinguna',
+  'privateMail.handoverTitle': 'Tæma póstinn og færa hann í hvelfinguna',
+  'privateMail.handoverBody':
+    'Dulkóðaður póstur sem þú getur ekki lengur opnað verður ekki endurheimtur. Héðan í frá opnast pósturinn þinn með Sytue ID-innskráningunni þinni, sem þú gætir þurft að endurtaka.',
+  'privateMail.handoverUnderstood': 'Ég skil að pósturinn sem ég get ekki opnað glatast',
+  'privateMail.handoverConfirm': 'Tæma og færa í hvelfinguna',
 };

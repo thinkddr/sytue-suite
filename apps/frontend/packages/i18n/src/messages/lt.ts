@@ -31,6 +31,47 @@ export const lt: Catalog = {
   'matrix.connect': 'Nustatyti šį įrenginį',
   'matrix.devices': 'Tavo įrenginiai',
   'matrix.failed': 'Nepavyko nustatyti šifravimo. Bandyk dar kartą.',
+  'vault.wrongKey':
+    'Šios programos šifruoti duomenys buvo užrakinti kitu Sytue ID atrakinimo raktu nei esantis šioje naršyklėje. Vėl prisijunkite prie Sytue ID, kad atsineštumėte čia dabartinį raktą. Jei ankstesnis raktas prarastas, galite išvalyti šios programos šifruotus duomenis ir pradėti iš naujo.',
+  'vault.wrongKeyDevice':
+    'Šios programos šifruoti duomenys buvo užrakinti kitu Sytue ID atrakinimo raktu nei esantis šiame įrenginyje. Vėl prisijunkite prie Sytue ID, kad atsineštumėte čia dabartinį raktą. Jei ankstesnis raktas prarastas, galite išvalyti šios programos šifruotus duomenis ir pradėti iš naujo.',
+  'vault.release': 'Išvalyti ir grįžti prie serverio duomenų',
+  'vault.releaseTitle': 'Grįžimas prie serverio duomenų',
+  'vault.releaseBody':
+    'Kai šios programos duomenys buvo užšifruoti kompiuterio ar mobiliojoje programoje, serveris išsaugojo jų kopiją tokią, kokia ji buvo tuo metu. Jei šifruotų duomenų atidaryti negalite, ši programa gali grįžti prie tos kopijos. Viskas, kas parašyta vėliau bet kuriame įrenginyje, prarandama ir negali būti atkurta.',
+  'vault.releaseUnderstood':
+    'Suprantu, kad viskas, kas parašyta perėjus prie šifravimo, bus prarasta',
+  'vault.releaseSignIn': 'Tapatybei patvirtinti Sytue ID pirmiausia paprašys prisijungti iš naujo.',
+  'vault.releaseFailed': 'Grįžti prie serverio duomenų nepavyko. Bandykite dar kartą.',
+  'vault.moveTitle': 'Perkelti Drive į šifruotą saugyklą',
+  'vault.moveOffer':
+    'Jūsų Drive vis dar laikomas ankstesniame šifravime. Perkelkite jį į saugyklą, kurią naudoja žiniatinklis ir kiti jūsų įrenginiai.',
+  'vault.moveAction': 'Perkelti į saugyklą',
+  'vault.moveBody':
+    'Visi jūsų failai ir aplankai su jų versijomis bus nukopijuoti į šifruotą saugyklą ir patikrinti po vieną. Iš ankstesnio šifravimo nieko neištrinama. Laikykite programą atidarytą, kol bus baigta; jei nutrūks, tęs nuo ten, kur sustojo.',
+  'vault.moveUnderstood': 'Suprantu, kad baigus šis Drive bus naudojamas iš saugyklos',
+  'vault.moveCopying': 'Kopijuojami ir tikrinami jūsų failai…',
+  'vault.moveDone': 'Atlikta. Jūsų Drive dabar yra šifruotoje saugykloje.',
+  'vault.moveFailed':
+    'Kopijos nepavyko užbaigti. Jūsų failai vis dar ankstesniame šifravime. Bandykite dar kartą.',
+  'vault.movePending':
+    'Šiame įrenginyje dar yra neišsiųstų pakeitimų. Palaukite, kol jie bus baigti, ir bandykite dar kartą.',
+  'vault.copyInProgress':
+    'Kitas įrenginys perkelia jūsų Drive į šifruotą saugyklą. Palaukite, kol baigs, ir bandykite dar kartą.',
+  'vault.copyCancel': 'Atšaukti kopijavimą',
+  'vault.copyCancelHint':
+    'Jei kopijavimas sustojo, galite jį atšaukti: niekas neištrinama, o kopijavimą galėsite pakartoti iš to įrenginio.',
+  'vault.releaseNotice':
+    'Šios programos duomenys buvo užšifruoti kompiuterio ar mobiliojoje programoje. Čia matote kopiją, kurią serveris tuo metu išsaugojo; kas parašyta vėliau, yra tik šifruotuose duomenyse. Jei jų nebegalite atidaryti, galite grįžti prie serverio duomenų.',
+  'notifications.kind.security.storage.released': '{name}: grįžta prie jūsų duomenų serveryje',
+  'vault.signInAgain': 'Vėl prisijungti prie Sytue ID',
+  'vault.empty': 'Išvalyti šifruotus duomenis',
+  'vault.emptyTitle': 'Išvalyti šios programos šifruotus duomenis',
+  'vault.emptyBody':
+    'Duomenys, kuriuos ši programa užšifravo prarastu raktu, bus ištrinti iš Sytue ir bus sukurtas naujas raktas. Likusi paskyros dalis nepaliečiama. To negalima atšaukti.',
+  'vault.emptyUnderstood': 'Suprantu, kad prarastu raktu užšifruoti duomenys bus ištrinti',
+  'vault.failed':
+    'Nepavyko atidaryti šifruotų duomenų. Bandykite dar kartą arba vėl prisijunkite prie Sytue ID. Jei raktas prarastas, galite išvalyti šios programos šifruotus duomenis.',
   'matrix.incoming': 'Patvirtinti šį įrenginį',
   'matrix.match': 'Sutampa',
   'matrix.mismatch': 'Nesutampa',

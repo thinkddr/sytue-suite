@@ -110,6 +110,84 @@ describe('rutaBovedaPq', () => {
     ]);
   });
 
+  test('signing-key va a Sytue ID con el token de la persona, solo GET y PUT', async () => {
+    const seen: { url: string; method: string; auth: string | null }[] = [];
+    const handler = rutaBovedaPq({
+      bff: fakeBff(session),
+      env: { ...env, SYTUE_OIDC_INTERNAL_BASE_URL: 'http://sytue-one-id' },
+      product: 'mail',
+      fetchImpl: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        seen.push({
+          url: String(input),
+          method: init?.method ?? 'GET',
+          auth: new Headers(init?.headers).get('authorization'),
+        });
+        return Response.json({ keys: [] });
+      }) as unknown as typeof fetch,
+    });
+    const call = (method: string, init: RequestInit = {}) => {
+      const req = new Request('https://mail.sytue.eu/api/pq-vault/signing-key', {
+        method,
+        ...init,
+      });
+      return handler({
+        request: req,
+        url: new URL(req.url),
+        params: { ruta: 'signing-key' },
+        cookies: {} as never,
+      } as never) as Promise<Response>;
+    };
+    expect((await call('GET')).status).toBe(200);
+    expect(seen).toEqual([
+      { url: 'http://sytue-one-id/api/v1/me/vault-keys/mail', method: 'GET', auth: 'Bearer tok-1' },
+    ]);
+    expect((await call('DELETE')).status).toBe(405);
+    // Desde otro sitio, nada.
+    const ajena = await call('GET', { headers: { origin: 'https://evil.example' } });
+    expect(ajena.status).toBe(403);
+    expect(seen.length).toBe(1);
+  });
+
+  test('copy: solo DELETE con ?id= de la marca, hacia services/drive', async () => {
+    const seen: { url: string; method: string }[] = [];
+    const handler = rutaBovedaPq({
+      bff: fakeBff(session),
+      env,
+      product: 'drive',
+      fetchImpl: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        seen.push({ url: String(input), method: init?.method ?? 'GET' });
+        return Response.json({ vault_id: '!pqv_AAAAAAAAAAAAAAAAAAAAAAAAAA', keys: [] });
+      }) as unknown as typeof fetch,
+    });
+    const scopeHeader = encodeStorageScopeHeader({
+      tenant: 'acme',
+      subject: 'sub-alice',
+      product: 'drive',
+    });
+    const call = (method: string, search: string) => {
+      const req = new Request(`https://drive.sytue.eu/api/pq-vault/copy${search}`, {
+        method,
+        headers: { [storageScopeHeader]: scopeHeader },
+      });
+      return handler({
+        request: req,
+        url: new URL(req.url),
+        params: { ruta: 'copy' },
+        cookies: {} as never,
+      } as never);
+    };
+    const id = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    expect((await call('DELETE', `?id=${id}`)).status).toBe(200);
+    expect(seen).toEqual([
+      { url: `http://drive.internal/api/v1/pq-vault/drive/copy?id=${id}`, method: 'DELETE' },
+    ]);
+    expect((await call('PUT', `?id=${id}`)).status).toBe(405);
+    expect((await call('DELETE', '')).status).toBe(400);
+    expect((await call('DELETE', `?id=${id}&otra=1`)).status).toBe(400);
+    expect((await call('DELETE', '?id=corto')).status).toBe(400);
+    expect(seen).toHaveLength(1);
+  });
+
   test('rechaza scope de otro producto con 409', async () => {
     const handler = rutaBovedaPq({
       bff: fakeBff(session),

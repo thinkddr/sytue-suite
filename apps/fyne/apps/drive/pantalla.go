@@ -1482,6 +1482,20 @@ func (p *Pantalla) AvisarCifrado(message string) {
 	}
 }
 
+// OfrecerCifrado enseña un aviso que no se va solo con una acción sobre el
+// almacenamiento cifrado (pasar el Drive de Matrix a la bóveda, ADR 0086). Se
+// llama en la rutina de la interfaz.
+func (p *Pantalla) OfrecerCifrado(titulo, descripcion, accion string, alPulsar func()) {
+	if p.cerrada.Load() {
+		return
+	}
+	a := ui.NuevoAviso(ui.AvisoInfo, titulo, descripcion)
+	a.Duracion = -1
+	a.RotuloAccion, a.AlPulsarAccion = accion, alPulsar
+	a.RotuloCerrar = p.tr.T("ui.close", nil)
+	p.avisos.Notificar(a)
+}
+
 // ordenarPor es la pulsación sobre una columna o el selector «Ordenar»: la misma columna
 // invierte el sentido. Se recuerda, y la carpeta se vuelve a pedir en el orden nuevo
 // desde arriba, porque lo ordena el servicio.

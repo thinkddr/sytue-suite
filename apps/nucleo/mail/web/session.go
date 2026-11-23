@@ -10,6 +10,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/mail/application"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/vaultproof"
 	"git.sytue.eu/sytue/one/apps/nucleo/webport"
 	"git.sytue.eu/sytue/one/apps/nucleo/webport/service"
 )
@@ -31,8 +33,28 @@ func NewManager(sources *webport.Sources, policies *webport.Policies) (*Manager,
 	return &Manager{core: core}, nil
 }
 
+// Store es dónde vive el correo, y lo elige el anfitrión al abrir: el módulo
+// nunca lo deduce. Lo comprueba contra la autoridad que sirve Rooms.
+type Store int
+
+const (
+	StoreMatrix Store = iota
+	StoreVault
+)
+
+type storeKey struct{}
+
 func (m *Manager) Open(ctx context.Context, ports Ports) (*Session, error) {
-	value, err := m.core.Open(ctx, ports)
+	return m.OpenStore(ctx, ports, StoreMatrix)
+}
+
+// OpenStore abre el correo en el almacén que eligió el anfitrión. La bóveda no
+// lleva puertos de Matrix: no hay identidad 1 de la que migrar.
+func (m *Manager) OpenStore(ctx context.Context, ports Ports, store Store) (*Session, error) {
+	if ctx == nil || store != StoreMatrix && store != StoreVault || store == StoreVault && (ports.LegacyReader != nil || ports.MigrationWriter != nil) {
+		return nil, webport.ErrRejected
+	}
+	value, err := m.core.Open(context.WithValue(ctx, storeKey{}, store), ports)
 	if err != nil {
 		return nil, err
 	}
@@ -102,19 +124,28 @@ func buildMailProduct(ctx context.Context, input webport.ProductBuildContext) (w
 	}
 	rooms := roomTransport.Rooms()
 	scope := isolated.FileScope()
+	store, _ := ctx.Value(storeKey{}).(Store)
 	authority, err := rooms.MatrixStorageAuthority(ctx, scope)
 	if err != nil {
+		return nil, err
+	}
+	if err := storeMatchesAuthority(store, authority); err != nil {
 		return nil, err
 	}
 	if err := isolated.RequireStorageAuthority(ctx, authority); err != nil {
 		return nil, err
 	}
-	cutover, err := rooms.MatrixStorageMigration(ctx, scope)
-	if err != nil {
-		return nil, err
-	}
-	requireLegacy := cutover.Phase != "isolated"
-	if requireLegacy && (reader == nil || cutover.Phase == "legacy" && writer == nil) {
+	requireLegacy := false
+	if store == StoreMatrix {
+		cutover, err := rooms.MatrixStorageMigration(ctx, scope)
+		if err != nil {
+			return nil, err
+		}
+		requireLegacy = cutover.Phase != "isolated"
+		if requireLegacy && (reader == nil || cutover.Phase == "legacy" && writer == nil) {
+			return nil, webport.ErrRejected
+		}
+	} else if reader != nil || writer != nil {
 		return nil, webport.ErrRejected
 	}
 	mailTransport, err := service.NewServiceTransport(isolated, "mail")
@@ -130,6 +161,7 @@ func buildMailProduct(ctx context.Context, input webport.ProductBuildContext) (w
 		Files: isolated, Source: source, Control: source.PrivateIngress(), Rooms: rooms,
 		Metadata: source, Usage: driveTransport.Drive(),
 		Authority: authority, Journal: journal, Isolated: isolated, RequireLegacy: requireLegacy,
+		Vault: store == StoreVault,
 	}
 	if requireLegacy {
 		previous, err := webport.NewMigrationStorage(reader, writer)
@@ -151,6 +183,16 @@ func buildMailProduct(ctx context.Context, input webport.ProductBuildContext) (w
 		return nil, err
 	}
 	return &mailManagedProduct{app}, nil
+}
+
+// storeMatchesAuthority: el almacén que eligió el anfitrión tiene que ser el de
+// la autoridad del ámbito. La bóveda solo abre con autoridad de bóveda, y el
+// camino de Matrix nunca abre un ámbito que ya es de la bóveda (ADR 0087).
+func storeMatchesAuthority(store Store, authority matrixproof.Authority) error {
+	if vaultproof.IsAuthority(authority) != (store == StoreVault) {
+		return webport.ErrRejected
+	}
+	return nil
 }
 
 // ComposeInputLimit frames base64 attachment JSON using the original admitted

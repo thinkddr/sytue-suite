@@ -308,6 +308,21 @@ export const lt: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Įrašyta į „Sytue Drive“.',
   'doc.msg.savedToDriveIn': '„{name}“ dabar turi jūsų pakeitimus kaip naują versiją.',
   'doc.msg.saveToDriveFailed': 'Nepavyko įrašyti pakeitimų į „Drive“.',
+  'doc.msg.saveToDriveVault': 'Jūsų Drive užšifruotas ištisai',
+  'doc.msg.saveToDriveVault.detail':
+    'Iš čia į jį įrašyti nepavyko. Atsisiųskite dokumentą ir įkelkite jį iš „Sytue Drive“.',
+  'doc.msg.savedToDriveEncrypted': 'Įrašyta į jūsų šifruotą „Drive“.',
+  'doc.msg.savedToDriveEncryptedIn': '„{name}“ buvo užšifruotas šioje naršyklėje prieš įrašant.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}“ buvo užšifruotas šiame įrenginyje prieš įrašant.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Jūsų šifruotas „Drive“ šiame įrenginyje užrakintas. Atrakinkite jį viršuje ir įrašykite dar kartą.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Prisijunkite iš naujo, kad atrakintumėte šifruotą „Drive“, ir įrašykite dar kartą.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Jūsų „Drive“ dar pereina prie šifravimo nuo galo iki galo. Atidarykite „Sytue Drive“, kad tai užbaigtumėte, ir įrašykite dar kartą.',
+  'doc.msg.saveToDriveUnsupported':
+    'Šio failo formato negalima perrašyti. Vietoj to atsisiųskite dokumentą.',
   'file.downloadPdf': 'Atsisiųsti kaip PDF',
   'file.pdfAccessible': 'Prieinamas PDF (PDF/UA)',
   'file.downloadHtml': 'Atsisiųsti kaip HTML',
@@ -2716,6 +2731,54 @@ export const lt: AppCatalog<typeof en> = {
   'pdf.error.signatureRequest.chainTooLong': 'Pasirašymo eilėje gali būti iki 10 asmenų.',
   'pdf.error.signatureRequest.busy':
     'Šis prašymas jau atidaromas. Bandykite dar kartą po akimirkos.',
+  'pdf.error.driveVault':
+    'Jūsų „Drive“ šifruojamas nuo galo iki galo: kitų organizacijų parašo užklausų kopijų į jį dar negalima įrašyti. Vietoj to atsisiųskite PDF.',
+  'pdf.device.title': 'Pasirašyti šiame įrenginyje',
+  'pdf.device.help':
+    'Jūsų „Drive“ šifruojamas nuo galo iki galo, todėl serveris negali skaityti jūsų PDF. Pasirinkite vieną: jis iššifruojamas ir pasirašomas čia jūsų sertifikatu, o pasirašyta kopija išsaugoma užšifruota šalia originalo. Nei PDF, nei jūsų sertifikatas nepasiekia serverio.',
+  'pdf.device.open': 'Atidaryti mano šifruotą „Drive“',
+  'pdf.device.empty.title': 'Jūsų šifruotame „Drive“ nėra PDF',
+  'pdf.device.empty.description': 'Įkelkite juos iš „Sytue Drive“ ir jie atsiras čia.',
+  'pdf.device.sign': 'Pasirašyti',
+  'pdf.device.signed': 'Pasirašyta ir išsaugota užšifruota kaip „{name}“.',
+  'pdf.device.stamp.on':
+    'Su laiko žyma iš {authority}: parašas įrodo, kas ir kada pasirašė. Tarnyba gauna tik parašo atspaudą, niekada PDF.',
+  'pdf.device.stamp.off':
+    'Be laiko žymos: ši paslauga neturi laiko žymų tarnybos, todėl parašas įrodo, kas pasirašė, bet ne kada.',
+  'pdf.device.appearance': 'Kaip atrodo parašas',
+  'pdf.device.appearance.invisible': 'Nematomas',
+  'pdf.device.appearance.visible': 'Matomas langelis',
+  'pdf.device.signedStamped': 'Pasirašyta su laiko žyma ir išsaugota užšifruota kaip „{name}“.',
+  'pdf.device.signedNoStamp':
+    'Pasirašyta ir išsaugota užšifruota kaip „{name}“, bet be laiko žymos: laiko žymų tarnyba neatsakė.',
+  'pdf.device.error.page': 'Parašas netelpa tame puslapyje. Pasirinkite kitą puslapį ar vietą.',
+  'pdf.device.view': 'Peržiūrėti',
+  'pdf.vault.help':
+    'Šis PDF yra jūsų šifruotame Drive: jis iššifruojamas tik šiame įrenginyje, kur galite jį peržiūrėti, komentuoti, pildyti, tvarkyti ir pasirašyti. Tai, ką išsaugote, grįžta šifruota.',
+  'pdf.vault.serverOnly':
+    'Su šifruotu Drive dar negalima prašyti parašo, apsaugoti slaptažodžiu, atpažinti teksto, užtamsinti, redaguoti teksto ar paveikslėlių, dėti antspaudų ir vandenženklių, lyginti, žiūrėti versijų istorijos ir spausdinti: tam reikia, kad paslauga perskaitytų PDF, arba tai dar neatliekama įrenginyje.',
+  'pdf.vault.notFound.title': 'Šio PDF nėra jūsų užšifruotame Diske',
+  'pdf.vault.notFound.description':
+    'Galbūt jis buvo perkeltas arba ištrintas. Ieškokite jo Sytue Drive.',
+  'pdf.vault.openSigned': 'Atidaryti pasirašytą kopiją',
+  'pdf.vault.engineUnavailable':
+    'Šiame įrenginyje nepavyko įkelti PDF variklio, todėl PDF rodomas naršyklės peržiūros programoje: galite jį peržiūrėti, atsisiųsti ir pasirašyti, bet ne redaguoti.',
+  'pdf.vault.unavailable': 'Su šifruotu Drive dar negalima.',
+  'pdf.device.requests':
+    'Prašyti kitų žmonių ar organizacijų parašo galima tik su serverio „Drive“: paslauga turi perskaityti PDF, kad jį išsiųstų ir patikrintų grįžusį parašą. Su šifruotu „Drive“ pasirašykite čia ir pasirašytą PDF išsiųskite patys.',
+  'pdf.device.error.signin':
+    'Iš naujo prisijunkite prie „Sytue ID“, kad atrakintumėte šifruotą „Drive“.',
+  'pdf.device.error.pending':
+    'Jūsų „Drive“ dar pereina prie šifravimo nuo galo iki galo. Užbaikite tai „Sytue Drive“.',
+  'pdf.device.error.password': 'Šis slaptažodis neatidaro sertifikato.',
+  'pdf.device.error.encrypted':
+    'Šis PDF apsaugotas slaptažodžiu, todėl jo negalima pasirašyti šiame įrenginyje.',
+  'pdf.device.error.locked':
+    'Šis PDF sertifikuotas nuo bet kokių pakeitimų: dar vienas parašas jį panaikintų.',
+  'pdf.device.error.unreadable':
+    'Šio PDF negalima pasirašyti šiame įrenginyje jo neperrašius. Niekas nepakeista.',
+  'pdf.device.error.failed':
+    'Nepavyko pasirašyti ar išsaugoti PDF. Jūsų „Drive“ niekas nepakeista.',
   'pdf.dialog.firmar.help':
     'Sertifikatas ir raktas niekada nepalieka jūsų organizacijos: jie naudojami serveryje ir nesaugomi.',
   'pdf.dialog.firmar.cert': 'Sertifikatas (PEM)',

@@ -956,4 +956,11 @@ export const hu: AppCatalog<typeof en> = {
     'A levelet elfogadták, de nem sikerült másolatot menteni az Elküldött mappába. Ne küldd el újra.',
   'externalMail.invalidConfiguration':
     'Adj meg érvényes e-mail-címet, mindkét szerver nevét és portját, valamint egy jelszót.',
+  'privateMail.handoverOffer': 'Nem tudod megnyitni a leveleidet? Ürítsd ki, és vidd át a széfbe',
+  'privateMail.handoverTitle': 'Levelek kiürítése és áthelyezése a széfbe',
+  'privateMail.handoverBody':
+    'A titkosított leveleket, amelyeket már nem tudsz megnyitni, nem lehet visszaállítani. Mostantól a leveleid a Sytue ID-bejelentkezéseddel nyílnak meg, amelyet lehet, hogy meg kell ismételned.',
+  'privateMail.handoverUnderstood':
+    'Megértettem, hogy a levelek, amelyeket nem tudok megnyitni, elvesznek',
+  'privateMail.handoverConfirm': 'Kiürítés és áthelyezés a széfbe',
 };

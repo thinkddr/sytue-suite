@@ -33,6 +33,50 @@ export const fr: Catalog = {
   'matrix.connect': 'Configurer cet appareil',
   'matrix.devices': 'Tes appareils',
   'matrix.failed': 'Le chiffrement n’a pas pu être configuré. Réessaie.',
+  'vault.wrongKey':
+    'Les données chiffrées de cette application ont été verrouillées avec une clé de déverrouillage Sytue ID différente de celle de ce navigateur. Reconnectez-vous à Sytue ID pour récupérer ici la clé actuelle. Si l’ancienne clé est perdue, vous pouvez vider les données chiffrées de cette application et recommencer.',
+  'vault.wrongKeyDevice':
+    'Les données chiffrées de cette application ont été verrouillées avec une clé de déverrouillage Sytue ID différente de celle de cet appareil. Reconnectez-vous à Sytue ID pour récupérer ici la clé actuelle. Si l’ancienne clé est perdue, vous pouvez vider les données chiffrées de cette application et recommencer.',
+  'vault.release': 'Vider et revenir aux données du serveur',
+  'vault.releaseTitle': 'Revenir aux données du serveur',
+  'vault.releaseBody':
+    'Lorsque les données de cette application ont été chiffrées depuis une application de bureau ou mobile, le serveur en a gardé une copie telle qu’elle était à ce moment-là. Si vous ne pouvez pas ouvrir les données chiffrées, cette application peut revenir à cette copie. Tout ce qui a été écrit après, sur n’importe quel appareil, est perdu et ne peut pas être récupéré.',
+  'vault.releaseUnderstood':
+    'Je comprends que tout ce qui a été écrit après le passage au chiffrement sera perdu',
+  'vault.releaseSignIn':
+    'Pour confirmer votre identité, Sytue ID vous demandera d’abord de vous reconnecter.',
+  'vault.releaseFailed': 'Impossible de revenir aux données du serveur. Réessayez.',
+  'vault.moveTitle': 'Déplacer Drive vers le coffre chiffré',
+  'vault.moveOffer':
+    'Votre Drive est encore stocké dans l’ancien chiffrement. Déplacez-le vers le coffre utilisé par le web et vos autres appareils.',
+  'vault.moveAction': 'Déplacer vers le coffre',
+  'vault.moveBody':
+    'Tous vos fichiers et dossiers, avec leurs versions, seront copiés dans le coffre chiffré et vérifiés un par un. Rien n’est supprimé de l’ancien chiffrement. Gardez l’application ouverte jusqu’à la fin ; si elle s’interrompt, elle reprend là où elle s’était arrêtée.',
+  'vault.moveUnderstood':
+    'Je comprends qu’une fois terminé, ce Drive sera utilisé depuis le coffre',
+  'vault.moveCopying': 'Copie et vérification de vos fichiers…',
+  'vault.moveDone': 'Terminé. Votre Drive est maintenant dans le coffre chiffré.',
+  'vault.moveFailed':
+    'La copie n’a pas pu être terminée. Vos fichiers sont toujours dans l’ancien chiffrement. Réessayez.',
+  'vault.movePending':
+    'Cet appareil a encore des modifications à envoyer. Attendez qu’elles se terminent et réessayez.',
+  'vault.copyInProgress':
+    'Un autre appareil déplace votre Drive vers le coffre chiffré. Attendez qu’il ait terminé et réessayez.',
+  'vault.copyCancel': 'Annuler la copie',
+  'vault.copyCancelHint':
+    'Si cette copie est bloquée, vous pouvez l’annuler : rien n’est supprimé et vous pourrez la relancer depuis cet appareil.',
+  'vault.releaseNotice':
+    'Les données de cette application ont été chiffrées depuis une application de bureau ou mobile. Ce que vous voyez ici est la copie gardée par le serveur à ce moment-là ; ce qui a été écrit ensuite se trouve uniquement dans les données chiffrées. Si vous ne pouvez plus les ouvrir, vous pouvez revenir aux données du serveur.',
+  'notifications.kind.security.storage.released': '{name} est revenu à vos données sur le serveur',
+  'vault.signInAgain': 'Se reconnecter à Sytue ID',
+  'vault.empty': 'Vider les données chiffrées',
+  'vault.emptyTitle': 'Vider les données chiffrées de cette application',
+  'vault.emptyBody':
+    'Les données que cette application a chiffrées avec la clé perdue seront supprimées de Sytue et une nouvelle clé sera créée. Le reste de votre compte n’est pas affecté. Cette action est irréversible.',
+  'vault.emptyUnderstood':
+    'Je comprends que les données chiffrées avec la clé perdue seront supprimées',
+  'vault.failed':
+    'Impossible d’ouvrir les données chiffrées. Réessayez ou reconnectez-vous à Sytue ID. Si la clé est perdue, vous pouvez vider les données chiffrées de cette application.',
   'matrix.incoming': 'Vérifier cet appareil',
   'matrix.match': 'Ils correspondent',
   'matrix.mismatch': 'Ils ne correspondent pas',

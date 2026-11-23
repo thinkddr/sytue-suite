@@ -381,4 +381,37 @@ export const sl: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Shranjeno v Slike › Sytue Photos: {count}',
   'library.saveFailed': 'Shranjevanje v galerijo tega računalnika ni uspelo: {name}',
   'backup.whileOpen': 'Na tem računalniku se kopira, dokler je Sytue Fotos odprt.',
+  'backup.encryptedWaitTitle': 'Odprite Sytue Fotos, da dokončate šifrirano kopiranje',
+  'backup.encryptedWaitBody':
+    'Vaš Drive je šifriran od konca do konca. Nove fotografije se kopirajo takoj, ko odprete Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Shranjeno v vaš Drive s šifriranjem od konca do konca: {count}',
+  'gallery.uploadVaultSignIn':
+    'Vaš Drive je šifriran od konca do konca. Znova se prijavite, da ga odklenete, in znova dodajte fotografije.',
+  'gallery.uploadVaultNotReady':
+    'Vaš Drive še prehaja na šifriranje od konca do konca. Odprite Sytue Drive, da to dokončate, in znova dodajte fotografije.',
+  'gallery.uploadVaultLocked':
+    'Vaš Drive je šifriran od konca do konca. Odklenite ga zgoraj in znova dodajte fotografije.',
+  'gallery.uploadVaultUnavailable':
+    'Vaš Drive je šifriran od konca do konca in ga v tej napravi ni mogoče odpreti. Dodajte fotografije v Sytue Photos na spletu.',
+  'gallery.encrypted.title': 'V vašem šifriranem Drivu',
+  'gallery.encrypted.show': 'Prikaži',
+  'gallery.encrypted.opening': 'Dešifriranje …',
+  'gallery.encrypted.failed': 'Vašega šifriranega Driva ni bilo mogoče odpreti.',
+  'gallery.encrypted.signIn': 'Znova se prijavite',
+  'gallery.encrypted.empty': 'V vašem šifriranem Drivu še ni fotografij.',
+  'gallery.encrypted.note':
+    'Fotografije, šifrirane od konca do konca, se dešifrirajo samo v tej napravi. Sytue AI, podobne fotografije, V bližini in spomini jih ne vključujejo.',
+  'gallery.encrypted.badge': 'Šifrirano od konca do konca',
+  'gallery.encrypted.open': 'Odpri {name} (šifrirano)',
+  'gallery.encrypted.notSelectable':
+    'Šifriranih fotografij ni mogoče izbrati: odprite eno, da jo označite kot priljubljeno ali dodate v album.',
+  'gallery.encrypted.actionFailed': 'Šifrirane galerije ni bilo mogoče posodobiti.',
+  'gallery.encrypted.saved':
+    'Shranjeno kot nova šifrirana različica. Prejšnja ostane v zgodovini različic v Drivu.',
+  'gallery.encrypted.albums': 'Šifrirani albumi',
+  'gallery.encrypted.newAlbum': 'Nov šifriran album',
+  'gallery.encrypted.saveVersion': 'Shrani kot novo različico',
+  'gallery.encrypted.editHint':
+    'Urejanje poteka v tej napravi in se shrani šifrirano kot nova različica fotografije.',
+  'gallery.encrypted.albumEmpty': 'Ta šifrirani album še nima fotografij.',
 };

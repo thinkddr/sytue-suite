@@ -31,6 +31,48 @@ export const is: Catalog = {
   'matrix.connect': 'Setja upp þetta tæki',
   'matrix.devices': 'Tækin þín',
   'matrix.failed': 'Ekki tókst að setja upp dulkóðun. Reyndu aftur.',
+  'vault.wrongKey':
+    'Dulkóðuð gögn þessa forrits voru læst með öðrum Sytue ID-aflæsingarlykli en þeim sem er í þessum vafra. Skráðu þig aftur inn í Sytue ID til að sækja núverandi lykil hingað. Ef fyrri lykillinn glataðist geturðu tæmt dulkóðuð gögn þessa forrits og byrjað upp á nýtt.',
+  'vault.wrongKeyDevice':
+    'Dulkóðuð gögn þessa forrits voru læst með öðrum Sytue ID-aflæsingarlykli en þeim sem er í þessu tæki. Skráðu þig aftur inn í Sytue ID til að sækja núverandi lykil hingað. Ef fyrri lykillinn glataðist geturðu tæmt dulkóðuð gögn þessa forrits og byrjað upp á nýtt.',
+  'vault.release': 'Tæma og fara aftur í gögn þjónsins',
+  'vault.releaseTitle': 'Fara aftur í gögn þjónsins',
+  'vault.releaseBody':
+    'Þegar gögn þessa forrits voru dulkóðuð úr tölvu- eða símaforriti geymdi þjónninn afrit eins og þau voru á þeirri stundu. Ef þú getur ekki opnað dulkóðuðu gögnin getur forritið farið aftur í það afrit. Allt sem var skrifað eftir það, á hvaða tæki sem er, glatast og ekki er hægt að endurheimta það.',
+  'vault.releaseUnderstood':
+    'Ég skil að allt sem var skrifað eftir að skipt var yfir í dulkóðun glatast',
+  'vault.releaseSignIn':
+    'Til að staðfesta hver þú ert biður Sytue ID þig fyrst um að skrá þig inn aftur.',
+  'vault.releaseFailed': 'Ekki tókst að fara aftur í gögn þjónsins. Reyndu aftur.',
+  'vault.moveTitle': 'Færa Drive í dulkóðuðu hvelfinguna',
+  'vault.moveOffer':
+    'Drive-ið þitt er enn geymt í fyrri dulkóðun. Færðu það í hvelfinguna sem vefurinn og önnur tæki þín nota.',
+  'vault.moveAction': 'Færa í hvelfinguna',
+  'vault.moveBody':
+    'Allar skrár og möppur þínar, með útgáfum sínum, verða afritaðar í dulkóðuðu hvelfinguna og athugaðar ein í einu. Engu er eytt úr fyrri dulkóðun. Hafðu forritið opið þar til því lýkur; ef það stöðvast heldur það áfram þar sem frá var horfið.',
+  'vault.moveUnderstood': 'Ég skil að þegar þessu lýkur verður þetta Drive notað úr hvelfingunni',
+  'vault.moveCopying': 'Afrita og athuga skrárnar þínar…',
+  'vault.moveDone': 'Búið. Drive-ið þitt er nú í dulkóðuðu hvelfingunni.',
+  'vault.moveFailed':
+    'Ekki tókst að ljúka afritinu. Skrárnar þínar eru enn í fyrri dulkóðun. Reyndu aftur.',
+  'vault.movePending':
+    'Þetta tæki á enn eftir að senda breytingar. Bíddu þar til þeim lýkur og reyndu aftur.',
+  'vault.copyInProgress':
+    'Annað tæki er að færa Drive-ið þitt í dulkóðuðu hvelfinguna. Bíddu þar til því lýkur og reyndu aftur.',
+  'vault.copyCancel': 'Hætta við afritunina',
+  'vault.copyCancelHint':
+    'Ef afritunin hefur stöðvast geturðu hætt við hana: engu er eytt og þú getur endurtekið hana úr hinu tækinu.',
+  'vault.releaseNotice':
+    'Gögn þessa forrits voru dulkóðuð úr tölvu- eða símaforriti. Hér sérðu afritið sem þjónninn geymdi á þeirri stundu; það sem var skrifað síðar er aðeins í dulkóðuðu gögnunum. Ef ekki er lengur hægt að opna þau geturðu farið aftur í gögn þjónsins.',
+  'notifications.kind.security.storage.released': '{name} fór aftur í gögnin þín á þjóninum',
+  'vault.signInAgain': 'Skrá aftur inn í Sytue ID',
+  'vault.empty': 'Tæma dulkóðuð gögn',
+  'vault.emptyTitle': 'Tæma dulkóðuð gögn þessa forrits',
+  'vault.emptyBody':
+    'Gögnum sem þetta forrit dulkóðaði með glataða lyklinum verður eytt úr Sytue og nýr lykill búinn til. Annað á reikningnum þínum breytist ekki. Ekki er hægt að afturkalla þetta.',
+  'vault.emptyUnderstood': 'Ég skil að gögnum sem dulkóðuð voru með glataða lyklinum verður eytt',
+  'vault.failed':
+    'Ekki tókst að opna dulkóðuðu gögnin. Reyndu aftur eða skráðu þig aftur inn í Sytue ID. Ef lykillinn glataðist geturðu tæmt dulkóðuð gögn þessa forrits.',
   'matrix.incoming': 'Staðfesta þetta tæki',
   'matrix.match': 'Þau passa saman',
   'matrix.mismatch': 'Þau passa ekki saman',

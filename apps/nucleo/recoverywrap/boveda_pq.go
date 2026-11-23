@@ -52,6 +52,18 @@ type PQVaultSecret struct {
 	Profile  string `json:"profile"`
 	Identity string `json:"identity"`
 	OwnerKey string `json:"owner_key"`
+	// SigningKey es la clave de firma híbrida de la bóveda (ADR 0087,
+	// firma_boveda.go). Opcional: las bóvedas anteriores no la tienen y la añaden
+	// en su siguiente apertura; las apps que no firman nada la ignoran.
+	SigningKey string `json:"signing_key,omitempty"`
+}
+
+// Signer abre la clave de firma de la bóveda. ErrInvalid si no tiene ninguna.
+func (s PQVaultSecret) Signer() (*PQVaultSigner, error) {
+	if s.SigningKey == "" {
+		return nil, ErrInvalid
+	}
+	return ParsePQVaultSigningKey(s.SigningKey)
 }
 
 // Validate comprueba la forma del secreto y que la identidad privada coincide con
@@ -70,6 +82,11 @@ func (s PQVaultSecret) Validate() (*pqc.Identity, error) {
 		return nil, ErrInvalid
 	}
 	clear(ownerKey)
+	if s.SigningKey != "" {
+		if _, err := ParsePQVaultSigningKey(s.SigningKey); err != nil {
+			return nil, ErrInvalid
+		}
+	}
 	return id, nil
 }
 

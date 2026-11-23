@@ -305,6 +305,20 @@ export const hr: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Spremljeno u Sytue Drive.',
   'doc.msg.savedToDriveIn': '„{name}” sada sadrži vaše promjene kao novu verziju.',
   'doc.msg.saveToDriveFailed': 'Promjene nije moguće spremiti na Disk.',
+  'doc.msg.saveToDriveVault': 'Vaš Drive šifriran je s kraja na kraj',
+  'doc.msg.saveToDriveVault.detail':
+    'Odavde ga nije moguće spremiti. Preuzmite dokument i prenesite ga iz Sytue Drivea.',
+  'doc.msg.savedToDriveEncrypted': 'Spremljeno na vaš šifrirani Disk.',
+  'doc.msg.savedToDriveEncryptedIn': '„{name}” je šifriran u ovom pregledniku prije spremanja.',
+  'doc.msg.savedToDriveEncryptedOnDevice': '„{name}” je šifriran na ovom uređaju prije spremanja.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Vaš šifrirani Disk zaključan je na ovom uređaju. Otključajte ga iznad i ponovno spremite.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Ponovno se prijavite da biste otključali šifrirani Disk i ponovno spremite.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Vaš Disk još prelazi na šifriranje s kraja na kraj. Otvorite Sytue Drive da se to dovrši i ponovno spremite.',
+  'doc.msg.saveToDriveUnsupported':
+    'Format ove datoteke ne može se ponovno zapisati. Umjesto toga preuzmite dokument.',
   'file.downloadPdf': 'Preuzmi kao PDF',
   'file.pdfAccessible': 'Pristupačni PDF (PDF/UA)',
   'file.downloadHtml': 'Preuzmi kao HTML',
@@ -2671,6 +2685,54 @@ export const hr: AppCatalog<typeof en> = {
     'Ista se osoba dvaput pojavljuje u redoslijedu potpisivanja.',
   'pdf.error.signatureRequest.chainTooLong': 'Redoslijed potpisivanja može imati do 10 osoba.',
   'pdf.error.signatureRequest.busy': 'Ovaj se zahtjev već otvara. Pokušajte ponovno za trenutak.',
+  'pdf.error.driveVault':
+    'Vaš je Disk šifriran s kraja na kraj: kopije zahtjeva za potpis iz drugih organizacija još se ne mogu spremiti na njega. Preuzmite PDF.',
+  'pdf.device.title': 'Potpiši na ovom uređaju',
+  'pdf.device.help':
+    'Vaš je Disk šifriran s kraja na kraj pa poslužitelj ne može čitati vaše PDF-ove. Odaberite jedan: dešifrira se i potpisuje ovdje vašim certifikatom, a potpisana kopija sprema se šifrirana uz izvornik. Ni PDF ni vaš certifikat ne stižu do poslužitelja.',
+  'pdf.device.open': 'Otvori moj šifrirani Disk',
+  'pdf.device.empty.title': 'Nema PDF-ova na vašem šifriranom Disku',
+  'pdf.device.empty.description': 'Prenesite ih iz Sytue Drivea i pojavit će se ovdje.',
+  'pdf.device.sign': 'Potpiši',
+  'pdf.device.signed': 'Potpisano i šifrirano spremljeno kao „{name}”.',
+  'pdf.device.stamp.on':
+    'S vremenskim žigom od {authority}: potpis dokazuje tko je i kada potpisao. Tijelo dobiva samo otisak potpisa, nikada PDF.',
+  'pdf.device.stamp.off':
+    'Bez vremenskog žiga: ova usluga nema tijelo za vremenske žigove, pa potpis dokazuje tko je potpisao, ali ne i kada.',
+  'pdf.device.appearance': 'Kako potpis izgleda',
+  'pdf.device.appearance.invisible': 'Nevidljiv',
+  'pdf.device.appearance.visible': 'Vidljivi okvir',
+  'pdf.device.signedStamped': 'Potpisano s vremenskim žigom i šifrirano spremljeno kao „{name}”.',
+  'pdf.device.signedNoStamp':
+    'Potpisano i šifrirano spremljeno kao „{name}”, ali bez vremenskog žiga: tijelo za vremenske žigove nije odgovorilo.',
+  'pdf.device.error.page': 'Potpis ne stane na tu stranicu. Odaberite drugu stranicu ili položaj.',
+  'pdf.device.view': 'Prikaži',
+  'pdf.vault.help':
+    'Ovaj PDF je u vašem šifriranom Driveu: dešifrira se samo na ovom uređaju, gdje ga možete pregledati, komentirati, ispuniti, organizirati i potpisati. Ono što spremite vraća se šifrirano.',
+  'pdf.vault.serverOnly':
+    'S vašim šifriranim Driveom još nisu dostupni zahtjevi za potpis, zaštita lozinkom, prepoznavanje teksta, zacrnjivanje, uređivanje teksta ili slika, pečati i vodeni žigovi, usporedba, povijest verzija ni ispis: zahtijevaju da usluga pročita PDF ili se još ne rade na uređaju.',
+  'pdf.vault.notFound.title': 'Ovaj PDF nije u vašem šifriranom Driveu',
+  'pdf.vault.notFound.description':
+    'Možda je premješten ili izbrisan. Potražite ga u Sytue Driveu.',
+  'pdf.vault.openSigned': 'Otvori potpisanu kopiju',
+  'pdf.vault.engineUnavailable':
+    'PDF mehanizam nije se mogao učitati na ovom uređaju, pa se PDF prikazuje u pregledniku: možete ga pregledati, preuzeti i potpisati, ali ne i urediti.',
+  'pdf.vault.unavailable': 'Još nije dostupno s vašim šifriranim Driveom.',
+  'pdf.device.requests':
+    'Traženje potpisa od drugih osoba ili organizacija zahtijeva Disk poslužitelja: usluga mora pročitati PDF da bi ga poslala i provjerila potpis koji se vrati. Sa šifriranim Diskom potpišite ovdje i sami pošaljite potpisani PDF.',
+  'pdf.device.error.signin':
+    'Ponovno se prijavite u Sytue ID kako biste otključali šifrirani Disk.',
+  'pdf.device.error.pending':
+    'Vaš Disk još prelazi na šifriranje s kraja na kraj. Dovršite to u Sytue Driveu.',
+  'pdf.device.error.password': 'Ta lozinka ne otvara certifikat.',
+  'pdf.device.error.encrypted':
+    'Ovaj je PDF zaštićen lozinkom i ne može se potpisati na ovom uređaju.',
+  'pdf.device.error.locked':
+    'Ovaj je PDF certificiran protiv svake promjene: novi potpis bi ga poništio.',
+  'pdf.device.error.unreadable':
+    'Ovaj se PDF ne može potpisati na ovom uređaju bez ponovnog zapisivanja. Ništa nije promijenjeno.',
+  'pdf.device.error.failed':
+    'PDF se nije mogao potpisati ni spremiti. Na vašem Disku ništa nije promijenjeno.',
   'pdf.dialog.firmar.help':
     'Certifikat i ključ nikad ne napuštaju vašu organizaciju: koriste se na poslužitelju i ne spremaju se.',
   'pdf.dialog.firmar.cert': 'Certifikat (PEM)',

@@ -22,14 +22,30 @@ import (
 //go:embed private_storage_v1.sql
 var privateStorageV1 []byte
 
-const privateStorageMarkerV1 = "-- sytue:private-storage-fence-v1"
+//go:embed private_storage_release_v1.sql
+var privateStorageReleaseV1 []byte
+
+const (
+	privateStorageMarkerV1        = "-- sytue:private-storage-fence-v1"
+	privateStorageReleaseMarkerV1 = "-- sytue:private-storage-release-v1"
+)
+
+// privateStorageFragments are the shared private storage versions every
+// service wrapper expands. The release version must follow the fence it
+// replaces in the same migration history (ADR 0086, «soltar la fuente»).
+func privateStorageFragments() []migrationDDLFragment {
+	return []migrationDDLFragment{
+		{marker: privateStorageMarkerV1, sql: privateStorageV1},
+		{marker: privateStorageReleaseMarkerV1, sql: privateStorageReleaseV1},
+	}
+}
 
 // WithPrivateStorageDDL expands an explicit versioned migration marker from one
 // shared SQL implementation. Services expose this wrapped FS as db.Migrations;
 // runtime, pgtest and SQL policy checks consequently read identical migrations.
 // Unmarked existing migrations are returned unchanged, preserving old history.
 func WithPrivateStorageDDL(source fs.FS) fs.FS {
-	return withMigrationDDL(source, migrationDDLFragment{marker: privateStorageMarkerV1, sql: privateStorageV1})
+	return withMigrationDDL(source, privateStorageFragments()...)
 }
 
 type migrationDDLFragment struct {

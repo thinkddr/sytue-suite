@@ -181,9 +181,15 @@
         // Ya desbloqueado en este navegador: a la web no hay nada que darle; a una
         // app nativa, su copia cifrada para ella.
         if (!cfg.app_key) return deliver(null, [], stored).then(unlocked);
-        return storedBytes(stored).then(function (key) {
-          return deliver(key, [], stored);
-        });
+        return storedBytes(stored)
+          .then(function (key) {
+            return deliver(key, [], stored);
+          })
+          .then(function (r) {
+            // Sin teclear nada ahora: la entrega sale de lo que ya había aquí.
+            r.stored = true;
+            return r;
+          });
       }
       var env = null;
       envelopes.forEach(function (e) {
@@ -284,7 +290,10 @@
    * verificador PKCE y la entrega solo la abre la clave efímera de la app que la pidió.
    */
   E.returnTo = function (next, blob, ua, web) {
-    var url = next;
+    // Solo una vuelta navegable (comun.js, `safeReturn`): el destino sale del bloque
+    // de datos del documento y acaba en `location` y en el enlace de «Volver».
+    var url = E.safeReturn(next);
+    if (!url) return { auto: "", manual: "" };
     // A una app WEB, en el fragmento: el navegador lo conserva al seguir las
     // redirecciones del callback y no lo manda a ningún servidor ni a sus registros.
     // Solo lo abre el puente de esa app (bridge.js, `handoff`).
@@ -304,6 +313,31 @@
     };
   };
 
+  /**
+   * Qué hace la página con el resultado del relevo.
+   *
+   * Lo nuevo es el puente de una app web que trae su clave (`cfg.web` y
+   * `cfg.app_key`): lo único que le sirve es una entrega. Volver sin ella dejaba a
+   * la app pidiendo «Iniciar sesión» otra vez, sin fin y sin decir por qué.
+   *
+   * - `confirm`: la clave ya estaba en este navegador y nadie ha tecleado nada
+   *   ahora. Se entrega tras un clic AQUÍ, en Sytue ID: un guion inyectado en la
+   *   app puede traer a la persona hasta esta página, pero no pulsar por ella.
+   * - `login`: no hay clave que entregar y aún no se ha tecleado la contraseña:
+   *   se pide (la autorización con `prompt=login`, una sola vez).
+   * - `failed`: tampoco tras teclearla. Se explica y se ofrece repetir o volver.
+   */
+  E.relayOutcome = function (cfg, r) {
+    if (r.enroll) return "enroll";
+    if (r.lost) return "lost";
+    if (cfg.web !== true || !cfg.app_key) return "go";
+    if (r.blob) return r.stored ? "confirm" : "go";
+    // Recién identificada (dos minutos) cuenta como tecleada: pedirlo otra vez no
+    // cambiaría nada.
+    var fresh = typeof cfg.auth_age === "number" && cfg.auth_age < 120000;
+    return cfg.login && !cfg.typed && !fresh ? "login" : "failed";
+  };
+
   var doc = global.document;
   var el = doc && doc.getElementById("e2e-relay");
   if (!el) return;
@@ -319,6 +353,8 @@
       global.navigator ? global.navigator.userAgent : "",
       cfg.web === true,
     );
+    // Una vuelta que no es navegable no se sigue ni se enlaza: quedarse aquí.
+    if (!to.auto) return;
     if (link) link.href = to.manual;
     // Por si el navegador no deja salir solo hacia el esquema de una app móvil.
     global.setTimeout(function () {
@@ -330,24 +366,58 @@
   var timer = global.setTimeout(function () {
     go("");
   }, 20000);
+  /** Cambia «Desbloqueando…» por una sección; false si la página no la tiene. */
+  function show(id) {
+    var section = doc.getElementById(id);
+    if (!section) return false;
+    var busy = doc.getElementById("e2e-working");
+    if (busy) busy.hidden = true;
+    section.hidden = false;
+    return true;
+  }
   E.relay(cfg).then(
     function (r) {
-      if (r.enroll) {
-        global.clearTimeout(timer);
-        var working0 = doc.getElementById("e2e-working");
-        var first = doc.getElementById("e2e-passkey-first");
-        if (working0) working0.hidden = true;
-        if (first) {
-          first.hidden = false;
+      var outcome = E.relayOutcome(cfg, r);
+      global.clearTimeout(timer);
+      if (outcome === "enroll" && show("e2e-passkey-first")) return;
+      if (outcome === "login") {
+        // La entrada tecleada es una ruta de este origen (/oauth2/authorize…): solo
+        // se sigue si lo es (comun.js, `safeReturn`); si no, como si fallara.
+        var login =
+          typeof cfg.login === "string" && cfg.login.charAt(0) === "/"
+            ? E.navigableReturn(cfg.login)
+            : "";
+        if (login) {
+          gone = true;
+          global.location.replace(login);
           return;
         }
+        outcome = "failed";
       }
-      if (!r.lost) {
-        global.clearTimeout(timer);
+      if (outcome === "failed" && show("e2e-failed")) return;
+      if (outcome === "confirm") {
+        var app = doc.getElementById("e2e-app");
+        var ok = doc.getElementById("e2e-confirm-go");
+        if (ok && show("e2e-confirm")) {
+          try {
+            if (app) app.textContent = new URL(cfg.next).host;
+          } catch (e) {
+            // Sin nombre que enseñar, la pregunta sigue valiendo.
+          }
+          ok.addEventListener("click", function () {
+            ok.disabled = true;
+            go(r.blob);
+          });
+          return;
+        }
+        // Sin dónde preguntar no se entrega nada.
+        go("");
+        return;
+      }
+      if (outcome !== "lost") {
         go(r.blob);
         return;
       }
-      global.clearTimeout(timer);
       var working = doc.getElementById("e2e-working");
       var lost = doc.getElementById("e2e-lost");
       var check = doc.getElementById("e2e-understood");

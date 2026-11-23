@@ -10,6 +10,7 @@
 #   <directorio>/                core   ← apps/nucleo/cmd/pqc-wasm  (cifrado E2E)
 #   <directorio>/office/         office ← apps/nucleo/cmd/office-wasm
 #   <directorio>/mail/           mail   ← apps/nucleo/cmd/mail-wasm
+#   <directorio>/pdf/            pdf    ← apps/nucleo/cmd/pdf-wasm  (PDF de la bóveda, ADR 0086)
 #
 # cada uno con core.wasm, wasm_exec.js y GO-LICENSE.
 #
@@ -43,7 +44,7 @@ destino="$(cd "$destino" && pwd)"
 cd "$raiz/apps/nucleo"
 goroot="$(go env GOROOT)"
 
-for par in core:pqc-wasm office:office-wasm mail:mail-wasm; do
+for par in core:pqc-wasm office:office-wasm mail:mail-wasm pdf:pdf-wasm; do
   modulo="${par%%:*}"
   dir="$destino"
   [ "$modulo" = core ] || dir="$destino/$modulo"

@@ -46,6 +46,9 @@ type Apertura struct {
 	// solo lectura ofrece pedir acceso o, al dueño, concederlo.
 	Rol       string
 	Contenido string
+	// Ancla es el `source_ref` de la presentación («drive:», «vault:» o ""), el de
+	// «Guardar en Drive».
+	Ancla string
 }
 
 // Abrir lee la ficha y el contenido. El ROL decide si se puede escribir: «viewer» y
@@ -60,7 +63,7 @@ func Abrir(ctx context.Context, svc *api.Slides, id string) (Apertura, error) {
 		return Apertura{}, err
 	}
 	d := &Documento{svc: svc, id: id, actor: uuid(), base: c}
-	return Apertura{Doc: d, Titulo: ficha.Title, Escribir: api.SlidesPuedeEscribir(rol), Rol: rol, Contenido: c.Modelo}, nil
+	return Apertura{Doc: d, Titulo: ficha.Title, Escribir: api.SlidesPuedeEscribir(rol), Rol: rol, Contenido: c.Modelo, Ancla: ficha.SourceRef}, nil
 }
 
 // Guardar escribe el modelo entero encima de lo último que se leyó o se escribió.

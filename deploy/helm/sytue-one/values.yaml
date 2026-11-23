@@ -349,6 +349,9 @@ secretosInternos:
   # Sytue ID (/internal/orgs/names), el Hub, Rooms y Calendar: el nombre visible de
   # las organizaciones de fuera que avisan o invitan a una persona.
   sytue-id-nombres-orgs: secret
+  # Sytue ID (/internal/vault-keys/lookup) y Rooms: la clave de firma activa de una
+  # bóveda post-cuántica, para verificar las acciones de entrada del correo (ADR 0087).
+  sytue-id-claves-boveda: secret
   # Sytue Docs y Sytue Drive: la papelera compartida (Drive mig 0027). Propio y no el
   # del Hub, que tienen todos los servicios, porque estas dos puertas borran.
   sytue-docs-drive-internal: secret

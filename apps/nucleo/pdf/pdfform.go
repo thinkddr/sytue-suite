@@ -514,7 +514,10 @@ func anexarRelleno(doc *PDFDoc, valores map[string]string, porNombre map[string]
 	if err := admiteAnexo(doc, anexoFormulario); err != nil {
 		return nil, err
 	}
-	e := nuevoAnexo(doc)
+	e, err := nuevoAnexo(doc)
+	if err != nil {
+		return nil, err
+	}
 	doc.registrarParchesDeRelleno(e, valores, porNombre)
 	nums := make([]int, 0, len(e.parches))
 	for llave := range e.parches {

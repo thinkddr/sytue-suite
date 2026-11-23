@@ -171,7 +171,7 @@ func (f *fuentePDF) decodificar(s pdfString) []glifo {
 	}
 	if f.dosBytes {
 		for i := 0; i+1 < len(s); i += 2 {
-			c := uint32(s[i])<<8 | uint32(s[i+1])
+			c := uint32(binary.BigEndian.Uint16(s[i : i+2]))
 			out = append(out, f.glifoCompuesto(c, c, 2, false))
 		}
 		if len(s)%2 == 1 { // byte suelto al final: se toma como código corto
@@ -1030,7 +1030,7 @@ func codigoDeHex(s pdfString) uint32 {
 func utf16Puntos(s pdfString) []uint16 {
 	out := make([]uint16, 0, len(s)/2)
 	for i := 0; i+1 < len(s); i += 2 {
-		out = append(out, uint16(s[i])<<8|uint16(s[i+1]))
+		out = append(out, binary.BigEndian.Uint16(s[i:i+2]))
 	}
 	if len(s) == 1 {
 		out = append(out, uint16(s[0]))

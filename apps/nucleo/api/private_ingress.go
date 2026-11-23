@@ -19,7 +19,7 @@ type PrivateIngress struct {
 }
 
 func NewPrivateIngress(serviceURL, product string, session Session, httpc *http.Client) (*PrivateIngress, error) {
-	if product != "mail" && product != "calendar" {
+	if !ingress.Product(product) {
 		return nil, ingress.ErrContract
 	}
 	return &PrivateIngress{c: New(serviceURL+"/api/v1", session, httpc), product: product}, nil
@@ -28,6 +28,9 @@ func (m *Mail) PrivateIngress() *PrivateIngress { return &PrivateIngress{c: m.c,
 func (c *Calendars) PrivateIngress() *PrivateIngress {
 	return &PrivateIngress{c: c.c, product: "calendar"}
 }
+
+// PrivateIngress es la entrada privada de avisos de One (ADR 0086).
+func (h *Hub) PrivateIngress() *PrivateIngress { return &PrivateIngress{c: h.c, product: "hub"} }
 
 func (c *PrivateIngress) request(scope storage.Scope, path string, body any) (Request, error) {
 	if c == nil || c.c == nil {

@@ -38,6 +38,15 @@ function bytesToBase64(bytes: Uint8Array, unpadded = false): string {
   return unpadded ? encoded.replace(/=+$/, '') : encoded;
 }
 
+/** Quita los `=` finales recorriendo desde el final, en tiempo lineal. Una expresión
+ *  como `/=+$/` reintenta desde cada `=` de una racha que no acaba la cadena y se
+ *  vuelve cuadrática con entradas hostiles del tipo `'='.repeat(n) + 'A'`. */
+export function trimBase64Padding(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x3d) end--;
+  return end === value.length ? value : value.slice(0, end);
+}
+
 function base64ToBytes(value: string, strictPadded: boolean): Uint8Array<ArrayBuffer> {
   if (strictPadded) {
     if (value === '') return new Uint8Array(0);
@@ -53,14 +62,14 @@ function base64ToBytes(value: string, strictPadded: boolean): Uint8Array<ArrayBu
     for (let i = 0; i < decoded.length; i++) out[i] = decoded.charCodeAt(i);
     return out;
   }
-  const trimmed = value.replace(/=+$/, '');
+  const trimmed = trimBase64Padding(value);
   if (trimmed === '') return new Uint8Array(0);
   if (!/^[A-Za-z0-9+/]+$/.test(trimmed) || trimmed.length % 4 === 1) {
     throw new MatrixSecurityError('identity');
   }
   const padded = trimmed + '='.repeat((4 - (trimmed.length % 4)) % 4);
   const decoded = atob(padded);
-  if (btoa(decoded).replace(/=+$/, '') !== trimmed) {
+  if (trimBase64Padding(btoa(decoded)) !== trimmed) {
     throw new MatrixSecurityError('identity');
   }
   const out = new Uint8Array(decoded.length);

@@ -623,7 +623,7 @@ func (s *Service) avisarAlOrganizador(ctx context.Context, uid, email string, pa
 		}
 		inv, err := s.store.RespondInvitation(ctx, pend.ID, estado, []string{email}, sub)
 		if err != nil {
-			log.From(ctx).Warn("calendar: marcar la invitación al responder desde el evento", "uid", uid, "error", err)
+			avisoAlResponder(ctx, "calendar: marcar la invitación al responder desde el evento", uid, err)
 			return
 		}
 		s.replyDeInvitacion(ctx, inv)
@@ -635,8 +635,16 @@ func (s *Service) avisarAlOrganizador(ctx context.Context, uid, email string, pa
 			s.mandarRespuestaPorCorreo(ctx, escrita, email, partstat)
 		}
 	default:
-		log.From(ctx).Warn("calendar: buscar la invitación al responder desde el evento", "uid", uid, "error", err)
+		avisoAlResponder(ctx, "calendar: buscar la invitación al responder desde el evento", uid, err)
 	}
+}
+
+// avisoAlResponder registra un fallo al responder desde el evento. El UID sale del
+// .ics, que escribe el cliente (o un organizador de fuera), y el error puede
+// citarlo: los dos pasan por logsafe.Text para que un CR/LF no fabrique líneas
+// de log falsas en un sumidero de texto.
+func avisoAlResponder(ctx context.Context, msg, uid string, err error) {
+	log.From(ctx).Warn(msg, "uid", logsafe.Text(uid), "error", logsafe.Text(err))
 }
 
 // --- Recordatorios in-app ---------------------------------------------------

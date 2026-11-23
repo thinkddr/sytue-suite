@@ -171,12 +171,23 @@ export function enlaceDeValor(campo: BasesField, valor: BasesValue | undefined):
     case 'url':
       return /^https?:\/\//i.test(valor) ? valor : null;
     case 'email':
-      return `mailto:${encodeURIComponent(valor).replace('%40', '@')}`;
+      return `mailto:${direccionMailto(valor)}`;
     case 'phone':
       return `tel:${valor.replace(/[^0-9+]/g, '')}`;
     default:
       return null;
   }
+}
+
+/**
+ * La dirección de un `mailto:` (RFC 6068): cada parte codificada y solo la última
+ * `@` como separador del dominio. Otra `@` del valor pertenece a la parte local y
+ * queda codificada (`%40`), sin depender de cuántas veces aparezca.
+ */
+function direccionMailto(valor: string): string {
+  const arroba = valor.lastIndexOf('@');
+  if (arroba < 0) return encodeURIComponent(valor);
+  return `${encodeURIComponent(valor.slice(0, arroba))}@${encodeURIComponent(valor.slice(arroba + 1))}`;
 }
 
 function idiomaDePagina(): string | undefined {

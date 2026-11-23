@@ -60,6 +60,7 @@ const aiEnabled = Boolean(serverEnv(import.meta.env).SYTUE_AI_URL);
       client:only="preact"
       documentId={documentId}
       userId={session.user.id}
+      tenant={session.user.tenant}
       locale={locale}
       aiEnabled={aiEnabled}
       volverA={volver}

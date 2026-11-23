@@ -3,14 +3,10 @@ import { createContext, type ComponentChildren } from 'preact';
 import { useContext, useEffect, useMemo } from 'preact/hooks';
 import { HttpClient, nodeResource, type DriveResource, type RawNode } from '@sytue/api-clients';
 import { contiene } from '@sytue/i18n';
-import {
-  MatrixSecurityError,
-  PrivateDriveError,
-  safeAttachmentType,
-  type StorageFileSink,
-} from '@sytue/offline/matrix';
+import { MatrixSecurityError, PrivateDriveError, safeAttachmentType } from '@sytue/offline/matrix';
 import { encodeStorageScopeHeader, storageScopeHeader } from '@sytue/config/matrix';
 import type { DriveBrowserAPI } from '../components/FileBrowser.js';
+import { collectPrivateDriveFile } from '@sytue/offline/vault/drive';
 import type { PrivateDriveSession } from './private-drive.js';
 
 function unavailable(): never {
@@ -356,46 +352,18 @@ export class PrivateDriveBrowser {
             await this.session.repository.versions(item.id, String(version + 1), signal)
           ).versions.find((v) => v.version === version);
     if (!file) throw new PrivateDriveError('not_found');
-    const size = file.size_bytes;
-    if (typeof size !== 'number' || !Number.isSafeInteger(size) || size < 0 || size > maximum)
-      unavailable();
-    const chunks: Uint8Array<ArrayBuffer>[] = [];
-    let bytes = 0,
-      committed = false;
-    const clear = () => {
-      for (const chunk of chunks) chunk.fill(0);
-      chunks.length = 0;
-    };
-    try {
-      const sink: StorageFileSink = {
-        write: (chunk) => {
-          this.check();
-          if (bytes + chunk.byteLength > size || bytes + chunk.byteLength > maximum) unavailable();
-          bytes += chunk.byteLength;
-          chunks.push(chunk.slice());
-          return Promise.resolve();
-        },
-        commit: () => {
-          if (bytes !== size) throw new MatrixSecurityError('reference');
-          committed = true;
-          return Promise.resolve();
-        },
-        abort: () => {
-          clear();
-          return Promise.resolve();
-        },
-      };
-      if (version === undefined) await this.session.repository.download(item.id, sink, signal);
-      else await this.session.repository.downloadVersion(item.id, version, sink, signal);
-      this.check();
-      signal.throwIfAborted();
-      if (!committed) throw new MatrixSecurityError('reference');
-      return new Blob(chunks, {
-        type: safeAttachmentType(typeof file.content_type === 'string' ? file.content_type : ''),
-      });
-    } finally {
-      clear();
-    }
+    const blob = await collectPrivateDriveFile({
+      size: file.size_bytes,
+      maximum,
+      type: safeAttachmentType(typeof file.content_type === 'string' ? file.content_type : ''),
+      check: () => this.check(),
+      run: (sink) =>
+        version === undefined
+          ? this.session.repository.download(item.id!, sink, signal)
+          : this.session.repository.downloadVersion(item.id!, version, sink, signal),
+    });
+    signal.throwIfAborted();
+    return blob;
   }
   async blobURL(
     item: DriveResource,

@@ -314,6 +314,22 @@ export const sl: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Shranjeno v Sytue Drive.',
   'doc.msg.savedToDriveIn': '»{name}« zdaj vsebuje vaše spremembe kot novo različico.',
   'doc.msg.saveToDriveFailed': 'Sprememb ni bilo mogoče shraniti v Drive.',
+  'doc.msg.saveToDriveVault': 'Vaš Drive je šifriran od konca do konca',
+  'doc.msg.saveToDriveVault.detail':
+    'Od tu ga ni bilo mogoče shraniti vanj. Prenesite dokument in ga naložite iz Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Shranjeno v vaš šifrirani Drive.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '»{name}« je bil pred shranjevanjem šifriran v tem brskalniku.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '»{name}« je bil pred shranjevanjem šifriran v tej napravi.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Vaš šifrirani Drive je v tej napravi zaklenjen. Odklenite ga zgoraj in znova shranite.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Znova se prijavite, da odklenete šifrirani Drive, in znova shranite.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Vaš Drive še prehaja na šifriranje od konca do konca. Odprite Sytue Drive, da se to konča, in znova shranite.',
+  'doc.msg.saveToDriveUnsupported':
+    'Oblike te datoteke ni mogoče znova zapisati. Namesto tega prenesite dokument.',
   'file.downloadPdf': 'Prenesi kot PDF',
   'file.pdfAccessible': 'Dostopen PDF (PDF/UA)',
   'file.downloadHtml': 'Prenesi kot HTML',
@@ -2709,6 +2725,53 @@ export const sl: AppCatalog<typeof en> = {
     'Ista oseba se v vrstnem redu podpisovanja pojavi dvakrat.',
   'pdf.error.signatureRequest.chainTooLong': 'Vrstni red podpisovanja ima lahko največ 10 oseb.',
   'pdf.error.signatureRequest.busy': 'Ta zahteva se že odpira. Poskusite znova čez trenutek.',
+  'pdf.error.driveVault':
+    'Vaš Drive je šifriran od konca do konca: kopij zahtev za podpis iz drugih organizacij vanj še ni mogoče shraniti. Namesto tega prenesite PDF.',
+  'pdf.device.title': 'Podpiši na tej napravi',
+  'pdf.device.help':
+    'Vaš Drive je šifriran od konca do konca, zato strežnik vaših PDF-jev ne more brati. Izberite enega: tu se dešifrira in podpiše z vašim potrdilom, podpisana kopija pa se shrani šifrirana poleg izvirnika. Niti PDF niti vaše potrdilo ne prideta do strežnika.',
+  'pdf.device.open': 'Odpri moj šifrirani Drive',
+  'pdf.device.empty.title': 'V šifriranem Drivu ni PDF-jev',
+  'pdf.device.empty.description': 'Naložite jih iz Sytue Drive in prikazali se bodo tukaj.',
+  'pdf.device.sign': 'Podpiši',
+  'pdf.device.signed': 'Podpisano in šifrirano shranjeno kot »{name}«.',
+  'pdf.device.stamp.on':
+    'S časovnim žigom od {authority}: podpis dokazuje, kdo in kdaj je podpisal. Overitelj prejme le prstni odtis podpisa, nikoli PDF-ja.',
+  'pdf.device.stamp.off':
+    'Brez časovnega žiga: ta storitev nima overitelja časovnih žigov, zato podpis dokazuje, kdo je podpisal, ne pa tudi kdaj.',
+  'pdf.device.appearance': 'Kako je videti podpis',
+  'pdf.device.appearance.invisible': 'Neviden',
+  'pdf.device.appearance.visible': 'Viden okvir',
+  'pdf.device.signedStamped': 'Podpisano s časovnim žigom in šifrirano shranjeno kot »{name}«.',
+  'pdf.device.signedNoStamp':
+    'Podpisano in šifrirano shranjeno kot »{name}«, vendar brez časovnega žiga: overitelj časovnih žigov se ni odzval.',
+  'pdf.device.error.page': 'Podpis ne gre na to stran. Izberite drugo stran ali položaj.',
+  'pdf.device.view': 'Ogled',
+  'pdf.vault.help':
+    'Ta PDF je v vašem šifriranem Drivu: dešifrira se samo v tej napravi, kjer ga lahko pregledate, označite, izpolnite, uredite in podpišete. Kar shranite, se vrne šifrirano.',
+  'pdf.vault.serverOnly':
+    'S šifriranim Drivom še niso na voljo zahteve za podpis, zaščita z geslom, prepoznavanje besedila, zakrivanje, urejanje besedila ali slik, žigi in vodni žigi, primerjava, zgodovina različic in tiskanje: zahtevajo, da storitev prebere PDF, ali se v napravi še ne izvajajo.',
+  'pdf.vault.notFound.title': 'Tega PDF-ja ni v vašem šifriranem Drivu',
+  'pdf.vault.notFound.description':
+    'Morda je bil premaknjen ali izbrisan. Poiščite ga v Sytue Drive.',
+  'pdf.vault.openSigned': 'Odpri podpisano kopijo',
+  'pdf.vault.engineUnavailable':
+    'Mehanizma PDF v tej napravi ni bilo mogoče naložiti, zato je PDF prikazan v pregledovalniku brskalnika: lahko ga pregledate, prenesete in podpišete, ne pa urejate.',
+  'pdf.vault.unavailable': 'S šifriranim Drivom še ni na voljo.',
+  'pdf.device.requests':
+    'Prošnja za podpis drugim osebam ali organizacijam potrebuje Drive strežnika: storitev mora PDF prebrati, da ga pošlje in preveri podpis, ki se vrne. S šifriranim Drivom podpišite tukaj in podpisani PDF pošljite sami.',
+  'pdf.device.error.signin': 'Znova se prijavite v Sytue ID, da odklenete šifrirani Drive.',
+  'pdf.device.error.pending':
+    'Vaš Drive še prehaja na šifriranje od konca do konca. Dokončajte to v Sytue Drive.',
+  'pdf.device.error.password': 'To geslo ne odpre potrdila.',
+  'pdf.device.error.encrypted':
+    'Ta PDF je zaščiten z geslom in ga na tej napravi ni mogoče podpisati.',
+  'pdf.device.error.locked':
+    'Ta PDF je potrjen proti vsaki spremembi: nov podpis bi ga razveljavil.',
+  'pdf.device.error.unreadable':
+    'Tega PDF-ja na tej napravi ni mogoče podpisati, ne da bi ga prepisali. Nič ni bilo spremenjeno.',
+  'pdf.device.error.failed':
+    'PDF-ja ni bilo mogoče podpisati ali shraniti. V vašem Drivu ni bilo nič spremenjeno.',
   'pdf.dialog.firmar.help':
     'Potrdilo in ključ nikoli ne zapustita vaše organizacije: uporabljata se na strežniku in se ne shranjujeta.',
   'pdf.dialog.firmar.cert': 'Potrdilo (PEM)',

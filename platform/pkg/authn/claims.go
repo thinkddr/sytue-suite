@@ -93,6 +93,15 @@ type Claims struct {
 	// Issuer y Audience del token validado.
 	Issuer   string
 	Audience []string
+	// AuthTime es el `auth_time`: cuándo se identificó la persona en Sytue ID, no
+	// cuándo se emitió el token (un refresco lo conserva). Cero si no viene.
+	AuthTime time.Time
+	// AMR son los métodos con que se identificó (`amr`: pwd, otp, mfa, webauthn…).
+	AMR []string
+	// MFAEnabled es el claim `mfa_enabled`: si la cuenta tiene segundo factor. Nil
+	// en un token anterior al claim; quien lo use lo trata como «sí» (ver
+	// IdentificacionReciente), nunca como «no».
+	MFAEnabled *bool
 }
 
 // LogValue implementa slog.LogValuer para que, al registrar Claims, NUNCA se

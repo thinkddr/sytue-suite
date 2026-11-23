@@ -31,6 +31,48 @@ export const sl: Catalog = {
   'matrix.connect': 'Nastavi to napravo',
   'matrix.devices': 'Tvoje naprave',
   'matrix.failed': 'Šifriranja ni bilo mogoče nastaviti. Poskusi znova.',
+  'vault.wrongKey':
+    'Šifrirani podatki te aplikacije so bili zaklenjeni z drugim ključem za odklepanje Sytue ID, kot je ta v tem brskalniku. Znova se prijavite v Sytue ID, da sem prenesete trenutni ključ. Če je prejšnji ključ izgubljen, lahko šifrirane podatke te aplikacije izpraznite in začnete znova.',
+  'vault.wrongKeyDevice':
+    'Šifrirani podatki te aplikacije so bili zaklenjeni z drugim ključem za odklepanje Sytue ID, kot je ta v tej napravi. Znova se prijavite v Sytue ID, da sem prenesete trenutni ključ. Če je prejšnji ključ izgubljen, lahko šifrirane podatke te aplikacije izpraznite in začnete znova.',
+  'vault.release': 'Izprazni in se vrni na podatke s strežnika',
+  'vault.releaseTitle': 'Vrnitev na podatke s strežnika',
+  'vault.releaseBody':
+    'Ko so bili podatki te aplikacije šifrirani iz aplikacije za računalnik ali mobilni telefon, je strežnik obdržal kopijo točno takšno, kot je bila takrat. Če šifriranih podatkov ne morete odpreti, se lahko ta aplikacija vrne na to kopijo. Vse, kar je bilo zapisano pozneje, na katerikoli napravi, se izgubi in tega ni mogoče obnoviti.',
+  'vault.releaseUnderstood':
+    'Razumem, da se izgubi vse, kar je bilo zapisano po prehodu na šifriranje',
+  'vault.releaseSignIn':
+    'Za potrditev identitete vas bo Sytue ID najprej prosil za ponovno prijavo.',
+  'vault.releaseFailed': 'Vrnitev na podatke s strežnika ni uspela. Poskusite znova.',
+  'vault.moveTitle': 'Premakni Drive v šifrirani trezor',
+  'vault.moveOffer':
+    'Vaš Drive je še vedno shranjen v prejšnjem šifriranju. Premaknite ga v trezor, ki ga uporabljajo splet in vaše druge naprave.',
+  'vault.moveAction': 'Premakni v trezor',
+  'vault.moveBody':
+    'Vse vaše datoteke in mape bodo skupaj z različicami kopirane v šifrirani trezor in preverjene ena za drugo. Iz prejšnjega šifriranja se nič ne izbriše. Pustite aplikacijo odprto, dokler ne konča; če se prekine, nadaljuje tam, kjer je ostala.',
+  'vault.moveUnderstood': 'Razumem, da se bo ta Drive po koncu uporabljal iz trezorja',
+  'vault.moveCopying': 'Kopiranje in preverjanje vaših datotek…',
+  'vault.moveDone': 'Končano. Vaš Drive je zdaj v šifriranem trezorju.',
+  'vault.moveFailed':
+    'Kopije ni bilo mogoče dokončati. Vaše datoteke so še vedno v prejšnjem šifriranju. Poskusite znova.',
+  'vault.movePending':
+    'Ta naprava ima še spremembe za pošiljanje. Počakajte, da se končajo, in poskusite znova.',
+  'vault.copyInProgress':
+    'Druga naprava premika vaš Drive v šifrirani trezor. Počakajte, da konča, in poskusite znova.',
+  'vault.copyCancel': 'Prekliči kopiranje',
+  'vault.copyCancelHint':
+    'Če se je kopiranje ustavilo, ga lahko prekličete: nič se ne izbriše in ga lahko ponovite s tiste naprave.',
+  'vault.releaseNotice':
+    'Podatki te aplikacije so bili šifrirani iz aplikacije za računalnik ali mobilni telefon. Tukaj je prikazana kopija, ki jo je strežnik takrat obdržal; kar je bilo zapisano pozneje, je le v šifriranih podatkih. Če jih ne morete več odpreti, se lahko vrnete na podatke s strežnika.',
+  'notifications.kind.security.storage.released': '{name}: vrnitev na vaše podatke na strežniku',
+  'vault.signInAgain': 'Znova se prijavi v Sytue ID',
+  'vault.empty': 'Izprazni šifrirane podatke',
+  'vault.emptyTitle': 'Izprazni šifrirane podatke te aplikacije',
+  'vault.emptyBody':
+    'Podatki, ki jih je ta aplikacija šifrirala z izgubljenim ključem, bodo izbrisani iz Sytue in ustvarjen bo nov ključ. Preostanek vašega računa ostane nespremenjen. Tega ni mogoče razveljaviti.',
+  'vault.emptyUnderstood': 'Razumem, da bodo podatki, šifrirani z izgubljenim ključem, izbrisani',
+  'vault.failed':
+    'Šifriranih podatkov ni bilo mogoče odpreti. Poskusite znova ali se znova prijavite v Sytue ID. Če je ključ izgubljen, lahko šifrirane podatke te aplikacije izpraznite.',
   'matrix.incoming': 'Preveri to napravo',
   'matrix.match': 'Ujemajo se',
   'matrix.mismatch': 'Ne ujemajo se',

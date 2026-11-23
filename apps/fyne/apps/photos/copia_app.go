@@ -20,6 +20,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/carrete"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/photos/galeriacifrada"
+	"git.sytue.eu/sytue/one/apps/nucleo/photos/render"
 )
 
 // # La copia de seguridad en la app
@@ -108,7 +110,12 @@ func (a *App) rondaCopia() {
 	a.cop.progreso, a.cop.fallo = &ProgresoCopia{}, nil
 	a.pintarCopia()
 	a.enSesion(func(vida context.Context) {
-		d := nuevoDestinoDrive(a.Drive, a.cli)
+		d, err := a.destinoSubida(vida)
+		if err != nil {
+			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
+			fyne.Do(func() { a.finRondaCopia(cuenta, ProgresoCopia{}, err) })
+			return
+		}
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		p, err := a.Copia.Ronda(vida, cuenta, d, func(p ProgresoCopia) {
 			fyne.Do(func() {
@@ -150,6 +157,21 @@ func (a *App) finRondaCopia(cuenta string, p ProgresoCopia, err error) {
 		}
 	}
 	a.pintarCopia()
+}
+
+// DriveCifradoAbierto es el Drive de la bóveda recién abierto en esta app (lo llama
+// quien la monta, en el hilo de la interfaz). La copia que esperaba por él sigue ya, sin
+// esperar a la ronda siguiente —también la que dejó esperando la copia con la app
+// cerrada—, y la galería cifrada que estaba cerrada se lee.
+func (a *App) DriveCifradoAbierto() {
+	if a.CopiaActiva() && a.identidad != "" &&
+		(errors.Is(a.cop.fallo, ErrDriveCifradoCerrado) || a.Copia.EsperandoBoveda(a.identidad)) {
+		a.cop.fallo = nil
+		a.rondaCopia()
+	}
+	if a.cif.pedida && a.cif.cerrada && !a.cif.cargando {
+		a.cargarCifradas(false)
+	}
 }
 
 // AlFondoCopia es la app pasando a segundo plano: si hay una ronda a medias, pide al
@@ -304,10 +326,38 @@ type destinoDrive struct {
 	drive   *api.Drive
 	fotos   *api.Photos
 	carpeta string
+	// nombres es lo que ya hay en «/Fotos» de un Drive privado, para no pisar nada:
+	// ahí subir con un nombre que ya está crea una versión nueva de ese fichero, y no
+	// hay `keep_both` que lo evite. Se lee una vez por destino.
+	nombres map[string]bool
+	// cifrada es la galería cifrada del Drive privado (ADR 0086), donde se apunta cada
+	// foto que se sube ahí. Se crea con la primera.
+	cifrada *galeriacifrada.Galeria
+}
+
+// privado: el Drive es el privado (la bóveda o Matrix), y la galería del servidor no
+// puede indexar lo que se sube ahí.
+func (d *destinoDrive) privado() bool {
+	return d.drive.Privado() && (d.fotos == nil || !d.fotos.CanImportPrivatePhotos())
 }
 
 func nuevoDestinoDrive(drive *api.Drive, fotos *api.Photos) *destinoDrive {
 	return &destinoDrive{drive: drive, fotos: fotos}
+}
+
+// destinoSubida es a dónde suben «Añadir fotos» y la copia: el Drive de siempre o,
+// si el del servidor ya no admite escrituras, el privado ([App.DriveDeSubida]). Se
+// pregunta en cada subida: la persona puede pasar su Drive a la bóveda con la
+// galería abierta.
+func (a *App) destinoSubida(vida context.Context) (*destinoDrive, error) {
+	if a.DriveDeSubida == nil || (a.cli != nil && a.cli.CanImportPrivatePhotos()) {
+		return nuevoDestinoDrive(a.Drive, a.cli), nil
+	}
+	drive, err := a.DriveDeSubida(vida)
+	if err != nil {
+		return nil, err
+	}
+	return nuevoDestinoDrive(drive, a.cli), nil
 }
 
 func (d *destinoDrive) carpetaFotos(vida context.Context) (string, error) {
@@ -379,17 +429,54 @@ func (d *destinoDrive) Subir(vida context.Context, ruta, nombre, tipo string) (S
 		}
 		return Subido{ID: foto.ID, Nombre: foto.Name}, nil
 	}
+	if d.privado() {
+		if d.nombres == nil {
+			if _, d.nombres, err = d.Contenido(vida); err != nil {
+				return Subido{}, err
+			}
+		}
+		nombre = nombreLibre(nombre, d.nombres)
+	}
 	fichero, err := d.drive.UploadConservando(c, carpeta, nombre, tipo, f, info.Size())
 	if err != nil {
 		return Subido{}, err
 	}
+	if d.nombres != nil {
+		d.nombres[fichero.Name] = true
+	}
+	if d.privado() {
+		d.indexarCifrada(c, ruta, fichero)
+	}
 	return Subido{ID: fichero.ID, Nombre: fichero.Name}, nil
+}
+
+// indexarCifrada apunta la foto recién subida al Drive privado en el índice de la
+// galería cifrada (fecha EXIF, medidas, miniatura cifrada), leyendo la copia local: el
+// original no vuelve a bajar. Es lo mejor posible: si falla, la foto ya está a salvo y
+// su entrada se reconstruye al leer la galería (aquí o en la web).
+func (d *destinoDrive) indexarCifrada(ctx context.Context, ruta string, fichero api.File) {
+	if !strings.HasPrefix(strings.ToLower(fichero.ContentType), "image/") || fichero.SizeBytes > render.MaxOriginal {
+		return
+	}
+	datos, err := os.ReadFile(ruta) //nolint:gosec // la misma copia local que se acaba de subir
+	if err != nil {
+		return
+	}
+	defer clear(datos)
+	if d.cifrada == nil {
+		d.cifrada = galeriacifrada.Nueva(d.drive, nil)
+	}
+	_ = d.cifrada.Indexar(ctx, fichero, datos)
 }
 
 // Indexar apunta en la galería lo subido. Un 400 es que syphotos no sabe medirlo.
 func (d *destinoDrive) Indexar(vida context.Context, id string) error {
 	if d.fotos != nil && d.fotos.CanImportPrivatePhotos() {
 		return nil
+	}
+	if d.privado() {
+		// El id es del Drive privado: syphotos no puede leer el fichero.
+		return errors.Join(ErrNoIndexable, ErrEnBoveda)
 	}
 	c, fin := ctx(vida)
 	defer fin()

@@ -18,9 +18,9 @@ type observedCompilerFS struct {
 func (f observedCompilerFS) Open(name string) (fs.File, error) { *f.reads++; return f.FS.Open(name) }
 
 func TestCompilerModulesAreAllowlistedLazyAndDigestBound(t *testing.T) {
-	files := fstest.MapFS{"core/core.wasm": &fstest.MapFile{Data: []byte("core-artifact")}, "core/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}, "office/core.wasm": &fstest.MapFile{Data: []byte("office-artifact")}, "office/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}, "mail/core.wasm": &fstest.MapFile{Data: []byte("mail-artifact")}, "mail/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}}
+	files := fstest.MapFS{"core/core.wasm": &fstest.MapFile{Data: []byte("core-artifact")}, "core/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}, "office/core.wasm": &fstest.MapFile{Data: []byte("office-artifact")}, "office/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}, "mail/core.wasm": &fstest.MapFile{Data: []byte("mail-artifact")}, "mail/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}, "pdf/core.wasm": &fstest.MapFile{Data: []byte("pdf-artifact")}, "pdf/wasm_exec.js": &fstest.MapFile{Data: []byte("runtime")}}
 	reads := 0
-	a := NewCompilerAssets(observedCompilerFS{FS: files, reads: &reads}, map[string]string{"core": "core", "office": "office", "mail": "mail"})
+	a := NewCompilerAssets(observedCompilerFS{FS: files, reads: &reads}, map[string]string{"core": "core", "office": "office", "mail": "mail", "pdf": "pdf"})
 	get := func(query, asset string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
 		a.Serve(w, httptest.NewRequest(http.MethodGet, "http://fixture.test/api/client-core/"+asset+query, http.NoBody), asset)
@@ -70,5 +70,17 @@ func TestCompilerModulesAreAllowlistedLazyAndDigestBound(t *testing.T) {
 	}
 	if w = get("?module=core&sha256="+manifest.Wasm, "core.wasm"); w.Code != 412 {
 		t.Fatal("cross-module digest accepted", w.Code)
+	}
+	// El motor de PDF del estudio de la bóveda (ADR 0086) se sirve igual: bajo demanda y
+	// atado a su huella.
+	mailReads := reads
+	if w = get("?module=pdf", "manifest.json"); w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &manifest) != nil || manifest.ID != "pdf" {
+		t.Fatal("lazy PDF manifest")
+	}
+	if reads <= mailReads {
+		t.Fatal("PDF module was not loaded on demand")
+	}
+	if w = get("?module=pdf&sha256="+manifest.Wasm, "core.wasm"); w.Code != 200 || w.Body.String() != "pdf-artifact" {
+		t.Fatal("PDF artifact is not pinned", w.Code)
 	}
 }

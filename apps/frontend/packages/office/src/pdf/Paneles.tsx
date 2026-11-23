@@ -69,11 +69,13 @@ import {
   moverRecuadro,
   recuadroArrastrado,
   rectElegido,
+  trazosAPagina,
   type EleccionFirma,
   type Fracciones,
   type Rect,
 } from './firmaPosicion.js';
 import { PedirFirma } from './PedirFirma';
+import { LienzoDeFirma } from './LienzoDeFirma';
 import { Versiones } from './Versiones';
 import { CompararVisual } from './CompararVisual';
 import {
@@ -139,7 +141,16 @@ export type Dialogo =
   | 'versiones';
 
 /** Devuelve si el cambio se llegó a aplicar. */
-type Aplicar = (cuerpo: Record<string, unknown>, mensaje: string) => Promise<boolean>;
+export type Aplicar = (cuerpo: Record<string, unknown>, mensaje: string) => Promise<boolean>;
+
+/**
+ * El estudio de un PDF de la bóveda (ADR 0086) usa estos mismos diálogos con el motor
+ * EN EL DISPOSITIVO: lo que aquí se pediría al servicio por la ruta lo da él, y lo que
+ * solo sabe hacer el servidor (reconocer texto) no se enseña.
+ */
+export interface DialogosLocales {
+  comprobarArchivo: () => Promise<InformeArchivo>;
+}
 
 /**
  * Las imágenes de la página: sustituir una por otra, o quitarla.
@@ -1362,7 +1373,7 @@ function Campos({
   );
 }
 
-function CampoEditable({
+export function CampoEditable({
   campo,
   valor,
   onValor,
@@ -2279,6 +2290,7 @@ export function Dialogos({
   svgs,
   onRestaurada,
   locale,
+  local,
 }: {
   dialogo: Dialogo;
   onCerrar: () => void;
@@ -2294,6 +2306,8 @@ export function Dialogos({
   onRestaurada: (version: number) => void;
   /** El idioma de las fechas del historial: esta isla no cuelga del contexto de la Shell. */
   locale?: Locale | undefined;
+  /** Con el motor en el dispositivo (el estudio de la bóveda); ver `DialogosLocales`. */
+  local?: DialogosLocales | undefined;
 }) {
   // El pie del diálogo, donde las herramientas con formulario ponen «Cancelar» y
   // «Aplicar» (`BotonesDialogo`, por un portal): al final del cuerpo, en el teléfono
@@ -2375,6 +2389,7 @@ export function Dialogos({
               trabajando={trabajando}
               paginas={contenido.paginas}
               svgs={svgs}
+              local={local}
             />
           )}
         </div>
@@ -2810,103 +2825,6 @@ function Proteger({
       </div>
     </div>
   );
-}
-
-/**
- * Lienzo para firmar de su puño y letra.
- *
- * Va con eventos de PUNTERO y no de ratón ni de toque, y esa es toda la razón de
- * que funcione en el móvil: `pointer*` cubre dedo, lápiz y ratón con el mismo
- * código, y `touch-action: none` impide que el navegador se lleve el gesto como
- * un desplazamiento de la página, que es lo que convierte firmar en pelearse con
- * el scroll.
- *
- * Los trazos se guardan en coordenadas del lienzo y se traducen al salir: en un
- * PDF el eje vertical crece hacia ARRIBA y en un lienzo hacia abajo, así que sin
- * invertirlo la firma sale del revés.
- */
-function LienzoDeFirma({
-  trazos,
-  onCambio,
-  etiqueta,
-}: {
-  trazos: [number, number][][];
-  onCambio: (t: [number, number][][]) => void;
-  etiqueta: string;
-}) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  const dibujandoRef = useRef(false);
-
-  useEffect(() => {
-    const c = ref.current;
-    const ctx = c?.getContext('2d');
-    if (!c || !ctx) return;
-    ctx.clearRect(0, 0, c.width, c.height);
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#1f2937';
-    for (const trazo of trazos) {
-      if (trazo.length === 0) continue;
-      ctx.beginPath();
-      ctx.moveTo(trazo[0]![0], trazo[0]![1]);
-      for (const [x, y] of trazo.slice(1)) ctx.lineTo(x, y);
-      ctx.stroke();
-    }
-  }, [trazos]);
-
-  const punto = (e: PointerEvent): [number, number] => {
-    const c = ref.current;
-    if (!c) return [0, 0];
-    const r = c.getBoundingClientRect();
-    // El lienzo se dibuja a su resolución interna aunque CSS lo estire.
-    return [
-      ((e.clientX - r.left) / r.width) * c.width,
-      ((e.clientY - r.top) / r.height) * c.height,
-    ];
-  };
-
-  return (
-    <div class="flex flex-col gap-1">
-      <canvas
-        ref={ref}
-        width={480}
-        height={148}
-        aria-label={etiqueta}
-        class="border-border bg-surface w-full cursor-crosshair touch-none rounded-md border"
-        onPointerDown={(e) => {
-          dibujandoRef.current = true;
-          e.currentTarget.setPointerCapture(e.pointerId);
-          onCambio([...trazos, [punto(e)]]);
-        }}
-        onPointerMove={(e) => {
-          if (!dibujandoRef.current || trazos.length === 0) return;
-          const resto = trazos.slice(0, -1);
-          const ultimo = [...trazos[trazos.length - 1]!, punto(e)];
-          onCambio([...resto, ultimo]);
-        }}
-        onPointerUp={() => {
-          dibujandoRef.current = false;
-        }}
-        onPointerCancel={() => {
-          dibujandoRef.current = false;
-        }}
-      />
-    </div>
-  );
-}
-
-/** Trazos del lienzo → coordenadas de la página, con el eje vertical al derecho. */
-function trazosAPagina(
-  trazos: [number, number][][],
-  ancho: number,
-  alto: number,
-  rect: Rect,
-): [number, number][][] {
-  const [x0, y0, x1, y1] = rect;
-  const w = x1 - x0;
-  const h = y1 - y0;
-  return trazos.map((t) => t.map(([x, y]) => [x0 + (x / ancho) * w, y1 - (y / alto) * h]));
 }
 
 /** Fichero → base64 sin la cabecera `data:`, que es lo que espera el BFF. */
@@ -4111,6 +4029,7 @@ function Herramientas({
   trabajando,
   paginas,
   svgs,
+  local,
 }: {
   t: ReturnType<typeof docsT>;
   path: string;
@@ -4119,6 +4038,7 @@ function Herramientas({
   trabajando: boolean;
   paginas: Pagina[];
   svgs: Record<number, string>;
+  local?: DialogosLocales | undefined;
 }) {
   const [nivel, setNivel] = useState<'sin-perdida' | 'equilibrada' | 'fuerte'>('equilibrada');
   const [margenes, setMargenes] = useState('20,20,20,20');
@@ -4190,13 +4110,16 @@ function Herramientas({
         </button>
       </section>
 
-      <Reconocer
-        t={t}
-        path={path}
-        onAplicar={onAplicar}
-        onCerrar={onCerrar}
-        trabajando={trabajando}
-      />
+      {/* Reconocer texto necesita el servicio de OCR: con el PDF en la bóveda, no. */}
+      {!local && (
+        <Reconocer
+          t={t}
+          path={path}
+          onAplicar={onAplicar}
+          onCerrar={onCerrar}
+          trabajando={trabajando}
+        />
+      )}
 
       <ExportarImagenes t={t} nombre={baseDeNombre(path)} paginas={paginas} svgs={svgs} />
 
@@ -4207,8 +4130,7 @@ function Herramientas({
           type="button"
           disabled={trabajando}
           onClick={() => {
-            void api
-              .comprobarArchivo(path)
+            void (local ? local.comprobarArchivo() : api.comprobarArchivo(path))
               .then(setInforme)
               .catch(() => setInforme(null));
           }}

@@ -61,6 +61,16 @@ test('los enlaces solo son http(s), mailto: y tel:', () => {
   expect(enlaceDeValor(campo('text'), 'https://sytue.eu')).toBeNull();
 });
 
+test('el mailto: separa el dominio por la última @ y codifica cualquier otra', () => {
+  // Antes solo se devolvía la primera `%40` a `@`: con dos, el dominio quedaba roto.
+  expect(enlaceDeValor(campo('email'), '"a@b"@ejemplo.es')).toBe('mailto:%22a%40b%22@ejemplo.es');
+  expect(enlaceDeValor(campo('email'), 'a@b@ejemplo.es')).toBe('mailto:a%40b@ejemplo.es');
+  expect(enlaceDeValor(campo('email'), 'ana?cc=x@ejemplo.es')).toBe(
+    'mailto:ana%3Fcc%3Dx@ejemplo.es',
+  );
+  expect(enlaceDeValor(campo('email'), 'sin-arroba')).toBe('mailto:sin-arroba');
+});
+
 test('se filtran como el número o el texto que guardan', () => {
   expect(efectivo(campo('currency')).kind).toBe('number');
   expect(efectivo(campo('rating')).kind).toBe('number');

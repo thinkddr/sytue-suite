@@ -14,6 +14,14 @@ func (c *Contacts) PrivateStorageState(ctx context.Context, scope storage.Scope)
 	return c.contactsSourceState(ctx, scope, "")
 }
 
+// PrivateStorageMode es solo el modo de la fuente (`legacy`, `frozen`…), para elegir
+// entre la API y Matrix. Una libreta compartida no impide usar la API, así que aquí
+// no se rechaza como en PrivateStorageState, que es la puerta de la migración.
+func (c *Contacts) PrivateStorageMode(ctx context.Context, scope storage.Scope) (string, error) {
+	state, err := privateAppMigrationState(ctx, c.c, scope, "contacts", "")
+	return state.Mode, err
+}
+
 func (c *Contacts) BeginPrivateStorageMigration(ctx context.Context, scope storage.Scope, epoch string) (PrivateAppMigrationState, error) {
 	if !storage.MigrationEpoch(epoch) {
 		return PrivateAppMigrationState{}, storage.ErrRecord

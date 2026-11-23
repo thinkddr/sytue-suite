@@ -10,6 +10,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/pqc"
@@ -20,18 +21,28 @@ import (
 type fakePQVaultStore struct {
 	state   store.PQVaultState
 	records []store.PQVaultRecord
+	claims  []store.PQVaultCopyClaim
 }
 
 func (f *fakePQVaultStore) GetPQVault(context.Context, string) (store.PQVaultState, error) {
 	return f.state, nil
 }
 
-func (f *fakePQVaultStore) PutPQVaultKey(_ context.Context, _ string, w recoverywrap.PQVaultWrapper, _, _ bool) (store.PQVaultState, error) {
+func (f *fakePQVaultStore) PutPQVaultKey(_ context.Context, _ string, w recoverywrap.PQVaultWrapper, _ bool, _ *store.PQVaultExpect) (store.PQVaultState, error) {
 	f.state = store.PQVaultState{
 		VaultID:     "!pqv_" + strings.Repeat("A", 26),
 		ActiveKeyID: w.KeyID,
 		Keys:        []recoverywrap.PQVaultWrapper{w},
 	}
+	return f.state, nil
+}
+
+func (f *fakePQVaultStore) ClaimPQVaultCopy(_ context.Context, _ string, claim store.PQVaultCopyClaim) (store.PQVaultState, error) {
+	f.claims = append(f.claims, claim)
+	return f.state, nil
+}
+
+func (f *fakePQVaultStore) ReleasePQVaultCopy(context.Context, string, string) (store.PQVaultState, error) {
 	return f.state, nil
 }
 
@@ -57,6 +68,22 @@ func (f *fakePQVaultStore) GetPQVaultRecord(_ context.Context, _, _, eventID str
 
 func (f *fakePQVaultStore) ListPQVaultRecords(_ context.Context, _, _ string, _ int64, _ int) (store.PQVaultRecordPage, error) {
 	return store.PQVaultRecordPage{Entries: f.records}, nil
+}
+
+func (f *fakePQVaultStore) FindPQVaultRecord(_ context.Context, _, _, _ string) (store.PQVaultRecord, error) {
+	return store.PQVaultRecord{}, domain.ErrNotFound
+}
+
+func (f *fakePQVaultStore) PQVaultReceipt(_ context.Context, _, vaultID, eventID string) (string, error) {
+	if vaultID != f.state.VaultID {
+		return "", domain.ErrConflict
+	}
+	for _, r := range f.records {
+		if r.EventID == eventID {
+			return f.state.ActiveKeyID, nil
+		}
+	}
+	return "", domain.ErrNotFound
 }
 
 func TestPQVaultServiceValidation(t *testing.T) {
@@ -86,7 +113,7 @@ func TestPQVaultServiceValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state, err := svc.PutPQVaultKey(ctx, "drive", w, true, false)
+	state, err := svc.PutPQVaultKey(ctx, "drive", w, true, nil)
 	if err != nil || state.ActiveKeyID != w.KeyID {
 		t.Fatalf("PutPQVaultKey: state=%+v err=%v", state, err)
 	}
@@ -99,5 +126,44 @@ func TestPQVaultServiceValidation(t *testing.T) {
 	rec, err := svc.AppendPQVaultRecord(ctx, "drive", state.VaultID, "tx-1", json.RawMessage(`{"org.sytue.storage_pq":{"v":1}}`))
 	if err != nil || rec.EventID == "" {
 		t.Fatalf("AppendPQVaultRecord: rec=%+v err=%v", rec, err)
+	}
+	// Vaciar exige una expectativa bien formada.
+	if _, err := svc.PutPQVaultKey(ctx, "drive", w, true, &PQVaultExpect{VaultID: "otra", Version: 1}); !errors.Is(err, domain.ErrInvalidName) {
+		t.Fatalf("vaciar con una bóveda mal escrita: %v", err)
+	}
+	if _, err := svc.PutPQVaultKey(ctx, "drive", w, true, &PQVaultExpect{VaultID: state.VaultID, Version: -1}); !errors.Is(err, domain.ErrInvalidName) {
+		t.Fatalf("vaciar con una versión negativa: %v", err)
+	}
+}
+
+// La marca de copia solo admite su tipo, un identificador opaco y una caducidad
+// corta.
+func TestPQVaultCopyClaimValidation(t *testing.T) {
+	st := &fakePQVaultStore{}
+	svc := &Service{pqVault: st}
+	ctx := store.WithOwner(context.Background(), "alice")
+	good := PQVaultCopyClaim{ID: strings.Repeat("c", 26), Holder: "native-linux", Kind: PQVaultCopyKind, Epoch: "epoch-1", TTL: 5 * time.Minute}
+	if _, err := svc.ClaimPQVaultCopy(ctx, "drive", good); err != nil || len(st.claims) != 1 {
+		t.Fatal("una marca bien formada se rechazó", err)
+	}
+	for _, bad := range []func(*PQVaultCopyClaim){
+		func(c *PQVaultCopyClaim) { c.ID = "corto" },
+		func(c *PQVaultCopyClaim) { c.Holder = "" },
+		func(c *PQVaultCopyClaim) { c.Kind = "otra" },
+		func(c *PQVaultCopyClaim) { c.Epoch = "" },
+		func(c *PQVaultCopyClaim) { c.TTL = time.Second },
+		func(c *PQVaultCopyClaim) { c.TTL = time.Hour },
+	} {
+		claim := good
+		bad(&claim)
+		if _, err := svc.ClaimPQVaultCopy(ctx, "drive", claim); !errors.Is(err, domain.ErrInvalidName) {
+			t.Fatalf("marca mal formada %+v: %v", claim, err)
+		}
+	}
+	if _, err := svc.ReleasePQVaultCopy(ctx, "drive", "x"); !errors.Is(err, domain.ErrInvalidName) {
+		t.Fatal("retirar una marca mal formada", err)
+	}
+	if _, err := svc.ClaimPQVaultCopy(context.Background(), "drive", good); !errors.Is(err, domain.ErrPermission) {
+		t.Fatal("sin propietario no hay marca", err)
 	}
 }

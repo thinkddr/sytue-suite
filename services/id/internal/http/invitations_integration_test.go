@@ -67,6 +67,10 @@ func (m *captureMailer) SendPlatformScopeChange(_ context.Context, to, sujeto, a
 	return nil
 }
 
+func (m *captureMailer) SendVaultKeyReset(_ context.Context, to, producto string, generacion int64) error {
+	return nil
+}
+
 func tokenFromLink(t *testing.T, link string) string {
 	t.Helper()
 	u, err := url.Parse(link)

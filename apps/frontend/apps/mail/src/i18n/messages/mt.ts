@@ -1008,4 +1008,11 @@ export const mt: AppCatalog<typeof en> = {
     'L-email ġiet aċċettata, iżda ma setgħetx tiġi salvata kopja fil-posta mibgħuta. Terġax tibgħatha.',
   'externalMail.invalidConfiguration':
     'Daħħal indirizz tal-email validu, l-ismijiet u l-ports taż-żewġ servers, u password.',
+  'privateMail.handoverOffer':
+    'Ma tistax tiftaħ il-posta tiegħek? Battalha u ċċaqlaqha għall-kaxxa-forti',
+  'privateMail.handoverTitle': 'Battal il-posta u ċċaqlaqha għall-kaxxa-forti',
+  'privateMail.handoverBody':
+    'Il-posta kriptata li ma tistax tibqa’ tiftaħ mhux se tiġi rkuprata. Minn issa ’l quddiem il-posta tiegħek tinfetaħ bil-login tiegħek ta’ Sytue ID, li jista’ jkollok terġa’ tagħmel.',
+  'privateMail.handoverUnderstood': 'Nifhem li l-posta li ma nistax niftaħ se tintilef',
+  'privateMail.handoverConfirm': 'Battal u ċċaqlaq għall-kaxxa-forti',
 };

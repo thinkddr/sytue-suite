@@ -96,10 +96,27 @@ func (h *Handler) ficheroDelDocumento(ctx context.Context, doc *domain.Document,
 	if err != nil {
 		return err
 	}
-	if err := h.drive.AccionFichero(ctx, t.Slug, doc.OwnerSub, string(doc.Kind), id, accion); err != nil {
+	if _, err := h.resultadoFichero(ctx, t.Slug, doc.OwnerSub, string(doc.Kind), id, accion, time.Time{}); err != nil {
 		return errDeDrive{err}
 	}
 	return nil
+}
+
+// resultadoFichero es drive.ResultadoFichero con la unidad cifrada resuelta. Si el
+// Drive del dueño ya está en la bóveda de extremo a extremo (ADR 0086), la copia
+// del fichero en el servidor está congelada y Drive no deja tocarla: tirarla,
+// restaurarla o comprobarla no aplica —la de la bóveda es de la persona, y el
+// servidor no la ve—. Purgar sí pregunta igual por la retención legal del dueño,
+// como un documento sin fichero: lo que nunca se salta es esa comprobación.
+func (h *Handler) resultadoFichero(ctx context.Context, tenant, owner, kind, id, accion string, borrado time.Time) (string, error) {
+	res, err := h.drive.ResultadoFichero(ctx, tenant, owner, kind, id, accion, borrado)
+	if !errors.Is(err, drive.ErrUnidadCifrada) || id == drive.SinFichero {
+		return res, err
+	}
+	if accion == drive.AccionPurgar {
+		return h.drive.ResultadoFichero(ctx, tenant, owner, kind, drive.SinFichero, accion, borrado)
+	}
+	return drive.ResultadoNoAplica, nil
 }
 
 // errorDePapelera traduce el fallo. Si fue al hablar con Drive, nada ha cambiado en
@@ -458,7 +475,7 @@ func (h *Handler) purgarCaducadoLegacy(ctx context.Context, cad store.Caducado, 
 	if id == "" {
 		id = drive.SinFichero
 	}
-	res, err := h.drive.ResultadoFichero(tctx, cad.Tenant, doc.OwnerSub, string(doc.Kind), id, drive.AccionPurgar, time.Time{})
+	res, err := h.resultadoFichero(tctx, cad.Tenant, doc.OwnerSub, string(doc.Kind), id, drive.AccionPurgar, time.Time{})
 	switch {
 	case errors.Is(err, drive.ErrRetencion):
 		c.Retenidos++
@@ -530,7 +547,7 @@ func (h *Handler) ReconciliarPapelera(ctx context.Context, org string, aplicar b
 		if d.DeletedAt != nil {
 			borrado = *d.DeletedAt
 		}
-		res, err := h.drive.ResultadoFichero(ctx, org, d.OwnerSub, string(d.Kind), ficheroDe(&d), accion, borrado)
+		res, err := h.resultadoFichero(ctx, org, d.OwnerSub, string(d.Kind), ficheroDe(&d), accion, borrado)
 		switch {
 		case err != nil:
 			r.Errores++

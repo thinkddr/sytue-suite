@@ -700,6 +700,14 @@ func (s *Suite) EntrarParaDesbloquear(ctx context.Context, legado string) error 
 	return s.entrarCon(ctx, nil, auth.PeticionLogin{Prompt: "login", Legado: legado})
 }
 
+// Reidentificar vuelve a entrar en Sytue ID pidiendo identificarse otra vez
+// (`prompt=login`, `max_age=0`), con segundo factor si la cuenta lo tiene. Lo pide
+// un servicio ante una acción que no se deshace (401 RFC 9470); a la vuelta se
+// repite la acción con el token nuevo.
+func (s *Suite) Reidentificar(ctx context.Context) error {
+	return s.entrarCon(ctx, nil, auth.PeticionLogin{Reautenticar: true})
+}
+
 func (s *Suite) entrar(ctx context.Context, transition *privateTransition) error {
 	return s.entrarCon(ctx, transition, auth.PeticionLogin{})
 }

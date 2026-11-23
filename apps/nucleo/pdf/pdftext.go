@@ -14,6 +14,7 @@
 package pdf
 
 import (
+	"encoding/binary"
 	"math"
 	"slices"
 	"strings"
@@ -383,7 +384,7 @@ func decodificarTextoPDF(s pdfString) string {
 	if len(s) >= 2 && s[0] == 0xFE && s[1] == 0xFF {
 		u := make([]uint16, 0, (len(s)-2)/2)
 		for i := 2; i+1 < len(s); i += 2 {
-			u = append(u, uint16(s[i])<<8|uint16(s[i+1]))
+			u = append(u, binary.BigEndian.Uint16(s[i:i+2]))
 		}
 		return string(utf16.Decode(u))
 	}

@@ -624,3 +624,39 @@ func TestElContenidoSeSaneaAlGuardar(t *testing.T) {
 		t.Errorf("al crear con contenido: queda guardado %q", got)
 	}
 }
+
+// TestAnclarEnBoveda: el ancla «vault:<id>» (ADR 0086) entra solo si la que hay sigue
+// siendo la esperada, no toca `updated_at` y no repite la de otro documento vivo.
+func TestAnclarEnBoveda(t *testing.T) {
+	st := newStore(t)
+	ctx := tenantCtx("acme")
+	const (
+		uno = "vault:0b5e7a1c-3f2d-4e6b-9a8c-1d2e3f4a5b6c"
+		dos = "vault:9f8e7d6c-5b4a-4321-8fed-cba987654321"
+	)
+	doc, _, err := st.CreateDocument(ctx, domain.CreateDocumentParams{
+		Kind: domain.KindDocument, Title: "Acta", OwnerSub: "user-ada",
+	})
+	if err != nil {
+		t.Fatalf("CreateDocument: %v", err)
+	}
+	if err := st.AnclarEnBoveda(ctx, doc.ID, uno, dos); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("con otra esperada: %v", err)
+	}
+	if err := st.AnclarEnBoveda(ctx, doc.ID, "", uno); err != nil {
+		t.Fatalf("AnclarEnBoveda: %v", err)
+	}
+	got, _ := st.GetDocument(ctx, doc.ID)
+	if got.SourceRef != uno || !got.UpdatedAt.Equal(doc.UpdatedAt) {
+		t.Fatalf("ancla %q, updated_at %v (antes %v)", got.SourceRef, got.UpdatedAt, doc.UpdatedAt)
+	}
+	otro, _, err := st.CreateDocument(ctx, domain.CreateDocumentParams{
+		Kind: domain.KindDocument, Title: "Otra", OwnerSub: "user-ada",
+	})
+	if err != nil {
+		t.Fatalf("CreateDocument: %v", err)
+	}
+	if err := st.AnclarEnBoveda(ctx, otro.ID, "", uno); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("misma ancla en dos documentos: %v", err)
+	}
+}

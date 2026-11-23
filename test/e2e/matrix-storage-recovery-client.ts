@@ -1,4 +1,5 @@
 import { verifyCoreIngressPort } from './core-ingress-port-client.js';
+import { textoAleatorio } from './lib/texto-aleatorio.js';
 // SPDX-License-Identifier: Apache-2.0
 import { verifyCoreStoragePort } from './storage-core-port-client.js';
 import {
@@ -306,11 +307,11 @@ void (async () => {
   state.stage = 'browser-write';
   // High entropy forces the shared fragment format near the historical limit;
   // domain JSON, including its integer above 2^53, remains exact original bytes.
-  const random = crypto.getRandomValues(new Uint8Array(29000));
-  let noise = '';
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (const byte of random) noise += alphabet[byte % alphabet.length];
-  random.fill(0);
+  // Muestreo por rechazo (sin sesgo de módulo): ver lib/texto-aleatorio.ts.
+  const noise = textoAleatorio(
+    29000,
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+  );
   const payload = new TextEncoder().encode(
     '{"text":"artificial private browser to native","integer":9007199254740995,"noise":"' +
       noise +

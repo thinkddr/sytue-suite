@@ -24,7 +24,7 @@ import (
 //	scripts/client-core-assets.sh services/rooms/internal/http/client_core_assets
 //	go test -tags imagen -run TestLaImagenSirveElNucleoDeCliente ./services/rooms/internal/http/
 //
-// Un módulo que pase de su límite (16 MiB core, 64 MiB office y mail) también
+// Un módulo que pase de su límite (16 MiB core, 64 MiB office y mail, 32 MiB pdf) también
 // sale aquí: NewCompilerAssets lo descarta y el manifiesto vuelve a ser un 503.
 func TestLaImagenSirveElNucleoDeCliente(t *testing.T) {
 	r := chi.NewRouter()
@@ -34,7 +34,7 @@ func TestLaImagenSirveElNucleoDeCliente(t *testing.T) {
 		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, http.NoBody))
 		return w
 	}
-	for _, modulo := range []string{"core", "office", "mail"} {
+	for _, modulo := range []string{"core", "office", "mail", "pdf"} {
 		w := get("/api/v1/client-core/manifest.json?module=" + modulo)
 		if w.Code != http.StatusOK {
 			t.Fatalf("%s: manifest.json → %d %q; la imagen saldría sin núcleo de cliente", modulo, w.Code, w.Body.String())

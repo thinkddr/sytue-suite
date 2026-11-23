@@ -829,5 +829,48 @@
     );
   };
 
+  /**
+   * La vuelta a la que se puede navegar desde una página del desbloqueo, o "" si no
+   * vale. Es la misma regla que aplica el servidor (desbloqueo.go: rutaInternaSegura,
+   * vueltaDelRelevo), repetida aquí porque el guion la saca de un bloque del
+   * documento y la sigue con `location` o la pone en un enlace: un `javascript:` o
+   * un `data:` se ejecutaría en el origen de Sytue ID. Vale una ruta de este origen
+   * (nunca `//otro` ni `/\otro`, que el navegador lee como otro sitio) o una URL
+   * absoluta http(s) o del esquema de una app de la suite (`sytue://`,
+   * `sytue-mail://`…), con autoridad; nunca con caracteres de control ni espacios,
+   * que el navegador quita antes de interpretarla.
+   */
+  E.safeReturn = function (url) {
+    if (typeof url !== "string" || !url || /[\u0000-\u0020\u007f]/.test(url))
+      return "";
+    if (url.charAt(0) === "/") return /^\/(?![\/\\])/.test(url) ? url : "";
+    return /^(https?|sytue(-[a-z0-9]+)*):\/\/[^\/\\?#@]+([\/?#]|$)/i.test(url)
+      ? url
+      : "";
+  };
+
+  /**
+   * La vuelta de `safeReturn` como dirección para `location`, rehecha desde
+   * piezas que no vienen del documento: el esquema es una constante elegida aquí
+   * y una ruta va tras el origen de esta página. Así ni una vuelta que se colara
+   * por la regla podría poner su propio esquema (`javascript:`). "" si no vale.
+   */
+  E.navigableReturn = function (url) {
+    var ok = E.safeReturn(url);
+    if (!ok) return "";
+    if (ok.charAt(0) === "/") return global.location.origin + ok;
+    var m = /^([a-z][a-z0-9-]*):\/\//i.exec(ok);
+    var esquema = m && m[1].toLowerCase();
+    var prefijo =
+      esquema === "https"
+        ? "https://"
+        : esquema === "http"
+          ? "http://"
+          : esquema && /^sytue(-[a-z0-9]+)*$/.test(esquema)
+            ? "sytue" + esquema.slice(5).replace(/[^a-z0-9-]/g, "") + "://"
+            : "";
+    return prefijo ? prefijo + ok.slice(m[0].length) : "";
+  };
+
   global.SytueE2E = E;
 })(typeof window !== "undefined" ? window : globalThis);

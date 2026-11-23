@@ -1,0 +1,42 @@
+{
+  "_comment": "Prueba de propietario de un registro de la bóveda PQ directa (ADR 0086), la de pq-vault.ts (computeRecordDigest/signProof). Ámbito, identidad y owner_key: boveda_pq.json. `payload` es el sobre org.sytue.storage_pq tal como lo guarda services/drive.",
+  "digest": "e432592df92e37a3b5e6adffed379775a3949da6659eefe869b3cfac81d2753b",
+  "event_id": "$pqe_vector",
+  "mac": "WbYk6k+zLAdef8KiA0wOd2zVAJggY+vy6jVbKEk2rhg=",
+  "payload": {
+    "msgtype": "m.text",
+    "body": "",
+    "org.sytue.storage_pq": {
+      "v": 1,
+      "kind": "record",
+      "envelope": {
+        "v": 1,
+        "profile": "age-MLKEM768-X25519-v1",
+        "key_id": "e6c590e1e6843c8b4e7c9f2038c052a54b0368fd336bbbd41cf13d77d7cf4505",
+        "ciphertext": "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IG1sa2VtNzY4eDI1NTE5IDIzVmV6bjBsUEE2RXFtMVJDNHdVRUtEWkp0OFByZ3gwRmRvM2tGclBmL2JrRUR5d1VBTXpnK25iNmlab3RCeU8vTFlVL251L0IyWFJrUWN2VXFGbEhWZjFoSTVoOGFWb0J4bGpKbDRJMTJxNWRlcUVtUHl6VVhyOHlZWXJpRy9PZXFWdExLNkVZVURncFFVRHFDREY4d1BZT3FFOTNWcGRMVy8xaFRxbjl6S2w0ZVhOakNaSGpmZjJBWlhrVWdGRVRwMlM2cGxwQ05SNDE0Y2JCbG93UXRxSFZmWFdEZzh0Q1B2eUtiR3o3cFBxY1VOZnFzTWtzSVZKT3VTRExyYjd5OHp0TDJyV3NkWkFJRGR3QUtrd2tCUTBoc3lZckJvZHlzSmRONXQvYmtPY2xBVWcvL2NTRmg2UExPSVpOKzFXL3lIYXBWUERUMk1uYklrcC8vUFlPL0dIRTI4UFpkdEppSVREOW83UDB6R3A3N3VlelEzL2tZZlU5WEc5RDIrYzVhaUFZTGlpVUlKMEs5NmxrS29xdXdGYXlYeUgzdW1TM3FNUHZMcXI1eWNkSGhucjBnK1dKNW93Y0pMRmlwTVVZUVlEUkxnT3pOVkNqVVBtaWtGanFkdTFyRjN5TDBjblBmKzk2WHU0NGpPWU9Ia04yZ1M1RnUrKzcxWUZYY1ZaT1dBa0MrR2dSdHc4bWVhTysxS0pEZHcreHUyTk42VHFudmxTUEgxeUtCd1V5dmliTzBYTG1UYUtreFlzOHVPeWhZOXZNcHZFdnU5bnpBRmI1eEQ4MXNvcElQeGNzUzNhQkZROE5uNDQ1N25NZkNvMkcrS2JueDdSSlBlQVdBWDY2anZ0RDQzYlRUbFp1R2FKUExqMUdyQXFSN0xmUzR0OCttelNmcHhjRmZhZXIzYTA2SjE0V3VUblF2T1NSM3lrQnlMY1UycVhlZ3hramNRUHBrRm9vdGNvZGdFRTJlUGRvclV5aEhNeEpTTFZob3JiaFdjMHNaTmlaNWQreTBBK3FBRklrR0tOS0lWRkxzL1c2OU56cDU4cjlVOGU1UmZCdHYxRnl4bEs0SDc1RWpkUEdNZVVaWHlZYTFNcnZFU0l1NHpab0ZYZmh2ZHpBNGE3MisvMm1RWXpWN2xMdklRT3pEbnFJUVREUkQ2MGhaRHlpbE44Rm1VazJJNVdPV3hkMlE1Z3l6OHRHN3FpYTFIbnFJVWdOVTlKZVl3SEhvNklROGplc2FsalpjNzdhamgreDFEZmU1alBxM2d5V3hIZTdmSG1JakVzajBIKzA5VkdYQVdTbEEvWDkrWXZNcnkzV1BkVHVNUEM3TEdUclF3d1RldDVqSk5CUnJqZE9RVnhvWjlWWjZlTktTYTNaR3BaalZtekI5M1Uvd1dPYnlpU3VrZlp1UzJMNFl5Yk5zanZvNHcxcGVyTnVKWlppTnAveXlMQUxKK2hhMHJTM1RCMjNHWWVMcUxkeGFJUVRsYmFuNHMwUFZmbzQ0cmdUVWVyMFNPa0xONHdjazhQY1RONXdyd3IrN25ONzFzTEFQc2RHTlF6czUrZjBEbHhsLzVYc2Y3cUZnSmZqQ1o2UlE2WDFZek5BN3hnVkxoVk1FaG03MDF4b20vN0ZKMVhQa1JkTTVneFIrTTJmaGdzQUU3djBrMGc2dE12cDNoRUVhKzBRa3RKeC9DdFlSQVNyUmxHVVVJd0ZIQmlBZmZaMk9xSkN6ZmZnWU1CTG1CVkZhclZBTzBPYTltSFpua0xJdVh1R2syRVRoLzZzQXpqbGs4OGpqbkVPcnQ1YjZVU0FRQmt4YjBaTHNWRHhvR3UwWFVVN1hqT0FrUFVhajhkZU9yYlpCK0pHcEN5SUtObkx4UW9KRUZxa0hJM3Q0M21md0hwclJidDhpaWU1UXZmZzd1eTErb0RGQW1xd21NakJKK0ZQZnJGUUkwS2c5QS9MMitjVHZ3Z2NYSWR1aEdYOHNnU0ZBNDVUUQo2VEJ1aDM4SDlMbzM0OXVaYUNzZHBybGRaWGpEdU5wZjFoWHZNN2JDMmVNCi0tLSAyVWJUMUFsL043WlRneVBHdDM0VjB5M3JOQlRGNDlpM25DZ1V5RFhHV1I0CkLI6mNlpqQ3utx6JptpDteOfoerV8ieXulX/H9ZvX8DzoYLgEtD9poCDrGeqcqKtqz1VqO3/zyg5s6Z6IpeeLXWN4WCpZ+eE/d7wtnRlUKE6VBGnR2TMNN+3IfACdUVJCAaQOFLBAgKm+eR+K9sMN7yAQ2L5vnkl9T70xSDm/Py+J9MgEWkJ4kSvSrWfxcoLYYVQoBWNEPw8bE8TJietVCirlJ0Ib5Yzwozs/AIe+9gOL9MkwM9JeQ35Y8hrZ8Hi07QmaWb2yVeuAPnkTuLxow0vRf9lTzL825XdnMEGG9gE1zjwOpQWRty00uwS0BkP0XuLdNaLO0AIZ6a3VKNrHdGXFFIHMClOptLcY1XLUO+tEBe5KPcou8aHRYgaWbxF0YOZQyvN/tnbyJPO5Yxm7OZHUDxAKRjRQlV1JL223pUPJSQrzL34rmuCGsrJsjj35HMZQ9U8I6G6ujTA5dyp7TNx1iVECZPTy520bHY+mm+/rmbt8TyQ7k209A15+tHIvq4r9fpvhylsvtzB5An0QVXA/2i0i1xnDu63/1kLKhijH+ZD8aBXLkJh4S0oU3AfSjFTCZs5biK6+Ef73/KJ51/kG24cIouiQ63sZDa8ukGmhg8f5o6Ot2KAKQk1T3bHCh7DRcRMOARMPLGjOf95vIvqQGiKhVV1EBG32c1Cs1CNWD+5BEsBv+L9XmBDR4yfiU5"
+      }
+    }
+  },
+  "proof": {
+    "v": 1,
+    "alg": "hmac-sha256",
+    "key_id": "e6c590e1e6843c8b4e7c9f2038c052a54b0368fd336bbbd41cf13d77d7cf4505",
+    "mac": "WbYk6k+zLAdef8KiA0wOd2zVAJggY+vy6jVbKEk2rhg="
+  },
+  "record": {
+    "v": 1,
+    "scope": {
+      "tenant": "acme",
+      "subject": "0f3c9a52-6d1e-4c1a-9b8e-2a7d5c4e1f00",
+      "product": "drive"
+    },
+    "object_id": "file_vector",
+    "revision_id": "rev_2",
+    "role": "content",
+    "previous": [
+      "$pqe_previous"
+    ],
+    "payload": "eyJuYW1lIjoiSW5mb3JtZSA8UTM+ICYgbcOhcyIsInNpemUiOjEyfQ=="
+  },
+  "vault_id": "!pqv_vector"
+}

@@ -298,6 +298,22 @@ export const sv: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Sparat i Sytue Drive.',
   'doc.msg.savedToDriveIn': '”{name}” har nu dina ändringar, som en ny version.',
   'doc.msg.saveToDriveFailed': 'Ändringarna kunde inte sparas i Drive.',
+  'doc.msg.saveToDriveVault': 'Din Drive är end-to-end-krypterad',
+  'doc.msg.saveToDriveVault.detail':
+    'Det gick inte att spara i den härifrån. Ladda ned dokumentet och ladda upp det från Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Sparat i din krypterade Drive.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '”{name}” krypterades i den här webbläsaren innan det sparades.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '”{name}” krypterades på den här enheten innan det sparades.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Din krypterade Drive är låst på den här enheten. Lås upp den ovan och spara igen.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Logga in igen för att låsa upp din krypterade Drive och spara igen.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Din Drive håller fortfarande på att gå över till end-to-end-kryptering. Öppna Sytue Drive för att slutföra och spara igen.',
+  'doc.msg.saveToDriveUnsupported':
+    'Den här filens format kan inte skrivas om. Ladda ned dokumentet i stället.',
   'file.downloadPdf': 'Ladda ned som PDF',
   'file.pdfAccessible': 'Tillgänglig PDF (PDF/UA)',
   'file.downloadHtml': 'Ladda ned som HTML',
@@ -2664,6 +2680,54 @@ export const sv: AppCatalog<typeof en> = {
     'Samma person finns två gånger i signeringsordningen.',
   'pdf.error.signatureRequest.chainTooLong': 'En signeringsordning kan ha upp till 10 personer.',
   'pdf.error.signatureRequest.busy': 'Begäran håller redan på att öppnas. Försök igen om en stund.',
+  'pdf.error.driveVault':
+    'Din Drive är end-to-end-krypterad: kopior för signaturbegäranden från andra organisationer kan inte lagras där än. Ladda ned PDF-filen i stället.',
+  'pdf.device.title': 'Signera på den här enheten',
+  'pdf.device.help':
+    'Din Drive är end-to-end-krypterad, så servern kan inte läsa dina pdf-filer. Välj en: den dekrypteras och signeras här med ditt certifikat, och den signerade kopian sparas krypterad bredvid originalet. Varken pdf-filen eller ditt certifikat når servern.',
+  'pdf.device.open': 'Öppna min krypterade Drive',
+  'pdf.device.empty.title': 'Inga pdf-filer i din krypterade Drive',
+  'pdf.device.empty.description': 'Ladda upp dem från Sytue Drive så visas de här.',
+  'pdf.device.sign': 'Signera',
+  'pdf.device.signed': 'Signerad och sparad krypterad som ”{name}”.',
+  'pdf.device.stamp.on':
+    'Med tidsstämpel från {authority}: signaturen bevisar vem som skrev under och när. Tidsstämpeltjänsten får bara signaturens fingeravtryck, aldrig PDF-filen.',
+  'pdf.device.stamp.off':
+    'Ingen tidsstämpel: den här tjänsten har ingen tidsstämpeltjänst, så signaturen bevisar vem som skrev under, inte när.',
+  'pdf.device.appearance': 'Så ser signaturen ut',
+  'pdf.device.appearance.invisible': 'Osynlig',
+  'pdf.device.appearance.visible': 'Synlig ruta',
+  'pdf.device.signedStamped': 'Signerad med tidsstämpel och sparad krypterad som ”{name}”.',
+  'pdf.device.signedNoStamp':
+    'Signerad och sparad krypterad som ”{name}”, men utan tidsstämpel: tidsstämpeltjänsten svarade inte.',
+  'pdf.device.error.page':
+    'Signaturen får inte plats på den sidan. Välj en annan sida eller placering.',
+  'pdf.device.view': 'Visa',
+  'pdf.vault.help':
+    'Den här PDF-filen finns i din krypterade Drive: den dekrypteras bara på den här enheten, där du kan visa, kommentera, fylla i, ordna och signera den. Det du sparar går tillbaka krypterat.',
+  'pdf.vault.serverOnly':
+    'Med din krypterade Drive är signaturförfrågningar, lösenordsskydd, textigenkänning, maskering, redigering av text eller bilder, stämplar och vattenmärken, jämförelse, versionshistorik och utskrift inte tillgängliga än: de kräver att tjänsten läser PDF-filen eller görs ännu inte på enheten.',
+  'pdf.vault.notFound.title': 'Den här PDF-filen finns inte i din krypterade Drive',
+  'pdf.vault.notFound.description':
+    'Den kan ha flyttats eller raderats. Leta efter den i Sytue Drive.',
+  'pdf.vault.openSigned': 'Öppna den signerade kopian',
+  'pdf.vault.engineUnavailable':
+    'PDF-motorn kunde inte läsas in på den här enheten, så PDF-filen visas i webbläsarens visare: du kan visa, ladda ned och signera den, men inte redigera den.',
+  'pdf.vault.unavailable': 'Inte tillgängligt än med din krypterade Drive.',
+  'pdf.device.requests':
+    'Att be andra personer eller organisationer att signera kräver serverns Drive: tjänsten måste läsa pdf-filen för att skicka den och kontrollera signaturen som kommer tillbaka. Med krypterad Drive signerar du här och skickar den signerade pdf-filen själv.',
+  'pdf.device.error.signin': 'Logga in på Sytue ID igen för att låsa upp din krypterade Drive.',
+  'pdf.device.error.pending':
+    'Din Drive håller fortfarande på att gå över till end-to-end-kryptering. Slutför det i Sytue Drive.',
+  'pdf.device.error.password': 'Det lösenordet öppnar inte certifikatet.',
+  'pdf.device.error.encrypted':
+    'Den här pdf-filen är lösenordsskyddad och kan inte signeras på den här enheten.',
+  'pdf.device.error.locked':
+    'Den här pdf-filen är certifierad mot alla ändringar: ytterligare en signatur skulle göra den ogiltig.',
+  'pdf.device.error.unreadable':
+    'Den här pdf-filen kan inte signeras på den här enheten utan att skrivas om. Inget har ändrats.',
+  'pdf.device.error.failed':
+    'Pdf-filen kunde inte signeras eller sparas. Inget har ändrats i din Drive.',
   'pdf.dialog.firmar.help':
     'Certifikatet och nyckeln lämnar aldrig organisationen: de används på servern och lagras inte.',
   'pdf.dialog.firmar.cert': 'Certifikat (PEM)',

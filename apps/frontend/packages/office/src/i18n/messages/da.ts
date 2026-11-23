@@ -302,6 +302,21 @@ export const da: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Gemt i Sytue Drive.',
   'doc.msg.savedToDriveIn': '»{name}« har nu dine ændringer som en ny version.',
   'doc.msg.saveToDriveFailed': 'Ændringerne kunne ikke gemmes i Drive.',
+  'doc.msg.saveToDriveVault': 'Dit Drive er end-to-end-krypteret',
+  'doc.msg.saveToDriveVault.detail':
+    'Det kunne ikke gemmes herfra. Download dokumentet, og upload det fra Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Gemt i dit krypterede Drive.',
+  'doc.msg.savedToDriveEncryptedIn': '»{name}« blev krypteret i denne browser, før den blev gemt.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '»{name}« blev krypteret på denne enhed, før den blev gemt.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Dit krypterede Drive er låst på denne enhed. Lås det op ovenfor, og gem igen.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Log ind igen for at låse dit krypterede Drive op, og gem igen.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Dit Drive er stadig ved at overgå til end-to-end-kryptering. Åbn Sytue Drive for at gøre det færdigt, og gem igen.',
+  'doc.msg.saveToDriveUnsupported':
+    'Denne fils format kan ikke genskrives. Download dokumentet i stedet.',
   'file.downloadPdf': 'Download som PDF',
   'file.pdfAccessible': 'Tilgængelig PDF (PDF/UA)',
   'file.downloadHtml': 'Download som HTML',
@@ -2666,6 +2681,54 @@ export const da: AppCatalog<typeof en> = {
     'En underskriftsrækkefølge kan have op til 10 personer.',
   'pdf.error.signatureRequest.busy':
     'Anmodningen er allerede ved at blive åbnet. Prøv igen om lidt.',
+  'pdf.error.driveVault':
+    'Dit Drive er end-to-end-krypteret: kopier til signaturanmodninger fra andre organisationer kan endnu ikke gemmes i det. Download PDF’en i stedet.',
+  'pdf.device.title': 'Underskriv på denne enhed',
+  'pdf.device.help':
+    'Dit Drive er end-to-end-krypteret, så serveren kan ikke læse dine PDF’er. Vælg en: den dekrypteres og underskrives her med dit certifikat, og den underskrevne kopi gemmes krypteret ved siden af originalen. Hverken PDF’en eller dit certifikat når serveren.',
+  'pdf.device.open': 'Åbn mit krypterede Drive',
+  'pdf.device.empty.title': 'Ingen PDF’er i dit krypterede Drive',
+  'pdf.device.empty.description': 'Upload dem fra Sytue Drive, så vises de her.',
+  'pdf.device.sign': 'Underskriv',
+  'pdf.device.signed': 'Underskrevet og gemt krypteret som »{name}«.',
+  'pdf.device.stamp.on':
+    'Med tidsstempel fra {authority}: signaturen beviser, hvem der underskrev og hvornår. Myndigheden modtager kun signaturens fingeraftryk, aldrig PDF’en.',
+  'pdf.device.stamp.off':
+    'Intet tidsstempel: denne tjeneste har ingen tidsstempelmyndighed, så signaturen beviser, hvem der underskrev, men ikke hvornår.',
+  'pdf.device.appearance': 'Sådan ser signaturen ud',
+  'pdf.device.appearance.invisible': 'Usynlig',
+  'pdf.device.appearance.visible': 'Synlig boks',
+  'pdf.device.signedStamped': 'Underskrevet med tidsstempel og gemt krypteret som »{name}«.',
+  'pdf.device.signedNoStamp':
+    'Underskrevet og gemt krypteret som »{name}«, men uden tidsstempel: tidsstempelmyndigheden svarede ikke.',
+  'pdf.device.error.page':
+    'Signaturen kan ikke være på den side. Vælg en anden side eller placering.',
+  'pdf.device.view': 'Vis',
+  'pdf.vault.help':
+    'Denne PDF ligger i dit krypterede Drev: den dekrypteres kun på denne enhed, hvor du kan se, kommentere, udfylde, organisere og underskrive den. Det, du gemmer, går krypteret tilbage.',
+  'pdf.vault.serverOnly':
+    'Med dit krypterede Drev er anmodning om underskrift, adgangskodebeskyttelse, tekstgenkendelse, overstregning, redigering af tekst eller billeder, stempler og vandmærker, sammenligning, versionshistorik og udskrivning endnu ikke tilgængelige: de kræver, at tjenesten læser PDF’en, eller kan endnu ikke udføres på enheden.',
+  'pdf.vault.notFound.title': 'Denne PDF er ikke i dit krypterede Drev',
+  'pdf.vault.notFound.description':
+    'Den er måske flyttet eller slettet. Søg efter den i Sytue Drive.',
+  'pdf.vault.openSigned': 'Åbn den underskrevne kopi',
+  'pdf.vault.engineUnavailable':
+    'PDF-motoren kunne ikke indlæses på denne enhed, så PDF’en vises i browserens fremviser: du kan se, downloade og underskrive den, men ikke redigere den.',
+  'pdf.vault.unavailable': 'Endnu ikke tilgængelig med dit krypterede Drev.',
+  'pdf.device.requests':
+    'At bede andre personer eller organisationer om en underskrift kræver serverens Drive: tjenesten skal læse PDF’en for at sende den og kontrollere den underskrift, der kommer tilbage. Med dit Drive krypteret underskriver du her og sender selv den underskrevne PDF.',
+  'pdf.device.error.signin': 'Log ind på Sytue ID igen for at låse dit krypterede Drive op.',
+  'pdf.device.error.pending':
+    'Dit Drive er stadig ved at overgå til end-to-end-kryptering. Gør det færdigt i Sytue Drive.',
+  'pdf.device.error.password': 'Den adgangskode åbner ikke certifikatet.',
+  'pdf.device.error.encrypted':
+    'Denne PDF er beskyttet med adgangskode og kan ikke underskrives på denne enhed.',
+  'pdf.device.error.locked':
+    'Denne PDF er certificeret mod enhver ændring: endnu en underskrift ville gøre den ugyldig.',
+  'pdf.device.error.unreadable':
+    'Denne PDF kan ikke underskrives på denne enhed uden at blive skrevet om. Intet er ændret.',
+  'pdf.device.error.failed':
+    'PDF’en kunne ikke underskrives eller gemmes. Intet er ændret i dit Drive.',
   'pdf.dialog.firmar.help':
     'Certifikatet og nøglen forlader aldrig din organisation: de bruges på serveren og gemmes ikke.',
   'pdf.dialog.firmar.cert': 'Certifikat (PEM)',

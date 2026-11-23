@@ -23,6 +23,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/guardardrive"
 	"git.sytue.eu/sytue/one/apps/nucleo/office/model"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
@@ -39,6 +40,10 @@ type App struct {
 	Svc   *api.Docs
 	Red   *offline.Monitor
 	Plazo time.Duration
+	// Drive son los dos Drive de la cuenta para «Guardar en Drive» (el del servidor y
+	// el de la bóveda, ADR 0086); lo pone el binario al montar la cuenta del servicio.
+	// nil: la entrada no sale.
+	Drive *guardardrive.Destinos
 
 	portada *editor.Portada
 	avisos  *ui.PilaAvisos
@@ -484,6 +489,14 @@ func (a *App) cargar(ab *abierto) {
 		}
 		ab.ctx.SinRed = !hayRed
 		a.poner(ab, doc.Title, rol, cont)
+		a.servicio().EngancharGuardarEnDrive(ab.ctx, editor.GuardarEnDrive{
+			Destinos: a.Drive, ID: ab.id, Doc: editor.DocumentoDrive(doc, rol, editor.Hoja),
+			Antes:      func() func() error { return a.guardarAntes(ab) },
+			Recomponer: ab.marco.Recomponer,
+			Avisar: func(tono ui.TonoAviso, titulo, texto string) {
+				a.avisos.Notificar(ui.NuevoAviso(tono, titulo, texto))
+			},
+		})
 		ab.lz.Rejilla.PonerComentarios(hilos)
 	})
 }

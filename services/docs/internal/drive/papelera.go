@@ -118,6 +118,11 @@ func (c *Cliente) ResultadoFichero(ctx context.Context, tenant, ownerSub, kind, 
 		}
 		return ResultadoNoAplica, nil
 	case http.StatusConflict:
+		// La unidad cifrada (ADR 0086) también contesta 409: su copia del servidor
+		// está congelada. Se distingue por el código; si no, es el nombre ocupado.
+		if codigoDeError(resp.Body) == codigoUnidadCifrada {
+			return "", ErrUnidadCifrada
+		}
 		return "", ErrNombreOcupado
 	case http.StatusLocked:
 		return "", ErrRetencion

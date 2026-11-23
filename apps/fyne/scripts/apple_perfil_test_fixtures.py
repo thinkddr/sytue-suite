@@ -5,7 +5,7 @@
 
 Los fixtures heredados son plist sin firma. Se sustituye únicamente el límite
 CMS dentro del proceso de prueba, igual que el antiguo doble de security cms.
-La firma/cadena/rol se ejercitan con CMS reales en apple_perfil-test.py.
+La firma/cadena/rol se ejercitan con CMS reales en tools/pruebasfyne/apple_perfil_test.go.
 No hay flag, variable de entorno ni modo de bypass en el código de producto.
 """
 import importlib.util

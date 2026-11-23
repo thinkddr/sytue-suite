@@ -110,3 +110,29 @@ func TestPrivateDriveFacadeNeverUsesLegacyHTTPForUnhandledOperations(t *testing.
 		})
 	}
 }
+
+func TestDrivePrivadoYUnidadCifrada(t *testing.T) {
+	original := NewDrive("https://drive.example", nil, nil)
+	if original.Privado() || (*Drive)(nil).Privado() {
+		t.Fatal("el cliente del servidor no es privado")
+	}
+	scope := storage.Scope{Tenant: "acme", Subject: "owner", Product: "drive"}
+	private, err := original.WithPrivateData(privateDriveDataFixture{scope: scope})
+	if err != nil || !private.Privado() {
+		t.Fatalf("WithPrivateData = %v, %v", private, err)
+	}
+	cifrada := &Error{Status: http.StatusConflict, Body: `{"error":{"code":"private_storage_migration_required","message":"x"}}`}
+	if !EsUnidadCifrada(cifrada) || !EsUnidadCifrada(errors.Join(errors.New("x"), cifrada)) || !EsUnidadCifrada(ErrUnidadCifrada) {
+		t.Fatal("el 409 de la unidad cifrada no se reconoce")
+	}
+	for _, otro := range []error{
+		&Error{Status: http.StatusConflict, Body: `{"error":{"code":"name_conflict"}}`},
+		&Error{Status: http.StatusForbidden, Body: `{"error":{"code":"private_storage_migration_required"}}`},
+		errors.New("private_storage_migration_required"),
+		nil,
+	} {
+		if EsUnidadCifrada(otro) {
+			t.Fatalf("%v no es la unidad cifrada", otro)
+		}
+	}
+}

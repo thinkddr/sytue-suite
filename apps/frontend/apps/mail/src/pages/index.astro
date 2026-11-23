@@ -9,6 +9,7 @@ import { returnToCanonico } from '@sytue/config';
 import AppLayout from '../layouts/AppLayout.astro';
 import { serverEnv } from '@sytue/auth/server';
 import { MailApp } from '../components/MailApp.js';
+import { correoSobreBoveda } from '../client/almacenCorreo.js';
 import { bff, toBffContext } from '../lib/bff.js';
 import { useT } from '../i18n/index.js';
 
@@ -39,6 +40,9 @@ const idBaseUrl = (serverEnv(import.meta.env).SYTUE_OIDC_ISSUER ?? 'https://id.s
 // El idioma lo negoció el middleware; de aquí baja por PROPS a la isla. Detectarlo
 // dentro de la isla desajustaría la hidratación (el servidor ya pintó en él).
 const locale = Astro.locals.locale;
+// ADR 0087: el correo privado sobre la bóveda va detrás de un conmutador de
+// despliegue, apagado salvo SYTUE_MAIL_BOVEDA=activado, hasta probarlo de punta a punta.
+const correoEnBoveda = correoSobreBoveda(serverEnv(import.meta.env).SYTUE_MAIL_BOVEDA);
 const t = useT(locale);
 ---
 
@@ -50,5 +54,6 @@ const t = useT(locale);
     hubBaseUrl={hubBaseUrl}
     idBaseUrl={idBaseUrl}
     locale={locale}
+    correoEnBoveda={correoEnBoveda}
   />
 </AppLayout>

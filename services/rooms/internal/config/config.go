@@ -78,6 +78,10 @@ type Config struct {
 	// IDNombresOrgsSecret abre `POST /internal/orgs/names` de Sytue ID: el nombre
 	// visible de la organización que invita. Vacío ⇒ solo su identificador.
 	IDNombresOrgsSecret string
+	// IDClavesBovedaSecret abre `POST /internal/vault-keys/lookup` de Sytue ID: la
+	// clave de firma activa de una bóveda (ADR 0087). Vacío ⇒ las acciones firmadas
+	// por bóvedas se rechazan.
+	IDClavesBovedaSecret string
 
 	// WhatsAppGraphURL es la raíz versionada de la Graph API de Meta con la que se
 	// habla con WhatsApp Business. Configurable para fijar la versión sin release y
@@ -209,6 +213,7 @@ func Load() (Config, error) {
 		EncryptedDocumentCalls:         l.GetBoolDefault("SYTUE_ROOMS_ENCRYPTED_DOCUMENT_CALLS", false),
 		IDURL:                          l.GetDefault("ID_URL", "http://id:8081"),
 		IDNombresOrgsSecret:            l.Get("ID_NOMBRES_ORGS_SECRET"),
+		IDClavesBovedaSecret:           l.Get("ID_VAULT_KEYS_SECRET"),
 
 		WhatsAppGraphURL: strings.TrimRight(l.GetDefault("WHATSAPP_GRAPH_URL", "https://graph.facebook.com/v23.0"), "/"),
 

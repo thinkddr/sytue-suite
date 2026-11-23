@@ -6,7 +6,6 @@ package photos
 import (
 	"context"
 	"image"
-	"io"
 	"path"
 	"strconv"
 	"strings"
@@ -49,6 +48,8 @@ const (
 	desdeEncontradas
 	// desdeSuelta es una foto que llegó sola, por un enlace de Drive.
 	desdeSuelta
+	// desdeAlbumCifrado es el álbum cifrado abierto en «Álbumes» (ADR 0086).
+	desdeAlbumCifrado
 )
 
 type estadoVisor struct {
@@ -86,7 +87,11 @@ type fotoOriginal struct {
 func (e *estadoVisor) lista() []api.Photo {
 	switch e.origen {
 	case desdeGaleria:
-		return e.a.g.fotos
+		// La línea que se ve: la del servidor con las cifradas por fecha. Así se pasa
+		// de una a otra con las flechas, sea cual sea su clase.
+		return e.a.lineaMezclada()
+	case desdeAlbumCifrado:
+		return e.a.fotosAlbumCifrado()
 	case desdeAlbum:
 		return e.a.uno.fotos
 	case desdeEncontradas:
@@ -113,6 +118,13 @@ func (e *estadoVisor) foto() (api.Photo, bool) {
 		f.Width, f.Height = ld[0], ld[1]
 	}
 	return f, true
+}
+
+// fotoDelServidor es la foto que se enseña si es del servidor: lo que pasa por él
+// (Sytue AI, girar, la papelera) no se hace con una cifrada.
+func (e *estadoVisor) fotoDelServidor() (api.Photo, bool) {
+	f, ok := e.foto()
+	return f, ok && !EsCifrada(f.ID)
 }
 
 // haySiguiente: en la galería, la última foto cargada no es la última si quedan
@@ -164,9 +176,9 @@ func (a *App) abrirVisor(origen origenVisor, i int, suelta ...api.Photo) {
 	}
 }
 
-// abrirEnGaleria abre una foto de la línea de tiempo por su id.
+// abrirEnGaleria abre una foto de la línea de tiempo (la mezclada) por su id.
 func (a *App) abrirEnGaleria(id string) {
-	if i := posicion(a.g.fotos, id); i >= 0 {
+	if i := posicion(a.lineaMezclada(), id); i >= 0 {
 		a.abrirVisor(desdeGaleria, i)
 	}
 }
@@ -202,6 +214,20 @@ func (a *App) pintarVisor() {
 		a.cerrarVisor()
 		return
 	}
+	e.capa.poner(PantallaVisor(a.v, a.datosVisor(e, f)))
+	if g := a.v.TecaGrande; g != nil {
+		l := e.lista()
+		for _, j := range [...]int{e.i - 1, e.i + 1} {
+			if j >= 0 && j < len(l) && a.Huella(l[j].ID) == "" {
+				g.Precargar(l[j].ID)
+			}
+		}
+	}
+}
+
+// datosVisor es lo que enseña el visor con la foto `f`: los mandos según de dónde salió
+// y de qué clase es (la cifrada, sin lo que pasa por el servidor; visorCifrada).
+func (a *App) datosVisor(e *estadoVisor, f api.Photo) Visor {
 	d := Visor{
 		Foto: f, Descripcion: f.Description, Etiquetas: f.Tags,
 		ConFicha: e.conFicha, AnchoFicha: a.medidaFicha(prefAnchoFicha, AnchoFicha, AnchoFichaMin, AnchoFichaMax),
@@ -248,7 +274,7 @@ func (a *App) pintarVisor() {
 		d.ClaveSistema, _ = a.DestinoGaleria.claves()
 		d.AlSistema = func() { a.guardarEnSistema([]api.Photo{f}) }
 	}
-	if l := f.Location; l != nil && a.AbrirWeb != nil {
+	if l := f.Location; l != nil && a.AbrirWeb != nil && !EsCifrada(f.ID) {
 		// El mapa es un ENLACE y no un mapa incrustado: así la posición de la foto
 		// solo sale de aquí si se pulsa.
 		lat, lon := strconv.FormatFloat(l.Lat, 'f', -1, 64), strconv.FormatFloat(l.Lon, 'f', -1, 64)
@@ -263,15 +289,10 @@ func (a *App) pintarVisor() {
 			botonPortada(a.v, esPortada(a.uno.album, f.ID), func() { a.ponerPortada(f) }),
 			botonQuitarDelAlbum(a.v, func() { a.quitarDelAlbum(f) }))
 	}
-	e.capa.poner(PantallaVisor(a.v, d))
-	if g := a.v.TecaGrande; g != nil {
-		l := e.lista()
-		for _, j := range [...]int{e.i - 1, e.i + 1} {
-			if j >= 0 && j < len(l) && a.Huella(l[j].ID) == "" {
-				g.Precargar(l[j].ID)
-			}
-		}
+	if EsCifrada(f.ID) {
+		a.visorCifrada(&d, f)
 	}
+	return d
 }
 
 func (a *App) anterior() {
@@ -372,7 +393,7 @@ func (a *App) teclaVisor(k *fyne.KeyEvent) {
 		a.cerrarVisor()
 	case atajoPapelera:
 		// Sin pregunta, como el botón: se deshace desde el aviso.
-		if f, ok := e.foto(); ok && e.origen == desdeGaleria {
+		if f, ok := e.fotoDelServidor(); ok && e.origen == desdeGaleria {
 			a.tirarDelVisor(f)
 		}
 	default:
@@ -433,27 +454,22 @@ func (e *estadoVisor) originalDe(id, huella string) image.Image {
 
 // pedirOriginal trae la foto entera con su receta —la de «Descargar», en su formato— y
 // la decodifica fuera del hilo de la interfaz.
+//
+// La de una cifrada es el original de la bóveda, descifrado y decodificado en memoria
+// (fuenteCifrada).
 func (a *App) pedirOriginal(f api.Photo) {
 	e := a.vis
 	huella := a.Huella(f.ID)
-	if a.cli == nil || e.originalDe(f.ID, huella) != nil || e.pidiendo == f.ID {
+	fuente := a.fuenteDe(f)
+	if !fuente.disponible() || e.originalDe(f.ID, huella) != nil || e.pidiendo == f.ID {
 		return
 	}
 	e.pidiendo = f.ID
-	formato := "jpeg"
-	if strings.Contains(f.ContentType, "png") {
-		formato = "png"
-	}
 	gen := a.gen
 	a.enSesion(func(vida context.Context) {
 		c, fin := context.WithTimeout(vida, 2*time.Minute)
 		defer fin()
-		var img image.Image
-		r, err := a.cli.Export(c, f.ID, formato)
-		if err == nil {
-			img, _, err = image.Decode(r)
-			_ = r.Close()
-		}
+		img, err := fuente.original(c, f)
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.vis != e || e.pidiendo != f.ID {
@@ -534,7 +550,7 @@ func (a *App) tirarDelVisor(f api.Photo) {
 // devuelve el servicio (ver Huella).
 func (a *App) girar() {
 	e := a.vis
-	f, ok := e.foto()
+	f, ok := e.fotoDelServidor()
 	if !ok || e.girando || a.cli == nil {
 		return
 	}
@@ -576,15 +592,17 @@ func (a *App) Huella(id string) string {
 }
 
 // descargar exporta la foto con su receta aplicada y la deja en la carpeta de
-// descargas, que es lo que hace el navegador con `Content-Disposition: attachment`.
+// descargas, que es lo que hace el navegador con `Content-Disposition: attachment`. La
+// de una cifrada se descifra en memoria y se escribe solo ahí (fuenteCifrada).
 func (a *App) descargar(f api.Photo, formato string) {
-	if a.cli == nil || a.Guardar == nil {
+	fuente := a.fuenteDe(f)
+	if a.Guardar == nil || !fuente.disponible() {
 		return
 	}
 	gen := a.gen
 	a.avisarVisor(a.v.T.T("gallery.downloadingNative", i18n.Vars{"count": 1}))
 	a.enSesion(func(vida context.Context) {
-		err := a.bajar(vida, f, formato)
+		err := a.bajarDe(vida, fuente, f, formato)
 		if err != nil {
 			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 			a.hilo(gen, func() { a.avisarVisor(a.textoDeFallo(err)) })
@@ -592,16 +610,20 @@ func (a *App) descargar(f api.Photo, formato string) {
 	})
 }
 
-// bajar trae una exportación y la guarda. Corre FUERA del hilo de la interfaz.
+// bajar trae una exportación del servidor y la guarda. Corre FUERA del hilo de la
+// interfaz.
 func (a *App) bajar(vida context.Context, f api.Photo, formato string) error {
+	return a.bajarDe(vida, fuenteServidor{cli: a.cli}, f, formato)
+}
+
+// bajarDe trae la exportación de `fuente` y la guarda con [App.Guardar], el único sitio
+// al que va: lo exportado de una cifrada está descifrado y no se deja en ningún otro.
+// Corre FUERA del hilo de la interfaz.
+func (a *App) bajarDe(vida context.Context, fuente fuenteVisor, f api.Photo, formato string) error {
 	c, fin := ctx(vida)
 	defer fin()
-	r, err := a.cli.Export(c, f.ID, formato)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = r.Close() }()
-	datos, err := io.ReadAll(r)
+	datos, err := fuente.exportar(c, f, formato)
+	defer clear(datos)
 	if err != nil {
 		return err
 	}

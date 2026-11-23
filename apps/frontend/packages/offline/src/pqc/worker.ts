@@ -6,6 +6,7 @@ import {
   type ClientCoreModule,
 } from '@sytue/config/client-core';
 import { hostMethodBounds, type HostCall, type HostMethod, type HostScope } from './host-port.js';
+import { isOwnerWorkerMessage } from './worker-origin.js';
 
 interface GoRuntime {
   env: Record<string, string>;
@@ -152,7 +153,10 @@ void ready
   .then((core) => host.postMessage({ type: 'ready', module_id: core.module_id ?? 'core' }))
   .catch(() => host.postMessage({ type: 'failed' }));
 
+// Worker dedicado: solo el documento que lo creó puede enviarle mensajes. Se
+// comprueba igualmente el origen y, después, la forma de cada mensaje por tipo.
 host.onmessage = (event): void => {
+  if (!isOwnerWorkerMessage(event, globalThis.location.origin)) return;
   const control = event.data as {
     type?: unknown;
     id?: unknown;

@@ -578,6 +578,12 @@ func (s *Server) Router() http.Handler {
 				Post("/internal/people/orgs", s.handleInternalPeopleOrgs)
 			r.With(httpx.SoloDesdeDentro(s.cfg.OrgsPersonaSecret)).Post("/internal/people/call-access", s.handleInternalCallIdentity)
 		}
+		// La clave de firma activa de una bóveda, para el servicio que verifica sus
+		// acciones (ADR 0087). Ver claves_boveda.go. Sin su secreto no se monta.
+		if s.cfg.ClavesBovedaSecret != "" {
+			r.With(httpx.SoloDesdeDentro(s.cfg.ClavesBovedaSecret)).
+				Post("/internal/vault-keys/lookup", s.handleInternalVaultKeyLookup)
+		}
 		// El estado de ciclo de vida de un conjunto de organizaciones por slug,
 		// para Pages (A11, §6.5). Ver internal_estado_orgs.go. Sin secreto no se monta.
 		if s.cfg.EstadoOrgsSecret != "" {
@@ -637,6 +643,10 @@ func (s *Server) Router() http.Handler {
 			r.Get("/me/rubrica", s.handleMeRubricaGet)
 			r.Put("/me/rubrica", s.handleMeRubricaPut)
 			r.Delete("/me/rubrica", s.handleMeRubricaDelete)
+			// La clave de firma de mis bóvedas (ADR 0087): el historial y el registro
+			// de la generación siguiente. Ver claves_boveda.go.
+			r.Get("/me/vault-keys/{product}", s.handleMeVaultKeysGet)
+			r.Put("/me/vault-keys/{product}", s.handleMeVaultKeyPut)
 			// «Exportar tus datos»: la entrega de la cuenta (platform/pkg/portabilidad).
 			r.Get("/me/export", s.handleMeExport)
 			r.Get("/me/sessions", s.handleMeSessions)

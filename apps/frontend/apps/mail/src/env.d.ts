@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly SYTUE_OIDC_CLIENT_SECRET: string;
   readonly SYTUE_OIDC_REDIRECT_URI: string;
   readonly SYTUE_OIDC_POST_LOGOUT_URI?: string;
+  /** ADR 0087: `activado` abre el correo privado sobre la bóveda. Apagado por defecto. */
+  readonly SYTUE_MAIL_BOVEDA?: string;
   readonly SYTUE_OIDC_SCOPES?: string;
   readonly SYTUE_SESSION_SECRET: string;
   // Backends.

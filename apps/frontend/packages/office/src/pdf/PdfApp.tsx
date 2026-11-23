@@ -1210,7 +1210,7 @@ interface CampoMarcado {
 }
 
 /** Una página: el documento dibujado y, encima, la capa donde se anota. */
-function Hoja({
+export function Hoja({
   pagina,
   svg,
   zoom,

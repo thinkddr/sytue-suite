@@ -47,6 +47,7 @@ func newIngressHarnessWithEpoch(t *testing.T, canonical bool) *ingressHarness {
 	if canonical {
 		migrations["migrations/0005_epoch.up.sql"] = &fstest.MapFile{Data: []byte("-- sytue:private-ingress-epoch-v1")}
 		migrations["migrations/0006_pq.up.sql"] = &fstest.MapFile{Data: []byte("-- sytue:private-ingress-pq-v1")}
+		migrations["migrations/0007_rotation.up.sql"] = &fstest.MapFile{Data: []byte("-- sytue:private-ingress-rotation-v1")}
 	}
 	fsys := pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateIngressDDL(migrations)))
 	h := &ingressHarness{Harness: pgtest.New(t, fsys, "migrations"), cfg: pg.PrivateIngressConfig{Scope: storage.Scope{Tenant: "acme", Subject: "alice", Product: "mail"}, Epoch: uuid.New()}, target: storage.PublicationTarget{RoomID: "!ingress:test", DeviceID: "DEVICE_A"}}

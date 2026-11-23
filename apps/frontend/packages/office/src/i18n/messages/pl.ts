@@ -311,6 +311,22 @@ export const pl: AppCatalog<typeof en> = {
   'doc.msg.savedToDrive': 'Zapisano w Sytue Drive.',
   'doc.msg.savedToDriveIn': '„{name}” zawiera teraz twoje zmiany jako nową wersję.',
   'doc.msg.saveToDriveFailed': 'Nie udało się zapisać zmian na Dysku.',
+  'doc.msg.saveToDriveVault': 'Twój Drive jest szyfrowany end-to-end',
+  'doc.msg.saveToDriveVault.detail':
+    'Nie udało się zapisać na nim stąd. Pobierz dokument i prześlij go z Sytue Drive.',
+  'doc.msg.savedToDriveEncrypted': 'Zapisano na zaszyfrowanym Dysku.',
+  'doc.msg.savedToDriveEncryptedIn':
+    '„{name}” został zaszyfrowany w tej przeglądarce przed zapisaniem.',
+  'doc.msg.savedToDriveEncryptedOnDevice':
+    '„{name}” został zaszyfrowany na tym urządzeniu przed zapisaniem.',
+  'doc.msg.saveToDriveVaultLocked':
+    'Twój zaszyfrowany Dysk jest zablokowany na tym urządzeniu. Odblokuj go powyżej i zapisz jeszcze raz.',
+  'doc.msg.saveToDriveVaultSignIn':
+    'Zaloguj się ponownie, aby odblokować zaszyfrowany Dysk, i zapisz jeszcze raz.',
+  'doc.msg.saveToDriveVaultNotReady':
+    'Twój Dysk wciąż przechodzi na szyfrowanie end-to-end. Otwórz Sytue Drive, aby to dokończyć, i zapisz jeszcze raz.',
+  'doc.msg.saveToDriveUnsupported':
+    'Formatu tego pliku nie można zapisać ponownie. Zamiast tego pobierz dokument.',
   'file.downloadPdf': 'Pobierz jako PDF',
   'file.pdfAccessible': 'Dostępny PDF (PDF/UA)',
   'file.downloadHtml': 'Pobierz jako HTML',
@@ -2723,6 +2739,55 @@ export const pl: AppCatalog<typeof en> = {
     'Ta sama osoba występuje dwukrotnie w kolejności podpisywania.',
   'pdf.error.signatureRequest.chainTooLong': 'Kolejność podpisywania może obejmować do 10 osób.',
   'pdf.error.signatureRequest.busy': 'Ta prośba jest już otwierana. Spróbuj ponownie za chwilę.',
+  'pdf.error.driveVault':
+    'Twój Dysk jest szyfrowany end-to-end: kopii próśb o podpis z innych organizacji nie można jeszcze na nim przechowywać. Zamiast tego pobierz plik PDF.',
+  'pdf.device.title': 'Podpisz na tym urządzeniu',
+  'pdf.device.help':
+    'Twój Drive jest szyfrowany end-to-end, więc serwer nie może czytać Twoich plików PDF. Wybierz jeden: zostanie odszyfrowany i podpisany tutaj Twoim certyfikatem, a podpisana kopia zostanie zapisana zaszyfrowana obok oryginału. Ani PDF, ani Twój certyfikat nie trafiają na serwer.',
+  'pdf.device.open': 'Otwórz mój zaszyfrowany Drive',
+  'pdf.device.empty.title': 'Brak plików PDF w zaszyfrowanym Drive',
+  'pdf.device.empty.description': 'Prześlij je z Sytue Drive, a pojawią się tutaj.',
+  'pdf.device.sign': 'Podpisz',
+  'pdf.device.signed': 'Podpisano i zapisano zaszyfrowany jako „{name}”.',
+  'pdf.device.stamp.on':
+    'Ze znacznikiem czasu od {authority}: podpis dowodzi, kto i kiedy podpisał. Urząd otrzymuje tylko odcisk podpisu, nigdy plik PDF.',
+  'pdf.device.stamp.off':
+    'Bez znacznika czasu: ta usługa nie ma urzędu znaczników czasu, więc podpis dowodzi, kto podpisał, ale nie kiedy.',
+  'pdf.device.appearance': 'Wygląd podpisu',
+  'pdf.device.appearance.invisible': 'Niewidoczny',
+  'pdf.device.appearance.visible': 'Widoczne pole',
+  'pdf.device.signedStamped':
+    'Podpisano ze znacznikiem czasu i zapisano zaszyfrowany jako „{name}”.',
+  'pdf.device.signedNoStamp':
+    'Podpisano i zapisano zaszyfrowany jako „{name}”, ale bez znacznika czasu: urząd znaczników czasu nie odpowiedział.',
+  'pdf.device.error.page':
+    'Podpis nie mieści się na tej stronie. Wybierz inną stronę lub położenie.',
+  'pdf.device.view': 'Wyświetl',
+  'pdf.vault.help':
+    'Ten PDF jest w Twoim zaszyfrowanym Drive: jest odszyfrowywany tylko na tym urządzeniu, gdzie możesz go przeglądać, komentować, wypełniać, porządkować i podpisywać. To, co zapiszesz, wraca zaszyfrowane.',
+  'pdf.vault.serverOnly':
+    'Z zaszyfrowanym Drive nie są jeszcze dostępne prośby o podpis, ochrona hasłem, rozpoznawanie tekstu, zaczernianie, edycja tekstu lub obrazów, pieczątki i znaki wodne, porównywanie, historia wersji ani drukowanie: wymagają, by usługa odczytała PDF, albo jeszcze nie działają na urządzeniu.',
+  'pdf.vault.notFound.title': 'Tego pliku PDF nie ma na Twoim zaszyfrowanym Dysku',
+  'pdf.vault.notFound.description':
+    'Mógł zostać przeniesiony lub usunięty. Poszukaj go w Sytue Drive.',
+  'pdf.vault.openSigned': 'Otwórz podpisaną kopię',
+  'pdf.vault.engineUnavailable':
+    'Nie udało się załadować silnika PDF na tym urządzeniu, więc PDF jest wyświetlany w przeglądarce: możesz go przeglądać, pobrać i podpisać, ale nie edytować.',
+  'pdf.vault.unavailable': 'Jeszcze niedostępne z zaszyfrowanym Drive.',
+  'pdf.device.requests':
+    'Prośba o podpis do innych osób lub organizacji wymaga Drive serwera: usługa musi odczytać PDF, aby go wysłać i sprawdzić podpis, który wraca. Przy zaszyfrowanym Drive podpisz tutaj i sam wyślij podpisany PDF.',
+  'pdf.device.error.signin': 'Zaloguj się ponownie do Sytue ID, aby odblokować zaszyfrowany Drive.',
+  'pdf.device.error.pending':
+    'Twój Drive wciąż przechodzi na szyfrowanie end-to-end. Dokończ to w Sytue Drive.',
+  'pdf.device.error.password': 'To hasło nie otwiera certyfikatu.',
+  'pdf.device.error.encrypted':
+    'Ten PDF jest chroniony hasłem i nie można go podpisać na tym urządzeniu.',
+  'pdf.device.error.locked':
+    'Ten PDF jest certyfikowany przeciw wszelkim zmianom: kolejny podpis by go unieważnił.',
+  'pdf.device.error.unreadable':
+    'Tego PDF nie można podpisać na tym urządzeniu bez przepisania go. Nic nie zostało zmienione.',
+  'pdf.device.error.failed':
+    'Nie udało się podpisać ani zapisać PDF. W Twoim Drive nic nie zostało zmienione.',
   'pdf.dialog.firmar.help':
     'Certyfikat i klucz nigdy nie opuszczają organizacji: są używane na serwerze i nie są przechowywane.',
   'pdf.dialog.firmar.cert': 'Certyfikat (PEM)',

@@ -22,6 +22,17 @@
 #     documento y las actualizaciones incrementales. También genera un PDF base con
 #     flujos de referencias cruzadas y de objetos (la forma que escribe Word/Acrobat).
 #
+#   * El firmador del NAVEGADOR (`packages/office/src/pdf/dispositivo`, ADR 0086,
+#     «Firmar en el dispositivo»), con el `.p12` de prueba de
+#     `platform/pkg/pkcs12/testdata/clasico.p12` (`anclas/empresa-pruebas.crt` es su
+#     certificado, autofirmado, solo el público): `firmado-en-el-dispositivo.pdf` es
+#     `firma-valida-flujos.pdf` con una segunda firma invisible (B-B) anexada por ese
+#     código TypeScript, y `firmado-en-el-dispositivo-visible-con-sello.pdf` es
+#     `sin-firmas.pdf` con una firma VISIBLE con rúbrica y sello de tiempo (B-T) de una
+#     autoridad `openssl ts` propia (`anclas/raiz-sello-dispositivo.crt`). Los escribe
+#     `generar-dispositivo.sh` (openssl y bun), que se puede lanzar suelto y que este
+#     guion lanza al final, cuando ya están los PDF base de los que parten.
+#
 # CLAVES. Las privadas son EFÍMERAS: se crean en un directorio temporal que se
 # borra al salir y NO se commitean (el .gitignore las excluye, y gitleaks no tiene
 # nada que mirar). Solo se guardan los PDF y los certificados RAÍZ (anclas/*.crt).
@@ -30,7 +41,7 @@
 # («ahora»), así que el resultado esperado no cambia ni caduca con el reloj.
 #
 # DEPENDENCIAS (solo de desarrollo; NADA de esto entra en producción ni en el
-# build): openssl 3.x, soffice, python3 con venv y red hacia PyPI para pyHanko. Las
+# build): openssl 3.x, soffice, bun, python3 con venv y red hacia PyPI para pyHanko. Las
 # versiones están fijadas abajo; los PDF commiteados dicen con cuáles se hicieron.
 #
 # USO (en el contenedor de agentes, no en el portátil):
@@ -215,5 +226,8 @@ fi
 
 "$VENV/bin/python" "$AQUI/generar.py" --pki "$PKI" --base "$T/base-libreoffice.pdf" \
   --salida "$AQUI" --trabajo "$T"
+
+# --- 4. El firmador del navegador (ADR 0086) -----------------------------------
+"$AQUI/generar-dispositivo.sh"
 
 echo "generados: $(find "$AQUI" -maxdepth 1 -name '*.pdf' | wc -l) PDF, $(cat "$AQUI"/*.pdf | wc -c) bytes"

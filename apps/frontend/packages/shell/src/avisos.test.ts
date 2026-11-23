@@ -99,7 +99,12 @@ function hubDoble(lista: Notification[], sinLeer: number, correo: number | null 
       return f;
     },
   };
-  return { hub, flujos, leidos, todos: () => todos, cargas: () => cargas };
+  // Un aviso que aparece en el Hub sin pasar por el flujo (la entrada privada de One).
+  const agregar = (n: Notification) => {
+    filas = [n, ...filas];
+    if (!n.read) pendientes++;
+  };
+  return { hub, flujos, leidos, todos: () => todos, cargas: () => cargas, agregar };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -584,6 +589,27 @@ describe('conectarAvisos', () => {
     expect(d.leidos).toEqual(['b']);
     expect(e?.sinLeer).toBe(0);
     expect(e?.items[0]?.read).toBe(true);
+    avisos.cerrar();
+  });
+
+  it('la señal sin datos de la entrada privada recarga la campana', async () => {
+    const d = hubDoble([aviso('a', { read: true })], 0);
+    let e: EstadoAvisos | undefined;
+    const llegados: string[] = [];
+    const avisos = conectarAvisos(d.hub, (x) => (e = x), {
+      limite: 30,
+      alLlegar: (n) => llegados.push(n.id),
+    });
+    await tick();
+    const cargas = d.cargas();
+    d.agregar(aviso('p', { private: true, type: 'security.storage.released' }));
+    d.flujos[0]?.emitir('private_ingress', '{}');
+    await hasta(() => e?.items.length === 2);
+    expect(d.cargas()).toBe(cargas + 1);
+    expect(e?.items.map((n) => n.id)).toEqual(['p', 'a']);
+    expect(e?.items[0]?.private).toBe(true);
+    await hasta(() => e?.sinLeer === 1);
+    expect(llegados).toEqual(['p']);
     avisos.cerrar();
   });
 

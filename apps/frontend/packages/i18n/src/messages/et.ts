@@ -32,6 +32,48 @@ export const et: Catalog = {
   'matrix.connect': 'Seadista see seade',
   'matrix.devices': 'Sinu seadmed',
   'matrix.failed': 'Krüptimist ei saanud seadistada. Proovi uuesti.',
+  'vault.wrongKey':
+    'Selle rakenduse krüptitud andmed lukustati teise Sytue ID avamisvõtmega kui selle brauseri oma. Logi uuesti Sytue ID-sse, et tuua praegune võti siia. Kui varasem võti on kadunud, võid selle rakenduse krüptitud andmed tühjendada ja otsast alustada.',
+  'vault.wrongKeyDevice':
+    'Selle rakenduse krüptitud andmed lukustati teise Sytue ID avamisvõtmega kui selle seadme oma. Logi uuesti Sytue ID-sse, et tuua praegune võti siia. Kui varasem võti on kadunud, võid selle rakenduse krüptitud andmed tühjendada ja otsast alustada.',
+  'vault.release': 'Tühjenda ja naase serveri andmete juurde',
+  'vault.releaseTitle': 'Naasmine serveri andmete juurde',
+  'vault.releaseBody':
+    'Kui selle rakenduse andmed krüpteeriti arvuti- või mobiilirakendusest, säilitas server neist koopia täpselt sellisena, nagu need tol hetkel olid. Kui krüpteeritud andmeid ei saa avada, saab rakendus naasta selle koopia juurde. Kõik, mis kirjutati hiljem mis tahes seadmes, läheb kaotsi ja seda ei saa taastada.',
+  'vault.releaseUnderstood':
+    'Mõistan, et kõik pärast krüpteerimisele üleminekut kirjutatu läheb kaotsi',
+  'vault.releaseSignIn': 'Isiku kinnitamiseks palub Sytue ID teil esmalt uuesti sisse logida.',
+  'vault.releaseFailed': 'Serveri andmete juurde naasmine ebaõnnestus. Proovige uuesti.',
+  'vault.moveTitle': 'Teisalda Drive krüpteeritud seifi',
+  'vault.moveOffer':
+    'Sinu Drive on endiselt salvestatud eelmise krüpteeringuga. Teisalda see seifi, mida kasutavad veeb ja sinu teised seadmed.',
+  'vault.moveAction': 'Teisalda seifi',
+  'vault.moveBody':
+    'Kõik sinu failid ja kaustad koos versioonidega kopeeritakse krüpteeritud seifi ja kontrollitakse ükshaaval. Eelmisest krüpteeringust ei kustutata midagi. Hoia rakendus avatuna, kuni see lõpetab; katkestuse korral jätkab see sealt, kus pooleli jäi.',
+  'vault.moveUnderstood': 'Saan aru, et pärast lõpetamist kasutatakse seda Drive’i seifist',
+  'vault.moveCopying': 'Sinu faile kopeeritakse ja kontrollitakse…',
+  'vault.moveDone': 'Valmis. Sinu Drive on nüüd krüpteeritud seifis.',
+  'vault.moveFailed':
+    'Kopeerimist ei õnnestunud lõpetada. Sinu failid on endiselt eelmises krüpteeringus. Proovi uuesti.',
+  'vault.movePending':
+    'Selles seadmes on veel saatmata muudatusi. Oota, kuni need lõpevad, ja proovi uuesti.',
+  'vault.copyInProgress':
+    "Teine seade teisaldab sinu Drive'i krüpteeritud seifi. Oota, kuni see lõpeb, ja proovi uuesti.",
+  'vault.copyCancel': 'Tühista kopeerimine',
+  'vault.copyCancelHint':
+    'Kui kopeerimine on seisma jäänud, võid selle tühistada: midagi ei kustutata ja saad seda sellest seadmest korrata.',
+  'vault.releaseNotice':
+    'Selle rakenduse andmed krüpteeriti arvuti- või mobiilirakendusest. Siin on näha koopia, mille server tol hetkel säilitas; hiljem kirjutatu on ainult krüpteeritud andmetes. Kui neid enam avada ei saa, saate naasta serveri andmete juurde.',
+  'notifications.kind.security.storage.released':
+    '{name}: naasmine teie serveris olevate andmete juurde',
+  'vault.signInAgain': 'Logi uuesti Sytue ID-sse',
+  'vault.empty': 'Tühjenda krüptitud andmed',
+  'vault.emptyTitle': 'Tühjenda selle rakenduse krüptitud andmed',
+  'vault.emptyBody':
+    'Andmed, mille see rakendus kadunud võtmega krüptis, kustutatakse Sytuest ja luuakse uus võti. Ülejäänud konto jääb puutumata. Seda ei saa tagasi võtta.',
+  'vault.emptyUnderstood': 'Saan aru, et kadunud võtmega krüptitud andmed kustutatakse',
+  'vault.failed':
+    'Krüptitud andmeid ei õnnestunud avada. Proovi uuesti või logi uuesti Sytue ID-sse. Kui võti on kadunud, võid selle rakenduse krüptitud andmed tühjendada.',
   'matrix.incoming': 'Kinnita see seade',
   'matrix.match': 'Need kattuvad',
   'matrix.mismatch': 'Need ei kattu',

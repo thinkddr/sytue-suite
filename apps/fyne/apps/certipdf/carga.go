@@ -347,9 +347,12 @@ var erroresPDF = map[string]string{
 	"pdf_signature_request_recipient_busy": "pdf.error.signatureRequest.recipientBusy",
 	"pdf_signature_request_changed":        "pdf.error.signatureRequest.changed",
 	"pdf_signature_request_busy":           "pdf.error.signatureRequest.busy",
-	"pdf_signature_org_closed":             "pdf.error.signatureRequest.orgClosed",
-	"pdf_signature_blocks_full":            "pdf.error.signatureRequest.blocksFull",
-	"pdf_unknown_letters":                  "pdf.error.unknownLetters",
+	// El Drive de la persona en la bóveda (ADR 0086): el servicio no puede dejar ahí la
+	// copia de una petición de otra organización.
+	"drive_private_vault":       "pdf.error.driveVault",
+	"pdf_signature_org_closed":  "pdf.error.signatureRequest.orgClosed",
+	"pdf_signature_blocks_full": "pdf.error.signatureRequest.blocksFull",
+	"pdf_unknown_letters":       "pdf.error.unknownLetters",
 	// Lo que el motor no sabe abrir: antes todo era `bad_request` con una frase en inglés.
 	"pdf_not_pdf":                "pdf.error.notPdf",
 	"pdf_unreadable":             "pdf.error.unreadable",
@@ -363,6 +366,8 @@ var erroresPDF = map[string]string{
 	"pdf_certify_signed":       "pdf.error.certifySigned",
 	"pdf_signature_too_large":  "pdf.error.signatureTooLarge",
 	"pdf_archive_not_possible": "pdf.error.archive",
+	// Con el PDF en la bóveda, lo que el motor del dispositivo aún no hace.
+	"pdf_local_unavailable": "pdf.vault.unavailable",
 }
 
 // mensajeDeError es `mensajeDeError`: lo que no llega a ser una respuesta es la RED, no

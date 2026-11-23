@@ -151,6 +151,15 @@ type Visor struct {
 	Girando, Describiendo bool
 
 	ConFavorita, ConBorrar, ConDescribir bool
+	// Cifrada: la foto es de la galería cifrada (ADR 0086), descifrada en el
+	// dispositivo. Lo que pasa por el servidor (parecidas, describir, girar, preguntar)
+	// no se ofrece, y la ficha lo dice con el candado.
+	Cifrada bool
+	// EnAlbumes son los álbumes del menú en los que ya está la foto: salen marcados, y
+	// elegirlos la saca (los cifrados). AlNuevoAlbum, si está, añade al menú «Nuevo
+	// álbum cifrado».
+	EnAlbumes    map[string]bool
+	AlNuevoAlbum func()
 	// Accion es el mando extra de la cabecera («Quitar del álbum»).
 	Accion fyne.CanvasObject
 
@@ -352,34 +361,24 @@ func mandosVisor(v Vista, d Visor) []fyne.CanvasObject {
 		}
 		hijos = append(hijos, b)
 	}
-	var album *ui.BotonIcono
-	album = mandoVisor(v, iconos.Album, "albums.addTo", func() {
-		if d.AlMenuAlbumes == nil {
-			return
-		}
-		d.AlMenuAlbumes(func(lista []api.Album) {
-			elems := make([]fyne.CanvasObject, 0, len(lista))
-			for _, a := range lista {
-				elems = append(elems, ui.NuevoElementoMenu(a.Rotulo(), iconos.Ninguno, func() {
-					if d.AlAnyadirA != nil {
-						d.AlAnyadirA(a)
-					}
-				}))
-			}
-			mostrarMenu(v.Traduce("albums.addTo"), album, elems)
-		})
-	})
-	hijos = append(hijos, album, mandoDescargar(v, d),
-		mandoVisor(v, iconos.Imagen, "viewer.similar", d.AlParecidas), filete(v))
+	hijos = append(hijos, mandoAlbumes(v, d), mandoDescargar(v, d))
+	// Una cifrada no pasa por el servidor: ni parecidas, ni describir, ni girar (se
+	// gira en «Editar», que guarda una versión nueva cifrada).
+	if !d.Cifrada {
+		hijos = append(hijos, mandoVisor(v, iconos.Imagen, "viewer.similar", d.AlParecidas))
+	}
+	hijos = append(hijos, filete(v))
 
-	if d.ConDescribir {
+	if d.ConDescribir && !d.Cifrada {
 		b := mandoVisor(v, iconos.Texto, "viewer.describe", d.AlDescribir)
 		b.Inerte = d.Describiendo
 		hijos = append(hijos, b)
 	}
-	girar := mandoVisor(v, iconos.Rotar, "viewer.rotate", d.AlGirar)
-	girar.Inerte = d.Girando
-	hijos = append(hijos, girar, filete(v))
+	if !d.Cifrada {
+		girar := mandoVisor(v, iconos.Rotar, "viewer.rotate", d.AlGirar)
+		girar.Inerte = d.Girando
+		hijos = append(hijos, girar, filete(v))
+	}
 
 	clavePase, glifo := "viewer.slideshow", glifoPlay
 	if d.Pase {
@@ -400,7 +399,7 @@ func mandosVisor(v Vista, d Visor) []fyne.CanvasObject {
 		hijos = append(hijos, mandoVisor(v, iconos.Teclado, "shortcuts.help", d.AlAtajos))
 	}
 
-	if d.ConBorrar {
+	if d.ConBorrar && !d.Cifrada {
 		b := mandoVisor(v, iconos.Papelera, "viewer.delete", d.AlBorrar)
 		b.FondoEncima, b.TrazoEncima = "bg-subtle", "danger-text" // `tone="danger"`
 		hijos = append(hijos, filete(v), b)
@@ -418,6 +417,38 @@ func mandosVisor(v Vista, d Visor) []fyne.CanvasObject {
 		}
 	}
 	return hijos
+}
+
+// mandoAlbumes es el desplegable de los álbumes: añadir a uno o, con una cifrada, sus
+// álbumes cifrados con los que ya la tienen marcados (y «Nuevo álbum cifrado»).
+func mandoAlbumes(v Vista, d Visor) *ui.BotonIcono {
+	var album *ui.BotonIcono
+	tituloAlbumes := "albums.addTo"
+	if d.Cifrada {
+		tituloAlbumes = "gallery.encrypted.albums"
+	}
+	album = mandoVisor(v, iconos.Album, tituloAlbumes, func() {
+		if d.AlMenuAlbumes == nil {
+			return
+		}
+		d.AlMenuAlbumes(func(lista []api.Album) {
+			elems := make([]fyne.CanvasObject, 0, len(lista)+1)
+			for _, a := range lista {
+				e := ui.NuevoElementoMenu(a.Rotulo(), iconos.Ninguno, func() {
+					if d.AlAnyadirA != nil {
+						d.AlAnyadirA(a)
+					}
+				})
+				e.Marcada = d.EnAlbumes[a.ID]
+				elems = append(elems, e)
+			}
+			if d.AlNuevoAlbum != nil {
+				elems = append(elems, ui.NuevoElementoMenu(v.Traduce("gallery.encrypted.newAlbum"), iconos.Mas, d.AlNuevoAlbum))
+			}
+			mostrarMenu(v.Traduce(tituloAlbumes), album, elems)
+		})
+	})
+	return album
 }
 
 // mandoDescargar es el desplegable de descargar: JPEG para compartir, PNG sin pérdida
@@ -796,16 +827,26 @@ func (r *asaRenderer) Refresh() {
 func FichaDelVisor(v Vista, d Visor) fyne.CanvasObject {
 	tecnica := fichaTecnica(v, d)
 	bloques := make([]ui.Bloque, 0, 2+len(tecnica)+5)
+	// Una cifrada no tiene descripción de Sytue AI ni se le pregunta: en su lugar, el
+	// candado y lo que no la incluye.
+	cabeza := seccionDescripcion
+	if d.Cifrada {
+		cabeza = seccionCifradaFicha
+	}
 	bloques = append(bloques,
-		ui.Bloque{Obj: seccionDescripcion(v, d), Margen: tema.Espacio(4)},
+		ui.Bloque{Obj: cabeza(v, d), Margen: tema.Espacio(4)},
 		// `pt-1`: el rótulo técnico baja un poco más que el `space-y-4`.
 		ui.Bloque{Obj: rotuloFicha(v.Traduce("viewer.infoTechnical"), ui.Medio, "text-muted", v, tema.Espacio(1)), Margen: tema.Espacio(4)},
 	)
 	for _, f := range tecnica {
 		bloques = append(bloques, ui.Bloque{Obj: f, Margen: tema.Espacio(2)})
 	}
-	bloques[len(bloques)-1].Margen = tema.Espacio(4)
-	bloques = append(bloques, preguntaFicha(v, d)...)
+	if d.Cifrada {
+		bloques[len(bloques)-1].Margen = 0
+	} else {
+		bloques[len(bloques)-1].Margen = tema.Espacio(4)
+		bloques = append(bloques, preguntaFicha(v, d)...)
+	}
 	// El `p-4` va DENTRO del desplazamiento, como el `overflow-y-auto` del aside, y el
 	// alto se cuenta al ancho de verdad de la ficha: sin él, el desplazamiento mediría
 	// los párrafos partidos a su ancho mínimo y dejaría un hueco al final.
@@ -816,6 +857,21 @@ func FichaDelVisor(v Vista, d Visor) fyne.CanvasObject {
 	cuerpo := container.New(ui.Margen{Izq: RellenoFicha, Der: RellenoFicha, Arr: RellenoFicha, Abj: RellenoFicha},
 		ui.AlAnchoFluido(ancho, ui.PilaBloques(bloques...)))
 	return container.New(fichaLayout{arriba: movil(v.Ventana)}, canvas.NewRectangle(tema.Color("border", v.Variante)), container.NewVScroll(cuerpo))
+}
+
+// seccionCifradaFicha es la cabecera de la ficha de una foto cifrada: el candado con
+// «Cifrada de extremo a extremo» y la nota de lo que no la incluye, en la caja de la
+// descripción.
+func seccionCifradaFicha(v Vista, _ Visor) fyne.CanvasObject {
+	titulo := container.New(ui.Fila{Hueco: tema.Espacio(1.5)},
+		iconos.Trazo(iconos.Candado, iconos.TallaXS, "primary", v.Variante).Objeto(),
+		rotuloFicha(v.Traduce("gallery.encrypted.badge"), ui.SemiNegrita, "text", v, 0))
+	return recuadro(v, "bg-subtle", "border", tema.RadioLG,
+		ui.Margen{Izq: tema.Espacio(3), Der: tema.Espacio(3), Arr: tema.Espacio(3), Abj: tema.Espacio(3)},
+		ui.PilaBloques(
+			ui.Bloque{Obj: titulo, Margen: tema.Espacio(1.5)},
+			bloqueLargo(ui.NuevoParrafo(v.Traduce("gallery.encrypted.note"), escalon11, ui.Normal, "text-muted", v.Variante), 0),
+		))
 }
 
 // seccionDescripcion es la `<section class="bg-bg-subtle border-border rounded-lg

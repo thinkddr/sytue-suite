@@ -127,6 +127,11 @@ func (o *OIDC) descubrir(ctx context.Context) error {
 type PeticionLogin struct {
 	Prompt string
 	Legado string
+	// Reautenticar pide a Sytue ID una identificación nueva (`prompt=login` y
+	// `max_age=0`): el token que vuelve lleva un `auth_time` de ahora y, si la
+	// cuenta tiene segundo factor, el segundo factor. Lo exige una acción que no
+	// se deshace («soltar la fuente», ADR 0086).
+	Reautenticar bool
 }
 
 // Login hace el flujo completo —Authorization Code + PKCE con redirect al loopback,
@@ -302,6 +307,9 @@ func (o *OIDC) autorizar(redirect, secretoDispositivo string, entrega *ecdh.Priv
 	if o.MaxAge > 0 {
 		q.Set("max_age", strconv.Itoa(o.MaxAge))
 	}
+	if p.Reautenticar {
+		q.Set("max_age", "0")
+	}
 	if secretoDispositivo != "" {
 		suma := sha256.Sum256([]byte(secretoDispositivo))
 		q.Set("sytue_device", base64.RawURLEncoding.EncodeToString(suma[:]))
@@ -309,7 +317,7 @@ func (o *OIDC) autorizar(redirect, secretoDispositivo string, entrega *ecdh.Priv
 	if entrega != nil {
 		q.Set("sytue_unlock_key", recoverywrap.DeliveryPublic(entrega))
 	}
-	if p.Prompt == "login" {
+	if p.Prompt == "login" || p.Reautenticar {
 		q.Set("prompt", "login")
 	}
 	if legadoValido(p.Legado) {

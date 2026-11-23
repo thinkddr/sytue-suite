@@ -403,4 +403,37 @@ export const ga: AppCatalog<typeof en> = {
   'library.savedToPictures': 'Sábháilte i bPictiúir › Sytue Photos: {count}',
   'library.saveFailed': 'Níorbh fhéidir sábháil i ngailearaí an ríomhaire seo: {name}',
   'backup.whileOpen': 'Ar an ríomhaire seo, déantar an cúltaca fad atá Sytue Fotos oscailte.',
+  'backup.encryptedWaitTitle': 'Oscail Sytue Fotos chun an cúltaca criptithe a chríochnú',
+  'backup.encryptedWaitBody':
+    'Tá do Drive criptithe ó cheann ceann. Déantar cúltaca de ghrianghraif nua chomh luath agus a osclaíonn tú Sytue Fotos.',
+  'gallery.uploadedEncrypted': 'Sábháilte i do Drive le criptiú ó cheann ceann: {count}',
+  'gallery.uploadVaultSignIn':
+    'Tá do Drive criptithe ó cheann ceann. Sínigh isteach arís chun é a dhíghlasáil, agus cuir na grianghraif leis arís.',
+  'gallery.uploadVaultNotReady':
+    'Tá do Drive fós ag aistriú go criptiú ó cheann ceann. Oscail Sytue Drive chun é a chríochnú, agus cuir na grianghraif leis arís.',
+  'gallery.uploadVaultLocked':
+    'Tá do Drive criptithe ó cheann ceann. Díghlasáil thuas é, agus cuir na grianghraif leis arís.',
+  'gallery.uploadVaultUnavailable':
+    'Tá do Drive criptithe ó cheann ceann agus ní féidir é a oscailt ar an ngléas seo. Cuir na grianghraif leis ó Sytue Photos ar an ngréasán.',
+  'gallery.encrypted.title': 'I do Drive criptithe',
+  'gallery.encrypted.show': 'Taispeáin',
+  'gallery.encrypted.opening': 'Á dhíchriptiú…',
+  'gallery.encrypted.failed': 'Níorbh fhéidir do Drive criptithe a oscailt.',
+  'gallery.encrypted.signIn': 'Sínigh isteach arís',
+  'gallery.encrypted.empty': 'Níl aon ghrianghraif i do Drive criptithe fós.',
+  'gallery.encrypted.note':
+    'Ní dhíchriptítear grianghraif atá criptithe ó cheann ceann ach ar an ngléas seo. Ní chuimsíonn Sytue AI, grianghraif chosúla, In aice láimhe ná cuimhní iad.',
+  'gallery.encrypted.badge': 'Criptithe ó cheann ceann',
+  'gallery.encrypted.open': 'Oscail {name} (criptithe)',
+  'gallery.encrypted.notSelectable':
+    'Ní féidir grianghraif chriptithe a roghnú: oscail ceann chun é a mharcáil mar cheanán nó chun é a chur le halbam.',
+  'gallery.encrypted.actionFailed': 'Níorbh fhéidir do ghailearaí criptithe a nuashonrú.',
+  'gallery.encrypted.saved':
+    'Sábháilte mar leagan criptithe nua. Fanann an ceann roimhe i stair leaganacha Drive.',
+  'gallery.encrypted.albums': 'Albaim chriptithe',
+  'gallery.encrypted.newAlbum': 'Albam criptithe nua',
+  'gallery.encrypted.saveVersion': 'Sábháil mar leagan nua',
+  'gallery.encrypted.editHint':
+    'Déantar an eagarthóireacht ar an ngléas seo agus sábháiltear í criptithe mar leagan nua den ghrianghraf.',
+  'gallery.encrypted.albumEmpty': 'Níl aon ghrianghraif san albam criptithe seo fós.',
 };

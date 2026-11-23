@@ -829,5 +829,25 @@
     );
   };
 
+  /**
+   * La vuelta a la que se puede navegar desde una página del desbloqueo, o "" si no
+   * vale. Es la misma regla que aplica el servidor (desbloqueo.go: rutaInternaSegura,
+   * vueltaDelRelevo), repetida aquí porque el guion la saca de un bloque del
+   * documento y la sigue con `location` o la pone en un enlace: un `javascript:` o
+   * un `data:` se ejecutaría en el origen de Sytue ID. Vale una ruta de este origen
+   * (nunca `//otro` ni `/\otro`, que el navegador lee como otro sitio) o una URL
+   * absoluta http(s) o del esquema de una app de la suite (`sytue://`,
+   * `sytue-mail://`…), con autoridad; nunca con caracteres de control ni espacios,
+   * que el navegador quita antes de interpretarla.
+   */
+  E.safeReturn = function (url) {
+    if (typeof url !== "string" || !url || /[\u0000-\u0020\u007f]/.test(url))
+      return "";
+    if (url.charAt(0) === "/") return /^\/(?![\/\\])/.test(url) ? url : "";
+    return /^(https?|sytue(-[a-z0-9]+)*):\/\/[^\/\\?#@]+([\/?#]|$)/i.test(url)
+      ? url
+      : "";
+  };
+
   global.SytueE2E = E;
 })(typeof window !== "undefined" ? window : globalThis);

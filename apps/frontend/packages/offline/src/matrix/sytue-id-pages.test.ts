@@ -118,6 +118,7 @@ interface E2E {
     cfg: Record<string, unknown>,
     r: RelayResult,
   ) => 'enroll' | 'lost' | 'go' | 'confirm' | 'login' | 'failed';
+  safeReturn: (url: string) => string;
   passwordChangeForm: (form: unknown, opts?: Record<string, unknown>) => void;
   PENDING_TTL: number;
 }
@@ -606,7 +607,7 @@ describe('relay', () => {
     expect(e2e.relayOutcome(cfg, { ...r, enroll: true })).toBe('enroll');
     expect(e2e.relayOutcome(cfg, { lost: true })).toBe('lost');
     const relay = source('relay.js');
-    expect(relay).toContain('global.location.replace(cfg.login)');
+    expect(relay).toContain('global.location.replace(login)');
     expect(relay).toContain('show("e2e-failed")');
     expect(relay).toContain('show("e2e-confirm")');
   });
@@ -1718,5 +1719,145 @@ describe('direct post-quantum vault (ADR 0086)', () => {
     });
     ask('fresh', blob);
     expect(await wait('fresh')).toMatchObject({ ok: true, secret: pqVector.secret });
+  });
+});
+
+/**
+ * The way back comes from a JSON block of the page and ends in `location` or in the
+ * href of a link, on Sytue ID's origin: a `javascript:` or `data:` there would run as
+ * Sytue ID. Only a path of this origin, or an http(s) or suite-app URL, is followed.
+ */
+describe('the way back is never script', () => {
+  const hostile = [
+    'javascript:alert(1)',
+    'JaVaScRiPt:alert(1)',
+    'javascript://mail.sytue.eu/%0aalert(1)',
+    ' javascript:alert(1)',
+    'java\tscript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+    '//evil.example/',
+    '/\\evil.example',
+    '/\t/evil.example',
+    'https://a@evil.example/',
+    'sytue-mail:/no-authority',
+  ];
+  const fine = [
+    '/account?pk=ok#claves',
+    '/',
+    'https://mail.sytue.eu/auth/callback?code=c&state=s',
+    'http://127.0.0.1:8921/auth/callback?code=c',
+    'sytue-mail://auth/callback?code=c0de&state=st4te',
+    'sytue://auth/callback',
+  ];
+
+  test('safeReturn keeps the suite ways back and drops anything else', () => {
+    const e2e = load(fakeWindow(), 'comun.js');
+    for (const url of fine) expect(e2e.safeReturn(url)).toBe(url);
+    for (const url of hostile)
+      expect({ url, safe: e2e.safeReturn(url) }).toEqual({ url, safe: '' });
+  });
+
+  test('the relay builds no way back from a hostile destination', () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
+    const returnTo = e2e.returnTo as (
+      next: string,
+      blob: string,
+      ua: string,
+      web: boolean,
+    ) => unknown;
+    for (const url of hostile)
+      for (const blob of ['', 'B10B'])
+        for (const web of [false, true])
+          expect({ url, to: returnTo(url, blob, 'Android', web) }).toEqual({
+            url,
+            to: { auto: '', manual: '' },
+          });
+  });
+
+  /** Runs a page script over a document that only has its JSON block and the link. */
+  async function runPage(script: string, block: string, cfg: Record<string, unknown>) {
+    const replaced: string[] = [];
+    const link = { href: '' };
+    const els: Record<string, unknown> = {
+      [block]: { textContent: JSON.stringify(cfg) },
+      'e2e-next': link,
+    };
+    const win = fakeWindow({
+      document: { getElementById: (id: string) => els[id] ?? null },
+      location: { origin: 'https://id.sytue.eu', replace: (u: string) => void replaced.push(u) },
+      navigator: { userAgent: 'Safari' },
+      fetch: async () => new Response(null, { status: 500 }),
+      // The relay's 20 s fallback leaves at once: the way back is what is tested.
+      setTimeout: (fn: () => void, ms: number) => {
+        if (ms === 20000) fn();
+        return 0;
+      },
+      clearTimeout: () => {},
+    });
+    new Function('window', source('comun.js'))(win);
+    (win.SytueE2E as E2E).store = memoryStore();
+    new Function('window', source(script))(win);
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 20));
+    return { replaced, link };
+  }
+
+  test('the relay page neither follows nor links a hostile destination', async () => {
+    for (const next of hostile) {
+      const { replaced, link } = await runPage('relay.js', 'e2e-relay', {
+        sub: 'u',
+        next,
+        envelopes: [],
+        creds: [],
+      });
+      expect({ next, replaced, href: link.href }).toEqual({ next, replaced: [], href: '' });
+    }
+    const ok = 'https://mail.sytue.eu/auth/callback?code=c&state=s';
+    const { replaced, link } = await runPage('relay.js', 'e2e-relay', {
+      sub: 'u',
+      next: ok,
+      envelopes: [],
+      creds: [],
+    });
+    expect({ replaced, href: link.href }).toEqual({ replaced: [ok], href: ok });
+  });
+
+  test('the relay follows the typed sign-in only when it is a path of this origin', async () => {
+    const next = 'https://mail.sytue.eu/auth/callback?code=c&state=s';
+    const cfg = {
+      sub: vectors.user_id,
+      next,
+      app_key: vectors.native.app_public,
+      web: true,
+      hint: vectors.hint,
+      salt: passwordKDF.salt,
+      creds: [],
+      envelopes: [],
+      auth_age: 3_600_000,
+    };
+    for (const login of [...hostile, 'https://evil.example/oauth2/authorize']) {
+      const { replaced } = await runPage('relay.js', 'e2e-relay', { ...cfg, login });
+      expect({ login, replaced }).toEqual({ login, replaced: [next] });
+    }
+    const login = '/oauth2/authorize?prompt=login&sytue_unlock_typed=1';
+    const { replaced } = await runPage('relay.js', 'e2e-relay', { ...cfg, login });
+    expect(replaced).toEqual([next, login]);
+  });
+
+  test('the new passkey page goes back to «Mi cuenta» instead of a hostile way back', async () => {
+    for (const next of hostile) {
+      const { replaced } = await runPage('passkey.js', 'e2e-passkey', {
+        sub: 'u',
+        cred: 'AAAA',
+        next,
+      });
+      expect({ next, replaced }).toEqual({ next, replaced: ['/account'] });
+    }
+    const { replaced } = await runPage('passkey.js', 'e2e-passkey', {
+      sub: 'u',
+      cred: 'AAAA',
+      next: '/account?pk=ok#claves',
+    });
+    expect(replaced).toEqual(['/account?pk=ok#claves']);
   });
 });

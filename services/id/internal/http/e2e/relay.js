@@ -290,7 +290,10 @@
    * verificador PKCE y la entrega solo la abre la clave efímera de la app que la pidió.
    */
   E.returnTo = function (next, blob, ua, web) {
-    var url = next;
+    // Solo una vuelta navegable (comun.js, `safeReturn`): el destino sale del bloque
+    // de datos del documento y acaba en `location` y en el enlace de «Volver».
+    var url = E.safeReturn(next);
+    if (!url) return { auto: "", manual: "" };
     // A una app WEB, en el fragmento: el navegador lo conserva al seguir las
     // redirecciones del callback y no lo manda a ningún servidor ni a sus registros.
     // Solo lo abre el puente de esa app (bridge.js, `handoff`).
@@ -350,6 +353,8 @@
       global.navigator ? global.navigator.userAgent : "",
       cfg.web === true,
     );
+    // Una vuelta que no es navegable no se sigue ni se enlaza: quedarse aquí.
+    if (!to.auto) return;
     if (link) link.href = to.manual;
     // Por si el navegador no deja salir solo hacia el esquema de una app móvil.
     global.setTimeout(function () {
@@ -376,9 +381,15 @@
       global.clearTimeout(timer);
       if (outcome === "enroll" && show("e2e-passkey-first")) return;
       if (outcome === "login") {
-        gone = true;
-        global.location.replace(cfg.login);
-        return;
+        // La entrada tecleada es una ruta de este origen (/oauth2/authorize…): solo
+        // se sigue si lo es (comun.js, `safeReturn`); si no, como si fallara.
+        var login = E.safeReturn(cfg.login);
+        if (login && login.charAt(0) === "/") {
+          gone = true;
+          global.location.replace(login);
+          return;
+        }
+        outcome = "failed";
       }
       if (outcome === "failed" && show("e2e-failed")) return;
       if (outcome === "confirm") {

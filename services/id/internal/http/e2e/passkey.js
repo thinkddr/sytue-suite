@@ -105,7 +105,8 @@
   function go() {
     if (gone) return;
     gone = true;
-    global.location.replace(cfg.next);
+    // Solo una vuelta navegable (comun.js, `safeReturn`); si no, «Mi cuenta».
+    global.location.replace(E.safeReturn(cfg.next) || "/account");
   }
   var creds =
     global.navigator &&

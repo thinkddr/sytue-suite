@@ -28,8 +28,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"html"
+	"html/template"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -393,7 +395,7 @@ func uriTecleada(r *http.Request) string {
 // redirige igual: entrar no depende del desbloqueo.
 func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req authzRequest, client domain.Client, sess domain.Session, destino string) {
 	appKey, ok := quiereRelevo(req, client)
-	if !ok {
+	if !ok || !vueltaDelRelevo(destino) {
 		http.Redirect(w, r, destino, http.StatusFound)
 		return
 	}
@@ -424,15 +426,53 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 			datos.Creds = append(datos.Creds, b64u.EncodeToString(c.CredID))
 		}
 	}
-	// json.Marshal escapa <, > y &: el bloque no puede cerrar el <script>.
-	raw, err := json.Marshal(datos)
+	page, err := relevoPage(i18n.From(r), destino, datos.Login, datos)
 	if err != nil {
 		http.Redirect(w, r, destino, http.StatusFound)
 		return
 	}
 	s.recordarPasskeyPrimero(w, envelopes)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(relevoPage(i18n.From(r), destino, datos.Login, string(raw))))
+	escribirPagina(w, http.StatusOK, page)
+}
+
+// esquemaDeLaSuite son los esquemas propios de las apps nativas de la suite
+// (`sytue://`, `sytue-mail://`…), los únicos no web a los que vuelve el relevo.
+var esquemaDeLaSuite = regexp.MustCompile(`^sytue(-[a-z0-9]+)*$`)
+
+// vueltaDelRelevo dice si el destino de la autorización se puede pintar en el
+// relevo, que lo pone en enlaces y lo sigue desde el guion: solo una URL absoluta
+// https o http (la vuelta de loopback del escritorio) o del esquema de una app de la
+// suite, con autoridad y sin credenciales. Un `javascript:`, `data:` o cualquier
+// otro esquema se ejecutaría en el origen de Sytue ID al pulsar o seguir el enlace;
+// con esos, la redirección de siempre (un Location no ejecuta nada).
+func vueltaDelRelevo(destino string) bool {
+	u, err := url.Parse(destino)
+	if err != nil || u.Host == "" || u.User != nil || u.Opaque != "" {
+		return false
+	}
+	switch esquema := strings.ToLower(u.Scheme); esquema {
+	case "https", "http":
+		return true
+	default:
+		return esquemaDeLaSuite.MatchString(esquema)
+	}
+}
+
+// plantillaDeDatos pinta el bloque JSON que leen los guiones del desbloqueo. Lo
+// escapa html/template en contexto de guion (`<`, `>` y `&` como \u003c…), así que
+// ningún valor de la petición (el destino, la vuelta) puede cerrar el <script> ni
+// meter marcado.
+var plantillaDeDatos = template.Must(template.New("datos").Parse(
+	`<script type="application/json" id="{{.ID}}">{{.Datos}}</script>`))
+
+// bloqueDeDatos devuelve el bloque JSON `id` con `datos`, escapado.
+func bloqueDeDatos(id string, datos any) (string, error) {
+	var b strings.Builder
+	err := plantillaDeDatos.Execute(&b, struct {
+		ID    string
+		Datos any
+	}{id, datos})
+	return b.String(), err
 }
 
 // relevoPage pinta el relevo: «Desbloqueando…» mientras el guion trabaja, la
@@ -443,7 +483,11 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 // clave que este navegador ya tiene, y el aviso de que no hay ninguna que entregar,
 // con la entrada tecleada. Volver a la app con las manos vacías y sin decir nada
 // era un bucle: la app solo sabía pedir «Iniciar sesión» otra vez.
-func relevoPage(loc, destino, login, datos string) string {
+func relevoPage(loc, destino, login string, datos relevoDatos) (string, error) {
+	bloque, err := bloqueDeDatos("e2e-relay", datos)
+	if err != nil {
+		return "", err
+	}
 	esc := html.EscapeString
 	t := func(k string) string { return esc(i18n.T(loc, k)) }
 	puente := ""
@@ -477,9 +521,9 @@ func relevoPage(loc, destino, login, datos string) string {
 		`<button type="button" id="e2e-restart" disabled>` + t("e2e.start_over") + `</button>` +
 		`</section>` +
 		puente +
-		`<script type="application/json" id="e2e-relay">` + datos + `</script>` +
+		bloque +
 		`<script>` + e2eComunJS + `</script><script>` + e2eRelayJS + `</script>`
-	return loginPage(loc, i18n.T(loc, "e2e.title"), body)
+	return loginPage(loc, i18n.T(loc, "e2e.title"), body), nil
 }
 
 // origenDelPuente devuelve el origen que pide el puente si es de la suite: la
@@ -568,18 +612,30 @@ func (s *Server) servirPuente(w http.ResponseWriter, _ *http.Request, origen, an
 
 // vueltaDelAlta valida a dónde vuelve /e2e/passkey: una ruta de Sytue ID o una
 // URL de una app de la suite (la misma regla que el puente, con ruta y consulta).
+//
+// Una ruta pasa por rutaInternaSegura, la regla de todos los return_to del IdP:
+// `//evil` y `/\evil` son otro sitio para el navegador. La URL del propio origen se
+// reduce a su ruta, que pasa por la misma regla: `https://id…//evil` daría
+// `//evil`.
 func (s *Server) vueltaDelAlta(v string) (string, bool) {
-	if strings.HasPrefix(v, "/") && !strings.HasPrefix(v, "//") && !strings.ContainsAny(v, "\\\r\n") {
+	if strings.HasPrefix(v, "/") {
+		if !rutaInternaSegura(v) {
+			return "", false
+		}
 		return v, true
 	}
 	u, err := url.Parse(v)
-	if err != nil || u.User != nil || u.Host == "" {
+	if err != nil || u.User != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
 		return "", false
 	}
 	origen := u.Scheme + "://" + u.Host
 	if origen == strings.TrimRight(s.cfg.Issuer, "/") {
 		// «Mi cuenta» en el propio origen de Sytue ID: se vuelve por la ruta.
-		return u.RequestURI() + fragmento(u), true
+		ruta := u.RequestURI() + fragmento(u)
+		if !rutaInternaSegura(ruta) {
+			return "", false
+		}
+		return ruta, true
 	}
 	if _, ok := s.origenDelPuente(origen); !ok {
 		return "", false
@@ -637,7 +693,7 @@ func (s *Server) handleUnlockPasskeyEnroll(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	raw, err := json.Marshal(passkeyDatos{Sub: sess.UserID, Cred: cred, RPID: s.cfg.RPID, Next: next}) //nolint:gosec // G117: `cred` es el identificador PÚBLICO de la passkey, no un secreto.
+	bloque, err := bloqueDeDatos("e2e-passkey", passkeyDatos{Sub: sess.UserID, Cred: cred, RPID: s.cfg.RPID, Next: next})
 	if err != nil {
 		http.Redirect(w, r, next, http.StatusFound)
 		return
@@ -651,10 +707,9 @@ func (s *Server) handleUnlockPasskeyEnroll(w http.ResponseWriter, r *http.Reques
 		`<button type="button" id="e2e-passkey-go">` + t("e2e.passkey_enroll_action") + `</button>` +
 		`<p class="alt"><a class="btn-link" href="` + esc(next) + `">` + t("e2e.continue") + `</a></p>` +
 		`</section>` +
-		`<script type="application/json" id="e2e-passkey">` + string(raw) + `</script>` +
+		bloque +
 		`<script>` + e2eComunJS + `</script><script>` + e2ePasskeyJS + `</script>`
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "e2e.title"), body)))
+	escribirPagina(w, http.StatusOK, loginPage(loc, i18n.T(loc, "e2e.title"), body))
 }
 
 // validCredentialID: un identificador de credencial en base64url sin relleno.

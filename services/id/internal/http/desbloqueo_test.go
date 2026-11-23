@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -171,12 +170,12 @@ func TestElRelevoSoloSiUnaAppDeLaSuiteLoPide(t *testing.T) {
 // Los datos del relevo van en un bloque JSON dentro del documento: un destino
 // hostil no puede cerrarlo y meter un guion.
 func TestElRelevoNoSeDejaInyectarPorElDestino(t *testing.T) {
-	raw, err := json.Marshal(relevoDatos{Sub: "u", Next: "https://x/</script><script>alert(1)</script>"})
+	datos := relevoDatos{Sub: "u", Next: "https://x/</script><script>alert(1)</script>"}
+	page, err := relevoPage("es", "https://x/cb?code=1&state=2", "", datos)
 	if err != nil {
 		t.Fatal(err)
 	}
-	page := relevoPage("es", "https://x/cb?code=1&state=2", "", string(raw))
-	if strings.Contains(page, "<script>alert") {
+	if strings.Contains(page, "<script>alert") || !strings.Contains(page, `\u003c/script\u003e\u003cscript\u003ealert(1)`) {
 		t.Fatal("el destino cierra el bloque de datos")
 	}
 	for _, id := range []string{`id="e2e-relay"`, `id="e2e-lost"`, `id="e2e-passkey-first" hidden`, `id="e2e-restart" disabled`, `id="e2e-understood"`, "<noscript>"} {
@@ -193,7 +192,11 @@ func TestElRelevoNoSeDejaInyectarPorElDestino(t *testing.T) {
 
 	// Con la clave del puente de una app web: la confirmación y la salida tecleada.
 	login := `/oauth2/authorize?client_id=a&prompt=login&x="><script>alert(2)</script>`
-	page = relevoPage("es", "https://x/cb?code=1&state=2", login, string(raw))
+	datos.Login = login
+	page, err = relevoPage("es", "https://x/cb?code=1&state=2", login, datos)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(page, "<script>alert") {
 		t.Fatal("la entrada tecleada cierra su atributo")
 	}
@@ -343,6 +346,14 @@ func TestLaPasskeyNuevaSoloVuelveALaSuite(t *testing.T) {
 		"/\\evil.example":                             "",
 		"javascript:alert(1)":                         "",
 		"https://a@mail.sytue.eu/":                    "",
+		// La URL del propio origen se reduce a su ruta: `//evil` sería otro sitio.
+		"https://id.sytue.eu//evil.example/x": "",
+		"https://id.sytue.eu/\\evil.example":  "/%5Cevil.example",
+		// Los navegadores quitan el TAB antes de interpretar: `/\t/evil` es `//evil`.
+		"/\t/evil.example":                         "",
+		"/\\/evil.example":                         "",
+		"data:text/html,<script>alert(1)</script>": "",
+		"ftp://mail.sytue.eu/":                     "",
 	} {
 		got, ok := s.vueltaDelAlta(v)
 		if (quiero == "") == ok || got != quiero {

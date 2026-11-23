@@ -88,6 +88,8 @@ decisions, or ones reversible at no cost, do not need an entry.
 | 0080 | [The whole suite on “paper”: the Notepads chrome moves to all fifteen apps](#0080)                                                                      | accepted · extends [0079](#0079)                                               |
 | 0081 | [The Matrix recovery key is held by Rooms for the OIDC session](#0081)                                                                                  | superseded → 0082                                                              |
 | 0082 | [The Matrix recovery key, wrapped on the device with the password or the passkey](#0082)                                                                | accepted · replaces [0081](#0081)                                              |
+| 0086 | [Direct post-quantum vault (`age-MLKEM768-X25519-v1`) for the suite's storage, without Synapse/Matrix](#0086)                                           | accepted · replaces Synapse/Matrix in the storage of 13 apps                   |
+| 0087 | [Sytue Mail on the direct vault: signing key in the vault, anchored by Sytue ID](#0087)                                                                 | accepted · Phase 2 of [0086](#0086) · deliveries 1 and 2 of 5                  |
 
 <a id="el-pivote-sytue-native-2026-07-01"></a>
 
@@ -6275,3 +6277,1231 @@ that weak point, and that is why it is the recommended one. A wrapper can be att
 the password: Argon2id at 64 MiB makes it expensive, but a weak password is still weak.
 Whoever forgets the password and has no other verified device or passkey can only
 reset (Rooms) and loses the encrypted history, as before 0081.
+
+<a id="0086"></a>
+
+<a id="0086--bóveda-post-cuántica-directa-age-mlkem768-x25519-v1-en-el-almacenamiento-de-la-suite-sin-synapsematrix"></a>
+
+## 0086 — Direct post-quantum vault (`age-MLKEM768-X25519-v1`) for the suite's storage, without Synapse/Matrix
+
+`accepted` · 2026-11-19 · security, e2ee, post-quantum, storage · builds on 0084 and 0085 · code in `apps/nucleo/recoverywrap/boveda_pq.go`, `services/id/internal/http/e2e/{comun,bridge}.js`, `services/drive/db/migrations/0040_pq_vault.{up,down}.sql`, `services/drive/internal/{store,service,http}/*pq_vault*`, `apps/frontend/packages/auth/src/server/pq-vault.ts`, `apps/frontend/packages/offline/src/vault/`, `apps/frontend/packages/shell/src/matrix/PqVaultGate.tsx`, `apps/frontend/apps/drive/src/{client/private-drive.ts,components/PrivateDriveGate.tsx}`
+
+**Context.** Using Synapse/Matrix (isolated `v2` accounts, cross-signing, SSSS secret storage,
+SAS/device verification and `matrix-js-sdk` + RustCrypto WASM) to encrypt the private storage
+of the suite's apps introduced a fragile chain of state —in particular, “set up device / sign
+in again with Sytue ID” loops for already existing accounts and a disproportionate operational
+and memory load— without bringing any multi-user messaging value to apps that only store the
+user's own encrypted records and files. At the same time, the suite already had the hybrid
+post-quantum cryptographic core `age-MLKEM768-X25519-v1` (NIST FIPS 203 ML-KEM-768 + X25519 +
+ChaCha20-Poly1305 via `filippo.io/age`, compiled to Go/Wasm in `apps/nucleo/cmd/pqc-wasm`) and
+the 256-bit account unlock key (AUK) held non-extractably in the Sytue ID bridge (0084, 0085).
+
+**Decision.**
+
+1. **Direct hybrid post-quantum encryption without Synapse.** Each storage product of the
+   suite opens its own **direct PQ vault** per `(tenant, owner_sub, product)`:
+   - **Record encryption:** profile `age-MLKEM768-X25519-v1` (ML-KEM-768 + X25519 +
+     ChaCha20-Poly1305) run in the shared Go/Wasm core (`pqc-wasm`), without implementing
+     primitives in JavaScript or loading `matrix-js-sdk` or RustCrypto WASM.
+   - **Owner authentication:** each record includes an HMAC-SHA256 proof
+     (`org.sytue.storage.auth.v1`) computed with a 256-bit `owner_key` per vault, imported
+     as a non-extractable `CryptoKey` in WebCrypto.
+   - **Wrapper in the Sytue ID bridge (`v2`):** the private identity `AGE-SECRET-KEY-PQ-1…` and
+     the `owner_key` are sealed in `id.<domain>` with AES-256-GCM and a key derived from the AUK
+     through HKDF-SHA256 with its own domain separation (`sytue-pq-vault-wrap-v1`, distinct from
+     the Matrix wrapper) and canonical AAD
+     `sytue-pq-vault-wrap-v1\0<tenant>\0<product>\0<sub>\0<key_id>`. Session records from
+     before this decision derive `vaultWrap` lazily and non-extractably without forcing a new
+     sign-in. The shared vectors live in `apps/nucleo/recoverywrap/testdata/boveda_pq.json` and
+     are checked in Go and in the bridge scripts.
+2. **Direct store in PostgreSQL (`services/drive`, migration `0040_pq_vault`).** The tables
+   `pq_vaults`, `pq_vault_keys` and `pq_vault_records` store only encrypted wrappers and
+   `org.sytue.storage_pq` envelopes, under `ENABLE` + `FORCE ROW LEVEL SECURITY` by
+   `(tenant, owner_sub)` and registered with `sytue_scope_admission_register`. The service rejects any
+   record without `org.sytue.storage_pq` and validates the wrapper through
+   `recoverywrap.PQVaultWrapper.Validate()` before persisting it. The apps' BFFs re-export the
+   single plumbing `rutaBovedaPq` from `@sytue/auth/server` at `/api/pq-vault/[...ruta].ts`.
+3. **Phase 1 scope (13 migrated apps) and exceptions.**
+   - **Migrated to `PqVaultGate` / `PqVault`:** `drive` (full encrypted repository with S3 blocks
+     at `/api/v1/cipher/blobs/drive/*` and PQ records at `/api/v1/pq-vault/drive/*`) and the 12
+     apps protected by `MatrixStorageGate` (`bases`, `calcus`, `calendar`, `cast`, `certipdf`,
+     `contacts`, `diapos`, `docus`, `erp`, `notes`, `photos`, `portal`/`hub`).
+   - **Sytue Rooms (permanent exception):** keeps Synapse/Matrix and Megolm/cross-signing for
+     real-time multi-user chat and federation/verification between people ([0077](#0077)).
+   - **Phase 2 (pending):** migrate Sytue Mail (it requires adapting the encrypted SMTP ingress
+     authority flow towards a PQ recipient) and the native `apps/fyne` clients (which already
+     share `apps/nucleo/pqc` and `apps/nucleo/recoverywrap`).
+
+**Consequences.**
+
+- The 13 storage apps stop depending on Synapse, Matrix SSO, SSSS and device verification to
+  open the user's data: signing in with Sytue ID is enough to unlock or initialize the
+  `age-MLKEM768-X25519-v1` vault in a single step.
+- End-to-end protection resistant to _harvest-now, decrypt-later_ attacks (ML-KEM-768 + X25519):
+  neither `services/drive` nor Sytue ID can decrypt the records or the private keys.
+- If a person loses their previous Sytue ID AUK, `PqVaultGate` offers an explicit reset with
+  confirmation (`PqVault.reset`) that generates a new PQ identity without getting stuck in a loop.
+
+**Fix after v3.22.0 (whoever was already encrypting could not get in).** Three faults added up:
+
+- The vault operations (`sytue-e2e-vault-unwrap`/`-wrap`) did not carry to the bridge the
+  `handoff` of the return from sign-in, so in Safari —partitioned bridge, no AUK in its
+  storage— each return asked for “Sign in” again. Now it travels with all key operations
+  (`unlock-bridge.ts`, `keyOperations`).
+- A record from before this ADR whose box could not be revealed left the bridge in `unavailable`,
+  with no way out; now it answers `signin`. And `wrong` (AUK expired in that browser) also returns
+  a one-time handoff key, so that signing in again replaces it.
+- `wrong` showed the Matrix text (“verify from another device”), which does not apply here.
+  Now it offers **sign in to Sytue ID again** or **empty the encrypted data** with confirmation, and
+  the same for any other failure when opening. If the vault has not a single record —the twelve apps
+  that go through the gate without storing anything in it—, `PqVault` resets it on its own: there is
+  nothing to lose. Emptying really deletes `pq_vault_records` (they used to be left orphaned and, since
+  `transaction_id` is unique per product and not per vault, a re-import collided with them).
+
+**One key for the whole account, also when typing it (after v3.22.0).** The unlock key is a
+single one, but each app sent people to Sytue ID with `prompt=login`: in a browser that separates
+the bridge's storage by origin (Safari) that meant typing the password once per app, and it was felt
+as “one encryption per app”. And if the relay ended with no key to hand over (passkey without PRF,
+the derivation did not finish), it returned to the app empty-handed and without saying anything: the
+app only knew how to ask for “Sign in” again, endlessly.
+
+- The bridge of a web app that brings its ephemeral key first goes through the relay **without typing
+  anything** (`entregaSinTeclear`, `desbloqueo.go`). If this browser already has the key in the Sytue
+  ID origin, the relay hands it over to the bridge after **one confirmation click in Sytue ID**: a
+  script injected into an app can bring the person to that page, but not click for them, which is
+  the same boundary that typing the password used to set.
+- If it does not have it, the relay itself asks for the typed authorization (`sytue_unlock_typed=1`,
+  only once). If there is still no key then, **it says so** and offers to retry with the password or
+  to go back without unlocking (`E.relayOutcome`, `relay.js`): it never returns silently.
+- Sytue Mail stays on Matrix (Phase 2). Whoever lost their key there has no reset: the storage
+  authority (`matrix_storage_authorities`) only allows changing root with the signature of the
+  previous root. Emptying it goes through migrating Mail to this vault, not through relaxing that
+  authority.
+
+**Native clients (Phase 2, 2026-11-23): pieces done and why no product changes yet.**
+
+Done: the native vault opens and seals its wrapper with the unlock key that the device session
+already has, without a bridge (`apps/nucleo/storage/pqvault`). It uses the same envelope, the same
+owner proof and the same emptying as `pq-vault.ts`, with a shared vector
+(`recoverywrap/testdata/boveda_pq_registro.json`). It satisfies `storage.RecordStore`; with
+`storage/vaultfiles`, which mounts Matrix's file layer on it (`matrix.StorageFiles`, the same
+code, without touching `Client`), it is a complete `records.Crypto` and `drive.Crypto`. The Fyne gate
+is `cifrado.PuertaBoveda`: sign in again, retry or empty with a confirmation checkbox.
+
+**Decision: native products stay on Matrix until three things are resolved.** None is switched
+behind the gate, not even the records-only ones. Moving them now would be prudence backwards:
+
+1. **On the web, the twelve records apps store nothing in the vault.** The gate only lets people
+   through; their data goes through the server API. Natively, calendar, contacts, notes, erp, bases,
+   cast, hub and the office apps store their encrypted records in Matrix (`storage/records`). Moving
+   them to the vault would not make web and native read the same thing: it would create a third copy
+   that nobody else reads. First it has to be decided where that encrypted data lives for both
+   platforms.
+2. **There is no reliable migration from Matrix to the vault.** `ImportLegacySnapshot` imports from
+   the server source (`legacy` → `frozen` → `private`), not from Matrix. If the source is already
+   `private` because the data was copied to Matrix, there is nothing to re-import. And a new vault
+   cannot start empty on a `private` source without changing the engine: it has no receipt and stays
+   in `ErrNotReady`. That same gap prevents “empty and start in the vault” for whoever cannot open
+   Matrix.
+3. **The device journal is shared.** Import and upload intents live in the same `offline.Store`
+   and namespace (`<product>-private-v1`, `PendingUploadsNamespace`) for both backends, with their
+   destination inside. A Matrix intent blocks the vault's and vice versa. The vault needs its own
+   journal, and signing out has to delete it as it deletes the current one.
+
+Drive (and with it photos, pdf and docs attachments) is the case that does converge: the web
+already stores Drive in the vault (`private-drive.ts`). It lacks points 2 and 3. Proposed rule for
+choosing the backend without asking for any key, only with what the server says:
+
+- if the product's vault has records, the vault;
+- if not, and the source is still `legacy`, the vault, importing as the web does;
+- if not, Matrix, until there is a migration.
+
+Mail and Rooms stay out: Mail because of delivery 4 of [0087](#0087), Rooms because of [0077](#0077).
+
+**Owner's decision (2026-11-23): bring the native apps in line with the web.** It resolves point 1:
+the native apps' encrypted records are not moved to the vault; the apps read and write through the
+server API, like the web. Drive, photos, pdf and docs attachments will go to the direct vault.
+
+Done, for the records (calendar, contacts, notes, erp, bases, cast, hub, docus, calcus and
+diapos): `cifrado.AplicacionRegistros` chooses **per account** with the mode of that product's
+server source (`GET /private-storage/migration`, without asking for any key).
+
+- **`legacy`** → the view is mounted on the service API with the Sytue ID session, bound to that
+  account (`sesionDeCuenta`: each request captures its authorization intent and does not go out
+  with another account's token). The Matrix app does not start: its `CanStart` is set by the host.
+  This is what mattered most: until now, opening a native app with the source in `legacy` started
+  the migration to Matrix, **froze the source** and that person's web could no longer write.
+- **Any other mode** (`building`, `frozen`, `private`) → Matrix, as until now: their data is there
+  and the server source no longer accepts writes.
+- Without being able to read the mode, neither one nor the other: “Retry”.
+- Contacts reads the mode with `PrivateStorageMode`, which does not reject shared address books (in
+  the API they do not matter; `PrivateStorageState` rejects them because it is the migration's gate).
+
+**Why there is no import from Matrix into the API.** There is no reliable path: the source's shared
+triggers (`sytue_private_storage_state_scope_guard`, `platform/pkg/pg/private_storage_v1.sql`) do not
+let a `frozen` or `private` source go back to `legacy`, and there is no server write that receives
+the Matrix records. So whoever opens Matrix keeps seeing their data through Matrix until that exists.
+Whoever **cannot** open Matrix and has the source frozen still has no way out: the Matrix gate stays
+as it was. The identified path is a “release the source” on the server: a new version of those
+triggers that allows `frozen`/`private` → `legacy` only through that operation, with the
+reauthentication of the emptying of [0087](#0087). It returns the server data as it was when frozen
+and loses only what was written in Matrix, which is what that person can no longer open; the “empty
+the encrypted data” checkbox says so. Done: see “Release the source” below.
+
+**Drive, photos, pdf and attachments.** Points 2 and 3 above and their host were missing. Drive,
+photos and pdf already choose vault or Matrix per account: see “Native Drive on the vault” below,
+with what is still missing.
+
+**“Release the source” (2026-11-23): the way out for whoever cannot open Matrix.** Done for the
+eight records services (calendar, contacts, notes, erp, bases, cast, hub and docs with docs, sheets
+and slides).
+
+- **v2 triggers** (`platform/pkg/pg/private_storage_release_v1.sql`, marker
+  `sytue:private-storage-release-v1`). The state row guard keeps all the v1 rules and adds a single
+  return from `frozen`/`private` to `legacy`: the one from `sytue_private_storage_release`, with the
+  epoch the person saw (another epoch is `PST03`, `private_storage_release_stale`), in its owner
+  transaction and never under maintenance or merge. The transition is bound by a transaction GUC to
+  `(table, tenant, owner, epoch)`; it is not an authorization boundary (the app role could set it,
+  like `app.maintenance`): it prevents a generic `UPDATE` from reopening a source. Each service swaps
+  its guard for v2 with `sytue_private_storage_release_install` in its own migration, without new
+  tables.
+- **What it returns.** The domain tables are not touched while the source is frozen (the write guard
+  rejects them), so `legacy` again is the server data as it was when frozen. What was written later
+  in Matrix is lost (and what Calendar's or Contacts' encrypted ingest left for that epoch): it stays
+  in Matrix, but nobody reads it any more. The old epoch's snapshot stays, immutable; a later
+  migration uses another epoch.
+- **Audit** in the same transaction: the state row gains `releases`, a list that only grows this way
+  (epoch, mode, rows, `released_at`, `auth_time`, `amr`). In addition, a line in the service log and
+  a bell notification (`security.storage.released`, pinned like the security ones; One's is created by
+  the Hub itself).
+- **Route**: `POST /private-storage/migration/release` (`platform/pkg/soltarfuente`), with the scope
+  header, without delegation, with `{"epoch", "discard_private_writes": true}` in the body —the
+  confirmation is also required on the server— and an identification less than five minutes old,
+  with a second factor if the account has one (`authn.IdentificacionReciente`, the same rule as the
+  emptying of [0087](#0087)). If missing, 401 `insufficient_user_authentication` with `max_age=300`
+  (RFC 9470). The services do not know whether the account has a second factor: Sytue ID now issues
+  it in the access token (`mfa_enabled`); a token without the claim counts as “with a second factor”.
+- **Web.** These apps never open Matrix on the web, so “the key does not open” is always the case:
+  `MatrixStorageGate` paints, outside the vault gate, a notice when the source is not `legacy` and
+  offers “Empty and go back to the server data” with a checkbox. If the service asks for
+  reauthentication, it stores the already confirmed operation (account, product and epoch, ten
+  minutes), sends the person to `/auth/login?reauth=1` (`max_age=0`) and repeats it once on return.
+  The common BFF only lets `POST migration/release` through, never in Drive or Photos.
+- **Native.** The Matrix panel of the records apps (`AplicacionRegistros`) offers the same way out
+  when the key does not open (`Panel.ConfirmarSoltarFuente`). If the service asks for
+  reauthentication, `Suite.Reidentificar` opens Sytue ID with `prompt=login` and `max_age=0` and it is
+  repeated for the same account; afterwards the app drops Matrix and mounts the view on the API.
+
+Seen while doing it and fixed afterwards: `hub_freeze_private_storage` read `notification_preferences`,
+which does not exist, and One's `Begin` failed (hub 0013 redefines it on `notification_prefs.kind`).
+ERP (syerp 0105) and Bases (0036) now deny in the database writing what the freeze captures while the
+source is not `legacy` (409 in the API). In Bases, a shared base does not enter the snapshot and stays
+editable: locking it would leave it read-only without an encrypted copy. Hub was first left without a
+guard on purpose: its server inbox was still alive with the private source, and a guard would have
+silently dropped the notifications other services send, security ones included. Guarding it first
+required a private notifications ingress; it is done (below, “One's private notifications
+ingress”). The migrations of calendar, contacts, notes, erp, cast and docs require PostgreSQL 17, so
+their routes were tested only at unit level; the shared SQL and those of bases, hub and erp (with a
+substitute collation), against PostgreSQL 16.
+
+**One's private notifications ingress (2026-11-23): done, with the guard in place.**
+Hub 0014 installs in its database the ingress shared with Mail and Calendar (`pg.WithPrivateIngressDDL`,
+with its single type `hub.receive`) and 0015 puts the write guard on `notifications` and
+`notification_prefs`. The order is the one that was needed: no notification reaches the guard any more.
+
+- **Where a notification goes.** `notify.Service.Create`, inside its transaction and after the
+  caps, reads the person's state row `FOR SHARE` (the freeze takes it `FOR UPDATE`; there is no race
+  between deciding and writing). In `legacy`, to `notifications` as always. If not,
+  `store.AdmitirAvisoPrivado`: its copy is stored in `hub_private_notices` and, if the person has
+  already enrolled an ingress key for that epoch, it is encrypted for it (`age`, inline in
+  `private_ingress_bodies`, the same sealing as Calendar; the body goes empty and the whole
+  notification in the encrypted metadata). The notification does not travel through NOTIFY, only a
+  `private_ingress` state event without data.
+- **No notification is lost.** The copy exists from the same transaction that accepts the notification:
+  - with no key yet, it is the queue; any operation of that person's ingress (including enrolling
+    the key) encrypts what was waiting, and if encrypting fails, only its savepoint is undone and
+    the notification stays in the copy;
+  - encrypted but unconfirmed, it is the reserve: **releasing the source** returns to
+    `notifications`, in the same transaction and with its id and date, everything no device
+    confirmed. What was encrypted for a key that person no longer opens is not left unread;
+  - when a device confirms its delivery (ACK verified by Rooms), the copy is deleted in that same
+    transaction: from then on the notification only exists encrypted in its private store.
+    Security ones (`security.*`, also `security.storage.released`) follow this same path
+    without exception. The “you released the source” one is created by the Hub after releasing it,
+    already in `legacy`. Accepted price: until the ACK the server stores the notification in clear
+    text, as in `legacy`.
+- **Caps.** The per-person, per-organization and per-type ones also count the copies of the last hour.
+- **Guard (0015).** The same rules as the previous attempt, which was discarded for dropping
+  notifications: a `subject` that cannot have a source (`email:…`, empty or longer than 1024 bytes)
+  does not create a state row; a DELETE with `app.merge='on'` (account deletion) passes, the merge
+  does not; the purge and “mark all” skip what is frozen (`hub_private_storage_frozen`); marking a
+  frozen notification and changing preferences give 409 `private_storage_frozen`. The historical
+  rebuild (already closed) answers `congelado`.
+- **Account deletion.** `hub_private_notices` is in `merge.DatosDeLaPersona`. What is encrypted in
+  the shared queue is retained, as in Mail and Calendar.
+- **Routes** `/private-storage/ingress/*` (the shared ones), on the Rooms authority
+  (`ROOMS_INTERNAL_SECRET`; without it, 503 `private_ingress_required` and notifications wait in the
+  copy). On the device, `apps/nucleo/hub.IngressExecutor` stores the decrypted notification in the
+  private store only once (its id is the delivery's), recognizes it on retry without restarting its
+  read and returns the commit of the claim's room.
+- **Devices.** `hub.Receiver` (`apps/nucleo/hub/receiver.go`) is the ingress on the device, like
+  Mail's: enrollment of the epoch's ingress key (`ingress.NewEnrollment`) and a worker
+  (`ingress.New` + `hub.IngressExecutor` + `ingress.NewHTTPSource` against the Hub's
+  `/private-storage/ingress/*`) that claims, stores and confirms. With the source in `legacy` it does
+  nothing. The Fyne Hub (`apps/fyne/cmd/hub`) first asks for Rooms' consent (like Mail), puts the
+  receiver among the retained sources of the records plan —its journal is drained on unmount and
+  is withdrawn or retained with the session— and starts it with the view: it reloads the inbox when
+  storing a notification and stops on unmount, sign-out or account switch. If the ingress fails,
+  the notifications already stored open anyway and what is pending stays in the Hub. `hub` enters
+  the single list of ingress products (`storage/ingress.Product`), and its enrollment journals are
+  deleted on sign-out like Calendar's.
+- **Web bell.** The web does not open One's private store, so the API's list and counter join
+  `notifications` with the copies not yet confirmed (`private: true`): with the source frozen the
+  bell still sees the new notifications, and the data-less `private_ingress` event reloads it.
+  Decision: they can be marked as read, in the copy (`read_at`), which is only the server's view: it
+  does not travel encrypted nor change what the device stores, and it comes back with the
+  notification if the source is released. “Mark all” marks its own and the copies and leaves what is
+  frozen as it is (it used to give 409). A notification that a device already confirmed is no longer
+  seen on the web: from then on it only exists encrypted in its private store. Frozen notifications
+  still give 409 when marked.
+- **Deployment.** The Hub's `ROOMS_INTERNAL_SECRET` in Compose and in the deployment configuration
+  (`sytue-hub`, key `rooms-internal-secret`, optional, like Mail and Calendar); the deployment
+  requires it.
+
+The enrollment and receipt of `hub` against the real Rooms authority is still not tested end to end
+(the tests use an authority that accepts any receipt and a worker with a fake source). Until a device
+confirms, what belongs to a person with the source frozen waits in the Hub, is seen in the web bell
+and goes back to `notifications` if they release the source: it is never lost.
+
+**Native Drive on the vault (2026-11-23): done for whoever the web already migrated.** Native Drive,
+Photos (its originals) and PDF read and write in the same vault as the web when the web has already
+taken that person's Drive there; if not, they stay on Matrix without any change. Native import and
+the move from Matrix to the vault came later (see below). Code in
+`apps/nucleo/storage/pqvault/existe.go`, `apps/fyne/sesion/diario_boveda*.go`,
+`apps/fyne/cifrado/{drive_boveda,aplicacion_drive}.go` and the hosts of `cmd/drive`,
+`cmd/photos` and `cmd/certipdf`.
+
+- **Choice per account, without asking for any key** (`cifrado.ElegirAlmacenDrive`), in this order:
+  pending Drive work of that account in some Matrix journal on the device → Matrix; pending work in
+  the vault journal → vault; the `drive` vault stores records (`pqvault.HasRecords`: it only reads
+  the key state and one page of encrypted records, it never creates the vault) → vault; otherwise →
+  Matrix. Without being able to count or ask: neither one nor the other, “Retry”. The Matrix app only
+  starts for the account sent to Matrix (its `CanStart` is set by the host, as in
+  `AplicacionRegistros`).
+- **The journals are never mixed.** The vault has its own device journal, encrypted and separate, in
+  `<settings>/private-work/<app>/pq-vault` (`Suite.DiarioBoveda`, with the same work token as the
+  Matrix one): same namespaces, another store, so an intent of one backend neither blocks nor resumes
+  the other's. An upload pending in the Matrix journal **is finished in Matrix**: while it exists,
+  that account stays on Matrix (which resumes it on mount) and nobody touches its intent; with the
+  Matrix journal empty, the account moves to the vault.
+- **Sign-out.** The vault journals enter `directoriosAlmacenPrivado`: their pending work blocks
+  sign-out like Matrix's, the explicit discard deletes it only for the account signing out, and the
+  sign-out cleanup removes everything that is not durable work, the same as with Matrix's.
+  `PendientesAlmacenamiento` also counts their uploads.
+- **Unlock with Sytue ID** through `PuertaBoveda` (the unlock key of the device session; sign in
+  again, retry or empty with a checkbox), without a new password or a loop. Its server is bound to
+  the account (`sesionBovedaDeCuenta`): a vault request after switching accounts fails instead of
+  carrying the other person's token.
+- **Repository:** the usual one (`apps/nucleo/drive`) on `vaultfiles.Store` and the vault journal,
+  with the same cycle (`RepositoryCycle`) and the same work registry as Matrix, so sign-out drains
+  it. It opens only if the vault has the migration receipt of the server's epoch (the same
+  `drive_migration_<sha>` object that the web's `PrivateDriveRepository.migrate` leaves); if not,
+  `ErrNotReady` and nothing is mounted (except the import below).
+
+**Importing from native and moving Matrix to the vault (2026-11-23): done.** What was left in
+points 1 and 2 of the previous list. Code in `apps/nucleo/drive/{direct_import,vault_migration}.go`,
+`apps/nucleo/matrix/storage_file_copy.go`, `apps/fyne/cifrado/{drive_boveda,drive_migracion}.go` and
+`cmd/drive`; end-to-end tests in `apps/nucleo/storage/vaultfiles/drive_migracion_test.go`
+(on `pqvaulttest`, with a fake server source and another vault as the copy's origin).
+
+- **The choice rule gains two steps** and ends up like this: pending work in Matrix → Matrix; an
+  unfinished copy from Matrix to the vault (`drive-vault-migration-v1` in a vault journal) →
+  Matrix, where the whole data still is and from where it is resumed; pending work in the vault →
+  vault; the vault with records → vault; **the server source in `legacy` → vault**, which imports
+  it; otherwise → Matrix. Matrix no longer freezes anyone's source: with the source in `legacy` the
+  vault always wins (also in Photos and PDF).
+- **Native import** (`drive.Config.DirectImport`, set only by the vault host; Matrix still does
+  not import onto an isolated identity). It is the same code that imported into Matrix and the same
+  result as the web: it freezes with its own epoch, whose intent (`begin_`) is written to the journal
+  **before** freezing; it copies each row with its intent and fixed transactions (a row already
+  published is reread and confirmed, not rewritten), checks the inventory against what the server
+  said and publishes the receipt at the end. An interruption leaves the epoch in the journal and the
+  next opening resumes it; an opening with the receipt already in place does not read the source
+  again. **An epoch frozen by someone else** (the web, another device or Matrix) is not imported from
+  here: `ErrNotReady`, as before. That way a half-done copy of something else is never mixed with the
+  server source.
+- **Copy from Matrix to the vault** (`drive.Repository.MigrateToVault`), with confirmation: the Drive
+  app, with the Matrix Drive open, offers “Move to the vault” in a notice that does not go away on its
+  own and asks for a checkbox (`cifrado.PasoBoveda`, keys `vault.move*` in the 26 languages). It uses
+  the identity cutover engine (`storage/transfer`): it copies each catalog revision with its links,
+  each file re-encrypted in authenticated blocks without a clear-text temporary
+  (`Client.MigrateStorageFileContentInto`) and checked against the original's commitment, rereads
+  everything from the destination, downloads every copied file in full and publishes **the receipt
+  last**. Until then the vault has no receipt and nobody opens it. **Matrix is not touched**, neither
+  during nor after: its data stays there. Matrix cannot be frozen (the power fence belongs to the
+  identity cutover controller), so its “fence” is a fingerprint of each room's authenticated catalog:
+  if someone writes to Matrix during the copy, it is not accepted. With Matrix work pending on the
+  device, it does not start.
+- **Resume or repeat.** The plan and the mappings live in the vault journal: an interruption resumes
+  where it stopped. If Matrix changed in between, the plan is no longer valid; the vault, which
+  without a receipt only holds the copy, is emptied (`pqvault.Reset`, only as it was seen and with the
+  copy's mark: see “The copy without races”) and it starts again. A vault **with** a receipt is never
+  emptied: if the web migrated in the meantime, the vault wins (`ErrVaultInUse`). When finished, the
+  map is archived separately (`drive-vault-migration-history-v1`, which does not count as pending)
+  and the app chooses again: it opens the vault with its receipt, as if the web had migrated it.
+- **Whoever cannot open Matrix** has in Drive's Matrix panel the way out of the records apps,
+  “Empty and go back to the server data”, without reauthenticating: it records in the vault journal
+  that it adopts the frozen epoch (`drive.AdoptRetainedSource`) and the vault imports it from the
+  copy the server kept. What was written afterwards in Matrix stays there, unread; the server does
+  not change (it does not work for a source already in `private`).
+
+What is **still not done**, and why:
+
+1. **Stuck Matrix uploads.** If the web already migrated to the vault and an upload is left pending
+   in the Matrix journal that Matrix can no longer finish (its engine has no receipt for the epoch
+   the web froze), the account stays on Matrix: the intent is kept, counts as pending on sign-out
+   and is only lost with the explicit discard. The copy does not start with Matrix work pending
+   either. Unchanged.
+2. ~~**The web during a copy.**~~ Done: see “The copy without races” below. What remains is that, if
+   the person **cancels** the copy from the web (or the mark expires because the device stopped),
+   the web imports on top as before: either it collides with what was copied and fails without
+   accepting anything (“Empty” with confirmation), or it leaves the vault with the server's copy and
+   its receipt, and what was written in Matrix after freezing is not seen in the vault. Nothing is
+   lost: it stays in Matrix.
+3. **Writes to Matrix after copying**, from another device that has not chosen again yet, stay in
+   Matrix. Without freezing Matrix there is no way to prevent them.
+4. ~~**A journal lost halfway through a copy.**~~ Done: see “The copy without races” below. What
+   remains is that, with the journal lost, the old mark (of an identifier that is no longer in any
+   journal) has to expire —five minutes without renewal— before the copy can be repeated, or be
+   cancelled from the web. The device is not identified (the mark's label is only
+   `native-<system>`), so one's own mark is not “taken back”.
+5. **Photos records:** see “Photos records and Docs attachments” below.
+6. **Docs attachments:** ditto.
+7. In the vault there is no ingress consent nor Matrix publication context
+   (`BindPublicationContext` is null: the vault receives nothing from outside) nor live event
+   notices (`AlEvento`): the view is refreshed on request.
+8. On Android, Photos and PDF still have no private Drive (the consumers have no shared journal
+   there, same as with Matrix); the Drive app does choose. The offer to copy is only in the Drive
+   app; Photos and PDF follow what is chosen.
+
+**The copy without races (2026-11-23): done.** Three gaps in the copy from Matrix to the vault.
+Code in `services/drive/internal/store/pq_vault.go` (migration `0041_pq_vault_copy`),
+`apps/nucleo/drive/{vault_copy,vault_migration}.go`, `apps/nucleo/storage/pqvault/vault.go`,
+`apps/fyne/cifrado/{drive_migracion,drive_boveda}.go`, `packages/offline/src/vault/pq-vault.ts`,
+`apps/drive/src/client/private-drive.ts` and `packages/shell/src/matrix/PqVaultGate.tsx`.
+
+- **(a) Emptying is compare-and-swap on the server.** The vault gains `version`, which goes up with
+  each new record and with each emptying under its row's lock (publishing takes `FOR NO KEY UPDATE`,
+  emptying `FOR UPDATE`: a publication in flight either finishes first and is seen, or waits).
+  `PUT keys` with `reset` requires `expect: {vault_id, version}` —without it, 400— and only empties
+  if the vault is still like that; if not, 409 `pq_vault_changed` and nothing is deleted. The client
+  sends **what it saw when deciding**: the native copy, what it read with its mark already set and
+  before rereading the catalog (`VaultNotEmptyError.Expect`, which the app passes to
+  `pqvault.Config.Expect`); the web, the vault it saw when the key did not open it
+  (`PqVaultError.expect` → `PqVault.reset({expect})`); the silent reset of an empty vault, what it
+  read before checking it was empty. That way the receipt of an import that finishes between “there
+  is no receipt” and “empty” is never deleted (`pqvault.ErrChanged`, `PqVaultError('changed')`): the
+  next attempt sees it and the copy stops (`ErrVaultInUse`). The server cannot read a receipt —it is
+  encrypted—, so “never empty a vault with a receipt” is decided by whoever can read it, and the CAS
+  guarantees that they decided over everything that was there.
+- **(b) The “copy in progress” mark.** Before reading the vault, `MigrateToVault` sets on the server
+  (`PUT /pq-vault/{product}/copy`) a mark with a random identifier stored in the vault journal, the
+  label `native-<system>`, the type `matrix-copy`, the server epoch and five minutes of life; it
+  renews it every minute while copying. With the mark active, the server only lets whoever brings
+  it (`copy_id`) publish and empty; the rest get 409 `pq_vault_copy_in_progress`. The copy writes
+  and empties with it (`api.WithPQVaultCopy`), keeps it when emptying and removes it when finishing
+  or when seeing that the vault already has its receipt. If someone cancels it, the copy's next
+  write is rejected and the copy stops. The web, before importing, looks at the mark: if it is
+  active it writes nothing and the gate shows “Another device is moving your Drive to the encrypted
+  vault” with **Retry** and **Cancel the copy** (`DELETE copy?id=`, which deletes no record: what
+  was copied is left without a receipt and Matrix stays whole).
+  When opening with the receipt, an already expired mark is removed. Another native device that
+  wants to copy in the meantime writes nothing and shows the same (`PasoOcupado`).
+- **(c) An orphaned copy is recognized.** With the mark, what is in a vault without a receipt is
+  known to be a copy from Matrix even if the journal was lost: the choice (`ElegirAlmacenDrive`)
+  sends to Matrix the account whose vault carries a `matrix-copy` mark (active or expired), where
+  the data is and from where “Move to the vault” repeats it: with the old mark expired, the new one
+  sees that the vault already had that of a Matrix copy (`VaultNotEmptyError.Copy`) and empties it
+  safely (CAS and its mark) before starting. With no plan **and** no previous mark, what is half
+  done is something else (a web import) and the copy **no longer empties it on its own**: it fails
+  without writing.
+- **Compatibility.** The migration only adds columns with a default value. Against an earlier
+  server (which rejects unknown fields), emptying with `expect` is 400 and the native copy does not
+  start (without `PUT copy`): it fails without writing anything, which is the safe thing, until
+  `services/drive` is deployed. Native apps already installed (v3.22 and earlier) empty without
+  `expect`: the new server allows it with the previous semantics (empties without comparing), but
+  rejects it with 409 `pq_vault_copy_in_progress` if someone else has an active mark, and records it
+  in the log (“emptied without expect”) to know when to withdraw it. Current clients always send
+  `expect`; their writes without `copy_id`, like those of earlier ones, respect the mark.
+
+**Photos records and Docs attachments (2026-11-23).** What was asked was to move them to the vault
+when the person's Drive is already in it. Having looked at the code, neither of the two can be moved
+there without breaking the web or risking data; what was done is the safe subset.
+
+_Photos._ The web does not store Photos records (albums, favorites, edits, memories) in the vault:
+its gate (`MatrixStorageGate` → `PqVaultGate`) only lets people through and the gallery reads and
+writes in syphotos through the API; the originals are uploaded by the BFF to the server Drive
+(`/api/drive-subir`) and syphotos indexes them. It is point 1 above, the same as for the records
+apps, and its answer is the same:
+
+- **Done:** native Photos uses `AplicacionRegistros` (`cmd/photos/private.go`). With the syphotos
+  source in `legacy`, the gallery goes through the API, like the web: records in syphotos, originals
+  in the “Photos” folder of the server Drive, opening a Drive file in the editor indexes through the
+  API (idempotent). Without Matrix, without `PuertaBoveda` and without freezing the source. Before,
+  native Photos always went to Matrix: with an isolated identity and the source in `legacy` it never
+  got to open (`ErrNotReady`), and with the old identity it imported and froze the web's source.
+  With the source already copied to Matrix (`building`, `frozen`, `private`), through Matrix as
+  until now, with its originals in the vault or in Matrix according to `ElegirAlmacenDrive`.
+- **Not done: Photos records in the vault.** A copy there would not be read by the web (it stays in
+  syphotos), which is exactly the third copy of point 1. And what is already in Matrix cannot be
+  moved without risk: the copy (`records.MigratePrivateCatalog` + `storage/transfer`, which already
+  verifies inventory, file commitments and receipt) requires the origin to be **frozen** on the
+  server (`FrozenStorageBindings`: the controller owning the rooms and the account unable to write).
+  For the isolated Matrix identity that freeze does not exist —only the old identity's cutover has
+  it, in Rooms—, so another device with Matrix open could keep writing after copying and that would
+  stay in Matrix without anyone reading it. Required first: a freeze of the isolated `photos`
+  identity in Rooms and reading the encrypted gallery on the web. To decide without races between
+  devices there is already a reusable piece: the server accepts Photos' source plan by CAS
+  **before** `Begin`, and its link (`SourcePlanRouting.Plan.Link.RoomID`) is the vault's `vault_id`
+  or a Matrix room, so it says without keys who kept the import.
+- **Uploading photos with Drive in the vault: fixed** (see “Uploading photos with Drive in the
+  vault” right below). Before, with the server Drive's source frozen, uploading failed with 409
+  `private_storage_migration_required` on the web and natively through the API.
+- A source plan accepted in Matrix before `Begin` (source still `legacy`) stays in the Matrix
+  journal: it counts as pending on sign-out and is discarded with the checkbox; the server data is
+  not touched.
+
+**Uploading photos with Drive in the vault (2026-11-23): done.** The gallery now uploads when the
+person's Drive is in the vault, without writing anything in clear text on the server and without
+overwriting any photo. What was decided is the minimum that leaks nothing: **the original goes
+encrypted to “Photos” in the vault's Drive and does not enter the server index**.
+
+- **Why without an index (on the server).** syphotos indexes by reading the original from the
+  server Drive and generates the thumbnails there; with the photo in the vault it cannot read it.
+  Giving it an entry with the vault id would give it metadata (date, name, size, EXIF) that it does
+  not have today, and even so it would not know how to show it. So the encrypted photos **do not
+  appear in the timeline, the albums or the search**: the web lists them separately, in the
+  browser. _Superseded_ by “The encrypted gallery” (below): the index exists, but on the client and
+  encrypted in the vault; the server still does not have it.
+- **Thumbnails: none stored.** No thumbnail is generated or stored (neither in clear text nor
+  encrypted): each photo is decrypted in memory when shown and the browser scales it; meanwhile, a
+  placeholder with a padlock. Storing encrypted thumbnails in the vault would leave loose files in
+  the person's Drive and a second copy to maintain; with the separate gallery and batches of 60 it
+  is not needed. Above 64 MB it is not decrypted for the view. _Superseded_ by “The encrypted
+  gallery”: with the photos in the timeline they are needed, and they are stored encrypted in the
+  vault.
+- **Web** (`apps/photos/src/client/{subida,driveCifrado}.ts`, `components/FotosCifradas.tsx`).
+  `/api/drive-subir` translates Drive's 409 (only with its code) into 409 `drive_private_vault`;
+  the gallery then sends that photo and the following ones to the vault's Drive, with **the same
+  repository and the same gate as web Drive**: `createPrivateDriveGate` moved from `apps/drive` to
+  `@sytue/offline/vault/drive` (Drive re-exports it) and the sink that assembles a decrypted file
+  (`collectPrivateDriveFile`) is shared by both. The gate gains `importar: false`: the gallery
+  **never imports or freezes** the server source; it opens the repository only with the migration
+  receipt (`initialize`, without reading anything in clear text) and, if Drive is still moving to
+  the vault, it says so. `PqVault.open` gains `existing`: the vault is opened only if it already
+  exists; it is never created, reset (not even silently with the wrong key), resealed nor does it
+  register its signing key from Photos. A name already in “Photos” is uploaded as
+  “IMG_0001 (2).jpg” (uploading with the same name would create a new version). The gallery shows
+  “In your encrypted Drive” only if the server Drive's source is no longer in `legacy` (checked
+  without keys), and opens the vault when the person asks for it or when uploading.
+- **Photos BFF for the Drive vault** under `/api/drive-cifrado/api/…`: `pq-vault` (GET and POST,
+  without PUT of keys), `matrix/storage/blobs` (GET and PUT, without DELETE) and
+  `matrix/storage/migration` (GET only: it never starts a migration), with the scope bound to
+  `drive`.
+- **Sytue ID bridge** (`bridge.js`): on its own host (`photos.`), Photos can **open**
+  (`sytue-e2e-vault-unwrap`) the `drive` vault (`VAULT_READERS`, `productOpenAllowed`); creating it
+  or resealing it (`vault-wrap`) is still Drive-only. On an organization host it already could, like
+  any app.
+- **Native** (`apps/fyne/apps/photos`, `cmd/photos`). The API gallery asks on each upload where to
+  upload (`App.DriveDeSubida`): with the server Drive's source in `legacy`, there; if not, to the
+  private Drive of the account chosen by `cifrado.AplicacionDrive` (the vault, `vaultfiles.Store`,
+  or Matrix), through `galeriaDriveData`. What is uploaded there is not indexed (`ErrEnBoveda`,
+  which the backup counts as done) and overwrites no photo. Without the private Drive open, the
+  gallery shows its panel to unlock it at the top and says so (`gallery.uploadVaultLocked`); a 409
+  from the server's encrypted drive (`api.EsUnidadCifrada`) is counted the same way, not as “could
+  not upload”.
+- **Messages** in the 26 languages (web Photos catalog, which native embeds):
+  `gallery.uploadedEncrypted`, `gallery.uploadVaultSignIn`, `gallery.uploadVaultNotReady`,
+  `gallery.uploadVaultLocked`, `gallery.uploadVaultUnavailable` and `gallery.encrypted.*`.
+
+What is **still not done**:
+
+1. ~~**The encrypted photos are not really in the gallery.**~~ Done on the web: see “The encrypted
+   gallery” below. Memories, similar, nearby and AI still do not include them, and it is said.
+2. ~~**Native does not list them.**~~ Done: its own section in the gallery, with the same index (see
+   below; they are not yet mixed with the server timeline natively).
+3. ~~**The backup with the app closed still uploads to the server Drive.**~~ Done: it no longer
+   insists on the 409 (see below); it uploads encrypted only if the app is alive in the process and
+   its encrypted Drive is already open.
+4. **What was already in the index** before moving Drive to the vault stays in syphotos with its
+   server thumbnails; it is not touched.
+5. **Where the device has no private Drive** (Photos on Android, point 8 above) it still cannot
+   upload with Drive in the vault; now it says so with its message
+   (`gallery.uploadVaultUnavailable`: “upload them from the web”) instead of a generic failure.
+
+**The encrypted gallery (2026-11-23): done, with what is said below.** The photos in the vault's
+Drive are first-class in Photos for whoever has their Drive there, without a single photo in clear
+text or a single piece of metadata reaching the server. Code in `apps/nucleo/photos/galeriacifrada`
+(Go, with the format and its tests), `apps/frontend/apps/photos/src/client/galeriaCifrada.ts`,
+`src/lib/{exif,lineaMezclada}.ts`, `src/components/{FotosCifradas,AlbumesCifrados}.tsx` and
+`apps/fyne/apps/photos/{galeria_cifrada,editor_cifrado,copia_fondo,copia_app}.go`,
+`apps/fyne/cmd/photos`.
+
+- **Where the index lives: encrypted files of the vault's own Drive**, inside “Photos”:
+  `.sytue-galeria/indice/<id>.json` (one entry per photo, with the Drive file id: capture date from
+  EXIF —extracted on the device—, already oriented dimensions, favorite, albums, the hash of the
+  indexed content and the id of its thumbnail), `.sytue-galeria/miniaturas/<id>.jpg` (512 px, made
+  on the device) and `.sytue-galeria/albumes/<id>.json` (one record per album). They are encrypted
+  with the same key and the same format as the photo; the server only sees opaque blocks, as with
+  any Drive file. They are **not** records of another type in the `drive` vault (the Drive catalog,
+  web and native, and the copy from Matrix to the vault verify what is there: a foreign type there
+  is a needless risk) **nor** a new `photos` vault (that is the one for the Photos records above,
+  which is still undecided; creating it would make native believe it already stores records, and
+  the Sytue ID bridge does not allow creating it from Photos). So nothing changes in the BFF, the
+  bridge or `services/drive` either. The `.sytue-galeria` folder is visible in the Drive app.
+- **Nothing is ever lost.** One entry per photo, not a whole index: two devices touching different
+  photos do not overwrite each other. Each change (favorite, album) rereads the entry right before
+  and applies only its own; if nothing changes, it does not write. Writing an entry again is a new
+  version of the same Drive file: the previous one stays in its history. An entry that is missing,
+  cannot be read, is not valid or belongs to other content (the photo was edited) stops nothing:
+  the photo comes out with what Drive says (name and upload date) and is **rebuilt from the
+  original** (a few per opening: 30 on the web, 10 natively), keeping favorite and albums. Nothing
+  is deleted from the gallery: no photos, no entries, no thumbnails. Two `.sytue-galeria` created
+  at the same time by two devices are read the same way (always the one with the lower id).
+- **Web.** Opening the encrypted Drive is still on request (“Show”) or when uploading. With it open,
+  the encrypted ones **enter the timeline by date** with the server ones (an encrypted one only
+  appears when the server timeline has reached its date, so as not to skip months), with a padlock;
+  in **favorites** (the marked ones), in the **search** (in the browser, by name and by date, ahead
+  of the server results) and with the year jump. Heart, viewer (decrypted in memory,
+  previous/next, download), **encrypted albums** (create, add, remove; on the albums page, a
+  separate section) and **editor** (rotation, mirror, exposure, contrast, saturation, temperature,
+  with the editor's engine) write only to the vault; saving an edit uploads a **new version** of the
+  same file (the original stays in the version history) and rebuilds the entry without losing date,
+  favorite or albums. Uploading records each photo in the index right away (if it fails, the photo
+  is already safe and gets rebuilt).
+- **What needs the server does not include them, and it is said**: Sytue AI (describe, ask, edit
+  with AI), similar, nearby, memories, duplicates, sharing, trash and bulk actions. The “In your
+  encrypted Drive” strip and the viewer say so (`gallery.encrypted.note`); in selection mode the
+  encrypted tiles are not selected and say so on hover (`gallery.encrypted.notSelectable`).
+- **Native (parity with the web, 2026-11-23).** The API gallery does the same as the web with the
+  same index and the same rules, in Go (`galeriacifrada`): the encrypted ones **enter the timeline
+  by date** (`MezclarLinea`, the rule of `lineaMezclada.ts`, with the chosen year and the search),
+  with a padlock on the tile, in **favorites** and in the **search** (on the device, by name and by
+  month). In the timeline, an encrypted one is an `api.Photo` with the file id prefixed with
+  `cifrada:`; the Photo libraries ask the app for their thumbnails, which decrypts them
+  (`miniaturasCifradas`), and **never** the server. In selection mode they are not selected and say
+  so (`gallery.encrypted.notSelectable`). Opening one shows it in the **full-screen viewer**, like
+  the server ones (see “The native viewer”, below), with its favorite, its **encrypted albums**
+  (checking adds it, unchecking removes it, and “New encrypted album”) and **Edit**: the usual
+  native editor without the Sytue AI tab and with “Save as new version”
+  (`gallery.encrypted.{saveVersion,editHint}`), which applies the recipe (rotation, mirror, crop,
+  exposure, contrast, saturation, temperature) to the whole photo with the Photos engine
+  (`photos/render`, orientation EXIF included) and uploads it as a new version **through
+  `ReplaceFile`**: the vault's Drive rejects a version that another device has already changed
+  instead of overwriting it (`galeriacifrada.Editar`/`GuardarEdicion`, which return the new file for
+  the next edit). The entry is rebuilt without losing the capture date (the edit comes out without
+  EXIF and the previous one is kept), the favorite or the albums. The **Albums** page has the
+  “Encrypted albums” section (create, open with its photos, compact empty state
+  `gallery.encrypted.albumEmpty`); adding and removing write only the photo's entry (`PonerEnAlbum`).
+  “Similar” and “nearby” say they do not include them (`gallery.encrypted.note`), as does the “In
+  your encrypted Drive” header, which no longer carries the photo strip: it keeps “Show”, the state
+  and the compact empty state. It does not ask to unlock the Drive on its own (`App.GaleriaCifrada`
+  with `abrir` false): with it closed it offers “Show”. What “Add photos” and the backup with the app
+  open upload to the private Drive is recorded in the index from the local copy, without downloading
+  the original again. The gallery's hidden Drive facade (`galeriaDriveData`) opens `Download` and
+  `ReplaceFile` for that; the rest stays closed. No new text: the web keys were already in the 26
+  languages of the catalog that native embeds.
+- **The native viewer (2026-11-23).** The full-screen viewer takes what belongs to the photo from its
+  **source** (`apps/fyne/apps/photos/visor_fuente.go`): the server one (its export) or the encrypted
+  gallery one (`cifrada:`), whose original is decrypted **only in memory**
+  (`galeriacifrada.Galeria.{Vista,Imagen,Exportar}`: the 2048 px “large” one, the whole photo at
+  real size and the JPEG or PNG export, oriented by its EXIF and without EXIF in what is exported).
+  It walks the **mixed timeline** being shown (and, from “Albums”, the open encrypted album), so the
+  arrows, Home/End, the slideshow and the “12 / 240” move from one kind of photo to the other.
+  **Download** writes the decrypted data only through `App.Guardar` (the system downloads or, on
+  mobile, the gallery), without a temporary file or cache; the viewer's Photo library stores the
+  “large” one, as with the server ones. Favorite, encrypted albums (a menu with the ones that have it
+  checked and “New encrypted album”) and Edit write only to the vault. With an encrypted one, what
+  goes through the server **is not offered** (similar, describe, ask, rotate —rotation is done in
+  Edit—, trash, map and nearby, system gallery), not even through its shortcuts, and the info panel
+  shows the padlock and `gallery.encrypted.note` instead. The dialog that used to show it is
+  removed.
+- **The backup with the app closed** asks for the server Drive's state (without keys) before
+  uploading anything. With the source in `legacy`, as always. If not, **it does not upload to the
+  server Drive**, and what it does depends on who can open the vault (decided on 2026-11-23):
+  - **The key** to unlock is the Sytue ID one: it goes with the session in the **system's secure
+    store** (Keystore on Android, Keychain on iOS; `auth.guardado`), with no copy anywhere else, and
+    it is used by the app's vault gate (`cifrado.PuertaBoveda`), which is what knows how to open it
+    with its journal, its leases and the account's authorization intent. The background round **does
+    not read or store it**: it only asks whether it is there (`App.ClaveEnDispositivo`, which
+    immediately deletes the copy the session returns).
+  - **With that account's app alive in the process** (Android with the process open, the iOS refresh
+    task) and the key on the device, the round asks **that same gate** to open the encrypted Drive
+    —what “Show” does—, waits for it to be ready (at most one minute, within the task's time limit)
+    and uploads encrypted through it, recording it in the index. If the key does not open, the gate
+    stays waiting for the person and the round ends without uploading.
+  - **Without the app alive** (Android waking up only the library, without `Suite`) **nothing is
+    opened**: opening the vault outside its gate would be a second way of handling its keys, without
+    journal or leases, and its guard is not weakened for the backup. Neither with the app alive and
+    without the key on the device (one has to sign in to Sytue ID again, and in the background there
+    is nobody to ask).
+  - In those cases the round ends without counting failures (`ErrCopiaEsperaBoveda`, `SinCambios`),
+    but **it no longer waits silently**: if there are photos to upload and the round could run
+    (permission, network), it notifies in the system (“Open Sytue Photos to finish the encrypted
+    backup”, `backup.encryptedWait{Title,Body}`), **once a day** at most
+    (`registroCopia.AvisoBoveda`, which a complete round clears).
+  - **With the app open, the backup continues as soon as the encrypted Drive is opened**
+    (`App.DriveCifradoAbierto`, from mounting the private Drive in `cmd/photos`): the round that
+    stopped because of it, or the one the background backup left waiting, does not wait for the next
+    one (15 min).
+  - Without being able to ask for the state (no network, earlier server), as before.
+- **Messages** in the 26 languages (web Photos catalog, which native embeds):
+  `gallery.encrypted.{note,badge,open,notSelectable,actionFailed,saved,albums,newAlbum,saveVersion,editHint,albumEmpty}`
+  and, native only, `backup.encryptedWait{Title,Body}`; removed `gallery.encrypted.{hint,more}`. The
+  native viewer adds none.
+- **Tests.** The format is tested with the same files in Go and in TypeScript
+  (`galeriacifrada/testdata`); the web, on the real `PrivateDriveRepository` and its synthetic store
+  (nothing in clear text reaches the store: no names, no dates, no album titles). In Go, the order
+  of the mixed timeline (`linea_test.go`), the albums and the editing (`edicion_test.go`) and the
+  version saved on the real vault (`boveda_test.go`: `vaultfiles` on `pqvaulttest`, the previous
+  version stays in the history, nothing in clear text in the blocks and an edit on an old version is
+  not saved; viewing and exporting write nothing and leave nothing in clear text); natively, the app
+  with the timeline, the tile, the albums and the editor
+  (`apps/fyne/apps/photos/galeria_cifrada_test.go`), the viewer (`visor_cifrada_test.go`:
+  previous/next along the mixed timeline, download only through `Guardar`, without the server
+  features) and the backup (`copia_fondo_boveda_test.go`: it opens through the gate with the key on
+  the device, without it it notifies once a day, and with the app open it continues when the
+  encrypted Drive is opened).
+
+What is **still not done** in the encrypted gallery, and why:
+
+1. **Native: what is not yet like the web.** Saving an edit closes the editor and goes back to the
+   gallery. Encrypted albums cannot be renamed or deleted (not on the web either). Natively with
+   Matrix (not through the API) there is no encrypted gallery.
+2. **The backup with the app closed does not open the vault without the app alive**, on purpose (see
+   above): opening it outside its gate, without `Suite`, would be another way of handling its keys.
+   It notifies and waits for the app to be opened. On iOS the notice does not show (the Fyne backup
+   one is not used there). On Android, Photos still has no private Drive (point 8 above), so the
+   photos wait there.
+3. **Performance with many photos**: reading the index means downloading one entry per photo (four
+   at a time). A snapshot derived from the index (which would not be a source of truth) would speed
+   it up.
+4. **No thumbnail** for what the device cannot decode (HEIC in many browsers): those show the
+   padlock and are seen when opened if the browser can.
+5. **What was already in the server index** before moving Drive to the vault stays there; it is not
+   moved to the encrypted gallery.
+
+_Docs._ The “attachments” of a private document are not Drive files: images go inside the content
+(dataURL) and natively the snapshots and blobs are binary rows of the records repository itself, so
+they follow the records (API with `legacy`, Matrix otherwise). What Docs does write to Drive, from
+the **server**, is each document's “home” file (`hogar_en_drive.go`), the signature PDFs and “Save
+to Drive”. With Drive in the vault, Drive rejects those writes with 409
+`private_storage_migration_required`, and that broke Docs:
+
+- **Done (`services/docs`):** the Drive client distinguishes that 409 by its code
+  (`drive.ErrUnidadCifrada`; any other 409 is still what it was). **Creating a document** no longer
+  fails with 503: it is created only in Docs and without an anchor, as in a deployment without
+  Drive; the server does not leave a clear-text copy in a drive the person has encrypted. **Save to
+  Drive** and the signature PDF answer 409 `drive_private_vault`; the editor says so in its language
+  (`doc.msg.saveToDriveVault`, 26 languages) instead of “the changes could not be saved”. The
+  **trash** took that 409 for “name taken”: now trashing, restoring or checking the frozen copy does
+  not apply, and purging still asks about the owner's legal hold, like a document without a file.
+- **The Docs file inside the vault: done for “Save to Drive”** (see right below). It is written by
+  the client, as was said; the `drive:<id>` anchor is not reused for the vault's new files.
+
+**The Docs file in the vault's Drive (2026-11-23).** With the person's Drive in the vault, web
+Docus, Calcus and Diapos store the document's file there, **encrypted in the browser**: no server
+receives it in clear text and the Docs one only gets the anchor.
+
+- **Two anchors** (`packages/office/src/editor/state/anclaDrive.ts`): `drive:<uuid>` is a file in
+  the server Drive, as always; `vault:<uuid>`, one in the vault's Drive. Nothing on the server
+  (Drive's trash, “open from Drive”, `ficheroDe`) treats a `vault:` as its own: it only recognizes
+  `drive:`. A `drive:<id>` from before moving to the vault still works if that file was copied:
+  `PrivateDriveRepository.migrate` keeps the id (`source_id`).
+- **Save to Drive** (`editor/state/driveCifrado.ts`, `useDocument.saveToDrive`). With a `drive:`
+  anchor, first the BFF as always; if it answers 409 `drive_private_vault`, or the anchor is already
+  `vault:`, or there is no anchor and Drive is in the vault (checked without keys, by the source
+  state), the browser exports the document through `/api/export`, opens the vault and uploads:
+  - to the anchored file if it is still alive in the vault, with its name, in its folder and in the
+    format of its extension: a new version (if it has no round trip, `.pdf` or `.txt`, it is not
+    rewritten and it is said: `doc.msg.saveToDriveUnsupported`);
+  - if not, to a new file in “Sytue Docs” at the root (the server's folder), in ODF (the format of
+    the server's home file) and without overwriting any name (“Minutes (2).odt”).
+    The menu offers “Save to Drive” also without an anchor when Drive is in the vault.
+- **The anchor is set by the service, not blindly by the client**
+  (`PUT /api/v1/documents/{id}/vault-anchor`, `services/docs/internal/http/ancla_boveda.go`, BFF
+  `/api/vault-anchor`): only the owner, only `vault:<canonical uuid>`, only from no anchor or from
+  another `vault:` —a `drive:` is not replaced: the trash still uses it for the server's frozen
+  file—, comparing with the current one (`expect`, 409 `vault_anchor_changed`) and without touching
+  `updated_at`. If it cannot be anchored (another tab did it first, no network), what was saved
+  stays in the vault and the next save tries again. Whoever is not the owner saves a copy in THEIR
+  encrypted Drive and anchors nothing.
+- **Same gate as Photos.** The consumer opening (`openConsumerPrivateDrive`: the vault only if it
+  exists, the repository only with the receipt, `importar: false`), the failure reasons and the
+  folder and name helpers moved to `@sytue/offline/vault/drive`; Photos uses them the same way.
+  Office BFF for the Drive vault under `/api/drive-cifrado/api/…`: `pq-vault` (GET and POST, without
+  PUT of keys), `matrix/storage/blobs` (GET and PUT, without DELETE) and `matrix/storage/migration`
+  (GET only). The Sytue ID bridge allows **opening** the `drive` vault from `docus.`, `calcus.` and
+  `diapos.` (`VAULT_READERS`); creating or resealing it is still Drive-only. CertiPDF also opens it
+  since 2026-11-23 (see “Signing on the device” below).
+- **Messages** in the 26 languages (office catalog, and the regenerated Fyne one):
+  `doc.msg.savedToDriveEncrypted(In)`, `doc.msg.saveToDriveVaultSignIn` (vault locked),
+  `doc.msg.saveToDriveVaultNotReady` (Drive still moving to the vault),
+  `doc.msg.saveToDriveUnsupported`, and `doc.msg.saveToDriveVault` for any other failure (download
+  and upload from Drive).
+
+**Native Docus, Calcus and Diapos (2026-11-23).** They do the same, with the rules in the core
+(`apps/nucleo/office/guardardrive`) and not in the view, and they encrypt on **the device**:
+
+- **The same decisions** (`guardardrive.GuardarDocumento`): with a `drive:` and Drive on the server
+  (source `legacy`), a new version in that file of the server Drive —what the BFF
+  `save-to-drive.ts` did, which native did not have: the entry did not show up—; if not, to the
+  vault's Drive: to the anchored file (`drive:` or `vault:`) if it is still alive, with `ReplaceFile`
+  tied to the version read (if another device published in the meantime, it fails instead of
+  overwriting it), or to a new ODF one in “Sytue Docs” without overwriting names (exact, as the vault
+  compares: files and folders). The owner anchors with `api.Docs.AnclarEnBoveda` (the same
+  `PUT …/vault-anchor`). The entry shows with an anchor, or without one if Drive is in the vault
+  (checked by the source state, without keys).
+- **Nothing in clear text to the server:** the Drive mode is checked BEFORE uploading; with the
+  vault, the server Drive is not even asked for the file. If Drive moves to the vault between
+  checking and uploading, the 409 `private_storage_migration_required` leads to the vault, as on the
+  web.
+- **No half-done state:** it exports before writing anything; if exporting or uploading fails, no
+  new file, version or anchor is left (only, if it was created, the “Sytue Docs” folder). The service
+  not allowing the anchor does not undo what was saved.
+- **The vault does not open on its own** (`cifrado.DriveOficina`, on `AplicacionDrive` like Photos):
+  it is not touched on startup or when opening a document. When pressing “Save to Drive” without the
+  vault's Drive open on the device, its gate is shown (`PuertaBoveda`: the device's Sytue ID key,
+  sign in again if it does not open) **above the editor** and the person is told to save again
+  (`doc.msg.saveToDriveVaultLocked`); once open, the strip disappears. If `ElegirAlmacenDrive` sends
+  the account to Matrix (its Drive has not moved to the vault yet), the office apps do not open the
+  Matrix Drive —a `vault:` would point to a file the web does not see— and say to finish from Sytue
+  Drive (`doc.msg.saveToDriveVaultNotReady`). With no vault Drive possible on the device,
+  `doc.msg.saveToDriveVault` (download and upload from Drive).
+- **New messages** in the 26 languages: `doc.msg.savedToDriveEncryptedOnDevice` (“it has been
+  encrypted on this device”, not “in this browser”) and `doc.msg.saveToDriveVaultLocked`.
+- **Tests** (`guardardrive_test.go`) against a real vault (`drive.Repository` on
+  `vaultfiles`/`pqvault` with `pqvaulttest`): new file and anchor, new version of the anchored one
+  (`vault:` and `drive:` kept), anchored one in the trash, clashing names, format without round trip,
+  export and upload failures with nothing half done, and that the blocks server never sees the
+  document; the editor hook and the gate, in `editor` and `cifrado`.
+
+What is **still not done**, and why:
+
+1. **The “home” file when creating the document.** It is still created without an anchor; the
+   encrypted file is born on the first “Save to Drive”. Writing it on creation would require opening
+   the vault (and perhaps asking to sign in again) on every creation, from all the places there are
+   (home page, templates, copies, Drive, native), and even then it would not follow the document:
+   the server one does not either, it is only rewritten when saving. Hence only explicit saves.
+2. **The signature PDFs.** The copy brought from another organization (`open`) and the signed one
+   brought back (`fetch-signed`) are server state: it stores their id and their server Drive path,
+   checks the copy through `Metadatos`, checks what was delivered against a Drive link, and CertiPDF
+   opens and signs only by server Drive path (`/pdf?path=`). A copy in the vault could not be opened,
+   signed or delivered from CertiPDF, and the request would be left pointing to a file the server
+   does not see. Meanwhile, the 409 `drive_private_vault` is said in its language
+   (`pdf.error.driveVault`: “download the PDF”) instead of a generic failure. The person's OWN
+   signature is solved: see “Signing on the device” right below.
+3. **Native with the Docs data in Matrix.** With the Docs records already in Matrix there is no
+   service to anchor to (`AnclarEnBoveda` gives `ErrPrivateDataOnly`), so the entry only shows with
+   the service API. And an account whose Drive was decided to go to Matrix stays that way until the
+   app is reopened or the account is switched (the office apps do not decide again on their own).
+4. **One opening per save (web).** Each “Save to Drive” opens the vault and closes it when finished;
+   it does not stay open in the editor. Natively, once unlocked it stays open while the account
+   lives in the app, as in Photos, and one has to press again after opening it.
+5. **The store test** of `AnclarEnBoveda` (`store_integration_test.go`) needs PostgreSQL 17
+   (`pg_c_utf8`); the HTTP layer test and the ACL matrix cover the rules.
+
+**Signing on the device: CertiPDF with Drive in the vault (2026-11-23).** Owner's decision
+(“Signing on the device”): with the person's Drive in the vault, **their own signature** of a PDF is
+made on the device; requesting signatures from other people or organizations still needs the server
+Drive. Nothing reaches any server in clear text: not the PDF, not the certificate, not its password.
+
+- **How CertiPDF signs today, and why the model does not change.** On the web, the `.p12` (or the
+  two PEMs) travels with each signature to the BFF (`pdf-aplicar.ts`, op `firmar-certificado`) and
+  the Docs service signs with the `apps/nucleo/pdf` engine (`FirmarIncrementalPDF`, appended PAdES
+  B-B and an RFC 3161 timestamp if the deployment has an authority); the certificate is not stored
+  anywhere. The vault signing key of [0087](#0087) (Ed25519 + ML-DSA-65) **is no use** for this: a
+  PDF is signed with an X.509 certificate that a European validator recognizes, not with a key
+  anchored in Sytue ID. So it is signed with the SAME certificate of the person, only in the browser.
+- **The browser signer** (`packages/office/src/pdf/dispositivo/`), without new dependencies, like
+  the Go one: `pkcs12.ts` opens the `.p12` with the same subset as `platform/pkg/pkcs12` (PBES2 with
+  PBKDF2 and AES-CBC through WebCrypto; the classic PBE-SHA1-3DES with the RFC 7292 derivation and a
+  hand-written 3DES in `des.ts`, checked against the FIPS 81 vector) and leaves the key as a
+  **non-extractable** `CryptoKey`; `pdfObjetos.ts` reads the chain of cross-reference tables
+  (classic, stream-based and objects inside streams, with FlateDecode and PNG predictor) and
+  `pades.ts` appends the signature (§7.5.6) with the same pieces as `pdfsignincr.go`:
+  `/SubFilter /ETSI.CAdES.detached`, content-type, message-digest and signing-certificate-v2
+  (without signing-time), SHA-256 with RSA PKCS#1 v1.5 or ECDSA, a 24 KiB placeholder, a free
+  “Sytue.FirmaN” field, an invisible signature with its empty appearance, `/SigFlags 3` and a table
+  of the same type as the original's. Before returning anything it **verifies** what was signed
+  (digest and signature with the certificate's key): a broken signature is not saved.
+- **With the vault** (`dispositivo/firmarEnBoveda.ts`, CertiPDF home page): if Drive is in the vault
+  (checked without keys, `driveEnBoveda`), the home page shows “Sign on this device”. The vault
+  **does not open on its own**: when pressed it opens with the Docs and Photos consumer gate
+  (`openConsumerPrivateDrive`: the vault only if it exists, the repository only with its receipt,
+  `importar: false`; the office BFF `/api/drive-cifrado/…`), the PDFs are listed (the repository's
+  recent ones), and when signing the chosen one is downloaded, decrypted in memory, signed and
+  uploaded **encrypted** to its same folder as a NEW file “name (signed).pdf” without overwriting
+  any name (“… (signed) (2).pdf”), the way the server leaves a copy (`siempreCopia`). The original is
+  not touched and the clear-text bytes are wiped when finished.
+- **The Sytue ID bridge** allows **opening** (not creating, emptying or resealing) the `drive` vault
+  from `certipdf.` (`VAULT_READERS`), as for Photos, Docus, Calcus and Diapos; its test
+  (`sytue-id-pages.test.ts`) fails if it is removed.
+- **Requesting signatures** stays on the server Drive: the service has to read the PDF to send it
+  (or share it by link with another organization) and check against it the signature that comes
+  back. The home page explains it (`pdf.device.requests`) next to signing on the device; the 409
+  `drive_private_vault` of outside requests still says `pdf.error.driveVault`.
+- **Native.** Native CertiPDF already works on the private Drive (the vault via `vaultfiles.Store`
+  and `PuertaBoveda`, or Matrix) and signs with a certificate LOCALLY (`api.PDF.localSign`, the same
+  engine as the server, without timestamp); now with its test (`docs_pdf_private_sign_test.go`: it
+  appends, verifies and does not talk to the service). What was missing was the other half: the
+  “Request signature” dialog of a private PDF no longer tries to call the service (it failed with a
+  generic error) and says the same as the web (`pdf.device.requests`); and `drive_private_vault` is
+  also translated natively (the error map did not match the web's and its test failed).
+- **Messages** in the 26 languages (`pdf.device.*`, office catalog and the regenerated Fyne one).
+- **Tests.** `firmaLocal.test.ts`: the two `.p12` of `platform/pkg/pkcs12/testdata`, signature on a
+  classic table and on streams, second signature, signature on a pyHanko PDF without breaking its
+  own, rejections with a reason, and the real vault (`PrivateDriveRepository`): it lists only PDFs,
+  the signed one verifies, the original does not change, names are not overwritten and **nothing in
+  clear text** in the store's blocks or records. **Third-party** verifiers:
+  `firmado-en-el-dispositivo.pdf` joins the corpus of `pdfverificar_corpus_test.go` (with
+  `anclas/empresa-pruebas.crt`) and comes out valid alongside the pyHanko signature it already had;
+  Poppler (`pdfsig`) also considers the signatures valid.
+
+What it **did not do** in that first delivery —no timestamp, invisible only and without opening the
+PDF in the studio— is solved in the second one, right below. Still not done, and why:
+
+1. **It does not certify (`/DocMDP`)** and does not sign a **password-protected** PDF, one
+   **certified with P=1** or one whose cross-reference table cannot be read safely: the server would
+   fall back to rewriting the whole file, and that is not done here. It is said with its sentence
+   instead of writing something dubious.
+2. **Without the system certificate** (electronic ID card, smart card, keychain): from the browser
+   there is no interface to sign with it. Native does have it (two-step signing, [0051](#0051)), but
+   its two steps go through the server with the PDF and are not offered with the private Drive.
+
+**Signing on the device, second delivery: timestamp, visible signature and the studio
+(2026-11-23).**
+
+- **Timestamp (PAdES B-T).** The same model as the server (`pdftimestamp.go`): after signing, the
+  SHA-256 of the **signature value** is stamped (the SignerInfo's messageImprint, what in Go is
+  `huellaDeFirma`) and the token goes as the **unsigned** attribute
+  `id-aa-signatureTimeStampToken` (`dispositivo/sello.ts`, `construirCMS`). The authority (URL,
+  credentials, anchors: the Docs service's `SELLO_*`) is only reachable by the server, so the
+  browser requests it through the BFF `/api/pdf-sello` (`pages/api/pdf-sello.ts`), which validates
+  that the body is **32 bytes** and rebuilds it with that single field, to the Docs service
+  (`GET`/`POST /api/v1/pdf/timestamp`, `services/docs/internal/http/pdfsello.go`), which calls
+  `PedirSello` with the nonce, checks that the token stamps THAT hash and, with anchors, that it is
+  signed by the configured authority, with a per-person cap. **The PDF or its digest never travel**:
+  a hash of a signed number says nothing about the document. The browser checks again that the token
+  stamps its signature before inserting it (`comprobarSello`), and the local verifier
+  (`verificarFirmas`) says whether a timestamp covers its signature. If the deployment **has no
+  authority**, the dialog says so BEFORE signing (`pdf.device.stamp.off`) and the signature comes out
+  B-B; if it has one, it says whose (`pdf.device.stamp.on`). If the authority does not respond, it
+  signs anyway without a timestamp —like the server (`construirCMS` in Go)— and the final notice says
+  so (`pdf.device.signedNoStamp`); with a timestamp, `pdf.device.signedStamped`.
+- **Visible signature**, optional (the invisible one is still the default). Page, one of the studio's
+  four positions (`rectFirma`, with the page's real size and its inherited MediaBox:
+  `DocumentoPdf.paginas`) and the drawn handwritten signature, if wanted, with the SAME canvas as the
+  studio (`LienzoDeFirma.tsx`, now shared; `trazosAPagina` in `firmaPosicion.ts`). The appearance is
+  generated here and is the server's (`objetoAparienciaFirma`): light background, golden border, the
+  handwritten signature in dark ink, “Signed by …” and the UTC date in Helvetica WinAnsi (what is
+  outside WinAnsi comes out as “?”, as in Go). A page that does not exist or a box that overflows is
+  reported (`pdf.device.error.page`).
+- **The studio with the vault.** `/pdf?path=` checks without keys whether Drive is in the vault
+  (`driveEnBoveda`); if it is, it opens `EstudioBoveda.tsx` instead of the usual one: the vault is
+  opened WHEN PRESSED with the same gate (`abrirRepositorioCifrado`: `existing: true`,
+  `importar: false`), the file is looked up by its path going down folder by folder
+  (`abrirPdfDeBoveda`) and decrypted in memory; it is **viewed** with the browser's PDF viewer on a
+  local `blob:` (read-only), **downloaded** and **signed** with the same dialog as the home page,
+  which leaves the encrypted signed file next to it and offers to open it. What needs the service to
+  read the PDF (organize, tools, protect, request signature…) shows **disabled with its note**
+  (`pdf.vault.serverOnly`); a path that does not exist, with its `EmptyState`. The home page list
+  links each vault PDF to its studio.
+- **Messages** in the 26 languages (`pdf.device.stamp.*`, `pdf.device.appearance*`,
+  `pdf.device.signedStamped`/`signedNoStamp`, `pdf.device.error.page`, `pdf.device.view`,
+  `pdf.vault.*`; removed `pdf.device.note`), and the regenerated Fyne catalog.
+- **Tests.** `selloVisible.test.ts`: the authority only receives ONE 32-byte hash which is the SHA-256
+  of the signature value (not of the PDF), the token covers it and `verificarFirmas` says so; a token
+  for another hash, of another algorithm, unreadable or an authority that is down leave the signature
+  valid and WITHOUT a timestamp; cancelling does not sign behind the person's back; the BFF client
+  sends only `{resumen}`; the visible appearance (page, box, handwritten signature, text) and the
+  page rejections. `EstudioBoveda.test.tsx`, with the real `PrivateDriveRepository`: with the vault,
+  `/pdf?path=` is the vault studio and does not open on its own; the server features show disabled;
+  the PDF is viewed from a `blob:`; signing visibly with a timestamp leaves “Minutes (signed).pdf”,
+  which verifies and carries the timestamp; the BFF only received `{resumen}` and nobody received the
+  PDF; and there is nothing in clear text in the store's blocks and records. In Go,
+  `pdfsello_test.go`: without an authority (404 `pdf_timestamp_unconfigured`), round trip against a
+  fake authority (it receives a TimeStampReq with the hash and a nonce), only SHA-256 digests (the
+  rest, 400 and without calling the authority), 401 without a session and 502 for a token for
+  another hash. **Third-party verifiers**: `firmado-en-el-dispositivo-visible-con-sello.pdf` (visible with a
+  handwritten signature on page 2 and a timestamp from an `openssl ts -reply` authority, root in
+  `anclas/raiz-sello-dispositivo.crt`) joins the corpus of `pdfverificar_corpus_test.go` and comes
+  out **valid with a trusted timestamp**; Poppler (`pdfsig`) considers the signature valid. It is
+  regenerated by `generar-dispositivo.sh` (openssl and bun, with `firmar-en-el-dispositivo.ts`),
+  which `generar.sh` also runs and which rewrites identically the first delivery's
+  `firmado-en-el-dispositivo.pdf`.
+
+What this second delivery **does not do**, and why:
+
+1. **The viewer is the browser's**, not the studio's SVG canvas: that one is drawn by the service's
+   engine, which cannot see the PDF. Some browser may download it instead of showing it (the
+   WebViews that Drive already noted); “Download” is always at hand. Annotating, filling in or
+   organizing a vault PDF on the web would need the PDF engine in the browser (Go/Wasm), and it is
+   still pending; native does it all locally.
+2. **No LTV** (`/DSS` with OCSP/CRL), like the server: the timestamp already makes the signature
+   survive the certificate's expiry, which is the main thing.
+3. **The handwritten signature stored in the account is not offered** when signing on the device: it
+   is drawn at the moment (or not drawn). Reading it from Sytue ID would be possible, but it is not
+   mixed here with signing a PDF the server does not see.
+
+<a id="0087"></a>
+
+<a id="0087--sytue-mail-en-la-bóveda-directa-clave-de-firma-en-la-bóveda-anclada-por-sytue-id"></a>
+
+## 0087 — Sytue Mail on the direct vault: signing key in the vault, anchored by Sytue ID
+
+`accepted` · 2026-11-22 · security, e2ee, post-quantum, mail · Phase 2 of [0086](#0086) · builds on 0084 and 0085 · delivery 1 code in `apps/nucleo/recoverywrap/firma_boveda.go`, `apps/nucleo/cmd/pqc-wasm/vault_signing_operations.go`, `services/id/internal/http/e2e/bridge.js`
+
+**Context.** The thirteen apps of [0086](#0086) only store the user's own records: changing the
+transport was enough for them. Sytue Mail also **receives** encrypted mail from outside, and for
+that the server has to know that an ingress key really belongs to that person. Today it knows
+through Matrix, in three places:
+
+- the mail module asks the browser for the cross-signing master key (`identity.root`,
+  `packages/offline/src/matrix/client.ts`);
+- the ingress key enrollments and the work turns (`key.enroll`, `task.claim`, `task.ack`,
+  `task.handoff`) are signed by the Matrix device and the server verifies them against Synapse's
+  key directory (`apps/nucleo/storage/ingress/matrixproof`);
+- the storage authority (`matrix_storage_authorities`, `services/rooms`) only allows changing root
+  if the previous root signs it.
+
+That last rule is the one that leaves whoever lost their key with no way out: there is no way to
+empty Mail and start again. The direct vault has nothing equivalent to replace it with: its owner
+proof is an HMAC, which the server cannot verify.
+
+**Decision.**
+
+1. **Signing key inside the vault's secret.** `PQVaultSecret` gains `signing_key`: a hybrid
+   Ed25519 + ML-DSA-65 pair (`crypto/ed25519`, `crypto/mldsa`), generated in the Go/Wasm core
+   together with the `age-MLKEM768-X25519-v1` identity and sealed with it by the Sytue ID bridge. A
+   signature is valid only if both halves verify. Existing vaults add it on their next opening; apps
+   that do not use it ignore it.
+2. **Sytue ID is the anchor.** When creating or emptying a vault, the browser registers the public
+   part in Sytue ID (`PUT /e2e/vault-keys/{product}`) with the person's session; Sytue ID stores
+   `(sub, tenant, product, generation, public key)` and serves it signed to the services. The mail
+   server verifies ingress actions against that registry, not against Synapse.
+   - **Enrollment:** the first key of a `(sub, tenant, product)` enters with the session.
+   - **Change with continuity:** a new key signed by the previous one enters without more.
+   - **Emptying:** a new key **without** the previous one's signature requires recent
+     reauthentication (`max_age`, and a second factor if the account has one), raises the
+     generation, stays in the audit log and notifies the person by email. It is the way out that
+     does not exist today.
+3. **Mail on `PqVault.storage()`.** The mail module keeps its ports (store, journal, work, ingress
+   secrets, control); what changes is who serves them: `identity.root` returns the public signing
+   key and ingress actions are signed with it. The Matrix authority of `mail` stays read-only to
+   migrate what the person can still open.
+4. **Migration per account, without silent loss.** Whoever opens their Matrix Mail moves it to the
+   vault on sign-in (the same historical origin mechanism already used by the move from identity 1
+   to 2). Whoever cannot open it chooses: sign in to Sytue ID again or empty with confirmation.
+
+**Deliveries.**
+
+1. **Done.** Core: `signing_key` in `recoverywrap` and `pqc-wasm` (`vault.signing.create`,
+   `.public`, `.sign`), shared vectors (`testdata/firma_boveda_pq.json`) and bridge (`bridge.js`
+   keeps the key when sealing and opening). No app creates or uses it yet.
+2. **Done.** Sytue ID: vault key registry (migration `0123_claves_boveda`, table `e2e_vault_keys`,
+   one row per generation and a single active one), enrollment, continuity and emptying rules
+   (`services/id/internal/http/claves_boveda.go`), audit `e2e.vault_key.<reason>` and email on
+   emptying. The person reads and registers with their access token at
+   `GET`/`PUT /api/v1/me/vault-keys/{product}`, not with the browser session as point 2 of the
+   decision said: the apps talk to Sytue ID through their BFF. The services read the active one at
+   `POST /internal/vault-keys/lookup` (its own secret, `VAULT_KEYS_SECRET`; without it the route is
+   not mounted). The statement that is signed is composed by the core
+   (`recoverywrap.PQVaultKeyStatement`, Wasm operation `vault.signing.enroll`).
+3. **Done.** Mail: verification of ingress actions against the registry
+   (`apps/nucleo/storage/ingress/vaultproof`), with the Matrix one in parallel; Rooms branches by
+   signature type (`services/rooms/internal/store/claves_boveda.go`).
+4. **In part, behind a switch that is off.** Web: Mail opens its storage in the vault
+   (`@sytue/offline/vault/mail`, `openVaultMailPrivate`) with the same ports of the mail module:
+   store `vault.storage()`; ingress secrets as encrypted `content` records of the vault itself,
+   write-once, read by their `transaction_id` (Drive gains that query); action signing in the core
+   (`vault.ingress.sign`, `vaultproof.SignIntent`: only the action the module asked for, ingress
+   only and with that key's root); `identity.root` = the Ed25519 half. Rooms gives `mail` the vault
+   authority when there is **no** Matrix authority and Sytue ID has an active key, and such a scope
+   no longer allows enrolling a Matrix root (`autoridad_boveda.go`; only `mail`: calendar also
+   registers a key but receives through Matrix). Everything is behind `SYTUE_MAIL_BOVEDA=activado`
+   in the Mail BFF; off, nothing changes. On, the gate looks at the authority: the vault's or none
+   (new account) → `PqVaultGate` (sign in again or empty with confirmation); Matrix's or when in
+   doubt → the Matrix gate.
+
+   **Decision on the migration:** in this delivery mail is **not** migrated from Matrix to the
+   vault. The historical origin (`resolveLegacy`, `registerHistoricalStorageReader`) reads from a
+   second Matrix SDK and writes to the new Matrix one; taking it to the vault requires that whoever
+   opens it can still open Matrix and a per-scope authority change (from Matrix to vault) that does
+   not exist today. Whoever opens their Matrix Mail stays on Matrix, untouched. And whoever
+   **cannot** open it but has a Matrix authority still has no way out: the authority handover has
+   to require the emptying's reauthentication, and Rooms does not see `auth_time` (pending: that
+   Sytue ID certifies it in the registered key, e.g. reason `vaciado` later than the Matrix
+   authority).
+
+   **Second batch (blockers for turning the switch on).**
+
+   - _ACK receipt:_ done. If the scope's authority is the vault's, Rooms does not look for a Matrix
+     event: it asks Drive (`POST /internal/pq-vault/receipt`, secret `ROOMS_INTERNAL_SECRET` which
+     they already share) whether the record is in the person's **current** vault and the destination
+     is that of their active key (`storage.PQVaultTarget`). When in any doubt, the ACK is rejected
+     and the mail stays in the queue.
+   - _Destruction guard:_ `guardMailDestruction` does what Matrix's `destructionGuard` does (pause
+     and “pending = 0”, otherwise `locked`) and is exposed as `guardDestruction`. Today nobody calls
+     it, because the vault does not destroy anything local with mail open: there is no `forget()`
+     (the keys come back from Sytue ID) and emptying is only offered if the vault does not open.
+   - _Device fence:_ there is none for the vault, **on purpose**, and a handoff with a vault proof
+     fails closed (without an active Matrix authority, `verifyMatrixStorageActionTx` rejects it;
+     besides, the fences table requires a Matrix authority row). A vault has a single destination
+     per key, shared by all its tabs, and a handoff requires different destinations
+     (`ingress.Handoff`). The only possible previous destination is the key from before an
+     emptying, and with it its ingress secrets were lost: there is nothing to rescue. Or else it is
+     a Matrix device after the authority handover (next point), which is fenced by revoking it in
+     Matrix.
+   - _Identity cutover for a vault scope:_ it was the underlying blocker (the mail module always ran
+     `transfer.Cutover`, which without a cutover row is in `legacy` and requires the historical
+     origin, and the initial import was done by that origin). Solved in the third batch.
+
+   **Third batch.**
+
+   - _Vault mode of the mail module:_ done. **The host chooses it**, never the module: `mail.open`
+     carries `store: "vault"` (`openVaultMailEngine`), `webMail.OpenStore` passes it to the
+     constructor and `application.Config.Vault` applies it. In that mode there is no historical
+     origin, no identity cutover, no call to `rooms.cutover.*`; a vault configuration with any
+     Matrix piece (origin, files, copier) is rejected. The epoch of the server's retained mail is
+     fixed with the vault as destination (`mail.CaptureDirectSource`: the same `transfer.BeginSource`
+     and the same server Begin, preceded by the enrollment of that epoch's ingress key) and imported
+     directly into the vault (`Repository.ImportDirectSource`, the usual importer: encrypted plan
+     in the journal before publishing, receipt last). With the server still in `legacy`, a vault
+     with data starts nothing. In addition, the chosen store has to be the authority's (Rooms): the
+     vault only opens with a vault authority and **the Matrix path no longer opens a vault scope**
+     (before it failed anyway, later, when comparing the root). For whoever opens their mail through
+     Matrix nothing else changes: same authority, same cutover, same ports.
+   - _Authority handover Matrix → vault:_ done, with the second batch's design.
+     - Sytue ID: `PUT /api/v1/me/vault-keys/mail` accepts `handover: true`. It always requires
+       recent identification (also on an enrollment), records the reason `traspaso`, leaves
+       `e2e.vault_key.traspaso` in the audit log and sends the same notice as an emptying. Only
+       `mail`, never together with the previous one's approval, and never hanging from the same key
+       that was already there without it (the signed statement does not allow a key to succeed
+       itself: the handover comes with a new vault). Repeating it returns the one already done.
+       Migration `0124_traspaso_boveda`: generation 1 is `alta` or `traspaso`; `alta` is still only
+       generation 1; `traspaso` only in `mail`. Checked against PostgreSQL 16 (up, a down that
+       refuses with handovers, and each constraint).
+     - Rooms: with a Matrix authority, it asks Sytue ID for the active key (which now carries
+       `reason` and `created_at`). If it is a `traspaso` one and **later** than the last change of
+       the Matrix authority (`updated_at`), it writes it down once in
+       `matrix_storage_vault_handovers` (migration `0081`, immutable, with the Matrix generation of
+       that moment) and gives the vault authority. From then on the scope belongs to the vault even
+       if the key later changes through continuity or emptying; without Sytue ID there is no answer
+       any more (it never goes back to Matrix), and the scope's Matrix proofs (ingress actions and
+       fences), their receipts and their root changes are rejected. That way all their Matrix
+       devices are fenced at once. Before the handover, Sytue ID down or a key that is not a
+       handover one leave the Matrix one, as always; and **a vault proof is no longer valid in a
+       Matrix scope without a handover** (before, Rooms would have verified it against Sytue ID; it
+       was only saved by mail retaining the Matrix root in the challenge).
+     - _The generation does not go down:_ the vault's is counted **on top of** the Matrix one there
+       was at the handover: authority = base + generation in Sytue ID (Matrix at 5 → the vault
+       starts at 6). Rooms applies the same base when giving the authority and when verifying, so
+       the generation retained by mail and the clients only goes up. Without a Matrix authority the
+       base is 0 and everything stays as it was.
+     - Web: with the switch, Mail's Matrix gate offers “Can't open your mail? Empty it and move it to
+       the vault” while the Matrix mail is not open, with confirmation (an “I understand it will be
+       lost” checkbox). It opens a **new** vault (`PqVault.reset` with `handover`), and if Sytue ID
+       asks to sign in again, the mark survives in the tab's `sessionStorage`. As soon as the
+       authority is the vault's, the gate chooses the normal vault and forgets the mark: **it never
+       empties twice**.
+     - Clock skew: Rooms compares the Sytue ID date with that of its own database. A skew of seconds
+       only matters if the person rotates their Matrix root at that very instant, and the handover
+       also requires the confirmation checkbox.
+
+   **Fourth batch.**
+
+   - _Rotation of the ingress key of an already enrolled epoch:_ done. It was what left whoever
+     hands over without receiving: their epoch had a Matrix ingress plan that the vault does not
+     have.
+     - Server (`platform/pkg/pg`, fragment `private-ingress-rotation-v1`; mail migrations `0040`
+       and calendar `0026`): each plan stores the Rooms authority that authorized it
+       (`authority_user`, `authority_generation`, immutable). The authorized enrollment
+       (`EnrollAuthorizedPrivateIngress`) accepts a **next** generation plan only if it is
+       authorized by an active **vault** authority **later** than that of the current plan: another
+       identity (from Matrix to the vault, or a plan from before storing its authority) or a higher
+       generation (a vault emptying; the generation never goes down). Matrix and calendar never
+       rotate; nor is a generation skipped nor is a revoked plan rotated. The previous plan **is
+       neither revoked nor deleted**: what was already encrypted for it stays in the queue, and the
+       admission encrypts new mail for the highest active plan (as it already did).
+     - Client (`ingress.EnrollmentConfig.Rotate`, which the host sets only in vault mode): if the
+       SDK answers that it **does not have** the current plan (`keyring.ErrRecoveryRequired`: the
+       vault port returned “not there”, not a network failure), it creates the next plan only once
+       (a retry recovers the same candidate) and enrolls it; if the server does not authorize it, it
+       fails closed and nothing changes.
+     - The vault worker only claims encrypted deliveries for **its** key (`ingress.Config.KeyID`):
+       those for the previous key stay in the queue, intact, instead of being claimed and blocked
+       here. The Matrix path carries neither `Rotate` nor `KeyID`.
+     - What is lost, and the confirmation says so: the mail that was already encrypted for the
+       Matrix key. Nobody can open it (its devices were fenced), but it is not deleted.
+   - _Latency of the handover query:_ solved. Before the handover, the question to Sytue ID has a
+     400 ms deadline and, if it fails or exceeds it, for 30 s Matrix is answered without asking. The
+     **outage** is remembered, never a “there is no handover”: with Sytue ID healthy it is asked on
+     every read, so a freshly registered handover is seen on the next one (the vault gate reads the
+     authority right after registering it; a cache of the “no” would have left it out). After the
+     handover there is no shortcut: without Sytue ID there is no authority.
+
+   **The switch is still off.** There is no known blocker in the code any more; it remains to be
+   tested end to end, which could not be done here (there is no Synapse nor the stack, and the
+   integration tests ran on a local PostgreSQL 16, not the 18 used in CI). Checklist, in an
+   ephemeral environment with Sytue ID, Rooms, Drive and Mail (`ID_VAULT_KEYS_SECRET` /
+   `VAULT_KEYS_SECRET`, `ROOMS_INTERNAL_SECRET`), the migrations `0124` of Sytue ID, `0081` of
+   Rooms, `0040` of mail and `0026` of calendar, the Mail BFF with `SYTUE_MAIL_BOVEDA=activado` and
+   the real `mail-wasm`/`pqc-wasm` in the browser:
+
+   1. _New account._ Opening Mail chooses the vault; the server moves to `frozen` with the epoch
+      `InitialSourceEpoch`; ingress plan 1 stores the vault authority; the mailbox imported from the
+      server appears; an incoming SMTP mail arrives, is claimed, stored in the vault and its ACK is
+      accepted by Drive (vault receipt); sending one goes out.
+   2. _Matrix account that does open._ With the switch on it stays on Matrix, without offering the
+      handover with mail open; it receives and sends the same; its ingress plan does not rotate.
+   3. _Handover._ Account with Matrix authority at 5 (with some previous rotation) and an enrolled
+      epoch that does not open its mail: confirm “empty and move”; sign in to Sytue ID again if
+      asked; check the email notice and the `e2e.vault_key.traspaso` audit; the vault authority at
+      6; an action signed by the Matrix device rejected; ingress plan 2 enrolled with the vault
+      authority; new mail arriving in the vault; deliveries of plan 1 still in the queue unclaimed;
+      the mailbox imported again from the server's retained epoch.
+   4. _Same browser that already used Matrix Mail._ The tab's encrypted journal is the same for both
+      paths: check that half-done Matrix intents (an unfinished ingress enrollment, claimed
+      deliveries) do not prevent opening the vault; today a half-done enrollment with another
+      destination fails **closed** (`ErrRevoked`), and then it would have to be withdrawn on
+      handover.
+   5. _Matrix scheduled sends._ The sends that the Matrix client left registered (controlled by its
+      commitment) are not controlled by the vault: check what happens to them and, if needed, cancel
+      them on handover.
+   6. _Emptying the mail vault._ After an emptying (new key, higher generation), the ingress plan
+      rotates again and mail arrives again.
+   7. _Sytue ID slow or down._ Before the handover, Matrix Mail opens without waiting more than
+      ~400 ms once and then immediately for 30 s; after the handover, the vault does not open.
+   8. _Unauthorized rotation._ A second rotation with the same authority, or one requested with a
+      Matrix authority, is rejected and the current plan does not change.
+
+5. Withdrawal of the Matrix authority of `mail` and, afterwards, native clients.
+
+**Consequences.**
+
+- Mail opens with the same key as the rest of the suite and gains emptying; Synapse remains only
+  for Rooms ([0077](#0077)).
+- Sytue ID becomes a trust anchor for incoming mail: whoever controls Sytue ID **and** the person's
+  session can register a new key. It is bounded by reauthentication, the generation visible to the
+  person and the notice; it is not eliminated. The current authority did prevent it, at the price
+  of having no way out.
+- An emptying does not decrypt anything earlier: mail encrypted with the lost key stays lost.
+- With the key registry configured, each read of the `mail` authority of a Matrix account also asks
+  Sytue ID (to see a handover). If Sytue ID does not answer, the Matrix one, as before. A slow answer
+  adds at most 400 ms to a read, and after an outage it stops asking for 30 s (fourth batch); a
+  handover registered during that pause waits for it to pass.
+
+**Rejected alternative.** Trusting the first key presented, without a registry in Sytue ID: fewer
+pieces, but after an emptying nobody could tell the person's key from one put there by whoever
+controls the server.

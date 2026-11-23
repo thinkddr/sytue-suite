@@ -880,6 +880,18 @@ if the logic breaks. With two conditions that have proven costly in this repo:
   were written that way, and one caught a positions regression (`[0 1 3 4]`) that
   does not show on screen because the order still comes out right.
 
+- **In Go, unless what is tested only exists in another language.** A new test is
+  written in Go (`go test`): it is the product's language, it runs with `-race` and with the
+  coverage of everything else, and it does not ask for another interpreter in CI. The exception is what
+  can only be exercised in its own engine —a Preact component, a script that runs
+  in the browser, an `.mjs` module—, and even there the logic that can be moved down to the Go
+  core is moved down and tested there. A shell or Python script that checks a contract
+  of the repository (a workflow, a catalog, a deployment file) is not an exception:
+  that contract is checked from Go.
+- **Once per commit, where it belongs.** The same suite is not repeated in two jobs nor
+  hung on an hourly workflow that guards something else: it finds nothing new and teaches people to
+  wait for CI.
+
 And beware of the **false green**, which has happened here several times:
 `grep -c "^FAIL"` gives 0 both when everything passed and when the command did not even run;
 `go test -run` with no matches says `ok`; and `printf … | grep -q` with

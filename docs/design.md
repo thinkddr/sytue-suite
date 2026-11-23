@@ -1619,8 +1619,8 @@ and in dark:
   a live region.
 
 It is launched by `test/e2e/correr-accesibilidad.sh` (also `cinta.mjs` and `paridad-cinta-web.mjs`) and
-by the `accesibilidad-office` job in `ci-frontend.yml`: when a release is published, on a schedule
-and manually, like the rest of the flow (it does not run on push or on PR).
+by the `accesibilidad-office` job in `ci-frontend.yml`: when a release is published and when
+`ci-frontend` is dispatched manually (it does not run on push, on PR, or inside `ci`).
 
 **The two rules that came out of measuring.**
 

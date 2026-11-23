@@ -975,7 +975,7 @@ func valorHex(c byte) (byte, bool) {
 // base-85 que valen cuatro bytes, con 'z' como atajo de cuatro ceros y '~>' de
 // terminador. Un grupo final incompleto codifica menos de cuatro bytes.
 func decodificarASCII85(datos []byte) []byte {
-	out := make([]byte, 0, len(datos)*4/5)
+	out := make([]byte, 0, capacidadASCII85(len(datos)))
 	var grupo [5]byte
 	n := 0
 	// Algunos generadores emiten el prefijo «<~» que la especificación no pide.
@@ -1005,6 +1005,9 @@ func decodificarASCII85(datos []byte) []byte {
 			}
 			return out
 		case c == 'z' && n == 0:
+			if len(out) >= maxFlujoInflado {
+				return out[:maxFlujoInflado] // ponytail: «z» multiplica por cuatro; es una bomba, no un documento
+			}
 			out = append(out, 0, 0, 0, 0)
 			continue
 		case c < '!' || c > 'u':
@@ -1021,6 +1024,18 @@ func decodificarASCII85(datos []byte) []byte {
 		emitir(n)
 	}
 	return out
+}
+
+// capacidadASCII85 es la reserva inicial de la salida: cuatro bytes por cada
+// cinco de entrada. Se divide ANTES de multiplicar y se acota a maxFlujoInflado,
+// de modo que una longitud hostil no puede desbordar int ni pedir más memoria de
+// la que un flujo puede llegar a ocupar. Es solo una pista: append crece si hace
+// falta (los «z» expanden más).
+func capacidadASCII85(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return min(n, maxFlujoInflado) / 5 * 4
 }
 
 // decodificarRunLength deshace RunLengthDecode (§7.4.5): un byte de longitud

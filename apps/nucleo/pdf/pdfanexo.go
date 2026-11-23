@@ -85,10 +85,19 @@ func admiteAnexo(doc *PDFDoc, cambio cambioAnexo) error {
 // nuevoAnexo es un ensamblador cuyos objetos NUEVOS se numeran detrás de los del
 // documento: lo que se escribe en él se puede anexar tal cual, y las
 // referencias a objetos del documento siguen valiendo porque no se renumera nada.
-func nuevoAnexo(doc *PDFDoc) *PDFEnsamblador {
+//
+// La tabla se reserva con el mayor número de objeto, que lo pone el fichero
+// (/Size o la xref): se acota aquí mismo a maxObjetosAnexo, y no solo en
+// admiteAnexo, para que ningún camino pueda reservar a ciegas lo que diga un
+// documento hostil.
+func nuevoAnexo(doc *PDFDoc) (*PDFEnsamblador, error) {
+	n := doc.maxObjeto()
+	if n < 0 || n >= maxObjetosAnexo {
+		return nil, fmt.Errorf("%w: demasiados objetos", ErrInvalidaFirmas)
+	}
 	e := NuevoEnsambladorPDF()
-	e.cuerpos = make([]objetoSalida, doc.maxObjeto())
-	return e
+	e.cuerpos = make([]objetoSalida, n)
+	return e, nil
 }
 
 // anexar escribe la actualización: los objetos cambiados del documento (con su

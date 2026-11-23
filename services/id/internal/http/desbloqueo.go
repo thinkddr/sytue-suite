@@ -488,35 +488,34 @@ func relevoPage(loc, destino, login string, datos relevoDatos) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	esc := html.EscapeString
-	t := func(k string) string { return esc(i18n.T(loc, k)) }
+	t := func(k string) string { return html.EscapeString(i18n.T(loc, k)) }
 	puente := ""
 	if login != "" {
 		puente = `<section id="e2e-confirm" hidden>` +
 			`<p class="sub">` + t("e2e.confirm_body") + `</p>` +
 			`<p class="sub"><strong id="e2e-app"></strong></p>` +
 			`<button type="button" id="e2e-confirm-go">` + t("e2e.confirm_action") + `</button>` +
-			`<p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.continue") + `</a></p>` +
+			`<p class="alt"><a class="btn-link" href="` + html.EscapeString(destino) + `">` + t("e2e.continue") + `</a></p>` +
 			`</section>` +
 			`<section id="e2e-failed" hidden>` +
 			alertHTML(i18n.T(loc, "e2e.lost_title")) +
 			`<p class="sub">` + t("e2e.failed_body") + `</p>` +
-			`<p class="alt"><a class="btn-link" id="e2e-retry" href="` + esc(login) + `">` + t("e2e.retry") + `</a></p>` +
-			`<p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.continue") + `</a></p>` +
+			`<p class="alt"><a class="btn-link" id="e2e-retry" href="` + html.EscapeString(login) + `">` + t("e2e.retry") + `</a></p>` +
+			`<p class="alt"><a class="btn-link" href="` + html.EscapeString(destino) + `">` + t("e2e.continue") + `</a></p>` +
 			`</section>`
 	}
 	body := `<p class="sub" id="e2e-working" role="status">` + t("e2e.unlocking") + `</p>` +
-		`<p class="alt" id="e2e-manual" hidden><a class="btn-link" id="e2e-next" href="` + esc(destino) + `">` + t("e2e.back_to_app") + `</a></p>` +
-		`<noscript><p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.back_to_app") + `</a></p></noscript>` +
+		`<p class="alt" id="e2e-manual" hidden><a class="btn-link" id="e2e-next" href="` + html.EscapeString(destino) + `">` + t("e2e.back_to_app") + `</a></p>` +
+		`<noscript><p class="alt"><a class="btn-link" href="` + html.EscapeString(destino) + `">` + t("e2e.back_to_app") + `</a></p></noscript>` +
 		`<section id="e2e-passkey-first" hidden>` +
 		alertHTML(i18n.T(loc, "e2e.passkey_first_title")) +
 		`<p class="sub">` + t("e2e.passkey_first_body") + `</p>` +
-		`<p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.back_to_app") + `</a></p>` +
+		`<p class="alt"><a class="btn-link" href="` + html.EscapeString(destino) + `">` + t("e2e.back_to_app") + `</a></p>` +
 		`</section>` +
 		`<section id="e2e-lost" hidden>` +
 		alertHTML(i18n.T(loc, "e2e.lost_title")) +
 		`<p class="sub">` + t("e2e.lost_body") + `</p>` +
-		`<p class="alt"><a class="btn-link" href="` + esc(destino) + `">` + t("e2e.continue") + `</a></p>` +
+		`<p class="alt"><a class="btn-link" href="` + html.EscapeString(destino) + `">` + t("e2e.continue") + `</a></p>` +
 		`<label class="check"><input type="checkbox" id="e2e-understood"> ` + t("e2e.start_over_confirm") + `</label>` +
 		`<button type="button" id="e2e-restart" disabled>` + t("e2e.start_over") + `</button>` +
 		`</section>` +
@@ -712,14 +711,13 @@ func (s *Server) handleUnlockPasskeyEnroll(w http.ResponseWriter, r *http.Reques
 		http.Redirect(w, r, next, http.StatusFound)
 		return
 	}
-	esc := html.EscapeString
-	t := func(k string) string { return esc(i18n.T(loc, k)) }
+	t := func(k string) string { return html.EscapeString(i18n.T(loc, k)) }
 	body := `<p class="sub" id="e2e-working" role="status">` + t("e2e.unlocking") + `</p>` +
-		`<noscript><p class="alt"><a class="btn-link" href="` + esc(next) + `">` + t("e2e.continue") + `</a></p></noscript>` +
+		`<noscript><p class="alt"><a class="btn-link" href="` + html.EscapeString(next) + `">` + t("e2e.continue") + `</a></p></noscript>` +
 		`<section id="e2e-passkey-ask" hidden>` +
 		`<p class="sub">` + t("e2e.passkey_enroll_body") + `</p>` +
 		`<button type="button" id="e2e-passkey-go">` + t("e2e.passkey_enroll_action") + `</button>` +
-		`<p class="alt"><a class="btn-link" href="` + esc(next) + `">` + t("e2e.continue") + `</a></p>` +
+		`<p class="alt"><a class="btn-link" href="` + html.EscapeString(next) + `">` + t("e2e.continue") + `</a></p>` +
 		`</section>` +
 		bloque +
 		`<script>` + e2eComunJS + `</script><script>` + e2ePasskeyJS + `</script>`

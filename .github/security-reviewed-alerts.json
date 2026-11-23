@@ -24,6 +24,10 @@
     {
       "path": "apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx",
       "blob": "7a201a17fa27161e55f5696849d1b55835a158d0"
+    },
+    {
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "blob": "1f75ba3ac8b17d3ceb89f329053c308b434206e8"
     }
   ],
   "reviews": [
@@ -110,6 +114,20 @@
       "path": "apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx",
       "comment": "False positive: the HTML is parsed with DOMParser into an inert document (no scripting or browsing context), only body.textContent is read, and it is inserted as plain text.",
       "evidence": "new DOMParser().parseFromString(b.html, 'text/html') never runs scripts or handlers or loads resources; the text is inserted with execCommand('insertText'), so nothing reaches a live DOM sink."
+    },
+    {
+      "number": 477,
+      "rule": "js/file-access-to-http",
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "comment": "False positive: an artificial-only e2e sends fixture ciphertext to a fixed local Synapse (127.0.0.1:18585). Room, token and Megolm body are validated and size-bound; the origin is asserted before the request.",
+      "evidence": "The fixture is produced by the native test run itself (fixture.artificial is asserted); the PUT is the test's purpose: proving the server rejects pre-encrypted cache without local witnesses."
+    },
+    {
+      "number": 478,
+      "rule": "js/file-access-to-http",
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "comment": "False positive: an artificial-only e2e sends fixture ciphertext to a fixed local Synapse (127.0.0.1:18585). Room, token and Megolm body are validated and size-bound; the origin is asserted before the request.",
+      "evidence": "The fixture is produced by the native test run itself (fixture.artificial is asserted); the PUT is the test's purpose: proving the server rejects pre-encrypted cache without local witnesses."
     }
   ]
 }

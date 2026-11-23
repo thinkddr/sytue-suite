@@ -80,11 +80,13 @@ test('invalid review manifests fail before API requests', () => {
     { ...manifest, files: [{ path: 'apps/nucleo/pdf/notas.txt', blob: 'b'.repeat(40) }] },
     { ...manifest, files: [{ path: 'apps/fyne/main.go', blob: 'b'.repeat(40) }] },
     { ...manifest, files: [{ path: 'apps/nucleo/../../secret.go', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'test/e2e/fixtures/secret.json', blob: 'b'.repeat(40) }] },
+    { ...manifest, files: [{ path: 'test/e2e/lib/x.mjs', blob: 'b'.repeat(40) }] },
   ]) assert.throws(() => validateReview(invalid));
 });
 
 test('review evidence may pin the shared core and frontend sources', () => {
-  for (const source of ['apps/nucleo/pdf/pdffont.go', 'apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx']) {
+  for (const source of ['apps/nucleo/pdf/pdffont.go', 'apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx', 'test/e2e/matrix-storage-recovery.mjs']) {
     validateReview({ ...manifest, files: [{ path: source, blob: 'b'.repeat(40) }], reviews: [{ ...manifest.reviews[0], path: source }] });
   }
 });

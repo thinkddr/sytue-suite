@@ -150,6 +150,27 @@
       "path": "services/id/internal/http/e2e/passkey.js",
       "comment": "False positive: the way back comes from a server-validated JSON block and goes through navigableReturn (comun.js), which rebuilds it with a constant scheme or this page's origin before the path; javascript: and data: are dropped.",
       "evidence": "sytue-id-pages.test.ts: 'navigableReturn rebuilds the way back with a scheme of its own' and the relay/passkey page tests run every hostile destination and assert no navigation to it."
+    },
+    {
+      "number": 486,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: MD5 over the padded password is ISO 32000 algorithm 2 (7.6.4.3), the key the PDF format fixes for revisions 2-4. It opens a PDF on the device; nothing is stored, and another hash could not read the file.",
+      "evidence": "pdfcrypt_test.go opens PDFs protected by the user and owner password (TestProtegerYAbrirConContrasenaDeUsuario, TestAbrirConContrasenaDeDuenoLevantaLosPermisos, TestContrasenaIncorrectaNoAbre)."
+    },
+    {
+      "number": 487,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: MD5 over the owner password is ISO 32000 algorithm 7 reversed (7.6.4.3), fixed by the PDF format for revisions 2-4 to recover the user password. Nothing is stored; another hash could not open the file.",
+      "evidence": "pdfcrypt_test.go opens PDFs protected by the user and owner password (TestProtegerYAbrirConContrasenaDeUsuario, TestAbrirConContrasenaDeDuenoLevantaLosPermisos, TestContrasenaIncorrectaNoAbre)."
+    },
+    {
+      "number": 485,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: SHA-256 here is ISO 32000-2 algorithm 2.B (revision 5/6: chained SHA-256/384/512 rounds), the hash the PDF format fixes. It checks the password of a PDF on the device; nothing is stored.",
+      "evidence": "pdfcrypt_test.go opens PDFs protected by the user and owner password (TestProtegerYAbrirConContrasenaDeUsuario, TestAbrirConContrasenaDeDuenoLevantaLosPermisos, TestContrasenaIncorrectaNoAbre)."
     }
   ]
 }

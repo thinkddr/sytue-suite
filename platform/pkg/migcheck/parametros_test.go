@@ -4,6 +4,7 @@
 package migcheck_test
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -179,6 +180,11 @@ func TestLaListaDeParametrosNoSeCopia(t *testing.T) {
 	grant := regexp.MustCompile(`(?i)GRANT\s+SET\s+ON\s+PARAMETER`)
 	var copias []string
 	for _, dir := range []string{"deploy", "platform", "services", "scripts", "infra"} {
+		// La distribución pública (sytue-suite) no lleva infra/: lo que no está no
+		// puede copiar la lista, así que se salta en vez de fallar.
+		if _, err := os.Stat(filepath.Join(raiz, dir)); errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		err := filepath.WalkDir(filepath.Join(raiz, dir), func(ruta string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err

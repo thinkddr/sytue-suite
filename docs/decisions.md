@@ -87,7 +87,9 @@ decisions, or ones reversible at no cost, do not need an entry.
 | 0079 | [Sytue Notepads on “paper”: a neutral chrome chosen by the app](#0079)                                                                                  | accepted                                                                       |
 | 0080 | [The whole suite on “paper”: the Notepads chrome moves to all fifteen apps](#0080)                                                                      | accepted · extends [0079](#0079)                                               |
 | 0081 | [The Matrix recovery key is held by Rooms for the OIDC session](#0081)                                                                                  | superseded → 0082                                                              |
-| 0082 | [The Matrix recovery key, wrapped on the device with the password or the passkey](#0082)                                                                | accepted · replaces [0081](#0081)                                              |
+| 0082 | [The Matrix recovery key, wrapped on the device with the password or the passkey](#0082)                                                                | superseded in part → 0084                                                      |
+| 0084 | [Signing in to Sytue ID unlocks the encryption of every app](#0084)                                                                                     | accepted · replaces [0082](#0082) in part · completed by [0085](#0085)         |
+| 0085 | [The unlock key is not left readable in the browser and does not leave Sytue ID](#0085)                                                                 | accepted · completes [0084](#0084)                                             |
 | 0086 | [Direct post-quantum vault (`age-MLKEM768-X25519-v1`) for the suite's storage, without Synapse/Matrix](#0086)                                           | accepted · replaces Synapse/Matrix in the storage of 13 apps                   |
 | 0087 | [Sytue Mail on the direct vault: signing key in the vault, anchored by Sytue ID](#0087)                                                                 | accepted · Phase 2 of [0086](#0086) · deliveries 1 and 2 of 5                  |
 
@@ -6211,9 +6213,13 @@ had the key on a device keeps it.
 
 <a id="0082--la-clave-de-recuperación-de-matrix-envuelta-en-el-dispositivo-con-la-contraseña-o-la-passkey"></a>
 
-## 0082 — The Matrix recovery key, wrapped on the device with the password or the passkey
+<a id="0082--la-clave-de-recuperación-de-matrix-envuelta-en-el-dispositivo-con-la-contraseña-o-la-passkey--superseded-en-parte-por-0084"></a>
 
-`accepted` · 2026-11-12 · branch `sytue-native` · replaces [0081](#0081)
+## 0082 — The Matrix recovery key, wrapped on the device with the password or the passkey · superseded in part by [0084](#0084)
+
+`superseded in part` · 2026-11-12 · branch `sytue-native` · replaces [0081](#0081).
+[0084](#0084) changes where the wrapping key comes from (the Sytue ID sign-in, without dialogs in
+the apps); the wrapper format, the table and the Rooms API remain.
 
 **Problem.** [0081](#0081) took away from the person the step of creating, storing and typing the recovery
 key, but it did so by storing it in Rooms encrypted with the service KEK: whoever
@@ -6278,13 +6284,334 @@ the password: Argon2id at 64 MiB makes it expensive, but a weak password is stil
 Whoever forgets the password and has no other verified device or passkey can only
 reset (Rooms) and loses the encrypted history, as before 0081.
 
+<a id="0084"></a>
+
+<a id="0084--el-inicio-de-sesión-de-sytue-id-desbloquea-el-cifrado-de-todas-las-apps"></a>
+
+## 0084 — Signing in to Sytue ID unlocks the encryption of every app
+
+`accepted` · 2026-11-17 · branch `sytue-native` · replaces [0082](#0082) in part ·
+completed by [0085](#0085), which changes how the key is stored in the browser and what the
+bridge hands over
+
+**Problem.** [0082](#0082) took the recovery key out of sight, but it left a dialog in each app:
+on a new device one had to type the password again (or use the passkey) inside Rooms, Drive or
+Mail, once per Matrix account, and accounts without custody were asked to verify the device with
+emojis. The owner (2026-11-17) asked for the simplest possible path: **no recovery keys, no
+separate password in the apps and no device verification**. The person only enters their key in
+Sytue ID, which is where the OIDC lives, and that unlocks the encryption of that device for every
+app. And the rule of 0082 still holds: **the operator cannot open the data**; what a server
+stores cannot be opened with anything that server has. Going back to the service's custody
+([0081](#0081)) was explicitly rejected.
+
+**Decision.** One **unlock key** per person (32 random bytes) that is born in a browser and that
+nobody but the person's devices sees in the clear:
+
+- **Envelopes in Sytue ID.** The service stores the unlock key only sealed with one of the
+  person's factors (table `e2e_unlock_envelopes`, ID migration 0122): a password envelope
+  (Argon2id at 64 MiB, 3 passes, 1 thread, with a public salt per person, and HKDF
+  `sytue-e2e-unlock-v1/password`) and one per passkey (the WebAuthn PRF extension with a fixed
+  input, `SHA-256("sytue-e2e-unlock-v1/passkey-prf")`, and HKDF `…/passkey`). AES-256-GCM with
+  the AAD bound to the person, the type and the passkey. All of a person's envelopes carry the
+  same public **fingerprint** (`HKDF(key, "…/hint")`): one with another fingerprint is rejected,
+  except when “starting from scratch”.
+- **The derivation belongs to the browser.** The Sytue ID sign-in page asks for the salt
+  (`POST /login/unlock/salt`, which answers the same whether or not the account exists: the salt
+  of someone who has no envelope yet and that of an address without an account are derived from
+  the service KEK), computes Argon2id **before** submitting the form and leaves the KEK in its own
+  origin's store (IndexedDB of `id.<domain>`). With a passkey, the sign-in ceremony also asks for
+  the PRF. The usual form still works without JavaScript; then there is simply no unlock.
+- **The relay.** When the app asks for it at `/oauth2/authorize` (`sytue_unlock=1` on the web,
+  `sytue_unlock_key=<ephemeral P-256 public key>` in the native apps), Sytue ID paints, instead
+  of the redirect with the code, a short page that opens the envelope with that KEK **in the
+  browser**. If the account has no key, it creates it; if the envelope for that factor is missing
+  or old (a new passkey, a changed password) and this browser already has the key with the right
+  fingerprint, it rebuilds the envelope. Only the envelope goes up to the server
+  (`PUT /e2e/envelopes`, with the session and from the same origin). Whatever happens, the person
+  goes back to the app.
+- **Web: the bridge.** The web apps read the unlock key from a hidden Sytue ID iframe
+  (`/e2e/bridge?o=<origin>`) through `postMessage`. The suite's subdomains are the same site, so
+  the iframe's store is the same as the sign-in page's: **a single sign-in unlocks every app in
+  that browser**. The bridge only lets itself be embedded by the requesting origin (exact
+  `frame-ancestors`, validated with the same rule as CORS) and only answers it, and only gives the
+  key of the person the app asks for.
+- **Native: the encrypted handover.** The app generates an ephemeral P-256 key per sign-in and
+  sends its public part in `/authorize`. The relay encrypts the unlock key for it (ECDH,
+  HKDF-SHA256 `…/native` and AES-256-GCM) and **its JavaScript** adds it to the return
+  (`sytue_unlock=…`, next to the code): the desktop loopback or the mobile custom scheme. It never
+  goes in a server `Location`, and even if the URL ended up in a history only the ephemeral key
+  opens it, and that key dies with that sign-in. The app checks that it belongs to the person of
+  the tokens and stores it with the session in the system's secure store, which the device's
+  native apps already share: one sign-in unlocks them all.
+- **The apps unlock on their own.** With the unlock key, the client opens the `sytue-id` wrapper
+  of its Matrix account in Rooms (`HKDF(key, "sytue-matrix-recovery-wrap-v1/sytue-id")`, the same
+  format as 0082 with the new type; Rooms migration 0080), or creates the encrypted account and
+  stores the wrapper before publishing the key, recovers the key, bootstraps cross-signing and the
+  device ends up **verified by itself**. Without the unlock key, the app shows “Unlocking…” and,
+  if it is missing, a “Sign in to Sytue ID” button, which goes back to `/authorize` with
+  `prompt=login` (Sytue ID accepts it since this decision, and the return does not repeat it).
+  Never a key dialog in the app.
+- **Signing out** of Sytue ID clears the browser store. Deleting a passkey deletes its envelope.
+
+**Transition from 0082.** The password and passkey wrappers of 0082 carry a random salt (or PRF
+input) **per wrapper**: the sign-in page cannot reproduce them without knowing them, and it does
+not know them (they are in Rooms). Therefore:
+
+- A device that already has the recovery key (verified under 0082) wraps it with the unlock key
+  without asking as soon as it has it.
+- The 0081 KEK copy is used once, as until now, and moves to the new type.
+- A new device that only finds 0082 wrappers asks **once** for a Sytue ID sign-in with
+  `prompt=login` and their public parameters (`sytue_legacy`: salts and PRF inputs, which are not
+  secret). The sign-in page computes, besides the KEK, the Argon2id of those salts (or the PRF
+  with that input, `second`), and the app opens the old wrapper and moves it to the `sytue-id`
+  type. It is the least annoying path that does not break the rule: the person enters their key
+  again, but in Sytue ID. The old wrappers stay in Rooms (they are still ciphertext with the 0082
+  caveat) and are withdrawn with the next key rotation; since [0085](#0085), as soon as a device
+  checks that the new one opens.
+
+**Password change.** The password envelope is rebuilt on the first sign-in with the new password
+from any browser that already has the key (changing it closes all sessions, so that sign-in comes
+right away, usually in the same browser). A reset by email or by an administrator works the same
+way. If none of the person's browsers has the key and the new password does not open the
+envelope, the relay says so and offers to continue without unlocking or to **start from scratch**
+after an express confirmation: it is the loss that 0082 already documented for whoever forgets
+the password without another device.
+
+**Consequences.** Neither Sytue ID (envelopes without the KEK or the PRF output), nor Rooms
+(wrappers without the unlock key), nor both databases together, nor any service's KEK open the
+data. The caveats, honestly:
+
+- **Sytue ID sees the password when checking it**, as in 0082: an ACTIVE operator who captures
+  sign-ins could derive the KEK. The passkey does not have that weak point.
+- **The JavaScript is served by the operator.** The derivation happens in a Sytue ID page; a
+  malicious operator could change that code to take what is derived. It is the limit of any
+  end-to-end encryption on the web; the native apps reduce it to the sign-in page, and the data
+  already stored still cannot be opened with what is on the server.
+- **The key lives in the browser and in the keychain** until sign-out, as the cross-signing keys
+  already lived in Matrix's encrypted store. An XSS in any suite app could ask the bridge for it:
+  it opens everything of that person, not only that app.
+- The sign-in page's CSP allows `'wasm-unsafe-eval'` (to compile Argon2id, not to run scripts
+  outside the hash list), and the bridge is the only Sytue ID page that can be embedded.
+- Accounts that only sign in through federated SSO have no secret in Sytue ID: they unlock with a
+  Sytue ID passkey; without it, the encryption does not open (before, 0082 asked for a password
+  made up in the app).
+- The PRF depends on the authenticator verifying the person: the same authenticator that
+  sometimes verifies and sometimes does not gives different outputs, and then that time there is
+  no unlock.
+
+The format is pinned by the vectors in `apps/nucleo/recoverywrap/testdata/desbloqueo.json`,
+which Go, the Sytue ID page and the web check.
+
+<a id="0085"></a>
+
+<a id="0085--la-clave-de-desbloqueo-no-queda-legible-en-el-navegador-ni-sale-de-sytue-id"></a>
+
+## 0085 — The unlock key is not left readable in the browser and does not leave Sytue ID
+
+`accepted` · 2026-11-17 · branch `sytue-native` · completes [0084](#0084)
+
+**Problem.** The owner (2026-11-17): «la clave debe asociarse a la contraseña del usuario (la de
+Sytue ID), **sin que quede expuesta ni almacenada en el navegador. Lo mínimo es que no quede
+expuesta en claro**» (“the key must be associated with the user's password (the Sytue ID one),
+**without being exposed or stored in the browser. The minimum is that it is not exposed in the
+clear**”). 0084 did not meet that: the password was not stored, but the `sytue-e2e` IndexedDB of
+`id.<domain>` held in the clear the KEK derived from it (`pending`, ten minutes), the unlock key
+(`auk:<sub>`, until sign-out) and what opens the 0082 wrappers (`legacy:<sub>`); and the bridge
+handed the unlock key **raw** to each app through `postMessage`, so any script of an app (or an
+XSS in it) could keep it and later open, from anywhere, everything of that person.
+
+**Decision.** Nothing secret is left readable in the browser, neither at rest nor to JavaScript,
+and the unlock key does not leave the Sytue ID origin towards any web app.
+
+- **Only non-extractable CryptoKeys.** The `id.<domain>` store holds only WebCrypto CryptoKeys
+  with `extractable: false` (IndexedDB stores them by _structured clone_) and ciphertext under one
+  of them. Derivations go straight to a CryptoKey: the KEK is `HKDF → deriveKey` to AES-256-GCM
+  (`encrypt`/`decrypt`) from the Argon2id or PRF output, without its bytes existing in
+  JavaScript; what opens a `sytue-id` wrapper is another AES-256-GCM CryptoKey derived the same
+  way. The bytes that do have to be touched (the Argon2id or PRF output, the key when opening an
+  envelope) are zeroed as soon as they are used.
+- **What is in the store and in what form.**
+
+  | Record         | Form                                                                                                                                                                      | Lives               |
+  | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+  | `vault`        | random AES-256-GCM CryptoKey, born in this browser, non-extractable                                                                                                       | until sign-out      |
+  | `pending`      | the KEK (non-extractable CryptoKey), the salt or the passkey (public) and, during the transition, what opens the 0082 wrappers encrypted with `vault`                     | ten minutes at most |
+  | `auk:<sub>`    | the fingerprint (public), the key for the `sytue-id` wrappers (non-extractable CryptoKey, the one the bridge uses) and the unlock key encrypted with `vault` (relay only) | until sign-out      |
+  | `legacy:<sub>` | the keys that open the 0082 wrappers (non-extractable CryptoKeys)                                                                                                         | ten minutes at most |
+
+  The encrypted copy of the unlock key is needed for two things 0084 promises: rebuilding the
+  envelope when the password changes or a new passkey arrives (the envelope is the key itself,
+  encrypted) and giving it to a native app that signs in with the session already open in that
+  browser. WebCrypto does not allow wrapping a non-extractable key, so the alternative would be a
+  readable key; the encrypted copy is only opened by the relay, in the Sytue ID origin.
+
+- **The bridge does the operations.** The app no longer receives the key: it asks the bridge
+  “open this account's wrapper” (`sytue-e2e-unwrap`, with the wrappers its BFF gave it) or “seal
+  this recovery key for this account” (`sytue-e2e-wrap`), and the bridge returns only the result:
+  the recovery key of THAT Matrix account (which the app's SDK needs anyway) or the wrapper, which
+  is public. The checks of 0084 remain (origin validated by the server, exact `frame-ancestors`,
+  only the parent window, only the requested `sub`) and two are added: the account has to belong
+  to that person (`@sytue_<sub>:…` or `@sytue_storage_<product>_<organization>_<sub>:…`) and an
+  isolated account is only operated by its product's app (Mail does not open Drive's) on each
+  app's own hosts; on an organization host (`<organization>.<domain>/drive`, `/mail`…), which is a
+  single origin for all its apps, there is no product to bind to; and at most ten operations per
+  second per bridge. The previous protocol (`sytue-e2e-get`) no longer answers, and the app does
+  not talk to a bridge that does not announce this version (`v: 2`): the bridge and the apps ship
+  together.
+- **The conversion.** What 0084 left in the clear is converted on the first use of any Sytue ID
+  page that opens the store (sign-in, relay, bridge): each record moves to its new form and is
+  overwritten; what is not recognized is deleted. Nobody has to sign in again.
+- **The server** rejects an envelope that the browser sealed for another person (`sub` different
+  from the session's): that envelope would never open and would replace a good one.
+
+**What the web app stores.** No app stores or receives the unlock key. What each app does persist
+in its origin:
+
+- **The SDK's crypto store** (matrix-sdk-crypto in IndexedDB: the device's Olm account, its Megolm
+  sessions and the cross-signing private keys). It used to be opened without a key and was left
+  readable in the profile. Each new store is opened with a random 32-byte key (`storageKey`) that
+  is only stored encrypted with a non-extractable CryptoKey of the app's origin
+  (`EncryptedOfflineValues`); the page's copy is zeroed as soon as the SDK has it and is deleted
+  with the device. A store written earlier without a key **is still opened without one**: the SDK
+  does not allow taking out the Olm account to move it to a new store, and throwing it away would
+  lose the device and whatever only it has. It gets encrypted when the device is renewed (the next
+  sign-in in that browser after signing out), without asking for anything.
+- **The recovery key** of its account only as the owner key cache already stored it: encrypted
+  with a non-extractable CryptoKey of the app's origin.
+- **The device's Matrix access token**, in the app's store as until now: it allows acting as that
+  device before the server, but it opens nothing encrypted without the SDK store.
+
+A device verified with [0082](#0082) that has the recovery key in that cache wraps it with the
+Sytue ID unlock on its own, without asking for anything; if the browser does not have the unlock
+key yet, it keeps working and tries again next time. Without the cache, the one-time path through
+Sytue ID of 0084 remains.
+
+**Accounts whose key has no wrapper** (v3.21.0 in production: Mail and Calcus of accounts that
+v3.20 left half done). Before showing “verify from another device”, the gate (web and Fyne)
+tries, in this order and without asking for anything: **(1)** the copy of the key the device
+itself keeps (the owner key cache; in Fyne, the keychain): it opens the account and gets wrapped;
+**(2)** a **half-done** account —default storage key, but neither a cross-signing identity nor a
+server backup, nor secrets in the secret storage—: nobody ever got verified, that key protected
+nothing and the account is set up as new; **(3)** on the web only, a device that keeps the private
+keys of the published identity and that of its backup, with no secrets in the secret storage nor
+another owner key: it stores them again under a new key. In (2) and (3) the new key is wrapped
+with the Sytue ID unlock **before** being published (without it, it goes to Sytue ID first), and
+nothing is deleted on the server. If nobody has anything, in Rooms the main way out is to start
+from scratch (after its confirmation) and verifying from another device comes second; private
+storage still has no reset.
+
+**What an XSS can and cannot do.**
+
+| Where                       | Can                                                                                                                          | Cannot                                                                                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In a suite app              | while the page is open, ask the bridge for the recovery key of the accounts that app already uses (Rooms' and its product's) | read the unlock key, the KEK or anything in the Sytue ID store; open other products' isolated accounts; take anything that opens the person's data after the page is closed |
+| In Sytue ID (`id.<domain>`) | use the store's keys and open the encrypted copy; capture the password as it is typed                                        | — it is the root of trust: its CSP only runs scripts by hash                                                                                                                |
+
+**What the operator sees.** The same as in 0084: the password when checking it, envelopes and
+wrappers it cannot open. If it served modified JavaScript in Sytue ID, it would take what is
+derived (the 0084 caveat remains).
+
+**Passkey preferred, password as fallback** (the owner, 2026-11-17: «si el usuario tiene
+configurada la passkey, aprovecha ese refuerzo de seguridad», “if the user has the passkey set up,
+make use of that extra security”).
+
+- **It is offered first.** When the last person who signed in on that browser has a passkey
+  envelope, the relay leaves a signal (`__Host-sytue_passkey_first`, HttpOnly, with nobody's
+  data) and the sign-in page paints the passkey **at the top**, as the main button, with the
+  password below. Where the browser allows it, the identity field also offers the device's
+  passkeys in autocomplete (conditional mediation). Signing in with the password while having a
+  passkey is not blocked: it still signs in and unlocks with its envelope, and next time the
+  passkey is offered. The desktop and mobile apps sign in on that same page in the system
+  browser, so it works the same for them.
+- **The new passkey unlocks from enrollment.** When registering it in Sytue ID's “My account”,
+  the PRF is requested in the creation itself; if the authenticator provides it, its KEK
+  (non-extractable CryptoKey) goes to `/e2e/passkey`, which seals with it the unlock key the
+  browser already has and uploads the envelope, without asking for anything else. If it does not
+  provide it (or the enrollment was in the “My account” app, which only asks whether the passkey
+  supports PRF), `/e2e/passkey` asks for the passkey **once** for that credential. The PRF has to
+  come from a real ceremony in the Sytue ID origin: if another page provided it, an injected
+  script could make up a passkey and a PRF and keep an envelope it knows how to open.
+  **Trade-off:** with an authenticator that does not provide the PRF when creating the passkey,
+  or from the “My account” app, enrollment takes one more passkey touch; Safari also asks for it
+  with a button, because it does not open the passkey without a gesture. If the person skips it,
+  the passkey unlocks on its first use, as before.
+- **What is gained.** With a passkey the password caveat before an ACTIVE operator capturing
+  sign-ins disappears: the PRF output only leaves the authenticator towards the Sytue ID page.
+  The password remains a fallback, with its envelope and that caveat, for whoever signs in with
+  it.
+- **At rest, bound to the passkey: no.** Re-deriving the store's CryptoKey from the PRF on each
+  use would require touching the passkey every time an app opens its account, a new step; it was
+  rejected.
+
+**The 0082 wrappers are withdrawn now.** 0084 left them in Rooms until the next key rotation.
+Now, as soon as a device checks that the `sytue-id` wrapper of the current key **opens** with the
+unlock key (the web, through the bridge; native apps, with the session's key), it stores it again
+with `retire_older=1` and Rooms deletes the password and passkey wrappers of that key **in the
+same transaction** that stores it: the account is never left without a wrapper that opens. Only a
+`sytue-id` one can request it. Each app's gate does it without asking anything, when opening a
+device or when moving an account to the new type.
+
+**Password change.** The password envelope is rebuilt **at the moment of the change**, not on the
+next sign-in. The relay stores next to the key a copy of the current password envelope (public:
+it is what Sytue ID stores). When changing it, the browser checks that the CURRENT password opens
+that copy and seals the key with the NEW one, with the same salt; the envelope travels with the
+change (`unlock_envelope` in `POST /account/password` and in `POST /api/v1/me/password`) and Sytue
+ID stores it **only if the change succeeds** (an envelope with another fingerprint is rejected by
+the store). In Sytue ID's “My account” the page itself does it (`e2e/cuenta.js`); in the “My
+account” app, the Sytue ID bridge (`sytue-e2e-password`), which only allows it for that app (its
+alias `account.<domain>` and `/e2e/cuenta` in Sytue ID's own origin) and only with the correct
+current password: whoever knows it could already open the envelope; whoever does not gets
+nothing. If something fails, the password is changed anyway and the envelope is rebuilt on
+sign-in, as in 0084.
+
+**The native apps.** The key arrives encrypted for that sign-in's ephemeral key and is stored
+**only with the session** in the system's secure store that the device's apps share: the keychain
+on desktop, the Keystore on Android and the Keychain on iOS. It never goes to a configuration file
+or a log. There is one caveat, that of any session: a Linux without a keychain stores the session
+in a file encrypted with AES-256-GCM whose key comes from another file and the machine-id
+(`store_fichero_linux.go`); it protects against a copy of the configuration or the home
+directory, not against a process of the same person nor a laptop without disk encryption, and the
+app warns that a keychain is advisable. In memory, signing out zeroes the key and what opened the
+0082 wrappers, and each encryption step receives its own copy and zeroes it when done.
+
+**Returning to the mobile app.** The relay returns to the app's custom scheme
+(`sytue-mail://auth/callback?…&sytue_unlock=…`) from JavaScript, after waiting for the
+encryption. On Android it goes out on its own as `intent://…#Intent;scheme=…;end`, the form
+Chrome documents for opening an app from a page, and the “Back to the app” button (after a second
+and a half) carries the scheme URL as is, which with the person's gesture opens any browser.
+Without `package` or `browser_fallback_url`: mobile sign-in uses custom schemes, not App Links,
+and the app that asked for the sign-in is the one that has it registered (another one that
+registered it cannot use the code without the PKCE verifier nor open the handover without the
+ephemeral key). **Still to be checked on a phone:** that Chrome, Firefox and Samsung Internet on
+Android open the app on their own with the intent after the wait, and that the button opens it
+in all three; on iOS, that Safari opens the scheme on its own or with the button.
+
+**What cannot be avoided** (said clearly, as the owner asked):
+
+- **In memory while in use.** The password is a JavaScript string: it cannot be wiped, it lives
+  in the form field and is sent to be checked, as always; the script only encodes it for Argon2id
+  and that copy is wiped. hash-wasm computes Argon2id in a 64 MiB WebAssembly memory that it
+  creates on each call and does not keep, but it does not zero it: it is left unreferenced until
+  the garbage collector frees it. The unlock key exists as bytes inside the relay for as long as
+  it takes to open or seal an envelope or to be encrypted for a native app, and is zeroed
+  afterwards; the JSON of the native handover is a string that lives as long as it takes to be
+  encrypted.
+- **At rest, inside the browser profile.** “Non-extractable” means JavaScript cannot read it; the
+  browser stores the CryptoKey material in the profile's IndexedDB database, protected like the
+  rest of the profile (disk or system account encryption), not encrypted separately. And
+  overwriting a record does not guarantee that the database engine deletes the old copy from disk
+  right away: it does so when compacting.
+- **The bridge is still an oracle** for an XSS in an app while that page is open: it can ask it
+  for the recovery keys that app already handles. What it can no longer do is take the master
+  key.
+
 <a id="0086"></a>
 
 <a id="0086--bóveda-post-cuántica-directa-age-mlkem768-x25519-v1-en-el-almacenamiento-de-la-suite-sin-synapsematrix"></a>
 
 ## 0086 — Direct post-quantum vault (`age-MLKEM768-X25519-v1`) for the suite's storage, without Synapse/Matrix
 
-`accepted` · 2026-11-19 · security, e2ee, post-quantum, storage · builds on 0084 and 0085 · code in `apps/nucleo/recoverywrap/boveda_pq.go`, `services/id/internal/http/e2e/{comun,bridge}.js`, `services/drive/db/migrations/0040_pq_vault.{up,down}.sql`, `services/drive/internal/{store,service,http}/*pq_vault*`, `apps/frontend/packages/auth/src/server/pq-vault.ts`, `apps/frontend/packages/offline/src/vault/`, `apps/frontend/packages/shell/src/matrix/PqVaultGate.tsx`, `apps/frontend/apps/drive/src/{client/private-drive.ts,components/PrivateDriveGate.tsx}`
+`accepted` · 2026-11-19 · security, e2ee, post-quantum, storage · builds on [0084](#0084) and [0085](#0085) · code in `apps/nucleo/recoverywrap/boveda_pq.go`, `services/id/internal/http/e2e/{comun,bridge}.js`, `services/drive/db/migrations/0040_pq_vault.{up,down}.sql`, `services/drive/internal/{store,service,http}/*pq_vault*`, `apps/frontend/packages/auth/src/server/pq-vault.ts`, `apps/frontend/packages/offline/src/vault/`, `apps/frontend/packages/shell/src/matrix/PqVaultGate.tsx`, `apps/frontend/apps/drive/src/{client/private-drive.ts,components/PrivateDriveGate.tsx}`
 
 **Context.** Using Synapse/Matrix (isolated `v2` accounts, cross-signing, SSSS secret storage,
 SAS/device verification and `matrix-js-sdk` + RustCrypto WASM) to encrypt the private storage
@@ -6294,7 +6621,7 @@ and memory load— without bringing any multi-user messaging value to apps that 
 user's own encrypted records and files. At the same time, the suite already had the hybrid
 post-quantum cryptographic core `age-MLKEM768-X25519-v1` (NIST FIPS 203 ML-KEM-768 + X25519 +
 ChaCha20-Poly1305 via `filippo.io/age`, compiled to Go/Wasm in `apps/nucleo/cmd/pqc-wasm`) and
-the 256-bit account unlock key (AUK) held non-extractably in the Sytue ID bridge (0084, 0085).
+the 256-bit account unlock key (AUK) held non-extractably in the Sytue ID bridge ([0084](#0084), [0085](#0085)).
 
 **Decision.**
 
@@ -7260,7 +7587,7 @@ What this second delivery **does not do**, and why:
 
 ## 0087 — Sytue Mail on the direct vault: signing key in the vault, anchored by Sytue ID
 
-`accepted` · 2026-11-22 · security, e2ee, post-quantum, mail · Phase 2 of [0086](#0086) · builds on 0084 and 0085 · delivery 1 code in `apps/nucleo/recoverywrap/firma_boveda.go`, `apps/nucleo/cmd/pqc-wasm/vault_signing_operations.go`, `services/id/internal/http/e2e/bridge.js`
+`accepted` · 2026-11-22 · security, e2ee, post-quantum, mail · Phase 2 of [0086](#0086) · builds on [0084](#0084) and [0085](#0085) · delivery 1 code in `apps/nucleo/recoverywrap/firma_boveda.go`, `apps/nucleo/cmd/pqc-wasm/vault_signing_operations.go`, `services/id/internal/http/e2e/bridge.js`
 
 **Context.** The thirteen apps of [0086](#0086) only store the user's own records: changing the
 transport was enough for them. Sytue Mail also **receives** encrypted mail from outside, and for

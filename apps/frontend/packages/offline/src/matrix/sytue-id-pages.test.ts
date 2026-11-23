@@ -119,6 +119,7 @@ interface E2E {
     r: RelayResult,
   ) => 'enroll' | 'lost' | 'go' | 'confirm' | 'login' | 'failed';
   safeReturn: (url: string) => string;
+  navigableReturn: (url: string) => string;
   passwordChangeForm: (form: unknown, opts?: Record<string, unknown>) => void;
   PENDING_TTL: number;
 }
@@ -1758,6 +1759,22 @@ describe('the way back is never script', () => {
       expect({ url, safe: e2e.safeReturn(url) }).toEqual({ url, safe: '' });
   });
 
+  test('navigableReturn rebuilds the way back with a scheme of its own, never the document\'s', () => {
+    const e2e = load(fakeWindow(), 'comun.js');
+    const want: Record<string, string> = {
+      '/account?pk=ok#claves': 'https://id.sytue.eu/account?pk=ok#claves',
+      '/': 'https://id.sytue.eu/',
+      'https://mail.sytue.eu/auth/callback?code=c&state=s': 'https://mail.sytue.eu/auth/callback?code=c&state=s',
+      'HTTPS://mail.sytue.eu/x': 'https://mail.sytue.eu/x',
+      'http://127.0.0.1:8921/auth/callback?code=c': 'http://127.0.0.1:8921/auth/callback?code=c',
+      'sytue-mail://auth/callback?code=c0de&state=st4te': 'sytue-mail://auth/callback?code=c0de&state=st4te',
+      'sytue://auth/callback': 'sytue://auth/callback',
+    };
+    for (const [url, href] of Object.entries(want)) expect(e2e.navigableReturn(url)).toBe(href);
+    for (const url of hostile)
+      expect({ url, href: e2e.navigableReturn(url) }).toEqual({ url, href: '' });
+  });
+
   test('the relay builds no way back from a hostile destination', () => {
     const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
     const returnTo = e2e.returnTo as (
@@ -1841,7 +1858,7 @@ describe('the way back is never script', () => {
     }
     const login = '/oauth2/authorize?prompt=login&sytue_unlock_typed=1';
     const { replaced } = await runPage('relay.js', 'e2e-relay', { ...cfg, login });
-    expect(replaced).toEqual([next, login]);
+    expect(replaced).toEqual([next, `https://id.sytue.eu${login}`]);
   });
 
   test('the new passkey page goes back to «Mi cuenta» instead of a hostile way back', async () => {
@@ -1851,13 +1868,16 @@ describe('the way back is never script', () => {
         cred: 'AAAA',
         next,
       });
-      expect({ next, replaced }).toEqual({ next, replaced: ['/account'] });
+      expect({ next, replaced }).toEqual({ next, replaced: ['https://id.sytue.eu/account'] });
     }
     const { replaced } = await runPage('passkey.js', 'e2e-passkey', {
       sub: 'u',
       cred: 'AAAA',
       next: '/account?pk=ok#claves',
     });
-    expect(replaced).toEqual(['/account?pk=ok#claves']);
+    expect(replaced).toEqual(['https://id.sytue.eu/account?pk=ok#claves']);
+    const app = 'https://mail.sytue.eu/auth/callback?code=c&state=s';
+    const back = await runPage('passkey.js', 'e2e-passkey', { sub: 'u', cred: 'AAAA', next: app });
+    expect(back.replaced).toEqual([app]);
   });
 });

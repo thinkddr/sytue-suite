@@ -383,8 +383,11 @@
       if (outcome === "login") {
         // La entrada tecleada es una ruta de este origen (/oauth2/authorize…): solo
         // se sigue si lo es (comun.js, `safeReturn`); si no, como si fallara.
-        var login = E.safeReturn(cfg.login);
-        if (login && login.charAt(0) === "/") {
+        var login =
+          typeof cfg.login === "string" && cfg.login.charAt(0) === "/"
+            ? E.navigableReturn(cfg.login)
+            : "";
+        if (login) {
           gone = true;
           global.location.replace(login);
           return;

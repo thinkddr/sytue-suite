@@ -207,7 +207,10 @@ function fromBase64(value: string): Uint8Array<ArrayBuffer> {
 
 function normalizeBase(basePath: string | undefined): string {
   if (!basePath || basePath === '/') return '';
-  return basePath.replace(/\/+$/, '');
+  // Sin regex: `/\/+$/` es cuadrático con muchas barras seguidas.
+  let end = basePath.length;
+  while (end > 0 && basePath.charCodeAt(end - 1) === 47) end--;
+  return basePath.slice(0, end);
 }
 
 async function computeRecordDigest(

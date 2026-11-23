@@ -17,6 +17,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
 	"git.sytue.eu/sytue/one/services/drive/internal/store"
@@ -87,7 +88,7 @@ func (h *Handlers) PutPQVaultKey(w http.ResponseWriter, r *http.Request) {
 		// se le vacía como entonces, sin comparar, pero nunca con la marca de copia
 		// activa de otro. Queda en el registro para saber cuándo retirarlo.
 		reset = &service.PQVaultExpect{Unchecked: true}
-		log.From(r.Context()).Warn("pq-vault: vaciado sin expect (cliente anterior)", "product", product)
+		log.From(r.Context()).Warn("pq-vault: vaciado sin expect (cliente anterior)", "product", logsafe.Text(product))
 	}
 	ctx := r.Context()
 	if req.CopyID != "" {

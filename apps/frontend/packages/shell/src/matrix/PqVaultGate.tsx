@@ -43,7 +43,10 @@ export type PqVaultGateMessage =
 
 function normalizeBase(value: string | undefined): string {
   if (!value || value === '/') return '';
-  return value.replace(/\/+$/, '');
+  // Sin regex: `/\/+$/` es cuadrático con muchas barras seguidas.
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
 }
 
 function buildSignInUrl(basePath: string, returnTo: string): string {

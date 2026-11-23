@@ -181,7 +181,7 @@ func (m *smtpMailer) SendEmailVerification(ctx context.Context, to, link string)
 
 func (m logMailer) SendVaultKeyReset(ctx context.Context, to, producto string, generacion int64) error {
 	m.log.WarnContext(ctx, "SMTP no configurado: aviso de vaciado de bóveda SOLO en el log (dev)",
-		"to", logsafe.Text(to), "producto", producto, "generacion", generacion)
+		"to", logsafe.Text(to), "producto", logsafe.Text(producto), "generacion", generacion)
 	return nil
 }
 

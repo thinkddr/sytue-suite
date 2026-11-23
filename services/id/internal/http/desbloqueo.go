@@ -619,7 +619,7 @@ func (s *Server) servirPuente(w http.ResponseWriter, _ *http.Request, origen, an
 // `//evil`.
 func (s *Server) vueltaDelAlta(v string) (string, bool) {
 	if strings.HasPrefix(v, "/") {
-		if !rutaInternaSegura(v) {
+		if strings.HasPrefix(v, "//") || strings.HasPrefix(v, "/\\") || !rutaInternaSegura(v) {
 			return "", false
 		}
 		return v, true
@@ -641,6 +641,23 @@ func (s *Server) vueltaDelAlta(v string) (string, bool) {
 		return "", false
 	}
 	return u.String(), true
+}
+
+// isValidRedirect dice si `v` es ya una vuelta del alta tal cual: lo que da
+// vueltaDelAlta para sí misma. Es la guarda con la que el manejador sigue la
+// vuelta (y el nombre con el que la reconoce el análisis estático).
+func (s *Server) isValidRedirect(v string) bool {
+	n, ok := s.vueltaDelAlta(v)
+	return ok && n == v
+}
+
+// destinoDelAlta es la vuelta de /e2e/passkey: la de `return_to` si vale, si no
+// «Mi cuenta».
+func (s *Server) destinoDelAlta(returnTo string) string {
+	if n, ok := s.vueltaDelAlta(returnTo); ok && s.isValidRedirect(n) {
+		return n
+	}
+	return "/account"
 }
 
 func fragmento(u *url.URL) string {
@@ -665,10 +682,7 @@ type passkeyDatos struct {
 // sin más.
 func (s *Server) handleUnlockPasskeyEnroll(w http.ResponseWriter, r *http.Request) {
 	loc := i18n.From(r)
-	next, ok := s.vueltaDelAlta(r.URL.Query().Get("return_to"))
-	if !ok {
-		next = "/account"
-	}
+	next := s.destinoDelAlta(r.URL.Query().Get("return_to"))
 	sess, ok := s.currentSession(r)
 	cred := r.URL.Query().Get("cred")
 	if !ok || !validCredentialID(cred) {

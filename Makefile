@@ -97,7 +97,10 @@ dev-app: ## Solo núcleo + apps concretas (DEV, cabe en 8 GB): make dev-app P=do
 
 .PHONY: dev-certs
 dev-certs: ## Genera el certificado TLS local de confianza (mkcert), si aún no existe
-	@if [ -s $(COMPOSE_DIR)/traefik/certs/sytue-localhost.pem ]; then \
+	@# dev-up y dev-app pasan por aquí en cada arranque: sin esta comprobación, mkcert
+	@# rehacía el certificado (y volvía a instalar su CA) cada vez.
+	@if [ -s $(COMPOSE_DIR)/traefik/certs/sytue-localhost.pem ] && \
+	    [ -s $(COMPOSE_DIR)/traefik/certs/sytue-localhost-key.pem ]; then \
 	  echo "Certificado local ya presente (deploy/compose/traefik/certs/)."; \
 	else \
 	  mkcert -install && \
@@ -127,11 +130,13 @@ dev-seed: ## Crea el usuario admin de desarrollo en Sytue ID
 	@# Requiere la pila levantada (make dev-up). Ejecuta el seed DENTRO del
 	@# contenedor id usando el binario ya presente en la imagen (/app/id).
 	@# Idempotente y solo-dev. Alternativa sin Docker (Postgres local en :5432):
-	@#   SYTUE_ID_ENV=dev \
-	@#   SYTUE_ID_DATABASE_DSN="postgres://sytue_id:PASS@127.0.0.1:5432/sytue_id?sslmode=disable" \
-	@#   go run ./services/id/cmd/id seed
-	@# La contraseña es SYTUE_ID_DEV_SEED_PASSWORD de deploy/compose/.env (la genera
-	@# ./sytue-deploy); si no está, el valor de desarrollo sytue-dev-admin.
+	@#   SYTUE_ID_ENV=dev SYTUE_ID_DATABASE_DSN="postgres://sytue_id:PASS@127.0.0.1:5432/sytue_id?sslmode=disable" go run ./services/id/cmd/id seed
+	@# (En una sola línea a propósito: con `\` al final, make une el comentario a la línea
+	@# siguiente y el shell recibe un `@#` suelto, «command not found», y dev-seed fallaba.)
+	@# La contraseña es SYTUE_ID_DEV_SEED_PASSWORD: la del entorno; si no, la de
+	@# deploy/compose/.env; y si tampoco, la de desarrollo sytue-dev-admin. Va con
+	@# `exec -e` porque el compose no se la da al contenedor id: antes fijarla en el
+	@# entorno o en el .env no cambiaba nada y el seed se quedaba con la de siempre.
 	@cd "$(COMPOSE_DIR)" && { \
 	  if [ -z "$$DOCKER_HOST" ] && [ -S "$$HOME/.colima/default/docker.sock" ]; then \
 	    export DOCKER_HOST="unix://$$HOME/.colima/default/docker.sock"; \

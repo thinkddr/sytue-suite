@@ -96,6 +96,21 @@ const selectDocByID = `
 	FROM documents
 	WHERE id = $1 AND deleted_at IS NULL`
 
+// Límites del listado: lo que pida el cliente fuera de (0, limiteListaMax] se
+// sustituye por limiteListaPorDefecto.
+const (
+	limiteListaPorDefecto = 50
+	limiteListaMax        = 200
+)
+
+// limiteLista acota el tamaño de página pedido por el cliente.
+func limiteLista(n int) int {
+	if n <= 0 || n > limiteListaMax {
+		return limiteListaPorDefecto
+	}
+	return n
+}
+
 // ListDocuments lista documentos del tenant accesibles por el subject. Combina
 // los que posee y aquellos en los que tiene una entrada de ACL (usuario, grupo
 // o tenant). El filtrado fino por rol se hace en dominio sobre cada documento.
@@ -106,16 +121,16 @@ const selectDocByID = `
 // comparación de fila (updated_at, id) < (cursor) es sargable (PostgreSQL la
 // trunca a updated_at <= cursor como condición de índice y rechequea el resto).
 func (s *Store) ListDocuments(ctx context.Context, subj domain.Subject, f domain.ListFilter) ([]domain.Document, error) {
-	if f.Limit <= 0 || f.Limit > 200 {
-		f.Limit = 50
-	}
+	f.Limit = limiteLista(f.Limit)
 	var cursorA, cursorB any
 	if f.ByTitle {
 		cursorA, cursorB = cursorTituloDe(f)
 	} else {
 		cursorA, cursorB = cursorDe(f)
 	}
-	out := make([]domain.Document, 0, f.Limit)
+	// La capacidad es una constante: el límite lo pide el cliente y, aunque ya va
+	// acotado, la reserva no depende de él (las filas las limita el LIMIT de SQL).
+	out := make([]domain.Document, 0, limiteListaPorDefecto)
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, consultaLista(f.ByTitle),
 			subj.Sub, subj.Groups, subj.Tenant,

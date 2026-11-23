@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   inventory:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -29,10 +30,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           INVENTORY_PATH: ${{ runner.temp }}/security-inventory/inventory.json
-        run: |
-          node .github/scripts/security-inventory.mjs
-          # TEMPORAL: resumen legible de las alertas abiertas en el log.
-          node -e 'const r=require(process.env.INVENTORY_PATH);for(const a of r.alerts.filter(x=>x.state==="open")){const l=a.location||{};console.log(["ALERTA",a.number,a.tool,a.rule.id,a.rule.severity||"-",(l.path||"")+":"+(l.startLine||""),(a.message||"").replace(/\s+/g," ").slice(0,220)].join(" | "))}'
+        run: node .github/scripts/security-inventory.mjs
       - name: Read Go analysis traces for source-level remediation
         if: inputs.analysis_ref != ''
         env:

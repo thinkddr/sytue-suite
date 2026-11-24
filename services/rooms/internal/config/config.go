@@ -82,6 +82,13 @@ type Config struct {
 	// clave de firma activa de una bóveda (ADR 0087). Vacío ⇒ las acciones firmadas
 	// por bóvedas se rechazan.
 	IDClavesBovedaSecret string
+	// CorreoSinMatrix retira la autoridad de Matrix del correo (ADR 0087, entrega 5):
+	// Rooms ya no da de alta ni rota raíces de Matrix de `mail`, rechaza sus pruebas
+	// y recibos, y a quien solo tiene la de Matrix le contesta el 409
+	// `storage_matrix_retired` para que pase a la bóveda. Solo se enciende con
+	// SYTUE_MAIL_SIN_MATRIX=activado; apagado (el defecto), todo como antes. Exige
+	// ID_VAULT_KEYS_SECRET: sin el registro de claves no se ve un traspaso.
+	CorreoSinMatrix bool
 
 	// WhatsAppGraphURL es la raíz versionada de la Graph API de Meta con la que se
 	// habla con WhatsApp Business. Configurable para fijar la versión sin release y
@@ -214,6 +221,7 @@ func Load() (Config, error) {
 		IDURL:                          l.GetDefault("ID_URL", "http://id:8081"),
 		IDNombresOrgsSecret:            l.Get("ID_NOMBRES_ORGS_SECRET"),
 		IDClavesBovedaSecret:           l.Get("ID_VAULT_KEYS_SECRET"),
+		CorreoSinMatrix:                CorreoSinMatrix(l.Get("SYTUE_MAIL_SIN_MATRIX")),
 
 		WhatsAppGraphURL: strings.TrimRight(l.GetDefault("WHATSAPP_GRAPH_URL", "https://graph.facebook.com/v23.0"), "/"),
 
@@ -301,6 +309,11 @@ func (c Config) validate() error {
 	if c.EncryptedDocumentCalls && c.DocumentCallAccessSecret == "" {
 		return fmt.Errorf("encrypted document calls require SYTUE_ROOMS_DOCUMENT_CALL_ACCESS_SECRET")
 	}
+	if c.CorreoSinMatrix && c.IDClavesBovedaSecret == "" {
+		// Sin el registro de claves Rooms no ve ningún traspaso: con Matrix retirada,
+		// nadie que venga de Matrix podría volver a abrir su correo.
+		return fmt.Errorf("SYTUE_MAIL_SIN_MATRIX=activado requiere ID_VAULT_KEYS_SECRET")
+	}
 	if c.MaxMessageBytes <= 0 {
 		return fmt.Errorf("config: MAX_MESSAGE_KB debe ser > 0")
 	}
@@ -309,6 +322,10 @@ func (c Config) validate() error {
 	}
 	return nil
 }
+
+// CorreoSinMatrix lee el conmutador de la retirada de Matrix del correo: solo
+// «activado» lo enciende, como SYTUE_MAIL_BOVEDA en el BFF de Mail.
+func CorreoSinMatrix(valor string) bool { return valor == "activado" }
 
 // firstNonEmpty devuelve el primer valor no vacío. Sostiene el rename de las variables
 // de entorno sin romper un despliegue a medio actualizar.

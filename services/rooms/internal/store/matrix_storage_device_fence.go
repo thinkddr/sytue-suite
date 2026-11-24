@@ -29,6 +29,9 @@ func (s *Store) withMatrixDeviceFence(ctx context.Context, proof ingress.Control
 	if proof.Validate(request.Scope, false) != nil || request.Kind != "task.handoff" || request.Handoff == nil || beginOnly && request.Handoff.Phase != "begin" {
 		return domain.ErrInvalidInput
 	}
+	if err := s.pruebaMatrixAdmitida(request.Scope.Product); err != nil {
+		return err
+	}
 	directory, ok := s.matrixGate.(matrixIngressDirectory)
 	if !ok {
 		return domain.ErrMatrixUnavailable

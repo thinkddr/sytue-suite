@@ -68,9 +68,15 @@ func raizMatrixPermitidaEn(ctx context.Context, scope storage.Scope, claves Clav
 	return domain.ErrConflict
 }
 
+// raizMatrixPermitida: ni en un ámbito de la bóveda ni con Matrix retirada en ese
+// producto (retirada_matrix.go). Guarda el alta y la confirmación de cualquier
+// cambio de raíz (ConfirmMatrixRoot).
 func (s *Store) raizMatrixPermitida(ctx context.Context, subject, product string) error {
 	scope, err := cutoverScope(ctx, subject, product)
 	if err != nil {
+		return err
+	}
+	if err := s.raizMatrixAdmitida(scope.Product); err != nil {
 		return err
 	}
 	return raizMatrixPermitidaEn(ctx, scope, s.clavesBoveda)

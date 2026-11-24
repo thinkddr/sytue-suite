@@ -18,6 +18,9 @@ func (s *Store) VerifyMatrixStorageReceipt(ctx context.Context, subject, product
 	if verify == nil || !target.Valid() || !receipt.Valid() || receipt.RoomID != target.RoomID {
 		return domain.ErrInvalidInput
 	}
+	if err := s.pruebaMatrixAdmitida(product); err != nil {
+		return err
+	}
 	return s.withMatrixAuthority(ctx, subject, product, func(ctx context.Context, tx pgx.Tx, scope storage.Scope) error {
 		authority, err := matrixAuthorityTx(ctx, tx, scope)
 		if err != nil {

@@ -14,6 +14,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
+	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
 type storageAuthorityService interface {
@@ -34,6 +35,11 @@ func authorityHTTPError(err error) error {
 		return httpx.ErrForbidden
 	case errors.Is(err, matrixproof.ErrRootEnrollment):
 		return httpx.ErrConflict.WithCode("storage_root_enrollment_required")
+	case errors.Is(err, domain.ErrMatrixStorageRetired):
+		// ADR 0087, entrega 5: la autoridad de Matrix de este producto está retirada
+		// y el ámbito no tiene otra. Los clientes enseñan solo «vaciar y pasar a la
+		// bóveda», sin la opción de seguir con Matrix.
+		return httpx.ErrConflict.WithCode("storage_matrix_retired").WithMessage("Mail no longer opens with the previous system. Move it to the vault.")
 	case errors.Is(err, matrixproof.ErrUnverified):
 		return httpx.ErrForbidden
 	default:

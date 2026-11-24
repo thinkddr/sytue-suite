@@ -49,9 +49,14 @@ type authorityFixture struct {
 
 func newAuthorityFixture(t *testing.T) *authorityFixture {
 	t.Helper()
+	return newAuthorityFixtureFor(t, "mail")
+}
+
+func newAuthorityFixtureFor(t *testing.T, product string) *authorityFixture {
+	t.Helper()
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
-	scope := storage.Scope{Tenant: "acme", Subject: "alice", Product: "mail"}
+	scope := storage.Scope{Tenant: "acme", Subject: "alice", Product: product}
 	keys := matrixprooftest.New(t, scope, "matrix.test", id.DeviceID("OWNER_DEVICE"))
 	gate := &rootAuthorityGate{keys: keys}
 	st.SetMatrixGate(gate)

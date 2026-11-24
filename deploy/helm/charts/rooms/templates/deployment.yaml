@@ -189,6 +189,12 @@ spec:
                   name: sytue-id-claves-boveda
                   key: secret
                   optional: true
+            # La autoridad de Matrix del correo, retirada (ADR 0087, entrega 5; ver
+            # config.correoSinMatrix en values.yaml). Sin el valor, todo como antes.
+            {{- with .Values.config.correoSinMatrix }}
+            - name: SYTUE_MAIL_SIN_MATRIX
+              value: {{ . | quote }}
+            {{- end }}
             # Sytue Docs por el Service interno: decide quien entra a la sala de un documento
             # («Llamar desde el documento», ADR 0070). Rooms le presenta el token de quien
             # llama; sin respuesta, esas salas quedan cerradas.

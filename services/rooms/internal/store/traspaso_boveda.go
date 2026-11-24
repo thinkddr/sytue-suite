@@ -144,6 +144,10 @@ func (s *Store) baseDeBoveda(ctx context.Context, subject, product string) (int6
 // respuesta: nunca se vuelve a Matrix). Si no, la de Matrix, salvo que Sytue ID
 // tenga una clave de traspaso vigente: entonces lo escribe y da la de la bóveda.
 // Si Sytue ID no contesta, Matrix, como hasta ahora: un traspaso puede esperar.
+//
+// Con Matrix retirada (retirada_matrix.go), en lugar de la de Matrix se contesta
+// que está retirada; y si Sytue ID no contesta, no hay respuesta: sin saber si ya
+// hubo un traspaso no se puede decir «pasa a la bóveda».
 func (s *Store) autoridadTraspasada(ctx context.Context, subject, product string, scope storage.Scope, matrix matrixproof.Authority, estado estadoTraspaso) (matrixproof.Authority, error) {
 	if estado.hecho {
 		clave, err := s.clavesBoveda.Activa(ctx, scope)
@@ -152,19 +156,30 @@ func (s *Store) autoridadTraspasada(ctx context.Context, subject, product string
 		}
 		return autoridadSobre(scope, clave, estado.base)
 	}
-	clave, err := s.traspasoID.consultar(ctx, scope, s.clavesBoveda)
-	if err != nil {
+	var clave ClaveBoveda
+	var err error
+	if s.matrixRetirada(scope.Product) {
+		// Sin Matrix a la que volver, la pregunta es la de siempre, sin atajos: lo
+		// mismo que tras el traspaso.
+		clave, err = s.clavesBoveda.Activa(ctx, scope)
+		switch {
+		case errors.Is(err, ErrSinClaveDeBoveda):
+			return matrixproof.Authority{}, domain.ErrMatrixStorageRetired
+		case err != nil:
+			return matrixproof.Authority{}, domain.ErrMatrixUnavailable
+		}
+	} else if clave, err = s.traspasoID.consultar(ctx, scope, s.clavesBoveda); err != nil {
 		// Sin saber de Sytue ID, lo de siempre: Matrix. Un traspaso puede esperar.
 		return matrix, nil //nolint:nilerr // a propósito: Sytue ID caído no deja sin correo a quien usa Matrix
 	}
 	if !traspasoVigente(clave, estado.ultimo) {
-		return matrix, nil
+		return s.matrixSinTraspaso(scope.Product, matrix)
 	}
 	base, err := s.registrarTraspaso(ctx, subject, product, matrix, estado.ultimo, clave)
 	if errors.Is(err, errTraspasoDesfasado) {
 		// La autoridad de Matrix cambió mientras tanto: no hay traspaso. Se contesta
 		// lo leído, como cualquier lectura concurrente; la siguiente ve el cambio.
-		return matrix, nil
+		return s.matrixSinTraspaso(scope.Product, matrix)
 	}
 	if err != nil {
 		return matrixproof.Authority{}, err

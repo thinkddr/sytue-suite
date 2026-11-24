@@ -29,6 +29,10 @@ func (s *Store) VerifyMatrixStorageAction(ctx context.Context, subject, product 
 		}
 		return s.verifyVaultStorageAction(ctx, scope, expected, proof)
 	}
+	// Con Matrix retirada en el producto, ninguna prueba de Matrix vale (ADR 0087).
+	if err := s.pruebaMatrixAdmitida(product); err != nil {
+		return result, err
+	}
 	directory, ok := s.matrixGate.(matrixIngressDirectory)
 	if !ok {
 		return result, domain.ErrMatrixUnavailable

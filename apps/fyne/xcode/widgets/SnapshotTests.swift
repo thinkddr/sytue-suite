@@ -37,18 +37,33 @@ struct SnapshotContractTests {
             }
         }
         let local = SytueWidgetActions.routes(product: "docs", scheme: "sytue-docs", declared: ["open", "search", "compose", "create", "https://example.test"])
-        require(local.count == 2 && local["search"]?.absoluteString == "sytue-docs:/?action=search", "search opens only this app without query text")
-        require(SytueWidgetActions.routes(product: "docs", scheme: "https", declared: ["search"]).isEmpty, "wrong scheme cannot become an external search destination")
-        require(SytueWidgetActions.routes(product: "docs", scheme: "sytue-docs", declared: ["open"])["search"] == nil, "search must be declared by host metadata")
-        require(SytueWidgetActions.routes(product: "mail", scheme: "sytue-mail", declared: ["compose", "search"]).count == 2, "mail keeps compose alongside search")
-        require(SytueWidgetActions.routes(product: "calendar", scheme: "sytue-calendar", declared: ["create", "search"]).count == 2, "calendar keeps create alongside search")
+        require(local.count == 1 && local["open"]?.absoluteString == "sytue-docs:/", "only this app's own open route")
+        require(local["search"] == nil, "search is no longer a widget action, even if a host still declares it")
+        require(SytueWidgetActions.routes(product: "docs", scheme: "https", declared: ["open"]).isEmpty, "wrong scheme cannot become an external destination")
+        require(SytueWidgetActions.routes(product: "mail", scheme: "sytue-mail", declared: ["compose", "search"]).count == 1, "mail keeps compose, never search")
+        require(SytueWidgetActions.routes(product: "calendar", scheme: "sytue-calendar", declared: ["create", "search"]).count == 1, "calendar keeps create, never search")
         require(SytueWidgetActions.routes(product: "mail", scheme: "sytue-mail", declared: ["create"])["create"] == nil,
                 "an event action cannot be exported by Mail")
         require(SytueWidgetActions.routes(product: "calendar", scheme: "sytue-calendar", declared: ["compose"])["compose"] == nil,
                 "a compose action cannot be exported by Calendar")
-        require(SytueWidgetActions.order == ["open", "compose", "create", "search"], "actions retain a predictable visual and VoiceOver order")
-        require(SytueWidgetActions.label(for: "search") == "search.label"
-                && SytueWidgetActions.symbol(for: "search") == "magnifyingglass", "search has a translated name alongside its symbol")
+        require(SytueWidgetActions.order == ["open", "compose", "create"], "actions retain a predictable visual and VoiceOver order")
+        require(SytueWidgetActions.label(for: "create") == "widgets.create"
+                && SytueWidgetActions.symbol(for: "create") == "calendar.badge.plus", "create has a translated name alongside its symbol")
+        // Cada fila de Calendar lleva a su día (calendario.FechaDelEnlace), sin nada del evento.
+        var madrid = Calendar(identifier: .gregorian)
+        madrid.timeZone = TimeZone(identifier: "Europe/Madrid")!
+        let timed = SytueWidgetItem(title: "Daily", subtitle: nil, badge: nil, color: nil,
+                                    start_at: 1_795_995_000, end_at: 1_795_998_600, all_day: nil, unread: nil, done: nil)
+        require(SytueWidgetActions.day(of: timed, product: "calendar", scheme: "sytue-calendar", calendar: madrid)?.absoluteString
+                == "sytue-calendar:/?date=2026-11-30", "a timed row opens its local day")
+        let allDay = SytueWidgetItem(title: "Trip", subtitle: nil, badge: nil, color: nil,
+                                     start_at: 1_795_996_800, end_at: 1_796_083_200, all_day: true, unread: nil, done: nil)
+        var west = Calendar(identifier: .gregorian)
+        west.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        require(SytueWidgetActions.day(of: allDay, product: "calendar", scheme: "sytue-calendar", calendar: west)?.absoluteString
+                == "sytue-calendar:/?date=2026-11-30&all_day=1", "an all-day row is floating: its UTC day, in any zone")
+        require(SytueWidgetActions.day(of: timed, product: "mail", scheme: "sytue-mail", calendar: madrid) == nil,
+                "only Calendar rows get a day route")
         func write(_ value: [String: Any]) throws {
             try JSONSerialization.data(withJSONObject: value).write(to: snapshot, options: .atomic)
         }

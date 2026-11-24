@@ -11,7 +11,6 @@
 "widgets.calendars" = "Ημερολόγια";
 "widgets.address_books" = "Βιβλία διευθύνσεων";
 "widgets.storage" = "Αποθηκευτικός χώρος";
-"search.label" = "Καθολική αναζήτηση";
 "app.bases.description" = "Συνεργατικοί σχεσιακοί πίνακες";
 "app.sheets.description" = "Υπολογιστικά φύλλα";
 "app.calendar.description" = "Ημερολόγιο";

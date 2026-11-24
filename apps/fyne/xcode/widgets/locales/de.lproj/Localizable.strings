@@ -11,7 +11,6 @@
 "widgets.calendars" = "Kalender";
 "widgets.address_books" = "Adressbücher";
 "widgets.storage" = "Speicher";
-"search.label" = "Globale Suche";
 "app.bases.description" = "Gemeinsame relationale Tabellen";
 "app.sheets.description" = "Tabellenkalkulation";
 "app.calendar.description" = "Kalender";

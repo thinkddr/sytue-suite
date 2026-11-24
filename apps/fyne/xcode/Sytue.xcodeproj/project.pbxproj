@@ -4424,7 +4424,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp.widgets;
 				PRODUCT_NAME = "Sytue-erp-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4463,7 +4463,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
 				PRODUCT_NAME = "Sytue-notes-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4508,7 +4508,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus.widgets;
 				PRODUCT_NAME = "Sytue-calcus-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4527,7 +4527,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
 				PRODUCT_NAME = "Sytue-contacts-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4559,7 +4559,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf.widgets;
 				PRODUCT_NAME = "Sytue-certipdf-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4578,7 +4578,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf.widgets;
 				PRODUCT_NAME = "Sytue-certipdf-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4622,7 +4622,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases.widgets;
 				PRODUCT_NAME = "Sytue-bases-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4661,7 +4661,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast.widgets;
 				PRODUCT_NAME = "Sytue-cast-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4693,7 +4693,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp.widgets;
 				PRODUCT_NAME = "Sytue-erp-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4712,7 +4712,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases.widgets;
 				PRODUCT_NAME = "Sytue-bases-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4744,7 +4744,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one.widgets;
 				PRODUCT_NAME = "Sytue-hub-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4841,7 +4841,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
 				PRODUCT_NAME = "Sytue-photos-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4899,7 +4899,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos.widgets;
 				PRODUCT_NAME = "Sytue-diapos-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4918,7 +4918,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar.widgets;
 				PRODUCT_NAME = "Sytue-calendar-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4950,7 +4950,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms.widgets;
 				PRODUCT_NAME = "Sytue-rooms-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4999,7 +4999,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail.widgets;
 				PRODUCT_NAME = "Sytue-mail-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_COMPOSE SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_COMPOSE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5057,7 +5057,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail.widgets;
 				PRODUCT_NAME = "Sytue-mail-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_COMPOSE SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_COMPOSE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5076,7 +5076,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar.widgets;
 				PRODUCT_NAME = "Sytue-calendar-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5095,7 +5095,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos.widgets;
 				PRODUCT_NAME = "Sytue-diapos-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5127,7 +5127,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.widgets;
 				PRODUCT_NAME = "Sytue-drive-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5146,7 +5146,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms.widgets;
 				PRODUCT_NAME = "Sytue-rooms-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5165,7 +5165,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast.widgets;
 				PRODUCT_NAME = "Sytue-cast-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5184,7 +5184,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
 				PRODUCT_NAME = "Sytue-notes-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5203,7 +5203,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.widgets;
 				PRODUCT_NAME = "Sytue-drive-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5222,7 +5222,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
 				PRODUCT_NAME = "Sytue-contacts-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5274,7 +5274,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus.widgets;
 				PRODUCT_NAME = "Sytue-docus-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5319,7 +5319,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus.widgets;
 				PRODUCT_NAME = "Sytue-docus-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5351,7 +5351,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
 				PRODUCT_NAME = "Sytue-photos-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5370,7 +5370,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one.widgets;
 				PRODUCT_NAME = "Sytue-hub-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5389,7 +5389,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus.widgets;
 				PRODUCT_NAME = "Sytue-calcus-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;

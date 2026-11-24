@@ -6,19 +6,38 @@ import Foundation
 // Only declared, local actions are allowed. Neither a snapshot nor its counters
 // can supply a URL, a query, an account or a destination outside the host app.
 enum SytueWidgetActions {
-    static let order = ["open", "compose", "create", "search"]
+    // «Buscar» ya no es una acción de los widgets (2026-11-24, ADR 0078): el dueño los
+    // quitó porque no aportaban. Un `search` que siga declarado en un FyneApp.toml no da
+    // ruta ni widget.
+    static let order = ["open", "compose", "create"]
 
     static func label(for action: String) -> String {
-        action == "search" ? "search.label" : "widgets." + action
+        "widgets." + action
     }
 
     static func symbol(for action: String) -> String {
         switch action {
-        case "search": return "magnifyingglass"
         case "compose": return "square.and.pencil"
         case "create": return "calendar.badge.plus"
         default: return "arrow.up.right"
         }
+    }
+
+    // El día de un evento en Calendar (calendario.FechaDelEnlace): `?date=AAAA-MM-DD` y,
+    // en uno de día completo —flotante, a medianoche UTC—, `&all_day=1`. Solo la fecha:
+    // nada del evento (ni título ni id) sale en la URL. Otras apps, sin ruta por fila.
+    static func day(of item: SytueWidgetItem, product: String, scheme: String, calendar: Calendar) -> URL? {
+        guard product == "calendar", scheme == "sytue-calendar", item.startAt > 0 else { return nil }
+        var reader = calendar
+        if item.isAllDay {
+            reader = Calendar(identifier: .gregorian)
+            guard let utc = TimeZone(identifier: "UTC") else { return nil }
+            reader.timeZone = utc
+        }
+        let day = reader.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: TimeInterval(item.startAt)))
+        guard let year = day.year, let month = day.month, let dayOfMonth = day.day else { return nil }
+        let date = String(format: "%04d-%02d-%02d", year, month, dayOfMonth)
+        return URL(string: scheme + ":/?date=" + date + (item.isAllDay ? "&all_day=1" : ""))
     }
 
     static func routes(product: String, scheme: String, declared: [String]) -> [String: URL] {
@@ -26,7 +45,6 @@ enum SytueWidgetActions {
         var routes = [String: URL]()
         for action in declared {
             if action == "open" { routes[action] = URL(string: scheme + ":/") }
-            if action == "search" { routes[action] = URL(string: scheme + ":/?action=search") }
             if action == "compose", product == "mail" {
                 routes[action] = URL(string: scheme + ":/?action=compose")
             }

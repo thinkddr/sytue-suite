@@ -27,7 +27,7 @@ Website = "https://sytue.eu"
 # coincidir con lo registrado en Sytue ID.
 [Development]
   esquema = "sytue-docs"
-  widget_acciones = "open,search"
+  widget_acciones = "open"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"
 

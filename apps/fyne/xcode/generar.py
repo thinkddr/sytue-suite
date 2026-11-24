@@ -72,8 +72,11 @@ def apps():
         if not (app["nombre"] and app["id"] and app["icono"] and app["marca"]):
             sys.exit("apps/fyne/cmd/%s/FyneApp.toml no declara Name, ID, Icon o esquema" % d)
         acciones = metadato(toml, "widget_acciones")
-        app["widget_acciones"] = acciones.split(",") if acciones else []
-        permitidas = {"open", "search"}
+        # «search» ya no es una acción de los widgets (2026-11-24, ADR 0078): el dueño los
+        # quitó porque no aportaban. Se ignora si un FyneApp.toml aún la declara (Mail,
+        # que cambia en otra rama).
+        app["widget_acciones"] = [a for a in acciones.split(",") if a != "search"] if acciones else []
+        permitidas = {"open"}
         if app["marca"] == "mail":
             permitidas.add("compose")
         if app["marca"] == "calendar":
@@ -178,7 +181,6 @@ def idiomas_widgets():
     """Las mismas traducciones del cliente Go; ninguna segunda tabla por idioma."""
     carpeta = os.path.join(RAIZ, "apps", "nucleo", "i18n", "locales")
     claves = (["widgets." + c for c in ("open", "compose", "create", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage")]
-              + ["search.label"]
               + ["app." + a["marca"] + ".description" for a in apps() if a["widget_acciones"]]
               + ["dataflow.item." + c for c in ("files", "events", "documents", "contacts")]
               + ["widgets.updatedAgo"])

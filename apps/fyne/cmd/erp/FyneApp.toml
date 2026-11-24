@@ -32,7 +32,7 @@ Website = "https://sytue.eu"
 # Sytue ID para el cliente `sytue-syerp`.
 [Development]
   esquema = "sytue-erp"
-  widget_acciones = "open,search"
+  widget_acciones = "open"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"
   # Abre ficheros del equipo que la persona elige (subir, adjuntar, importar, insertar): en

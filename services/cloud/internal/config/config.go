@@ -342,13 +342,13 @@ func Load(defaultPort string) (Config, error) {
 		TenantsPermitidos:             l.GetCSVDefault("TENANTS_PERMITIDOS", OrganizacionDeLaPlataforma),
 		RunnerMode:                    l.GetDefault("RUNNER_MODE", ""),
 		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.35.0-rootless@sha256:5987568f92dafbfb679879de59c1cd8d26597f5f6635c314e166164e2615870c"),
-		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "alpine/curl:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d"),
+		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "alpine/curl:8.23.0@sha256:2a36f3dfe424231c1b03753929e43dda451c29a6193873916924f0b6073bbc5f"),
 		CraneImage:                    l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1"),
 
 		// Pinneadas por tag (no :latest); en prod, re-pinnear por digest tras
 		// verificar con un build vivo (como KANIKO_IMAGE).
-		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.694@sha256:28b87df2b33b4f0fbbd5eb0da11f4d9bb22deceb8641b53406d75a9b01400cad"),
-		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.1@sha256:2306e2b05ee0ef99f5d25b0779f645b24ae9f91ba187107503592fcdfe78da3a"),
+		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.695@sha256:7f293a04b9c80390b42b5f041fc3018c592bb67863f5ad50dd9597610444294e"),
+		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.1@sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef"),
 		CNBRunImage:     l.Get("CNB_RUN_IMAGE"),
 
 		BuildNamespace:      l.GetDefault("BUILD_NAMESPACE", "sytue-builds"),

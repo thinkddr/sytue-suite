@@ -394,7 +394,7 @@ services:
   # Esta imagen ya está en el catálogo (`managed-http-task`), espejada y firmada,
   # así que el cambio quita una dependencia de terceros en vez de añadirla.
   minio-init:
-    image: alpine/curl:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d
+    image: alpine/curl:8.23.0@sha256:2a36f3dfe424231c1b03753929e43dda451c29a6193873916924f0b6073bbc5f
     networks: [backend]
     depends_on:
       s3:

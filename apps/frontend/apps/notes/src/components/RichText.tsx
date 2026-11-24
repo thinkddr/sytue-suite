@@ -2749,7 +2749,7 @@ export function RichText({
           ? createPortal(
               <div
                 ref={menuRef}
-                class={cx('fixed', menu.tipo === 'cmd' ? 'w-80' : 'w-72')}
+                class={cx('fixed max-w-[calc(100vw-16px)]', menu.tipo === 'cmd' ? 'w-80' : 'w-72')}
                 style={{
                   zIndex: 'var(--z-dropdown)',
                   left: `${menu.x}px`,

@@ -90,7 +90,7 @@ config:
     # curl (licencia curl, permisiva): con esta imagen corre una tarea programada
     # que solo llama a una URL, sin obligar a nadie a empaquetar una imagen para
     # hacer un POST cada noche.
-    httpTask: alpine/curl:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d
+    httpTask: alpine/curl:8.23.0@sha256:2a36f3dfe424231c1b03753929e43dda451c29a6193873916924f0b6073bbc5f
   # Object Storage (S3 UE) para cache de builds/logs. endpoint/región overridable.
   s3:
     endpoint: https://s3.fr-par.scw.cloud

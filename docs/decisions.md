@@ -7965,6 +7965,33 @@ proof is an HMAC, which the server cannot verify.
      Matrix without proposing to empty, as before. The “Can't open your mail?” exit of the Matrix
      gate stays for whoever chooses to keep it.
 
+   **Sixth batch (2026-11-24): native Mail on the vault.** The fifth batch, in Fyne. It brings
+   forward delivery 5's native clients; withdrawing the Matrix authority is still pending.
+
+   - _Choice:_ `cifrado.ElegirAlmacenCorreo` reads the same Rooms authority with the same rule
+     (vault or new account → vault; confirmed Matrix → "Move your mail to the new vault"; in
+     doubt → Matrix without proposing to empty, with the "Can't open your mail?" exit while it
+     does not open). The host is `cifrado.AplicacionCorreo`, like `AplicacionDrive`; both
+     screens belong to `apps/mail` (`PasarABoveda`, `OfertaTraspaso`) with the web's keys.
+   - _Mail on the vault:_ `mail/application` in vault mode with `storage/vaultingress` as its
+     device: the vault with its file layer; ingress secrets as records of the vault itself read
+     by their transaction (`pqvault.ReadIngressSecret`, `api.Drive.FindPQVaultRecord`), the same
+     ones the web writes; ingress actions signed with the vault key (`pqvault.SignIngressAction`;
+     the vault keeps it until closed); and a claimed delivery's policy checked before every send
+     (`pqvault.WithPublicationPolicy`, the web's `putAuthorized`). Rooms' authority has to be
+     that vault's (identity, root and active), and its signing key the active one in Sytue ID.
+   - _Handover:_ `pqvault.Config.Handover` registers the key with the mark (`mail` only).
+     "Empty and move" opens a new vault (`Reset`); if Sytue ID asks to sign in, the user signs
+     in again (`Suite.Reidentificar`, `max_age=0`) and the SAME vault is registered
+     (`Vault.RegisterSigningKey`), without emptying again. If mail does not open after
+     emptying, that run's retry opens that vault with the mark and does not empty either. What
+     was asked (the handover, keeping Matrix) lives in the run, like the tab's
+     `sessionStorage`; once the authority is the vault's, it is forgotten. With the same key
+     already active no other handover is requested (the statement does not allow a key to
+     succeed itself): it counts if Sytue ID stores it as a `traspaso`, and otherwise it does
+     not.
+   - Not tested end to end here (no stack): the checklist above also applies to the native app.
+
 5. Withdrawal of the Matrix authority of `mail` and, afterwards, native clients.
 
 **Consequences.**

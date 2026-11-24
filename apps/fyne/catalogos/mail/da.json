@@ -450,7 +450,10 @@
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
   "privateMail.vaultMoveBody": "Din mail er krypteret med det tidligere system. For at den kan åbnes med dit Sytue ID-login ligesom de andre apps, skal den tømmes og startes forfra i boksen. Mail, der kun var krypteret med det tidligere system, går tabt.",
+  "privateMail.vaultMoveCheckFailed": "Status for din mail kunne ikke kontrolleres. Prøv igen om et øjeblik.",
   "privateMail.vaultMoveKeep": "Fortsæt med den tidligere mail indtil videre",
+  "privateMail.vaultMoveRetiredBody": "Det tidligere mailsystem er ikke længere tilgængeligt. Indtil du flytter din mail til boksen, modtager du ikke ny mail: det, der kommer i mellemtiden, gemmes krypteret med det tidligere system ligesom den mail, du allerede havde, og kan ikke læses. Det slettes ikke, men ingen kan åbne det. Når du har flyttet, kommer din mail igen frem og åbnes med dit Sytue ID-login ligesom de andre apps.",
+  "privateMail.vaultMoveRetiredTitle": "Flyt din mail til den nye boks for at blive ved med at modtage den",
   "privateMail.vaultMoveTitle": "Flyt din mail til den nye boks",
   "privateMail.vaultMoveUnderstood": "Jeg forstår, at mail krypteret med det tidligere system går tabt",
   "purge.body": {

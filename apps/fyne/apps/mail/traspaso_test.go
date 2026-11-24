@@ -6,7 +6,9 @@ package mail
 import (
 	"testing"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/widget"
 )
 
 // «Pasa tu correo a la nueva bóveda»: vaciar solo con la casilla marcada (y la
@@ -65,5 +67,51 @@ func TestOfertaTraspasoConfirmaConCasilla(t *testing.T) {
 	test.Tap(o.vaciar)
 	if confirmados != 1 || o.confirmar.Visible() {
 		t.Fatal("confirmar no vació una vez")
+	}
+}
+
+// Con Matrix retirada (ADR 0087, entrega 5): sin «seguir con el anterior», con el
+// texto de la retirada antes de la casilla, y vaciar solo con la casilla.
+func TestPasarABovedaConMatrixRetiradaNoOfreceSeguir(t *testing.T) {
+	test.NewTempApp(t)
+	tr := traductor(t)
+	confirmados := 0
+	v := NuevaPasarABoveda(tr, func() { confirmados++ }, nil)
+	if v.seguir != nil {
+		t.Fatal("con Matrix retirada se ofrece seguir con el anterior")
+	}
+	if v.cuerpo.Text != tr.T("privateMail.vaultMoveRetiredBody", nil) || v.cuerpo.Text == "privateMail.vaultMoveRetiredBody" {
+		t.Fatalf("el texto no es el de la retirada del catálogo: %q", v.cuerpo.Text)
+	}
+	caja := v.raiz.(*fyne.Container).Objects[0].(*fyne.Container)
+	if len(caja.Objects) != 4 || caja.Objects[1] != v.cuerpo || caja.Objects[2] != v.entiendo {
+		t.Fatal("el aviso de la retirada no va antes de la casilla")
+	}
+	if titulo := caja.Objects[0].(*widget.Label).Text; titulo != tr.T("privateMail.vaultMoveRetiredTitle", nil) {
+		t.Fatalf("el título no es el de la retirada: %q", titulo)
+	}
+	if botones := caja.Objects[3].(*fyne.Container).Objects; len(botones) != 1 || botones[0] != v.pasar {
+		t.Fatal("con Matrix retirada hay más botones que «vaciar y pasar»")
+	}
+	test.Tap(v.pasar)
+	v.entiendo.SetChecked(true)
+	test.Tap(v.pasar)
+	if confirmados != 1 {
+		t.Fatal("vaciar con la casilla no confirmó una vez")
+	}
+}
+
+// La duda con Matrix retirada: el aviso del catálogo y «Reintentar».
+func TestCorreoSinComprobarReintenta(t *testing.T) {
+	test.NewTempApp(t)
+	tr := traductor(t)
+	veces := 0
+	v := NuevaCorreoSinComprobar(tr, func() { veces++ })
+	if v.Objeto() == nil || v.reintentar.Text != tr.T("common.retry", nil) || v.reintentar.Text == "common.retry" {
+		t.Fatalf("el botón no sale del catálogo: %q", v.reintentar.Text)
+	}
+	test.Tap(v.reintentar)
+	if veces != 1 {
+		t.Fatal("«Reintentar» no reintentó")
 	}
 }

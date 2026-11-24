@@ -450,7 +450,10 @@
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
   "privateMail.vaultMoveBody": "Votre messagerie est chiffrée avec l'ancien système. Pour qu'elle s'ouvre avec votre connexion Sytue ID, comme les autres applications, il faut la vider et repartir de zéro dans le coffre. Les messages chiffrés uniquement avec l'ancien système seront perdus.",
+  "privateMail.vaultMoveCheckFailed": "Impossible de vérifier l'état de votre messagerie. Réessayez dans un instant.",
   "privateMail.vaultMoveKeep": "Continuer avec l'ancienne messagerie pour l'instant",
+  "privateMail.vaultMoveRetiredBody": "L'ancien système de messagerie n'est plus disponible. Tant que vous n'aurez pas passé votre messagerie au coffre, vous ne recevrez pas de nouveaux messages : ceux qui arrivent entre-temps sont conservés chiffrés avec l'ancien système, comme les messages que vous aviez déjà, et ne pourront pas être lus. Ils ne sont pas supprimés, mais personne ne pourra les ouvrir. Une fois le passage fait, vos messages vous parviennent de nouveau et s'ouvrent avec votre connexion Sytue ID, comme les autres applications.",
+  "privateMail.vaultMoveRetiredTitle": "Passez votre messagerie au nouveau coffre pour continuer à recevoir vos messages",
   "privateMail.vaultMoveTitle": "Passez votre messagerie au nouveau coffre",
   "privateMail.vaultMoveUnderstood": "Je comprends que les messages chiffrés avec l'ancien système seront perdus",
   "purge.body": {

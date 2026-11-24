@@ -51,6 +51,9 @@ func TestElegirAlmacenCorreo(t *testing.T) {
 		{"cuenta nueva (409 en el sobre de httpx)", responde(matrixproof.Authority{}, conflicto(`{"error":{"code":"storage_root_enrollment_required"}}`)), scopeCorreo, CorreoEnBoveda},
 		{"cuenta nueva (409 suelto)", responde(matrixproof.Authority{}, conflicto(`{"code":"storage_root_enrollment_required"}`)), scopeCorreo, CorreoEnBoveda},
 		{"autoridad de Matrix confirmada", responde(matrix, nil), scopeCorreo, CorreoEnMatrix},
+		{"Matrix retirada (409 en el sobre de httpx)", responde(matrixproof.Authority{}, conflicto(`{"error":{"code":"storage_matrix_retired"}}`)), scopeCorreo, CorreoRetirado},
+		{"Matrix retirada (409 suelto)", responde(matrixproof.Authority{}, conflicto(`{"code":"storage_matrix_retired"}`)), scopeCorreo, CorreoRetirado},
+		{"el código de la retirada sin 409: la duda", responde(matrixproof.Authority{}, &api.Error{Status: 503, Body: `{"code":"storage_matrix_retired"}`}), scopeCorreo, CorreoDudoso},
 		{"otro 409: la duda", responde(matrixproof.Authority{}, conflicto(`{"code":"otra_cosa"}`)), scopeCorreo, CorreoDudoso},
 		{"5xx: la duda", responde(matrixproof.Authority{}, &api.Error{Status: 503}), scopeCorreo, CorreoDudoso},
 		{"sin red: la duda", responde(matrixproof.Authority{}, errors.New("sin red")), scopeCorreo, CorreoDudoso},
@@ -67,24 +70,33 @@ func TestElegirAlmacenCorreo(t *testing.T) {
 	}
 }
 
-// `destinoCorreo` de la web: la bóveda gana siempre; después, un traspaso pedido.
+// `destinoCorreo` de la web: la bóveda gana siempre; después, un traspaso pedido;
+// con Matrix retirada, solo pasar, y la duda sabiéndolo no abre Matrix.
 func TestDestinoCorreo(t *testing.T) {
 	casos := []struct {
-		almacen         AlmacenCorreo
-		traspaso, sigue bool
-		quiero          destinoCorreo
+		almacen                   AlmacenCorreo
+		traspaso, sigue, retirada bool
+		quiero                    destinoCorreo
 	}{
-		{CorreoEnBoveda, false, false, correoBoveda},
-		{CorreoEnBoveda, true, true, correoBoveda},
-		{CorreoEnMatrix, false, false, correoElegir},
-		{CorreoEnMatrix, false, true, correoMatrix},
-		{CorreoEnMatrix, true, true, correoTraspaso},
-		{CorreoDudoso, false, false, correoMatrix},
-		{CorreoDudoso, true, false, correoTraspaso},
+		{CorreoEnBoveda, false, false, false, correoBoveda},
+		{CorreoEnBoveda, true, true, false, correoBoveda},
+		{CorreoEnBoveda, false, false, true, correoBoveda},
+		{CorreoEnMatrix, false, false, false, correoElegir},
+		{CorreoEnMatrix, false, true, false, correoMatrix},
+		{CorreoEnMatrix, true, true, false, correoTraspaso},
+		{CorreoDudoso, false, false, false, correoMatrix},
+		{CorreoDudoso, true, false, false, correoTraspaso},
+		// Matrix retirada (entrega 5).
+		{CorreoRetirado, false, false, true, correoPasar},
+		{CorreoRetirado, false, true, true, correoPasar},
+		{CorreoRetirado, true, false, true, correoTraspaso},
+		{CorreoDudoso, false, false, true, correoSinComprobar},
+		{CorreoDudoso, false, true, true, correoSinComprobar},
+		{CorreoDudoso, true, false, true, correoTraspaso},
 	}
 	for _, c := range casos {
-		if got := elegirDestinoCorreo(c.almacen, c.traspaso, c.sigue); got != c.quiero {
-			t.Errorf("%d/%v/%v: %d, quería %d", c.almacen, c.traspaso, c.sigue, got, c.quiero)
+		if got := elegirDestinoCorreo(c.almacen, c.traspaso, c.sigue, c.retirada); got != c.quiero {
+			t.Errorf("%d/%v/%v/%v: %d, quería %d", c.almacen, c.traspaso, c.sigue, c.retirada, got, c.quiero)
 		}
 	}
 }
@@ -184,6 +196,8 @@ type bancoCorreo struct {
 	confirmar, seguir    func()
 	oferta               *widget.Label
 	confirmarDesdeMatrix func()
+	sinComprobar         *widget.Label
+	reintentar           func()
 }
 
 func nuevoBancoCorreo(t *testing.T) *bancoCorreo {
@@ -243,6 +257,11 @@ func nuevoBancoCorreo(t *testing.T) *bancoCorreo {
 			b.oferta, b.confirmarDesdeMatrix = widget.NewLabel("oferta"), confirmar
 			return b.oferta
 		},
+		vistaSinComprobar: func(reintentar func()) fyne.CanvasObject {
+			b.sinComprobar, b.reintentar = widget.NewLabel("sin comprobar"), reintentar
+			return b.sinComprobar
+		},
+		retirada:  retiradaEnPreferencias(fyne.CurrentApp()),
 		estado:    func(s ApplicationState, _ error) { b.estados = append(b.estados, s) },
 		dispatch:  func(f func()) { b.ui <- f },
 		slot:      container.NewStack(),
@@ -512,5 +531,81 @@ func TestAnfitrionCorreoCambiarDeCuentaCierraLaBovedaPendiente(t *testing.T) {
 	}
 	if b.host.traspasos[auth.IdentitySnapshot{Issuer: "https://id.example.test", Client: "suite", Subject: "alice", Organization: "acme"}] == nil {
 		t.Fatal("el traspaso pedido por la cuenta anterior se perdió en la ejecución")
+	}
+}
+
+// Con Matrix retirada en Rooms (entrega 5) solo se ofrece pasar a la bóveda: la
+// pantalla sin «seguir», sin abrir Matrix; confirmar abre la bóveda del traspaso.
+func TestAnfitrionCorreoMatrixRetiradaSoloOfrecePasar(t *testing.T) {
+	b := nuevoBancoCorreo(t)
+	b.elige = CorreoRetirado
+	b.host.adoptar()
+	b.esperar()
+	if !b.host.va(correoPasar) || b.pasar == nil || b.enseña() != b.pasar || b.seguir != nil {
+		t.Fatal("con Matrix retirada no se enseña solo «pasar a la bóveda»")
+	}
+	if len(b.puertas) != 0 || len(b.matrix.arranco) != 0 || b.host.matrixPuedeEmpezar() || b.oferta != nil {
+		t.Fatal("con Matrix retirada se abrió algo antes de confirmar")
+	}
+	// «Seguir con Matrix» no tiene efecto aquí aunque alguien lo llame.
+	b.host.seguirConMatrix()
+	if !b.host.va(correoPasar) || len(b.matrix.arranco) != 0 {
+		t.Fatal("con Matrix retirada se pudo seguir con Matrix")
+	}
+	b.confirmar()
+	if p := b.ultimaPuerta(); p.modo != puertaTraspaso || b.host.matrixPuedeEmpezar() {
+		t.Fatal("confirmar con Matrix retirada no abre la bóveda nueva del traspaso")
+	}
+}
+
+// Desde que Rooms dijo que Matrix está retirada, la duda no abre Matrix sino
+// «Reintentar»; se recuerda en las preferencias de la app y una respuesta de
+// Matrix (el conmutador de Rooms apagado) lo olvida.
+func TestAnfitrionCorreoDudaConMatrixRetiradaNoAbreMatrix(t *testing.T) {
+	b := nuevoBancoCorreo(t)
+	b.elige = CorreoRetirado
+	b.host.adoptar()
+	b.esperar()
+	if !b.host.va(correoPasar) {
+		t.Fatal("no se aprendió la retirada")
+	}
+
+	// La siguiente lectura no sabe (red, 5xx): ni Matrix ni la salida de vaciar.
+	b.elige = CorreoDudoso
+	b.host.reintentar()
+	b.esperar()
+	if !b.host.va(correoSinComprobar) || b.sinComprobar == nil || b.enseña() != b.sinComprobar {
+		t.Fatal("la duda con Matrix retirada no enseña «Reintentar»")
+	}
+	if len(b.matrix.arranco) != 0 || b.host.matrixPuedeEmpezar() || b.oferta != nil || len(b.puertas) != 0 {
+		t.Fatal("la duda con Matrix retirada abrió Matrix o la bóveda")
+	}
+
+	// Lo recuerda otra ejecución (las preferencias de la app).
+	otro := &anfitrionCorreo{retirada: retiradaEnPreferencias(fyne.CurrentApp())}
+	if !otro.retirada.sabe(b.owner) || otro.retirada.sabe(auth.IdentitySnapshot{Subject: "bob"}) {
+		t.Fatal("la retirada no quedó en las preferencias de esta cuenta")
+	}
+
+	// «Reintentar» vuelve a preguntar.
+	b.elige = CorreoRetirado
+	b.reintentar()
+	b.esperar()
+	if !b.host.va(correoPasar) || b.enseña() != b.pasar {
+		t.Fatal("«Reintentar» no volvió a preguntar a Rooms")
+	}
+
+	// Una respuesta de Matrix olvida la retirada: la duda vuelve a ir por Matrix.
+	b.elige = CorreoEnMatrix
+	b.host.reintentar()
+	b.esperar()
+	if !b.host.va(correoElegir) || b.seguir == nil {
+		t.Fatal("con Matrix confirmada no se ofrece elegir")
+	}
+	b.elige = CorreoDudoso
+	b.host.decidir()
+	b.esperar()
+	if !b.host.va(correoMatrix) || len(b.matrix.arranco) != 1 || !b.matrix.arranco[0] {
+		t.Fatal("olvidada la retirada, la duda no va por Matrix como antes")
 	}
 }

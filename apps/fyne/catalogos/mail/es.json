@@ -450,7 +450,10 @@
   "privateMail.smtpConsentConfirm": "Permitir y enviar",
   "privateMail.smtpConsentTitle": "Enviar fuera de Sytue",
   "privateMail.vaultMoveBody": "Tu correo está cifrado con el sistema anterior. Para que se abra con tu inicio de sesión de Sytue ID, como el resto de las aplicaciones, hay que vaciarlo y empezar de nuevo en la bóveda. El correo que solo estaba cifrado con el sistema anterior se perderá.",
+  "privateMail.vaultMoveCheckFailed": "No se ha podido comprobar el estado de tu correo. Inténtalo de nuevo en un momento.",
   "privateMail.vaultMoveKeep": "Seguir con el correo anterior por ahora",
+  "privateMail.vaultMoveRetiredBody": "El sistema anterior del correo ya no está disponible. Hasta que pases tu correo a la bóveda no recibirás correo nuevo: lo que te llegue mientras tanto se guarda cifrado con el sistema anterior, igual que el correo que ya tenías, y no se podrá leer. No se borra, pero nadie podrá abrirlo. Al pasar, el correo vuelve a llegarte y se abre con tu inicio de sesión de Sytue ID, como el resto de las aplicaciones.",
+  "privateMail.vaultMoveRetiredTitle": "Pasa tu correo a la nueva bóveda para seguir recibiéndolo",
   "privateMail.vaultMoveTitle": "Pasa tu correo a la nueva bóveda",
   "privateMail.vaultMoveUnderstood": "Entiendo que se perderá el correo cifrado con el sistema anterior",
   "purge.body": {

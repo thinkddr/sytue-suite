@@ -41,13 +41,21 @@ const (
 	// sistema anterior: se le ofrece pasarlo a la bóveda (vaciándolo) o seguir.
 	CorreoEnMatrix
 	// CorreoDudoso: cualquier otra respuesta (red, 5xx, respuesta rara, sin
-	// organización). Se va por Matrix, el camino de siempre, sin proponer vaciar.
+	// organización). Se va por Matrix, el camino de siempre, sin proponer vaciar;
+	// salvo que Rooms ya dijera que Matrix está retirada (elegirDestinoCorreo).
 	CorreoDudoso
+	// CorreoRetirado: Rooms ya no honra la autoridad de Matrix del correo (ADR
+	// 0087, entrega 5) y la cuenta no tiene otra: solo queda pasar a la bóveda.
+	CorreoRetirado
 )
 
 // codeRootEnrollmentRequired es el 409 de Rooms cuando el correo aún no tiene
 // autoridad: una cuenta nueva.
 const codeRootEnrollmentRequired = "storage_root_enrollment_required"
+
+// codeMatrixRetired es el 409 de Rooms con la autoridad de Matrix del correo
+// retirada (SYTUE_MAIL_SIN_MATRIX en Rooms): la cuenta tiene que pasar a la bóveda.
+const codeMatrixRetired = "storage_matrix_retired"
 
 // LectorAutoridad es lo que se lee de Rooms para elegir (*api.Rooms).
 type LectorAutoridad interface {
@@ -64,8 +72,13 @@ func ElegirAlmacenCorreo(ctx context.Context, rooms LectorAutoridad, scope stora
 	authority, err := rooms.MatrixStorageAuthority(ctx, scope)
 	if err != nil {
 		var failure *api.Error
-		if errors.As(err, &failure) && failure.Status == http.StatusConflict && failure.Code() == codeRootEnrollmentRequired {
-			return CorreoEnBoveda
+		if errors.As(err, &failure) && failure.Status == http.StatusConflict {
+			switch failure.Code() {
+			case codeRootEnrollmentRequired:
+				return CorreoEnBoveda
+			case codeMatrixRetired:
+				return CorreoRetirado
+			}
 		}
 		return CorreoDudoso
 	}
@@ -90,18 +103,29 @@ const (
 	correoTraspaso
 	// correoElegir: la pantalla que ofrece pasar el correo a la bóveda o seguir.
 	correoElegir
+	// correoPasar: la misma pantalla con Matrix retirada: solo pasar a la bóveda.
+	correoPasar
+	// correoSinComprobar: la duda con Matrix retirada: «Reintentar», sin abrir Matrix.
+	correoSinComprobar
 )
 
 // elegirDestinoCorreo: la bóveda gana SIEMPRE (con el traspaso hecho, o sin
 // Matrix, se abre la que hay y nunca se vacía otra vez); un traspaso pedido va
-// después; con autoridad de Matrix confirmada se ofrece elegir, salvo que en esta
-// ejecución se eligiera seguir; ante la duda, Matrix sin proponer nada.
-func elegirDestinoCorreo(almacen AlmacenCorreo, traspasoPedido, seguirConMatrix bool) destinoCorreo {
+// después; con Matrix retirada solo se ofrece pasar; con autoridad de Matrix
+// confirmada se ofrece elegir, salvo que en esta ejecución se eligiera seguir;
+// ante la duda, Matrix sin proponer nada, salvo que Rooms ya dijera que Matrix
+// está retirada (`matrixRetirada`): entonces «Reintentar», porque Matrix ya no
+// abriría.
+func elegirDestinoCorreo(almacen AlmacenCorreo, traspasoPedido, seguirConMatrix, matrixRetirada bool) destinoCorreo {
 	switch {
 	case almacen == CorreoEnBoveda:
 		return correoBoveda
 	case traspasoPedido:
 		return correoTraspaso
+	case almacen == CorreoRetirado:
+		return correoPasar
+	case almacen == CorreoDudoso && matrixRetirada:
+		return correoSinComprobar
 	case almacen == CorreoEnMatrix && !seguirConMatrix:
 		return correoElegir
 	default:

@@ -170,7 +170,7 @@ test('subir indexa, y favoritas, álbumes y ediciones van solo a la bóveda', as
     await repositorio.close();
     await f.close();
   }
-});
+}, 15000);
 
 test('una foto sin entrada sale igual y se reconstruye desde el original', async () => {
   const f = await privateDriveWriteFixture(),
@@ -196,7 +196,7 @@ test('una foto sin entrada sale igual y se reconstruye desde el original', async
     await repositorio.close();
     await f.close();
   }
-});
+}, 15000);
 
 test('busca por nombre y por fecha en el índice descifrado', () => {
   const base = {

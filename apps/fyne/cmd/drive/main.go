@@ -81,7 +81,9 @@ func main() {
 
 	red, cliente := s.Conexion("drive", drive.SinGuardarSinConexion...)
 	// El widget nativo lo lee su propia Fuente (la raíz y la cuota), SIN la caché de
-	// trabajar sin conexión, y se vuelve a publicar tras cada escritura de Drive.
+	// trabajar sin conexión, del Drive privado que monte la vista (WidgetDesdeDrivePrivado)
+	// y se vuelve a publicar tras cada escritura en él. Sin la vista montada (en segundo
+	// plano, sin la clave), se conserva lo publicado.
 	s.PublicadorWidget(s.FuenteWidget(tr))
 	slot := container.NewStack()
 	cryptoT := func(key string) string { return tr.T(key, nil) }
@@ -152,6 +154,11 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
+			// Lo que se sube, renombra, mueve o borra va al Drive privado, que no pasa por
+			// HTTP: avisa al widget como ClienteConAviso. Y el widget lee ESTE Drive mientras
+			// esté abierto: el del servidor de la cuenta está congelado.
+			data = data.ConAviso(s.AvisarEscritura)
+			s.WidgetDesdeDrivePrivado(ctx, data, account)
 			// UI handlers acquire their request context from screen.Vida below.
 			screen := drive.NuevaPantalla(tr, data, red, w) //nolint:contextcheck // The presenter retains ctx as Vida; UI callbacks do not accept contexts.
 			screen.Cuenta = account
@@ -161,7 +168,7 @@ func main() {
 			// «Combinar PDF» con la misma fachada privada que la pantalla: los PDF se
 			// leen del repositorio cifrado y se unen en el dispositivo, como en CertiPDF.
 			if pdf, err := api.NewPDF(s.URL("docs"), s.URL("drive"), bound, nil).WithPrivateDrive(repo); err == nil {
-				screen.ConPDF(pdf)
+				screen.ConPDF(pdf.ConAviso(s.AvisarEscritura))
 			}
 			integraciones := api.NewIntegraciones(s.URL("integrations"), bound, nil)
 			// Connections use consent; legacy server-side file import stays inactive.

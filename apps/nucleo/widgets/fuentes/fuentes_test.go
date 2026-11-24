@@ -320,7 +320,9 @@ func TestUnaLecturaSecundariaQueFallaConservaLoPublicado(t *testing.T) {
 		{"lo publicado en la organización", func(b string) widgets.Fuente { return Cast(Comunes{}, api.NewCast(b, nil, nil)) }, cast, "/videos " + api.CastOrgScope + " " + api.CastStatusReady},
 		{"la cuota de Cast", func(b string) widgets.Fuente { return Cast(Comunes{}, api.NewCast(b, nil, nil)) }, cast, "/quota"},
 		{"los álbumes", func(b string) widgets.Fuente { return Photos(Comunes{}, api.NewPhotos(b, nil, nil)) }, fotos, "/albums"},
-		{"la cuota de Drive", func(b string) widgets.Fuente { return Drive(Comunes{}, api.NewDrive(b, nil, nil)) }, drive, "/quota"},
+		{"la cuota de Drive", func(b string) widgets.Fuente {
+			return Drive(Comunes{}, api.NewDrive(b, nil, nil), api.NewDrive(b, nil, nil))
+		}, drive, "/quota"},
 	}
 	for _, c := range casos {
 		if _, err := c.fuente(servidorConEstados(t, c.rutas, nil))(context.Background()); err != nil {

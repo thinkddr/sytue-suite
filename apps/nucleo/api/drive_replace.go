@@ -20,7 +20,7 @@ func (d *Drive) ReplaceFile(ctx context.Context, original File, contentType stri
 		if !ok {
 			return File{}, ErrPrivateDriveOperation
 		}
-		return writer.ReplaceFile(ctx, original, contentType, input, size)
+		return conAviso[File](d)(writer.ReplaceFile(ctx, original, contentType, input, size))
 	}
 	return d.Upload(ctx, original.FolderID, original.Name, contentType, input, size)
 }

@@ -42,3 +42,17 @@ func (p *PDF) CheckRemoteProcessing(ctx context.Context) error {
 	}
 	return nil
 }
+
+// ConAviso es una copia que avisa con `avisar` tras cada escritura con éxito en el Drive
+// privado (Drive.ConAviso): guardar, subir, renombrar, copiar, mandar a la papelera o
+// firmar dejan un fichero nuevo o cambiado en la carpeta «PDF», y el widget de CertiPDF
+// se vuelve a publicar. Sin Drive privado, el mismo cliente: el de HTTP avisa con su
+// transporte.
+func (p *PDF) ConAviso(avisar func()) *PDF {
+	if p == nil || p.drive == nil || !p.drive.Privado() || avisar == nil {
+		return p
+	}
+	copia := *p
+	copia.drive = p.drive.ConAviso(avisar)
+	return &copia
+}

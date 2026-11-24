@@ -56,7 +56,7 @@ func (d *Drive) sensitivityLabels(ctx context.Context, request Request) ([]Etiqu
 // quita la que tenga. El servicio rechaza (400) un id que no sea de ESTA organización.
 func (d *Drive) SetLabel(ctx context.Context, fichero, etiqueta string) error {
 	if d.data != nil {
-		return d.data.SetLabel(ctx, fichero, etiqueta)
+		return d.avisado(d.data.SetLabel(ctx, fichero, etiqueta))
 	}
 	ruta := elemento(DriveFile, fichero, "/label")
 	if etiqueta == "" {

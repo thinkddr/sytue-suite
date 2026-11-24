@@ -67,6 +67,9 @@ def metadata(appdir):
     for source in sorted((FYNE.parent / "nucleo/i18n/locales").glob("*.json")):
         catalog = json.loads(source.read_text())
         locales[source.stem] = {key: catalog[label] for key, label in LABELS.items()}
+        # Sin datos (sin sesión, caducado), el widget dice qué es la app en vez de quedarse
+        # en blanco, con «Abrir» debajo: la misma descripción que el de Apple.
+        locales[source.stem]["description"] = catalog["app." + product + ".description"]
     if "en" not in locales or not isinstance(locales["en"]["unread"], dict):
         raise ValueError("catálogo nativo incompleto")
     return {"version": 1, "id": bundle, "name": details["Name"], "scheme": scheme,

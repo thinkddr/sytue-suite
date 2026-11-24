@@ -4,10 +4,12 @@
 package fuentes
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Lo que comprobaban los widgets_test.go de cada pantalla cuando las pantallas
@@ -73,5 +75,63 @@ func TestDrivePoneLasCarpetasDelanteYElTamanoDeLosFicheros(t *testing.T) {
 	})
 	if len(items) != 2 || items[0].Badge != "DIR" || items[1].Title != "informe.pdf" || items[1].Badge == "" {
 		t.Fatalf("items de la raíz: %+v", items)
+	}
+}
+
+// TestCadaFilaLlevaLaRutaDeSuElemento (formato 3): cada constructor pone en la fila la
+// ruta de su elemento dentro de la app, con identificadores (o, en Drive y CertiPDF, la
+// ruta del fichero), y ninguna se sale de widgets.ValidRoute. La ida y vuelta por el
+// receptor de cada app está en apps/fyne (TestCadaFilaDelWidgetAbreSuElemento).
+func TestCadaFilaLlevaLaRutaDeSuElemento(t *testing.T) {
+	const uuid = "0b5c6f3e-1d2a-4c8e-9f00-112233445566"
+	ahora := time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)
+	casos := map[string]struct {
+		items []widgets.Item
+		ruta  string
+	}{
+		"notes": {itemsDeNotas(api.Notebook{ID: "nb 1", Title: "P"}, []api.Note{{ID: "n1", Title: "Plan", UpdatedAt: ahora}}),
+			"/notebooks/nb%201?note=n1"},
+		"contacts":          {itemsDeContactos([]api.Contact{{ID: uuid, FormattedName: "Elena"}}), "/contacts/" + uuid},
+		"contacts sin uuid": {itemsDeContactos([]api.Contact{{ID: "c1", FormattedName: "Elena"}}), ""},
+		"drive carpeta": {itemsDeRaiz("es", api.Children{Folders: []api.Folder{{ID: "f", Name: "Q3 & Q4"}}}),
+			"/?path=%2FQ3%20%26%20Q4"},
+		"drive fichero": {itemsDeRaiz("es", api.Children{Files: []api.File{{ID: "a", Name: "ñ.pdf", SizeBytes: 1}}}),
+			"/?preview=%2F%C3%B1.pdf"},
+		"pdf":          {itemsDePDF([]api.File{{ID: "a", Name: "Contrato.pdf"}}), "/pdf?path=%2FPDF%2FContrato.pdf"},
+		"cast":         {itemsDeCast(nil, []api.CastVideo{{ID: "v1", Title: "Demo"}}, nil), "/watch/v1"},
+		"rooms":        {detalleRooms([]api.RoomsChannel{{ID: "!c1:sytue.eu", Kind: "public", Name: "general"}}, nil, true).Items, "/channels/%21c1%3Asytue.eu"},
+		"photos album": {itemsDeAlbumes([]api.Album{{ID: "al1", Title: "Viaje", Count: 3}}), "/album?id=al1"},
+		"photos foto":  {itemsDeFotos(Comunes{}, []api.Photo{{ID: "p1", Name: "IMG.jpg", DriveFileID: "df1"}}), "/abrir?file=df1"},
+		"one reciente": {actividadReciente([]api.HubHit{{Source: "notes", Kind: "note", Title: "Plan"}}), "/actividad"},
+		"one sin ruta": {agendaDeHoy([]api.EventoDeHoy{{Resumen: "Daily", Inicio: ahora}}, ahora), ""},
+	}
+	firmas, _ := itemsDeFirmas(api.PDFPeticionesFirma{Recibidas: []api.PDFPeticionFirma{
+		{Ruta: "/PDF/Alta.pdf", Estado: "pendiente"}, {Nombre: "De fuera.pdf", NombrePide: "Ana", Estado: "pendiente"},
+	}})
+	casos["pdf firma"] = struct {
+		items []widgets.Item
+		ruta  string
+	}{firmas[:1], "/pdf?path=%2FPDF%2FAlta.pdf"}
+	casos["pdf firma de fuera, sin copia aún"] = struct {
+		items []widgets.Item
+		ruta  string
+	}{firmas[1:], ""}
+	for nombre, c := range casos {
+		if len(c.items) != 1 || c.items[0].Route != c.ruta || !widgets.ValidRoute(c.items[0].Route) {
+			t.Errorf("%s: filas %+v, quiero la ruta %q", nombre, c.items, c.ruta)
+			continue
+		}
+		if strings.Contains(c.items[0].Route, "token") {
+			t.Errorf("%s: una ruta no lleva tokens", nombre)
+		}
+	}
+	for _, r := range []string{RutaDocumento("d1"), RutaBase(uuid), RutaTareasERP(), RutaDia(ahora, false)} {
+		if r == "" || !widgets.ValidRoute(r) {
+			t.Errorf("ruta %q", r)
+		}
+	}
+	if RutaDocumento("d1") != "/edit?id=d1" || RutaBase(uuid) != "/base/"+uuid || RutaTareasERP() != "/?vista=tareas" ||
+		RutaDia(ahora, false) != "/?date=2026-11-24" || RutaBase("x") != "" {
+		t.Fatal("rutas de Docus, Bases, ERP o Calendar")
 	}
 }

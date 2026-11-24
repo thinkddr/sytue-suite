@@ -49,7 +49,7 @@ func itemsDeRaiz(l i18n.Locale, hijos api.Children) []widgets.Item {
 			break
 		}
 		if nombre := strings.TrimSpace(f.Name); nombre != "" {
-			items = append(items, widgets.Item{Title: nombre, Badge: "DIR", StartAt: unix(f.UpdatedAt)})
+			items = append(items, widgets.Item{Title: nombre, Badge: "DIR", StartAt: unix(f.UpdatedAt), Route: RutaDrive(f.Name, true)})
 		}
 	}
 	for _, f := range hijos.Files {
@@ -64,7 +64,9 @@ func itemsDeRaiz(l i18n.Locale, hijos api.Children) []widgets.Item {
 		if f.SizeBytes >= 0 {
 			insignia = i18n.FormatBytes(l, float64(f.SizeBytes))
 		}
-		items = append(items, widgets.Item{Title: nombre, Subtitle: f.ContentType, Badge: insignia, StartAt: unix(f.UpdatedAt)})
+		items = append(items, widgets.Item{
+			Title: nombre, Subtitle: f.ContentType, Badge: insignia, StartAt: unix(f.UpdatedAt), Route: RutaDrive(f.Name, false),
+		})
 	}
 	return widgets.SanitizeItems(items)
 }

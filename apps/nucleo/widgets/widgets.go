@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Daniel Delgado Ramos
 
 // Package widgets supplies bounded, non-secret snapshots to native OS widget
-// extensions. Providers never receive tokens, message text or arbitrary links.
+// extensions. Providers never receive tokens, message text or arbitrary links: a row
+// carries at most an opaque route INSIDE its own app (Item.Route), never a URL.
 package widgets
 
 import (
@@ -29,8 +30,10 @@ import (
 const (
 	// Version is shared with the WidgetKit, Android and desktop providers. La 2 (del
 	// 2026-11-06) lleva en `generation` la ÉPOCA de identidad, no la marca de sesión, y
-	// vive hasta 24 h: los lectores solo aceptan la 2 (ADR 0078, enmienda).
-	Version = 2
+	// vive hasta 24 h. La 3 (2026-11-24) añade a cada fila su ruta opaca dentro de la
+	// app (`route`): los lectores solo aceptan la 3 (ADR 0078, enmiendas). Un snapshot 2
+	// que siga en disco no se enseña: lo de Drive salía del servidor congelado.
+	Version = 3
 	// MaxAge es la caducidad máxima: pasado un día el widget se oculta. Los quince
 	// widgets enseñan «lo de hoy», y pasado un día enseñarían el hoy de ayer como si fuera
 	// el de hoy; es también el horizonte en que el sistema concede varias rondas en
@@ -57,8 +60,11 @@ const (
 	MaxTitleBytes    = 120
 	MaxSubtitleBytes = 160
 	MaxBadgeBytes    = 24
-	maxTimestamp     = 10_000_000_000
-	maxFileBytes     = 16 << 10
+	// MaxRouteBytes acota la ruta de una fila: la de un fichero de Drive lleva su nombre
+	// escapado (tres bytes por cada uno que no sea ASCII sin reservar).
+	MaxRouteBytes = 512
+	maxTimestamp  = 10_000_000_000
+	maxFileBytes  = 16 << 10
 )
 
 var (
@@ -160,6 +166,13 @@ type Snapshot struct {
 // app (for example an upcoming calendar event, inbox conversation header, recent
 // file or task). It never contains tokens, ciphertext ("enc:v1:"), message bodies
 // or arbitrary URLs.
+//
+// Route (formato 3) es a dónde lleva tocar la fila: la ruta y la consulta de un enlace
+// del esquema de LA PROPIA app (`/edit?id=…`, `/contacts/<id>`), las mismas que ya
+// atienden sus receptores (`sesion.AlAbrirURL`). El lector le antepone el esquema que
+// tiene firmado (`sytue-<producto>:`), así que una ruta no puede llevar a otra app, a la
+// web ni a otra cuenta. Lleva identificadores y, en Drive, el nombre que ya es el
+// título; nunca un token. Su forma la fija ValidRoute, la misma en Swift y en Java.
 type Item struct {
 	Title    string `json:"title"`
 	Subtitle string `json:"subtitle,omitempty"`
@@ -170,6 +183,7 @@ type Item struct {
 	AllDay   bool   `json:"all_day,omitempty"`
 	Unread   bool   `json:"unread,omitempty"`
 	Done     bool   `json:"done,omitempty"`
+	Route    string `json:"route,omitempty"`
 }
 
 // CalendarGrid describes the displayed month's busy days and accent colors so
@@ -261,8 +275,94 @@ func SanitizeItem(in Item) (Item, bool) {
 		AllDay:   in.AllDay,
 		Unread:   in.Unread,
 		Done:     in.Done,
+		Route:    SanitizeRoute(in.Route),
 	}, true
 }
+
+// Escapar es un segmento o un valor de una ruta de fila: todo lo que no sea una letra o
+// una cifra ASCII, `-`, `.`, `_` o `~` va como `%XX` (en mayúsculas), también la barra,
+// el espacio y el `+`. Así lo que lee el receptor (url.Parse, `Query`) es el original.
+func Escapar(s string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if esSinReservar(c) {
+			b.WriteByte(c)
+			continue
+		}
+		b.WriteByte('%')
+		b.WriteByte(hex[c>>4])
+		b.WriteByte(hex[c&15])
+	}
+	return b.String()
+}
+
+// Ruta compone la ruta de una fila: `camino` ya escapado (cada trozo variable con
+// Escapar) y, detrás, los pares clave-valor de la consulta, escapados aquí. Un valor
+// vacío no se pone. "" si el resultado no es una ruta válida (ValidRoute): la fila se
+// queda sin destino propio y abre la app.
+func Ruta(camino string, pares ...string) string {
+	if len(pares)%2 != 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(camino)
+	sep := "?"
+	for i := 0; i < len(pares); i += 2 {
+		if pares[i+1] == "" {
+			continue
+		}
+		b.WriteString(sep + Escapar(pares[i]) + "=" + Escapar(pares[i+1]))
+		sep = "&"
+	}
+	return SanitizeRoute(b.String())
+}
+
+// SanitizeRoute devuelve la ruta si es válida (ValidRoute) y "" si no.
+func SanitizeRoute(r string) string {
+	if !ValidRoute(r) {
+		return ""
+	}
+	return r
+}
+
+// ValidRoute es la forma de la ruta de una fila, la misma que comprueban
+// `SytueWidgetSnapshot.isValidRoute` (Swift) y `WidgetSnapshot.validRoute` (Java), y
+// que testdata/contrato.tsv prueba en los tres: vacía (sin ruta), o de 1 a
+// MaxRouteBytes bytes que empiezan por UNA barra (`//` sería una autoridad), solo con
+// letras y cifras ASCII, `-._~/?=&` y escapes `%XX` en mayúsculas, y sin el marcador de
+// cifrado (`enc:v1:` escapado). Nada de `:`, `#`, `@`, espacios ni `+`.
+func ValidRoute(r string) bool {
+	if r == "" {
+		return true
+	}
+	if len(r) > MaxRouteBytes || r[0] != '/' || strings.HasPrefix(r, "//") ||
+		strings.Contains(strings.ToUpper(r), "ENC%3AV1%3A") {
+		return false
+	}
+	for i := 0; i < len(r); i++ {
+		c := r[i]
+		switch {
+		case esSinReservar(c), c == '/', c == '?', c == '=', c == '&':
+		case c == '%':
+			if i+2 >= len(r) || !esHexMayuscula(r[i+1]) || !esHexMayuscula(r[i+2]) {
+				return false
+			}
+			i += 2
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func esSinReservar(c byte) bool {
+	return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' ||
+		c == '-' || c == '.' || c == '_' || c == '~'
+}
+
+func esHexMayuscula(c byte) bool { return '0' <= c && c <= '9' || 'A' <= c && c <= 'F' }
 
 // SanitizeItems returns up to MaxItems sanitized visual entries.
 func SanitizeItems(in []Item) []Item {
@@ -490,6 +590,9 @@ func validItems(items []Item) bool {
 			return false
 		}
 		if it.EndAt > 0 && it.StartAt > 0 && it.EndAt < it.StartAt {
+			return false
+		}
+		if !ValidRoute(it.Route) {
 			return false
 		}
 	}

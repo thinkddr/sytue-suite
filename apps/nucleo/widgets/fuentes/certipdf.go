@@ -71,6 +71,8 @@ func itemsDeFirmas(ps api.PDFPeticionesFirma) ([]widgets.Item, int64) {
 		items = append(items, widgets.Item{
 			Title: titulo, Subtitle: r.NombrePide, Badge: "FIRMAR",
 			StartAt: unix(r.Creada), Color: "#d83b35", Unread: true,
+			// Una petición de fuera no tiene copia en mi unidad hasta abrirla (Ruta vacía).
+			Route: RutaPDF(r.Ruta),
 		})
 	}
 	return items, pendientes
@@ -80,7 +82,7 @@ func itemsDePDF(lista []api.File) []widgets.Item {
 	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
 	for _, f := range lista {
 		if nombre := strings.TrimSpace(f.Name); nombre != "" {
-			items = append(items, widgets.Item{Title: nombre, Badge: "PDF", StartAt: unix(f.UpdatedAt)})
+			items = append(items, widgets.Item{Title: nombre, Badge: "PDF", StartAt: unix(f.UpdatedAt), Route: RutaPDF(pdfEnCarpeta(f.Name))})
 		}
 		if llenos(items) {
 			break

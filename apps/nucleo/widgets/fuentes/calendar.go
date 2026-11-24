@@ -236,5 +236,7 @@ func itemDeEvento(c Comunes, oc ocurrencia, ini time.Time) widgets.Item {
 		StartAt:  max(oc.Start.Unix(), 0),
 		EndAt:    max(oc.End.Unix(), 0),
 		AllDay:   oc.Event.AllDay,
+		// Su día, con `ini` ya en la zona de la app (y flotante si es de día completo).
+		Route: RutaDia(ini, oc.Event.AllDay),
 	}
 }

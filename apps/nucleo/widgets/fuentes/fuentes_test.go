@@ -131,6 +131,10 @@ func TestCalendarElDiaCompletoEsFlotante(t *testing.T) {
 		if len(d.Items) != 1 || d.Calendar == nil || !slices.Equal(d.Calendar.BusyDays, []int{6}) {
 			t.Fatalf("%s, el 6 a las 23:30: filas %+v, días ocupados %+v", zona, d.Items, d.Calendar)
 		}
+		// Su día es el 6 en cualquier zona: la fila lleva a `?date=2026-11-06&all_day=1`.
+		if d.Items[0].Route != "/?date=2026-11-06&all_day=1" {
+			t.Fatalf("%s: la fila del día completo lleva a %q", zona, d.Items[0].Route)
+		}
 		if got := widgets.Vigentes(d.Items, "calendar", time.Date(2026, 11, 6, 23, 59, 59, 0, zona)); len(got) != 1 {
 			t.Fatalf("%s: el lector quita el día completo antes de acabar el día", zona)
 		}

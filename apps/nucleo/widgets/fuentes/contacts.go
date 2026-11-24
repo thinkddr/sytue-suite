@@ -64,6 +64,7 @@ func itemsDeContactos(lista []api.Contact) []widgets.Item {
 		}
 		items = append(items, widgets.Item{
 			Title: nombre, Subtitle: subtitulo, Badge: monograma(nombre), StartAt: unix(c.UpdatedAt),
+			Route: RutaContacto(c.ID),
 		})
 		if llenos(items) {
 			break

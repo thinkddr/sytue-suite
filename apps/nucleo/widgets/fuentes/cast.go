@@ -84,7 +84,7 @@ func itemsDeCast(vivos, mios, org []api.CastVideo) []widgets.Item {
 			}
 			items = append(items, widgets.Item{
 				Title: titulo, Subtitle: v.Owner.Name, Badge: insignia,
-				StartAt: unix(v.CreatedAt), Color: color, Unread: enDirecto,
+				StartAt: unix(v.CreatedAt), Color: color, Unread: enDirecto, Route: RutaVideo(v.ID),
 			})
 		}
 	}

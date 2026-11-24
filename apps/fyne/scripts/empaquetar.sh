@@ -2160,7 +2160,7 @@ android)
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/WidgetSnapshot.java" "$FYNE/android/prueba/eu/sytue/nativo/WidgetSnapshotPrueba.java" \
     "$FYNE/android/prueba/eu/sytue/nativo/WidgetsBloqueoPrueba.java"
-  # El contrato del formato 2 es el mismo fichero que corren Go y Swift.
+  # El contrato del formato 3 es el mismo fichero que corren Go y Swift.
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetSnapshotPrueba \
     "$FYNE/../nucleo/widgets/testdata/contrato.tsv"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetsBloqueoPrueba

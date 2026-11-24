@@ -6096,6 +6096,56 @@ phone: here there is no Android SDK or NDK, so the Java has been compiled agains
 Android 16 framework (Robolectric's `android-all`) and the C entry point against the
 JDK's `jni.h`, but neither the APK nor the Android `.so` has been built.
 
+**Enmienda (2026-11-24): «siguen sin actualizarse», el refresco continuo, Calendar con título y
+hora, y fuera «Buscar».** El dueño: tras crear un evento en Calendar nativo, el widget no lo
+enseñaba; los widgets deben seguir al día con la app al fondo; Calendar solo enseñaba puntos; y
+los widgets de «Buscar» no aportan.
+
+1. **La causa: las escrituras por la API no avisaban.** Desde que las apps de registros montan
+   su vista sobre la API con la fuente en `legacy` ([0086](#0086)), el cliente del campo `API`
+   de `cifrado.AplicacionRegistros` se construía sin `Suite.ClienteConAviso` (solo Rooms lo
+   pasaba). Ninguna escritura llamaba a `AvisarEscritura`, el Publicador quedaba limpio y al
+   pasar al fondo `PublicarPendiente` no tenía nada que publicar. Ahora lo pasan calendar,
+   contacts, notes, erp, bases, cast, hub, docus, calcus, diapos y photos, y
+   `TestLasVistasPorLaAPIAvisanAlWidget` lo exige a cada `cmd` (excepciones con su porqué:
+   drive y certipdf escriben en el Drive privado; mail publica con su vivo).
+2. **Qué es «continuo».** Con la app abierta: tras cada escritura (antirrebote de 1,5 s, como
+   mucho una ronda cada 30 s), con la señal `datos` del servidor, el vivo de Mail y Rooms, al
+   volver a primer plano y al recuperar la red; al pasar al fondo, lo pendiente en el acto.
+   Con la app al fondo o cerrada, **cada 15 min como mínimo, cuando el sistema lo deja**: la
+   tarea de refresco de iOS se pide cada 15 min (antes 30) y el trabajo periódico de Android va
+   cada 15 min con 5 de holgura (antes cada hora), los mínimos de cada plataforma; además, el
+   aviso silencioso (iOS) y el relevo de One (Android) siguen despertando la app con cada
+   cambio. iOS reparte las tareas según el uso y el presupuesto, no corre con el teléfono
+   bloqueado (protección de datos) ni tras cerrar la app a mano en el multitarea, y Doze junta
+   los trabajos de Android en sus ventanas de mantenimiento: es lo más que dejan, no un reloj.
+   La línea de tiempo de WidgetKit pasa de `.atEnd` (hasta 24 h) a **releer el fichero a los
+   15 min** (`SytueWidgetTimeline.reread`): una recarga pedida desde el fondo puede quedarse sin
+   presupuesto, y lo publicado por la tarea de refresco no se veía. La extensión sigue sin red,
+   sin Keychain y sin sesión: el descarte de «leer desde la extensión con su propia sesión»
+   sigue en pie; quien lee es la app, despertada en segundo plano.
+   `TestLosRefrescosDelWidgetVanAlMismoRitmo` ata las tres cadencias.
+3. **Calendar enseña lo próximo con título y hora.** Los datos ya iban en el snapshot (título,
+   lugar, inicio, fin, día completo, desde la ampliación del 2026-11-01): era la maqueta. En el
+   pequeño la rejilla del mes se comía el alto; ahora enseña el día y los dos próximos eventos
+   con su hora (la rejilla, si no hay nada próximo), y Android, en su pequeño, los eventos en vez
+   de la rejilla. Cada fila de iOS (mediano y mayores) es un enlace a **su día**,
+   `sytue-calendar:/?date=AAAA-MM-DD` (`&all_day=1` en los de día completo): solo la fecha, nada
+   del evento; el pequeño y la pantalla de bloqueo abren el día del siguiente. La pantalla de
+   bloqueo dice título y hora. Los títulos de una cuenta en Matrix no llegan al widget: su Fuente
+   lee del servidor (más abajo).
+4. **Sin widgets de «Buscar».** Fuera `SytueSearchWidget`, su ruta y su rótulo, el botón del
+   widget de Android y `search` de los `FyneApp.toml`; `generar.py` y `android-widgets.py`
+   ignoran un `search` que siga declarado (Mail, que cambia en otra rama). La entrada de Go que
+   atendía `?action=search` (`Suite.AlBuscar`, `ui/barrabusqueda_widget.go`) se queda sin quien
+   la llame hasta quitarla junto a su enganche en la barra.
+
+Pendiente: una ruta opaca por elemento en el snapshot (formato 3) para que cada fila de Mail,
+Notes, Contacts, Drive y el resto abra ESE elemento, y acciones nuevas («nota nueva»,
+«contacto nuevo») donde la app ya tenga el formulario; y que la Fuente de una cuenta en Matrix
+lea su repositorio privado en vez de la fuente congelada del servidor. Ni Swift ni el Java del
+widget se han compilado ni probado en un dispositivo.
+
 <a id="0079"></a>
 
 <a id="0079--sytue-notepads-sobre-papel-un-cromo-neutro-elegido-por-la-app"></a>

@@ -7598,6 +7598,15 @@ it called `invalid()` and the gate went back to “The encrypted data could not 
   Before, the usual vault was opened, failed again and you had to empty again. If the vault was
   already emptied (Mail asks to sign in afterwards, to register the signing key), it is not
   marked: it is never emptied twice.
+- **Native apps, the same.** The Fyne gate (`PuertaBoveda`) gains `AntesDeVaciar`, which Drive uses
+  to release its source before `pqvault.Reset` (re-identifying if the service asks and trying once
+  more if the epoch changed); without the unlock key it releases nothing and asks to sign in, and on
+  return it finishes emptying (`vaciarAlEntrar`; “Retry” forgets it). If the vault opens but Drive
+  does not load, the failure notice offers “Empty” with its checkbox, which opens a new gate
+  emptying (`IniciarVaciando`). In the record apps (Calendar, Contacts, Notes, Bases, Cast, ERP and
+  the office apps) the Matrix panel offers “Empty and go back to the server data” whenever the
+  account goes through Matrix, whether it opens or not, like the web notice: whoever had their data
+  in Matrix goes back to the server data and carries on as on the web.
 
 **Signing on the device, third delivery: the PDF engine in the browser (2026-11-23).** The studio of
 a vault PDF stops being “view and sign”: it is drawn with the studio's canvas and is annotated,

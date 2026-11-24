@@ -215,3 +215,103 @@ func TestPuertaBovedaOtraCuentaLaCierra(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 }
+
+// Vaciar sin la clave en el dispositivo no toca nada (ni suelta la fuente): pide
+// entrar, y al volver de Sytue ID termina de vaciar en vez de abrir la bóveda de antes,
+// que volvería a fallar. La web lo guarda como intención (sytue.vault-reset).
+func TestPuertaBovedaVaciarSinClaveTerminaAlVolverAEntrar(t *testing.T) {
+	b := nuevoBancoBoveda(t)
+	antes := 0
+	b.puerta.cfg.AntesDeVaciar = func(context.Context) error {
+		antes++
+		return nil
+	}
+	b.sembrar(claveBoveda(9))
+	b.puerta.Iniciar(t.Context())
+	if got := b.esperar(); got != BovedaNoAbre {
+		t.Fatalf("estado: %v", got)
+	}
+	b.clave = nil
+	b.puerta.PedirVaciado()
+	b.puerta.Vaciar(true)
+	if got := b.esperar(); got != BovedaEntrar || !b.puerta.vista.entrar.Visible() {
+		t.Fatalf("sin clave, vaciar pide entrar: %v", got)
+	}
+	if antes != 0 || b.fake.RecordCount() != 1 {
+		t.Fatal("sin clave no se suelta la fuente ni se vacía nada")
+	}
+	// Entrar falla (se cancela): el vaciado sigue pendiente.
+	b.entrar = func(context.Context) error { return errors.New("cancelado") }
+	fynetest.Tap(b.puerta.vista.entrar)
+	if got := b.esperar(); got != BovedaFallo {
+		t.Fatalf("estado: %v", got)
+	}
+	b.entrar = func(context.Context) error {
+		b.clave = claveBoveda(1)
+		return nil
+	}
+	fynetest.Tap(b.puerta.vista.otraVez)
+	if got := b.esperar(); got != BovedaLista || len(b.listas) != 1 {
+		t.Fatalf("al volver a entrar se termina de vaciar: %v", got)
+	}
+	if antes != 1 || b.fake.RecordCount() != 0 {
+		t.Fatalf("vació (%d registros) tras soltar la fuente %d vez", b.fake.RecordCount(), antes)
+	}
+}
+
+// Reintentar es abrir, no vaciar: olvida un vaciado pendiente de entrar.
+func TestPuertaBovedaReintentarOlvidaElVaciadoPendiente(t *testing.T) {
+	b := nuevoBancoBoveda(t)
+	b.sembrar(claveBoveda(9))
+	b.puerta.Iniciar(t.Context())
+	b.esperar()
+	b.clave = nil
+	b.puerta.PedirVaciado()
+	b.puerta.Vaciar(true)
+	if got := b.esperar(); got != BovedaEntrar {
+		t.Fatalf("estado: %v", got)
+	}
+	fynetest.Tap(b.puerta.vista.reintenta)
+	if got := b.esperar(); got != BovedaEntrar {
+		t.Fatalf("estado: %v", got)
+	}
+	b.entrar = func(context.Context) error {
+		b.clave = claveBoveda(9)
+		return nil
+	}
+	fynetest.Tap(b.puerta.vista.entrar)
+	if got := b.esperar(); got != BovedaLista || b.fake.RecordCount() != 1 {
+		t.Fatalf("tras reintentar, entrar abre la bóveda de antes sin vaciarla: %v", got)
+	}
+}
+
+// Si AntesDeVaciar falla (Drive no pudo soltar su fuente), no se vacía nada y no
+// queda nada pendiente.
+func TestPuertaBovedaAntesDeVaciarFallaNoVacia(t *testing.T) {
+	b := nuevoBancoBoveda(t)
+	b.puerta.cfg.AntesDeVaciar = func(context.Context) error { return pqvault.ErrSignin }
+	b.sembrar(claveBoveda(9))
+	b.puerta.Iniciar(t.Context())
+	b.esperar()
+	b.puerta.PedirVaciado()
+	b.puerta.Vaciar(true)
+	b.esperar()
+	if b.fake.RecordCount() != 1 || b.puerta.vaciarAlEntrar {
+		t.Fatal("un fallo antes de vaciar vació o dejó el vaciado pendiente")
+	}
+}
+
+// IniciarVaciando: la app ya confirmó (la bóveda abría, pero su contenido no cargaba).
+func TestPuertaBovedaIniciarVaciando(t *testing.T) {
+	b := nuevoBancoBoveda(t)
+	antes := 0
+	b.puerta.cfg.AntesDeVaciar = func(context.Context) error {
+		antes++
+		return nil
+	}
+	b.sembrar(claveBoveda(1))
+	b.puerta.IniciarVaciando(t.Context())
+	if got := b.esperar(); got != BovedaLista || antes != 1 || b.fake.RecordCount() != 0 {
+		t.Fatalf("iniciar vaciando suelta la fuente, vacía y entrega: %v %d %d", got, antes, b.fake.RecordCount())
+	}
+}

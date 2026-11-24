@@ -58,7 +58,7 @@ type AplicacionRegistrosConfig[R PrivateRepository] struct {
 	// API monta la vista sobre la API del servidor, como la web.
 	API func(Cuenta) (ApplicationView, error)
 	// Soltar devuelve la fuente del servidor a legacy («soltar la fuente», ADR
-	// 0086): la salida del panel de Matrix cuando la clave no abre. Nil: sin salida.
+	// 0086): la salida del panel de Matrix, abra o no. Nil: sin salida.
 	// SoltarEn(servicio) es la de todos los servicios de registros.
 	Soltar SoltarFuente
 }
@@ -304,6 +304,10 @@ func (h *registros) soltarFuente(ctx context.Context) error {
 		if actual, dentro := h.identity(); !dentro || actual != owner {
 			return auth.ErrAuthorizationChanged
 		}
+		err = h.devolver(ctx, h.session(owner), scope)
+	}
+	if errors.Is(err, api.ErrFuenteCambiada) {
+		// Otro dispositivo congeló otra vez entre leer la época y soltarla: una vez más.
 		err = h.devolver(ctx, h.session(owner), scope)
 	}
 	if err != nil {

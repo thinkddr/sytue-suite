@@ -21,6 +21,7 @@ package cifrado
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
@@ -376,7 +377,43 @@ func AbrirDriveBoveda(ctx context.Context, fabrica FabricaBoveda, driveURL strin
 	return recursos, repository, nil
 }
 
-// PuertaDriveDeSesion es la puerta de la bóveda de Drive de la cuenta actual.
+// PuertaDriveDeSesion es la puerta de la bóveda de Drive de la cuenta actual. Antes
+// de vaciar suelta la fuente congelada del servidor, como la web: la bóveda nueva
+// importa el Drive del servidor y, con la fuente ya `private` (o una congelación que
+// no cuadra), no tendría de dónde.
 func PuertaDriveDeSesion(suite *sesion.Suite, translate func(string) string, lista func(context.Context, *pqvault.Vault)) (*PuertaBoveda, error) {
-	return NuevaPuertaBovedaDeSesion(suite, "drive", translate, lista)
+	puerta, err := NuevaPuertaBovedaDeSesion(suite, "drive", translate, lista)
+	if err != nil {
+		return nil, err
+	}
+	owner := suite.Sesion.SnapshotIdentity()
+	session := sesionBovedaDeCuenta{session: suite.Sesion, owner: owner}
+	scope := puerta.cfg.Scope
+	puerta.cfg.AntesDeVaciar = func(ctx context.Context) error {
+		return soltarFuenteAntesDeVaciar(ctx, func(ctx context.Context) error {
+			return api.SoltarFuentePrivada(ctx, suite.URL("drive"), session, scope)
+		}, suite.Reidentificar, func() bool { return suite.Sesion.SnapshotIdentity() == owner })
+	}
+	return puerta, nil
+}
+
+// soltarFuenteAntesDeVaciar suelta la fuente (sin fuente congelada no hace nada).
+// Si el servicio pide identificarse otra vez, abre Sytue ID (prompt=login,
+// max_age=0) y repite una vez para la MISMA cuenta; si la fuente cambió mientras
+// tanto, lee otra vez y repite una vez.
+func soltarFuenteAntesDeVaciar(ctx context.Context, soltar, reidentificar func(context.Context) error, misma func() bool) error {
+	err := soltar(ctx)
+	if errors.Is(err, api.ErrReautenticacion) && reidentificar != nil {
+		if errEntrar := reidentificar(ctx); errEntrar != nil {
+			return errEntrar
+		}
+		if !misma() {
+			return auth.ErrAuthorizationChanged
+		}
+		err = soltar(ctx)
+	}
+	if errors.Is(err, api.ErrFuenteCambiada) {
+		err = soltar(ctx)
+	}
+	return err
 }

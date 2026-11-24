@@ -294,13 +294,14 @@ func TestRegistrosVolverAEntrarNoReviveLaVistaVieja(t *testing.T) {
 }
 
 // «Soltar la fuente» desde el panel de Matrix: solo para la cuenta que va por
-// Matrix, con una reidentificación si el servicio la pide y para la MISMA cuenta;
-// después Matrix se suelta y la cuenta pasa a la API.
+// Matrix, con una reidentificación si el servicio la pide y para la MISMA cuenta, y
+// otro intento si la época cambió entre leerla y soltarla; después Matrix se suelta
+// y la cuenta pasa a la API.
 func TestRegistrosSoltarLaFuenteVuelveALaAPI(t *testing.T) {
 	b := nuevoBancoRegistros(t)
 	b.modos["persona-a"] = "frozen"
 	var llamadas []storage.Scope
-	respuestas := []error{api.ErrReautenticacion, nil}
+	respuestas := []error{api.ErrReautenticacion, api.ErrFuenteCambiada, nil}
 	b.host.devolver = func(_ context.Context, _ api.Session, scope storage.Scope) error {
 		llamadas = append(llamadas, scope)
 		err := respuestas[0]
@@ -323,7 +324,7 @@ func TestRegistrosSoltarLaFuenteVuelveALaAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := storage.Scope{Tenant: "acme", Subject: "persona-a", Product: "contacts"}
-	if reidentificaciones != 1 || len(llamadas) != 2 || llamadas[1] != want {
+	if reidentificaciones != 1 || len(llamadas) != 3 || llamadas[2] != want {
 		t.Fatalf("reidentificaciones %d, llamadas %v", reidentificaciones, llamadas)
 	}
 	b.esperar() // soltada
@@ -332,7 +333,7 @@ func TestRegistrosSoltarLaFuenteVuelveALaAPI(t *testing.T) {
 		t.Fatalf("retiros %d, montajes %d", b.matrix.retiros, len(b.montajes))
 	}
 	// Ya por la API: no hay nada que soltar desde Matrix.
-	if err := b.host.soltarFuente(context.Background()); !errors.Is(err, auth.ErrAuthorizationChanged) || len(llamadas) != 2 {
+	if err := b.host.soltarFuente(context.Background()); !errors.Is(err, auth.ErrAuthorizationChanged) || len(llamadas) != 3 {
 		t.Fatal("soltó una cuenta que no va por Matrix", err)
 	}
 }

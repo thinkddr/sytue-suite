@@ -466,7 +466,10 @@
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
   "privateMail.vaultMoveBody": "Jūsų paštas užšifruotas ankstesne sistema. Kad jis atsidarytų prisijungus prie Sytue ID kaip ir kitos programos, jį reikia ištuštinti ir pradėti iš naujo saugykloje. Paštas, užšifruotas tik ankstesne sistema, bus prarastas.",
+  "privateMail.vaultMoveCheckFailed": "Nepavyko patikrinti jūsų pašto būsenos. Bandykite dar kartą po akimirkos.",
   "privateMail.vaultMoveKeep": "Kol kas tęsti su ankstesniu paštu",
+  "privateMail.vaultMoveRetiredBody": "Ankstesnė pašto sistema nebepasiekiama. Kol neperkelsite pašto į saugyklą, naujo pašto negausite: tai, kas ateina tuo metu, saugoma užšifruota ankstesne sistema, kaip ir jau turėtas paštas, ir jo nebus galima perskaityti. Jis neištrinamas, bet niekas negalės jo atidaryti. Perkėlus paštas vėl pradės ateiti ir atsidarys prisijungus prie Sytue ID, kaip ir kitos programos.",
+  "privateMail.vaultMoveRetiredTitle": "Perkelkite paštą į naują saugyklą, kad toliau jį gautumėte",
   "privateMail.vaultMoveTitle": "Perkelkite paštą į naują saugyklą",
   "privateMail.vaultMoveUnderstood": "Suprantu, kad ankstesne sistema užšifruotas paštas bus prarastas",
   "purge.body": {

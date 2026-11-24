@@ -52,15 +52,19 @@ type estadoCompartidos struct {
 // AlbumDeEnlace saca el álbum de un enlace a «Compartido conmigo» (el aviso
 // `photos.shared`), o "" si no lo es.
 func AlbumDeEnlace(u *url.URL) string {
-	id, _ := api.LeerAlbumCompartido(u)
-	return id
+	if id, ok := api.LeerAlbumCompartido(u); ok {
+		return id
+	}
+	return "" // `?album=` en otra página no es este enlace
 }
 
 // AlbumPropioDeEnlace saca el álbum propio del aviso `photos.album.added` —alguien con
 // edición le ha añadido fotos—, o "" si no lo es.
 func AlbumPropioDeEnlace(u *url.URL) string {
-	id, _ := api.LeerAlbum(u)
-	return id
+	if id, ok := api.LeerAlbum(u); ok {
+		return id
+	}
+	return "" // `?id=` en otra página no es este enlace
 }
 
 // Compartidos son los datos de «Compartido conmigo».

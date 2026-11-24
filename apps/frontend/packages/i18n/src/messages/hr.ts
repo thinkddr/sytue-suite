@@ -500,6 +500,9 @@ export const hr: Catalog = {
   'widgets.compose': 'Napiši',
   'widgets.storage': 'Pohrana',
   'widgets.create': 'Stvori događaj',
+  'widgets.newNote': 'Nova bilješka',
+  'widgets.newContact': 'Novi kontakt',
+  'widgets.addPhotos': 'Dodaj fotografije',
   'widgets.updatedAgo': 'Ažurirano {time}',
   'widgets.updatedAt': 'Ažurirano: {time}',
 

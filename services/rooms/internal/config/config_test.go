@@ -15,7 +15,7 @@ func setMinimalEnv(t *testing.T) {
 		"SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET",
 		"SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_URL", "SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_SECRET", "PUBLIC_URL", "DB_MAX_CONNS", "OIDC_ISSUER", "OIDC_JWKS_URL", "OIDC_AUDIENCE",
 		"DRIVE_URL", "INTEGRATIONS_URL", "INTEGRATIONS_INTERNAL_SECRET", "WS_ALLOWED_ORIGINS", "MAX_MESSAGE_KB", "MESSAGE_PAGE_SIZE",
-		"PRESENCE_TTL", "PORT", "HTTP_ADDR", "ENV", "VERSION", "CHANNEL_MAIL_DOMAIN",
+		"PRESENCE_TTL", "PORT", "HTTP_ADDR", "ENV", "VERSION", "CHANNEL_MAIL_DOMAIN", "SYTUE_MAIL_SIN_MATRIX",
 	} {
 		t.Setenv(k, "")
 	}
@@ -155,6 +155,29 @@ func TestChannelMailDomain(t *testing.T) {
 	t.Setenv("CHANNEL_MAIL_DOMAIN", " @Rooms.Sytue.EU. ")
 	if cfg, err = Load(); err != nil || cfg.ChannelMailDomain != "rooms.sytue.eu" {
 		t.Errorf("ChannelMailDomain = %q, %v", cfg.ChannelMailDomain, err)
+	}
+}
+
+// La retirada de Matrix del correo (ADR 0087, entrega 5) va APAGADA por defecto,
+// solo «activado» la enciende y, encendida, exige el registro de claves de bóveda.
+func TestCorreoSinMatrix(t *testing.T) {
+	for _, valor := range []string{"", "1", "true", "ACTIVADO", "activada", " activado"} {
+		setMinimalEnv(t)
+		t.Setenv("ID_VAULT_KEYS_SECRET", "secreto")
+		t.Setenv("SYTUE_MAIL_SIN_MATRIX", valor)
+		if cfg, err := Load(); err != nil || cfg.CorreoSinMatrix {
+			t.Fatalf("%q encendió la retirada de Matrix: %v %v", valor, cfg.CorreoSinMatrix, err)
+		}
+	}
+	setMinimalEnv(t)
+	t.Setenv("ID_VAULT_KEYS_SECRET", "secreto")
+	t.Setenv("SYTUE_MAIL_SIN_MATRIX", "activado")
+	if cfg, err := Load(); err != nil || !cfg.CorreoSinMatrix {
+		t.Fatalf("«activado» no encendió la retirada: %v %v", cfg.CorreoSinMatrix, err)
+	}
+	t.Setenv("ID_VAULT_KEYS_SECRET", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("la retirada de Matrix arrancó sin el registro de claves de bóveda")
 	}
 }
 

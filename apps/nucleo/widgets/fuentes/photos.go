@@ -54,7 +54,7 @@ func itemsDeFotos(c Comunes, fotos []api.Photo) []widgets.Item {
 		}
 		items = append(items, widgets.Item{
 			Title: titulo, Subtitle: f.Camera, Badge: strings.TrimSpace(insignia),
-			StartAt: unix(f.TakenAt), Unread: f.Favorite,
+			StartAt: unix(f.TakenAt), Unread: f.Favorite, Route: RutaFoto(f.DriveFileID),
 		})
 		if llenos(items) {
 			break
@@ -67,7 +67,7 @@ func itemsDeAlbumes(lista []api.Album) []widgets.Item {
 	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
 	for _, a := range lista {
 		if titulo := strings.TrimSpace(a.Title); titulo != "" {
-			items = append(items, widgets.Item{Title: titulo, Badge: strconv.Itoa(a.Count)})
+			items = append(items, widgets.Item{Title: titulo, Badge: strconv.Itoa(a.Count), Route: RutaAlbum(a.ID)})
 		}
 		if llenos(items) {
 			break

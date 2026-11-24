@@ -217,6 +217,22 @@ func LeerEvento(u *url.URL) (string, bool) {
 	return "", false
 }
 
+// LeerAccion es la acción rápida del widget nativo de `producto` que trae un enlace
+// (`sytue-<producto>:/?action=<acción>`, ADR 0078): la raíz de la app, con o sin el
+// prefijo de la web y la organización, y `action` como ÚNICO parámetro. "" si no lo es.
+// Quien la atiende abre un formulario, una pregunta o el selector del sistema que la
+// persona confirma: el enlace lo puede abrir cualquiera y nunca escribe nada solo.
+func LeerAccion(producto string, u *url.URL) string {
+	if !raizDe(u, producto) {
+		return ""
+	}
+	q := u.Query()
+	if len(q) != 1 || len(q["action"]) != 1 {
+		return ""
+	}
+	return q.Get("action")
+}
+
 // esSlugDeOrg dice si `s` tiene la forma de un slug de organización: minúsculas, dígitos
 // y guiones, sin guiones al borde. El formato lo fija `platform/pkg/tenancy` y lo replica
 // la web (`RE_SLUG_ORG` de packages/config/src/organizacion.ts); este módulo no depende

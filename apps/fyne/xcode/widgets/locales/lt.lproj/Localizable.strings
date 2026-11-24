@@ -1,6 +1,9 @@
 "widgets.open" = "Atverti";
 "widgets.compose" = "Rašyti";
 "widgets.create" = "Kurti įvykį";
+"widgets.newNote" = "Naujas užrašas";
+"widgets.newContact" = "Naujas kontaktas";
+"widgets.addPhotos" = "Pridėti nuotraukų";
 "widgets.notes" = "Užrašai";
 "widgets.rows" = "Eilutės";
 "widgets.pending" = "Laukiama";

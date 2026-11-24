@@ -34,7 +34,7 @@ Website = "https://sytue.eu"
 # registrado en Sytue ID.
 [Development]
   esquema = "sytue-photos"
-  widget_acciones = "open"
+  widget_acciones = "open,upload"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"
   # Abre ficheros del equipo que la persona elige (subir, adjuntar, importar, insertar): en

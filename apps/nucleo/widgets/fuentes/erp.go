@@ -33,7 +33,7 @@ func ERP(c Comunes, e *api.ERP) widgets.Fuente {
 			}
 			items = append(items, widgets.Item{
 				Title: titulo, Subtitle: primero(a.RegistroEtiqueta, a.Modelo), Badge: a.Vence,
-				Color: color, Unread: vencida || a.Vence == hoy,
+				Color: color, Unread: vencida || a.Vence == hoy, Route: RutaTareasERP(),
 			})
 			if llenos(items) {
 				break

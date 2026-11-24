@@ -1048,4 +1048,10 @@ export const de: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Ich verstehe, dass mit dem bisherigen System verschlüsselte E-Mails verloren gehen',
   'privateMail.vaultMoveKeep': 'Vorerst bei den bisherigen E-Mails bleiben',
+  'privateMail.vaultMoveRetiredTitle':
+    'Verschiebe deine E-Mails in den neuen Tresor, um weiter E-Mails zu empfangen',
+  'privateMail.vaultMoveRetiredBody':
+    'Das bisherige E-Mail-System ist nicht mehr verfügbar. Bis du deine E-Mails in den Tresor verschiebst, empfängst du keine neuen E-Mails: Was in der Zwischenzeit ankommt, wird wie deine bisherigen E-Mails mit dem bisherigen System verschlüsselt aufbewahrt und kann nicht gelesen werden. Es wird nicht gelöscht, aber niemand kann es öffnen. Nach dem Verschieben kommen E-Mails wieder an und öffnen sich wie die übrigen Apps mit deiner Sytue-ID-Anmeldung.',
+  'privateMail.vaultMoveCheckFailed':
+    'Der Stand deiner E-Mails konnte nicht geprüft werden. Versuche es gleich noch einmal.',
 };

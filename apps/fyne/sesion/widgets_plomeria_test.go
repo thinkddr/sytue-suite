@@ -87,9 +87,6 @@ func TestLosCmdUsanLaFuenteRegistrada(t *testing.T) {
 // sinAvisoDeEscritura son los `cmd` con widget que no envuelven ningún cliente con
 // ClienteConAviso, y por qué. Uno nuevo con widget o lo envuelve o se apunta aquí.
 var sinAvisoDeEscritura = map[string]string{
-	// Escriben solo en el Drive privado (bóveda o Matrix): nada sale por HTTP.
-	"drive":    "repositorio privado",
-	"certipdf": "repositorio privado",
 	// Su widget lo mueve el vivo del buzón (AvisarWidget), no sus escrituras.
 	"mail": "vivo de Mail",
 }
@@ -123,7 +120,11 @@ func TestLasVistasPorLaAPIAvisanAlWidget(t *testing.T) {
 				t.Fatal(err)
 			}
 			widget = widget || strings.Contains(string(texto), "s.PublicadorWidget(")
-			aviso = aviso || strings.Contains(string(texto), ".ClienteConAviso(")
+			// Drive y CertiPDF escriben en el Drive privado, que no pasa por HTTP: avisan
+			// con api.Drive.ConAviso / api.PDF.ConAviso (TestElDrivePrivadoAvisaAlWidget).
+			aviso = aviso || strings.Contains(string(texto), ".ClienteConAviso(") ||
+				strings.Contains(string(texto), ".ConAviso(s.AvisarEscritura)") ||
+				strings.Contains(string(texto), ".ConAviso(h.suite.AvisarEscritura)")
 			f, err := parser.ParseFile(token.NewFileSet(), ruta, texto, 0)
 			if err != nil {
 				t.Fatal(err)
@@ -155,7 +156,7 @@ func TestLasVistasPorLaAPIAvisanAlWidget(t *testing.T) {
 	if conVistaAPI < 11 {
 		t.Fatalf("solo %d vistas por la API; las apps de registros son once", conVistaAPI)
 	}
-	if !slices.Equal(slices.Sorted(maps.Keys(sinAvisoDeEscritura)), []string{"certipdf", "drive", "mail"}) {
+	if !slices.Equal(slices.Sorted(maps.Keys(sinAvisoDeEscritura)), []string{"mail"}) {
 		t.Fatal("la lista de excepciones ha cambiado: revisa por qué esa app no avisa")
 	}
 }
@@ -189,4 +190,35 @@ func expresion(e ast.Expr) string {
 		return expresion(v.X) + "." + v.Sel.Name
 	}
 	return "?"
+}
+
+// TestElDrivePrivadoAvisaAlWidget: Drive y CertiPDF escriben en el Drive privado (la
+// bóveda o Matrix), que no pasa por HTTP ni por ClienteConAviso. Hasta el 2026-11-24
+// subir, renombrar, borrar o firmar no volvía a publicar su widget. Cada fachada privada
+// de sus `cmd` sale con ConAviso(…AvisarEscritura): la de la pantalla de Drive (y la que
+// sirve al proveedor de documentos del sistema), la de «Combinar PDF» y la de CertiPDF.
+func TestElDrivePrivadoAvisaAlWidget(t *testing.T) {
+	for fichero, quiero := range map[string][]string{
+		filepath.Join("..", "cmd", "drive", "main.go"): {
+			"data, err := account.WithPrivateData(repo)", "data = data.ConAviso(s.AvisarEscritura)",
+			"screen.ConPDF(pdf.ConAviso(s.AvisarEscritura))",
+		},
+		filepath.Join("..", "cmd", "certipdf", "private.go"): {
+			"WithPrivateDrive(repository)", "pdf = pdf.ConAviso(h.suite.AvisarEscritura)",
+		},
+	} {
+		texto, err := os.ReadFile(fichero)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, q := range quiero {
+			if !strings.Contains(string(texto), q) {
+				t.Errorf("%s no dice %q: sus escrituras en el Drive privado no avisan al widget", fichero, q)
+			}
+		}
+		privadas := strings.Count(string(texto), "WithPrivateData(") + strings.Count(string(texto), "WithPrivateDrive(")
+		if avisos := strings.Count(string(texto), ".ConAviso("); avisos < privadas {
+			t.Errorf("%s: %d fachadas privadas y solo %d con ConAviso", fichero, privadas, avisos)
+		}
+	}
 }

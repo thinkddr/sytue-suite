@@ -12,21 +12,24 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
-// Drive lee la cuota y lo que hay en la RAÍZ, aunque la app esté en una subcarpeta.
+// Drive lee lo que hay en la RAÍZ de `datos` —el Drive privado que la app tiene abierto
+// (api.Drive.WithPrivateData), aunque esté en una subcarpeta— y la cuota de la cuenta en
+// `cuenta`, el cliente del servidor (los controles de la cuenta no son datos privados).
 // Con almacén externo (que la cuota de Sytue no mide) o una cuota que no es para esta
 // persona (403/404) no hay porcentaje; si la cuota o la raíz fallan por otra cosa, no se
-// publica y se conserva lo anterior. Peticiones: 3.
-func Drive(c Comunes, dr *api.Drive) widgets.Fuente {
+// publica y se conserva lo anterior. La monta la app con Privada: la registrada no lee el
+// servidor, congelado (privada.go). Peticiones: 1 de cuota y 2 lecturas locales.
+func Drive(c Comunes, datos, cuenta *api.Drive) widgets.Fuente {
 	return func(ctx context.Context) (widgets.Detail, error) {
-		raiz, err := dr.Root(ctx)
+		raiz, err := datos.Root(ctx)
 		if err != nil {
 			return widgets.Detail{}, err
 		}
-		hijos, err := dr.Children(ctx, raiz.ID, "")
+		hijos, err := datos.Children(ctx, raiz.ID, "")
 		if err != nil {
 			return widgets.Detail{}, err
 		}
-		q, err := dr.Quota(ctx)
+		q, err := cuenta.Quota(ctx)
 		if err := secundaria(err); err != nil {
 			return widgets.Detail{}, err
 		}
@@ -49,7 +52,7 @@ func itemsDeRaiz(l i18n.Locale, hijos api.Children) []widgets.Item {
 			break
 		}
 		if nombre := strings.TrimSpace(f.Name); nombre != "" {
-			items = append(items, widgets.Item{Title: nombre, Badge: "DIR", StartAt: unix(f.UpdatedAt)})
+			items = append(items, widgets.Item{Title: nombre, Badge: "DIR", StartAt: unix(f.UpdatedAt), Route: RutaDrive(f.Name, true)})
 		}
 	}
 	for _, f := range hijos.Files {
@@ -64,7 +67,9 @@ func itemsDeRaiz(l i18n.Locale, hijos api.Children) []widgets.Item {
 		if f.SizeBytes >= 0 {
 			insignia = i18n.FormatBytes(l, float64(f.SizeBytes))
 		}
-		items = append(items, widgets.Item{Title: nombre, Subtitle: f.ContentType, Badge: insignia, StartAt: unix(f.UpdatedAt)})
+		items = append(items, widgets.Item{
+			Title: nombre, Subtitle: f.ContentType, Badge: insignia, StartAt: unix(f.UpdatedAt), Route: RutaDrive(f.Name, false),
+		})
 	}
 	return widgets.SanitizeItems(items)
 }

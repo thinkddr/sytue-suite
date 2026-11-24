@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -79,6 +80,17 @@ func (a *App) abrirContactoEn(scope cargaContacts, id string) {
 	if abrir != nil && a.vigente(scope) {
 		a.abrirLibretaEn(scope, *abrir)
 	}
+}
+
+// PedirNuevo es la acción «Nuevo contacto» del widget (`?action=create`): abre el
+// formulario de crear en la libreta abierta, que la persona rellena y guarda —el enlace
+// no crea nada—. Si la lista aún no ha llegado (la app arrancando), se abre al llegar.
+// En el hilo de la interfaz.
+func (a *App) PedirNuevo() {
+	if a.Pantalla.Activa != nil && a.Pantalla.Estado == ui.EstadoExito && a.abrirFormulario(nil) != nil {
+		return
+	}
+	a.nuevoPedido = true
 }
 
 // abrirPedido enseña la ficha pedida por enlace si ya está en la lista. En el hilo de

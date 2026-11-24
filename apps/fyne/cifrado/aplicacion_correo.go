@@ -11,7 +11,11 @@ package cifrado
 //   - autoridad de Matrix confirmada → «Pasa tu correo a la nueva bóveda»: vaciar y
 //     pasar, o seguir por ahora con el anterior (en esta ejecución);
 //   - ante la duda → el correo de Matrix de siempre, con la salida «¿No puedes abrir
-//     tu correo?» mientras no está abierto.
+//     tu correo?» mientras no está abierto;
+//   - Matrix retirada en Rooms (ADR 0087, entrega 5: `storage_matrix_retired`) → la
+//     misma pantalla SIN «seguir con el anterior»; y desde que Rooms lo dijo (se
+//     recuerda en las preferencias de la app), la duda ya no abre Matrix sino un
+//     «Reintentar». El anfitrión lo sabe solo por la respuesta de Rooms.
 //
 // Vaciar y pasar abre una bóveda NUEVA (pqvault.Reset) y registra su clave en
 // Sytue ID con la marca de traspaso. Si Sytue ID pide identificarse otra vez, se
@@ -45,7 +49,12 @@ type AplicacionCorreoConfig struct {
 	MontarBoveda func(context.Context, Cuenta, *MailApplicationRepository) (ApplicationView, error)
 	// PasarABoveda es la pantalla «Pasa tu correo a la nueva bóveda» (apps/mail):
 	// `confirmar`, ya con la casilla marcada, vacía y pasa; `seguir` sigue con Matrix.
+	// Con `seguir` nil (Matrix retirada) no hay vuelta atrás: la pantalla no ofrece
+	// seguir y dice lo que se pierde.
 	PasarABoveda func(confirmar, seguir func()) fyne.CanvasObject
+	// SinComprobar es el aviso «no se ha podido comprobar…» con `reintentar`
+	// (apps/mail): la duda cuando Rooms ya dijo que Matrix está retirada.
+	SinComprobar func(reintentar func()) fyne.CanvasObject
 	// OfertaTraspaso es la salida «¿No puedes abrir tu correo?» debajo de Matrix
 	// (apps/mail); `confirmar` llega ya con la casilla marcada.
 	OfertaTraspaso func(confirmar func()) fyne.CanvasObject
@@ -61,7 +70,7 @@ type AplicacionCorreo struct {
 // NuevaAplicacionCorreo monta la app; Start la arranca.
 func NuevaAplicacionCorreo(cfg AplicacionCorreoConfig) (*AplicacionCorreo, error) {
 	suite := cfg.Matrix.Suite
-	if suite == nil || suite.Sesion == nil || cfg.Matrix.Product != "mail" || cfg.Matrix.Translate == nil || cfg.MontarBoveda == nil || cfg.PasarABoveda == nil || cfg.OfertaTraspaso == nil {
+	if suite == nil || suite.Sesion == nil || cfg.Matrix.Product != "mail" || cfg.Matrix.Translate == nil || cfg.MontarBoveda == nil || cfg.PasarABoveda == nil || cfg.OfertaTraspaso == nil || cfg.SinComprobar == nil {
 		return nil, ErrPrivateResources
 	}
 	fabrica, err := NuevaFabricaBoveda(suite, "mail")
@@ -101,14 +110,16 @@ func NuevaAplicacionCorreo(cfg AplicacionCorreoConfig) (*AplicacionCorreo, error
 			}
 			return recursos, repository, nil
 		},
-		montar:      cfg.MontarBoveda,
-		vistaPasar:  cfg.PasarABoveda,
-		vistaOferta: cfg.OfertaTraspaso,
-		estado:      cfg.Matrix.State,
-		dispatch:    fyne.Do,
-		slot:        container.NewStack(),
-		traspasos:   map[auth.IdentitySnapshot]*marcaTraspaso{},
-		seguir:      map[auth.IdentitySnapshot]bool{},
+		montar:            cfg.MontarBoveda,
+		vistaPasar:        cfg.PasarABoveda,
+		vistaOferta:       cfg.OfertaTraspaso,
+		vistaSinComprobar: cfg.SinComprobar,
+		retirada:          retiradaEnPreferencias(cfg.Matrix.Application),
+		estado:            cfg.Matrix.State,
+		dispatch:          fyne.Do,
+		slot:              container.NewStack(),
+		traspasos:         map[auth.IdentitySnapshot]*marcaTraspaso{},
+		seguir:            map[auth.IdentitySnapshot]bool{},
 	}
 	matrixCfg := cfg.Matrix
 	matrixCfg.CanStart = host.matrixPuedeEmpezar
@@ -226,10 +237,14 @@ type anfitrionCorreo struct {
 	montar        func(context.Context, Cuenta, *MailApplicationRepository) (ApplicationView, error)
 	vistaPasar    func(confirmar, seguir func()) fyne.CanvasObject
 	vistaOferta   func(confirmar func()) fyne.CanvasObject
-	estado        func(ApplicationState, error)
-	dispatch      func(func())
-	matrix        appMatrix
-	slot          *fyne.Container
+	// vistaSinComprobar es la duda con Matrix retirada.
+	vistaSinComprobar func(reintentar func()) fyne.CanvasObject
+	// retirada recuerda, por cuenta, que Rooms dijo que Matrix está retirada.
+	retirada *recuerdoRetirada
+	estado   func(ApplicationState, error)
+	dispatch func(func())
+	matrix   appMatrix
+	slot     *fyne.Container
 
 	owner   auth.IdentitySnapshot
 	inside  bool
@@ -358,7 +373,7 @@ func (h *anfitrionCorreo) decidido(life context.Context, owner auth.IdentitySnap
 	}
 	h.ocupado = false
 	marca := h.traspasos[owner]
-	destino := elegirDestinoCorreo(almacen, marca != nil, h.seguir[owner])
+	destino := elegirDestinoCorreo(almacen, marca != nil, h.seguir[owner], h.aprenderRetirada(owner, almacen))
 	switch destino {
 	case correoBoveda:
 		// Con la autoridad de la bóveda, la marca se olvida: nunca se vacía otra vez.
@@ -371,9 +386,33 @@ func (h *anfitrionCorreo) decidido(life context.Context, owner auth.IdentitySnap
 	case correoElegir:
 		h.decidirDestino(correoElegir, owner)
 		h.enseñar(h.vistaPasar(h.pedirTraspaso, h.seguirConMatrix))
+	case correoPasar:
+		// Matrix retirada: solo pasar a la bóveda, sin «seguir con el anterior».
+		h.decidirDestino(correoPasar, owner)
+		h.enseñar(h.vistaPasar(h.pedirTraspaso, nil))
+	case correoSinComprobar:
+		// No se sabe dónde está el correo y Matrix ya no abriría: ni Matrix ni vaciar.
+		h.decidirDestino(correoSinComprobar, owner)
+		h.enseñar(h.vistaSinComprobar(h.reintentar))
 	case correoMatrix, correoSinDecidir:
 		h.irAMatrix(owner)
 	}
+}
+
+// aprenderRetirada es lo que una respuesta clara de Rooms enseña de la retirada de
+// Matrix, y lo que se sabe después: `retirado` se recuerda; Matrix confirmada (el
+// conmutador de Rooms apagado) se olvida; la bóveda y la duda no cambian nada.
+func (h *anfitrionCorreo) aprenderRetirada(owner auth.IdentitySnapshot, almacen AlmacenCorreo) bool {
+	switch almacen {
+	case CorreoRetirado:
+		h.retirada.recordar(owner, true)
+		return true
+	case CorreoEnMatrix:
+		h.retirada.recordar(owner, false)
+		return false
+	case CorreoEnBoveda, CorreoDudoso:
+	}
+	return h.retirada.sabe(owner)
 }
 
 func (h *anfitrionCorreo) modoTraspaso(owner auth.IdentitySnapshot) modoPuerta {

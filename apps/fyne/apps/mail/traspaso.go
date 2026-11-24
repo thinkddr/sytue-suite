@@ -24,19 +24,30 @@ import (
 // pierde el correo cifrado con el sistema anterior) o seguir por ahora con el
 // anterior. Sale antes de intentar abrir Matrix: no hace falta poder abrirlo para
 // empezar de nuevo.
+//
+// Con Matrix retirada en Rooms (ADR 0087, entrega 5) no hay «seguir»: el texto,
+// antes de la casilla, dice que el sistema anterior ya no está, que hasta pasar no
+// llega correo nuevo y que lo cifrado con él no se podrá leer.
 type PasarABoveda struct {
 	raiz     fyne.CanvasObject
+	cuerpo   *widget.Label
 	entiendo *widget.Check
 	pasar    *widget.Button
-	seguir   *widget.Button
+	seguir   *widget.Button // nil con Matrix retirada
 }
 
 // NuevaPasarABoveda la monta. `confirmar` solo se llama con la casilla marcada.
+// Sin `seguir` (nil) es la de Matrix retirada.
 func NuevaPasarABoveda(t *i18n.Translator, confirmar, seguir func()) *PasarABoveda {
 	v := &PasarABoveda{}
-	titulo := widget.NewLabelWithStyle(t.T("privateMail.vaultMoveTitle", nil), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	cuerpo := widget.NewLabel(t.T("privateMail.vaultMoveBody", nil))
-	cuerpo.Wrapping = fyne.TextWrapWord
+	claveTitulo, claveCuerpo := "privateMail.vaultMoveTitle", "privateMail.vaultMoveBody"
+	if seguir == nil {
+		claveTitulo, claveCuerpo = "privateMail.vaultMoveRetiredTitle", "privateMail.vaultMoveRetiredBody"
+	}
+	titulo := widget.NewLabelWithStyle(t.T(claveTitulo, nil), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	titulo.Wrapping = fyne.TextWrapWord
+	v.cuerpo = widget.NewLabel(t.T(claveCuerpo, nil))
+	v.cuerpo.Wrapping = fyne.TextWrapWord
 	v.pasar = widget.NewButton(t.T("privateMail.handoverConfirm", nil), func() {
 		if !v.entiendo.Checked {
 			return
@@ -47,13 +58,38 @@ func NuevaPasarABoveda(t *i18n.Translator, confirmar, seguir func()) *PasarABove
 	v.pasar.Importance = widget.DangerImportance
 	v.pasar.Disable()
 	v.entiendo = widget.NewCheck(t.T("privateMail.vaultMoveUnderstood", nil), func(marcada bool) { habilitar(v.pasar, marcada) })
-	v.seguir = widget.NewButton(t.T("privateMail.vaultMoveKeep", nil), seguir)
-	v.raiz = container.NewPadded(container.NewVBox(titulo, cuerpo, v.entiendo, container.NewHBox(v.pasar, v.seguir)))
+	botones := container.NewHBox(v.pasar)
+	if seguir != nil {
+		v.seguir = widget.NewButton(t.T("privateMail.vaultMoveKeep", nil), seguir)
+		botones.Add(v.seguir)
+	}
+	v.raiz = container.NewPadded(container.NewVBox(titulo, v.cuerpo, v.entiendo, botones))
 	return v
 }
 
 // Objeto es la pantalla.
 func (v *PasarABoveda) Objeto() fyne.CanvasObject { return v.raiz }
+
+// CorreoSinComprobar es la duda con Matrix retirada: no se sabe dónde está el
+// correo y Matrix ya no abriría, así que ni Matrix ni vaciar; solo «Reintentar».
+type CorreoSinComprobar struct {
+	raiz       fyne.CanvasObject
+	reintentar *widget.Button
+}
+
+// NuevaCorreoSinComprobar la monta; `reintentar` vuelve a preguntar a Rooms.
+func NuevaCorreoSinComprobar(t *i18n.Translator, reintentar func()) *CorreoSinComprobar {
+	v := &CorreoSinComprobar{}
+	aviso := widget.NewLabel(t.T("privateMail.vaultMoveCheckFailed", nil))
+	aviso.Wrapping = fyne.TextWrapWord
+	v.reintentar = widget.NewButton(t.T("common.retry", nil), reintentar)
+	v.reintentar.Importance = widget.HighImportance
+	v.raiz = container.NewPadded(container.NewVBox(aviso, container.NewHBox(v.reintentar)))
+	return v
+}
+
+// Objeto es el aviso.
+func (v *CorreoSinComprobar) Objeto() fyne.CanvasObject { return v.raiz }
 
 // OfertaTraspaso es la salida «¿No puedes abrir tu correo? Vacíalo y pásalo a la
 // bóveda» debajo del correo de Matrix mientras no está abierto, con su

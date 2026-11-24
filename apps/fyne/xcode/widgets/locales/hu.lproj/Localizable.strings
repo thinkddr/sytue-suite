@@ -1,6 +1,9 @@
 "widgets.open" = "Megnyitás";
 "widgets.compose" = "Levélírás";
 "widgets.create" = "Esemény létrehozása";
+"widgets.newNote" = "Új jegyzet";
+"widgets.newContact" = "Új névjegy";
+"widgets.addPhotos" = "Fotók hozzáadása";
 "widgets.notes" = "Jegyzetek";
 "widgets.rows" = "Sorok";
 "widgets.pending" = "Függőben";

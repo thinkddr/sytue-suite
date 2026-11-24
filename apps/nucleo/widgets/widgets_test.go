@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -603,8 +604,8 @@ func TestLoQueNoSeReescribeLlegaVivoAlSiguienteLatido(t *testing.T) {
 	}
 }
 
-// TestElFormatoDosLlevaLaEpocaYDuraUnDia: lo que se escribe es la versión 2 con la
-// época (no la marca de sesión) y vive 24 h; un v1 que siga en disco no se enseña, y
+// TestElFormatoDosLlevaLaEpocaYDuraUnDia: lo que se escribe es la versión 3 con la
+// época (no la marca de sesión) y vive 24 h; un v2 que siga en disco no se enseña, y
 // un `*.cerrada` en la carpeta (un cierre de sesión) lo oculta todo.
 func TestElFormatoDosLlevaLaEpocaYDuraUnDia(t *testing.T) {
 	scope := fixture(t)
@@ -618,7 +619,7 @@ func TestElFormatoDosLlevaLaEpocaYDuraUnDia(t *testing.T) {
 		t.Fatal(err)
 	}
 	estado := ajustes.Leer()
-	if s.Version != 2 || s.Generation != estado.Epoca || s.Generation == estado.Sesion ||
+	if s.Version != Version || s.Generation != estado.Epoca || s.Generation == estado.Sesion ||
 		s.ExpiresAt-s.UpdatedAt != int64(24*time.Hour/time.Second) {
 		t.Fatalf("snapshot escrito: %+v (época %q, marca %q)", s, estado.Epoca, estado.Sesion)
 	}
@@ -639,12 +640,40 @@ func TestElFormatoDosLlevaLaEpocaYDuraUnDia(t *testing.T) {
 	if err := os.Remove(cierre); err != nil {
 		t.Fatal(err)
 	}
-	s.Version = 1
+	s.Version = 2
 	data, _ := json.Marshal(s)
 	if err := os.WriteFile(filename, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Read("eu.sytue.mail"); !errors.Is(err, ErrPrivate) {
-		t.Fatalf("un snapshot v1 sigue visible: %v", err)
+		t.Fatalf("un snapshot v2 sigue visible: %v", err)
+	}
+}
+
+// TestLaRutaDeUnaFilaSeEscapaYSeLeeIgual: Ruta escapa cada valor de modo que lo que
+// lee el receptor (url.Parse) es el original, también con barras, espacios, `+`, `&` y
+// letras no ASCII; y una fila con una ruta mal formada se publica sin ella.
+func TestLaRutaDeUnaFilaSeEscapaYSeLeeIgual(t *testing.T) {
+	nombre := "/Informes Q3+Q4 & ñandú.pdf"
+	r := Ruta("/", "preview", nombre, "vacio", "")
+	if r != "/?preview=%2FInformes%20Q3%2BQ4%20%26%20%C3%B1and%C3%BA.pdf" {
+		t.Fatalf("ruta %q", r)
+	}
+	u, err := url.Parse("sytue-drive:" + r)
+	if err != nil || u.Scheme != "sytue-drive" || u.Query().Get("preview") != nombre || u.Query().Has("vacio") {
+		t.Fatalf("leída: %+v, %v", u, err)
+	}
+	if got := Ruta("/notebooks/"+Escapar("c 1/x"), "note", "n1"); got != "/notebooks/c%201%2Fx?note=n1" {
+		t.Fatalf("camino escapado: %q", got)
+	}
+	if Ruta("/x", "impar") != "" || Ruta("x") != "" || Ruta("/"+strings.Repeat("a", MaxRouteBytes)) != "" {
+		t.Fatal("una ruta inválida no se compone")
+	}
+	it, ok := SanitizeItem(Item{Title: "x", Route: "https://evil.example"})
+	if !ok || it.Route != "" {
+		t.Fatalf("una ruta mal formada se quita de la fila: %+v", it)
+	}
+	if it, _ := SanitizeItem(Item{Title: "x", Route: "/edit?id=1"}); it.Route != "/edit?id=1" {
+		t.Fatalf("una ruta válida se conserva: %+v", it)
 	}
 }

@@ -71,6 +71,7 @@ func detalleRooms(canales []api.RoomsChannel, pend []api.RoomsUnread, pendientes
 			}
 			items = append(items, widgets.Item{
 				Title: "#" + c.Name, Subtitle: c.Topic, Badge: insignia, Unread: pendientesCompletos && n > 0,
+				Route: RutaCanal(c.ID),
 			})
 		}
 	}

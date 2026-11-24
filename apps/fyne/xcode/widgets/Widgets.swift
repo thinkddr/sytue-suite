@@ -26,11 +26,14 @@ struct SytueWidgetConfiguration {
 
     var descriptionKey: String { "app." + product + ".description" }
 
+    // La app tiene alguna acción rápida (crear, redactar, añadir) además de «Abrir».
+    var hasQuickActions: Bool { actions.keys.contains { $0 != "open" } }
+
     var brandColor: Color { SytueWidgetPalette.brand(for: product) }
 
-    // El día del evento de una fila, si es de Calendar (SytueWidgetActions.day).
-    func dayRoute(for item: SytueWidgetItem) -> URL? {
-        SytueWidgetActions.day(of: item, product: product, scheme: scheme, calendar: .autoupdatingCurrent)
+    // A dónde lleva una fila: su elemento dentro de esta app (SytueWidgetActions.route).
+    func route(for item: SytueWidgetItem) -> URL? {
+        SytueWidgetActions.route(of: item, product: product, scheme: scheme)
     }
 
     var productSymbol: String { SytueWidgetPalette.symbol(for: product) }
@@ -425,10 +428,11 @@ private struct SytueStorageBarView: View {
 
 private struct SytueWidgetActionLabel: View {
     let action: String
+    var product = ""
 
     var body: some View {
-        Label(LocalizedStringKey(SytueWidgetActions.label(for: action)),
-              systemImage: SytueWidgetActions.symbol(for: action))
+        Label(LocalizedStringKey(SytueWidgetActions.label(for: action, product: product)),
+              systemImage: SytueWidgetActions.symbol(for: action, product: product))
     }
 }
 
@@ -446,19 +450,19 @@ private struct SytueQuickActionsBar: View {
                 if let destination = configuration.actions[action] {
                     Link(destination: destination) {
                         if iconOnly {
-                            Image(systemName: SytueWidgetActions.symbol(for: action))
+                            Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product))
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(configuration.brandColor)
                                 .frame(width: 24, height: 24)
                                 .background(configuration.brandColor.opacity(0.14))
                                 .clipShape(Circle())
                                 .sytueAccentable()
-                                .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action))))
+                                .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product))))
                         } else {
                             HStack(spacing: 4) {
-                                Image(systemName: SytueWidgetActions.symbol(for: action))
+                                Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product))
                                     .font(.system(size: 10, weight: .semibold))
-                                Text(LocalizedStringKey(SytueWidgetActions.label(for: action)))
+                                Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product)))
                                     .font(.caption2.weight(.semibold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
@@ -472,6 +476,38 @@ private struct SytueQuickActionsBar: View {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// Sin nada que enseñar (sin sesión, caducado o nada todavía): qué es la app y qué se puede
+// hacer, nunca un widget en blanco. La acción rápida de la app (crear, redactar, añadir),
+// que es un Link en los tamaños mediano y mayores; sin ella, «Abrir», que es el widgetURL.
+private struct SytueEmptyStateView: View {
+    let configuration: SytueWidgetConfiguration
+    var showsSymbol = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if showsSymbol {
+                Image(systemName: configuration.productSymbol)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(configuration.brandColor)
+                    .sytueAccentable()
+                    .accessibilityHidden(true)
+            }
+            Text(LocalizedStringKey(configuration.descriptionKey))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+            if configuration.hasQuickActions {
+                SytueQuickActionsBar(configuration: configuration, iconOnly: false)
+            } else {
+                SytueWidgetActionLabel(action: "open", product: configuration.product)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(configuration.brandColor)
+                    .sytueAccentable()
             }
         }
     }
@@ -604,8 +640,9 @@ private struct SytueCalendarEventRow: View {
     }
 }
 
-// Una fila que lleva a su destino (el día de un evento) cuando lo hay. WidgetKit atiende
-// `Link` en los tamaños mediano y mayores; en el pequeño manda el widgetURL del widget.
+// Una fila que lleva a su elemento (el día de un evento, una nota, un documento…) cuando
+// lo hay. WidgetKit atiende `Link` en los tamaños mediano y mayores; en el pequeño manda
+// el widgetURL del widget.
 private struct SytueRowLink<Content: View>: View {
     let destination: URL?
     @ViewBuilder let content: () -> Content
@@ -967,7 +1004,7 @@ struct SytueWidgetView: View {
                 if !items.isEmpty {
                     VStack(alignment: .leading, spacing: 5) {
                         ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, item in
-                            SytueRowLink(destination: configuration.dayRoute(for: item)) {
+                            SytueRowLink(destination: configuration.route(for: item)) {
                                 SytueCalendarEventRow(
                                     item: item,
                                     brand: configuration.brandColor,
@@ -1027,15 +1064,15 @@ struct SytueWidgetView: View {
             if !items.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(items.prefix(4).enumerated()), id: \.offset) { _, item in
-                        SytueRowLink(destination: configuration.dayRoute(for: item)) {
+                        SytueRowLink(destination: configuration.route(for: item)) {
                             SytueCalendarEventRow(
                                 item: item,
                                 brand: configuration.brandColor,
                                 referenceDate: entry.date,
                                 showSubtitle: true
                             )
-                    }
                         }
+                    }
                 }
             } else if let counters = entry.snapshot?.counters, !counters.isEmpty {
                 HStack(spacing: 16) {
@@ -1088,15 +1125,15 @@ struct SytueWidgetView: View {
                     .foregroundStyle(.secondary)
                 if !items.isEmpty {
                     ForEach(Array(items.prefix(6).enumerated()), id: \.offset) { _, item in
-                        SytueRowLink(destination: configuration.dayRoute(for: item)) {
+                        SytueRowLink(destination: configuration.route(for: item)) {
                             SytueCalendarEventRow(
                                 item: item,
                                 brand: configuration.brandColor,
                                 referenceDate: entry.date,
                                 showSubtitle: true
                             )
-                    }
                         }
+                    }
                 } else if let counters = entry.snapshot?.counters, !counters.isEmpty {
                     HStack(spacing: 16) {
                         ForEach(Array(counters.prefix(3)), id: \.kind) { counter in
@@ -1183,13 +1220,15 @@ struct SytueWidgetView: View {
             if !items.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(items.prefix(storagePercent != nil ? 2 : 3).enumerated()), id: \.offset) { _, item in
-                        SytueProductItemRow(
-                            product: configuration.product,
-                            item: item,
-                            brand: configuration.brandColor,
-                            referenceDate: entry.date,
-                            showSubtitle: items.count <= 2
-                        )
+                        SytueRowLink(destination: configuration.route(for: item)) {
+                            SytueProductItemRow(
+                                product: configuration.product,
+                                item: item,
+                                brand: configuration.brandColor,
+                                referenceDate: entry.date,
+                                showSubtitle: items.count <= 2
+                            )
+                        }
                     }
                 }
                 Spacer(minLength: 0)
@@ -1204,12 +1243,8 @@ struct SytueWidgetView: View {
                 Spacer(minLength: 0)
             } else if storagePercent == nil {
                 Spacer(minLength: 0)
-                Text(LocalizedStringKey(configuration.descriptionKey))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                SytueEmptyStateView(configuration: configuration, showsSymbol: false)
                 Spacer(minLength: 0)
-                SytueQuickActionsBar(configuration: configuration, iconOnly: false)
             } else {
                 Spacer(minLength: 0)
             }
@@ -1236,29 +1271,21 @@ struct SytueWidgetView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(items.prefix(6).enumerated()), id: \.offset) { _, item in
-                        SytueProductItemRow(
-                            product: configuration.product,
-                            item: item,
-                            brand: configuration.brandColor,
-                            referenceDate: entry.date,
-                            showSubtitle: true
-                        )
+                        SytueRowLink(destination: configuration.route(for: item)) {
+                            SytueProductItemRow(
+                                product: configuration.product,
+                                item: item,
+                                brand: configuration.brandColor,
+                                referenceDate: entry.date,
+                                showSubtitle: true
+                            )
+                        }
                     }
                 }
                 Spacer(minLength: 0)
-            } else if entry.snapshot == nil {
+            } else if entry.snapshot == nil || (nonStorageCounters.isEmpty && storagePercent == nil) {
                 Spacer(minLength: 0)
-                VStack(alignment: .leading, spacing: 10) {
-                    Image(systemName: configuration.productSymbol)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(configuration.brandColor)
-                        .sytueAccentable()
-                    Text(LocalizedStringKey(configuration.descriptionKey))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                    SytueQuickActionsBar(configuration: configuration, iconOnly: false)
-                }
+                SytueEmptyStateView(configuration: configuration)
                 Spacer(minLength: 0)
             } else {
                 Spacer(minLength: 0)
@@ -1278,31 +1305,34 @@ struct SytueWidgetView: View {
                             SytueWidgetCounterView(counter: counter, brand: configuration.brandColor)
                         }
                     }
-                } else if entry.snapshot == nil {
-                    Text(LocalizedStringKey(configuration.descriptionKey))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(4)
                 }
                 if let pct = storagePercent {
                     SytueStorageBarView(percent: pct, brand: configuration.brandColor, compact: false)
                 }
                 Spacer(minLength: 0)
-                SytueQuickActionsBar(configuration: configuration, iconOnly: false)
+                // Sin filas, la acción va con el estado vacío de la derecha.
+                if !items.isEmpty {
+                    SytueQuickActionsBar(configuration: configuration, iconOnly: false)
+                }
             }
             .frame(maxWidth: 200, maxHeight: .infinity, alignment: .topLeading)
 
             VStack(alignment: .leading, spacing: 6) {
                 if !items.isEmpty {
                     ForEach(Array(items.prefix(6).enumerated()), id: \.offset) { _, item in
-                        SytueProductItemRow(
-                            product: configuration.product,
-                            item: item,
-                            brand: configuration.brandColor,
-                            referenceDate: entry.date,
-                            showSubtitle: true
-                        )
+                        SytueRowLink(destination: configuration.route(for: item)) {
+                            SytueProductItemRow(
+                                product: configuration.product,
+                                item: item,
+                                brand: configuration.brandColor,
+                                referenceDate: entry.date,
+                                showSubtitle: true
+                            )
+                        }
                     }
+                } else {
+                    Spacer(minLength: 0)
+                    SytueEmptyStateView(configuration: configuration)
                 }
                 Spacer(minLength: 0)
             }
@@ -1432,12 +1462,14 @@ struct SytueWidgetView: View {
         .redacted(reason: entry.isProtected ? .placeholder : [])
     }
 
-    // A dónde lleva tocar el widget entero: en Calendar, al día del siguiente evento en el
-    // pequeño y en la pantalla de bloqueo (sin Link por fila); si no, a la app.
+    // A dónde lleva tocar el widget entero. En el pequeño y en la pantalla de bloqueo no
+    // hay Link por fila: Calendar lleva al día del siguiente evento (lo que enseña es su
+    // agenda), y el resto, si enseña una sola fila, a ese elemento; con más, a la app.
     private var tapRoute: URL? {
         let conLinks = [.systemMedium, .systemLarge].contains(family) || isExtraLarge
-        if !conLinks, let next = entry.items.first, let day = configuration.dayRoute(for: next) {
-            return day
+        if !conLinks, let first = entry.items.first, let route = configuration.route(for: first),
+           configuration.product == "calendar" || entry.items.count == 1 {
+            return route
         }
         return configuration.actions["open"]
     }
@@ -1469,19 +1501,19 @@ struct SytueActionWidgetView: View {
     let configuration = SytueWidgetConfiguration()
 
     private var title: some View {
-        SytueWidgetActionLabel(action: action).lineLimit(2).minimumScaleFactor(0.8)
+        SytueWidgetActionLabel(action: action, product: configuration.product).lineLimit(2).minimumScaleFactor(0.8)
     }
 
     @ViewBuilder private var content: some View {
         #if os(iOS)
         if #available(iOSApplicationExtension 16.0, *), family == .accessoryInline {
-            SytueWidgetActionLabel(action: action)
+            SytueWidgetActionLabel(action: action, product: configuration.product)
         } else if #available(iOSApplicationExtension 16.0, *), family == .accessoryCircular {
             ZStack {
                 AccessoryWidgetBackground()
-                Image(systemName: SytueWidgetActions.symbol(for: action)).font(.title2)
+                Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product)).font(.title2)
             }
-            .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action))))
+            .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product))))
         } else if #available(iOSApplicationExtension 16.0, *), family == .accessoryRectangular {
             VStack(alignment: .leading, spacing: 2) {
                 Text(configuration.name).font(.headline).lineLimit(1)
@@ -1515,12 +1547,12 @@ struct SytueActionWidgetView: View {
                     Circle()
                         .fill(configuration.brandColor.opacity(0.16))
                         .frame(width: 32, height: 32)
-                    Image(systemName: SytueWidgetActions.symbol(for: action))
+                    Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(configuration.brandColor)
                         .sytueAccentable()
                 }
-                Text(LocalizedStringKey(SytueWidgetActions.label(for: action)))
+                Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product)))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
@@ -1583,7 +1615,7 @@ private func actionConfiguration(_ action: String) -> some WidgetConfiguration {
     return StaticConfiguration(kind: configuration.bundle + ".widgets." + action, provider: SytueWidgetActionProvider()) { _ in
         SytueActionWidgetView(action: action)
     }
-    .configurationDisplayName(Text(LocalizedStringKey(SytueWidgetActions.label(for: action))))
+    .configurationDisplayName(Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product))))
     .description(Text(configuration.name))
     .supportedFamilies(actionFamilies())
 }
@@ -1603,6 +1635,13 @@ struct SytueCreateWidget: Widget {
     }
 }
 
+// «Añadir fotos» de Photos: abre el selector del sistema; lo elegido se sube al confirmarlo.
+struct SytueUploadWidget: Widget {
+    var body: some WidgetConfiguration {
+        actionConfiguration("upload")
+    }
+}
+
 @main
 struct SytueWidgets: WidgetBundle {
     var body: some Widget {
@@ -1614,6 +1653,9 @@ struct SytueWidgets: WidgetBundle {
         #endif
         #if SYTUE_WIDGET_ACTION_CREATE
         SytueCreateWidget()
+        #endif
+        #if SYTUE_WIDGET_ACTION_UPLOAD
+        SytueUploadWidget()
         #endif
     }
 }

@@ -1040,4 +1040,10 @@ export const fr: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     "Je comprends que les messages chiffrés avec l'ancien système seront perdus",
   'privateMail.vaultMoveKeep': "Continuer avec l'ancienne messagerie pour l'instant",
+  'privateMail.vaultMoveRetiredTitle':
+    'Passez votre messagerie au nouveau coffre pour continuer à recevoir vos messages',
+  'privateMail.vaultMoveRetiredBody':
+    "L'ancien système de messagerie n'est plus disponible. Tant que vous n'aurez pas passé votre messagerie au coffre, vous ne recevrez pas de nouveaux messages : ceux qui arrivent entre-temps sont conservés chiffrés avec l'ancien système, comme les messages que vous aviez déjà, et ne pourront pas être lus. Ils ne sont pas supprimés, mais personne ne pourra les ouvrir. Une fois le passage fait, vos messages vous parviennent de nouveau et s'ouvrent avec votre connexion Sytue ID, comme les autres applications.",
+  'privateMail.vaultMoveCheckFailed':
+    "Impossible de vérifier l'état de votre messagerie. Réessayez dans un instant.",
 };

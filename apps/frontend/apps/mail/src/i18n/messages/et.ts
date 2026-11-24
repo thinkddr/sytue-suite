@@ -955,4 +955,9 @@ export const et: AppCatalog<typeof en> = {
     'Sinu post on krüptitud eelmise süsteemiga. Et see avaneks nagu teised rakendused sinu Sytue ID sisselogimisega, tuleb see tühjendada ja hoidlas uuesti alustada. Post, mis oli krüptitud ainult eelmise süsteemiga, läheb kaotsi.',
   'privateMail.vaultMoveUnderstood': 'Saan aru, et eelmise süsteemiga krüptitud post läheb kaotsi',
   'privateMail.vaultMoveKeep': 'Jätka praegu eelmise postiga',
+  'privateMail.vaultMoveRetiredTitle': 'Vii oma post uude hoidlasse, et seda edasi saada',
+  'privateMail.vaultMoveRetiredBody':
+    'Eelmine postisüsteem ei ole enam saadaval. Kuni sa oma posti hoidlasse ei vii, ei saa sa uut posti: vahepeal saabuv post hoitakse eelmise süsteemiga krüptituna, nagu sinu senine post, ja seda ei saa lugeda. Seda ei kustutata, kuid keegi ei saa seda avada. Pärast üleviimist hakkab post jälle saabuma ja avaneb nagu teised rakendused sinu Sytue ID sisselogimisega.',
+  'privateMail.vaultMoveCheckFailed':
+    'Sinu posti olekut ei õnnestunud kontrollida. Proovi hetke pärast uuesti.',
 };

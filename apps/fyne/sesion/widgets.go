@@ -61,7 +61,15 @@ type widgetsSuite struct {
 	pub    *widgets.Publicador
 	avisos []string
 	prueba *widgets.OpcionesPublicador
+	// privada es la Fuente de Drive y de CertiPDF, que leen el repositorio privado que
+	// la app tenga abierto (WidgetDesdeDrivePrivado); comunes, los de su FuenteWidget.
+	privada fuentes.Privada
+	comunes fuentes.Comunes
 }
+
+// esWidgetPrivado: los productos cuyos datos viven en el repositorio privado del
+// dispositivo (el Drive en la bóveda o en Matrix). Su fuente del servidor está congelada.
+func esWidgetPrivado(producto string) bool { return producto == "drive" || producto == "pdf" }
 
 // PublicadorWidget crea el publicador del widget de esta app con su Fuente y lo
 // engancha a los disparadores comunes (ADR 0078, enmienda del 2026-11-06): entrar y
@@ -98,7 +106,42 @@ func (s *Suite) FuenteWidget(t *i18n.Translator) widgets.Fuente {
 	if !ok {
 		return nil
 	}
+	if esWidgetPrivado(s.productoWidget()) {
+		// Drive y CertiPDF: lo que la app monte al abrir su repositorio privado y, sin él,
+		// lo mismo que la registrada (fuentes.ErrSinDatosPrivados: se conserva lo publicado).
+		s.widgets.mu.Lock()
+		s.widgets.comunes = s.ComunesWidget(t)
+		s.widgets.mu.Unlock()
+		return s.widgets.privada.Fuente()
+	}
 	return fabrica(s.ComunesWidget(t), s.URL, s.Sesion)
+}
+
+// WidgetDesdeDrivePrivado hace que el widget de Drive lea, mientras dure `vida`, el
+// Drive privado que la app acaba de abrir (`datos`, api.Drive.WithPrivateData) y la cuota
+// de la cuenta con `cuenta`, su cliente del servidor; y lo publica ya. Sin ello, la
+// fuente del servidor de esa cuenta está congelada y lo nuevo no salía nunca (ADR 0078,
+// enmienda del 2026-11-24).
+func (s *Suite) WidgetDesdeDrivePrivado(vida context.Context, datos, cuenta *api.Drive) {
+	s.montarWidgetPrivado(vida, func(c fuentes.Comunes) widgets.Fuente { return fuentes.Drive(c, datos, cuenta) })
+}
+
+// WidgetDesdePDFPrivado es WidgetDesdeDrivePrivado de CertiPDF: los PDF de su carpeta en
+// el Drive privado (`archivos`, api.PDF.WithPrivateDrive) y las peticiones de firma del
+// servicio (`firmas`).
+func (s *Suite) WidgetDesdePDFPrivado(vida context.Context, archivos, firmas *api.PDF) {
+	s.montarWidgetPrivado(vida, func(c fuentes.Comunes) widgets.Fuente { return fuentes.CertiPDF(c, archivos, firmas) })
+}
+
+func (s *Suite) montarWidgetPrivado(vida context.Context, f func(fuentes.Comunes) widgets.Fuente) {
+	if vida == nil || vida.Err() != nil || s.app == nil || !esWidgetPrivado(s.productoWidget()) {
+		return
+	}
+	s.widgets.mu.Lock()
+	comunes := s.widgets.comunes
+	s.widgets.mu.Unlock()
+	context.AfterFunc(vida, s.widgets.privada.Montar(f(comunes)))
+	s.AvisarWidget()
 }
 
 // ProbarWidgetsCon es SOLO para tests: el reloj, el Programar y los plazos de los
@@ -149,6 +192,12 @@ func (s *Suite) avisarEscrituraWidget() {
 		p.AvisarEscritura()
 	}
 }
+
+// AvisarEscritura dice que esta app acaba de escribir por una vía que no es HTTP: el
+// Drive privado de Drive y de CertiPDF, en la bóveda o en Matrix (api.Drive.ConAviso,
+// api.PDF.ConAviso). Cuenta como una escritura de ClienteConAviso, con su intervalo
+// mínimo. Es seguro llamarlo sin publicador.
+func (s *Suite) AvisarEscritura() { s.avisarEscrituraWidget() }
 
 // ClienteConAviso envuelve el cliente HTTP de los clientes `api` del PROPIO producto
 // (nil: el de siempre): cada escritura con éxito avisa al widget, con el intervalo

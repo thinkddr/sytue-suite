@@ -1015,4 +1015,10 @@ export const sk: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Rozumiem, že pošta zašifrovaná predchádzajúcim systémom sa stratí',
   'privateMail.vaultMoveKeep': 'Zatiaľ pokračovať s predchádzajúcou poštou',
+  'privateMail.vaultMoveRetiredTitle':
+    'Presuňte poštu do nového trezoru, aby ste ju naďalej dostávali',
+  'privateMail.vaultMoveRetiredBody':
+    'Predchádzajúci poštový systém už nie je k dispozícii. Kým poštu nepresuniete do trezoru, nebude vám chodiť nová pošta: čo medzitým príde, sa uloží zašifrované predchádzajúcim systémom, rovnako ako pošta, ktorú už máte, a nebude sa dať prečítať. Nezmaže sa, ale nikto ju nebude môcť otvoriť. Po presune vám pošta znova začne chodiť a bude sa otvárať prihlásením do Sytue ID ako ostatné aplikácie.',
+  'privateMail.vaultMoveCheckFailed':
+    'Stav vašej pošty sa nepodarilo overiť. Skúste to o chvíľu znova.',
 };

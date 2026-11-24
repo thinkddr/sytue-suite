@@ -42,8 +42,11 @@ var registradas = map[string]Fabrica{
 	"slides": func(c Comunes, url func(string) string, s api.Session) widgets.Fuente {
 		return Docs(c, api.NewDocs(url("docs"), s, nil), api.DocSlides)
 	},
-	"drive": func(c Comunes, url func(string) string, s api.Session) widgets.Fuente {
-		return Drive(c, api.NewDrive(url("drive"), s, nil))
+	// Drive y CertiPDF guardan en el repositorio privado (la bóveda o Matrix): sin la app
+	// abierta no hay de dónde leer, y el servidor está congelado. La app monta la suya
+	// (Privada); aquí, la del refresco sin ventana, se conserva lo publicado.
+	"drive": func(Comunes, func(string) string, api.Session) widgets.Fuente {
+		return sinDatosPrivados()
 	},
 	"erp": func(c Comunes, url func(string) string, s api.Session) widgets.Fuente {
 		return ERP(c, api.NewERP(url("erp"), s, nil, string(c.idioma())))
@@ -57,8 +60,8 @@ var registradas = map[string]Fabrica{
 	"one": func(c Comunes, url func(string) string, s api.Session) widgets.Fuente {
 		return Hub(c, api.NewHub(url("hub"), s, nil), api.NewCalendars(url("calendar"), s, nil), api.NewMail(url("mail"), s, nil))
 	},
-	"pdf": func(c Comunes, url func(string) string, s api.Session) widgets.Fuente {
-		return CertiPDF(c, api.NewPDF(url("docs"), url("drive"), s, nil))
+	"pdf": func(Comunes, func(string) string, api.Session) widgets.Fuente {
+		return sinDatosPrivados()
 	},
 	"photos": func(c Comunes, url func(string) string, s api.Session) widgets.Fuente {
 		return Photos(c, api.NewPhotos(url("photos"), s, nil))

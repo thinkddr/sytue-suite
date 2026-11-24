@@ -63,6 +63,9 @@ func newMailStorage(s *sesion.Suite, application fyne.App, window fyne.Window, t
 		OfertaTraspaso: func(confirmar func()) fyne.CanvasObject {
 			return mailUI.NuevaOfertaTraspaso(translator, confirmar).Objeto()
 		},
+		SinComprobar: func(reintentar func()) fyne.CanvasObject {
+			return mailUI.NuevaCorreoSinComprobar(translator, reintentar).Objeto()
+		},
 	})
 	if err != nil {
 		return nil, err

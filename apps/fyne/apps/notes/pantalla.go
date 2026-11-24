@@ -141,6 +141,9 @@ type Pantalla struct {
 	// vinculoPendiente es la nota vinculada que pide un enlace entrante y todavía no se
 	// ha creado: está preguntada, y la crea `aceptarVinculo` si se dice que sí.
 	vinculoPendiente *api.NoteInput
+	// nuevaPendiente: se ha preguntado «Nueva nota» por la acción del widget y aún no se
+	// ha dicho que sí (preguntarNueva).
+	nuevaPendiente bool
 	// clave es la del cuaderno cifrado abierto, mientras está abierto (ver cifrado.go).
 	clave            []byte
 	cryptoEpoch      uint64

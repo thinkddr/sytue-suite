@@ -30,6 +30,7 @@
 	<key>SytueWidgetActions</key>
 	<array>
 		<string>open</string>
+		<string>upload</string>
 	</array>
 	<key>SytueWidgetBundle</key>
 	<string>eu.sytue.photos</string>

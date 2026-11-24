@@ -967,4 +967,10 @@ export const sv: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Jag förstår att e-post som krypterats med det tidigare systemet går förlorad',
   'privateMail.vaultMoveKeep': 'Fortsätt med den tidigare e-posten tills vidare',
+  'privateMail.vaultMoveRetiredTitle':
+    'Flytta din e-post till det nya valvet för att fortsätta ta emot den',
+  'privateMail.vaultMoveRetiredBody':
+    'Det tidigare e-postsystemet är inte längre tillgängligt. Tills du flyttar din e-post till valvet får du ingen ny e-post: det som kommer under tiden sparas krypterat med det tidigare systemet, precis som e-posten du redan hade, och kan inte läsas. Det raderas inte, men ingen kan öppna det. När du har flyttat kommer e-posten fram igen och öppnas med din Sytue ID-inloggning, som de andra apparna.',
+  'privateMail.vaultMoveCheckFailed':
+    'Det gick inte att kontrollera statusen för din e-post. Försök igen om en stund.',
 };

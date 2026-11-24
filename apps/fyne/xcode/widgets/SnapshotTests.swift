@@ -20,10 +20,11 @@ struct SnapshotContractTests {
         let preferences = root.appendingPathComponent("ajustes.json")
         let snapshot = root.appendingPathComponent("widgets/eu.sytue.rooms.json")
         let now: Int64 = 1_800_000_000
-        // Formato 2: `generation` es la época (sesion.epoca), confirmada con la marca.
+        // Formato 3: `generation` es la época (sesion.epoca), confirmada con la marca, y
+        // cada fila puede llevar su ruta dentro de la app.
         let epoch = "0123456789abcdef0123456789abcdef"
         let valid: [String: Any] = [
-            "version": 2, "product": "rooms", "generation": epoch,
+            "version": 3, "product": "rooms", "generation": epoch,
             "updated_at": now - 10, "expires_at": now + 600, "active": true,
             "counters": [["kind": "unread", "value": 3]],
         ]
@@ -46,24 +47,43 @@ struct SnapshotContractTests {
                 "an event action cannot be exported by Mail")
         require(SytueWidgetActions.routes(product: "calendar", scheme: "sytue-calendar", declared: ["compose"])["compose"] == nil,
                 "a compose action cannot be exported by Calendar")
-        require(SytueWidgetActions.order == ["open", "compose", "create"], "actions retain a predictable visual and VoiceOver order")
+        require(SytueWidgetActions.order == ["open", "compose", "create", "upload"], "actions retain a predictable visual and VoiceOver order")
+        require(SytueWidgetActions.routes(product: "contacts", scheme: "sytue-contacts", declared: ["open", "create"])["create"]?.absoluteString
+                == "sytue-contacts:/?action=create", "contacts opens its new-contact form")
+        require(SytueWidgetActions.routes(product: "notes", scheme: "sytue-notes", declared: ["create"])["create"]?.absoluteString
+                == "sytue-notes:/?action=create", "notes asks for a new note")
+        require(SytueWidgetActions.routes(product: "photos", scheme: "sytue-photos", declared: ["upload", "create"]).count == 1,
+                "photos only exports its picker")
+        require(SytueWidgetActions.routes(product: "docs", scheme: "sytue-docs", declared: ["upload"]).isEmpty,
+                "an action outside the product's table is never exported")
+        require(SytueWidgetActions.label(for: "create", product: "contacts") == "widgets.newContact"
+                && SytueWidgetActions.label(for: "create", product: "notes") == "widgets.newNote"
+                && SytueWidgetActions.label(for: "upload", product: "photos") == "widgets.addPhotos",
+                "each product names its own action")
         require(SytueWidgetActions.label(for: "create") == "widgets.create"
                 && SytueWidgetActions.symbol(for: "create") == "calendar.badge.plus", "create has a translated name alongside its symbol")
-        // Cada fila de Calendar lleva a su día (calendario.FechaDelEnlace), sin nada del evento.
-        var madrid = Calendar(identifier: .gregorian)
-        madrid.timeZone = TimeZone(identifier: "Europe/Madrid")!
-        let timed = SytueWidgetItem(title: "Daily", subtitle: nil, badge: nil, color: nil,
-                                    start_at: 1_795_995_000, end_at: 1_795_998_600, all_day: nil, unread: nil, done: nil)
-        require(SytueWidgetActions.day(of: timed, product: "calendar", scheme: "sytue-calendar", calendar: madrid)?.absoluteString
-                == "sytue-calendar:/?date=2026-11-30", "a timed row opens its local day")
-        let allDay = SytueWidgetItem(title: "Trip", subtitle: nil, badge: nil, color: nil,
-                                     start_at: 1_795_996_800, end_at: 1_796_083_200, all_day: true, unread: nil, done: nil)
-        var west = Calendar(identifier: .gregorian)
-        west.timeZone = TimeZone(identifier: "America/Los_Angeles")!
-        require(SytueWidgetActions.day(of: allDay, product: "calendar", scheme: "sytue-calendar", calendar: west)?.absoluteString
-                == "sytue-calendar:/?date=2026-11-30&all_day=1", "an all-day row is floating: its UTC day, in any zone")
-        require(SytueWidgetActions.day(of: timed, product: "mail", scheme: "sytue-mail", calendar: madrid) == nil,
-                "only Calendar rows get a day route")
+        // Cada fila lleva a su elemento con la ruta que escribió la app (widgets.Ruta): en
+        // Calendar, su día (calendario.FechaDelEnlace); en Docus, su documento. Siempre con el
+        // esquema propio de la extensión.
+        let day = SytueWidgetItem(title: "Daily", subtitle: nil, badge: nil, color: nil, start_at: 1_795_995_000,
+                                  end_at: 1_795_998_600, all_day: nil, unread: nil, done: nil,
+                                  route: "/?date=2026-11-30")
+        require(SytueWidgetActions.route(of: day, product: "calendar", scheme: "sytue-calendar")?.absoluteString
+                == "sytue-calendar:/?date=2026-11-30", "a calendar row opens its day")
+        let document = SytueWidgetItem(title: "Plan", subtitle: nil, badge: nil, color: nil, start_at: nil,
+                                       end_at: nil, all_day: nil, unread: nil, done: nil, route: "/edit?id=d1")
+        require(SytueWidgetActions.route(of: document, product: "docs", scheme: "sytue-docs")?.absoluteString
+                == "sytue-docs:/edit?id=d1", "a document row opens that document")
+        require(SytueWidgetActions.route(of: document, product: "docs", scheme: "https") == nil,
+                "a row route never takes another scheme")
+        let outside = SytueWidgetItem(title: "Plan", subtitle: nil, badge: nil, color: nil, start_at: nil,
+                                      end_at: nil, all_day: nil, unread: nil, done: nil, route: "//evil.example/x")
+        require(SytueWidgetActions.route(of: outside, product: "docs", scheme: "sytue-docs") == nil,
+                "a route with an authority opens nothing")
+        let bare = SytueWidgetItem(title: "Plan", subtitle: nil, badge: nil, color: nil, start_at: nil,
+                                   end_at: nil, all_day: nil, unread: nil, done: nil)
+        require(SytueWidgetActions.route(of: bare, product: "docs", scheme: "sytue-docs") == nil,
+                "a row without route opens the app")
         func write(_ value: [String: Any]) throws {
             try JSONSerialization.data(withJSONObject: value).write(to: snapshot, options: .atomic)
         }
@@ -115,7 +135,7 @@ struct SnapshotContractTests {
                             "contract visible: " + c[1])
                 case "rancio":
                     let object: [String: Any] = [
-                        "version": 2, "product": "mail", "active": true, "generation": "g",
+                        "version": 3, "product": "mail", "active": true, "generation": "g",
                         "updated_at": int(c[2]), "expires_at": int(c[2]) + 60, "counters": [[String: Any]](),
                     ]
                     let decoded = try JSONDecoder().decode(SytueWidgetSnapshot.self,
@@ -129,11 +149,27 @@ struct SnapshotContractTests {
                                                end_at: int(c[4]), all_day: c[5] == "1", unread: nil, done: nil)
                     require(SytueWidgetTimeline.isCurrent(item, now: int(c[6]), calendar: zone) == (c[7] == "1"),
                             "contract current: " + c[1] + " in " + c[2])
+                case "ruta":
+                    let expected = c[3] == "1"
+                    require(SytueWidgetSnapshot.isValidRoute(field(c[2])) == expected, "contract route: " + c[1])
+                    var row: [String: Any] = ["title": "x"]
+                    if !field(c[2]).isEmpty { row["route"] = field(c[2]) }
+                    let object: [String: Any] = [
+                        "version": 3, "product": "notes", "active": true, "generation": "e1",
+                        "updated_at": Int64(1_792_500_000), "expires_at": Int64(1_792_500_120),
+                        "counters": [[String: Any]](), "items": [row],
+                    ]
+                    let decoded = try JSONDecoder().decode(SytueWidgetSnapshot.self,
+                                                           from: JSONSerialization.data(withJSONObject: object))
+                    let entorno = SytueWidgetEntorno(epoca: "e1", confirmada: "m1", marca: "m1", cerrada: false, bloqueo: false)
+                    require(decoded.isVisible(product: "notes", entorno: entorno, now: 1_792_500_000) == expected,
+                            "contract route, snapshot: " + c[1])
                 default:
                     require(false, "unknown contract case " + c[0])
                 }
             }
-            require((counts["visible"] ?? 0) >= 15 && (counts["rancio"] ?? 0) >= 4 && (counts["vigente"] ?? 0) >= 10,
+            require((counts["visible"] ?? 0) >= 15 && (counts["rancio"] ?? 0) >= 4 && (counts["vigente"] ?? 0) >= 10
+                        && (counts["ruta"] ?? 0) >= 20,
                     "the contrato.tsv cases are all there")
         }
 
@@ -167,8 +203,8 @@ struct SnapshotContractTests {
         try reject("generation", "previous-account")
         try reject("generation", "opaque-revision")
         try reject("product", "mail")
-        try reject("version", 1)
-        try reject("version", 3)
+        try reject("version", 2)
+        try reject("version", 4)
         try reject("active", false)
         try reject("updated_at", now + 6)
         try reject("expires_at", now)
@@ -202,6 +238,10 @@ struct SnapshotContractTests {
             "busy_days": [3, 14, 28],
             "day_colors": ["3": "#953be7", "14": "#16734d"],
         ]
+        var withRoute = valid
+        withRoute["items"] = [["title": "#general", "route": "/channels/c1"]]
+        try write(withRoute)
+        require(load()?.visualItems.first?.routeText == "/channels/c1", "a row keeps its route inside the app")
         try write(rich)
         let loadedRich = load()
         require(loadedRich?.visualItems.first?.title == "Reunión de diseño"
@@ -211,6 +251,8 @@ struct SnapshotContractTests {
         try reject("items", [["title": "enc:v1:secret-title"]])
         try reject("items", [["title": "Valid", "subtitle": "ENC:V1:secret-sub"]])
         try reject("items", [["title": "Valid", "url": "https://evil.example"]])
+        try reject("items", [["title": "Valid", "route": "https://evil.example"]])
+        try reject("items", [["title": "Valid", "route": NSNull()]])
         try reject("items", [["title": "Valid", "color": "#953BE7"]])
         try reject("items", Array(repeating: ["title": "x"], count: 9))
         try reject("calendar", ["year": 2026, "month": 2, "busy_days": [29]])

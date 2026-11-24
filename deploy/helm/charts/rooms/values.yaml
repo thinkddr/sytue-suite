@@ -104,6 +104,18 @@ config:
     ssoProviderID: oidc-sytue
     sourceURL: https://github.com/element-hq/synapse/tree/v1.165.0
     existingSecret: sytue-matrix
+  # Retirada de la autoridad de Matrix del correo (ADR 0087, entrega 5) ->
+  # SYTUE_MAIL_SIN_MATRIX. APAGADA por defecto: vacío deja todo como antes y solo
+  # "activado" la enciende. Encendida, Rooms ya no honra la autoridad de Matrix de
+  # `mail`: no da de alta ni rota raíces de Matrix del correo, rechaza sus pruebas
+  # y recibos, y a quien aún tiene el correo en Matrix le contesta
+  # `storage_matrix_retired`, así que Mail (web y nativo) solo le ofrece «Vaciar y
+  # pasar a la bóveda». Hasta que lo haga NO recibe correo nuevo: lo que le llega
+  # se queda en la cola cifrado para Matrix, sin poderse leer (no se borra). Exige
+  # ID_VAULT_KEYS_SECRET (Rooms no arranca sin él) y SYTUE_MAIL_BOVEDA encendido
+  # en el frontal de Mail. Calendario y el resto no cambian. Encenderla es decisión
+  # del dueño, en los valores de cada entorno (rooms.config.correoSinMatrix).
+  correoSinMatrix: ""
   # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
   # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
   dbMaxConns: 10

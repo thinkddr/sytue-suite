@@ -1064,4 +1064,10 @@ export const ga: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Tuigim go gcaillfear post atá criptithe leis an gcóras roimhe seo',
   'privateMail.vaultMoveKeep': 'Lean ar aghaidh leis an bpost roimhe seo faoi láthair',
+  'privateMail.vaultMoveRetiredTitle':
+    'Bog do phost chuig an gcrann nua chun leanúint de é a fháil',
+  'privateMail.vaultMoveRetiredBody':
+    'Níl an córas poist roimhe seo ar fáil a thuilleadh. Go dtí go mbogfaidh tú do phost chuig an gcrann, ní bhfaighidh tú post nua: coinneofar an méid a thagann idir an dá linn criptithe leis an gcóras roimhe seo, díreach cosúil leis an bpost a bhí agat cheana, agus ní féidir é a léamh. Ní scriostar é, ach ní bheidh aon duine in ann é a oscailt. Tar éis duit é a bhogadh, tagann do phost chugat arís agus osclaítear é le do shíniú isteach Sytue ID, cosúil leis na haipeanna eile.',
+  'privateMail.vaultMoveCheckFailed':
+    'Níorbh fhéidir staid do phoist a sheiceáil. Bain triail eile as i gceann nóiméid.',
 };

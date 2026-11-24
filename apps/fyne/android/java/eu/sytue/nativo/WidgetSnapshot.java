@@ -17,18 +17,23 @@ import java.util.Set;
 import java.util.TimeZone;
 
 /**
- * Contrato de apps/nucleo/widgets (formato 2), sin dependencias de Android ni acceso a
+ * Contrato de apps/nucleo/widgets (formato 3), sin dependencias de Android ni acceso a
  * secretos. Los mismos casos que Go y Swift: apps/nucleo/widgets/testdata/contrato.tsv.
  */
 public final class WidgetSnapshot {
-    /** Solo el formato 2: `generation` es la época de identidad, no la marca de sesión. */
-    public static final long VERSION = 2;
+    /**
+     * Solo el formato 3: `generation` es la época de identidad, no la marca de sesión, y
+     * cada fila puede llevar su ruta dentro de la app (`route`, widgets.ValidRoute en Go).
+     */
+    public static final long VERSION = 3;
     /** Caducidad máxima, 24 h: pasado un día el «hoy» sería el de ayer (ADR 0078). */
     public static final long MAX_AGE = 86400;
     /** Por debajo de 15 min el dato se considera vivo (Snapshot.Rancio en Go). */
     public static final long FRESCO = 900;
     public static final int MAX_BYTES = 16 * 1024;
     public static final int MAX_ITEMS = 8;
+    /** El tope de la ruta de una fila (widgets.MaxRouteBytes). */
+    public static final int MAX_ROUTE_BYTES = 512;
     private static final long MAX_TIMESTAMP = 10_000_000_000L;
     private static final Set<String> KINDS = new HashSet<>(Arrays.asList("unread", "files", "events", "documents",
             "contacts", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage_percent"));
@@ -53,9 +58,16 @@ public final class WidgetSnapshot {
         public final boolean allDay;
         public final boolean unread;
         public final boolean done;
+        /** Ruta dentro de la propia app (`/edit?id=…`), o "" si la fila no lleva a nada suyo. */
+        public final String route;
 
         public Item(String title, String subtitle, String badge, String color,
                 long startAt, long endAt, boolean allDay, boolean unread, boolean done) {
+            this(title, subtitle, badge, color, startAt, endAt, allDay, unread, done, "");
+        }
+
+        public Item(String title, String subtitle, String badge, String color,
+                long startAt, long endAt, boolean allDay, boolean unread, boolean done, String route) {
             this.title = title;
             this.subtitle = subtitle == null ? "" : subtitle;
             this.badge = badge == null ? "" : badge;
@@ -65,6 +77,7 @@ public final class WidgetSnapshot {
             this.allDay = allDay;
             this.unread = unread;
             this.done = done;
+            this.route = route == null ? "" : route;
         }
     }
 
@@ -183,6 +196,79 @@ public final class WidgetSnapshot {
         return true;
     }
 
+    /**
+     * widgets.ValidRoute: vacía (sin ruta), o hasta MAX_ROUTE_BYTES bytes que empiezan por
+     * UNA barra, solo con letras y cifras ASCII, `-._~/?=&` y escapes `%XX` en mayúsculas,
+     * y sin el marcador de cifrado escapado. El receptor la abre como `sytue-<producto>:` +
+     * ruta: no puede llevar a otra app, a la web ni a otra cuenta.
+     */
+    public static boolean validRoute(String r) {
+        if (r == null) {
+            return false;
+        }
+        if (r.isEmpty()) {
+            return true;
+        }
+        if (r.length() > MAX_ROUTE_BYTES || r.charAt(0) != '/' || r.startsWith("//")
+                || r.toUpperCase(Locale.ROOT).contains("ENC%3AV1%3A")) {
+            return false;
+        }
+        for (int i = 0; i < r.length(); i++) {
+            char c = r.charAt(i);
+            if (sinReservar(c) || c == '/' || c == '?' || c == '=' || c == '&') {
+                continue;
+            }
+            if (c == '%' && i + 2 < r.length() && hexMayuscula(r.charAt(i + 1)) && hexMayuscula(r.charAt(i + 2))) {
+                i += 2;
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean sinReservar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~';
+    }
+
+    private static boolean hexMayuscula(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
+    }
+
+    /**
+     * A dónde lleva tocar una fila: su ruta dentro de esta app con el esquema del catálogo
+     * firmado (el JSON no lo elige), o la app si no tiene. La ruta ya pasó validRoute al
+     * leer el snapshot; se vuelve a mirar aquí.
+     */
+    public static String destinoDeFila(String scheme, Item item) {
+        if (item == null || item.route.isEmpty() || !validRoute(item.route)) {
+            return scheme + ":/";
+        }
+        return scheme + ":" + item.route;
+    }
+
+    /**
+     * Las acciones rápidas de cada producto, además de «open»: abren un formulario, una
+     * pregunta o el selector del sistema que la persona confirma; un enlace nunca escribe
+     * nada solo. La misma tabla en generar.py, android-widgets.py y Snapshot.swift.
+     */
+    public static boolean accionPermitida(String product, String action) {
+        if (product == null || action == null) {
+            return false;
+        }
+        switch (action) {
+            case "compose":
+                return "mail".equals(product);
+            case "create":
+                return "calendar".equals(product) || "contacts".equals(product) || "notes".equals(product);
+            case "upload":
+                return "photos".equals(product);
+            default:
+                return false;
+        }
+    }
+
     public boolean visible(String expectedProduct, Entorno entorno, long now) {
         if (entorno == null || !entorno.permite() || !active || version != VERSION || product == null
                 || !product.equals(expectedProduct)
@@ -208,7 +294,8 @@ public final class WidgetSnapshot {
                     || (!item.color.isEmpty() && !isHexColor(item.color))
                     || item.startAt < 0 || item.startAt > MAX_TIMESTAMP
                     || item.endAt < 0 || item.endAt > MAX_TIMESTAMP
-                    || (item.endAt > 0 && item.startAt > 0 && item.endAt < item.startAt)) {
+                    || (item.endAt > 0 && item.startAt > 0 && item.endAt < item.startAt)
+                    || !validRoute(item.route)) {
                 return false;
             }
         }

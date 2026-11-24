@@ -98,7 +98,7 @@ func itemsDeNotas(c api.Notebook, lista []api.Note) []widgets.Item {
 		}
 		items = append(items, widgets.Item{
 			Title: titulo, Subtitle: c.Title, Badge: insignia, StartAt: unix(n.UpdatedAt),
-			Color: c.Color, Unread: n.Kind == "task" && !n.Checked,
+			Color: c.Color, Unread: n.Kind == "task" && !n.Checked, Route: RutaNota(c.ID, n.ID),
 		})
 		if llenos(items) {
 			break

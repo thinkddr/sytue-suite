@@ -4463,7 +4463,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
 				PRODUCT_NAME = "Sytue-notes-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4527,7 +4527,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
 				PRODUCT_NAME = "Sytue-contacts-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4841,7 +4841,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
 				PRODUCT_NAME = "Sytue-photos-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_UPLOAD";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5184,7 +5184,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
 				PRODUCT_NAME = "Sytue-notes-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5222,7 +5222,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
 				PRODUCT_NAME = "Sytue-contacts-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -5351,7 +5351,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
 				PRODUCT_NAME = "Sytue-photos-Widgets";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_UPLOAD";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;

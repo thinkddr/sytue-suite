@@ -1,6 +1,9 @@
 "widgets.open" = "Otvori";
 "widgets.compose" = "Napiši";
 "widgets.create" = "Stvori događaj";
+"widgets.newNote" = "Nova bilješka";
+"widgets.newContact" = "Novi kontakt";
+"widgets.addPhotos" = "Dodaj fotografije";
 "widgets.notes" = "Bilješke";
 "widgets.rows" = "Redci";
 "widgets.pending" = "Na čekanju";

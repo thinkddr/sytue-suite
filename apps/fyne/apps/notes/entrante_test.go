@@ -25,6 +25,8 @@ func TestLeerUnEnlaceEntrante(t *testing.T) {
 		{"sytue-notes:/?notebook=c1&note=n1&h=destino-2", Entrante{Cuaderno: "c1", Nota: "n1", Ancla: "destino-2"}, true},
 		{"sytue-notes:/notebooks/c2?note=n7", Entrante{Cuaderno: "c2", Nota: "n7"}, true},
 		{"sytue-notes:/?link=calendar_event:e1&label=Reuni%C3%B3n", Entrante{Vinculo: "calendar_event:e1", Rotulo: "Reunión"}, true},
+		{"sytue-notes:/?action=create", Entrante{Crear: true}, true},
+		{"sytue-notes:/?action=create&title=x", Entrante{}, false},
 		{"sytue-notes:/", Entrante{}, false},
 		{"sytue-notes:/ajustes", Entrante{}, false},
 	}
@@ -183,5 +185,50 @@ func TestUnEnlaceNoCreaLaNotaSinPreguntar(t *testing.T) {
 	}
 	if r := falso.rutas(); len(r) != 0 {
 		t.Fatalf("sin que nadie haya dicho que sí, el enlace ya ha pedido %v", r)
+	}
+}
+
+// TestLaNuevaNotaDelWidgetSePreguntaYSeCrea: la acción «Nueva nota» del widget
+// (`sytue-notes:/?action=create`) llega con la app recién abierta. Al cargar el cuaderno
+// y sus notas se PREGUNTA —el enlace solo no escribe nada— y con el sí se crea UNA nota
+// de texto en el cuaderno abierto, la de la barra.
+func TestLaNuevaNotaDelWidgetSePreguntaYSeCrea(t *testing.T) {
+	p, falso := pantallaConServicio(t, map[string]string{
+		"GET /notebooks":               `{"notebooks":[{"id":"c1","title":"Mudanza"}]}`,
+		"GET /notebooks/c1/notes/page": `{"notes":[]}`,
+		"POST /notebooks/c1/notes":     `{"id":"n9","notebook_id":"c1","kind":"text"}`,
+	})
+	p.cuadernos, p.activo, p.notas = nil, Cuaderno{}, nil
+	u, _ := url.Parse("sytue-notes:/?action=create")
+	if !p.AtenderEnlace(u) {
+		t.Fatal("la acción del widget no se reconoce")
+	}
+	p.cargarCuadernos()
+	esperar(t, func() bool {
+		var preguntada bool
+		fyne.DoAndWait(func() { preguntada = p.nuevaPendiente })
+		return preguntada
+	})
+	posts := func() int {
+		n := 0
+		for _, r := range falso.rutas() {
+			if strings.HasPrefix(r, "POST ") {
+				n++
+			}
+		}
+		return n
+	}
+	if posts() != 0 {
+		t.Fatal("la nota se creó sin preguntar")
+	}
+	fyne.DoAndWait(p.aceptarNueva)
+	esperar(t, func() bool { return posts() == 1 })
+	if c := falso.ultima(t, "POST /notebooks/c1/notes"); c["kind"] != "text" {
+		t.Fatalf("la nota nueva viaja con %v", c)
+	}
+	// Ni volver a cargar ni otro «sí» la crean otra vez.
+	fyne.DoAndWait(func() { p.aplicarEntrante(); p.aceptarNueva() })
+	if n := posts(); n != 1 {
+		t.Fatalf("la acción ha creado %d notas", n)
 	}
 }

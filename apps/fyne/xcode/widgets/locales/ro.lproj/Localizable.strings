@@ -1,6 +1,9 @@
 "widgets.open" = "Deschide";
 "widgets.compose" = "Compune";
 "widgets.create" = "Creează eveniment";
+"widgets.newNote" = "Notiță nouă";
+"widgets.newContact" = "Contact nou";
+"widgets.addPhotos" = "Adaugă fotografii";
 "widgets.notes" = "Notițe";
 "widgets.rows" = "Rânduri";
 "widgets.pending" = "În așteptare";

@@ -499,6 +499,9 @@ export const hu: Catalog = {
   'widgets.compose': 'Levélírás',
   'widgets.storage': 'Tárhely',
   'widgets.create': 'Esemény létrehozása',
+  'widgets.newNote': 'Új jegyzet',
+  'widgets.newContact': 'Új névjegy',
+  'widgets.addPhotos': 'Fotók hozzáadása',
   'widgets.updatedAgo': 'Frissítve {time}',
   'widgets.updatedAt': 'Frissítve: {time}',
 

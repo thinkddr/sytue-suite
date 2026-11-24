@@ -1,6 +1,9 @@
 "widgets.open" = "Oscail";
 "widgets.compose" = "Cum";
 "widgets.create" = "Cruthaigh imeacht";
+"widgets.newNote" = "Nóta nua";
+"widgets.newContact" = "Teagmhálaí nua";
+"widgets.addPhotos" = "Cuir grianghraif leis";
 "widgets.notes" = "Nótaí";
 "widgets.rows" = "Rónna";
 "widgets.pending" = "Ar feitheamh";

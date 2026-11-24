@@ -29,10 +29,61 @@
         android:layout_height="wrap_content" android:layout_marginTop="2dp"
         android:textSize="11sp" android:textColor="@color/sytue_widget_muted"
         android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
-    <ImageView android:id="@+id/sytue_widget_visual" android:layout_width="match_parent"
+    <!-- El cuerpo: la imagen (la rejilla del mes o los contadores) y, debajo o al lado, una
+         imagen por fila, cada una con su enlace a su elemento (formato 3, Widgets.java). -->
+    <LinearLayout android:id="@+id/sytue_widget_body" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1"
         android:layout_marginTop="4dp" android:layout_marginBottom="4dp"
-        android:scaleType="fitCenter" android:visibility="gone" />
+        android:orientation="horizontal" android:visibility="gone">
+        <LinearLayout android:id="@+id/sytue_widget_main" android:layout_width="0dp"
+            android:layout_height="match_parent" android:layout_weight="1"
+            android:orientation="vertical">
+            <ImageView android:id="@+id/sytue_widget_visual" android:layout_width="match_parent"
+                android:layout_height="0dp" android:layout_weight="1"
+                android:scaleType="fitCenter" android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_strip" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:adjustViewBounds="true"
+                android:scaleType="fitCenter" android:importantForAccessibility="no"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_row0" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_row1" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_row2" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_row3" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_row4" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sytue_widget_side" android:layout_width="0dp"
+            android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:orientation="vertical"
+            android:visibility="gone">
+            <ImageView android:id="@+id/sytue_widget_side0" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_side1" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+            <ImageView android:id="@+id/sytue_widget_side2" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:adjustViewBounds="true" android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
     <TextView android:id="@+id/sytue_widget_counts" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical"
         android:textSize="15sp" android:textColor="@color/sytue_widget_muted"

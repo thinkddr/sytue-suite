@@ -487,6 +487,9 @@ export const da: Catalog = {
   'widgets.compose': 'Skriv',
   'widgets.storage': 'Lagerplads',
   'widgets.create': 'Opret begivenhed',
+  'widgets.newNote': 'Ny note',
+  'widgets.newContact': 'Ny kontakt',
+  'widgets.addPhotos': 'Tilføj fotos',
   'widgets.updatedAgo': 'Opdateret {time}',
   'widgets.updatedAt': 'Opdateret: {time}',
 

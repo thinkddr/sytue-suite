@@ -957,4 +957,10 @@ export const da: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Jeg forstår, at mail krypteret med det tidligere system går tabt',
   'privateMail.vaultMoveKeep': 'Fortsæt med den tidligere mail indtil videre',
+  'privateMail.vaultMoveRetiredTitle':
+    'Flyt din mail til den nye boks for at blive ved med at modtage den',
+  'privateMail.vaultMoveRetiredBody':
+    'Det tidligere mailsystem er ikke længere tilgængeligt. Indtil du flytter din mail til boksen, modtager du ikke ny mail: det, der kommer i mellemtiden, gemmes krypteret med det tidligere system ligesom den mail, du allerede havde, og kan ikke læses. Det slettes ikke, men ingen kan åbne det. Når du har flyttet, kommer din mail igen frem og åbnes med dit Sytue ID-login ligesom de andre apps.',
+  'privateMail.vaultMoveCheckFailed':
+    'Status for din mail kunne ikke kontrolleres. Prøv igen om et øjeblik.',
 };

@@ -99,6 +99,7 @@ func actividadReciente(hits []api.HubHit) []widgets.Item {
 		}
 		out = append(out, widgets.Item{
 			Title: titulo, Subtitle: h.Kind, Badge: strings.ToUpper(h.Source), StartAt: cuando,
+			Route: RutaActividad(),
 		})
 		if llenos(out) {
 			break

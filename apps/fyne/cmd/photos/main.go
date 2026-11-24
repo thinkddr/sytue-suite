@@ -66,23 +66,9 @@ func main() {
 		s.RutaPropia(func(u *url.URL) bool {
 			return photos.TokenDeEnlace(u) != "" || photos.AlbumDeEnlace(u) != "" || photos.AlbumPropioDeEnlace(u) != ""
 		})
-		s.AlAbrirURL(func(u *url.URL) {
-			fyne.Do(func() {
-				current := host.presenter.Load()
-				if current == nil {
-					return
-				}
-				if token := photos.TokenDeEnlace(u); token != "" {
-					current.app.AbrirPublico(token)
-				}
-				if album := photos.AlbumDeEnlace(u); album != "" {
-					current.app.AbrirCompartido(album)
-				}
-				if album := photos.AlbumPropioDeEnlace(u); album != "" {
-					current.app.AbrirAlbum(album)
-				}
-			})
-		})
+		// Un álbum (también la fila de un widget) o «Añadir fotos» del widget; si llega
+		// con la app arrancando, al montar la galería.
+		s.AlAbrirURL(func(u *url.URL) { fyne.Do(func() { host.atender(u) }) })
 		s.AlAbrirFichero("photos", host.OpenDriveFile)
 		soltar.AlArrastrar(w, func(active bool) {
 			if current := host.presenter.Load(); current != nil {

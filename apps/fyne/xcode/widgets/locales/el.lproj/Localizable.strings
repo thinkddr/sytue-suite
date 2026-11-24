@@ -1,6 +1,9 @@
 "widgets.open" = "Άνοιγμα";
 "widgets.compose" = "Σύνταξη";
 "widgets.create" = "Δημιουργία συμβάντος";
+"widgets.newNote" = "Νέα σημείωση";
+"widgets.newContact" = "Νέα επαφή";
+"widgets.addPhotos" = "Προσθήκη φωτογραφιών";
 "widgets.notes" = "Σημειώσεις";
 "widgets.rows" = "Γραμμές";
 "widgets.pending" = "Σε αναμονή";

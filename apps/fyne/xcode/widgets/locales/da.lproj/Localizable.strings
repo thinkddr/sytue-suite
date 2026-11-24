@@ -1,6 +1,9 @@
 "widgets.open" = "Åbn";
 "widgets.compose" = "Skriv";
 "widgets.create" = "Opret begivenhed";
+"widgets.newNote" = "Ny note";
+"widgets.newContact" = "Ny kontakt";
+"widgets.addPhotos" = "Tilføj fotos";
 "widgets.notes" = "Noter";
 "widgets.rows" = "Rækker";
 "widgets.pending" = "Afventende";

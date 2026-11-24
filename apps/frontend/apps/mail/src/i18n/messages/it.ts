@@ -1024,4 +1024,10 @@ export const it: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Capisco che la posta cifrata con il sistema precedente andrà persa',
   'privateMail.vaultMoveKeep': 'Continua con la posta precedente per ora',
+  'privateMail.vaultMoveRetiredTitle':
+    'Sposta la tua posta nella nuova cassaforte per continuare a riceverla',
+  'privateMail.vaultMoveRetiredBody':
+    "Il sistema di posta precedente non è più disponibile. Finché non sposti la tua posta nella cassaforte non riceverai nuova posta: quella che arriva nel frattempo resta cifrata con il sistema precedente, come la posta che avevi già, e non si potrà leggere. Non viene eliminata, ma nessuno potrà aprirla. Dopo lo spostamento la posta torna ad arrivarti e si apre con l'accesso a Sytue ID, come le altre app.",
+  'privateMail.vaultMoveCheckFailed':
+    'Non è stato possibile verificare lo stato della tua posta. Riprova tra un momento.',
 };

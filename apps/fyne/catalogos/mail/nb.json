@@ -450,7 +450,10 @@
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
   "privateMail.vaultMoveBody": "E-posten din er kryptert med det forrige systemet. For at den skal åpnes med Sytue ID-påloggingen din, slik som de andre appene, må den tømmes og startes på nytt i hvelvet. E-post som bare var kryptert med det forrige systemet, går tapt.",
+  "privateMail.vaultMoveCheckFailed": "Statusen til e-posten din kunne ikke kontrolleres. Prøv igjen om et øyeblikk.",
   "privateMail.vaultMoveKeep": "Fortsett med den forrige e-posten inntil videre",
+  "privateMail.vaultMoveRetiredBody": "Det forrige e-postsystemet er ikke lenger tilgjengelig. Inntil du flytter e-posten din til hvelvet, mottar du ikke ny e-post: det som kommer i mellomtiden, lagres kryptert med det forrige systemet, slik som e-posten du allerede hadde, og kan ikke leses. Det slettes ikke, men ingen kan åpne det. Når du har flyttet, kommer e-posten frem igjen og åpnes med Sytue ID-påloggingen din, slik som de andre appene.",
+  "privateMail.vaultMoveRetiredTitle": "Flytt e-posten din til det nye hvelvet for å fortsette å motta den",
   "privateMail.vaultMoveTitle": "Flytt e-posten din til det nye hvelvet",
   "privateMail.vaultMoveUnderstood": "Jeg forstår at e-post kryptert med det forrige systemet går tapt",
   "purge.body": {

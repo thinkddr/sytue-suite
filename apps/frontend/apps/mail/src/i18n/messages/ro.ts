@@ -1016,4 +1016,10 @@ export const ro: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Înțeleg că se va pierde corespondența criptată cu sistemul anterior',
   'privateMail.vaultMoveKeep': 'Continuă deocamdată cu corespondența anterioară',
+  'privateMail.vaultMoveRetiredTitle':
+    'Mută-ți corespondența în noul seif ca să o primești în continuare',
+  'privateMail.vaultMoveRetiredBody':
+    'Sistemul de corespondență anterior nu mai este disponibil. Până nu îți muți corespondența în seif, nu vei primi corespondență nouă: ce sosește între timp se păstrează criptat cu sistemul anterior, ca și corespondența pe care o aveai deja, și nu va putea fi citit. Nu se șterge, dar nimeni nu îl va putea deschide. După mutare, corespondența îți sosește din nou și se deschide cu autentificarea Sytue ID, ca restul aplicațiilor.',
+  'privateMail.vaultMoveCheckFailed':
+    'Starea corespondenței tale nu a putut fi verificată. Reîncearcă peste o clipă.',
 };

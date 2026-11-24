@@ -169,6 +169,12 @@ func run() error {
 	if claves := store.NuevasClavesBovedaID(cfg.IDURL, cfg.IDClavesBovedaSecret); claves != nil {
 		st.SetClavesBoveda(claves)
 	}
+	// La autoridad de Matrix del correo, retirada (ADR 0087, entrega 5): quien aún
+	// tenga el correo en Matrix tiene que pasarlo a la bóveda.
+	st.SetCorreoSinMatrix(cfg.CorreoSinMatrix)
+	if cfg.CorreoSinMatrix {
+		logger.Info("autoridad de Matrix del correo retirada (SYTUE_MAIL_SIN_MATRIX)")
+	}
 	drive := service.NewDriveClient(cfg.DriveURL)
 	svc := service.New(cfg, st, service.NewPoolPublisher(pool), drive)
 	// Recibos de ACK del correo que vive en la bóveda (ADR 0087): los comprueba Drive,

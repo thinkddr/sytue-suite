@@ -525,6 +525,9 @@ export const en = {
   'widgets.compose': 'Compose',
   'widgets.storage': 'Storage',
   'widgets.create': 'Create event',
+  'widgets.newNote': 'New note',
+  'widgets.newContact': 'New contact',
+  'widgets.addPhotos': 'Add photos',
   'widgets.updatedAgo': 'Updated {time}',
   'widgets.updatedAt': 'Updated: {time}',
 

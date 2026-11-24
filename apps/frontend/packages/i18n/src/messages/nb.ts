@@ -487,6 +487,9 @@ export const nb: Catalog = {
   'widgets.compose': 'Skriv',
   'widgets.storage': 'Lagring',
   'widgets.create': 'Opprett hendelse',
+  'widgets.newNote': 'Nytt notat',
+  'widgets.newContact': 'Ny kontakt',
+  'widgets.addPhotos': 'Legg til bilder',
   'widgets.updatedAgo': 'Oppdatert {time}',
   'widgets.updatedAt': 'Oppdatert: {time}',
 

@@ -1,6 +1,9 @@
 "widgets.open" = "Отваряне";
 "widgets.compose" = "Писане";
 "widgets.create" = "Създаване на събитие";
+"widgets.newNote" = "Нова бележка";
+"widgets.newContact" = "Нов контакт";
+"widgets.addPhotos" = "Добавяне на снимки";
 "widgets.notes" = "Бележки";
 "widgets.rows" = "Редове";
 "widgets.pending" = "Чакащи";

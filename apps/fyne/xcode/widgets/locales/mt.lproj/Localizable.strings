@@ -1,6 +1,9 @@
 "widgets.open" = "Iftaħ";
 "widgets.compose" = "Ikteb";
 "widgets.create" = "Oħloq avveniment";
+"widgets.newNote" = "Nota ġdida";
+"widgets.newContact" = "Kuntatt ġdid";
+"widgets.addPhotos" = "Żid ritratti";
 "widgets.notes" = "Noti";
 "widgets.rows" = "Ringieli";
 "widgets.pending" = "Pendenti";

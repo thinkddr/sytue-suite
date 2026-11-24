@@ -964,4 +964,9 @@ export const fi: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Ymmärrän, että aiemmalla järjestelmällä salattu posti menetetään',
   'privateMail.vaultMoveKeep': 'Jatka toistaiseksi aiemmalla postilla',
+  'privateMail.vaultMoveRetiredTitle': 'Siirrä postisi uuteen holviin, jotta saat sitä edelleen',
+  'privateMail.vaultMoveRetiredBody':
+    'Aiempi postijärjestelmä ei ole enää käytettävissä. Ennen kuin siirrät postisi holviin, et saa uutta postia: sillä välin saapuva posti säilytetään aiemmalla järjestelmällä salattuna, kuten jo saamasi posti, eikä sitä voi lukea. Sitä ei poisteta, mutta kukaan ei voi avata sitä. Siirron jälkeen posti alkaa taas tulla ja avautuu Sytue ID -kirjautumisellasi kuten muutkin sovellukset.',
+  'privateMail.vaultMoveCheckFailed':
+    'Postisi tilaa ei voitu tarkistaa. Yritä hetken kuluttua uudelleen.',
 };

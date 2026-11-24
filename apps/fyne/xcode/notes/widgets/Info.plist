@@ -30,6 +30,7 @@
 	<key>SytueWidgetActions</key>
 	<array>
 		<string>open</string>
+		<string>create</string>
 	</array>
 	<key>SytueWidgetBundle</key>
 	<string>eu.sytue.notes</string>

@@ -26,6 +26,9 @@ struct SytueWidgetConfiguration {
 
     var descriptionKey: String { "app." + product + ".description" }
 
+    // La app tiene alguna acción rápida (crear, redactar, añadir) además de «Abrir».
+    var hasQuickActions: Bool { actions.keys.contains { $0 != "open" } }
+
     var brandColor: Color { SytueWidgetPalette.brand(for: product) }
 
     // A dónde lleva una fila: su elemento dentro de esta app (SytueWidgetActions.route).
@@ -473,6 +476,38 @@ private struct SytueQuickActionsBar: View {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// Sin nada que enseñar (sin sesión, caducado o nada todavía): qué es la app y qué se puede
+// hacer, nunca un widget en blanco. La acción rápida de la app (crear, redactar, añadir),
+// que es un Link en los tamaños mediano y mayores; sin ella, «Abrir», que es el widgetURL.
+private struct SytueEmptyStateView: View {
+    let configuration: SytueWidgetConfiguration
+    var showsSymbol = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if showsSymbol {
+                Image(systemName: configuration.productSymbol)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(configuration.brandColor)
+                    .sytueAccentable()
+                    .accessibilityHidden(true)
+            }
+            Text(LocalizedStringKey(configuration.descriptionKey))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+            if configuration.hasQuickActions {
+                SytueQuickActionsBar(configuration: configuration, iconOnly: false)
+            } else {
+                SytueWidgetActionLabel(action: "open", product: configuration.product)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(configuration.brandColor)
+                    .sytueAccentable()
             }
         }
     }
@@ -1208,12 +1243,8 @@ struct SytueWidgetView: View {
                 Spacer(minLength: 0)
             } else if storagePercent == nil {
                 Spacer(minLength: 0)
-                Text(LocalizedStringKey(configuration.descriptionKey))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                SytueEmptyStateView(configuration: configuration, showsSymbol: false)
                 Spacer(minLength: 0)
-                SytueQuickActionsBar(configuration: configuration, iconOnly: false)
             } else {
                 Spacer(minLength: 0)
             }
@@ -1252,19 +1283,9 @@ struct SytueWidgetView: View {
                     }
                 }
                 Spacer(minLength: 0)
-            } else if entry.snapshot == nil {
+            } else if entry.snapshot == nil || (nonStorageCounters.isEmpty && storagePercent == nil) {
                 Spacer(minLength: 0)
-                VStack(alignment: .leading, spacing: 10) {
-                    Image(systemName: configuration.productSymbol)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(configuration.brandColor)
-                        .sytueAccentable()
-                    Text(LocalizedStringKey(configuration.descriptionKey))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                    SytueQuickActionsBar(configuration: configuration, iconOnly: false)
-                }
+                SytueEmptyStateView(configuration: configuration)
                 Spacer(minLength: 0)
             } else {
                 Spacer(minLength: 0)
@@ -1284,17 +1305,15 @@ struct SytueWidgetView: View {
                             SytueWidgetCounterView(counter: counter, brand: configuration.brandColor)
                         }
                     }
-                } else if entry.snapshot == nil {
-                    Text(LocalizedStringKey(configuration.descriptionKey))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(4)
                 }
                 if let pct = storagePercent {
                     SytueStorageBarView(percent: pct, brand: configuration.brandColor, compact: false)
                 }
                 Spacer(minLength: 0)
-                SytueQuickActionsBar(configuration: configuration, iconOnly: false)
+                // Sin filas, la acción va con el estado vacío de la derecha.
+                if !items.isEmpty {
+                    SytueQuickActionsBar(configuration: configuration, iconOnly: false)
+                }
             }
             .frame(maxWidth: 200, maxHeight: .infinity, alignment: .topLeading)
 
@@ -1311,6 +1330,9 @@ struct SytueWidgetView: View {
                             )
                         }
                     }
+                } else {
+                    Spacer(minLength: 0)
+                    SytueEmptyStateView(configuration: configuration)
                 }
                 Spacer(minLength: 0)
             }

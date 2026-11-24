@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "E-posten din er kryptert med det forrige systemet. For at den skal åpnes med Sytue ID-påloggingen din, slik som de andre appene, må den tømmes og startes på nytt i hvelvet. E-post som bare var kryptert med det forrige systemet, går tapt.",
+  "privateMail.vaultMoveKeep": "Fortsett med den forrige e-posten inntil videre",
+  "privateMail.vaultMoveTitle": "Flytt e-posten din til det nye hvelvet",
+  "privateMail.vaultMoveUnderstood": "Jeg forstår at e-post kryptert med det forrige systemet går tapt",
   "purge.body": {
     "one": "Denne meldingen forsvinner for godt og kan ikke gjenopprettes. Den frigjør plassen den tar.",
     "other": "Disse {count} meldingene forsvinner for godt og kan ikke gjenopprettes. De frigjør plassen de tar."

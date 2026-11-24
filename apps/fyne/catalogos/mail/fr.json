@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Votre messagerie est chiffrée avec l'ancien système. Pour qu'elle s'ouvre avec votre connexion Sytue ID, comme les autres applications, il faut la vider et repartir de zéro dans le coffre. Les messages chiffrés uniquement avec l'ancien système seront perdus.",
+  "privateMail.vaultMoveKeep": "Continuer avec l'ancienne messagerie pour l'instant",
+  "privateMail.vaultMoveTitle": "Passez votre messagerie au nouveau coffre",
+  "privateMail.vaultMoveUnderstood": "Je comprends que les messages chiffrés avec l'ancien système seront perdus",
   "purge.body": {
     "one": "Ce message disparaîtra pour de bon et ne pourra pas être récupéré. L’espace qu’il occupe est libéré.",
     "other": "Ces {count} messages disparaîtront pour de bon et ne pourront pas être récupérés. L’espace qu’ils occupent est libéré."

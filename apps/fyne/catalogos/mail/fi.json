@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Postisi on salattu aiemmalla järjestelmällä. Jotta se avautuu Sytue ID -kirjautumisellasi kuten muutkin sovellukset, se on tyhjennettävä ja aloitettava alusta holvissa. Vain aiemmalla järjestelmällä salattu posti menetetään.",
+  "privateMail.vaultMoveKeep": "Jatka toistaiseksi aiemmalla postilla",
+  "privateMail.vaultMoveTitle": "Siirrä postisi uuteen holviin",
+  "privateMail.vaultMoveUnderstood": "Ymmärrän, että aiemmalla järjestelmällä salattu posti menetetään",
   "purge.body": {
     "one": "Viesti katoaa lopullisesti, eikä sitä voi palauttaa. Sen viemä tila vapautuu.",
     "other": "Nämä {count} viestiä katoavat lopullisesti, eikä niitä voi palauttaa. Niiden viemä tila vapautuu."

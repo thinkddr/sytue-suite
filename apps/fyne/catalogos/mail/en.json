@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Your mail is encrypted with the previous system. To open it with your Sytue ID sign-in, like the rest of the apps, it has to be emptied and started again in the vault. Mail that was only encrypted with the previous system will be lost.",
+  "privateMail.vaultMoveKeep": "Keep using the previous mail for now",
+  "privateMail.vaultMoveTitle": "Move your mail to the new vault",
+  "privateMail.vaultMoveUnderstood": "I understand that mail encrypted with the previous system will be lost",
   "purge.body": {
     "one": "This message will be gone for good and cannot be recovered. It frees up the space it takes.",
     "other": "These {count} messages will be gone for good and cannot be recovered. They free up the space they take."

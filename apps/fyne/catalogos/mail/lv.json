@@ -457,6 +457,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Jūsu pasts ir šifrēts ar iepriekšējo sistēmu. Lai tas atvērtos ar jūsu Sytue ID pieteikšanos tāpat kā pārējās lietotnes, tas jāiztukšo un jāsāk no jauna glabātuvē. Pasts, kas bija šifrēts tikai ar iepriekšējo sistēmu, tiks zaudēts.",
+  "privateMail.vaultMoveKeep": "Pagaidām turpināt ar iepriekšējo pastu",
+  "privateMail.vaultMoveTitle": "Pārvietojiet pastu uz jauno glabātuvi",
+  "privateMail.vaultMoveUnderstood": "Saprotu, ka ar iepriekšējo sistēmu šifrētais pasts tiks zaudēts",
   "purge.body": {
     "zero": "{count} ziņojumu pazudīs uz visiem laikiem, un tos nevarēs atjaunot. Tiks atbrīvota to aizņemtā vieta.",
     "one": "{count} ziņojums pazudīs uz visiem laikiem, un to nevarēs atjaunot. Tiks atbrīvota tā aizņemtā vieta.",

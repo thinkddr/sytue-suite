@@ -465,6 +465,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Il-posta tiegħek hija kriptata bis-sistema ta' qabel. Biex tinfetaħ bil-login ta' Sytue ID tiegħek, bħall-bqija tal-apps, trid titbattal u tibda mill-ġdid fil-kaxxaforti. Il-posta li kienet kriptata biss bis-sistema ta' qabel se tintilef.",
+  "privateMail.vaultMoveKeep": "Kompli bil-posta ta' qabel għalissa",
+  "privateMail.vaultMoveTitle": "Ittrasferixxi l-posta tiegħek fil-kaxxaforti l-ġdida",
+  "privateMail.vaultMoveUnderstood": "Nifhem li l-posta kriptata bis-sistema ta' qabel se tintilef",
   "purge.body": {
     "one": "Dan il-messaġġ jisparixxi għal kollox u ma jistax jiġi rkuprat. L-ispazju li jieħu jinħeles.",
     "few": "Dawn il-{count} messaġġi jisparixxu għal kollox u ma jistgħux jiġu rkuprati. L-ispazju li jieħdu jinħeles.",

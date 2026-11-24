@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Din e-post är krypterad med det tidigare systemet. För att den ska öppnas med din Sytue ID-inloggning, som de andra apparna, måste den tömmas och börja om i valvet. E-post som bara var krypterad med det tidigare systemet går förlorad.",
+  "privateMail.vaultMoveKeep": "Fortsätt med den tidigare e-posten tills vidare",
+  "privateMail.vaultMoveTitle": "Flytta din e-post till det nya valvet",
+  "privateMail.vaultMoveUnderstood": "Jag förstår att e-post som krypterats med det tidigare systemet går förlorad",
   "purge.body": {
     "one": "Det här meddelandet försvinner för gott och kan inte återställas. Utrymmet det tar frigörs.",
     "other": "De här {count} meddelandena försvinner för gott och kan inte återställas. Utrymmet de tar frigörs."

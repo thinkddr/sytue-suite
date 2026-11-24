@@ -465,6 +465,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Twoja poczta jest zaszyfrowana poprzednim systemem. Aby otwierała się po zalogowaniu do Sytue ID, jak pozostałe aplikacje, trzeba ją opróżnić i zacząć od nowa w sejfie. Poczta zaszyfrowana tylko poprzednim systemem zostanie utracona.",
+  "privateMail.vaultMoveKeep": "Na razie zostań przy poprzedniej poczcie",
+  "privateMail.vaultMoveTitle": "Przenieś pocztę do nowego sejfu",
+  "privateMail.vaultMoveUnderstood": "Rozumiem, że poczta zaszyfrowana poprzednim systemem zostanie utracona",
   "purge.body": {
     "one": "Ta wiadomość zniknie na zawsze i nie będzie można jej odzyskać. Zwolni to zajmowane przez nią miejsce.",
     "few": "Te {count} wiadomości znikną na zawsze i nie będzie można ich odzyskać. Zwolni to zajmowane przez nie miejsce.",

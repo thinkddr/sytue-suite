@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "A levelei az előző rendszerrel vannak titkosítva. Ahhoz, hogy a többi alkalmazáshoz hasonlóan a Sytue ID-bejelentkezésével nyíljanak meg, ki kell üríteni őket, és újra kell kezdeni a széfben. A csak az előző rendszerrel titkosított levelek elvesznek.",
+  "privateMail.vaultMoveKeep": "Egyelőre maradok az előző levelezésnél",
+  "privateMail.vaultMoveTitle": "Helyezze át a leveleit az új széfbe",
+  "privateMail.vaultMoveUnderstood": "Megértettem, hogy az előző rendszerrel titkosított levelek elvesznek",
   "purge.body": {
     "one": "Ez az üzenet végleg eltűnik, és nem állítható vissza. Az általa foglalt hely felszabadul.",
     "other": "Ez a(z) {count} üzenet végleg eltűnik, és nem állítható vissza. Az általuk foglalt hely felszabadul."

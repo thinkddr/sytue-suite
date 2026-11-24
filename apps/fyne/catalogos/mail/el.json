@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Το ταχυδρομείο σας είναι κρυπτογραφημένο με το προηγούμενο σύστημα. Για να ανοίγει με τη σύνδεσή σας στο Sytue ID, όπως οι υπόλοιπες εφαρμογές, πρέπει να αδειάσει και να ξεκινήσει από την αρχή στο θησαυροφυλάκιο. Το ταχυδρομείο που ήταν κρυπτογραφημένο μόνο με το προηγούμενο σύστημα θα χαθεί.",
+  "privateMail.vaultMoveKeep": "Συνέχεια με το προηγούμενο ταχυδρομείο προς το παρόν",
+  "privateMail.vaultMoveTitle": "Μεταφέρετε το ταχυδρομείο σας στο νέο θησαυροφυλάκιο",
+  "privateMail.vaultMoveUnderstood": "Καταλαβαίνω ότι το ταχυδρομείο που κρυπτογραφήθηκε με το προηγούμενο σύστημα θα χαθεί",
   "purge.body": {
     "one": "Αυτό το μήνυμα θα χαθεί για πάντα και δεν θα μπορεί να ανακτηθεί. Ελευθερώνεται ο χώρος που καταλαμβάνει.",
     "other": "Αυτά τα {count} μηνύματα θα χαθούν για πάντα και δεν θα μπορούν να ανακτηθούν. Ελευθερώνεται ο χώρος που καταλαμβάνουν."

@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Je e-mail is versleuteld met het vorige systeem. Om hem, net als de andere apps, met je Sytue ID-aanmelding te openen, moet hij worden geleegd en opnieuw beginnen in de kluis. E-mail die alleen met het vorige systeem was versleuteld, gaat verloren.",
+  "privateMail.vaultMoveKeep": "Voorlopig de vorige e-mail blijven gebruiken",
+  "privateMail.vaultMoveTitle": "Zet je e-mail over naar de nieuwe kluis",
+  "privateMail.vaultMoveUnderstood": "Ik begrijp dat e-mail die met het vorige systeem is versleuteld verloren gaat",
   "purge.body": {
     "one": "Dit bericht verdwijnt voorgoed en kan niet worden hersteld. De ruimte die het inneemt, komt vrij.",
     "other": "Deze {count} berichten verdwijnen voorgoed en kunnen niet worden hersteld. De ruimte die ze innemen, komt vrij."

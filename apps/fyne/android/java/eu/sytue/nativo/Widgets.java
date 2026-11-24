@@ -421,10 +421,11 @@ public final class Widgets extends AppWidgetProvider {
             maximo = 4;
             disponible = dpH - 96;
         } else if (calendario) {
-            altoFila = 30;
+            // En el pequeño, filas de una línea (con la hora a la derecha): caben dos.
+            altoFila = dpH < 80 ? 24 : 30;
             maximo = 3;
         } else {
-            altoFila = dpH >= 150 ? 34 : 30;
+            altoFila = dpH < 80 ? 24 : (dpH >= 150 ? 34 : 30);
             maximo = dpH >= 210 ? FILAS : (dpH >= 150 ? 3 : 2);
             if (almacen != null) {
                 disponible -= ALTO_BARRA_DP;

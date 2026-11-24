@@ -8,8 +8,8 @@
  * enviar; un mensaje puede llevar solo adjuntos. Teclado + raton. Envio optimista
  * gestionado por el padre. docs/design.md §9.
  *
- * El cromo tiene tres puertas y ningún formulario permanente (Ola 1 de paridad,
- * docs/roadmap.md): «+» abre el menú de acciones (subir fichero, fichero YA existente
+ * El cromo tiene tres puertas y ningún formulario permanente (Ola 1 de paridad de
+ * Rooms): «+» abre el menú de acciones (subir fichero, fichero YA existente
  * de Sytue Drive, apps e integraciones); «!» abre la prioridad y el acuse de recibo; y
  * el reloj abre «Enviar más tarde» con atajos relativos (el control de fecha solo
  * aparece si se pide «personalizada»). Lo que se aplica se resume en un chip sobre la

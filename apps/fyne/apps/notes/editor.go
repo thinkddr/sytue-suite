@@ -4,7 +4,6 @@
 package notes
 
 import (
-	"cmp"
 	"context"
 	"image"
 	"image/color"
@@ -36,7 +35,7 @@ import (
 // que se ve escribiendo es lo que se ve después, a la letra.
 //
 // ponytail: dos límites conocidos. (1) No hay IME: el driver de Fyne no lo tiene en
-// escritorio (docs/roadmap.md, «Techos del toolkit»), así que el chino o el japonés no se
+// escritorio (docs/design.md, «Techos del toolkit»), así que el chino o el japonés no se
 // teclean aquí ni en ningún campo nativo. (2) La barra no entra en el orden de tabulación
 // (el Tab del cuerpo es sangrar, como en la web); se usa con el puntero o con sus atajos
 // (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K, Ctrl+Alt+0…5). El cursor sí parpadea, como el del
@@ -91,6 +90,19 @@ const (
 	DerechaD   = "M4.5 6h15M10.5 10h9M4.5 14h15M10.5 18h9"
 	GomaD      = "M9 19.5h10.5M4.6 15.4l8.8-8.8a1.5 1.5 0 0 1 2.1 0l3.9 3.9a1.5 1.5 0 0 1 0 2.1L13.5 18.5H9.4l-4.8-3.1Z"
 	TituloD    = "M6 5v14M18 5v14M6 12h12"
+	// SimboloD es la omega de «Símbolos» y MayusD, el «Aa» de distinguir mayúsculas.
+	// Propios del editor nativo, con el trazo de 24 y el grosor de los de glyphs.tsx.
+	SimboloD = "M5 19.5h4.5v-2.3a6.5 6.5 0 1 1 5 0v2.3H19"
+	// FormatoD es la «A» subrayada de «Más formato».
+	FormatoD = "M6.5 16 11 4.5h2L17.5 16M8.2 12h7.6M4.5 20h15"
+	// TijerasD son las tijeras de «Cortar».
+	TijerasD = "M6.5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6.5 20a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM8.5 8l11 10M8.5 16l11-10"
+	// PegarD es la tablilla del portapapeles de «Pegar».
+	PegarD = "M9 4.5h6v3H9zM9 6H7a1.5 1.5 0 0 0-1.5 1.5v11A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 17 6h-2"
+	// ArrobaD es la arroba de «Mencionar» y EstadoD, la etiqueta de un estado.
+	ArrobaD = "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm0 0v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1"
+	EstadoD = "M4.5 8.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2ZM8 12h8"
+	MayusD  = "M3.5 18 7.5 6l4 12M5 13.5h5M20.5 12v6M20.5 15.25a2.75 2.75 0 1 1-5.5 0 2.75 2.75 0 0 1 5.5 0Z"
 )
 
 // foto es un estado del editor para deshacer: el documento y la selección.
@@ -123,21 +135,27 @@ type EditorNota struct {
 
 	marca string
 	zona  *zonaEdicion
-	barra *fyne.Container
-	// barraLado es la barra de formato dentro de su `overflow-x-auto`: en el teléfono va en
-	// una fila y se desplaza de lado, en vez de comerse cuatro filas de la pantalla.
-	barraLado *ui.DesplazaLado
-	// Afuera devuelve el desplazador de la página: lo vertical que cae sobre la barra
-	// mueve la página, no la barra. Nil: lo vertical no hace nada sobre ella.
-	Afuera func() fyne.Scrollable
+	// barra es la barra de formato (barra_editor.go): una fila con lo que cabe y «Más».
+	barra   *fyne.Container
+	barraEd *barraEd
+	// estado es el pie con las palabras, las letras y el tiempo de lectura
+	// (estado_nota.go). Nil: sin pie (Mail).
+	estado *pieEstado
+	// AutoformatoEnLinea convierte `**x**`, `*x*`, `_x_`, `` `x` `` y `~~x~~` en su
+	// formato al cerrar la marca (autoformato.go). Lo enciende Notepads; el redactor de
+	// Mail, que en la web no lo tiene, escribe las marcas tal cual.
+	AutoformatoEnLinea bool
+	// cambios cuenta los cambios del documento (lo escribe avisarCambio): el pie sabe así
+	// si tiene que volver a contar.
+	cambios int
 	// barraTabla es la de las acciones de la tabla, que solo se ve en una celda.
 	barraTabla *fyne.Container
-	// fondoBarra y fileteBarra son el `bg-surface` y el `border-b` de la barra, y
-	// fondoTabla y fileteTabla los de la barra de tabla.
-	fondoBarra, fileteBarra *canvas.Rectangle
-	fondoTabla, fileteTabla *canvas.Rectangle
-	botones                 map[string]*botonBarra
-	bloqueBt                *botonBloque
+	tablaEd    *barraEd
+	// barraCodigo es la de un bloque de código, con su lenguaje (insertar.go).
+	barraCodigo *fyne.Container
+	codigoEd    *barraEd
+	botones     map[string]*botonBarra
+	bloqueBt    *botonBloque
 	// Estirado es la tarjeta estirada: el cuerpo crece hasta abajo (`flex-1`).
 	Estirado bool
 	// SinAro quita el aro de foco del cuerpo (`sinAro` de RichText.tsx): en la hoja del
@@ -194,6 +212,10 @@ type EditorNota struct {
 	descartada *Pos
 	burbuja    *flotante
 	buscador   *buscadorNota
+	// simbolos es el último selector de símbolos abierto (simbolos.go) e insertando, el
+	// último menú «+» (insertar.go).
+	simbolos   *selectorSimbolos
+	insertando *ui.Emergente
 	// enlaces es lo que ofrece «[[»: la búsqueda de la herramienta de enlaces, sin Drive.
 	// Sin ella (Mail, una nota compartida conmigo), «[[» es texto.
 	enlaces *busquedaEnlaces
@@ -211,21 +233,17 @@ var _ fyne.Widget = (*EditorNota)(nil)
 // NuevoEditorNota prepara el editor de un documento. El cursor queda al final.
 func NuevoEditorNota(tr *i18n.Translator, d *Documento, marcaDeAgua string) *EditorNota {
 	e := &EditorNota{tr: tr, doc: d.ParaEditar(), marca: marcaDeAgua}
+	e.doc.rotuloExpandir = tr.T("editor.expand", nil)
 	e.ExtendBaseWidget(e)
-	e.zona = &zonaEdicion{e: e}
+	e.zona = &zonaEdicion{e: e, encima: -1}
 	e.zona.ExtendBaseWidget(e.zona)
 	e.cur = e.fin()
 	e.ancla = e.cur
 	e.barra = e.armarBarra()
-	e.barraLado = ui.NuevoDesplazaLado(e.barra, 0, func() fyne.Scrollable {
-		if e.Afuera != nil {
-			return e.Afuera()
-		}
-		return nil
-	})
-	e.barraLado.Medir = func(ancho float32) float32 { return altoDe(e.barra, ancho) }
 	e.barraTabla = e.armarBarraTabla()
 	e.barraTabla.Hidden = !e.enTabla()
+	e.barraCodigo = e.armarBarraCodigo()
+	e.barraCodigo.Hidden = !e.enCodigo()
 	e.burbuja = e.armarBurbuja()
 	e.refrescarBarra()
 	return e
@@ -275,6 +293,7 @@ func (e *EditorNota) guardarFoto() {
 // refuses a new edit. It cannot retain that unaccepted change in Undo/Redo.
 func (e *EditorNota) rechazarCambio(html string) {
 	e.doc = Leer(html).ParaEditar()
+	e.doc.rotuloExpandir = e.tr.T("editor.expand", nil)
 	e.cur, e.ancla = e.acotar(e.cur), e.acotar(e.ancla)
 	e.deshacer, e.rehacer = nil, nil
 	e.pendiente = nil
@@ -292,20 +311,22 @@ func (e *EditorNota) cambiado() {
 // avisarCambio cuenta hacia fuera que el documento ha cambiado (para guardarlo) y, con
 // «Buscar en la nota» abierta, rehace las coincidencias para que los velos sigan al texto.
 func (e *EditorNota) avisarCambio() {
+	e.cambios++
 	e.rehacerHallados()
 	llamar1(e.AlCambiar, e.HTML())
 }
 
 func (e *EditorNota) repintar() {
-	antes, tabla := e.zona.Size().Height, e.barraTabla.Visible()
+	antes, tabla, codigo := e.zona.Size().Height, e.barraTabla.Visible(), e.barraCodigo.Visible()
 	e.zona.encenderCursor() // el cursor que se mueve o escribe se ve, como en el navegador
 	e.refrescarBarra()
 	e.zona.Refresh()
-	if e.enTabla() != tabla {
-		e.barraTabla.Hidden = !e.enTabla()
+	cambia := e.enTabla() != tabla || e.enCodigo() != codigo
+	if cambia {
+		e.barraTabla.Hidden, e.barraCodigo.Hidden = !e.enTabla(), !e.enCodigo()
 		e.Refresh()
 	}
-	if e.AlCrecer != nil && (e.zona.MinSize().Height != antes || e.enTabla() != tabla) {
+	if e.AlCrecer != nil && (e.zona.MinSize().Height != antes || cambia) {
 		e.AlCrecer()
 	}
 	if e.AlMoverCursor != nil {
@@ -468,6 +489,11 @@ func (e *EditorNota) Orden(orden, valor string) {
 			return
 		}
 		e.hacer(func() { e.cur = e.doc.EditarTabla(orden, e.cur); e.ancla = e.cur })
+	case "cabeceraFila", "cabeceraCol", "fondoCelda":
+		if !e.bloqueActual().Celda.EnTabla() {
+			return
+		}
+		e.hacer(func() { e.doc.FormatearTabla(orden, valor, e.cur) })
 	}
 }
 
@@ -662,9 +688,12 @@ func (e *EditorNota) tecla(k fyne.KeyName) {
 	case fyne.KeyReturn, fyne.KeyEnter:
 		e.intro()
 	case fyne.KeyTab:
-		if e.shift {
+		switch {
+		case e.enTabla():
+			e.irACelda(e.shift) // en una tabla, de celda en celda (tabla_barra.go)
+		case e.shift:
 			e.Orden("desangrar", "")
-		} else {
+		default:
 			e.Orden("sangrar", "")
 		}
 	case fyne.KeyEscape:
@@ -723,8 +752,12 @@ func (e *EditorNota) espacio() {
 		e.escribir(" ")
 		return
 	}
+	// El espacio se escribe primero, como cualquier letra, y la conversión es su PROPIO
+	// paso de deshacer: Ctrl/⌘+Z justo después devuelve «## » tal cual (autoformato.go).
+	e.escribiendo = false
+	e.escribir(" ")
 	e.hacer(func() {
-		inicio := Pos{e.cur.B, e.cur.O - borrar}
+		inicio := Pos{e.cur.B, e.cur.O - borrar - 1}
 		e.cur = e.doc.Borrar(inicio, e.cur)
 		e.ancla = e.cur
 		switch orden {
@@ -928,9 +961,11 @@ func (e *EditorNota) atajoPropio(x *desktop.CustomShortcut) {
 	case fyne.KeyU:
 		e.Orden("u", "")
 	case fyne.KeyK:
-		if b := e.botones["enlace"]; b != nil {
-			llamar1(e.AlEnlazar, fyne.CanvasObject(b))
-		}
+		llamar1(e.AlEnlazar, e.disparadorDe("enlace"))
+	case fyne.KeySlash:
+		e.verAtajos()
+	case fyne.KeyH:
+		e.abrirReemplazar()
 	case fyne.KeyReturn, fyne.KeyEnter:
 		llamar0(e.AlTerminar)
 	case fyne.KeyY:
@@ -954,95 +989,6 @@ func (e *EditorNota) botonDeOrden(glifo string, icono iconos.Icono, rotulo strin
 	})
 }
 
-// armarBarra monta los botones en el orden de RichText.tsx.
-func (e *EditorNota) armarBarra() *fyne.Container {
-	t := e.tr.T
-	e.botones = map[string]*botonBarra{}
-	boton := func(clave, glifo string, icono iconos.Icono, rotulo string, f func()) *botonBarra {
-		b := e.botonDeOrden(glifo, icono, rotulo, f)
-		e.botones[clave] = b
-		return b
-	}
-	atajo := func(rotulo, teclas string) string {
-		return t("editor.shortcut", i18n.Vars{"label": rotulo, "keys": teclas})
-	}
-	sep := func() fyne.CanvasObject { return nuevoSeparadorEd() }
-	e.bloqueBt = nuevoBotonBloque(t("editor.block", nil), func() { e.menuBloque() })
-	items := make([]fyne.CanvasObject, 0, 28)
-	items = append(items,
-		boton("undo", DeshacerD, iconos.Ninguno, atajo(t("editor.undo", nil), ui.AtajoDelSistema("Ctrl+Z")), func() { e.Orden("undo", "") }),
-		boton("redo", RehacerD, iconos.Ninguno, atajo(t("editor.redo", nil), ui.AtajoDelSistema("Ctrl+Y")), func() { e.Orden("redo", "") }),
-		sep(), e.bloqueBt, sep(),
-		boton("b", NegritaD, iconos.Ninguno, atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
-		boton("i", CursivaD, iconos.Ninguno, atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
-		boton("u", SubrayadoD, iconos.Ninguno, atajo(t("editor.underline", nil), ui.AtajoDelSistema("Ctrl+U")), func() { e.Orden("u", "") }),
-		boton("s", TachadoD, iconos.Ninguno, t("editor.strike", nil), func() { e.Orden("s", "") }),
-		boton("mark", "", iconos.Rotulador, t("editor.highlight", nil), func() { e.Orden("mark", "") }),
-		boton("code", "", iconos.Codigo, t("editor.inlineCode", nil), func() { e.Orden("code", "") }),
-	)
-	pintura := boton("color", PaletaD, iconos.Ninguno, t("editor.textColor", nil), nil)
-	pintura.AlPulsar = func() { e.paletaColor(pintura) }
-	items = append(items, pintura, sep(),
-		boton("tarea", TareaD, iconos.Ninguno, atajo(t("note.newTodo", nil), "[]"), func() { e.Orden("tarea", "") }),
-		boton("vinetas", VinetasD, iconos.Ninguno, t("editor.bulletList", nil), func() { e.Orden("vinetas", "") }),
-		boton("numeros", NumerosD, iconos.Ninguno, t("editor.numberedList", nil), func() { e.Orden("numeros", "") }),
-		boton("desangrar", DesangrarD, iconos.Ninguno, atajo(t("editor.outdent", nil), "Shift+Tab"), func() { e.Orden("desangrar", "") }),
-		boton("sangrar", SangrarD, iconos.Ninguno, atajo(t("editor.indent", nil), "Tab"), func() { e.Orden("sangrar", "") }),
-		sep(),
-		boton("left", IzquierdaD, iconos.Ninguno, t("editor.alignLeft", nil), func() { e.Orden("alinear", "left") }),
-		boton("center", CentroD, iconos.Ninguno, t("editor.alignCenter", nil), func() { e.Orden("alinear", "center") }),
-		boton("right", DerechaD, iconos.Ninguno, t("editor.alignRight", nil), func() { e.Orden("alinear", "right") }),
-		sep(),
-	)
-	enlace := boton("enlace", EnlaceD, iconos.Ninguno, atajo(t("editor.linkTool", nil), ui.AtajoDelSistema("Ctrl+K")), nil)
-	enlace.AlPulsar = func() { llamar1(e.AlEnlazar, fyne.CanvasObject(enlace)) }
-	items = append(items, enlace,
-		boton("regla", "", iconos.Menos, t("editor.hr", nil), func() { e.Orden("regla", "") }),
-		boton("limpiar", GomaD, iconos.Ninguno, t("editor.clearFormat", nil), func() { e.Orden("limpiar", "") }),
-		// Tabla 3×3 de partida (`insertarTabla(3, 3)`).
-		boton("tabla", TablaD, iconos.Ninguno, t("editor.table", nil), func() { e.Orden("tabla", "") }),
-	)
-	e.fondoBarra, e.fileteBarra = canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})
-	f := &barraFlex{
-		entera: -1, px: PXBarraEd, py: PYBarraEd, hueco: HuecoBarraEd,
-		// El ancho de SU ventana, no el de la primera de la app: con otra abierta (la
-		// captura rápida, un diálogo) la barra se quedaba en una fila recortada en un
-		// escritorio de sobra ancho, sin los botones del final.
-		filaUnica: func() bool { return anchoVentana([]fyne.CanvasObject{e}) < ui.CorteMD },
-	}
-	return container.New(f, append([]fyne.CanvasObject{e.fondoBarra, e.fileteBarra}, items...)...)
-}
-
-// armarBarraTabla es la barra de «Acciones de la tabla», que en la web sale SOLO con el
-// cursor en una celda (`enTabla`): el rótulo «Tabla» en `text-xs text-subtle px-1`, las
-// cuatro de insertar —con el icono `minus` de la web, las cuatro— y, tras un separador,
-// las tres de eliminar con la papelera.
-func (e *EditorNota) armarBarraTabla() *fyne.Container {
-	t := e.tr.T
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	rotulo := container.New(ui.Margen{Izq: PXRotuloTabla, Der: PXRotuloTabla},
-		lineaTok(t("editor.table", nil), tema.TextoXS, ui.Normal, "text-subtle", v))
-	items := []fyne.CanvasObject{rotulo}
-	for i, o := range OrdenesTabla {
-		if i == 4 {
-			items = append(items, nuevoSeparadorEd())
-		}
-		glifo, icono := "", iconos.Menos
-		if i >= 4 {
-			glifo, icono = PapeleraD, iconos.Ninguno
-		}
-		b := e.botonDeOrden(glifo, icono, t(o.Clave, nil), func() { e.Orden(o.Orden, "") })
-		e.botones[o.Orden] = b
-		items = append(items, b)
-	}
-	e.fondoTabla, e.fileteTabla = canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})
-	return container.New(&barraFlex{entera: -1, px: PXBarraEd, py: PYBarraEd, hueco: HuecoBarraEd},
-		append([]fyne.CanvasObject{e.fondoTabla, e.fileteTabla}, items...)...)
-}
-
-// PXRotuloTabla es el `px-1` del rótulo de la barra de tabla.
-const PXRotuloTabla = 1 * 0.25 * tema.Rem
-
 // enTabla dice si el cursor está en una celda: es lo que enseña la barra de tabla.
 func (e *EditorNota) enTabla() bool {
 	return len(e.doc.Bloques) > 0 && e.bloqueActual().Celda.EnTabla()
@@ -1051,7 +997,7 @@ func (e *EditorNota) enTabla() bool {
 // barras son las barras que se ven, en su orden: la de formato y, con el cursor en una
 // celda, la de tabla.
 func (e *EditorNota) barras() []fyne.CanvasObject {
-	out := []fyne.CanvasObject{e.barraLado}
+	out := []fyne.CanvasObject{e.barra}
 	if e.buscador != nil {
 		out = append(out, e.buscador.barra)
 	}
@@ -1060,6 +1006,9 @@ func (e *EditorNota) barras() []fyne.CanvasObject {
 	}
 	if e.enTabla() {
 		out = append(out, e.barraTabla)
+	}
+	if e.enCodigo() {
+		out = append(out, e.barraCodigo)
 	}
 	return out
 }
@@ -1071,18 +1020,22 @@ func (e *EditorNota) refrescarBarra() {
 		return
 	}
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	e.fondoBarra.FillColor = tema.Color("surface", v)
-	e.fileteBarra.FillColor = tema.Color("border", v)
-	e.fondoTabla.FillColor = tema.Color("surface", v)
-	e.fileteTabla.FillColor = tema.Color("border", v)
+	e.barraEd.fondo.FillColor = tema.Color("surface", v)
+	e.barraEd.filete.FillColor = tema.Color("border", v)
+	for _, b := range []*barraEd{e.tablaEd, e.codigoEd} {
+		b.fondo.FillColor, b.filete.FillColor = tema.Color("surface", v), tema.Color("border", v)
+	}
 	bl := Bloque{Tipo: Parrafo}
 	if len(e.doc.Bloques) > 0 {
 		bl = e.bloqueActual()
 	}
 	estados := map[string]bool{
 		"b": e.estadoMarca("b"), "i": e.estadoMarca("i"), "u": e.estadoMarca("u"), "s": e.estadoMarca("s"),
-		"vinetas": bl.Tipo == Vineta, "numeros": bl.Tipo == Numerada,
-		"left": bl.Alineacion == "left", "center": bl.Alineacion == "center", "right": bl.Alineacion == "right",
+		"code": e.estadoMarca("code"), "tarea": bl.Tipo == Tarea, "buscar": e.buscador != nil,
+		"vinetas": bl.Tipo == Vineta && bl.Lista == "", "numeros": bl.Tipo == Numerada,
+		"cabeceraFila": bl.Celda.EnTabla() && cabeceraDeFila(bl.Celda.Tabla),
+		"cabeceraCol":  bl.Celda.EnTabla() && cabeceraDeColumna(bl.Celda.Tabla),
+		"left":         bl.Alineacion == "left", "center": bl.Alineacion == "center", "right": bl.Alineacion == "right",
 	}
 	for clave, b := range e.botones {
 		activo, conEstado := estados[clave]
@@ -1107,12 +1060,14 @@ func (e *EditorNota) refrescarBarra() {
 	}
 	e.bloqueBt.Refresh()
 	e.barra.Refresh()
-	e.barraLado.Refresh()
 	e.barraTabla.Refresh()
+	e.refrescarBarraCodigo()
+	e.refrescarEstado()
 }
 
-// menuBloque abre el desplegable de «Estilo del texto» con los ocho, el actual marcado.
-func (e *EditorNota) menuBloque() {
+// menuBloque abre el desplegable de «Estilo del texto» con los ocho, el actual marcado,
+// colgando de `disparador` (su botón o «Más»).
+func (e *EditorNota) menuBloque(disparador fyne.CanvasObject) {
 	actual := "p"
 	if len(e.doc.Bloques) > 0 {
 		actual = EtiquetaDe(e.bloqueActual())
@@ -1128,7 +1083,7 @@ func (e *EditorNota) menuBloque() {
 	}
 	m := ui.NuevoMenu(elementos...)
 	m.Rotulo = e.tr.T("editor.block", nil)
-	m.Mostrar(e.bloqueBt)
+	m.Mostrar(disparador)
 }
 
 // paletaColor abre la paleta de «Color del texto»: el color por defecto y los ocho.
@@ -1174,6 +1129,9 @@ func (e *EditorNota) AltoPara(ancho float32) float32 {
 	for _, b := range e.barras() {
 		alto += altoDe(b, ancho)
 	}
+	if e.estado != nil {
+		alto += altoPie
+	}
 	return alto + e.zona.altoPara(ancho)
 }
 
@@ -1190,6 +1148,9 @@ func (r *editorRenderer) MinSize() fyne.Size {
 
 func (r *editorRenderer) Objects() []fyne.CanvasObject {
 	objs := append(r.e.barras(), r.e.zona)
+	if r.e.estado != nil {
+		objs = append(objs, r.e.estado)
+	}
 	if r.e.portal == nil {
 		objs = append(objs, r.e.flotantes()...)
 	}
@@ -1205,8 +1166,16 @@ func (r *editorRenderer) Layout(t fyne.Size) {
 		b.Resize(fyne.NewSize(t.Width, h))
 		alto += h
 	}
+	pie := float32(0)
+	if r.e.estado != nil {
+		pie = altoPie
+	}
 	r.e.zona.Move(fyne.NewPos(0, alto))
-	r.e.zona.Resize(fyne.NewSize(t.Width, max(t.Height-alto, r.e.zona.altoPara(t.Width))))
+	r.e.zona.Resize(fyne.NewSize(t.Width, max(t.Height-alto-pie, r.e.zona.altoPara(t.Width))))
+	if r.e.estado != nil {
+		r.e.estado.Move(fyne.NewPos(0, alto+r.e.zona.Size().Height))
+		r.e.estado.Resize(fyne.NewSize(t.Width, pie))
+	}
 	if r.e.portal == nil {
 		r.e.colocarFlotantes(r.e.zona.Position(), t.Width, 0)
 		return
@@ -1233,6 +1202,8 @@ type zonaEdicion struct {
 	maq      *Maquetado
 	ancho    float32
 	arrastre bool
+	// encima es el bloque bajo el ratón, que enseña su asa (bloque_menu.go); -1, ninguno.
+	encima int
 	// contexto es el doble toque y el menú contextual (editor_menu.go).
 	contexto contextoZona
 	// El parpadeo del cursor (cursor_parpadeo.go): la raya pintada, si está en su fase
@@ -1328,7 +1299,7 @@ func (z *zonaEdicion) comprobarSalida() {
 	}
 	// La caja de «Buscar en la nota» y las herramientas del cuaderno conservan la
 	// sesión sin robar el foco a la herramienta que la persona está usando.
-	if z.e.buscador != nil && z.e.buscador.campo.Enfocado() {
+	if z.e.buscador != nil && z.e.buscador.conservaFoco(f) {
 		return
 	}
 	if z.e.conservaEdicion != nil && z.e.conservaEdicion(f) {
@@ -1344,6 +1315,9 @@ func (z *zonaEdicion) TypedRune(r rune) {
 		return
 	}
 	z.e.escribir(string(r))
+	if esLetraDeMarca(r) {
+		z.e.autoformatoEnLinea()
+	}
 }
 
 func (z *zonaEdicion) TypedKey(k *fyne.KeyEvent) {
@@ -1433,6 +1407,12 @@ func (z *zonaEdicion) Tapped(ev *fyne.PointEvent) {
 			return
 		}
 	}
+	if z.tocarAsa(ev.Position) {
+		return // el menú del bloque (bloque_menu.go)
+	}
+	if z.tocarEspecial(ev.Position) {
+		return // una etiqueta, una fecha o el título de un desplegable (insertar.go)
+	}
 	if z.dobleToque(ev.Position) {
 		return // el segundo toque selecciona la palabra (editor_menu.go)
 	}
@@ -1511,6 +1491,9 @@ func (r *zonaRenderer) Layout(t fyne.Size) {
 		z.raya.Hidden = z.apagado
 		objs = append(objs, z.raya)
 	}
+	if asa := z.asa(v); asa != nil {
+		objs = append(objs, asa)
+	}
 	if a := z.contexto.ancla; a != nil {
 		objs = append(objs, a) // de donde cuelga el menú contextual (editor_menu.go)
 	}
@@ -1576,211 +1559,6 @@ func (r *zonaRenderer) seleccion(v tema.Variante) []fyne.CanvasObject {
 func (r *zonaRenderer) Refresh() {
 	r.Layout(r.z.Size())
 	canvas.Refresh(r.z)
-}
-
-// ---- Botones de la barra ----
-
-// botonBarra es BOTON_DE_BARRA: 24,5 × 24,5, plano, `rounded-sm`, el glifo de 16 en
-// `text-muted` que pasa a `text` al pasar, `bg-bg-subtle` encima y `bg-selected` pulsado
-// (`aria-pressed`), y al 40 % apagado.
-//
-// NO es enfocable, a propósito: en la web el botón hace `preventDefault` en el
-// `mousedown` para que el cuerpo no pierda el foco ni la selección, y aquí eso es no
-// aceptar el foco.
-type botonBarra struct {
-	widget.BaseWidget
-	glifo  string
-	icono  iconos.Icono
-	Rotulo string
-	// ConEstado es `aria-pressed`: Activo pinta el hundido.
-	ConEstado, Activo, Inerte bool
-	AlPulsar                  func()
-	// Glifo y Radio cambian el glifo de 16 y el `rounded-sm` (cero: esos).
-	Glifo, Radio float32
-	encima       bool
-}
-
-var (
-	_ fyne.Tappable     = (*botonBarra)(nil)
-	_ desktop.Hoverable = (*botonBarra)(nil)
-)
-
-func nuevoBotonBarra(glifo string, icono iconos.Icono, rotulo string, f func()) *botonBarra {
-	b := &botonBarra{glifo: glifo, icono: icono, Rotulo: rotulo, AlPulsar: f}
-	b.ExtendBaseWidget(b)
-	return b
-}
-
-func (b *botonBarra) AccessibilityLabel() string { return b.Rotulo }
-func (b *botonBarra) AccessibilityRole() fyne.AccessibleRole {
-	return fyne.AccessibleRoleButton
-}
-
-func (b *botonBarra) Tapped(*fyne.PointEvent) {
-	if !b.Inerte {
-		llamar0(b.AlPulsar)
-	}
-}
-
-func (b *botonBarra) MouseIn(*desktop.MouseEvent)    { b.encima = true; b.Refresh() }
-func (b *botonBarra) MouseMoved(*desktop.MouseEvent) {}
-func (b *botonBarra) MouseOut()                      { b.encima = false; b.Refresh() }
-
-func (b *botonBarra) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &botonBarraRenderer{b: b, fondo: canvas.NewRectangle(color.NRGBA{})}
-	r.fondo.CornerRadius = cmp.Or(b.Radio, tema.RadioSM)
-	if b.glifo != "" {
-		r.dibujo = iconos.TrazoDeRuta(b.glifo, b.lado(), tema.Color("text-muted", v))
-	} else {
-		r.dibujo = iconos.Trazo(b.icono, b.lado(), "text-muted", v)
-	}
-	r.Refresh()
-	return r
-}
-
-type botonBarraRenderer struct {
-	b      *botonBarra
-	fondo  *canvas.Rectangle
-	dibujo *iconos.Dibujo
-}
-
-func (r *botonBarraRenderer) MinSize() fyne.Size { return fyne.NewSize(LadoBotonEd, LadoBotonEd) }
-func (r *botonBarraRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.fondo, r.dibujo.Objeto()}
-}
-func (r *botonBarraRenderer) Destroy() {}
-func (r *botonBarraRenderer) Layout(t fyne.Size) {
-	r.fondo.Resize(t)
-	g := r.b.lado()
-	r.dibujo.Colocar((t.Width-g)/2, (t.Height-g)/2, g)
-}
-
-func (b *botonBarra) lado() float32 { return cmp.Or(b.Glifo, GlifoEd) }
-
-func (r *botonBarraRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	b := r.b
-	tinta, fondo := tema.Color("text-muted", v), color.NRGBA{}
-	switch {
-	case b.Inerte:
-	case b.ConEstado && b.Activo:
-		tinta, fondo = tema.Color("text", v), tema.Color("selected", v)
-	case b.encima:
-		tinta, fondo = tema.Color("text", v), tema.Color("bg-subtle", v)
-	}
-	if b.Inerte {
-		tinta = velo(tinta, 0.4)
-	}
-	r.fondo.FillColor = fondo
-	r.fondo.Refresh()
-	r.dibujo.TenirCon(tinta)
-}
-
-// botonBloque es el desplegable de «Estilo del texto»: `w-auto gap-1 px-1.5 text-sm` con
-// el glifo `heading` de 14, el rótulo (`max-w-24 truncate`) y el chevron de 12.
-type botonBloque struct {
-	botonBarra
-	Texto string
-}
-
-func nuevoBotonBloque(rotulo string, f func()) *botonBloque {
-	b := &botonBloque{}
-	b.Rotulo, b.AlPulsar = rotulo, f
-	b.ExtendBaseWidget(b)
-	return b
-}
-
-func (b *botonBloque) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &botonBloqueRenderer{
-		b:      b,
-		fondo:  canvas.NewRectangle(color.NRGBA{}),
-		glifo:  iconos.TrazoDeRuta(TituloD, 14, tema.Color("text-muted", v)),
-		flecha: iconos.Trazo(iconos.ChevronAbajo, 12, "text-muted", v),
-		texto:  ui.Texto(b.Texto, tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
-	}
-	r.fondo.CornerRadius = tema.RadioSM
-	r.Refresh()
-	return r
-}
-
-type botonBloqueRenderer struct {
-	b             *botonBloque
-	fondo         *canvas.Rectangle
-	glifo, flecha *iconos.Dibujo
-	texto         *canvas.Text
-}
-
-func (r *botonBloqueRenderer) anchoTexto() float32 {
-	return min(ui.Medir(r.b.Texto, tema.TextoSM, ui.Normal).Width, AnchoMaxBloqueEd)
-}
-
-func (r *botonBloqueRenderer) MinSize() fyne.Size {
-	hueco := float32(0.25 * tema.Rem)
-	return fyne.NewSize(2*PXBarraEd+14+hueco+r.anchoTexto()+hueco+12, LadoBotonEd)
-}
-
-func (r *botonBloqueRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.fondo, r.glifo.Objeto(), r.texto, r.flecha.Objeto()}
-}
-func (r *botonBloqueRenderer) Destroy() {}
-
-func (r *botonBloqueRenderer) Layout(t fyne.Size) {
-	hueco := float32(0.25 * tema.Rem)
-	r.fondo.Resize(t)
-	x := float32(PXBarraEd)
-	r.glifo.Colocar(x, (t.Height-14)/2, 14)
-	x += 14 + hueco
-	ui.Truncar(r.texto, r.b.Texto, tema.TextoSM, ui.Normal, AnchoMaxBloqueEd)
-	ui.ColocarTexto(r.texto, tema.TextoSM, x, (t.Height-tema.TextoSM.Linea)/2)
-	x += r.anchoTexto() + hueco
-	r.flecha.Colocar(x, (t.Height-12)/2, 12)
-}
-
-func (r *botonBloqueRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	tinta, fondo := tema.Color("text-muted", v), color.NRGBA{}
-	if r.b.encima {
-		tinta, fondo = tema.Color("text", v), tema.Color("bg-subtle", v)
-	}
-	r.fondo.FillColor = fondo
-	r.fondo.Refresh()
-	r.glifo.TenirCon(tinta)
-	r.flecha.TenirCon(tinta)
-	r.texto.Text, r.texto.Color = r.b.Texto, tinta
-	r.texto.Refresh()
-}
-
-// separadorEd es SEPARADOR_DE_BARRA: un pelo de 1 × 17,5 con `mx-1`.
-type separadorEd struct{ widget.BaseWidget }
-
-func nuevoSeparadorEd() *separadorEd {
-	s := &separadorEd{}
-	s.ExtendBaseWidget(s)
-	return s
-}
-
-func (s *separadorEd) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	return &separadorRenderer{r: canvas.NewRectangle(tema.Color("border", v))}
-}
-
-type separadorRenderer struct{ r *canvas.Rectangle }
-
-func (s *separadorRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(tema.Borde+2*MargenSeparadorE, AltoSeparadorEd)
-}
-func (s *separadorRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{s.r} }
-func (s *separadorRenderer) Destroy()                     {}
-func (s *separadorRenderer) Layout(t fyne.Size) {
-	s.r.Move(fyne.NewPos(MargenSeparadorE, (t.Height-AltoSeparadorEd)/2))
-	s.r.Resize(fyne.NewSize(tema.Borde, AltoSeparadorEd))
-}
-
-func (s *separadorRenderer) Refresh() {
-	s.r.FillColor = tema.Color("border", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
-	s.r.Refresh()
 }
 
 // ---- Guardado ----

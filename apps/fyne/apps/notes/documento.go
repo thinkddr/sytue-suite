@@ -124,6 +124,11 @@ type Tramo struct {
 	// añade a todos los enlaces guardados.
 	Enlace  string
 	Externo bool
+	// Estado es el color de una etiqueta de estado, `<span data-estado="azul">TEXTO</span>`
+	// (bloques_ricos.go); Fecha, el `datetime` (AAAA-MM-DD) de una fecha,
+	// `<time datetime="2026-11-24">24 nov 2026</time>`. Vacíos: texto corriente.
+	Estado string
+	Fecha  string
 	// Salto es un `<br/>` DENTRO del bloque. Es un tramo y no un bloque nuevo porque
 	// `<p>a<br/>b</p>` y `<p>a</p><p>b</p>` no son el mismo documento, y partirlo en
 	// dos dejaba sin poder editar cualquier nota con un salto suelto —que es lo que
@@ -153,6 +158,15 @@ type Bloque struct {
 	// Plegada es el `class="plegada"` de un `<li>` (la lista plegada): al leer la
 	// nota no se ve lo que cuelga de él (plegar.go).
 	Plegada bool
+	// Caja es el panel o el desplegable en el que va el bloque (bloques_ricos.go): como
+	// `Celda`, la comparten los bloques de una misma caja y no se cambia en su sitio.
+	Caja *Caja
+	// Lista es el `data-tipo` de la lista de un `<li>`: «decisiones» (`<ul
+	// data-tipo="decisiones">`). Vacía: una lista corriente.
+	Lista string
+	// Lenguaje es el `data-lenguaje` de un bloque de código, `<pre><code
+	// data-lenguaje="go">…</code></pre>`. Vacío: un `<pre>` sin más.
+	Lenguaje string
 }
 
 // Celda dice en qué celda de qué tabla está un bloque. Con `Tabla` nil, en ninguna. Es
@@ -221,11 +235,16 @@ type Documento struct {
 	original  string
 	fiel      bool
 	noPintado []string
-	// celda es la celda que se está leyendo, mientras se lee.
+	// celda es la celda que se está leyendo, mientras se lee; caja, el panel o el
+	// desplegable.
 	celda Celda
+	caja  *Caja
 	// desplegado enseña también lo plegado: es la copia que se edita (`ParaEditar`),
 	// como en la web, donde el editor ve la lista entera.
 	desplegado bool
+	// rotuloExpandir es lo que se lee en un desplegable sin título mientras se escribe
+	// («Desplegable»): lo pone el editor, que es quien tiene el idioma.
+	rotuloExpandir string
 }
 
 // Leer interpreta el HTML de una nota.
@@ -286,6 +305,10 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 			d.abrirTarea(n)
 			break
 		}
+		if c := cajaDe(n); c != nil && !d.celda.EnTabla() {
+			d.leerCaja(n, c)
+			return
+		}
 		d.abrir(Bloque{Tipo: Parrafo, Etiqueta: n.Data, Alineacion: alineacion(n)})
 	case "h1", "h2", "h3", "h4", "h5", "h6":
 		d.abrir(Bloque{
@@ -295,7 +318,12 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 	case "blockquote":
 		d.abrir(Bloque{Tipo: Cita, Etiqueta: n.Data, Alineacion: alineacion(n)})
 	case "pre":
-		d.abrir(Bloque{Tipo: Codigo, Etiqueta: n.Data})
+		d.abrir(Bloque{Tipo: Codigo, Etiqueta: n.Data, Lenguaje: lenguajeDe(n)})
+	case "details":
+		if c := cajaDe(n); c != nil && !d.celda.EnTabla() {
+			d.leerCaja(n, c)
+			return
+		}
 	case "hr":
 		d.abrir(Bloque{Tipo: Regla})
 		return
@@ -306,6 +334,9 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 		b := Bloque{Tipo: Vineta, Nivel: max(nivel, 1), Etiqueta: n.Data, Plegada: atributo(n, "class") == claseplegada}
 		if enOrdenada(n) {
 			b.Tipo = Numerada
+		}
+		if p := n.Parent; p != nil && p.Data == "ul" && atributo(p, "data-tipo") == ListaDecisiones {
+			b.Lista = ListaDecisiones
 		}
 		d.abrir(b)
 	case "ul", "ol":
@@ -326,14 +357,9 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 		// suelta no está modelada, y por eso su nota deja de ser fiel.
 		return
 	case "b", "strong", "i", "em", "u", "s", "strike", "del", "mark", "code":
-		// `slices.Concat` y no `append`: `e` se pasa por valor a los hermanos y un
-		// `append` sobre el mismo respaldo le metería a uno la marca del otro.
-		e.Marcas = slices.Concat(e.Marcas, []string{n.Data})
-	case "span":
-		e.EnSpan = true
-		st := atributo(n, "style")
-		e.Color, e.Fondo = propiedad(st, "color"), propiedad(st, "background-color")
-		e.Fuente, e.Tamano = propiedad(st, "font-family"), propiedad(st, "font-size")
+		e = conMarcaLeida(n, e)
+	case "time", "span":
+		e = tramoDeLinea(n, e)
 	case "img":
 		d.asegurarBloque()
 		e.Texto, e.Imagen = "", slices.Clone(n.Attr)
@@ -397,7 +423,7 @@ func (d *Documento) leerTabla(n *html.Node) {
 					continue
 				}
 				d.celda = Celda{Tabla: t, Fila: f, Col: len(fila.Celdas)}
-				fila.Celdas = append(fila.Celdas, CeldaTabla{Cabecera: c.DataAtom == atom.Th, Atributos: c.Attr})
+				fila.Celdas = append(fila.Celdas, CeldaTabla{Cabecera: c.DataAtom == atom.Th, Atributos: atributosCelda(c.Attr)})
 				d.abrir(Bloque{Tipo: Parrafo})
 				for h := c.FirstChild; h != nil; h = h.NextSibling {
 					d.recorrer(h, Tramo{}, 0)
@@ -412,7 +438,7 @@ func (d *Documento) leerTabla(n *html.Node) {
 // abrir empieza un bloque nuevo en la celda que se está leyendo, cerrando el anterior
 // si nació vacío.
 func (d *Documento) abrir(b Bloque) {
-	b.Celda = d.celda
+	b.Celda, b.Caja = d.celda, d.caja
 	d.cerrarSuelto(b.Celda)
 	d.Bloques = append(d.Bloques, b)
 }
@@ -468,8 +494,8 @@ func (d *Documento) añadirSalto(e Tramo) {
 // nada: la nota `a<br>b` del saneador no tiene `<p>`, y envolverla la cambiaba. Se
 // pinta igual que un párrafo, que es lo que hace el navegador con el texto anónimo.
 func (d *Documento) asegurarBloque() {
-	if n := len(d.Bloques); n == 0 || d.Bloques[n-1].Celda != d.celda {
-		d.Bloques = append(d.Bloques, Bloque{Tipo: Parrafo, Celda: d.celda})
+	if n := len(d.Bloques); n == 0 || d.Bloques[n-1].Celda != d.celda || d.Bloques[n-1].Caja != d.caja {
+		d.Bloques = append(d.Bloques, Bloque{Tipo: Parrafo, Celda: d.celda, Caja: d.caja})
 	}
 }
 
@@ -519,6 +545,9 @@ func escribirBloques(b *strings.Builder, bloques []Bloque) {
 	type abierta struct {
 		etiqueta string
 		li       bool
+		// lista es el `data-tipo` del `<ul>`: una lista de decisiones no sigue a una
+		// corriente en el mismo `<ul>`.
+		lista string
 	}
 	var pila []abierta
 	cerrarUna := func() {
@@ -531,15 +560,12 @@ func escribirBloques(b *strings.Builder, bloques []Bloque) {
 	}
 	for i := 0; i < len(bloques); i++ {
 		bl := bloques[i]
-		if bl.Celda.EnTabla() {
+		if j, escribir := corrida(bloques, i); escribir != nil {
+			// Una caja o una tabla: sus bloques van juntos dentro de su elemento.
 			for len(pila) > 0 {
 				cerrarUna()
 			}
-			j := i + 1
-			for j < len(bloques) && bloques[j].Celda.Tabla == bl.Celda.Tabla {
-				j++
-			}
-			escribirTabla(b, bloques[i:j])
+			escribir(b, bloques[i:j])
 			i = j - 1
 			continue
 		}
@@ -556,7 +582,7 @@ func escribirBloques(b *strings.Builder, bloques []Bloque) {
 			cerrarUna()
 		}
 		if len(pila) == nivel {
-			if pila[nivel-1].etiqueta != quiere {
+			if pila[nivel-1].etiqueta != quiere || pila[nivel-1].lista != bl.Lista {
 				cerrarUna()
 			} else if pila[nivel-1].li {
 				b.WriteString("</li>")
@@ -564,8 +590,12 @@ func escribirBloques(b *strings.Builder, bloques []Bloque) {
 			}
 		}
 		for len(pila) < nivel {
-			b.WriteString("<" + quiere + ">")
-			pila = append(pila, abierta{etiqueta: quiere})
+			if bl.Lista != "" && quiere == "ul" {
+				b.WriteString(`<ul data-tipo="` + html.EscapeString(bl.Lista) + `">`)
+			} else {
+				b.WriteString("<" + quiere + ">")
+			}
+			pila = append(pila, abierta{etiqueta: quiere, lista: bl.Lista})
 		}
 		escribirElemento(b, bl)
 		pila[len(pila)-1].li = true
@@ -685,8 +715,14 @@ func escribirBloque(b *strings.Builder, bl Bloque) {
 		b.WriteString(` style="text-align:` + html.EscapeString(bl.Alineacion) + `"`)
 	}
 	b.WriteString(">")
+	if bl.Tipo == Codigo && bl.Lenguaje != "" {
+		b.WriteString(`<code data-lenguaje="` + html.EscapeString(bl.Lenguaje) + `">`)
+	}
 	for _, t := range bl.Tramos {
 		escribirTramo(b, t)
+	}
+	if bl.Tipo == Codigo && bl.Lenguaje != "" {
+		b.WriteString("</code>")
 	}
 	b.WriteString("</" + bl.Etiqueta + ">")
 }
@@ -710,10 +746,22 @@ func escribirTramo(b *strings.Builder, t Tramo) {
 	if t.EnSpan {
 		b.WriteString("<span" + estiloDe(t) + ">")
 	}
+	if t.Estado != "" {
+		b.WriteString(`<span data-estado="` + html.EscapeString(t.Estado) + `">`)
+	}
+	if t.Fecha != "" {
+		b.WriteString(`<time datetime="` + html.EscapeString(t.Fecha) + `">`)
+	}
 	if t.Imagen != nil {
 		b.WriteString("<img" + atributos(t.Imagen) + "/>")
 	} else {
 		b.WriteString(html.EscapeString(t.Texto))
+	}
+	if t.Fecha != "" {
+		b.WriteString("</time>")
+	}
+	if t.Estado != "" {
+		b.WriteString("</span>")
 	}
 	if t.EnSpan {
 		b.WriteString("</span>")

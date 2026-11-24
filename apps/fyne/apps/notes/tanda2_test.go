@@ -444,8 +444,13 @@ func TestUnEnlaceConTituloLlevaHastaEl(t *testing.T) {
 
 // TestUnaTablaSePintaComoEnLaWeb: medido en la web con esta misma nota en una tarjeta de
 // 323,7 (300,7 de cuerpo): la tabla empieza a 30,75 (la línea de «Recuento:» y su `mb-2`),
-// sin bordes ni relleno —filas de 22,75—, las columnas a lo que piden (152,546875 y 35,671875), la
-// cabecera en negrita y centrada, y «Fin.» a 99.
+// las líneas de 22,75, las columnas a lo que piden (152,546875 y 35,671875) y la cabecera
+// en negrita y centrada.
+//
+// Desde el 2026-11-24 una tabla sin estilo propio lleva la rejilla del tema: un pelo de
+// `border` y `px-2 py-1` en cada celda (y la cabecera sobre `bg-subtle`), que es la regla
+// `.sytue-prose :is(td, th)` que la web pone a la vez. Las cuentas son las de antes más
+// eso.
 //
 // VISTO EN ROJO (2026-09-23, en el frontal): sin el caso de la tabla en `bloque`, la
 // tabla sale como una línea de texto corrido y «Fin.» sube a 46,8.
@@ -467,12 +472,14 @@ func TestUnaTablaSePintaComoEnLaWeb(t *testing.T) {
 			t.Errorf("%s: %.2f, y la web da %.2f", que, got, quiero)
 		}
 	}
-	casi("la fila de cabecera", donde["Cuarto"].Y, 30.75)
-	casi("la segunda fila", donde["Cocina"].Y, 53.5)
-	casi("la segunda columna", x["12"], 152.546875)
-	casi("«Cajas» (la cabecera, que es la más ancha)", x["Cajas"], 152.546875)
-	casi("«Cuarto» centrada", x["Cuarto"]+medirTrozo("Cuarto", donde["Cuarto"].Trozos[0].estilo)/2, 152.546875/2)
-	casi("«Fin.»", donde["Fin."].Y, 99)
+	pelo, fila := tema.Borde, 22.75+2*pyCeldaTabla
+	casi("la fila de cabecera", donde["Cuarto"].Y, 30.75+pelo+pyCeldaTabla)
+	casi("la segunda fila", donde["Cocina"].Y, 30.75+pelo+fila+pelo+pyCeldaTabla)
+	col2 := pelo + 152.546875 + 2*pxCeldaTabla + pelo + pxCeldaTabla
+	casi("la segunda columna", x["12"], col2)
+	casi("«Cajas» (la cabecera, que es la más ancha)", x["Cajas"], col2)
+	casi("«Cuarto» centrada", x["Cuarto"]+medirTrozo("Cuarto", donde["Cuarto"].Trozos[0].estilo)/2, pelo+pxCeldaTabla+152.546875/2)
+	casi("«Fin.»", donde["Fin."].Y, 30.75+3*fila+4*pelo)
 	if donde["Cuarto"].Trozos[0].estilo.peso < ui.SemiNegrita {
 		t.Error("la cabecera no va en negrita")
 	}

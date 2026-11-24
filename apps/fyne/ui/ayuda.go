@@ -144,8 +144,8 @@ func (a *AyudaEnLinea) AccessibilityLabel() string {
 // AccessibilityRole: es texto. La web le pone `role="alert"` en peligro y `status` en
 // aviso; Fyne 2.8 no tiene ninguno de los dos y no hay región viva a la que anunciar.
 //
-// ponytail: el techo es del toolkit, no de esta pieza. Está en los huecos medidos de
-// `docs/roadmap.md` junto al resto de lo anunciable.
+// ponytail: el techo es del toolkit, no de esta pieza. Está en los techos del toolkit de
+// `docs/design.md` junto al resto de lo anunciable.
 func (a *AyudaEnLinea) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleText }
 
 // AltoAyudaEnLinea es lo que ocupa a un ancho dado: el borde y el `p-3` de arriba y

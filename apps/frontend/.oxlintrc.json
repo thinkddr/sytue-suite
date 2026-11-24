@@ -156,7 +156,7 @@
         // --- Reglas donde la implementación de oxlint diverge de eslint-plugin-jsx-a11y ---
         // Las tres estaban en verde con ESLint; oxlint las aplica sin las excepciones
         // que jsx-a11y trae de fábrica, y marcan patrones ARIA correctos del repo.
-        // Se revisaron una a una el 2026-08-08 (desglose en PENDIENTES.md).
+        // Se revisaron una a una el 2026-08-08 (desglose en `git show 8ea50125a:PENDIENTES.md`).
         //
         // 181 avisos, y no son de los canvas: dominan `role="group"` en los grupos de la
         // cinta —donde <fieldset> metería semántica de formulario que no toca— y

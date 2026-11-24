@@ -627,7 +627,7 @@ func (r *accesoRenderer) Layout(t fyne.Size) {
 }
 
 // atenuarSobre mezcla un color con la superficie, que es lo que hace `opacity-60` sobre
-// el grupo entero (Fyne no tiene opacidad de grupo: `docs/roadmap.md`, techos).
+// el grupo entero (Fyne no tiene opacidad de grupo: `docs/design.md`, techos).
 func atenuarSobre(c, fondo color.NRGBA, o float32) color.NRGBA {
 	if o >= 1 {
 		return c

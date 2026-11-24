@@ -63,7 +63,7 @@ func px(img image.Image, x, y int) color.NRGBA {
 }
 
 // cerca compara dos colores con un canal de margen: el alfa se cuantiza y ningún gate
-// puede exigir byte a byte (`docs/roadmap.md`, huecos medidos).
+// puede exigir byte a byte (`docs/design.md`, techos del toolkit).
 func cerca(a, b color.NRGBA) bool {
 	d := func(x, y uint8) bool { return int(x)-int(y) > 1 || int(y)-int(x) > 1 }
 	return !d(a.R, b.R) && !d(a.G, b.G) && !d(a.B, b.B)

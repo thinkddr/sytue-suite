@@ -227,7 +227,7 @@ func (e *Explorador) t(clave string, vars ...i18n.Vars) string {
 // SinRed dice si la pantalla está en la fase de sin conexión, que es la que apaga
 // TODAS las mutaciones: subir, crear, mover, renombrar, papelera y favoritos.
 //
-// Es el contrato de `docs/roadmap.md` §«Contrato offline»: se navega por lo ya
+// Es el contrato de `docs/architecture.md` §«Contrato offline»: se navega por lo ya
 // consultado y se abre lo descargado, y nada se encola. Una subida a medias que se
 // reintenta sola es como se duplica un fichero.
 func (e *Explorador) SinRed() bool { return e.Fase == SinConexion || e.Desconectado }
@@ -1679,8 +1679,10 @@ func (e *Explorador) nuevaFilaTactil() *filaTactilDrive {
 	return a
 }
 
+// CreateRenderer: la fila se queda todo el ancho menos el del asa, que va a la derecha.
+// Con `ui.FilaAuto` cada hijo se quedaba en su mínimo y el nombre no salía en táctil.
 func (a *filaTactilDrive) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(container.New(ui.FilaAuto{Derecha: 1}, a.fila, a.asa))
+	return widget.NewSimpleRenderer(container.NewBorder(nil, nil, nil, a.asa, a.fila))
 }
 
 // marcarDestino repinta el resalte: en la lista, las filas visibles; en la rejilla, solo

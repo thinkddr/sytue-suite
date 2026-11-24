@@ -157,3 +157,40 @@ test('en un bloque de código el Markdown pegado se queda en letras', () => {
     ),
   ).toEqual({ texto: '## Plan\n- [ ] Cajas' });
 });
+
+test('una URL sola se pega como enlace; con texto seleccionado, enlaza ese texto', () => {
+  expect(queSePega(portapapeles({ 'text/plain': 'https://sytue.eu/precios' }))).toEqual({
+    html: '<a href="https://sytue.eu/precios">https://sytue.eu/precios</a>',
+  });
+  expect(
+    queSePega(portapapeles({ 'text/plain': ' https://sytue.eu/ ' }), false, true, 'la web'),
+  ).toEqual({ html: '<a href="https://sytue.eu/">la web</a>' });
+  // El `<a>` que copian algunos navegadores con la misma URL dentro, igual.
+  const html = '<a href="https://sytue.eu/x">https://sytue.eu/x</a>';
+  expect(
+    queSePega(portapapeles({ 'text/plain': 'https://sytue.eu/x', 'text/html': html })),
+  ).toEqual({ html: '<a href="https://sytue.eu/x">https://sytue.eu/x</a>' });
+});
+
+test('lo que no es una URL sola no se convierte en enlace', () => {
+  for (const texto of ['mira https://sytue.eu', 'javascript:alert(1)', 'sytue.eu', 'ftp://x.y/'])
+    expect(queSePega(portapapeles({ 'text/plain': texto }))).toEqual({ texto });
+  // Con Mayúsculas, o dentro de un bloque de código, la URL es texto.
+  expect(queSePega(portapapeles({ 'text/plain': 'https://sytue.eu/' }), true)).toEqual({
+    texto: 'https://sytue.eu/',
+  });
+  expect(queSePega(portapapeles({ 'text/plain': 'https://sytue.eu/' }), false, false)).toEqual({
+    texto: 'https://sytue.eu/',
+  });
+});
+
+test('lo copiado de otra nota conserva sus bloques, y nada que no esté en sus listas', () => {
+  const html =
+    '<div data-panel="info" onclick="x()"><p>a</p></div><span data-estado="rojo">NO</span>' +
+    '<div class="task-row"><input type="checkbox" checked> <span>t</span></div>';
+  expect(queSePega(portapapeles({ 'text/plain': 'a NO t', 'text/html': html }))).toEqual({
+    html:
+      '<div data-panel="info"><p>a</p></div><span data-estado="rojo">NO</span>' +
+      '<div class="task-row"><input type="checkbox" checked=""> <span>t</span></div>',
+  });
+});

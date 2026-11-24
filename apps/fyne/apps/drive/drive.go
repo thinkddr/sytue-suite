@@ -19,7 +19,7 @@
 //
 // # Sin conexión
 //
-// El contrato está en `docs/roadmap.md` §«Contrato offline de las apps nativas»: Drive
+// El contrato está en `docs/architecture.md` §«Contrato offline de las apps nativas»: Drive
 // navega por lo ya consultado y abre lo descargado, y TODA mutación —subir, mover,
 // renombrar, papelera, favoritos, enlaces— se desactiva. No se encola nada: una subida
 // a medias que se reintenta sola es como se duplica un fichero.

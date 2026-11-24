@@ -7,7 +7,7 @@
 // (pgtest): quitar a alguien de un team le revoca de verdad el acceso —lectura Y
 // escritura— a los canales privados de ese team, y su canal deja de listarse.
 //
-// Hallazgo del comité de paridad de Rooms (docs/roadmap.md, dominio «canales»):
+// Hallazgo del comité de paridad de Rooms (antiguo §4 de docs/roadmap.md, «canales»):
 // RemoveTeamMember solo borraba de team_members, y las verjas de canal privado solo
 // consultaban channel_members, así que un empleado dado de baja conservaba acceso
 // completo entrando por el channelID. Los DM quedan FUERA a propósito (son de ámbito

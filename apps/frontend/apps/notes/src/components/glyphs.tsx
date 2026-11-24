@@ -55,6 +55,38 @@ const PATHS = {
   alignRight: 'M4.5 6h15M10.5 10h9M4.5 14h15M10.5 18h9',
   heading: 'M6 5v14M18 5v14M6 12h12',
   layoutTree: 'M4 4.5h6v4H4zM12 11h8v4h-8zM12 17.5h8v4h-8zM7 8.5v11h5M7 13h5',
+  // Los bloques del editor (el menú «+» y «/»): un panel con su «i», la sección que se
+  // pliega, la decisión que se bifurca, el símbolo (omega), el emoji, la arroba.
+  panel:
+    'M5 5.5h14A1.5 1.5 0 0 1 20.5 7v10a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17V7A1.5 1.5 0 0 1 5 5.5ZM8 11v4.5M8 8.5h.01',
+  expandir: 'M5 8l3 3 3-3M13.5 9.5h6M5 14.5h14.5M5 18.5h10',
+  decision: 'M12 20.5V15L6.5 9.5v-5M12 15l5.5-5.5v-5M4.5 6.5l2-2 2 2M15.5 6.5l2-2 2 2',
+  omega: 'M5 19.5h4.5v-1.8a6.5 6.5 0 1 1 5 0v1.8H19',
+  carita:
+    'M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17ZM8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01',
+  arroba:
+    'M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0v1.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.3 6.7',
+  subindice: 'M4.5 6.5l7 9M11.5 6.5l-7 9M15.5 15a1.75 1.75 0 1 1 3.5 0c0 1.2-3.5 2.5-3.5 4.5h3.5',
+  superindice: 'M4.5 8.5l7 9M11.5 8.5l-7 9M15.5 5a1.75 1.75 0 1 1 3.5 0c0 1.2-3.5 2.5-3.5 4.5h3.5',
+  ajuste: 'M4.5 6.5h15M4.5 12h12a2.75 2.75 0 0 1 0 5.5h-4M14.5 15.5l-2 2 2 2M4.5 17.5h5',
+  // «Coincidir mayúsculas» de la búsqueda: una A grande y una a pequeña.
+  mayusculas:
+    'M3.5 18 8 6l4.5 12M5 14h6M19.5 12.5V18M19.5 15.25a2.5 2.75 0 1 1-5 0 2.5 2.75 0 0 1 5 0Z',
+  // Cortar y pegar de la burbuja de la selección (copiar es `copy`, más arriba).
+  tijeras:
+    'M8.5 7a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8.5 17a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8 8.5l11.5 9M8 15.5l11.5-9',
+  pegar:
+    'M9 4.5h6v3H9ZM9 6H6.5A1.5 1.5 0 0 0 5 7.5v11A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 17.5 6H15',
+  // La barra de tabla: dónde va la fila o la columna nueva (la «+» fuera de la rejilla),
+  // cuál se quita (la «×» dentro), y la cabecera rellena.
+  filaArriba: 'M4.5 11.5h15v8h-15ZM4.5 15.5h15M12 3.5v5M9.5 6h5',
+  filaAbajo: 'M4.5 4.5h15v8h-15ZM4.5 8.5h15M12 15.5v5M9.5 18h5',
+  columnaAntes: 'M11.5 4.5h8v15h-8ZM15.5 4.5v15M3.5 12h5M6 9.5v5',
+  columnaDespues: 'M4.5 4.5h8v15h-8ZM8.5 4.5v15M15.5 12h5M18 9.5v5',
+  filaQuitar: 'M4.5 8.5h15v7h-15ZM10 10.5l4 3M14 10.5l-4 3',
+  columnaQuitar: 'M8.5 4.5h7v15h-7ZM10.5 10l3 4M13.5 10l-3 4',
+  cabeceraFila: 'M4.5 4.5h15v5h-15ZM4.5 9.5v10h15v-10M4.5 14.5h15M12 9.5v10',
+  cabeceraColumna: 'M4.5 4.5h5v15h-5ZM9.5 4.5h10v15h-10M9.5 12h10M14.5 4.5v15',
 } as const;
 
 /** Los nombres de Notepads que dibuja el catálogo común. Una nota guarda el suyo en

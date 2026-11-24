@@ -41,7 +41,17 @@ type estiloCelda struct {
 	borde        float32
 	colorBorde   color.NRGBA
 	relleno      [4]float32 // arriba, derecha, abajo, izquierda
+	// fondoToken y bordeToken son el fondo y la rejilla que pone el tema (no el `style`):
+	// el `data-fondo` de la celda, el `bg-subtle` de la cabecera y el pelo `border`.
+	fondoToken string
+	bordeToken bool
 }
+
+// Las medidas de una celda sin estilo propio: `px-2 py-1` con su pelo de `border`.
+var (
+	pxCeldaTabla = tema.Espacio(2)
+	pyCeldaTabla = tema.Espacio(1)
+)
 
 // celdaPuesta es una celda ya colocada en la rejilla.
 type celdaPuesta struct {
@@ -99,6 +109,23 @@ func estiloCeldaDe(t *Tabla, f, c int) estiloCelda {
 		} else if col, ok := tokens.ParseColor(tok); ok {
 			e.colorBorde = col
 		}
+	}
+	// Sin borde ni relleno propios (toda tabla guardada: el saneador quita el `style`),
+	// los del tema: la rejilla en `border` y `px-2 py-1`, para que las columnas se lean.
+	if propiedad(propio, "border") == "" {
+		e.borde, e.bordeToken = tema.Borde, true
+	}
+	if propiedad(propio, "padding") == "" {
+		e.relleno = [4]float32{pyCeldaTabla, pxCeldaTabla, pyCeldaTabla, pxCeldaTabla}
+	}
+	switch f := fondoDe(celda); {
+	case f != "":
+		e.fondoToken, _ = coloresEstado(f)
+	case e.cabecera && e.fondo == "":
+		e.fondoToken = "bg-subtle"
+	}
+	if e.cabecera && attr(celda.Atributos, "scope") == "row" && heredado(t, f, c, "text-align") == "" {
+		e.alinear = "" // la cabecera de una fila se lee como su texto, a la izquierda
 	}
 	// `padding` con uno, dos, tres o cuatro valores, como en CSS.
 	if v := strings.Fields(propiedad(propio, "padding")); len(v) > 0 {
@@ -349,6 +376,10 @@ func (m *Maquetado) tabla(bloques []Bloque, indice func(int) int, y, ancho float
 		if c, ok := tokens.ParseColor(p.estilo.fondo); ok && p.estilo.fondo != "" {
 			m.Adornos = slices.Insert(m.Adornos, fondos, Adorno{Tipo: adornoCaja, Bloque: indice(max(p.desde, 0)), X: x0, Y: y0, An: w, Al: h, color: c})
 			fondos++
+		} else if p.estilo.fondoToken != "" {
+			c := tema.Color(p.estilo.fondoToken, v)
+			m.Adornos = slices.Insert(m.Adornos, fondos, Adorno{Tipo: adornoCaja, Bloque: indice(max(p.desde, 0)), X: x0, Y: y0, An: w, Al: h, color: c})
+			fondos++
 		}
 		cm := maq[k]
 		dx := x0 + p.estilo.relleno[3]
@@ -386,6 +417,9 @@ func (m *Maquetado) tabla(bloques []Bloque, indice func(int) int, y, ancho float
 			x0, y0 := xs[p.col]-lineas, ys[p.fila]-lineas
 			an, al := xs[p.col+p.cols]-x0, ys[p.fila+p.filas]-y0
 			c := p.estilo.colorBorde
+			if p.estilo.bordeToken {
+				c = tema.Color("border", v)
+			}
 			rejilla = append(rejilla,
 				Adorno{Tipo: adornoCaja, X: x0, Y: y0, An: an, Al: lineas, color: c},
 				Adorno{Tipo: adornoCaja, X: x0, Y: y0 + al - lineas, An: an, Al: lineas, color: c},

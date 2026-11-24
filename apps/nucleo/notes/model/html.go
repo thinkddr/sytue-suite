@@ -4,7 +4,9 @@
 package model
 
 import (
+	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/net/html"
 )
@@ -40,6 +42,79 @@ var allowedTags = map[string]bool{
 	"table": true, "thead": true, "tbody": true, "tr": true, "th": true, "td": true,
 	// Tareas: casillas de verificación interactivas en listas de tareas.
 	"input": true,
+	// Los bloques del editor (ver `bloques` más abajo): la sección que se pliega, la
+	// fecha, y subíndice y superíndice del «más formato» de la barra.
+	"details": true, "summary": true, "time": true, "sub": true, "sup": true,
+}
+
+// LOS BLOQUES DEL EDITOR, compartidos con la web y con Fyne: el HTML que se guarda
+// y que las tres partes leen igual. Cada atributo vale SOLO en su etiqueta y SOLO con
+// los valores de su lista; cualquier otro se cae, no se corrige.
+//
+//	panel       <div data-panel="info|nota|exito|aviso|error">…</div>
+//	expandir    <details data-expandir [open]><summary>Título</summary>…</details>
+//	estado      <span data-estado="gris|azul|verde|amarillo|rojo|morado">TEXTO</span>
+//	decisiones  <ul data-tipo="decisiones"><li>…</li></ul>
+//	fecha       <time datetime="AAAA-MM-DD">texto</time>
+//	código      <pre [data-lineas] [data-ajuste]><code data-lenguaje="go|javascript|…">…</code></pre>
+//	tabla       <table [data-numerada]>, <thead> de <th>, <th scope="row">, data-fondo en td/th
+//	columnas    <div data-columnas="2|3"><div data-columna>…</div>…</div>
+//
+// La lista de la web es `BLOQUES_DE_NOTAS` en
+// `apps/frontend/packages/ui/src/browser/portapapeles.ts`, y la prueba
+// `bloques-saneado.test.ts` de Notes compara las dos: si cambias una, cambia la otra.
+var (
+	coloresDeBloque = []string{"gris", "azul", "verde", "amarillo", "rojo", "morado"}
+	// La lista del editor de Fyne, con su misma grafía: la nota se escribe en las dos.
+	lenguajes = []string{
+		"texto", "bash", "c", "cpp", "csharp", "css", "go", "html", "java", "javascript",
+		"json", "kotlin", "markdown", "php", "python", "ruby", "rust", "sql", "swift",
+		"typescript", "xml", "yaml",
+	}
+	// bloquesEnum: etiqueta → atributo → valores que valen.
+	bloquesEnum = map[string]map[string][]string{
+		"div":  {"data-panel": {"info", "nota", "exito", "aviso", "error"}, "data-columnas": {"2", "3"}},
+		"span": {"data-estado": coloresDeBloque},
+		"ul":   {"data-tipo": {"decisiones"}},
+		"code": {"data-lenguaje": lenguajes},
+		"th":   {"scope": {"row"}, "data-fondo": coloresDeBloque},
+		"td":   {"data-fondo": coloresDeBloque},
+	}
+	// bloquesSinValor: etiqueta → atributos que se ponen sin valor (presentes o no).
+	bloquesSinValor = map[string][]string{
+		"details": {"data-expandir", "open"},
+		"div":     {"data-columna"},
+		"pre":     {"data-lineas", "data-ajuste"},
+		"table":   {"data-numerada"},
+	}
+)
+
+// atributoDeBloque devuelve el atributo ya serializado si vale para esa etiqueta, o "".
+func atributoDeBloque(tag, clave, valor string) string {
+	if valores, ok := bloquesEnum[tag][clave]; ok {
+		if slices.Contains(valores, valor) {
+			return ` ` + clave + `="` + valor + `"`
+		}
+		return ""
+	}
+	// Uno sin valor solo vale vacío (o con su propio nombre, que es lo mismo en HTML).
+	if slices.Contains(bloquesSinValor[tag], clave) && (valor == "" || valor == clave) {
+		return ` ` + clave
+	}
+	if tag == "time" && clave == "datetime" && fechaISO(valor) {
+		return ` datetime="` + valor + `"`
+	}
+	return ""
+}
+
+// fechaISO dice si `v` es un día de verdad escrito AAAA-MM-DD: el formato del
+// `<time>` del editor, sin hora ni zona.
+func fechaISO(v string) bool {
+	if len(v) != 10 {
+		return false
+	}
+	t, err := time.Parse("2006-01-02", v)
+	return err == nil && t.Format("2006-01-02") == v
 }
 
 // voidTags no llevan cierre.
@@ -163,10 +238,15 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 		return ""
 	}
 	var b strings.Builder
+	// Un atributo repetido sale una vez, el primero, que es el que lee el navegador.
+	vistos := map[string]bool{}
 	for {
 		k, v, more := z.TagAttr()
 		clave, valor := string(k), string(v)
+		repetido := vistos[clave]
+		vistos[clave] = true
 		switch {
+		case repetido:
 		case clave == "href" && tag == "a":
 			if ValidWebURL(valor) || strings.HasPrefix(valor, "mailto:") {
 				b.WriteString(` href="` + html.EscapeString(valor) + `"`)
@@ -189,6 +269,10 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 			if s := estiloPermitido(valor); s != "" {
 				b.WriteString(` style="` + html.EscapeString(s) + `"`)
 			}
+		default:
+			// Los valores de los bloques salen de listas cerradas y de una fecha
+			// comprobada: no hay nada que escapar.
+			b.WriteString(atributoDeBloque(tag, clave, valor))
 		}
 		if !more {
 			return b.String()

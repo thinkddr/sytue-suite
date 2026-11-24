@@ -192,7 +192,7 @@ func TestSinGenteLaArrobaEsUnaArroba(t *testing.T) {
 		t.Errorf("en un cuaderno cifrado la arroba ofrece %v", rotulos(ed))
 	}
 	teclear(ed.zona, " /tab")
-	if got := rotulos(ed); len(got) != 1 || got[0] != ed.tr.T("editor.table", nil)+"/table" || ed.menu.panel.rotulo != p.tr.T("slash.title", nil) {
+	if got := rotulos(ed); len(got) != 1 || got[0] != ed.tr.T("editor.table", nil)+"/table" || ed.menu.panel.rotulo != p.tr.T("editor.slashMenu", nil) {
 		t.Errorf("la barra ofrece %v", got)
 	}
 }

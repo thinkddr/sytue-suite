@@ -10,21 +10,36 @@ import { rangos } from '@sytue/i18n';
 /**
  * Las coincidencias de `q` en el texto de `raiz`, como rangos del DOM, con la
  * regla de `rangos` de @sytue/i18n (sin acentos ni mayúsculas).
+ * Con `mayusculas` («Coincidir mayúsculas»), la búsqueda es literal: distingue mayúsculas
+ * y acentos, como el «Match case» de cualquier editor.
  * ponytail: se busca nodo de texto a nodo de texto, así que algo partido por el
  * formato («reu<b>nión</b>») no sale; unir los nodos es lo que toca si se echa en falta.
  */
-export function coincidenciasEn(raiz: Node, q: string): Range[] {
+export function coincidenciasEn(
+  raiz: Node,
+  q: string,
+  opciones: { mayusculas?: boolean } = {},
+): Range[] {
   const out: Range[] = [];
   if (!q.trim()) return out;
   const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()) {
-    for (const [a, b] of rangos((n as Text).data, q)) {
+    const datos = (n as Text).data;
+    for (const [a, b] of opciones.mayusculas ? exactos(datos, q) : rangos(datos, q)) {
       const r = document.createRange();
       r.setStart(n, a);
       r.setEnd(n, b);
       out.push(r);
     }
   }
+  return out;
+}
+
+/** Dónde está `q` tal cual en `texto`, sin solaparse. */
+function exactos(texto: string, q: string): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = texto.indexOf(q); i !== -1; i = texto.indexOf(q, i + q.length))
+    out.push([i, i + q.length]);
   return out;
 }
 

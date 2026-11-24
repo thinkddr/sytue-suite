@@ -129,7 +129,7 @@ export interface FuncionParidad {
  * servicio falso de las pruebas. Ver un vídeo funciona allí también (tocar, pantalla
  * completa al tumbarlo, pausa en segundo plano) pero su fila nombra la imagen dentro de
  * imagen, que en el teléfono no existe todavía. Lo demás de Cast espera a verse contra el
- * servicio desplegado (roadmap § Sytue Cast en el teléfono).
+ * servicio desplegado (roadmap anterior, § Sytue Cast en el teléfono).
  *
  * 2026-09-28: 31 y 40 — «Ver un vídeo» en el teléfono con la imagen dentro de imagen de
  * Android (supportsPictureInPicture y enterPictureInPictureMode), vista en el emulador.
@@ -237,7 +237,7 @@ export interface FuncionParidad {
 // 2026-11-17: +1 en las dos por «calcus-rangos-editables» (PEND-CALC-FYNE-RANGOS): los
 // rangos editables por persona de la web no tenían entrada; Fyne ya los conserva, los mueve
 // y los respeta, pero aún no deja definirlos al proteger la hoja.
-export const TOPE_DEUDA = { escritorio: 61, movil: 86 } as const;
+export const TOPE_DEUDA = { escritorio: 70, movil: 95 } as const;
 
 /**
  * DÓNDE SE CIERRA LA DEUDA. Una sola sección y no tres cadenas: las tres que
@@ -854,7 +854,7 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // petición con caché sin conexión (Cloud Files, `apps/nucleo/nube`, verificado en
     // una VM, de ida y vuelta); en macOS y Linux, el montaje WebDAV del explorador
     // (`escritorio.MontarWebDAV`), sin caché: File Provider pide una cuenta de Apple
-    // que firme (docs/roadmap.md, «La caché sin conexión que daba FUSE»). En
+    // que firme (docs/operations.md#drive-integracion-nativa). En
     // 'planificado' hasta verlo desde el Hub en cada sistema.
     escritorio: 'planificado',
     movil: 'planificado',
@@ -1213,6 +1213,114 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // Web: «Ancho de lectura» / «Ancho completo» en el «…» de la hoja, guardado en
     // `data.reading_width` de la nota. Fyne todavía no lo lee ni lo ofrece: su hoja
     // sigue a todo el ancho, que es el valor por defecto en las dos.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  // EL EDITOR DE NOTAS COMO EL DE CONFLUENCE (encargo del 2026-11-24): la web y Fyne lo
+  // hacen a la vez, con las mismas claves (`editor.*`) y el mismo HTML de bloques, que
+  // deja pasar el saneador compartido (`apps/nucleo/notes/model/html.go`). Van en 'si'
+  // en las dos superficies nativas por decisión del encargo, con el nativo hecho en
+  // paralelo por su propio agente.
+  {
+    id: 'notes-editor-barra',
+    nombre:
+      'Barra del editor en una fila con «Más»: estilos con vista previa, «Más formato», alineación y sangría en un menú, ayudas con atajo',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-insertar',
+    nombre:
+      'Catálogo «+» y «/» con descripción: paneles, sección plegable, estado, decisiones, fecha, columnas, código con lenguaje',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-markdown-linea',
+    nombre: 'Markdown al escribir (`**x**`, `*x*`, `` `x` ``, `~~x~~`) y Ctrl/⌘+Z que lo devuelve',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-simbolos',
+    nombre: 'Símbolos y emoji (con «:»), con búsqueda y los 16 últimos usados',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-buscar-reemplazar',
+    nombre: 'Buscar y reemplazar en la nota, con «Coincidir mayúsculas» y reemplazar todo',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-pie-atajos',
+    nombre: 'Pie del editor (palabras, caracteres, lectura) y hoja de atajos (Ctrl/⌘+/)',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-tabla',
+    nombre:
+      'Barra flotante de tabla: cabeceras de fila y columna, filas numeradas, fondo de celda, alineación; Tab entre celdas y menú de celda',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-portapapeles',
+    nombre: 'Copiar, cortar y pegar en la burbuja de la selección, con el pegado saneado',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-bloques',
+    nombre:
+      'Asa ⋮⋮ de cada bloque: subir, bajar, duplicar, eliminar, «Convertir en…» y arrastrar para mover',
+    producto: 'notes',
+    web: true,
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

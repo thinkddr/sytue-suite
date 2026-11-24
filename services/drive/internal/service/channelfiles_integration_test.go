@@ -8,8 +8,8 @@
 // `integration`). Es el que de verdad prueba la verja: los unitarios corren como
 // SUPERUSUARIO y NO ejercitan la RLS de ámbito de la mig 0014.
 //
-// Hallazgo del comité de paridad de Rooms (docs/roadmap.md, «Ficheros y Sytue
-// Drive»): un adjunto de un canal PRIVADO o de un DM se subía a la raíz del tenant y
+// Hallazgo del comité de paridad de Rooms (antiguo §4 de docs/roadmap.md, «Ficheros y
+// Sytue Drive»): un adjunto de un canal PRIVADO o de un DM se subía a la raíz del tenant y
 // «Mi unidad» es un espacio compartido de la organización ⇒ lo leía cualquiera.
 //
 // Lo que fija este test:

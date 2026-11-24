@@ -10,50 +10,76 @@
    esto un `<h1>` escrito con la barra se veía como texto normal: la jerarquía
    que BasKet enseña a golpe de vista no existía en pantalla. */
 @layer components {
+  /* LA PROSA DE UNA NOTA, como la de una página de Confluence: interlínea generosa, una
+     escala de títulos clara (en `em`, para que siga al tamaño de la hoja o de la línea)
+     y aire entre bloques. Todo con tokens: claro, oscuro y translúcido. */
+  .sytue-prose {
+    line-height: 1.7;
+  }
   .sytue-prose :is(h1, h2, h3, h4, h5, h6) {
-    @apply text-text mt-4 mb-1.5 leading-tight font-semibold first:mt-0;
+    @apply text-text mt-[1.4em] mb-[0.4em] leading-tight font-semibold first:mt-0;
   }
   .sytue-prose h1 {
-    @apply text-2xl;
+    @apply text-[1.75em] tracking-[-0.015em];
   }
   .sytue-prose h2 {
-    @apply text-xl;
+    @apply text-[1.4em] tracking-[-0.01em];
   }
   .sytue-prose h3 {
-    @apply text-lg;
+    @apply text-[1.15em];
   }
   .sytue-prose h4 {
-    @apply text-base;
+    @apply text-[1em];
   }
   .sytue-prose h5 {
-    @apply text-sm tracking-wide uppercase;
+    @apply text-[0.8em] tracking-[0.06em] uppercase;
   }
   .sytue-prose h6 {
-    @apply text-text-muted text-sm;
+    @apply text-text-muted text-[0.875em];
   }
   .sytue-prose p {
-    @apply mb-2 last:mb-0;
+    @apply mb-[0.75em] last:mb-0;
   }
+  /* Listas: viñeta, círculo y cuadrado al anidar; números, letras y romanos. La sublista
+     va pegada a su elemento, sin el margen de una lista nueva. */
   .sytue-prose ul {
-    @apply my-1.5 list-disc pl-6;
+    @apply my-[0.6em] list-disc pl-6;
   }
   .sytue-prose ol {
-    @apply my-1.5 list-decimal pl-6;
+    @apply my-[0.6em] list-decimal pl-6;
   }
-  .sytue-prose li {
+  .sytue-prose :is(ul, ol) :is(ul, ol) {
     @apply my-0.5;
   }
+  .sytue-prose ul ul {
+    list-style-type: circle;
+  }
+  .sytue-prose ul ul ul {
+    list-style-type: square;
+  }
+  .sytue-prose ol ol {
+    list-style-type: lower-alpha;
+  }
+  .sytue-prose ol ol ol {
+    list-style-type: lower-roman;
+  }
+  .sytue-prose li {
+    @apply my-[0.2em] pl-0.5;
+  }
+  .sytue-prose li::marker {
+    color: var(--sytue-text-muted);
+  }
   .sytue-prose blockquote {
-    @apply border-border text-text-muted my-2 border-l-[3px] pl-3;
+    @apply border-border-strong text-text-muted my-[0.9em] border-l-[3px] py-0.5 pl-4;
   }
   .sytue-prose code {
-    @apply bg-bg-subtle rounded px-1 py-0.5 font-mono text-[0.92em];
+    @apply bg-bg-subtle border-border-subtle rounded border px-1 py-px font-mono text-[0.88em];
   }
   .sytue-prose pre {
-    @apply bg-bg-subtle my-2 overflow-x-auto rounded-md px-3 py-2 font-mono text-sm;
+    @apply bg-bg-subtle my-[0.9em] overflow-x-auto rounded-md px-3 py-2 font-mono text-sm;
   }
   .sytue-prose pre code {
-    @apply bg-transparent p-0;
+    @apply border-0 bg-transparent p-0 text-[1em];
   }
   .sytue-prose mark {
     @apply rounded-sm bg-[#fff3a3] px-0.5 text-inherit;
@@ -81,7 +107,7 @@
     @apply text-primary-text font-medium;
   }
   .sytue-prose hr {
-    @apply border-border my-3 border-t;
+    @apply border-border my-[1.25em] border-t;
   }
   .sytue-prose .task-row {
     @apply my-1 flex items-baseline gap-2;
@@ -91,6 +117,292 @@
   }
   .sytue-prose .task-row > span {
     @apply min-w-0 flex-1;
+  }
+  /* Una tarea hecha se retira: tachada y en gris, sin desaparecer. */
+  .sytue-prose .task-row:has(> input[type='checkbox']:checked) > span {
+    @apply text-text-subtle line-through decoration-1;
+  }
+}
+
+/* LOS BLOQUES DEL EDITOR (bloques.ts; el HTML compartido con Fyne y el saneador): panel,
+   sección que se pliega, estado, decisiones, fecha, código, tabla y columnas. Todo con
+   los tokens de la casa: el oscuro y el translúcido llegan solos. Los iconos van como
+   máscara (`mask`) sobre el color del token, así que siguen la tinta del tema. */
+@layer components {
+  /* Los seis colores de bloque (estado, fondo de celda, muestras): fondo y tinta. */
+  :is(
+    [data-estado],
+    [data-fondo],
+    .notes-fondo-gris,
+    .notes-fondo-azul,
+    .notes-fondo-verde,
+    .notes-fondo-amarillo,
+    .notes-fondo-rojo,
+    .notes-fondo-morado
+  ) {
+    --notes-fondo: var(--sytue-bg-subtle);
+    --notes-tinta: var(--sytue-text-muted);
+  }
+  :is([data-estado='azul'], [data-fondo='azul'], .notes-fondo-azul) {
+    --notes-fondo: var(--sytue-info-bg);
+    --notes-tinta: var(--sytue-info-text);
+  }
+  :is([data-estado='verde'], [data-fondo='verde'], .notes-fondo-verde) {
+    --notes-fondo: var(--sytue-success-bg);
+    --notes-tinta: var(--sytue-success-text);
+  }
+  :is([data-estado='amarillo'], [data-fondo='amarillo'], .notes-fondo-amarillo) {
+    --notes-fondo: var(--sytue-warning-bg);
+    --notes-tinta: var(--sytue-warning-text);
+  }
+  :is([data-estado='rojo'], [data-fondo='rojo'], .notes-fondo-rojo) {
+    --notes-fondo: var(--sytue-danger-bg);
+    --notes-tinta: var(--sytue-danger-text);
+  }
+  :is([data-estado='morado'], [data-fondo='morado'], .notes-fondo-morado) {
+    --notes-fondo: var(--sytue-violet-bg);
+    --notes-tinta: var(--sytue-violet-text);
+  }
+  [class*='notes-fondo-'] {
+    background: var(--notes-fondo);
+  }
+  .notes-tinta-info {
+    color: var(--sytue-info-text);
+  }
+  .notes-tinta-nota {
+    color: var(--sytue-violet-text);
+  }
+  .notes-tinta-exito {
+    color: var(--sytue-success-text);
+  }
+  .notes-tinta-aviso {
+    color: var(--sytue-warning-text);
+  }
+  .notes-tinta-error {
+    color: var(--sytue-danger-text);
+  }
+
+  /* Panel: fondo tintado, icono a la izquierda y el contenido con su propio margen. */
+  .sytue-prose [data-panel] {
+    --notes-panel-fondo: var(--sytue-info-bg);
+    --notes-panel-tinta: var(--sytue-info-text);
+    --notes-panel-icono: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 11v5M12 7.5h.01'/></svg>");
+    @apply relative my-3 rounded-md py-2.5 pr-3 pl-10;
+    background: var(--notes-panel-fondo);
+  }
+  .sytue-prose [data-panel] > :first-child {
+    @apply mt-0;
+  }
+  .sytue-prose [data-panel] > :last-child {
+    @apply mb-0;
+  }
+  .sytue-prose [data-panel]::before {
+    content: '';
+    position: absolute;
+    top: 0.8rem;
+    left: 0.875rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    background: var(--notes-panel-tinta);
+    mask: var(--notes-panel-icono) center / contain no-repeat;
+  }
+  .sytue-prose [data-panel='nota'] {
+    --notes-panel-fondo: var(--sytue-violet-bg);
+    --notes-panel-tinta: var(--sytue-violet-text);
+    --notes-panel-icono: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 19.5h4l10-10-4-4-10 10z'/><path d='M13 7l4 4'/></svg>");
+  }
+  .sytue-prose [data-panel='exito'] {
+    --notes-panel-fondo: var(--sytue-success-bg);
+    --notes-panel-tinta: var(--sytue-success-text);
+    --notes-panel-icono: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M8 12.5l2.5 2.5L16 9.5'/></svg>");
+  }
+  .sytue-prose [data-panel='aviso'] {
+    --notes-panel-fondo: var(--sytue-warning-bg);
+    --notes-panel-tinta: var(--sytue-warning-text);
+    --notes-panel-icono: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 4l9 15.5H3z'/><path d='M12 10v4M12 17h.01'/></svg>");
+  }
+  .sytue-prose [data-panel='error'] {
+    --notes-panel-fondo: var(--sytue-danger-bg);
+    --notes-panel-tinta: var(--sytue-danger-text);
+    --notes-panel-icono: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M9 9l6 6M15 9l-6 6'/></svg>");
+  }
+
+  /* Sección que se pliega: un recuadro fino, su título con un triángulo que gira. */
+  .sytue-prose details[data-expandir] {
+    @apply border-border my-3 rounded-md border px-3 py-2;
+  }
+  .sytue-prose details[data-expandir] > summary {
+    @apply text-text flex cursor-pointer items-center gap-2 font-medium;
+    list-style: none;
+  }
+  .sytue-prose details[data-expandir] > summary::-webkit-details-marker {
+    display: none;
+  }
+  .sytue-prose details[data-expandir] > summary::before {
+    content: '';
+    flex: none;
+    width: 0.875rem;
+    height: 0.875rem;
+    background: var(--sytue-text-muted);
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M9 5l7 7-7 7'/></svg>")
+      center / contain no-repeat;
+    transition: rotate 150ms ease;
+  }
+  .sytue-prose details[data-expandir][open] > summary {
+    @apply mb-1.5;
+  }
+  .sytue-prose details[data-expandir][open] > summary::before {
+    rotate: 90deg;
+  }
+
+  /* Estado: una etiqueta corta, en mayúsculas pequeñas y con el color de su token. */
+  .sytue-prose [data-estado] {
+    @apply inline-block rounded-sm px-1.5 align-[0.08em] text-[0.72em] leading-[1.6] font-bold tracking-[0.04em] whitespace-nowrap uppercase;
+    background: var(--notes-fondo);
+    color: var(--notes-tinta);
+  }
+
+  /* Decisiones: la flecha que se bifurca en vez de la viñeta. */
+  .sytue-prose ul[data-tipo='decisiones'] {
+    @apply my-2 list-none pl-0;
+  }
+  .sytue-prose ul[data-tipo='decisiones'] > li {
+    @apply relative my-1 pl-7;
+  }
+  .sytue-prose ul[data-tipo='decisiones'] > li::before {
+    content: '';
+    position: absolute;
+    top: 0.2em;
+    left: 0.125rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    background: var(--sytue-success-text);
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20.5V15L6.5 9.5v-5M12 15l5.5-5.5v-5M4.5 6.5l2-2 2 2M15.5 6.5l2-2 2 2'/></svg>")
+      center / contain no-repeat;
+  }
+
+  /* Fecha: una ficha discreta que no se parte. */
+  .sytue-prose time[datetime] {
+    @apply bg-bg-subtle text-text rounded-sm px-1.5 py-px text-[0.92em] whitespace-nowrap;
+  }
+
+  /* Código: el lenguaje arriba a la derecha, los números de línea en su columna y el
+     ajuste de líneas largas cuando se pide. */
+  .sytue-prose pre {
+    @apply relative leading-5 whitespace-pre;
+  }
+  .sytue-prose pre[data-ajuste] {
+    @apply whitespace-pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .sytue-prose pre[data-lineas] {
+    @apply pl-13;
+  }
+  .sytue-prose pre code[data-lenguaje]:not([data-lenguaje='texto'])::before {
+    content: attr(data-lenguaje);
+    position: absolute;
+    top: 0.25rem;
+    right: 0.5rem;
+    color: var(--sytue-text-subtle);
+    font-family: var(--font-sans);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .notes-lineas {
+    @apply text-text-subtle pointer-events-none absolute w-10 py-2 text-right font-mono text-sm leading-5 whitespace-pre select-none;
+  }
+  .sytue-prose pre > .notes-lineas {
+    @apply top-0 left-0;
+  }
+
+  /* Tabla: rejilla fina, cabecera con fondo, columnas repartidas a partes iguales y las
+     filas numeradas con un contador (sin tocar el HTML). Los `!important` pisan los
+     bordes en línea que traen las celdas nuevas del módulo común (los del correo). */
+  .sytue-prose table {
+    @apply my-3 w-full border-collapse text-sm;
+    table-layout: fixed;
+  }
+  /* La misma tabla que pinta Fyne: rejilla `border`, celdas `px-2 py-1` y la cabecera
+     (fila o columna) sobre `bg-subtle`, alineada a la izquierda. */
+  .sytue-prose :is(td, th) {
+    border: 1px solid var(--sytue-border) !important;
+    padding: 0.25rem 0.5rem !important;
+    @apply align-top break-words;
+  }
+  .sytue-prose th {
+    @apply bg-bg-subtle text-text text-left font-semibold;
+  }
+  .sytue-prose :is(td, th)[data-fondo] {
+    background: var(--notes-fondo);
+  }
+  .sytue-prose table[data-numerada] {
+    counter-reset: notes-fila;
+  }
+  .sytue-prose table[data-numerada] tbody tr {
+    counter-increment: notes-fila;
+  }
+  .sytue-prose table[data-numerada] tr::before {
+    @apply bg-bg-subtle text-text-subtle w-10 text-right tabular-nums;
+    display: table-cell;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--sytue-border);
+  }
+  .sytue-prose table[data-numerada] thead tr::before {
+    content: '';
+  }
+  .sytue-prose table[data-numerada] tbody tr::before {
+    content: counter(notes-fila);
+  }
+  /* La celda donde está el cursor, en el editor (la marca RichText con una capa). */
+  .notes-celda-activa {
+    @apply pointer-events-none absolute rounded-[2px];
+    box-shadow: inset 0 0 0 2px var(--sytue-primary);
+  }
+
+  /* El asa ⋮⋮ del bloque, a la izquierda del texto: con ratón, solo al pasar por la nota
+     o escribir en ella; con el dedo, siempre (y de 44 de alto). */
+  .notes-asa {
+    @apply text-text-subtle hover:bg-bg-subtle hover:text-text absolute -left-2.5 z-[1] grid h-6 w-5 cursor-grab place-items-center rounded-sm opacity-0 transition-opacity duration-150 active:cursor-grabbing;
+  }
+  .notes-editor-campo:is(:hover, :focus-within) .notes-asa,
+  .notes-asa[aria-expanded='true'] {
+    @apply opacity-100;
+  }
+  @media (pointer: coarse) {
+    .notes-asa {
+      @apply -left-3.5 h-11 w-7 opacity-100;
+    }
+  }
+  /* Dónde caerá el bloque que se arrastra. */
+  .notes-soltar {
+    @apply bg-primary pointer-events-none absolute inset-x-3 -mt-px h-0.5 rounded-full;
+  }
+
+  /* Columnas: dos o tres, una debajo de otra en el teléfono. En el editor, una guía
+     punteada dice dónde acaba cada una. */
+  .sytue-prose [data-columnas] {
+    @apply my-3 grid gap-4;
+  }
+  .sytue-prose [data-columnas='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sytue-prose [data-columnas='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sytue-prose [data-columna] {
+    @apply min-w-0;
+  }
+  .sytue-prose[contenteditable] [data-columna] {
+    @apply rounded-sm;
+    outline: 1px dashed var(--sytue-border);
+    outline-offset: 4px;
+  }
+  @media (max-width: 639px) {
+    .sytue-prose [data-columnas] {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 }
 
@@ -617,6 +929,35 @@
   }
   :root:not([data-theme]) ::highlight(sytue-buscar-actual) {
     background-color: #a36a00;
+  }
+}
+
+/* Lo mismo donde no hay API de resaltados: recuadros en una capa encima del texto
+   (RichText), translúcidos para que el texto se siga leyendo debajo. */
+.notes-coincidencia {
+  position: absolute;
+  border-radius: 2px;
+  background-color: rgb(255 243 163 / 0.65);
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.notes-coincidencia--actual {
+  background-color: rgb(245 196 107 / 0.75);
+}
+[data-theme='dark'] .notes-coincidencia {
+  background-color: rgb(107 93 0 / 0.6);
+  mix-blend-mode: screen;
+}
+[data-theme='dark'] .notes-coincidencia--actual {
+  background-color: rgb(163 106 0 / 0.7);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .notes-coincidencia {
+    background-color: rgb(107 93 0 / 0.6);
+    mix-blend-mode: screen;
+  }
+  :root:not([data-theme]) .notes-coincidencia--actual {
+    background-color: rgb(163 106 0 / 0.7);
   }
 }
 

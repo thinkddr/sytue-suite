@@ -119,8 +119,8 @@ func (c *cabecera) preparar(v tema.Variante, ancho float32) {
 // ponytail: el H1 lleva `letter-spacing: -0.01em` (−0,315 px por letra a 31,5) y aquí
 // no se aplica: `ui.Versal` es el único que sabe repartir tracking y fija el positivo
 // del sobretítulo. En «Tus aplicaciones» son 5 px de más al final de un rótulo
-// alineado a la izquierda. Se cierra el día que `NuevoVersal` acepte el tracking, que
-// es el mismo hueco que ya está apuntado en roadmap.md para `tracking-wide`.
+// alineado a la izquierda. Se cierra pasando este rótulo a `ui.NuevoEspaciado`, que ya
+// reparte el tracking de `tracking-wide` (`ui.NuevoVersalCon`).
 func (c *cabecera) colocar(x float32) float32 { return c.colocarEn(x, MargenY) }
 
 // colocarEn es colocar con otro margen de página: el `marco:py-5` de la portada.

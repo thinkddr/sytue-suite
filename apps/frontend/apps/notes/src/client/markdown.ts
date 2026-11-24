@@ -12,6 +12,7 @@
  * RichText, que además comprueba que el marcador abre la línea.
  */
 import { htmlATexto, pegadoConFormato, textoPegado } from '@sytue/ui/browser/portapapeles';
+import { escapar, esURLWeb } from './captura.js';
 
 export interface AtajoMarkdown {
   /** Orden de edición, la misma que aplica la barra. */
@@ -244,6 +245,21 @@ export function markdownAHtml(texto: string): string {
 /** Lo que entra en el editor al pegar: HTML ya saneado, o texto plano. */
 export type Pegado = { html: string } | { texto: string };
 
+/** Lo que el editor de notas sabe pintar además de la lista común: sus tareas y sus bloques. */
+const DE_NOTAS = { tareas: true, bloques: true } as const;
+
+/**
+ * Una URL sola, la que se pega desde la barra de direcciones: entra como enlace, como en
+ * Confluence o en Notion. Con texto seleccionado, ese texto pasa a ser el enlace
+ * (`seleccion`). El enlace sale de `pegadoConFormato`, como todo lo demás.
+ */
+function enlacePegado(texto: string, seleccion: string): string | null {
+  const url = texto.trim();
+  if (/\s/.test(url) || !esURLWeb(url)) return null;
+  const rotulo = seleccion.trim() || url;
+  return pegadoConFormato(`<a href="${escapar(url)}">${escapar(rotulo)}</a>`) || null;
+}
+
 /**
  * Qué se pega. Con `sinFormato` (Ctrl/⌘+Mayús+V), el texto plano tal cual. Si no:
  * el Markdown, si el texto lo parece y el HTML que lo acompaña (si lo hay) es solo
@@ -258,18 +274,25 @@ export function queSePega(
   datos: Pick<DataTransfer, 'getData'> | null | undefined,
   sinFormato = false,
   conMarkdown = true,
+  seleccion = '',
 ): Pegado {
   const texto = textoPegado(datos);
   if (sinFormato) return { texto };
   const html = datos?.getData('text/html') ?? '';
+  // La URL sola (o el `<a>` que la envuelve, que es lo que copian algunos navegadores).
+  if (conMarkdown && (!html || htmlATexto(html).trim() === texto.trim())) {
+    const enlace = enlacePegado(texto, seleccion);
+    if (enlace) return { html: enlace };
+  }
   const esMarkdown = conMarkdown && pareceMarkdown(texto);
   if (esMarkdown && (!html || pareceMarkdown(htmlATexto(html)))) {
-    const md = pegadoConFormato(markdownAHtml(texto), { tareas: true });
+    const md = pegadoConFormato(markdownAHtml(texto), DE_NOTAS);
     if (md) return { html: md };
   }
   // El `.md` coloreado de un editor de código, dentro de un bloque de código, es texto.
   if (!conMarkdown && html && pareceMarkdown(texto) && pareceMarkdown(htmlATexto(html)))
     return { texto };
-  const rico = pegadoConFormato(html);
+  // Lo copiado de otra nota conserva sus tareas y sus bloques, con sus listas cerradas.
+  const rico = pegadoConFormato(html, DE_NOTAS);
   return rico ? { html: rico } : { texto };
 }

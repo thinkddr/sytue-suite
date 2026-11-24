@@ -1065,8 +1065,7 @@ func (i Icono) String() string {
 //
 // Cada app de la suite tiene glifos que `packages/ui/src/components/Icon.tsx` NO
 // declara y que viven dentro de la propia app en la web: los ocho del triaje de Mail,
-// la estrella y la tarta de Contacts, los ocho de Notepads. Son ~22 en total y están
-// contados en `docs/roadmap.md`.
+// la estrella y la tarta de Contacts, los ocho de Notepads. Son ~22 en total.
 //
 // La alternativa era meterlos en `catalogo` y ampliar `TestElCatalogoEsElDeLaWeb` para
 // que mirase además los `.tsx` de cada app. Se descartó por dos motivos MEDIDOS en

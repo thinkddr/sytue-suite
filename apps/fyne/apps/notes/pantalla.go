@@ -649,15 +649,6 @@ func (p *Pantalla) hayRed() bool {
 }
 
 // Arrancar hace la primera carga.
-// afuera es el desplazador de la página, para lo vertical que cae sobre algo que se
-// desplaza de lado (la barra del editor en el teléfono).
-func (p *Pantalla) afuera() fyne.Scrollable {
-	if p.desplazador == nil {
-		return nil
-	}
-	return p.desplazador
-}
-
 func (p *Pantalla) Arrancar() {
 	if !p.vigente() {
 		return

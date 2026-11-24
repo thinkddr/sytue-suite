@@ -97,7 +97,8 @@ func (p *Pantalla) abrirEditor(n Nota) {
 		doc = Leer(borrador.EditorHTML())
 	}
 	ed := NuevoEditorNota(p.tr, doc, p.tr.T("note.placeholder", nil))
-	ed.Afuera = p.afuera
+	ed.AutoformatoEnLinea = true
+	ed.conPie()
 	s := &sesionEdicion{
 		nota: n.ID, editor: ed, fusion: n.ID + ":" + strconv.FormatInt(time.Now().UnixNano(), 36),
 	}

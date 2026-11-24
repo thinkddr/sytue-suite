@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
@@ -37,28 +38,59 @@ import (
 // El menú NO es una capa: una capa se queda con el teclado, y aquí hay que seguir
 // escribiendo en el cuerpo para filtrar (ver `flotante`).
 
-// comando es una entrada del menú: su orden, su rótulo y los alias que valen en
-// cualquier idioma («/h1», «/todo», «/---»).
+// comando es una entrada del menú: su orden, su rótulo, los alias que valen en
+// cualquier idioma («/h1», «/todo», «/---») y la pista de la derecha: el atajo de
+// Markdown que hace lo mismo al escribir («#», «- », «[ ]»…) o, si no lo hay, su alias.
 type comando struct {
 	id, clave string
 	alias     []string
+	pista     string
 	glifo     string
 	icono     iconos.Icono
+	// puntos añade «…» al rótulo: el comando abre algo más (el selector de símbolos).
+	puntos bool
 }
 
+// comandos son los de «/», en el orden del menú: el párrafo y los bloques, y luego lo
+// que se inserta.
 var comandos = []comando{
 	{id: "p", clave: "editor.paragraph", alias: []string{"p", "text"}, icono: iconos.Texto},
-	{id: "h1", clave: "editor.h1", alias: []string{"h1", "#"}, glifo: TituloD},
-	{id: "h2", clave: "editor.h2", alias: []string{"h2", "##"}, glifo: TituloD},
-	{id: "h3", clave: "editor.h3", alias: []string{"h3", "###"}, glifo: TituloD},
-	{id: "tarea", clave: "note.newTodo", alias: []string{"todo", "task", "[]"}, glifo: TareaD},
-	{id: "vinetas", clave: "editor.bulletList", alias: []string{"ul", "list", "-"}, glifo: VinetasD},
-	{id: "numeros", clave: "editor.numberedList", alias: []string{"ol", "1."}, glifo: NumerosD},
-	{id: "cita", clave: "editor.quote", alias: []string{"quote", ">"}, glifo: CitaD},
-	{id: "codigo", clave: "editor.codeBlock", alias: []string{"code", "```"}, icono: iconos.Codigo},
-	{id: "regla", clave: "editor.hr", alias: []string{"hr", "divider", "---"}, icono: iconos.Menos},
+	{id: "h1", clave: "editor.heading1", alias: []string{"h1", "#"}, pista: "#", glifo: TituloD},
+	{id: "h2", clave: "editor.heading2", alias: []string{"h2", "##"}, pista: "##", glifo: TituloD},
+	{id: "h3", clave: "editor.heading3", alias: []string{"h3", "###"}, pista: "###", glifo: TituloD},
+	{id: "vinetas", clave: "editor.bulletList", alias: []string{"ul", "list", "-"}, pista: "-", glifo: VinetasD},
+	{id: "numeros", clave: "editor.numberedList", alias: []string{"ol", "1."}, pista: "1.", glifo: NumerosD},
+	{id: "tarea", clave: "editor.taskList", alias: []string{"todo", "task", "[]"}, pista: "[ ]", glifo: TareaD},
+	{id: "decision", clave: "editor.decision", alias: []string{"decision"}, glifo: DecisionD},
+	{id: "cita", clave: "editor.quote", alias: []string{"quote", ">"}, pista: ">", glifo: CitaD},
+	{id: "codigo", clave: "editor.codeBlock", alias: []string{"code", "```"}, pista: "```", icono: iconos.Codigo},
 	{id: "tabla", clave: "editor.table", alias: []string{"table"}, glifo: TablaD},
+	{id: "regla", clave: "editor.divider", alias: []string{"hr", "divider", "---"}, pista: "---", icono: iconos.Menos},
+	{id: "panel_info", clave: "editor.panelInfo", alias: []string{"info", "panel"}, icono: iconos.Informacion},
+	{id: "panel_nota", clave: "editor.panelNote", alias: []string{"note", "panel"}, icono: iconos.Lapiz},
+	{id: "panel_exito", clave: "editor.panelSuccess", alias: []string{"success", "panel"}, icono: iconos.Tic},
+	{id: "panel_aviso", clave: "editor.panelWarning", alias: []string{"warning", "panel"}, icono: iconos.Aviso},
+	{id: "panel_error", clave: "editor.panelError", alias: []string{"error", "panel"}, icono: iconos.Peligro},
+	{id: "expandir", clave: "editor.expand", alias: []string{"expand", "details"}, icono: iconos.ChevronAbajo},
+	{id: "estado", clave: "editor.status", alias: []string{"status", "lozenge"}, glifo: EstadoD, puntos: true},
+	{id: "fecha", clave: "editor.date", alias: []string{"date", "time"}, icono: iconos.Calendario, puntos: true},
+	{id: "hoy", clave: "editor.today", alias: []string{"today"}, icono: iconos.Reloj},
+	{id: "enlace", clave: "editor.linkNote", alias: []string{"link", "[["}, pista: "[[", glifo: NotaD},
+	{id: "mencion", clave: "editor.mention", alias: []string{"mention", "@"}, pista: "@", glifo: ArrobaD},
+	{id: "simbolo", clave: "editor.symbols", alias: []string{"symbol", "char"}, glifo: SimboloD, puntos: true},
 }
+
+// pistaComando es lo que se lee a la derecha de un comando.
+func pistaComando(c comando) string {
+	if c.pista != "" {
+		return c.pista
+	}
+	return "/" + c.alias[0]
+}
+
+// maxSinResultados es lo que se deja escribir tras «/» sin que nada case antes de cerrar
+// el menú: «/xyz» todavía puede estar buscando un comando; una palabra entera, no.
+const maxSinResultados = 6
 
 // filasMenuCmd son las filas que se ven del menú a la vez.
 const filasMenuCmd = 8
@@ -141,7 +173,7 @@ var disparos = []struct {
 }
 
 // rotulosMenu son los nombres de las tres listas (`ROTULO_MENU`).
-var rotulosMenu = map[tipoMenu]string{menuCmd: "slash.title", menuNota: "editor.linkNote", menuPersona: "editor.mention"}
+var rotulosMenu = map[tipoMenu]string{menuCmd: "editor.slashMenu", menuNota: "editor.linkNote", menuPersona: "editor.mention"}
 
 // menuComandos es el menú abierto: de qué tipo es, dónde está su disparador, qué se ha
 // escrito tras él y cuál de las filas está activa.
@@ -151,6 +183,8 @@ type menuComandos struct {
 	q      string
 	idx    int
 	panel  *flotante
+	// desplazado es lo que la lista ha bajado dentro del panel cuando no cabe entera.
+	desplazado float32
 }
 
 // sugerencia es una fila de cualquiera de los tres menús (`Sugerencia` de RichText.tsx).
@@ -165,7 +199,24 @@ type sugerencia struct {
 	elegir func()
 }
 
-func (e *EditorNota) rotuloComando(c comando) string { return e.tr.T(c.clave, nil) }
+func (e *EditorNota) rotuloComando(c comando) string {
+	if c.puntos {
+		return e.tr.T(c.clave, nil) + "…"
+	}
+	return e.tr.T(c.clave, nil)
+}
+
+// comandoDisponible dice si un comando tiene sentido en este editor: «Enlazar una nota»
+// necesita con qué enlazar.
+func (e *EditorNota) comandoDisponible(c comando) bool {
+	switch c.id {
+	case "enlace":
+		return e.enlaces != nil || e.AlEnlazar != nil
+	case "mencion":
+		return e.gente != nil
+	}
+	return true
+}
 
 // disparo es el disparador que hay justo antes del cursor: qué abre, dónde empieza y lo
 // escrito tras él.
@@ -227,9 +278,11 @@ func (e *EditorNota) mirarMenu() {
 		idx = m.idx
 	}
 	m := &menuComandos{tipo: d.tipo, inicio: d.inicio, q: d.q, idx: idx}
-	// `[[` se ve aunque aún no haya nada: dice que busca, o que nada casa. Los otros dos,
-	// solo con algo que ofrecer.
-	if d.tipo != menuNota && len(e.sugerencias(m)) == 0 {
+	// `[[` se ve aunque aún no haya nada: dice que busca, o que nada casa. «/» dice
+	// «Sin resultados» mientras lo escrito todavía puede ser un comando. «@», solo con
+	// alguien que ofrecer.
+	if len(e.sugerencias(m)) == 0 && (d.tipo == menuPersona ||
+		d.tipo == menuCmd && utf8.RuneCountInString(d.q) > maxSinResultados) {
 		e.cerrarMenu()
 		return
 	}
@@ -259,8 +312,11 @@ func (e *EditorNota) sugerencias(m *menuComandos) []sugerencia {
 	switch m.tipo {
 	case menuCmd:
 		for _, c := range filtrarComandos(m.q, e.rotuloComando) {
+			if !e.comandoDisponible(c) {
+				continue
+			}
 			out = append(out, sugerencia{
-				glifo: c.glifo, icono: c.icono, rotulo: e.rotuloComando(c), detalle: "/" + c.alias[0],
+				glifo: c.glifo, icono: c.icono, rotulo: e.rotuloComando(c), detalle: pistaComando(c),
 				elegir: func() { e.ejecutarComando(c) },
 			})
 		}
@@ -307,18 +363,29 @@ func (e *EditorNota) armarMenu() {
 	if m.tipo != menuCmd {
 		ancho = anchoMenuSug
 	}
-	// Como mucho ocho filas a la vista (el `max-h-72` de la web), con la activa dentro. El
-	// rótulo de un grupo sale sobre la primera fila que se vea de él.
-	desde := max(0, min(m.idx-filasMenuCmd/2, len(sug)-filasMenuCmd))
-	hasta := min(len(sug), desde+filasMenuCmd)
-	filas := make([]fyne.CanvasObject, 0, hasta-desde+3)
-	for i := desde; i < hasta; i++ {
-		s := sug[i]
-		if s.grupo != "" && (i == desde || s.grupo != sug[i-1].grupo) {
-			filas = append(filas, container.New(ui.Margen{Izq: pxFilaCmd, Der: pxFilaCmd, Arr: tema.Espacio(1), Abj: tema.Espacio(0.5)},
-				lineaTok(s.grupo, tema.TextoXS, ui.Normal, "text-subtle", v)))
+	// Todas las filas, con el rótulo de cada grupo sobre la primera de él; se ven como
+	// mucho ocho (el `max-h-72` de la web) y el resto se alcanza desplazando la lista —con
+	// el dedo, con la rueda o con las flechas, que la llevan hasta la activa—.
+	filas := make([]fyne.CanvasObject, 0, len(sug)+3)
+	var y, yActiva, altoActiva, altoFila float32
+	for i, s := range sug {
+		if s.grupo != "" && (i == 0 || s.grupo != sug[i-1].grupo) {
+			g := container.New(ui.Margen{Izq: pxFilaCmd, Der: pxFilaCmd, Arr: tema.Espacio(1), Abj: tema.Espacio(0.5)},
+				lineaTok(s.grupo, tema.TextoXS, ui.Normal, "text-subtle", v))
+			filas = append(filas, g)
+			y += g.MinSize().Height
 		}
-		filas = append(filas, nuevaFilaSugerencia(e, s, i, i == m.idx, ancho, v))
+		f := nuevaFilaSugerencia(e, s, i, i == m.idx, ancho, v)
+		altoFila = f.MinSize().Height
+		if i == m.idx {
+			yActiva, altoActiva = y, altoFila
+		}
+		filas = append(filas, f)
+		y += altoFila
+	}
+	if m.tipo == menuCmd && len(sug) == 0 {
+		filas = append(filas, container.New(ui.Margen{Izq: pxFilaCmd, Der: pxFilaCmd, Arr: pyFilaCmd, Abj: pyFilaCmd},
+			lineaTok(e.tr.T("editor.slashNoResults", nil), tema.TextoSM, ui.Normal, "text-muted", v)))
 	}
 	if m.tipo == menuNota && (len(sug) == 0 || e.enlaces.buscando) {
 		estado := []fyne.CanvasObject{lineaTok(e.tr.T("editor.linkNoResults", nil), tema.TextoSM, ui.Normal, "text-muted", v)}
@@ -334,7 +401,18 @@ func (e *EditorNota) armarMenu() {
 	// El ancho de la lista aunque no haya filas (`w-72`).
 	tope := canvas.NewRectangle(color.NRGBA{})
 	tope.SetMinSize(fyne.NewSize(ancho, 0))
-	m.panel = nuevoFlotante(container.New(ui.Columna{}, append(filas, tope)...), tema.Espacio(1))
+	var lista fyne.CanvasObject = container.New(ui.Columna{}, append(filas, tope)...)
+	if visible := float32(filasMenuCmd) * altoFila; len(sug) > filasMenuCmd {
+		total := lista.MinSize().Height
+		m.desplazado = min(max(m.desplazado, yActiva+altoActiva-visible), yActiva, max(total-visible, 0))
+		m.desplazado = max(m.desplazado, 0)
+		d := container.NewVScroll(lista)
+		d.SetMinSize(fyne.NewSize(ancho, visible))
+		d.Offset = fyne.NewPos(0, m.desplazado)
+		d.OnScrolled = func(p fyne.Position) { m.desplazado = p.Y }
+		lista = d
+	}
+	m.panel = nuevoFlotante(lista, tema.Espacio(1))
 	m.panel.rotulo = e.tr.T(rotulosMenu[m.tipo], nil)
 }
 
@@ -395,6 +473,13 @@ func (e *EditorNota) ejecutarComando(c comando) {
 	if !e.tomarDisparo(nil) {
 		return
 	}
+	e.aplicarComando(c)
+}
+
+// aplicarComando hace lo del comando donde está el cursor: es lo que comparten «/» y el
+// menú «+» de la barra.
+func (e *EditorNota) aplicarComando(c comando) {
+	a, b := e.seleccion()
 	switch c.id {
 	case "p", "h1", "h2", "h3":
 		e.Orden("bloque", c.id)
@@ -402,10 +487,66 @@ func (e *EditorNota) ejecutarComando(c comando) {
 		e.Orden("bloque", "blockquote")
 	case "codigo":
 		e.Orden("bloque", "pre")
+	case "hoy":
+		e.insertarHoy()
+	case "fecha":
+		e.abrirFecha(e.anclaCursor())
+	case "estado":
+		e.abrirEstado(e.anclaCursor())
+	case "decision":
+		e.hacer(func() { e.doc.AlternarDecisiones(a, b) })
+	case "panel_info", "panel_nota", "panel_exito", "panel_aviso", "panel_error":
+		e.hacer(func() { e.doc.PonerCaja(a, b, CajaPanel, strings.TrimPrefix(c.id, "panel_")) })
+	case "expandir":
+		e.hacer(func() { e.doc.PonerCaja(a, b, CajaExpandir, "") })
+	case "enlace":
+		e.empezarEnlace()
+	case "mencion":
+		e.empezarCon("@")
+	case "simbolo":
+		e.abrirSimbolos(e.anclaCursor())
 	default: // tarea, vinetas, numeros, regla y tabla se llaman igual que su orden
 		e.Orden(c.id, "")
 	}
 	e.Refresh()
+}
+
+// ahoraEditor es el reloj de «Fecha de hoy»; las pruebas lo fijan.
+var ahoraEditor = time.Now
+
+// insertarHoy pone la fecha de hoy (`<time>`), en el idioma de la app, donde estaba
+// «/hoy», en su propio paso de deshacer.
+func (e *EditorNota) insertarHoy() { e.insertarFecha(ahoraEditor()) }
+
+// insertarFecha pone una fecha (`<time datetime="AAAA-MM-DD">`) con su texto en el idioma
+// de la app («24 nov 2026»), pisando lo seleccionado.
+func (e *EditorNota) insertarFecha(f time.Time) {
+	e.insertarEspecial(fechaTexto(e, f), Tramo{Fecha: f.Format(time.DateOnly)})
+}
+
+// insertarEspecial pone una etiqueta de estado o una fecha en su paso de deshacer.
+func (e *EditorNota) insertarEspecial(texto string, especial Tramo) {
+	a, b := e.seleccion()
+	e.hacer(func() {
+		if a != b {
+			e.cur = e.doc.Borrar(a, b)
+		}
+		e.cur = e.doc.InsertarEtiqueta(e.cur, texto, especial)
+		e.ancla = e.cur
+	})
+}
+
+// empezarEnlace es «Enlazar una nota»: escribe «[[», que abre la lista de notas que
+// enlazar en el mismo sitio; sin cuaderno que la ofrezca, abre la herramienta de
+// enlaces.
+func (e *EditorNota) empezarEnlace() {
+	if e.enlaces == nil {
+		llamar1(e.AlEnlazar, e.disparadorDe("enlace"))
+		return
+	}
+	e.escribiendo = false
+	e.escribir("[[")
+	e.escribiendo = false
 }
 
 // enlazarNota cambia `[[consulta` por el enlace a la nota: el mismo que pone la
@@ -427,12 +568,15 @@ func (e *EditorNota) mencionar(p api.Miembro) {
 // toma el foco: el teclado sigue en el cuerpo, que es donde se filtra.
 type filaSugerencia struct {
 	widget.BaseWidget
-	e      *EditorNota
-	s      sugerencia
-	i      int
-	activa bool
-	ancho  float32
-	v      tema.Variante
+	// alEncima, si lo hay, es lo que hace pasar por encima (el menú «+»); si no, la fila
+	// se marca activa en el menú del cuerpo.
+	alEncima func()
+	e        *EditorNota
+	s        sugerencia
+	i        int
+	activa   bool
+	ancho    float32
+	v        tema.Variante
 }
 
 var (
@@ -457,6 +601,10 @@ func (f *filaSugerencia) AccessibilityRole() fyne.AccessibleRole {
 func (f *filaSugerencia) Tapped(*fyne.PointEvent) { f.s.elegir() }
 
 func (f *filaSugerencia) MouseIn(*desktop.MouseEvent) {
+	if f.alEncima != nil {
+		f.alEncima()
+		return
+	}
 	if f.e.menu != nil && f.e.menu.idx != f.i {
 		f.e.menu.idx = f.i
 		f.e.armarMenu()
@@ -504,8 +652,9 @@ type filaSugerenciaRenderer struct {
 	texto, dentro, detalle *canvas.Text
 }
 
+// MinSize: `py-1.5` alrededor de la línea; con el dedo, 44 de alto.
 func (r *filaSugerenciaRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(r.f.ancho, max(tema.TextoSM.Linea, cajaDibCmd)+2*pyFilaCmd)
+	return fyne.NewSize(r.f.ancho, ui.SueloTactil(max(tema.TextoSM.Linea, cajaDibCmd)+2*pyFilaCmd))
 }
 
 func (r *filaSugerenciaRenderer) Objects() []fyne.CanvasObject {

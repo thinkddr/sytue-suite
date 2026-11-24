@@ -142,6 +142,11 @@ func (v *Vault) send(ctx context.Context, transaction, kind string, envelope pqc
 	if err != nil {
 		return storage.Reference{}, err
 	}
+	// La política de una publicación autorizada (WithPublicationPolicy), justo
+	// antes de cada envío: un fragmento más tampoco sale si ya no vale.
+	if err := v.checkPublication(ctx); err != nil {
+		return storage.Reference{}, err
+	}
 	saved, err := v.server.AppendPQVaultRecord(ctx, v.scope, v.vaultID, transaction, raw)
 	if err != nil {
 		return storage.Reference{}, err

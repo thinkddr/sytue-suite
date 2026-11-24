@@ -246,6 +246,9 @@ type VaultKeyRegistration struct {
 	PreviousKeyID string                        `json:"previous_key_id"`
 	Proof         []byte                        `json:"proof"`
 	Continuity    []byte                        `json:"continuity,omitempty"`
+	// Handover es la marca de traspaso del correo de Matrix a la bóveda (ADR 0087):
+	// Sytue ID la acepta solo en `mail` y siempre con identificación reciente.
+	Handover bool `json:"handover,omitempty"`
 }
 
 // CodeVaultKeyReauth es el código del 403 de un vaciado sin identificación reciente.

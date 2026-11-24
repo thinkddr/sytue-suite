@@ -375,6 +375,7 @@ func (h *registros) enseñarCargando() {
 func (h *registros) enseñar(object fyne.CanvasObject) {
 	h.slot.Objects = []fyne.CanvasObject{object}
 	h.slot.Refresh()
+	ui.RecolocarBarraSuite(h.slot)
 }
 
 // CuentaAPI es la cuenta de una vista montada sobre la API: su vida acaba al

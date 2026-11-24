@@ -86,6 +86,7 @@ func NewPrivateApplication[R PrivateRepository](cfg PrivateApplicationConfig[R])
 		replace: func(object fyne.CanvasObject) {
 			application.slot.Objects = []fyne.CanvasObject{object}
 			application.slot.Refresh()
+			ui.RecolocarBarraSuite(application.slot)
 		},
 	}
 	core.cfg.state = func(state ApplicationState, failure error) { application.renderState(cfg, state, failure) }
@@ -199,6 +200,7 @@ func (a *PrivateApplication[R]) renderState(cfg PrivateApplicationConfig[R], sta
 			a.slot.Objects = []fyne.CanvasObject{view}
 		}
 		a.slot.Refresh()
+		ui.RecolocarBarraSuite(a.slot)
 	}
 	if cfg.State != nil {
 		cfg.State(state, failure)

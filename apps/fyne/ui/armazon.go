@@ -837,6 +837,12 @@ func (a *Armazon) prepararBarraMovil(b *BarraMovil, estrecha bool) {
 		b.enSuite = true
 		b.reservaSuite = canalonBarraUnica + LadoControlBarra() + huecoBarraUnica
 		b.tituloRespaldo = bs.nombreProducto()
+		if !bs.barraApp {
+			// El montaje no ha visto este armazón: la app llegó después de colocarlo (las
+			// de registros se montan al saber si van por la API o por Matrix) y cambiar lo
+			// de dentro no lo vuelve a colocar. Sin esto, dos barras apiladas.
+			bs.recolocarMontaje()
+		}
 	}
 	b.Refresh()
 }

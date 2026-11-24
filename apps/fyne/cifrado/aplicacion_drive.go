@@ -475,4 +475,5 @@ func (h *anfitrionDrive) enseñarCargando() {
 func (h *anfitrionDrive) enseñar(object fyne.CanvasObject) {
 	h.slot.Objects = []fyne.CanvasObject{object}
 	h.slot.Refresh()
+	ui.RecolocarBarraSuite(h.slot)
 }

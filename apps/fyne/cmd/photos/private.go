@@ -169,6 +169,7 @@ func (h *photosStorage) render(text func(string) string) {
 		h.slot.Objects = []fyne.CanvasObject{container.NewBorder(status, nil, nil, nil, h.photos.Objeto())}
 	}
 	h.slot.Refresh()
+	ui.RecolocarBarraSuite(h.slot)
 }
 
 func (h *photosStorage) Close() {

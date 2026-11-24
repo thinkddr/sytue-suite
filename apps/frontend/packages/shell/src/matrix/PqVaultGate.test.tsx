@@ -247,6 +247,223 @@ test('PqVaultGate on a wrong key offers to sign in again or empty, and empties o
   }
 });
 
+/** Confirma «Vaciar» en la puerta que esté pintada. */
+async function confirmarVaciar(): Promise<void> {
+  const boton = (text: string): HTMLButtonElement | undefined =>
+    [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+  await until(() => boton('Vaciar los datos cifrados') !== undefined);
+  await act(() => {
+    boton('Vaciar los datos cifrados')!.click();
+  });
+  await until(() => document.querySelector('input[type="checkbox"]') !== null);
+  await act(() => {
+    (document.querySelector('input[type="checkbox"]') as HTMLInputElement).click();
+  });
+  const confirm = [...document.querySelectorAll('button')].filter(
+    (b) => b.textContent?.trim() === 'Vaciar los datos cifrados',
+  );
+  const danger = confirm[confirm.length - 1]!;
+  await until(() => !danger.disabled);
+  await act(() => {
+    danger.click();
+  });
+}
+
+const epoca = '0d3f5a1e-6b2c-4c1d-9e8f-7a6b5c4d3e2f';
+
+test('Drive: vaciar suelta antes la fuente congelada, y la bóveda nueva puede importar', async () => {
+  sessionStorage.clear();
+  const root = document.createElement('div');
+  document.body.appendChild(root);
+  const pasos: string[] = [];
+  let mode: 'frozen' | null = 'frozen';
+  try {
+    await act(() => {
+      render(
+        <PqVaultGate
+          actor={actor}
+          tenant="acme"
+          locale="es"
+          product="drive"
+          openVault={async () => {
+            throw new PqVaultError('unavailable');
+          }}
+          resetVault={async () => {
+            pasos.push('vaciar:' + (mode ?? 'legacy'));
+            return fakeVault({
+              scope: Object.freeze({ tenant: 'acme', subject: actor, product: 'drive' }),
+            } as Partial<PqVault>);
+          }}
+          sourceReleaser={{
+            frozen: async () => (mode ? { mode, epoch: epoca } : null),
+            release: async (epoch) => {
+              pasos.push('soltar:' + epoch);
+              mode = null;
+              return 'released';
+            },
+          }}
+          navigate={() => pasos.push('navegar')}
+        >
+          <p data-secret="true">datos</p>
+        </PqVaultGate>,
+        root,
+      );
+    });
+    await confirmarVaciar();
+    await until(() => root.querySelector('[data-secret]') !== null);
+    // Primero se suelta la fuente; con ella ya en legacy, se vacía la bóveda.
+    expect(pasos).toEqual(['soltar:' + epoca, 'vaciar:legacy']);
+  } finally {
+    await act(() => {
+      render(null, root);
+    });
+    root.remove();
+  }
+});
+
+test('Drive: si soltar pide identificarse, a la vuelta suelta esa época y vacía sin volver a preguntar', async () => {
+  sessionStorage.clear();
+  const pasos: string[] = [];
+  let mode: 'frozen' | null = 'frozen';
+  let reautenticado = false;
+  const puerta = (root: HTMLElement) =>
+    render(
+      <PqVaultGate
+        actor={actor}
+        tenant="acme"
+        locale="es"
+        product="drive"
+        basePath="/drive"
+        openVault={async () => {
+          pasos.push('abrir');
+          throw new PqVaultError('unavailable');
+        }}
+        resetVault={async () => {
+          pasos.push('vaciar:' + (mode ?? 'legacy'));
+          return fakeVault({
+            scope: Object.freeze({ tenant: 'acme', subject: actor, product: 'drive' }),
+          } as Partial<PqVault>);
+        }}
+        sourceReleaser={{
+          frozen: async () => (mode ? { mode, epoch: epoca } : null),
+          release: async (epoch) => {
+            if (!reautenticado) return 'reauth';
+            pasos.push('soltar:' + epoch);
+            mode = null;
+            return 'released';
+          },
+        }}
+        navigate={(url) => pasos.push('navegar:' + url)}
+      >
+        <p data-secret="true">datos</p>
+      </PqVaultGate>,
+      root,
+    );
+  const primera = document.createElement('div');
+  document.body.appendChild(primera);
+  try {
+    await act(() => puerta(primera));
+    await confirmarVaciar();
+    await until(() => pasos.some((p) => p.startsWith('navegar:')));
+    const url = pasos.find((p) => p.startsWith('navegar:'))!.slice('navegar:'.length);
+    expect(url.startsWith('/drive/auth/login?')).toBe(true);
+    expect(new URL(url, 'https://drive.test').searchParams.get('reauth')).toBe('1');
+    expect(new URL(url, 'https://drive.test').searchParams.get('unlock')).toBe('1');
+    expect(pasos.some((p) => p.startsWith('vaciar'))).toBe(false);
+  } finally {
+    await act(() => render(null, primera));
+    primera.remove();
+  }
+  // De vuelta de Sytue ID, con la identificación reciente.
+  reautenticado = true;
+  pasos.length = 0;
+  const vuelta = document.createElement('div');
+  document.body.appendChild(vuelta);
+  try {
+    await act(() => puerta(vuelta));
+    await until(() => vuelta.querySelector('[data-secret]') !== null);
+    expect(pasos).toEqual(['soltar:' + epoca, 'vaciar:legacy']);
+    // La marca se gasta: otra vuelta abre sin vaciar.
+    expect(sessionStorage.getItem('sytue.vault-empty.drive')).toBeNull();
+  } finally {
+    await act(() => render(null, vuelta));
+    vuelta.remove();
+  }
+});
+
+test('vaciar que pide identificarse antes de tocar la bóveda vacía a la vuelta, una sola vez', async () => {
+  sessionStorage.clear();
+  const calendario = () =>
+    fakeVault({
+      scope: Object.freeze({ tenant: 'acme', subject: actor, product: 'calendar' }),
+    } as Partial<PqVault>);
+  const pasos: string[] = [];
+  let falta = true;
+  const puerta = (root: HTMLElement) =>
+    render(
+      <PqVaultGate
+        actor={actor}
+        tenant="acme"
+        locale="es"
+        product="calendar"
+        openVault={async () => {
+          pasos.push('abrir');
+          if (falta) throw new PqVaultError('wrong', undefined, { vault_id: '!pqv_v', version: 1 });
+          return calendario();
+        }}
+        resetVault={async () => {
+          pasos.push('vaciar');
+          // A este navegador le falta la clave de desbloqueo: no se ha vaciado nada.
+          if (falta) throw new PqVaultError('signin');
+          return calendario();
+        }}
+      >
+        <p data-secret="true">datos</p>
+      </PqVaultGate>,
+      root,
+    );
+  const primera = document.createElement('div');
+  document.body.appendChild(primera);
+  try {
+    await act(() => puerta(primera));
+    await confirmarVaciar();
+    await until(() =>
+      [...document.querySelectorAll('button')].some((b) =>
+        (b.textContent ?? '').includes('Iniciar sesión'),
+      ),
+    );
+    expect(pasos).toEqual(['abrir', 'vaciar']);
+  } finally {
+    await act(() => render(null, primera));
+    primera.remove();
+  }
+  falta = false;
+  pasos.length = 0;
+  const vuelta = document.createElement('div');
+  document.body.appendChild(vuelta);
+  try {
+    await act(() => puerta(vuelta));
+    await until(() => vuelta.querySelector('[data-secret]') !== null);
+    // A la vuelta vacía directamente, sin abrir la bóveda de antes.
+    expect(pasos).toEqual(['vaciar']);
+  } finally {
+    await act(() => render(null, vuelta));
+    vuelta.remove();
+  }
+  // Una tercera apertura ya no vacía.
+  pasos.length = 0;
+  const otra = document.createElement('div');
+  document.body.appendChild(otra);
+  try {
+    await act(() => puerta(otra));
+    await until(() => otra.querySelector('[data-secret]') !== null);
+    expect(pasos).toEqual(['abrir']);
+  } finally {
+    await act(() => render(null, otra));
+    otra.remove();
+  }
+});
+
 /*
  * El barrido de pantallas (`test/e2e/mobile-audit.mjs`) reconoce esta puerta con
  * `estadoPuertaCifrado` para volver a entrar cuando a su contexto le falta la clave

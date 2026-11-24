@@ -1,6 +1,9 @@
 "widgets.open" = "Ava";
 "widgets.compose" = "Koosta kiri";
 "widgets.create" = "Loo sündmus";
+"widgets.newNote" = "Uus märge";
+"widgets.newContact" = "Uus kontakt";
+"widgets.addPhotos" = "Lisa fotosid";
 "widgets.notes" = "Märkmed";
 "widgets.rows" = "Read";
 "widgets.pending" = "Ootel";

@@ -122,3 +122,39 @@ func pruebaAviso(t *testing.T, tipo, producto string, destino *url.URL) {
 		t.Errorf("%s: la app de %q no entiende %v", tipo, producto, nativo)
 	}
 }
+
+// TestLaAccionDelWidgetSoloLlegaALaRaizDeSuApp: `?action=create` y compañía son de la
+// raíz del esquema de SU app (con o sin prefijo y organización), como único parámetro.
+func TestLaAccionDelWidgetSoloLlegaALaRaizDeSuApp(t *testing.T) {
+	for enlace, quiero := range map[string]string{
+		"sytue-contacts:/?action=create":               "create",
+		"sytue-contacts:/contacts/?action=create":      "create",
+		"sytue-contacts:/contacts/acme/?action=create": "create",
+		"sytue-photos:/?action=upload":                 "upload",
+		"sytue-notes:?action=create":                   "create",
+		"sytue-contacts:/?action=create&title=x":       "",
+		"sytue-contacts:/?action=create&action=x":      "",
+		"sytue-contacts:/contacts/x/y?action=create":   "",
+		"sytue-notes:/?action=create":                  "",
+		"https://contacts.sytue.eu/?action=create":     "",
+	} {
+		u, err := url.Parse(enlace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		producto := "contacts"
+		switch u.Scheme {
+		case "sytue-photos":
+			producto = "photos"
+		case "sytue-notes":
+			if enlace == "sytue-notes:/?action=create" {
+				producto = "contacts" // de otra app: no es suya
+			} else {
+				producto = "notes"
+			}
+		}
+		if got := LeerAccion(producto, u); got != quiero {
+			t.Errorf("%s (%s): %q, quiero %q", enlace, producto, got, quiero)
+		}
+	}
+}

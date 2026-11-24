@@ -506,6 +506,9 @@ export const ga: Catalog = {
   'widgets.compose': 'Cum',
   'widgets.storage': 'Stóras',
   'widgets.create': 'Cruthaigh imeacht',
+  'widgets.newNote': 'Nóta nua',
+  'widgets.newContact': 'Teagmhálaí nua',
+  'widgets.addPhotos': 'Cuir grianghraif leis',
   'widgets.updatedAgo': 'Nuashonraithe {time}',
   'widgets.updatedAt': 'Nuashonraithe: {time}',
 

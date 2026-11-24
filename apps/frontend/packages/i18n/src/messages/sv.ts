@@ -488,6 +488,9 @@ export const sv: Catalog = {
   'widgets.compose': 'Skriv',
   'widgets.storage': 'Lagring',
   'widgets.create': 'Skapa händelse',
+  'widgets.newNote': 'Ny anteckning',
+  'widgets.newContact': 'Ny kontakt',
+  'widgets.addPhotos': 'Lägg till foton',
   'widgets.updatedAgo': 'Uppdaterad {time}',
   'widgets.updatedAt': 'Uppdaterad: {time}',
 

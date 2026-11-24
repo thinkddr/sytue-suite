@@ -1,6 +1,9 @@
 "widgets.open" = "Openen";
 "widgets.compose" = "Opstellen";
 "widgets.create" = "Afspraak maken";
+"widgets.newNote" = "Nieuwe notitie";
+"widgets.newContact" = "Nieuw contact";
+"widgets.addPhotos" = "Foto's toevoegen";
 "widgets.notes" = "Notities";
 "widgets.rows" = "Rijen";
 "widgets.pending" = "In behandeling";

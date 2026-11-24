@@ -1,6 +1,9 @@
 "widgets.open" = "Atvērt";
 "widgets.compose" = "Rakstīt";
 "widgets.create" = "Izveidot notikumu";
+"widgets.newNote" = "Jauna piezīme";
+"widgets.newContact" = "Jauns kontakts";
+"widgets.addPhotos" = "Pievienot fotoattēlus";
 "widgets.notes" = "Piezīmes";
 "widgets.rows" = "Rindas";
 "widgets.pending" = "Gaida";

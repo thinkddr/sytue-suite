@@ -85,7 +85,10 @@ type App struct {
 	// pedido es el contacto que pidió un enlace, hasta que su libreta carga; y
 	// libretaPedida, su libreta si el enlace llegó antes que las libretas.
 	pedido, libretaPedida string
-	favoritos             map[string]bool
+	// nuevoPedido: la acción «Nuevo contacto» del widget llegó antes que la lista; el
+	// formulario se abre al llegar (PedirNuevo).
+	nuevoPedido bool
+	favoritos   map[string]bool
 	// destacando son los UID con su SetFavorite en vuelo (ver destacar).
 	destacando map[string]bool
 	marcados   map[string]bool
@@ -816,7 +819,7 @@ func (a *App) Vaciar() {
 		d.Cerrar()
 		delete(a.escrituras, key)
 	}
-	a.pedido, a.libretaPedida = "", ""
+	a.pedido, a.libretaPedida, a.nuevoPedido = "", "", false
 	p := a.Pantalla
 	a.todos = nil
 	clear(a.favoritos)
@@ -901,6 +904,10 @@ func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
 		}
 		a.repintar()
 		a.abrirPedido()
+		if a.nuevoPedido {
+			a.nuevoPedido = false
+			a.abrirFormulario(nil)
+		}
 	})
 }
 

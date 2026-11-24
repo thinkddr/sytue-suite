@@ -1,6 +1,9 @@
 "widgets.open" = "Apri";
 "widgets.compose" = "Scrivi";
 "widgets.create" = "Crea evento";
+"widgets.newNote" = "Nuova nota";
+"widgets.newContact" = "Nuovo contatto";
+"widgets.addPhotos" = "Aggiungi foto";
 "widgets.notes" = "Note";
 "widgets.rows" = "Righe";
 "widgets.pending" = "In sospeso";

@@ -236,6 +236,39 @@ public final class WidgetSnapshot {
         return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
     }
 
+    /**
+     * A dónde lleva tocar una fila: su ruta dentro de esta app con el esquema del catálogo
+     * firmado (el JSON no lo elige), o la app si no tiene. La ruta ya pasó validRoute al
+     * leer el snapshot; se vuelve a mirar aquí.
+     */
+    public static String destinoDeFila(String scheme, Item item) {
+        if (item == null || item.route.isEmpty() || !validRoute(item.route)) {
+            return scheme + ":/";
+        }
+        return scheme + ":" + item.route;
+    }
+
+    /**
+     * Las acciones rápidas de cada producto, además de «open»: abren un formulario, una
+     * pregunta o el selector del sistema que la persona confirma; un enlace nunca escribe
+     * nada solo. La misma tabla en generar.py, android-widgets.py y Snapshot.swift.
+     */
+    public static boolean accionPermitida(String product, String action) {
+        if (product == null || action == null) {
+            return false;
+        }
+        switch (action) {
+            case "compose":
+                return "mail".equals(product);
+            case "create":
+                return "calendar".equals(product) || "contacts".equals(product) || "notes".equals(product);
+            case "upload":
+                return "photos".equals(product);
+            default:
+                return false;
+        }
+    }
+
     public boolean visible(String expectedProduct, Entorno entorno, long now) {
         if (entorno == null || !entorno.permite() || !active || version != VERSION || product == null
                 || !product.equals(expectedProduct)

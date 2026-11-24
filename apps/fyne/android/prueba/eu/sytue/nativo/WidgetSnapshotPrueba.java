@@ -202,6 +202,16 @@ public final class WidgetSnapshotPrueba {
         check(agenda.conVigentes(mediodia, madrid).items.size() == 1
                 && agenda.conVigentes(mediodia, madrid).items.get(0).title.equals("Reunión"), "only current calendar rows");
         check(pronto.conVigentes(mediodia + 3600, madrid) == pronto, "other products are not trimmed");
+        check(WidgetSnapshot.accionPermitida("mail", "compose") && WidgetSnapshot.accionPermitida("calendar", "create")
+                && WidgetSnapshot.accionPermitida("contacts", "create") && WidgetSnapshot.accionPermitida("notes", "create")
+                && WidgetSnapshot.accionPermitida("photos", "upload"), "each product keeps its quick action");
+        check(!WidgetSnapshot.accionPermitida("docs", "create") && !WidgetSnapshot.accionPermitida("mail", "create")
+                && !WidgetSnapshot.accionPermitida("photos", "create") && !WidgetSnapshot.accionPermitida("drive", "upload")
+                && !WidgetSnapshot.accionPermitida("mail", "search") && !WidgetSnapshot.accionPermitida(null, "open"),
+                "no action outside the table");
+        WidgetSnapshot.Item conRuta = new WidgetSnapshot.Item("x", "", "", "", 0, 0, false, false, false, "/edit?id=d1");
+        check(WidgetSnapshot.destinoDeFila("sytue-docs", conRuta).equals("sytue-docs:/edit?id=d1"), "a row opens its element");
+        check(WidgetSnapshot.destinoDeFila("sytue-docs", okItem).equals("sytue-docs:/"), "a row without route opens the app");
         System.out.println("Widget snapshot: " + checks + " checks passed");
     }
 }

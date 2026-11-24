@@ -1,6 +1,9 @@
 "widgets.open" = "Öppna";
 "widgets.compose" = "Skriv";
 "widgets.create" = "Skapa händelse";
+"widgets.newNote" = "Ny anteckning";
+"widgets.newContact" = "Ny kontakt";
+"widgets.addPhotos" = "Lägg till foton";
 "widgets.notes" = "Anteckningar";
 "widgets.rows" = "Rader";
 "widgets.pending" = "Väntande";

@@ -24,6 +24,7 @@ ET.register_namespace("android", ANDROID)
 ATTR = "{" + ANDROID + "}"
 LABELS = {
     "open": "widgets.open", "compose": "widgets.compose", "create": "widgets.create",
+    "upload": "widgets.addPhotos",
     "unread": "notifications.unread", "files": "dataflow.item.files",
     "events": "dataflow.item.events", "documents": "dataflow.item.documents",
     "contacts": "dataflow.item.contacts", "notes": "widgets.notes", "rows": "widgets.rows",
@@ -45,6 +46,14 @@ LABELS = {
 # nunca con una variable del runner.
 FONDO_GO = True
 
+# Las acciones rápidas de cada producto, además de «open»: abren un formulario, una
+# pregunta o el selector del sistema que la persona confirma. La misma tabla en
+# xcode/generar.py, Snapshot.swift y WidgetSnapshot.accionPermitida.
+ACCIONES = {"mail": {"compose"}, "calendar": {"create"}, "contacts": {"create"},
+            "notes": {"create"}, "photos": {"upload"}}
+# El rótulo de «create» en cada producto: el de Calendar es «Crear evento».
+CREAR = {"contacts": "widgets.newContact", "notes": "widgets.newNote"}
+
 
 def metadata(appdir):
     data = tomllib.loads((appdir / "FyneApp.toml").read_text())
@@ -56,11 +65,7 @@ def metadata(appdir):
     # «search» ya no es una acción de los widgets (2026-11-24, ADR 0078): se ignora si un
     # FyneApp.toml aún la declara (Mail, que cambia en otra rama).
     actions = [a for a in dev.get("widget_acciones", "").split(",") if a != "search"]
-    allowed = {"open"}
-    if product == "mail":
-        allowed.add("compose")
-    if product == "calendar":
-        allowed.add("create")
+    allowed = {"open"} | ACCIONES.get(product, set())
     if not actions or actions[0] != "open" or len(actions) != len(set(actions)) or not set(actions) <= allowed:
         raise ValueError("acciones del widget no permitidas")
     locales = {}
@@ -70,6 +75,7 @@ def metadata(appdir):
         # Sin datos (sin sesión, caducado), el widget dice qué es la app en vez de quedarse
         # en blanco, con «Abrir» debajo: la misma descripción que el de Apple.
         locales[source.stem]["description"] = catalog["app." + product + ".description"]
+        locales[source.stem]["create"] = catalog[CREAR.get(product, "widgets.create")]
     if "en" not in locales or not isinstance(locales["en"]["unread"], dict):
         raise ValueError("catálogo nativo incompleto")
     return {"version": 1, "id": bundle, "name": details["Name"], "scheme": scheme,

@@ -324,6 +324,20 @@ func (a *App) favoritasDeLaSeleccion() {
 // persona, que es donde viven (decisión de almacén de Sytue Fotos).
 const CarpetaFotos = "Fotos"
 
+// AnyadirFotos es la acción «Añadir fotos» del widget nativo (`?action=upload`): el
+// mismo selector del sistema que el botón de la galería, en «Fotos». Lo elegido se sube
+// al confirmar el selector; el enlace solo lo abre. Con el editor abierto no hace nada:
+// no se cierra a medias lo que se está editando. En el hilo de la interfaz.
+func (a *App) AnyadirFotos() {
+	if a.ed != nil {
+		return
+	}
+	if !a.enLineaDeTiempo() {
+		a.Ir(RutaFotos)
+	}
+	a.elegirFicheros()
+}
+
 // elegirFicheros es «Añadir fotos»: el selector de ficheros DEL SISTEMA, con varios a
 // la vez, como el `<input type="file" multiple accept="image/*">` de la web.
 func (a *App) elegirFicheros() {

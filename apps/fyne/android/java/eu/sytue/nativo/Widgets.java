@@ -305,8 +305,7 @@ public final class Widgets extends AppWidgetProvider {
                     for (int n = 0; n < actions.length(); n++) {
                         String act = actions.getString(n);
                         // Las únicas escrituras son formularios existentes que la persona debe confirmar.
-                        if (("mail".equals(product) && "compose".equals(act))
-                                || ("calendar".equals(product) && "create".equals(act))) {
+                        if (WidgetSnapshot.accionPermitida(product, act)) {
                             views.setViewVisibility(resource(ctx, "id", "sytue_widget_extra"), View.VISIBLE);
                             views.setTextColor(resource(ctx, "id", "sytue_widget_extra"), brandColor);
                             action(ctx, views, "sytue_widget_extra", labels.getString(act),
@@ -477,21 +476,9 @@ public final class Widgets extends AppWidgetProvider {
             }
             String rotulo = item.subtitle.isEmpty() ? item.title : item.title + ", " + item.subtitle;
             mostrarImagen(views, resource(ctx, "id", nombre), fila, rotulo);
-            clickDestination(ctx, views, nombre, destinoDeFila(scheme, item), widget,
+            clickDestination(ctx, views, nombre, WidgetSnapshot.destinoDeFila(scheme, item), widget,
                     (alLado ? CLIC_LADO : CLIC_FILA) + i);
         }
-    }
-
-    /**
-     * A dónde lleva tocar una fila: su ruta dentro de esta app con el esquema del catálogo
-     * firmado (el JSON no lo elige), o la app si no tiene. La ruta ya pasó
-     * WidgetSnapshot.validRoute al leer el snapshot; se vuelve a mirar aquí.
-     */
-    static String destinoDeFila(String scheme, WidgetSnapshot.Item item) {
-        if (item.route.isEmpty() || !WidgetSnapshot.validRoute(item.route)) {
-            return scheme + ":/";
-        }
-        return scheme + ":" + item.route;
     }
 
     private static void mostrarImagen(RemoteViews views, int id, Bitmap bmp, String descripcion) {

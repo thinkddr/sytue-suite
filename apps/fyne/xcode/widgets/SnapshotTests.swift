@@ -47,7 +47,19 @@ struct SnapshotContractTests {
                 "an event action cannot be exported by Mail")
         require(SytueWidgetActions.routes(product: "calendar", scheme: "sytue-calendar", declared: ["compose"])["compose"] == nil,
                 "a compose action cannot be exported by Calendar")
-        require(SytueWidgetActions.order == ["open", "compose", "create"], "actions retain a predictable visual and VoiceOver order")
+        require(SytueWidgetActions.order == ["open", "compose", "create", "upload"], "actions retain a predictable visual and VoiceOver order")
+        require(SytueWidgetActions.routes(product: "contacts", scheme: "sytue-contacts", declared: ["open", "create"])["create"]?.absoluteString
+                == "sytue-contacts:/?action=create", "contacts opens its new-contact form")
+        require(SytueWidgetActions.routes(product: "notes", scheme: "sytue-notes", declared: ["create"])["create"]?.absoluteString
+                == "sytue-notes:/?action=create", "notes asks for a new note")
+        require(SytueWidgetActions.routes(product: "photos", scheme: "sytue-photos", declared: ["upload", "create"]).count == 1,
+                "photos only exports its picker")
+        require(SytueWidgetActions.routes(product: "docs", scheme: "sytue-docs", declared: ["upload"]).isEmpty,
+                "an action outside the product's table is never exported")
+        require(SytueWidgetActions.label(for: "create", product: "contacts") == "widgets.newContact"
+                && SytueWidgetActions.label(for: "create", product: "notes") == "widgets.newNote"
+                && SytueWidgetActions.label(for: "upload", product: "photos") == "widgets.addPhotos",
+                "each product names its own action")
         require(SytueWidgetActions.label(for: "create") == "widgets.create"
                 && SytueWidgetActions.symbol(for: "create") == "calendar.badge.plus", "create has a translated name alongside its symbol")
         // Cada fila lleva a su elemento con la ruta que escribió la app (widgets.Ruta): en

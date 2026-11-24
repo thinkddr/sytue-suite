@@ -505,6 +505,9 @@ export const pl: Catalog = {
   'widgets.compose': 'Napisz',
   'widgets.storage': 'Miejsce',
   'widgets.create': 'Utwórz wydarzenie',
+  'widgets.newNote': 'Nowa notatka',
+  'widgets.newContact': 'Nowy kontakt',
+  'widgets.addPhotos': 'Dodaj zdjęcia',
   'widgets.updatedAgo': 'Zaktualizowano {time}',
   'widgets.updatedAt': 'Zaktualizowano: {time}',
 

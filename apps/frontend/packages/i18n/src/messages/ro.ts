@@ -501,6 +501,9 @@ export const ro: Catalog = {
   'widgets.compose': 'Compune',
   'widgets.storage': 'Stocare',
   'widgets.create': 'Creează eveniment',
+  'widgets.newNote': 'Notiță nouă',
+  'widgets.newContact': 'Contact nou',
+  'widgets.addPhotos': 'Adaugă fotografii',
   'widgets.updatedAgo': 'Actualizat {time}',
   'widgets.updatedAt': 'Actualizat: {time}',
 

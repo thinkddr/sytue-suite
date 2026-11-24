@@ -503,6 +503,9 @@ export const sl: Catalog = {
   'widgets.compose': 'Napiši',
   'widgets.storage': 'Shramba',
   'widgets.create': 'Ustvari dogodek',
+  'widgets.newNote': 'Nov zapisek',
+  'widgets.newContact': 'Nov stik',
+  'widgets.addPhotos': 'Dodaj fotografije',
   'widgets.updatedAgo': 'Posodobljeno {time}',
   'widgets.updatedAt': 'Posodobljeno: {time}',
 

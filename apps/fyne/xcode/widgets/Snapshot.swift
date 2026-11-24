@@ -9,16 +9,34 @@ enum SytueWidgetActions {
     // «Buscar» ya no es una acción de los widgets (2026-11-24, ADR 0078): el dueño los
     // quitó porque no aportaban. Un `search` que siga declarado en un FyneApp.toml no da
     // ruta ni widget.
-    static let order = ["open", "compose", "create"]
+    static let order = ["open", "compose", "create", "upload"]
 
-    static func label(for action: String) -> String {
-        "widgets." + action
+    // Las acciones rápidas de cada producto, además de «open» (ADR 0078): cada una abre un
+    // formulario, una pregunta o el selector del sistema que la persona confirma. La misma
+    // tabla en generar.py, android-widgets.py y WidgetSnapshot.accionPermitida (Java).
+    static let allowed: [String: Set<String>] = [
+        "mail": ["compose"], "calendar": ["create"], "contacts": ["create"], "notes": ["create"],
+        "photos": ["upload"],
+    ]
+
+    // El rótulo traducido de una acción en su producto: «create» es «Crear evento» en
+    // Calendar, «Nuevo contacto» en Contacts y «Nueva nota» en Notes.
+    static func label(for action: String, product: String = "calendar") -> String {
+        switch (action, product) {
+        case ("create", "contacts"): return "widgets.newContact"
+        case ("create", "notes"): return "widgets.newNote"
+        case ("upload", _): return "widgets.addPhotos"
+        default: return "widgets." + action
+        }
     }
 
-    static func symbol(for action: String) -> String {
-        switch action {
-        case "compose": return "square.and.pencil"
-        case "create": return "calendar.badge.plus"
+    static func symbol(for action: String, product: String = "calendar") -> String {
+        switch (action, product) {
+        case ("compose", _): return "square.and.pencil"
+        case ("create", "contacts"): return "person.crop.circle.badge.plus"
+        case ("create", "notes"): return "note.text.badge.plus"
+        case ("create", _): return "calendar.badge.plus"
+        case ("upload", _): return "photo.on.rectangle.angled"
         default: return "arrow.up.right"
         }
     }
@@ -38,12 +56,10 @@ enum SytueWidgetActions {
         guard !product.isEmpty, scheme == "sytue-" + product else { return [:] }
         var routes = [String: URL]()
         for action in declared {
-            if action == "open" { routes[action] = URL(string: scheme + ":/") }
-            if action == "compose", product == "mail" {
-                routes[action] = URL(string: scheme + ":/?action=compose")
-            }
-            if action == "create", product == "calendar" {
-                routes[action] = URL(string: scheme + ":/?action=create")
+            if action == "open" {
+                routes[action] = URL(string: scheme + ":/")
+            } else if allowed[product]?.contains(action) == true {
+                routes[action] = URL(string: scheme + ":/?action=" + action)
             }
         }
         return routes

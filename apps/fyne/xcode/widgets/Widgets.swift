@@ -425,10 +425,11 @@ private struct SytueStorageBarView: View {
 
 private struct SytueWidgetActionLabel: View {
     let action: String
+    var product = ""
 
     var body: some View {
-        Label(LocalizedStringKey(SytueWidgetActions.label(for: action)),
-              systemImage: SytueWidgetActions.symbol(for: action))
+        Label(LocalizedStringKey(SytueWidgetActions.label(for: action, product: product)),
+              systemImage: SytueWidgetActions.symbol(for: action, product: product))
     }
 }
 
@@ -446,19 +447,19 @@ private struct SytueQuickActionsBar: View {
                 if let destination = configuration.actions[action] {
                     Link(destination: destination) {
                         if iconOnly {
-                            Image(systemName: SytueWidgetActions.symbol(for: action))
+                            Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product))
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(configuration.brandColor)
                                 .frame(width: 24, height: 24)
                                 .background(configuration.brandColor.opacity(0.14))
                                 .clipShape(Circle())
                                 .sytueAccentable()
-                                .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action))))
+                                .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product))))
                         } else {
                             HStack(spacing: 4) {
-                                Image(systemName: SytueWidgetActions.symbol(for: action))
+                                Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product))
                                     .font(.system(size: 10, weight: .semibold))
-                                Text(LocalizedStringKey(SytueWidgetActions.label(for: action)))
+                                Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product)))
                                     .font(.caption2.weight(.semibold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
@@ -1478,19 +1479,19 @@ struct SytueActionWidgetView: View {
     let configuration = SytueWidgetConfiguration()
 
     private var title: some View {
-        SytueWidgetActionLabel(action: action).lineLimit(2).minimumScaleFactor(0.8)
+        SytueWidgetActionLabel(action: action, product: configuration.product).lineLimit(2).minimumScaleFactor(0.8)
     }
 
     @ViewBuilder private var content: some View {
         #if os(iOS)
         if #available(iOSApplicationExtension 16.0, *), family == .accessoryInline {
-            SytueWidgetActionLabel(action: action)
+            SytueWidgetActionLabel(action: action, product: configuration.product)
         } else if #available(iOSApplicationExtension 16.0, *), family == .accessoryCircular {
             ZStack {
                 AccessoryWidgetBackground()
-                Image(systemName: SytueWidgetActions.symbol(for: action)).font(.title2)
+                Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product)).font(.title2)
             }
-            .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action))))
+            .accessibilityLabel(Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product))))
         } else if #available(iOSApplicationExtension 16.0, *), family == .accessoryRectangular {
             VStack(alignment: .leading, spacing: 2) {
                 Text(configuration.name).font(.headline).lineLimit(1)
@@ -1524,12 +1525,12 @@ struct SytueActionWidgetView: View {
                     Circle()
                         .fill(configuration.brandColor.opacity(0.16))
                         .frame(width: 32, height: 32)
-                    Image(systemName: SytueWidgetActions.symbol(for: action))
+                    Image(systemName: SytueWidgetActions.symbol(for: action, product: configuration.product))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(configuration.brandColor)
                         .sytueAccentable()
                 }
-                Text(LocalizedStringKey(SytueWidgetActions.label(for: action)))
+                Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product)))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
@@ -1592,7 +1593,7 @@ private func actionConfiguration(_ action: String) -> some WidgetConfiguration {
     return StaticConfiguration(kind: configuration.bundle + ".widgets." + action, provider: SytueWidgetActionProvider()) { _ in
         SytueActionWidgetView(action: action)
     }
-    .configurationDisplayName(Text(LocalizedStringKey(SytueWidgetActions.label(for: action))))
+    .configurationDisplayName(Text(LocalizedStringKey(SytueWidgetActions.label(for: action, product: configuration.product))))
     .description(Text(configuration.name))
     .supportedFamilies(actionFamilies())
 }
@@ -1612,6 +1613,13 @@ struct SytueCreateWidget: Widget {
     }
 }
 
+// «Añadir fotos» de Photos: abre el selector del sistema; lo elegido se sube al confirmarlo.
+struct SytueUploadWidget: Widget {
+    var body: some WidgetConfiguration {
+        actionConfiguration("upload")
+    }
+}
+
 @main
 struct SytueWidgets: WidgetBundle {
     var body: some Widget {
@@ -1623,6 +1631,9 @@ struct SytueWidgets: WidgetBundle {
         #endif
         #if SYTUE_WIDGET_ACTION_CREATE
         SytueCreateWidget()
+        #endif
+        #if SYTUE_WIDGET_ACTION_UPLOAD
+        SytueUploadWidget()
         #endif
     }
 }

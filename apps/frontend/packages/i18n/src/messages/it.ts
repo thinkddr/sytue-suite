@@ -501,6 +501,9 @@ export const it: Catalog = {
   'widgets.compose': 'Scrivi',
   'widgets.storage': 'Spazio di archiviazione',
   'widgets.create': 'Crea evento',
+  'widgets.newNote': 'Nuova nota',
+  'widgets.newContact': 'Nuovo contatto',
+  'widgets.addPhotos': 'Aggiungi foto',
   'widgets.updatedAgo': 'Aggiornato {time}',
   'widgets.updatedAt': 'Aggiornato: {time}',
 

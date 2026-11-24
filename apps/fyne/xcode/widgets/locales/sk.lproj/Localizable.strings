@@ -1,6 +1,9 @@
 "widgets.open" = "Otvoriť";
 "widgets.compose" = "Napísať";
 "widgets.create" = "Vytvoriť udalosť";
+"widgets.newNote" = "Nová poznámka";
+"widgets.newContact" = "Nový kontakt";
+"widgets.addPhotos" = "Pridať fotky";
 "widgets.notes" = "Poznámky";
 "widgets.rows" = "Riadky";
 "widgets.pending" = "Čakajúce";

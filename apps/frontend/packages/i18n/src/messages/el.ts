@@ -505,6 +505,9 @@ export const el: Catalog = {
   'widgets.compose': 'Σύνταξη',
   'widgets.storage': 'Αποθηκευτικός χώρος',
   'widgets.create': 'Δημιουργία συμβάντος',
+  'widgets.newNote': 'Νέα σημείωση',
+  'widgets.newContact': 'Νέα επαφή',
+  'widgets.addPhotos': 'Προσθήκη φωτογραφιών',
   'widgets.updatedAgo': 'Ενημερώθηκε {time}',
   'widgets.updatedAt': 'Ενημέρωση: {time}',
 

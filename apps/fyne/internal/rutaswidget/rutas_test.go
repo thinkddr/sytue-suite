@@ -10,6 +10,10 @@ package rutaswidget_test
 
 import (
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,4 +134,59 @@ func TestCadaFilaDelWidgetAbreSuElemento(t *testing.T) {
 			t.Fatalf("One abre %v", d)
 		}
 	})
+}
+
+// TestCadaAccionDelWidgetTieneQuienLaAtienda: cada acción rápida que declara un
+// FyneApp.toml (`widget_acciones`, la que ponen los widgets de Apple y de Android como
+// `sytue-<producto>:/?action=<acción>`) la lee el receptor de esa app y abre un
+// formulario, una pregunta o el selector: Calendar su formulario, Contacts el suyo
+// (contactos.App.PedirNuevo), Notes la pregunta de «Nueva nota» (notes.Entrante.Crear) y
+// Photos el selector (photos.App.AnyadirFotos). Una acción nueva sin receptor falla aquí.
+func TestCadaAccionDelWidgetTieneQuienLaAtienda(t *testing.T) {
+	atiende := map[string]func(*url.URL) bool{
+		"calendar/create": func(u *url.URL) bool {
+			_, ok := calendario.LeerIntencion(u.Query(), time.Now(), time.UTC)
+			return ok
+		},
+		"contacts/create": func(u *url.URL) bool { return api.LeerAccion("contacts", u) == "create" },
+		"notes/create": func(u *url.URL) bool {
+			e, ok := notes.LeerEntrante(u)
+			return ok && e.Crear
+		},
+		"photos/upload": func(u *url.URL) bool { return api.LeerAccion("photos", u) == "upload" },
+		// Mail la atiende su propia rama (cmd/mail, fuera de este cambio).
+		"mail/compose": func(u *url.URL) bool { return api.LeerAccion("mail", u) == "compose" },
+	}
+	tomls, err := filepath.Glob(filepath.Join("..", "..", "cmd", "*", "FyneApp.toml"))
+	if err != nil || len(tomls) < 15 {
+		t.Fatalf("sin los FyneApp.toml: %v", err)
+	}
+	esquema := regexp.MustCompile(`(?m)^\s*esquema\s*=\s*"sytue-([a-z0-9-]+)"`)
+	acciones := regexp.MustCompile(`(?m)^\s*widget_acciones\s*=\s*"([^"]*)"`)
+	vistas := 0
+	for _, ruta := range tomls {
+		datos, err := os.ReadFile(ruta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e, a := esquema.FindSubmatch(datos), acciones.FindSubmatch(datos)
+		if e == nil || a == nil {
+			continue
+		}
+		producto := string(e[1])
+		for _, accion := range strings.Split(string(a[1]), ",") {
+			if accion == "open" || accion == "search" {
+				continue
+			}
+			lee, ok := atiende[producto+"/"+accion]
+			u, _ := url.Parse(api.Esquema(producto) + ":/?action=" + accion)
+			if !ok || !lee(u) {
+				t.Errorf("%s declara la acción %q y su app no la atiende", ruta, accion)
+			}
+			vistas++
+		}
+	}
+	if vistas < 5 {
+		t.Fatalf("solo %d acciones declaradas; son cinco (mail, calendar, contacts, notes, photos)", vistas)
+	}
 }

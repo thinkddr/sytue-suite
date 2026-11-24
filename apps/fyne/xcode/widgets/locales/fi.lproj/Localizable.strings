@@ -1,6 +1,9 @@
 "widgets.open" = "Avaa";
 "widgets.compose" = "Kirjoita";
 "widgets.create" = "Luo tapahtuma";
+"widgets.newNote" = "Uusi muistiinpano";
+"widgets.newContact" = "Uusi yhteystieto";
+"widgets.addPhotos" = "Lisää kuvia";
 "widgets.notes" = "Muistiinpanot";
 "widgets.rows" = "Rivit";
 "widgets.pending" = "Odottaa";

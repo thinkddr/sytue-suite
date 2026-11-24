@@ -234,8 +234,8 @@ struct SnapshotContractTests {
         try reset()
         require(SytueWidgetSnapshots.load(directory: root, bundle: "../sesion.marca", product: "rooms", now: now) == nil,
                 "untrusted bundle cannot choose another path")
-        // La línea de tiempo `.atEnd`: precalculada, sin la entrada vacía de 24 h cuando la
-        // lectura es protegida.
+        // La línea de tiempo: precalculada, sin la entrada vacía de 24 h cuando la lectura es
+        // protegida.
         try reset()
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC")!
@@ -269,7 +269,12 @@ struct SnapshotContractTests {
         } else {
             require(false, "the 24 h calendar snapshot is visible")
         }
-        require(SytueWidgetTimeline.plan(for: .hidden, now: start, calendar: utc) == .empty, "nothing to show, no reloads")
+        require(SytueWidgetTimeline.plan(for: .hidden, now: start, calendar: utc) == .empty, "nothing to show, no entries")
+        // WidgetKit vuelve a leer a los 15 min (o en la caducidad, si llega antes).
+        require(SytueWidgetTimeline.reread == 900, "rereads every 15 min, like the background refresh")
+        require(SytueWidgetTimeline.rereadDate(now: start) == start.addingTimeInterval(900), "reread without expiry")
+        require(SytueWidgetTimeline.rereadDate(now: start, expiry: start.addingTimeInterval(600)) == start.addingTimeInterval(600),
+                "never reread after the expiry")
         require(SytueWidgetTimeline.plan(for: .protected, now: start, calendar: utc) == .protected(retry: start.addingTimeInterval(300)),
                 "a protected read retries in 5 min")
         try reset()

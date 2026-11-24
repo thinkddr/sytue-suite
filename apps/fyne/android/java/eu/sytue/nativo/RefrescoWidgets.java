@@ -24,7 +24,7 @@ import org.json.JSONObject;
 
 /**
  * El widget de esta app, al día con la app cerrada (ADR 0078, enmienda del 2026-11-06,
- * pieza 6). Sin Google no hay push en Android: hay un trabajo periódico (cada hora, con
+ * pieza 6). Sin Google no hay push en Android: hay un trabajo periódico (cada 15 min, con
  * red y sin batería baja) y otro suelto que encola One cuando oye la señal de cambios de
  * este producto (RelevoWidgets).
  *
@@ -63,7 +63,10 @@ public final class RefrescoWidgets extends JobService {
         }
     }
 
-    /** Encola el periódico si no está (o si está con otro modo, tras una actualización). */
+    /**
+     * Encola el periódico si no está, o si está con otro modo o con otro periodo (tras una
+     * actualización: el de cada hora de antes se cambia por el de RefrescoReglas.CADA_MS).
+     */
     static void programar(Context ctx) {
         JobScheduler trabajos = ctx.getSystemService(JobScheduler.class);
         if (trabajos == null) {
@@ -71,7 +74,9 @@ public final class RefrescoWidgets extends JobService {
         }
         boolean go = conGo(ctx);
         JobInfo actual = trabajos.getPendingJob(PERIODICO);
-        if (actual != null && actual.getExtras().getBoolean(EXTRA_GO, false) == go) {
+        if (actual != null && actual.getExtras().getBoolean(EXTRA_GO, false) == go
+                && actual.getIntervalMillis() == RefrescoReglas.CADA_MS
+                && actual.getFlexMillis() == RefrescoReglas.HOLGURA_MS) {
             return;
         }
         PersistableBundle extras = new PersistableBundle();

@@ -277,17 +277,31 @@ enum SytueWidgetTimeline {
 
     // Qué línea de tiempo pide WidgetKit (Widgets.swift la traduce).
     enum Plan: Equatable {
-        // Las fechas con datos y, al final, la caducidad sin ellos; política `.atEnd`.
+        // Las fechas con datos y, al final, la caducidad sin ellos; se vuelve a leer a los
+        // `reread` (o en la caducidad, si llega antes).
         case entries([Date], expiry: Date)
         // La lectura falló por la protección de datos (el teléfono bloqueado): no es «no
         // hay datos». Se pinta el marco con el marcador y se vuelve a pedir en 5 min, sin
         // la entrada vacía de 24 h que borraría lo que ya había.
         case protected(retry: Date)
-        // Sin datos que enseñar: nada que recargar hasta que la app publique o borre.
+        // Sin datos que enseñar: se vuelve a mirar a los `reread`, por si la app publicó
+        // con su recarga sin presupuesto.
         case empty
     }
 
     static let protectedRetry: TimeInterval = 5 * 60
+
+    // Cada cuánto vuelve WidgetKit a leer el snapshot aunque la app no lo recargue: lo que
+    // publicaron la tarea de refresco o el aviso silencioso con la app al fondo llega aunque
+    // su reloadAllTimelines se quedara sin presupuesto. Es lo que la app pide a iOS para esa
+    // tarea (sesion.CadaRefrescoEnFondo); WidgetKit lo toma como un mínimo.
+    static let reread: TimeInterval = 15 * 60
+
+    static func rereadDate(now: Date, expiry: Date? = nil) -> Date {
+        let next = now.addingTimeInterval(reread)
+        guard let expiry else { return next }
+        return min(next, expiry)
+    }
 
     static func plan(for reading: SytueWidgetReading, now: Date, calendar: Calendar) -> Plan {
         switch reading {

@@ -239,8 +239,10 @@ struct SytueWidgetProvider: TimelineProvider {
 
     // Formato 2 (ADR 0078): el snapshot vive hasta 24 h, así que la línea de tiempo se
     // precalcula entera —el «Actualizado hace X», las medianoches, el fin de cada evento y
-    // la caducidad sin datos— con `.atEnd`: sin recargas periódicas que gasten el
-    // presupuesto. Recarga la app (reloadAllTimelines) cuando publica o borra.
+    // la caducidad sin datos—. Recarga la app (reloadAllTimelines) cuando publica o borra
+    // y, además, WidgetKit vuelve a leer el fichero a los 15 min (`reread`): una recarga
+    // pedida desde el fondo puede quedarse sin presupuesto, y con `.atEnd` lo publicado
+    // por la tarea de refresco no se veía hasta la caducidad.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SytueWidgetEntry>) -> Void) {
         let date = Date()
         let reading = configuration.reading(at: date)
@@ -248,14 +250,15 @@ struct SytueWidgetProvider: TimelineProvider {
         case .entries(let dates, let expiry):
             let entries = dates.map { SytueWidgetEntry(date: $0, snapshot: reading.snapshot) }
                 + [SytueWidgetEntry(date: expiry, snapshot: nil)]
-            completion(Timeline(entries: entries, policy: .atEnd))
+            completion(Timeline(entries: entries, policy: .after(SytueWidgetTimeline.rereadDate(now: date, expiry: expiry))))
         case .protected(let retry):
             // No es «no hay datos»: con el teléfono bloqueado el contenedor no se lee. Nada
             // de entrada vacía de 24 h; se vuelve a pedir en 5 min.
             completion(Timeline(entries: [SytueWidgetEntry(date: date, snapshot: nil, isProtected: true)],
                                 policy: .after(retry)))
         case .empty:
-            completion(Timeline(entries: [SytueWidgetEntry(date: date, snapshot: nil)], policy: .never))
+            completion(Timeline(entries: [SytueWidgetEntry(date: date, snapshot: nil)],
+                                policy: .after(SytueWidgetTimeline.rereadDate(now: date))))
         }
     }
 }

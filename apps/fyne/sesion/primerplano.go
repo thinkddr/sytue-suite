@@ -75,7 +75,7 @@ func (s *Suite) repartir(vuelve bool) {
 // # Lo que dice que hay alguien sigue al primer plano (iOS)
 //
 // En iOS una app mandada al fondo se suspende, y hasta la tarea de refresco del widget
-// (fondo.go) no volvía a correr. Con ella, iOS la reanuda en segundo plano cada 30 min o
+// (fondo.go) no volvía a correr. Con ella, iOS la reanuda en segundo plano cada 15 min o
 // menos, y todo lo que estaba esperando vuelve a correr: el latido vencido publicaba «En
 // línea» de madrugada y el SSE de la barra se reconectaba. Por eso allí la presencia
 // (latir) y el SSE de la barra (ui.BarraSuite) se paran al dejar el primer plano y

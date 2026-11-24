@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode"
 )
 
@@ -293,4 +294,38 @@ func nombreDe(s *ast.SelectorExpr) string {
 		return id.Name + "." + s.Sel.Name
 	}
 	return s.Sel.Name
+}
+
+// TestLosRefrescosDelWidgetVanAlMismoRitmo: «continuo» con la app al fondo o cerrada es
+// lo que dejan las plataformas, y las tres piezas lo piden igual: la tarea de refresco de
+// iOS (CadaRefrescoEnFondo), la relectura de la línea de tiempo de WidgetKit
+// (SytueWidgetTimeline.reread) y el trabajo periódico de Android (RefrescoReglas.CADA_MS),
+// cada 15 min, que es el mínimo de JobScheduler y lo que Apple recomienda. Antes, iOS
+// pedía 30 min, la línea de tiempo no se releía hasta la caducidad (`.atEnd`, 24 h) y
+// Android iba cada hora.
+func TestLosRefrescosDelWidgetVanAlMismoRitmo(t *testing.T) {
+	if CadaRefrescoEnFondo != 15*time.Minute {
+		t.Fatalf("iOS pide el refresco cada %s; quiero 15 min", CadaRefrescoEnFondo)
+	}
+	fuentes := map[string]string{
+		filepath.Join("..", "xcode", "widgets", "Snapshot.swift"):                              "static let reread: TimeInterval = 15 * 60",
+		filepath.Join("..", "xcode", "widgets", "Widgets.swift"):                               "policy: .after(SytueWidgetTimeline.rereadDate(now: date, expiry: expiry))",
+		filepath.Join("..", "android", "java", "eu", "sytue", "nativo", "RefrescoReglas.java"): "static final long CADA_MS = 15L * 60 * 1000;",
+	}
+	for ruta, quiero := range fuentes {
+		texto, err := os.ReadFile(ruta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(texto), quiero) {
+			t.Errorf("%s no dice %q", ruta, quiero)
+		}
+	}
+	widgets, err := os.ReadFile(filepath.Join("..", "xcode", "widgets", "Widgets.swift"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(widgets), "policy: .atEnd") {
+		t.Error("Widgets.swift vuelve a `.atEnd`: lo publicado al fondo no se vería hasta la caducidad")
+	}
 }

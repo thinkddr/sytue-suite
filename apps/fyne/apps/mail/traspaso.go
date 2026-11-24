@@ -3,7 +3,7 @@
 
 package mail
 
-// paridad-web: apps/frontend/apps/mail/src/components/TraspasoBoveda.tsx
+// paridad-web: apps/frontend/apps/mail/src/pages/index.astro (la puerta de la bóveda de Mail, TraspasoBoveda.tsx)
 
 import (
 	"fyne.io/fyne/v2"

@@ -32,7 +32,7 @@ func TestPrivateStorageReleaseReturnsDriveToTheFrozenServerData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := privateRows(ctx, t, st, first, 100)
+	rows := privateRows(ctx, t, st, first, storage.MaxLegacySourceRows)
 
 	// Otra época, otro ámbito u otra persona: nada cambia.
 	if err := st.ReleasePrivateStorage(ctx, scope, release(uuid.New())); !errors.Is(err, pg.ErrPrivateStorageReleaseStale) {
@@ -76,7 +76,7 @@ func TestPrivateStorageReleaseReturnsDriveToTheFrozenServerData(t *testing.T) {
 	if again.Mode != "frozen" || again.Rows != frozen.Rows || again.Blobs != frozen.Blobs {
 		t.Fatalf("refrozen source differs: before %+v after %+v", frozen, again)
 	}
-	if got := privateRows(ctx, t, st, second, 100); len(got) != len(rows) {
+	if got := privateRows(ctx, t, st, second, storage.MaxLegacySourceRows); len(got) != len(rows) {
 		t.Fatalf("refrozen rows: got %d want %d", len(got), len(rows))
 	}
 	if _, err := st.PrivateStorageSourcePage(ctx, first, store.PrivateSourceCursor{}, 10); !errors.Is(err, domain.ErrPrivateStorageEpoch) {

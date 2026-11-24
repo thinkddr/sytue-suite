@@ -20,10 +20,12 @@ import {
   elegirAlmacenCorreo,
   olvidarTraspaso,
   pedirTraspaso,
+  quiereSeguirConMatrix,
+  seguirConMatrix,
   traspasoPedido,
   type DestinoCorreo,
 } from '../client/almacenCorreo.js';
-import { TraspasoBoveda } from './TraspasoBoveda.js';
+import { PasarABoveda, TraspasoBoveda } from './TraspasoBoveda.js';
 
 interface GateProps {
   actor: string;
@@ -35,7 +37,8 @@ interface GateProps {
 /**
  * La puerta del correo privado. Con `vault` (el conmutador de despliegue
  * `SYTUE_MAIL_BOVEDA`, ADR 0087), quien no tiene correo en Matrix lo abre en la
- * bóveda; quien ya lo tiene en Matrix sigue por Matrix. Sin él, siempre Matrix.
+ * bóveda; a quien lo tiene en Matrix se le ofrece pasarlo a la bóveda (vaciándolo)
+ * o seguir por ahora con Matrix. Sin el conmutador, siempre Matrix.
  */
 export function PrivateMailGate(props: GateProps & { vault?: boolean | undefined }) {
   const [almacen, setAlmacen] = useState<DestinoCorreo | null>(props.vault ? null : 'matrix');
@@ -55,7 +58,11 @@ export function PrivateMailGate(props: GateProps & { vault?: boolean | undefined
       .then((elegido) => {
         if (controller.signal.aborted) return;
         const pestana = almacenDePestana();
-        const destino = destinoCorreo(elegido, traspasoPedido(pestana, props.actor, props.tenant));
+        const destino = destinoCorreo(
+          elegido,
+          traspasoPedido(pestana, props.actor, props.tenant),
+          quiereSeguirConMatrix(pestana, props.actor, props.tenant),
+        );
         if (destino === 'boveda') olvidarTraspaso(pestana, props.actor, props.tenant);
         setAlmacen(destino);
       })
@@ -64,6 +71,20 @@ export function PrivateMailGate(props: GateProps & { vault?: boolean | undefined
   }, [props.vault, props.actor, props.tenant]);
   if (almacen === 'boveda') return <VaultMailGate {...props} />;
   if (almacen === 'traspaso') return <VaultMailGate {...props} traspaso />;
+  if (almacen === 'elegir')
+    return (
+      <PasarABoveda
+        locale={props.locale}
+        onConfirm={() => {
+          pedirTraspaso(almacenDePestana(), props.actor, props.tenant);
+          setAlmacen('traspaso');
+        }}
+        onKeep={() => {
+          seguirConMatrix(almacenDePestana(), props.actor, props.tenant);
+          setAlmacen('matrix');
+        }}
+      />
+    );
   if (almacen === 'matrix')
     return (
       <MatrixMailGate

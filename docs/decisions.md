@@ -7581,6 +7581,33 @@ What this second delivery **does not do**, and why:
    is drawn at the moment (or not drawn). Reading it from Sytue ID would be possible, but it is not
    mixed here with signing a PDF the server does not see.
 
+**Emptying the vault of Drive and the other apps (2026-11-24).** “Empty” did not let you start
+over in Drive on the web: the new vault has no import receipt, and `migrateDriveSource` can only
+import from a `frozen` source; with the source already `private` (or a freeze that does not match)
+it called `invalid()` and the gate went back to “The encrypted data could not be opened”.
+
+- Drive gains “release the source” (`soltarfuente`, migration `0042_private_storage_release`,
+  `Store.ReleasePrivateStorage`, `POST /api/v1/private-storage/migration/release`, exempt from the
+  legacy write guard; the BFF lets it through with the session checked). When “Empty” is
+  confirmed in Drive, `PqVaultGate` first releases the frozen source (`releaseBeforeEmpty`): it
+  goes back to the server data as it was frozen, the new vault freezes again and imports them. If
+  releasing asks to sign in, you come back to the same screen and it finishes without asking
+  again (`rememberPendingEmpty`, only that epoch, 10 min).
+- In every app, an “Empty” that asks to sign in **before** touching the vault (this browser lacked
+  the unlock key to seal the new one) is finished on return (`sytue.vault-reset.<product>`).
+  Before, the usual vault was opened, failed again and you had to empty again. If the vault was
+  already emptied (Mail asks to sign in afterwards, to register the signing key), it is not
+  marked: it is never emptied twice.
+- **Native apps, the same.** The Fyne gate (`PuertaBoveda`) gains `AntesDeVaciar`, which Drive uses
+  to release its source before `pqvault.Reset` (re-identifying if the service asks and trying once
+  more if the epoch changed); without the unlock key it releases nothing and asks to sign in, and on
+  return it finishes emptying (`vaciarAlEntrar`; “Retry” forgets it). If the vault opens but Drive
+  does not load, the failure notice offers “Empty” with its checkbox, which opens a new gate
+  emptying (`IniciarVaciando`). In the record apps (Calendar, Contacts, Notes, Bases, Cast, ERP and
+  the office apps) the Matrix panel offers “Empty and go back to the server data” whenever the
+  account goes through Matrix, whether it opens or not, like the web notice: whoever had their data
+  in Matrix goes back to the server data and carries on as on the web.
+
 **Signing on the device, third delivery: the PDF engine in the browser (2026-11-23).** The studio of
 a vault PDF stops being “view and sign”: it is drawn with the studio's canvas and is annotated,
 filled in, organized and run through the tools **on the device**, with the SAME engine as the Docs
@@ -7874,6 +7901,19 @@ proof is an HMAC, which the server cannot verify.
       ~400 ms once and then immediately for 30 s; after the handover, the vault does not open.
    8. _Unauthorized rotation._ A second rotation with the same authority, or one requested with a
       Matrix authority, is rejected and the current plan does not change.
+
+   **Fifth batch (2026-11-24): the switch is turned on and the move to the vault is direct.**
+   Owner's decision: Mail has to work with the vault like the rest of the apps.
+
+   - `SYTUE_MAIL_BOVEDA: activado` in the `mail` value of `charts/sytue-frontend` (production and
+     staging). The checklist above is to be run on the deployment.
+   - _Moving to the vault even if Matrix opens._ With a **confirmed** Matrix authority (`matrix`),
+     the gate no longer tries to open Matrix: it shows “Move your mail to the new vault”
+     (`PasarABoveda`), which empties and moves (the same handover, with a checkbox that the mail
+     encrypted with the previous system is lost) or lets you “keep the previous mail for now” in
+     that tab. When in doubt (`dudoso`: network, 5xx, odd answer, no organization) it goes through
+     Matrix without proposing to empty, as before. The “Can't open your mail?” exit of the Matrix
+     gate stays for whoever chooses to keep it.
 
 5. Withdrawal of the Matrix authority of `mail` and, afterwards, native clients.
 

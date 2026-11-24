@@ -210,8 +210,9 @@ export function rutaMigracionMatrixPrivada(options: {
       const path = (ctx.params.ruta ?? '').slice('migration'.length).replace(/^\//, ''),
         parts = path.split('/'),
         method = ctx.request.method,
-        // «Soltar la fuente» (ADR 0086): solo POST, con el mismo cuerpo acotado.
-        release = path === 'release' && product !== 'drive' && product !== 'photos';
+        // «Soltar la fuente» (ADR 0086): solo POST, con el mismo cuerpo acotado. Drive
+        // la suelta al vaciar su bóveda; Photos no tiene fuente propia que soltar.
+        release = path === 'release' && product !== 'photos';
       if (
         path !== '' &&
         !release &&
@@ -237,7 +238,8 @@ export function rutaMigracionMatrixPrivada(options: {
         )
       )
         return fail(400, 'private_storage_source_invalid');
-      if (strictOwner && !ctx.request.headers.has(sessionOwnerHeader))
+      // Soltar la fuente va siempre atada a la sesión comprobada (también en Drive).
+      if ((strictOwner || release) && !ctx.request.headers.has(sessionOwnerHeader))
         return fail(409, 'private_storage_session_required');
       const scope = privateStorageScope(ctx.request, session, product);
       if (scope instanceof Response) return scope;

@@ -960,4 +960,10 @@ export const pt: AppCatalog<typeof en> = {
     'O correio cifrado que já não consegue abrir não será recuperado. A partir de agora o seu correio abre com o seu início de sessão no Sytue ID, que poderá ter de repetir.',
   'privateMail.handoverUnderstood': 'Compreendo que o correio que não consigo abrir será perdido',
   'privateMail.handoverConfirm': 'Esvaziar e passar para o cofre',
+  'privateMail.vaultMoveTitle': 'Passe o seu correio para o novo cofre',
+  'privateMail.vaultMoveBody':
+    'O seu correio está cifrado com o sistema anterior. Para que abra com o seu início de sessão do Sytue ID, como as restantes aplicações, é preciso esvaziá-lo e recomeçar no cofre. O correio cifrado apenas com o sistema anterior perder-se-á.',
+  'privateMail.vaultMoveUnderstood':
+    'Compreendo que o correio cifrado com o sistema anterior se perderá',
+  'privateMail.vaultMoveKeep': 'Continuar com o correio anterior por agora',
 };

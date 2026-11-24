@@ -201,7 +201,7 @@ func TestElPanelNuncaEnsenaNiPideNingunaClave(t *testing.T) {
 }
 
 // «Vaciar y volver a los datos del servidor» (ADR 0086): solo en una app de
-// registros, solo cuando la clave no abre, y nunca a un clic: casilla obligatoria.
+// registros, y nunca a un clic: casilla obligatoria.
 // Si falla, se queda en la confirmación con el aviso.
 func TestSoltarLaFuenteDesdeElPanelPideConfirmacion(t *testing.T) {
 	c, _ := panelEn(t, 320)
@@ -257,6 +257,39 @@ func TestSoltarLaFuenteDesdeElPanelPideConfirmacion(t *testing.T) {
 	// Al repetir la confirmación, la casilla vuelve a estar sin marcar.
 	if !boton(t, c, "vault.release").Inerte {
 		t.Fatal("tras un fallo, la acción quedó armada")
+	}
+}
+
+// La salida también está con Matrix abierto o cuando abrir falló: quien tenía sus
+// datos en Matrix puede volver a los del servidor y pasar a la bóveda nueva, como en
+// la web (SourceReleaseNotice).
+func TestSoltarLaFuenteSeOfreceAbraONoMatrix(t *testing.T) {
+	c, _ := panelEn(t, 320)
+	c.ctx = t.Context()
+	c.client = &mx.Client{}
+	defer func() { c.client = nil; c.Cerrar() }()
+	c.AbrirPanel()
+	c.Base.Bootstrap.StorageProduct = "notes"
+	for _, estado := range []struct {
+		diag   Diagnostico
+		status mx.VerificationStatus
+	}{
+		{Diagnostico{Paso: PasoVerificar}, mx.VerificationStatus{HasIdentity: true, Verified: true}},
+		{Diagnostico{Paso: PasoDesbloquear}, mx.VerificationStatus{HasIdentity: true}},
+		{Diagnostico{Paso: PasoCrear}, mx.VerificationStatus{}},
+	} {
+		c.diag, c.status = estado.diag, estado.status
+		c.SoltarFuente = nil
+		c.pintar()
+		if slices.Contains(textos(c), c.t("vault.release")) {
+			t.Fatalf("%v: sin SoltarFuente no hay salida", estado.diag.Paso)
+		}
+		c.SoltarFuente = func(context.Context) error { return nil }
+		c.pintar()
+		boton(t, c, "vault.release").Tapped(nil)
+		if !slices.Contains(textos(c), c.t("vault.releaseBody")) || !boton(t, c, "vault.release").Inerte {
+			t.Fatalf("%v: la salida no pide confirmación", estado.diag.Paso)
+		}
 	}
 }
 

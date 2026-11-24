@@ -20,6 +20,13 @@ import {
   type PqVaultOpenOptions,
 } from '@sytue/offline/vault';
 import type { MatrixGateMessage } from './MatrixDeviceGate.js';
+import {
+  releaseBeforeEmpty,
+  rememberPendingEmpty,
+  sourceReleaseClient,
+  takePendingEmpty,
+  type SourceReleaser,
+} from './source-release.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
 
 /**
@@ -56,6 +63,45 @@ function buildSignInUrl(basePath: string, returnTo: string): string {
   return `${normalizeBase(basePath)}/auth/login?${params.toString()}`;
 }
 
+/**
+ * «Vaciar» que pidió identificarse antes de tocar la bóveda (a este navegador le
+ * faltaba la clave de desbloqueo con la que sellar la nueva). La marca, de esta
+ * pestaña y esta cuenta, dice a la vuelta que la persona ya confirmó vaciar: sin
+ * ella, la puerta abría la bóveda de antes, volvía a fallar y había que vaciar otra
+ * vez. Solo se pone si la bóveda no se llegó a vaciar: nunca se vacía dos veces.
+ */
+const resetIntentKey = (product: string) => 'sytue.vault-reset.' + product;
+const resetIntentLifetime = 10 * 60 * 1000;
+
+function rememberResetIntent(product: string, actor: string, tenant: string | undefined): void {
+  try {
+    sessionStorage.setItem(
+      resetIntentKey(product),
+      JSON.stringify({ actor, tenant: tenant ?? '', at: Date.now() }),
+    );
+  } catch {
+    // Sin almacenamiento de sesión, a la vuelta se pide vaciar otra vez.
+  }
+}
+
+function takeResetIntent(product: string, actor: string, tenant: string | undefined): boolean {
+  try {
+    const raw = sessionStorage.getItem(resetIntentKey(product));
+    sessionStorage.removeItem(resetIntentKey(product));
+    if (!raw) return false;
+    const value = JSON.parse(raw) as { actor?: unknown; tenant?: unknown; at?: unknown };
+    const age = typeof value.at === 'number' ? Date.now() - value.at : -1;
+    return (
+      value.actor === actor &&
+      value.tenant === (tenant ?? '') &&
+      age >= 0 &&
+      age <= resetIntentLifetime
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function closeThenDrain(closing: Promise<void> | undefined, vault: PqVault): Promise<void> {
   try {
     await closing;
@@ -79,6 +125,14 @@ export interface PqVaultGateProps {
   resetVault?: (options: PqVaultOpenOptions) => Promise<PqVault>;
   /** Cancela la copia en curso de otro dispositivo (sustituible en pruebas). */
   cancelCopy?: (options: PqVaultCopyOptions) => Promise<void>;
+  /**
+   * La fuente del servidor que se suelta antes de vaciar (Drive). `null`, ninguna.
+   * Por defecto, la de Drive: su bóveda nueva importa el Drive del servidor, y si la
+   * fuente siguiera congelada no tendría de dónde (sustituible en pruebas).
+   */
+  sourceReleaser?: SourceReleaser | null;
+  /** Navegación a Sytue ID (sustituible en pruebas). */
+  navigate?: (url: string) => void;
   children: ComponentChildren | ((vault: PqVault) => ComponentChildren);
 }
 
@@ -110,6 +164,8 @@ export function PqVaultGate({
   openVault = defaultOpenVault,
   resetVault = defaultResetVault,
   cancelCopy = defaultCancelCopy,
+  sourceReleaser,
+  navigate = (url) => window.location.assign(url),
   children,
 }: PqVaultGateProps): JSX.Element {
   const fixture = useContext(MatrixStorageFixtureContext);
@@ -117,6 +173,24 @@ export function PqVaultGate({
     () => normalizeBase(basePath ?? prefijoDeApp(product === 'hub' ? 'one' : product) ?? ''),
     [basePath, product],
   );
+  // Solo Drive suelta su fuente al vaciar: es la app cuya bóveda importa del servidor.
+  const releaseOwner = useMemo(
+    () => (!fixture && tenant && product === 'drive' ? { actor, tenant, product } : null),
+    [fixture, actor, tenant, product],
+  );
+  const releaser = useMemo<SourceReleaser | null>(
+    () =>
+      sourceReleaser !== undefined
+        ? sourceReleaser
+        : releaseOwner
+          ? sourceReleaseClient({ ...releaseOwner, basePath: resolvedBase })
+          : null,
+    [sourceReleaser, releaseOwner, resolvedBase],
+  );
+  const releaserRef = useRef(releaser);
+  useEffect(() => {
+    releaserRef.current = releaser;
+  });
   const translate = useMemo(() => createTranslate(locale), [locale]);
   const t = (key: PqVaultGateMessage): string => translate(key);
 
@@ -207,13 +281,28 @@ export function PqVaultGate({
     setCopying(false);
     setError(null);
 
-    const shouldReset = resetRequestedRef.current;
+    let shouldReset = resetRequestedRef.current;
     resetRequestedRef.current = false;
+    // De vuelta de identificarse tras un «vaciar» que no llegó a vaciar.
+    if (!shouldReset && takeResetIntent(product, actor, tenant)) shouldReset = true;
     const expect = shouldReset ? wrongExpectRef.current : undefined;
     wrongExpectRef.current = undefined;
-    const openFn = shouldReset ? resetVault : openVault;
     void (async () => {
       try {
+        // De vuelta de Sytue ID tras confirmar «vaciar»: se suelta la época que la
+        // persona vio y se vacía, sin volver a preguntar.
+        const pendingRelease = releaserRef.current;
+        if (!shouldReset && pendingRelease && releaseOwner) {
+          const confirmed = takePendingEmpty(releaseOwner);
+          if (confirmed) {
+            const released = await releaseBeforeEmpty(pendingRelease, controller.signal, confirmed);
+            if (released.outcome !== 'none' && released.outcome !== 'released')
+              throw new PqVaultError('unavailable');
+            shouldReset = true;
+          }
+        }
+        controller.signal.throwIfAborted();
+        const openFn = shouldReset ? resetVault : openVault;
         const instance = await openFn({
           actor,
           tenant,
@@ -248,6 +337,8 @@ export function PqVaultGate({
         setBusy(false);
         activateRef.current?.(instance);
       } catch (failure) {
+        // La bóveda no llegó a abrirse (ni, con `shouldReset`, a vaciarse).
+        const notOpened = opened === null;
         if (opened) {
           await teardown(opened).catch(() => {});
           opened = null;
@@ -264,6 +355,7 @@ export function PqVaultGate({
         }
         if (failure instanceof PqVaultError) {
           if (failure.reason === 'signin') {
+            if (shouldReset && notOpened) rememberResetIntent(product, actor, tenant);
             setNeedSignIn(true);
             return;
           }
@@ -289,7 +381,45 @@ export function PqVaultGate({
       controller.abort();
       void teardown(opened ?? liveVaultRef.current);
     };
-  }, [actor, tenant, product, resolvedBase, syntheticVault, openVault, resetVault, tick]);
+  }, [
+    actor,
+    tenant,
+    product,
+    resolvedBase,
+    syntheticVault,
+    openVault,
+    resetVault,
+    releaseOwner,
+    tick,
+  ]);
+
+  // «Vaciar»: con fuente en el servidor (Drive), primero se suelta la fuente
+  // congelada; si para eso hay que identificarse otra vez, se vuelve aquí y se
+  // termina (takePendingEmpty). Después, la bóveda se vacía y se vuelve a abrir.
+  const emptyVault = async () => {
+    const current = releaserRef.current;
+    if (current && releaseOwner) {
+      setBusy(true);
+      setError(null);
+      setWrongKey(false);
+      const released = await releaseBeforeEmpty(current);
+      if (released.outcome === 'reauth') {
+        rememberPendingEmpty(releaseOwner, released.epoch);
+        navigate(
+          buildSignInUrl(resolvedBase, window.location.pathname + window.location.search) +
+            '&reauth=1',
+        );
+        return;
+      }
+      if (released.outcome === 'failed') {
+        setBusy(false);
+        setError('vault.failed');
+        return;
+      }
+    }
+    resetRequestedRef.current = true;
+    setTick((value) => value + 1);
+  };
 
   if (disabled && typeof children !== 'function') {
     return <>{children}</>;
@@ -436,8 +566,7 @@ export function PqVaultGate({
               if (!understood) return;
               setResetting(false);
               setUnderstood(false);
-              resetRequestedRef.current = true;
-              setTick((value) => value + 1);
+              void emptyVault();
             }}
           >
             {t('vault.empty')}

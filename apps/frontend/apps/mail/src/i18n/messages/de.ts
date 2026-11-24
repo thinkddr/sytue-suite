@@ -1042,4 +1042,10 @@ export const de: AppCatalog<typeof en> = {
   'privateMail.handoverUnderstood':
     'Ich verstehe, dass die E-Mails, die ich nicht öffnen kann, verloren gehen',
   'privateMail.handoverConfirm': 'Leeren und in den Tresor übernehmen',
+  'privateMail.vaultMoveTitle': 'Verschiebe deine E-Mails in den neuen Tresor',
+  'privateMail.vaultMoveBody':
+    'Deine E-Mails sind mit dem bisherigen System verschlüsselt. Damit sie sich wie die übrigen Apps mit deiner Sytue-ID-Anmeldung öffnen, müssen sie geleert und im Tresor neu begonnen werden. E-Mails, die nur mit dem bisherigen System verschlüsselt waren, gehen verloren.',
+  'privateMail.vaultMoveUnderstood':
+    'Ich verstehe, dass mit dem bisherigen System verschlüsselte E-Mails verloren gehen',
+  'privateMail.vaultMoveKeep': 'Vorerst bei den bisherigen E-Mails bleiben',
 };

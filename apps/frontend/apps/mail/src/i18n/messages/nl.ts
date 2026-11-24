@@ -977,4 +977,10 @@ export const nl: AppCatalog<typeof en> = {
     'Versleutelde e-mail die je niet meer kunt openen, wordt niet hersteld. Vanaf nu opent je e-mail met je Sytue ID-aanmelding, die je mogelijk opnieuw moet doen.',
   'privateMail.handoverUnderstood': 'Ik begrijp dat de e-mail die ik niet kan openen verloren gaat',
   'privateMail.handoverConfirm': 'Legen en overzetten naar de kluis',
+  'privateMail.vaultMoveTitle': 'Zet je e-mail over naar de nieuwe kluis',
+  'privateMail.vaultMoveBody':
+    'Je e-mail is versleuteld met het vorige systeem. Om hem, net als de andere apps, met je Sytue ID-aanmelding te openen, moet hij worden geleegd en opnieuw beginnen in de kluis. E-mail die alleen met het vorige systeem was versleuteld, gaat verloren.',
+  'privateMail.vaultMoveUnderstood':
+    'Ik begrijp dat e-mail die met het vorige systeem is versleuteld verloren gaat',
+  'privateMail.vaultMoveKeep': 'Voorlopig de vorige e-mail blijven gebruiken',
 };

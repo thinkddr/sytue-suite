@@ -998,4 +998,10 @@ export const lv: AppCatalog<typeof en> = {
     'Šifrētais pasts, ko vairs nevarat atvērt, netiks atgūts. Turpmāk jūsu pasts atveras ar jūsu Sytue ID pierakstīšanos, kas, iespējams, būs jāatkārto.',
   'privateMail.handoverUnderstood': 'Saprotu, ka pasts, ko nevaru atvērt, tiks zaudēts',
   'privateMail.handoverConfirm': 'Iztukšot un pārcelt uz glabātuvi',
+  'privateMail.vaultMoveTitle': 'Pārvietojiet pastu uz jauno glabātuvi',
+  'privateMail.vaultMoveBody':
+    'Jūsu pasts ir šifrēts ar iepriekšējo sistēmu. Lai tas atvērtos ar jūsu Sytue ID pieteikšanos tāpat kā pārējās lietotnes, tas jāiztukšo un jāsāk no jauna glabātuvē. Pasts, kas bija šifrēts tikai ar iepriekšējo sistēmu, tiks zaudēts.',
+  'privateMail.vaultMoveUnderstood':
+    'Saprotu, ka ar iepriekšējo sistēmu šifrētais pasts tiks zaudēts',
+  'privateMail.vaultMoveKeep': 'Pagaidām turpināt ar iepriekšējo pastu',
 };

@@ -1013,4 +1013,10 @@ export const en = {
     'Encrypted mail that you can no longer open will not be recovered. From now on your mail opens with your Sytue ID sign-in, which you may be asked to repeat.',
   'privateMail.handoverUnderstood': 'I understand that the mail I cannot open will be lost',
   'privateMail.handoverConfirm': 'Empty and move to the vault',
+  'privateMail.vaultMoveTitle': 'Move your mail to the new vault',
+  'privateMail.vaultMoveBody':
+    'Your mail is encrypted with the previous system. To open it with your Sytue ID sign-in, like the rest of the apps, it has to be emptied and started again in the vault. Mail that was only encrypted with the previous system will be lost.',
+  'privateMail.vaultMoveUnderstood':
+    'I understand that mail encrypted with the previous system will be lost',
+  'privateMail.vaultMoveKeep': 'Keep using the previous mail for now',
 } satisfies Record<string, MessageEntry>;

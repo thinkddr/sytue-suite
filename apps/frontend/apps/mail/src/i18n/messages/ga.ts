@@ -1058,4 +1058,10 @@ export const ga: AppCatalog<typeof en> = {
     'Ní aisghabhfar post criptithe nach féidir leat a oscailt a thuilleadh. As seo amach osclaíonn do phost le do shíniú isteach Sytue ID, agus seans go n-iarrfar ort é a dhéanamh arís.',
   'privateMail.handoverUnderstood': 'Tuigim go gcaillfear an post nach féidir liom a oscailt',
   'privateMail.handoverConfirm': 'Folmhaigh agus aistrigh go dtí an cruinneachán',
+  'privateMail.vaultMoveTitle': 'Bog do phost chuig an gcrann nua',
+  'privateMail.vaultMoveBody':
+    'Tá do phost criptithe leis an gcóras roimhe seo. Chun é a oscailt le do shíniú isteach Sytue ID, cosúil leis na haipeanna eile, caithfear é a fholmhú agus tosú as an nua sa chrann. Caillfear post nach raibh criptithe ach leis an gcóras roimhe seo.',
+  'privateMail.vaultMoveUnderstood':
+    'Tuigim go gcaillfear post atá criptithe leis an gcóras roimhe seo',
+  'privateMail.vaultMoveKeep': 'Lean ar aghaidh leis an bpost roimhe seo faoi láthair',
 };

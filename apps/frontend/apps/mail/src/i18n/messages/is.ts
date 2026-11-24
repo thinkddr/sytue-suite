@@ -956,4 +956,10 @@ export const is: AppCatalog<typeof en> = {
     'Dulkóðaður póstur sem þú getur ekki lengur opnað verður ekki endurheimtur. Héðan í frá opnast pósturinn þinn með Sytue ID-innskráningunni þinni, sem þú gætir þurft að endurtaka.',
   'privateMail.handoverUnderstood': 'Ég skil að pósturinn sem ég get ekki opnað glatast',
   'privateMail.handoverConfirm': 'Tæma og færa í hvelfinguna',
+  'privateMail.vaultMoveTitle': 'Færðu póstinn þinn í nýju hvelfinguna',
+  'privateMail.vaultMoveBody':
+    'Pósturinn þinn er dulkóðaður með fyrra kerfinu. Til að hann opnist með Sytue ID-innskráningunni þinni, eins og hin forritin, þarf að tæma hann og byrja upp á nýtt í hvelfingunni. Póstur sem var aðeins dulkóðaður með fyrra kerfinu glatast.',
+  'privateMail.vaultMoveUnderstood':
+    'Ég skil að póstur sem er dulkóðaður með fyrra kerfinu glatast',
+  'privateMail.vaultMoveKeep': 'Halda áfram með fyrri póstinn í bili',
 };

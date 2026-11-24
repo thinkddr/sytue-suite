@@ -457,6 +457,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Corespondența ta este criptată cu sistemul anterior. Pentru a se deschide cu autentificarea Sytue ID, ca restul aplicațiilor, trebuie golită și reluată de la zero în seif. Corespondența criptată doar cu sistemul anterior se va pierde.",
+  "privateMail.vaultMoveKeep": "Continuă deocamdată cu corespondența anterioară",
+  "privateMail.vaultMoveTitle": "Mută-ți corespondența în noul seif",
+  "privateMail.vaultMoveUnderstood": "Înțeleg că se va pierde corespondența criptată cu sistemul anterior",
   "purge.body": {
     "one": "Acest mesaj va dispărea pentru totdeauna și nu va mai putea fi recuperat. Spațiul pe care îl ocupă va fi eliberat.",
     "few": "Aceste {count} mesaje vor dispărea pentru totdeauna și nu vor mai putea fi recuperate. Spațiul pe care îl ocupă va fi eliberat.",

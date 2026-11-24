@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Deine E-Mails sind mit dem bisherigen System verschlüsselt. Damit sie sich wie die übrigen Apps mit deiner Sytue-ID-Anmeldung öffnen, müssen sie geleert und im Tresor neu begonnen werden. E-Mails, die nur mit dem bisherigen System verschlüsselt waren, gehen verloren.",
+  "privateMail.vaultMoveKeep": "Vorerst bei den bisherigen E-Mails bleiben",
+  "privateMail.vaultMoveTitle": "Verschiebe deine E-Mails in den neuen Tresor",
+  "privateMail.vaultMoveUnderstood": "Ich verstehe, dass mit dem bisherigen System verschlüsselte E-Mails verloren gehen",
   "purge.body": {
     "one": "Diese Nachricht ist danach für immer weg und nicht wiederherstellbar. Der belegte Platz wird frei.",
     "other": "Diese {count} Nachrichten sind danach für immer weg und nicht wiederherstellbar. Der belegte Platz wird frei."

@@ -465,6 +465,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Vaše pošta je zašifrovaná předchozím systémem. Aby se otevírala přihlášením do Sytue ID jako ostatní aplikace, je třeba ji vyprázdnit a začít znovu v trezoru. Pošta zašifrovaná jen předchozím systémem se ztratí.",
+  "privateMail.vaultMoveKeep": "Zatím pokračovat s předchozí poštou",
+  "privateMail.vaultMoveTitle": "Přesuňte poštu do nového trezoru",
+  "privateMail.vaultMoveUnderstood": "Rozumím, že pošta zašifrovaná předchozím systémem se ztratí",
   "purge.body": {
     "one": "Tato zpráva zmizí navždy a nepůjde obnovit. Uvolní se místo, které zabírá.",
     "few": "Tyto {count} zprávy zmizí navždy a nepůjde je obnovit. Uvolní se místo, které zabírají.",

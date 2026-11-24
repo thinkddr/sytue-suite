@@ -449,6 +449,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "La tua posta è cifrata con il sistema precedente. Per aprirla con l'accesso a Sytue ID, come le altre app, bisogna svuotarla e ricominciare nella cassaforte. La posta cifrata solo con il sistema precedente andrà persa.",
+  "privateMail.vaultMoveKeep": "Continua con la posta precedente per ora",
+  "privateMail.vaultMoveTitle": "Sposta la tua posta nella nuova cassaforte",
+  "privateMail.vaultMoveUnderstood": "Capisco che la posta cifrata con il sistema precedente andrà persa",
   "purge.body": {
     "one": "Questo messaggio sparisce per sempre e non si potrà recuperare. Libera lo spazio che occupa.",
     "other": "Questi {count} messaggi spariscono per sempre e non si potranno recuperare. Liberano lo spazio che occupano."

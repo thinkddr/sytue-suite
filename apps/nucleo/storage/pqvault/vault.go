@@ -77,6 +77,11 @@ type Config struct {
 	// servidor solo la vacía si sigue así (ErrChanged si no). Sin él, vale lo que
 	// lea Reset al empezar.
 	Expect *api.PQVaultExpect
+	// Handover registra la clave de firma con la marca de traspaso del correo de
+	// Matrix a la bóveda (ADR 0087), que Sytue ID solo acepta en `mail` y con
+	// identificación reciente. Solo cuando la persona lo confirma («vaciar y pasar
+	// a la bóveda»), y normalmente con Reset: el traspaso llega con una bóveda nueva.
+	Handover bool
 }
 
 // SigningStatus dice si la clave de firma de la bóveda es la activa en Sytue ID.
@@ -91,20 +96,23 @@ const (
 	SigningUnavailable SigningStatus = "unavailable"
 )
 
-// Vault es una bóveda abierta. Guarda en memoria la identidad híbrida y la clave
-// de propietario hasta Close.
+// Vault es una bóveda abierta. Guarda en memoria la identidad híbrida, la clave
+// de propietario y la de firma hasta Close.
 type Vault struct {
 	scope     storage.Scope
 	server    Server
 	vaultID   string
 	keyID     string
 	recipient pqc.Recipient
-	signing   SigningStatus
 
 	mu       sync.RWMutex
 	identity *pqc.Identity
 	owner    []byte
-	closed   bool
+	// signingKey es la clave de firma (ADR 0087) en la forma del secreto; la usa
+	// el correo para firmar sus acciones de entrada. Se borra al cerrar.
+	signingKey []byte
+	signing    SigningStatus
+	closed     bool
 }
 
 // Open abre la bóveda con la clave de desbloqueo, o la crea si no existe. Si la
@@ -194,7 +202,7 @@ func open(ctx context.Context, cfg Config, reset bool) (*Vault, error) {
 	}
 	signing := SigningMissing
 	if secret.SigningKey != "" {
-		signing = registerSigningKey(ctx, cfg.Registry, scope, secret.SigningKey)
+		signing = registerSigningKey(ctx, cfg.Registry, scope, secret.SigningKey, cfg.Handover)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -211,6 +219,7 @@ func open(ctx context.Context, cfg Config, reset bool) (*Vault, error) {
 	return &Vault{
 		scope: scope, server: cfg.Server, vaultID: vaultID, keyID: keyID,
 		recipient: identity.Recipient(), signing: signing, identity: identity, owner: owner,
+		signingKey: []byte(secret.SigningKey),
 	}, nil
 }
 
@@ -331,9 +340,11 @@ func addSigningKey(ctx context.Context, server Server, auk []byte, scope storage
 
 // registerSigningKey registra en Sytue ID la clave de firma si no es ya la activa.
 // Sin activa es un alta; con otra activa, que esta bóveda ya no puede aprobar
-// porque no la tiene, es un vaciado, y Sytue ID pide identificarse otra vez.
-func registerSigningKey(ctx context.Context, registry Registry, scope storage.Scope, encoded string) SigningStatus {
-	if registry == nil {
+// porque no la tiene, es un vaciado, y Sytue ID pide identificarse otra vez. Con
+// `handover` (solo `mail`) se pide siempre, con la marca de traspaso: Sytue ID
+// dice si esa clave ya lo tiene, y si no, exige identificación reciente.
+func registerSigningKey(ctx context.Context, registry Registry, scope storage.Scope, encoded string, handover bool) SigningStatus {
+	if registry == nil || handover && scope.Product != "mail" {
 		return SigningUnavailable
 	}
 	signer, err := recoverywrap.ParsePQVaultSigningKey(encoded)
@@ -359,7 +370,14 @@ func registerSigningKey(ctx context.Context, registry Registry, scope storage.Sc
 	generation, previous := int64(1), ""
 	if active != nil {
 		if active.KeyID == keyID {
-			return SigningRegistered
+			// La misma clave otra vez. Con traspaso, Sytue ID solo da por bueno el
+			// que ya se hizo (repetirlo devuelve el hecho), nunca uno colgado de una
+			// clave que ya estaba sin él; y una clave no se sucede a sí misma en la
+			// declaración, así que ni se pide.
+			if !handover || active.Reason == ReasonHandover {
+				return SigningRegistered
+			}
+			return SigningUnavailable
 		}
 		generation, previous = active.Generation+1, active.KeyID
 	}
@@ -371,7 +389,7 @@ func registerSigningKey(ctx context.Context, registry Registry, scope storage.Sc
 	if err != nil {
 		return SigningUnavailable
 	}
-	err = registry.PutVaultKey(ctx, scope.Product, api.VaultKeyRegistration{PublicKey: public, PreviousKeyID: previous, Proof: proof})
+	err = registry.PutVaultKey(ctx, scope.Product, api.VaultKeyRegistration{PublicKey: public, PreviousKeyID: previous, Proof: proof, Handover: handover})
 	if err == nil {
 		return SigningRegistered
 	}
@@ -396,7 +414,11 @@ func (v *Vault) VaultID() string { return v.vaultID }
 func (v *Vault) KeyID() string { return v.keyID }
 
 // SigningStatus dice si su clave de firma es la activa en Sytue ID.
-func (v *Vault) SigningStatus() SigningStatus { return v.signing }
+func (v *Vault) SigningStatus() SigningStatus {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.signing
+}
 
 // PublicationTarget es el destino de las publicaciones, el mismo que usa la web:
 // la bóveda y un dispositivo `pq-` derivado de la clave.
@@ -413,7 +435,8 @@ func (v *Vault) Close() {
 	}
 	v.closed = true
 	clear(v.owner)
-	v.owner, v.identity = nil, nil
+	clear(v.signingKey)
+	v.owner, v.identity, v.signingKey = nil, nil, nil
 }
 
 // keys devuelve la identidad y una copia de la clave de propietario, o ErrClosed.

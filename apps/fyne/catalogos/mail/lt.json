@@ -465,6 +465,10 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Jūsų paštas užšifruotas ankstesne sistema. Kad jis atsidarytų prisijungus prie Sytue ID kaip ir kitos programos, jį reikia ištuštinti ir pradėti iš naujo saugykloje. Paštas, užšifruotas tik ankstesne sistema, bus prarastas.",
+  "privateMail.vaultMoveKeep": "Kol kas tęsti su ankstesniu paštu",
+  "privateMail.vaultMoveTitle": "Perkelkite paštą į naują saugyklą",
+  "privateMail.vaultMoveUnderstood": "Suprantu, kad ankstesne sistema užšifruotas paštas bus prarastas",
   "purge.body": {
     "one": "{count} laiškas išnyks visam laikui ir jo nebus galima atkurti. Atsilaisvins jo užimama vieta.",
     "few": "{count} laiškai išnyks visam laikui ir jų nebus galima atkurti. Atsilaisvins jų užimama vieta.",

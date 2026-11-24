@@ -31,7 +31,9 @@ import (
 // solo si la bóveda sigue como la vio el cliente (versión); la publicación es
 // idempotente por transacción y sube la versión; con una marca de copia activa
 // solo publica y vacía quien la tiene; el historial va del más reciente al más
-// antiguo; un vaciado de la clave de firma sin identificación reciente es 403.
+// antiguo; un registro se busca por su transacción; un vaciado de la clave de
+// firma sin identificación reciente es 403, y un traspaso (`handover`) lo exige
+// siempre, solo en `mail` y nunca colgado de una clave que ya estaba sin él.
 type Fake struct {
 	t     *testing.T
 	scope storage.Scope
@@ -61,6 +63,8 @@ type Fake struct {
 	Signing  []api.VaultKey
 	// RecentLogin: la sesión vale como identificación reciente para un vaciado.
 	RecentLogin bool
+	// Handovers cuenta los PUT de la clave de firma que pidieron traspaso.
+	Handovers int
 	// Blobs son los bloques cifrados de /api/v1/cipher/blobs.
 	Blobs storagetest.CipherState
 }
@@ -310,6 +314,15 @@ func (f *Fake) list(w http.ResponseWriter, r *http.Request) {
 		f.json(w, http.StatusOK, api.PQVaultRecordPage{Entries: []api.PQVaultRecord{}})
 		return
 	}
+	if q.Has("transaction_id") {
+		// La búsqueda por transacción: una página de cero o un registro.
+		page := api.PQVaultRecordPage{Entries: []api.PQVaultRecord{}}
+		if i, ok := f.txns[q.Get("transaction_id")]; ok {
+			page.Entries = append(page.Entries, f.Records[i])
+		}
+		f.json(w, http.StatusOK, page)
+		return
+	}
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	before := int64(1 << 62)
 	if c := q.Get("cursor"); c != "" {
@@ -358,6 +371,9 @@ func (f *Fake) vaultKeys(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad", http.StatusBadRequest)
 		return
 	}
+	if f.beforeHandover(w, req, keyID) {
+		return
+	}
 	generation, previous := int64(1), ""
 	if len(f.Signing) > 0 {
 		generation, previous = f.Signing[0].Generation+1, f.Signing[0].KeyID
@@ -371,8 +387,48 @@ func (f *Fake) vaultKeys(w http.ResponseWriter, r *http.Request) {
 		f.json(w, http.StatusForbidden, map[string]string{"code": api.CodeVaultKeyReauth, "message": "reauth"})
 		return
 	}
-	f.Signing = append([]api.VaultKey{{Generation: generation, KeyID: keyID, PreviousKeyID: previous}}, f.Signing...)
+	reason := "alta"
+	switch {
+	case req.Handover:
+		reason = "traspaso"
+	case previous != "":
+		reason = "vaciado"
+	}
+	public, err := json.Marshal(req.PublicKey)
+	if err != nil {
+		http.Error(w, "bad", http.StatusBadRequest)
+		return
+	}
+	f.Signing = append([]api.VaultKey{{Generation: generation, KeyID: keyID, PreviousKeyID: previous, PublicKey: public, Reason: reason}}, f.Signing...)
 	f.json(w, http.StatusOK, f.Signing[0])
+}
+
+// beforeHandover es lo que Sytue ID resuelve antes de verificar firmas
+// (antesDelTraspaso): un traspaso solo en `mail` y sin aprobación de la anterior;
+// la misma clave otra vez no cambia nada (repetir un traspaso devuelve el hecho,
+// pero no se cuelga de una clave que ya estaba sin él); y un traspaso exige
+// siempre identificación reciente. Dice si ya contestó.
+func (f *Fake) beforeHandover(w http.ResponseWriter, req api.VaultKeyRegistration, keyID string) bool {
+	if req.Handover {
+		f.Handovers++
+	}
+	if req.Handover && (f.scope.Product != "mail" || len(req.Continuity) > 0) {
+		f.json(w, http.StatusBadRequest, map[string]string{"code": "vault_key_handover", "message": "handover"})
+		return true
+	}
+	if len(f.Signing) > 0 && f.Signing[0].KeyID == keyID {
+		if req.Handover && f.Signing[0].Reason != "traspaso" {
+			f.json(w, http.StatusBadRequest, map[string]string{"code": "vault_key_handover", "message": "handover"})
+			return true
+		}
+		f.json(w, http.StatusOK, f.Signing[0])
+		return true
+	}
+	if req.Handover && !f.RecentLogin {
+		f.json(w, http.StatusForbidden, map[string]string{"code": api.CodeVaultKeyReauth, "message": "reauth"})
+		return true
+	}
+	return false
 }
 
 // RecordCount cuenta los registros guardados.

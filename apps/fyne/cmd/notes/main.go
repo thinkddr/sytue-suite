@@ -200,7 +200,7 @@ func main() {
 		},
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
 			organization := cuenta.PrivateStorageScope().Tenant
-			svc := api.NewNotes(s.URL("notes"), cuenta.HTTP(), cliente)
+			svc := api.NewNotes(s.URL("notes"), cuenta.HTTP(), s.ClienteConAviso(cliente))
 			p := montarNotepadsAPI(cuenta.Context(), svc, tr, l, red, w, func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", organization, ruta) })
 			return vista(p, cuenta.Check), nil
 		},

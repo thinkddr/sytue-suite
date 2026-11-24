@@ -214,7 +214,7 @@ func main() {
 			return state.Mode, err
 		},
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
-			return mount(cuenta, api.NewHub(s.URL("hub"), cuenta.HTTP(), nil)), nil
+			return mount(cuenta, api.NewHub(s.URL("hub"), cuenta.HTTP(), s.ClienteConAviso(nil))), nil
 		},
 	})
 	// Los avisos flotantes van por ENCIMA del desplazador: dentro se irían al bajar.

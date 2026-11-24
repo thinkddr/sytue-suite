@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
@@ -69,12 +70,18 @@ func (s *servidorQueAnota) vio(parte string) bool {
 
 // Por la API (fuente `legacy`), la galería habla con el servidor como la web: los
 // registros con el servicio de Photos y los originales con el Drive del servidor,
-// con la credencial de la cuenta. Nada pasa por el Drive oculto ni por Matrix.
+// con la credencial de la cuenta. Nada pasa por el Drive oculto ni por Matrix. Y una
+// escritura de Photos avisa al widget por el cliente que le da el `cmd`
+// (Suite.ClienteConAviso); una lectura no.
+//
+// VISTO EN ROJO sin pasar `escrituras` a api.NewPhotos: 0 avisos tras Indexar.
 func TestPhotosPorLaAPIHablaConElServidor(t *testing.T) {
 	photosSrv, driveSrv := &servidorQueAnota{}, &servidorQueAnota{}
 	cuenta := cuentaDePrueba{scope: storage.Scope{Tenant: "acme", Subject: "ada", Product: "photos"}, session: sesionDePrueba{}}
+	var avisos atomic.Int32
+	escrituras := api.ConAvisoDeEscritura(nil, func() { avisos.Add(1) })
 
-	client, drive, err := clientesPhotos(photosSrv.levantar(t), driveSrv.levantar(t), almacenPhotos{cuenta: cuenta})
+	client, drive, err := clientesPhotos(photosSrv.levantar(t), driveSrv.levantar(t), escrituras, almacenPhotos{cuenta: cuenta})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,23 +94,29 @@ func TestPhotosPorLaAPIHablaConElServidor(t *testing.T) {
 	if !photosSrv.vio("POST") || !photosSrv.vio("/assets") || !photosSrv.vio("Bearer tok-de-ada") {
 		t.Fatalf("Indexar no fue al servicio de Photos con la cuenta: %v", photosSrv.vistas)
 	}
+	if n := avisos.Load(); n != 1 {
+		t.Fatalf("indexar una foto por la API avisa %d veces al widget; quiero 1", n)
+	}
 	if _, err := drive.Root(t.Context()); err != nil {
 		t.Fatalf("Root: %v", err)
 	}
 	if !driveSrv.vio("/folders/root") || !driveSrv.vio("Bearer tok-de-ada") {
 		t.Fatalf("el Drive de la galería no fue el del servidor: %v", driveSrv.vistas)
 	}
+	if n := avisos.Load(); n != 1 {
+		t.Fatalf("leer el Drive de la galería ha avisado al widget (%d avisos)", n)
+	}
 }
 
 // Sin cuenta no hay clientes; y con repositorio, sin el Drive oculto de los
 // originales tampoco: la galería de Matrix nunca sube al Drive del servidor.
 func TestPhotosSinCuentaOSinDriveOcultoNoMonta(t *testing.T) {
-	if _, _, err := clientesPhotos("http://photos.invalid", "http://drive.invalid", almacenPhotos{}); !errors.Is(err, cifrado.ErrPrivateResources) {
+	if _, _, err := clientesPhotos("http://photos.invalid", "http://drive.invalid", nil, almacenPhotos{}); !errors.Is(err, cifrado.ErrPrivateResources) {
 		t.Fatalf("sin cuenta: %v", err)
 	}
 	cuenta := cuentaDePrueba{scope: storage.Scope{Tenant: "acme", Subject: "ada", Product: "photos"}}
 	var resolve func(context.Context) (*privateDrive.Repository, error)
-	if _, _, err := clientesPhotos("http://photos.invalid", "http://drive.invalid", almacenPhotos{cuenta: cuenta, repository: &privatePhotos.Repository{}, resolveDrive: resolve}); !errors.Is(err, cifrado.ErrPrivateResources) {
+	if _, _, err := clientesPhotos("http://photos.invalid", "http://drive.invalid", nil, almacenPhotos{cuenta: cuenta, repository: &privatePhotos.Repository{}, resolveDrive: resolve}); !errors.Is(err, cifrado.ErrPrivateResources) {
 		t.Fatalf("con repositorio y sin Drive oculto: %v", err)
 	}
 }

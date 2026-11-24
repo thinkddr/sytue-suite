@@ -867,9 +867,10 @@ func (n *Notes) PreviewNotebook(ctx context.Context, volcado []byte, nombre stri
 	if err := validateNotebookBackup(volcado, nombre); err != nil {
 		return VistaPreviaVolcado{}, err
 	}
+	// Un ensayo que no crea nada: no cuenta como escritura para el widget.
 	return JSON[VistaPreviaVolcado](ctx, n.c, Request{
 		Method: http.MethodPost, Path: "/notebooks/preview", Body: volcado, Query: queryNombre(nombre),
-		Header: http.Header{"Content-Type": {"application/json"}},
+		Header: http.Header{"Content-Type": {"application/json"}}, Lectura: true,
 	})
 }
 

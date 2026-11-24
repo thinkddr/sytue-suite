@@ -125,16 +125,20 @@ func TestModosDeLaPuertaDelCorreo(t *testing.T) {
 }
 
 type puertaCorreoFalsa struct {
-	modo    modoPuerta
-	objeto  fyne.CanvasObject
-	lista   func(context.Context, *pqvault.Vault)
-	vida    context.Context
-	cerrada bool
+	modo     modoPuerta
+	objeto   fyne.CanvasObject
+	lista    func(context.Context, *pqvault.Vault)
+	vida     context.Context
+	vaciando bool
+	cerrada  bool
 }
 
 func (p *puertaCorreoFalsa) Objeto() fyne.CanvasObject   { return p.objeto }
 func (p *puertaCorreoFalsa) Iniciar(ctx context.Context) { p.vida = ctx }
-func (p *puertaCorreoFalsa) Cerrar()                     { p.cerrada = true }
+func (p *puertaCorreoFalsa) IniciarVaciando(ctx context.Context) {
+	p.vida, p.vaciando = ctx, true
+}
+func (p *puertaCorreoFalsa) Cerrar() { p.cerrada = true }
 
 type recursosCorreoFalsos struct {
 	life    context.Context

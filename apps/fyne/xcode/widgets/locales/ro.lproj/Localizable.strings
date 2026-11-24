@@ -1,6 +1,9 @@
 "widgets.open" = "Deschide";
 "widgets.compose" = "Compune";
 "widgets.create" = "Creează eveniment";
+"widgets.newNote" = "Notiță nouă";
+"widgets.newContact" = "Contact nou";
+"widgets.addPhotos" = "Adaugă fotografii";
 "widgets.notes" = "Notițe";
 "widgets.rows" = "Rânduri";
 "widgets.pending" = "În așteptare";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Calendare";
 "widgets.address_books" = "Agende de adrese";
 "widgets.storage" = "Stocare";
-"search.label" = "Căutare globală";
 "app.bases.description" = "Tabele relaționale colaborative";
 "app.sheets.description" = "Foi de calcul";
 "app.calendar.description" = "Calendar";

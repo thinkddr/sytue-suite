@@ -49,6 +49,9 @@ func (s *Store) MatrixRootChangeChallenge(ctx context.Context, subject, product,
 	if !storage.MigrationEpoch(epoch) || (kind != "root.resume" && kind != "root.rotate") {
 		return challenge, domain.ErrInvalidInput
 	}
+	if err := s.raizMatrixAdmitida(product); err != nil {
+		return challenge, err
+	}
 	directory, ok := s.matrixGate.(matrixIngressDirectory)
 	if !ok {
 		return challenge, domain.ErrMatrixUnavailable

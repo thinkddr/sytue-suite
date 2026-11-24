@@ -112,7 +112,10 @@ struct WidgetProjectTests {
             guard let metadata = try? String(contentsOf: directory.appendingPathComponent("FyneApp.toml"), encoding: .utf8) else { continue }
             let actions = quoted("widget_acciones", metadata)
             if actions.isEmpty { continue }
-            require(actions.components(separatedBy: ",").contains("search"), "global search declared for " + directory.lastPathComponent)
+            // «Buscar» se quitó de los widgets (2026-11-24); Mail aún lo declara en su
+            // FyneApp.toml (otra rama) y generar.py lo ignora.
+            require(!actions.components(separatedBy: ",").contains("search") || directory.lastPathComponent == "mail",
+                    "no search widget declared for " + directory.lastPathComponent)
             widgetApps += 1
             let app = directory.lastPathComponent
             let bundle = quoted("ID", metadata)
@@ -178,8 +181,8 @@ struct WidgetProjectTests {
         for directory in try FileManager.default.contentsOfDirectory(at: xcode.appendingPathComponent("widgets/locales"), includingPropertiesForKeys: nil) {
             guard directory.pathExtension == "lproj" else { continue }
             let strings = try plist(directory.appendingPathComponent("Localizable.strings"))
-            require(strings["widgets.storage"] is String && strings["search.label"] is String,
-                    "storage and action labels translated in " + directory.lastPathComponent)
+            require(strings["widgets.storage"] is String && strings["widgets.create"] is String && strings["search.label"] == nil,
+                    "storage and action labels translated, no search label, in " + directory.lastPathComponent)
             for app in widgetProducts {
                 require(strings["app." + app + ".description"] is String,
                         "gallery and private-state description translated for " + app + " in " + directory.lastPathComponent)

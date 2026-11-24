@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 	"git.sytue.eu/sytue/one/services/drive/internal/store"
@@ -22,6 +24,21 @@ type privateStorageStore interface {
 }
 
 func (s *Service) PrivateStorageAvailable() bool { _, ok := s.store.(privateStorageStore); return ok }
+
+type privateStorageReleaser interface {
+	ReleasePrivateStorage(context.Context, storage.Scope, pg.PrivateStorageRelease) error
+}
+
+// ReleasePrivateStorage es «soltar la fuente» (ADR 0086): vuelve a legacy la fuente
+// congelada del Drive de esta persona. Lo monta platform/pkg/soltarfuente, que ya
+// exige la confirmación y la reautenticación reciente.
+func (s *Service) ReleasePrivateStorage(ctx context.Context, scope storage.Scope, release pg.PrivateStorageRelease) error {
+	source, ok := s.store.(privateStorageReleaser)
+	if !ok {
+		return domain.ErrNotFound
+	}
+	return source.ReleasePrivateStorage(ctx, scope, release)
+}
 
 func (s *Service) PrivateStorageState(ctx context.Context) (store.PrivateStorageState, error) {
 	source, ok := s.store.(privateStorageStore)

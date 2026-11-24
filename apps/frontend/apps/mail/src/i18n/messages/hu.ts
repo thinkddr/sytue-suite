@@ -963,4 +963,16 @@ export const hu: AppCatalog<typeof en> = {
   'privateMail.handoverUnderstood':
     'Megértettem, hogy a levelek, amelyeket nem tudok megnyitni, elvesznek',
   'privateMail.handoverConfirm': 'Kiürítés és áthelyezés a széfbe',
+  'privateMail.vaultMoveTitle': 'Helyezze át a leveleit az új széfbe',
+  'privateMail.vaultMoveBody':
+    'A levelei az előző rendszerrel vannak titkosítva. Ahhoz, hogy a többi alkalmazáshoz hasonlóan a Sytue ID-bejelentkezésével nyíljanak meg, ki kell üríteni őket, és újra kell kezdeni a széfben. A csak az előző rendszerrel titkosított levelek elvesznek.',
+  'privateMail.vaultMoveUnderstood':
+    'Megértettem, hogy az előző rendszerrel titkosított levelek elvesznek',
+  'privateMail.vaultMoveKeep': 'Egyelőre maradok az előző levelezésnél',
+  'privateMail.vaultMoveRetiredTitle':
+    'Helyezze át a leveleit az új széfbe, hogy továbbra is megkapja őket',
+  'privateMail.vaultMoveRetiredBody':
+    'Az előző levelezőrendszer már nem érhető el. Amíg nem helyezi át a leveleit a széfbe, nem kap új leveleket: ami addig érkezik, az előző rendszerrel titkosítva marad meg, akárcsak a már meglévő levelei, és nem lehet elolvasni. Nem törlődik, de senki sem tudja megnyitni. Az áthelyezés után a levelek újra megérkeznek, és a többi alkalmazáshoz hasonlóan a Sytue ID-bejelentkezésével nyílnak meg.',
+  'privateMail.vaultMoveCheckFailed':
+    'Nem sikerült ellenőrizni a levelei állapotát. Próbálja újra egy pillanat múlva.',
 };

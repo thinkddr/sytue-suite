@@ -1,6 +1,9 @@
 "widgets.open" = "Ava";
 "widgets.compose" = "Koosta kiri";
 "widgets.create" = "Loo sündmus";
+"widgets.newNote" = "Uus märge";
+"widgets.newContact" = "Uus kontakt";
+"widgets.addPhotos" = "Lisa fotosid";
 "widgets.notes" = "Märkmed";
 "widgets.rows" = "Read";
 "widgets.pending" = "Ootel";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendrid";
 "widgets.address_books" = "Aadressiraamatud";
 "widgets.storage" = "Salvestusruum";
-"search.label" = "Üldotsing";
 "app.bases.description" = "Ühised seostabelid";
 "app.sheets.description" = "Arvutustabelid";
 "app.calendar.description" = "Kalender";

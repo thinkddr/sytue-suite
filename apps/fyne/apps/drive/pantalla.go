@@ -281,6 +281,7 @@ func (p *Pantalla) Cerrar() {
 	if p.raiz != nil {
 		p.raiz.Objects = nil
 		p.raiz.Refresh()
+		ui.RecolocarBarraSuite(p.raiz)
 	}
 }
 
@@ -419,6 +420,7 @@ func (p *Pantalla) Repintar() {
 	p.raiz.Objects[0] = arm
 	p.capaSubir.Hidden = !p.conSubirFlotante()
 	p.raiz.Refresh()
+	ui.RecolocarBarraSuite(p.raiz)
 }
 
 // Recargar vuelve a pedir lo de la sección en la que se está. Lo llama el `main`

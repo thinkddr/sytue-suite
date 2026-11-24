@@ -498,6 +498,9 @@ export const fi: Catalog = {
   'widgets.compose': 'Kirjoita',
   'widgets.storage': 'Tallennustila',
   'widgets.create': 'Luo tapahtuma',
+  'widgets.newNote': 'Uusi muistiinpano',
+  'widgets.newContact': 'Uusi yhteystieto',
+  'widgets.addPhotos': 'Lisää kuvia',
   'widgets.updatedAgo': 'Päivitetty {time}',
   'widgets.updatedAt': 'Päivitetty: {time}',
 

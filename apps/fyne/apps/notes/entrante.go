@@ -15,6 +15,9 @@ import (
 //   - `?notebook=<id>&note=<id>&h=<slug>` (y `/notebooks/<id>?note=…`, la dirección
 //     canónica que componen la búsqueda del Hub y los enlaces compartidos en Rooms):
 //     abre ese cuaderno, selecciona esa nota y baja hasta ese título.
+//   - `?action=create`: la acción «Nueva nota» del widget nativo (api.LeerAccion).
+//     Pregunta en el cuaderno abierto y, con el sí, crea una nota de texto, como la de
+//     la barra: un enlace del esquema lo abre cualquiera y no escribe nada solo.
 //   - `?link=<tipo>:<id>&label=<rótulo>`: el otro extremo de la referencia
 //     bidireccional —«escribir una nota para este evento» de Calendar—. Crea UNA nota
 //     vinculada en el cuaderno abierto, que es el que elige quien escribe, y la crea
@@ -32,6 +35,8 @@ type Entrante struct {
 	// Compartida es una nota que alguien me ha compartido (`?shared=`, el aviso
 	// `notes.shared`): se abre en «Compartido conmigo».
 	Compartida string
+	// Crear es la acción «Nueva nota» del widget (`?action=create`).
+	Crear bool
 }
 
 // TipoPorDestino es `TIPO_POR_DESTINO` de NotesApp.tsx: el tipo de la nota que nace de
@@ -55,11 +60,12 @@ func LeerEntrante(u *url.URL) (Entrante, bool) {
 	e := Entrante{
 		Cuaderno: q.Get("notebook"), Nota: q.Get("note"), Ancla: q.Get("h"),
 		Vinculo: q.Get("link"), Rotulo: q.Get("label"), Compartida: q.Get("shared"),
+		Crear: api.LeerAccion("notes", u) == "create",
 	}
 	if id, ok := strings.CutPrefix(u.Path, "/notebooks/"); ok && id != "" && !strings.Contains(id, "/") {
 		e.Cuaderno = id
 	}
-	return e, e.Cuaderno != "" || e.Nota != "" || e.Vinculo != "" || e.Compartida != ""
+	return e, e.Cuaderno != "" || e.Nota != "" || e.Vinculo != "" || e.Compartida != "" || e.Crear
 }
 
 // AtenderEnlace atiende un enlace del esquema de Notepads y dice si era suyo. Va en el
@@ -115,6 +121,17 @@ func (p *Pantalla) aplicarEntrante() {
 			return // la nota vinculada, cuando lleguen las de este cuaderno
 		}
 	}
+	// «Nueva nota» del widget, cuando hay cuaderno abierto con sus notas: se pregunta una
+	// vez (el enlace se consume) y, con el sí, nuevaNota, que pide la contraseña de un
+	// cuaderno cerrado como la de la barra.
+	if e.Crear {
+		if p.activo.ID == "" || p.lienzo.Fase == Cargando {
+			return // al cargar el cuaderno o sus notas
+		}
+		e.Crear = false
+		p.vista = VistaCuaderno
+		p.preguntarNueva()
+	}
 	// El vínculo, cuando hay cuaderno abierto, sus notas cargadas y se puede escribir en
 	// él (la web espera a `!bloqueado`). Una vez: el enlace se consume al usarlo.
 	if e.Vinculo == "" || p.activo.ID == "" || p.bloqueado || p.lienzo.Fase == Cargando {
@@ -142,6 +159,24 @@ func (p *Pantalla) aplicarEntrante() {
 	}
 	t := p.tr.T
 	p.preguntar(t("note.new", nil), e.Rotulo, t("capture.add", nil), false, p.aceptarVinculo)
+}
+
+// preguntarNueva es la «Nueva nota» del widget: se pregunta en el cuaderno abierto, con
+// su título. Crearla sin más dejaría una nota en blanco, a la vista de quien comparta el
+// cuaderno, con solo pulsar un enlace que cualquiera puede abrir (NAT-05).
+func (p *Pantalla) preguntarNueva() {
+	t := p.tr.T
+	p.nuevaPendiente = true
+	p.preguntar(t("note.new", nil), p.activo.Titulo, t("capture.add", nil), false, p.aceptarNueva)
+}
+
+// aceptarNueva es el «sí» de preguntarNueva: la nota nueva de la barra, UNA vez.
+func (p *Pantalla) aceptarNueva() {
+	if !p.nuevaPendiente {
+		return
+	}
+	p.nuevaPendiente = false
+	p.nuevaNota()
 }
 
 // aceptarVinculo crea la nota vinculada que pidió un enlace entrante, UNA vez: es el «sí»

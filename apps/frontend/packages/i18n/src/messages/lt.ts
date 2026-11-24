@@ -506,6 +506,9 @@ export const lt: Catalog = {
   'widgets.compose': 'Rašyti',
   'widgets.storage': 'Saugykla',
   'widgets.create': 'Kurti įvykį',
+  'widgets.newNote': 'Naujas užrašas',
+  'widgets.newContact': 'Naujas kontaktas',
+  'widgets.addPhotos': 'Pridėti nuotraukų',
   'widgets.updatedAgo': 'Atnaujinta {time}',
   'widgets.updatedAt': 'Atnaujinta: {time}',
 

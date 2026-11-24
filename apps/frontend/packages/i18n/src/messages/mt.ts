@@ -491,6 +491,9 @@ export const mt: Catalog = {
   'widgets.compose': 'Ikteb',
   'widgets.storage': 'Ħażna',
   'widgets.create': 'Oħloq avveniment',
+  'widgets.newNote': 'Nota ġdida',
+  'widgets.newContact': 'Kuntatt ġdid',
+  'widgets.addPhotos': 'Żid ritratti',
   'widgets.updatedAgo': 'Aġġornat {time}',
   'widgets.updatedAt': 'Aġġornat: {time}',
 

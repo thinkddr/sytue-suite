@@ -1018,4 +1018,16 @@ export const it: AppCatalog<typeof en> = {
     'La posta cifrata che non puoi più aprire non verrà recuperata. D’ora in poi la tua posta si apre con l’accesso a Sytue ID, che potrebbe esserti chiesto di ripetere.',
   'privateMail.handoverUnderstood': 'Ho capito che la posta che non posso aprire andrà persa',
   'privateMail.handoverConfirm': 'Svuota e passa alla cassaforte',
+  'privateMail.vaultMoveTitle': 'Sposta la tua posta nella nuova cassaforte',
+  'privateMail.vaultMoveBody':
+    "La tua posta è cifrata con il sistema precedente. Per aprirla con l'accesso a Sytue ID, come le altre app, bisogna svuotarla e ricominciare nella cassaforte. La posta cifrata solo con il sistema precedente andrà persa.",
+  'privateMail.vaultMoveUnderstood':
+    'Capisco che la posta cifrata con il sistema precedente andrà persa',
+  'privateMail.vaultMoveKeep': 'Continua con la posta precedente per ora',
+  'privateMail.vaultMoveRetiredTitle':
+    'Sposta la tua posta nella nuova cassaforte per continuare a riceverla',
+  'privateMail.vaultMoveRetiredBody':
+    "Il sistema di posta precedente non è più disponibile. Finché non sposti la tua posta nella cassaforte non riceverai nuova posta: quella che arriva nel frattempo resta cifrata con il sistema precedente, come la posta che avevi già, e non si potrà leggere. Non viene eliminata, ma nessuno potrà aprirla. Dopo lo spostamento la posta torna ad arrivarti e si apre con l'accesso a Sytue ID, come le altre app.",
+  'privateMail.vaultMoveCheckFailed':
+    'Non è stato possibile verificare lo stato della tua posta. Riprova tra un momento.',
 };

@@ -297,6 +297,7 @@ func (p *PapeleraDocs) Vaciar() {
 func (p *PapeleraDocs) Repintar() {
 	p.raiz.Objects = []fyne.CanvasObject{p.construir()}
 	p.raiz.Refresh()
+	ui.RecolocarBarraSuite(p.raiz)
 }
 
 func (p *PapeleraDocs) construir() fyne.CanvasObject {

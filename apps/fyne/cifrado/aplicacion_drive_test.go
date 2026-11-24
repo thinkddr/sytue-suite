@@ -15,21 +15,26 @@ import (
 	fynetest "fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	privateDrive "git.sytue.eu/sytue/one/apps/nucleo/drive"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/pqvault"
 )
 
 type puertaFalsa struct {
-	objeto  fyne.CanvasObject
-	lista   func(context.Context, *pqvault.Vault)
-	vida    context.Context
-	cerrada bool
+	objeto   fyne.CanvasObject
+	lista    func(context.Context, *pqvault.Vault)
+	vida     context.Context
+	vaciando bool
+	cerrada  bool
 }
 
 func (p *puertaFalsa) Objeto() fyne.CanvasObject   { return p.objeto }
 func (p *puertaFalsa) Iniciar(ctx context.Context) { p.vida = ctx }
-func (p *puertaFalsa) Cerrar()                     { p.cerrada = true }
+func (p *puertaFalsa) IniciarVaciando(ctx context.Context) {
+	p.vida, p.vaciando = ctx, true
+}
+func (p *puertaFalsa) Cerrar() { p.cerrada = true }
 
 type repoBovedaFalso struct {
 	inicializar error
@@ -226,6 +231,73 @@ func TestAnfitrionDriveFalloAlInicializarCierraLaBoveda(t *testing.T) {
 	}
 	if !vault.Closed() || b.repos[0].cierres.Load() != 1 {
 		t.Fatal("la bóveda o el repositorio quedaron abiertos tras el fallo")
+	}
+}
+
+// Una bóveda que abre pero cuyo Drive no carga (recién vaciada, con la fuente ya
+// `private`) no se queda en «reintentar»: deja vaciar, con casilla, y vacía con una
+// puerta nueva (que suelta antes la fuente, AntesDeVaciar).
+func TestAnfitrionDriveFalloAlInicializarDejaVaciarConConfirmacion(t *testing.T) {
+	b := nuevoBancoAnfitrionDrive(t)
+	b.elige["alice"] = DriveEnBoveda
+	abrir := b.host.abrir
+	b.host.abrir = func(ctx context.Context, vault *pqvault.Vault) (*RecursosBoveda, repositorioBoveda, error) {
+		recursos, repo, err := abrir(ctx, vault)
+		if repo != nil {
+			repo.(*repoBovedaFalso).inicializar = privateDrive.ErrSource
+		}
+		return recursos, repo, err
+	}
+	b.host.adoptar()
+	b.esperar()
+	b.puertas[0].lista(b.banco.ctx, b.banco.abrirBoveda(t))
+	b.esperar()
+	vacio, ok := b.enseña().(*ui.Vacio)
+	if !ok || vacio.AccionSecundaria == nil {
+		t.Fatal("el fallo de carga no ofrece vaciar")
+	}
+	vaciar := vacio.AccionSecundaria.(*ui.Boton)
+	if vaciar.Texto != "vault.empty" {
+		t.Fatal("la salida no es vaciar:", vaciar.Texto)
+	}
+	vaciar.AlPulsar()
+	confirmacion, ok := b.enseña().(*fyne.Container)
+	if !ok {
+		t.Fatal("vaciar no pidió confirmación")
+	}
+	var casilla *ui.Eleccion
+	var peligro *ui.Boton
+	for _, o := range confirmacion.Objects {
+		switch v := o.(type) {
+		case *ui.Eleccion:
+			casilla = v
+		case *fyne.Container:
+			for _, b := range v.Objects {
+				if boton, ok := b.(*ui.Boton); ok && boton.Variante == ui.Peligro {
+					peligro = boton
+				}
+			}
+		}
+	}
+	if casilla == nil || peligro == nil || !peligro.Inerte {
+		t.Fatal("la confirmación no tiene casilla y botón de peligro inerte")
+	}
+	// Sin la casilla no se vacía nada.
+	peligro.Tapped(nil)
+	if len(b.puertas) != 1 {
+		t.Fatal("vació sin la casilla")
+	}
+	casilla.Marcada = true
+	casilla.AlCambiar(true)
+	if peligro.Inerte {
+		t.Fatal("la casilla no habilita vaciar")
+	}
+	peligro.Tapped(nil)
+	if len(b.puertas) != 2 || !b.puertas[1].vaciando || b.puertas[1].vida == nil {
+		t.Fatal("vaciar no abrió una puerta nueva vaciando")
+	}
+	if !b.puertas[0].cerrada || b.host.matrixPuedeEmpezar() {
+		t.Fatal("la puerta anterior sigue o se pasó a Matrix")
 	}
 }
 

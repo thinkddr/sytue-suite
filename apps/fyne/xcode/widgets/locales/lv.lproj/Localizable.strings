@@ -1,6 +1,9 @@
 "widgets.open" = "Atvērt";
 "widgets.compose" = "Rakstīt";
 "widgets.create" = "Izveidot notikumu";
+"widgets.newNote" = "Jauna piezīme";
+"widgets.newContact" = "Jauns kontakts";
+"widgets.addPhotos" = "Pievienot fotoattēlus";
 "widgets.notes" = "Piezīmes";
 "widgets.rows" = "Rindas";
 "widgets.pending" = "Gaida";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendāri";
 "widgets.address_books" = "Adrešu grāmatas";
 "widgets.storage" = "Krātuve";
-"search.label" = "Globālā meklēšana";
 "app.bases.description" = "Kopīgas relāciju tabulas";
 "app.sheets.description" = "Izklājlapas";
 "app.calendar.description" = "Kalendārs";

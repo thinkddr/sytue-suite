@@ -1,6 +1,9 @@
 "widgets.open" = "Otevřít";
 "widgets.compose" = "Napsat";
 "widgets.create" = "Vytvořit událost";
+"widgets.newNote" = "Nová poznámka";
+"widgets.newContact" = "Nový kontakt";
+"widgets.addPhotos" = "Přidat fotky";
 "widgets.notes" = "Poznámky";
 "widgets.rows" = "Řádky";
 "widgets.pending" = "Čekající";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendáře";
 "widgets.address_books" = "Adresáře";
 "widgets.storage" = "Úložiště";
-"search.label" = "Globální vyhledávání";
 "app.bases.description" = "Společné relační tabulky";
 "app.sheets.description" = "Tabulky";
 "app.calendar.description" = "Kalendář";

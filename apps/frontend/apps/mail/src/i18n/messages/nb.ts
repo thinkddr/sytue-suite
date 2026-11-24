@@ -953,4 +953,16 @@ export const nb: AppCatalog<typeof en> = {
     'Kryptert e-post som du ikke lenger kan åpne, blir ikke gjenopprettet. Fra nå av åpnes e-posten din med Sytue ID-påloggingen din, som du kanskje må gjenta.',
   'privateMail.handoverUnderstood': 'Jeg forstår at e-posten jeg ikke kan åpne, går tapt',
   'privateMail.handoverConfirm': 'Tøm og flytt til hvelvet',
+  'privateMail.vaultMoveTitle': 'Flytt e-posten din til det nye hvelvet',
+  'privateMail.vaultMoveBody':
+    'E-posten din er kryptert med det forrige systemet. For at den skal åpnes med Sytue ID-påloggingen din, slik som de andre appene, må den tømmes og startes på nytt i hvelvet. E-post som bare var kryptert med det forrige systemet, går tapt.',
+  'privateMail.vaultMoveUnderstood':
+    'Jeg forstår at e-post kryptert med det forrige systemet går tapt',
+  'privateMail.vaultMoveKeep': 'Fortsett med den forrige e-posten inntil videre',
+  'privateMail.vaultMoveRetiredTitle':
+    'Flytt e-posten din til det nye hvelvet for å fortsette å motta den',
+  'privateMail.vaultMoveRetiredBody':
+    'Det forrige e-postsystemet er ikke lenger tilgjengelig. Inntil du flytter e-posten din til hvelvet, mottar du ikke ny e-post: det som kommer i mellomtiden, lagres kryptert med det forrige systemet, slik som e-posten du allerede hadde, og kan ikke leses. Det slettes ikke, men ingen kan åpne det. Når du har flyttet, kommer e-posten frem igjen og åpnes med Sytue ID-påloggingen din, slik som de andre appene.',
+  'privateMail.vaultMoveCheckFailed':
+    'Statusen til e-posten din kunne ikke kontrolleres. Prøv igjen om et øyeblikk.',
 };

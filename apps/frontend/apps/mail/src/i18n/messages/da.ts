@@ -951,4 +951,16 @@ export const da: AppCatalog<typeof en> = {
     'Krypteret mail, som du ikke længere kan åbne, gendannes ikke. Fremover åbner din mail med dit Sytue ID-login, som du måske skal gentage.',
   'privateMail.handoverUnderstood': 'Jeg forstår, at den mail, jeg ikke kan åbne, går tabt',
   'privateMail.handoverConfirm': 'Tøm og flyt til boksen',
+  'privateMail.vaultMoveTitle': 'Flyt din mail til den nye boks',
+  'privateMail.vaultMoveBody':
+    'Din mail er krypteret med det tidligere system. For at den kan åbnes med dit Sytue ID-login ligesom de andre apps, skal den tømmes og startes forfra i boksen. Mail, der kun var krypteret med det tidligere system, går tabt.',
+  'privateMail.vaultMoveUnderstood':
+    'Jeg forstår, at mail krypteret med det tidligere system går tabt',
+  'privateMail.vaultMoveKeep': 'Fortsæt med den tidligere mail indtil videre',
+  'privateMail.vaultMoveRetiredTitle':
+    'Flyt din mail til den nye boks for at blive ved med at modtage den',
+  'privateMail.vaultMoveRetiredBody':
+    'Det tidligere mailsystem er ikke længere tilgængeligt. Indtil du flytter din mail til boksen, modtager du ikke ny mail: det, der kommer i mellemtiden, gemmes krypteret med det tidligere system ligesom den mail, du allerede havde, og kan ikke læses. Det slettes ikke, men ingen kan åbne det. Når du har flyttet, kommer din mail igen frem og åbnes med dit Sytue ID-login ligesom de andre apps.',
+  'privateMail.vaultMoveCheckFailed':
+    'Status for din mail kunne ikke kontrolleres. Prøv igen om et øjeblik.',
 };

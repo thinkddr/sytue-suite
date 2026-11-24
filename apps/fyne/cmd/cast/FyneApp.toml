@@ -34,7 +34,7 @@ Website = "https://sytue.eu"
 # registrado en Sytue ID.
 [Development]
   esquema = "sytue-cast"
-  widget_acciones = "open,search"
+  widget_acciones = "open"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"
   # Emitir desde la app abre la cámara, el micrófono y la pantalla con la misma llamada

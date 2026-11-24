@@ -488,6 +488,9 @@ export const bg: Catalog = {
   'widgets.compose': 'Писане',
   'widgets.storage': 'Хранилище',
   'widgets.create': 'Създаване на събитие',
+  'widgets.newNote': 'Нова бележка',
+  'widgets.newContact': 'Нов контакт',
+  'widgets.addPhotos': 'Добавяне на снимки',
   'widgets.updatedAgo': 'Обновено {time}',
   'widgets.updatedAt': 'Обновено: {time}',
 

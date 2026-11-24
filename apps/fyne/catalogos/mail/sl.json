@@ -465,6 +465,13 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Vaša pošta je šifrirana s prejšnjim sistemom. Da se bo odpirala s prijavo v Sytue ID kot ostale aplikacije, jo je treba izprazniti in začeti znova v trezorju. Pošta, šifrirana samo s prejšnjim sistemom, bo izgubljena.",
+  "privateMail.vaultMoveCheckFailed": "Stanja vaše pošte ni bilo mogoče preveriti. Poskusite znova čez trenutek.",
+  "privateMail.vaultMoveKeep": "Zaenkrat nadaljuj s prejšnjo pošto",
+  "privateMail.vaultMoveRetiredBody": "Prejšnji poštni sistem ni več na voljo. Dokler pošte ne premaknete v trezor, ne boste prejemali nove pošte: kar prispe medtem, se shrani šifrirano s prejšnjim sistemom, tako kot pošta, ki jo že imate, in je ne bo mogoče prebrati. Ne izbriše se, a nihče je ne bo mogel odpreti. Po premiku vam pošta znova prihaja in se odpira s prijavo v Sytue ID kot ostale aplikacije.",
+  "privateMail.vaultMoveRetiredTitle": "Premaknite pošto v novi trezor, da jo boste še naprej prejemali",
+  "privateMail.vaultMoveTitle": "Premaknite pošto v novi trezor",
+  "privateMail.vaultMoveUnderstood": "Razumem, da bo pošta, šifrirana s prejšnjim sistemom, izgubljena",
   "purge.body": {
     "one": "{count} sporočilo bo za vedno izginilo in ga ne bo mogoče obnoviti. Sprosti se prostor, ki ga zaseda.",
     "two": "{count} sporočili bosta za vedno izginili in ju ne bo mogoče obnoviti. Sprosti se prostor, ki ga zasedata.",

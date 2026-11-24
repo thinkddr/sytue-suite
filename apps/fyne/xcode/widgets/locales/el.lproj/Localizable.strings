@@ -1,6 +1,9 @@
 "widgets.open" = "Άνοιγμα";
 "widgets.compose" = "Σύνταξη";
 "widgets.create" = "Δημιουργία συμβάντος";
+"widgets.newNote" = "Νέα σημείωση";
+"widgets.newContact" = "Νέα επαφή";
+"widgets.addPhotos" = "Προσθήκη φωτογραφιών";
 "widgets.notes" = "Σημειώσεις";
 "widgets.rows" = "Γραμμές";
 "widgets.pending" = "Σε αναμονή";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Ημερολόγια";
 "widgets.address_books" = "Βιβλία διευθύνσεων";
 "widgets.storage" = "Αποθηκευτικός χώρος";
-"search.label" = "Καθολική αναζήτηση";
 "app.bases.description" = "Συνεργατικοί σχεσιακοί πίνακες";
 "app.sheets.description" = "Υπολογιστικά φύλλα";
 "app.calendar.description" = "Ημερολόγιο";

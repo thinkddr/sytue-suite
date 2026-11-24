@@ -37,7 +37,9 @@ func Docs(_ Comunes, docs *api.Docs, kind api.DocKind) widgets.Fuente {
 			if doc.Starred {
 				insignia = "★"
 			}
-			items = append(items, widgets.Item{Title: titulo, Badge: insignia, StartAt: unix(doc.UpdatedAt), Unread: doc.Starred})
+			items = append(items, widgets.Item{
+				Title: titulo, Badge: insignia, StartAt: unix(doc.UpdatedAt), Unread: doc.Starred, Route: RutaDocumento(doc.ID),
+			})
 			if llenos(items) {
 				break
 			}

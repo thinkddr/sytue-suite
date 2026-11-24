@@ -31,7 +31,6 @@
 	<array>
 		<string>open</string>
 		<string>create</string>
-		<string>search</string>
 	</array>
 	<key>SytueWidgetBundle</key>
 	<string>eu.sytue.calendar</string>

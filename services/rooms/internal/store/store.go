@@ -40,6 +40,9 @@ type Store struct {
 	// traspasoID acota la consulta de traspaso de las cuentas de Matrix (plazo
 	// corto y pausa tras una avería de Sytue ID).
 	traspasoID consultaTraspaso
+	// correoSinMatrix retira la autoridad de Matrix del correo (ADR 0087, entrega 5;
+	// SYTUE_MAIL_SIN_MATRIX). Ver retirada_matrix.go.
+	correoSinMatrix bool
 }
 
 // New construye un Store sobre el pool dado, con el cifrador de secretos en

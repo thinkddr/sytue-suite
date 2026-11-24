@@ -51,7 +51,10 @@ public final class RefrescoReglasPrueba {
         check(!RefrescoReglas.llamanteValido(null, "eu.sytue.mail"), "Mail rejects an unknown caller");
         check(!RefrescoReglas.llamanteValido("eu.sytue.one", "eu.sytue.one"), "One does not relay to itself");
 
-        check(RefrescoReglas.CADA_MS == 3_600_000L && RefrescoReglas.HOLGURA_MS == 900_000L, "hourly with 15 min flex");
+        check(RefrescoReglas.CADA_MS == 900_000L && RefrescoReglas.HOLGURA_MS == 300_000L, "every 15 min with 5 min flex");
+        check(RefrescoReglas.CADA_MS >= 15L * 60 * 1000, "periodic interval below JobScheduler's minimum");
+        check(RefrescoReglas.HOLGURA_MS >= 5L * 60 * 1000 && RefrescoReglas.HOLGURA_MS < RefrescoReglas.CADA_MS,
+                "flex below JobScheduler's minimum or not shorter than the period");
         System.out.println("Widget background refresh: " + checks + " checks passed");
     }
 }

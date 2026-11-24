@@ -24,6 +24,9 @@ export const sourceReleaseProducts = [
   'docs',
   'sheets',
   'slides',
+  // Drive la suelta al vaciar su bóveda (PqVaultGate): sin fuente congelada, la
+  // bóveda nueva no tendría de dónde importar el Drive del servidor.
+  'drive',
 ] as const;
 export type SourceReleaseProduct = (typeof sourceReleaseProducts)[number];
 export function isSourceReleaseProduct(value: string): value is SourceReleaseProduct {
@@ -53,7 +56,12 @@ const epochPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export function sourceReleaseClient(options: SourceReleaseOptions) {
   const send: SourceReleaseFetch =
     options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
-  const api = (path: string) => withBase(options.basePath, '/api/private-storage/migration' + path);
+  // Drive sirve la fuente en la ruta de su BFF de siempre; el resto, en la común.
+  const root =
+    options.product === 'drive'
+      ? '/api/matrix/storage/migration'
+      : '/api/private-storage/migration';
+  const api = (path: string) => withBase(options.basePath, root + path);
   const headers = async (signal?: AbortSignal): Promise<Record<string, string>> => {
     const response = await send(withBase(options.basePath, '/auth/session'), {
       credentials: 'same-origin',
@@ -190,4 +198,96 @@ export function takePendingRelease(
 /** A Sytue ID con `max_age=0` y de vuelta a esta misma página. */
 export function reauthenticationUrl(basePath: string, returnTo: string): string {
   return withBase(basePath, '/auth/login?reauth=1&returnTo=' + encodeURIComponent(returnTo));
+}
+
+/**
+ * «Vaciar» la bóveda de una app con fuente en el servidor (PqVaultGate): antes de
+ * vaciar se suelta la fuente congelada, para que la bóveda nueva vuelva a importar
+ * los datos del servidor. Si para soltarla hay que identificarse otra vez, esta
+ * marca (de esta pestaña, de esta cuenta y de esa época) dice a la vuelta que la
+ * persona ya confirmó vaciar: se suelta y se vacía sin volver a preguntar.
+ */
+interface PendingEmpty {
+  readonly actor: string;
+  readonly tenant: string;
+  readonly product: string;
+  readonly epoch: string;
+  readonly at: number;
+}
+const pendingEmptyKey = (product: string) => 'sytue.vault-empty.' + product;
+
+export function rememberPendingEmpty(
+  options: Pick<SourceReleaseOptions, 'actor' | 'tenant' | 'product'>,
+  epoch: string,
+  now = Date.now(),
+): void {
+  try {
+    const value: PendingEmpty = { ...options, epoch, at: now };
+    sessionStorage.setItem(pendingEmptyKey(options.product), JSON.stringify(value));
+  } catch {
+    // Sin almacenamiento de sesión, a la vuelta se pide vaciar otra vez.
+  }
+}
+
+/** La época con la que se confirmó vaciar, si es de esta cuenta y reciente. Se
+ * borra al leerla: la vuelta repite la operación una sola vez. */
+export function takePendingEmpty(
+  options: Pick<SourceReleaseOptions, 'actor' | 'tenant' | 'product'>,
+  now = Date.now(),
+): string | null {
+  try {
+    const raw = sessionStorage.getItem(pendingEmptyKey(options.product));
+    sessionStorage.removeItem(pendingEmptyKey(options.product));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<PendingEmpty>;
+    if (
+      value.actor !== options.actor ||
+      value.tenant !== options.tenant ||
+      value.product !== options.product ||
+      typeof value.epoch !== 'string' ||
+      !epochPattern.test(value.epoch) ||
+      typeof value.at !== 'number' ||
+      now - value.at < 0 ||
+      now - value.at > pendingLifetime
+    )
+      return null;
+    return value.epoch;
+  } catch {
+    return null;
+  }
+}
+
+/** Lo que la puerta necesita de la fuente para vaciar (sustituible en pruebas). */
+export interface SourceReleaser {
+  frozen: (signal?: AbortSignal) => Promise<FrozenSource | null>;
+  release: (epoch: string, signal?: AbortSignal) => Promise<ReleaseOutcome>;
+}
+
+/**
+ * Suelta la fuente congelada antes de vaciar. `none`: no hay nada congelado (o ya
+ * se soltó), se puede vaciar; `reauth`: hay que identificarse otra vez con esa
+ * época; `failed`: no se pudo, y vaciar ahora dejaría la bóveda sin de dónde importar.
+ */
+export async function releaseBeforeEmpty(
+  client: SourceReleaser,
+  signal?: AbortSignal,
+  expected?: string,
+): Promise<{ outcome: 'none' | 'released' | 'failed' } | { outcome: 'reauth'; epoch: string }> {
+  let frozen: FrozenSource | null;
+  try {
+    frozen = await client.frozen(signal);
+  } catch {
+    return { outcome: 'failed' };
+  }
+  if (!frozen) return { outcome: 'none' };
+  // De vuelta de Sytue ID solo se suelta la época que la persona confirmó.
+  if (expected !== undefined && frozen.epoch !== expected) return { outcome: 'failed' };
+  const outcome = await client.release(frozen.epoch, signal);
+  if (outcome === 'released') return { outcome };
+  if (outcome === 'reauth') return { outcome, epoch: frozen.epoch };
+  if (outcome === 'stale') {
+    const now = await client.frozen(signal).catch(() => undefined);
+    return { outcome: now === null ? 'none' : 'failed' };
+  }
+  return { outcome: 'failed' };
 }

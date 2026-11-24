@@ -499,6 +499,9 @@ export const cs: Catalog = {
   'widgets.compose': 'Napsat',
   'widgets.storage': 'Úložiště',
   'widgets.create': 'Vytvořit událost',
+  'widgets.newNote': 'Nová poznámka',
+  'widgets.newContact': 'Nový kontakt',
+  'widgets.addPhotos': 'Přidat fotky',
   'widgets.updatedAgo': 'Aktualizováno {time}',
   'widgets.updatedAt': 'Aktualizováno: {time}',
 

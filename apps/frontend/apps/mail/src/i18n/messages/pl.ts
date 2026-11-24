@@ -1013,4 +1013,15 @@ export const pl: AppCatalog<typeof en> = {
   'privateMail.handoverUnderstood':
     'Rozumiem, że poczta, której nie mogę otworzyć, zostanie utracona',
   'privateMail.handoverConfirm': 'Opróżnij i przenieś do sejfu',
+  'privateMail.vaultMoveTitle': 'Przenieś pocztę do nowego sejfu',
+  'privateMail.vaultMoveBody':
+    'Twoja poczta jest zaszyfrowana poprzednim systemem. Aby otwierała się po zalogowaniu do Sytue ID, jak pozostałe aplikacje, trzeba ją opróżnić i zacząć od nowa w sejfie. Poczta zaszyfrowana tylko poprzednim systemem zostanie utracona.',
+  'privateMail.vaultMoveUnderstood':
+    'Rozumiem, że poczta zaszyfrowana poprzednim systemem zostanie utracona',
+  'privateMail.vaultMoveKeep': 'Na razie zostań przy poprzedniej poczcie',
+  'privateMail.vaultMoveRetiredTitle': 'Przenieś pocztę do nowego sejfu, aby dalej ją otrzymywać',
+  'privateMail.vaultMoveRetiredBody':
+    'Poprzedni system poczty nie jest już dostępny. Dopóki nie przeniesiesz poczty do sejfu, nie będziesz otrzymywać nowej poczty: to, co przyjdzie w międzyczasie, jest przechowywane zaszyfrowane poprzednim systemem, tak jak poczta, którą już masz, i nie da się jej odczytać. Nie zostanie usunięta, ale nikt nie będzie mógł jej otworzyć. Po przeniesieniu poczta znów zacznie przychodzić i będzie się otwierać po zalogowaniu do Sytue ID, jak pozostałe aplikacje.',
+  'privateMail.vaultMoveCheckFailed':
+    'Nie udało się sprawdzić stanu Twojej poczty. Spróbuj ponownie za chwilę.',
 };

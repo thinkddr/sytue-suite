@@ -41,6 +41,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,7 +65,7 @@ public final class Widgets extends AppWidgetProvider {
             "updated_at", "expires_at", "active", "counters", "items", "calendar");
     private static final Set<String> COUNTER_KEYS = keys("kind", "value");
     private static final Set<String> ALLOWED_ITEM_KEYS = keys("title", "subtitle", "badge", "color",
-            "start_at", "end_at", "all_day", "unread", "done");
+            "start_at", "end_at", "all_day", "unread", "done", "route");
     private static final Set<String> REQUIRED_CALENDAR_KEYS = keys("year", "month");
     private static final Set<String> ALLOWED_CALENDAR_KEYS = keys("year", "month", "busy_days", "day_colors");
     private static final int MAX_BITMAP_PIXELS = 135_000;
@@ -172,6 +173,7 @@ public final class Widgets extends AppWidgetProvider {
             blank.setImageViewBitmap(visualId, null);
             blank.setViewVisibility(visualId, View.GONE);
         }
+        apagarCuerpo(ctx, blank);
         if (updatedId != 0) {
             blank.setTextViewText(updatedId, "");
             blank.setViewVisibility(updatedId, View.GONE);
@@ -297,21 +299,13 @@ public final class Widgets extends AppWidgetProvider {
 
                 action(ctx, views, "sytue_widget_open", labels.getString("open"), scheme + ":/", id, 0);
                 views.setTextColor(resource(ctx, "id", "sytue_widget_open"), brandColor);
-                views.setViewVisibility(resource(ctx, "id", "sytue_widget_search"), View.GONE);
                 views.setViewVisibility(resource(ctx, "id", "sytue_widget_extra"), View.GONE);
                 if (!compactSmall) {
                     JSONArray actions = config.getJSONArray("actions");
                     for (int n = 0; n < actions.length(); n++) {
                         String act = actions.getString(n);
-                        if ("search".equals(act)) {
-                            views.setViewVisibility(resource(ctx, "id", "sytue_widget_search"), View.VISIBLE);
-                            views.setTextColor(resource(ctx, "id", "sytue_widget_search"), brandColor);
-                            action(ctx, views, "sytue_widget_search", labels.getString("search"),
-                                    scheme + ":/?action=search", id, 1);
-                        }
                         // Las únicas escrituras son formularios existentes que la persona debe confirmar.
-                        if (("mail".equals(product) && "compose".equals(act))
-                                || ("calendar".equals(product) && "create".equals(act))) {
+                        if (WidgetSnapshot.accionPermitida(product, act)) {
                             views.setViewVisibility(resource(ctx, "id", "sytue_widget_extra"), View.VISIBLE);
                             views.setTextColor(resource(ctx, "id", "sytue_widget_extra"), brandColor);
                             action(ctx, views, "sytue_widget_extra", labels.getString(act),
@@ -320,31 +314,10 @@ public final class Widgets extends AppWidgetProvider {
                     }
                 }
 
-                int visualId = resource(ctx, "id", "sytue_widget_visual");
-                int countsId = resource(ctx, "id", "sytue_widget_counts");
-                boolean hasVisual = "calendar".equals(product)
-                        || (snapshot != null && (!snapshot.items.isEmpty() || !snapshot.counters.isEmpty()));
-
-                if (visualId != 0 && hasVisual) {
-                    int canvasDpW = Math.max(96, minW - 24);
-                    int canvasDpH = Math.max(54, minH - (hideFooter ? 36 : 68) - (actualizado.isEmpty() ? 0 : 14));
-                    Bitmap bmp = renderVisualBitmap(product, snapshot, labels, locale, night,
-                            canvasDpW, canvasDpH, metrics.density);
-                    views.setImageViewBitmap(visualId, bmp);
-                    views.setContentDescription(visualId, accessibleSummary(product, snapshot, labels, locale));
-                    views.setViewVisibility(visualId, View.VISIBLE);
-                    clickDestination(ctx, views, "sytue_widget_visual", scheme + ":/", id, 0);
-                    views.setTextViewText(countsId, "");
-                    views.setViewVisibility(countsId, View.GONE);
-                } else {
-                    if (visualId != 0) {
-                        views.setImageViewBitmap(visualId, null);
-                        views.setViewVisibility(visualId, View.GONE);
-                    }
-                    String textSummary = counters(snapshot, labels, locale);
-                    views.setTextViewText(countsId, textSummary);
-                    views.setViewVisibility(countsId, textSummary.isEmpty() ? View.GONE : View.VISIBLE);
-                }
+                int canvasDpW = Math.max(96, minW - 24);
+                int canvasDpH = Math.max(54, minH - (hideFooter ? 36 : 68) - (actualizado.isEmpty() ? 0 : 14));
+                pintarCuerpo(ctx, views, id, product, scheme, snapshot, labels, locale, night,
+                        canvasDpW, canvasDpH, metrics.density);
 
                 manager.updateAppWidget(id, views);
             }
@@ -356,6 +329,191 @@ public final class Widgets extends AppWidgetProvider {
                 enBlanco(ctx, manager, id);
             }
         }
+    }
+
+    /** Las imágenes de fila del layout: cinco debajo (o solas) y tres al lado de la rejilla. */
+    private static final int FILAS = 5;
+    private static final int FILAS_AL_LADO = 3;
+    /** El primer código de clic de las filas de debajo y el de las de al lado. */
+    private static final int CLIC_FILA = 3;
+    private static final int CLIC_LADO = 8;
+    /** El hueco entre filas (`layout_marginTop` de cada una en sytue_widget.xml). */
+    private static final int HUECO_FILA_DP = 3;
+    /** El alto de la barra de almacenamiento encima de las filas. */
+    private static final int ALTO_BARRA_DP = 22;
+
+    /** Todo el cuerpo apagado y sin imágenes: lo que no se enciende no enseña nada viejo. */
+    private static void apagarCuerpo(Context ctx, RemoteViews views) {
+        for (String nombre : new String[] {"sytue_widget_body", "sytue_widget_side"}) {
+            int id = resource(ctx, "id", nombre);
+            if (id != 0) {
+                views.setViewVisibility(id, View.GONE);
+            }
+        }
+        List<String> imagenes = new ArrayList<>(Arrays.asList("sytue_widget_visual", "sytue_widget_strip"));
+        for (int i = 0; i < FILAS; i++) {
+            imagenes.add("sytue_widget_row" + i);
+        }
+        for (int i = 0; i < FILAS_AL_LADO; i++) {
+            imagenes.add("sytue_widget_side" + i);
+        }
+        for (String nombre : imagenes) {
+            int id = resource(ctx, "id", nombre);
+            if (id != 0) {
+                views.setImageViewBitmap(id, null);
+                views.setViewVisibility(id, View.GONE);
+            }
+        }
+    }
+
+    /**
+     * El cuerpo del widget. Con filas (formato 3), cada fila es SU imagen con SU enlace al
+     * elemento (`sytue-<producto>:` + ruta; sin ruta, la app): las de un producto debajo de
+     * su barra de almacenamiento; las de Calendar solas en el pequeño, al lado de la rejilla
+     * en el mediano y debajo en el grande. Sin filas, una sola imagen (la rejilla con los
+     * contadores, o los contadores) y, sin nada que dibujar, el texto: los contadores o la
+     * descripción de la app, con «Abrir» debajo.
+     */
+    private static void pintarCuerpo(Context ctx, RemoteViews views, int widget, String product, String scheme,
+            WidgetSnapshot snapshot, JSONObject labels, Locale locale, boolean night,
+            int dpW, int dpH, float density) throws JSONException {
+        apagarCuerpo(ctx, views);
+        int bodyId = resource(ctx, "id", "sytue_widget_body");
+        int visualId = resource(ctx, "id", "sytue_widget_visual");
+        int countsId = resource(ctx, "id", "sytue_widget_counts");
+        boolean calendario = "calendar".equals(product);
+        List<WidgetSnapshot.Item> items = snapshot != null ? snapshot.items : Collections.<WidgetSnapshot.Item>emptyList();
+        boolean hayContadores = snapshot != null && !snapshot.counters.isEmpty();
+        if (bodyId == 0 || visualId == 0 || (!calendario && items.isEmpty() && !hayContadores)) {
+            String texto = counters(snapshot, labels, locale);
+            if (texto.isEmpty()) {
+                texto = labels.optString("description", "");
+            }
+            views.setTextViewText(countsId, texto);
+            views.setViewVisibility(countsId, texto.isEmpty() ? View.GONE : View.VISIBLE);
+            return;
+        }
+        views.setTextViewText(countsId, "");
+        views.setViewVisibility(countsId, View.GONE);
+        views.setViewVisibility(bodyId, View.VISIBLE);
+        if (items.isEmpty()) {
+            Bitmap bmp = renderVisualBitmap(product, snapshot, labels, locale, night, dpW, dpH, density);
+            mostrarImagen(views, visualId, bmp, accessibleSummary(product, snapshot, labels, locale));
+            clickDestination(ctx, views, "sytue_widget_visual", scheme + ":/", widget, 0);
+            return;
+        }
+        int brand = brandColor(product, night);
+        int textPrimary = night ? Color.parseColor("#F5F5F7") : Color.parseColor("#1C1C1E");
+        int textMuted = night ? Color.parseColor("#98989D") : Color.parseColor("#6E6E73");
+        Date now = new Date();
+        boolean alLado = calendario && dpW >= 215 && dpH < 195;
+        boolean debajo = calendario && dpH >= 195;
+        Long almacen = calendario ? null : findStoragePercent(snapshot);
+        // Cuántas filas caben, de qué alto y de qué ancho; y lo que queda para la rejilla.
+        int altoFila;
+        int maximo;
+        int disponible = dpH;
+        if (alLado) {
+            altoFila = dpH >= 3 * 33 ? 30 : 26;
+            maximo = FILAS_AL_LADO;
+        } else if (debajo) {
+            altoFila = 32;
+            maximo = 4;
+            disponible = dpH - 96;
+        } else if (calendario) {
+            // En el pequeño, filas de una línea (con la hora a la derecha): caben dos.
+            altoFila = dpH < 80 ? 24 : 30;
+            maximo = 3;
+        } else {
+            altoFila = dpH < 80 ? 24 : (dpH >= 150 ? 34 : 30);
+            maximo = dpH >= 210 ? FILAS : (dpH >= 150 ? 3 : 2);
+            if (almacen != null) {
+                disponible -= ALTO_BARRA_DP;
+            }
+        }
+        int caben = Math.max(1, Math.min(maximo, Math.min(items.size(),
+                (disponible + HUECO_FILA_DP) / (altoFila + HUECO_FILA_DP))));
+        int anchoFila = alLado ? Math.max(80, (dpW - 8) / 2) : dpW;
+        int anchoRejilla = alLado ? Math.max(80, (dpW - 8) / 2) : dpW;
+        int altoRejilla = alLado ? dpH : Math.max(80, dpH - caben * (altoFila + HUECO_FILA_DP));
+        // Un solo presupuesto de píxeles para todas las imágenes, como con una sola.
+        float area = caben * (float) anchoFila * altoFila;
+        if (alLado || debajo) {
+            area += anchoRejilla * (float) altoRejilla;
+        }
+        if (almacen != null) {
+            area += dpW * (float) ALTO_BARRA_DP;
+        }
+        float s = escala(area, density);
+
+        if (alLado || debajo) {
+            Bitmap rejilla = renderGridBitmap(snapshot, locale, night, anchoRejilla, altoRejilla, s, alLado);
+            mostrarImagen(views, visualId, rejilla, accessibleSummary(product, snapshot, labels, locale));
+            clickDestination(ctx, views, "sytue_widget_visual", scheme + ":/", widget, 0);
+        }
+        if (almacen != null) {
+            Bitmap barra = lienzo(dpW, ALTO_BARRA_DP - 2, s);
+            drawStorageBar(new Canvas(barra), almacen, labels.getString("storage_percent"), locale,
+                    brand, night, textMuted, 0f, 0f, barra.getWidth(), barra.getHeight(), s);
+            mostrarImagen(views, resource(ctx, "id", "sytue_widget_strip"), barra, "");
+        }
+        if (alLado) {
+            int sideId = resource(ctx, "id", "sytue_widget_side");
+            if (sideId != 0) {
+                views.setViewVisibility(sideId, View.VISIBLE);
+            }
+        }
+        for (int i = 0; i < caben; i++) {
+            WidgetSnapshot.Item item = items.get(i);
+            String nombre = (alLado ? "sytue_widget_side" : "sytue_widget_row") + i;
+            Bitmap fila = lienzo(anchoFila, altoFila, s);
+            Canvas lienzoFila = new Canvas(fila);
+            if (calendario) {
+                drawEventRow(lienzoFila, item, locale, now, brand, night, textPrimary, textMuted,
+                        0f, 0f, fila.getWidth(), fila.getHeight(), s, fila.getHeight() < 25f * s);
+            } else {
+                drawProductItemRow(lienzoFila, product, item, locale, now, brand, night, textPrimary, textMuted,
+                        0f, 0f, fila.getWidth(), fila.getHeight(), s);
+            }
+            String rotulo = item.subtitle.isEmpty() ? item.title : item.title + ", " + item.subtitle;
+            mostrarImagen(views, resource(ctx, "id", nombre), fila, rotulo);
+            clickDestination(ctx, views, nombre, WidgetSnapshot.destinoDeFila(scheme, item), widget,
+                    (alLado ? CLIC_LADO : CLIC_FILA) + i);
+        }
+    }
+
+    private static void mostrarImagen(RemoteViews views, int id, Bitmap bmp, String descripcion) {
+        if (id == 0) {
+            return;
+        }
+        views.setImageViewBitmap(id, bmp);
+        views.setContentDescription(id, descripcion);
+        views.setViewVisibility(id, View.VISIBLE);
+    }
+
+    /** La escala de las imágenes: la densidad (como mucho 2,25) sin pasar del presupuesto. */
+    private static float escala(float areaDp, float density) {
+        float maxScale = (float) Math.sqrt((double) MAX_BITMAP_PIXELS / Math.max(1f, areaDp));
+        return Math.max(1.0f, Math.min(Math.min(density, 2.25f), maxScale));
+    }
+
+    private static Bitmap lienzo(int dpW, int dpH, float s) {
+        return Bitmap.createBitmap(Math.max(1, Math.round(dpW * s)), Math.max(1, Math.round(dpH * s)),
+                Bitmap.Config.ARGB_8888);
+    }
+
+    /** La rejilla del mes sola: al lado de las filas en el mediano y encima en el grande. */
+    private static Bitmap renderGridBitmap(WidgetSnapshot snapshot, Locale locale, boolean night,
+            int dpW, int dpH, float s, boolean compact) {
+        Bitmap bmp = lienzo(dpW, dpH, s);
+        int brand = brandColor("calendar", night);
+        int textPrimary = night ? Color.parseColor("#F5F5F7") : Color.parseColor("#1C1C1E");
+        int textMuted = night ? Color.parseColor("#98989D") : Color.parseColor("#6E6E73");
+        Calendar cal = Calendar.getInstance(locale);
+        drawMonthGrid(new Canvas(bmp), cal, cal.getTime(), cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1,
+                cal.get(Calendar.DAY_OF_MONTH), snapshot, locale, brand, textPrimary, textMuted,
+                0f, 0f, bmp.getWidth(), bmp.getHeight(), s, compact);
+        return bmp;
     }
 
     private static void action(Context ctx, RemoteViews views, String view, String label,
@@ -377,7 +535,9 @@ public final class Widgets extends AppWidgetProvider {
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(destination));
         intent.setComponent(new ComponentName(ctx.getPackageName(), "org.golang.app.GoNativeActivity"));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        views.setOnClickPendingIntent(id, PendingIntent.getActivity(ctx, widget * 4 + action,
+        // Un código por widget y por destino: 0 abrir, 2 la acción, 3-7 las filas de debajo
+        // y 8-10 las de al lado (CLIC_FILA, CLIC_LADO).
+        views.setOnClickPendingIntent(id, PendingIntent.getActivity(ctx, widget * 16 + action,
                 intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
     }
 
@@ -477,15 +637,15 @@ public final class Widgets extends AppWidgetProvider {
             float eventsY = divY + 5f * s;
             drawCalendarEventsPane(canvas, snapshot, labels, locale, now, brand, night,
                     textPrimary, textMuted, 0f, eventsY, w, h - eventsY, s, 4);
+        } else if (snapshot != null && !snapshot.items.isEmpty()) {
+            // Pequeño con algo próximo (2026-11-24): los eventos con su hora, no la rejilla.
+            // Con la rejilla, el siguiente evento solo cabía desde 115 dp de alto y en un 2x2
+            // de muchos lanzadores solo se veían los puntos de los días ocupados.
+            drawCalendarEventsPane(canvas, snapshot, labels, locale, now, brand, night,
+                    textPrimary, textMuted, 0f, 0f, w, h, s, 3);
         } else {
-            boolean hasNext = snapshot != null && !snapshot.items.isEmpty() && dpH >= 115;
-            float gridH = hasNext ? h - 20f * s : h;
             drawMonthGrid(canvas, cal, now, year, month, today, snapshot, locale, brand,
-                    textPrimary, textMuted, 0f, 0f, w, gridH, s, true);
-            if (hasNext) {
-                drawEventRow(canvas, snapshot.items.get(0), locale, now, brand, night,
-                        textPrimary, textMuted, 0f, gridH + 2f * s, w, 18f * s, s, true);
-            }
+                    textPrimary, textMuted, 0f, 0f, w, h, s, true);
         }
     }
 
@@ -1114,7 +1274,8 @@ public final class Widgets extends AppWidgetProvider {
                             optionalInteger(row, "end_at"),
                             optionalBoolean(row, "all_day"),
                             optionalBoolean(row, "unread"),
-                            optionalBoolean(row, "done")));
+                            optionalBoolean(row, "done"),
+                            optionalString(row, "route")));
                 }
             }
 

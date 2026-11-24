@@ -504,6 +504,9 @@ export const lv: Catalog = {
   'widgets.compose': 'Rakstīt',
   'widgets.storage': 'Krātuve',
   'widgets.create': 'Izveidot notikumu',
+  'widgets.newNote': 'Jauna piezīme',
+  'widgets.newContact': 'Jauns kontakts',
+  'widgets.addPhotos': 'Pievienot fotoattēlus',
   'widgets.updatedAgo': 'Atjaunināts {time}',
   'widgets.updatedAt': 'Atjaunināts: {time}',
 

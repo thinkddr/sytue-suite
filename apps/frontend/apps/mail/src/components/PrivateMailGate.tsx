@@ -15,15 +15,19 @@ import { PqVault, type PqVaultOpenOptions } from '@sytue/offline/vault';
 import { PrivateMailClient } from '../client/privateMail.js';
 import { createVaultMailGate } from '../client/privateMailVault.js';
 import {
+  almacenDelNavegador,
   almacenDePestana,
+  aprenderRetirada,
   destinoCorreo,
   elegirAlmacenCorreo,
   olvidarTraspaso,
   pedirTraspaso,
+  quiereSeguirConMatrix,
+  seguirConMatrix,
   traspasoPedido,
   type DestinoCorreo,
 } from '../client/almacenCorreo.js';
-import { TraspasoBoveda } from './TraspasoBoveda.js';
+import { CorreoSinComprobar, PasarABoveda, TraspasoBoveda } from './TraspasoBoveda.js';
 
 interface GateProps {
   actor: string;
@@ -35,10 +39,16 @@ interface GateProps {
 /**
  * La puerta del correo privado. Con `vault` (el conmutador de despliegue
  * `SYTUE_MAIL_BOVEDA`, ADR 0087), quien no tiene correo en Matrix lo abre en la
- * bóveda; quien ya lo tiene en Matrix sigue por Matrix. Sin él, siempre Matrix.
+ * bóveda; a quien lo tiene en Matrix se le ofrece pasarlo a la bóveda (vaciándolo)
+ * o seguir por ahora con Matrix. Sin el conmutador, siempre Matrix.
+ *
+ * Si Rooms dice que Matrix está retirada (entrega 5), solo se ofrece pasar a la
+ * bóveda, y la duda ya no abre Matrix: enseña «Reintentar». La puerta lo sabe solo
+ * por lo que contesta Rooms, nunca por un conmutador propio.
  */
 export function PrivateMailGate(props: GateProps & { vault?: boolean | undefined }) {
   const [almacen, setAlmacen] = useState<DestinoCorreo | null>(props.vault ? null : 'matrix');
+  const [intento, setIntento] = useState(0);
   useEffect(() => {
     if (!props.vault) {
       setAlmacen('matrix');
@@ -55,15 +65,46 @@ export function PrivateMailGate(props: GateProps & { vault?: boolean | undefined
       .then((elegido) => {
         if (controller.signal.aborted) return;
         const pestana = almacenDePestana();
-        const destino = destinoCorreo(elegido, traspasoPedido(pestana, props.actor, props.tenant));
+        const destino = destinoCorreo(
+          elegido,
+          traspasoPedido(pestana, props.actor, props.tenant),
+          quiereSeguirConMatrix(pestana, props.actor, props.tenant),
+          aprenderRetirada(almacenDelNavegador(), props.actor, props.tenant, elegido),
+        );
         if (destino === 'boveda') olvidarTraspaso(pestana, props.actor, props.tenant);
         setAlmacen(destino);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [props.vault, props.actor, props.tenant]);
+  }, [props.vault, props.actor, props.tenant, intento]);
   if (almacen === 'boveda') return <VaultMailGate {...props} />;
   if (almacen === 'traspaso') return <VaultMailGate {...props} traspaso />;
+  if (almacen === 'pasar')
+    return (
+      <PasarABoveda
+        locale={props.locale}
+        onConfirm={() => {
+          pedirTraspaso(almacenDePestana(), props.actor, props.tenant);
+          setAlmacen('traspaso');
+        }}
+      />
+    );
+  if (almacen === 'reintentar')
+    return <CorreoSinComprobar locale={props.locale} onRetry={() => setIntento((n) => n + 1)} />;
+  if (almacen === 'elegir')
+    return (
+      <PasarABoveda
+        locale={props.locale}
+        onConfirm={() => {
+          pedirTraspaso(almacenDePestana(), props.actor, props.tenant);
+          setAlmacen('traspaso');
+        }}
+        onKeep={() => {
+          seguirConMatrix(almacenDePestana(), props.actor, props.tenant);
+          setAlmacen('matrix');
+        }}
+      />
+    );
   if (almacen === 'matrix')
     return (
       <MatrixMailGate

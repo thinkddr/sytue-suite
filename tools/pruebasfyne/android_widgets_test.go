@@ -169,7 +169,7 @@ func (r *androidWidgetsRecursos) verificar(t *testing.T) {
 	if err := json.Unmarshal([]byte(guiontest.Leer(t, filepath.Join(r.apk, "assets", "sytue-widget.json"))), &config); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(config.Actions, []string{"open", "compose", "search"}) {
+	if !reflect.DeepEqual(config.Actions, []string{"open", "compose"}) {
 		t.Fatalf("acciones %v", config.Actions)
 	}
 	if config.Locales["es"]["open"] != "Abrir" {
@@ -286,11 +286,13 @@ devolver(salida)
 		if c.Scheme != "sytue-"+c.Product {
 			t.Fatalf("%s: esquema %s y producto %s", c.ID, c.Scheme, c.Product)
 		}
-		if !slices.Contains(c.Actions, "search") {
-			t.Fatalf("%s sin la acción search: %v", c.ID, c.Actions)
+		// «Buscar» ya no es una acción de los widgets (ADR 0078, 2026-11-24): cada uno
+		// abre su app y, si la tiene, su acción rápida (formato 3, enmienda del mismo día).
+		if len(c.Actions) == 0 || c.Actions[0] != "open" || slices.Contains(c.Actions, "search") {
+			t.Fatalf("%s: acciones %v", c.ID, c.Actions)
 		}
 		for idioma, etiquetas := range c.Locales {
-			for _, k := range []string{"search", "calendars", "address_books"} {
+			for _, k := range []string{"open", "calendars", "address_books", "description"} {
 				if etiquetas[k] == "" {
 					t.Fatalf("%s/%s: falta la etiqueta %s", c.ID, idioma, k)
 				}

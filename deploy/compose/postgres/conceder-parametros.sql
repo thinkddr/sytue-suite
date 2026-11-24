@@ -44,7 +44,8 @@
 --     MISMA sesión antes de este fichero (pgtest, dev y separar-roles.sh lo usan).
 --
 -- Idempotente: conceder lo que ya está concedido no cambia nada. Un solo DO: o todo
--- o nada. Lo ejecuta un superusuario, que es quien puede conceder sobre parámetros.
+-- o nada, salvo un rol hallado que otra sesión borra a mitad, que se salta. Lo
+-- ejecuta un superusuario, que es quien puede conceder sobre parámetros.
 DO $parametros$
 DECLARE
   -- En orden alfabético. app.merge no lo lleva hoy ninguna función en su SET (lo
@@ -58,6 +59,7 @@ DECLARE
   ];
   nombrados text[] := coalesce(string_to_array(nullif(current_setting('sytue.roles', true), ''), ','), '{}');
   roles text[];
+  rol text;
   falta text;
 BEGIN
   IF EXISTS (SELECT FROM unnest(parametros) p WHERE p !~ '^[a-z_]+\.[a-z_][a-z0-9_]*$') THEN
@@ -92,9 +94,18 @@ BEGIN
       current_setting('server_version'), array_to_string(roles, ', '), array_to_string(parametros, ', ');
   END IF;
 
-  EXECUTE format('GRANT SET ON PARAMETER %s TO %s',
-    array_to_string(parametros, ', '),
-    (SELECT string_agg(quote_ident(x), ', ') FROM unnest(roles) x));
+  -- Rol a rol: uno HALLADO que ya no existe (otra sesión lo borró entre la lista y el
+  -- GRANT; en CI, las pruebas que comparten servidor crean y borran roles `*_app`)
+  -- no tiene nada que conceder. Uno NOMBRADO que desaparece sigue siendo un error.
+  FOREACH rol IN ARRAY roles LOOP
+    BEGIN
+      EXECUTE format('GRANT SET ON PARAMETER %s TO %I', array_to_string(parametros, ', '), rol);
+    EXCEPTION WHEN undefined_object THEN
+      IF rol = ANY (nombrados) THEN
+        RAISE;
+      END IF;
+    END;
+  END LOOP;
   RAISE NOTICE 'parámetros de funciones: SET sobre % para %',
     array_to_string(parametros, ', '), array_to_string(roles, ', ');
 END

@@ -1,6 +1,9 @@
 "widgets.open" = "Otvori";
 "widgets.compose" = "Napiši";
 "widgets.create" = "Stvori događaj";
+"widgets.newNote" = "Nova bilješka";
+"widgets.newContact" = "Novi kontakt";
+"widgets.addPhotos" = "Dodaj fotografije";
 "widgets.notes" = "Bilješke";
 "widgets.rows" = "Redci";
 "widgets.pending" = "Na čekanju";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendari";
 "widgets.address_books" = "Adresari";
 "widgets.storage" = "Pohrana";
-"search.label" = "Globalno pretraživanje";
 "app.bases.description" = "Zajedničke relacijske tablice";
 "app.sheets.description" = "Proračunske tablice";
 "app.calendar.description" = "Kalendar";

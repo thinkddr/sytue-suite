@@ -74,6 +74,12 @@ func (h *pdfStorage) montar(resources cifrado.Cuenta, repository *privateDrive.R
 	if err != nil {
 		return cifrado.ApplicationView{}, err
 	}
+	// Lo que se guarda, sube, renombra, firma o se manda a la papelera va al Drive
+	// privado, que no pasa por HTTP: avisa al widget como ClienteConAviso.
+	pdf = pdf.ConAviso(h.suite.AvisarEscritura)
+	// El widget lee la carpeta «PDF» de ESTE Drive mientras esté abierto, y las peticiones
+	// de firma del servicio: el Drive del servidor de la cuenta está congelado.
+	h.suite.WidgetDesdePDFPrivado(resources.Context(), pdf, api.NewPDF(h.suite.URL("docs"), h.suite.URL("drive"), resources.HTTP(), nil))
 	p := certipdf.NuevaPantalla(h.traductor.T)
 	p.IA = api.NewIA(h.suite.URL("ai"), resources.HTTP(), nil)
 	p.Idioma = string(h.traductor.Locale())

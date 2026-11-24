@@ -1,6 +1,9 @@
 "widgets.open" = "Open";
 "widgets.compose" = "Compose";
 "widgets.create" = "Create event";
+"widgets.newNote" = "New note";
+"widgets.newContact" = "New contact";
+"widgets.addPhotos" = "Add photos";
 "widgets.notes" = "Notes";
 "widgets.rows" = "Rows";
 "widgets.pending" = "Pending";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Calendars";
 "widgets.address_books" = "Address books";
 "widgets.storage" = "Storage";
-"search.label" = "Global search";
 "app.bases.description" = "Collaborative relational tables";
 "app.sheets.description" = "Spreadsheets";
 "app.calendar.description" = "Calendar";

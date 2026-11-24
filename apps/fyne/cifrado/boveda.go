@@ -22,6 +22,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/pqvault"
 )
@@ -65,6 +66,10 @@ type PuertaBovedaConfig struct {
 	Translate func(string) string
 	// Dispatch lleva al hilo de la interfaz (fyne.Do si nil).
 	Dispatch func(func())
+	// AntesDeVaciar, si está, corre antes de vaciar la bóveda (fuera del hilo de la
+	// interfaz): Drive suelta ahí su fuente congelada, para que la bóveda nueva tenga
+	// de dónde importar. Si falla, no se vacía nada.
+	AntesDeVaciar func(context.Context) error
 	// abrir y vaciar se sustituyen en pruebas.
 	abrir, vaciar func(context.Context, pqvault.Config) (*pqvault.Vault, error)
 }
@@ -80,7 +85,12 @@ type PuertaBoveda struct {
 	ocupada     bool
 	confirmando bool
 	cerrada     bool
-	vista       *vistaBoveda
+	// vaciarAlEntrar: un «vaciar» confirmado pidió iniciar sesión antes de tocar la
+	// bóveda (sin la clave de desbloqueo no se puede sellar la nueva). Al volver a
+	// entrar se termina de vaciar en vez de abrir la bóveda de antes, que volvería a
+	// fallar. Nunca se pone si la bóveda ya se vació.
+	vaciarAlEntrar bool
+	vista          *vistaBoveda
 }
 
 // NuevaPuertaBoveda crea la puerta; Iniciar la abre.
@@ -193,22 +203,79 @@ func (p *PuertaBoveda) Iniciar(ctx context.Context) {
 	p.abrir(false) //nolint:contextcheck // abrir usa p.life, que deriva de ctx y vive lo que la puerta.
 }
 
-// Reintentar vuelve a abrir con la clave que haya ahora.
-func (p *PuertaBoveda) Reintentar() { p.abrir(false) }
+// Reintentar vuelve a abrir con la clave que haya ahora. Abrir es lo contrario de
+// vaciar: un vaciado pendiente de entrar se olvida, y habrá que confirmarlo otra vez.
+func (p *PuertaBoveda) Reintentar() {
+	p.mu.Lock()
+	p.vaciarAlEntrar = false
+	p.mu.Unlock()
+	p.abrir(false)
+}
 
-// VolverAEntrar trae la clave de desbloqueo de Sytue ID y vuelve a abrir.
+// VolverAEntrar trae la clave de desbloqueo de Sytue ID y vuelve a abrir (o, si un
+// «vaciar» confirmado se quedó esperando la clave, termina de vaciar).
 func (p *PuertaBoveda) VolverAEntrar() {
-	if p.cfg.Entrar == nil {
-		p.abrir(false)
-		return
+	p.mu.Lock()
+	vaciar := p.vaciarAlEntrar
+	p.vaciarAlEntrar = false
+	p.mu.Unlock()
+	open := p.cfg.abrir
+	if vaciar {
+		open = p.vaciarCon
 	}
 	p.correr(func(life context.Context) (context.Context, *pqvault.Vault, error) {
-		if err := p.cfg.Entrar(life); err != nil {
-			return life, nil, err
+		ctx, vault, err := life, (*pqvault.Vault)(nil), error(nil)
+		if p.cfg.Entrar != nil {
+			err = p.cfg.Entrar(life)
 		}
-		return p.abrirCon(life, p.cfg.abrir)
+		entro := err == nil
+		if entro {
+			ctx, vault, err = p.abrirCon(life, open)
+		}
+		// Si no se pudo entrar, o sigue sin clave, el vaciado pendiente sigue
+		// pendiente: la bóveda no se tocó.
+		var antes errAntesDeVaciar
+		if vaciar && (!entro || errors.Is(err, pqvault.ErrSignin) && !errors.As(err, &antes)) {
+			p.mu.Lock()
+			p.vaciarAlEntrar = true
+			p.mu.Unlock()
+		}
+		return ctx, vault, err
 	})
 }
+
+// IniciarVaciando arranca la puerta vaciando la bóveda: la app ya pidió y obtuvo la
+// confirmación (la bóveda abría, pero lo que guarda no se pudo cargar).
+func (p *PuertaBoveda) IniciarVaciando(ctx context.Context) {
+	p.mu.Lock()
+	if p.life != nil || p.cerrada {
+		p.mu.Unlock()
+		return
+	}
+	p.life, p.stop = context.WithCancel(ctx) //nolint:gosec // G118: Cerrar llama a stop.
+	p.mu.Unlock()
+	p.abrir(true) //nolint:contextcheck // abrir usa p.life, que deriva de ctx y vive lo que la puerta.
+}
+
+// vaciarCon es `vaciar` precedido de AntesDeVaciar.
+func (p *PuertaBoveda) vaciarCon(ctx context.Context, cfg pqvault.Config) (*pqvault.Vault, error) {
+	// Sin la clave no se sella la bóveda nueva: no se suelta nada hasta tenerla.
+	if len(cfg.UnlockKey) != recoverywrap.UnlockKeyLen {
+		return nil, pqvault.ErrSignin
+	}
+	if p.cfg.AntesDeVaciar != nil {
+		if err := p.cfg.AntesDeVaciar(ctx); err != nil {
+			return nil, errAntesDeVaciar{err}
+		}
+	}
+	return p.cfg.vaciar(ctx, cfg)
+}
+
+// errAntesDeVaciar envuelve un fallo previo a vaciar: la bóveda sigue como estaba.
+type errAntesDeVaciar struct{ err error }
+
+func (e errAntesDeVaciar) Error() string { return e.err.Error() }
+func (e errAntesDeVaciar) Unwrap() error { return e.err }
 
 // PedirVaciado enseña la confirmación de vaciar.
 func (p *PuertaBoveda) PedirVaciado() {
@@ -253,9 +320,20 @@ func (p *PuertaBoveda) Cerrar() {
 func (p *PuertaBoveda) abrir(reset bool) {
 	open := p.cfg.abrir
 	if reset {
-		open = p.cfg.vaciar
+		open = p.vaciarCon
 	}
-	p.correr(func(life context.Context) (context.Context, *pqvault.Vault, error) { return p.abrirCon(life, open) })
+	p.correr(func(life context.Context) (context.Context, *pqvault.Vault, error) {
+		ctx, vault, err := p.abrirCon(life, open)
+		// Sin clave de desbloqueo, vaciar no llegó a tocar la bóveda: al volver a
+		// entrar se termina. Un fallo de AntesDeVaciar no se arrastra.
+		var antes errAntesDeVaciar
+		if reset && errors.Is(err, pqvault.ErrSignin) && !errors.As(err, &antes) {
+			p.mu.Lock()
+			p.vaciarAlEntrar = true
+			p.mu.Unlock()
+		}
+		return ctx, vault, err
+	})
 }
 
 // abrirCon abre con la clave de la sesión, atado a su cuenta. Devuelve también el

@@ -23,6 +23,9 @@ import (
 type Drive struct {
 	c    *Client
 	data DriveData
+	// avisar se llama tras cada escritura con éxito en los datos privados (ConAviso): la
+	// de HTTP ya la ve el transporte (ConAvisoDeEscritura), la del repositorio cifrado no.
+	avisar func()
 }
 
 // NewDrive crea el cliente sobre la raíz del servicio (ServiceURL(apex, "drive")).
@@ -174,7 +177,7 @@ func (d *Drive) ChildrenEn(ctx context.Context, carpeta, cursor string, o OrdenL
 // CreateFolder crea una carpeta dentro de otra.
 func (d *Drive) CreateFolder(ctx context.Context, padre, nombre string) (Folder, error) {
 	if d.data != nil {
-		return d.data.CreateFolder(ctx, padre, nombre)
+		return conAviso[Folder](d)(d.data.CreateFolder(ctx, padre, nombre))
 	}
 	return PostJSON[Folder](ctx, d.c, "/folders", map[string]string{"parent_id": padre, "name": nombre})
 }
@@ -225,7 +228,7 @@ func (d *Drive) Thumbnail(ctx context.Context, fichero string) (io.ReadCloser, e
 // Si ya hay un fichero con ese nombre en la carpeta, lo SUSTITUYE (una versión nueva).
 func (d *Drive) Upload(ctx context.Context, carpeta, nombre, tipo string, cuerpo io.Reader, tamano int64) (File, error) {
 	if d.data != nil {
-		return d.data.Upload(ctx, carpeta, nombre, tipo, cuerpo, tamano)
+		return conAviso[File](d)(d.data.Upload(ctx, carpeta, nombre, tipo, cuerpo, tamano))
 	}
 	return d.subir(ctx, carpeta, url.Values{"name": {nombre}}, tipo, cuerpo, tamano)
 }
@@ -237,7 +240,7 @@ func (d *Drive) Upload(ctx context.Context, carpeta, nombre, tipo string, cuerpo
 // sigue eligiendo un nombre libre antes de subir.
 func (d *Drive) UploadConservando(ctx context.Context, carpeta, nombre, tipo string, cuerpo io.Reader, tamano int64) (File, error) {
 	if d.data != nil {
-		return d.data.Upload(ctx, carpeta, nombre, tipo, cuerpo, tamano)
+		return conAviso[File](d)(d.data.Upload(ctx, carpeta, nombre, tipo, cuerpo, tamano))
 	}
 	return d.subir(ctx, carpeta, url.Values{"name": {nombre}, "on_conflict": {"keep_both"}}, tipo, cuerpo, tamano)
 }
@@ -291,7 +294,7 @@ func elemento(k DriveKind, id, resto string) string {
 // Rename cambia el nombre. El servicio contesta 409 si ya hay otro igual en su carpeta.
 func (d *Drive) Rename(ctx context.Context, k DriveKind, id, nombre string) error {
 	if d.data != nil {
-		return d.data.Rename(ctx, k, id, nombre)
+		return d.avisado(d.data.Rename(ctx, k, id, nombre))
 	}
 	return d.mandar(ctx, http.MethodPatch, elemento(k, id, ""), map[string]string{"name": nombre})
 }
@@ -300,7 +303,7 @@ func (d *Drive) Rename(ctx context.Context, k DriveKind, id, nombre string) erro
 // que lleve UNA de las dos cosas: nombre o destino.
 func (d *Drive) Move(ctx context.Context, k DriveKind, id, destino string) error {
 	if d.data != nil {
-		return d.data.Move(ctx, k, id, destino)
+		return d.avisado(d.data.Move(ctx, k, id, destino))
 	}
 	campo := "new_folder_id"
 	if k == DriveFolder {
@@ -312,7 +315,7 @@ func (d *Drive) Move(ctx context.Context, k DriveKind, id, destino string) error
 // Delete manda el elemento a la papelera; una carpeta, con todo lo que lleva dentro.
 func (d *Drive) Delete(ctx context.Context, k DriveKind, id string) error {
 	if d.data != nil {
-		return d.data.Delete(ctx, k, id)
+		return d.avisado(d.data.Delete(ctx, k, id))
 	}
 	return d.mandar(ctx, http.MethodDelete, elemento(k, id, ""), nil)
 }
@@ -320,7 +323,7 @@ func (d *Drive) Delete(ctx context.Context, k DriveKind, id string) error {
 // Restore lo devuelve de la papelera a donde estaba.
 func (d *Drive) Restore(ctx context.Context, k DriveKind, id string) error {
 	if d.data != nil {
-		return d.data.Restore(ctx, k, id)
+		return d.avisado(d.data.Restore(ctx, k, id))
 	}
 	return d.mandar(ctx, http.MethodPost, elemento(k, id, "/restore"), nil)
 }
@@ -334,7 +337,7 @@ func (d *Drive) Purge(ctx context.Context, k DriveKind, id string) error {
 // copia al mismo contenido, y el nombre («Copia de …») lo pone él.
 func (d *Drive) CopyFile(ctx context.Context, id string) (File, error) {
 	if d.data != nil {
-		return d.data.CopyFile(ctx, id)
+		return conAviso[File](d)(d.data.CopyFile(ctx, id))
 	}
 	return JSON[File](ctx, d.c, Request{Method: http.MethodPost, Path: elemento(DriveFile, id, "/copy")})
 }
@@ -427,7 +430,7 @@ func (d *Drive) Favorites(ctx context.Context) (Compartidos, error) {
 // SetFavorite pone o quita la estrella. Es de la persona, no del fichero: nadie más la ve.
 func (d *Drive) SetFavorite(ctx context.Context, k DriveKind, id string, favorito bool) error {
 	if d.data != nil {
-		return d.data.SetFavorite(ctx, k, id, favorito)
+		return d.avisado(d.data.SetFavorite(ctx, k, id, favorito))
 	}
 	campo := "file_id"
 	if k == DriveFolder {
@@ -693,7 +696,7 @@ func (d *Drive) DownloadVersion(ctx context.Context, fichero string, n int) (io.
 // a ser una versión más del historial.
 func (d *Drive) RestoreVersion(ctx context.Context, fichero string, n int) error {
 	if d.data != nil {
-		return d.data.RestoreVersion(ctx, fichero, n)
+		return d.avisado(d.data.RestoreVersion(ctx, fichero, n))
 	}
 	return d.mandar(ctx, http.MethodPost, version(fichero, n, "/restore"), nil)
 }
@@ -750,4 +753,33 @@ func (d *Drive) Zip(ctx context.Context, ficheros, carpetas []string, nombre str
 	}
 	contenido, _ = strconv.ParseInt(resp.Header.Get("X-Zip-Content-Bytes"), 10, 64)
 	return resp.Body, max(contenido, 0), nil
+}
+
+// ConAviso es una copia de este cliente que llama a `avisar` tras cada escritura con
+// éxito en los datos PRIVADOS (WithPrivateData): subir, crear, renombrar, mover, borrar,
+// restaurar, copiar, sustituir, destacar y etiquetar. Es el ClienteConAviso del Drive en
+// la bóveda o en Matrix, que no pasa por HTTP: con él el widget de Drive y el de CertiPDF
+// se vuelven a publicar tras cada escritura (ADR 0078, enmienda del 2026-11-24). Las
+// lecturas no avisan. `avisar` corre en la rutina de la escritura: tiene que volver
+// enseguida. nil o sin datos privados, el mismo cliente.
+func (d *Drive) ConAviso(avisar func()) *Drive {
+	if d == nil || d.data == nil || avisar == nil {
+		return d
+	}
+	copia := *d
+	copia.avisar = avisar
+	return &copia
+}
+
+// avisado avisa de una escritura privada si fue bien, y devuelve su error.
+func (d *Drive) avisado(err error) error {
+	if err == nil && d.avisar != nil {
+		d.avisar()
+	}
+	return err
+}
+
+// conAviso es avisado para las escrituras que devuelven algo además del error.
+func conAviso[T any](d *Drive) func(T, error) (T, error) {
+	return func(v T, err error) (T, error) { return v, d.avisado(err) }
 }

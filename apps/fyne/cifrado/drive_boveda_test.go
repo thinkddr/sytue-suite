@@ -282,3 +282,44 @@ func TestVaultFactoryRejectsForeignVaultAndClosesIt(t *testing.T) {
 		t.Fatal("sin diario de la bóveda no se abre nada, y la bóveda se cierra", err)
 	}
 }
+
+// Antes de vaciar la bóveda de Drive se suelta la fuente del servidor: con una
+// reautenticación (misma cuenta) o una época cambiada se reintenta una vez; con otra
+// cuenta tras entrar, no se suelta nada.
+func TestSoltarFuenteAntesDeVaciar(t *testing.T) {
+	falla := errors.New("sin red")
+	casos := []struct {
+		nombre   string
+		errores  []error
+		misma    bool
+		entrar   error
+		llamadas int
+		entradas int
+		quiere   error
+	}{
+		{nombre: "suelta", errores: []error{nil}, llamadas: 1},
+		{nombre: "reautentica", errores: []error{api.ErrReautenticacion, nil}, misma: true, llamadas: 2, entradas: 1},
+		{nombre: "otra cuenta", errores: []error{api.ErrReautenticacion}, llamadas: 1, entradas: 1, quiere: auth.ErrAuthorizationChanged},
+		{nombre: "no entra", errores: []error{api.ErrReautenticacion}, entrar: falla, llamadas: 1, entradas: 1, quiere: falla},
+		{nombre: "época cambiada", errores: []error{api.ErrFuenteCambiada, nil}, llamadas: 2},
+		{nombre: "falla", errores: []error{falla}, llamadas: 1, quiere: falla},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			llamadas, entradas := 0, 0
+			err := soltarFuenteAntesDeVaciar(t.Context(), func(context.Context) error {
+				llamadas++
+				return c.errores[llamadas-1]
+			}, func(context.Context) error {
+				entradas++
+				return c.entrar
+			}, func() bool { return c.misma })
+			if !errors.Is(err, c.quiere) && (err != nil || c.quiere != nil) {
+				t.Fatalf("error %v, quería %v", err, c.quiere)
+			}
+			if llamadas != c.llamadas || entradas != c.entradas {
+				t.Fatalf("soltó %d veces y entró %d", llamadas, entradas)
+			}
+		})
+	}
+}

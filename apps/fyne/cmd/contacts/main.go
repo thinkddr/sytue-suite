@@ -65,6 +65,8 @@ func main() {
 	w.Resize(fyne.NewSize(1280, 800))
 	var current *contactos.App
 	var pendingID string
+	// pendingNuevo: la acción «Nuevo contacto» del widget llegó sin vista montada.
+	var pendingNuevo bool
 	// mount monta la vista sobre la cuenta que toque: la API del servicio, como la web,
 	// o los datos ya migrados a Matrix (ADR 0086, «clientes nativos»).
 	mount := func(resources cifrado.Cuenta, facade *api.Contacts) cifrado.ApplicationView {
@@ -86,6 +88,10 @@ func main() {
 			id := pendingID
 			pendingID = ""
 			c.SolicitarContacto(id)
+		}
+		if pendingNuevo {
+			pendingNuevo = false
+			c.PedirNuevo()
 		}
 		return cifrado.ApplicationView{Object: c.Objeto(), Detach: func() {
 			c.Cerrar()
@@ -111,7 +117,7 @@ func main() {
 		Soltar: cifrado.SoltarEn(s.URL("contacts")),
 		Modo:   contactsMode(s),
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
-			return mount(cuenta, api.NewContacts(s.URL("contacts"), cuenta.HTTP(), nil)), nil
+			return mount(cuenta, api.NewContacts(s.URL("contacts"), cuenta.HTTP(), s.ClienteConAviso(nil))), nil
 		},
 	})
 	if err != nil {
@@ -127,6 +133,17 @@ func main() {
 		})
 		s.RutaPropia(func(u *url.URL) bool { return contactos.IDDeEnlace(u) != "" })
 		s.AlAbrirURL(func(u *url.URL) {
+			// «Nuevo contacto» del widget: el formulario de crear, que se guarda a mano.
+			if api.LeerAccion("contacts", u) == "create" {
+				fyne.Do(func() {
+					if current != nil {
+						current.PedirNuevo()
+					} else {
+						pendingNuevo = true
+					}
+				})
+				return
+			}
 			if id := contactos.IDDeEnlace(u); id != "" {
 				fyne.Do(func() {
 					if current != nil {

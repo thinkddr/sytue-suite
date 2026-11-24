@@ -500,6 +500,9 @@ export const sk: Catalog = {
   'widgets.compose': 'Napísať',
   'widgets.storage': 'Úložisko',
   'widgets.create': 'Vytvoriť udalosť',
+  'widgets.newNote': 'Nová poznámka',
+  'widgets.newContact': 'Nový kontakt',
+  'widgets.addPhotos': 'Pridať fotky',
   'widgets.updatedAgo': 'Aktualizované {time}',
   'widgets.updatedAt': 'Aktualizované: {time}',
 

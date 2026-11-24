@@ -1,6 +1,9 @@
 "widgets.open" = "Abrir";
 "widgets.compose" = "Escrever";
 "widgets.create" = "Criar evento";
+"widgets.newNote" = "Nova nota";
+"widgets.newContact" = "Novo contacto";
+"widgets.addPhotos" = "Adicionar fotos";
 "widgets.notes" = "Notas";
 "widgets.rows" = "Linhas";
 "widgets.pending" = "Pendentes";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Calendários";
 "widgets.address_books" = "Livros de endereços";
 "widgets.storage" = "Armazenamento";
-"search.label" = "Pesquisa global";
 "app.bases.description" = "Tabelas relacionais colaborativas";
 "app.sheets.description" = "Folhas de cálculo";
 "app.calendar.description" = "Calendário";

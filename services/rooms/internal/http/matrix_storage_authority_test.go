@@ -3,6 +3,8 @@ package chathttp
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,8 +14,10 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
+	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/config"
+	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
 type authorityServiceFixture struct {
@@ -46,6 +50,26 @@ func (f *authorityServiceFixture) ConfirmMatrixRoot(_ context.Context, _, _ stri
 func (f *authorityServiceFixture) VerifyMatrixStorageAction(context.Context, string, string, matrixproof.Action, matrixproof.SignedAction) (matrixproof.Authorization, error) {
 	f.calls++
 	return matrixproof.Authorization{}, nil
+}
+
+// La retirada de Matrix del correo (ADR 0087, entrega 5) tiene su propio estado
+// en la API, distinto de «cuenta nueva»: los clientes enseñan solo el traspaso.
+func TestStorageAuthorityHTTPMatrixRetirada(t *testing.T) {
+	cases := map[error]string{
+		domain.ErrMatrixStorageRetired:                         "storage_matrix_retired",
+		matrixproof.ErrRootEnrollment:                          "storage_root_enrollment_required",
+		domain.ErrMatrixUnavailable:                            "encrypted_messaging_unavailable",
+		fmt.Errorf("leer: %w", domain.ErrMatrixStorageRetired): "storage_matrix_retired",
+	}
+	for err, code := range cases {
+		var failure *httpx.Error
+		if !errors.As(authorityHTTPError(err), &failure) || failure.Code != code {
+			t.Fatalf("%v: %+v, quería %s", err, failure, code)
+		}
+		if code == "storage_matrix_retired" && failure.Status != http.StatusConflict {
+			t.Fatalf("la retirada no es un 409: %d", failure.Status)
+		}
+	}
 }
 
 func TestStorageAuthorityHTTPUsesVerifiedOwnerAndRejectsDelegation(t *testing.T) {

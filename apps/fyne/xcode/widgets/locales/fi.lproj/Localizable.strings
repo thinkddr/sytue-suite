@@ -1,6 +1,9 @@
 "widgets.open" = "Avaa";
 "widgets.compose" = "Kirjoita";
 "widgets.create" = "Luo tapahtuma";
+"widgets.newNote" = "Uusi muistiinpano";
+"widgets.newContact" = "Uusi yhteystieto";
+"widgets.addPhotos" = "Lisää kuvia";
 "widgets.notes" = "Muistiinpanot";
 "widgets.rows" = "Rivit";
 "widgets.pending" = "Odottaa";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalenterit";
 "widgets.address_books" = "Osoitekirjat";
 "widgets.storage" = "Tallennustila";
-"search.label" = "Yleinen haku";
 "app.bases.description" = "Yhteiset relaatiotaulukot";
 "app.sheets.description" = "Laskentataulukot";
 "app.calendar.description" = "Kalenteri";

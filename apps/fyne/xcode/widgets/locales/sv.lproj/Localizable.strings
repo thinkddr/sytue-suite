@@ -1,6 +1,9 @@
 "widgets.open" = "Öppna";
 "widgets.compose" = "Skriv";
 "widgets.create" = "Skapa händelse";
+"widgets.newNote" = "Ny anteckning";
+"widgets.newContact" = "Ny kontakt";
+"widgets.addPhotos" = "Lägg till foton";
 "widgets.notes" = "Anteckningar";
 "widgets.rows" = "Rader";
 "widgets.pending" = "Väntande";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendrar";
 "widgets.address_books" = "Adressböcker";
 "widgets.storage" = "Lagring";
-"search.label" = "Global sökning";
 "app.bases.description" = "Delade relationstabeller";
 "app.sheets.description" = "Kalkylblad";
 "app.calendar.description" = "Kalender";

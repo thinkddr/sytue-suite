@@ -23,7 +23,7 @@ func Bases(_ Comunes, b *api.Bases) widgets.Fuente {
 			if nombre := strings.TrimSpace(base.Name); nombre != "" {
 				items = append(items, widgets.Item{
 					Title: nombre, Subtitle: base.Description,
-					Badge: strings.ToUpper(base.Role), StartAt: unix(base.UpdatedAt),
+					Badge: strings.ToUpper(base.Role), StartAt: unix(base.UpdatedAt), Route: RutaBase(base.ID),
 				})
 			}
 			if llenos(items) {

@@ -1,6 +1,9 @@
 "widgets.open" = "Atverti";
 "widgets.compose" = "Rašyti";
 "widgets.create" = "Kurti įvykį";
+"widgets.newNote" = "Naujas užrašas";
+"widgets.newContact" = "Naujas kontaktas";
+"widgets.addPhotos" = "Pridėti nuotraukų";
 "widgets.notes" = "Užrašai";
 "widgets.rows" = "Eilutės";
 "widgets.pending" = "Laukiama";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendoriai";
 "widgets.address_books" = "Adresų knygos";
 "widgets.storage" = "Saugykla";
-"search.label" = "Bendroji paieška";
 "app.bases.description" = "Bendros reliacinės lentelės";
 "app.sheets.description" = "Skaičiuoklės";
 "app.calendar.description" = "Kalendorius";

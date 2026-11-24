@@ -123,6 +123,8 @@ func (a *AplicacionDrive) Close() {
 type puertaDrive interface {
 	Objeto() fyne.CanvasObject
 	Iniciar(context.Context)
+	// IniciarVaciando arranca vaciando la bóveda (la confirmación ya se pidió).
+	IniciarVaciando(context.Context)
 	Cerrar()
 }
 
@@ -150,13 +152,15 @@ type anfitrionDrive struct {
 	matrix    appMatrix
 	slot      *fyne.Container
 
-	owner    auth.IdentitySnapshot
-	inside   bool
-	life     context.Context
-	stop     context.CancelFunc
-	cerrado  bool
-	ocupado  bool
-	vigente  puertaDrive
+	owner   auth.IdentitySnapshot
+	inside  bool
+	life    context.Context
+	stop    context.CancelFunc
+	cerrado bool
+	ocupado bool
+	vigente puertaDrive
+	// fallo es el último fallo al cargar el Drive de la bóveda (para volver a él).
+	fallo    error
 	recursos *RecursosBoveda
 	repo     repositorioBoveda
 	vista    *ApplicationView
@@ -277,10 +281,10 @@ func (h *anfitrionDrive) decidido(life context.Context, owner auth.IdentitySnaps
 		h.matrix.Retry()
 		return
 	}
-	h.abrirPuerta(life, owner)
+	h.abrirPuerta(life, owner, false)
 }
 
-func (h *anfitrionDrive) abrirPuerta(life context.Context, owner auth.IdentitySnapshot) {
+func (h *anfitrionDrive) abrirPuerta(life context.Context, owner auth.IdentitySnapshot, vaciar bool) {
 	var vigente puertaDrive
 	puerta, err := h.puerta(func(ctx context.Context, vault *pqvault.Vault) {
 		h.bovedaLista(life, owner, vigente, ctx, vault)
@@ -292,6 +296,10 @@ func (h *anfitrionDrive) abrirPuerta(life context.Context, owner auth.IdentitySn
 	vigente = puerta
 	h.vigente = vigente
 	h.enseñar(puerta.Objeto())
+	if vaciar {
+		puerta.IniciarVaciando(life)
+		return
+	}
 	puerta.Iniciar(life)
 }
 
@@ -341,8 +349,65 @@ func (h *anfitrionDrive) inicializada(life context.Context, owner auth.IdentityS
 		recursos.Close()
 	}
 	if vigente {
-		h.fallar(err) //nolint:contextcheck // Soltar la bóveda vive más que esta decisión: espera a la vista y cierra sin cancelar.
+		h.fallarAbierta(err) //nolint:contextcheck // Soltar la bóveda vive más que esta decisión: espera a la vista y cierra sin cancelar.
 	}
+}
+
+// fallarAbierta es fallar cuando la bóveda sí abrió pero su Drive no se pudo cargar
+// (la importación del servidor no cuadra, o la fuente ya no está): además de
+// reintentar, deja vaciar, como la web. Sin esta salida, una bóveda recién vaciada
+// cuya fuente ya era `private` se quedaba en «reintentar» para siempre.
+func (h *anfitrionDrive) fallarAbierta(err error) {
+	h.fallo = err
+	h.fallar(err)
+	vacio, ok := h.slot.Objects[0].(*ui.Vacio)
+	if !ok {
+		return
+	}
+	vaciar := ui.NuevoBoton(h.translate("vault.empty"), h.pedirVaciado)
+	vaciar.Variante = ui.Secundario
+	vacio.AccionSecundaria = vaciar
+	vacio.Refresh()
+}
+
+// pedirVaciado enseña la confirmación de vaciar, con su casilla obligatoria.
+func (h *anfitrionDrive) pedirVaciado() {
+	if h.cerrado || h.ocupado || h.life == nil {
+		return
+	}
+	var accion *ui.Boton
+	entiendo := ui.NuevaCasilla(h.translate("vault.emptyUnderstood"), func(marcada bool) {
+		accion.Inerte = !marcada
+		accion.Refresh()
+	})
+	accion = ui.NuevoBoton(h.translate("vault.empty"), func() {
+		if entiendo.Marcada {
+			h.vaciar()
+		}
+	})
+	accion.Variante = ui.Peligro
+	accion.Inerte = true
+	volver := ui.NuevoBoton(h.translate("action.back"), func() { h.fallarAbierta(h.fallo) })
+	volver.Variante = ui.Secundario
+	cuerpo := widget.NewLabel(h.translate("vault.emptyBody"))
+	cuerpo.Wrapping = fyne.TextWrapWord
+	h.enseñar(container.NewVBox(
+		widget.NewLabelWithStyle(h.translate("vault.emptyTitle"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		cuerpo, entiendo, container.NewHBox(accion, volver),
+	))
+}
+
+// vaciar abre la puerta vaciando: suelta la fuente del servidor (AntesDeVaciar) y
+// estrena la bóveda, que vuelve a importar el Drive del servidor.
+func (h *anfitrionDrive) vaciar() {
+	if h.cerrado || h.ocupado || h.life == nil || !h.actual(h.life, h.owner) {
+		return
+	}
+	h.soltarBoveda()
+	h.mu.Lock()
+	h.destino, h.para = DriveEnBoveda, h.owner
+	h.mu.Unlock()
+	h.abrirPuerta(h.life, h.owner, true)
 }
 
 func (h *anfitrionDrive) fallar(err error) {
@@ -410,4 +475,5 @@ func (h *anfitrionDrive) enseñarCargando() {
 func (h *anfitrionDrive) enseñar(object fyne.CanvasObject) {
 	h.slot.Objects = []fyne.CanvasObject{object}
 	h.slot.Refresh()
+	ui.RecolocarBarraSuite(h.slot)
 }

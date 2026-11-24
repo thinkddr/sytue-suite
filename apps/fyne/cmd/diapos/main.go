@@ -212,7 +212,7 @@ func main() {
 			return state.Mode, err
 		},
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
-			return mount(cuenta, api.NewSlides(s.URL("slides"), cuenta.HTTP(), nil), driveBoveda.Destinos(cuenta)), nil
+			return mount(cuenta, api.NewSlides(s.URL("slides"), cuenta.HTTP(), s.ClienteConAviso(nil)), driveBoveda.Destinos(cuenta)), nil
 		},
 	})
 	if err != nil {

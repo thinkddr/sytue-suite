@@ -6,32 +6,60 @@ import Foundation
 // Only declared, local actions are allowed. Neither a snapshot nor its counters
 // can supply a URL, a query, an account or a destination outside the host app.
 enum SytueWidgetActions {
-    static let order = ["open", "compose", "create", "search"]
+    // «Buscar» ya no es una acción de los widgets (2026-11-24, ADR 0078): el dueño los
+    // quitó porque no aportaban. Un `search` que siga declarado en un FyneApp.toml no da
+    // ruta ni widget.
+    static let order = ["open", "compose", "create", "upload"]
 
-    static func label(for action: String) -> String {
-        action == "search" ? "search.label" : "widgets." + action
+    // Las acciones rápidas de cada producto, además de «open» (ADR 0078): cada una abre un
+    // formulario, una pregunta o el selector del sistema que la persona confirma. La misma
+    // tabla en generar.py, android-widgets.py y WidgetSnapshot.accionPermitida (Java).
+    static let allowed: [String: Set<String>] = [
+        "mail": ["compose"], "calendar": ["create"], "contacts": ["create"], "notes": ["create"],
+        "photos": ["upload"],
+    ]
+
+    // El rótulo traducido de una acción en su producto: «create» es «Crear evento» en
+    // Calendar, «Nuevo contacto» en Contacts y «Nueva nota» en Notes.
+    static func label(for action: String, product: String = "calendar") -> String {
+        switch (action, product) {
+        case ("create", "contacts"): return "widgets.newContact"
+        case ("create", "notes"): return "widgets.newNote"
+        case ("upload", _): return "widgets.addPhotos"
+        default: return "widgets." + action
+        }
     }
 
-    static func symbol(for action: String) -> String {
-        switch action {
-        case "search": return "magnifyingglass"
-        case "compose": return "square.and.pencil"
-        case "create": return "calendar.badge.plus"
+    static func symbol(for action: String, product: String = "calendar") -> String {
+        switch (action, product) {
+        case ("compose", _): return "square.and.pencil"
+        case ("create", "contacts"): return "person.crop.circle.badge.plus"
+        case ("create", "notes"): return "note.text.badge.plus"
+        case ("create", _): return "calendar.badge.plus"
+        case ("upload", _): return "photo.on.rectangle.angled"
         default: return "arrow.up.right"
         }
+    }
+
+    // A dónde lleva una fila (formato 3): su ruta dentro de ESTA app, que la app escribió
+    // con widgets.Ruta (el día de un evento, `?date=AAAA-MM-DD`; una nota, un contacto, un
+    // documento…). Se le antepone el esquema firmado de la extensión, así que no puede
+    // llevar a otra app, a la web ni a otra cuenta; una ruta fuera de su forma ya dejó el
+    // snapshot sin enseñar al leerlo. Sin ruta, nil: la fila abre la app.
+    static func route(of item: SytueWidgetItem, product: String, scheme: String) -> URL? {
+        guard !product.isEmpty, scheme == "sytue-" + product, !item.routeText.isEmpty,
+              SytueWidgetSnapshot.isValidRoute(item.routeText) else { return nil }
+        return URL(string: scheme + ":" + item.routeText)
     }
 
     static func routes(product: String, scheme: String, declared: [String]) -> [String: URL] {
         guard !product.isEmpty, scheme == "sytue-" + product else { return [:] }
         var routes = [String: URL]()
         for action in declared {
-            if action == "open" { routes[action] = URL(string: scheme + ":/") }
-            if action == "search" { routes[action] = URL(string: scheme + ":/?action=search") }
-            if action == "compose", product == "mail" {
-                routes[action] = URL(string: scheme + ":/?action=compose")
-            }
-            if action == "create", product == "calendar" {
-                routes[action] = URL(string: scheme + ":/?action=create")
+            if action == "open" {
+                routes[action] = URL(string: scheme + ":/")
+            } else if allowed[product]?.contains(action) == true {
+                routes[action] = URL(string: scheme + ":/?action=" + action)
             }
         }
         return routes
@@ -62,8 +90,11 @@ struct SytueWidgetItem: Decodable, Equatable {
     let all_day: Bool?
     let unread: Bool?
     let done: Bool?
+    // La ruta de la fila dentro de la propia app (widgets.Item.Route en Go).
+    var route: String? = nil
 
     var subtitleText: String { subtitle ?? "" }
+    var routeText: String { route ?? "" }
     var badgeText: String { badge ?? "" }
     var colorText: String { color ?? "" }
     var startAt: Int64 { start_at ?? 0 }
@@ -83,7 +114,7 @@ struct SytueWidgetCalendar: Decodable, Equatable {
     var dayColors: [String: String] { day_colors ?? [:] }
 }
 
-// Lo que el lector comprueba FUERA del snapshot (widgets.Entorno en Go, formato 2): la
+// Lo que el lector comprueba FUERA del snapshot (widgets.Entorno en Go, formato 3): la
 // época de identidad (primera línea de `sesion.epoca`), la marca con que se confirmó
 // (cuarta), la `sesion.marca` actual, si hay un `*.cerrada` y el bloqueo de la suite.
 struct SytueWidgetEntorno: Equatable {
@@ -100,10 +131,12 @@ struct SytueWidgetEntorno: Equatable {
 
 struct SytueWidgetSnapshot: Decodable {
     // El contrato común con Go y Java (apps/nucleo/widgets/testdata/contrato.tsv): solo el
-    // formato 2, como mucho 24 h, y a partir de 15 min el widget dice de cuándo es el dato.
-    static let version = 2
+    // formato 3, como mucho 24 h, y a partir de 15 min el widget dice de cuándo es el dato.
+    // Cada fila puede llevar su ruta dentro de la app, de como mucho `maxRouteBytes`.
+    static let version = 3
     static let maxAge: Int64 = 86400
     static let fresco: Int64 = 900
+    static let maxRouteBytes = 512
 
     let version: Int
     let product: String
@@ -147,6 +180,33 @@ struct SytueWidgetSnapshot: Decodable {
         return true
     }
 
+    // widgets.ValidRoute: vacía, o de 1 a `maxRouteBytes` bytes que empiezan por UNA barra,
+    // solo con letras y cifras ASCII, `-._~/?=&` y escapes `%XX` en mayúsculas, y sin el
+    // marcador de cifrado escapado.
+    static func isValidRoute(_ value: String) -> Bool {
+        let bytes = Array(value.utf8)
+        if bytes.isEmpty { return true }
+        guard bytes.count <= maxRouteBytes, bytes[0] == 0x2F, !(bytes.count > 1 && bytes[1] == 0x2F),
+              !value.uppercased().contains("ENC%3AV1%3A") else { return false }
+        func unreserved(_ b: UInt8) -> Bool {
+            (b >= 0x61 && b <= 0x7A) || (b >= 0x41 && b <= 0x5A) || (b >= 0x30 && b <= 0x39)
+                || b == 0x2D || b == 0x2E || b == 0x5F || b == 0x7E
+        }
+        func upperHex(_ b: UInt8) -> Bool { (b >= 0x30 && b <= 0x39) || (b >= 0x41 && b <= 0x46) }
+        var i = 0
+        while i < bytes.count {
+            let b = bytes[i]
+            if unreserved(b) || b == 0x2F || b == 0x3F || b == 0x3D || b == 0x26 {
+                i += 1
+            } else if b == 0x25, i + 2 < bytes.count, upperHex(bytes[i + 1]), upperHex(bytes[i + 2]) {
+                i += 3
+            } else {
+                return false
+            }
+        }
+        return true
+    }
+
     private static func validText(_ value: String, maxBytes: Int) -> Bool {
         let bytes = Array(value.utf8)
         guard bytes.count <= maxBytes, !value.lowercased().contains("enc:v1:") else { return false }
@@ -177,7 +237,8 @@ struct SytueWidgetSnapshot: Decodable {
                   (item.colorText.isEmpty || Self.isHexColor(item.colorText)),
                   item.startAt >= 0, item.startAt <= Self.maxTimestamp,
                   item.endAt >= 0, item.endAt <= Self.maxTimestamp,
-                  (item.endAt == 0 || item.startAt == 0 || item.endAt >= item.startAt) else { return false }
+                  (item.endAt == 0 || item.startAt == 0 || item.endAt >= item.startAt),
+                  Self.isValidRoute(item.routeText) else { return false }
         }
         if let cal = calendar {
             guard (1970...2200).contains(cal.year), (1...12).contains(cal.month) else { return false }
@@ -277,17 +338,31 @@ enum SytueWidgetTimeline {
 
     // Qué línea de tiempo pide WidgetKit (Widgets.swift la traduce).
     enum Plan: Equatable {
-        // Las fechas con datos y, al final, la caducidad sin ellos; política `.atEnd`.
+        // Las fechas con datos y, al final, la caducidad sin ellos; se vuelve a leer a los
+        // `reread` (o en la caducidad, si llega antes).
         case entries([Date], expiry: Date)
         // La lectura falló por la protección de datos (el teléfono bloqueado): no es «no
         // hay datos». Se pinta el marco con el marcador y se vuelve a pedir en 5 min, sin
         // la entrada vacía de 24 h que borraría lo que ya había.
         case protected(retry: Date)
-        // Sin datos que enseñar: nada que recargar hasta que la app publique o borre.
+        // Sin datos que enseñar: se vuelve a mirar a los `reread`, por si la app publicó
+        // con su recarga sin presupuesto.
         case empty
     }
 
     static let protectedRetry: TimeInterval = 5 * 60
+
+    // Cada cuánto vuelve WidgetKit a leer el snapshot aunque la app no lo recargue: lo que
+    // publicaron la tarea de refresco o el aviso silencioso con la app al fondo llega aunque
+    // su reloadAllTimelines se quedara sin presupuesto. Es lo que la app pide a iOS para esa
+    // tarea (sesion.CadaRefrescoEnFondo); WidgetKit lo toma como un mínimo.
+    static let reread: TimeInterval = 15 * 60
+
+    static func rereadDate(now: Date, expiry: Date? = nil) -> Date {
+        let next = now.addingTimeInterval(reread)
+        guard let expiry else { return next }
+        return min(next, expiry)
+    }
 
     static func plan(for reading: SytueWidgetReading, now: Date, calendar: Calendar) -> Plan {
         switch reading {
@@ -326,7 +401,7 @@ enum SytueWidgetSnapshots {
     ]
     private static let allowedFields: Set<String> = requiredFields.union(["items", "calendar"])
     private static let itemAllowedFields: Set<String> = [
-        "title", "subtitle", "badge", "color", "start_at", "end_at", "all_day", "unread", "done",
+        "title", "subtitle", "badge", "color", "start_at", "end_at", "all_day", "unread", "done", "route",
     ]
     private static let calendarRequiredFields: Set<String> = ["year", "month"]
     private static let calendarAllowedFields: Set<String> = ["year", "month", "busy_days", "day_colors"]
@@ -383,7 +458,7 @@ enum SytueWidgetSnapshots {
         }
     }
 
-    // Formato 2: la época y su confirmación de `sesion.epoca`, la `sesion.marca`, el
+    // Formato 3: la época y su confirmación de `sesion.epoca`, la `sesion.marca`, el
     // bloqueo de `ajustes.json` y si queda algún `*.cerrada` (un cierre de sesión).
     static func entorno(_ directory: URL) throws -> SytueWidgetEntorno {
         let marker = try read(directory.appendingPathComponent("sesion.marca"), limit: 1024)

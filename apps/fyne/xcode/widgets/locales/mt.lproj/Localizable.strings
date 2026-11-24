@@ -1,6 +1,9 @@
 "widgets.open" = "Iftaħ";
 "widgets.compose" = "Ikteb";
 "widgets.create" = "Oħloq avveniment";
+"widgets.newNote" = "Nota ġdida";
+"widgets.newContact" = "Kuntatt ġdid";
+"widgets.addPhotos" = "Żid ritratti";
 "widgets.notes" = "Noti";
 "widgets.rows" = "Ringieli";
 "widgets.pending" = "Pendenti";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendarji";
 "widgets.address_books" = "Kotba tal-indirizzi";
 "widgets.storage" = "Ħażna";
-"search.label" = "Tfittxija globali";
 "app.bases.description" = "Tabelli relazzjonali kollaborattivi";
 "app.sheets.description" = "Spreadsheets";
 "app.calendar.description" = "Kalendarju";

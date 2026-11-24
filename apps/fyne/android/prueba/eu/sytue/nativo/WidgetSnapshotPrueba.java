@@ -47,7 +47,7 @@ public final class WidgetSnapshotPrueba {
 
     /** Los casos de testdata/contrato.tsv, con la misma lectura que contrato_test.go. */
     private static void contrato(String fichero) throws IOException {
-        int visibles = 0, rancios = 0, vigentes = 0;
+        int visibles = 0, rancios = 0, vigentes = 0, rutas = 0;
         for (String linea : Files.readAllLines(Paths.get(fichero), StandardCharsets.UTF_8)) {
             if (linea.isEmpty() || linea.startsWith("#")) {
                 continue;
@@ -65,7 +65,7 @@ public final class WidgetSnapshotPrueba {
                     break;
                 }
                 case "rancio": {
-                    WidgetSnapshot s = make(2, "mail", "g", Long.parseLong(c[2]), Long.parseLong(c[2]) + 60, true);
+                    WidgetSnapshot s = make(3, "mail", "g", Long.parseLong(c[2]), Long.parseLong(c[2]) + 60, true);
                     check(s.rancio(Long.parseLong(c[3])) == "1".equals(c[4]), "contrato rancio: " + c[1]);
                     rancios++;
                     break;
@@ -80,55 +80,67 @@ public final class WidgetSnapshotPrueba {
                     vigentes++;
                     break;
                 }
+                case "ruta": {
+                    boolean quiero = "1".equals(c[3]);
+                    check(WidgetSnapshot.validRoute(campo(c[2])) == quiero, "contrato ruta: " + c[1]);
+                    WidgetSnapshot s = new WidgetSnapshot(3, "notes", "e1", 1792500000L, 1792500120L, true,
+                            Collections.<WidgetSnapshot.Counter>emptyList(),
+                            Collections.singletonList(new WidgetSnapshot.Item("x", "", "", "", 0, 0, false, false, false,
+                                    campo(c[2]))), null);
+                    check(s.visible("notes", new WidgetSnapshot.Entorno("e1", "m1", "m1", false, false), 1792500000L) == quiero,
+                            "contrato ruta, snapshot: " + c[1]);
+                    rutas++;
+                    break;
+                }
                 default:
                     throw new AssertionError("tipo de caso desconocido: " + c[0]);
             }
         }
-        check(visibles >= 15 && rancios >= 4 && vigentes >= 10, "el contrato se ha quedado corto");
+        check(visibles >= 15 && rancios >= 4 && vigentes >= 10 && rutas >= 20, "el contrato se ha quedado corto");
     }
 
     public static void main(String[] args) throws IOException {
         check(args.length == 1, "uso: WidgetSnapshotPrueba apps/nucleo/widgets/testdata/contrato.tsv");
         contrato(args[0]);
         WidgetSnapshot.Counter unread = new WidgetSnapshot.Counter("unread", 7);
-        WidgetSnapshot valid = make(2, "mail", "generation-one", NOW, NOW + 120, true, unread);
+        WidgetSnapshot valid = make(3, "mail", "generation-one", NOW, NOW + 120, true, unread);
         check(visible(valid), "valid snapshot");
         for (String kind : Arrays.asList("calendars", "address_books")) {
-            check(visible(make(2, "mail", "generation-one", NOW, NOW + 120, true,
+            check(visible(make(3, "mail", "generation-one", NOW, NOW + 120, true,
                     new WidgetSnapshot.Counter(kind, 2))), "complete collection kind " + kind);
         }
         for (long percent : new long[] {0, 32, 100}) {
-            check(visible(make(2, "mail", "generation-one", NOW, NOW + 120, true,
+            check(visible(make(3, "mail", "generation-one", NOW, NOW + 120, true,
                     new WidgetSnapshot.Counter("storage_percent", percent))), "valid storage percentage");
         }
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, true,
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, true,
                 new WidgetSnapshot.Counter("storage_percent", 101))), "invalid storage percentage");
         check(!valid.visible("mail", new WidgetSnapshot.Entorno("generation-two", "marca", "marca", false, false), NOW), "late old account response");
         check(!valid.visible("mail", new WidgetSnapshot.Entorno("", "marca", "marca", false, false), NOW), "logout");
         check(!valid.visible("rooms", ENTORNO, NOW), "different product");
         check(!valid.visible("mail", new WidgetSnapshot.Entorno("generation-one", "marca", "marca", false, true), NOW), "session/OS lock");
         check(!valid.visible("mail", ENTORNO, NOW + 120), "expiry");
-        check(!visible(make(1, "mail", "generation-one", NOW, NOW + 120, true)), "v1 snapshot");
-        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, true)), "future schema");
-        check(!visible(make(2, "mail", "", NOW, NOW + 120, true)), "empty generation");
-        check(!visible(make(2, "mail", "generation-one", 0, NOW + 120, true)), "zero timestamp");
-        check(!visible(make(2, "mail", "generation-one", NOW + 6, NOW + 120, true)), "future timestamp");
-        check(visible(make(2, "mail", "generation-one", NOW, NOW + 86400, true)), "one day TTL");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 86401, true)), "excessive TTL");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW, true)), "empty TTL");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, false)), "inactive");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, true,
+        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, true)), "v2 snapshot");
+        check(!visible(make(4, "mail", "generation-one", NOW, NOW + 120, true)), "future schema");
+        check(!visible(make(3, "mail", "", NOW, NOW + 120, true)), "empty generation");
+        check(!visible(make(3, "mail", "generation-one", 0, NOW + 120, true)), "zero timestamp");
+        check(!visible(make(3, "mail", "generation-one", NOW + 6, NOW + 120, true)), "future timestamp");
+        check(visible(make(3, "mail", "generation-one", NOW, NOW + 86400, true)), "one day TTL");
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 86401, true)), "excessive TTL");
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW, true)), "empty TTL");
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, false)), "inactive");
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, true,
                 new WidgetSnapshot.Counter("subject", 1))), "no message content category");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, true,
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, true,
                 new WidgetSnapshot.Counter("unread", -1))), "negative count");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, true,
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, true,
                 new WidgetSnapshot.Counter("unread", 1_000_000_000_001L))), "count bound");
-        check(!visible(make(2, "mail", "generation-one", NOW, NOW + 120, true, unread, unread)), "duplicate kind");
+        check(!visible(make(3, "mail", "generation-one", NOW, NOW + 120, true, unread, unread)), "duplicate kind");
         List<WidgetSnapshot.Counter> values = new ArrayList<>(Collections.nCopies(13, unread));
-        check(!visible(new WidgetSnapshot(2, "mail", "generation-one", NOW, NOW + 120, true, values)), "list bound");
+        check(!visible(new WidgetSnapshot(3, "mail", "generation-one", NOW, NOW + 120, true, values)), "list bound");
         values.clear();
         values.add(unread);
-        WidgetSnapshot detached = new WidgetSnapshot(2, "mail", "generation-one", NOW, NOW + 120, true, values);
+        WidgetSnapshot detached = new WidgetSnapshot(3, "mail", "generation-one", NOW, NOW + 120, true, values);
         values.clear();
         check(detached.counters.size() == 1, "defensive copy");
         WidgetSnapshot.Item okItem = new WidgetSnapshot.Item(
@@ -136,26 +148,34 @@ public final class WidgetSnapshotPrueba {
         WidgetSnapshot.CalendarGrid okCal = new WidgetSnapshot.CalendarGrid(
                 2026, 11, Arrays.asList(3, 14, 28), Collections.singletonMap("3", "#953be7"));
         WidgetSnapshot rich = new WidgetSnapshot(
-                2, "calendar", "generation-one", NOW, NOW + 120, true,
+                3, "calendar", "generation-one", NOW, NOW + 120, true,
                 Collections.singletonList(new WidgetSnapshot.Counter("events", 2)),
                 Collections.singletonList(okItem), okCal);
         check(rich.visible("calendar", ENTORNO, NOW), "rich calendar snapshot");
-        check(!new WidgetSnapshot(2, "mail", "generation-one", NOW, NOW + 120, true, values,
+        check(!new WidgetSnapshot(3, "mail", "generation-one", NOW, NOW + 120, true, values,
                 Collections.singletonList(new WidgetSnapshot.Item("enc:v1:secret", "", "", "", 0, 0, false, false, false)), null)
                 .visible("mail", ENTORNO, NOW), "reject encrypted title");
-        check(!new WidgetSnapshot(2, "mail", "generation-one", NOW, NOW + 120, true, values,
+        check(!new WidgetSnapshot(3, "mail", "generation-one", NOW, NOW + 120, true, values,
                 Collections.singletonList(new WidgetSnapshot.Item("Title", "ENC:V1:secret", "", "", 0, 0, false, false, false)), null)
                 .visible("mail", ENTORNO, NOW), "reject encrypted subtitle");
-        check(!new WidgetSnapshot(2, "mail", "generation-one", NOW, NOW + 120, true, values,
+        check(new WidgetSnapshot(3, "docs", "generation-one", NOW, NOW + 120, true, values,
+                Collections.singletonList(new WidgetSnapshot.Item("Plan", "", "", "", 0, 0, false, false, false,
+                        "/edit?id=d1")), null)
+                .visible("docs", ENTORNO, NOW), "a row with its own route");
+        check(!new WidgetSnapshot(3, "docs", "generation-one", NOW, NOW + 120, true, values,
+                Collections.singletonList(new WidgetSnapshot.Item("Plan", "", "", "", 0, 0, false, false, false,
+                        "https://evil.example")), null)
+                .visible("docs", ENTORNO, NOW), "reject a row that names a destination outside its app");
+        check(!new WidgetSnapshot(3, "mail", "generation-one", NOW, NOW + 120, true, values,
                 Collections.nCopies(9, okItem), null)
                 .visible("mail", ENTORNO, NOW), "reject >8 items");
-        check(!new WidgetSnapshot(2, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
+        check(!new WidgetSnapshot(3, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
                 new WidgetSnapshot.CalendarGrid(2026, 2, Collections.singletonList(29), null))
                 .visible("calendar", ENTORNO, NOW), "reject non-leap Feb 29");
-        check(!new WidgetSnapshot(2, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
+        check(!new WidgetSnapshot(3, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
                 new WidgetSnapshot.CalendarGrid(2026, 11, Arrays.asList(14, 3), null))
                 .visible("calendar", ENTORNO, NOW), "reject unsorted busy days");
-        check(!new WidgetSnapshot(2, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
+        check(!new WidgetSnapshot(3, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
                 new WidgetSnapshot.CalendarGrid(2026, 11, null, Collections.singletonMap("03", "#953be7")))
                 .visible("calendar", ENTORNO, NOW), "reject non-canonical day key");
         check(!valid.visible("mail", new WidgetSnapshot.Entorno("generation-one", "vieja", "marca", false, false), NOW),
@@ -172,16 +192,26 @@ public final class WidgetSnapshotPrueba {
                 false, false, false);
         WidgetSnapshot.Item terminado = new WidgetSnapshot.Item("Antes", "", "", "", mediodia - 7200, mediodia - 3600,
                 false, false, false);
-        WidgetSnapshot agenda = new WidgetSnapshot(2, "calendar", "generation-one", mediodia, mediodia + 86400, true,
+        WidgetSnapshot agenda = new WidgetSnapshot(3, "calendar", "generation-one", mediodia, mediodia + 86400, true,
                 Collections.<WidgetSnapshot.Counter>emptyList(), Arrays.asList(terminado, reunion), null);
         check(WidgetSnapshot.proximoRepintado(agenda, mediodia, madrid) == mediodia + 1800, "repaint when an event ends");
         check(WidgetSnapshot.proximoRepintado(agenda, mediodia + 1800, madrid) == medianoche, "then at midnight");
-        WidgetSnapshot pronto = new WidgetSnapshot(2, "mail", "generation-one", mediodia, mediodia + 60, true,
+        WidgetSnapshot pronto = new WidgetSnapshot(3, "mail", "generation-one", mediodia, mediodia + 60, true,
                 Collections.<WidgetSnapshot.Counter>emptyList(), Arrays.asList(reunion), null);
         check(WidgetSnapshot.proximoRepintado(pronto, mediodia, madrid) == mediodia + 60, "repaint at expiry; mail items never end");
         check(agenda.conVigentes(mediodia, madrid).items.size() == 1
                 && agenda.conVigentes(mediodia, madrid).items.get(0).title.equals("Reunión"), "only current calendar rows");
         check(pronto.conVigentes(mediodia + 3600, madrid) == pronto, "other products are not trimmed");
+        check(WidgetSnapshot.accionPermitida("mail", "compose") && WidgetSnapshot.accionPermitida("calendar", "create")
+                && WidgetSnapshot.accionPermitida("contacts", "create") && WidgetSnapshot.accionPermitida("notes", "create")
+                && WidgetSnapshot.accionPermitida("photos", "upload"), "each product keeps its quick action");
+        check(!WidgetSnapshot.accionPermitida("docs", "create") && !WidgetSnapshot.accionPermitida("mail", "create")
+                && !WidgetSnapshot.accionPermitida("photos", "create") && !WidgetSnapshot.accionPermitida("drive", "upload")
+                && !WidgetSnapshot.accionPermitida("mail", "search") && !WidgetSnapshot.accionPermitida(null, "open"),
+                "no action outside the table");
+        WidgetSnapshot.Item conRuta = new WidgetSnapshot.Item("x", "", "", "", 0, 0, false, false, false, "/edit?id=d1");
+        check(WidgetSnapshot.destinoDeFila("sytue-docs", conRuta).equals("sytue-docs:/edit?id=d1"), "a row opens its element");
+        check(WidgetSnapshot.destinoDeFila("sytue-docs", okItem).equals("sytue-docs:/"), "a row without route opens the app");
         System.out.println("Widget snapshot: " + checks + " checks passed");
     }
 }

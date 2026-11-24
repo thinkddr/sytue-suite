@@ -121,6 +121,7 @@ var nombres = map[string]string{
 	"calendar": "Sytue Calendar", "contacts": "Sytue Contacts", "notes": "Sytue Notepads",
 	"erp": "Sytue ERP", "bases": "Sytue Bases", "cast": "Sytue Cast", "hub": "Sytue One",
 	"docs": "Sytue Docus", "sheets": "Sytue Calcus", "slides": "Sytue Diapos",
+	"drive": "Sytue Drive",
 }
 
 // Aviso es el aviso a la persona: su app ha vuelto a los datos del servidor.

@@ -53,6 +53,14 @@ PUENTE_WIDGETS = "SytueWidgetBridge"
 XCODE = "2700"
 
 
+# Las acciones rápidas de los widgets, además de «open», por producto. Cada una abre un
+# formulario, una pregunta o el selector del sistema que la persona confirma: un enlace
+# del esquema nunca escribe nada solo (ADR 0078). La misma tabla en android-widgets.py,
+# SytueWidgetActions.allowed (Snapshot.swift) y WidgetSnapshot.accionPermitida (Java).
+ACCIONES_WIDGET = {"mail": {"compose"}, "calendar": {"create"}, "contacts": {"create"},
+                   "notes": {"create"}, "photos": {"upload"}}
+
+
 def metadato(toml, clave):
     m = re.search(r'^\s*%s\s*=\s*"([^"]*)"' % re.escape(clave), toml, re.M)
     return m.group(1) if m else ""
@@ -72,12 +80,11 @@ def apps():
         if not (app["nombre"] and app["id"] and app["icono"] and app["marca"]):
             sys.exit("apps/fyne/cmd/%s/FyneApp.toml no declara Name, ID, Icon o esquema" % d)
         acciones = metadato(toml, "widget_acciones")
-        app["widget_acciones"] = acciones.split(",") if acciones else []
-        permitidas = {"open", "search"}
-        if app["marca"] == "mail":
-            permitidas.add("compose")
-        if app["marca"] == "calendar":
-            permitidas.add("create")
+        # «search» ya no es una acción de los widgets (2026-11-24, ADR 0078): el dueño los
+        # quitó porque no aportaban. Se ignora si un FyneApp.toml aún la declara (Mail,
+        # que cambia en otra rama).
+        app["widget_acciones"] = [a for a in acciones.split(",") if a != "search"] if acciones else []
+        permitidas = {"open"} | ACCIONES_WIDGET.get(app["marca"], set())
         if (len(set(app["widget_acciones"])) != len(app["widget_acciones"])
                 or not set(app["widget_acciones"]).issubset(permitidas)
                 or (acciones and "open" not in app["widget_acciones"])):
@@ -177,8 +184,8 @@ def derechos_widgets(a, plataforma):
 def idiomas_widgets():
     """Las mismas traducciones del cliente Go; ninguna segunda tabla por idioma."""
     carpeta = os.path.join(RAIZ, "apps", "nucleo", "i18n", "locales")
-    claves = (["widgets." + c for c in ("open", "compose", "create", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage")]
-              + ["search.label"]
+    claves = (["widgets." + c for c in ("open", "compose", "create", "newNote", "newContact", "addPhotos", "notes", "rows",
+                                         "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage")]
               + ["app." + a["marca"] + ".description" for a in apps() if a["widget_acciones"]]
               + ["dataflow.item." + c for c in ("files", "events", "documents", "contacts")]
               + ["widgets.updatedAgo"])

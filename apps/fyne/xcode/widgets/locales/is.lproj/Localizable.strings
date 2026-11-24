@@ -1,6 +1,9 @@
 "widgets.open" = "Opna";
 "widgets.compose" = "Skrifa";
 "widgets.create" = "Búa til viðburð";
+"widgets.newNote" = "Nýr minnispunktur";
+"widgets.newContact" = "Nýr tengiliður";
+"widgets.addPhotos" = "Bæta við myndum";
 "widgets.notes" = "Glósur";
 "widgets.rows" = "Raðir";
 "widgets.pending" = "Í bið";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Dagatöl";
 "widgets.address_books" = "Heimilisfangaskrár";
 "widgets.storage" = "Geymslurými";
-"search.label" = "Altæk leit";
 "app.bases.description" = "Sameiginlegar venslatöflur";
 "app.sheets.description" = "Töflureiknar";
 "app.calendar.description" = "Dagatal";

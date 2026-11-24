@@ -465,6 +465,13 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Il-posta tiegħek hija kriptata bis-sistema ta' qabel. Biex tinfetaħ bil-login ta' Sytue ID tiegħek, bħall-bqija tal-apps, trid titbattal u tibda mill-ġdid fil-kaxxaforti. Il-posta li kienet kriptata biss bis-sistema ta' qabel se tintilef.",
+  "privateMail.vaultMoveCheckFailed": "Ma setax jiġi ċċekkjat l-istat tal-posta tiegħek. Erġa' pprova fi ftit mumenti.",
+  "privateMail.vaultMoveKeep": "Kompli bil-posta ta' qabel għalissa",
+  "privateMail.vaultMoveRetiredBody": "Is-sistema tal-posta ta' qabel m'għadhiex disponibbli. Sakemm tittrasferixxi l-posta tiegħek fil-kaxxaforti ma tirċievix posta ġdida: dak li jasal sadanittant jinżamm kriptat bis-sistema ta' qabel, bħall-posta li diġà kellek, u ma jistax jinqara. Ma jitħassarx, iżda ħadd ma jkun jista' jiftħu. Wara t-trasferiment, il-posta terġa' tasal għandek u tinfetaħ bil-login ta' Sytue ID tiegħek, bħall-bqija tal-apps.",
+  "privateMail.vaultMoveRetiredTitle": "Ittrasferixxi l-posta tiegħek fil-kaxxaforti l-ġdida biex tibqa' tirċeviha",
+  "privateMail.vaultMoveTitle": "Ittrasferixxi l-posta tiegħek fil-kaxxaforti l-ġdida",
+  "privateMail.vaultMoveUnderstood": "Nifhem li l-posta kriptata bis-sistema ta' qabel se tintilef",
   "purge.body": {
     "one": "Dan il-messaġġ jisparixxi għal kollox u ma jistax jiġi rkuprat. L-ispazju li jieħu jinħeles.",
     "few": "Dawn il-{count} messaġġi jisparixxu għal kollox u ma jistgħux jiġu rkuprati. L-ispazju li jieħdu jinħeles.",

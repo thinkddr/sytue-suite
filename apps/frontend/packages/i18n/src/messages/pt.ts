@@ -487,6 +487,9 @@ export const pt: Catalog = {
   'widgets.compose': 'Escrever',
   'widgets.storage': 'Armazenamento',
   'widgets.create': 'Criar evento',
+  'widgets.newNote': 'Nova nota',
+  'widgets.newContact': 'Novo contacto',
+  'widgets.addPhotos': 'Adicionar fotos',
   'widgets.updatedAgo': 'Atualizado {time}',
   'widgets.updatedAt': 'Atualizado: {time}',
 

@@ -449,6 +449,13 @@
   "privateMail.smtpConsentBody": "Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.",
   "privateMail.smtpConsentConfirm": "Allow and send",
   "privateMail.smtpConsentTitle": "Send outside Sytue",
+  "privateMail.vaultMoveBody": "Пощата ви е шифрована с предишната система. За да се отваря с вашия вход в Sytue ID, както останалите приложения, трябва да се изпразни и да започне наново в трезора. Пощата, шифрована само с предишната система, ще бъде загубена.",
+  "privateMail.vaultMoveCheckFailed": "Състоянието на пощата ви не можа да бъде проверено. Опитайте отново след малко.",
+  "privateMail.vaultMoveKeep": "Засега продължи с предишната поща",
+  "privateMail.vaultMoveRetiredBody": "Предишната система за поща вече не е налична. Докато не преместите пощата си в трезора, няма да получавате нова поща: това, което пристига междувременно, се пази шифровано с предишната система, както и пощата, която вече имате, и не може да бъде прочетено. Не се изтрива, но никой няма да може да го отвори. След преместването пощата отново започва да пристига и се отваря с вашия вход в Sytue ID, както останалите приложения.",
+  "privateMail.vaultMoveRetiredTitle": "Преместете пощата си в новия трезор, за да продължите да я получавате",
+  "privateMail.vaultMoveTitle": "Преместете пощата си в новия трезор",
+  "privateMail.vaultMoveUnderstood": "Разбирам, че пощата, шифрована с предишната система, ще бъде загубена",
   "purge.body": {
     "one": "Това съобщение ще изчезне завинаги и не може да бъде възстановено. Мястото, което заема, ще се освободи.",
     "other": "Тези {count} съобщения ще изчезнат завинаги и не могат да бъдат възстановени. Мястото, което заемат, ще се освободи."

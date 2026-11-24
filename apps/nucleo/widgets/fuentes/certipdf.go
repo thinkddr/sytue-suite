@@ -17,17 +17,20 @@ import (
 // maxRecientesPDF es lo que la portada de CertiPDF enseña: con más, el total no se da.
 const maxRecientesPDF = 48
 
-// CertiPDF lee las peticiones de firma recibidas (las pendientes, primero) y los PDF
-// recientes. Cada lectura falla por su lado. Peticiones: 2.
-func CertiPDF(_ Comunes, pdf *api.PDF) widgets.Fuente {
+// CertiPDF lee las peticiones de firma recibidas (las pendientes, primero) del servicio,
+// con `firmas`, y los PDF recientes de la carpeta «PDF» del Drive privado que la app tiene
+// abierto, con `archivos` (api.PDF.WithPrivateDrive). Cada lectura falla por su lado. La
+// monta la app con Privada: la registrada no lee el Drive congelado del servidor
+// (privada.go). Peticiones: 1 y las lecturas locales.
+func CertiPDF(_ Comunes, archivos, firmas *api.PDF) widgets.Fuente {
 	return func(ctx context.Context) (widgets.Detail, error) {
 		var (
 			lecturas   sync.WaitGroup
 			peticiones api.PDFPeticionesFirma
 			errP       error
 		)
-		lecturas.Go(func() { peticiones, errP = pdf.PeticionesFirma(ctx) })
-		lista, errL := pdf.Lista(ctx)
+		lecturas.Go(func() { peticiones, errP = firmas.PeticionesFirma(ctx) })
+		lista, errL := archivos.Lista(ctx)
 		lecturas.Wait()
 		if err := todoFalla(errP, errL); err != nil {
 			return widgets.Detail{}, err
@@ -71,6 +74,8 @@ func itemsDeFirmas(ps api.PDFPeticionesFirma) ([]widgets.Item, int64) {
 		items = append(items, widgets.Item{
 			Title: titulo, Subtitle: r.NombrePide, Badge: "FIRMAR",
 			StartAt: unix(r.Creada), Color: "#d83b35", Unread: true,
+			// Una petición de fuera no tiene copia en mi unidad hasta abrirla (Ruta vacía).
+			Route: RutaPDF(r.Ruta),
 		})
 	}
 	return items, pendientes
@@ -80,7 +85,7 @@ func itemsDePDF(lista []api.File) []widgets.Item {
 	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
 	for _, f := range lista {
 		if nombre := strings.TrimSpace(f.Name); nombre != "" {
-			items = append(items, widgets.Item{Title: nombre, Badge: "PDF", StartAt: unix(f.UpdatedAt)})
+			items = append(items, widgets.Item{Title: nombre, Badge: "PDF", StartAt: unix(f.UpdatedAt), Route: RutaPDF(pdfEnCarpeta(f.Name))})
 		}
 		if llenos(items) {
 			break

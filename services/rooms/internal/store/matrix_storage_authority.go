@@ -71,6 +71,11 @@ func (s *Store) MatrixStorageAuthority(ctx context.Context, subject, product str
 		// Con autoridad de Matrix: la de la bóveda solo tras un traspaso (ADR 0087).
 		return s.autoridadTraspasada(ctx, subject, product, scope, result, traspaso)
 	}
+	if err == nil && scope.Valid() && s.matrixRetirada(scope.Product) {
+		// Matrix retirada y sin registro de claves no se ve un traspaso: no hay
+		// respuesta (la configuración de Rooms no lo admite; esto es por si acaso).
+		return matrixproof.Authority{}, domain.ErrMatrixUnavailable
+	}
 	if scope.Valid() {
 		// Sin autoridad de Matrix, la de la bóveda si la hay (ADR 0087). Fuera de la
 		// transacción: es una pregunta a Sytue ID, no una fila de aquí.

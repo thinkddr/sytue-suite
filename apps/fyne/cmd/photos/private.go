@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"net/url"
 	"sync/atomic"
 
 	"fyne.io/fyne/v2"
@@ -44,9 +45,12 @@ type (
 		drive           *cifrado.AplicacionDrive
 		driveRepository atomic.Pointer[photosDrive]
 		presenter       atomic.Pointer[photosPresenter]
-		needed          bool
-		neededBy        auth.IdentitySnapshot
-		driveFailure    error
+		// pendiente es el enlace que llegó sin galería montada (la app arrancando por
+		// una fila o la acción del widget): se atiende al montarla.
+		pendiente    atomic.Pointer[url.URL]
+		needed       bool
+		neededBy     auth.IdentitySnapshot
+		driveFailure error
 	}
 )
 
@@ -97,6 +101,9 @@ func newPhotosStorage(suite *sesion.Suite, application fyne.App, window fyne.Win
 			return cifrado.ApplicationView{}, err
 		}
 		host.presenter.Store(presenter)
+		if u := host.pendiente.Swap(nil); u != nil {
+			fyne.Do(func() { host.atender(u) })
+		}
 		return cifrado.ApplicationView{Object: presenter.app.Objeto(), Detach: func() { presenter.app.Cerrar(); host.presenter.CompareAndSwap(presenter, nil) }}, nil
 	}
 	// Los registros propios de Photos (álbumes, favoritas, ediciones) siguen la
@@ -169,6 +176,7 @@ func (h *photosStorage) render(text func(string) string) {
 		h.slot.Objects = []fyne.CanvasObject{container.NewBorder(status, nil, nil, nil, h.photos.Objeto())}
 	}
 	h.slot.Refresh()
+	ui.RecolocarBarraSuite(h.slot)
 }
 
 func (h *photosStorage) Close() {
@@ -305,5 +313,36 @@ func (h *photosStorage) driveCifrado(cuenta cifrado.Cuenta, identity auth.Identi
 			},
 			scope: scope,
 		})
+	}
+}
+
+// esEnlaceDePhotos: lo que atender sabe abrir (el álbum público, uno compartido, uno
+// propio o la acción «Añadir fotos» del widget).
+func esEnlaceDePhotos(u *url.URL) bool {
+	return photoView.TokenDeEnlace(u) != "" || photoView.AlbumDeEnlace(u) != "" ||
+		photoView.AlbumPropioDeEnlace(u) != "" || api.LeerAccion("photos", u) == "upload"
+}
+
+// atender abre lo que pide un enlace en la galería montada; sin ella, lo guarda para
+// cuando se monte. En el hilo de la interfaz.
+func (h *photosStorage) atender(u *url.URL) {
+	current := h.presenter.Load()
+	if current == nil {
+		if esEnlaceDePhotos(u) {
+			h.pendiente.Store(u)
+		}
+		return
+	}
+	if token := photoView.TokenDeEnlace(u); token != "" {
+		current.app.AbrirPublico(token)
+	}
+	if album := photoView.AlbumDeEnlace(u); album != "" {
+		current.app.AbrirCompartido(album)
+	}
+	if album := photoView.AlbumPropioDeEnlace(u); album != "" {
+		current.app.AbrirAlbum(album)
+	}
+	if api.LeerAccion("photos", u) == "upload" {
+		current.app.AnyadirFotos()
 	}
 }

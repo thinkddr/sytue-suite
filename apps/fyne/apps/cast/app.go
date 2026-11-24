@@ -1002,17 +1002,10 @@ func esVideo(nombre string) bool {
 // `/manage/<id>`, `/c/<org>`, `/explore`, `/studio`, `/upload` y `/moderation` (a donde
 // lleva el aviso de una denuncia). Dice si la entendió.
 func (a *App) AbrirEnlace(u *url.URL) bool {
-	partes := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(partes) > 0 && partes[0] == "cast" {
-		partes = partes[1:]
-	}
+	partes := partesDeEnlace(u)
 	if len(partes) == 0 || partes[0] == "" {
 		a.Ir(RutaInicio)
 		return true
-	}
-	// La forma canónica lleva la organización detrás del prefijo (ADR 0056).
-	if len(partes) > 1 && !esRutaDeCast(partes[0]) && esRutaDeCast(partes[1]) {
-		partes = partes[1:]
 	}
 	if r, hay := rutasSinParametro[partes[0]]; hay {
 		a.Ir(r)
@@ -1033,6 +1026,29 @@ func (a *App) AbrirEnlace(u *url.URL) bool {
 		return false
 	}
 	return true
+}
+
+// partesDeEnlace son los trozos de la ruta de un enlace a Cast sin el prefijo `/cast` de
+// la web ni la organización que va detrás de él (la forma canónica, ADR 0056).
+func partesDeEnlace(u *url.URL) []string {
+	partes := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(partes) > 0 && partes[0] == "cast" {
+		partes = partes[1:]
+	}
+	if len(partes) > 1 && !esRutaDeCast(partes[0]) && esRutaDeCast(partes[1]) {
+		partes = partes[1:]
+	}
+	return partes
+}
+
+// VideoDeEnlace es el vídeo que abre un enlace `/watch/<id>` (o `/embed/<id>`), o "": lo
+// que hace AbrirEnlace con él, sin abrir nada. Lo usa la prueba de las filas del widget.
+func VideoDeEnlace(u *url.URL) string {
+	partes := partesDeEnlace(u)
+	if len(partes) > 1 && (partes[0] == "watch" || partes[0] == "embed") {
+		return partes[1]
+	}
+	return ""
 }
 
 // rutasSinParametro son las páginas que se abren solo con su nombre.

@@ -486,6 +486,9 @@ export const et: Catalog = {
   'widgets.compose': 'Koosta kiri',
   'widgets.storage': 'Salvestusruum',
   'widgets.create': 'Loo sündmus',
+  'widgets.newNote': 'Uus märge',
+  'widgets.newContact': 'Uus kontakt',
+  'widgets.addPhotos': 'Lisa fotosid',
   'widgets.updatedAgo': 'Uuendatud {time}',
   'widgets.updatedAt': 'Uuendatud: {time}',
 

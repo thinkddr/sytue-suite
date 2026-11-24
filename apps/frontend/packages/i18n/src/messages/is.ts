@@ -491,6 +491,9 @@ export const is: Catalog = {
   'widgets.compose': 'Skrifa',
   'widgets.storage': 'Geymslurými',
   'widgets.create': 'Búa til viðburð',
+  'widgets.newNote': 'Nýr minnispunktur',
+  'widgets.newContact': 'Nýr tengiliður',
+  'widgets.addPhotos': 'Bæta við myndum',
   'widgets.updatedAgo': 'Uppfært {time}',
   'widgets.updatedAt': 'Uppfært: {time}',
 

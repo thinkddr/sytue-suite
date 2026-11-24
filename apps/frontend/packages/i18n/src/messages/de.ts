@@ -518,6 +518,9 @@ export const de: Catalog = {
   'widgets.compose': 'Verfassen',
   'widgets.storage': 'Speicher',
   'widgets.create': 'Termin erstellen',
+  'widgets.newNote': 'Neue Notiz',
+  'widgets.newContact': 'Neuer Kontakt',
+  'widgets.addPhotos': 'Fotos hinzufügen',
   'widgets.updatedAgo': 'Aktualisiert {time}',
   'widgets.updatedAt': 'Aktualisiert: {time}',
 

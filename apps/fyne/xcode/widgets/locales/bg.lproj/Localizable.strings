@@ -1,6 +1,9 @@
 "widgets.open" = "Отваряне";
 "widgets.compose" = "Писане";
 "widgets.create" = "Създаване на събитие";
+"widgets.newNote" = "Нова бележка";
+"widgets.newContact" = "Нов контакт";
+"widgets.addPhotos" = "Добавяне на снимки";
 "widgets.notes" = "Бележки";
 "widgets.rows" = "Редове";
 "widgets.pending" = "Чакащи";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Календари";
 "widgets.address_books" = "Адресни книги";
 "widgets.storage" = "Хранилище";
-"search.label" = "Глобално търсене";
 "app.bases.description" = "Съвместни релационни таблици";
 "app.sheets.description" = "Електронни таблици";
 "app.calendar.description" = "Календар";

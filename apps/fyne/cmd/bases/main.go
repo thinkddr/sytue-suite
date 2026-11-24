@@ -129,7 +129,7 @@ func main() {
 			return state.Mode, err
 		},
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
-			return mount(cuenta, api.NewBases(s.URL("bases"), cuenta.HTTP(), nil)), nil
+			return mount(cuenta, api.NewBases(s.URL("bases"), cuenta.HTTP(), s.ClienteConAviso(nil))), nil
 		},
 	})
 

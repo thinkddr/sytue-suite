@@ -1,6 +1,9 @@
 "widgets.open" = "Megnyitás";
 "widgets.compose" = "Levélírás";
 "widgets.create" = "Esemény létrehozása";
+"widgets.newNote" = "Új jegyzet";
+"widgets.newContact" = "Új névjegy";
+"widgets.addPhotos" = "Fotók hozzáadása";
 "widgets.notes" = "Jegyzetek";
 "widgets.rows" = "Sorok";
 "widgets.pending" = "Függőben";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Naptárak";
 "widgets.address_books" = "Címjegyzékek";
 "widgets.storage" = "Tárhely";
-"search.label" = "Globális keresés";
 "app.bases.description" = "Közös relációs táblák";
 "app.sheets.description" = "Táblázatok";
 "app.calendar.description" = "Naptár";

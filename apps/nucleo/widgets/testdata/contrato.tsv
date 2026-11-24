@@ -1,4 +1,4 @@
-# Contrato del snapshot de los widgets nativos (formato 2): los mismos casos los
+# Contrato del snapshot de los widgets nativos (formato 3): los mismos casos los
 # corren Go (contrato_test.go), Java (WidgetSnapshotPrueba.java) y Swift
 # (SnapshotTests.swift). Columnas separadas por tabuladores; «-» es la cadena vacía.
 # visible  caso  epoca  confirmada  marca  cerrada  bloqueo  version  active  generation  updated_at  expires_at  now  esperado
@@ -6,26 +6,29 @@
 # rancio   caso  updated_at  now  esperado
 # vigente  caso  zona  start_at  end_at  all_day  now  esperado
 #   (producto «calendar»; el día completo es flotante: medianoche UTC)
-visible	valido	e1	m1	m1	0	0	2	1	e1	1792500000	1792500120	1792500000	1
-visible	24h justas	e1	m1	m1	0	0	2	1	e1	1792500000	1792586400	1792500000	1
-visible	24h y 1 s	e1	m1	m1	0	0	2	1	e1	1792500000	1792586401	1792500000	0
-visible	visto al ultimo segundo	e1	m1	m1	0	0	2	1	e1	1792500000	1792586400	1792586399	1
-visible	visto a las 24h	e1	m1	m1	0	0	2	1	e1	1792500000	1792586400	1792586400	0
-visible	caducado	e1	m1	m1	0	0	2	1	e1	1792500000	1792500000	1792500000	0
-visible	formato v1	e1	m1	m1	0	0	1	1	e1	1792500000	1792500120	1792500000	0
-visible	formato v3	e1	m1	m1	0	0	3	1	e1	1792500000	1792500120	1792500000	0
-visible	inactivo	e1	m1	m1	0	0	2	0	e1	1792500000	1792500120	1792500000	0
-visible	otra epoca	e1	m1	m1	0	0	2	1	e0	1792500000	1792500120	1792500000	0
-visible	sin epoca	-	m1	m1	0	0	2	1	-	1792500000	1792500120	1792500000	0
-visible	renovado: otra marca confirmada	e1	m2	m2	0	0	2	1	e1	1792500000	1792500120	1792500000	1
-visible	sin confirmar	e1	m0	m1	0	0	2	1	e1	1792500000	1792500120	1792500000	0
-visible	sin marca	e1	-	-	0	0	2	1	e1	1792500000	1792500120	1792500000	0
-visible	cerrada	e1	m1	m1	1	0	2	1	e1	1792500000	1792500120	1792500000	0
-visible	bloqueo	e1	m1	m1	0	1	2	1	e1	1792500000	1792500120	1792500000	0
-visible	reloj 5 s por delante	e1	m1	m1	0	0	2	1	e1	1792500005	1792500120	1792500000	1
-visible	del futuro	e1	m1	m1	0	0	2	1	e1	1792500006	1792500120	1792500000	0
-visible	sin fecha	e1	m1	m1	0	0	2	1	e1	0	1792500120	1792500000	0
-visible	caduca antes de escribirse	e1	m1	m1	0	0	2	1	e1	1792500000	1792499999	1792499990	0
+# ruta     caso  route  esperado
+#   (la ruta de una fila; «-» es sin ruta. Un snapshot con una fila de ruta inválida no
+#   se enseña. El lector la abre como `sytue-<producto>:` + route)
+visible	valido	e1	m1	m1	0	0	3	1	e1	1792500000	1792500120	1792500000	1
+visible	24h justas	e1	m1	m1	0	0	3	1	e1	1792500000	1792586400	1792500000	1
+visible	24h y 1 s	e1	m1	m1	0	0	3	1	e1	1792500000	1792586401	1792500000	0
+visible	visto al ultimo segundo	e1	m1	m1	0	0	3	1	e1	1792500000	1792586400	1792586399	1
+visible	visto a las 24h	e1	m1	m1	0	0	3	1	e1	1792500000	1792586400	1792586400	0
+visible	caducado	e1	m1	m1	0	0	3	1	e1	1792500000	1792500000	1792500000	0
+visible	formato v2	e1	m1	m1	0	0	2	1	e1	1792500000	1792500120	1792500000	0
+visible	formato v4	e1	m1	m1	0	0	4	1	e1	1792500000	1792500120	1792500000	0
+visible	inactivo	e1	m1	m1	0	0	3	0	e1	1792500000	1792500120	1792500000	0
+visible	otra epoca	e1	m1	m1	0	0	3	1	e0	1792500000	1792500120	1792500000	0
+visible	sin epoca	-	m1	m1	0	0	3	1	-	1792500000	1792500120	1792500000	0
+visible	renovado: otra marca confirmada	e1	m2	m2	0	0	3	1	e1	1792500000	1792500120	1792500000	1
+visible	sin confirmar	e1	m0	m1	0	0	3	1	e1	1792500000	1792500120	1792500000	0
+visible	sin marca	e1	-	-	0	0	3	1	e1	1792500000	1792500120	1792500000	0
+visible	cerrada	e1	m1	m1	1	0	3	1	e1	1792500000	1792500120	1792500000	0
+visible	bloqueo	e1	m1	m1	0	1	3	1	e1	1792500000	1792500120	1792500000	0
+visible	reloj 5 s por delante	e1	m1	m1	0	0	3	1	e1	1792500005	1792500120	1792500000	1
+visible	del futuro	e1	m1	m1	0	0	3	1	e1	1792500006	1792500120	1792500000	0
+visible	sin fecha	e1	m1	m1	0	0	3	1	e1	0	1792500120	1792500000	0
+visible	caduca antes de escribirse	e1	m1	m1	0	0	3	1	e1	1792500000	1792499999	1792499990	0
 rancio	recien	1792500000	1792500000	0
 rancio	14 min 59 s	1792500000	1792500899	0
 rancio	15 min	1792500000	1792500900	1
@@ -50,3 +53,26 @@ vigente	dia completo sin fin	America/New_York	1794009600	0	1	1794092400	1
 vigente	dia completo sin fin, al dia siguiente	America/New_York	1794009600	0	1	1794114000	0
 vigente	dos dias, el segundo	America/New_York	1794009600	1794182400	1	1794196800	1
 vigente	dos dias, el tercero	America/New_York	1794009600	1794182400	1	1794200400	0
+ruta	sin ruta	-	1
+ruta	la raiz	/	1
+ruta	editar un documento	/edit?id=0b5c6f3e-1d2a-4c8e-9f00-112233445566	1
+ruta	una nota de un cuaderno	/notebooks/c1?note=n1	1
+ruta	un fichero de Drive escapado	/?preview=%2FInforme%20final%20%C3%B1.pdf	1
+ruta	el dia de un evento	/?date=2026-11-30&all_day=1	1
+ruta	512 bytes	/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa	1
+ruta	513 bytes	/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa	0
+ruta	una autoridad	//evil.example/x	0
+ruta	otro esquema	https:/evil.example	0
+ruta	sin barra delante	edit?id=1	0
+ruta	dos puntos	/x:y	0
+ruta	una arroba	/x@y	0
+ruta	un fragmento	/x#y	0
+ruta	un espacio	/x y	0
+ruta	un mas	/x?q=a+b	0
+ruta	una barra invertida	/x\y	0
+ruta	escape en minusculas	/x?q=%2f	0
+ruta	escape a medias	/x?q=%2	0
+ruta	escape que no es hex	/x?q=%ZZ	0
+ruta	no ascii sin escapar	/ñ	0
+ruta	marcador de cifrado escapado	/x?q=enc%3Av1%3Aabc	0
+ruta	marcador de cifrado en mayusculas	/x?q=ENC%3AV1%3Aabc	0

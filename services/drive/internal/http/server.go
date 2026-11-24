@@ -19,6 +19,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
 	"git.sytue.eu/sytue/one/services/drive/internal/webdav"
@@ -139,6 +140,10 @@ func NewRouter(d Deps) http.Handler {
 		api.Post("/private-storage/migration", h.BeginPrivateStorageMigration)
 		api.Get("/private-storage/migration/{epoch}/rows", h.PrivateStorageSourcePage)
 		api.Get("/private-storage/migration/{epoch}/blobs/{kind}/{source}", h.PrivateStorageSourceBlob)
+		// «Soltar la fuente» (ADR 0086): la salida de quien vació la bóveda de su Drive.
+		if h.migration != nil {
+			soltarfuente.Montar(api, soltarfuente.Config{Product: "drive", Soltar: d.Service.ReleasePrivateStorage, Avisar: d.Service.Hub().Send})
+		}
 
 		// Carpetas.
 		// «Exportar tus datos»: los archivos con sus bytes (platform/pkg/portabilidad).

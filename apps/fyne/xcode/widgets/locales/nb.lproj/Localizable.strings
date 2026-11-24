@@ -1,6 +1,9 @@
 "widgets.open" = "Åpne";
 "widgets.compose" = "Skriv";
 "widgets.create" = "Opprett hendelse";
+"widgets.newNote" = "Nytt notat";
+"widgets.newContact" = "Ny kontakt";
+"widgets.addPhotos" = "Legg til bilder";
 "widgets.notes" = "Notater";
 "widgets.rows" = "Rader";
 "widgets.pending" = "Ventende";
@@ -11,7 +14,6 @@
 "widgets.calendars" = "Kalendere";
 "widgets.address_books" = "Adressebøker";
 "widgets.storage" = "Lagring";
-"search.label" = "Globalt søk";
 "app.bases.description" = "Delte relasjonstabeller";
 "app.sheets.description" = "Regneark";
 "app.calendar.description" = "Kalender";

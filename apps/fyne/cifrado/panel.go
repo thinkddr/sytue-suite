@@ -60,7 +60,7 @@ type Panel struct {
 	// desbloquear que ofrece este panel: aquí no se teclea nada.
 	IniciarSesion func(ctx context.Context, legado string) error
 	// SoltarFuente es «Vaciar y volver a los datos del servidor» (ADR 0086): la
-	// salida de una app de registros cuando su clave de Matrix no abre. Devuelve la
+	// salida de una app de registros que tiene sus datos en Matrix, abra o no. Devuelve la
 	// fuente del servidor a como estaba al congelarse; lo escrito después en
 	// Matrix se pierde. Nil: sin esa salida (Rooms, Drive, Mail).
 	SoltarFuente func(context.Context) error
@@ -509,12 +509,14 @@ func (c *Panel) pintar() {
 			c.footer.Add(c.boton("matrix.verifyPerson", c.verificarPersona))
 		}
 		c.footer.Add(c.boton("matrix.notices", c.licencias))
+		c.botonSoltarFuente()
 	case c.client == nil:
 		c.footer.Add(c.boton("matrix.connect", c.conectar))
 	case c.diag.Paso == PasoDesbloquear || c.diag.Paso == PasoCrear:
 		// Solo queda aquí si abrir o crear falló (red, servicio): se reintenta igual.
 		c.body.Add(c.parrafo(c.t("matrix.failed")))
 		c.footer.Add(c.boton("action.retry", c.Recuperar))
+		c.botonSoltarFuente()
 	default:
 		// La cuenta tiene una clave que nadie aquí abre: ni envoltorio, ni la copia de
 		// este dispositivo, ni una cuenta a medias que rehacer (Diagnosticar ya lo
@@ -524,12 +526,20 @@ func (c *Panel) pintar() {
 		if c.status.HasIdentity && !c.nativeRecovery && c.Base.Bootstrap.StorageProduct == "" {
 			c.footer.Add(c.boton("matrix.reset", c.Restablecer))
 		}
-		if c.SoltarFuente != nil {
-			c.footer.Add(c.boton("vault.release", func() { c.ConfirmarSoltarFuente(false) }))
-		}
+		c.botonSoltarFuente()
 		c.botonVerificar()
 	}
 	c.actualizar()
+}
+
+// botonSoltarFuente ofrece «Vaciar y volver a los datos del servidor» en una app de
+// registros: se abra o no Matrix, como el aviso de la web (SourceReleaseNotice), que
+// se ve siempre que la fuente esté congelada. Quien tiene sus datos en Matrix puede
+// así dejarlo y pasar a la bóveda nueva sin abrirlo antes (ADR 0086, ADR 0087).
+func (c *Panel) botonSoltarFuente() {
+	if c.SoltarFuente != nil {
+		c.footer.Add(c.boton("vault.release", func() { c.ConfirmarSoltarFuente(false) }))
+	}
 }
 
 func (c *Panel) botonVerificar() {

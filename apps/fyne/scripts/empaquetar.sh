@@ -822,7 +822,7 @@ plist_documentos() { # <dir de la app>
 # `fetch` en UIBackgroundModes y el identificador de la tarea, `<App ID>.refresco`. Solo
 # con su interruptor (`refresco_apple_activo`, que exige también el de los widgets) y en
 # las apps con widget: sin lector, la app no tiene nada que refrescar. El fork de Fyne registra el PRIMERO de
-# BGTaskSchedulerPermittedIdentifiers (parche 0016) y la suite pide uno cada 30 min
+# BGTaskSchedulerPermittedIdentifiers (parche 0016) y la suite pide uno cada 15 min
 # (`sesion.CadaRefrescoEnFondo`). No es un derecho: no pide capacidad ni perfiles nuevos.
 # Una orden de PlistBuddy por línea; nada si no toca.
 #
@@ -2160,7 +2160,7 @@ android)
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/WidgetSnapshot.java" "$FYNE/android/prueba/eu/sytue/nativo/WidgetSnapshotPrueba.java" \
     "$FYNE/android/prueba/eu/sytue/nativo/WidgetsBloqueoPrueba.java"
-  # El contrato del formato 2 es el mismo fichero que corren Go y Swift.
+  # El contrato del formato 3 es el mismo fichero que corren Go y Swift.
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetSnapshotPrueba \
     "$FYNE/../nucleo/widgets/testdata/contrato.tsv"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetsBloqueoPrueba

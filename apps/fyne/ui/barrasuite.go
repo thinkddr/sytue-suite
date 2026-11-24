@@ -236,6 +236,8 @@ type BarraSuite struct {
 	// montado es lo que devolvió Montar: la barra le avisa cuando cambia la apariencia,
 	// que es cuando hay que volver a colocar el marco y la hoja.
 	montado *fyne.Container
+	// recolocando: hay un recolocarMontaje pendiente en el hilo de la interfaz.
+	recolocando bool
 	// pintada es la apariencia con la que se colocó el montaje por última vez.
 	pintada aparienciaVista
 	// LA BARRA ÚNICA DEL TELÉFONO (TopBar.tsx con `movil`). Por debajo de 768 la barra
@@ -253,9 +255,6 @@ type BarraSuite struct {
 	// que pinta el montaje. Así la burbuja de un botón queda encima del contenido y de
 	// la propia barra, y no la recorta ningún desplazador.
 	portalPistas *fyne.Container
-	// buscarPendiente espera a tener sesión y lienzo antes de mostrar el teclado.
-	buscarPendiente bool
-	busquedaSesion  sesion.Estado
 	// atajosDeApp son los grupos que la app enseña en la hoja de «?» (ConAtajosDeApp);
 	// ayudaUna engancha «?» al lienzo una sola vez, en cuanto lo hay.
 	atajosDeApp func() []GrupoDeAtajos
@@ -330,7 +329,6 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 	b.cerrarSuite.Hide()
 	b.tituloApp = Texto(p.NombreCorto(), tema.TextoMD, SemiNegrita, color.NRGBA{})
 	b.ExtendBaseWidget(b)
-	b.engancharBusqueda()
 	return b
 }
 
@@ -462,6 +460,34 @@ func barraSuiteDe(c fyne.Canvas) *BarraSuite {
 		}
 	}
 	return nil
+}
+
+// RecolocarBarraSuite lo llama quien cambia lo que hay bajo la barra de la suite (un
+// hueco que pasa de «cargando» a la app, o de la app a un aviso): el montaje no se
+// vuelve a colocar solo, y en el teléfono tiene que decidir otra vez si la barra es
+// única. El paso a una app con barra ya lo avisa su armazón; el de vuelta, no. Sin
+// barra de la suite en ese lienzo, nada.
+func RecolocarBarraSuite(o fyne.CanvasObject) {
+	if b := barraSuiteDe(lienzoDe(o)); b != nil {
+		b.recolocarMontaje()
+	}
+}
+
+// recolocarMontaje vuelve a colocar lo que devolvió Montar, FUERA del Layout que lo
+// pide (el de un armazón de dentro): decide otra vez si la barra es única. Una vez por
+// vuelta del hilo de la interfaz, aunque lo pidan varios.
+func (b *BarraSuite) recolocarMontaje() {
+	c := b.montado
+	if c == nil || b.recolocando {
+		return
+	}
+	b.recolocando = true
+	fyne.Do(func() {
+		b.recolocando = false
+		if m, es := c.Layout.(*montaje); es {
+			m.Layout(c.Objects, c.Size())
+		}
+	})
 }
 
 // ContenidoMontado es lo que hay ahora mismo bajo la barra en lo que devolvió Montar: el
@@ -1020,7 +1046,6 @@ func (r *barraSuiteRenderer) layoutAncho(t fyne.Size, lado, y, desplaza, canalon
 	hueco := max(hasta-desde, 0)
 	ancho := min(AnchoBuscadorBarra, hueco)
 	r.b.buscador.colocar(desde+(hueco-ancho)/2, (AltoBarraSuite()-AltoCampo(CampoMD))/2, ancho, t)
-	r.b.atenderBusqueda()
 	r.pintarTitulo()
 }
 

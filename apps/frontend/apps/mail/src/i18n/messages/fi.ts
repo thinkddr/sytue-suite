@@ -958,4 +958,15 @@ export const fi: AppCatalog<typeof en> = {
     'Salattua postia, jota et enää saa auki, ei palauteta. Tästä lähtien postisi avautuu Sytue ID -kirjautumisellasi, joka voidaan pyytää toistamaan.',
   'privateMail.handoverUnderstood': 'Ymmärrän, että posti, jota en saa auki, menetetään',
   'privateMail.handoverConfirm': 'Tyhjennä ja siirrä holviin',
+  'privateMail.vaultMoveTitle': 'Siirrä postisi uuteen holviin',
+  'privateMail.vaultMoveBody':
+    'Postisi on salattu aiemmalla järjestelmällä. Jotta se avautuu Sytue ID -kirjautumisellasi kuten muutkin sovellukset, se on tyhjennettävä ja aloitettava alusta holvissa. Vain aiemmalla järjestelmällä salattu posti menetetään.',
+  'privateMail.vaultMoveUnderstood':
+    'Ymmärrän, että aiemmalla järjestelmällä salattu posti menetetään',
+  'privateMail.vaultMoveKeep': 'Jatka toistaiseksi aiemmalla postilla',
+  'privateMail.vaultMoveRetiredTitle': 'Siirrä postisi uuteen holviin, jotta saat sitä edelleen',
+  'privateMail.vaultMoveRetiredBody':
+    'Aiempi postijärjestelmä ei ole enää käytettävissä. Ennen kuin siirrät postisi holviin, et saa uutta postia: sillä välin saapuva posti säilytetään aiemmalla järjestelmällä salattuna, kuten jo saamasi posti, eikä sitä voi lukea. Sitä ei poisteta, mutta kukaan ei voi avata sitä. Siirron jälkeen posti alkaa taas tulla ja avautuu Sytue ID -kirjautumisellasi kuten muutkin sovellukset.',
+  'privateMail.vaultMoveCheckFailed':
+    'Postisi tilaa ei voitu tarkistaa. Yritä hetken kuluttua uudelleen.',
 };

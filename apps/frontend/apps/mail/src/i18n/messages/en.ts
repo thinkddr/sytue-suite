@@ -1019,4 +1019,9 @@ export const en = {
   'privateMail.vaultMoveUnderstood':
     'I understand that mail encrypted with the previous system will be lost',
   'privateMail.vaultMoveKeep': 'Keep using the previous mail for now',
+  'privateMail.vaultMoveRetiredTitle': 'Move your mail to the new vault to keep receiving it',
+  'privateMail.vaultMoveRetiredBody':
+    'The previous mail system is no longer available. Until you move your mail to the vault you will not receive new mail: anything that arrives in the meantime is kept encrypted with the previous system, like the mail you already had, and cannot be read. It is not deleted, but nobody will be able to open it. Once you move, mail reaches you again and opens with your Sytue ID sign-in, like the rest of the apps.',
+  'privateMail.vaultMoveCheckFailed':
+    'The state of your mail could not be checked. Try again in a moment.',
 } satisfies Record<string, MessageEntry>;

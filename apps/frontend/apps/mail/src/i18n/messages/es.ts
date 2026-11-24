@@ -1015,4 +1015,9 @@ export const es: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Entiendo que se perderá el correo cifrado con el sistema anterior',
   'privateMail.vaultMoveKeep': 'Seguir con el correo anterior por ahora',
+  'privateMail.vaultMoveRetiredTitle': 'Pasa tu correo a la nueva bóveda para seguir recibiéndolo',
+  'privateMail.vaultMoveRetiredBody':
+    'El sistema anterior del correo ya no está disponible. Hasta que pases tu correo a la bóveda no recibirás correo nuevo: lo que te llegue mientras tanto se guarda cifrado con el sistema anterior, igual que el correo que ya tenías, y no se podrá leer. No se borra, pero nadie podrá abrirlo. Al pasar, el correo vuelve a llegarte y se abre con tu inicio de sesión de Sytue ID, como el resto de las aplicaciones.',
+  'privateMail.vaultMoveCheckFailed':
+    'No se ha podido comprobar el estado de tu correo. Inténtalo de nuevo en un momento.',
 };

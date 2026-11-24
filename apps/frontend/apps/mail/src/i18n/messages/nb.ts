@@ -959,4 +959,10 @@ export const nb: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Jeg forstår at e-post kryptert med det forrige systemet går tapt',
   'privateMail.vaultMoveKeep': 'Fortsett med den forrige e-posten inntil videre',
+  'privateMail.vaultMoveRetiredTitle':
+    'Flytt e-posten din til det nye hvelvet for å fortsette å motta den',
+  'privateMail.vaultMoveRetiredBody':
+    'Det forrige e-postsystemet er ikke lenger tilgjengelig. Inntil du flytter e-posten din til hvelvet, mottar du ikke ny e-post: det som kommer i mellomtiden, lagres kryptert med det forrige systemet, slik som e-posten du allerede hadde, og kan ikke leses. Det slettes ikke, men ingen kan åpne det. Når du har flyttet, kommer e-posten frem igjen og åpnes med Sytue ID-påloggingen din, slik som de andre appene.',
+  'privateMail.vaultMoveCheckFailed':
+    'Statusen til e-posten din kunne ikke kontrolleres. Prøv igjen om et øyeblikk.',
 };

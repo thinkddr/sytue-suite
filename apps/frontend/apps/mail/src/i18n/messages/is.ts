@@ -962,4 +962,10 @@ export const is: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Ég skil að póstur sem er dulkóðaður með fyrra kerfinu glatast',
   'privateMail.vaultMoveKeep': 'Halda áfram með fyrri póstinn í bili',
+  'privateMail.vaultMoveRetiredTitle':
+    'Færðu póstinn þinn í nýju hvelfinguna til að halda áfram að fá hann',
+  'privateMail.vaultMoveRetiredBody':
+    'Fyrra póstkerfið er ekki lengur tiltækt. Þangað til þú færir póstinn þinn í hvelfinguna færðu engan nýjan póst: það sem berst á meðan er geymt dulkóðað með fyrra kerfinu, eins og pósturinn sem þú áttir fyrir, og ekki er hægt að lesa það. Því er ekki eytt, en enginn getur opnað það. Eftir flutninginn berst pósturinn aftur og opnast með Sytue ID-innskráningunni þinni, eins og hin forritin.',
+  'privateMail.vaultMoveCheckFailed':
+    'Ekki tókst að athuga stöðu póstsins þíns. Reyndu aftur eftir smástund.',
 };

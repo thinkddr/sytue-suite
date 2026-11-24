@@ -1004,4 +1004,10 @@ export const lv: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Saprotu, ka ar iepriekšējo sistēmu šifrētais pasts tiks zaudēts',
   'privateMail.vaultMoveKeep': 'Pagaidām turpināt ar iepriekšējo pastu',
+  'privateMail.vaultMoveRetiredTitle':
+    'Pārvietojiet pastu uz jauno glabātuvi, lai turpinātu to saņemt',
+  'privateMail.vaultMoveRetiredBody':
+    'Iepriekšējā pasta sistēma vairs nav pieejama. Kamēr nepārvietosiet pastu uz glabātuvi, jaunu pastu nesaņemsiet: tas, kas pienāk pa to laiku, tiek glabāts šifrēts ar iepriekšējo sistēmu tāpat kā jau esošais pasts, un to nevarēs izlasīt. Tas netiek dzēsts, bet neviens to nevarēs atvērt. Pēc pārvietošanas pasts atkal pienāk un atveras ar jūsu Sytue ID pieteikšanos tāpat kā pārējās lietotnes.',
+  'privateMail.vaultMoveCheckFailed':
+    'Neizdevās pārbaudīt jūsu pasta stāvokli. Mēģiniet vēlreiz pēc brīža.',
 };

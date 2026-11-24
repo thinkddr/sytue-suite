@@ -983,4 +983,10 @@ export const nl: AppCatalog<typeof en> = {
   'privateMail.vaultMoveUnderstood':
     'Ik begrijp dat e-mail die met het vorige systeem is versleuteld verloren gaat',
   'privateMail.vaultMoveKeep': 'Voorlopig de vorige e-mail blijven gebruiken',
+  'privateMail.vaultMoveRetiredTitle':
+    'Zet je e-mail over naar de nieuwe kluis om e-mail te blijven ontvangen',
+  'privateMail.vaultMoveRetiredBody':
+    'Het vorige e-mailsysteem is niet meer beschikbaar. Tot je je e-mail naar de kluis overzet, ontvang je geen nieuwe e-mail: wat in de tussentijd binnenkomt, wordt net als je bestaande e-mail versleuteld met het vorige systeem bewaard en kan niet worden gelezen. Het wordt niet verwijderd, maar niemand kan het openen. Na het overzetten komt je e-mail weer binnen en opent hij met je Sytue ID-aanmelding, net als de andere apps.',
+  'privateMail.vaultMoveCheckFailed':
+    'De status van je e-mail kon niet worden gecontroleerd. Probeer het zo meteen opnieuw.',
 };

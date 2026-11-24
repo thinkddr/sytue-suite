@@ -60,6 +60,11 @@ export function TraspasoBoveda({ locale, onConfirm }: { locale: Locale; onConfir
  * vaciándolo con confirmación (`onConfirm`), o seguir por ahora con el anterior
  * (`onKeep`). Sale antes de intentar abrir Matrix: no hace falta poder abrirlo
  * para empezar de nuevo en la bóveda.
+ *
+ * Sin `onKeep` es la de Matrix retirada (entrega 5: Rooms ya no la honra): no hay
+ * «seguir con el anterior», y el texto, antes de la casilla, dice que el sistema
+ * anterior ya no está, que hasta pasar no llega correo nuevo y que lo cifrado con
+ * él (también lo que llegue mientras tanto) se queda sin poderse leer.
  */
 export function PasarABoveda({
   locale,
@@ -68,19 +73,22 @@ export function PasarABoveda({
 }: {
   locale: Locale;
   onConfirm: () => void;
-  onKeep: () => void;
+  onKeep?: (() => void) | undefined;
 }) {
   const t = useT(locale);
   const [entendido, setEntendido] = useState(false);
+  const retirada = !onKeep;
   return (
     <section
       class="mx-auto flex w-full max-w-xl flex-col gap-4 px-6 py-10"
       aria-labelledby="pasar-a-boveda"
     >
       <h1 id="pasar-a-boveda" class="text-text text-xl font-semibold">
-        {t('privateMail.vaultMoveTitle')}
+        {t(retirada ? 'privateMail.vaultMoveRetiredTitle' : 'privateMail.vaultMoveTitle')}
       </h1>
-      <p class="text-text-muted text-sm">{t('privateMail.vaultMoveBody')}</p>
+      <p class="text-text-muted text-sm">
+        {t(retirada ? 'privateMail.vaultMoveRetiredBody' : 'privateMail.vaultMoveBody')}
+      </p>
       <Checkbox
         checked={entendido}
         onChange={(event) => setEntendido(event.currentTarget.checked)}
@@ -98,8 +106,29 @@ export function PasarABoveda({
         >
           {t('privateMail.handoverConfirm')}
         </Button>
-        <Button variant="secondary" onClick={onKeep}>
-          {t('privateMail.vaultMoveKeep')}
+        {onKeep ? (
+          <Button variant="secondary" onClick={onKeep}>
+            {t('privateMail.vaultMoveKeep')}
+          </Button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Ante la duda con Matrix retirada (ADR 0087, entrega 5): no se sabe dónde está el
+ * correo y Matrix ya no abriría, así que ni se abre Matrix ni se propone vaciar.
+ * Solo «Reintentar» (`onRetry`), que vuelve a preguntar a Rooms.
+ */
+export function CorreoSinComprobar({ locale, onRetry }: { locale: Locale; onRetry: () => void }) {
+  const t = useT(locale);
+  return (
+    <section class="mx-auto flex w-full max-w-xl flex-col gap-4 px-6 py-10" role="alert">
+      <p class="text-text text-sm">{t('privateMail.vaultMoveCheckFailed')}</p>
+      <div>
+        <Button variant="secondary" onClick={onRetry}>
+          {t('common.retry')}
         </Button>
       </div>
     </section>

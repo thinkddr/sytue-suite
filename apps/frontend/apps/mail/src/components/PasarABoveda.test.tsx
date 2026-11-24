@@ -20,7 +20,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-function pintar() {
+function pintar(retirada = false) {
   const llamadas = { vaciar: 0, seguir: 0 };
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -29,7 +29,7 @@ function pintar() {
       <PasarABoveda
         locale="en"
         onConfirm={() => void llamadas.vaciar++}
-        onKeep={() => void llamadas.seguir++}
+        onKeep={retirada ? undefined : () => void llamadas.seguir++}
       />,
       host,
     );
@@ -63,4 +63,25 @@ test('seguir con el correo anterior no vacía nada', () => {
   const { llamadas, boton } = pintar();
   act(() => boton(en['privateMail.vaultMoveKeep']).click());
   expect(llamadas).toEqual({ vaciar: 0, seguir: 1 });
+});
+
+// Matrix retirada en Rooms (ADR 0087, entrega 5): sin «seguir con el anterior», y
+// el texto dice, antes de la casilla, que el sistema anterior ya no está, que no
+// llega correo nuevo hasta pasar y que lo cifrado con él no se podrá leer.
+test('con Matrix retirada no se ofrece seguir con el anterior', () => {
+  const { host, llamadas, boton } = pintar(true);
+  expect(host.querySelector('h1')?.textContent).toBe(en['privateMail.vaultMoveRetiredTitle']);
+  expect(host.querySelector('p')?.textContent).toBe(en['privateMail.vaultMoveRetiredBody']);
+  expect(host.textContent).not.toContain(en['privateMail.vaultMoveBody']);
+  expect([...host.querySelectorAll('button')].map((b) => b.textContent?.trim())).toEqual([
+    en['privateMail.handoverConfirm'],
+  ]);
+  const casilla = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  expect(
+    host.querySelector('p')!.compareDocumentPosition(casilla) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(boton(en['privateMail.handoverConfirm']).disabled).toBe(true);
+  act(() => casilla.click());
+  act(() => boton(en['privateMail.handoverConfirm']).click());
+  expect(llamadas).toEqual({ vaciar: 1, seguir: 0 });
 });

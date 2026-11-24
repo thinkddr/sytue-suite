@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { describe, expect, test } from 'bun:test';
 import {
+  aprenderRetirada,
   correoSobreBoveda,
   destinoCorreo,
   elegirAlmacenCorreo,
@@ -54,6 +55,20 @@ describe('dónde vive el correo privado (ADR 0087)', () => {
     ).toBe('boveda');
   });
 
+  test('Matrix retirada en Rooms (entrega 5) → «retirada», distinta de cuenta nueva', async () => {
+    for (const body of [
+      { code: 'storage_matrix_retired' },
+      { error: { code: 'storage_matrix_retired' } },
+    ])
+      expect(await elegir(con(Response.json(body, { status: 409 })).fetchImpl)).toBe('retirada');
+    // El código con otro estado no es la retirada.
+    expect(
+      await elegir(
+        con(Response.json({ code: 'storage_matrix_retired' }, { status: 503 })).fetchImpl,
+      ),
+    ).toBe('dudoso');
+  });
+
   test('ante la duda, «dudoso»: ni bóveda ni propuesta de vaciar', async () => {
     expect(await elegir(con(Response.json({ code: 'otra' }, { status: 409 })).fetchImpl)).toBe(
       'dudoso',
@@ -94,6 +109,48 @@ describe('vaciar y pasar a la bóveda (ADR 0087)', () => {
     // Ante la duda no se propone vaciar: Matrix, el camino de siempre.
     expect(destinoCorreo('dudoso', false)).toBe('matrix');
     expect(destinoCorreo('dudoso', false, true)).toBe('matrix');
+  });
+
+  test('con Matrix retirada solo queda pasar, y la duda no abre Matrix', () => {
+    // Retirada: la pantalla sin «seguir», aunque en esta pestaña se eligiera seguir.
+    expect(destinoCorreo('retirada', false)).toBe('pasar');
+    expect(destinoCorreo('retirada', false, true)).toBe('pasar');
+    expect(destinoCorreo('retirada', false, true, true)).toBe('pasar');
+    // Un traspaso ya pedido sigue; la bóveda gana siempre.
+    expect(destinoCorreo('retirada', true)).toBe('traspaso');
+    expect(destinoCorreo('boveda', false, false, true)).toBe('boveda');
+    // La duda, sabiendo que Matrix está retirada: «Reintentar», nunca Matrix.
+    expect(destinoCorreo('dudoso', false, false, true)).toBe('reintentar');
+    expect(destinoCorreo('dudoso', false, true, true)).toBe('reintentar');
+    expect(destinoCorreo('dudoso', true, false, true)).toBe('traspaso');
+    // Sin la retirada, lo de antes, exactamente.
+    expect(destinoCorreo('dudoso', false, false, false)).toBe('matrix');
+    expect(destinoCorreo('matrix', false, false, false)).toBe('elegir');
+    expect(destinoCorreo('matrix', false, true, false)).toBe('matrix');
+  });
+
+  test('la retirada se aprende de Rooms: «retirada» la recuerda, «matrix» la olvida', () => {
+    const s = memoria();
+    expect(aprenderRetirada(s, 'user-1', 'acme', 'dudoso')).toBe(false);
+    expect(aprenderRetirada(s, 'user-1', 'acme', 'retirada')).toBe(true);
+    // La duda y la bóveda no la cambian.
+    expect(aprenderRetirada(s, 'user-1', 'acme', 'dudoso')).toBe(true);
+    expect(aprenderRetirada(s, 'user-1', 'acme', 'boveda')).toBe(true);
+    // Es de esta persona y organización.
+    expect(aprenderRetirada(s, 'user-2', 'acme', 'dudoso')).toBe(false);
+    expect(aprenderRetirada(s, 'user-1', 'otra', 'dudoso')).toBe(false);
+    // Una respuesta de Matrix (el conmutador de Rooms apagado) la olvida.
+    expect(aprenderRetirada(s, 'user-1', 'acme', 'matrix')).toBe(false);
+    expect(aprenderRetirada(s, 'user-1', 'acme', 'dudoso')).toBe(false);
+    // Sin almacén, o con uno roto, vale la respuesta de ahora.
+    const bloqueado = () => {
+      throw new Error('bloqueado');
+    };
+    const roto = { getItem: bloqueado, setItem: bloqueado, removeItem: bloqueado };
+    expect(aprenderRetirada(roto, 'user-1', 'acme', 'retirada')).toBe(true);
+    expect(aprenderRetirada(roto, 'user-1', 'acme', 'dudoso')).toBe(false);
+    expect(aprenderRetirada(undefined, 'user-1', 'acme', 'retirada')).toBe(true);
+    expect(aprenderRetirada(undefined, 'user-1', 'acme', 'dudoso')).toBe(false);
   });
 
   test('«seguir con el anterior» vale para esta persona y organización', () => {

@@ -1013,4 +1013,9 @@ export const cs: AppCatalog<typeof en> = {
     'Vaše pošta je zašifrovaná předchozím systémem. Aby se otevírala přihlášením do Sytue ID jako ostatní aplikace, je třeba ji vyprázdnit a začít znovu v trezoru. Pošta zašifrovaná jen předchozím systémem se ztratí.',
   'privateMail.vaultMoveUnderstood': 'Rozumím, že pošta zašifrovaná předchozím systémem se ztratí',
   'privateMail.vaultMoveKeep': 'Zatím pokračovat s předchozí poštou',
+  'privateMail.vaultMoveRetiredTitle': 'Přesuňte poštu do nového trezoru, abyste ji dál dostávali',
+  'privateMail.vaultMoveRetiredBody':
+    'Předchozí poštovní systém už není k dispozici. Dokud poštu nepřesunete do trezoru, nebude vám chodit nová pošta: co mezitím přijde, se uloží zašifrované předchozím systémem, stejně jako pošta, kterou už máte, a nepůjde přečíst. Nesmaže se, ale nikdo ji nebude moci otevřít. Po přesunu vám pošta zase začne chodit a bude se otevírat přihlášením do Sytue ID jako ostatní aplikace.',
+  'privateMail.vaultMoveCheckFailed':
+    'Stav vaší pošty se nepodařilo ověřit. Zkuste to za chvíli znovu.',
 };

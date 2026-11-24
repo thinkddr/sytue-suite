@@ -32,7 +32,7 @@ Website = "https://sytue.eu"
 # Sytue ID.
 [Development]
   esquema = "sytue-mail"
-  widget_acciones = "open,compose,search"
+  widget_acciones = "open,compose"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"
   # Abre ficheros del equipo que la persona elige (subir, adjuntar, importar, insertar): en

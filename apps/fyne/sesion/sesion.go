@@ -106,15 +106,13 @@ type Suite struct {
 	widgets widgetsSuite
 	// despertar es el registro de esta app en el Hub para el aviso silencioso de iOS
 	// (despertar.go).
-	despertar         despertarSuite
-	presencia         api.EstadoPresencia
-	mensaje           string
-	alCambiar         []func(Estado)
-	alAbrirURL        []func(*url.URL)
-	alBuscar          func()
-	busquedaPendiente bool
-	consentimiento    *autorizacionApp
-	matrixConsent     *matrixAuthorization
+	despertar      despertarSuite
+	presencia      api.EstadoPresencia
+	mensaje        string
+	alCambiar      []func(Estado)
+	alAbrirURL     []func(*url.URL)
+	consentimiento *autorizacionApp
+	matrixConsent  *matrixAuthorization
 	// alVolver y alFondo son los apuntados a la vida de la app (primerplano.go).
 	alVolver, alFondo []func()
 	sinDueno          []*url.URL // llegaron antes de Arrancar; los recibe cada receptor que se apunte hasta entonces
@@ -628,7 +626,7 @@ func (s *Suite) recibirURL(u *url.URL) {
 	if nativo, ok := api.DesdeLaWeb(s.apex, u); ok {
 		u = nativo
 	}
-	if s.recibirBusqueda(u) {
+	if s.esBusquedaAntigua(u) {
 		return
 	}
 	s.mu.Lock()

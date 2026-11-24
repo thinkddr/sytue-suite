@@ -6146,6 +6146,48 @@ the app already has the form; and that the Source of an account in Matrix reads 
 repository instead of the server's frozen source. Neither the Swift nor the widget Java has been
 compiled or tried on a device.
 
+**Enmienda (2026-11-24, segunda): formato 3, cada fila abre su elemento, acciones rápidas y el
+Drive privado.** Lo pendiente de la enmienda anterior, con la lista de Calendar como guía (dato
+viejo, puntos en vez de contenido, nada que tocar):
+
+1. **Formato 3: la ruta de cada fila.** `widgets.Item.Route` (`route`) es la ruta y la consulta
+   de un enlace del esquema de LA PROPIA app; el lector le antepone el esquema que tiene firmado
+   (`sytue-<producto>:`), así que no puede llevar a otra app, a la web ni a otra cuenta, y no es
+   un «enlace arbitrario» de los que este ADR descarta. Su forma (`widgets.ValidRoute`, igual en
+   Swift y en Java y con casos `ruta` en `testdata/contrato.tsv`): hasta 512 bytes, una sola
+   barra delante, ASCII sin reservar, `/?=&` y escapes `%XX`, sin el marcador de cifrado. Lleva
+   identificadores y, en Drive y CertiPDF, la ruta del fichero (que es como abren y cuyo nombre ya
+   es el título); nunca un token. Son las rutas que cada app ya atendía (`fuentes/rutas.go`): el
+   día del evento, la nota en su cuaderno, la ficha del contacto, el fichero o la carpeta de la
+   raíz de Drive, el documento de Docus/Calcus/Diapos, el PDF (y la petición de firma con copia),
+   la base, la lista de tareas del ERP (la tarea no tiene página), el álbum y la foto, el vídeo,
+   el canal y, en One, la actividad (la agenda, sin ruta). Mail sigue sin ruta: su Fuente la
+   cambia otra rama. En iOS cada fila de los tamaños mediano y mayores es un `Link`; en el
+   pequeño, Calendar abre el día del siguiente y el resto, con una sola fila, esa fila. En
+   Android cada fila es su imagen con su `PendingIntent`. `TestCadaFilaDelWidgetAbreSuElemento`
+   pasa la ruta de cada Fuente por el receptor de su app. Un snapshot 2 que siga en disco no se
+   enseña.
+2. **Acciones rápidas** (tabla igual en `generar.py`, `android-widgets.py`, `Snapshot.swift` y
+   `WidgetSnapshot.accionPermitida`): «Nuevo contacto» abre el formulario de Contacts, «Nueva
+   nota» pregunta en el cuaderno abierto antes de crear y «Añadir fotos» abre el selector del
+   sistema; con Mail («Redactar») y Calendar («Crear evento»), cinco. Ninguna escribe sin que la
+   persona confirme: el enlace lo abre cualquiera. Docus, Calcus y Diapos no tienen «Documento
+   nuevo»: su portada crea en el acto y falta la pregunta antes de crear.
+3. **Drive y CertiPDF.** Escriben en el Drive privado (bóveda o Matrix), que no pasa por HTTP:
+   `api.Drive.ConAviso`/`api.PDF.ConAviso` avisan al widget tras cada escritura con éxito. Y su
+   Fuente ya no lee la fuente del servidor, congelada: lee el Drive privado que la vista tiene
+   abierto (`fuentes.Privada`, `Suite.WidgetDesdeDrivePrivado`/`WidgetDesdePDFPrivado`), con la
+   cuota y las peticiones de firma del servicio. Sin él —iOS en segundo plano o el refresco sin
+   ventana de Android, que no tienen la clave— falla con `ErrSinDatosPrivados` y se conserva lo
+   último publicado, con su antigüedad: nunca lo congelado.
+4. **Sin datos**, el widget dice qué es la app y ofrece su acción (o «Abrir») en vez de quedarse
+   en blanco, en todos los tamaños.
+
+Pendiente: las apps de registros en Matrix (Calendar, Contacts, Notes, Photos, Bases, ERP, Cast y
+la ofimática) siguen leyendo para el widget la fuente del servidor, congelada; necesitan lo mismo
+que Drive, con su repositorio. «Documento nuevo» en la ofimática, con su pregunta. Ni Swift ni el
+Java de Android se han compilado de verdad (el Java, contra stubs) ni probado en un dispositivo.
+
 <a id="0079"></a>
 
 <a id="0079--sytue-notepads-sobre-papel-un-cromo-neutro-elegido-por-la-app"></a>

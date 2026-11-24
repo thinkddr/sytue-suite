@@ -110,8 +110,10 @@ func TestContratoComunConLosLectoresNativos(t *testing.T) {
 			// Una fila con una ruta inválida deja el snapshot entero sin enseñar, como
 			// cualquier otro campo fuera de su forma.
 			e := Entorno{Epoca: "e1", Confirmada: "m1", Marca: "m1"}
-			s := Snapshot{Version: Version, Product: "notes", Active: true, Generation: "e1",
-				UpdatedAt: 1792500000, ExpiresAt: 1792500120, Items: []Item{{Title: "x", Route: c[2]}}}
+			s := Snapshot{
+				Version: Version, Product: "notes", Active: true, Generation: "e1",
+				UpdatedAt: 1792500000, ExpiresAt: 1792500120, Items: []Item{{Title: "x", Route: c[2]}},
+			}
 			if got := s.Visible(e, time.Unix(1792500000, 0)); got != quiero {
 				t.Errorf("ruta «%s»: el snapshot visible=%v, el contrato dice %s", c[1], got, c[3])
 			}

@@ -28,17 +28,25 @@ func (driveEscrituras) Root(context.Context) (Folder, error) { return Folder{ID:
 func (driveEscrituras) Children(context.Context, string, string) (Children, error) {
 	return Children{}, nil
 }
+
 func (d driveEscrituras) CreateFolder(context.Context, string, string) (Folder, error) {
 	return Folder{ID: "c"}, d.fallar
 }
+
 func (d driveEscrituras) Upload(context.Context, string, string, string, io.Reader, int64) (File, error) {
 	return File{ID: "f"}, d.fallar
 }
+
 func (d driveEscrituras) Rename(context.Context, DriveKind, string, string) error { return d.fallar }
-func (d driveEscrituras) Move(context.Context, DriveKind, string, string) error   { return d.fallar }
-func (d driveEscrituras) Delete(context.Context, DriveKind, string) error         { return d.fallar }
-func (d driveEscrituras) Restore(context.Context, DriveKind, string) error        { return d.fallar }
-func (d driveEscrituras) CopyFile(context.Context, string) (File, error)          { return File{}, d.fallar }
+
+func (d driveEscrituras) Move(context.Context, DriveKind, string, string) error { return d.fallar }
+
+func (d driveEscrituras) Delete(context.Context, DriveKind, string) error { return d.fallar }
+
+func (d driveEscrituras) Restore(context.Context, DriveKind, string) error { return d.fallar }
+
+func (d driveEscrituras) CopyFile(context.Context, string) (File, error) { return File{}, d.fallar }
+
 func (d driveEscrituras) SetFavorite(context.Context, DriveKind, string, bool) error {
 	return d.fallar
 }

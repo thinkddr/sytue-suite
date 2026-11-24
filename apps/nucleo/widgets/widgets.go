@@ -309,7 +309,7 @@ func Ruta(camino string, pares ...string) string {
 	var b strings.Builder
 	b.WriteString(camino)
 	sep := "?"
-	for i := 0; i < len(pares); i += 2 {
+	for i := 0; i+1 < len(pares); i += 2 {
 		if pares[i+1] == "" {
 			continue
 		}

@@ -89,14 +89,20 @@ func TestCadaFilaLlevaLaRutaDeSuElemento(t *testing.T) {
 		items []widgets.Item
 		ruta  string
 	}{
-		"notes": {itemsDeNotas(api.Notebook{ID: "nb 1", Title: "P"}, []api.Note{{ID: "n1", Title: "Plan", UpdatedAt: ahora}}),
-			"/notebooks/nb%201?note=n1"},
+		"notes": {
+			itemsDeNotas(api.Notebook{ID: "nb 1", Title: "P"}, []api.Note{{ID: "n1", Title: "Plan", UpdatedAt: ahora}}),
+			"/notebooks/nb%201?note=n1",
+		},
 		"contacts":          {itemsDeContactos([]api.Contact{{ID: uuid, FormattedName: "Elena"}}), "/contacts/" + uuid},
 		"contacts sin uuid": {itemsDeContactos([]api.Contact{{ID: "c1", FormattedName: "Elena"}}), ""},
-		"drive carpeta": {itemsDeRaiz("es", api.Children{Folders: []api.Folder{{ID: "f", Name: "Q3 & Q4"}}}),
-			"/?path=%2FQ3%20%26%20Q4"},
-		"drive fichero": {itemsDeRaiz("es", api.Children{Files: []api.File{{ID: "a", Name: "ñ.pdf", SizeBytes: 1}}}),
-			"/?preview=%2F%C3%B1.pdf"},
+		"drive carpeta": {
+			itemsDeRaiz("es", api.Children{Folders: []api.Folder{{ID: "f", Name: "Q3 & Q4"}}}),
+			"/?path=%2FQ3%20%26%20Q4",
+		},
+		"drive fichero": {
+			itemsDeRaiz("es", api.Children{Files: []api.File{{ID: "a", Name: "ñ.pdf", SizeBytes: 1}}}),
+			"/?preview=%2F%C3%B1.pdf",
+		},
 		"pdf":          {itemsDePDF([]api.File{{ID: "a", Name: "Contrato.pdf"}}), "/pdf?path=%2FPDF%2FContrato.pdf"},
 		"cast":         {itemsDeCast(nil, []api.CastVideo{{ID: "v1", Title: "Demo"}}, nil), "/watch/v1"},
 		"rooms":        {detalleRooms([]api.RoomsChannel{{ID: "!c1:sytue.eu", Kind: "public", Name: "general"}}, nil, true).Items, "/channels/%21c1%3Asytue.eu"},

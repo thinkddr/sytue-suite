@@ -26,9 +26,11 @@ type drivePrivadoDePrueba struct {
 func (drivePrivadoDePrueba) PrivateStorageScope() storage.Scope {
 	return storage.Scope{Tenant: "org", Subject: "ana", Product: "drive"}
 }
+
 func (drivePrivadoDePrueba) Root(context.Context) (api.Folder, error) {
 	return api.Folder{ID: "raiz"}, nil
 }
+
 func (d drivePrivadoDePrueba) Children(context.Context, string, string) (api.Children, error) {
 	return api.Children{Files: []api.File{{ID: "f", Name: d.nombre, SizeBytes: 1}}}, nil
 }

@@ -6096,55 +6096,55 @@ phone: here there is no Android SDK or NDK, so the Java has been compiled agains
 Android 16 framework (Robolectric's `android-all`) and the C entry point against the
 JDK's `jni.h`, but neither the APK nor the Android `.so` has been built.
 
-**Enmienda (2026-11-24): «siguen sin actualizarse», el refresco continuo, Calendar con título y
-hora, y fuera «Buscar».** El dueño: tras crear un evento en Calendar nativo, el widget no lo
-enseñaba; los widgets deben seguir al día con la app al fondo; Calendar solo enseñaba puntos; y
-los widgets de «Buscar» no aportan.
+**Amendment (2026-11-24): "still not updating", continuous refresh, Calendar with title and
+time, and no more "Search".** The owner: after creating an event in native Calendar, the widget
+did not show it; widgets must stay up to date with the app in the background; Calendar only showed
+dots; and the "Search" widgets add no value.
 
-1. **La causa: las escrituras por la API no avisaban.** Desde que las apps de registros montan
-   su vista sobre la API con la fuente en `legacy` ([0086](#0086)), el cliente del campo `API`
-   de `cifrado.AplicacionRegistros` se construía sin `Suite.ClienteConAviso` (solo Rooms lo
-   pasaba). Ninguna escritura llamaba a `AvisarEscritura`, el Publicador quedaba limpio y al
-   pasar al fondo `PublicarPendiente` no tenía nada que publicar. Ahora lo pasan calendar,
-   contacts, notes, erp, bases, cast, hub, docus, calcus, diapos y photos, y
-   `TestLasVistasPorLaAPIAvisanAlWidget` lo exige a cada `cmd` (excepciones con su porqué:
-   drive y certipdf escriben en el Drive privado; mail publica con su vivo).
-2. **Qué es «continuo».** Con la app abierta: tras cada escritura (antirrebote de 1,5 s, como
-   mucho una ronda cada 30 s), con la señal `datos` del servidor, el vivo de Mail y Rooms, al
-   volver a primer plano y al recuperar la red; al pasar al fondo, lo pendiente en el acto.
-   Con la app al fondo o cerrada, **cada 15 min como mínimo, cuando el sistema lo deja**: la
-   tarea de refresco de iOS se pide cada 15 min (antes 30) y el trabajo periódico de Android va
-   cada 15 min con 5 de holgura (antes cada hora), los mínimos de cada plataforma; además, el
-   aviso silencioso (iOS) y el relevo de One (Android) siguen despertando la app con cada
-   cambio. iOS reparte las tareas según el uso y el presupuesto, no corre con el teléfono
-   bloqueado (protección de datos) ni tras cerrar la app a mano en el multitarea, y Doze junta
-   los trabajos de Android en sus ventanas de mantenimiento: es lo más que dejan, no un reloj.
-   La línea de tiempo de WidgetKit pasa de `.atEnd` (hasta 24 h) a **releer el fichero a los
-   15 min** (`SytueWidgetTimeline.reread`): una recarga pedida desde el fondo puede quedarse sin
-   presupuesto, y lo publicado por la tarea de refresco no se veía. La extensión sigue sin red,
-   sin Keychain y sin sesión: el descarte de «leer desde la extensión con su propia sesión»
-   sigue en pie; quien lee es la app, despertada en segundo plano.
-   `TestLosRefrescosDelWidgetVanAlMismoRitmo` ata las tres cadencias.
-3. **Calendar enseña lo próximo con título y hora.** Los datos ya iban en el snapshot (título,
-   lugar, inicio, fin, día completo, desde la ampliación del 2026-11-01): era la maqueta. En el
-   pequeño la rejilla del mes se comía el alto; ahora enseña el día y los dos próximos eventos
-   con su hora (la rejilla, si no hay nada próximo), y Android, en su pequeño, los eventos en vez
-   de la rejilla. Cada fila de iOS (mediano y mayores) es un enlace a **su día**,
-   `sytue-calendar:/?date=AAAA-MM-DD` (`&all_day=1` en los de día completo): solo la fecha, nada
-   del evento; el pequeño y la pantalla de bloqueo abren el día del siguiente. La pantalla de
-   bloqueo dice título y hora. Los títulos de una cuenta en Matrix no llegan al widget: su Fuente
-   lee del servidor (más abajo).
-4. **Sin widgets de «Buscar».** Fuera `SytueSearchWidget`, su ruta y su rótulo, el botón del
-   widget de Android y `search` de los `FyneApp.toml`; `generar.py` y `android-widgets.py`
-   ignoran un `search` que siga declarado (Mail, que cambia en otra rama). La entrada de Go que
-   atendía `?action=search` (`Suite.AlBuscar`, `ui/barrabusqueda_widget.go`) se queda sin quien
-   la llame hasta quitarla junto a su enganche en la barra.
+1. **The cause: writes through the API did not notify.** Since the record apps mount their view
+   on the API with the source in `legacy` ([0086](#0086)), the client of the `API` field of
+   `cifrado.AplicacionRegistros` was built without `Suite.ClienteConAviso` (only Rooms passed
+   it). No write called `AvisarEscritura`, the Publisher stayed clean, and on going to the
+   background `PublicarPendiente` had nothing to publish. Now calendar, contacts, notes, erp,
+   bases, cast, hub, docus, calcus, diapos and photos pass it, and
+   `TestLasVistasPorLaAPIAvisanAlWidget` requires it of every `cmd` (exceptions with their
+   reason: drive and certipdf write to the private Drive; mail publishes through its live link).
+2. **What "continuous" means.** With the app open: after every write (1.5 s debounce, at most one
+   round every 30 s), on the server's `datos` signal, on Mail's and Rooms' live updates, on
+   returning to the foreground and on regaining the network; on going to the background, whatever
+   is pending right away. With the app in the background or closed, **every 15 min at least, when
+   the system allows it**: the iOS refresh task is requested every 15 min (before, 30) and the
+   Android periodic job runs every 15 min with 5 of flex (before, hourly), each platform's minimum;
+   the silent push (iOS) and One's relay (Android) still wake the app on every change. iOS
+   schedules tasks by usage and budget, does not run them with the phone locked (data
+   protection) or after the app is force-quit from the switcher, and Doze batches Android jobs
+   into its maintenance windows: it is the most they allow, not a clock. The WidgetKit timeline
+   goes from `.atEnd` (up to 24 h) to **re-reading the file after 15 min**
+   (`SytueWidgetTimeline.reread`): a reload requested from the background can run out of budget,
+   and what the refresh task published was not shown. The extension still has no network, no
+   Keychain and no session: the rejection of "reading from the extension with its own session"
+   stands; the reader is the app, woken in the background.
+   `TestLosRefrescosDelWidgetVanAlMismoRitmo` ties the three cadences together.
+3. **Calendar shows what is coming with title and time.** The data was already in the snapshot
+   (title, location, start, end, all-day, since the 2026-11-01 extension): it was the layout. In
+   the small family the month grid took the whole height; now it shows the day and the next two
+   events with their time (the grid, if nothing is coming), and Android, in its small size, the
+   events instead of the grid. Each iOS row (medium and larger) links to **its day**,
+   `sytue-calendar:/?date=YYYY-MM-DD` (`&all_day=1` for all-day events): only the date, nothing
+   about the event; the small family and the lock screen open the next event's day. The lock
+   screen shows title and time. Titles of an account in Matrix do not reach the widget: its Source
+   reads from the server (below).
+4. **No "Search" widgets.** Removed `SytueSearchWidget`, its route and its label, the Android
+   widget button and `search` from the `FyneApp.toml` files; `generar.py` and
+   `android-widgets.py` ignore a `search` still declared. The Go entry that handled
+   `?action=search` (`Suite.AlBuscar`, `ui/barrabusqueda_widget.go`) and its hook in the suite
+   bar are removed too; an old widget that still sends the action just opens the app.
 
-Pendiente: una ruta opaca por elemento en el snapshot (formato 3) para que cada fila de Mail,
-Notes, Contacts, Drive y el resto abra ESE elemento, y acciones nuevas («nota nueva»,
-«contacto nuevo») donde la app ya tenga el formulario; y que la Fuente de una cuenta en Matrix
-lea su repositorio privado en vez de la fuente congelada del servidor. Ni Swift ni el Java del
-widget se han compilado ni probado en un dispositivo.
+Pending: an opaque route per item in the snapshot (format 3) so that each row of Mail, Notes,
+Contacts, Drive and the rest opens THAT item, and new actions ("new note", "new contact") where
+the app already has the form; and that the Source of an account in Matrix reads its private
+repository instead of the server's frozen source. Neither the Swift nor the widget Java has been
+compiled or tried on a device.
 
 <a id="0079"></a>
 

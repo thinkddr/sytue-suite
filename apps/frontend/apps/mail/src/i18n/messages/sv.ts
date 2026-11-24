@@ -961,4 +961,10 @@ export const sv: AppCatalog<typeof en> = {
     'Krypterad e-post som du inte längre kan öppna återställs inte. Från och med nu öppnas din e-post med din Sytue ID-inloggning, som du kan behöva upprepa.',
   'privateMail.handoverUnderstood': 'Jag förstår att e-posten jag inte kan öppna går förlorad',
   'privateMail.handoverConfirm': 'Töm och flytta till valvet',
+  'privateMail.vaultMoveTitle': 'Flytta din e-post till det nya valvet',
+  'privateMail.vaultMoveBody':
+    'Din e-post är krypterad med det tidigare systemet. För att den ska öppnas med din Sytue ID-inloggning, som de andra apparna, måste den tömmas och börja om i valvet. E-post som bara var krypterad med det tidigare systemet går förlorad.',
+  'privateMail.vaultMoveUnderstood':
+    'Jag förstår att e-post som krypterats med det tidigare systemet går förlorad',
+  'privateMail.vaultMoveKeep': 'Fortsätt med den tidigare e-posten tills vidare',
 };

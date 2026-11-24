@@ -1034,4 +1034,10 @@ export const fr: AppCatalog<typeof en> = {
   'privateMail.handoverUnderstood':
     'Je comprends que le courrier que je ne peux pas ouvrir sera perdu',
   'privateMail.handoverConfirm': 'Vider et passer au coffre',
+  'privateMail.vaultMoveTitle': 'Passez votre messagerie au nouveau coffre',
+  'privateMail.vaultMoveBody':
+    "Votre messagerie est chiffrée avec l'ancien système. Pour qu'elle s'ouvre avec votre connexion Sytue ID, comme les autres applications, il faut la vider et repartir de zéro dans le coffre. Les messages chiffrés uniquement avec l'ancien système seront perdus.",
+  'privateMail.vaultMoveUnderstood':
+    "Je comprends que les messages chiffrés avec l'ancien système seront perdus",
+  'privateMail.vaultMoveKeep': "Continuer avec l'ancienne messagerie pour l'instant",
 };

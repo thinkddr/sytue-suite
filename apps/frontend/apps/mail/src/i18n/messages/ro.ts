@@ -1010,4 +1010,10 @@ export const ro: AppCatalog<typeof en> = {
     'Poșta criptată pe care nu o mai poți deschide nu va fi recuperată. De acum, poșta ta se deschide cu autentificarea în Sytue ID, pe care s-ar putea să trebuiască să o repeți.',
   'privateMail.handoverUnderstood': 'Înțeleg că poșta pe care nu o pot deschide se va pierde',
   'privateMail.handoverConfirm': 'Golește și mută în seif',
+  'privateMail.vaultMoveTitle': 'Mută-ți corespondența în noul seif',
+  'privateMail.vaultMoveBody':
+    'Corespondența ta este criptată cu sistemul anterior. Pentru a se deschide cu autentificarea Sytue ID, ca restul aplicațiilor, trebuie golită și reluată de la zero în seif. Corespondența criptată doar cu sistemul anterior se va pierde.',
+  'privateMail.vaultMoveUnderstood':
+    'Înțeleg că se va pierde corespondența criptată cu sistemul anterior',
+  'privateMail.vaultMoveKeep': 'Continuă deocamdată cu corespondența anterioară',
 };

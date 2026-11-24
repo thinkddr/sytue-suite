@@ -237,6 +237,11 @@ apps:
     path: /mail
     clientId: sytue-mail
     tlsSecret: tls-mail-sytue-eu
+    # Mail en la bóveda directa, como el resto de las apps (ADR 0087): las cuentas
+    # nuevas abren en la bóveda, y a quien tiene el correo cifrado con Matrix se le
+    # ofrece vaciarlo y pasarlo a la bóveda. Sin esta variable, todo por Matrix.
+    env:
+      SYTUE_MAIL_BOVEDA: activado
     enabled: true
   # Hosts compartidos con el backend Go (mismo subdominio): se reutiliza un UNICO
   # secret TLS por host (un solo Certificate cert-manager). El SPA sirve "/" y el

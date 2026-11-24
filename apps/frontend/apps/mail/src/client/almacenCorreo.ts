@@ -5,15 +5,17 @@
  * Rooms, que tiene UNA por ámbito:
  *
  * - de la bóveda (identidad `…:sytue-vault`) → bóveda;
- * - de Matrix → Matrix: quien ya abre su correo por Matrix sigue igual;
+ * - de Matrix → `matrix`: su correo está cifrado con el sistema anterior, y se le
+ *   ofrece pasarlo a la bóveda (vaciándolo) o seguir por Matrix;
  * - ninguna todavía (`storage_root_enrollment_required`) → cuenta nueva → bóveda.
  *
- * Ante cualquier otra respuesta, Matrix: es el camino de siempre, y elegir la
- * bóveda sin saberlo podría dejar a alguien sin abrir el correo que ya tiene.
+ * Ante cualquier otra respuesta, `dudoso`: se va por Matrix, el camino de siempre,
+ * sin ofrecer vaciar nada. Elegir la bóveda (o proponer vaciar) sin saber qué hay
+ * podría dejar a alguien sin el correo que ya tiene.
  */
 import { encodeStorageScopeHeader, storageScopeHeader } from '@sytue/config/matrix';
 
-export type AlmacenCorreo = 'boveda' | 'matrix';
+export type AlmacenCorreo = 'boveda' | 'matrix' | 'dudoso';
 
 /** El conmutador de despliegue (variable del BFF de Mail, apagada por defecto). */
 export function correoSobreBoveda(valor: string | undefined): boolean {
@@ -27,7 +29,7 @@ export async function elegirAlmacenCorreo(options: {
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
 }): Promise<AlmacenCorreo> {
-  if (!options.tenant) return 'matrix';
+  if (!options.tenant) return 'dudoso';
   const f = options.fetchImpl ?? fetch;
   const base =
     !options.basePath || options.basePath === '/' ? '' : options.basePath.replace(/\/+$/, '');
@@ -47,7 +49,7 @@ export async function elegirAlmacenCorreo(options: {
     });
   } catch {
     options.signal?.throwIfAborted();
-    return 'matrix';
+    return 'dudoso';
   }
   const body = (await res.json().catch(() => null)) as {
     user_id?: unknown;
@@ -55,31 +57,38 @@ export async function elegirAlmacenCorreo(options: {
     error?: { code?: unknown };
   } | null;
   if (res.ok) {
-    return typeof body?.user_id === 'string' && body.user_id.endsWith(':sytue-vault')
-      ? 'boveda'
-      : 'matrix';
+    if (typeof body?.user_id !== 'string' || body.user_id === '') return 'dudoso';
+    return body.user_id.endsWith(':sytue-vault') ? 'boveda' : 'matrix';
   }
   const code = body?.code ?? body?.error?.code;
   if (res.status === 409 && code === 'storage_root_enrollment_required') return 'boveda';
-  return 'matrix';
+  return 'dudoso';
 }
 
 /**
- * El traspaso del correo de Matrix a la bóveda (ADR 0087) para quien no puede
- * abrir su correo de Matrix: «vaciar y pasar a la bóveda», con confirmación.
+ * El traspaso del correo de Matrix a la bóveda (ADR 0087): «vaciar y pasar a la
+ * bóveda», con confirmación, tanto si el correo de Matrix abre como si no.
  *
- * - `matrix` con un traspaso pedido en esta pestaña → `traspaso`: se abre una
- *   bóveda NUEVA (`PqVault.reset`) y su clave se registra con la marca de
- *   traspaso, que Sytue ID solo acepta con identificación reciente. Si pide volver
- *   a entrar, la marca sobrevive a la vuelta en `sessionStorage` (esta pestaña).
  * - `boveda` gana SIEMPRE: con el traspaso hecho (o sin Matrix) se abre la bóveda
  *   que hay, nunca se vacía otra vez, y la marca se olvida.
+ * - Con un traspaso pedido en esta pestaña → `traspaso`: se abre una bóveda NUEVA
+ *   (`PqVault.reset`) y su clave se registra con la marca de traspaso, que Sytue
+ *   ID solo acepta con identificación reciente. Si pide volver a entrar, la marca
+ *   sobrevive a la vuelta en `sessionStorage` (esta pestaña).
+ * - `matrix` (autoridad de Matrix confirmada) → `elegir`: la pantalla que ofrece
+ *   pasar el correo a la bóveda o seguir por ahora con el anterior (`seguir`).
+ * - `dudoso` → `matrix`: el camino de siempre, sin proponer vaciar.
  */
-export type DestinoCorreo = AlmacenCorreo | 'traspaso';
+export type DestinoCorreo = 'boveda' | 'matrix' | 'traspaso' | 'elegir';
 
-export function destinoCorreo(elegido: AlmacenCorreo, traspasoPedido: boolean): DestinoCorreo {
+export function destinoCorreo(
+  elegido: AlmacenCorreo,
+  traspasoPedido: boolean,
+  seguirConMatrix = false,
+): DestinoCorreo {
   if (elegido === 'boveda') return 'boveda';
-  return traspasoPedido ? 'traspaso' : 'matrix';
+  if (traspasoPedido) return 'traspaso';
+  return elegido === 'matrix' && !seguirConMatrix ? 'elegir' : 'matrix';
 }
 
 type Almacen = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -122,6 +131,38 @@ export function olvidarTraspaso(
     almacen?.removeItem(claveTraspaso(actor, tenant));
   } catch {
     /* Nada que olvidar. */
+  }
+}
+
+function claveSeguir(actor: string, tenant: string | undefined): string {
+  return `sytue.mail.seguirMatrix:${tenant ?? ''}:${actor}`;
+}
+
+/**
+ * «Seguir con el correo anterior por ahora»: en esta pestaña no se vuelve a
+ * proponer pasar a la bóveda. En otra pestaña, o tras cerrar el navegador, sí.
+ */
+export function seguirConMatrix(
+  almacen: Almacen | undefined,
+  actor: string,
+  tenant: string | undefined,
+): void {
+  try {
+    almacen?.setItem(claveSeguir(actor, tenant), '1');
+  } catch {
+    /* Sin almacén, la elección vale para esta vista. */
+  }
+}
+
+export function quiereSeguirConMatrix(
+  almacen: Almacen | undefined,
+  actor: string,
+  tenant: string | undefined,
+): boolean {
+  try {
+    return almacen?.getItem(claveSeguir(actor, tenant)) === '1';
+  } catch {
+    return false;
   }
 }
 

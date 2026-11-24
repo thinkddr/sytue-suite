@@ -1009,4 +1009,10 @@ export const es: AppCatalog<typeof en> = {
     'El correo cifrado que ya no puedes abrir no se recupera. A partir de ahora tu correo se abre con tu inicio de sesión de Sytue ID, que puede que tengas que repetir.',
   'privateMail.handoverUnderstood': 'Entiendo que se perderá el correo que no puedo abrir',
   'privateMail.handoverConfirm': 'Vaciar y pasar a la bóveda',
+  'privateMail.vaultMoveTitle': 'Pasa tu correo a la nueva bóveda',
+  'privateMail.vaultMoveBody':
+    'Tu correo está cifrado con el sistema anterior. Para que se abra con tu inicio de sesión de Sytue ID, como el resto de las aplicaciones, hay que vaciarlo y empezar de nuevo en la bóveda. El correo que solo estaba cifrado con el sistema anterior se perderá.',
+  'privateMail.vaultMoveUnderstood':
+    'Entiendo que se perderá el correo cifrado con el sistema anterior',
+  'privateMail.vaultMoveKeep': 'Seguir con el correo anterior por ahora',
 };

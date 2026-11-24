@@ -1017,4 +1017,10 @@ export const lt: AppCatalog<typeof en> = {
     'Šifruotas paštas, kurio nebegalite atidaryti, nebus atkurtas. Nuo šiol jūsų paštas atsidaro prisijungus prie Sytue ID, ir gali tekti prisijungti dar kartą.',
   'privateMail.handoverUnderstood': 'Suprantu, kad paštas, kurio negaliu atidaryti, bus prarastas',
   'privateMail.handoverConfirm': 'Ištuštinti ir perkelti į saugyklą',
+  'privateMail.vaultMoveTitle': 'Perkelkite paštą į naują saugyklą',
+  'privateMail.vaultMoveBody':
+    'Jūsų paštas užšifruotas ankstesne sistema. Kad jis atsidarytų prisijungus prie Sytue ID kaip ir kitos programos, jį reikia ištuštinti ir pradėti iš naujo saugykloje. Paštas, užšifruotas tik ankstesne sistema, bus prarastas.',
+  'privateMail.vaultMoveUnderstood':
+    'Suprantu, kad ankstesne sistema užšifruotas paštas bus prarastas',
+  'privateMail.vaultMoveKeep': 'Kol kas tęsti su ankstesniu paštu',
 };

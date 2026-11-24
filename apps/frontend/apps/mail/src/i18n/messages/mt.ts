@@ -1015,4 +1015,9 @@ export const mt: AppCatalog<typeof en> = {
     'Il-posta kriptata li ma tistax tibqa’ tiftaħ mhux se tiġi rkuprata. Minn issa ’l quddiem il-posta tiegħek tinfetaħ bil-login tiegħek ta’ Sytue ID, li jista’ jkollok terġa’ tagħmel.',
   'privateMail.handoverUnderstood': 'Nifhem li l-posta li ma nistax niftaħ se tintilef',
   'privateMail.handoverConfirm': 'Battal u ċċaqlaq għall-kaxxa-forti',
+  'privateMail.vaultMoveTitle': 'Ittrasferixxi l-posta tiegħek fil-kaxxaforti l-ġdida',
+  'privateMail.vaultMoveBody':
+    "Il-posta tiegħek hija kriptata bis-sistema ta' qabel. Biex tinfetaħ bil-login ta' Sytue ID tiegħek, bħall-bqija tal-apps, trid titbattal u tibda mill-ġdid fil-kaxxaforti. Il-posta li kienet kriptata biss bis-sistema ta' qabel se tintilef.",
+  'privateMail.vaultMoveUnderstood': "Nifhem li l-posta kriptata bis-sistema ta' qabel se tintilef",
+  'privateMail.vaultMoveKeep': "Kompli bil-posta ta' qabel għalissa",
 };

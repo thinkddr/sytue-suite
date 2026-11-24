@@ -1011,4 +1011,10 @@ export const sl: AppCatalog<typeof en> = {
     'Šifrirane pošte, ki je ne morete več odpreti, ni mogoče obnoviti. Odslej se vaša pošta odpira s prijavo v Sytue ID, ki jo boste morda morali ponoviti.',
   'privateMail.handoverUnderstood': 'Razumem, da bo pošta, ki je ne morem odpreti, izgubljena',
   'privateMail.handoverConfirm': 'Izprazni in prestavi v trezor',
+  'privateMail.vaultMoveTitle': 'Premaknite pošto v novi trezor',
+  'privateMail.vaultMoveBody':
+    'Vaša pošta je šifrirana s prejšnjim sistemom. Da se bo odpirala s prijavo v Sytue ID kot ostale aplikacije, jo je treba izprazniti in začeti znova v trezorju. Pošta, šifrirana samo s prejšnjim sistemom, bo izgubljena.',
+  'privateMail.vaultMoveUnderstood':
+    'Razumem, da bo pošta, šifrirana s prejšnjim sistemom, izgubljena',
+  'privateMail.vaultMoveKeep': 'Zaenkrat nadaljuj s prejšnjo pošto',
 };

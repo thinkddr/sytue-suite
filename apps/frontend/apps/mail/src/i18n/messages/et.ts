@@ -950,4 +950,9 @@ export const et: AppCatalog<typeof en> = {
     'Krüptitud posti, mida sa enam avada ei saa, ei taastata. Nüüdsest avaneb sinu post Sytue ID sisselogimisega, mida võidakse paluda korrata.',
   'privateMail.handoverUnderstood': 'Saan aru, et post, mida ma avada ei saa, läheb kaotsi',
   'privateMail.handoverConfirm': 'Tühjenda ja vii hoidlasse',
+  'privateMail.vaultMoveTitle': 'Vii oma post uude hoidlasse',
+  'privateMail.vaultMoveBody':
+    'Sinu post on krüptitud eelmise süsteemiga. Et see avaneks nagu teised rakendused sinu Sytue ID sisselogimisega, tuleb see tühjendada ja hoidlas uuesti alustada. Post, mis oli krüptitud ainult eelmise süsteemiga, läheb kaotsi.',
+  'privateMail.vaultMoveUnderstood': 'Saan aru, et eelmise süsteemiga krüptitud post läheb kaotsi',
+  'privateMail.vaultMoveKeep': 'Jätka praegu eelmise postiga',
 };

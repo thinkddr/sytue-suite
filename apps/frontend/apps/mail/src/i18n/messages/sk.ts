@@ -1009,4 +1009,10 @@ export const sk: AppCatalog<typeof en> = {
     'Šifrovanú poštu, ktorú už nemôžete otvoriť, nie je možné obnoviť. Odteraz sa vaša pošta otvára prihlásením do Sytue ID, ktoré možno budete musieť zopakovať.',
   'privateMail.handoverUnderstood': 'Rozumiem, že pošta, ktorú nemôžem otvoriť, sa stratí',
   'privateMail.handoverConfirm': 'Vyprázdniť a presunúť do trezoru',
+  'privateMail.vaultMoveTitle': 'Presuňte poštu do nového trezoru',
+  'privateMail.vaultMoveBody':
+    'Vaša pošta je zašifrovaná predchádzajúcim systémom. Aby sa otvárala prihlásením do Sytue ID ako ostatné aplikácie, treba ju vyprázdniť a začať odznova v trezore. Pošta zašifrovaná len predchádzajúcim systémom sa stratí.',
+  'privateMail.vaultMoveUnderstood':
+    'Rozumiem, že pošta zašifrovaná predchádzajúcim systémom sa stratí',
+  'privateMail.vaultMoveKeep': 'Zatiaľ pokračovať s predchádzajúcou poštou',
 };

@@ -118,6 +118,7 @@ func main() {
 			})
 			slot.Objects = []fyne.CanvasObject{view}
 			slot.Refresh()
+			ui.RecolocarBarraSuite(slot)
 		}
 	}
 	control = &drivePrivado{
@@ -139,6 +140,7 @@ func main() {
 				slot.Objects = []fyne.CanvasObject{view}
 			}
 			slot.Refresh()
+			ui.RecolocarBarraSuite(slot)
 		},
 		montar: func(ctx context.Context, repo repositorioPrivado) (*drive.Pantalla, error) {
 			bound, err := cifrado.SessionHTTP(ctx)
@@ -179,6 +181,7 @@ func main() {
 			montarSelector(w, screen)
 			slot.Objects = []fyne.CanvasObject{screen.Objeto()} //nolint:contextcheck // UI callbacks use screen.Vida, already bound to ctx.
 			slot.Refresh()
+			ui.RecolocarBarraSuite(slot)
 			go func() {
 				if runtime.GOOS == "ios" && sistema.ArchivosDisponible() {
 					return
@@ -428,6 +431,7 @@ func main() {
 			if control.pantalla == nil {
 				slot.Objects = []fyne.CanvasObject{puerta.Objeto()}
 				slot.Refresh()
+				ui.RecolocarBarraSuite(slot)
 			}
 		}
 		control.reintentar = func() { //nolint:contextcheck // Reintentar usa la vida de la puerta, atada a ctx en Iniciar.

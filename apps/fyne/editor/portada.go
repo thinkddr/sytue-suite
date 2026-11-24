@@ -178,6 +178,7 @@ func (p *Portada) AbrirPapelera() {
 	p.papelera = x
 	p.raiz.Objects = []fyne.CanvasObject{x.Objeto()}
 	p.raiz.Refresh()
+	ui.RecolocarBarraSuite(p.raiz)
 	x.Cargar()
 }
 
@@ -189,6 +190,7 @@ func (p *Portada) CerrarPapelera() {
 	p.papelera = nil
 	p.raiz.Objects = []fyne.CanvasObject{p.vista}
 	p.raiz.Refresh()
+	ui.RecolocarBarraSuite(p.raiz)
 	p.Cargar()
 }
 

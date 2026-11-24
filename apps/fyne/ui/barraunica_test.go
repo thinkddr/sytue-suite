@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -192,4 +193,69 @@ func traductorEs(t *testing.T) *i18n.Translator {
 		t.Fatal(err)
 	}
 	return tr
+}
+
+// La app que llega DESPUÉS de montar la barra (las de registros esperan a saber si van
+// por la API o por Matrix, y Calendar se monta entonces dentro de su hueco) también va
+// en la barra única: el montaje no vuelve a colocarse solo al cambiar lo de dentro, y la
+// barra de la app se quedaba debajo de la de la suite, dos barras apiladas.
+//
+// VISTO EN ROJO sin el aviso de `prepararBarraMovil` al montaje: la móvil queda en y=60.
+func TestLaBarraUnicaConLaAppMontadaDespues(t *testing.T) {
+	defer TactilDePrueba(true)()
+	hueco := container.NewStack(NuevoVacio("Cargando", ""))
+	b, parar := BarraSuiteDePrueba(traductorPrueba(t), iconos.Calendar)
+	t.Cleanup(parar)
+	w := test.NewWindow(b.Montar(container.NewStack(hueco)))
+	t.Cleanup(w.Close)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 700))
+	if b.barraApp {
+		t.Fatal("sin armazón no hay barra de app")
+	}
+
+	a := NuevoArmazon(contenidoDePrueba())
+	a.Menu, a.Titulo = NuevoLateral("Menú", nil), "Septiembre"
+	hueco.Objects = []fyne.CanvasObject{a}
+	hueco.Refresh()
+	fyne.DoAndWait(func() {})
+
+	nav := a.barra
+	d := fyne.CurrentApp().Driver()
+	if nav == nil || !nav.enSuite || !b.barraApp || d.AbsolutePositionForObject(nav).Y != 0 {
+		t.Fatalf("la app montada después no sube a la barra única: enSuite=%v barraApp=%v y=%v",
+			nav != nil && nav.enSuite, b.barraApp, d.AbsolutePositionForObject(nav).Y)
+	}
+	if b.tituloApp.Visible() {
+		t.Error("la suite sigue pintando el nombre del producto encima")
+	}
+}
+
+// Y al revés: si lo de dentro deja de ser una app con barra (vuelve a «cargando», o
+// pasa a un aviso), quien lo cambia avisa (RecolocarBarraSuite) y la suite vuelve a
+// llevar el nombre del producto con lo de dentro DEBAJO, no tapado por ella.
+func TestLaBarraUnicaSeDeshaceAlQuitarLaApp(t *testing.T) {
+	defer TactilDePrueba(true)()
+	a := NuevoArmazon(contenidoDePrueba())
+	a.Menu, a.Titulo = NuevoLateral("Menú", nil), "Septiembre"
+	hueco := container.NewStack(a)
+	b, parar := BarraSuiteDePrueba(traductorPrueba(t), iconos.Calendar)
+	t.Cleanup(parar)
+	w := test.NewWindow(b.Montar(container.NewStack(hueco)))
+	t.Cleanup(w.Close)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 700))
+	if !b.barraApp {
+		t.Fatal("con la app montada, la barra es única")
+	}
+
+	aviso := NuevoVacio("Cargando", "")
+	hueco.Objects = []fyne.CanvasObject{aviso}
+	hueco.Refresh()
+	RecolocarBarraSuite(hueco)
+	fyne.DoAndWait(func() {})
+	d := fyne.CurrentApp().Driver()
+	if b.barraApp || !b.tituloApp.Visible() || d.AbsolutePositionForObject(hueco).Y != AltoBarraSuite() {
+		t.Fatalf("sin app con barra: barraApp=%v título=%v y=%v", b.barraApp, b.tituloApp.Visible(), d.AbsolutePositionForObject(hueco).Y)
+	}
 }

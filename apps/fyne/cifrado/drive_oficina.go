@@ -141,6 +141,7 @@ func (d *DriveOficina) render() {
 		d.slot.Objects = []fyne.CanvasObject{d.app.Objeto()}
 	}
 	d.slot.Refresh()
+	ui.RecolocarBarraSuite(d.slot)
 }
 
 // pedir enseña la puerta y la (re)intenta, para la cuenta de ahora.

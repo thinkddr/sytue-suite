@@ -8034,7 +8034,80 @@ proof is an HMAC, which the server cannot verify.
      not.
    - Not tested end to end here (no stack): the checklist above also applies to the native app.
 
-5. Withdrawal of the Matrix authority of `mail` and, afterwards, native clients.
+5. **Done, behind a switch that is off by default.** Withdrawal of the Matrix authority of
+   `mail` (seventh batch); the native clients came earlier, in the sixth.
+
+   **Seventh batch (2026-11-24): delivery 5, Rooms stops honouring the Matrix authority of
+   `mail`.** Everything sits behind **one** Rooms switch, `SYTUE_MAIL_SIN_MATRIX` (only
+   `activado` turns it on); off, nothing changes. Only `mail`: calendar registers a vault key but
+   receives through Matrix, and it and the other products are untouched
+   (`services/rooms/internal/store/retirada_matrix.go`).
+
+   - _What is retired._ With the switch, a `mail` scope with Matrix authority (active or revoked)
+     and no handover behaves like a handed-over one, but without the vault:
+     - no Matrix root can be enrolled, rotated or resumed (the challenges and the confirmation
+       answer `storage_matrix_retired`);
+     - its Matrix proofs (ingress actions `key.enroll`/`task.*` and device fences) and its ACK
+       receipts are refused, as after a handover (`ErrUnverified`, 403);
+     - reading its authority answers the retired state (below). If Sytue ID does not answer, there
+       is no answer (503 `encrypted_messaging_unavailable`): without knowing whether a handover
+       already happened, neither Matrix nor "move" (it could ask to empty again). That lookup
+       skips the fourth batch's 400 ms / 30 s shortcut, as after a handover: there is no Matrix
+       to go back to.
+     - The handover is unchanged: a `traspaso` key newer than the last change of the Matrix
+       authority is written to `matrix_storage_vault_handovers` and grants the vault authority
+       (base + generation). Turning the switch off later undoes no handover.
+     - With no authority (new account) it is still `storage_root_enrollment_required` → the vault,
+       but it can no longer enroll Matrix; with the vault authority, nothing changes.
+   - _The state in the API._ `409 {"error":{"code":"storage_matrix_retired"}}` on
+     `GET /api/v1/matrix/storage/mail/authority` (and on `/internal/storage-authority/state`):
+     "Matrix is retired, move to the vault". It is distinct from
+     `storage_root_enrollment_required` (new account) and from any doubt. Clients have no switch
+     of their own: they learn it from this answer; the Matrix core fails closed on that 409 (it
+     does not try to enroll).
+   - _Web_ (`almacenCorreo.ts`, `PrivateMailGate.tsx`, `TraspasoBoveda.tsx`): `retirada` →
+     `PasarABoveda` without "Keep the previous mail for now", with its own title and text before
+     the checkbox (`privateMail.vaultMoveRetiredTitle`, `…RetiredBody`): the previous system is
+     gone, no new mail arrives until moving, what was encrypted with it (including what arrives
+     meanwhile) cannot be read and is not deleted. The browser remembers it (`aprenderRetirada`,
+     `localStorage` per person and organisation: it belongs to the server, not to a tab), so from
+     then on a doubtful read no longer opens Matrix: it shows "Retry" (`CorreoSinComprobar`,
+     `privateMail.vaultMoveCheckFailed`). A `matrix` answer (switch off) forgets it. Without ever
+     having heard it, doubt goes through Matrix as before, and Matrix does not open (Rooms refuses
+     it). Without the switch, everything exactly as in the fifth batch.
+   - _Native_ (`cifrado.ElegirAlmacenCorreo` → `CorreoRetirado`; `AplicacionCorreo`): the same,
+     with `apps/mail`'s `PasarABoveda` without `seguir` and `CorreoSinComprobar`; the memory, in
+     the app's preferences. The three new keys are in the 26 languages and in the native catalogs
+     (`gen-i18n.ts mail`).
+   - _The switch._ Rooms variable `SYTUE_MAIL_SIN_MATRIX`; in the chart,
+     `rooms.config.correoSinMatrix`, **empty (off) by default**: turning it on in an environment
+     means setting `activado` in its values, the owner's decision. It requires
+     `ID_VAULT_KEYS_SECRET` (without the key registry no handover would be seen: Rooms does not
+     start) and only makes sense with `SYTUE_MAIL_BOVEDA=activado` in Mail's BFF (without it, the
+     web goes straight to Matrix, which would no longer open).
+   - _What someone still on Matrix sees and loses when it is turned on._ Only "Move your mail to
+     the new vault to keep receiving it". **They stop receiving new mail until they do "Empty and
+     move to the vault"**: the mail server still accepts their mail and encrypts it for the
+     current ingress plan, Matrix's, which nobody can claim any more; it stays queued, encrypted
+     and unreadable, **not deleted**. What was only encrypted with Matrix (their Matrix mailbox
+     and what is pending in the queue) no longer opens from Mail. On moving, the ingress plan
+     rotates (fourth batch) and new mail reaches the vault; the earlier mail stays queued, as
+     after any handover.
+   - _Tests._ Rooms: unit (`retirada_matrix_test.go`, the HTTP mapping, the configuration) and
+     integration (`retirada_matrix_integration_test.go`: retirement, refusals, a converting
+     handover, calendar untouched, switch off unchanged). Web and native: the gate with the
+     retirement and with doubt. Not tested end to end.
+   - _Left for later._
+     - Delete Mail's Matrix path once the switch stays on for good: on the web `MatrixMailGate`,
+       the "Can't open your mail?" exit, "keep the previous one" and mail's historical source; in
+       the core the Matrix mode of `mail/application` (identity cutover, historical source, mail's
+       `matrixproof`); in Fyne `OfertaTraspaso` and Mail's Matrix app; in Rooms the Matrix branch
+       of `mail` (authority, challenges, fences, receipts), keeping what calendar uses. And the
+       switch itself.
+     - Make sure mail arriving for a retired Matrix account before it moves is not lost (for
+       example, deferring its SMTP delivery with a 4xx until the handover, which the sender
+       retries). Not done: today it stays unreadable in the queue.
+
 
 **Consequences.**
 
@@ -8045,6 +8118,9 @@ proof is an HMAC, which the server cannot verify.
   person and the notice; it is not eliminated. The current authority did prevent it, at the price
   of having no way out.
 - An emptying does not decrypt anything earlier: mail encrypted with the lost key stays lost.
+- With the Matrix authority of `mail` retired (delivery 5), anyone who has not moved to the vault
+  receives no new mail until they do: what arrives meanwhile is encrypted for Matrix and stays
+  queued, unreadable. That is why the switch is off by default.
 - With the key registry configured, each read of the `mail` authority of a Matrix account also asks
   Sytue ID (to see a handover). If Sytue ID does not answer, the Matrix one, as before. A slow answer
   adds at most 400 ms to a read, and after an outage it stops asking for 30 s (fourth batch); a

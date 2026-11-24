@@ -506,7 +506,7 @@ export const nl: Catalog = {
   'widgets.create': 'Afspraak maken',
   'widgets.newNote': 'Nieuwe notitie',
   'widgets.newContact': 'Nieuw contact',
-  'widgets.addPhotos': 'Foto\'s toevoegen',
+  'widgets.addPhotos': "Foto's toevoegen",
   'widgets.updatedAgo': 'Bijgewerkt {time}',
   'widgets.updatedAt': 'Bijgewerkt: {time}',
 

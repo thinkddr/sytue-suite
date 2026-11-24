@@ -41,6 +41,6 @@ Website = "https://sytue.eu"
 # Sytue ID.
 [Development]
   esquema = "sytue-calendar"
-  widget_acciones = "open,create,search"
+  widget_acciones = "open,create"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"

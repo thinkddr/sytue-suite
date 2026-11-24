@@ -11,7 +11,6 @@
 "widgets.calendars" = "Kalendere";
 "widgets.address_books" = "Adressebøger";
 "widgets.storage" = "Lagerplads";
-"search.label" = "Global søgning";
 "app.bases.description" = "Delte relationstabeller";
 "app.sheets.description" = "Regneark";
 "app.calendar.description" = "Kalender";

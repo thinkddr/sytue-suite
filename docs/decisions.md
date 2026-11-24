@@ -6096,6 +6096,56 @@ phone: here there is no Android SDK or NDK, so the Java has been compiled agains
 Android 16 framework (Robolectric's `android-all`) and the C entry point against the
 JDK's `jni.h`, but neither the APK nor the Android `.so` has been built.
 
+**Amendment (2026-11-24): "still not updating", continuous refresh, Calendar with title and
+time, and no more "Search".** The owner: after creating an event in native Calendar, the widget
+did not show it; widgets must stay up to date with the app in the background; Calendar only showed
+dots; and the "Search" widgets add no value.
+
+1. **The cause: writes through the API did not notify.** Since the record apps mount their view
+   on the API with the source in `legacy` ([0086](#0086)), the client of the `API` field of
+   `cifrado.AplicacionRegistros` was built without `Suite.ClienteConAviso` (only Rooms passed
+   it). No write called `AvisarEscritura`, the Publisher stayed clean, and on going to the
+   background `PublicarPendiente` had nothing to publish. Now calendar, contacts, notes, erp,
+   bases, cast, hub, docus, calcus, diapos and photos pass it, and
+   `TestLasVistasPorLaAPIAvisanAlWidget` requires it of every `cmd` (exceptions with their
+   reason: drive and certipdf write to the private Drive; mail publishes through its live link).
+2. **What "continuous" means.** With the app open: after every write (1.5 s debounce, at most one
+   round every 30 s), on the server's `datos` signal, on Mail's and Rooms' live updates, on
+   returning to the foreground and on regaining the network; on going to the background, whatever
+   is pending right away. With the app in the background or closed, **every 15 min at least, when
+   the system allows it**: the iOS refresh task is requested every 15 min (before, 30) and the
+   Android periodic job runs every 15 min with 5 of flex (before, hourly), each platform's minimum;
+   the silent push (iOS) and One's relay (Android) still wake the app on every change. iOS
+   schedules tasks by usage and budget, does not run them with the phone locked (data
+   protection) or after the app is force-quit from the switcher, and Doze batches Android jobs
+   into its maintenance windows: it is the most they allow, not a clock. The WidgetKit timeline
+   goes from `.atEnd` (up to 24 h) to **re-reading the file after 15 min**
+   (`SytueWidgetTimeline.reread`): a reload requested from the background can run out of budget,
+   and what the refresh task published was not shown. The extension still has no network, no
+   Keychain and no session: the rejection of "reading from the extension with its own session"
+   stands; the reader is the app, woken in the background.
+   `TestLosRefrescosDelWidgetVanAlMismoRitmo` ties the three cadences together.
+3. **Calendar shows what is coming with title and time.** The data was already in the snapshot
+   (title, location, start, end, all-day, since the 2026-11-01 extension): it was the layout. In
+   the small family the month grid took the whole height; now it shows the day and the next two
+   events with their time (the grid, if nothing is coming), and Android, in its small size, the
+   events instead of the grid. Each iOS row (medium and larger) links to **its day**,
+   `sytue-calendar:/?date=YYYY-MM-DD` (`&all_day=1` for all-day events): only the date, nothing
+   about the event; the small family and the lock screen open the next event's day. The lock
+   screen shows title and time. Titles of an account in Matrix do not reach the widget: its Source
+   reads from the server (below).
+4. **No "Search" widgets.** Removed `SytueSearchWidget`, its route and its label, the Android
+   widget button and `search` from the `FyneApp.toml` files; `generar.py` and
+   `android-widgets.py` ignore a `search` still declared. The Go entry that handled
+   `?action=search` (`Suite.AlBuscar`, `ui/barrabusqueda_widget.go`) and its hook in the suite
+   bar are removed too; an old widget that still sends the action just opens the app.
+
+Pending: an opaque route per item in the snapshot (format 3) so that each row of Mail, Notes,
+Contacts, Drive and the rest opens THAT item, and new actions ("new note", "new contact") where
+the app already has the form; and that the Source of an account in Matrix reads its private
+repository instead of the server's frozen source. Neither the Swift nor the widget Java has been
+compiled or tried on a device.
+
 <a id="0079"></a>
 
 <a id="0079--sytue-notepads-sobre-papel-un-cromo-neutro-elegido-por-la-app"></a>

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
 	"runtime"
 
 	"fyne.io/fyne/v2"
@@ -40,7 +41,9 @@ type almacenPhotos struct {
 }
 
 func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.Suite, translate *i18n.Translator, almacen almacenPhotos) (*photosPresenter, error) {
-	client, drive, err := clientesPhotos(suite.URL("photos"), suite.URL("drive"), almacen)
+	// Las escrituras de Photos por la API avisan a su widget (Suite.ClienteConAviso);
+	// las del Drive de la galería no: el servidor avisa al indexar (señal `datos`).
+	client, drive, err := clientesPhotos(suite.URL("photos"), suite.URL("drive"), suite.ClienteConAviso(nil), almacen)
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +104,15 @@ func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.
 // repositorio, los datos privados: los registros cifrados y el Drive oculto de los
 // originales (bóveda o Matrix, cifrado.AplicacionDrive). Sin él, la API del
 // servidor: los originales van a la carpeta «Fotos» del Drive del servidor y el
-// servicio de Photos los indexa, igual que client/subida.ts en la web.
-func clientesPhotos(photosURL, driveURL string, almacen almacenPhotos) (*api.Photos, *api.Drive, error) {
+// servicio de Photos los indexa, igual que client/subida.ts en la web. `escrituras`
+// es el cliente HTTP de Photos por la API (nil: el de siempre); con repositorio no se
+// usa, porque nada sale por HTTP.
+func clientesPhotos(photosURL, driveURL string, escrituras *http.Client, almacen almacenPhotos) (*api.Photos, *api.Drive, error) {
 	if almacen.cuenta == nil {
 		return nil, nil, cifrado.ErrPrivateResources
 	}
 	session := almacen.cuenta.HTTP()
-	client := api.NewPhotos(photosURL, session, nil)
+	client := api.NewPhotos(photosURL, session, escrituras)
 	drive := api.NewDrive(driveURL, session, nil)
 	if almacen.repository == nil {
 		return client, drive, nil

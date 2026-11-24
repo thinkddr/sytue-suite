@@ -11,7 +11,6 @@
 "widgets.calendars" = "Календари";
 "widgets.address_books" = "Адресни книги";
 "widgets.storage" = "Хранилище";
-"search.label" = "Глобално търсене";
 "app.bases.description" = "Съвместни релационни таблици";
 "app.sheets.description" = "Електронни таблици";
 "app.calendar.description" = "Календар";

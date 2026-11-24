@@ -36,7 +36,7 @@ Website = "https://sytue.eu"
 # tocar Sytue ID es el identificador de cliente.
 [Development]
   esquema = "sytue-rooms"
-  widget_acciones = "open,search"
+  widget_acciones = "open"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"
   client_id = "sytue-chat"

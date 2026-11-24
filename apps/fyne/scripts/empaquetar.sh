@@ -822,7 +822,7 @@ plist_documentos() { # <dir de la app>
 # `fetch` en UIBackgroundModes y el identificador de la tarea, `<App ID>.refresco`. Solo
 # con su interruptor (`refresco_apple_activo`, que exige también el de los widgets) y en
 # las apps con widget: sin lector, la app no tiene nada que refrescar. El fork de Fyne registra el PRIMERO de
-# BGTaskSchedulerPermittedIdentifiers (parche 0016) y la suite pide uno cada 30 min
+# BGTaskSchedulerPermittedIdentifiers (parche 0016) y la suite pide uno cada 15 min
 # (`sesion.CadaRefrescoEnFondo`). No es un derecho: no pide capacidad ni perfiles nuevos.
 # Una orden de PlistBuddy por línea; nada si no toca.
 #

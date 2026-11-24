@@ -297,18 +297,11 @@ public final class Widgets extends AppWidgetProvider {
 
                 action(ctx, views, "sytue_widget_open", labels.getString("open"), scheme + ":/", id, 0);
                 views.setTextColor(resource(ctx, "id", "sytue_widget_open"), brandColor);
-                views.setViewVisibility(resource(ctx, "id", "sytue_widget_search"), View.GONE);
                 views.setViewVisibility(resource(ctx, "id", "sytue_widget_extra"), View.GONE);
                 if (!compactSmall) {
                     JSONArray actions = config.getJSONArray("actions");
                     for (int n = 0; n < actions.length(); n++) {
                         String act = actions.getString(n);
-                        if ("search".equals(act)) {
-                            views.setViewVisibility(resource(ctx, "id", "sytue_widget_search"), View.VISIBLE);
-                            views.setTextColor(resource(ctx, "id", "sytue_widget_search"), brandColor);
-                            action(ctx, views, "sytue_widget_search", labels.getString("search"),
-                                    scheme + ":/?action=search", id, 1);
-                        }
                         // Las únicas escrituras son formularios existentes que la persona debe confirmar.
                         if (("mail".equals(product) && "compose".equals(act))
                                 || ("calendar".equals(product) && "create".equals(act))) {
@@ -477,15 +470,15 @@ public final class Widgets extends AppWidgetProvider {
             float eventsY = divY + 5f * s;
             drawCalendarEventsPane(canvas, snapshot, labels, locale, now, brand, night,
                     textPrimary, textMuted, 0f, eventsY, w, h - eventsY, s, 4);
+        } else if (snapshot != null && !snapshot.items.isEmpty()) {
+            // Pequeño con algo próximo (2026-11-24): los eventos con su hora, no la rejilla.
+            // Con la rejilla, el siguiente evento solo cabía desde 115 dp de alto y en un 2x2
+            // de muchos lanzadores solo se veían los puntos de los días ocupados.
+            drawCalendarEventsPane(canvas, snapshot, labels, locale, now, brand, night,
+                    textPrimary, textMuted, 0f, 0f, w, h, s, 3);
         } else {
-            boolean hasNext = snapshot != null && !snapshot.items.isEmpty() && dpH >= 115;
-            float gridH = hasNext ? h - 20f * s : h;
             drawMonthGrid(canvas, cal, now, year, month, today, snapshot, locale, brand,
-                    textPrimary, textMuted, 0f, 0f, w, gridH, s, true);
-            if (hasNext) {
-                drawEventRow(canvas, snapshot.items.get(0), locale, now, brand, night,
-                        textPrimary, textMuted, 0f, gridH + 2f * s, w, 18f * s, s, true);
-            }
+                    textPrimary, textMuted, 0f, 0f, w, h, s, true);
         }
     }
 

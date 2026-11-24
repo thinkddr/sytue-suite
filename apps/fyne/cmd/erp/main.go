@@ -158,7 +158,7 @@ func main() {
 			return state.Mode, err
 		},
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
-			return mount(cuenta, api.NewERP(s.URL("erp"), cuenta.HTTP(), nil, string(l))), nil
+			return mount(cuenta, api.NewERP(s.URL("erp"), cuenta.HTTP(), s.ClienteConAviso(nil), string(l))), nil
 		},
 	})
 

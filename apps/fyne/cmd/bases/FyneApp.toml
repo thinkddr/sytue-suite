@@ -33,6 +33,6 @@ Website = "https://sytue.eu"
 # (migración 0109).
 [Development]
   esquema = "sytue-bases"
-  widget_acciones = "open,search"
+  widget_acciones = "open"
   # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
   bundle = "one"

@@ -255,9 +255,6 @@ type BarraSuite struct {
 	// que pinta el montaje. Así la burbuja de un botón queda encima del contenido y de
 	// la propia barra, y no la recorta ningún desplazador.
 	portalPistas *fyne.Container
-	// buscarPendiente espera a tener sesión y lienzo antes de mostrar el teclado.
-	buscarPendiente bool
-	busquedaSesion  sesion.Estado
 	// atajosDeApp son los grupos que la app enseña en la hoja de «?» (ConAtajosDeApp);
 	// ayudaUna engancha «?» al lienzo una sola vez, en cuanto lo hay.
 	atajosDeApp func() []GrupoDeAtajos
@@ -332,7 +329,6 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 	b.cerrarSuite.Hide()
 	b.tituloApp = Texto(p.NombreCorto(), tema.TextoMD, SemiNegrita, color.NRGBA{})
 	b.ExtendBaseWidget(b)
-	b.engancharBusqueda()
 	return b
 }
 
@@ -1050,7 +1046,6 @@ func (r *barraSuiteRenderer) layoutAncho(t fyne.Size, lado, y, desplaza, canalon
 	hueco := max(hasta-desde, 0)
 	ancho := min(AnchoBuscadorBarra, hueco)
 	r.b.buscador.colocar(desde+(hueco-ancho)/2, (AltoBarraSuite()-AltoCampo(CampoMD))/2, ancho, t)
-	r.b.atenderBusqueda()
 	r.pintarTitulo()
 }
 

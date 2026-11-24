@@ -11,7 +11,6 @@
 "widgets.calendars" = "Calendarios";
 "widgets.address_books" = "Libretas de direcciones";
 "widgets.storage" = "Almacenamiento";
-"search.label" = "Búsqueda global";
 "app.bases.description" = "Tablas relacionales colaborativas";
 "app.sheets.description" = "Hojas de cálculo";
 "app.calendar.description" = "Calendario";

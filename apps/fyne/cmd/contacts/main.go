@@ -111,7 +111,7 @@ func main() {
 		Soltar: cifrado.SoltarEn(s.URL("contacts")),
 		Modo:   contactsMode(s),
 		API: func(cuenta cifrado.Cuenta) (cifrado.ApplicationView, error) {
-			return mount(cuenta, api.NewContacts(s.URL("contacts"), cuenta.HTTP(), nil)), nil
+			return mount(cuenta, api.NewContacts(s.URL("contacts"), cuenta.HTTP(), s.ClienteConAviso(nil))), nil
 		},
 	})
 	if err != nil {

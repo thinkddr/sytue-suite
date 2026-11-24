@@ -18,9 +18,13 @@ final class RefrescoReglas {
     static final int FALLO = 2;
     static final int APLAZADO = 3;
 
-    /** El periódico: cada hora, con 15 min de holgura para que Android lo agrupe. */
-    static final long CADA_MS = 60L * 60 * 1000;
-    static final long HOLGURA_MS = 15L * 60 * 1000;
+    /**
+     * El periódico: cada 15 min (el mínimo de JobScheduler, y lo que se le pide a iOS), con
+     * 5 min de holgura (el mínimo) para que Android lo agrupe. Con red y sin batería baja;
+     * en reposo (Doze) Android lo junta con sus ventanas de mantenimiento.
+     */
+    static final long CADA_MS = 15L * 60 * 1000;
+    static final long HOLGURA_MS = 5L * 60 * 1000;
     /** El relevo: como mucho uno por minuto y app, por mucho que cambie en el servidor. */
     static final long MIN_RELEVO_MS = 60L * 1000;
     /** Con el teléfono bloqueado, el relevo se vuelve a intentar a los 5 min (lineal). */

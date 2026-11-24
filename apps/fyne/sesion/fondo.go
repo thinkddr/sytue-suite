@@ -321,8 +321,10 @@ func (r Resultado) String() string {
 
 const (
 	// CadaRefrescoEnFondo es el refresco que se le pide a iOS cada vez que la app pasa a
-	// segundo plano y tras cada uno. Es un mínimo: iOS decide cuándo, según el uso.
-	CadaRefrescoEnFondo = 30 * time.Minute
+	// segundo plano y tras cada uno. Es un mínimo: iOS decide cuándo, según el uso y su
+	// presupuesto. 15 min es lo menos que Apple recomienda para un widget y lo que vale
+	// también para Android (RefrescoReglas.CADA_MS): pedir menos no hace que corra antes.
+	CadaRefrescoEnFondo = 15 * time.Minute
 	// ReintentoAplazado es el siguiente tras un Aplazado, con la esperanza de que para
 	// entonces el teléfono esté desbloqueado. iOS no lo garantiza.
 	ReintentoAplazado = 5 * time.Minute

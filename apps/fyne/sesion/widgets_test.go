@@ -23,13 +23,13 @@ func (widgetApp) Metadata() fyne.AppMetadata {
 	return fyne.AppMetadata{ID: "eu.sytue.docus", Custom: map[string]string{"esquema": "sytue-docs"}}
 }
 
-func TestWidgetBusquedaSoloAceptaLaAccionLocalSinTexto(t *testing.T) {
+func TestWidgetBusquedaAntiguaSoloReconoceLaAccionLocalSinTexto(t *testing.T) {
 	a := test.NewApp()
 	defer a.Quit()
 	s := &Suite{app: widgetApp{a}}
 	for _, destino := range []string{"sytue-docs:/?action=search", "sytue-docs:?action=search"} {
 		u, _ := url.Parse(destino)
-		if !s.EsBusqueda(u) {
+		if !s.esBusquedaAntigua(u) {
 			t.Fatalf("no reconoce la búsqueda de esta app: %s", destino)
 		}
 	}
@@ -41,34 +41,30 @@ func TestWidgetBusquedaSoloAceptaLaAccionLocalSinTexto(t *testing.T) {
 		"sytue-docs:/?action=compose", "sytue-docs:/?action=search;secret=private",
 	} {
 		u, _ := url.Parse(destino)
-		if s.EsBusqueda(u) {
+		if s.esBusquedaAntigua(u) {
 			t.Fatalf("acepta un destino o texto que el widget no declara: %s", destino)
 		}
 	}
-	if s.EsBusqueda(nil) || (&Suite{}).EsBusqueda(&url.URL{}) {
+	if s.esBusquedaAntigua(nil) || (&Suite{}).esBusquedaAntigua(&url.URL{}) {
 		t.Fatal("busca sin enlace ni aplicación")
 	}
 }
 
-func TestWidgetBusquedaTempranaNoAbsorbeRutasDesconocidas(t *testing.T) {
+// Un widget de búsqueda que siga en la pantalla de inicio abre la app y nada más: la
+// acción no llega a las rutas del producto ni oculta una ruta que no existe.
+func TestWidgetBusquedaAntiguaSoloAbreLaApp(t *testing.T) {
 	a := test.NewApp()
 	defer a.Quit()
 	s := &Suite{app: widgetApp{a}, oidc: &auth.OIDC{}}
 	u, _ := url.Parse("sytue-docs:/?action=search")
 	s.recibirURL(u)
-	if !s.busquedaPendiente || len(s.sinDueno) != 0 {
-		t.Fatal("la acción temprana se perdió o se entregó como ruta de documento")
-	}
-	llamadas := 0
-	s.AlBuscar(func() { llamadas++ })
-	fyne.DoAndWait(func() {})
-	if llamadas != 1 || s.busquedaPendiente || len(s.alAbrirURL) != 0 {
-		t.Fatal("el receptor de búsqueda alteró las rutas de producto o repitió la acción")
+	if len(s.sinDueno) != 0 || len(s.alAbrirURL) != 0 {
+		t.Fatal("la acción retirada se entregó como ruta de documento")
 	}
 	u, _ = url.Parse("sytue-docs:/does-not-exist")
 	s.recibirURL(u)
 	if !s.finArranque() {
-		t.Fatal("registrar la búsqueda oculta una ruta no encontrada")
+		t.Fatal("la búsqueda retirada oculta una ruta no encontrada")
 	}
 }
 

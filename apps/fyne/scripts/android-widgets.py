@@ -23,7 +23,7 @@ ANDROID = "http://schemas.android.com/apk/res/android"
 ET.register_namespace("android", ANDROID)
 ATTR = "{" + ANDROID + "}"
 LABELS = {
-    "open": "widgets.open", "search": "search.label", "compose": "widgets.compose", "create": "widgets.create",
+    "open": "widgets.open", "compose": "widgets.compose", "create": "widgets.create",
     "unread": "notifications.unread", "files": "dataflow.item.files",
     "events": "dataflow.item.events", "documents": "dataflow.item.documents",
     "contacts": "dataflow.item.contacts", "notes": "widgets.notes", "rows": "widgets.rows",
@@ -53,8 +53,10 @@ def metadata(appdir):
     if not re.fullmatch(r"eu\.sytue\.[a-z][a-z0-9]*", bundle) or not re.fullmatch(r"sytue-[a-z][a-z0-9]*", scheme):
         raise ValueError("identificador o esquema de widget inválido")
     product = scheme.removeprefix("sytue-")
-    actions = dev.get("widget_acciones", "").split(",")
-    allowed = {"open", "search"}
+    # «search» ya no es una acción de los widgets (2026-11-24, ADR 0078): se ignora si un
+    # FyneApp.toml aún la declara (Mail, que cambia en otra rama).
+    actions = [a for a in dev.get("widget_acciones", "").split(",") if a != "search"]
+    allowed = {"open"}
     if product == "mail":
         allowed.add("compose")
     if product == "calendar":
@@ -170,8 +172,7 @@ def prepare(args):
         # El layout inicial también lleva el idioma del SO antes del primer callback.
         for locale, labels in config["locales"].items():
             resources = ET.Element("resources")
-            for name, value in (("sytue_widget_name", config["name"]), ("sytue_widget_open", labels["open"]),
-                                ("sytue_widget_search", labels["search"])):
+            for name, value in (("sytue_widget_name", config["name"]), ("sytue_widget_open", labels["open"])):
                 ET.SubElement(resources, "string", {"name": name, "formatted": "false"}).text = value.replace("'", "\\'")
             qualifier = "values" if locale == "en" else "values-" + locale
             write_xml(res / qualifier / "sytue_widget.xml", resources)

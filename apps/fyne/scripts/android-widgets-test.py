@@ -81,7 +81,8 @@ class ResourceTests(unittest.TestCase):
         for name in ("classes.dex", "lib/arm64-v8a/libSytue_Mail.so", "assets/existing.txt"):
             self.assertEqual((self.apk / name).read_bytes(), b"existing artifact")
         config = json.loads((self.apk / "assets/sytue-widget.json").read_text())
-        self.assertEqual(config["actions"], ["open", "compose", "search"])
+        # Mail aún declara «search» en su FyneApp.toml: el widget lo ignora (ADR 0078).
+        self.assertEqual(config["actions"], ["open", "compose"])
         self.assertEqual(config["locales"]["es"]["open"], "Abrir")
         self.assertIsInstance(config["locales"]["en"]["unread"], dict)
         self.assertEqual(len(config["locales"]), 26)
@@ -139,9 +140,9 @@ class ResourceTests(unittest.TestCase):
             self.assertNotIn(config["id"], seen)
             seen.add(config["id"])
             self.assertEqual(config["scheme"], "sytue-" + config["product"])
-            self.assertIn("search", config["actions"])
+            self.assertNotIn("search", config["actions"])
             for labels in config["locales"].values():
-                self.assertTrue(labels["search"])
+                self.assertNotIn("search", labels)
                 self.assertTrue(labels["calendars"])
                 self.assertTrue(labels["address_books"])
                 self.assertEqual(labels["updated_at"].count("{time}"), 1)

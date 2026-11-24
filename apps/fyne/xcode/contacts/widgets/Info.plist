@@ -30,7 +30,6 @@
 	<key>SytueWidgetActions</key>
 	<array>
 		<string>open</string>
-		<string>search</string>
 	</array>
 	<key>SytueWidgetBundle</key>
 	<string>eu.sytue.contacts</string>

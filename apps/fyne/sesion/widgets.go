@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
-
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -25,40 +23,11 @@ import (
 // It contains no token, identity, network client or configurable destination.
 type VistaWidget = widgets.View
 
-// AlBuscar recibe la acción transversal, también si llegó al arrancar antes de
-// montar la barra. No cuenta como un receptor de rutas propias del producto.
-func (s *Suite) AlBuscar(f func()) {
-	s.mu.Lock()
-	s.alBuscar = f
-	pendiente := s.busquedaPendiente && f != nil
-	if pendiente {
-		s.busquedaPendiente = false
-	}
-	s.mu.Unlock()
-	if pendiente {
-		fyne.Do(f)
-	}
-}
-
-func (s *Suite) recibirBusqueda(u *url.URL) bool {
-	if !s.EsBusqueda(u) {
-		return false
-	}
-	s.mu.Lock()
-	f := s.alBuscar
-	if f == nil {
-		s.busquedaPendiente = true
-	}
-	s.mu.Unlock()
-	if f != nil {
-		fyne.Do(f)
-	}
-	return true
-}
-
-// EsBusqueda reconoce sólo la acción local de esta app. No admite texto ni
-// destinos del exterior: el widget abre el campo y la persona escribe después.
-func (s *Suite) EsBusqueda(u *url.URL) bool {
+// esBusquedaAntigua reconoce la acción «Buscar» de los widgets de búsqueda global,
+// retirados (ADR 0078, 2026-11-24: no aportaban). Uno que siga en una pantalla de
+// inicio hasta que el sistema lo quite aún la puede mandar: abre la app y nada más,
+// sin llegar a los receptores de rutas del producto.
+func (s *Suite) esBusquedaAntigua(u *url.URL) bool {
 	if s.app == nil || u == nil {
 		return false
 	}

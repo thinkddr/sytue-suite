@@ -6,19 +6,38 @@ import Foundation
 // Only declared, local actions are allowed. Neither a snapshot nor its counters
 // can supply a URL, a query, an account or a destination outside the host app.
 enum SytueWidgetActions {
-    static let order = ["open", "compose", "create", "search"]
+    // «Buscar» ya no es una acción de los widgets (2026-11-24, ADR 0078): el dueño los
+    // quitó porque no aportaban. Un `search` que siga declarado en un FyneApp.toml no da
+    // ruta ni widget.
+    static let order = ["open", "compose", "create"]
 
     static func label(for action: String) -> String {
-        action == "search" ? "search.label" : "widgets." + action
+        "widgets." + action
     }
 
     static func symbol(for action: String) -> String {
         switch action {
-        case "search": return "magnifyingglass"
         case "compose": return "square.and.pencil"
         case "create": return "calendar.badge.plus"
         default: return "arrow.up.right"
         }
+    }
+
+    // El día de un evento en Calendar (calendario.FechaDelEnlace): `?date=AAAA-MM-DD` y,
+    // en uno de día completo —flotante, a medianoche UTC—, `&all_day=1`. Solo la fecha:
+    // nada del evento (ni título ni id) sale en la URL. Otras apps, sin ruta por fila.
+    static func day(of item: SytueWidgetItem, product: String, scheme: String, calendar: Calendar) -> URL? {
+        guard product == "calendar", scheme == "sytue-calendar", item.startAt > 0 else { return nil }
+        var reader = calendar
+        if item.isAllDay {
+            reader = Calendar(identifier: .gregorian)
+            guard let utc = TimeZone(identifier: "UTC") else { return nil }
+            reader.timeZone = utc
+        }
+        let day = reader.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: TimeInterval(item.startAt)))
+        guard let year = day.year, let month = day.month, let dayOfMonth = day.day else { return nil }
+        let date = String(format: "%04d-%02d-%02d", year, month, dayOfMonth)
+        return URL(string: scheme + ":/?date=" + date + (item.isAllDay ? "&all_day=1" : ""))
     }
 
     static func routes(product: String, scheme: String, declared: [String]) -> [String: URL] {
@@ -26,7 +45,6 @@ enum SytueWidgetActions {
         var routes = [String: URL]()
         for action in declared {
             if action == "open" { routes[action] = URL(string: scheme + ":/") }
-            if action == "search" { routes[action] = URL(string: scheme + ":/?action=search") }
             if action == "compose", product == "mail" {
                 routes[action] = URL(string: scheme + ":/?action=compose")
             }
@@ -277,17 +295,31 @@ enum SytueWidgetTimeline {
 
     // Qué línea de tiempo pide WidgetKit (Widgets.swift la traduce).
     enum Plan: Equatable {
-        // Las fechas con datos y, al final, la caducidad sin ellos; política `.atEnd`.
+        // Las fechas con datos y, al final, la caducidad sin ellos; se vuelve a leer a los
+        // `reread` (o en la caducidad, si llega antes).
         case entries([Date], expiry: Date)
         // La lectura falló por la protección de datos (el teléfono bloqueado): no es «no
         // hay datos». Se pinta el marco con el marcador y se vuelve a pedir en 5 min, sin
         // la entrada vacía de 24 h que borraría lo que ya había.
         case protected(retry: Date)
-        // Sin datos que enseñar: nada que recargar hasta que la app publique o borre.
+        // Sin datos que enseñar: se vuelve a mirar a los `reread`, por si la app publicó
+        // con su recarga sin presupuesto.
         case empty
     }
 
     static let protectedRetry: TimeInterval = 5 * 60
+
+    // Cada cuánto vuelve WidgetKit a leer el snapshot aunque la app no lo recargue: lo que
+    // publicaron la tarea de refresco o el aviso silencioso con la app al fondo llega aunque
+    // su reloadAllTimelines se quedara sin presupuesto. Es lo que la app pide a iOS para esa
+    // tarea (sesion.CadaRefrescoEnFondo); WidgetKit lo toma como un mínimo.
+    static let reread: TimeInterval = 15 * 60
+
+    static func rereadDate(now: Date, expiry: Date? = nil) -> Date {
+        let next = now.addingTimeInterval(reread)
+        guard let expiry else { return next }
+        return min(next, expiry)
+    }
 
     static func plan(for reading: SytueWidgetReading, now: Date, calendar: Calendar) -> Plan {
         switch reading {

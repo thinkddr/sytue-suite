@@ -279,7 +279,13 @@ export class HttpClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly options: HttpClientOptions) {
-    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
+    // Se llama sin objeto delante: un `fetch` del navegador pasado sin atar, llamado
+    // como `this.fetchImpl(...)`, lanza «Illegal invocation» (lo que dejó Mail y
+    // Drive en `prepare/network`, ver PqVault).
+    const send = options.fetchImpl;
+    this.fetchImpl = send
+      ? (((input, init) => send(input, init)) as typeof fetch)
+      : globalThis.fetch.bind(globalThis);
   }
 
   get baseUrl(): string {

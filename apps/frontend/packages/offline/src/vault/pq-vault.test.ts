@@ -193,6 +193,55 @@ describe('PqVault (ADR 0086)', () => {
   });
 });
 
+describe('PqVault: el fetch del navegador (prepare/network en Mail y Drive)', () => {
+  // En producción nadie pasa `fetchImpl`: la bóveda usa el `fetch` global. El del
+  // navegador lanza «Illegal invocation» si se llama como método de otro objeto, y
+  // la bóveda lo guardaba en `this.fetchImpl` y lo llamaba así al publicar y leer
+  // registros. El arnés hace lo mismo que el navegador; aquí se pone como global.
+  test('sin fetchImpl publica, lee y lista registros con el fetch global', async () => {
+    const core = createMockCore();
+    const h = createHarness();
+    const original = globalThis.fetch;
+    globalThis.fetch = h.fetchImpl;
+    try {
+      const vault = await PqVault.open({
+        actor: 'user-1',
+        tenant: 'acme',
+        product: 'drive',
+        basePath: '/drive',
+        bridge: h.bridge,
+        createCore: () => core,
+      });
+      const repo = vault.storage();
+      await repo.prepare();
+      const target = repo.publicationTarget();
+      await repo.recoverable(target);
+      const payload = Buffer.from('{}').toString('base64');
+      const ref = await repo.exclusive((signal) =>
+        repo.putRecord(
+          'tx-global-1',
+          {
+            v: 1 as const,
+            scope: { tenant: 'acme', subject: 'user-1', product: 'drive' as const },
+            object_id: 'doc-1',
+            revision_id: 'rev-1',
+            role: 'index' as const,
+            payload,
+          },
+          signal,
+          target,
+        ),
+      );
+      expect((await repo.readRecord(ref, 'doc-1', 'index')).payload).toBe(payload);
+      expect((await repo.rawCatalogHistory(vault.vaultId, null, 10)).entries).toHaveLength(1);
+      expect(await vault.copyMarker()).toBeNull();
+      await vault.closeAndDrain();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
 describe('PqVault: vaciar sin carreras y la copia de otro dispositivo (ADR 0086)', () => {
   const opts = (h: ReturnType<typeof createHarness>, core: PqcRuntime) => ({
     actor: 'user-1',
@@ -376,11 +425,13 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
       } as unknown as PqcRuntime;
     };
     const h = createHarness();
+    // Sin objeto delante, como lo llama el navegador (ver el arnés).
+    const servir = h.fetchImpl;
     const registro: { generation: number; key_id: string; retired_at?: string }[] = [];
     let reciente = true;
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input), 'https://drive.sytue.eu');
-      if (url.pathname !== '/drive/api/pq-vault/signing-key') return h.fetchImpl(input, init);
+      if (url.pathname !== '/drive/api/pq-vault/signing-key') return servir(input, init);
       if ((init?.method ?? 'GET') === 'GET')
         return Response.json({ keys: [...registro].reverse() });
       const body = JSON.parse(String(init?.body)) as { previous_key_id: string };
@@ -481,10 +532,12 @@ describe('PqVault: traspaso del correo de Matrix a la bóveda (ADR 0087)', () =>
       },
     } as unknown as PqcRuntime;
     const h = createHarness({ product });
+    // Sin objeto delante, como lo llama el navegador (ver el arnés).
+    const servir = h.fetchImpl;
     const cuerpos: Record<string, unknown>[] = [];
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input), 'https://drive.sytue.eu');
-      if (url.pathname !== '/drive/api/pq-vault/signing-key') return h.fetchImpl(input, init);
+      if (url.pathname !== '/drive/api/pq-vault/signing-key') return servir(input, init);
       if ((init?.method ?? 'GET') === 'GET') return Response.json({ keys: [] });
       cuerpos.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return Response.json({});
@@ -554,6 +607,8 @@ describe('PqVault: el correo sobre la bóveda (ADR 0087, entrega 4)', () => {
       },
     } as unknown as PqcRuntime;
     const h = createHarness();
+    // Sin objeto delante, como lo llama el navegador (ver el arnés).
+    const servir = h.fetchImpl;
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input), 'https://drive.sytue.eu');
       const method = init?.method ?? 'GET';
@@ -586,7 +641,7 @@ describe('PqVault: el correo sobre la bóveda (ADR 0087, entrega 4)', () => {
             : [],
         });
       }
-      return h.fetchImpl(input, init);
+      return servir(input, init);
     }) as unknown as typeof fetch;
     const vault = await PqVault.open({
       actor: 'user-1',

@@ -700,7 +700,13 @@ export class PqVault {
     this.keyId = params.keyId;
     this.recipient = params.recipient;
     this.base = params.base;
-    this.fetchImpl = params.fetchImpl;
+    // Se llama sin objeto delante. El `fetch` del navegador exige `this` ===
+    // `window` (o ninguno): guardado tal cual y llamado como `this.fetchImpl(...)`
+    // lanzaba «Illegal invocation», un TypeError que la puerta contaba como
+    // `network`. Mail y Drive se quedaban en `prepare/network` al publicar su
+    // primer registro, con la bóveda ya abierta.
+    const send = params.fetchImpl;
+    this.fetchImpl = ((input, init) => send(input, init)) as typeof fetch;
     this.core = params.core;
     this.lifetime = params.lifetime;
     this.identityBytes = params.identityBytes;

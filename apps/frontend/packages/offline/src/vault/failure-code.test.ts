@@ -39,6 +39,15 @@ test('el código del fallo dice qué comprobación fue, con lo que es fijo en el
     [new HttpError(502, 'Bad Gateway', secret, secret), 'http.502'],
     [new DOMException('Aborted', 'AbortError'), 'aborted'],
     [new TypeError('Failed to fetch ' + secret), 'network'],
+    [new TypeError('NetworkError when attempting to fetch resource.'), 'network'],
+    [new TypeError('Load failed'), 'network'],
+    // Un TypeError del código no es la red: así se escondió el `fetch` sin atar de
+    // la bóveda (`prepare/network` en Mail y Drive).
+    [new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation"), 'error.TypeError'],
+    [
+      new TypeError("Cannot read properties of undefined (reading '" + secret + "')"),
+      'error.TypeError',
+    ],
     [new AggregateError([new DriveImportError('inventory')], secret), 'drive.import.inventory'],
     [new Error(secret), 'error.Error'],
     ['texto suelto', 'unknown'],

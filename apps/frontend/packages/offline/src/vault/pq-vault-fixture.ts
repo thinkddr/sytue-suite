@@ -186,7 +186,17 @@ export function createHarness(
     },
   };
 
-  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  // Tan estricto como el `fetch` del navegador: llamado como método de otro objeto
+  // (`this.fetchImpl(...)`) lanza «Illegal invocation». Bun no lo hace, y por eso
+  // las pruebas no vieron que la bóveda guardaba `fetch` sin atar y lo llamaba así:
+  // en el navegador Mail y Drive se quedaban en `prepare/network`.
+  const fetchImpl = async function (
+    this: unknown,
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> {
+    if (this !== undefined && this !== globalThis)
+      throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
     const url = new URL(String(input), 'https://drive.sytue.eu');
     const method = init?.method ?? 'GET';
     if (url.pathname === '/drive/api/pq-vault/bootstrap') {
@@ -300,7 +310,7 @@ export function createHarness(
       });
     }
     return new Response(null, { status: 404 });
-  }) as unknown as typeof fetch;
+  } as unknown as typeof fetch;
 
   return {
     bridge,

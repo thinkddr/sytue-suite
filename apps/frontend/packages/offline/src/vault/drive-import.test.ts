@@ -55,13 +55,15 @@ async function bench() {
     cipher = new Map<string, Uint8Array>();
   let failRecordAt = -1,
     posts = 0;
+  // Sin objeto delante, como lo llama el navegador (ver el arnés).
+  const servir = server.fetchImpl;
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'https://drive.sytue.eu');
     if (url.pathname === '/drive/api/pq-vault/records' && init?.method === 'POST') {
       // Un cliente que se cierra a mitad: lo que no llegó no se guarda.
       if (++posts === failRecordAt) return new Response(null, { status: 503 });
     }
-    return server.fetchImpl(input, init);
+    return servir(input, init);
   }) as typeof fetch;
   const source = (): PrivateDriveSource =>
     ({

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -354,7 +353,6 @@ func (c *panelCampos) alCambiarPagina() {
 // filaPropuesta es el `<li class="bg-bg-subtle flex justify-between gap-2 rounded-sm
 // px-2 py-1">`: la etiqueta recortada y el tipo.
 func (c *panelCampos) filaPropuesta(pr Propuesta, ancho float32) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	px, py := tema.Espacio(2), tema.Espacio(1)
 	tipo := c.t(claveDeTipoCampo(pr.Tipo))
 	nombre := pr.Etiqueta
@@ -362,8 +360,8 @@ func (c *panelCampos) filaPropuesta(pr Propuesta, ancho float32) fyne.CanvasObje
 		nombre = c.t("pdf.detect.unnamed")
 	}
 	cabe := ancho - 2*px - tema.Espacio(2) - ui.Medir(tipo, tema.Texto2XS, ui.Normal).Width
-	fondo := canvas.NewRectangle(tema.Color("bg-subtle", v))
-	fondo.CornerRadius = tema.RadioSM
+	fondo := ui.NuevoLiso("bg-subtle")
+	fondo.Radio = tema.RadioSM
 	fila := container.New(aLosLados{},
 		rotuloRecortado(nombre, tema.Texto2XS, ui.Normal, "text", cabe),
 		ui.NuevoRotulo(tipo, tema.Texto2XS, ui.Normal, "text-subtle"))

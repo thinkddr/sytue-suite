@@ -71,7 +71,7 @@ func (p *Pantalla) cargarDoc(id string) {
 			p.docs = map[string]docRemoto{}
 		}
 		p.docs[id] = docRemoto{html: c.Value, err: err, listo: true}
-		p.Repintar()
+		p.repintarJuntos()
 	})
 }
 

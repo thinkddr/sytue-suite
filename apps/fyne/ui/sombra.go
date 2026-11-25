@@ -153,46 +153,60 @@ func (s *Sombra) Ajustar(pos fyne.Position, tam fyne.Size, v tema.Variante) {
 	s.img.Resize(fyne.NewSize(tam.Width+2*s.margen, tam.Height+2*s.margen))
 }
 
-// generar pinta la imagen de la sombra: un plano de alfa por capa, desenfocado y teñido,
-// compuesto de atrás hacia delante.
+// generar pone la imagen de la sombra para ese tamaño y esa variante. La saca de la
+// caché del proceso (sombracache.go), que la pinta si no la tiene: cada tarjeta, hoja o
+// panel que se rehace vuelve a pedir la misma, y desenfocarla otra vez era lo que más
+// pesaba al repintar.
 func (s *Sombra) generar(tam fyne.Size, v tema.Variante) {
 	s.capas = tema.Sombra(s.nivel, v)
 	if s.propias != nil {
 		s.capas = s.propias(v)
 	}
 	s.ancho, s.alto, s.variante, s.hecha = tam.Width, tam.Height, v, true
+	s.margen = margenSombra(s.capas)
+	s.img.Image = imagenSombra(s.capas, s.radio, tam, s.sinInterior)
+	s.img.Refresh()
+}
 
-	// El margen tiene que dar para el desenfoque MÁS el desplazamiento de la capa que
-	// más se salga. 3σ deja por debajo del 0,3 % del alfa, que sobre un 0,18 es nada.
-	s.margen = 0
-	for _, c := range s.capas {
+// margenSombra es lo que la imagen se sale del panel por cada lado: tiene que dar para el
+// desenfoque MÁS el desplazamiento de la capa que más se salga. 3σ deja por debajo del
+// 0,3 % del alfa, que sobre un 0,18 es nada.
+func margenSombra(capas []tema.CapaSombra) float32 {
+	var margen float32
+	for _, c := range capas {
 		alcance := float32(math.Ceil(float64(3*c.Desviacion()))) + max(abs(c.DesplX), abs(c.DesplY))
-		s.margen = max(s.margen, alcance)
+		margen = max(margen, alcance)
 	}
+	return margen
+}
 
-	w := int(math.Ceil(float64(tam.Width + 2*s.margen)))
-	h := int(math.Ceil(float64(tam.Height + 2*s.margen)))
+// pintarSombra pinta la imagen de una sombra entera: un plano de alfa por capa,
+// desenfocado y teñido, compuesto de atrás hacia delante. Es una función pura de lo que
+// recibe —por eso se puede guardar en una caché— y la referencia con la que se compara
+// la sombra de nueve partes (estirarSombra).
+func pintarSombra(capas []tema.CapaSombra, radio float32, tam fyne.Size, sinInterior bool) *image.NRGBA {
+	margen := margenSombra(capas)
+	w := int(math.Ceil(float64(tam.Width + 2*margen)))
+	h := int(math.Ceil(float64(tam.Height + 2*margen)))
 	out := image.NewNRGBA(image.Rect(0, 0, w, h))
 
 	// De atrás hacia delante: en CSS la PRIMERA sombra de la lista se pinta ENCIMA.
-	for i := len(s.capas) - 1; i >= 0; i-- {
-		c := s.capas[i]
-		plano := planoRedondeado(w, h, s.margen+c.DesplX, s.margen+c.DesplY, tam.Width, tam.Height, s.radio)
+	for i := len(capas) - 1; i >= 0; i-- {
+		c := capas[i]
+		plano := planoRedondeado(w, h, margen+c.DesplX, margen+c.DesplY, tam.Width, tam.Height, radio)
 		if desv := c.Desviacion(); desv > 0 {
 			plano = desenfocar(plano, w, h, float64(desv))
 		}
 		componer(out, plano, c.Color)
 	}
 
-	if s.sinInterior {
-		interior := planoRedondeado(w, h, s.margen, s.margen, tam.Width, tam.Height, s.radio)
+	if sinInterior {
+		interior := planoRedondeado(w, h, margen, margen, tam.Width, tam.Height, radio)
 		for i, cobertura := range interior {
 			out.Pix[4*i+3] = uint8(float32(out.Pix[4*i+3])*(1-cobertura) + 0.5)
 		}
 	}
-
-	s.img.Image = out
-	s.img.Refresh()
+	return out
 }
 
 // planoRedondeado rasteriza un rectángulo de esquinas redondeadas en un plano de

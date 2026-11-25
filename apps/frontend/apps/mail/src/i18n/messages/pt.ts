@@ -454,6 +454,7 @@ export const pt: AppCatalog<typeof en> = {
   'compose.templates': 'Modelos',
   'compose.templatesEmpty': 'Ainda não tem modelos. Crie-os nas Definições do Mail.',
   'compose.attachFailed': 'Não foi possível ler o anexo',
+  'compose.openFailed': 'Não foi possível abrir o editor da mensagem. Tente de novo.',
   'compose.pastedImageDropped': 'A imagem colada não foi incluída',
   'compose.pastedImagesDropped': 'As imagens coladas não foram incluídas',
   'compose.pastedImagesDroppedDescription': 'Para enviar imagens, anexe-as como ficheiros.',

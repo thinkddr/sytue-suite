@@ -12,7 +12,7 @@ import (
 // clientCoreAssets se declara en client_core_embed.go (desarrollo: el directorio puede
 // estar sin generar y la ruta contesta 503) o en client_core_embed_imagen.go (-tags
 // imagen, lo que va a la imagen: sin el núcleo generado el binario no compila).
-var compiledClientModules = httpx.NewCompilerAssets(clientCoreAssets, map[string]string{"core": "client_core_assets", "office": "client_core_assets/office", "mail": "client_core_assets/mail", "pdf": "client_core_assets/pdf"})
+var compiledClientModules = httpx.NewCompilerAssets(clientCoreAssets, map[string]string{"core": "client_core_assets", "vault": "client_core_assets/vault", "office": "client_core_assets/office", "mail": "client_core_assets/mail", "pdf": "client_core_assets/pdf"})
 
 func ClientCore(w http.ResponseWriter, r *http.Request) {
 	compiledClientModules.Serve(w, r, chi.URLParam(r, "asset"))

@@ -19,14 +19,14 @@ import {
   readSheetGrid,
   readSheetState,
   subscribeSheetState,
-} from '../sheets/SheetCanvas';
+} from '../sheets/mando';
 import { cleanFormula } from '../sheets/aifill.js';
 import { EditorIcon } from '../icons';
 import { aiErrorCode, aiErrorKey, buildAiRequest, parseAiResponse, type AiAction } from '../ai';
 import type { DocsKey } from '../../i18n';
 import type { EditorContext } from '../types';
 import { bloquesDe, type Bloque } from '@sytue/ai';
-import { dispatchSlidesCommand } from '../slides/SlidesCanvas';
+import { dispatchSlidesCommand } from '../slides/mando';
 
 /** Receta de foco visible (regla de oro §0.6; nunca outline:none sin reemplazo). */
 // El anillo canónico vive en `@sytue/ui/styles.css` (.sytue-focus-ring): una sola

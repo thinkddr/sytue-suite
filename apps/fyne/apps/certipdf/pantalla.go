@@ -151,6 +151,16 @@ type Pantalla struct {
 	escala        float64 // la escala a la que están pedidas las imágenes
 	visor         *fyne.Container
 	raiz          *fyne.Container
+	// arm y movil son el armazón del documento y su barra de la app: por debajo de `md`
+	// la salida, el nombre del documento y el panel suben a ella, que en el teléfono es
+	// la de la suite (la barra única, como Mail y Calendar).
+	arm   *ui.Armazon
+	movil *ui.BarraMovil
+	// marco es el contenido del armazón: la cinta, el cuerpo y el cajón. Es SIEMPRE el
+	// mismo y se le cambian los hijos; uno nuevo en cada recomposición no se volvía a
+	// colocar hasta el siguiente cambio de medida y las hojas se quedaban con el zoom de
+	// antes.
+	marco *fyne.Container
 	// portal es donde se pintan las pistas de la cinta, encima de todo (ver ui.Pista).
 	portal *fyne.Container
 	// ancho es el de la última colocación: decide si una franja parte en dos líneas.
@@ -187,7 +197,28 @@ func NuevaPantalla(tv TraductorVars) *Pantalla {
 	p.barra.AlPanel = func(v bool) { p.PanelAbierto = v; p.Recomponer() }
 	p.barra.AlPulsarDialogo = p.abrirDialogo
 	p.barra.AlDescargar, p.barra.AlImprimir = p.descargar, p.imprimir
+	p.movil = ui.NuevaBarraMovil()
+	p.movil.EnDetalle, p.movil.AlVolver = true, p.barra.AlVolver
+	p.arm = ui.NuevoArmazon(nil)
+	p.arm.BarraMovil = p.movil
 	return p
+}
+
+// ponerBarraApp lleva a la barra de la app la salida, el nombre del documento y el panel.
+func (p *Pantalla) ponerBarraApp() {
+	b, rotulo := p.movil, "pdf.back"
+	if p.barra.DesdeDrive {
+		rotulo = "pdf.backToDrive"
+	}
+	b.RotuloVolver, b.Titulo = p.t(rotulo), p.barra.Titulo
+	panel := ui.NuevoBotonBarraMovil(iconos.Lista, p.t("pdf.panel.title"), func() {
+		if p.barra.AlPanel != nil {
+			p.barra.AlPanel(!p.PanelAbierto)
+		}
+	})
+	panel.Pulsado = p.PanelAbierto
+	b.Acciones = []fyne.CanvasObject{panel}
+	b.Refresh()
 }
 
 // Barra es la cinta, para que quien monta la ventana pueda cablear sus diálogos.
@@ -223,6 +254,10 @@ func (p *Pantalla) recomponer() {
 	b.Pagina, b.Zoom, b.Ajuste, b.DosPaginas = p.PaginaActual, p.Zoom, p.Ajuste, p.DosPaginas
 	b.Trabajando, b.PanelAbierto, b.Ancho = p.Trabajando, p.PanelAbierto, p.ancho
 	b.AlNuevo, b.AlAbrir = p.AlCrear, p.AlElegir
+	b.Titulo, b.EnBarraApp = "", p.ancho > 0 && p.ancho < md
+	if p.doc != nil {
+		b.Titulo = p.doc.Nombre()
+	}
 	cuerpo := p.cuerpo()
 	if p.enDocumento() {
 		p.sincronizarHojas()
@@ -233,11 +268,23 @@ func (p *Pantalla) recomponer() {
 		// La cinta se acaba de rehacer: una pista que estuviera abierta es de un botón
 		// que ya no está y no recibirá nunca su MouseOut.
 		p.portal.Objects = nil
-		p.raiz.Objects = []fyne.CanvasObject{container.New(&marcoPantalla{p: p}, objs...), p.portal}
+		p.ponerBarraApp()
+		if p.marco == nil {
+			p.marco = container.New(&marcoPantalla{p: p})
+			p.arm.Contenido = p.marco
+		}
+		p.marco.Objects = objs
+		p.raiz.Objects = []fyne.CanvasObject{p.arm, p.portal}
+		p.marco.Refresh()
 		return
 	}
-	// Sin documento no hay cinta: `PdfApp` devuelve el estado a pantalla completa.
+	// Sin documento no hay cinta: `PdfApp` devuelve el estado a pantalla completa. Y sin
+	// armazón la barra de la suite vuelve a ser la suya, con la marca: se le avisa.
+	enArmazon := len(p.raiz.Objects) > 0 && p.raiz.Objects[0] == p.arm
 	p.raiz.Objects = []fyne.CanvasObject{cuerpo}
+	if enArmazon {
+		ui.RecolocarBarraSuite(p.raiz)
+	}
 }
 
 // enDocumento es si hay un documento que enseñar, con su cinta.
@@ -366,8 +413,7 @@ func (p *Pantalla) documento() fyne.CanvasObject {
 			partes = append(partes, f)
 		}
 	}
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	fondo := canvas.NewRectangle(tema.Color("bg-subtle", v))
+	fondo := ui.NuevoLiso("bg-subtle")
 	p.panel.PaginaActual = p.PaginaActual
 	// Con el cajón abierto en estrecho, el panel está en el cajón: un objeto no puede
 	// estar en dos sitios, así que en la columna queda un hueco (que ahí no se ve).
@@ -554,7 +600,7 @@ func (c *conPanel) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		objs[0].Hide()
 		objs[1].Move(fyne.NewPos(0, 0))
 		objs[1].Resize(t)
-		c.p.alMedir(t)
+		c.medir(t)
 		return
 	}
 	objs[0].Show()
@@ -564,7 +610,18 @@ func (c *conPanel) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[1].Move(fyne.NewPos(ancho, 0))
 	resto := fyne.NewSize(max(t.Width-ancho, 0), t.Height)
 	objs[1].Resize(resto)
-	c.p.alMedir(resto)
+	c.medir(resto)
+}
+
+// medir ajusta el zoom al hueco y, si cambia, vuelve a colocar las hojas: el desplazador
+// ya se ha colocado con las de antes, y sin otra pasada se quedaban a su medida vieja
+// (al abrir dentro del armazón, a la del zoom 1).
+func (c *conPanel) medir(t fyne.Size) {
+	antes := c.p.Zoom
+	c.p.alMedir(t)
+	if c.p.Zoom != antes && c.p.desplazar != nil {
+		c.p.desplazar.Refresh()
+	}
 }
 
 // marcoPantalla apila la cinta arriba, con su alto fijo, y le da el resto al cuerpo.
@@ -644,13 +701,12 @@ func (p *Pantalla) cajon() []fyne.CanvasObject {
 		p.PanelAbierto = false
 		p.Recomponer()
 	}
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	aspa := ui.NuevoBotonIcono(iconos.Cerrar, p.t("pdf.close"), cerrar)
 	aspa.Lado, aspa.TamIcono, aspa.Radio = tema.Espacio(11), 18, 0.25*tema.Rem
 	aspa.Trazo, aspa.TrazoEncima, aspa.FondoEncima = "text-muted", "text", ""
 	titulo := ui.NuevoRotulo(p.t("pdf.panel.title"), tema.TextoXS, ui.Medio, "text")
-	cabecera := container.New(cabeceraCajon{}, canvas.NewRectangle(tema.Color("border", v)), titulo, aspa)
-	fondo := canvas.NewRectangle(tema.Color("menu-surface", v))
+	cabecera := container.New(cabeceraCajon{}, ui.NuevoLiso("border"), titulo, aspa)
+	fondo := ui.NuevoLiso("menu-surface")
 	if p.sombraCajon == nil {
 		p.sombraCajon = ui.NuevaSombra(tema.SombraXL, 0)
 	}

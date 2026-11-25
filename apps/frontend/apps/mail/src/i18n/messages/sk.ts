@@ -500,6 +500,7 @@ export const sk: AppCatalog<typeof en> = {
   'compose.templates': 'Šablóny',
   'compose.templatesEmpty': 'Zatiaľ nemáte žiadne šablóny. Vytvorte ich v nastaveniach Mailu.',
   'compose.attachFailed': 'Prílohu sa nepodarilo načítať',
+  'compose.openFailed': 'Editor správy sa nepodarilo otvoriť. Skúste to znova.',
   'compose.pastedImageDropped': 'Vložený obrázok nebol zahrnutý',
   'compose.pastedImagesDropped': 'Vložené obrázky neboli zahrnuté',
   'compose.pastedImagesDroppedDescription': 'Ak chcete poslať obrázky, priložte ich ako súbory.',

@@ -243,21 +243,144 @@ func (p *Pantalla) paginaAjustes() fyne.CanvasObject {
 			cuerpo))
 	}
 	relajado := tema.Escalon{Tam: tema.TextoBase.Tam, Linea: 1.625 * tema.TextoBase.Tam}
-	cabecera := container.NewBorder(nil, nil, nil, container.NewVBox(c.volver),
+	ventana := func() float32 { return p.Ventana }
+	cabecera := container.New(&cabeceraAjustesCal{ventana: ventana},
 		ui.EnColumna(tema.Espacio(1.5),
 			ui.NuevoParrafo(p.t("settings.title", nil), ui.EscalonTitulo(2), ui.PesoTitulo(2), "text", v),
-			ui.NuevoParrafo(p.t("settings.description", nil), relajado, ui.Normal, "text-muted", v)))
+			ui.NuevoParrafo(p.t("settings.description", nil), relajado, ui.Normal, "text-muted", v)),
+		c.volver)
+	columnas := &columnasAjustes{ventana: ventana}
 	pagina := ui.EnColumna(tema.Espacio(6),
 		cabecera,
 		seccion("settings.eventsTitle", "settings.eventsDescription",
-			container.NewGridWithColumns(2, campo("settings.duration", c.duracion), campo("settings.reminder", c.recordatorio))),
+			container.New(columnas, campo("settings.duration", c.duracion), campo("settings.reminder", c.recordatorio))),
 		seccion("settings.workTitle", "settings.workDescription",
-			container.NewGridWithColumns(2, campo("settings.workStart", c.inicio), campo("settings.workEnd", c.fin))),
+			container.New(columnas, campo("settings.workStart", c.inicio), campo("settings.workEnd", c.fin))),
 		seccion("settings.viewTitle", "settings.viewDescription",
 			ui.EnColumna(tema.Espacio(3), c.finde, c.numero)),
 	)
 	marco := container.New(&anchoAcotado{max: AnchoPaginaAjustes, canalon: tema.Espacio(6)}, pagina)
 	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(marco))
+}
+
+// columnasAjustes es el `grid gap-4 sm:grid-cols-2` de la web: los campos de una
+// sección en columnas desde `sm` y, por debajo, uno sobre otro con el mismo `gap-4`. El
+// corte mide la VENTANA, como todos los de la hoja; sin medirla aún, se supone ancha. A
+// 390 las dos columnas no cabían y la página entera se salía por la derecha.
+type columnasAjustes struct{ ventana func() float32 }
+
+var _ fyne.Layout = (*columnasAjustes)(nil)
+
+// HuecoColumnasAjustes es el `gap-4` entre los campos, en las dos direcciones.
+var HuecoColumnasAjustes = tema.Espacio(4)
+
+func (l *columnasAjustes) apiladas() bool {
+	v := l.ventana()
+	return v > 0 && v < ui.CorteSM
+}
+
+func (l *columnasAjustes) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for i, o := range objs {
+		m := o.MinSize()
+		w = max(w, m.Width)
+		switch {
+		case !l.apiladas():
+			h = max(h, m.Height)
+		case i > 0:
+			h += HuecoColumnasAjustes + m.Height
+		default:
+			h = m.Height
+		}
+	}
+	if n := float32(len(objs)); n > 0 && !l.apiladas() {
+		w = n*w + (n-1)*HuecoColumnasAjustes
+	}
+	return fyne.NewSize(w, h)
+}
+
+func (l *columnasAjustes) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	if l.apiladas() {
+		y := float32(0)
+		for _, o := range objs {
+			h := o.MinSize().Height
+			o.Move(fyne.NewPos(0, y))
+			o.Resize(fyne.NewSize(t.Width, h))
+			y += h + HuecoColumnasAjustes
+		}
+		return
+	}
+	n := float32(len(objs))
+	ancho := max((t.Width-(n-1)*HuecoColumnasAjustes)/n, 0)
+	for i, o := range objs {
+		o.Move(fyne.NewPos(float32(i)*(ancho+HuecoColumnasAjustes), 0))
+		o.Resize(fyne.NewSize(ancho, t.Height))
+	}
+}
+
+// cabeceraAjustesCal es la cabecera de la página: el título y su entrada con «Volver al
+// calendario» a la derecha (`gap-4`, como `SettingsShell`) y, por debajo de `sm`, el
+// botón debajo del texto. A su derecha, a 390 el título y la entrada se quedaban en
+// media pantalla y el botón se salía. objs son el texto y el botón.
+type cabeceraAjustesCal struct {
+	ventana func() float32
+	// ancho es el último que le dieron: el alto del texto depende de él.
+	ancho float32
+}
+
+var _ fyne.Layout = (*cabeceraAjustesCal)(nil)
+
+func (l *cabeceraAjustesCal) apilada() bool {
+	v := l.ventana()
+	return v > 0 && v < ui.CorteSM
+}
+
+// columnaTexto es el ancho del texto en una cabecera de `ancho`.
+func (l *cabeceraAjustesCal) columnaTexto(objs []fyne.CanvasObject, ancho float32) float32 {
+	if l.apilada() {
+		return ancho
+	}
+	return max(ancho-objs[1].MinSize().Width-HuecoColumnasAjustes, 0)
+}
+
+// AltoCon es lo que mide a ese ancho: la columna de la página lo pregunta así
+// (`ui.AltoA`), porque el texto se reparte en más o menos líneas.
+func (l *cabeceraAjustesCal) AltoCon(objs []fyne.CanvasObject, ancho float32) float32 {
+	texto, boton := ui.AltoA(objs[0], l.columnaTexto(objs, ancho)), objs[1].MinSize().Height
+	if l.apilada() {
+		return texto + HuecoColumnasAjustes + boton
+	}
+	return max(texto, boton)
+}
+
+func (l *cabeceraAjustesCal) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	texto, boton := objs[0].MinSize(), objs[1].MinSize()
+	alto := max(texto.Height, boton.Height)
+	if l.apilada() {
+		alto = texto.Height + HuecoColumnasAjustes + boton.Height
+	}
+	if l.ancho > 0 {
+		alto = l.AltoCon(objs, l.ancho)
+	}
+	if l.apilada() {
+		return fyne.NewSize(max(texto.Width, boton.Width), alto)
+	}
+	return fyne.NewSize(texto.Width+HuecoColumnasAjustes+boton.Width, alto)
+}
+
+func (l *cabeceraAjustesCal) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	l.ancho = t.Width
+	col := l.columnaTexto(objs, t.Width)
+	alto := ui.AltoA(objs[0], col)
+	objs[0].Move(fyne.NewPos(0, 0))
+	objs[0].Resize(fyne.NewSize(col, alto))
+	boton := objs[1].MinSize()
+	if l.apilada() {
+		objs[1].Move(fyne.NewPos(0, alto+HuecoColumnasAjustes))
+	} else {
+		objs[1].Move(fyne.NewPos(t.Width-boton.Width, 0))
+	}
+	objs[1].Resize(boton)
 }
 
 // anchoAcotado centra su hijo con un ancho máximo y un canalón a los lados y arriba

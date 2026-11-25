@@ -75,6 +75,8 @@ export const hu: Catalog = {
   'vault.emptyUnderstood': 'Megértettem, hogy az elveszett kulccsal titkosított adatok törlődnek',
   'vault.failed':
     'A titkosított adatokat nem sikerült megnyitni. Próbálja újra, vagy jelentkezzen be újra a Sytue ID-be. Ha a kulcs elveszett, kiürítheti az alkalmazás titkosított adatait.',
+  'vault.moreInfo': 'További információ',
+  'vault.attention': 'A titkosított adataid figyelmet igényelnek',
   'matrix.incoming': 'Készülék ellenőrzése',
   'matrix.match': 'Egyeznek',
   'matrix.mismatch': 'Nem egyeznek',

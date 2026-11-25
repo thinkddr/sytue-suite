@@ -459,6 +459,7 @@ export const bg: AppCatalog<typeof en> = {
   'compose.templates': 'Шаблони',
   'compose.templatesEmpty': 'Все още нямате шаблони. Създайте ги в Настройки на Mail.',
   'compose.attachFailed': 'Прикаченият файл не можа да се прочете',
+  'compose.openFailed': 'Редакторът на съобщения не можа да се отвори. Опитайте отново.',
   'compose.pastedImageDropped': 'Поставеното изображение не е включено',
   'compose.pastedImagesDropped': 'Поставените изображения не са включени',
   'compose.pastedImagesDroppedDescription':

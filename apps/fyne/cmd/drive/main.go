@@ -105,12 +105,17 @@ func main() {
 		abrirSistema = func() error { return archivos.abrir(s.AbrirDriveEnSistema) }
 	}
 	var control *drivePrivado
-	notify := func(error) {
-		// Keep provider details and private source names out of notices/logs.
+	notify := func(err error) {
+		// Keep provider details and private source names out of notices/logs: solo
+		// el código corto de la comprobación que falló (cifrado.CodigoFallo).
+		codigo := cifrado.CodigoFallo(err)
+		if codigo != "" {
+			slog.Warn("drive: el Drive privado no abrió", "codigo", codigo)
+		}
 		if control != nil && control.pantalla != nil {
 			control.pantalla.AvisarCifrado(cryptoT("matrix.failed"))
 		} else if control != nil {
-			view := ui.NuevoVacio(cryptoT("matrix.failed"), "")
+			view := ui.NuevoVacio(cryptoT("matrix.failed"), codigo)
 			view.Accion = ui.NuevoBoton(tr.T("action.retry", nil), func() {
 				if c := control.ciclo; c != nil {
 					control.preparar(c.ctx)

@@ -105,6 +105,51 @@ func TestElSelectorDeAvatarSoloAbreDesdeLaCamara(t *testing.T) {
 	}
 }
 
+// TestLaCamaraDelSelectorNoTapaLasIniciales: el botón de la cámara va en la esquina del
+// avatar y en la ficha de Contacts (64) tapaba el pie de la segunda inicial (auditoría
+// del 2026-11-24). Se busca la tinta BLANCA de las iniciales en el avatar solo y se
+// comprueba que el botón, colocado, no la pisa, en las dos tallas que lo llevan.
+// VISTO EN ROJO con el `-right-1 -bottom-1` de la web.
+func TestLaCamaraDelSelectorNoTapaLasIniciales(t *testing.T) {
+	for _, talla := range []TallaAvatar{AvatarLG, AvatarXL} {
+		for _, nombre := range []string{"Héctor Lamas", "Ana Ruiz", "Waldo Moreno"} {
+			av := NuevoAvatar(nombre).Con(talla)
+			m := MedidaAvatar(talla)
+			av.Resize(m)
+			img := pinta(t, m.Width, m.Height, av)
+			blanco := tema.Color("neutral-0", tema.Claro)
+			// Solo DENTRO del círculo: fuera está el blanco del lienzo de la prueba.
+			centro, radio := m.Width/2*escala, (m.Width/2-2)*escala
+			tinta := func(x, y int) bool {
+				dx, dy := float32(x)-centro, float32(y)-centro
+				return dx*dx+dy*dy <= radio*radio && cercaDe(px(img, x, y), blanco, 40)
+			}
+			s := NuevoSelectorAvatar(NuevoAvatar(nombre).Con(talla))
+			s.Resize(m)
+			r := test.WidgetRenderer(s).(*selectorAvatarRenderer)
+			r.Layout(m)
+			p := r.fondo.Position()
+			// La tinta de las iniciales (en píxeles de la captura) no entra en el botón.
+			hay := false
+			for y := range img.Bounds().Dy() {
+				for x := range img.Bounds().Dx() {
+					if !tinta(x, y) {
+						continue
+					}
+					hay = true
+					if float32(x) >= p.X*escala && float32(y) >= p.Y*escala {
+						t.Fatalf("talla %v, «%s»: el botón de la cámara (desde %v) tapa la inicial en (%d, %d)",
+							talla, nombre, p, x, y)
+					}
+				}
+			}
+			if !hay {
+				t.Fatalf("«%s»: no hay iniciales que medir", nombre)
+			}
+		}
+	}
+}
+
 // La portada de una tarjeta redondeada: el trozo del centro a la proporción pedida, con las
 // esquinas de ARRIBA transparentes y las de abajo enteras (la tarjeta sigue debajo).
 func TestRecorteRedondeadoArriba(t *testing.T) {

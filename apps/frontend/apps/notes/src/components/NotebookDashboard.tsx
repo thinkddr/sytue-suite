@@ -23,7 +23,7 @@ import {
 import { appUrl, orgActual } from '@sytue/config';
 import { intlTag, type Locale } from '@sytue/i18n';
 import type { DailyDay, Note, NoteInput, Notebook } from '@sytue/api-clients';
-import { textoPegado } from '@sytue/ui/browser/portapapeles';
+import { textoPegado } from '../client/html.js';
 import type { T } from '../i18n/index.js';
 import {
   capturaRapida,

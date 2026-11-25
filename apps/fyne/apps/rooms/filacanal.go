@@ -368,7 +368,10 @@ func (r *filaCanalRenderer) Refresh() {
 	f.rotulo.Color = con(tinta, 1)
 	f.rotulo.Refresh()
 	if f.vivo != nil {
-		f.vivo.FillColor = con("success", 1)
+		// `success-text` y no `success`: el verde de relleno se queda igual en oscuro y
+		// sobre el carril oscuro (o la fila elegida) el punto quedaba a ~2,8:1 (ROOM-03,
+		// auditoría del 2026-11-24); el del texto aclara con el tema.
+		f.vivo.FillColor = con("success-text", 1)
 		f.vivo.Refresh()
 	}
 	if f.fuera != nil {

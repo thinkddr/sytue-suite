@@ -76,6 +76,8 @@ export const de: Catalog = {
     'Ich verstehe, dass die mit dem verlorenen Schlüssel verschlüsselten Daten gelöscht werden',
   'vault.failed':
     'Die verschlüsselten Daten konnten nicht geöffnet werden. Versuche es erneut oder melde dich erneut bei Sytue ID an. Ist der Schlüssel verloren, kannst du die verschlüsselten Daten dieser App leeren.',
+  'vault.moreInfo': 'Weitere Informationen',
+  'vault.attention': 'Deine verschlüsselten Daten brauchen deine Aufmerksamkeit',
   'matrix.incoming': 'Dieses Gerät verifizieren',
   'matrix.match': 'Sie stimmen überein',
   'matrix.mismatch': 'Sie stimmen nicht überein',

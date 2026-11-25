@@ -8,8 +8,18 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
-import { Badge, Button, CardIcon, EmptyState, FieldGroup, Icon, Input, Skeleton } from '@sytue/ui';
+import { MatrixStorageGate } from '@sytue/shell/vault';
+import {
+  Badge,
+  Button,
+  CardIcon,
+  EmptyState,
+  FieldGroup,
+  Icon,
+  Input,
+  Skeleton,
+  marcarAppLista,
+} from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import type { BasesBase } from '@sytue/api-clients/bases';
@@ -65,6 +75,12 @@ function BasesAppBody({ locale, user, hubBaseUrl }: Props): JSX.Element {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  // `sytue:app-ready`: la lista de bases ya está pintada (o su fallo). Lo que se
+  // presupuesta en vez del LCP y lo que espera la bóveda para abrirse detrás.
+  useEffect(() => {
+    if (!cargando) marcarAppLista();
+  }, [cargando]);
 
   async function crear(e: Event): Promise<void> {
     e.preventDefault();

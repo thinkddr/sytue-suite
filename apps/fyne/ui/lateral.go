@@ -218,10 +218,11 @@ func cerrarCajonMovil(o fyne.CanvasObject) {
 
 // azulSobreTinta es la otra mitad de esa reasignación: en la web `--color-primary`
 // cambia para TODO lo que cuelga del `<nav>`, no solo para la cabecera. Así que cada
-// botón PRINCIPAL o SECUNDARIO del cuerpo o del pie —el «Reintentar» de un error de
-// carpetas, el «Mejorar el plan» junto al medidor— pasa también al primario del carril,
-// blanco con el rótulo de su color. El fantasma no usa `primary` de relleno, y en la web
-// tampoco cambia.
+// botón PRINCIPAL del cuerpo o del pie —el «Reintentar» de un error de carpetas, el
+// «Mejorar el plan» junto al medidor— pasa también al primario del carril, blanco con el
+// rótulo de su color. El fantasma no usa `primary` de relleno, y en la web tampoco
+// cambia; el secundario tampoco desde que es de contorno (`bg-surface text-text`, que la
+// reasignación no toca).
 //
 // Se recorre el árbol del menú: contenedores, desplazadores y las
 // piezas del lateral que dicen sus hijos.
@@ -233,7 +234,7 @@ func azulSobreTinta(o fyne.CanvasObject) {
 	switch v := o.(type) {
 	case nil:
 	case *Boton:
-		if (v.Variante == Primario || v.Variante == Secundario) && !v.SobreCromo {
+		if v.Variante == Primario && !v.SobreCromo {
 			v.SobreCromo = true
 			v.Refresh()
 		}
@@ -1477,7 +1478,12 @@ type AccionLateral struct {
 	// apagada es el `opacity-0` de una acción que solo se ve al pasar (ver
 	// `SeccionLateral.AccionesAlPasar`): el glifo no se pinta y el botón sigue ahí.
 	apagada bool
-	giro    *fyne.Animation
+	// giro es el `animate-spin`, que se duerme solo cuando la acción deja de pintarse
+	// (animacionSinFin): un menú rehecho deja la acción vieja fuera del árbol, y Fyne no
+	// destruye su renderer hasta pasado un minuto. girando es que está arrancado, aunque
+	// duerma.
+	giro    animacionSinFin
+	girando bool
 }
 
 // DuracionGiro es el `animate-spin` de Tailwind: `spin 1s linear infinite`.
@@ -1504,15 +1510,16 @@ func (a *AccionLateral) icono() fyne.CanvasObject {
 func (a *AccionLateral) girar() {
 	quiere := a.Girando && a.Glifo != nil && !MenosMovimiento()
 	switch {
-	case quiere && a.giro == nil:
-		a.giro = fyne.NewAnimation(DuracionGiro, func(p float32) { a.Glifo.Girar(360 * p) })
-		a.giro.Curve = fyne.AnimationLinear
-		a.giro.RepeatCount = fyne.AnimationRepeatForever
-		a.giro.Start()
-	case !quiere && a.giro != nil:
-		a.giro.Stop()
-		a.giro = nil
-		a.Glifo.Girar(0)
+	case quiere && !a.girando:
+		a.girando = true
+		glifo := a.Glifo
+		a.giro.arrancar(DuracionGiro, func(p float32) { glifo.Girar(360 * p) })
+	case !quiere && a.girando:
+		a.girando = false
+		a.giro.parar()
+		if a.Glifo != nil {
+			a.Glifo.Girar(0)
+		}
 	}
 }
 
@@ -1561,17 +1568,21 @@ type accionRenderer struct {
 	fondo, tinta transicion
 }
 
-func (r *accionRenderer) MinSize() fyne.Size           { return MedidaAccionLateral() }
-func (r *accionRenderer) Objects() []fyne.CanvasObject { return r.objetos }
+func (r *accionRenderer) MinSize() fyne.Size { return MedidaAccionLateral() }
 
-// Destroy para el giro: el renderer se tira cuando la acción deja de estar en pantalla
-// (Mail rehace su menú con cada dato), y una animación infinita sin nadie que la mire
-// seguiría corriendo hasta que muera el proceso.
+// Objects es también el aviso del pintor al giro: mientras se pinta, gira; fuera del
+// árbol o escondida, se duerme sola (animacionSinFin).
+func (r *accionRenderer) Objects() []fyne.CanvasObject {
+	r.a.giro.pintada()
+	return r.objetos
+}
+
+// Destroy para el giro del todo: el renderer se tira cuando la acción lleva un minuto
+// fuera de la pantalla (Mail rehace su menú con cada dato). Si vuelve a pintarse, el
+// renderer nuevo lo arranca otra vez.
 func (r *accionRenderer) Destroy() {
-	if r.a.giro != nil {
-		r.a.giro.Stop()
-		r.a.giro = nil
-	}
+	r.a.giro.parar()
+	r.a.girando = false
 }
 
 // Layout centra el icono en la caja, a SU tamaño: quien llama pasa el `<Icon size>` de

@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Envoyer quand même",
   "compose.noAttachmentTitle": "Envoyer sans pièce jointe",
   "compose.noDraftsFolder": "Impossible de trouver le dossier Brouillons",
+  "compose.openFailed": "Impossible d’ouvrir l’éditeur de message. Réessayez.",
   "compose.pastedImageDropped": "L’image collée n’a pas été incluse",
   "compose.pastedImagesDropped": "Les images collées n’ont pas été incluses",
   "compose.pastedImagesDroppedDescription": "Pour envoyer des images, joignez-les comme fichiers.",

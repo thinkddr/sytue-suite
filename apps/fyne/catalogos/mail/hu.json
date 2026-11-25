@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Küldés mégis",
   "compose.noAttachmentTitle": "Küldés melléklet nélkül",
   "compose.noDraftsFolder": "A Piszkozatok mappa nem található",
+  "compose.openFailed": "Nem sikerült megnyitni az üzenetszerkesztőt. Próbálja újra.",
   "compose.pastedImageDropped": "A beillesztett kép nem került bele",
   "compose.pastedImagesDropped": "A beillesztett képek nem kerültek bele",
   "compose.pastedImagesDroppedDescription": "Képek küldéséhez csatolja őket fájlként.",

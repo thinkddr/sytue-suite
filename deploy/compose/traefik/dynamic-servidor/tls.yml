@@ -22,5 +22,7 @@ http:
         referrerPolicy: "strict-origin-when-cross-origin"
         stsSeconds: 31536000
         stsIncludeSubdomains: true
+    # Lo que ya trae Content-Encoding (los wasm precomprimidos del núcleo de
+    # cliente) pasa sin recomprimir; ver deploy/helm/sytue-one/templates/edge-security.yaml.
     sytue-compress:
       compress: {}

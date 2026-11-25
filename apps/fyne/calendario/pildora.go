@@ -5,6 +5,8 @@ package calendario
 
 import (
 	"image/color"
+	"strings"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -17,14 +19,17 @@ import (
 )
 
 // AltoPildora es lo que mide el `EventChip` de CalendarGrid.tsx: `py-0.5` a cada lado
-// sobre la caja de línea de `text-xs`, con su borde dentro (`border-box`).
+// sobre la caja de línea de `text-xs`, con su borde dentro (`border-box`), y nunca menos
+// de 24 (`min-h-[max(24px,1.5rem)]`, el objetivo táctil de WCAG 2.5.8; con el relleno
+// medía 20).
 //
-//	1,75 + 14 + 1,75 = 17,5   y el `border` de 1 va DENTRO, así que sigue siendo 17,5
-//
-// La versión `expanded` (`py-1`), que la vista de día usa, mide 21.
+// La versión `expanded` (`py-1`), que la vista de día usa, mide lo mismo. La de DOS
+// líneas (la única píldora de una celda sin barras, `dosLineas`) mide 38: dos cajas de
+// línea, su `py-0.5` y el borde.
 var (
-	AltoPildora          = 2*espacio0p5 + tema.TextoXS.Linea
-	AltoPildoraExpandida = 2*tema.Espacio(1) + tema.TextoXS.Linea
+	AltoPildora          = max(24, 2*espacio0p5+tema.TextoXS.Linea)
+	AltoPildoraExpandida = max(24, 2*tema.Espacio(1)+tema.TextoXS.Linea)
+	AltoPildoraDosLineas = 2*espacio0p5 + 2*tema.TextoXS.Linea + 2*tema.Borde
 )
 
 // pildora es el `EventChip`: una píldora sobre `bg-subtle` con borde, el punto del
@@ -44,6 +49,9 @@ type pildora struct {
 
 	m *Mes
 	o Ocurrencia
+	// dosLineas: la hora y el título van en un párrafo de hasta dos líneas, la segunda
+	// bajo la hora, en vez de cortarse en «08:00 Reunión s…» (`dosLineas` de la web).
+	dosLineas bool
 }
 
 var _ fyne.Widget = (*pildora)(nil)
@@ -122,23 +130,26 @@ func (p *pildora) CreateRenderer() fyne.WidgetRenderer {
 		punto: canvas.NewRectangle(p.o.Color),
 		hora:  ui.Texto(p.hora(), tema.TextoXS, ui.Medio, tema.Color("text-muted", v)),
 		texto: ui.Texto(p.resumen(), tema.TextoXS, ui.Normal, tema.Color("text", v)),
+		resto: ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text", v)),
 		aro:   ui.NuevoAro(tema.RadioSM, 0, v),
 	}
 	r.punto.CornerRadius = LadoPunto / 2
 	// El aro DELANTE: es relleno y la caja opaca le tapa el centro. Pintado encima,
 	// tapaba la píldora entera (regla de `ui.Aro.Antes`).
-	r.objetos = r.aro.Antes(append(r.caja.Objetos(), r.punto, r.hora, r.texto)...)
+	r.objetos = r.aro.Antes(append(r.caja.Objetos(), r.punto, r.hora, r.texto, r.resto)...)
 	r.aro.Ver(false)
 	r.Refresh() // regla 7 de `ui`
 	return r
 }
 
 type pildoraRenderer struct {
-	p       *pildora
-	caja    *ui.Caja
-	punto   *canvas.Rectangle
-	hora    *canvas.Text
-	texto   *canvas.Text
+	p     *pildora
+	caja  *ui.Caja
+	punto *canvas.Rectangle
+	hora  *canvas.Text
+	texto *canvas.Text
+	// resto es la segunda línea de una píldora en dos líneas.
+	resto   *canvas.Text
 	aro     *ui.Aro
 	objetos []fyne.CanvasObject
 }
@@ -151,6 +162,9 @@ func (r *pildoraRenderer) MinSize() fyne.Size {
 	if r.p.conHora() {
 		ancho += ui.Medir(r.p.hora(), tema.TextoXS, ui.Medio).Width + tema.Espacio(1.5)
 	}
+	if r.p.dosLineas {
+		return fyne.NewSize(ancho, AltoPildoraDosLineas)
+	}
 	return fyne.NewSize(ancho, AltoPildora)
 }
 
@@ -161,6 +175,12 @@ func (r *pildoraRenderer) Destroy()                     {}
 // `shrink-0`: lo que no cabe se recorta del título.
 func (r *pildoraRenderer) Layout(t fyne.Size) {
 	r.caja.Redimensionar(t)
+	if r.p.dosLineas {
+		r.dosLineas(t)
+		r.aro.Colocar(t)
+		return
+	}
+	r.resto.Hide()
 	x := espacio1p5 + tema.Borde
 	r.punto.Move(fyne.NewPos(x, (t.Height-LadoPunto)/2))
 	r.punto.Resize(fyne.NewSize(LadoPunto, LadoPunto))
@@ -178,6 +198,48 @@ func (r *pildoraRenderer) Layout(t fyne.Size) {
 	r.aro.Colocar(t)
 }
 
+// dosLineas coloca la píldora en dos líneas: `items-start`, el punto con la primera
+// (`mt-1`) y la hora y el título en el mismo párrafo, así que la primera línea es la
+// hora y las palabras que quepan detrás, y la segunda empieza bajo la hora y corta con
+// «…» lo que no quepa (`line-clamp-2`).
+func (r *pildoraRenderer) dosLineas(t fyne.Size) {
+	arriba := tema.Borde + espacio0p5
+	x := espacio1p5 + tema.Borde
+	r.punto.Move(fyne.NewPos(x, arriba+(tema.TextoXS.Linea-LadoPunto)/2))
+	r.punto.Resize(fyne.NewSize(LadoPunto, LadoPunto))
+	x += LadoPunto + tema.Espacio(1.5)
+	cabe := max(t.Width-x-espacio1p5-tema.Borde, 0)
+	primera := x
+	if r.p.conHora() {
+		r.hora.Show()
+		ui.ColocarTexto(r.hora, tema.TextoXS, x, arriba)
+		primera += ui.Medir(r.p.hora(), tema.TextoXS, ui.Medio).Width + tema.Espacio(1.5)
+	} else {
+		r.hora.Hide()
+	}
+	linea1, linea2 := partirEnDos(r.p.resumen(), max(x+cabe-primera, 0))
+	ui.Truncar(r.texto, linea1, tema.TextoXS, ui.Normal, max(x+cabe-primera, 0))
+	ui.ColocarTexto(r.texto, tema.TextoXS, primera, arriba)
+	r.resto.Show()
+	ui.Truncar(r.resto, linea2, tema.TextoXS, ui.Normal, cabe)
+	ui.ColocarTexto(r.resto, tema.TextoXS, x, arriba+tema.TextoXS.Linea)
+}
+
+// partirEnDos reparte el título: en la primera línea, las palabras que caben en `cabe`;
+// el resto, a la segunda. Una primera palabra que no cabe sola va entera a la primera,
+// que la corta con «…».
+func partirEnDos(s string, cabe float32) (primera, resto string) {
+	palabras := strings.Fields(s)
+	n := 0
+	for n < len(palabras) && ui.Medir(strings.Join(palabras[:n+1], " "), tema.TextoXS, ui.Normal).Width <= cabe {
+		n++
+	}
+	if n == 0 {
+		n = min(1, len(palabras))
+	}
+	return strings.Join(palabras[:n], " "), strings.Join(palabras[n:], " ")
+}
+
 // Refresh pinta el hover de la web: `hover:border-border-strong hover:bg-surface`.
 func (r *pildoraRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
@@ -192,6 +254,8 @@ func (r *pildoraRenderer) Refresh() {
 	r.hora.Refresh()
 	r.texto.Color = tema.Color("text", v)
 	r.texto.Refresh()
+	r.resto.Color = tema.Color("text", v)
+	r.resto.Refresh()
 	r.aro.Ver(r.p.Enfocado())
 }
 
@@ -200,11 +264,32 @@ func (r *pildoraRenderer) Refresh() {
 // con la paleta de antes o viene de otro cliente CalDAV. Lo guardado no se reescribe. Lo
 // que no se pueda leer cae en el acento por defecto, igual que la web.
 func colorDe(s string) color.NRGBA {
-	if c, ok := tokens.TonoDeUsuario(s); ok {
-		return c.NRGBA()
+	tonos.Lock()
+	defer tonos.Unlock()
+	if c, ok := tonos.de[s]; ok {
+		return c
 	}
-	return AcentoPorDefecto
+	c := AcentoPorDefecto
+	if t, ok := tokens.TonoDeUsuario(s); ok {
+		c = t.NRGBA()
+	}
+	// Un calendario es un puñado de colores: el tope solo evita que crezca sin fin con
+	// colores de eventos importados uno a uno.
+	if tonos.de == nil || len(tonos.de) >= topeTonos {
+		tonos.de = map[string]color.NRGBA{}
+	}
+	tonos.de[s] = c
+	return c
 }
+
+// tonos recuerda el tono de cada color guardado: `TonoDeUsuario` busca el más cercano
+// de la paleta en OKLab, y cada repintado lo pedía por cada evento.
+var tonos struct {
+	sync.Mutex
+	de map[string]color.NRGBA
+}
+
+const topeTonos = 256
 
 // hexCrudo convierte un `#rrggbb` en un color tal cual, sin pasar por la paleta: es para
 // los colores de la suite (un token resuelto), no para los que elige la gente.

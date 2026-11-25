@@ -152,7 +152,7 @@ describe('openVaultMailPrivate (ADR 0087)', () => {
       );
     const tras = await abrir('reauth').catch((e: unknown) => e);
     expect(tras).toBeInstanceOf(PqVaultError);
-    expect((tras as PqVaultError).reason).toBe('signin');
+    expect((tras as PqVaultError).reason).toBe('reauth');
     expect(((await abrir('missing').catch((e: unknown) => e)) as PqVaultError).reason).toBe(
       'unavailable',
     );

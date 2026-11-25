@@ -53,6 +53,8 @@ export const sk: AppCatalog<typeof en> = {
   'list.unstar': 'Odobrať {name} z označených hviezdičkou',
   'list.starredTitle': 'S hviezdičkou',
   'list.reviewDuplicates': 'Skontrolovať duplicity ({count})',
+  'list.selectMode': 'Vybrať',
+  'list.moreActions': 'Ďalšie akcie',
   'list.count': {
     one: '{count} kontakt',
     few: '{count} kontakty',

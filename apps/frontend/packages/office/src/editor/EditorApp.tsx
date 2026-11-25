@@ -8,6 +8,9 @@
  * lienzo según kind (folio/hoja/diapositivas), panel de ajustes y barra de
  * estado. Construye el EditorContext (contrato §2) y lo pasa por props a cada
  * zona (y por EditorCtx.Provider para piezas profundas).
+ *
+ * Lo que depende del tipo (el lienzo, los cuerpos de la cinta, sus atajos y su franja)
+ * llega aparte, del editor de ese tipo (`./tipos`): cada documento baja solo el suyo.
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
@@ -17,11 +20,12 @@ import {
   EmptyState,
   ShortcutsModal,
   ToastProvider,
-  type GrupoDeAtajos,
+  marcarAppLista,
 } from '@sytue/ui';
 import { fetchSession } from '@sytue/auth/client';
 import { FranjaPeticion } from '@sytue/shell';
 import { driveFolderUrl } from '@sytue/config';
+import type { DocKind } from '@sytue/api-clients';
 import type { Locale } from '@sytue/i18n';
 import { docsT } from '../i18n';
 import { r } from '../lib/rutas';
@@ -37,11 +41,7 @@ import { StatusBar } from './layout/StatusBar';
 import { LeftRail } from './layout/LeftRail';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { Ribbon } from './ribbon/Ribbon';
-import { PageCanvas } from './canvas/PageCanvas';
-import { SheetCanvas } from './sheets/SheetCanvas';
-import { FranjaHojaProtegida } from './sheets/FranjaHojaProtegida';
-import { atajosPropiosDeHoja } from './sheets/atajosHoja';
-import { SlidesCanvas, presentShortcuts } from './slides/SlidesCanvas';
+import { useEditorDe } from './tipos';
 import { useAtajosDelEditor } from './atajos';
 import { gruposDeAtajos } from './atajosAyuda';
 
@@ -63,6 +63,11 @@ export interface EditorAppProps {
   aiEnabled: boolean;
   /** Carpeta de Drive de la que vino el documento para volver a ella al salir. */
   volverA?: string | undefined;
+  /**
+   * El tipo del documento, si el servidor lo sabe (`entrarEnDocumento`): su editor se
+   * empieza a bajar a la vez que el documento. Sin él, al llegar el documento.
+   */
+  kind?: DocKind | undefined;
 }
 
 export function EditorApp({
@@ -72,6 +77,7 @@ export function EditorApp({
   locale,
   aiEnabled,
   volverA,
+  kind,
 }: EditorAppProps): JSX.Element {
   // useDocument usa useToast: el proveedor debe envolver al hook (§4.4).
   return (
@@ -83,6 +89,7 @@ export function EditorApp({
         locale={locale}
         aiEnabled={aiEnabled}
         volverA={volverA}
+        kind={kind}
       />
       {/* Una sola vez, aquí: deja los diálogos disponibles para el lienzo de hojas
           y diapositivas y para el ribbon, que hacen su trabajo en funciones
@@ -90,18 +97,6 @@ export function EditorApp({
       <DialogosDelEditor />
     </ToastProvider>
   );
-}
-
-/** Los atajos que solo tiene un tipo de documento: en Calcus, los de la rejilla, y en
- *  Diapos, los de presentar, con la pestaña delante para que «Navegar» no se lea como
- *  algo del editor. */
-function propiosDe(kind: EditorContext['kind'], t: EditorContext['t']): GrupoDeAtajos[] {
-  if (kind === 'spreadsheet') return atajosPropiosDeHoja(t);
-  if (kind !== 'presentation') return [];
-  return presentShortcuts(t).map((g) => ({
-    ...g,
-    titulo: `${t('ribbon.tab.present')} › ${g.titulo}`,
-  }));
 }
 
 /** Igualdad campo a campo de FormatState (13 escalares): evita re-render por tick. */
@@ -131,9 +126,12 @@ function EditorShell({
   locale,
   aiEnabled,
   volverA,
+  kind,
 }: EditorAppProps): JSX.Element {
   const data = useDocument(documentId, userId, tenant);
   const t = docsT(locale);
+  // El editor del tipo: con el `kind` de la página, se pide ya, a la vez que el documento.
+  const tipo = useEditorDe(data.doc?.kind ?? kind ?? null);
 
   const [ui, setUiState] = useState<EditorUi>({
     panel: null,
@@ -217,7 +215,18 @@ function EditorShell({
     };
   }, []);
 
-  if (data.status === 'loading' || (data.status === 'ready' && data.doc === null)) {
+  // `sytue:app-ready`: el documento ya está pintado en su lienzo (o el motivo de que no).
+  const pintado =
+    data.status === 'error' || tipo.fallo || (data.doc !== null && tipo.editor !== null);
+  useEffect(() => {
+    if (pintado) marcarAppLista();
+  }, [pintado]);
+
+  if (
+    data.status === 'loading' ||
+    (data.status === 'ready' && data.doc === null) ||
+    (data.status !== 'error' && data.doc && !tipo.editor && !tipo.fallo)
+  ) {
     // Esqueleto del cromo (cabecera · pestañas · ribbon · rail · folio · estado):
     // se percibe más rápido que un spinner y no salta al montar la UI real (§4.4).
     // La clase sytue-editor aporta los tokens de métrica y el lienzo oscuro en dark.
@@ -282,7 +291,8 @@ function EditorShell({
     );
   }
 
-  if (data.status === 'error' || data.doc === null) {
+  const editor = tipo.editor;
+  if (data.status === 'error' || data.doc === null || !editor) {
     return (
       <div class="bg-surface flex h-full w-full items-center justify-center">
         <EmptyState
@@ -355,14 +365,7 @@ function EditorShell({
     volverA,
   };
 
-  const canvas =
-    ctx.kind === 'spreadsheet' ? (
-      <SheetCanvas ctx={ctx} />
-    ) : ctx.kind === 'presentation' ? (
-      <SlidesCanvas ctx={ctx} />
-    ) : (
-      <PageCanvas ctx={ctx} />
-    );
+  const { Lienzo, Franja } = editor;
 
   return (
     // El proveedor de idioma envuelve al del editor: las piezas profundas de las
@@ -383,16 +386,14 @@ function EditorShell({
                   locale={locale}
                 />
                 {/* Con permiso, una hoja protegida es un bloqueo propio: «Editar». */}
-                {!data.soloLectura && ctx.kind === 'spreadsheet' ? (
-                  <FranjaHojaProtegida locale={locale} />
-                ) : null}
+                {!data.soloLectura && Franja ? <Franja locale={locale} /> : null}
               </>
             ) : undefined
           }
           header={<EditorHeader ctx={ctx} />}
-          ribbon={<Ribbon ctx={ctx} />}
+          ribbon={<Ribbon ctx={ctx} cuerpos={editor.cuerpos} />}
           rail={<LeftRail ctx={ctx} />}
-          main={canvas}
+          main={<Lienzo ctx={ctx} />}
           settings={<SettingsPanel ctx={ctx} />}
           status={<StatusBar ctx={ctx} />}
           panelOpen={ui.panel !== null || ui.settingsOpen}
@@ -403,7 +404,7 @@ function EditorShell({
           open={ui.atajos === true}
           onClose={() => setUi({ atajos: false })}
           title={t('view.shortcuts')}
-          groups={ui.atajos ? gruposDeAtajos(ctx.kind, t, propiosDe(ctx.kind, t)) : []}
+          groups={ui.atajos ? gruposDeAtajos(ctx.kind, t, editor.atajos(t)) : []}
         />
       </EditorCtx.Provider>
     </EditorI18nCtx.Provider>

@@ -18,9 +18,9 @@ import {
   answersToText,
   buildFormFieldHtml,
   coerceFieldValue,
-  extractFormAnswers,
   parseOptions,
 } from '../src/editor/formfields';
+import { extractFormAnswers } from '../src/editor/formfields-respuestas';
 import type { FormAnswer, FormFieldType } from '../src/editor/formfields';
 
 test('buildFormFieldHtml: markup por tipo', () => {

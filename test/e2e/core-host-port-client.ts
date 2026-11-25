@@ -51,7 +51,7 @@ async function run(): Promise<void> {
   const assertOpen = (): void => {
     if (!allowed || lease.signal.aborted) throw new Error("retired");
   };
-  const runtime = new PqcRuntime({ signal: lease.signal, binding, assertOpen });
+  const runtime = new PqcRuntime({ signal: lease.signal, binding, assertOpen }, 'core');
   const journal = new PqcEncryptedJournal(
     scope,
     () => allowed && !lease.signal.aborted,

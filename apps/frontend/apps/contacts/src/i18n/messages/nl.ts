@@ -48,6 +48,8 @@ export const nl: AppCatalog<typeof en> = {
   'list.unstar': 'Ster van {name} verwijderen',
   'list.starredTitle': 'Met ster',
   'list.reviewDuplicates': 'Duplicaten bekijken ({count})',
+  'list.selectMode': 'Selecteren',
+  'list.moreActions': 'Meer acties',
   'list.count': { one: '{count} contact', other: '{count} contacten' },
   'list.countFiltered': {
     one: '{shown} van {count} contact',

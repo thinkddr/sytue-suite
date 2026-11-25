@@ -142,15 +142,17 @@ func (m *Miniatura) AccessibilityLabel() string { return m.Rotulo }
 // 79 y lo pisaría. Quien toca la foto para abrirla la marcaría.
 const ladoToqueCorazon = 8 * 0.25 * tema.Rem
 
-// sinHover dice si aquí no hay «pasar por encima» (un teléfono): el corazón va entonces
-// SIEMPRE a la vista, que es el `pointer-coarse:opacity-100` de la web. Un botón que no
-// se ve y se pulsa le roba el toque a la foto. Es una variable por las pruebas.
-var sinHover = ui.EsMovil
-
 // corazonVisible dice si el corazón se ve: siempre en una favorita, al pasar por encima
-// en las demás —o siempre, donde no hay puntero que pase— y nunca mientras se selecciona.
+// en las demás y nunca mientras se selecciona.
+//
+// Con el dedo no hay «pasar por encima», así que en el teléfono solo lo llevan las
+// favoritas. Hasta la auditoría estética del 2026-11-24 iba en TODAS (el
+// `pointer-coarse:opacity-100` de la web): un corazón en cada miniatura recargaba la
+// galería y no distinguía las favoritas, que se pintaban con el mismo corazón hueco.
+// Con el dedo una foto se marca desde el visor o seleccionándola; y como el corazón que
+// no se ve tampoco se pulsa (Tapped), no le roba el toque a la foto.
 func (m *Miniatura) corazonVisible() bool {
-	return m.RotuloFavorita != "" && !m.Seleccionando && (m.Foto.Favorite || m.encima || sinHover())
+	return m.RotuloFavorita != "" && !m.Seleccionando && (m.Foto.Favorite || m.encima)
 }
 
 // Tapped abre la foto, o la marca si se está seleccionando. Quién es cada cosa lo
@@ -247,7 +249,10 @@ func (m *Miniatura) CreateRenderer() fyne.WidgetRenderer {
 	r.marca = ui.NuevaCaja(negro50, blanco, tema.RadioPill)
 	r.tic = iconos.Trazo(iconos.Tic, iconoTesela, "on-primary", v)
 	r.fondoCoraz = ui.NuevaCaja(negro60, color.NRGBA{}, tema.Forma("radius-control"))
+	// Hueco en la que no es favorita y LLENO en la que sí, como el `fill: currentColor`
+	// de la web: los dos y se enseña el que toca, que la favorita cambia sin rehacer.
 	r.corazon = iconos.TrazoConTinta(iconos.Corazon, iconoTesela, blanco)
+	r.corazonLleno = iconos.TrazoLlenoConTinta(iconos.Corazon, iconoTesela, blanco)
 	r.fondoAprox = ui.NuevaCaja(tema.Color(fondoAprox, v), color.NRGBA{}, tema.RadioSM)
 	r.fondoCandado = ui.NuevaCaja(negro60, color.NRGBA{}, tema.RadioPill)
 	r.candado = iconos.TrazoConTinta(iconos.Candado, iconoCandado, blanco)
@@ -291,8 +296,10 @@ type miniaturaRenderer struct {
 	tic        *iconos.Dibujo
 	fondoCoraz *ui.Caja
 	corazon    *iconos.Dibujo
-	fondoAprox *ui.Caja
-	aprox      *canvas.Text
+	// corazonLleno es el de una favorita.
+	corazonLleno *iconos.Dibujo
+	fondoAprox   *ui.Caja
+	aprox        *canvas.Text
 	// fondoCandado y candado son la marca de una foto cifrada.
 	fondoCandado *ui.Caja
 	candado      *iconos.Dibujo
@@ -309,7 +316,7 @@ func (r *miniaturaRenderer) rehacer() {
 	r.objetos = append(r.objetos, r.marca.Objetos()...)
 	r.objetos = append(r.objetos, r.tic.Objeto())
 	r.objetos = append(r.objetos, r.fondoCoraz.Objetos()...)
-	r.objetos = append(r.objetos, r.corazon.Objeto())
+	r.objetos = append(r.objetos, r.corazon.Objeto(), r.corazonLleno.Objeto())
 	r.objetos = append(r.objetos, r.fondoAprox.Objetos()...)
 	r.objetos = append(r.objetos, r.aprox)
 	r.objetos = append(r.objetos, r.fondoCandado.Objetos()...)
@@ -377,7 +384,9 @@ func (r *miniaturaRenderer) Layout(t fyne.Size) {
 	ui.MoverCaja(r.fondoCoraz, fyne.NewPos(margenMarca, y), fyne.NewSize(lado, lado))
 	verCaja(r.fondoCoraz, verCorazon)
 	r.corazon.Colocar(margenMarca+rellenoCoraz, y+rellenoCoraz, iconoTesela)
-	r.corazon.Ver(verCorazon)
+	r.corazon.Ver(verCorazon && !m.Foto.Favorite)
+	r.corazonLleno.Colocar(margenMarca+rellenoCoraz, y+rellenoCoraz, iconoTesela)
+	r.corazonLleno.Ver(verCorazon && m.Foto.Favorite)
 
 	// La marca de «fecha aproximada», abajo a la derecha, al pasar por encima o con el
 	// foco dentro (`group-hover` y `group-focus-within`).

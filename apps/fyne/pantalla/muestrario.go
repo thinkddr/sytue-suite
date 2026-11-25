@@ -237,7 +237,8 @@ func seccionCampos(tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 	izquierda := columna(tema.Espacio(4),
 		ui.GrupoCampo("Nombre", true, nombre, "", ""),
 		ui.GrupoCampo("Correo", true, correo, "", "Falta el dominio del correo."),
-		ui.GrupoCampo("Cargo", false, inerte, "Lo cambia la administración.", ""))
+		ui.GrupoCampo("Cargo", false, inerte, "Lo cambia la administración.", ""),
+		ui.GrupoCampo("Buscador de vista", false, ui.NuevoBuscador("Buscar en el correo"), "", ""))
 	cuando := ui.NuevoCampoFechaHora(ui.CampoMD, time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC))
 	derecha := columna(tema.Espacio(4),
 		ui.GrupoCampo("Notas", false, notas, "Se envía a las personas invitadas.", ""),

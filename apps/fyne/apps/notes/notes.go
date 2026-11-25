@@ -432,7 +432,20 @@ func Ordenar(notas []Nota, o Orden, _ i18n.Locale) []Nota {
 // Filtrar es el `notasVisibles` de NotesApp.tsx: el texto se busca en título y cuerpo,
 // sin distinguir mayúsculas, y el estado de etiqueta es un filtro aparte.
 func Filtrar(notas []Nota, texto, estado string) []Nota {
+	return filtrarCon(notas, texto, estado, textoDeNota)
+}
+
+// textoDeNota es lo que el filtro busca en una nota: el título y el texto del cuerpo, sin
+// acentos ni mayúsculas.
+func textoDeNota(n Nota) string { return buscar.Plegar(n.Titulo + " " + htmltext.Text(n.Contenido)) }
+
+// filtrarCon es Filtrar con el texto de cada nota sacado de `texto`. Sin nada que filtrar
+// devuelve las mismas notas: copiarlas eran ~2 MB por repintado en un cuaderno de mil.
+func filtrarCon(notas []Nota, texto, estado string, textoDe func(Nota) string) []Nota {
 	q := buscar.Plegar(strings.TrimSpace(texto))
+	if q == "" && estado == "" {
+		return notas
+	}
 	var out []Nota
 	for _, n := range notas {
 		if estado != "" && !slices.ContainsFunc(n.Estados, func(s api.NoteState) bool {
@@ -440,12 +453,31 @@ func Filtrar(notas []Nota, texto, estado string) []Nota {
 		}) {
 			continue
 		}
-		if q != "" && !strings.Contains(buscar.Plegar(n.Titulo+" "+htmltext.Text(n.Contenido)), q) {
+		if q != "" && !strings.Contains(textoDe(n), q) {
 			continue
 		}
 		out = append(out, n)
 	}
 	return out
+}
+
+// textosPlegados recuerda el texto de filtrar de cada nota mientras no cambien su título
+// ni su cuerpo: pasar el HTML a texto y plegarlo era lo que más costaba de cada repintado
+// con el filtro puesto.
+type textosPlegados map[string]textoPlegado
+
+type textoPlegado struct{ titulo, contenido, plegado string }
+
+func (c *textosPlegados) de(n Nota) string {
+	if t, ok := (*c)[n.ID]; ok && t.titulo == n.Titulo && t.contenido == n.Contenido {
+		return t.plegado
+	}
+	if *c == nil {
+		*c = textosPlegados{}
+	}
+	t := textoPlegado{titulo: n.Titulo, contenido: n.Contenido, plegado: textoDeNota(n)}
+	(*c)[n.ID] = t
+	return t.plegado
 }
 
 // Nodo es una nota con las que cuelgan de ella (`client/arbol.ts`).

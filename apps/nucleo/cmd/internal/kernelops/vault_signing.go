@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //go:build js && wasm
 
-package main
+package kernelops
 
 import (
 	"syscall/js"
@@ -13,10 +13,10 @@ import (
 // aquí, en el núcleo, como la identidad de cifrado. El navegador nunca implementa
 // Ed25519 ni ML-DSA: solo guarda la clave dentro del secreto de la bóveda.
 func init() {
-	domainOperations["vault.signing.create"] = vaultSigningCreate
-	domainOperations["vault.signing.public"] = vaultSigningPublic
-	domainOperations["vault.signing.sign"] = vaultSigningSign
-	domainOperations["vault.signing.enroll"] = vaultSigningEnroll
+	Operations["vault.signing.create"] = vaultSigningCreate
+	Operations["vault.signing.public"] = vaultSigningPublic
+	Operations["vault.signing.sign"] = vaultSigningSign
+	Operations["vault.signing.enroll"] = vaultSigningEnroll
 }
 
 const (

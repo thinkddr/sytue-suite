@@ -118,7 +118,8 @@ func (p *Pantalla) notaEnArrastre(n Nota, en fyne.Position) (*Tarjeta, bool) {
 		return nil, false
 	}
 	for _, t := range p.lienzo.vivas {
-		if t.nota.ID == n.ID || t.nota.Grupo != n.Grupo || t.nota.Fijada != n.Fijada || !contienePunto(t, en) {
+		// La que su columna no cuelga no está en la ventana: su posición es de cuando lo estuvo.
+		if t.fuera || t.nota.ID == n.ID || t.nota.Grupo != n.Grupo || t.nota.Fijada != n.Fijada || !contienePunto(t, en) {
 			continue
 		}
 		a := fyne.CurrentApp().Driver().AbsolutePositionForObject(t)
@@ -168,6 +169,8 @@ func (p *Pantalla) marcarArrastreNota(n Nota, en fyne.Position) {
 	}
 	p.autoArrastre.Actualizar(s, en, func(_, dy float32) {
 		s.ScrollToOffset(fyne.NewPos(s.Offset.X, s.Offset.Y+dy))
+		// ScrollToOffset no avisa a OnScrolled: las tarjetas que entran, a mano.
+		p.lienzo.alDesplazar()
 		p.marcarDestinoNota(n, en)
 	})
 }

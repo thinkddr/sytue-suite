@@ -24,7 +24,8 @@ import (
 //   - `.sytue-focus-ring-inset` — `box-shadow: 0 0 0 1px var(--sytue-surface),
 //     0 0 0 3px var(--sytue-focus-ring)`. Abre un pelo del color de la superficie antes
 //     del anillo, o el anillo se funde con el relleno de un botón sólido. Es el de los
-//     botones.
+//     botones. Y su anillo es del color del TEXTO, no el de foco: la hoja reasigna
+//     `--sytue-focus-ring` a `--sytue-text` en esa clase (ver `tokenPintado`).
 //
 // # Tres cosas que hay que saber para no equivocarse al usarlo
 //
@@ -94,10 +95,9 @@ func NuevoAro(radio, sep float32, v tema.Variante) *Aro {
 // ahí Sidebar.tsx pide `chrome-focus`, que es blanco
 // (`.sytue-focus-ring-chrome`).
 func NuevoAroCon(token string, radio, sep float32, v tema.Variante) *Aro {
-	a := &Aro{
-		anillo: canvas.NewRectangle(tema.Color(token, v)), sep: sep, token: token,
-		arriba: radio, abajo: radio, tinta: tema.Color(token, v), fondo: tema.Color("surface", v),
-	}
+	a := &Aro{sep: sep, token: token, arriba: radio, abajo: radio, fondo: tema.Color("surface", v)}
+	a.tinta = tema.Color(a.tokenPintado(), v)
+	a.anillo = canvas.NewRectangle(a.tinta)
 	a.anillo.CornerRadius = RadioExtendido(radio, sep+grosorAro)
 	a.anillo.Hide()
 	if sep > 0 {
@@ -318,6 +318,20 @@ func (a *Aro) repintar() {
 	}
 }
 
+// tokenPintado es el color que pinta el anillo. Con hueco —el aro de lo que va sobre
+// RELLENO, `.sytue-focus-ring-inset`—, el `focus-ring` de siempre pasa a ser `text`: la
+// hoja lo cambia ahí (`--sytue-focus-ring: var(--sytue-text)`) porque el token de foco ES
+// el primario, y sobre un botón principal el aro se fundía con su relleno y solo se veía
+// el pelo del hueco, como si el botón engordara. El texto contrasta con la superficie del
+// hueco y con cualquier relleno de acento en los tres temas. Un token propio —el aro
+// blanco del cromo, `sidebar-focus`— se queda: la regla del cromo va después y gana.
+func (a *Aro) tokenPintado() string {
+	if a.sep > 0 && a.token == "focus-ring" {
+		return "text"
+	}
+	return a.token
+}
+
 // CambiarToken cambia el color del anillo sin reconstruirlo: es para el control que vive
 // a ratos sobre el carril y a ratos fuera (los de la barra, que por debajo de 768 es
 // carril entera). Se ve en el siguiente `Pintar`.
@@ -325,7 +339,7 @@ func (a *Aro) CambiarToken(token string) { a.token = token }
 
 // Pintar recolorea el aro al cambiar de tema, sin reconstruirlo.
 func (a *Aro) Pintar(v tema.Variante) {
-	tinta, fondo := tema.Color(a.token, v), tema.Color("surface", v)
+	tinta, fondo := tema.Color(a.tokenPintado(), v), tema.Color("surface", v)
 	cambia := tinta != a.tinta || fondo != a.fondo
 	a.tinta, a.fondo = tinta, fondo
 	if a.abierto {

@@ -217,13 +217,15 @@ func nuevoRevisor(f *Folio, t func(string, i18n.Vars) string, loc i18n.Locale) *
 	r.aceptar = ui.NuevoBoton(r.tr("revision.acceptAll"), todos(true)).Con(ui.Fantasma, ui.TallaSM)
 	r.rechazar = ui.NuevoBoton(r.tr("revision.rejectAll"), todos(false)).Con(ui.Fantasma, ui.TallaSM)
 	// `border-border mt-auto flex gap-1.5 border-t pt-2`.
-	raya := canvas.NewRectangle(tema.Color("border", v))
-	raya.SetMinSize(fyne.NewSize(0, tema.Borde))
+	raya := ui.NuevoLiso("border")
+	raya.Minimo = fyne.NewSize(0, tema.Borde)
 	pie := container.New(ui.Columna{}, raya, container.New(layout.NewCustomPaddedLayout(tema.Espacio(2), 0, 0, 0),
 		container.New(ui.Fila{Hueco: tema.Espacio(1.5)}, r.aceptar, r.rechazar)))
 	medio := container.New(layout.NewCustomPaddedLayout(tema.Espacio(2), tema.Espacio(2), 0, 0), container.NewVScroll(r.lista))
-	r.objeto = container.New(layout.NewCustomPaddedLayout(MargenCuerpo, MargenCuerpo, MargenCuerpo, MargenCuerpo),
-		container.NewBorder(nav, pie, nil, nil, medio))
+	// Las tarjetas se componen con los colores ya resueltos: al cambiar de tema en
+	// caliente se vuelven a componer, o se quedaban en el tema anterior.
+	r.objeto = ui.RehacerConElTema(container.New(layout.NewCustomPaddedLayout(MargenCuerpo, MargenCuerpo, MargenCuerpo, MargenCuerpo),
+		container.NewBorder(nav, pie, nil, nil, medio)), r.pintar)
 	return r
 }
 

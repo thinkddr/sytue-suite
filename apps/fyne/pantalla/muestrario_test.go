@@ -227,6 +227,8 @@ var fueraDelMuestrario = map[string]string{
 	"NuevoFondoSuite":                "fondo del modo traslúcido de una ventana entera; sale en las capturas de cada app",
 	"NuevoGif":                       "necesita un GIF decodificado; lo usa Rooms",
 	"NuevoImportarDatos":             "necesita el traductor y el servicio de integraciones",
+	"NuevoLiso":                      "primitiva de relleno plano que sigue al tema: la usan las cintas y los paneles de las apps",
+	"NuevoLisoCon":                   "variante de NuevoLiso con un color calculado en vez de un token",
 	"NuevoLateral":                   "lateral entero de una app; sale en las capturas de cada app",
 	"NuevoMesFecha":                  "calendario del selector de fecha, con su idioma y su zona; sale en Calendar",
 	"NuevoParrafoConTinta":           "variante de NuevoParrafo con un color suelto en vez de un token",

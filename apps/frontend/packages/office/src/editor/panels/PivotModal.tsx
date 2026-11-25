@@ -18,7 +18,7 @@ import { Button, Checkbox, FieldGroup, Input, Modal, Select } from '@sytue/ui';
 import { useT } from '../context';
 import type { DocsKey } from '../../i18n';
 import { EditorIcon } from '../icons';
-import { dispatchSheetCommand, readSheetValues } from '../sheets/SheetCanvas';
+import { dispatchSheetCommand, readSheetValues } from '../sheets/mando';
 import { NUMFMT_PRESETS, formatCellValue, parseRangeRef } from '../sheets/format';
 import { PIVOT_DATES, PIVOT_FNS, PIVOT_SHOWS, pivotItems } from '../sheets/pivot';
 import type { PivotFieldRef, PivotShow, PivotValueRef, SheetPivot } from '../sheets/pivot';

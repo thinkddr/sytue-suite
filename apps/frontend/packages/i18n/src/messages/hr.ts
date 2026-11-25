@@ -74,6 +74,8 @@ export const hr: Catalog = {
   'vault.emptyUnderstood': 'Razumijem da će podaci šifrirani izgubljenim ključem biti izbrisani',
   'vault.failed':
     'Šifrirane podatke nije bilo moguće otvoriti. Pokušajte ponovno ili se ponovno prijavite u Sytue ID. Ako je ključ izgubljen, možete isprazniti šifrirane podatke ove aplikacije.',
+  'vault.moreInfo': 'Više informacija',
+  'vault.attention': 'Tvoji šifrirani podaci trebaju pažnju',
   'matrix.incoming': 'Potvrdi ovaj uređaj',
   'matrix.match': 'Podudaraju se',
   'matrix.mismatch': 'Ne podudaraju se',

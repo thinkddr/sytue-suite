@@ -337,6 +337,11 @@ func (r *fichaRenderer) Refresh() {
 		fondo = tema.Color("bg-subtle", v)
 	}
 	r.caja.Pintar(fondo, borde)
+	// Las dos tintas también, aquí y no solo al montar: si no, al cambiar de tema en
+	// caliente la galería de estilos se quedaba con el texto del tema anterior.
+	r.muestra.Color, r.nombre.Color = tema.Color(r.f.e.token, v), tema.Color("text-subtle", v)
+	r.muestra.Refresh()
+	r.nombre.Refresh()
 	r.aro.Pintar(v)
 	r.aro.Ver(r.f.Enfocado)
 	if s := r.f.Size(); s.Width > 0 { // sin tamaño todavía: la caja con borde saldría negativa

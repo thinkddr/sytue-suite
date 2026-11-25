@@ -912,14 +912,19 @@ func (r *lanzadorRenderer) altoRejilla(ventana, ancho float32) float32 {
 		if i > 0 {
 			alto += rj.Hueco
 		}
-		alto += r.altoFila(i, cols, anchoCol)
+		alto += r.altoFila(i, cols, anchoCol, ventana)
 	}
 	return alto
 }
 
-func (r *lanzadorRenderer) altoFila(desde, cols int, anchoCol float32) float32 {
+func (r *lanzadorRenderer) altoFila(desde, cols int, anchoCol, ventana float32) float32 {
 	if tema.EsMarco() {
-		return AltoTeselaCompacta // una línea de descripción: todas miden lo mismo
+		// Una línea de descripción, todas iguales; en el teléfono, hasta dos.
+		var alto float32
+		for i := desde; i < len(r.teselas) && i < desde+cols; i++ {
+			alto = max(alto, AltoTeselaCompactaCon(LineasCompacta(r.teselas[i].Descripcion, anchoCol, ventana < ui.CorteSM)))
+		}
+		return max(alto, AltoTeselaCompacta)
 	}
 	var alto float32
 	for i := desde; i < len(r.teselas) && i < desde+cols; i++ {
@@ -934,7 +939,10 @@ func (r *lanzadorRenderer) filasConectadas(ventana, ancho float32) (cols int, co
 	rj := r.rejillaApps(ventana)
 	cols, col = rj.Columnas(ancho), rj.AnchoColumna(ancho)
 	for i := 0; i < len(r.conectadas); i += cols {
-		alto := AltoTeselaCompacta // Marco: una línea de descripción, como las propias
+		alto := AltoTeselaCompacta // Marco: como las propias (altoFila)
+		for c := i; tema.EsMarco() && c < len(r.conectadas) && c < i+cols; c++ {
+			alto = max(alto, AltoTeselaCompactaCon(LineasCompacta(r.conectadas[c].App.Description, col, ventana < ui.CorteSM)))
+		}
 		if !tema.EsMarco() {
 			alto = 0
 			for c := i; c < len(r.conectadas) && c < i+cols; c++ {
@@ -1244,7 +1252,7 @@ func (r *lanzadorRenderer) colocarRejilla(x, y, ventana, ancho float32) float32 
 	cols := rj.Columnas(ancho)
 	col := rj.AnchoColumna(ancho)
 	for i := 0; i < len(r.teselas); i += cols {
-		alto := r.altoFila(i, cols, col)
+		alto := r.altoFila(i, cols, col, ventana)
 		for c := 0; c < cols && i+c < len(r.teselas); c++ {
 			o := r.teselas[i+c]
 			o.Move(fyne.NewPos(x+rj.X(ancho, c), y))

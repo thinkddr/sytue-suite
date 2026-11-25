@@ -48,6 +48,8 @@ export const bg: AppCatalog<typeof en> = {
   'list.unstar': 'Премахване на {name} от контактите със звезда',
   'list.starredTitle': 'Със звезда',
   'list.reviewDuplicates': 'Преглед на дубликати ({count})',
+  'list.selectMode': 'Избор',
+  'list.moreActions': 'Още действия',
   'list.count': { one: '{count} контакт', other: '{count} контакта' },
   'list.countFiltered': { one: '{shown} от {count} контакт', other: '{shown} от {count} контакта' },
   'list.countWithLabel': '{summary} · {label}',

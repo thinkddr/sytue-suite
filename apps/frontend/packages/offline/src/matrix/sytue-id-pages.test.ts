@@ -117,7 +117,7 @@ interface E2E {
   relayOutcome: (
     cfg: Record<string, unknown>,
     r: RelayResult,
-  ) => 'enroll' | 'lost' | 'go' | 'confirm' | 'login' | 'failed';
+  ) => 'enroll' | 'lost' | 'go' | 'login' | 'failed';
   safeReturn: (url: string) => string;
   navigableReturn: (url: string) => string;
   passwordChangeForm: (form: unknown, opts?: Record<string, unknown>) => void;
@@ -558,7 +558,7 @@ describe('relay', () => {
     expect(web).toEqual({ unlocked: true, blob: '' });
   });
 
-  test("a web app's bridge gets the key this browser already holds after a click, never silently", async () => {
+  test("a web app's bridge gets the key this browser already holds without asking anything", async () => {
     const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
     await e2e.saveUnlock(vectors.user_id, key.slice());
     const { f, calls } = recorder();
@@ -576,8 +576,9 @@ describe('relay', () => {
     expect(calls).toEqual([]);
     expect(r.stored).toBe(true);
     expect((await openDelivery(r.blob!)).key).toBe(vectors.unlock_key);
-    expect(e2e.relayOutcome(cfg, r)).toBe('confirm');
-    // A key just opened with the password that was typed needs no second question.
+    // The key belongs to the account and lives in Sytue ID: no click per app.
+    expect(e2e.relayOutcome(cfg, r)).toBe('go');
+    // A key just opened with the password that was typed needs no question either.
     expect(e2e.relayOutcome(cfg, { unlocked: true, blob: r.blob! })).toBe('go');
     // A native app and an ordinary web sign-in leave as they always did.
     expect(e2e.relayOutcome({ ...cfg, web: false }, r)).toBe('go');
@@ -610,7 +611,7 @@ describe('relay', () => {
     const relay = source('relay.js');
     expect(relay).toContain('global.location.replace(login)');
     expect(relay).toContain('show("e2e-failed")');
-    expect(relay).toContain('show("e2e-confirm")');
+    expect(relay).not.toContain('e2e-confirm');
   });
 
   test('after a password change, the browser that holds the key re-wraps it with the new password', async () => {

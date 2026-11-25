@@ -5,8 +5,10 @@
   "description": "Sytue One \u2014 motor de f\u00f3rmulas clean-room (sem\u00e1ntica OpenFormula / ECMA-376) para el KIND spreadsheet del editor Sytue Docs. Parser, grafo de dependencias, rec\u00e1lculo topol\u00f3gico y registro de funciones. TypeScript puro, cero dependencias.",
   "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./ligero": "./src/ligero.ts"
   },
   "files": [
     "src"

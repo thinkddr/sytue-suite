@@ -93,8 +93,14 @@ func TestElResumenSeEligeEnSuMenuYSeRecuerda(t *testing.T) {
 	if !slices.Equal(textos, quiero) {
 		t.Errorf("el menú ofrece %q y la web %q", textos, quiero)
 	}
-	if e := elementoMenu(t, m, "Suma: 3"); !e.Marcada || !e.Inerte {
-		t.Error("la suma, única elegida, va marcada y no se puede quitar")
+	// La suma, única elegida, va marcada y con la tinta de las demás (apagada salía en
+	// gris, a ~2,5:1); pulsarla no la quita.
+	if e := elementoMenu(t, m, "Suma: 3"); !e.Marcada || e.Inerte {
+		t.Error("la suma, única elegida, va marcada y sin apagar")
+	}
+	test.Tap(elementoMenu(t, m, "Suma: 3"))
+	if got := p.Resumen(); got != "Suma: 3" {
+		t.Errorf("pulsar la única elegida deja el resumen en %q", got)
 	}
 	test.Tap(elementoMenu(t, m, "Máx.: 2"))
 	test.Tap(elementoMenu(t, m, "Recuento: 3"))

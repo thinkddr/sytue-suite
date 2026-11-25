@@ -8,7 +8,7 @@
  */
 import type { JSX } from 'preact';
 import { useT } from '../i18n/index.js';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Button, Icon, Popover, cx, usePointerDrag, useToast } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { CalendarEvent } from '../client/calendarApi.js';
@@ -42,8 +42,11 @@ import { celdaEnPunto, desplazarDias, eventoDesplazado } from './arrastreMes.js'
 import { plegar } from '@sytue/i18n';
 
 // Geometría de las barras multi-día en la vista MES.
-const BAR_H = 22; // alto de una fila de barras, con separación
-const BAR_INNER_H = 18; // alto pintado de la barra
+// La barra mide 24, como las fichas con hora (`EventChip`): es un control y su objetivo
+// táctil es el de WCAG 2.5.8. Medía 18 y era lo único de la celda por debajo. La fila
+// suma la misma separación de 2 px que hay entre fichas (`gap-0.5`).
+const BAR_H = 26; // alto de una fila de barras, con separación
+const BAR_INNER_H = 24; // alto pintado de la barra
 // Alto reservado por el número de día: el relleno de la celda (6) más el círculo
 // del día (24). Va en PÍXELES y las clases que lo producen también —`p-[6px]` y
 // `h-[24px]`— porque este número se usa en un `style` absoluto: las barras de
@@ -171,6 +174,36 @@ interface MonthChip {
   date: Date;
 }
 
+// Lo que mide cada cosa de la celda del mes, para saber cuántas fichas caben.
+const FICHA_H = 24; // `EventChip`: `min-h-[max(24px,1.5rem)]`
+const FICHA_GAP = 2; // `gap-0.5` entre fichas y `mt-0.5` sobre la primera
+const MAS_H = 16; // «+N más»: una línea de `text-xs`
+const CELDA_PIE = 6 + 1; // el relleno de abajo (`p-[6px]`) y el borde inferior
+
+/**
+ * Cuántas fichas con hora caben en una celda del mes: la semana mide `altoSemana`, las
+ * barras se llevan `barras` px y hay `total` fichas. Si no caben todas (o hay barras
+ * escondidas, `masForzado`), deja sitio para «+N más». Sin medir (`altoSemana` 0: el
+ * primer pintado, o un DOM sin alturas) devuelve null y manda el presupuesto fijo de
+ * carriles.
+ *
+ * Antes solo contaba carriles (cuatro, menos las barras) y no el alto: a 1280×800 la
+ * cuarta ficha de un día no se veía y la tercera salía cortada, sin «+N más» que lo
+ * dijera, y en una semana con barra la segunda ficha perdía el borde de abajo.
+ */
+export function fichasQueCaben(
+  altoSemana: number,
+  barras: number,
+  total: number,
+  masForzado = false,
+): number | null {
+  if (!(altoSemana > 0)) return null;
+  const hueco = altoSemana - CELDA_PIE - DATE_ROW_H - barras - FICHA_GAP;
+  const todas = Math.floor((hueco + FICHA_GAP) / (FICHA_H + FICHA_GAP));
+  if (!masForzado && total <= todas) return total;
+  return Math.max(0, Math.floor((hueco - MAS_H) / (FICHA_H + FICHA_GAP)));
+}
+
 interface MonthLayout {
   days: Date[];
   /** Segmentos de barra por semana (6): todo-el-día y multi-día, apilados y partidos. */
@@ -271,7 +304,8 @@ function MonthBar({
       {seg.continuesLeft ? (
         <span class="sr-only">{event.summary}</span>
       ) : (
-        <span class="text-2xs truncate leading-none font-medium">
+        // `text-xs`, el cuerpo de las fichas: a 24 de alto el `text-2xs` se quedaba chico.
+        <span class="truncate text-xs leading-none font-medium">
           {event.summary || t('event.untitled')}
         </span>
       )}
@@ -327,6 +361,19 @@ export function CalendarGrid({
   // `onMoveResize` que la rejilla horaria: pregunta el alcance en una serie, no mueve
   // una suscripción y trae «Deshacer».
   const rejillaMesRef = useRef<HTMLDivElement | null>(null);
+  // Alto de una semana del mes, medido: de él sale cuántas fichas caben en cada celda.
+  const [altoSemana, setAltoSemana] = useState(0);
+  const semanasMes = monthLayout?.weeks.length ?? 0;
+  // De maquetación: medido antes de pintar, el primer fotograma ya sale con lo que cabe.
+  useLayoutEffect(() => {
+    const el = rejillaMesRef.current;
+    if (!el || semanasMes === 0 || typeof ResizeObserver === 'undefined') return;
+    const medir = (): void => setAltoSemana(el.clientHeight / semanasMes);
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [semanasMes]);
   const arrastreMesRef = useRef<ArrastreMes | null>(null);
   const [arrastreMes, setArrastreMes] = useState<ArrastreMes | null>(null);
   const suprimirClicHastaRef = useRef(0);
@@ -460,7 +507,9 @@ export function CalendarGrid({
             // cuenta como «+N más» por día. Los chips comparten el presupuesto.
             const { visible, hiddenByCol } = limitWeekRows(weekSegs, MAX_BAR_ROWS);
             const visibleRows = Math.min(rowCount(weekSegs), MAX_BAR_ROWS);
-            const barsAreaH = visibleRows * BAR_H;
+            // Hasta el pie de la última barra, sin la separación de debajo: esa ya la pone
+            // el `mt-0.5` de las fichas, y contarla dos veces le quitaba 2 px a su sitio.
+            const barsAreaH = visibleRows > 0 ? visibleRows * BAR_H - (BAR_H - BAR_INNER_H) : 0;
             const chipCap = Math.max(1, MAX_LANES - visibleRows);
             return (
               <div key={w} class="relative grid min-h-0 flex-1 grid-cols-7">
@@ -469,7 +518,16 @@ export function CalendarGrid({
                   const day = days[gi]!;
                   const inMonth = day.getMonth() === cursor.getMonth();
                   const dayChips = chipsByDayIdx[gi]!;
-                  const shown = dayChips.slice(0, chipCap);
+                  const caben = fichasQueCaben(
+                    altoSemana,
+                    barsAreaH,
+                    dayChips.length,
+                    hiddenByCol[c]! > 0,
+                  );
+                  const shown = dayChips.slice(
+                    0,
+                    caben === null ? chipCap : Math.min(chipCap, caben),
+                  );
                   const more = hiddenByCol[c]! + (dayChips.length - shown.length);
                   const esDestino = destino !== null && destino.start <= gi && gi <= destino.end;
                   return (
@@ -546,6 +604,7 @@ export function CalendarGrid({
                               event={event}
                               date={date}
                               color={color}
+                              dosLineas={barsAreaH === 0 && dayChips.length === 1}
                               onClick={seleccionarEnMes}
                               atenuado={event === arrastrado}
                               {...(event.readOnly
@@ -946,6 +1005,7 @@ export function EventChip({
   date,
   color,
   expanded,
+  dosLineas,
   onClick,
   onPointerDown,
   atenuado,
@@ -956,6 +1016,13 @@ export function EventChip({
   /** Color de reserva; prima el del calendario del evento. */
   color: string;
   expanded?: boolean;
+  /**
+   * La única ficha de su celda, sin barras encima: hay sitio para que el título siga en
+   * una segunda línea en vez de cortarse a los diez caracteres («08:00 Reunión s…» a
+   * 1280 px). La hora y el título van en el mismo párrafo, así que la segunda línea
+   * empieza bajo la hora y no bajo el título.
+   */
+  dosLineas?: boolean | undefined;
   onClick: (e: GridEvent, anchor: DOMRect) => void;
   /** Empieza el arrastre a otro día (sin él, la píldora solo se abre). */
   onPointerDown?: ((e: PointerEvent) => void) | undefined;
@@ -975,7 +1042,8 @@ export function EventChip({
       class={cx(
         // Pildora sobre superficie con borde: el color del calendario va en el
         // punto (portador de color con texto AA garantizado sobre el borde).
-        'border-border bg-bg-subtle text-text flex min-w-0 items-center gap-1.5 rounded-sm border px-1.5 text-left text-xs',
+        'border-border bg-bg-subtle text-text flex min-w-0 gap-1.5 rounded-sm border px-1.5 text-left text-xs',
+        dosLineas ? 'items-start' : 'items-center',
         // En la celda del mes el contenido no recibe el puntero (cae al botón de
         // crear de fondo); la píldora sí.
         'pointer-events-auto',
@@ -985,26 +1053,44 @@ export function EventChip({
         'hover:border-border-strong hover:bg-surface hover:shadow-[var(--shadow-xs)]',
         'sytue-focus-ring',
         expanded ? 'py-1' : 'py-0.5',
+        // Objetivo de 24 px (WCAG 2.5.8): con `text-xs`, `py-0.5` y el borde medía 22.
+        // En px y rem a la vez, como los botones: con la base de letra en 14 los 1,5rem
+        // se quedarían en 21.
+        'min-h-[max(24px,1.5rem)]',
       )}
       title={event.summary}
     >
       <span
-        class="h-2 w-2 shrink-0 rounded-full"
+        // En dos líneas el punto va con la primera (16 px de interlínea: 4 arriba).
+        class={cx('h-2 w-2 shrink-0 rounded-full', dosLineas && 'mt-1')}
         style={{ backgroundColor: event.color ?? color }}
         aria-hidden="true"
       />
-      {/* La hora de inicio, delante del título: en el mes es lo que distingue la
-          reunión de las 9 de la de las 5 sin abrir ninguna. Solo desde `sm:`: en el
-          teléfono la celda mide ~50 px y la hora se comería el título entero. */}
-      <span
-        class={cx(
-          'text-text-muted shrink-0 font-medium tabular-nums',
-          expanded ? undefined : 'hidden sm:inline',
-        )}
-      >
-        {timeLabel(locale, date)}
-      </span>
-      <span class="truncate">{event.summary}</span>
+      {dosLineas ? (
+        // Dos líneas solo con la ventana a 640 px de alto o más: por debajo, la fila del
+        // mes ya no da para 38 px de ficha y la segunda línea saldría cortada a la mitad.
+        <span class="min-w-0 truncate break-words [@media(min-height:40rem)]:line-clamp-2 [@media(min-height:40rem)]:whitespace-normal">
+          <span class="text-text-muted me-1.5 hidden font-medium tabular-nums sm:inline">
+            {timeLabel(locale, date)}
+          </span>
+          {event.summary}
+        </span>
+      ) : (
+        <>
+          {/* La hora de inicio, delante del título: en el mes es lo que distingue la
+              reunión de las 9 de la de las 5 sin abrir ninguna. Solo desde `sm:`: en el
+              teléfono la celda mide ~50 px y la hora se comería el título entero. */}
+          <span
+            class={cx(
+              'text-text-muted shrink-0 font-medium tabular-nums',
+              expanded ? undefined : 'hidden sm:inline',
+            )}
+          >
+            {timeLabel(locale, date)}
+          </span>
+          <span class="truncate">{event.summary}</span>
+        </>
+      )}
     </button>
   );
 }

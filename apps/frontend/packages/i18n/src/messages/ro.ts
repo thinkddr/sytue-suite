@@ -72,6 +72,8 @@ export const ro: Catalog = {
   'vault.emptyUnderstood': 'Înțeleg că datele criptate cu cheia pierdută vor fi șterse',
   'vault.failed':
     'Datele criptate nu au putut fi deschise. Încearcă din nou sau conectează-te din nou la Sytue ID. Dacă cheia s-a pierdut, poți goli datele criptate ale acestei aplicații.',
+  'vault.moreInfo': 'Mai multe informații',
+  'vault.attention': 'Datele tale criptate necesită atenție',
   'matrix.incoming': 'Verifică acest dispozitiv',
   'matrix.match': 'Se potrivesc',
   'matrix.mismatch': 'Nu se potrivesc',

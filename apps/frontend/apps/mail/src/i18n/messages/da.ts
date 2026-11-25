@@ -446,6 +446,7 @@ export const da: AppCatalog<typeof en> = {
   'compose.templates': 'Skabeloner',
   'compose.templatesEmpty': 'Ingen skabeloner endnu. Opret dem i indstillingerne for Mail.',
   'compose.attachFailed': 'Den vedhæftede fil kunne ikke læses',
+  'compose.openFailed': 'Beskededitoren kunne ikke åbnes. Prøv igen.',
   'compose.pastedImageDropped': 'Det indsatte billede kom ikke med',
   'compose.pastedImagesDropped': 'De indsatte billeder kom ikke med',
   'compose.pastedImagesDroppedDescription': 'Vedhæft billeder som filer for at sende dem.',

@@ -60,7 +60,11 @@ type Fake struct {
 	BeforeReset func(*Fake)
 	// FailList hace fallar el listado de registros (¿está vacía?).
 	FailList bool
-	Signing  []api.VaultKey
+	// FailAppend, si no es nil, decide antes de guardar cada registro nuevo (con
+	// los que ya hay) si la publicación se corta: el servidor contesta 503 y no
+	// guarda nada, como un cliente que se cierra a mitad de una importación.
+	FailAppend func(records int) bool
+	Signing    []api.VaultKey
 	// RecentLogin: la sesión vale como identificación reciente para un vaciado.
 	RecentLogin bool
 	// Handovers cuenta los PUT de la clave de firma que pidieron traspaso.
@@ -294,6 +298,10 @@ func (f *Fake) append(w http.ResponseWriter, r *http.Request) {
 	}
 	if i, ok := f.txns[req.TransactionID]; ok {
 		f.json(w, http.StatusCreated, f.Records[i])
+		return
+	}
+	if f.FailAppend != nil && f.FailAppend(len(f.Records)) {
+		http.Error(w, "down", http.StatusServiceUnavailable)
 		return
 	}
 	f.Seq++

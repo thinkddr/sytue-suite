@@ -1,5 +1,5 @@
 import createDOMPurify from 'dompurify';
-import { htmlATexto } from '@sytue/ui/browser/portapapeles';
+import type * as Portapapeles from '@sytue/ui/browser/portapapeles';
 
 /**
  * Utilidades de rich-text del compositor de Sytue Mail (solo navegador). El
@@ -336,12 +336,41 @@ export function textToHtml(text: string): string {
   return escapeHtml(text).replace(/\r?\n/g, '<br>');
 }
 
-/**
- * HTML → texto plano (para guardar el borrador, que es text/plain). Es la pieza
- * compartida de `@sytue/ui`, la misma que usa Notepads al pegar desde Safari.
+/*
+ * `htmlToText` es la pieza compartida de `@sytue/ui`, la misma que usa Notepads al
+ * pegar desde Safari, y va sobre parse5 (con entities): ~225 KB que estaban en el JS
+ * inicial de Mail aunque nadie abriera el redactor. Se bajan al abrirlo por primera
+ * vez (`ComposeModal` espera a `cargarRichText` antes de montar el redactor), y desde
+ * ahí todo sigue siendo síncrono, igual que antes.
  */
-export { htmlATexto as htmlToText } from '@sytue/ui/browser/portapapeles';
+let portapapeles: typeof Portapapeles | undefined;
+let cargando: Promise<void> | undefined;
+
+/** Baja parse5 para el redactor. Idempotente; si falla, el siguiente intento repite. */
+export function cargarRichText(): Promise<void> {
+  cargando ??= import('@sytue/ui/browser/portapapeles').then(
+    (modulo) => {
+      portapapeles = modulo;
+    },
+    (error: unknown) => {
+      cargando = undefined;
+      throw error;
+    },
+  );
+  return cargando;
+}
+
+/** ¿Ya se puede usar `htmlToText` sin esperar? */
+export function richTextCargado(): boolean {
+  return portapapeles !== undefined;
+}
+
+/** HTML → texto plano (para guardar el borrador, que es text/plain). */
+export function htmlToText(html: string): string {
+  if (!portapapeles) throw new Error('richtext: htmlToText antes de cargarRichText()');
+  return portapapeles.htmlATexto(html);
+}
 /** ¿El HTML compuesto está vacío (solo espacios/saltos)? */
 export function isHtmlEmpty(html: string): boolean {
-  return htmlATexto(html).trim().length === 0;
+  return htmlToText(html).trim().length === 0;
 }

@@ -75,7 +75,8 @@ export async function searchEncryptedMessages(
     life.signal.throwIfAborted();
     assertMatrixScope(scope);
   };
-  const core = new PqcRuntime({ signal: life.signal, assertOpen: check });
+  // La búsqueda usa el núcleo completo: `rooms.search.*` no está en el de la bóveda.
+  const core = new PqcRuntime({ signal: life.signal, assertOpen: check }, 'core');
   const encoder = new TextEncoder(),
     decoder = new TextDecoder();
   let ast: Uint8Array | undefined;

@@ -334,6 +334,21 @@ func (l *Libro) Formato(c, f int) (negrita, cursiva bool, alinear string) {
 	return p.b, p.i, p.alinear
 }
 
+// AlinearPintado es la alineación con la que se PINTA la celda: la suya o, sin ninguna,
+// la de «General» de cualquier hoja de cálculo, que pone los números a la derecha y lo
+// demás a la izquierda. Iban todos a la izquierda, y una columna de importes no se leía
+// por las unidades (auditoría del 2026-11-24; la web hace lo mismo en SheetCanvas.tsx).
+func (l *Libro) AlinearPintado(c, f int) string {
+	_, _, alinear := l.Formato(c, f)
+	if alinear != "" {
+		return alinear
+	}
+	if _, numero := l.Valor(c, f).(float64); numero {
+		return "right"
+	}
+	return ""
+}
+
 // Estilo es el formato visual de la celda (el cero si no tiene).
 func (l *Libro) Estilo(c, f int) Estilo { return l.h().estilos[Celda{C: c, F: f}] }
 

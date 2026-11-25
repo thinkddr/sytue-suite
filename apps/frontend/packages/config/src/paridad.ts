@@ -380,7 +380,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // pleno son las carpetas de la cuadrícula de Drive. El Hub es en Marco otra portada,
     // «Bienvenida y tablero», como en la web: el saludo por la hora, los accesos rápidos en
     // píldoras con un «Más», las apps en teselas compactas y «Hoy» y «Reciente» al lado
-    // desde 1024 (`apps/fyne/apps/hub/lanzador.go` y `pildoras.go`).
+    // desde 1024 (`apps/fyne/apps/hub/lanzador.go` y `pildoras.go`). 2026-11-24: en el
+    // teléfono Fyne lleva la descripción de la tesela compacta en hasta dos líneas (la
+    // web, `marco:line-clamp-1`, la corta a 390); en escritorio, una, como la web.
     // Escritorio: visto en ventana real el 2026-10-05 (`ventana-real.sh`, Xvfb con el GL
     // de Mesa) en las catorce apps, a 1280 y a 360 y en los tres modos; la portada del Hub,
     // con el menú de «Más» abierto. Falta verlo en un teléfono.
@@ -593,6 +595,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // meses), con Inicio y Fin; igual en la lista y la cuadrícula de Drive. Web
     // (`@sytue/ui` `navegacionRejilla.ts`) y Fyne (`ui.MoverFocoEnRejilla`; la lista de
     // Drive con el resalte de `widget.List`), con los mismos casos en las dos.
+    // 2026-11-24 (auditoría estética nativa): la favorita lleva el corazón LLENO en las
+    // dos, y con el dedo solo está en las favoritas (la web con `pointer-coarse:hidden`);
+    // se marca desde el visor o seleccionando. Una diferencia del teléfono en Fyne: por
+    // debajo de `sm` las pestañas inactivas van solo con su icono (las seis con rótulo
+    // cortaban «Compartid…»).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

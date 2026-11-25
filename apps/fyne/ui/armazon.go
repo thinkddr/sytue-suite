@@ -124,8 +124,11 @@ type Armazon struct {
 	// árbol ahí mismo, sino pedirlo para después.
 	AlMedir func(ancho float32)
 
-	anchoMedido float32     // el último ancho avisado a AlMedir
-	barra       *BarraMovil // la del armazón, cuando la app no trae ninguna
+	anchoMedido float32 // el último ancho avisado a AlMedir
+	// detalleVisto es el último enDetalle colocado: al cambiar, se recoloca la capa del
+	// botón flotante, que es hermana del armazón y no se entera sola.
+	detalleVisto bool
+	barra        *BarraMovil // la del armazón, cuando la app no trae ninguna
 	// suite es la barra de la suite bajo la que lo ha colocado `BarraSuite.Montar`: en
 	// un teléfono su barra móvil sube a ella (la barra única). Si la app rehace el
 	// armazón sin que el montaje se vuelva a colocar, se busca en el lienzo.
@@ -138,6 +141,12 @@ type Armazon struct {
 	arrastrandoCajon bool
 	cerrandoCajon    bool
 	r                *armazonRenderer
+}
+
+// enDetalle dice si el armazón enseña el detalle en lugar de la lista: con panel, en
+// estrecho y con el detalle abierto.
+func (a *Armazon) enDetalle() bool {
+	return a.Panel != nil && a.DetalleAbierto && a.Size().Width > 0 && a.Size().Width < Estrecho
 }
 
 func (a *Armazon) anchoPanelActual() float32 {
@@ -293,6 +302,9 @@ func refrescarFlotantesEn(o fyne.CanvasObject) {
 	case *raizGestos:
 		refrescarFlotantesEn(v.content)
 	case *fyne.Container:
+		if _, es := v.Layout.(CapaFlotante); es {
+			v.Refresh() // vuelve a decidir si el botón se ve (ver CapaFlotante)
+		}
 		for _, h := range v.Objects {
 			refrescarFlotantesEn(h)
 		}
@@ -760,37 +772,20 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	}
 	r.fondo.Resize(t)
 	estrecha := t.Width < Estrecho
+	if d := a.enDetalle(); d != a.detalleVisto {
+		a.detalleVisto = d
+		defer a.refrescarFlotantes()
+	}
 	// En Marco el panel y el contenido van en la HOJA, que se separa del borde derecho y
 	// del de abajo (el `margin` de `.sytue-sheet`) y, sin menú a su izquierda, también de ese.
 	// En estrecho llega al borde y conserva las cuatro esquinas.
 	separa := a.separacionHoja(estrecha)
 
 	esCajon := estrecha || a.Carril != nil
-	// Al pasar a ancho el cajón se cierra solo, que es lo que hace `useNavDrawer`: si
-	// no, al volver a estrecho aparecía abierto sin que nadie lo hubiera pedido.
-	if !esCajon && (a.CajonAbierto || a.arrastrandoCajon || a.cerrandoCajon) {
-		estabaAbierto := a.CajonAbierto
-		a.CajonAbierto = false
-		a.arrastrandoCajon = false
-		a.cerrandoCajon = false
-		a.entrada = 0
-		if estabaAbierto && a.AlCajon != nil {
-			a.AlCajon(false)
-		}
+	if !esCajon {
+		a.cerrarCajonEnAncho()
 	}
-	arriba := float32(0)
-	if bm := a.barraMovil(); bm != nil {
-		if b, es := bm.(*BarraMovil); es {
-			a.prepararBarraMovil(b, estrecha)
-		}
-		h := bm.MinSize().Height
-		esconder(bm, !estrecha)
-		if estrecha {
-			bm.Move(fyne.NewPos(0, 0))
-			bm.Resize(fyne.NewSize(t.Width, h))
-			arriba = h
-		}
-	}
+	arriba := a.colocarBarraMovil(t, estrecha)
 	alto := max(t.Height-arriba-separa, 0)
 
 	// Con la barra única el armazón empieza arriba del todo y su barra ES la de la suite:
@@ -821,6 +816,43 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	a.Contenido.Resize(fyne.NewSize(max(util, 0), max(alto-2*MargenContenido, 0)))
 }
 
+// cerrarCajonEnAncho cierra el cajón al pasar a ancho, que es lo que hace
+// `useNavDrawer`: si no, al volver a estrecho aparecía abierto sin que nadie lo
+// hubiera pedido.
+func (a *Armazon) cerrarCajonEnAncho() {
+	if !a.CajonAbierto && !a.arrastrandoCajon && !a.cerrandoCajon {
+		return
+	}
+	estabaAbierto := a.CajonAbierto
+	a.CajonAbierto = false
+	a.arrastrandoCajon = false
+	a.cerrandoCajon = false
+	a.entrada = 0
+	if estabaAbierto && a.AlCajon != nil {
+		a.AlCajon(false)
+	}
+}
+
+// colocarBarraMovil prepara la barra móvil y, en estrecho, la pone arriba a todo el
+// ancho; en ancho la esconde. Devuelve lo que ocupa arriba.
+func (a *Armazon) colocarBarraMovil(t fyne.Size, estrecha bool) float32 {
+	bm := a.barraMovil()
+	if bm == nil {
+		return 0
+	}
+	if b, es := bm.(*BarraMovil); es {
+		a.prepararBarraMovil(b, estrecha)
+	}
+	h := bm.MinSize().Height
+	esconder(bm, !estrecha)
+	if !estrecha {
+		return 0
+	}
+	bm.Move(fyne.NewPos(0, 0))
+	bm.Resize(fyne.NewSize(t.Width, h))
+	return h
+}
+
 // prepararBarraMovil le dice a la barra móvil lo que depende del ancho: si hay lista, si
 // se ve, el cajón y —en un teléfono con la barra de la suite encima— que va DENTRO de
 // ella (la barra única), con la reserva de la entrada y el nombre del producto.
@@ -829,9 +861,18 @@ func (a *Armazon) prepararBarraMovil(b *BarraMovil, estrecha bool) {
 	b.listaVisible = a.Panel != nil && !estrecha
 	b.CajonAbierto = a.CajonAbierto
 	b.enSuite, b.reservaSuite, b.tituloRespaldo = false, 0, ""
+	// La barra que lo colocó, salvo que la ventana tenga el armazón SIN montaje encima:
+	// si se quitó el montaje (el giro de prueba de `recorrido/montaje` lo pone y lo
+	// retira), la barra vieja recolocaba un montaje que ya no se pinta y le devolvía al
+	// contenido de la ventana su medida de entonces. Se mira el contenido de la ventana y
+	// no solo cuál es, porque el driver de pruebas da por ventana la última creada.
 	bs := a.suite
-	if bs == nil {
-		bs = barraSuiteDe(lienzoDe(a))
+	if c := lienzoDe(a); c != nil {
+		if en := barraSuiteDe(c); en != nil {
+			bs = en
+		} else if armazonEn(c.Content()) == a {
+			bs = nil
+		}
 	}
 	if estrecha && bs != nil {
 		b.enSuite = true

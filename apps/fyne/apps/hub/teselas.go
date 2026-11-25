@@ -57,6 +57,68 @@ const (
 	AltoTeselaCompacta float32 = 2*tema.Borde + 2*TeselaCompactaPY + iconos.MarcaLG
 )
 
+// # La descripción compacta en el teléfono
+//
+// En Marco la descripción va en UNA línea (`marco:line-clamp-1`), y a 390 las dos
+// columnas dejan unos 90 px al texto: «Archivos y col…», «Documentos de t…» (auditoría
+// estética del 2026-11-24). Por debajo de `sm` va en hasta DOS líneas, como en Carril
+// (`line-clamp-2`), y la fila crece a lo que pida su tesela más alta.
+
+// AltoTeselaCompactaCon es lo que mide la tesela compacta con la descripción en
+// `lineas` líneas: lo de siempre, o lo que pida el texto si pasa de la marca.
+func AltoTeselaCompactaCon(lineas int) float32 {
+	return max(AltoTeselaCompacta,
+		2*tema.Borde+2*TeselaCompactaPY+tema.TextoRaiz.Linea+float32(lineas)*EscalonDescripcion.Linea)
+}
+
+// anchoTextoCompacta es lo que deja al texto una tesela compacta de ese ancho.
+func anchoTextoCompacta(ancho float32) float32 {
+	return max(ancho-2*tema.Borde-2*TeselaCompactaPX-iconos.MarcaLG-HuecoTesela, 0)
+}
+
+// LineasCompacta es en cuántas líneas va la descripción de una tesela compacta de ese
+// ancho: una y, en el teléfono, hasta dos.
+func LineasCompacta(descripcion string, ancho float32, telefono bool) int {
+	if !telefono {
+		return 1
+	}
+	return max(min(len(ui.Repartir(descripcion, EscalonDescripcion, ui.Normal, anchoTextoCompacta(ancho))), LineasDescripcion), 1)
+}
+
+// colocarTextoCompacta pone el nombre y la descripción de una tesela compacta de `t`:
+// centrados en su alto y, si la tesela tiene alto para dos líneas, la descripción en
+// las que pida (hasta dos, con «…» en la segunda).
+func colocarTextoCompacta(nombre *canvas.Text, desc []*canvas.Text, n, d string, x, cabe, cabeNombre float32, t fyne.Size) float32 {
+	lineas := ui.Repartir(d, EscalonDescripcion, ui.Normal, cabe)
+	cuantas := 1
+	if t.Height >= AltoTeselaCompactaCon(LineasDescripcion)-0.5 {
+		cuantas = max(min(len(lineas), LineasDescripcion), 1)
+	}
+	y := (t.Height - tema.TextoRaiz.Linea - float32(cuantas)*EscalonDescripcion.Linea) / 2
+	arriba := y
+	ui.Truncar(nombre, n, tema.TextoRaiz, ui.SemiNegrita, cabeNombre)
+	ui.ColocarTexto(nombre, tema.TextoRaiz, x, y)
+	y += tema.TextoRaiz.Linea
+	for i, o := range desc {
+		if i >= cuantas {
+			o.Hide()
+			continue
+		}
+		o.Show()
+		texto := d
+		if cuantas > 1 {
+			texto = lineas[i]
+			if i == cuantas-1 && len(lineas) > cuantas {
+				texto = juntar(lineas[i:])
+			}
+		}
+		ui.Truncar(o, texto, EscalonDescripcion, ui.Normal, cabe)
+		ui.ColocarTexto(o, EscalonDescripcion, x, y)
+		y += EscalonDescripcion.Linea
+	}
+	return arriba
+}
+
 // radioTesela es el `rounded-card` de la tesela: un token de forma.
 func radioTesela() float32 { return tema.Forma("radius-card") }
 
@@ -264,7 +326,8 @@ func (r *teselaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *teselaRenderer) Destroy()                     {}
 
 // colocarCompacta es la tesela de Marco: la marca a la izquierda y, centrados en su
-// alto (`items-center`), el nombre y la descripción en una línea cada uno.
+// alto (`items-center`), el nombre y la descripción, en una línea o, en el teléfono, en
+// hasta dos (colocarTextoCompacta).
 func (r *teselaRenderer) colocarCompacta(t fyne.Size) {
 	x := tema.Borde + TeselaCompactaPX
 	// `scale-105`: la marca crece desde su centro y no mueve lo de al lado.
@@ -272,26 +335,16 @@ func (r *teselaRenderer) colocarCompacta(t fyne.Size) {
 	r.marca.Colocar(x-crece, (t.Height-iconos.MarcaLG)/2-crece, iconos.MarcaLG*EscalaMarcaCompacta)
 	x += iconos.MarcaLG + HuecoTesela
 	cabe := max(t.Width-x-TeselaCompactaPX-tema.Borde, 0)
-	y := (t.Height - tema.TextoRaiz.Linea - EscalonDescripcion.Linea) / 2
 
 	cabeNombre := cabe
+	if r.insignia != nil {
+		cabeNombre -= r.insignia.MinSize().Width + 0.25*tema.Rem
+	}
+	y := colocarTextoCompacta(r.nombre, r.desc, r.t.Producto.NombreCorto(), r.t.Descripcion, x, cabe, cabeNombre, t)
 	if r.insignia != nil {
 		m := r.insignia.MinSize()
 		r.insignia.Resize(m)
 		r.insignia.Move(fyne.NewPos(x+cabe-m.Width, y+(tema.TextoRaiz.Linea-m.Height)/2))
-		cabeNombre -= m.Width + 0.25*tema.Rem
-	}
-	ui.Truncar(r.nombre, r.t.Producto.NombreCorto(), tema.TextoRaiz, ui.SemiNegrita, cabeNombre)
-	ui.ColocarTexto(r.nombre, tema.TextoRaiz, x, y)
-	y += tema.TextoRaiz.Linea
-	for i, d := range r.desc {
-		if i > 0 { // `marco:line-clamp-1`
-			d.Hide()
-			continue
-		}
-		d.Show()
-		ui.Truncar(d, r.t.Descripcion, EscalonDescripcion, ui.Normal, cabe)
-		ui.ColocarTexto(d, EscalonDescripcion, x, y)
 	}
 }
 
@@ -545,26 +598,14 @@ func (r *teselaConectadaRenderer) colocarMarca(x, y, lado float32) {
 }
 
 // colocarCompacta es la de `teselaRenderer`: marca a la izquierda, nombre y
-// descripción en una línea cada uno.
+// descripción (colocarTextoCompacta).
 func (r *teselaConectadaRenderer) colocarCompacta(t fyne.Size) {
 	x := tema.Borde + TeselaCompactaPX
 	crece := iconos.MarcaLG * (EscalaMarcaCompacta - 1) / 2
 	r.colocarMarca(x-crece, (t.Height-iconos.MarcaLG)/2-crece, iconos.MarcaLG*EscalaMarcaCompacta)
 	x += iconos.MarcaLG + HuecoTesela
 	cabe := max(t.Width-x-TeselaCompactaPX-tema.Borde, 0)
-	y := (t.Height - tema.TextoRaiz.Linea - EscalonDescripcion.Linea) / 2
-	ui.Truncar(r.nombre, r.t.App.Name, tema.TextoRaiz, ui.SemiNegrita, cabe)
-	ui.ColocarTexto(r.nombre, tema.TextoRaiz, x, y)
-	y += tema.TextoRaiz.Linea
-	for i, d := range r.desc {
-		if i > 0 { // `marco:line-clamp-1`
-			d.Hide()
-			continue
-		}
-		d.Show()
-		ui.Truncar(d, r.t.App.Description, EscalonDescripcion, ui.Normal, cabe)
-		ui.ColocarTexto(d, EscalonDescripcion, x, y)
-	}
+	colocarTextoCompacta(r.nombre, r.desc, r.t.App.Name, r.t.App.Description, x, cabe, cabe, t)
 }
 
 func (r *teselaConectadaRenderer) Layout(t fyne.Size) {

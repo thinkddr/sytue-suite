@@ -6,6 +6,7 @@ package editor
 import (
 	"context"
 	"image/color"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -81,6 +82,36 @@ type Comentarios struct {
 	menNuevo, menRespuesta fyne.CanvasObject
 	hilos                  *fyne.Container
 	objeto                 fyne.CanvasObject
+	// anchoCuerpo es el de la columna de hilos, al que se reparten los textos: el del
+	// panel de escritorio hasta que el panel diga otro (ver anchoDeComentarios).
+	anchoCuerpo float32
+}
+
+// cuerpo es el ancho al que se reparten los hilos.
+func (c *Comentarios) cuerpo() float32 {
+	if c.anchoCuerpo > 0 {
+		return c.anchoCuerpo
+	}
+	return AnchoCuerpoPanel
+}
+
+// anchoDeComentarios coloca el panel y, si su ancho cambia, vuelve a repartir los hilos.
+//
+// Los textos se repartían SIEMPRE al ancho del panel de escritorio (288), y en el teléfono
+// el panel ocupa la pantalla entera: cada comentario partía en la columna de 245 con más de
+// cien píxeles libres a la derecha (auditoría del 2026-11-24). El reparto de un `Parrafo`
+// es su `Ancho`, así que se rehacen con el de verdad.
+type anchoDeComentarios struct{ c *Comentarios }
+
+func (a anchoDeComentarios) MinSize(objs []fyne.CanvasObject) fyne.Size { return objs[0].MinSize() }
+
+func (a anchoDeComentarios) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	if cuerpo := t.Width - 2*MargenPanel; t.Width > 0 && math.Abs(float64(cuerpo-a.c.cuerpo())) > 0.5 {
+		a.c.anchoCuerpo = cuerpo
+		a.c.pintar()
+	}
+	objs[0].Move(fyne.NewPos(0, 0))
+	objs[0].Resize(t)
 }
 
 func (c *Comentarios) t(clave string) string {
@@ -135,9 +166,12 @@ func NuevosComentarios(f FuenteComentarios) *Comentarios {
 	c.hilos = container.New(ui.Columna{Hueco: tema.Espacio(2)})
 	// `flex min-h-full flex-col gap-2 p-3`, con el formulario al pie (`mt-auto`).
 	pie := container.New(ui.Columna{Hueco: tema.Espacio(1.5)}, c.Nuevo, c.menNuevo, container.New(AlDerecha{}, c.Enviar))
-	c.objeto = container.New(layout.NewCustomPaddedLayout(MargenPanel, MargenPanel, MargenPanel, MargenPanel),
+	// Los hilos se componen con las tintas ya resueltas (las cajas, las citas, el 60 % de
+	// los resueltos): al cambiar de tema en caliente se vuelven a componer, o las tarjetas
+	// se quedaban en el tema anterior.
+	c.objeto = ui.RehacerConElTema(container.New(anchoDeComentarios{c}, container.New(layout.NewCustomPaddedLayout(MargenPanel, MargenPanel, MargenPanel, MargenPanel),
 		container.NewBorder(nil, container.New(layout.NewCustomPaddedLayout(tema.Espacio(1), 0, 0, 0), pie), nil, nil,
-			container.NewVScroll(c.hilos)))
+			container.NewVScroll(c.hilos)))), c.pintar)
 	c.pintar()
 	c.Recargar()
 	return c
@@ -232,7 +266,7 @@ func (c *Comentarios) pintar() {
 	raices, resp := Hilos(c.lista)
 	c.hilos.Objects = nil
 	if len(raices) == 0 {
-		c.hilos.Add(ui.NuevoParrafo(c.t("comments.empty"), tema.TextoSM, ui.Normal, "text-muted", v).A(AnchoCuerpoPanel))
+		c.hilos.Add(ui.NuevoParrafo(c.t("comments.empty"), tema.TextoSM, ui.Normal, "text-muted", v).A(c.cuerpo()))
 	}
 	for _, r := range raices {
 		c.hilos.Add(c.hilo(r, resp[r.ID], v))
@@ -243,7 +277,7 @@ func (c *Comentarios) pintar() {
 
 // hilo es el `<article class="border-border rounded-md border p-2">` de un comentario raíz.
 func (c *Comentarios) hilo(r api.DocComment, respuestas []api.DocComment, v tema.Variante) fyne.CanvasObject {
-	ancho := AnchoCuerpoPanel - 2*tema.Borde - 2*tema.Espacio(2)
+	ancho := c.cuerpo() - 2*tema.Borde - 2*tema.Espacio(2)
 	inerte := c.pendiente || c.sinRed()
 	// `opacity-60` en un hilo resuelto: sin opacidad de grupo, las tintas se aplanan.
 	tinta := func(token string) color.NRGBA {

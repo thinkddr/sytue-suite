@@ -14,6 +14,7 @@
  *
  * Y `montarEditor`, el `RichText` montado con el cursor donde se pida.
  */
+import '../client/html-estatico.js';
 import { render } from 'preact';
 import { RichText } from './RichText.js';
 

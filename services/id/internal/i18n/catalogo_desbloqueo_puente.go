@@ -4,9 +4,8 @@
 package i18n
 
 // Las cadenas del relevo cuando lo pide el puente de una app web con su clave
-// (desbloqueo.go, entregaSinTeclear): confirmar la entrega de la clave que este
-// navegador ya tiene, y decir que no hay ninguna que entregar en vez de volver a
-// la app con las manos vacías. El título de ese aviso es `e2e.lost_title`.
+// (desbloqueo.go, entregaSinTeclear): decir que no hay ninguna clave que entregar
+// en vez de volver a la app con las manos vacías. El título de ese aviso es `e2e.lost_title`.
 func init() {
 	for k, v := range catalogoDesbloqueoPuente {
 		catalogo[k] = v
@@ -14,62 +13,6 @@ func init() {
 }
 
 var catalogoDesbloqueoPuente = map[string]map[string]string{
-	"e2e.confirm_body": {
-		"en": "This browser already holds the key to your encrypted data. Unlock it in this app too?",
-		"es": "Este navegador ya tiene la clave de tus datos cifrados. ¿Desbloquearlos también en esta aplicación?",
-		"fr": "Ce navigateur détient déjà la clé de vos données chiffrées. Les déverrouiller aussi dans cette application ?",
-		"de": "Dieser Browser hat den Schlüssel zu deinen verschlüsselten Daten bereits. Auch in dieser App entsperren?",
-		"it": "Questo browser ha già la chiave dei tuoi dati crittografati. Sbloccarli anche in questa applicazione?",
-		"bg": "Този браузър вече има ключа за шифрованите ви данни. Да се отключат ли и в това приложение?",
-		"cs": "Tento prohlížeč už má klíč k vašim šifrovaným datům. Odemknout je i v této aplikaci?",
-		"da": "Denne browser har allerede nøglen til dine krypterede data. Vil du også låse dem op i denne app?",
-		"el": "Αυτό το πρόγραμμα περιήγησης έχει ήδη το κλειδί των κρυπτογραφημένων δεδομένων σας. Να ξεκλειδωθούν και σε αυτή την εφαρμογή;",
-		"et": "Sellel brauseril on teie krüpteeritud andmete võti juba olemas. Kas avada need ka selles rakenduses?",
-		"fi": "Tällä selaimella on jo salattujen tietojesi avain. Avataanko niiden lukitus myös tässä sovelluksessa?",
-		"ga": "Tá eochair do shonraí criptithe ag an mbrabhsálaí seo cheana féin. An ndíghlasálfar san aip seo iad freisin?",
-		"hr": "Ovaj preglednik već ima ključ vaših šifriranih podataka. Otključati ih i u ovoj aplikaciji?",
-		"hu": "Ez a böngésző már rendelkezik a titkosított adatai kulcsával. Feloldja őket ebben az alkalmazásban is?",
-		"is": "Þessi vafri er þegar með lykilinn að dulkóðuðu gögnunum þínum. Viltu opna þau líka í þessu forriti?",
-		"lt": "Ši naršyklė jau turi jūsų šifruotų duomenų raktą. Atrakinti juos ir šioje programoje?",
-		"lv": "Šajā pārlūkā jau ir jūsu šifrēto datu atslēga. Vai atbloķēt tos arī šajā lietotnē?",
-		"mt": "Dan il-browser diġà għandu ċ-ċavetta tad-data kriptata tiegħek. Tiftaħha wkoll f’din l-applikazzjoni?",
-		"nb": "Denne nettleseren har allerede nøkkelen til de krypterte dataene dine. Vil du låse dem opp i denne appen også?",
-		"nl": "Deze browser heeft de sleutel van je versleutelde gegevens al. Ook in deze app ontgrendelen?",
-		"pl": "Ta przeglądarka ma już klucz do Twoich zaszyfrowanych danych. Odblokować je także w tej aplikacji?",
-		"pt": "Este navegador já tem a chave dos seus dados encriptados. Desbloqueá-los também nesta aplicação?",
-		"ro": "Acest browser are deja cheia datelor tale criptate. Le deblochezi și în această aplicație?",
-		"sk": "Tento prehliadač už má kľúč k vašim šifrovaným údajom. Odomknúť ich aj v tejto aplikácii?",
-		"sl": "Ta brskalnik že ima ključ vaših šifriranih podatkov. Jih želite odkleniti tudi v tej aplikaciji?",
-		"sv": "Den här webbläsaren har redan nyckeln till dina krypterade data. Vill du låsa upp dem i den här appen också?",
-	},
-	"e2e.confirm_action": {
-		"en": "Unlock",
-		"es": "Desbloquear",
-		"fr": "Déverrouiller",
-		"de": "Entsperren",
-		"it": "Sblocca",
-		"bg": "Отключване",
-		"cs": "Odemknout",
-		"da": "Lås op",
-		"el": "Ξεκλείδωμα",
-		"et": "Ava",
-		"fi": "Avaa lukitus",
-		"ga": "Díghlasáil",
-		"hr": "Otključaj",
-		"hu": "Feloldás",
-		"is": "Opna",
-		"lt": "Atrakinti",
-		"lv": "Atbloķēt",
-		"mt": "Iftaħ",
-		"nb": "Lås opp",
-		"nl": "Ontgrendelen",
-		"pl": "Odblokuj",
-		"pt": "Desbloquear",
-		"ro": "Deblochează",
-		"sk": "Odomknúť",
-		"sl": "Odkleni",
-		"sv": "Lås upp",
-	},
 	"e2e.failed_body": {
 		"en": "This browser could not get the key that protects your encrypted data. Sign in again typing your password: it is what opens that key.",
 		"es": "Este navegador no ha podido obtener la clave que protege tus datos cifrados. Vuelve a iniciar sesión escribiendo tu contraseña: es lo que abre esa clave.",

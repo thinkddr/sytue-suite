@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Изпращане въпреки това",
   "compose.noAttachmentTitle": "Изпращане без прикачени файлове",
   "compose.noDraftsFolder": "Папката „Чернови“ не беше намерена",
+  "compose.openFailed": "Редакторът на съобщения не можа да се отвори. Опитайте отново.",
   "compose.pastedImageDropped": "Поставеното изображение не е включено",
   "compose.pastedImagesDropped": "Поставените изображения не са включени",
   "compose.pastedImagesDroppedDescription": "За да изпратите изображения, прикачете ги като файлове.",

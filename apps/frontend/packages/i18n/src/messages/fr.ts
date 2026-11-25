@@ -77,6 +77,8 @@ export const fr: Catalog = {
     'Je comprends que les données chiffrées avec la clé perdue seront supprimées',
   'vault.failed':
     'Impossible d’ouvrir les données chiffrées. Réessayez ou reconnectez-vous à Sytue ID. Si la clé est perdue, vous pouvez vider les données chiffrées de cette application.',
+  'vault.moreInfo': 'Plus d’informations',
+  'vault.attention': 'Tes données chiffrées demandent ton attention',
   'matrix.incoming': 'Vérifier cet appareil',
   'matrix.match': 'Ils correspondent',
   'matrix.mismatch': 'Ils ne correspondent pas',

@@ -161,3 +161,12 @@ func (p *Pantalla) verTodosLosRegistros() {
 	l.Q = ""
 	p.cambiarLectura(l)
 }
+
+// vacioLista es «Todavía no tienes ninguna base» con su dibujo, el `icon="database"` del
+// `EmptyState` de BasesApp.tsx (BASE-05): era solo texto. El paso siguiente es el campo
+// «Nombre de la nueva base» que tiene justo encima, así que no lleva botón.
+func (p *Pantalla) vacioLista(v tema.Variante) *ui.Vacio {
+	x := ui.NuevoVacio(p.t("bases.empty.title"), p.t("bases.empty.body"))
+	x.Glifo = iconos.Trazo(iconos.BaseDeDatos, ui.LadoGlifoVacio, "text-subtle", v)
+	return x
+}

@@ -39,6 +39,17 @@ test('la variante inset abre el hueco ANTES del anillo, o se funde con el rellen
   expect(r.indexOf('var(--sytue-surface)')).toBeLessThan(r.indexOf('var(--sytue-focus-ring)'));
 });
 
+test('sobre relleno el anillo toma el color del texto, no el del primario que lo rellena', () => {
+  // El token de foco es el primario: en un botón primario el anillo se fundía con el
+  // relleno y solo se veía el hueco de 1 px.
+  expect(css).toContain('.sytue-focus-ring-inset,\n.sytue-focus-ring-inset-within {');
+  expect(rule('.sytue-focus-ring-inset-within')).toContain('--sytue-focus-ring: var(--sytue-text)');
+  // Antes que el del cromo, que tiene que seguir ganando en la barra.
+  expect(css.indexOf('.sytue-focus-ring-inset,')).toBeLessThan(
+    css.indexOf('.sytue-focus-ring-chrome {'),
+  );
+});
+
 test('label y meta fijan el COLOR: sin él serían text-xs/text-2xs con otro nombre', () => {
   // Es lo que distingue a estos dos de display/h1-h4/overline, que solo dan tipografía.
   // Son roles semánticos —la etiqueta de un control, el dato accesorio—, y el valor está

@@ -12,6 +12,7 @@
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css",
     "./assets": "./src/assets/index.ts",
+    "./browser/bloques-de-notas": "./src/browser/bloques-de-notas.ts",
     "./browser/editing": "./src/browser/editing.ts",
     "./browser/portapapeles": "./src/browser/portapapeles.ts",
     "./browser/tabla": "./src/browser/tabla.ts",

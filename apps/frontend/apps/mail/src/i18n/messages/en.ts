@@ -556,6 +556,7 @@ export const en = {
   'compose.templates': 'Templates',
   'compose.templatesEmpty': 'No templates yet. Create them in Mail settings.',
   'compose.attachFailed': 'The attachment could not be read',
+  'compose.openFailed': 'The message editor could not be opened. Try again.',
   'compose.pastedImageDropped': 'The pasted image was not included',
   'compose.pastedImagesDropped': 'The pasted images were not included',
   'compose.pastedImagesDroppedDescription': 'To send images, attach them as files.',

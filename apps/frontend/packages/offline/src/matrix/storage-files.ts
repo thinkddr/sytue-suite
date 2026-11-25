@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Native file.v1 authenticated, bounded reads. */
-import { createSHA256, type IHasher } from 'hash-wasm';
-import { Attachment, EncryptedAttachment, initAsync } from '@matrix-org/matrix-sdk-crypto-wasm';
+import { createSHA256, type IHasher } from './sha256.js';
+import { matrixAttachments } from './attachment-wasm.js';
 import { maxCipherBlockBytes } from '@sytue/config/matrix';
 import type { MatrixReference, MatrixStorageScope } from './types.js';
 import { storageWork } from './storage-jobs.js';
@@ -160,7 +160,7 @@ export class StorageFiles {
         ciphertext.byteLength > maxCipherBlockBytes
       )
         return invalid();
-      await initAsync();
+      const { Attachment, EncryptedAttachment } = await matrixAttachments();
       this.check(signal);
       const encrypted = new EncryptedAttachment(ciphertext, JSON.stringify(descriptor.matrix_file));
       try {

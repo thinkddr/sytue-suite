@@ -184,6 +184,49 @@ export function porQueNoEntra(href: string): string | null {
   return null;
 }
 
+/** `/oauth2/authorize`: el paso de OIDC por el que pasa toda entrada a una app. */
+export const esPasoDeAutorizacion = (u: URL): boolean =>
+  /^\/oauth2\/authorize\/?$/.test(u.pathname);
+
+/**
+ * Deja la página FUERA del paso de autorización antes de decidir dónde está.
+ *
+ * `/oauth2/authorize` es un PASO, no una pantalla: con sesión en el IdP devuelve
+ * solo a la app, y con la doble ida y vuelta de OIDC entre el host del producto y
+ * el del tenant, al `domcontentloaded` a veces aún no ha terminado. Leer la URL en
+ * ese instante toma el paso por una pantalla del IdP. Se espera a que salga —a la
+ * app o al formulario— y, si en `espera` no sale, se recarga para relanzarlo, hasta
+ * `intentos` veces (`pausa` dice cuánto esperar antes: lo que pida el IdP si está
+ * limitando). Devuelve si la página estaba en el paso.
+ *
+ * Lo comparten los barridos. El de pantallas no lo tenía, y leía la URL nada más
+ * cargar: salía «el IdP muestra /mail/corporate/, que no es el formulario de
+ * acceso» en la portada de cada app (2026-11-23 y 24) con la app ya en pantalla:
+ * la ruta era la de la app, leída después de esperar el formulario.
+ */
+export async function salirDelPasoDeAutorizacion(
+  page: Pick<Page, "url" | "waitForURL" | "waitForTimeout" | "reload">,
+  {
+    espera = 20_000,
+    intentos = 3,
+    pausa = () => 5_000,
+  }: { espera?: number; intentos?: number; pausa?: () => number } = {},
+): Promise<boolean> {
+  if (!esPasoDeAutorizacion(new URL(page.url()))) return false;
+  for (let intento = 1; esPasoDeAutorizacion(new URL(page.url())); intento++) {
+    const salio = await page
+      .waitForURL((u) => !esPasoDeAutorizacion(u), { timeout: espera })
+      .then(
+        () => true,
+        () => false,
+      );
+    if (salio || intento >= intentos) break;
+    await page.waitForTimeout(pausa());
+    await page.reload({ waitUntil: "domcontentloaded" }).catch(() => {});
+  }
+  return true;
+}
+
 /**
  * La portada de Admin envía al employee a su cuenta del IdP. Ese destino
  * concreto no es un formulario de login ni una pantalla administrativa medida.

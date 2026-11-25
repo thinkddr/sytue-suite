@@ -155,9 +155,26 @@ func AltoFilaCon(chips []Etiqueta, anchoTexto float32) float32 {
 // el delantero y su `gap-3`. La fecha y el clip van DENTRO de la columna, en sus
 // líneas, así que no le quitan nada.
 func AnchoTextoFila(anchoFila float32) float32 {
-	izquierda := ui.InicioFila() + ui.LadoEleccion + 2*HuecoDelantero + PuntoSinLeer +
+	return max(anchoFila-MargenFila-inicioTextoFila(), 0)
+}
+
+// inicioTextoFila es dónde empieza la columna de texto: el delantero (casilla, punto y
+// avatar con sus huecos) y su `gap-3`.
+func inicioTextoFila() float32 {
+	return ui.InicioFila() + ui.LadoEleccion + huecoCasilla() + PuntoSinLeer + HuecoDelantero +
 		ui.MedidaAvatar(ui.AvatarMD).Width + HuecoBloque
-	return max(anchoFila-MargenFila-izquierda, 0)
+}
+
+// huecoCasilla es lo que separa la casilla del punto y del avatar: el `gap-1` del
+// delantero y, con el dedo, el `gap-3` que la fila de Contacts deja entre su casilla y su
+// avatar. A 4 px, en el teléfono —donde la casilla se ve siempre— casilla, punto y avatar
+// se leían como una sola mancha, y el dedo que se quedaba corto de la casilla abría el
+// correo. Ese hueco es también de la casilla: tocarlo la marca.
+func huecoCasilla() float32 {
+	if esTactil() {
+		return HuecoBloque
+	}
+	return HuecoDelantero
 }
 
 // ColorEtiqueta es `labelDot`: el token de color de una etiqueta (un id de la paleta de
@@ -456,9 +473,7 @@ func (r *filaRenderer) montar() {
 // el MinSize del objeto que devuelve su `CreateItem` y lo aplica a todas. Una fila con
 // etiquetas crece, y ese alto se lo pone la bandeja con `SetItemHeight`.
 func (r *filaRenderer) MinSize() fyne.Size {
-	ancho := ui.InicioFila() + MargenFila + ui.LadoEleccion + 2*HuecoDelantero +
-		PuntoSinLeer + ui.MedidaAvatar(ui.AvatarMD).Width + HuecoBloque
-	return fyne.NewSize(ancho, AltoFilaConversacion())
+	return fyne.NewSize(inicioTextoFila()+MargenFila, AltoFilaConversacion())
 }
 
 func (r *filaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
@@ -483,7 +498,13 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 	// `hidden`, y si desapareciera el avatar se movería 21 px al pasar el ratón.
 	r.casilla.Resize(fyne.NewSize(ui.LadoEleccion, ui.LadoEleccion))
 	r.casilla.Move(fyne.NewPos(x, centro(ui.LadoEleccion)))
-	x += ui.LadoEleccion + HuecoDelantero
+	if esTactil() {
+		// Con el dedo la casilla recoge el toque en todo el alto y en su hueco hasta el
+		// punto (ver huecoCasilla); la `Eleccion` pinta su cuadrado centrado en el alto.
+		r.casilla.Resize(fyne.NewSize(ui.LadoEleccion+huecoCasilla(), contenido))
+		r.casilla.Move(fyne.NewPos(x, 0))
+	}
+	x += ui.LadoEleccion + huecoCasilla()
 	r.punto.Resize(fyne.NewSize(PuntoSinLeer, PuntoSinLeer))
 	r.punto.Move(fyne.NewPos(x, centro(PuntoSinLeer)))
 	x += PuntoSinLeer + HuecoDelantero

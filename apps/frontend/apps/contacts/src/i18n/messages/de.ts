@@ -60,6 +60,8 @@ export const de: AppCatalog<typeof en> = {
   'list.unstar': 'Markierung von {name} entfernen',
   'list.starredTitle': 'Markiert',
   'list.reviewDuplicates': 'Duplikate prüfen ({count})',
+  'list.selectMode': 'Auswählen',
+  'list.moreActions': 'Weitere Aktionen',
   'list.count': { one: '{count} Kontakt', other: '{count} Kontakte' },
   'list.countFiltered': {
     one: '{shown} von {count} Kontakt',

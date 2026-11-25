@@ -188,7 +188,7 @@ func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
 	case ui.EstadoCargando:
 		abajo = p.listaDia(true)
 		if enAgenda {
-			abajo = esqueletoAgendaCompacta()
+			abajo = p.esqueletoAgendaCompacta()
 		}
 	case ui.EstadoExito, ui.EstadoVacia:
 		abajo = p.listaDia(false)
@@ -223,8 +223,8 @@ func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
 
 // esqueletoAgendaCompacta es la agenda del teléfono mientras carga: tres filas como las
 // de la lista del día (`pt-2` y `EsqueletoListaDia` en la web).
-func esqueletoAgendaCompacta() fyne.CanvasObject {
-	return container.New(ui.Margen{Arr: espacio2}, esqueletoListaDia())
+func (p *Pantalla) esqueletoAgendaCompacta() fyne.CanvasObject {
+	return container.New(ui.Margen{Arr: espacio2}, conLatido(p, esqueletoListaDia()))
 }
 
 // hojaYLista pone la hoja arriba con su sombra debajo (`shadow-sm` y `z-10`) y la lista
@@ -255,7 +255,7 @@ func (p *Pantalla) listaDia(cargando bool) fyne.CanvasObject {
 	filas := []fyne.CanvasObject{titulo}
 	switch dia := EventosDelDia(p.Cursor, p.zona(), p.Eventos); {
 	case cargando:
-		filas = append(filas, esqueletoListaDia())
+		filas = append(filas, conLatido(p, esqueletoListaDia()))
 	case len(dia) == 0:
 		filas = append(filas, renglon(p.t("day.noEvents", nil), tema.TextoSM, ui.Normal, "text-muted",
 			ui.Margen{Izq: espacio4, Arr: espacio2, Der: espacio4, Abj: espacio2}))

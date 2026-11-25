@@ -4,8 +4,11 @@
 package notes
 
 import (
+	"bytes"
+	"image"
 	"image/color"
 	"slices"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -102,9 +105,19 @@ type Lienzo struct {
 	Imagen          func(url string) imagenRemota
 	Documento       func(id string) docRemoto
 	// vivas son las tarjetas del último repintado, por nota: a las que llevar la vista.
+	// previas son las del repintado anterior mientras se reparte el nuevo: una tarjeta
+	// cuya nota y forma no han cambiado (`claveTarjeta`) se REUTILIZA, con su renderer,
+	// su prosa ya maquetada y sus medidas, en vez de rehacerse.
 	vivas          map[string]*Tarjeta
+	previas        map[string]*Tarjeta
 	columnas       []fyne.CanvasObject
 	marcasColumnas []*canvas.Rectangle
+	// desplazador es el del lienzo (lo pone la Pantalla): con él, las columnas y la lista
+	// cuelgan solo las tarjetas que se ven (virtual.go). virtuales son esas columnas, las
+	// del último repintado, y anchos el de cada una la última vez que se colocó.
+	desplazador *container.Scroll
+	virtuales   []*columnaVirtual
+	anchos      map[claveColumna]float32
 	// AlMoverLibre es soltar una nota arrastrada en el lienzo libre, en su nuevo (x, y).
 	AlMoverLibre       func(Nota, fyne.Position)
 	AlArrastrarNota    func(Nota, fyne.Position)
@@ -260,9 +273,10 @@ func (l *Lienzo) sinCoincidencias() *ui.Vacio {
 
 // reparto coloca las tarjetas según la disposición del cuaderno.
 func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
-	l.vivas = make(map[string]*Tarjeta, len(l.Notas))
-	l.columnas, l.marcasColumnas = nil, nil
-	tarjetas := make([]fyne.CanvasObject, 0, len(l.Notas))
+	l.previas, l.vivas = l.vivas, make(map[string]*Tarjeta, len(l.Notas))
+	defer func() { l.previas = nil }()
+	l.columnas, l.marcasColumnas, l.virtuales = nil, nil, nil
+	tarjetas := make([]*Tarjeta, 0, len(l.Notas))
 	var arrastrables []*Tarjeta
 	// En lista, cada sublista va justo debajo de su nota y sangrada (`conSangria` de la web).
 	notas, niveles := l.Notas, map[string]int(nil)
@@ -270,19 +284,11 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 		notas, niveles = conSangria(l.Notas)
 	}
 	for _, n := range notas {
-		t := l.tarjeta(n)
+		t, reusada := l.tarjetaEn(n, v)
 		t.Nivel = niveles[n.ID]
-		if l.Cuaderno.Vista == Libre && !l.SoloLectura && !l.Bloqueado {
-			t.AlSoltar = func(p fyne.Position) {
-				llamar2(l.AlMoverLibre, n, fyne.NewPos(max(p.X-MargenLienzo, 0), max(p.Y-MargenLienzo, 0)))
-			}
+		t.fuera = false
+		if l.engancharArrastre(t, n, reusada) {
 			arrastrables = append(arrastrables, t)
-		} else if !l.Llenar && !l.SoloLectura && !l.Bloqueado && l.AlSoltarNota != nil {
-			t.AlSoltar = func(fyne.Position) {}
-			t.arrastreEnSitio = true
-			t.alArrastrar = func(en fyne.Position) { llamar2(l.AlArrastrarNota, n, en) }
-			t.alSoltarEn = func(en fyne.Position) { l.AlSoltarNota(n, en) }
-			t.alCancelarArrastre = l.AlCancelarArrastre
 		}
 		tarjetas = append(tarjetas, t)
 	}
@@ -291,7 +297,7 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 		// Cada nota donde se soltó, con su propio ancho. El lienzo CRECE con lo que
 		// haya abajo del todo (`min-h-full`): con un alto fijo, una nota arrastrada al
 		// fondo quedaría fuera de alcance.
-		c := container.New(&libre{}, tarjetas...)
+		c := container.New(&libre{}, objetosDe(tarjetas)...)
 		for _, t := range arrastrables {
 			t.alEmpezar = func() { alFrente(c, t) }
 		}
@@ -299,7 +305,7 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 	case Columnas:
 		cols := make([]fyne.CanvasObject, NumColumnas)
 		for i := range cols {
-			var dentro []fyne.CanvasObject
+			var dentro []*Tarjeta
 			for j, n := range l.Notas {
 				// Una columna fuera de rango cae en la última en vez de desaparecer,
 				// que es lo que hace el `Math.min(Math.max(...))` de la web.
@@ -307,7 +313,8 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 					dentro = append(dentro, tarjetas[j])
 				}
 			}
-			columna := container.New(columnaConDestino{columnaTarjetas{hueco: HuecoLista}}, dentro...)
+			// Con destino: vacía sigue siendo un sitio visible y alcanzable para el asa.
+			columna := l.nuevaColumnaVirtual(claveColumna(i), HuecoLista, true, dentro)
 			marca := canvas.NewRectangle(color.Transparent)
 			marca.StrokeWidth, marca.StrokeColor, marca.CornerRadius = tema.AnilloFoco, tema.Color("primary", v), tema.RadioMD
 			marca.Hide()
@@ -327,59 +334,113 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 		if len(tarjetas) == 1 {
 			return tarjetas[0]
 		}
-		return container.New(columnaTarjetas{}, tarjetas...)
+		return container.New(columnaTarjetas{}, objetosDe(tarjetas)...)
 	}
 	if !l.filas() {
 		// Un árbol que no llena el panel: tarjetas en columna, como siempre.
-		return conMargen(container.New(&acotado{ancho: AnchoLectura}, container.New(columnaTarjetas{hueco: HuecoLista}, tarjetas...)))
+		return conMargen(container.New(&acotado{ancho: AnchoLectura}, l.nuevaColumnaVirtual(columnaArbol, HuecoLista, false, tarjetas)))
 	}
 	// Las filas, en la columna de lectura (`.notes-col`) y sangradas 8 px hacia fuera
 	// (`.notes-stream -mx-2`): el glifo de cada una cae en el borde de la columna, bajo el
 	// título, con `gap-1` entre filas y `pb-10`.
-	filas := container.New(columnaTarjetas{hueco: tema.Espacio(1)}, tarjetas...)
+	filas := l.nuevaColumnaVirtual(columnaLista, tema.Espacio(1), false, tarjetas)
 	margen := max(l.margenDiario()-RellenoFilaX, 0)
 	return container.New(&acotado{ancho: AnchoLectura + 2*tema.Espacio(6)},
 		container.New(ui.Margen{Izq: margen, Der: margen, Abj: tema.Espacio(10)}, filas))
+}
+
+// engancharArrastre pone a la tarjeta los avisos de su arrastre: en el lienzo libre se
+// suelta donde se deja (y dice que es de las que suben al frente); en las columnas y en
+// la lista se reordena. La reutilizada fuera del libre ya los tiene, y valen igual: no
+// dependen más que de la nota, que es la misma (Lienzo.tarjetaEn).
+//
+// Los avisos van en funciones aparte porque capturan la nota, y eso la copia al montón:
+// aquí, en cada vuelta del repintado y aunque la tarjeta se reutilizara.
+func (l *Lienzo) engancharArrastre(t *Tarjeta, n Nota, reusada bool) (libre bool) {
+	switch {
+	case reusada && l.Cuaderno.Vista != Libre:
+	case l.Cuaderno.Vista == Libre && !l.SoloLectura && !l.Bloqueado:
+		l.arrastreLibre(t, n)
+		return true
+	case !l.Llenar && !l.SoloLectura && !l.Bloqueado && l.AlSoltarNota != nil:
+		l.arrastreEnSitio(t, n)
+	}
+	return false
+}
+
+// arrastreLibre suelta la nota donde se deja, en el lienzo libre.
+func (l *Lienzo) arrastreLibre(t *Tarjeta, n Nota) {
+	t.AlSoltar = func(p fyne.Position) {
+		llamar2(l.AlMoverLibre, n, fyne.NewPos(max(p.X-MargenLienzo, 0), max(p.Y-MargenLienzo, 0)))
+	}
+}
+
+// arrastreEnSitio reordena la nota en su columna o en la lista.
+func (l *Lienzo) arrastreEnSitio(t *Tarjeta, n Nota) {
+	t.AlSoltar = func(fyne.Position) {}
+	t.arrastreEnSitio = true
+	t.alArrastrar = func(en fyne.Position) { llamar2(l.AlArrastrarNota, n, en) }
+	t.alSoltarEn = func(en fyne.Position) { l.AlSoltarNota(n, en) }
+	t.alCancelarArrastre = l.AlCancelarArrastre
+}
+
+// objetosDe son las tarjetas como objetos del lienzo.
+func objetosDe(ts []*Tarjeta) []fyne.CanvasObject {
+	out := make([]fyne.CanvasObject, len(ts))
+	for i, t := range ts {
+		out[i] = t
+	}
+	return out
 }
 
 // conSangria devuelve las notas en el orden en que se pintan en una lista —cada sublista
 // justo debajo de su nota, respetando el orden que llega entre hermanas— y la profundidad
 // de cada una. Lo que cuelga de algo que no está a la vista (filtrado, o un ciclo en los
 // datos) se queda en la raíz. Es `conSangria` de client/arbol.ts.
+//
+// Va por índices y no copia ninguna nota hasta la lista final; sin ninguna sublista a la
+// vista devuelve las mismas notas, todas en la raíz. Copiar cada nota a tres mapas eran
+// ~4 MB por repintado de una lista de mil.
 func conSangria(notas []Nota) ([]Nota, map[string]int) {
-	porID := make(map[string]Nota, len(notas))
-	for _, n := range notas {
-		porID[n.ID] = n
+	porID := make(map[string]int, len(notas))
+	for i, n := range notas {
+		porID[n.ID] = i
 	}
-	sube := func(desde Nota, id string) bool {
+	sube := func(desde int, id string) bool {
 		vistos := map[string]bool{}
-		for actual, ok := desde, true; ok && !vistos[actual.ID]; actual, ok = porID[actual.Grupo] {
-			if actual.ID == id {
+		for actual, ok := desde, true; ok && !vistos[notas[actual].ID]; actual, ok = porID[notas[actual].Grupo] {
+			if notas[actual].ID == id {
 				return true
 			}
-			vistos[actual.ID] = true
-			if actual.Grupo == "" {
+			vistos[notas[actual].ID] = true
+			if notas[actual].Grupo == "" {
 				break
 			}
 		}
 		return false
 	}
-	hijos := map[string][]Nota{}
-	var raices []Nota
-	for _, n := range notas {
-		if padre, ok := porID[n.Grupo]; ok && n.Grupo != "" && padre.ID != n.ID && !sube(padre, n.ID) {
-			hijos[padre.ID] = append(hijos[padre.ID], n)
+	var hijos map[string][]int
+	raices := make([]int, 0, len(notas))
+	for i, n := range notas {
+		if padre, ok := porID[n.Grupo]; ok && n.Grupo != "" && notas[padre].ID != n.ID && !sube(padre, n.ID) {
+			if hijos == nil {
+				hijos = map[string][]int{}
+			}
+			hijos[notas[padre].ID] = append(hijos[notas[padre].ID], i)
 			continue
 		}
-		raices = append(raices, n)
+		raices = append(raices, i)
+	}
+	if hijos == nil {
+		return notas, nil
 	}
 	out := make([]Nota, 0, len(notas))
 	niveles := make(map[string]int, len(notas))
-	var bajar func(n Nota, nivel int)
-	bajar = func(n Nota, nivel int) {
-		out = append(out, n)
-		niveles[n.ID] = nivel
-		for _, h := range hijos[n.ID] {
+	var bajar func(i, nivel int)
+	bajar = func(i, nivel int) {
+		out = append(out, notas[i])
+		niveles[notas[i].ID] = nivel
+		for _, h := range hijos[notas[i].ID] {
 			bajar(h, nivel+1)
 		}
 	}
@@ -405,11 +466,36 @@ func (l *Lienzo) margenDiario() float32 {
 }
 
 func (l *Lienzo) tarjeta(n Nota) *Tarjeta {
-	t := NuevaTarjeta(l.tr, n)
-	t.Diario = l.filas()
+	t, _ := l.tarjetaEn(n, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	return t
+}
+
+// tarjetaEn es la tarjeta de `n` en este repintado, y si es la del anterior reutilizada.
+//
+// La reutilizada se queda como estaba: misma clave y misma nota son los mismos campos, y
+// sus avisos leen los del lienzo al llamarlos, que no cambian de un repintado a otro.
+// Volver a ponérselos eran una docena de cierres por nota y repintado, que en un
+// cuaderno de mil notas eran casi todo lo que se asignaba.
+func (l *Lienzo) tarjetaEn(n Nota, v tema.Variante) (*Tarjeta, bool) {
+	clave, reutilizable := l.claveDe(n, v)
 	if l.vivas == nil {
 		l.vivas = map[string]*Tarjeta{}
 	}
+	if t := l.previas[n.ID]; t != nil && reutilizable && t.reutilizable && t.clave == clave && igualNota(t.nota, n) {
+		t.nota, t.insercion = n, 0
+		l.vivas[n.ID] = t
+		return t, true
+	}
+	return l.tarjetaNueva(n, clave, reutilizable), false
+}
+
+// tarjetaNueva hace y engancha la tarjeta de `n`. Va aparte de tarjetaEn porque sus
+// avisos capturan la nota, y eso la copia al montón: así solo se copia al hacerla.
+func (l *Lienzo) tarjetaNueva(n Nota, clave claveTarjeta, reutilizable bool) *Tarjeta {
+	t := NuevaTarjeta(l.tr, n)
+	t.nota, t.clave, t.reutilizable = n, clave, reutilizable
+	t.insercion = 0
+	t.Diario = l.filas()
 	l.vivas[n.ID] = t
 	t.Seleccionada = n.ID == l.Seleccionada
 	t.Bloqueada = l.Bloqueado
@@ -450,6 +536,88 @@ func (l *Lienzo) tarjeta(n Nota) *Tarjeta {
 	}
 	return t
 }
+
+// claveTarjeta es lo que, además de su nota, decide las piezas de una tarjeta: si dos
+// repintados dan la misma, la del anterior vale tal cual.
+type claveTarjeta struct {
+	v                                                        tema.Variante
+	diario, seleccionada, bloqueada, soloLectura, llenar     bool
+	sinAcciones, sinMenu, alConvertir, alEditar, alRenombrar bool
+	arrastre                                                 int
+	imagenLista, imagenFallo                                 bool
+	imagen                                                   image.Image
+	docListo, docFallo                                       bool
+	docHTML                                                  string
+}
+
+// claveDe es la clave de la tarjeta de `n` en este repintado, y si se puede reutilizar:
+// la que se escribe o se renombra lleva un campo vivo, y la de un recordatorio dice
+// cuánto falta, que cambia solo con el reloj.
+func (l *Lienzo) claveDe(n Nota, v tema.Variante) (claveTarjeta, bool) {
+	c := claveTarjeta{
+		v: v, diario: l.filas(),
+		seleccionada: n.ID == l.Seleccionada, bloqueada: l.Bloqueado,
+		soloLectura: !n.Editable(l.SoloLectura, l.Bloqueado), llenar: l.Llenar,
+		sinAcciones: l.SoloLectura, sinMenu: l.SinMenu, alConvertir: l.AlConvertir != nil,
+		alEditar: l.AlEditar != nil, alRenombrar: l.AlRenombrar != nil,
+	}
+	switch {
+	case l.Cuaderno.Vista == Libre && !l.SoloLectura && !l.Bloqueado:
+		c.arrastre = 1
+	case !l.Llenar && !l.SoloLectura && !l.Bloqueado && l.AlSoltarNota != nil:
+		c.arrastre = 2
+	}
+	if n.Tipo == "image" && l.Imagen != nil && esWeb(n.URL) {
+		r := l.Imagen(n.URL)
+		c.imagenLista, c.imagenFallo, c.imagen = r.lista, r.err != nil, r.img
+	}
+	if n.Tipo == "doc" && l.Documento != nil && len(n.Enlaces) > 0 {
+		r := l.Documento(n.Enlaces[0].TargetID)
+		c.docListo, c.docFallo, c.docHTML = r.listo, r.err != nil, r.html
+	}
+	_, conRecordatorio := l.Recordatorios[n.ID]
+	return c, n.ID != l.Editando && n.ID != l.Renombrando && !conRecordatorio
+}
+
+// igualNota dice si dos versiones de una nota se pintan igual y escriben igual: todo
+// lo de la vista y la nota tal como llegó (`Crudo`), de la que parte cada escritura. El
+// documento sale del contenido, así que basta con comparar este.
+func igualNota(a, b Nota) bool {
+	return igualTexto(a, b) && igualSitio(a, b) && igualCrudo(a.Crudo, b.Crudo)
+}
+
+func igualTexto(a, b Nota) bool {
+	return a.ID == b.ID && a.Cuaderno == b.Cuaderno && a.Tipo == b.Tipo && a.Titulo == b.Titulo &&
+		a.Contenido == b.Contenido && bytes.Equal(a.Datos, b.Datos) && a.Cifrada == b.Cifrada &&
+		a.Icono == b.Icono && a.URL == b.URL && slices.Equal(a.Estados, b.Estados) &&
+		slices.Equal(a.Enlaces, b.Enlaces) && slices.Equal(a.Adjuntos, b.Adjuntos) &&
+		a.Papelera == nil && b.Papelera == nil
+}
+
+func igualSitio(a, b Nota) bool {
+	return a.Grupo == b.Grupo && a.X == b.X && a.Y == b.Y && a.Col == b.Col && a.Posicion == b.Posicion &&
+		a.Ancho == b.Ancho && a.Plegada == b.Plegada && a.Marcada == b.Marcada && a.Cancelada == b.Cancelada &&
+		a.Traslados == b.Traslados && a.Fijada == b.Fijada && a.Tocada.Equal(b.Tocada) && a.Creada.Equal(b.Creada)
+}
+
+func igualCrudo(a, b api.Note) bool {
+	return a.ID == b.ID && a.OwnerSub == b.OwnerSub && a.NotebookID == b.NotebookID && a.Kind == b.Kind &&
+		a.Title == b.Title && a.Content == b.Content && a.ContentCipher == b.ContentCipher &&
+		bytes.Equal(a.Data, b.Data) && a.DataJSON == b.DataJSON && a.Visibility == b.Visibility &&
+		slices.Equal(a.States, b.States) && slices.Equal(a.Links, b.Links) && igualCrudoSitio(a, b)
+}
+
+func igualCrudoSitio(a, b api.Note) bool {
+	return a.X == b.X && a.Y == b.Y && a.Col == b.Col && a.Position == b.Position && a.Width == b.Width &&
+		igualPuntero(a.GroupID, b.GroupID) && a.Collapsed == b.Collapsed && a.Checked == b.Checked &&
+		igualHora(a.CheckedAt, b.CheckedAt) && igualHora(a.CancelledAt, b.CancelledAt) && a.Pinned == b.Pinned &&
+		igualPuntero(a.Indexable, b.Indexable) && a.CreatedAt.Equal(b.CreatedAt) &&
+		a.UpdatedAt.Equal(b.UpdatedAt) && igualPuntero(a.RepeatedInto, b.RepeatedInto)
+}
+
+func igualPuntero[T comparable](a, b *T) bool { return a == b || (a != nil && b != nil && *a == *b) }
+
+func igualHora(a, b *time.Time) bool { return a == b || (a != nil && b != nil && a.Equal(*b)) }
 
 // Cartel es el aviso de solo lectura de la nota abierta, o nil si no hace falta.
 //
@@ -637,15 +805,6 @@ func anchoLibre(n Nota, minimo float32) float32 {
 // ancho no parte ninguna línea ni sabe cuánto mide su imagen: hasta el fotograma
 // siguiente (el `EnsureMinSize` del driver), su contenido se salía por debajo.
 type columnaTarjetas struct{ hueco float32 }
-
-// Una columna vacía sigue siendo un destino visible y alcanzable para el asa.
-type columnaConDestino struct{ columnaTarjetas }
-
-func (c columnaConDestino) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	m := c.columnaTarjetas.MinSize(objs)
-	m.Height = max(m.Height, tema.Espacio(16))
-	return m
-}
 
 func (c columnaTarjetas) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return ui.Columna{Hueco: c.hueco}.MinSize(objs)

@@ -16,7 +16,7 @@ import (
 
 func TestVaultproofAutoridadDeLaBoveda(t *testing.T) {
 	_, reg := firmante(t, 1)
-	scope := accion(t, reg, "key.enroll").Scope
+	scope := accionDePrueba(t, reg, "key.enroll").Scope
 	a, err := Authority(scope, reg)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ type casoFirma func() (*recoverywrap.PQVaultSigner, matrixproof.Intent, matrixpr
 
 func TestVaultproofFirmaSoloLoPedido(t *testing.T) {
 	s, reg := firmante(t, 1)
-	esperada := accion(t, reg, "task.ack")
+	esperada := accionDePrueba(t, reg, "task.ack")
 	prueba, err := SignIntent(s, esperada.Intent(), esperada, ahora)
 	if err != nil {
 		t.Fatal(err)

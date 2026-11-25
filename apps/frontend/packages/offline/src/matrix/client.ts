@@ -30,7 +30,12 @@ import {
   initAsync,
 } from '@matrix-org/matrix-sdk-crypto-wasm';
 import type { RoomMessageEventContent } from 'matrix-js-sdk/lib/@types/events';
-import type { IContent as MatrixCustomContent } from 'matrix-js-sdk';
+import {
+  safeAttachmentType,
+  validCallContent,
+  type MatrixCallEventType,
+  type MatrixCallKeyContent,
+} from './guards.js';
 import type { ReceivedToDeviceMessage } from 'matrix-js-sdk/lib/sync-accumulator';
 import { DeviceVerification } from 'matrix-js-sdk/lib/models/device';
 import type { MatrixKeyCustody } from './custody.js';
@@ -134,6 +139,15 @@ import {
   type MatrixReference,
   type RoomsEncryptedContent,
 } from './types.js';
+
+// Viven en `guards.ts` para que las apps sin Matrix las usen sin el SDK; aquí siguen
+// exportándose como antes.
+export {
+  safeAttachmentType,
+  validCallContent,
+  type MatrixCallEventType,
+  type MatrixCallKeyContent,
+};
 
 /**
  * Recovery secrets stay in this client. Since ADR 0081 the shared gate never shows
@@ -3670,46 +3684,6 @@ export class SuiteMatrix {
     });
     return pending;
   }
-}
-
-/** Active documents must never execute on the Rooms origin after decryption. */
-export function safeAttachmentType(type: string): string {
-  return /^(image\/(png|jpeg|webp|gif|avif|bmp)|application\/pdf|text\/plain|audio\/[a-z0-9.+-]+|video\/[a-z0-9.+-]+)$/.test(
-    type,
-  )
-    ? type
-    : 'application/octet-stream';
-}
-export type MatrixCallEventType =
-  'org.sytue.rooms.call_key.v1' | 'org.sytue.rooms.call_key_request.v1';
-export interface MatrixCallKeyContent extends MatrixCustomContent {
-  v: 1;
-  call_id: string;
-  generation: number;
-  algorithm: 'AES-GCM';
-  expires_at: number;
-  key_b64?: string;
-}
-
-export function validCallContent(
-  type: MatrixCallEventType,
-  content: MatrixCallKeyContent,
-): boolean {
-  return (
-    content.v === 1 &&
-    typeof content.call_id === 'string' &&
-    content.call_id.length > 0 &&
-    content.call_id.length <= 256 &&
-    Number.isSafeInteger(content.generation) &&
-    content.generation >= 0 &&
-    content.algorithm === 'AES-GCM' &&
-    Number.isSafeInteger(content.expires_at) &&
-    content.expires_at > Date.now() &&
-    content.expires_at <= Date.now() + 24 * 60 * 60 * 1000 &&
-    (type === 'org.sytue.rooms.call_key_request.v1'
-      ? content.key_b64 === undefined
-      : typeof content.key_b64 === 'string' && /^[A-Za-z0-9+/]{43}=$/.test(content.key_b64))
-  );
 }
 
 async function boundedMedia(response: Response, maximum: number): Promise<Uint8Array<ArrayBuffer>> {

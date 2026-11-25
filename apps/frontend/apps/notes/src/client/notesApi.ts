@@ -9,6 +9,7 @@
 import { withBase } from '@sytue/ui';
 import { noteWritePath } from '@sytue/api-clients';
 import { validateImportBeforeUpload } from './onexGuard.js';
+import { cargarHtml } from './html.js';
 import type {
   DailyDay,
   Hashtag,
@@ -65,14 +66,21 @@ async function pedir<T>(path: string, init?: RequestInit): Promise<T> {
   // `withBase`: en producción la app se sirve bajo su prefijo (`/notes`) tanto en
   // su subdominio como en el host de la organización. Una ruta absoluta sin él
   // apunta a la raíz del host, que ahí es el 404 de Traefik.
-  const res = await fetch(withBase(import.meta.env.BASE_URL, path), {
-    credentials: 'include',
-    headers: {
-      accept: 'application/json',
-      ...(init?.body ? { 'content-type': 'application/json' } : {}),
-    },
-    ...init,
-  });
+  //
+  // Con el parser de HTML (`html.ts`): lo que devuelve el BFF son notas que la interfaz
+  // lee sin esperar, así que ninguna respuesta llega antes que él. Se baja a la vez que
+  // la primera petición; las demás no esperan nada.
+  const [res] = await Promise.all([
+    fetch(withBase(import.meta.env.BASE_URL, path), {
+      credentials: 'include',
+      headers: {
+        accept: 'application/json',
+        ...(init?.body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...init,
+    }),
+    cargarHtml(),
+  ]);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new NotesApiError(res.status, body.error ?? 'error');

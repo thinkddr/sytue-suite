@@ -16,7 +16,7 @@ import {
   formatNumber,
   numToCol,
   parseFormula,
-} from '@sytue/formula';
+} from '@sytue/formula/ligero';
 import type { AstNode, CellRef, CellValue, TableArea } from '@sytue/formula';
 import type {
   BorderStroke,
@@ -99,6 +99,19 @@ export function parseCell(html: string): CellParts {
     inner = (m[1] ?? '').trim();
   }
   return { align, b, i, inner };
+}
+
+/**
+ * Alineación con la que se PINTA una celda: la suya o, sin ninguna, la de «General» de
+ * cualquier hoja de cálculo, que pone los números a la derecha y lo demás a la izquierda.
+ * Iban todos a la izquierda y una columna de importes no se leía por las unidades. El
+ * atajo es por coste: se pregunta por cada celda visible y sin formato no empieza por «<».
+ * Gemelo de `Libro.AlinearPintado` en apps/fyne/calcus/libro.go.
+ */
+export function alineacionPintada(html: string, valor: unknown): CellParts['align'] {
+  const propia = html.trimStart().startsWith('<') ? parseCell(html).align : '';
+  if (propia !== '') return propia;
+  return typeof valor === 'number' ? 'right' : '';
 }
 
 export function renderCellHtml(p: CellParts): string {

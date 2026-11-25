@@ -5,8 +5,6 @@ package matrixproof
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
 	"slices"
 	"strings"
 
@@ -15,11 +13,6 @@ import (
 	"maunium.net/go/mautrix/id"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
-)
-
-var (
-	ErrUnverified     = errors.New("ingress: independently authenticated Matrix device is required")
-	ErrRootEnrollment = errors.New("ingress: explicitly confirmed Matrix root enrollment is required")
 )
 
 // Origin is resolved independently by the server from its configured Matrix
@@ -47,11 +40,6 @@ type Device struct {
 	signing    id.Ed25519
 	encryption id.Curve25519
 	evidence   *DeviceEvidence
-}
-
-func validKey(value string) bool {
-	raw, err := base64.RawStdEncoding.DecodeString(value)
-	return err == nil && len(raw) == 32 && base64.RawStdEncoding.EncodeToString(raw) == value
 }
 
 func crossKey(value mautrix.CrossSigningKeys, user id.UserID, usage id.CrossSigningUsage) (id.Ed25519, error) {

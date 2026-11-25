@@ -99,17 +99,29 @@ func (p *Pantalla) vistaAgenda() fyne.CanvasObject {
 	// text-sm`, no el `Input` de Form.tsx (`text-base`, `border-strong`). Es un
 	// `ui.CampoPropio`: el `py` sale de centrar la línea de `text-sm` (15,75) en los 31,5
 	// del `h-9` con su borde.
-	buscador := ui.NuevaEntrada(p.t("search.events", nil)).ConPropia(ui.CampoPropio{
-		MargenX: tema.Espacio(3), MargenY: (tema.Espacio(9) - 2*tema.Borde - tema.TextoSM.Linea) / 2,
-		Texto: tema.TextoSM, Borde: "border",
-	})
-	buscador.PonerTexto(p.consultaAgenda)
+	//
+	// El campo es el MISMO de un pintado a otro (con su foco y su cursor), como el filtro
+	// de Notepads: uno nuevo en cada pintado —la campana, una invitación— se llevaba el
+	// foco de quien escribía, y cada uno se quedaba vivo tras soltarse. Se rehace si
+	// cambia el idioma, por su marca de agua.
+	if p.buscadorAgenda == nil || p.buscadorAgendaEn != p.locale() {
+		b := ui.NuevaEntrada(p.t("search.events", nil)).ConPropia(ui.CampoPropio{
+			MargenX: tema.Espacio(3), MargenY: (tema.Espacio(9) - 2*tema.Borde - tema.TextoSM.Linea) / 2,
+			Texto: tema.TextoSM, Borde: "border",
+		})
+		b.PonerTexto(p.consultaAgenda)
+		b.AlCambiar(func(s string) {
+			p.consultaAgenda = s
+			if l := p.listaAgendaViva; l != nil {
+				l.Objects = []fyne.CanvasObject{p.listaAgenda()}
+				l.Refresh()
+			}
+		})
+		p.buscadorAgenda, p.buscadorAgendaEn = b, p.locale()
+	}
+	buscador := p.buscadorAgenda
 	lista := container.NewStack(p.listaAgenda())
-	buscador.AlCambiar(func(s string) {
-		p.consultaAgenda = s
-		lista.Objects = []fyne.CanvasObject{p.listaAgenda()}
-		lista.Refresh()
-	})
+	p.listaAgendaViva = lista
 	altoBuscador := 2*espacio2 + ui.AltoCampo(ui.CampoMD) + tema.Borde
 	cabecera := container.New(&conFilete{M: espacio2}, canvas.NewRectangle(tema.Color("border", v)), buscador)
 	return container.NewStack(canvas.NewRectangle(tema.Color("surface", v)),
@@ -124,14 +136,132 @@ func (p *Pantalla) listaAgenda() fyne.CanvasObject {
 		options.Arriba = func() bool { return true }
 		return ui.RefrescarAlTirar(p.agendaVacia(strings.TrimSpace(p.consultaAgenda) != ""), &options)
 	}
-	filas := make([]fyne.CanvasObject, 0, len(grupos))
-	for i, g := range grupos {
-		filas = append(filas, p.nuevoGrupoAgenda(g, i > 0))
-	}
-	scroll, lista := desplazable(container.New(ui.Columna{}, filas...))
+	a := &agendaVirtual{p: p, grupos: grupos, hechos: map[int]*grupoAgenda{}, desde: -1}
+	a.c = container.New(a)
+	scroll, lista := desplazable(a.c)
+	a.s = scroll
+	scroll.OnScrolled = func(fyne.Position) { a.alDesplazar() }
+	a.ponerVentana()
 	options := p.Refresco
 	options.Arriba = func() bool { return scroll.Offset.Y <= 0.5 }
 	return ui.RefrescarAlTirar(lista, &options)
+}
+
+// agendaVirtual es la columna de días de la agenda con solo los días que se ven y uno
+// más por cada lado: un mes con 170 eventos eran 2.300 objetos rehechos en cada
+// repintado. Cada día mide lo que dice `MedidaGrupoAgenda`, así que dónde cae cada uno
+// se cuenta sin montarlo; el mínimo es el de la columna entera.
+type agendaVirtual struct {
+	p            *Pantalla
+	grupos       []grupoDia
+	s            *container.Scroll
+	c            *fyne.Container
+	hechos       map[int]*grupoAgenda
+	desde, hasta int
+}
+
+// DiasDeMas son los días que se montan fuera de la vista por cada lado.
+const DiasDeMas = 1
+
+func (a *agendaVirtual) alto(i int) float32 {
+	return MedidaGrupoAgenda(len(a.grupos[i].dentro), i > 0)
+}
+
+func (a *agendaVirtual) MinSize([]fyne.CanvasObject) fyne.Size {
+	var alto float32
+	for i := range a.grupos {
+		alto += a.alto(i)
+	}
+	return fyne.NewSize(0, alto)
+}
+
+func (a *agendaVirtual) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	a.ponerVentana()
+	a.colocar(t.Width)
+}
+
+func (a *agendaVirtual) colocar(ancho float32) {
+	var y float32
+	for i := range a.grupos {
+		h := a.alto(i)
+		if g, ok := a.hechos[i]; ok {
+			g.Move(fyne.NewPos(0, y))
+			g.Resize(fyne.NewSize(ancho, h))
+		}
+		y += h
+	}
+}
+
+// ventana es [desde, hasta): los días que caen en el desplazable y DiasDeMas.
+func (a *agendaVirtual) ventana() (int, int) {
+	var arriba, visible float32
+	if a.s != nil { // nil mientras se monta su propio desplazable
+		arriba, visible = a.s.Offset.Y, a.s.Size().Height
+	}
+	if visible <= 0 {
+		if c := fyne.CurrentApp().Driver().CanvasForObject(a.c); c != nil {
+			visible = c.Size().Height
+		} else {
+			visible = 800
+		}
+	}
+	desde, hasta := len(a.grupos), 0
+	var y float32
+	for i := range a.grupos {
+		h := a.alto(i)
+		if y+h > arriba && y < arriba+visible {
+			desde, hasta = min(desde, i), i+1
+		}
+		y += h
+	}
+	if hasta == 0 { // nada a la vista (aún sin medir): los primeros
+		desde, hasta = 0, 1
+	}
+	return max(desde-DiasDeMas, 0), min(hasta+DiasDeMas, len(a.grupos))
+}
+
+// ponerVentana monta los días que entran en la vista y suelta los que salen.
+func (a *agendaVirtual) ponerVentana() bool {
+	desde, hasta := a.ventana()
+	if desde == a.desde && hasta == a.hasta {
+		return false
+	}
+	a.desde, a.hasta = desde, hasta
+	for i := range a.hechos {
+		if i < desde || i >= hasta {
+			delete(a.hechos, i)
+		}
+	}
+	objs := make([]fyne.CanvasObject, 0, hasta-desde)
+	for i := desde; i < hasta; i++ {
+		g, ok := a.hechos[i]
+		if !ok {
+			g = a.p.nuevoGrupoAgenda(a.grupos[i], i > 0)
+			for _, f := range g.filas {
+				f.alEnfocar = a.traerALaVista
+			}
+			a.hechos[i] = g
+		}
+		objs = append(objs, g)
+	}
+	a.c.Objects = objs
+	return true
+}
+
+// alDesplazar monta lo que entra en la vista al desplazar.
+func (a *agendaVirtual) alDesplazar() {
+	if a.ponerVentana() {
+		a.colocar(a.c.Size().Width)
+		a.c.Refresh()
+	}
+}
+
+// traerALaVista lleva a la vista la fila que recibe el foco con el tabulador, y monta
+// el día siguiente: sin eso, el tabulador salía de la agenda en el último día montado.
+func (a *agendaVirtual) traerALaVista() {
+	if c := fyne.CurrentApp().Driver().CanvasForObject(a.c); c != nil && ui.MostrarFoco(a.s, c, 0) {
+		a.alDesplazar()
+	}
 }
 
 // agendaVacia es el vacío de la agenda, que NO es `EmptyState`: un texto `text-sm
@@ -323,6 +453,8 @@ type filaAgenda struct {
 	alAbrir func(o Ocurrencia, ancla fyne.CanvasObject)
 
 	encima, enfocada bool
+	// alEnfocar avisa a la agenda virtual de que la fila tiene el foco.
+	alEnfocar func()
 }
 
 var (
@@ -346,7 +478,14 @@ func (f *filaAgenda) Tapped(*fyne.PointEvent) {
 		f.p.AlAbrirEvento(f.o, f)
 	}
 }
-func (f *filaAgenda) FocusGained()                   { f.enfocada = true; f.Refresh() }
+
+func (f *filaAgenda) FocusGained() {
+	f.enfocada = true
+	f.Refresh()
+	if f.alEnfocar != nil {
+		f.alEnfocar()
+	}
+}
 func (f *filaAgenda) FocusLost()                     { f.enfocada = false; f.Refresh() }
 func (f *filaAgenda) TypedRune(rune)                 {}
 func (f *filaAgenda) MouseIn(*desktop.MouseEvent)    { f.encima = true; f.Refresh() }

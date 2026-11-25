@@ -149,9 +149,13 @@ func (a *App) Arrancar() {
 	a.portada.Cargar()
 }
 
+// mostrar pone lo que se enseña. Al volver a la portada la barra de la suite tiene que
+// saber que ya no hay barra de la app que acoger (el editor va en un armazón; la
+// portada, no): sin el aviso, en el teléfono se quedaba sin su marca.
 func (a *App) mostrar(o fyne.CanvasObject) {
 	a.raiz.Objects[0] = o
 	a.raiz.Refresh()
+	ui.RecolocarBarraSuite(a.raiz)
 }
 
 func (a *App) titulo(t string) {
@@ -229,7 +233,7 @@ func (a *App) nueva(titulo string) *abierta {
 	ctx.Refrescar = func() { cromo(); ed.Refrescar() }
 	ab := &abierta{ctx: ctx, ed: ed, marco: marco}
 	a.abierta = ab
-	a.mostrar(container.NewStack(marco, ed.Avisos()))
+	a.mostrar(container.NewStack(marco.Montado(), ed.Avisos()))
 	return ab
 }
 

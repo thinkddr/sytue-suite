@@ -19,8 +19,8 @@ import type { DocsKey } from '../../i18n';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Button, FieldGroup, MenuItem, Modal, Select, Spinner, Checkbox } from '@sytue/ui';
 import { EditorIcon } from '../icons';
-import { dispatchSheetCommand, readSheetGrid } from '../sheets/SheetCanvas';
-import type { ExternalTableState } from '../sheets/SheetCanvas';
+import { dispatchSheetCommand, readSheetGrid } from '../sheets/mando';
+import type { ExternalTableState } from '../sheets/mando';
 import {
   buildExecuteBody,
   cellText,

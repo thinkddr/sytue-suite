@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./matrix": "./src/matrix/index.ts",
+    "./vault": "./src/vault.ts",
     "./matrix/fixture": "./src/matrix/MatrixStorageFixture.tsx"
   },
   "files": [

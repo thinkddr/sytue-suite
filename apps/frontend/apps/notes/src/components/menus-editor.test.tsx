@@ -5,6 +5,7 @@
 // enlazar (con la búsqueda de la herramienta de enlaces) y «@» la gente a la que
 // mencionar. Lo que se inserta al elegir lo hace `execCommand`, que el DOM de los tests
 // no tiene: eso se mira en un navegador. Aquí, cuándo se abren, qué ofrecen y cuándo no.
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

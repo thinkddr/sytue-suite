@@ -154,7 +154,13 @@ export function NotebookTree({
       setArrastrando(null);
     },
   });
-  const asa = (tipo: ArrastreArbol['tipo'], id: string, titulo: string) => (
+  /**
+   * El asa de arrastre. Con `sangria` (la de la fila, una longitud CSS) y ratón, va FUERA
+   * de lo que se lee, en el hueco de su izquierda: solo se ve al señalar la fila y no
+   * tiene por qué quitarle al nombre los 30 px que ocupaba invisible. Con el dedo sigue
+   * en la fila.
+   */
+  const asa = (tipo: ArrastreArbol['tipo'], id: string, titulo: string, sangria?: string) => (
     <button
       type="button"
       data-mantiene-nav
@@ -163,7 +169,10 @@ export function NotebookTree({
       class={cx(
         ANILLO_CROMO,
         'notes-tree-grip text-sidebar-fg-muted hover:text-sidebar-fg grid size-6 shrink-0 cursor-grab touch-none place-items-center rounded-sm select-none active:cursor-grabbing pointer-coarse:size-11',
+        sangria !== undefined &&
+          'pointer-fine:absolute pointer-fine:top-1/2 pointer-fine:w-4 pointer-fine:-translate-y-1/2',
       )}
+      {...(sangria !== undefined ? { style: { left: `calc(${sangria} - 1.25rem)` } } : {})}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
         if (e.button === 0)
@@ -231,9 +240,16 @@ export function NotebookTree({
       return s;
     });
 
+  // Sin un solo cuaderno dentro de otro no hay flechas que alinear: el hueco de la flecha
+  // (21 px) se queda para el nombre.
+  const plano = notebooks.every((n) => !n.parent_id);
+
   const rama = (nb: Notebook, nivel: number): JSX.Element => {
     const hijos = hijosDe(nb.id);
     const cerrado = cerrados.has(nb.id);
+    // La del `SidebarItem` en el primer nivel: el punto de color cae bajo los iconos de
+    // «Hoy» o «Tareas» y el nombre empieza donde empiezan sus rótulos.
+    const sangria = `calc(var(--sytue-nav-pad) + ${(nivel - 1) * 0.85}rem)`;
     return (
       // `min-w-0`: este `li` es hijo de un `ul` con `display:grid`, y un elemento de
       // rejilla trae `min-width: auto` —se niega a encoger por debajo de su
@@ -268,15 +284,15 @@ export function NotebookTree({
             }
           }}
           class={cx(
-            'notes-notebook-row group rounded-nav relative flex cursor-pointer items-center gap-1.5 py-1.5 pr-1 text-base transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
+            'notes-notebook-row group rounded-nav relative flex cursor-pointer items-center gap-2 py-1.5 pr-1 text-base transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
             ANILLO_CROMO,
             activo === nb.id
               ? 'sytue-nav-current bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)]'
               : 'text-sidebar-fg hover:bg-sidebar-hover',
           )}
-          style={{ paddingLeft: `${0.5 + (nivel - 1) * 0.85}rem` }}
+          style={{ paddingLeft: sangria }}
         >
-          {onReorderNotebook && !nb.read_only ? asa('notebook', nb.id, nb.title) : null}
+          {onReorderNotebook && !nb.read_only ? asa('notebook', nb.id, nb.title, sangria) : null}
           {hijos.length > 0 ? (
             <button
               type="button"
@@ -297,7 +313,7 @@ export function NotebookTree({
                 class={cx('transition-transform duration-150', !cerrado && 'rotate-90')}
               />
             </button>
-          ) : (
+          ) : plano ? null : (
             <span class="w-[13px] shrink-0" aria-hidden="true" />
           )}
 
@@ -306,14 +322,18 @@ export function NotebookTree({
               {nb.emoji}
             </span>
           ) : (
-            <span
-              aria-hidden="true"
-              class="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ background: colorDeUsuario(nb.color) ?? nb.color }}
-            />
+            // En una caja de 20, la de los iconos del `SidebarItem` (y la del emoji).
+            <span aria-hidden="true" class="grid w-5 shrink-0 place-items-center">
+              <span
+                class="h-2.5 w-2.5 rounded-full"
+                style={{ background: colorDeUsuario(nb.color) ?? nb.color }}
+              />
+            </span>
           )}
 
-          <span class="min-w-0 flex-1 truncate" title={nb.title}>
+          {/* Hasta DOS líneas, como el rótulo de `SidebarItem`: con `truncate` el
+              cuaderno se cortaba a unos diez caracteres a 1280 px («Proyecto d…»). */}
+          <span class="line-clamp-2 min-w-0 flex-1 break-words" title={nb.title}>
             {nb.title}
           </span>
 
@@ -350,38 +370,46 @@ export function NotebookTree({
             />
           ) : null}
 
-          {cuantas(nb) > 0 ? (
-            <span class="text-sidebar-fg-muted shrink-0 text-sm tabular-nums">{cuantas(nb)}</span>
-          ) : null}
+          {/* El contador y las acciones comparten sitio con el ratón: las acciones salen
+              al pasar por encima o al enfocar y ocupan el hueco del contador, que se
+              esconde mientras. Antes cada uno tenía el suyo y el de las acciones, invisible
+              casi siempre, le quitaba al nombre 30 px de los 256 del lateral. Con el dedo,
+              donde no hay `hover`, van uno al lado del otro y las acciones siempre a la
+              vista. */}
+          <span class="grid shrink-0 items-center justify-items-end pointer-coarse:flex pointer-coarse:gap-1.5">
+            {cuantas(nb) > 0 ? (
+              <span class="text-sidebar-fg-muted text-sm tabular-nums [grid-area:1/1] pointer-fine:group-focus-within:invisible pointer-fine:group-hover:invisible">
+                {cuantas(nb)}
+              </span>
+            ) : null}
 
-          {/* Acciones del cuaderno. Aparecen al pasar por encima o al enfocar; en
-              táctil están siempre, que es donde no hay `hover`. */}
-          <span class="shrink-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
-            <Dropdown
-              label={t('notebook.settings')}
-              align="end"
-              trigger={(props) => (
-                <button
-                  {...props}
-                  type="button"
-                  data-mantiene-nav
-                  class={ACCION_DE_CUADERNO}
-                  aria-label={t('notebook.settings')}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    props.onClick();
-                  }}
-                >
-                  <Icon name="ellipsis" size={14} />
-                </button>
-              )}
-            >
-              <MenuItem onClick={() => onNewChild(nb)}>{t('notebook.newChild')}</MenuItem>
-              {onMoveNotebook && puedeMoverCuaderno(nb) ? (
-                <MenuItem onClick={() => onMoveNotebook(nb)}>{t('notebook.moveTo')}</MenuItem>
-              ) : null}
-              <MenuItem onClick={() => onSettings(nb)}>{t('notebook.settings')}</MenuItem>
-            </Dropdown>
+            <span class="opacity-0 transition-opacity duration-150 [grid-area:1/1] group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+              <Dropdown
+                label={t('notebook.settings')}
+                align="end"
+                trigger={(props) => (
+                  <button
+                    {...props}
+                    type="button"
+                    data-mantiene-nav
+                    class={ACCION_DE_CUADERNO}
+                    aria-label={t('notebook.settings')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.onClick();
+                    }}
+                  >
+                    <Icon name="ellipsis" size={14} />
+                  </button>
+                )}
+              >
+                <MenuItem onClick={() => onNewChild(nb)}>{t('notebook.newChild')}</MenuItem>
+                {onMoveNotebook && puedeMoverCuaderno(nb) ? (
+                  <MenuItem onClick={() => onMoveNotebook(nb)}>{t('notebook.moveTo')}</MenuItem>
+                ) : null}
+                <MenuItem onClick={() => onSettings(nb)}>{t('notebook.settings')}</MenuItem>
+              </Dropdown>
+            </span>
           </span>
         </div>
 

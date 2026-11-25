@@ -6,6 +6,7 @@
  * el papel en dos. Ahí el foco ya se ve en el cursor y en la barra de formato abierta.
  * En una tarjeta (columnas, lienzo) el aro sigue: delimita qué ficha se edita.
  */
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

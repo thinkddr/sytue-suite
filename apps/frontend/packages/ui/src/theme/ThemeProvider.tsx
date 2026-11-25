@@ -117,11 +117,11 @@ function useEje<T extends string>(
 
 export interface ThemeProviderProps {
   children: ComponentChildren;
-  /** Modo inicial si no hay valor persistido. */
+  /** Modo inicial si no hay valor persistido: el del sistema, como el primer pintado. */
   defaultMode?: ThemeMode;
 }
 
-export function ThemeProvider({ children, defaultMode = 'light' }: ThemeProviderProps) {
+export function ThemeProvider({ children, defaultMode = 'system' }: ThemeProviderProps) {
   const [mode, setModeState] = useState<ThemeMode>(() =>
     readThemePreference(defaultMode, STORAGE_KEY),
   );

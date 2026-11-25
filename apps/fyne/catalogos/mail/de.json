@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Trotzdem senden",
   "compose.noAttachmentTitle": "Ohne Anhang senden",
   "compose.noDraftsFolder": "Der Ordner „Entwürfe“ wurde nicht gefunden",
+  "compose.openFailed": "Der Nachrichteneditor konnte nicht geöffnet werden. Bitte erneut versuchen.",
   "compose.pastedImageDropped": "Das eingefügte Bild wurde nicht übernommen",
   "compose.pastedImagesDropped": "Die eingefügten Bilder wurden nicht übernommen",
   "compose.pastedImagesDroppedDescription": "Um Bilder zu senden, hängen Sie sie als Dateien an.",

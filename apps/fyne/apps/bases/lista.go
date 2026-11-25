@@ -111,7 +111,7 @@ func (p *Pantalla) objetoLista(v tema.Variante) fyne.CanvasObject {
 		hijos = append(hijos, b.Con(container.New(ui.Columna{Hueco: tema.Espacio(2)},
 			b.Bloque(0, altoEsqueleto), b.Bloque(0, altoEsqueleto))))
 	case len(p.Lista) == 0 && p.Fallo == "":
-		hijos = append(hijos, ui.NuevoVacio(p.t("bases.empty.title"), p.t("bases.empty.body")))
+		hijos = append(hijos, p.vacioLista(v))
 	default:
 		// Con una sola base no hay nada que buscar; con lo escrito, el campo se queda
 		// aunque la lista se quede en una.

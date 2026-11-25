@@ -320,9 +320,12 @@
    * `cfg.app_key`): lo único que le sirve es una entrega. Volver sin ella dejaba a
    * la app pidiendo «Iniciar sesión» otra vez, sin fin y sin decir por qué.
    *
-   * - `confirm`: la clave ya estaba en este navegador y nadie ha tecleado nada
-   *   ahora. Se entrega tras un clic AQUÍ, en Sytue ID: un guion inyectado en la
-   *   app puede traer a la persona hasta esta página, pero no pulsar por ella.
+   * - `go` también cuando la clave ya estaba en este navegador y nadie ha
+   *   tecleado nada ahora: la clave es de la cuenta y vive en Sytue ID, así que se
+   *   entrega sin preguntar. Antes pedía un clic aquí; era un paso más por cada app
+   *   (en Safari, cada una tiene su puente aparte) para algo que la persona ya
+   *   había decidido al entrar. El origen de la vuelta lo comprueba el servidor
+   *   (`origenDelPuente`, `quiereRelevo`): solo vuelve a una app web de la suite.
    * - `login`: no hay clave que entregar y aún no se ha tecleado la contraseña:
    *   se pide (la autorización con `prompt=login`, una sola vez).
    * - `failed`: tampoco tras teclearla. Se explica y se ofrece repetir o volver.
@@ -331,7 +334,7 @@
     if (r.enroll) return "enroll";
     if (r.lost) return "lost";
     if (cfg.web !== true || !cfg.app_key) return "go";
-    if (r.blob) return r.stored ? "confirm" : "go";
+    if (r.blob) return "go";
     // Recién identificada (dos minutos) cuenta como tecleada: pedirlo otra vez no
     // cambiaría nada.
     var fresh = typeof cfg.auth_age === "number" && cfg.auth_age < 120000;
@@ -395,25 +398,6 @@
         outcome = "failed";
       }
       if (outcome === "failed" && show("e2e-failed")) return;
-      if (outcome === "confirm") {
-        var app = doc.getElementById("e2e-app");
-        var ok = doc.getElementById("e2e-confirm-go");
-        if (ok && show("e2e-confirm")) {
-          try {
-            if (app) app.textContent = new URL(cfg.next).host;
-          } catch (e) {
-            // Sin nombre que enseñar, la pregunta sigue valiendo.
-          }
-          ok.addEventListener("click", function () {
-            ok.disabled = true;
-            go(r.blob);
-          });
-          return;
-        }
-        // Sin dónde preguntar no se entrega nada.
-        go("");
-        return;
-      }
       if (outcome !== "lost") {
         go(r.blob);
         return;

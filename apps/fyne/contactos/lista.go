@@ -342,10 +342,13 @@ func (p *Pantalla) listaViva() fyne.CanvasObject {
 				}
 			},
 		)
+		// Una fila vacía al final en el teléfono: «Nuevo contacto» flotante tapaba la última.
+		p.reservaLista = ui.ReservarEnLista(p.virtual)
 		p.Refresco.Arriba = func() bool { return p.virtual.GetScrollOffset() <= 0.5 }
 		p.cuerpo = ui.RefrescarAlTirar(ui.EnvolverLista(p.virtual), &p.Refresco)
 	}
 	p.montarFilas()
+	p.reservaLista.Ajustar(p.Ventana) // antes de los altos: les devuelve el suyo
 	// El alto de cada fila: 49 con correo u organización, 46 sin ninguno, y 28 la
 	// cabecera de una inicial.
 	for i, fila := range p.filasLista {

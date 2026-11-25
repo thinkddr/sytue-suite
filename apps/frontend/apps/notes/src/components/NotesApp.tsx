@@ -54,6 +54,7 @@ import {
   enCampoDeTexto,
   haySuperposicionAbierta,
   withBase,
+  marcarAppLista,
 } from '@sytue/ui';
 import { esCuentaPersonal, type SytueUser } from '@sytue/auth';
 import { MARCA_ORG, RE_SLUG_ORG, colorDeUsuario, rutaConOrg } from '@sytue/config';
@@ -313,6 +314,8 @@ function NotesView({
   const pegarEnCaptura = useRef<((texto: string) => boolean) | null>(null);
   const [cargandoNotas, setCargandoNotas] = useState(false);
   const [errorArbol, setErrorArbol] = useState(false);
+  // Las notas del primer cuaderno ya llegaron (o no había ninguno que abrir).
+  const notasLlegaron = useRef(false);
   const [seleccionada, setSeleccionada] = useState<string | null>(notaInicial ?? null);
   // El título al que llegar dentro de la nota elegida: viene de un enlace con
   // `h=`. Se consume una vez pintada la nota, y se olvida.
@@ -546,6 +549,13 @@ function NotesView({
     }
   }, [notebookInicial, almacen]);
 
+  // `sytue:app-ready`: el cuaderno ya enseña sus notas (o no hay cuaderno, o falló
+  // el árbol). Lo que se presupuesta en vez del LCP y lo que espera la bóveda.
+  useEffect(() => {
+    if (cargandoArbol || cargandoNotas) return;
+    if (notasLlegaron.current || errorArbol || !activo) marcarAppLista();
+  }, [cargandoArbol, cargandoNotas, errorArbol, activo]);
+
   useEffect(() => {
     void cargarArbol();
     void api
@@ -586,7 +596,11 @@ function NotesView({
         if (guardadas) setNotes(guardadas);
         else toast.notify({ tone: 'danger', title: t('error.loadFailed') });
       })
-      .finally(() => vivo && setCargandoNotas(false));
+      .finally(() => {
+        if (!vivo) return;
+        notasLlegaron.current = true;
+        setCargandoNotas(false);
+      });
     return () => {
       vivo = false;
     };

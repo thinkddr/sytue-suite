@@ -14,7 +14,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Card, Icon } from '@sytue/ui';
+import { Button, Card, Icon, marcarAppLista } from '@sytue/ui';
 import { revisionDeCuenta, type ClaveRevision, type PuntoRevision } from '@sytue/shell';
 import type { AccountMessageKey, T } from '../i18n/index.js';
 import { primeraLectura } from '../lib/primeraLectura.js';
@@ -76,6 +76,12 @@ export function RevisionSeguridad({ t }: { t: T }): JSX.Element | null {
       vivo = false;
     };
   }, []);
+
+  // `sytue:app-ready`: la revisión, lo primero de la página y lo que lee de cinco
+  // sitios, ya está pintada. Lo que se presupuesta en vez del LCP.
+  useEffect(() => {
+    if (puntos) marcarAppLista();
+  }, [puntos]);
 
   // Si no ha llegado nada no hay revisión que hacer: una tarjeta vacía, o «todo
   // bien» sin haber mirado, sería peor que no enseñarla.

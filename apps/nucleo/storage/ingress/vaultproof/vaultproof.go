@@ -5,12 +5,12 @@
 // firmadas por la clave de una bóveda post-cuántica (ADR 0087), en lugar de por
 // un dispositivo de Matrix.
 //
-// El formato de la acción no cambia (matrixproof.Action, con el nonce y el
+// El formato de la acción no cambia (accion.Action, con el nonce y el
 // transcript que retiene la autoridad): cambia quién la firma y contra qué se
 // comprueba. La firma es la híbrida de la bóveda (Ed25519 + ML-DSA-65) sobre el
 // JSON canónico de la acción, con el contexto `ingress.<kind>`, y la clave tiene
 // que ser la ACTIVA que Sytue ID tiene registrada para esa persona, organización
-// y producto. El resultado es una matrixproof.Authorization como la de Matrix, así
+// y producto. El resultado es una accion.Authorization como la de Matrix, así
 // que el resto del correo (cola, handoff, ACK) no distingue de dónde vino.
 package vaultproof
 
@@ -25,7 +25,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
-	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/accion"
 )
 
 // Algorithm es el algoritmo de la firma dentro de `signatures`: la entrada es
@@ -33,7 +33,7 @@ import (
 const Algorithm = "sytue-pq-vault"
 
 // ErrUnverified es lo que se devuelve ante cualquier cosa que no verifica.
-var ErrUnverified = matrixproof.ErrUnverified
+var ErrUnverified = accion.ErrUnverified
 
 // Registered es la clave activa de la bóveda según Sytue ID.
 type Registered struct {
@@ -44,7 +44,7 @@ type Registered struct {
 
 // UserID es la identidad con la que la bóveda firma: el prefijo aislado del
 // ámbito, como una cuenta de Matrix, seguido de un servidor que no existe en
-// Matrix. Así matrixproof.Authority.Validate la acepta y nunca se confunde con una.
+// Matrix. Así accion.Authority.Validate la acepta y nunca se confunde con una.
 func UserID(scope storage.Scope) string {
 	prefix := storage.IsolatedMatrixUserPrefix(scope)
 	if prefix == "" {
@@ -57,26 +57,26 @@ func UserID(scope storage.Scope) string {
 func Context(kind string) string { return "ingress." + kind }
 
 // Payload son los bytes que se firman: el JSON canónico de la acción.
-func Payload(action matrixproof.Action) ([]byte, error) {
-	return matrixproof.CanonicalBytes(action)
+func Payload(action accion.Action) ([]byte, error) {
+	return accion.CanonicalBytes(action)
 }
 
 // Sign firma la acción con la clave de la bóveda (para el cliente y las pruebas).
-func Sign(signer *recoverywrap.PQVaultSigner, action matrixproof.Action) (matrixproof.SignedAction, error) {
+func Sign(signer *recoverywrap.PQVaultSigner, action accion.Action) (accion.SignedAction, error) {
 	public := signer.Public()
 	keyID, err := public.ID()
 	if err != nil {
-		return matrixproof.SignedAction{}, err
+		return accion.SignedAction{}, err
 	}
 	payload, err := Payload(action)
 	if err != nil {
-		return matrixproof.SignedAction{}, err
+		return accion.SignedAction{}, err
 	}
 	sig, err := signer.Sign(Context(action.Kind), payload)
 	if err != nil {
-		return matrixproof.SignedAction{}, err
+		return accion.SignedAction{}, err
 	}
-	return matrixproof.SignedAction{Action: action, Signatures: signatures.Signatures{
+	return accion.SignedAction{Action: action, Signatures: signatures.Signatures{
 		id.UserID(UserID(action.Scope)): {id.KeyID(Algorithm + ":" + keyID): base64.StdEncoding.EncodeToString(sig)},
 	}}, nil
 }
@@ -90,21 +90,21 @@ func RootKey(public recoverywrap.PQVaultVerifyKey) string {
 // Authority es la autoridad de almacenamiento de una bóveda: la que Rooms sirve
 // para un ámbito que vive en la bóveda y no en Matrix (ADR 0087). La generación y
 // la raíz son las de la clave activa en Sytue ID.
-func Authority(scope storage.Scope, reg Registered) (matrixproof.Authority, error) {
-	out := matrixproof.Authority{
+func Authority(scope storage.Scope, reg Registered) (accion.Authority, error) {
+	out := accion.Authority{
 		Version: 1, Scope: scope, UserID: UserID(scope), RootKey: RootKey(reg.Public),
 		Generation: reg.Generation, Status: "active",
 	}
 	keyID, err := reg.Public.ID()
 	if err != nil || keyID != reg.KeyID || out.Validate(scope) != nil {
-		return matrixproof.Authority{}, ErrUnverified
+		return accion.Authority{}, ErrUnverified
 	}
 	return out, nil
 }
 
 // IsAuthority dice si una autoridad de almacenamiento es la de una bóveda (y no
 // la de una cuenta de Matrix): su identidad es la de UserID.
-func IsAuthority(a matrixproof.Authority) bool {
+func IsAuthority(a accion.Authority) bool {
 	return a.Scope.Valid() && a.UserID == UserID(a.Scope)
 }
 
@@ -123,16 +123,16 @@ func Signable(kind string) bool {
 // (`expected`, fijado antes de pedir el reto), si está vigente, si es una acción
 // de entrada y si nombra la raíz de ESTA clave. Es lo que hace el núcleo Wasm
 // por el navegador: el reto del servidor nunca elige qué se firma.
-func SignIntent(signer *recoverywrap.PQVaultSigner, expected matrixproof.Intent, action matrixproof.Action, now time.Time) (matrixproof.SignedAction, error) {
+func SignIntent(signer *recoverywrap.PQVaultSigner, expected accion.Intent, action accion.Action, now time.Time) (accion.SignedAction, error) {
 	if signer == nil || !expected.Valid() || action.Intent() != expected || !Signable(action.Kind) ||
 		!action.Valid(now) || action.RootKey != RootKey(signer.Public()) {
-		return matrixproof.SignedAction{}, ErrUnverified
+		return accion.SignedAction{}, ErrUnverified
 	}
 	return Sign(signer, action)
 }
 
 // Signed dice si la prueba viene firmada por una bóveda (y no por Matrix).
-func Signed(proof matrixproof.SignedAction) bool {
+func Signed(proof accion.SignedAction) bool {
 	for _, keys := range proof.Signatures {
 		for k := range keys {
 			if strings.HasPrefix(string(k), Algorithm+":") {
@@ -145,7 +145,7 @@ func Signed(proof matrixproof.SignedAction) bool {
 
 // verifySignature comprueba que la prueba trae una sola firma, la de esta clave
 // con el nombre de la bóveda, y que verifica sobre la acción esperada.
-func verifySignature(expected matrixproof.Action, proof matrixproof.SignedAction, public recoverywrap.PQVaultVerifyKey, keyID string) error {
+func verifySignature(expected accion.Action, proof accion.SignedAction, public recoverywrap.PQVaultVerifyKey, keyID string) error {
 	user := id.UserID(UserID(expected.Scope))
 	if user == "" || len(proof.Signatures) != 1 || len(proof.Signatures[user]) != 1 {
 		return ErrUnverified
@@ -173,8 +173,8 @@ func verifySignature(expected matrixproof.Action, proof matrixproof.SignedAction
 
 // Verify comprueba la prueba contra la acción esperada y la clave registrada, y
 // devuelve la autorización. `expected` es el transcript que retuvo la autoridad.
-func Verify(expected matrixproof.Action, proof matrixproof.SignedAction, reg Registered, now time.Time) (matrixproof.Authorization, error) {
-	var nada matrixproof.Authorization
+func Verify(expected accion.Action, proof accion.SignedAction, reg Registered, now time.Time) (accion.Authorization, error) {
+	var nada accion.Authorization
 	if proof.Action != expected || !expected.Intent().Valid() || reg.Generation < 1 {
 		return nada, ErrUnverified
 	}
@@ -198,7 +198,7 @@ func Verify(expected matrixproof.Action, proof matrixproof.SignedAction, reg Reg
 	if err != nil {
 		return nada, ErrUnverified
 	}
-	out := matrixproof.Authorization{
+	out := accion.Authorization{
 		Version: 1, Authority: authority,
 		Target: expected.Target, SigningKey: root, Nonce: expected.Nonce, RequestSHA256: expected.RequestSHA256,
 	}

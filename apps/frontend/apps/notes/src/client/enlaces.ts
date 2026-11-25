@@ -11,7 +11,8 @@
  * recargar. Aquí está todo lo que no toca el DOM, para poder probarlo.
  */
 import type { Note, NoteLink } from '@sytue/api-clients';
-import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+import type { DefaultTreeAdapterMap } from 'parse5';
+import { parseFragment } from './html.js';
 
 /** El slug de un título: lo que va en `h=` y en el `id` del encabezado. */
 export function slugDe(texto: string): string {

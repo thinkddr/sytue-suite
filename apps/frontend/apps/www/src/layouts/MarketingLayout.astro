@@ -180,7 +180,10 @@ const robots = noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview
     >
       {t('skip.content')}
     </a>
-    <SiteHeader client:load locale={locale} path={path} labels={headerLabels} />
+    <!-- `client:idle`: la cabecera ya llega pintada del servidor y, sin los 26
+         catálogos de i18n, su isla es pequeña; hidratarla cuando el navegador queda
+         libre no le quita al primer pintado ni al LCP el hilo principal. -->
+    <SiteHeader client:idle locale={locale} path={path} labels={headerLabels} />
     <main id="content">
       <slot />
     </main>

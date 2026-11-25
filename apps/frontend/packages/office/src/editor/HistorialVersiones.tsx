@@ -25,10 +25,13 @@ export function MenuHistorial({
   ctx,
   trigger,
   align = 'start',
+  class: cls,
 }: {
   ctx: EditorContext;
   trigger: (props: DisparadorHistorial) => ComponentChildren;
   align?: 'start' | 'end';
+  /** Las clases del desplegable en la fila que lo contiene (p. ej. dejarlo encoger). */
+  class?: string;
 }): JSX.Element {
   const t = ctx.t;
   const { confirmar, dialogo } = useConfirm();
@@ -52,6 +55,7 @@ export function MenuHistorial({
       <Dropdown
         label={t('versions.history')}
         align={align}
+        {...(cls ? { class: cls } : {})}
         trigger={(props) =>
           trigger({
             ...props,

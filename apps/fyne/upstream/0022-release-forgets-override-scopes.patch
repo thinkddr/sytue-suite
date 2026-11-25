@@ -1,0 +1,157 @@
+From bf88aa6b5e7fc69597936277141ed9f955cb4e28 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 01:22:44 +0000
+Subject: [PATCH] fix(cache): forget the override scope of every released or
+ collected object
+
+Every object placed under a ThemeOverride gets an entry in the scope map,
+primitives included, and only a widget's entry was ever deleted (with its
+renderer). The keys are weak, so the objects themselves are freed, but the
+entries stayed: a ThemeOverride whose content is rebuilt grew the map by one
+entry per primitive, for good. Measured in the Sytue suite, a calendar month
+repainted under its scroll's ThemeOverride left ~47 KB per repaint in the map
+even with ReleaseRenderers.
+
+- ReleaseTree deletes the entry of every object it releases, not only of
+  widgets.
+- Clean (on canvas refresh, with the renderers) drops the entries whose weak
+  key no longer points to anything. Before Go 1.24 the map holds its objects
+  and there is nothing to drop.
+
+New tests: TestReleaseTree_ForgetsTheScopeOfEveryObject and
+TestClean_DropsTheScopesOfCollectedObjects (red without each change).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01K7a9FPvLA4FsHbm41nkUrM
+---
+ internal/cache/base.go          |  1 +
+ internal/cache/overrides.go     | 13 +++++++++
+ internal/cache/overrides_old.go |  3 +++
+ internal/cache/release.go       |  3 +++
+ internal/cache/release_test.go  | 48 +++++++++++++++++++++++++++++++++
+ 5 files changed, 68 insertions(+)
+
+diff --git a/internal/cache/base.go b/internal/cache/base.go
+index 6a9c55b..432266a 100644
+--- a/internal/cache/base.go
++++ b/internal/cache/base.go
+@@ -70,6 +70,7 @@ func Clean(canvasRefreshed bool) {
+ 	if canvasRefreshed {
+ 		// Destroy renderers on canvas refresh to avoid flickering screen.
+ 		destroyExpiredRenderers(then)
++		overrides.dropDead()
+ 		// canvases cache should be invalidated only on canvas refresh, otherwise there wouldn't
+ 		// be a way to recover them later
+ 		destroyExpiredCanvases(then)
+diff --git a/internal/cache/overrides.go b/internal/cache/overrides.go
+index 05d86b9..33843c5 100644
+--- a/internal/cache/overrides.go
++++ b/internal/cache/overrides.go
+@@ -61,3 +61,16 @@ func (m *overrideMap) Delete(o fyne.CanvasObject) {
+ 		m.m.Delete(k)
+ 	}
+ }
++
++// dropDead deletes the entries of objects that have been collected. Their weak keys no
++// longer match anything, but the entries stayed: canvas primitives are never deleted
++// (only widgets are, when their renderer is destroyed), so a ThemeOverride whose content
++// is rebuilt grew this map by one entry per primitive, for good.
++func (m *overrideMap) dropDead() {
++	m.m.Range(func(k, _ any) bool {
++		if k.(weak.Pointer[byte]).Value() == nil {
++			m.m.Delete(k)
++		}
++		return true
++	})
++}
+diff --git a/internal/cache/overrides_old.go b/internal/cache/overrides_old.go
+index 8d8da35..9bf77d0 100644
+--- a/internal/cache/overrides_old.go
++++ b/internal/cache/overrides_old.go
+@@ -19,3 +19,6 @@ func (m *overrideMap) StoreIfChanged(o fyne.CanvasObject, s *OverrideScope) {
+ 	}
+ 	m.Store(o, s)
+ }
++
++// dropDead does nothing: without weak keys no entry outlives its object.
++func (m *overrideMap) dropDead() {}
+diff --git a/internal/cache/release.go b/internal/cache/release.go
+index 7541bb8..99d885c 100644
+--- a/internal/cache/release.go
++++ b/internal/cache/release.go
+@@ -47,6 +47,9 @@ func ReleaseTree(o fyne.CanvasObject, kept Kept) {
+ 	if tinfo, ok := objectTextures.Load(o); ok && tinfo != nil {
+ 		tinfo.expires.Store(0)
+ 	}
++	// Every object placed under a ThemeOverride has an entry for its scope, primitives
++	// and containers too, and only a widget's was deleted (with its renderer).
++	overrides.Delete(o)
+ 	switch x := o.(type) {
+ 	case *fyne.Container:
+ 		for _, c := range x.Objects {
+diff --git a/internal/cache/release_test.go b/internal/cache/release_test.go
+index 3ed48ce..3feee0e 100644
+--- a/internal/cache/release_test.go
++++ b/internal/cache/release_test.go
+@@ -1,6 +1,7 @@
+ package cache
+ 
+ import (
++	"runtime"
+ 	"testing"
+ 
+ 	"fyne.io/fyne/v2"
+@@ -53,3 +54,50 @@ func TestReleaseTree_CreatesNoRenderer(t *testing.T) {
+ type dummyObject struct {
+ 	fyne.CanvasObject
+ }
++
++func TestReleaseTree_ForgetsTheScopeOfEveryObject(t *testing.T) {
++	testClearAll()
++	defer ResetThemeCaches()
++	prim := &dummyObject{}
++	wid := &dummyWidget{}
++	Renderer(wid)
++	inner := &fyne.Container{Objects: []fyne.CanvasObject{prim}}
++	tree := &fyne.Container{Objects: []fyne.CanvasObject{inner, wid}}
++	NewOverrideScope(nil).Apply(tree)
++	for _, o := range []fyne.CanvasObject{prim, wid} {
++		_, ok := overrides.Load(o)
++		assert.True(t, ok)
++	}
++
++	ReleaseTree(tree, nil)
++	for _, o := range []fyne.CanvasObject{tree, inner, prim, wid} {
++		_, ok := overrides.Load(o)
++		assert.False(t, ok, "a released object keeps the scope entry of the override it was under")
++	}
++}
++
++func TestClean_DropsTheScopesOfCollectedObjects(t *testing.T) {
++	testClearAll()
++	defer ResetThemeCaches()
++	overrides.m.Clear()
++	scope := NewOverrideScope(nil)
++	for range 100 {
++		scope.Apply(&fyne.Container{Objects: []fyne.CanvasObject{&dummyObject{}}})
++	}
++	kept := &dummyObject{}
++	scope.Apply(kept)
++	runtime.GC()
++	runtime.GC()
++
++	tm := &timeMock{}
++	tm.setTime(10, 0)
++	lastClean = tm.createTime(9, 0)
++	Clean(true)
++
++	n := 0
++	overrides.m.Range(func(any, any) bool { n++; return true })
++	assert.Equal(t, 1, n, "the entries of collected objects are dropped on clean")
++	_, ok := overrides.Load(kept)
++	assert.True(t, ok)
++	runtime.KeepAlive(kept)
++}
+-- 
+2.43.0
+

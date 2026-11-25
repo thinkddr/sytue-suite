@@ -194,10 +194,13 @@ type FilasEsqueleto struct {
 // latidoEsqueleto es el ÚNICO latido de un grupo de bloques de carga: una animación que
 // lleva la fase y tiñe todos sus rectángulos a la vez. Lo comparten FilasEsqueleto y
 // BloquesEsqueleto.
+//
+// Se duerme sola en cuanto el grupo deja de pintarse —quitado del árbol o escondido— y se
+// despierta al volver (animacionSinFin); el renderer avisa desde `Objects()`.
 type latidoEsqueleto struct {
 	mu   sync.Mutex
 	fase float32
-	anim *fyne.Animation
+	animacionSinFin
 }
 
 // latir lanza el latido; `tenir` repinta los bloques en cada fotograma. Con «menos
@@ -206,30 +209,18 @@ func (l *latidoEsqueleto) latir(tenir func()) {
 	if MenosMovimiento() {
 		return
 	}
-	a := fyne.NewAnimation(DuracionPulso, func(p float32) {
+	l.arrancar(DuracionPulso, func(p float32) {
 		l.mu.Lock()
 		l.fase = p
 		l.mu.Unlock()
 		tenir()
 	})
-	a.Curve = fyne.AnimationLinear
-	a.RepeatCount = fyne.AnimationRepeatForever
-	l.mu.Lock()
-	l.anim = a
-	l.mu.Unlock()
-	a.Start()
 }
 
-// Parar detiene el latido. Lo llama el renderer al destruirse.
-func (l *latidoEsqueleto) Parar() {
-	l.mu.Lock()
-	a := l.anim
-	l.anim = nil
-	l.mu.Unlock()
-	if a != nil {
-		a.Stop()
-	}
-}
+// Parar detiene el latido para siempre: ya no lo despierta volver a pintarse. Lo llama
+// el renderer al destruirse, y quien sabe que la carga ha terminado puede llamarlo antes;
+// no hace falta para lo que sale del árbol, que se duerme solo.
+func (l *latidoEsqueleto) Parar() { l.parar() }
 
 // tinta es el relleno de los bloques en el instante del latido.
 func (l *latidoEsqueleto) tinta(tinte string) color.NRGBA {
@@ -404,8 +395,11 @@ func (r *filasEsqueletoRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(0, cab+encima+n*paso-(paso-r.alto()))
 }
 
-func (r *filasEsqueletoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *filasEsqueletoRenderer) Destroy()                     { r.f.Parar() }
+func (r *filasEsqueletoRenderer) Objects() []fyne.CanvasObject {
+	r.f.pintada()
+	return r.objetos
+}
+func (r *filasEsqueletoRenderer) Destroy() { r.f.Parar() }
 
 // ponerBloque coloca un bloque del esqueleto; un ancho negativo se queda en cero.
 func ponerBloque(b *canvas.Rectangle, x, y, w, h float32) {

@@ -456,6 +456,7 @@ export const el: AppCatalog<typeof en> = {
   'compose.templates': 'Πρότυπα',
   'compose.templatesEmpty': 'Δεν υπάρχουν ακόμη πρότυπα. Δημιουργήστε τα στις Ρυθμίσεις του Mail.',
   'compose.attachFailed': 'Δεν ήταν δυνατή η ανάγνωση του συνημμένου',
+  'compose.openFailed': 'Δεν ήταν δυνατό το άνοιγμα του επεξεργαστή μηνυμάτων. Δοκιμάστε ξανά.',
   'compose.pastedImageDropped': 'Η εικόνα που επικολλήθηκε δεν συμπεριλήφθηκε',
   'compose.pastedImagesDropped': 'Οι εικόνες που επικολλήθηκαν δεν συμπεριλήφθηκαν',
   'compose.pastedImagesDroppedDescription': 'Για να στείλετε εικόνες, επισυνάψτε τις ως αρχεία.',

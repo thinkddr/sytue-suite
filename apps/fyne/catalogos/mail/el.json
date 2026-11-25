@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Αποστολή παρ’ όλα αυτά",
   "compose.noAttachmentTitle": "Αποστολή χωρίς συνημμένα",
   "compose.noDraftsFolder": "Δεν βρέθηκε ο φάκελος «Πρόχειρα»",
+  "compose.openFailed": "Δεν ήταν δυνατό το άνοιγμα του επεξεργαστή μηνυμάτων. Δοκιμάστε ξανά.",
   "compose.pastedImageDropped": "Η εικόνα που επικολλήθηκε δεν συμπεριλήφθηκε",
   "compose.pastedImagesDropped": "Οι εικόνες που επικολλήθηκαν δεν συμπεριλήφθηκαν",
   "compose.pastedImagesDroppedDescription": "Για να στείλετε εικόνες, επισυνάψτε τις ως αρχεία.",

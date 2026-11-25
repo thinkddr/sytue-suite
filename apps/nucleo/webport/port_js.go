@@ -10,6 +10,7 @@ import (
 	"syscall/js"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/webport/rpc"
 )
 
 type JSPort struct{ id string }
@@ -21,27 +22,10 @@ func NewJS(id string) (*JSPort, error) {
 	return &JSPort{id: id}, nil
 }
 func (p *JSPort) ID() string { return p.id }
-func BytesArg(value js.Value, maximum int) ([]byte, error) {
-	if value.Type() != js.TypeObject || !value.InstanceOf(js.Global().Get("Uint8Array")) {
-		return nil, ErrRejected
-	}
-	size := value.Get("byteLength").Int()
-	if size < 0 || size > maximum {
-		return nil, ErrRejected
-	}
-	out := make([]byte, size)
-	if js.CopyBytesToGo(out, value) != size {
-		clear(out)
-		return nil, ErrRejected
-	}
-	return out, nil
-}
 
-func BytesValue(raw []byte) js.Value {
-	out := js.Global().Get("Uint8Array").New(len(raw))
-	js.CopyBytesToJS(out, raw)
-	return out
-}
+// BytesArg y BytesValue son las de rpc: un solo transporte.
+func BytesArg(value js.Value, maximum int) ([]byte, error) { return rpc.BytesArg(value, maximum) }
+func BytesValue(raw []byte) js.Value                       { return rpc.BytesValue(raw) }
 
 func (p *JSPort) Current(ctx context.Context) (Identity, error) {
 	raw, err := p.Call(ctx, storage.Scope{}, Current, nil)
@@ -101,10 +85,7 @@ func (p *JSPort) Call(ctx context.Context, scope storage.Scope, method Method, p
 }
 
 // ScopeArg decodes routing only; it is never an authority grant.
-func ScopeArg(req js.Value) storage.Scope {
-	value := req.Get("scope")
-	return storage.Scope{Tenant: value.Get("tenant").String(), Subject: value.Get("subject").String(), Product: value.Get("product").String()}
-}
+func ScopeArg(req js.Value) storage.Scope { return rpc.ScopeArg(req) }
 
 // AuthorizedJS binds a request to its host-owned account/product/device lease.
 // Processors receive only authorized data; keys and network credentials remain

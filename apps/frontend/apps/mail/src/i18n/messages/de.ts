@@ -499,6 +499,8 @@ export const de: AppCatalog<typeof en> = {
   'compose.templates': 'Vorlagen',
   'compose.templatesEmpty': 'Noch keine Vorlagen. Legen Sie sie in den Mail-Einstellungen an.',
   'compose.attachFailed': 'Der Anhang konnte nicht gelesen werden',
+  'compose.openFailed':
+    'Der Nachrichteneditor konnte nicht geöffnet werden. Bitte erneut versuchen.',
   'compose.pastedImageDropped': 'Das eingefügte Bild wurde nicht übernommen',
   'compose.pastedImagesDropped': 'Die eingefügten Bilder wurden nicht übernommen',
   'compose.pastedImagesDroppedDescription': 'Um Bilder zu senden, hängen Sie sie als Dateien an.',

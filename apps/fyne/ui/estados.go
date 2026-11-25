@@ -77,6 +77,11 @@ func PanelEstado(e Estado, t TextosEstado, esqueleto fyne.CanvasObject) fyne.Can
 	}
 	v := NuevoVacio(t.Titulo, t.Descripcion)
 	v.Ilustracion = t.Ilustracion
+	if e == EstadoError {
+		// DS-06: «no se pudo cargar» es un error y lo dice su marca (`tone="error"`), no
+		// el gris de «aún no hay nada». Hasta el 2026-11-24 solo lo usaba el editor.
+		v.Tono = VacioError
+	}
 	if t.RotuloAccion != "" {
 		b := NuevoBoton(t.RotuloAccion, t.Accion).Con(Secundario, TallaSM)
 		if t.Primaria {

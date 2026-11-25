@@ -56,6 +56,11 @@ type Parrafo struct {
 	// en la web. Se busca línea a línea: un término partido entre dos líneas no se marca.
 	Consulta string
 	Resalte  color.NRGBA
+
+	// token es el de NuevoParrafo, si se construyó con la variante EN VIGOR, y resuelta
+	// la Tinta que salió de él la última vez: ver seguirToken.
+	token    string
+	resuelta color.NRGBA
 }
 
 var (
@@ -64,8 +69,38 @@ var (
 )
 
 // NuevoParrafo crea el párrafo con el color de un token del tema.
+//
+// Con la variante en vigor, el párrafo SIGUE al token: lo vuelve a resolver al pintarse
+// tras un cambio de tema (ver seguirToken). Los que se componen al armar un panel —las
+// pistas y los vacíos del panel de CertiPDF, de los de Docus y Calcus— no se vuelven a
+// componer al cambiarlo, y se quedaban con la tinta del tema anterior sobre el fondo del
+// nuevo (2026-11-25). Con otra variante es que se quiere fija, y lo es.
 func NuevoParrafo(texto string, e tema.Escalon, p Peso, token string, v tema.Variante) *Parrafo {
-	return NuevoParrafoConTinta(texto, e, p, tema.Color(token, v))
+	t := NuevoParrafoConTinta(texto, e, p, tema.Color(token, v))
+	if v == varianteEnVigor() {
+		t.token, t.resuelta = token, t.Tinta
+	}
+	return t
+}
+
+// varianteEnVigor es la de la app, o la clara si no hay app.
+func varianteEnVigor() tema.Variante {
+	if app := fyne.CurrentApp(); app != nil {
+		return tema.De(app.Settings().ThemeVariant())
+	}
+	return tema.Claro
+}
+
+// seguirToken vuelve a resolver el token de NuevoParrafo con la variante en vigor. Solo
+// si nadie ha cambiado la Tinta desde la última vez: quien la pone a mano —el renderer
+// que la atenúa con su control inerte, el que la cambia con el estado— es su dueño, y
+// la vuelve a poner él en su propio refresco.
+func (t *Parrafo) seguirToken() {
+	if t.token == "" || t.Tinta != t.resuelta {
+		return
+	}
+	t.Tinta = tema.Color(t.token, varianteEnVigor())
+	t.resuelta = t.Tinta
 }
 
 // NuevoParrafoConTinta es NuevoParrafo con el color ya resuelto: lo necesita quien
@@ -237,6 +272,7 @@ func (r *parrafoRenderer) Layout(t fyne.Size) {
 }
 
 func (r *parrafoRenderer) Refresh() {
+	r.t.seguirToken()
 	r.ancho = 0 // fuerza el reparto: puede haber cambiado el texto
 	r.Layout(r.t.Size())
 	for _, l := range r.lineas {

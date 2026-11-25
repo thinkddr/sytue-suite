@@ -9,6 +9,7 @@ require (
 	filippo.io/age v1.3.2
 	git.sytue.eu/sytue/one/apps/nucleo v0.0.0-00010101000000-000000000000
 	github.com/alicebob/miniredis/v2 v2.40.0
+	github.com/andybalholm/brotli v1.3.0
 	github.com/beevik/etree v1.8.1
 	github.com/coder/websocket v1.8.15
 	github.com/crewjam/saml v0.5.2-0.20261106150424-8ec91e20a8dd

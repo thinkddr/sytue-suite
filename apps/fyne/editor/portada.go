@@ -792,7 +792,7 @@ func (w *vistaPortada) vacio() *ui.Vacio {
 			break
 		}
 		e = ui.NuevoVacio(p.t("list.empty.title"), p.t("list.empty.description"))
-		e.Ilustracion = tiposVacio(v)
+		e.Ilustracion = tiposVacio()
 		crear := ui.NuevoBoton(p.t("list.empty.action"), p.Crear).Con(ui.Primario, ui.TallaSM)
 		crear.Cargando = p.Creando
 		e.Accion = crear
@@ -805,28 +805,33 @@ func (w *vistaPortada) vacio() *ui.Vacio {
 
 // tiposVacio son las tres teselas de `bg-bg-subtle` con el glifo de cada tipo que la
 // portada vacía enseña en vez de una ilustración: `flex gap-2`, `h-11 w-11 rounded-lg`,
-// glifo de 22 en `text-subtle`.
-func tiposVacio(v tema.Variante) fyne.CanvasObject {
+// glifo de 22 en `text-subtle`. Los dos colores siguen al tema en caliente: el fondo es
+// un `ui.Liso` y el glifo se tiñe al colocarse (ver teselaGlifo).
+func tiposVacio() fyne.CanvasObject {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	hijos := make([]fyne.CanvasObject, 0, 3)
 	for _, t := range []Tipo{Documento, Hoja, Presentacion} {
-		fondo := canvas.NewRectangle(tema.Color("bg-subtle", v))
-		fondo.CornerRadius = tema.RadioLG
+		fondo := ui.NuevoLiso("bg-subtle")
+		fondo.Radio = tema.RadioLG
 		g := iconos.TrazoDeRuta(t.Glifo(), GlifoAcceso, tema.Color("text-subtle", v))
-		hijos = append(hijos, container.New(teselaGlifo{}, fondo, g.Objeto()))
+		hijos = append(hijos, container.New(teselaGlifo{glifo: g}, fondo, g.Objeto()))
 	}
 	c := container.New(ui.Fila{Hueco: tema.Espacio(2)}, hijos...)
 	c.Resize(c.MinSize())
 	return c
 }
 
-// teselaGlifo coloca un fondo de 38,5 y un glifo de 22 centrado.
-type teselaGlifo struct{}
+// teselaGlifo coloca un fondo de 38,5 y un glifo de 22 centrado, y tiñe el glifo de
+// `text-subtle` con el tema en vigor: Layout es lo que Fyne vuelve a llamar en cada
+// contenedor al cambiar de tema, y la portada vacía no se recompone entonces.
+type teselaGlifo struct{ glifo *iconos.Dibujo }
 
 func (teselaGlifo) MinSize([]fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(LadoTeselaAcceso, LadoTeselaAcceso)
 }
 
-func (teselaGlifo) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
+func (g teselaGlifo) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
+	g.glifo.Tenir("text-subtle", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(fyne.NewSize(LadoTeselaAcceso, LadoTeselaAcceso))
 	d := (LadoTeselaAcceso - GlifoAcceso) / 2

@@ -35,6 +35,7 @@ import {
   BarraMovil,
   useBarraUnica,
   Kbd,
+  marcarAppLista,
 } from '@sytue/ui';
 import type { BarraMovilProps, VirtualListHandle } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
@@ -1017,6 +1018,14 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     }
   }
 
+  // `sytue:app-ready`: la lista de canales y los mensajes del canal abierto ya están
+  // pintados (o no hay canal, o falló la lista). Lo que se presupuesta en vez del LCP.
+  const mensajesLlegaron = useRef(false);
+  useEffect(() => {
+    if (loadingChannels || loadingMessages) return;
+    if (mensajesLlegaron.current || channelsError || !activeId) marcarAppLista();
+  }, [loadingChannels, loadingMessages, channelsError, activeId]);
+
   // Carga de canales (channelsTick reintenta tras un error).
   useEffect(() => {
     let live = true;
@@ -1096,7 +1105,11 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         setMessages([]);
         setMessagesError(true);
       })
-      .finally(() => live && setLoadingMessages(false));
+      .finally(() => {
+        if (!live) return;
+        mensajesLlegaron.current = true;
+        setLoadingMessages(false);
+      });
     // Saltar a un mensaje antiguo NO marca el canal como leído (no borrar los no leídos
     // posteriores a la ventana). Abrir el final del canal sí: limpia contadores y persiste.
     if (!jumping) {

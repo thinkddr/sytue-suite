@@ -59,5 +59,5 @@ func pantallaConCarga(t func(string, i18n.Vars) string, loc i18n.Locale, alVolve
 		ctx.Titulo, ctx.Estado, ctx.SoloLectura = titulo, editor.Listo, true
 		ctx.Refrescar()
 	}
-	return marco, cargar
+	return marco.Montado(), cargar
 }

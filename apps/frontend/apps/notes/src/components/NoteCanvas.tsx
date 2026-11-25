@@ -28,7 +28,7 @@ import {
   haySuperposicionAbierta,
 } from '@sytue/ui';
 import type { Note, Notebook, Reminder } from '@sytue/api-clients';
-import { textoPegado } from '@sytue/ui/browser/portapapeles';
+import { textoPegado } from '../client/html.js';
 import type { T } from '../i18n/index.js';
 import { colocarNota, conSangria } from '../client/arbol.js';
 import { interpretarCaptura, type Captura } from '../client/captura.js';

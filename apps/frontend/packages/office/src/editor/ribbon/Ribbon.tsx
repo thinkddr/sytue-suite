@@ -15,16 +15,15 @@
  * tabulación, flechas, Inicio/Fin), F6 salta entre la cinta y el lienzo, y sus popovers
  * son `fixed` (popovers.ts) para que el desplazamiento no los recorte.
  *
- * Nota de integración: los cuerpos de pestaña (B8–B10) se importan aquí por
- * composición, según el reparto del blueprint §10; este fichero es su único
- * punto de montaje. El menú Archivo es propio (no el Dropdown de @sytue/ui)
+ * Nota de integración: los cuerpos de pestaña (B8–B10) llegan por `cuerpos`, los del
+ * editor del tipo de documento (`../tipos`): la cinta es la misma en los tres, pero cada
+ * tipo baja solo los suyos. El menú Archivo es propio (no el Dropdown de @sytue/ui)
  * para poder cerrarse al elegir una opción y mantener los ítems compactos.
  */
 import { Fragment } from 'preact';
 import type { JSX } from 'preact';
 import { appUrl, OFFICE_EXPORTS, officeExportAvailable } from '@sytue/config';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import type { DocKind } from '@sytue/api-clients';
 import {
   MenuItem,
   MenuSeparator,
@@ -48,52 +47,27 @@ import type { DocsKey } from '../../i18n';
 import type { EditorContext } from '../types';
 import { pestanasDe } from '../pestanas';
 import type { RibbonTabId } from '../pestanas';
-import { InicioTab } from './tabs/Inicio';
-import { InicioSheetsTab } from './tabs/InicioSheets';
-import { DisenoSlidesTab, InicioSlidesTab, PresentarTab } from './tabs/InicioSlides';
-import { InsertarTab } from './tabs/Insertar';
-import { DatosTab, FormulasTab } from './tabs/Datos';
-import { DisposicionTab } from './tabs/Disposicion';
-import { ReferenciasTab } from './tabs/Referencias';
-import { ColaboracionTab } from './tabs/Colaboracion';
-import { VistaTab } from './tabs/Vista';
+import type { EditorDeTipo } from '../tipos';
 
 // El anillo canónico vive en `@sytue/ui/styles.css` (.sytue-focus-ring): una sola
 // definición para toda la suite, en vez de la copia que cada fichero perdía a su manera.
 const FOCUS_RING = 'sytue-focus-ring';
 
-/** El cuerpo de cada pestaña, según el tipo de documento. Cada tipo con SU cuerpo cuando
- *  los comandos actúan sobre otro modelo: en «Inicio» la hoja y la presentación tienen el
- *  suyo (actúan sobre la celda o la diapositiva, no solo sobre el texto bajo el caret), y
- *  «Diseño» del folio es la disposición de página mientras que el de las diapositivas es
- *  su tamaño y su patrón. Qué pestañas hay y dónde se ven lo dice `pestanas.json`; esto
- *  es solo lo que se pinta dentro. `test/taxonomia.test.ts` exige una entrada por id. */
-const CUERPOS: Readonly<Record<RibbonTabId, CuerposDe>> = {
-  inicio: {
-    por: { spreadsheet: InicioSheetsTab, presentation: InicioSlidesTab },
-    otro: InicioTab,
-  },
-  insertar: { por: {}, otro: InsertarTab },
-  diseno: { por: { presentation: DisenoSlidesTab }, otro: DisposicionTab },
-  referencias: { por: {}, otro: ReferenciasTab },
-  datos: { por: {}, otro: DatosTab },
-  formulas: { por: {}, otro: FormulasTab },
-  presentar: { por: {}, otro: PresentarTab },
-  revisar: { por: {}, otro: ColaboracionTab },
-  vista: { por: {}, otro: VistaTab },
-};
-
-/** Cuerpo de una pestaña: el de cada tipo que tiene el suyo y el de los demás. Es un dato y no
- *  una función que devuelve el componente: elegirlo con una llamada en el render lo hacía pasar
- *  por «componente creado al pintar» (react/static-components) aunque siempre sea el mismo. */
-interface CuerposDe {
-  readonly por: Partial<Record<DocKind, Cuerpo>>;
-  readonly otro: Cuerpo;
-}
-
-type Cuerpo = (props: { ctx: EditorContext }) => JSX.Element;
-
-export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
+/**
+ * `cuerpos`: el de cada pestaña, del editor del tipo de documento. Cada tipo con SU cuerpo
+ * cuando los comandos actúan sobre otro modelo: en «Inicio» la hoja y la presentación
+ * tienen el suyo (actúan sobre la celda o la diapositiva, no solo sobre el texto bajo el
+ * caret), y «Diseño» del folio es la disposición de página mientras que el de las
+ * diapositivas es su tamaño y su patrón. Qué pestañas hay y dónde se ven lo dice
+ * `pestanas.json`; `test/taxonomia.test.ts` exige un cuerpo por pestaña en cada tipo.
+ */
+export function Ribbon({
+  ctx,
+  cuerpos,
+}: {
+  ctx: EditorContext;
+  cuerpos: EditorDeTipo['cuerpos'];
+}): JSX.Element {
   const [activeId, setActiveId] = useState<RibbonTabId>('inicio');
   // El desvanecido del borde derecho avisa de que la tira sigue: a 360 px se ven
   // 248 px de los 439 que miden las seis pestañas de un documento.
@@ -112,8 +86,7 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
   // 'inicio' existe para todos los kinds, así que visibles nunca está vacío.
   const active = visibles.find((t) => t.id === activeId) ?? visibles[0]!;
 
-  const cuerpos = CUERPOS[active.id];
-  const ActiveBody = cuerpos.por[ctx.kind] ?? cuerpos.otro;
+  const ActiveBody = cuerpos[active.id];
 
   // Roving tabindex, flechas e Inicio/Fin (@sytue/ui): ver `useTablist`. Los ids de
   // pestaña y panel se sobrescriben con los de siempre (`ribbon-tab-<id>`,
@@ -297,7 +270,7 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
                     'min-w-0 flex-1 [scrollbar-width:thin] flex-nowrap overflow-x-auto',
               )}
             >
-              <ActiveBody ctx={ctx} />
+              {ActiveBody ? <ActiveBody ctx={ctx} /> : null}
             </Toolbar>
           </BandaDesplegada.Provider>
           {/* «Más» es un control de la cinta más, en su sitio de la fila: plano como los

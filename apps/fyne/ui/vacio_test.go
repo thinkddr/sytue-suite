@@ -155,6 +155,29 @@ func TestElVacioColocaLaAccionSecundaria(t *testing.T) {
 		32*2+26+12+8+a.MinSize().Height+HuecoAccionesVacio+b.MinSize().Height)
 }
 
+// TestElEstadoDeErrorLlevaElTonoDeError: DS-06 solo lo usaba el editor; «no se pudo
+// cargar» de `PanelEstado` (Contacts, Calendar…) salía con el glifo gris de «aún no hay
+// nada». Ahora lleva el tono de error y su glifo de peligro; los otros estados, no.
+// VISTO EN ROJO sin el tono en `PanelEstado`.
+func TestElEstadoDeErrorLlevaElTonoDeError(t *testing.T) {
+	textos := TextosEstado{Titulo: "No se pudo cargar", Descripcion: "Comprueba la conexión."}
+	for _, c := range []struct {
+		e    Estado
+		tono TonoVacio
+	}{{EstadoError, VacioError}, {EstadoVacia, VacioNeutro}, {EstadoSinConexion, VacioNeutro}, {EstadoSinPermiso, VacioNeutro}} {
+		v, es := PanelEstado(c.e, textos, nil).(*Vacio)
+		if !es {
+			t.Fatalf("el estado %v no es un Vacio", c.e)
+		}
+		if v.Tono != c.tono {
+			t.Errorf("el estado %v lleva el tono %v y tocaba %v", c.e, v.Tono, c.tono)
+		}
+	}
+	if v := PanelEstado(EstadoError, textos, nil).(*Vacio); v.glifo() == nil {
+		t.Error("el error sin ilustración no lleva el glifo de peligro")
+	}
+}
+
 // TestElVacioDeErrorRespetaLaIlustracion: como el `spot="errorRetry"` de la web, la
 // ilustración que se pide gana al glifo de peligro; en compacto, que no lleva
 // ilustración, vuelve el glifo. VISTO EN ROJO con el glifo impuesto siempre.

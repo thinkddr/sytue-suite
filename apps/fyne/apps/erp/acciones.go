@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -1035,106 +1034,20 @@ func quitarNil(objs ...fyne.CanvasObject) []fyne.CanvasObject {
 	return out
 }
 
-// Medidas del botón del cajón: `mt-4 ml-6`, 44×44 (`min-h-[44px] min-w-[44px]`),
-// `rounded-md border text-lg`, con el «☰» de texto.
-const (
-	CajonMT   float32 = 4 * 0.25 * tema.Rem
-	CajonML   float32 = 6 * 0.25 * tema.Rem
-	LadoCajon float32 = 44
-)
-
-// mainERP es el contenido de `main`: en el móvil, el botón del cajón arriba y la vista
-// debajo; en escritorio, la vista sola.
+// mainERP es el contenido de `main`. El «☰» del móvil ya no va aquí, en su propia caja
+// sobre la vista: es el de la barra de la app, que en el teléfono sube a la de la suite
+// (la barra única, como Mail y Calendar; auditoría del 2026-11-24).
 type mainERP struct {
-	cajon     *BotonCajon
 	contenido fyne.CanvasObject
 }
 
-func (m *mainERP) arriba() float32 {
-	if m.cajon == nil {
-		return 0
-	}
-	return CajonMT + LadoCajon
-}
-
 func (m *mainERP) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, m.arriba()+m.contenido.MinSize().Height)
+	return fyne.NewSize(0, m.contenido.MinSize().Height)
 }
 
 func (m *mainERP) Layout(_ []fyne.CanvasObject, t fyne.Size) {
-	if m.cajon != nil {
-		m.cajon.Move(fyne.NewPos(CajonML, CajonMT))
-		m.cajon.Resize(fyne.NewSize(LadoCajon, LadoCajon))
-	}
-	y := m.arriba()
-	m.contenido.Move(fyne.NewPos(0, y))
-	m.contenido.Resize(fyne.NewSize(t.Width, max(t.Height-y, m.contenido.MinSize().Height)))
-}
-
-// BotonCajon es el «☰» que abre el menú en el móvil: el único mando de navegación que
-// hay por debajo de 768 px.
-type BotonCajon struct {
-	ui.Pulsable
-}
-
-// NuevoBotonCajon crea el botón. `nombre` es su `aria-label` («Menú»).
-func NuevoBotonCajon(nombre string, alPulsar func()) *BotonCajon {
-	b := &BotonCajon{}
-	b.Nombre, b.AlPulsar = nombre, alPulsar
-	b.ExtendBaseWidget(b)
-	return b
-}
-
-// MinSize son los 44 de la diana táctil.
-func (b *BotonCajon) MinSize() fyne.Size {
-	b.ExtendBaseWidget(b)
-	return fyne.NewSize(LadoCajon, LadoCajon)
-}
-
-// CreateRenderer construye la caja perfilada y el «☰».
-func (b *BotonCajon) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &cajonRenderer{
-		b:     b, // `rounded-control`: el radio del botón es de la forma
-		aro:   ui.NuevoAro(tema.Forma("radius-control"), ui.SinHueco, v),
-		caja:  ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), tema.Forma("radius-control")),
-		texto: ui.Texto("☰", tema.TextoLG, ui.Normal, tema.Color("text-muted", v)),
-	}
-	r.Refresh()
-	return r
-}
-
-type cajonRenderer struct {
-	b     *BotonCajon
-	aro   *ui.Aro
-	caja  *ui.Caja
-	texto *canvas.Text
-}
-
-func (r *cajonRenderer) MinSize() fyne.Size { return r.b.MinSize() }
-func (r *cajonRenderer) Objects() []fyne.CanvasObject {
-	return append(append(r.aro.Objetos(), r.caja.Objetos()...), r.texto)
-}
-func (r *cajonRenderer) Destroy() {}
-
-func (r *cajonRenderer) Layout(t fyne.Size) {
-	r.aro.Colocar(t)
-	r.caja.Redimensionar(t)
-	ancho := ui.Medir("☰", tema.TextoLG, ui.Normal).Width
-	ui.ColocarTexto(r.texto, tema.TextoLG, (t.Width-ancho)/2, (t.Height-tema.TextoLG.Linea)/2)
-}
-
-func (r *cajonRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.texto.Color = tema.Color("text-muted", v)
-	if r.b.Encima() {
-		r.texto.Color = tema.Color("text", v)
-	}
-	r.texto.Refresh()
-	r.caja.CambiarRadio(tema.Forma("radius-control")) // la forma se cambia en caliente
-	r.aro.CambiarRadio(tema.Forma("radius-control"))
-	r.aro.Ver(r.b.Enfocado())
-	r.aro.Pintar(v)
+	m.contenido.Move(fyne.NewPos(0, 0))
+	m.contenido.Resize(fyne.NewSize(t.Width, max(t.Height, m.contenido.MinSize().Height)))
 }
 
 // --- Tareas, libro y balance ------------------------------------------------------

@@ -193,6 +193,47 @@ type Pantalla struct {
 	// AlRehacer pide reconstruir la pantalla FUERA del Layout: la ventana cruzó el corte
 	// del mes del teléfono.
 	AlRehacer func()
+
+	// latidos son los esqueletos de carga del último pintado (ver `conLatido`).
+	latidos []latido
+
+	// mes, mesDesplazador, mesRefresco y mesObjeto son el mes de escritorio montado, el
+	// mismo en cada repintado (ver vistaMes).
+	mes            *Mes
+	mesDesplazador *container.Scroll
+	mesRefresco    *ui.RefrescoLista
+	mesObjeto      fyne.CanvasObject
+	// menuHecho y cabeceraHecha son el menú y la cabecera del último repintado, con la
+	// clave con que se hicieron (menuConservado, cabeceraConservada); grupoMenu es el
+	// selector de vista de ese menú.
+	menuHecho     *ui.Lateral
+	menuClave     claveMenu
+	grupoMenu     *ui.Segmentado
+	cabeceraHecha *CabeceraVista
+	cabeceraClave claveCabecera
+	// buscadorAgenda es el campo de la agenda, el mismo en cada pintado, con el idioma
+	// de su marca de agua; listaAgendaViva, la lista que filtra (vistaAgenda).
+	buscadorAgenda   *ui.Entrada
+	buscadorAgendaEn i18n.Locale
+	listaAgendaViva  *fyne.Container
+}
+
+// latido es un esqueleto de carga que late hasta que alguien lo para.
+type latido interface{ Parar() }
+
+// conLatido apunta un esqueleto de carga del pintado en curso. Un esqueleto solo deja de
+// latir al destruirse su renderer, y Fyne destruye los de un árbol sustituido un minuto
+// después: los del arranque seguían latiendo —a 60 fps— con los datos ya en pantalla.
+func conLatido[T latido](p *Pantalla, e T) T {
+	p.latidos = append(p.latidos, e)
+	return e
+}
+
+// pararLatidos para los esqueletos de un pintado que ya no está en pantalla.
+func pararLatidos(viejos []latido) {
+	for _, e := range viejos {
+		e.Parar()
+	}
 }
 
 // t es azúcar para no repetir el nil-check del traductor en cada rótulo.
@@ -230,9 +271,15 @@ func (p *Pantalla) visible(id string) bool {
 
 // Construir arma el árbol de la pantalla entera, listo para `SetContent`.
 func (p *Pantalla) Construir() fyne.CanvasObject {
-	a := ui.NuevoArmazon(p.contenido())
+	return p.ConstruirEn(ui.NuevoArmazon(nil))
+}
+
+// ConstruirEn es Construir sobre un armazón que ya está en la ventana: la App repinta
+// así, con el armazón de siempre, en vez de colgar uno nuevo con cada cambio.
+func (p *Pantalla) ConstruirEn(a *ui.Armazon) *ui.Armazon {
+	a.Contenido = p.contenido()
 	a.AlMedir = p.medirVentana
-	a.Menu = p.menu()
+	a.Menu = p.menuConservado()
 	a.BarraMovil = p.nuevaBarraMovil()
 	a.CajonAbierto = p.cajonAbierto
 	a.AlCajon = func(abierto bool) {
@@ -342,14 +389,46 @@ func (p *Pantalla) contenido() fyne.CanvasObject {
 		return p.conFranjas(p.vistaMesCompacta())
 	}
 	cuerpo := p.conFranjas(p.cuerpo())
-	cab := p.cabecera()
+	cab := p.cabeceraConservada()
 	return container.New(&bajoCabecera{c: cab}, cab, cuerpo)
+}
+
+// claveCabecera es lo que decide la cabecera de la vista: el título, los dos contadores
+// y la vista elegida, con el idioma y el tema. Lo demás son avisos fijos de la App.
+type claveCabecera struct {
+	v                   tema.Variante
+	locale              i18n.Locale
+	titulo              string
+	vista               Vista
+	invitaciones, nRecs int
+}
+
+// cabeceraConservada es la cabecera del último repintado mientras su clave no cambie,
+// como el menú (menuConservado): una campana que suena o una invitación que llega la
+// rehacen; un evento que llega, no.
+func (p *Pantalla) cabeceraConservada() *CabeceraVista {
+	k := claveCabecera{
+		v: tema.De(fyne.CurrentApp().Settings().ThemeVariant()), locale: p.locale(), titulo: p.Titulo(),
+		vista: p.Vista, invitaciones: p.Invitaciones, nRecs: len(p.Recordatorios),
+	}
+	if p.cabeceraHecha == nil || k != p.cabeceraClave {
+		p.cabeceraHecha, p.cabeceraClave = p.cabecera(), k
+	}
+	return p.cabeceraHecha
 }
 
 // cuerpo es la vista activa, o el panel del estado cuando no hay datos que enseñar.
 func (p *Pantalla) cuerpo() fyne.CanvasObject {
-	if panel := ui.PanelEstado(p.Estado, p.textosDeEstado(), p.esqueleto()); panel != nil {
-		return panel
+	if p.Estado != ui.EstadoExito {
+		// El esqueleto solo se arma cargando: con datos eran 42 círculos, su latido y
+		// sus aros en cada repintado, para tirarlos sin pintarlos.
+		var esqueleto fyne.CanvasObject
+		if p.Estado == ui.EstadoCargando {
+			esqueleto = p.esqueleto()
+		}
+		if panel := ui.PanelEstado(p.Estado, p.textosDeEstado(), esqueleto); panel != nil {
+			return panel
+		}
 	}
 	vista := p.vista()
 	if p.Recargando {
@@ -371,7 +450,22 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 		return p.vistaHoraria()
 	case VistaMes:
 	}
-	m := NuevoMes(p.locale(), p.Cursor)
+	return p.vistaMes()
+}
+
+// vistaMes es el mes de escritorio. El mes, su desplazador y el tema que le quita la
+// sombra son los MISMOS en cada repintado: rehacerlos eran 42 celdas con sus píldoras y
+// recorrer el árbol entero con el tema, aunque no cambiara nada (la campana, una
+// invitación, el menú). El mes se rehace solo si cambia lo que lo decide (`claveMes`), y
+// el desplazador vuelve arriba al cambiar de mes, como uno nuevo.
+func (p *Pantalla) vistaMes() fyne.CanvasObject {
+	m := p.mes
+	if m == nil {
+		m = NuevoMes(p.locale(), p.Cursor)
+	} else if m.Cursor.Year() != p.Cursor.Year() || m.Cursor.Month() != p.Cursor.Month() {
+		p.mesDesplazador.Offset = fyne.Position{}
+	}
+	m.Locale, m.Cursor = p.locale(), p.Cursor
 	m.Zona = p.zona()
 	m.Eventos = p.Eventos
 	m.SinTitulo = p.t("event.untitled", nil)
@@ -380,6 +474,7 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 		return p.t("nav.createEventOn", i18n.Vars{"date": i18n.FormatDayMonthLong(p.locale(), d)})
 	}
 	m.DesdeAntes = p.t("cal.fromEarlier", nil)
+	m.NumeroSemana = nil
 	if p.ajustes().NumeroSemana {
 		m.NumeroSemana = func(n int) string { return p.t("grid.weekNumber", i18n.Vars{"week": n}) }
 	}
@@ -388,12 +483,20 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 	m.AlMas = func(d time.Time, ancla fyne.CanvasObject) { p.mostrarDiaMes(d, ancla) }
 	// Arrastrar a otro día guarda por el mismo camino que la rejilla horaria.
 	m.AlMover = p.AlMoverEvento
-	// El mes conserva seis semanas legibles en horizontal: si no cabe su mínimo,
-	// se recorre entero en vez de apretar los números y eventos unos sobre otros.
-	desplazar, vista := desplazable(m)
-	refresco := p.Refresco
-	refresco.Arriba = func() bool { return desplazar.Offset.Y <= 0.5 }
-	return ui.RefrescarAlTirar(vista, &refresco)
+	if p.mes == nil {
+		// El mes conserva seis semanas legibles en horizontal: si no cabe su mínimo,
+		// se recorre entero en vez de apretar los números y eventos unos sobre otros.
+		desplazar, vista := desplazable(m)
+		p.mes, p.mesDesplazador, p.mesRefresco = m, desplazar, &ui.RefrescoLista{}
+		p.mesObjeto = ui.RefrescarAlTirar(vista, p.mesRefresco)
+	} else {
+		// Rehace el mes si hace falta y recoloca el desplazador si cambia su mínimo.
+		p.mesDesplazador.Refresh()
+	}
+	desplazar := p.mesDesplazador
+	*p.mesRefresco = p.Refresco
+	p.mesRefresco.Arriba = func() bool { return desplazar.Offset.Y <= 0.5 }
+	return p.mesObjeto
 }
 
 // textosDeEstado es la copia de cada uno de los seis, con las claves del catálogo de
@@ -464,7 +567,7 @@ func (p *Pantalla) crearHoy() {
 // una vez, como el `role="status"` con `loading.calendar` de la web.
 func (p *Pantalla) esqueleto() fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	b := ui.NuevosBloquesEsqueleto().ConRotulo(p.t("loading.calendar", nil))
+	b := conLatido(p, ui.NuevosBloquesEsqueleto().ConRotulo(p.t("loading.calendar", nil)))
 	c := &cargaMes{fondo: canvas.NewRectangle(tema.Color("surface", v))}
 	objs := []fyne.CanvasObject{c.fondo}
 	for range 7 {

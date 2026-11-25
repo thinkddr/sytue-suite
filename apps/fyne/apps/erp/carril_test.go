@@ -369,32 +369,29 @@ func TestElERPLlevaLaFormaMarco(t *testing.T) {
 		t.Error("el aspa no cierra el cajón")
 	}
 
-	// Por debajo de 768: no se pinta el carril de iconos del escritorio ni una
-	// segunda barra móvil del armazón; el único mando es `#erp-cajon-boton`.
+	// Por debajo de 768: no se pinta el carril de iconos del escritorio; el único mando
+	// es el «☰» de la barra móvil del armazón.
 	q := pantallaDePrueba(t)
 	q.Ventana = fyne.NewSize(360, 740)
 	e := test.NewWindow(q.Objeto())
 	defer e.Close()
 	e.SetPadded(false)
 	e.Resize(q.Ventana)
-	var enCarril, botones int
-	var boton *BotonCajon
+	var enCarril, barras int
 	var movil *ui.BarraMovil
 	recorrer(e.Content(), func(o fyne.CanvasObject) {
 		switch b := o.(type) {
 		case *AccionCarril:
 			enCarril++
-		case *BotonCajon:
-			botones++
-			boton = b
 		case *ui.BarraMovil:
+			barras++
 			movil = b
 		}
 	})
-	if enCarril != 0 || botones != 1 || boton == nil || movil != nil {
-		t.Fatalf("a 360 hay %d acciones de carril, %d botones de cajón y barraMovil=%v", enCarril, botones, movil)
+	if enCarril != 0 || barras != 1 || movil == nil || movil.AlMenu == nil {
+		t.Fatalf("a 360 hay %d acciones de carril y %d barras móviles (con menú: %v)", enCarril, barras, movil != nil && movil.AlMenu != nil)
 	}
-	test.Tap(boton)
+	movil.AlMenu()
 	if !q.cajon || !q.arm.CajonAbierto || !q.arm.Menu.Visible() {
 		t.Fatal("el botón del cajón no abre la navegación móvil del ERP")
 	}

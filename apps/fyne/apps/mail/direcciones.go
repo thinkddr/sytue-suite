@@ -129,11 +129,19 @@ func NuevoCampoDirecciones(marca string) *CampoDirecciones {
 func (c *CampoDirecciones) Foco() fyne.Focusable { return c.editor }
 
 // Poner fija el valor desde fuera (abrir un borrador, elegir de la libreta).
+//
+// Sin el foco, el cursor va al PRINCIPIO, como un `<input>` al que se le pone el valor:
+// al final, el campo corría el texto hasta él y la respuesta abría con «…nombre-largo.eu>»
+// en «Para», sin el nombre de a quién se contesta. Con el foco se queda al final, que es
+// donde se sigue escribiendo.
 func (c *CampoDirecciones) Poner(v string) {
 	c.Valor = v
 	_, actual := PartirDirecciones(v)
 	c.editor.OnChanged = nil
 	c.editor.PonerTexto(actual)
+	if !c.enfocado {
+		c.editor.PonerCursor(0)
+	}
 	c.editor.AlCambiar(c.teclear)
 	c.Refresh()
 }

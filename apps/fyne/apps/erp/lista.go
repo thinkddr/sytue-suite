@@ -179,6 +179,9 @@ type Orden struct {
 func NuevaLista(tr *i18n.Translator) *Lista {
 	l := &Lista{tr: tr, loc: tr.Locale(), Total: -1, Marcadas: map[string]bool{}}
 	l.buscador = ui.NuevaEntrada(l.t("list.searchPlaceholder")).ConPropia(CampoBuscadorLista)
+	// Con la lupa y Escape que vacía, como el buscador común de la suite (`ui.NuevoBuscador`);
+	// el campo es el suyo, más bajo, por la cabecera de la lista.
+	l.buscador.Icono, l.buscador.Busqueda = iconos.Buscar, true
 	l.buscador.Ancho = AnchoBuscador
 	l.buscador.AlCambiar(func(q string) {
 		if l.AlBuscar != nil {

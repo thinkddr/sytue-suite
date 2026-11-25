@@ -4,6 +4,7 @@ import preact from '@astrojs/preact';
 import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 import { sytueHealthEndpoint } from '@sytue/config/astro-health';
+import { sytuePrecarga } from '@sytue/config/astro-precarga';
 import { sytueNoEncontrada } from '@sytue/config/astro-404';
 import { sytueSecurity } from '@sytue/config/astro-security';
 
@@ -26,7 +27,12 @@ export default defineConfig({
   // @sytue/config/astro-security).
   security: sytueSecurity,
   adapter: node({ mode: 'standalone' }),
-  integrations: [sytueHealthEndpoint(), sytueNoEncontrada(), preact({ compat: true })],
+  integrations: [
+    sytuePrecarga(),
+    sytueHealthEndpoint(),
+    sytueNoEncontrada(),
+    preact({ compat: true }),
+  ],
   server: { port: 4327, host: true },
   vite: {
     plugins: [tailwindcss()],

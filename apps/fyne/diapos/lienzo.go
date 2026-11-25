@@ -168,6 +168,11 @@ type Lienzo struct {
 	// con su clave, que es lo que hace `i18n.Translator.T` con una clave suelta.
 	Rotulo   func(clave string) string
 	Variante tema.Variante
+	// AlTema dice que la Variante es la de la app y se resuelve AL PINTAR: la llevan el
+	// escenario del editor y las miniaturas. Puesta por quien compone, se quedaba en la
+	// del momento y, al cambiar de tema en caliente, los marcadores vacíos y el acento
+	// de la selección seguían en el anterior. La presentación no la lleva: es oscura.
+	AlTema bool
 	// Oculta es la caja de texto que se está escribiendo: su texto lo pintan los
 	// editores de encima, y pintarlo también aquí lo doblaría.
 	Oculta string
@@ -364,6 +369,9 @@ func (r *lienzoRenderer) Layout(t fyne.Size) {
 }
 
 func (r *lienzoRenderer) Refresh() {
+	if r.l.AlTema {
+		r.l.Variante = tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	}
 	r.rehacer(r.l.Size())
 	canvas.Refresh(r.l)
 }

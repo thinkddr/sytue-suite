@@ -56,7 +56,7 @@ func TestElEsqueletoSeQuedaQuietoSinMovimiento(t *testing.T) {
 	e := NuevoEsqueleto(40, 20)
 	e.Resize(fyne.NewSize(40, 20))
 	_ = pinta(t, 40, 20, e) // monta el renderer, que es quien arrancaría el pulso
-	if e.anim != nil {
+	if e.latido.andando() {
 		t.Error("con SinMovimiento el esqueleto ha arrancado una animación")
 	}
 	if o := opacidadPulso(e.fase); o != 1 {

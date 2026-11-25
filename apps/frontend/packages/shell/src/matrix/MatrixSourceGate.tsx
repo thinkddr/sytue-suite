@@ -5,13 +5,15 @@ import type { MatrixStorageProduct } from '@sytue/config/matrix';
 import { prefijoDeApp } from '@sytue/config/tokens';
 import type { Locale } from '@sytue/i18n';
 import { MatrixBrowserAuth } from '@sytue/offline/matrix/auth';
+import type { SuiteMatrix } from '@sytue/offline/matrix';
 import {
   CifradoDesactivado,
   MatrixSecurityError,
-  SuiteMatrix,
   type MatrixBootstrap,
-} from '@sytue/offline/matrix';
-import { MatrixDeviceGate, type MatrixGateHost } from './MatrixDeviceGate.js';
+} from '@sytue/offline/matrix/types';
+import type { MatrixGateHost } from './MatrixDeviceGate.js';
+// La rama de Matrix baja al pintarse: este módulo lo importan las apps de la bóveda.
+import { MatrixDeviceGate, openSuiteMatrix } from './matrix-lazy.js';
 import { PqVaultGate } from './PqVaultGate.js';
 import { SourceReleaseNotice } from './SourceReleaseNotice.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
@@ -181,7 +183,7 @@ export function MatrixSourceGate({
       open: async (bootstrap, ui, session) => {
         const instance = legacyHost.open
           ? await legacyHost.open(bootstrap, ui, session)
-          : await SuiteMatrix.open(bootstrap, ui, session);
+          : await openSuiteMatrix(bootstrap, ui, session);
         try {
           matching(instance);
           historical = instance;
@@ -282,12 +284,15 @@ export function MatrixStorageGate({
           product={product}
           basePath={basePath ?? prefijoDeApp(product === 'hub' ? 'one' : product) ?? '/'}
         />
+        {/* Sus hijos nunca reciben la bóveda: la app se pinta ya y la bóveda se abre
+            en segundo plano (ADR 0086, «La puerta no bloquea la app»). */}
         <PqVaultGate
           actor={actor}
           tenant={tenant}
           locale={locale}
           product={product}
           basePath={basePath}
+          background
         >
           {children}
         </PqVaultGate>

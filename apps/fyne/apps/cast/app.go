@@ -335,15 +335,15 @@ type ahoraEmision struct {
 // pantalla completa).
 func Nueva(cli *api.Cast, v Vista, w fyne.Window) *App {
 	a := &App{cli: cli, w: w, v: v, lanzar: func(f func()) { go f() }, enLaInterfaz: fyne.Do}
-	a.buscador = ui.NuevaEntrada(v.Traduce("explore.search")).Con(ui.CampoSM)
-	a.buscador.Icono = iconoBuscar
+	// El buscador común de la suite (`md`, con lupa): el `sm` de 24 con letra de 12 era
+	// el único así de pequeño (auditoría del 2026-11-24).
+	a.buscador = ui.NuevoBuscador(v.Traduce("explore.search"))
 	a.buscador.AlCambiar(func(s string) {
 		if a.ruta == RutaExplorar {
 			a.pintar()
 		}
 	})
-	a.buscaInicio = ui.NuevaEntrada(v.Traduce("home.search")).Con(ui.CampoSM)
-	a.buscaInicio.Icono = iconoBuscar
+	a.buscaInicio = ui.NuevoBuscador(v.Traduce("home.search"))
 	a.buscaInicio.AlCambiar(func(string) {
 		if a.ruta != RutaInicio {
 			return
@@ -569,6 +569,9 @@ func (a *App) pintar() {
 		o, activa = a.pantallaEmitir(), SecEmitir
 	case RutaModeracion:
 		o, activa = a.pantallaModeracion(), SecModeracion
+	}
+	if a.ruta == RutaInicio && a.dentro() {
+		o = ui.ConReservaFlotante(o) // que el «Subir» flotante no tape lo último
 	}
 	a.scroll.Content = container.New(&a.movil.hueco, o)
 	a.scroll.Refresh()

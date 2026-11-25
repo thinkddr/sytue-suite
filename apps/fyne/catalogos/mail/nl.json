@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Toch verzenden",
   "compose.noAttachmentTitle": "Verzenden zonder bijlagen",
   "compose.noDraftsFolder": "De map Concepten is niet gevonden",
+  "compose.openFailed": "De berichteditor kon niet worden geopend. Probeer het opnieuw.",
   "compose.pastedImageDropped": "De geplakte afbeelding is niet opgenomen",
   "compose.pastedImagesDropped": "De geplakte afbeeldingen zijn niet opgenomen",
   "compose.pastedImagesDroppedDescription": "Voeg afbeeldingen als bestanden toe om ze te versturen.",

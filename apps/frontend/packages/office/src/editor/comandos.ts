@@ -28,8 +28,8 @@
 import type { DocKind } from '@sytue/api-clients';
 import type { DocsKey } from '../i18n';
 import type { EditorCommand, FormatState } from './types';
-import type { SheetCommand } from './sheets/SheetCanvas';
-import type { SlidesCommand } from './slides/SlidesCanvas';
+import type { SheetCommand } from './sheets/mando';
+import type { SlidesCommand } from './slides/mando';
 import type { RibbonTabId } from './pestanas';
 import datos from './comandos.json';
 

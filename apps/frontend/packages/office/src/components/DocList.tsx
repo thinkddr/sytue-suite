@@ -44,6 +44,7 @@ import {
   useToast,
   VirtualList,
   withBase,
+  marcarAppLista,
 } from '@sytue/ui';
 import type {
   DocKind,
@@ -367,7 +368,7 @@ export function PortadaDeTesela({ doc }: { doc: DocumentMeta }): JSX.Element {
   );
 }
 
-interface DocTileProps {
+export interface DocTileProps {
   doc: DocumentMeta;
   locale: Locale;
   t: DocsT;
@@ -378,9 +379,15 @@ interface DocTileProps {
   onDelete: (doc: DocumentMeta) => void;
   onStar: (doc: DocumentMeta) => void;
   offline: boolean;
+  /**
+   * La tesela comparte fila con otras: el título reserva sus dos líneas para que la fecha
+   * caiga a la misma altura en toda la fila aunque solo un título parta. En una columna
+   * (el teléfono) no hay con quién alinear y el hueco sobraría.
+   */
+  enFila?: boolean;
 }
 
-function DocTile({
+export function DocTile({
   doc,
   locale,
   t,
@@ -391,6 +398,7 @@ function DocTile({
   onDelete,
   onStar,
   offline,
+  enFila = false,
 }: DocTileProps): JSX.Element {
   const label = kindLabel(t, doc.kind);
   const date = shortDate(locale, doc.updatedAt);
@@ -406,7 +414,13 @@ function DocTile({
       >
         <PortadaDeTesela doc={doc} />
         <div class="flex min-w-0 flex-col gap-0.5 p-3">
-          <span class="text-text truncate font-medium" title={doc.title}>
+          {/* Hasta dos líneas: sin miniatura todas las portadas son el mismo glifo y el
+              título es lo único que distingue un documento de otro. En una línea, a 1280 px
+              (teselas de ~190), se quedaba en unos quince caracteres: «Informe trimestral …». */}
+          <span
+            class={cx('text-text line-clamp-2 font-medium break-words', enFila && 'min-h-[2lh]')}
+            title={doc.title}
+          >
             {doc.title}
           </span>
           <span
@@ -427,9 +441,12 @@ function DocTile({
           class={cx(
             tileActionBtn,
             'absolute top-2 left-2 transition-opacity duration-150',
+            // Con el dedo la estrella vacía no se pinta (destacar está en «…»): con la
+            // opacidad a cero seguía ahí para un toque a ciegas. La llena sí, que dice
+            // algo del documento.
             doc.starred
               ? 'text-primary-text opacity-100'
-              : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
+              : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden',
           )}
           aria-pressed={doc.starred}
           aria-label={t(doc.starred ? 'tile.unstar.label' : 'tile.star.label', {
@@ -443,12 +460,14 @@ function DocTile({
       ) : null}
       {/* Acciones fuera del <a> (un botón dentro de un enlace es HTML inválido).
           Ocultas con opacidad hasta hover/foco: siguen en el orden de tabulación
-          y en el árbol de accesibilidad; en punteros gruesos, siempre visibles. */}
+          y en el árbol de accesibilidad. Con el dedo, donde no hay hover, queda solo
+          «…» y siempre a la vista: cinco iconos por tarjeta eran el escritorio metido
+          en el teléfono, y el menú ya trae todo lo que hacían los otros cuatro. */}
       {!offline ? (
         <div class="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
           <button
             type="button"
-            class={tileActionBtn}
+            class={cx(tileActionBtn, 'pointer-coarse:hidden')}
             aria-label={t('tile.rename.label', { title: doc.title })}
             title={t('tile.rename')}
             onClick={() => onRename(doc)}
@@ -476,6 +495,36 @@ function DocTile({
           >
             {(close) => (
               <>
+                {/* Todo lo de la tesela, también lo que ya tiene botón al pasar el ratón:
+                    con el dedo este menú es lo único que se ve, y con el teclado es más
+                    corto llegar aquí que a cuatro botones. */}
+                <MenuItem
+                  icon={<Glyph name="pencil" />}
+                  onClick={() => {
+                    close();
+                    onRename(doc);
+                  }}
+                >
+                  {t('tile.rename')}
+                </MenuItem>
+                <MenuItem
+                  icon={<Glyph name="star" filled={doc.starred} />}
+                  onClick={() => {
+                    close();
+                    onStar(doc);
+                  }}
+                >
+                  {t(doc.starred ? 'tile.unstar' : 'tile.star')}
+                </MenuItem>
+                <MenuItem
+                  icon={<Glyph name="share" />}
+                  onClick={() => {
+                    close();
+                    onShare(doc);
+                  }}
+                >
+                  {t('tile.share')}
+                </MenuItem>
                 <MenuItem
                   icon={<Glyph name="copy" />}
                   onClick={() => {
@@ -504,12 +553,23 @@ function DocTile({
                     </MenuItem>
                   ))}
                 </div>
+                <MenuSeparator />
+                <MenuItem
+                  danger
+                  icon={<Glyph name="trash" />}
+                  onClick={() => {
+                    close();
+                    onDelete(doc);
+                  }}
+                >
+                  {t('tile.delete')}
+                </MenuItem>
               </>
             )}
           </Dropdown>
           <button
             type="button"
-            class={tileActionBtn}
+            class={cx(tileActionBtn, 'pointer-coarse:hidden')}
             aria-label={t('tile.share.label', { title: doc.title })}
             title={t('tile.share')}
             onClick={() => onShare(doc)}
@@ -518,7 +578,7 @@ function DocTile({
           </button>
           <button
             type="button"
-            class={cx(tileActionBtn, 'hover:text-danger-text')}
+            class={cx(tileActionBtn, 'hover:text-danger-text pointer-coarse:hidden')}
             aria-label={t('tile.delete.label', { title: doc.title })}
             title={t('tile.delete')}
             onClick={() => onDelete(doc)}
@@ -660,6 +720,12 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
   useEffect(() => {
     void load(filtros);
   }, [filtros, load]);
+
+  // `sytue:app-ready`: la lista ya enseña sus documentos (o el fallo). Lo que se
+  // presupuesta en vez del LCP y lo que espera la bóveda para abrirse detrás.
+  useEffect(() => {
+    if (docs !== null || error) marcarAppLista();
+  }, [docs, error]);
 
   // Abrir un fichero de Drive que no se pudo abrir devuelve aquí con el motivo
   // (/open-from-drive). Sin esto, la persona pulsa «Abrir con Sytue Docs», acaba en
@@ -1407,7 +1473,9 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
           ) : (
             <VirtualList
               items={rows}
-              estimateSize={192}
+              // La fila medida a 1280: tesela de 186 (con las dos líneas del título) y
+              // los 16 de `pb-4`. La lista mide cada fila; esto es solo el primer cálculo.
+              estimateSize={202}
               getItemKey={rowKey}
               scrollElementRef={pageScrollRef}
               aria-label={t('list.grid.label')}
@@ -1429,6 +1497,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
                       onDelete={setPendingDelete}
                       onStar={(doc) => void toggleStar(doc)}
                       offline={offline}
+                      enFila={cols > 1}
                     />
                   ))}
                 </div>

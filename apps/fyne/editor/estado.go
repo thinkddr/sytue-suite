@@ -309,4 +309,7 @@ func (r *estadoRenderer) Refresh() {
 	for _, o := range r.Objects() {
 		o.Refresh()
 	}
+	// Y se coloca de nuevo: los rótulos miden su texto, y del 75 % al 100 % el
+	// porcentaje se quedaba con la caja de dos cifras, en «10…».
+	r.Layout(r.b.Size())
 }

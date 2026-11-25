@@ -294,8 +294,12 @@ func (p *PapeleraDocs) Vaciar() {
 // ---- la vista ----
 
 // Repintar rehace la pantalla con el estado de ahora, en el hilo de la interfaz.
+//
+// La pantalla se compone con los colores ya resueltos: al cambiar de tema en caliente se
+// repinta entera (`ui.RehacerConElTema`), o el fondo, el título y las filas se quedaban
+// en el tema anterior.
 func (p *PapeleraDocs) Repintar() {
-	p.raiz.Objects = []fyne.CanvasObject{p.construir()}
+	p.raiz.Objects = []fyne.CanvasObject{ui.RehacerConElTema(p.construir(), p.Repintar)}
 	p.raiz.Refresh()
 	ui.RecolocarBarraSuite(p.raiz)
 }
@@ -343,7 +347,7 @@ func (p *PapeleraDocs) cuerpo(v tema.Variante) fyne.CanvasObject {
 		return p.listado(v)
 	case Vacio:
 		e = ui.NuevoVacio(p.t("trash.emptyTitle"), p.t("trash.emptyBody"))
-		e.Ilustracion = tiposVacio(v)
+		e.Ilustracion = tiposVacio()
 	case SinConexion:
 		e = ui.NuevoVacio(p.t("list.offline.emptyTitle"), p.t("list.offline.emptyDescription"))
 		e.Ilustracion = aviso()

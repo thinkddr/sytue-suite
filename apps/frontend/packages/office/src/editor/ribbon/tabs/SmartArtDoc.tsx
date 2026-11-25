@@ -24,7 +24,7 @@ import type { SmartArtItem, SmartArtLayout } from '../../types';
 import { getEditorRoot } from '../../canvas/exec';
 import { EditorIcon } from '../../icons';
 import { POPOVER_SHELL, RibbonGroup, RibbonSelect, useBloqueado } from '../primitives';
-import { SMARTART_LAYOUTS } from '../../slides/SlidesCanvas';
+import { SMARTART_LAYOUTS } from '../../slides/mando';
 import {
   DEFAULT_SMARTART_ITEMS,
   parseSmartArtItems,

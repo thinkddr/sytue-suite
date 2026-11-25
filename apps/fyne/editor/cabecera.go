@@ -82,9 +82,10 @@ func NuevaCabecera(ctx *Contexto, alVolver func()) *Cabecera {
 		}
 	})
 	c.compartir = ui.NuevoBoton(ctx.Traducir("header.share"), nil).Con(ui.Primario, ui.TallaSM)
-	// Fantasma y no Secundario: en la suite `secondary` es el MISMO relleno que `primary` con
-	// borde, y la cabecera enseñaba dos llamadas a la acción iguales, una al lado de la otra.
-	// La que importa es Compartir; descargar es un comando más (también está en «Archivo»).
+	// Fantasma y no Secundario: cuando `secondary` era el MISMO relleno que `primary` con
+	// borde (hasta el 2026-11-24; hoy es de contorno), la cabecera enseñaba dos llamadas a la
+	// acción iguales, una al lado de la otra. Se queda en fantasma: la que importa es
+	// Compartir, y descargar es un comando más (también está en «Archivo»).
 	c.descargar = ui.NuevoBoton(ctx.Traducir("header.download"), c.abrirDescargas).Con(ui.Fantasma, ui.TallaSM)
 	// `leadingIcon={<EditorIcon name="download" />}`: el `lg` de 18, en la tinta del botón
 	// (`text-primary-text` del fantasma).
@@ -421,6 +422,12 @@ func (r *cabeceraRenderer) Refresh() {
 	r.fondo.FillColor = tema.Color("surface", v)
 	r.linea.FillColor = tema.Color("border", v)
 	r.c.filete.FillColor = tema.Color("border", v)
+	// La marca y el glifo de «Descargar» son dibujos con la tinta resuelta al montar la
+	// cabecera (el anillo de la tesela y el `primary-text` del fantasma), y el botón no
+	// tiñe un Glifo puesto a mano: se tiñen aquí para seguir a un cambio de tema en
+	// caliente, que solo refresca. TenirCon no repinta si no cambia.
+	r.c.marca.TenirCon(tema.Color("product-tile-ring", v))
+	r.c.descargar.Glifo.Tenir("primary-text", v)
 	if s := r.c.Size(); s.Width > 0 {
 		r.Layout(s) // el chip cambia de texto con el reloj, y en un móvil se recorta
 	}

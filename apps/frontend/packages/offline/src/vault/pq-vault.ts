@@ -22,7 +22,8 @@ import {
   type MatrixStorageScope,
 } from '@sytue/config/matrix';
 import { EncryptedOfflineValues, type EncryptedOfflinePort } from '../encrypted-storage.js';
-import { PqcRuntime, type PqcIdentityMaterial } from '../pqc/runtime.js';
+import { vaultCoreModule } from '@sytue/config/client-core';
+import { PqcRuntime, prewarmClientCore, type PqcIdentityMaterial } from '../pqc/runtime.js';
 import { StorageJobs } from '../matrix/storage-jobs.js';
 import { StoragePq, type StoragePqKeySource } from '../matrix/storage-pq.js';
 import { StorageRepository, type StorageRecordTransport } from '../matrix/storage-repository.js';
@@ -53,6 +54,13 @@ import {
  */
 export type PqVaultReason =
   | 'signin'
+  /**
+   * Sytue ID pide una identificación reciente (`vault_key_reauth`, ADR 0087): la
+   * clave de firma de esta bóveda sustituye a otra y eso solo vale tras volver a
+   * teclear la clave. Un inicio de sesión normal no basta: el relevo entrega el
+   * código con la sesión de antes y Sytue ID vuelve a contestar 403.
+   */
+  | 'reauth'
   | 'wrong'
   | 'identity'
   | 'closed'
@@ -674,11 +682,29 @@ export class PqVault {
     return PqVault.openInternal(options, true);
   }
 
+  /**
+   * El núcleo (`vault`) empieza a bajar YA, en paralelo con el bootstrap, las claves y el
+   * puente, y no con el primer `invoke`, tras los tres. Lo hacía solo la puerta
+   * (`PqVaultGate`); aquí lo tiene también quien abre la bóveda por su cuenta (Photos y
+   * Docs con el Drive de la bóveda). El worker nace sin cuenta: solo sabe la URL pública
+   * de los artefactos y sus resúmenes. El `PqcRuntime` de esta apertura lo adopta, una
+   * sola vez; si la apertura acaba sin adoptarlo (falla, o no llegó a usar el núcleo),
+   * se termina. Con un núcleo propio (`createCore`, las pruebas) no se arranca nada.
+   */
   private static async openInternal(
     options: PqVaultOpenOptions,
     forceReset: boolean,
   ): Promise<PqVault> {
     if (forceReset && options.existing) throw new PqVaultError('missing');
+    const soltarNucleo = options.createCore ? undefined : prewarmClientCore(vaultCoreModule);
+    try {
+      return await PqVault.abrir(options, forceReset);
+    } finally {
+      soltarNucleo?.();
+    }
+  }
+
+  private static async abrir(options: PqVaultOpenOptions, forceReset: boolean): Promise<PqVault> {
     const f = options.fetchImpl ?? fetch;
     const base = normalizeBase(options.basePath);
     const bridge: PqVaultBridgePort = options.bridge ?? {
@@ -1195,8 +1221,11 @@ export class PqVault {
       this.exclusiveQueue = new Promise<void>((resolve) => {
         release = resolve;
       });
-      return this.jobs.run(
-        'exclusive',
+      // Cada turno es un trabajo propio. Con un nombre fijo, el segundo que llegaba
+      // mientras corría el primero se rechazaba (`locked`) sin soltar su turno, y
+      // todo lo exclusivo que viniera después esperaba para siempre.
+      const turn = this.jobs.run(
+        crypto.randomUUID(),
         async (child) => {
           try {
             await prev;
@@ -1209,6 +1238,12 @@ export class PqVault {
         },
         parent,
       );
+      // Si ni siquiera llegó a empezar (bóveda cerrada, señal ya abortada), el turno
+      // se suelta igual cuando le toque.
+      void turn.catch(() => {
+        void prev.then(release, release);
+      });
+      return turn;
     };
 
     const transport: StorageRecordTransport = {

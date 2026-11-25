@@ -244,8 +244,10 @@ func (p *Pestanas) elementosResumen(e Estadisticas) []fyne.CanvasObject {
 		el := ui.NuevoElementoMenu(p.lz.textoMedida(m, e), iconos.Ninguno, func() { p.AlternarMedida(m) })
 		el.Denso, el.MantieneAbierto = true, true
 		el.Marcada = slices.Contains(p.medidas, m)
-		// La última que queda no se puede quitar: el resumen se quedaría sin nada que pulsar.
-		el.Inerte = el.Marcada && len(p.medidas) == 1
+		// La última que queda no se puede quitar (el resumen se quedaría sin nada que
+		// pulsar): pulsarla no hace nada (`AlternarMedida`), pero se pinta con la tinta
+		// de las demás. Apagada era la ÚNICA elegida la que salía en gris, a ~2,5:1
+		// (auditoría del 2026-11-24).
 		out = append(out, el)
 	}
 	return out

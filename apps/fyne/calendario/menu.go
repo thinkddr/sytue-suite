@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"slices"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -16,12 +17,91 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
+// claveMenu es todo lo que decide el menú (ver menu): con la misma que en el repintado
+// anterior, el menú de antes vale tal cual, con su foco, el ratón encima y sus medidas.
+// Las listas van copiadas: se comparan por contenido, no por ser la misma.
+type claveMenu struct {
+	fija                     claveMenuFija
+	calendarios, compartidos []api.Calendar
+	visibles                 []bool
+	recordatorios            []api.Reminder
+}
+
+type claveMenuFija struct {
+	v                                                      tema.Variante
+	locale                                                 i18n.Locale
+	cursor, hoy                                            time.Time
+	zona                                                   *time.Location
+	sinConexion, compacta, vinculados, ajustes, enAjustes  bool
+	recursos, recEnCajon, recCargando, recFallo, conImport bool
+	vista                                                  Vista
+	invitaciones                                           int
+}
+
+func (p *Pantalla) claveMenu() claveMenu {
+	k := claveMenu{
+		fija: claveMenuFija{
+			v: tema.De(fyne.CurrentApp().Settings().ThemeVariant()), locale: p.locale(),
+			cursor: p.Cursor, hoy: inicioDelDia(time.Now(), p.zona()), zona: p.zona(),
+			sinConexion: p.SinConexion, compacta: p.compacta(), vinculados: p.AlServiciosVinculados != nil,
+			ajustes: p.AlAbrirAjustes != nil, enAjustes: p.EnAjustes, recursos: p.PuedeGestionarRecursos,
+			conImport: p.Importar != nil,
+		},
+		calendarios: slices.Clone(p.Calendarios), compartidos: slices.Clone(p.Compartidos),
+	}
+	for _, cs := range [][]api.Calendar{p.Calendarios, p.Compartidos} {
+		for _, c := range cs {
+			k.visibles = append(k.visibles, p.visible(c.ID))
+		}
+	}
+	if k.fija.compacta {
+		// Lo del bloque de la vista del cajón (seccionVistaMovil).
+		k.fija.vista, k.fija.invitaciones = p.Vista, p.Invitaciones
+		k.fija.recEnCajon, k.fija.recCargando, k.fija.recFallo = p.recEnCajon, p.recCargando, p.recFallo
+		k.recordatorios = slices.Clone(p.Recordatorios)
+	}
+	return k
+}
+
+func (k claveMenu) igual(o claveMenu) bool {
+	return k.fija == o.fija && slices.Equal(k.calendarios, o.calendarios) && slices.Equal(k.compartidos, o.compartidos) &&
+		slices.Equal(k.visibles, o.visibles) && slices.Equal(k.recordatorios, o.recordatorios)
+}
+
+// menuConservado es el menú del último repintado si nada de lo que lo decide ha cambiado
+// (`claveMenu`), y uno nuevo si no. Rehacerlo en cada repintado —el mini-mes son 42
+// días con su aro cada uno— era lo que más costaba del mes de escritorio una vez
+// conservado el mes. El pie de importar tiene su propio estado y se pone cada vez.
+//
+// Con el esqueleto de los calendarios no se conserva: su latido se para al repintar.
+func (p *Pantalla) menuConservado() fyne.CanvasObject {
+	if p.CargandoCalendarios {
+		p.menuHecho = nil
+		return p.menu()
+	}
+	k := p.claveMenu()
+	if l := p.menuHecho; l != nil && k.igual(p.menuClave) {
+		p.grupoCajon = p.grupoMenu
+		if pie := p.pieMenu(); pie != l.Pie {
+			l.Pie = pie
+			l.Refresh()
+		}
+		return l
+	}
+	l := p.lateral()
+	p.menuHecho, p.menuClave, p.grupoMenu = l, k, p.grupoCajon
+	return l
+}
+
 // El menú de Sytue Calendar: «Crear evento» arriba, el mini-mes, «Mis calendarios» y,
 // si los hay, los compartidos conmigo.
 //
 // El carril, su ancho y su canalón son `ui.Lateral` —la misma pieza que montan las
 // otras cinco apps—; lo de dentro es de Calendar.
-func (p *Pantalla) menu() fyne.CanvasObject {
+func (p *Pantalla) menu() fyne.CanvasObject { return p.lateral() }
+
+// lateral es el menú (ver menu), con su tipo.
+func (p *Pantalla) lateral() *ui.Lateral {
 	crear := ui.NuevoBoton(p.t("nav.createEvent", nil), func() { p.cajonAbierto = false; p.crearHoy() }).
 		ConIcono(iconos.Mas, 0)
 	crear.Ancho = ui.AnchoUtilMenu // `fullWidth`
@@ -66,15 +146,20 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 	cuerpo := ui.EnColumna(0, bloques...)
 
 	l := ui.NuevoLateral(p.t("nav.myCalendars", nil), cuerpo).ConCabecera(crear)
-	// El pie es `<ImportData>` («Trae tus calendarios»), que solo se pinta si la
-	// organización tiene un origen conectado. Sin él no hay pie: ni franja ni filete
-	// (en la web, `empty:hidden` en el pie de Sidebar.tsx).
+	l.Pie = p.pieMenu()
+	return l
+}
+
+// pieMenu es `<ImportData>` («Trae tus calendarios»), que solo se pinta si la
+// organización tiene un origen conectado. Sin él no hay pie: ni franja ni filete (en la
+// web, `empty:hidden` en el pie de Sidebar.tsx).
+func (p *Pantalla) pieMenu() fyne.CanvasObject {
 	if p.Importar != nil {
 		if o := p.Importar.Objeto(ui.AnchoUtilMenu, tema.De(fyne.CurrentApp().Settings().ThemeVariant())); o != nil {
-			l.Pie = o
+			return o
 		}
 	}
-	return l
+	return nil
 }
 
 // seccionVistaMovil es el primer bloque del cajón en el mes del teléfono: lo que la
@@ -166,9 +251,9 @@ func (p *Pantalla) seccionMisCalendarios() *ui.SeccionLateral {
 		// Dos filas de 36 separadas por el `gap-0.5` de la sección: `ui.FilasEsqueleto`
 		// con esa receta, un solo latido y un solo «Cargando».
 		s.Filas = []fyne.CanvasObject{
-			ui.NuevasFilasEsqueleto(2, ui.SinDelantero, 1).ConReceta(ui.RecetaEsqueleto{
+			conLatido(p, ui.NuevasFilasEsqueleto(2, ui.SinDelantero, 1).ConReceta(ui.RecetaEsqueleto{
 				Alto: 36, Hueco: tema.Espacio(0.5), Rayas: []ui.RayaEsqueleto{{Alto: 36}},
-			}).SobreCromo(),
+			}).SobreCromo()),
 		}
 		return s
 	}

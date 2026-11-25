@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Skicka ändå",
   "compose.noAttachmentTitle": "Skicka utan bilagor",
   "compose.noDraftsFolder": "Mappen Utkast hittades inte",
+  "compose.openFailed": "Meddelandeeditorn kunde inte öppnas. Försök igen.",
   "compose.pastedImageDropped": "Den inklistrade bilden togs inte med",
   "compose.pastedImagesDropped": "De inklistrade bilderna togs inte med",
   "compose.pastedImagesDroppedDescription": "Bifoga bilder som filer för att skicka dem.",

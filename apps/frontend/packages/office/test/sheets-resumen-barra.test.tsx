@@ -167,8 +167,12 @@ test('el resumen enseña solo la suma hasta que se elige otra cosa, y se recuerd
   expect(disparador.getAttribute('aria-haspopup')).toBe('menu');
   clic(disparador);
   expect(casilla('Suma').getAttribute('aria-checked')).toBe('true');
-  // La única marcada no se puede quitar: un resumen vacío no se podría volver a pulsar.
-  expect(casilla('Suma').disabled).toBe(true);
+  // La única marcada no se puede quitar (un resumen vacío no se podría volver a pulsar),
+  // pero no se apaga: en gris no se leía. Pulsarla no la quita.
+  expect(casilla('Suma').disabled).toBe(false);
+  clic(casilla('Suma'));
+  expect(resumen(h)).toBe('Suma: 6');
+  expect(casilla('Suma').getAttribute('aria-checked')).toBe('true');
   expect(casilla('Mín.').getAttribute('aria-checked')).toBe('false');
   expect(casilla('Recuento numérico').textContent).toBe('Recuento numérico: 3');
   clic(casilla('Máx.'));

@@ -76,8 +76,24 @@ type Pantalla struct {
 	recordatorios map[string]api.NoteReminder
 	orden         Orden
 	filtro        string
+	// filtroPintado es el filtro del último repintado y relojFiltro, la espera antes de
+	// repintar con el que se está escribiendo (filtrarConEspera).
+	filtroPintado string
+	relojFiltro   *time.Timer
+	// repintePendiente es un repintado ya pedido por lo que llega de la red (imágenes y
+	// documentos): los que lleguen antes de que corra no piden otro (repintarJuntos).
+	repintePendiente bool
 	// filtroEstado es el estado de etiqueta por el que se filtra; vacío, ninguno.
 	filtroEstado string
+	// textos es el texto de filtrar de cada nota, mientras no cambie (textosPlegados).
+	textos textosPlegados
+	// lateralHecho y barraHecha son el carril y la barra del último repintado, con la
+	// clave con que se hicieron (conservar.go); filasLateral, las filas de ese carril.
+	lateralHecho fyne.CanvasObject
+	lateralClave claveLateral
+	filasLateral map[string]*ui.FilaLateral
+	barraHecha   fyne.CanvasObject
+	barraClave   claveBarra
 	// bloqueado oculta también los datos legados hasta verificar la clave local.
 	bloqueado bool
 
@@ -309,8 +325,16 @@ func corteDe(ancho float32) int {
 }
 
 func (p *Pantalla) armazon(v tema.Variante) *ui.Armazon {
-	a := ui.NuevoArmazon(p.contenido(v))
-	a.Menu = p.lateral.Objeto(v)
+	return p.armarEn(ui.NuevoArmazon(nil), v)
+}
+
+// armarEn pone en el armazón `a` las columnas del estado de ahora: Repintar cuelga las
+// nuevas en el que ya está montado en vez de dejar uno entero cada vez, que Fyne
+// retenía un minuto con todo lo de dentro.
+func (p *Pantalla) armarEn(a *ui.Armazon, v tema.Variante) *ui.Armazon {
+	a.Contenido = p.contenido(v)
+	a.Menu = p.lateralConservado(v)
+	a.Panel = nil
 	// El panel secundario SOLO existe en la vista de árbol, que es cuando hay una lista
 	// de notas a la izquierda y una nota a la derecha. En las otras tres disposiciones
 	// el lienzo ocupa el panel entero.
@@ -407,7 +431,7 @@ func (p *Pantalla) contenidoCuaderno(v tema.Variante) fyne.CanvasObject {
 	// panel (dashboard), sin barra encima.
 	var franjas []fyne.CanvasObject
 	if !enPagina(p.activo) {
-		franjas = append(franjas, p.barra.Objeto(v))
+		franjas = append(franjas, p.barraConservada(v))
 	}
 	// El aviso de «sin conexión» va SOBRE el contenido y debajo de la barra, que es
 	// donde lo pone la web (`role="status"`).
@@ -460,7 +484,10 @@ func (p *Pantalla) contenidoCuaderno(v tema.Variante) fyne.CanvasObject {
 func (p *Pantalla) desplazar(o fyne.CanvasObject, libre bool) fyne.CanvasObject {
 	if p.desplazador == nil {
 		p.desplazador = container.NewScroll(o)
+		// Al desplazar, las columnas cuelgan las tarjetas que entran en la vista.
+		p.desplazador.OnScrolled = func(fyne.Position) { p.lienzo.alDesplazar() }
 	}
+	p.lienzo.desplazador = p.desplazador
 	p.desplazador.Content = o
 	p.desplazador.Direction = container.ScrollVerticalOnly
 	if libre {
@@ -511,14 +538,43 @@ func (p *Pantalla) Repintar() {
 	p.sincronizar()
 	// Repintar rehace las tarjetas: la ficha de un enlace era de una prosa que ya no está.
 	p.portal.poner(clavePrevia)
-	p.raiz.Objects[0] = p.armazon(p.variante())
+	// Lo que se descuelga se suelta en cuanto lo nuevo está colocado (ui.SoltarArboles):
+	// la caché de Fyne lo guardaba un minuto, con las tarjetas que ya no se ven dentro.
+	var viejos []fyne.CanvasObject
+	if p.desplazador != nil {
+		// El desplazador es el mismo y se conserva; lo de antes de dentro, no, y por él
+		// ya no se llegaría: cuelga solo del contenido viejo.
+		viejos = append(viejos, p.desplazador.Content)
+	}
+	if a, ok := p.raiz.Objects[0].(*ui.Armazon); ok {
+		viejos = append(viejos, a.Contenido, a.Menu, a.Panel, a.BarraMovil)
+		p.armarEn(a, p.variante()).Refresh()
+	} else {
+		viejos = append(viejos, p.raiz.Objects[0])
+		p.raiz.Objects[0] = p.armazon(p.variante())
+	}
 	p.raiz.Refresh()
+	soltarArboles(viejos, p.conservados()...)
 	// En el pintado en que la nota ya está —la de otro cuaderno llega después—, al título.
 	if a := p.ancla; a != "" {
 		if _, ok := p.nota(p.lienzo.Seleccionada); ok {
 			p.ancla = ""
 			p.enHilo(func() { p.irAlAncla(a) })
 		}
+	}
+}
+
+// soltarArboles es `ui.SoltarArboles`; el guardián de la memoria retenida lo cambia para
+// medir sin él.
+var soltarArboles = ui.SoltarArboles
+
+// conservados son el árbol de la pantalla y lo que se guarda de un repintado a otro
+// aunque ahora no esté colgado (en otra vista, con el panel cerrado): soltarlo le
+// quitaría su renderer para nada.
+func (p *Pantalla) conservados() []fyne.CanvasObject {
+	return []fyne.CanvasObject{
+		p.raiz, p.desplazador, p.lateralHecho, p.barraHecha, p.campoCaptura, p.barra.filtro,
+		p.lienzo.Editor, p.lienzo.CampoTitulo, p.arbol.desplazado, p.arbol.Campo, p.busqueda.campo, p.dia.semana,
 	}
 }
 
@@ -573,8 +629,12 @@ func (p *Pantalla) sincronizar() {
 	if p.activo.Crudo.DailyDate == "" {
 		p.dia.semana, p.dia.marcasDestino = nil, nil
 	}
+	p.filtroPintado = p.filtro
 	enfocadas := enfocarNotas(p.notas, p.enfoque, p.ocultarTerminadas)
-	visibles := Ordenar(Filtrar(enfocadas, p.filtro, p.filtroEstado), p.orden, p.loc)
+	if len(p.textos) > 4*len(p.notas)+64 {
+		p.textos = nil // de cuadernos que ya no están abiertos
+	}
+	visibles := Ordenar(filtrarCon(enfocadas, p.filtro, p.filtroEstado, p.textos.de), p.orden, p.loc)
 
 	p.lateral.Cuadernos, p.lateral.Activo, p.lateral.EsMio = enArbol(p.cuadernos), p.activo.ID, p.esMio
 	// Las del cuaderno abierto cuelgan de su fila TAL COMO LLEGARON: la web le pasa
@@ -587,6 +647,8 @@ func (p *Pantalla) sincronizar() {
 	p.barra.Bloqueado, p.barra.SinRed = p.bloqueado, !p.hayRed()
 	p.barra.Deshacer, p.barra.Rehacer = p.hist.SiguienteDeshacer(), p.hist.SiguienteRehacer()
 	p.barra.Estrecha = p.anchoVentana() < ui.CorteSM
+	// Por debajo de 768 el título del cuaderno ya va en la barra de la app (barraMovil).
+	p.barra.RepiteLaBarra = p.anchoVentana() < ui.Estrecho && p.activo.Titulo != ""
 	// «Compartir con personas» del cuaderno: solo su dueño, con red y con directorio.
 	p.barra.AlCompartir = nil
 	if p.Directorio != nil && p.svc != nil && p.hayRed() && p.esMio(p.activo.Crudo.OwnerSub) {
@@ -627,6 +689,26 @@ func (p *Pantalla) sincronizar() {
 		return
 	}
 	p.lienzo.Llenar, p.lienzo.Notas = false, visibles
+}
+
+// EsperaFiltro es lo que se espera tras la última tecla del filtro antes de repintar el
+// cuaderno filtrado: escribir «mudanza» repinta una vez y no siete.
+const EsperaFiltro = 130 * time.Millisecond
+
+// filtrarConEspera apunta lo escrito en el filtro y repinta cuando se deja de escribir.
+// El campo es el mismo de un repintado a otro, así que lo escrito se ve en el acto.
+func (p *Pantalla) filtrarConEspera(s string) {
+	p.filtro = s
+	if p.relojFiltro != nil {
+		p.relojFiltro.Stop()
+	}
+	p.relojFiltro = time.AfterFunc(EsperaFiltro, func() {
+		p.enHilo(func() {
+			if p.filtro != p.filtroPintado {
+				p.Repintar()
+			}
+		})
+	})
 }
 
 // quitarFiltro vacía el filtro de texto y el de estado, y también el campo de la barra,
@@ -886,7 +968,7 @@ func (p *Pantalla) enganchar() {
 	}
 
 	b := p.barra
-	b.AlFiltrar = func(s string) { p.filtro = s; p.Repintar() }
+	b.AlFiltrar = p.filtrarConEspera
 	b.AlOrdenar = func(o Orden) {
 		p.orden = o
 		// Se recuerda entre sesiones: quien prefiere ver lo último tocado lo prefiere

@@ -273,6 +273,13 @@ func TestElBotonFlotanteNoTapaElCajon(t *testing.T) {
 	w.Resize(fyne.NewSize(360, 760))
 	a.Arrancar()
 	_ = w.Canvas().Capture()
+	// Cruzar el corte de 768 (la ventana nace ancha) repinta la pantalla por la cola de
+	// la interfaz: hasta que se vacía, el botón y la barra que se miran pueden ser los
+	// de un árbol que ya se ha sustituido (la prueba fallaba a ratos, 4 de cada 10).
+	for range 3 {
+		fyne.DoAndWait(func() {})
+		_ = w.Canvas().Capture()
+	}
 	var fab *ui.BotonFlotante
 	var barra *ui.BarraMovil
 	var mirar func(o fyne.CanvasObject)

@@ -491,6 +491,7 @@ export const ro: AppCatalog<typeof en> = {
   'compose.templates': 'Șabloane',
   'compose.templatesEmpty': 'Încă nu aveți șabloane. Creați-le în Setările Mail.',
   'compose.attachFailed': 'Atașamentul nu a putut fi citit',
+  'compose.openFailed': 'Editorul mesajului nu a putut fi deschis. Încercați din nou.',
   'compose.pastedImageDropped': 'Imaginea lipită nu a fost inclusă',
   'compose.pastedImagesDropped': 'Imaginile lipite nu au fost incluse',
   'compose.pastedImagesDroppedDescription': 'Pentru a trimite imagini, atașați-le ca fișiere.',

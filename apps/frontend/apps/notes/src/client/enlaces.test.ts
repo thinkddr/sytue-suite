@@ -3,6 +3,7 @@
  * calcula mal, el enlace lleva a otra nota, a ningún sitio o —peor— parece que
  * funciona en el editor y se rompe en el fichero exportado.
  */
+import './html-estatico.js';
 import { expect, test } from 'bun:test';
 import type { Note } from '@sytue/api-clients';
 import {

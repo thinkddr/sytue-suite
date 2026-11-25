@@ -46,6 +46,12 @@ var SinGuardarSinConexion = []string{
 // una función pura de sus campos; aquí solo se rellenan esos campos y se vuelve a
 // pintar. Es lo que hace que los guardianes de píxel no necesiten ni red ni servicio.
 type Pantalla struct {
+	// repintePendiente es el repintado ya pedido por las miniaturas que llegan: las que
+	// lleguen antes de que corra no piden otro (llegaMiniatura). Solo en la interfaz.
+	repintePendiente bool
+	// arm es el armazón montado en `raiz`: Repintar le cambia la vista y el menú.
+	arm *ui.Armazon
+
 	svc *api.Drive
 	// Cuenta is the separate account/control client when svc owns private data.
 	Cuenta  *api.Drive
@@ -308,6 +314,7 @@ func (p *Pantalla) Objeto() fyne.CanvasObject {
 	}
 	arm := ui.NuevoArmazon(vista)
 	arm.Menu = p.lateral.Objeto(v)
+	p.arm = arm
 	// «Subir» al alcance del pulgar: en el teléfono el botón de la cabecera queda arriba
 	// del todo. Por debajo de 768 lo coloca `CapaFlotante`; por encima, no se ve.
 	p.capaSubir = container.New(ui.CapaFlotante{},
@@ -415,13 +422,39 @@ func (p *Pantalla) Repintar() {
 		return
 	}
 	v := p.variante()
-	arm := ui.NuevoArmazon(p.vista(v))
-	arm.Menu = p.lateral.Objeto(v)
-	p.raiz.Objects[0] = arm
+	// El armazón es el mismo: se cambian su vista y su menú. Uno nuevo por repintado
+	// dejaba el viejo, con todo lo de dentro, retenido por Fyne un minuto.
+	var viejos []fyne.CanvasObject
+	if p.arm == nil || p.raiz.Objects[0] != p.arm {
+		viejos = append(viejos, p.raiz.Objects[0])
+		p.arm = ui.NuevoArmazon(nil)
+		p.raiz.Objects[0] = p.arm
+	}
+	// Lo que se descuelga se suelta en cuanto lo nuevo está colocado (ui.SoltarArboles).
+	// Las franjas de la vista del explorador van aparte: al rehacerla, su pila vieja se
+	// vacía (Explorador.Objeto) y por ella ya no se llegaría a lo de dentro.
+	viejos = append(viejos, p.arm.Contenido, p.arm.Menu)
+	if e := p.explor; e.vista != nil {
+		viejos = append(viejos, e.vista.Objects...)
+		if e.desplazable != nil {
+			// El desplazable se conserva; la rejilla de antes, que cuelga de él, no.
+			viejos = append(viejos, e.desplazable.Content)
+		}
+	}
+	p.arm.Contenido, p.arm.Menu = p.vista(v), p.lateral.Objeto(v)
 	p.capaSubir.Hidden = !p.conSubirFlotante()
+	p.arm.Refresh()
 	p.raiz.Refresh()
 	ui.RecolocarBarraSuite(p.raiz)
+	// Se conservan, además del árbol, el desplazador y la lista del explorador, que se
+	// reutilizan al volver a su sección.
+	e := p.explor
+	soltarArboles(viejos, p.raiz, e.desplazable, e.filasObj, e.listaFranja)
 }
+
+// soltarArboles es `ui.SoltarArboles`; el guardián de la memoria retenida lo cambia para
+// medir sin él.
+var soltarArboles = ui.SoltarArboles
 
 // Recargar vuelve a pedir lo de la sección en la que se está. Lo llama el `main`
 // cuando cambia la sesión: entrar en otra de las apps de la suite abre esta también.
@@ -1013,6 +1046,11 @@ func (p *Pantalla) marcar(id string) {
 		e.Seleccion[id] = !e.Seleccion[id]
 		p.ancla = i
 	}
+	// En su sitio, si lo que está en pantalla es el explorador: marcar no cambia nada
+	// más (ni el menú, ni las carpetas, ni lo que se ve de la rejilla).
+	if p.seccion == MiUnidad && p.arm != nil && p.arm.Contenido != nil && e.ActualizarSeleccion(p.variante()) {
+		return
+	}
 	p.Repintar()
 }
 
@@ -1469,12 +1507,26 @@ func (p *Pantalla) pedirMiniatura(el Elemento) {
 		}
 		enHilo(func() {
 			delete(p.pidiendo, el.ID)
-			p.explor.Miniaturas[el.ID] = img
-			if p.explor.Rejilla {
-				p.Repintar()
-			}
+			p.llegaMiniatura(el.ID, img)
 		})
 	}()
+}
+
+// llegaMiniatura apunta la miniatura que ha llegado y repinta la cuadrícula UNA vez por
+// todas las que lleguen en la misma vuelta de la rutina de la interfaz: una carpeta de
+// fotos repintaba la cuadrícula entera por cada una.
+func (p *Pantalla) llegaMiniatura(id string, img image.Image) {
+	p.explor.Miniaturas[id] = img
+	if !p.explor.Rejilla || p.repintePendiente {
+		return
+	}
+	p.repintePendiente = true
+	enHilo(func() {
+		p.repintePendiente = false
+		if p.explor.Rejilla {
+			p.Repintar()
+		}
+	})
 }
 
 // AvisarCifrado reports a private storage failure without exposing source details.

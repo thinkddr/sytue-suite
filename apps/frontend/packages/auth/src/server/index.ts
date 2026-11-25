@@ -64,7 +64,7 @@ export {
 } from './matrix-storage-authority.js';
 
 // Public maintained client core; shares the transport without requiring a data session.
-export { clientCoreProxy, roomsServiceBase } from '@sytue/api-clients';
+export { clientCoreHead, clientCoreProxy, roomsServiceBase } from '@sytue/api-clients';
 
 export { rutaMailPrivado, rutaCorteIdentidadMatrixPrivada } from './mail-private-storage.js';
 

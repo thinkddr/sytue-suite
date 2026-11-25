@@ -80,6 +80,9 @@ type PestanaNav struct {
 	// compartido. Manda sobre Icono.
 	Propio string
 	Activa bool
+	// SoloIcono pinta solo el icono, centrado en su relleno; el rótulo sigue siendo el
+	// nombre accesible. Es la pestaña inactiva del teléfono (ver Nav).
+	SoloIcono bool
 }
 
 var _ fyne.Widget = (*PestanaNav)(nil)
@@ -106,8 +109,12 @@ func (p *PestanaNav) pesoPestana() ui.Peso {
 	return ui.Normal
 }
 
-// MedidaPestanaNav es lo que ocupa: relleno, icono, hueco y rótulo.
+// MedidaPestanaNav es lo que ocupa: relleno, icono, hueco y rótulo (solo el relleno y el
+// icono si va SoloIcono).
 func MedidaPestanaNav(p *PestanaNav) fyne.Size {
+	if p.SoloIcono {
+		return fyne.NewSize(2*RellenoPestana+IconoNav, AltoPestanaNav)
+	}
 	ancho := 2*RellenoPestana + IconoNav + HuecoIconoNav +
 		ui.Medir(p.Rotulo, tema.TextoSM, p.pesoPestana()).Width
 	return fyne.NewSize(ancho, AltoPestanaNav)
@@ -170,6 +177,12 @@ func (r *pestanaNavRenderer) Layout(t fyne.Size) {
 	ui.MoverCaja(r.caja, fyne.NewPos(0, 0), t)
 	r.aro.Colocar(t)
 	r.aro.Ver(r.p.Enfocado())
+	if r.p.SoloIcono {
+		r.icono.Colocar((t.Width-IconoNav)/2, (t.Height-IconoNav)/2, IconoNav)
+		r.texto.Hide()
+		return
+	}
+	r.texto.Show()
 	r.icono.Colocar(RellenoPestana, (t.Height-IconoNav)/2, IconoNav)
 	ui.ColocarTexto(r.texto, tema.TextoSM,
 		RellenoPestana+IconoNav+HuecoIconoNav, (t.Height-tema.TextoSM.Linea)/2)
@@ -198,6 +211,10 @@ func Nav(v Vista, activa Seccion, alIr func(Seccion)) *fyne.Container {
 		if sec == SecRepetidas {
 			p.Propio = glifoRepetidas
 		}
+		// En el teléfono las seis con su rótulo miden unos 600 px: la fila deslizable
+		// cortaba «Compartid…» contra el borde y las dos últimas ni se veían. Ahí la
+		// activa lleva su rótulo y las demás solo su icono (el rótulo es su nombre).
+		p.SoloIcono = v.Ventana > 0 && v.Ventana < ui.CorteSM && sec != activa
 		hijos = append(hijos, p)
 	}
 	fila := container.New(ui.Fila{Hueco: HuecoNav}, hijos...)
@@ -205,8 +222,9 @@ func Nav(v Vista, activa Seccion, alIr func(Seccion)) *fyne.Container {
 		return fila
 	}
 	// En móvil, UNA fila que se desplaza de lado (`flex-nowrap overflow-x-auto`): con
-	// `flex-wrap` las cinco pestañas partían en dos filas y el cromo se comía un tercio
-	// de la pantalla antes de la primera foto.
+	// `flex-wrap` las pestañas partían en dos filas y el cromo se comía un tercio de la
+	// pantalla antes de la primera foto. Con los iconos ya caben a 390; la fila sigue
+	// deslizándose por si una traducción larga no cabe a 320.
 	return deslizable(fila)
 }
 

@@ -6,14 +6,13 @@
  * folio (insertar los campos, el modo «Rellenar formulario» y su interacción)
  * vive en ribbon/tabs/Insertar.tsx y canvas/PageCanvas.tsx; aquí solo la lógica
  * no trivial y testeable: construir el HTML del campo (FUENTE ÚNICA del markup,
- * con escape anti-XSS), validar/normalizar un valor y extraer {nombre→valor} de
- * un HTML con campos (para revisar/exportar respuestas). El VALOR vive en el
+ * con escape anti-XSS) y validar/normalizar un valor. Extraer {nombre→valor} de un
+ * HTML con campos va aparte (`formfields-respuestas.ts`, con parse5: se baja al
+ * abrir «Ver respuestas»). El VALOR vive en el
  * propio HTML del campo (texto = contenido; casilla = data-checked; desplegable =
  * data-value), así persiste con el autosave. Mismo patrón que mailmerge.ts.
  * Ejecutar el self-test: cd apps/frontend && bun test packages/office/test/formfields.test.ts
  */
-import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
-
 /** Los tres tipos de campo rellenable (elementos inline en el HTML del folio). */
 export type FormFieldType = 'text' | 'checkbox' | 'select';
 
@@ -109,54 +108,6 @@ export function coerceFieldValue(
     return options.includes(value) ? value : null;
   }
   return raw;
-}
-
-type HtmlNode = DefaultTreeAdapterMap['childNode'];
-const HIDDEN = new Set(['script', 'style', 'template', 'noscript', 'iframe', 'object', 'embed']);
-
-/** Texto plano, sin ejecutar HTML ni volver a interpretar entidades ya decodificadas. */
-function fieldText(nodes: HtmlNode[]): string {
-  const pending = [...nodes].reverse();
-  const parts: string[] = [];
-  while (pending.length) {
-    const node = pending.pop()!;
-    if ('value' in node) parts.push(node.value);
-    else if ('tagName' in node && !HIDDEN.has(node.tagName)) {
-      for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
-    }
-  }
-  return parts.join('').trim();
-}
-
-/**
- * Extrae {nombre, tipo, valor} de cada campo de un HTML, en orden de documento
- * (para revisar/exportar respuestas). El parser HTML funciona sin DOM también en
- * SSR: atributos y texto se leen de nodos, nunca eliminando etiquetas con regex.
- * Los valores devueltos son texto plano, no HTML saneado para insertar en el DOM.
- */
-export function extractFormAnswers(html: string): FormAnswer[] {
-  const out: FormAnswer[] = [];
-  const pending: HtmlNode[] = [...parseFragment(html).childNodes].reverse();
-  while (pending.length) {
-    const node = pending.pop()!;
-    if (!('tagName' in node) || HIDDEN.has(node.tagName)) continue;
-    for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
-    if (node.tagName !== 'span') continue;
-    const attrs = new Map(node.attrs.map(({ name, value }) => [name, value]));
-    const type = attrs.get('data-formfield')?.toLowerCase();
-    if (type !== 'text' && type !== 'checkbox' && type !== 'select') continue;
-    const name = attrs.get('data-name') ?? '';
-    let value: string;
-    if (type === 'checkbox') {
-      value = attrs.get('data-checked') === '1' ? 'Sí' : 'No';
-    } else if (type === 'select') {
-      value = attrs.get('data-value') ?? '';
-    } else {
-      value = fieldText(node.childNodes);
-    }
-    out.push({ name, type, value });
-  }
-  return out;
 }
 
 /** Respuestas → texto «Nombre: valor» por línea (para copiar/exportar). */

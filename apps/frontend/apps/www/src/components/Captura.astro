@@ -10,17 +10,33 @@
  * salta cuando aparece. `aspect-[16/10]` es la misma proporción con la que las
  * genera `test/e2e/capturas-producto.mjs` (1440×900), así que una imagen
  * recortada de otro tamaño se ve encajada y no deformada.
+ *
+ * `srcset` y `sizes`: la captura sale a 2x (2880 px, ~135 KB) y en el teléfono se
+ * pinta a ~362 px; Lighthouse medía −125 KiB en móvil por servir la grande a todos.
+ * `sizes` es el ancho real de la ficha (`max-w-4xl` con `px-6`: 848 px como mucho,
+ * el ancho de la ventana menos 3rem por debajo), y el navegador elige el ancho
+ * según su densidad. Los anchos salen al construir (Sharp, `astro:assets`).
  */
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
+
 interface Props {
-  src: string;
+  src: ImageMetadata;
   alt: string;
 }
 const { src, alt } = Astro.props;
+
+const sizes = '(min-width: 56rem) 848px, calc(100vw - 3rem)';
+// Hasta 848 px a 2x; nunca más ancho que el original.
+const anchos = [480, 720, 960, 1280, 1696].filter((ancho) => ancho <= src.width);
+const imagen = await getImage({ src, widths: anchos, sizes, format: 'webp' });
 ---
 
 <figure class="border-border bg-surface-sunken mt-10 overflow-hidden rounded-lg border shadow-[var(--shadow-sm)]">
   <img
-    src={src}
+    src={imagen.src}
+    srcset={imagen.srcSet.attribute}
+    sizes={sizes}
     alt={alt}
     width="1440"
     height="900"

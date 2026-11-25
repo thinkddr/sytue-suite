@@ -65,7 +65,7 @@ func TestLasDosTeclasSonLaKbdDeLaWeb(t *testing.T) {
 		fondo, tinta, borde string
 	}{
 		{"del papel", nil, TeclaSuperficie, "bg-subtle", "text-muted", "border"},
-		{"del cromo", nil, TeclaCromo, TokenCarril(), "on-chrome-muted", "chrome-border"},
+		{"del cromo", nil, TeclaCromo, FondoCarrilVivo, "on-chrome-muted", "chrome-border"},
 	} {
 		c.k = c.nueva("j")
 		if m := MedidaTecla(c.k); m != fyne.NewSize(lado, lado) {
@@ -155,5 +155,22 @@ func TestLaTablaPintaElObjetoDeLaCelda(t *testing.T) {
 	}
 	if fr.textos[1] != "Pagada" {
 		t.Errorf("sin objeto la celda tiene que volver a su texto, y tiene %q", fr.textos[1])
+	}
+}
+
+// TestLaTeclaDelCromoSigueALaForma: la tecla del cromo pinta el fondo del carril de la
+// forma EN VIGOR. Nacida en Marco pedía `frame-from` al pasar a Carril, que no lo tiene,
+// y repintarla entraba en pánico (el «Ctrl+G» del carril de Rooms, 2026-11-24).
+func TestLaTeclaDelCromoSigueALaForma(t *testing.T) {
+	t.Cleanup(tema.FormaDeLosGuardianes)
+	tema.ElegirForma("marco")
+	k := TeclaCromo("⌘K")
+	if relleno, _ := k.colores(tema.Claro); relleno != tema.Color("frame-from", tema.Claro) {
+		t.Errorf("en Marco la tecla pinta %v y el marco es %v", relleno, tema.Color("frame-from", tema.Claro))
+	}
+	tema.ElegirForma("carril")
+	relleno, _ := k.colores(tema.Claro)
+	if relleno != tema.Color("sidebar-bg", tema.Claro) {
+		t.Errorf("en Carril la misma tecla pinta %v y el carril es %v", relleno, tema.Color("sidebar-bg", tema.Claro))
 	}
 }

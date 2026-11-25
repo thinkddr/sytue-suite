@@ -72,6 +72,8 @@ export const it: Catalog = {
   'vault.emptyUnderstood': 'Ho capito che i dati cifrati con la chiave persa verranno eliminati',
   'vault.failed':
     'Impossibile aprire i dati cifrati. Riprova o accedi di nuovo a Sytue ID. Se la chiave è andata persa, puoi svuotare i dati cifrati di questa app.',
+  'vault.moreInfo': 'Maggiori informazioni',
+  'vault.attention': 'I tuoi dati cifrati richiedono attenzione',
   'matrix.incoming': 'Verifica questo dispositivo',
   'matrix.match': 'Corrispondono',
   'matrix.mismatch': 'Non corrispondono',

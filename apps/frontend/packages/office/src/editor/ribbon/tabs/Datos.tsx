@@ -33,12 +33,12 @@ import {
   readSheetState,
   readSheetValues,
   subscribeSheetState,
-} from '../../sheets/SheetCanvas';
+} from '../../sheets/mando';
 import type {
   ExternalTableState,
   GoalSeekProbeResult,
   SolverProbeResult,
-} from '../../sheets/SheetCanvas';
+} from '../../sheets/mando';
 import { ExternalDataModal } from '../../panels/ExternalDataModal';
 import { NameManagerMenu } from '../../sheets/NameManager';
 import { PivotModal, newPivotDraft } from '../../panels/PivotModal';

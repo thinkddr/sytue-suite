@@ -68,7 +68,7 @@ const standardStore: MatrixSessionStore = {
   delete: deleteOfflineValue,
 };
 async function loadStandardClient(): Promise<ClientFactory> {
-  const { createClient } = await import('matrix-js-sdk');
+  const { createClient } = await import('./sdk-client.js');
   return (options) => createClient({ ...options, disableVoip: true });
 }
 

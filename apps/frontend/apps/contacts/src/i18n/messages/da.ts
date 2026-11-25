@@ -48,6 +48,8 @@ export const da: AppCatalog<typeof en> = {
   'list.unstar': 'Fjern {name} fra kontakter med stjerne',
   'list.starredTitle': 'Med stjerne',
   'list.reviewDuplicates': 'Gennemgå dubletter ({count})',
+  'list.selectMode': 'Vælg',
+  'list.moreActions': 'Flere handlinger',
   'list.count': { one: '{count} kontakt', other: '{count} kontakter' },
   'list.countFiltered': {
     one: '{shown} af {count} kontakt',

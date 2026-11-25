@@ -5,7 +5,7 @@
  */
 import { APP_VIEWPORT, returnToCanonico } from '@sytue/config';
 import { Shell } from '../components/Shell';
-import { serverEnv } from '@sytue/auth/server';
+import { clientCoreHead, roomsServiceBase, serverEnv } from '@sytue/auth/server';
 import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
 import { htmlLangAttrs } from '@sytue/i18n';
 import { bff, toBffContext, hubBaseUrl } from '../lib/auth';
@@ -43,6 +43,9 @@ const hub = hubBaseUrl();
 // producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
 // porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
 const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+// Drive entero espera a la bóveda (ADR 0086): el núcleo empieza a bajar con el HTML,
+// con sus resúmenes en la página y la precarga de `wasm_exec.js` y `core.wasm`.
+const cabeceraNucleo = await clientCoreHead(roomsServiceBase(serverEnv(import.meta.env)), prefijo);
 ---
 
 <!doctype html>
@@ -92,6 +95,7 @@ const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BA
       )}
     ></script>
     <script is:inline set:html={themeInitScript}></script>
+    <Fragment set:html={cabeceraNucleo} />
   </head>
   <body class="bg-bg text-text h-full antialiased">
     <Shell client:load user={user} hubBaseUrl={hub} locale={locale}>

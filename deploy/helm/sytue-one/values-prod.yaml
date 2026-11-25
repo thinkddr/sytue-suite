@@ -465,6 +465,11 @@ rooms:
     # El MISMO dominio que mail.config.channelMailDomain: Mail recibe y publica, y
     # Rooms solo lo ensena con el secreto de cada webhook entrante.
     channelMailDomain: rooms.sytue.eu
+    # Entrega 5 del ADR 0087: Matrix retirada del correo. Decisión del dueño del
+    # 2026-11-24: encendida ya. Quien siga con el correo en Matrix deja de recibir
+    # correo nuevo hasta «Vaciar y pasar a la bóveda», y el cifrado para Matrix se
+    # queda en la cola sin poderse leer (no se borra). Calendario no cambia.
+    correoSinMatrix: activado
 # Sytue Bases, APAGADA en este entorno (decisión pendiente del dueño, 2026-10-04). El
 # defecto del chart es encendida, pero aquí los guiones de deploy/production todavía no
 # crean sus secretos (`sytue-bases`, `bases-oidc-client-secret`) ni existen el DNS

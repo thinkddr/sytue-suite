@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "blob": "ef318a959c9e2e8d4457b3e4f42ae483a04eb474"
+    },
+    {
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "blob": "3b572a1526186c12b5f53e3b9645a6e96ec222b6"
+    },
+    {
+      "path": "apps/nucleo/pdf/pdftype3.go",
+      "blob": "7fdf0e4ec5daa2e1763aaf8239725c426ec7be6c"
+    },
+    {
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "blob": "6e6ea42c669a6277dd45f1ab02e3a1b0c6953fe9"
+    },
+    {
+      "path": "apps/nucleo/office/model/proteccion_diapos.go",
+      "blob": "0685ec28b6426f6b70b89d59bd39ede652923a11"
+    },
+    {
+      "path": "apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx",
+      "blob": "7a201a17fa27161e55f5696849d1b55835a158d0"
+    },
+    {
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "blob": "1f75ba3ac8b17d3ceb89f329053c308b434206e8"
+    },
+    {
+      "path": "services/id/internal/http/e2e/passkey.js",
+      "blob": "6ef5075d5043a53b6b1357fc2dbb3efcb4aca34c"
+    },
+    {
+      "path": "services/id/internal/http/e2e/relay.js",
+      "blob": "ba2893a1a640716eda608e56168187083f5529d4"
+    }
+  ],
+  "reviews": [
+    {
+      "number": 446,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 447,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 448,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 449,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 450,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdffont.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 451,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 452,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 453,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftext.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 454,
+      "rule": "go/incorrect-integer-conversion",
+      "path": "apps/nucleo/pdf/pdftype3.go",
+      "comment": "False positive: the flagged operands are bytes of pdfString ([]byte) widened to uint16/int32/uint32; lossless by type. Parsed numbers that are narrowed are bound-checked (FirstChar<=255, CID<=maxCID).",
+      "evidence": "CodeQL reaches these sites through the pdfObj interface from ParseInt in the lexer; Go's types rule that path out. TestAnchosSimplesNoTruncanPrimerCodigo and TestMetricasCIDNoTruncanCodigos cover the narrowed values."
+    },
+    {
+      "number": 430,
+      "rule": "go/weak-cryptographic-algorithm",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: RC4 is only used to READ legacy PDFs (revisions 2-4) as the PDF spec requires. The only writer, cifradorPDF, always emits AES-256 (V5/R6, AESV3).",
+      "evidence": "rc4Aplicar is reached only from password checks for R2-R4 and from criptoPDF.aplicar on decryption; TestProtegerPDFSoloEscribeAES256 fails if writing ever stops using AES-256."
+    },
+    {
+      "number": 443,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/office/model/proteccion_diapos.go",
+      "comment": "False positive: this SHA-256 is a change-detection fingerprint of the locked slide content; huellaProtect strips password/hasPassword before hashing. Passwords use the OOXML KDF.",
+      "evidence": "Passwords are derived by HashClave/derivarClaveOOXML (random 16-byte salt, 100000 SHA-512 rounds); TestHuellaProtectNoDependeDeLaContrasena fixes that the fingerprint ignores the password."
+    },
+    {
+      "number": 437,
+      "rule": "js/xss",
+      "path": "apps/frontend/packages/office/src/editor/slides/SlidesCanvas.tsx",
+      "comment": "False positive: the HTML is parsed with DOMParser into an inert document (no scripting or browsing context), only body.textContent is read, and it is inserted as plain text.",
+      "evidence": "new DOMParser().parseFromString(b.html, 'text/html') never runs scripts or handlers or loads resources; the text is inserted with execCommand('insertText'), so nothing reaches a live DOM sink."
+    },
+    {
+      "number": 477,
+      "rule": "js/file-access-to-http",
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "comment": "False positive: an artificial-only e2e sends fixture ciphertext to a fixed local Synapse (127.0.0.1:18585). Room, token and Megolm body are validated and size-bound; the origin is asserted before the request.",
+      "evidence": "The fixture is produced by the native test run itself (fixture.artificial is asserted); the PUT is the test's purpose: proving the server rejects pre-encrypted cache without local witnesses."
+    },
+    {
+      "number": 478,
+      "rule": "js/file-access-to-http",
+      "path": "test/e2e/matrix-storage-recovery.mjs",
+      "comment": "False positive: an artificial-only e2e sends fixture ciphertext to a fixed local Synapse (127.0.0.1:18585). Room, token and Megolm body are validated and size-bound; the origin is asserted before the request.",
+      "evidence": "The fixture is produced by the native test run itself (fixture.artificial is asserted); the PUT is the test's purpose: proving the server rejects pre-encrypted cache without local witnesses."
+    },
+    {
+      "number": 476,
+      "rule": "js/xss-through-dom",
+      "path": "services/id/internal/http/e2e/relay.js",
+      "comment": "False positive: the way back comes from a server-validated JSON block and goes through navigableReturn (comun.js), which rebuilds it with a constant scheme or this page's origin before the path; javascript: and data: are dropped.",
+      "evidence": "sytue-id-pages.test.ts: 'navigableReturn rebuilds the way back with a scheme of its own' and the relay/passkey page tests run every hostile destination and assert no navigation to it."
+    },
+    {
+      "number": 484,
+      "rule": "js/xss-through-dom",
+      "path": "services/id/internal/http/e2e/passkey.js",
+      "comment": "False positive: the way back comes from a server-validated JSON block and goes through navigableReturn (comun.js), which rebuilds it with a constant scheme or this page's origin before the path; javascript: and data: are dropped.",
+      "evidence": "sytue-id-pages.test.ts: 'navigableReturn rebuilds the way back with a scheme of its own' and the relay/passkey page tests run every hostile destination and assert no navigation to it."
+    },
+    {
+      "number": 486,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: MD5 over the padded password is ISO 32000 algorithm 2 (7.6.4.3), the key the PDF format fixes for revisions 2-4. It opens a PDF on the device; nothing is stored, and another hash could not read the file.",
+      "evidence": "pdfcrypt_test.go opens PDFs protected by the user and owner password (TestProtegerYAbrirConContrasenaDeUsuario, TestAbrirConContrasenaDeDuenoLevantaLosPermisos, TestContrasenaIncorrectaNoAbre)."
+    },
+    {
+      "number": 487,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: MD5 over the owner password is ISO 32000 algorithm 7 reversed (7.6.4.3), fixed by the PDF format for revisions 2-4 to recover the user password. Nothing is stored; another hash could not open the file.",
+      "evidence": "pdfcrypt_test.go opens PDFs protected by the user and owner password (TestProtegerYAbrirConContrasenaDeUsuario, TestAbrirConContrasenaDeDuenoLevantaLosPermisos, TestContrasenaIncorrectaNoAbre)."
+    },
+    {
+      "number": 485,
+      "rule": "go/weak-sensitive-data-hashing",
+      "path": "apps/nucleo/pdf/pdfcrypt.go",
+      "comment": "False positive: SHA-256 here is ISO 32000-2 algorithm 2.B (revision 5/6: chained SHA-256/384/512 rounds), the hash the PDF format fixes. It checks the password of a PDF on the device; nothing is stored.",
+      "evidence": "pdfcrypt_test.go opens PDFs protected by the user and owner password (TestProtegerYAbrirConContrasenaDeUsuario, TestAbrirConContrasenaDeDuenoLevantaLosPermisos, TestContrasenaIncorrectaNoAbre)."
+    }
+  ]
+}

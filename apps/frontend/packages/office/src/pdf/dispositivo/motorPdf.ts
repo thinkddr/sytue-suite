@@ -33,6 +33,10 @@ export interface EdicionLocal {
   despues?: number | undefined;
   ahorro?: number | undefined;
   importados?: number | undefined;
+  /** Propiedades: el documento lleva XMP y el cambio puede no verse en otro lector. */
+  xmp?: boolean | undefined;
+  /** Buscar y reemplazar: cuántos fragmentos cambiaron. */
+  reemplazos?: number | undefined;
 }
 
 /** El motor, tal y como lo usa el estudio de la bóveda. Sustituible en pruebas. */
@@ -42,14 +46,38 @@ export interface MotorPdf {
   /** Dibuja un lote de páginas («1-4») en SVG: número de página → SVG. */
   render: (doc: string, paginas: string, escala: number) => Promise<Record<number, string>>;
   anotar: (doc: string, campos: Record<string, string>, autor: string) => Promise<EdicionLocal>;
+  /** `datos` es el XFDF de `importar-datos`. */
   formulario: (
     doc: string,
     campos: Record<string, string>,
     nombre: string,
+    datos?: Uint8Array,
   ) => Promise<EdicionLocal>;
-  /** `combinar` (varios, en su orden), `extraer` (o reordenar), `borrar`, `rotar`. */
+  /**
+   * `combinar` (varios, en su orden), `extraer` (o reordenar), `borrar`, `rotar` y las
+   * capas de un documento (`marca-agua`, `fondo`, `numerar`, `bates`, `encabezado`, `pie`).
+   */
   paginas: (docs: string[], campos: Record<string, string>) => Promise<EdicionLocal>;
   herramienta: (doc: string, campos: Record<string, string>) => Promise<EdicionLocal>;
+  /** `proteger` (AES-256), `desproteger`, `metadatos`, `sanear` y `redactar`. */
+  proteger: (doc: string, campos: Record<string, string>) => Promise<EdicionLocal>;
+  /**
+   * `analizar` y buscar sin aplicar (JSON); `texto`, `buscar-reemplazar` con
+   * `aplicar=1`, `imagen` (con `imagen`, o sin ella para quitarla), `capas`, `indice`.
+   */
+  editar: (
+    doc: string,
+    campos: Record<string, string>,
+    imagen?: Uint8Array,
+  ) => Promise<EdicionLocal>;
+  /** Compara dos documentos abiertos: el JSON de `/pdf/compare`. */
+  comparar: (a: string, b: string, campos: Record<string, string>) => Promise<unknown>;
+  /** El texto de cada página con su posición (`/pdf/text`). */
+  texto: (doc: string) => Promise<unknown>;
+  /** El informe de las firmas, sin anclas de confianza (`anclas: false`). */
+  verificar: (doc: string) => Promise<unknown>;
+  /** Un fichero incrustado, en bytes opacos. */
+  adjunto: (doc: string, nombre: string) => Promise<Uint8Array<ArrayBuffer>>;
   cerrar: (doc: string) => Promise<void>;
   /** Para el worker y borra la memoria del motor. */
   apagar: () => void;
@@ -90,7 +118,16 @@ function edicion(r: Respuesta): EdicionLocal {
     despues: numero(r.despues),
     ahorro: numero(r.ahorro),
     importados: numero(r.importados),
+    xmp: r.xmp === true ? true : undefined,
+    reemplazos: numero(r.reemplazos),
   };
+}
+
+/** El cuerpo JSON de una lectura (`comparar`, `texto`, `verificar`). */
+function json(r: Respuesta): unknown {
+  comprobar(r);
+  if (!(r.body instanceof Uint8Array)) throw fallo('pdf_failed');
+  return JSON.parse(new TextDecoder().decode(r.body)) as unknown;
 }
 
 /** El motor sobre un ejecutor del módulo `pdf` (el worker de `PqcRuntime`). */
@@ -125,12 +162,38 @@ export function motorSobre(ejecutor: EjecutorModulo): MotorPdf {
     },
     anotar: async (doc, campos, autor) =>
       edicion(await llamar('pdf.anotar', { doc, autor, campos: codificar(campos) })),
-    formulario: async (doc, campos, nombre) =>
-      edicion(await llamar('pdf.formulario', { doc, nombre, campos: codificar(campos) })),
+    formulario: async (doc, campos, nombre, datos) =>
+      edicion(
+        await llamar('pdf.formulario', {
+          doc,
+          nombre,
+          campos: codificar(campos),
+          ...(datos ? { datos: datos.slice() } : {}),
+        }),
+      ),
     paginas: async (docs, campos) =>
       edicion(await llamar('pdf.paginas', { docs, campos: codificar(campos) })),
     herramienta: async (doc, campos) =>
       edicion(await llamar('pdf.herramienta', { doc, campos: codificar(campos) })),
+    proteger: async (doc, campos) =>
+      edicion(await llamar('pdf.proteger', { doc, campos: codificar(campos) })),
+    editar: async (doc, campos, imagen) =>
+      edicion(
+        await llamar('pdf.editar', {
+          doc,
+          campos: codificar(campos),
+          ...(imagen ? { imagen: imagen.slice() } : {}),
+        }),
+      ),
+    comparar: async (a, b, campos) =>
+      json(await llamar('pdf.comparar', { docs: [a, b], campos: codificar(campos) })),
+    texto: async (doc) => json(await llamar('pdf.texto', { doc })),
+    verificar: async (doc) => json(await llamar('pdf.verificar', { doc })),
+    async adjunto(doc, nombre) {
+      const r = comprobar(await llamar('pdf.adjunto', { doc, nombre }));
+      if (!(r.body instanceof Uint8Array)) throw fallo('pdf_failed');
+      return new Uint8Array(r.body);
+    },
     async cerrar(doc) {
       await llamar('pdf.cerrar', { doc }).catch(() => undefined);
     },

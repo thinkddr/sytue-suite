@@ -74,6 +74,9 @@ var reservados = map[string]struct{}{
 	"oembed": {}, "studio": {}, "upload": {}, "watch": {},
 	// La consola: peticiones de firma que llegan de otra organización (ADR 0059).
 	"firmas-de-fuera": {},
+	// La consola: el registro de solicitudes RGPD de la organización (ADR 0054,
+	// enmienda del 2026-11-25).
+	"privacidad": {},
 	// Sytue Web: el asistente de alta y la ficha de un sitio (`edit` y `settings` ya
 	// están arriba).
 	"new": {}, "site": {},

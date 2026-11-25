@@ -30,8 +30,7 @@
  * seguiría al documento: tampoco lo hace el del servidor, que solo se reescribe al
  * guardar. El ancla se crea en el primer «Guardar en Drive», que es explícito.
  */
-import { DriveClient, type DocKind } from '@sytue/api-clients';
-import type { MatrixStorageScope } from '@sytue/config/matrix';
+import type { DocKind } from '@sytue/api-clients';
 import { PrivateDriveError, type PrivateDriveRepository } from '@sytue/offline/matrix';
 import type { PqVault, PqVaultOpenOptions } from '@sytue/offline/vault';
 import {
@@ -43,13 +42,14 @@ import {
   type ConsumerPrivateDrive,
   type PrivateDriveSource,
 } from '@sytue/offline/vault/drive';
-import { withBase } from '@sytue/ui';
 import type { ExportFormat } from '../types';
 import { exportFilename } from '../exportName';
 import { anclaDeBoveda, leerAncla, sePuedeAnclarEnBoveda } from './anclaDrive';
+import { baseDelBff, fuenteDelNavegador } from './driveEnBoveda';
 
-/** El prefijo de las rutas del BFF de la ofimática para la bóveda de Drive. */
-export const RUTA_DRIVE_CIFRADO = '/api/drive-cifrado';
+// La pregunta de si el Drive está en la bóveda va aparte, sin el Drive de la bóveda: el
+// editor la hace al abrir y este módulo lo baja solo al guardar (`useDocument`).
+export { driveEnBoveda, RUTA_DRIVE_CIFRADO } from './driveEnBoveda';
 /** La carpeta de los documentos: la misma que en el Drive del servidor. */
 export const CARPETA_DOCUMENTOS = 'Sytue Docs';
 
@@ -236,32 +236,6 @@ export async function guardarDocumentoEnBoveda(options: {
 }
 
 /* --- Lo del navegador: el BFF de la ofimática y la apertura de la bóveda --- */
-
-const baseDelBff = (): string => withBase(import.meta.env.BASE_URL ?? '/', RUTA_DRIVE_CIFRADO);
-
-function fuenteDelNavegador(): PrivateDriveSource {
-  return new DriveClient({ baseUrl: window.location.origin + baseDelBff() });
-}
-
-/**
- * ¿El Drive del servidor de esta persona ya no admite escrituras (está, o está
- * pasando, a la bóveda)? Solo lee el estado de la fuente, sin claves. Ante la duda
- * (sin organización, error de red) contesta que no: el editor sigue como siempre.
- */
-export async function driveEnBoveda(
-  actor: string,
-  tenant: string | undefined,
-  fuente: () => Pick<PrivateDriveSource, 'privateStorageState'> = fuenteDelNavegador,
-  signal?: AbortSignal,
-): Promise<boolean> {
-  if (!tenant || !actor) return false;
-  const scope: MatrixStorageScope = { tenant, subject: actor, product: 'drive' };
-  try {
-    return (await fuente().privateStorageState(scope, signal)).mode !== 'legacy';
-  } catch {
-    return false;
-  }
-}
 
 /** Abre el Drive de la bóveda (solo si existe y tiene el recibo de la migración). */
 export async function abrirDriveCifrado(options: {

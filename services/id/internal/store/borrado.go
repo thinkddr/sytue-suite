@@ -164,12 +164,16 @@ func (s *Store) BorrarCuentaPropia(ctx context.Context, q pg.Querier, userID str
 	return true, nil
 }
 
-// CuentaPropiaPendiente es una baja propia a la que le falta algún paso.
+// CuentaPropiaPendiente es una baja propia —o una supresión RGPD pedida a la
+// organización (mig 0130)— a la que le falta algún paso.
 type CuentaPropiaPendiente struct {
 	ID       string
 	ClosedAt time.Time
 	// DatosBorrados dice si ya se borró lo que guardan los otros servicios.
 	DatosBorrados bool
+	// Supresion es el id de la solicitud RGPD que ordenó la supresión física:
+	// no espera la ventana de 30 días. Vacío en una baja propia.
+	Supresion string
 }
 
 // CuentasPropiasPendientes lista las bajas propias sin terminar: las que aún
@@ -182,12 +186,17 @@ type CuentaPropiaPendiente struct {
 //
 // En orden ALEATORIO y no por antigüedad: con un lote fijo, unas pocas cuentas
 // cuyo borrado falla siempre se quedarían las primeras y taparían a las demás.
+//
+// Una supresión RGPD (erasure_request_id) entra en cuanto pasa `borrarDesde`:
+// la organización ya decidió y no hay ventana de recuperación.
 func (s *Store) CuentasPropiasPendientes(ctx context.Context, borrarDesde, antes time.Time, limite int) ([]CuentaPropiaPendiente, error) {
 	rows, err := s.DB().Query(ctx, `
-		SELECT id, closed_at, personal_data_erased_at IS NOT NULL
+		SELECT id, closed_at, personal_data_erased_at IS NOT NULL, coalesce(erasure_request_id::text, '')
 		FROM users
-		WHERE status = 'deleted' AND closed_by = id AND purged_at IS NULL
-		  AND ((personal_data_erased_at IS NULL AND closed_at < $1) OR closed_at < $2)
+		WHERE status = 'deleted' AND purged_at IS NULL
+		  AND ((closed_by = id
+		        AND ((personal_data_erased_at IS NULL AND closed_at < $1) OR closed_at < $2))
+		    OR (erasure_request_id IS NOT NULL AND closed_at < $1))
 		ORDER BY random() LIMIT $3`, borrarDesde, antes, limite)
 	if err != nil {
 		return nil, errf("CuentasPropiasPendientes", err)
@@ -196,7 +205,7 @@ func (s *Store) CuentasPropiasPendientes(ctx context.Context, borrarDesde, antes
 	var out []CuentaPropiaPendiente
 	for rows.Next() {
 		var c CuentaPropiaPendiente
-		if err := rows.Scan(&c.ID, &c.ClosedAt, &c.DatosBorrados); err != nil {
+		if err := rows.Scan(&c.ID, &c.ClosedAt, &c.DatosBorrados, &c.Supresion); err != nil {
 			return nil, errf("CuentasPropiasPendientes.scan", err)
 		}
 		out = append(out, c)
@@ -208,15 +217,16 @@ func (s *Store) CuentasPropiasPendientes(ctx context.Context, borrarDesde, antes
 // guardan nada personal de esta cuenta.
 func (s *Store) MarcarDatosPersonalesBorrados(ctx context.Context, userID string) error {
 	_, err := s.DB().Exec(ctx, `UPDATE users SET personal_data_erased_at = now()
-		WHERE id = $1 AND status = 'deleted' AND closed_by = id`, userID)
+		WHERE id = $1 AND status = 'deleted' AND (closed_by = id OR erasure_request_id IS NOT NULL)`, userID)
 	return errf("MarcarDatosPersonalesBorrados", err)
 }
 
-// PurgarCuentaPropia anonimiza una baja propia cuya ventana venció (`antes`) y le
-// quita las membresías. Devuelve nil si no había nada que purgar —otra réplica
-// llegó antes, se restauró o la ventana aún no ha vencido— y, si purgó, los
-// slugs de sus cuentas personales (vacío, no nil, si no tenía ninguna): su
-// contenido es lo que queda por borrar a mano.
+// PurgarCuentaPropia anonimiza una baja propia cuya ventana venció (`antes`) —o
+// una supresión RGPD, que no espera ventana (mig 0130)— y le quita las
+// membresías. Devuelve nil si no había nada que purgar —otra réplica
+// llegó antes, se restauró o la ventana aún no ha vencido— y, si purgó, los ids
+// de sus cuentas personales (vacío, no nil, si no tenía ninguna), cuyo contenido
+// queda en la cola de purga de organizaciones (mig 0129).
 //
 // No es un DELETE de la fila, por dos razones. Las filas que la referencian sin
 // cascada (auditoría de plataforma, fusiones) harían fallar el borrado; y su
@@ -226,8 +236,9 @@ func (s *Store) MarcarDatosPersonalesBorrados(ctx context.Context, userID string
 //
 // La cuenta personal pierde su nombre, que es el correo de su titular, y se queda
 // con su id. Su slug sigue siendo un resumen del correo (domain.PersonalSlug): es
-// la clave de tenant en las diez bases y desaparece con el borrado manual de su
-// contenido, que borra también la organización.
+// la clave de tenant en las bases de los servicios, y con él las vacía la purga
+// de organizaciones (http.BarrerPurgasDeTenant). La fila de la organización se
+// queda, como la de la cuenta: la referencian tablas sin cascada.
 func (s *Store) PurgarCuentaPropia(ctx context.Context, userID string, antes time.Time) ([]string, error) {
 	var personales []string
 	err := s.InTx(ctx, func(q pg.Querier) error {
@@ -238,8 +249,8 @@ func (s *Store) PurgarCuentaPropia(ctx context.Context, userID string, antes tim
 			    phone = NULL, recovery_email = NULL, external_id = NULL,
 			    department = NULL, title = NULL, location = NULL,
 			    password_hash = NULL, mfa_enabled = false, purged_at = now()
-			WHERE id = $1 AND status = 'deleted' AND closed_by = id AND purged_at IS NULL
-			  AND personal_data_erased_at IS NOT NULL AND closed_at < $2`, userID, antes)
+			WHERE id = $1 AND status = 'deleted' AND purged_at IS NULL AND personal_data_erased_at IS NOT NULL
+			  AND ((closed_by = id AND closed_at < $2) OR erasure_request_id IS NOT NULL)`, userID, antes)
 		if err != nil {
 			return errf("PurgarCuentaPropia", err)
 		}
@@ -266,11 +277,23 @@ func (s *Store) PurgarCuentaPropia(ctx context.Context, userID string, antes tim
 		if err := rows.Err(); err != nil {
 			return errf("PurgarCuentaPropia.personal.rows", err)
 		}
+		// Su contenido —correo, archivos, fotos— entra en la cola de purga en la
+		// misma transacción (mig 0129): si la anonimización se confirma, el
+		// borrado ya está pedido, y si no, tampoco queda pedido.
+		for _, org := range personales {
+			if err := s.EncolarPurgaDeTenant(ctx, q, org, PurgaCuentaBorrada); err != nil {
+				return err
+			}
+		}
 		for _, sql := range append(credencialesSQL,
 			`DELETE FROM group_members WHERE user_id = $1`,
 			`DELETE FROM user_custom_roles WHERE user_id = $1`,
 			`DELETE FROM role_eligibilities WHERE user_id = $1`,
 			`DELETE FROM onboarding_progress WHERE user_id = $1`,
+			// La reserva de su @usuario anterior y un cambio de móvil a medias: la
+			// purga suelta el @usuario para que otra persona pueda elegirlo.
+			`DELETE FROM usernames_retirados WHERE user_id = $1`,
+			`DELETE FROM phone_change_codes WHERE user_id = $1`,
 			`DELETE FROM memberships WHERE user_id = $1`,
 		) {
 			if _, err := q.Exec(ctx, sql, userID); err != nil {

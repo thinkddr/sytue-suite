@@ -7,7 +7,7 @@
 import { APP_VIEWPORT, appDomains, returnToCanonico } from '@sytue/config';
 import { serverEnv } from '@sytue/auth/server';
 import '../styles/app.css';
-import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
+import { SUFIJO_ICONOS, withBase } from '@sytue/ui';
 import { bff, toBffContext } from '../lib/bff.js';
 import { htmlLangAttrs } from '@sytue/i18n';
 
@@ -75,15 +75,10 @@ if (!(await bff.getSession(toBffContext(Astro)))) {
       rel="apple-touch-icon"
       href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
     />
-    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada app
-         se sirve bajo su prefijo y la raíz del host es un 404. -->
-    <script
-      is:inline
-      set:html={basePathScript(
-        serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL,
-      )}
-    ></script>
-    <script is:inline set:html={themeInitScript}></script>
+    <!-- Prefijo de /api y /auth, y tema guardado: un fichero de este origen
+         (/arranque.js, sytueArranque) y no scripts en línea, para que la CSP de
+         scripts no necesite 'unsafe-inline'. Síncrono: tiene que ir antes que las islas. -->
+    <script is:inline src={withBase(prefijo, '/arranque.js')}></script>
   </head>
   <body class="bg-bg text-text h-full antialiased">
     <slot name="app" />

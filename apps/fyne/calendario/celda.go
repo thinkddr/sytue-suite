@@ -38,7 +38,8 @@ type celdaMes struct {
 	ocultas  int
 	// reserva es el alto del carril de barras de su semana (`barsAreaH`).
 	reserva float32
-	// dosLineas: su única píldora sigue en una segunda línea (`dosLineas` de la web).
+	// dosLineas: sus píldoras siguen en una segunda línea, si caben todas así
+	// (`dosLineas` de la web).
 	dosLineas bool
 	// destino: aquí caería el evento que se está arrastrando (`arrastremes.go`).
 	destino bool
@@ -206,9 +207,14 @@ func (r *celdaRenderer) Layout(t fyne.Size) {
 	}
 	if r.mas != nil {
 		// `px-1.5 text-xs font-medium`, recortado con puntos suspensivos si no cabe: el
-		// botón mide su texto, nunca más que el ancho útil.
+		// botón mide su texto, nunca más que el ancho útil. Mide 24 (WCAG 2.5.8) sin
+		// quitarle sitio a nada: va pegado a la última píldora, sin su `gap-0.5`, y baja
+		// al relleno de la celda; lo reservado sigue siendo el hueco y una línea (18).
+		if len(r.pildoras) > 0 {
+			y -= espacio0p5
+		}
 		r.mas.Move(fyne.NewPos(x, y))
-		r.mas.Resize(fyne.NewSize(min(r.mas.MinSize().Width, ancho), tema.TextoXS.Linea))
+		r.mas.Resize(fyne.NewSize(min(r.mas.MinSize().Width, ancho), AltoMasDia))
 	}
 }
 

@@ -233,6 +233,36 @@ export const lt: AppCatalog<typeof en> = {
   'recovery.invalid': 'Šio adreso naudoti negalima: jis turi būti tinkamas ir ne Sytue.',
   'recovery.wrong_password': 'Slaptažodis neteisingas.',
   'recovery.failed': 'Nepavyko išsaugoti. Po akimirkos bandykite dar kartą.',
+  'recovery.password.hint':
+    'Bet kokiam pakeitimui šioje kortelėje reikia jūsų dabartinio slaptažodžio.',
+  'recovery.username.new': 'Naujas naudotojo vardas',
+  'recovery.username.hint':
+    'Paliktas vardas 30 dienų lieka rezervuotas jums, o keisti jį galima kartą per 30 dienų.',
+  'recovery.username.change': 'Keisti naudotojo vardą',
+  'recovery.username.changed': 'Naudotojo vardas pakeistas.',
+  'recovery.username.invalid':
+    'Šis naudotojo vardas netinka: naudokite nuo 3 iki 64 raidžių, skaitmenų, taškų ar brūkšnelių.',
+  'recovery.username.taken': 'Šis naudotojo vardas neprieinamas.',
+  'recovery.username.recent': 'Naudotojo vardą pakeitėte mažiau nei prieš 30 dienų.',
+  'recovery.username.is_address':
+    'Asmeninėje paskyroje naudotojo vardas yra jūsų Sytue adresas, todėl čia jo pakeisti negalima.',
+  'recovery.phone.none':
+    'Mobiliojo numerio dar neturite: pridėkite jį, kad galėtumėte prisijungti ir juo.',
+  'recovery.phone.new': 'Naujas mobiliojo telefono numeris',
+  'recovery.phone.format': 'Su šalies kodu, pavyzdžiui, +370 600 00000.',
+  'recovery.phone.send': 'Siųsti kodą',
+  'recovery.phone.sent': 'Išsiuntėme kodą SMS žinute numeriu {phone}.',
+  'recovery.phone.code': 'Kodas',
+  'recovery.phone.confirm': 'Patvirtinti',
+  'recovery.phone.changed': 'Mobiliojo telefono numeris išsaugotas.',
+  'recovery.phone.invalid': 'Šis numeris netinka: parašykite jį su šalies kodu.',
+  'recovery.phone.same': 'Tai jau jūsų mobiliojo telefono numeris.',
+  'recovery.phone.wait': 'Palaukite minutę prieš prašydami kito kodo.',
+  'recovery.phone.limit': 'Paprašyta per daug kodų. Bandykite vėliau.',
+  'recovery.phone.code_wrong': 'Kodas neteisingas.',
+  'recovery.phone.code_expired': 'Kodo galiojimas baigėsi. Paprašykite naujo.',
+  'recovery.phone.has_account': 'Šis mobiliojo telefono numeris jau priklauso kitai paskyrai.',
+  'recovery.phone.unavailable': 'Šiuo metu SMS siųsti negalima. Bandykite vėliau.',
   'delete.title': 'Ištrinti mano paskyrą',
   'delete.hint':
     'Ištrinami jūsų prisijungimo duomenys ir viskas, kas priklauso tik jums; tai, kas priklauso jūsų organizacijai, joje lieka. 30 dienų paskyrą galima atkurti.',

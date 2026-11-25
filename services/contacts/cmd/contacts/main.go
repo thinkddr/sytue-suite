@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
@@ -122,7 +123,13 @@ func run() error {
 	}
 	davHandler := carddavsrv.Handler(st, davCache)
 
+	// La traza de acceso (docs/security.md §1.7): en lotes, sin bloquear la
+	// petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
 	router := contactshttp.NewRouter(contactshttp.Deps{
+		Traza:    traza,
 		Cfg:      cfg,
 		Store:    st,
 		Verifier: verifier,

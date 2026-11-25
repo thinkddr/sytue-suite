@@ -61,15 +61,20 @@ type widgetsSuite struct {
 	pub    *widgets.Publicador
 	avisos []string
 	prueba *widgets.OpcionesPublicador
-	// privada es la Fuente de Drive y de CertiPDF, que leen el repositorio privado que
-	// la app tenga abierto (WidgetDesdeDrivePrivado); comunes, los de su FuenteWidget.
+	// privada es la Fuente de los productos que leen el repositorio privado que la app
+	// tenga abierto (WidgetDesdeDrivePrivado, WidgetDesdeRegistrosPrivados); comunes, los
+	// de su FuenteWidget.
 	privada fuentes.Privada
 	comunes fuentes.Comunes
 }
 
-// esWidgetPrivado: los productos cuyos datos viven en el repositorio privado del
-// dispositivo (el Drive en la bóveda o en Matrix). Su fuente del servidor está congelada.
-func esWidgetPrivado(producto string) bool { return producto == "drive" || producto == "pdf" }
+// esWidgetPrivado: los productos cuyos datos viven, o pueden vivir, en el repositorio
+// privado del dispositivo: el Drive en la bóveda o en Matrix (Drive y CertiPDF) y las
+// apps de registros con la cuenta en Matrix. Con ellos ahí, su fuente del servidor está
+// congelada.
+func esWidgetPrivado(producto string) bool {
+	return producto == "drive" || producto == "pdf" || fuentes.DeRegistros(producto)
+}
 
 // PublicadorWidget crea el publicador del widget de esta app con su Fuente y lo
 // engancha a los disparadores comunes (ADR 0078, enmienda del 2026-11-06): entrar y
@@ -106,15 +111,19 @@ func (s *Suite) FuenteWidget(t *i18n.Translator) widgets.Fuente {
 	if !ok {
 		return nil
 	}
+	comunes := s.ComunesWidget(t)
 	if esWidgetPrivado(s.productoWidget()) {
-		// Drive y CertiPDF: lo que la app monte al abrir su repositorio privado y, sin él,
-		// lo mismo que la registrada (fuentes.ErrSinDatosPrivados: se conserva lo publicado).
+		// Lo que la app monte al abrir su repositorio privado y, sin él, la registrada: en
+		// Drive y CertiPDF falla con fuentes.ErrSinDatosPrivados (se conserva lo publicado);
+		// en una app de registros lee el servidor solo si la fuente de la cuenta sigue
+		// `legacy`.
 		s.widgets.mu.Lock()
-		s.widgets.comunes = s.ComunesWidget(t)
+		s.widgets.comunes = comunes
 		s.widgets.mu.Unlock()
+		s.widgets.privada.Respaldar(fabrica(comunes, s.URL, s.Sesion))
 		return s.widgets.privada.Fuente()
 	}
-	return fabrica(s.ComunesWidget(t), s.URL, s.Sesion)
+	return fabrica(comunes, s.URL, s.Sesion)
 }
 
 // WidgetDesdeDrivePrivado hace que el widget de Drive lea, mientras dure `vida`, el
@@ -133,6 +142,25 @@ func (s *Suite) WidgetDesdePDFPrivado(vida context.Context, archivos, firmas *ap
 	s.montarWidgetPrivado(vida, func(c fuentes.Comunes) widgets.Fuente { return fuentes.CertiPDF(c, archivos, firmas) })
 }
 
+// WidgetDesdeRegistrosPrivados es WidgetDesdeDrivePrivado de una app de registros
+// (Calendar, Contacts, Notes, Photos, Bases, ERP, Cast y la ofimática) con la cuenta en
+// Matrix: mientras dure `vida`, su widget lee `datos`, la fachada que la vista acaba de
+// montar sobre el repositorio privado (el *api.Calendars, *api.Notes… de WithPrivateData),
+// y lo que no es dato privado (la cuota de Cast) con `cuenta`, la sesión de esa cuenta.
+// Sin ello leía la fuente del servidor, congelada desde que la cuenta pasó a Matrix
+// (ADR 0078, enmienda del 2026-11-24). Una fachada que no es la de su producto no monta
+// nada.
+func (s *Suite) WidgetDesdeRegistrosPrivados(vida context.Context, cuenta api.Session, datos any) {
+	if s.app == nil {
+		return
+	}
+	producto := s.productoWidget()
+	s.montarWidgetPrivado(vida, func(c fuentes.Comunes) widgets.Fuente {
+		f, _ := fuentes.Privados(producto, c, datos, s.URL, cuenta)
+		return f
+	})
+}
+
 func (s *Suite) montarWidgetPrivado(vida context.Context, f func(fuentes.Comunes) widgets.Fuente) {
 	if vida == nil || vida.Err() != nil || s.app == nil || !esWidgetPrivado(s.productoWidget()) {
 		return
@@ -140,7 +168,11 @@ func (s *Suite) montarWidgetPrivado(vida context.Context, f func(fuentes.Comunes
 	s.widgets.mu.Lock()
 	comunes := s.widgets.comunes
 	s.widgets.mu.Unlock()
-	context.AfterFunc(vida, s.widgets.privada.Montar(f(comunes)))
+	fuente := f(comunes)
+	if fuente == nil {
+		return
+	}
+	context.AfterFunc(vida, s.widgets.privada.Montar(fuente))
 	s.AvisarWidget()
 }
 

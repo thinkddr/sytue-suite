@@ -2754,9 +2754,9 @@ export const lt: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Parašas netelpa tame puslapyje. Pasirinkite kitą puslapį ar vietą.',
   'pdf.device.view': 'Peržiūrėti',
   'pdf.vault.help':
-    'Šis PDF yra jūsų šifruotame Drive: jis iššifruojamas tik šiame įrenginyje, kur galite jį peržiūrėti, komentuoti, pildyti, tvarkyti ir pasirašyti. Tai, ką išsaugote, grįžta šifruota.',
+    'Šis PDF yra jūsų šifruotame Drive: jis iššifruojamas tik šiame įrenginyje, kur galite jį peržiūrėti, komentuoti, pildyti, tvarkyti, apsaugoti, užtušuoti, redaguoti, palyginti, spausdinti ir pasirašyti. Tai, ką išsaugote, grįžta šifruota.',
   'pdf.vault.serverOnly':
-    'Su šifruotu Drive dar negalima prašyti parašo, apsaugoti slaptažodžiu, atpažinti teksto, užtamsinti, redaguoti teksto ar paveikslėlių, dėti antspaudų ir vandenženklių, lyginti, žiūrėti versijų istorijos ir spausdinti: tam reikia, kad paslauga perskaitytų PDF, arba tai dar neatliekama įrenginyje.',
+    'Su šifruotu Drive negalimi parašo prašymai, teksto atpažinimas ir asistentas: jiems reikia, kad paslauga perskaitytų PDF. Visa kita atliekama šiame įrenginyje.',
   'pdf.vault.notFound.title': 'Šio PDF nėra jūsų užšifruotame Diske',
   'pdf.vault.notFound.description':
     'Galbūt jis buvo perkeltas arba ištrintas. Ieškokite jo Sytue Drive.',
@@ -2772,7 +2772,9 @@ export const lt: AppCatalog<typeof en> = {
     'Jūsų „Drive“ dar pereina prie šifravimo nuo galo iki galo. Užbaikite tai „Sytue Drive“.',
   'pdf.device.error.password': 'Šis slaptažodis neatidaro sertifikato.',
   'pdf.device.error.encrypted':
-    'Šis PDF apsaugotas slaptažodžiu, todėl jo negalima pasirašyti šiame įrenginyje.',
+    'Šis PDF apsaugotas slaptažodžiu: atidarykite jį ir pasirašykite jo studijoje, kur naudojamas jo slaptažodis.',
+  'pdf.device.protectedNote':
+    'Šis PDF apsaugotas slaptažodžiu. Kad jį būtų galima pasirašyti, šiame įrenginyje jis perrašomas be slaptažodžio, kaip daro ir serveris: pasirašyta kopija išsaugoma šifruota jūsų Drive, bet be PDF slaptažodžio.',
   'pdf.device.error.locked':
     'Šis PDF sertifikuotas nuo bet kokių pakeitimų: dar vienas parašas jį panaikintų.',
   'pdf.device.error.unreadable':

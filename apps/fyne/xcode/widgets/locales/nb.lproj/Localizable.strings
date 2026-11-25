@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nytt notat";
 "widgets.newContact" = "Ny kontakt";
 "widgets.addPhotos" = "Legg til bilder";
+"widgets.newDocument" = "Nytt dokument";
+"widgets.newSpreadsheet" = "Nytt regneark";
+"widgets.newPresentation" = "Ny presentasjon";
+"widgets.openToUpdate" = "Oppdateres når appen er åpen";
 "widgets.notes" = "Notater";
 "widgets.rows" = "Rader";
 "widgets.pending" = "Ventende";

@@ -19,6 +19,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/config"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
@@ -313,5 +314,17 @@ func TestDeliverPushForEvent_HubNotification(t *testing.T) {
 	}
 	if carolNotif.Type != "rooms.message" || carolNotif.Title != "Sytue Rooms" || carolNotif.Body != hubnotify.TextoAvisoRooms {
 		t.Errorf("carol notificación inesperada: %+v", carolNotif)
+	}
+}
+
+// La suscripción caduca de una persona de fuera se borra en SU organización: en la
+// del canal no existe y la limpieza no haría nada.
+func TestContextoDeSuscripcion(t *testing.T) {
+	canal := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "acme"})
+	if got := tenancy.MustFrom(contextoDeSuscripcion(canal, domain.PushTarget{Subject: "bob"})); got.Slug != "acme" {
+		t.Fatalf("la de alguien del canal se borra en %q, quiero acme", got.Slug)
+	}
+	if got := tenancy.MustFrom(contextoDeSuscripcion(canal, domain.PushTarget{Subject: "bea", Tenant: "otra"})); got.Slug != "otra" {
+		t.Fatalf("la de la persona de fuera se borra en %q, quiero otra", got.Slug)
 	}
 }

@@ -11,7 +11,7 @@
  * de un libro importado o de un coeditor no se convierte nunca en algo clicable.
  * Helpers PUROS (sin DOM); los prueba test/sheets-enlaces.test.ts.
  */
-import { parseFormula, type AstNode, type CellValue } from '@sytue/formula';
+import { parseFormula, type AstNode, type CellValue } from '@sytue/formula/motor';
 import { rawText } from './format';
 
 const ESQUEMAS_PERMITIDOS = new Set(['http:', 'https:', 'mailto:']);

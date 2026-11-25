@@ -22,8 +22,9 @@ import (
 // Cada acción es un paso de deshacer. Un bloque de una tabla no se mueve ni se duplica
 // solo (rompería la rejilla): sus acciones son las de la barra de tabla.
 //
-// ponytail: arrastrar el asa para mover el bloque no está: subir y bajar hacen lo mismo
-// sin la geometría de soltar entre líneas.
+// Y arrastrar el asa lleva el bloque (o la tabla, o las columnas, enteras) a otro sitio:
+// una raya en el color de marca dice entre qué bloques caerá (`.notes-soltar` de la web),
+// y soltarlo es un paso de deshacer (arrastre_bloque.go).
 
 var _ desktop.Hoverable = (*zonaEdicion)(nil)
 
@@ -149,8 +150,8 @@ func (e *EditorNota) menuConvertir(disparador fyne.CanvasObject) {
 	})
 }
 
-// unidad son los bloques [i, j) que se mueven juntos con el `b`: él solo, o la tabla
-// entera si es de una.
+// unidad son los bloques [i, j) que se mueven juntos con el `b`: él solo, o la tabla (o
+// las columnas) entera si es de una.
 func (d *Documento) unidad(b int) (int, int) {
 	if d.Bloques[b].Celda.EnTabla() {
 		return d.rangoTabla(b)

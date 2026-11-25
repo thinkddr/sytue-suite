@@ -59,6 +59,9 @@ const (
 // puede hacerle al correo: resolver un destinatario y entregar. Nada más.
 type Procesador interface {
 	Resolve(ctx context.Context, address string) (store.ResolvedAddress, error)
+	// Aplazar dice si el correo de un destinatario tiene que esperar a que pase
+	// su correo a la bóveda (delivery.ErrAplazada).
+	Aplazar(ctx context.Context, rcpt store.ResolvedAddress) error
 	Deliver(ctx context.Context, msg delivery.InboundMessage) error
 }
 
@@ -120,16 +123,41 @@ func (h *handler) recibir(w http.ResponseWriter, r *http.Request) {
 	// RCPT del MX. Sin esto, un mensaje para una dirección que no existe se
 	// procesaría entero —parseo, subida del .eml— para descubrirlo al final.
 	locales := make([]string, 0, len(para))
+	var aplazados []string
 	for _, rcpt := range para {
-		if _, err := h.in.Resolve(r.Context(), rcpt); err != nil {
+		resolved, err := h.in.Resolve(r.Context(), rcpt)
+		if err != nil {
 			if errors.Is(err, domain.ErrNoSuchUser) {
 				continue
 			}
 			h.fallo(w, "resolver destinatario", err)
 			return
 		}
+		if err := h.in.Aplazar(r.Context(), resolved); err != nil {
+			if !errors.Is(err, delivery.ErrAplazada) {
+				h.fallo(w, "resolver destinatario", err)
+				return
+			}
+			aplazados = append(aplazados, rcpt)
+			continue
+		}
 		locales = append(locales, rcpt)
 	}
+	if len(locales) == 0 && len(aplazados) > 0 {
+		// Todos los de aquí esperan a pasar su correo a la bóveda: lo mismo que el
+		// 450 del MX. El reenviador reintenta y, si no se resuelve, se rinde.
+		w.Header().Set("Retry-After", reintentoAplazado)
+		http.Error(w, "entrega aplazada", http.StatusServiceUnavailable)
+		return
+	}
+	// Con otros destinatarios que sí reciben, una sola respuesta HTTP no puede
+	// aplazar a uno y entregar a los demás: aplazar a todos se lo retrasaría a
+	// ellos, y entregar y pedir el reintento se lo duplicaría. El aplazado entra
+	// entonces como antes (cifrado para su plan vigente), y queda en el registro.
+	if len(aplazados) > 0 && h.logger != nil {
+		h.logger.Warn("webhook de entrada: destinatario aplazado entregado con los demás", "aplazados", len(aplazados))
+	}
+	locales = append(locales, aplazados...)
 	if len(locales) == 0 {
 		// 200 y no error: el destinatario no existe aquí, y eso es una respuesta
 		// definitiva. Devolver 5xx haría que el reenviador lo intentara durante
@@ -159,6 +187,10 @@ func (h *handler) recibir(w http.ResponseWriter, r *http.Request) {
 // aplica el procesador con MaxBytes y devuelve ErrMessageTooLarge. Este existe
 // para que un cuerpo absurdo no se lea entero antes de llegar a esa política.
 const maxCuerpo = 64 << 20
+
+// reintentoAplazado es el Retry-After (segundos) de una entrega aplazada: el
+// mismo orden que los primeros reintentos de un MTA.
+const reintentoAplazado = "900"
 
 func (h *handler) autorizado(r *http.Request) bool {
 	dado := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")

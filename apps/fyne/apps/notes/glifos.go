@@ -111,6 +111,12 @@ var Glifos = map[string]string{
 	"layoutFree":    LibreD,
 	"layoutColumns": ColumnasD,
 	"layoutList":    ListaD,
+
+	// La burbuja de la selección (burbuja.go): «Más formato», copiar, cortar y pegar.
+	"formato": FormatoD,
+	"copy":    CopiarD,
+	"tijeras": TijerasD,
+	"pegar":   PegarD,
 }
 
 // Glifo pinta uno de los de arriba al lado y con el token de color pedidos.

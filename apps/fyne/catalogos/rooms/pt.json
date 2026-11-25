@@ -326,6 +326,7 @@
   "dm.deleteFailed": "Não foi possível eliminar a conversa.",
   "dm.empty": "Ainda não há mais ninguém na equipa.",
   "dm.emptyQuery": "Ninguém corresponde à pesquisa.",
+  "dm.externalClosed": "A tua organização não permite conversas com esta pessoa.",
   "dm.invite": "Convidar pessoas",
   "dm.maxPeople": {
     "one": "Pode adicionar até {count} pessoa.",

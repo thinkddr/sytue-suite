@@ -130,6 +130,21 @@ func Leer(datos []byte) (Metadatos, error) {
 	if !ok {
 		return Metadatos{}, ErrSinExif
 	}
+	return leerTIFF(tiff, orden)
+}
+
+// LeerTIFF es Leer sobre el bloque TIFF de un EXIF que ya se sacó de su contenedor:
+// el del elemento `Exif` de un HEIC (`heic.RawExif`), que no va en un segmento APP1.
+// Las mismas guardas: lo que no cuadra devuelve lo leído hasta ahí.
+func LeerTIFF(t []byte) (Metadatos, error) {
+	tiff, orden, ok := cabeceraTIFF(t)
+	if !ok {
+		return Metadatos{}, ErrSinExif
+	}
+	return leerTIFF(tiff, orden)
+}
+
+func leerTIFF(tiff []byte, orden binary.ByteOrder) (Metadatos, error) {
 	var m Metadatos
 	// El desfase horario vive en el IFD de Exif y la fecha también, pero pueden
 	// llegar en cualquier orden dentro del mismo IFD: se recogen crudos y se

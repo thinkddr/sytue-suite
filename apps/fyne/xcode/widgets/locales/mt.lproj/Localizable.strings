@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nota ġdida";
 "widgets.newContact" = "Kuntatt ġdid";
 "widgets.addPhotos" = "Żid ritratti";
+"widgets.newDocument" = "Dokument ġdid";
+"widgets.newSpreadsheet" = "Spreadsheet ġdida";
+"widgets.newPresentation" = "Preżentazzjoni ġdida";
+"widgets.openToUpdate" = "Jiġi aġġornat meta l-app tkun miftuħa";
 "widgets.notes" = "Noti";
 "widgets.rows" = "Ringieli";
 "widgets.pending" = "Pendenti";

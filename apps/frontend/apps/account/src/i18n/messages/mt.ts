@@ -231,6 +231,36 @@ export const mt: AppCatalog<typeof en> = {
   'recovery.invalid': 'Dan l-indirizz ma jistax jintuża: irid ikun validu u barra minn Sytue.',
   'recovery.wrong_password': 'Il-password mhijiex korretta.',
   'recovery.failed': 'Ma setax tiġi ssejvjata. Erġa’ pprova ftit wara.',
+  'recovery.password.hint':
+    'Il-password attwali tiegħek hija meħtieġa għal kull bidla f’din il-karta.',
+  'recovery.username.new': 'Isem tal-utent ġdid',
+  'recovery.username.hint':
+    'Dak li tħalli jibqa’ riżervat għalik għal 30 jum, u tista’ tbiddlu darba kull 30 jum.',
+  'recovery.username.change': 'Ibdel l-isem tal-utent',
+  'recovery.username.changed': 'L-isem tal-utent inbidel.',
+  'recovery.username.invalid':
+    'Dan l-isem tal-utent mhuwiex validu: uża minn 3 sa 64 ittra, numru, tikka jew sing.',
+  'recovery.username.taken': 'Dan l-isem tal-utent mhuwiex disponibbli.',
+  'recovery.username.recent': 'Biddilt l-isem tal-utent inqas minn 30 jum ilu.',
+  'recovery.username.is_address':
+    'F’kont personali l-isem tal-utent huwa l-indirizz Sytue tiegħek, għalhekk ma jinbidilx minn hawn.',
+  'recovery.phone.none': 'Għad m’għandekx numru tal-mowbajl: żid wieħed biex tidħol ukoll bih.',
+  'recovery.phone.new': 'Numru tal-mowbajl ġdid',
+  'recovery.phone.format': 'Bil-kodiċi tal-pajjiż, pereżempju +356 7900 0000.',
+  'recovery.phone.send': 'Ibgħat il-kodiċi',
+  'recovery.phone.sent': 'Bgħatnielek kodiċi b’messaġġ SMS fuq {phone}.',
+  'recovery.phone.code': 'Kodiċi',
+  'recovery.phone.confirm': 'Ikkonferma',
+  'recovery.phone.changed': 'In-numru tal-mowbajl ġie ssejvjat.',
+  'recovery.phone.invalid': 'Dan in-numru mhuwiex validu: iktbu bil-kodiċi tal-pajjiż.',
+  'recovery.phone.same': 'Dan diġà huwa n-numru tal-mowbajl tiegħek.',
+  'recovery.phone.wait': 'Stenna minuta qabel ma titlob kodiċi ieħor.',
+  'recovery.phone.limit': 'Intalbu wisq kodiċijiet. Erġa’ pprova aktar tard.',
+  'recovery.phone.code_wrong': 'Il-kodiċi mhuwiex korrett.',
+  'recovery.phone.code_expired': 'Il-kodiċi skada. Itlob ieħor.',
+  'recovery.phone.has_account': 'Dan in-numru tal-mowbajl diġà jappartjeni għal kont ieħor.',
+  'recovery.phone.unavailable':
+    'Bħalissa ma jistgħux jintbagħtu messaġġi SMS. Erġa’ pprova aktar tard.',
   'delete.title': 'Ħassar il-kont tiegħi',
   'delete.hint':
     'Jitħassru d-dettalji tad-dħul tiegħek u dak kollu li hu tiegħek biss; dak li hu tal-organizzazzjoni tiegħek jibqa’ hemm. Għal 30 jum il-kont jista’ jiġi rkuprat.',

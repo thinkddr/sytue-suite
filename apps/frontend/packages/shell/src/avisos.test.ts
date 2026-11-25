@@ -1012,11 +1012,10 @@ describe('TIPOS_DE_AVISOS', () => {
     for (const t of tipos) if (t.startsWith('security.')) throw new Error(`${t} no se calla`);
   });
 
-  it('cada tipo tiene su título en el catálogo (salvo los que el servicio titula)', () => {
+  it('cada tipo tiene su título en el catálogo', () => {
     const delCatalogo = new Set(tiposDelCatalogo());
-    // `cloud.deploy` lleva el título del servicio (`sinClave` de hubnotify).
     const sinTitulo = [...tipos].filter((t) => !delCatalogo.has(t));
-    expect(sinTitulo).toEqual(['cloud.deploy']);
+    expect(sinTitulo).toEqual([]);
   });
 
   it('solo da tipos a orígenes que se ofrecen, y sin repetir fila en un origen', () => {

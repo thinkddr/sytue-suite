@@ -234,6 +234,36 @@ export const ro: AppCatalog<typeof en> = {
     'Această adresă nu poate fi folosită: trebuie să fie validă și din afara Sytue.',
   'recovery.wrong_password': 'Parola nu este corectă.',
   'recovery.failed': 'Nu s-a putut salva. Încercați din nou peste câteva momente.',
+  'recovery.password.hint':
+    'Pentru orice modificare pe acest card este nevoie de parola ta actuală.',
+  'recovery.username.new': 'Nume de utilizator nou',
+  'recovery.username.hint':
+    'Cel pe care îl lași rămâne rezervat pentru tine 30 de zile și îl poți schimba o dată la 30 de zile.',
+  'recovery.username.change': 'Schimbă numele de utilizator',
+  'recovery.username.changed': 'Numele de utilizator a fost schimbat.',
+  'recovery.username.invalid':
+    'Acest nume de utilizator nu este valid: folosește între 3 și 64 de litere, cifre, puncte sau cratime.',
+  'recovery.username.taken': 'Acest nume de utilizator nu este disponibil.',
+  'recovery.username.recent': 'Ți-ai schimbat numele de utilizator acum mai puțin de 30 de zile.',
+  'recovery.username.is_address':
+    'Într-un cont personal, numele de utilizator este adresa ta Sytue, așa că nu se schimbă de aici.',
+  'recovery.phone.none':
+    'Încă nu ai un număr de mobil: adaugă unul ca să te poți conecta și cu el.',
+  'recovery.phone.new': 'Număr de mobil nou',
+  'recovery.phone.format': 'Cu prefixul țării, de exemplu +40 700 000 000.',
+  'recovery.phone.send': 'Trimite codul',
+  'recovery.phone.sent': 'Ți-am trimis un cod prin SMS la {phone}.',
+  'recovery.phone.code': 'Cod',
+  'recovery.phone.confirm': 'Confirmă',
+  'recovery.phone.changed': 'Numărul de mobil a fost salvat.',
+  'recovery.phone.invalid': 'Acest număr nu este valid: scrie-l cu prefixul țării.',
+  'recovery.phone.same': 'Acesta este deja numărul tău de mobil.',
+  'recovery.phone.wait': 'Așteaptă un minut înainte să ceri alt cod.',
+  'recovery.phone.limit': 'Au fost cerute prea multe coduri. Încearcă mai târziu.',
+  'recovery.phone.code_wrong': 'Codul nu este corect.',
+  'recovery.phone.code_expired': 'Codul a expirat. Cere altul.',
+  'recovery.phone.has_account': 'Acest număr de mobil aparține deja altui cont.',
+  'recovery.phone.unavailable': 'Momentan nu se pot trimite SMS-uri. Încearcă mai târziu.',
   'delete.title': 'Șterge contul meu',
   'delete.hint':
     'Se șterg datele dvs. de autentificare și tot ce vă aparține doar dvs.; ce aparține organizației dvs. rămâne acolo. Timp de 30 de zile contul poate fi recuperat.',

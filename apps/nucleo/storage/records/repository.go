@@ -64,6 +64,11 @@ type Config struct {
 	// consumers reject binary snapshots rather than interpreting bytes as JSON.
 	BinaryKind     func(string) bool
 	ValidateBinary func(context.Context, SnapshotRow) error
+	// OnWrite, opcional, se llama tras cada mutación aceptada (Mutate y sus variantes),
+	// fuera del cerrojo del diario y sin datos: es el aviso al widget nativo de que su app
+	// acaba de escribir en el repositorio privado, que no pasa por HTTP (ADR 0078). Tiene
+	// que volver enseguida. Los lectores históricos lo dejan a nil.
+	OnWrite func()
 }
 
 type Repository struct {

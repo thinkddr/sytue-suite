@@ -28,5 +28,6 @@ func diaposPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], s
 		Service:    api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil),
 		New:        office.New,
 		Historical: office.NewHistoricalSource,
+		OnWrite:    suite.AvisarEscritura,
 	})
 }

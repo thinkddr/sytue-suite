@@ -1,0 +1,4 @@
+# El editor de hojas importa el motor de fórmulas sin sus funciones, que en la app llegan
+# aparte (@sytue/formula, src/perezosas.ts); los tests las esperan instaladas.
+[test]
+preload = ["./test/funciones-instaladas.ts"]

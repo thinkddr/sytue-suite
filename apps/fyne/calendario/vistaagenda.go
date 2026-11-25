@@ -59,10 +59,11 @@ func AltoColumnaDia() float32 {
 	return espacio0p5 + tema.TextoXS.Linea + tema.TextoLG.Linea + tema.TextoXS.Linea
 }
 
-// grupoDia son las ocurrencias de un mismo día, en orden.
+// grupoDia son las ocurrencias de un mismo día, en orden: punteros a las de la pantalla,
+// que no se tocan, en vez de una copia de cada una por repintado.
 type grupoDia struct {
 	dia    time.Time
-	dentro []Ocurrencia
+	dentro []*Ocurrencia
 }
 
 // porDia agrupa por día natural, en orden cronológico y con el filtro del buscador. Un
@@ -73,7 +74,8 @@ func (p *Pantalla) porDia(consulta string) []grupoDia {
 	inicio := inicioDelDia(p.Cursor, loc)
 	q := buscar.Plegar(strings.TrimSpace(consulta))
 	var grupos []grupoDia
-	for _, o := range p.Eventos { // ya vienen ordenadas por inicio
+	for i := range p.Eventos { // ya vienen ordenadas por inicio
+		o := &p.Eventos[i]
 		if q != "" && !strings.Contains(buscar.Plegar(o.Event.Summary+" "+o.Event.Location+" "+o.Event.Description), q) {
 			continue
 		}
@@ -85,7 +87,7 @@ func (p *Pantalla) porDia(consulta string) []grupoDia {
 			grupos[n-1].dentro = append(grupos[n-1].dentro, o)
 			continue
 		}
-		grupos = append(grupos, grupoDia{dia: d, dentro: []Ocurrencia{o}})
+		grupos = append(grupos, grupoDia{dia: d, dentro: []*Ocurrencia{o}})
 	}
 	return grupos
 }
@@ -93,7 +95,24 @@ func (p *Pantalla) porDia(consulta string) []grupoDia {
 // vistaAgenda monta el buscador y, debajo, la lista. El buscador filtra EN CALIENTE lo
 // que ya está cargado —la web lo dice: el índice del servicio queda para cuando haga
 // falta escala—, así que al teclear se rehace solo la lista y el campo no pierde el foco.
+//
+// La agenda entera es también la MISMA mientras no cambie lo que la decide (la clave del
+// mes del teléfono sin su posición ni su estado de recarga): rehacerla en cada repintado
+// eran sus días montados y su desplazable (~0,4 MB) y volvía arriba.
 func (p *Pantalla) vistaAgenda() fyne.CanvasObject {
+	k := p.claveCompacta()
+	k.pos, k.recargando, k.fallo = 0, false, ""
+	p.agendaUsada = true
+	if p.agendaHecha != nil && p.agendaClave == k && p.buscadorAgenda != nil && p.buscadorAgendaEn == p.locale() {
+		return p.agendaHecha
+	}
+	o := p.construirAgenda()
+	p.agendaHecha, p.agendaClave = o, k
+	return o
+}
+
+// construirAgenda monta la agenda de cero, con el buscador de siempre.
+func (p *Pantalla) construirAgenda() fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	// El `<input>` de la web va escrito a mano: `h-9 rounded-md border border-border px-3
 	// text-sm`, no el `Input` de Form.tsx (`text-base`, `border-strong`). Es un
@@ -355,7 +374,7 @@ type grupoAgenda struct {
 func (p *Pantalla) nuevoGrupoAgenda(g grupoDia, filete bool) *grupoAgenda {
 	w := &grupoAgenda{p: p, g: g, filete: filete}
 	for _, o := range g.dentro {
-		w.filas = append(w.filas, p.nuevaFilaAgenda(o))
+		w.filas = append(w.filas, p.nuevaFilaAgenda(*o))
 	}
 	w.ExtendBaseWidget(w)
 	return w

@@ -18,6 +18,7 @@ package smtp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	gosmtp "github.com/emersion/go-smtp"
 
 	"git.sytue.eu/sytue/one/services/mail/internal/config"
+	"git.sytue.eu/sytue/one/services/mail/internal/delivery"
 )
 
 // verificador simula a Sytue ID: devuelve la identidad que se le diga, o falla.
@@ -270,5 +272,19 @@ func TestMXDataSinDestinatarios(t *testing.T) {
 func TestRemoteIPSinConexion(t *testing.T) {
 	if ip := remoteIP(nil); ip != nil {
 		t.Fatalf("remoteIP(nil) = %v", ip)
+	}
+}
+
+// UN DESTINATARIO CUYO CORREO TIENE QUE ESPERAR (su cuenta aún no ha pasado el
+// correo a la bóveda, ADR 0087) recibe un 450 4.2.1 en RCPT: temporal, para que
+// el remitente reintente y, si no se resuelve, se rinda con un aviso de no
+// entrega. Un fallo al decidirlo es el 451 de siempre, nunca un 5xx.
+func TestRcptAplazado(t *testing.T) {
+	var e *gosmtp.SMTPError
+	if !errors.As(rcptAplazado(fmt.Errorf("%w (retirada)", delivery.ErrAplazada)), &e) || e.Code != 450 || e.EnhancedCode != (gosmtp.EnhancedCode{4, 2, 1}) {
+		t.Fatalf("aplazado: %+v", e)
+	}
+	if !errors.As(rcptAplazado(errors.New("base caída")), &e) || e.Code != 451 || e.EnhancedCode != (gosmtp.EnhancedCode{4, 3, 0}) {
+		t.Fatalf("fallo al decidir: %+v", e)
 	}
 }

@@ -4,6 +4,10 @@
 "widgets.newNote" = "Uus märge";
 "widgets.newContact" = "Uus kontakt";
 "widgets.addPhotos" = "Lisa fotosid";
+"widgets.newDocument" = "Uus dokument";
+"widgets.newSpreadsheet" = "Uus arvutustabel";
+"widgets.newPresentation" = "Uus esitlus";
+"widgets.openToUpdate" = "Värskendatakse, kui rakendus on avatud";
 "widgets.notes" = "Märkmed";
 "widgets.rows" = "Read";
 "widgets.pending" = "Ootel";

@@ -29,6 +29,7 @@ const DINAMICAS: Record<string, readonly string[]> = {
   'editor.kind.${kind}': pre('editor.kind.', EDITORES),
   'externalSignatures.mode.${m}': pre('externalSignatures.mode.', FIRMAS),
   'externalSignatures.mode.${m}.help': FIRMAS.map((m) => `externalSignatures.mode.${m}.help`),
+  'roomsExternal.mode.${m}.help': FIRMAS.map((m) => `roomsExternal.mode.${m}.help`),
   'migrations.domain.${d}': pre('migrations.domain.', [
     'drive',
     'contacts',

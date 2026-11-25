@@ -316,6 +316,7 @@
   "dm.deleteFailed": "De chat kon niet worden verwijderd.",
   "dm.empty": "Er is nog niemand anders in het team.",
   "dm.emptyQuery": "Niemand komt overeen met je zoekopdracht.",
+  "dm.externalClosed": "Je organisatie staat geen gesprekken met deze persoon toe.",
   "dm.invite": "Personen uitnodigen",
   "dm.maxPeople": {
     "one": "Je kunt maximaal {count} persoon toevoegen.",

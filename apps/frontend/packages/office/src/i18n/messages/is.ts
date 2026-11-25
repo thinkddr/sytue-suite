@@ -2693,9 +2693,9 @@ export const is: AppCatalog<typeof en> = {
     'Undirskriftin kemst ekki fyrir á þeirri síðu. Veldu aðra síðu eða staðsetningu.',
   'pdf.device.view': 'Skoða',
   'pdf.vault.help':
-    'Þessi PDF-skrá er í dulkóðaða Drifinu þínu: hún er aðeins afkóðuð í þessu tæki, þar sem þú getur skoðað hana, skrifað athugasemdir, fyllt út, raðað og undirritað. Það sem þú vistar fer dulkóðað til baka.',
+    'Þessi PDF-skrá er í dulkóðaða Drifinu þínu: hún er aðeins afkóðuð í þessu tæki, þar sem þú getur skoðað hana, skrifað athugasemdir, fyllt út, raðað, varið, afmáð efni, breytt, borið saman, prentað og undirritað. Það sem þú vistar fer dulkóðað til baka.',
   'pdf.vault.serverOnly':
-    'Með dulkóðaða Drifinu eru beiðnir um undirritun, aðgangsorðsvörn, textagreining, yfirstrikun, breyting texta eða mynda, stimplar og vatnsmerki, samanburður, útgáfusaga og prentun ekki enn í boði: þjónustan þarf að lesa PDF-skrána eða þetta er ekki enn gert í tækinu.',
+    'Með dulkóðaða Drifinu eru beiðnir um undirritun, textagreining og aðstoðarmaðurinn ekki í boði: þau krefjast þess að þjónustan lesi PDF-skrána. Allt annað fer fram í þessu tæki.',
   'pdf.vault.notFound.title': 'Þetta PDF-skjal er ekki í dulkóðaða Drifinu þínu',
   'pdf.vault.notFound.description':
     'Það gæti hafa verið fært eða eytt. Leitaðu að því í Sytue Drive.',
@@ -2710,7 +2710,9 @@ export const is: AppCatalog<typeof en> = {
     'Drive-ið þitt er enn að færast yfir í dulkóðun enda á milli. Ljúktu því í Sytue Drive.',
   'pdf.device.error.password': 'Þetta lykilorð opnar ekki skilríkið.',
   'pdf.device.error.encrypted':
-    'Þetta PDF-skjal er varið með lykilorði og ekki er hægt að undirrita það á þessu tæki.',
+    'Þetta PDF-skjal er varið með lykilorði: opnaðu það og undirritaðu það úr vinnusvæði þess, þar sem lykilorð þess er notað.',
+  'pdf.device.protectedNote':
+    'Þetta PDF-skjal er varið með lykilorði. Til að undirrita það er það endurskrifað án lykilorðsins í þessu tæki, eins og þjónninn gerir: undirritaða afritið er vistað dulkóðað í Drifinu þínu, en án lykilorðs PDF-skjalsins.',
   'pdf.device.error.locked':
     'Þetta PDF-skjal er vottað gegn öllum breytingum: önnur undirritun myndi ógilda það.',
   'pdf.device.error.unreadable':

@@ -56,6 +56,13 @@ export interface ChannelCall {
    * pulsará «bloquear» sobre una sala ya bloqueada y la abrirá sin querer.
    */
   locked: boolean;
+  /**
+   * ¿Llaman a la puerta aunque esté abierta? La reunión de un evento de Calendar, a la
+   * que llegan con el enlace invitados de otra organización sin la clave ni la
+   * invitación: esperan a que el anfitrión les deje pasar, así que quien modera mira
+   * la cola también con la sala abierta. Lo decide el servicio (`waiting_room`).
+   */
+  waitingRoom: boolean;
 }
 
 /**
@@ -89,6 +96,11 @@ interface Room {
   created_by?: string;
   /** Puerta echada: no entra nadie nuevo (el servicio lo omite cuando es false). */
   locked?: boolean;
+  /**
+   * La reunión de un evento: a su puerta llaman invitados de otra organización aunque
+   * esté abierta (el servicio lo omite cuando es false).
+   */
+  waiting_room?: boolean;
 }
 
 /** Sala en crudo del servicio Go (snake_case) antes de normalizar a `Meeting`. */
@@ -286,6 +298,7 @@ export function meetClient({ accessToken }: MeetClientDeps) {
         roomId: room.id,
         hostIdentity: room.created_by ?? '',
         locked: conn.room?.locked ?? room.locked ?? false,
+        waitingRoom: conn.room?.waiting_room ?? false,
       };
     },
 
@@ -360,6 +373,7 @@ export function meetClient({ accessToken }: MeetClientDeps) {
         roomId: id,
         hostIdentity: conn.room?.created_by ?? '',
         locked: conn.room?.locked ?? false,
+        waitingRoom: conn.room?.waiting_room ?? false,
       };
     },
 

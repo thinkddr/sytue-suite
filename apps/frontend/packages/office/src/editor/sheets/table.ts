@@ -11,8 +11,8 @@
  * viviendo en `cells` (el texto crudo manda); la tabla solo aporta formato y
  * comportamiento. Self-test: packages/office/test/sheets-tables.test.ts (bun test).
  */
-import { ERR, FormulaError } from '@sytue/formula';
-import type { CellValue, RefRange, TableQuery } from '@sytue/formula';
+import { ERR, FormulaError } from '@sytue/formula/motor';
+import type { CellValue, RefRange, TableQuery } from '@sytue/formula/motor';
 import type { SheetTable, TableTotalFn } from '../types';
 import { parseRangeRef } from './format';
 import type { RangeRect } from './format';

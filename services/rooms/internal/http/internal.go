@@ -48,7 +48,11 @@ func (ih *intHandlers) internalAuth(next http.Handler) http.Handler {
 // ---------------------------------------------------------------------------
 
 // ChannelAccess responde si un sujeto puede LEER un canal. Idempotente y sin
-// cuerpo: GET con tenant/channel/subject en la query.
+// cuerpo en el caso normal: GET con tenant/channel/subject en la query.
+//
+// La conversación con gente de OTRA organización (ADR 0040) vive en la anfitriona, y
+// quien viene de fuera pregunta con la suya: entonces responde 200 con
+// {"tenant": "<anfitriona>"}, que es donde Drive sube y lee el adjunto.
 func (ih *intHandlers) ChannelAccess(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	t, err := tenancy.New(q.Get("tenant"))
@@ -67,11 +71,18 @@ func (ih *intHandlers) ChannelAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// GetChannel aplica requireChannelAccess: público ⇒ miembro del equipo; privado ⇒
-	// miembro del canal Y del equipo; directo ⇒ participante. Cualquier negativa
-	// (ErrForbidden/ErrNotFound) sale como 404 indistinguible.
-	if _, err := ih.svc.GetChannel(tenancy.Into(r.Context(), t), channelID, subject); err != nil {
+	// miembro del canal Y del equipo; directo ⇒ participante; y la fila `externo` en una
+	// conversación con gente de fuera. Cualquier negativa (ErrForbidden/ErrNotFound)
+	// sale como 404 indistinguible.
+	// Es la misma pregunta que hace el tiempo real al suscribir un canal.
+	donde, ok := ih.svc.CanAccessChannel(r.Context(), t.Slug, channelID, subject)
+	if !ok {
 		httpx.Fail(w, r, httpx.ErrNotFound)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	if donde == t.Slug {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]string{"tenant": donde})
 }

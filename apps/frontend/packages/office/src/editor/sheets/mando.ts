@@ -11,7 +11,7 @@
  * aquí al montarse (`lienzoDeHoja`) y lo demás habla con este módulo. `SheetCanvas`
  * reexporta todo, para quien ya lo importaba de allí.
  */
-import type { CellValue } from '@sytue/formula';
+import type { CellValue } from '@sytue/formula/motor';
 import type {
   CellStyle,
   CondRule,

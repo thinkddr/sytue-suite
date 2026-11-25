@@ -319,6 +319,49 @@ paths:
               schema: { $ref: "#/components/schemas/Invitation" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/admin/audit-log:
+    get:
+      tags: [Salud]
+      summary: Traza de auditoría de la organización activa (owner/admin)
+      description: >
+        La traza de docs/security.md §1.7 de este servicio: los accesos a datos de
+        cliente (`acceso.*`: exportaciones .ics y compartir). Quién, qué (id del recurso, nunca su
+        contenido), cuándo y desde dónde (`detail.ip`, `detail.request_id`).
+        Paginación keyset (occurred_at, id) DESC con los filtros en la consulta;
+        `format=csv` exporta hasta 5000 filas. La traza `acceso.*` se guarda doce
+        meses.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: action, in: query, required: false, schema: { type: string, maxLength: 100 }, description: Prefijo de la acción }
+        - { name: actor, in: query, required: false, schema: { type: string }, description: Subcadena del actor }
+        - { name: since, in: query, required: false, schema: { type: string }, description: RFC3339 o AAAA-MM-DD }
+        - { name: until, in: query, required: false, schema: { type: string }, description: RFC3339 o AAAA-MM-DD (inclusivo) }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [csv] } }
+      responses:
+        "200":
+          description: Página de la traza ({ items, nextCursor }) o CSV
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        occurred_at: { type: string, format: date-time }
+                        actor: { type: string }
+                        action: { type: string }
+                        target: { type: string }
+                        detail: { type: object }
+                  nextCursor: { type: string }
+        "400": { description: Filtros, fechas o cursor no válidos }
+        "403": { description: Rol insuficiente }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -434,6 +477,12 @@ components:
         description: { type: string }
         location: { type: string }
         organizer: { type: string, description: "Email; por defecto el del usuario." }
+        organizer_name:
+          type: string
+          maxLength: 255
+          description: >-
+            CN del ORGANIZER. Si organiza quien escribe, manda su nombre de Sytue ID y
+            esto solo vale si el token no lo trae; al editar se conserva el que hubiera.
         start: { type: string, format: date-time }
         end: { type: string, format: date-time }
         tzid: { type: string, example: "Europe/Madrid" }
@@ -474,6 +523,9 @@ components:
         description: { type: string }
         location: { type: string }
         organizer: { type: string }
+        organizer_name:
+          type: string
+          description: CN del ORGANIZER («Ada Lovelace»); ausente si el iCalendar no lo trae.
         dtstart: { type: string, format: date-time }
         dtend: { type: string, format: date-time }
         tzid: { type: string }

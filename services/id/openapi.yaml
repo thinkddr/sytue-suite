@@ -395,6 +395,86 @@ paths:
         "400": { description: Dirección no válida o de Sytue }
         "401": { description: La contraseña actual no es correcta }
 
+  /api/v1/me/username:
+    put:
+      tags: [Identity]
+      summary: Cambiar el @usuario
+      description: >
+        Pide la contraseña actual. El @usuario anterior queda reservado 30 días para
+        quien lo dejó (nadie más puede elegirlo ni recibirlo asignado) y no se puede
+        volver a cambiar dentro de ese plazo. En una cuenta personal el @usuario es su
+        dirección de Sytue y no se cambia desde aquí (`username_is_address`). Los
+        errores llevan su código (`username_invalid`, `username_taken`,
+        `username_recent`, `username_is_address`).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, description: "Con o sin la arroba delante." }
+                password: { type: string }
+      responses:
+        "200": { description: "{ username }" }
+        "400": { description: "@usuario no válido" }
+        "401": { description: La contraseña actual no es correcta }
+        "409": { description: "Ocupado, reservado o es su dirección" }
+        "429": { description: "Ya se cambió en los últimos 30 días" }
+
+  /api/v1/me/phone:
+    put:
+      tags: [Identity]
+      summary: Cambiar o añadir el móvil (manda el código por SMS)
+      description: >
+        Pide la contraseña actual y manda un código de seis dígitos por SMS al móvil
+        nuevo (E.164; se admiten espacios y el prefijo 00). No lo fija: eso es
+        `POST /api/v1/me/phone/verify`. Diez minutos, cinco intentos, otro código
+        tras un minuto (`code_wait`), y los mismos límites que el alta por número, por
+        IP y global por hora (`sms_limit`). Que el número ya es de otra cuenta no se
+        dice aquí sino tras el código.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone: { type: string }
+                password: { type: string }
+      responses:
+        "202": { description: "Código enviado ({ pending })" }
+        "400": { description: "Móvil no válido (`phone_invalid`)" }
+        "401": { description: La contraseña actual no es correcta }
+        "409": { description: "Ya es su móvil (`phone_same`)" }
+        "429": { description: "`code_wait` o `sms_limit`" }
+        "502": { description: "El SMS no salió (`sms_failed`)" }
+        "503": { description: "Sin SMS configurados (`sms_unavailable`)" }
+
+  /api/v1/me/phone/verify:
+    post:
+      tags: [Identity]
+      summary: Confirmar el código y fijar el móvil nuevo
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200": { description: "{ phone }" }
+        "400": { description: "Código incorrecto (`code_wrong`)" }
+        "409": { description: "El móvil ya es de otra cuenta (`phone_has_account`)" }
+        "410": { description: "Sin código pendiente, caducado o sin intentos (`code_expired`)" }
+
   /api/v1/me/mfa/totp/enroll:
     post:
       tags: [WebAuthn]
@@ -617,6 +697,173 @@ paths:
         "403": { description: Rol insuficiente o acción no permitida sobre el objetivo }
         "404": { description: El usuario no es miembro de la organización activa }
 
+  /api/v1/admin/privacy/requests:
+    get:
+      tags: [Identity]
+      summary: Registro de solicitudes RGPD de la organización activa (owner/admin)
+      description: >
+        Lo que la organización, como responsable del tratamiento, ha recibido de
+        las personas (arts. 15–21): tipo, canal, recepción, plazo de un mes y su
+        prórroga de dos (art. 12.3), verificación de identidad y resolución. Lo
+        más reciente primero, hasta 500. Reservado a owner/admin, no delegable.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, received, in_progress, completed, rejected] } }
+        - { name: kind, in: query, required: false, schema: { type: string, enum: [access, rectification, erasure, restriction, portability, objection] } }
+        - { name: overdue, in: query, required: false, schema: { type: string, enum: ["1"] }, description: Solo las abiertas con el plazo vencido }
+      responses:
+        "200":
+          description: Solicitudes y recuento de abiertas y vencidas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests: { type: array, items: { $ref: "#/components/schemas/PrivacyRequest" } }
+                  summary:
+                    type: object
+                    properties: { open: { type: integer }, overdue: { type: integer } }
+                  response_months: { type: integer }
+                  extension_months: { type: integer }
+        "400": { description: Filtro desconocido }
+        "403": { description: Rol insuficiente o cuenta personal }
+    post:
+      tags: [Identity]
+      summary: Registrar una solicitud RGPD en nombre de una persona
+      description: >
+        La persona se identifica por su cuenta de la organización (`user_id`) o
+        por su correo; si el correo es de una cuenta de la organización, se
+        enlaza sola. El plazo se cuenta desde `received_at` (por defecto, ahora;
+        como mucho un año atrás). Se audita sin el correo de la persona.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, channel]
+              properties:
+                subject_email: { type: string, format: email }
+                subject_name: { type: string, maxLength: 200 }
+                user_id: { type: string, format: uuid }
+                kind: { type: string, enum: [access, rectification, erasure, restriction, portability, objection] }
+                channel: { type: string, enum: [email, web, letter, phone, in_person, other] }
+                received_at: { type: string, description: RFC3339 o AAAA-MM-DD }
+                identity_verified: { type: boolean }
+                identity_method: { type: string, maxLength: 200 }
+                notes: { type: string, maxLength: 4000 }
+      responses:
+        "201": { description: "Solicitud registrada ({ request })" }
+        "400": { description: Tipo, canal, correo o fecha no válidos }
+        "404": { description: "`user_id` no es de la organización activa" }
+
+  /api/v1/admin/privacy/requests/{id}:
+    get:
+      tags: [Identity]
+      summary: Una solicitud RGPD con su historia y si admite supresión física
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: "{ request, events, erasure: { available, reason } }"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request: { $ref: "#/components/schemas/PrivacyRequest" }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        at: { type: string, format: date-time }
+                        actor_id: { type: string }
+                        action: { type: string }
+                        detail: { type: object }
+                  erasure:
+                    type: object
+                    properties:
+                      available: { type: boolean }
+                      reason: { type: string, enum: [not_erasure, completed, in_progress, closed, no_account, not_member] }
+        "404": { description: No es de la organización activa }
+    patch:
+      tags: [Identity]
+      summary: Avanzar o cerrar una solicitud abierta
+      description: >
+        Cerrar (`completed` o `rejected`) exige una resolución escrita, que es lo
+        que se le contesta a la persona. Una supresión en curso no se da por
+        resuelta hasta que el barrido la termina. Una solicitud cerrada no cambia.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [received, in_progress, completed, rejected] }
+                resolution: { type: string, maxLength: 4000 }
+                notes: { type: string, maxLength: 4000 }
+                identity_verified: { type: boolean }
+                identity_method: { type: string, maxLength: 200 }
+      responses:
+        "200": { description: "Solicitud actualizada ({ request })" }
+        "400": { description: Estado desconocido o cierre sin resolución }
+        "409": { description: Solicitud cerrada, o supresión aún en curso }
+
+  /api/v1/admin/privacy/requests/{id}/extend:
+    post:
+      tags: [Identity]
+      summary: Prorrogar dos meses el plazo (una vez, antes de que venza)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties: { reason: { type: string, maxLength: 1000 } }
+      responses:
+        "200": { description: "Plazo prorrogado ({ request })" }
+        "400": { description: Sin motivo }
+        "409": { description: Ya prorrogada, vencida o cerrada }
+
+  /api/v1/admin/privacy/requests/{id}/erase:
+    post:
+      tags: [Identity]
+      summary: Supresión física de la cuenta de una solicitud de supresión
+      description: >
+        Pide reautenticación y que se escriba el correo de la persona. Da de baja
+        la cuenta sin ventana de recuperación, borra en el acto lo que sirve para
+        entrar y, en el siguiente barrido, anonimiza la ficha, quita sus
+        membresías y borra lo que los demás servicios guardan de la persona. Se
+        niega si la cuenta es también de otra organización o tiene su cuenta
+        personal, y si dejaría una organización sin administración. Lo que la
+        persona creó para la organización (buzón, archivos, eventos) se queda en
+        la organización.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties: { confirm: { type: string, description: Correo de la persona } }
+      responses:
+        "200": { description: "Supresión iniciada ({ request, note })" }
+        "400": { description: La confirmación no coincide }
+        "401": { description: Hace falta reautenticarse }
+        "403": { description: La propia cuenta, o un owner siendo admin }
+        "409": { description: No es una supresión de cuenta, cuenta de fuera, única administradora o ya en curso }
+
   /api/v1/webauthn/register/begin:
     post:
       tags: [WebAuthn]
@@ -632,6 +879,31 @@ paths:
       responses: { "201": { description: Passkey registrada } }
 
 components:
+  schemas:
+    PrivacyRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        subject_user_id: { type: string, format: uuid }
+        subject_email: { type: string }
+        subject_name: { type: string }
+        kind: { type: string, enum: [access, rectification, erasure, restriction, portability, objection] }
+        channel: { type: string, enum: [email, web, letter, phone, in_person, other] }
+        received_at: { type: string, format: date-time }
+        due_at: { type: string, format: date-time }
+        extended: { type: boolean }
+        extension_reason: { type: string }
+        identity_verified: { type: boolean }
+        identity_method: { type: string }
+        status: { type: string, enum: [received, in_progress, completed, rejected] }
+        resolution: { type: string }
+        notes: { type: string }
+        erasure_started_at: { type: string, format: date-time }
+        erasure_completed_at: { type: string, format: date-time }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        closed_at: { type: string, format: date-time }
   securitySchemes:
     bearerAuth:
       type: http

@@ -344,6 +344,12 @@ func identificacionFromToken(tok jwt.Token, c *Claims) {
 			c.MFAEnabled = &b
 		}
 	}
+	// Solo los valores que se conocen: uno desconocido se queda vacío, que como
+	// `none` no concede nada (DispositivoDeConfianza).
+	switch dt := claimTexto(tok, "device_trust"); dt {
+	case DeviceTrustNone, DeviceTrustStandard, DeviceTrustManaged:
+		c.DeviceTrust = dt
+	}
 }
 
 // planClaimsFromToken lee la clase de la organización, su plan y las cuotas que

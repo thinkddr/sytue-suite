@@ -21,25 +21,12 @@
  *   docs/architecture.md#calcus-compatibilidad.)
  */
 import { buildRegistry } from './functions/index.js';
+import { FUNCIONES_DEL_MOTOR } from './nombres-funciones.js';
 
 /** Versión del catálogo: sube cuando se añaden funciones (o cambia lo que declara). */
 export const CATALOGO_VERSION = 4;
 
-/** Las funciones que despacha el motor y no el registro: reciben el AST (un LAMBDA o un
- *  nombre) o necesitan el entorno (los parámetros del LAMBDA en curso). */
-export const FUNCIONES_DEL_MOTOR: readonly string[] = [
-  'LET',
-  'LAMBDA',
-  'MAP',
-  'REDUCE',
-  'SCAN',
-  'MAKEARRAY',
-  'BYROW',
-  'BYCOL',
-  'ISOMITTED',
-  'GROUPBY',
-  'PIVOTBY',
-];
+export { FUNCIONES_DEL_MOTOR };
 
 /** Compatibilidad con Excel: `clasica` existe en Excel 2019 y anteriores; `excel365`, solo
  *  en Excel 2021 / Microsoft 365. */

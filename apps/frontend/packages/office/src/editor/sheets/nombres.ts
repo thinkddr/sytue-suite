@@ -20,8 +20,8 @@
  *
  * Self-test: packages/office/test/sheets-nombres.test.ts (bun test).
  */
-import { isValidDefinedName, numToCol, parseFormula } from '@sytue/formula';
-import type { Engine } from '@sytue/formula';
+import { isValidDefinedName, numToCol, parseFormula } from '@sytue/formula/motor';
+import type { Engine } from '@sytue/formula/motor';
 import type { DefinedName, SheetModel } from '../types';
 import { extractRefs, tokenizeFx } from './formula-edit';
 import { parseRangeRef, sheetPrefix } from './format';

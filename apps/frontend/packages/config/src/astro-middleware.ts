@@ -121,6 +121,13 @@ export function cabecerasCerradas(
         : "script-src 'self' 'unsafe-inline'",
       ["connect-src 'self'", ...shell.conectar, ...conectar].join(' '),
       ["img-src 'self' data: blob:", ...shell.imagenes, ...imagenes].join(' '),
+      // Workers de este origen (el cifrado de la bóveda, el e2ee de LiveKit) y de
+      // `blob:`: el sandbox de scripts de Bases y de la ofimática es un iframe
+      // `srcdoc`, que HEREDA esta política, y arranca el código del usuario en un
+      // Worker `blob:`. Sin la directiva, `worker-src` cae en `script-src` y el
+      // navegador lo bloqueaba: «Creating a worker from 'blob:…' violates…» —medido
+      // con Chromium contra esta misma cabecera—, y los scripts no arrancaban.
+      "worker-src 'self' blob:",
       ...(marcos ? [["frame-src 'self'", ...marcos].join(' ')] : []),
     ].join('; '),
   };

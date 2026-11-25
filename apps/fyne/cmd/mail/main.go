@@ -78,7 +78,7 @@ func main() {
 	w.SetPadded(false)
 	host, err := newMailStorage(s, a, w, t)
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(t.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(barra.Montar(host.application.Objeto()))
 		w.SetOnClosed(host.application.Close)

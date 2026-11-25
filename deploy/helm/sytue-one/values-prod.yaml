@@ -12,6 +12,9 @@
 
 global:
   env: prod
+  # Los servicios hablan con PgBouncer por TLS y lo verifican (ver values.yaml).
+  pgbouncerTls:
+    enabled: true
   domain: sytue.eu
   region: fr-par
   imageRegistry: rg.fr-par.scw.cloud/sytue-prod-platform
@@ -209,7 +212,8 @@ cert-manager:
 #     fallo de la auditoria; max_client_conn=2000 lo absorbe de sobra).
 #
 # DSN (secrets sytue-<svc>-db, fuera de banda):
-#   dsn        -> postgres://<user>:<pass>@pgbouncer:6432/<base>?sslmode=disable
+#   dsn        -> postgres://<user>:<pass>@pgbouncer:6432/<base>?sslmode=verify-full&sslrootcert=/etc/sytue/pgbouncer-ca/ca.crt
+#                 (TLS verificado contra la CA propia de PgBouncer: global.pgbouncerTls)
 #   dsn-direct -> postgres://<user>:<pass>@<rdb-privada>:5432/<base>?sslmode=require
 # Y el secret sytue-pgbouncer (userlist.txt) + sytue-postgresql (host/port RDB).
 # DEV (deploy/compose) NO usa PgBouncer.

@@ -1,0 +1,17 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- El CN del ORGANIZER (RFC 5545 3.2.2): el nombre con el que se presenta quien
+-- organiza («Ada Lovelace»), junto a su dirección en `organizer`. La web lo leía del
+-- iCalendar de cada evento (`parseOrganizer`) y las apps nativas, que leen la API REST,
+-- solo tenían la dirección: nombraban al organizador por su correo.
+--
+-- Proyección consultable, como `color` y `conference_url`: el recurso CalDAV se sirve
+-- tal cual desde calendar_objects.data, así que el round-trip no depende de esta
+-- columna. '' = el ORGANIZER no trae CN (o el evento no tiene organizador).
+--
+-- Sin relleno de lo que ya había: la tabla fuerza la RLS por organización y el
+-- guardián del almacenamiento privado (0016) rechaza escribir en una fuente congelada,
+-- así que un UPDATE aquí o no vería filas o pararía el servicio. Cada evento lo toma
+-- de su iCalendar la próxima vez que se guarda, por REST o por CalDAV.
+ALTER TABLE events ADD COLUMN organizer_name text NOT NULL DEFAULT '';

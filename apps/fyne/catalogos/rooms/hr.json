@@ -326,6 +326,7 @@
   "dm.deleteFailed": "Razgovor se nije mogao izbrisati.",
   "dm.empty": "U timu još nema drugih osoba.",
   "dm.emptyQuery": "Nitko ne odgovara pretraživanju.",
+  "dm.externalClosed": "Vaša organizacija ne dopušta razgovore s ovom osobom.",
   "dm.invite": "Pozovi osobe",
   "dm.maxPeople": {
     "one": "Možete dodati najviše {count} osobu.",

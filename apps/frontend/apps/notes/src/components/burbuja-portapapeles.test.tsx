@@ -168,3 +168,30 @@ test('en el teléfono va debajo de la selección y tachado, resaltado y código 
   expect(caja.style.top).toBe('228px');
   expect(caja.style.transform).toBe('translateX(-50%)');
 });
+
+test('en el teléfono todas las herramientas de la burbuja miden lo mismo: el hueco entre glifos es igual', async () => {
+  window.matchMedia = ((q: string) => ({ matches: true, media: q })) as typeof window.matchMedia;
+  editor = await conSeleccion('<p>hola mundo</p>', 'hola');
+  const botones = [...burbuja()!.querySelectorAll('button')];
+  expect(botones.map((x) => x.getAttribute('aria-label'))).toEqual([
+    'editor.bold',
+    'editor.italic',
+    'editor.moreFormatting',
+    'editor.linkTool',
+    'editor.copy',
+    'editor.cut',
+    'editor.paste',
+  ]);
+  // «Más formato» era más ancho (con flecha y menos relleno) y descuadraba la fila.
+  const formas = new Set(
+    botones.map((x) =>
+      x.className
+        .split(/\s+/)
+        .filter((c) => !c.startsWith('aria-expanded:'))
+        .sort()
+        .join(' '),
+    ),
+  );
+  expect(formas.size).toBe(1);
+  for (const x of botones) expect(x.querySelectorAll('svg')).toHaveLength(1);
+});

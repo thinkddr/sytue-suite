@@ -14,15 +14,19 @@
  * Con firmas se avisa además de lo que de verdad se pierde: si la firma se puso
  * después de la versión elegida, el documento restaurado no la lleva. La firma no
  * desaparece del historial, pero el PDF vigente deja de estar firmado.
+ *
+ * Con el PDF en la bóveda (ADR 0086) el historial es el del repositorio cifrado: la
+ * fuente del estudio lo lista, abre una versión descifrándola aquí y la restaura, sin
+ * que el servidor vea ninguna.
  */
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button, EmptyState, InlineHelp, Spinner, VersionList, useConfirm } from '@sytue/ui';
 import type { FileVersion } from '@sytue/api-clients';
 import type { Locale } from '@sytue/i18n';
 import type { DocsT } from '../i18n';
-import { r as ruta } from '../lib/rutas';
-import { ErrorPDF, versiones as apiVersiones } from './api';
+import { ErrorPDF } from './api';
 import { mensajeDeError } from './errores';
+import { useFuentePdf } from './fuente';
 
 export function Versiones({
   t,
@@ -46,6 +50,7 @@ export function Versiones({
   const [cargandoMas, setCargandoMas] = useState(false);
   const [fallo, setFallo] = useState('');
   const [restaurando, setRestaurando] = useState<number | null>(null);
+  const fuente = useFuentePdf(path);
 
   const cargar = useCallback(
     async (cursor?: string) => {
@@ -55,7 +60,7 @@ export function Versiones({
         setError(false);
       }
       try {
-        const p = await apiVersiones.listar(path, cursor);
+        const p = await fuente.versiones.listar(cursor);
         setLista((antes) => (cursor ? [...(antes ?? []), ...p.versions] : p.versions));
         setSiguiente(p.nextCursor ?? null);
       } catch {
@@ -66,7 +71,7 @@ export function Versiones({
         setCargandoMas(false);
       }
     },
-    [path],
+    [fuente],
   );
 
   useEffect(() => {
@@ -92,7 +97,7 @@ export function Versiones({
     setRestaurando(v.version);
     setFallo('');
     try {
-      await apiVersiones.restaurar(path, v.version);
+      await fuente.versiones.restaurar(v.version);
       onRestaurada(v.version);
     } catch (e) {
       setFallo(
@@ -150,17 +155,36 @@ export function Versiones({
             v.isCurrent ? null : (
               <>
                 {/* Un enlace de verdad: se abre en otra pestaña con el visor del
-                    navegador, sin tocar el documento que se está editando aquí. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  href={ruta(apiVersiones.rutaDeVersion(path, v.version))}
-                  target="_blank"
-                  rel="noopener"
-                  aria-label={t('pdf.versions.openAria', { version: v.version })}
-                >
-                  {t('pdf.versions.open')}
-                </Button>
+                    navegador, sin tocar el documento que se está editando aquí. En la
+                    bóveda no hay URL que valga: se descifra aquí y se abre en claro. */}
+                {fuente.versiones.enlace ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    href={fuente.versiones.enlace(v.version)}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={t('pdf.versions.openAria', { version: v.version })}
+                  >
+                    {t('pdf.versions.open')}
+                  </Button>
+                ) : fuente.versiones.abrir ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t('pdf.versions.openAria', { version: v.version })}
+                    onClick={() => {
+                      setFallo('');
+                      void fuente.versiones
+                        .abrir?.(v.version)
+                        .catch((e: unknown) =>
+                          setFallo(mensajeDeError(e, t, 'pdf.versions.failed')),
+                        );
+                    }}
+                  >
+                    {t('pdf.versions.open')}
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   size="sm"

@@ -114,6 +114,12 @@ type Room struct {
 	// LinkKey es la clave del enlace de una reunión suelta (mig 0040): con ella entra
 	// quien no la convocó ni estuvo dentro. Solo la recibe quien ya puede entrar.
 	LinkKey string `json:"link_key,omitempty"`
+	// WaitingRoom dice que a la puerta pueden llamar aunque la sala esté abierta: la
+	// reunión de un evento de Calendar, a la que llegan con el enlace invitados de
+	// otras organizaciones que no tienen la clave ni la invitación (ADR 0040). Lo
+	// deriva el servicio del origen de la sala; los clientes lo usan para mirar la
+	// cola de la puerta también con la sala abierta.
+	WaitingRoom bool `json:"waiting_room,omitempty"`
 	// StartedAt/EndedAt marcan el ciclo real en LiveKit (vía webhooks).
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	EndedAt   *time.Time `json:"ended_at,omitempty"`

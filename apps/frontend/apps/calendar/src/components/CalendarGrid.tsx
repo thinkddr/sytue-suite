@@ -177,7 +177,11 @@ interface MonthChip {
 // Lo que mide cada cosa de la celda del mes, para saber cuántas fichas caben.
 const FICHA_H = 24; // `EventChip`: `min-h-[max(24px,1.5rem)]`
 const FICHA_GAP = 2; // `gap-0.5` entre fichas y `mt-0.5` sobre la primera
-const MAS_H = 16; // «+N más»: una línea de `text-xs`
+// «+N más» mide 24 (el objetivo de WCAG 2.5.8) pero se le reserva lo de siempre, su
+// hueco y una línea de `text-xs`: va pegado a la última ficha, sin el `gap-0.5`, y baja
+// los 6 px del relleno de la celda (`MasDelDia`). Así no le quita sitio a ninguna ficha.
+const MAS_H = 16;
+const FICHA2_H = 38; // `EventChip` en dos líneas: dos de `text-xs`, `py-0.5` y el borde
 const CELDA_PIE = 6 + 1; // el relleno de abajo (`p-[6px]`) y el borde inferior
 
 /**
@@ -202,6 +206,22 @@ export function fichasQueCaben(
   const todas = Math.floor((hueco + FICHA_GAP) / (FICHA_H + FICHA_GAP));
   if (!masForzado && total <= todas) return total;
   return Math.max(0, Math.floor((hueco - MAS_H) / (FICHA_H + FICHA_GAP)));
+}
+
+/**
+ * Si las `total` fichas de una celda caben en DOS líneas cada una bajo `barras` px de
+ * barras, en una semana de `altoSemana`: entonces van en dos (`EventChip dosLineas`) y
+ * el título se lee entero en vez de cortarse a la primera línea. Sin medir, solo la
+ * ficha sola de una semana sin barras, como antes.
+ *
+ * Antes solo iba en dos líneas la ficha SOLA de su celda: con dos o más, todas se
+ * cortaban a una aunque sobrara sitio, y el título solo se leía en el aviso emergente.
+ */
+export function fichasEnDosLineas(altoSemana: number, barras: number, total: number): boolean {
+  if (total === 0) return false;
+  if (!(altoSemana > 0)) return barras === 0 && total === 1;
+  const hueco = altoSemana - CELDA_PIE - DATE_ROW_H - barras - FICHA_GAP;
+  return total * (FICHA2_H + FICHA_GAP) - FICHA_GAP <= hueco;
 }
 
 interface MonthLayout {
@@ -596,7 +616,9 @@ export function CalendarGrid({
                         {barsAreaH > 0 ? (
                           <span aria-hidden="true" style={{ height: `${barsAreaH}px` }} />
                         ) : null}
-                        <div class="mt-0.5 flex min-w-0 flex-col gap-0.5 overflow-hidden">
+                        {/* Sin `overflow-hidden`: el «+N más» baja al relleno de la celda, que
+                            ya recorta (`overflow-hidden` de la celda). */}
+                        <div class="mt-0.5 flex min-w-0 flex-col gap-0.5">
                           {shown.map(({ event, date }) => (
                             <EventChip
                               locale={locale}
@@ -604,7 +626,9 @@ export function CalendarGrid({
                               event={event}
                               date={date}
                               color={color}
-                              dosLineas={barsAreaH === 0 && dayChips.length === 1}
+                              dosLineas={
+                                more === 0 && fichasEnDosLineas(altoSemana, barsAreaH, shown.length)
+                              }
                               onClick={seleccionarEnMes}
                               atenuado={event === arrastrado}
                               {...(event.readOnly
@@ -623,6 +647,7 @@ export function CalendarGrid({
                               items={eventosDelDiaMes(weekSegs, c, dayChips)}
                               color={color}
                               onSelectEvent={onSelectEvent}
+                              pegado={shown.length > 0}
                             />
                           ) : null}
                         </div>
@@ -761,6 +786,7 @@ function MasDelDia({
   items,
   color,
   onSelectEvent,
+  pegado,
 }: {
   locale: Locale;
   day: Date;
@@ -768,11 +794,13 @@ function MasDelDia({
   items: Positioned[];
   color: string;
   onSelectEvent: (event: GridEvent, anchor: DOMRect) => void;
+  /** Hay fichas encima: va pegado a la última, sin el `gap-0.5` (ver MAS_H). */
+  pegado: boolean;
 }): JSX.Element {
   const t = useT(locale);
   const fecha = dayMonthLabel(locale, day);
   return (
-    <div class="pointer-events-auto flex min-w-0">
+    <div class={cx('pointer-events-auto -mb-[6px] flex min-w-0', pegado && '-mt-0.5')}>
       <Popover
         label={t('grid.dayEvents', { date: fecha, count: items.length })}
         trigger={(props) => (
@@ -782,6 +810,11 @@ function MasDelDia({
             class={cx(
               'text-text-muted hover:text-text hover:bg-surface-sunken sytue-focus-ring',
               'max-w-full truncate rounded-sm px-1.5 text-left text-xs font-medium transition-colors',
+              // 24 px de alto, como las fichas (WCAG 2.5.8): con la línea de `text-xs`
+              // sola medía 16. Lo que crece no se le quita a las fichas: sube el `gap-0.5`
+              // que lo separaba de la última (una ficha y él son objetivos contiguos, no
+              // solapados) y baja al relleno de la celda (ver MAS_H).
+              'h-6 py-1',
             )}
           >
             {t('grid.more', { count: more })}

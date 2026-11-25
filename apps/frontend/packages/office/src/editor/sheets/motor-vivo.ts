@@ -12,7 +12,7 @@
  * cambiar las hojas (alta, baja, nombre), las tablas o sus encabezados (el resolutor de
  * `Tabla[Columna]` ya no daría lo mismo). Puro, sin DOM: lo prueban los tests.
  */
-import { Engine, numToCol } from '@sytue/formula';
+import { Engine, numToCol } from '@sytue/formula/motor';
 import type { SheetAutoFilter, SheetData, SheetModel } from '../types';
 import { hiddenByFilter } from './filtro';
 import { formatCellValue, rawText } from './format';

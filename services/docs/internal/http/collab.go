@@ -73,7 +73,7 @@ func (h *Handler) postOps(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("There are no operations to apply."))
 		return
 	}
-	seqd, newSeq, err := h.svc.ApplyOps(domain.ConProteccion(r.Context(), req.Proteccion), subj, docID(r), req.Ops, req.BaseSeq)
+	seqd, newSeq, err := h.aplicarOps(domain.ConProteccion(r.Context(), req.Proteccion), subj, docID(r), req.Ops, req.BaseSeq)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -195,7 +195,7 @@ func subjName(r *http.Request) string {
 
 // ApplyOps satisface collab.Handler (autoriza + secuencia + persiste).
 func (h *Handler) ApplyOps(ctx context.Context, subj domain.Subject, docID string, ops []domain.Op) ([]domain.SequencedOp, int64, error) {
-	return h.svc.ApplyOps(ctx, subj, docID, ops, nil)
+	return h.aplicarOps(ctx, subj, docID, ops, nil)
 }
 
 // OpsSince satisface collab.Handler (replay).

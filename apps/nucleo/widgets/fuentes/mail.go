@@ -85,6 +85,8 @@ func cabecerasDeEntrada(c Comunes, mensajes []api.MailMessage) []widgets.Item {
 		items = append(items, widgets.Item{
 			Title: titulo, Subtitle: subtitulo, Badge: insignia,
 			StartAt: unix(h.ultimo.ReceivedAt), Unread: h.sinLeer,
+			// Su conversación, como el aviso de un correo nuevo (api.LeerHilo).
+			Route: RutaHilo(h.ultimo.ThreadID),
 		})
 		if llenos(items) {
 			break

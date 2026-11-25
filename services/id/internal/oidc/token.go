@@ -56,6 +56,12 @@ type TokenClaims struct {
 	Nonce        string // ID token (replay de la petición de autorización)
 	AuthTime     time.Time
 	AMR          []string // métodos de autenticación (pwd|mfa|webauthn)
+	// DeviceTrust es el claim `device_trust` (none|standard; managed reservado):
+	// la garantía sobre el dispositivo de la sesión que respalda el token (ver
+	// domain.EvaluarConfianzaDelDispositivo). Va en el ACCESS token porque lo
+	// aplican los servicios, y en el ID token por la misma razón que `amr`. Vacío:
+	// no se emite (tokens sin sesión de navegador detrás).
+	DeviceTrust string
 	// MFAEnabled dice si la cuenta tiene segundo factor (claim `mfa_enabled`, solo
 	// en el ACCESS token). Los servicios lo necesitan para exigir «identificación
 	// reciente, y con segundo factor si la cuenta lo tiene» sin preguntar a Sytue
@@ -190,6 +196,9 @@ func (i *Issuer) IssueAccessToken(c TokenClaims, now time.Time) (string, error) 
 	if c.MFAEnabled != nil {
 		b = b.Claim("mfa_enabled", *c.MFAEnabled)
 	}
+	if c.DeviceTrust != "" {
+		b = b.Claim("device_trust", c.DeviceTrust)
+	}
 	if len(c.Roles) > 0 {
 		b = b.Claim("roles", c.Roles)
 	}
@@ -322,6 +331,9 @@ func (i *Issuer) IssueIDToken(c TokenClaims, now time.Time) (string, error) {
 	}
 	if len(c.AMR) > 0 {
 		b = b.Claim("amr", c.AMR)
+	}
+	if c.DeviceTrust != "" {
+		b = b.Claim("device_trust", c.DeviceTrust)
 	}
 	if c.Tenant != "" {
 		b = b.Claim("tenant", c.Tenant)

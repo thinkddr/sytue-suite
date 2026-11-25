@@ -2776,9 +2776,9 @@ export const mt: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Il-firma ma tidħolx f’dik il-paġna. Agħżel paġna jew pożizzjoni oħra.',
   'pdf.device.view': 'Ara',
   'pdf.vault.help':
-    'Dan il-PDF jinsab fid-Drive kriptat tiegħek: jiġi dekriptat biss fuq dan it-tagħmir, fejn tista’ tarah, tannotah, timlieh, torganizzah u tiffirmah. Dak li tissejvja jmur lura kriptat.',
+    'Dan il-PDF jinsab fid-Drive kriptat tiegħek: jiġi dekriptat biss fuq dan it-tagħmir, fejn tista’ tarah, tannotah, timlieh, torganizzah, tipproteġih, tħassar kontenut minnu, teditjah, tqabblu, tipprintjah u tiffirmah. Dak li tissejvja jmur lura kriptat.',
   'pdf.vault.serverOnly':
-    'Bid-Drive kriptat tiegħek għadhom mhumiex disponibbli talbiet għal firma, protezzjoni b’password, għarfien tat-test, ħassir, editjar ta’ test jew stampi, timbri u marki tal-ilma, tqabbil, l-istorja tal-verżjonijiet u l-istampar: jeħtieġu li s-servizz jaqra l-PDF jew għadhom ma jsirux fuq it-tagħmir.',
+    'Bid-Drive kriptat tiegħek, it-talbiet għall-firma, ir-rikonoxximent tat-test u l-assistent mhumiex disponibbli: jeħtieġu li s-servizz jaqra l-PDF. Kull ħaġa oħra ssir fuq dan it-tagħmir.',
   'pdf.vault.notFound.title': 'Dan il-PDF mhuwiex fid-Drive kriptat tiegħek',
   'pdf.vault.notFound.description': 'Forsi ġie mċaqlaq jew imħassar. Fittxu f’Sytue Drive.',
   'pdf.vault.openSigned': 'Iftaħ il-kopja ffirmata',
@@ -2792,7 +2792,9 @@ export const mt: AppCatalog<typeof en> = {
     'Id-Drive tiegħek għadu għaddej għall-kriptaġġ minn tarf sa tarf. Lestih minn Sytue Drive.',
   'pdf.device.error.password': 'Dik il-password ma tiftaħx iċ-ċertifikat.',
   'pdf.device.error.encrypted':
-    'Dan il-PDF huwa protett b’password u ma jistax jiġi ffirmat fuq dan l-apparat.',
+    'Dan il-PDF huwa protett b’password: iftħu u iffirmah mill-istudjo tiegħu, fejn tintuża l-password tiegħu.',
+  'pdf.device.protectedNote':
+    'Dan il-PDF huwa protett b’password. Biex jiġi ffirmat, jinkiteb mill-ġdid mingħajrha fuq dan it-tagħmir, kif jagħmel is-server: il-kopja ffirmata tiġi ssejvjata kriptata fid-Drive tiegħek, iżda mingħajr il-password tal-PDF.',
   'pdf.device.error.locked':
     'Dan il-PDF huwa ċċertifikat kontra kull bidla: firma oħra tinvalidah.',
   'pdf.device.error.unreadable':

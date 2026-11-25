@@ -74,6 +74,10 @@ func scanSavedMessage(row pgx.Row, tenant string) (domain.Message, time.Time, er
 // mensaje de un canal privado al que el usuario ya no pertenece. Devuelve el cursor
 // de la siguiente página (la fecha de guardado del último elemento) o nil si no hay
 // más.
+//
+// Lo guardado en una conversación de OTRA organización (ADR 0040) se escribió en la
+// anfitriona, donde vive el mensaje: se lee allí también (enCadaAnfitrion) y se junta
+// con lo propio por fecha, solo de las conversaciones donde sigue como externo.
 func (s *Store) ListSaved(ctx context.Context, subject string, before *time.Time, limit int) ([]domain.Message, *time.Time, error) {
 	t := tenancy.MustFrom(ctx)
 	if limit <= 0 || limit > 100 {
@@ -83,46 +87,51 @@ func (s *Store) ListSaved(ctx context.Context, subject string, before *time.Time
 	if before != nil {
 		beforeTs = *before
 	}
-	var msgs []domain.Message
-	var next *time.Time
+	var todos []conFecha[domain.Message]
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx,
-			`SELECT `+prefixed("m", messageCols)+`, sv.created_at
-			 FROM message_saves sv
-			 JOIN messages m ON m.tenant=sv.tenant AND m.id=sv.message_id
-			 JOIN channels c ON c.tenant=sv.tenant AND c.id=sv.channel_id
-			 WHERE sv.tenant=$1 AND sv.subject=$2
-			   AND m.deleted_at IS NULL AND c.deleted_at IS NULL
-			   AND sv.created_at < $3
-			   AND (
-			        c.kind='public'
-			        OR EXISTS (SELECT 1 FROM channel_members cm
-			                   WHERE cm.tenant=c.tenant AND cm.channel_id=c.id AND cm.subject=$2)
-			   )`+filtroVaciado("m", "$2")+`
-			 ORDER BY sv.created_at DESC, sv.message_id DESC
-			 LIMIT $4`,
-			t.Slug, subject, beforeTs, limit)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		var lastSavedAt time.Time
-		for rows.Next() {
-			m, savedAt, err := scanSavedMessage(rows, t.Slug)
-			if err != nil {
-				return err
-			}
-			msgs = append(msgs, m)
-			lastSavedAt = savedAt
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		// Página completa: hay potencialmente más; expón el cursor keyset.
-		if len(msgs) == limit {
-			next = &lastSavedAt
-		}
-		return nil
+		var err error
+		todos, err = guardadosTx(ctx, tx, t.Slug, subject, beforeTs, limit, false)
+		return err
 	})
-	return msgs, next, err
+	if err != nil {
+		return nil, nil, err
+	}
+	err = s.enCadaAnfitrion(ctx, subject, t.Slug, func(tx pgx.Tx, anfitrion string) (bool, error) {
+		fuera, err := guardadosTx(ctx, tx, anfitrion, subject, beforeTs, limit, true)
+		todos = append(todos, fuera...)
+		return false, err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	msgs, next := paginaPorFecha(todos, limit)
+	return msgs, next, nil
+}
+
+// guardadosTx lee una página de lo guardado por subject en UNA organización.
+func guardadosTx(ctx context.Context, tx pgx.Tx, tenant, subject string, beforeTs time.Time, limit int, deFuera bool) ([]conFecha[domain.Message], error) {
+	rows, err := tx.Query(ctx,
+		`SELECT `+prefixed("m", messageCols)+`, sv.created_at
+		 FROM message_saves sv
+		 JOIN messages m ON m.tenant=sv.tenant AND m.id=sv.message_id
+		 JOIN channels c ON c.tenant=sv.tenant AND c.id=sv.channel_id
+		 WHERE sv.tenant=$1 AND sv.subject=$2
+		   AND m.deleted_at IS NULL AND c.deleted_at IS NULL
+		   AND sv.created_at < $3`+accesoAlCanal(deFuera)+filtroVaciado("m", "$2")+`
+		 ORDER BY sv.created_at DESC, sv.message_id DESC
+		 LIMIT $4`,
+		tenant, subject, beforeTs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []conFecha[domain.Message]
+	for rows.Next() {
+		m, savedAt, err := scanSavedMessage(rows, tenant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, conFecha[domain.Message]{v: m, fecha: savedAt, id: m.ID})
+	}
+	return out, rows.Err()
 }

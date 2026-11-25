@@ -251,6 +251,7 @@ export const sv: AppCatalog<typeof en> = {
     other: 'Du kan lägga till högst {count} personer.',
   },
   'dm.openFailed': 'Det gick inte att öppna konversationen.',
+  'dm.externalClosed': 'Din organisation tillåter inte samtal med den här personen.',
   'people.search': 'Sök efter ”{query}” i Sytue One',
   'people.searching': 'Söker i Sytue One…',
   'people.notFound': 'Ingen i Sytue One använder den e-postadressen eller det @användarnamnet.',

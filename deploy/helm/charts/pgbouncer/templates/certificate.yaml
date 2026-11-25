@@ -1,0 +1,95 @@
+{{- /*
+TLS de los servicios a PgBouncer, con una CA PROPIA del namespace (cert-manager).
+
+Hasta aquí el primer salto iba en claro dentro del clúster: solo PgBouncer → RDB
+llevaba TLS. Con esto los servicios hablan con PgBouncer por TLS y VERIFICAN el
+certificado (`sslmode=verify-full&sslrootcert=…` en sus DSN, deploy/production/
+02b-secretos.sh): una NetworkPolicy mal puesta, un pod comprometido en el mismo
+nodo o un espejo de tráfico ya no leen consultas ni credenciales.
+
+Una CA propia y no el ClusterIssuer ACME: el nombre es `pgbouncer`, interno, y no
+lo firma ninguna CA pública. Tres piezas, el patrón de cert-manager para una CA
+privada: un Issuer autofirmado que solo firma la CA, la CA, y un Issuer CA que
+firma el certificado del Service. Todo NAMESPACED: esta CA no puede firmar nada
+fuera de este namespace.
+
+Vidas: la CA, diez años —rotarla obliga a reiniciar los servicios, porque pgx lee
+la raíz al abrir el pool—; el del Service, noventa días, renovado a los sesenta
+sin tocar los servicios (la raíz no cambia). PgBouncer recarga el certificado
+renovado él solo (ver deployment.yaml).
+*/ -}}
+{{- if ((.Values.global).pgbouncerTls).enabled }}
+{{- $tls := .Values.tls }}
+{{- $svc := include "sytue-pgbouncer.serviceName" . }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "sytue-pgbouncer.fullname" . }}-raiz
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "sytue-pgbouncer.fullname" . }}-ca
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+spec:
+  isCA: true
+  commonName: {{ printf "%s-ca" $svc | quote }}
+  secretName: {{ $tls.caSecretName | quote }}
+  duration: {{ $tls.caDuration | quote }}
+  renewBefore: {{ $tls.caRenewBefore | quote }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: {{ include "sytue-pgbouncer.fullname" . }}-raiz
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "sytue-pgbouncer.fullname" . }}-ca
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+spec:
+  ca:
+    secretName: {{ $tls.caSecretName | quote }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "sytue-pgbouncer.fullname" . }}-tls
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+spec:
+  # El Secret que montan PgBouncer (tls.crt, tls.key) y los servicios (solo
+  # ca.crt): su nombre es contrato con global.pgbouncerTls.secretName.
+  secretName: {{ ((.Values.global).pgbouncerTls).secretName | default "sytue-pgbouncer-tls" | quote }}
+  duration: {{ $tls.duration | quote }}
+  renewBefore: {{ $tls.renewBefore | quote }}
+  commonName: {{ $svc | quote }}
+  # El host de los DSN es `pgbouncer` a secas; los otros tres, por si un cliente
+  # usa el nombre completo. verify-full compara el host con ESTA lista.
+  dnsNames:
+    - {{ $svc | quote }}
+    - {{ printf "%s.%s" $svc .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc" $svc .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc.cluster.local" $svc .Release.Namespace | quote }}
+  usages:
+    - server auth
+    - digital signature
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: {{ include "sytue-pgbouncer.fullname" . }}-ca
+    kind: Issuer
+    group: cert-manager.io
+{{- end }}

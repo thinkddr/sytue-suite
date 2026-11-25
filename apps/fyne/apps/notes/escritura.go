@@ -114,6 +114,13 @@ func (p *Pantalla) abrirEditor(n Nota) {
 	ed.AlTerminar = p.cerrarEditor
 	ed.conservaEdicion = p.barra.conservaEdicion
 	ed.AlEnlazar = func(d fyne.CanvasObject) { p.herramientaEnlace(ed, d) }
+	// Imágenes y ficheros dentro del texto (adjuntos_cuerpo.go): se guardan como adjuntos
+	// de la nota y se pintan con los que tenga AHORA.
+	ed.AlAdjuntar = func(imagen bool) { p.adjuntarEnCuerpo(n.ID, ed, imagen) }
+	ed.Imagenes = imagenesDeAdjuntos(func() []Adjunto {
+		actual, _ := p.nota(n.ID)
+		return actual.Adjuntos
+	})
 	// «[[» busca como la herramienta, sin Drive; «@», la gente de la organización, salvo
 	// en un cuaderno cifrado: el servicio no lee su texto y la mención no avisaría a nadie.
 	ed.enlaces = p.nuevaBusquedaEnlaces(false)

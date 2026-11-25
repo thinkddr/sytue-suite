@@ -251,6 +251,7 @@ export const is: AppCatalog<typeof en> = {
     other: 'Þú getur bætt við allt að {count} manneskjum.',
   },
   'dm.openFailed': 'Ekki tókst að opna samtalið.',
+  'dm.externalClosed': 'Stofnunin þín leyfir ekki samtöl við þennan aðila.',
   'people.search': 'Leita að „{query}“ í Sytue One',
   'people.searching': 'Leitar í Sytue One…',
   'people.notFound': 'Enginn aðgangur í Sytue One notar þetta netfang eða @notandanafn.',

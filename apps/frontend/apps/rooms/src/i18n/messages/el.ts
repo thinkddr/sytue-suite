@@ -255,6 +255,7 @@ export const el: AppCatalog<typeof en> = {
     other: 'Μπορείτε να προσθέσετε έως {count} άτομα.',
   },
   'dm.openFailed': 'Δεν ήταν δυνατό το άνοιγμα της συνομιλίας.',
+  'dm.externalClosed': 'Ο οργανισμός σας δεν επιτρέπει συζητήσεις με αυτό το άτομο.',
   'people.search': 'Αναζήτηση «{query}» στο Sytue One',
   'people.searching': 'Αναζήτηση στο Sytue One…',
   'people.notFound': 'Αυτό το email ή @όνομα χρήστη δεν χρησιμοποιείται στο Sytue One.',

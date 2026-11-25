@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/services/syphotos/internal/trashgc"
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
@@ -177,6 +178,9 @@ func run() error {
 	dr := drive.Nuevo(cfg.DriveBaseURL, cfg.DriveTimeout)
 	ingesta := service.NuevaIngesta(st, dr, objetos, cfg.BytesDeCabecera, cfg.LadosDeDerivada)
 	limpieza := service.NuevaLimpieza(objetos, st)
+
+	// Purga de tenant (ADR 0054): las derivadas de una organización que desaparece.
+	go purgatenant.Trabajador{DB: pool, Almacen: objetos, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
 
 	// Auto-purga de la papelera. La condición también va aquí, además de dentro
 	// del worker, para no dejar una gorutina viva que solo sabe salirse.

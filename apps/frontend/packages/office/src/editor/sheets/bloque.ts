@@ -15,7 +15,7 @@
  * ponytail: pisa lo que hubiera en las celdas que ocupa, como un pegado; avisar antes
  * si el destino no está vacío cuando alguien lo pida.
  */
-import { numToCol } from '@sytue/formula';
+import { numToCol } from '@sytue/formula/motor';
 import type { CellStyle, ChartSpec, NumFmt, SheetData } from '../types';
 import {
   parseRangeRef,

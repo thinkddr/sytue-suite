@@ -971,7 +971,7 @@ export const sv: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Flytta din e-post till det nya valvet för att fortsätta ta emot den',
   'privateMail.vaultMoveRetiredBody':
-    'Det tidigare e-postsystemet är inte längre tillgängligt. Tills du flyttar din e-post till valvet får du ingen ny e-post: det som kommer under tiden sparas krypterat med det tidigare systemet, precis som e-posten du redan hade, och kan inte läsas. Det raderas inte, men ingen kan öppna det. När du har flyttat kommer e-posten fram igen och öppnas med din Sytue ID-inloggning, som de andra apparna.',
+    'Det tidigare e-postsystemet är inte längre tillgängligt. Tills du flyttar din e-post till valvet får du ingen ny e-post: det som skickas till dig under tiden väntar på avsändarens server, som försöker igen i några dagar. Flyttar du i tid kommer det fram till dig efteråt; annars får avsändaren besked om att det inte kunde levereras. Det som redan är krypterat med det tidigare systemet, precis som e-posten du redan hade, kan inte läsas: det raderas inte, men ingen kan öppna det. När du har flyttat kommer e-posten fram igen och öppnas med din Sytue ID-inloggning, som de andra apparna.',
   'privateMail.vaultMoveCheckFailed':
     'Det gick inte att kontrollera statusen för din e-post. Försök igen om en stund.',
 };

@@ -274,6 +274,7 @@ export const es: AppCatalog<typeof en> = {
     other: 'Puedes añadir a {count} personas como máximo.',
   },
   'dm.openFailed': 'No se pudo abrir la conversación.',
+  'dm.externalClosed': 'Tu organización no permite conversaciones con esta persona.',
 
   // --- Personas de otra organización (ADR 0040) ---------------------------
   'people.search': 'Buscar «{query}» en Sytue One',

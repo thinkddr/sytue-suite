@@ -131,6 +131,11 @@ public final class WidgetSnapshot {
     public final List<Counter> counters;
     public final List<Item> items;
     public final CalendarGrid calendar;
+    /**
+     * `app_only`: lo publicado salió del repositorio privado, que solo se relee con la app
+     * abierta (Snapshot.SoloConLaApp en Go). Ya rancio, el widget lo dice (pideAbrir).
+     */
+    public final boolean soloConLaApp;
 
     public WidgetSnapshot(long version, String product, String generation, long updatedAt,
             long expiresAt, boolean active, List<Counter> counters) {
@@ -139,6 +144,13 @@ public final class WidgetSnapshot {
 
     public WidgetSnapshot(long version, String product, String generation, long updatedAt,
             long expiresAt, boolean active, List<Counter> counters, List<Item> items, CalendarGrid calendar) {
+        this(version, product, generation, updatedAt, expiresAt, active, counters, items, calendar, false);
+    }
+
+    public WidgetSnapshot(long version, String product, String generation, long updatedAt,
+            long expiresAt, boolean active, List<Counter> counters, List<Item> items, CalendarGrid calendar,
+            boolean soloConLaApp) {
+        this.soloConLaApp = soloConLaApp;
         this.version = version;
         this.product = product;
         this.generation = generation;
@@ -261,7 +273,9 @@ public final class WidgetSnapshot {
             case "compose":
                 return "mail".equals(product);
             case "create":
-                return "calendar".equals(product) || "contacts".equals(product) || "notes".equals(product);
+                // Docus, Calcus y Diapos preguntan antes de crear (editor.Portada.PreguntarCrear).
+                return "calendar".equals(product) || "contacts".equals(product) || "notes".equals(product)
+                        || "docs".equals(product) || "sheets".equals(product) || "slides".equals(product);
             case "upload":
                 return "photos".equals(product);
             default:
@@ -339,6 +353,14 @@ public final class WidgetSnapshot {
     }
 
     /**
+     * «Se actualiza con la app abierta» (Snapshot.PideAbrir en Go): un dato ya rancio del
+     * repositorio privado, que ni el refresco sin ventana puede releer sin la clave.
+     */
+    public boolean pideAbrir(long now) {
+        return soloConLaApp && rancio(now);
+    }
+
+    /**
      * widgets.Vigentes: en Calendar, un evento con hora vale mientras no haya terminado (o
      * no haya empezado); uno de día completo es FLOTANTE —medianoche UTC— y vale hasta la
      * medianoche local que sigue a su último día, con el final exclusivo. Sin fechas, vale.
@@ -376,7 +398,8 @@ public final class WidgetSnapshot {
                 quedan.add(item);
             }
         }
-        return new WidgetSnapshot(version, product, generation, updatedAt, expiresAt, active, counters, quedan, calendar);
+        return new WidgetSnapshot(version, product, generation, updatedAt, expiresAt, active, counters, quedan, calendar,
+                soloConLaApp);
     }
 
     /**
@@ -399,6 +422,10 @@ public final class WidgetSnapshot {
         }
         if (snapshot.expiresAt > now) {
             proximo = Math.min(proximo, snapshot.expiresAt);
+        }
+        // Cuando un dato del repositorio privado se pone rancio, el rótulo cambia (pideAbrir).
+        if (snapshot.soloConLaApp && snapshot.updatedAt + FRESCO > now) {
+            proximo = Math.min(proximo, snapshot.updatedAt + FRESCO);
         }
         if ("calendar".equals(snapshot.product)) {
             for (Item item : snapshot.items) {

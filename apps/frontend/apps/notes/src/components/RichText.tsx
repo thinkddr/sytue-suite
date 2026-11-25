@@ -72,6 +72,9 @@ import type { NotesMessageKey, T } from '../i18n/index.js';
 import { escapar } from '../client/captura.js';
 import { atajoMarkdown, queSePega } from '../client/markdown.js';
 import { normalizarSalida } from '../client/salida.js';
+import { htmlDeAdjunto, MAX_ADJUNTO, pintarAdjuntos, TIPOS_DE_IMAGEN } from './adjuntos-texto.js';
+import { useBarraEnTeclado } from './barra-teclado.js';
+import type { NoteAttachment } from './NoteCard.js';
 import { atajoEnLinea } from '../client/autoformato.js';
 import { estadisticas, textoDeNota } from '../client/extracto.js';
 import { atajosDelEditor } from './atajos-editor.js';
@@ -120,9 +123,15 @@ import {
   alternarFilasNumeradas,
   celdaEn,
   celdaVecina,
+  combinarAbajo,
+  combinarDerecha,
   entrarEnCelda,
+  esCombinada,
   fondoDeCelda,
   posicionDe,
+  separarCelda,
+  vecinaAbajo,
+  vecinaDerecha,
 } from './tabla-notas.js';
 import { BarraDeBloque, type AccionesDeBloque } from './BarraDeBloque.js';
 import { copiarRango, leerPortapapeles } from './portapapeles-editor.js';
@@ -168,6 +177,14 @@ interface Props {
    */
   anchoCompleto?: boolean;
   onAncho?: () => void;
+  /**
+   * Los adjuntos de la nota, para pintar las imágenes del texto (`<img src="adjunto:ID">`,
+   * adjuntos-texto.ts), y cómo guardar unos nuevos: los ficheros elegidos con «Imagen» o
+   * «Archivo», o pegados, pasan a `data.attachments` y vuelven ya con su id. Sin
+   * `onAdjuntar`, el editor no ofrece ni lo uno ni lo otro.
+   */
+  adjuntos?: readonly NoteAttachment[];
+  onAdjuntar?: (ficheros: File[]) => Promise<NoteAttachment[]>;
 }
 
 interface Accion {
@@ -379,8 +396,17 @@ export function RichText({
   sinAro = false,
   anchoCompleto,
   onAncho,
+  adjuntos,
+  onAdjuntar,
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
+  // El editor entero (barra, campo, avisos): seguir escribiendo es tener el foco dentro.
+  const raizRef = useRef<HTMLDivElement>(null);
+  // La barra pegada al teclado del teléfono (barra-teclado.ts): a qué altura, o arriba.
+  const teclado = useBarraEnTeclado(ref, raizRef);
+  // El selector de ficheros de «Imagen» y «Archivo», y el aviso de uno que no cabe.
+  const ficheroRef = useRef<HTMLInputElement>(null);
+  const [avisoAdjunto, setAvisoAdjunto] = useState(false);
   // Qué comandos están activos en la selección actual. Sin esto, el botón de
   // negrita se ve igual dentro y fuera de un texto en negrita y hay que pulsarlo
   // para averiguar en qué estado se estaba.
@@ -497,7 +523,11 @@ export function RichText({
   const personas = enlaces?.personas;
   /** Lo que aquí se puede insertar: sin cuaderno no hay notas que enlazar, ni sin gente a quién. */
   const disponible = (c: Comando) =>
-    (c.id !== 'enlace' || enlaces !== undefined) && (c.id !== 'mencion' || personas !== undefined);
+    (c.id !== 'enlace' || enlaces !== undefined) &&
+    (c.id !== 'mencion' || personas !== undefined) &&
+    ((c.id !== 'imagen' && c.id !== 'archivo') || onAdjuntar !== undefined);
+  // Un adjunto que llega después (otra pestaña, la cola) se pinta en cuanto está.
+  useEffect(() => pintarAdjuntos(ref.current, adjuntos ?? [], false), [adjuntos]);
   useEffect(() => {
     if (!pidiendoGente || !personas) return;
     let vivo = true;
@@ -689,6 +719,7 @@ export function RichText({
     if (ref.current && ref.current.innerHTML !== initialHtml) {
       ref.current.innerHTML = initialHtml;
     }
+    pintarAdjuntos(ref.current, adjuntos ?? [], false);
     executeEditingCommand('styleWithCSS', 'true');
     ref.current?.focus();
     // Las capas (números de línea, celda activa) se miden con lo ya pintado, y otra vez
@@ -1089,6 +1120,9 @@ export function RichText({
         cabeceraFila: () => enCelda((x) => alternarCabeceraDeFila(x.closest('table')!)),
         cabeceraColumna: () => enCelda((x) => alternarCabeceraDeColumna(x.closest('table')!)),
         numerada: () => enCelda((x) => alternarFilasNumeradas(x.closest('table')!)),
+        combinarDerecha: () => enCelda(combinarDerecha),
+        combinarAbajo: () => enCelda(combinarAbajo),
+        separar: () => enCelda(separarCelda),
         fondo: (color) => enCelda((x) => fondoDeCelda(x, color)),
         alinear: (lado) => enCelda((x) => alinearColumna(x, lado)),
       },
@@ -1399,7 +1433,36 @@ export function RichText({
         return abrirSimbolos(true);
       case 'emoji':
         return abrirSimbolos('emoji');
+      case 'imagen':
+      case 'archivo':
+        if (document.activeElement === ref.current) guardarSeleccion();
+        if (ficheroRef.current) {
+          ficheroRef.current.accept = id === 'imagen' ? TIPOS_DE_IMAGEN.join(',') : '';
+          ficheroRef.current.click();
+        }
+        return;
     }
+  };
+
+  /**
+   * Guarda unos ficheros como adjuntos de la nota y los pone en el cursor: las imágenes
+   * dentro del texto y lo demás como enlace a su fichero. Uno que no cabe en la nota no
+   * se sube (y se dice).
+   */
+  const adjuntar = async (ficheros: File[]) => {
+    if (!onAdjuntar || ficheros.length === 0) return;
+    if (ficheros.some((f) => f.size > MAX_ADJUNTO)) {
+      setAvisoAdjunto(true);
+      return;
+    }
+    setAvisoAdjunto(false);
+    const nuevos = await onAdjuntar(ficheros);
+    if (nuevos.length === 0) return;
+    enfocarTexto();
+    executeEditingCommand('insertHTML', nuevos.map(htmlDeAdjunto).join(''));
+    pintarAdjuntos(ref.current, [...(adjuntos ?? []), ...nuevos], false);
+    refrescar();
+    emitir();
   };
 
   /** Borra «/consulta» e inserta el elemento, como si se hubiera elegido en el «+». */
@@ -2143,8 +2206,32 @@ export function RichText({
   ];
 
   return (
-    <div class={cx('flex min-h-0 flex-col', estirado && 'flex-1')}>
-      <BarraConMas items={items} aria-label={ariaLabel} etiquetaMas={t('editor.more')} />
+    <div ref={raizRef} class={cx('flex min-h-0 flex-col', estirado && 'flex-1')}>
+      {/* En el teléfono, escribiendo, la barra va pegada encima del teclado. */}
+      <div
+        class={cx(teclado !== null && 'notes-barra-teclado')}
+        style={teclado !== null ? { bottom: `${teclado}px` } : undefined}
+      >
+        <BarraConMas items={items} aria-label={ariaLabel} etiquetaMas={t('editor.more')} />
+      </div>
+      <input
+        ref={ficheroRef}
+        type="file"
+        multiple
+        class="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(e) => {
+          const lista = [...(e.currentTarget.files ?? [])];
+          e.currentTarget.value = '';
+          void adjuntar(lista);
+        }}
+      />
+      {avisoAdjunto ? (
+        <p role="status" class="text-danger-text px-1 py-0.5 text-xs">
+          {t('editor.attachTooLarge')}
+        </p>
+      ) : null}
 
       {/* El fallo del asistente no se traga: sin aviso, pulsar «ordenar» y no ver
           nada se lee como que la nota está rota. */}
@@ -2440,6 +2527,15 @@ export function RichText({
             // el Markdown, convertido; y con Mayúsculas, el texto plano.
             e.preventDefault();
             e.stopPropagation();
+            // Una captura o un fichero pegado entra como adjunto (adjuntos-texto.ts). Solo
+            // si no trae texto: Word y Excel pegan, junto al texto, una imagen de él.
+            const pegados = [...(e.clipboardData?.files ?? [])];
+            const conTexto =
+              !!e.clipboardData?.getData('text/plain') || !!e.clipboardData?.getData('text/html');
+            if (pegados.length > 0 && onAdjuntar && !conTexto) {
+              void adjuntar(pegados);
+              return;
+            }
             // En un bloque de código el Markdown se queda en letras, como al teclear.
             const ancla = window.getSelection()?.anchorNode;
             const enCodigo = !!(ancla instanceof Element ? ancla : ancla?.parentElement)?.closest(
@@ -2864,16 +2960,15 @@ export function RichText({
                     onPress={() => aplicar('italic')}
                   />
                   {/* En el teléfono, tachado, resaltado y código van en «Más formato»: así
-                      la burbuja cabe en 390 px, como la de Fyne. */}
+                      la burbuja cabe en 390 px, como la de Fyne. Su botón mide lo mismo que
+                      los demás y no lleva flecha: con ella era más ancho y con menos aire a
+                      los lados, y los huecos entre herramientas salían desiguales. */}
                   {burbuja.estrecha ? (
                     <Dropdown
                       label={t('editor.moreFormatting')}
                       trigger={disparador(
                         t('editor.moreFormatting'),
-                        <Icon name="text" size={16} />,
-                        {
-                          flecha: true,
-                        },
+                        <Glyph name="formato" size={16} />,
                       )}
                     >
                       {[
@@ -3132,6 +3227,16 @@ export function RichText({
                   <MenuSeparator />
                   {opcion(t('editor.headerRow'), 'cabeceraFila', a.cabeceraFila)}
                   {opcion(t('editor.headerColumn'), 'cabeceraColumna', a.cabeceraColumna)}
+                  <MenuSeparator />
+                  {vecinaDerecha(contexto.celda)
+                    ? opcion(t('editor.mergeRight'), 'combinar', a.combinarDerecha)
+                    : null}
+                  {vecinaAbajo(contexto.celda)
+                    ? opcion(t('editor.mergeDown'), 'combinarAbajo', a.combinarAbajo)
+                    : null}
+                  {esCombinada(contexto.celda)
+                    ? opcion(t('editor.splitCell'), 'separar', a.separar)
+                    : null}
                   <MenuSeparator />
                   {opcion(t('editor.rowDelete'), 'filaQuitar', a.quitarFila)}
                   {opcion(t('editor.colDelete'), 'columnaQuitar', a.quitarColumna)}

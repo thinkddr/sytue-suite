@@ -5,7 +5,7 @@
  * «Mi cuenta» comparte origen con Sytue ID (docs/security.md#riesgo-aceptado-mi-cuenta-en-el-origen-del-idp),
  * así que aquí `script-src` no admite nada que no sea nuestro: Astro emite la
  * cabecera con los hashes de sus scripts, y los de arranque del layout se sirven
- * como fichero de este origen (src/pages/arranque.js.ts). `applySecurityHeaders`
+ * como fichero de este origen (`/arranque.js`, sytueArranque). `applySecurityHeaders`
  * CONSERVA esa CSP de Astro (no la pisa) y le AÑADE la de la casa, de modo que el
  * navegador aplica las dos: antes esto se hacía a mano aquí, ahora lo hace la
  * propia función (la misma regla que conserva el `sandbox` de los adjuntos).

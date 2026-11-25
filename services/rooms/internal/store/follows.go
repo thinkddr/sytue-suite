@@ -138,6 +138,9 @@ func markThreadViewed(ctx context.Context, tx pgx.Tx, tenant string, rootID uuid
 // UNA sola consulta, sin N+1 (mismo patrón que UnreadByChannel). Reaplica el filtro de
 // acceso al canal (público, o miembro) como ListSaved: no revela un hilo de un canal
 // privado del que ya no eres miembro. Devuelve el cursor de la siguiente página o nil.
+//
+// Los hilos de una conversación de OTRA organización (ADR 0040) se siguen en la
+// anfitriona: se leen allí también y se juntan por actividad, como ListSaved.
 func (s *Store) ListFollowedThreads(ctx context.Context, subject string, before *time.Time, limit int) ([]domain.ThreadSummary, *time.Time, error) {
 	t := tenancy.MustFrom(ctx)
 	if limit <= 0 || limit > 100 {
@@ -147,49 +150,55 @@ func (s *Store) ListFollowedThreads(ctx context.Context, subject string, before 
 	if before != nil {
 		beforeTs = *before
 	}
-	var out []domain.ThreadSummary
-	var next *time.Time
+	var todos []conFecha[domain.ThreadSummary]
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx,
-			`SELECT `+prefixed("m", messageCols)+`, f.last_activity,
-			        (SELECT count(*) FROM messages r
-			         WHERE r.tenant=f.tenant AND r.parent_id=f.root_id AND r.deleted_at IS NULL
-			           AND r.author_sub <> f.subject
-			           AND r.created_at > f.last_viewed_at) AS unread_replies
-			 FROM thread_follows f
-			 JOIN messages m ON m.tenant=f.tenant AND m.id=f.root_id AND m.deleted_at IS NULL
-			 JOIN channels c ON c.tenant=m.tenant AND c.id=m.channel_id AND c.deleted_at IS NULL
-			 WHERE f.tenant=$1 AND f.subject=$2 AND f.last_activity < $3
-			   AND (
-			        c.kind='public'
-			        OR EXISTS (SELECT 1 FROM channel_members cm
-			                   WHERE cm.tenant=c.tenant AND cm.channel_id=c.id AND cm.subject=$2)
-			   )`+filtroVaciado("m", "$2")+`
-			 ORDER BY f.last_activity DESC, f.root_id DESC
-			 LIMIT $4`,
-			t.Slug, subject, beforeTs, limit)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		var lastActivity time.Time
-		for rows.Next() {
-			var ts domain.ThreadSummary
-			m, err := scanMessage(rows, t.Slug, &ts.LastActivity, &ts.UnreadReplies)
-			if err != nil {
-				return err
-			}
-			ts.Root = m
-			out = append(out, ts)
-			lastActivity = ts.LastActivity
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		if len(out) == limit {
-			next = &lastActivity
-		}
-		return nil
+		var err error
+		todos, err = hilosSeguidosTx(ctx, tx, t.Slug, subject, beforeTs, limit, false)
+		return err
 	})
-	return out, next, err
+	if err != nil {
+		return nil, nil, err
+	}
+	err = s.enCadaAnfitrion(ctx, subject, t.Slug, func(tx pgx.Tx, anfitrion string) (bool, error) {
+		fuera, err := hilosSeguidosTx(ctx, tx, anfitrion, subject, beforeTs, limit, true)
+		todos = append(todos, fuera...)
+		return false, err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	out, next := paginaPorFecha(todos, limit)
+	return out, next, nil
+}
+
+// hilosSeguidosTx lee una página de los hilos que subject sigue en UNA organización.
+func hilosSeguidosTx(ctx context.Context, tx pgx.Tx, tenant, subject string, beforeTs time.Time, limit int, deFuera bool) ([]conFecha[domain.ThreadSummary], error) {
+	rows, err := tx.Query(ctx,
+		`SELECT `+prefixed("m", messageCols)+`, f.last_activity,
+		        (SELECT count(*) FROM messages r
+		         WHERE r.tenant=f.tenant AND r.parent_id=f.root_id AND r.deleted_at IS NULL
+		           AND r.author_sub <> f.subject
+		           AND r.created_at > f.last_viewed_at) AS unread_replies
+		 FROM thread_follows f
+		 JOIN messages m ON m.tenant=f.tenant AND m.id=f.root_id AND m.deleted_at IS NULL
+		 JOIN channels c ON c.tenant=m.tenant AND c.id=m.channel_id AND c.deleted_at IS NULL
+		 WHERE f.tenant=$1 AND f.subject=$2 AND f.last_activity < $3`+accesoAlCanal(deFuera)+filtroVaciado("m", "$2")+`
+		 ORDER BY f.last_activity DESC, f.root_id DESC
+		 LIMIT $4`,
+		tenant, subject, beforeTs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []conFecha[domain.ThreadSummary]
+	for rows.Next() {
+		var ts domain.ThreadSummary
+		m, err := scanMessage(rows, tenant, &ts.LastActivity, &ts.UnreadReplies)
+		if err != nil {
+			return nil, err
+		}
+		ts.Root = m
+		out = append(out, conFecha[domain.ThreadSummary]{v: ts, fecha: ts.LastActivity, id: m.ID})
+	}
+	return out, rows.Err()
 }

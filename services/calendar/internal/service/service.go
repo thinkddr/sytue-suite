@@ -294,12 +294,15 @@ func (s *Service) DeleteCalendar(ctx context.Context, id uuid.UUID) error {
 // servicio sintetiza el iCalendar canonico si no se aporta (cliente REST) o lo
 // reusa verbatim (cliente CalDAV via PutObject).
 type EventInput struct {
-	CalendarID     uuid.UUID
-	UID            string // vacio => se genera
-	Summary        string
-	Description    string
-	Location       string
-	Organizer      string
+	CalendarID  uuid.UUID
+	UID         string // vacio => se genera
+	Summary     string
+	Description string
+	Location    string
+	Organizer   string
+	// OrganizerName es el CN del organizador. Lo decide nombreOrganizador: el nombre de
+	// la sesión cuando la persona organiza y, al editar, el que el evento ya tenía.
+	OrganizerName  string
 	DTStart        time.Time
 	DTEnd          time.Time
 	TZID           string
@@ -340,6 +343,7 @@ func (s *Service) CreateEvent(ctx context.Context, in EventInput) (domain.Event,
 		return domain.Event{}, err
 	}
 	in.Organizer = organizador(ctx, in.Organizer, "")
+	in.OrganizerName = nombreOrganizador(ctx, in.Organizer, in.OrganizerName, "")
 	if in.Send {
 		if err := s.puedeInvitar(ctx, in); err != nil {
 			return domain.Event{}, err
@@ -373,13 +377,14 @@ func (s *Service) UpdateEvent(ctx context.Context, in EventInput) (domain.Event,
 	}
 	cur, errCur := s.store.GetObjectByUID(ctx, in.CalendarID, in.UID)
 	// Editar no cambia de organizador: se conserva el que el evento ya tenía.
-	organizaba := ""
+	organizaba, nombreOrganizaba := "", ""
 	if errCur == nil {
 		if po, err := caldav.DecodeCalendarObject(cur.Data, in.CalendarID.String()); err == nil {
-			organizaba = po.Master.Organizer
+			organizaba, nombreOrganizaba = po.Master.Organizer, po.Master.OrganizerName
 		}
 	}
 	in.Organizer = organizador(ctx, in.Organizer, organizaba)
+	in.OrganizerName = nombreOrganizador(ctx, in.Organizer, in.OrganizerName, nombreOrganizaba)
 	if in.Send {
 		if err := s.puedeInvitar(ctx, in); err != nil {
 			return domain.Event{}, err
@@ -944,6 +949,25 @@ func organizador(ctx context.Context, pedido, organizaba string) string {
 	return cmp.Or(c.Email, c.Mailbox)
 }
 
+// nombreOrganizador es el CN de quien organiza, que la web enseña en vez de la
+// dirección. `organizer` ya es el que decidió [organizador]; `pedido` es el CN que trae
+// el cuerpo y `tenia` el que el evento ya llevaba. Por orden:
+//
+//   - el que ya tenía: editar no cambia de organizador, ni de nombre;
+//   - si organiza la persona de la sesión, su nombre de Sytue ID (`name`), que es el que
+//     ve todo el mundo; sin él, el que pida el cuerpo;
+//   - si no, el que ya hubiera, y si no, nada: el CN de otra persona no se inventa.
+func nombreOrganizador(ctx context.Context, organizer, pedido, tenia string) string {
+	if tenia = domain.SanitizeCommonName(tenia); tenia != "" {
+		return tenia
+	}
+	c, _ := authn.FromContext(ctx)
+	if esDeLaSesion(c, cleanAddr(organizer)) {
+		return domain.SanitizeCommonName(cmp.Or(c.Name, pedido))
+	}
+	return ""
+}
+
 // puedeInvitar dice, ANTES de guardar, si lo que se pide repartir cabe en los topes:
 // así la API contesta con un error claro en vez de guardar el evento y callarse las
 // invitaciones.
@@ -1040,6 +1064,7 @@ func (s *Service) toStoreInput(in EventInput) (domain.EventInput, error) {
 		Description:    in.Description,
 		Location:       in.Location,
 		Organizer:      cleanAddr(in.Organizer),
+		OrganizerName:  domain.SanitizeCommonName(in.OrganizerName),
 		DTStart:        in.DTStart.UTC(),
 		DTEnd:          in.DTEnd.UTC(),
 		TZID:           orDefault(in.TZID, "UTC"),
@@ -1069,7 +1094,7 @@ func (s *Service) toStoreInput(in EventInput) (domain.EventInput, error) {
 	// Sintetiza el iCalendar canonico para servirlo por CalDAV.
 	ev := domain.Event{
 		UID: si.UID, Summary: si.Summary, Description: si.Description, Location: si.Location,
-		Organizer: si.Organizer, DTStart: si.DTStart, DTEnd: si.DTEnd, TZID: si.TZID,
+		Organizer: si.Organizer, OrganizerName: si.OrganizerName, DTStart: si.DTStart, DTEnd: si.DTEnd, TZID: si.TZID,
 		AllDay: si.AllDay, Status: orStatus(si.Status), Classification: orClass(si.Classification),
 		Transparency: orTransp(si.Transparency), Color: si.Color, ConferenceURL: si.ConferenceURL,
 		RRule: si.RRule, Attendees: si.Attendees,

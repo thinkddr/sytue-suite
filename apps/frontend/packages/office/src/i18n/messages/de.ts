@@ -2854,9 +2854,9 @@ export const de: AppCatalog<typeof en> = {
     'Die Signatur passt nicht auf diese Seite. Wähle eine andere Seite oder Position.',
   'pdf.device.view': 'Ansehen',
   'pdf.vault.help':
-    'Dieses PDF liegt in deinem verschlüsselten Drive: Es wird nur auf diesem Gerät entschlüsselt, wo du es ansehen, kommentieren, ausfüllen, organisieren und signieren kannst. Was du speicherst, geht verschlüsselt zurück.',
+    'Dieses PDF liegt in deinem verschlüsselten Drive: Es wird nur auf diesem Gerät entschlüsselt, wo du es ansehen, kommentieren, ausfüllen, organisieren, schützen, schwärzen, bearbeiten, vergleichen, drucken und signieren kannst. Was du speicherst, geht verschlüsselt zurück.',
   'pdf.vault.serverOnly':
-    'Mit deinem verschlüsselten Drive sind Signaturanfragen, Kennwortschutz, Texterkennung, Schwärzen, Bearbeiten von Text oder Bildern, Stempel und Wasserzeichen, Vergleichen, Versionsverlauf und Drucken noch nicht verfügbar: Sie erfordern, dass der Dienst das PDF liest, oder sind noch nicht auf dem Gerät möglich.',
+    'Mit deinem verschlüsselten Drive sind Signaturanfragen, Texterkennung und der Assistent nicht verfügbar: Sie setzen voraus, dass der Dienst das PDF liest. Alles andere geschieht auf diesem Gerät.',
   'pdf.vault.notFound.title': 'Dieses PDF ist nicht in deinem verschlüsselten Drive',
   'pdf.vault.notFound.description':
     'Es wurde vielleicht verschoben oder gelöscht. Suche es in Sytue Drive.',
@@ -2872,7 +2872,9 @@ export const de: AppCatalog<typeof en> = {
     'Ihr Drive wird noch auf Ende-zu-Ende-Verschlüsselung umgestellt. Schließen Sie das in Sytue Drive ab.',
   'pdf.device.error.password': 'Dieses Passwort öffnet das Zertifikat nicht.',
   'pdf.device.error.encrypted':
-    'Dieses PDF ist passwortgeschützt und kann auf diesem Gerät nicht signiert werden.',
+    'Dieses PDF ist passwortgeschützt: Öffne es und signiere es in seinem Studio, wo sein Passwort verwendet wird.',
+  'pdf.device.protectedNote':
+    'Dieses PDF ist passwortgeschützt. Zum Signieren wird es auf diesem Gerät ohne das Passwort neu geschrieben, wie es auch der Server tut: Die signierte Kopie wird verschlüsselt in deinem Drive gespeichert, aber ohne das Passwort des PDFs.',
   'pdf.device.error.locked':
     'Dieses PDF ist gegen jede Änderung zertifiziert: Eine weitere Signatur würde es ungültig machen.',
   'pdf.device.error.unreadable':

@@ -182,6 +182,7 @@ import {
 import { MeetingsPanel } from './MeetingsPanel.js';
 import { AbrirEnLaApp } from './AbrirEnLaApp.js';
 import { abrirReunionEnLaApp, queHacer } from '../lib/enLaApp.js';
+import { esperarALaPuerta } from '../lib/puerta.js';
 import {
   queryPresence,
   sendHeartbeat,
@@ -3484,7 +3485,22 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             label: t('meet.knock'),
             onClick: () => {
               void knockMeeting(id, clave)
-                .then(() => toast.notify({ tone: 'success', title: t('meet.knocked') }))
+                .then(async () => {
+                  toast.notify({ tone: 'success', title: t('meet.knocked') });
+                  // Y se espera a que abran, como Fyne: quien llama no tiene que volver
+                  // a abrir el enlace. Lo usan también los invitados de otra
+                  // organización a la reunión de un evento (lib/puerta.ts).
+                  const dentro = await esperarALaPuerta({
+                    entrar: () => joinMeeting(id, clave),
+                    cerrada: (e) => e instanceof LlamadaError && e.code === 'room_locked',
+                  });
+                  if (dentro) {
+                    setRhsView(null);
+                    setCall(dentro);
+                  } else {
+                    toast.notify({ tone: 'info', title: t('meet.roomLockedNotice') });
+                  }
+                })
                 .catch(() => toast.notify({ tone: 'danger', title: t('meetings.joinFailed') }));
             },
           },
@@ -5175,6 +5191,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     hostIdentity={call.hostIdentity}
                     orgAdmin={user.roles.includes('admin') || user.roles.includes('owner')}
                     locked={call.locked}
+                    waitingRoom={call.waitingRoom}
                     {...(callChannelId ? { channelId: callChannelId } : {})}
                     {...(callChannelId && callChannelId === activeId
                       ? {

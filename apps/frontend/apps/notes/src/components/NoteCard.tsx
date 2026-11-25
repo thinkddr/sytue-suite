@@ -40,6 +40,7 @@ import { conHashtags, conMenciones } from '../client/hashtags.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
 import { RichText } from './RichText.js';
 import { numerarCodigo } from './bloques.js';
+import { leerAdjuntos, pintarAdjuntos } from './adjuntos-texto.js';
 import { convertirNota, resumenNota, terminada, vecesTrasladada } from '../client/diario.js';
 import { rotuloRecordatorio, yaPaso } from '../client/recordatorios.js';
 import { textoDeNota } from '../client/extracto.js';
@@ -81,6 +82,9 @@ export interface NoteAttachment {
   type: string;
   dataUrl: string;
 }
+
+/** Ningún adjunto, siempre la misma lista: el cuerpo no se vuelve a pintar por ella. */
+const SIN_ADJUNTOS: readonly NoteAttachment[] = [];
 
 interface Props {
   t: T;
@@ -254,38 +258,29 @@ export function NoteCard({
     onChange({ data: anchoLectura ? resto : { ...resto, [CLAVE_ANCHO_LECTURA]: true } });
   };
 
-  const adjuntos: NoteAttachment[] = Array.isArray(note.data?.attachments)
+  const adjuntos: readonly NoteAttachment[] = Array.isArray(note.data?.attachments)
     ? (note.data.attachments as NoteAttachment[])
-    : [];
+    : SIN_ADJUNTOS;
 
   const alSubirArchivos = (e: Event) => {
     const files = (e.target as HTMLInputElement).files;
     if (!files || files.length === 0) return;
-    const nuevasPromesas = Array.from(files).map((f) => {
-      return new Promise<NoteAttachment>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resolve({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: f.name,
-            size: f.size,
-            type: f.type,
-            dataUrl: (reader.result as string) || '',
-          });
-        };
-        reader.readAsDataURL(f);
-      });
-    });
-    void Promise.all(nuevasPromesas).then((nuevos) => {
-      const dataActual = note.data ?? {};
-      onChange({
-        data: {
-          ...dataActual,
-          attachments: [...adjuntos, ...nuevos],
-        },
-      });
-    });
+    void adjuntarArchivos(Array.from(files));
     (e.target as HTMLInputElement).value = '';
+  };
+
+  /** Los ficheros, a los adjuntos de la nota; devuelve los nuevos, ya con su id. Es lo
+   *  que usan «Adjuntar archivos…» y la imagen o el fichero puestos en el texto. */
+  const adjuntarArchivos = async (ficheros: File[]): Promise<NoteAttachment[]> => {
+    const nuevos = await leerAdjuntos(ficheros);
+    const dataActual = note.data ?? {};
+    onChange({
+      data: {
+        ...dataActual,
+        attachments: [...adjuntos, ...nuevos],
+      },
+    });
+    return nuevos;
   };
 
   const eliminarAdjunto = (id: string) => {
@@ -520,6 +515,9 @@ export function NoteCard({
       // La hoja del árbol (`llenar`) y la fila de lista o diario son papel: sin aro.
       sinAro={llenar || diario}
       {...(enlaces ? { enlaces } : {})}
+      // Imágenes y ficheros dentro del texto: adjuntos de la nota (adjuntos-texto.ts).
+      adjuntos={adjuntos}
+      onAdjuntar={adjuntarArchivos}
       // La hoja del árbol elige su ancho también desde la barra del editor.
       {...(hoja ? { anchoCompleto: !anchoLectura, onAncho: alternarAnchoLectura } : {})}
     />
@@ -1066,10 +1064,14 @@ function Cuerpo({
         return true;
       };
       const html = conMenciones(conHashtags(conAnclas(contenido || '')));
+      const adjuntos = Array.isArray(note.data?.attachments)
+        ? (note.data.attachments as NoteAttachment[])
+        : SIN_ADJUNTOS;
       return onEdit ? (
         <CuerpoEditable
           t={t}
           html={html}
+          adjuntos={adjuntos}
           llenar={llenar}
           onEdit={onEdit}
           alPulsar={alPulsar}
@@ -1080,6 +1082,7 @@ function Cuerpo({
         <CuerpoLectura
           t={t}
           html={html}
+          adjuntos={adjuntos}
           alPulsar={alPulsar}
           llenar={llenar}
           {...(publicBase ? { publicBase } : {})}
@@ -1093,6 +1096,7 @@ function Cuerpo({
 function CuerpoEditable({
   t,
   html,
+  adjuntos,
   llenar,
   onEdit,
   alPulsar,
@@ -1101,6 +1105,8 @@ function CuerpoEditable({
 }: {
   t: T;
   html: string;
+  /** Los de la nota: pintan las imágenes del texto y descargan sus ficheros. */
+  adjuntos: readonly NoteAttachment[];
   llenar: boolean;
   onEdit: () => void;
   alPulsar: (e: MouseEvent) => boolean;
@@ -1109,7 +1115,10 @@ function CuerpoEditable({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const ficha = useVistaPreviaEnlaces(ref, t, publicBase, previa);
-  useLayoutEffect(() => numerarCodigo(ref.current), [html]);
+  useLayoutEffect(() => {
+    numerarCodigo(ref.current);
+    pintarAdjuntos(ref.current, adjuntos, true);
+  }, [html, adjuntos]);
   return (
     <>
       <div
@@ -1170,6 +1179,7 @@ export function claseCuerpo(llenar: boolean): string {
 function CuerpoLectura({
   t,
   html,
+  adjuntos,
   alPulsar,
   llenar,
   publicBase,
@@ -1177,6 +1187,7 @@ function CuerpoLectura({
 }: {
   t: T;
   html: string;
+  adjuntos: readonly NoteAttachment[];
   alPulsar: (e: MouseEvent) => boolean;
   llenar: boolean;
   publicBase?: string;
@@ -1184,7 +1195,10 @@ function CuerpoLectura({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const ficha = useVistaPreviaEnlaces(ref, t, publicBase, previa);
-  useLayoutEffect(() => numerarCodigo(ref.current), [html]);
+  useLayoutEffect(() => {
+    numerarCodigo(ref.current);
+    pintarAdjuntos(ref.current, adjuntos, true);
+  }, [html, adjuntos]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;

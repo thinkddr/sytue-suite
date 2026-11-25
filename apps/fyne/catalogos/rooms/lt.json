@@ -336,6 +336,7 @@
   "dm.deleteFailed": "Nepavyko ištrinti pokalbio.",
   "dm.empty": "Komandoje dar nėra kitų asmenų.",
   "dm.emptyQuery": "Paieškos neatitinka nė vienas asmuo.",
+  "dm.externalClosed": "Jūsų organizacija neleidžia pokalbių su šiuo asmeniu.",
   "dm.invite": "Pakviesti asmenų",
   "dm.maxPeople": {
     "one": "Galite pridėti ne daugiau kaip {count} asmenį.",

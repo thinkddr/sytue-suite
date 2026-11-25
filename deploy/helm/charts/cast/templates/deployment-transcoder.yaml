@@ -121,9 +121,12 @@ spec:
           resources:
             {{- toYaml .Values.transcoder.resources | nindent 12 }}
           volumeMounts:
+            # Raíz del TLS de PgBouncer (global.pgbouncerTls): el DSN la verifica.
+            {{- include "sytue.pgbouncerCaMount" . | nindent 12 }}
             - name: trabajo
               mountPath: {{ .Values.transcoder.tmpDir }}
       volumes:
+        {{- include "sytue.pgbouncerCaVolume" . | nindent 8 }}
         # Originales y derivadas mientras se transcodifican. Con TOPE: sin el, un
         # original de 8 GiB mas sus derivadas se comerian el disco del nodo.
         - name: trabajo

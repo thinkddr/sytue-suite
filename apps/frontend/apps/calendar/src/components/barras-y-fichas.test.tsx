@@ -6,8 +6,10 @@
  *
  *  · Las barras de varios días medían 18 px y las fichas con hora 24 (WCAG 2.5.8): ahora
  *    las barras también, en el mes y en la franja «todo el día» de la semana.
- *  · Las fichas se cortaban a los diez caracteres («08:00 Reunión s…»): la única ficha de
- *    una celda sin barras sigue en una segunda línea.
+ *  · Las fichas se cortaban a los diez caracteres («08:00 Reunión s…»): las de una celda
+ *    siguen en una segunda línea si caben todas así (2026-11-25: antes, solo la sola).
+ *  · «+N más» mide 24 px, como las fichas (WCAG 2.5.8); medía 16. No quita sitio: se pega
+ *    a la última ficha y baja al relleno de la celda.
  *  · Y cuántas fichas caben sale del ALTO medido de la semana, no solo de contar carriles:
  *    con la barra a 24, la segunda ficha de un día con barra perdía el borde de abajo, y
  *    ya antes la cuarta de un día lleno no se veía sin «+N más» que lo dijera.
@@ -16,7 +18,13 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterAll, afterEach, describe, expect, test } from 'bun:test';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
-import { CalendarGrid, EventChip, fichasQueCaben, type GridEvent } from './CalendarGrid.js';
+import {
+  CalendarGrid,
+  EventChip,
+  fichasEnDosLineas,
+  fichasQueCaben,
+  type GridEvent,
+} from './CalendarGrid.js';
 
 const registrado = typeof document === 'undefined';
 if (registrado) GlobalRegistrator.register();
@@ -122,7 +130,8 @@ describe('cuántas fichas caben', () => {
   test('sin barras caben dos; con tres, dos y «+1 más»', () => {
     expect(fichasQueCaben(SEMANA, 0, 1)).toBe(1);
     expect(fichasQueCaben(SEMANA, 0, 2)).toBe(2);
-    // Tres no caben: se deja sitio a «+N más» (16 px) bajo las dos que sí.
+    // Tres no caben: se deja sitio a «+N más» bajo las dos que sí. Mide 24 pero se le
+    // reservan 16 y su hueco: el resto lo pone el relleno de la celda.
     expect(fichasQueCaben(SEMANA, 0, 3)).toBe(2);
   });
 
@@ -145,5 +154,26 @@ describe('cuántas fichas caben', () => {
 
   test('nunca menos de cero', () => {
     expect(fichasQueCaben(40, 50, 3)).toBe(0);
+  });
+});
+
+describe('las fichas en dos líneas', () => {
+  test('van en dos todas las de la celda si caben las dos líneas de cada una', () => {
+    // A 1280×800 cabe una ficha en dos líneas; en una ventana de 1920×1080, dos.
+    expect(fichasEnDosLineas(107.8, 0, 1)).toBe(true);
+    expect(fichasEnDosLineas(107.8, 0, 2)).toBe(false);
+    expect(fichasEnDosLineas(155, 0, 2)).toBe(true);
+    expect(fichasEnDosLineas(155, 0, 3)).toBe(false);
+    // Las barras se comen su sitio: con una fila caben dos; con dos filas, una.
+    expect(fichasEnDosLineas(155, 24, 2)).toBe(true);
+    expect(fichasEnDosLineas(155, 50, 2)).toBe(false);
+    expect(fichasEnDosLineas(155, 50, 1)).toBe(true);
+  });
+
+  test('sin medir, solo la ficha sola de una semana sin barras, como antes', () => {
+    expect(fichasEnDosLineas(0, 0, 1)).toBe(true);
+    expect(fichasEnDosLineas(0, 0, 2)).toBe(false);
+    expect(fichasEnDosLineas(0, 24, 1)).toBe(false);
+    expect(fichasEnDosLineas(155, 0, 0)).toBe(false);
   });
 });

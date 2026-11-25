@@ -241,24 +241,22 @@ func (n *DeployNotifier) notifyHub(ctx context.Context, tenant string, target st
 	if n.hub == nil || target.CreatedBy == "" {
 		return
 	}
-	nivel, verbo := "success", "listo"
+	// Un tipo por resultado, como `pages.domain.active|failed`: cada cliente compone el
+	// título con `notifications.kind.<tipo>` y `{project}`, y el resultado va en la
+	// clave, no en una palabra en castellano. Una regla guardada para el `cloud.deploy`
+	// de antes sigue valiendo para los dos (`domain.Muted` del Hub).
+	aviso := hubnotify.Notification{Type: "cloud.deploy.ready", Level: "success", Title: "Despliegue listo: " + target.ProjectSlug}
 	if status != "ready" {
-		nivel, verbo = "error", "fallido"
+		aviso = hubnotify.Notification{Type: "cloud.deploy.failed", Level: "error", Title: "Despliegue fallido: " + target.ProjectSlug}
 	}
 	cuerpo := target.CommitSHA
 	if len(cuerpo) > 7 {
 		cuerpo = cuerpo[:7]
 	}
-	err := n.hub.Send(ctx, hubnotify.Notification{
-		Tenant:  tenant,
-		Subject: target.CreatedBy,
-		Source:  "cloud",
-		Type:    "cloud.deploy",
-		Level:   nivel,
-		Title:   "Despliegue " + verbo + ": " + target.ProjectSlug,
-		Body:    cuerpo,
-		URL:     target.URL,
-	})
+	aviso.Tenant, aviso.Subject, aviso.Source = tenant, target.CreatedBy, "cloud"
+	aviso.Body, aviso.URL = cuerpo, target.URL
+	aviso.Params = map[string]string{"project": target.ProjectSlug}
+	err := n.hub.Send(ctx, aviso)
 	if err != nil {
 		log.From(ctx).Info("hub: despliegue sin notificar", "error", err, "deployment_id", deploymentID)
 	}

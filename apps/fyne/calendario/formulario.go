@@ -766,7 +766,7 @@ func (f *formulario) bloqueInvitados() fyne.CanvasObject {
 			// estaba invitado: la web lo enseña «Sin responder», no sin insignia.
 			respuestas[strings.ToLower(a.Email)] = cmp.Or(a.PartStat, "NEEDS-ACTION")
 		}
-		organizador = api.SinMailto(f.e.O.Event.Organizer)
+		organizador = nombreOrganizador(f.e.O.Event)
 	}
 	var pildoras []fyne.CanvasObject
 	for _, correo := range f.e.Invitados {

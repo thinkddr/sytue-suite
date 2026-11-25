@@ -336,6 +336,7 @@
   "dm.deleteFailed": "Chat se nepodařilo smazat.",
   "dm.empty": "V týmu zatím nikdo další není.",
   "dm.emptyQuery": "Hledání nikdo neodpovídá.",
+  "dm.externalClosed": "Vaše organizace nepovoluje konverzace s touto osobou.",
   "dm.invite": "Pozvat lidi",
   "dm.maxPeople": {
     "one": "Můžete přidat nejvýše {count} osobu.",

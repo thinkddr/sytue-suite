@@ -220,7 +220,7 @@ func main() {
 	// Los avisos flotantes van por ENCIMA del desplazador: dentro se irían al bajar.
 	barra := ui.NuevaBarraSuite(t, s, iconos.One)
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(t.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(barra.Montar(private.Objeto()))
 	}
@@ -274,6 +274,9 @@ func main() {
 		// llegan en el hilo de la interfaz.
 		barra.AlCambiarSinLeer(func(n int) { sinLeer = n; montarBandeja() })
 		v.AlCambiarHoy(montarBandeja)
+		// Y, como el sistema en el móvil, despierta el trabajo de las apps cerradas: la
+		// copia de seguridad de Photos (sesion.DespertarTareasEnFondo).
+		s.DespertarTareasEnFondo(context.Background())
 	}
 	// Y el atajo global de la suite (Ctrl+Alt+Espacio; ⌃⌥⌘Espacio en macOS) trae su
 	// buscador desde cualquier sitio. Sin él —otro programa tiene la combinación, o el
@@ -292,6 +295,11 @@ func main() {
 	s.AlAbrirURL(func(u *url.URL) {
 		if strings.Trim(u.Path, "/") == "" {
 			return // «ábrete» (`sesion.Traer`): la ventana ya sale, y se queda donde estaba
+		}
+		// La fila de la agenda de hoy del widget: su día en Calendar, como en «Hoy».
+		if ruta, ok := hub.DiaDeAgenda(u); ok {
+			v.AbrirDiaDeAgenda(ruta)
+			return
 		}
 		d, ok := hub.DestinoDeRuta(u.Path)
 		v.Ir(d)

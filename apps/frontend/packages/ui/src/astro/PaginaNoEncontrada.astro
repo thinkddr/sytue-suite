@@ -16,7 +16,6 @@
 import { DEFAULT_LOCALE, htmlLangAttrs, translate, type MessageKey } from '@sytue/i18n';
 import '../styles.css';
 import { SUFIJO_ICONOS, withBase } from '../basePath.js';
-import { themeInitScript } from '../theme/ThemeProvider.js';
 import { PaginaNoEncontrada } from '../components/PaginaNoEncontrada.js';
 
 const locale = Astro.locals.locale ?? DEFAULT_LOCALE;
@@ -39,7 +38,9 @@ const prefijo = process.env.SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
       href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
       type="image/svg+xml"
     />
-    <script is:inline set:html={themeInitScript}></script>
+    <!-- El tema guardado, del `/arranque.js` de la app (sytueArranque) y no en línea:
+         así la CSP de scripts no necesita `'unsafe-inline'`. -->
+    <script is:inline src={withBase(prefijo, '/arranque.js')}></script>
   </head>
   <body class="bg-bg text-text antialiased">
     <PaginaNoEncontrada

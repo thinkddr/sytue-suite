@@ -315,6 +315,14 @@ func (s *Session) AdoptarCon(ctx context.Context, t Tokens) error {
 	// Adoptar siempre guarda, incluso si le reenvían un resultado de Compartida.
 	t.persistenciaAtendida = false
 	t.adopcion = true
+	// Un inicio de sesión de la MISMA persona que vuelve sin clave de desbloqueo (el
+	// navegador no la tenía y no se tecleó nada) no borra la que este dispositivo ya
+	// guarda con la sesión: la clave es de la cuenta, no de cada login. Antes un
+	// «Entrar» así dejaba todas las apps nativas sin poder abrir sus datos cifrados
+	// hasta otro viaje a Sytue ID. La de otra persona nunca pasa (la sesión cambia).
+	if t.Desbloqueo == nil && t.Subject != "" && t.Subject == s.tokens.Subject && t.Issuer == s.tokens.Issuer && s.tokens.Desbloqueo.valida() {
+		t.Desbloqueo = s.tokens.Desbloqueo
+	}
 	s.actionVersion++
 	return s.poner(t)
 }

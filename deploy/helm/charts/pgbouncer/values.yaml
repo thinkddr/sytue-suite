@@ -8,9 +8,12 @@
 #
 # CONTRATO DE DSN (prod):
 #   - Los secrets `sytue-<svc>-db` apuntan su clave `dsn` a ESTE Service
-#     (host=pgbouncer, port=6432, sslmode=disable — trafico
-#     intra-cluster protegido por NetworkPolicy; el TLS hacia la RDB lo pone
-#     PgBouncer con server_tls_sslmode=require).
+#     (host=pgbouncer, port=6432) POR TLS y verificandolo:
+#     `sslmode=verify-full&sslrootcert=/etc/sytue/pgbouncer-ca/ca.crt`. El
+#     certificado lo emite una CA propia del namespace (templates/certificate.yaml)
+#     y la raiz la monta cada servicio desde el mismo Secret (solo `ca.crt`). Hasta
+#     el 2026-11-25 este salto iba en claro (sslmode=disable) y solo el de
+#     PgBouncer -> RDB llevaba TLS (server_tls_sslmode=require).
 #   - La clave `dsn-direct` (nueva) conserva el DSN DIRECTO a la RDB y se
 #     inyecta como DATABASE_DIRECT_URL: la usa platform/pkg/pg para el trabajo
 #     con estado de SESION que un pooler transaccional NO soporta:
@@ -33,6 +36,32 @@
 enabled: true
 component: pgbouncer
 
+# Interruptor GLOBAL a proposito: lo leen este chart (TLS en PgBouncer) y los de
+# cada servicio (montar la raiz para verificarlo), y las dos mitades tienen que ir
+# juntas. Lo enciende el perfil que despliega PgBouncer (values-prod/staging del
+# umbrella); el umbrella pisa estos valores por defecto.
+global:
+  pgbouncerTls:
+    enabled: false
+    # Secret con tls.crt/tls.key (PgBouncer) y ca.crt (servicios).
+    secretName: sytue-pgbouncer-tls
+    # Donde lo montan los servicios: la ruta va en el DSN (`sslrootcert`).
+    mountPath: /etc/sytue/pgbouncer-ca
+
+# TLS de los clientes a PgBouncer (con global.pgbouncerTls.enabled). Ver
+# templates/certificate.yaml.
+tls:
+  # La CA propia del namespace. Solo la usa el Issuer CA; nadie la monta.
+  caSecretName: sytue-pgbouncer-ca
+  caDuration: 87600h # 10 años: rotarla exige reiniciar los servicios
+  caRenewBefore: 8760h
+  # El del Service: 90 días, renovado 30 antes de caducar.
+  duration: 2160h
+  renewBefore: 720h
+  # Cada cuanto mira PgBouncer si el certificado del Secret cambio, para
+  # recargarlo (SIGHUP) sin reiniciar el pod.
+  reloadCheckSeconds: 300
+
 # ¡LA CUENTA DE CONEXIONES DEPENDE DE ESTO! Conexiones max hacia la RDB =
 # replicaCount x (numero de bases) x settings.maxDbConnections. Sin HPA a
 # proposito: escalar PgBouncer sin recalcular el presupuesto rompe el tope.
@@ -54,7 +83,7 @@ image:
   # socket y ficheros los pone el chart, no la imagen.
   # Upstream para desarrollo; values-prod usa el mirror privado de Scaleway.
   repository: ghcr.io/cloudnative-pg/pgbouncer
-  tag: "1.26.1-202611241637-trixie@sha256:2fa259d22b8ffc0218a2421298909fb36bf45ceff7652f36bcf7b63197103fb0"
+  tag: "1.26.1-202611251233-trixie@sha256:9f648625e11f67f5171f1edd31648c7d02a1a4a5e1b8adf7d4a9db30dce8c22b"
   pullPolicy: IfNotPresent
   useGlobalRegistry: false
 
@@ -101,6 +130,11 @@ settings:
   maxPreparedStatements: 200
   # TLS hacia la RDB (Scaleway exige sslmode=require).
   serverTlsSslmode: require
+  # TLS de los CLIENTES (solo con global.pgbouncerTls.enabled). `require`: una
+  # conexion en claro se rechaza, aunque el cliente sea de la suite. TLS 1.3 a
+  # secas: pgx y PgBouncer lo hablan, y no hay cliente viejo que contentar.
+  clientTlsSslmode: require
+  clientTlsProtocols: tlsv1.3
   # Alineado con MaxConnLifetime/MaxConnIdleTime de platform/pkg/pg.
   serverLifetime: 3600
   serverIdleTimeout: 300

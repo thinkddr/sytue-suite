@@ -326,6 +326,7 @@
   "dm.deleteFailed": "Conversația nu a putut fi ștearsă.",
   "dm.empty": "Încă nu mai este nimeni în echipă.",
   "dm.emptyQuery": "Nimeni nu corespunde căutării.",
+  "dm.externalClosed": "Organizația ta nu permite conversații cu această persoană.",
   "dm.invite": "Invită persoane",
   "dm.maxPeople": {
     "one": "Puteți adăuga cel mult {count} persoană.",

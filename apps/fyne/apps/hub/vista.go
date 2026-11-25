@@ -383,6 +383,11 @@ func (v *Vista) Saltar(p Producto, ruta string) {
 	_ = Abrir(v.abrir, v.apex, v.org(), p, ruta)
 }
 
+// AbrirDiaDeAgenda abre en Calendar el día de un evento de la agenda de hoy (`ruta`, de
+// DiaDeAgenda): la fila del widget nativo de One. Como la fila de la tarjeta «Hoy», en
+// Calendar o en la aplicación que la organización le haya dado en su lugar.
+func (v *Vista) AbrirDiaDeAgenda(ruta string) { v.lanzador.abrirProducto("calendar", ruta) }
+
 // AbrirURL abre una dirección de fuera (un resultado de la actividad, el sitio
 // público). Delega en el sistema igual que el salto entre aplicaciones.
 func (v *Vista) AbrirURL(crudo string) {

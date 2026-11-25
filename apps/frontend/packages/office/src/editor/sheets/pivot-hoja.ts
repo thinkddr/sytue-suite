@@ -9,7 +9,7 @@
  *
  * No toca el estado del lienzo: devuelve la hoja nueva y la definición con su rango.
  */
-import { formatNumber, numToCol, type CellValue, type Engine } from '@sytue/formula';
+import { formatNumber, numToCol, type CellValue, type Engine } from '@sytue/formula/motor';
 import type { NumFmt, SheetData, SheetModel } from '../types';
 import type { DocsKey } from '../../i18n';
 import { applyNumFmt, escapeHtml, formatCellValue, parseRangeRef } from './format';

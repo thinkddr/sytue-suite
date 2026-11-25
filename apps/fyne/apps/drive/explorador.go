@@ -948,13 +948,13 @@ func (e *Explorador) plantillaFila(conCasilla bool, v tema.Variante) func() fyne
 // ajustarDesplazamiento pone la reserva del «Subir» flotante, el «arriba del todo»
 // del tirar para refrescar y, si se pidió, vuelve el listado al principio.
 func (e *Explorador) ajustarDesplazamiento(conFranja bool) {
-	if conFranja {
-		// ponytail: con la franja de carpetas la lista va dentro de otro desplazamiento
-		// y su final no es el de la pantalla; ahí no se reserva (`ui.Estrecho` la apaga).
-		e.reservaFilas.Ajustar(ui.Estrecho)
-	} else {
-		e.reservaFilas.Ajustar(e.Ventana)
-	}
+	// Con la franja de carpetas en el teléfono la lista va dentro de otro desplazamiento
+	// (montarLista). Si la franja cabe, ese otro no se mueve y el final de la lista es el
+	// de la pantalla: la reserva va en la lista, como sin franja. Si no cabe (una ventana
+	// baja: `compacta`), la lista es de dos filas dentro del desplazamiento y la reserva
+	// va al final de éste (`columnaLista.reserva`); ahí la lista no la lleva. Lo decide
+	// el alto de la ventana, que se sabe al colocar: viewportListaCarpetas lo reajusta.
+	e.ajustarReserva(conFranja && e.listaFranja != nil && franjaCompacta(e.listaFranja.Size().Height))
 	e.Refresco.Arriba = func() bool {
 		return e.filas.GetScrollOffset() <= 0.5 && (!conFranja || e.listaFranja == nil || e.listaFranja.Offset.Y <= 0.5)
 	}
@@ -967,12 +967,25 @@ func (e *Explorador) ajustarDesplazamiento(conFranja bool) {
 	}
 }
 
+// ajustarReserva pone la fila de la reserva del «Subir» flotante en la lista, salvo con la
+// franja compacta, que la lleva al final de su desplazamiento.
+func (e *Explorador) ajustarReserva(compacta bool) {
+	if compacta {
+		e.reservaFilas.Ajustar(ui.Estrecho) // `Estrecho` la apaga
+		return
+	}
+	e.reservaFilas.Ajustar(e.Ventana)
+}
+
 func (e *Explorador) montarLista(col *columnaLista, hijos []fyne.CanvasObject, lineas int) fyne.CanvasObject {
 	if col.franja == nil || !ui.EsTactil() {
 		return container.New(col, hijos...)
 	}
 	// Conserva el desplazable y su contenido entre repintados.
 	col.altoFilas = float32(min(len(e.deLista), 2)) * ui.AltoFilaDriveCon(lineas)
+	if e.Ventana > 0 && e.Ventana < ui.Estrecho {
+		col.reserva = ui.ReservaFlotante
+	}
 	var contenido *fyne.Container
 	if e.listaFranja == nil {
 		contenido = container.New(col, hijos...)
@@ -989,6 +1002,7 @@ func (e *Explorador) montarLista(col *columnaLista, hijos []fyne.CanvasObject, l
 	viewport := &viewportListaCarpetas{
 		col: col, contenido: contenido, scroll: e.listaFranja,
 		normal: col.franja, natural: e.franjaScroll.Content,
+		reserva: e.ajustarReserva,
 	}
 	viewport.preparar(e.listaFranja.Size())
 	refresco := e.Refresco
@@ -1110,6 +1124,11 @@ type columnaLista struct {
 	compacta   bool
 	ancho      float32
 	altoFilas  float32
+	// reserva es el hueco del «Subir» flotante al final del desplazamiento de la franja
+	// compacta (ui.ReservaFlotante en el teléfono): la lista de dos filas queda encima
+	// del botón al bajar del todo. Sin compactar, la reserva va en la lista. altoVista
+	// es el alto del desplazamiento, que acota la reserva (ver pieCompacta).
+	reserva, altoVista float32
 }
 
 var _ fyne.Layout = (*columnaLista)(nil)
@@ -1119,7 +1138,7 @@ const PieLista float32 = 6 * 0.25 * tema.Rem
 
 func (c *columnaLista) MinSize([]fyne.CanvasObject) fyne.Size {
 	if c.compacta {
-		alto := c.altoFranja(c.ancho) + ui.AltoCabeceraDrive + c.altoFilas + PieLista
+		alto := c.altoFranja(c.ancho) + ui.AltoCabeceraDrive + c.altoFilas + c.pieCompacta()
 		if c.pie != nil {
 			alto += AltoPieCargando
 		}
@@ -1148,7 +1167,10 @@ func (c *columnaLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	ancho := max(t.Width-2*CanalonLista, 0)
 	c.cab.Move(fyne.NewPos(CanalonLista, arriba))
 	c.cab.Resize(fyne.NewSize(ancho, ui.AltoCabeceraDrive))
-	abajo := t.Height
+	abajo, debajo := t.Height, PieLista
+	if c.compacta {
+		debajo = c.pieCompacta()
+	}
 	if c.pie != nil {
 		// El pie va a TODO el ancho (no lleva `mx-3`) y es hermano del listado, así
 		// que el `pb-6` de este queda por encima de él.
@@ -1157,7 +1179,18 @@ func (c *columnaLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		c.pie.Resize(fyne.NewSize(t.Width, AltoPieCargando))
 	}
 	c.filas.Move(fyne.NewPos(CanalonLista, arriba+ui.AltoCabeceraDrive))
-	c.filas.Resize(fyne.NewSize(ancho, max(abajo-arriba-ui.AltoCabeceraDrive-PieLista, 0)))
+	c.filas.Resize(fyne.NewSize(ancho, max(abajo-arriba-ui.AltoCabeceraDrive-debajo, 0)))
+}
+
+// pieCompacta es lo que queda debajo de la lista de la franja compacta: el `pb-6` o, en
+// el teléfono, la reserva del «Subir» flotante, que ya lleva su margen. La reserva no
+// pasa de lo que deja la lista en el desplazamiento: abajo del todo, sus dos filas se
+// ven enteras aunque en una ventana muy baja el botón llegue a la segunda.
+func (c *columnaLista) pieCompacta() float32 {
+	if c.reserva == 0 {
+		return PieLista
+	}
+	return max(PieLista, min(c.reserva, c.altoVista-c.altoFilas))
 }
 
 // viewportListaCarpetas conserva una tarjeta entera cuando el 45 % del cuerpo no
@@ -1169,6 +1202,14 @@ type viewportListaCarpetas struct {
 	contenido       *fyne.Container
 	scroll          *container.Scroll
 	normal, natural fyne.CanvasObject
+	// reserva pone la del «Subir» flotante donde toca según la franja sea compacta o
+	// no (Explorador.ajustarReserva); repetirla sin cambios no hace nada.
+	reserva func(compacta bool)
+}
+
+// franjaCompacta dice si en un cuerpo de ese alto el 45 % no llega a una tarjeta entera.
+func franjaCompacta(alto float32) bool {
+	return TopeFranja*alto < RellenoFranja+AltoTeselaFranja+RellenoFranjaAbajo
 }
 
 func (*viewportListaCarpetas) MinSize([]fyne.CanvasObject) fyne.Size {
@@ -1176,8 +1217,11 @@ func (*viewportListaCarpetas) MinSize([]fyne.CanvasObject) fyne.Size {
 }
 
 func (v *viewportListaCarpetas) preparar(t fyne.Size) {
-	v.col.ancho = t.Width
-	v.col.compacta = TopeFranja*t.Height < RellenoFranja+AltoTeselaFranja+RellenoFranjaAbajo
+	v.col.ancho, v.col.altoVista = t.Width, t.Height
+	v.col.compacta = franjaCompacta(t.Height)
+	if v.reserva != nil && t.Height > 0 {
+		v.reserva(v.col.compacta)
+	}
 	v.col.franja = v.normal
 	if v.col.compacta {
 		v.col.franja = v.natural

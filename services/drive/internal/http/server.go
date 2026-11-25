@@ -17,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/soltarfuente"
@@ -56,6 +57,8 @@ type Deps struct {
 	ExternalUsage externalUsageStore
 	Blobs         blobGetter
 	ReadyCheckers []httpx.Checker
+	// Traza escribe la traza de acceso (ReglasDeTraza). Nil ⇒ sin traza.
+	Traza *auditlog.Registro
 }
 
 // Los verbos WebDAV en chi ANTES de montar /dav, como Calendar y Contacts: sin esto
@@ -80,9 +83,14 @@ func NewRouter(d Deps) http.Handler {
 	//
 	// Subir este tope NO afloja las rutas de JSON: `DecodeJSON` tiene su propio
 	// límite de 1 MiB y sigue mandando ahí.
+	var traza func(http.Handler) http.Handler
+	if d.Traza != nil {
+		traza = d.Traza.Middleware(ReglasDeTraza...)
+	}
 	r := httpx.NewRouter(httpx.RouterOptions{
 		RequestTimeout: 60 * time.Second,
 		MaxBodyBytes:   max(d.Cfg.MaxUploadBytes, storage.MaxCipherBlockBytes) + (1 << 20),
+		Traza:          traza,
 	})
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 

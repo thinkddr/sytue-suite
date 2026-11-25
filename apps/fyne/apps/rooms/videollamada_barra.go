@@ -78,6 +78,9 @@ type extrasLlamada struct {
 	// Bloqueada es la puerta echada; Cola, quién espera.
 	Bloqueada bool
 	Cola      []api.RoomsKnock
+	// SalaDeEspera: llaman a la puerta aunque esté abierta (la reunión de un evento,
+	// con invitados de otra organización; RoomsMeeting.WaitingRoom).
+	SalaDeEspera bool
 	// Fallo es el aviso rojo de una moderación que el servicio rechazó.
 	Fallo string
 	// AlCopiarEnlace copia el enlace de la reunión; AlDispositivos abre su diálogo.
@@ -202,9 +205,10 @@ func (v *VistaLlamada) moderar(f func() error, luego func()) {
 	})
 }
 
-// mirarPuerta trae la cola de quien espera, si la puerta está echada y se modera.
+// mirarPuerta trae la cola de quien espera, si se modera y la puerta está echada o la
+// sala tiene sala de espera.
 func (v *VistaLlamada) mirarPuerta() {
-	if !v.Modera || !v.Bloqueada || v.Mod.Cola == nil {
+	if !v.Modera || !v.hayPuerta() || v.Mod.Cola == nil {
 		v.Cola = nil
 		return
 	}
@@ -394,9 +398,12 @@ func (v *VistaLlamada) panelParticipantes(vr tema.Variante) fyne.CanvasObject {
 	return container.NewVScroll(container.New(ui.Columna{Hueco: tema.Espacio(2)}, filas...))
 }
 
+// hayPuerta: alguien puede estar esperando a que le abran.
+func (v *VistaLlamada) hayPuerta() bool { return v.Bloqueada || v.SalaDeEspera }
+
 // filasPuerta es quién espera en la puerta, con «Dejar entrar» y «No dejar entrar».
 func (v *VistaLlamada) filasPuerta(vr tema.Variante) []fyne.CanvasObject {
-	if !v.Modera || !v.Bloqueada || len(v.Cola) == 0 {
+	if !v.Modera || !v.hayPuerta() || len(v.Cola) == 0 {
 		return nil
 	}
 	t := v.T

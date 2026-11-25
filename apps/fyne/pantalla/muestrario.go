@@ -467,8 +467,9 @@ func seccionVacio(v tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 	vacio := ui.NuevoVacio("No hay nada en esta carpeta", "Arrastra archivos aquí o súbelos con el botón.")
 	vacio.Glifo = iconos.Trazo(iconos.Nube, ui.LadoGlifoVacio, "text-subtle", v)
 	vacio.Accion = ui.NuevoBoton("Subir archivos", nil)
-	fallo := ui.NuevoVacio("No se ha podido cargar", "Comprueba la conexión y vuelve a intentarlo.")
-	fallo.Tono, fallo.Compacto = ui.VacioError, true
+	// El fallo con su constructor (DS-06): el tono de error pone el glifo de peligro.
+	fallo := ui.NuevoVacioError("No se ha podido cargar", "Comprueba la conexión y vuelve a intentarlo.")
+	fallo.Compacto = true
 	fallo.Accion = ui.NuevoBoton("Reintentar", nil).Con(ui.Secundario, ui.TallaSM)
 	return container.NewGridWithColumns(2, vacio, fallo), nil
 }

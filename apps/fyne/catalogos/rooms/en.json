@@ -316,6 +316,7 @@
   "dm.deleteFailed": "The chat could not be deleted.",
   "dm.empty": "There is nobody else on the team yet.",
   "dm.emptyQuery": "Nobody matches your search.",
+  "dm.externalClosed": "Your organisation does not allow conversations with this person.",
   "dm.invite": "Invite people",
   "dm.maxPeople": {
     "one": "You can add up to {count} person.",

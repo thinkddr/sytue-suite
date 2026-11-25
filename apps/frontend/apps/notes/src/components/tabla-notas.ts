@@ -11,6 +11,7 @@
  * `data-numerada` en la tabla y el fondo `data-fondo` con el nombre de un token
  * (`gris|azul|…`), nunca un color crudo. Todo pasa el saneador del servicio.
  */
+import { BLOQUES_DE_NOTAS } from '@sytue/ui/browser/bloques-de-notas';
 import type { ColorDeBloque } from './bloques.js';
 
 // Sin las colecciones de tabla (`rows`, `tBodies`, `cells`): consultas del DOM, que
@@ -179,4 +180,138 @@ export function celdaEn(
   if (!f) return null;
   const celdas = celdasDe(f);
   return celdas[Math.min(Math.max(col, 0), celdas.length - 1)] ?? null;
+}
+
+/*
+ * COMBINAR Y SEPARAR CELDAS: `colspan` y `rowspan`, con los topes del saneador del
+ * servicio (`BLOQUES_DE_NOTAS.numericos`). Lo mismo, con las mismas reglas, que el
+ * editor de Fyne (`combinar.go`):
+ *
+ *   - con la de la derecha: la celda se queda con la siguiente de su fila si ocupan las
+ *     mismas filas; el texto de la otra va detrás del suyo;
+ *   - con la de abajo: igual con la que empieza justo debajo, en la misma sección, y
+ *     ocupa las mismas columnas;
+ *   - separar: la celda vuelve a una ranura y las que tapaba vuelven, vacías.
+ */
+
+const TOPE = BLOQUES_DE_NOTAS.numericos['td'] ?? {};
+
+/** Un `colspan` o un `rowspan` de la celda: 1 si no lo trae o no es un número. */
+function tramo(celda: Element, k: 'colspan' | 'rowspan'): number {
+  const n = Number(celda.getAttribute(k));
+  return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+
+function ponerTramo(celda: Element, k: 'colspan' | 'rowspan', n: number): void {
+  if (n > 1) celda.setAttribute(k, String(n));
+  else celda.removeAttribute(k);
+}
+
+/** Dónde empieza cada celda en la rejilla: su fila y su columna, contando lo que tapan
+ *  las combinadas de arriba. */
+function ranuras(tabla: HTMLTableElement): Map<HTMLTableCellElement, [number, number]> {
+  const filas = filasDe(tabla);
+  const ocupada = new Set<string>();
+  const out = new Map<HTMLTableCellElement, [number, number]>();
+  filas.forEach((fila, f) => {
+    let col = 0;
+    for (const c of celdasDe(fila)) {
+      while (ocupada.has(`${f},${col}`)) col++;
+      out.set(c, [f, col]);
+      const alto = Math.min(tramo(c, 'rowspan'), filas.length - f);
+      for (let df = 0; df < alto; df++)
+        for (let dc = 0; dc < tramo(c, 'colspan'); dc++) ocupada.add(`${f + df},${col + dc}`);
+      col += tramo(c, 'colspan');
+    }
+  });
+  return out;
+}
+
+const vacia = (c: Element): boolean =>
+  (c.textContent ?? '').replace(/ /g, '').trim() === '' && !c.querySelector('img');
+
+/** Pasa lo de `de` detrás de lo de `a` (si `a` está vacía, en su lugar). */
+function juntar(a: HTMLTableCellElement, de: HTMLTableCellElement): void {
+  if (vacia(de)) return;
+  if (vacia(a)) a.replaceChildren();
+  a.append(...de.childNodes);
+}
+
+/** La celda con la que se combinaría `celda` a la derecha, o null. */
+export function vecinaDerecha(celda: HTMLTableCellElement): HTMLTableCellElement | null {
+  const tabla = celda.closest('table');
+  const fila = celda.parentElement;
+  if (!tabla || !fila) return null;
+  const otra = celdasDe(fila)[celdasDe(fila).indexOf(celda) + 1];
+  if (!otra || tramo(otra, 'rowspan') !== tramo(celda, 'rowspan')) return null;
+  if (tramo(celda, 'colspan') + tramo(otra, 'colspan') > (TOPE['colspan'] ?? 1)) return null;
+  const r = ranuras(tabla);
+  return r.get(otra)?.[1] === (r.get(celda)?.[1] ?? -1) + tramo(celda, 'colspan') ? otra : null;
+}
+
+/** La celda con la que se combinaría `celda` por abajo, o null. */
+export function vecinaAbajo(celda: HTMLTableCellElement): HTMLTableCellElement | null {
+  const tabla = celda.closest('table');
+  if (!tabla) return null;
+  const r = ranuras(tabla);
+  const [f, col] = r.get(celda) ?? [-1, -1];
+  const fila = filasDe(tabla)[f + tramo(celda, 'rowspan')];
+  if (!fila || fila.parentElement !== celda.parentElement?.parentElement) return null;
+  const otra = celdasDe(fila).find((c) => r.get(c)?.[1] === col);
+  if (!otra || tramo(otra, 'colspan') !== tramo(celda, 'colspan')) return null;
+  return tramo(celda, 'rowspan') + tramo(otra, 'rowspan') > (TOPE['rowspan'] ?? 1) ? null : otra;
+}
+
+/** Si la celda ocupa más de una ranura. */
+export function esCombinada(celda: HTMLTableCellElement): boolean {
+  return tramo(celda, 'colspan') > 1 || tramo(celda, 'rowspan') > 1;
+}
+
+export function combinarDerecha(celda: HTMLTableCellElement): void {
+  const otra = vecinaDerecha(celda);
+  if (!otra) return;
+  juntar(celda, otra);
+  ponerTramo(celda, 'colspan', tramo(celda, 'colspan') + tramo(otra, 'colspan'));
+  otra.remove();
+}
+
+export function combinarAbajo(celda: HTMLTableCellElement): void {
+  const otra = vecinaAbajo(celda);
+  if (!otra) return;
+  juntar(celda, otra);
+  ponerTramo(celda, 'rowspan', tramo(celda, 'rowspan') + tramo(otra, 'rowspan'));
+  otra.remove();
+}
+
+/** Separa una celda combinada: vuelve a una ranura y las que tapaba vuelven vacías, del
+ *  mismo tipo que ella (`th` con su `scope`, si lo era). */
+export function separarCelda(celda: HTMLTableCellElement): void {
+  const tabla = celda.closest('table');
+  if (!tabla || !esCombinada(celda)) return;
+  const r = ranuras(tabla);
+  const filas = filasDe(tabla);
+  const [f, col] = r.get(celda) ?? [0, 0];
+  const ancho = tramo(celda, 'colspan');
+  const alto = Math.min(tramo(celda, 'rowspan'), filas.length - f);
+  ponerTramo(celda, 'colspan', 1);
+  ponerTramo(celda, 'rowspan', 1);
+  const nueva = () => {
+    const c = celda.ownerDocument.createElement(celda.tagName.toLowerCase() === 'th' ? 'th' : 'td');
+    const scope = celda.getAttribute('scope');
+    if (scope) c.setAttribute('scope', scope);
+    c.innerHTML = '<br>';
+    return c;
+  };
+  for (let g = f; g < f + alto; g++) {
+    const fila = filas[g];
+    if (!fila) continue;
+    const n = g === f ? ancho - 1 : ancho;
+    // En su fila, detrás de ella; en las de debajo, delante de la primera que empiece
+    // más a la derecha.
+    const antes =
+      g === f
+        ? celda.nextElementSibling
+        : (celdasDe(fila).find((c) => (r.get(c)?.[1] ?? -1) > col) ?? null);
+    for (let k = 0; k < n; k++) fila.insertBefore(nueva(), antes);
+  }
 }

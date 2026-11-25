@@ -217,6 +217,21 @@ func (s *Store) CopiarAdjuntoAMiUnidad(ctx context.Context, channelID, fileID, d
 	return out, err
 }
 
+// GuardarAdjuntoDeFuera es el final de «Guardar en mi Drive» para el adjunto de una
+// conversación que vive en OTRA organización (ADR 0040): su blob ya se ha copiado a
+// esta (src.StorageKey) y aquí se registra la copia en «Mi unidad» con el mismo nombre
+// de copia y la misma cuota que CopiarAdjuntoAMiUnidad.
+func (s *Store) GuardarAdjuntoDeFuera(ctx context.Context, src domain.File, destFolderID uuid.UUID, ownerSub string) (domain.File, error) {
+	t := tenancy.MustFrom(ctx)
+	var out domain.File
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		var e error
+		out, e = insertarCopia(ctx, tx, t.Slug, src, destFolderID, ownerSub)
+		return e
+	})
+	return out, err
+}
+
 func (s *Store) ChannelFile(ctx context.Context, channelID, fileID uuid.UUID) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File

@@ -2,6 +2,7 @@
 export {
   PqVault,
   PqVaultError,
+  pqVaultUnavailable,
   PqVaultDisabledError,
   fetchPqVaultBootstrap,
   readPqVaultCopy,

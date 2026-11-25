@@ -100,9 +100,55 @@ func cuerpoHTMLDeNota(n Note) string {
 		// pero SANEADO AQUÍ, no «porque ya lo estaba»: hasta 2026-10 solo se saneaban al
 		// guardar las notas de texto y de tarea, y este volcado sacaba tal cual el HTML
 		// de las de cualquier otro tipo. Sobre lo ya saneado no cambia nada.
-		return `<div class="cuerpo">` + c + `</div>` + "\n"
+		return `<div class="cuerpo">` + conAdjuntosEnLinea(c, n.Data) + `</div>` + "\n"
 	}
 	return `<p class="vacia">(vacía)</p>` + "\n"
+}
+
+// Las imágenes y los ficheros del texto nombran un adjunto de la nota (`adjunto:ID`,
+// html.go), que fuera de la app no es nada. En el volcado se ponen sus datos: la imagen
+// se ve y el fichero se descarga con su nombre. Lo que no es un adjunto de la nota, o
+// no es una URL de datos de un tipo que valga, se queda como estaba.
+var (
+	reRefAdjunto = regexp.MustCompile(`(src|href)="adjunto:([A-Za-z0-9_-]{1,64})"`)
+	reDatosAdj   = regexp.MustCompile(`^data:[a-z]+/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$`)
+)
+
+// adjuntoExportado es lo que el volcado lee de un adjunto.
+type adjuntoExportado struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	DataURL string `json:"dataUrl"` //nolint:tagliatelle // el nombre lo fija la web
+}
+
+// conAdjuntosEnLinea cambia en un cuerpo ya saneado cada `adjunto:ID` por los datos de
+// su adjunto: en una imagen, si son de una imagen; en un enlace, con `download`.
+func conAdjuntosEnLinea(cuerpo string, data json.RawMessage) string {
+	if !strings.Contains(cuerpo, `="adjunto:`) {
+		return cuerpo
+	}
+	var d struct {
+		Attachments []adjuntoExportado `json:"attachments"`
+	}
+	if json.Unmarshal(data, &d) != nil {
+		return cuerpo
+	}
+	return reRefAdjunto.ReplaceAllStringFunc(cuerpo, func(ref string) string {
+		m := reRefAdjunto.FindStringSubmatch(ref)
+		for _, a := range d.Attachments {
+			if a.ID != m[2] || !reDatosAdj.MatchString(a.DataURL) {
+				continue
+			}
+			if m[1] == "src" {
+				if !reImagenEnLinea.MatchString(a.DataURL) {
+					return ref
+				}
+				return `src="` + a.DataURL + `"`
+			}
+			return `href="` + a.DataURL + `" download="` + html.EscapeString(a.Name) + `"`
+		}
+		return ref
+	})
 }
 
 func estadosHTML(n Note) string {

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { cabecerasCerradas } from './astro-middleware.js';
 import {
   applySecurityHeaders,
+  sytueCsp,
   SYTUE_PERMISSIONS_POLICY_ROOMS,
   SYTUE_SECURITY_HEADERS,
 } from './astro-security.js';
@@ -429,5 +430,81 @@ describe('ninguna app deja sus tests sin ejecutar', () => {
       scripts?: Record<string, string>;
     };
     expect(pkg.scripts?.test).toBeString();
+  });
+});
+
+/*
+ * Los scripts SIN 'unsafe-inline' (2026-11-25): Astro firma lo que procesa (`sytueCsp`)
+ * y lo que el layout escribía a mano llega de `/arranque.js` (`sytueArranque`). Una app
+ * con la política estricta que vuelva a poner un script en línea lo vería bloqueado en
+ * el navegador y sin un error a la vista: se para aquí. Verlo en rojo: devuelve a
+ * cualquier layout estricto su `<script is:inline set:html={themeInitScript}>`.
+ */
+describe('scripts sin unsafe-inline', () => {
+  const appsDir = fileURLToPath(new URL('../../../apps/', import.meta.url));
+  const ssr = readdirSync(appsDir).filter((app) =>
+    existsSync(`${appsDir}${app}/src/middleware.ts`),
+  );
+  const config = (app: string) => readFileSync(`${appsDir}${app}/astro.config.mjs`, 'utf8');
+  const estrictas = ssr.filter((app) => config(app).includes('csp: sytueCsp('));
+
+  it('la política de Astro no deja scripts en línea y sí WebAssembly', () => {
+    const csp = sytueCsp();
+    expect(csp.scriptDirective.resources).toEqual(["'self'", "'wasm-unsafe-eval'"]);
+    expect(csp.scriptDirective.resources).not.toContain("'unsafe-inline'");
+    expect(csp.scriptDirective.resources).not.toContain("'unsafe-eval'");
+    expect(sytueCsp({ hashes: ['sha256-abc'] }).scriptDirective.hashes).toEqual(['sha256-abc']);
+  });
+
+  it('la cabecera de la casa deja arrancar workers propios y el del sandbox de scripts', () => {
+    // El sandbox es un iframe `srcdoc` que HEREDA esta política y lanza un Worker
+    // `blob:`; sin `worker-src` cae en `script-src` y se bloquea (medido con Chromium).
+    const csp = cabecerasCerradas('https://hub.ejemplo.test')['content-security-policy'] ?? '';
+    expect(csp.split('; ')).toContain("worker-src 'self' blob:");
+  });
+
+  it('todas las SSR sirven /arranque.js: la página 404 de la suite lo carga', () => {
+    for (const app of ssr)
+      expect([app, config(app).includes('sytueArranque(')]).toEqual([app, true]);
+  });
+
+  it('estas apps llevan ya la política estricta', () => {
+    expect(estrictas.toSorted()).toEqual(
+      [
+        'calendar',
+        'cast',
+        'console',
+        'contacts',
+        'drive',
+        'erp',
+        'mail',
+        'notes',
+        'pages',
+        'photos',
+      ].toSorted(),
+    );
+  });
+
+  it('ninguna app estricta ejecuta un script en línea que Astro no firme', () => {
+    const astroDe = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const ruta = `${dir}/${e.name}`;
+        if (e.isDirectory()) return e.name === 'dev' ? [] : astroDe(ruta);
+        return e.name.endsWith('.astro') ? [ruta] : [];
+      });
+    const culpables: string[] = [];
+    for (const app of estrictas) {
+      for (const fichero of astroDe(`${appsDir}${app}/src`)) {
+        for (const etiqueta of readFileSync(fichero, 'utf8').match(/<script\b[^>]*>/g) ?? []) {
+          // Lo que procesa Astro (sin is:inline) lo firma él; un `src` lo cubre 'self';
+          // un bloque de datos (JSON) no se ejecuta.
+          if (!/\bis:inline\b/.test(etiqueta)) continue;
+          if (/\bsrc=/.test(etiqueta)) continue;
+          if (/type="application\/(ld\+)?json"/.test(etiqueta)) continue;
+          culpables.push(`${fichero.slice(appsDir.length)}: ${etiqueta}`);
+        }
+      }
+    }
+    expect(culpables).toEqual([]);
   });
 });

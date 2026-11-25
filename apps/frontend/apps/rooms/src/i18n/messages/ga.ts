@@ -293,6 +293,7 @@ export const ga: AppCatalog<typeof en> = {
     other: 'Uasmhéid daoine is féidir a chur leis: {count}.',
   },
   'dm.openFailed': 'Níorbh fhéidir an comhrá a oscailt.',
+  'dm.externalClosed': 'Ní cheadaíonn d’eagraíocht comhráite leis an duine seo.',
   'people.search': 'Cuardaigh “{query}” ar Sytue One',
   'people.searching': 'Ag cuardach ar Sytue One…',
   'people.notFound': 'Níl aon duine ar Sytue One ag úsáid an ríomhphoist nó an @ainmúsáideora sin.',

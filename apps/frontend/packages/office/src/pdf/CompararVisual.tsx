@@ -12,7 +12,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { cx } from '@sytue/ui';
 import { documentLocale } from '@sytue/i18n';
 import type { docsT } from '../i18n';
-import { api, type ComparacionVisual, type DiferenciaVisual } from './api';
+import type { ComparacionVisual, DiferenciaVisual } from './api';
+import { useFuentePdf } from './fuente';
 import {
   SENSIBILIDADES,
   SENSIBILIDAD_POR_DEFECTO,
@@ -48,6 +49,7 @@ export function CompararVisual({
   const [paginas, setPaginas] = useState<Record<number, Pagina>>({});
   // Quién pidió la última comparación: una respuesta que llega tarde no pisa a la nueva.
   const vuelta = useRef(0);
+  const fuente = useFuentePdf(path);
 
   const lista = res?.paginas ?? [];
   const paradas = paradasDe(lista);
@@ -60,8 +62,8 @@ export function CompararVisual({
     setRes(null);
     setPaginas({});
     setParada(0);
-    void api
-      .compararVisual(path, otro, toleranciaDe(sens))
+    void fuente
+      .compararVisual(otro, toleranciaDe(sens))
       .then((r) => {
         if (mia !== vuelta.current) return;
         setRes(r);
@@ -83,8 +85,8 @@ export function CompararVisual({
       return;
     const mia = vuelta.current;
     setPaginas((p) => ({ ...p, [paginaActual]: 'cargando' }));
-    void api
-      .compararVisualPagina(path, otro, paginaActual, toleranciaDe(sens))
+    void fuente
+      .compararVisualPagina(otro, paginaActual, toleranciaDe(sens))
       .then((r) => {
         if (mia === vuelta.current) setPaginas((p) => ({ ...p, [paginaActual]: r.pagina }));
       })

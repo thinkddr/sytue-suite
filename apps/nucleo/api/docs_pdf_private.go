@@ -26,7 +26,7 @@ func (p *PDF) WithPrivateDrive(data DriveData) (*PDF, error) {
 	if err != nil {
 		return nil, errors.Join(ErrPrivatePDFOperation, err)
 	}
-	return &PDF{drive: drive, motor: privateDataClient(p.motor, ErrPrivatePDFOperation)}, nil
+	return &PDF{drive: drive, motor: privateDataClient(p.motor, ErrPrivatePDFOperation), signatures: newLocalSignatures()}, nil
 }
 
 // CheckRemoteProcessing rejects content processing outside the authorized

@@ -103,6 +103,9 @@ type Pantalla struct {
 	banco     *Banco
 	// tpv es el punto de venta: vive lo que la pantalla, con su cesta.
 	tpv *TPV
+	// CobrosTPV es donde el punto de venta guarda el cobro enviado y sin confirmar
+	// (AlmacenCobroTPVDe); nil, solo en memoria.
+	CobrosTPV AlmacenCobroTPV
 	// AbrirApp abre otra app de la suite por su esquema (o la web): el correo que pide
 	// una factura se escribe en Sytue Mail. nil, no se ofrece.
 	AbrirApp func(producto, ruta string)
@@ -123,6 +126,11 @@ type Pantalla struct {
 	repintarIA func()
 	// facturas es el asistente de facturas abierto (nil, ninguno).
 	facturas *AsistenteFacturas
+	// importando es el asistente de «Importar desde otro programa» abierto (nil, ninguno).
+	importando *ImportarDesde
+	// PoliticaURL es la política de privacidad del sitio público, el enlace del
+	// `DataFlow` del asistente de importar. Vacía, sin enlace.
+	PoliticaURL string
 	// panelIA es el panel de Sytue AI abierto por última vez (para los guardianes).
 	panelIA *PanelIA
 	// scrollMain es el desplazador de `main`: se lleva lo vertical de lo que se desplaza
@@ -678,6 +686,8 @@ func (p *Pantalla) enganchar() {
 	b.AlCambiar = p.cambiarModulo
 	b.AlConfigurar = func() { p.IrA(VistaAsistente) }
 	b.AlBanco = func() { p.IrA(VistaBanco) }
+	b.AlImportar = func() { p.AbrirImportarDesde() }
+	b.PuedeImportar = p.PuedeImportarDesde
 }
 
 // AbrirPaleta abre la paleta de la suite: la piden el botón «Ir a…» del carril, el del

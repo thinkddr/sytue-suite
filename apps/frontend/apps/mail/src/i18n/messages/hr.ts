@@ -995,7 +995,7 @@ export const hr: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Premjestite poštu u novi trezor kako biste je i dalje primali',
   'privateMail.vaultMoveRetiredBody':
-    'Prethodni sustav pošte više nije dostupan. Dok ne premjestite poštu u trezor, nećete primati novu poštu: ono što stigne u međuvremenu sprema se šifrirano prethodnim sustavom, kao i pošta koju već imate, i neće se moći pročitati. Ne briše se, ali nitko je neće moći otvoriti. Nakon premještanja pošta vam ponovno stiže i otvara se prijavom u Sytue ID kao i ostale aplikacije.',
+    'Prethodni sustav pošte više nije dostupan. Dok ne premjestite poštu u trezor, nećete primati novu poštu: pošta koju vam pošalju u međuvremenu čeka na poslužitelju s kojeg je poslana, a on je nekoliko dana pokušava ponovno isporučiti. Ako poštu premjestite na vrijeme, stići će vam nakon toga; ako ne, vratit će se kao neisporučena. Ono što je već šifrirano prethodnim sustavom, kao i pošta koju već imate, neće se moći pročitati: ne briše se, ali nitko to neće moći otvoriti. Nakon premještanja pošta vam ponovno stiže i otvara se prijavom u Sytue ID kao i ostale aplikacije.',
   'privateMail.vaultMoveCheckFailed':
     'Stanje vaše pošte nije bilo moguće provjeriti. Pokušajte ponovno za trenutak.',
 };

@@ -10,8 +10,11 @@
 package store_test
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/rooms/db"
@@ -191,5 +194,75 @@ func TestPushRespetaLaPausa(t *testing.T) {
 	}
 	if w, i, _ := cuantos(); w != 1 || i != 1 {
 		t.Fatalf("pausa quitada: web %d, ios %d; quiero 1, 1", w, i)
+	}
+}
+
+// TestPushAPersonaDeOtraOrganizacion: la persona de fuera (ADR 0040) se suscribe desde
+// SU organización. El aviso de un DM la encuentra allí, con esa organización en el
+// target para poder limpiarla, y respeta su «Pausar avisos» de allí. La lectura entre
+// organizaciones no enseña la suscripción de nadie que no sea externo.
+func TestPushAPersonaDeOtraOrganizacion(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool, nil)
+	acme, otra := tenantCtx("acme"), tenantCtx("otra")
+	tm, _ := seedTeamChannel(acme, t, st, "alice", domain.ChannelPublic)
+
+	dm, err := st.OpenGroupDirect(acme, tm.ID, "alice", []string{"bea"}, map[string]string{"bea": "Bea de Otra"})
+	if err != nil {
+		t.Fatalf("OpenGroupDirect con externa: %v", err)
+	}
+	if _, err := st.AceptarInvitacion(context.Background(), "bea", "otra", dm.ID); err != nil {
+		t.Fatalf("aceptar el DM: %v", err)
+	}
+	// Bea se suscribe desde la suya; Carla, de «otra» y sin conversación de fuera, también.
+	if err := st.SavePushSubscription(otra, "bea", subFor("bea")); err != nil {
+		t.Fatalf("SavePushSubscription bea: %v", err)
+	}
+	if err := st.SavePushSubscription(otra, "carla", subFor("carla")); err != nil {
+		t.Fatalf("SavePushSubscription carla: %v", err)
+	}
+
+	targets, err := st.PushTargetsForMessage(acme, dm.ID, "alice", nil)
+	if err != nil {
+		t.Fatalf("PushTargetsForMessage: %v", err)
+	}
+	if len(targets) != 1 || targets[0].Subject != "bea" || targets[0].Tenant != "otra" ||
+		targets[0].Endpoint != subFor("bea").Endpoint {
+		t.Fatalf("DM con la externa: targets=%+v, quiero la suscripción de bea en «otra»", targets)
+	}
+	// Mencionar a Carla no la convierte en destinataria: no está en el canal.
+	if targets, _ := st.PushTargetsForMessage(acme, dm.ID, "alice", []string{"carla"}); len(targets) != 1 {
+		t.Fatalf("mención a quien no está: targets=%+v", targets)
+	}
+
+	// Su pausa es la de su organización.
+	hasta := time.Now().Add(time.Hour)
+	if _, err := st.SetNotifyPause(otra, "bea", &hasta); err != nil {
+		t.Fatalf("SetNotifyPause: %v", err)
+	}
+	if targets, _ := st.PushTargetsForMessage(acme, dm.ID, "alice", nil); len(targets) != 0 {
+		t.Fatalf("con la pausa de su organización: targets=%+v, quiero 0", targets)
+	}
+	if _, err := st.SetNotifyPause(otra, "bea", nil); err != nil {
+		t.Fatalf("quitar la pausa: %v", err)
+	}
+
+	// La caduca se limpia en SU organización.
+	if err := st.DeletePushSubscription(otra, "bea", subFor("bea").Endpoint); err != nil {
+		t.Fatalf("DeletePushSubscription: %v", err)
+	}
+	if targets, _ := st.PushTargetsForMessage(acme, dm.ID, "alice", nil); len(targets) != 0 {
+		t.Fatalf("tras limpiar: targets=%+v", targets)
+	}
+
+	// La política de mantenimiento solo enseña las de quien es externo en algo.
+	var vistas int
+	if err := h.Pool.InMaintenanceTx(context.Background(), func(tx pgx.Tx) error {
+		return tx.QueryRow(context.Background(), `SELECT count(*) FROM push_subscriptions`).Scan(&vistas)
+	}); err != nil {
+		t.Fatalf("lectura de mantenimiento: %v", err)
+	}
+	if vistas != 0 {
+		t.Fatalf("mantenimiento ve %d suscripciones de quien no es externo", vistas)
 	}
 }

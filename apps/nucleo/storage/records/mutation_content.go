@@ -99,6 +99,9 @@ func (r *Repository) runMutation(parent context.Context, operation string, input
 		result, err = r.resumeMutation(ctx, call)
 		return err
 	})
+	if err == nil && (found || !resumeOnly) && r.cfg.OnWrite != nil {
+		r.cfg.OnWrite()
+	}
 	return result, found, err
 }
 

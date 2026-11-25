@@ -635,11 +635,20 @@ export class ChatHttpError extends Error {
     message: string,
     /** Explicación del servicio en un 422: qué respondió el otro lado de un puente. */
     readonly detail?: string,
+    /**
+     * El código del servicio cuando dice algo que la isla tiene que distinguir de un
+     * 403 cualquiera: `rooms_external_closed`, la política de contacto con gente de
+     * fuera de la organización (mig 0083 de Rooms).
+     */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ChatHttpError';
   }
 }
+
+/** Los códigos del servicio que llegan hasta la isla (ChatHttpError.code). */
+const CODIGOS_DE_LA_ISLA = new Set(['rooms_external_closed']);
 
 /**
  * Respuesta de una ruta BFF cuando el servicio falla: los 4xx se PRESERVAN (403 sin
@@ -650,7 +659,11 @@ export class ChatHttpError extends Error {
 export function chatFail(err: unknown): Response {
   const status =
     err instanceof ChatHttpError && err.status >= 400 && err.status < 500 ? err.status : 502;
-  return new Response(JSON.stringify({ error: 'chat_error' }), {
+  const error =
+    err instanceof ChatHttpError && err.code && CODIGOS_DE_LA_ISLA.has(err.code)
+      ? err.code
+      : 'chat_error';
+  return new Response(JSON.stringify({ error }), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
@@ -681,16 +694,21 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
       ...(signal ? { signal } : {}),
     });
     if (!res.ok) {
-      // Solo el 422 trae una explicación que merece la pena enseñar; el resto de
-      // errores sigue siendo un código.
-      const detail =
-        res.status === 422
+      // Solo el 422 trae una explicación que merece la pena enseñar, y solo un 403 un
+      // código que la isla distinga (CODIGOS_DE_LA_ISLA); el resto sigue siendo un estado.
+      const cuerpo =
+        res.status === 422 || res.status === 403
           ? await res
               .json()
-              .then((d: { error?: { message?: string } }) => d.error?.message)
+              .then((d: { error?: { message?: string; code?: string } }) => d.error)
               .catch(() => undefined)
           : undefined;
-      throw new ChatHttpError(res.status, `Sytue Chat ${method} ${path} -> ${res.status}`, detail);
+      throw new ChatHttpError(
+        res.status,
+        `Sytue Chat ${method} ${path} -> ${res.status}`,
+        res.status === 422 ? cuerpo?.message : undefined,
+        cuerpo?.code,
+      );
     }
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;

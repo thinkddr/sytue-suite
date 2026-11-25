@@ -148,7 +148,8 @@ func (s *Server) grantAuthCode(w http.ResponseWriter, r *http.Request, client do
 		amr = nil
 	}
 
-	resp := s.buildTokens(ctx, client, user, ac.OrgID, ac.Scope, ac.Nonce, ac.AuthTime, amr)
+	resp := s.buildTokens(ctx, client, user, ac.OrgID, ac.Scope, ac.Nonce, ac.AuthTime, amr,
+		s.confianzaDelDispositivo(ctx, ac.SessionID))
 	if resp == nil {
 		httpx.Fail(w, r, httpx.ErrInternal)
 		return
@@ -416,7 +417,10 @@ func (s *Server) grantRefresh(w http.ResponseWriter, r *http.Request, client dom
 	if err != nil {
 		amrRot = nil
 	}
-	resp := s.buildTokens(ctx, client, rot.user, rot.orgID, rot.newScope, "", rot.authTime, amrRot)
+	// Y la confianza del dispositivo se evalúa de nuevo: si se revocó o se le quitó
+	// la confianza, este refresco ya no la afirma.
+	resp := s.buildTokens(ctx, client, rot.user, rot.orgID, rot.newScope, "", rot.authTime, amrRot,
+		s.confianzaDelDispositivo(ctx, rot.sessionID))
 	if resp == nil {
 		// buildTokens devuelve nil si la firma falla (clave activa ilegible, por
 		// ejemplo). Aquí faltaba la comprobación que sí hace grantAuthCode, así que
@@ -471,12 +475,13 @@ func (s *Server) grantClientCredentials(w http.ResponseWriter, r *http.Request, 
 }
 
 // buildTokens construye access + id token (sin persistir refresh).
-func (s *Server) buildTokens(ctx context.Context, client domain.Client, user domain.User, orgID, scope, nonce string, authTime time.Time, amr []string) *tokenResponse {
+func (s *Server) buildTokens(ctx context.Context, client domain.Client, user domain.User, orgID, scope, nonce string, authTime time.Time, amr []string, deviceTrust string) *tokenResponse {
 	now := time.Now()
 	common := s.userClaims(ctx, client, user, orgID, scope, now)
 	common.Nonce = nonce
 	common.AuthTime = authTime
 	common.AMR = amr
+	common.DeviceTrust = deviceTrust
 	mfa := user.MFAEnabled
 	common.MFAEnabled = &mfa
 
@@ -664,4 +669,17 @@ var clientesConCampana = map[string]bool{
 	"sytue-console": true, "sytue-cloud": true, "sytue-syerp": true, "sytue-cast": true,
 	"sytue-pages": true, "sytue-bases": true, "sytue-desktop": true, "sytue-mobile": true,
 	"sytue-docus": true, "sytue-calcus": true, "sytue-diapos": true, "sytue-certipdf": true,
+}
+
+// confianzaDelDispositivo es el `device_trust` de los tokens de una sesión. Si no se
+// puede leer, `none`: afirmar confianza sin haberla comprobado es justo lo que el
+// claim existe para no hacer.
+func (s *Server) confianzaDelDispositivo(ctx context.Context, sessionID string) string {
+	dt, err := s.store.ConfianzaDelDispositivo(ctx, sessionID)
+	if err != nil {
+		s.log.WarnContext(ctx, "no se pudo evaluar la confianza del dispositivo",
+			"session_id", sessionID, "error", err)
+		return domain.DeviceTrustNone
+	}
+	return dt
 }

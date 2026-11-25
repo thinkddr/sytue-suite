@@ -164,6 +164,8 @@ const carpetas = [
   join(FRONTEND, 'packages', 'office', 'src/i18n/messages'),
   // El panel «Quién puede consultar» de la consola, que va en 26 idiomas antes que ella.
   join(FRONTEND, 'apps', 'console', 'src/i18n/acceso/messages'),
+  // Y el registro RGPD de la consola (página «Privacidad»), igual.
+  join(FRONTEND, 'apps', 'console', 'src/i18n/privacidad/messages'),
   ...readdirSync(join(FRONTEND, 'apps'))
     .map((a) => join(FRONTEND, 'apps', a, 'src/i18n/messages'))
     .filter(existsSync),

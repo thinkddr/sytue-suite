@@ -15,6 +15,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets/fuentes"
 )
 
 // TestNadiePublicaWidgetsDesdeLaVista: el widget nativo de cada app lo publica SOLO su
@@ -109,9 +111,9 @@ func TestLasVistasPorLaAPIAvisanAlWidget(t *testing.T) {
 	conVistaAPI := 0
 	for _, dir := range dirs {
 		app := filepath.Base(dir)
-		fuentes, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+		codigo, _ := filepath.Glob(filepath.Join(dir, "*.go"))
 		var widget, aviso bool
-		for _, ruta := range fuentes {
+		for _, ruta := range codigo {
 			if strings.HasSuffix(ruta, "_test.go") {
 				continue
 			}
@@ -219,6 +221,49 @@ func TestElDrivePrivadoAvisaAlWidget(t *testing.T) {
 		privadas := strings.Count(string(texto), "WithPrivateData(") + strings.Count(string(texto), "WithPrivateDrive(")
 		if avisos := strings.Count(string(texto), ".ConAviso("); avisos < privadas {
 			t.Errorf("%s: %d fachadas privadas y solo %d con ConAviso", fichero, privadas, avisos)
+		}
+	}
+}
+
+// TestLasAppsDeRegistrosEnMatrixLeenYAvisanDesdeSuRepositorio: con la cuenta en Matrix,
+// una app de registros lee y escribe en su repositorio privado, que no pasa por HTTP. Su
+// widget tiene que leer ESE repositorio (Suite.WidgetDesdeRegistrosPrivados, al montar
+// la vista de Matrix) y cada escritura aceptada en él tiene que avisarle
+// (cifrado.RecordApplicationConfig.OnWrite = AvisarEscritura). Hasta el 2026-11-25 el
+// widget leía la fuente del servidor, congelada, y ninguna escritura le avisaba.
+func TestLasAppsDeRegistrosEnMatrixLeenYAvisanDesdeSuRepositorio(t *testing.T) {
+	apps := map[string]string{
+		"bases": "bases", "calendar": "calendar", "cast": "cast", "contacts": "contacts", "erp": "erp",
+		"notes": "notes", "photos": "photos", "docus": "docs", "calcus": "sheets", "diapos": "slides",
+	}
+	for app, producto := range apps {
+		if !fuentes.DeRegistros(producto) {
+			t.Errorf("%s no es una app de registros para el widget", producto)
+		}
+		ficheros, _ := filepath.Glob(filepath.Join("..", "cmd", app, "*.go"))
+		var todo strings.Builder
+		for _, ruta := range ficheros {
+			if strings.HasSuffix(ruta, "_test.go") {
+				continue
+			}
+			texto, err := os.ReadFile(ruta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			todo.Write(texto)
+		}
+		texto := todo.String()
+		if !strings.Contains(texto, ".WidgetDesdeRegistrosPrivados(") {
+			t.Errorf("cmd/%s no monta su widget sobre el repositorio privado", app)
+		}
+		if !regexp.MustCompile(`OnWrite:\s*suite\.AvisarEscritura|OnWrite:\s*onWrite`).MatchString(texto) ||
+			!strings.Contains(texto, "suite.AvisarEscritura") {
+			t.Errorf("cmd/%s: sus escrituras en el repositorio privado no avisan al widget (OnWrite)", app)
+		}
+	}
+	for _, producto := range []string{"drive", "pdf", "mail", "rooms", "one"} {
+		if fuentes.DeRegistros(producto) {
+			t.Errorf("%s no es una app de registros", producto)
 		}
 	}
 }

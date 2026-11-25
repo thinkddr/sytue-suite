@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nieuwe notitie";
 "widgets.newContact" = "Nieuw contact";
 "widgets.addPhotos" = "Foto's toevoegen";
+"widgets.newDocument" = "Nieuw document";
+"widgets.newSpreadsheet" = "Nieuwe spreadsheet";
+"widgets.newPresentation" = "Nieuwe presentatie";
+"widgets.openToUpdate" = "Wordt bijgewerkt als de app open is";
 "widgets.notes" = "Notities";
 "widgets.rows" = "Rijen";
 "widgets.pending" = "In behandeling";

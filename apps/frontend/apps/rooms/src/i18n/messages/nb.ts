@@ -251,6 +251,7 @@ export const nb: AppCatalog<typeof en> = {
     other: 'Du kan legge til opptil {count} personer.',
   },
   'dm.openFailed': 'Samtalen kunne ikke åpnes.',
+  'dm.externalClosed': 'Organisasjonen din tillater ikke samtaler med denne personen.',
   'people.search': 'Søk etter «{query}» i Sytue One',
   'people.searching': 'Søker i Sytue One…',
   'people.notFound': 'Ingen i Sytue One bruker den e-postadressen eller det @brukernavnet.',

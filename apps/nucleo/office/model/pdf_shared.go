@@ -52,7 +52,10 @@ var (
 	AplanarAnotacionesPDF    = shared.AplanarAnotacionesPDF
 	AplanarFormularioPDF     = shared.AplanarFormularioPDF
 	ApplyAnnotationOperation = shared.ApplyAnnotationOperation
+	ApplyCompareOperation    = shared.ApplyCompareOperation
+	ApplyEditOperation       = shared.ApplyEditOperation
 	ApplyFormOperation       = shared.ApplyFormOperation
+	ApplyLayerOperation      = shared.ApplyLayerOperation
 	ApplyPageOperation       = shared.ApplyPageOperation
 	ApplyProtectionOperation = shared.ApplyProtectionOperation
 	ApplyToolOperation       = shared.ApplyToolOperation
@@ -146,14 +149,25 @@ const (
 var (
 	DecodeOperationJSON    = shared.DecodeOperationJSON
 	DecodificarJPX         = shared.DecodificarJPX
+	DescribeDeviceError    = shared.DescribeDeviceError
 	DescribeOperationError = shared.DescribeOperationError
 	DescribeReadError      = shared.DescribeReadError
 	DesprotegerPDF         = shared.DesprotegerPDF
 )
 
 type (
+	DeviceEdit       = shared.DeviceEdit
+	DeviceFailure    = shared.DeviceFailure
+	DeviceSession    = shared.DeviceSession
 	DiferenciaPagina = shared.DiferenciaPagina
 	DiferenciaVisual = shared.DiferenciaVisual
+)
+
+var EditOperationHeaders = shared.EditOperationHeaders
+
+type (
+	EditOperationInput  = shared.EditOperationInput
+	EditOperationResult = shared.EditOperationResult
 )
 
 var (
@@ -168,6 +182,7 @@ var (
 	ErrCCITT                  = shared.ErrCCITT
 	ErrCertificadoNoUsable    = shared.ErrCertificadoNoUsable
 	ErrCertificarFirmado      = shared.ErrCertificarFirmado
+	ErrDeviceDocument         = shared.ErrDeviceDocument
 	ErrFirmaNoCabe            = shared.ErrFirmaNoCabe
 	ErrFirmaNoCorresponde     = shared.ErrFirmaNoCorresponde
 	ErrInvalidaFirmas         = shared.ErrInvalidaFirmas
@@ -235,6 +250,8 @@ type (
 )
 
 var (
+	IsLayerOperation = shared.IsLayerOperation
+	LayerPosition    = shared.LayerPosition
 	LeerCabecerasJPX = shared.LeerCabecerasJPX
 	LeerPDF          = shared.LeerPDF
 	LeerPDFConClave  = shared.LeerPDFConClave
@@ -248,8 +265,11 @@ var MarcarComentarioPDF = shared.MarcarComentarioPDF
 
 const (
 	MaxCommentIndex       = shared.MaxCommentIndex
+	MaxDeviceBytes        = shared.MaxDeviceBytes
+	MaxDeviceDocuments    = shared.MaxDeviceDocuments
 	MaxIndexedPages       = shared.MaxIndexedPages
 	MaxInputFiles         = shared.MaxInputFiles
+	MaxLayerText          = shared.MaxLayerText
 	MaxOperationFileBytes = shared.MaxOperationFileBytes
 	MaxOperationJSONBytes = shared.MaxOperationJSONBytes
 	MaxPDFBytes           = shared.MaxPDFBytes
@@ -275,6 +295,8 @@ const (
 	MotivoSinAnclas        = shared.MotivoSinAnclas
 	MotivoSinAtributos     = shared.MotivoSinAtributos
 )
+
+var NewDeviceSession = shared.NewDeviceSession
 
 type NivelCompresion = shared.NivelCompresion
 
@@ -324,6 +346,7 @@ var (
 	ParsePageRotation          = shared.ParsePageRotation
 	ParsePageSelection         = shared.ParsePageSelection
 	ParseProtectionPermissions = shared.ParseProtectionPermissions
+	ParseVisualOptions         = shared.ParseVisualOptions
 	PedirSello                 = shared.PedirSello
 )
 
@@ -402,3 +425,5 @@ const (
 var VerificarFirmaDeResumen = shared.VerificarFirmaDeResumen
 
 type ViewResult = shared.ViewResult
+
+const VisualCompareTimeout = shared.VisualCompareTimeout

@@ -180,11 +180,17 @@ func TestElMesNoRepartePorCadaMedida(t *testing.T) {
 // retenidoPorPintado es lo que queda vivo en el montón, por pintado, tras n pintados y
 // una recolección: lo que la caché de renderers de Fyne sigue guardando de los árboles
 // descolgados (el driver de pruebas no la limpia nunca, así que se ve entero).
+//
+// Cada pintado cambia la consulta de la agenda entre "" y " " (que filtran lo mismo): el
+// mes del teléfono y la agenda se conservan si no cambia nada
+// (TestRepintarConservaElMesDelTelefonoYLaAgenda), y así se rehacen ellos solos, como
+// antes en cada pintado, sin rehacer el menú ni la cabecera.
 func retenidoPorPintado(a *App, n int) int64 {
 	var antes, despues runtime.MemStats
 	runtime.GC()
 	runtime.ReadMemStats(&antes)
-	for range n {
+	for i := range n {
+		a.P.consultaAgenda = []string{"", " "}[i%2]
 		a.pintar()
 	}
 	runtime.GC()
@@ -201,8 +207,8 @@ func sinSoltar(t testing.TB, f func()) {
 	f()
 }
 
-// TestPintarNoRetieneLosArbolesViejos: el mes del teléfono y la agenda se rehacen
-// enteros en cada pintado, y lo descolgado se suelta en el acto (ui.SoltarArboles): tras
+// TestPintarNoRetieneLosArbolesViejos: cuando el mes del teléfono o la agenda se rehacen
+// (otro día, otro mes), lo descolgado se suelta en el acto (ui.SoltarArboles): tras
 // cuarenta pintados queda en el montón menos de la mitad de lo que quedaba cuando la
 // caché de Fyne lo guardaba hasta caducar (medido el 2026-11-25: de 148 a 47 KB por
 // pintado en el mes del teléfono y de 231 a 37 KB en la agenda). Lo que sigue quedando
@@ -226,6 +232,52 @@ func TestPintarNoRetieneLosArbolesViejos(t *testing.T) {
 				t.Errorf("soltando quedan %d B por pintado y sin soltar %d B", con, sin)
 			}
 		})
+	}
+}
+
+// TestRepintarConservaElMesDelTelefonoYLaAgenda: como el mes de escritorio, la vista del
+// mes del teléfono (con su hoja y su lista del día) y la agenda son las MISMAS en un
+// repintado que no cambia lo que las decide; otro día las rehace. VISTO EN ROJO con las
+// dos rehechas en cada `pintar` (el banco del mes del teléfono pasaba de 494 a 72 KB, y
+// el de la agenda en el teléfono de 837 a 71).
+func TestRepintarConservaElMesDelTelefonoYLaAgenda(t *testing.T) {
+	for _, c := range []struct {
+		nombre      string
+		ancho, alto float32
+		vista       Vista
+		hecha       func(*Pantalla) fyne.CanvasObject
+	}{
+		{"movil/mes", 390, 844, VistaMes, func(p *Pantalla) fyne.CanvasObject { return p.compactaHecha }},
+		{"escritorio/agenda", 1280, 800, VistaAgenda, func(p *Pantalla) fyne.CanvasObject { return p.agendaHecha }},
+	} {
+		t.Run(c.nombre, func(t *testing.T) {
+			a, _ := appDeBanco(t, c.ancho, c.alto, c.vista)
+			p := a.P
+			antes := c.hecha(p)
+			if antes == nil {
+				t.Fatal("la vista no se ha guardado para el pintado siguiente")
+			}
+			elegido := p.diaElegido
+			a.pintar()
+			if c.hecha(p) != antes {
+				t.Fatal("un repintado sin cambios ha rehecho la vista")
+			}
+			if p.diaElegido != elegido {
+				t.Error("el día elegido (el del foco) no es el de la vista conservada")
+			}
+			p.Cursor = cursorDeBanco.AddDate(0, 0, 1)
+			a.pintar()
+			if c.hecha(p) == antes {
+				t.Error("otro día tenía que rehacer la vista")
+			}
+		})
+	}
+	// Al pasar del teléfono al escritorio, la vista del teléfono no se queda guardada.
+	a, w := appDeBanco(t, 390, 844, VistaMes)
+	w.Resize(fyne.NewSize(1280, 800))
+	a.pintar()
+	if a.P.compactaHecha != nil {
+		t.Error("en escritorio se sigue conservando el mes del teléfono")
 	}
 }
 

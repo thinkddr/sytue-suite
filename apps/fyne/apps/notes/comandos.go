@@ -65,6 +65,10 @@ var comandos = []comando{
 	{id: "cita", clave: "editor.quote", alias: []string{"quote", ">"}, pista: ">", glifo: CitaD},
 	{id: "codigo", clave: "editor.codeBlock", alias: []string{"code", "```"}, pista: "```", icono: iconos.Codigo},
 	{id: "tabla", clave: "editor.table", alias: []string{"table"}, glifo: TablaD},
+	{id: "columnas2", clave: "editor.columns2", alias: []string{"columns", "layout", "2"}, glifo: ColumnasD},
+	{id: "columnas3", clave: "editor.columns3", alias: []string{"columns", "layout", "3"}, glifo: ColumnasD},
+	{id: "imagen", clave: "editor.image", alias: []string{"image", "img", "picture"}, icono: iconos.Imagen, puntos: true},
+	{id: "archivo", clave: "editor.file", alias: []string{"file", "attach"}, glifo: FicheroD, puntos: true},
 	{id: "regla", clave: "editor.divider", alias: []string{"hr", "divider", "---"}, pista: "---", icono: iconos.Menos},
 	{id: "panel_info", clave: "editor.panelInfo", alias: []string{"info", "panel"}, icono: iconos.Informacion},
 	{id: "panel_nota", clave: "editor.panelNote", alias: []string{"note", "panel"}, icono: iconos.Lapiz},
@@ -78,6 +82,7 @@ var comandos = []comando{
 	{id: "enlace", clave: "editor.linkNote", alias: []string{"link", "[["}, pista: "[[", glifo: NotaD},
 	{id: "mencion", clave: "editor.mention", alias: []string{"mention", "@"}, pista: "@", glifo: ArrobaD},
 	{id: "simbolo", clave: "editor.symbols", alias: []string{"symbol", "char"}, glifo: SimboloD, puntos: true},
+	{id: "emoji", clave: "editor.emoji", alias: []string{"emoji", ":"}, pista: ":", glifo: CaritaD, puntos: true},
 }
 
 // pistaComando es lo que se lee a la derecha de un comando.
@@ -157,6 +162,7 @@ const (
 	menuCmd tipoMenu = iota
 	menuNota
 	menuPersona
+	menuEmoji
 )
 
 // disparos es lo que abre cada menú y cómo se lee lo escrito tras ello (`DISPAROS` de
@@ -170,10 +176,11 @@ var disparos = []struct {
 	{menuNota, "[[", consultaDeEnlace},
 	{menuPersona, "@", ui.ConsultaMencion},
 	{menuCmd, "/", consultaDeBarra},
+	{menuEmoji, ":", consultaDeEmoji},
 }
 
 // rotulosMenu son los nombres de las tres listas (`ROTULO_MENU`).
-var rotulosMenu = map[tipoMenu]string{menuCmd: "editor.slashMenu", menuNota: "editor.linkNote", menuPersona: "editor.mention"}
+var rotulosMenu = map[tipoMenu]string{menuCmd: "editor.slashMenu", menuNota: "editor.linkNote", menuPersona: "editor.mention", menuEmoji: "editor.emoji"}
 
 // menuComandos es el menú abierto: de qué tipo es, dónde está su disparador, qué se ha
 // escrito tras él y cuál de las filas está activa.
@@ -191,6 +198,8 @@ type menuComandos struct {
 type sugerencia struct {
 	glifo string
 	icono iconos.Icono
+	// emoji, si lo hay, es el dibujo de la fila: el emoji en su cara de color.
+	emoji string
 	// rotulo es lo que se lee; dentro, el título dentro de la nota, tras «›»; detalle, a
 	// la derecha y en gris: el atajo del comando, el cuaderno, el correo.
 	rotulo, dentro, detalle string
@@ -214,6 +223,8 @@ func (e *EditorNota) comandoDisponible(c comando) bool {
 		return e.enlaces != nil || e.AlEnlazar != nil
 	case "mencion":
 		return e.gente != nil
+	case "imagen", "archivo":
+		return e.AlAdjuntar != nil
 	}
 	return true
 }
@@ -281,7 +292,7 @@ func (e *EditorNota) mirarMenu() {
 	// `[[` se ve aunque aún no haya nada: dice que busca, o que nada casa. «/» dice
 	// «Sin resultados» mientras lo escrito todavía puede ser un comando. «@», solo con
 	// alguien que ofrecer.
-	if len(e.sugerencias(m)) == 0 && (d.tipo == menuPersona ||
+	if len(e.sugerencias(m)) == 0 && (d.tipo == menuPersona || d.tipo == menuEmoji ||
 		d.tipo == menuCmd && utf8.RuneCountInString(d.q) > maxSinResultados) {
 		e.cerrarMenu()
 		return
@@ -345,6 +356,12 @@ func (e *EditorNota) sugerencias(m *menuComandos) []sugerencia {
 				s.detalle = p.Email
 			}
 			out = append(out, s)
+		}
+	case menuEmoji:
+		// `:son` ofrece los emoji cuyas palabras empiezan así, con su primera palabra.
+		for _, x := range buscarEmoji(m.q) {
+			palabra, _, _ := strings.Cut(x.claves, " ")
+			out = append(out, sugerencia{emoji: x.s, rotulo: ":" + palabra, elegir: func() { e.ponerEmoji(x.s) }})
 		}
 	}
 	return out
@@ -505,6 +522,22 @@ func (e *EditorNota) aplicarComando(c comando) {
 		e.empezarCon("@")
 	case "simbolo":
 		e.abrirSimbolos(e.anclaCursor())
+	case "emoji":
+		e.abrirEmoji(e.anclaCursor())
+	case "columnas2", "columnas3":
+		n := 2
+		if c.id == "columnas3" {
+			n = 3
+		}
+		e.hacer(func() {
+			if e.haySeleccion() {
+				e.cur = e.doc.Borrar(a, b)
+			}
+			e.cur = e.doc.InsertarColumnas(e.cur, n)
+			e.ancla = e.cur
+		})
+	case "imagen", "archivo":
+		llamar1(e.AlAdjuntar, c.id == "imagen")
 	default: // tarea, vinetas, numeros, regla y tabla se llaman igual que su orden
 		e.Orden(c.id, "")
 	}
@@ -632,9 +665,12 @@ func (f *filaSugerencia) CreateRenderer() fyne.WidgetRenderer {
 		fondo.FillColor = tema.Color("menu-selected", f.v)
 	}
 	var dib fyne.CanvasObject
-	if f.s.glifo != "" {
+	switch {
+	case f.s.emoji != "":
+		dib = ui.TextoConCara(f.s.emoji, tema.TextoBase, caraEmoji(), tema.Color("text", f.v))
+	case f.s.glifo != "":
 		dib = Glifo(f.s.glifo, 15, "text-muted", f.v)
-	} else {
+	default:
 		dib = Icono(f.s.icono, 15, "text-muted", f.v)
 	}
 	return &filaSugerenciaRenderer{

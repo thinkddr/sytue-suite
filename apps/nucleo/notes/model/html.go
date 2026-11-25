@@ -4,9 +4,12 @@
 package model
 
 import (
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/net/html"
 )
@@ -45,6 +48,9 @@ var allowedTags = map[string]bool{
 	// Los bloques del editor (ver `bloques` más abajo): la sección que se pliega, la
 	// fecha, y subíndice y superíndice del «más formato» de la barra.
 	"details": true, "summary": true, "time": true, "sub": true, "sup": true,
+	// Una imagen DENTRO del texto, solo de un adjunto de la nota o pequeña y en línea
+	// (ver `imagenPermitida`): ni una dirección de fuera ni una del propio servicio.
+	"img": true,
 }
 
 // LOS BLOQUES DEL EDITOR, compartidos con la web y con Fyne: el HTML que se guarda
@@ -57,8 +63,11 @@ var allowedTags = map[string]bool{
 //	decisiones  <ul data-tipo="decisiones"><li>…</li></ul>
 //	fecha       <time datetime="AAAA-MM-DD">texto</time>
 //	código      <pre [data-lineas] [data-ajuste]><code data-lenguaje="go|javascript|…">…</code></pre>
-//	tabla       <table [data-numerada]>, <thead> de <th>, <th scope="row">, data-fondo en td/th
+//	tabla       <table [data-numerada]>, <thead> de <th>, <th scope="row">, data-fondo en td/th,
+//	            colspan="2…20" y rowspan="2…100" en td/th (celdas combinadas)
 //	columnas    <div data-columnas="2|3"><div data-columna>…</div>…</div>
+//	imagen      <img src="adjunto:ID" alt="…" [width] [height]> (ver `imagenPermitida`)
+//	fichero     <a href="adjunto:ID">nombre</a>
 //
 // La lista de la web es `BLOQUES_DE_NOTAS` en
 // `apps/frontend/packages/ui/src/browser/portapapeles.ts`, y la prueba
@@ -87,10 +96,72 @@ var (
 		"pre":     {"data-lineas", "data-ajuste"},
 		"table":   {"data-numerada"},
 	}
+	// bloquesNumericos: etiqueta → atributo → el número más alto que vale. Valen de 2 al
+	// tope, en decimal y sin ceros delante (un 1 es no ponerlo): así la vuelta sale igual
+	// byte a byte, y una celda no puede pedir un millón de columnas.
+	bloquesNumericos = map[string]map[string]int{
+		"td": {"colspan": 20, "rowspan": 100},
+		"th": {"colspan": 20, "rowspan": 100},
+	}
 )
+
+// LAS IMÁGENES Y LOS FICHEROS DEL TEXTO. Se guardan como los demás adjuntos de la nota
+// (en `data.attachments`, que topa el tamaño de `data`) y el cuerpo los nombra por su id
+// con el esquema `adjunto:`. Es lo único que vale en un `src`, además de una imagen
+// pequeña en línea (`data:image/png|jpeg|gif|webp;base64,…`, hasta MaxImagenEnLinea):
+//
+//   - una dirección de fuera (`https://…`), porque la nota la pinta el navegador de OTRA
+//     persona (un cuaderno compartido, un enlace público) y pedir la imagen le dice a
+//     ese servidor quién la ha abierto y cuándo;
+//   - una del propio servicio (`/api/…`), porque el navegador la pide CON la sesión de
+//     quien la ve: un `<img src="/api/…">` es una petición GET hecha en su nombre;
+//   - un `data:` de otro tipo (`image/svg+xml`, `text/html`) o sin base64, ni uno mayor
+//     que el tope: un SVG puede traer guiones, y la nota no es sitio para megas en línea.
+//
+// De `<img>` solo quedan `src`, `alt` (texto, hasta MaxAltImagen letras) y `width` y
+// `height` (enteros de 1 a MaxLadoImagen). Una imagen sin `src` válido no sale.
+
+// Los topes de una imagen del texto.
+const (
+	MaxImagenEnLinea = 64 << 10
+	MaxAltImagen     = 300
+	MaxLadoImagen    = 4096
+)
+
+var (
+	// reAdjunto es `adjunto:` con un id de adjunto: el de la web y Fyne
+	// (`Date.now()-aleatorio`), y nada que pueda salirse de una URL.
+	reAdjunto = regexp.MustCompile(`^adjunto:[A-Za-z0-9_-]{1,64}$`)
+	// reImagenEnLinea es una imagen en línea de las cuatro que pinta cualquiera.
+	reImagenEnLinea = regexp.MustCompile(`^data:image/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$`)
+)
+
+// EsAdjunto dice si `v` nombra un adjunto de la nota (`adjunto:ID`).
+func EsAdjunto(v string) bool { return reAdjunto.MatchString(v) }
+
+// imagenPermitida dice si un `src` vale en una nota.
+func imagenPermitida(v string) bool {
+	return EsAdjunto(v) || len(v) <= MaxImagenEnLinea && reImagenEnLinea.MatchString(v)
+}
+
+// numeroDeBloque devuelve el atributo numérico ya serializado si vale, o "".
+func numeroDeBloque(tag, clave, valor string) (string, bool) {
+	tope, ok := bloquesNumericos[tag][clave]
+	if !ok {
+		return "", false
+	}
+	n, err := strconv.Atoi(valor)
+	if err != nil || n < 2 || n > tope || strconv.Itoa(n) != valor {
+		return "", true
+	}
+	return ` ` + clave + `="` + valor + `"`, true
+}
 
 // atributoDeBloque devuelve el atributo ya serializado si vale para esa etiqueta, o "".
 func atributoDeBloque(tag, clave, valor string) string {
+	if n, es := numeroDeBloque(tag, clave, valor); es {
+		return n
+	}
 	if valores, ok := bloquesEnum[tag][clave]; ok {
 		if slices.Contains(valores, valor) {
 			return ` ` + clave + `="` + valor + `"`
@@ -118,7 +189,7 @@ func fechaISO(v string) bool {
 }
 
 // voidTags no llevan cierre.
-var voidTags = map[string]bool{"br": true, "hr": true, "input": true}
+var voidTags = map[string]bool{"br": true, "hr": true, "input": true, "img": true}
 
 // droppedSubtrees son las etiquetas cuyo CONTENIDO también se tira. Escapar el
 // texto de un <script> lo dejaría visible como código en la nota; borrarlo entero
@@ -155,8 +226,12 @@ func (s *saneador) abre(z *html.Tokenizer, autocerrada bool) {
 	if s.saltando > 0 || !allowedTags[tag] {
 		return
 	}
+	attrs := atributosPermitidos(z, tag, hasAttr)
+	if tag == "img" && !strings.HasPrefix(attrs, ` src="`) {
+		return // una imagen sin `src` que valga no se pinta: fuera entera
+	}
 	s.out.WriteString("<" + tag)
-	s.out.WriteString(atributosPermitidos(z, tag, hasAttr))
+	s.out.WriteString(attrs)
 	s.out.WriteString(">")
 	if !voidTags[tag] && !autocerrada {
 		s.abiertas = append(s.abiertas, tag)
@@ -237,6 +312,9 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 	if !hasAttr {
 		return ""
 	}
+	if tag == "img" {
+		return atributosDeImagen(z)
+	}
 	var b strings.Builder
 	// Un atributo repetido sale una vez, el primero, que es el que lee el navegador.
 	vistos := map[string]bool{}
@@ -248,13 +326,7 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 		switch {
 		case repetido:
 		case clave == "href" && tag == "a":
-			if ValidWebURL(valor) || strings.HasPrefix(valor, "mailto:") {
-				b.WriteString(` href="` + html.EscapeString(valor) + `"`)
-				// Un enlace de una nota ajena abre en otra pestaña SIN darle acceso a
-				// esta: `noopener` cierra window.opener, `noreferrer` no filtra de
-				// dónde viene.
-				b.WriteString(` target="_blank" rel="noopener noreferrer"`)
-			}
+			b.WriteString(enlacePermitido(valor))
 		case clave == "type" && tag == "input":
 			if strings.EqualFold(valor, "checkbox") {
 				b.WriteString(` type="checkbox"`)
@@ -270,14 +342,55 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 				b.WriteString(` style="` + html.EscapeString(s) + `"`)
 			}
 		default:
-			// Los valores de los bloques salen de listas cerradas y de una fecha
-			// comprobada: no hay nada que escapar.
+			// Los valores de los bloques salen de listas cerradas, de una fecha
+			// comprobada y de enteros: no hay nada que escapar.
 			b.WriteString(atributoDeBloque(tag, clave, valor))
 		}
 		if !more {
 			return b.String()
 		}
 	}
+}
+
+// enlacePermitido es el `href` de un enlace si vale —una dirección web, un correo o un
+// adjunto de la nota—, ya serializado, o "".
+func enlacePermitido(valor string) string {
+	if !ValidWebURL(valor) && !strings.HasPrefix(valor, "mailto:") && !EsAdjunto(valor) {
+		return ""
+	}
+	// Un enlace de una nota ajena abre en otra pestaña SIN darle acceso a esta:
+	// `noopener` cierra window.opener, `noreferrer` no filtra de dónde viene.
+	return ` href="` + html.EscapeString(valor) + `" target="_blank" rel="noopener noreferrer"`
+}
+
+// atributosDeImagen son los de un `<img>`: `src` el primero (si no vale, ninguno), y
+// detrás `alt`, `width` y `height`, en ese orden y escapados. Todo lo demás —`onerror`,
+// `srcset`, `style`, `loading`— se cae.
+func atributosDeImagen(z *html.Tokenizer) string {
+	valores := map[string]string{}
+	for {
+		k, v, more := z.TagAttr()
+		if _, visto := valores[string(k)]; !visto {
+			valores[string(k)] = string(v)
+		}
+		if !more {
+			break
+		}
+	}
+	src, ok := valores["src"]
+	if !ok || !imagenPermitida(src) {
+		return ""
+	}
+	b := ` src="` + html.EscapeString(src) + `"`
+	if alt, ok := valores["alt"]; ok && utf8.RuneCountInString(alt) <= MaxAltImagen {
+		b += ` alt="` + html.EscapeString(alt) + `"`
+	}
+	for _, lado := range []string{"width", "height"} {
+		if n, err := strconv.Atoi(valores[lado]); err == nil && n >= 1 && n <= MaxLadoImagen && strconv.Itoa(n) == valores[lado] {
+			b += ` ` + lado + `="` + valores[lado] + `"`
+		}
+	}
+	return b
 }
 
 // clasePermitida dice si una clase sobrevive: la fila y la casilla de una tarea, y

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,6 +17,12 @@ import (
 
 // ErrUnavailable means a revocation could not be acknowledged safely.
 var ErrUnavailable = errors.New("callaccess: synchronous document call revocation is unavailable")
+
+// ErrStorageMatrixRetired es el 409 `storage_matrix_retired` de Rooms: ya no honra
+// la autoridad de Matrix de ese ámbito y no hay traspaso a la bóveda (ADR 0087,
+// entrega 5). Envuelve ErrUnavailable: quien no la distingue la trata como
+// cualquier otra respuesta que no sirve.
+var ErrStorageMatrixRetired = fmt.Errorf("%w: storage_matrix_retired", ErrUnavailable)
 
 // Revoker closes document calls before an access change commits.
 type Revoker interface {
@@ -103,10 +110,27 @@ func (c *Client) request(ctx context.Context, method, path string, body, out any
 		return nil
 	}
 	if res.StatusCode != http.StatusOK {
-		return ErrUnavailable
+		return failedResponse(res)
 	}
 	if json.NewDecoder(io.LimitReader(res.Body, 8192)).Decode(out) != nil {
 		return ErrUnavailable
 	}
 	return nil
+}
+
+// failedResponse solo distingue el 409 de la autoridad de Matrix retirada; lo
+// demás, como siempre, es ErrUnavailable.
+func failedResponse(res *http.Response) error {
+	if res.StatusCode != http.StatusConflict {
+		return ErrUnavailable
+	}
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.NewDecoder(io.LimitReader(res.Body, 4096)).Decode(&body) == nil && body.Error.Code == "storage_matrix_retired" {
+		return ErrStorageMatrixRetired
+	}
+	return ErrUnavailable
 }

@@ -17,7 +17,7 @@ import {
   numToCol,
   parseFormula,
 } from '@sytue/formula/ligero';
-import type { AstNode, CellRef, CellValue, TableArea } from '@sytue/formula';
+import type { AstNode, CellRef, CellValue, TableArea } from '@sytue/formula/motor';
 import type {
   BorderStroke,
   CellBorder,
@@ -267,7 +267,9 @@ export function applyNumFmt(fmt: NumFmt, n: number): string {
 /** Texto a mostrar para un CellValue: números → numfmt (o General del motor);
  *  texto/booleano/error pasan de largo (mismo criterio que Engine.getDisplay). */
 export function formatCellValue(v: CellValue, fmt?: NumFmt): string {
-  if (v instanceof FormulaError) return v.code;
+  // #BUSY!: la fórmula llama a una función que aún no ha llegado (`cargarFunciones` de
+  // @sytue/formula). Vacía hasta que llegue, no un error que parpadea.
+  if (v instanceof FormulaError) return v.code === '#BUSY!' ? '' : v.code;
   if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
   if (typeof v === 'number') return fmt ? applyNumFmt(fmt, v) : formatNumber(v);
   return v;

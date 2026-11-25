@@ -172,9 +172,10 @@ func abrir(_ context.Context, e Elemento) (string, func(), error) {
 	return ruta, nada, nil
 }
 
-// convertir no existe en el escritorio: Go no trae decodificador de HEIC, y el del
-// sistema (WIC en Windows, libheif en Linux) no siempre está. Quien llama sube el
-// original, que es la copia de seguridad igual.
+// convertir no existe en el escritorio: el decodificador del sistema (WIC en Windows,
+// libheif en Linux) no siempre está, y no hace falta. Quien llama sube el original, que
+// es la copia de seguridad igual, y syphotos decodifica el HEIC él mismo (`miniatura`,
+// HEVC en Go puro, desde el 2026-11-25).
 func convertir(context.Context, string) (string, func(), error) {
 	return "", func() {}, ErrNoDisponible
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/events"
@@ -38,6 +39,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/operador"
 	"git.sytue.eu/sytue/one/platform/pkg/personas"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 	chatdb "git.sytue.eu/sytue/one/services/rooms/db"
 	"git.sytue.eu/sytue/one/services/rooms/internal/config"
@@ -303,6 +305,10 @@ func run() error {
 	// necesita de lectura además de escritura, porque quien firma la descarga es
 	// este servicio. Si no hay destino configurado no se cablea nada y la ruta
 	// responde «esta instalación no guarda grabaciones» en vez de romperse.
+	// Purga de tenant (ADR 0054): lo único que Rooms guarda en un almacén son las
+	// grabaciones; sin destino de grabación no hay objetos y las órdenes se
+	// cumplen sin más.
+	var almacenPurga purgatenant.Almacen = purgatenant.SinAlmacen{}
 	if mediaCfg.PuedeGrabar() {
 		host, ssl := servidorS3(mediaCfg.RecordingEndpoint)
 		objetos, err := objectstore.New(objectstore.Config{
@@ -313,6 +319,7 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("almacén de grabaciones: %w", err)
 		}
+		almacenPurga = objetos
 		// Se comprueba que el bucket EXISTE antes de dar la grabación por
 		// disponible. Un nombre bien escrito de un bucket que nadie creó pasa
 		// todas las validaciones de config y solo falla al subir el fichero, o
@@ -326,6 +333,7 @@ func run() error {
 			mediaSvc.SetObjectStore(objetos)
 		}
 	}
+	go purgatenant.Trabajador{DB: pool, Almacen: almacenPurga, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
 
 	enAnfitrion := chathttp.EnAnfitrion(svc)
 	mediaDeps := mediahttp.Deps{
@@ -340,7 +348,13 @@ func run() error {
 		},
 	}
 
+	// La traza de acceso de Rooms (docs/security.md §1.7): en lotes, sin bloquear
+	// la petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
 	router := chathttp.NewRouter(chathttp.Deps{
+		Traza:       traza,
 		Cfg:         cfg,
 		Service:     svc,
 		Verifier:    verifier,

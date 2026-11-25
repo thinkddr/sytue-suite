@@ -60,7 +60,9 @@ func (s *mxSession) Rcpt(to string, _ *gosmtp.RcptOptions) error {
 		return &gosmtp.SMTPError{Code: 501, EnhancedCode: gosmtp.EnhancedCode{5, 1, 3}, Message: "Bad recipient address"}
 	}
 	// Solo aceptamos correo para direcciones locales conocidas (anti-relay).
-	if _, err := s.d.Inbound.Resolve(context.Background(), addr.String()); err != nil {
+	ctx := context.Background()
+	resolved, err := s.d.Inbound.Resolve(ctx, addr.String())
+	if err != nil {
 		if errors.Is(err, domain.ErrNoSuchUser) {
 			return &gosmtp.SMTPError{Code: 550, EnhancedCode: gosmtp.EnhancedCode{5, 1, 1}, Message: "No such user here"}
 		}
@@ -69,8 +71,26 @@ func (s *mxSession) Rcpt(to string, _ *gosmtp.RcptOptions) error {
 	if len(s.rcpts) >= s.d.Cfg.MaxRecipients {
 		return &gosmtp.SMTPError{Code: 452, EnhancedCode: gosmtp.EnhancedCode{4, 5, 3}, Message: "Too many recipients"}
 	}
+	// El aplazamiento va AQUÍ y no en DATA: así espera solo este destinatario. En
+	// DATA el 4xx sería para todo el mensaje, y cada reintento volvería a
+	// entregárselo a los demás.
+	if err := s.d.Inbound.Aplazar(ctx, resolved); err != nil {
+		return rcptAplazado(err)
+	}
 	s.rcpts = append(s.rcpts, addr.String())
 	return nil
+}
+
+// rcptAplazado es la respuesta a un destinatario cuyo correo tiene que esperar
+// (delivery.ErrAplazada): 450 4.2.1, «el buzón existe pero ahora no admite
+// correo» (RFC 3463), temporal, así que el remitente reintenta y acaba
+// rindiéndose con un aviso de no entrega si no se resuelve. Cualquier otro fallo
+// al decidirlo es el 451 de siempre.
+func rcptAplazado(err error) error {
+	if errors.Is(err, delivery.ErrAplazada) {
+		return &gosmtp.SMTPError{Code: 450, EnhancedCode: gosmtp.EnhancedCode{4, 2, 1}, Message: "Mailbox temporarily unavailable, try again later"}
+	}
+	return &gosmtp.SMTPError{Code: 451, EnhancedCode: gosmtp.EnhancedCode{4, 3, 0}, Message: "Temporary lookup failure"}
 }
 
 func (s *mxSession) Data(r io.Reader) error {

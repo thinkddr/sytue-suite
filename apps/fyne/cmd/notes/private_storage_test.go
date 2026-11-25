@@ -155,7 +155,7 @@ func TestNotepadsPlanRejectsMissingResourcesBeforeConstruction(t *testing.T) {
 	if _, err := notesPlan(t.Context(), nil, nil); !errors.Is(err, cifrado.ErrPrivateResources) {
 		t.Fatal(err)
 	}
-	if _, err := buildNotesPlan(t.Context(), nil, nil, nil, nil); !errors.Is(err, cifrado.ErrPrivateResources) {
+	if _, err := buildNotesPlan(t.Context(), nil, nil, nil, nil, nil); !errors.Is(err, cifrado.ErrPrivateResources) {
 		t.Fatal(err)
 	}
 }

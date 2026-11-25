@@ -2708,9 +2708,9 @@ export const hu: AppCatalog<typeof en> = {
     'Az aláírás nem fér el azon az oldalon. Válasszon másik oldalt vagy helyet.',
   'pdf.device.view': 'Megtekintés',
   'pdf.vault.help':
-    'Ez a PDF a titkosított Drive-odban van: csak ezen az eszközön fejtjük vissza, ahol megtekintheted, jegyzetelheted, kitöltheted, rendezheted és aláírhatod. Amit mentesz, titkosítva kerül vissza.',
+    'Ez a PDF a titkosított Drive-odban van: csak ezen az eszközön fejtjük vissza, ahol megtekintheted, jegyzetelheted, kitöltheted, rendezheted, védheted, kitakarhatod, szerkesztheted, összehasonlíthatod, kinyomtathatod és aláírhatod. Amit mentesz, titkosítva kerül vissza.',
   'pdf.vault.serverOnly':
-    'A titkosított Drive-val még nem érhető el az aláíráskérés, a jelszavas védelem, a szövegfelismerés, a kitakarás, a szöveg vagy képek szerkesztése, a bélyegzők és vízjelek, az összehasonlítás, a verzióelőzmények és a nyomtatás: ezekhez a szolgáltatásnak el kell olvasnia a PDF-et, vagy még nem végezhetők el az eszközön.',
+    'A titkosított Drive-oddal nem érhető el az aláíráskérés, a szövegfelismerés és az asszisztens: ezekhez a szolgáltatásnak el kell olvasnia a PDF-et. Minden más ezen az eszközön történik.',
   'pdf.vault.notFound.title': 'Ez a PDF nincs a titkosított Drive-jában',
   'pdf.vault.notFound.description':
     'Lehet, hogy áthelyezték vagy törölték. Keresse meg a Sytue Drive-ban.',
@@ -2724,7 +2724,10 @@ export const hu: AppCatalog<typeof en> = {
   'pdf.device.error.pending':
     'A Drive még átáll a végpontok közötti titkosításra. Fejezze be a Sytue Drive-ban.',
   'pdf.device.error.password': 'Ez a jelszó nem nyitja meg a tanúsítványt.',
-  'pdf.device.error.encrypted': 'Ez a PDF jelszóval védett, ezért ezen az eszközön nem írható alá.',
+  'pdf.device.error.encrypted':
+    'Ez a PDF jelszóval védett: nyisd meg, és írd alá a saját stúdiójából, ahol a jelszavát használjuk.',
+  'pdf.device.protectedNote':
+    'Ez a PDF jelszóval védett. Az aláíráshoz ezen az eszközön jelszó nélkül újraírjuk, ahogy a szerver is teszi: az aláírt példányt titkosítva mentjük a Drive-odba, de a PDF jelszava nélkül.',
   'pdf.device.error.locked':
     'Ez a PDF minden módosítás ellen tanúsított: egy újabb aláírás érvénytelenítené.',
   'pdf.device.error.unreadable':

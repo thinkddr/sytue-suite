@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'bun:test';
 import { ORIGENES_DE_AVISOS } from '@sytue/shell';
 import {
@@ -5,6 +7,7 @@ import {
   ORIGENES_FIJOS,
   silenciable,
   silenciado,
+  TIPOS_PARTIDOS,
   tipoSilenciado,
 } from './reglasAvisos.js';
 
@@ -60,4 +63,30 @@ test('una fila de varios tipos sale encendida mientras llegue alguno', () => {
   expect(filaSilenciada(una, 'rooms', tipos)).toBe(false);
   const las2 = [...una, { source: 'rooms', kind: 'rooms.invitation.direct', muted: true }];
   expect(filaSilenciada(las2, 'rooms', tipos)).toBe(true);
+});
+
+test('un tipo partido hereda la regla del de antes, como el Hub', () => {
+  const prefs = [{ source: 'cloud', kind: 'cloud.deploy', muted: true }];
+  expect(tipoSilenciado(prefs, 'cloud', 'cloud.deploy.ready')).toBe(true);
+  expect(filaSilenciada(prefs, 'cloud', ['cloud.deploy.ready', 'cloud.deploy.failed'])).toBe(true);
+  // La regla propia manda sobre la heredada.
+  const propia = [...prefs, { source: 'cloud', kind: 'cloud.deploy.failed', muted: false }];
+  expect(tipoSilenciado(propia, 'cloud', 'cloud.deploy.failed')).toBe(false);
+  // Solo los de la tabla: las invitaciones directas no salieron de las de canal.
+  const salas = [{ source: 'rooms', kind: 'rooms.invitation', muted: true }];
+  expect(tipoSilenciado(salas, 'rooms', 'rooms.invitation.direct')).toBe(false);
+});
+
+test('la tabla de tipos partidos es la del Hub', () => {
+  const go = readFileSync(
+    fileURLToPath(
+      new URL('../../../../../../services/hub/internal/domain/domain.go', import.meta.url),
+    ),
+    'utf8',
+  );
+  const bloque = go.slice(go.indexOf('var tiposPartidos'), go.indexOf('// TipoAnterior'));
+  const delHub = Object.fromEntries(
+    [...bloque.matchAll(/"([a-z.]+)":\s+"([a-z.]+)"/g)].map((m) => [m[1], m[2]]),
+  );
+  expect(delHub).toEqual({ ...TIPOS_PARTIDOS });
 });

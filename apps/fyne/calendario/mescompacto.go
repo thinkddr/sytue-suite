@@ -54,9 +54,11 @@ type SemanaCompacta struct {
 	Dias   [7]DiaCompacto
 }
 
-// FilaDia es un evento del día, como lo pinta la lista bajo la rejilla.
+// FilaDia es un evento del día, como lo pinta la lista bajo la rejilla. O apunta a la
+// ocurrencia de la lista de la pantalla, que no se toca: copiarla en cada día que cubre
+// eran cientos de KB por repintado del mes del teléfono.
 type FilaDia struct {
-	O           Ocurrencia
+	O           *Ocurrencia
 	Inicio, Fin time.Time
 	TodoElDia   bool
 	// Cruza: con hora y acaba otro día que el de su inicio; la fila enseña las dos fechas.
@@ -65,7 +67,7 @@ type FilaDia struct {
 
 // colorPunto es `event.color ?? accent`: `Fundir` ya resuelve el del calendario, y una
 // ocurrencia sin color (alfa cero) lleva el acento.
-func colorPunto(o Ocurrencia) color.NRGBA {
+func colorPunto(o *Ocurrencia) color.NRGBA {
 	if o.Color.A == 0 {
 		return AcentoPorDefecto
 	}
@@ -76,8 +78,9 @@ func colorPunto(o Ocurrencia) color.NRGBA {
 // evento: `Tramar` da el tramo y se apunta en cada día del tramo.
 func porDia(dias []time.Time, loc *time.Location, eventos []Ocurrencia) [][]FilaDia {
 	cubos := make([][]FilaDia, len(dias))
-	for _, o := range eventos {
-		ini, fin := ocurrenciaInstantes(o, loc)
+	for i := range eventos {
+		o := &eventos[i]
+		ini, fin := ocurrenciaInstantes(*o, loc)
 		desde, hasta, ok := Tramar(dias, ini, fin, loc)
 		if !ok {
 			continue

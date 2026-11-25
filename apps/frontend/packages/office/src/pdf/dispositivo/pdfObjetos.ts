@@ -25,7 +25,9 @@ export type MotivoPdf =
   /** Certificado con /DocMDP P=1: no admite NINGÚN cambio, tampoco otra firma. */
   | 'bloqueado'
   /** La firma visible no cabe donde se pidió: la página no existe o el recuadro se sale. */
-  | 'pagina';
+  | 'pagina'
+  /** Se pidió certificar (/DocMDP) un documento que ya lleva firmas: solo la primera puede. */
+  | 'certificarFirmado';
 
 export class ErrorPdf extends Error {
   constructor(

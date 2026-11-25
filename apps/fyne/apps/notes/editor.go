@@ -38,7 +38,7 @@ import (
 // escritorio (docs/design.md, «Techos del toolkit»), así que el chino o el japonés no se
 // teclean aquí ni en ningún campo nativo. (2) La barra no entra en el orden de tabulación
 // (el Tab del cuerpo es sangrar, como en la web); se usa con el puntero o con sus atajos
-// (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K, Ctrl+Alt+0…5). El cursor sí parpadea, como el del
+// (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K, Ctrl+Alt+0…6). El cursor sí parpadea, como el del
 // navegador (cursor_parpadeo.go).
 
 // Medidas de la barra y del cuerpo, de la hoja con el rem de 16.
@@ -63,7 +63,8 @@ var ColoresTexto = []string{"#b91c1c", "#c2410c", "#a16207", "#15803d", "#0e7490
 // ColorResaltado es el `RESALTADO` de la web.
 const ColorResaltado = "#fff3a3"
 
-// BloquesEd son los ocho del desplegable, con su clave.
+// BloquesEd son los nueve del desplegable, con su clave: el párrafo, los seis títulos,
+// la cita y el código, como `BLOQUES` de RichText.tsx.
 var BloquesEd = []struct{ Valor, Clave string }{
 	{"p", "editor.paragraph"},
 	{"h1", "editor.h1"},
@@ -71,6 +72,7 @@ var BloquesEd = []struct{ Valor, Clave string }{
 	{"h3", "editor.h3"},
 	{"h4", "editor.h4"},
 	{"h5", "editor.h5"},
+	{"h6", "editor.h6"},
 	{"blockquote", "editor.quote"},
 	{"pre", "editor.codeBlock"},
 }
@@ -95,14 +97,30 @@ const (
 	SimboloD = "M5 19.5h4.5v-2.3a6.5 6.5 0 1 1 5 0v2.3H19"
 	// FormatoD es la «A» subrayada de «Más formato».
 	FormatoD = "M6.5 16 11 4.5h2L17.5 16M8.2 12h7.6M4.5 20h15"
-	// TijerasD son las tijeras de «Cortar».
-	TijerasD = "M6.5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6.5 20a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM8.5 8l11 10M8.5 16l11-10"
-	// PegarD es la tablilla del portapapeles de «Pegar».
-	PegarD = "M9 4.5h6v3H9zM9 6H7a1.5 1.5 0 0 0-1.5 1.5v11A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 17 6h-2"
+	// CopiarD son las dos hojas de «Copiar», TijerasD las tijeras de «Cortar» y PegarD
+	// la tablilla del portapapeles de «Pegar»: los de la burbuja de la web (glyphs.tsx,
+	// `copy`, `tijeras` y `pegar`), con el mismo trazo redondeado. Antes la burbuja
+	// copiaba con el icono de «copias» del catálogo (esquinas vivas) junto a dos dibujos
+	// propios que no eran los de la web.
+	CopiarD  = "M10 8.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 8.5 18v-8A1.5 1.5 0 0 1 10 8.5ZM8.5 15.5H6A1.5 1.5 0 0 1 4.5 14V6A1.5 1.5 0 0 1 6 4.5h8A1.5 1.5 0 0 1 15.5 6v2.5"
+	TijerasD = "M8.5 7a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8.5 17a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8 8.5l11.5 9M8 15.5l11.5-9"
+	PegarD   = "M9 4.5h6v3H9ZM9 6H6.5A1.5 1.5 0 0 0 5 7.5v11A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 17.5 6H15"
 	// ArrobaD es la arroba de «Mencionar» y EstadoD, la etiqueta de un estado.
 	ArrobaD = "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm0 0v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1"
 	EstadoD = "M4.5 8.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2ZM8 12h8"
 	MayusD  = "M3.5 18 7.5 6l4 12M5 13.5h5M20.5 12v6M20.5 15.25a2.75 2.75 0 1 1-5.5 0 2.75 2.75 0 0 1 5.5 0Z"
+	// CaritaD es la cara de «Emoji»; SubindiceD y SuperindiceD, la equis con el dos abajo
+	// o arriba; AjusteD, la línea que vuelve («Ajustar líneas largas»). De glyphs.tsx.
+	CaritaD      = "M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17ZM8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01"
+	SubindiceD   = "M4.5 6.5l7 9M11.5 6.5l-7 9M15.5 15a1.75 1.75 0 1 1 3.5 0c0 1.2-3.5 2.5-3.5 4.5h3.5"
+	SuperindiceD = "M4.5 8.5l7 9M11.5 8.5l-7 9M15.5 5a1.75 1.75 0 1 1 3.5 0c0 1.2-3.5 2.5-3.5 4.5h3.5"
+	AjusteD      = "M4.5 6.5h15M4.5 12h12a2.75 2.75 0 0 1 0 5.5h-4M14.5 15.5l-2 2 2 2M4.5 17.5h5"
+	// CombinarD y CombinarAbajoD son dos celdas que se juntan en una, de lado o de arriba
+	// abajo, y SepararD, una que se parte en dos (combinar.go). Propios, con el trazo de
+	// 24 de los de la barra de tabla.
+	CombinarD      = "M4.5 5.5h15v13h-15ZM8 12h8M13.5 9.5 16 12l-2.5 2.5M10.5 9.5 8 12l2.5 2.5"
+	CombinarAbajoD = "M5.5 4.5v15h13v-15ZM12 8v8M9.5 13.5 12 16l2.5-2.5M9.5 10.5 12 8l2.5 2.5"
+	SepararD       = "M4.5 5.5h15v13h-15ZM12 5.5v13M9.5 10 7.5 12l2 2M14.5 10l2 2-2 2"
 )
 
 // foto es un estado del editor para deshacer: el documento y la selección.
@@ -172,6 +190,10 @@ type EditorNota struct {
 	// AlEnlazar abre la herramienta de enlaces colgando del botón; la pantalla sabe qué
 	// notas ofrecer. Devuelve por `aplicarEnlace`.
 	AlEnlazar func(disparador fyne.CanvasObject)
+	// AlAdjuntar pide una imagen (true) o un fichero para ponerlos en el texto: quien
+	// aloja el editor los guarda como adjuntos de la nota y vuelve con InsertarAdjunto
+	// (adjuntos_cuerpo.go). Sin él (Mail), «Imagen» y «Archivo» no se ofrecen.
+	AlAdjuntar func(imagen bool)
 	// AlCrecer avisa de que el alto ha cambiado, para que quien la contiene recoloque.
 	AlCrecer func()
 	// Tecla y Atajo ven las teclas y las combinaciones ANTES que el editor y devuelven
@@ -226,6 +248,9 @@ type EditorNota struct {
 	// portal es donde van el menú y la burbuja para que nada los tape (flotante.go); sin
 	// él (Mail, las pruebas), van con el editor.
 	portal *portal
+	// tecladoAlto es lo que tapa el teclado del teléfono mientras se escribe: con él, la
+	// barra de formato va pegada encima (barra_teclado.go).
+	tecladoAlto float32
 }
 
 var _ fyne.Widget = (*EditorNota)(nil)
@@ -235,7 +260,7 @@ func NuevoEditorNota(tr *i18n.Translator, d *Documento, marcaDeAgua string) *Edi
 	e := &EditorNota{tr: tr, doc: d.ParaEditar(), marca: marcaDeAgua}
 	e.doc.rotuloExpandir = tr.T("editor.expand", nil)
 	e.ExtendBaseWidget(e)
-	e.zona = &zonaEdicion{e: e, encima: -1}
+	e.zona = &zonaEdicion{e: e, encima: -1, llevando: -1, soltar: -1}
 	e.zona.ExtendBaseWidget(e.zona)
 	e.cur = e.fin()
 	e.ancla = e.cur
@@ -403,7 +428,7 @@ func (e *EditorNota) Orden(orden, valor string) {
 		e.deshacerUno()
 	case "redo":
 		e.rehacerUno()
-	case "b", "i", "u", "s", "code":
+	case "b", "i", "u", "s", "code", "sub", "sup":
 		if !e.haySeleccion() {
 			// Sin selección, la marca es para lo que se escriba a continuación.
 			t := estiloEn(e.bloqueActual(), e.cur.O)
@@ -485,15 +510,32 @@ func (e *EditorNota) Orden(orden, valor string) {
 			e.ancla = e.cur
 		})
 	case "filaEncima", "filaDebajo", "colAntes", "colDespues", "borrarFila", "borrarCol", "borrarTabla":
-		if !e.bloqueActual().Celda.EnTabla() {
+		if !e.enTabla() {
 			return
 		}
 		e.hacer(func() { e.cur = e.doc.EditarTabla(orden, e.cur); e.ancla = e.cur })
-	case "cabeceraFila", "cabeceraCol", "fondoCelda":
-		if !e.bloqueActual().Celda.EnTabla() {
-			return
+	default:
+		e.ordenDeBloque(orden, valor)
+	}
+}
+
+// ordenDeBloque son las órdenes de la barra de tabla que cambian su forma (cabeceras,
+// fondo, filas numeradas, combinar) y las de la barra del código: cada una solo donde
+// vale, en su paso de deshacer.
+func (e *EditorNota) ordenDeBloque(orden, valor string) {
+	switch orden {
+	case "cabeceraFila", "cabeceraCol", "fondoCelda", "numerada":
+		if e.enTabla() {
+			e.hacer(func() { e.doc.FormatearTabla(orden, valor, e.cur) })
 		}
-		e.hacer(func() { e.doc.FormatearTabla(orden, valor, e.cur) })
+	case "combinarDerecha", "combinarAbajo", "separarCelda":
+		if e.doc.PuedeCombinar(orden, e.cur) {
+			e.hacer(func() { e.cur = e.doc.CombinarCeldas(orden, e.cur); e.ancla = e.cur })
+		}
+	case "lineas", "ajuste":
+		if e.enCodigo() {
+			e.hacer(func() { e.doc.AlternarCodigo(e.cur.B, orden) })
+		}
 	}
 }
 
@@ -937,8 +979,8 @@ func (e *EditorNota) atajoPropio(x *desktop.CustomShortcut) {
 		return
 	}
 	if x.Modifier&fyne.KeyModifierAlt != 0 {
-		// Ctrl+Alt+0 párrafo, Ctrl+Alt+1…5 títulos.
-		if n := string(x.KeyName); len(n) == 1 && n[0] >= '0' && n[0] <= '5' {
+		// Ctrl+Alt+0 párrafo, Ctrl+Alt+1…6 títulos (`ATAJO_BLOQUE` de la web).
+		if n := string(x.KeyName); len(n) == 1 && n[0] >= '0' && n[0] <= '6' {
 			valor := "p"
 			if n != "0" {
 				valor = "h" + n
@@ -991,13 +1033,16 @@ func (e *EditorNota) botonDeOrden(glifo string, icono iconos.Icono, rotulo strin
 
 // enTabla dice si el cursor está en una celda: es lo que enseña la barra de tabla.
 func (e *EditorNota) enTabla() bool {
-	return len(e.doc.Bloques) > 0 && e.bloqueActual().Celda.EnTabla()
+	return len(e.doc.Bloques) > 0 && e.bloqueActual().Celda.EnTabla() && !e.bloqueActual().Celda.Tabla.EsColumnas()
 }
 
 // barras son las barras que se ven, en su orden: la de formato y, con el cursor en una
 // celda, la de tabla.
 func (e *EditorNota) barras() []fyne.CanvasObject {
-	out := []fyne.CanvasObject{e.barra}
+	var out []fyne.CanvasObject
+	if !e.enTeclado() {
+		out = append(out, e.barra) // si no, va pegada al teclado (barra_teclado.go)
+	}
 	if e.buscador != nil {
 		out = append(out, e.buscador.barra)
 	}
@@ -1035,6 +1080,9 @@ func (e *EditorNota) refrescarBarra() {
 		"vinetas": bl.Tipo == Vineta && bl.Lista == "", "numeros": bl.Tipo == Numerada,
 		"cabeceraFila": bl.Celda.EnTabla() && cabeceraDeFila(bl.Celda.Tabla),
 		"cabeceraCol":  bl.Celda.EnTabla() && cabeceraDeColumna(bl.Celda.Tabla),
+		"numerada":     bl.Celda.EnTabla() && numerada(bl.Celda.Tabla),
+		"lineas":       bl.Tipo == Codigo && bl.Lineas,
+		"ajuste":       bl.Tipo == Codigo && bl.Ajuste,
 		"left":         bl.Alineacion == "left", "center": bl.Alineacion == "center", "right": bl.Alineacion == "right",
 	}
 	for clave, b := range e.botones {
@@ -1046,7 +1094,9 @@ func (e *EditorNota) refrescarBarra() {
 		case "redo":
 			b.Inerte = len(e.rehacer) == 0
 		case "tabla":
-			b.Inerte = e.enTabla() // una tabla dentro de otra no se edita (documento.go)
+			b.Inerte = bl.Celda.EnTabla() // una tabla dentro de otra no se edita (documento.go)
+		case "combinarDerecha", "combinarAbajo", "separarCelda":
+			b.Inerte = !e.doc.PuedeCombinar(clave, e.cur)
 		case "ia":
 			b.Inerte = e.iaTrabajando
 		}
@@ -1065,7 +1115,7 @@ func (e *EditorNota) refrescarBarra() {
 	e.refrescarEstado()
 }
 
-// menuBloque abre el desplegable de «Estilo del texto» con los ocho, el actual marcado,
+// menuBloque abre el desplegable de «Estilo del texto» con los nueve, el actual marcado,
 // colgando de `disparador` (su botón o «Más»).
 func (e *EditorNota) menuBloque(disparador fyne.CanvasObject) {
 	actual := "p"
@@ -1182,7 +1232,12 @@ func (r *editorRenderer) Layout(t fyne.Size) {
 	}
 	off := r.e.portal.desde(r.e)
 	r.e.colocarFlotantes(r.e.zona.Position().Add(off), r.e.portal.c.Size().Width, r.e.portal.c.Size().Height)
-	r.e.portal.poner(r.e, r.e.flotantes()...)
+	flotan := r.e.flotantes()
+	if r.e.enTeclado() {
+		r.e.colocarEnTeclado()
+		flotan = append(flotan, r.e.barra)
+	}
+	r.e.portal.poner(r.e, flotan...)
 }
 
 func (r *editorRenderer) Refresh() {
@@ -1204,6 +1259,12 @@ type zonaEdicion struct {
 	arrastre bool
 	// encima es el bloque bajo el ratón, que enseña su asa (bloque_menu.go); -1, ninguno.
 	encima int
+	// pararTeclado deja de mirar el teclado del teléfono (barra_teclado.go).
+	pararTeclado chan struct{}
+	// llevando es el bloque que se arrastra por su asa, y soltar e ySoltar, delante de qué
+	// bloque caería y la altura de su raya (arrastre_bloque.go); -1, ninguno.
+	llevando, soltar int
+	ySoltar          float32
 	// contexto es el doble toque y el menú contextual (editor_menu.go).
 	contexto contextoZona
 	// El parpadeo del cursor (cursor_parpadeo.go): la raya pintada, si está en su fase
@@ -1269,6 +1330,7 @@ func (z *zonaEdicion) AcceptsTab() bool { return true }
 
 func (z *zonaEdicion) FocusGained() {
 	z.enfocado = true
+	z.vigilarTeclado()
 	z.encenderCursor()
 	z.Refresh()
 	z.e.Refresh()
@@ -1280,6 +1342,7 @@ func (z *zonaEdicion) FocusGained() {
 // web. Se decide DESPUÉS, cuando el foco ya ha caído en su sitio.
 func (z *zonaEdicion) FocusLost() {
 	z.enfocado = false
+	z.dejarTeclado()
 	z.pararParpadeo()
 	z.Refresh()
 	z.e.Refresh() // la burbuja solo se ve con el cuerpo enfocado
@@ -1422,10 +1485,20 @@ func (z *zonaEdicion) Tapped(ev *fyne.PointEvent) {
 	}
 }
 
-// Dragged selecciona arrastrando: el ancla en el punto de partida.
+// Dragged selecciona arrastrando: el ancla en el punto de partida. Si se empieza en el
+// asa de un bloque, lo que se arrastra es el bloque (arrastre_bloque.go).
 func (z *zonaEdicion) Dragged(ev *fyne.DragEvent) {
+	if z.llevando >= 0 {
+		z.arrastrarAsa(ev.Position)
+		return
+	}
 	if !z.arrastre {
 		inicio := fyne.NewPos(ev.Position.X-ev.Dragged.DX, ev.Position.Y-ev.Dragged.DY)
+		if z.enAsa(inicio) {
+			z.llevando = z.encima
+			z.arrastrarAsa(ev.Position)
+			return
+		}
 		if p, ok := z.posEn(inicio); ok {
 			z.e.ancla = p
 		}
@@ -1438,7 +1511,12 @@ func (z *zonaEdicion) Dragged(ev *fyne.DragEvent) {
 	}
 }
 
-func (z *zonaEdicion) DragEnd() { z.arrastre = false }
+func (z *zonaEdicion) DragEnd() {
+	z.arrastre = false
+	if z.llevando >= 0 {
+		z.soltarAsa()
+	}
+}
 
 func (z *zonaEdicion) CreateRenderer() fyne.WidgetRenderer { return &zonaRenderer{z: z} }
 
@@ -1493,6 +1571,9 @@ func (r *zonaRenderer) Layout(t fyne.Size) {
 	}
 	if asa := z.asa(v); asa != nil {
 		objs = append(objs, asa)
+	}
+	if raya := z.rayaSoltar(t.Width, v); raya != nil {
+		objs = append(objs, raya)
 	}
 	if a := z.contexto.ancla; a != nil {
 		objs = append(objs, a) // de donde cuelga el menú contextual (editor_menu.go)

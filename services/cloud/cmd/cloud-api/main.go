@@ -30,6 +30,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 
@@ -285,6 +286,14 @@ func run() error {
 	// uso). Corre en cada réplica: es idempotente y los DELETE se serializan
 	// por bloqueo de fila, así que la concurrencia entre réplicas es inocua.
 	go purgeLoop(ctx, st, logger)
+
+	// Purga de tenant (ADR 0054): los logs de build de una organización que
+	// desaparece. Sin Object Storage no hay objetos, y las órdenes se cumplen sin más.
+	var almacenPurga purgatenant.Almacen = purgatenant.SinAlmacen{}
+	if blobs != nil {
+		almacenPurga = blobs
+	}
+	go purgatenant.Trabajador{DB: pool, Almacen: almacenPurga, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
 
 	// Re-sellado de secretos con la KEK primaria: lo que convierte «hay una clave
 	// nueva en SECRET_ENC_KEY» en «ya no queda nada cifrado con la vieja», sin

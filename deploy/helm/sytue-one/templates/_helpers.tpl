@@ -255,3 +255,37 @@ Uso (nindent al nivel de los items de ports, normalmente 8):
       key: rooms-internal-secret
       optional: true
 {{- end -}}
+
+{{/*
+sytue.pgbouncerCaMount / sytue.pgbouncerCaVolume — la raiz con la que cada servicio
+verifica el certificado de PgBouncer (global.pgbouncerTls). Su DSN la nombra
+(`sslrootcert=<mountPath>/ca.crt`, deploy/production/02b-secretos.sh) y pgx la lee
+al abrir el pool. Se monta SOLO `ca.crt` del Secret del certificado: la clave de
+PgBouncer no llega a ningun servicio. Sin global.pgbouncerTls.enabled no emiten
+nada. Uso, en el contenedor y en el pod:
+  volumeMounts:
+    {{- include "sytue.pgbouncerCaMount" . | nindent 12 }}
+  volumes:
+    {{- include "sytue.pgbouncerCaVolume" . | nindent 8 }}
+*/}}
+{{- define "sytue.pgbouncerCaMount" -}}
+{{- $tls := ((.Values.global).pgbouncerTls | default dict) -}}
+{{- if $tls.enabled -}}
+- name: pgbouncer-ca
+  mountPath: {{ $tls.mountPath | default "/etc/sytue/pgbouncer-ca" }}
+  readOnly: true
+{{- end -}}
+{{- end -}}
+
+{{- define "sytue.pgbouncerCaVolume" -}}
+{{- $tls := ((.Values.global).pgbouncerTls | default dict) -}}
+{{- if $tls.enabled -}}
+- name: pgbouncer-ca
+  secret:
+    secretName: {{ $tls.secretName | default "sytue-pgbouncer-tls" }}
+    defaultMode: 0444
+    items:
+      - key: ca.crt
+        path: ca.crt
+{{- end -}}
+{{- end -}}

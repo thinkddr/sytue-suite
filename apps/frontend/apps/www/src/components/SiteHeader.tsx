@@ -19,31 +19,54 @@ import {
   useTheme,
   logos,
   Glifo,
+  cx,
 } from '@sytue/ui';
 import { appDomains } from '@sytue/config';
 import { localePath } from '../i18n/paths';
 
-function ThemeToggle({ labels }: { labels: HeaderLabels }) {
+/**
+ * El cambio de tema. En la barra, solo el glifo; en el menú móvil (`conTexto`), con
+ * su rótulo y a todo el ancho: por debajo de 360 px no cabe en la barra junto a
+ * «Acceder», y es «Acceder» lo que no puede faltar.
+ */
+function ThemeToggle({
+  labels,
+  conTexto = false,
+  class: cls,
+}: {
+  labels: HeaderLabels;
+  conTexto?: boolean;
+  class?: string;
+}) {
   const { resolved, toggle } = useTheme();
   const isDark = resolved === 'dark';
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      iconOnly
-      aria-label={isDark ? labels.toLight : labels.toDark}
+  const rotulo = isDark ? labels.toLight : labels.toDark;
+  const glifo = isDark ? (
+    // Sol (modo claro disponible)
+    <Glifo size={18}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </Glifo>
+  ) : (
+    // Luna (modo oscuro disponible)
+    <Glifo d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" size={18} />
+  );
+  return conTexto ? (
+    // Como una entrada más del menú, con su misma sangría y su mismo texto.
+    <button
+      type="button"
       onClick={toggle}
-    >
-      {isDark ? (
-        // Sol (modo claro disponible)
-        <Glifo size={18}>
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-        </Glifo>
-      ) : (
-        // Luna (modo oscuro disponible)
-        <Glifo d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" size={18} />
+      class={cx(
+        'text-text hover:bg-bg-subtle active:bg-surface-sunken rounded-control sytue-focus-ring flex w-full items-center gap-2 px-3 py-2 text-left text-base font-medium transition-colors',
+        cls,
       )}
+    >
+      {glifo}
+      {rotulo}
+    </button>
+  ) : (
+    <Button variant="ghost" size="sm" iconOnly aria-label={rotulo} class={cls} onClick={toggle}>
+      {glifo}
     </Button>
   );
 }
@@ -171,9 +194,18 @@ function HeaderInner({ locale, path, labels }: HeaderProps) {
         actions={
           <>
             <LanguageMenu locale={locale} path={path} label={labels.language} />
-            <ThemeToggle labels={labels} />
-            <a href={appDomains.one} class="hidden md:inline-flex">
-              <Button variant="ghost" size="sm">
+            {/* En un envoltorio: `hidden` sobre el propio botón pierde contra su
+                `inline-flex`. */}
+            <span class="hidden min-[360px]:inline-flex">
+              <ThemeToggle labels={labels} />
+            </span>
+            {/* «Acceder» se ve en TODOS los anchos. En el teléfono estaba oculto
+                (`hidden md:inline-flex`) y el menú solo traía «Empieza gratis»:
+                quien ya tenía cuenta no tenía por dónde entrar. Por debajo de
+                360 px el tema pasa al menú para que quepa también con el texto más
+                largo («Kirjaudu sisään»). */}
+            <a href={appDomains.one} class="inline-flex">
+              <Button variant="ghost" size="sm" class="whitespace-nowrap">
                 {labels.signIn}
               </Button>
             </a>
@@ -210,6 +242,9 @@ function HeaderInner({ locale, path, labels }: HeaderProps) {
                 {n.label}
               </a>
             ))}
+            <div class="min-[360px]:hidden">
+              <ThemeToggle labels={labels} conTexto />
+            </div>
             <a href={`${appDomains.id}/signup`} class="mt-1">
               <Button variant="primary" fullWidth>
                 {labels.start}

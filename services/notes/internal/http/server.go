@@ -90,11 +90,11 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/daily", h.DailyRange)
 		api.Get("/daily/this-day", h.ThisDay)
 		api.Get("/notebooks/{id}", h.GetNotebook)
-		api.Put("/notebooks/{id}", h.UpdateNotebook)
-		api.Delete("/notebooks/{id}", h.DeleteNotebook)
+		api.Put("/notebooks/{id}", h.quienesVen(h.UpdateNotebook, false))
+		api.Delete("/notebooks/{id}", h.quienesVen(h.DeleteNotebook, false))
 		// Archivo (archivo.go): POST archiva la rama, DELETE la devuelve.
-		api.Post("/notebooks/{id}/archive", h.ArchiveNotebook)
-		api.Delete("/notebooks/{id}/archive", h.UnarchiveNotebook)
+		api.Post("/notebooks/{id}/archive", h.quienesVen(h.ArchiveNotebook, false))
+		api.Delete("/notebooks/{id}/archive", h.quienesVen(h.UnarchiveNotebook, false))
 		// Pedir acceso de edición a un cuaderno ajeno que se lee (peticiones.go).
 		api.Post("/notebooks/{id}/edit-requests", h.PedirEdicion)
 		api.Get("/notebooks/{id}/edit-requests", h.ListarPeticiones)
@@ -128,8 +128,8 @@ func NewRouter(d Deps) http.Handler {
 		// copia de hace meses, y quien lo abre no sabe qué cuaderno es. Esta ruta
 		// lo lee y lo devuelve sin escribir nada.
 		api.Post("/notebooks/preview", h.PreviewNotebook)
-		api.Post("/notebooks/{id}/notes", h.CreateNote)
-		api.Post("/notebooks/{id}/encrypted-notes", h.CreateEncryptedNote)
+		api.Post("/notebooks/{id}/notes", h.quienesVen(h.CreateNote, false))
+		api.Post("/notebooks/{id}/encrypted-notes", h.quienesVen(h.CreateEncryptedNote, false))
 
 		// Rutas literales ANTES de /notes/{id}: si no, "search" y "trash" se
 		// tomarían por un identificador y darían 400 en vez de responder.
@@ -167,14 +167,14 @@ func NewRouter(d Deps) http.Handler {
 		// único que puede descifrarla.
 		api.Get("/notes/{id}/versions", h.ListVersions)
 		api.Get("/notes/{id}/versions/{versionID}", h.GetVersion)
-		api.Put("/notes/{id}", h.UpdateNote)
-		api.Put("/notes/{id}/encrypted", h.UpdateEncryptedNote)
-		api.Post("/notes/{id}/encrypted-content", h.MigrateEncryptedContent)
-		api.Post("/notes/{id}/move", h.MoveNote)
-		api.Post("/notes/{id}/state", h.SetNoteState)
-		api.Delete("/notes/{id}", h.DeleteNote)
-		api.Post("/notes/{id}/restore", h.RestoreNote)
-		api.Delete("/notes/{id}/purge", h.PurgeNote)
+		api.Put("/notes/{id}", h.quienesVen(h.UpdateNote, true))
+		api.Put("/notes/{id}/encrypted", h.quienesVen(h.UpdateEncryptedNote, true))
+		api.Post("/notes/{id}/encrypted-content", h.quienesVen(h.MigrateEncryptedContent, true))
+		api.Post("/notes/{id}/move", h.quienesVen(h.MoveNote, true))
+		api.Post("/notes/{id}/state", h.quienesVen(h.SetNoteState, true))
+		api.Delete("/notes/{id}", h.quienesVen(h.DeleteNote, true))
+		api.Post("/notes/{id}/restore", h.quienesVen(h.RestoreNote, true))
+		api.Delete("/notes/{id}/purge", h.quienesVen(h.PurgeNote, true))
 
 		// Etiquetas con estado.
 		api.Get("/tags", h.ListTags)

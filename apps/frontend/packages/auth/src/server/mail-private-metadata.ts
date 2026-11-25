@@ -15,6 +15,7 @@ import {
   privateStorageBody,
   privateStorageFailure as fail,
 } from './matrix-storage-scope.js';
+import { contextoDerivado } from './contexto-derivado.js';
 
 /** Public delivery addresses and opaque-byte counters only. No MIME/content route. */
 export function rutaMetadataMailPrivado(options: {
@@ -72,7 +73,7 @@ export function rutaMetadataMailPrivado(options: {
       return fail(400, 'private_metadata_route_invalid');
     const response =
       path === 'usage'
-        ? await usage({ ...ctx, params: { ...ctx.params, ruta: 'usage/mail' } })
+        ? await usage(contextoDerivado(ctx, { ...ctx.params, ruta: 'usage/mail' }))
         : await mail(ctx);
     response.headers.set('cache-control', 'no-store');
     response.headers.set('vary', 'Cookie');

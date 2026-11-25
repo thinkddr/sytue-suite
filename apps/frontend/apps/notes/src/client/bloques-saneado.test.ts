@@ -10,6 +10,7 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { BLOQUES_DE_NOTAS } from '@sytue/ui/browser/portapapeles';
+import { idDeAdjunto } from '@sytue/ui/browser/bloques-de-notas';
 
 const GO = readFileSync(
   new URL('../../../../../nucleo/notes/model/html.go', import.meta.url),
@@ -64,6 +65,35 @@ test('los atributos sin valor son los mismos', () => {
   expect(go).toEqual(
     Object.fromEntries(Object.entries(BLOQUES_DE_NOTAS.sinValor).map(([e, v]) => [e, [...v]])),
   );
+});
+
+test('los atributos numéricos (celdas combinadas) son los mismos, con los mismos topes', () => {
+  const go: Record<string, Record<string, number>> = {};
+  for (const [, e = '', cuerpo = ''] of bloqueGo('bloquesNumericos').matchAll(
+    /^\t\t"(\w+)":\s*\{([^}]*)\},?$/gm,
+  ))
+    go[e] = Object.fromEntries(
+      [...cuerpo.matchAll(/"([\w-]+)":\s*(\d+)/g)].map((x) => [x[1]!, Number(x[2])]),
+    );
+  expect(Object.keys(go).length).toBeGreaterThan(1);
+  expect(go).toEqual(
+    Object.fromEntries(
+      Object.entries(BLOQUES_DE_NOTAS.numericos).map(([e, v]) => [e, { ...v }]),
+    ) as Record<string, Record<string, number>>,
+  );
+});
+
+test('el id de un adjunto tiene la misma forma en la web y en el servicio', () => {
+  expect(GO).toContain('regexp.MustCompile(`^adjunto:[A-Za-z0-9_-]{1,64}$`)');
+  expect(idDeAdjunto('adjunto:1732540000000-ab12cd')).toBe('1732540000000-ab12cd');
+  for (const malo of [
+    'adjunto:../x',
+    ' adjunto:a',
+    'adjunto:',
+    'https://x',
+    `adjunto:${'a'.repeat(65)}`,
+  ])
+    expect(idDeAdjunto(malo)).toBeNull();
 });
 
 test('las etiquetas de los bloques están en la lista del servicio', () => {

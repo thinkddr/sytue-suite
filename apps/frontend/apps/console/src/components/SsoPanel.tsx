@@ -34,6 +34,7 @@ import type { TableColumn } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import ConnectIdpWizard from './ConnectIdpWizard.js';
 import RegisterOidcAppWizard from './RegisterOidcAppWizard.js';
+import RegisterSamlSpWizard from './RegisterSamlSpWizard.js';
 import { useT } from '../i18n/index.js';
 import type { OidcApp, SamlSp, SsoProvider } from '../lib/types.js';
 
@@ -43,7 +44,7 @@ interface SsoPanelProps {
   providers: SsoProvider[];
   /** Aplicaciones de terceros que entran CON Sytue (Sytue ID como proveedor). */
   apps: OidcApp[];
-  /** Apps para las que Sytue ID hace de IdP SAML. Las da de alta el catálogo. */
+  /** Apps para las que Sytue ID hace de IdP SAML. Las da de alta el catálogo o un admin a mano. */
   samlSps: SamlSp[];
   /**
    * false = la lista de SP no se pudo leer (Sytue ID caído, o un rol delegado con
@@ -83,6 +84,8 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
   const [spBusyId, setSpBusyId] = useState<string | null>(null);
   const [confirmSpDel, setConfirmSpDel] = useState<SamlSp | null>(null);
   const [spDetails, setSpDetails] = useState<SamlSp | null>(null);
+  /** Alta manual de un SP que no está en el catálogo (RegisterSamlSpWizard). */
+  const [spWizard, setSpWizard] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<SsoProvider | null>(null);
@@ -496,6 +499,19 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
     },
   ];
 
+  if (spWizard) {
+    return (
+      <SettingsShell title={t('sso.saml.register')} description={t('sso.saml.wizardDescription')}>
+        <RegisterSamlSpWizard
+          t={t}
+          onCreated={(sp) => setSpItems((prev) => [sp, ...prev])}
+          onCancel={() => setSpWizard(false)}
+          onDone={() => setSpWizard(false)}
+        />
+      </SettingsShell>
+    );
+  }
+
   if (appWizard) {
     return (
       <SettingsShell title={t('sso.apps.register')} description={t('sso.apps.wizardDescription')}>
@@ -629,7 +645,24 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
         )}
       </SettingsSection>
 
-      <SettingsSection plain title={t('sso.saml.title')} description={t('sso.saml.description')}>
+      <SettingsSection
+        plain
+        title={t('sso.saml.title')}
+        description={t('sso.saml.description')}
+        actions={
+          samlSpsLive && spItems.length > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!live}
+              leadingIcon={<Icon name="plus" size={14} />}
+              onClick={() => setSpWizard(true)}
+            >
+              {t('sso.saml.register')}
+            </Button>
+          ) : null
+        }
+      >
         {!samlSpsLive ? (
           <Card>
             <InlineHelp tone="warning" title={t('common.offlineIdTitle')}>
@@ -642,6 +675,11 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
               title={t('sso.saml.emptyTitle')}
               description={t('sso.saml.emptyDescription')}
               icon="lock"
+              action={
+                <Button variant="primary" disabled={!live} onClick={() => setSpWizard(true)}>
+                  {t('sso.saml.emptyAction')}
+                </Button>
+              }
             />
           </Card>
         ) : (

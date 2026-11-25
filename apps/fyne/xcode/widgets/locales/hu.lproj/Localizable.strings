@@ -4,6 +4,10 @@
 "widgets.newNote" = "Új jegyzet";
 "widgets.newContact" = "Új névjegy";
 "widgets.addPhotos" = "Fotók hozzáadása";
+"widgets.newDocument" = "Új dokumentum";
+"widgets.newSpreadsheet" = "Új munkafüzet";
+"widgets.newPresentation" = "Új bemutató";
+"widgets.openToUpdate" = "Nyitott alkalmazással frissül";
 "widgets.notes" = "Jegyzetek";
 "widgets.rows" = "Sorok";
 "widgets.pending" = "Függőben";

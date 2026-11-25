@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
@@ -34,6 +35,9 @@ type Deps struct {
 	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
 	// los widgets nativos. nil: sin señal.
 	Hub *hubnotify.Client
+	// Traza escribe la traza de acceso (ReglasDeTraza) y sirve su lectura admin.
+	// Nil ⇒ sin traza.
+	Traza *auditlog.Registro
 }
 
 // Registrar los verbos WebDAV en chi ANTES de montar cualquier router CalDAV
@@ -42,7 +46,11 @@ func init() { httpx.EnableWebDAVMethods() }
 
 // NewRouter construye el router completo de Sytue Calendar.
 func NewRouter(d Deps) http.Handler {
-	r := httpx.NewRouter(httpx.RouterOptions{RequestTimeout: 60 * time.Second})
+	var traza func(http.Handler) http.Handler
+	if d.Traza != nil {
+		traza = d.Traza.Middleware(ReglasDeTraza...)
+	}
+	r := httpx.NewRouter(httpx.RouterOptions{RequestTimeout: 60 * time.Second, Traza: traza})
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
 	h := &Handlers{svc: d.Service, cfg: d.Cfg}
@@ -81,6 +89,12 @@ func NewRouter(d Deps) http.Handler {
 			soltarfuente.Montar(api, soltarfuente.Config{Product: "calendar", Soltar: d.Service.Store().ReleasePrivateStorage, Avisar: d.Hub.Send})
 		}
 		mountCalendarPrivateIngress(api, d.PrivateIngress, d.Cfg.MaxObjectBytes*2+(128<<10))
+
+		// La traza de acceso de la organización (docs/security.md §1.7), para la
+		// auditoría unificada de Sytue Admin: listado keyset y CSV.
+		if d.Traza != nil {
+			api.With(d.Verifier.RequireRole("owner", "admin")).Get("/admin/audit-log", d.Traza.Lectura("calendar"))
+		}
 
 		// Calendarios (colecciones).
 		// «Exportar tus datos»: la entrega de la agenda (platform/pkg/portabilidad).

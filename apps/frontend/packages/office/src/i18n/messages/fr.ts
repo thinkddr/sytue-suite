@@ -2845,9 +2845,9 @@ export const fr: AppCatalog<typeof en> = {
     'La signature ne tient pas sur cette page. Choisissez une autre page ou position.',
   'pdf.device.view': 'Voir',
   'pdf.vault.help':
-    'Ce PDF est dans votre Drive chiffré : il n’est déchiffré que sur cet appareil, où vous pouvez le consulter, l’annoter, le remplir, l’organiser et le signer. Ce que vous enregistrez repart chiffré.',
+    'Ce PDF est dans votre Drive chiffré : il n’est déchiffré que sur cet appareil, où vous pouvez le consulter, l’annoter, le remplir, l’organiser, le protéger, le caviarder, le modifier, le comparer, l’imprimer et le signer. Ce que vous enregistrez repart chiffré.',
   'pdf.vault.serverOnly':
-    'Avec votre Drive chiffré, demander une signature, protéger par mot de passe, reconnaître le texte, caviarder, modifier le texte ou les images, les tampons et filigranes, comparer, l’historique des versions et l’impression ne sont pas encore disponibles : ils exigent que le service lise le PDF ou ne se font pas encore sur l’appareil.',
+    'Avec votre Drive chiffré, demander une signature, reconnaître le texte et l’assistant ne sont pas disponibles : ils exigent que le service lise le PDF. Tout le reste se fait sur cet appareil.',
   'pdf.vault.notFound.title': 'Ce PDF n’est pas dans votre Drive chiffré',
   'pdf.vault.notFound.description':
     'Il a peut-être été déplacé ou supprimé. Cherchez-le dans Sytue Drive.',
@@ -2862,7 +2862,9 @@ export const fr: AppCatalog<typeof en> = {
     'Votre Drive est encore en cours de passage au chiffrement de bout en bout. Terminez depuis Sytue Drive.',
   'pdf.device.error.password': 'Ce mot de passe n’ouvre pas le certificat.',
   'pdf.device.error.encrypted':
-    'Ce PDF est protégé par mot de passe : il ne peut pas être signé sur cet appareil.',
+    'Ce PDF est protégé par mot de passe : ouvrez-le et signez-le depuis son studio, où son mot de passe est utilisé.',
+  'pdf.device.protectedNote':
+    'Ce PDF est protégé par mot de passe. Pour le signer, il est réécrit sans ce mot de passe sur cet appareil, comme le fait le serveur : la copie signée est enregistrée chiffrée dans votre Drive, mais sans le mot de passe du PDF.',
   'pdf.device.error.locked':
     'Ce PDF est certifié contre toute modification : une autre signature l’invaliderait.',
   'pdf.device.error.unreadable':

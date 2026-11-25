@@ -1008,7 +1008,7 @@ export const lv: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Pārvietojiet pastu uz jauno glabātuvi, lai turpinātu to saņemt',
   'privateMail.vaultMoveRetiredBody':
-    'Iepriekšējā pasta sistēma vairs nav pieejama. Kamēr nepārvietosiet pastu uz glabātuvi, jaunu pastu nesaņemsiet: tas, kas pienāk pa to laiku, tiek glabāts šifrēts ar iepriekšējo sistēmu tāpat kā jau esošais pasts, un to nevarēs izlasīt. Tas netiek dzēsts, bet neviens to nevarēs atvērt. Pēc pārvietošanas pasts atkal pienāk un atveras ar jūsu Sytue ID pieteikšanos tāpat kā pārējās lietotnes.',
+    'Iepriekšējā pasta sistēma vairs nav pieejama. Kamēr nepārvietosiet pastu uz glabātuvi, jaunu pastu nesaņemsiet: tas, ko jums pa to laiku nosūta, gaida serverī, no kura tas nosūtīts, un tas dažas dienas mēģina to piegādāt vēlreiz. Ja pārvietosiet laikus, tas jūs sasniegs vēlāk; ja ne, tas tiks atgriezts kā nepiegādāts. To, kas jau ir šifrēts ar iepriekšējo sistēmu, piemēram, jau esošo pastu, nevarēs izlasīt: tas netiek dzēsts, bet neviens to nevarēs atvērt. Pēc pārvietošanas pasts atkal pienāk un atveras ar jūsu Sytue ID pieteikšanos tāpat kā pārējās lietotnes.',
   'privateMail.vaultMoveCheckFailed':
     'Neizdevās pārbaudīt jūsu pasta stāvokli. Mēģiniet vēlreiz pēc brīža.',
 };

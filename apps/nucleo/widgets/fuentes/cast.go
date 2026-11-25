@@ -12,11 +12,13 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
-// Cast lee la cuota, lo mío, lo publicado en la organización y lo que está en directo,
-// sin búsqueda, aunque la app esté en otra sección. Si una de las cuatro falla (salvo un
-// 403/404), se conserva lo publicado: un directo no desaparece por un fallo puntual.
-// Peticiones: 4.
-func Cast(_ Comunes, cl *api.Cast) widgets.Fuente {
+// Cast lee de `cl` lo mío, lo publicado en la organización y lo que está en directo, sin
+// búsqueda, aunque la app esté en otra sección, y la cuota de la cuenta de `cuenta`, el
+// cliente del servidor (con la cuenta en Matrix, `cl` es el repositorio privado y la cuota
+// sigue siendo del servicio, como en Drive). Si una de las cuatro falla (salvo un 403/404
+// o lo que el repositorio privado no tiene), se conserva lo publicado: un directo no
+// desaparece por un fallo puntual. Peticiones: 4.
+func Cast(_ Comunes, cl, cuenta *api.Cast) widgets.Fuente {
 	return func(ctx context.Context) (widgets.Detail, error) {
 		mios, err := cl.Videos(ctx, api.CastMine, "", "", "", 24)
 		if err != nil {
@@ -30,7 +32,7 @@ func Cast(_ Comunes, cl *api.Cast) widgets.Fuente {
 		if err := secundaria(err); err != nil {
 			return widgets.Detail{}, err
 		}
-		q, err := cl.Quota(ctx)
+		q, err := cuenta.Quota(ctx)
 		if err := secundaria(err); err != nil {
 			return widgets.Detail{}, err
 		}

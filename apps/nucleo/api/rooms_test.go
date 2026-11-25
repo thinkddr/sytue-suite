@@ -396,7 +396,7 @@ func TestLosCamposDeRoomsSonLosDelServicio(t *testing.T) {
 		`api.Post("/me/categories", h.CreateCategory)`, `api.Patch("/me/categories/{categoryID}", h.UpdateCategory)`,
 		`api.Delete("/me/categories/{categoryID}", h.DeleteCategory)`, `api.Get("/me/drafts", h.ListDrafts)`,
 		`api.Put("/me/drafts", h.PutDraft)`, `api.Get("/me/scheduled", h.ListScheduled)`,
-		`api.Delete("/scheduled/{scheduledID}", h.CancelScheduled)`,
+		`porProgramado.Delete("/scheduled/{scheduledID}", h.CancelScheduled)`,
 	} {
 		if !strings.Contains(rutas, ruta) {
 			t.Errorf("services/rooms ya no monta %s", ruta)

@@ -3,7 +3,11 @@
 
 package hub
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+	"time"
+)
 
 // Destino es una pantalla de ESTA aplicación: las ocho del portal y el asistente
 // secundario de clientes externos. Saltar a otro PRODUCTO no es un destino, es una acción del
@@ -61,4 +65,36 @@ func DestinoDeRuta(ruta string) (Destino, bool) {
 		}
 	}
 	return AInicio, false
+}
+
+// RutaAgenda es la ruta de la fila de un evento de la agenda de hoy en el widget nativo
+// de One (fuentes.RutaAgenda): `sytue-one:/agenda?date=AAAA-MM-DD`, con `&all_day=1` en
+// uno de todo el día. No es una pantalla de One: la agenda es de Calendar.
+const RutaAgenda = "/agenda"
+
+// DiaDeAgenda es la ruta de Calendar que abre un enlace `sytue-one:/agenda?date=…`: la
+// vista de día en esa fecha (`/?date=AAAA-MM-DD`, y `&all_day=1`), la misma que abre la
+// fila de la tarjeta «Hoy» (RutaDelEvento) y que Calendar atiende
+// (`calendario.FechaDelEnlace`). Se vuelve a escribir con la fecha leída, nunca se copia
+// la consulta: un enlace con otra cosa —otra ruta, otros parámetros, una fecha que no es
+// una fecha— no lleva a ningún sitio.
+func DiaDeAgenda(u *url.URL) (string, bool) {
+	if u == nil || u.Host != "" || u.User != nil || u.Opaque != "" || u.Fragment != "" ||
+		strings.TrimSuffix(strings.TrimPrefix(u.Path, "/one"), "/") != RutaAgenda {
+		return "", false
+	}
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil || len(q["date"]) != 1 || len(q) > 2 ||
+		(len(q) == 2 && (len(q["all_day"]) != 1 || q.Get("all_day") != "1")) {
+		return "", false
+	}
+	dia, err := time.Parse(time.DateOnly, q.Get("date"))
+	if err != nil {
+		return "", false
+	}
+	destino := url.Values{"date": {dia.Format(time.DateOnly)}}
+	if q.Has("all_day") {
+		destino.Set("all_day", "1")
+	}
+	return "/?" + destino.Encode(), true
 }

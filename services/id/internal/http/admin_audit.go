@@ -40,6 +40,10 @@ func (s *Server) activeOrg(r *http.Request) (domain.Organization, error) {
 	if c.Tenant == "" {
 		return domain.Organization{}, httpx.ErrForbidden.WithMessage("The token has no active organisation.")
 	}
+	// Ya resuelta por confinarAOrgActiva para este mismo tenant: no se vuelve a leer.
+	if org, ok := orgActivaDelContexto(r.Context(), c.Tenant); ok {
+		return org, nil
+	}
 	org, err := s.store.GetOrgBySlug(r.Context(), c.Tenant)
 	if err != nil {
 		return domain.Organization{}, mapDomainErr(err)

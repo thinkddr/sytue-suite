@@ -6,7 +6,9 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -73,6 +75,58 @@ func (s *Store) enCadaAnfitrion(ctx context.Context, subject, propio string, fn 
 	})
 }
 
+// accesoAlCanal es el filtro de acceso de las listas por persona (guardados, hilos,
+// borradores) sobre el canal `c` y el sujeto `$2`. En la organización propia, el de
+// siempre: canal público o miembro. En una anfitriona (deFuera), solo las
+// conversaciones donde sigue como persona de fuera: un canal público de la anfitriona
+// no es suyo, y si le sacan de la conversación lo suyo de allí deja de listarse.
+func accesoAlCanal(deFuera bool) string {
+	if deFuera {
+		return `
+		   AND EXISTS (SELECT 1 FROM channel_members cm
+		               WHERE cm.tenant=c.tenant AND cm.channel_id=c.id AND cm.subject=$2 AND cm.externo)`
+	}
+	return `
+		   AND (
+		        c.kind='public'
+		        OR EXISTS (SELECT 1 FROM channel_members cm
+		                   WHERE cm.tenant=c.tenant AND cm.channel_id=c.id AND cm.subject=$2)
+		   )`
+}
+
+// conFecha es un elemento de una lista por persona con la fecha por la que se ordena
+// y pagina y su id para desempatar.
+type conFecha[T any] struct {
+	v     T
+	fecha time.Time
+	id    uuid.UUID
+}
+
+// paginaPorFecha junta lo leído en la organización propia y en las anfitrionas: lo
+// ordena por fecha descendente (y id), se queda con `limit` y, si la página va llena,
+// devuelve como cursor la fecha del último, igual que la lista de una sola
+// organización.
+func paginaPorFecha[T any](todos []conFecha[T], limit int) ([]T, *time.Time) {
+	slices.SortStableFunc(todos, func(a, b conFecha[T]) int {
+		if c := b.fecha.Compare(a.fecha); c != 0 {
+			return c
+		}
+		return strings.Compare(b.id.String(), a.id.String())
+	})
+	if len(todos) > limit {
+		todos = todos[:limit]
+	}
+	out := make([]T, len(todos))
+	for i, x := range todos {
+		out[i] = x.v
+	}
+	if len(todos) == limit && limit > 0 {
+		f := todos[len(todos)-1].fecha
+		return out, &f
+	}
+	return out, nil
+}
+
 // AnfitrionDeCanal devuelve la organización donde vive el canal cuando subject está
 // en él como persona de fuera; "" en cualquier otro caso, que es el normal.
 func (s *Store) AnfitrionDeCanal(ctx context.Context, subject, propio string, channelID uuid.UUID) (string, error) {
@@ -104,6 +158,28 @@ func (s *Store) AnfitrionDeMensaje(ctx context.Context, subject, propio string, 
 			       ON cm.tenant = m.tenant AND cm.channel_id = m.channel_id
 			      AND cm.subject = $3 AND cm.externo
 			     WHERE m.tenant = $1 AND m.id = $2)`, t, messageID, subject).Scan(&hay)
+		if hay {
+			anfitrion = t
+		}
+		return hay, err
+	})
+	return anfitrion, err
+}
+
+// AnfitrionDeProgramado es lo mismo para un mensaje programado de subject: se guardó
+// en la organización de la conversación y se edita o cancela allí. Solo los suyos y
+// de conversaciones donde sigue como externo.
+func (s *Store) AnfitrionDeProgramado(ctx context.Context, subject, propio string, id uuid.UUID) (string, error) {
+	var anfitrion string
+	err := s.enCadaAnfitrion(ctx, subject, propio, func(tx pgx.Tx, t string) (bool, error) {
+		var hay bool
+		err := tx.QueryRow(ctx,
+			`SELECT EXISTS (
+			     SELECT 1 FROM scheduled_messages sm
+			     JOIN channel_members cm
+			       ON cm.tenant = sm.tenant AND cm.channel_id = sm.channel_id
+			      AND cm.subject = $3 AND cm.externo
+			     WHERE sm.tenant = $1 AND sm.id = $2 AND sm.author_sub = $3)`, t, id, subject).Scan(&hay)
 		if hay {
 			anfitrion = t
 		}

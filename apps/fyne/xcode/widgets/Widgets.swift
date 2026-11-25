@@ -237,6 +237,13 @@ struct SytueWidgetEntry: TimelineEntry {
         return String(format: NSLocalizedString("widgets.updatedAgo", comment: ""),
                       relative.localizedString(for: snapshot.updatedDate, relativeTo: date))
     }
+
+    // «Se actualiza con la app abierta», debajo, si el dato rancio salió del repositorio
+    // privado (Snapshot.PideAbrir): sin la app no hay clave para releerlo.
+    var openHint: String? {
+        guard let snapshot, snapshot.asksToOpen(now: Int64(date.timeIntervalSince1970)) else { return nil }
+        return NSLocalizedString("widgets.openToUpdate", comment: "")
+    }
 }
 
 struct SytueWidgetProvider: TimelineProvider {
@@ -1453,6 +1460,13 @@ struct SytueWidgetView: View {
             regularContent
             if let stale = entry.staleLabel {
                 Text(stale)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            if let hint = entry.openHint {
+                Text(hint)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

@@ -167,6 +167,10 @@ type Bloque struct {
 	// Lenguaje es el `data-lenguaje` de un bloque de código, `<pre><code
 	// data-lenguaje="go">…</code></pre>`. Vacío: un `<pre>` sin más.
 	Lenguaje string
+	// Lineas y Ajuste son el `data-lineas` (números de línea) y el `data-ajuste`
+	// (partir las líneas largas) de un bloque de código: `<pre data-lineas=""
+	// data-ajuste="">`, en ese orden, que es el de la web (bloques_ricos.go).
+	Lineas, Ajuste bool
 }
 
 // Celda dice en qué celda de qué tabla está un bloque. Con `Tabla` nil, en ninguna. Es
@@ -184,7 +188,14 @@ func (c Celda) EnTabla() bool { return c.Tabla != nil }
 type Tabla struct {
 	Atributos []html.Attribute
 	Filas     []FilaTabla
+	// Columnas es el `data-columnas` («2» o «3») cuando lo que se aplana no es una tabla
+	// sino unas COLUMNAS, `<div data-columnas="2"><div data-columna="">…</div>…</div>`:
+	// una sola fila sin rejilla, cada columna una celda (columnas.go). Vacío: una tabla.
+	Columnas string
 }
+
+// EsColumnas dice si la «tabla» son unas columnas.
+func (t *Tabla) EsColumnas() bool { return t != nil && t.Columnas != "" }
 
 // FilaTabla es un `<tr>` con la sección en la que va.
 type FilaTabla struct {
@@ -245,6 +256,9 @@ type Documento struct {
 	// rotuloExpandir es lo que se lee en un desplegable sin título mientras se escribe
 	// («Desplegable»): lo pone el editor, que es quien tiene el idioma.
 	rotuloExpandir string
+	// alternadas son los desplegables que se han abierto o cerrado al LEER, pulsando su
+	// título: cambia lo que se ve, no la nota (bloques_ricos.go).
+	alternadas map[*Caja]bool
 }
 
 // Leer interpreta el HTML de una nota.
@@ -305,7 +319,11 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 			d.abrirTarea(n)
 			break
 		}
-		if c := cajaDe(n); c != nil && !d.celda.EnTabla() {
+		if esColumnas(n) && !d.celda.EnTabla() && d.caja == nil {
+			d.leerColumnas(n)
+			return
+		}
+		if c := cajaDe(n); c != nil && d.admiteCaja() {
 			d.leerCaja(n, c)
 			return
 		}
@@ -318,9 +336,12 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 	case "blockquote":
 		d.abrir(Bloque{Tipo: Cita, Etiqueta: n.Data, Alineacion: alineacion(n)})
 	case "pre":
-		d.abrir(Bloque{Tipo: Codigo, Etiqueta: n.Data, Lenguaje: lenguajeDe(n)})
+		d.abrir(Bloque{
+			Tipo: Codigo, Etiqueta: n.Data, Lenguaje: lenguajeDe(n),
+			Lineas: tiene(n, "data-lineas"), Ajuste: tiene(n, "data-ajuste"),
+		})
 	case "details":
-		if c := cajaDe(n); c != nil && !d.celda.EnTabla() {
+		if c := cajaDe(n); c != nil && d.admiteCaja() {
 			d.leerCaja(n, c)
 			return
 		}
@@ -356,7 +377,7 @@ func (d *Documento) recorrer(n *html.Node, e Tramo, nivel int) {
 		// Solo la casilla de una tarea, que se lee al abrir su `div.task-row`. Una
 		// suelta no está modelada, y por eso su nota deja de ser fiel.
 		return
-	case "b", "strong", "i", "em", "u", "s", "strike", "del", "mark", "code":
+	case "b", "strong", "i", "em", "u", "s", "strike", "del", "mark", "code", "sub", "sup":
 		e = conMarcaLeida(n, e)
 	case "time", "span":
 		e = tramoDeLinea(n, e)
@@ -626,6 +647,10 @@ func escribirTabla(b *strings.Builder, run []Bloque) {
 		bl.Celda = Celda{}
 		porCelda[k] = append(porCelda[k], bl)
 	}
+	if t.EsColumnas() {
+		escribirColumnas(b, t, porCelda)
+		return
+	}
 	b.WriteString("<table" + atributos(t.Atributos) + ">")
 	seccion := ""
 	for f, fila := range t.Filas {
@@ -711,6 +736,16 @@ func escribirBloque(b *strings.Builder, bl Bloque) {
 		return
 	}
 	b.WriteString("<" + bl.Etiqueta)
+	if bl.Tipo == Codigo {
+		// El orden de la web (`BLOQUES_DE_NOTAS.sinValor.pre`): así la vuelta sale igual
+		// byte a byte.
+		if bl.Lineas {
+			b.WriteString(` data-lineas=""`)
+		}
+		if bl.Ajuste {
+			b.WriteString(` data-ajuste=""`)
+		}
+	}
 	if bl.Alineacion != "" {
 		b.WriteString(` style="text-align:` + html.EscapeString(bl.Alineacion) + `"`)
 	}
@@ -800,11 +835,26 @@ func normalizar(s string) string {
 	}
 	var b strings.Builder
 	for _, n := range nodos {
+		ordenarAtributos(n)
 		if html.Render(&b, n) != nil {
 			return s
 		}
 	}
 	return b.String()
+}
+
+// ordenarAtributos pone por orden de nombre los atributos de un árbol. El orden de los
+// atributos no es parte del documento —el navegador los lee igual en cualquiera—, y la
+// web los deja en el orden en que se pulsaron (`<pre data-ajuste="" data-lineas="">` si
+// se pidió antes el ajuste): sin esto, esa nota no sería fiel aunque la vuelta escriba
+// lo mismo. Un atributo repetido no llega aquí: el analizador se queda con el primero.
+func ordenarAtributos(n *html.Node) {
+	if len(n.Attr) > 1 {
+		slices.SortStableFunc(n.Attr, func(a, b html.Attribute) int { return cmp.Compare(a.Key, b.Key) })
+	}
+	for h := n.FirstChild; h != nil; h = h.NextSibling {
+		ordenarAtributos(h)
+	}
 }
 
 // enOrdenada dice si el `li` cuelga de un `<ol>`.

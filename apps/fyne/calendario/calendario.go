@@ -216,6 +216,19 @@ type Pantalla struct {
 	buscadorAgenda   *ui.Entrada
 	buscadorAgendaEn i18n.Locale
 	listaAgendaViva  *fyne.Container
+	// compactaHecha es la vista del mes del teléfono del último pintado, con la clave con
+	// que se hizo, el día elegido y el asa que lleva (los del foco) y el refresco de su
+	// desplazable; agendaHecha, la agenda. Un pintado con la misma clave las devuelve
+	// tal cual (vistaMesCompacta, vistaAgenda).
+	compactaHecha    fyne.CanvasObject
+	compactaClave    claveCompacta
+	compactaDia      *diaCompacto
+	compactaAsa      *asaMes
+	compactaRefresco *ui.RefrescoLista
+	agendaHecha      fyne.CanvasObject
+	agendaClave      claveCompacta
+	// compactaUsada y agendaUsada dicen si el pintado en curso las enseña (contenido).
+	compactaUsada, agendaUsada bool
 }
 
 // latido es un esqueleto de carga que late hasta que alguien lo para.
@@ -382,6 +395,18 @@ func contar(n int) string {
 // contenido es la cabecera y, debajo, la vista o el estado que toque. En el mes del
 // teléfono no hay cabecera de vista: lo suyo va en la barra móvil y en el cajón.
 func (p *Pantalla) contenido() fyne.CanvasObject {
+	// Lo que no se enseña en este pintado no se conserva: guardarlo era recorrerlo en
+	// cada repintado para no soltarlo (soltarArboles), sin volver a enseñarlo hasta
+	// cruzar el corte del teléfono o cambiar de vista, que lo rehacen de todos modos.
+	p.compactaUsada, p.agendaUsada = false, false
+	defer func() {
+		if !p.compactaUsada {
+			p.compactaHecha = nil
+		}
+		if !p.agendaUsada {
+			p.agendaHecha = nil
+		}
+	}()
 	if p.EnAjustes {
 		return p.paginaAjustes()
 	}

@@ -120,7 +120,7 @@ func (e *EditorNota) accionesBarra() []accionBarra {
 	return []accionBarra{
 		{clave: "undo", grupo: grupoHistoria, prioridad: prioAlta, glifo: DeshacerD, rotulo: t("editor.undo"), teclas: ui.AtajoDelSistema("Ctrl+Z"), pulsar: orden("undo")},
 		{clave: "redo", grupo: grupoHistoria, prioridad: prioMedia, glifo: RehacerD, rotulo: t("editor.redo"), teclas: ui.AtajoDelSistema("Ctrl+Y"), pulsar: orden("redo")},
-		{clave: "bloque", grupo: grupoBloque, prioridad: prioAlta, rotulo: t("editor.block"), teclas: ui.AtajoDelSistema("Ctrl+Alt+0…5"), abre: true, pulsar: e.menuBloque},
+		{clave: "bloque", grupo: grupoBloque, prioridad: prioAlta, rotulo: t("editor.block"), teclas: ui.AtajoDelSistema("Ctrl+Alt+0…6"), abre: true, pulsar: e.menuBloque},
 		{clave: "b", grupo: grupoFormato, prioridad: prioEsencial, glifo: NegritaD, rotulo: t("editor.bold"), teclas: ui.AtajoDelSistema("Ctrl+B"), pulsar: orden("b")},
 		{clave: "i", grupo: grupoFormato, prioridad: prioEsencial, glifo: CursivaD, rotulo: t("editor.italic"), teclas: ui.AtajoDelSistema("Ctrl+I"), pulsar: orden("i")},
 		{clave: "formato", grupo: grupoFormato, prioridad: prioFormato, glifo: FormatoD, rotulo: t("editor.moreFormatting"), abre: true, pulsar: e.menuFormato},
@@ -183,6 +183,8 @@ func (e *EditorNota) menuFormato(disparador fyne.CanvasObject) {
 		marca(SubrayadoD, iconos.Ninguno, "editor.underline", "u"),
 		marca(TachadoD, iconos.Ninguno, "editor.strike", "s"),
 		marca("", iconos.Codigo, "editor.inlineCode", "code"),
+		marca(SubindiceD, iconos.Ninguno, "editor.subscript", "sub"),
+		marca(SuperindiceD, iconos.Ninguno, "editor.superscript", "sup"),
 		{icono: iconos.Rotulador, rotulo: t("editor.highlight"), hacer: func() { e.Orden("mark", "") }},
 		nil,
 		{glifo: GomaD, rotulo: t("editor.clearFormat"), hacer: func() { e.Orden("limpiar", "") }},

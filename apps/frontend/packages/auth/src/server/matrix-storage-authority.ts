@@ -12,6 +12,7 @@ import { serverEnv, type EnvLike } from '../config.js';
 import type { Bff } from './bff.js';
 import { crearProxyDeServicio } from './proxy.js';
 import { privateStorageScope, privateStorageFailure as fail } from './matrix-storage-scope.js';
+import { contextoDerivado } from './contexto-derivado.js';
 
 /** Public control transcripts only. The common proxy owns session/CSRF checks;
  * the authenticated backend owns nonces, signatures and durable generations. */
@@ -86,10 +87,9 @@ function rutaControlMatrixPrivado(
   });
   return async (ctx) => {
     const raw = ctx.params.ruta ?? '';
-    const response = await proxy({
-      ...ctx,
-      params: { ...ctx.params, ruta: area + (raw ? '/' + raw : '') },
-    });
+    const response = await proxy(
+      contextoDerivado(ctx, { ...ctx.params, ruta: area + (raw ? '/' + raw : '') }),
+    );
     response.headers.set('cache-control', 'no-store');
     response.headers.set('vary', 'Cookie');
     return response;

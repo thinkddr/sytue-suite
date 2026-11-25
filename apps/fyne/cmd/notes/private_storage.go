@@ -79,10 +79,10 @@ func notesPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], su
 	if err != nil {
 		return cifrado.ApplicationPlan[*notepadsRepository]{}, err
 	}
-	return buildNotesPlan(ctx, resources, source, api.NewDrive(suite.URL("drive"), resources.HTTP(), nil), api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil))
+	return buildNotesPlan(ctx, resources, source, api.NewDrive(suite.URL("drive"), resources.HTTP(), nil), api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil), suite.AvisarEscritura)
 }
 
-func buildNotesPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], source records.Source, gateway *api.Drive, service transfer.CutoverService) (cifrado.ApplicationPlan[*notepadsRepository], error) {
+func buildNotesPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], source records.Source, gateway *api.Drive, service transfer.CutoverService, onWrite func()) (cifrado.ApplicationPlan[*notepadsRepository], error) {
 	var empty cifrado.ApplicationPlan[*notepadsRepository]
 	if resources == nil {
 		return empty, cifrado.ErrPrivateResources
@@ -91,7 +91,7 @@ func buildNotesPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client
 		return empty, err
 	}
 	return cifrado.NewRecordApplicationPlan(ctx, resources, cifrado.RecordApplicationConfig[*notepadsRepository]{
-		Gateway: gateway, Source: source, Service: service, Historical: privateNotes.NewHistoricalSource,
+		Gateway: gateway, Source: source, Service: service, Historical: privateNotes.NewHistoricalSource, OnWrite: onWrite,
 		New: func(cfg records.Config) (*notepadsRepository, error) { //nolint:contextcheck // A failed constructor closes only new, unregistered components before any IO was admitted.
 			repository, err := privateNotes.New(cfg)
 			if err != nil {

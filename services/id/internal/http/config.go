@@ -304,8 +304,12 @@ type Config struct {
 	SMSSweegoAPIKey string
 	// SMSSender es el remitente que ve quien recibe el código («Sytue»). Tiene que
 	// estar dado de alta en Sweego; vacío, Sweego usa el que haya.
-	SMSSender    string
-	MollieAPIKey string
+	SMSSender string
+	// SMSMaxPerHour es el tope de SMS de TODO Sytue ID en una hora (ADR 0041), además
+	// de los de cada número y cada IP: lo que se puede gastar en un mal día aunque el
+	// fraude venga repartido entre muchos números e IP. 0 lo quita.
+	SMSMaxPerHour int
+	MollieAPIKey  string
 	// DragonflyURL es la cache efímera compartida (redis://dragonfly:6379). VACÍA
 	// es un estado válido: sin ella el IdP consulta PostgreSQL como siempre. Solo
 	// se usa para acelerar lo que se pregunta en cada token, nunca para decidir.
@@ -399,6 +403,7 @@ func Load() (Config, error) {
 		LoginBypassKey:          []byte(l.Get("LOGIN_BYPASS_KEY")),
 		SMSSweegoAPIKey:         l.Get("SMS_SWEEGO_API_KEY"),
 		SMSSender:               l.Get("SMS_SENDER"),
+		SMSMaxPerHour:           l.GetIntDefault("SMS_MAX_PER_HOUR", 200),
 		MollieAPIKey:            l.Get("MOLLIE_API_KEY"),
 		DragonflyURL:            l.Get("DRAGONFLY_URL"),
 		DragonflyPassword:       l.Get("DRAGONFLY_PASSWORD"),

@@ -17,7 +17,7 @@ import (
 var migrationFiles embed.FS
 
 // Migrations expande la valla compartida de la fuente y la entrada privada de avisos (0014).
-var Migrations = pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateIngressDDL(migrationFiles)))
+var Migrations = pg.WithAuditLogDDL(pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateIngressDDL(migrationFiles))))
 
 // MigrationsDir es la subcarpeta dentro de Migrations donde viven los .sql.
 const MigrationsDir = "migrations"

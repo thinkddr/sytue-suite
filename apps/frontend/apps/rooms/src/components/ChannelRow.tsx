@@ -149,10 +149,13 @@ export function ChannelRow({
           {/* Llamada en curso: punto vivo, no un icono más. Va DENTRO del botón
               para que se lea con el nombre del canal en un lector de pantalla
               —«general, hay una llamada»— y no como un control aparte que se
-              tabula sin poder pulsarlo. */}
+              tabula sin poder pulsarlo. `success-text` y no `success`: el verde de
+              relleno no cambia en oscuro y en la fila elegida quedaba a ~2,8:1; el del
+              texto aclara con el tema (ROOM-03, como `filacanal.go` de Fyne). El punto
+              es `bg-current`: sin texto encima, la tinta vale de relleno. */}
           {inCall ? (
-            <span class="text-success flex shrink-0 items-center gap-1 text-xs font-medium">
-              <span class="bg-success h-1.5 w-1.5 animate-pulse rounded-full" aria-hidden="true" />
+            <span class="text-success-text flex shrink-0 items-center gap-1 text-xs font-medium">
+              <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-hidden="true" />
               <span class="sr-only">{t('call.ongoing')}</span>
             </span>
           ) : null}

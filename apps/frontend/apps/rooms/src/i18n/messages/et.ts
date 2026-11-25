@@ -248,6 +248,7 @@ export const et: AppCatalog<typeof en> = {
     other: 'Saate lisada kuni {count} inimest.',
   },
   'dm.openFailed': 'Vestlust ei õnnestunud avada.',
+  'dm.externalClosed': 'Sinu organisatsioon ei luba selle inimesega vestelda.',
   'people.search': "Otsi „{query}“ Sytue One'ist",
   'people.searching': "Otsimine Sytue One'ist…",
   'people.notFound': "Keegi Sytue One'is ei kasuta seda e-posti ega @kasutajanime.",

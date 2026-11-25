@@ -248,6 +248,7 @@ export const fi: AppCatalog<typeof en> = {
     other: 'Voit lisätä enintään {count} henkilöä.',
   },
   'dm.openFailed': 'Keskustelun avaaminen epäonnistui.',
+  'dm.externalClosed': 'Organisaatiosi ei salli keskusteluja tämän henkilön kanssa.',
   'people.search': 'Hae ”{query}” Sytue Onesta',
   'people.searching': 'Haetaan Sytue Onesta…',
   'people.notFound': 'Kukaan Sytue Onessa ei käytä tätä sähköpostia tai @käyttäjänimeä.',

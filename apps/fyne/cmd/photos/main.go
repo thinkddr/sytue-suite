@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -32,6 +33,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 )
 
 // Ventana inicial: la misma con la que se midió la web (1280×800).
@@ -40,8 +42,16 @@ const (
 	altoInicial  = 800
 )
 
+// bundle es el identificador de la app, el de FyneApp.toml.
+const bundle = "eu.sytue.photos"
+
 func main() {
-	a := app.NewWithID("eu.sytue.photos")
+	a := app.NewWithID(bundle)
+	// Lanzada por el Hub desde la bandeja (sesion.DespertarTareasEnFondo): la copia de
+	// seguridad con la app cerrada, sin ventana, y fuera.
+	if slices.Contains(os.Args[1:], escritorio.ArgTareaEnFondo) {
+		os.Exit(sesion.TareaEnFondoEscritorio(bundle, "photos"))
+	}
 	a.Settings().SetTheme(tema.Sytue{})
 
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
@@ -61,7 +71,7 @@ func main() {
 
 	host, err := newPhotosStorage(s, a, w, tr)
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(tr.T("matrix.failed", nil), ""))
 	} else {
 		s.RutaPropia(func(u *url.URL) bool {
 			return photos.TokenDeEnlace(u) != "" || photos.AlbumDeEnlace(u) != "" || photos.AlbumPropioDeEnlace(u) != ""

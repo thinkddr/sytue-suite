@@ -2871,9 +2871,9 @@ export const en = {
     'The signature does not fit on that page. Choose another page or position.',
   'pdf.device.view': 'View',
   'pdf.vault.help':
-    'This PDF is in your encrypted Drive: it is decrypted only on this device, where you can view, annotate, fill in, organise and sign it. Whatever you save goes back encrypted.',
+    'This PDF is in your encrypted Drive: it is decrypted only on this device, where you can view, annotate, fill in, organise, protect, redact, edit, compare, print and sign it. Whatever you save goes back encrypted.',
   'pdf.vault.serverOnly':
-    'With your encrypted Drive, requesting signatures, password protection, text recognition, redaction, editing text or images, stamps and watermarks, comparing, version history and printing are not available yet: they need the service to read the PDF or have not been brought to the device.',
+    'With your encrypted Drive, requesting signatures, text recognition and the assistant are not available: they need the service to read the PDF. Everything else is done on this device.',
   'pdf.vault.notFound.title': 'This PDF is not in your encrypted Drive',
   'pdf.vault.notFound.description':
     'It may have been moved or deleted. Look for it in Sytue Drive.',
@@ -2888,7 +2888,9 @@ export const en = {
     'Your Drive is still moving to end-to-end encryption. Finish it from Sytue Drive.',
   'pdf.device.error.password': 'That password does not open the certificate.',
   'pdf.device.error.encrypted':
-    'This PDF is password-protected, so it cannot be signed on this device.',
+    'This PDF is password-protected: open it and sign it from its studio, where its password is used.',
+  'pdf.device.protectedNote':
+    'This PDF is password-protected. To sign it, it is rewritten without the password on this device, as the server does: the signed copy is saved encrypted in your Drive, but without the PDF’s password.',
   'pdf.device.error.locked':
     'This PDF is certified against any change: another signature would invalidate it.',
   'pdf.device.error.unreadable':

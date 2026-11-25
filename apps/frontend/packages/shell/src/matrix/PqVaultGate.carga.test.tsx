@@ -158,6 +158,8 @@ test('en segundo plano un fallo de la bóveda no tapa la app: queda en el candad
         locale="es"
         product="notes"
         background
+        // El viaje automático a Sytue ID ya se hizo (o no se puede): queda el candado.
+        autoSignIn={false}
         openVault={async () => {
           throw new PqVaultError('signin');
         }}
@@ -392,4 +394,36 @@ test('la pantalla de la puerta: sin jerga a la vista y «Vaciar» aparte de «Re
   expect(vaciar.className).not.toBe(reintentar.className);
   expect(vaciar.parentElement).not.toBe(reintentar.parentElement);
   expect(vaciar.parentElement?.className).toContain('border-t');
+});
+
+test('en segundo plano, sin la clave aquí, la puerta también va sola a Sytue ID (sin pulsar el candado)', async () => {
+  sessionStorage.clear();
+  marcarAppLista();
+  const pasos: string[] = [];
+  const el = root();
+  await act(() => {
+    render(
+      <PqVaultGate
+        actor={actor}
+        tenant="acme"
+        locale="es"
+        product="calendar"
+        basePath="/calendar"
+        background
+        openVault={async () => {
+          throw new PqVaultError('signin');
+        }}
+        navigate={(url) => pasos.push(url)}
+      >
+        <p data-app="true">Llamada con proveedor</p>
+      </PqVaultGate>,
+      el,
+    );
+  });
+  await until(() => pasos.length > 0);
+  const url = new URL(pasos[0]!, 'https://calendar.test');
+  expect(url.pathname).toBe('/calendar/auth/login');
+  expect(url.searchParams.get('unlock')).toBe('1');
+  // La app sigue a la vista mientras tanto.
+  expect(el.querySelector('[data-app]')).not.toBeNull();
 });

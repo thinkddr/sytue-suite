@@ -860,6 +860,15 @@ html {
   [data-forma='carril']:not(:has(nav:is(.bg-sidebar, .bg-rail))) .sytue-esquina-marca {
     width: fit-content;
   }
+  /* Y con el cromo «papel», ni eso: ahí la esquina es el fondo de la página
+     (`sidebar-bg` es `bg`) junto a una barra de `topbar-bg`, y quedaba un bloque pálido
+     suelto delante de una barra blanca (Hub, Docus, Calcus, Diapos y CertiPDF; auditoría
+     del 2026-11-24). Sin fondo la barra es continua y la marca va sobre ella con la misma
+     tinta (`sidebar-fg` es `text`). Es `anchoEsquinaPintada` de Fyne (`barrasuite.go`). */
+  [data-cromo='papel'][data-forma='carril']:not(:has(nav:is(.bg-sidebar, .bg-rail)))
+    .sytue-esquina-marca {
+    background: transparent;
+  }
 }
 
 /* ---- El CROMO «papel» (`data-cromo='papel'`, ADR 0079) ----

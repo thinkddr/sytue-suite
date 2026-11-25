@@ -68,10 +68,13 @@ type masDiaRenderer struct {
 	objetos []fyne.CanvasObject
 }
 
-// MinSize: `px-1.5 text-xs`, a la altura de su línea, que es lo que ya medía el texto
-// suelto (las alturas de la celda no cambian).
+// AltoMasDia es el alto del «+N más»: `min-h-[max(24px,1.5rem)] py-1`, el objetivo de
+// WCAG 2.5.8, como las píldoras. Hasta el 2026-11-25 medía su línea de `text-xs` (16).
+var AltoMasDia = max(24, 2*espacio1+tema.TextoXS.Linea)
+
+// MinSize: `px-1.5 py-1 text-xs`, de AltoMasDia de alto.
 func (r *masDiaRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(2*espacio1p5+ui.Medir(r.b.rotulo, tema.TextoXS, ui.Medio).Width, tema.TextoXS.Linea)
+	return fyne.NewSize(2*espacio1p5+ui.Medir(r.b.rotulo, tema.TextoXS, ui.Medio).Width, AltoMasDia)
 }
 func (r *masDiaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *masDiaRenderer) Destroy()                     {}
@@ -79,7 +82,7 @@ func (r *masDiaRenderer) Destroy()                     {}
 func (r *masDiaRenderer) Layout(t fyne.Size) {
 	r.caja.Redimensionar(t)
 	ui.Truncar(r.texto, r.b.rotulo, tema.TextoXS, ui.Medio, max(t.Width-2*espacio1p5, 0))
-	ui.ColocarTexto(r.texto, tema.TextoXS, espacio1p5, 0)
+	ui.ColocarTexto(r.texto, tema.TextoXS, espacio1p5, (t.Height-tema.TextoXS.Linea)/2)
 	r.aro.Colocar(t)
 }
 
@@ -111,7 +114,7 @@ func (p *Pantalla) mostrarDiaMes(dia time.Time, ancla fyne.CanvasObject) *ui.Eme
 	filas = append(filas, renglon(fecha, tema.TextoSM, ui.SemiNegrita, "text", ui.Margen{Izq: tema.Borde + espacio2, Abj: espacio2}))
 	var e *ui.Emergente
 	for _, f := range dias {
-		fila := p.nuevaFilaAgenda(f.O)
+		fila := p.nuevaFilaAgenda(*f.O)
 		fila.alAbrir = func(o Ocurrencia, _ fyne.CanvasObject) {
 			if e != nil {
 				e.Cerrar()

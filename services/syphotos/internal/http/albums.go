@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/services/syphotos/internal/domain"
 )
 
@@ -112,6 +113,9 @@ func (h *Handlers) RenombrarAlbum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if al.Duenyo != sub(r) {
+		// Lo que cambia quien edita un álbum ajeno lo ve su dueña: también le llega la
+		// señal de cambios de su widget (ADR 0078).
+		hubnotify.AvisarTambien(r.Context(), al.Duenyo)
 		// El enlace es una credencial de la dueña: quien edita no lo ve. Y a ella se le
 		// dice quién le ha cambiado el título, que no lo hace a escondidas. Solo si
 		// cambió: elegir la portada manda el título de siempre y no es un renombrado.

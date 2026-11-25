@@ -361,7 +361,7 @@ func bloqueNuevo(b Bloque, alFinal bool) Bloque {
 	n := bloqueNuevoSinCelda(b, alFinal)
 	n.Celda, n.Caja = b.Celda, b.Caja
 	if n.Tipo == b.Tipo {
-		n.Lista, n.Lenguaje = b.Lista, b.Lenguaje
+		n.Lista, n.Lenguaje, n.Lineas, n.Ajuste = b.Lista, b.Lenguaje, b.Lineas, b.Ajuste
 	}
 	return n
 }
@@ -535,15 +535,21 @@ func (d *Documento) tramos(a, b Pos, f func(*Tramo)) {
 // da igual que sea `<b>` o `<strong>`.
 var sinonimos = map[string][]string{
 	"b": {"b", "strong"}, "i": {"i", "em"}, "u": {"u"}, "s": {"s", "strike", "del"},
-	"code": {"code"}, "mark": {"mark"},
+	"code": {"code"}, "mark": {"mark"}, "sub": {"sub"}, "sup": {"sup"},
 }
+
+// excluyentes son las marcas que se quitan una a la otra: un texto no va a la vez
+// arriba y abajo, y el navegador, al poner `subscript`, quita `superscript`.
+var excluyentes = map[string]string{"sub": "sup", "sup": "sub"}
 
 func tieneMarca(t Tramo, m string) bool {
 	return slices.ContainsFunc(t.Marcas, func(x string) bool { return slices.Contains(sinonimos[m], x) })
 }
 
 func conMarca(t Tramo, m string, poner bool) Tramo {
-	marcas := slices.DeleteFunc(slices.Clone(t.Marcas), func(x string) bool { return slices.Contains(sinonimos[m], x) })
+	marcas := slices.DeleteFunc(slices.Clone(t.Marcas), func(x string) bool {
+		return slices.Contains(sinonimos[m], x) || poner && x == excluyentes[m]
+	})
 	if poner {
 		marcas = append(marcas, m)
 	}
@@ -623,7 +629,7 @@ func (d *Documento) bloques(a, b Pos, f func(*Bloque)) {
 	}
 }
 
-// Formatear es `formatBlock`: «p», «h1»…«h5», «blockquote» o «pre».
+// Formatear es `formatBlock`: «p», «h1»…«h6», «blockquote» o «pre».
 func (d *Documento) Formatear(a, b Pos, etiqueta string) {
 	d.bloques(a, b, func(bl *Bloque) {
 		if bl.Tipo == Regla || bl.Tipo == BloqueOpaco {
@@ -647,7 +653,7 @@ func (d *Documento) Formatear(a, b Pos, etiqueta string) {
 			bl.Tipo, bl.Etiqueta = Parrafo, "p"
 		}
 		if bl.Tipo != Codigo {
-			bl.Lenguaje = ""
+			bl.Lenguaje, bl.Lineas, bl.Ajuste = "", false, false
 		}
 		bl.Lista = ""
 		limpiar(bl)

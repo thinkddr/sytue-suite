@@ -1022,7 +1022,7 @@ export const pl: AppCatalog<typeof en> = {
   'privateMail.vaultMoveKeep': 'Na razie zostań przy poprzedniej poczcie',
   'privateMail.vaultMoveRetiredTitle': 'Przenieś pocztę do nowego sejfu, aby dalej ją otrzymywać',
   'privateMail.vaultMoveRetiredBody':
-    'Poprzedni system poczty nie jest już dostępny. Dopóki nie przeniesiesz poczty do sejfu, nie będziesz otrzymywać nowej poczty: to, co przyjdzie w międzyczasie, jest przechowywane zaszyfrowane poprzednim systemem, tak jak poczta, którą już masz, i nie da się jej odczytać. Nie zostanie usunięta, ale nikt nie będzie mógł jej otworzyć. Po przeniesieniu poczta znów zacznie przychodzić i będzie się otwierać po zalogowaniu do Sytue ID, jak pozostałe aplikacje.',
+    'Poprzedni system poczty nie jest już dostępny. Dopóki nie przeniesiesz poczty do sejfu, nie będziesz otrzymywać nowej poczty: wiadomości wysłane do Ciebie w międzyczasie czekają na serwerze, z którego zostały wysłane, a ten przez kilka dni ponawia próby doręczenia. Jeśli przeniesiesz pocztę na czas, dotrą do Ciebie później; jeśli nie, wrócą jako niedoręczone. Tego, co jest już zaszyfrowane poprzednim systemem, tak jak poczty, którą już masz, nie da się odczytać: nie zostanie usunięte, ale nikt nie będzie mógł tego otworzyć. Po przeniesieniu poczta znów zacznie przychodzić i będzie się otwierać po zalogowaniu do Sytue ID, jak pozostałe aplikacje.',
   'privateMail.vaultMoveCheckFailed':
     'Nie udało się sprawdzić stanu Twojej poczty. Spróbuj ponownie za chwilę.',
 };

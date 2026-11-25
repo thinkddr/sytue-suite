@@ -326,6 +326,7 @@
   "dm.deleteFailed": "Tērzēšanu neizdevās izdzēst.",
   "dm.empty": "Komandā vēl nav citu personu.",
   "dm.emptyQuery": "Meklēšanai neatbilst neviena persona.",
+  "dm.externalClosed": "Jūsu organizācija neatļauj sarunas ar šo personu.",
   "dm.invite": "Uzaicināt personas",
   "dm.maxPeople": {
     "zero": "Varat pievienot ne vairāk kā {count} personu.",

@@ -138,6 +138,8 @@ type chatService interface {
 	// Personas de otra organización (ADR 0040, externos.go).
 	ResolvePerson(ctx context.Context, consulta string) (service.Persona, error)
 	ListExternalChannels(ctx context.Context, sub string) ([]domain.Channel, []domain.ReadState, error)
+	PoliticaContactoExterno(ctx context.Context) (domain.PoliticaContactoExterno, error)
+	GuardarPoliticaContactoExterno(ctx context.Context, p domain.PoliticaContactoExterno, por string) (domain.PoliticaContactoExterno, error)
 	Invitaciones(ctx context.Context, sub string) ([]domain.Invitacion, error)
 	AceptarInvitacion(ctx context.Context, sub, name string, channelID uuid.UUID) error
 	RechazarInvitacion(ctx context.Context, sub string, channelID uuid.UUID) error
@@ -179,6 +181,9 @@ func toAPIError(err error) error {
 		// Distinto de ErrForbidden: lo que falla no es el permiso del ACTOR sino que
 		// el sujeto de la operación no pertenece al equipo (añadir a un canal).
 		return httpx.ErrForbidden.WithMessage("That person is not a member of the channel's team.")
+	case errors.Is(err, domain.ErrContactoExternoCerrado):
+		// A quien abre la conversación: es la regla de su propia organización.
+		return httpx.ErrForbidden.WithCode("rooms_external_closed").WithMessage("Your organisation does not allow conversations with that person.")
 	case errors.Is(err, domain.ErrBlocked):
 		// El mismo texto para las dos personas: no dice quién bloqueó a quién.
 		return httpx.ErrForbidden.WithMessage("Messages cannot be sent in this conversation.").WithCode("blocked")

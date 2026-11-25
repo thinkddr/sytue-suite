@@ -15,8 +15,8 @@ import (
 // En la web se recuerda en `localStorage` con la clave `sub` + organización
 // (`clavePrimerosPasos`). Aquí va en los ajustes de la suite, y la clave lleva además
 // el EMISOR: el mismo `sub` en otra instalación de Sytue ID es otra persona. No va en
-// `sesion.PorPersona`, cuyo ámbito es solo el `sub` y la app (hay que sustituir ese
-// ámbito antes de ampliarlo, ver docs/roadmap.md).
+// `sesion.PorPersona`, que tiene ese mismo ámbito pero es de UNA app: ocultarla vale para
+// todas las de la suite de este equipo.
 
 // HuellaPrimerosPasos es la clave de quien oculta: emisor, sujeto y organización. Vacía
 // si no hay sujeto: sin nadie dentro no se recuerda nada.

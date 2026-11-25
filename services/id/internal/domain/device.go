@@ -7,6 +7,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"slices"
 	"strings"
 	"time"
 )
@@ -83,4 +84,34 @@ func deviceMAC(key []byte, label, msg string) string {
 	m.Write([]byte(label))
 	m.Write([]byte(msg))
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+// Valores del claim `device_trust` (docs/security.md §11.4.1). Es lo que un servicio
+// puede exigir para un recurso `restricted` o `value_ip`.
+const (
+	// DeviceTrustNone: nada que garantice el dispositivo. Es lo que vale cualquier
+	// token sin los requisitos de abajo, también los anteriores a este claim.
+	DeviceTrustNone = "none"
+	// DeviceTrustStandard: la sesión se abrió desde un dispositivo REGISTRADO de la
+	// persona que ella misma marcó de confianza desde ese dispositivo (prueba de
+	// posesión: la cookie firmada), Y se identificó con una passkey, el único factor
+	// atado a un autenticador y resistente a phishing. Las dos cosas: un dispositivo
+	// de confianza sin passkey lo puede declarar cualquiera que tenga la contraseña, y
+	// una passkey sin dispositivo de confianza no dice nada del equipo desde el que se
+	// usa.
+	DeviceTrustStandard = "standard"
+	// DeviceTrustManaged: dispositivo gestionado por la organización (Sytue Linux o
+	// Sytue Android inscritos). RESERVADO: Sytue ID no tiene todavía inscripción de
+	// dispositivos gestionados, así que no lo emite nunca. Se nombra para que nadie
+	// reutilice el valor con otro significado.
+	DeviceTrustManaged = "managed"
+)
+
+// EvaluarConfianzaDelDispositivo decide `device_trust` a partir de cómo se
+// identificó la sesión (`amr`) y de si su dispositivo está hoy marcado de confianza.
+func EvaluarConfianzaDelDispositivo(amr []string, dispositivoDeConfianza bool) string {
+	if dispositivoDeConfianza && slices.Contains(amr, "webauthn") {
+		return DeviceTrustStandard
+	}
+	return DeviceTrustNone
 }

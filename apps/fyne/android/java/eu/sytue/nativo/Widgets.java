@@ -62,7 +62,7 @@ public final class Widgets extends AppWidgetProvider {
     private static final Set<String> REQUIRED_SNAPSHOT_KEYS = keys("version", "product", "generation",
             "updated_at", "expires_at", "active", "counters");
     private static final Set<String> ALLOWED_SNAPSHOT_KEYS = keys("version", "product", "generation",
-            "updated_at", "expires_at", "active", "counters", "items", "calendar");
+            "updated_at", "expires_at", "active", "counters", "items", "calendar", "app_only");
     private static final Set<String> COUNTER_KEYS = keys("kind", "value");
     private static final Set<String> ALLOWED_ITEM_KEYS = keys("title", "subtitle", "badge", "color",
             "start_at", "end_at", "all_day", "unread", "done", "route");
@@ -249,6 +249,10 @@ public final class Widgets extends AppWidgetProvider {
                 snapshot = snapshot.conVigentes(now, zona);
             }
             String actualizado = snapshot != null ? rotuloActualizado(ctx, snapshot, labels) : "";
+            // Un dato rancio del repositorio privado: solo se relee con la app abierta.
+            if (snapshot != null && snapshot.pideAbrir(now)) {
+                actualizado += " · " + labels.getString("open_to_update");
+            }
             int updatedId = resource(ctx, "id", "sytue_widget_updated");
             int layout = resource(ctx, "layout", "sytue_widget");
             int appIcon = ctx.getApplicationInfo().icon;
@@ -1331,7 +1335,7 @@ public final class Widgets extends AppWidgetProvider {
             }
             WidgetSnapshot snapshot = new WidgetSnapshot(integer(json, "version"), string(json, "product"),
                     string(json, "generation"), integer(json, "updated_at"), integer(json, "expires_at"),
-                    (Boolean) active, values, parsedItems, parsedCalendar);
+                    (Boolean) active, values, parsedItems, parsedCalendar, optionalBoolean(json, "app_only"));
             WidgetSnapshot.Entorno after = entorno(ctx, dir);
             if (!mismoEntorno(before, after) || !snapshot.visible(product, after, System.currentTimeMillis() / 1000)) {
                 return null;

@@ -6,6 +6,8 @@
 # rancio   caso  updated_at  now  esperado
 # vigente  caso  zona  start_at  end_at  all_day  now  esperado
 #   (producto «calendar»; el día completo es flotante: medianoche UTC)
+# abrir    caso  app_only  updated_at  now  esperado
+#   (Snapshot.PideAbrir: «Se actualiza con la app abierta», solo con app_only y ya rancio)
 # ruta     caso  route  esperado
 #   (la ruta de una fila; «-» es sin ruta. Un snapshot con una fila de ruta inválida no
 #   se enseña. El lector la abre como `sytue-<producto>:` + route)
@@ -33,6 +35,10 @@ rancio	recien	1792500000	1792500000	0
 rancio	14 min 59 s	1792500000	1792500899	0
 rancio	15 min	1792500000	1792500900	1
 rancio	casi un dia	1792500000	1792586399	1
+abrir	privado y fresco	1	1792500000	1792500899	0
+abrir	privado y rancio	1	1792500000	1792500900	1
+abrir	del servidor y rancio	0	1792500000	1792586399	0
+abrir	del servidor y fresco	0	1792500000	1792500000	0
 vigente	con hora, terminado	Europe/Madrid	1794045600	1794049199	0	1794049200	0
 vigente	con hora, termina ahora	Europe/Madrid	1794045600	1794049200	0	1794049200	0
 vigente	con hora, en curso	Europe/Madrid	1794045600	1794049201	0	1794049200	1

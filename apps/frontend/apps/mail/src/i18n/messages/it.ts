@@ -1028,7 +1028,7 @@ export const it: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Sposta la tua posta nella nuova cassaforte per continuare a riceverla',
   'privateMail.vaultMoveRetiredBody':
-    "Il sistema di posta precedente non è più disponibile. Finché non sposti la tua posta nella cassaforte non riceverai nuova posta: quella che arriva nel frattempo resta cifrata con il sistema precedente, come la posta che avevi già, e non si potrà leggere. Non viene eliminata, ma nessuno potrà aprirla. Dopo lo spostamento la posta torna ad arrivarti e si apre con l'accesso a Sytue ID, come le altre app.",
+    "Il sistema di posta precedente non è più disponibile. Finché non sposti la tua posta nella cassaforte non riceverai nuova posta: quella che ti inviano nel frattempo resta in attesa sul server del mittente, che riprova per qualche giorno. Se fai lo spostamento in tempo, ti arriverà dopo; altrimenti il mittente riceverà un avviso di mancata consegna. Ciò che è già cifrato con il sistema precedente, come la posta che avevi già, non si potrà leggere: non viene eliminato, ma nessuno potrà aprirlo. Dopo lo spostamento la posta torna ad arrivarti e si apre con l'accesso a Sytue ID, come le altre app.",
   'privateMail.vaultMoveCheckFailed':
     'Non è stato possibile verificare lo stato della tua posta. Riprova tra un momento.',
 };

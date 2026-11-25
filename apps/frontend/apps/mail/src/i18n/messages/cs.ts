@@ -1016,7 +1016,7 @@ export const cs: AppCatalog<typeof en> = {
   'privateMail.vaultMoveKeep': 'Zatím pokračovat s předchozí poštou',
   'privateMail.vaultMoveRetiredTitle': 'Přesuňte poštu do nového trezoru, abyste ji dál dostávali',
   'privateMail.vaultMoveRetiredBody':
-    'Předchozí poštovní systém už není k dispozici. Dokud poštu nepřesunete do trezoru, nebude vám chodit nová pošta: co mezitím přijde, se uloží zašifrované předchozím systémem, stejně jako pošta, kterou už máte, a nepůjde přečíst. Nesmaže se, ale nikdo ji nebude moci otevřít. Po přesunu vám pošta zase začne chodit a bude se otevírat přihlášením do Sytue ID jako ostatní aplikace.',
+    'Předchozí poštovní systém už není k dispozici. Dokud poštu nepřesunete do trezoru, nebude vám chodit nová pošta: zprávy, které vám mezitím někdo pošle, počkají na serveru, ze kterého byly odeslány, a ten bude doručení několik dní opakovat. Pokud poštu přesunete včas, dorazí vám potom; pokud ne, vrátí se jako nedoručitelné. Co už je zašifrované předchozím systémem, například pošta, kterou už máte, nepůjde přečíst: nesmaže se, ale nikdo to nebude moci otevřít. Po přesunu vám pošta zase začne chodit a bude se otevírat přihlášením do Sytue ID jako ostatní aplikace.',
   'privateMail.vaultMoveCheckFailed':
     'Stav vaší pošty se nepodařilo ověřit. Zkuste to za chvíli znovu.',
 };

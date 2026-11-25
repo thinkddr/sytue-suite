@@ -1019,7 +1019,7 @@ export const sk: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Presuňte poštu do nového trezoru, aby ste ju naďalej dostávali',
   'privateMail.vaultMoveRetiredBody':
-    'Predchádzajúci poštový systém už nie je k dispozícii. Kým poštu nepresuniete do trezoru, nebude vám chodiť nová pošta: čo medzitým príde, sa uloží zašifrované predchádzajúcim systémom, rovnako ako pošta, ktorú už máte, a nebude sa dať prečítať. Nezmaže sa, ale nikto ju nebude môcť otvoriť. Po presune vám pošta znova začne chodiť a bude sa otvárať prihlásením do Sytue ID ako ostatné aplikácie.',
+    'Predchádzajúci poštový systém už nie je k dispozícii. Kým poštu nepresuniete do trezoru, nebude vám chodiť nová pošta: správy, ktoré vám medzitým niekto pošle, počkajú na serveri, z ktorého boli odoslané, a ten bude doručenie niekoľko dní opakovať. Ak poštu presuniete včas, dorazia vám potom; ak nie, vrátia sa ako nedoručiteľné. Čo už je zašifrované predchádzajúcim systémom, napríklad pošta, ktorú už máte, sa nebude dať prečítať: nezmaže sa, ale nikto to nebude môcť otvoriť. Po presune vám pošta znova začne chodiť a bude sa otvárať prihlásením do Sytue ID ako ostatné aplikácie.',
   'privateMail.vaultMoveCheckFailed':
     'Stav vašej pošty sa nepodarilo overiť. Skúste to o chvíľu znova.',
 };

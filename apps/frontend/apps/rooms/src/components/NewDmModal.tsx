@@ -12,7 +12,7 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { Modal, Button } from '@sytue/ui';
 import { useShell } from '@sytue/shell';
-import { openDirect, type Channel, type ChannelMember } from '../client/chatApi.js';
+import { ChatHttpError, openDirect, type Channel, type ChannelMember } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { SelectorDePersonas } from './SelectorDePersonas.js';
 
@@ -43,7 +43,7 @@ export function NewDmModal({
   const esAdmin = user.roles.some((r) => r === 'owner' || r === 'admin');
   const [selected, setSelected] = useState<ChannelMember[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<boolean | 'externo'>(false);
 
   useEffect(() => {
     if (open) {
@@ -67,7 +67,11 @@ export function NewDmModal({
           peers: selected.map((m) => m.name),
         }),
       )
-      .catch(() => setError(true))
+      .catch((e: unknown) =>
+        setError(
+          e instanceof ChatHttpError && e.code === 'rooms_external_closed' ? 'externo' : true,
+        ),
+      )
       .finally(() => setBusy(false));
   }
 
@@ -114,7 +118,7 @@ export function NewDmModal({
         />
         {error ? (
           <p class="text-danger-text text-sm" role="alert">
-            {t('dm.openFailed')}
+            {error === 'externo' ? t('dm.externalClosed') : t('dm.openFailed')}
           </p>
         ) : null}
       </div>

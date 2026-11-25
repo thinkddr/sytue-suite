@@ -2716,6 +2716,23 @@ XML
       recursos="$bundle_ios"
       [ "$plataforma" != macos ] || recursos="$destino/Contents/Resources"
       plist_apple "$plataforma" "$dir" "$plist" "$recursos" || exit 1
+      # El manifiesto de privacidad (apps/fyne/xcode/<app>/PrivacyInfo.xcprivacy, de
+      # generar.py), el mismo que pone el proyecto de Xcode: en la raíz del .app de iOS y en
+      # Contents/Resources del de macOS, que es `recursos`. Antes de volver a firmar.
+      #
+      # Un tag anterior a los manifiestos (v3.25.1 y antes) no los trae: release-desktop
+      # despachado desde main con `inputs.ref` usa ESTE script con las fuentes del tag, y
+      # el `cp` sin más tumbaba la entrega entera (2026-11-25, «PrivacyInfo.xcprivacy: No
+      # such file or directory»). Ese tag sale como salió entonces, sin manifiesto, con un
+      # aviso; uno que sí lo tiene y no lo puede copiar sigue parando.
+      if [ "$app" != demo ]; then
+        manifiesto="$FYNE/xcode/$app/PrivacyInfo.xcprivacy"
+        if [ -f "$manifiesto" ]; then
+          cp "$manifiesto" "$recursos/PrivacyInfo.xcprivacy" || exit 1
+        else
+          echo "::warning::$app: este tag no trae PrivacyInfo.xcprivacy (anterior a los manifiestos); se empaqueta sin él" >&2
+        fi
+      fi
       # La CLI no copia el cumplimiento de exportación del proyecto de Xcode.
       # La misma declaración autorizada llega al artefacto ANTES de volver a firmarlo.
       if [ "$plataforma" = ios ] || [ -n "$tienda" ]; then

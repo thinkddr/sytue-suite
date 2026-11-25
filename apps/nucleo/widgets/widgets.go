@@ -160,6 +160,12 @@ type Snapshot struct {
 	Counters   []Counter     `json:"counters"`
 	Items      []Item        `json:"items,omitempty"`
 	Calendar   *CalendarGrid `json:"calendar,omitempty"`
+	// SoloConLaApp (`app_only`): lo publicado salió del repositorio privado del
+	// dispositivo (el Drive de la bóveda o de Matrix, una app de registros en Matrix), que
+	// solo se puede releer con la app abierta: sin ella no hay clave (fuentes.Privada). Ya
+	// rancio, el lector lo dice («Se actualiza con la app abierta», PideAbrir) en vez de
+	// dejar que envejezca sin explicación. Un booleano y nada más: ni qué ni de dónde.
+	SoloConLaApp bool `json:"app_only,omitempty"`
 }
 
 // Item is a compact, sanitized visual entry already loaded by an authenticated
@@ -196,10 +202,12 @@ type CalendarGrid struct {
 }
 
 // Detail groups bounded counters with optional visual items and a calendar grid.
+// SoloConLaApp dice que se leyó del repositorio privado (Snapshot.SoloConLaApp).
 type Detail struct {
-	Counters []Counter
-	Items    []Item
-	Calendar *CalendarGrid
+	Counters     []Counter
+	Items        []Item
+	Calendar     *CalendarGrid
+	SoloConLaApp bool
 }
 
 // SanitizeText collapses whitespace, drops E2E ciphertext markers ("enc:v1:"),
@@ -729,6 +737,8 @@ func PublishDetail(ctx context.Context, bundle, product string, scope Scope, det
 		Counters:   append([]Counter{}, detail.Counters...),
 		Items:      slices.Clone(detail.Items),
 		Calendar:   cloneCalendar(detail.Calendar),
+
+		SoloConLaApp: detail.SoloConLaApp,
 	}
 	data, err := json.Marshal(s)
 	if err != nil {
@@ -748,6 +758,7 @@ func (s Snapshot) reusable(product string, e Entorno, detail Detail, now time.Ti
 		slices.Equal(s.Counters, detail.Counters) &&
 		slices.Equal(s.Items, detail.Items) &&
 		equalCalendar(s.Calendar, detail.Calendar) &&
+		s.SoloConLaApp == detail.SoloConLaApp &&
 		s.ExpiresAt <= now.Add(age).Unix() &&
 		s.UpdatedAt > now.Add(-RenovarTras).Unix() &&
 		s.ExpiresAt > now.Add(vidaParaReusar).Unix()
@@ -769,6 +780,15 @@ func (s Snapshot) Visible(e Entorno, now time.Time) bool {
 // lleva Fresco o más sin comprobarse.
 func (s Snapshot) Rancio(now time.Time) bool {
 	return now.Unix()-s.UpdatedAt >= int64(Fresco/time.Second)
+}
+
+// PideAbrir dice si el lector añade «Se actualiza con la app abierta»
+// (`widgets.openToUpdate`): un dato ya Rancio que salió del repositorio privado
+// (SoloConLaApp). Con la app al fondo o cerrada nadie lo puede releer —ni el refresco de
+// iOS ni el de Android tienen la clave— y, sin esto, envejecía sin que el widget dijera
+// por qué. La misma regla en Swift y en Java (testdata/contrato.tsv, casos `abrir`).
+func (s Snapshot) PideAbrir(now time.Time) bool {
+	return s.SoloConLaApp && s.Rancio(now)
 }
 
 // Vigentes son los elementos que siguen valiendo a `now`, para un snapshot ya Visible.

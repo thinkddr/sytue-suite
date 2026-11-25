@@ -219,69 +219,23 @@ func parsearGrados(value string) (int, error) {
 // aplicarCapa ejecuta las operaciones que SUPERPONEN texto: marca de agua,
 // numeración —corriente o Bates— y encabezado o pie.
 //
-// El texto lo escribe el usuario, así que se acota su longitud: una cadena de un
-// megabyte se dibujaría en cada página y el fichero resultante sería absurdo.
+// La composición es del motor (`domain.ApplyLayerOperation`), la misma que usan el
+// estudio de la bóveda en el navegador y las apps nativas con el Drive privado
+// (ADR 0086): aquí solo se leen los campos del formulario.
 func aplicarCapa(op string, doc *domain.PDFDoc, r *http.Request) ([]byte, error) {
-	const maxTexto = 500
-
-	texto := strings.TrimSpace(r.FormValue("texto"))
-	if op != "numerar" && op != "bates" && texto == "" {
-		return nil, httpx.ErrBadRequest.WithMessage("The text to be written is missing.")
+	out, err := domain.ApplyLayerOperation(op, doc, map[string]string{
+		"texto": r.FormValue("texto"), "posicion": r.FormValue("posicion"),
+		"desde": r.FormValue("desde"), "digitos": r.FormValue("digitos"),
+	})
+	if err != nil {
+		return nil, errorDeDominio(err)
 	}
-	if len([]rune(texto)) > maxTexto {
-		return nil, httpx.ErrBadRequest.WithMessage(
-			fmt.Sprintf("The text is too long (maximum %d characters).", maxTexto),
-		)
-	}
-
-	switch op {
-	case "marca-agua":
-		return domain.MarcaDeAguaPDF(doc, texto)
-
-	case "fondo":
-		return domain.FondoPDF(doc, texto)
-
-	case "numerar":
-		return domain.NumerarPaginasPDF(doc, texto, posicionDe(r.FormValue("posicion")))
-
-	case "bates":
-		desde, err := enteroOpcional(r.FormValue("desde"), 1, 1_000_000_000)
-		if err != nil {
-			return nil, err
-		}
-		digitos, err := enteroOpcional(r.FormValue("digitos"), 6, 12)
-		if err != nil {
-			return nil, err
-		}
-		return domain.NumeracionBatesPDF(doc, texto, desde, digitos)
-
-	case "encabezado":
-		return domain.EncabezadoPiePDF(doc, texto, domain.CapaSuperiorCen)
-
-	default: // "pie"
-		return domain.EncabezadoPiePDF(doc, texto, domain.CapaInferiorCen)
-	}
+	return out, nil
 }
 
-// posicionDe traduce el nombre de posición que llega del cliente. Uno
-// desconocido cae en el pie centrado en vez de dar error: es una preferencia
-// estética, y fallar por ella tiraría el trabajo entero.
-func posicionDe(s string) domain.PosicionCapa {
-	switch strings.TrimSpace(s) {
-	case "superior-izquierda":
-		return domain.CapaSuperiorIzq
-	case "superior-centro":
-		return domain.CapaSuperiorCen
-	case "superior-derecha":
-		return domain.CapaSuperiorDer
-	case "inferior-izquierda":
-		return domain.CapaInferiorIzq
-	case "inferior-derecha":
-		return domain.CapaInferiorDer
-	default:
-		return domain.CapaInferiorCen
-	}
-}
+// posicionDe traduce el nombre de posición que llega del cliente
+// (`domain.LayerPosition`): uno desconocido cae en el pie centrado.
+func posicionDe(s string) domain.PosicionCapa { return domain.LayerPosition(s) }
 
 // enteroOpcional lee un entero del formulario con valor por defecto y techo.
 //

@@ -270,6 +270,7 @@ export const hr: AppCatalog<typeof en> = {
     other: 'Možete dodati najviše {count} osoba.',
   },
   'dm.openFailed': 'Razgovor se nije mogao otvoriti.',
+  'dm.externalClosed': 'Vaša organizacija ne dopušta razgovore s ovom osobom.',
   'people.search': 'Pretraži „{query}” u Sytue One',
   'people.searching': 'Pretraživanje u Sytue One…',
   'people.notFound': 'Nitko u Sytue One ne upotrebljava tu e-poštu ili @korisničko ime.',

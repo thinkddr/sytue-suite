@@ -57,6 +57,7 @@ import {
   type Pagina,
   type InformeArchivo,
 } from './api';
+import { useFuentePdf } from './fuente';
 import { MASCARA_SCROLL_X, useScrollRestante, useTablist } from '@sytue/ui';
 import { r } from '../lib/rutas.js';
 import { HERRAMIENTAS_NACIONALES, LISTA_DE_CONFIANZA_UE, herramientaDe } from './firmaNacional.js';
@@ -142,15 +143,6 @@ export type Dialogo =
 
 /** Devuelve si el cambio se llegó a aplicar. */
 export type Aplicar = (cuerpo: Record<string, unknown>, mensaje: string) => Promise<boolean>;
-
-/**
- * El estudio de un PDF de la bóveda (ADR 0086) usa estos mismos diálogos con el motor
- * EN EL DISPOSITIVO: lo que aquí se pediría al servicio por la ruta lo da él, y lo que
- * solo sabe hacer el servidor (reconocer texto) no se enseña.
- */
-export interface DialogosLocales {
-  comprobarArchivo: () => Promise<InformeArchivo>;
-}
 
 /**
  * Las imágenes de la página: sustituir una por otra, o quitarla.
@@ -294,12 +286,13 @@ function DetectarCampos({
   const [props, setProps] = useState<PropuestaCampo[] | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState('');
+  const fuente = useFuentePdf(path);
 
   const buscar = (): void => {
     setBuscando(true);
     setError('');
-    void api
-      .detectarCampos(path, pagina, clave || undefined)
+    void fuente
+      .detectarCampos(pagina, clave || undefined)
       .then((r) => setProps(r.propuestas ?? []))
       .catch(() => setError(t('pdf.detect.failed')))
       .finally(() => setBuscando(false));
@@ -412,6 +405,7 @@ function Adjuntos({
 }) {
   const [bajando, setBajando] = useState('');
   const [error, setError] = useState('');
+  const fuente = useFuentePdf(path);
 
   if (adjuntos.length === 0) {
     return <p class="text-text-subtle p-3 text-xs">{t('pdf.attachments.empty')}</p>;
@@ -420,8 +414,8 @@ function Adjuntos({
   const bajar = (a: Adjunto): void => {
     setBajando(a.nombre);
     setError('');
-    void api
-      .adjunto(path, a.nombre, clave || undefined)
+    void fuente
+      .adjunto(a.nombre, clave || undefined)
       .then((blob) => descargarBlob(blob, a.nombre))
       .catch(() => setError(t('pdf.attachments.failed', { name: a.nombre })))
       .finally(() => setBajando(''));
@@ -695,6 +689,9 @@ export function PanelLateral({
   onCerrar: () => void;
 }) {
   useMobileBack(abierto, onCerrar, { anchoMaximo: '64rem', nivel: 1 });
+  // Con el PDF en la bóveda no hay asistente: le mandaría al servidor el texto que
+  // la bóveda existe para no enseñarle (ADR 0086).
+  const { local } = useFuentePdf(path);
 
   // Un documento escaneado no tiene ni una letra que buscar (ver `sinCapaDeTexto`).
   // Sin decirlo, buscar contestaba «0 resultados» para siempre.
@@ -725,7 +722,7 @@ export function PanelLateral({
     // capa de texto no tenía de qué hablar; ahora es justo donde más sirve: la
     // pestaña ofrece leerlo con IA y a partir de ahí funciona igual que sobre un
     // PDF con texto. Un escaneo es la mitad de lo que se abre aquí.
-    { id: 'asistente', clave: 'pdf.ai.tab', n: 0 },
+    ...(local ? [] : [{ id: 'asistente' as const, clave: 'pdf.ai.tab' as DocsKey, n: 0 }]),
   ];
 
   // El aviso de que la tira de pestañas sigue: sin él, una fila que se desliza
@@ -865,7 +862,7 @@ export function PanelLateral({
               trabajando={trabajando}
             />
           )}
-          {panel === 'asistente' && (
+          {panel === 'asistente' && !local && (
             <Asistente
               onCargarTexto={onCargarTexto}
               sinCapaDeTexto={sinCapaDeTexto}
@@ -1257,6 +1254,7 @@ function Campos({
   const campos = (contenido.campos ?? []).filter((c) => c.tipo !== 'boton');
   const [valores, setValores] = useState<Record<string, string>>({});
   const entradaDatos = useRef<HTMLInputElement>(null);
+  const fuente = useFuentePdf(path);
   // Antes de cualquier `return` condicional: aplanar destruye los campos
   // editables y se pregunta con el diálogo de la casa, no con el del navegador.
   const { confirmar, dialogo: dialogoAplanar } = useConfirm();
@@ -1315,8 +1313,8 @@ function Campos({
           type="button"
           disabled={trabajando}
           onClick={() => {
-            void api
-              .exportarDatos(path, clave || undefined)
+            void fuente
+              .exportarDatos(clave || undefined)
               .then((b) => descargarBlob(b, 'datos.xfdf'))
               .catch(() => undefined);
           }}
@@ -1474,6 +1472,7 @@ function Firmas({
   const firmas = contenido.firmas ?? [];
   const [informe, setInforme] = useState<InformeVerificacion | null>(null);
   const [estado, setEstado] = useState<'listo' | 'trabajando' | 'error'>('listo');
+  const fuente = useFuentePdf(path);
 
   // Otro documento, otro informe: el de uno no puede quedar pegado al siguiente.
   useEffect(() => {
@@ -1485,8 +1484,8 @@ function Firmas({
   // y no algo que corra al abrir el panel.
   const verificar = () => {
     setEstado('trabajando');
-    api
-      .verificar(path, clave || undefined)
+    fuente
+      .verificar(clave || undefined)
       .then((r) => {
         setInforme(r);
         setEstado('listo');
@@ -1953,6 +1952,7 @@ function Buscar({
   const [resultados, setResultados] = useState<{ pagina: number; texto: string }[]>([]);
   const [buscando, setBuscando] = useState(false);
   const campoRef = useRef<HTMLInputElement>(null);
+  const fuente = useFuentePdf(path);
 
   // El foco entra en el campo al abrir la pestaña. Es lo que hace que Ctrl+F
   // sirva de algo: sin esto había que ir a buscar el recuadro con el ratón.
@@ -1984,8 +1984,8 @@ function Buscar({
   const revisar = (): void => {
     if (consulta.trim() === '') return;
     setRevisando(true);
-    void api
-      .buscarTexto(path, { buscar: consulta, reemplazar: reemplazo }, clave || undefined)
+    void fuente
+      .buscarTexto({ buscar: consulta, reemplazar: reemplazo }, clave || undefined)
       .then((r) => setCoincidencias(r.coincidencias ?? []))
       .catch(() => setCoincidencias([]))
       .finally(() => setRevisando(false));
@@ -2141,12 +2141,13 @@ function Editar({
   const [analisis, setAnalisis] = useState<AnalisisEdicion | null>(null);
   const [cargando, setCargando] = useState(true);
   const [textos, setTextos] = useState<Record<number, string>>({});
+  const fuente = useFuentePdf(path);
 
   useEffect(() => {
     let vivo = true;
     setCargando(true);
-    void api
-      .analizarEdicion(path, pagina, clave || undefined)
+    void fuente
+      .analizarEdicion(pagina, clave || undefined)
       .then((a) => {
         if (!vivo) return;
         setAnalisis(a);
@@ -2163,7 +2164,7 @@ function Editar({
     return () => {
       vivo = false;
     };
-  }, [path, pagina, clave]);
+  }, [fuente, pagina, clave]);
 
   if (cargando) return <p class="text-text-subtle p-3 text-xs">{t('pdf.edit.loading')}</p>;
   if (!analisis) return <p class="text-text-subtle p-3 text-xs">{t('pdf.edit.failed')}</p>;
@@ -2295,7 +2296,6 @@ export function Dialogos({
   svgs,
   onRestaurada,
   locale,
-  local,
 }: {
   dialogo: Dialogo;
   onCerrar: () => void;
@@ -2311,8 +2311,6 @@ export function Dialogos({
   onRestaurada: (version: number) => void;
   /** El idioma de las fechas del historial: esta isla no cuelga del contexto de la Shell. */
   locale?: Locale | undefined;
-  /** Con el motor en el dispositivo (el estudio de la bóveda); ver `DialogosLocales`. */
-  local?: DialogosLocales | undefined;
 }) {
   // El pie del diálogo, donde las herramientas con formulario ponen «Cancelar» y
   // «Aplicar» (`BotonesDialogo`, por un portal): al final del cuerpo, en el teléfono
@@ -2394,7 +2392,6 @@ export function Dialogos({
               trabajando={trabajando}
               paginas={contenido.paginas}
               svgs={svgs}
-              local={local}
             />
           )}
         </div>
@@ -3731,6 +3728,7 @@ function CompararTexto({
   const [difs, setDifs] = useState<DiferenciaPagina[] | null>(null);
   const [iguales, setIguales] = useState(false);
   const [estado, setEstado] = useState<'listo' | 'trabajando' | 'error'>('listo');
+  const fuente = useFuentePdf(path);
 
   return (
     <div class="flex flex-col gap-3">
@@ -3740,8 +3738,8 @@ function CompararTexto({
         onSubmit={(e) => {
           e.preventDefault();
           setEstado('trabajando');
-          void api
-            .comparar(path, otro)
+          void fuente
+            .comparar(otro)
             .then((r) => {
               setDifs(r.diferencias ?? []);
               setIguales(r.iguales);
@@ -4036,7 +4034,6 @@ function Herramientas({
   trabajando,
   paginas,
   svgs,
-  local,
 }: {
   t: ReturnType<typeof docsT>;
   path: string;
@@ -4045,8 +4042,8 @@ function Herramientas({
   trabajando: boolean;
   paginas: Pagina[];
   svgs: Record<number, string>;
-  local?: DialogosLocales | undefined;
 }) {
+  const fuente = useFuentePdf(path);
   const [nivel, setNivel] = useState<'sin-perdida' | 'equilibrada' | 'fuerte'>('equilibrada');
   const [margenes, setMargenes] = useState('20,20,20,20');
   const [informe, setInforme] = useState<InformeArchivo | null>(null);
@@ -4118,7 +4115,7 @@ function Herramientas({
       </section>
 
       {/* Reconocer texto necesita el servicio de OCR: con el PDF en la bóveda, no. */}
-      {!local && (
+      {!fuente.local && (
         <Reconocer
           t={t}
           path={path}
@@ -4137,7 +4134,8 @@ function Herramientas({
           type="button"
           disabled={trabajando}
           onClick={() => {
-            void (local ? local.comprobarArchivo() : api.comprobarArchivo(path))
+            void fuente
+              .comprobarArchivo()
               .then(setInforme)
               .catch(() => setInforme(null));
           }}

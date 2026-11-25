@@ -9,7 +9,7 @@
  *   cd apps/frontend/packages/formula && bun compat/comparar.ts
  */
 import { catalogo } from '../src/catalogo';
-import { Engine } from '../src/engine';
+import { Engine } from '../src/index'; // el índice instala las funciones (perezosas.ts)
 import { FormulaError } from '../src/values';
 import { DATOS } from './corpus';
 import type { Esperado, Resultado } from './libreoffice';

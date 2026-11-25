@@ -356,6 +356,44 @@ func TestUnaCustodiaFallidaDejaElPanelBloqueadoYReintentable(t *testing.T) {
 	boton(t, c, "matrix.signIn")
 }
 
+// Sin la clave de desbloqueo en el dispositivo, el panel va SOLO a Sytue ID a por
+// ella, sin esperar a que se pulse «Iniciar sesión» (como la puerta de la bóveda y la
+// web): una vez. Si a la vuelta sigue sin ella, queda el botón y no se repite.
+func TestSinClaveElPanelVaSoloASytueIDUnaVez(t *testing.T) {
+	c, _ := panelEn(t, 320)
+	c.ctx = t.Context()
+	c.client = &mx.Client{}
+	defer func() { c.client = nil; c.Cerrar() }()
+	pedidas := make(chan string, 4)
+	c.IniciarSesion = func(_ context.Context, legado string) error {
+		pedidas <- legado
+		return errors.New("artificial: el navegador no volvió")
+	}
+	c.diag, c.status = Diagnostico{Paso: PasoCrear}, mx.VerificationStatus{}
+	c.AbrirPanel()
+	sinClave := func(context.Context, *mx.Client, Custodia) (Diagnostico, bool, error) {
+		return Diagnostico{}, false, ErrSinDesbloqueo
+	}
+	c.custodiar(sinClave)
+	esperarLibre(t, c)
+	select {
+	case <-pedidas:
+	case <-time.After(3 * time.Second):
+		t.Fatal("sin clave, el panel no fue solo a Sytue ID")
+	}
+	esperarLibre(t, c)
+	boton(t, c, "matrix.signIn")
+	// Otra vez sin clave: ya fue una vez, ahora espera al botón.
+	c.custodiar(sinClave)
+	esperarLibre(t, c)
+	select {
+	case <-pedidas:
+		t.Fatal("el panel volvió a Sytue ID solo, en bucle")
+	case <-time.After(200 * time.Millisecond):
+	}
+	boton(t, c, "matrix.signIn")
+}
+
 func TestClosingThePanelForgetsTheDiagnosis(t *testing.T) {
 	c, _ := panelEn(t, 320)
 	c.ctx, c.cancel = context.WithCancel(t.Context())

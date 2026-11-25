@@ -830,18 +830,13 @@ func errorDeOCR(err error) error {
 
 // --- Comparar ----------------------------------------------------------------
 
-// plazoCompararVisual acota el tiempo de una comparación visual. Se mira entre página y
-// página (el intérprete no se interrumpe a medias), así que una página patológica puede
-// pasarse; lo que no ocurre es que veinte páginas la sumen. Es MENOR que el
-// `RequestTimeout` del router (30 s): si fuera mayor, el router cortaría con un 504 antes
-// de que esta comparación devolviera lo hecho hasta ahí con `truncado`.
-const plazoCompararVisual = 25 * time.Second
-
 // pdfComparar atiende POST /api/v1/pdf/compare: dos ficheros en «file» y sale
 // qué cambia en cada página.
 //
 // Con `modo=visual` se comparan los PÍXELES de cada página en vez del texto
-// (ver `domain.CompararVisual`); el modo de texto sigue siendo el de siempre.
+// (ver `domain.CompararVisual`); el modo de texto sigue siendo el de siempre. El
+// cuerpo lo monta el motor (`domain.ApplyCompareOperation`), el mismo que compara
+// en el dispositivo con el Drive en la bóveda (ADR 0086).
 func (h *Handler) pdfComparar(w http.ResponseWriter, r *http.Request) {
 	if !h.prepararFormularioPDF(w, r) {
 		return
@@ -863,88 +858,16 @@ func (h *Handler) pdfComparar(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Comparing needs exactly two PDFs."))
 		return
 	}
-	if modo == "visual" {
-		h.pdfCompararVisual(w, r, docs[0], docs[1])
-		return
+	fields := map[string]string{}
+	for _, key := range []string{"modo", "pagina", "escala", "tolerancia", "vecindad"} {
+		fields[key] = r.FormValue(key)
 	}
-	difs, err := domain.CompararPDF(docs[0], docs[1])
+	out, err := domain.ApplyCompareOperation(r.Context(), docs[0], docs[1], fields)
 	if err != nil {
 		httpx.Fail(w, r, errorDeDominio(err))
 		return
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{
-		"diferencias": difs,
-		"iguales":     len(difs) == 0,
-	})
-}
-
-// opcionesVisualesDelFormulario lee y valida los ajustes. Un valor fuera de rango se
-// RECHAZA y no se recorta en silencio: quien pide una tolerancia de 900 se ha
-// equivocado, y un resultado «normal» le haría creer que se aplicó.
-func opcionesVisualesDelFormulario(r *http.Request) (domain.OpcionesVisual, error) {
-	var o domain.OpcionesVisual
-	if s := strings.TrimSpace(r.FormValue("escala")); s != "" {
-		v, err := strconv.ParseFloat(s, 64)
-		if err != nil || !(v >= 0.25 && v <= 3) { // «!(…)» y no «< ||  >»: NaN no es menor ni mayor que nada
-			return o, httpx.ErrBadRequest.WithMessage("The scale must be between 0.25 and 3.")
-		}
-		o.Escala = v
-	}
-	if s := strings.TrimSpace(r.FormValue("tolerancia")); s != "" {
-		v, err := strconv.Atoi(s)
-		if err != nil || v < 1 || v > 255 {
-			return o, httpx.ErrBadRequest.WithMessage("The tolerance must be between 1 and 255.")
-		}
-		o.Tolerancia = v
-	}
-	if s := strings.TrimSpace(r.FormValue("vecindad")); s != "" {
-		v, err := strconv.Atoi(s)
-		if err != nil || v < 0 || v > 3 {
-			return o, httpx.ErrBadRequest.WithMessage("The neighbourhood must be between 0 and 3.")
-		}
-		o.Vecindad, o.SinVecindad = v, v == 0
-	}
-	return o, nil
-}
-
-// pdfCompararVisual responde a `modo=visual`. Sin `pagina`, el resumen de todo el
-// documento (regiones y porcentajes, sin imágenes); con `pagina`, esa página con su
-// resaltado en PNG (base64 en el JSON).
-func (h *Handler) pdfCompararVisual(w http.ResponseWriter, r *http.Request, a, b *domain.PDFDoc) {
-	opts, err := opcionesVisualesDelFormulario(r)
-	if err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	if s := strings.TrimSpace(r.FormValue("pagina")); s != "" {
-		n, err := enteroOpcional(s, 1, max(a.NumPaginas(), b.NumPaginas()))
-		if err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		dif, err := domain.CompararVisualPagina(a, b, n, opts)
-		if err != nil {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(err.Error()))
-			return
-		}
-		httpx.JSON(w, r, http.StatusOK, map[string]any{
-			"modo": "visual", "paginas_a": a.NumPaginas(), "paginas_b": b.NumPaginas(),
-			"pagina": dif,
-		})
-		return
-	}
-	ctx, parar := context.WithTimeout(r.Context(), plazoCompararVisual)
-	defer parar()
-	res, err := domain.CompararVisual(ctx, a, b, opts)
-	if err != nil {
-		httpx.Fail(w, r, errorDeDominio(err))
-		return
-	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{
-		"modo": "visual", "paginas_a": res.PaginasA, "paginas_b": res.PaginasB,
-		"comparadas": res.Comparadas, "truncado": res.Truncado,
-		"paginas": res.Paginas, "iguales": res.Iguales,
-	})
+	httpx.JSON(w, r, http.StatusOK, json.RawMessage(out))
 }
 
 // --- Ayudas ------------------------------------------------------------------

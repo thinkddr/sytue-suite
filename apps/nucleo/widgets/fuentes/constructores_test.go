@@ -109,7 +109,15 @@ func TestCadaFilaLlevaLaRutaDeSuElemento(t *testing.T) {
 		"photos album": {itemsDeAlbumes([]api.Album{{ID: "al1", Title: "Viaje", Count: 3}}), "/album?id=al1"},
 		"photos foto":  {itemsDeFotos(Comunes{}, []api.Photo{{ID: "p1", Name: "IMG.jpg", DriveFileID: "df1"}}), "/abrir?file=df1"},
 		"one reciente": {actividadReciente([]api.HubHit{{Source: "notes", Kind: "note", Title: "Plan"}}), "/actividad"},
-		"one sin ruta": {agendaDeHoy([]api.EventoDeHoy{{Resumen: "Daily", Inicio: ahora}}, ahora), ""},
+		"one agenda":   {agendaDeHoy([]api.EventoDeHoy{{Resumen: "Daily", Inicio: ahora}}, ahora), "/agenda?date=2026-11-24"},
+		// Uno de día completo es flotante: su fecha, aunque en la zona de la app fuera otra.
+		"one agenda, día completo": {
+			agendaDeHoy([]api.EventoDeHoy{{Resumen: "Fiesta", Inicio: time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC), TodoElDia: true}},
+				ahora.In(time.FixedZone("Honolulu", -10*3600))),
+			"/agenda?date=2026-11-24&all_day=1",
+		},
+		"mail":          {cabecerasDeEntrada(Comunes{}, []api.MailMessage{{ID: "m1", ThreadID: "t 1", From: "ana@sytue.eu"}}), "/?thread=t%201"},
+		"mail sin hilo": {cabecerasDeEntrada(Comunes{}, []api.MailMessage{{ID: "m1", From: "ana@sytue.eu"}}), ""},
 	}
 	firmas, _ := itemsDeFirmas(api.PDFPeticionesFirma{Recibidas: []api.PDFPeticionFirma{
 		{Ruta: "/PDF/Alta.pdf", Estado: "pendiente"}, {Nombre: "De fuera.pdf", NombrePide: "Ana", Estado: "pendiente"},

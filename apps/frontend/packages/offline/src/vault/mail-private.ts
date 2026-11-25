@@ -183,7 +183,13 @@ export async function openVaultMailPrivate(
   // la bóveda firme: tras un vaciado hay que identificarse otra vez, de verdad
   // (`reauth`: con `max_age=0`, no con la sesión que ya hay).
   if (vault.signingKeyStatus === 'reauth') throw new PqVaultError('reauth');
-  if (vault.signingKeyStatus !== 'registered') throw new PqVaultError('unavailable');
+  if (vault.signingKeyStatus !== 'registered') {
+    // Con el porqué (`signing_put_400_vault_key_proof`…): sin él, «Más información»
+    // decía `vault.unavailable` y no había forma de saber qué contestó Sytue ID.
+    const error = new PqVaultError('unavailable');
+    error.check = vault.signingKeyCheck ?? 'signing_' + vault.signingKeyStatus;
+    throw error;
+  }
   options.signal?.throwIfAborted();
   const basePath = options.basePath || '/';
   const openOwner =

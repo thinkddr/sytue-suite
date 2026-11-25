@@ -169,9 +169,66 @@ func (p *Pantalla) accionesBarraCompacta() []fyne.CanvasObject {
 	return []fyne.CanvasObject{h, mas}
 }
 
+// claveCompacta es todo lo que decide la vista del mes del teléfono: si un repintado da
+// la misma que el anterior, la vista de antes vale tal cual (ver vistaMesCompacta).
+type claveCompacta struct {
+	primer      *Ocurrencia
+	n           int
+	cursor, hoy time.Time
+	zona        *time.Location
+	t           *i18n.Translator
+	v           tema.Variante
+	pos         PosicionAsa
+	estado      Estado
+	recargando  bool
+	sinConexion bool
+	fallo       string
+	consulta    string
+}
+
+func (p *Pantalla) claveCompacta() claveCompacta {
+	k := claveCompacta{
+		n: len(p.Eventos), cursor: p.Cursor, hoy: inicioDelDia(p.ahora(), p.zona()), zona: p.zona(), t: p.T,
+		v: tema.De(fyne.CurrentApp().Settings().ThemeVariant()), pos: p.posicion(), estado: p.Estado,
+		recargando: p.Recargando, sinConexion: p.SinConexion, fallo: p.Fallo, consulta: p.consultaAgenda,
+	}
+	if len(p.Eventos) > 0 {
+		k.primer = &p.Eventos[0]
+	}
+	return k
+}
+
 // vistaMesCompacta es la vista entera: la hoja de la rejilla y, debajo, la lista del día
 // (o el panel de error en su sitio), desplazable y con tirar para refrescar.
+//
+// Es la MISMA en cada repintado que no cambia lo que la decide (`claveCompacta`), como el
+// mes de escritorio: rehacerla eran las semanas con sus días, la lista o la agenda y sus
+// desplazadores (~0,5 MB) por la campana, una invitación o el menú, y un gesto o la
+// animación de la hoja a medias se cortaban. Cargando no se conserva: sus esqueletos se
+// paran al repintar (pararLatidos).
 func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
+	k := p.claveCompacta()
+	p.compactaUsada = true
+	if p.compactaHecha != nil && p.compactaClave == k && k.estado != ui.EstadoCargando {
+		// La agenda de la posición de abajo va dentro: se sigue conservando con ella.
+		p.agendaUsada = p.agendaUsada || k.pos == PosAgenda
+		p.diaElegido, p.asaMes = p.compactaDia, p.compactaAsa
+		if p.compactaRefresco != nil {
+			arriba := p.compactaRefresco.Arriba
+			*p.compactaRefresco = p.Refresco
+			p.compactaRefresco.Arriba = arriba
+		}
+		return p.compactaHecha
+	}
+	p.compactaRefresco = nil
+	o := p.construirMesCompacta()
+	p.compactaHecha, p.compactaClave = o, k
+	p.compactaDia, p.compactaAsa = p.diaElegido, p.asaMes
+	return o
+}
+
+// construirMesCompacta monta la vista del mes del teléfono de cero.
+func (p *Pantalla) construirMesCompacta() fyne.CanvasObject {
 	cargando := p.Estado == ui.EstadoCargando
 	eventos := p.Eventos
 	if cargando {
@@ -218,6 +275,7 @@ func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
 	m.arrancar()
 	refresco := p.Refresco
 	refresco.Arriba = func() bool { return desplazar.Offset.Y <= 0.5 }
+	p.compactaRefresco = &refresco
 	return ui.RefrescarAlTirar(vista, &refresco)
 }
 
@@ -1077,14 +1135,14 @@ type filaEventoDia struct {
 }
 
 func (p *Pantalla) nuevaFilaEventoDia(f FilaDia, _ tema.Variante) *filaEventoDia {
-	fila := &filaEventoDia{color: colorPunto(f.O), cuando: p.cuandoFila(f), titulo: resumenDe(f.O, p.t("event.untitled", nil))}
+	fila := &filaEventoDia{color: colorPunto(f.O), cuando: p.cuandoFila(f), titulo: resumenDe(*f.O, p.t("event.untitled", nil))}
 	// «Tenis, 14:00 – 15:00»: el separador es del catálogo (`grid.blockAria`, el nombre
 	// de un bloque de la semana), no una coma escrita aquí.
 	fila.Nombre = p.t("grid.blockAria", i18n.Vars{"title": fila.titulo, "time": fila.cuando})
 	o := f.O
 	fila.AlPulsar = func() {
 		if p.AlAbrirEvento != nil {
-			p.AlAbrirEvento(o, fila)
+			p.AlAbrirEvento(*o, fila)
 		}
 	}
 	fila.ExtendBaseWidget(fila)

@@ -962,6 +962,7 @@ func (sa *Sala) EntrarPorEnlace(id, clave string) {
 func (sa *Sala) prepararBarra(v *VistaLlamada, c api.RoomsCall, canal string, l EnCurso) {
 	v.Modera = c.Role == "host" || c.Room.CreatedBy == sa.Yo || sa.adminEquipo
 	v.Bloqueada = c.Room.Locked
+	v.SalaDeEspera = c.Room.WaitingRoom
 	v.Mod = sa.moderacionDe(c.Room.ID)
 	if c.Encryption != nil {
 		v.Mod.Grabar = nil // server recording cannot decrypt native E2E media

@@ -14,10 +14,9 @@ import (
 )
 
 // sinClave son los tipos que hoy se mandan sin título en el catálogo común, con su
-// motivo. Se compara por IGUALDAD: si a uno le llega su clave, sobra aquí.
-var sinClave = map[string]string{
-	"cloud.deploy": "su título lleva el estado y el proyecto («Despliegue fallido: web»); hasta que tenga clave con parámetros, la campana enseña el título en castellano que manda el servicio",
-}
+// motivo. Se compara por IGUALDAD: si a uno le llega su clave, sobra aquí. Está
+// vacía desde que `cloud.deploy` se partió en `.ready` y `.failed` con `{project}`.
+var sinClave = map[string]string{}
 
 // Cada tipo de aviso que un servicio manda al Hub tiene su título en el catálogo
 // común (`notifications.kind.<tipo>`): sin él, la campana de la web y la de las

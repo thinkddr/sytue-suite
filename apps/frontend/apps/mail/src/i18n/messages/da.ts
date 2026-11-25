@@ -961,7 +961,7 @@ export const da: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Flyt din mail til den nye boks for at blive ved med at modtage den',
   'privateMail.vaultMoveRetiredBody':
-    'Det tidligere mailsystem er ikke længere tilgængeligt. Indtil du flytter din mail til boksen, modtager du ikke ny mail: det, der kommer i mellemtiden, gemmes krypteret med det tidligere system ligesom den mail, du allerede havde, og kan ikke læses. Det slettes ikke, men ingen kan åbne det. Når du har flyttet, kommer din mail igen frem og åbnes med dit Sytue ID-login ligesom de andre apps.',
+    'Det tidligere mailsystem er ikke længere tilgængeligt. Indtil du flytter din mail til boksen, modtager du ikke ny mail: det, der sendes til dig i mellemtiden, venter på afsenderens server, som prøver igen i nogle dage. Flytter du i tide, når det frem til dig bagefter; ellers får afsenderen besked om, at det ikke kunne leveres. Det, der allerede er krypteret med det tidligere system, ligesom den mail, du allerede havde, kan ikke læses: det slettes ikke, men ingen kan åbne det. Når du har flyttet, kommer din mail igen frem og åbnes med dit Sytue ID-login ligesom de andre apps.',
   'privateMail.vaultMoveCheckFailed':
     'Status for din mail kunne ikke kontrolleres. Prøv igen om et øjeblik.',
 };

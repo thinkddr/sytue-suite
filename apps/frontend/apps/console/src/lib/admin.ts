@@ -47,6 +47,7 @@ import type {
   PimEligibility,
   PimEligibilityInput,
   SamlSp,
+  SamlSpInput,
   SensitivityLabel,
   SensitivityLabelInput,
   SsoProvider,
@@ -1530,7 +1531,7 @@ function toSamlSp(w: SamlSpWire): SamlSp {
 
 /**
  * SP SAML de la organización activa. Los crea `integrations` al activar una plantilla
- * del catálogo, así que hasta ahora existían sin que nadie pudiera verlos.
+ * del catálogo o un admin a mano (`createSamlSp`).
  */
 export async function loadSamlSps(session: SytueSession): Promise<Sourced<SamlSp[]>> {
   try {
@@ -1616,6 +1617,15 @@ export async function loadScimStatus(session: SytueSession): Promise<Sourced<Sci
   } catch {
     return { live: false, data: null };
   }
+}
+
+/**
+ * Alta manual de un SP SAML: la app de terceros que no está en el catálogo. Sytue ID
+ * valida de nuevo (ACS https, certificado X.509 sin clave privada) y responde 400 si
+ * algo no vale o 409 si ese entity ID ya está registrado.
+ */
+export async function createSamlSp(session: SytueSession, input: SamlSpInput): Promise<SamlSp> {
+  return toSamlSp(await adminHttp(session).postJson<SamlSpWire>('/apps/saml-sps', input));
 }
 
 /** Enciende/apaga la federación con ese SP sin borrar su configuración. */

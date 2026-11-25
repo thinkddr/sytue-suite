@@ -2,44 +2,32 @@
 import { expect, test } from 'bun:test';
 import { RoomEvent } from 'livekit-client';
 import {
+  detenerPistas,
   enableAuthorizedMedia,
-  endAutomaticReconnect,
   finishFailedCall,
   registerReconnectBarrier,
 } from './callMedia.js';
 
 test.each([RoomEvent.Reconnecting, RoomEvent.SignalReconnecting])(
-  'the %s event invokes the same fail-closed media barrier',
+  'the %s event reaches the same reconnect barrier',
   (event) => {
     const handlers = new Map<RoomEvent, () => void>();
     const trace: string[] = [];
-    const track = {
-      mediaStreamTrack: { enabled: true },
-      stop: () => trace.push('stop-track'),
-    };
     registerReconnectBarrier(
       (name, listener) => handlers.set(name, listener),
-      () =>
-        endAutomaticReconnect(
-          [track],
-          () => trace.push('invalidate'),
-          () => trace.push('fail-closed'),
-        ),
+      () => trace.push('barrier'),
     );
     expect(handlers.size).toBe(2);
     handlers.get(event)?.();
-    expect(track.mediaStreamTrack.enabled).toBe(false);
-    expect(trace).toEqual(['invalidate', 'stop-track', 'fail-closed']);
+    expect(trace).toEqual(['barrier']);
   },
 );
 
-test('automatic reconnect invalidates permission, stops all tracks and closes the call immediately', () => {
-  let allowed = true;
+test('detenerPistas disables and stops every local track, even after one fails', () => {
   const stopped: string[] = [];
   const make = (name: string) => ({
     mediaStreamTrack: { enabled: true },
     stop: () => {
-      expect(allowed).toBe(false);
       stopped.push(name);
       if (name === 'video') throw new Error('track already stopped');
     },
@@ -47,20 +35,8 @@ test('automatic reconnect invalidates permission, stops all tracks and closes th
   const audio = make('audio');
   const video = make('video');
   const screen = make('screen');
-  let failed = false;
-  endAutomaticReconnect(
-    [audio, video, screen],
-    () => {
-      allowed = false;
-      expect(audio.mediaStreamTrack.enabled).toBe(true);
-    },
-    () => {
-      failed = true;
-    },
-  );
-  expect(allowed).toBe(false);
+  detenerPistas([audio, video, screen]);
   expect(stopped).toEqual(['audio', 'video', 'screen']);
-  expect(failed).toBe(true);
   expect([audio, video, screen].map((track) => track.mediaStreamTrack.enabled)).toEqual([
     false,
     false,

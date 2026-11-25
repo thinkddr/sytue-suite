@@ -6,7 +6,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { sytueHealthEndpoint } from '@sytue/config/astro-health';
 import { sytuePrecarga } from '@sytue/config/astro-precarga';
 import { sytueNoEncontrada } from '@sytue/config/astro-404';
-import { sytueSecurity } from '@sytue/config/astro-security';
+import { sytueArranque } from '@sytue/config/astro-arranque';
+import { sytueCsp, sytueSecurity } from '@sytue/config/astro-security';
 
 /**
  * Sytue Web — Astro 7 + Preact 10 (islands), SSR para el BFF.
@@ -18,12 +19,15 @@ export default defineConfig({
   // `/web`, el prefijo del producto desde el 2026-10-04 (antes `/pages`, que el chart
   // redirige a este). La clave del paquete y de la carpeta sigue siendo `pages`.
   base: '/web',
-  security: sytueSecurity,
+  // `csp`: script-src SIN 'unsafe-inline' (sytueCsp, astro-security.ts): Astro firma
+  // sus scripts y los de arranque llegan de /arranque.js (sytueArranque).
+  security: { ...sytueSecurity, csp: sytueCsp() },
   adapter: node({ mode: 'standalone' }),
   integrations: [
     sytuePrecarga(),
     sytueHealthEndpoint(),
     sytueNoEncontrada(),
+    sytueArranque(),
     preact({ compat: true }),
   ],
   server: { port: 4336, host: true },

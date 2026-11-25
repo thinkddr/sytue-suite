@@ -37,6 +37,32 @@ func TestMutedAplicaLaReglaMasEspecifica(t *testing.T) {
 	}
 }
 
+// Un tipo partido en varios (`cloud.deploy` → `.ready` y `.failed`) hereda la regla
+// del de antes hasta que el suyo tenga la propia, que manda.
+func TestMutedHeredaLaReglaDelTipoPartido(t *testing.T) {
+	t.Parallel()
+	prefs := []NotificationPref{
+		{Source: SourceCloud, Kind: "cloud.deploy", Muted: true},
+		{Source: SourceCloud, Kind: "cloud.deploy.failed", Muted: false},
+	}
+	if !Muted(prefs, SourceCloud, "cloud.deploy.ready") {
+		t.Error("cloud.deploy.ready no hereda la regla de cloud.deploy")
+	}
+	if Muted(prefs, SourceCloud, "cloud.deploy.failed") {
+		t.Error("la regla propia de cloud.deploy.failed no manda sobre la heredada")
+	}
+	// Solo los de la tabla: `rooms.invitation.direct` no salió de `rooms.invitation`.
+	salas := []NotificationPref{{Source: SourceRooms, Kind: "rooms.invitation", Muted: true}}
+	if Muted(salas, SourceRooms, "rooms.invitation.direct") {
+		t.Error("rooms.invitation.direct heredó la regla de rooms.invitation")
+	}
+	// La heredada gana a la del origen entero, como la exacta.
+	conOrigen := []NotificationPref{{Source: SourceCloud, Muted: true}, {Source: SourceCloud, Kind: "cloud.deploy", Muted: false}}
+	if Muted(conOrigen, SourceCloud, "cloud.deploy.ready") {
+		t.Error("la regla del tipo de antes no gana a la del origen")
+	}
+}
+
 func TestValidSource(t *testing.T) {
 	t.Parallel()
 	if !ValidSource(SourceRooms) {

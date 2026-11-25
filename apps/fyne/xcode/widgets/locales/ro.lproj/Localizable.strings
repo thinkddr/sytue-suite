@@ -4,6 +4,10 @@
 "widgets.newNote" = "Notiță nouă";
 "widgets.newContact" = "Contact nou";
 "widgets.addPhotos" = "Adaugă fotografii";
+"widgets.newDocument" = "Document nou";
+"widgets.newSpreadsheet" = "Foaie de calcul nouă";
+"widgets.newPresentation" = "Prezentare nouă";
+"widgets.openToUpdate" = "Se actualizează când aplicația este deschisă";
 "widgets.notes" = "Notițe";
 "widgets.rows" = "Rânduri";
 "widgets.pending" = "În așteptare";

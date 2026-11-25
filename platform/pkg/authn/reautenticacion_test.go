@@ -60,3 +60,31 @@ func TestIdentificacionRecienteConSegundoFactorSiLaCuentaLoTiene(t *testing.T) {
 		t.Fatal("sin claims no hay reautenticación")
 	}
 }
+
+// TestDeviceTrustDelToken: solo los valores que emite Sytue ID se leen como tales, y
+// solo `standard` o `managed` dan un dispositivo de confianza. Lo ausente, lo vacío y
+// lo desconocido no conceden nada.
+func TestDeviceTrustDelToken(t *testing.T) {
+	casos := []struct {
+		json      string
+		valor     string
+		confianza bool
+	}{
+		{`{"sub":"ada","device_trust":"standard"}`, DeviceTrustStandard, true},
+		{`{"sub":"ada","device_trust":"managed"}`, DeviceTrustManaged, true},
+		{`{"sub":"ada","device_trust":"none"}`, DeviceTrustNone, false},
+		{`{"sub":"ada"}`, "", false},
+		{`{"sub":"ada","device_trust":"STANDARD"}`, "", false},
+		{`{"sub":"ada","device_trust":true}`, "", false},
+	}
+	for _, c := range casos {
+		tok, err := jwt.Parse([]byte(c.json), jwt.WithVerify(false), jwt.WithValidate(false))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := claimsFromToken(tok)
+		if got.DeviceTrust != c.valor || got.DispositivoDeConfianza() != c.confianza {
+			t.Errorf("%s: device_trust=%q confianza=%v, quiero %q y %v", c.json, got.DeviceTrust, got.DispositivoDeConfianza(), c.valor, c.confianza)
+		}
+	}
+}

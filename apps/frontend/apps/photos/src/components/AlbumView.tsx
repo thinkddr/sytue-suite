@@ -6,7 +6,15 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Icon, IconButton, useConfirm, usePrompt, withBase } from '@sytue/ui';
+import {
+  Button,
+  Icon,
+  IconButton,
+  marcarAppLista,
+  useConfirm,
+  usePrompt,
+  withBase,
+} from '@sytue/ui';
 import { translate, type Locale } from '@sytue/i18n';
 import { CompartirConPersonas } from '@sytue/shell';
 import {
@@ -70,6 +78,10 @@ function VistaDeAlbum({
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(cargar, [id]);
+  // `sytue:app-ready`: el álbum con sus fotos (o su fallo) ya está pintado.
+  useEffect(() => {
+    if ((al !== null && fotos !== null) || fallo !== null) marcarAppLista();
+  }, [al, fotos, fallo]);
 
   /** Renombrar: el diálogo de la casa con el título de ahora escrito. */
   const renombrar = async () => {

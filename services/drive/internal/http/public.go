@@ -28,6 +28,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
@@ -111,6 +112,8 @@ func (h *Handlers) servePublic(w http.ResponseWriter, r *http.Request, token, su
 	}
 	if !node.IsDir {
 		defer node.Body.Close()
+		// Sin sesión: el actor es el enlace y el tenant, el que lo resolvió.
+		auditlog.AnotarComo(r.Context(), tenant, "link:"+share.ID.String(), "link.download", node.File.ID.String(), nil)
 		writePublicFile(w, node.File, node.Body)
 		return
 	}

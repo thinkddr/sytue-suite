@@ -24,7 +24,7 @@ ET.register_namespace("android", ANDROID)
 ATTR = "{" + ANDROID + "}"
 LABELS = {
     "open": "widgets.open", "compose": "widgets.compose", "create": "widgets.create",
-    "upload": "widgets.addPhotos",
+    "upload": "widgets.addPhotos", "open_to_update": "widgets.openToUpdate",
     "unread": "notifications.unread", "files": "dataflow.item.files",
     "events": "dataflow.item.events", "documents": "dataflow.item.documents",
     "contacts": "dataflow.item.contacts", "notes": "widgets.notes", "rows": "widgets.rows",
@@ -50,9 +50,11 @@ FONDO_GO = True
 # pregunta o el selector del sistema que la persona confirma. La misma tabla en
 # xcode/generar.py, Snapshot.swift y WidgetSnapshot.accionPermitida.
 ACCIONES = {"mail": {"compose"}, "calendar": {"create"}, "contacts": {"create"},
-            "notes": {"create"}, "photos": {"upload"}}
+            "notes": {"create"}, "photos": {"upload"}, "docs": {"create"}, "sheets": {"create"},
+            "slides": {"create"}}
 # El rótulo de «create» en cada producto: el de Calendar es «Crear evento».
-CREAR = {"contacts": "widgets.newContact", "notes": "widgets.newNote"}
+CREAR = {"contacts": "widgets.newContact", "notes": "widgets.newNote", "docs": "widgets.newDocument",
+         "sheets": "widgets.newSpreadsheet", "slides": "widgets.newPresentation"}
 
 
 def metadata(appdir):

@@ -29,6 +29,10 @@ type RoomsMeeting struct {
 	Locked bool `json:"locked,omitempty"`
 	// LinkKey es la clave del enlace de una reunión suelta: va en el enlace que se copia.
 	LinkKey string `json:"link_key,omitempty"`
+	// WaitingRoom: a la puerta llaman aunque esté abierta. Es la reunión de un evento,
+	// a la que llegan invitados de otra organización sin la clave; quien modera mira la
+	// cola también con la sala abierta (la web, `ChannelCall.waitingRoom`).
+	WaitingRoom bool `json:"waiting_room,omitempty"`
 }
 
 // Titulo es `r.title || r.name`.

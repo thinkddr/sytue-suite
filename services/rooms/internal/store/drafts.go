@@ -6,6 +6,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -27,36 +28,54 @@ const nilParent = `'00000000-0000-0000-0000-000000000000'::uuid`
 // ListDrafts devuelve los borradores VIVOS del usuario (canal accesible y no
 // borrado), del más reciente al más antiguo. Reaplica el filtro de acceso al canal
 // como ListSaved: si te sacaron de un canal privado, su borrador deja de listarse.
+//
+// El borrador de una conversación de OTRA organización (ADR 0040) se guarda en la
+// anfitriona, junto al canal: se lee allí también, solo de donde sigue como externo.
 func (s *Store) ListDrafts(ctx context.Context, subject string) ([]domain.Draft, error) {
 	t := tenancy.MustFrom(ctx)
 	var out []domain.Draft
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx,
-			`SELECT d.channel_id, d.parent_id, d.body, d.updated_at
-			 FROM message_drafts d
-			 JOIN channels c ON c.tenant=d.tenant AND c.id=d.channel_id
-			 WHERE d.tenant=$1 AND d.subject=$2 AND c.deleted_at IS NULL
-			   AND (
-			        c.kind='public'
-			        OR EXISTS (SELECT 1 FROM channel_members cm
-			                   WHERE cm.tenant=c.tenant AND cm.channel_id=c.id AND cm.subject=$2)
-			   )
-			 ORDER BY d.updated_at DESC`,
-			t.Slug, subject)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var d domain.Draft
-			if err := rows.Scan(&d.ChannelID, &d.ParentID, &d.Body, &d.UpdatedAt); err != nil {
-				return err
-			}
-			out = append(out, d)
-		}
-		return rows.Err()
+		var err error
+		out, err = borradoresTx(ctx, tx, t.Slug, subject, false)
+		return err
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	err = s.enCadaAnfitrion(ctx, subject, t.Slug, func(tx pgx.Tx, anfitrion string) (bool, error) {
+		fuera, err := borradoresTx(ctx, tx, anfitrion, subject, true)
+		out = append(out, fuera...)
+		return false, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.SortStableFunc(out, func(a, b domain.Draft) int { return b.UpdatedAt.Compare(a.UpdatedAt) })
+	return out, nil
+}
+
+// borradoresTx lee los borradores de subject en UNA organización.
+func borradoresTx(ctx context.Context, tx pgx.Tx, tenant, subject string, deFuera bool) ([]domain.Draft, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT d.channel_id, d.parent_id, d.body, d.updated_at
+		 FROM message_drafts d
+		 JOIN channels c ON c.tenant=d.tenant AND c.id=d.channel_id
+		 WHERE d.tenant=$1 AND d.subject=$2 AND c.deleted_at IS NULL`+accesoAlCanal(deFuera)+`
+		 ORDER BY d.updated_at DESC`,
+		tenant, subject)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Draft
+	for rows.Next() {
+		var d domain.Draft
+		if err := rows.Scan(&d.ChannelID, &d.ParentID, &d.Body, &d.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
 }
 
 // PutDraft fija (upsert) el borrador del usuario en un ámbito de redacción. Exige

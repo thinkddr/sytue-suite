@@ -41,7 +41,7 @@ func TestLeerAjustesComoLaWeb(t *testing.T) {
 // fines de semana) y en el recordatorio con el que nace un evento nuevo.
 func TestPaginaDeAjustes(t *testing.T) {
 	prefs := test.NewApp().Preferences()
-	almacen := sesion.NuevoPorPersona(prefs, func() string { return "ana" })
+	almacen := sesion.NuevoPorPersona(prefs, func() sesion.Alcance { return sesion.Alcance{Sujeto: "ana"} })
 	a := appDePrueba(t, &servicioFalso{})
 	a.Almacen = almacen
 	a.Arrancar()

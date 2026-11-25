@@ -2705,9 +2705,9 @@ export const da: AppCatalog<typeof en> = {
     'Signaturen kan ikke være på den side. Vælg en anden side eller placering.',
   'pdf.device.view': 'Vis',
   'pdf.vault.help':
-    'Denne PDF ligger i dit krypterede Drev: den dekrypteres kun på denne enhed, hvor du kan se, kommentere, udfylde, organisere og underskrive den. Det, du gemmer, går krypteret tilbage.',
+    'Denne PDF ligger i dit krypterede Drev: den dekrypteres kun på denne enhed, hvor du kan se, kommentere, udfylde, organisere, beskytte, sværte, redigere, sammenligne, udskrive og underskrive den. Det, du gemmer, går krypteret tilbage.',
   'pdf.vault.serverOnly':
-    'Med dit krypterede Drev er anmodning om underskrift, adgangskodebeskyttelse, tekstgenkendelse, overstregning, redigering af tekst eller billeder, stempler og vandmærker, sammenligning, versionshistorik og udskrivning endnu ikke tilgængelige: de kræver, at tjenesten læser PDF’en, eller kan endnu ikke udføres på enheden.',
+    'Med dit krypterede Drev er anmodning om underskrift, tekstgenkendelse og assistenten ikke tilgængelige: de kræver, at tjenesten læser PDF’en. Alt andet sker på denne enhed.',
   'pdf.vault.notFound.title': 'Denne PDF er ikke i dit krypterede Drev',
   'pdf.vault.notFound.description':
     'Den er måske flyttet eller slettet. Søg efter den i Sytue Drive.',
@@ -2722,7 +2722,9 @@ export const da: AppCatalog<typeof en> = {
     'Dit Drive er stadig ved at overgå til end-to-end-kryptering. Gør det færdigt i Sytue Drive.',
   'pdf.device.error.password': 'Den adgangskode åbner ikke certifikatet.',
   'pdf.device.error.encrypted':
-    'Denne PDF er beskyttet med adgangskode og kan ikke underskrives på denne enhed.',
+    'Denne PDF er beskyttet med adgangskode: åbn den, og underskriv den fra dens studie, hvor dens adgangskode bruges.',
+  'pdf.device.protectedNote':
+    'Denne PDF er beskyttet med adgangskode. For at underskrive den skrives den om uden adgangskoden på denne enhed, som serveren også gør: den underskrevne kopi gemmes krypteret i dit Drev, men uden PDF’ens adgangskode.',
   'pdf.device.error.locked':
     'Denne PDF er certificeret mod enhver ændring: endnu en underskrift ville gøre den ugyldig.',
   'pdf.device.error.unreadable':

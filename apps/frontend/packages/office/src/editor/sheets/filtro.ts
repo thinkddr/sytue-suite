@@ -13,7 +13,7 @@
  * entra en el modelo, así que activarla no cambia lo que ven los demás.
  * Self-test: packages/office/test/sheets-filtro.test.ts (bun test).
  */
-import type { CellValue } from '@sytue/formula';
+import type { CellValue } from '@sytue/formula/motor';
 import type { CellStyle, FilterCondition, FilterOp, SheetAutoFilter } from '../types';
 import { formatCellValue, parseEsDate, parseEsNumberStrict } from './format';
 

@@ -15,6 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets/fuentes"
 )
 
 // # Lanzada sin escena: iOS despierta la app para su widget
@@ -406,6 +407,13 @@ func resultadoDeRonda(bundle string, antes widgets.Snapshot, err error) Resultad
 		return Nuevos // la ronda ha borrado el snapshot de esta app
 	case errors.Is(err, widgets.ErrPrivate):
 		return SinCambios // la sesión cambió o se bloqueó entre medias: nada que enseñar
+	case errors.Is(err, fuentes.ErrSinDatosPrivados):
+		// Los datos viven en el repositorio privado y sin la app no hay clave: no es un
+		// fallo, es lo esperado (Drive, CertiPDF y las apps de registros en Matrix). Lo
+		// publicado se queda y, ya rancio, dice que se actualiza con la app abierta
+		// (widgets.Snapshot.PideAbrir). Contestar «falló» gastaba el presupuesto de
+		// refresco de iOS y hacía que Android reintentara con espera creciente.
+		return SinCambios
 	case err != nil:
 		return Fallo
 	}

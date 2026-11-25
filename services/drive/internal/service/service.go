@@ -1475,7 +1475,14 @@ func (s *Service) SharedUpload(ctx context.Context, subject string, groups []str
 	if err != nil {
 		return domain.File{}, err
 	}
-	return s.UploadFile(ownerCtx, destID, name, contentType, ownerSub, body)
+	f, err := s.UploadFile(ownerCtx, destID, name, contentType, ownerSub, body)
+	if err == nil {
+		// Lo que sube una colaboradora a la carpeta compartida cambia el Drive de quien la
+		// compartió: le llega la señal de cambios, como al dueño de un calendario (ADR
+		// 0078). A quien sube ya le llega por TrasEscribir.
+		hubnotify.AvisarTambien(ctx, sh.CreatedBy)
+	}
+	return f, err
 }
 
 // resolveSharedFolder camina subpath (solo carpetas) por nombre desde rootID y

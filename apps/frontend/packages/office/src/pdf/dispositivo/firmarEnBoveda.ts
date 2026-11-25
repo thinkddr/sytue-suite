@@ -148,13 +148,21 @@ export async function firmarEnBoveda(options: {
   visible?: EleccionVisible | undefined;
   /** La palabra del nombre del firmado, en el idioma de quien firma. */
   sufijo: string;
+  /**
+   * Los bytes que se firman, si no son los del fichero tal cual (el estudio da los de
+   * un PDF protegido ya reescrito sin su contraseña). Se borran al terminar.
+   */
+  original?: Uint8Array<ArrayBuffer> | undefined;
   signal?: AbortSignal | undefined;
 }): Promise<FirmadoEnBoveda> {
   const { repositorio, id, signal } = options;
   const fila = await repositorio.file(id, signal);
   const carpeta = texto(fila, 'folder_id');
-  if (!carpeta) throw new ErrorPdf('ilegible', 'sin carpeta');
-  const original = await bajarPdf(repositorio, fila, signal);
+  if (!carpeta) {
+    options.original?.fill(0);
+    throw new ErrorPdf('ilegible', 'sin carpeta');
+  }
+  const original = options.original ?? (await bajarPdf(repositorio, fila, signal));
   let firmado: Uint8Array<ArrayBuffer>;
   let sello: Date | null;
   let selloFallido: boolean;

@@ -29,7 +29,7 @@ func TestRegisterVaultKeyGeneracionesHistorialYUnaSolaActiva(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registrar := func(clave string, motivo string) (store.VaultKeyRow, error) {
+	registrar := func(clave, motivo string) (store.VaultKeyRow, error) {
 		return st.RegisterVaultKey(ctx, u.ID, "acme", "mail", func(actual *store.VaultKeyRow) (store.VaultKeyChange, error) {
 			if actual != nil && actual.KeyID == clave {
 				return store.VaultKeyChange{}, store.ErrVaultKeyUnchanged

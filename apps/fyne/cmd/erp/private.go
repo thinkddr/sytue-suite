@@ -26,5 +26,6 @@ func erpPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], suit
 		Service:    api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil),
 		New:        privateERP.New,
 		Historical: privateERP.NewHistoricalSource,
+		OnWrite:    suite.AvisarEscritura,
 	})
 }

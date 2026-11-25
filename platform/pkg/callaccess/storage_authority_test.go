@@ -78,3 +78,39 @@ func TestStorageAuthorityInternalClientRejectsChangedProofAndKeepsSecretOffURL(t
 		})
 	}
 }
+
+// Rooms dice con un 409 propio que la autoridad de Matrix del correo está
+// retirada (ADR 0087, entrega 5). El correo lo distingue para aplazar la entrega
+// SMTP; cualquier otra respuesta sigue siendo una falta de respuesta.
+func TestStorageAuthorityDistingueLaRetiradaDeMatrix(t *testing.T) {
+	scope := storage.Scope{Tenant: "acme", Subject: "owner", Product: "mail"}
+	for name, c := range map[string]struct {
+		status   int
+		body     string
+		retirada bool
+	}{
+		"retirada":              {http.StatusConflict, `{"error":{"code":"storage_matrix_retired","message":"Move it to the vault."}}`, true},
+		"cuenta nueva":          {http.StatusConflict, `{"error":{"code":"storage_root_enrollment_required"}}`, false},
+		"conflicto sin cuerpo":  {http.StatusConflict, ``, false},
+		"Sytue ID no contesta":  {http.StatusServiceUnavailable, `{"error":{"code":"storage_matrix_retired"}}`, false},
+		"cuerpo que no es JSON": {http.StatusConflict, `storage_matrix_retired`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/internal/storage-authority/state" {
+					t.Error("ruta", r.URL.Path)
+				}
+				w.WriteHeader(c.status)
+				_, _ = w.Write([]byte(c.body))
+			}))
+			defer server.Close()
+			_, err := New(server.URL, "synthetic-authority").ReadStorageAuthority(t.Context(), scope)
+			if !errors.Is(err, ErrUnavailable) {
+				t.Fatalf("una respuesta que no sirve no es ErrUnavailable: %v", err)
+			}
+			if got := errors.Is(err, ErrStorageMatrixRetired); got != c.retirada {
+				t.Fatalf("retirada = %v; quiero %v (%v)", got, c.retirada, err)
+			}
+		})
+	}
+}

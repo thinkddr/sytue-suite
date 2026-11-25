@@ -26,5 +26,6 @@ func basesPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], su
 		Service:    api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil),
 		New:        privateBases.New,
 		Historical: privateBases.NewHistoricalSource,
+		OnWrite:    suite.AvisarEscritura,
 	})
 }

@@ -170,7 +170,7 @@ func TestPrivateNotepadsApplicationAgainstPostgresAndFreshDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := buildNotesPlan(ctx, resources, source, gateway, routing)
+	plan, err := buildNotesPlan(ctx, resources, source, gateway, routing, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestPrivateNotepadsApplicationAgainstPostgresAndFreshDevice(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ownPlan, err := buildNotesPlan(ctx, own, source, gateway, routing)
+		ownPlan, err := buildNotesPlan(ctx, own, source, gateway, routing, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -448,7 +448,7 @@ func TestPrivateNotepadsApplicationAgainstPostgresAndFreshDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recovered, err := buildNotesPlan(ctx, recoveredResources, source, gateway, routing)
+	recovered, err := buildNotesPlan(ctx, recoveredResources, source, gateway, routing, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

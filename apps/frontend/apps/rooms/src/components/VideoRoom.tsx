@@ -37,11 +37,12 @@ import {
 import type { T } from '../i18n/index.js';
 import { CallEncryption } from '../client/callEncryption.js';
 import {
+  detenerPistas,
   enableAuthorizedMedia,
-  endAutomaticReconnect,
   finishFailedCall,
   registerReconnectBarrier,
 } from '../client/callMedia.js';
+import { ReanudacionLlamada } from '../client/reanudacion.js';
 import type { PreJoinChoice } from './PreJoin.js';
 import { ordenarPorProtagonista, protagonista, type ModoEscenario } from '../lib/escenario.js';
 import { pegaEsteVideo } from '../lib/pistas.js';
@@ -77,6 +78,11 @@ interface Props {
   hostIdentity: string;
   /** ¿Estaba la sala bloqueada al entrar? Sin esto, recargar «abre» el candado. */
   locked?: boolean;
+  /**
+   * ¿Llaman a la puerta aunque esté abierta? La reunión de un evento: los invitados de
+   * otra organización sin la clave esperan en ella (`ChannelCall.waitingRoom`).
+   */
+  waitingRoom?: boolean;
   /**
    * Chat de la reunión. Es el chat DEL CANAL, no uno aparte: lo que se escribe
    * durante la llamada sigue ahí al día siguiente, que es lo que uno espera de un
@@ -213,6 +219,7 @@ function EncryptedVideoRoom({
   hostIdentity,
   orgAdmin = false,
   locked = false,
+  waitingRoom = false,
   chat,
   resources,
 }: Props & { resources: EncryptedCallResources }): JSX.Element {
@@ -592,6 +599,45 @@ function EncryptedVideoRoom({
       syncTiles();
     }
 
+    // La reconexión automática del SDK no se deja seguir sola: se reanuda a mano con
+    // ámbito, clave, conexión y acuse nuevos, sin publicar hasta el acuse
+    // (client/reanudacion.ts). Antes se cortaba la llamada y había que volver a entrar.
+    const reanudacion = new ReanudacionLlamada({
+      suspender: () => {
+        const encryption = encryptionRef.current;
+        if (!encryption) throw new Error('Encrypted call not bound');
+        encryption.suspendForReconnect();
+      },
+      pararPistas: () => {
+        detenerPistas(
+          [...room.localParticipant.trackPublications.values()]
+            .map((publication) => publication.track)
+            .filter((track) => track !== undefined),
+        );
+      },
+      avisar: () => {
+        setState('reconnecting');
+        setSharing(false);
+        setMenuReaccion(false);
+      },
+      cortarTransporte: async () => {
+        await room.disconnect();
+        if (cancelled || ended) throw new Error('Call ended while resuming');
+      },
+      reanudar: async () => {
+        const encryption = encryptionRef.current;
+        if (!encryption) throw new Error('Encrypted call not bound');
+        await encryption.refresh(true);
+        // Si se juntó con un refresco que ya estaba en marcha, el acuse puede quedar
+        // pendiente: se pide ya, en vez de esperar al siguiente refresco programado.
+        if (!encryption.ready && !cancelled && !ended) await encryption.refresh();
+      },
+      fallar: () => {
+        setRejoinRequired(true);
+        failEncryptedCall();
+      },
+    });
+
     worker.addEventListener('error', failEncryptedCall);
     worker.addEventListener('messageerror', failEncryptedCall);
     room
@@ -618,7 +664,7 @@ function EncryptedVideoRoom({
       .on(RoomEvent.EncryptionError, failEncryptedCall)
       .on(RoomEvent.DataReceived, onData)
       .on(RoomEvent.Reconnected, () => {
-        if (reconnectingRef.current) return;
+        if (reconnectingRef.current || reanudacion.reanudando) return;
         void encryptionRef.current
           ?.refresh()
           .then(() => {
@@ -627,34 +673,32 @@ function EncryptedVideoRoom({
           .catch(failEncryptedCall);
       })
       .on(RoomEvent.Disconnected, () => {
-        if (cancelled || ended || saliendoAdrede.current || reconnectingRef.current) return;
+        if (
+          cancelled ||
+          ended ||
+          saliendoAdrede.current ||
+          reconnectingRef.current ||
+          reanudacion.reanudando
+        )
+          return;
         if (everConnected.current && encryptionRef.current) {
           setState('reconnecting');
           void encryptionRef.current.refresh(true).catch(failEncryptedCall);
         } else setState('failed');
       });
 
-    registerReconnectBarrier((event, listener) => room.on(event, listener), stopAutomaticReconnect);
-
-    function stopAutomaticReconnect(): void {
-      if (cancelled || ended || reconnectingRef.current) return;
-      const encryption = encryptionRef.current;
-      if (!encryption) {
-        failEncryptedCall();
-        return;
-      }
-      const tracks = [...room.localParticipant.trackPublications.values()]
-        .map((publication) => publication.track)
-        .filter((track) => track !== undefined);
-      setRejoinRequired(true);
-      // LiveKit can restart tracks during automatic reconnect before teardown
-      // settles. Stop them and end the call; rejoining creates a fresh worker.
-      endAutomaticReconnect(tracks, () => encryption.suspendForReconnect(), failEncryptedCall);
-    }
+    registerReconnectBarrier(
+      (event, listener) => room.on(event, listener),
+      () => {
+        if (cancelled || ended || reconnectingRef.current) return;
+        void reanudacion.alReconectarSolo();
+      },
+    );
 
     function failEncryptedCall(): void {
       if (cancelled || ended) return;
       ended = true;
+      reanudacion.parar();
       finishFailedCall(
         () => {
           const encryption = encryptionRef.current;
@@ -792,6 +836,7 @@ function EncryptedVideoRoom({
     })();
     return () => {
       cancelled = true;
+      reanudacion.parar();
       encryptionRef.current?.close();
       encryptionRef.current = null;
       void room.disconnect();
@@ -895,7 +940,7 @@ function EncryptedVideoRoom({
   }
 
   useEffect(() => {
-    if (!canModerate || !bloqueada) {
+    if (!canModerate || !(bloqueada || waitingRoom)) {
       setCola([]);
       return;
     }
@@ -911,7 +956,7 @@ function EncryptedVideoRoom({
       vivo = false;
       window.clearInterval(id);
     };
-  }, [canModerate, bloqueada, roomId]);
+  }, [canModerate, bloqueada, waitingRoom, roomId]);
 
   /** Abre la puerta a quien llama, o lo retira de la cola. */
   async function responderPuerta(identity: string, admitir: boolean): Promise<void> {

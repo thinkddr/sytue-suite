@@ -2748,9 +2748,9 @@ export const sl: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Podpis ne gre na to stran. Izberite drugo stran ali položaj.',
   'pdf.device.view': 'Ogled',
   'pdf.vault.help':
-    'Ta PDF je v vašem šifriranem Drivu: dešifrira se samo v tej napravi, kjer ga lahko pregledate, označite, izpolnite, uredite in podpišete. Kar shranite, se vrne šifrirano.',
+    'Ta PDF je v vašem šifriranem Drivu: dešifrira se samo v tej napravi, kjer ga lahko pregledate, označite, izpolnite, uredite, zaščitite, počrnite, spremenite, primerjate, natisnete in podpišete. Kar shranite, se vrne šifrirano.',
   'pdf.vault.serverOnly':
-    'S šifriranim Drivom še niso na voljo zahteve za podpis, zaščita z geslom, prepoznavanje besedila, zakrivanje, urejanje besedila ali slik, žigi in vodni žigi, primerjava, zgodovina različic in tiskanje: zahtevajo, da storitev prebere PDF, ali se v napravi še ne izvajajo.',
+    'Z vašim šifriranim Drivom zahteve za podpis, prepoznavanje besedila in pomočnik niso na voljo: zahtevajo, da storitev prebere PDF. Vse drugo se opravi v tej napravi.',
   'pdf.vault.notFound.title': 'Tega PDF-ja ni v vašem šifriranem Drivu',
   'pdf.vault.notFound.description':
     'Morda je bil premaknjen ali izbrisan. Poiščite ga v Sytue Drive.',
@@ -2765,7 +2765,9 @@ export const sl: AppCatalog<typeof en> = {
     'Vaš Drive še prehaja na šifriranje od konca do konca. Dokončajte to v Sytue Drive.',
   'pdf.device.error.password': 'To geslo ne odpre potrdila.',
   'pdf.device.error.encrypted':
-    'Ta PDF je zaščiten z geslom in ga na tej napravi ni mogoče podpisati.',
+    'Ta PDF je zaščiten z geslom: odprite ga in ga podpišite iz njegovega studia, kjer se uporabi njegovo geslo.',
+  'pdf.device.protectedNote':
+    'Ta PDF je zaščiten z geslom. Da ga je mogoče podpisati, se v tej napravi znova zapiše brez gesla, kot to stori strežnik: podpisana kopija se shrani šifrirana v vaš Drive, vendar brez gesla PDF-ja.',
   'pdf.device.error.locked':
     'Ta PDF je potrjen proti vsaki spremembi: nov podpis bi ga razveljavil.',
   'pdf.device.error.unreadable':

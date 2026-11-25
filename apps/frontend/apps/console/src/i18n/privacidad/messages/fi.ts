@@ -1,0 +1,97 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * El registro de solicitudes RGPD y la supresión física de una cuenta: traducción
+ * del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const fi: AppCatalog<typeof en> = {
+  'privacidad.titulo': 'Tietosuojapyynnöt',
+  'privacidad.descripcion':
+    'Mitä ihmiset pyytävät organisaatioltasi henkilötiedoistaan (GDPR, artiklat 15–21). Kirjaa jokainen pyyntö, vastaa kuukauden kuluessa ja toteuta poisto täällä.',
+  'privacidad.registrar': 'Kirjaa pyyntö',
+  'privacidad.filtro': 'Näytä',
+  'privacidad.filtro.abiertas': 'Avoimet',
+  'privacidad.filtro.vencidas': 'Myöhässä',
+  'privacidad.filtro.todas': 'Kaikki',
+  'privacidad.resumen.abiertas': 'Avoimet pyynnöt',
+  'privacidad.resumen.vencidas': 'Määräaika ylittynyt',
+  'privacidad.vacia': 'Ei näytettäviä pyyntöjä.',
+  'privacidad.errorCarga': 'Rekisteriä ei voitu ladata.',
+  'privacidad.col.persona': 'Henkilö',
+  'privacidad.col.tipo': 'Pyyntö',
+  'privacidad.col.recibida': 'Vastaanotettu',
+  'privacidad.col.plazo': 'Määräaika',
+  'privacidad.col.estado': 'Tila',
+  'privacidad.tipo.access': 'Pääsy omiin tietoihin',
+  'privacidad.tipo.rectification': 'Oikaisu',
+  'privacidad.tipo.erasure': 'Poisto',
+  'privacidad.tipo.restriction': 'Käsittelyn rajoittaminen',
+  'privacidad.tipo.portability': 'Siirrettävyys',
+  'privacidad.tipo.objection': 'Vastustaminen',
+  'privacidad.canal.email': 'Sähköposti',
+  'privacidad.canal.web': 'Verkkolomake',
+  'privacidad.canal.letter': 'Kirje',
+  'privacidad.canal.phone': 'Puhelin',
+  'privacidad.canal.in_person': 'Henkilökohtaisesti',
+  'privacidad.canal.other': 'Muu',
+  'privacidad.estado.received': 'Vastaanotettu',
+  'privacidad.estado.in_progress': 'Käsittelyssä',
+  'privacidad.estado.completed': 'Vastattu',
+  'privacidad.estado.rejected': 'Hylätty',
+  'privacidad.plazo.vencida': 'Myöhässä',
+  'privacidad.plazo.pronto': 'Erääntyy pian',
+  'privacidad.plazo.prorrogada': 'Pidennetty',
+  'privacidad.alta.quien': 'Kuka pyytää',
+  'privacidad.alta.miembro': 'Joku organisaatiosta',
+  'privacidad.alta.fuera': 'Joku ulkopuolinen',
+  'privacidad.alta.elegirMiembro': 'Valitse henkilö',
+  'privacidad.alta.correo': 'Hänen sähköpostiosoitteensa',
+  'privacidad.alta.nombre': 'Hänen nimensä (valinnainen)',
+  'privacidad.alta.tipo': 'Mitä pyydetään',
+  'privacidad.alta.canal': 'Miten se saapui',
+  'privacidad.alta.recibida': 'Saapumispäivä',
+  'privacidad.alta.recibidaAyuda':
+    'Kuukauden määräaika lasketaan tästä päivämäärästä eikä kuluvasta päivästä.',
+  'privacidad.alta.identidad': 'Henkilöllisyys tarkistettu',
+  'privacidad.alta.metodo': 'Miten se tarkistettiin',
+  'privacidad.alta.notas': 'Muistiinpanot',
+  'privacidad.alta.error.subject': 'Kerro, kuka pyynnön tekee.',
+  'privacidad.alta.error.email': 'Anna kelvollinen sähköpostiosoite.',
+  'privacidad.alta.error.date':
+    'Päivämäärän on oltava viimeisen vuoden ajalta eikä tulevaisuudessa.',
+  'privacidad.alta.error.upstream': 'Pyyntöä ei voitu kirjata.',
+  'privacidad.alta.hecha': 'Pyyntö kirjattu.',
+  'privacidad.detalle.plazo': 'Vastaa viimeistään {fecha}',
+  'privacidad.detalle.resolucion': 'Henkilölle annettu vastaus',
+  'privacidad.detalle.resolucionAyuda': 'Pakollinen pyynnön sulkemiseksi: se kerrotaan henkilölle.',
+  'privacidad.detalle.guardar': 'Tallenna',
+  'privacidad.detalle.guardado': 'Pyyntö päivitetty.',
+  'privacidad.detalle.cerrada': 'Tämä pyyntö on suljettu, eikä sitä voi enää muuttaa.',
+  'privacidad.detalle.prorroga': 'Pidennä kahdella kuukaudella',
+  'privacidad.detalle.prorrogaAyuda':
+    'Vain kerran ja ennen määräajan päättymistä. Henkilölle on kerrottava syy: kirjoita se tähän.',
+  'privacidad.detalle.prorrogar': 'Pidennä',
+  'privacidad.detalle.historia': 'Historia',
+  'privacidad.evento.created': 'Kirjattu',
+  'privacidad.evento.updated': 'Päivitetty',
+  'privacidad.evento.extended': 'Määräaikaa pidennetty',
+  'privacidad.evento.erasureStarted': 'Poisto aloitettu',
+  'privacidad.evento.erasureCompleted': 'Poisto valmis',
+  'privacidad.supresion.titulo': 'Poista tili',
+  'privacidad.supresion.explica':
+    'Tili suljetaan heti eikä sitä voi palauttaa, ja sen kirjautumistavat poistetaan. Muutamassa minuutissa profiili anonymisoidaan ja poistetaan se, mitä muut palvelut säilyttävät henkilöstä. Se, mitä henkilö loi organisaatiolle (postilaatikko, tiedostot, tapahtumat), jää organisaatiolle.',
+  'privacidad.supresion.confirmar': 'Vahvista kirjoittamalla {correo}',
+  'privacidad.supresion.iniciada': 'Poisto aloitettu. Se valmistuu muutamassa minuutissa.',
+  'privacidad.supresion.enCurso': 'Poisto on käynnissä.',
+  'privacidad.supresion.hecha': 'Tili on poistettu.',
+  'privacidad.supresion.sinCuenta':
+    'Henkilöllä ei ole tiliä organisaatiossa: täällä ei ole poistettavaa tiliä.',
+  'privacidad.supresion.noMiembro': 'Henkilö ei ole enää organisaation jäsen.',
+  'privacidad.supresion.error': 'Tiliä ei voitu poistaa.',
+  'privacidad.error.upstream': 'Muutosta ei voitu tallentaa.',
+  'privacidad.cancelar': 'Peruuta',
+};

@@ -79,10 +79,16 @@ config:
     region: fr-par
     bucket: sytue-paas-build-cache
     useSSL: true
+  # Scaleway IAM: acuña por tenant la credencial del registry ACOTADA a su caché de
+  # builds (internal/buildcache). Con SCW_ORG_ID y el `scw-secret-key` del Secret; sin
+  # ellos, la caché sigue en línea (fail-closed: nunca una credencial más ancha).
+  scw:
+    orgId: ""
 
 # Secret (existingSecret) sytue-cloud-builder. OBLIGATORIAS (config.Load l.Require):
 # database-url, secret-enc-key, s3-access-key, s3-secret-key. OPCIONALES (secretKeyRef
-# optional:true): registry-username, registry-password, github-app-id, github-app-private-key.
+# optional:true): registry-username, registry-password, github-app-id, github-app-private-key,
+# scw-secret-key (token de plataforma con derecho IAM, para la caché de builds por tenant).
 existingSecret: sytue-cloud-builder
 
 rbac:

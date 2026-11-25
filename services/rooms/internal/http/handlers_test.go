@@ -28,6 +28,7 @@ import (
 type fakeService struct {
 	// anfitrion es la organización que devuelve Anfitrion (vacía = la del token).
 	anfitrion  string
+	politica   domain.PoliticaContactoExterno
 	persona    service.Persona
 	personaErr error
 
@@ -207,6 +208,18 @@ func (f *fakeService) RechazarInvitacion(context.Context, string, uuid.UUID) err
 
 func (f *fakeService) ListExternalChannels(context.Context, string) ([]domain.Channel, []domain.ReadState, error) {
 	return f.channels, f.states, f.channelErr
+}
+
+func (f *fakeService) PoliticaContactoExterno(context.Context) (domain.PoliticaContactoExterno, error) {
+	return f.politica, nil
+}
+
+func (f *fakeService) GuardarPoliticaContactoExterno(ctx context.Context, p domain.PoliticaContactoExterno, _ string) (domain.PoliticaContactoExterno, error) {
+	limpia, err := service.PoliticaContactoValida(p, "acme")
+	if err == nil {
+		f.politica = limpia
+	}
+	return limpia, err
 }
 
 func (f *fakeService) Anfitrion(context.Context, string, service.RefAnfitrion) (string, error) {

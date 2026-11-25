@@ -1,0 +1,97 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * El registro de solicitudes RGPD de la organización y la supresión física de una
+ * cuenta (ADR 0054, enmienda del 2026-11-25), en INGLÉS: la fuente de verdad. Los
+ * otros 25 derivan su tipo de aquí, así que una clave nueva rompe su compilación
+ * hasta que se traduzca.
+ */
+import type { MessageEntry } from '@sytue/i18n';
+
+export const en = {
+  'privacidad.titulo': 'Privacy requests',
+  'privacidad.descripcion':
+    'What people ask your organisation to do with their personal data (GDPR, articles 15 to 21). Register each request, answer within one month and, for an erasure, carry it out here.',
+  'privacidad.registrar': 'Register a request',
+  'privacidad.filtro': 'Show',
+  'privacidad.filtro.abiertas': 'Open',
+  'privacidad.filtro.vencidas': 'Overdue',
+  'privacidad.filtro.todas': 'All',
+  'privacidad.resumen.abiertas': 'Open requests',
+  'privacidad.resumen.vencidas': 'Past their deadline',
+  'privacidad.vacia': 'No requests to show.',
+  'privacidad.errorCarga': 'The register could not be loaded.',
+  'privacidad.col.persona': 'Person',
+  'privacidad.col.tipo': 'Request',
+  'privacidad.col.recibida': 'Received',
+  'privacidad.col.plazo': 'Deadline',
+  'privacidad.col.estado': 'Status',
+  'privacidad.tipo.access': 'Access to their data',
+  'privacidad.tipo.rectification': 'Rectification',
+  'privacidad.tipo.erasure': 'Erasure',
+  'privacidad.tipo.restriction': 'Restriction of processing',
+  'privacidad.tipo.portability': 'Data portability',
+  'privacidad.tipo.objection': 'Objection',
+  'privacidad.canal.email': 'Email',
+  'privacidad.canal.web': 'Web form',
+  'privacidad.canal.letter': 'Letter',
+  'privacidad.canal.phone': 'Phone',
+  'privacidad.canal.in_person': 'In person',
+  'privacidad.canal.other': 'Other',
+  'privacidad.estado.received': 'Received',
+  'privacidad.estado.in_progress': 'In progress',
+  'privacidad.estado.completed': 'Answered',
+  'privacidad.estado.rejected': 'Refused',
+  'privacidad.plazo.vencida': 'Overdue',
+  'privacidad.plazo.pronto': 'Due soon',
+  'privacidad.plazo.prorrogada': 'Extended',
+  'privacidad.alta.quien': 'Who is asking',
+  'privacidad.alta.miembro': 'Someone in the organisation',
+  'privacidad.alta.fuera': 'Someone outside it',
+  'privacidad.alta.elegirMiembro': 'Choose the person',
+  'privacidad.alta.correo': 'Their email address',
+  'privacidad.alta.nombre': 'Their name (optional)',
+  'privacidad.alta.tipo': 'What they ask for',
+  'privacidad.alta.canal': 'How it arrived',
+  'privacidad.alta.recibida': 'Date it arrived',
+  'privacidad.alta.recibidaAyuda': 'The one-month deadline counts from this date, not from today.',
+  'privacidad.alta.identidad': 'Identity checked',
+  'privacidad.alta.metodo': 'How it was checked',
+  'privacidad.alta.notas': 'Notes',
+  'privacidad.alta.error.subject': 'Say who is making the request.',
+  'privacidad.alta.error.email': 'Enter a valid email address.',
+  'privacidad.alta.error.date': 'The date must be within the last year and not in the future.',
+  'privacidad.alta.error.upstream': 'The request could not be registered.',
+  'privacidad.alta.hecha': 'Request registered.',
+  'privacidad.detalle.plazo': 'Answer by {fecha}',
+  'privacidad.detalle.resolucion': 'Answer given to the person',
+  'privacidad.detalle.resolucionAyuda':
+    'Required to close the request: it is what the person is told.',
+  'privacidad.detalle.guardar': 'Save',
+  'privacidad.detalle.guardado': 'Request updated.',
+  'privacidad.detalle.cerrada': 'This request is closed and can no longer change.',
+  'privacidad.detalle.prorroga': 'Extend by two months',
+  'privacidad.detalle.prorrogaAyuda':
+    'Once, before the deadline. The person has to be told why: write it here.',
+  'privacidad.detalle.prorrogar': 'Extend',
+  'privacidad.detalle.historia': 'History',
+  'privacidad.evento.created': 'Registered',
+  'privacidad.evento.updated': 'Updated',
+  'privacidad.evento.extended': 'Deadline extended',
+  'privacidad.evento.erasureStarted': 'Erasure started',
+  'privacidad.evento.erasureCompleted': 'Erasure completed',
+  'privacidad.supresion.titulo': 'Erase the account',
+  'privacidad.supresion.explica':
+    'The account is closed at once with no way back and its sign-in methods are deleted. Within minutes its profile is anonymised and what other services keep about the person is deleted. What the person created for the organisation (mailbox, files, events) stays with the organisation.',
+  'privacidad.supresion.confirmar': 'Type {correo} to confirm',
+  'privacidad.supresion.iniciada': 'Erasure started. It completes within minutes.',
+  'privacidad.supresion.enCurso': 'The erasure is running.',
+  'privacidad.supresion.hecha': 'The account has been erased.',
+  'privacidad.supresion.sinCuenta':
+    'The person has no account in the organisation: there is no account to erase here.',
+  'privacidad.supresion.noMiembro': 'The person is no longer a member of the organisation.',
+  'privacidad.supresion.error': 'The account could not be erased.',
+  'privacidad.error.upstream': 'The change could not be saved.',
+  'privacidad.cancelar': 'Cancel',
+} satisfies Record<string, MessageEntry>;

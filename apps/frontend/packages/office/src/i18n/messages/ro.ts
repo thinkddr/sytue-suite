@@ -2754,9 +2754,9 @@ export const ro: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Semnătura nu încape pe acea pagină. Alegeți altă pagină sau poziție.',
   'pdf.device.view': 'Vizualizați',
   'pdf.vault.help':
-    'Acest PDF este în Drive-ul tău criptat: este decriptat doar pe acest dispozitiv, unde îl poți vedea, adnota, completa, organiza și semna. Ce salvezi se întoarce criptat.',
+    'Acest PDF este în Drive-ul tău criptat: este decriptat doar pe acest dispozitiv, unde îl poți vedea, adnota, completa, organiza, proteja, cenzura, edita, compara, tipări și semna. Ce salvezi se întoarce criptat.',
   'pdf.vault.serverOnly':
-    'Cu Drive-ul criptat nu sunt încă disponibile cererile de semnătură, protecția cu parolă, recunoașterea textului, înnegrirea, editarea textului sau a imaginilor, ștampilele și filigranele, compararea, istoricul versiunilor și imprimarea: necesită ca serviciul să citească PDF-ul sau nu se fac încă pe dispozitiv.',
+    'Cu Drive-ul tău criptat nu sunt disponibile cererile de semnătură, recunoașterea textului și asistentul: necesită ca serviciul să citească PDF-ul. Restul se face pe acest dispozitiv.',
   'pdf.vault.notFound.title': 'Acest PDF nu se află în Drive-ul dvs. criptat',
   'pdf.vault.notFound.description': 'Poate a fost mutat sau șters. Căutați-l în Sytue Drive.',
   'pdf.vault.openSigned': 'Deschideți copia semnată',
@@ -2771,7 +2771,9 @@ export const ro: AppCatalog<typeof en> = {
     'Drive-ul tău încă trece la criptarea integrală. Finalizează din Sytue Drive.',
   'pdf.device.error.password': 'Această parolă nu deschide certificatul.',
   'pdf.device.error.encrypted':
-    'Acest PDF este protejat cu parolă și nu poate fi semnat pe acest dispozitiv.',
+    'Acest PDF este protejat cu parolă: deschide-l și semnează-l din studioul lui, unde se folosește parola sa.',
+  'pdf.device.protectedNote':
+    'Acest PDF este protejat cu parolă. Pentru a-l semna, este rescris fără ea pe acest dispozitiv, cum face și serverul: copia semnată se salvează criptată în Drive-ul tău, dar fără parola PDF-ului.',
   'pdf.device.error.locked':
     'Acest PDF este certificat împotriva oricărei modificări: o altă semnătură l-ar invalida.',
   'pdf.device.error.unreadable':

@@ -255,6 +255,37 @@ export const fr: AppCatalog<typeof en> = {
     'Cette adresse ne convient pas : elle doit être valide et extérieure à Sytue.',
   'recovery.wrong_password': 'Le mot de passe n’est pas correct.',
   'recovery.failed': 'Impossible d’enregistrer. Réessayez dans un instant.',
+  'recovery.password.hint':
+    'Votre mot de passe actuel est nécessaire pour toute modification de cette carte.',
+  'recovery.username.new': 'Nouveau nom d’utilisateur',
+  'recovery.username.hint':
+    'Celui que vous quittez vous reste réservé 30 jours, et vous pouvez le changer une fois tous les 30 jours.',
+  'recovery.username.change': 'Changer de nom d’utilisateur',
+  'recovery.username.changed': 'Nom d’utilisateur modifié.',
+  'recovery.username.invalid':
+    'Ce nom d’utilisateur n’est pas valide : utilisez de 3 à 64 lettres, chiffres, points ou tirets.',
+  'recovery.username.taken': 'Ce nom d’utilisateur n’est pas disponible.',
+  'recovery.username.recent': 'Vous avez changé votre nom d’utilisateur il y a moins de 30 jours.',
+  'recovery.username.is_address':
+    'Dans un compte personnel, votre nom d’utilisateur est votre adresse Sytue : il ne se change pas ici.',
+  'recovery.phone.none':
+    'Pas encore de numéro de mobile : ajoutez-en un pour vous connecter aussi avec.',
+  'recovery.phone.new': 'Nouveau numéro de mobile',
+  'recovery.phone.format': 'Avec l’indicatif du pays, par exemple +33 6 00 00 00 00.',
+  'recovery.phone.send': 'Envoyer le code',
+  'recovery.phone.sent': 'Nous avons envoyé un code par SMS au {phone}.',
+  'recovery.phone.code': 'Code',
+  'recovery.phone.confirm': 'Confirmer',
+  'recovery.phone.changed': 'Numéro de mobile enregistré.',
+  'recovery.phone.invalid': 'Ce numéro n’est pas valide : écrivez-le avec l’indicatif du pays.',
+  'recovery.phone.same': 'C’est déjà votre numéro de mobile.',
+  'recovery.phone.wait': 'Attendez une minute avant de demander un autre code.',
+  'recovery.phone.limit': 'Trop de codes demandés. Réessayez plus tard.',
+  'recovery.phone.code_wrong': 'Le code n’est pas correct.',
+  'recovery.phone.code_expired': 'Le code a expiré. Demandez-en un autre.',
+  'recovery.phone.has_account': 'Ce numéro de mobile appartient déjà à un autre compte.',
+  'recovery.phone.unavailable':
+    'Les SMS ne sont pas disponibles pour le moment. Réessayez plus tard.',
   'delete.title': 'Supprimer mon compte',
   'delete.hint':
     'Vos identifiants et tout ce qui n’appartient qu’à vous sont supprimés ; ce qui appartient à votre organisation y reste. Le compte peut être récupéré pendant 30 jours.',

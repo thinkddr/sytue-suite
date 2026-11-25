@@ -16,15 +16,20 @@ enum SytueWidgetActions {
     // tabla en generar.py, android-widgets.py y WidgetSnapshot.accionPermitida (Java).
     static let allowed: [String: Set<String>] = [
         "mail": ["compose"], "calendar": ["create"], "contacts": ["create"], "notes": ["create"],
-        "photos": ["upload"],
+        "photos": ["upload"], "docs": ["create"], "sheets": ["create"], "slides": ["create"],
     ]
 
     // El rótulo traducido de una acción en su producto: «create» es «Crear evento» en
-    // Calendar, «Nuevo contacto» en Contacts y «Nueva nota» en Notes.
+    // Calendar, «Nuevo contacto» en Contacts, «Nueva nota» en Notes y «Nuevo documento»,
+    // «Nueva hoja de cálculo» y «Nueva presentación» en Docus, Calcus y Diapos, que
+    // preguntan antes de crear.
     static func label(for action: String, product: String = "calendar") -> String {
         switch (action, product) {
         case ("create", "contacts"): return "widgets.newContact"
         case ("create", "notes"): return "widgets.newNote"
+        case ("create", "docs"): return "widgets.newDocument"
+        case ("create", "sheets"): return "widgets.newSpreadsheet"
+        case ("create", "slides"): return "widgets.newPresentation"
         case ("upload", _): return "widgets.addPhotos"
         default: return "widgets." + action
         }
@@ -35,6 +40,9 @@ enum SytueWidgetActions {
         case ("compose", _): return "square.and.pencil"
         case ("create", "contacts"): return "person.crop.circle.badge.plus"
         case ("create", "notes"): return "note.text.badge.plus"
+        case ("create", "docs"): return "doc.badge.plus"
+        case ("create", "sheets"): return "tablecells.badge.ellipsis"
+        case ("create", "slides"): return "rectangle.stack.badge.plus"
         case ("create", _): return "calendar.badge.plus"
         case ("upload", _): return "photo.on.rectangle.angled"
         default: return "arrow.up.right"
@@ -147,6 +155,9 @@ struct SytueWidgetSnapshot: Decodable {
     let counters: [SytueWidgetCounter]
     let items: [SytueWidgetItem]?
     let calendar: SytueWidgetCalendar?
+    // `app_only`: lo publicado salió del repositorio privado, que solo se relee con la app
+    // abierta (Snapshot.SoloConLaApp en Go). Ya rancio, el widget lo dice (asksToOpen).
+    let app_only: Bool?
 
     var visualItems: [SytueWidgetItem] { items ?? [] }
 
@@ -259,6 +270,10 @@ struct SytueWidgetSnapshot: Decodable {
 
     // Snapshot.Rancio: a partir de aquí el widget dice «Actualizado hace X».
     func isStale(now: Int64) -> Bool { now - updated_at >= Self.fresco }
+
+    // Snapshot.PideAbrir: un dato ya rancio del repositorio privado, que ni el refresco de
+    // iOS puede releer sin la clave; el widget añade «Se actualiza con la app abierta».
+    func asksToOpen(now: Int64) -> Bool { app_only == true && isStale(now: now) }
 
     var updatedDate: Date { Date(timeIntervalSince1970: TimeInterval(updated_at)) }
 }
@@ -399,7 +414,7 @@ enum SytueWidgetSnapshots {
     private static let requiredFields: Set<String> = [
         "version", "product", "generation", "updated_at", "expires_at", "active", "counters",
     ]
-    private static let allowedFields: Set<String> = requiredFields.union(["items", "calendar"])
+    private static let allowedFields: Set<String> = requiredFields.union(["items", "calendar", "app_only"])
     private static let itemAllowedFields: Set<String> = [
         "title", "subtitle", "badge", "color", "start_at", "end_at", "all_day", "unread", "done", "route",
     ]

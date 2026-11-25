@@ -336,6 +336,7 @@
   "dm.deleteFailed": "Klepeta ni bilo mogoče izbrisati.",
   "dm.empty": "V ekipi še ni drugih oseb.",
   "dm.emptyQuery": "Iskanju ne ustreza nobena oseba.",
+  "dm.externalClosed": "Vaša organizacija ne dovoljuje pogovorov s to osebo.",
   "dm.invite": "Povabi osebe",
   "dm.maxPeople": {
     "one": "Dodate lahko največ {count} osebo.",

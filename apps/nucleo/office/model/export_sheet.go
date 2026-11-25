@@ -61,6 +61,9 @@ type sheetData struct {
 	// notas son los comentarios de sus celdas: los leídos del fichero o los que se exportan
 	// (sheet_notas.go).
 	notas []notaCelda
+	// segXlsx son sus segmentadores tal como salen a Excel, solo al exportar a .xlsx
+	// (export_sheet_segmentadores.go).
+	segXlsx []segmentadorXlsx
 }
 
 type numFmtSpec struct {
@@ -237,11 +240,16 @@ func buildXlsxComentado(s *State, comments []Comment) ([]byte, error) {
 	var cuenta contadorObjetos
 	hojas := make([]string, len(model.Sheets))
 	eng, nombresHoja := motorParaFiltros(model)
+	// Las dinámicas que salen, con su caché, y los segmentadores que las citan a ellas o a
+	// una tabla (export_sheet_segmentadores.go).
+	pivotes := planDePivotes(model)
+	segmentadores := planSegmentadores(model, pivotes)
 	for i, sd := range model.Sheets {
 		sd.sanearEsquema()
 		if notas != nil {
 			sd.notas = notas[i]
 		}
+		sd.segXlsx = segmentadores[i]
 		n := i + 1
 		part := "xl/worksheets/sheet" + strconv.Itoa(n) + ".xml"
 		name := sd.Name
@@ -318,7 +326,8 @@ func buildXlsxComentado(s *State, comments []Comment) ([]byte, error) {
 		overrides.String() +
 		`</Types>`
 
-	addXlsxPivots(files, model)
+	addXlsxPivots(files, pivotes, camposSegmentados(segmentadores))
+	cachesSegmentadoresXlsx(files, segmentadores)
 	return zipPackage(files)
 }
 

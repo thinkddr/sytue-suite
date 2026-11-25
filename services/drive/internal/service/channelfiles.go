@@ -22,6 +22,10 @@
 //     fichero inexistente ⇒ ErrNotFound (404), nunca 403.
 //   - Fail-closed: si Sytue Rooms no responde (o no hay secreto interno configurado),
 //     NO se sirve el adjunto.
+//   - La conversación con gente de OTRA organización (ADR 0040) vive en la de quien
+//     la abrió, y sus adjuntos también: Rooms dice cuál es (ChannelTenant) y la
+//     subida y la lectura se hacen allí, con su cuota y su almacenamiento. Quien
+//     viene de fuera trae un token de la suya, que aquí solo sirve para preguntar.
 //
 // Los dos tipos de adjunto NO son iguales, y se tratan distinto a propósito:
 //
@@ -50,12 +54,39 @@ import (
 	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
-// ChannelAuthorizer resuelve si un sujeto puede LEER un canal de Sytue Rooms. La
-// implementación real es *ChatClient (chat.go), que pregunta a services/rooms con el
-// secreto interno compartido. nil = puede; domain.ErrNotFound = no puede o el canal
-// no existe (sin distinguir: no se filtra la existencia).
+// ChannelAuthorizer resuelve si un sujeto puede LEER un canal de Sytue Rooms y en qué
+// organización vive. La implementación real es *ChatClient (chat.go), que pregunta a
+// services/rooms con el secreto interno compartido. Sin error = puede, y el canal vive
+// en la organización devuelta (la del contexto, o la anfitriona de una conversación con
+// gente de fuera); domain.ErrNotFound = no puede o el canal no existe (sin distinguir:
+// no se filtra la existencia).
 type ChannelAuthorizer interface {
-	CanAccessChannel(ctx context.Context, channelID uuid.UUID, subject string) error
+	ChannelTenant(ctx context.Context, channelID uuid.UUID, subject string) (tenancy.Tenant, error)
+}
+
+// enOrganizacionDelCanal aplica la verja y devuelve el contexto en la organización
+// donde vive el canal: el mismo si es la del token y, si no, el de la anfitriona.
+func (s *Service) enOrganizacionDelCanal(ctx context.Context, channelID uuid.UUID, subject string) (context.Context, error) {
+	t, err := s.chat.ChannelTenant(ctx, channelID, subject)
+	if err != nil {
+		return nil, err
+	}
+	if propia, err := tenancy.From(ctx); err == nil && propia.Slug == t.Slug {
+		return ctx, nil
+	}
+	return tenancy.Into(ctx, t), nil
+}
+
+// conOrganizacionDe devuelve el contexto en la organización donde vive el fichero, que
+// es donde están su blob y su miniatura.
+func conOrganizacionDe(ctx context.Context, f domain.File) context.Context {
+	if f.Tenant == "" {
+		return ctx
+	}
+	if t, err := tenancy.From(ctx); err == nil && t.Slug == f.Tenant {
+		return ctx
+	}
+	return tenancy.Into(ctx, tenancy.Tenant{Slug: f.Tenant})
 }
 
 // ChannelFile aplica la verja y devuelve los metadatos del adjunto (nombre/tipo/
@@ -72,17 +103,19 @@ func (s *Service) ChannelFile(ctx context.Context, channelID, fileID uuid.UUID, 
 	if subject == "" || channelID == uuid.Nil || fileID == uuid.Nil {
 		return domain.File{}, domain.ErrNotFound
 	}
-	if err := s.chat.CanAccessChannel(ctx, channelID, subject); err != nil {
+	cctx, err := s.enOrganizacionDelCanal(ctx, channelID, subject)
+	if err != nil {
 		return domain.File{}, err
 	}
-	f, err := s.team.ChannelFile(ctx, channelID, fileID)
+	f, err := s.team.ChannelFile(cctx, channelID, fileID)
 	if err == nil {
 		return f, nil
 	}
 	if !errors.Is(err, domain.ErrNotFound) {
 		return domain.File{}, err
 	}
-	// Ámbito personal: fichero adjuntado por referencia o adjunto heredado.
+	// Ámbito personal: fichero adjuntado por referencia o adjunto heredado. Es de
+	// quien lo adjuntó y vive en SU organización, así que se busca en la del token.
 	if store.OwnerFrom(ctx) == "" {
 		ctx = store.WithOwner(ctx, subject)
 	}
@@ -95,6 +128,7 @@ func (s *Service) ChannelFileContent(ctx context.Context, channelID, fileID uuid
 	if err != nil {
 		return domain.File{}, nil, err
 	}
+	ctx = conOrganizacionDe(ctx, f)
 	t, _ := tenancy.From(ctx)
 	rc, err := s.blobs.Get(ctx, t, f.StorageKey)
 	if err != nil {
@@ -113,7 +147,7 @@ func (s *Service) ChannelThumbnail(ctx context.Context, channelID, fileID uuid.U
 	if err != nil {
 		return nil, "", "", err
 	}
-	return s.thumbnailOf(ctx, f)
+	return s.thumbnailOf(conOrganizacionDe(ctx, f), f)
 }
 
 // ChannelUploadFile sube un adjunto AL CANAL: exige membresía, guarda el blob en S3
@@ -121,8 +155,7 @@ func (s *Service) ChannelThumbnail(ctx context.Context, channelID, fileID uuid.U
 // modo que nace invisible para el resto de la organización. Es el camino del
 // compositor de Rooms (arrastrar, pegar, «Subir archivo»).
 func (s *Service) ChannelUploadFile(ctx context.Context, channelID uuid.UUID, subject, name, contentType string, body io.Reader) (domain.File, error) {
-	t, err := tenancy.From(ctx)
-	if err != nil {
+	if _, err := tenancy.From(ctx); err != nil {
 		return domain.File{}, err
 	}
 	if !domain.ValidName(name) {
@@ -131,10 +164,13 @@ func (s *Service) ChannelUploadFile(ctx context.Context, channelID uuid.UUID, su
 	if s.chat == nil || subject == "" || channelID == uuid.Nil {
 		return domain.File{}, domain.ErrNotFound
 	}
-	// Verja ANTES de gastar cuota, ancho de banda y un objeto en S3.
-	if err := s.chat.CanAccessChannel(ctx, channelID, subject); err != nil {
+	// Verja ANTES de gastar cuota, ancho de banda y un objeto en S3. Desde aquí todo
+	// —cuota, blob, metadato y evento— es de la organización donde vive el canal.
+	ctx, err := s.enOrganizacionDelCanal(ctx, channelID, subject)
+	if err != nil {
 		return domain.File{}, err
 	}
+	t := tenancy.MustFrom(ctx)
 	if _, err := s.store.EnsureQuota(ctx, s.cfg.DefaultQuotaBytes); err != nil {
 		return domain.File{}, err
 	}
@@ -213,8 +249,15 @@ func (s *Service) CopyChannelFileToMyDrive(ctx context.Context, channelID, fileI
 		ctx = store.WithOwner(ctx, subject)
 	}
 	// Verja de canal: la ÚNICA que autoriza esto.
-	if _, err := s.ChannelFile(ctx, channelID, fileID, subject); err != nil {
+	origen, err := s.ChannelFile(ctx, channelID, fileID, subject)
+	if err != nil {
 		return domain.File{}, err
+	}
+	// El adjunto de una conversación de OTRA organización vive en la anfitriona (ADR
+	// 0040): su blob es de allí y una copia que lo referenciara apuntaría al
+	// almacenamiento de otra organización. Se copian los bytes, como una subida.
+	if propia, _ := tenancy.From(ctx); origen.Tenant != "" && origen.Tenant != propia.Slug {
+		return s.copiarAdjuntoDeFuera(ctx, origen, channelID, subject)
 	}
 	// La cuota se comprueba aunque el blob se comparta: lo que se contabiliza son los
 	// bytes lógicos del usuario, no el almacenamiento físico.
@@ -241,6 +284,53 @@ func (s *Service) CopyChannelFileToMyDrive(ctx context.Context, channelID, fileI
 	}
 	s.publish(ctx, "drive.file.copied", map[string]any{
 		"file_id": f.ID, "source_id": fileID, "name": f.Name, "size": f.SizeBytes,
+		"from_channel": channelID,
+	})
+	return f, nil
+}
+
+// copiarAdjuntoDeFuera guarda en «Mi unidad» de quien llama el adjunto de una
+// conversación que vive en otra organización: lee el blob allí, lo sube aquí y lo
+// registra como cualquier «Guardar en mi Drive» (mismo nombre de copia, misma cuota).
+func (s *Service) copiarAdjuntoDeFuera(ctx context.Context, origen domain.File, channelID uuid.UUID, subject string) (domain.File, error) {
+	if s.team == nil {
+		return domain.File{}, domain.ErrNotFound
+	}
+	octx := conOrganizacionDe(ctx, origen)
+	rc, err := s.blobs.Get(octx, tenancy.MustFrom(octx), origen.StorageKey)
+	if err != nil {
+		if errors.Is(err, objectstore.ErrNotFound) {
+			return domain.File{}, domain.ErrNotFound
+		}
+		return domain.File{}, fmt.Errorf("service: abrir el adjunto de fuera: %w", err)
+	}
+	defer rc.Close()
+	t := tenancy.MustFrom(ctx)
+	if _, err := s.store.EnsureQuota(ctx, s.cfg.DefaultQuotaBytes); err != nil {
+		return domain.File{}, err
+	}
+	root, err := s.store.EnsureRoot(ctx)
+	if err != nil {
+		return domain.File{}, err
+	}
+	key, err := s.claveDeBlob(ctx, t, root.ID, origen.Name)
+	if err != nil {
+		return domain.File{}, err
+	}
+	storageKey, size, checksum, err := s.putBlob(ctx, t, key, origen.Name, origen.ContentType, subject, rc)
+	if err != nil {
+		return domain.File{}, err
+	}
+	storageKey = s.compartirBlob(ctx, t, storageKey, checksum)
+	copia := origen
+	copia.Tenant, copia.StorageKey, copia.SizeBytes, copia.Checksum = t.Slug, storageKey, size, checksum
+	f, err := s.team.GuardarAdjuntoDeFuera(ctx, copia, root.ID, subject)
+	if err != nil {
+		s.soltarBlob(ctx, t, storageKey)
+		return domain.File{}, err
+	}
+	s.publish(ctx, "drive.file.copied", map[string]any{
+		"file_id": f.ID, "source_id": origen.ID, "name": f.Name, "size": f.SizeBytes,
 		"from_channel": channelID,
 	})
 	return f, nil

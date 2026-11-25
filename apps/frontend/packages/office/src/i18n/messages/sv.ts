@@ -2704,9 +2704,9 @@ export const sv: AppCatalog<typeof en> = {
     'Signaturen får inte plats på den sidan. Välj en annan sida eller placering.',
   'pdf.device.view': 'Visa',
   'pdf.vault.help':
-    'Den här PDF-filen finns i din krypterade Drive: den dekrypteras bara på den här enheten, där du kan visa, kommentera, fylla i, ordna och signera den. Det du sparar går tillbaka krypterat.',
+    'Den här PDF-filen finns i din krypterade Drive: den dekrypteras bara på den här enheten, där du kan visa, kommentera, fylla i, ordna, skydda, maskera, redigera, jämföra, skriva ut och signera den. Det du sparar går tillbaka krypterat.',
   'pdf.vault.serverOnly':
-    'Med din krypterade Drive är signaturförfrågningar, lösenordsskydd, textigenkänning, maskering, redigering av text eller bilder, stämplar och vattenmärken, jämförelse, versionshistorik och utskrift inte tillgängliga än: de kräver att tjänsten läser PDF-filen eller görs ännu inte på enheten.',
+    'Med din krypterade Drive är signaturförfrågningar, textigenkänning och assistenten inte tillgängliga: de kräver att tjänsten läser PDF-filen. Allt annat görs på den här enheten.',
   'pdf.vault.notFound.title': 'Den här PDF-filen finns inte i din krypterade Drive',
   'pdf.vault.notFound.description':
     'Den kan ha flyttats eller raderats. Leta efter den i Sytue Drive.',
@@ -2721,7 +2721,9 @@ export const sv: AppCatalog<typeof en> = {
     'Din Drive håller fortfarande på att gå över till end-to-end-kryptering. Slutför det i Sytue Drive.',
   'pdf.device.error.password': 'Det lösenordet öppnar inte certifikatet.',
   'pdf.device.error.encrypted':
-    'Den här pdf-filen är lösenordsskyddad och kan inte signeras på den här enheten.',
+    'Den här pdf-filen är lösenordsskyddad: öppna den och signera den från dess studio, där dess lösenord används.',
+  'pdf.device.protectedNote':
+    'Den här pdf-filen är lösenordsskyddad. För att signera den skrivs den om utan lösenordet på den här enheten, som servern också gör: den signerade kopian sparas krypterad i din Drive, men utan pdf-filens lösenord.',
   'pdf.device.error.locked':
     'Den här pdf-filen är certifierad mot alla ändringar: ytterligare en signatur skulle göra den ogiltig.',
   'pdf.device.error.unreadable':

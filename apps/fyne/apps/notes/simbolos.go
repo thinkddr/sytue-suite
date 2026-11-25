@@ -6,6 +6,7 @@ package notes
 import (
 	"image/color"
 	"slices"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -27,12 +28,9 @@ import (
 // de al lado, también entre apartados), Inicio y Fin, Intro o Espacio eligen y Escape
 // cierra. Con el dedo, cada casilla mide 44.
 //
-// ponytail: sin emoji. El cuerpo de una nota se pinta con Figtree y, para lo que Figtree
-// no trae, con la letra de reserva DEL SISTEMA (la de Noto Color Emoji en Linux y
-// Android; en macOS y Windows sus emoji son sbix y COLR, que el pintor de Fyne no
-// dibuja). La cara de color propia (`tema.Emoji`, 10 MB) solo la usa el selector de Sytue
-// Rooms, no la prosa: un emoji puesto aquí se vería en blanco o como una caja según el
-// equipo, así que no se ofrece.
+// Y sus emoji, el último apartado (emoji.go): se pintan en la cara de color de la suite
+// (`tema.Emoji`, la del selector de Rooms), aquí y en la prosa, porque la letra de
+// reserva del sistema no los dibuja en macOS ni en Windows.
 
 // clavePrefSimbolos es donde la app recuerda los últimos usados, en sus preferencias
 // locales: no sale del equipo.
@@ -90,7 +88,24 @@ func (e *EditorNota) seccionesSimbolos() []seccionSimbolos {
 	for _, c := range CategoriasSimbolos {
 		out = append(out, seccionSimbolos{e.tr.T(c.Clave, nil), c.Simbolos})
 	}
-	return out
+	emoji := make([]string, len(Emoji))
+	for i, x := range Emoji {
+		emoji[i] = x.s
+	}
+	return append(out, seccionSimbolos{e.tr.T("editor.emoji", nil), emoji})
+}
+
+// abrirEmoji abre el selector de símbolos con la primera casilla de los emoji activa:
+// «/» → «Emoji…» y su botón (el `abrirSimbolos('emoji')` de la web).
+func (e *EditorNota) abrirEmoji(disparador fyne.CanvasObject) {
+	e.abrirSimbolos(disparador)
+	if s := e.simbolos; s != nil {
+		k := 0
+		for _, sec := range s.secciones[:len(s.secciones)-1] {
+			k += len(sec.simbolos)
+		}
+		s.mover(k)
+	}
 }
 
 // abrirSimbolos abre el selector colgando de `disparador` (el botón, «Más» o el cursor).
@@ -308,7 +323,11 @@ func (s *selectorSimbolos) CreateRenderer() fyne.WidgetRenderer {
 	for _, sec := range s.secciones {
 		r.titulos = append(r.titulos, ui.Texto(sec.titulo, tema.TextoXS, ui.Medio, tema.Color("text-subtle", v)))
 		for _, x := range sec.simbolos {
-			r.glifos = append(r.glifos, ui.Texto(x, tema.TextoLG, ui.Normal, tema.Color("text", v)))
+			g := ui.Texto(x, tema.TextoLG, ui.Normal, tema.Color("text", v))
+			if letra, _ := utf8.DecodeRuneInString(x); esEmoji(letra) {
+				g.FontSource = caraEmoji() // los emoji, en su cara de color (emoji.go)
+			}
+			r.glifos = append(r.glifos, g)
 		}
 	}
 	s.r = r
@@ -372,6 +391,9 @@ func (r *selectorSimbolosRenderer) Layout(fyne.Size) {
 			r.cajas = append(r.cajas, fyne.NewPos(x, cy))
 			g := r.glifos[k]
 			m := ui.Medir(g.Text, tema.TextoLG, ui.Normal)
+			if g.FontSource == caraEmoji() {
+				m = ui.MedirConCara(g.Text, tema.TextoLG, g.FontSource)
+			}
 			ui.ColocarTexto(g, tema.TextoLG, x+(lado-m.Width)/2, cy+(lado-tema.TextoLG.Linea)/2)
 			k++
 		}

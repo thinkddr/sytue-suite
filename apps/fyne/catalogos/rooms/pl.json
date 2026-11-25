@@ -336,6 +336,7 @@
   "dm.deleteFailed": "Nie udało się usunąć czatu.",
   "dm.empty": "W zespole nie ma jeszcze innych osób.",
   "dm.emptyQuery": "Nikt nie pasuje do wyszukiwania.",
+  "dm.externalClosed": "Twoja organizacja nie pozwala na rozmowy z tą osobą.",
   "dm.invite": "Zaproś osoby",
   "dm.maxPeople": {
     "one": "Możesz dodać maksymalnie {count} osobę.",

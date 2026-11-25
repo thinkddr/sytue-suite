@@ -973,7 +973,7 @@ export const hu: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Helyezze át a leveleit az új széfbe, hogy továbbra is megkapja őket',
   'privateMail.vaultMoveRetiredBody':
-    'Az előző levelezőrendszer már nem érhető el. Amíg nem helyezi át a leveleit a széfbe, nem kap új leveleket: ami addig érkezik, az előző rendszerrel titkosítva marad meg, akárcsak a már meglévő levelei, és nem lehet elolvasni. Nem törlődik, de senki sem tudja megnyitni. Az áthelyezés után a levelek újra megérkeznek, és a többi alkalmazáshoz hasonlóan a Sytue ID-bejelentkezésével nyílnak meg.',
+    'Az előző levelezőrendszer már nem érhető el. Amíg nem helyezi át a leveleit a széfbe, nem kap új leveleket: az addig küldött levelek a feladó szerverén várnak, amely néhány napig újra próbálkozik. Ha időben áthelyezi a leveleit, ezek utána megérkeznek; ha nem, a feladó értesítést kap, hogy nem sikerült kézbesíteni őket. Ami már az előző rendszerrel titkosítva van, akárcsak a már meglévő levelei, nem olvasható el: nem törlődik, de senki sem tudja megnyitni. Az áthelyezés után a levelek újra megérkeznek, és a többi alkalmazáshoz hasonlóan a Sytue ID-bejelentkezésével nyílnak meg.',
   'privateMail.vaultMoveCheckFailed':
     'Nem sikerült ellenőrizni a levelei állapotát. Próbálja újra egy pillanat múlva.',
 };

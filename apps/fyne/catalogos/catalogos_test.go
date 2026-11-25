@@ -268,6 +268,10 @@ var noSonClaves = []string{".json", ".png", ".pdf", ".p12", ".pem", ".svg", ".go
 // guardián pida inventar un texto que nunca se mostraría en pantalla.
 var literalesQueNoSonClaves = map[string]bool{
 	"calendar.recordatorios.anunciados": true,
+	// Los modelos de Odoo que «Importar desde otro programa» pide al servicio
+	// (`apps/erp/importar_desde.go`): son las claves de sus mapeos, no se traducen.
+	"product.product": true,
+	"crm.lead":        true,
 	// El tipo de aviso que Rooms le manda al Hub por un directo (`rooms/avisosdirectos.go`).
 	"rooms.message": true,
 	// El tipo del aviso del Hub que desbloquea en vivo la franja de solo lectura

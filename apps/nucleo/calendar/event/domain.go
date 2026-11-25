@@ -141,6 +141,28 @@ func SanitizeConferenceURL(v string) string {
 	return v
 }
 
+// MaxCommonName es lo más largo que se guarda de un CN: un nombre visible, no un texto.
+const MaxCommonName = 255
+
+// SanitizeCommonName deja un CN (el nombre de ORGANIZER o ATTENDEE) listo para un
+// parámetro de iCalendar: sin controles —saltos de línea incluidos, la vía de inyección
+// en un formato de líneas— ni comillas dobles, que un valor de parámetro no puede
+// llevar (RFC 5545 3.1), sin blancos a los lados y con [MaxCommonName] runas como
+// mucho.
+func SanitizeCommonName(v string) string {
+	v = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f || r == '"' {
+			return -1
+		}
+		return r
+	}, v)
+	v = strings.TrimSpace(v)
+	if r := []rune(v); len(r) > MaxCommonName {
+		v = strings.TrimSpace(string(r[:MaxCommonName]))
+	}
+	return v
+}
+
 func isHexColor(v string) bool {
 	if v == "" || v[0] != '#' || (len(v) != 7 && len(v) != 9) {
 		return false
@@ -210,14 +232,17 @@ type CalendarObject struct {
 // recurso CalDAV asociado (objeto + iCalendar serializado). Es el valor que las
 // capas de transporte (HTTP/CalDAV) y el store intercambian al escribir.
 type Input struct {
-	CalendarID     uuid.UUID
-	UID            string
-	ResourceName   string
-	ICalData       string
-	Summary        string
-	Description    string
-	Location       string
-	Organizer      string
+	CalendarID   uuid.UUID
+	UID          string
+	ResourceName string
+	ICalData     string
+	Summary      string
+	Description  string
+	Location     string
+	Organizer    string
+	// OrganizerName es el CN del ORGANIZER (RFC 5545 3.2.2): el nombre con el que se
+	// presenta quien organiza. Vacío si el iCalendar no lo trae.
+	OrganizerName  string
 	DTStart        time.Time
 	DTEnd          time.Time
 	TZID           string
@@ -243,15 +268,17 @@ type Input struct {
 
 // Event es la proyeccion normalizada de un VEVENT (maestro u override).
 type Event struct {
-	ID             uuid.UUID      `json:"id"`
-	Tenant         string         `json:"-"`
-	CalendarID     uuid.UUID      `json:"calendar_id"`
-	ObjectID       uuid.UUID      `json:"object_id"`
-	UID            string         `json:"uid"`
-	Summary        string         `json:"summary"`
-	Description    string         `json:"description,omitempty"`
-	Location       string         `json:"location,omitempty"`
-	Organizer      string         `json:"organizer,omitempty"`
+	ID          uuid.UUID `json:"id"`
+	Tenant      string    `json:"-"`
+	CalendarID  uuid.UUID `json:"calendar_id"`
+	ObjectID    uuid.UUID `json:"object_id"`
+	UID         string    `json:"uid"`
+	Summary     string    `json:"summary"`
+	Description string    `json:"description,omitempty"`
+	Location    string    `json:"location,omitempty"`
+	Organizer   string    `json:"organizer,omitempty"`
+	// OrganizerName es el CN del ORGANIZER: «Ada Lovelace». Vacío si no lo trae.
+	OrganizerName  string         `json:"organizer_name,omitempty"`
 	DTStart        time.Time      `json:"dtstart"`
 	DTEnd          time.Time      `json:"dtend"`
 	TZID           string         `json:"tzid"`

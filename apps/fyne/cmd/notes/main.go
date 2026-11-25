@@ -186,6 +186,11 @@ func main() {
 			//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
 			Mount: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *notepadsRepository) (cifrado.ApplicationView, error) {
 				organization := repository.PrivateStorageScope().Tenant
+				// El widget lee este repositorio mientras esté montado: el servidor de esta
+				// cuenta está congelado desde que pasó a Matrix (ADR 0078).
+				if facade, err := api.NewNotes(s.URL("notes"), resources.HTTP(), nil).WithPrivateData(repository); err == nil {
+					s.WidgetDesdeRegistrosPrivados(resources.Context(), resources.HTTP(), facade)
+				}
 				p, err := montarNotepads(ctx, repository, tr, l, red, w, func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", organization, ruta) }) //nolint:contextcheck // The presenter retains its own mounted lifetime; future gestures must not inherit the mount request.
 				if err != nil {
 					return cifrado.ApplicationView{}, err
@@ -206,7 +211,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(tr.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(barra.Montar(private.Objeto()))
 		w.SetOnClosed(private.Close)

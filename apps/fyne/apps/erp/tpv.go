@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"image"
 	"image/color"
 	"math"
 	"net/http"
@@ -44,10 +45,12 @@ import (
 // congela (`Incierto`) y «Reintentar» manda EXACTAMENTE el mismo cuerpo, con la misma
 // operación: el servicio la reconoce y devuelve la factura que ya emitió.
 //
-// ponytail: la web conserva el cobro pendiente en el almacén sin conexión para
-// recuperarlo tras recargar la página; aquí vive lo que el proceso (cerrar la app con un
-// cobro incierto lo pierde, y la venta, si se registró, se ve en las facturas). Las
-// imágenes de producto y «Crear presupuesto» son ERP-09.
+// Como la web, el cobro enviado y sin confirmar se guarda ANTES de enviarlo en el almacén
+// sin conexión de la suite, a nombre de la cuenta (emisor, persona y organización):
+// cerrar la app con un cobro incierto ya no lo pierde, y al volver al punto de venta la
+// cesta congelada reaparece con su misma operación (tpv_pendiente.go). Con la cesta se
+// crea también un presupuesto («Crear presupuesto») y cada producto puede llevar su
+// imagen, que se sube desde aquí (tpv_imagenes.go): la pieza ERP-09.
 
 // Medidas del punto de venta.
 const (
@@ -111,8 +114,8 @@ var tiposTPV = []string{"21", "10", "5", "4"}
 
 // LineaTPV es una línea de la cesta: el producto tal como se vio y sus unidades.
 type LineaTPV struct {
-	Producto Registro
-	Cantidad int64
+	Producto Registro `json:"producto"`
+	Cantidad int64    `json:"cantidad"`
 }
 
 // CuotaTPV es el desglose de un tipo de IVA de la cesta, en céntimos.
@@ -152,7 +155,19 @@ type TPV struct {
 	SoloLectura bool
 	// PuedeCrearProducto ofrece «Nuevo producto».
 	PuedeCrearProducto bool
-	Ventana            float32
+	// PuedePresupuesto ofrece «Crear presupuesto» con la cesta.
+	PuedePresupuesto bool
+	// Imagenes son las de los productos que la tienen, ya reducidas; EditarImagenes
+	// enseña en cada producto el botón de subir la suya, que solo se ofrece con
+	// PuedeEditarImagenes. SubiendoImagen es el producto cuya imagen va de camino.
+	Imagenes                            map[string]image.Image
+	EditarImagenes, PuedeEditarImagenes bool
+	SubiendoImagen                      string
+	Ventana                             float32
+
+	// Pendientes es donde se guarda el cobro enviado y sin confirmar; nil, solo en
+	// memoria (como antes).
+	Pendientes AlmacenCobroTPV
 
 	// Buscar es el de SelectorRelacion, para el cliente.
 	Buscar func(ctx context.Context, modelo, q string) ([]Registro, error)
@@ -166,6 +181,8 @@ type TPV struct {
 	AlCatalogo      func()
 	AlNuevoProducto func()
 	AlCambio        func()
+	AlPresupuesto   func(p api.ERPPresupuestoTPV)
+	AlSubirImagen   func(producto string)
 
 	// operacion es el UUID del cobro que se está armando; se rehace al cambiar la cesta.
 	operacion string
@@ -173,6 +190,12 @@ type TPV struct {
 	pendiente *api.ERPCobroTPV
 	// recuperado: el envío en curso es un reintento.
 	recuperado bool
+	// ofertaOperacion es el UUID del presupuesto que se está armando, igual que
+	// operacion para el cobro; restaurado, que ya se miró si había un cobro guardado.
+	ofertaOperacion string
+	restaurado      bool
+	// adjuntosImagen es el adjunto de cada imagen ya bajada: no se vuelve a bajar.
+	adjuntosImagen map[string]string
 
 	buscador, caja, recibido *ui.Entrada
 	cliente                  *SelectorRelacion
@@ -285,7 +308,7 @@ func (t *TPV) Modificar(p Registro, delta int64) {
 	if !t.Editable() {
 		return
 	}
-	t.operacion = ""
+	t.operacion, t.ofertaOperacion = "", ""
 	i := slices.IndexFunc(t.Lineas, func(l LineaTPV) bool { return l.Producto.ID == p.ID })
 	if i < 0 {
 		if delta > 0 {
@@ -354,7 +377,7 @@ func (t *TPV) PonerCliente(id, nombre string) {
 	if !t.Editable() {
 		return
 	}
-	t.Cliente, t.NombreCliente, t.operacion = id, nombre, ""
+	t.Cliente, t.NombreCliente, t.operacion, t.ofertaOperacion = id, nombre, "", ""
 	t.cliente.Valor, t.cliente.Etiqueta = id, nombre
 	t.cliente.Refresh()
 	t.cambio()
@@ -418,6 +441,18 @@ func (t *TPV) Cobrar() {
 		t.cambio()
 		return
 	}
+	// Se guarda ANTES de enviar: si la respuesta se pierde y la app se cierra, al volver
+	// se reintenta la misma operación. Si no se puede guardar, no se envía: otro cobro
+	// distinto sin confirmar (de otra ventana) se recupera en vez de pisarlo.
+	if err := t.guardarPendiente(c); err != nil {
+		t.Fallo = t.t("pos.resume")
+		if !errors.Is(err, ErrOtroCobroTPV) {
+			t.Fallo = t.t("error.generic")
+		}
+		t.Restaurar()
+		t.cambio()
+		return
+	}
 	t.recuperado = t.Incierto
 	t.pendiente, t.Incierto, t.Ocupado, t.Fallo = &c, true, true, ""
 	t.cambio()
@@ -431,13 +466,18 @@ func (t *TPV) Cobrar() {
 func (t *TPV) Cobrado(v api.ERPVentaTPV, err error, mensaje string) {
 	t.Ocupado = false
 	if err == nil {
+		t.quitarPendiente()
 		t.Venta, t.Incierto, t.pendiente, t.Fallo = &v, false, nil, ""
 		return
 	}
 	t.Fallo = mensaje
 	var e *api.Error
 	if !t.recuperado && errors.As(err, &e) && (e.Status == http.StatusBadRequest || e.Status == http.StatusUnprocessableEntity) {
-		t.pendiente, t.Incierto = nil, false
+		// Si no se puede borrar lo guardado, se queda incierto: mejor reintentar la
+		// misma operación que dejar guardado un cobro que la cesta ya no enseña.
+		if t.quitarPendiente() {
+			t.pendiente, t.Incierto = nil, false
+		}
 	}
 }
 
@@ -446,8 +486,13 @@ func (t *TPV) NuevaVenta() {
 	if t.Ocupado {
 		return
 	}
+	if !t.quitarPendiente() {
+		t.Fallo = t.t("error.generic")
+		t.cambio()
+		return
+	}
 	t.Venta, t.pendiente, t.Incierto, t.Fallo = nil, nil, false, ""
-	t.Lineas, t.operacion, t.Recibido = nil, "", ""
+	t.Lineas, t.operacion, t.ofertaOperacion, t.Recibido = nil, "", "", ""
 	t.recibido.PonerTexto("")
 	t.Cliente, t.NombreCliente = "", ""
 	t.cliente.Valor, t.cliente.Etiqueta = "", ""
@@ -533,6 +578,20 @@ func (t *TPV) cabecera(v tema.Variante, ancho float32) (fyne.CanvasObject, float
 	if t.AlCatalogo != nil {
 		b := ui.NuevoBoton(t.t("pos.catalogue"), t.AlCatalogo).Con(ui.Fantasma, ui.TallaMD)
 		b.Icono = iconos.Rejilla
+		ps = append(ps, piezaDe(b, fyne.NewSize(b.MinSize().Width, TactilTPV)))
+	}
+	// «Imágenes» del menú «Catálogo» de la web: enseña en cada producto el botón de
+	// subir su imagen. Encendido, va lleno (el `aria-pressed`).
+	if t.PuedeEditarImagenes && t.AlSubirImagen != nil {
+		variante := ui.Fantasma
+		if t.EditarImagenes {
+			variante = ui.Secundario
+		}
+		b := ui.NuevoBoton(t.t("pos.images"), func() {
+			t.EditarImagenes = !t.EditarImagenes
+			t.cambio()
+		}).Con(variante, ui.TallaMD)
+		b.Icono = iconos.Camara
 		ps = append(ps, piezaDe(b, fyne.NewSize(b.MinSize().Width, TactilTPV)))
 	}
 	if len(ps) == 0 {
@@ -688,6 +747,7 @@ func (t *TPV) rejilla(productos []Registro, ancho float32) (fyne.CanvasObject, f
 			listo := ListoTPV(p)
 			te := NuevaTeselaTPV(p, t.Cantidad(p.ID), func() { t.Modificar(p, 1); t.cambio() })
 			te.Movil = t.movil()
+			te.Imagen = t.Imagenes[p.ID]
 			te.Tono = tonos[max(0, slices.Index(cats, categoriaTPV(p)))%len(tonos)]
 			te.Precio = t.t("pos.configure")
 			if listo {
@@ -698,7 +758,20 @@ func (t *TPV) rejilla(productos []Registro, ancho float32) (fyne.CanvasObject, f
 			alto = max(alto, te.AltoPara(w))
 		}
 		for j, te := range teselas {
-			l.poner(te, float32(j)*(w+gap), y, w, alto)
+			x := float32(j) * (w + gap)
+			l.poner(te, x, y, w, alto)
+			// El botón de la cámara, arriba a la derecha (`.erp-tpv-product-image-action`).
+			if t.EditarImagenes && t.PuedeEditarImagenes && t.AlSubirImagen != nil {
+				id := fila[j].ID
+				nombre := NombreDe(fila[j])
+				b := ui.NuevoBoton("", func() { t.AlSubirImagen(id) }).Con(ui.Secundario, ui.TallaSM)
+				b.Icono, b.SoloIcono = iconos.Camara, true
+				b.Rotulo = t.t("pos.imageUpload", i18n.Vars{"name": nombre})
+				b.Cargando = t.SubiendoImagen == id
+				b.Inerte = t.SubiendoImagen != ""
+				lado := max(b.MinSize().Width, TactilTPV)
+				l.poner(b, x+w-0.75*tema.Rem-lado, y+0.75*tema.Rem, lado, TactilTPV)
+			}
 		}
 		y += alto + gap
 	}
@@ -742,6 +815,13 @@ func (t *TPV) enCurso(v tema.Variante, ancho float32) (fyne.CanvasObject, float3
 	o, h = t.lineas(v, ancho)
 	l.poner(o, 0, y, ancho, h)
 	y += h + 1*tema.Rem
+	// «Crear presupuesto», con la cesta y quien puede crearlos (ERP-09).
+	if t.PuedePresupuesto && t.AlPresupuesto != nil && len(t.Lineas) > 0 {
+		b := ui.NuevoBoton(t.t("pos.quote"), t.CrearPresupuesto).Con(ui.Secundario, ui.TallaMD)
+		b.Inerte = !t.Editable()
+		l.poner(b, 0, y, b.MinSize().Width, TactilTPV)
+		y += TactilTPV + 1*tema.Rem
+	}
 	o, h = t.totales(v, ancho)
 	l.poner(o, 0, y+0.25*tema.Rem, ancho, h)
 	y += 0.25*tema.Rem + h + 1.5*tema.Rem
@@ -1027,7 +1107,18 @@ type TeselaTPV struct {
 	Tono                       ui.TonoTarjeta
 	// Movil es el `padding: 0.875rem` y el `min-height: 9.75rem` del teléfono.
 	Movil bool
+	// Imagen es la del producto, si la tiene (`.erp-tpv-product-with-image`): cubre la
+	// tesela y el nombre y el precio van en una etiqueta opaca abajo.
+	Imagen image.Image
 }
+
+// Medidas de la etiqueta sobre la imagen: el `padding: 0.5rem 0.75rem` y el
+// `margin-inline: -0.5rem; margin-bottom: -0.5rem` de `.erp-tpv-product-info`.
+const (
+	EtiquetaTPVPY     float32 = 0.5 * tema.Rem
+	EtiquetaTPVPX     float32 = 0.75 * tema.Rem
+	EtiquetaTPVMargen float32 = 0.5 * tema.Rem
+)
 
 var _ fyne.Widget = (*TeselaTPV)(nil)
 
@@ -1064,8 +1155,25 @@ func (te *TeselaTPV) minimo() float32 {
 func (te *TeselaTPV) AltoPara(ancho float32) float32 {
 	dentro := max(ancho-2*te.pad(), 0)
 	par := parrafoNombreTPV(te.NombreProd)
+	if te.Imagen != nil {
+		// Con imagen el nombre va en la etiqueta, sin su margen de arriba.
+		alto := 2*te.pad() + tema.TextoXS.Linea + TeselaTPVNombreMY + te.altoEtiqueta(dentro) - EtiquetaTPVMargen
+		return max(alto, te.minimo())
+	}
 	alto := 2*te.pad() + tema.TextoXS.Linea + 2*TeselaTPVNombreMY + ui.AltoParrafo(par, dentro) + te.altoAbajo(dentro)
 	return max(alto, te.minimo())
+}
+
+// anchoEtiqueta es el de dentro de la etiqueta sobre la imagen.
+func anchoEtiqueta(dentro float32) float32 {
+	return max(dentro+2*EtiquetaTPVMargen-2*EtiquetaTPVPX, 0)
+}
+
+// altoEtiqueta es el de la etiqueta: el nombre, su `margin-bottom: 0.5rem` y la fila
+// del precio, con su relleno.
+func (te *TeselaTPV) altoEtiqueta(dentro float32) float32 {
+	w := anchoEtiqueta(dentro)
+	return 2*EtiquetaTPVPY + ui.AltoParrafo(parrafoNombreTPV(te.NombreProd), w) + 0.5*tema.Rem + te.altoAbajo(w)
 }
 
 // altoAbajo es el de la fila del precio y la cuenta: «Configura precio e IVA» se
@@ -1094,7 +1202,7 @@ func (te *TeselaTPV) colores(v tema.Variante) (fondo, borde, tinta, apagada colo
 	}
 	fondo, borde = tema.Color("card-"+tono, v), tema.Color("border-subtle", v)
 	tinta, apagada = tema.Color("text", v), tema.Color("text-muted", v)
-	if te.Cantidad > 0 {
+	if te.Cantidad > 0 && te.Imagen == nil {
 		fondo = tema.Color("card-solid-"+tono, v)
 		tinta = tema.Color("on-card-solid-"+tono, v)
 		apagada = tinta
@@ -1127,6 +1235,17 @@ func (te *TeselaTPV) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.cifra = ui.Texto(cifra, escalonCuentaTPV, ui.SemiNegrita, tema.Color("on-primary", v))
 	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
+	if te.Imagen != nil {
+		// La foto cubre la tesela (`object-fit: cover`); el código y la etiqueta van sobre
+		// una superficie casi opaca para que se lean sobre cualquier foto.
+		r.foto = canvas.NewImageFromImage(te.Imagen)
+		r.foto.FillMode, r.foto.CornerRadius = canvas.ImageFillCover, tema.RadioLG
+		r.fondoCodigo = canvas.NewRectangle(sinColor)
+		r.fondoCodigo.CornerRadius = tema.RadioSM
+		r.fondoEtiqueta = canvas.NewRectangle(sinColor)
+		r.fondoEtiqueta.CornerRadius = tema.RadioSM
+		r.objetos = append(r.objetos, r.foto, r.fondoCodigo, r.fondoEtiqueta)
+	}
 	r.objetos = append(r.objetos, r.codigo, r.nombre, r.precio)
 	r.objetos = append(r.objetos, r.cuenta.Objetos()...)
 	r.objetos = append(r.objetos, r.cifra)
@@ -1140,7 +1259,10 @@ type teselaTPVRenderer struct {
 	caja, cuenta   *ui.Caja
 	codigo, cifra  *canvas.Text
 	nombre, precio *ui.Parrafo
-	objetos        []fyne.CanvasObject
+	// foto y los dos fondos solo con imagen.
+	foto                       *canvas.Image
+	fondoCodigo, fondoEtiqueta *canvas.Rectangle
+	objetos                    []fyne.CanvasObject
 }
 
 func (r *teselaTPVRenderer) MinSize() fyne.Size           { return r.te.MinSize() }
@@ -1152,6 +1274,10 @@ func (r *teselaTPVRenderer) Layout(t fyne.Size) {
 	dentro := max(t.Width-2*pad, 0)
 	r.aro.Colocar(t)
 	r.caja.Redimensionar(t)
+	if r.foto != nil {
+		r.layoutConFoto(t, pad, dentro)
+		return
+	}
 	ui.Truncar(r.codigo, r.te.Codigo, tema.TextoXS, ui.Normal, dentro)
 	ui.ColocarTexto(r.codigo, tema.TextoXS, pad, pad)
 	y := pad + tema.TextoXS.Linea + TeselaTPVNombreMY
@@ -1170,9 +1296,56 @@ func (r *teselaTPVRenderer) Layout(t fyne.Size) {
 	r.precio.Resize(fyne.NewSize(wp, hp))
 }
 
+// layoutConFoto es `.erp-tpv-product-with-image`: la foto de borde a borde, el código
+// arriba sobre su fondo y la etiqueta con el nombre, el precio y la cuenta, pegada abajo.
+func (r *teselaTPVRenderer) layoutConFoto(t fyne.Size, pad, dentro float32) {
+	r.foto.Move(fyne.NewPos(tema.Borde, tema.Borde))
+	r.foto.Resize(fyne.NewSize(max(t.Width-2*tema.Borde, 0), max(t.Height-2*tema.Borde, 0)))
+	ui.Truncar(r.codigo, r.te.Codigo, tema.TextoXS, ui.Normal, dentro)
+	wc := min(ui.Medir(r.codigo.Text, tema.TextoXS, ui.Normal).Width, dentro)
+	r.fondoCodigo.Move(fyne.NewPos(pad-0.25*tema.Rem, pad-0.125*tema.Rem))
+	r.fondoCodigo.Resize(fyne.NewSize(wc+0.5*tema.Rem, tema.TextoXS.Linea+0.25*tema.Rem))
+	ui.ColocarTexto(r.codigo, tema.TextoXS, pad, pad)
+	// La etiqueta: un poco más ancha que el contenido y bajando medio rem del relleno.
+	alto := r.te.altoEtiqueta(dentro)
+	x0, y0 := pad-EtiquetaTPVMargen, t.Height-pad+EtiquetaTPVMargen-alto
+	r.fondoEtiqueta.Move(fyne.NewPos(x0, y0))
+	r.fondoEtiqueta.Resize(fyne.NewSize(dentro+2*EtiquetaTPVMargen, alto))
+	w := anchoEtiqueta(dentro)
+	x, y := x0+EtiquetaTPVPX, y0+EtiquetaTPVPY
+	hn := ui.AltoParrafo(r.nombre, w)
+	r.nombre.Move(fyne.NewPos(x, y))
+	r.nombre.Resize(fyne.NewSize(w, hn))
+	abajo := y0 + alto - EtiquetaTPVPY - LadoCuentaTPV
+	ui.MoverCaja(r.cuenta, fyne.NewPos(x+w-LadoCuentaTPV, abajo), fyne.NewSize(LadoCuentaTPV, LadoCuentaTPV))
+	wci := ui.Medir(r.cifra.Text, escalonCuentaTPV, ui.SemiNegrita).Width
+	ui.ColocarTexto(r.cifra, escalonCuentaTPV, x+w-LadoCuentaTPV+(LadoCuentaTPV-wci)/2, abajo+(LadoCuentaTPV-escalonCuentaTPV.Linea)/2)
+	wp := anchoPrecioTPV(w)
+	hp := ui.AltoParrafo(r.precio, wp)
+	r.precio.Move(fyne.NewPos(x, y0+alto-EtiquetaTPVPY-max(hp, LadoCuentaTPV)+max(LadoCuentaTPV-hp, 0)/2))
+	r.precio.Resize(fyne.NewSize(wp, hp))
+}
+
 func (r *teselaTPVRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	fondo, borde, tinta, apagada := r.te.colores(v)
+	if r.foto != nil {
+		// Sobre la foto, la tinta de siempre en la superficie elevada al 96 %.
+		sobre := tema.Color("surface-raised", v)
+		sobre.A = 245
+		r.fondoCodigo.FillColor, r.fondoEtiqueta.FillColor = sobre, sobre
+		r.fondoCodigo.Refresh()
+		r.fondoEtiqueta.Refresh()
+		tinta, apagada = tema.Color("text", v), tema.Color("text-muted", v)
+		if r.te.Inerte {
+			tinta, apagada = ui.Atenuar(tinta, 0.55), ui.Atenuar(apagada, 0.55)
+		}
+		r.foto.Translucency = 0
+		if r.te.Inerte {
+			r.foto.Translucency = 0.45
+		}
+		r.foto.Refresh()
+	}
 	r.aro.Ver(r.te.Enfocado())
 	r.aro.Pintar(v)
 	r.caja.Pintar(fondo, borde)
@@ -1201,6 +1374,10 @@ func (p *Pantalla) objetoTPV(v tema.Variante) fyne.CanvasObject {
 		return !p.PuedeAccion("facturacion", verbo)
 	})
 	t.PuedeCrearProducto = p.PuedeCrear("producto") && p.lienzo != nil
+	// `altas.puedeCrear('presupuesto')` y `puedeAccion('productos', 'escribir')` de la web;
+	// subir imágenes pide además un selector de ficheros.
+	t.PuedePresupuesto = p.PuedeCrear(ModeloPresupuesto)
+	t.PuedeEditarImagenes = p.PuedeAccion("productos", "escribir") && p.ElegirFicheros != nil
 	return t.Objeto(v)
 }
 
@@ -1221,6 +1398,7 @@ func (p *Pantalla) engancharTPV() {
 			p.Abrir(m)
 		}
 	}
+	p.engancharTPVExtras()
 	t.AlNuevoProducto = func() {
 		if m, ok := p.modeloPorClave("producto"); ok {
 			p.AltaRapida(m, nil, nil, func(Registro) { p.cargarTPV() })
@@ -1249,6 +1427,11 @@ func (p *Pantalla) cargarTPV() {
 	}
 	t := p.tpv
 	q := t.Busqueda
+	// El cobro que quedó sin confirmar al cerrar la app vuelve en cuanto se entra.
+	t.Pendientes = p.CobrosTPV
+	if !t.restaurado {
+		t.Restaurar()
+	}
 	// Como la web, pedir de nuevo se lleva el aviso de antes: un fallo de carga no se
 	// queda pegado encima del catálogo cuando la red ya volvió.
 	t.Cargando, t.Fallo = true, ""
@@ -1279,6 +1462,7 @@ func (p *Pantalla) cargarTPV() {
 				}
 			}
 			p.Repintar()
+			p.cargarImagenesTPV()
 		})
 	})
 }
@@ -1302,6 +1486,7 @@ func (p *Pantalla) masTPV() {
 				t.Fallo = MensajeDeError(err, p.tr)
 			} else if t.Busqueda == q {
 				t.Productos, t.Siguiente = append(t.Productos, pag.Registros...), pag.Siguiente
+				defer p.cargarImagenesTPV()
 			}
 			p.Repintar()
 		})

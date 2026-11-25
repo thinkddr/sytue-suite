@@ -135,12 +135,13 @@ describe('openVaultMailPrivate (ADR 0087)', () => {
 
   test('sin la clave de firma activa en Sytue ID no se abre ni se pide sesión', async () => {
     let sesiones = 0;
-    const abrir = (status: string, product = 'mail') =>
+    const abrir = (status: string, product = 'mail', check?: string) =>
       openVaultMailPrivate(
         {
           isClosed: false,
           scope: { ...scope, product },
           signingKeyStatus: status,
+          signingKeyCheck: check,
         } as unknown as PqVault,
         {
           basePath: '/mail',
@@ -153,9 +154,14 @@ describe('openVaultMailPrivate (ADR 0087)', () => {
     const tras = await abrir('reauth').catch((e: unknown) => e);
     expect(tras).toBeInstanceOf(PqVaultError);
     expect((tras as PqVaultError).reason).toBe('reauth');
-    expect(((await abrir('missing').catch((e: unknown) => e)) as PqVaultError).reason).toBe(
-      'unavailable',
-    );
+    const sinClave = (await abrir('missing').catch((e: unknown) => e)) as PqVaultError;
+    expect(sinClave.reason).toBe('unavailable');
+    expect(sinClave.check).toBe('signing_missing');
+    // Lo que contestó Sytue ID llega a «Más información».
+    const rechazada = (await abrir('unavailable', 'mail', 'signing_put_400_vault_key_proof').catch(
+      (e: unknown) => e,
+    )) as PqVaultError;
+    expect(rechazada.check).toBe('signing_put_400_vault_key_proof');
     await expect(abrir('registered', 'drive')).rejects.toThrow();
     expect(sesiones).toBe(0);
   });

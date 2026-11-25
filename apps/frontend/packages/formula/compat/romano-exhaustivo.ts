@@ -8,7 +8,7 @@
  *
  *   cd apps/frontend/packages/formula && bun compat/romano-exhaustivo.ts
  */
-import { Engine } from '../src/engine';
+import { Engine } from '../src/index'; // el índice instala las funciones (perezosas.ts)
 import { calcular } from './libreoffice';
 
 const formulas: string[] = [];

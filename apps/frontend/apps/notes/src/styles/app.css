@@ -375,6 +375,17 @@
       @apply -left-3.5 h-11 w-7 opacity-100;
     }
   }
+  /* En el teléfono, escribiendo, la barra del editor va pegada encima del teclado
+     (barra-teclado.ts pone su `bottom`): a lo ancho, sobre todo lo demás y con su filete
+     arriba, que es donde ahora toca con la nota. */
+  .notes-barra-teclado {
+    @apply bg-surface border-border fixed inset-x-0 z-40 border-t;
+    padding-bottom: 0;
+  }
+  .notes-barra-teclado > * {
+    @apply border-b-0;
+  }
+
   /* Dónde caerá el bloque que se arrastra. */
   .notes-soltar {
     @apply bg-primary pointer-events-none absolute inset-x-3 -mt-px h-0.5 rounded-full;

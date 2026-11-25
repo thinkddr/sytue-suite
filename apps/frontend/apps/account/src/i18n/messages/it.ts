@@ -247,6 +247,36 @@ export const it: AppCatalog<typeof en> = {
   'recovery.invalid': 'Questo indirizzo non va bene: deve essere valido ed esterno a Sytue.',
   'recovery.wrong_password': 'La password non è corretta.',
   'recovery.failed': 'Non è stato possibile salvare. Riprova tra poco.',
+  'recovery.password.hint':
+    'Per qualsiasi modifica in questa scheda serve la tua password attuale.',
+  'recovery.username.new': 'Nuovo nome utente',
+  'recovery.username.hint':
+    'Quello che lasci resta riservato a te per 30 giorni, e puoi cambiarlo una volta ogni 30 giorni.',
+  'recovery.username.change': 'Cambia nome utente',
+  'recovery.username.changed': 'Nome utente cambiato.',
+  'recovery.username.invalid':
+    'Questo nome utente non è valido: usa da 3 a 64 lettere, numeri, punti o trattini.',
+  'recovery.username.taken': 'Questo nome utente non è disponibile.',
+  'recovery.username.recent': 'Hai cambiato il nome utente meno di 30 giorni fa.',
+  'recovery.username.is_address':
+    'In un account personale il nome utente è il tuo indirizzo Sytue, quindi non si cambia da qui.',
+  'recovery.phone.none':
+    'Non hai ancora un numero di cellulare: aggiungine uno per accedere anche con quello.',
+  'recovery.phone.new': 'Nuovo numero di cellulare',
+  'recovery.phone.format': 'Con il prefisso internazionale, per esempio +39 300 000 0000.',
+  'recovery.phone.send': 'Invia codice',
+  'recovery.phone.sent': 'Ti abbiamo inviato un codice via SMS al {phone}.',
+  'recovery.phone.code': 'Codice',
+  'recovery.phone.confirm': 'Conferma',
+  'recovery.phone.changed': 'Numero di cellulare salvato.',
+  'recovery.phone.invalid': 'Questo numero non è valido: scrivilo con il prefisso internazionale.',
+  'recovery.phone.same': 'È già il tuo numero di cellulare.',
+  'recovery.phone.wait': 'Aspetta un minuto prima di chiedere un altro codice.',
+  'recovery.phone.limit': 'Troppi codici richiesti. Riprova più tardi.',
+  'recovery.phone.code_wrong': 'Il codice non è corretto.',
+  'recovery.phone.code_expired': 'Il codice è scaduto. Chiedine un altro.',
+  'recovery.phone.has_account': 'Questo numero di cellulare appartiene già a un altro account.',
+  'recovery.phone.unavailable': 'Al momento non è possibile inviare SMS. Riprova più tardi.',
   'delete.title': 'Elimina il mio account',
   'delete.hint':
     'Vengono eliminate le tue credenziali e tutto ciò che è solo tuo; ciò che appartiene alla tua organizzazione resta lì. Per 30 giorni si può recuperare.',

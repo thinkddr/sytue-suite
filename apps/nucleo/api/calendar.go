@@ -76,13 +76,16 @@ type Attendee struct {
 
 // Event es un evento tal y como lo devuelve el servicio.
 type Event struct {
-	ID             string      `json:"id"`
-	CalendarID     string      `json:"calendar_id"`
-	UID            string      `json:"uid"`
-	Summary        string      `json:"summary"`
-	Description    string      `json:"description,omitempty"`
-	Location       string      `json:"location,omitempty"`
-	Organizer      string      `json:"organizer,omitempty"`
+	ID          string `json:"id"`
+	CalendarID  string `json:"calendar_id"`
+	UID         string `json:"uid"`
+	Summary     string `json:"summary"`
+	Description string `json:"description,omitempty"`
+	Location    string `json:"location,omitempty"`
+	Organizer   string `json:"organizer,omitempty"`
+	// OrganizerName es el CN del ORGANIZER, el nombre con el que se presenta quien
+	// organiza: la web lo enseña en vez de la dirección. Vacío si no lo trae.
+	OrganizerName  string      `json:"organizer_name,omitempty"`
 	DTStart        time.Time   `json:"dtstart"`
 	DTEnd          time.Time   `json:"dtend"`
 	TZID           string      `json:"tzid"`
@@ -115,7 +118,7 @@ func (e Event) Recurring() bool {
 func (e Event) Input() EventInput {
 	return EventInput{
 		Summary: e.Summary, Description: e.Description, Location: e.Location, Organizer: e.Organizer,
-		Start: e.DTStart, End: e.DTEnd, TZID: e.TZID, AllDay: e.AllDay,
+		OrganizerName: e.OrganizerName, Start: e.DTStart, End: e.DTEnd, TZID: e.TZID, AllDay: e.AllDay,
 		Status: e.Status, Classification: e.Classification, Transparency: e.Transparency,
 		Color: e.Color, ConferenceURL: e.ConferenceURL,
 		RRule: e.RRule, RDate: e.RDate, ExDate: e.ExDate, Attendees: e.Attendees,
@@ -148,11 +151,14 @@ type EventInput struct {
 	// UID solo cuenta al CREAR: el servicio lo toma de ahí o genera uno. Hace falta darlo
 	// cuando algo ya se ligó al evento antes de guardarlo (la sala de videollamada) y al
 	// mover un evento de calendario, que es crearlo en el destino con el mismo UID.
-	UID            string      `json:"uid,omitempty"`
-	Summary        string      `json:"summary"`
-	Description    string      `json:"description,omitempty"`
-	Location       string      `json:"location,omitempty"`
-	Organizer      string      `json:"organizer,omitempty"`
+	UID         string `json:"uid,omitempty"`
+	Summary     string `json:"summary"`
+	Description string `json:"description,omitempty"`
+	Location    string `json:"location,omitempty"`
+	Organizer   string `json:"organizer,omitempty"`
+	// OrganizerName es el CN que pide quien crea; el servicio pone el de la sesión
+	// cuando la persona organiza, y al editar conserva el que hubiera.
+	OrganizerName  string      `json:"organizer_name,omitempty"`
 	Start          time.Time   `json:"start"`
 	End            time.Time   `json:"end"`
 	TZID           string      `json:"tzid,omitempty"`

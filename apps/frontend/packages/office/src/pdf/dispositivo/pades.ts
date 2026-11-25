@@ -24,13 +24,17 @@
  *   servidor, y quien firma lo sabe;
  * - firma VISIBLE opcional, con la MISMA apariencia que dibuja el servidor
  *   (`objetoAparienciaFirma`): el recuadro, la rúbrica dibujada si la hay, «Firmado
- *   por …» y la fecha, en Helvetica estándar (sin incrustar fuentes).
+ *   por …» y la fecha, en Helvetica estándar (sin incrustar fuentes);
+ * - CERTIFICA si se pide («bloquear el documento después de firmar»): /DocMDP con
+ *   /P 1 en la firma y /Perms en el catálogo, como `dictDeFirma` y `anexarFirma` en
+ *   Go, y solo en la PRIMERA firma (`certificarFirmado` si ya hay otra).
  *
  * LO QUE ESTE CAMINO NO HACE, y por qué (ADR 0086, «Firmar en el dispositivo»):
  *
- * - No CERTIFICA (/DocMDP) ni firma PDF protegidos con contraseña o con la tabla de
- *   referencias rota: el servidor caería a reescribir el fichero entero, y eso aquí
- *   no se hace. Se dice en vez de escribir algo dudoso.
+ * - No firma un PDF protegido con contraseña ni uno con la tabla de referencias rota:
+ *   habría que reescribir el fichero entero. Con contraseña, el estudio de la bóveda
+ *   lo reescribe ANTES sin ella con el motor del dispositivo (como el servidor, que
+ *   firma reescribiendo) y entonces lo firma aquí (`FirmarEnDispositivo.tsx`).
  */
 import {
   ETIQUETA,
@@ -64,6 +68,7 @@ import {
   entero,
   esCadena,
   esDict,
+  esNombre,
   esRef,
   leerTextoPDF,
   nombre,
@@ -101,6 +106,11 @@ export interface OpcionesFirmaLocal {
   visible?: FirmaVisible | undefined;
   /** Cómo pedir el sello de tiempo; sin él, la firma sale sin sello (B-B). */
   sello?: PedirSello | undefined;
+  /**
+   * CERTIFICA el documento (/DocMDP, /P 1): cualquier cambio posterior invalida la
+   * firma. Solo en la primera firma, como en Go (`ErrCertificarFirmado`).
+   */
+  certificar?: boolean | undefined;
   signal?: AbortSignal | undefined;
 }
 
@@ -120,6 +130,7 @@ interface DatosAnexo {
   lugar: string;
   fecha: Date;
   visible: FirmaVisible | undefined;
+  certificar: boolean;
 }
 
 const ascii = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
@@ -340,6 +351,24 @@ async function nombresDeCampos(doc: DocumentoPdf, acro: Dict | null): Promise<Se
   return usados;
 }
 
+/**
+ * ¿El formulario lleva ya alguna firma (un campo /Sig con valor)? Certificar solo
+ * cabe en la primera: certifica el documento ENTERO, y con otra firma delante no se
+ * puede sin invalidarla (`camposDeFirma` en Go).
+ */
+async function hayFirmas(doc: DocumentoPdf, acro: Dict | null): Promise<boolean> {
+  const campos = acro ? await doc.resolver(acro.get('Fields')) : null;
+  const pendientes: Obj[] = Array.isArray(campos) ? campos.slice(0, 5000) : [];
+  for (let i = 0; i < pendientes.length && i < 5000; i++) {
+    const d = await doc.resolver(pendientes[i]);
+    if (!esDict(d)) continue;
+    if (esNombre(d.get('FT'), 'Sig') && d.has('V')) return true;
+    const hijos = await doc.resolver(d.get('Kids'));
+    if (Array.isArray(hijos)) pendientes.push(...hijos);
+  }
+  return false;
+}
+
 /** ¿El documento está certificado sin admitir cambios (/DocMDP con /P 1)? */
 async function bloqueado(doc: DocumentoPdf, catalogo: Dict): Promise<boolean> {
   const perms = await doc.resolver(catalogo.get('Perms'));
@@ -389,6 +418,8 @@ async function anexarHueco(pdf: Uint8Array, opts: DatosAnexo): Promise<ConHueco>
 
   const acroAntes = await doc.resolver(catalogo.get('AcroForm'));
   const acro: Dict = esDict(acroAntes) ? copia(acroAntes) : new Map();
+  if (opts.certificar && (await hayFirmas(doc, esDict(acroAntes) ? acroAntes : null)))
+    throw new ErrorPdf('certificarFirmado');
   const usados = await nombresDeCampos(doc, esDict(acroAntes) ? acroAntes : null);
   let k = 1;
   while (usados.has(`Sytue.Firma${k}`)) k++;
@@ -410,6 +441,12 @@ async function anexarHueco(pdf: Uint8Array, opts: DatosAnexo): Promise<ConHueco>
   ];
   if (opts.motivo) sig.push(`/Reason ${serializar(textoPDF(opts.motivo))}`);
   if (opts.lugar) sig.push(`/Location ${serializar(textoPDF(opts.lugar))}`);
+  // /P 1: no se admite NINGÚN cambio posterior. /V 1.2 es la versión del método de
+  // transformación, no la del PDF (`dictDeFirma` en Go).
+  if (opts.certificar)
+    sig.push(
+      '/Reference [<</Type /SigRef /TransformMethod /DocMDP /TransformParams <</Type /TransformParams /P 1 /V /1.2>>>>]',
+    );
   objetos.set(numSig, `${sig.join('\n')}>>`);
 
   const campo: Dict = new Map<string, Obj>([
@@ -443,6 +480,9 @@ async function anexarHueco(pdf: Uint8Array, opts: DatosAnexo): Promise<ConHueco>
   acro.set('SigFlags', num(3));
   const nuevoCatalogo = copia(catalogo);
   nuevoCatalogo.set('AcroForm', acro);
+  // Sin /Perms en el catálogo el /DocMDP de la firma no lo mira ningún lector: el
+  // documento saldría «certificado» solo en el nombre de la casilla.
+  if (opts.certificar) nuevoCatalogo.set('Perms', new Map<string, Obj>([['DocMDP', ref(numSig)]]));
   objetos.set(raizRef.n, serializar(nuevoCatalogo));
 
   // --- Serializar el anexo detrás del original, sin tocar un byte de lo que había.
@@ -550,6 +590,7 @@ export async function firmarPdfConDetalle(
     lugar: opciones.lugar?.trim() ?? '',
     fecha: opciones.fecha ?? new Date(),
     visible: opciones.visible,
+    certificar: opciones.certificar === true,
   };
   const h = await anexarHueco(pdf, opts);
   const resumen = await sha256(h.datos.subarray(0, h.inicio), h.datos.subarray(h.fin));

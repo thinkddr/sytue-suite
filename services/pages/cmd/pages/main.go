@@ -40,6 +40,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 
 	pagesdb "git.sytue.eu/sytue/one/services/pages/db"
@@ -112,6 +113,9 @@ func runAPI() error {
 		return fmt.Errorf("almacén de objetos: %w", err)
 	}
 	st := store.New(pool)
+	// Purga de tenant (ADR 0054): las webs publicadas de una organización que
+	// desaparece. Sus prefijos los anota el gancho de la base (mig. 0007).
+	go purgatenant.Trabajador{DB: pool, Almacen: objetos, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
 
 	verifier, err := authn.NewVerifier(ctx, authn.VerifierConfig{
 		Issuer:    cfg.OIDCIssuer,

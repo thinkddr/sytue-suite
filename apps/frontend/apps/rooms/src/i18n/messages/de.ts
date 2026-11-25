@@ -291,6 +291,7 @@ export const de: AppCatalog<typeof en> = {
     other: 'Du kannst höchstens {count} Personen hinzufügen.',
   },
   'dm.openFailed': 'Die Unterhaltung konnte nicht geöffnet werden.',
+  'dm.externalClosed': 'Deine Organisation erlaubt keine Unterhaltungen mit dieser Person.',
 
   // --- Personas de otra organización (ADR 0040) ---------------------------
   'people.search': '„{query}“ in Sytue One suchen',

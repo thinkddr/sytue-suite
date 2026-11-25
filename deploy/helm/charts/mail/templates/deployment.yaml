@@ -393,12 +393,15 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+            # Raíz del TLS de PgBouncer (global.pgbouncerTls): el DSN la verifica.
+            {{- include "sytue.pgbouncerCaMount" . | nindent 12 }}
             - name: tmp
               mountPath: /tmp
             - name: tls
               mountPath: /etc/sytue/tls
               readOnly: true
       volumes:
+        {{- include "sytue.pgbouncerCaVolume" . | nindent 8 }}
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.config.tmpSizeLimit | default "2Gi" }}

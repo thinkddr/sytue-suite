@@ -279,6 +279,7 @@ export const cs: AppCatalog<typeof en> = {
     other: 'Můžete přidat nejvýše {count} osob.',
   },
   'dm.openFailed': 'Konverzaci se nepodařilo otevřít.',
+  'dm.externalClosed': 'Vaše organizace nepovoluje konverzace s touto osobou.',
   'people.search': 'Hledat „{query}“ v Sytue One',
   'people.searching': 'Hledání v Sytue One…',
   'people.notFound': 'Tento e-mail ani @uživatelské jméno v Sytue One nikdo nepoužívá.',

@@ -28,6 +28,11 @@ func TestCodigoFalloSoloLlevaLoFijo(t *testing.T) {
 		{fmt.Errorf("envuelto: %w", privateDrive.ErrConflict), "drive.conflict"},
 		{&privateDrive.ImportError{Check: "row_heads", Err: privateDrive.ErrConflict}, "drive.import.row_heads"},
 		{pqvault.ErrWrong, "vault.wrong"},
+		// La clave de firma, con lo que contestó Sytue ID: el mismo código que la web.
+		{&pqvault.SigningKeyError{Check: "signing_put_400_vault_key_proof"}, "vault.unavailable.signing_put_400_vault_key_proof"},
+		{fmt.Errorf("envuelto: %w", &pqvault.SigningKeyError{Check: "signing_missing"}), "vault.unavailable.signing_missing"},
+		{&pqvault.SigningKeyError{Check: secreto}, "vault.unavailable.signing"},
+		{pqvault.ErrSigningKey, "vault.unavailable.signing"},
 		{context.Canceled, "canceled"},
 		{&api.Error{Status: 409, URL: secreto, Body: `{"error":{"code":"private_storage_snapshot_changed","message":"` + secreto + `"}}`}, "http.409.private_storage_snapshot_changed"},
 		{&api.Error{Status: 400, URL: secreto, Body: `{"error":{"code":"` + secreto + `"}}`}, "http.400"},

@@ -2,7 +2,12 @@
 import { expect, test } from 'bun:test';
 import { DriveClient } from '@sytue/api-clients';
 import type { StorageRepository } from '@sytue/offline/matrix';
-import { PqVaultError, type PqVault, type PqVaultCopyMarker } from '@sytue/offline/vault';
+import {
+  PqVaultError,
+  pqVaultUnavailable,
+  type PqVault,
+  type PqVaultCopyMarker,
+} from '@sytue/offline/vault';
 import {
   decodeStorageScopeHeader,
   storageScopeHeader,
@@ -28,7 +33,7 @@ async function fixture() {
   let sourceFactories = 0,
     storageCalls = 0,
     staleCleared = 0;
-  let marker: PqVaultCopyMarker | null = null;
+  let marker: PqVaultCopyMarker | null | Error = null;
   const requests: string[] = [];
   const mutableScope: MatrixStorageScope = { ...scope };
   let storage: () => StorageRepository = () => f.repository();
@@ -41,7 +46,7 @@ async function fixture() {
       storageCalls++;
       return storage();
     },
-    copyMarker: () => Promise.resolve(marker),
+    copyMarker: () => (marker instanceof Error ? Promise.reject(marker) : Promise.resolve(marker)),
     clearStaleCopy: () => {
       staleCleared++;
       return Promise.resolve();
@@ -73,7 +78,7 @@ async function fixture() {
     requests,
     counts: () => ({ sourceFactories, storageCalls }),
     staleCleared: () => staleCleared,
-    setMarker: (value: PqVaultCopyMarker | null) => {
+    setMarker: (value: PqVaultCopyMarker | null | Error) => {
       marker = value;
     },
     setStorage: (factory: () => StorageRepository) => {
@@ -200,6 +205,35 @@ test('Drive gate opens past an expired copy marker and clears it once the receip
     expect(f.staleCleared()).toBe(1);
   } finally {
     lifetime.abort();
+    await f.gate.host.close(f.instance);
+    await f.f.close();
+  }
+});
+
+test('Drive gate opens even if the copy marker cannot be read: the server still refuses to publish over a copy', async () => {
+  const f = await fixture();
+  f.setMarker(pqVaultUnavailable('copy_keys_get', 502));
+  const lifetime = new AbortController();
+  try {
+    await f.gate.host.prepare(f.instance, lifetime.signal);
+    expect((await f.gate.current(f.instance).repository.root()).id).toBe('root');
+  } finally {
+    lifetime.abort();
+    await f.gate.host.close(f.instance);
+    await f.f.close();
+  }
+});
+
+test('Drive gate still stops on any other failure reading the copy marker', async () => {
+  const f = await fixture();
+  f.setMarker(new PqVaultError('signin'));
+  try {
+    const failure = await f.gate.host
+      .prepare(f.instance, new AbortController().signal)
+      .catch((error: unknown) => error);
+    expect((failure as PqVaultError).reason).toBe('signin');
+    expect(f.requests).toHaveLength(0);
+  } finally {
     await f.gate.host.close(f.instance);
     await f.f.close();
   }

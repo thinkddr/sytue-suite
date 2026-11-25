@@ -102,6 +102,26 @@ type Claims struct {
 	// en un token anterior al claim; quien lo use lo trata como «sí» (ver
 	// IdentificacionReciente), nunca como «no».
 	MFAEnabled *bool
+	// DeviceTrust es el claim `device_trust`: qué garantiza Sytue ID del dispositivo
+	// de la sesión (`none`, `standard`; `managed` está reservado). Vacío si el token
+	// no lo trae o trae un valor que no se conoce, y vacío vale lo mismo que `none`:
+	// la confianza no se presume (ver DispositivoDeConfianza).
+	DeviceTrust string
+}
+
+// Valores de `device_trust`, los mismos que emite Sytue ID
+// (services/id/internal/domain/device.go).
+const (
+	DeviceTrustNone     = "none"
+	DeviceTrustStandard = "standard"
+	DeviceTrustManaged  = "managed"
+)
+
+// DispositivoDeConfianza dice si el token afirma, como mínimo, un dispositivo de
+// confianza de nivel `standard`: lo que pide un recurso `restricted`
+// (docs/security.md §11.4.1). `managed` también vale; cualquier otra cosa, no.
+func (c Claims) DispositivoDeConfianza() bool {
+	return c.DeviceTrust == DeviceTrustStandard || c.DeviceTrust == DeviceTrustManaged
 }
 
 // LogValue implementa slog.LogValuer para que, al registrar Claims, NUNCA se
@@ -177,8 +197,13 @@ func (c Claims) TenantOrEmpty() (tenancy.Tenant, bool) {
 
 type ctxKey struct{}
 
-// Into inserta los claims en el contexto.
+// Into inserta los claims en el contexto. Si un middleware de fuera puso un
+// Testigo (ConTestigo), queda anotado: es lo que deja a la traza de acceso
+// (platform/pkg/auditlog) saber quién era sin depender de cómo se autenticó.
 func Into(ctx context.Context, c Claims) context.Context {
+	if t, ok := ctx.Value(testigoKey{}).(*Testigo); ok {
+		t.anotar(c)
+	}
 	return context.WithValue(ctx, ctxKey{}, c)
 }
 

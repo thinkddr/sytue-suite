@@ -109,8 +109,17 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   // ChatHttpError lleva el código de estado (el 4xx que el BFF preserva del servicio Go),
   // así el llamador puede distinguir p. ej. un 409 de nombre duplicado de un fallo
   // genérico. El mensaje es el mismo de antes: los `catch` existentes no cambian.
-  if (!res.ok) throw new ChatHttpError(res.status, `Error ${res.status}`);
+  if (!res.ok) throw await errorDeLaRespuesta(res);
   return decryptPayload((await res.json()) as T);
+}
+
+/** El error de una ruta BFF, con el código que el BFF deja pasar (`chatFail`). */
+async function errorDeLaRespuesta(res: Response): Promise<ChatHttpError> {
+  const code = await res
+    .json()
+    .then((d: { error?: unknown }) => (typeof d.error === 'string' ? d.error : undefined))
+    .catch(() => undefined);
+  return new ChatHttpError(res.status, `Error ${res.status}`, undefined, code);
 }
 
 async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
@@ -137,7 +146,7 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Pr
     );
     throw new Error('No autenticado');
   }
-  if (!res.ok) throw new ChatHttpError(res.status, `Error ${res.status}`);
+  if (!res.ok) throw await errorDeLaRespuesta(res);
   return decryptPayload((await res.json()) as T);
 }
 

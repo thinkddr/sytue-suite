@@ -2704,9 +2704,9 @@ export const nb: AppCatalog<typeof en> = {
     'Signaturen får ikke plass på den siden. Velg en annen side eller plassering.',
   'pdf.device.view': 'Vis',
   'pdf.vault.help':
-    'Denne PDF-en ligger i den krypterte Disken din: den dekrypteres bare på denne enheten, der du kan se, kommentere, fylle ut, organisere og signere den. Det du lagrer, går kryptert tilbake.',
+    'Denne PDF-en ligger i den krypterte Disken din: den dekrypteres bare på denne enheten, der du kan se, kommentere, fylle ut, organisere, beskytte, sladde, redigere, sammenligne, skrive ut og signere den. Det du lagrer, går kryptert tilbake.',
   'pdf.vault.serverOnly':
-    'Med den krypterte Disken er signaturforespørsler, passordbeskyttelse, tekstgjenkjenning, sladding, redigering av tekst eller bilder, stempler og vannmerker, sammenligning, versjonslogg og utskrift ikke tilgjengelige ennå: de krever at tjenesten leser PDF-en, eller kan ennå ikke gjøres på enheten.',
+    'Med den krypterte Disken din er signaturforespørsler, tekstgjenkjenning og assistenten ikke tilgjengelige: de krever at tjenesten leser PDF-en. Alt annet skjer på denne enheten.',
   'pdf.vault.notFound.title': 'Denne PDF-en er ikke i den krypterte Disken din',
   'pdf.vault.notFound.description':
     'Den kan ha blitt flyttet eller slettet. Se etter den i Sytue Drive.',
@@ -2721,7 +2721,9 @@ export const nb: AppCatalog<typeof en> = {
     'Driven din går fortsatt over til ende-til-ende-kryptering. Fullfør det i Sytue Drive.',
   'pdf.device.error.password': 'Det passordet åpner ikke sertifikatet.',
   'pdf.device.error.encrypted':
-    'Denne PDF-en er passordbeskyttet og kan ikke signeres på denne enheten.',
+    'Denne PDF-en er passordbeskyttet: åpne den og signer den fra studioet dens, der passordet brukes.',
+  'pdf.device.protectedNote':
+    'Denne PDF-en er passordbeskyttet. For å signere den skrives den om uten passordet på denne enheten, slik serveren også gjør: den signerte kopien lagres kryptert i Disken din, men uten PDF-ens passord.',
   'pdf.device.error.locked':
     'Denne PDF-en er sertifisert mot enhver endring: en ny signatur ville gjøre den ugyldig.',
   'pdf.device.error.unreadable':

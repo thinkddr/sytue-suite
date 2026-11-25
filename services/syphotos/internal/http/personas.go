@@ -144,6 +144,8 @@ func (h *Handlers) CompartirConPersona(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
+	// El álbum aparece (o cambia de permiso) en lo de quien lo recibe: también su widget.
+	hubnotify.AvisarTambien(r.Context(), sujeto)
 	org := tenancy.MustFrom(r.Context()).Slug
 	if nueva && h.avisados.Primera(org+"|"+id.String()+"|"+sujeto) {
 		// Lo que va a ver tiene que estar generado: con su sesión no hay original que leer.
@@ -179,6 +181,7 @@ func (h *Handlers) DejarDeCompartirConPersona(w http.ResponseWriter, r *http.Req
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
+	hubnotify.AvisarTambien(r.Context(), sujeto) // y desaparece de lo suyo
 	w.WriteHeader(http.StatusNoContent)
 }
 

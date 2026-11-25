@@ -6,11 +6,14 @@ package http
 import (
 	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
@@ -304,6 +307,10 @@ func (h *Handler) viewShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, err)
 		return
 	}
+	// Sin sesión: el actor es el enlace (un resumen de su token, que no se puede
+	// volver a usar) y el tenant, el del documento.
+	resumen := sha256.Sum256([]byte(chi.URLParam(r, "token")))
+	auditlog.AnotarComo(r.Context(), res.Tenant, "link:"+hex.EncodeToString(resumen[:6]), "doc.link.view", doc.ID, nil)
 	// «Cualquiera con el enlace» no es «cualquiera»: fuera de los buscadores.
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	httpx.JSON(w, r, http.StatusOK, map[string]any{

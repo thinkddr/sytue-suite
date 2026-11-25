@@ -111,7 +111,11 @@ func (s *Server) setDeviceCookie(w http.ResponseWriter, value string) {
 // secreto), así que es estable por (usuario, navegador) y único global. Best-effort:
 // un fallo registrando NO rompe el login (solo se pierde el reconocimiento del
 // dispositivo hasta el próximo login). El dispositivo nace `trusted=false`.
-func (s *Server) registerDevice(w http.ResponseWriter, r *http.Request, userID, orgID string) {
+//
+// Devuelve el id del dispositivo (devices.id) para atarlo a la sesión (mig 0128), o
+// vacío si no se pudo registrar: la sesión nace igual, sin dispositivo, y sus tokens
+// dicen `device_trust=none`.
+func (s *Server) registerDevice(w http.ResponseWriter, r *http.Request, userID, orgID string) string {
 	b, ok := "", false
 	if c, err := s.requestCookie(r, deviceCookieName); err == nil && c.Value != "" {
 		b, ok = domain.ParseDeviceCookie(s.deviceKey, c.Value)
@@ -120,7 +124,7 @@ func (s *Server) registerDevice(w http.ResponseWriter, r *http.Request, userID, 
 		var err error
 		if b, err = domain.GenerateToken(32); err != nil {
 			s.log.Warn("dispositivos: no se pudo acuñar el secreto de dispositivo", "error", err)
-			return
+			return ""
 		}
 		s.setDeviceCookie(w, domain.SignDeviceCookie(s.deviceKey, b))
 	}
@@ -138,13 +142,15 @@ func (s *Server) registerDevice(w http.ResponseWriter, r *http.Request, userID, 
 	if ds, err := s.store.ListDevicesForUser(r.Context(), userID); err == nil && len(ds) > 0 {
 		nuevo = !slices.ContainsFunc(ds, func(d domain.Device) bool { return d.DeviceID == dev.DeviceID })
 	}
-	if _, err := s.store.UpsertDevice(r.Context(), nil, dev); err != nil {
+	got, err := s.store.UpsertDevice(r.Context(), nil, dev)
+	if err != nil {
 		s.log.Warn("dispositivos: no se pudo registrar el dispositivo", "user_id", userID, "error", err)
-		return
+		return ""
 	}
 	if nuevo {
 		s.avisarSeguridad(r.Context(), orgID, userID, "security.signin.new", map[string]string{"device": dev.Name})
 	}
+	return got.ID
 }
 
 // clearMFACookie elimina la cookie de continuación MFA.
@@ -317,6 +323,14 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request, userID, o
 	if err != nil {
 		return err
 	}
+	// Registrar/identificar el dispositivo (mig 0022): choke point de TODOS los métodos
+	// de login (contraseña, passkey, federado, SAML), como la verja anti-bypass de CA.
+	// Requiere org (FK); sin org no hay contexto de dispositivo que persistir. Va ANTES
+	// de la sesión para que la sesión nazca atada a él (mig 0128, `device_trust`).
+	deviceID := ""
+	if orgID != "" {
+		deviceID = s.registerDevice(w, r, userID, orgID)
+	}
 	sess := domain.Session{
 		TokenHash:    domain.HashToken(token),
 		UserID:       userID,
@@ -326,17 +340,12 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request, userID, o
 		UserAgent:    r.UserAgent(),
 		LugarCifrado: lugarCifrado,
 		ExpiresAt:    exp,
+		DeviceID:     deviceID,
 	}
 	if _, err := s.store.InsertSession(r.Context(), nil, sess); err != nil {
 		return err
 	}
 	s.setSessionCookie(w, token, exp)
-	// Registrar/identificar el dispositivo (mig 0022): choke point de TODOS los métodos
-	// de login (contraseña, passkey, federado, SAML), como la verja anti-bypass de CA.
-	// Requiere org (FK); sin org no hay contexto de dispositivo que persistir.
-	if orgID != "" {
-		s.registerDevice(w, r, userID, orgID)
-	}
 	return nil
 }
 

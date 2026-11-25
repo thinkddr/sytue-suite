@@ -2764,9 +2764,9 @@ export const ga: AppCatalog<typeof en> = {
     'Ní luíonn an síniú ar an leathanach sin. Roghnaigh leathanach nó suíomh eile.',
   'pdf.device.view': 'Féach',
   'pdf.vault.help':
-    'Tá an PDF seo i do Drive criptithe: ní dhíchriptítear é ach ar an ngléas seo, áit ar féidir leat é a fheiceáil, nótaí a chur leis, é a líonadh, a eagrú agus a shíniú. Téann a shábhálann tú ar ais criptithe.',
+    'Tá an PDF seo i do Drive criptithe: ní dhíchriptítear é ach ar an ngléas seo, áit ar féidir leat é a fheiceáil, nótaí a chur leis, é a líonadh, a eagrú, a chosaint, ábhar a dhubhú ann, é a chur in eagar, a chur i gcomparáid, a phriontáil agus a shíniú. Téann a shábhálann tú ar ais criptithe.',
   'pdf.vault.serverOnly':
-    'Le do Drive criptithe níl na nithe seo ar fáil fós: síniú a iarraidh, cosaint le pasfhocal, aithint téacs, dubhú, téacs nó íomhánna a chur in eagar, stampaí agus comharthaí uisce, comparáid, stair na leaganacha ná priontáil: teastaíonn ón tseirbhís an PDF a léamh nó ní dhéantar fós ar an ngléas iad.',
+    'Le do Drive criptithe, níl iarraidh ar shíniú, aithint téacs ná an cúntóir ar fáil: teastaíonn uathu go léifeadh an tseirbhís an PDF. Déantar gach rud eile ar an ngléas seo.',
   'pdf.vault.notFound.title': 'Níl an PDF seo i do Drive criptithe',
   'pdf.vault.notFound.description':
     'B’fhéidir gur bogadh nó gur scriosadh é. Cuardaigh é in Sytue Drive.',
@@ -2782,7 +2782,9 @@ export const ga: AppCatalog<typeof en> = {
     'Tá do Drive fós ag aistriú go criptiú ó cheann ceann. Críochnaigh é ó Sytue Drive.',
   'pdf.device.error.password': 'Ní osclaíonn an pasfhocal sin an teastas.',
   'pdf.device.error.encrypted':
-    'Tá an PDF seo cosanta le pasfhocal agus ní féidir é a shíniú ar an ngléas seo.',
+    'Tá an PDF seo cosanta le pasfhocal: oscail é agus sínigh é óna stiúideo, áit a n-úsáidtear a phasfhocal.',
+  'pdf.device.protectedNote':
+    'Tá an PDF seo cosanta le pasfhocal. Chun é a shíniú, athscríobhtar é gan an pasfhocal ar an ngléas seo, mar a dhéanann an freastalaí: sábháiltear an chóip shínithe criptithe i do Drive, ach gan pasfhocal an PDF.',
   'pdf.device.error.locked':
     'Tá an PDF seo deimhnithe in aghaidh aon athraithe: chuirfeadh síniú eile ó bhail é.',
   'pdf.device.error.unreadable':

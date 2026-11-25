@@ -314,6 +314,11 @@ func (s *Service) CreateRoom(ctx context.Context, in CreateRoomInput) (domain.Ro
 		payload["created_by"] = in.CreatedBy
 	}
 	s.publish(ctx, "meet.room.created", payload)
+	// Una llamada nueva en un documento se avisa a quien colabora en él (ADR 0070).
+	// Solo al CREAR la sala: unirse a la que ya hay no vuelve a avisar.
+	if src.Kind == domain.SourceDocument {
+		s.avisarLlamadaDeDocumento(ctx, src.RefID)
+	}
 	return room, nil
 }
 
@@ -691,14 +696,22 @@ func (s *Service) Knock(ctx context.Context, roomID uuid.UUID, identity, name st
 	if !room.IsJoinable() {
 		return domain.Admission{}, domain.ErrRoomClosed
 	}
-	if !room.Locked {
+	// La reunión de un evento tiene sala de espera para quien viene de otra
+	// organización: llama aunque la sala esté abierta, y lo que le deja esperar es el
+	// enlace del evento —el id de la sala—, no la verja de dentro, que no pasa.
+	espera := salaDeEsperaDeFuera(ctx, room)
+	if !room.Locked && !espera {
 		return domain.Admission{}, domain.ErrRoomOpen
 	}
 	// El acceso a la sala se comprueba IGUAL que al entrar: llamar a la puerta de
 	// una reunión de un canal del que no eres miembro no es «esperar», es
 	// enterarse de que esa reunión existe.
 	if err := s.requireRoomAccess(ctx, room, identity, false); err != nil {
-		return domain.Admission{}, err
+		if !espera || !errors.Is(err, domain.ErrPermission) {
+			return domain.Admission{}, err
+		}
+	} else if !room.Locked {
+		return domain.Admission{}, domain.ErrRoomOpen // puede entrar: no hay puerta que llamar
 	}
 	a, err := s.store.Knock(ctx, roomID, identity, name)
 	if err != nil {
@@ -884,6 +897,11 @@ func (s *Service) JoinRoom(ctx context.Context, roomID uuid.UUID, identity, disp
 	}
 	ctx, err = s.encryptedRoomAccess(ctx, room, identity, isAdmin)
 	if err != nil {
+		// A la reunión de un evento, quien viene de otra organización sin la clave ni
+		// la invitación entra por la sala de espera: para él la puerta está echada.
+		if errors.Is(err, domain.ErrPermission) && salaDeEsperaDeFuera(ctx, room) {
+			return JoinResult{}, domain.ErrRoomLocked
+		}
 		return JoinResult{}, err
 	}
 	isAdmin = currentDocumentAdministrator(ctx, room, isAdmin)
@@ -1038,6 +1056,16 @@ func (s *Service) requireReunionSuelta(ctx context.Context, room domain.Room, su
 		s.calGate != nil && s.calGate.EsInvitado(ctx, src.RefID) {
 		return nil
 	}
+	// Quien viene de otra organización y el anfitrión dejó pasar desde la sala de
+	// espera: sigue dentro para lo que pide la llamada después de entrar (el cifrado,
+	// quién está) aunque el SFU aún no le haya apuntado como participante.
+	if salaDeEsperaDeFuera(ctx, room) {
+		if admitido, err := s.store.IsAdmitted(ctx, room.ID, subject); err != nil {
+			return err
+		} else if admitido {
+			return nil
+		}
+	}
 	// ponytail: se recorre el roster (decenas de filas como mucho), igual que arriba.
 	parts, err := s.store.ListParticipants(ctx, room.ID, false)
 	if err != nil {
@@ -1049,6 +1077,30 @@ func (s *Service) requireReunionSuelta(ctx context.Context, room domain.Room, su
 		}
 	}
 	return domain.ErrPermission
+}
+
+type deFueraKey struct{}
+
+// DeOtraOrganizacion marca que quien llama viene de OTRA organización: su petición se
+// ha llevado a la anfitriona de la sala (EnAnfitrion) y su token no dice nada aquí.
+func DeOtraOrganizacion(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deFueraKey{}, true)
+}
+
+// EsDeOtraOrganizacion dice si la petición es de alguien de otra organización (DeOtraOrganizacion).
+func EsDeOtraOrganizacion(ctx context.Context) bool {
+	v, _ := ctx.Value(deFueraKey{}).(bool)
+	return v
+}
+
+// salaDeEsperaDeFuera: la reunión de un evento (Room.WaitingRoom) a la que llega
+// alguien de otra organización. Si no trae la clave ni la invitación, no entra ni se
+// le dice que no: espera a que el anfitrión le deje pasar (decisión de roadmap: «que
+// entren por la sala de espera»). A la gente de la organización anfitriona no le
+// cambia nada: la reunión suelta sigue siendo de quien la convocó, de quien estuvo y
+// de quien trae el enlace (decidido el 2026-10-16).
+func salaDeEsperaDeFuera(ctx context.Context, room domain.Room) bool {
+	return room.WaitingRoom && EsDeOtraOrganizacion(ctx)
 }
 
 // CabeceraClave es la cabecera en la que el BFF y las apps nativas mandan la clave del

@@ -271,11 +271,17 @@ func TipoCritico(kind string) bool {
 // Un origen no silenciable o un tipo crítico se entregan siempre, aunque quede una
 // regla guardada de antes de que se rechazaran o aunque se haya callado el origen
 // entero: callar «Sytue Web» calla los formularios, no los cobros duplicados.
+//
+// Un tipo que se parte en varios hereda la regla del de antes (`TipoAnterior`)
+// mientras el suyo no tenga la propia. Sin eso, partir un tipo devolvía los avisos a
+// quien lo había callado, y las reglas de la fuente privada (ADR 0086) no se pueden
+// reescribir con una migración.
 func Muted(prefs []NotificationPref, source Source, kind string) bool {
 	if !Silenciable(source) || TipoCritico(kind) {
 		return false
 	}
-	deOrigen := false
+	anterior := TipoAnterior(kind)
+	deOrigen, deAnterior, hayAnterior := false, false, false
 	for _, p := range prefs {
 		if p.Source != source {
 			continue
@@ -284,12 +290,30 @@ func Muted(prefs []NotificationPref, source Source, kind string) bool {
 		if kind != "" && p.Kind == kind {
 			return p.Muted
 		}
-		if p.Kind == "" {
+		switch {
+		case p.Kind == "":
 			deOrigen = p.Muted
+		case anterior != "" && p.Kind == anterior:
+			deAnterior, hayAnterior = p.Muted, true
 		}
+	}
+	if hayAnterior {
+		return deAnterior
 	}
 	return deOrigen
 }
+
+// tiposPartidos dice de qué tipo salió cada uno de los que se partieron: su regla
+// guardada sigue valiendo para ellos. La misma tabla, en `reglasAvisos.ts` del portal.
+var tiposPartidos = map[string]string{
+	// Un solo tipo con el resultado escrito en castellano en el título, hasta que se
+	// partió para que cada cliente lo traduzca (`notifications.kind.cloud.deploy.*`).
+	"cloud.deploy.ready":  "cloud.deploy",
+	"cloud.deploy.failed": "cloud.deploy",
+}
+
+// TipoAnterior es el tipo del que salió `kind` al partirse, o "".
+func TipoAnterior(kind string) string { return tiposPartidos[kind] }
 
 // NotificationLevel categoriza la prioridad de una notificación.
 type NotificationLevel string

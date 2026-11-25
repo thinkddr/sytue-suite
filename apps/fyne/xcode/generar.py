@@ -58,7 +58,8 @@ XCODE = "2700"
 # del esquema nunca escribe nada solo (ADR 0078). La misma tabla en android-widgets.py,
 # SytueWidgetActions.allowed (Snapshot.swift) y WidgetSnapshot.accionPermitida (Java).
 ACCIONES_WIDGET = {"mail": {"compose"}, "calendar": {"create"}, "contacts": {"create"},
-                   "notes": {"create"}, "photos": {"upload"}}
+                   "notes": {"create"}, "photos": {"upload"}, "docs": {"create"},
+                   "sheets": {"create"}, "slides": {"create"}}
 
 
 def metadato(toml, clave):
@@ -76,6 +77,7 @@ def apps():
         app = {"clave": d, "nombre": metadato(toml, "Name"), "id": metadato(toml, "ID"),
                "icono": metadato(toml, "Icon"), "enlaces": metadato(toml, "enlaces"),
                "archivos": metadato(toml, "archivos") == "si",
+               "ficheros": metadato(toml, "ficheros") == "si", "extensiones": metadato(toml, "extensiones"),
                "marca": metadato(toml, "esquema").removeprefix("sytue-")}
         if not (app["nombre"] and app["id"] and app["icono"] and app["marca"]):
             sys.exit("apps/fyne/cmd/%s/FyneApp.toml no declara Name, ID, Icon o esquema" % d)
@@ -140,6 +142,97 @@ PRIVACIDAD_WIDGETS = {
 }
 
 
+# EL MANIFIESTO DE PRIVACIDAD DE CADA APP (`<app>/PrivacyInfo.xcprivacy`, en la raíz del .app
+# de iOS y en Contents/Resources del de macOS). Apple lo exige a las apps de iOS desde mayo
+# de 2024: las API de «motivo requerido» que el binario usa, con su motivo, y los datos que
+# recoge. Las quince son Go (Fyne) y comparten casi todo lo nativo, así que lo que cambia
+# de una a otra sale de su FyneApp.toml y de su `appstore/<app>/privacidad.txt`.
+#
+# Las API, comprobadas el 2026-11-25 en el Go de la cadena, el fork de Fyne y GLFW (ninguna
+# app las llama por su cuenta en Swift u Objective-C: `grep` en apps/fyne y apps/nucleo):
+#
+# - Fechas de ficheros (stat, fstat, lstat, fstatat): `os.Stat` y `File.Stat` de Go, en los
+#   ficheros del contenedor de la app y del App Group (ajustes, sesión, widgets, cachés):
+#   C617.1. Las que abren ficheros que la persona elige (`ficheros`, `extensiones` o
+#   `archivos` en su FyneApp.toml: el selector del sistema, «Abrir con», el proveedor de
+#   Drive) los miden también: 3B52.1.
+# - Hora desde el arranque (mach_absolute_time): el reloj monótono del runtime de Go y los
+#   temporizadores de GLFW, para medir lo que pasa dentro de la app: 35F9.1.
+# - Espacio en disco (statfs, fstatfs): SQLite de github.com/mattn/go-sqlite3, que en Apple
+#   mira el sistema de ficheros de la base antes de escribir en ella (el almacén cifrado de
+#   Matrix): E174.1. Lo enlazan las quince (`go list -deps`).
+# - UserDefaults: en macOS, GLFW registra sus valores por defecto en el dominio de la app y
+#   Fyne lee la apariencia: CA92.1. En iOS no se usa; el manifiesto es el mismo para los dos.
+#
+# Ni rastreo ni dominios de rastreo: no hay SDK de terceros, anuncios ni analítica.
+API_PRIVACIDAD = {
+    "NSPrivacyAccessedAPICategoryDiskSpace": ["E174.1"],
+    "NSPrivacyAccessedAPICategoryFileTimestamp": ["C617.1"],
+    "NSPrivacyAccessedAPICategorySystemBootTime": ["35F9.1"],
+    "NSPrivacyAccessedAPICategoryUserDefaults": ["CA92.1"],
+}
+# Los tipos de dato de `appstore/<app>/privacidad.txt` («App Privacy»), con el nombre que
+# les da el manifiesto. Uno que no esté aquí para el generador: lo declarado en la tienda y
+# en el binario no puede divergir.
+DATOS_PRIVACIDAD = {
+    "Contact Info: Name": "NSPrivacyCollectedDataTypeName",
+    "Contact Info: Email Address": "NSPrivacyCollectedDataTypeEmailAddress",
+    "Contact Info: Phone Number": "NSPrivacyCollectedDataTypePhoneNumber",
+    "Contact Info: Physical Address": "NSPrivacyCollectedDataTypePhysicalAddress",
+    "Contact Info: Other User Contact Info": "NSPrivacyCollectedDataTypeOtherUserContactInfo",
+    "Contacts: Contacts": "NSPrivacyCollectedDataTypeContacts",
+    "Financial Info: Other Financial Info": "NSPrivacyCollectedDataTypeOtherFinancialInfo",
+    "Identifiers: User ID": "NSPrivacyCollectedDataTypeUserID",
+    "Identifiers: Device ID": "NSPrivacyCollectedDataTypeDeviceID",
+    "Usage Data: Product Interaction": "NSPrivacyCollectedDataTypeProductInteraction",
+    "User Content: Audio Data": "NSPrivacyCollectedDataTypeAudioData",
+    "User Content: Emails or Text Messages": "NSPrivacyCollectedDataTypeEmailsOrTextMessages",
+    "User Content: Other User Content": "NSPrivacyCollectedDataTypeOtherUserContent",
+    "User Content: Photos or Videos": "NSPrivacyCollectedDataTypePhotosorVideos",
+}
+FINALIDADES_PRIVACIDAD = {"App Functionality": "NSPrivacyCollectedDataTypePurposeAppFunctionality"}
+
+
+def datos_recogidos(clave):
+    """Los tipos de dato de la etiqueta «App Privacy» de la app, en la forma del manifiesto."""
+    ruta = os.path.join(FYNE, "appstore", clave, "privacidad.txt")
+    with open(ruta, encoding="utf-8") as f:
+        lineas = f.read().splitlines()
+    if "¿Se usan para seguimiento (tracking)? NO, ninguno" not in lineas:
+        sys.exit("%s: el manifiesto solo sabe de apps sin seguimiento" % ruta)
+    datos = []
+    for linea in lineas:
+        columnas = [c.strip() for c in linea.split("|")]
+        if len(columnas) != 5 or columnas[0] == "Tipo de dato":
+            continue
+        tipo, finalidad, vinculado, seguimiento = columnas[:4]
+        if (tipo not in DATOS_PRIVACIDAD or finalidad not in FINALIDADES_PRIVACIDAD
+                or vinculado not in ("Sí", "No") or seguimiento != "No"):
+            sys.exit("%s: «%s» no tiene equivalente en el manifiesto de privacidad" % (ruta, linea))
+        datos.append({
+            "NSPrivacyCollectedDataType": DATOS_PRIVACIDAD[tipo],
+            "NSPrivacyCollectedDataTypeLinked": vinculado == "Sí",
+            "NSPrivacyCollectedDataTypeTracking": False,
+            "NSPrivacyCollectedDataTypePurposes": [FINALIDADES_PRIVACIDAD[finalidad]],
+        })
+    if not datos:
+        sys.exit("%s no declara ningún dato" % ruta)
+    return sorted(datos, key=lambda d: d["NSPrivacyCollectedDataType"])
+
+
+def privacidad_app(a):
+    """El PrivacyInfo.xcprivacy de una app host (arriba, API_PRIVACIDAD)."""
+    api = {k: list(v) for k, v in API_PRIVACIDAD.items()}
+    if a["ficheros"] or a["extensiones"] or a["archivos"]:
+        api["NSPrivacyAccessedAPICategoryFileTimestamp"].append("3B52.1")
+    return plist_widgets({
+        "NSPrivacyTracking": False, "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": datos_recogidos(a["clave"]),
+        "NSPrivacyAccessedAPITypes": [{"NSPrivacyAccessedAPIType": k, "NSPrivacyAccessedAPITypeReasons": sorted(v)}
+                                      for k, v in sorted(api.items())],
+    })
+
+
 def grupo_widgets():
     """El contenedor, nunca el grupo de acceso al Keychain, tiene una sola fuente."""
     ruta = os.path.join(RAIZ, "apps", "nucleo", "ajustes", "grupo_apple.go")
@@ -184,7 +277,8 @@ def derechos_widgets(a, plataforma):
 def idiomas_widgets():
     """Las mismas traducciones del cliente Go; ninguna segunda tabla por idioma."""
     carpeta = os.path.join(RAIZ, "apps", "nucleo", "i18n", "locales")
-    claves = (["widgets." + c for c in ("open", "compose", "create", "newNote", "newContact", "addPhotos", "notes", "rows",
+    claves = (["widgets." + c for c in ("open", "compose", "create", "newNote", "newContact", "addPhotos",
+                                         "newDocument", "newSpreadsheet", "newPresentation", "openToUpdate", "notes", "rows",
                                          "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage")]
               + ["app." + a["marca"] + ".description" for a in apps() if a["widget_acciones"]]
               + ["dataflow.item." + c for c in ("files", "events", "documents", "contacts")]
@@ -454,7 +548,8 @@ def pbxproj(lista):
     for a in lista:
         c = a["clave"]
         hijos = [fichero(c + "/assets", "AppIcon.icon", "folder.iconcomposer.icon"),
-                 fichero(c + "/tienda", "tienda.entitlements", "text.plist.entitlements")]
+                 fichero(c + "/tienda", "tienda.entitlements", "text.plist.entitlements"),
+                 fichero(c + "/privacidad", "PrivacyInfo.xcprivacy", "text.xml")]
         ajustes = {"PRODUCT_NAME": a["nombre"], "EXECUTABLE_NAME": "sytue-" + c,
                    "PRODUCT_BUNDLE_IDENTIFIER": a["id"], "SYTUE_APP": c,
                    "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": c + "/tienda.entitlements"}
@@ -479,8 +574,12 @@ def pbxproj(lista):
                                    "sourceTree": "BUILT_PRODUCTS_DIR"}
         productos.append(ident("producto", c))
         o[ident("bf", c)] = {"isa": "PBXBuildFile", "fileRef": hijos[0]}
+        # El manifiesto de privacidad va con los recursos: Xcode lo deja en la raíz del .app
+        # de iOS y en Contents/Resources del de macOS, donde Apple lo busca.
+        o[ident("bf", c, "privacidad")] = {"isa": "PBXBuildFile", "fileRef": ident("ref", c + "/privacidad")}
         o[ident("recursos", c)] = {"isa": "PBXResourcesBuildPhase", "buildActionMask": 2147483647,
-                                   "files": [ident("bf", c)], "runOnlyForDeploymentPostprocessing": 0}
+                                   "files": [ident("bf", c), ident("bf", c, "privacidad")],
+                                   "runOnlyForDeploymentPostprocessing": 0}
         # Siempre: Go lleva su propia caché y Xcode no sabe qué fuentes lee. La entrada es el
         # Info.plist que Xcode acaba de escribir (la fase lo retoca después) y la salida, el
         # ejecutable que Xcode firma al final.
@@ -696,6 +795,7 @@ def generar(destino):
                 escribir("%s/archivos/%s.entitlements" % (c, plataforma), derechos_archivos(c, plataforma))
             escribir(c + "/archivos/Info.plist", info_archivos())
         escribir(c + "/ios.entitlements", plist(ios))
+        escribir(c + "/PrivacyInfo.xcprivacy", privacidad_app(a))
         if a["widget_acciones"]:
             escribir(c + "/widgets/Info.plist", info_widgets(a))
             for plataforma in ("ios", "macos"):

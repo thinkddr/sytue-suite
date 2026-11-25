@@ -58,11 +58,11 @@ type macros struct {
 var grabadora = &macros{}
 
 // AlmacenPersonal es donde se guardan las macros; lo cumple `sesion.PorPersona`, que pone
-// a la persona en la clave y no guarda nada sin nadie dentro.
+// la cuenta (emisor, persona y organización) en la clave y no guarda nada sin nadie dentro.
 type AlmacenPersonal interface {
 	Leer(clave string) string
 	Poner(clave, valor string)
-	Persona() string // el `sub` de quien ha entrado, o ""
+	Persona() string // la cuenta de quien ha entrado (cambia con la organización), o ""
 }
 
 // Personal es el almacén de la persona que ha entrado, si la app lo da (lo pone el `main`

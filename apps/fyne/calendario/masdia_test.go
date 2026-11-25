@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -59,6 +60,17 @@ func TestElMasDelMesDespliegaElDiaYNoCrea(t *testing.T) {
 	}
 	if _, ok := fyne.CanvasObject(cr.mas).(fyne.Focusable); !ok || cr.mas.AccessibilityLabel() != "+3 más" {
 		t.Fatalf("«+N más» no es un botón enfocable con su rótulo: %q", cr.mas.AccessibilityLabel())
+	}
+	// Mide 24 (WCAG 2.5.8; medía 16), pegado a la última píldora y dentro de su celda.
+	ultima := cr.pildoras[len(cr.pildoras)-1]
+	if h := cr.mas.Size().Height; h != 24 {
+		t.Errorf("«+N más» mide %v de alto y el objetivo es 24", h)
+	}
+	if arriba, pie := cr.mas.Position().Y, ultima.Position().Y+ultima.Size().Height; arriba < pie-0.01 {
+		t.Errorf("«+N más» empieza en %v, encima del pie de la última píldora (%v)", arriba, pie)
+	}
+	if fin := cr.mas.Position().Y + cr.mas.Size().Height; fin > celda.Size().Height-tema.Borde+0.01 {
+		t.Errorf("«+N más» acaba en %v, fuera de su celda de %v", fin, celda.Size().Height)
 	}
 
 	test.Tap(cr.mas)

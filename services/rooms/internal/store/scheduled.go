@@ -6,6 +6,8 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -101,6 +103,9 @@ func (s *Store) CreateScheduled(ctx context.Context, rec NewScheduledRecord) (do
 // por SendAt ascendente (los más próximos primero). Opcionalmente acotados a un
 // canal.
 //
+// Lo programado en una conversación de OTRA organización (ADR 0040) se guarda en la
+// anfitriona —es donde se publicará—: se lee allí también y se junta por SendAt.
+//
 // ponytail: sin keyset — los programados pendientes de un usuario son un conjunto
 // acotado por su propia redacción (como los fijados de un canal, ListPins); se capa
 // a 200. Si crecieran, portar a keyset por (send_at, id).
@@ -108,25 +113,56 @@ func (s *Store) ListScheduled(ctx context.Context, subject string, channelID *uu
 	t := tenancy.MustFrom(ctx)
 	var out []domain.ScheduledMessage
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx,
-			`SELECT `+scheduledCols+` FROM scheduled_messages
-			 WHERE tenant=$1 AND author_sub=$2 AND ($3::uuid IS NULL OR channel_id=$3)
-			 ORDER BY send_at ASC, id ASC LIMIT 200`,
-			t.Slug, subject, channelID)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			sm, err := scanScheduled(rows, t.Slug)
-			if err != nil {
-				return err
-			}
-			out = append(out, sm)
-		}
-		return rows.Err()
+		var err error
+		out, err = programadosTx(ctx, tx, t.Slug, subject, channelID)
+		return err
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	err = s.enCadaAnfitrion(ctx, subject, t.Slug, func(tx pgx.Tx, anfitrion string) (bool, error) {
+		fuera, err := programadosTx(ctx, tx, anfitrion, subject, channelID)
+		out = append(out, fuera...)
+		return false, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.SortStableFunc(out, func(a, b domain.ScheduledMessage) int {
+		if c := a.SendAt.Compare(b.SendAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID.String(), b.ID.String())
+	})
+	if len(out) > maxProgramadosListados {
+		out = out[:maxProgramadosListados]
+	}
+	return out, nil
+}
+
+// maxProgramadosListados es el tope de ListScheduled (ver su ponytail).
+const maxProgramadosListados = 200
+
+// programadosTx lee los programados de subject en UNA organización.
+func programadosTx(ctx context.Context, tx pgx.Tx, tenant, subject string, channelID *uuid.UUID) ([]domain.ScheduledMessage, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT `+scheduledCols+` FROM scheduled_messages
+		 WHERE tenant=$1 AND author_sub=$2 AND ($3::uuid IS NULL OR channel_id=$3)
+		 ORDER BY send_at ASC, id ASC LIMIT $4`,
+		tenant, subject, channelID, maxProgramadosListados)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.ScheduledMessage
+	for rows.Next() {
+		sm, err := scanScheduled(rows, tenant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, sm)
+	}
+	return out, rows.Err()
 }
 
 // UpdateScheduledRecord son los campos editables de un programado (nil = sin cambio).

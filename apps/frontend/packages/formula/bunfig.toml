@@ -1,0 +1,4 @@
+# Los tests construyen el motor desde `./engine.js` y esperan las funciones instaladas,
+# que en la app llegan aparte (src/perezosas.ts): la precarga las instala.
+[test]
+preload = ["./test/funciones-instaladas.ts"]

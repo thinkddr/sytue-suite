@@ -278,7 +278,7 @@ func baseGoogleEvent(ev domain.Event) GoogleEvent {
 		Sequence:     ev.SequenceNo,
 	}
 	if ev.Organizer != "" {
-		g.Organizer = &GooglePerson{Email: ev.Organizer}
+		g.Organizer = &GooglePerson{Email: ev.Organizer, DisplayName: ev.OrganizerName}
 	}
 	g.Attendees = googleAttendees(ev.Attendees, ev.Organizer)
 	return g

@@ -346,8 +346,10 @@ type relevoDatos struct {
 	AuthAge   int64                   `json:"auth_age"`
 	// Web: la vuelta es a una app web; la entrega (si hay clave) va en el fragmento.
 	Web bool `json:"web"`
-	// Login y Typed solo con la clave del puente de una app web (entregaSinTeclear):
-	// la autorización que obliga a teclear la clave, y si esta ya viene de ella.
+	// Login y Typed solo con la clave efímera de una app (el puente de una web, o la
+	// entrega de una nativa): la autorización que obliga a teclear la clave, y si esta
+	// ya viene de ella. Sin la clave en este navegador, el relevo la pide en el mismo
+	// viaje en vez de volver sin nada.
 	Login string `json:"login,omitempty"`
 	Typed bool   `json:"typed,omitempty"`
 }
@@ -415,7 +417,7 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 	if datos.Envelopes == nil {
 		datos.Envelopes = []recoverywrap.Envelope{}
 	}
-	if appKey != "" && datos.Web {
+	if appKey != "" {
 		datos.Login = uriTecleada(r)
 		datos.Typed = r.URL.Query().Get(paramTecleado) == "1"
 	}

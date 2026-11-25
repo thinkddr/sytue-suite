@@ -17,10 +17,18 @@
  * la bóveda (`EstudioBoveda.tsx`): firma invisible por defecto o un recuadro visible
  * (página, posición y rúbrica opcional, la misma apariencia que el servidor), y sello
  * de tiempo si el despliegue tiene autoridad; si no la tiene, lo dice ANTES de firmar.
+ *
+ * Como el diálogo del servidor, puede CERTIFICAR el documento («bloquear después de
+ * firmar», /DocMDP) y ofrece la rúbrica GUARDADA en la cuenta («Recordar mi firma»,
+ * `/api/pdf-rubrica`): leerla y guardarla solo mueve los trazos de la persona, nunca
+ * nada del PDF. Y en el estudio firma también un PDF protegido con contraseña: el motor
+ * del dispositivo lo reescribe sin ella (como el servidor, que firma reescribiendo) y
+ * lo dice antes; si ya llevaba firmas, pregunta antes de invalidarlas.
  */
 import { useEffect, useId, useState } from 'preact/hooks';
 import {
   Button,
+  Checkbox,
   EmptyState,
   FieldGroup,
   FieldHint,
@@ -29,6 +37,7 @@ import {
   Modal,
   SegmentedControl,
   Spinner,
+  confirmarEnEditor,
 } from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { ConsumerPrivateDrive } from '@sytue/offline/vault/drive';
@@ -47,6 +56,7 @@ import {
 import { pedirSelloAlServidor, selloDisponible, type SelloDisponible } from './dispositivo/sello';
 import { POSICIONES_FIRMA, type PosicionFirma } from './firmaPosicion';
 import { LienzoDeFirma } from './LienzoDeFirma';
+import { rubrica } from './api';
 
 /** La frase de cada motivo por el que no se pudo firmar. */
 export const MENSAJE_FIRMA_LOCAL: Record<MotivoFirmaLocal, DocsKey> = {
@@ -56,6 +66,7 @@ export const MENSAJE_FIRMA_LOCAL: Record<MotivoFirmaLocal, DocsKey> = {
   bloqueado: 'pdf.device.error.locked',
   ilegible: 'pdf.device.error.unreadable',
   pagina: 'pdf.device.error.page',
+  certificarFirmado: 'pdf.error.certifySigned',
   entrar: 'pdf.device.error.signin',
   pendiente: 'pdf.device.error.pending',
   fallo: 'pdf.device.error.failed',
@@ -78,12 +89,22 @@ export const rutaDelEstudio = (ruta: string) => r(`/pdf?path=${encodeURIComponen
 
 type Apariencia = 'invisible' | 'visible';
 
+/**
+ * Un PDF protegido con contraseña que el estudio tiene abierto: cómo reescribirlo sin
+ * ella con el motor del dispositivo y si ya lleva firmas (que reescribir invalida).
+ */
+export interface PdfProtegido {
+  desproteger: () => Promise<Uint8Array<ArrayBuffer>>;
+  firmado: boolean;
+}
+
 /** El diálogo de firmar un PDF de la bóveda con un `.p12`. */
 export function DialogoFirmar({
   t,
   pdf,
   drive,
   paginas,
+  protegido,
   onCerrar,
   onFirmado,
 }: {
@@ -92,6 +113,8 @@ export function DialogoFirmar({
   drive: Pick<ConsumerPrivateDrive, 'repository' | 'signal'>;
   /** Cuántas páginas tiene, si se sabe (el estudio lo sabe; la portada no). */
   paginas?: number | undefined;
+  /** Con contraseña y abierto en el estudio: se firma reescrito sin ella. */
+  protegido?: PdfProtegido | undefined;
   onCerrar: () => void;
   onFirmado: (firmado: FirmadoEnBoveda) => void;
 }) {
@@ -104,9 +127,27 @@ export function DialogoFirmar({
   const [pagina, setPagina] = useState('1');
   const [posicion, setPosicion] = useState<PosicionFirma>(POSICIONES_FIRMA[0]!);
   const [trazos, setTrazos] = useState<[number, number][][]>([]);
+  const [certificar, setCertificar] = useState(false);
+  // «Recordar mi firma», como el diálogo del servidor: la guardada se pone sola en el
+  // lienzo y la casilla sale marcada; desmarcarla y firmar la olvida.
+  const [recordar, setRecordar] = useState(false);
+  const [guardada, setGuardada] = useState(false);
   const [sello, setSello] = useState<SelloDisponible | null>(null);
   const [firmando, setFirmando] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let vivo = true;
+    void rubrica.leer().then((r) => {
+      if (!vivo || !r) return;
+      setGuardada(true);
+      setRecordar(true);
+      setTrazos((actuales) => (actuales.length === 0 ? r : actuales));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   // Si habrá sello se dice ANTES de firmar, no al terminar.
   useEffect(() => {
@@ -127,17 +168,31 @@ export function DialogoFirmar({
 
   const firmar = async () => {
     if (!p12 || firmando) return;
+    // Reescribir un PDF protegido que ya lleva firmas las invalida: se pregunta antes,
+    // como el estudio del servidor, y solo con un sí se sigue.
+    if (
+      protegido?.firmado &&
+      !(await confirmarEnEditor({
+        mensaje: t('pdf.signatures.invalidate.confirm'),
+        confirmLabel: t('pdf.signatures.invalidate.apply'),
+        tone: 'danger',
+      }))
+    )
+      return;
     setFirmando(true);
     setError('');
     try {
       const identidad = await leerPkcs12(p12.slice(), clave);
+      const original = protegido ? await protegido.desproteger() : undefined;
       const hecho = await firmarEnBoveda({
         repositorio: drive.repository,
         id: pdf.id,
         identidad,
+        original,
         opciones: {
           motivo,
           lugar,
+          certificar,
           sello: sello?.disponible ? pedirSelloAlServidor() : undefined,
         },
         visible:
@@ -148,6 +203,12 @@ export function DialogoFirmar({
         signal: drive.signal,
       });
       setClave('');
+      // Mejor esfuerzo y sin esperar, como en el servidor: recordar la rúbrica no puede
+      // retrasar ni impedir la firma. Solo se toca con una firma visible dibujada.
+      if (apariencia === 'visible') {
+        if (recordar && trazos.length > 0) void rubrica.guardar(trazos);
+        else if (!recordar && guardada) void rubrica.olvidar();
+      }
       onFirmado(hecho);
     } catch (e) {
       setError(t(MENSAJE_FIRMA_LOCAL[motivoFirmaLocal(e)]));
@@ -275,7 +336,44 @@ export function DialogoFirmar({
                 {t('pdf.dialog.firmar.limpiar')}
               </Button>
             </div>
+            <label class="text-text flex flex-col gap-0.5 text-xs">
+              <span class="flex items-center gap-1.5">
+                <Checkbox
+                  checked={recordar}
+                  onChange={(e) => setRecordar((e.target as HTMLInputElement).checked)}
+                  class="accent-primary"
+                  data-recordar-firma
+                />
+                {t('pdf.dialog.firmar.recordar')}
+              </span>
+              <span class="text-text-subtle text-2xs ml-5 text-pretty">
+                {t(
+                  guardada
+                    ? 'pdf.dialog.firmar.recordar.guardada'
+                    : 'pdf.dialog.firmar.recordar.help',
+                )}
+              </span>
+            </label>
           </div>
+        )}
+        <label class="text-text flex flex-col gap-0.5 text-xs">
+          <span class="flex items-center gap-1.5">
+            <Checkbox
+              checked={certificar}
+              onChange={(e) => setCertificar((e.target as HTMLInputElement).checked)}
+              class="accent-primary"
+              data-certificar
+            />
+            {t('pdf.dialog.firmar.lock')}
+          </span>
+          <span class="text-text-subtle text-2xs ml-5 text-pretty">
+            {t('pdf.dialog.firmar.lockHelp')}
+          </span>
+        </label>
+        {protegido && (
+          <FieldHint tone="warning">
+            <span data-firma-protegido>{t('pdf.device.protectedNote')}</span>
+          </FieldHint>
         )}
         {sello && (
           <FieldHint tone={sello.disponible ? 'info' : 'warning'}>

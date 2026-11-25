@@ -18,6 +18,7 @@ import {
   readPrivateStorageBody,
   privateStorageFailure as fail,
 } from './matrix-storage-scope.js';
+import { contextoDerivado } from './contexto-derivado.js';
 
 interface PrivateRouteOptions {
   bff: Bff;
@@ -183,10 +184,9 @@ export function rutaCorteIdentidadMatrixPrivada(
   return async (ctx) => {
     const raw = ctx.params.ruta ?? '';
     return reply(
-      await proxy({
-        ...ctx,
-        params: { ...ctx.params, ruta: 'migration' + (raw ? '/' + raw : '') },
-      }),
+      await proxy(
+        contextoDerivado(ctx, { ...ctx.params, ruta: 'migration' + (raw ? '/' + raw : '') }),
+      ),
     );
   };
 }

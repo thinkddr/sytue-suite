@@ -1,6 +1,7 @@
 /**
  * UnifiedAuditPanel — Auditoría UNIFICADA de Sytue Admin: agrega la traza de todos
- * los servicios (Identidad, Correo, Archivos, Integraciones) en una sola tabla,
+ * los servicios (Identidad, Correo, Archivos, Notas, Documentos, Rooms, Calendario,
+ * Contactos, Hub e Integraciones) en una sola tabla,
  * etiquetada por servicio y ordenada por fecha DESC. El fan-out best-effort vive en
  * el BFF (lib/audit-siem.ts): una llamada por servicio; si una fuente cae, se avisa
  * sin romper el resto. Filtros (servicio, acción, actor, rango de fechas) y export
@@ -36,6 +37,11 @@ const SOURCE_LABEL_KEY: Record<AuditSource, ConsoleMessageKey> = {
   mail: 'audit.source.mail',
   drive: 'audit.source.drive',
   notes: 'audit.source.notes',
+  docs: 'audit.source.docs',
+  rooms: 'audit.source.rooms',
+  calendar: 'audit.source.calendar',
+  contacts: 'audit.source.contacts',
+  hub: 'audit.source.hub',
   integrations: 'audit.source.integrations',
 };
 
@@ -45,6 +51,11 @@ const SOURCE_TONE: Record<AuditSource, BadgeTone> = {
   mail: 'accent',
   drive: 'success',
   notes: 'primary',
+  docs: 'primary',
+  rooms: 'accent',
+  calendar: 'success',
+  contacts: 'info',
+  hub: 'neutral',
   integrations: 'neutral',
 };
 
@@ -101,6 +112,11 @@ const SOURCE_OPTIONS: { value: '' | AuditSource; labelKey: ConsoleMessageKey }[]
   { value: 'mail', labelKey: 'audit.source.mail' },
   { value: 'drive', labelKey: 'audit.source.drive' },
   { value: 'notes', labelKey: 'audit.source.notes' },
+  { value: 'docs', labelKey: 'audit.source.docs' },
+  { value: 'rooms', labelKey: 'audit.source.rooms' },
+  { value: 'calendar', labelKey: 'audit.source.calendar' },
+  { value: 'contacts', labelKey: 'audit.source.contacts' },
+  { value: 'hub', labelKey: 'audit.source.hub' },
   { value: 'integrations', labelKey: 'audit.source.integrations' },
 ];
 

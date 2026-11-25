@@ -673,7 +673,7 @@ func (a *App) pintar() {
 	pararLatidos(latidos)
 	// Se conservan, además del árbol nuevo, las piezas que la pantalla guarda para el
 	// pintado siguiente aunque ahora no se vean (otra vista, el cajón cerrado).
-	soltarArboles(viejos, a.raiz, p.mesObjeto, p.menuHecho, p.cabeceraHecha, p.buscadorAgenda)
+	soltarArboles(viejos, a.raiz, p.mesObjeto, p.menuHecho, p.cabeceraHecha, p.buscadorAgenda, p.compactaHecha, p.agendaHecha)
 	switch foco.(type) {
 	case *diaCompacto:
 		if p.diaElegido != nil {

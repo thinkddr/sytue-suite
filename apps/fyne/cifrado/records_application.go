@@ -26,6 +26,10 @@ type RecordApplicationConfig[R RecordApplicationRepository] struct {
 	Service                transfer.CutoverService
 	New                    func(records.Config) (R, error)
 	Historical             func(records.Config) (*records.HistoricalSource, error)
+	// OnWrite avisa tras cada escritura aceptada en el repositorio privado: el
+	// Suite.AvisarEscritura de la app, que vuelve a publicar su widget (ADR 0078). Por
+	// la API lo hace sesion.Suite.ClienteConAviso; aquí nada pasa por HTTP. Opcional.
+	OnWrite func()
 }
 
 // NewRecordApplicationPlan reuses the same complete-source cutover and retained
@@ -47,7 +51,7 @@ func NewRecordApplicationPlan[R RecordApplicationRepository](ctx context.Context
 		}
 		bind = cfg.BindPublicationContext
 	}
-	configuration := records.Config{Context: ctx, BindPublicationContext: bind, WorkLease: resources.WorkLease(), Scope: resources.PrivateStorageScope(), Crypto: resources.Devices.Isolated, Gateway: cfg.Gateway, Journal: resources.Journal, Source: cfg.Source}
+	configuration := records.Config{Context: ctx, BindPublicationContext: bind, WorkLease: resources.WorkLease(), Scope: resources.PrivateStorageScope(), Crypto: resources.Devices.Isolated, Gateway: cfg.Gateway, Journal: resources.Journal, Source: cfg.Source, OnWrite: cfg.OnWrite}
 	target, err := cfg.New(configuration)
 	if err != nil {
 		return plan, err
@@ -59,6 +63,7 @@ func NewRecordApplicationPlan[R RecordApplicationRepository](ctx context.Context
 	if resources.Devices.RequireLegacy {
 		configuration.Crypto = resources.Devices.Legacy
 		configuration.BindPublicationContext = nil
+		configuration.OnWrite = nil
 		historical, err = cfg.Historical(configuration)
 		if err != nil {
 			target.Close()

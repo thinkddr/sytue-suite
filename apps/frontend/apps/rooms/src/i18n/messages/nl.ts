@@ -252,6 +252,7 @@ export const nl: AppCatalog<typeof en> = {
     other: 'Je kunt maximaal {count} personen toevoegen.',
   },
   'dm.openFailed': 'Het gesprek kon niet worden geopend.',
+  'dm.externalClosed': 'Je organisatie staat geen gesprekken met deze persoon toe.',
   'people.search': '“{query}” zoeken in Sytue One',
   'people.searching': 'Zoeken in Sytue One…',
   'people.notFound': 'Niemand in Sytue One gebruikt dat e-mailadres of die @gebruikersnaam.',

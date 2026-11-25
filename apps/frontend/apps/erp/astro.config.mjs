@@ -6,7 +6,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { sytueHealthEndpoint } from '@sytue/config/astro-health';
 import { sytuePrecarga } from '@sytue/config/astro-precarga';
 import { sytueNoEncontrada } from '@sytue/config/astro-404';
-import { sytueSecurity } from '@sytue/config/astro-security';
+import { sytueArranque } from '@sytue/config/astro-arranque';
+import { sytueCsp, sytueSecurity } from '@sytue/config/astro-security';
 
 /**
  * SyERP — Astro 7 + Preact 10 (islands), SSR para el BFF.
@@ -16,12 +17,15 @@ import { sytueSecurity } from '@sytue/config/astro-security';
 export default defineConfig({
   output: 'server',
   base: '/erp',
-  security: sytueSecurity,
+  // `csp`: script-src SIN 'unsafe-inline' (sytueCsp, astro-security.ts): Astro firma
+  // sus scripts y los de arranque llegan de /arranque.js (sytueArranque).
+  security: { ...sytueSecurity, csp: sytueCsp() },
   adapter: node({ mode: 'standalone' }),
   integrations: [
     sytuePrecarga(),
     sytueHealthEndpoint(),
     sytueNoEncontrada(),
+    sytueArranque(),
     preact({ compat: true }),
   ],
   server: { port: 4334, host: true },

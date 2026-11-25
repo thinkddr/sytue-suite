@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -158,6 +159,9 @@ type Service struct {
 	// directorio encuentra en Sytue ID a personas de otras organizaciones (ver
 	// externos.go). nil = no se puede añadir a nadie de fuera.
 	directorio Directorio
+	// orgsDePersona dice en qué organizaciones está alguien (contacto_externo.go); nil =
+	// Sytue ID.
+	orgsDePersona OrganizacionesDePersona
 	// hubNotifier emite notificaciones a Sytue Hub para menciones y mensajes directos.
 	hubNotifier *hubnotify.Client
 	nombresOrgs NombresOrgs
@@ -425,6 +429,10 @@ func (s *Service) AddChannelMember(ctx context.Context, channelID uuid.UUID, act
 		p, perr := s.directorio.PorID(ctx, subject)
 		switch {
 		case perr == nil:
+			// La política de contacto de esta organización (contacto_externo.go).
+			if cerr := s.contactoDeSalida(ctx, []string{subject}); cerr != nil {
+				return domain.Member{}, cerr
+			}
 			m, err = s.pstore.AddExternalChannelMember(ctx, channelID, actor, subject, nombreDePersona(p))
 		case !errors.Is(perr, domain.ErrNotFound):
 			err = perr
@@ -451,8 +459,15 @@ func (s *Service) Invitaciones(ctx context.Context, subject string) ([]domain.In
 		return nil, err
 	}
 	inv, err := s.pstore.Invitaciones(ctx, subject, t.Slug)
-	if err != nil || s.nombresOrgs == nil {
-		return inv, err
+	if err != nil {
+		return nil, err
+	}
+	// La que no admiten las políticas de las dos organizaciones no llega a verse.
+	inv = slices.DeleteFunc(inv, func(i domain.Invitacion) bool {
+		return !s.contactoPermitido(ctx, t.Slug, i.Organizacion)
+	})
+	if s.nombresOrgs == nil {
+		return inv, nil
 	}
 	// El nombre visible de la organización que invita (decisión del dueño, 17/10): solo
 	// de las que invitan a ESTA persona, que es la verja de Sytue ID.
@@ -473,6 +488,12 @@ func (s *Service) AceptarInvitacion(ctx context.Context, subject, name string, c
 	t, err := tenancy.From(ctx)
 	if err != nil {
 		return err
+	}
+	// Sin admitirlo las dos políticas, no se entra (y la invitación ni se veía).
+	if org, err := s.pstore.OrganizacionDeInvitacion(ctx, subject, t.Slug, channelID); err != nil {
+		return err
+	} else if org != "" && !s.contactoPermitido(ctx, t.Slug, org) {
+		return domain.ErrContactoExternoCerrado
 	}
 	anfitrion, err := s.pstore.AceptarInvitacion(ctx, subject, t.Slug, channelID)
 	if err != nil {
@@ -560,11 +581,13 @@ func (s *Service) OpenGroupDirect(ctx context.Context, teamID uuid.UUID, actorSu
 		if t, terr := tenancy.From(ctx); terr == nil {
 			grupo := append([]string{actorSub}, otherSubs...)
 			ch, hay, err := s.pstore.DirectoDeFuera(ctx, actorSub, t.Slug, grupo)
-			if err != nil || hay {
+			if err != nil || (hay && s.contactoPermitido(ctx, t.Slug, ch.Tenant)) {
 				return ch, err
 			}
-			// El grupo ya le había escrito desde otra organización: abrirlo es aceptar.
-			if ch, hay, err = s.pstore.AceptarDirectoPendiente(ctx, actorSub, t.Slug, grupo); err != nil || hay {
+			// El grupo ya le había escrito desde otra organización: abrirlo es aceptar,
+			// si las dos políticas lo admiten.
+			permitida := func(org string) bool { return s.contactoPermitido(ctx, t.Slug, org) }
+			if ch, hay, err = s.pstore.AceptarDirectoPendiente(ctx, actorSub, t.Slug, grupo, permitida); err != nil || hay {
 				return ch, err
 			}
 		}
@@ -729,11 +752,17 @@ func (s *Service) PutDraft(ctx context.Context, sub string, channelID uuid.UUID,
 		return domain.Draft{}, domain.ErrEncryptedRequired
 	}
 	body, err := domain.NormalizeBody(body, s.cfg.MaxMessageBytes)
+	if !errors.Is(err, domain.ErrEmptyMessage) && err != nil {
+		return domain.Draft{}, err
+	}
+	// El de una conversación de otra organización se guarda en la anfitriona, junto
+	// al canal (ADR 0040); ListDrafts lo lee allí.
+	ctx, aerr := s.enOrganizacionDelCanal(ctx, sub, channelID)
+	if aerr != nil {
+		return domain.Draft{}, aerr
+	}
 	if errors.Is(err, domain.ErrEmptyMessage) {
 		return domain.Draft{ChannelID: channelID, ParentID: parentID}, s.store.DeleteDraft(ctx, sub, channelID, parentID)
-	}
-	if err != nil {
-		return domain.Draft{}, err
 	}
 	return s.store.PutDraft(ctx, sub, channelID, parentID, body)
 }

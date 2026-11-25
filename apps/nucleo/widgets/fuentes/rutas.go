@@ -136,5 +136,29 @@ func RutaCanal(id string) string {
 // reciente de otra app se abre desde allí, en la app que toca.
 func RutaActividad() string { return widgets.Ruta("/actividad") }
 
+// RutaAgenda es un evento de la agenda de hoy de One por su día (`/agenda?date=AAAA-MM-DD`,
+// y `&all_day=1` en uno de día completo; hub.DiaDeAgenda): One lo abre en Calendar, en ese
+// día, como la fila de su tarjeta «Hoy». Es ruta de One porque la fila es de su widget y el
+// lector solo antepone el esquema propio; lleva solo la fecha, nada del evento, como
+// RutaDia.
+func RutaAgenda(inicio time.Time, diaCompleto bool) string {
+	if inicio.IsZero() {
+		return ""
+	}
+	if diaCompleto {
+		return widgets.Ruta("/agenda", "date", inicio.Format(time.DateOnly), "all_day", "1")
+	}
+	return widgets.Ruta("/agenda", "date", inicio.Format(time.DateOnly))
+}
+
+// RutaHilo es una conversación de Mail (`/?thread=<hilo>`, api.LeerHilo): la misma que abre
+// el aviso de un correo nuevo. Sin hilo, sin ruta.
+func RutaHilo(hilo string) string {
+	if hilo == "" {
+		return ""
+	}
+	return widgets.Ruta("/", "thread", hilo)
+}
+
 // pdfEnCarpeta es la ruta de un PDF de la carpeta de CertiPDF.
 func pdfEnCarpeta(nombre string) string { return "/" + api.PDFCarpeta + "/" + nombre }

@@ -20,11 +20,13 @@ import (
 	"syscall"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 
 	drivedb "git.sytue.eu/sytue/one/services/drive/db"
@@ -146,7 +148,14 @@ func run() error {
 	svc := service.New(cfg, st, blobs, service.NewPoolPublisher(pool), chatGate)
 	davHandler := webdav.Handler("/dav", svc)
 
+	// La traza de acceso a ficheros (docs/security.md §1.7): en lotes, sin
+	// bloquear la petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
+
 	router := drivehttp.NewRouter(drivehttp.Deps{
+		Traza:    traza,
 		Cfg:      cfg,
 		Service:  svc,
 		Verifier: verifier,
@@ -191,6 +200,14 @@ func run() error {
 			}
 		}()
 	}
+
+	// Purga de tenant (ADR 0054): cuando Sytue ID ha borrado las filas de una
+	// organización que desaparece, aquí se borran sus objetos, también los
+	// deduplicados de la organización (`shared/drive/<slug>/`, compartir.go). El
+	// almacén externo de una organización (su propio bucket) no se toca: es suyo.
+	go purgatenant.Trabajador{DB: pool, Almacen: blobs, Log: logger, Prefijos: func(slug string) []string {
+		return []string{objectstore.PrefijoCompartido + "drive/" + slug + "/"}
+	}}.Ejecutar(ctx, purgatenant.Cada)
 
 	srv := httpx.NewServer(httpx.ServerConfig{
 		Addr:            cfg.HTTPAddr,

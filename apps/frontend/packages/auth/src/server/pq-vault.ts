@@ -22,6 +22,7 @@ import {
   privateStorageFailure as fail,
   privateStorageScope,
 } from './matrix-storage-scope.js';
+import { contextoDerivado } from './contexto-derivado.js';
 
 const maxKeyBodyBytes = 16 << 10;
 // Una clave pública híbrida y dos firmas ML-DSA-65, en base64: unos 14 KB.
@@ -120,9 +121,7 @@ export function rutaBovedaPq(options: {
       )
         return fail(403, 'cross_site');
       // El proxy compone la ruta con `ruta`: aquí va vacía, la fija el prefijo.
-      const sub = Object.assign(Object.create(ctx) as typeof ctx, {
-        params: { ...ctx.params, ruta: '' },
-      });
+      const sub = contextoDerivado(ctx, { ...ctx.params, ruta: '' });
       const response = await proxyClaveDeFirma(sub);
       response.headers.set('cache-control', 'no-store');
       response.headers.set('vary', 'Cookie');

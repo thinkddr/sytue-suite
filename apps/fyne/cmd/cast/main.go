@@ -211,6 +211,11 @@ func main() {
 				if err != nil {
 					return cifrado.ApplicationView{}, err
 				}
+				// El widget lee este repositorio mientras esté montado: el servidor de esta
+				// cuenta está congelado desde que pasó a Matrix (ADR 0078). Vive lo que la cuenta
+				// montada, no esta petición de montaje.
+				//nolint:contextcheck // la vida es la de la cuenta (resources.Context).
+				s.WidgetDesdeRegistrosPrivados(resources.Context(), resources.HTTP(), facade)
 				return mount(resources, facade), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
 			},
 		},
@@ -224,7 +229,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(tr.T("matrix.failed", nil), ""))
 	} else {
 		// Cast SÍ sirve sin sesión —la portada pública, los canales y los vídeos públicos—
 		// y cada pantalla que la necesita ofrece entrar: la barra no la tapa con su página

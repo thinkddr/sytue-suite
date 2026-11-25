@@ -2731,9 +2731,9 @@ export const nl: AppCatalog<typeof en> = {
     'De handtekening past niet op die pagina. Kies een andere pagina of positie.',
   'pdf.device.view': 'Bekijken',
   'pdf.vault.help':
-    'Deze pdf staat in je versleutelde Drive: hij wordt alleen op dit apparaat ontsleuteld, waar je hem kunt bekijken, annoteren, invullen, ordenen en ondertekenen. Wat je opslaat, gaat versleuteld terug.',
+    'Deze pdf staat in je versleutelde Drive: hij wordt alleen op dit apparaat ontsleuteld, waar je hem kunt bekijken, annoteren, invullen, ordenen, beveiligen, zwartlakken, bewerken, vergelijken, afdrukken en ondertekenen. Wat je opslaat, gaat versleuteld terug.',
   'pdf.vault.serverOnly':
-    'Met je versleutelde Drive zijn handtekeningverzoeken, wachtwoordbeveiliging, tekstherkenning, zwartlakken, tekst of afbeeldingen bewerken, stempels en watermerken, vergelijken, versiegeschiedenis en afdrukken nog niet beschikbaar: daarvoor moet de dienst de pdf lezen of ze kunnen nog niet op het apparaat.',
+    'Met je versleutelde Drive zijn ondertekeningsverzoeken, tekstherkenning en de assistent niet beschikbaar: daarvoor moet de dienst de pdf lezen. Al het andere gebeurt op dit apparaat.',
   'pdf.vault.notFound.title': 'Deze pdf staat niet in je versleutelde Drive',
   'pdf.vault.notFound.description':
     'Hij is misschien verplaatst of verwijderd. Zoek hem in Sytue Drive.',
@@ -2749,7 +2749,9 @@ export const nl: AppCatalog<typeof en> = {
     'Je Drive gaat nog over naar end-to-endversleuteling. Rond dat af vanuit Sytue Drive.',
   'pdf.device.error.password': 'Met dat wachtwoord gaat het certificaat niet open.',
   'pdf.device.error.encrypted':
-    'Deze pdf is met een wachtwoord beveiligd en kan op dit apparaat niet worden ondertekend.',
+    'Deze pdf is met een wachtwoord beveiligd: open hem en onderteken hem vanuit zijn studio, waar het wachtwoord wordt gebruikt.',
+  'pdf.device.protectedNote':
+    'Deze pdf is met een wachtwoord beveiligd. Om hem te ondertekenen wordt hij op dit apparaat zonder het wachtwoord herschreven, zoals de server ook doet: de ondertekende kopie wordt versleuteld in je Drive opgeslagen, maar zonder het wachtwoord van de pdf.',
   'pdf.device.error.locked':
     'Deze pdf is gecertificeerd tegen elke wijziging: een extra handtekening zou hem ongeldig maken.',
   'pdf.device.error.unreadable':

@@ -2705,9 +2705,9 @@ export const pt: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'A assinatura não cabe nessa página. Escolha outra página ou posição.',
   'pdf.device.view': 'Ver',
   'pdf.vault.help':
-    'Este PDF está no teu Drive cifrado: só é decifrado neste dispositivo, onde o podes ver, anotar, preencher, organizar e assinar. O que guardares volta cifrado.',
+    'Este PDF está no teu Drive cifrado: só é decifrado neste dispositivo, onde o podes ver, anotar, preencher, organizar, proteger, rasurar, editar, comparar, imprimir e assinar. O que guardares volta cifrado.',
   'pdf.vault.serverOnly':
-    'Com o teu Drive cifrado ainda não estão disponíveis pedir assinaturas, proteger com palavra-passe, reconhecer texto, ocultar, editar texto ou imagens, carimbos e marcas de água, comparar, o histórico de versões nem imprimir: precisam que o serviço leia o PDF ou ainda não se fazem no dispositivo.',
+    'Com o teu Drive cifrado não estão disponíveis os pedidos de assinatura, o reconhecimento de texto nem o assistente: precisam que o serviço leia o PDF. Tudo o resto é feito neste dispositivo.',
   'pdf.vault.notFound.title': 'Este PDF não está no seu Drive cifrado',
   'pdf.vault.notFound.description': 'Pode ter sido movido ou eliminado. Procure-o no Sytue Drive.',
   'pdf.vault.openSigned': 'Abrir a cópia assinada',
@@ -2721,7 +2721,9 @@ export const pt: AppCatalog<typeof en> = {
     'O seu Drive ainda está a passar para a cifragem de ponta a ponta. Conclua a partir do Sytue Drive.',
   'pdf.device.error.password': 'Essa palavra-passe não abre o certificado.',
   'pdf.device.error.encrypted':
-    'Este PDF está protegido por palavra-passe e não pode ser assinado neste dispositivo.',
+    'Este PDF está protegido por palavra-passe: abre-o e assina-o a partir do seu estúdio, onde é usada a sua palavra-passe.',
+  'pdf.device.protectedNote':
+    'Este PDF está protegido por palavra-passe. Para o assinar, é reescrito sem ela neste dispositivo, como faz o servidor: a cópia assinada é guardada cifrada no teu Drive, mas sem a palavra-passe do PDF.',
   'pdf.device.error.locked':
     'Este PDF está certificado contra qualquer alteração: outra assinatura invalidá-lo-ia.',
   'pdf.device.error.unreadable':

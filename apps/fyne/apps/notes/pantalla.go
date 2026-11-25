@@ -87,6 +87,9 @@ type Pantalla struct {
 	filtroEstado string
 	// textos es el texto de filtrar de cada nota, mientras no cambie (textosPlegados).
 	textos textosPlegados
+	// orden es lo ordenado en el último repintado, con la lista de la que salió
+	// (ordenadas).
+	ordenHecho ordenHecho
 	// lateralHecho y barraHecha son el carril y la barra del último repintado, con la
 	// clave con que se hicieron (conservar.go); filasLateral, las filas de ese carril.
 	lateralHecho fyne.CanvasObject
@@ -634,7 +637,7 @@ func (p *Pantalla) sincronizar() {
 	if len(p.textos) > 4*len(p.notas)+64 {
 		p.textos = nil // de cuadernos que ya no están abiertos
 	}
-	visibles := Ordenar(filtrarCon(enfocadas, p.filtro, p.filtroEstado, p.textos.de), p.orden, p.loc)
+	visibles := p.ordenadas(filtrarCon(enfocadas, p.filtro, p.filtroEstado, p.textos.de))
 
 	p.lateral.Cuadernos, p.lateral.Activo, p.lateral.EsMio = enArbol(p.cuadernos), p.activo.ID, p.esMio
 	// Las del cuaderno abierto cuelgan de su fila TAL COMO LLEGARON: la web le pasa
@@ -689,6 +692,66 @@ func (p *Pantalla) sincronizar() {
 		return
 	}
 	p.lienzo.Llenar, p.lienzo.Notas = false, visibles
+}
+
+// ordenHecho es lo que dejó `ordenadas`: la lista de entrada (que la mantiene viva, para
+// que su memoria no la reutilice otra lista del mismo largo), el orden con que se ordenó
+// (`perm`: la posición en la entrada de cada nota de la salida) y la salida, que se
+// reescribe en cada repintado sin pedir memoria nueva.
+type ordenHecho struct {
+	de    []Nota
+	orden Orden
+	perm  []int
+	out   []Nota
+}
+
+// ordenadas es Ordenar con el orden de la pantalla, sin copiar el cuaderno en memoria
+// nueva en cada repintado: eran ~0,7 MB con mil notas por una imagen que llega o un cambio
+// de foco. Ordena las posiciones y no las notas; con la MISMA lista que el repintado
+// anterior y su orden aún válido (nadie ha tocado una clave en su sitio) no reordena; y
+// copia las notas en la salida de antes, que vuelve a escribirse entera, así que nunca
+// enseña una nota vieja. En el orden en que ya venían, devuelve la entrada tal cual.
+func (p *Pantalla) ordenadas(notas []Nota) []Nota {
+	h := &p.ordenHecho
+	cmpNotas := compararNotas(p.orden)
+	misma := len(notas) > 0 && len(h.de) == len(notas) && &h.de[0] == &notas[0] && h.orden == p.orden
+	if !misma || !sigueOrdenada(notas, h.perm, cmpNotas) {
+		h.perm = h.perm[:0]
+		for i := range notas {
+			h.perm = append(h.perm, i)
+		}
+		slices.SortStableFunc(h.perm, func(i, j int) int { return cmpNotas(&notas[i], &notas[j]) })
+		h.de, h.orden = notas, p.orden
+	}
+	identidad := true
+	for k, i := range h.perm {
+		if k != i {
+			identidad = false
+			break
+		}
+	}
+	if identidad {
+		return notas
+	}
+	h.out = h.out[:0]
+	for _, i := range h.perm {
+		h.out = append(h.out, notas[i])
+	}
+	return h.out
+}
+
+// sigueOrdenada dice si `perm` aún ordena `notas`, estable: a claves iguales, la de antes
+// en la entrada va antes.
+func sigueOrdenada(notas []Nota, perm []int, c func(a, b *Nota) int) bool {
+	if len(perm) != len(notas) {
+		return false
+	}
+	return slices.IsSortedFunc(perm, func(i, j int) int {
+		if r := c(&notas[i], &notas[j]); r != 0 {
+			return r
+		}
+		return cmp.Compare(i, j)
+	})
 }
 
 // EsperaFiltro es lo que se espera tras la última tecla del filtro antes de repintar el
@@ -1352,6 +1415,10 @@ func (p *Pantalla) purgarYa(n Nota) {
 // dentro, sin salir (`destinoInterno` de la web); cualquier otro lo abre el sistema, que
 // es el `target="_blank"` que el servicio pone a todos.
 func (p *Pantalla) seguirEnlace(href string) {
+	if a, ok := p.adjuntoDeEnlace(href); ok {
+		p.descargarAdjunto(a) // un fichero del texto (adjuntos_cuerpo.go)
+		return
+	}
 	if tag, ok := hashtagDe(href); ok {
 		p.buscarHashtag("#" + tag)
 		return

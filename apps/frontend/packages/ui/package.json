@@ -18,7 +18,9 @@
     "./browser/tabla": "./src/browser/tabla.ts",
     "./browser/zoom": "./src/browser/zoom.ts",
     "./icons": "./src/assets/icons.ts",
-    "./pagina-404.astro": "./src/astro/PaginaNoEncontrada.astro"
+    "./pagina-404.astro": "./src/astro/PaginaNoEncontrada.astro",
+    "./arranque": "./src/astro/arranque.ts",
+    "./arranque-sw": "./src/astro/arranque-sw.ts"
   },
   "files": [
     "src"

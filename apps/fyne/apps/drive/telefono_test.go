@@ -110,3 +110,50 @@ func TestLaBarraDeSeleccionCabeEnElTelefono(t *testing.T) {
 		}
 	}
 }
+
+// TestLaFranjaDeCarpetasDejaSitioAlSubirFlotante: con la franja de carpetas en el
+// teléfono la lista va dentro de otro desplazamiento y no reservaba el hueco del «Subir»
+// flotante, que tapaba su última fila (auditoría del 2026-11-24). Si la franja cabe, el
+// final de la lista es el de la pantalla y la lista lleva su fila de reserva, como sin
+// franja; en una ventana baja (franja compacta) la reserva va al final del desplazamiento
+// de fuera y la lista de dos filas no la lleva. VISTO EN ROJO con la reserva apagada.
+func TestLaFranjaDeCarpetasDejaSitioAlSubirFlotante(t *testing.T) {
+	e, w := exploradorEnElTelefono(t)
+	if e.listaFranja == nil {
+		t.Fatal("sin el desplazamiento de la franja: el fixture no la monta")
+	}
+	if !e.reservaFilas.Activa() {
+		t.Error("con la franja a 390 × 844 la lista no reserva el hueco del «Subir» flotante")
+	}
+	contenido, ok := e.listaFranja.Content.(*fyne.Container)
+	if !ok {
+		t.Fatal("el desplazamiento de la franja no lleva su columna")
+	}
+	col, ok := contenido.Layout.(*columnaLista)
+	if !ok {
+		t.Fatal("la columna de la franja no es una columnaLista")
+	}
+	// Con la franja normal, la lista acaba a `PieLista` del final del cuerpo: la reserva
+	// de su última fila es la que la separa del botón.
+	if fin, cuerpo := e.filasObj.Position().Y+e.filasObj.Size().Height, contenido.Size().Height; fin < cuerpo-PieLista-1 {
+		t.Errorf("la lista acaba en %v y el cuerpo en %v: sobra hueco además de la reserva", fin, cuerpo)
+	}
+
+	// Una ventana baja: la franja compacta pone la reserva al final del desplazamiento.
+	w.Resize(fyne.NewSize(390, 380))
+	if !col.compacta {
+		t.Fatalf("a 390 × 380 la franja no es compacta (cuerpo de %v)", e.listaFranja.Size().Height)
+	}
+	if e.reservaFilas.Activa() {
+		t.Error("con la franja compacta la lista de dos filas aún lleva su fila de reserva")
+	}
+	e.listaFranja.ScrollToBottom()
+	fin := e.filasObj.Position().Y + e.filasObj.Size().Height - e.listaFranja.Offset.Y
+	boton := e.listaFranja.Size().Height - ui.LadoBotonFlotante - ui.MargenBotonFlotante
+	if fin > boton+0.5 {
+		t.Errorf("abajo del todo la lista acaba en %v y el «Subir» empieza en %v", fin, boton)
+	}
+	if inicio := fin - e.filasObj.Size().Height; inicio < -0.5 {
+		t.Errorf("abajo del todo la lista empieza en %v, fuera del desplazamiento", inicio)
+	}
+}

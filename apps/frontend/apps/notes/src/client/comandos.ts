@@ -38,6 +38,8 @@ export type IdComando =
   | 'tabla'
   | 'columnas2'
   | 'columnas3'
+  | 'imagen'
+  | 'archivo'
   | 'regla'
   | 'estado'
   | 'fecha'
@@ -176,6 +178,20 @@ export const COMANDOS: readonly Comando[] = [
     clave: 'editor.columns3',
     descripcion: 'editor.columnsDesc',
     alias: ['columns', 'layout', '3'],
+  },
+  // Una imagen o un fichero: se guardan como adjuntos de la nota y el texto los nombra
+  // (`adjunto:ID`, components/adjuntos-texto.ts). Solo donde hay nota a la que adjuntar.
+  {
+    id: 'imagen',
+    clave: 'editor.image',
+    descripcion: 'editor.imageDesc',
+    alias: ['image', 'img', 'picture'],
+  },
+  {
+    id: 'archivo',
+    clave: 'editor.file',
+    descripcion: 'editor.fileDesc',
+    alias: ['file', 'attach'],
   },
   {
     id: 'regla',

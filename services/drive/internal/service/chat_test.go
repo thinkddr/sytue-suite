@@ -36,8 +36,8 @@ func TestChatClientContract(t *testing.T) {
 		t.Fatal("NewChatClient con URL y secreto no debe ser nil")
 	}
 	ctx := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "acme"})
-	if err := c.CanAccessChannel(ctx, cid, "alice"); err != nil {
-		t.Fatalf("204 debe ser acceso concedido, got %v", err)
+	if got, err := c.ChannelTenant(ctx, cid, "alice"); err != nil || got.Slug != "acme" {
+		t.Fatalf("204 debe ser acceso concedido en la organización del token, got %+v %v", got, err)
 	}
 	if gotPath != "/internal/channel-access" {
 		t.Fatalf("ruta = %q", gotPath)
@@ -60,7 +60,7 @@ func TestChatClientMapping(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(code)
 		}))
-		err := NewChatClient(srv.URL, "s").CanAccessChannel(ctx, uuid.New(), "bob")
+		_, err := NewChatClient(srv.URL, "s").ChannelTenant(ctx, uuid.New(), "bob")
 		srv.Close()
 		if !errors.Is(err, domain.ErrNotFound) {
 			t.Fatalf("%d => %v, quiero ErrNotFound", code, err)
@@ -70,9 +70,42 @@ func TestChatClientMapping(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	err := NewChatClient(srv.URL, "s").CanAccessChannel(ctx, uuid.New(), "bob")
+	_, err := NewChatClient(srv.URL, "s").ChannelTenant(ctx, uuid.New(), "bob")
 	if err == nil || errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("500 => %v, quiero un error distinto de ErrNotFound (fail-closed, no «no miembro»)", err)
+	}
+}
+
+// TestChatClientAnfitriona: la persona de OTRA organización (ADR 0040) lee el canal
+// donde está como externa, que vive en la de quien lo abrió: Rooms contesta 200 con
+// esa organización y es donde Drive sube y lee el adjunto. Un 200 que no dice una
+// organización válida es un error, no un permiso.
+func TestChatClientAnfitriona(t *testing.T) {
+	ctx := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "otra"})
+	for _, tc := range []struct {
+		cuerpo string
+		quiero string
+	}{
+		{`{"tenant":"acme"}`, "acme"},
+		{`{"tenant":""}`, ""},
+		{`{"tenant":"Mal Slug"}`, ""},
+		{`no es json`, ""},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(tc.cuerpo))
+		}))
+		got, err := NewChatClient(srv.URL, "s").ChannelTenant(ctx, uuid.New(), "bea")
+		srv.Close()
+		if tc.quiero == "" {
+			if err == nil || errors.Is(err, domain.ErrNotFound) {
+				t.Fatalf("%s => %+v %v, quiero un error (fail-closed)", tc.cuerpo, got, err)
+			}
+			continue
+		}
+		if err != nil || got.Slug != tc.quiero {
+			t.Fatalf("%s => %+v %v, quiero %s", tc.cuerpo, got, err, tc.quiero)
+		}
 	}
 }
 

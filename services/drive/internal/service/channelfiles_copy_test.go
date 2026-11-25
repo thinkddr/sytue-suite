@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 )
 
@@ -27,12 +28,12 @@ type chatFake struct {
 	preguntas int
 }
 
-func (c *chatFake) CanAccessChannel(_ context.Context, _ uuid.UUID, _ string) error {
+func (c *chatFake) ChannelTenant(ctx context.Context, _ uuid.UUID, _ string) (tenancy.Tenant, error) {
 	c.preguntas++
 	if c.deja {
-		return nil
+		return tenancy.From(ctx)
 	}
-	return domain.ErrNotFound
+	return tenancy.Tenant{}, domain.ErrNotFound
 }
 
 func TestCopiarAdjuntoDeCanalAjenoNiExiste(t *testing.T) {

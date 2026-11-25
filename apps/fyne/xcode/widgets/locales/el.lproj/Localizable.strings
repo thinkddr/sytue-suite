@@ -4,6 +4,10 @@
 "widgets.newNote" = "Νέα σημείωση";
 "widgets.newContact" = "Νέα επαφή";
 "widgets.addPhotos" = "Προσθήκη φωτογραφιών";
+"widgets.newDocument" = "Νέο έγγραφο";
+"widgets.newSpreadsheet" = "Νέο υπολογιστικό φύλλο";
+"widgets.newPresentation" = "Νέα παρουσίαση";
+"widgets.openToUpdate" = "Ενημερώνεται όταν η εφαρμογή είναι ανοιχτή";
 "widgets.notes" = "Σημειώσεις";
 "widgets.rows" = "Γραμμές";
 "widgets.pending" = "Σε αναμονή";

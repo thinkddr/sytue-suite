@@ -161,6 +161,10 @@ type Bienvenida struct {
 	// lleva a ellos no se pinta.
 	AlConfigurar func()
 	AlBanco      func()
+	// AlImportar abre «Importar desde otro programa»; la tarjeta solo sale si
+	// PuedeImportar dice que sí (quien administra la organización).
+	AlImportar    func()
+	PuedeImportar func() bool
 }
 
 // NuevaBienvenida crea la portada.
@@ -264,6 +268,11 @@ func (b *Bienvenida) Objeto(v tema.Variante) fyne.CanvasObject {
 	if b.SinJustificar > 0 && b.AlBanco != nil {
 		add(b.aviso(v, ancho, b.t("dashboard.weekTitle"), b.t("dashboard.bankPending", i18n.Vars{"count": b.SinJustificar}),
 			b.t("dashboard.bankAction"), aviso, b.AlBanco))
+	}
+	// «Trae tus datos de otro programa»: una tarjeta normal con su botón secundario.
+	if b.AlImportar != nil && b.PuedeImportar != nil && b.PuedeImportar() {
+		add(b.avisoCon(v, ancho, b.t("migrate.cta"), b.t("migrate.ctaBody"), b.t("migrate.title"),
+			tema.Color("border", v), ui.Secundario, b.AlImportar))
 	}
 	switch {
 	case b.SabePerfil && !b.ConPerfil && b.AlConfigurar != nil:
@@ -392,8 +401,13 @@ func (c *conSombra) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 // aviso es una tarjeta de «esta semana»: título, frase y el botón que lleva a hacerlo.
 // En el móvil el botón baja y ocupa todo el ancho (`flex-col`).
 func (b *Bienvenida) aviso(v tema.Variante, ancho float32, titulo, cuerpo, accion string, borde color.NRGBA, al func()) (fyne.CanvasObject, float32) {
+	return b.avisoCon(v, ancho, titulo, cuerpo, accion, borde, ui.Primario, al)
+}
+
+// avisoCon es aviso con el botón de otra variante.
+func (b *Bienvenida) avisoCon(v tema.Variante, ancho float32, titulo, cuerpo, accion string, borde color.NRGBA, variante ui.Variante, al func()) (fyne.CanvasObject, float32) {
 	dentro := ancho - 2*tema.Borde - 2*TarjetaPX
-	boton := ui.NuevoBoton(accion, al).Con(ui.Primario, ui.TallaSM)
+	boton := ui.NuevoBoton(accion, al).Con(variante, ui.TallaSM)
 	mb := boton.MinSize()
 	anchoIzq := dentro
 	if b.sm() {

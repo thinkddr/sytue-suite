@@ -40,8 +40,8 @@ func TestLasFichasQueCabenSonLasDeLaWeb(t *testing.T) {
 
 // TestLasBarrasYLaFichaSolaDelMes: las barras de varios días miden 24 (como las
 // píldoras, el objetivo de WCAG 2.5.8) a 26 de paso, en el mes y en la franja «todo el
-// día» de la semana; y la única píldora de un día sin barras en su semana va en dos
-// líneas en vez de cortarse, con la hora y el título en el mismo párrafo.
+// día» de la semana; y las píldoras de un día van en dos líneas si caben así en vez de
+// cortarse, con la hora y el título en el mismo párrafo.
 //
 // VISTO EN ROJO con las barras de 18 a 22 de paso y la píldora de 20 en una línea.
 func TestLasBarrasYLaFichaSolaDelMes(t *testing.T) {
@@ -109,9 +109,13 @@ func TestLasBarrasYLaFichaSolaDelMes(t *testing.T) {
 	if pr.resto.Position().X != pr.hora.Position().X {
 		t.Errorf("la segunda línea empieza en %v y la hora en %v", pr.resto.Position().X, pr.hora.Position().X)
 	}
-	// Con barras en su semana, la píldora va en una línea, de 24.
-	conBarra, _ := pildoraDel(16)
-	if conBarra.dosLineas || conBarra.Size().Height != 24 {
-		t.Errorf("con barras en la semana la píldora mide %v (dos líneas: %v)", conBarra.Size().Height, conBarra.dosLineas)
+	// Con una barra en su semana también va en dos líneas si cabe bajo ella (desde el
+	// 2026-11-25, como `fichasEnDosLineas` de la web), sin salirse de su celda.
+	conBarra, celdaBarra := pildoraDel(16)
+	if !conBarra.dosLineas || conBarra.Size().Height != AltoPildoraDosLineas {
+		t.Errorf("con una barra en la semana la píldora mide %v (dos líneas: %v)", conBarra.Size().Height, conBarra.dosLineas)
+	}
+	if fin := conBarra.Position().Y + conBarra.Size().Height; fin > celdaBarra.Size().Height-RellenoCelda {
+		t.Errorf("la píldora bajo la barra acaba en %v y la celda en %v", fin, celdaBarra.Size().Height)
 	}
 }

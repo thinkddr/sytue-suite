@@ -1,0 +1,97 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * El registro de solicitudes RGPD y la supresión física de una cuenta: traducción
+ * del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const sv: AppCatalog<typeof en> = {
+  'privacidad.titulo': 'Integritetsbegäranden',
+  'privacidad.descripcion':
+    'Vad personer begär av din organisation om sina personuppgifter (GDPR, artikel 15–21). Registrera varje begäran, svara inom en månad och genomför en radering här.',
+  'privacidad.registrar': 'Registrera en begäran',
+  'privacidad.filtro': 'Visa',
+  'privacidad.filtro.abiertas': 'Öppna',
+  'privacidad.filtro.vencidas': 'Försenade',
+  'privacidad.filtro.todas': 'Alla',
+  'privacidad.resumen.abiertas': 'Öppna begäranden',
+  'privacidad.resumen.vencidas': 'Fristen har passerat',
+  'privacidad.vacia': 'Inga begäranden att visa.',
+  'privacidad.errorCarga': 'Registret kunde inte läsas in.',
+  'privacidad.col.persona': 'Person',
+  'privacidad.col.tipo': 'Begäran',
+  'privacidad.col.recibida': 'Mottagen',
+  'privacidad.col.plazo': 'Frist',
+  'privacidad.col.estado': 'Status',
+  'privacidad.tipo.access': 'Tillgång till sina uppgifter',
+  'privacidad.tipo.rectification': 'Rättelse',
+  'privacidad.tipo.erasure': 'Radering',
+  'privacidad.tipo.restriction': 'Begränsning av behandling',
+  'privacidad.tipo.portability': 'Dataportabilitet',
+  'privacidad.tipo.objection': 'Invändning',
+  'privacidad.canal.email': 'E-post',
+  'privacidad.canal.web': 'Webbformulär',
+  'privacidad.canal.letter': 'Brev',
+  'privacidad.canal.phone': 'Telefon',
+  'privacidad.canal.in_person': 'Personligen',
+  'privacidad.canal.other': 'Annat',
+  'privacidad.estado.received': 'Mottagen',
+  'privacidad.estado.in_progress': 'Pågår',
+  'privacidad.estado.completed': 'Besvarad',
+  'privacidad.estado.rejected': 'Avslagen',
+  'privacidad.plazo.vencida': 'Försenad',
+  'privacidad.plazo.pronto': 'Löper ut snart',
+  'privacidad.plazo.prorrogada': 'Förlängd',
+  'privacidad.alta.quien': 'Vem frågar',
+  'privacidad.alta.miembro': 'Någon i organisationen',
+  'privacidad.alta.fuera': 'Någon utanför',
+  'privacidad.alta.elegirMiembro': 'Välj personen',
+  'privacidad.alta.correo': 'Personens e-postadress',
+  'privacidad.alta.nombre': 'Personens namn (valfritt)',
+  'privacidad.alta.tipo': 'Vad som begärs',
+  'privacidad.alta.canal': 'Hur den kom in',
+  'privacidad.alta.recibida': 'Mottagningsdatum',
+  'privacidad.alta.recibidaAyuda': 'Fristen på en månad räknas från detta datum, inte från i dag.',
+  'privacidad.alta.identidad': 'Identitet kontrollerad',
+  'privacidad.alta.metodo': 'Hur den kontrollerades',
+  'privacidad.alta.notas': 'Anteckningar',
+  'privacidad.alta.error.subject': 'Ange vem som gör begäran.',
+  'privacidad.alta.error.email': 'Ange en giltig e-postadress.',
+  'privacidad.alta.error.date':
+    'Datumet måste ligga inom det senaste året och får inte vara i framtiden.',
+  'privacidad.alta.error.upstream': 'Begäran kunde inte registreras.',
+  'privacidad.alta.hecha': 'Begäran registrerad.',
+  'privacidad.detalle.plazo': 'Svara senast {fecha}',
+  'privacidad.detalle.resolucion': 'Svar som gavs till personen',
+  'privacidad.detalle.resolucionAyuda':
+    'Krävs för att stänga begäran: det är vad personen får veta.',
+  'privacidad.detalle.guardar': 'Spara',
+  'privacidad.detalle.guardado': 'Begäran uppdaterad.',
+  'privacidad.detalle.cerrada': 'Den här begäran är stängd och kan inte längre ändras.',
+  'privacidad.detalle.prorroga': 'Förläng med två månader',
+  'privacidad.detalle.prorrogaAyuda':
+    'En gång och innan fristen löper ut. Personen måste få veta varför: skriv det här.',
+  'privacidad.detalle.prorrogar': 'Förläng',
+  'privacidad.detalle.historia': 'Historik',
+  'privacidad.evento.created': 'Registrerad',
+  'privacidad.evento.updated': 'Uppdaterad',
+  'privacidad.evento.extended': 'Fristen förlängd',
+  'privacidad.evento.erasureStarted': 'Radering startad',
+  'privacidad.evento.erasureCompleted': 'Radering klar',
+  'privacidad.supresion.titulo': 'Radera kontot',
+  'privacidad.supresion.explica':
+    'Kontot stängs direkt och oåterkalleligt, och dess inloggningsmetoder raderas. Inom några minuter anonymiseras profilen och det som andra tjänster sparar om personen raderas. Det personen skapat för organisationen (brevlåda, filer, händelser) stannar i organisationen.',
+  'privacidad.supresion.confirmar': 'Skriv {correo} för att bekräfta',
+  'privacidad.supresion.iniciada': 'Raderingen har startat. Den är klar inom några minuter.',
+  'privacidad.supresion.enCurso': 'Raderingen pågår.',
+  'privacidad.supresion.hecha': 'Kontot har raderats.',
+  'privacidad.supresion.sinCuenta':
+    'Personen har inget konto i organisationen: här finns inget konto att radera.',
+  'privacidad.supresion.noMiembro': 'Personen är inte längre medlem i organisationen.',
+  'privacidad.supresion.error': 'Kontot kunde inte raderas.',
+  'privacidad.error.upstream': 'Ändringen kunde inte sparas.',
+  'privacidad.cancelar': 'Avbryt',
+};

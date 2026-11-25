@@ -5,7 +5,7 @@
  */
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
-import { chatClient } from '../../lib/chat.js';
+import { chatClient, chatFail } from '../../lib/chat.js';
 
 export const prerender = false;
 
@@ -34,8 +34,9 @@ export const POST: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).openDirect(subjects);
     return json({ channel });
-  } catch {
-    return json({ error: 'chat_error' }, 502);
+  } catch (err) {
+    // El 4xx y el código de la política de contacto llegan a la isla (chatFail).
+    return chatFail(err);
   }
 };
 

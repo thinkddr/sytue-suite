@@ -133,6 +133,12 @@ func (s *Store) organizacionDeInvitacion(ctx context.Context, subject, propio st
 	return tenant, err
 }
 
+// OrganizacionDeInvitacion es la organización anfitriona de la invitación de subject a
+// ese canal; "" si no la hay.
+func (s *Store) OrganizacionDeInvitacion(ctx context.Context, subject, propio string, channelID uuid.UUID) (string, error) {
+	return s.organizacionDeInvitacion(ctx, subject, propio, channelID)
+}
+
 // AceptarInvitacion convierte la invitación en pertenencia (fila `externo`) y devuelve
 // la organización anfitriona. ErrNotFound si no hay invitación.
 func (s *Store) AceptarInvitacion(ctx context.Context, subject, propio string, channelID uuid.UUID) (string, error) {
@@ -179,14 +185,19 @@ func (s *Store) resolverInvitacion(ctx context.Context, subject, propio string, 
 
 // AceptarDirectoPendiente: quien abre un DM con un grupo que ya le había escrito desde
 // otra organización acepta esa invitación en vez de abrir una segunda conversación (el
-// mismo grupo, una sola conversación, ADR 0040). Abrirla es consentir.
-func (s *Store) AceptarDirectoPendiente(ctx context.Context, subject, propio string, subs []string) (domain.Channel, bool, error) {
+// mismo grupo, una sola conversación, ADR 0040). Abrirla es consentir. `permitida`
+// (nil = todas) deja fuera las de organizaciones que la política de contacto no admite
+// (mig 0083).
+func (s *Store) AceptarDirectoPendiente(ctx context.Context, subject, propio string, subs []string, permitida func(org string) bool) (domain.Channel, bool, error) {
 	lista, err := s.invitacionesDe(ctx, subject, propio)
 	if err != nil || len(lista) == 0 {
 		return domain.Channel{}, false, err
 	}
 	slug := directSlugN(subs...)
 	for _, i := range lista {
+		if permitida != nil && !permitida(i.Organizacion) {
+			continue
+		}
 		var ch domain.Channel
 		err := s.pool.InTx(ctx, func(tx pgx.Tx) error {
 			if err := pg.SetTenant(ctx, tx, i.Organizacion); err != nil {

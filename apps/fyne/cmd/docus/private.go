@@ -28,5 +28,6 @@ func docusPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], su
 		Service:    api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil),
 		New:        office.New,
 		Historical: office.NewHistoricalSource,
+		OnWrite:    suite.AvisarEscritura,
 	})
 }

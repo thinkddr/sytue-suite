@@ -8,6 +8,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
@@ -39,11 +40,34 @@ func (s *Store) Audit(ctx context.Context, q pg.Querier, e AuditEntry) error {
 	if err != nil {
 		return errf("Audit.marshal", err)
 	}
+	orgID, orgSlug := orgDeAuditoria(e.OrgID)
 	const sql = `INSERT INTO audit_log (actor_id, org_id, action, target, ip, detail)
-		VALUES (nullif($1,'')::uuid, nullif($2,'')::uuid, $3, nullif($4,''),
-		        nullif($5,'')::inet, $6)`
-	_, err = q.Exec(ctx, sql, e.ActorID, e.OrgID, e.Action, e.Target, e.IP, raw)
+		VALUES (nullif($1,'')::uuid,
+		        coalesce(nullif($2,'')::uuid, (SELECT id FROM organizations WHERE slug = nullif($7,''))),
+		        $3, nullif($4,''), nullif($5,'')::inet, $6)`
+	_, err = q.Exec(ctx, sql, e.ActorID, orgID, e.Action, e.Target, e.IP, raw, orgSlug)
 	return errf("Audit", err)
+}
+
+// uuidDeAuditoria es la forma de un id de organización: 8-4-4-4-12 en hexadecimal.
+var uuidDeAuditoria = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// orgDeAuditoria separa lo que llega como organización de una entrada: su id o su
+// slug. Los manejadores de «mi cuenta» (`/api/v1/me/…`) pasan `c.Tenant`, que en el
+// token es el SLUG («acme»), y el `::uuid` de antes hacía fallar el INSERT entero:
+// esas acciones (contraseñas de aplicación, avatar, teléfono, dispositivos, passkeys…)
+// no quedaban en el registro, y el error se descartaba (`_ = s.store.Audit`). Lo
+// descubrió la prueba de integración de la actividad de la cuenta. Ahora un slug se
+// resuelve a su id en la misma sentencia (NULL si no existe), y nada se cuela como
+// uuid sin serlo.
+func orgDeAuditoria(org string) (id, slug string) {
+	if org == "" {
+		return "", ""
+	}
+	if uuidDeAuditoria.MatchString(org) {
+		return org, ""
+	}
+	return "", org
 }
 
 // AuditFilter acota una consulta del log. Todos los campos son opcionales; la

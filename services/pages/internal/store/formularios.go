@@ -114,6 +114,10 @@ func (s *Store) ListarEnvios(ctx context.Context, tenant string, siteID uuid.UUI
 // formulario y devuelve cuántas CAMBIARON. Con `ids` vacío y `leidas`, marca todas
 // las que quedaban sin leer: es el «marcar todo como leído» de la bandeja.
 //
+// Sin ids, pgx manda un `nil` como NULL y no como un array vacío: `cardinality(NULL)`
+// es NULL y «marcar todo» no marcaba nada (lo vio TestBandejaLeidasYBorrado). De ahí el
+// coalesce de la condición.
+//
 // Marcar no reescribe la hora de una ya leída (coalesce): «leída el martes» sigue
 // siendo verdad aunque se vuelva a pulsar el jueves. Y solo toca las filas que de
 // verdad cambian, para que el recuento devuelto sea el que la pantalla resta.
@@ -124,7 +128,7 @@ func (s *Store) MarcarEnviosLeidos(ctx context.Context, tenant string, siteID uu
 			UPDATE form_submissions
 			   SET read_at = CASE WHEN $5 THEN coalesce(read_at, now()) ELSE NULL END
 			 WHERE site_id = $1 AND tenant = $2 AND form_id = $3
-			   AND (cardinality($4::uuid[]) = 0 OR id = ANY($4::uuid[]))
+			   AND (coalesce(cardinality($4::uuid[]), 0) = 0 OR id = ANY($4::uuid[]))
 			   AND (read_at IS NULL) = $5`,
 			siteID, tenant, formID, ids, leidas)
 		if err != nil {

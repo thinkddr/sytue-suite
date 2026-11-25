@@ -87,8 +87,14 @@ func TestEstadoDeCuenta(t *testing.T) {
 	if e.Ventas != (store.ResumenCuenta{Facturado: 400, Pagado: 300, Pendiente: 100, Vencido: 100}) || e.Compras.Pendiente != 50 {
 		t.Fatalf("estado de cuenta: %+v", e)
 	}
-	if len(e.Documentos) != 3 || e.Documentos[0].ID != abierta.ID || e.Documentos[0].DiasVencida != 24 {
-		t.Fatalf("documentos (la abierta y vencida primero): %+v", e.Documentos)
+	// Lo abierto primero y, dentro, lo más vencido: la compra sin vencimiento cuenta
+	// desde su fecha (55 días, como en la antigüedad) y va antes que la venta (24); la
+	// cobrada, al final y sin días.
+	if len(e.Documentos) != 3 ||
+		e.Documentos[0].ID != gasto.ID || e.Documentos[0].DiasVencida != 55 ||
+		e.Documentos[1].ID != abierta.ID || e.Documentos[1].DiasVencida != 24 ||
+		e.Documentos[2].ID != pagada.ID || e.Documentos[2].DiasVencida != 0 {
+		t.Fatalf("documentos (lo abierto y más vencido primero): %+v", e.Documentos)
 	}
 }
 
@@ -102,9 +108,9 @@ func TestProductosBajoMinimo(t *testing.T) {
 	producto, existencia, almacen := modelo(t, c, "producto"), modelo(t, c, "existencia"), modelo(t, c, "almacen")
 	a1 := crear(ctx, t, st, almacen, `{"nombre":"Norte"}`)
 	a2 := crear(ctx, t, st, almacen, `{"nombre":"Sur"}`)
-	corto := crear(ctx, t, st, producto, `{"nombre":"Tornillo","stock_minimo":"100"}`)
-	justo := crear(ctx, t, st, producto, `{"nombre":"Tuerca","stock_minimo":"10"}`)
-	crear(ctx, t, st, producto, `{"nombre":"Arandela"}`)
+	corto := crear(ctx, t, st, producto, `{"nombre":"Tornillo","tipo":"bien","precio":100,"stock_minimo":"100"}`)
+	justo := crear(ctx, t, st, producto, `{"nombre":"Tuerca","tipo":"bien","precio":100,"stock_minimo":"10"}`)
+	crear(ctx, t, st, producto, `{"nombre":"Arandela","tipo":"bien","precio":100}`)
 	for _, e := range []string{
 		fmt.Sprintf(`{"producto":%q,"almacen":%q,"existencias":"30.5"}`, corto.ID, a1.ID),
 		fmt.Sprintf(`{"producto":%q,"almacen":%q,"existencias":"20"}`, corto.ID, a2.ID),

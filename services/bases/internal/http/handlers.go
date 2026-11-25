@@ -355,9 +355,9 @@ func (h *Handlers) listarRegistros(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	vista, extra, ok := lecturaDe(r)
-	if !ok {
-		httpx.Fail(w, r, httpx.ErrBadRequest)
+	vista, extra, err := lecturaDe(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
 		return
 	}
 	limite, _ := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -373,16 +373,23 @@ func (h *Handlers) listarRegistros(w http.ResponseWriter, r *http.Request) {
 // un UUID) y lo del momento (`q`, `sort`, `today`). Lo comparten la rejilla, la
 // exportación y el resumen: si cada uno lo leyera a su modo, el pie sumaría una cosa y
 // la descarga traería otra.
-func lecturaDe(r *http.Request) (string, store.LecturaAdHoc, bool) {
+//
+// Devuelve el error que se contesta tal cual: una vista que no es un UUID no existe
+// (404, como antes de juntar aquí las lecturas: lo vigila TestFlujoYPermisosPorHTTP) y
+// lo del momento mal formado es un 400.
+func lecturaDe(r *http.Request) (string, store.LecturaAdHoc, error) {
 	vista := ""
 	if v := r.URL.Query().Get("view"); v != "" {
 		var err error
 		if vista, err = idDe(v); err != nil {
-			return "", store.LecturaAdHoc{}, false
+			return "", store.LecturaAdHoc{}, httpx.ErrNotFound
 		}
 	}
 	extra, ok := lecturaAdHoc(r.URL.Query())
-	return vista, extra, ok
+	if !ok {
+		return "", store.LecturaAdHoc{}, httpx.ErrBadRequest
+	}
+	return vista, extra, nil
 }
 
 // resumir es el pie de la rejilla: cuántos registros pasan la vista y las cifras de
@@ -394,9 +401,9 @@ func (h *Handlers) resumir(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	vista, extra, ok := lecturaDe(r)
-	if !ok {
-		httpx.Fail(w, r, httpx.ErrBadRequest)
+	vista, extra, err := lecturaDe(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
 		return
 	}
 	res, err := h.Store.Resumir(r.Context(), a, tid, vista, extra)
@@ -649,9 +656,9 @@ func (h *Handlers) exportar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Lo que se ve: la vista, la búsqueda y el orden del momento (como `listarRegistros`).
-	vista, extra, ok := lecturaDe(r)
-	if !ok {
-		httpx.Fail(w, r, httpx.ErrBadRequest)
+	vista, extra, err := lecturaDe(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
 		return
 	}
 	// Por tramos: la tabla no cabe en memoria (ya no tiene el techo de 50.000). La cabecera

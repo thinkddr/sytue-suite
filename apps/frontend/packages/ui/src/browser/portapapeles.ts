@@ -178,6 +178,107 @@ export interface OpcionesDePegado {
    * editor que las sabe pintar; de la casilla se copia el `checked` y nada más.
    */
   tareas?: boolean;
+  /**
+   * Los bloques del editor de Sytue Notes (`BLOQUES_DE_NOTAS`): panel, sección que se
+   * pliega, estado, decisiones, fecha, lenguaje del código, cabeceras y fondos de
+   * tabla, columnas, subíndice y superíndice. Cada atributo, solo en su etiqueta y
+   * solo con los valores de su lista.
+   */
+  bloques?: boolean;
+}
+
+const COLORES_DE_BLOQUE = ['gris', 'azul', 'verde', 'amarillo', 'rojo', 'morado'] as const;
+
+/**
+ * LOS BLOQUES DEL EDITOR DE NOTAS: el HTML que guardan la web y Fyne. Es la misma lista
+ * que la del saneador del servicio (`apps/nucleo/notes/model/html.go`), y la prueba
+ * `bloques-saneado.test.ts` de Notes compara las dos.
+ *
+ *   panel       <div data-panel="info|nota|exito|aviso|error">…</div>
+ *   expandir    <details data-expandir [open]><summary>Título</summary>…</details>
+ *   estado      <span data-estado="gris|azul|verde|amarillo|rojo|morado">TEXTO</span>
+ *   decisiones  <ul data-tipo="decisiones"><li>…</li></ul>
+ *   fecha       <time datetime="AAAA-MM-DD">texto</time>
+ *   código      <pre [data-lineas] [data-ajuste]><code data-lenguaje="go|javascript|…">…</code></pre>
+ *   tabla       <table [data-numerada]>, <thead> de <th>, <th scope="row">, data-fondo en td/th
+ *   columnas    <div data-columnas="2|3"><div data-columna>…</div>…</div>
+ */
+export const BLOQUES_DE_NOTAS = {
+  /** Etiqueta → atributo → valores que valen. */
+  enumerados: {
+    div: { 'data-panel': ['info', 'nota', 'exito', 'aviso', 'error'], 'data-columnas': ['2', '3'] },
+    span: { 'data-estado': COLORES_DE_BLOQUE },
+    ul: { 'data-tipo': ['decisiones'] },
+    code: {
+      // La lista del editor de Fyne, con su misma grafía.
+      'data-lenguaje': [
+        'texto',
+        'bash',
+        'c',
+        'cpp',
+        'csharp',
+        'css',
+        'go',
+        'html',
+        'java',
+        'javascript',
+        'json',
+        'kotlin',
+        'markdown',
+        'php',
+        'python',
+        'ruby',
+        'rust',
+        'sql',
+        'swift',
+        'typescript',
+        'xml',
+        'yaml',
+      ],
+    },
+    th: { scope: ['row'], 'data-fondo': COLORES_DE_BLOQUE },
+    td: { 'data-fondo': COLORES_DE_BLOQUE },
+  } as Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>,
+  /** Etiqueta → atributos que van sin valor. */
+  sinValor: {
+    details: ['data-expandir', 'open'],
+    div: ['data-columna'],
+    pre: ['data-lineas', 'data-ajuste'],
+    table: ['data-numerada'],
+  } as Readonly<Record<string, readonly string[]>>,
+  /** Etiquetas que solo entran con los bloques (las demás ya están en la lista común). */
+  etiquetas: ['details', 'summary', 'time', 'sub', 'sup'] as readonly string[],
+  coloresDeBloque: COLORES_DE_BLOQUE,
+} as const;
+
+/** `AAAA-MM-DD` y un día que existe. */
+export function fechaISO(v: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+/** Los atributos de bloque que valen para `etiqueta`, ya comprobados, en el orden de origen. */
+function atributosDeBloque(
+  etiqueta: string,
+  nodo: DefaultTreeAdapterMap['element'],
+): [string, string][] {
+  const out: [string, string][] = [];
+  for (const { name, value } of nodo.attrs) {
+    if (out.some(([n]) => n === name)) continue;
+    const valores = BLOQUES_DE_NOTAS.enumerados[etiqueta]?.[name];
+    if (valores) {
+      if (valores.includes(value)) out.push([name, value]);
+    } else if (
+      BLOQUES_DE_NOTAS.sinValor[etiqueta]?.includes(name) &&
+      (value === '' || value === name)
+    ) {
+      out.push([name, '']);
+    } else if (etiqueta === 'time' && name === 'datetime' && fechaISO(value)) {
+      out.push([name, value]);
+    }
+  }
+  return out;
 }
 
 /** La primera casilla (`<input type="checkbox">`) dentro de la fila, a cualquier profundidad. */
@@ -247,12 +348,18 @@ function copiar(
     let base: string | undefined = ESTRUCTURA[etiqueta];
     // Google Docs envuelve TODO en `<b style="font-weight:normal">`.
     if (base === 'b' && marcas.negrita === false) base = undefined;
+    // Los bloques de Notes: sus etiquetas propias, y el `<span>` solo si es un estado.
+    const deBloque = opciones.bloques ? atributosDeBloque(etiqueta, nodo) : [];
+    if (opciones.bloques && BLOQUES_DE_NOTAS.etiquetas.includes(etiqueta)) base = etiqueta;
+    if (opciones.bloques && etiqueta === 'h6') base = 'h6';
+    if (etiqueta === 'span' && deBloque.length > 0) base = 'span';
     const capas = [base, base !== 'b' && marcas.negrita ? 'b' : undefined, ...marcas.extra]
       .filter((t): t is string => Boolean(t))
       .filter((t, i, todas) => todas.indexOf(t) === i);
     let dentro: Node = destino;
     for (const capa of capas) {
       const nuevo = doc.createElement(capa);
+      if (capa === base) for (const [n, v] of deBloque) nuevo.setAttribute(n, v);
       if (capa === 'a') {
         const href = enlaceSeguro(atributo(nodo, 'href'));
         if (!href) continue;

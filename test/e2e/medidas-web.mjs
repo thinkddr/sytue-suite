@@ -519,7 +519,7 @@ mkdirSync(SALIDA, { recursive: true });
 // macOS o Windows. Medido el 2026-09-22: «o» a 11,375 px son 6,5938 y la sonda apuntaba
 // 7; «Colaboración», 67,67 contra 70 (+3,4 %). Con eso, comparar un rótulo del puerto a
 // Fyne contra «lo medido en producción» daba un falso negativo que crece con la
-// longitud de la palabra. Ver `docs/roadmap.md#texto-hinting-del-navegador`.
+// longitud de la palabra. Ver `docs/design.md#texto-hinting-del-navegador`.
 const navegador = await chromium.launch({ args: ['--font-render-hinting=none'] });
 /*
  * SIN `storageState`: se entra de nuevo en cada barrido, a propósito.

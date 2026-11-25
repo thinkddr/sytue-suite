@@ -193,7 +193,8 @@ func (p *Pantalla) abrirEditorCompartida(n Nota) {
 		return
 	}
 	ed := NuevoEditorNota(p.tr, n.Doc, p.tr.T("note.placeholder", nil))
-	ed.Afuera = p.afuera
+	ed.AutoformatoEnLinea = true
+	ed.conPie()
 	s := &sesionEdicion{
 		nota: n.ID, editor: ed, compartida: true,
 		fusion: n.ID + ":" + strconv.FormatInt(time.Now().UnixNano(), 36),

@@ -59,7 +59,7 @@ func largo(b Bloque) int {
 // tramos son nuevos; las listas de marcas se comparten porque nunca se cambian en su
 // sitio (se sustituyen).
 func (d *Documento) copia() *Documento {
-	c := &Documento{Bloques: make([]Bloque, len(d.Bloques)), original: d.original, fiel: d.fiel, Imagenes: d.Imagenes, desplegado: d.desplegado}
+	c := &Documento{Bloques: make([]Bloque, len(d.Bloques)), original: d.original, fiel: d.fiel, Imagenes: d.Imagenes, desplegado: d.desplegado, rotuloExpandir: d.rotuloExpandir}
 	for i, b := range d.Bloques {
 		b.Tramos = slices.Clone(b.Tramos)
 		c.Bloques[i] = b
@@ -110,7 +110,7 @@ func partirEn(b *Bloque, o int) int {
 func mismoEstilo(a, b Tramo) bool {
 	return !a.Salto && !b.Salto && a.Imagen == nil && b.Imagen == nil && slices.Equal(a.Marcas, b.Marcas) &&
 		a.EnSpan == b.EnSpan && a.Color == b.Color && a.Fondo == b.Fondo && a.Fuente == b.Fuente &&
-		a.Tamano == b.Tamano && a.Enlace == b.Enlace && a.Externo == b.Externo
+		a.Tamano == b.Tamano && a.Enlace == b.Enlace && a.Externo == b.Externo && a.Estado == b.Estado && a.Fecha == b.Fecha
 }
 
 // limpiar quita los tramos vacíos y junta los contiguos del mismo estilo.
@@ -359,7 +359,10 @@ func (d *Documento) borrarEntreCeldas(a, b Pos) Pos {
 // la celda de `b`.
 func bloqueNuevo(b Bloque, alFinal bool) Bloque {
 	n := bloqueNuevoSinCelda(b, alFinal)
-	n.Celda = b.Celda
+	n.Celda, n.Caja = b.Celda, b.Caja
+	if n.Tipo == b.Tipo {
+		n.Lista, n.Lenguaje = b.Lista, b.Lenguaje
+	}
 	return n
 }
 
@@ -397,7 +400,12 @@ func (d *Documento) Partir(p Pos) Pos {
 		d.Bloques[p.B] = Bloque{Tipo: Parrafo, Etiqueta: "p", Celda: b.Celda}
 		return Pos{p.B, 0}
 	case esLista(b.Tipo) && vacio:
-		d.Bloques[p.B] = Bloque{Tipo: Parrafo, Etiqueta: "div", Alineacion: b.Alineacion, Celda: b.Celda}
+		d.Bloques[p.B] = Bloque{Tipo: Parrafo, Etiqueta: "div", Alineacion: b.Alineacion, Celda: b.Celda, Caja: b.Caja}
+		return Pos{p.B, 0}
+	case b.Caja != nil && b.Tipo == Parrafo && vacio && d.ultimoDeCaja(p.B):
+		// Intro en la línea vacía del final de un panel o un desplegable sale de él,
+		// como de una lista.
+		d.Bloques[p.B].Caja = nil
 		return Pos{p.B, 0}
 	}
 	o := max(p.O, inicioEditable(b))
@@ -447,6 +455,11 @@ func (d *Documento) Retroceso(p Pos) Pos {
 		d.Bloques[p.B].Tipo, d.Bloques[p.B].Etiqueta, d.Bloques[p.B].Nivel = Parrafo, "div", 0
 		return Pos{p.B, 0}
 	case Parrafo, Titulo, Cita, Codigo, Regla, BloqueOpaco:
+	}
+	if b.Caja != nil && (p.B == 0 || d.Bloques[p.B-1].Caja != b.Caja) {
+		// Al principio de un panel o un desplegable, la línea sale de él.
+		d.Bloques[p.B].Caja = nil
+		return p
 	}
 	if p.B > 0 && d.Bloques[p.B-1].Celda != b.Celda {
 		// Al principio de una celda no se junta con la de antes, ni lo que sigue a una
@@ -633,6 +646,10 @@ func (d *Documento) Formatear(a, b Pos, etiqueta string) {
 		default:
 			bl.Tipo, bl.Etiqueta = Parrafo, "p"
 		}
+		if bl.Tipo != Codigo {
+			bl.Lenguaje = ""
+		}
+		bl.Lista = ""
 		limpiar(bl)
 	})
 }
@@ -656,7 +673,7 @@ func EtiquetaDe(bl Bloque) string {
 // son de esa lista, salen de ella; si no, entran.
 func (d *Documento) AlternarLista(a, b Pos, tipo TipoBloque) {
 	todos := true
-	d.bloques(a, b, func(bl *Bloque) { todos = todos && bl.Tipo == tipo })
+	d.bloques(a, b, func(bl *Bloque) { todos = todos && bl.Tipo == tipo && bl.Lista == "" })
 	d.bloques(a, b, func(bl *Bloque) {
 		if bl.Tipo == Regla || bl.Tipo == BloqueOpaco {
 			return
@@ -675,6 +692,7 @@ func (d *Documento) AlternarLista(a, b Pos, tipo TipoBloque) {
 		default:
 			bl.Tipo, bl.Etiqueta, bl.Nivel = tipo, "li", 1
 		}
+		bl.Lista, bl.Lenguaje = "", ""
 		limpiar(bl)
 	})
 }

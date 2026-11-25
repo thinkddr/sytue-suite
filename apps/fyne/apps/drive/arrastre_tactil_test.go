@@ -55,3 +55,28 @@ func TestElAsaTactilConservaElOrigenAlReciclarFilaYCancelaOtraVista(t *testing.T
 		t.Fatal("un gesto de otra vista mueve datos o deja el destino marcado")
 	}
 }
+
+// En táctil la fila lleva el asa de arrastrar a la derecha y el nombre se queda el
+// resto del ancho. Con `ui.FilaAuto` cada hijo se quedaba en su mínimo y el nombre del
+// fichero no salía en ningún aparato táctil (auditoría estética del 2026-11-24).
+//
+// VISTO EN ROJO con el `FilaAuto{Derecha: 1}` de antes: la fila mide su mínimo.
+func TestLaFilaTactilDeDriveDejaElAnchoAlNombre(t *testing.T) {
+	t.Cleanup(ui.TactilDePrueba(true))
+	e := NuevoExplorador(traductor(t))
+	e.Fase = Exito
+	fila := e.nuevaFilaTactil()
+	fila.el = Elemento{ID: "a", Nombre: "Contrato de arrendamiento firmado.pdf", Ruta: "/Contrato.pdf"}
+	w := test.NewWindow(fila)
+	t.Cleanup(w.Close)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 60))
+	// Menos el asa y el hueco que deja el borde entre las dos (el relleno del tema).
+	asa := fila.asa.Size().Width
+	if got, quiero := fila.fila.Size().Width, float32(390)-asa; got < quiero-12 {
+		t.Fatalf("la fila del nombre mide %v de %v (el asa, %v)", got, quiero, asa)
+	}
+	if fila.asa.Position().X+asa > 390+0.5 {
+		t.Fatalf("el asa se sale por la derecha: x=%v ancho=%v", fila.asa.Position().X, asa)
+	}
+}

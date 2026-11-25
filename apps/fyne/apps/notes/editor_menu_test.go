@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -306,28 +307,49 @@ func TestElMenuContextualTieneSusRotulosEnCadaApp(t *testing.T) {
 	}
 }
 
-// TestEnElTelefonoLaBarraVaEnUnaFila: por debajo de `md` la barra de formato es UNA fila
-// que se desplaza de lado (`FILA_UNICA_EN_MOVIL` de la web); en el escritorio envuelve
-// como siempre y no se desplaza.
+// TestLaBarraEsUnaFilaYLoQueNoCabeVaAMas: la barra de formato es UNA fila de alto fijo
+// en todos los anchos (no envuelve ni se desplaza de lado): lo que no cabe se recoge en
+// «Más», empezando por lo de menos uso. En el teléfono quedan a la vista negrita,
+// cursiva, tareas y viñetas, y cada botón mide 44 × 44.
 //
-// VISTO EN ROJO (2026-11-06): en el driver móvil, a 393 de ancho, la barra envolvía en
-// cuatro filas y se comía media pantalla.
-func TestEnElTelefonoLaBarraVaEnUnaFila(t *testing.T) {
-	medir := func(ancho float32) (alto float32, desplaza bool) {
+// VISTO EN ROJO (2026-11-24): con la barra de antes, a 390 la fila se desplazaba de lado
+// con media barra fuera de la vista, y en una columna estrecha del escritorio envolvía en
+// dos o tres filas.
+func TestLaBarraEsUnaFilaYLoQueNoCabeVaAMas(t *testing.T) {
+	medir := func(t *testing.T, ancho float32, tactil bool) (*EditorNota, float32) {
+		t.Helper()
+		t.Cleanup(ui.TactilDePrueba(tactil))
 		ed := NuevoEditorNota(trInterno(t), Leer("<p>hola</p>"), "")
 		w := test.NewWindow(ed)
-		defer w.Close()
+		t.Cleanup(w.Close)
+		w.SetPadded(false)
 		w.Resize(fyne.NewSize(ancho, 600))
-		lado := ed.barraLado
-		return lado.AltoPara(lado.Size().Width), lado.AnchoContenido() > lado.Size().Width+1
+		return ed, ed.barra.Size().Height
 	}
-	altoAncha, desplazaAncha := medir(1280)
-	altoTelefono, desplazaTelefono := medir(390)
-	if desplazaAncha {
-		t.Error("a 1280 la barra se desplaza de lado")
+	ancho, altoAncho := medir(t, 1280, false)
+	if ancho.barraEd.masObj.Visible() || len(ancho.barraEd.fuera) != 0 {
+		t.Errorf("a 1280 hay %d acciones en «Más»", len(ancho.barraEd.fuera))
 	}
-	if altoTelefono != altoAncha || !desplazaTelefono {
-		t.Fatalf("a 390 la barra mide %v (a 1280, %v) y se desplaza=%v: quiero una fila que se desplace",
-			altoTelefono, altoAncha, desplazaTelefono)
+	estrecho, altoEstrecho := medir(t, 420, false)
+	if altoEstrecho != altoAncho || !estrecho.barraEd.masObj.Visible() || len(estrecho.barraEd.fuera) == 0 {
+		t.Errorf("a 420 la barra mide %v (a 1280, %v) y recoge %d", altoEstrecho, altoAncho, len(estrecho.barraEd.fuera))
+	}
+	tel, altoTel := medir(t, 390, true)
+	if altoTel != ladoBotonEd()+2*PYBarraEd+tema.Borde || ladoBotonEd() != ui.SueloTactilBarra {
+		t.Errorf("en el teléfono la barra mide %v y cada botón %v", altoTel, ladoBotonEd())
+	}
+	for _, clave := range []string{"b", "i", "tarea", "vinetas"} {
+		if b := tel.botones[clave]; b == nil || !b.Visible() || b.Size().Width < ui.SueloTactilBarra {
+			t.Errorf("en el teléfono %q no se ve a 44", clave)
+		}
+	}
+	derecha := tel.barraEd.masObj.Position().X + tel.barraEd.masObj.Size().Width
+	if !tel.barraEd.masObj.Visible() || derecha > tel.barra.Size().Width {
+		t.Errorf("«Más» no se ve o se sale de la fila: acaba en %v de %v", derecha, tel.barra.Size().Width)
+	}
+	for _, it := range tel.barraEd.items {
+		if it.obj.Visible() && it.obj.Position().X+it.obj.Size().Width > tel.barraEd.masObj.Position().X {
+			t.Errorf("%q se monta sobre «Más»", it.a.clave)
+		}
 	}
 }

@@ -102,6 +102,45 @@ test('las tareas de una nota solo pasan si quien pega las pide, y sin atributos'
   expect(pegadoConFormato(html)).toBe('<div> Cajas</div>');
 });
 
+test('los bloques de Notes pasan solo si quien pega los pide, y solo con sus valores', () => {
+  const bloques =
+    '<div data-panel="aviso" onclick="x()"><p>Ojo</p></div>' +
+    '<details data-expandir open ontoggle="x()"><summary>Más</summary><p>a</p></details>' +
+    '<p><span data-estado="verde" style="color:red">HECHO</span> ' +
+    '<time datetime="2026-11-24">hoy</time> H<sub>2</sub>O</p>' +
+    '<ul data-tipo="decisiones"><li>Sí</li></ul>' +
+    '<pre data-lineas><code data-lenguaje="go">x := 1</code></pre>' +
+    '<table data-numerada><thead><tr><th scope="col">A</th></tr></thead>' +
+    '<tbody><tr><th scope="row">1</th><td data-fondo="azul">1</td></tr></tbody></table>' +
+    '<div data-columnas="2"><div data-columna><p>c</p></div></div>';
+  expect(pegadoConFormato(bloques, { bloques: true })).toBe(
+    '<div data-panel="aviso"><p>Ojo</p></div>' +
+      '<details data-expandir="" open=""><summary>Más</summary><p>a</p></details>' +
+      '<p><span data-estado="verde">HECHO</span> <time datetime="2026-11-24">hoy</time> ' +
+      'H<sub>2</sub>O</p><ul data-tipo="decisiones"><li>Sí</li></ul>' +
+      '<pre data-lineas=""><code data-lenguaje="go">x := 1</code></pre>' +
+      '<table data-numerada=""><thead><tr><th>A</th></tr></thead>' +
+      '<tbody><tr><th scope="row">1</th><td data-fondo="azul">1</td></tr></tbody></table>' +
+      '<div data-columnas="2"><div data-columna=""><p>c</p></div></div>',
+  );
+  // Sin pedirlos, lo de siempre: ni atributos ni etiquetas nuevas (Mail no cambia).
+  expect(pegadoConFormato('<div data-panel="aviso">a</div><p>H<sub>2</sub>O</p>')).toBe(
+    '<div>a</div><p>H2O</p>',
+  );
+});
+
+test('un valor fuera de su lista se cae, y el atributo de un bloque no vale en otra etiqueta', () => {
+  const ajeno =
+    '<div data-panel="peligro">a</div><span data-estado="#f00">b</span>' +
+    '<p data-estado="verde">c</p><time datetime="2026-02-30">d</time>' +
+    '<pre><code data-lenguaje="cobol">e</code></pre><td data-fondo="red">f</td>' +
+    '<details data-expandir="sí"><summary>g</summary></details>';
+  expect(pegadoConFormato(ajeno, { bloques: true })).toBe(
+    '<div>a</div>b<p>c</p><time>d</time><pre><code>e</code></pre>f' +
+      '<details><summary>g</summary></details>',
+  );
+});
+
 test('una fila de tarea sin `<span>` toma el resto de la fila como texto', () => {
   expect(
     pegadoConFormato('<div class="task-row"><input type="checkbox"> <b>sola</b></div>', {

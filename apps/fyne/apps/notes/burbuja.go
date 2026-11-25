@@ -14,7 +14,8 @@ import (
 )
 
 // La burbuja de formato (la de RichText.tsx): encima de lo seleccionado, con lo que se
-// hace con una selección —negrita, cursiva, tachado, resaltado, código y enlace—. La
+// hace con una selección —negrita, cursiva, «Más formato» (subrayado, tachado, código,
+// resaltado, quitar formato) y enlace— y, en su propio grupo, copiar, cortar y pegar. La
 // barra de arriba sigue ahí; la burbuja es para no tener que subir a buscarla. Como el
 // menú de «/», es un `flotante` y no una capa: sus botones no se llevan el foco.
 
@@ -23,17 +24,39 @@ func (e *EditorNota) armarBurbuja() *flotante {
 	atajo := func(rotulo, teclas string) string {
 		return t("editor.shortcut", i18n.Vars{"label": rotulo, "keys": teclas})
 	}
-	enlace := nuevoBotonBarra(EnlaceD, iconos.Ninguno, atajo(t("editor.linkTool", nil), ui.AtajoDelSistema("Ctrl+K")), nil)
-	enlace.AlPulsar = func() { llamar1(e.AlEnlazar, fyne.CanvasObject(enlace)) }
-	botones := []fyne.CanvasObject{
-		e.botonDeOrden(NegritaD, iconos.Ninguno, atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
-		e.botonDeOrden(CursivaD, iconos.Ninguno, atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
-		e.botonDeOrden(TachadoD, iconos.Ninguno, t("editor.strike", nil), func() { e.Orden("s", "") }),
-		e.botonDeOrden("", iconos.Rotulador, t("editor.highlight", nil), func() { e.Orden("mark", "") }),
-		e.botonDeOrden("", iconos.Codigo, t("editor.inlineCode", nil), func() { e.Orden("code", "") }),
-		enlace,
+	boton := func(glifo string, icono iconos.Icono, rotulo, pista string, f func()) fyne.CanvasObject {
+		return e.botonDeOrden(glifo, icono, rotulo, f).conPista(pista)
 	}
-	return nuevoFlotante(container.New(ui.Fila{Hueco: HuecoBarraEd}, botones...), tema.Espacio(1))
+	enlace := nuevoBotonBarra(EnlaceD, iconos.Ninguno, t("editor.linkTool", nil), nil)
+	enlace.AlPulsar = func() { llamar1(e.AlEnlazar, fyne.CanvasObject(enlace)) }
+	// Como la barra flotante de un editor de páginas: negrita, cursiva, el resto del
+	// formato en «Más formato» y el enlace; así cabe en un teléfono a 44 por botón.
+	mas := e.botonDeOrden(FormatoD, iconos.Ninguno, t("editor.moreFormatting", nil), nil)
+	mas.AlPulsar = func() { e.menuFormato(mas) }
+	formato := make([]fyne.CanvasObject, 0, 8)
+	formato = append(formato,
+		boton(NegritaD, iconos.Ninguno, t("editor.bold", nil), atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
+		boton(CursivaD, iconos.Ninguno, t("editor.italic", nil), atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
+		mas.conPista(t("editor.moreFormatting", nil)),
+		enlace.conPista(atajo(t("editor.linkTool", nil), ui.AtajoDelSistema("Ctrl+K"))),
+	)
+	// Copiar, cortar y pegar, en su grupo: con el dedo no hay Ctrl+C, y el menú del
+	// sistema de un `contenteditable` no existe aquí. Van por el MISMO camino que sus
+	// atajos (`zonaEdicion.TypedShortcut`), así que pegar pasa por el Markdown y por el
+	// `Atajo` de quien aloja el editor, como Ctrl/⌘+V.
+	portapapeles := func() fyne.Clipboard { return fyne.CurrentApp().Clipboard() }
+	edicion := []fyne.CanvasObject{
+		boton("", iconos.Copias, t("editor.copy", nil), atajo(t("editor.copy", nil), ui.AtajoDelSistema("Ctrl+C")),
+			func() { e.zona.TypedShortcut(&fyne.ShortcutCopy{Clipboard: portapapeles()}) }),
+		boton(TijerasD, iconos.Ninguno, t("editor.cut", nil), atajo(t("editor.cut", nil), ui.AtajoDelSistema("Ctrl+X")),
+			func() { e.zona.TypedShortcut(&fyne.ShortcutCut{Clipboard: portapapeles()}) }),
+		boton(PegarD, iconos.Ninguno, t("editor.paste", nil), atajo(t("editor.paste", nil), ui.AtajoDelSistema("Ctrl+V")),
+			func() { e.zona.TypedShortcut(&fyne.ShortcutPaste{Clipboard: portapapeles()}) }),
+	}
+	fila := append(append(formato, nuevoSeparadorEd()), edicion...)
+	f := nuevoFlotante(container.New(ui.Fila{Hueco: HuecoBarraEd}, fila...), tema.Espacio(1))
+	f.rotulo = t("editor.selectionTools", nil)
+	return f
 }
 
 // conBurbuja dice si la burbuja se ve: con algo seleccionado en el cuerpo enfocado, y sin

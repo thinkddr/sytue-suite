@@ -32,7 +32,7 @@ import (
 //     suite; en nativo no hay esquema al que llamar (ver `api.abre`).
 //   - «Abrir en Docus/Calcus/Diapos»: en la web el rótulo va escrito a mano en castellano,
 //     sin clave de catálogo; aquí pulsar la fila ya lo abre en su app.
-//   - «Organizar páginas»: diferencia deliberada (anotada en BACKLOG-FYNE.md). En nativo
+//   - «Organizar páginas»: diferencia deliberada. En nativo
 //     el PDF se abre en Sytue CertiPDF, que ya organiza las páginas
 //     (`apps/certipdf/dialogos.go`); repetir el diálogo aquí sería una segunda copia.
 //

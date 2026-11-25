@@ -106,7 +106,7 @@ func (f *FilaCalendario) AccessibilityLabel() string {
 }
 
 // El rol es el botón de `ui.Pulsable`: es una casilla, pero Fyne 2.8.1 solo conoce
-// cuatro roles y ninguno dice «marcado» —techo del toolkit, `docs/roadmap.md`.
+// cuatro roles y ninguno dice «marcado» —techo del toolkit, `docs/design.md`.
 
 // CreateRenderer compone fondo, casilla, nombre y lo que lleve a la derecha.
 func (f *FilaCalendario) CreateRenderer() fyne.WidgetRenderer {

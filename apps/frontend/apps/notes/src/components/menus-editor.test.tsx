@@ -120,8 +120,8 @@ test('sin gente que ofrecer (un cuaderno cifrado) la arroba es una arroba', asyn
   expect(lista()).toBeNull();
 });
 
-test('la barra sigue abriendo los bloques', async () => {
+test('la barra sigue abriendo los bloques, con su descripción', async () => {
   await escribir('<p>/tab</p>', fuentes());
-  expect(lista()?.getAttribute('aria-label')).toBe('slash.title');
-  expect(opciones()).toEqual(['editor.table/table']);
+  expect(lista()?.getAttribute('aria-label')).toBe('editor.slashMenu');
+  expect(opciones()).toEqual(['editor.tableeditor.tableDesc']);
 });

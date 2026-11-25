@@ -145,7 +145,7 @@ orgHost:
   canonical: corporate
   # UN certificado comodin para todas las organizaciones. Exige que el emisor
   # resuelva por DNS-01 (HTTP-01 no valida comodines), y desde el 2026-08-14 lo
-  # hace: ver docs/roadmap.md#ingreso-por-organizacion-pendiente.
+  # hace: ver `git show 8ea50125a:docs/roadmap.md`, «El ingreso por organización».
   tlsSecret: tls-wildcard-sytue-eu
   # Cierre de la transición (ADR 0056): true convierte el comodín de
   # organización en 301 al host de producto. Encenderlo SOLO cuando el frente

@@ -76,11 +76,7 @@ func (e *EditorNota) ConAsistente(asistir func(context.Context, api.PeticionIA) 
 	if e.botones["ia"] != nil {
 		return
 	}
-	b := nuevoBotonBarra(ChispasD, iconos.Ninguno, e.tr.T("editor.ai", nil), nil)
-	b.AlPulsar = func() { e.menuIA(b) }
-	e.botones["ia"] = b
-	e.barra.Objects = append(e.barra.Objects, b)
-	e.barra.Refresh()
+	e.ponerAccion(e.accionIA())
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	e.aviso = container.New(ui.Margen{Izq: 0.25 * tema.Rem, Der: 0.25 * tema.Rem, Arr: 0.125 * tema.Rem, Abj: 0.125 * tema.Rem},
 		lineaTok(e.tr.T("editor.aiError", nil), tema.TextoXS, ui.Normal, "danger-text", v))

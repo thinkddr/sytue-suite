@@ -17,7 +17,7 @@
  */
 import type { JSX } from 'preact';
 import { colorDeUsuario } from '@sytue/config';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import {
   Badge,
   Dropdown,
@@ -39,6 +39,7 @@ import { conAnclas, destinoInterno, type DestinoInterno } from '../client/enlace
 import { conHashtags, conMenciones } from '../client/hashtags.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
 import { RichText } from './RichText.js';
+import { numerarCodigo } from './bloques.js';
 import { convertirNota, resumenNota, terminada, vecesTrasladada } from '../client/diario.js';
 import { rotuloRecordatorio, yaPaso } from '../client/recordatorios.js';
 import { textoDeNota } from '../client/extracto.js';
@@ -519,6 +520,8 @@ export function NoteCard({
       // La hoja del árbol (`llenar`) y la fila de lista o diario son papel: sin aro.
       sinAro={llenar || diario}
       {...(enlaces ? { enlaces } : {})}
+      // La hoja del árbol elige su ancho también desde la barra del editor.
+      {...(hoja ? { anchoCompleto: !anchoLectura, onAncho: alternarAnchoLectura } : {})}
     />
   ) : separador ? (
     <hr class="notes-stream-rule" />
@@ -1042,6 +1045,9 @@ function Cuerpo({
           else objetivo.classList.toggle('plegada');
           return true;
         }
+        // El título de una sección que se pliega (`<details data-expandir>`) la abre o la
+        // cierra, como en Confluence: no es pulsar la nota para escribir.
+        if ((e.target as HTMLElement | null)?.closest('summary')) return true;
         const a = (e.target as HTMLElement | null)?.closest('a');
         if (!a) return false;
         const d = publicBase ? destinoInterno(a.href, publicBase) : null;
@@ -1095,6 +1101,7 @@ function CuerpoEditable({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const ficha = useVistaPreviaEnlaces(ref, t, publicBase, previa);
+  useLayoutEffect(() => numerarCodigo(ref.current), [html]);
   return (
     <>
       <div
@@ -1169,6 +1176,7 @@ function CuerpoLectura({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const ficha = useVistaPreviaEnlaces(ref, t, publicBase, previa);
+  useLayoutEffect(() => numerarCodigo(ref.current), [html]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;

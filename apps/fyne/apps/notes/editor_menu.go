@@ -125,6 +125,19 @@ func (z *zonaEdicion) menuContextual(en fyne.Position) *ui.Menu {
 	}
 	opcion("editor.paste", &fyne.ShortcutPaste{Clipboard: portapapeles})
 	opcion("editor.selectAll", &fyne.ShortcutSelectAll{})
+	// Con el dedo no hay asa: las acciones del bloque van aquí (bloque_menu.go).
+	if bloque := e.opcionesDeBloque(); ui.EsTactil() && len(bloque) > 0 {
+		elementos = append(elementos, ui.NuevoSeparadorMenu())
+		for _, o := range bloque {
+			if o == nil {
+				continue
+			}
+			elementos = append(elementos, ui.NuevoElementoMenu(o.rotulo, o.icono, func() {
+				o.hacer()
+				e.reenfocar()
+			}))
+		}
+	}
 	m := ui.NuevoMenu(elementos...)
 	m.AlInicio, m.Ancla = true, z.anclaEn(en)
 	return m
@@ -136,6 +149,7 @@ func (z *zonaEdicion) anclaEn(p fyne.Position) fyne.CanvasObject {
 		z.contexto.ancla = canvas.NewRectangle(color.Transparent)
 	}
 	z.contexto.ancla.Move(p)
+	z.contexto.ancla.Resize(fyne.Size{})
 	z.Refresh() // la zona la mete entre sus objetos: `ui.Menu` la busca en pantalla
 	return z.contexto.ancla
 }

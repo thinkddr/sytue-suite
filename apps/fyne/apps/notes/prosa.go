@@ -173,6 +173,8 @@ type Adorno struct {
 	// plegada es la viñeta de un elemento plegado mientras se escribe: va en el color de
 	// marca (el `::marker` de app.css).
 	plegada bool
+	// caja es el panel o el desplegable de un `adornoPanel` o un `adornoCabecera`.
+	caja *Caja
 }
 
 type tipoAdorno uint8
@@ -185,6 +187,15 @@ const (
 	adornoFondo
 	adornoRegla
 	adornoCaja
+	// adornoPanel es el fondo de un panel o el borde de un desplegable; adornoIcono, el
+	// icono del panel; adornoCabecera, la fila del título de un desplegable;
+	// adornoDecision, la marca de una decisión; y adornoEtiqueta, el lenguaje de un bloque
+	// de código (bloques_ricos.go).
+	adornoPanel
+	adornoIcono
+	adornoCabecera
+	adornoDecision
+	adornoEtiqueta
 )
 
 // Maquetado es la prosa entera a un ancho.
@@ -218,6 +229,8 @@ type estiloBloque struct {
 	mayus   bool
 	alinear string
 	pyFondo float32
+	// tachado es lo hecho de una tarea marcada: se apaga y se tacha.
+	tachado bool
 }
 
 func estiloBloqueDe(b Bloque, primero bool, l Letra) estiloBloque {
@@ -249,6 +262,10 @@ func estiloBloqueDe(b Bloque, primero bool, l Letra) estiloBloque {
 		e.x = sangriaLista * float32(max(b.Nivel, 1))
 	case Tarea:
 		e.mt, e.mb, e.x = margenTarea, margenTarea, LadoCasillaNativa+huecoTarea
+		if b.Marcada {
+			// Lo terminado se retira, no se celebra (como la casilla de la libreta).
+			e.tinta, e.tachado = "text-muted", true
+		}
 	case Regla:
 		e.mt, e.mb = margenRegla, margenRegla
 	case BloqueOpaco:
@@ -281,8 +298,18 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 			d.Bloques[otro].Celda == d.Bloques[k].Celda
 	}
 	ocultos := d.ocultos()
+	cj := cajas{m: m, ancho: ancho, rotulo: d.rotuloExpandir}
 	for i := 0; i < len(d.Bloques); i++ {
 		b := d.Bloques[i]
+		if b.Caja != cj.abierta && (i >= len(ocultos) || !ocultos[i]) {
+			if cj.abierta != nil {
+				y, margenPrevio = cj.cerrar(y)
+			}
+			if b.Caja != nil {
+				y = cj.abrir(i, b.Caja, y, margenPrevio)
+				margenPrevio = 0
+			}
+		}
 		if i < len(ocultos) && ocultos[i] {
 			// Cuelga de un elemento plegado (plegar.go): no ocupa, pero conserva su caja
 			// para que los índices de `Bloques` sigan siendo los del documento.
@@ -306,8 +333,15 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 			i = j - 1
 			continue
 		}
-		e := estiloBloqueDe(b, i == 0, l)
+		e := estiloBloqueDe(b, i == 0 || cj.primero, l)
+		if b.Caja != nil {
+			e.x += cj.x(b.Caja)
+			e.der += pxCaja
+		}
 		mt := e.mt
+		if cj.primero {
+			mt, cj.primero = 0, false
+		}
 		if esLista(b.Tipo) && !sigueLista(i, i-1) {
 			mt = max(mt, margenLista)
 		}
@@ -350,6 +384,9 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 		y += alto
 		margenPrevio = mb
 	}
+	if cj.abierta != nil {
+		y, margenPrevio = cj.cerrar(y)
+	}
 	// El último margen de abajo se queda dentro del cuerpo: es un contexto propio.
 	m.Alto = y + margenPrevio
 	return m
@@ -366,11 +403,17 @@ func (m *Maquetado) bloque(i int, b Bloque, e estiloBloque, y, ancho float32, nu
 			return m.tablaOpaca(i, b, y, ancho, v)
 		}
 	case Codigo:
-		// El fondo va detrás del texto, con su relleno.
+		// El fondo va detrás del texto, con su relleno. Con lenguaje, su nombre va en una
+		// franja de arriba, en `text-xs text-subtle`.
 		inicio := len(m.Adornos)
-		m.Adornos = append(m.Adornos, Adorno{Tipo: adornoFondo, Bloque: i, X: 0, Y: y})
-		alto := m.lineas(i, b, e, y+e.pyFondo, ancho, v) + 2*e.pyFondo
-		m.Adornos[inicio].An, m.Adornos[inicio].Al = ancho, alto
+		m.Adornos = append(m.Adornos, Adorno{Tipo: adornoFondo, Bloque: i, X: e.x - pxCodigo, Y: y})
+		arriba := e.pyFondo
+		if b.Lenguaje != "" {
+			m.Adornos = append(m.Adornos, Adorno{Tipo: adornoEtiqueta, Bloque: i, X: e.x, Y: y + e.pyFondo, Texto: nombreLenguaje(b.Lenguaje), escalon: tema.TextoXS})
+			arriba += tema.TextoXS.Linea + margenEtiquetaCodigo
+		}
+		alto := m.lineas(i, b, e, y+arriba, ancho, v) + arriba + e.pyFondo
+		m.Adornos[inicio].An, m.Adornos[inicio].Al = ancho-(e.x-pxCodigo)-(e.der-pxCodigo), alto
 		return alto
 	default:
 	}
@@ -383,6 +426,9 @@ func (m *Maquetado) bloque(i int, b Bloque, e estiloBloque, y, ancho float32, nu
 		a := Adorno{Tipo: adornoVineta, Bloque: i, X: e.x, Y: primera.Y, Al: primera.Alto, escalon: e.escalon}
 		if b.Tipo == Numerada {
 			a.Tipo, a.Texto = adornoNumero, strconv.Itoa(numero)+"."
+		}
+		if b.Lista == ListaDecisiones {
+			a.Tipo = adornoDecision
 		}
 		m.Adornos = append(m.Adornos, a)
 	case Tarea:
@@ -620,7 +666,7 @@ func (m *Maquetado) pedazosDe(b Bloque, e estiloBloque, v tema.Variante, cabe fl
 		}
 		est := estiloTramo(t, e, v)
 		texto := t.Texto
-		if e.mayus {
+		if e.mayus || est.mayus {
 			texto = strings.ToUpper(texto)
 		}
 		for _, trozo := range partirBlancos(texto) {
@@ -697,6 +743,8 @@ func estiloTramo(t Tramo, e estiloBloque, v tema.Variante) estiloTrozo {
 			}
 		}
 	}
+	s.tachado = s.tachado || e.tachado
+	estiloEspecial(&s, t, e, v)
 	if t.Enlace != "" {
 		s.enlace, s.subrayado, s.href = true, true, t.Enlace
 		s.tinta = tema.Color("primary-text", v)
@@ -1092,7 +1140,7 @@ func PintarProsa(m *Maquetado, v tema.Variante) []fyne.CanvasObject {
 // la web se pintan por encima de los fondos y por debajo del texto.
 func pintarProsaEnCapas(m *Maquetado, v tema.Variante) (fondos, delante []fyne.CanvasObject) {
 	for _, a := range m.Adornos {
-		if a.Tipo == adornoFondo || a.Tipo == adornoCaja {
+		if a.Tipo == adornoFondo || a.Tipo == adornoCaja || a.Tipo == adornoPanel {
 			fondos = append(fondos, pintarAdorno(a, v)...)
 		} else {
 			delante = append(delante, pintarAdorno(a, v)...)
@@ -1144,6 +1192,8 @@ func pintarAdorno(a Adorno, v tema.Variante) []fyne.CanvasObject {
 		return casillaNativa(a, v)
 	case adornoCaja:
 		return []fyne.CanvasObject{rect(a.color, a.X, a.Y, a.An, a.Al, 0)}
+	case adornoPanel, adornoIcono, adornoCabecera, adornoDecision, adornoEtiqueta:
+		return pintarAdornoRico(a, v)
 	}
 	return nil
 }

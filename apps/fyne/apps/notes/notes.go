@@ -39,7 +39,7 @@
 // # Sin conexión
 //
 // Se lee lo ya cargado y TODA mutación se desactiva —crear, editar, mover, etiquetar,
-// papelera—, que es el contrato de `docs/roadmap.md` §«Contrato offline de las apps
+// papelera—, que es el contrato de `docs/architecture.md` §«Contrato offline de las apps
 // nativas». No se encola nada: una edición que se reintenta sola sobre una nota que
 // mientras tanto cambió en otro sitio es como se pierde texto.
 package notes

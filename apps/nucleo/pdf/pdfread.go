@@ -6,7 +6,7 @@
 // cara — un fichero de fuera usa todo lo que la especificación permite y no solo
 // lo que uno decidió emitir.
 //
-// Sirve de base a Sytue PDF (roadmap §5). Aquí está la CAPA ESTRUCTURAL: el
+// Sirve de base a Sytue PDF (antiguo §5 del roadmap). Aquí está la CAPA ESTRUCTURAL: el
 // árbol de objetos, las dos formas de tabla de referencias cruzadas, los flujos
 // comprimidos y el árbol de páginas. El render fiel se apoya en esto y vive en
 // `pdfrender.go`; el descifrado, en `pdfcrypt.go`; la recuperación de un fichero

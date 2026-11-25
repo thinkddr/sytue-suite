@@ -272,7 +272,7 @@ func (c *Compositor) tecla(k *fyne.KeyEvent) bool {
 	// aquí en escritorio ni en wasm: el driver glfw lo convierte en un
 	// `desktop.CustomShortcut`. En móvil con teclado físico SÍ llega como ↑ a secas,
 	// porque el driver móvil (`typeDownCanvas`) descarta los modificadores; es deuda
-	// del fork (docs/roadmap.md, «Flecha arriba…»).
+	// del fork (docs/roadmap.md, «Fork de Fyne»).
 	if k.Name == fyne.KeyUp && !c.area.Mayus() && c.Texto() == "" && len(c.Pendientes) == 0 &&
 		c.AlEditarUltimo != nil && c.AlEditarUltimo() {
 		return true

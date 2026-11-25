@@ -105,11 +105,25 @@ func TestLaBurbujaSaleConLaSeleccion(t *testing.T) {
 	if !ed.conBurbuja() || len(ed.flotantes()) != 1 {
 		t.Fatal("con selección no sale la burbuja")
 	}
-	fila := ed.burbuja.contenido.(*fyne.Container)
-	fila.Objects[0].(*botonBarra).Tapped(&fyne.PointEvent{})
+	botonDeBurbuja(t, ed, ed.tr.T("editor.bold", nil)).Tapped(&fyne.PointEvent{})
 	if got := ed.HTML(); got != "<p><b>hola</b> mundo</p>" {
 		t.Errorf("la negrita de la burbuja deja %q", got)
 	}
+}
+
+// botonDeBurbuja es el botón de la burbuja con ese rótulo.
+func botonDeBurbuja(t *testing.T, ed *EditorNota, rotulo string) *botonBarra {
+	t.Helper()
+	var hallado *botonBarra
+	cadaObjeto(ed.burbuja, func(o fyne.CanvasObject) {
+		if b, ok := o.(*botonBarra); ok && b.Rotulo == rotulo {
+			hallado = b
+		}
+	})
+	if hallado == nil {
+		t.Fatalf("la burbuja no tiene %q", rotulo)
+	}
+	return hallado
 }
 
 // TestBuscarEnLaNota: Ctrl+F abre la barra, se encuentra sin acentos, Intro va a la

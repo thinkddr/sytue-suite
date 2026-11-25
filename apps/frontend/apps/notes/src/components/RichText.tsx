@@ -13,7 +13,11 @@
  * usa el compositor de Sytue Mail: dos implementaciones del mismo gesto acaban
  * comportándose distinto en la tercera pulsación. `styleWithCSS` va activado
  * para que color y alineación salgan como `style` —que es lo que el saneador
- * del servicio conserva— y no como `<font>` o `align=`, que tiraría.
+ * del servicio conserva— y no como `<font>` o `align=`, que tiraría. Y APAGADO
+ * para negrita, cursiva, subrayado y tachado (`ordenar`): con él encendido salían
+ * como `<span style="font-weight: bold">`, y el saneador solo deja en `style` el
+ * color y la alineación, así que la negrita se perdía al guardar. Los colores, que el
+ * navegador escribe en `rgb()`, se entregan en `#rrggbb` (`client/salida.ts`).
  *
  * EL PEGADO CONSERVA LA ESTRUCTURA Y TOMA EL ESTILO DE LA NOTA. Insertar el HTML
  * del portapapeles tal cual lo EJECUTARÍA aquí y ahora, antes de que ningún
@@ -30,25 +34,24 @@ import { Fragment, type JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import {
-  BARRA_DE_EDICION,
   BOTON_DE_BARRA,
+  Button,
   Dropdown,
-  FILA_UNICA_EN_MOVIL,
   Icon,
   Input,
-  MASCARA_SCROLL_X,
   MenuItem,
   MenuSeparator,
   Popover,
   SEPARADOR_DE_BARRA,
+  ShortcutsModal,
   Spinner,
   Toolbar,
   Tooltip,
   cx,
-  useScrollRestante,
   useFitInViewport,
   useMobileBack,
   atajoDelSistema,
+  type IconName,
 } from '@sytue/ui';
 import { candidatos, consultaMencion, moverActiva, type Persona } from '@sytue/shell';
 import {
@@ -58,7 +61,6 @@ import {
   executeEditingCommand,
 } from '@sytue/ui/browser/editing';
 import {
-  ESTILO_CELDA,
   celdaDe,
   eliminarColumna,
   eliminarFila,
@@ -66,9 +68,13 @@ import {
   insertarColumna,
   insertarFila,
 } from '@sytue/ui/browser/tabla';
-import type { T } from '../i18n/index.js';
+import type { NotesMessageKey, T } from '../i18n/index.js';
 import { escapar } from '../client/captura.js';
 import { atajoMarkdown, queSePega } from '../client/markdown.js';
+import { normalizarSalida } from '../client/salida.js';
+import { atajoEnLinea } from '../client/autoformato.js';
+import { estadisticas, textoDeNota } from '../client/extracto.js';
+import { atajosDelEditor } from './atajos-editor.js';
 import {
   consultaDeBarra,
   consultaDeEnlace,
@@ -82,6 +88,53 @@ import { COLORES_DE_TEXTO, nombreDeColor } from './colores.js';
 import { construirPeticion, leerRespuesta, type AccionIA } from '../lib/ai.js';
 import { bloquesDe, type Bloque } from '@sytue/ai';
 import { LinkTool, useOpcionesDeEnlace, type FuentesDeEnlace, type Opcion } from './LinkTool.js';
+import { BarraConMas, OpcionDeMas, type ItemDeBarra } from './BarraConMas.js';
+import { DibujoDeComando, MenuInsertar } from './MenuInsertar.js';
+import { SelectorDeSimbolos } from './SelectorDeSimbolos.js';
+import {
+  apuntarReciente,
+  buscarSimbolos,
+  consultaDeEmoji,
+  type IdCategoria,
+} from '../client/simbolos.js';
+import {
+  codigoDe,
+  contextoDe,
+  entrarEnNuevo,
+  fechaLegible,
+  hoyISO,
+  lineasDe,
+  plantillaColumnas,
+  plantillaDecisiones,
+  plantillaEstado,
+  plantillaExpandir,
+  plantillaFecha,
+  plantillaPanel,
+  type Contexto,
+  type TipoDePanel,
+} from './bloques.js';
+import {
+  alinearColumna,
+  alternarCabeceraDeColumna,
+  alternarCabeceraDeFila,
+  alternarFilasNumeradas,
+  celdaEn,
+  celdaVecina,
+  entrarEnCelda,
+  fondoDeCelda,
+  posicionDe,
+} from './tabla-notas.js';
+import { BarraDeBloque, type AccionesDeBloque } from './BarraDeBloque.js';
+import { copiarRango, leerPortapapeles } from './portapapeles-editor.js';
+import {
+  bloqueDe,
+  duplicarBloque,
+  enPanel,
+  llevarBloque,
+  moverBloque,
+  quitarBloque,
+} from './mover-bloques.js';
+import { documentLocale } from '@sytue/i18n';
 
 interface Props {
   t: T;
@@ -108,13 +161,20 @@ interface Props {
    * (columnas, lienzo) el aro se queda: allí sí delimita qué ficha se edita.
    */
   sinAro?: boolean;
+  /**
+   * La hoja del árbol: a todo el ancho del panel (`true`) o estrechada a la columna de
+   * lectura. Con `onAncho`, la barra ofrece «Ancho completo» como en Confluence; la
+   * elección es de la nota (`data.reading_width`, NoteCard).
+   */
+  anchoCompleto?: boolean;
+  onAncho?: () => void;
 }
 
 interface Accion {
   cmd: string;
   valor?: string;
   glyph?: GlyphName;
-  icon?: 'code' | 'highlighter' | 'minus' | 'chevronUp' | 'chevronDown' | 'close';
+  icon?: IconName;
   label: string;
   atajo?: string;
   /** Con estado (aria-pressed) o solo acción. */
@@ -122,41 +182,89 @@ interface Accion {
   desactivada?: boolean;
 }
 
+/**
+ * Los estilos de texto del desplegable, con su VISTA PREVIA: cada opción se escribe con
+ * el aspecto que dará (como en Confluence), con las mismas escalas que la prosa.
+ */
 const BLOQUES: {
   valor: string;
-  clave: 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'quote' | 'codeBlock';
+  clave: 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'codeBlock';
+  vista: string;
 }[] = [
-  { valor: 'p', clave: 'paragraph' },
-  { valor: 'h1', clave: 'h1' },
-  { valor: 'h2', clave: 'h2' },
-  { valor: 'h3', clave: 'h3' },
-  { valor: 'h4', clave: 'h4' },
-  { valor: 'h5', clave: 'h5' },
-  { valor: 'blockquote', clave: 'quote' },
-  { valor: 'pre', clave: 'codeBlock' },
+  { valor: 'p', clave: 'paragraph', vista: 'text-sm' },
+  { valor: 'h1', clave: 'h1', vista: 'text-xl font-semibold leading-tight' },
+  { valor: 'h2', clave: 'h2', vista: 'text-lg font-semibold leading-tight' },
+  { valor: 'h3', clave: 'h3', vista: 'text-base font-semibold' },
+  { valor: 'h4', clave: 'h4', vista: 'text-sm font-semibold' },
+  { valor: 'h5', clave: 'h5', vista: 'text-xs font-semibold uppercase tracking-wide' },
+  { valor: 'h6', clave: 'h6', vista: 'text-text-muted text-xs font-semibold' },
+  {
+    valor: 'blockquote',
+    clave: 'quote',
+    vista: 'border-border-strong text-text-muted border-l-2 pl-2 text-sm',
+  },
+  { valor: 'pre', clave: 'codeBlock', vista: 'font-mono text-xs' },
 ];
 
 /** Colores de texto legibles sobre claro y oscuro. El primero es «por defecto». */
 const COLORES = COLORES_DE_TEXTO;
 const RESALTADO = '#fff3a3';
 
-/** El dibujo de cada comando de «/»: el mismo que su botón en la barra. */
-const DIBUJO_COMANDO: Record<IdComando, { glyph?: GlyphName; icon?: 'text' | 'code' | 'minus' }> = {
-  p: { icon: 'text' },
-  h1: { glyph: 'heading' },
-  h2: { glyph: 'heading' },
-  h3: { glyph: 'heading' },
-  tarea: { glyph: 'todo' },
-  vinetas: { glyph: 'bulletList' },
-  numeros: { glyph: 'numberedList' },
-  cita: { glyph: 'quote' },
-  codigo: { icon: 'code' },
-  regla: { icon: 'minus' },
-  tabla: { glyph: 'table' },
+/** Las órdenes que tienen que salir como etiqueta (`<b>`, `<i>`, `<u>`, `<strike>`, `<sub>`, `<sup>`). */
+const ETIQUETADAS = new Set([
+  'bold',
+  'italic',
+  'underline',
+  'strikeThrough',
+  'subscript',
+  'superscript',
+]);
+
+/** Ctrl/⌘ + letra → la orden que conmuta. */
+const TECLAS_DE_FORMATO: Record<string, string | undefined> = {
+  b: 'bold',
+  i: 'italic',
+  u: 'underline',
 };
 
-/** Los tres menús que se abren al teclear: un bloque, una nota que enlazar, alguien. */
-type TipoMenu = 'cmd' | 'nota' | 'persona';
+/** Los grupos de la barra, en su orden: historia | bloque | formato | color | listas | insertar | herramientas. */
+type GrupoDeBarra =
+  'historia' | 'bloque' | 'formato' | 'color' | 'listas' | 'insertar' | 'herramientas';
+
+/** El atajo de cada tipo de bloque, para el menú: Ctrl+Alt+0 el párrafo, Ctrl+Alt+1…5 los títulos. */
+const ATAJO_BLOQUE: Record<string, string | undefined> = {
+  p: 'Ctrl+Alt+0',
+  h1: 'Ctrl+Alt+1',
+  h2: 'Ctrl+Alt+2',
+  h3: 'Ctrl+Alt+3',
+  h4: 'Ctrl+Alt+4',
+  h5: 'Ctrl+Alt+5',
+  h6: 'Ctrl+Alt+6',
+};
+
+/** Lo que ofrece el asistente, en su orden (las tres primeras ordenan, las demás reescriben). */
+const ACCIONES_IA: readonly (readonly [AccionIA, NotesMessageKey])[] = [
+  ['ordenar', 'editor.ai.tidy'],
+  ['tareas', 'editor.ai.tasks'],
+  ['titular', 'editor.ai.title'],
+  ['resumir', 'editor.ai.summarize'],
+  ['ampliar', 'editor.ai.expand'],
+  ['corregir', 'editor.ai.fix'],
+  ['traducir', 'editor.ai.translate'],
+];
+
+/**
+ * Una orden de edición con el `styleWithCSS` que le toca (ver la cabecera). Se deja
+ * puesto a propósito: con el cursor sin selección, el navegador decide el marcado al
+ * TECLEAR lo siguiente, no al conmutar.
+ */
+function ordenar(cmd: string, valor?: string): boolean {
+  executeEditingCommand('styleWithCSS', ETIQUETADAS.has(cmd) ? 'false' : 'true');
+  return executeEditingCommand(cmd, valor);
+}
+
+/** Los menús que se abren al teclear: un bloque, una nota que enlazar, alguien, un emoji. */
+type TipoMenu = 'cmd' | 'nota' | 'persona' | 'emoji';
 
 /**
  * Lo que abre cada menú y cómo se lee lo escrito tras ello. `[[` va primero: el nombre
@@ -166,12 +274,14 @@ const DISPAROS: readonly (readonly [TipoMenu, string, (antes: string) => string 
   ['nota', '[[', consultaDeEnlace],
   ['persona', '@', consultaMencion],
   ['cmd', '/', consultaDeBarra],
+  ['emoji', ':', consultaDeEmoji],
 ];
 
 const ROTULO_MENU = {
-  cmd: 'slash.title',
+  cmd: 'editor.slashMenu',
   nota: 'editor.linkNote',
   persona: 'editor.mention',
+  emoji: 'editor.emoji',
 } as const;
 
 /** Una fila de cualquiera de los tres menús. */
@@ -181,6 +291,8 @@ interface Sugerencia {
   rotulo: string;
   /** El título dentro de la nota, tras «›». */
   dentro?: string;
+  /** Una línea bajo el rótulo: qué hace el elemento (catálogo de «/»). */
+  descripcion?: string;
   /** A la derecha y en gris: el atajo del comando, el cuaderno, el correo. */
   detalle?: string;
   /** El grupo al que pertenece (este cuaderno, otros cuadernos). */
@@ -190,6 +302,7 @@ interface Sugerencia {
 
 /** Id del cuadro de «Buscar en la nota», para darle el foco al abrirlo. */
 const ID_BUSCAR = 'notes-buscar-en-nota';
+const ID_REEMPLAZO = 'notes-reemplazar-en-nota';
 
 /** El registro de resaltados de CSS (`CSS.highlights`), donde lo hay. */
 function registroResaltados(): {
@@ -235,11 +348,9 @@ function BotonDeBarra({
     >
       <button
         type="button"
-        class={cx(
-          BOTON_DE_BARRA,
-          a.conEstado && activos[a.cmd] && 'bg-bg-subtle text-text',
-          a.desactivada && 'opacity-40',
-        )}
+        // El estado activo lo pinta `aria-pressed` (BOTON_DE_BARRA): lo que se ve y lo
+        // que oye el lector de pantalla no pueden separarse.
+        class={BOTON_DE_BARRA}
         aria-label={a.label}
         disabled={a.desactivada}
         {...(a.conEstado ? { 'aria-pressed': activos[a.cmd] ?? false } : {})}
@@ -266,6 +377,8 @@ export function RichText({
   enlaces,
   estirado = false,
   sinAro = false,
+  anchoCompleto,
+  onAncho,
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   // Qué comandos están activos en la selección actual. Sin esto, el botón de
@@ -274,19 +387,51 @@ export function RichText({
   const [activos, setActivos] = useState<Record<string, boolean>>({});
   const [bloque, setBloque] = useState('p');
   const [vacio, setVacio] = useState(initialHtml.trim() === '');
+  // Palabras, caracteres y lectura del pie, las mismas cuentas que «Información»
+  // (`estadisticas`, igual que Fyne). Se recalculan un momento después de escribir.
+  const [cuentas, setCuentas] = useState(() => estadisticas(textoDeNota(initialHtml)));
+  const recuento = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // La hoja de atajos (Ctrl/⌘+/).
+  const [atajos, setAtajos] = useState(false);
+  // El asa ⋮⋮ del bloque bajo el puntero o el del cursor (con el dedo, siempre a la
+  // vista), su menú, y el arrastre: qué bloque se lleva y dónde caería.
+  const [asa, setAsa] = useState<{ el: HTMLElement; top: number } | null>(null);
+  const [menuBloque, setMenuBloque] = useState<{ x: number; y: number } | null>(null);
+  const bloqueDelMenu = useRef<HTMLElement | null>(null);
+  const arrastrado = useRef<HTMLElement | null>(null);
+  const [soltarEn, setSoltarEn] = useState<{
+    top: number;
+    destino: HTMLElement;
+    antes: boolean;
+  } | null>(null);
   const [enlaceAbierto, setEnlaceAbierto] = useState(false);
-  // Celda de tabla donde está el cursor: mientras la hay, la barra enseña las
-  // acciones de tabla. Mismo trato que en el redactor de Sytue Mail, con el
-  // mismo módulo (@sytue/ui/browser/tabla): dos implementaciones del mismo
-  // gesto acaban comportándose distinto.
-  const [enTabla, setEnTabla] = useState(false);
-  // En móvil las barras NO se envuelven en filas: se desplazan de lado (ver
-  // scrollX.ts). Con veinticinco controles, `flex-wrap` a secas apilaba cuatro o
-  // cinco filas y la nota quedaba en un par de líneas. La de tabla es
-  // condicional, así que su hook depende de `enTabla`: sin él corre con el ref
-  // vacío y no se vuelve a enlazar nunca.
-  const barra = useScrollRestante<HTMLDivElement>();
-  const barraTabla = useScrollRestante<HTMLDivElement>(enTabla);
+  const [colorAbierto, setColorAbierto] = useState(false);
+  // El «+» de la barra y el selector de símbolos (`true`) o de emoji (`'emoji'`).
+  const [insertarAbierto, setInsertarAbierto] = useState(false);
+  const [simbolosAbierto, setSimbolosAbierto] = useState<IdCategoria | true | false>(false);
+  // Un bloque elegido a propósito (la fecha recién puesta con «Fecha», que abre su
+  // calendario): manda sobre el que se deduce del cursor.
+  const [elegido, setElegido] = useState<HTMLElement | null>(null);
+  // El bloque con barra propia donde está el cursor (tabla, código, panel, estado,
+  // fecha, sección): su barra flota junto a él (BarraDeBloque), como en Confluence. La
+  // tabla sigue usando el módulo común de Mail (@sytue/ui/browser/tabla) para filas y
+  // columnas: dos implementaciones del mismo gesto acaban comportándose distinto.
+  const [contextoCursor, setContextoCursor] = useState<Contexto | null>(null);
+  // Si el foco está en el editor o en lo que cuelga de él (su barra flotante, un menú):
+  // fuera, la barra del bloque se va.
+  const [conFoco, setConFoco] = useState(true);
+  // El menú de una celda con el botón derecho, en el punto donde se pidió.
+  const [menuCelda, setMenuCelda] = useState<{ x: number; y: number } | null>(null);
+  // Los números de línea de los bloques de código que los llevan: una capa encima del
+  // campo, fuera del HTML de la nota (`data-lineas`).
+  const [numeros, setNumeros] = useState<{ top: number; left: number; n: number }[]>([]);
+  // La celda donde está el cursor, marcada con un recuadro (también una capa).
+  const [celdaActiva, setCeldaActiva] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
   // Si hay algo que deshacer o rehacer, según el navegador: sin esto los dos
   // botones se ven iguales con la pila vacía y con veinte cambios dentro.
   const [puede, setPuede] = useState({ undo: false, redo: false });
@@ -295,6 +440,8 @@ export function RichText({
   const seleccion = useRef<Range | null>(null);
   /** Ctrl/⌘+Mayús+V: el pegado que viene es «sin formato». */
   const pegarSinFormato = useRef(false);
+  /** Cómo deshacer el último atajo de Markdown, mientras sea lo último que se hizo. */
+  const ultimoAuto = useRef<(() => void) | null>(null);
 
   const guardarSeleccion = useCallback(() => {
     const rango = window.getSelection();
@@ -341,12 +488,16 @@ export function RichText({
   // El disparador al que se dijo «no» con Escape: no se vuelve a abrir en él.
   const descartada = useRef<{ nodo: Node; off: number } | null>(null);
   const rotuloCmd = (c: Comando) => t(c.clave);
+  const descripcionCmd = (c: Comando) => t(c.descripcion);
   // `[[`: la búsqueda de la herramienta de enlaces, la misma, sin Drive.
   const notasMenu = useOpcionesDeEnlace(menu?.tipo === 'nota' ? menu.q : null, enlaces, false);
   // `@`: la gente se pide a la primera arroba y se filtra aquí.
   const [gente, setGente] = useState<readonly Persona[] | null>(null);
   const pidiendoGente = menu?.tipo === 'persona' && gente === null;
   const personas = enlaces?.personas;
+  /** Lo que aquí se puede insertar: sin cuaderno no hay notas que enlazar, ni sin gente a quién. */
+  const disponible = (c: Comando) =>
+    (c.id !== 'enlace' || enlaces !== undefined) && (c.id !== 'mencion' || personas !== undefined);
   useEffect(() => {
     if (!pidiendoGente || !personas) return;
     let vivo = true;
@@ -357,20 +508,24 @@ export function RichText({
   }, [pidiendoGente, personas]);
   const sugerencias = ((): Sugerencia[] => {
     if (menu?.tipo === 'cmd')
-      return filtrarComandos(menu.q, rotuloCmd).map((c) => {
-        const d = DIBUJO_COMANDO[c.id];
-        return {
-          clave: c.id,
-          dibujo: d.icon ? (
-            <Icon name={d.icon} size={15} />
-          ) : (
-            <Glyph name={d.glyph ?? 'note'} size={15} />
-          ),
-          rotulo: rotuloCmd(c),
-          detalle: `/${c.alias[0]}`,
-          elegir: () => ejecutarComando(c),
-        };
-      });
+      return filtrarComandos(menu.q, rotuloCmd, descripcionCmd, disponible).map((c) => ({
+        clave: c.id,
+        dibujo: <DibujoDeComando id={c.id} size={15} />,
+        rotulo: rotuloCmd(c),
+        descripcion: descripcionCmd(c),
+        ...(c.pista ? { detalle: c.pista } : {}),
+        elegir: () => ejecutarComando(c),
+      }));
+    // `:son` ofrece los emoji cuyas palabras empiezan así; ocho, que es lo que se lee.
+    if (menu?.tipo === 'emoji')
+      return buscarSimbolos(menu.q, 'emoji')
+        .slice(0, 8)
+        .map((x) => ({
+          clave: x.s,
+          dibujo: <span class="text-base leading-none">{x.s}</span>,
+          rotulo: `:${x.claves.split(' ')[0]}`,
+          elegir: () => ponerEmoji(x.s),
+        }));
     if (menu?.tipo === 'nota')
       return notasMenu.opciones.map((o) => ({
         clave: o.clave,
@@ -392,9 +547,10 @@ export function RichText({
       }));
     return [];
   })();
-  // `[[` se ve aunque aún no haya nada: dice que busca, o que nada casa. Los otros dos,
-  // solo con algo que ofrecer.
-  const abierto = menu !== null && (sugerencias.length > 0 || menu.tipo === 'nota');
+  // `[[` y «/» se ven aunque no haya nada: dicen que buscan, o que nada casa. Los otros
+  // dos, solo con algo que ofrecer: una «@» o unos dos puntos sueltos son texto.
+  const abierto =
+    menu !== null && (sugerencias.length > 0 || menu.tipo === 'nota' || menu.tipo === 'cmd');
   const activa = Math.min(menu?.idx ?? 0, Math.max(sugerencias.length - 1, 0));
   const menuRef = useRef<HTMLDivElement>(null);
   useFitInViewport(menuRef, abierto ? menu : null, { vertical: true });
@@ -415,13 +571,40 @@ export function RichText({
   // Encima de lo seleccionado, con lo que se hace con una selección: negrita,
   // cursiva, tachado, resaltado, código y enlace. La barra de arriba sigue ahí;
   // la burbuja es para no tener que subir a buscarla.
-  const [burbuja, setBurbuja] = useState<{ x: number; y: number } | null>(null);
+  const [burbuja, setBurbuja] = useState<{
+    x: number;
+    y: number;
+    /** Con el dedo va DEBAJO de la selección: encima sale el menú del sistema. */
+    abajo: boolean;
+    /** En una pantalla estrecha, tachado, resaltado y código van en «Más formato». */
+    estrecha: boolean;
+  } | null>(null);
+  // «Pegar» de la burbuja sin permiso para leer el portapapeles: se dice cómo pegar.
+  const [avisoPegar, setAvisoPegar] = useState(false);
+  useEffect(() => {
+    if (!avisoPegar) return;
+    const t = window.setTimeout(() => setAvisoPegar(false), 6000);
+    return () => window.clearTimeout(t);
+  }, [avisoPegar]);
   const burbujaRef = useRef<HTMLDivElement>(null);
   useFitInViewport(burbujaRef, burbuja && !menu ? burbuja : null, { vertical: true });
 
-  // --- Buscar en la nota ----------------------------------------------------
-  const [buscador, setBuscador] = useState<{ q: string; i: number } | null>(null);
+  // --- Buscar y reemplazar en la nota --------------------------------------
+  const [buscador, setBuscador] = useState<{
+    q: string;
+    i: number;
+    /** «Coincidir mayúsculas»: literal, mayúsculas y acentos incluidos. */
+    mayus: boolean;
+    /** Con la fila de reemplazar (Ctrl/⌘+H). */
+    reemplazar: boolean;
+    por: string;
+  } | null>(null);
   const coincidencias = useRef<Range[]>([]);
+  // Sin la API de resaltados de CSS (navegadores que aún no la tienen), las coincidencias
+  // se marcan con recuadros en una capa encima del campo: tampoco tocan el HTML de la nota.
+  const [marcasBusqueda, setMarcasBusqueda] = useState<
+    { top: number; left: number; width: number; height: number; actual: boolean }[]
+  >([]);
 
   const formato: Accion[] = [
     { cmd: 'bold', glyph: 'bold', label: t('editor.bold'), atajo: 'Ctrl+B', conEstado: true },
@@ -433,26 +616,46 @@ export function RichText({
       atajo: 'Ctrl+U',
       conEstado: true,
     },
-    { cmd: 'strikeThrough', glyph: 'strikethrough', label: t('editor.strike'), conEstado: true },
-  ];
-  const listas: Accion[] = [
     {
-      cmd: 'insertTask',
-      glyph: 'todo',
-      label: t('note.newTodo'),
-      atajo: '[]',
+      cmd: 'strikeThrough',
+      glyph: 'strikethrough',
+      label: t('editor.strike'),
+      atajo: 'Ctrl+Shift+X',
+      conEstado: true,
     },
+  ];
+  const codigoEnLinea: Accion = {
+    cmd: 'code',
+    icon: 'code',
+    label: t('editor.inlineCode'),
+    atajo: 'Ctrl+E',
+  };
+  const resaltado: Accion = {
+    cmd: 'mark',
+    icon: 'highlighter',
+    label: t('editor.highlight'),
+    atajo: 'Ctrl+Shift+H',
+  };
+  const listas: Accion[] = [
     {
       cmd: 'insertUnorderedList',
       glyph: 'bulletList',
       label: t('editor.bulletList'),
+      atajo: '-',
       conEstado: true,
     },
     {
       cmd: 'insertOrderedList',
       glyph: 'numberedList',
       label: t('editor.numberedList'),
+      atajo: '1.',
       conEstado: true,
+    },
+    {
+      cmd: 'insertTask',
+      glyph: 'todo',
+      label: t('editor.taskList'),
+      atajo: '[]',
     },
     { cmd: 'outdent', glyph: 'outdent', label: t('editor.outdent'), atajo: 'Shift+Tab' },
     { cmd: 'indent', glyph: 'indent', label: t('editor.indent'), atajo: 'Tab' },
@@ -471,7 +674,12 @@ export function RichText({
     setPuede({ undo: editingCommandEnabled('undo'), redo: editingCommandEnabled('redo') });
     const b = editingCommandValue('formatBlock').toLowerCase().replace(/[<>]/g, '');
     setBloque(BLOQUES.some((x) => x.valor === b) ? b : 'p');
-    setEnTabla(celdaDe(window.getSelection()?.anchorNode ?? null) !== null);
+    setContextoCursor(
+      ref.current ? contextoDe(window.getSelection()?.anchorNode ?? null, ref.current) : null,
+    );
+    medirNumeros();
+    if (ref.current && document.activeElement === ref.current)
+      ponerAsa(bloqueDe(window.getSelection()?.anchorNode ?? null, ref.current));
   };
 
   // El HTML inicial se escribe en el DOM una sola vez: después manda el
@@ -483,6 +691,14 @@ export function RichText({
     }
     executeEditingCommand('styleWithCSS', 'true');
     ref.current?.focus();
+    // Las capas (números de línea, celda activa) se miden con lo ya pintado, y otra vez
+    // cuando cambia el ancho: el código y la tabla se reflujan.
+    medirNumeros();
+    window.addEventListener('resize', medirNumeros);
+    return () => {
+      window.removeEventListener('resize', medirNumeros);
+      if (recuento.current) clearTimeout(recuento.current);
+    };
     // initialHtml queda fuera a propósito: el padre remonta con `key` cuando
     // cambia de nota, y reaccionar a él aquí es exactamente lo que no debe pasar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,7 +707,11 @@ export function RichText({
   const emitir = () => {
     const html = ref.current?.innerHTML ?? '';
     setVacio(ref.current?.textContent?.trim() === '' && !html.includes('<img'));
-    onChange(html);
+    const limpio = normalizarSalida(html);
+    onChange(limpio);
+    medirNumeros();
+    if (recuento.current) clearTimeout(recuento.current);
+    recuento.current = setTimeout(() => setCuentas(estadisticas(textoDeNota(limpio))), 250);
   };
 
   // --- Asistente de IA ------------------------------------------------------
@@ -516,11 +736,11 @@ export function RichText({
       if (bloque.tipo === 'li') executeEditingCommand('insertUnorderedList');
       else executeEditingCommand('formatBlock', bloque.tipo === 'p' ? 'p' : bloque.tipo);
       for (const trozo of bloque.trozos) {
-        if (trozo.negrita) executeEditingCommand('bold');
-        if (trozo.cursiva) executeEditingCommand('italic');
+        if (trozo.negrita) ordenar('bold');
+        if (trozo.cursiva) ordenar('italic');
         executeEditingCommand('insertText', trozo.texto);
-        if (trozo.cursiva) executeEditingCommand('italic');
-        if (trozo.negrita) executeEditingCommand('bold');
+        if (trozo.cursiva) ordenar('italic');
+        if (trozo.negrita) ordenar('bold');
       }
       if (bloque.tipo === 'li') executeEditingCommand('insertUnorderedList');
     });
@@ -575,9 +795,20 @@ export function RichText({
     }
   };
 
+  /** Deshacer de la barra: tras un atajo de Markdown, como Ctrl+Z, devuelve lo tecleado. */
+  const deshacer = () => {
+    const atajo = ultimoAuto.current;
+    ultimoAuto.current = null;
+    if (!atajo) return aplicar('undo');
+    enfocarTexto();
+    atajo();
+    refrescar();
+    emitir();
+  };
+
   const aplicar = (cmd: string, valor?: string) => {
     enfocarTexto();
-    executeEditingCommand(cmd, valor);
+    ordenar(cmd, valor);
     refrescar();
     emitir();
   };
@@ -629,7 +860,20 @@ export function RichText({
       const taskRow = document.createElement('div');
       taskRow.className = 'task-row';
       taskRow.innerHTML = '<input type="checkbox" /> <span>&nbsp;</span>';
+      const original = bloque.cloneNode(true) as HTMLElement;
       bloque.replaceWith(taskRow);
+      // La fila de tarea se pone a mano (con `insertHTML` el navegador le quita el
+      // `<span>`), así que deshacerla también: vuelve el «[]» tal cual, con su espacio.
+      ultimoAuto.current = () => {
+        if (!taskRow.isConnected) return;
+        taskRow.replaceWith(original);
+        const r = document.createRange();
+        r.selectNodeContents(original);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        if (tecla === ' ') executeEditingCommand('insertText', ' ');
+      };
       const span = taskRow.querySelector('span');
       if (span) {
         const newRange = document.createRange();
@@ -650,21 +894,72 @@ export function RichText({
     sel.addRange(marcador);
     executeEditingCommand('delete');
     executeEditingCommand(atajo.cmd, atajo.valor);
+    // Ctrl+Z justo después devuelve lo tecleado tal cual: deshace las dos órdenes y
+    // pone la tecla que se comió el atajo (el espacio, o el salto de línea de Intro).
+    ultimoAuto.current = () => {
+      executeEditingCommand('undo');
+      executeEditingCommand('undo');
+      executeEditingCommand(tecla === ' ' ? 'insertText' : 'insertParagraph', ' ');
+    };
     refrescar();
     emitir();
     return true;
   };
 
-  /** Tabla de `filas`×`columnas`. Los bordes van en línea, como en Mail: así se
-   *  ven igual en la nota, en el HTML exportado y en el PDF. */
+  /**
+   * Markdown en la línea (`client/autoformato.ts`): al teclear la marca que cierra,
+   * `**x**`, `*x*`, `_x_`, `` `x` `` o `~~x~~` pasan a su formato con UNA orden
+   * (`insertHTML`), así que un Ctrl+Z devuelve las marcas. Detrás va un espacio de ancho
+   * cero para seguir escribiendo FUERA del formato; al guardar se quita (salida.ts).
+   * Dentro del código no se toca nada.
+   */
+  const aplicarAtajoEnLinea = (): boolean => {
+    const raiz = ref.current;
+    const sel = window.getSelection();
+    if (!raiz || !sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
+    const rango = sel.getRangeAt(0);
+    const nodo = rango.startContainer;
+    if (nodo.nodeType !== Node.TEXT_NODE || !raiz.contains(nodo)) return false;
+    if (nodo.parentElement?.closest('pre, code')) return false;
+    const fin = rango.startOffset;
+    const atajo = atajoEnLinea((nodo as Text).data.slice(0, fin));
+    if (!atajo) return false;
+    const marcas = document.createRange();
+    marcas.setStart(nodo, atajo.desde);
+    marcas.setEnd(nodo, fin);
+    sel.removeAllRanges();
+    sel.addRange(marcas);
+    const e = atajo.etiqueta;
+    if (!executeEditingCommand('insertHTML', `<${e}>${escapar(atajo.texto)}</${e}>\u200B`)) {
+      // El navegador no la ha hecho: el cursor vuelve a donde estaba, detrás de la marca,
+      // o lo siguiente que se teclee se comería lo seleccionado.
+      sel.removeAllRanges();
+      sel.addRange(rango);
+      return false;
+    }
+    ultimoAuto.current = () => executeEditingCommand('undo');
+    return true;
+  };
+
+  /**
+   * Tabla de `filas`×`columnas`, con la fila de cabecera puesta (como en Confluence). Sin
+   * estilos en línea: el saneador de las notas no los guarda (solo color y alineación) y
+   * los bordes, el relleno y la cabecera los pinta la prosa (app.css), en claro y oscuro.
+   */
   const insertarTabla = (filas: number, columnas: number) => {
     enfocarTexto();
-    const celda = `<td style="${ESTILO_CELDA}">&nbsp;</td>`;
-    const fila = `<tr>${celda.repeat(columnas)}</tr>`;
+    const cabecera = `<thead><tr>${'<th><br></th>'.repeat(columnas)}</tr></thead>`;
+    const fila = `<tr>${'<td><br></td>'.repeat(columnas)}</tr>`;
     executeEditingCommand(
       'insertHTML',
-      `<table style="border-collapse: collapse; width: 100%">${fila.repeat(filas)}</table><p><br></p>`,
+      `<table data-nuevo="">${cabecera}<tbody>${fila.repeat(Math.max(1, filas - 1))}</tbody></table><p><br></p>`,
     );
+    const tabla = ref.current?.querySelector<HTMLTableElement>('table[data-nuevo]');
+    if (tabla) {
+      tabla.removeAttribute('data-nuevo');
+      const primera = tabla.querySelector<HTMLTableCellElement>('th, td');
+      if (primera) entrarEnCelda(primera);
+    }
     refrescar();
     emitir();
   };
@@ -708,19 +1003,200 @@ export function RichText({
     emitir();
   };
 
-  /** Aplica una acción a la celda donde está el cursor. */
+  /**
+   * Aplica una acción a la celda donde está el cursor. Las celdas nuevas del módulo común
+   * traen los bordes en línea (los del correo); aquí sobran: el saneador no los guarda y
+   * la prosa ya los pinta. Se deja solo la alineación.
+   */
   const enCelda = (accion: (c: HTMLTableCellElement) => void) => {
     enfocarTexto();
     const celda = celdaDe(window.getSelection()?.anchorNode ?? null);
     if (!celda) return;
+    const tabla = celda.closest('table');
+    const donde = posicionDe(celda);
     accion(celda);
+    // Cambiar una celda de etiqueta (cabeceras) o quitar su fila se lleva el cursor:
+    // vuelve a la misma posición de la rejilla, o a la más cercana que quede.
+    if (!celda.isConnected && tabla?.isConnected) {
+      const otra = celdaEn(tabla, donde);
+      if (otra) entrarEnCelda(otra);
+    }
+    for (const c of tabla?.querySelectorAll<HTMLElement>('td[style], th[style]') ?? []) {
+      const alineado = c.style.textAlign;
+      c.removeAttribute('style');
+      if (alineado) c.style.setProperty('text-align', alineado);
+    }
     refrescar();
     emitir();
+  };
+
+  /** Coloca el asa junto a `bloque` (un hijo directo del campo), medido sobre el envoltorio. */
+  const ponerAsa = (bloque: HTMLElement | null) => {
+    const caja = ref.current?.parentElement?.getBoundingClientRect();
+    if (!bloque || !caja) {
+      if (!menuBloque) setAsa(null);
+      return;
+    }
+    const top = bloque.getBoundingClientRect().top - caja.top;
+    setAsa((a) => (a && a.el === bloque && a.top === top ? a : { el: bloque, top }));
+  };
+
+  /**
+   * Una acción del menú del bloque: el cursor va al principio del bloque (las órdenes de
+   * convertir actúan donde está) y después se entrega la nota.
+   */
+  const conBloque = (accion: (b: HTMLElement) => void) => {
+    const b = bloqueDelMenu.current;
+    const raiz = ref.current;
+    if (!b?.isConnected || !raiz) return;
+    raiz.focus();
+    const r = document.createRange();
+    r.selectNodeContents(b);
+    r.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    guardarSeleccion();
+    accion(b);
+    emitir();
+    refrescar();
+  };
+
+  /** Abre el menú del bloque en `x,y` (el asa, o el cursor con Mayús+F10). */
+  const abrirMenuBloque = (bloque: HTMLElement, x: number, y: number) => {
+    bloqueDelMenu.current = bloque;
+    setMenuBloque({ x, y });
+  };
+
+  /** Cambia el bloque del cursor (un atributo, quitarlo) y entrega la nota. */
+  const enBloque = (accion: () => void) => {
+    accion();
+    setElegido(null);
+    emitir();
+    refrescar();
+  };
+
+  const accionesDeBloque = (c: Contexto): AccionesDeBloque => {
+    const el = c.el;
+    const quitar = () => enBloque(() => el.remove());
+    return {
+      tabla: {
+        fila: (lado) => enCelda((x) => insertarFila(x, lado)),
+        columna: (lado) => enCelda((x) => insertarColumna(x, lado)),
+        quitarFila: () => enCelda(eliminarFila),
+        quitarColumna: () => enCelda(eliminarColumna),
+        quitarTabla: () => enCelda(eliminarTabla),
+        cabeceraFila: () => enCelda((x) => alternarCabeceraDeFila(x.closest('table')!)),
+        cabeceraColumna: () => enCelda((x) => alternarCabeceraDeColumna(x.closest('table')!)),
+        numerada: () => enCelda((x) => alternarFilasNumeradas(x.closest('table')!)),
+        fondo: (color) => enCelda((x) => fondoDeCelda(x, color)),
+        alinear: (lado) => enCelda((x) => alinearColumna(x, lado)),
+      },
+      codigo: {
+        lenguaje: (l) =>
+          enBloque(() => codigoDe(el as HTMLPreElement).setAttribute('data-lenguaje', l)),
+        lineas: () => enBloque(() => el.toggleAttribute('data-lineas')),
+        ajuste: () => enBloque(() => el.toggleAttribute('data-ajuste')),
+        quitar,
+      },
+      panel: { tipo: (tipo) => enBloque(() => el.setAttribute('data-panel', tipo)), quitar },
+      estado: { color: (color) => enBloque(() => el.setAttribute('data-estado', color)), quitar },
+      fecha: {
+        dia: (iso) =>
+          enBloque(() => {
+            el.setAttribute('datetime', iso);
+            el.textContent = fechaLegible(iso, documentLocale());
+          }),
+        quitar,
+      },
+      expandir: { quitar },
+    };
+  };
+
+  /**
+   * Las capas encima del campo —los números de línea de cada `pre[data-lineas]` y el
+   * recuadro de la celda activa—, medidas respecto a su envoltorio (`relative`).
+   */
+  const medirNumeros = () => {
+    const raiz = ref.current;
+    const caja = raiz?.parentElement?.getBoundingClientRect();
+    if (!raiz || !caja) return;
+    const nuevos = [...raiz.querySelectorAll<HTMLElement>('pre[data-lineas]')].map((pre) => {
+      const r = pre.getBoundingClientRect();
+      return { top: r.top - caja.top, left: r.left - caja.left, n: lineasDe(pre) };
+    });
+    setNumeros((antes) => (JSON.stringify(antes) === JSON.stringify(nuevos) ? antes : nuevos));
+    const celda = celdaDe(window.getSelection()?.anchorNode ?? null);
+    const r = celda && raiz.contains(celda) ? celda.getBoundingClientRect() : null;
+    setCeldaActiva(
+      r && r.width > 0
+        ? { top: r.top - caja.top, left: r.left - caja.left, width: r.width, height: r.height }
+        : null,
+    );
   };
 
   const abrirEnlaces = () => {
     if (document.activeElement === ref.current) guardarSeleccion();
     setEnlaceAbierto(true);
+  };
+
+  const abrirColor = () => {
+    if (document.activeElement === ref.current) guardarSeleccion();
+    setColorAbierto(true);
+  };
+
+  const abrirSimbolos = (enfoque: IdCategoria | true) => {
+    if (document.activeElement === ref.current) guardarSeleccion();
+    setSimbolosAbierto(enfoque);
+  };
+
+  const abrirInsertar = () => {
+    if (document.activeElement === ref.current) guardarSeleccion();
+    setInsertarAbierto(true);
+  };
+
+  /**
+   * Copiar o cortar lo seleccionado (la burbuja). Cortar borra con la orden del navegador,
+   * así que Ctrl+Z lo devuelve; y solo si de verdad se copió, para no perder nada.
+   */
+  const copiar = async (cortar: boolean) => {
+    const sel = window.getSelection();
+    const rango =
+      sel && sel.rangeCount > 0 && !sel.isCollapsed && ref.current?.contains(sel.anchorNode)
+        ? sel.getRangeAt(0).cloneRange()
+        : seleccion.current;
+    if (!rango || rango.collapsed) return;
+    const hecho = await copiarRango(rango);
+    if (!cortar || !hecho) return;
+    ref.current?.focus();
+    const ahora = window.getSelection();
+    ahora?.removeAllRanges();
+    ahora?.addRange(rango);
+    executeEditingCommand('delete');
+    refrescar();
+    emitir();
+  };
+
+  /**
+   * Pegar desde la burbuja: lo leído entra por `queSePega`, el mismo saneado que Ctrl+V.
+   * Sin permiso (o sin la API), se dice que se pegue con el teclado.
+   */
+  const pegar = async () => {
+    if (document.activeElement === ref.current) guardarSeleccion();
+    const elegido = seleccion.current?.toString() ?? '';
+    const datos = await leerPortapapeles();
+    if (!datos) {
+      setAvisoPegar(true);
+      return;
+    }
+    enfocarTexto();
+    const ancla = window.getSelection()?.anchorNode;
+    const enCodigo = !!(ancla instanceof Element ? ancla : ancla?.parentElement)?.closest('pre');
+    const pegado = queSePega(datos, false, !enCodigo, elegido);
+    if ('html' in pegado) executeEditingCommand('insertHTML', pegado.html);
+    else if (pegado.texto) executeEditingCommand('insertText', pegado.texto);
+    refrescar();
+    emitir();
   };
 
   /** El enlace con su nombre en lugar de la selección, y un espacio para seguir fuera de él. */
@@ -786,10 +1262,7 @@ export function RichText({
       return;
     }
     const x = descartada.current;
-    if (
-      (x && x.nodo === d.nodo && x.off === d.off) ||
-      (d.tipo === 'cmd' && filtrarComandos(d.q, rotuloCmd).length === 0)
-    ) {
+    if (x && x.nodo === d.nodo && x.off === d.off) {
       setMenu(null);
       return;
     }
@@ -797,7 +1270,7 @@ export function RichText({
     r.setStart(d.nodo, d.off);
     r.setEnd(d.nodo, d.off + 1);
     const caja = r.getBoundingClientRect();
-    const ancho = d.tipo === 'cmd' ? 240 : 288;
+    const ancho = d.tipo === 'cmd' ? 320 : 288;
     const arriba = caja.bottom + 4 + 260 > window.innerHeight && caja.top - 264 >= 0;
     setMenu((m) => ({
       tipo: d.tipo,
@@ -839,11 +1312,30 @@ export function RichText({
     emitir();
   };
 
-  /** Borra «/consulta» y aplica el comando con la misma orden que su botón. */
-  const ejecutarComando = (c: Comando) => {
+  /** «:son» se cambia por el emoji elegido. */
+  const ponerEmoji = (emoji: string) => {
     if (!tomarDisparo()) return;
-    executeEditingCommand('delete');
-    const bloque: Partial<Record<IdComando, string>> = {
+    apuntarReciente(emoji);
+    executeEditingCommand('insertText', emoji);
+    refrescar();
+    emitir();
+  };
+
+  /** Un bloque de los nuevos (`bloques.ts`), con el cursor dentro al acabar. */
+  const insertarBloque = (html: string) => {
+    executeEditingCommand('insertHTML', html);
+    if (ref.current) entrarEnNuevo(ref.current);
+    refrescar();
+    emitir();
+  };
+
+  /**
+   * Inserta un elemento del catálogo donde está el cursor: lo comparten «/» y el «+» de
+   * la barra. Los de siempre van con la MISMA orden que su botón; los bloques nuevos, con
+   * su plantilla.
+   */
+  const insertarElemento = (id: IdComando) => {
+    const bloques: Partial<Record<IdComando, string>> = {
       p: '<p>',
       h1: '<h1>',
       h2: '<h2>',
@@ -851,13 +1343,70 @@ export function RichText({
       cita: '<blockquote>',
       codigo: '<pre>',
     };
-    const valor = bloque[c.id];
-    if (valor) aplicar('formatBlock', valor);
-    else if (c.id === 'tarea') insertarTarea();
-    else if (c.id === 'vinetas') aplicar('insertUnorderedList');
-    else if (c.id === 'numeros') aplicar('insertOrderedList');
-    else if (c.id === 'regla') aplicar('insertHorizontalRule');
-    else if (c.id === 'tabla') insertarTabla(3, 3);
+    const paneles: Partial<Record<IdComando, TipoDePanel>> = {
+      panelInfo: 'info',
+      panelNota: 'nota',
+      panelExito: 'exito',
+      panelAviso: 'aviso',
+      panelError: 'error',
+    };
+    const valor = bloques[id];
+    const panel = paneles[id];
+    if (valor) return aplicar('formatBlock', valor);
+    if (panel) return insertarBloque(plantillaPanel(panel));
+    switch (id) {
+      case 'tarea':
+        return insertarTarea();
+      case 'vinetas':
+        return aplicar('insertUnorderedList');
+      case 'numeros':
+        return aplicar('insertOrderedList');
+      case 'regla':
+        return aplicar('insertHorizontalRule');
+      case 'tabla':
+        return insertarTabla(3, 3);
+      case 'decision':
+        return insertarBloque(plantillaDecisiones());
+      case 'expandir':
+        return insertarBloque(plantillaExpandir(t('editor.expand')));
+      case 'columnas2':
+      case 'columnas3':
+        return insertarBloque(plantillaColumnas(id === 'columnas2' ? 2 : 3));
+      case 'estado':
+        return insertarBloque(plantillaEstado(t('editor.status').toLocaleUpperCase()));
+      case 'fecha':
+      case 'hoy': {
+        enfocarTexto();
+        executeEditingCommand('insertHTML', plantillaFecha(hoyISO(), documentLocale()));
+        const fecha = ref.current ? entrarEnNuevo(ref.current) : null;
+        // «Fecha» abre el calendario sobre la que acaba de entrar; «Hoy» la deja puesta.
+        if (id === 'fecha' && fecha) setElegido(fecha);
+        refrescar();
+        emitir();
+        return;
+      }
+      case 'enlace':
+        // Sin cuaderno no hay `[[`: la herramienta de enlaces, que también pega URL.
+        if (!enlaces) return abrirEnlaces();
+        enfocarTexto();
+        executeEditingCommand('insertText', '[[');
+        return mirarMenu();
+      case 'mencion':
+        enfocarTexto();
+        executeEditingCommand('insertText', '@');
+        return mirarMenu();
+      case 'simbolo':
+        return abrirSimbolos(true);
+      case 'emoji':
+        return abrirSimbolos('emoji');
+    }
+  };
+
+  /** Borra «/consulta» e inserta el elemento, como si se hubiera elegido en el «+». */
+  const ejecutarComando = (c: Comando) => {
+    if (!tomarDisparo()) return;
+    executeEditingCommand('delete');
+    insertarElemento(c.id);
   };
 
   // La burbuja sigue a la selección: `selectionchange` es el único aviso que
@@ -884,9 +1433,14 @@ export function RichText({
         setBurbuja(null);
         return;
       }
+      const consulta = (q: string) =>
+        typeof window.matchMedia === 'function' && window.matchMedia(q).matches;
+      const abajo = consulta('(pointer: coarse)');
       setBurbuja({
-        x: Math.max(104, Math.min(caja.left + caja.width / 2, window.innerWidth - 104)),
-        y: Math.max(caja.top, 44),
+        x: Math.max(120, Math.min(caja.left + caja.width / 2, window.innerWidth - 120)),
+        y: abajo ? caja.bottom : Math.max(caja.top, 44),
+        abajo,
+        estrecha: consulta('(max-width: 639px)'),
       });
     };
     document.addEventListener('selectionchange', mirar);
@@ -898,21 +1452,75 @@ export function RichText({
   }, [guardarSeleccion]);
 
   /** Pinta las coincidencias y lleva la vista a la actual. */
-  const pintarBusqueda = (q: string, i: number) => {
-    const todas = ref.current ? coincidenciasEn(ref.current, q) : [];
+  const pintarBusqueda = (
+    q: string,
+    i: number,
+    cambios: Partial<{ mayus: boolean; reemplazar: boolean; por: string }> = {},
+  ) => {
+    const mayus = cambios.mayus ?? buscador?.mayus ?? false;
+    const todas = ref.current ? coincidenciasEn(ref.current, q, { mayusculas: mayus }) : [];
     coincidencias.current = todas;
     const actual = todas.length ? ((i % todas.length) + todas.length) % todas.length : 0;
-    resaltar('sytue-buscar', todas);
-    resaltar('sytue-buscar-actual', todas[actual] ? [todas[actual]] : []);
+    if (registroResaltados()) {
+      resaltar('sytue-buscar', todas);
+      resaltar('sytue-buscar-actual', todas[actual] ? [todas[actual]] : []);
+    } else {
+      const caja = ref.current?.parentElement?.getBoundingClientRect();
+      setMarcasBusqueda(
+        caja
+          ? todas.flatMap((r, n) =>
+              [...(r.getClientRects?.() ?? [])].map((x) => ({
+                top: x.top - caja.top,
+                left: x.left - caja.left,
+                width: x.width,
+                height: x.height,
+                actual: n === actual,
+              })),
+            )
+          : [],
+      );
+    }
     todas[actual]?.startContainer.parentElement?.scrollIntoView({ block: 'nearest' });
-    setBuscador({ q, i: actual });
+    setBuscador({
+      q,
+      i: actual,
+      mayus,
+      reemplazar: cambios.reemplazar ?? buscador?.reemplazar ?? false,
+      por: cambios.por ?? buscador?.por ?? '',
+    });
   };
 
-  const abrirBuscador = () => {
+  /** Ctrl/⌘+F busca; Ctrl/⌘+H abre además la fila de reemplazar. */
+  const abrirBuscador = (conReemplazo = false) => {
     const sel = window.getSelection();
     const q = sel && !sel.isCollapsed ? sel.toString().slice(0, 80) : (buscador?.q ?? '');
-    pintarBusqueda(q, 0);
-    window.setTimeout(() => document.getElementById(ID_BUSCAR)?.focus(), 0);
+    pintarBusqueda(q, 0, { reemplazar: conReemplazo || (buscador?.reemplazar ?? false) });
+    const destino = conReemplazo && q ? ID_REEMPLAZO : ID_BUSCAR;
+    window.setTimeout(() => document.getElementById(destino)?.focus(), 0);
+  };
+
+  /**
+   * Sustituye la coincidencia actual (o todas, de la última a la primera para que los
+   * rangos no se muevan) con `insertText`: entra en la pila de deshacer del navegador y
+   * no mete HTML, solo texto. El foco vuelve al campo de reemplazar.
+   */
+  const reemplazar = (todas: boolean) => {
+    if (!buscador || !ref.current) return;
+    const lista = coincidencias.current;
+    const una = lista[buscador.i];
+    const objetivo = todas ? [...lista].reverse() : una ? [una] : [];
+    if (objetivo.length === 0) return;
+    ref.current.focus();
+    const sel = window.getSelection();
+    for (const r of objetivo) {
+      sel?.removeAllRanges();
+      sel?.addRange(r);
+      executeEditingCommand('insertText', buscador.por);
+    }
+    emitir();
+    refrescar();
+    pintarBusqueda(buscador.q, todas ? 0 : buscador.i);
+    window.setTimeout(() => document.getElementById(ID_REEMPLAZO)?.focus(), 0);
   };
 
   /** Cierra la búsqueda dejando seleccionada la coincidencia en la que estaba. */
@@ -920,6 +1528,7 @@ export function RichText({
     const actual = buscador ? coincidencias.current[buscador.i] : undefined;
     resaltar('sytue-buscar', []);
     resaltar('sytue-buscar-actual', []);
+    setMarcasBusqueda([]);
     setBuscador(null);
     ref.current?.focus();
     if (actual) {
@@ -928,6 +1537,20 @@ export function RichText({
       sel?.addRange(actual);
     }
   };
+
+  // La barra del bloque solo vive con el foco en el editor o en lo que cuelga de él.
+  useEffect(() => {
+    const mirar = (e: FocusEvent) => {
+      const d = e.target instanceof Element ? e.target : null;
+      setConFoco(
+        !!d &&
+          (ref.current?.contains(d) === true ||
+            d.closest('[data-notes-editor-tools], [role="menu"], [role="dialog"]') !== null),
+      );
+    };
+    document.addEventListener('focusin', mirar);
+    return () => document.removeEventListener('focusin', mirar);
+  }, []);
 
   // Al desmontar (otra nota, salir del editor) no se quedan resaltados colgando.
   useEffect(
@@ -947,68 +1570,330 @@ export function RichText({
     emitir();
   };
 
+  // La fecha recién puesta con «Fecha» abre su calendario aunque el cursor quede detrás.
+  const contexto: Contexto | null =
+    elegido?.isConnected && elegido.tagName === 'TIME' && ref.current?.contains(elegido)
+      ? { tipo: 'fecha', el: elegido as HTMLTimeElement }
+      : contextoCursor;
+
   const etiquetaBloque = t(
     `editor.${BLOQUES.find((b) => b.valor === bloque)?.clave ?? 'paragraph'}` as never,
   );
+  const alineada = alineacion.find((a) => activos[a.cmd]) ?? alineacion[0]!;
+  const dibujoDe = (a: Accion) =>
+    a.icon ? <Icon name={a.icon} size={16} /> : <Glyph name={a.glyph ?? 'note'} size={16} />;
 
-  return (
-    <div class={cx('flex min-h-0 flex-col', estirado && 'flex-1')}>
-      <Toolbar
-        data-scroll-x
-        innerRef={barra.ref}
-        class={cx(
-          BARRA_DE_EDICION,
-          'md:flex-wrap',
-          FILA_UNICA_EN_MOVIL,
-          barra.queda && MASCARA_SCROLL_X,
-        )}
-        aria-label={ariaLabel}
+  /** Un botón de la barra y su opción en «Más». */
+  // El estado de lo que no es una orden de edición (el ancho de la hoja).
+  const activosDeBarra: Record<string, boolean> = {
+    ...activos,
+    anchoCompleto: anchoCompleto === true,
+  };
+  const itemBoton = (
+    a: Accion,
+    grupo: GrupoDeBarra,
+    prioridad: number,
+    onPress: () => void,
+  ): ItemDeBarra => ({
+    id: a.cmd,
+    grupo,
+    prioridad,
+    barra: () => <BotonDeBarra t={t} activos={activosDeBarra} a={a} onPress={onPress} />,
+    menu: (cerrar) => (
+      <OpcionDeMas
+        dibujo={dibujoDe(a)}
+        rotulo={a.label}
+        atajo={a.atajo}
+        marcada={a.conEstado ? (activosDeBarra[a.cmd] ?? false) : undefined}
+        desactivada={a.desactivada}
+        cerrar={cerrar}
+        onElegir={onPress}
+      />
+    ),
+  });
+
+  /** Elegir en un panel lo cierra y devuelve el cursor al texto (no al botón). */
+  const trasElegir = (cerrar: () => void, despues?: () => void) => {
+    cerrar();
+    // Después de que el panel se cierre y devuelva el foco a su botón: entonces el
+    // cursor vuelve al texto, donde estaba, y se hace lo elegido.
+    window.setTimeout(() => {
+      enfocarTexto();
+      despues?.();
+    }, 0);
+  };
+
+  const muestrasDeColor = () => (
+    <div class="grid grid-cols-4 gap-1.5 p-2">
+      <button
+        type="button"
+        class="border-border sytue-focus-ring rounded-control hover:bg-bg-subtle col-span-4 min-w-0 border px-2 py-1 text-sm"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          aplicar('foreColor', 'inherit');
+          trasElegir(() => setColorAbierto(false));
+        }}
       >
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{
-            cmd: 'undo',
-            glyph: 'undo',
-            label: t('editor.undo'),
-            atajo: 'Ctrl+Z',
-            desactivada: !puede.undo,
+        {t('editor.colorDefault')}
+      </button>
+      {COLORES.map((c) => (
+        <button
+          key={c}
+          type="button"
+          // Acción, no estado: aplica y cierra, así que botones con el nombre
+          // del tono (no un radiogroup, que elegiría al moverse con flechas).
+          aria-label={nombreDeColor(t, c)}
+          title={nombreDeColor(t, c)}
+          style={{ background: c }}
+          class="sytue-focus-ring border-border h-7 w-7 rounded-full border transition-transform duration-150 hover:scale-110"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            aplicar('foreColor', c);
+            trasElegir(() => setColorAbierto(false));
           }}
-          onPress={() => aplicar('undo')}
         />
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{
-            cmd: 'redo',
-            glyph: 'redo',
-            label: t('editor.redo'),
-            atajo: 'Ctrl+Y',
-            desactivada: !puede.redo,
-          }}
-          onPress={() => aplicar('redo')}
-        />
-        <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
+      ))}
+    </div>
+  );
 
+  const herramientaDeEnlace = () => (
+    <LinkTool
+      t={t}
+      {...(enlaces ? { fuentes: enlaces } : {})}
+      onPick={(e) => insertarEnlace(e.url, e.label)}
+      onClose={() => {
+        setEnlaceAbierto(false);
+        enfocarTexto();
+      }}
+    />
+  );
+
+  /** El disparador de un desplegable o un panel de la barra, con su ayuda. */
+  const disparador =
+    (
+      rotulo: string,
+      dibujo: JSX.Element,
+      extra?: { ancho?: string; texto?: string; flecha?: boolean },
+    ) =>
+    (props: Record<string, unknown>) => (
+      <Tooltip label={rotulo}>
+        <button
+          {...props}
+          type="button"
+          class={cx(
+            BOTON_DE_BARRA,
+            'aria-expanded:bg-bg-subtle aria-expanded:text-text',
+            extra?.texto !== undefined && 'w-auto gap-1 px-1.5 text-sm',
+            extra?.flecha && 'w-auto gap-0.5 px-1',
+          )}
+          aria-label={extra?.texto ? `${rotulo}: ${extra.texto}` : rotulo}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {dibujo}
+          {extra?.texto !== undefined ? (
+            <>
+              {/* ANCHO FIJO: «Párrafo» y «Título 1» no miden lo mismo, y la barra no
+                  puede moverse al pasar de un bloque a otro ni de una nota a otra. */}
+              <span class={cx('hidden truncate text-left sm:inline', extra.ancho)}>
+                {extra.texto}
+              </span>
+              <Icon name="chevronDown" size={12} />
+            </>
+          ) : extra?.flecha ? (
+            <Icon name="chevronDown" size={12} />
+          ) : null}
+        </button>
+      </Tooltip>
+    );
+
+  /** Un desplegable de la barra con sus acciones; en «Más», las mismas en fila. */
+  const itemMenu = (
+    id: string,
+    grupo: GrupoDeBarra,
+    prioridad: number,
+    rotulo: string,
+    dibujo: JSX.Element,
+    acciones: { a: Accion; hacer: () => void; marcada?: boolean }[],
+  ): ItemDeBarra => ({
+    id,
+    grupo,
+    prioridad,
+    ancho: 40,
+    barra: () => (
+      <Dropdown label={rotulo} trigger={disparador(rotulo, dibujo, { flecha: true })}>
+        {acciones.map(({ a, hacer, marcada }) => (
+          <MenuItem
+            key={a.cmd}
+            size="sm"
+            icon={dibujoDe(a)}
+            {...(marcada !== undefined || a.conEstado
+              ? { role: 'menuitemcheckbox', 'aria-checked': marcada ?? activos[a.cmd] ?? false }
+              : {})}
+            onMouseDown={(e: MouseEvent) => e.preventDefault()}
+            onClick={hacer}
+          >
+            <span class="min-w-0 flex-1">{a.label}</span>
+            {(marcada ?? (a.conEstado && activos[a.cmd])) ? (
+              <Icon name="check" size={14} class="text-text-muted shrink-0" />
+            ) : null}
+            {a.atajo ? <span class="sytue-meta shrink-0">{atajoDelSistema(a.atajo)}</span> : null}
+          </MenuItem>
+        ))}
+      </Dropdown>
+    ),
+    menu: (cerrar) =>
+      acciones.map(({ a, hacer, marcada }) => (
+        <OpcionDeMas
+          key={a.cmd}
+          dibujo={dibujoDe(a)}
+          rotulo={a.label}
+          atajo={a.atajo}
+          marcada={marcada ?? (a.conEstado ? (activos[a.cmd] ?? false) : undefined)}
+          cerrar={cerrar}
+          onElegir={hacer}
+        />
+      )),
+  });
+
+  /** Una herramienta con panel (símbolos, el «+»): su botón y, sin sitio, colgada de «Más». */
+  const itemPanel = (
+    id: string,
+    grupo: GrupoDeBarra,
+    prioridad: number,
+    rotulo: string,
+    dibujo: JSX.Element,
+    abierto: boolean,
+    abrir: () => void,
+    cerrar: () => void,
+    contenido: () => JSX.Element,
+  ): ItemDeBarra => ({
+    id,
+    grupo,
+    prioridad,
+    barra: () => (
+      <Popover
+        label={rotulo}
+        open={abierto}
+        onOpenChange={(o) => (o ? abrir() : cerrar())}
+        trigger={disparador(rotulo, dibujo)}
+      >
+        {contenido()}
+      </Popover>
+    ),
+    menu: (cerrarMenu) => (
+      <OpcionDeMas dibujo={dibujo} rotulo={rotulo} cerrar={cerrarMenu} onElegir={abrir} />
+    ),
+    panel: abierto ? { label: rotulo, contenido, cerrar } : null,
+  });
+
+  const selectorDeSimbolos = () => (
+    <SelectorDeSimbolos
+      t={t}
+      {...(simbolosAbierto === 'emoji' ? { enfoque: 'emoji' as const } : {})}
+      onElegir={(simbolo) =>
+        trasElegir(
+          () => setSimbolosAbierto(false),
+          () => {
+            executeEditingCommand('insertText', simbolo);
+            refrescar();
+            emitir();
+          },
+        )
+      }
+    />
+  );
+
+  const menuInsertar = () => (
+    <MenuInsertar
+      t={t}
+      disponible={disponible}
+      onElegir={(id) =>
+        trasElegir(
+          () => setInsertarAbierto(false),
+          () => insertarElemento(id),
+        )
+      }
+    />
+  );
+
+  const listaDe = (cmd: string) => listas.find((a) => a.cmd === cmd)!;
+  const masFormato: { a: Accion; hacer: () => void }[] = [
+    { a: formato[2]!, hacer: () => aplicar('underline') },
+    { a: formato[3]!, hacer: () => aplicar('strikeThrough') },
+    { a: codigoEnLinea, hacer: () => envolver('code') },
+    {
+      a: { cmd: 'subscript', glyph: 'subindice', label: t('editor.subscript'), conEstado: true },
+      hacer: () => aplicar('subscript'),
+    },
+    {
+      a: {
+        cmd: 'superscript',
+        glyph: 'superindice',
+        label: t('editor.superscript'),
+        conEstado: true,
+      },
+      hacer: () => aplicar('superscript'),
+    },
+    {
+      a: { cmd: 'removeFormat', glyph: 'eraser', label: t('editor.clearFormat'), atajo: 'Ctrl+\\' },
+      hacer: () => aplicar('removeFormat'),
+    },
+  ];
+  const parrafo: { a: Accion; hacer: () => void; marcada?: boolean }[] = [
+    ...alineacion.map((a) => ({ a, hacer: () => aplicar(a.cmd), marcada: alineada.cmd === a.cmd })),
+    { a: listaDe('outdent'), hacer: () => aplicar('outdent') },
+    { a: listaDe('indent'), hacer: () => aplicar('indent') },
+  ];
+
+  /*
+   * LA BARRA, COMO LA DE CONFLUENCE: historia | estilo del texto | negrita, cursiva y «más
+   * formato» | color | listas | alineación y sangría | insertar (enlace, mención, emoji,
+   * tabla y el «+» con todo) | herramientas. Lo que no cabe va a «Más» (BarraConMas).
+   */
+  const items: ItemDeBarra[] = [
+    itemBoton(
+      {
+        cmd: 'undo',
+        glyph: 'undo',
+        label: t('editor.undo'),
+        atajo: 'Ctrl+Z',
+        desactivada: !puede.undo,
+      },
+      'historia',
+      7,
+      deshacer,
+    ),
+    itemBoton(
+      {
+        cmd: 'redo',
+        glyph: 'redo',
+        label: t('editor.redo'),
+        atajo: 'Ctrl+Y',
+        desactivada: !puede.redo,
+      },
+      'historia',
+      5,
+      () => aplicar('redo'),
+    ),
+    {
+      id: 'bloque',
+      grupo: 'bloque',
+      prioridad: 8,
+      ancho: 116,
+      barra: () => (
         <Dropdown
           label={t('editor.block')}
-          trigger={(props) => (
-            <button
-              {...props}
-              type="button"
-              class={cx(BOTON_DE_BARRA, 'w-auto gap-1 px-1.5 text-sm')}
-              aria-label={t('editor.block')}
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              <Glyph name="heading" size={14} />
-              <span class="max-w-24 truncate">{etiquetaBloque}</span>
-              <Icon name="chevronDown" size={12} />
-            </button>
-          )}
+          trigger={disparador(t('editor.block'), <Glyph name="heading" size={16} />, {
+            texto: etiquetaBloque,
+            ancho: 'w-20',
+          })}
         >
           {BLOQUES.map((b) => (
             <MenuItem
               key={b.valor}
+              size="sm"
+              role="menuitemradio"
+              aria-checked={bloque === b.valor}
               // EL preventDefault NO ES OPCIONAL, y su ausencia aquí es lo que
               // rompía «Título 1»: al pulsar la opción, el navegador movía el
               // foco al elemento del menú y sacaba el cursor del texto. El menú
@@ -1020,305 +1905,418 @@ export function RichText({
               onMouseDown={(e: MouseEvent) => e.preventDefault()}
               onClick={() => aplicar('formatBlock', `<${b.valor}>`)}
             >
-              {t(`editor.${b.clave}` as never)}
-              {bloque === b.valor ? ' ✓' : ''}
+              <span class={cx('text-text min-w-0 flex-1 truncate', b.vista)}>
+                {t(`editor.${b.clave}` as never)}
+              </span>
+              {bloque === b.valor ? (
+                <Icon name="check" size={14} class="text-text-muted shrink-0" />
+              ) : null}
+              {ATAJO_BLOQUE[b.valor] ? (
+                <span class="sytue-meta shrink-0">{atajoDelSistema(ATAJO_BLOQUE[b.valor]!)}</span>
+              ) : null}
             </MenuItem>
           ))}
         </Dropdown>
-        <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
-
-        {formato.map((a) => (
-          <BotonDeBarra t={t} activos={activos} key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
-        ))}
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{ cmd: 'mark', icon: 'highlighter', label: t('editor.highlight') }}
-          onPress={() => aplicar('hiliteColor', RESALTADO)}
-        />
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{ cmd: 'code', icon: 'code', label: t('editor.inlineCode') }}
-          onPress={() => envolver('code')}
-        />
+      ),
+      menu: (cerrar) =>
+        BLOQUES.map((b) => (
+          <OpcionDeMas
+            key={b.valor}
+            rotulo={t(`editor.${b.clave}` as never)}
+            atajo={ATAJO_BLOQUE[b.valor]}
+            marcada={bloque === b.valor}
+            cerrar={cerrar}
+            onElegir={() => aplicar('formatBlock', `<${b.valor}>`)}
+          />
+        )),
+    },
+    itemBoton(formato[0]!, 'formato', 10, () => aplicar('bold')),
+    itemBoton(formato[1]!, 'formato', 10, () => aplicar('italic')),
+    itemMenu(
+      'masFormato',
+      'formato',
+      6,
+      t('editor.moreFormatting'),
+      <Icon name="text" size={16} />,
+      masFormato,
+    ),
+    {
+      id: 'color',
+      grupo: 'color',
+      prioridad: 4,
+      barra: () => (
         <Popover
           label={t('editor.textColor')}
-          trigger={(props) => (
-            <Tooltip label={t('editor.textColor')}>
-              <button
-                {...props}
-                type="button"
-                class={BOTON_DE_BARRA}
-                aria-label={t('editor.textColor')}
-                onMouseDown={(e) => e.preventDefault()}
-              >
-                <Glyph name="palette" size={16} />
-              </button>
-            </Tooltip>
-          )}
+          open={colorAbierto}
+          onOpenChange={(o) => (o ? abrirColor() : setColorAbierto(false))}
+          trigger={disparador(t('editor.textColor'), <Glyph name="palette" size={16} />)}
         >
-          {(close) => (
-            <div class="grid grid-cols-4 gap-1.5 p-2">
-              <button
-                type="button"
-                class="border-border sytue-focus-ring rounded-control col-span-4 min-w-0 border px-2 py-1 text-sm"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  aplicar('foreColor', 'inherit');
-                  close();
-                }}
-              >
-                {t('editor.colorDefault')}
-              </button>
-              {COLORES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  // Acción, no estado: aplica y cierra, así que botones con el nombre
-                  // del tono (no un radiogroup, que elegiría al moverse con flechas).
-                  aria-label={nombreDeColor(t, c)}
-                  title={nombreDeColor(t, c)}
-                  style={{ background: c }}
-                  class="sytue-focus-ring border-border h-7 w-7 rounded-full border"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    aplicar('foreColor', c);
-                    close();
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          {muestrasDeColor()}
         </Popover>
-        <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
-
-        {listas.map((a) => (
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            key={a.cmd}
-            a={a}
-            onPress={() => (a.cmd === 'insertTask' ? insertarTarea() : aplicar(a.cmd))}
-          />
-        ))}
-        <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
-        {alineacion.map((a) => (
-          <BotonDeBarra t={t} activos={activos} key={a.cmd} a={a} onPress={() => aplicar(a.cmd)} />
-        ))}
-        <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
-
+      ),
+      menu: (cerrar) => (
+        <OpcionDeMas
+          dibujo={<Glyph name="palette" size={16} />}
+          rotulo={t('editor.textColor')}
+          cerrar={cerrar}
+          onElegir={abrirColor}
+        />
+      ),
+      panel: colorAbierto
+        ? {
+            label: t('editor.textColor'),
+            contenido: muestrasDeColor,
+            cerrar: () => setColorAbierto(false),
+          }
+        : null,
+    },
+    itemBoton(resaltado, 'color', 3, () => aplicar('hiliteColor', RESALTADO)),
+    itemBoton(listaDe('insertUnorderedList'), 'listas', 9, () => aplicar('insertUnorderedList')),
+    itemBoton(listaDe('insertOrderedList'), 'listas', 7, () => aplicar('insertOrderedList')),
+    itemBoton(listaDe('insertTask'), 'listas', 9, () => insertarTarea()),
+    itemMenu('parrafo', 'listas', 3, t('editor.alignIndent'), dibujoDe(alineada), parrafo),
+    {
+      id: 'enlace',
+      grupo: 'insertar',
+      prioridad: 6,
+      barra: () => (
         <Popover
           label={t('editor.linkTool')}
           open={enlaceAbierto}
           onOpenChange={(o) => (o ? abrirEnlaces() : setEnlaceAbierto(false))}
-          trigger={(props) => (
-            <Tooltip
-              label={t('editor.shortcut', {
-                label: t('editor.linkTool'),
-                keys: atajoDelSistema('Ctrl+K'),
-              })}
-            >
-              <button
-                {...props}
-                type="button"
-                class={BOTON_DE_BARRA}
-                aria-label={t('editor.linkTool')}
-                onMouseDown={(e) => e.preventDefault()}
-              >
-                <Glyph name="link" size={16} />
-              </button>
-            </Tooltip>
+          trigger={disparador(
+            t('editor.shortcut', {
+              label: t('editor.linkTool'),
+              keys: atajoDelSistema('Ctrl+K'),
+            }),
+            <Glyph name="link" size={16} />,
           )}
         >
-          <LinkTool
-            t={t}
-            {...(enlaces ? { fuentes: enlaces } : {})}
-            onPick={(e) => insertarEnlace(e.url, e.label)}
-            onClose={() => {
-              setEnlaceAbierto(false);
-              enfocarTexto();
-            }}
-          />
+          {herramientaDeEnlace()}
         </Popover>
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{ cmd: 'insertHorizontalRule', icon: 'minus', label: t('editor.hr') }}
-          onPress={() => aplicar('insertHorizontalRule')}
+      ),
+      menu: (cerrar) => (
+        <OpcionDeMas
+          dibujo={<Glyph name="link" size={16} />}
+          rotulo={t('editor.linkTool')}
+          atajo="Ctrl+K"
+          cerrar={cerrar}
+          onElegir={abrirEnlaces}
         />
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{ cmd: 'removeFormat', glyph: 'eraser', label: t('editor.clearFormat') }}
-          onPress={() => aplicar('removeFormat')}
-        />
-        {/* Tabla 3×3 de partida: es la que sale en cualquier editor al pulsar el
-            botón, y crece con las acciones de abajo. */}
-        <BotonDeBarra
-          t={t}
-          activos={activos}
-          a={{ cmd: 'insertTable', glyph: 'table', label: t('editor.table') }}
-          onPress={() => insertarTabla(3, 3)}
-        />
-        {/* EL ASISTENTE VA AL FINAL Y APARTE: no es formato, reescribe lo que
-            has apuntado. Entre negrita y tabla se pulsa sin querer. */}
+      ),
+      panel: enlaceAbierto
+        ? {
+            label: t('editor.linkTool'),
+            contenido: herramientaDeEnlace,
+            cerrar: () => setEnlaceAbierto(false),
+          }
+        : null,
+    },
+    ...(personas
+      ? [
+          itemBoton(
+            { cmd: 'mencion', glyph: 'arroba', label: t('editor.mention'), atajo: '@' },
+            'insertar',
+            2,
+            () => insertarElemento('mencion'),
+          ),
+        ]
+      : []),
+    itemPanel(
+      'emoji',
+      'insertar',
+      3,
+      t('editor.emoji'),
+      <Glyph name="carita" size={16} />,
+      simbolosAbierto === 'emoji',
+      () => abrirSimbolos('emoji'),
+      () => setSimbolosAbierto(false),
+      selectorDeSimbolos,
+    ),
+    itemPanel(
+      'simbolos',
+      'insertar',
+      2,
+      t('editor.symbols'),
+      <Glyph name="omega" size={16} />,
+      simbolosAbierto === true,
+      () => abrirSimbolos(true),
+      () => setSimbolosAbierto(false),
+      selectorDeSimbolos,
+    ),
+    // Tabla 3×3 de partida: es la que sale en cualquier editor al pulsar el botón, y
+    // crece con las acciones de tabla.
+    itemBoton({ cmd: 'insertTable', glyph: 'table', label: t('editor.table') }, 'insertar', 4, () =>
+      insertarTabla(3, 3),
+    ),
+    itemPanel(
+      'insertar',
+      'insertar',
+      8,
+      t('editor.shortcut', { label: t('editor.insert'), keys: '/' }),
+      <Icon name="plus" size={16} />,
+      insertarAbierto,
+      abrirInsertar,
+      () => setInsertarAbierto(false),
+      menuInsertar,
+    ),
+    itemBoton(
+      { cmd: 'buscar', icon: 'search', label: t('editor.find'), atajo: 'Ctrl+F' },
+      'herramientas',
+      2,
+      () => abrirBuscador(),
+    ),
+    ...(onAncho
+      ? [
+          itemBoton(
+            {
+              cmd: 'anchoCompleto',
+              icon: 'fitWidth',
+              label: t('editor.fullWidth'),
+              conEstado: true,
+            },
+            'herramientas',
+            1,
+            onAncho,
+          ),
+        ]
+      : []),
+    itemBoton(
+      { cmd: 'atajos', icon: 'teclado', label: t('editor.shortcuts'), atajo: 'Ctrl+/' },
+      'herramientas',
+      1,
+      () => {
+        if (document.activeElement === ref.current) guardarSeleccion();
+        setAtajos(true);
+      },
+    ),
+    // EL ASISTENTE VA AL FINAL Y APARTE: no es formato, reescribe lo que has
+    // apuntado. Entre negrita y tabla se pulsa sin querer.
+    {
+      id: 'ia',
+      grupo: 'herramientas',
+      prioridad: 1,
+      barra: () => (
         <Dropdown
           label={t('editor.ai')}
           align="end"
           trigger={(props) => (
-            <button
-              {...props}
-              type="button"
-              class={BOTON_DE_BARRA}
-              title={t('editor.ai')}
-              aria-label={t('editor.ai')}
-              disabled={iaTrabajando !== null}
-            >
-              {iaTrabajando !== null ? <Spinner size={16} /> : <Glyph name="sparkles" size={16} />}
-            </button>
+            <Tooltip label={t('editor.ai')}>
+              <button
+                {...props}
+                type="button"
+                class={cx(BOTON_DE_BARRA, 'aria-expanded:bg-bg-subtle aria-expanded:text-text')}
+                aria-label={t('editor.ai')}
+                disabled={iaTrabajando !== null}
+              >
+                {iaTrabajando !== null ? (
+                  <Spinner size={16} />
+                ) : (
+                  <Glyph name="sparkles" size={16} />
+                )}
+              </button>
+            </Tooltip>
           )}
         >
-          <MenuItem onClick={() => void aplicarIA('ordenar')}>{t('editor.ai.tidy')}</MenuItem>
-          <MenuItem onClick={() => void aplicarIA('tareas')}>{t('editor.ai.tasks')}</MenuItem>
-          <MenuItem onClick={() => void aplicarIA('titular')}>{t('editor.ai.title')}</MenuItem>
-          <MenuSeparator />
-          <MenuItem onClick={() => void aplicarIA('resumir')}>{t('editor.ai.summarize')}</MenuItem>
-          <MenuItem onClick={() => void aplicarIA('ampliar')}>{t('editor.ai.expand')}</MenuItem>
-          <MenuItem onClick={() => void aplicarIA('corregir')}>{t('editor.ai.fix')}</MenuItem>
-          <MenuItem onClick={() => void aplicarIA('traducir')}>{t('editor.ai.translate')}</MenuItem>
+          {ACCIONES_IA.map(([accion, clave], i) => (
+            <Fragment key={accion}>
+              {i === 3 ? <MenuSeparator /> : null}
+              <MenuItem size="sm" onClick={() => void aplicarIA(accion)}>
+                {t(clave)}
+              </MenuItem>
+            </Fragment>
+          ))}
         </Dropdown>
-      </Toolbar>
+      ),
+      menu: (cerrar) =>
+        ACCIONES_IA.map(([accion, clave]) => (
+          <OpcionDeMas
+            key={accion}
+            dibujo={<Glyph name="sparkles" size={16} />}
+            rotulo={t(clave)}
+            desactivada={iaTrabajando !== null}
+            cerrar={cerrar}
+            onElegir={() => void aplicarIA(accion)}
+          />
+        )),
+    },
+  ];
+
+  return (
+    <div class={cx('flex min-h-0 flex-col', estirado && 'flex-1')}>
+      <BarraConMas items={items} aria-label={ariaLabel} etiquetaMas={t('editor.more')} />
 
       {/* El fallo del asistente no se traga: sin aviso, pulsar «ordenar» y no ver
           nada se lee como que la nota está rota. */}
+      {avisoPegar ? (
+        <p role="status" class="text-text-muted px-1 py-0.5 text-xs">
+          {t('editor.pasteBlocked')}
+        </p>
+      ) : null}
       {iaError ? (
         <p role="status" class="text-danger-text px-1 py-0.5 text-xs">
           {t('editor.aiError')}
         </p>
       ) : null}
 
-      {/* Acciones de tabla: aparecen SOLO con el cursor dentro de una, como en
-          Outlook. Enseñarlas siempre alargaría la barra para algo que la mayoría
-          de las notas no usa. */}
-      {enTabla ? (
-        <Toolbar
-          data-scroll-x
-          innerRef={barraTabla.ref}
-          class={cx(
-            BARRA_DE_EDICION,
-            'md:flex-wrap',
-            FILA_UNICA_EN_MOVIL,
-            barraTabla.queda && MASCARA_SCROLL_X,
-          )}
-          aria-label={t('editor.tableTools')}
-        >
-          <span class="text-text-subtle px-1 text-xs">{t('editor.table')}</span>
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'rowAbove', icon: 'minus', label: t('editor.rowAbove') }}
-            onPress={() => enCelda((c) => insertarFila(c, 'antes'))}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'rowBelow', icon: 'minus', label: t('editor.rowBelow') }}
-            onPress={() => enCelda((c) => insertarFila(c, 'despues'))}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'colBefore', icon: 'minus', label: t('editor.colBefore') }}
-            onPress={() => enCelda((c) => insertarColumna(c, 'antes'))}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'colAfter', icon: 'minus', label: t('editor.colAfter') }}
-            onPress={() => enCelda((c) => insertarColumna(c, 'despues'))}
-          />
-          <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'rowDelete', glyph: 'trash', label: t('editor.rowDelete') }}
-            onPress={() => enCelda(eliminarFila)}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'colDelete', glyph: 'trash', label: t('editor.colDelete') }}
-            onPress={() => enCelda(eliminarColumna)}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'tableDelete', glyph: 'trash', label: t('editor.tableDelete') }}
-            onPress={() => enCelda(eliminarTabla)}
-          />
-        </Toolbar>
+      {/* La barra del bloque donde está el cursor flota junto a él (BarraDeBloque). */}
+      {contexto && conFoco ? (
+        <BarraDeBloque t={t} contexto={contexto} acciones={accionesDeBloque(contexto)} />
       ) : null}
 
       {/* Buscar en la nota (Ctrl+F dentro del editor). Las coincidencias se
           pintan con la API de resaltados de CSS: no tocan el DOM de la nota, así
           que no hay nada que deshacer ni que se cuele al guardar. */}
       {buscador ? (
-        <div class={cx(BARRA_DE_EDICION, 'gap-1.5')} role="search">
-          <Input
-            id={ID_BUSCAR}
-            type="search"
-            size="sm"
-            value={buscador.q}
-            class="min-w-0 flex-1"
-            placeholder={t('find.placeholder')}
-            aria-label={t('find.placeholder')}
-            autocomplete="off"
-            onInput={(e) => pintarBusqueda(e.currentTarget.value, 0)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                pintarBusqueda(buscador.q, buscador.i + (e.shiftKey ? -1 : 1));
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                e.stopPropagation();
-                cerrarBuscador();
-              }
-            }}
-          />
-          <span class="sytue-meta shrink-0 tabular-nums" aria-live="polite">
-            {coincidencias.current.length > 0
-              ? t('find.count', {
-                  current: String(buscador.i + 1),
-                  total: String(coincidencias.current.length),
-                })
-              : buscador.q.trim()
-                ? t('find.none')
-                : ''}
-          </span>
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{
-              cmd: 'findPrev',
-              icon: 'chevronUp',
-              label: t('find.previous'),
-              atajo: 'Shift+Enter',
-            }}
-            onPress={() => pintarBusqueda(buscador.q, buscador.i - 1)}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'findNext', icon: 'chevronDown', label: t('find.next'), atajo: 'Enter' }}
-            onPress={() => pintarBusqueda(buscador.q, buscador.i + 1)}
-          />
-          <BotonDeBarra
-            t={t}
-            activos={activos}
-            a={{ cmd: 'findClose', icon: 'close', label: t('find.close') }}
-            onPress={cerrarBuscador}
-          />
+        <div class="border-border bg-surface flex flex-col border-b" role="search">
+          <div class="flex items-center gap-1.5 px-1.5 py-1">
+            <Input
+              id={ID_BUSCAR}
+              type="search"
+              size="sm"
+              value={buscador.q}
+              class="min-w-0 flex-1"
+              placeholder={t('find.placeholder')}
+              aria-label={t('find.placeholder')}
+              autocomplete="off"
+              onInput={(e) => pintarBusqueda(e.currentTarget.value, 0)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  pintarBusqueda(buscador.q, buscador.i + (e.shiftKey ? -1 : 1));
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cerrarBuscador();
+                }
+              }}
+            />
+            {/* Lo que se ve: «2 de 5»; lo que se anuncia, cuántas hay. */}
+            <span
+              class="sytue-meta shrink-0 tabular-nums"
+              title={t('editor.matches', { count: coincidencias.current.length })}
+            >
+              <span aria-hidden="true">
+                {coincidencias.current.length > 0
+                  ? t('find.count', {
+                      current: String(buscador.i + 1),
+                      total: String(coincidencias.current.length),
+                    })
+                  : buscador.q.trim()
+                    ? t('find.none')
+                    : ''}
+              </span>
+              <span class="sr-only" aria-live="polite">
+                {buscador.q.trim()
+                  ? t('editor.matches', { count: coincidencias.current.length })
+                  : ''}
+              </span>
+            </span>
+            <Toolbar aria-label={t('editor.find')} class="flex shrink-0 items-center gap-0.5">
+              <BotonDeBarra
+                t={t}
+                activos={{ mayus: buscador.mayus }}
+                a={{
+                  cmd: 'mayus',
+                  glyph: 'mayusculas',
+                  label: t('editor.matchCase'),
+                  conEstado: true,
+                }}
+                onPress={() => pintarBusqueda(buscador.q, 0, { mayus: !buscador.mayus })}
+              />
+              <BotonDeBarra
+                t={t}
+                activos={activos}
+                a={{
+                  cmd: 'findPrev',
+                  icon: 'chevronUp',
+                  label: t('editor.findPrev'),
+                  atajo: 'Shift+Enter',
+                }}
+                onPress={() => pintarBusqueda(buscador.q, buscador.i - 1)}
+              />
+              <BotonDeBarra
+                t={t}
+                activos={activos}
+                a={{
+                  cmd: 'findNext',
+                  icon: 'chevronDown',
+                  label: t('editor.findNext'),
+                  atajo: 'Enter',
+                }}
+                onPress={() => pintarBusqueda(buscador.q, buscador.i + 1)}
+              />
+              {/* Abre o cierra la fila de reemplazar: dice si está abierta, no si «está
+                  reemplazando», y por eso no se llama igual que el botón de la fila. */}
+              <Tooltip
+                label={t('editor.shortcut', {
+                  label: `${t('editor.replace')}…`,
+                  keys: atajoDelSistema('Ctrl+H'),
+                })}
+              >
+                <button
+                  type="button"
+                  class={cx(BOTON_DE_BARRA, 'aria-expanded:bg-selected aria-expanded:text-text')}
+                  aria-label={`${t('editor.replace')}…`}
+                  aria-expanded={buscador.reemplazar}
+                  aria-controls={ID_REEMPLAZO}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() =>
+                    pintarBusqueda(buscador.q, buscador.i, { reemplazar: !buscador.reemplazar })
+                  }
+                >
+                  <Icon name="swap" size={16} />
+                </button>
+              </Tooltip>
+              <BotonDeBarra
+                t={t}
+                activos={activos}
+                a={{ cmd: 'findClose', icon: 'close', label: t('find.close'), atajo: 'Escape' }}
+                onPress={cerrarBuscador}
+              />
+            </Toolbar>
+          </div>
+          {buscador.reemplazar ? (
+            <div class="flex items-center gap-1.5 px-1.5 pb-1">
+              <Input
+                id={ID_REEMPLAZO}
+                type="text"
+                size="sm"
+                value={buscador.por}
+                class="min-w-0 flex-1"
+                placeholder={t('editor.replaceWith')}
+                aria-label={t('editor.replaceWith')}
+                autocomplete="off"
+                onInput={(e) => setBuscador({ ...buscador, por: e.currentTarget.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    reemplazar(e.metaKey || e.ctrlKey);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cerrarBuscador();
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={coincidencias.current.length === 0}
+                onClick={() => reemplazar(false)}
+              >
+                {t('editor.replace')}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={coincidencias.current.length === 0}
+                onClick={() => reemplazar(true)}
+              >
+                {t('editor.replaceAll')}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1328,7 +2326,35 @@ export function RichText({
           `flex-1` del campo no tenía contra qué medirse y se quedaba en su
           mínimo. Medido en el piloto: tarjeta 630px, editor 84px, 446px muertos
           debajo con la clase correcta puesta. */}
-      <div class={cx('relative', estirado && 'flex min-h-0 flex-1 flex-col')}>
+      <div
+        class={cx('notes-editor-campo relative', estirado && 'flex min-h-0 flex-1 flex-col')}
+        onMouseMove={(e) => {
+          if (ref.current && !arrastrado.current) ponerAsa(bloqueDe(e.target as Node, ref.current));
+        }}
+        onDragOver={(e) => {
+          const b = arrastrado.current;
+          const raiz = ref.current;
+          if (!b || !raiz) return;
+          // Solo los bloques propios se sueltan aquí: lo demás lo pega el navegador.
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+          const destino = bloqueDe(e.target as Node, raiz);
+          const caja = raiz.parentElement?.getBoundingClientRect();
+          if (!destino || !caja) return;
+          const r = destino.getBoundingClientRect();
+          const antes = e.clientY < r.top + r.height / 2;
+          setSoltarEn({ top: (antes ? r.top : r.bottom) - caja.top, destino, antes });
+        }}
+        onDrop={(e) => {
+          const b = arrastrado.current;
+          if (!b) return;
+          e.preventDefault();
+          if (soltarEn && llevarBloque(b, soltarEn.destino, soltarEn.antes)) emitir();
+          arrastrado.current = null;
+          setSoltarEn(null);
+          ponerAsa(b);
+        }}
+      >
         <div
           ref={ref}
           contentEditable
@@ -1357,13 +2383,25 @@ export function RichText({
             // en lectura, que aquí faltaba.
             estirado && 'flex-1',
           )}
-          onInput={() => {
+          onInput={(e) => {
+            const ev = e as unknown as InputEvent;
+            // DESPUÉS de que el navegador acabe la edición que avisa (una microtarea): una
+            // orden de edición dentro del `input` de otra la rechaza Chromium, y la
+            // selección de las marcas se quedaba puesta para que la siguiente tecla se
+            // las comiera. Visto en Chromium sin cabeza con el banco del editor.
+            if (ev.inputType === 'insertText' && !ev.isComposing && /[*_`~]$/.test(ev.data ?? ''))
+              queueMicrotask(() => {
+                if (!aplicarAtajoEnLinea()) return;
+                emitir();
+                refrescar();
+              });
             guardarSeleccion();
             emitir();
             refrescar();
             mirarMenu();
           }}
           onBlur={() => {
+            ultimoAuto.current = null;
             guardarSeleccion();
             emitir();
             setMenu(null);
@@ -1380,6 +2418,14 @@ export function RichText({
           }}
           onClick={(e) => {
             const target = e.target as HTMLElement | null;
+            // El título de una sección que se pliega se escribe: pulsarlo pone el cursor.
+            // Solo el triángulo de su izquierda (los primeros 24 px) la abre o la cierra,
+            // como en Confluence; si no, cada clic para escribir la plegaría.
+            const titulo = target?.closest('summary');
+            if (titulo && ref.current?.contains(titulo)) {
+              const izquierda = titulo.getBoundingClientRect().left;
+              if (e.clientX > izquierda + 24) e.preventDefault();
+            }
             if (target instanceof HTMLInputElement && target.type === 'checkbox') {
               if (target.checked) {
                 target.setAttribute('checked', '');
@@ -1399,14 +2445,47 @@ export function RichText({
             const enCodigo = !!(ancla instanceof Element ? ancla : ancla?.parentElement)?.closest(
               'pre',
             );
-            const pegado = queSePega(e.clipboardData, pegarSinFormato.current, !enCodigo);
+            const pegado = queSePega(
+              e.clipboardData,
+              pegarSinFormato.current,
+              !enCodigo,
+              window.getSelection()?.toString() ?? '',
+            );
             pegarSinFormato.current = false;
             if ('html' in pegado) executeEditingCommand('insertHTML', pegado.html);
             else if (pegado.texto) executeEditingCommand('insertText', pegado.texto);
             emitir();
           }}
+          onMouseDown={() => {
+            setElegido(null);
+            ultimoAuto.current = null;
+          }}
+          onContextMenu={(e) => {
+            // El menú de la celda con el botón derecho (o Mayús+F10), con lo mismo que la
+            // barra de la tabla. Fuera de una tabla, el del navegador.
+            const celda = celdaDe(e.target as Node);
+            if (!celda) return;
+            e.preventDefault();
+            // El menú actúa sobre la celda pulsada: el cursor va a ella si no estaba ya.
+            if (celdaDe(window.getSelection()?.anchorNode ?? null) !== celda) entrarEnCelda(celda);
+            guardarSeleccion();
+            refrescar();
+            setMenuCelda({ x: e.clientX, y: e.clientY });
+          }}
           onKeyDown={(e) => {
             const mod = e.metaKey || e.ctrlKey;
+            if (elegido) setElegido(null);
+            // Ctrl/⌘+Z JUSTO después de un atajo de Markdown devuelve lo tecleado tal
+            // cual; cualquier otra tecla (salvo un modificador suelto) lo olvida.
+            const deshacerAtajo = ultimoAuto.current;
+            if (!/^(Shift|Control|Meta|Alt)$/.test(e.key)) ultimoAuto.current = null;
+            if (deshacerAtajo && mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+              e.preventDefault();
+              deshacerAtajo();
+              refrescar();
+              emitir();
+              return;
+            }
             // El evento `paste` no dice qué teclas lo trajeron: Ctrl/⌘+Mayús+V se apunta
             // aquí, justo antes, y lo consume `onPaste`. Cualquier otra tecla lo olvida.
             pegarSinFormato.current = mod && e.shiftKey && e.key.toLowerCase() === 'v';
@@ -1432,15 +2511,116 @@ export function RichText({
                 return;
               }
             }
-            if (mod && !e.altKey && e.key.toLowerCase() === 'f') {
+            // En el título de una sección que se pliega, Espacio escribe un espacio (no la
+            // pliega, que es lo que hace Chromium con un `<summary>` editable) e Intro baja
+            // al contenido, abriéndola si estaba cerrada.
+            const enTitulo = (() => {
+              const n = window.getSelection()?.anchorNode ?? null;
+              const el = n?.nodeType === Node.TEXT_NODE ? n.parentElement : (n as Element | null);
+              const t0 = el?.closest('summary');
+              return t0 && ref.current?.contains(t0) ? t0 : null;
+            })();
+            if (enTitulo && !mod && !e.altKey && (e.key === ' ' || e.key === 'Enter')) {
               e.preventDefault();
-              abrirBuscador();
+              if (e.key === ' ') {
+                executeEditingCommand('insertText', ' ');
+              } else {
+                const seccion = enTitulo.parentElement as HTMLDetailsElement;
+                seccion.open = true;
+                let destino = enTitulo.nextElementSibling;
+                if (!destino) {
+                  destino = document.createElement('p');
+                  destino.innerHTML = '<br>';
+                  seccion.append(destino);
+                }
+                const r = document.createRange();
+                r.selectNodeContents(destino);
+                r.collapse(true);
+                const sel = window.getSelection();
+                sel?.removeAllRanges();
+                sel?.addRange(r);
+              }
+              emitir();
+              refrescar();
+              return;
+            }
+            // Alt+Mayús+↑/↓ sube o baja el bloque del cursor (el cursor va con él), y
+            // Mayús+F10 abre el menú del bloque: el asa, para quien no usa el ratón.
+            if (e.altKey && e.shiftKey && !mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+              const b = ref.current
+                ? bloqueDe(window.getSelection()?.anchorNode ?? null, ref.current)
+                : null;
+              if (b) {
+                e.preventDefault();
+                if (moverBloque(b, e.key === 'ArrowUp' ? -1 : 1)) {
+                  emitir();
+                  refrescar();
+                }
+                return;
+              }
+            }
+            if (
+              e.shiftKey &&
+              e.key === 'F10' &&
+              !celdaDe(window.getSelection()?.anchorNode ?? null)
+            ) {
+              const b = ref.current
+                ? bloqueDe(window.getSelection()?.anchorNode ?? null, ref.current)
+                : null;
+              if (b) {
+                e.preventDefault();
+                const r = b.getBoundingClientRect();
+                guardarSeleccion();
+                abrirMenuBloque(b, r.left, r.top);
+                return;
+              }
+            }
+            // Ctrl/⌘+/ abre la hoja de atajos. Por `key`: en un teclado español la barra es
+            // Mayús+7, así que no se mira Mayúsculas.
+            if (mod && !e.altKey && (e.key === '/' || e.code === 'Slash')) {
+              e.preventDefault();
+              guardarSeleccion();
+              setAtajos(true);
+              return;
+            }
+            if (mod && !e.altKey && !e.shiftKey && /^[fh]$/.test(e.key.toLowerCase())) {
+              e.preventDefault();
+              abrirBuscador(e.key.toLowerCase() === 'h');
               return;
             }
             if (mod && e.key === '.') {
               e.preventDefault();
               alternarPlegadoAqui();
               return;
+            }
+            // Ctrl/⌘+B, I y U por la misma puerta que la barra: el navegador los aplica
+            // por su cuenta con el `styleWithCSS` que haya puesto, y con el del color
+            // la negrita salía como `<span style>` y se perdía al guardar.
+            const conmuta =
+              mod && !e.altKey && !e.shiftKey && TECLAS_DE_FORMATO[e.key.toLowerCase()];
+            if (conmuta) {
+              e.preventDefault();
+              aplicar(conmuta);
+              return;
+            }
+            // Los atajos que la barra enseña en su ayuda: tachado, código, resaltado y
+            // quitar formato. Por `code` y no por `key`: con Mayúsculas la tecla cambia.
+            if (mod && !e.altKey) {
+              const otro =
+                e.shiftKey && e.code === 'KeyX'
+                  ? () => aplicar('strikeThrough')
+                  : e.shiftKey && e.code === 'KeyH'
+                    ? () => aplicar('hiliteColor', RESALTADO)
+                    : !e.shiftKey && e.code === 'KeyE'
+                      ? () => envolver('code')
+                      : !e.shiftKey && (e.code === 'Backslash' || e.key === '\\')
+                        ? () => aplicar('removeFormat')
+                        : null;
+              if (otro) {
+                e.preventDefault();
+                otro();
+                return;
+              }
             }
             if (e.key === 'Escape') {
               e.stopPropagation();
@@ -1453,6 +2633,19 @@ export function RichText({
               abrirEnlaces();
             } else if (e.key === 'Tab') {
               e.preventDefault();
+              // En una tabla, Tab va a la celda siguiente y Mayús+Tab a la anterior; en la
+              // última, Tab añade una fila, como en cualquier hoja.
+              const celda = celdaDe(window.getSelection()?.anchorNode ?? null);
+              if (celda && ref.current?.contains(celda)) {
+                let destino = celdaVecina(celda, e.shiftKey ? -1 : 1);
+                if (!destino && !e.shiftKey) {
+                  enCelda((x) => insertarFila(x, 'despues'));
+                  destino = celdaVecina(celda, 1);
+                }
+                if (destino) entrarEnCelda(destino);
+                refrescar();
+                return;
+              }
               if (e.shiftKey) {
                 aplicar('outdent');
               } else {
@@ -1544,7 +2737,7 @@ export function RichText({
 
             if ((e.key === ' ' || e.key === 'Enter') && !mod && !e.altKey && !e.shiftKey) {
               if (aplicarAtajoMarkdown(e.key)) e.preventDefault();
-            } else if (mod && e.altKey && /^[0-5]$/.test(e.key)) {
+            } else if (mod && e.altKey && /^[0-6]$/.test(e.key)) {
               // Ctrl+Alt+0 párrafo, Ctrl+Alt+1..5 títulos: Ctrl+1..5 cambia de
               // pestaña en varios navegadores.
               e.preventDefault();
@@ -1556,7 +2749,7 @@ export function RichText({
           ? createPortal(
               <div
                 ref={menuRef}
-                class={cx('fixed', menu.tipo === 'cmd' ? 'w-60' : 'w-72')}
+                class={cx('fixed', menu.tipo === 'cmd' ? 'w-80' : 'w-72')}
                 style={{
                   zIndex: 'var(--z-dropdown)',
                   left: `${menu.x}px`,
@@ -1564,7 +2757,7 @@ export function RichText({
                   transform: menu.arriba ? 'translateY(-100%)' : undefined,
                 }}
               >
-                <div class="sytue-pop-in sytue-menu-surface border-border max-h-72 overflow-y-auto rounded-lg border p-1 shadow-[var(--shadow-md)]">
+                <div class="sytue-pop-in sytue-menu-surface border-border max-h-80 overflow-y-auto rounded-lg border p-1 shadow-[var(--shadow-md)]">
                   <div
                     id="notes-menu-sugerencias"
                     role="listbox"
@@ -1597,9 +2790,16 @@ export function RichText({
                           <span class="text-text-muted grid h-5 w-5 shrink-0 place-items-center">
                             {s.dibujo}
                           </span>
-                          <span class="min-w-0 flex-1 truncate">
-                            {s.rotulo}
-                            {s.dentro ? <span class="text-text-muted"> › {s.dentro}</span> : null}
+                          <span class="min-w-0 flex-1">
+                            <span class="block truncate">
+                              {s.rotulo}
+                              {s.dentro ? <span class="text-text-muted"> › {s.dentro}</span> : null}
+                            </span>
+                            {s.descripcion ? (
+                              <span class="text-text-muted block truncate text-xs">
+                                {s.descripcion}
+                              </span>
+                            ) : null}
                           </span>
                           {s.detalle ? (
                             <span class="sytue-meta max-w-[45%] shrink-0 truncate">
@@ -1610,6 +2810,11 @@ export function RichText({
                       </Fragment>
                     ))}
                   </div>
+                  {menu.tipo === 'cmd' && sugerencias.length === 0 ? (
+                    <p class="text-text-muted px-2.5 py-1.5 text-sm" role="status">
+                      {t('editor.slashNoResults')}
+                    </p>
+                  ) : null}
                   {menu.tipo === 'nota' && (sugerencias.length === 0 || notasMenu.buscando) ? (
                     <p
                       class="text-text-muted flex items-center gap-2 px-2.5 py-1.5 text-sm"
@@ -1637,37 +2842,78 @@ export function RichText({
                 style={{
                   zIndex: 'var(--z-dropdown)',
                   left: `${burbuja.x}px`,
-                  top: `${burbuja.y - 6}px`,
-                  transform: 'translate(-50%, -100%)',
+                  top: burbuja.abajo ? `${burbuja.y + 8}px` : `${burbuja.y - 6}px`,
+                  transform: burbuja.abajo ? 'translateX(-50%)' : 'translate(-50%, -100%)',
                 }}
               >
                 <Toolbar
                   aria-label={t('editor.selectionTools')}
+                  omitir='[role="menu"]'
                   class="sytue-pop-in sytue-menu-surface border-border flex items-center gap-0.5 rounded-lg border p-1 shadow-[var(--shadow-md)]"
                 >
-                  {formato
-                    .filter((a) => a.cmd !== 'underline')
-                    .map((a) => (
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
+                    a={formato[0]!}
+                    onPress={() => aplicar('bold')}
+                  />
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
+                    a={formato[1]!}
+                    onPress={() => aplicar('italic')}
+                  />
+                  {/* En el teléfono, tachado, resaltado y código van en «Más formato»: así
+                      la burbuja cabe en 390 px, como la de Fyne. */}
+                  {burbuja.estrecha ? (
+                    <Dropdown
+                      label={t('editor.moreFormatting')}
+                      trigger={disparador(
+                        t('editor.moreFormatting'),
+                        <Icon name="text" size={16} />,
+                        {
+                          flecha: true,
+                        },
+                      )}
+                    >
+                      {[
+                        { a: formato[3]!, hacer: () => aplicar('strikeThrough') },
+                        { a: resaltado, hacer: () => aplicar('hiliteColor', RESALTADO) },
+                        { a: codigoEnLinea, hacer: () => envolver('code') },
+                      ].map(({ a, hacer }) => (
+                        <MenuItem
+                          key={a.cmd}
+                          size="sm"
+                          icon={dibujoDe(a)}
+                          onMouseDown={(e: MouseEvent) => e.preventDefault()}
+                          onClick={hacer}
+                        >
+                          {a.label}
+                        </MenuItem>
+                      ))}
+                    </Dropdown>
+                  ) : (
+                    <>
                       <BotonDeBarra
                         t={t}
                         activos={activos}
-                        key={a.cmd}
-                        a={a}
-                        onPress={() => aplicar(a.cmd)}
+                        a={formato[3]!}
+                        onPress={() => aplicar('strikeThrough')}
                       />
-                    ))}
-                  <BotonDeBarra
-                    t={t}
-                    activos={activos}
-                    a={{ cmd: 'mark', icon: 'highlighter', label: t('editor.highlight') }}
-                    onPress={() => aplicar('hiliteColor', RESALTADO)}
-                  />
-                  <BotonDeBarra
-                    t={t}
-                    activos={activos}
-                    a={{ cmd: 'code', icon: 'code', label: t('editor.inlineCode') }}
-                    onPress={() => envolver('code')}
-                  />
+                      <BotonDeBarra
+                        t={t}
+                        activos={activos}
+                        a={resaltado}
+                        onPress={() => aplicar('hiliteColor', RESALTADO)}
+                      />
+                      <BotonDeBarra
+                        t={t}
+                        activos={activos}
+                        a={codigoEnLinea}
+                        onPress={() => envolver('code')}
+                      />
+                    </>
+                  )}
                   <BotonDeBarra
                     t={t}
                     activos={activos}
@@ -1678,6 +2924,26 @@ export function RichText({
                       atajo: 'Ctrl+K',
                     }}
                     onPress={abrirEnlaces}
+                  />
+                  {/* El portapapeles, en su propio grupo: no es formato. */}
+                  <span class={SEPARADOR_DE_BARRA} aria-hidden="true" />
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
+                    a={{ cmd: 'copy', glyph: 'copy', label: t('editor.copy'), atajo: 'Ctrl+C' }}
+                    onPress={() => void copiar(false)}
+                  />
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
+                    a={{ cmd: 'cut', glyph: 'tijeras', label: t('editor.cut'), atajo: 'Ctrl+X' }}
+                    onPress={() => void copiar(true)}
+                  />
+                  <BotonDeBarra
+                    t={t}
+                    activos={activos}
+                    a={{ cmd: 'paste', glyph: 'pegar', label: t('editor.paste'), atajo: 'Ctrl+V' }}
+                    onPress={() => void pegar()}
                   />
                 </Toolbar>
               </div>,
@@ -1692,7 +2958,210 @@ export function RichText({
             {placeholder}
           </span>
         ) : null}
+        {/* Los números de línea del código: una capa encima del campo, no texto de la
+            nota (no se guardan ni se copian). */}
+        {asa?.el.isConnected ? (
+          <Tooltip label={t('editor.blockMenu')} placement="right">
+            <button
+              type="button"
+              class="notes-asa sytue-focus-ring"
+              style={{ top: `${asa.top}px` }}
+              aria-label={t('editor.blockMenu')}
+              aria-haspopup="menu"
+              aria-expanded={menuBloque !== null}
+              draggable
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                guardarSeleccion();
+                abrirMenuBloque(asa.el, r.left, r.bottom);
+              }}
+              onDragStart={(e) => {
+                arrastrado.current = asa.el;
+                e.dataTransfer?.setData('text/plain', '');
+                if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragEnd={() => {
+                arrastrado.current = null;
+                setSoltarEn(null);
+              }}
+            >
+              <Icon name="grip" size={14} />
+            </button>
+          </Tooltip>
+        ) : null}
+        {soltarEn ? (
+          <span class="notes-soltar" aria-hidden="true" style={{ top: `${soltarEn.top}px` }} />
+        ) : null}
+        {menuBloque ? (
+          <Dropdown
+            label={t('editor.blockMenu')}
+            abiertoEn={menuBloque}
+            onCerrar={() => setMenuBloque(null)}
+          >
+            {(cerrar) => {
+              const opcion = (rotulo: string, dibujo: JSX.Element, hacer: () => void) => (
+                <MenuItem
+                  size="sm"
+                  icon={dibujo}
+                  onMouseDown={(e: MouseEvent) => e.preventDefault()}
+                  onClick={() => {
+                    cerrar();
+                    hacer();
+                  }}
+                >
+                  {rotulo}
+                </MenuItem>
+              );
+              const convertir = (rotulo: string, dibujo: JSX.Element, hacer: () => void) =>
+                opcion(rotulo, dibujo, () => conBloque(hacer));
+              return (
+                <>
+                  {opcion(t('editor.moveUp'), <Icon name="chevronUp" size={16} />, () =>
+                    conBloque((b) => moverBloque(b, -1)),
+                  )}
+                  {opcion(t('editor.moveDown'), <Icon name="chevronDown" size={16} />, () =>
+                    conBloque((b) => moverBloque(b, 1)),
+                  )}
+                  {opcion(t('editor.duplicate'), <Glyph name="copy" size={16} />, () =>
+                    conBloque((b) => duplicarBloque(b)),
+                  )}
+                  {opcion(t('editor.delete'), <Glyph name="trash" size={16} />, () =>
+                    conBloque((b) => quitarBloque(b, ref.current!)),
+                  )}
+                  <MenuSeparator />
+                  <p class="sytue-meta px-2.5 pt-1 pb-0.5" aria-hidden="true">
+                    {t('editor.convertTo')}
+                  </p>
+                  {convertir(t('editor.paragraph'), <Icon name="text" size={16} />, () =>
+                    ordenar('formatBlock', '<p>'),
+                  )}
+                  {convertir(t('editor.heading1'), <Glyph name="heading" size={16} />, () =>
+                    ordenar('formatBlock', '<h1>'),
+                  )}
+                  {convertir(t('editor.heading2'), <Glyph name="heading" size={16} />, () =>
+                    ordenar('formatBlock', '<h2>'),
+                  )}
+                  {convertir(t('editor.heading3'), <Glyph name="heading" size={16} />, () =>
+                    ordenar('formatBlock', '<h3>'),
+                  )}
+                  {convertir(t('editor.bulletList'), <Glyph name="bulletList" size={16} />, () =>
+                    ordenar('insertUnorderedList'),
+                  )}
+                  {convertir(
+                    t('editor.numberedList'),
+                    <Glyph name="numberedList" size={16} />,
+                    () => ordenar('insertOrderedList'),
+                  )}
+                  {convertir(t('editor.quote'), <Glyph name="quote" size={16} />, () =>
+                    ordenar('formatBlock', '<blockquote>'),
+                  )}
+                  {convertir(t('editor.codeBlock'), <Icon name="code" size={16} />, () =>
+                    ordenar('formatBlock', '<pre>'),
+                  )}
+                  {opcion(t('editor.panelInfo'), <Glyph name="panel" size={16} />, () =>
+                    conBloque((b) => enPanel(b)),
+                  )}
+                </>
+              );
+            }}
+          </Dropdown>
+        ) : null}
+        {marcasBusqueda.map((m, n) => (
+          <span
+            key={n}
+            aria-hidden="true"
+            class={cx('notes-coincidencia', m.actual && 'notes-coincidencia--actual')}
+            style={{
+              top: `${m.top}px`,
+              left: `${m.left}px`,
+              width: `${m.width}px`,
+              height: `${m.height}px`,
+            }}
+          />
+        ))}
+        {celdaActiva && conFoco ? (
+          <span
+            class="notes-celda-activa"
+            aria-hidden="true"
+            style={{
+              top: `${celdaActiva.top}px`,
+              left: `${celdaActiva.left}px`,
+              width: `${celdaActiva.width}px`,
+              height: `${celdaActiva.height}px`,
+            }}
+          />
+        ) : null}
+        {numeros.map((x, i) => (
+          <span
+            key={i}
+            class="notes-lineas"
+            aria-hidden="true"
+            style={{ top: `${x.top}px`, left: `${x.left}px` }}
+          >
+            {Array.from({ length: x.n }, (_, k) => k + 1).join('\n')}
+          </span>
+        ))}
+        {menuCelda && contexto?.tipo === 'tabla' ? (
+          <Dropdown
+            label={t('editor.tableTools')}
+            abiertoEn={menuCelda}
+            onCerrar={() => setMenuCelda(null)}
+          >
+            {(cerrar) => {
+              const a = accionesDeBloque(contexto).tabla;
+              const opcion = (rotulo: string, dibujo: GlyphName, hacer: () => void) => (
+                <MenuItem
+                  size="sm"
+                  icon={<Glyph name={dibujo} size={16} />}
+                  onMouseDown={(e: MouseEvent) => e.preventDefault()}
+                  onClick={() => {
+                    cerrar();
+                    hacer();
+                  }}
+                >
+                  {rotulo}
+                </MenuItem>
+              );
+              return (
+                <>
+                  {opcion(t('editor.rowAbove'), 'filaArriba', () => a.fila('antes'))}
+                  {opcion(t('editor.rowBelow'), 'filaAbajo', () => a.fila('despues'))}
+                  {opcion(t('editor.colBefore'), 'columnaAntes', () => a.columna('antes'))}
+                  {opcion(t('editor.colAfter'), 'columnaDespues', () => a.columna('despues'))}
+                  <MenuSeparator />
+                  {opcion(t('editor.headerRow'), 'cabeceraFila', a.cabeceraFila)}
+                  {opcion(t('editor.headerColumn'), 'cabeceraColumna', a.cabeceraColumna)}
+                  <MenuSeparator />
+                  {opcion(t('editor.rowDelete'), 'filaQuitar', a.quitarFila)}
+                  {opcion(t('editor.colDelete'), 'columnaQuitar', a.quitarColumna)}
+                  {opcion(t('editor.tableDelete'), 'trash', a.quitarTabla)}
+                </>
+              );
+            }}
+          </Dropdown>
+        ) : null}
       </div>
+      {/* El pie: palabras, caracteres y lectura, en voz baja y con altura fija (no
+          mueve nada al aparecer). No se anuncia: cambiaría con cada tecla. */}
+      <div class="text-text-subtle flex h-6 shrink-0 items-center justify-end gap-3 px-3 text-xs tabular-nums select-none">
+        <span>{t('editor.words', { count: cuentas.palabras })}</span>
+        <span class="max-sm:hidden">{t('editor.chars', { count: cuentas.caracteres })}</span>
+        <span>
+          {t('editor.readingTime', {
+            minutes: cuentas.palabras ? Math.max(1, cuentas.minutos) : 0,
+          })}
+        </span>
+      </div>
+      <ShortcutsModal
+        open={atajos}
+        title={t('editor.shortcuts')}
+        groups={atajos ? atajosDelEditor(t) : []}
+        onClose={() => {
+          setAtajos(false);
+          window.setTimeout(enfocarTexto, 0);
+        }}
+      />
     </div>
   );
 }

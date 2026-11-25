@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -43,6 +44,27 @@ func (s *Store) ListarRegistros(ctx context.Context, a domain.Actor, tabla, vist
 type LecturaAdHoc struct {
 	Search string
 	Sort   []domain.Orden // vacío = el de la vista
+	// Today es el día de quien lee (AAAA-MM-DD), para los filtros relativos a hoy.
+	Today string
+}
+
+// configDeLectura es la configuración con la que se lee: la de la vista guardada (o
+// ninguna) con la búsqueda, el orden y el día de la lectura encima. La comparten la
+// rejilla, la exportación y el resumen, para que los tres cuenten lo mismo.
+func configDeLectura(ctx context.Context, tx pgx.Tx, a domain.Actor, tabla, vista string, extra LecturaAdHoc) (domain.ConfigVista, error) {
+	var cfg domain.ConfigVista
+	if vista != "" {
+		var raw []byte
+		if err := tx.QueryRow(ctx, `SELECT config FROM base_views WHERE id = $1 AND table_id = $2 AND tenant = $3`, vista, tabla, a.Tenant).Scan(&raw); err != nil {
+			return cfg, errNoFilas(err)
+		}
+		_ = json.Unmarshal(raw, &cfg)
+	}
+	cfg.Search, cfg.Today = extra.Search, extra.Today
+	if len(extra.Sort) > 0 {
+		cfg.Sort = extra.Sort
+	}
+	return cfg, nil
 }
 
 // ListarRegistrosCon es ListarRegistros con búsqueda y orden de un momento.
@@ -68,17 +90,9 @@ func (s *Store) ListarRegistrosCon(ctx context.Context, a domain.Actor, tabla, v
 		if out.Fields, err = camposDe(ctx, tx, a, tabla); err != nil {
 			return err
 		}
-		var cfg domain.ConfigVista
-		if vista != "" {
-			var raw []byte
-			if err := tx.QueryRow(ctx, `SELECT config FROM base_views WHERE id = $1 AND table_id = $2 AND tenant = $3`, vista, tabla, a.Tenant).Scan(&raw); err != nil {
-				return errNoFilas(err)
-			}
-			_ = json.Unmarshal(raw, &cfg)
-		}
-		cfg.Search = extra.Search
-		if len(extra.Sort) > 0 {
-			cfg.Sort = extra.Sort
+		cfg, err := configDeLectura(ctx, tx, a, tabla, vista, extra)
+		if err != nil {
+			return err
 		}
 		if out.Records, out.NextCursor, err = leerRegistros(ctx, tx, a, tabla, out.Fields, cfg, limite, cursor); err != nil {
 			return err
@@ -196,8 +210,15 @@ func hayHueco(ctx context.Context, tx pgx.Tx, tenant, tabla string) error {
 	return nil
 }
 
-// CrearRegistro añade un registro (editor). links es {campo de enlace: ids}.
+// CrearRegistro añade un registro (editor). links es {campo de enlace: ids}. Los
+// campos que no trae nacen con su valor por defecto, y «hoy» es el del servidor.
 func (s *Store) CrearRegistro(ctx context.Context, a domain.Actor, tabla string, data map[string]json.RawMessage, links map[string][]string) (domain.Registro, error) {
+	return s.CrearRegistroEl(ctx, a, tabla, data, links, time.Now())
+}
+
+// CrearRegistroEl es CrearRegistro con el día de quien da el alta, que es lo que vale
+// una fecha con defecto «hoy»: a las 00:30 en Madrid el servidor sigue en ayer.
+func (s *Store) CrearRegistroEl(ctx context.Context, a domain.Actor, tabla string, data map[string]json.RawMessage, links map[string][]string, hoy time.Time) (domain.Registro, error) {
 	var r domain.Registro
 	err := s.en(ctx, a, func(tx pgx.Tx) error {
 		base, err := autorizarTabla(ctx, tx, a, tabla, domain.AccEscribirReg)
@@ -212,6 +233,7 @@ func (s *Store) CrearRegistro(ctx context.Context, a domain.Actor, tabla string,
 		if err != nil {
 			return err
 		}
+		limpio = domain.ConDefectos(campos, data, limpio, hoy)
 		if err := domain.TamanoDatos(limpio); err != nil {
 			return err
 		}
@@ -236,6 +258,65 @@ func (s *Store) CrearRegistro(ctx context.Context, a domain.Actor, tabla string,
 			return err
 		}
 		return auditar(ctx, tx, a, base, &tabla, &r.ID, nil, "record.create", nil, jsonDe(limpio))
+	})
+	return r, err
+}
+
+// DuplicarRegistro crea un registro nuevo con los valores y los enlaces de otro de la
+// misma tabla (editor), y lo devuelve. Es «lo mismo, pero otro»: rev, autoría y fechas
+// son las del alta, y las fórmulas se recalculan. Los adjuntos NO se copian: son
+// ficheros con su propio almacenamiento y su traza, y duplicarlos en silencio
+// multiplicaría lo guardado por un clic; la copia nace sin ellos y se dice en la
+// interfaz. Todo en una transacción, como el alta.
+func (s *Store) DuplicarRegistro(ctx context.Context, a domain.Actor, registro string) (domain.Registro, error) {
+	var r domain.Registro
+	err := s.en(ctx, a, func(tx pgx.Tx) error {
+		tabla, base, err := registroDe(ctx, tx, a, registro)
+		if err != nil {
+			return err
+		}
+		if err := autorizar(ctx, tx, a, base, tabla, domain.AccEscribirReg); err != nil {
+			return err
+		}
+		origen, err := registroPorID(ctx, tx, a, registro, tabla)
+		if err != nil {
+			return err
+		}
+		campos, err := camposDe(ctx, tx, a, tabla)
+		if err != nil {
+			return err
+		}
+		// Solo lo que sigue siendo un campo con valor escrito: lo de un campo borrado ya
+		// no está en data, y una fórmula no se copia, se vuelve a calcular.
+		datos := make(map[string]json.RawMessage, len(origen.Data))
+		for _, c := range campos {
+			if v, ok := origen.Data[c.ID]; ok && c.Kind != domain.TipoFormula && c.Kind != domain.TipoAdjunto {
+				datos[c.ID] = v
+			}
+		}
+		if err := hayHueco(ctx, tx, a.Tenant, tabla); err != nil {
+			return err
+		}
+		r = domain.Registro{TableID: tabla, Data: datos, Links: map[string][]string{}}
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO base_records (tenant, base_id, table_id, data, created_by, updated_by)
+			VALUES ($1, $2, $3, $4::jsonb, $5, $5) RETURNING id::text, rev, created_by, updated_by, created_at, updated_at`,
+			a.Tenant, base, tabla, jsonDe(datos), a.Sub).
+			Scan(&r.ID, &r.Rev, &r.CreatedBy, &r.UpdatedBy, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return err
+		}
+		if len(origen.Links) > 0 {
+			if _, err := guardarEnlaces(ctx, tx, a, campos, tabla, r.ID, origen.Links); err != nil {
+				return err
+			}
+			for k, v := range origen.Links {
+				r.Links[k] = v
+			}
+		}
+		if err := aplicarFormulas(ctx, tx, a, base, &r); err != nil {
+			return err
+		}
+		return auditar(ctx, tx, a, base, &tabla, &r.ID, nil, "record.create", nil, jsonDe(datos))
 	})
 	return r, err
 }

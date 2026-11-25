@@ -395,4 +395,37 @@ export const nucleo = {
 
   'forms.empty': 'Aucune réponse pour l’instant',
   'forms.empty_help': 'Lorsque quelqu’un enverra un formulaire de votre site, vous le verrez ici.',
+  'sites.search': 'Rechercher des sites',
+  'sites.search_empty': 'Aucun site ne correspond à « {q} ».',
+  'sites.sort_label': 'Trier les sites',
+  'sites.sort_recent': 'Modifiés récemment',
+  'sites.sort_name': 'Nom (A–Z)',
+  'sites.view_live': 'Voir le site',
+  'sites.view_live_aria': 'Voir {nombre} publié (s’ouvre dans un nouvel onglet)',
+  'seo.title': 'Ce que verront les moteurs de recherche',
+  'seo.intro':
+    'Une revue du brouillon : titres, descriptions et images dont dépendent les moteurs de recherche et les lecteurs d’écran. Ce sont des avertissements ; ils n’empêchent pas de publier.',
+  'seo.open_editor': 'Ouvrir l’éditeur',
+  'seo.recheck': 'Revérifier',
+  'seo.error': 'Impossible de charger la revue. Réessayez.',
+  'seo.all_good':
+    'Tout va bien : chaque page a son titre et sa description, et les images ont un texte alternatif.',
+  'seo.summary': 'Avertissements : {count}',
+  'seo.badge_warning': 'À améliorer',
+  'seo.badge_info': 'Remarque',
+  'seo.on_page': 'Page : {page}',
+  'seo.title_missing': 'La page n’a pas de titre : le moteur de recherche en inventera un.',
+  'seo.title_long':
+    'Le titre fait {count} caractères ; environ 60 tiennent avant que le moteur de recherche ne le coupe.',
+  'seo.title_duplicate':
+    'Une autre page porte le même titre : elles se feront concurrence dans les résultats.',
+  'seo.description_missing':
+    'La page n’a pas de description : le moteur de recherche affichera un extrait de texte au hasard.',
+  'seo.description_long': 'La description fait {count} caractères ; environ 160 sont affichés.',
+  'seo.image_alt_missing':
+    'Images sans texte alternatif : {count}. Les lecteurs d’écran et les moteurs de recherche ne savent pas ce qu’elles montrent ; marquez-les comme décoratives si elles ne montrent rien.',
+  'seo.page_noindex': 'Cette page est masquée aux moteurs de recherche (noindex).',
+  'seo.site_noindex': 'Tout le site est masqué aux moteurs de recherche (noindex).',
+  'seo.share_image_missing':
+    'Le site n’a pas d’image de partage : les liens dans les messages et les réseaux sociaux s’afficheront sans image.',
 };

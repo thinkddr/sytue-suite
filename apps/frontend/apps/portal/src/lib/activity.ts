@@ -23,11 +23,32 @@ export interface DayGroup {
  * concreto y nadie podría distinguirlo después.
  */
 export function groupByDay(results: readonly SearchResult[]): DayGroup[] {
-  const orden: string[] = [];
-  const cubos = new Map<string, DayGroup>();
+  return agruparPorDia(results, (r) => r.timestamp);
+}
 
-  for (const r of results) {
-    const at = r.timestamp !== undefined ? new Date(r.timestamp) : undefined;
+/** Un grupo de `agruparPorDia`: lo mismo que `DayGroup`, para cualquier elemento. */
+export interface GrupoDelDia<T> {
+  day: string;
+  at: Date;
+  items: T[];
+}
+
+/**
+ * El corte por día de `groupByDay`, para cualquier lista ya ordenada: la bandeja de
+ * notificaciones lo usa con la fecha de cada aviso. Una sola regla de «qué día es»
+ * para las dos pantallas, en hora local.
+ */
+export function agruparPorDia<T>(
+  items: readonly T[],
+  cuando: (x: T) => string | number | undefined,
+): GrupoDelDia<T>[] {
+  const orden: string[] = [];
+  const cubos = new Map<string, GrupoDelDia<T>>();
+
+  for (const x of items) {
+    const marca = cuando(x);
+    const fecha = marca !== undefined ? new Date(marca) : undefined;
+    const at = fecha && !Number.isNaN(fecha.getTime()) ? fecha : undefined;
     // `toISOString` daría el día en UTC y a las 00:30 de Madrid enseñaría «ayer».
     const day = at ? claveLocal(at) : '';
     let grupo = cubos.get(day);
@@ -36,7 +57,7 @@ export function groupByDay(results: readonly SearchResult[]): DayGroup[] {
       cubos.set(day, grupo);
       orden.push(day);
     }
-    grupo.items.push(r);
+    grupo.items.push(x);
   }
 
   // Los sin fecha, al final, vengan donde vengan en el orden del Hub.

@@ -1800,6 +1800,61 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
 
+  /projects/{id}/deploy-freeze:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      tags: [projects]
+      operationId: getDeployFreeze
+      summary: ¿Está congelada la producción del proyecto?
+      description: >
+        Lo lee cualquier miembro: quien va a desplegar necesita saberlo antes de
+        pulsar, no después de un 409.
+      responses:
+        "200":
+          description: Estado de la congelación
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeployFreeze" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      tags: [projects]
+      operationId: freezeDeploys
+      summary: Congelar los despliegues de producción (admin/owner)
+      description: >
+        Mientras dure, nada nuevo llega a producción: ni el push a la rama de
+        producción (el webhook se da por procesado y el intento queda en la
+        auditoría como `deploy.blocked_frozen`), ni un despliegue manual, ni el
+        disparador de un CMS, ni publicar una preview; todos contestan 409
+        `deploy_frozen`. Las previews y el rollback siguen funcionando: no
+        cambian lo que ve el público o son la salida de emergencia. Sobre un
+        proyecto ya congelado solo cambia el motivo.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 280, example: Cierre contable de fin de mes }
+      responses:
+        "200":
+          description: Producción congelada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeployFreeze" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [projects]
+      operationId: unfreezeDeploys
+      summary: Descongelar los despliegues de producción (admin/owner)
+      responses:
+        "204": { description: Producción abierta otra vez (idempotente) }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /projects/{id}/metrics:
     parameters:
       - { $ref: "#/components/parameters/IdPath" }
@@ -3502,6 +3557,15 @@ components:
         updated_at: { type: string, format: date-time }
         ready_at: { type: string, format: date-time }
         error: { type: string }
+
+    DeployFreeze:
+      type: object
+      required: [frozen]
+      properties:
+        frozen: { type: boolean }
+        reason: { type: string, maxLength: 280 }
+        frozen_by: { type: string, description: sub de Sytue ID de quien congeló. }
+        frozen_at: { type: string, format: date-time }
 
     Domain:
       type: object

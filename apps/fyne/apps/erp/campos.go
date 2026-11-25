@@ -238,6 +238,7 @@ func nuevoControl(c Campo, valor string, f *Ficha) *Control {
 		a.Propia = &CampoFicha
 		a.PonerTexto(valor)
 		a.AlCambiar(cambio)
+		a.AlAtajo = f.atajoGuardar
 		k.area, k.obj, k.alto = a, a, a.MinSize().Height
 	case api.ERPSeleccion:
 		opciones := make([]string, 1, 1+len(c.Opciones))
@@ -289,6 +290,7 @@ func nuevoControl(c Campo, valor string, f *Ficha) *Control {
 		}
 		e.PonerTexto(valor)
 		e.AlCambiar(cambio)
+		e.AlAtajo = f.atajoGuardar
 		k.entrada, k.obj, k.alto = e, e, CampoFicha.Alto()
 	}
 	return k

@@ -4,7 +4,12 @@ import DeploymentsPanel from '../../../components/DeploymentsPanel';
 import { requireSession } from '@sytue/auth/server';
 import { canonicaConOrg } from '@sytue/config';
 import { getBff, toBffContext } from '../../../server/bff.js';
-import { firstSourceError, loadProject, loadDeployments } from '../../../lib/cloud.js';
+import {
+  firstSourceError,
+  loadProject,
+  loadDeployments,
+  loadDeployFreeze,
+} from '../../../lib/cloud.js';
 
 import { useT } from '../../../i18n/index.js';
 
@@ -28,7 +33,12 @@ const { slug } = Astro.params;
 const projectSourced = slug ? await loadProject(session, slug) : undefined;
 if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
 const project = projectSourced.data;
-const deploymentsSourced = await loadDeployments(session, project.slug);
+// En paralelo: la congelación es una lectura independiente y la pantalla necesita
+// las dos antes de pintar (el aviso va arriba del historial).
+const [deploymentsSourced, freezeSourced] = await Promise.all([
+  loadDeployments(session, project.slug),
+  loadDeployFreeze(session, project.slug),
+]);
 const { data: deployments, live } = deploymentsSourced;
 ---
 
@@ -43,6 +53,7 @@ const { data: deployments, live } = deploymentsSourced;
     project={project.slug}
     deployments={deployments}
     live={live}
+    freeze={freezeSourced.data}
     locale={locale}
     error={firstSourceError(projectSourced, deploymentsSourced)}
   />

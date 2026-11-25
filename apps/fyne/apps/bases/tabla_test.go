@@ -41,7 +41,9 @@ type falso struct {
 	registros map[string][]m
 	vistas    map[string][]m
 	vistas2   []string // peticiones, en orden
-	n         int
+	// dias es el `today` de cada petición que lo lleva (método, ruta y día).
+	dias []string
+	n    int
 	// conflicto hace que la siguiente operación de celda diga que ha pisado un valor.
 	conflicto bool
 	// referenciado hace que borrar sin `force` conteste 409 `referenced`.
@@ -134,7 +136,10 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ruta := strings.TrimPrefix(r.URL.Path, "/api/v1")
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.vistas2 = append(f.vistas2, strings.TrimSpace(r.Method+" "+strings.TrimPrefix(r.URL.RequestURI(), "/api/v1")+" "+string(cuerpo)))
+	f.vistas2 = append(f.vistas2, strings.TrimSpace(r.Method+" "+strings.TrimPrefix(uriSinDia(r.URL), "/api/v1")+" "+string(cuerpo)))
+	if d := r.URL.Query().Get("today"); d != "" {
+		f.dias = append(f.dias, r.Method+" "+ruta+" "+d)
+	}
 	var pedido m
 	_ = json.Unmarshal(cuerpo, &pedido)
 	x := strings.Split(strings.Trim(ruta, "/"), "/")
@@ -185,7 +190,7 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				falla(http.StatusUnprocessableEntity, "invalid")
 				return
 			}
-			for _, k := range []string{"name", "formula", "choices"} {
+			for _, k := range []string{"name", "formula", "choices", "default"} {
 				if v, hay := pedido[k]; hay {
 					campos[i][k] = v
 				}
@@ -293,6 +298,30 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		falla(http.StatusNotFound, "not_found")
+	case clave == "POST records/3" && x[2] == "duplicate":
+		orig, tabla := f.registro(x[1])
+		if orig == nil {
+			falla(http.StatusNotFound, "not_found")
+			return
+		}
+		datos := m{}
+		for k, v := range orig["data"].(m) {
+			datos[k] = v
+		}
+		reg := m{"id": fmt.Sprintf("n%d", f.n), "table_id": tabla, "rev": 1, "data": datos, "links": m{}}
+		f.registros[tabla] = append(f.registros[tabla], reg)
+		w.WriteHeader(http.StatusCreated)
+		di(reg)
+	case clave == "GET tables/3" && x[2] == "summary":
+		// Lo cuenta el servicio sobre la tabla entera: aquí, cuántos hay y la suma de la edad.
+		suma := 0.0
+		for _, r := range f.registros[x[1]] {
+			if n, ok := r["data"].(m)["eda"].(float64); ok {
+				suma += n
+			}
+		}
+		n := len(f.registros[x[1]])
+		di(m{"count": n, "fields": m{"nom": m{"filled": n}, "eda": m{"filled": n, "sum": suma, "avg": suma / float64(max(n, 1)), "min": 21, "max": 59}}})
 	case clave == "GET records/3" && x[2] == "comments":
 		out := []m{}
 		for _, c := range f.comentarios {
@@ -815,11 +844,17 @@ func TestQuienSoloLeeNoEdita(t *testing.T) {
 	if !strings.Contains(got, "Puedes leer esta tabla pero no cambiarla.") {
 		t.Errorf("la rejilla no dice que es de solo lectura:\n%s", got)
 	}
-	for _, no := range []string{"[Añadir registro]", "[Añadir campo]", "(Más acciones · Personas)", "(Más acciones · Clientes)"} {
+	for _, no := range []string{"[Añadir registro]", "[Añadir campo]", "(Más acciones · Clientes)"} {
 		if strings.Contains(got, no) {
 			t.Errorf("un lector ve %s", no)
 		}
 	}
+	// El «⋯» de la tabla, a un lector, solo le da lo que no escribe: los totales y la hoja
+	// de atajos.
+	if acciones := elementosDe(t, w, "Personas"); !slices.Equal(acciones, []string{"Ver totales", "Atajos de teclado"}) {
+		t.Errorf("un lector tiene en el menú de la tabla %v", acciones)
+	}
+	cerrarMenus(w)
 	// La ficha se abre también para leer: sin campos que escribir ni botón de borrar.
 	pulsar(t, w, "Fila 1")
 	capturar(t, w, "ficha-lector")

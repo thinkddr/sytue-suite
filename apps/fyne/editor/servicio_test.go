@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -56,5 +57,24 @@ func TestServicioDescargaPlantillaDespuesDeGuardar(t *testing.T) {
 	s.DescargarPlantilla("d1", "Otra", Documento, "ooxml", func() error { return errors.New("no guardado") }, nil)
 	if peticiones.Load() != 2 {
 		t.Error("se exportó una plantilla cuyo guardado falló")
+	}
+}
+
+// Lo que se escribe en el dispositivo (el CSV de una hoja) va a la misma carpeta de
+// descargas, sin servicio, y avisa con el nombre del fichero como una descarga.
+func TestGuardarLocalDejaElFicheroYAvisa(t *testing.T) {
+	dir := t.TempDir()
+	var aviso string
+	s := Servicio{
+		Lanzar: func(f func()) { f() }, Carpeta: func() (string, error) { return dir, nil },
+		Avisar: func(_ ui.TonoAviso, titulo string) { aviso = titulo },
+	}
+	s.GuardarLocal("Ventas - Hoja1.csv", []byte("a,b\r\n"))
+	datos, err := os.ReadFile(filepath.Join(dir, "Ventas - Hoja1.csv"))
+	if err != nil || string(datos) != "a,b\r\n" {
+		t.Fatalf("fichero %q: %v", datos, err)
+	}
+	if aviso != "Ventas - Hoja1.csv" {
+		t.Errorf("el aviso dice %q", aviso)
 	}
 }

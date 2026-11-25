@@ -172,12 +172,18 @@ func (r *Repository) Contadores(ctx context.Context) (api.HubContadores, error) 
 }
 
 func (r *Repository) MarkAllRead(ctx context.Context) error {
+	return r.MarkAllReadDe(ctx, "")
+}
+
+// MarkAllReadDe marca los de un producto (o todos, con el origen vacío): el «Marcar
+// todas» de la bandeja con un filtro de producto puesto.
+func (r *Repository) MarkAllReadDe(ctx context.Context, origen string) error {
 	notices, err := r.List(ctx)
 	if err != nil {
 		return err
 	}
 	for _, n := range notices {
-		if !n.Read {
+		if !n.Read && (origen == "" || n.Source == origen) {
 			if err := r.MarkRead(ctx, n.ID); err != nil {
 				return err
 			}

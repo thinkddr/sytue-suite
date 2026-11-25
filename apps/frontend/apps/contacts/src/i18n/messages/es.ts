@@ -365,4 +365,10 @@ export const es: AppCatalog<typeof en> = {
   'relation.coworker': 'Colega',
   'relation.emergency': 'Emergencias',
   'relation.other': 'Otra',
+  'batch.copyEmails': 'Copiar los correos',
+  'batch.emailsCopied': 'Correos copiados',
+  'birthdays.anniversary': 'Aniversario',
+  'list.sortByLastName': 'Ordenar por apellido',
+  'list.sortByFirstName': 'Ordenar por nombre',
+  'detail.shareByEmail': 'Compartir por correo',
 };

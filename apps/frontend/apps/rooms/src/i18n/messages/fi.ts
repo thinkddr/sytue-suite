@@ -989,4 +989,11 @@ export const fi: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Yhdistä tämä sovellus tiliisi organisaatiossa {tenant}. Nykyiset käyttöoikeutesi säilyvät.',
   'nativeResource.approve': 'Yhdistä',
+  'channel.markRead': 'Merkitse luetuksi',
+  'channel.copyLink': 'Kopioi linkki',
+  'channel.linkCopied': 'Linkki kopioitu',
+  'channel.download': 'Lataa keskustelu',
+  'channel.downloaded': 'Keskustelu tallennettu kohteeseen',
+  'channel.downloadFailed': 'Keskustelua ei voitu tallentaa',
+  'status.nothingUnread': 'Kaikki oli jo luettu',
 };

@@ -374,4 +374,36 @@ export const nucleo = {
 
   'forms.empty': 'No responses yet',
   'forms.empty_help': 'When someone submits a form on your website, you will see it here.',
+  'sites.search': 'Search sites',
+  'sites.search_empty': 'No site matches "{q}".',
+  'sites.sort_label': 'Sort sites',
+  'sites.sort_recent': 'Recently edited',
+  'sites.sort_name': 'Name (A–Z)',
+  'sites.view_live': 'View site',
+  'sites.view_live_aria': 'View {nombre} published (opens in a new tab)',
+  'seo.title': 'What search engines will see',
+  'seo.intro':
+    'A review of the draft: titles, descriptions and images that search engines and screen readers depend on. These are warnings; they do not stop you publishing.',
+  'seo.open_editor': 'Open the editor',
+  'seo.recheck': 'Check again',
+  'seo.error': 'The review could not be loaded. Try again.',
+  'seo.all_good':
+    'All good: every page has its title and description, and the images have alternative text.',
+  'seo.summary': 'Warnings: {count}',
+  'seo.badge_warning': 'Improve',
+  'seo.badge_info': 'Note',
+  'seo.on_page': 'Page: {page}',
+  'seo.title_missing': 'The page has no title: search engines will make one up.',
+  'seo.title_long': 'The title has {count} characters; around 60 fit before search engines cut it.',
+  'seo.title_duplicate':
+    'Another page has the same title: they will compete with each other in the results.',
+  'seo.description_missing':
+    'The page has no description: search engines will show a random piece of text.',
+  'seo.description_long': 'The description has {count} characters; around 160 are shown.',
+  'seo.image_alt_missing':
+    'Images without alternative text: {count}. Screen readers and search engines cannot tell what they show; mark them as decorative if they show nothing.',
+  'seo.page_noindex': 'This page is hidden from search engines (noindex).',
+  'seo.site_noindex': 'The whole site is hidden from search engines (noindex).',
+  'seo.share_image_missing':
+    'The site has no share image: links in messages and social networks will show without a picture.',
 };

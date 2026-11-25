@@ -207,7 +207,7 @@ func TestElMesDelTelefonoSeParecaALaCaptura(t *testing.T) {
 		}
 
 		b := barraDe(t, raiz)
-		if b.Titulo != "noviembre" || !b.TituloCentrado || len(b.Acciones) != 2 {
+		if b.Titulo != "noviembre" || !b.TituloCentrado || len(b.Acciones) != 1 {
 			t.Errorf("%s: barra %q centrado %v con %d acciones", modo, b.Titulo, b.TituloCentrado, len(b.Acciones))
 		}
 		if tx := textos(b); !tx["noviembre"] || !tx["6"] {
@@ -216,8 +216,9 @@ func TestElMesDelTelefonoSeParecaALaCaptura(t *testing.T) {
 		if buscarObjeto(raiz, func(o fyne.CanvasObject) bool { _, es := o.(*CabeceraVista); return es }) != nil {
 			t.Errorf("%s: en el teléfono no hay cabecera de vista", modo)
 		}
-		if n := len(a.capaFlotante().Objects); n != 0 {
-			t.Errorf("%s: en el mes del teléfono no hay botón flotante (hay %d)", modo, n)
+		// Crear es el «+» flotante también aquí: era un «+» de la barra (2026-11-25).
+		if n := len(a.capaFlotante().Objects); n != 1 {
+			t.Errorf("%s: en el mes del teléfono crear es el «+» flotante (hay %d)", modo, n)
 		}
 		tx := textos(raiz)
 		for _, quiero := range []string{"viernes, 6 de noviembre de 2026", "14:00 – 15:00", "Tenis", "lun", "dom", "44", "49"} {
@@ -266,10 +267,12 @@ func TestCargandoElMesDelTelefonoNoCambiaDeForma(t *testing.T) {
 	}
 }
 
-// TestTocarUnDiaLoEligeYMasCrea: tocar un día lo ELIGE y no crea; el «+» crea en el día
-// elegido, y sin red está inerte. VISTO EN ROJO con el `AlPulsar` del día en
-// `AlCrearEvento` (lo de la rejilla de escritorio).
-func TestTocarUnDiaLoEligeYMasCrea(t *testing.T) {
+// TestTocarUnDiaLoEligeYElMasFlotanteCrea: tocar un día lo ELIGE y no crea; crear es el
+// «+» flotante, también en el mes del teléfono —era un «+» de la barra—, y abre el
+// formulario sobre el día elegido; sin red no está. VISTO EN ROJO con el `AlPulsar` del
+// día en `AlCrearEvento` (lo de la rejilla de escritorio) y con la capa vacía en el mes
+// compacto, como estaba.
+func TestTocarUnDiaLoEligeYElMasFlotanteCrea(t *testing.T) {
 	p := pantallaCaptura(t)
 	var elegido, creado time.Time
 	p.AlElegirDia = func(d time.Time) { elegido = d }
@@ -280,16 +283,34 @@ func TestTocarUnDiaLoEligeYMasCrea(t *testing.T) {
 	if elegido.Day() != 13 || !creado.IsZero() {
 		t.Errorf("tocar el 13 eligió %v y creó %v", elegido, creado)
 	}
-	b := barraDe(t, w.Content())
-	mas := b.Acciones[1].(*ui.BotonIcono)
-	test.Tap(mas)
-	if !creado.Equal(p.Cursor) {
-		t.Errorf("el + creó en %v y el elegido es %v", creado, p.Cursor)
+	if n := len(barraDe(t, w.Content()).Acciones); n != 1 {
+		t.Errorf("la barra lleva %d acciones y crear ya no va en ella: solo «Hoy»", n)
 	}
-	p.SinConexion = true
-	w2, _ := telefono(t, p)
-	if !barraDe(t, w2.Content()).Acciones[1].(*ui.BotonIcono).Inerte {
-		t.Error("sin red el + no está inerte")
+
+	a, wa := appConVentana(t, &escrituras{})
+	a.P.Vista = VistaMes
+	wa.Resize(fyne.NewSize(390, 844))
+	a.pintar()
+	if !a.P.compacta() {
+		t.Fatal("a 390 el mes no es el del teléfono")
+	}
+	var fab *ui.BotonFlotante
+	recorrer(a.raiz, func(o fyne.CanvasObject) {
+		if f, es := o.(*ui.BotonFlotante); es {
+			fab = f
+		}
+	})
+	if fab == nil || !fab.Visible() {
+		t.Fatal("en el mes del teléfono no está el «+» flotante")
+	}
+	antes := len(wa.Canvas().Overlays().List())
+	test.Tap(fab)
+	if len(wa.Canvas().Overlays().List()) <= antes {
+		t.Error("el «+» flotante no abre el formulario de crear")
+	}
+	a.P.SinConexion = true
+	if n := len(a.capaFlotante().Objects); n != 0 {
+		t.Errorf("sin red el «+» sigue (%d)", n)
 	}
 }
 
@@ -1052,7 +1073,7 @@ func TestElFocoEsUnAroAbierto(t *testing.T) {
 }
 
 // TestLaCabeceraYLaListaVanEnLaZonaDeLaPantalla: con una zona que no es la del cursor, el
-// título de la barra, la fecha de la lista, el nombre del «+» y la rejilla dicen el MISMO
+// título de la barra, la fecha de la lista y la rejilla dicen el MISMO
 // día. 30-nov-2026 23:30Z es el 1 de diciembre en Madrid. VISTO EN ROJO sin el `.In` en
 // `listaDia` (la lista decía el 30 de noviembre bajo la rejilla de diciembre) y en
 // `TituloCompacto` («noviembre»).
@@ -1071,10 +1092,6 @@ func TestLaCabeceraYLaListaVanEnLaZonaDeLaPantalla(t *testing.T) {
 	}
 	if tx := textos(raiz); !tx["martes, 1 de diciembre de 2026"] {
 		t.Errorf("la lista no dice «martes, 1 de diciembre de 2026»")
-	}
-	mas := b.Acciones[1].(*ui.BotonIcono)
-	if want := p.t("nav.createEventOn", i18n.Vars{"date": i18n.FormatDayMonthLong(p.locale(), time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC))}); mas.Rotulo != want {
-		t.Errorf("el «+» se llama %q y es %q", mas.Rotulo, want)
 	}
 }
 

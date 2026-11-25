@@ -19,6 +19,7 @@
 import AppLayout from '../layouts/AppLayout.astro';
 import { useT } from '../i18n/index.js';
 import { EmptyState, formatBytes } from '@sytue/ui';
+import Huella from '../components/Huella.astro';
 import { bff, toBffContext } from '../lib/auth';
 import { canonicaConOrg, returnToCanonico } from '@sytue/config';
 import {
@@ -119,6 +120,7 @@ const resto = catalogo.instaladores.filter((i) => !destacados.includes(i));
               <a class="sy-btn sy-btn--primary mt-3 inline-flex" href={i.href} download>
                 {t('downloads.get')}
               </a>
+              {i.sha256 ? <Huella sha256={i.sha256} t={t} /> : null}
             </li>
           ))}
         </ul>
@@ -132,7 +134,7 @@ const resto = catalogo.instaladores.filter((i) => !destacados.includes(i));
         </h2>
         <ul class="border-border divide-border divide-y rounded-lg border">
           {resto.map((i) => (
-            <li class="flex items-center justify-between gap-4 px-4 py-3">
+            <li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
               <span class="min-w-0">
                 <span class="text-text block truncate font-medium">{i.producto}</span>
                 <span class="sytue-meta">{ficha(i)}</span>
@@ -140,6 +142,11 @@ const resto = catalogo.instaladores.filter((i) => !destacados.includes(i));
               <a class="sy-btn sy-btn--ghost shrink-0" href={i.href} download>
                 {t('downloads.get')}
               </a>
+              {i.sha256 ? (
+                <div class="basis-full">
+                  <Huella sha256={i.sha256} t={t} />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

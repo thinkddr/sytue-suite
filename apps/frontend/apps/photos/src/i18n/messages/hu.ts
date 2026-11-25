@@ -375,4 +375,9 @@ export const hu: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'A szerkesztés ezen az eszközön történik, és titkosítva menti a fotó új verziójaként.',
   'gallery.encrypted.albumEmpty': 'Ebben a titkosított albumban még nincsenek fotók.',
+  'shortcuts.favorite': 'Kedvencnek jelölés vagy eltávolítás',
+  'trash.restoreAll': 'Összes visszaállítása',
+  'trash.restoredAll': 'Visszakerült a fotói közé: {count}',
+  'album.download': 'Album letöltése',
+  'viewer.openInDrive': 'Eredeti megtekintése a Sytue Drive-ban',
 };

@@ -1095,4 +1095,11 @@ export const en = {
   'nativeResource.description':
     'Connect this app to your account in {tenant}. Your existing access permissions stay in place.',
   'nativeResource.approve': 'Connect',
+  'channel.markRead': 'Mark as read',
+  'channel.copyLink': 'Copy link',
+  'channel.linkCopied': 'Link copied',
+  'channel.download': 'Download conversation',
+  'channel.downloaded': 'Conversation saved in',
+  'channel.downloadFailed': 'The conversation could not be saved',
+  'status.nothingUnread': 'Everything was already read',
 } satisfies Record<string, MessageEntry>;

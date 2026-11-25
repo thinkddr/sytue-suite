@@ -374,4 +374,8 @@ export const cs: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Odebrat z veřejné stránky',
   'moderation.action.unpublish': 'Zrušit zveřejnění',
   'moderation.action.block': 'Zablokovat osobu v organizaci',
+  'player.loop': 'Opakovat',
+  'watch.chapters': 'Kapitoly',
+  'watch.jumpTo': 'Přejít na {time}',
+  'share.startAt': 'Začít v {time}',
 };

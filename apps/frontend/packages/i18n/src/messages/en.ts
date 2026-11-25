@@ -420,9 +420,13 @@ export const en = {
   'import.fromGoogle': 'Bring it from Google',
   'import.fromMicrosoft': 'Bring it from Microsoft 365',
   'import.running': 'Copying your data… {count} items so far.',
-  'import.done': '{count} items brought across, {skipped} left out.',
+  'import.done': '{what}: {count} items brought across, {skipped} left out. Finished on {date}.',
   'import.someFailed': 'Some of your data could not be copied. Your administrator can see why.',
   'import.failed': 'The import could not be started. Try again in a moment.',
+  'import.unavailable':
+    'The connection with {source} cannot be read right now: it expired, was revoked or was never authorised. Ask your administrator to connect it again.',
+  'import.needsAdmin':
+    'The connection with {source} cannot copy the data of each person yet. Ask your administrator to finish setting it up.',
 
   // Qué pasa con los datos al conectar algo con un tercero (@sytue/ui DataFlow):
   // entra, sale o en los dos sentidos, con la política que aplica a cada lado.

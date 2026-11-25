@@ -105,7 +105,10 @@ type Pagina struct {
 type Filtro struct {
 	Modelo string
 	Estado string
-	// Texto busca en el nombre legible (índice trigram).
+	// Texto busca en el nombre legible (índice trigram) y en la referencia: «FV-2026-41»
+	// encuentra la factura por su número, como la búsqueda global (`Buscar`). La lista
+	// solo miraba el nombre, así que la factura que se buscaba por su número no salía en
+	// su propia lista y sí en la paleta.
 	Texto string
 	// Campo/Valor filtra por un campo declarado: `data @> {campo: valor}`.
 	Campo  string
@@ -268,7 +271,8 @@ func (s *Store) Listar(ctx context.Context, f Filtro) (Pagina, error) {
 			   AND model = $2
 			   AND (deleted_at IS NULL) = %t
 			   AND ($3 = '' OR estado = $3)
-			   AND ($4 = '' OR plegar(etiqueta) LIKE '%%' || plegar($4) || '%%')
+			   AND ($4 = '' OR plegar(etiqueta) LIKE '%%' || plegar($4) || '%%'
+			        OR plegar(ref) LIKE '%%' || plegar($4) || '%%')
 			   AND ($5::jsonb IS NULL OR data @> $5::jsonb)
 			   AND ($6::timestamptz IS NULL
 			        OR (created_at, id) < ($6::timestamptz, $7::uuid))
@@ -901,15 +905,27 @@ func (s *Store) Resumen(ctx context.Context) (ResumenOperativo, error) {
 }
 
 // EstadisticasModelo agrupa agregados y conteos por estado de un modelo.
+//
+// Con búsqueda (`Filtro.Texto`), todo cuenta solo lo que la casa: las píldoras de
+// estado dicen cuántos de los buscados hay en cada uno. `Filtrados` es lo que la lista
+// enseña —búsqueda Y estado—, y la suma del dinero es de eso mismo. Antes la suma era
+// siempre la del modelo entero, así que «Importe acumulado» bajo una lista filtrada por
+// «Pagado» sumaba también lo pendiente: una cifra con pinta de cierta y equivocada.
 type EstadisticasModelo struct {
 	Modelo     string         `json:"modelo"`
 	Total      int            `json:"total"`
+	Filtrados  int            `json:"filtrados"`
 	PorEstado  map[string]int `json:"por_estado"`
 	SumaDinero int64          `json:"suma_dinero,omitempty"`
 }
 
 // Estadisticas calcula el desglose de registros por estado y la suma monetaria si aplica.
 func (s *Store) Estadisticas(ctx context.Context, m *catalogo.Modelo) (EstadisticasModelo, error) {
+	return s.EstadisticasDe(ctx, m, Filtro{Modelo: m.Clave})
+}
+
+// EstadisticasDe es Estadisticas con la búsqueda y el estado de la lista.
+func (s *Store) EstadisticasDe(ctx context.Context, m *catalogo.Modelo, f Filtro) (EstadisticasModelo, error) {
 	tenant, err := tenantDe(ctx)
 	if err != nil {
 		return EstadisticasModelo{}, err
@@ -933,13 +949,17 @@ func (s *Store) Estadisticas(ctx context.Context, m *catalogo.Modelo) (Estadisti
 	}
 
 	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		// La búsqueda es la de `Listar`, con la misma `plegar`: si no, la píldora diría
+		// un número y la lista enseñaría otro.
 		const qEstados = `
 			SELECT estado, COUNT(*)
 			FROM records
 			WHERE tenant = $1 AND model = $2 AND deleted_at IS NULL
+			  AND ($3 = '' OR plegar(etiqueta) LIKE '%' || plegar($3) || '%'
+			       OR plegar(ref) LIKE '%' || plegar($3) || '%')
 			GROUP BY estado;
 		`
-		rows, err := tx.Query(ctx, qEstados, tenant, m.Clave)
+		rows, err := tx.Query(ctx, qEstados, tenant, m.Clave, f.Texto)
 		if err != nil {
 			return err
 		}
@@ -953,6 +973,9 @@ func (s *Store) Estadisticas(ctx context.Context, m *catalogo.Modelo) (Estadisti
 			}
 			res.PorEstado[est] = cnt
 			res.Total += cnt
+			if f.Estado == "" || f.Estado == est {
+				res.Filtrados += cnt
+			}
 		}
 		if err := rows.Err(); err != nil {
 			return err
@@ -962,9 +985,12 @@ func (s *Store) Estadisticas(ctx context.Context, m *catalogo.Modelo) (Estadisti
 			qSuma := fmt.Sprintf(`
 				SELECT COALESCE(SUM((data->>'%s')::bigint), 0)
 				FROM records
-				WHERE tenant = $1 AND model = $2 AND deleted_at IS NULL;
+				WHERE tenant = $1 AND model = $2 AND deleted_at IS NULL
+				  AND ($3 = '' OR estado = $3)
+				  AND ($4 = '' OR plegar(etiqueta) LIKE '%%' || plegar($4) || '%%'
+				       OR plegar(ref) LIKE '%%' || plegar($4) || '%%');
 			`, campoDinero)
-			_ = tx.QueryRow(ctx, qSuma, tenant, m.Clave).Scan(&res.SumaDinero)
+			_ = tx.QueryRow(ctx, qSuma, tenant, m.Clave, f.Estado, f.Texto).Scan(&res.SumaDinero)
 		}
 		return nil
 	})

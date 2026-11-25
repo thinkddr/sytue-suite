@@ -388,4 +388,8 @@ export const es: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Retirar de la portada pública',
   'moderation.action.unpublish': 'Despublicar',
   'moderation.action.block': 'Bloquear a la persona en la organización',
+  'player.loop': 'Repetir',
+  'watch.chapters': 'Capítulos',
+  'watch.jumpTo': 'Ir a {time}',
+  'share.startAt': 'Empezar en {time}',
 };

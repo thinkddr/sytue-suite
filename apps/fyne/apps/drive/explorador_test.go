@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -32,25 +31,29 @@ func cercaDe(t *testing.T, que string, tengo, quiero, tol float32) {
 	}
 }
 
-// TestSubirLlevaSuFlechaYCaeDondeProduccion: «Subir» es un `Button` con `leadingIcon` y
-// mide 71 en producción; sin la flecha salía de 50 y arrastraba todo el grupo. Y el
-// conmutador se separa 10,5 (`gap-2` + `ml-1`), no 3,5: «Subir» empieza en 1119,5.
+// TestLaCabeceraYaNoCrea: «Nuevo» y «Subir» dejaron la cabecera el 2026-11-25 —crear es
+// el «+» flotante de la pantalla, en todos los anchos (TestNuevoFlota)—, así que el grupo de
+// la derecha es el buscador y el conmutador, sin un solo botón. Y el buscador sigue pegado
+// al conmutador por el `gap-2` y su `ml-1`: 10,5.
 //
-// VISTO EN ROJO (2026-09-22, en el frontal): quitando el `HuecoAcciones` de la
-// separación del conmutador, «Subir» cae en 1126,5.
-func TestSubirLlevaSuFlechaYCaeDondeProduccion(t *testing.T) {
+// VISTO EN ROJO devolviendo «Nuevo» y «Subir» a `Acciones`.
+func TestLaCabeceraYaNoCrea(t *testing.T) {
 	e := NuevoExplorador(traductor(t))
 	e.Ventana = 1280
 	cab := e.cabecera(tema.Claro)
 	cab.Resize(fyne.NewSize(1280-tema.AnchoLateral, AltoCabeceraVista))
 	lay, _ := cab.(*fyne.Container).Layout.(*CabeceraVista)
-	subir, ok := lay.Acciones[2].(*ui.Boton)
-	if !ok || subir.Glifo == nil {
-		t.Fatal("«Subir» no lleva su glifo de Drive")
+	if len(lay.Acciones) != 1 || lay.Acciones[0] != e.buscador {
+		t.Fatalf("la cabecera lleva %d acciones y es solo el buscador", len(lay.Acciones))
 	}
-	cercaDe(t, "el ancho de «Subir»", subir.Size().Width, 78.9375, 0.75)
-	cercaDe(t, "«Subir» empieza en x=1119,5", tema.AnchoLateral+subir.Position().X, 1103.0625, 0.75)
-	casi(t, "el glifo de «Subir» es el `size={16}`", subir.TamIcono, iconos.TallaSM)
+	recorrer(cab, func(o fyne.CanvasObject) {
+		if b, ok := o.(*ui.Boton); ok {
+			t.Errorf("la cabecera lleva el botón %q: crear es el «+» flotante", b.Texto)
+		}
+	})
+	b := lay.Acciones[0]
+	cercaDe(t, "el buscador, hasta el conmutador", b.Position().X+b.Size().Width+HuecoAcciones+MargenCromo,
+		lay.Conmutador.Position().X, 0.01)
 }
 
 // TestElBuscadorYLaListaSobrevivenAlRepintado: la pantalla se rehace con cada cambio de
@@ -231,8 +234,8 @@ func TestLaFilaEstrechaYLaDeBusquedaLlevanSusLineas(t *testing.T) {
 //
 // Antes envolvía como podía y a 360 daba tres filas; y antes aún se quedaba en una, se
 // salía por la izquierda y tapaba «Mi unidad» (visto en una ventana real el 2026-09-27).
-// VISTO EN ROJO sin el ramo de la rejilla en `Layout`: a 360 «Subir» baja a una tercera
-// fila (y = 95) y a 700 todo se queda en una, con 55 de alto.
+// VISTO EN ROJO sin el ramo de la rejilla en `Layout`: a 360 «Subir» bajaba a una tercera
+// fila (y = 95) y a 700 todo se quedaba en una, con 55 de alto.
 func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	web := webref.Read(t, "apps/frontend/apps/drive/src/components/FileBrowser.tsx")
 	for _, c := range []struct{ trozo, porque string }{
@@ -263,16 +266,16 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	if x := lay.Ruta.Position().X; x != canalon || lay.Ruta.Size().Width < lay.Ruta.MinSize().Width {
 		t.Errorf("la ruta está en x=%g con %g de ancho; quiero x=%g y entera", x, lay.Ruta.Size().Width, canalon)
 	}
-	buscador, nuevo, subir := lay.Acciones[0], lay.Acciones[1], lay.Acciones[2]
+	// Abajo solo queda el buscador, a todo el ancho (`max-md:col-span-full`): «Nuevo» y
+	// «Subir», que compartían su fila, son el «+» flotante desde el 2026-11-25.
+	buscador := lay.Acciones[0]
 	for _, m := range []struct {
 		que            string
 		o              fyne.CanvasObject
 		x0, x1, y, alt float32
 	}{
 		{"el conmutador de vista", lay.Conmutador, 282, 344, 10, 32},
-		{"el buscador", buscador, 16, 164, 50, 32},
-		{"«Nuevo»", nuevo, 172, 257, 50, 32},
-		{"«Subir»", subir, 265, 344, 50, 32},
+		{"el buscador", buscador, 16, 344, 50, 32},
 	} {
 		p, s := m.o.Position(), m.o.Size()
 		cercaDe(t, m.que+", donde empieza", p.X, m.x0, 1.5)
@@ -288,7 +291,7 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	lay = cab.(*fyne.Container).Layout.(*CabeceraVista)
 	casi(t, "el alto de la cabecera a 700", cab.MinSize().Height, 93)
 	casi(t, "el buscador a 700, desde el canalón", lay.Acciones[0].Position().X, 24)
-	casi(t, "«Subir» a 700, hasta el canalón", lay.Acciones[2].Position().X+lay.Acciones[2].Size().Width, 700-24)
+	casi(t, "el buscador a 700, hasta el canalón", lay.Acciones[0].Position().X+lay.Acciones[0].Size().Width, 700-24)
 	e.Ventana = 1280
 	cab = e.cabecera(tema.Claro)
 	cab.Resize(fyne.NewSize(1280-tema.AnchoLateral, cab.MinSize().Height))
@@ -307,9 +310,6 @@ func TestLaRotacionDelBuscadorDeDriveConCarrilYAreaSeguraConservaLaConsulta(t *t
 	tema.ElegirForma("marco")
 	e := NuevoExplorador(traductor(t))
 	e.Ventana = 320
-	nuevos, subidas := 0, 0
-	e.AlNuevo = func(fyne.CanvasObject) { nuevos++ }
-	e.AlSubir = func() { subidas++ }
 	vista := e.Objeto(tema.Claro).(*fyne.Container)
 	cab := vista.Objects[0].(*fyne.Container)
 	lay := cab.Layout.(*CabeceraVista)
@@ -325,18 +325,9 @@ func TestLaRotacionDelBuscadorDeDriveConCarrilYAreaSeguraConservaLaConsulta(t *t
 		if buscador.Size().Width < minimo || buscador.Texto() != "acta" {
 			t.Fatalf("ventana útil %g: buscador=%v, consulta=%q", ancho, buscador.Size(), buscador.Texto())
 		}
-		if ancho <= 272 && buscador.Position().Y+buscador.Size().Height > lay.Acciones[1].Position().Y {
-			t.Fatal("Nuevo invade el buscador cuando este necesita una fila completa")
+		pos, tam := lay.Conmutador.Position(), lay.Conmutador.Size()
+		if pos.X < 0 || pos.Y < 0 || pos.X+tam.Width > cab.Size().Width || pos.Y+tam.Height > cab.Size().Height {
+			t.Fatalf("el conmutador queda fuera de la cabecera: %v/%v en %v", pos, tam, cab.Size())
 		}
-		for _, o := range lay.Acciones[1:] {
-			pos, tam := o.Position(), o.Size()
-			if pos.X < 0 || pos.Y < 0 || pos.X+tam.Width > cab.Size().Width || pos.Y+tam.Height > cab.Size().Height {
-				t.Fatalf("un mando queda fuera de la cabecera: %v/%v en %v", pos, tam, cab.Size())
-			}
-			test.Tap(o.(fyne.Tappable))
-		}
-	}
-	if nuevos != 5 || subidas != 5 {
-		t.Fatal("Nuevo o Subir dejó de responder tras cambiar el área útil")
 	}
 }

@@ -158,6 +158,7 @@ func (in *inicio) cuerpoInsertar(c *editor.Contexto) fyne.CanvasObject {
 					c.Mandar(editor.InsertarTexto, s)
 				})
 			}),
+			botonFechaHora(c, inerte),
 		),
 		editor.SeparadorGrupos(),
 		editor.NuevoGrupo(c.Traducir("group.headerFooter"),

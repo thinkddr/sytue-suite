@@ -102,6 +102,35 @@ func (a *App) descargarICS(c api.Calendar) {
 	})
 }
 
+// descargarEventoICS es «Descargar .ics» de la vista rápida: el recurso del evento tal
+// cual se guardó (con su serie y sus recordatorios) en Descargas, con el título como
+// nombre, igual que `icsDescarga.ts` en la web.
+func (a *App) descargarEventoICS(o Ocurrencia) {
+	nombre := resumenDe(o, a.P.t("event.untitled", nil))
+	nombre = strings.Map(func(r rune) rune {
+		if r < 0x20 || strings.ContainsRune(`/\:"*?<>|`, r) {
+			return '-'
+		}
+		return r
+	}, nombre) + ".ics"
+	a.escribir(func(ctx context.Context) error {
+		ics, err := a.Cal.EventICS(ctx, o.Event.ID)
+		if err != nil {
+			return err
+		}
+		carpeta, err := ficheros.Carpeta()
+		if err != nil {
+			return err
+		}
+		_, err = ficheros.Guardar(carpeta, nombre, bytes.NewReader(ics))
+		return err
+	}, func(err error) {
+		if err != nil {
+			a.avisar(ui.AvisoPeligro, "toast.icsFailed")
+		}
+	})
+}
+
 // formularioCalendario es CalendarModal: nuevo (`c` nil) o renombrar y cambiar el color.
 func (a *App) formularioCalendario(c *api.Calendar) {
 	lienzo := a.lienzo()

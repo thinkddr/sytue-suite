@@ -375,4 +375,10 @@ export const lt: AppCatalog<typeof en> = {
   'relation.coworker': 'Kolega',
   'relation.emergency': 'Skubus kontaktas',
   'relation.other': 'Kita',
+  'batch.copyEmails': 'Kopijuoti el. pašto adresus',
+  'batch.emailsCopied': 'El. pašto adresai nukopijuoti',
+  'birthdays.anniversary': 'Sukaktis',
+  'list.sortByLastName': 'Rikiuoti pagal pavardę',
+  'list.sortByFirstName': 'Rikiuoti pagal vardą',
+  'detail.shareByEmail': 'Bendrinti el. paštu',
 };

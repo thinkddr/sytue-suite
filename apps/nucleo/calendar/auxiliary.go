@@ -133,6 +133,47 @@ func (r *Repository) DismissReminder(ctx context.Context, id string) error {
 	return err
 }
 
+// SnoozeReminder es «Posponer» en el almacén privado: el recordatorio vuelve a vencer
+// dentro de `minutes` (de 1 a 1440), como en el servicio. Uno descartado no se pospone.
+func (r *Repository) SnoozeReminder(ctx context.Context, id string, minutes int) (time.Time, error) {
+	if minutes < 1 || minutes > 24*60 {
+		return time.Time{}, invalid()
+	}
+	until := time.Now().Add(time.Duration(minutes) * time.Minute).UTC().Truncate(time.Second)
+	_, err := r.mutate(ctx, "snooze_reminder", map[string]any{"id": id, "minutes": minutes}, func(s *model.Snapshot) (model.Aggregate, error) {
+		row, ok := s.Row("reminder", id)
+		if !ok {
+			return model.Aggregate{}, missing()
+		}
+		var rel struct {
+			Owner     string     `json:"owner_sub"`
+			Object    string     `json:"object_id"`
+			Dismissed *time.Time `json:"dismissed_at"`
+		}
+		if json.Unmarshal(row.JSON, &rel) != nil {
+			return model.Aggregate{}, model.ErrSnapshot
+		}
+		if rel.Owner != r.scope.Subject || rel.Dismissed != nil {
+			return model.Aggregate{}, missing()
+		}
+		a, err := s.Edit("object_state", rel.Object)
+		if err != nil {
+			return a, err
+		}
+		for i, row := range a.Rows {
+			if row.Kind == "reminder" && row.ID == id {
+				a.Rows[i], err = patch(row, map[string]any{"trigger_at": until})
+				return a, err
+			}
+		}
+		return a, missing()
+	})
+	if err != nil {
+		return time.Time{}, err
+	}
+	return until, nil
+}
+
 func (r *Repository) Shares(ctx context.Context, calendar string) ([]api.CalendarShare, error) {
 	s, err := r.Snapshot(ctx)
 	if err != nil {

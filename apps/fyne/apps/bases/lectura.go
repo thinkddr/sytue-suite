@@ -35,9 +35,11 @@ type lectura struct {
 // hay dice si la lectura pide algo más que la vista.
 func (l lectura) hay() bool { return l.Q != "" || l.Campo != "" }
 
-// api son los parámetros que viajan; lo que no se ha pedido no se manda.
+// api son los parámetros que viajan; lo que no se ha pedido no se manda, salvo el día
+// del dispositivo (`hoyLocal` de la web): lo usan los filtros relativos a hoy, y con el
+// del servidor, en UTC, «hoy» sería ayer cada noche en Europa.
 func (l lectura) api() api.BasesLectura {
-	out := api.BasesLectura{Q: strings.TrimSpace(l.Q)}
+	out := api.BasesLectura{Q: strings.TrimSpace(l.Q), Today: time.Now().Format(time.DateOnly)}
 	if l.Campo != "" {
 		dir := "asc"
 		if l.Desc {

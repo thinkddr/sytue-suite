@@ -371,4 +371,9 @@ export const is: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Breytingin fer fram á þessu tæki og er vistuð dulkóðuð sem ný útgáfa myndarinnar.',
   'gallery.encrypted.albumEmpty': 'Engar myndir eru enn í þessu dulkóðaða albúmi.',
+  'shortcuts.favorite': 'Merkja eða afmerkja sem uppáhald',
+  'trash.restoreAll': 'Endurheimta allt',
+  'trash.restoredAll': 'Aftur í myndunum þínum: {count}',
+  'album.download': 'Sækja albúm',
+  'viewer.openInDrive': 'Skoða frumritið í Sytue Drive',
 };

@@ -177,8 +177,81 @@ export interface ResumenOperativo {
 export interface EstadisticasModelo {
   modelo: string;
   total: number;
+  /** Lo que la lista enseña: la búsqueda Y el estado elegidos (el recuento de la barra). */
+  filtrados?: number;
   por_estado: Record<string, number>;
+  /** La suma de la columna de dinero de lo que la lista enseña, no del modelo entero. */
   suma_dinero?: number;
+}
+
+// --- La cartera: antigüedad, estado de cuenta, bajo mínimo y mayor ----------------
+
+/** Un tramo de la antigüedad de lo pendiente: días vencido desde su vencimiento. */
+export type TramoAntiguedad = 'al_dia' | '1_30' | '31_60' | '61_90' | 'mas_90';
+
+/** `GET /cobros/antiguedad`: lo pendiente de cobro o de pago, en cinco tramos. */
+export interface Antiguedad {
+  modelo: string;
+  hoy: string;
+  tramos: { tramo: TramoAntiguedad; centimos: number; documentos: number }[];
+  total: number;
+  vencido: number;
+}
+
+/** Un lado del estado de cuenta de un contacto, en céntimos. */
+export interface ResumenCuenta {
+  facturado: number;
+  pagado: number;
+  pendiente: number;
+  vencido: number;
+}
+
+/** `GET /contacto/{id}/estado-cuenta`. */
+export interface EstadoCuenta {
+  ventas: ResumenCuenta;
+  compras: ResumenCuenta;
+  documentos: {
+    id: string;
+    modelo: string;
+    ref: string;
+    fecha: string;
+    vencimiento?: string;
+    estado: string;
+    total: number;
+    dias_vencida: number;
+  }[];
+  recortado: boolean;
+}
+
+/** `GET /inventario/bajo-minimo`: cantidades como cadena decimal, como el resto del ERP. */
+export interface ProductoBajoMinimo {
+  id: string;
+  ref?: string;
+  nombre: string;
+  minimo: string;
+  stock: string;
+  unidad?: string;
+  faltan: string;
+  almacenes: number;
+}
+
+/** `GET /mayor`: el libro mayor de una cuenta con el saldo que deja cada apunte. */
+export interface Mayor {
+  cuenta: string;
+  saldo_inicial: number;
+  apuntes: {
+    asiento_id: string;
+    ref: string;
+    fecha: string;
+    concepto: string;
+    debe: number;
+    haber: number;
+    saldo: number;
+  }[];
+  debe: number;
+  haber: number;
+  saldo_final: number;
+  recortado: boolean;
 }
 
 // --- Perfil de la organización y obligaciones -------------------------------

@@ -87,6 +87,8 @@ export interface EventInput {
   rruleRaw?: string;
   /** La repetición no se ha tocado: el BFF conserva la RRULE guardada byte a byte. */
   recurrenceUnchanged?: boolean;
+  /** «Mostrar como»: 'TRANSPARENT' es disponible (no ocupa en free/busy). */
+  transp?: 'OPAQUE' | 'TRANSPARENT';
 }
 
 /** Invitacion de la bandeja de planificacion (iTIP), enriquecida por el BFF. */
@@ -386,6 +388,14 @@ export function listDueReminders(
 /** Descarta un recordatorio in-app (mutacion por POST, CSRF-safe). */
 export function dismissReminder(id: string): Promise<{ ok: boolean }> {
   return sendJson('POST', '/api/reminders', { id });
+}
+
+/** Pospone un recordatorio `minutes`; devuelve cuándo vuelve a sonar (RFC3339). */
+export function snoozeReminder(
+  id: string,
+  minutes: number,
+): Promise<{ ok: boolean; trigger_at: string }> {
+  return sendJson('POST', '/api/reminders', { id, snooze: minutes });
 }
 
 /**

@@ -372,7 +372,8 @@ export function TimeGrid({
 
   return (
     <div class="bg-surface flex h-full flex-col">
-      <div ref={scrollRef} class="min-h-0 flex-1 overflow-y-auto">
+      {/* `sytue-reserva-flotante`: las últimas horas se bajan por encima del «+» flotante. */}
+      <div ref={scrollRef} class="sytue-reserva-flotante min-h-0 flex-1 overflow-y-auto">
         {/* Cabecera de días + franja de todo-el-día: fijas arriba al desplazar. Cristal,
             como la barra superior: en el traslúcido `bg-surface` es un velo, y las horas
             que pasan por debajo («07:00») se leían a través, encima de «15 min». */}

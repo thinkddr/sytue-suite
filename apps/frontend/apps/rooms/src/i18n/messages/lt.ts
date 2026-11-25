@@ -1110,4 +1110,11 @@ export const lt: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Prijunk šią programėlę prie savo paskyros organizacijoje {tenant}. Tavo esamos prieigos teisės išlieka.',
   'nativeResource.approve': 'Prijungti',
+  'channel.markRead': 'Pažymėti kaip perskaitytą',
+  'channel.copyLink': 'Kopijuoti nuorodą',
+  'channel.linkCopied': 'Nuoroda nukopijuota',
+  'channel.download': 'Atsisiųsti pokalbį',
+  'channel.downloaded': 'Pokalbis išsaugotas',
+  'channel.downloadFailed': 'Nepavyko išsaugoti pokalbio',
+  'status.nothingUnread': 'Viskas jau buvo perskaityta',
 };

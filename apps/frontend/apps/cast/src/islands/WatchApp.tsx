@@ -39,11 +39,13 @@ import { ChatPanel } from '../components/ChatPanel.js';
 import { Comments } from '../components/Comments.js';
 import { Diapositivas } from '../components/Diapositivas.js';
 import { ShareDialog } from '../components/ShareDialog.js';
+import { Capitulos, ConMarcas } from '../components/ConMarcas.js';
 import { useModeracion, type Moderacion } from '../components/Moderacion.js';
 import { ICONO_VISIBILIDAD } from '../components/VideoCard.js';
 import { reproducir, video as pedirVideo } from '../client/castApi.js';
 import { tipoDeFallo, type TipoDeFallo } from '../lib/fallo.js';
 import { ruta, urlDeMedia } from '../lib/rutas.js';
+import { capitulosDe, inicioDeUrl } from '../lib/marcas.js';
 import type { Reproduccion, Video } from '../lib/tipos.js';
 
 interface Props {
@@ -90,6 +92,23 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
   const moderacion = useModeracion(t, locale, conSesion);
   // El `<video>` de la grabación, para saltar al capítulo de una diapositiva.
   const elVideo = useRef<HTMLVideoElement | null>(null);
+  // El «?t=» del enlace con que se llegó: el vídeo empieza ahí.
+  const [inicio] = useState(() =>
+    typeof location === 'undefined'
+      ? null
+      : inicioDeUrl(new URL(location.href).searchParams.get('t')),
+  );
+  // El segundo en que se pulsó «Compartir», para «Empezar en…».
+  const [segundo, setSegundo] = useState(0);
+  // Una marca de la descripción, de un capítulo o de un comentario: el vídeo salta allí
+  // y suena, y la página sube hasta él si se estaba leyendo más abajo.
+  const saltar = (s: number): void => {
+    const el = elVideo.current;
+    if (!el) return;
+    el.currentTime = s;
+    void el.play().catch(() => undefined);
+    el.scrollIntoView?.({ block: 'nearest' });
+  };
 
   const reproducible = v?.status === 'ready' || v?.status === 'live';
 
@@ -188,6 +207,7 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
               duracionMs={play.duration_ms ?? v.duration_ms}
               titulo={v.title}
               reanudar={user && !enDirecto ? { persona: user.id, video: v.id } : null}
+              inicio={inicio}
               alVideo={(el) => {
                 elVideo.current = el;
               }}
@@ -226,7 +246,10 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
                 <Button
                   variant="secondary"
                   leadingIcon={<Icon name="link" size={16} />}
-                  onClick={() => setCompartir(true)}
+                  onClick={() => {
+                    setSegundo(enDirecto ? 0 : (elVideo.current?.currentTime ?? 0));
+                    setCompartir(true);
+                  }}
                 >
                   {t('watch.share')}
                 </Button>
@@ -253,7 +276,13 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
                 )}
               </div>
             </div>
-            {v.description ? <Descripcion t={t} texto={v.description} /> : null}
+            {v.description ? (
+              <Descripcion
+                t={t}
+                texto={v.description}
+                saltar={!enDirecto && play && !falloPlay ? saltar : undefined}
+              />
+            ) : null}
           </div>
 
           {enDirecto ? null : (
@@ -267,6 +296,7 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
                 entrar={entrar}
                 miSub={user?.id ?? null}
                 moderacion={moderacion}
+                saltar={play && !falloPlay ? saltar : undefined}
               />
             </div>
           )}
@@ -290,7 +320,13 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
           </aside>
         ) : null}
       </div>
-      <ShareDialog t={t} video={v} abierto={compartir} cerrar={() => setCompartir(false)} />
+      <ShareDialog
+        t={t}
+        video={v}
+        segundo={segundo}
+        abierto={compartir}
+        cerrar={() => setCompartir(false)}
+      />
       {moderacion.dialogos}
     </>
   );
@@ -392,9 +428,19 @@ function Metadatos({ t, locale, video: v }: { t: T; locale: Locale; video: Video
   );
 }
 
-function Descripcion({ t, texto }: { t: T; texto: string }): JSX.Element {
+function Descripcion({
+  t,
+  texto,
+  saltar,
+}: {
+  t: T;
+  texto: string;
+  /** Sin él (en directo, o sin reproductor todavía) las marcas son texto. */
+  saltar?: ((segundos: number) => void) | undefined;
+}): JSX.Element {
   const [abierta, setAbierta] = useState(false);
   const larga = texto.length > 280 || texto.split('\n').length > 4;
+  const capitulos = saltar ? capitulosDe(texto) : [];
   return (
     <div class="bg-bg-subtle rounded-card px-4 py-3">
       <p
@@ -403,7 +449,7 @@ function Descripcion({ t, texto }: { t: T; texto: string }): JSX.Element {
           !abierta && larga && 'line-clamp-4',
         )}
       >
-        {texto}
+        <ConMarcas t={t} texto={texto} saltar={saltar} />
       </p>
       {larga ? (
         <button
@@ -414,6 +460,9 @@ function Descripcion({ t, texto }: { t: T; texto: string }): JSX.Element {
         >
           {abierta ? t('watch.less') : t('watch.more')}
         </button>
+      ) : null}
+      {capitulos.length && saltar ? (
+        <Capitulos t={t} capitulos={capitulos} saltar={saltar} />
       ) : null}
     </div>
   );

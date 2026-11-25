@@ -397,4 +397,36 @@ export const nucleo = {
   'forms.empty': 'Nu există încă răspunsuri',
   'forms.empty_help':
     'Când cineva trimite un formular de pe site-ul dumneavoastră, îl veți vedea aici.',
+  'sites.search': 'Caută site-uri',
+  'sites.search_empty': 'Niciun site nu corespunde cu „{q}”.',
+  'sites.sort_label': 'Sortează site-urile',
+  'sites.sort_recent': 'Editate recent',
+  'sites.sort_name': 'Nume (A–Z)',
+  'sites.view_live': 'Vezi site-ul',
+  'sites.view_live_aria': 'Vezi {nombre} publicat (se deschide într-o filă nouă)',
+  'seo.title': 'Ce vor vedea motoarele de căutare',
+  'seo.intro':
+    'O verificare a schiței: titluri, descrieri și imagini de care depind motoarele de căutare și cititoarele de ecran. Sunt avertismente; nu împiedică publicarea.',
+  'seo.open_editor': 'Deschide editorul',
+  'seo.recheck': 'Verifică din nou',
+  'seo.error': 'Verificarea nu a putut fi încărcată. Încearcă din nou.',
+  'seo.all_good':
+    'Totul e în regulă: fiecare pagină are titlu și descriere, iar imaginile au text alternativ.',
+  'seo.summary': 'Avertismente: {count}',
+  'seo.badge_warning': 'De îmbunătățit',
+  'seo.badge_info': 'Notă',
+  'seo.on_page': 'Pagina: {page}',
+  'seo.title_missing': 'Pagina nu are titlu: motorul de căutare va inventa unul.',
+  'seo.title_long':
+    'Titlul are {count} caractere; încap în jur de 60 înainte ca motorul de căutare să-l taie.',
+  'seo.title_duplicate': 'O altă pagină are același titlu: vor concura între ele în rezultate.',
+  'seo.description_missing':
+    'Pagina nu are descriere: motorul de căutare va afișa un fragment de text oarecare.',
+  'seo.description_long': 'Descrierea are {count} caractere; se afișează în jur de 160.',
+  'seo.image_alt_missing':
+    'Imagini fără text alternativ: {count}. Cititoarele de ecran și motoarele de căutare nu știu ce arată; marchează-le ca decorative dacă nu arată nimic.',
+  'seo.page_noindex': 'Această pagină este ascunsă de motoarele de căutare (noindex).',
+  'seo.site_noindex': 'Întregul site este ascuns de motoarele de căutare (noindex).',
+  'seo.share_image_missing':
+    'Site-ul nu are imagine de partajare: linkurile din mesaje și rețele sociale vor apărea fără imagine.',
 };

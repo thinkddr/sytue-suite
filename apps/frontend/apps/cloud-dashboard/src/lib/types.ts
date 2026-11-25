@@ -4,7 +4,11 @@
  * Sytue DevX (cloud.sytue.eu / Sytue DevX API). docs/CONVENTIONS.md §14.
  */
 
-export type DeployStatus = 'building' | 'ready' | 'error' | 'queued' | 'canceled';
+/**
+ * `retired`: una producción que otra reemplazó. Es el estado de todo lo que se
+ * puede recuperar con un rollback, así que no puede pintarse como «en cola».
+ */
+export type DeployStatus = 'building' | 'ready' | 'error' | 'queued' | 'canceled' | 'retired';
 export type DeployTarget = 'production' | 'preview';
 export type Framework = 'astro' | 'next' | 'preact' | 'static' | 'node' | 'sveltekit';
 export type Region = 'fr-par' | 'nl-ams';
@@ -119,6 +123,16 @@ export interface Deployment {
   durationSec?: number;
   /** Si es el despliegue de produccion actual. */
   current?: boolean;
+  /**
+   * Motivo del fallo tal cual lo dejó el control-plane (solo en `error`). Sin él,
+   * la fila roja decía QUE falló pero no POR QUÉ, y había que ir a buscarlo.
+   */
+  errorMessage?: string;
+  /**
+   * Compilación que produjo la imagen (vacío en BYO). Es lo que abre su log desde
+   * la fila: los registros solo enseñaban el de la ÚLTIMA compilación.
+   */
+  buildId?: string;
 }
 
 export interface Domain {

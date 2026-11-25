@@ -696,6 +696,7 @@ func (b *Boton) Tapped(*fyne.PointEvent) {
 		cerrarTecladoMovil(lienzoDe(b))
 	}
 	b.AlPulsar()
+	b.pista.alPulsar() // ya se ha elegido (ver `Pista.alPulsar`)
 }
 
 // MouseIn, MouseMoved y MouseOut son `:hover`.

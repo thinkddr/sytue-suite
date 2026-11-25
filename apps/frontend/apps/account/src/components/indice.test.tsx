@@ -118,6 +118,7 @@ describe('Mi cuenta con índice', () => {
       '#recuperacion',
       '#sesiones',
       '#dispositivos',
+      '#actividad',
       '#contrasenas-app',
       '#firma',
       '#borrar',

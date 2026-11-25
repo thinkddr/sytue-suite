@@ -9,6 +9,8 @@ package http
 
 import (
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 
@@ -79,4 +81,62 @@ func (s *Server) handleMePasskeyDelete(w http.ResponseWriter, r *http.Request) {
 	_ = s.store.Audit(r.Context(), nil, auditEntry(subject, c.Tenant, "webauthn.credential.removed", id, r))
 	s.avisarSeguridad(r.Context(), c.Tenant, subject, "security.passkey.removed", nil)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// topeNombrePasskey es el tope del nombre visible de una passkey, en runas: el mismo
+// `maxLength` que el campo del alta en Mi cuenta. El store además sanea (controles
+// fuera), pero no acota a algo que quepa en una fila.
+const topeNombrePasskey = 60
+
+// nombrePasskeyValido recorta el nombre pedido y dice si sirve: no vacío —una passkey
+// sin nombre vuelve a llamarse «Passkey» como todas— y dentro del tope.
+func nombrePasskeyValido(nombre string) (string, bool) {
+	nombre = strings.TrimSpace(nombre)
+	return nombre, nombre != "" && utf8.RuneCountInString(nombre) <= topeNombrePasskey
+}
+
+// handleMePasskeyRename — PATCH /api/v1/webauthn/credentials/{id} {"name": "…"} —
+// cambia el nombre visible de una passkey propia. Con dos o tres llaves, «Passkey» y
+// «Passkey» no dicen cuál quitar el día que se pierde el portátil; hasta ahora el
+// nombre solo se ponía al darla de alta y no se podía corregir (el store ya sabía
+// hacerlo, `RenameCredentialForUser`, y nadie lo llamaba).
+//
+// No pide paso adicional de identidad: el nombre no da ni quita acceso a nada. Sí se
+// audita, porque aparece en la actividad de la cuenta junto al resto de cambios de
+// las passkeys. El store acota por usuario (anti-IDOR): un id ajeno es un 404.
+func (s *Server) handleMePasskeyRename(w http.ResponseWriter, r *http.Request) {
+	subject, ok := s.webauthnUser(r)
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !uuidRe.MatchString(id) {
+		httpx.Fail(w, r, httpx.ErrNotFound)
+		return
+	}
+	var cuerpo struct {
+		Name string `json:"name"`
+	}
+	if err := httpx.DecodeJSON(w, r, &cuerpo); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	nombre, valido := nombrePasskeyValido(cuerpo.Name)
+	if !valido {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The name must have between 1 and 60 characters."))
+		return
+	}
+	cambiada, err := s.store.RenameCredentialForUser(r.Context(), nil, subject, id, nombre)
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
+		return
+	}
+	if !cambiada {
+		httpx.Fail(w, r, httpx.ErrNotFound)
+		return
+	}
+	c, _ := claimsFrom(r.Context())
+	_ = s.store.Audit(r.Context(), nil, auditEntry(subject, c.Tenant, "webauthn.credential.renamed", id, r))
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"id": id, "name": nombre})
 }

@@ -779,4 +779,17 @@ export const ro: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Nu s-au putut încărca mai multe rezultate. Încearcă din nou.',
   'privacy.notice':
     'Nu vindem datele dumneavoastră și nu le partajăm cu terți. Nu le folosim pentru profilare, publicitate sau pentru a antrena ori îmbunătăți serviciile noastre sau ale altora. Sunt criptate în tranzit și în repaus și ies din infrastructura noastră europeană doar când este strict necesar pentru facturare și în integrările pe care le activați, unde terțul vă va cere aprobarea pentru datele pe care le va folosi.',
+  'inbox.markAllOf': 'Marchează-le pe cele din {app} drept citite',
+  'inbox.markUnread': 'Marchează ca necitită',
+  'inbox.muteLikeThis': 'Dezactivează notificările ca aceasta',
+  'inbox.mutedLikeThis':
+    'Nu vei mai primi notificări ca aceea. Poți schimba asta mai jos, la „Ce vrei să primești”.',
+  'inbox.muteFailed': 'Nu s-au putut dezactiva. Încearcă din nou.',
+  'inbox.actionsOf': 'Acțiuni pentru „{title}”',
+  'downloads.checksum': 'Verifică descărcarea',
+  'downloads.checksumHelp':
+    'Amprenta sa SHA-256. Calculează-o pe cea a fișierului descărcat și verifică dacă se potrivesc.',
+  'downloads.checksumLabel': 'Amprentă SHA-256',
+  'downloads.copyChecksum': 'Copiază amprenta',
+  'downloads.checksumCopied': 'Amprentă copiată',
 };

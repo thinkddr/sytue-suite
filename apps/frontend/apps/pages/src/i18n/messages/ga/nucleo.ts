@@ -406,4 +406,37 @@ export const nucleo = {
 
   'forms.empty': 'Níl aon fhreagra ann fós',
   'forms.empty_help': 'Nuair a sheolfaidh duine foirm ar do shuíomh gréasáin, feicfidh tú anseo í.',
+  'sites.search': 'Cuardaigh suímh',
+  'sites.search_empty': 'Níl aon suíomh ag teacht le "{q}".',
+  'sites.sort_label': 'Sórtáil suímh',
+  'sites.sort_recent': 'Curtha in eagar le déanaí',
+  'sites.sort_name': 'Ainm (A–Z)',
+  'sites.view_live': 'Féach ar an suíomh',
+  'sites.view_live_aria': 'Féach ar {nombre} foilsithe (osclaítear i gcluaisín nua)',
+  'seo.title': 'An méid a fheicfidh innill chuardaigh',
+  'seo.intro':
+    'Athbhreithniú ar an dréacht: teidil, cur síos agus íomhánna a mbíonn innill chuardaigh agus léitheoirí scáileáin ag brath orthu. Rabhaidh iad seo; ní chuireann siad cosc ar fhoilsiú.',
+  'seo.open_editor': 'Oscail an t-eagarthóir',
+  'seo.recheck': 'Seiceáil arís',
+  'seo.error': 'Níorbh fhéidir an t-athbhreithniú a lódáil. Bain triail eile as.',
+  'seo.all_good':
+    'Tá gach rud i gceart: tá teideal agus cur síos ag gach leathanach, agus tá téacs malartach ag na híomhánna.',
+  'seo.summary': 'Rabhaidh: {count}',
+  'seo.badge_warning': 'Feabhsaigh',
+  'seo.badge_info': 'Nóta',
+  'seo.on_page': 'Leathanach: {page}',
+  'seo.title_missing': 'Níl teideal ar an leathanach: cumfaidh an t-inneall cuardaigh ceann.',
+  'seo.title_long':
+    'Tá {count} carachtar sa teideal; luíonn timpeall 60 sula ngearrann an t-inneall cuardaigh é.',
+  'seo.title_duplicate':
+    'Tá an teideal céanna ar leathanach eile: beidh siad in iomaíocht lena chéile sna torthaí.',
+  'seo.description_missing':
+    'Níl cur síos ar an leathanach: taispeánfaidh an t-inneall cuardaigh píosa téacs randamach.',
+  'seo.description_long': 'Tá {count} carachtar sa chur síos; taispeántar timpeall 160.',
+  'seo.image_alt_missing':
+    'Íomhánna gan téacs malartach: {count}. Ní féidir le léitheoirí scáileáin ná le hinnill chuardaigh a insint cad a thaispeánann siad; marcáil iad mar mhaisiúcháin mura dtaispeánann siad aon rud.',
+  'seo.page_noindex': 'Tá an leathanach seo i bhfolach ó innill chuardaigh (noindex).',
+  'seo.site_noindex': 'Tá an suíomh ar fad i bhfolach ó innill chuardaigh (noindex).',
+  'seo.share_image_missing':
+    'Níl íomhá chomhroinnte ag an suíomh: taispeánfar naisc i dteachtaireachtaí agus ar líonraí sóisialta gan pictiúr.',
 };

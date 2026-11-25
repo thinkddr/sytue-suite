@@ -802,4 +802,17 @@ export const it: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Impossibile caricare altri risultati. Riprova.',
   'privacy.notice':
     'Non vendiamo i tuoi dati né li cediamo a terzi. Non li usiamo per profilarti, per pubblicità, né per addestrare o migliorare i nostri servizi o quelli di altri. Sono cifrati in transito e a riposo, e lasciano la nostra infrastruttura europea solo per lo stretto necessario alla fatturazione e nelle integrazioni che attivi tu, in cui il terzo ti chiederà l’approvazione sui dati che userà.',
+  'inbox.markAllOf': 'Segna quelle di {app} come lette',
+  'inbox.markUnread': 'Segna come non letta',
+  'inbox.muteLikeThis': 'Silenzia le notifiche come questa',
+  'inbox.mutedLikeThis':
+    'Non riceverai più notifiche come quella. Puoi cambiarlo qui sotto, in «Cosa vuoi ricevere».',
+  'inbox.muteFailed': 'Impossibile silenziarle. Riprova.',
+  'inbox.actionsOf': 'Azioni per «{title}»',
+  'downloads.checksum': 'Verifica il download',
+  'downloads.checksumHelp':
+    'La sua impronta SHA-256. Calcola quella del file scaricato e verifica che coincidano.',
+  'downloads.checksumLabel': 'Impronta SHA-256',
+  'downloads.copyChecksum': 'Copia l’impronta',
+  'downloads.checksumCopied': 'Impronta copiata',
 };

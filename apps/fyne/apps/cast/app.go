@@ -16,7 +16,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada/camara"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -251,6 +250,10 @@ type estadoVer struct {
 	// compartir es el diálogo abierto, para repintarlo al copiar.
 	compartir *ui.Dialogo
 	copiado   string
+	// momento es por dónde iba el vídeo al abrir Compartir, y enMomento si se comparte
+	// desde ahí («Empezar en…», el «?t=» de la web).
+	momento   time.Duration
+	enMomento bool
 	// La calidad (calidad_ver.go): la elegida en el menú (0, «Automática»), la del
 	// WebM que suena, si se está cambiando, cuándo cambió «Automática» por última vez,
 	// su espera tras un cambio de tamaño y el medidor del ritmo de descarga.
@@ -571,7 +574,7 @@ func (a *App) pintar() {
 		o, activa = a.pantallaModeracion(), SecModeracion
 	}
 	if a.ruta == RutaInicio && a.dentro() {
-		o = ui.ConReservaFlotante(o) // que el «Subir» flotante no tape lo último
+		o = ui.ConReservaFlotante(o) // que el «+» flotante no tape lo último
 	}
 	a.scroll.Content = container.New(&a.movil.hueco, o)
 	a.scroll.Refresh()
@@ -586,9 +589,10 @@ func (a *App) pintar() {
 	// Sin título: la barra única dice el nombre de marca del producto, como la web.
 	a.raiz.Objects = []fyne.CanvasObject{arm}
 	if a.ruta == RutaInicio && a.dentro() {
-		// «Subir» al alcance del pulgar (MobileFab de la web, `fab` en Inicio): solo se
-		// ve por debajo de 768, donde el menú es un cajón cerrado.
-		fab := ui.NuevoBotonFlotante(a.v.Traduce("nav.upload"), iconos.Subir, func() { a.Ir(RutaSubir) })
+		// «Subir» es el «+» flotante (`BotonFlotante` de Marco.tsx, `fab` en Inicio), abajo
+		// a la derecha y en todos los anchos: la acción de crear de Cast, como «Redactar»
+		// en Mail. La cabecera de Inicio ya no lo repite.
+		fab := ui.NuevoBotonFlotante(a.v.Traduce("nav.upload"), func() { a.Ir(RutaSubir) })
 		capa := container.New(ui.CapaFlotante{}, fab)
 		// Con el cajón abierto no se ve: el velo del cajón tapa la página, y el botón
 		// quedaba encima de los dos (visto en el emulador).
@@ -922,14 +926,15 @@ func (a *App) abrir(x api.CastVideo) { a.AbrirVideo(x.ID) }
 // ---- El teclado y soltar ----
 
 // tecla recibe lo que se pulsa sin nada enfocado: en la página de un vídeo, los atajos
-// del reproductor (espacio, ←/→ 5 s, F, M), como la web.
+// del reproductor (espacio o K, ←/→ 5 s, J/L 10 s, Inicio y Fin, 0–9, F, M), como la
+// web.
 func (a *App) tecla(e *fyne.KeyEvent) {
 	if a.ruta != RutaVer || (a.w != nil && a.w.Canvas().Overlays().Top() != nil) {
 		return
 	}
 	r := a.deVer()
 	switch e.Name {
-	case fyne.KeySpace:
+	case fyne.KeySpace, fyne.KeyK:
 		if r != nil {
 			r.Alternar()
 		}
@@ -948,11 +953,27 @@ func (a *App) tecla(e *fyne.KeyEvent) {
 	case fyne.KeyP:
 		a.alternarPiP()
 	default:
-		return
+		if !a.irConTecla(e.Name) {
+			return
+		}
 	}
 	if a.visor != nil {
 		a.visor.Rehacer()
 	}
+}
+
+// irConTecla lleva el vídeo adonde manda la tecla (J/L, Inicio/Fin, 0–9); false si la
+// tecla no lleva a ningún sitio o no hay vídeo.
+func (a *App) irConTecla(k fyne.KeyName) bool {
+	r := a.deVer()
+	if r == nil {
+		return false
+	}
+	destino, ok := DestinoDeTecla(k, r.Posicion(), r.Duracion())
+	if ok {
+		r.Buscar(destino)
+	}
+	return ok
 }
 
 func (a *App) pantallaCompleta() {

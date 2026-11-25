@@ -20,7 +20,7 @@
  * fila del cursor; en la agenda desaparece y debajo va la agenda de siempre (`agenda`).
  * Soltar o cambiar de vista anima la hoja, salvo con `prefers-reduced-motion`.
  *
- * Tocar un día lo ELIGE (no crea: crear es el «+» de la barra, sobre el día elegido).
+ * Tocar un día lo ELIGE (no crea: crear es el «+» flotante, sobre el día elegido).
  * Teclado: ←→ un día, ↑↓ una semana, Inicio/Fin lunes/domingo, RePág/AvPág un mes
  * (recortando el día). El foco sigue a la selección (tabindex itinerante), también
  * cuando la cambia un atajo global con un día enfocado.
@@ -538,7 +538,12 @@ export function MesCompacto({
           <section
             aria-labelledby={idTitulo}
             aria-busy={cargando || atenuado || undefined}
-            class={cx('flex-1 pb-4 transition-opacity duration-150', atenuado && 'opacity-60')}
+            // El hueco del «+» flotante al final: el último evento del día se baja por
+            // encima de él.
+            class={cx(
+              'sytue-reserva-flotante flex-1 pb-4 transition-opacity duration-150',
+              atenuado && 'opacity-60',
+            )}
           >
             <h2 id={idTitulo} class="text-text text-md px-4 pt-4 pb-2 font-semibold">
               {titulo}
@@ -587,24 +592,19 @@ export function MesCompacto({
 
 /**
  * Las acciones de la barra móvil en el mes del teléfono: «Hoy» con forma de hoja de
- * calendario y el número de HOY dentro, y «+» para crear en el día elegido.
+ * calendario y el número de HOY dentro. Crear en el día elegido era otro «+» aquí; ahora
+ * es el «+» flotante de toda la suite (BotonFlotante), abajo a la derecha.
  */
 export function AccionesBarraCompacta({
   t,
   locale,
   hoy,
-  cursor,
-  offline,
   onHoy,
-  onCrear,
 }: {
   t: T;
   locale: Locale;
   hoy: Date;
-  cursor: Date;
-  offline: boolean;
   onHoy: () => void;
-  onCrear: () => void;
 }): JSX.Element {
   return (
     <>
@@ -623,17 +623,6 @@ export function AccionesBarraCompacta({
         >
           {hoy.getDate()}
         </span>
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        iconOnly
-        aria-label={t('nav.createEventOn', { date: dayMonthLabel(locale, cursor) })}
-        title={t('header.shortcut', { label: t('nav.createEvent'), key: 'C' })}
-        disabled={offline}
-        onClick={onCrear}
-      >
-        <Icon name="plus" size={20} />
       </Button>
     </>
   );

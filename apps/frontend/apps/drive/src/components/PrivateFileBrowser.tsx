@@ -1,11 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Button, EmptyState, Input, Modal, Spinner, marcarAppLista, useToast } from '@sytue/ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import {
+  BotonFlotante,
+  Button,
+  EmptyState,
+  Input,
+  MenuItem,
+  Migas,
+  Modal,
+  ShortcutsModal,
+  Spinner,
+  marcarAppLista,
+  useToast,
+} from '@sytue/ui';
 import { useI18n } from '@sytue/i18n/preact';
 import type { DriveResource } from '@sytue/api-clients';
 import { MatrixSecurityError, PrivateDriveError } from '@sytue/offline/matrix';
 import { usePrivateDrive } from '../client/private-browser.js';
-import { useT } from '../i18n/index.js';
+import { useT, type DriveMessageKey } from '../i18n/index.js';
+import { accionDeEvento, gruposDeAtajos, type AccionAtajo } from '../lib/atajos.js';
+import { FILTROS_TIPO, filtrarPorTipo, migasDe, vecinoDe, type FiltroTipo } from '../lib/tipos.js';
+import { Glyph } from './glyphs.js';
 import { VersionsDialog } from './VersionsDialog.js';
 import {
   collectDropEntries,
@@ -15,6 +30,19 @@ import {
   TrashView,
   type UploadEntry,
 } from './FileBrowser.js';
+
+/** Los atajos que esta vista atiende: buscar, subir, nueva carpeta y la hoja. Los de la
+ *  selección (Supr, F2, ⌘A) no, porque aquí no se selecciona. */
+const ACCIONES_BOVEDA: readonly AccionAtajo[] = ['search', 'upload', 'newFolder', 'help'];
+
+const ROTULO_TIPO: Record<FiltroTipo, DriveMessageKey> = {
+  todo: 'files.type.all',
+  carpetas: 'files.type.folders',
+  documentos: 'files.type.documents',
+  pdf: 'files.type.pdf',
+  imagenes: 'files.type.images',
+  media: 'files.type.media',
+};
 
 const parent = (path: string) => path.slice(0, path.lastIndexOf('/')) || '/';
 const join = (path: string, name: string) => (path === '/' ? '/' + name : path + '/' + name);
@@ -100,6 +128,9 @@ function PrivateFilesContent({
   const [query, setQuery] = useState(''),
     [search, setSearch] = useState(''),
     [revision, setRevision] = useState(0);
+  // «Filtrar por tipo» (lib/tipos.ts): sobre lo cargado, sin otra consulta.
+  const [tipo, setTipo] = useState<FiltroTipo>('todo');
+  const [atajosOpen, setAtajosOpen] = useState(false);
   // `sytue:app-ready`: la carpeta ya enseña sus archivos (o por qué no).
   useEffect(() => {
     if (items !== null || failed) marcarAppLista();
@@ -226,6 +257,43 @@ function PrivateFilesContent({
       }
     }
   }, [cursor, section, search, data, path, toast, t]);
+  // Ir a una carpeta de la ruta desde las migas, saliendo de la búsqueda.
+  const irA = (ruta: string) => {
+    setPath(ruta);
+    setQuery('');
+    void data
+      .resolve(ruta)
+      .then(remember)
+      .catch(() => toast.notify({ tone: 'danger', title: t('files.error.loadTitle') }));
+  };
+  // «Mostrar en su carpeta» de un resultado de búsqueda, de Recientes o de Destacados:
+  // la carpeta que lo contiene, abierta como cualquier otra (y en «Mi unidad»).
+  const showInFolder = (item: DriveResource) => {
+    void data
+      .resolve(parent(item.path))
+      .then(open)
+      .catch(() => toast.notify({ tone: 'danger', title: t('files.error.loadTitle') }));
+  };
+  // Los atajos de la hoja de Drive que tienen sentido aquí: buscar, subir, nueva carpeta
+  // y la propia hoja. Los de la selección (Supr, F2, ⌘A) no: esta vista no selecciona.
+  useEffect(() => {
+    const puedeCrear = section === 'my' && initialized && !busy;
+    const onKey = (e: KeyboardEvent): void => {
+      const accion = accionDeEvento(e, { offline: false });
+      if (accion === 'help') setAtajosOpen(true);
+      else if (accion === 'search' && section === 'my')
+        document.getElementById('drive-private-search')?.focus();
+      else if (accion === 'upload' && puedeCrear) inputRef.current?.click();
+      else if (accion === 'newFolder' && puedeCrear) {
+        setName('');
+        setEdit({ kind: 'create' });
+      } else return;
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [section, initialized, busy]);
+  const visibles = useMemo(() => (items ? filtrarPorTipo(items, tipo) : null), [items, tipo]);
   const download = (item: DriveResource) => {
     void data
       .download(item)
@@ -361,74 +429,80 @@ function PrivateFilesContent({
         {section === 'recent' || section === 'favorites' ? (
           <h1 class="sytue-h3">{t(section === 'recent' ? 'recent.title' : 'favorites.title')}</h1>
         ) : (
-          <nav aria-label={t('files.breadcrumb')} class="flex min-w-0 items-center gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setPath('/');
-                setQuery('');
-                void data
-                  .resolve('/')
-                  .then(remember)
-                  .catch(() => toast.notify({ tone: 'danger', title: t('files.error.loadTitle') }));
-              }}
-            >
-              {t('nav.myDrive')}
-            </Button>
-            {path !== '/' ? (
-              <>
-                <Button
-                  variant="ghost"
-                  aria-label={t('files.breadcrumb')}
-                  onClick={() => {
-                    const up = parent(path);
-                    setPath(up);
-                    void data
-                      .resolve(up)
-                      .then(remember)
-                      .catch(() =>
-                        toast.notify({ tone: 'danger', title: t('files.error.loadTitle') }),
-                      );
-                  }}
-                >
-                  ←
-                </Button>
-                <span class="truncate text-sm">{path.split('/').at(-1)}</span>
-              </>
-            ) : null}
-          </nav>
+          // La ruta entera con las migas de siempre (las de «Mi unidad» del Drive de
+          // servidor): antes era «←» y el nombre de la última carpeta, y volver tres
+          // niveles eran tres clics a ciegas.
+          <Migas
+            label={t('files.breadcrumb')}
+            class="min-w-0 grow"
+            migas={[
+              { clave: '/', nombre: t('nav.myDrive'), onIr: () => irA('/') },
+              ...migasDe(path).map((m) => ({
+                clave: m.ruta,
+                nombre: m.nombre,
+                onIr: () => irA(m.ruta),
+              })),
+            ]}
+          />
         )}
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={busy || !initialized} onClick={refresh}>
             {t('files.retry')}
           </Button>
-          {section === 'my' ? (
-            <>
-              <Button
-                variant="secondary"
-                disabled={busy || !initialized}
-                onClick={() => {
-                  setName('');
-                  setEdit({ kind: 'create' });
-                }}
-              >
-                {t('files.newFolder.title')}
-              </Button>
-              <Button disabled={busy || !initialized} onClick={() => inputRef.current?.click()}>
-                {t('files.upload')}
-              </Button>
-            </>
-          ) : null}
         </div>
+        {/* «Subir» y «Nueva carpeta» son el «+» flotante, abajo a la derecha y en todos
+            los anchos, como «Redactar» en Mail: estaban en esta fila y en el teléfono
+            quedaban arriba del todo. Solo en «Mi unidad», como estaban. */}
+        {section === 'my' ? (
+          <BotonFlotante
+            label={t('files.new')}
+            disabled={busy || !initialized}
+            menu={
+              <>
+                <MenuItem
+                  icon={<Glyph name="upload" size={16} />}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  {t('files.upload')}
+                </MenuItem>
+                <MenuItem
+                  icon={<Glyph name="folder" size={16} />}
+                  onClick={() => {
+                    setName('');
+                    setEdit({ kind: 'create' });
+                  }}
+                >
+                  {t('files.newFolder.title')}
+                </MenuItem>
+              </>
+            }
+          />
+        ) : null}
       </div>
       {section === 'my' ? (
         <div class="px-4 pb-4">
           <Input
+            id="drive-private-search"
             value={query}
             aria-label={t('files.searchAria')}
             placeholder={t('files.search')}
             onInput={(event) => setQuery(event.currentTarget.value)}
           />
+        </div>
+      ) : null}
+      {items && (items.length > 0 || tipo !== 'todo') ? (
+        <div class="flex flex-wrap gap-1 px-4 pb-3" role="group" aria-label={t('files.type.label')}>
+          {FILTROS_TIPO.map((f) => (
+            <Button
+              key={f}
+              variant={tipo === f ? 'secondary' : 'ghost'}
+              size="xs"
+              aria-pressed={tipo === f}
+              onClick={() => setTipo(f)}
+            >
+              {t(ROTULO_TIPO[f])}
+            </Button>
+          ))}
         </div>
       ) : null}
       <input
@@ -473,14 +547,41 @@ function PrivateFilesContent({
           <Spinner size={18} />
           {t('files.loading')}
         </p>
+      ) : items.length === 0 && search.trim() ? (
+        // Una búsqueda sin resultados no es una carpeta vacía: decía «Esta carpeta está
+        // vacía» y no dejaba volver más que borrando a mano.
+        <EmptyState
+          title={t('files.search.emptyTitle', { query: search.trim() })}
+          description={t('files.search.emptyBody')}
+          spot="emptySearch"
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
+              {t('files.search.clear')}
+            </Button>
+          }
+        />
       ) : items.length === 0 ? (
         <EmptyState
           title={t(section === 'favorites' ? 'favorites.emptyTitle' : 'files.empty.title')}
           description={t(section === 'favorites' ? 'favorites.emptyBody' : 'files.empty.body')}
         />
+      ) : visibles && visibles.length === 0 ? (
+        <EmptyState
+          title={t('files.type.empty')}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setTipo('todo')}>
+              {t('files.type.all')}
+            </Button>
+          }
+        />
       ) : (
         <FileList
-          items={items}
+          items={visibles ?? items}
+          onShowInFolder={
+            section === 'recent' || section === 'favorites' || search.trim()
+              ? showInFolder
+              : undefined
+          }
           showLocation={section === 'recent' || section === 'favorites' || !!search.trim()}
           favoriteIds={favoriteIds}
           onToggleFavorite={busy ? undefined : toggleFavorite}
@@ -546,8 +647,24 @@ function PrivateFilesContent({
         />
       ) : null}
       {preview ? (
-        <PrivatePreview item={preview} onClose={() => setPreview(null)} onDownload={download} />
+        <PrivatePreview
+          item={preview}
+          onClose={() => setPreview(null)}
+          onDownload={download}
+          anterior={vecinoDe(visibles ?? [], preview, -1)}
+          siguiente={vecinoDe(visibles ?? [], preview, 1)}
+          onCambiar={(item) => {
+            remember(item);
+            setPreview(item);
+          }}
+        />
       ) : null}
+      <ShortcutsModal
+        open={atajosOpen}
+        title={t('shortcuts.title')}
+        groups={gruposDeAtajos(t, undefined, ACCIONES_BOVEDA)}
+        onClose={() => setAtajosOpen(false)}
+      />
       {versions ? (
         <VersionsDialog
           item={versions}
@@ -565,10 +682,17 @@ function PrivatePreview({
   item,
   onClose,
   onDownload,
+  anterior,
+  siguiente,
+  onCambiar,
 }: {
   item: DriveResource;
   onClose: () => void;
   onDownload: (item: DriveResource) => void;
+  /** Los ficheros de al lado en la lista que se ve: ← y → pasan de uno a otro. */
+  anterior?: DriveResource | null;
+  siguiente?: DriveResource | null;
+  onCambiar?: (item: DriveResource) => void;
 }) {
   const data = usePrivateDrive(),
     { locale } = useI18n(),
@@ -605,6 +729,19 @@ function PrivatePreview({
       if (owned) data.releaseURL(owned);
     };
   }, [data, item, kind]);
+  // ← y → pasan al fichero de al lado sin cerrar: mirar diez fotos eran diez «abrir y
+  // cerrar».
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const destino = e.key === 'ArrowLeft' ? anterior : e.key === 'ArrowRight' ? siguiente : null;
+      if (!destino || !onCambiar) return;
+      e.preventDefault();
+      onCambiar(destino);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [anterior, siguiente, onCambiar]);
   return (
     <Modal
       open
@@ -612,9 +749,29 @@ function PrivatePreview({
       title={item.name}
       onClose={onClose}
       footer={
-        <Button variant="secondary" onClick={() => onDownload(item)}>
-          {t('action.download')}
-        </Button>
+        <>
+          {onCambiar ? (
+            <>
+              <Button
+                variant="ghost"
+                disabled={!anterior}
+                onClick={() => anterior && onCambiar(anterior)}
+              >
+                {t('preview.prev')}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!siguiente}
+                onClick={() => siguiente && onCambiar(siguiente)}
+              >
+                {t('preview.next')}
+              </Button>
+            </>
+          ) : null}
+          <Button variant="secondary" onClick={() => onDownload(item)}>
+            {t('action.download')}
+          </Button>
+        </>
       }
     >
       {failed ? (

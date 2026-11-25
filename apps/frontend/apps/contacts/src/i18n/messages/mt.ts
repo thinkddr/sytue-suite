@@ -373,4 +373,10 @@ export const mt: AppCatalog<typeof en> = {
   'relation.coworker': 'Kollega',
   'relation.emergency': 'Emerġenza',
   'relation.other': 'Oħra',
+  'batch.copyEmails': 'Ikkopja l-indirizzi tal-email',
+  'batch.emailsCopied': 'L-indirizzi tal-email ġew ikkupjati',
+  'birthdays.anniversary': 'Anniversarju',
+  'list.sortByLastName': 'Issortja skont il-kunjom',
+  'list.sortByFirstName': 'Issortja skont l-isem',
+  'detail.shareByEmail': 'Aqsam bl-email',
 };

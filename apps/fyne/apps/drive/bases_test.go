@@ -36,7 +36,7 @@ func TestNuevoLlevaLaVistaDeBases(t *testing.T) {
 	}
 	t1 := func(k string) string { return p.tr.T(k, nil) }
 	quiero := []string{
-		t1("files.new.folder"), "—",
+		t1("files.upload"), t1("files.new.folder"), "—",
 		t1("files.new.document"), t1("files.new.spreadsheet"), t1("files.new.presentation"), "—",
 		t1("files.new.bases"),
 	}

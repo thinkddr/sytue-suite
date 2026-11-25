@@ -327,4 +327,10 @@ export const et: AppCatalog<typeof en> = {
   'relation.coworker': 'Kolleeg',
   'relation.emergency': 'Hädaabikontakt',
   'relation.other': 'Muu',
+  'batch.copyEmails': 'Kopeeri e-posti aadressid',
+  'batch.emailsCopied': 'E-posti aadressid kopeeritud',
+  'birthdays.anniversary': 'Tähtpäev',
+  'list.sortByLastName': 'Sordi perekonnanime järgi',
+  'list.sortByFirstName': 'Sordi eesnime järgi',
+  'detail.shareByEmail': 'Jaga e-postiga',
 };

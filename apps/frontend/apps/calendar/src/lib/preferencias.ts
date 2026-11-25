@@ -16,6 +16,7 @@
  * Fyne guarda lo mismo con `sesion.PorPersona` (apps/fyne/calendario/preferencias.go).
  */
 import type { ViewMode } from '../components/dates.js';
+import { miRespuesta } from './ical.js';
 
 const VISTAS: readonly ViewMode[] = ['month', 'week', 'day', 'agenda'];
 /** Tope de URLs ocultas guardadas: las de calendarios borrados no deben crecer sin fin. */
@@ -128,9 +129,15 @@ export interface AjustesCalendario {
   finesDeSemana: boolean;
   /** Número de semana ISO en el mes y la semana. */
   numeroSemana: boolean;
+  /**
+   * Con false, los eventos a los que he dicho que no salen de la rejilla y de la
+   * agenda (siguen guardados, y en la búsqueda). Por defecto se ven, como hasta ahora.
+   */
+  rechazados: boolean;
 }
 
-/** Lo de siempre: una hora, sin recordatorio, de 9 a 18, la semana entera y sin número. */
+/** Lo de siempre: una hora, sin recordatorio, de 9 a 18, la semana entera, sin número y
+ * con los rechazados a la vista. */
 export const AJUSTES_POR_DEFECTO: Readonly<AjustesCalendario> = {
   duracion: 60,
   recordatorio: null,
@@ -138,6 +145,7 @@ export const AJUSTES_POR_DEFECTO: Readonly<AjustesCalendario> = {
   finLaboral: 18,
   finesDeSemana: true,
   numeroSemana: false,
+  rechazados: true,
 };
 
 /** Las duraciones que se ofrecen; una guardada que no esté aquí vuelve a la de siempre. */
@@ -174,6 +182,7 @@ export function normalizarAjustes(datos: unknown): AjustesCalendario {
     finesDeSemana:
       typeof d['finesDeSemana'] === 'boolean' ? d['finesDeSemana'] : base.finesDeSemana,
     numeroSemana: typeof d['numeroSemana'] === 'boolean' ? d['numeroSemana'] : base.numeroSemana,
+    rechazados: typeof d['rechazados'] === 'boolean' ? d['rechazados'] : base.rechazados,
   };
 }
 
@@ -189,4 +198,17 @@ export function leerAjustes(userId: string): AjustesCalendario {
 
 export function guardarAjustes(userId: string, ajustes: AjustesCalendario): void {
   if (userId) escribir(clave(userId, 'ajustes'), JSON.stringify(normalizarAjustes(ajustes)));
+}
+
+/**
+ * Si un evento se queda fuera de la vista por «Mostrar los eventos que he rechazado»:
+ * solo con el ajuste apagado y solo si MI respuesta es «no» (la del organizador o la
+ * de otros invitados no cuenta). Fyne aplica lo mismo en `calendario.OcultoPorRechazo`.
+ */
+export function ocultoPorRechazo(
+  ajustes: Pick<AjustesCalendario, 'rechazados'>,
+  ical: string | undefined,
+  correo: string | undefined,
+): boolean {
+  return !ajustes.rechazados && miRespuesta(ical, correo) === 'declined';
 }

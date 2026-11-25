@@ -376,4 +376,9 @@ export const en = {
   'gallery.encrypted.editHint':
     'The edit is done on this device and saved encrypted as a new version of the photo.',
   'gallery.encrypted.albumEmpty': 'This encrypted album has no photos yet.',
+  'shortcuts.favorite': 'Mark or unmark as favourite',
+  'trash.restoreAll': 'Restore all',
+  'trash.restoredAll': 'Back in your photos: {count}',
+  'album.download': 'Download album',
+  'viewer.openInDrive': 'See the original in Sytue Drive',
 } as const;

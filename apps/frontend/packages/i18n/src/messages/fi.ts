@@ -387,9 +387,13 @@ export const fi: Catalog = {
   'import.fromGoogle': 'Tuo Googlesta',
   'import.fromMicrosoft': 'Tuo Microsoft 365:stä',
   'import.running': 'Kopioidaan tietojasi… tähän mennessä {count} kohdetta.',
-  'import.done': '{count} kohdetta tuotu, {skipped} jätetty pois.',
+  'import.done': '{what}: {count} kohdetta tuotu, {skipped} jätetty pois. Valmis {date}.',
   'import.someFailed': 'Osaa tiedoistasi ei voitu kopioida. Ylläpitäjäsi näkee syyn.',
   'import.failed': 'Tuontia ei voitu käynnistää. Yritä hetken kuluttua uudelleen.',
+  'import.unavailable':
+    'Yhteyttä palveluun {source} ei voi lukea juuri nyt: se on vanhentunut, peruttu tai sitä ei ole koskaan valtuutettu. Pyydä ylläpitäjääsi yhdistämään se uudelleen.',
+  'import.needsAdmin':
+    'Yhteys palveluun {source} ei vielä voi kopioida kunkin henkilön tietoja. Pyydä ylläpitäjääsi viimeistelemään sen asetukset.',
   'dataflow.label': 'Mitä tiedoille tapahtuu',
   'dataflow.in.title': 'Tulee vain palveluun Sytue One',
   'dataflow.in.body':

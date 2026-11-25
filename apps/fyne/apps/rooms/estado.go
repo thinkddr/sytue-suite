@@ -269,6 +269,20 @@ func (sa *Sala) CambiarPresencia(e api.EstadoPresencia, texto string, conPlazo b
 	}
 }
 
+// MarcarCanalLeido es el «Marcar como leído» de UNA fila (`marcarCanalLeido`): su
+// contador a cero ya y el acuse al servicio. Uno que falle lo devuelve el siguiente
+// recuento de no leídos.
+func (sa *Sala) MarcarCanalLeido(c Canal) {
+	delete(sa.pend, c.ID)
+	if c.ID == sa.abierto {
+		sa.noLeidoAbierto = false
+	}
+	sa.pintarCanales()
+	sa.P.Refrescar()
+	pedir(sa, func(ctx context.Context) (struct{}, error) { return struct{}{}, sa.S.MarkRead(ctx, c.ID) },
+		func(struct{}, error) {})
+}
+
 // MarcarTodoLeido es `marcarTodoLeido`: todos los contadores a cero de golpe, cada
 // canal pendiente dado por leído, y el aviso con cuántos.
 func (sa *Sala) MarcarTodoLeido() {
@@ -289,6 +303,11 @@ func (sa *Sala) MarcarTodoLeido() {
 		}
 		return struct{}{}, nil
 	}, func(struct{}, error) {
+		// Con nada pendiente, decirlo: «0 conversaciones» parecía un fallo.
+		if len(pendientes) == 0 {
+			sa.P.Avisar(ui.AvisoInfo, t.T("status.nothingUnread", nil))
+			return
+		}
 		sa.P.Avisar(ui.AvisoExito, t.T("status.markedAllRead", i18n.Vars{"count": len(pendientes)}))
 	})
 }

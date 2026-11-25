@@ -177,8 +177,14 @@ func (a *App) parecidasALosResultados() { a.AbrirParecidas(idsDe(a.g.fotos)) }
 func (a *App) guardarSeleccionEnSistema() { a.guardarEnSistema(a.seleccionadas()) }
 
 // descargarSeleccion exporta en JPEG lo marcado, una a una.
-func (a *App) descargarSeleccion() {
-	fotos := a.seleccionadas()
+func (a *App) descargarSeleccion() { a.descargarFotos(a.seleccionadas()) }
+
+// descargarAlbum baja el álbum abierto entero, como «Descargar el álbum» de la web: ahí
+// va en un ZIP; aquí cada foto a la carpeta de descargas, como la selección.
+func (a *App) descargarAlbum() { a.descargarFotos(a.uno.fotos) }
+
+// descargarFotos exporta en JPEG esas fotos, una a una, a la carpeta de descargas.
+func (a *App) descargarFotos(fotos []api.Photo) {
 	if len(fotos) == 0 || a.cli == nil || a.Guardar == nil {
 		return
 	}

@@ -166,6 +166,8 @@ const carpetas = [
   join(FRONTEND, 'apps', 'console', 'src/i18n/acceso/messages'),
   // Y el registro RGPD de la consola (página «Privacidad»), igual.
   join(FRONTEND, 'apps', 'console', 'src/i18n/privacidad/messages'),
+  // Y las herramientas de gestión de cuentas (acceso efectivo, bajas, lotes), igual.
+  join(FRONTEND, 'apps', 'console', 'src/i18n/gestion/messages'),
   ...readdirSync(join(FRONTEND, 'apps'))
     .map((a) => join(FRONTEND, 'apps', a, 'src/i18n/messages'))
     .filter(existsSync),

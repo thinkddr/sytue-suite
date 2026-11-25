@@ -19,12 +19,22 @@ import (
 var operadores = map[string][]string{
 	api.BasesKindText:        {"contains", "eq", "neq", "empty", "notempty"},
 	api.BasesKindNumber:      {"eq", "neq", "gt", "gte", "lt", "lte", "empty", "notempty"},
-	api.BasesKindDate:        {"eq", "neq", "gt", "gte", "lt", "lte", "empty", "notempty"},
+	api.BasesKindDate:        {"eq", "neq", "gt", "gte", "lt", "lte", "empty", "notempty", "today", "past_days", "next_days", "this_month"},
 	api.BasesKindCheckbox:    {"eq"},
 	api.BasesKindSelect:      {"eq", "neq", "empty", "notempty"},
 	api.BasesKindMultiselect: {"contains", "empty", "notempty"},
 	api.BasesKindLink:        {"empty", "notempty"},
 }
+
+// opsSinValor son los operadores que no llevan valor (`OPS_SIN_VALOR` de la web): vacío o
+// no, y los relativos a un día que pone la lectura («hoy», «este mes»).
+var opsSinValor = []string{"empty", "notempty", "today", "this_month"}
+
+// opsConDias son los relativos que llevan un número de días, hoy incluido.
+var opsConDias = []string{"past_days", "next_days"}
+
+// maxDias es el tope de días de un filtro relativo (`domain.MaxDiasRelativos`).
+const maxDias = 3650
 
 // operadoresDe son los operadores de un campo; una fórmula se filtra como su resultado y
 // los adjuntos no se filtran.
@@ -45,9 +55,11 @@ func camposDeFormulario(campos []api.BasesField) []api.BasesField {
 // borradorVista es lo que se lleva escrito en el diálogo de «Añadir vista».
 type borradorVista struct {
 	nombre, tipo string
-	// agrupar es el campo de selección de un tablero; campos, los de un formulario.
+	// agrupar es el campo de selección de un tablero; campos, los de un formulario, y
+	// obligatorios, los de ellos que hay que rellenar para enviarlo.
 	agrupar                            string
 	campos                             []string
+	obligatorios                       []string
 	filtroCampo, filtroOp, filtroValor string
 	ordenCampo, ordenDir               string
 	// Al editar: los filtros y órdenes que la vista ya tenía después del primero. El
@@ -67,6 +79,7 @@ func borradorDeVista(v api.BasesView, campos []api.BasesField) borradorVista {
 		}
 	}
 	b.campos = slices.Clone(v.Config.Fields)
+	b.obligatorios = slices.Clone(v.Config.Required)
 	// Un formulario sin lista pide todos los que admite: se abre con todos marcados, que
 	// es lo mismo que guardarlo así.
 	if v.Kind == api.BasesForm && len(b.campos) == 0 {
@@ -94,6 +107,27 @@ func borradorDeVista(v api.BasesView, campos []api.BasesField) borradorVista {
 	return b
 }
 
+// valorDeFiltro es con qué compara un filtro: un número de días en los relativos, nada en
+// los que no llevan valor y, en el resto, lo escrito en el tipo del campo. `ok` falso si
+// lo escrito no vale.
+func valorDeFiltro(f api.BasesField, op, texto string) (valor any, ok bool) {
+	switch {
+	case slices.Contains(opsConDias, op):
+		n, err := strconv.Atoi(strings.TrimSpace(texto))
+		return n, err == nil && n >= 1 && n <= maxDias
+	case slices.Contains(opsSinValor, op):
+		return nil, true
+	}
+	switch f.Kind {
+	case api.BasesKindNumber:
+		n, err := strconv.ParseFloat(strings.Replace(strings.TrimSpace(texto), ",", ".", 1), 64)
+		return n, err == nil
+	case api.BasesKindCheckbox:
+		return texto == "true", true
+	}
+	return texto, strings.TrimSpace(texto) != ""
+}
+
 // configDeBorrador es la configuración que se envía al servicio; `ok` falso si el
 // borrador no vale todavía.
 func configDeBorrador(b borradorVista, campos []api.BasesField) (cfg api.BasesViewConfig, ok bool) {
@@ -105,6 +139,13 @@ func configDeBorrador(b borradorVista, campos []api.BasesField) (cfg api.BasesVi
 	}
 	if b.tipo == api.BasesForm {
 		cfg.Fields = b.campos
+		// Obligatorio solo lo que el formulario enseña, en su orden: el servicio rechaza
+		// la vista entera por un obligatorio que no sale.
+		for _, id := range b.campos {
+			if slices.Contains(b.obligatorios, id) {
+				cfg.Required = append(cfg.Required, id)
+			}
+		}
 		return cfg, len(b.campos) > 0
 	}
 	if i := slices.IndexFunc(campos, func(c api.BasesField) bool { return c.ID == b.filtroCampo }); i >= 0 {
@@ -112,25 +153,11 @@ func configDeBorrador(b borradorVista, campos []api.BasesField) (cfg api.BasesVi
 		if !slices.Contains(operadoresDe(f), b.filtroOp) {
 			return cfg, false
 		}
-		filtro := api.BasesFilter{Field: f.ID, Op: b.filtroOp}
-		if b.filtroOp != "empty" && b.filtroOp != "notempty" {
-			switch f.Kind {
-			case api.BasesKindNumber:
-				n, err := strconv.ParseFloat(strings.Replace(strings.TrimSpace(b.filtroValor), ",", ".", 1), 64)
-				if err != nil {
-					return cfg, false
-				}
-				filtro.Value = n
-			case api.BasesKindCheckbox:
-				filtro.Value = b.filtroValor == "true"
-			default:
-				if strings.TrimSpace(b.filtroValor) == "" {
-					return cfg, false
-				}
-				filtro.Value = b.filtroValor
-			}
+		valor, vale := valorDeFiltro(f, b.filtroOp, b.filtroValor)
+		if !vale {
+			return cfg, false
 		}
-		cfg.Filters = []api.BasesFilter{filtro}
+		cfg.Filters = []api.BasesFilter{{Field: f.ID, Op: b.filtroOp, Value: valor}}
 	}
 	// Lo que se conserva de la vista editada, salvo lo de campos que ya no existen: el
 	// servicio rechazaría la vista entera por un filtro sobre un campo borrado.

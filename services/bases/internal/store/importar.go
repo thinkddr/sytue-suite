@@ -86,6 +86,16 @@ type Exportacion struct {
 // salte registros. Deja constancia en la traza al empezar: una exportación es la salida
 // de datos de la organización y se audita como tal, se termine de descargar o no.
 func (s *Store) ExportarTabla(ctx context.Context, a domain.Actor, tabla string, fn func(Exportacion) error) error {
+	return s.ExportarVista(ctx, a, tabla, "", LecturaAdHoc{}, fn)
+}
+
+// ExportarVista exporta lo que se ve: los registros de la tabla que pasan los filtros
+// de la vista y la búsqueda del momento, en su orden. «Exportar» en una vista que
+// enseña los pedidos pendientes bajaba la tabla entera, y quien lo abría en una hoja
+// tenía que volver a filtrar a mano lo que ya tenía filtrado. Sin vista ni búsqueda
+// es la tabla entera, como antes. Las columnas siguen siendo todas: la vista no oculta
+// campos.
+func (s *Store) ExportarVista(ctx context.Context, a domain.Actor, tabla, vista string, extra LecturaAdHoc, fn func(Exportacion) error) error {
 	cursor := ""
 	for tramo := 0; ; tramo++ {
 		var ex Exportacion
@@ -102,7 +112,11 @@ func (s *Store) ExportarTabla(ctx context.Context, a domain.Actor, tabla string,
 			if ex.Fields, err = camposDe(ctx, tx, a, tabla); err != nil {
 				return err
 			}
-			if ex.Records, siguiente, err = leerRegistros(ctx, tx, a, tabla, ex.Fields, domain.ConfigVista{}, domain.MaxPagina, cursor); err != nil {
+			cfg, err := configDeLectura(ctx, tx, a, tabla, vista, extra)
+			if err != nil {
+				return err
+			}
+			if ex.Records, siguiente, err = leerRegistros(ctx, tx, a, tabla, ex.Fields, cfg, domain.MaxPagina, cursor); err != nil {
 				return err
 			}
 			if ex.Labels, err = etiquetasDeEnlaces(ctx, tx, a, ex.Fields, ex.Records); err != nil {

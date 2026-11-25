@@ -368,11 +368,14 @@ import { comandoDelAtajo } from '../comandos';
 import { MARCAS_DE_CELDA, atenderAtajoDeTexto } from '../canvas/atajos';
 import {
   atajoDeHoja,
+  hojaVecina,
   rellenoDeAtajo,
   seleccionEntera,
   serialDeHoy,
   type AtajoHoja,
 } from './atajosHoja';
+import { esFuncionAutosuma, formulaDeAutosuma, planDeAutosuma } from './autosuma';
+import { esModoTextoCeldas, literalReescribible, transformarTextoCelda } from './textoCeldas';
 import '../canvas/superficies.css';
 import './superficie-hoja.css';
 import {
@@ -443,6 +446,8 @@ export const PROTECT_CONTENT_CMDS: ReadonlySet<SheetCommand> = new Set<SheetComm
   'paste',
   'dedupe',
   'text2cols',
+  'cleantext',
+  'autosum',
   'merge',
   'pivot',
   'pivotrefresh',
@@ -3137,6 +3142,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   // El registro global se instala una sola vez, pero cada invocación debe usar
   // las operaciones de la renderización más reciente.
   const commandActionsRef = useUltimo({
+    startEdit,
     apply,
     applyCells,
     applySheet,
@@ -3154,6 +3160,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   useEffect(() => {
     const run = (cmd: SheetCommand, value?: string): void => {
       const {
+        startEdit,
         apply,
         applyCells,
         applySheet,
@@ -3617,6 +3624,66 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
           title: t('sheet.msg.dupesRemoved'),
           description: t('sheet.msg.dupesRemoved.detail', { count: keys.length - keep.length }),
         });
+        return;
+      }
+      /* --- Σ: la fórmula al pie de los números (autosuma.ts, con sus vectores). --- */
+      if (cmd === 'autosum') {
+        const fn = esFuncionAutosuma(value) ? value : 'SUM';
+        const plan = planDeAutosuma(
+          range,
+          {
+            esNumero: (c, r) => typeof cur.engine.getValue(s.name, refOf({ c, r })) === 'number',
+            vacia: (c, r) => (s.cells[refOf({ c, r })] ?? '') === '',
+          },
+          { cols: MAX_COLS, filas: MAX_ROWS },
+        );
+        if (plan === null) {
+          // Sin números al lado, como Excel: la celda se abre con la función para que el
+          // rango se elija con el ratón o se teclee.
+          startEdit(cur.sel, `=${fn}(`);
+          return;
+        }
+        if (plan.length === 0) return;
+        const cells = { ...s.cells };
+        const refs = plan.map((p) => {
+          const ref = refOf({ c: p.c, r: p.r });
+          const partes = parseCell(s.cells[ref] ?? '');
+          partes.inner = escapeHtml(formulaDeAutosuma(fn, p.rango));
+          cells[ref] = renderCellHtml(partes);
+          return ref;
+        });
+        anotarCambio(cells, s.cells, refs);
+        applySheet({ cells });
+        return;
+      }
+
+      /* --- Limpiar texto: espacios y mayúsculas de los LITERALES (textoCeldas.ts). --- */
+      if (cmd === 'cleantext') {
+        if (!esModoTextoCeldas(value)) return;
+        const cells = { ...s.cells };
+        const refs: string[] = [];
+        // Por las celdas que existen y no por el rango: una columna entera son un millón.
+        for (const ref of Object.keys(s.cells)) {
+          const rr = parseRangeRef(ref);
+          if (!rr || rr.c1 < range.c1 || rr.c1 > range.c2 || rr.r1 < range.r1 || rr.r1 > range.r2)
+            continue;
+          const raw = s.cells[ref] ?? '';
+          const partes = parseCell(raw);
+          // Una fórmula calcula su texto; y el marcado que no es el envoltorio de la celda
+          // no se reescribe a ciegas (la app nativa tampoco: `celdaEntendida`).
+          if (isFormula(raw) || !literalReescribible(partes.inner)) continue;
+          const antes = stripHtml(partes.inner);
+          const despues = transformarTextoCelda(antes, value);
+          if (despues === antes) continue;
+          partes.inner = escapeHtml(despues);
+          const html = renderCellHtml(partes);
+          if (html === '') delete cells[ref];
+          else cells[ref] = html;
+          refs.push(ref);
+        }
+        if (refs.length === 0) return;
+        anotarCambio(cells, s.cells, refs);
+        applySheet({ cells });
         return;
       }
       if (cmd === 'text2cols') {
@@ -4817,6 +4884,28 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       const cur = stateRef.current;
       return cur.model.sheets[cur.model.active]?.name ?? null;
     };
+    lienzoDeHoja.sheetCsvReader = () => {
+      const cur = stateRef.current;
+      const s = cur.model.sheets[cur.model.active];
+      if (!s) return null;
+      // Desde A1, como Excel y Sheets: las filas y columnas vacías de delante también
+      // cuentan, o el CSV no volvería a caer en su sitio al importarlo.
+      let ultC = -1;
+      let ultR = -1;
+      for (const ref of Object.keys(s.cells)) {
+        const rr = parseRangeRef(ref);
+        if (!rr || (s.cells[ref] ?? '') === '') continue;
+        ultC = Math.max(ultC, rr.c1);
+        ultR = Math.max(ultR, rr.r1);
+      }
+      const filas: string[][] = [];
+      for (let r = 0; r <= ultR; r++) {
+        const fila: string[] = [];
+        for (let c = 0; c <= ultC; c++) fila.push(clipDisplay(s, cur.engine, c, r));
+        filas.push(fila);
+      }
+      return { hoja: s.name, filas };
+    };
     lienzoDeHoja.sheetValueReader = (range: string, sheet?: string): CellValue[][] | null => {
       const cur = stateRef.current;
       const rr = parseRangeRef(range);
@@ -4924,6 +5013,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       lienzoDeHoja.sheetGridReader = null;
       lienzoDeHoja.sheetValueReader = null;
       lienzoDeHoja.sheetNameReader = null;
+      lienzoDeHoja.sheetCsvReader = null;
       lienzoDeHoja.sheetProbeReader = null;
       lienzoDeHoja.sheetSolverReader = null;
     };
@@ -5692,7 +5782,20 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       setExt(hasta);
       return;
     }
+    if (a === 'hojaSiguiente' || a === 'hojaAnterior') {
+      const m = cur.model;
+      switchSheet(hojaVecina(m.active, m.sheets.length, a === 'hojaSiguiente' ? 1 : -1));
+      return;
+    }
     if (ctx.soloLectura) return;
+    if (a === 'autosuma') {
+      dispatchSheetCommand('autosum', 'SUM');
+      return;
+    }
+    if (a.startsWith('formato:')) {
+      dispatchSheetCommand('numfmt', a.slice('formato:'.length));
+      return;
+    }
     if (a === 'hoy') {
       escribirHoy(cur.sel);
       return;

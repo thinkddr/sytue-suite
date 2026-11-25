@@ -165,6 +165,32 @@
     ],
     "telemetry": true
   },
+  "fontGrow": {
+    "labelKey": "format.fontGrow",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+."
+      }
+    ],
+    "telemetry": true
+  },
+  "fontShrink": {
+    "labelKey": "format.fontShrink",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+,"
+      }
+    ],
+    "telemetry": true
+  },
   "color": {
     "labelKey": "format.textColor",
     "kinds": ["document", "presentation"],
@@ -355,6 +381,14 @@
         "keys": "Ctrl+]"
       }
     ],
+    "telemetry": true
+  },
+  "sortParagraphs": {
+    "labelKey": "paragraph.sort",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
     "telemetry": true
   },
   "lineHeight": {
@@ -855,6 +889,14 @@
     "script": true,
     "telemetry": true
   },
+  "insertDateTime": {
+    "labelKey": "insert.dateTime",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.elements",
+    "edits": true,
+    "telemetry": true
+  },
   "header": {
     "labelKey": "insert.header",
     "kinds": ["document"],
@@ -975,6 +1017,11 @@
     "group": "group.sortFilter",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+L"
+      }
+    ],
     "telemetry": true
   },
   "filterset": {
@@ -1073,6 +1120,14 @@
     "group": "group.tools",
     "edits": true,
     "script": true,
+    "telemetry": true
+  },
+  "cleantext": {
+    "labelKey": "data.cleanText",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.tools",
+    "edits": true,
     "telemetry": true
   },
   "validadd": {
@@ -1216,6 +1271,14 @@
     "group": "rail.outline.title",
     "edits": true,
     "script": true,
+    "telemetry": true
+  },
+  "autosum": {
+    "labelKey": "sheet.autosum",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.functions",
+    "edits": true,
     "telemetry": true
   },
   "goalseek": {

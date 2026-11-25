@@ -32,7 +32,7 @@ import {
   Spinner,
   useToast,
   esAtajoDeApp,
-  MobileFab,
+  BotonFlotante,
   withBase,
   useUltimo,
   marcarAppLista,
@@ -106,7 +106,7 @@ import {
 import { MessageList, SEARCH_INPUT_ID, CONVERSATION_LIST_ID } from './MessageList.js';
 import { MessageReader, disparadorDeAtajo } from './MessageReader.js';
 import { ComposeModal } from './ComposeModal.js';
-import { gruposDeAtajos } from './hojaDeAtajos.js';
+import { destinoDeIr, gruposDeAtajos } from './hojaDeAtajos.js';
 import { respuestasRetenidas } from './respondido.js';
 import { FiltersModal } from './FiltersModal.js';
 import { LabelsModal } from './LabelsModal.js';
@@ -2806,12 +2806,34 @@ function MailAppBody({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Elemen
 
   const vecinas = vecinasDeLaAbierta(conversations.length, indiceAbierta, hayMas);
 
+  // Cuándo se pulsó la «g» de «ir a» (0, ninguna): la siguiente tecla decide la carpeta.
+  const irPendiente = useRef(0);
   atajosRef.current = (e: KeyboardEvent): void => {
     // `modalAbierto` SIGUE, además de `esAtajoDeApp`: el estado sabe de diálogos
     // que esta app monta y que aún no han pintado su `role="dialog"`, y la
     // utilidad compartida sabe de menús y popovers que este estado no cuenta. Las
     // dos comprobaciones cubren cosas distintas.
     if (modalAbierto || !esAtajoDeApp(e)) return;
+    // «g» y la letra de la carpeta («g i», Recibidos): antes que todo lo demás, porque
+    // la segunda tecla es también un atajo suelto («a» responde a todos) y aquí manda
+    // la «g». Vale también desde los ajustes, que ir a una carpeta cierra.
+    const ahora = Date.now();
+    const pendiente = irPendiente.current;
+    irPendiente.current = 0;
+    const rol = destinoDeIr(e.key, pendiente, ahora);
+    if (rol) {
+      const destino = mailboxes.find((m) => m.role === rol);
+      if (destino) {
+        e.preventDefault();
+        selectMailbox(destino);
+      }
+      return;
+    }
+    if (e.key === 'g') {
+      e.preventDefault();
+      irPendiente.current = ahora;
+      return;
+    }
     // En la página de ajustes no hay lista ni lector: j/k, archivar o destacar
     // actuarían sobre una conversación que no se ve. Quedan la ayuda y redactar.
     if (enAjustes && e.key !== '?' && e.key !== 'c') return;
@@ -2937,20 +2959,9 @@ function MailAppBody({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Elemen
 
   const sidebar = (
     <Sidebar
-      header={
-        <Button
-          fullWidth
-          variant="primary"
-          leadingIcon={<Icon name="plus" />}
-          // El atajo, en el tooltip: es la única forma de que se sepa que existe
-          // sin abrir una ayuda que nadie abre. No en el nombre accesible, que un
-          // lector de pantalla leería «(C)» a cada paso.
-          title={`${t('nav.compose')} (C)`}
-          onClick={openCompose}
-        >
-          {t('nav.compose')}
-        </Button>
-      }
+      // Sin «Redactar» en la cabecera: es el «+» flotante, en todos los anchos (ver el
+      // `BotonFlotante` de abajo). Dos controles para lo mismo según el ancho era lo que
+      // había, y producto pidió uno (2026-11-25).
       // Pie: indicador de cuota de almacenamiento. Se recarga con listTry (que se
       // incrementa tras enviar/guardar borradores), así refleja el uso sin recargar.
       footer={
@@ -3345,10 +3356,14 @@ function MailAppBody({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Elemen
           />
         )}
       </AppShell>
-      {/* Redactar al alcance del pulgar: en móvil el menú lateral es un cajón cerrado. */}
-      <MobileFab
+      {/* Redactar es el «+» flotante, abajo a la derecha y en todos los anchos: al alcance
+          del pulgar en el teléfono, donde el menú lateral es un cajón cerrado, y el mismo
+          sitio en escritorio. El atajo, en el tooltip: es la única forma de que se sepa
+          que existe sin abrir una ayuda que nadie abre. No en el nombre accesible, que un
+          lector de pantalla leería «(C)» a cada paso. */}
+      <BotonFlotante
         label={t('nav.compose')}
-        icon={<Icon name="plus" size={24} />}
+        title={`${t('nav.compose')} (C)`}
         onClick={openCompose}
       />
 
@@ -3369,6 +3384,14 @@ function MailAppBody({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Elemen
         onSaved={refreshList}
         onUndoSend={handleUndoSend}
         onAnswered={handleAnswered}
+        onEnviarYArchivar={
+          onArchive
+            ? (id) => {
+                const conv = conversations.find((c) => c.messages.some((m) => m.id === id));
+                if (conv) onArchive(conv);
+              }
+            : undefined
+        }
       />
 
       <FiltersModal

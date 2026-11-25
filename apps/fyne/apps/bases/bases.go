@@ -34,6 +34,9 @@ func Traductor(l i18n.Locale) (*i18n.Translator, error) {
 
 // Pantalla es Sytue Bases entera: el carril, «Mis bases» y la base abierta.
 type Pantalla struct {
+	// conPie: los totales de la vista están encendidos (resumen.go). Es de la persona y
+	// dura lo que la ventana, como el resto de lo que se elige al mirar.
+	conPie  bool
 	tr      *i18n.Translator
 	svc     *api.Bases
 	ventana fyne.Window
@@ -150,6 +153,7 @@ func enHilo(f func()) { fyne.Do(f) }
 func (p *Pantalla) Arrancar() {
 	if p.ventana != nil {
 		ui.AlAtras(p.ventana.Canvas(), p.atras)
+		p.engancharTeclas(p.ventana.Canvas())
 	}
 	p.cargarLista()
 }

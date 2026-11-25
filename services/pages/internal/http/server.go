@@ -89,6 +89,7 @@ func montarRutas(g grupos, h *Handlers) {
 	montarWebhooks(g, h)
 	montarFormularios(g, h)
 	montarIA(g, h)
+	montarSEO(g, h)
 }
 
 // construir monta el router base y sus grupos, sin rutas de ningún área.

@@ -61,6 +61,8 @@ export function deployStatusLabel(t: T, status: DeployStatus): string {
       return t('deploy.status.queued');
     case 'canceled':
       return t('deploy.status.canceled');
+    case 'retired':
+      return t('deploy.status.retired');
   }
 }
 
@@ -70,6 +72,7 @@ export const deployStatusTone: Record<DeployStatus, BadgeTone> = {
   error: 'danger',
   queued: 'neutral',
   canceled: 'warning',
+  retired: 'neutral',
 };
 
 /**

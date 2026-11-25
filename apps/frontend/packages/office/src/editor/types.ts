@@ -252,6 +252,9 @@ export type EditorCommand =
   | 'subscript'
   | 'font' // value: nombre de fuente, p. ej. 'Georgia'
   | 'size' // value: '1'..'7' (escala execCommand, §3.2)
+  | 'fontGrow' // un peldaño de `size` más (Ctrl+Mayús+.)
+  | 'fontShrink' // un peldaño menos (Ctrl+Mayús+,)
+  | 'sortParagraphs' // value: 'asc' | 'desc' — ordena los párrafos elegidos (hermanos)
   | 'color' // value: hex de CONTENT_PALETTE
   | 'highlight' // value: hex de HIGHLIGHT_PALETTE o 'transparent'
   | 'clearFormat'

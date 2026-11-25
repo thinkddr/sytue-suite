@@ -24,11 +24,12 @@ import {
   FieldGroup,
   InlineHelp,
   Input,
+  Modal,
   Spinner,
   usePrompt,
 } from '@sytue/ui';
 import { api, consulta, mensajeDeError } from '../lib/api.js';
-import type { Asiento, EstadoCierre, MovimientoCierre, RespuestaBalance } from './tipos.js';
+import type { Asiento, EstadoCierre, Mayor, MovimientoCierre, RespuestaBalance } from './tipos.js';
 import { formatearDinero, formatearFecha } from './formato.js';
 import type { T } from '../i18n/index.js';
 import {
@@ -497,10 +498,116 @@ export function LibroDiario({
   );
 }
 
+/**
+ * El libro MAYOR de una cuenta: sus apuntes asentados del período, cada uno con el saldo
+ * que deja, entre el saldo con el que entra y el que sale. El sumas y saldos dice cuánto
+ * hay en la 430; el mayor dice de dónde sale, que es lo siguiente que se pregunta. Se
+ * abre desde la fila de la cuenta, con el mismo período.
+ */
+export function MayorCuenta({
+  cuenta,
+  periodo,
+  locale,
+  t,
+  onCerrar,
+}: {
+  cuenta: string;
+  periodo: Periodo;
+  locale: string;
+  t: T;
+  onCerrar: () => void;
+}): JSX.Element {
+  const [datos, setDatos] = useState<Mayor | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let vivo = true;
+    api<Mayor>(`mayor${consulta({ cuenta, ...rangoDePeriodo(periodo) })}`)
+      .then((r) => vivo && setDatos(r))
+      .catch((err: unknown) => {
+        if (vivo) setError(mensajeDeError(err, t));
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [cuenta, periodo, t]);
+  return (
+    <Modal
+      open
+      size="lg"
+      onClose={onCerrar}
+      title={t('ledger.accountTitle', { account: cuenta })}
+      footer={<Button onClick={onCerrar}>{t('action.close')}</Button>}
+    >
+      {error ? (
+        <Fallo texto={error} />
+      ) : !datos ? (
+        <Cargando />
+      ) : (
+        <div class="space-y-3" data-mayor={cuenta}>
+          <p class="text-text-muted text-sm tabular-nums">
+            {t('ledger.openingBalance', { amount: formatearDinero(datos.saldo_inicial, locale) })}
+          </p>
+          {datos.apuntes.length === 0 ? (
+            <p class="text-text-muted py-6 text-center text-sm">{textoVacio(periodo, t)}</p>
+          ) : (
+            <div class="max-w-full overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-border text-text border-b text-left">
+                    <th scope="col" class="sytue-overline px-2 py-2 font-bold">
+                      {t('ledger.concept')}
+                    </th>
+                    <th scope="col" class="sytue-overline px-2 py-2 text-right font-bold">
+                      {t('ledger.debit')}
+                    </th>
+                    <th scope="col" class="sytue-overline px-2 py-2 text-right font-bold">
+                      {t('ledger.credit')}
+                    </th>
+                    <th scope="col" class="sytue-overline px-2 py-2 text-right font-bold">
+                      {t('balance.balance')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos.apuntes.map((a, i) => (
+                    <tr key={`${a.asiento_id}-${i}`} class="border-border border-b align-top">
+                      <td class="px-2 py-1.5">
+                        <span class="text-text block">{a.concepto || a.ref}</span>
+                        <span class="text-text-subtle font-mono text-xs">
+                          {formatearFecha(a.fecha, locale)} · {a.ref}
+                        </span>
+                      </td>
+                      <td class="text-text px-2 py-1.5 text-right tabular-nums">
+                        {importe(a.debe, locale)}
+                      </td>
+                      <td class="text-text px-2 py-1.5 text-right tabular-nums">
+                        {importe(a.haber, locale)}
+                      </td>
+                      <td class="text-text px-2 py-1.5 text-right font-medium tabular-nums">
+                        {formatearDinero(a.saldo, locale)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p class="text-text text-sm font-medium tabular-nums">
+            {t('ledger.closingBalance', { amount: formatearDinero(datos.saldo_final, locale) })}
+          </p>
+          {datos.recortado ? <p class="text-text-subtle text-xs">{t('ai.truncated')}</p> : null}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export function Balance({ locale, t }: { locale: string; t: T }): JSX.Element {
   const [datos, setDatos] = useState<RespuestaBalance | null>(null);
   const [error, setError] = useState('');
   const [periodo, setPeriodo] = useState<Periodo>('todo');
+  /** La cuenta cuyo mayor está abierto. */
+  const [mayor, setMayor] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -551,7 +658,17 @@ export function Balance({ locale, t }: { locale: string; t: T }): JSX.Element {
           <tbody>
             {cuentas.map((c) => (
               <tr key={c.cuenta} class="border-border border-b">
-                <td class="text-text px-3 py-2 font-mono text-xs">{c.cuenta}</td>
+                <td class="text-text px-3 py-2 font-mono text-xs">
+                  <button
+                    type="button"
+                    class="sytue-focus-ring text-primary-text rounded-control hover:underline"
+                    aria-label={t('ledger.openAccount', { account: c.cuenta })}
+                    title={t('ledger.openAccount', { account: c.cuenta })}
+                    onClick={() => setMayor(c.cuenta)}
+                  >
+                    {c.cuenta}
+                  </button>
+                </td>
                 <td class="text-text px-3 py-2 text-right tabular-nums">
                   {importe(c.debe, locale)}
                 </td>
@@ -584,6 +701,15 @@ export function Balance({ locale, t }: { locale: string; t: T }): JSX.Element {
           </tfoot>
         </table>
       )}
+      {mayor ? (
+        <MayorCuenta
+          cuenta={mayor}
+          periodo={periodo}
+          locale={locale}
+          t={t}
+          onCerrar={() => setMayor(null)}
+        />
+      ) : null}
     </div>
   );
 }

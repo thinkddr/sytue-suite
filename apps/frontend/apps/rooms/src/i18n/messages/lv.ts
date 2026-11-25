@@ -1056,4 +1056,11 @@ export const lv: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Savieno šo lietotni ar savu kontu organizācijā {tenant}. Tavas esošās piekļuves atļaujas paliek spēkā.',
   'nativeResource.approve': 'Savienot',
+  'channel.markRead': 'Atzīmēt kā izlasītu',
+  'channel.copyLink': 'Kopēt saiti',
+  'channel.linkCopied': 'Saite nokopēta',
+  'channel.download': 'Lejupielādēt sarunu',
+  'channel.downloaded': 'Saruna saglabāta',
+  'channel.downloadFailed': 'Sarunu neizdevās saglabāt',
+  'status.nothingUnread': 'Viss jau bija izlasīts',
 };

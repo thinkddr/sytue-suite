@@ -14,13 +14,31 @@
  *
  * No aparece si la organización no ha conectado ningún origen: en ese caso no hay nada
  * que ofrecer, y un botón que siempre falla es peor que ningún botón.
+ *
+ * Un botón por CUENTA, no por conexión: la misma cuenta de Google conectada varias veces
+ * —o para Drive, Meet y Chat además de para migrar— salía como varios «Traerlo de
+ * Google» idénticos. Ahora el servidor unifica (`/migrations/self/origins`), el BFF lo
+ * vuelve a comprobar, y aquí el botón lleva la cuenta cuando hay más de una del mismo
+ * proveedor. Lo que decide sin pintar vive en `importacion.ts`.
  */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button, DataFlow, Icon, Spinner } from '@sytue/ui';
 import type { DataCategory } from '@sytue/ui';
+import { formatDate } from '@sytue/i18n';
 import { useI18n } from '@sytue/i18n/preact';
-import type { ImportDomain, ImportJob, ImportOrigin } from '@sytue/api-clients';
+import { latestImports } from '@sytue/api-clients';
+import type { ImportDomain, ImportJob, ImportOrigin, ImportSource } from '@sytue/api-clients';
+import {
+  MARCA,
+  claveDeFallo,
+  contarTraidos,
+  cuentaDeOrigen,
+  enCurso,
+  esDeOrigen,
+  proveedoresRepetidos,
+  repartir,
+} from './importacion.js';
 
 export interface ImportDataProps {
   /**
@@ -51,7 +69,6 @@ const CATEGORIA: Record<ImportDomain, DataCategory> = {
   contacts: 'contacts',
 };
 
-/** ¿Sigue trabajando? Mientras lo haga se vuelve a preguntar. */
 /**
  * Si la persona lo dejó plegado. Una preferencia de este navegador y para todas las apps:
  * quien ya ha decidido no traer nada no quiere el bloque abierto en cada producto. Sin
@@ -76,8 +93,11 @@ function guardarPlegado(plegado: boolean): void {
   }
 }
 
-function enCurso(jobs: ImportJob[]): boolean {
-  return jobs.some((j) => j.status === 'queued' || j.status === 'running');
+/** El gateway rechazó el lanzamiento con este código (vacío si no dio ninguno). */
+class FalloAlLanzar extends Error {
+  constructor(readonly code: string) {
+    super(code || 'import_failed');
+  }
 }
 
 export function ImportData({
@@ -85,11 +105,12 @@ export function ImportData({
   endpoint = '/api/import',
   onFinished,
 }: ImportDataProps): JSX.Element | null {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [estado, setEstado] = useState<Estado>(VACIO);
   const [cargando, setCargando] = useState(true);
   const [enviando, setEnviando] = useState(false);
-  const [error, setError] = useState('');
+  // El último lanzamiento rechazado, con el código del gateway; `null` si no hubo fallo.
+  const [fallo, setFallo] = useState<{ code: string; source: ImportSource } | null>(null);
   // En el lateral el bloque entero (ayuda, DataFlow, botones) se come media barra, así
   // que se puede plegar a su línea de título.
   const [plegado, setPlegado] = useState(leerPlegado);
@@ -118,7 +139,7 @@ export function ImportData({
         if (!vivo) return;
         const jobs = data.jobs ?? [];
         const antes = trabajaba.current;
-        trabajaba.current = enCurso(jobs);
+        trabajaba.current = jobs.some(enCurso);
         setEstado({ origins: data.origins ?? [], jobs });
         if (antes && !trabajaba.current) onFinished?.();
         if (trabajaba.current) timer = setTimeout(() => void cargar(), 5000);
@@ -138,36 +159,100 @@ export function ImportData({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, domains.join(','), vuelta]);
 
-  async function traer(origin: ImportOrigin): Promise<void> {
+  /**
+   * Lanza la importación de `quiero` desde un origen. El servidor es idempotente: si esa
+   * cuenta y contenido ya tenían un trabajo, devuelve ese —en marcha, o reanudado donde
+   * se quedó— y aquí SUSTITUYE al que había en vez de sumarse a él.
+   */
+  async function traer(origin: Pick<ImportOrigin, 'instanceId' | 'source'>, quiero = domains) {
     if (enviando) return;
     setEnviando(true);
-    setError('');
+    setFallo(null);
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ instanceId: origin.instanceId, source: origin.source, domains }),
+        body: JSON.stringify({
+          instanceId: origin.instanceId,
+          source: origin.source,
+          domains: quiero,
+        }),
       });
-      if (!res.ok) throw new Error(String(res.status));
+      if (!res.ok) {
+        const cuerpo = (await res.json().catch(() => null)) as { code?: unknown } | null;
+        throw new FalloAlLanzar(typeof cuerpo?.code === 'string' ? cuerpo.code : '');
+      }
       const data = (await res.json()) as { jobs?: ImportJob[] };
-      setEstado((e) => ({ ...e, jobs: [...(data.jobs ?? []), ...e.jobs] }));
+      const nuevos = data.jobs ?? [];
+      const ids = new Set(nuevos.map((j) => j.id));
+      setEstado((e) => ({
+        ...e,
+        jobs: latestImports([...nuevos, ...e.jobs.filter((j) => !ids.has(j.id))]),
+      }));
       trabajaba.current = true;
       setVuelta((v) => v + 1);
-    } catch {
-      setError(t('import.failed'));
+    } catch (e) {
+      setFallo({ code: e instanceof FalloAlLanzar ? e.code : '', source: origin.source });
     } finally {
       setEnviando(false);
     }
+  }
+
+  /**
+   * Reintenta lo que falló: un lanzamiento por cuenta con sus contenidos fallidos. Cada
+   * trabajo sigue donde se quedó y vuelve a intentar SOLO lo que no entró.
+   */
+  async function reintentar(fallidos: ImportJob[]): Promise<void> {
+    type Lanzamiento = {
+      origin: Pick<ImportOrigin, 'instanceId' | 'source'>;
+      doms: ImportDomain[];
+    };
+    const porCuenta = new Map<string, Lanzamiento>();
+    for (const j of fallidos) {
+      const o = estado.origins.find((x) => esDeOrigen(j, x)) ?? {
+        instanceId: j.instanceId,
+        source: j.source,
+      };
+      const clave = `${o.source}|${o.instanceId}`;
+      const grupo = porCuenta.get(clave) ?? { origin: o, doms: [] };
+      if (!grupo.doms.includes(j.domain)) grupo.doms.push(j.domain);
+      porCuenta.set(clave, grupo);
+    }
+    for (const { origin, doms } of porCuenta.values()) await traer(origin, doms);
   }
 
   // Sin orígenes conectados no hay nada que ofrecer. Tampoco mientras se averigua: un
   // bloque que aparece y desaparece al cargar da la sensación de que algo se rompió.
   if (cargando || (estado.origins.length === 0 && estado.jobs.length === 0)) return null;
 
-  const trabajando = estado.jobs.filter((j) => j.status === 'queued' || j.status === 'running');
-  const hechos = estado.jobs.filter((j) => j.status === 'done');
-  const fallidos = estado.jobs.filter((j) => j.status === 'error');
+  const { trabajando, hechos, fallidos, libres, variasCuentas } = repartir(
+    estado.origins,
+    estado.jobs,
+    domains,
+  );
+  const repetidos = proveedoresRepetidos(estado.origins);
+  /** «Traerlo de Google», y «· acme.com» detrás si hay más de una cuenta de Google. */
+  const rotulo = (o: ImportOrigin): string => {
+    const base = t(o.source === 'google' ? 'import.fromGoogle' : 'import.fromMicrosoft');
+    return repetidos.has(o.source) ? `${base} · ${cuentaDeOrigen(o)}` : base;
+  };
+  const marca = (o: ImportOrigin): string =>
+    repetidos.has(o.source) ? `${MARCA[o.source]} · ${cuentaDeOrigen(o)}` : MARCA[o.source];
+  /** «Correo», y «· acme.com» detrás si el resumen mezcla cuentas. */
+  const que = (j: ImportJob): string => {
+    const tipo = t(`dataflow.item.${CATEGORIA[j.domain]}`);
+    return variasCuentas && j.accountLabel ? `${tipo} · ${j.accountLabel}` : tipo;
+  };
+  // Las cuentas que no pueden leer se dicen una vez, apagadas y con el motivo.
+  const apagados = libres
+    .filter((o) => o.state !== 'ready')
+    .map((o) => t('import.unavailable', { source: marca(o) }));
+  // Un aviso por motivo distinto, no uno por trabajo: el correo y los contactos de la
+  // misma cuenta caducada son UN problema, y si ya lo dice el origen apagado, sobra.
+  const motivos = [
+    ...new Set(fallidos.map((j) => t(claveDeFallo(j.errorCode), { source: MARCA[j.source] }))),
+  ].filter((m) => !apagados.includes(m));
 
   function alternar(): void {
     const siguiente = !plegado;
@@ -205,59 +290,78 @@ export function ImportData({
             <div class="mt-2 flex items-center gap-2" aria-live="polite">
               <Spinner size={16} />
               <p class="text-text-muted text-xs">
-                {t('import.running', { count: contar(trabajando) })}
+                {t('import.running', { count: contarTraidos(trabajando) })}
               </p>
             </div>
           ) : (
             <>
               <p class="text-text-muted mt-0.5 text-xs">{t('import.help')}</p>
               <DataFlow compact class="mt-2" incoming={domains.map((d) => CATEGORIA[d])} />
-              <div class="mt-2 flex flex-wrap gap-2">
-                {estado.origins.map((o) => (
-                  <Button
-                    key={o.instanceId}
-                    size="sm"
-                    variant="secondary"
-                    disabled={enviando}
-                    onClick={() => void traer(o)}
-                  >
-                    {t(o.source === 'google' ? 'import.fromGoogle' : 'import.fromMicrosoft')}
-                  </Button>
-                ))}
-              </div>
             </>
           )}
+          {/* Las cuentas con una importación en marcha no se ofrecen otra vez: el
+              servidor devolvería la misma, y un botón que no hace nada confunde. */}
+          {libres.length > 0 ? (
+            <div class="mt-2 flex flex-wrap gap-2">
+              {libres.map((o) => (
+                <Button
+                  key={o.instanceId}
+                  size="sm"
+                  variant="secondary"
+                  disabled={enviando || o.state !== 'ready'}
+                  onClick={() => void traer(o)}
+                >
+                  {rotulo(o)}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {apagados.map((m) => (
+            <p key={m} class="text-text-muted mt-2 text-xs">
+              {m}
+            </p>
+          ))}
 
           {/* El recuento va SIEMPRE, también cuando termina: «traído» a secas no dice si
           llegó todo, y saber cuántos elementos se quedaron fuera es la mitad honesta
-          del informe. */}
-          {hechos.length > 0 ? (
-            <p class="sytue-meta mt-2">
-              {t('import.done', { count: contar(hechos), skipped: contarOmitidos(hechos) })}
+          del informe. Una línea por contenido, con lo acumulado y cuándo terminó. */}
+          {hechos.map((j) => (
+            <p key={j.id} class="sytue-meta mt-2">
+              {t('import.done', {
+                what: que(j),
+                count: j.migrated,
+                skipped: j.skipped,
+                date: formatDate(locale, j.finishedAt ?? j.createdAt),
+              })}
             </p>
-          ) : null}
+          ))}
           {fallidos.length > 0 ? (
-            <p class="text-danger-text mt-2 text-xs" role="alert">
-              {t('import.someFailed')}
-            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-2" role="alert">
+              {motivos.map((m) => (
+                <p key={m} class="text-danger-text text-xs">
+                  {m}
+                </p>
+              ))}
+              {/* Reintentar sigue donde se quedó: solo vuelve a intentar lo que no entró. */}
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={enviando || trabajando.length > 0}
+                onClick={() => void reintentar(fallidos)}
+              >
+                {t('action.retry')}
+              </Button>
+            </div>
           ) : null}
-          {error ? (
+          {fallo !== null ? (
             <p class="text-danger-text mt-2 text-xs" role="alert">
-              {error}
+              {claveDeFallo(fallo.code) === 'import.unavailable'
+                ? t('import.unavailable', { source: MARCA[fallo.source] })
+                : t('import.failed')}
             </p>
           ) : null}
         </>
       )}
     </section>
   );
-}
-
-/** Total de elementos traídos por una tanda de trabajos. */
-function contar(jobs: ImportJob[]): number {
-  return jobs.reduce((n, j) => n + j.migrated, 0);
-}
-
-/** Total de elementos que NO se pudieron traer. */
-function contarOmitidos(jobs: ImportJob[]): number {
-  return jobs.reduce((n, j) => n + j.skipped, 0);
 }

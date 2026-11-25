@@ -358,4 +358,10 @@ export const ro: AppCatalog<typeof en> = {
   'relation.coworker': 'Coleg',
   'relation.emergency': 'Urgență',
   'relation.other': 'Alta',
+  'batch.copyEmails': 'Copiați adresele de e-mail',
+  'batch.emailsCopied': 'Adrese de e-mail copiate',
+  'birthdays.anniversary': 'Aniversare',
+  'list.sortByLastName': 'Sortați după nume',
+  'list.sortByFirstName': 'Sortați după prenume',
+  'detail.shareByEmail': 'Partajați prin e-mail',
 };

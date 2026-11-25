@@ -60,7 +60,8 @@ export function opcionesDePosponer(ahora: Date): { opcion: OpcionDePosponer; fec
   return out;
 }
 
-const ROTULOS = {
+/** Rótulo de cada fecha fija; el redactor lo usa también para «Programar envío». */
+export const ROTULOS = {
   laterToday: 'snooze.laterToday',
   tomorrow: 'snooze.tomorrow',
   weekend: 'snooze.weekend',

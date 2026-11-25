@@ -344,6 +344,13 @@ func (a *App) archivo(ab *abierta, id string, escribe bool) {
 	ctx.Exportar = func(f string) { a.exportar(ab, id, f) }
 	ctx.ExportarPlantilla = func(f string) { a.exportarCon(ab, id, f, true) }
 	ctx.Imprimir = func() { a.exportar(ab, id, editor.FormatoImprimir) }
+	// Las notas del orador se escriben aquí, del modelo vivo, como en la web: valen sin red.
+	ctx.DescargarNotas = func() {
+		texto := NotasComoTexto(ab.ed.Modelo().Diapos, func(n int) string {
+			return ctx.Traducir("slides.number", i18n.Vars{"n": n})
+		})
+		srv.GuardarLocal(api.NombreDescarga(ctx.Titulo)+".txt", []byte(texto))
+	}
 	ctx.Versiones = func(listo func([]api.DocVersion)) { srv.Versiones(id, listo) }
 	// «Hacer una copia», con cualquier papel, como la web: guarda lo pendiente y la abre.
 	ctx.HacerCopia = func(listo func()) {

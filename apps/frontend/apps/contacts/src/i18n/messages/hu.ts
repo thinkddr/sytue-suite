@@ -329,4 +329,10 @@ export const hu: AppCatalog<typeof en> = {
   'relation.coworker': 'Munkatárs',
   'relation.emergency': 'Vészhelyzeti',
   'relation.other': 'Egyéb',
+  'batch.copyEmails': 'E-mail-címek másolása',
+  'batch.emailsCopied': 'E-mail-címek kimásolva',
+  'birthdays.anniversary': 'Évforduló',
+  'list.sortByLastName': 'Rendezés vezetéknév szerint',
+  'list.sortByFirstName': 'Rendezés utónév szerint',
+  'detail.shareByEmail': 'Megosztás e-mailben',
 };

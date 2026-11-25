@@ -1099,4 +1099,11 @@ export const fr: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Connectez cette app à votre compte dans {tenant}. Vos autorisations actuelles sont conservées.',
   'nativeResource.approve': 'Connecter',
+  'channel.markRead': 'Marquer comme lu',
+  'channel.copyLink': 'Copier le lien',
+  'channel.linkCopied': 'Lien copié',
+  'channel.download': 'Télécharger la conversation',
+  'channel.downloaded': 'Conversation enregistrée dans',
+  'channel.downloadFailed': 'Impossible d’enregistrer la conversation',
+  'status.nothingUnread': 'Tout était déjà lu',
 };

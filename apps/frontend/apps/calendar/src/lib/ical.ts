@@ -40,6 +40,9 @@ export function normalizeWeekdays(days: readonly string[]): Weekday[] {
   return WEEKDAYS.filter((d) => days.includes(d));
 }
 
+/** Cómo cuenta un evento en la disponibilidad: ocupado (lo de siempre) o disponible. */
+export type Transp = 'OPAQUE' | 'TRANSPARENT';
+
 export interface EventInput {
   uid: string;
   summary: string;
@@ -98,6 +101,13 @@ export interface EventInput {
    * guardarla. `recurrence` manda si vienen las dos.
    */
   rruleRaw?: string | undefined;
+  /**
+   * «Mostrar como» (TRANSP, RFC 5545 §3.8.2.7): 'TRANSPARENT' es «disponible» y el
+   * evento no cuenta como ocupado en free/busy ni en «buscar hueco» (los dos los
+   * calcula el servicio con `CountsAsBusy`). Sin valor, el guardado no toca el TRANSP
+   * que traiga el recurso: un arrastre no sabe de esto y no debe borrarlo.
+   */
+  transp?: Transp | undefined;
   /**
    * El usuario no ha tocado la repetición. Al editar un recurso que ya existe, el BFF
    * conserva entonces la RRULE guardada byte a byte; sin esto, que no venga
@@ -252,6 +262,9 @@ export function buildVevent(input: EventInput): string {
   }
 
   lines.push(`SUMMARY:${escapeText(input.summary)}`);
+  // OPAQUE es el valor por defecto del RFC: solo se escribe el «disponible», así un
+  // evento normal sale igual que siempre y volver a «ocupado» es quitar la línea.
+  if (input.transp === 'TRANSPARENT') lines.push('TRANSP:TRANSPARENT');
   if (input.location) lines.push(`LOCATION:${escapeText(input.location)}`);
   if (input.description) lines.push(`DESCRIPTION:${escapeText(input.description)}`);
 
@@ -412,6 +425,17 @@ export function parseColor(ical: string): string | undefined {
   if (apple?.[1]) return apple[1];
   const named = ical.match(/^COLOR[^:\r\n]*:\s*([a-zA-Z]{1,40})\s*$/im);
   return named?.[1];
+}
+
+/**
+ * «Mostrar como» del maestro: 'TRANSPARENT' si el evento se marcó como disponible y,
+ * en cualquier otro caso (sin TRANSP, OPAQUE o algo ilegible), 'OPAQUE', que es lo
+ * que el servicio cuenta como ocupado.
+ */
+export function parseTransp(ical: string | undefined): Transp {
+  if (!ical) return 'OPAQUE';
+  const v = propLines(maestro(ical), 'TRANSP')[0]?.value.toUpperCase();
+  return v === 'TRANSPARENT' ? 'TRANSPARENT' : 'OPAQUE';
 }
 
 /**
@@ -785,6 +809,9 @@ export function fundirVevent(original: string, input: EventInput): string {
 
   const gestionadas = new Set(GESTIONADAS);
   if (!input.recurrenceUnchanged) gestionadas.add('RRULE');
+  // «Mostrar como» solo manda cuando el formulario lo dice: el arrastre no lo lleva y
+  // tiene que conservar el TRANSP que hubiera (de este formulario o de Apple/Outlook).
+  if (input.transp) gestionadas.add('TRANSP');
   const esGestionada = (l: Linea): boolean =>
     l.nombre === 'CONFERENCE' ? esConferenciaWeb(l) : gestionadas.has(l.nombre);
   const mismoValor = (a: Linea, b: Linea): boolean => {

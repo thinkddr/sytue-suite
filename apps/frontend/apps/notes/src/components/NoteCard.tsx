@@ -30,12 +30,15 @@ import {
   Checkbox,
   useUltimo,
   formatBytes,
+  copiarAlPortapapeles,
+  useToast,
 } from '@sytue/ui';
 import { documentLocale } from '@sytue/i18n';
 import type { Note, NoteLink, Reminder } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
 import { Glyph, type GlyphName } from './glyphs.js';
-import { conAnclas, destinoInterno, type DestinoInterno } from '../client/enlaces.js';
+import { conAnclas, destinoInterno, urlDeNota, type DestinoInterno } from '../client/enlaces.js';
+import { textoParaCopiar } from '../client/copiarNota.js';
 import { conHashtags, conMenciones } from '../client/hashtags.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
 import { RichText } from './RichText.js';
@@ -499,6 +502,15 @@ export function NoteCard({
   // En el diario un texto sin título es la fila entera: su cuerpo va en la línea del
   // glifo, sin el «Sin título» que se repetiría en cada captura.
   const enLinea = diario && !titulo && note.kind === 'text' && !bloqueado && !renombrando;
+  // «Copiar enlace» y «Copiar el texto»: al portapapeles y un aviso que lo dice (o que
+  // no se ha podido, que el portapapeles puede negarse).
+  const toast = useToast();
+  const copiar = async (texto: string, hecho: 'note.linkCopied' | 'note.textCopied') => {
+    const ok = await copiarAlPortapapeles(texto);
+    toast.notify(
+      ok ? { tone: 'success', title: t(hecho) } : { tone: 'danger', title: t('note.copyFailed') },
+    );
+  };
   // Un separador (`---`) es solo su raya: sin viñeta y sin editor que abrir.
   const separador = enLinea && !editando && /^\s*<hr\s*\/?>\s*$/i.test(contenido);
   const cuerpo = bloqueado ? (
@@ -807,6 +819,33 @@ export function NoteCard({
               <MenuItem onClick={() => fileInputRef.current?.click()}>{t('note.attach')}</MenuItem>
             ) : null}
             {onInfo ? <MenuItem onClick={onInfo}>{t('note.info')}</MenuItem> : null}
+            {/* Copiar sin abrir nada: el ENLACE a esta nota (solo ids: abre a quien ya
+                puede leerla, y nada más) y su TEXTO, para pegarlo en un correo o en un
+                chat. El texto solo con la nota legible: de una cifrada y cerrada no
+                hay nada que copiar. */}
+            {enlaces ? (
+              <MenuItem
+                onClick={() =>
+                  void copiar(
+                    urlDeNota(enlaces.publicBase, enlaces.notebookId, note.id),
+                    'note.linkCopied',
+                  )
+                }
+              >
+                {t('note.copyLink')}
+              </MenuItem>
+            ) : null}
+            {!bloqueado ? (
+              <MenuItem
+                onClick={() =>
+                  void textoParaCopiar(titulo, contenido).then((txt) =>
+                    copiar(txt, 'note.textCopied'),
+                  )
+                }
+              >
+                {t('note.copyText')}
+              </MenuItem>
+            ) : null}
             {onVersions && !soloLectura ? (
               <MenuItem onClick={onVersions}>{t('note.versions')}</MenuItem>
             ) : null}

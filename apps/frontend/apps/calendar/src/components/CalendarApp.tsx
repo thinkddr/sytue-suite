@@ -39,7 +39,7 @@ import {
   ToastProvider,
   cx,
   useScrollRestante,
-  MobileFab,
+  BotonFlotante,
   SidebarAction,
   SidebarItem,
   SidebarSection,
@@ -102,6 +102,7 @@ import {
   parseAttendees,
   parseColor,
   parseRecurrence,
+  parseTransp,
   rruleCruda,
   tieneRepeticion,
 } from '../lib/ical.js';
@@ -127,10 +128,12 @@ import {
   leerAjustes,
   leerOcultos,
   leerVista,
+  ocultoPorRechazo,
   visiblesTrasCarga,
   type AjustesCalendario,
 } from '../lib/preferencias.js';
 import { CalendarSettings } from './CalendarSettings.js';
+import { Disponibilidad } from './Disponibilidad.js';
 import { useT } from '../i18n/index.js';
 import { I18nProvider } from '@sytue/i18n/preact';
 import { colorDeUsuario } from '@sytue/config';
@@ -327,6 +330,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   });
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
+  // «Compartir mi disponibilidad» (Disponibilidad.tsx).
+  const [disponibilidadOpen, setDisponibilidadOpen] = useState(false);
   // Solo los administradores del tenant dan de alta/gestionan salas y recursos.
   const canManageResources = user.roles.includes('admin') || user.roles.includes('owner');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -547,7 +552,10 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     const merged: GridEvent[] = [];
     for (const c of allCalendars) {
       if (!visible.has(c.url)) continue;
-      for (const ev of byCal[c.url] ?? [])
+      for (const ev of byCal[c.url] ?? []) {
+        // «Mostrar los eventos que he rechazado» apagado: lo dicho que no fuera de la
+        // vista. Siguen en el calendario (y en la búsqueda) por si se cambia de idea.
+        if (ocultoPorRechazo(ajustes, ev.ical, user.email)) continue;
         // Color POR evento (X-APPLE-CALENDAR-COLOR/COLOR del VEVENT) si lo tiene;
         // si no, el color del calendario de origen. readOnly marca los eventos de
         // una suscripción ICS (no arrastrables/editables). Se pinta con el tono de la
@@ -560,11 +568,12 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           calendarUrl: c.url,
           readOnly: c.readOnly || offline,
         });
+      }
     }
     return merged;
     // `visible` se relee vía `visibleKey` (recomputa al cambiar la selección).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventsByCal, visibleKey, allCalendars, rangeKey, offline]);
+  }, [eventsByCal, visibleKey, allCalendars, rangeKey, offline, ajustes.rechazados]);
 
   /** Invalida la cache y relanza la carga (tras guardar/borrar un evento). */
   function reload(): void {
@@ -797,6 +806,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       description: event.description,
       color: event.ical ? parseColor(event.ical) : undefined,
       conferenceUrl: event.conferenceUrl,
+      transp: parseTransp(event.ical),
       recurrence,
       ...(rruleRaw ? { rruleRaw } : {}),
       invitees,
@@ -968,18 +978,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
   const sidebar = (
     <Sidebar
-      header={
-        <Button
-          fullWidth
-          variant="primary"
-          leadingIcon={<Icon name="plus" />}
-          disabled={offline}
-          title={t('header.shortcut', { label: t('nav.createEvent'), key: 'C' })}
-          onClick={() => openCreate(cursor)}
-        >
-          {t('nav.createEvent')}
-        </Button>
-      }
+      // Sin «Crear evento» en la cabecera: es el «+» flotante, en todos los anchos (ver el
+      // `BotonFlotante` de abajo). Producto pidió un solo control (2026-11-25).
       // «Trae tus calendarios»: la migración solo tenía puerta en la consola de
       // administración, y quien estrena Sytue con la agenda vacía no va a buscarla ahí.
       // Se pinta solo si la organización tiene conectado un origen.
@@ -1230,8 +1230,14 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           </ul>
         </div>
       ) : null}
-      {/* Una sola puerta a la página de ajustes, como en Mail (design.md §8.4). */}
+      {/* Una sola puerta a la página de ajustes, como en Mail (design.md §8.4). Encima,
+          «Compartir mi disponibilidad»: es de leer tu agenda, así que vale sin red. */}
       <SidebarSection>
+        <SidebarItem
+          label={t('availability.open')}
+          icon={<Icon name="clock" size={18} />}
+          onClick={() => setDisponibilidadOpen(true)}
+        />
         <SidebarItem
           label={t('nav.settings')}
           active={ajustesOpen}
@@ -1271,10 +1277,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                   t={t}
                   locale={locale}
                   hoy={new Date()}
-                  cursor={cursor}
-                  offline={offline}
                   onHoy={() => setCursor(new Date())}
-                  onCrear={() => openCreate(cursor)}
                 />
               ),
               // Lo pendiente del cajón (recordatorios e invitaciones), que en el
@@ -1416,7 +1419,11 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
             />
           ) : null}
 
-          <div class="min-h-0 flex-1 overflow-auto">
+          {/* Con los ajustes, lo que desplaza es esto: les deja al final el hueco del «+»
+              flotante. Con la rejilla no, que mide la altura entera y desplaza por dentro
+              (la semana y la agenda dejan su hueco ahí); el mes no desplaza, y el «+» se
+              queda sobre la esquina del último día, que se abre pulsando su número. */}
+          <div class={cx('min-h-0 flex-1 overflow-auto', ajustesOpen && 'sytue-reserva-flotante')}>
             {ajustesOpen ? (
               <CalendarSettings
                 t={t}
@@ -1529,15 +1536,16 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           </div>
         </div>
       </AppShell>
-      {/* Crear evento al alcance del pulgar: en móvil el menú lateral es un cajón cerrado.
-          En el mes del teléfono no: ahí crear es el «+» de la barra. */}
-      {offline || compacto ? null : (
-        <MobileFab
-          // Lo mismo que la cabecera: en el mes por debajo de 640 solo asomaría el primer
-          // instante, antes de que `useEstrecha` resuelva.
-          class={mode === 'month' ? 'max-sm:hidden' : ''}
+      {/* «Crear evento» es el «+» flotante, abajo a la derecha y en todos los anchos: al
+          alcance del pulgar en el teléfono, donde el menú lateral es un cajón cerrado, y
+          el mismo sitio en escritorio. También en el mes del teléfono, donde era un «+» de
+          la barra: crea en el día elegido, que es el cursor. Sin red no se ofrece. El
+          atajo, en el tooltip y no en el nombre accesible: un lector de pantalla no navega
+          por teclas de una sola letra. */}
+      {offline ? null : (
+        <BotonFlotante
           label={t('nav.createEvent')}
-          icon={<Icon name="plus" size={24} />}
+          title={t('header.shortcut', { label: t('nav.createEvent'), key: 'C' })}
           onClick={() => openCreate(cursor)}
         />
       )}
@@ -1549,6 +1557,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         calendars={eventTargets}
         editing={modal.editing}
         recordatorioPorDefecto={ajustes.recordatorio}
+        ocupados={shownEvents}
+        miCorreo={user.email}
         onClose={() => setModal({ open: false, editing: null })}
         onSaved={reload}
       />
@@ -1571,6 +1581,14 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       <ShareCalendarModal t={t} calendar={sharingCal} onClose={() => setSharingCal(null)} />
 
       <ResourcesModal t={t} open={resourcesOpen} onClose={() => setResourcesOpen(false)} />
+
+      <Disponibilidad
+        t={t}
+        locale={locale}
+        open={disponibilidadOpen}
+        ajustes={ajustes}
+        onClose={() => setDisponibilidadOpen(false)}
+      />
 
       <IrAFecha
         t={t}

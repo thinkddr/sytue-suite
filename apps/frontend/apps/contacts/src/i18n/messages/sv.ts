@@ -329,4 +329,10 @@ export const sv: AppCatalog<typeof en> = {
   'relation.coworker': 'Kollega',
   'relation.emergency': 'Nödkontakt',
   'relation.other': 'Annan',
+  'batch.copyEmails': 'Kopiera e-postadresserna',
+  'batch.emailsCopied': 'E-postadresserna kopierades',
+  'birthdays.anniversary': 'Årsdag',
+  'list.sortByLastName': 'Sortera efter efternamn',
+  'list.sortByFirstName': 'Sortera efter förnamn',
+  'detail.shareByEmail': 'Dela via e-post',
 };

@@ -51,8 +51,19 @@ const AUTO_TEMPLATES = [
   { key: 'google' as const, templateKey: 'google-workspace' },
   { key: 'github' as const, templateKey: 'github' },
 ].filter((tpl) => enabledCatalogKeys.has(tpl.templateKey));
+// Con varias conexiones de la misma plantilla se elige la que ya tiene credencial, y
+// entre esas la activa. Antes se cogía la primera de la lista —la más nueva—, que podía
+// ser un borrador de un intento abandonado: el asistente ofrecía «Conectar», y
+// autorizarlo dejaba la MISMA cuenta conectada dos veces.
+const rango = (i: { status: string; hasSecrets: boolean }) =>
+  (i.hasSecrets ? 2 : 0) + (i.status === 'active' ? 1 : 0);
 const autoSources = AUTO_TEMPLATES.map((tpl) => {
-  const inst = connected.data.find((i) => i.templateKey === tpl.templateKey);
+  const inst = connected.data
+    .filter((i) => i.templateKey === tpl.templateKey)
+    .reduce<(typeof connected.data)[number] | undefined>(
+      (mejor, i) => (!mejor || rango(i) > rango(mejor) ? i : mejor),
+      undefined,
+    );
   return {
     ...tpl,
     ...(inst ? { instanceId: inst.id } : {}),

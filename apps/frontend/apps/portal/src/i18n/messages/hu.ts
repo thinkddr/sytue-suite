@@ -765,4 +765,17 @@ export const hu: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Nem sikerült további találatokat betölteni. Próbáld újra.',
   'privacy.notice':
     'Nem adjuk el az adatait, és nem adjuk át harmadik feleknek. Nem használjuk profilalkotásra, hirdetésre, sem szolgáltatásaink vagy bárki máséinak betanítására vagy fejlesztésére. Átvitel közben és nyugalmi állapotban is titkosítva vannak, és csak a számlázáshoz feltétlenül szükséges mértékben, valamint az Ön által bekapcsolt integrációkban hagyják el európai infrastruktúránkat; ott a harmadik fél jóváhagyást kér az általa használt adatokra.',
+  'inbox.markAllOf': '{app} olvasottnak jelölése',
+  'inbox.markUnread': 'Megjelölés olvasatlanként',
+  'inbox.muteLikeThis': 'Az ilyen értesítések némítása',
+  'inbox.mutedLikeThis':
+    'Ilyen értesítéseket többé nem kap. Ezt lent, a „Mit szeretne kapni” részben módosíthatja.',
+  'inbox.muteFailed': 'Nem sikerült némítani. Próbálja újra.',
+  'inbox.actionsOf': 'Műveletek: „{title}”',
+  'downloads.checksum': 'Letöltés ellenőrzése',
+  'downloads.checksumHelp':
+    'Az SHA-256 ujjlenyomata. Számítsa ki a letöltött fájlét, és ellenőrizze, hogy egyeznek-e.',
+  'downloads.checksumLabel': 'SHA-256 ujjlenyomat',
+  'downloads.copyChecksum': 'Ujjlenyomat másolása',
+  'downloads.checksumCopied': 'Ujjlenyomat kimásolva',
 };

@@ -140,6 +140,7 @@ function HomeAppBody({ locale, user, hubBaseUrl }: Props): JSX.Element {
         <SectionHeader
           level={1}
           title={t('home.title')}
+          // «Subir» ya no va aquí: es el «+» flotante de `Marco`, en todos los anchos.
           actions={
             <div class="hidden gap-2 sm:flex">
               <Button
@@ -148,13 +149,6 @@ function HomeAppBody({ locale, user, hubBaseUrl }: Props): JSX.Element {
                 leadingIcon={<Icon name="emitir" size={16} />}
               >
                 {t('nav.studio')}
-              </Button>
-              <Button
-                variant="primary"
-                href={ruta('/upload')}
-                leadingIcon={<Icon name="upload" size={16} />}
-              >
-                {t('nav.upload')}
               </Button>
             </div>
           }

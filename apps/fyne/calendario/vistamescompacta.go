@@ -155,18 +155,16 @@ func (p *Pantalla) medirVentana(ancho float32) {
 // invitaciones sin contestar. En el teléfono ya no se ven en ninguna cabecera.
 func (p *Pantalla) pendientesMenu() int { return len(p.Recordatorios) + p.Invitaciones }
 
-// accionesBarraCompacta son «Hoy» con forma de hoja y «+» sobre el día elegido.
+// accionesBarraCompacta es «Hoy» con forma de hoja. Crear en el día elegido era otro «+»
+// aquí; ahora es el «+» flotante de toda la suite (`capaFlotante`), abajo a la derecha.
 func (p *Pantalla) accionesBarraCompacta() []fyne.CanvasObject {
-	l, hoy, cursor := p.locale(), p.ahora(), p.Cursor.In(p.zona())
+	l, hoy := p.locale(), p.ahora()
 	h := nuevoBotonHoyHoja(hoy.Day(), p.t("grid.todayLabel", i18n.Vars{"date": i18n.FormatDayMonthLong(l, hoy)}), func() {
 		if p.AlIrHoy != nil {
 			p.AlIrHoy()
 		}
 	})
-	mas := ui.NuevoBotonBarraMovil(iconos.Mas, p.t("nav.createEventOn", i18n.Vars{"date": i18n.FormatDayMonthLong(l, cursor)}), p.crearHoy)
-	mas.TamIcono = 20 // `<Icon name="plus" size={20} />`
-	mas.Inerte = p.SinConexion
-	return []fyne.CanvasObject{h, mas}
+	return []fyne.CanvasObject{h}
 }
 
 // claveCompacta es todo lo que decide la vista del mes del teléfono: si un repintado da
@@ -266,7 +264,9 @@ func (p *Pantalla) construirMesCompacta() fyne.CanvasObject {
 		m.arrancar()
 		return container.NewStack(fondo, cuerpo)
 	}
-	desplazar, vista := desplazable(container.NewStack(fondo, cuerpo))
+	// Con el hueco del «+» flotante al final: el último evento del día se baja por encima
+	// de él (`sytue-reserva-flotante` en la lista de MesCompacto.tsx).
+	desplazar, vista := desplazable(container.NewStack(fondo, ui.ConReservaFlotante(cuerpo)))
 	m.desplazar = desplazar
 	m.alCambiarAlto = func() {
 		cuerpo.Refresh()

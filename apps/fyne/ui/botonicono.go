@@ -303,7 +303,7 @@ func (b *BotonIcono) Tapped(*fyne.PointEvent) {
 	// Pulsar descarta la ayuda, como el `onPointerDown` de Tooltip.tsx: ya se ha
 	// elegido, y si la pulsación abre un menú o cambia de pantalla la burbuja se
 	// quedaría encima, o huérfana en el portal. Volver a enfocarlo la abre otra vez.
-	b.ayudaAbierta().alEscape()
+	b.ayudaAbierta().alPulsar()
 }
 
 // MouseIn y MouseOut son `:hover`.

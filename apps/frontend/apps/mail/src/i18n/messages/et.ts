@@ -961,4 +961,14 @@ export const et: AppCatalog<typeof en> = {
     'Eelmine postisüsteem ei ole enam saadaval. Kuni sa oma posti hoidlasse ei vii, ei saa sa uut posti: vahepeal sulle saadetud kirjad ootavad saatja serveris, mis proovib mõne päeva jooksul uuesti. Kui viid posti õigel ajal üle, jõuavad need sinuni hiljem; kui mitte, saab saatja teate, et kirju ei õnnestunud kohale toimetada. Seda, mis on juba eelmise süsteemiga krüptitud, nagu sinu senist posti, ei saa lugeda: seda ei kustutata, kuid keegi ei saa seda avada. Pärast üleviimist hakkab post jälle saabuma ja avaneb nagu teised rakendused sinu Sytue ID sisselogimisega.',
   'privateMail.vaultMoveCheckFailed':
     'Sinu posti olekut ei õnnestunud kontrollida. Proovi hetke pärast uuesti.',
+  'shortcuts.goInbox': 'Ava Sisendkaust',
+  'shortcuts.goSent': 'Ava Saadetud',
+  'shortcuts.goDrafts': 'Ava Mustandid',
+  'shortcuts.goArchive': 'Ava Arhiiv',
+  'compose.sendAndArchive': 'Saada ja arhiveeri',
+  'reader.copyAddress': 'Kopeeri aadress',
+  'reader.addressCopied': 'Aadress kopeeritud',
+  'reader.copyAddressFailed': 'Aadressi ei õnnestunud kopeerida',
+  'reader.viewPlain': 'Näita lihttekstina',
+  'reader.viewFormatted': 'Näita vorminguga',
 };

@@ -363,4 +363,8 @@ export const de: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Von der öffentlichen Seite entfernen',
   'moderation.action.unpublish': 'Veröffentlichung aufheben',
   'moderation.action.block': 'Person in der Organisation blockieren',
+  'player.loop': 'Wiederholen',
+  'watch.chapters': 'Kapitel',
+  'watch.jumpTo': 'Zu {time} springen',
+  'share.startAt': 'Bei {time} beginnen',
 };

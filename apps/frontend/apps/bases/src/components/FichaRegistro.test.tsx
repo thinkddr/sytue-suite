@@ -153,3 +153,36 @@ test('quien solo lee ve los valores y nada que escriba', () => {
   expect(boton('grid.deleteRecord:2')).toBeUndefined();
   expect(boton('common.close')).toBeDefined();
 });
+
+const porNombre = (nombre: string) =>
+  document.querySelector<HTMLButtonElement>(`button[aria-label="${nombre}"]`);
+
+test('las flechas pasan al registro de al lado llevando lo cambiado, y se apagan sin vecino', () => {
+  const idas: [number, Record<string, BasesValue>][] = [];
+  montar({
+    onIr: (paso, datos) => idas.push([paso, datos]),
+    hayAnterior: false,
+    haySiguiente: true,
+  });
+  expect(porNombre('record.previous')?.disabled).toBe(true);
+  escribir(campoDe('Nombre') as HTMLInputElement, 'Eva');
+  act(() => porNombre('record.next')!.click());
+  expect(idas).toEqual([[1, { nom: 'Eva' }]]);
+  // Un valor que no encaja no deja pasar: se corrige antes.
+  escribir(campoDe('Edad') as HTMLInputElement, 'treinta');
+  act(() => porNombre('record.next')!.click());
+  expect(idas.length).toBe(1);
+});
+
+test('duplicar es de quien escribe y no se ofrece en un registro recién creado', () => {
+  const copias: number[] = [];
+  montar({ onDuplicar: () => copias.push(1) });
+  act(() => boton('record.duplicate')!.click());
+  expect(copias).toEqual([1]);
+  render(null, document.body);
+  montar({ onDuplicar: () => copias.push(1), nuevo: true });
+  expect(boton('record.duplicate')).toBeUndefined();
+  render(null, document.body);
+  montar({ onDuplicar: () => copias.push(1), puedeEditar: false });
+  expect(boton('record.duplicate')).toBeUndefined();
+});

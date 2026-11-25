@@ -189,6 +189,10 @@ type Descargas struct {
 
 	AlDescargar  func(api.Instalador)
 	AlReintentar func()
+	// AlCopiarHuella lleva al portapapeles la huella SHA-256 de un instalador, para
+	// comprobar a mano lo que se ha bajado por otro camino (la web la enseña en un
+	// `<details>` «Comprobar la descarga»). Sin huella en el catálogo, no hay enlace.
+	AlCopiarHuella func(api.Instalador)
 }
 
 var _ fyne.Widget = (*Descargas)(nil)
@@ -225,6 +229,8 @@ type tarjetaDescarga struct {
 	caja         *ui.Caja
 	nombre, meta *ui.Parrafo
 	enlace       *ui.Enlace
+	// huella es «Copiar la huella» bajo el enlace (`mt-2`); nil sin huella.
+	huella *ui.Enlace
 }
 
 // filaDescarga es una de la lista: el nombre recortado, la línea gris y el enlace.
@@ -232,6 +238,8 @@ type filaDescarga struct {
 	nombre, meta *canvas.Text
 	completo     string
 	enlace       *ui.Enlace
+	// huella es «Copiar la huella», a la izquierda del enlace; nil sin huella.
+	huella *ui.Enlace
 }
 
 type descargasRenderer struct {
@@ -274,6 +282,21 @@ func (r *descargasRenderer) enlace(i api.Instalador) *ui.Enlace {
 		e.Inerte = d.Bajando[i.Fichero]
 		e.Refresh()
 	}
+	return e
+}
+
+// huella es el enlace «Copiar la huella» de un instalador con suma en el catálogo.
+func (r *descargasRenderer) huella(i api.Instalador) *ui.Enlace {
+	d := r.d
+	if i.SHA256 == "" || d.AlCopiarHuella == nil {
+		return nil
+	}
+	e := ui.NuevoEnlace(d.T.T("downloads.copyChecksum", nil), tema.TextoXS, ui.Normal, "text-muted", func() {
+		d.AlCopiarHuella(i)
+	})
+	e.Liso = true
+	// Con el producto delante: en la lista serían diez «Copiar la huella» iguales.
+	e.Nombre = d.T.T("downloads.copyChecksum", nil) + " — " + ProductoDeFichero(i.Fichero) + " (" + MetaInstalador(d.T.Locale(), i) + ")"
 	return e
 }
 
@@ -331,9 +354,13 @@ func (r *descargasRenderer) rehacer() {
 				nombre: p(ProductoDeFichero(i.Fichero), tema.TextoRaiz, ui.Medio, "text"),
 				meta:   p(MetaInstalador(d.T.Locale(), i), tema.TextoXS, ui.Normal, "text-subtle"),
 				enlace: r.enlace(i),
+				huella: r.huella(i),
 			}
 			r.tarjetas = append(r.tarjetas, c)
 			r.objetos = append(append(r.objetos, c.caja.Objetos()...), c.nombre, c.meta, c.enlace)
+			if c.huella != nil {
+				r.objetos = append(r.objetos, c.huella)
+			}
 		}
 	}
 	if len(resto) > 0 {
@@ -357,9 +384,13 @@ func (r *descargasRenderer) rehacer() {
 				meta:     ui.Texto(MetaInstalador(d.T.Locale(), i), tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
 				completo: nombre,
 				enlace:   r.enlace(i),
+				huella:   r.huella(i),
 			}
 			r.filas = append(r.filas, f)
 			r.objetos = append(r.objetos, f.nombre, f.meta, f.enlace)
+			if f.huella != nil {
+				r.objetos = append(r.objetos, f.huella)
+			}
 		}
 	}
 }
@@ -448,9 +479,20 @@ func (r *descargasRenderer) colocarVacio(x, y, ancho float32, mover bool) float3
 
 // altoTarjeta es su contenido con el borde y el `p-4`.
 func altoTarjeta(c tarjetaDescarga, dentro float32) float32 {
-	return 2*(tema.Borde+RellenoTarjetaDescarga) + ui.AltoParrafo(c.nombre, dentro) +
+	alto := 2*(tema.Borde+RellenoTarjetaDescarga) + ui.AltoParrafo(c.nombre, dentro) +
 		ui.AltoParrafo(c.meta, dentro) + MargenEnlaceTarjeta + ui.MedidaEnlace(c.enlace).Height
+	if c.huella != nil {
+		alto += MargenHuellaDescarga + ui.MedidaEnlace(c.huella).Height
+	}
+	return alto
 }
+
+// MargenHuellaDescarga es el `mt-2` de «Comprobar la descarga» bajo el botón, y
+// HuecoHuellaFila el hueco con el enlace de la fila de la lista.
+const (
+	MargenHuellaDescarga float32 = 2 * 0.25 * tema.Rem
+	HuecoHuellaFila      float32 = 4 * 0.25 * tema.Rem
+)
 
 // colocarTarjetas pone la rejilla de destacadas. Las de una misma fila se estiran al
 // alto de la mayor, que es lo que hace `grid` con su `align-items: stretch`.
@@ -477,6 +519,10 @@ func (r *descargasRenderer) colocarTarjetas(x, y, ancho float32, columnas int, m
 			iy = ponerParrafo(c.nombre, ix, iy, dentro, true)
 			iy = ponerParrafo(c.meta, ix, iy, dentro, true) + MargenEnlaceTarjeta
 			ponerObjeto(c.enlace, ix, iy, ui.MedidaEnlace(c.enlace), true)
+			if c.huella != nil {
+				iy += ui.MedidaEnlace(c.enlace).Height + MargenHuellaDescarga
+				ponerObjeto(c.huella, ix, iy, ui.MedidaEnlace(c.huella), true)
+			}
 		}
 		y += alto
 	}
@@ -512,6 +558,12 @@ func (r *descargasRenderer) colocarLista(x, y, ancho float32, mover bool) float3
 		m := ui.MedidaEnlace(f.enlace)
 		// `min-w-0` a la izquierda y `shrink-0` a la derecha: el nombre se recorta.
 		cabe := max(dentro-m.Width-HuecoFilaDescarga, 0)
+		if f.huella != nil {
+			mh := ui.MedidaEnlace(f.huella)
+			cabe = max(cabe-mh.Width-HuecoHuellaFila, 0)
+			ponerObjeto(f.huella, fx+RellenoFilaDescargaX+dentro-m.Width-HuecoHuellaFila-mh.Width,
+				fy+(altoFilaDescarga-mh.Height)/2, mh, true)
+		}
 		cx, cy := fx+RellenoFilaDescargaX, fy+RellenoFilaDescargaY
 		ui.Truncar(f.nombre, f.completo, tema.TextoRaiz, ui.Medio, cabe)
 		ui.ColocarTexto(f.nombre, tema.TextoRaiz, cx, cy)

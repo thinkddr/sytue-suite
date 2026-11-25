@@ -364,4 +364,8 @@ export const ga: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Bain den leathanach poiblí',
   'moderation.action.unpublish': 'Dífhoilsigh',
   'moderation.action.block': 'Bac an duine san eagraíocht',
+  'player.loop': 'Athsheinn',
+  'watch.chapters': 'Caibidlí',
+  'watch.jumpTo': 'Téigh go {time}',
+  'share.startAt': 'Tosaigh ag {time}',
 };

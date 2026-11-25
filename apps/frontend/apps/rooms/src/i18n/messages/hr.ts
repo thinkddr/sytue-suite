@@ -1040,4 +1040,11 @@ export const hr: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Poveži ovu aplikaciju sa svojim računom u {tenant}. Tvoje postojeće dozvole pristupa ostaju na snazi.',
   'nativeResource.approve': 'Poveži',
+  'channel.markRead': 'Označi kao pročitano',
+  'channel.copyLink': 'Kopiraj poveznicu',
+  'channel.linkCopied': 'Poveznica kopirana',
+  'channel.download': 'Preuzmi razgovor',
+  'channel.downloaded': 'Razgovor spremljen u',
+  'channel.downloadFailed': 'Razgovor nije moguće spremiti',
+  'status.nothingUnread': 'Sve je već bilo pročitano',
 };

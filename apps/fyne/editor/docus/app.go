@@ -390,6 +390,10 @@ func (a *App) cargar(ab *abierto) {
 		// lector); una versión la guarda quien escribe (el servicio pide editor).
 		ctx.Exportar = func(f string) { a.exportar(ab, f) }
 		ctx.ExportarPlantilla = func(f string) { a.exportarCon(ab, f, true) }
+		// El texto sin formato se escribe aquí, del folio vivo, como en la web: vale sin red.
+		ctx.DescargarTexto = func() {
+			a.servicio().GuardarLocal(api.NombreDescarga(ctx.Titulo)+".txt", []byte(ab.folio.TextoPlano()))
+		}
 		ctx.Imprimir = func() { a.exportar(ab, editor.FormatoImprimir) }
 		if api.CanWrite(rol) {
 			ctx.Bloques = &editor.BloquesDoc{

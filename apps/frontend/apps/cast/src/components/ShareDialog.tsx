@@ -9,27 +9,37 @@
  */
 import type { JSX } from 'preact';
 import { useId } from 'preact/hooks';
-import { Button, Icon, Input, Modal, Textarea, useToast } from '@sytue/ui';
+import { useState } from 'preact/hooks';
+import { Button, Checkbox, Icon, Input, Modal, Textarea, useToast } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
+import { duracion } from '../lib/formato.js';
 import { codigoDeInsercion } from '../lib/incrustar.js';
+import { enlaceEn } from '../lib/marcas.js';
 import { rutaPublica } from '../lib/rutas.js';
 import type { Video } from '../lib/tipos.js';
 
 export function ShareDialog({
   t,
   video,
+  segundo = 0,
   abierto,
   cerrar,
 }: {
   t: T;
   video: Video;
+  /** Por dónde iba el vídeo al pulsar «Compartir»: ofrece «Empezar en…» si no es 0. */
+  segundo?: number;
   abierto: boolean;
   cerrar: () => void;
 }): JSX.Element {
   const id = useId();
   const toast = useToast();
+  const [enMomento, setEnMomento] = useState(false);
   const origen = typeof location === 'undefined' ? '' : location.origin;
-  const enlace = origen + rutaPublica(`/watch/${video.id}`);
+  const base = origen + rutaPublica(`/watch/${video.id}`);
+  const momento = Math.floor(segundo);
+  // «Empezar en 1:23»: el mismo enlace con «?t=83», que la página de ver respeta.
+  const enlace = enMomento && momento > 0 ? enlaceEn(base, momento) : base;
   const abierta = video.visibility === 'public' || video.visibility === 'unlisted';
   const codigo = codigoDeInsercion(
     origen + rutaPublica(`/embed/${video.id}`),
@@ -70,6 +80,13 @@ export function ShareDialog({
               {t('share.copyLink')}
             </Button>
           </div>
+          {momento > 0 ? (
+            <Checkbox
+              label={t('share.startAt', { time: duracion(momento * 1000) })}
+              checked={enMomento}
+              onChange={(e: Event) => setEnMomento((e.target as HTMLInputElement).checked)}
+            />
+          ) : null}
           {abierta ? null : <p class="text-text-muted text-xs">{t('share.restricted')}</p>}
         </div>
         <div class="flex flex-col gap-1.5">

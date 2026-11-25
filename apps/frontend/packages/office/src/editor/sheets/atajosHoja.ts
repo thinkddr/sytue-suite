@@ -71,11 +71,44 @@ export function seleccionEntera(
 
 /** Lo que hace la rejilla con una pulsación que no es de la cinta. */
 export type AtajoHoja =
-  'rellenarAbajo' | 'rellenarDerecha' | 'hoy' | 'fila' | 'columna' | 'ayuda' | 'irA';
+  | 'rellenarAbajo'
+  | 'rellenarDerecha'
+  | 'hoy'
+  | 'fila'
+  | 'columna'
+  | 'ayuda'
+  | 'irA'
+  | 'autosuma'
+  | 'hojaSiguiente'
+  | 'hojaAnterior'
+  | FormatoDeAtajo;
+
+/**
+ * Los formatos de número con teclado, por la TECLA y no por el carácter (Control+Mayús+1,
+ * 3, 4 y 5, los de Sheets): «!», «#», «$» y «%» no caen en el mismo sitio en un teclado
+ * español que en uno inglés, y lo que se recuerda es la cifra. Con Control también en el
+ * Mac, como Excel: ⌘⇧3, ⌘⇧4 y ⌘⇧5 son las capturas de pantalla del sistema.
+ */
+export const FORMATOS_DE_ATAJO = {
+  Digit1: 'thousands',
+  Digit3: 'date',
+  Digit4: 'currency',
+  Digit5: 'percent',
+} as const;
+export type FormatoDeAtajo =
+  `formato:${(typeof FORMATOS_DE_ATAJO)[keyof typeof FORMATOS_DE_ATAJO]}`;
+
+/** La hoja de al lado (`dir` 1, la siguiente), sin dar la vuelta: como Excel, en la
+ *  última Ctrl+AvPág no hace nada. */
+export function hojaVecina(activa: number, total: number, dir: 1 | -1): number {
+  return Math.max(0, Math.min(total - 1, activa + dir));
+}
 
 /** Lo que importa de un `keydown` (así se prueba sin DOM). */
 export interface PulsacionHoja {
   key: string;
+  /** La tecla física (`KeyboardEvent.code`): para los atajos que van por la tecla. */
+  code?: string;
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
@@ -90,8 +123,21 @@ export interface PulsacionHoja {
  * quien los atiende les quita lo que hace el navegador, buscar y recargar).
  */
 export function atajoDeHoja(e: PulsacionHoja): AtajoHoja | null {
-  if (e.altKey) return null;
   const ctrl = e.ctrlKey || e.metaKey;
+  // Alt+= es la Σ de Excel. Por el carácter («=» va con Mayúsculas en un teclado
+  // español: Alt+Mayús+0) o por la tecla, que en el Mac con Opción escribe «≠».
+  if (e.altKey && !ctrl && (e.key === '=' || (e.code === 'Equal' && !e.shiftKey))) {
+    return 'autosuma';
+  }
+  if (e.altKey) return null;
+  // Ctrl+AvPág y Ctrl+RePág cambian de hoja; con Mayúsculas también, que es el de Sheets
+  // (el navegador se queda el de sin Mayúsculas para sus pestañas).
+  if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
+    return e.key === 'PageDown' ? 'hojaSiguiente' : 'hojaAnterior';
+  }
+  if (e.ctrlKey && !e.metaKey && e.shiftKey && e.code && e.code in FORMATOS_DE_ATAJO) {
+    return `formato:${FORMATOS_DE_ATAJO[e.code as keyof typeof FORMATOS_DE_ATAJO]}`;
+  }
   if (e.key === 'F5') return ctrl || e.shiftKey ? null : 'irA';
   if (e.key === ' ') {
     if (ctrl && !e.shiftKey) return 'columna';
@@ -145,6 +191,7 @@ export const GRUPOS_HOJA: { titulo: DocsKey; filas: FilaAtajo[] }[] = [
       { teclas: ['{tab}', 'Shift+{tab}'], descripcion: 'sheet.shortcuts.tab' },
       { teclas: ['{esc}'], descripcion: 'sheet.shortcuts.escape' },
       { teclas: ['Ctrl+G', 'F5'], descripcion: 'sheet.shortcuts.goTo' },
+      { teclas: ['Ctrl+{pageDown}', 'Ctrl+{pageUp}'], descripcion: 'sheet.shortcuts.sheets' },
     ],
   },
   {
@@ -164,6 +211,11 @@ export const GRUPOS_HOJA: { titulo: DocsKey; filas: FilaAtajo[] }[] = [
       { teclas: ['Ctrl+D'], descripcion: 'sheet.shortcuts.fillDown' },
       { teclas: ['Ctrl+R'], descripcion: 'sheet.shortcuts.fillRight' },
       { teclas: ['Ctrl+;'], descripcion: 'sheet.shortcuts.today' },
+      { teclas: ['Alt+='], descripcion: 'sheet.autosum' },
+      {
+        teclas: ['Control+Shift+1', 'Control+Shift+3', 'Control+Shift+4', 'Control+Shift+5'],
+        descripcion: 'sheet.shortcuts.numberFormats',
+      },
       { teclas: ['Ctrl+C'], descripcion: 'cmd.copy' },
       { teclas: ['Ctrl+X'], descripcion: 'cmd.cut' },
       { teclas: ['Ctrl+V'], descripcion: 'cmd.paste' },
@@ -191,7 +243,7 @@ export function teclaDeHoja(combinacion: string, t: DocsT, mac: boolean = esMac(
   });
   if (conNombres.startsWith('Control+')) {
     const resto = conNombres.slice('Control+'.length);
-    return mac ? `⌃${resto}` : textoAtajo(`Ctrl+${resto}`, t, false);
+    return mac ? `⌃${resto.replace(/Shift\+/g, '⇧')}` : textoAtajo(`Ctrl+${resto}`, t, false);
   }
   return textoAtajo(conNombres, t, mac);
 }

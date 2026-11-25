@@ -2048,11 +2048,14 @@ func TestElMenuDeLaFilaDelCanal(t *testing.T) {
 		return strings.Join(out, " | ")
 	}
 	sa.MenuFila(l.Canales[0], sa.P.Canal.Cabecera)
-	if got := rotulos(); got != "Añadir a favoritos | — | Todas las notificaciones ✓ | Solo menciones y palabras clave | "+
-		"Silenciar el canal | — | Mover a «Clientes» | Mover a «Zeta» | — | Salir del canal | Archivar canal | Borrar canal" {
+	// «Copiar enlace» siempre; «Descargar la conversación» porque es la abierta y tiene
+	// mensajes; «Marcar como leído» no, porque no tiene nada pendiente.
+	if got := rotulos(); got != "Añadir a favoritos | Copiar enlace | Descargar la conversación | — | Todas las notificaciones ✓ | "+
+		"Solo menciones y palabras clave | Silenciar el canal | — | Mover a «Clientes» | Mover a «Zeta» | — | Salir del canal | "+
+		"Archivar canal | Borrar canal" {
 		t.Fatalf("el menú de la fila es %q", got)
 	}
-	test.Tap(sa.menuFila.Elementos[4].(*ui.ElementoMenu))
+	test.Tap(sa.menuFila.Elementos[6].(*ui.ElementoMenu))
 	if c := l.Canales[0]; !s.pidio("SetNotifyLevel(c1,none)") || c.Nivel != AvisarNada || !c.Silenciado {
 		t.Errorf("silenciar: %v, nivel %v, silenciado %v", s.llamadas, c.Nivel, c.Silenciado)
 	}

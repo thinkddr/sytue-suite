@@ -31,7 +31,12 @@ import {
   useToast,
   EmptyState,
 } from '@sytue/ui';
-import { listDueReminders, dismissReminder, type Reminder } from '../client/calendarApi.js';
+import {
+  listDueReminders,
+  dismissReminder,
+  snoozeReminder,
+  type Reminder,
+} from '../client/calendarApi.js';
 import { timeLabel, isToday, dayMonthLabel } from './dates.js';
 import type { T } from '../i18n/index.js';
 
@@ -52,6 +57,8 @@ export interface EstadoRecordatorios {
   ocupado: string | null;
   permiso: NotificationPermission | 'unsupported';
   descartar: (id: string) => Promise<void>;
+  /** Lo saca de la campana y vuelve a sonar dentro de `minutos`. */
+  posponer: (id: string, minutos: number) => Promise<void>;
   /** Lleva el calendario al día del recordatorio. */
   irA: (r: Reminder) => void;
   pedirPermiso: () => Promise<void>;
@@ -76,6 +83,9 @@ const BASE_INTERVAL = 60_000; // 1 min
 const MAX_INTERVAL = 10 * 60_000; // techo del backoff
 const NOTIFIED_KEY = 'sytue-cal-reminders-notified';
 const NOTIFIED_CAP = 300;
+
+/** Lo que se ofrece al posponer, en minutos: lo de Apple y Google, sin pasar de una hora. */
+export const POSPONER_MINUTOS: readonly number[] = [5, 10, 30, 60];
 
 /** Ids ya notificados (nativo/toast) — persistente para no repetir tras recargar. */
 function loadNotified(): Set<string> {
@@ -217,6 +227,31 @@ export function useRecordatorios({ t, locale, onDeepLink }: Opciones): EstadoRec
     }
   }
 
+  // Posponer: sale ya de la lista y de «notificados», para que al volver a vencer se
+  // avise otra vez (con el mismo id: el servicio lo rearma, no crea otro). Si falla,
+  // se vuelve a sondear y reaparece: mejor que dar por pospuesto lo que no se guardó.
+  async function snooze(id: string, minutos: number): Promise<void> {
+    setBusyId(id);
+    setReminders((list) => list.filter((r) => r.id !== id));
+    notified.current.delete(id);
+    saveNotified(notified.current);
+    try {
+      const { trigger_at } = await snoozeReminder(id, minutos);
+      const vuelve = new Date(trigger_at);
+      toast.notify({
+        tone: 'success',
+        title: t('reminders.snoozed', {
+          time: timeLabel(locale, Number.isNaN(vuelve.getTime()) ? new Date() : vuelve),
+        }),
+      });
+    } catch {
+      toast.notify({ tone: 'danger', title: t('toast.reminderSnoozeFailed') });
+      sondearYa.current();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function requestPermission(): Promise<void> {
     if (typeof Notification === 'undefined') return;
     try {
@@ -233,6 +268,7 @@ export function useRecordatorios({ t, locale, onDeepLink }: Opciones): EstadoRec
     ocupado: busyId,
     permiso: permission,
     descartar: dismiss,
+    posponer: snooze,
     irA: deepLink,
     pedirPermiso: requestPermission,
     reintentar: () => sondearYa.current(),
@@ -283,6 +319,8 @@ export function ReminderCenter({
   }, [open, fila]);
 
   const { lista: reminders, cargando: loading, error, ocupado: busyId, permiso } = estado;
+  // El recordatorio cuya fila enseña «Posponer»: uno a la vez, debajo de su título.
+  const [posponiendo, setPosponiendo] = useState<string | null>(null);
   function deepLink(r: Reminder): void {
     estado.irA(r);
     setOpen(false);
@@ -319,7 +357,10 @@ export function ReminderCenter({
         ) : (
           <ul class="divide-border divide-y">
             {reminders.map((r) => (
-              <li key={r.id} class="hover:bg-bg-subtle flex items-start gap-2 px-3 py-2.5">
+              <li
+                key={r.id}
+                class="hover:bg-bg-subtle flex flex-wrap items-start gap-2 px-3 py-2.5"
+              >
                 <button
                   type="button"
                   onClick={() => deepLink(r)}
@@ -345,6 +386,45 @@ export function ReminderCenter({
                   leadingIcon={<Icon name="close" size={16} />}
                   {...enSitio}
                 />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  aria-label={t('reminders.snooze', {
+                    title: r.summary || t('reminders.eventFallback'),
+                  })}
+                  aria-expanded={posponiendo === r.id}
+                  onClick={() => setPosponiendo((v) => (v === r.id ? null : r.id))}
+                  disabled={busyId === r.id}
+                  class="mt-0.5 shrink-0"
+                  leadingIcon={<Icon name="clock" size={16} />}
+                  {...enSitio}
+                />
+                {posponiendo === r.id ? (
+                  <div
+                    role="group"
+                    aria-label={t('reminders.snoozeFor')}
+                    class="flex w-full flex-wrap items-center gap-1.5"
+                  >
+                    <span class="sytue-meta">{t('reminders.snoozeFor')}</span>
+                    {POSPONER_MINUTOS.map((m) => (
+                      <Button
+                        key={m}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setPosponiendo(null);
+                          void estado.posponer(r.id, m);
+                        }}
+                        {...enSitio}
+                      >
+                        {m % 60 === 0
+                          ? t('settings.durationHours', { count: m / 60 })
+                          : t('settings.durationMinutes', { count: m })}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -369,8 +369,12 @@ export function parseAuditFilters(p: URLSearchParams): AuditFilters {
 
 const SIEM_COLUMNS = ['ts', 'service', 'actor', 'action', 'target', 'detail'] as const;
 
-/** Neutraliza la inyección de fórmulas CSV (CWE-1236) y entrecomilla si hace falta. */
-function csvCell(s: string): string {
+/**
+ * Neutraliza la inyección de fórmulas CSV (CWE-1236) y entrecomilla si hace falta.
+ * Exportada para el CSV del directorio: una sola regla para todo lo que la consola
+ * entrega para abrir en una hoja de cálculo.
+ */
+export function csvCell(s: string): string {
   let v = s;
   if (v && '=+-@\t\r'.includes(v[0]!)) v = `'${v}`; // fuerza texto en Excel/Sheets
   if (/[",\r\n]/.test(v)) v = `"${v.replace(/"/g, '""')}"`;

@@ -5,6 +5,7 @@ package calcus
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -81,6 +82,7 @@ func (c *Lienzo) Mandar(cmd editor.Comando, valor string) {
 	}
 	c1, f1, c2, f2 := r.Rango()
 	if c.mandarFormato(cmd, valor, c1, f1, c2, f2) || c.mandarDatos(cmd, valor, c1, f1, c2, f2) ||
+		c.mandarHerramientas(cmd, valor, c1, f1, c2, f2) ||
 		c.mandarEsquema(cmd, valor, c1, f1, c2, f2) || c.mandarDinamica(cmd, valor) ||
 		c.mandarHipotesis(cmd, valor) || c.mandarRelleno(cmd, valor) ||
 		c.mandarMedida(cmd, valor, c1, f1, c2, f2) {
@@ -203,6 +205,28 @@ func (c *Lienzo) hacerCombinar(c1, f1, c2, f2 int, centrar bool) bool {
 	}
 	c.Rejilla.sel, c.Rejilla.ext = u.ancla(), nil
 	return true
+}
+
+// mandarHerramientas son Σ (`autosum`) y «Limpiar texto» (`cleantext`). Devuelve false si
+// no es uno de ellos o si no ha cambiado nada.
+func (c *Lienzo) mandarHerramientas(cmd editor.Comando, valor string, c1, f1, c2, f2 int) bool {
+	switch cmd {
+	case CmdLimpiarTexto:
+		return c.Libro.LimpiarTexto(valor, c1, f1, c2, f2)
+	case CmdAutosuma:
+		if c.Libro.Autosuma(valor, c1, f1, c2, f2) {
+			return true
+		}
+		// Sin números al lado, como Excel: la celda se abre con la función para que el
+		// rango se elija con el ratón o se teclee.
+		fn := valor
+		if !slices.Contains(FuncionesAutosuma, fn) {
+			fn = "SUM"
+		}
+		c.Rejilla.Editar("=" + fn + "(")
+	default: // los demás comandos los atienden las otras ramas de Mandar
+	}
+	return false
 }
 
 // mandarDatos son los comandos de la pestaña Datos. Devuelve false si no es uno de

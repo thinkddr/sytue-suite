@@ -411,4 +411,9 @@ export const cs: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Úprava probíhá na tomto zařízení a uloží se šifrovaně jako nová verze fotky.',
   'gallery.encrypted.albumEmpty': 'Toto šifrované album zatím nemá žádné fotky.',
+  'shortcuts.favorite': 'Přidat do oblíbených nebo odebrat',
+  'trash.restoreAll': 'Obnovit vše',
+  'trash.restoredAll': 'Vráceno do fotek: {count}',
+  'album.download': 'Stáhnout album',
+  'viewer.openInDrive': 'Zobrazit originál v Sytue Drive',
 };

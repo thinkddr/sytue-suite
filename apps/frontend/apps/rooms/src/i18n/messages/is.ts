@@ -990,4 +990,11 @@ export const is: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Tengdu þetta forrit við reikninginn þinn hjá {tenant}. Núverandi aðgangsheimildir þínar haldast.',
   'nativeResource.approve': 'Tengja',
+  'channel.markRead': 'Merkja sem lesið',
+  'channel.copyLink': 'Afrita tengil',
+  'channel.linkCopied': 'Tengill afritaður',
+  'channel.download': 'Sækja samtalið',
+  'channel.downloaded': 'Samtal vistað í',
+  'channel.downloadFailed': 'Ekki tókst að vista samtalið',
+  'status.nothingUnread': 'Allt var þegar lesið',
 };

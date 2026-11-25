@@ -209,6 +209,9 @@ function testFix(status: number, app: CatalogApp, t: T): string {
         : t('wizard.app.fix.rejected', { app: app.name });
     case 404:
       return t('wizard.app.fix.notFound', { app: app.name, field });
+    // La misma cuenta ya está conectada (`instance_exists`): no se crea otra.
+    case 409:
+      return t('wizard.app.fix.alreadyConnected', { app: app.name });
     case 502:
     case 503:
     case 504:
@@ -352,9 +355,11 @@ export default function ConnectAppWizard({
         description: t(
           status === 400
             ? 'wizard.app.fix.activateBadData'
-            : status === 502
-              ? 'wizard.app.fix.activateIdpDown'
-              : 'wizard.app.fix.activateGeneric',
+            : status === 409
+              ? 'wizard.app.fix.alreadyConnected'
+              : status === 502
+                ? 'wizard.app.fix.activateIdpDown'
+                : 'wizard.app.fix.activateGeneric',
         ),
       });
     } finally {

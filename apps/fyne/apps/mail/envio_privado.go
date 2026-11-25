@@ -140,6 +140,9 @@ func (b *Buzon) reintentarEnvioPrivado(rd *redaccion) {
 		original := rd.r.B
 		b.cerrar(rd)
 		b.alGuardarBorrador()
+		if rd.archivar {
+			b.archivarContestada(original.Responde)
+		}
 		notice := ui.NuevoAviso(ui.AvisoExito, b.P.T.T("compose.sent", nil), "")
 		notice.RotuloCerrar = b.P.T.T("ui.dismissNotification", nil)
 		if value.status.Queued {

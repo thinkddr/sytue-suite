@@ -157,6 +157,7 @@ test('el «…» trae «Seleccionar», los duplicados y lo de importar y exporta
   expect([...menu.keys()]).toEqual([
     'Seleccionar',
     'Revisar duplicados (1)',
+    'Ordenar por apellido',
     'Importar vCard (.vcf)',
     'Importar CSV (Google/Outlook)',
     'Exportar vCard (.vcf)',

@@ -161,8 +161,12 @@ func TestElDialogoDelRecuentoEnseñaLasDosColumnas(t *testing.T) {
 	if len(rotulos) != 3 || rotulos[1] != "Selección" || rotulos[2] != "Documento" {
 		t.Fatalf("columnas %q", rotulos)
 	}
-	if n := tabla.Filas(); n != 5 {
-		t.Fatalf("%d filas y son cinco cifras", n)
+	if n := tabla.Filas(); n != 6 {
+		t.Fatalf("%d filas y son seis cifras", n)
+	}
+	// 1340 palabras a 200 por minuto son 7 minutos (hacia arriba); las 12 de la selección, 1.
+	if got := [3]string{tabla.Celda(5, 0), tabla.Celda(5, 1), tabla.Celda(5, 2)}; got != [3]string{"Tiempo de lectura (minutos)", "1", "7"} {
+		t.Errorf("tiempo de lectura: %q", got)
 	}
 	fila := func(i int) [3]string { return [3]string{tabla.Celda(i, 0), tabla.Celda(i, 1), tabla.Celda(i, 2)} }
 	if got := fila(0); got != [3]string{"Páginas", "", "3"} {

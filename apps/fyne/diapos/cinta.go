@@ -142,6 +142,23 @@ func (e *Editor) cuerpoPresentar(c *editor.Contexto) fyne.CanvasObject {
 	if e.Cast != nil && e.Cast.Cliente != nil {
 		botones = append(botones, editor.NuevoBotonCinta(iconos.EdEmitirCast, c.Traducir("slides.cast.present"), e.PresentarConCast))
 	}
+	// Avance automático en bucle (`slides/presentar.ts`): de quien presenta en este
+	// dispositivo, en el Almacen, como el tamaño de las notas del moderador.
+	opciones := make([]editor.Opcion, len(SegundosAvance))
+	for i, s := range SegundosAvance {
+		rotulo := c.Traducir("slides.autoAdvance.off")
+		if s > 0 {
+			rotulo = c.Traducir("slides.autoAdvance.every", i18n.Vars{"n": s})
+		}
+		opciones[i] = editor.Opcion{Valor: strconv.Itoa(s), Rotulo: rotulo}
+	}
+	avance := editor.NuevoSelectorCinta(c.Traducir("slides.autoAdvance"), AnchoSelectorAvance, opciones,
+		strconv.Itoa(LeerAvance(e.Almacen)), func(v string) {
+			if e.Almacen != nil {
+				e.Almacen.Poner(ClaveAvance, v)
+			}
+		})
+	botones = append(botones, avance)
 	return editor.Grupos(
 		editor.NuevoGrupo(c.Traducir("group.slideshow"), botones...),
 	)

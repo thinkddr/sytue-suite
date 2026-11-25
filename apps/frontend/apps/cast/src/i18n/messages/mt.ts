@@ -356,4 +356,8 @@ export const mt: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Neħħi mill-paġna pubblika',
   'moderation.action.unpublish': 'Neħħi l-pubblikazzjoni',
   'moderation.action.block': 'Imblokka lill-persuna fl-organizzazzjoni',
+  'player.loop': 'Irrepeti',
+  'watch.chapters': 'Kapitoli',
+  'watch.jumpTo': 'Mur għal {time}',
+  'share.startAt': 'Ibda minn {time}',
 };

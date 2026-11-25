@@ -6,6 +6,7 @@ package photos
 import (
 	"context"
 	"image"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -270,6 +271,13 @@ func (a *App) datosVisor(e *estadoVisor, f api.Photo) Visor {
 		AlGuardarDesc:  a.guardarDescripcion,
 	}
 	d.AlEditar = func() { a.AbrirEditor(f, "") }
+	// «Ver el original en Sytue Drive»: la foto ES un fichero de Drive, y desde aquí no
+	// había forma de llegar a él (su carpeta, compartirlo, sus versiones). Se abre en
+	// la app de Drive por su esquema, con la web de respaldo. Una cifrada no: su Drive
+	// es el de la bóveda y lleva su propio camino.
+	if f.DriveFileID != "" && a.AbrirApp != nil && !EsCifrada(f.ID) {
+		d.AlAbrirEnDrive = func() { a.AbrirApp("drive", "/files/"+url.PathEscape(f.DriveFileID)) }
+	}
 	if a.ofreceGaleria() {
 		d.ClaveSistema, _ = a.DestinoGaleria.claves()
 		d.AlSistema = func() { a.guardarEnSistema([]api.Photo{f}) }
@@ -411,6 +419,15 @@ func (a *App) runaVisor(r rune) {
 		a.pintarVisor()
 	case atajoTamanyoReal:
 		a.alternarTamanyoReal()
+	case atajoFavorita:
+		// El corazón de la barra: sin pregunta, se deshace pulsando otra vez.
+		if f, ok := e.fotoDelServidor(); ok && e.origen == desdeGaleria {
+			a.cambiarFavorita(f, !f.Favorite)
+		}
+	case atajoEditar:
+		if f, ok := e.foto(); ok {
+			a.AbrirEditor(f, "")
+		}
 	case atajoAyuda:
 		// Solo con el visor encima de todo: sobre un menú suyo, el teclado es del menú.
 		if a.w == nil || a.w.Canvas().Overlays().Top() == e.capa {

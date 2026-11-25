@@ -771,4 +771,17 @@ export const sk: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Ďalšie výsledky sa nepodarilo načítať. Skúste to znova.',
   'privacy.notice':
     'Vaše údaje nepredávame ani ich neposkytujeme tretím stranám. Nepoužívame ich na profilovanie, reklamu ani na trénovanie či zlepšovanie našich služieb alebo služieb iných. Sú šifrované pri prenose aj uložení a našu európsku infraštruktúru opúšťajú len vtedy, keď je to nevyhnutné na fakturáciu, a v integráciách, ktoré zapnete, kde vás tretia strana požiada o súhlas s údajmi, ktoré použije.',
+  'inbox.markAllOf': 'Označiť {app} ako prečítané',
+  'inbox.markUnread': 'Označiť ako neprečítané',
+  'inbox.muteLikeThis': 'Stlmiť podobné oznámenia',
+  'inbox.mutedLikeThis':
+    'Takéto oznámenia už nebudete dostávať. Zmeniť to môžete nižšie v časti „Čo chcete dostávať“.',
+  'inbox.muteFailed': 'Nepodarilo sa stlmiť. Skúste to znova.',
+  'inbox.actionsOf': 'Akcie pre „{title}“',
+  'downloads.checksum': 'Overiť stiahnutie',
+  'downloads.checksumHelp':
+    'Jeho odtlačok SHA-256. Vypočítajte odtlačok stiahnutého súboru a overte, že sa zhodujú.',
+  'downloads.checksumLabel': 'Odtlačok SHA-256',
+  'downloads.copyChecksum': 'Kopírovať odtlačok',
+  'downloads.checksumCopied': 'Odtlačok skopírovaný',
 };

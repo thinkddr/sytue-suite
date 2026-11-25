@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Szervezet kizárása az automatikus Sytue AI-feldolgozásból",
   "aiBatch.excludedHint": "A szervezet ki van zárva az automatikus Sytue AI-feldolgozásból. Az új fényképeket nem dolgozzuk fel a háttérben javaslatokhoz vagy hasonlóságokhoz.",
   "album.coverSet": "Az albumborító frissült",
+  "album.download": "Album letöltése",
   "album.isCover": "Ez az album borítója",
   "album.linkCopied": "Hivatkozás másolva",
   "album.newLink": "Új hivatkozás",
@@ -257,6 +258,7 @@
   "public.count": "{count} fotó",
   "public.notFound": "Ez a hivatkozás már nem érvényes.",
   "public.title": "Megosztott album",
+  "shortcuts.favorite": "Kedvencnek jelölés vagy eltávolítás",
   "shortcuts.first": "Első fotó",
   "shortcuts.group.gallery": "Galéria",
   "shortcuts.group.viewer": "Megjelenítő",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Ma törlődik",
   "trash.restore": "Visszaállítás",
+  "trash.restoreAll": "Összes visszaállítása",
+  "trash.restoredAll": "Visszakerült a fotói közé: {count}",
   "trash.retention": {
     "one": "A galériából eltávolított fotók 1 napig maradnak itt, és addig visszaállíthatók.",
     "other": "A galériából eltávolított fotók {count} napig maradnak itt, és addig visszaállíthatók."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Technikai részletek",
   "viewer.infoUploaded": "Feltöltve (nincs EXIF-dátum)",
   "viewer.next": "Következő fotó",
+  "viewer.openInDrive": "Eredeti megtekintése a Sytue Drive-ban",
   "viewer.prev": "Előző fotó",
   "viewer.rotate": "Forgatás 90°-kal",
   "viewer.rotateFailed": "A fotót nem sikerült elforgatni.",

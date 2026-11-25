@@ -763,4 +763,17 @@ export const lv: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Neizdevās ielādēt vairāk rezultātu. Mēģiniet vēlreiz.',
   'privacy.notice':
     'Mēs nepārdodam jūsu datus un nenododam tos trešajām personām. Mēs tos neizmantojam profilēšanai, reklāmai vai savu vai citu pakalpojumu apmācībai vai uzlabošanai. Tie ir šifrēti pārsūtīšanas un glabāšanas laikā un atstāj mūsu Eiropas infrastruktūru tikai tad, ja tas ir noteikti nepieciešams rēķina izrakstīšanai, un jūsu ieslēgtajās integrācijās, kurās trešā persona lūgs jūsu piekrišanu datiem, ko tā izmantos.',
+  'inbox.markAllOf': 'Atzīmēt {app} kā izlasītus',
+  'inbox.markUnread': 'Atzīmēt kā nelasītu',
+  'inbox.muteLikeThis': 'Izslēgt šādus paziņojumus',
+  'inbox.mutedLikeThis':
+    'Šādus paziņojumus vairs nesaņemsiet. To var mainīt zemāk, sadaļā “Ko vēlaties saņemt”.',
+  'inbox.muteFailed': 'Neizdevās izslēgt. Mēģiniet vēlreiz.',
+  'inbox.actionsOf': 'Darbības: “{title}”',
+  'downloads.checksum': 'Pārbaudīt lejupielādi',
+  'downloads.checksumHelp':
+    'Tā SHA-256 nospiedums. Aprēķiniet lejupielādētā faila nospiedumu un pārbaudiet, vai tie sakrīt.',
+  'downloads.checksumLabel': 'SHA-256 nospiedums',
+  'downloads.copyChecksum': 'Kopēt nospiedumu',
+  'downloads.checksumCopied': 'Nospiedums nokopēts',
 };

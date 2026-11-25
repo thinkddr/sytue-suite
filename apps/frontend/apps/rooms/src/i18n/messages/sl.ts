@@ -1110,4 +1110,11 @@ export const sl: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Poveži to aplikacijo s svojim računom v {tenant}. Tvoja obstoječa dovoljenja za dostop ostanejo veljavna.',
   'nativeResource.approve': 'Poveži',
+  'channel.markRead': 'Označi kot prebrano',
+  'channel.copyLink': 'Kopiraj povezavo',
+  'channel.linkCopied': 'Povezava kopirana',
+  'channel.download': 'Prenesi pogovor',
+  'channel.downloaded': 'Pogovor shranjen v',
+  'channel.downloadFailed': 'Pogovora ni bilo mogoče shraniti',
+  'status.nothingUnread': 'Vse je bilo že prebrano',
 };

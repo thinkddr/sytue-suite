@@ -6,7 +6,7 @@
  * {delete:true} porque el checkOrigin CSRF de Astro bloquea DELETE. Los secretos
  * jamás se muestran en claro ni se guardan en git (Secret Manager). §10, §14.
  */
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import {
   Card,
   CardBody,
@@ -35,6 +35,7 @@ import { useT } from '../i18n/index.js';
 import { postBff, notifyDemoIfNeeded, demoDesc } from '../lib/bff-client.js';
 import DemoBanner from './DemoBanner.js';
 import EnvImport, { type ParsedVar } from './EnvImport.js';
+import { filtrarVariables, plantillaEnvExample, type FiltroAmbito } from '../lib/variables.js';
 
 function scopeLabel(t: T, scope: EnvScope): string {
   switch (scope) {
@@ -146,6 +147,33 @@ function EnvInner({ vars, project, live, locale, error }: Props) {
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<EnvVar | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [q, setQ] = useState('');
+  const [ambito, setAmbito] = useState<FiltroAmbito>('');
+  const visibles = useMemo(() => filtrarVariables(items, q, ambito), [items, q, ambito]);
+  const filtrando = q.trim() !== '' || ambito !== '';
+
+  /**
+   * Descarga la plantilla `.env.example` (solo claves) generada aquí mismo: no hace
+   * falta ir al servidor para algo que ya está en pantalla, y así funciona también
+   * en la demostración. Lo que sí revela valores —el `.env`— sigue siendo la
+   * descarga del control-plane, con su rol y su auditoría.
+   */
+  function descargarPlantilla() {
+    const texto = plantillaEnvExample(items, {
+      cabecera: t('env.example.header', { project }),
+      soloProduccion: t('env.example.onlyProduction'),
+      soloPreview: t('env.example.onlyPreview'),
+      gestionadas: t('env.example.managed'),
+    });
+    const url = URL.createObjectURL(new Blob([texto], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '.env.example';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
   /**
    * Recoge en la tabla lo que acaba de importarse. Las que ya existían se
@@ -380,6 +408,11 @@ function EnvInner({ vars, project, live, locale, error }: Props) {
           >
             {t('env.export')}
           </Button>
+          {/* La plantilla sin valores: lo que se sube al repositorio para que quien
+              clone sepa qué rellenar. No revela nada, así que no pide rol. */}
+          <Button variant="ghost" disabled={items.length === 0} onClick={descargarPlantilla}>
+            {t('env.example.download')}
+          </Button>
         </div>
         <Card class="mb-6">
           <CardBody>
@@ -465,18 +498,56 @@ function EnvInner({ vars, project, live, locale, error }: Props) {
           </CardBody>
         </Card>
 
-        <div class="mb-3 flex items-baseline justify-between gap-3">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 class="sytue-h4 text-text">{t('env.listTitle')}</h2>
-          <span class="text-text-muted text-sm tabular-nums">
-            {t('env.count', { count: items.length })}
+          <span class="text-text-muted text-sm tabular-nums" aria-live="polite">
+            {filtrando
+              ? t('env.filter.count', { count: visibles.length, total: items.length })
+              : t('env.count', { count: items.length })}
           </span>
         </div>
+        {items.length > 0 ? (
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <Input
+              type="search"
+              value={q}
+              class="w-64 min-w-0 font-mono"
+              leadingIcon={<Icon name="search" size={16} />}
+              placeholder={t('env.filter.search')}
+              aria-label={t('env.filter.search')}
+              onInput={(e) => setQ(e.currentTarget.value)}
+            />
+            <Select
+              value={ambito}
+              class="w-52"
+              aria-label={t('env.filter.scope')}
+              onChange={(e) => setAmbito(e.currentTarget.value as FiltroAmbito)}
+            >
+              <option value="">{t('env.filter.allScopes')}</option>
+              <option value="production">{t('env.scope.production')}</option>
+              <option value="preview">{t('env.scope.preview')}</option>
+              <option value="managed">{t('env.filter.managed')}</option>
+            </Select>
+            {filtrando ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setQ('');
+                  setAmbito('');
+                }}
+              >
+                {t('env.filter.clear')}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <Table
           columns={columns}
-          rows={items}
+          rows={visibles}
           rowKey={(v) => v.key}
           caption={t('env.caption')}
-          emptyContent={t('env.empty')}
+          emptyContent={filtrando ? t('env.filter.empty') : t('env.empty')}
         />
       </div>
 

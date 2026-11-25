@@ -36,7 +36,7 @@ import {
 } from '@sytue/ui';
 import { EventNotes } from './EventNotes.js';
 import { GuestList } from './GuestList.js';
-import { parseGuests, parseOrganizer, type GuestStatus } from '../lib/ical.js';
+import { parseGuests, parseOrganizer, parseTransp, type GuestStatus } from '../lib/ical.js';
 import { descargarIcs } from '../lib/icsDescarga.js';
 import type { GridEvent } from './CalendarGrid.js';
 import { eventInstant, parseTzid } from './dates.js';
@@ -274,6 +274,9 @@ export function EventPopover({
 
   const color = event.color ?? accentColor;
   const when = whenLabel(t, locale, event);
+  // «Disponible»: se dice en el detalle, porque en la rejilla se ve igual que cualquier
+  // otro y es lo que explica que nadie te lo cuente como ocupado.
+  const libre = parseTransp(event.ical) === 'TRANSPARENT';
   const readOnly = Boolean(event.readOnly);
   const titulo = event.summary || t('event.untitled');
   // Llevarse el evento fuera (a otro calendario, a alguien de fuera de la organización):
@@ -365,6 +368,12 @@ export function EventPopover({
                 />
                 <dt class="sr-only">{t('popover.when')}</dt>
                 <dd>{when}</dd>
+              </div>
+            ) : null}
+            {libre ? (
+              <div class="text-text-muted text-sm">
+                <dt class="sr-only">{t('event.showAs')}</dt>
+                <dd>{t('popover.showsAsFree')}</dd>
               </div>
             ) : null}
             {event.location ? (
@@ -466,6 +475,12 @@ export function EventPopover({
           <div class="text-text-muted text-xs tabular-nums">
             <dt class="sr-only">{t('popover.when')}</dt>
             <dd>{when}</dd>
+          </div>
+        ) : null}
+        {libre ? (
+          <div class="text-text-muted text-xs">
+            <dt class="sr-only">{t('event.showAs')}</dt>
+            <dd>{t('popover.showsAsFree')}</dd>
           </div>
         ) : null}
         {event.location ? (

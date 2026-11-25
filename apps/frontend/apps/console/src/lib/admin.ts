@@ -14,6 +14,14 @@ import type { SytueSession } from '@sytue/auth';
 import { adminBaseUrl } from './auth.js';
 import * as seed from './data.js';
 import { cumpleFiltro, type FiltroUsuarios } from './filtros-usuarios.js';
+import { csvCell } from './audit-siem.js';
+import {
+  csvDirectorio,
+  type AccesoEfectivo,
+  type CuentaCerrada,
+  type FilaDirectorio,
+  type TrabajoLote,
+} from './gestion.js';
 
 /**
  * ¿Ha CONTESTADO el backend? Un 4xx es una respuesta —«no puedes» o «no hay»— y
@@ -2379,4 +2387,102 @@ export function buildMetrics(tenants: Tenant[], users: DirectoryUser[]): Console
       hintKey: 'dashboard.metric.mfaHint',
     },
   ];
+}
+
+// ---- Gestión: acceso efectivo, bajas recuperables, lotes y export del directorio ----
+
+/**
+ * Qué puede hacer una persona y POR QUÉ (rol integrado, roles personalizados y
+ * elevaciones PIM vivas), resuelto por Sytue ID con la misma regla que aplica al
+ * autorizar. La consola lo enseñaba por piezas en cuatro pantallas.
+ */
+export async function loadEffectiveAccess(
+  session: SytueSession,
+  userId: string,
+): Promise<AccesoEfectivo> {
+  const r = await adminHttp(session).json<Partial<AccesoEfectivo>>({
+    path: `/users/${encodeURIComponent(userId)}/effective-access`,
+  });
+  return {
+    role: typeof r?.role === 'string' ? r.role : 'member',
+    permissions: Array.isArray(r?.permissions) ? r.permissions : [],
+    custom_roles: Array.isArray(r?.custom_roles) ? r.custom_roles : [],
+    groups: Array.isArray(r?.groups) ? r.groups : [],
+    pending_elevations: Array.isArray(r?.pending_elevations) ? r.pending_elevations : [],
+    as_of: typeof r?.as_of === 'string' ? r.as_of : new Date().toISOString(),
+  };
+}
+
+/** Las bajas que aún se pueden deshacer, con los días de retención de la organización. */
+export async function loadClosedUsers(
+  session: SytueSession,
+): Promise<{ users: CuentaCerrada[]; retention_days: number }> {
+  const r = await adminHttp(session).json<{ users?: CuentaCerrada[]; retention_days?: number }>({
+    path: '/users/closed',
+  });
+  return {
+    users: Array.isArray(r?.users) ? r.users : [],
+    retention_days: Number(r?.retention_days ?? 30),
+  };
+}
+
+/**
+ * Restaura una cuenta cerrada. Vuelve SUSPENDIDA: restaurar devuelve los datos,
+ * reactivar devuelve el acceso, y son dos decisiones. Sytue ID exige haberse
+ * autenticado hace poco (step-up): su 401 viaja tal cual con su `code`.
+ */
+export function restoreUser(
+  session: SytueSession,
+  userId: string,
+): Promise<{ id: string; status: string }> {
+  return adminHttp(session).json({
+    method: 'POST',
+    path: `/users/${encodeURIComponent(userId)}/restore`,
+  });
+}
+
+/** Los lotes recientes de la organización (sin el detalle por persona). */
+export async function loadBulkJobs(session: SytueSession): Promise<TrabajoLote[]> {
+  const r = await adminHttp(session).json<{ jobs?: TrabajoLote[] }>({ path: '/jobs' });
+  return Array.isArray(r?.jobs) ? r.jobs : [];
+}
+
+/** Un lote con su informe por persona. */
+export function loadBulkJob(session: SytueSession, jobId: string): Promise<TrabajoLote> {
+  return adminHttp(session).json<TrabajoLote>({ path: `/jobs/${encodeURIComponent(jobId)}` });
+}
+
+/** Tope de páginas del export: 50 × 200 = 10 000 personas por fichero. */
+const EXPORT_MAX_PAGINAS = 50;
+
+/**
+ * El directorio entero (con el término y el filtro de la pantalla) en CSV. Recorre
+ * las páginas keyset de Sytue ID en el servidor: el navegador recibe un fichero, no
+ * cincuenta peticiones. Sin backend vivo LANZA —no se inventa un fichero de la
+ * demostración que alguien podría tomar por el directorio real—.
+ */
+export async function exportDirectoryCsv(
+  session: SytueSession,
+  opts: { q?: string; filter?: FiltroUsuarios | '' } = {},
+): Promise<{ csv: string; truncated: boolean }> {
+  const filas: FilaDirectorio[] = [];
+  let cursor = '';
+  for (let pagina = 0; pagina < EXPORT_MAX_PAGINAS; pagina++) {
+    const page = await adminHttp(session).consulta<{ items: AdminUserWire[]; nextCursor?: string }>(
+      {
+        path: '/users',
+        query: {
+          cursor: cursor || undefined,
+          limit: 200,
+          q: opts.q || undefined,
+          filter: opts.filter || undefined,
+        },
+      },
+    );
+    if (!Array.isArray(page?.items)) throw new Error('bad_shape');
+    filas.push(...page.items);
+    cursor = typeof page.nextCursor === 'string' ? page.nextCursor : '';
+    if (!cursor) return { csv: csvDirectorio(filas, csvCell), truncated: false };
+  }
+  return { csv: csvDirectorio(filas, csvCell), truncated: true };
 }

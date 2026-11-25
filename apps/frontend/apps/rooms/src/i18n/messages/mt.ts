@@ -1139,4 +1139,11 @@ export const mt: AppCatalog<typeof en> = {
   'nativeResource.description':
     "Qabbad din l-app mal-kont tiegħek f'{tenant}. Il-permessi ta’ aċċess attwali tiegħek jibqgħu fis-seħħ.",
   'nativeResource.approve': 'Qabbad',
+  'channel.markRead': 'Immarka bħala moqri',
+  'channel.copyLink': 'Ikkopja l-link',
+  'channel.linkCopied': 'Il-link ġiet ikkupjata',
+  'channel.download': 'Niżżel il-konversazzjoni',
+  'channel.downloaded': 'Il-konversazzjoni ġiet issejvjata f’',
+  'channel.downloadFailed': 'Il-konversazzjoni ma setgħetx tiġi ssejvjata',
+  'status.nothingUnread': 'Kollox kien diġà moqri',
 };

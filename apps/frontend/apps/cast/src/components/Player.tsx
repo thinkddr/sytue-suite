@@ -12,8 +12,12 @@
  * Controles propios sobre el `<video>` (los nativos cambian en cada navegador y no
  * se pueden traducir): reproducir, posición, volumen, velocidad, calidad, imagen dentro
  * de imagen y pantalla completa. Teclado dentro del reproductor, como en cualquiera:
- * espacio o K reproduce y pausa, ←/→ mueven 5 s, < y > bajan y suben la velocidad,
- * F pantalla completa, M silencio, P imagen dentro de imagen.
+ * espacio o K reproduce y pausa, ←/→ mueven 5 s y J/L 10 s, Inicio y Fin van al
+ * principio y al final, 0–9 al 0 %–90 % (lib/marcas.ts), < y > bajan y suben la
+ * velocidad, F pantalla completa, M silencio, P imagen dentro de imagen.
+ *
+ * «Repetir», en el menú de la velocidad, vuelve a empezar al acabar (el `loop` del
+ * `<video>`). Y `inicio` (el «?t=» de un enlace compartido) manda sobre lo recordado.
  *
  * La velocidad (0,5× a 2×, lib/velocidad.ts) vale para cualquier fuente —hls.js, HLS
  * nativo o WebM—, porque es del `<video>` y no del flujo. Solo existe aquí: el directo
@@ -41,6 +45,7 @@ import { duracion } from '../lib/formato.js';
 import { etiqueta } from '../lib/calidades.js';
 import { VELOCIDADES, siguiente } from '../lib/velocidad.js';
 import { CADA_MS, desde, leer, recordar } from '../lib/reanudar.js';
+import { destinoDeTecla } from '../lib/marcas.js';
 
 /** Lo mínimo de hls.js que usa el menú de calidad. */
 interface NivelesHls {
@@ -64,6 +69,8 @@ export interface PlayerProps {
    * gestión del póster, la inserción) siempre empieza de cero y no se guarda nada.
    */
   reanudar?: { persona: string; video: string } | null;
+  /** El segundo en que empezar (el «?t=» de un enlace): manda sobre `reanudar`. */
+  inicio?: number | null;
   /** Para quien necesita el `<video>` (el póster de un fotograma). */
   alVideo?: (v: HTMLVideoElement | null) => void;
   class?: string;
@@ -81,6 +88,7 @@ export function Player({
   titulo,
   autoplay = false,
   reanudar = null,
+  inicio = null,
   alVideo,
   class: cls,
 }: PlayerProps): JSX.Element {
@@ -107,6 +115,7 @@ export function Player({
   // dice nada).
   const [velocidad, setVelocidad] = useState(1);
   const [menuVelocidad, setMenuVelocidad] = useState(false);
+  const [repetir, setRepetir] = useState(false);
   const [anuncio, setAnuncio] = useState<string | null>(null);
   // Reanudar: el segundo al que saltar cuando cargue (se gasta al saltar), el que se
   // ofrece deshacer con «Empezar desde el principio», si ya sonó alguna vez (el botón
@@ -140,10 +149,11 @@ export function Player({
 
   // Dónde se quedó: se lee antes de poner la fuente, que es al cargarla cuando se salta.
   useEffect(() => {
-    pendiente.current = persona && idVideo ? desde(leer(persona), idVideo, Date.now()) : null;
+    pendiente.current =
+      inicio ?? (persona && idVideo ? desde(leer(persona), idVideo, Date.now()) : null);
     visto.current = null;
     setRetomado(null);
-  }, [persona, idVideo]);
+  }, [persona, idVideo, inicio]);
 
   /** Guarda lo último que se vio, si hay algo que guardar. */
   const guardarYa = useCallback(() => {
@@ -349,8 +359,16 @@ export function Player({
         setMenuCalidad(false);
         setMenuVelocidad(false);
         break;
-      default:
-        return;
+      default: {
+        // J/L, Inicio/Fin y 0–9: con un modificador son del navegador (Ctrl+1 cambia
+        // de pestaña), y dentro de la barra de posición, de la barra.
+        const v = video.current;
+        if (!v || enRango || e.ctrlKey || e.metaKey || e.altKey) return;
+        const destino = destinoDeTecla(e.key, v.currentTime, v.duration);
+        if (destino === null) return;
+        e.preventDefault();
+        v.currentTime = destino;
+      }
     }
     mostrar();
   };
@@ -388,6 +406,7 @@ export function Player({
         poster={poster ?? undefined}
         playsInline
         preload="metadata"
+        loop={repetir}
         autoplay={autoplay}
         onClick={alternar}
         onPlay={() => {
@@ -588,6 +607,21 @@ export function Player({
                       {velocidad === r ? <Icon name="check" size={16} /> : null}
                     </button>
                   ))}
+                  <div role="separator" class="my-1 border-t border-white/20" />
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={repetir}
+                    onClick={() => {
+                      setRepetir(!repetir);
+                      setMenuVelocidad(false);
+                      botonVelocidadRef.current?.focus();
+                    }}
+                    class="sytue-focus-ring flex items-center justify-between gap-3 px-3 py-1.5 text-left hover:bg-white/15"
+                  >
+                    {t('player.loop')}
+                    {repetir ? <Icon name="check" size={16} /> : null}
+                  </button>
                 </div>
               ) : null}
             </div>

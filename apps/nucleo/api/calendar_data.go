@@ -18,6 +18,8 @@ type CalendarData interface {
 	RespondInvitation(context.Context, string, string) (Invitation, error)
 	Reminders(context.Context) ([]Reminder, error)
 	DismissReminder(context.Context, string) error
+	SnoozeReminder(context.Context, string, int) (time.Time, error)
+	EventICS(context.Context, string) ([]byte, error)
 	List(context.Context) ([]Calendar, error)
 	SearchEvents(context.Context, string, int) ([]Event, error)
 	SharedWithMe(context.Context) ([]Calendar, error)

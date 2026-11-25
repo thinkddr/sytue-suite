@@ -353,4 +353,10 @@ export const hr: AppCatalog<typeof en> = {
   'relation.coworker': 'Kolega',
   'relation.emergency': 'Hitni kontakt',
   'relation.other': 'Drugo',
+  'batch.copyEmails': 'Kopiraj adrese e-pošte',
+  'batch.emailsCopied': 'Adrese e-pošte kopirane',
+  'birthdays.anniversary': 'Godišnjica',
+  'list.sortByLastName': 'Poredaj po prezimenu',
+  'list.sortByFirstName': 'Poredaj po imenu',
+  'detail.shareByEmail': 'Podijeli e-poštom',
 };

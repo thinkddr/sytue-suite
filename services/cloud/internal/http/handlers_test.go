@@ -34,6 +34,10 @@ type fakeSvc struct {
 	org    domain.Organization
 	orgErr error
 
+	// Congelación de producción (handlers_freeze_test.go).
+	freeze    *domain.DeployFreeze
+	freezeErr error
+
 	updOrgName *string
 
 	project       domain.Project
@@ -374,6 +378,26 @@ func (f *fakeSvc) ProtectPreviews(context.Context, uuid.UUID) (string, error) {
 }
 
 func (f *fakeSvc) UnprotectPreviews(context.Context, uuid.UUID) error { return nil }
+
+func (f *fakeSvc) DeployFreeze(context.Context, uuid.UUID) (domain.DeployFreeze, bool, error) {
+	if f.freeze == nil {
+		return domain.DeployFreeze{}, false, f.freezeErr
+	}
+	return *f.freeze, true, f.freezeErr
+}
+
+func (f *fakeSvc) FreezeDeploys(_ context.Context, id uuid.UUID, reason string) (domain.DeployFreeze, error) {
+	if f.freezeErr != nil {
+		return domain.DeployFreeze{}, f.freezeErr
+	}
+	f.freeze = &domain.DeployFreeze{ProjectID: id, Reason: reason}
+	return *f.freeze, nil
+}
+
+func (f *fakeSvc) UnfreezeDeploys(context.Context, uuid.UUID) error {
+	f.freeze = nil
+	return f.freezeErr
+}
 
 func (f *fakeSvc) RotateProjectWebhookSecret(context.Context, uuid.UUID) (string, error) {
 	return "scl_rotado", nil

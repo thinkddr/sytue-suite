@@ -8,6 +8,7 @@ package cast
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -171,6 +172,11 @@ func fichaVideo(v Vista, d Ver) []ui.Bloque {
 			mas := ui.NuevoEnlace(v.Traduce(clave), tema.TextoSM, ui.SemiNegrita, "text", d.AlAlternarDescripcion)
 			cuerpo = ui.PilaBloques(ui.Bloque{Obj: p, Margen: tema.Espacio(1)}, ui.Bloque{Obj: container.New(ui.FilaAuto{Derecha: 1}, mas)})
 		}
+		// Los capítulos (Capitulos de ConMarcas.tsx): solo con reproductor, que es a
+		// quien llevan.
+		if caps := CapitulosDe(desc); len(caps) > 0 && d.AlCapitulo != nil && vid.Status != api.CastStatusLive {
+			cuerpo = ui.PilaBloques(ui.Bloque{Obj: cuerpo, Margen: tema.Espacio(3)}, ui.Bloque{Obj: listaCapitulos(v, caps, d.AlCapitulo)})
+		}
 		bloques = append(bloques, ui.Bloque{
 			Obj:    container.New(&recuadroLayout{caja: caja}, append(caja.Objetos(), cuerpo)...),
 			Margen: HuecoSeccion,
@@ -179,6 +185,18 @@ func fichaVideo(v Vista, d Ver) []ui.Bloque {
 		bloques[len(bloques)-1].Margen = HuecoSeccion
 	}
 	return bloques
+}
+
+// listaCapitulos es «Capítulos»: el rótulo y, por cada uno, su marca y su título, que
+// llevan el vídeo allí.
+func listaCapitulos(v Vista, caps []Capitulo, ir func(ms int64)) fyne.CanvasObject {
+	bloques := make([]ui.Bloque, 0, 1+len(caps))
+	bloques = append(bloques, ui.Bloque{Obj: Parrafo(v, v.Traduce("watch.chapters"), tema.TextoSM, ui.SemiNegrita, "text"), Margen: tema.Espacio(1)})
+	for _, c := range caps {
+		enlace := ui.NuevoEnlace(Duracion(c.Inicio)+"  "+c.Titulo, tema.TextoSM, ui.Normal, "primary-text", func() { ir(c.Inicio.Milliseconds()) })
+		bloques = append(bloques, ui.Bloque{Obj: enlace, Margen: tema.Espacio(1)})
+	}
+	return ui.PilaBloques(bloques...)
 }
 
 // botonDenunciar es «Denunciar» junto a Compartir: un menú con el vídeo, quien lo
@@ -238,6 +256,11 @@ type Compartir struct {
 	Insercion string
 	// Copiado es la línea de «Copiado» tras pulsar.
 	Copiado string
+	// Momento es por dónde iba el vídeo: con un segundo o más se ofrece «Empezar en…»,
+	// que marca EnMomento y pone el «?t=» en el enlace. AlEnMomento cambia la casilla.
+	Momento     time.Duration
+	EnMomento   bool
+	AlEnMomento func(bool)
 
 	AlCopiarEnlace, AlCopiarInsercion func()
 }
@@ -263,6 +286,11 @@ func CuerpoCompartir(v Vista, d Compartir) fyne.CanvasObject {
 	abierto := d.Video.Visibility == api.CastPublic || d.Video.Visibility == api.CastUnlisted
 	enlace := enlaceCompartir(v, d)
 	bloques := []ui.Bloque{{Obj: enlace, Margen: tema.Espacio(3)}}
+	if d.AlEnMomento != nil {
+		casilla := ui.NuevaCasilla(v.Traduce("share.startAt", i18n.Vars{"time": Duracion(d.Momento)}), d.AlEnMomento)
+		casilla.Marcada = d.EnMomento
+		bloques = append(bloques, ui.Bloque{Obj: casilla, Margen: tema.Espacio(3)})
+	}
 	if !abierto {
 		bloques = append(bloques, ui.Bloque{Obj: Parrafo(v, v.Traduce("share.restricted"), tema.TextoXS, ui.Normal, "text-muted"), Margen: tema.Espacio(4)})
 	}

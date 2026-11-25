@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Organisatie uitsluiten van de automatische Sytue AI-batch",
   "aiBatch.excludedHint": "De organisatie is uitgesloten van de automatische Sytue AI-batch. Nieuwe foto’s worden niet op de achtergrond verwerkt voor suggesties of gelijkenissen.",
   "album.coverSet": "Albumomslag bijgewerkt",
+  "album.download": "Album downloaden",
   "album.isCover": "Dit is de albumomslag",
   "album.linkCopied": "Link gekopieerd",
   "album.newLink": "Nieuwe link",
@@ -257,6 +258,7 @@
   "public.count": "{count} foto's",
   "public.notFound": "Deze link is niet meer geldig.",
   "public.title": "Gedeeld album",
+  "shortcuts.favorite": "Als favoriet markeren of verwijderen",
   "shortcuts.first": "Eerste foto",
   "shortcuts.group.gallery": "Galerij",
   "shortcuts.group.viewer": "Viewer",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Wordt vandaag verwijderd",
   "trash.restore": "Herstellen",
+  "trash.restoreAll": "Alles terugzetten",
+  "trash.restoredAll": "Terug bij je foto’s: {count}",
   "trash.retention": {
     "one": "Foto's die je uit de galerij verwijdert, blijven hier 1 dag en kunnen tot die tijd worden hersteld.",
     "other": "Foto's die je uit de galerij verwijdert, blijven hier {count} dagen en kunnen tot die tijd worden hersteld."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Technische details",
   "viewer.infoUploaded": "Geüpload (geen EXIF-datum)",
   "viewer.next": "Volgende foto",
+  "viewer.openInDrive": "Origineel bekijken in Sytue Drive",
   "viewer.prev": "Vorige foto",
   "viewer.rotate": "90° draaien",
   "viewer.rotateFailed": "De foto kon niet worden gedraaid.",

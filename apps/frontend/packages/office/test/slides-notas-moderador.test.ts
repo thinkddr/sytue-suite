@@ -79,6 +79,8 @@ describe('PresenterView', () => {
           cur: 0,
           step: 0,
           elapsedMs: 0,
+          paused: false,
+          onPause: () => {},
           clock: '10:00',
           winW: 1040,
           notesSize,

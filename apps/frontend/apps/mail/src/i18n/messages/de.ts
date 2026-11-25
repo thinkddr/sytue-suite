@@ -1056,4 +1056,14 @@ export const de: AppCatalog<typeof en> = {
     'Das bisherige E-Mail-System ist nicht mehr verfügbar. Bis du deine E-Mails in den Tresor verschiebst, empfängst du keine neuen E-Mails: Was dir in der Zwischenzeit geschickt wird, wartet auf dem Server des Absenders, der es einige Tage lang erneut versucht. Verschiebst du rechtzeitig, kommt es danach bei dir an; andernfalls erfährt der Absender, dass es nicht zugestellt werden konnte. Was bereits mit dem bisherigen System verschlüsselt ist, wie deine bisherigen E-Mails, kann nicht gelesen werden: Es wird nicht gelöscht, aber niemand kann es öffnen. Nach dem Verschieben kommen E-Mails wieder an und öffnen sich wie die übrigen Apps mit deiner Sytue-ID-Anmeldung.',
   'privateMail.vaultMoveCheckFailed':
     'Der Stand deiner E-Mails konnte nicht geprüft werden. Versuche es gleich noch einmal.',
+  'shortcuts.goInbox': 'Zum Posteingang',
+  'shortcuts.goSent': 'Zu Gesendet',
+  'shortcuts.goDrafts': 'Zu Entwürfe',
+  'shortcuts.goArchive': 'Zum Archiv',
+  'compose.sendAndArchive': 'Senden und archivieren',
+  'reader.copyAddress': 'Adresse kopieren',
+  'reader.addressCopied': 'Adresse kopiert',
+  'reader.copyAddressFailed': 'Die Adresse konnte nicht kopiert werden',
+  'reader.viewPlain': 'Als reinen Text anzeigen',
+  'reader.viewFormatted': 'Mit Formatierung anzeigen',
 };

@@ -25,6 +25,15 @@ export interface CifrasTexto {
   parrafos: number;
 }
 
+/**
+ * Minutos de lectura a 200 palabras por minuto, hacia arriba: el ritmo de lectura
+ * silenciosa con el que Notes enseña su «x min» (`PALABRAS_POR_MINUTO`), para que la suite
+ * diga lo mismo de un mismo texto. Sin palabras, cero. Go: `editor.MinutosDeLectura`.
+ */
+export function minutosDeLectura(palabras: number): number {
+  return Math.ceil(Math.max(0, palabras) / 200);
+}
+
 /* El `\s` de JavaScript, a propósito: es el que usa `countWords`, y Go lo replica
  * tal cual en lugar de usar su `unicode.IsSpace` (que difiere en U+0085 y U+FEFF). */
 const BLANCO = /\s/u;
@@ -99,6 +108,20 @@ export function textoDeNodo(raiz: Node): string {
     .split('\n')
     .map((l) => l.replace(/^[ \t\f\r]+|[ \t\f\r]+$/g, ''))
     .join('\n');
+}
+
+/**
+ * «Descargar como texto sin formato»: una línea por párrafo, sin las vacías, y un salto al
+ * final, que es lo que esperan un formulario, un editor de código o un correo en texto
+ * plano. Sale del mismo texto que el recuento, así que lo que se cuenta es lo que se baja.
+ * La app nativa lo escribe igual (`editor.TextoPlanoDeDescarga`), con los mismos vectores.
+ */
+export function textoPlanoDeDescarga(texto: string): string {
+  const lineas = texto
+    .split(/\r\n|\r|\n/)
+    .map((l) => l.replace(/\s+$/u, ''))
+    .filter((l) => l.trim() !== '');
+  return lineas.length === 0 ? '' : `${lineas.join('\n')}\n`;
 }
 
 /** El texto de un documento guardado (el HTML del registro de contenido). */

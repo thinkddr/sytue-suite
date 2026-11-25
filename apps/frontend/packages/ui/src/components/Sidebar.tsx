@@ -56,10 +56,11 @@ export function Sidebar({
         width: collapsed ? 'var(--spacing-sidebar-collapsed)' : 'var(--spacing-sidebar)',
       }}
     >
-      {/* El botón principal de la cabecera («Crear evento», «Redactar», «Nuevo contacto»)
-          lleva el aro BLANCO del cromo, como `.sytue-focus-ring-chrome`. Solo el HIJO
-          DIRECTO con aro de botón, y no el contenedor: la variable se hereda, y Rooms
-          mete aquí su menú de presencia, que se abre dentro y es superficie clara. */}
+      {/* Un botón en la cabecera lleva el aro BLANCO del cromo, como
+          `.sytue-focus-ring-chrome`. Solo el HIJO DIRECTO con aro de botón, y no el
+          contenedor: la variable se hereda, y Rooms mete aquí su menú de presencia, que se
+          abre dentro y es superficie clara. «Crear evento», «Redactar» y «Nuevo contacto»
+          ya no van aquí: crear es el «+» flotante (BotonFlotante.tsx), en todos los anchos. */}
       {header ? (
         <div class="px-4 py-3 [&>.sytue-focus-ring-inset]:[--sytue-focus-ring:var(--sytue-chrome-focus)]">
           {header}

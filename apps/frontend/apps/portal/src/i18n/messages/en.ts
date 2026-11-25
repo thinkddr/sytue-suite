@@ -799,4 +799,17 @@ export const en = {
   'search.loadMoreFailed': 'More results could not be loaded. Try again.',
   'privacy.notice':
     'We do not sell your data or share it with third parties. We do not use it to profile you, for advertising, or to train or improve our services or anyone else’s. It is encrypted in transit and at rest, and only leaves our European infrastructure where strictly needed to bill you and in the integrations you enable, where the third party will ask your approval for the data it will use.',
+  'inbox.markAllOf': 'Mark {app} as read',
+  'inbox.markUnread': 'Mark as unread',
+  'inbox.muteLikeThis': 'Mute notifications like this',
+  'inbox.mutedLikeThis':
+    'You will no longer get notifications like that one. You can change it below, in “What you want to get”.',
+  'inbox.muteFailed': 'Could not mute them. Try again.',
+  'inbox.actionsOf': 'Actions for “{title}”',
+  'downloads.checksum': 'Verify the download',
+  'downloads.checksumHelp':
+    'Its SHA-256 fingerprint. Work out the one of the file you downloaded and check that they match.',
+  'downloads.checksumLabel': 'SHA-256 fingerprint',
+  'downloads.copyChecksum': 'Copy fingerprint',
+  'downloads.checksumCopied': 'Fingerprint copied',
 };

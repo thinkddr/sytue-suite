@@ -48,7 +48,7 @@ func RecuentoDelTexto(texto string) Recuento {
 	for _, linea := range strings.FieldsFunc(texto, func(c rune) bool { return c == '\n' || c == '\r' }) {
 		conTinta := false
 		for _, c := range linea {
-			if !esBlancoJS(c) {
+			if !EsBlancoJS(c) {
 				r.CaracteresSinEspacios++
 				conTinta = true
 			}
@@ -56,15 +56,39 @@ func RecuentoDelTexto(texto string) Recuento {
 		r.Caracteres += utf8.RuneCountInString(linea)
 		if conTinta {
 			r.Parrafos++
-			r.Palabras += len(strings.FieldsFunc(linea, esBlancoJS))
+			r.Palabras += len(strings.FieldsFunc(linea, EsBlancoJS))
 		}
 	}
 	return r
 }
 
-// esBlancoJS es el `\s` de JavaScript y no `unicode.IsSpace`: el de Go toma también
-// U+0085 y deja fuera U+FEFF, y con eso una misma selección contaría distinto.
-func esBlancoJS(c rune) bool {
+// MinutosDeLectura es `minutosDeLectura`: a 200 palabras por minuto, hacia arriba, el
+// ritmo con el que Notes dice su «x min». Sin palabras, cero.
+func MinutosDeLectura(palabras int) int {
+	return (max(0, palabras) + 199) / 200
+}
+
+// TextoPlanoDeDescarga es `textoPlanoDeDescarga`: una línea por párrafo, sin las vacías
+// ni el blanco del final de cada una, y un salto al final. Sale del mismo texto que el
+// recuento, con los mismos vectores (`docus-herramientas.json`).
+func TextoPlanoDeDescarga(texto string) string {
+	var lineas []string
+	for _, l := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(texto, "\r\n", "\n"), "\r", "\n"), "\n") {
+		l = strings.TrimRightFunc(l, EsBlancoJS)
+		if strings.TrimFunc(l, EsBlancoJS) != "" {
+			lineas = append(lineas, l)
+		}
+	}
+	if len(lineas) == 0 {
+		return ""
+	}
+	return strings.Join(lineas, "\n") + "\n"
+}
+
+// EsBlancoJS es el `\s` de JavaScript y no `unicode.IsSpace`: el de Go toma también
+// U+0085 y deja fuera U+FEFF, y con eso una misma selección contaría distinto. Es
+// exportado porque «Limpiar texto» de Calcus recorta con la misma regla que la web.
+func EsBlancoJS(c rune) bool {
 	switch c {
 	case '\t', '\n', '\v', '\f', '\r', ' ', 0xa0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff:
 		return true
@@ -125,6 +149,7 @@ func CuerpoRecuento(ctx *Contexto, paginas int, documento Recuento, seleccion *R
 		{"wordcount.characters", documento.Caracteres, s.Caracteres, false},
 		{"wordcount.charactersNoSpaces", documento.CaracteresSinEspacios, s.CaracteresSinEspacios, false},
 		{"wordcount.paragraphs", documento.Parrafos, s.Parrafos, false},
+		{"wordcount.readingTime", MinutosDeLectura(documento.Palabras), MinutosDeLectura(s.Palabras), false},
 	}
 	// La cabecera del rótulo va vacía: en la web es `sr-only`, y aquí el nombre ya lo da el
 	// título del diálogo. Las cifras miden lo que su cabecera y el rótulo se queda el

@@ -399,10 +399,14 @@ export const pl: Catalog = {
   'import.fromGoogle': 'Przenieś z Google',
   'import.fromMicrosoft': 'Przenieś z Microsoft 365',
   'import.running': 'Kopiowanie danych… dotychczas {count} elementów.',
-  'import.done': 'Przeniesiono {count} elementów, pominięto {skipped}.',
+  'import.done': '{what}: przeniesiono {count} elementów, pominięto {skipped}. Zakończono {date}.',
   'import.someFailed':
     'Części danych nie udało się skopiować. Administracja organizacji może sprawdzić dlaczego.',
   'import.failed': 'Nie udało się uruchomić importu. Spróbuj ponownie za chwilę.',
+  'import.unavailable':
+    'Nie można teraz odczytać połączenia z {source}: wygasło, zostało cofnięte albo nigdy nie zostało autoryzowane. Poproś administrację organizacji o ponowne połączenie.',
+  'import.needsAdmin':
+    'Połączenie z {source} nie może jeszcze kopiować danych każdej osoby. Poproś administrację organizacji o dokończenie konfiguracji.',
   'dataflow.label': 'Co dzieje się z danymi',
   'dataflow.in.title': 'Trafia tylko do Sytue One',
   'dataflow.in.body':

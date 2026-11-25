@@ -358,4 +358,8 @@ export const nl: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Van de openbare pagina halen',
   'moderation.action.unpublish': 'Publicatie intrekken',
   'moderation.action.block': 'Persoon blokkeren in de organisatie',
+  'player.loop': 'Herhalen',
+  'watch.chapters': 'Hoofdstukken',
+  'watch.jumpTo': 'Naar {time}',
+  'share.startAt': 'Beginnen bij {time}',
 };

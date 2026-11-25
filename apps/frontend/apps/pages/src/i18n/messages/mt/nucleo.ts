@@ -399,4 +399,37 @@ export const nucleo = {
 
   'forms.empty': 'Għad m’hemm l-ebda tweġiba',
   'forms.empty_help': 'Meta xi ħadd jibgħat formola fuq il-websajt tiegħek, taraha hawn.',
+  'sites.search': 'Fittex siti',
+  'sites.search_empty': 'L-ebda sit ma jaqbel ma\' "{q}".',
+  'sites.sort_label': 'Irranġa s-siti',
+  'sites.sort_recent': 'Editjati reċentement',
+  'sites.sort_name': 'Isem (A–Ż)',
+  'sites.view_live': 'Ara s-sit',
+  'sites.view_live_aria': "Ara {nombre} ippubblikat (jinfetaħ f'tab ġdida)",
+  'seo.title': "X'se jaraw il-magni tat-tiftix",
+  'seo.intro':
+    'Reviżjoni tal-abbozz: titli, deskrizzjonijiet u stampi li fuqhom jiddependu l-magni tat-tiftix u l-qarrejja tal-iskrin. Dawn huma twissijiet; ma jwaqqfux il-pubblikazzjoni.',
+  'seo.open_editor': 'Iftaħ l-editur',
+  'seo.recheck': 'Iċċekkja mill-ġdid',
+  'seo.error': "Ir-reviżjoni ma setgħetx titgħabba. Erġa' pprova.",
+  'seo.all_good':
+    'Kollox sew: kull paġna għandha t-titlu u d-deskrizzjoni tagħha, u l-istampi għandhom test alternattiv.',
+  'seo.summary': 'Twissijiet: {count}',
+  'seo.badge_warning': 'Itjieb',
+  'seo.badge_info': 'Nota',
+  'seo.on_page': 'Paġna: {page}',
+  'seo.title_missing': "Il-paġna m'għandhiex titlu: il-magna tat-tiftix se tivvinta wieħed.",
+  'seo.title_long':
+    'It-titlu għandu {count} karattru; madwar 60 jidħlu qabel ma l-magna tat-tiftix taqtgħu.',
+  'seo.title_duplicate':
+    "Paġna oħra għandha l-istess titlu: se jikkompetu ma' xulxin fir-riżultati.",
+  'seo.description_missing':
+    "Il-paġna m'għandhiex deskrizzjoni: il-magna tat-tiftix se turi biċċa test kwalunkwe.",
+  'seo.description_long': 'Id-deskrizzjoni għandha {count} karattru; jintwerew madwar 160.',
+  'seo.image_alt_missing':
+    "Stampi mingħajr test alternattiv: {count}. Il-qarrejja tal-iskrin u l-magni tat-tiftix ma jafux x'juru; immarkahom bħala dekorattivi jekk ma juru xejn.",
+  'seo.page_noindex': 'Din il-paġna hija moħbija mill-magni tat-tiftix (noindex).',
+  'seo.site_noindex': 'Is-sit kollu huwa moħbi mill-magni tat-tiftix (noindex).',
+  'seo.share_image_missing':
+    "Is-sit m'għandux stampa għall-qsim: il-links fil-messaġġi u fin-netwerks soċjali se jidhru mingħajr stampa.",
 };

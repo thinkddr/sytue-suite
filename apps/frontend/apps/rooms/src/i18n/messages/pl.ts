@@ -1112,4 +1112,11 @@ export const pl: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Połącz tę aplikację ze swoim kontem w {tenant}. Obecne uprawnienia dostępu pozostają bez zmian.',
   'nativeResource.approve': 'Połącz',
+  'channel.markRead': 'Oznacz jako przeczytane',
+  'channel.copyLink': 'Kopiuj link',
+  'channel.linkCopied': 'Skopiowano link',
+  'channel.download': 'Pobierz rozmowę',
+  'channel.downloaded': 'Rozmowa zapisana w',
+  'channel.downloadFailed': 'Nie udało się zapisać rozmowy',
+  'status.nothingUnread': 'Wszystko było już przeczytane',
 };

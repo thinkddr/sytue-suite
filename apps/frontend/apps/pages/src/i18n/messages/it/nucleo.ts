@@ -386,4 +386,37 @@ export const nucleo = {
 
   'forms.empty': 'Ancora nessuna risposta',
   'forms.empty_help': 'Quando qualcuno invierà un modulo del tuo sito, lo vedrai qui.',
+  'sites.search': 'Cerca siti',
+  'sites.search_empty': 'Nessun sito corrisponde a «{q}».',
+  'sites.sort_label': 'Ordina i siti',
+  'sites.sort_recent': 'Modificati di recente',
+  'sites.sort_name': 'Nome (A–Z)',
+  'sites.view_live': 'Vedi sito',
+  'sites.view_live_aria': 'Vedi {nombre} pubblicato (si apre in una nuova scheda)',
+  'seo.title': 'Cosa vedranno i motori di ricerca',
+  'seo.intro':
+    'Una revisione della bozza: titoli, descrizioni e immagini da cui dipendono i motori di ricerca e i lettori di schermo. Sono avvisi; non impediscono di pubblicare.',
+  'seo.open_editor': 'Apri l’editor',
+  'seo.recheck': 'Ricontrolla',
+  'seo.error': 'Impossibile caricare la revisione. Riprova.',
+  'seo.all_good':
+    'Tutto a posto: ogni pagina ha titolo e descrizione e le immagini hanno il testo alternativo.',
+  'seo.summary': 'Avvisi: {count}',
+  'seo.badge_warning': 'Da migliorare',
+  'seo.badge_info': 'Nota',
+  'seo.on_page': 'Pagina: {page}',
+  'seo.title_missing': 'La pagina non ha un titolo: il motore di ricerca ne inventerà uno.',
+  'seo.title_long':
+    'Il titolo ha {count} caratteri; ne entrano circa 60 prima che il motore di ricerca lo tagli.',
+  'seo.title_duplicate':
+    'Un’altra pagina ha lo stesso titolo: si faranno concorrenza nei risultati.',
+  'seo.description_missing':
+    'La pagina non ha una descrizione: il motore di ricerca mostrerà un frammento di testo qualsiasi.',
+  'seo.description_long': 'La descrizione ha {count} caratteri; ne vengono mostrati circa 160.',
+  'seo.image_alt_missing':
+    'Immagini senza testo alternativo: {count}. Lettori di schermo e motori di ricerca non sanno cosa mostrano; segnale come decorative se non mostrano nulla.',
+  'seo.page_noindex': 'Questa pagina è nascosta ai motori di ricerca (noindex).',
+  'seo.site_noindex': 'L’intero sito è nascosto ai motori di ricerca (noindex).',
+  'seo.share_image_missing':
+    'Il sito non ha un’immagine di condivisione: i link nei messaggi e sui social appariranno senza immagine.',
 };

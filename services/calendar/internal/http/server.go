@@ -143,6 +143,8 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/events/search", h.SearchEvents)
 		api.Get("/events/invited", h.EventInvited)
 		api.Get("/events/{id}", h.GetEvent)
+		// «Descargar .ics» de un evento para quien no lee por CalDAV (la app nativa).
+		api.Get("/events/{id}/ics", h.EventICS)
 		api.Put("/events/{id}", h.UpdateEvent)
 		api.Delete("/events/{id}", h.DeleteEvent)
 
@@ -155,6 +157,8 @@ func NewRouter(d Deps) http.Handler {
 		// Recordatorios in-app (VALARM): cola de vencidos + descartar.
 		api.Get("/reminders/due", h.ListDueReminders)
 		api.Post("/reminders/{id}/dismiss", h.DismissReminder)
+		// «Posponer» (5, 10, 30 min… hasta un día): vuelve a sonar a su nueva hora.
+		api.Post("/reminders/{id}/snooze", h.SnoozeReminder)
 
 		// Free/Busy (disponibilidad).
 		api.Get("/freebusy", h.FreeBusy)

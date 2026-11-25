@@ -560,6 +560,11 @@ type Entrada struct {
 	// Un campo de una línea junta las líneas pegadas en una; la captura de Notepads
 	// prefiere hacer una nota por línea.
 	AlPegar func(texto string) bool
+	// AlAtajo ve un atajo (Ctrl/⌘ + tecla) ANTES que el editor y devuelve `true` cuando
+	// se lo queda. Fyne entrega los atajos al objeto con el foco y este campo se los pasa
+	// todos a su editor, así que ⌘S en la ficha del ERP no llegaba nunca al lienzo
+	// mientras se escribía, que es justo cuando se pulsa.
+	AlAtajo func(fyne.Shortcut) bool
 	// Busqueda es `type="search"`: Escape vacía lo escrito, como en el navegador. Con el
 	// campo vacío, Escape sigue su camino (el diálogo o el menú de encima).
 	Busqueda bool
@@ -660,6 +665,9 @@ func (e *Entrada) TypedKey(k *fyne.KeyEvent) {
 // X11): el driver de pruebas escribe directamente en el editor. En solo lectura se
 // puede seleccionar y copiar, pero no cambiar el texto.
 func (e *Entrada) TypedShortcut(s fyne.Shortcut) {
+	if e.AlAtajo != nil && e.AlAtajo(s) {
+		return
+	}
 	if e.soloLectura {
 		switch s.(type) {
 		case *fyne.ShortcutCopy, *fyne.ShortcutSelectAll:

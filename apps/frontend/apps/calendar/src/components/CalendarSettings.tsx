@@ -151,6 +151,14 @@ export function CalendarSettings({ t, ajustes, onChange, onClose }: Props): JSX.
               poner({ numeroSemana: (e.currentTarget as HTMLInputElement).checked })
             }
           />
+          <Switch
+            data-ajuste="rechazados"
+            label={t('settings.declined')}
+            checked={ajustes.rechazados}
+            onChange={(e: Event) =>
+              poner({ rechazados: (e.currentTarget as HTMLInputElement).checked })
+            }
+          />
         </div>
       </SettingsSection>
     </SettingsShell>

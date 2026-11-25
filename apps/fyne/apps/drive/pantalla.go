@@ -21,7 +21,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/peticion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -78,9 +77,11 @@ type Pantalla struct {
 	avisos        *ui.PilaAvisos
 
 	raiz *fyne.Container
-	// capaSubir es el «Subir» flotante del teléfono (`MobileFab` en FileBrowser.tsx):
-	// la capa existe siempre y se esconde fuera de «Mi unidad» o sin red.
-	capaSubir *fyne.Container
+	// capaNuevo es el «+» flotante de crear (`BotonFlotante` en FileBrowser.tsx), en
+	// todos los anchos: abre el menú de «Nuevo» con «Subir» delante. La capa existe
+	// siempre y se esconde fuera de «Mi unidad» o sin red.
+	capaNuevo *fyne.Container
+	nuevo     *ui.BotonFlotante
 	// Plazo es cuánto se espera a una petición. Se deja abierto para el guardián.
 	Plazo time.Duration
 
@@ -315,19 +316,30 @@ func (p *Pantalla) Objeto() fyne.CanvasObject {
 	arm := ui.NuevoArmazon(vista)
 	arm.Menu = p.lateral.Objeto(v)
 	p.arm = arm
-	// «Subir» al alcance del pulgar: en el teléfono el botón de la cabecera queda arriba
-	// del todo. Por debajo de 768 lo coloca `CapaFlotante`; por encima, no se ve.
-	p.capaSubir = container.New(ui.CapaFlotante{},
-		ui.NuevoBotonFlotante(p.tr.T("files.upload", nil), iconos.Subir, p.elegirYSubir))
-	p.capaSubir.Hidden = !p.conSubirFlotante()
-	p.raiz = container.New(&medidorVentana{al: p.alMedir}, arm, p.capaSubir, p.avisos)
+	// Crear es el «+» flotante, abajo a la derecha y en todos los anchos, como «Redactar»
+	// en Mail: una sola puerta para subir y para crear, que antes eran «Nuevo» y «Subir»
+	// en la cabecera y otro «Subir» flotante en el teléfono (producto, 2026-11-25).
+	p.nuevo = ui.NuevoBotonFlotante(p.tr.T("files.new", nil), func() { p.menuNuevo(p.nuevo) })
+	p.capaNuevo = container.New(ui.CapaFlotante{}, p.nuevo)
+	p.ponerNuevo()
+	p.raiz = container.New(&medidorVentana{al: p.alMedir}, arm, p.capaNuevo, p.avisos)
 	return p.raiz
 }
 
-// conSubirFlotante dice si toca el «Subir» flotante: en «Mi unidad» y con red, que es
-// donde la web lo pinta (lo lleva el explorador, y sin red no se sube).
-func (p *Pantalla) conSubirFlotante() bool {
+// conNuevoFlotante dice si toca el «+» flotante: en «Mi unidad» y con red, que es donde
+// la web lo pinta (lo lleva el explorador, y sin red no se sube ni se crea).
+func (p *Pantalla) conNuevoFlotante() bool {
 	return p.seccion == MiUnidad && !p.explor.SinRed()
+}
+
+// ponerNuevo esconde el «+» donde no toca y lo apaga mientras algo ocupa el explorador
+// (`disabled={busy}`), como lo estaban «Nuevo» y «Subir» en la cabecera.
+func (p *Pantalla) ponerNuevo() {
+	p.capaNuevo.Hidden = !p.conNuevoFlotante()
+	if p.nuevo.Inerte != p.explor.Ocupado {
+		p.nuevo.Inerte = p.explor.Ocupado
+		p.nuevo.Refresh()
+	}
 }
 
 // medidorVentana es `container.NewStack` que además avisa del ancho que le toca.
@@ -442,7 +454,7 @@ func (p *Pantalla) Repintar() {
 		}
 	}
 	p.arm.Contenido, p.arm.Menu = p.vista(v), p.lateral.Objeto(v)
-	p.capaSubir.Hidden = !p.conSubirFlotante()
+	p.ponerNuevo()
 	p.arm.Refresh()
 	p.raiz.Refresh()
 	ui.RecolocarBarraSuite(p.raiz)
@@ -796,7 +808,6 @@ func (p *Pantalla) enganchar() {
 	e.AlSubir = p.elegirYSubir
 	e.AlCargarMas = p.cargarMas
 	e.AlMenu = p.menuElemento
-	e.AlNuevo = p.menuNuevo
 	p.lateral.AlAbrirDispositivos = p.abrirDispositivos
 
 	t := p.papelera

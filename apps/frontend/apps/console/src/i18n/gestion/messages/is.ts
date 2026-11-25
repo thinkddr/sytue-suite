@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const is: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Hvað viðkomandi má og hvers vegna',
+  'gestion.acceso.ver': 'Sýna',
+  'gestion.acceso.error': 'Ekki tókst að hlaða raunverulegum aðgangi.',
+  'gestion.acceso.ayuda':
+    'Sytue ID reiknar þetta með sömu reglu og það notar við heimildir. Hver heimild sýnir hvaðan hún kemur; ef þú fjarlægir upprunann skaltu skoða hina sem eru taldir hér.',
+  'gestion.acceso.sinPermisos': 'Engar stjórnunarheimildir.',
+  'gestion.acceso.fuente.integrado': 'Innbyggt hlutverk: {role}',
+  'gestion.acceso.fuente.rol': 'Hlutverk: {name}',
+  'gestion.acceso.fuente.elevacion': 'Hækkað í {name} til {when}',
+  'gestion.acceso.pendientes': 'Hækkanir sem bíða samþykkis',
+  'gestion.acceso.pendiente': '{role}, beðið um {when}',
+  'gestion.acceso.grupos': 'Hópar',
+  'gestion.acceso.sinGrupos': 'Ekki í neinum hópi.',
+  'gestion.acceso.calculado': 'Reiknað {when}',
+  'gestion.sesiones.titulo': 'Opnar lotur',
+  'gestion.sesiones.ver': 'Sýna',
+  'gestion.sesiones.error': 'Ekki tókst að hlaða lotunum.',
+  'gestion.sesiones.vacia': 'Engar opnar lotur.',
+  'gestion.sesiones.inicio': 'skráð inn {when}',
+  'gestion.sesiones.caduca': 'rennur út {when}',
+  'gestion.sesiones.mfa': 'Annar þáttur',
+  'gestion.sesiones.sinMfa': 'Aðeins lykilorð',
+  'gestion.sesiones.total': 'Opnar lotur: {count}',
+  'gestion.bajas.titulo': 'Lokaðir aðgangar sem enn má endurheimta',
+  'gestion.bajas.ayuda':
+    'Lokaður aðgangur heldur gögnunum í {days} daga. Endurheimt skilar honum í biðstöðu: virkjaðu hann aftur í notendaskránni til að veita aðgang á ný.',
+  'gestion.bajas.cerrada': 'lokað {when}',
+  'gestion.bajas.motivo': 'ástæða: {reason}',
+  'gestion.bajas.quedan': 'Dagar eftir: {count}',
+  'gestion.bajas.restaurar': 'Endurheimta',
+  'gestion.bajas.confirmarTitulo': 'Endurheimta {name}?',
+  'gestion.bajas.confirmar':
+    'Aðgangurinn kemur til baka í biðstöðu, með gögnunum. Enginn getur skráð sig inn fyrr en þú virkjar hann aftur.',
+  'gestion.bajas.restaurada': '{name} endurheimt',
+  'gestion.bajas.reactivar':
+    'Hann er í biðstöðu: virkjaðu hann í notendaskránni til að veita aðgang á ný.',
+  'gestion.bajas.fallo': 'Ekki tókst að endurheimta aðganginn',
+  'gestion.directorio.exportar': 'Flytja út CSV',
+  'gestion.dispositivos.buscar': 'Leita að einstaklingi, tæki eða IP',
+  'gestion.dispositivos.confianza': 'Sía eftir trausti',
+  'gestion.dispositivos.todos': 'Öll tæki',
+  'gestion.dispositivos.recuento': 'Sýnir {count} af {total}',
+  'gestion.dispositivos.sinResultados': 'Ekkert tæki passar.',
+  'gestion.auditoria.rango': 'Fljótlegt tímabil',
+  'gestion.auditoria.hoy': 'Í dag',
+  'gestion.auditoria.7d': '7 dagar',
+  'gestion.auditoria.30d': '30 dagar',
+  'gestion.roles.duplicar': 'Tvöfalda',
+  'gestion.roles.copia': '{name} (afrit)',
+  'gestion.lotes.titulo': 'Nýlegar fjöldaaðgerðir',
+  'gestion.lotes.ayuda': 'Hvað var gert fyrir marga í einu og hjá hverjum það tókst ekki.',
+  'gestion.lotes.ver': 'Sýna',
+  'gestion.lotes.error': 'Ekki tókst að hlaða fjöldaaðgerðum.',
+  'gestion.lotes.vacio': 'Engar fjöldaaðgerðir enn.',
+  'gestion.lotes.progreso': '{done} af {total}',
+  'gestion.lotes.accion.setRole': 'Breyta hlutverki',
+  'gestion.lotes.estado.ejecutando': 'Í gangi',
+  'gestion.lotes.estado.terminado': 'Lokið',
+  'gestion.lotes.estado.cancelado': 'Hætt við',
+  'gestion.lotes.estado.interrumpido': 'Rofið',
+  'gestion.lotes.detalle': 'Nánar',
+  'gestion.lotes.todosBien': 'Gert hjá öllum.',
+  'gestion.lote.fallos': 'Ekki gert hjá',
+  'gestion.lote.cerrar': 'Loka',
+  'gestion.lote.codigo.not_found': 'er ekki í þessari stofnun',
+  'gestion.lote.codigo.self': 'þetta ert þú',
+  'gestion.lote.codigo.forbidden': 'það þarf eigandaréttindi til að breyta eigandaaðgangi',
+  'gestion.lote.codigo.deleted': 'aðganginum hefur verið lokað',
+  'gestion.lote.codigo.last_owner': 'síðasti eigandi stofnunarinnar',
+  'gestion.lote.codigo.last_admin': 'síðasti stjórnandi stofnunarinnar',
+  'gestion.lote.codigo.error': 'óvænt villa; reyndu aftur',
+  'gestion.lote.seleccionarVisibles': 'Velja allt sýnilegt ({count})',
+  'gestion.lote.recortado':
+    'Fjöldaaðgerð nær að hámarki til {max} manns: fyrstu {max} sýnilegu eru valin.',
+};

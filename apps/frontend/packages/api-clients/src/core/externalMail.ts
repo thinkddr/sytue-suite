@@ -56,6 +56,34 @@ export function servesMail(account: Pick<ExternalMailAccount, 'services'>): bool
   return (account.services ?? ['mail']).includes('mail');
 }
 /**
+ * One entry per provider account for a picker that opens `service`.
+ *
+ * The gateway keeps an address connected for Mail and the same address connected
+ * for Calendar as two connections, and accounts connected twice before that rule
+ * existed are still listed: the Calendar, Contacts and Notes pickers showed the
+ * same address twice and picking the wrong one asked to sign in again. The entry
+ * kept is `keep` (what is already open), else the one that serves `service`, else
+ * a connected one; the first seen otherwise. Order follows first appearance.
+ */
+export function accountsFor(
+  items: ExternalMailAccount[],
+  service: LinkedService,
+  keep?: string,
+): ExternalMailAccount[] {
+  const score = (a: ExternalMailAccount): number =>
+    (a.instance_id === keep ? 4 : 0) +
+    (a.connected && (a.services ?? ['mail']).includes(service) ? 2 : 0) +
+    (a.connected ? 1 : 0);
+  const byAccount = new Map<string, ExternalMailAccount>();
+  for (const item of items) {
+    const address = item.address.trim().toLowerCase();
+    const key = address ? `${item.provider}|${address}` : `instance|${item.instance_id}`;
+    const seen = byAccount.get(key);
+    if (!seen || score(item) > score(seen)) byAccount.set(key, item);
+  }
+  return [...byAccount.values()];
+}
+/**
  * iCloud Mail offers no sign-in for other apps: it is IMAP and SMTP with an
  * app-specific password. Its servers are fixed, so Mail asks only for the
  * address and that password and saves an `imap` connection with these.

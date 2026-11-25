@@ -997,4 +997,11 @@ export const bg: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Свържи това приложение с акаунта си в {tenant}. Съществуващите ти права за достъп се запазват.',
   'nativeResource.approve': 'Свързване',
+  'channel.markRead': 'Маркирай като прочетено',
+  'channel.copyLink': 'Копирай връзката',
+  'channel.linkCopied': 'Връзката е копирана',
+  'channel.download': 'Изтегли разговора',
+  'channel.downloaded': 'Разговорът е запазен в',
+  'channel.downloadFailed': 'Разговорът не можа да бъде запазен',
+  'status.nothingUnread': 'Всичко вече беше прочетено',
 };

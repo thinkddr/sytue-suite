@@ -7,3 +7,21 @@
 /* Detectar clases usadas en las islas Preact y páginas de esta app. Lo que hay
    dentro de @sytue/ui lo declara el propio paquete. */
 @source '../**/*.{astro,ts,tsx}';
+
+/* Imprimir los códigos de recuperación y nada más (`imprimirCodigos`, en
+   lib/codigosRecuperacion.ts). `visibility` y no `display`: el bloque vive dentro de
+   la tarjeta y de la página, y esconder a sus antepasados con `display` lo
+   escondería a él también. */
+@media print {
+  html[data-imprimir='codigos'] body * {
+    visibility: hidden;
+  }
+  html[data-imprimir='codigos'] #codigos-recuperacion-imprimibles,
+  html[data-imprimir='codigos'] #codigos-recuperacion-imprimibles * {
+    visibility: visible;
+  }
+  html[data-imprimir='codigos'] #codigos-recuperacion-imprimibles {
+    position: absolute;
+    inset: 0 0 auto 0;
+  }
+}

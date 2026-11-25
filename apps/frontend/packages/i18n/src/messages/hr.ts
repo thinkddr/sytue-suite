@@ -394,10 +394,14 @@ export const hr: Catalog = {
   'import.fromGoogle': 'Prenesi iz Googlea',
   'import.fromMicrosoft': 'Prenesi iz Microsofta 365',
   'import.running': 'Kopiranje vaših podataka… dosad {count} stavki.',
-  'import.done': 'Preneseno {count} stavki, {skipped} izostavljeno.',
+  'import.done': '{what}: preneseno {count} stavki, {skipped} izostavljeno. Završeno {date}.',
   'import.someFailed':
     'Dio vaših podataka nije bilo moguće kopirati. Administracija vaše organizacije može vidjeti zašto.',
   'import.failed': 'Uvoz nije bilo moguće pokrenuti. Pokušajte ponovno za koji trenutak.',
+  'import.unavailable':
+    'Vezu s {source} trenutačno nije moguće čitati: istekla je, opozvana je ili nikad nije autorizirana. Zamolite administraciju organizacije da je ponovno poveže.',
+  'import.needsAdmin':
+    'Veza s {source} još ne može kopirati podatke svake osobe. Zamolite administraciju organizacije da dovrši postavljanje.',
   'dataflow.label': 'Što se događa s podacima',
   'dataflow.in.title': 'Samo ulazi u Sytue One',
   'dataflow.in.body':

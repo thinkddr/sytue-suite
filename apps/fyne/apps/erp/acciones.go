@@ -243,6 +243,7 @@ func (p *Pantalla) abrirFicha(r, semilla *Registro) {
 	}
 	if r != nil {
 		p.cargarSeguimiento(f)
+		p.cargarEstadoCuenta(f)
 	}
 }
 
@@ -337,6 +338,7 @@ func (p *Pantalla) engancharFicha(f *Ficha) {
 		p.avisar(ui.AvisoInfo, p.t("form.copiedId"))
 	}
 	f.AlDescargar = func(que string) { p.descargar(f, que) }
+	f.AlRecordar = func() { p.dialogoRecordatorio(f) }
 	f.AlPlanear = func() {
 		f.Planificando = !f.Planificando
 		p.Repintar()
@@ -963,11 +965,12 @@ func (p *Pantalla) exportar(ids []string) {
 		return
 	}
 	l := p.lista
-	m, q, estado := l.Modelo.Clave, l.Busqueda, l.Estado
+	// En el orden de la lista: quien ordena por importe y exporta espera el fichero así.
+	m, q, estado, orden := l.Modelo.Clave, l.Busqueda, l.Estado, l.Orden
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		cuerpo, nombre, err := p.svc.Exportar(ctx, m, q, estado, ids)
+		cuerpo, nombre, err := p.svc.ExportarEnOrden(ctx, m, q, estado, ids, orden.Campo, orden.Asc)
 		p.guardarYAbrir(cuerpo, nombre, err)
 	})
 }
@@ -1353,6 +1356,7 @@ func (p *Pantalla) cargarPortada() {
 	conPerfil := p.Organizacion != nil && p.PuedeLeer("obligaciones")
 	b.CargandoResumen = true
 	p.cargarFacturacion()
+	p.cargarCartera()
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()

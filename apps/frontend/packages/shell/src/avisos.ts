@@ -15,6 +15,8 @@ export type FuenteAvisos = Pick<
   'notifications' | 'contadores' | 'markRead' | 'markAllRead'
 > & {
   streamNotifications: () => Promise<FlujoAvisos>;
+  /** «Marcar como no leído». Opcional: la campana no lo ofrece; la bandeja del portal sí. */
+  markUnread?: HubClient['markUnread'];
 };
 
 /** Lo que se usa de un `EventSource`. */
@@ -97,7 +99,10 @@ export const ESPERA_MAX_MS = 30_000;
 
 export interface Avisos {
   leer: (id: string) => Promise<void>;
-  leerTodos: () => Promise<void>;
+  /** Devuelve uno a «sin leer» (sin `markUnread` en la fuente, no hace nada). */
+  desleer: (id: string) => Promise<void>;
+  /** Todos, o con `origen` solo los de ese producto (el filtro de la bandeja). */
+  leerTodos: (origen?: string) => Promise<void>;
   reintentar: () => void;
   /** Trae la página siguiente, la de detrás del último de la lista. */
   masAntiguos: () => Promise<void>;
@@ -416,14 +421,40 @@ export function conectarAvisos(
         }
       });
     },
-    leerTodos() {
+    desleer(id) {
+      return escribir(async () => {
+        const antes = estado.items.find((n) => n.id === id);
+        if (!antes || !antes.read || !hub.markUnread) return;
+        poner({
+          items: estado.items.map((n) => (n.id === id ? { ...n, read: false } : n)),
+          sinLeer: estado.sinLeer + 1,
+        });
+        try {
+          await hub.markUnread(id);
+        } catch {
+          if (cerrado) return;
+          poner({
+            items: estado.items.map((n) => (n.id === id ? { ...n, read: true } : n)),
+            sinLeer: Math.max(0, estado.sinLeer - 1),
+          });
+        }
+      });
+    },
+    leerTodos(origen) {
       return escribir(async () => {
         const antes = estado;
         const antesPorId = new Map(antes.items.map((n) => [n.id, n.read]));
         const recibidosAntes = recibidosSinLeer;
-        poner({ items: estado.items.map((n) => ({ ...n, read: true })), sinLeer: 0 });
+        // Con un producto, solo se apagan los suyos: el contador baja en los que se
+        // ven, y la recarga de después (`escribir`) trae la cuenta exacta de la base.
+        const toca = (n: Notification) => !origen || n.source === origen;
+        const apagados = antes.items.filter((n) => toca(n) && !n.read).length;
+        poner({
+          items: estado.items.map((n) => (toca(n) ? { ...n, read: true } : n)),
+          sinLeer: origen ? Math.max(0, estado.sinLeer - apagados) : 0,
+        });
         try {
-          await hub.markAllRead();
+          await (origen ? hub.markAllRead(origen) : hub.markAllRead());
         } catch {
           if (cerrado) return;
           poner({

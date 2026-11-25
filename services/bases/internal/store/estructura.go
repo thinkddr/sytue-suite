@@ -43,13 +43,14 @@ func leerCampo(rows pgx.Rows) (domain.Campo, error) {
 		return c, err
 	}
 	var o struct {
-		Choices  []string    `json:"choices"`
-		Formula  string      `json:"formula"`
-		Result   domain.Tipo `json:"result"`
-		Currency string      `json:"currency"`
+		Choices  []string        `json:"choices"`
+		Formula  string          `json:"formula"`
+		Result   domain.Tipo     `json:"result"`
+		Currency string          `json:"currency"`
+		Default  json.RawMessage `json:"default"`
 	}
 	_ = json.Unmarshal(opts, &o)
-	c.Choices, c.Formula, c.Result, c.Currency = o.Choices, o.Formula, o.Result, o.Currency
+	c.Choices, c.Formula, c.Result, c.Currency, c.Default = o.Choices, o.Formula, o.Result, o.Currency, o.Default
 	return c, nil
 }
 
@@ -347,6 +348,52 @@ func (s *Store) CambiarOpciones(ctx context.Context, a domain.Actor, campo strin
 			return err
 		}
 		return auditar(ctx, tx, a, base, &tabla, nil, &campo, "field.options", antes, jsonDe(opciones))
+	})
+}
+
+// CambiarDefecto fija (o, con nil, quita) el valor por defecto de un campo
+// (propietario). Vive en `options` junto a las opciones y la fórmula: es configuración
+// del campo y no necesita columna. No toca los registros que ya hay: el defecto es para
+// los que se den de alta desde ahora.
+func (s *Store) CambiarDefecto(ctx context.Context, a domain.Actor, campo string, raw json.RawMessage) error {
+	return s.en(ctx, a, func(tx pgx.Tx) error {
+		tabla, base, err := tablaDeCampo(ctx, tx, a, campo)
+		if err != nil {
+			return err
+		}
+		if err := autorizar(ctx, tx, a, base, tabla, domain.AccEsquema); err != nil {
+			return err
+		}
+		rows, err := tx.Query(ctx, `
+			SELECT id::text, table_id::text, name, kind, options, coalesce(link_table_id::text, ''), position
+			  FROM base_fields WHERE id = $1 AND tenant = $2`, campo, a.Tenant)
+		if err != nil {
+			return err
+		}
+		var c domain.Campo
+		if rows.Next() {
+			c, err = leerCampo(rows)
+		} else {
+			err = domain.ErrNoExiste
+		}
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		v, err := domain.ValidarDefecto(c, raw)
+		if err != nil {
+			return err
+		}
+		if v == nil {
+			_, err = tx.Exec(ctx, `UPDATE base_fields SET options = options - 'default' WHERE id = $1 AND tenant = $2`, campo, a.Tenant)
+		} else {
+			_, err = tx.Exec(ctx, `UPDATE base_fields SET options = options || jsonb_build_object('default', $3::jsonb) WHERE id = $1 AND tenant = $2`,
+				campo, a.Tenant, []byte(v))
+		}
+		if err != nil {
+			return err
+		}
+		return auditar(ctx, tx, a, base, &tabla, nil, &campo, "field.default", c.Default, v)
 	})
 }
 

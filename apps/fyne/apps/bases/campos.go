@@ -32,6 +32,7 @@ const (
 	accionRenombrar accionCampo = iota
 	accionFormula
 	accionOpciones
+	accionDefecto
 	accionBorrar
 )
 
@@ -44,6 +45,8 @@ func (p *Pantalla) alCampo(accion accionCampo, campo api.BasesField) {
 		p.dialogoFormulaCampo(campo)
 	case accionOpciones:
 		p.dialogoOpcionesCampo(campo)
+	case accionDefecto:
+		p.dialogoDefectoCampo(campo)
 	case accionBorrar:
 		p.dialogoBorrarCampo(campo)
 	}

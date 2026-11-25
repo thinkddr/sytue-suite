@@ -39,6 +39,20 @@ export function planDeZip(
   return { ficheros, fuera: seleccion.length - validas + (validas - ficheros.length) };
 }
 
+/**
+ * El nombre del ZIP de un álbum entero: su título, sin lo que un sistema de ficheros
+ * no acepta en un nombre (`/`, `\`, `:`…), y el respaldo («Fotos») si se queda en nada.
+ */
+export function prefijoDeAlbum(titulo: string, respaldo: string): string {
+  const limpio = titulo
+    // eslint-disable-next-line no-control-regex -- los de control tampoco valen en un nombre
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+  return limpio || respaldo;
+}
+
 /** Nombre del ZIP sin extensión (Drive añade «.zip»): «Fotos 2026-11-10». */
 export function nombreDeZip(prefijo: string, hoy: Date): string {
   const d = (n: number) => String(n).padStart(2, '0');

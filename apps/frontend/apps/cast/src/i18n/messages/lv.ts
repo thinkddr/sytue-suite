@@ -365,4 +365,8 @@ export const lv: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Noņemt no publiskās lapas',
   'moderation.action.unpublish': 'Atsaukt publicēšanu',
   'moderation.action.block': 'Bloķēt personu organizācijā',
+  'player.loop': 'Atkārtot',
+  'watch.chapters': 'Nodaļas',
+  'watch.jumpTo': 'Pāriet uz {time}',
+  'share.startAt': 'Sākt no {time}',
 };

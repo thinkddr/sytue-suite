@@ -125,10 +125,12 @@ func (h *Handlers) montar(r chi.Router) {
 	j.Get("/tables/{tid}/views", h.listarVistas)
 	j.Post("/tables/{tid}/views", h.crearVista)
 	j.Get("/tables/{tid}/export", h.exportar)
+	j.Get("/tables/{tid}/summary", h.resumir)
 
 	j.Patch("/fields/{fid}", h.renombrarCampo)
 	j.Delete("/fields/{fid}", h.borrarCampo)
 	j.Get("/records/{rid}", h.obtenerRegistro)
+	j.Post("/records/{rid}/duplicate", h.duplicarRegistro)
 	j.Put("/records/{rid}/cells/{fid}", h.escribirCelda)
 	j.Get("/bases/{id}/events", h.flujoDeCambios)
 	j.Put("/bases/{id}/presence", h.latir)

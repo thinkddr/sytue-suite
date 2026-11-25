@@ -1310,6 +1310,9 @@ export const es: AppCatalog<typeof en> = {
     'Se ejecuta en segundo plano; puedes ver el estado en unos minutos.',
   'apps.toast.testFailed': 'La conexión ha fallado',
   'apps.toast.actionFailed': 'No se ha podido completar',
+  'apps.toast.oauthExists': 'Esa cuenta ya estaba conectada',
+  'apps.toast.oauthExistsHint':
+    'Se ha mantenido la conexión que había, {name}. Vuelve a conectarla desde la lista si ha dejado de funcionar.',
   'apps.toast.gatewayDown': 'El servicio de la aplicación o Sytue ID no responden ahora mismo.',
 
   // --- Inicio de sesión único (SSO) -----------------------------------------
@@ -2921,6 +2924,8 @@ export const es: AppCatalog<typeof en> = {
     '{app} no responde ahora mismo. No es culpa de tus datos: vuelve a probar en un minuto.',
   'wizard.app.fix.generic':
     'No hemos podido conectar. Revisa los datos del paso anterior y prueba otra vez.',
+  'wizard.app.fix.alreadyConnected':
+    'Esa cuenta de {app} ya está conectada. Usa la conexión que hay o vuelve a conectarla desde la lista si ha dejado de funcionar.',
   'wizard.app.toast.activateFailed': 'No se ha podido activar',
   'wizard.app.fix.activateBadData':
     'Revisa los datos del paso «Configurar»: no hemos podido dar de alta el inicio de sesión.',

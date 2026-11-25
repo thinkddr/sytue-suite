@@ -58,6 +58,9 @@ function montar(onDialogo: (d: Dialogo) => void = () => undefined): HTMLElement 
       onDosPaginas={nada}
       leyendo={false}
       onLeer={nada}
+      onDescargarTexto={nada}
+      onResumenComentarios={nada}
+      onCopiarPagina={nada}
       pagina={1}
       total={3}
       onIrA={nada}

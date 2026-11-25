@@ -394,10 +394,15 @@ export const ga: Catalog = {
   'import.fromGoogle': 'Tabhair ó Google é',
   'import.fromMicrosoft': 'Tabhair ó Microsoft 365 é',
   'import.running': 'Do chuid sonraí á gcóipeáil… {count} mír go dtí seo.',
-  'import.done': '{count} mír tugtha anall, {skipped} fágtha ar lár.',
+  'import.done':
+    '{what}: {count} mír tugtha anall, {skipped} fágtha ar lár. Críochnaithe ar {date}.',
   'import.someFailed':
     'Níorbh fhéidir cuid de do chuid sonraí a chóipeáil. Feicfidh do riarthóir cén fáth.',
   'import.failed': 'Níorbh fhéidir an t-iompórtáil a thosú. Bain triail eile as ar ball.',
+  'import.unavailable':
+    'Ní féidir an nasc le {source} a léamh faoi láthair: tá sé imithe in éag, cúlghairmeadh é nó níor údaraíodh riamh é. Iarr ar do riarthóir é a nascadh arís.',
+  'import.needsAdmin':
+    'Ní féidir leis an nasc le {source} sonraí gach duine a chóipeáil fós. Iarr ar do riarthóir an socrú a chríochnú.',
   'dataflow.label': 'Cad a tharlaíonn do na sonraí',
   'dataflow.in.title': 'Ní thagann sé ach isteach i Sytue One',
   'dataflow.in.body':

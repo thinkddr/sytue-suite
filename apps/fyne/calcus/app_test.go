@@ -272,8 +272,8 @@ func TestLaCintaDeCalcusEsLaDeLaWeb(t *testing.T) {
 	if got := strings.Join(grupos(vis[1].Cuerpo(ctx)), ","); got != quiero {
 		t.Errorf("los grupos de Datos son %s", got)
 	}
-	// «Fórmulas»: el análisis de hipótesis (el asistente solo sale con servicio de IA).
-	if got := strings.Join(grupos(vis[2].Cuerpo(ctx)), ","); got != "group.whatIf" {
+	// «Fórmulas»: Σ y el análisis de hipótesis (el asistente solo sale con servicio de IA).
+	if got := strings.Join(grupos(vis[2].Cuerpo(ctx)), ","); got != "group.functions,group.whatIf" {
 		t.Errorf("los grupos de Fórmulas son %s", got)
 	}
 	// Y los botones mandan: la negrita de la cinta llega a la celda.

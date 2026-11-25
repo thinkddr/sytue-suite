@@ -391,4 +391,35 @@ export const nucleo = {
 
   'forms.empty': 'Vēl nav atbilžu',
   'forms.empty_help': 'Kad kāds iesniegs veidlapu jūsu vietnē, tā būs redzama šeit.',
+  'sites.search': 'Meklēt vietnes',
+  'sites.search_empty': 'Neviena vietne neatbilst “{q}”.',
+  'sites.sort_label': 'Kārtot vietnes',
+  'sites.sort_recent': 'Nesen rediģētās',
+  'sites.sort_name': 'Nosaukums (A–Ž)',
+  'sites.view_live': 'Skatīt vietni',
+  'sites.view_live_aria': 'Skatīt publicēto {nombre} (atveras jaunā cilnē)',
+  'seo.title': 'Ko redzēs meklētāji',
+  'seo.intro':
+    'Melnraksta pārskats: virsraksti, apraksti un attēli, no kuriem atkarīgi meklētāji un ekrāna lasītāji. Tie ir brīdinājumi; tie netraucē publicēt.',
+  'seo.open_editor': 'Atvērt redaktoru',
+  'seo.recheck': 'Pārbaudīt vēlreiz',
+  'seo.error': 'Pārskatu neizdevās ielādēt. Mēģiniet vēlreiz.',
+  'seo.all_good':
+    'Viss kārtībā: katrai lapai ir virsraksts un apraksts, un attēliem ir alternatīvais teksts.',
+  'seo.summary': 'Brīdinājumi: {count}',
+  'seo.badge_warning': 'Uzlabot',
+  'seo.badge_info': 'Piezīme',
+  'seo.on_page': 'Lapa: {page}',
+  'seo.title_missing': 'Lapai nav virsraksta: meklētājs to izdomās pats.',
+  'seo.title_long': 'Virsrakstā ir {count} rakstzīmes; ietilpst ap 60, pirms meklētājs to apgriež.',
+  'seo.title_duplicate':
+    'Citai lapai ir tāds pats virsraksts: rezultātos tās konkurēs savā starpā.',
+  'seo.description_missing': 'Lapai nav apraksta: meklētājs rādīs nejaušu teksta fragmentu.',
+  'seo.description_long': 'Aprakstā ir {count} rakstzīmes; tiek rādītas ap 160.',
+  'seo.image_alt_missing':
+    'Attēli bez alternatīvā teksta: {count}. Ekrāna lasītāji un meklētāji nezina, ko tie rāda; atzīmējiet tos kā dekoratīvus, ja tie neko nerāda.',
+  'seo.page_noindex': 'Šī lapa ir paslēpta no meklētājiem (noindex).',
+  'seo.site_noindex': 'Visa vietne ir paslēpta no meklētājiem (noindex).',
+  'seo.share_image_missing':
+    'Vietnei nav kopīgošanas attēla: saites ziņās un sociālajos tīklos tiks rādītas bez attēla.',
 };

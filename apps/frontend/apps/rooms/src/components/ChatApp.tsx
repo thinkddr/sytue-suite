@@ -139,6 +139,13 @@ import {
   localMinutesNow,
 } from '../lib/mentions.js';
 import { unreadDividerIndex } from '../lib/unread.js';
+import { useCopiarConAviso } from './AccionesDeMensaje.js';
+import { enTandas, TANDA_DE_LEIDOS } from '../lib/enTandas.js';
+import {
+  conversacionEnTexto,
+  descargarTexto,
+  nombreDeConversacion,
+} from '../lib/conversacionEnTexto.js';
 import { applyCardVotes, toggleMyCardVote } from '../lib/cards.js';
 import {
   applyReactionDelta,
@@ -2939,12 +2946,48 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       onSelect: () => setNotifyLevel(c, lvl),
     });
     const items: MenuEntry[] = [
+      // «Marcar como leído» sin abrirlo: lo que se ha visto en el móvil, o lo que no
+      // hace falta leer. Solo con algo pendiente: en uno al día no hace nada.
+      ...((c.unread ?? 0) > 0 || (c.mentions ?? 0) > 0
+        ? ([
+            {
+              key: 'read',
+              label: t('channel.markRead'),
+              icon: <Icon name="check" size={16} />,
+              onSelect: () => marcarCanalLeido(c),
+            },
+          ] as MenuEntry[])
+        : []),
       {
         key: 'fav',
         label: c.favorite ? t('channel.unfavourite') : t('channel.favourite'),
         icon: <StarGlyph size={16} filled={c.favorite ?? false} />,
         onSelect: () => toggleFavorite(c),
       },
+      // El enlace al canal, para pegarlo en un correo, una nota o un documento: abre la
+      // conversación a quien ya está dentro.
+      {
+        key: 'link',
+        label: t('channel.copyLink'),
+        icon: <Icon name="link" size={16} />,
+        onSelect: () => copiarEnlaceDeCanal(channelLink(c.id), t('channel.linkCopied')),
+      },
+      // La conversación ABIERTA en un .txt, con lo que hay cargado: para guardar un
+      // acuerdo o leerla sin conexión. Se arma aquí, con los mensajes ya descifrados.
+      ...(c.id === activeId && messages.length > 0
+        ? ([
+            {
+              key: 'download',
+              label: t('channel.download'),
+              icon: <Icon name="download" size={16} />,
+              onSelect: () =>
+                descargarTexto(
+                  nombreDeConversacion(c.name, new Date()),
+                  conversacionEnTexto(c.name, messages),
+                ),
+            },
+          ] as MenuEntry[])
+        : []),
       'separator',
       levelItem('all', t('notify.levelAll')),
       levelItem('mentions', t('notify.levelMentions')),
@@ -3853,10 +3896,30 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
   // «Marcar todo como leído»: contadores a cero en el acto y una llamada por canal
   // con algo pendiente. Si alguna falla, el siguiente sondeo repone su contador.
+  // «Marcar como leído» de UNA fila: el contador a cero ya y el acuse al servicio; si
+  // falla, el siguiente refresco de los no leídos lo vuelve a poner.
+  const marcarCanalLeido = (c: Channel) => {
+    setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread: 0, mentions: 0 } : x)));
+    void markRead(c.id).catch(() => undefined);
+  };
+  const copiarEnlaceDeCanal = useCopiarConAviso(t);
+
   const marcarTodoLeido = useCallback(() => {
     const pendientes = channels.filter((c) => (c.unread ?? 0) > 0 || (c.mentions ?? 0) > 0);
+    // Con nada pendiente, decirlo: «0 conversaciones» parecía un fallo.
+    if (pendientes.length === 0) {
+      toast.notify({ tone: 'info', title: t('status.nothingUnread') });
+      return;
+    }
     setChannels((prev) => prev.map((c) => ({ ...c, unread: 0, mentions: 0 })));
-    void Promise.allSettled(pendientes.map((c) => markRead(c.id))).then(() =>
+    // En tandas (`enTandas`): con cien canales pendientes eran cien peticiones a la vez,
+    // y el tope por persona del servicio devolvía 429 a parte de ellas sin que nadie lo
+    // viera — esos canales volvían a salir sin leer en el siguiente recuento.
+    void enTandas(
+      pendientes.map((c) => c.id),
+      TANDA_DE_LEIDOS,
+      (id) => markRead(id),
+    ).then(() =>
       toast.notify({
         tone: 'success',
         title: t('status.markedAllRead', { count: pendientes.length }),

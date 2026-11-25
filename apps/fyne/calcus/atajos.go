@@ -110,10 +110,32 @@ func (r *Rejilla) SeleccionarEnteras(filas bool) {
 	r.Refresh()
 }
 
-// atajoDeHoja atiende los de este fichero que llegan con Ctrl (⌘ en el Mac). Ctrl+; y
-// Ctrl+/ valen con Mayúsculas o sin ellas: en un teclado español los dos signos van con
-// Mayúsculas, y lo que se busca es el signo. Devuelve si era uno de ellos.
+// formatosDeAtajo son los formatos de número con teclado, por la TECLA (Control+Mayús+1,
+// 3, 4 y 5, los de Sheets), como `FORMATOS_DE_ATAJO` de la web. Con Control también en el
+// Mac, como Excel: ⌘⇧3, ⌘⇧4 y ⌘⇧5 son las capturas de pantalla del sistema.
+var formatosDeAtajo = map[fyne.KeyName]string{
+	fyne.Key1: "thousands", fyne.Key3: "date", fyne.Key4: "currency", fyne.Key5: "percent",
+}
+
+// hojaVecina es `hojaVecina`: la de al lado, sin dar la vuelta.
+func hojaVecina(activa, total, dir int) int { return max(0, min(total-1, activa+dir)) }
+
+// mandar pasa un comando de la cinta al lienzo, que es quien lo ejecuta.
+func (r *Rejilla) mandar(cmd editor.Comando, valor string) {
+	if r.AlMandar != nil {
+		r.AlMandar(cmd, valor)
+	}
+}
+
+// atajoDeHoja atiende los de este fichero. Ctrl+; y Ctrl+/ valen con Mayúsculas o sin
+// ellas: en un teclado español los dos signos van con Mayúsculas, y lo que se busca es el
+// signo. Alt+= es la Σ de Excel; Ctrl+AvPág y Ctrl+RePág (también con Mayúsculas, el de
+// Sheets) cambian de hoja; Control+Mayús+cifra pone un formato de número. Devuelve si
+// era uno de ellos.
 func (r *Rejilla) atajoDeHoja(k fyne.KeyName, mod fyne.KeyModifier) bool {
+	if r.atajoDeHerramientas(k, mod) {
+		return true
+	}
 	ctrl := fyne.KeyModifierShortcutDefault
 	switch {
 	case mod&^fyne.KeyModifierShift == ctrl && k == fyne.KeySlash:
@@ -129,6 +151,23 @@ func (r *Rejilla) atajoDeHoja(k fyne.KeyName, mod fyne.KeyModifier) bool {
 	case (mod == ctrl || mod == fyne.KeyModifierControl) && k == fyne.KeySpace:
 		// En el Mac, ⌃Espacio, como Excel: ⌘+Espacio lo coge Spotlight y no llega.
 		r.SeleccionarEnteras(false)
+	default:
+		return false
+	}
+	return true
+}
+
+// atajoDeHerramientas son Alt+=, Ctrl+AvPág/RePág y Control+Mayús+cifra.
+func (r *Rejilla) atajoDeHerramientas(k fyne.KeyName, mod fyne.KeyModifier) bool {
+	switch {
+	case mod&^fyne.KeyModifierShift == fyne.KeyModifierAlt && k == fyne.KeyEqual:
+		r.mandar(CmdAutosuma, "SUM")
+	case mod&^fyne.KeyModifierShift == fyne.KeyModifierShortcutDefault && (k == fyne.KeyPageDown || k == fyne.KeyPageUp):
+		if r.AlHojaVecina != nil {
+			r.AlHojaVecina(map[bool]int{true: 1, false: -1}[k == fyne.KeyPageDown])
+		}
+	case mod == fyne.KeyModifierControl|fyne.KeyModifierShift && formatosDeAtajo[k] != "":
+		r.mandar(CmdFormatoNum, formatosDeAtajo[k])
 	default:
 		return false
 	}
@@ -185,6 +224,7 @@ var gruposHoja = []struct {
 		{[]string{"{tab}", "Shift+{tab}"}, "sheet.shortcuts.tab"},
 		{[]string{"{esc}"}, "sheet.shortcuts.escape"},
 		{[]string{"Ctrl+G", "F5"}, "sheet.shortcuts.goTo"},
+		{[]string{"Ctrl+{pageDown}", "Ctrl+{pageUp}"}, "sheet.shortcuts.sheets"},
 	}},
 	{"sheet.shortcuts.group.select", []filaAtajo{
 		{[]string{"Shift+→"}, "sheet.shortcuts.extend"},
@@ -198,6 +238,8 @@ var gruposHoja = []struct {
 		{[]string{"Ctrl+D"}, "sheet.shortcuts.fillDown"},
 		{[]string{"Ctrl+R"}, "sheet.shortcuts.fillRight"},
 		{[]string{"Ctrl+;"}, "sheet.shortcuts.today"},
+		{[]string{"Alt+="}, "sheet.autosum"},
+		{[]string{"Control+Shift+1", "Control+Shift+3", "Control+Shift+4", "Control+Shift+5"}, "sheet.shortcuts.numberFormats"},
 		{[]string{"Ctrl+C"}, "cmd.copy"},
 		{[]string{"Ctrl+X"}, "cmd.cut"},
 		{[]string{"Ctrl+V"}, "cmd.paste"},
@@ -226,7 +268,7 @@ func teclaDeHojaPara(goos, combinacion string, t func(string) string) string {
 	}
 	if resto, ok := strings.CutPrefix(combinacion, "Control+"); ok {
 		if goos == "darwin" || goos == "ios" {
-			return "⌃" + resto
+			return "⌃" + strings.ReplaceAll(resto, "Shift+", "⇧")
 		}
 		combinacion = "Ctrl+" + resto
 	}

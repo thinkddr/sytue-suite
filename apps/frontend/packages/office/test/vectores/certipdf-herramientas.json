@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "nota": "El texto fuera del PDF en CertiPDF: renglones de una página, el texto entero y el resumen de comentarios. La web los recorre en pdf-herramientas.test.ts y Go en apps/fyne/apps/certipdf/herramientas_test.go. En `resumen`, las páginas se rotulan «Página N», los tipos con su nombre tal cual y el anónimo «Anónimo».",
+  "lineas": [
+    {
+      "fragmentos": [
+        { "texto": "cliente", "x": 120, "y": 700, "tamano": 12 },
+        { "texto": "Estimado", "x": 50, "y": 701, "tamano": 12 },
+        { "texto": "Gracias.", "x": 50, "y": 650, "tamano": 12 },
+        { "texto": "  ", "x": 50, "y": 600, "tamano": 12 }
+      ],
+      "sale": ["Estimado cliente", "Gracias."]
+    },
+    { "fragmentos": [], "sale": [] }
+  ],
+  "texto": [
+    {
+      "paginas": [
+        [{ "texto": "Uno", "x": 10, "y": 10, "tamano": 10 }],
+        null,
+        [{ "texto": "Tres", "x": 10, "y": 10, "tamano": 10 }]
+      ],
+      "sale": "Uno\n\n\n\nTres\n"
+    },
+    { "paginas": [], "sale": "" }
+  ],
+  "resumen": [
+    {
+      "anotaciones": [
+        {
+          "pagina": 2,
+          "tipo": "Text",
+          "rect": [0, 0, 1, 1],
+          "texto": "Revisar\nesta cifra",
+          "autor": "Ana"
+        },
+        { "pagina": 0, "tipo": "Highlight", "rect": [0, 0, 1, 1], "texto": "Importante" },
+        {
+          "pagina": 2,
+          "tipo": "Text",
+          "rect": [0, 0, 1, 1],
+          "texto": "Hecho",
+          "autor": "Luis",
+          "respuesta_a": 0
+        },
+        { "pagina": 1, "tipo": "Ink", "rect": [0, 0, 1, 1] }
+      ],
+      "sale": "Página 1\nHighlight · Anónimo: Importante\n\nPágina 3\nText · Ana: Revisar esta cifra\n  ↳ Text · Luis: Hecho\n"
+    },
+    { "anotaciones": [{ "pagina": 0, "tipo": "Ink", "rect": [0, 0, 1, 1] }], "sale": "" }
+  ]
+}

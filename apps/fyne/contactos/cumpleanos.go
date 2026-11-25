@@ -22,6 +22,8 @@ type Cumpleanos struct {
 	Dias int
 	// Edad son los años que cumple. 0: el servicio no sabe el año.
 	Edad int
+	// Aniversario: es su ANNIVERSARY y no su cumpleaños; la lista lo dice.
+	Aniversario bool
 }
 
 // ProximosCumpleanos son los de `contactos` en los próximos `ventana` días desde
@@ -31,11 +33,8 @@ type Cumpleanos struct {
 func ProximosCumpleanos(contactos []api.Contact, hoy time.Time, ventana int) []Cumpleanos {
 	inicio := time.Date(hoy.Year(), hoy.Month(), hoy.Day(), 0, 0, 0, 0, hoy.Location())
 	var fuera []Cumpleanos
-	for _, c := range contactos {
-		mes, dia, anyo, ok := cumpleDe(c)
-		if !ok {
-			continue
-		}
+	// El cumpleaños y, si lo hay, el aniversario: los dos son «el día de alguien».
+	poner := func(c api.Contact, mes time.Month, dia, anyo int, aniversario bool) {
 		f := time.Date(inicio.Year(), mes, dia, 0, 0, 0, 0, inicio.Location())
 		if f.Before(inicio) {
 			f = time.Date(inicio.Year()+1, mes, dia, 0, 0, 0, 0, inicio.Location())
@@ -44,13 +43,21 @@ func ProximosCumpleanos(contactos []api.Contact, hoy time.Time, ventana int) []C
 		// convertir «mañana» en «hoy».
 		dias := int(f.Sub(inicio).Round(24*time.Hour) / (24 * time.Hour))
 		if dias > ventana {
-			continue
+			return
 		}
-		cu := Cumpleanos{Contacto: c, Fecha: f, Dias: dias}
-		if anyo > 1000 {
+		cu := Cumpleanos{Contacto: c, Fecha: f, Dias: dias, Aniversario: aniversario}
+		if anyo > 1000 && !aniversario {
 			cu.Edad = f.Year() - anyo
 		}
 		fuera = append(fuera, cu)
+	}
+	for _, c := range contactos {
+		if mes, dia, anyo, ok := cumpleDe(c); ok {
+			poner(c, mes, dia, anyo, false)
+		}
+		if a := c.Anniversary; a != nil {
+			poner(c, a.Month(), a.Day(), a.Year(), true)
+		}
 	}
 	// ESTABLE y solo por días: a igualdad se queda el orden de entrada, que es el
 	// alfabético del idioma con el que ya viene la libreta (`ordenar`).

@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const nb: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Hva personen kan gjøre, og hvorfor',
+  'gestion.acceso.ver': 'Vis',
+  'gestion.acceso.error': 'Den faktiske tilgangen kunne ikke lastes inn.',
+  'gestion.acceso.ayuda':
+    'Beregnes av Sytue ID med samme regel som brukes ved autorisering. Hver tillatelse viser hvor den kommer fra; fjerner du kilden, sjekk de andre som står her.',
+  'gestion.acceso.sinPermisos': 'Ingen administrasjonstillatelser.',
+  'gestion.acceso.fuente.integrado': 'Innebygd rolle: {role}',
+  'gestion.acceso.fuente.rol': 'Rolle: {name}',
+  'gestion.acceso.fuente.elevacion': 'Hevet til {name} til {when}',
+  'gestion.acceso.pendientes': 'Hevinger som venter på godkjenning',
+  'gestion.acceso.pendiente': '{role}, bedt om {when}',
+  'gestion.acceso.grupos': 'Grupper',
+  'gestion.acceso.sinGrupos': 'Er ikke med i noen gruppe.',
+  'gestion.acceso.calculado': 'Beregnet {when}',
+  'gestion.sesiones.titulo': 'Åpne økter',
+  'gestion.sesiones.ver': 'Vis',
+  'gestion.sesiones.error': 'Øktene kunne ikke lastes inn.',
+  'gestion.sesiones.vacia': 'Ingen åpne økter.',
+  'gestion.sesiones.inicio': 'logget inn {when}',
+  'gestion.sesiones.caduca': 'utløper {when}',
+  'gestion.sesiones.mfa': 'Annen faktor',
+  'gestion.sesiones.sinMfa': 'Bare passord',
+  'gestion.sesiones.total': 'Åpne økter: {count}',
+  'gestion.bajas.titulo': 'Lukkede kontoer du fortsatt kan gjenopprette',
+  'gestion.bajas.ayuda':
+    'En lukket konto beholder dataene sine i {days} dager. Gjenoppretting gir den tilbake suspendert: aktiver den igjen i katalogen for å gi tilgang.',
+  'gestion.bajas.cerrada': 'lukket {when}',
+  'gestion.bajas.motivo': 'årsak: {reason}',
+  'gestion.bajas.quedan': 'Dager igjen: {count}',
+  'gestion.bajas.restaurar': 'Gjenopprett',
+  'gestion.bajas.confirmarTitulo': 'Gjenopprette {name}?',
+  'gestion.bajas.confirmar':
+    'Kontoen kommer tilbake suspendert, med dataene sine. Ingen kan logge inn med den før du aktiverer den igjen.',
+  'gestion.bajas.restaurada': '{name} gjenopprettet',
+  'gestion.bajas.reactivar': 'Den er suspendert: aktiver den i katalogen for å gi tilgang igjen.',
+  'gestion.bajas.fallo': 'Kontoen kunne ikke gjenopprettes',
+  'gestion.directorio.exportar': 'Eksporter CSV',
+  'gestion.dispositivos.buscar': 'Søk etter person, enhet eller IP',
+  'gestion.dispositivos.confianza': 'Filtrer etter tillit',
+  'gestion.dispositivos.todos': 'Alle enheter',
+  'gestion.dispositivos.recuento': 'Viser {count} av {total}',
+  'gestion.dispositivos.sinResultados': 'Ingen enheter samsvarer.',
+  'gestion.auditoria.rango': 'Hurtigvalg av periode',
+  'gestion.auditoria.hoy': 'I dag',
+  'gestion.auditoria.7d': '7 dager',
+  'gestion.auditoria.30d': '30 dager',
+  'gestion.roles.duplicar': 'Dupliser',
+  'gestion.roles.copia': '{name} (kopi)',
+  'gestion.lotes.titulo': 'Siste massehandlinger',
+  'gestion.lotes.ayuda':
+    'Hva som ble brukt på flere personer samtidig, og hvem det ikke kunne brukes på.',
+  'gestion.lotes.ver': 'Vis',
+  'gestion.lotes.error': 'Massehandlingene kunne ikke lastes inn.',
+  'gestion.lotes.vacio': 'Ingen massehandlinger ennå.',
+  'gestion.lotes.progreso': '{done} av {total}',
+  'gestion.lotes.accion.setRole': 'Endre rolle',
+  'gestion.lotes.estado.ejecutando': 'Kjører',
+  'gestion.lotes.estado.terminado': 'Fullført',
+  'gestion.lotes.estado.cancelado': 'Avbrutt',
+  'gestion.lotes.estado.interrumpido': 'Avbrutt underveis',
+  'gestion.lotes.detalle': 'Detaljer',
+  'gestion.lotes.todosBien': 'Brukt på alle.',
+  'gestion.lote.fallos': 'Ikke brukt på',
+  'gestion.lote.cerrar': 'Lukk',
+  'gestion.lote.codigo.not_found': 'er ikke i denne organisasjonen',
+  'gestion.lote.codigo.self': 'det er deg',
+  'gestion.lote.codigo.forbidden': 'bare en eier kan endre en eier',
+  'gestion.lote.codigo.deleted': 'kontoen er lukket',
+  'gestion.lote.codigo.last_owner': 'organisasjonens siste eier',
+  'gestion.lote.codigo.last_admin': 'organisasjonens siste administrator',
+  'gestion.lote.codigo.error': 'uventet feil; prøv igjen',
+  'gestion.lote.seleccionarVisibles': 'Velg alle synlige ({count})',
+  'gestion.lote.recortado':
+    'En massehandling omfatter høyst {max} personer: de første {max} synlige er valgt.',
+};

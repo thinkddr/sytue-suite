@@ -213,7 +213,10 @@ function RootToastProvider({ children }: { children: ComponentChildren }): JSX.E
     [notify, dismiss, registerDialog],
   );
 
-  // El hueco del diálogo de encima, si hay uno, o la esquina de la ventana.
+  // El hueco del diálogo de encima, si hay uno, o la esquina de la ventana. Con el «+»
+  // flotante de la app en la misma esquina (BotonFlotante.tsx), los avisos suben por
+  // encima de él: los dos a la vez se pisaban, y el «Deshacer» de un aviso quedaba
+  // justo donde el dedo va a crear.
   const pila =
     visibles.length > 0 ? (
       <div
@@ -222,6 +225,8 @@ function RootToastProvider({ children }: { children: ComponentChildren }): JSX.E
           outlet
             ? 'px-5 pb-3'
             : 'fixed right-[max(1rem,var(--sytue-safe-right,0px))] bottom-[max(1rem,var(--sytue-safe-bottom,0px))] w-[calc(100%_-_max(1rem,var(--sytue-safe-left,0px))_-_max(1rem,var(--sytue-safe-right,0px)))] max-w-sm',
+          !outlet &&
+            '[body:has([data-sytue-fab])_&]:bottom-[calc(max(1rem,var(--sytue-safe-bottom,0px))+4.5rem)]',
         )}
         style={outlet ? undefined : { zIndex: 'var(--z-toast)' }}
       >

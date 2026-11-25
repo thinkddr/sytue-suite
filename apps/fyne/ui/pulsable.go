@@ -67,8 +67,17 @@ var (
 	_ desktop.Mouseable = (*pulsable)(nil)
 )
 
-// Tapped es el clic del ratón y el toque del dedo.
-func (p *pulsable) Tapped(*fyne.PointEvent) { p.activar() }
+// Tapped es el clic del ratón y el toque del dedo. Si la pulsación elige algo, la pista
+// que lo envuelve se cierra: hasta el 2026-11-25 solo lo hacía `BotonIcono`, y en los
+// demás controles la burbuja abierta al pasar se quedaba encima del menú o de la vista
+// que se acababa de abrir, hasta que el puntero saliera.
+func (p *pulsable) Tapped(*fyne.PointEvent) {
+	if p.Inerte || p.AlPulsar == nil {
+		return
+	}
+	p.activar()
+	p.pista.alPulsar()
+}
 
 func (p *pulsable) activar() {
 	if p.Inerte || p.AlPulsar == nil {

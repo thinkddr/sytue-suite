@@ -54,12 +54,31 @@ let ultimoCierre = Number.NEGATIVE_INFINITY;
  */
 function crearTemporizador(setOpen: (fn: (antes: boolean) => boolean) => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // El foco que llega de una PULSACIÓN no abre la ayuda. Chromium enfoca el botón en el
+  // `mousedown`, DESPUÉS del `pointerdown` que la cierra, así que el foco la volvía a
+  // abrir al instante: la campana de la barra dejaba «Notificaciones» flotando encima del
+  // panel que acababa de abrir (medido en el banco de la barra, 2026-11-25), y lo mismo
+  // cualquier botón de icono que abre un menú. Se gasta en el primer foco y se olvida al
+  // soltar (`click`) o al perderlo: Safari no enfoca al pulsar y no puede quedarse puesto.
+  let porPuntero = false;
   const abrir = (): void => {
     clearTimeout(timer);
     setOpen(() => true);
   };
   return {
     abrir,
+    pulsar: (): void => {
+      porPuntero = true;
+    },
+    olvidarPulsacion: (): void => {
+      porPuntero = false;
+    },
+    /** El foco abre al instante, salvo el que trae una pulsación (ver `porPuntero`). */
+    enfocar: (el: EventTarget | null): void => {
+      const pulsado = porPuntero;
+      porPuntero = false;
+      if (!pulsado && focoDeTeclado(el)) abrir();
+    },
     programar: (): void => {
       clearTimeout(timer);
       if (Date.now() - ultimoCierre < GRUPO) abrir();
@@ -76,6 +95,21 @@ function crearTemporizador(setOpen: (fn: (antes: boolean) => boolean) => void) {
       clearTimeout(timer);
     },
   };
+}
+
+/**
+ * Si el foco es de los que el navegador marca (`:focus-visible`): el del teclado, o el
+ * que un menú devuelve a su disparador al cerrarse con Escape. El que vuelve tras un clic
+ * fuera NO lo es, y por eso tampoco abre la ayuda encima de lo que se acaba de cerrar.
+ * Donde el selector no se entiende, se abre: perder la ayuda del teclado es peor.
+ */
+function focoDeTeclado(el: EventTarget | null): boolean {
+  if (!(el instanceof Element)) return true;
+  try {
+    return el.matches(':focus-visible');
+  } catch {
+    return true;
+  }
 }
 
 type Lado = 'top' | 'bottom' | 'right' | 'left';
@@ -132,7 +166,10 @@ export function Tooltip({ label, children, placement = 'top' }: TooltipProps): J
   const [ancla, setAncla] = useState<HTMLElement | null>(null);
   const panelRef = useRef<HTMLSpanElement | null>(null);
 
-  const { abrir, programar, cerrar, soltar } = useMemo(() => crearTemporizador(setOpen), []);
+  const { programar, cerrar, soltar, pulsar, olvidarPulsacion, enfocar } = useMemo(
+    () => crearTemporizador(setOpen),
+    [],
+  );
   useEffect(() => soltar, [soltar]);
 
   // Escape cierra la ayuda sin tocar el foco ni la acción (WAI-ARIA APG): un tooltip que
@@ -215,17 +252,23 @@ export function Tooltip({ label, children, placement = 'top' }: TooltipProps): J
       onFocus: (e: Event) => {
         llamar(p.onFocus ?? p.onfocusin, e);
         recordar(e);
-        abrir();
+        enfocar(e.currentTarget);
       },
       onBlur: (e: Event) => {
         llamar(p.onBlur ?? p.onfocusout, e);
+        olvidarPulsacion();
         cerrar();
       },
       // Pulsar el control descarta la ayuda: ya se ha elegido, y si abre un menú la
-      // ayuda quedaría encima de él.
+      // ayuda quedaría encima de él. Y el foco que llega detrás no la vuelve a abrir.
       onPointerDown: (e: Event) => {
         llamar(p.onPointerDown, e);
+        pulsar();
         cerrar();
+      },
+      onClick: (e: Event) => {
+        llamar(p.onClick, e);
+        olvidarPulsacion();
       },
     };
     // `aria-describedby` va en el CONTROL: el lector de pantalla anuncia la descripción

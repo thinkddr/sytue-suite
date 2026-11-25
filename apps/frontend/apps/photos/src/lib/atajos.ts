@@ -13,7 +13,7 @@ import type { GrupoDeAtajos } from '@sytue/ui';
 import type { PhotosMessageKey, T } from '../i18n/index.js';
 
 /** Lo que hace una tecla en la galería (la línea de tiempo y Favoritas). */
-export type AccionDeGaleria = 'subir' | 'salirDeSeleccion' | 'ayuda';
+export type AccionDeGaleria = 'subir' | 'buscar' | 'salirDeSeleccion' | 'ayuda';
 
 /** Lo que hace una tecla con el visor abierto. */
 export type AccionDelVisor =
@@ -24,6 +24,8 @@ export type AccionDelVisor =
   | 'pase'
   | 'ficha'
   | 'tamanyoReal'
+  | 'favorita'
+  | 'editar'
   | 'papelera'
   | 'cerrar'
   | 'ayuda';
@@ -42,6 +44,9 @@ interface FilaDeAtajo<A> {
 const GALERIA: FilaDeAtajo<AccionDeGaleria>[] = [
   // El atajo que pulsa el menú nativo de la app de escritorio.
   { teclas: ['u'], accion: 'subir', descripcion: 'gallery.add' },
+  // «/» lleva al buscador, como en Drive, Mail y la búsqueda de la suite: buscar una
+  // foto por su nombre o por lo que sale en ella era ir a por el ratón.
+  { teclas: ['/'], accion: 'buscar', descripcion: 'gallery.search' },
   { teclas: ['Escape'], accion: 'salirDeSeleccion', descripcion: 'gallery.cancelSelection' },
   { teclas: ['?'], accion: 'ayuda', descripcion: 'shortcuts.help' },
 ];
@@ -58,6 +63,10 @@ const VISOR: FilaDeAtajo<AccionDelVisor>[] = [
   { teclas: [' '], accion: 'pase', descripcion: 'shortcuts.slideshow' },
   { teclas: ['i'], accion: 'ficha', descripcion: 'shortcuts.info' },
   { teclas: ['z'], accion: 'tamanyoReal', descripcion: 'shortcuts.zoom' },
+  // Las dos cosas que más se hacen con una foto abierta, sin buscar su botón: el
+  // corazón y el editor.
+  { teclas: ['f'], accion: 'favorita', descripcion: 'shortcuts.favorite' },
+  { teclas: ['e'], accion: 'editar', descripcion: 'viewer.edit' },
   { teclas: ['Delete', 'Backspace'], accion: 'papelera', descripcion: 'viewer.delete' },
   { teclas: ['Escape'], accion: 'cerrar', descripcion: 'viewer.close' },
   { teclas: ['?'], accion: 'ayuda', descripcion: 'shortcuts.help' },
@@ -113,6 +122,8 @@ export interface OpcionesDelVisor {
   saltos?: boolean;
   /** Supr tira la foto a la papelera. */
   papelera?: boolean;
+  /** F marca o desmarca la favorita (un álbum compartido no la ofrece). */
+  favorita?: boolean;
 }
 
 function grupo<A>(t: T, titulo: PhotosMessageKey, filas: FilaDeAtajo<A>[]): GrupoDeAtajos {
@@ -134,12 +145,13 @@ function grupo<A>(t: T, titulo: PhotosMessageKey, filas: FilaDeAtajo<A>[]): Grup
 export function gruposDeAtajos(
   t: T,
   donde: 'galeria' | 'visor',
-  { saltos = true, papelera = true }: OpcionesDelVisor = {},
+  { saltos = true, papelera = true, favorita = true }: OpcionesDelVisor = {},
 ): GrupoDeAtajos[] {
   const visor = VISOR.filter(
     (f) =>
       (saltos || (f.accion !== 'primera' && f.accion !== 'ultima')) &&
-      (papelera || f.accion !== 'papelera'),
+      (papelera || f.accion !== 'papelera') &&
+      (favorita || f.accion !== 'favorita'),
   );
   const delVisor = grupo(t, 'shortcuts.group.viewer', visor);
   if (donde === 'visor') return [delVisor];

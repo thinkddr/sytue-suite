@@ -20,6 +20,8 @@ type ResumenFormulario struct {
 	Enabled bool
 	Notify  []domain.StoreNotifyPerson
 	Total   int
+	// SinLeer son las respuestas que nadie ha marcado como leídas (read_at NULL).
+	SinLeer int
 }
 
 // Formularios devuelve, en una transacción, el IR en vivo del sitio (nil si no está
@@ -35,9 +37,11 @@ func (s *Store) Formularios(ctx context.Context, tenant string, siteID uuid.UUID
 			return err
 		}
 		rows, err := tx.Query(ctx, `
-			SELECT coalesce(f.form_id, n.form_id), coalesce(f.enabled, true), coalesce(f.notify, '[]'::jsonb), coalesce(n.total, 0)
+			SELECT coalesce(f.form_id, n.form_id), coalesce(f.enabled, true), coalesce(f.notify, '[]'::jsonb),
+			       coalesce(n.total, 0), coalesce(n.sin_leer, 0)
 			  FROM (SELECT form_id, enabled, notify FROM form_settings WHERE site_id = $1 AND tenant = $2) f
-			  FULL JOIN (SELECT form_id, count(*) AS total FROM form_submissions
+			  FULL JOIN (SELECT form_id, count(*) AS total, count(*) FILTER (WHERE read_at IS NULL) AS sin_leer
+			               FROM form_submissions
 			              WHERE site_id = $1 AND tenant = $2 GROUP BY form_id) n ON n.form_id = f.form_id`,
 			siteID, tenant)
 		if err != nil {
@@ -48,7 +52,7 @@ func (s *Store) Formularios(ctx context.Context, tenant string, siteID uuid.UUID
 			var id string
 			var r ResumenFormulario
 			var notify []byte
-			if err := rows.Scan(&id, &r.Enabled, &notify, &r.Total); err != nil {
+			if err := rows.Scan(&id, &r.Enabled, &notify, &r.Total, &r.SinLeer); err != nil {
 				return err
 			}
 			_ = json.Unmarshal(notify, &r.Notify)
@@ -104,4 +108,50 @@ func (s *Store) ListarEnvios(ctx context.Context, tenant string, siteID uuid.UUI
 		return rows.Err()
 	})
 	return out, err
+}
+
+// MarcarEnviosLeidos marca como leídas (o vuelve a dejar sin leer) respuestas de un
+// formulario y devuelve cuántas CAMBIARON. Con `ids` vacío y `leidas`, marca todas
+// las que quedaban sin leer: es el «marcar todo como leído» de la bandeja.
+//
+// Marcar no reescribe la hora de una ya leída (coalesce): «leída el martes» sigue
+// siendo verdad aunque se vuelva a pulsar el jueves. Y solo toca las filas que de
+// verdad cambian, para que el recuento devuelto sea el que la pantalla resta.
+func (s *Store) MarcarEnviosLeidos(ctx context.Context, tenant string, siteID uuid.UUID, formID string, ids []uuid.UUID, leidas bool) (int64, error) {
+	var n int64
+	err := s.enSitio(ctx, tenant, siteID, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE form_submissions
+			   SET read_at = CASE WHEN $5 THEN coalesce(read_at, now()) ELSE NULL END
+			 WHERE site_id = $1 AND tenant = $2 AND form_id = $3
+			   AND (cardinality($4::uuid[]) = 0 OR id = ANY($4::uuid[]))
+			   AND (read_at IS NULL) = $5`,
+			siteID, tenant, formID, ids, leidas)
+		if err != nil {
+			return err
+		}
+		n = tag.RowsAffected()
+		return nil
+	})
+	return n, err
+}
+
+// BorrarEnvio borra UNA respuesta de un formulario: lo que se hace cuando quien la
+// escribió pide que se borren sus datos (RGPD, art. 17). No hay papelera a propósito:
+// una respuesta «borrada» que sigue guardada no está borrada. Devuelve
+// ErrFormularioNoExiste si no había nada que borrar con ese id en ese formulario.
+func (s *Store) BorrarEnvio(ctx context.Context, tenant string, siteID uuid.UUID, formID string, id uuid.UUID) error {
+	return s.enSitio(ctx, tenant, siteID, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			DELETE FROM form_submissions
+			 WHERE site_id = $1 AND tenant = $2 AND form_id = $3 AND id = $4`,
+			siteID, tenant, formID, id)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.ErrFormularioNoExiste
+		}
+		return nil
+	})
 }

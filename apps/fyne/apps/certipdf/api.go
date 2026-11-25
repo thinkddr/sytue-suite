@@ -306,8 +306,15 @@ func TramosDelIndice(indice []Marcador, total int) []Tramo {
 // hace una pausa donde no la hay—. Se agrupan por altura y se ordenan por posición, que
 // es como se leería en papel.
 func TextoParaLeer(frags []Fragmento) string {
+	return strings.Join(LineasDeTexto(frags), ". ")
+}
+
+// LineasDeTexto es `lineasDeTexto`: los renglones de una página en el orden en que se leen
+// en papel. TextoParaLeer los une con una pausa para la voz; «Descargar el texto» y
+// «Copiar el texto de la página», uno por renglón.
+func LineasDeTexto(frags []Fragmento) []string {
 	if len(frags) == 0 {
-		return ""
+		return nil
 	}
 	// Dos fragmentos son de la misma línea si sus bases caen dentro de media altura de
 	// letra. Con un umbral fijo, un pie de página de 6 pt y un título de 30 pt no
@@ -348,5 +355,5 @@ func TextoParaLeer(frags []Fragmento) string {
 			salida = append(salida, linea)
 		}
 	}
-	return strings.Join(salida, ". ")
+	return salida
 }

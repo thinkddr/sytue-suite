@@ -306,6 +306,9 @@ export const papelera = () =>
 export const restaurar = (id: string) =>
   mandar<void>('POST', `/api/v1/assets/${encodeURIComponent(id)}/restore`);
 
+/** Saca TODA la papelera de vuelta a la galería, en una petición. Dice cuántas. */
+export const restaurarTodo = () => mandar<{ restored: number }>('POST', '/api/v1/trash/restore');
+
 /**
  * Marca o desmarca una favorita. El VALOR va en el cuerpo y no se alterna en el
  * servidor: dos pulsaciones rápidas —o un reintento— tienen que dejar la foto

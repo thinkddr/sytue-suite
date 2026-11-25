@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Utelukk organisasjonen fra den automatiske Sytue AI-kjøringen",
   "aiBatch.excludedHint": "Organisasjonen er utelukket fra den automatiske Sytue AI-kjøringen. Nye bilder behandles ikke i bakgrunnen for forslag eller likhet.",
   "album.coverSet": "Albumomslaget er oppdatert",
+  "album.download": "Last ned album",
   "album.isCover": "Dette er albumomslaget",
   "album.linkCopied": "Lenke kopiert",
   "album.newLink": "Ny lenke",
@@ -257,6 +258,7 @@
   "public.count": "{count} bilder",
   "public.notFound": "Denne lenken er ikke gyldig lenger.",
   "public.title": "Delt album",
+  "shortcuts.favorite": "Merk eller fjern som favoritt",
   "shortcuts.first": "Første bilde",
   "shortcuts.group.gallery": "Galleri",
   "shortcuts.group.viewer": "Visning",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Slettes i dag",
   "trash.restore": "Gjenopprett",
+  "trash.restoreAll": "Gjenopprett alt",
+  "trash.restoredAll": "Tilbake i bildene dine: {count}",
   "trash.retention": {
     "one": "Bilder du fjerner fra galleriet, blir her i 1 dag og kan gjenopprettes frem til da.",
     "other": "Bilder du fjerner fra galleriet, blir her i {count} dager og kan gjenopprettes frem til da."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Tekniske detaljer",
   "viewer.infoUploaded": "Lastet opp (ingen EXIF-dato)",
   "viewer.next": "Neste bilde",
+  "viewer.openInDrive": "Se originalen i Sytue Drive",
   "viewer.prev": "Forrige bilde",
   "viewer.rotate": "Roter 90°",
   "viewer.rotateFailed": "Bildet kunne ikke roteres.",

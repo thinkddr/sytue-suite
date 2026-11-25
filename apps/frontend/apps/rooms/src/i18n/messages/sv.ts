@@ -997,4 +997,11 @@ export const sv: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Anslut den här appen till ditt konto i {tenant}. Dina nuvarande åtkomstbehörigheter finns kvar.',
   'nativeResource.approve': 'Anslut',
+  'channel.markRead': 'Markera som läst',
+  'channel.copyLink': 'Kopiera länk',
+  'channel.linkCopied': 'Länk kopierad',
+  'channel.download': 'Ladda ned konversationen',
+  'channel.downloaded': 'Konversationen sparad i',
+  'channel.downloadFailed': 'Det gick inte att spara konversationen',
+  'status.nothingUnread': 'Allt var redan läst',
 };

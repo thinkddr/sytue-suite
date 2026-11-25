@@ -23,6 +23,8 @@ export const MAX_CUERPO_ENVIO = 96 * 1024;
 export interface DefinicionFormulario {
   name: string;
   fields: BasesField[];
+  /** Los ids de los campos que hay que rellenar (el servicio lo vuelve a exigir). */
+  required?: string[];
 }
 
 /** Las cabeceras que se reenvían al servicio: solo la IP de quien pregunta, para el límite. */

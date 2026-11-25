@@ -1088,4 +1088,11 @@ export const it: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Collega questa app al tuo account in {tenant}. Le autorizzazioni di accesso attuali restano invariate.',
   'nativeResource.approve': 'Collega',
+  'channel.markRead': 'Segna come letto',
+  'channel.copyLink': 'Copia link',
+  'channel.linkCopied': 'Link copiato',
+  'channel.download': 'Scarica la conversazione',
+  'channel.downloaded': 'Conversazione salvata in',
+  'channel.downloadFailed': 'Impossibile salvare la conversazione',
+  'status.nothingUnread': 'Era già tutto letto',
 };

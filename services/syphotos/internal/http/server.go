@@ -140,6 +140,7 @@ func NewRouter(d Deps) http.Handler {
 		api.Delete("/trash", h.Purgar)
 		api.Delete("/trash/{id}", h.Purgar)
 		api.Post("/assets/{id}/restore", h.Restaurar)
+		api.Post("/trash/restore", h.RestaurarTodo)
 		api.Get("/albums", h.Albumes)
 		api.Post("/albums", h.CrearAlbum)
 		api.Get("/albums/{album}", h.Album)

@@ -373,4 +373,8 @@ export const en = {
   'moderation.action.unlist': 'Remove from the public page',
   'moderation.action.unpublish': 'Unpublish',
   'moderation.action.block': 'Block the person in the organisation',
+  'player.loop': 'Loop',
+  'watch.chapters': 'Chapters',
+  'watch.jumpTo': 'Go to {time}',
+  'share.startAt': 'Start at {time}',
 } as const;

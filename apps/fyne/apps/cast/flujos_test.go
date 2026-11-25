@@ -742,6 +742,15 @@ func TestVerReproduceElWebM(t *testing.T) {
 	if !a.reproductor.Silenciado() {
 		t.Error("M no silencia")
 	}
+	// J/L, Inicio/Fin y 0–9 (DestinoDeTecla): 5 lleva a la mitad, Inicio al principio.
+	a.tecla(&fyne.KeyEvent{Name: fyne.Key5})
+	if p, d := a.reproductor.Posicion(), a.reproductor.Duracion(); p < d/2-200*time.Millisecond || p > d/2+200*time.Millisecond {
+		t.Errorf("5 deja la posición en %v de %v", p, d)
+	}
+	a.tecla(&fyne.KeyEvent{Name: fyne.KeyHome})
+	if p := a.reproductor.Posicion(); p != 0 {
+		t.Errorf("Inicio deja la posición en %v", p)
+	}
 	a.Ir(RutaInicio) // suelta el reproductor
 	if a.reproductor != nil || a.fuente != nil {
 		t.Error("salir de la página no suelta el reproductor")

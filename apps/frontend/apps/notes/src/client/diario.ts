@@ -13,6 +13,41 @@ export type Enfoque = (typeof ENFOQUES)[number];
 export function diaLocal(d = new Date()): string {
   return `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/**
+ * El día que deja el selector de «Ir a…», si hay que ir a alguno: una fecha válida
+ * (`AAAA-MM-DD`, lo que da `<input type="date">`) y distinta de la abierta. Vaciar el
+ * campo, o volver a elegir el mismo día, no abre nada.
+ */
+export function diaElegido(valor: string, abierto: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor) || valor === abierto) return null;
+  const d = new Date(`${valor}T12:00:00`);
+  return Number.isNaN(d.getTime()) || diaLocal(d) !== valor ? null : valor;
+}
+
+/**
+ * Abre el selector de fecha del sistema del campo de «Ir a…». `showPicker` es lo que
+ * lo despliega desde un botón; donde no está, el foco en el campo deja escribirla.
+ */
+export function abrirSelectorDeDia(campo: HTMLInputElement | null): void {
+  if (!campo) return;
+  try {
+    if (typeof campo.showPicker === 'function') {
+      campo.showPicker();
+      return;
+    }
+  } catch {
+    // Sin gesto del usuario o en un marco ajeno: se cae al foco.
+  }
+  campo.focus();
+}
+
+/** «Ayer» o «Mañana» si `dia` lo es respecto de `hoy` (los dos `AAAA-MM-DD`); si no, null. */
+export function diaRelativo(dia: string, hoy: string): 'daily.yesterday' | 'daily.tomorrow' | null {
+  if (dia === desplazarDia(hoy, -1)) return 'daily.yesterday';
+  if (dia === desplazarDia(hoy, 1)) return 'daily.tomorrow';
+  return null;
+}
+
 export function desplazarDia(dia: string, delta: number): string {
   const d = new Date(`${dia}T12:00:00`);
   d.setDate(d.getDate() + delta);

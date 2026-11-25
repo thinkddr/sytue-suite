@@ -19,6 +19,7 @@ import {
   papelera,
   purgar,
   restaurar,
+  restaurarTodo,
   textoAlternativo,
   urlDeVariante,
   vaciarPapelera,
@@ -101,6 +102,23 @@ function Papelera({
     }
   };
 
+  // «Restaurar todo»: sin pregunta, porque no destruye nada —lo restaurado se puede
+  // volver a tirar—, y en UNA petición: tras borrar una carpeta entera por error eran
+  // cientos de clics en «Restaurar».
+  const [restaurando, setRestaurando] = useState(false);
+  const volverTodas = async () => {
+    setRestaurando(true);
+    try {
+      const { restored } = await restaurarTodo();
+      setFotos([]);
+      setAviso(t('trash.restoredAll', { count: restored }));
+    } catch (e) {
+      avisarFallo(e);
+    } finally {
+      setRestaurando(false);
+    }
+  };
+
   const vaciandoTodo = confirmando === 'todas';
 
   return (
@@ -109,7 +127,16 @@ function Papelera({
         <div class="flex flex-wrap items-center gap-2">
           <Nav t={t} locale={locale} activa="trash" />
           {fotos && fotos.length > 0 ? (
-            <span class="mb-4 ml-auto">
+            <span class="mb-4 ml-auto flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<Icon name="undo" />}
+                disabled={restaurando}
+                onClick={() => void volverTodas()}
+              >
+                {t('trash.restoreAll')}
+              </Button>
               <Button
                 variant="danger"
                 size="sm"

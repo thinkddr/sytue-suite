@@ -1128,6 +1128,7 @@ func (c *carrilDiapos) rehacer() {
 		t.Activa = i == e.activa
 		t.AlMover = func(hasta int) { e.Mover(i, hasta) }
 		t.AlOcultar = func() { e.AlternarOculta(i) }
+		t.AlDuplicar = func() { e.Elegir(i); e.Duplicar() }
 		t.AlAtajo = e.ctx.AtajoDelEditor
 		t.Rotulo = func(clave string, n, total int) string {
 			return e.ctx.Traducir(clave, i18n.Vars{"n": n, "total": total})

@@ -383,4 +383,9 @@ export const it: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'La modifica avviene su questo dispositivo e viene salvata crittografata come nuova versione della foto.',
   'gallery.encrypted.albumEmpty': 'Questo album crittografato non contiene ancora foto.',
+  'shortcuts.favorite': 'Aggiungi o togli dai preferiti',
+  'trash.restoreAll': 'Ripristina tutto',
+  'trash.restoredAll': 'Tornate nelle tue foto: {count}',
+  'album.download': 'Scarica l’album',
+  'viewer.openInDrive': 'Vedi l’originale in Sytue Drive',
 };

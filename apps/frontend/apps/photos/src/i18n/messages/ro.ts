@@ -402,4 +402,9 @@ export const ro: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Editarea se face pe acest dispozitiv și se salvează criptat ca versiune nouă a fotografiei.',
   'gallery.encrypted.albumEmpty': 'Acest album criptat nu are încă fotografii.',
+  'shortcuts.favorite': 'Marchează sau elimină de la favorite',
+  'trash.restoreAll': 'Restaurează tot',
+  'trash.restoredAll': 'Înapoi în fotografiile tale: {count}',
+  'album.download': 'Descarcă albumul',
+  'viewer.openInDrive': 'Vezi originalul în Sytue Drive',
 };

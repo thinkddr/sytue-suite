@@ -219,20 +219,21 @@ export function GlobalSearch(): JSX.Element {
     />
   );
 
+  // EL COMBOBOX ES EL CAMPO, no la caja que lo envuelve (patrón de WAI-ARIA 1.2, el
+  // mismo de `PaletaDeComandos`). Estaba en un `<div>` que nunca tiene el foco, y el
+  // lector de pantalla solo sigue `aria-activedescendant` en el elemento ENFOCADO: al
+  // bajar con las flechas el resultado se marcaba en pantalla y no se anunciaba nada, ni
+  // si la lista estaba abierta (medido en el banco: el campo enfocado sin `role`, sin
+  // `aria-expanded` y sin `aria-activedescendant`).
+  const marcado = open && ordenados.length > 0 ? `sytue-opt-${activo}` : undefined;
   return (
-    <div
-      ref={boxRef}
-      role="combobox"
-      aria-expanded={open}
-      aria-haspopup="listbox"
-      aria-controls="sytue-search-results"
-      aria-owns="sytue-search-results"
-      aria-activedescendant={open && ordenados.length > 0 ? `sytue-opt-${activo}` : undefined}
-      tabIndex={-1}
-      class="relative w-full max-w-[480px]"
-      onKeyDown={onKeyDown}
-    >
+    <div ref={boxRef} class="relative w-full max-w-[480px]">
       <Input
+        role="combobox"
+        aria-expanded={open}
+        aria-autocomplete="list"
+        aria-controls={open ? 'sytue-search-results' : undefined}
+        {...(marcado ? { 'aria-activedescendant': marcado } : {})}
         // `id`/`name`: sin ellos Chrome lo marca como campo sin identificar y el
         // autocompletado del navegador no sabe qué es.
         id="sytue-busqueda-global"
@@ -245,6 +246,8 @@ export function GlobalSearch(): JSX.Element {
           if (results.length > 0 || error) setOpen(true);
         }}
         onBlur={() => setEnfocado(false)}
+        // En el campo, que es el combobox y donde se queda el foco mientras se marca.
+        onKeyDown={onKeyDown}
         placeholder={t('search.placeholder')}
         aria-label={t('search.label')}
         // Píldora PERFILADA sobre la barra de tinta —velo y borde blancos—: un campo
@@ -372,6 +375,11 @@ export function GlobalSearch(): JSX.Element {
                                 marcado ? 'bg-selected' : 'hover:bg-bg-subtle',
                               )}
                               onMouseEnter={() => setActivo(i)}
+                              // Con el foco en un resultado (se llega con Tab), Escape
+                              // sigue cerrando y devolviendo el foco al campo.
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') onKeyDown(e);
+                              }}
                             >
                               <span
                                 class="text-text block truncate text-base font-medium"

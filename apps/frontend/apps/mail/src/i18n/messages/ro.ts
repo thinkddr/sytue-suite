@@ -1023,4 +1023,14 @@ export const ro: AppCatalog<typeof en> = {
     'Sistemul de corespondență anterior nu mai este disponibil. Până nu îți muți corespondența în seif, nu vei primi corespondență nouă: ce ți se trimite între timp așteaptă pe serverul expeditorului, care reîncearcă timp de câteva zile. Dacă faci mutarea la timp, îți va sosi după aceea; dacă nu, expeditorul va fi anunțat că nu a putut fi livrat. Ce este deja criptat cu sistemul anterior, ca și corespondența pe care o aveai deja, nu va putea fi citit: nu se șterge, dar nimeni nu îl va putea deschide. După mutare, corespondența îți sosește din nou și se deschide cu autentificarea Sytue ID, ca restul aplicațiilor.',
   'privateMail.vaultMoveCheckFailed':
     'Starea corespondenței tale nu a putut fi verificată. Reîncearcă peste o clipă.',
+  'shortcuts.goInbox': 'Accesați Mesaje primite',
+  'shortcuts.goSent': 'Accesați Trimise',
+  'shortcuts.goDrafts': 'Accesați Ciorne',
+  'shortcuts.goArchive': 'Accesați Arhivă',
+  'compose.sendAndArchive': 'Trimiteți și arhivați',
+  'reader.copyAddress': 'Copiați adresa',
+  'reader.addressCopied': 'Adresă copiată',
+  'reader.copyAddressFailed': 'Adresa nu a putut fi copiată',
+  'reader.viewPlain': 'Afișează ca text simplu',
+  'reader.viewFormatted': 'Afișează cu formatare',
 };

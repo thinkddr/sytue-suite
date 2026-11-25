@@ -57,6 +57,9 @@ type App struct {
 	Abridor api.Abridor
 	Apex    string
 	Org     func() string
+	// Almacen guarda lo que la web deja en `localStorage` por persona: el orden de la
+	// libreta (orden.go). Nil: por nombre, sin guardar.
+	Almacen Almacen
 	// ElegirFichero abre el selector de ficheros del sistema con esas extensiones y le
 	// pasa a `listo` lo leído, en el hilo de la interfaz. nil: no hay selector, y
 	// «Importar» sale apagado.
@@ -275,6 +278,7 @@ func (a *App) enganchar() {
 	p.AlReintentarEtiquetas = func() { a.programar(a.cargarEtiquetasEn) }
 	p.AlEnviarCorreo = a.enviarCorreo
 	p.AlReunion = a.reunion
+	p.AlCompartir = a.compartirPorCorreo
 	p.AlCopiar = a.copiar
 	p.AlExportar = func(c api.Contact) { a.programar(func(scope cargaContacts) { a.exportar(scope, c) }) }
 	p.AlAbrirEnlace = a.abrirEnlace
@@ -306,6 +310,8 @@ func (a *App) enganchar() {
 	p.AlExportarCSV = a.exportarCSV
 	p.AlSoltarMarcados = func() { clear(a.marcados); a.repintarPartes(ParteLista) }
 	p.AlCorreoATodos = a.correoATodos
+	p.AlCopiarCorreos = a.copiarCorreos
+	p.AlCambiarOrden = a.cambiarOrden
 	p.AlExportarSeleccion = func(sel []api.Contact) { a.exportarContactos(p.t("io.exportFilename", nil), sel) }
 	p.AlCorreoEtiqueta = func() {
 		_, cs := a.miembrosEtiquetaActiva()
@@ -340,7 +346,7 @@ func (a *App) lienzo() fyne.Canvas {
 //
 //	n  nuevo contacto       j/k  siguiente / anterior   /  al buscador
 //	e  editar               s    destacar                x  marcar
-//	?  la hoja de atajos
+//	?  la hoja de atajos      #    a la papelera
 //
 // e, s y x actúan sobre la fila enfocada; sin ella, sobre la ficha abierta.
 func (a *App) Atajo(r rune) {
@@ -361,18 +367,27 @@ func (a *App) Atajo(r rune) {
 		p.EnfocarBuscador()
 	case 'j', 'k':
 		a.moverCursor(r == 'j')
-	case 'e':
-		if o := a.objetivoDeAtajo(); o != nil && escribe {
-			a.abrirFormulario(o)
+	case 'e', 's', 'x', '#':
+		if o := a.objetivoDeAtajo(); o != nil {
+			a.atajoSobre(r, *o, escribe)
 		}
-	case 's':
-		if o := a.objetivoDeAtajo(); o != nil && escribe {
-			a.destacar(*o)
-		}
-	case 'x':
-		if o := a.objetivoDeAtajo(); o != nil && p.AlMarcar != nil {
-			p.AlMarcar(o.ID)
-		}
+	}
+}
+
+// atajoSobre son las letras que actúan sobre un contacto (la fila enfocada o la ficha
+// abierta): editar, destacar, marcar y, como en Gmail, «#» a la papelera con el
+// «Deshacer» del aviso, por el mismo lote que la barra de selección.
+func (a *App) atajoSobre(r rune, o api.Contact, escribe bool) {
+	p := a.Pantalla
+	switch {
+	case r == 'e' && escribe:
+		a.abrirFormulario(&o)
+	case r == 's' && escribe:
+		a.destacar(o)
+	case r == 'x' && p.AlMarcar != nil:
+		p.AlMarcar(o.ID)
+	case r == '#' && escribe:
+		a.lote(LoteAPapelera, []api.Contact{o}, nil)
 	}
 }
 
@@ -445,7 +460,7 @@ func (a *App) verAtajos(c fyne.Canvas) {
 		}},
 		{Titulo: p.t("shortcuts.group.actions", nil), Atajos: []ui.AtajoDeTeclado{
 			fila("nav.newContact", "n"), fila("shortcuts.edit", "e"), fila("shortcuts.star", "s"),
-			fila("shortcuts.select", "x"), fila("shortcuts.help", "?"),
+			fila("shortcuts.select", "x"), fila("batch.toTrash", "#"), fila("shortcuts.help", "?"),
 		}},
 	})
 }
@@ -939,7 +954,7 @@ func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
 			a.repintar()
 			return
 		}
-		ordenar(lista, p.locale())
+		ordenar(lista, p.locale(), p.PorApellido)
 		a.todos, p.Estado = lista, ui.EstadoExito
 		if p.Seleccionado != nil {
 			p.Seleccionado = buscarPorID(lista, p.Seleccionado.ID)
@@ -1030,7 +1045,7 @@ func (a *App) volcar() {
 	// Sin filtro, la lista va por cabeceras A–Z y lo que no empieza por letra, al final:
 	// el cursor y j/k recorren lo que se ve, en el orden en que se ve.
 	if p.ConCabeceras() {
-		p.Contactos = porInicial(p.Contactos, p.locale())
+		p.Contactos = porInicial(p.Contactos, p.locale(), p.PorApellido)
 	}
 	// Los cumpleaños y los duplicados son de la libreta ENTERA y no del filtro: se
 	// cuentan una vez por libreta cargada (y por día, los cumpleaños), no con cada tecla.
@@ -1094,9 +1109,18 @@ func filtrar(todos []api.Contact, consulta string, miembros []string, porEtiquet
 }
 
 func coincide(c api.Contact, q, digitos string, porTelefono bool) bool {
-	if strings.Contains(buscar.Plegar(c.DisplayName()), q) ||
-		strings.Contains(buscar.Plegar(c.Organization), q) {
-		return true
+	// Además del nombre y la organización, lo que la web saca de la vCard con
+	// `textoBuscable`: apodo, cargo, nota y la ciudad de sus direcciones («el de
+	// Zaragoza», «la abogada»).
+	for _, s := range []string{c.DisplayName(), c.Organization, c.Nickname, c.Title, c.Note} {
+		if strings.Contains(buscar.Plegar(s), q) {
+			return true
+		}
+	}
+	for _, d := range c.Addresses {
+		if strings.Contains(buscar.Plegar(d.Locality), q) {
+			return true
+		}
 	}
 	for _, e := range c.Emails {
 		if strings.Contains(buscar.Plegar(e.Email), q) {
@@ -1123,13 +1147,6 @@ func soloDigitos(s string) string {
 }
 
 // ordenar es el `localeCompare(…, intlTag(locale))` de la web.
-func ordenar(lista []api.Contact, l i18n.Locale) {
-	c := cotejador(l)
-	slices.SortStableFunc(lista, func(x, y api.Contact) int {
-		return c.CompareString(x.DisplayName(), y.DisplayName())
-	})
-}
-
 func buscarPorID(lista []api.Contact, id string) *api.Contact {
 	for i := range lista {
 		if lista[i].ID == id {

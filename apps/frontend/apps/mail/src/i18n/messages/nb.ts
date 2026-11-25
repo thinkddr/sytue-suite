@@ -966,4 +966,14 @@ export const nb: AppCatalog<typeof en> = {
     'Det forrige e-postsystemet er ikke lenger tilgjengelig. Inntil du flytter e-posten din til hvelvet, mottar du ikke ny e-post: det som sendes til deg i mellomtiden, venter på avsenderens server, som prøver igjen i noen dager. Flytter du i tide, kommer det frem til deg etterpå; ellers får avsenderen beskjed om at det ikke kunne leveres. Det som allerede er kryptert med det forrige systemet, slik som e-posten du allerede hadde, kan ikke leses: det slettes ikke, men ingen kan åpne det. Når du har flyttet, kommer e-posten frem igjen og åpnes med Sytue ID-påloggingen din, slik som de andre appene.',
   'privateMail.vaultMoveCheckFailed':
     'Statusen til e-posten din kunne ikke kontrolleres. Prøv igjen om et øyeblikk.',
+  'shortcuts.goInbox': 'Gå til Innboks',
+  'shortcuts.goSent': 'Gå til Sendt',
+  'shortcuts.goDrafts': 'Gå til Utkast',
+  'shortcuts.goArchive': 'Gå til Arkiv',
+  'compose.sendAndArchive': 'Send og arkiver',
+  'reader.copyAddress': 'Kopier adressen',
+  'reader.addressCopied': 'Adressen er kopiert',
+  'reader.copyAddressFailed': 'Kunne ikke kopiere adressen',
+  'reader.viewPlain': 'Vis som ren tekst',
+  'reader.viewFormatted': 'Vis med formatering',
 };

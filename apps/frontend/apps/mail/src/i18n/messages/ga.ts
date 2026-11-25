@@ -1072,4 +1072,14 @@ export const ga: AppCatalog<typeof en> = {
     'Níl an córas poist roimhe seo ar fáil a thuilleadh. Go dtí go mbogfaidh tú do phost chuig an gcrann, ní bhfaighidh tú post nua: fanann an méid a sheoltar chugat idir an dá linn ar fhreastalaí an tseoltóra, a dhéanann iarracht arís ar feadh cúpla lá. Má bhogann tú in am, tiocfaidh sé chugat ina dhiaidh sin; mura mbogann, cuirfear in iúl don seoltóir nárbh fhéidir é a sheachadadh. Ní féidir an méid atá criptithe cheana leis an gcóras roimhe seo a léamh, díreach cosúil leis an bpost a bhí agat cheana: ní scriostar é, ach ní bheidh aon duine in ann é a oscailt. Tar éis duit é a bhogadh, tagann do phost chugat arís agus osclaítear é le do shíniú isteach Sytue ID, cosúil leis na haipeanna eile.',
   'privateMail.vaultMoveCheckFailed':
     'Níorbh fhéidir staid do phoist a sheiceáil. Bain triail eile as i gceann nóiméid.',
+  'shortcuts.goInbox': 'Téigh go dtí an Bosca isteach',
+  'shortcuts.goSent': 'Téigh go dtí Seolta',
+  'shortcuts.goDrafts': 'Téigh go dtí Dréachtaí',
+  'shortcuts.goArchive': 'Téigh go dtí an Chartlann',
+  'compose.sendAndArchive': 'Seol agus cartlannaigh',
+  'reader.copyAddress': 'Cóipeáil an seoladh',
+  'reader.addressCopied': 'Cóipeáladh an seoladh',
+  'reader.copyAddressFailed': 'Níorbh fhéidir an seoladh a chóipeáil',
+  'reader.viewPlain': 'Taispeáin mar ghnáth-théacs',
+  'reader.viewFormatted': 'Taispeáin le formáidiú',
 };

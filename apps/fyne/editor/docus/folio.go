@@ -1262,6 +1262,15 @@ func (f *Folio) Recuento() (documento editor.Recuento, seleccion *editor.Recuent
 	return documento, seleccion
 }
 
+// TextoPlano es el documento en texto sin formato (`textoPlanoDeDescarga`): el mismo
+// texto que cuenta el recuento, una línea por párrafo.
+func (f *Folio) TextoPlano() string {
+	if f.doc == nil {
+		return ""
+	}
+	return editor.TextoPlanoDeDescarga(strings.ReplaceAll(f.doc.Texto(), string(rico.ObjetoRuna), ""))
+}
+
 // PalabrasSeleccionadas son las de la selección, para el «12 de 340» de la barra.
 func (f *Folio) PalabrasSeleccionadas() (int, bool) {
 	if !f.haySeleccion() {

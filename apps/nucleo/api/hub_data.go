@@ -17,7 +17,10 @@ type HubData interface {
 	AvisarAMi(context.Context, HubAvisoPropio) error
 	Contadores(context.Context) (HubContadores, error)
 	MarkRead(context.Context, string) error
+	MarkUnread(context.Context, string) error
 	MarkAllRead(context.Context) error
+	// MarkAllReadDe es MarkAllRead de un solo producto (el filtro de la bandeja).
+	MarkAllReadDe(context.Context, string) error
 	NotificationPrefs(context.Context) ([]HubNotificationPref, error)
 	SetNotificationPref(context.Context, HubNotificationPref) (HubNotificationPref, error)
 }

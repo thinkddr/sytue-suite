@@ -157,7 +157,9 @@ func (p *Pantalla) listaAgenda() fyne.CanvasObject {
 	}
 	a := &agendaVirtual{p: p, grupos: grupos, hechos: map[int]*grupoAgenda{}, desde: -1}
 	a.c = container.New(a)
-	scroll, lista := desplazable(a.c)
+	// Con el hueco del «+» flotante al final: el último día se baja por encima de él
+	// (`sytue-reserva-flotante` en la agenda de CalendarGrid.tsx).
+	scroll, lista := desplazable(ui.ConReservaFlotante(a.c))
 	a.s = scroll
 	scroll.OnScrolled = func(fyne.Position) { a.alDesplazar() }
 	a.ponerVentana()

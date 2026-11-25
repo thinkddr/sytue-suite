@@ -407,10 +407,15 @@ export const fr: Catalog = {
   'import.fromGoogle': 'Les apporter depuis Google',
   'import.fromMicrosoft': 'Les apporter depuis Microsoft 365',
   'import.running': 'Copie de vos données… {count} éléments pour l’instant.',
-  'import.done': '{count} éléments apportés, {skipped} laissés de côté.',
+  'import.done':
+    '{what} : {count} éléments apportés, {skipped} laissés de côté. Terminé le {date}.',
   'import.someFailed':
     'Une partie de vos données n’a pas pu être copiée. Votre administration peut en voir la raison.',
   'import.failed': 'L’import n’a pas pu démarrer. Réessayez dans un instant.',
+  'import.unavailable':
+    'La connexion avec {source} ne peut pas être lue pour l’instant : elle a expiré, a été révoquée ou n’a jamais été autorisée. Demandez à votre administration de la reconnecter.',
+  'import.needsAdmin':
+    'La connexion avec {source} ne peut pas encore copier les données de chaque personne. Demandez à votre administration de terminer sa configuration.',
   'dataflow.label': 'Ce que deviennent les données',
   'dataflow.in.title': 'Entre uniquement dans Sytue One',
   'dataflow.in.body':

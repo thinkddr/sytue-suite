@@ -394,4 +394,33 @@ export const nucleo = {
 
   'forms.empty': 'Odgovorov še ni',
   'forms.empty_help': 'Ko nekdo odda obrazec na vašem spletnem mestu, ga boste videli tukaj.',
+  'sites.search': 'Išči spletna mesta',
+  'sites.search_empty': 'Nobeno spletno mesto se ne ujema z »{q}«.',
+  'sites.sort_label': 'Razvrsti spletna mesta',
+  'sites.sort_recent': 'Nedavno urejena',
+  'sites.sort_name': 'Ime (A–Ž)',
+  'sites.view_live': 'Ogled spletnega mesta',
+  'sites.view_live_aria': 'Ogled objavljenega {nombre} (odpre se v novem zavihku)',
+  'seo.title': 'Kaj bodo videli iskalniki',
+  'seo.intro':
+    'Pregled osnutka: naslovi, opisi in slike, od katerih so odvisni iskalniki in bralniki zaslona. To so opozorila; objave ne preprečujejo.',
+  'seo.open_editor': 'Odpri urejevalnik',
+  'seo.recheck': 'Preveri znova',
+  'seo.error': 'Pregleda ni bilo mogoče naložiti. Poskusite znova.',
+  'seo.all_good': 'Vse v redu: vsaka stran ima naslov in opis, slike pa nadomestno besedilo.',
+  'seo.summary': 'Opozorila: {count}',
+  'seo.badge_warning': 'Izboljšaj',
+  'seo.badge_info': 'Opomba',
+  'seo.on_page': 'Stran: {page}',
+  'seo.title_missing': 'Stran nima naslova: iskalnik si ga bo izmislil.',
+  'seo.title_long': 'Naslov ima {count} znakov; iskalnik ga skrajša pri približno 60.',
+  'seo.title_duplicate': 'Druga stran ima enak naslov: v rezultatih bosta tekmovali med seboj.',
+  'seo.description_missing': 'Stran nima opisa: iskalnik bo prikazal naključen del besedila.',
+  'seo.description_long': 'Opis ima {count} znakov; prikaže se jih približno 160.',
+  'seo.image_alt_missing':
+    'Slike brez nadomestnega besedila: {count}. Bralniki zaslona in iskalniki ne vedo, kaj prikazujejo; če ne prikazujejo ničesar, jih označite kot okrasne.',
+  'seo.page_noindex': 'Ta stran je skrita pred iskalniki (noindex).',
+  'seo.site_noindex': 'Celotno spletno mesto je skrito pred iskalniki (noindex).',
+  'seo.share_image_missing':
+    'Spletno mesto nima slike za deljenje: povezave v sporočilih in družbenih omrežjih bodo prikazane brez slike.',
 };

@@ -1011,4 +1011,11 @@ export const hu: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Csatlakoztasd ezt az alkalmazást a fiókodhoz itt: {tenant}. A meglévő hozzáférési jogosultságaid megmaradnak.',
   'nativeResource.approve': 'Csatlakoztatás',
+  'channel.markRead': 'Megjelölés olvasottként',
+  'channel.copyLink': 'Hivatkozás másolása',
+  'channel.linkCopied': 'Hivatkozás kimásolva',
+  'channel.download': 'Beszélgetés letöltése',
+  'channel.downloaded': 'Beszélgetés mentve ide:',
+  'channel.downloadFailed': 'Nem sikerült menteni a beszélgetést',
+  'status.nothingUnread': 'Már minden olvasott volt',
 };

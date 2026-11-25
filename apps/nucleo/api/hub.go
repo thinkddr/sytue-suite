@@ -198,6 +198,38 @@ func (h *Hub) MarkRead(ctx context.Context, id string) error {
 	return resp.Body.Close()
 }
 
+// MarkUnread devuelve un aviso a «sin leer» (`POST /notifications/{id}/unread`): el
+// «Marcar como no leído» de la bandeja.
+func (h *Hub) MarkUnread(ctx context.Context, id string) error {
+	if h.private != nil {
+		return h.private.MarkUnread(ctx, id)
+	}
+	resp, err := h.c.Do(ctx, Request{Method: http.MethodPost, Path: "/notifications/" + url.PathEscape(id) + "/unread"})
+	if err != nil {
+		return err
+	}
+	return resp.Body.Close()
+}
+
+// MarkAllReadDe da por leídos los avisos de UN producto (`read_all?source=drive`): lo que
+// hace «Marcar todas» con un filtro de producto puesto. Sin origen, todos.
+func (h *Hub) MarkAllReadDe(ctx context.Context, origen string) error {
+	if origen == "" {
+		return h.MarkAllRead(ctx)
+	}
+	if h.private != nil {
+		return h.private.MarkAllReadDe(ctx, origen)
+	}
+	resp, err := h.c.Do(ctx, Request{
+		Method: http.MethodPost, Path: "/notifications/read_all",
+		Query: url.Values{"source": {origen}},
+	})
+	if err != nil {
+		return err
+	}
+	return resp.Body.Close()
+}
+
 // MarkAllRead da por leídos TODOS los avisos de una vez (`POST /notifications/read_all`).
 func (h *Hub) MarkAllRead(ctx context.Context) error {
 	if h.private != nil {

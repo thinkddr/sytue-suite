@@ -394,10 +394,14 @@ export const it: Catalog = {
   'import.fromGoogle': 'Portalo da Google',
   'import.fromMicrosoft': 'Portalo da Microsoft 365',
   'import.running': 'Copia dei tuoi dati in corso… {count} elementi finora.',
-  'import.done': '{count} elementi portati, {skipped} rimasti fuori.',
+  'import.done': '{what}: {count} elementi portati, {skipped} rimasti fuori. Terminato il {date}.',
   'import.someFailed':
     'Una parte dei tuoi dati non è stata copiata. Chi amministra la tua organizzazione può vederne il motivo.',
   'import.failed': 'Non è stato possibile avviare l’importazione. Riprova tra un momento.',
+  'import.unavailable':
+    'Al momento la connessione con {source} non è leggibile: è scaduta, è stata revocata o non è mai stata autorizzata. Chiedi a chi amministra la tua organizzazione di ricollegarla.',
+  'import.needsAdmin':
+    'La connessione con {source} non può ancora copiare i dati di ogni persona. Chiedi a chi amministra la tua organizzazione di completarne la configurazione.',
   'dataflow.label': 'Cosa succede ai dati',
   'dataflow.in.title': 'Entra solo in Sytue One',
   'dataflow.in.body':

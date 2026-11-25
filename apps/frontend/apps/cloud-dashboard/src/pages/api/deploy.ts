@@ -3,6 +3,8 @@
  *   { deployment }              -> vuelve a publicar esa produccion (rollback)
  *   { deployment, preview: true } -> publica en produccion la imagen de esa preview
  *   { deployment, cancel: true } -> cancela ese despliegue si sigue en curso
+ *   { project }                 -> vuelve a desplegar la rama de producción
+ *   { project, ref?, commit? }  -> despliega en producción esa rama/etiqueta o commit
  *
  * BFF de despliegues. La accion viaja por POST (no PUT) porque el checkOrigin CSRF
  * de Astro rechaza otros verbos con 403 (mismo patron que /api/env). Devuelve
@@ -18,6 +20,7 @@ import {
   triggerDeploy,
   httpErrorInfo,
 } from '../../lib/cloud.js';
+import { commitValido, refValida } from '../../lib/despliegues.js';
 
 export const prerender = false;
 
@@ -27,7 +30,14 @@ export const POST: APIRoute = async (ctx) => {
   const session = await bff.getSession(toBffContext(ctx));
   if (!session) return json({ error: 'unauthenticated' }, 401);
 
-  let body: { deployment?: unknown; project?: unknown; cancel?: unknown; preview?: unknown };
+  let body: {
+    deployment?: unknown;
+    project?: unknown;
+    cancel?: unknown;
+    preview?: unknown;
+    ref?: unknown;
+    commit?: unknown;
+  };
   try {
     body = (await ctx.request.json()) as typeof body;
   } catch {
@@ -55,7 +65,20 @@ export const POST: APIRoute = async (ctx) => {
       return json({ ok: true, live });
     }
     if (project) {
-      const live = await triggerDeploy(session, project);
+      // La forma se comprueba aquí para contestar 400 con un código que la pantalla
+      // sabe decir; la validación que manda es la del control-plane (ValidGitRef y
+      // ValidCommitSHA), que es la que protege el contexto de compilación.
+      const ref = typeof body.ref === 'string' ? body.ref.trim() : '';
+      const commit = typeof body.commit === 'string' ? body.commit.trim() : '';
+      if (ref && !refValida(ref)) return json({ error: 'invalid_ref' }, 400);
+      if (commit && !commitValido(commit)) return json({ error: 'invalid_commit' }, 400);
+      const live = await triggerDeploy(
+        session,
+        project,
+        ref || commit
+          ? { ...(ref ? { gitRef: ref } : {}), ...(commit ? { commitSha: commit } : {}) }
+          : undefined,
+      );
       return json({ ok: true, live });
     }
   } catch (err) {

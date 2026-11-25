@@ -305,6 +305,60 @@ function blocksInSelection(): HTMLElement[] {
   return single ? [single] : [];
 }
 
+/**
+ * El peldaño de `fontSize` («1»…«7») de al lado: Ctrl+Mayús+. sube uno y Ctrl+Mayús+,
+ * baja uno, como en Word y Docs de Google, sin pasar de los extremos. Indeterminado («»)
+ * cuenta como la talla normal, «3». La app nativa hace lo mismo (`docus.pasoDeTalla`).
+ */
+export function pasoDeTalla(actual: string, dir: 1 | -1): string {
+  const n = /^[1-7]$/.test(actual) ? Number(actual) : 3;
+  return String(Math.min(7, Math.max(1, n + dir)));
+}
+
+/**
+ * «Ordenar párrafos»: los bloques elegidos, de la A a la Z (o al revés) por su texto, con
+ * la colación del idioma del documento. Solo si son HERMANOS —párrafos seguidos o
+ * elementos de una misma lista—: mezclar una lista con los párrafos de alrededor la
+ * rompería. Estable: los iguales quedan en el orden en que estaban. La app nativa lo hace
+ * con `rico.OrdenarBloques`, con los mismos vectores (`docus-ordenar.json`).
+ */
+function ordenarParrafos(desc: boolean): void {
+  const bloques = blocksInSelection();
+  const padre = bloques[0]?.parentElement;
+  if (bloques.length < 2 || !padre || bloques.some((b) => b.parentElement !== padre)) return;
+  // El idioma del documento (el `lang` del folio, que es el suyo o el de la interfaz).
+  const idioma = padre.closest<HTMLElement>('[lang]')?.lang || undefined;
+  const orden = ordenDeTextos(
+    bloques.map((b) => textoDeBloque(b)),
+    desc,
+    idioma,
+  ).map((i) => bloques[i]!);
+  if (orden.every((b, i) => b === bloques[i])) return;
+  const ref = bloques[bloques.length - 1]!.nextSibling;
+  for (const b of orden) padre.insertBefore(b, ref);
+  // Lo ordenado sigue elegido: mover los nodos deja la selección en cualquier parte, y
+  // así «de la Z a la A» justo después da la vuelta a lo mismo.
+  const sel = document.getSelection();
+  if (sel) {
+    const r = document.createRange();
+    r.setStartBefore(orden[0]!);
+    r.setEndAfter(orden[orden.length - 1]!);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+  dispatchInput();
+}
+
+const textoDeBloque = (b: Element): string => (b.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+/** Los índices de `textos` en el orden de «Ordenar párrafos» (puro, para los vectores). */
+export function ordenDeTextos(textos: readonly string[], desc: boolean, idioma?: string): number[] {
+  const signo = desc ? -1 : 1;
+  return textos
+    .map((_, i) => i)
+    .sort((a, b) => signo * textos[a]!.localeCompare(textos[b]!, idioma));
+}
+
 /** '<F>x<C>' → tabla F×C de celdas vacías + párrafo de escape posterior (§3.1). */
 function tableHtml(spec: string): string | null {
   const m = /^(\d{1,2})\s*[x×]\s*(\d{1,2})$/i.exec(spec.trim());
@@ -690,6 +744,17 @@ function ejecutar(command: EditorCommand, value?: string): void {
       break;
     case 'changeCase':
       if (esModoMayusculas(value)) cambiarMayusculas(value);
+      break;
+    case 'fontGrow':
+    case 'fontShrink': {
+      // Sin talla única bajo el cursor (una selección con dos) se parte de la normal.
+      const actual = editingCommandValue('fontSize');
+      const siguiente = pasoDeTalla(actual, command === 'fontGrow' ? 1 : -1);
+      if (siguiente !== actual) cmd('fontSize', siguiente);
+      break;
+    }
+    case 'sortParagraphs':
+      ordenarParrafos(value === 'desc');
       break;
     case 'listCheck':
       listaDeCasillas();

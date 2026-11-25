@@ -12,8 +12,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
-
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 )
 
 // TestElBotonFlotanteNoVaEnElDetalle: en el teléfono, con la ficha de un contacto o el
@@ -24,7 +22,7 @@ import (
 func TestElBotonFlotanteNoVaEnElDetalle(t *testing.T) {
 	a := NuevoArmazon(canvas.NewRectangle(color.NRGBA{}))
 	a.Panel = canvas.NewRectangle(color.NRGBA{})
-	fab := NuevoBotonFlotante("Nuevo contacto", iconos.Mas, nil)
+	fab := NuevoBotonFlotante("Nuevo contacto", nil)
 	w := test.NewTempWindow(t, container.NewStack(a, container.New(CapaFlotante{}, fab)))
 	w.SetPadded(false)
 	w.Resize(fyne.NewSize(390, 700))
@@ -43,10 +41,11 @@ func TestElBotonFlotanteNoVaEnElDetalle(t *testing.T) {
 	}
 }
 
-// TestLasListasDejanSitioAlBotonFlotante: en el teléfono, el final de una lista quedaba
-// bajo el «+» (Mail, Contacts, Drive y Cast). El contenido de un desplazamiento gana la
-// reserva (88) por debajo de `Estrecho`, y una `widget.List` una fila vacía de ese alto al
-// final, que no se pinta ni se elige; en ancho, nada. VISTO EN ROJO sin la reserva.
+// TestLasListasDejanSitioAlBotonFlotante: el final de una lista quedaba bajo el «+» (Mail,
+// Contacts, Drive y Cast). El contenido de un desplazamiento gana la reserva (88), y una
+// `widget.List` una fila vacía de ese alto al final, que no se pinta ni se elige. En TODOS
+// los anchos, que el «+» ya se ve también en escritorio (2026-11-25). VISTO EN ROJO sin la
+// reserva, y a 1280 con la de antes, que solo valía por debajo de `Estrecho`.
 func TestLasListasDejanSitioAlBotonFlotante(t *testing.T) {
 	if ReservaFlotante != 88 {
 		t.Errorf("la reserva mide %v y son `h-14` más dos `bottom-4`: 88", ReservaFlotante)
@@ -60,8 +59,8 @@ func TestLasListasDejanSitioAlBotonFlotante(t *testing.T) {
 		t.Errorf("a 390 el contenido mide %v y con la reserva son %v", got, 300+ReservaFlotante)
 	}
 	w.Resize(fyne.NewSize(1280, 800))
-	if got := envuelto.MinSize().Height; got != 300 {
-		t.Errorf("a 1280 el contenido mide %v: la reserva sobra sin botón flotante", got)
+	if got := envuelto.MinSize().Height; got != 300+ReservaFlotante {
+		t.Errorf("a 1280 el contenido mide %v y el «+» también flota ahí: son %v", got, 300+ReservaFlotante)
 	}
 
 	// Con sitio para la «Dora» que se añade más abajo.
@@ -93,7 +92,11 @@ func TestLasListasDejanSitioAlBotonFlotante(t *testing.T) {
 		t.Errorf("al crecer, la lista tiene %d filas y son %d", got, len(filas)+1)
 	}
 	r.Ajustar(1280)
-	if got := l.Length(); got != len(filas) {
-		t.Errorf("a 1280 la lista tiene %d filas: la reserva sobra", got)
+	if got := l.Length(); got != len(filas)+1 {
+		t.Errorf("a 1280 la lista tiene %d filas y el «+» también flota ahí: son %d", got, len(filas)+1)
+	}
+	r.Ajustar(0)
+	if w2.Canvas().Size().Width > 0 && l.Length() != len(filas)+1 {
+		t.Errorf("con el ancho de su lienzo la reserva se apaga: %d filas", l.Length())
 	}
 }

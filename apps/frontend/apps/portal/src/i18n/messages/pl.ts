@@ -784,4 +784,17 @@ export const pl: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Nie udało się wczytać więcej wyników. Spróbuj ponownie.',
   'privacy.notice':
     'Nie sprzedajemy Twoich danych ani nie udostępniamy ich podmiotom trzecim. Nie używamy ich do profilowania, reklamy ani do trenowania czy ulepszania naszych usług lub cudzych. Są szyfrowane podczas przesyłania i przechowywania i opuszczają naszą europejską infrastrukturę tylko wtedy, gdy jest to absolutnie konieczne do wystawienia faktury, oraz w integracjach, które włączysz — wtedy podmiot trzeci poprosi o zgodę na dane, których użyje.',
+  'inbox.markAllOf': 'Oznacz {app} jako przeczytane',
+  'inbox.markUnread': 'Oznacz jako nieprzeczytane',
+  'inbox.muteLikeThis': 'Wycisz takie powiadomienia',
+  'inbox.mutedLikeThis':
+    'Nie będziesz już dostawać takich powiadomień. Możesz to zmienić niżej, w sekcji „Co chcesz otrzymywać”.',
+  'inbox.muteFailed': 'Nie udało się wyciszyć. Spróbuj ponownie.',
+  'inbox.actionsOf': 'Działania dla „{title}”',
+  'downloads.checksum': 'Sprawdź pobrany plik',
+  'downloads.checksumHelp':
+    'Jego odcisk SHA-256. Oblicz odcisk pobranego pliku i sprawdź, czy się zgadzają.',
+  'downloads.checksumLabel': 'Odcisk SHA-256',
+  'downloads.copyChecksum': 'Kopiuj odcisk',
+  'downloads.checksumCopied': 'Skopiowano odcisk',
 };

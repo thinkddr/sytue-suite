@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -542,6 +543,7 @@ func (p *Pantalla) irA(vista string) {
 	case VistaBalance:
 		p.libro.Balance, p.libro.Fallo, p.libro.Periodo = nil, "", ""
 		p.libro.AlPeriodo = p.cambiarPeriodo
+		p.libro.AlMayor = p.verMayor
 		p.cargarBalance()
 	case VistaObligaciones:
 		if p.SabeOrg && p.Organizacion == nil {
@@ -1039,7 +1041,9 @@ func (p *Pantalla) cargarEstadisticas(modelo string) {
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
-	st, err := p.svc.Estadisticas(ctx, modelo)
+	// Con la búsqueda y el estado de la lista: el recuento y la suma cuentan lo que se ve.
+	l0 := p.lista
+	st, err := p.svc.EstadisticasDe(ctx, modelo, l0.Busqueda, l0.Estado)
 	if err != nil {
 		return
 	}
@@ -1049,6 +1053,9 @@ func (p *Pantalla) cargarEstadisticas(modelo string) {
 			return
 		}
 		l.Total, l.PorEstado, l.SumaDinero = st.Total, st.PorEstado, st.SumaDinero
+		if st.Filtrados > 0 || l.Busqueda != "" || l.Estado != "" {
+			l.Total = st.Filtrados
+		}
 		p.Repintar()
 	})
 }
@@ -1069,6 +1076,12 @@ func (p *Pantalla) Atajos(c fyne.Canvas, b *ui.BarraSuite) {
 	} else {
 		p.paleta.EnLienzo(c)
 	}
+	// Ctrl+S sin un campo enfocado (con él, lo atiende el campo: `Ficha.atajoGuardar`).
+	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyS, Modifier: fyne.KeyModifierShortcutDefault}, func(s fyne.Shortcut) {
+		if f := p.ficha; f != nil && c.Overlays().Top() == nil {
+			f.atajoGuardar(s)
+		}
+	})
 	c.SetOnTypedRune(func(r rune) {
 		// La hoja de atajos no depende de tener una lista abierta: se pide también
 		// desde la bienvenida, que es donde más falta hace.

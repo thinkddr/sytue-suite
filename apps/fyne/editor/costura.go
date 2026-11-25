@@ -177,11 +177,16 @@ const (
 	Titulo       Comando = "heading" // valor: "p", "h1", "h2", "h3", "blockquote"
 	Superindice  Comando = "superscript"
 	Subindice    Comando = "subscript"
-	Fuente       Comando = "font"       // valor: la familia, «Arial»
-	Tamano       Comando = "size"       // valor: el peldaño de `fontSize`, «1»…«7»
-	ColorTexto   Comando = "color"      // valor: `#rrggbb` de CONTENT_PALETTE
-	Resaltado    Comando = "highlight"  // valor: `#rrggbb` o «transparent»
-	Interlineado Comando = "lineHeight" // valor: «1», «1.15», «1.5», «2»
+	Fuente       Comando = "font" // valor: la familia, «Arial»
+	Tamano       Comando = "size" // valor: el peldaño de `fontSize`, «1»…«7»
+	// AumentarLetra y ReducirLetra suben o bajan un peldaño de `size` (Ctrl+Mayús+. y ,).
+	AumentarLetra Comando = "fontGrow"
+	ReducirLetra  Comando = "fontShrink"
+	// OrdenarParrafos ordena los párrafos elegidos. Valor: «asc» o «desc».
+	OrdenarParrafos Comando = "sortParagraphs"
+	ColorTexto      Comando = "color"      // valor: `#rrggbb` de CONTENT_PALETTE
+	Resaltado       Comando = "highlight"  // valor: `#rrggbb` o «transparent»
+	Interlineado    Comando = "lineHeight" // valor: «1», «1.15», «1.5», «2»
 
 	// Los de la pestaña «Insertar».
 	InsertarTabla   Comando = "insertTable" // valor: «FxC», con «h» detrás si lleva fila de encabezado
@@ -484,6 +489,15 @@ type Contexto struct {
 	// nil deja las dos descargas de plantillas inertes.
 	ExportarPlantilla func(formato string)
 	Exportando        string
+	// DescargarCSV es «Descargar la hoja como CSV» de Calcus: el fichero se escribe en el
+	// dispositivo, así que no se apaga sin red. nil: la entrada no sale.
+	DescargarCSV func()
+	// DescargarTexto es «Descargar como texto sin formato» de Docus, también escrito en el
+	// dispositivo. nil: la entrada no sale.
+	DescargarTexto func()
+	// DescargarNotas es «Descargar las notas del orador» de Diapos, también escrito en el
+	// dispositivo. nil: la entrada no sale.
+	DescargarNotas func()
 	// Imprimir es Ctrl/Cmd+P: el PDF del documento, con lo pendiente ya guardado, al
 	// diálogo de impresión del sistema. En la web lo hace el navegador; aquí lo pone el
 	// producto (`Exportar(FormatoImprimir)`). nil: el atajo no hace nada.

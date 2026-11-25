@@ -374,4 +374,9 @@ export const fi: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Muokkaus tehdään tällä laitteella ja tallennetaan salattuna kuvan uutena versiona.',
   'gallery.encrypted.albumEmpty': 'Tässä salatussa albumissa ei ole vielä kuvia.',
+  'shortcuts.favorite': 'Merkitse suosikiksi tai poista',
+  'trash.restoreAll': 'Palauta kaikki',
+  'trash.restoredAll': 'Palautettu kuviisi: {count}',
+  'album.download': 'Lataa albumi',
+  'viewer.openInDrive': 'Näytä alkuperäinen Sytue Drivessa',
 };

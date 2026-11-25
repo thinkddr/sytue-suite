@@ -408,10 +408,15 @@ export const de: Catalog = {
   'import.fromGoogle': 'Von Google holen',
   'import.fromMicrosoft': 'Von Microsoft 365 holen',
   'import.running': 'Deine Daten werden kopiert… bisher {count} Elemente.',
-  'import.done': '{count} Elemente übernommen, {skipped} ausgelassen.',
+  'import.done':
+    '{what}: {count} Elemente übernommen, {skipped} ausgelassen. Abgeschlossen am {date}.',
   'import.someFailed':
     'Ein Teil deiner Daten konnte nicht kopiert werden. Deine Administration sieht den Grund.',
   'import.failed': 'Der Import konnte nicht gestartet werden. Versuche es gleich noch einmal.',
+  'import.unavailable':
+    'Die Verbindung mit {source} kann gerade nicht gelesen werden: Sie ist abgelaufen, wurde widerrufen oder nie autorisiert. Bitte deine Administration, sie neu zu verbinden.',
+  'import.needsAdmin':
+    'Die Verbindung mit {source} kann die Daten der einzelnen Personen noch nicht kopieren. Bitte deine Administration, die Einrichtung abzuschließen.',
   'dataflow.label': 'Was mit den Daten passiert',
   'dataflow.in.title': 'Kommt nur in Sytue One an',
   'dataflow.in.body':

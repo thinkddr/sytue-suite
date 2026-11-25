@@ -380,4 +380,9 @@ export const nl: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'De bewerking gebeurt op dit apparaat en wordt versleuteld opgeslagen als nieuwe versie van de foto.',
   'gallery.encrypted.albumEmpty': "Dit versleutelde album bevat nog geen foto's.",
+  'shortcuts.favorite': 'Als favoriet markeren of verwijderen',
+  'trash.restoreAll': 'Alles terugzetten',
+  'trash.restoredAll': 'Terug bij je foto’s: {count}',
+  'album.download': 'Album downloaden',
+  'viewer.openInDrive': 'Origineel bekijken in Sytue Drive',
 };

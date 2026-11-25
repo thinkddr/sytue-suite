@@ -21,6 +21,7 @@ import { t as translate, type ClaveMensaje } from '../i18n/index.js';
 import { Tienda } from '../tienda/Tienda.js';
 import { Pedidos } from '../tienda/Pedidos.js';
 import { Bandeja } from '../formularios/Bandeja.js';
+import { RevisionSEO } from '../components/RevisionSEO.js';
 import { ruta } from '../lib/rutas.js';
 import { administra } from '../lib/roles.js';
 import { detalleDominio, progresoDominio, type DominioSitio } from '../lib/dominios.js';
@@ -304,6 +305,9 @@ function Publicar({
         </Button>
       ) : null}
       <p class="text-text-muted mt-3 text-xs">{t('publish.check_server')}</p>
+
+      {/* Lo que verá un buscador, antes de publicar: avisos, no un bloqueo. */}
+      <RevisionSEO siteId={siteId} t={t} />
 
       {resultado ? (
         <Aviso tono={resultado.tono} class="mt-5">

@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Изключи организацията от автоматичния пакет на Sytue AI",
   "aiBatch.excludedHint": "Организацията е изключена от автоматичния пакет на Sytue AI. Снимките не се обработват във фонов режим за предложения или подобни.",
   "album.coverSet": "Корицата на албума е обновена",
+  "album.download": "Изтегли албума",
   "album.isCover": "Това е корицата на албума",
   "album.linkCopied": "Връзката е копирана",
   "album.newLink": "Нова връзка",
@@ -257,6 +258,7 @@
   "public.count": "{count} снимки",
   "public.notFound": "Тази връзка вече не е валидна.",
   "public.title": "Споделен албум",
+  "shortcuts.favorite": "Добави или махни от любими",
   "shortcuts.first": "Първа снимка",
   "shortcuts.group.gallery": "Галерия",
   "shortcuts.group.viewer": "Преглед",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Изтрива се днес",
   "trash.restore": "Възстановяване",
+  "trash.restoreAll": "Възстанови всичко",
+  "trash.restoredAll": "Върнати в снимките ви: {count}",
   "trash.retention": {
     "one": "Снимките, които премахнете от галерията, остават тук 1 ден и дотогава могат да бъдат възстановени.",
     "other": "Снимките, които премахнете от галерията, остават тук {count} дни и дотогава могат да бъдат възстановени."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Технически данни",
   "viewer.infoUploaded": "Качена (без EXIF дата)",
   "viewer.next": "Следваща снимка",
+  "viewer.openInDrive": "Виж оригинала в Sytue Drive",
   "viewer.prev": "Предишна снимка",
   "viewer.rotate": "Завъртане на 90°",
   "viewer.rotateFailed": "Снимката не можа да бъде завъртяна.",

@@ -1105,4 +1105,11 @@ export const cs: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Připoj tuto aplikaci ke svému účtu v {tenant}. Tvá stávající přístupová oprávnění zůstanou zachována.',
   'nativeResource.approve': 'Připojit',
+  'channel.markRead': 'Označit jako přečtené',
+  'channel.copyLink': 'Kopírovat odkaz',
+  'channel.linkCopied': 'Odkaz zkopírován',
+  'channel.download': 'Stáhnout konverzaci',
+  'channel.downloaded': 'Konverzace uložena do',
+  'channel.downloadFailed': 'Konverzaci se nepodařilo uložit',
+  'status.nothingUnread': 'Vše už bylo přečtené',
 };

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -28,6 +29,8 @@ func (v *Vista) ConBuzon(b Buzon) *Vista {
 	v.avisos.AlAbrir = v.abrirAviso
 	v.avisos.AlMarcarLeido = v.marcarLeido
 	v.avisos.AlMarcarTodas = v.marcarTodas
+	v.avisos.AlDesmarcar = v.desmarcar
+	v.avisos.AlSilenciarComoEste = v.silenciarComoEste
 	v.avisos.AlSilenciar = v.silenciar
 	v.avisos.AlCargarMas = v.cargarMas
 	v.avisos.AlReintentarReglas = func() {
@@ -218,13 +221,59 @@ func (v *Vista) marcarLeido(n api.HubNotification) {
 	v.segundoPlano(func(ctx context.Context) { _ = v.buzon.MarkRead(ctx, n.ID) })
 }
 
+// marcarTodas marca las que se ven: todas, o con un producto elegido solo las suyas, que
+// es lo que la persona tiene delante. Antes se llevaba también las de otros productos.
 func (v *Vista) marcarTodas() {
+	// Se pulsa en la rutina de la interfaz, que es la que cambia el filtro.
+	origen := v.avisos.Producto
 	v.enUI(func() {
 		for i := range v.avisos.Items {
-			v.avisos.Items[i].Read = true
+			if origen == "" || v.avisos.Items[i].Source == origen {
+				v.avisos.Items[i].Read = true
+			}
 		}
 	})
-	v.segundoPlano(func(ctx context.Context) { _ = v.buzon.MarkAllRead(ctx) })
+	v.segundoPlano(func(ctx context.Context) { _ = v.buzon.MarkAllReadDe(ctx, origen) })
+}
+
+// desmarcar devuelve UN aviso a «sin leer» desde su menú: lo que se abrió sin tiempo
+// de atenderlo. Optimista, como «leído»; si el Hub no lo guarda, vuelve a leído.
+func (v *Vista) desmarcar(n api.HubNotification) {
+	poner := func(leido bool) {
+		for i := range v.avisos.Items {
+			if v.avisos.Items[i].ID == n.ID {
+				v.avisos.Items[i].Read = leido
+			}
+		}
+	}
+	v.enUI(func() { poner(false) })
+	v.segundoPlano(func(ctx context.Context) {
+		if v.buzon.MarkUnread(ctx, n.ID) != nil {
+			v.enUI(func() { poner(true) })
+		}
+	})
+}
+
+// silenciarComoEste guarda la regla de «Qué quieres recibir» por tipo —origen y `kind`
+// = el tipo del aviso— y lo dice con un aviso flotante, como la web con su `status`.
+// Las reglas se releen al acabar: la de por tipo no tiene interruptor propio en esta
+// pantalla, pero el origen puede haber quedado entero en silencio por otro lado.
+func (v *Vista) silenciarComoEste(n api.HubNotification) {
+	v.segundoPlano(func(ctx context.Context) {
+		_, err := v.buzon.SetNotificationPref(ctx, api.HubNotificationPref{Source: n.Source, Kind: n.Type, Muted: true})
+		v.enUI(func() {
+			if err != nil {
+				v.pilaAvisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, v.t.T("inbox.muteFailed", nil), ""))
+				return
+			}
+			v.pilaAvisos.Notificar(ui.NuevoAviso(ui.AvisoExito, v.t.T("inbox.mutedLikeThis", nil), ""))
+		})
+		// Fuera de enUI, que corre con el cerrojo de la vista puesto y AlReintentarReglas
+		// lo vuelve a pedir: dentro sería un abrazo mortal.
+		if err == nil && v.avisos.AlReintentarReglas != nil {
+			v.avisos.AlReintentarReglas()
+		}
+	})
 }
 
 // silenciar es optimista, como en la web, pero no a ciegas: si el Hub no lo guarda se

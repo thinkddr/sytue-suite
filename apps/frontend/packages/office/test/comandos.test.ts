@@ -165,10 +165,12 @@ describe('atajos', () => {
     expect(doc(',')).toEqual({ id: 'subscript' });
     expect(doc('\\')).toEqual({ id: 'clearFormat' });
     expect(doc('k')).toEqual({ id: 'insertLink' });
-    // En la caja de Diapos se pregunta igual, con 'document'; en la rejilla no existen.
-    expect(
-      comandoDelAtajo(tecla('L', { ctrlKey: true, shiftKey: true }), 'spreadsheet'),
-    ).toBeNull();
+    // En la caja de Diapos se pregunta igual, con 'document'. En la rejilla la misma
+    // combinación es el autofiltro de Excel y Sheets: el registro solo la prohíbe repetida
+    // dentro de un tipo.
+    expect(comandoDelAtajo(tecla('L', { ctrlKey: true, shiftKey: true }), 'spreadsheet')).toEqual({
+      id: 'autofilter',
+    });
   });
 
   test('con Mayús o con ⌥ casa la tecla por su posición, nunca con AltGr', () => {

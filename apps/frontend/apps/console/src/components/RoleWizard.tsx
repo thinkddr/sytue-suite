@@ -30,14 +30,27 @@ export interface RoleWizardProps {
   onAssign: (role: CustomRole) => void;
   onCancel: () => void;
   onDone: () => void;
+  /**
+   * Punto de partida al DUPLICAR un rol: el nombre propuesto y sus permisos. Un rol
+   * parecido a otro se creaba marcando a mano las mismas casillas, que es donde se
+   * cuela la que falta.
+   */
+  initial?: { name: string; permissions: string[] } | undefined;
 }
 
-export default function RoleWizard({ t, onCreated, onAssign, onCancel, onDone }: RoleWizardProps) {
+export default function RoleWizard({
+  t,
+  onCreated,
+  onAssign,
+  onCancel,
+  onDone,
+  initial,
+}: RoleWizardProps) {
   const toast = useToast();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [name, setName] = useState('');
-  const [perms, setPerms] = useState<string[]>([]);
+  const [name, setName] = useState(initial?.name ?? '');
+  const [perms, setPerms] = useState<string[]>(initial?.permissions ?? []);
   const [created, setCreated] = useState<CustomRole | null>(null);
   const trimmed = name.trim();
 

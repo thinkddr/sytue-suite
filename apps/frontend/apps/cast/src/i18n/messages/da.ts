@@ -353,4 +353,8 @@ export const da: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Fjern fra den offentlige side',
   'moderation.action.unpublish': 'Fjern offentliggørelse',
   'moderation.action.block': 'Bloker personen i organisationen',
+  'player.loop': 'Gentag',
+  'watch.chapters': 'Kapitler',
+  'watch.jumpTo': 'Gå til {time}',
+  'share.startAt': 'Start ved {time}',
 };

@@ -143,20 +143,25 @@ func elementosMenu(acciones []accionMenu) []fyne.CanvasObject {
 	return out
 }
 
-// menuNuevo es el desplegable de «Nuevo»: la carpeta; tras el separador, los tres tipos
-// de Sytue Docs, y tras otro, la vista de Sytue Bases, en el orden de la web. Antes solo
-// había «Nueva carpeta» y para empezar un documento había que salir a Docs.
+// menuNuevo es el desplegable de «Nuevo», colgado del «+» flotante y abriendo hacia
+// arriba, que abajo no cabe: «Subir» delante, que es lo que más se hace; la carpeta; tras
+// el separador, los tres tipos de Sytue Docs, y tras otro, la vista de Sytue Bases, en el
+// orden de la web. Antes solo había «Nueva carpeta» y para empezar un documento había que
+// salir a Docs.
 func (p *Pantalla) menuNuevo(disparador fyne.CanvasObject) {
 	m := ui.NuevoMenu(p.elementosNuevo()...)
 	m.Rotulo = p.tr.T("files.new", nil)
+	m.Arriba = true // `side="top"` del Dropdown de BotonFlotante.tsx
 	m.Mostrar(disparador)
 }
 
-// elementosNuevo es lo que lleva «Nuevo». «Subir carpeta» va junto a «Carpeta», como en
-// la web, y solo donde hay selector de carpetas: en el móvil `ElegirCarpeta` es nil.
+// elementosNuevo es lo que lleva «Nuevo». «Subir» va el primero: era el botón primario de
+// la cabecera. «Subir carpeta» va junto a «Carpeta», como en la web, y solo donde hay
+// selector de carpetas: en el móvil `ElegirCarpeta` es nil.
 func (p *Pantalla) elementosNuevo() []fyne.CanvasObject {
 	t := func(clave string) string { return p.tr.T(clave, nil) }
 	out := []fyne.CanvasObject{
+		ui.NuevoElementoMenu(t("files.upload"), iconos.Subir, p.elegirYSubir),
 		ui.NuevoElementoMenu(t("files.new.folder"), iconos.DriveCarpeta, p.pedirCarpeta),
 	}
 	if p.ElegirCarpeta != nil {

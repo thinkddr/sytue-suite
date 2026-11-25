@@ -16,14 +16,14 @@ import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import {
   AppShell,
+  BotonFlotante,
   Button,
-  Icon,
-  MobileFab,
   ProductIcon,
   SkipLink,
   ThemeProvider,
   ToastProvider,
   TopBar,
+  cx,
   withBase,
 } from '@sytue/ui';
 import { SytueShell } from '@sytue/shell';
@@ -42,7 +42,7 @@ export interface MarcoProps {
   activa: Seccion | null;
   children: ComponentChildren;
   /**
-   * Con el botón flotante de «Subir» en el móvil. Solo en las listas (Inicio,
+   * Con el «+» flotante de «Subir», en todos los anchos. Solo en las listas (Inicio,
    * Explorar): en la página de un vídeo taparía el chat o los comentarios, y en
    * Subir sería un botón que lleva a donde ya se está.
    */
@@ -80,7 +80,13 @@ export function Marco({
   // bloque contenedor de lo que lleva dentro tiene que ser él. Sin eso, los `sr-only` de
   // «Subir» se anclaban al `main` y le daban un segundo desplazamiento sin nada debajo
   // (y antes de que el `main` fuera `relative`, al documento: 192 px en la v3.11.1).
-  const contenido = <div class="relative h-full min-h-0 overflow-y-auto">{children}</div>;
+  // Con el «+» flotante, lo último de la lista se baja por encima de él
+  // (`sytue-reserva-flotante`).
+  const contenido = (
+    <div class={cx('relative h-full min-h-0 overflow-y-auto', fab && 'sytue-reserva-flotante')}>
+      {children}
+    </div>
+  );
 
   if (!usuario) {
     return (
@@ -119,10 +125,11 @@ export function Marco({
       >
         {contenido}
       </AppShell>
+      {/* «Subir» es el «+» flotante, abajo a la derecha y en todos los anchos: la
+          acción de crear de Cast, como «Redactar» en Mail. */}
       {!fab ? null : (
-        <MobileFab
+        <BotonFlotante
           label={t('nav.upload')}
-          icon={<Icon name="upload" size={24} />}
           onClick={() => window.location.assign(ruta('/upload'))}
         />
       )}

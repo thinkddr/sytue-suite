@@ -93,6 +93,54 @@ func (a ExternalMailAccount) ServesMail() bool {
 	return a.Services == nil || slices.Contains(a.Services, "mail")
 }
 
+// AccountsFor leaves one entry per provider account for a picker that opens
+// `service`: the `accountsFor` of @sytue/api-clients. The gateway keeps an address
+// connected for Mail and the same address connected for Calendar as two
+// connections, and accounts connected twice before that rule are still listed:
+// the pickers showed the same address twice and picking the wrong one asked to
+// sign in again. The entry kept is `keep` (what is already open), else the one
+// that serves `service`, else a connected one; the first seen otherwise. Order
+// follows first appearance.
+func AccountsFor(items []ExternalMailAccount, service, keep string) []ExternalMailAccount {
+	score := func(a ExternalMailAccount) int {
+		n := 0
+		if a.InstanceID == keep {
+			n += 4
+		}
+		services := a.Services
+		if services == nil {
+			services = []string{"mail"}
+		}
+		if a.Connected && slices.Contains(services, service) {
+			n += 2
+		}
+		if a.Connected {
+			n++
+		}
+		return n
+	}
+	var order []string
+	byAccount := map[string]ExternalMailAccount{}
+	for _, item := range items {
+		key := "instance|" + item.InstanceID
+		if address := strings.ToLower(strings.TrimSpace(item.Address)); address != "" {
+			key = item.Provider + "|" + address
+		}
+		seen, ok := byAccount[key]
+		if !ok {
+			order = append(order, key)
+		}
+		if !ok || score(item) > score(seen) {
+			byAccount[key] = item
+		}
+	}
+	out := make([]ExternalMailAccount, 0, len(order))
+	for _, key := range order {
+		out = append(out, byAccount[key])
+	}
+	return out
+}
+
 type ExternalMailProvider struct {
 	Services      []LinkedServiceCapability `json:"services"`
 	Provider      string                    `json:"provider"`

@@ -328,6 +328,35 @@ func TestLaPilaSeQuedaEnLaEsquinaInferiorDerecha(t *testing.T) {
 	}
 }
 
+// TestLosAvisosSubenSobreElMasFlotante: con el «+» flotante de crear a la vista en la
+// ventana, la pila sube su alto y su margen (`4.5rem`), como hace Toast.tsx con
+// `[body:has([data-sytue-fab])_&]`: los dos van en la misma esquina y se pisaban. Sin él,
+// o con su capa escondida (Drive fuera de «Mi unidad»), vuelve a la esquina.
+// VISTO EN ROJO sin `sobreFlotante`: el aviso se queda a 16 del borde, encima del «+».
+func TestLosAvisosSubenSobreElMasFlotante(t *testing.T) {
+	web := webref.Read(t, "apps/frontend/packages/ui/src/components/Toast.tsx")
+	if !strings.Contains(web, "'[body:has([data-sytue-fab])_&]:bottom-[calc(max(1rem,var(--sytue-safe-bottom,0px))+4.5rem)]'") {
+		t.Error("Toast.tsx ya no sube la pila sobre el «+» flotante: la de aquí ha dejado de ser la suya")
+	}
+	p := pilaQueSeVacia(t)
+	fab := NuevoBotonFlotante("Redactar", nil)
+	capa := container.New(CapaFlotante{}, fab)
+	w := test.NewTempWindow(t, container.NewStack(canvas.NewRectangle(magenta), capa, p))
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(1280, 800))
+	aviso := NuevoAviso(AvisoExito, "Enviado", "")
+	p.Notificar(aviso)
+	p.Refresh()
+	if fin, quiero := aviso.Position().Y+aviso.Size().Height, float32(800-16-72); fin != quiero {
+		t.Errorf("con el «+» a la vista el aviso acaba en y=%v y va por encima de él, en %v", fin, quiero)
+	}
+	capa.Hide()
+	p.Refresh()
+	if fin := aviso.Position().Y + aviso.Size().Height; fin != 800-16 {
+		t.Errorf("sin el «+» el aviso acaba en y=%v y vuelve a la esquina, a %v", fin, 800-16)
+	}
+}
+
 // TestUnAvisoNoDejaLaAplicacionSinPoderPulsar es el guardián que justifica que la pila
 // NO sea una capa, y está escrito invirtiéndolo.
 //

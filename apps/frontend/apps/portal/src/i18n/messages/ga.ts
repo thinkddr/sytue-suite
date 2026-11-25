@@ -818,4 +818,17 @@ export const ga: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Níorbh fhéidir tuilleadh torthaí a lódáil. Bain triail eile as.',
   'privacy.notice':
     'Ní dhíolaimid do chuid sonraí agus ní thugaimid do thríú páirtithe iad. Ní úsáidimid iad chun próifíl a dhéanamh díot, le haghaidh fógraíochta, ná chun ár seirbhísí féin ná seirbhísí aon duine eile a thraenáil ná a fheabhsú. Tá siad criptithe agus iad á seoladh agus i mbun stórála, agus ní fhágann siad ár mbonneagar Eorpach ach a mhéid is fíor-riachtanach chun billeáil a dhéanamh ort agus sna comhtháthuithe a chuireann tú féin ar siúl, áit a n-iarrfaidh an tríú páirtí do chead maidir leis na sonraí a úsáidfidh sé.',
+  'inbox.markAllOf': 'Marcáil iad seo ó {app} mar léite',
+  'inbox.markUnread': 'Marcáil mar neamhléite',
+  'inbox.muteLikeThis': 'Balbhaigh fógraí mar seo',
+  'inbox.mutedLikeThis':
+    'Ní bhfaighidh tú fógraí mar sin a thuilleadh. Is féidir é a athrú thíos, in “Cad ba mhaith leat a fháil”.',
+  'inbox.muteFailed': 'Níorbh fhéidir iad a bhalbhú. Bain triail eile as.',
+  'inbox.actionsOf': 'Gníomhartha do “{title}”',
+  'downloads.checksum': 'Fíoraigh an íoslódáil',
+  'downloads.checksumHelp':
+    'A mhéarlorg SHA-256. Ríomh méarlorg an chomhaid a d’íoslódáil tú agus seiceáil go bhfuil siad mar an gcéanna.',
+  'downloads.checksumLabel': 'Méarlorg SHA-256',
+  'downloads.copyChecksum': 'Cóipeáil an méarlorg',
+  'downloads.checksumCopied': 'Méarlorg cóipeáilte',
 };

@@ -4,9 +4,13 @@
 package mail
 
 import (
+	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
 // TestResponderEsBuildReplyDraft: los prefijos no se duplican ni se traducen, la cita
@@ -37,6 +41,36 @@ func TestResponderEsBuildReplyDraft(t *testing.T) {
 	}
 	if got := TituloRedactor(tr, f.Asunto, false); got != tr.T("compose.forwardTitle", nil) {
 		t.Errorf("el título de un reenvío es %q", got)
+	}
+}
+
+// TestLasRaicesDelAdjuntoSonLasDeLaWeb: las mismas raíces y las mismas frases que
+// `client/adjuntos.vectores.json`, en los 26 idiomas. Si la web añade una raíz y Fyne no,
+// o al revés, se ve aquí y no en el correo de alguien que escribe en lituano.
+func TestLasRaicesDelAdjuntoSonLasDeLaWeb(t *testing.T) {
+	var v struct {
+		Raices []string `json:"raices"`
+		Si     []string `json:"si"`
+		No     []string `json:"no"`
+	}
+	if err := json.Unmarshal([]byte(webref.Read(t, "apps/frontend/apps/mail/src/client/adjuntos.vectores.json")), &v); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(v.Raices, RaicesAdjunto) {
+		t.Fatalf("las raíces de Fyne no son las de la web:\n web  %q\n fyne %q", v.Raices, RaicesAdjunto)
+	}
+	if len(v.Si) < 26 || len(v.No) < 26 {
+		t.Fatalf("pocas frases: %d sí, %d no", len(v.Si), len(v.No))
+	}
+	for _, f := range v.Si {
+		if !MencionaAdjunto(f) {
+			t.Errorf("no ve el adjunto en %q", f)
+		}
+	}
+	for _, f := range v.No {
+		if MencionaAdjunto(f) {
+			t.Errorf("ve un adjunto en %q", f)
+		}
 	}
 }
 

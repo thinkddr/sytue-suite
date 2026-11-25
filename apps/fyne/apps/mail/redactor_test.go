@@ -327,6 +327,36 @@ func TestProgramarPideHoraFuturaYSaleConElla(t *testing.T) {
 	}
 }
 
+// TestProgramarConUnaFechaFija: el panel ofrece las fechas de posponer («Mañana»…) y
+// pulsar una rellena fecha y hora, que siguen siendo lo que se programa.
+func TestProgramarConUnaFechaFija(t *testing.T) {
+	s := servicioConTodas()
+	b, _, _ := buzonConVentana(t, s, fyne.NewSize(1280, 800))
+	b.abrirRedactor(Borrador{Para: "grace@example.org", Asunto: "Mañana"})
+	rd := b.redaccion
+	rd.r.AlternarProgramar()
+	manana := traductor(t).T("snooze.tomorrow", nil)
+	var boton *ui.Boton
+	for _, o := range rd.r.atajosProgramar.Objects {
+		if bt, ok := o.(*ui.Boton); ok && bt.Texto == manana {
+			boton = bt
+		}
+	}
+	if boton == nil {
+		t.Fatalf("sin «%s» en el panel de programar", manana)
+	}
+	boton.Tapped(nil)
+	cuando, ok := rd.r.cuando.leer()
+	quiero := time.Now().AddDate(0, 0, 1)
+	if !ok || cuando.Hour() != 8 || cuando.Minute() != 0 || cuando.Day() != quiero.Day() {
+		t.Fatalf("«Mañana» puso %v (%v)", cuando, ok)
+	}
+	rd.r.BotonProgramar.Tapped(nil)
+	if s.pidio("Schedule") != 1 {
+		t.Errorf("no se programó con la fecha fija: %v", s.llamadas)
+	}
+}
+
 // TestLosProgramadosSeCancelanYSeReprograman: la lista sale del servicio y cancelar
 // quita el envío de la cola.
 func TestLosProgramadosSeCancelanYSeReprograman(t *testing.T) {

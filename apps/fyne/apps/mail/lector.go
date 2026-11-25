@@ -95,6 +95,8 @@ type Lector struct {
 	CreandoEvento bool
 	// AlCompartirEnRooms es «Compartir en Rooms», en «Más acciones». Nil, no se ofrece.
 	AlCompartirEnRooms func(Mensaje)
+	// AlCopiarDireccion es «Copiar la dirección» del remitente. Nil, no se ofrece.
+	AlCopiarDireccion func(direccion string)
 	// Silenciada y PospuestaHasta son el estado del hilo abierto (posponer.go): «Más
 	// acciones» ofrece deshacerlo y «Posponer» pasa a «Cambiar la fecha». Cero: ni
 	// silenciado ni pospuesto.
@@ -207,7 +209,10 @@ func (x *Lector) CreateRenderer() fyne.WidgetRenderer {
 
 	r.hilo = &hiloLayout{}
 	r.pila = container.New(r.hilo)
-	r.desplaza = container.NewVScroll(r.pila)
+	// Con el hueco del «+» de Redactar al final: en escritorio flota sobre el lector, y sin
+	// él el final del último mensaje se quedaba debajo (`sytue-reserva-flotante` en
+	// MessageReader.tsx).
+	r.desplaza = container.NewVScroll(ui.ConReservaFlotante(r.pila))
 	r.vacio = ui.NuevoVacio("", "")
 	r.Refresh()
 	return r

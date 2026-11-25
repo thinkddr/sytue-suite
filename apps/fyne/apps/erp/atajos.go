@@ -4,6 +4,9 @@
 package erp
 
 import (
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver/desktop"
+
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
@@ -36,6 +39,7 @@ var gruposDelERP = []struct {
 	}},
 	{"shortcuts.group.actions", []filaDeAtajo{
 		{tal("n"), "shortcuts.new"},
+		{func(func(string) string) []string { return []string{ui.AtajoDelSistema("Ctrl+S")} }, "shortcuts.save"},
 		{func(t func(string) string) []string { return []string{t("shortcuts.key.esc")} }, "shortcuts.close"},
 		{tal("?"), "shortcuts.help"},
 	}},
@@ -53,6 +57,25 @@ func (p *Pantalla) gruposDeAtajos() []ui.GrupoDeAtajos {
 		out = append(out, grupo)
 	}
 	return out
+}
+
+// esGuardar dice si un atajo es Ctrl+S (⌘S en un Mac): el `guardar` de `GRUPOS_ERP`.
+func esGuardar(s fyne.Shortcut) bool {
+	c, ok := s.(*desktop.CustomShortcut)
+	return ok && c.KeyName == fyne.KeyS && c.Modifier == fyne.KeyModifierShortcutDefault
+}
+
+// atajoGuardar es Ctrl+S en un campo de la ficha: la guarda, como «Guardar». Quien solo
+// lee o mira la papelera no tiene nada que guardar, y el atajo se queda sin hacer nada
+// (no sigue al editor, que no sabe qué es).
+func (f *Ficha) atajoGuardar(s fyne.Shortcut) bool {
+	if !esGuardar(s) {
+		return false
+	}
+	if f.AlGuardar != nil && !f.SoloLectura && !f.EnPapelera && !f.Guardando {
+		f.AlGuardar()
+	}
+	return true
 }
 
 // verAtajos abre la hoja de «?». Con una capa ya delante (un diálogo, la propia hoja) la

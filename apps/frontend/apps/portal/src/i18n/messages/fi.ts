@@ -758,4 +758,17 @@ export const fi: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Lisää tuloksia ei voitu ladata. Yritä uudelleen.',
   'privacy.notice':
     'Emme myy tietojasi emmekä luovuta niitä kolmansille osapuolille. Emme käytä niitä profilointiin, mainontaan emmekä palveluidemme tai kenenkään muun palveluiden kouluttamiseen tai parantamiseen. Ne on salattu siirron aikana ja levossa, ja ne poistuvat eurooppalaisesta infrastruktuuristamme vain siltä osin kuin laskutus välttämättä vaatii sekä käyttöön ottamissasi integraatioissa, joissa kolmas osapuoli pyytää hyväksyntäsi käyttämilleen tiedoille.',
+  'inbox.markAllOf': 'Merkitse {app} luetuiksi',
+  'inbox.markUnread': 'Merkitse lukemattomaksi',
+  'inbox.muteLikeThis': 'Mykistä tällaiset ilmoitukset',
+  'inbox.mutedLikeThis':
+    'Et saa enää tällaisia ilmoituksia. Voit muuttaa tätä alempana kohdassa ”Mitä haluat saada”.',
+  'inbox.muteFailed': 'Mykistäminen ei onnistunut. Yritä uudelleen.',
+  'inbox.actionsOf': 'Toiminnot: ”{title}”',
+  'downloads.checksum': 'Tarkista lataus',
+  'downloads.checksumHelp':
+    'Sen SHA-256-sormenjälki. Laske ladatun tiedoston sormenjälki ja tarkista, että ne täsmäävät.',
+  'downloads.checksumLabel': 'SHA-256-sormenjälki',
+  'downloads.copyChecksum': 'Kopioi sormenjälki',
+  'downloads.checksumCopied': 'Sormenjälki kopioitu',
 };

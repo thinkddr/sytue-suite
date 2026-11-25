@@ -1,12 +1,23 @@
 import type { JSX } from 'preact';
 import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
-import { Button, EmptyState, Badge, Skeleton, marcarAppLista } from '@sytue/ui';
+import {
+  Button,
+  EmptyState,
+  Badge,
+  Icon,
+  Input,
+  Select,
+  Skeleton,
+  marcarAppLista,
+} from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { Marco } from '../components/Marco.js';
 import { t as translate, type ClaveMensaje } from '../i18n/index.js';
 import { ruta } from '../lib/rutas.js';
 import { administra } from '../lib/roles.js';
+import { direccionDelRender } from '../lib/direccion.js';
+import { filtrarYOrdenarSitios, type OrdenSitios } from '../lib/listados.js';
 
 interface Props {
   locale: Locale;
@@ -40,6 +51,10 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
   const [filtro, setFiltro] = useState<Filtro>('all');
   const [restaurando, setRestaurando] = useState<string | null>(null);
   const [errorRestaurar, setErrorRestaurar] = useState(false);
+  // Con una docena de webs —una agencia, una red de tiendas— encontrar una era
+  // recorrer tarjetas a ojo.
+  const [busqueda, setBusqueda] = useState('');
+  const [orden, setOrden] = useState<OrdenSitios>('recent');
 
   const cargarSitios = useCallback(async () => {
     setCargando(true);
@@ -82,11 +97,16 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
   const activos = sitios.filter((s) => !s.deleted_at);
   const eliminados = sitios.filter((s) => s.deleted_at);
 
-  const filtrados = activos.filter((s) => {
-    if (filtro === 'published') return s.published_number != null;
-    if (filtro === 'draft') return s.published_number == null;
-    return true;
-  });
+  const filtrados = filtrarYOrdenarSitios(
+    activos.filter((s) => {
+      if (filtro === 'published') return s.published_number != null;
+      if (filtro === 'draft') return s.published_number == null;
+      return true;
+    }),
+    busqueda,
+    orden,
+    locale,
+  );
 
   const ahora = useMemo(() => Date.now(), []);
   const diasRestantes = (borradoEn: string) =>
@@ -120,22 +140,42 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
         </div>
 
         {activos.length > 0 ? (
-          <div class="mb-6 flex flex-wrap gap-2" role="group" aria-label={t('sites.filter_label')}>
-            {filtros.map(([clave, rotulo]) => (
-              <button
-                key={clave}
-                type="button"
-                aria-pressed={filtro === clave}
-                onClick={() => setFiltro(clave)}
-                class={`sytue-focus-ring rounded-control px-3 py-1.5 text-sm font-medium transition-colors ${
-                  filtro === clave
-                    ? 'bg-selected text-primary-text font-semibold'
-                    : 'text-text-muted hover:bg-bg-subtle'
-                }`}
-              >
-                {t(rotulo)}
-              </button>
-            ))}
+          <div class="mb-6 flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap gap-2" role="group" aria-label={t('sites.filter_label')}>
+              {filtros.map(([clave, rotulo]) => (
+                <button
+                  key={clave}
+                  type="button"
+                  aria-pressed={filtro === clave}
+                  onClick={() => setFiltro(clave)}
+                  class={`sytue-focus-ring rounded-control px-3 py-1.5 text-sm font-medium transition-colors ${
+                    filtro === clave
+                      ? 'bg-selected text-primary-text font-semibold'
+                      : 'text-text-muted hover:bg-bg-subtle'
+                  }`}
+                >
+                  {t(rotulo)}
+                </button>
+              ))}
+            </div>
+            <Input
+              type="search"
+              value={busqueda}
+              class="ml-auto w-60 max-w-full"
+              leadingIcon={<Icon name="search" size={16} />}
+              placeholder={t('sites.search')}
+              aria-label={t('sites.search')}
+              onInput={(e) => setBusqueda(e.currentTarget.value)}
+            />
+            <Select
+              value={orden}
+              class="w-44"
+              aria-label={t('sites.sort_label')}
+              onChange={(e) => setOrden(e.currentTarget.value as OrdenSitios)}
+            >
+              <option value="recent">{t('sites.sort_recent')}</option>
+              <option value="name">{t('sites.sort_name')}</option>
+            </Select>
           </div>
         ) : null}
 
@@ -172,7 +212,11 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
             action={botonCrear}
           />
         ) : filtrados.length === 0 ? (
-          <p class="text-text-muted py-8 text-center text-sm">{t('sites.filter_empty')}</p>
+          <p class="text-text-muted py-8 text-center text-sm">
+            {busqueda.trim()
+              ? t('sites.search_empty', { q: busqueda.trim() })
+              : t('sites.filter_empty')}
+          </p>
         ) : (
           <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filtrados.map((sitio) => (
@@ -208,10 +252,30 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
                     </p>
                   </div>
 
-                  <div class="border-border mt-4 flex items-center justify-between gap-2 border-t pt-3">
+                  <div class="border-border mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                     <Button variant="secondary" size="sm" href={ruta(`/site/${sitio.id}`)}>
                       {t('sites.manage')}
                     </Button>
+                    {/* La web publicada, a un clic: comprobar cómo se ve de verdad
+                        obligaba a entrar en la ficha para encontrar la dirección. */}
+                    {(() => {
+                      const url =
+                        sitio.published_number != null
+                          ? direccionDelRender({ site: { canonical_host: sitio.canonical_host } })
+                          : null;
+                      return url ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={t('sites.view_live_aria', { nombre: sitio.name })}
+                        >
+                          {t('sites.view_live')}
+                        </Button>
+                      ) : null;
+                    })()}
                     <Button variant="primary" size="sm" href={ruta(`/edit/${sitio.id}`)}>
                       {t('sites.open_editor')}
                     </Button>

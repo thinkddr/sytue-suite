@@ -29,6 +29,8 @@ import type { BadgeTone } from '@sytue/ui';
 import { formatDateTime, formatList, type Locale } from '@sytue/i18n';
 import { useT, type ConsoleMessageKey, type T } from '../i18n/index.js';
 import type { AuditSource, SiemRecord, SourceStatus } from '../lib/audit-siem.js';
+import { useTGestion } from '../i18n/gestion/index.js';
+import { rangoRapido } from '../lib/gestion.js';
 
 // La CLAVE de cada fuente se declara aquí: lib/audit-siem.ts es módulo SOLO servidor,
 // así que solo se importan sus TIPOS (import type se borra en el build del cliente).
@@ -127,6 +129,7 @@ export default function UnifiedAuditPanel({
   locale,
 }: UnifiedAuditPanelProps) {
   const t = useT(locale);
+  const tg = useTGestion(locale);
   const [items, setItems] = useState<SiemRecord[]>(records);
   const [status, setStatus] = useState<SourceStatus[]>(sources);
   const [service, setService] = useState<'' | AuditSource>('');
@@ -182,6 +185,21 @@ export default function UnifiedAuditPanel({
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * «¿Qué ha pasado esta semana?» es la pregunta de casi todas las visitas, y
+   * respondía tecleando dos fechas. El rango se aplica en el acto, con el resto de
+   * filtros que ya hubiera puestos.
+   */
+  function aplicarRango(dias: number) {
+    const r = rangoRapido(dias, new Date());
+    setSince(r.since);
+    setUntil(r.until);
+    const p = new URLSearchParams(filterParams);
+    p.set('since', r.since);
+    p.set('until', r.until);
+    void apply(p);
   }
 
   function clear() {
@@ -262,6 +280,39 @@ export default function UnifiedAuditPanel({
         <Button type="submit" variant="secondary" disabled={loading}>
           {loading ? t('audit.applying') : t('audit.apply')}
         </Button>
+        <div
+          class="flex items-center gap-1"
+          role="group"
+          aria-label={tg('gestion.auditoria.rango')}
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={loading}
+            onClick={() => aplicarRango(0)}
+          >
+            {tg('gestion.auditoria.hoy')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={loading}
+            onClick={() => aplicarRango(7)}
+          >
+            {tg('gestion.auditoria.7d')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={loading}
+            onClick={() => aplicarRango(30)}
+          >
+            {tg('gestion.auditoria.30d')}
+          </Button>
+        </div>
         <div class="ml-auto flex items-center gap-2">
           <a
             href={exportCsvHref}

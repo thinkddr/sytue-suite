@@ -5,12 +5,23 @@
  * Catálogo de productos de la tienda: listado, alta, edición y baja con confirmación.
  */
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
-import { Badge, Button, ConfirmDialog, EmptyState, Table, type TableColumn } from '@sytue/ui';
+import { useMemo, useState } from 'preact/hooks';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  Icon,
+  Input,
+  Select,
+  Table,
+  type TableColumn,
+} from '@sytue/ui';
 import { formatCurrency, formatNumber, formatPercent, type Locale } from '@sytue/i18n';
 import { ruta } from '../lib/rutas.js';
 import { ProductoModal } from './ProductoModal.js';
 import { detalleDeError, type Product, type Traductor } from './tipos.js';
+import { existencias, filtrarProductos, type FiltroCatalogo } from '../lib/listados.js';
 
 export interface CatalogoProps {
   siteId: string;
@@ -58,6 +69,14 @@ export function Catalogo({
   const [editando, setEditando] = useState<Product | null>(null);
   const [aEliminar, setAEliminar] = useState<Product | null>(null);
   const [eliminando, setEliminando] = useState(false);
+  // Buscar por nombre o SKU y ver de un vistazo lo agotado o a punto de agotarse:
+  // con cincuenta productos, reponer era recorrer la tabla fila a fila.
+  const [busqueda, setBusqueda] = useState('');
+  const [filtro, setFiltro] = useState<FiltroCatalogo>('');
+  const visibles = useMemo(
+    () => filtrarProductos(productos, busqueda, filtro),
+    [productos, busqueda, filtro],
+  );
 
   const nombreDe = (p: Product) =>
     p.name.es || Object.values(p.name)[0] || t('store.product_unnamed');
@@ -65,11 +84,15 @@ export function Catalogo({
     const v = p.variants?.[0];
     return v ? formatCurrency(locale, v.price_cents / 100, moneda) : '—';
   };
+  // La suma de TODAS las variantes, con su aviso: la tabla enseñaba solo la primera.
   const stockDe = (p: Product) => {
-    const stock = p.variants?.[0]?.stock;
-    return stock === null || stock === undefined
-      ? t('store.stock_unlimited')
-      : formatNumber(locale, stock);
+    const e = existencias(p);
+    if (e.total === null) return t('store.stock_unlimited');
+    if (e.agotado) return <Badge tone="danger">{t('store.stock_out')}</Badge>;
+    if (e.bajo) {
+      return <Badge tone="warning">{t('store.stock_low', { count: e.total })}</Badge>;
+    }
+    return formatNumber(locale, e.total);
   };
   const fichaDe = (p: Product) => (
     <Badge tone={p.kind === 'food' ? 'warning' : 'info'}>
@@ -163,6 +186,31 @@ export function Catalogo({
         </Button>
       </div>
 
+      {productos.length > 0 ? (
+        <div class="flex flex-wrap items-center gap-2">
+          <Input
+            type="search"
+            value={busqueda}
+            class="w-64 max-w-full"
+            leadingIcon={<Icon name="search" size={16} />}
+            placeholder={t('store.products_search')}
+            aria-label={t('store.products_search')}
+            onInput={(e) => setBusqueda(e.currentTarget.value)}
+          />
+          <Select
+            value={filtro}
+            class="w-52"
+            aria-label={t('store.products_filter')}
+            onChange={(e) => setFiltro(e.currentTarget.value as FiltroCatalogo)}
+          >
+            <option value="">{t('store.products_filter_all')}</option>
+            <option value="agotados">{t('store.products_filter_out')}</option>
+            <option value="bajos">{t('store.products_filter_low')}</option>
+            <option value="inactivos">{t('store.products_filter_inactive')}</option>
+          </Select>
+        </div>
+      ) : null}
+
       {productos.length === 0 ? (
         <div class="border-border bg-surface rounded-xl border">
           <EmptyState
@@ -175,18 +223,20 @@ export function Catalogo({
             }
           />
         </div>
+      ) : visibles.length === 0 ? (
+        <p class="text-text-muted py-6 text-center text-sm">{t('store.products_filter_empty')}</p>
       ) : (
         <>
           <div class="hidden sm:block">
             <Table
               caption={t('store.products')}
               columns={columnas}
-              rows={productos}
+              rows={visibles}
               rowKey={(p) => p.id}
             />
           </div>
           <ul class="space-y-3 sm:hidden">
-            {productos.map((p) => (
+            {visibles.map((p) => (
               <li key={p.id} class="border-border bg-surface rounded-xl border p-4">
                 <div class="flex items-start justify-between gap-3">
                   <p class="text-text min-w-0 font-semibold break-words">{nombreDe(p)}</p>

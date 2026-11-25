@@ -1011,4 +1011,14 @@ export const lv: AppCatalog<typeof en> = {
     'Iepriekšējā pasta sistēma vairs nav pieejama. Kamēr nepārvietosiet pastu uz glabātuvi, jaunu pastu nesaņemsiet: tas, ko jums pa to laiku nosūta, gaida serverī, no kura tas nosūtīts, un tas dažas dienas mēģina to piegādāt vēlreiz. Ja pārvietosiet laikus, tas jūs sasniegs vēlāk; ja ne, tas tiks atgriezts kā nepiegādāts. To, kas jau ir šifrēts ar iepriekšējo sistēmu, piemēram, jau esošo pastu, nevarēs izlasīt: tas netiek dzēsts, bet neviens to nevarēs atvērt. Pēc pārvietošanas pasts atkal pienāk un atveras ar jūsu Sytue ID pieteikšanos tāpat kā pārējās lietotnes.',
   'privateMail.vaultMoveCheckFailed':
     'Neizdevās pārbaudīt jūsu pasta stāvokli. Mēģiniet vēlreiz pēc brīža.',
+  'shortcuts.goInbox': 'Doties uz Iesūtni',
+  'shortcuts.goSent': 'Doties uz Nosūtītajiem',
+  'shortcuts.goDrafts': 'Doties uz Melnrakstiem',
+  'shortcuts.goArchive': 'Doties uz Arhīvu',
+  'compose.sendAndArchive': 'Sūtīt un arhivēt',
+  'reader.copyAddress': 'Kopēt adresi',
+  'reader.addressCopied': 'Adrese nokopēta',
+  'reader.copyAddressFailed': 'Adresi neizdevās nokopēt',
+  'reader.viewPlain': 'Rādīt kā vienkāršu tekstu',
+  'reader.viewFormatted': 'Rādīt ar formatējumu',
 };

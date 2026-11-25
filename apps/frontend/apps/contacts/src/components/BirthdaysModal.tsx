@@ -38,7 +38,7 @@ export function BirthdaysModal({
       ) : (
         <ul class="divide-border/60 border-border max-h-[60dvh] divide-y overflow-y-auto rounded-md border">
           {cumpleanos.map((c) => (
-            <li key={c.contact.uid}>
+            <li key={`${c.contact.uid}${c.aniversario ? ':aniversario' : ''}`}>
               <button
                 type="button"
                 onClick={() => onOpen(c.contact)}
@@ -51,7 +51,11 @@ export function BirthdaysModal({
                   <span class="text-text truncate text-sm font-medium">{c.contact.fullName}</span>
                   <span class="text-text-muted truncate text-xs">
                     {formatDate(locale, c.fecha, { day: 'numeric', month: 'long' })}
-                    {c.edad !== undefined ? ` · ${t('birthdays.turns', { age: c.edad })}` : ''}
+                    {c.aniversario
+                      ? ` · ${t('birthdays.anniversary')}`
+                      : c.edad !== undefined
+                        ? ` · ${t('birthdays.turns', { age: c.edad })}`
+                        : ''}
                   </span>
                 </span>
                 <span

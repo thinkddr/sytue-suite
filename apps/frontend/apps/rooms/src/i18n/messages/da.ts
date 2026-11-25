@@ -996,4 +996,11 @@ export const da: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Forbind denne app med din konto i {tenant}. Dine nuværende adgangstilladelser bevares.',
   'nativeResource.approve': 'Forbind',
+  'channel.markRead': 'Markér som læst',
+  'channel.copyLink': 'Kopiér link',
+  'channel.linkCopied': 'Link kopieret',
+  'channel.download': 'Download samtalen',
+  'channel.downloaded': 'Samtalen er gemt i',
+  'channel.downloadFailed': 'Samtalen kunne ikke gemmes',
+  'status.nothingUnread': 'Alt var allerede læst',
 };

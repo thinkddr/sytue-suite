@@ -298,37 +298,85 @@ func marcarNotificacionTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, d destin
 	return nil
 }
 
+// MarkUnread devuelve una notificación a «sin leer»: el «Marcar como no leído» de la
+// bandeja, para lo que se ha abierto sin tiempo de atenderlo y no se quiere perder
+// entre lo leído. Mismas reglas que MarkRead: solo los avisos de quien llama
+// (ErrNotFound si no existe o no es suyo), sin tocar una fuente de One congelada
+// (0015), y el que espera en la entrada privada se cambia en su copia (0014).
+// Idempotente: uno ya sin leer se queda como está.
+func (s *Store) MarkUnread(ctx context.Context, id uuid.UUID, subjects []string) error {
+	return PrivateStorageError(s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
+		d, err := conDestinatarios(ctx, tx, subjects)
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx,
+			`UPDATE notifications SET read = false, read_at = NULL
+				 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4)) AND read = true
+				   AND (subject = $5 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $6))`,
+			id, d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido)
+		if err != nil || tag.RowsAffected() > 0 {
+			return err
+		}
+		copia, err := tx.Exec(ctx,
+			`UPDATE hub_private_notices SET read_at = NULL
+				 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4))`,
+			id, d.enLaOrganizacion, d.organizacion, d.deLaPersona)
+		if err != nil || copia.RowsAffected() == 1 {
+			return err
+		}
+		// Distinguir «no existe» de «ya estaba sin leer».
+		var existe bool
+		if err := tx.QueryRow(ctx,
+			`SELECT true FROM notifications
+				 WHERE id=$1 AND ((tenant = $3 AND subject = ANY($2)) OR subject = ANY($4))
+				   AND (subject = $5 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $6))`,
+			id, d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido).Scan(&existe); errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		return nil
+	}))
+}
+
 // MarkAllRead marca todas las notificaciones del usuario como leídas y devuelve
 // cuántas se han actualizado. Las que están en una fuente de One congelada (0015) se
 // quedan como están —no pueden cambiar hasta soltarla—, y las que esperan en la
 // entrada privada se marcan en su copia (0014).
-func (s *Store) MarkAllRead(ctx context.Context, subjects []string) (int64, error) {
+//
+// Con `origen` (un producto: `drive`, `mail`…), solo las de ese producto: es lo que
+// pide la bandeja con un filtro de producto puesto. «Marcar todas» con «Drive»
+// elegido se llevaba también los correos sin leer que no estaban a la vista.
+func (s *Store) MarkAllRead(ctx context.Context, subjects []string, origen string) (int64, error) {
 	var affected int64
 	err := s.enLecturaDeAvisos(ctx, func(tx pgx.Tx) error {
 		d, err := conDestinatarios(ctx, tx, subjects)
 		if err != nil {
 			return err
 		}
-		affected, err = marcarTodasNotificacionesTx(ctx, tx, d)
+		affected, err = marcarTodasNotificacionesTx(ctx, tx, d, origen)
 		return err
 	})
 	return affected, PrivateStorageError(err)
 }
 
-func marcarTodasNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios) (int64, error) {
+func marcarTodasNotificacionesTx(ctx context.Context, tx pgx.Tx, d destinatarios, origen string) (int64, error) {
 	tag, err := tx.Exec(ctx,
 		`UPDATE notifications SET read = true, read_at = now()
 			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read = false
 			   AND (subject = $4 OR NOT EXISTS (SELECT 1 FROM buzones_olvidados b WHERE b.buzon = notifications.subject AND b.olvidado >= $5))
+			   AND ($6 = '' OR source = $6)
 			   AND NOT hub_private_storage_frozen(tenant, subject)`,
-		d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido)
+		d.enLaOrganizacion, d.organizacion, d.deLaPersona, d.subject, d.emitido, origen)
 	if err != nil {
 		return 0, err
 	}
 	copias, err := tx.Exec(ctx,
 		`UPDATE hub_private_notices SET read_at = now()
-			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read_at IS NULL`,
-		d.enLaOrganizacion, d.organizacion, d.deLaPersona)
+			 WHERE ((tenant = $2 AND subject = ANY($1)) OR subject = ANY($3)) AND read_at IS NULL
+			   AND ($4 = '' OR source = $4)`,
+		d.enLaOrganizacion, d.organizacion, d.deLaPersona, origen)
 	if err != nil {
 		return 0, err
 	}

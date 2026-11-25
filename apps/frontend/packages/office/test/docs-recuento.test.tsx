@@ -193,6 +193,7 @@ describe('la barra de estado', () => {
       ['Caracteres', '24'],
       ['Caracteres sin espacios', '21'],
       ['Párrafos', '2'],
+      ['Tiempo de lectura (minutos)', '1'],
     ]);
   });
 

@@ -28,7 +28,10 @@ import type { T } from '../i18n/index.js';
 import {
   capturaRapida,
   diaLocal,
+  abrirSelectorDeDia,
   desplazarDia,
+  diaElegido,
+  diaRelativo,
   ENFOQUES,
   expandirCaptura,
   lineasDeCaptura,
@@ -187,6 +190,8 @@ export function NotebookDashboard({
   // pendiente. El día abierto se cuenta aquí mismo, con lo que ya está en pantalla.
   const [marcas, setMarcas] = useState<Map<string, DailyDay>>(new Map());
   const [sobre, setSobre] = useState<string | null>(null);
+  // El selector de fecha del sistema de «Ir a…», escondido: lo despliega su botón.
+  const selectorDia = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!date) return;
     let vivo = true;
@@ -334,6 +339,29 @@ export function NotebookDashboard({
                 >
                   {t('daily.today')}
                 </Button>
+                {/* «Ir a…»: un día concreto sin pulsar la flecha treinta veces (la
+                    reunión de hace un mes, el cumpleaños del mes que viene). Es el
+                    selector de fecha del sistema, que ya sabe de idiomas y de teclado. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={openingDay}
+                  onClick={() => abrirSelectorDeDia(selectorDia.current)}
+                >
+                  {t('daily.goToDate')}
+                </Button>
+                <input
+                  ref={selectorDia}
+                  type="date"
+                  class="sr-only"
+                  tabIndex={-1}
+                  aria-label={t('daily.goToDate')}
+                  value={date}
+                  onChange={(e) => {
+                    const elegido = diaElegido(e.currentTarget.value, date);
+                    if (elegido) onDay(elegido);
+                  }}
+                />
                 <IconButton
                   label={t('daily.next')}
                   disabled={openingDay}
@@ -365,6 +393,13 @@ export function NotebookDashboard({
                   <>
                     <span aria-hidden="true">·</span>
                     <span class="notes-day-today">{t('daily.today')}</span>
+                  </>
+                ) : diaRelativo(date, hoy) ? (
+                  // «Ayer» y «Mañana» en gris: son los otros dos días que se abren a
+                  // diario, y con solo la fecha había que hacer la cuenta.
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{t(diaRelativo(date, hoy)!)}</span>
                   </>
                 ) : null}
               </p>

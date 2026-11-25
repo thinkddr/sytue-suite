@@ -12,8 +12,20 @@ import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { HubClient, bearer } from '@sytue/api-clients';
 import type { ProductKey } from '@sytue/config';
-import { appForKey, Button, EmptyState, ProductIcon, Skeleton } from '@sytue/ui';
-import { formatTimeAgo, translate } from '@sytue/i18n';
+import type { Notification } from '@sytue/api-clients';
+import {
+  appForKey,
+  Button,
+  Dropdown,
+  EmptyState,
+  Icon,
+  IconButton,
+  MenuItem,
+  ProductIcon,
+  Skeleton,
+  useAhora,
+} from '@sytue/ui';
+import { formatDate, formatTimeAgo, translate } from '@sytue/i18n';
 import type { Locale } from '@sytue/i18n';
 import { getAccessToken } from '@sytue/auth/client';
 import {
@@ -29,6 +41,8 @@ import {
 } from '@sytue/shell';
 import { useT } from '../i18n/index.js';
 import { PreferenciasAvisos } from './PreferenciasAvisos.js';
+import { agruparPorDia, dayLabelKey } from '../lib/activity.js';
+import { clicAparte, silenciableDesdeElAviso } from '../lib/bandeja.js';
 
 interface Props {
   locale: Locale;
@@ -70,7 +84,28 @@ export function NotificationsInbox({
 
   const items = estado && !estado.cargando ? estado.items : null;
   const error = estado?.fallo === true && (estado.items.length ?? 0) === 0;
-  const marcarTodas = () => void avisos?.leerTodos();
+  // Con un producto elegido, «Marcar todas» marca las de ESE producto: es lo que se
+  // está viendo. Antes se llevaba también los avisos de los demás.
+  const marcarTodas = () => void avisos?.leerTodos(producto ?? undefined);
+  // Lo que acaba de pasar con un aviso desde su menú: se dice en una región `status`.
+  const [hecho, setHecho] = useState<'' | 'silenciado' | 'fallo'>('');
+  // Cambiarla vuelve a montar «Qué quieres recibir», que relee las reglas: lo que se
+  // acaba de silenciar desde un aviso aparece ahí ya apagado.
+  const [versionReglas, setVersionReglas] = useState(0);
+  // «Hoy» y «Ayer» contra un reloj que avanza (cada minuto): con la bandeja abierta
+  // de un día para otro, lo de ayer deja de llamarse «Hoy» solo.
+  const ahora = useAhora();
+
+  async function silenciarComoEste(n: Notification): Promise<void> {
+    setHecho('');
+    try {
+      await hub.setNotificationPref({ source: n.source, kind: n.type ?? '', muted: true });
+      setHecho('silenciado');
+      setVersionReglas((v) => v + 1);
+    } catch {
+      setHecho('fallo');
+    }
+  }
 
   const todas = items ?? [];
   // El número de la base, no el de los cien cargados.
@@ -127,9 +162,13 @@ export function NotificationsInbox({
             );
           })}
         </nav>
-        {sinLeer > 0 ? (
+        {(producto === null ? sinLeer > 0 : visibles.some((n) => !n.read)) ? (
           <Button variant="secondary" onClick={marcarTodas}>
-            {t('inbox.markAll')}
+            {producto === null
+              ? t('inbox.markAll')
+              : t('inbox.markAllOf', {
+                  app: appForKey(producto)?.name.replace('Sytue ', '') ?? producto,
+                })}
           </Button>
         ) : null}
       </div>
@@ -172,76 +211,54 @@ export function NotificationsInbox({
           />
         )
       ) : (
-        <ul class="divide-border divide-y">
-          {visibles.map((n) => {
-            const app = appForKey(n.source);
-            const contenido = (
-              <>
-                <span class="mt-0.5 shrink-0">
-                  <ProductIcon appKey={n.source} size={18} />
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span
-                    class={'text-text block text-sm ' + (n.read ? 'font-medium' : 'font-semibold')}
-                  >
-                    {tituloAviso(locale, n)}
-                  </span>
-                  {cuerpoAviso(locale, n) ? (
-                    <span class="text-text-muted mt-0.5 block text-sm">
-                      {cuerpoAviso(locale, n)}
-                    </span>
-                  ) : null}
-                  <span class="text-text-subtle mt-1 block text-xs">
-                    {/* De otra organización, o anterior al registro de avisos. */}
-                    {procedenciaAviso(locale, n).map((p) => `${p} · `)}
-                    {app ? app.name.replace('Sytue ', '') : n.source} ·{' '}
-                    {formatTimeAgo(locale, new Date(n.created_at))}
-                  </span>
-                </span>
-                {/* El punto se ve fuera, en su botón; aquí se dice para quien no lo ve. */}
-                {!n.read ? <span class="sr-only">{t('inbox.unreadDot')}</span> : null}
-              </>
-            );
+        // Cortada por día, como la actividad: «Hoy», «Ayer» y luego fechas. Con cien
+        // avisos seguidos no se sabía dónde acababa lo de esta mañana.
+        <div class="flex flex-col gap-6">
+          {agruparPorDia(visibles, (n) => n.created_at).map((grupo) => {
+            const clave = dayLabelKey(grupo.day, ahora);
+            const rotulo =
+              clave === 'today'
+                ? t('activity.today')
+                : clave === 'yesterday'
+                  ? t('activity.yesterday')
+                  : formatDate(locale, grupo.at, {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    });
             return (
-              <li key={n.id} class="flex items-start">
-                {destinoAviso(n) ? (
-                  <a
-                    href={destinoAviso(n) ?? undefined}
-                    onClick={(e) => {
-                      // Se navega DESPUÉS del «leído»: antes la navegación cancelaba la
-                      // petición y el aviso volvía sin leer.
-                      e.preventDefault();
-                      if (avisos) {
-                        void abrirAviso(avisos, n, (u) => window.location.assign(u));
-                      }
-                    }}
-                    class="hover:bg-chrome-hover sytue-focus-ring flex min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-3 transition-colors"
-                  >
-                    {contenido}
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void avisos?.leer(n.id)}
-                    class="hover:bg-chrome-hover sytue-focus-ring flex min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-3 text-left transition-colors"
-                  >
-                    {contenido}
-                  </button>
-                )}
-                {/* El punto azul es un botón: marca ESTE aviso como leído sin abrirlo. Va
-                    fuera de la fila (un botón dentro de un enlace no es HTML válido). */}
-                {!n.read ? (
-                  <MarcarLeido
-                    class="mt-3"
-                    rotulo={t('inbox.markRead')}
-                    alMarcar={() => void avisos?.leer(n.id)}
-                  />
-                ) : null}
-              </li>
+              <section key={grupo.day} aria-label={rotulo}>
+                <h2 class="sytue-overline text-text-subtle border-border mb-1 border-b pb-2">
+                  {rotulo}
+                </h2>
+                <ul class="divide-border divide-y">
+                  {grupo.items.map((n) => (
+                    <FilaAviso
+                      key={n.id}
+                      n={n}
+                      t={t}
+                      locale={locale}
+                      avisos={avisos}
+                      alSilenciar={(x) => void silenciarComoEste(x)}
+                    />
+                  ))}
+                </ul>
+              </section>
             );
           })}
-        </ul>
+        </div>
       )}
+      {/* Siempre montada: lo que pasó con el último «Silenciar avisos como este». */}
+      <p
+        role="status"
+        class={hecho === 'fallo' ? 'text-danger-text text-sm' : 'text-text-muted text-sm'}
+      >
+        {hecho === 'silenciado'
+          ? t('inbox.mutedLikeThis')
+          : hecho === 'fallo'
+            ? t('inbox.muteFailed')
+            : ''}
+      </p>
       {estado?.hayMas && items && items.length > 0 ? (
         <div>
           <Button variant="secondary" size="sm" onClick={() => void avisos?.masAntiguos()}>
@@ -255,11 +272,143 @@ export function NotificationsInbox({
           aparte a propósito: si el Hub no las sirve, la bandeja sigue siendo útil y
           solo se cae esa sección. */}
       <PreferenciasAvisos
+        key={versionReglas}
         locale={locale}
         hub={hub}
         organizacion={organizacion}
         personal={personal}
       />
     </div>
+  );
+}
+
+/**
+ * Un aviso de la bandeja: la fila que lo abre (o lo marca, si no lleva a ningún
+ * sitio), el punto de «sin leer» y su menú «…» con lo que se hace con UN aviso sin
+ * abrirlo: devolverlo a «sin leer» y silenciar los que son como él.
+ */
+function FilaAviso({
+  n,
+  t,
+  locale,
+  avisos,
+  alSilenciar,
+}: {
+  n: Notification;
+  t: ReturnType<typeof useT>;
+  locale: Locale;
+  avisos: Avisos | null;
+  alSilenciar: (n: Notification) => void;
+}): JSX.Element {
+  const app = appForKey(n.source);
+  const destino = destinoAviso(n);
+  const contenido = (
+    <>
+      <span class="mt-0.5 shrink-0">
+        <ProductIcon appKey={n.source} size={18} />
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class={'text-text block text-sm ' + (n.read ? 'font-medium' : 'font-semibold')}>
+          {tituloAviso(locale, n)}
+        </span>
+        {cuerpoAviso(locale, n) ? (
+          <span class="text-text-muted mt-0.5 block text-sm">{cuerpoAviso(locale, n)}</span>
+        ) : null}
+        <span class="text-text-subtle mt-1 block text-xs">
+          {/* De otra organización, o anterior al registro de avisos. */}
+          {procedenciaAviso(locale, n).map((p) => `${p} · `)}
+          {app ? app.name.replace('Sytue ', '') : n.source} ·{' '}
+          {formatTimeAgo(locale, new Date(n.created_at))}
+        </span>
+      </span>
+      {/* El punto se ve fuera, en su botón; aquí se dice para quien no lo ve. */}
+      {!n.read ? <span class="sr-only">{t('inbox.unreadDot')}</span> : null}
+    </>
+  );
+  const conMenu = n.read || silenciableDesdeElAviso(n);
+  return (
+    <li class="flex items-start">
+      {destino ? (
+        <a
+          href={destino}
+          onClick={(e) => {
+            // Ctrl/⌘/Mayús/rueda: el navegador lo abre aparte y la bandeja se queda;
+            // aquí solo se marca leído. Lo demás navega DESPUÉS del «leído»: antes la
+            // navegación cancelaba la petición y el aviso volvía sin leer.
+            if (clicAparte(e)) {
+              void avisos?.leer(n.id);
+              return;
+            }
+            e.preventDefault();
+            if (avisos) void abrirAviso(avisos, n, (u) => window.location.assign(u));
+          }}
+          onAuxClick={(e) => {
+            if (e.button === 1) void avisos?.leer(n.id);
+          }}
+          class="hover:bg-chrome-hover sytue-focus-ring flex min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-3 transition-colors"
+        >
+          {contenido}
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void avisos?.leer(n.id)}
+          class="hover:bg-chrome-hover sytue-focus-ring flex min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-3 text-left transition-colors"
+        >
+          {contenido}
+        </button>
+      )}
+      {/* El punto azul es un botón: marca ESTE aviso como leído sin abrirlo. Va
+          fuera de la fila (un botón dentro de un enlace no es HTML válido). */}
+      {!n.read ? (
+        <MarcarLeido
+          class="mt-3"
+          rotulo={t('inbox.markRead')}
+          alMarcar={() => void avisos?.leer(n.id)}
+        />
+      ) : null}
+      {conMenu ? (
+        <Dropdown
+          align="end"
+          label={t('inbox.actionsOf', { title: tituloAviso(locale, n) })}
+          trigger={(p) => (
+            <span class="mt-2">
+              <IconButton
+                {...p}
+                size="sm"
+                label={t('inbox.actionsOf', { title: tituloAviso(locale, n) })}
+              >
+                <Icon name="ellipsis" />
+              </IconButton>
+            </span>
+          )}
+        >
+          {(cerrar) => (
+            <>
+              {n.read ? (
+                <MenuItem
+                  onClick={() => {
+                    cerrar();
+                    void avisos?.desleer(n.id);
+                  }}
+                >
+                  {t('inbox.markUnread')}
+                </MenuItem>
+              ) : null}
+              {silenciableDesdeElAviso(n) ? (
+                <MenuItem
+                  onClick={() => {
+                    cerrar();
+                    alSilenciar(n);
+                  }}
+                >
+                  {t('inbox.muteLikeThis')}
+                </MenuItem>
+              ) : null}
+            </>
+          )}
+        </Dropdown>
+      ) : null}
+    </li>
   );
 }

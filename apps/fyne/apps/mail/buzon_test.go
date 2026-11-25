@@ -1023,8 +1023,8 @@ func TestTraeTuCorreoVaEnElPie(t *testing.T) {
 		pedidos = append(pedidos, r.Method+" "+r.URL.Path)
 		mu.Unlock()
 		switch r.URL.Path {
-		case "/api/v1/instances":
-			_, _ = io.WriteString(w, `{"instances":[{"id":"g","name":"G","template_key":"google","status":"active"}]}`)
+		case "/api/v1/migrations/self/origins":
+			_, _ = io.WriteString(w, `{"origins":[{"instance_id":"g","name":"G","source":"google","state":"ready"}]}`)
 		case "/api/v1/migrations/self":
 			_, _ = io.WriteString(w, `{"migrations":[{"id":"c","domain":"contacts","status":"done"},{"id":"d","domain":"drive","status":"done"}]}`)
 		}
@@ -1059,7 +1059,7 @@ func TestTraeTuCorreoVaEnElPie(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.Contains(pedidos, "GET /api/v1/instances") || !slices.Contains(pedidos, "GET /api/v1/migrations/self") {
+	if !slices.Contains(pedidos, "GET /api/v1/migrations/self/origins") || !slices.Contains(pedidos, "GET /api/v1/migrations/self") {
 		t.Errorf("la pasarela no se consulta: %v", pedidos)
 	}
 }

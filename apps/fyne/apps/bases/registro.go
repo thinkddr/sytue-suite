@@ -229,6 +229,15 @@ func (f *fichaRegistro) rehacer() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	ancho := p.anchoDialogo(560)
 	hijos := make([]fyne.CanvasObject, 0, len(f.b.Campos))
+	// Las flechas al registro de al lado, arriba a la derecha: revisar una tabla registro
+	// a registro era cerrar, bajar una fila y volver a abrir (`onIr` de la ficha web).
+	if !f.nuevo {
+		i := f.posicion()
+		ant := ui.NuevoBotonIcono(iconos.ChevronArriba, p.t("record.previous"), func() { f.ir(-1) })
+		sig := ui.NuevoBotonIcono(iconos.ChevronAbajo, p.t("record.next"), func() { f.ir(1) })
+		ant.Inerte, sig.Inerte = i <= 0, i < 0 || i >= len(f.b.vent.registros())-1
+		hijos = append(hijos, container.New(ui.Fila{Hueco: tema.Espacio(1)}, ant, sig))
+	}
 	for _, c := range f.b.Campos {
 		hijos = append(hijos, f.grupo(c, v, ancho))
 	}
@@ -239,6 +248,16 @@ func (f *fichaRegistro) rehacer() {
 	}
 	// Borrar va al final del cuerpo y no en el pie: ahí, junto a «Guardar», un toque
 	// de más se lleva el registro.
+	// Duplicar: los mismos valores y enlaces en un registro nuevo; los adjuntos no, y el
+	// rótulo de ayuda lo dice.
+	if f.puedeEditar && !f.nuevo {
+		dup := ui.NuevoBoton(p.t("record.duplicate"), func() {
+			r := f.r
+			f.cerrar()
+			p.duplicarRegistro(r)
+		}).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Copias, 14)
+		acciones = append(acciones, ui.NuevaPista(p.t("record.duplicateHelp"), dup))
+	}
 	if f.puedeEditar && !f.nuevo {
 		borrar := ui.NuevoBoton(p.t("grid.deleteRecord", i18n.Vars{"n": f.n}), func() {
 			f.cerrar()
@@ -395,6 +414,35 @@ func (f *fichaRegistro) marcados(c api.BasesField) ([]string, bool) {
 		}
 	}
 	return ids, true
+}
+
+// posicion es dónde está el registro de la ficha entre los cargados (-1 si no está).
+func (f *fichaRegistro) posicion() int {
+	return slices.IndexFunc(f.b.vent.registros(), func(x api.BasesRecord) bool { return x.ID == f.r.ID })
+}
+
+// ir pasa la ficha al registro de al lado (-1 el de arriba, 1 el de abajo) guardando
+// antes lo cambiado, como «Guardar». Un valor que no encaja no deja pasar: se corrige.
+func (f *fichaRegistro) ir(paso int) {
+	regs := f.b.vent.registros()
+	i := f.posicion() + paso
+	if f.posicion() < 0 || i < 0 || i >= len(regs) {
+		return
+	}
+	if f.puedeEditar {
+		datos, enlaces, vale := f.cambios()
+		if !vale {
+			f.rehacer()
+			return
+		}
+		f.cerrar()
+		if len(datos) > 0 || len(enlaces) > 0 {
+			f.p.cambiar(f.r, datos, enlaces)
+		}
+	} else {
+		f.cerrar()
+	}
+	f.p.abrirRegistro(regs[i], false)
 }
 
 // guardar envía lo cambiado y cierra. Con `otro`, añade además un registro y abre su

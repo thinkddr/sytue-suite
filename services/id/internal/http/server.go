@@ -669,6 +669,9 @@ func (s *Server) Router() http.Handler {
 			// «Exportar tus datos»: la entrega de la cuenta (platform/pkg/portabilidad).
 			r.Get("/me/export", s.handleMeExport)
 			persona.Get("/me/sessions", s.handleMeSessions)
+			// «Actividad reciente» de Mi cuenta: los cambios de seguridad y los inicios
+			// de sesión de quien llama, del log de auditoría (me_actividad.go).
+			persona.Get("/me/activity", s.handleMeActivity)
 			// El otro lado de la lectura de arriba. Existían solo como formulario
 			// HTML (`/account/sessions/revoke*`), así que quien no renderiza ese
 			// HTML podía ver sus sesiones pero no cerrarlas.
@@ -769,6 +772,8 @@ func (s *Server) Router() http.Handler {
 				// (`/account/passkeys/delete`), así que quien no renderiza ese HTML
 				// podía registrar llaves y no retirarlas nunca.
 				r.Delete("/credentials/{id}", s.handleMePasskeyDelete)
+				// Y ponerle otro nombre, para distinguir una llave de otra (me_passkeys.go).
+				r.Patch("/credentials/{id}", s.handleMePasskeyRename)
 			})
 			// --- Alta inicial guiada (mig 0027) ---
 			// Sin requireRole a propósito: quien se da de alta aún no tiene org ni

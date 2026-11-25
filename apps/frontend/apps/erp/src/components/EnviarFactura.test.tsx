@@ -125,3 +125,41 @@ test('un borrador no se envía', async () => {
   expect(document.body.textContent).toContain(t('send.notIssued'));
   expect(boton(t('send.submit')).disabled).toBe(true);
 });
+
+test('el recordatorio de pago lleva su asunto, el importe y el vencimiento, y se marca como tal', async () => {
+  await act(async () => {
+    render(
+      <ToastProvider>
+        <EnviarFactura
+          facturaId="f1"
+          referencia="F-2026/0007"
+          t={t}
+          recordatorio={{ importe: '121,00 €', vencimiento: '1 nov 2026' }}
+          onCerrar={() => {}}
+        />
+      </ToastProvider>,
+      host,
+    );
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(document.body.textContent).toContain(t('remind.title', { ref: 'F-2026/0007' }));
+  await act(async () => {
+    boton(t('send.submit')).click();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(enviados).toEqual([
+    {
+      para: 'facturas@cliente.es',
+      asunto: t('remind.defaultSubject', { ref: 'F-2026/0007' }),
+      mensaje: t('remind.defaultMessage', {
+        ref: 'F-2026/0007',
+        amount: '121,00 €',
+        date: '1 nov 2026',
+      }),
+      recordatorio: true as unknown as string,
+    },
+  ]);
+  expect(enviados[0]?.mensaje).toContain('121,00 €');
+});

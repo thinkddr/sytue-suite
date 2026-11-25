@@ -16,7 +16,17 @@
  */
 import type { JSX } from 'preact';
 import { useId, useState } from 'preact/hooks';
-import { Button, Checkbox, FieldGroup, Icon, Input, Modal, Select, EmptyState } from '@sytue/ui';
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  FieldGroup,
+  Icon,
+  IconButton,
+  Input,
+  Modal,
+  Select,
+} from '@sytue/ui';
 import { contiene } from '@sytue/i18n';
 import type { BasesField, BasesRecord, BasesValue } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
@@ -65,6 +75,19 @@ export interface FichaRegistroProps {
     otro: boolean,
   ) => void;
   onBorrar: () => void;
+  /** Copia el registro en uno nuevo (valores y enlaces). Sin ella no se pinta el botón. */
+  onDuplicar?: () => void;
+  /**
+   * Pasa al registro de al lado en la rejilla (-1 el de arriba, 1 el de abajo), guardando
+   * antes lo cambiado. Sin ella no hay flechas; sin vecino, la flecha se apaga.
+   */
+  onIr?: (
+    paso: -1 | 1,
+    datos: Record<string, BasesValue>,
+    enlaces: Record<string, string[]>,
+  ) => void;
+  hayAnterior?: boolean;
+  haySiguiente?: boolean;
   /** Abre los ficheros de un campo de adjuntos (también quien solo lee: para descargar). */
   onAdjuntos: (campo: BasesField) => void;
   /** Abre los comentarios del registro. Sin ella no se pinta el botón. */
@@ -86,16 +109,37 @@ export function FichaRegistro(p: FichaRegistroProps): JSX.Element {
     if (invalidos.includes(c.id)) setInvalidos((xs) => xs.filter((x) => x !== c.id));
   }
 
-  function guardar(otro: boolean): void {
+  /** Lo cambiado, o null si algo no encaja (y entonces el foco va a lo primero que falla). */
+  function validos(): ReturnType<typeof cambiosDeFicha> | null {
     const c = cambiosDeFicha(campos, p.registro, borrador);
     if (c.invalidos.length > 0) {
       setInvalidos(c.invalidos);
       // El foco va al primero que no encaja: es lo que hay que corregir.
       const primero = campos.find((x) => c.invalidos.includes(x.id));
       if (primero) document.getElementById(idDe(primero))?.focus();
+      return null;
+    }
+    return c;
+  }
+
+  function guardar(otro: boolean): void {
+    const c = validos();
+    if (c) p.onGuardar(c.datos, c.enlaces, otro);
+  }
+
+  /**
+   * Al registro de al lado sin cerrar la ficha: revisar una tabla registro a registro era
+   * cerrar, bajar una fila y volver a abrir. Quien solo lee no guarda nada; quien escribe
+   * se lleva guardado lo cambiado, como con «Guardar».
+   */
+  function ir(paso: -1 | 1): void {
+    if (!p.onIr) return;
+    if (!puedeEditar) {
+      p.onIr(paso, {}, {});
       return;
     }
-    p.onGuardar(c.datos, c.enlaces, otro);
+    const c = validos();
+    if (c) p.onIr(paso, c.datos, c.enlaces);
   }
 
   /** Lo que se enseña de un campo que aquí no se cambia. */
@@ -332,6 +376,28 @@ export function FichaRegistro(p: FichaRegistroProps): JSX.Element {
   return (
     <Modal open onClose={p.onCerrar} title={t('grid.row', { n: p.n })} size="md" footer={pie}>
       <div class="flex flex-col gap-4">
+        {p.onIr ? (
+          <nav class="-mt-2 flex justify-end gap-1" aria-label={t('record.navigation')}>
+            <IconButton
+              size="sm"
+              label={t('record.previous')}
+              showTitle
+              disabled={!p.hayAnterior}
+              onClick={() => ir(-1)}
+            >
+              <Icon name="chevronUp" size={16} />
+            </IconButton>
+            <IconButton
+              size="sm"
+              label={t('record.next')}
+              showTitle
+              disabled={!p.haySiguiente}
+              onClick={() => ir(1)}
+            >
+              <Icon name="chevronDown" size={16} />
+            </IconButton>
+          </nav>
+        ) : null}
         {campos.map(grupo)}
         {p.onComentar || (puedeEditar && !p.nuevo) ? (
           // Borrar va al final del cuerpo y no en el pie: ahí, junto a «Guardar», un
@@ -345,6 +411,17 @@ export function FichaRegistro(p: FichaRegistroProps): JSX.Element {
                 onClick={p.onComentar}
               >
                 {t('record.comments')}
+              </Button>
+            ) : null}
+            {puedeEditar && !p.nuevo && p.onDuplicar ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<Icon name="copies" size={14} />}
+                title={t('record.duplicateHelp')}
+                onClick={p.onDuplicar}
+              >
+                {t('record.duplicate')}
               </Button>
             ) : null}
             {puedeEditar && !p.nuevo ? (

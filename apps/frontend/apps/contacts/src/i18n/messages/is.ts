@@ -334,4 +334,10 @@ export const is: AppCatalog<typeof en> = {
   'relation.coworker': 'Samstarfsmaður',
   'relation.emergency': 'Neyðartengiliður',
   'relation.other': 'Annað',
+  'batch.copyEmails': 'Afrita netföngin',
+  'batch.emailsCopied': 'Netföngin afrituð',
+  'birthdays.anniversary': 'Afmæli',
+  'list.sortByLastName': 'Raða eftir eftirnafni',
+  'list.sortByFirstName': 'Raða eftir fornafni',
+  'detail.shareByEmail': 'Deila með tölvupósti',
 };

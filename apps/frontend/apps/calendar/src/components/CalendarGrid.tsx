@@ -943,7 +943,8 @@ function AgendaView({
           )}
         </div>
       ) : (
-        <ul class="divide-border min-h-0 flex-1 divide-y overflow-y-auto">
+        // El hueco del «+» flotante al final: el último día se baja por encima de él.
+        <ul class="divide-border sytue-reserva-flotante min-h-0 flex-1 divide-y overflow-y-auto">
           {days.map((evs) => {
             const first = evs[0]!.date;
             const day = first.getTime() < windowStart.getTime() ? windowStart : first;

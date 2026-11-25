@@ -382,3 +382,57 @@ func TestPrivateCancelledAndClosedWorkDoesNotSucceed(t *testing.T) {
 		t.Fatal("closed repository accepted create")
 	}
 }
+
+// «Marcar como no leído» y «Marcar todas» de un producto también en el almacén privado
+// de One: el aviso vuelve a sin leer sin perder nada, dos veces no publica otra
+// revisión, y «Marcar todas» de Drive deja el correo como estaba.
+func TestPrivateMarkUnreadAndMarkAllOfOneSource(t *testing.T) {
+	r, port, _ := setupPrivate(t)
+	correo := noticeFixture()
+	drive := noticeFixture()
+	drive.ID, drive.Source, drive.Type, drive.Title = "notice2", "drive", "drive.shared", "Shared"
+	for _, n := range []Notice{correo, drive} {
+		if err := r.Put(t.Context(), n); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := r.MarkAllReadDe(t.Context(), "drive"); err != nil {
+		t.Fatal(err)
+	}
+	leidos := func() map[string]bool {
+		t.Helper()
+		got, err := r.List(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]bool{}
+		for _, n := range got {
+			out[n.ID] = n.Read
+		}
+		return out
+	}
+	if l := leidos(); !l["notice2"] || l["notice1"] {
+		t.Fatal("«Marcar todas» de Drive tocó lo que no era de Drive", l)
+	}
+	if err := r.MarkUnread(t.Context(), "notice2"); err != nil {
+		t.Fatal(err)
+	}
+	if l := leidos(); l["notice2"] {
+		t.Fatal("el aviso sigue leído", l)
+	}
+	port.mu.Lock()
+	antes := len(port.objects)
+	port.mu.Unlock()
+	if err := r.MarkUnread(t.Context(), "notice2"); err != nil {
+		t.Fatal("otra vez", err)
+	}
+	port.mu.Lock()
+	despues := len(port.objects)
+	port.mu.Unlock()
+	if despues != antes {
+		t.Fatal("desmarcar uno ya sin leer publicó otra revisión")
+	}
+	if err := r.MarkUnread(t.Context(), "../x"); !errors.Is(err, ErrNotice) {
+		t.Fatal("identificador inválido", err)
+	}
+}

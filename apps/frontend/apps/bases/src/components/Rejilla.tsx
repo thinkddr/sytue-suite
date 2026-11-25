@@ -16,7 +16,8 @@
  *
  * Lo copiado de una hoja de cálculo se pega (Ctrl+V) desde la celda con el foco, y las
  * filas que sobran son registros nuevos (`lib/pegar.ts`); lo mismo al soltar ese texto
- * sobre una celda. Los ficheros soltados sobre una fila van a sus adjuntos: mientras se
+ * sobre una celda. Y Ctrl+C copia la celda con el foco como texto, el mismo que se pega:
+ * Fyne ya lo hacía y la web no, así que copiar de una tabla a otra iba en un solo sentido. Los ficheros soltados sobre una fila van a sus adjuntos: mientras se
  * arrastran, la rejilla se recuadra y la fila de debajo se marca.
  */
 import type { JSX } from 'preact';
@@ -32,7 +33,7 @@ import {
   MenuSeparator,
   Select,
 } from '@sytue/ui';
-import type { BasesField, BasesRecord, BasesValue } from '@sytue/api-clients/bases';
+import type { BasesField, BasesRecord, BasesSummary, BasesValue } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import { moverFoco, type Celda } from '../lib/rejilla.js';
 import { vecino } from '../lib/esquema.js';
@@ -40,6 +41,8 @@ import { opcionesDeSelect } from '../lib/ficha.js';
 import { esNumerico, ICONO_DE_TIPO } from '../lib/aspecto.js';
 import { vacioDe } from '../lib/vacios.js';
 import { llevaFicheros, planDePegado } from '../lib/pegar.js';
+import { pieDeColumna, recuento } from '../lib/resumen.js';
+import { admiteDefecto } from '../lib/defectos.js';
 import { InsigniaOpcion } from './InsigniaOpcion.js';
 import { VacioGuiado } from './VacioGuiado.js';
 import {
@@ -58,7 +61,7 @@ export interface OpcionEnlace {
 }
 
 /** Lo que se hace con un campo desde su cabecera. */
-export type AccionCampo = 'renombrar' | 'formula' | 'opciones' | 'borrar';
+export type AccionCampo = 'renombrar' | 'formula' | 'opciones' | 'defecto' | 'borrar';
 
 export interface RejillaProps {
   t: T;
@@ -116,6 +119,11 @@ export interface RejillaProps {
   onMoverCampo?: (campo: BasesField, destino: BasesField) => void;
   /** Añadir un campo desde la cabecera «+» del final. Va con `onCampo`. */
   onNuevoCampo?: () => void;
+  /**
+   * El pie con los totales de la vista entera (`lib/resumen.ts`). Sin él no se pinta: lo
+   * pide quien lo enciende, porque cuesta una pasada por toda la tabla.
+   */
+  resumen?: BasesSummary | null;
   /** Cuántos registros hay ANTES de los que se enseñan (carga por ventanas). */
   desde: number;
   hayAntes: boolean;
@@ -279,6 +287,34 @@ export function Rejilla(p: RejillaProps): JSX.Element {
     const saltados = plan.saltados > 0 ? t('grid.pasteSkipped', { n: plan.saltados }) : '';
     setAvisoPegado(saltados);
     setAviso(error ?? (saltados || (plan.nuevos.length > 0 ? t('grid.added') : t('grid.saved'))));
+  }
+
+  /** El texto que se copia de una celda: el que se escribiría en ella al pegarlo. */
+  function textoDeCelda(c: Celda): string {
+    const campo = campos[c.col];
+    const r = registros[c.fila];
+    if (!campo || !r) return '';
+    if (campo.kind === 'link') {
+      const mapa = p.etiquetas[campo.link_table_id ?? ''];
+      return enlacesDe(r, campo)
+        .map((id) => mapa?.get(id) ?? id)
+        .join(', ');
+    }
+    if (campo.kind === 'attachment') {
+      return (r.attachments?.[campo.id] ?? []).map((a) => a.name).join(', ');
+    }
+    if (campo.kind === 'multiselect') {
+      const v = r.data[campo.id];
+      return Array.isArray(v) ? v.join(', ') : '';
+    }
+    return textoDeValor(campo, r.data[campo.id]);
+  }
+
+  function alCopiar(e: ClipboardEvent, c: Celda): void {
+    // En edición, lo seleccionado del editor se copia como en cualquier campo.
+    if (editando || !e.clipboardData) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', textoDeCelda(c));
   }
 
   function alPegar(e: ClipboardEvent, c: Celda): void {
@@ -579,6 +615,18 @@ export function Rejilla(p: RejillaProps): JSX.Element {
                 {t('field.editChoices')}
               </MenuItem>
             ) : null}
+            {admiteDefecto(c) ? (
+              <MenuItem
+                size="sm"
+                icon={<Icon name="tag" size={14} />}
+                onClick={() => {
+                  cerrar();
+                  onCampo('defecto', c);
+                }}
+              >
+                {t('field.default')}
+              </MenuItem>
+            ) : null}
             {p.onMoverCampo ? (
               <>
                 <MenuSeparator />
@@ -656,7 +704,7 @@ export function Rejilla(p: RejillaProps): JSX.Element {
           role="grid"
           aria-label={t('grid.label', { table: p.nombreTabla })}
           aria-describedby="ayuda-rejilla"
-          aria-rowcount={p.hayMas || p.hayAntes ? -1 : registros.length + 1}
+          aria-rowcount={p.hayMas || p.hayAntes ? -1 : registros.length + 1 + (p.resumen ? 1 : 0)}
           aria-colcount={campos.length + (p.onNuevoCampo ? 2 : 1)}
           aria-readonly={!puedeEditar}
           class="bases-grid w-full min-w-max border-separate border-spacing-0 text-sm"
@@ -774,6 +822,7 @@ export function Rejilla(p: RejillaProps): JSX.Element {
                       }}
                       onKeyDown={(e) => alPulsarCelda(e, c)}
                       onPaste={(e) => alPegar(e, c)}
+                      onCopy={(e) => alCopiar(e, c)}
                       onDragOver={(e: DragEvent) => {
                         const que = aceptaSoltar(e);
                         if (!que) return;
@@ -798,6 +847,36 @@ export function Rejilla(p: RejillaProps): JSX.Element {
               </tr>
             ))}
           </tbody>
+          {p.resumen ? (
+            <tfoot class="bg-bg-subtle" data-pie-resumen>
+              <tr>
+                <th
+                  scope="row"
+                  class="text-text-muted px-2 py-2 text-start text-xs font-medium whitespace-nowrap tabular-nums"
+                >
+                  {recuento(p.resumen, t)}
+                </th>
+                {campos.map((campo) => {
+                  const pie = pieDeColumna(campo, p.resumen?.fields[campo.id], t);
+                  return (
+                    <td
+                      key={campo.id}
+                      class={`text-text-muted px-3 py-2 text-xs whitespace-nowrap tabular-nums ${esNumerico(campo) ? 'text-end' : ''}`}
+                      {...(pie?.detalle ? { title: pie.detalle } : {})}
+                    >
+                      {pie ? (
+                        <>
+                          {pie.texto}
+                          {pie.detalle ? <span class="sr-only"> · {pie.detalle}</span> : null}
+                        </>
+                      ) : null}
+                    </td>
+                  );
+                })}
+                {p.onNuevoCampo ? <td aria-hidden="true" /> : null}
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
       {vacio ? (

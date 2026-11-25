@@ -363,7 +363,9 @@ export function MailSettings({
       level={2}
       title={t('settings.title')}
       description={t('settings.description')}
-      class="h-full overflow-y-auto"
+      // El hueco del «+» de Redactar, que flota encima: lo último de los ajustes se
+      // puede bajar por encima de él.
+      class="sytue-reserva-flotante h-full overflow-y-auto"
     >
       {secciones.map((s) => (
         <SettingsSection

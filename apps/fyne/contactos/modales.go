@@ -104,7 +104,10 @@ var AltoFilaCumple = 2*RellenoFilaCumpleY + ui.MedidaAvatar(ui.AvatarSM).Height
 
 func nuevaFilaCumple(p *Pantalla, c Cumpleanos, alPulsar func()) *filaCumple {
 	fecha := i18n.FormatDayMonthLong(p.locale(), c.Fecha)
-	if c.Edad > 0 {
+	switch {
+	case c.Aniversario:
+		fecha += " · " + p.t("birthdays.anniversary", nil)
+	case c.Edad > 0:
 		fecha += " · " + p.t("birthdays.turns", i18n.Vars{"age": c.Edad})
 	}
 	f := &filaCumple{nombre: c.Contacto.DisplayName(), fecha: fecha, cuando: p.cuando(c.Dias), hoy: c.Dias == 0}

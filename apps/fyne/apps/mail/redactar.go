@@ -53,6 +53,10 @@ type redaccion struct {
 	d               *ui.Dialogo
 	guardar, enviar *ui.Boton
 	descartar       *ui.Boton
+	// enviarArchivar es «Enviar y archivar» (solo al contestar) y archivar, si el envío
+	// en curso salió de él: tras salir se archiva la conversación contestada.
+	enviarArchivar *ui.Boton
+	archivar       bool
 	// reloj es «Programar envío»: oculto mientras el «De» es una cuenta externa.
 	reloj               *ui.BotonIcono
 	enviando, guardando bool
@@ -222,7 +226,14 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 		Con(ui.Fantasma, ui.TallaMD)
 	rd.guardar.Rotulo, rd.guardar.SoloIcono, rd.guardar.Icono, rd.guardar.TamIcono =
 		rd.guardar.Texto, true, iconos.Guardar, TallaGlifoLector
-	rd.enviar = ui.NuevoBoton(t.T("compose.send", nil), func() { b.enviar(rd, false) }).Con(ui.Primario, ui.TallaMD)
+	rd.enviar = ui.NuevoBoton(t.T("compose.send", nil), func() { rd.archivar = false; b.enviar(rd, false) }).Con(ui.Primario, ui.TallaMD)
+	// «Enviar y archivar» al contestar, como en la web: secundario, junto a «Enviar».
+	if br.Responde != "" && b.P.Acciones.Archivar != nil && br.Cuenta == "" {
+		rd.enviarArchivar = ui.NuevoBoton(t.T("compose.sendAndArchive", nil), func() {
+			rd.archivar = true
+			b.enviar(rd, false)
+		}).Con(ui.Secundario, ui.TallaMD)
+	}
 	// El reloj es un conmutador (`aria-expanded`, y `bg-selected` mientras el panel está
 	// abierto): por eso es el botón de icono del cromo, que sí sabe estar pulsado, con
 	// el lado de un `iconOnly` de talla por defecto.
@@ -255,11 +266,15 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 		formato.Refresh()
 		b.recordarFormato(rd.r.VerFormato)
 	}
+	derecha := []fyne.CanvasObject{rd.guardar, rd.enviar}
+	if rd.enviarArchivar != nil {
+		derecha = []fyne.CanvasObject{rd.guardar, rd.enviarArchivar, rd.enviar}
+	}
 	pie := &pieRedactor{
 		ancho: ancho, izquierda: []fyne.CanvasObject{formato, adjuntar, reloj, rd.descartar},
-		derecha: []fyne.CanvasObject{rd.guardar, rd.enviar},
+		derecha: derecha,
 	}
-	cajaPie := container.New(pie, formato, adjuntar, reloj, rd.descartar, rd.guardar, rd.enviar)
+	cajaPie := container.New(pie, append([]fyne.CanvasObject{formato, adjuntar, reloj, rd.descartar}, derecha...)...)
 	// Programar es de la cola de Sytue: desde una cuenta externa no se ofrece.
 	rd.reloj = reloj
 	ponerReloj := func() {
@@ -287,7 +302,8 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 		rd.cambios++
 		b.programarAutoguardado(rd)
 	}
-	rd.r.AlEnviar = func() { b.enviar(rd, false) }
+	// ⌘/Ctrl+Intro es «Enviar» a secas, aunque antes se probara «Enviar y archivar».
+	rd.r.AlEnviar = func() { rd.archivar = false; b.enviar(rd, false) }
 	rd.r.AlPegar = func(texto string) { b.pegar(rd, texto) }
 	if b.ElegirImagenes != nil {
 		rd.r.AlImagenDelEquipo = func() { b.imagenDelEquipo(rd) }
@@ -680,6 +696,10 @@ func (b *Buzon) pintarBotonesRedactor(rd *redaccion) {
 	for _, x := range []*ui.Boton{rd.guardar, rd.enviar, rd.descartar} {
 		x.Refresh()
 	}
+	if x := rd.enviarArchivar; x != nil {
+		x.Inerte = rd.enviando || rd.guardando
+		x.Refresh()
+	}
 }
 
 // enviar es `handleSend`: valida «Para» en línea, pregunta si se menciona un adjunto
@@ -754,6 +774,9 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 		b.cerrar(rd)
 		b.alGuardarBorrador()
 		b.retenerRespuesta(env.ID, br.Responde)
+		if rd.archivar {
+			b.archivarContestada(br.Responde)
+		}
 		a := ui.NuevoAviso(ui.AvisoExito, t.T("compose.sent", nil), "")
 		a.RotuloCerrar = t.T("ui.dismissNotification", nil)
 		if env.ID != "" {
@@ -766,6 +789,22 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 		}
 		b.P.Notificar(a)
 	})
+}
+
+// archivarContestada es el final de «Enviar y archivar»: la conversación del mensaje
+// contestado, a Archivo, con el «Deshacer» del triaje. Después del envío y no antes: si
+// no sale, la conversación se queda donde estaba.
+func (b *Buzon) archivarContestada(id string) {
+	archivar := b.P.Acciones.Archivar
+	if id == "" || archivar == nil {
+		return
+	}
+	for _, c := range b.P.Bandeja.Conversaciones {
+		if slices.ContainsFunc(c.Mensajes, func(m Mensaje) bool { return m.ID == id }) {
+			archivar(c)
+			return
+		}
+	}
 }
 
 // enviarPorCuenta es enviar desde una cuenta externa: una sola vez por su proveedor

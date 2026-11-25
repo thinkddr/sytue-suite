@@ -9,6 +9,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -152,7 +153,14 @@ type Ficha struct {
 	AlReenviarVF    func()
 	AlPlanear       func()
 	AlIA            func()
-	AlRequisitos    func()
+	// AlRecordar abre el recordatorio de pago de una factura vencida (cartera.go); nil,
+	// sin botón.
+	AlRecordar func()
+	// EstadoCuenta es el de un contacto (cartera.go); nil, sin pedir o sin permiso.
+	EstadoCuenta *api.ERPEstadoCuenta
+	// Hoy es la fecha con la que se cuentan los días vencida; cero, la de ahora.
+	Hoy          time.Time
+	AlRequisitos func()
 
 	// Los controles y los campos que se teclean fuera de ellos viven lo que la ficha:
 	// ver `Control`.
@@ -308,6 +316,12 @@ func (f *Ficha) Objeto(v tema.Variante, ancho float32) fyne.CanvasObject {
 		add(o, alto, siguiente, false)
 		siguiente = AvisoFichaMB
 	}
+	// «Vencida · N d»: una factura abierta cuyo vencimiento ya pasó (cartera.go).
+	if dias := f.vencidaFicha(); dias > 0 {
+		o, alto := avisoFicha(v, f.tr.T("due.overdue", i18n.Vars{"n": dias}), "danger-bg", "danger-text", f.anchoCampos())
+		add(o, alto, siguiente, false)
+		siguiente = AvisoFichaMB
+	}
 	for i, k := range f.controles {
 		o, alto := f.bloqueCampo(v, k)
 		if i > 0 {
@@ -322,6 +336,10 @@ func (f *Ficha) Objeto(v tema.Variante, ancho float32) fyne.CanvasObject {
 	if f.Registro != nil {
 		o, alto := f.seguimiento(v)
 		add(o, alto, SeccionMT, false)
+		if f.EstadoCuenta != nil {
+			o, alto = f.seccionEstadoCuenta(v)
+			add(o, alto, SeccionMT, false)
+		}
 		o, alto = f.trazabilidad(v)
 		add(o, alto, SeccionMT, false)
 	}
@@ -492,6 +510,9 @@ func (f *Ficha) botonesCabecera() []fyne.CanvasObject {
 		}).Con(ui.Secundario, ui.TallaSM)
 		c.Inerte = f.Guardando || f.AlConvertir == nil
 		botones = append(botones, c)
+	}
+	if rec := f.botonRecordatorio(); rec != nil {
+		botones = append(botones, rec)
 	}
 	if !f.EnPapelera {
 		// «Rellenar con Sytue AI» abre `RellenarIA`.

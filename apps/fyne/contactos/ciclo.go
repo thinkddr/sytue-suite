@@ -127,7 +127,10 @@ func (a *App) programarEn(scope cargaContacts, f func(cargaContacts)) {
 
 // IniciarCarga and SolicitarContacto bind external entry points to the identity
 // that requested them, even if the presenter is cleared before a task starts.
-func (a *App) IniciarCarga() { a.programar(a.cargarEn) }
+func (a *App) IniciarCarga() {
+	a.restaurarOrden()
+	a.programar(a.cargarEn)
+}
 
 func (a *App) SolicitarContacto(id string) {
 	a.programar(func(scope cargaContacts) { a.abrirContactoEn(scope, id) })

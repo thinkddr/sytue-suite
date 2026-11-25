@@ -69,6 +69,20 @@
   }
 }
 
+/* EL HUECO DEL «+» FLOTANTE (BotonFlotante.tsx). El botón va encima de la pantalla,
+   abajo a la derecha, y sin esto tapaba la última fila de una lista o el final de lo
+   que se lee: al bajar del todo seguía debajo. Lo que desplaza bajo él lleva esta
+   clase y, solo si hay botón, acaba con un relleno de su alto y sus dos márgenes —el de
+   abajo con el borde seguro—: 88 px con el rem de 16, el `ReservaFlotante` de Fyne.
+
+   FUERA DE TODA `@layer`, por lo mismo que el anillo de foco: un `pb-4` de la lista
+   ganaría desde `utilities` y dejaría el botón encima otra vez. Y con el selector del
+   botón en el body, no con una variable: una variable sin definir apagaría también el
+   relleno propio de la lista cuando no hay botón. */
+body:has([data-sytue-fab]) .sytue-reserva-flotante {
+  padding-bottom: calc(max(1rem, var(--sytue-safe-bottom, 0px)) + 4.5rem);
+}
+
 /* La lista NATIVA de opciones es otra superficie: el select cerrado puede ser un
    cristal o estar sobre el cromo, pero su lista no puede heredar ese fondo ni su
    tinta. Chromium pinta el alfa de las opciones sin el desenfoque del control. */

@@ -6,7 +6,9 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
+	"strconv"
 )
 
 // TipoVista es la forma de mirar una tabla.
@@ -44,10 +46,44 @@ type ConfigVista struct {
 	GroupBy string   `json:"group_by,omitempty"` // Kanban: campo select
 	// Fields: campos visibles del formulario, en orden. Vacío = todos los que no son enlaces.
 	Fields []string `json:"fields,omitempty"`
+	// Required: los campos del formulario que hay que rellenar para enviarlo. Solo en
+	// un formulario, y solo campos que el formulario enseña: obligar a uno que no sale
+	// dejaría el formulario imposible de enviar.
+	Required []string `json:"required,omitempty"`
 	// Search: búsqueda libre de una lectura concreta (`?q=`). Nunca se guarda con la
 	// vista: es lo que alguien teclea un momento, no parte de su definición.
 	Search string `json:"-"`
+	// Today: el día de quien mira (`?today=`), para los filtros de fecha relativos
+	// («hoy», «últimos 7 días»). Tampoco se guarda: es de la lectura, y sin él vale el
+	// día del servidor, que en UTC va por detrás de Madrid una o dos horas cada noche.
+	Today string `json:"-"`
 }
+
+// Operadores de fecha relativos a hoy: no comparan con un día fijo sino con el de la
+// lectura, así que una vista «Vence esta semana» no hay que editarla cada lunes.
+// `past_days` y `next_days` llevan el número de días (1 a MaxDiasRelativos) e
+// incluyen hoy; `today` y `this_month` no llevan valor.
+const (
+	OpHoy         = "today"
+	OpEsteMes     = "this_month"
+	OpUltimosDias = "past_days"
+	OpProximosDia = "next_days"
+)
+
+// MaxDiasRelativos es el tope de días de `past_days` y `next_days`: diez años.
+const MaxDiasRelativos = 3650
+
+// SinValor dice si un operador no lleva valor.
+func SinValor(op string) bool {
+	switch op {
+	case "empty", "notempty", OpHoy, OpEsteMes:
+		return true
+	}
+	return false
+}
+
+// DiasRelativos dice si un operador lleva un número de días como valor.
+func DiasRelativos(op string) bool { return op == OpUltimosDias || op == OpProximosDia }
 
 // Vista guardada.
 type Vista struct {
@@ -63,7 +99,7 @@ type Vista struct {
 var operadores = map[Tipo][]string{
 	TipoTexto:     {"eq", "neq", "contains", "empty", "notempty"},
 	TipoNumero:    {"eq", "neq", "gt", "gte", "lt", "lte", "empty", "notempty"},
-	TipoFecha:     {"eq", "neq", "gt", "gte", "lt", "lte", "empty", "notempty"},
+	TipoFecha:     {"eq", "neq", "gt", "gte", "lt", "lte", "empty", "notempty", OpHoy, OpUltimosDias, OpProximosDia, OpEsteMes},
 	TipoCasilla:   {"eq"},
 	TipoSeleccion: {"eq", "neq", "empty", "notempty"},
 	TipoMultiple:  {"contains", "empty", "notempty"},
@@ -90,8 +126,16 @@ func ValidarConfig(kind TipoVista, c ConfigVista, campos []Campo) (ConfigVista, 
 		if !ok || !slices.Contains(operadores[campo.Kind], f.Op) {
 			return c, fmt.Errorf("%w: filtro %d", ErrInvalido, i+1)
 		}
-		if f.Op == "empty" || f.Op == "notempty" {
+		if SinValor(f.Op) {
 			c.Filters[i].Value = nil
+			continue
+		}
+		if DiasRelativos(f.Op) {
+			var n float64
+			if json.Unmarshal(f.Value, &n) != nil || n != math.Trunc(n) || n < 1 || n > MaxDiasRelativos {
+				return c, fmt.Errorf("%w: días del filtro %d", ErrInvalido, i+1)
+			}
+			c.Filters[i].Value = json.RawMessage(strconv.Itoa(int(n)))
 			continue
 		}
 		// El valor del filtro es del mismo tipo que el campo (contains de texto y de
@@ -126,5 +170,33 @@ func ValidarConfig(kind TipoVista, c ConfigVista, campos []Campo) (ConfigVista, 
 			return c, fmt.Errorf("%w: campo del formulario", ErrInvalido)
 		}
 	}
+	if kind != VistaFormulario {
+		c.Required = nil
+		return c, nil
+	}
+	// Obligatorio solo lo que el formulario enseña (Fields vacío = todos los que admite)
+	// y sin repetir: el formulario público pinta el asterisco de esta lista.
+	enFormulario := func(id string) bool {
+		// El tipo GUARDADO, no el efectivo: una fórmula se filtra como número, pero no
+		// se rellena.
+		i := slices.IndexFunc(campos, func(f Campo) bool { return f.ID == id })
+		if i < 0 || !AdmiteFormulario(campos[i].Kind) {
+			return false
+		}
+		return len(c.Fields) == 0 || slices.Contains(c.Fields, id)
+	}
+	vistos := make(map[string]bool, len(c.Required))
+	for _, id := range c.Required {
+		if !enFormulario(id) || vistos[id] {
+			return c, fmt.Errorf("%w: campo obligatorio del formulario", ErrInvalido)
+		}
+		vistos[id] = true
+	}
 	return c, nil
+}
+
+// AdmiteFormulario dice si un tipo de campo (el guardado) se puede rellenar desde un
+// formulario público: enlaces, fórmulas y adjuntos no salen nunca.
+func AdmiteFormulario(t Tipo) bool {
+	return t != TipoRelacion && t != TipoFormula && t != TipoAdjunto
 }

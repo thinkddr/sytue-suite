@@ -94,8 +94,14 @@ type BasesField struct {
 	Result  string `json:"result,omitempty"`
 	// Currency solo en un campo de moneda: su código ISO 4217 (EUR, USD…).
 	Currency string `json:"currency,omitempty"`
-	Position int    `json:"position"`
+	// Default es el valor con el que nace un registro que no trae este campo; en una
+	// fecha puede ser BasesDefaultToday, el día de cada alta. nil = sin defecto.
+	Default  any `json:"default,omitempty"`
+	Position int `json:"position"`
 }
+
+// BasesDefaultToday es el defecto de una fecha que vale el día de cada alta.
+const BasesDefaultToday = "today"
 
 // BasesTable es una tabla con sus campos.
 type BasesTable struct {
@@ -163,6 +169,24 @@ type BasesViewConfig struct {
 	Sort    []BasesSort   `json:"sort,omitempty"`
 	GroupBy string        `json:"group_by,omitempty"`
 	Fields  []string      `json:"fields,omitempty"`
+	// Required son los campos del formulario que hay que rellenar para enviarlo.
+	Required []string `json:"required,omitempty"`
+}
+
+// BasesFieldSummary es el resumen de una columna en el pie de la rejilla. Filled cuenta
+// los registros con valor; Sum, Avg, Min y Max solo vienen en los numéricos con valor.
+type BasesFieldSummary struct {
+	Filled int64    `json:"filled"`
+	Sum    *float64 `json:"sum,omitempty"`
+	Avg    *float64 `json:"avg,omitempty"`
+	Min    *float64 `json:"min,omitempty"`
+	Max    *float64 `json:"max,omitempty"`
+}
+
+// BasesSummary es el pie de la rejilla: lo que pasa la vista ENTERA, no lo cargado.
+type BasesSummary struct {
+	Count  int64                        `json:"count"`
+	Fields map[string]BasesFieldSummary `json:"fields"`
 }
 
 // BasesView es una vista guardada de una tabla.
@@ -416,6 +440,12 @@ func (b *Bases) ReorderFields(ctx context.Context, tabla string, campos []string
 	return b.sinCuerpo(ctx, http.MethodPut, "/tables/"+url.PathEscape(tabla)+"/field-order", map[string][]string{"fields": campos})
 }
 
+// SetFieldDefault fija el valor por defecto de un campo (solo el propietario); nil lo
+// quita. La clave viaja siempre: un `null` es «quítalo», no «no lo toques».
+func (b *Bases) SetFieldDefault(ctx context.Context, campo string, valor any) error {
+	return b.sinCuerpo(ctx, http.MethodPatch, "/fields/"+url.PathEscape(campo), map[string]any{"default": valor})
+}
+
 // DeleteField borra un campo y sus valores.
 func (b *Bases) DeleteField(ctx context.Context, campo string) error {
 	if b.private != nil {
@@ -436,6 +466,19 @@ func (b *Bases) ListRecords(ctx context.Context, tabla, vista, cursor string, li
 // sustituye al de la vista. Los resuelve el servicio sobre la tabla entera.
 type BasesLectura struct {
 	Q, Sort string
+	// Today es el día de quien mira (AAAA-MM-DD), para los filtros relativos a hoy.
+	Today string
+}
+
+// consulta es la lectura como parámetros de la URL; lo vacío no se manda.
+func (l BasesLectura) consulta(vista string) url.Values {
+	q := url.Values{}
+	for k, v := range map[string]string{"q": l.Q, "sort": l.Sort, "today": l.Today, "view": vista} {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	return q
 }
 
 // ListRecordsCon es ListRecords con búsqueda y orden de un momento; lo vacío no se manda.
@@ -448,16 +491,7 @@ func (b *Bases) ListRecordsCon(ctx context.Context, tabla, vista, cursor string,
 		}
 		return b.private.ListRecords(ctx, tabla, vista, cursor, limite)
 	}
-	q := url.Values{}
-	if l.Q != "" {
-		q.Set("q", l.Q)
-	}
-	if l.Sort != "" {
-		q.Set("sort", l.Sort)
-	}
-	if vista != "" {
-		q.Set("view", vista)
-	}
+	q := l.consulta(vista)
 	if cursor != "" {
 		q.Set("cursor", cursor)
 	}
@@ -467,7 +501,8 @@ func (b *Bases) ListRecordsCon(ctx context.Context, tabla, vista, cursor string,
 	return JSON[BasesRecordPage](ctx, b.c, Request{Path: "/tables/" + url.PathEscape(tabla) + "/records", Query: q})
 }
 
-// CreateRecord crea un registro.
+// CreateRecord crea un registro. Lleva el día del dispositivo (`?today=`): es el de un
+// campo con defecto «hoy», que con el del servidor saldría ayer cada noche en Europa.
 func (b *Bases) CreateRecord(ctx context.Context, tabla string, datos map[string]any, enlaces map[string][]string) (BasesRecord, error) {
 	if b.private != nil {
 		return b.private.CreateRecord(ctx, tabla, datos, enlaces)
@@ -479,7 +514,27 @@ func (b *Bases) CreateRecord(ctx context.Context, tabla string, datos map[string
 	if enlaces != nil {
 		cuerpo["links"] = enlaces
 	}
-	return basesJSON[BasesRecord](ctx, b, http.MethodPost, "/tables/"+url.PathEscape(tabla)+"/records", cuerpo)
+	cuerpoJSON, err := json.Marshal(cuerpo)
+	if err != nil {
+		return BasesRecord{}, err
+	}
+	return JSON[BasesRecord](ctx, b.c, Request{
+		Method: http.MethodPost, Path: "/tables/" + url.PathEscape(tabla) + "/records",
+		Query: url.Values{"today": {time.Now().Format(time.DateOnly)}}, Body: cuerpoJSON,
+		Header: http.Header{"Content-Type": {"application/json"}},
+	})
+}
+
+// DuplicateRecord copia un registro (sus valores y enlaces; los adjuntos no) en uno
+// nuevo de su tabla y lo devuelve.
+func (b *Bases) DuplicateRecord(ctx context.Context, registro string) (BasesRecord, error) {
+	return basesJSON[BasesRecord](ctx, b, http.MethodPost, "/records/"+url.PathEscape(registro)+"/duplicate", nil)
+}
+
+// Summary es el pie de la rejilla: cuántos registros pasan la vista y la lectura del
+// momento, y las cifras de cada columna, calculadas por el servicio sobre todos ellos.
+func (b *Bases) Summary(ctx context.Context, tabla, vista string, l BasesLectura) (BasesSummary, error) {
+	return JSON[BasesSummary](ctx, b.c, Request{Path: "/tables/" + url.PathEscape(tabla) + "/summary", Query: l.consulta(vista)})
 }
 
 // GetRecord lee un registro.
@@ -686,10 +741,20 @@ func (b *Bases) TransferBase(ctx context.Context, base, email string) error {
 // Export baja una tabla entera en `csv` o `json`. Cerrar el cuerpo es cosa de quien
 // llama. Los campos de enlace salen con sus valores, no con ids.
 func (b *Bases) Export(ctx context.Context, tabla, formato string) (io.ReadCloser, error) {
+	return b.ExportCon(ctx, tabla, formato, "", BasesLectura{})
+}
+
+// ExportCon exporta lo que se ve: los registros que pasan la vista y la lectura del
+// momento, en su orden (sin vista ni lectura, la tabla entera).
+func (b *Bases) ExportCon(ctx context.Context, tabla, formato, vista string, l BasesLectura) (io.ReadCloser, error) {
 	if b.private != nil {
+		// El dispositivo exporta la tabla entera que guarda, como hasta ahora: los
+		// filtros de una vista los ejecuta el servicio sobre los datos en claro.
 		return b.private.Export(ctx, tabla, formato)
 	}
-	resp, err := b.c.Do(ctx, Request{Path: "/tables/" + url.PathEscape(tabla) + "/export", Query: url.Values{"format": {formato}}})
+	q := l.consulta(vista)
+	q.Set("format", formato)
+	resp, err := b.c.Do(ctx, Request{Path: "/tables/" + url.PathEscape(tabla) + "/export", Query: q})
 	if err != nil {
 		return nil, err
 	}

@@ -47,7 +47,7 @@ func TestLaVistaDelModeradorEsLaDeLaWeb(t *testing.T) {
 	mod := NuevoModerador(p, "es")
 	fijo := time.Date(2026, 9, 23, 1, 23, 0, 0, time.Local)
 	mod.ahora = func() time.Time { return fijo }
-	mod.inicio = fijo.Add(-3 * time.Second)
+	mod.crono = Cronometro{Inicio: fijo.Add(-3 * time.Second)}
 	w := test.NewTempWindow(t, mod)
 	w.SetPadded(false)
 	w.Resize(fyne.NewSize(AnchoModerador, AltoModerador))
@@ -57,12 +57,16 @@ func TestLaVistaDelModeradorEsLaDeLaWeb(t *testing.T) {
 		t.Errorf("cabecera = %q %q %q", r.tiempoTexto, r.reloj.Text, r.posicion.Text)
 	}
 	// El span real mide 63,765625 con tnum y letter-spacing .02em; también deja
-	// «Reiniciar» en x = 20 + 63,765625 + 14, sin saltos al cambiar las cifras.
+	// «Pausar» en x = 20 + 63,765625 + 14, sin saltos al cambiar las cifras, y
+	// «Reiniciar» detrás con el mismo hueco (`gap: 14px`).
 	if ancho := r.tiempo.Ancho(); !cerca32(ancho, 63.765625, 0.03) {
 		t.Errorf("el cronómetro ocupa %v; Chromium da 63,765625", ancho)
 	}
-	if x := r.reinicia.Position().X; !cerca32(x, 97.765625, 0.03) {
-		t.Errorf("«Reiniciar» empieza en %v; Chromium da 97,765625", x)
+	if x := r.pausa.Position().X; !cerca32(x, 97.765625, 0.03) {
+		t.Errorf("«Pausar» empieza en %v; Chromium da 97,765625", x)
+	}
+	if x := r.reinicia.Position().X; !cerca32(x, 97.765625+r.pausa.MinSize().Width+14, 0.03) {
+		t.Errorf("«Reiniciar» empieza en %v, detrás de «Pausar»", x)
 	}
 	if pos, tam := r.reinicia.Position(), r.reinicia.Size(); pos.Y != 13 || tam.Height != 32 {
 		t.Errorf("«Reiniciar» en %v, %v", pos, tam)

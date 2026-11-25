@@ -36,6 +36,7 @@ import {
 } from '../client/contactsApi.js';
 import { cumpleanosDe, formatearCumpleanos } from '../client/cumpleanos.js';
 import { parseVcardDetails, roleLine, type PostalAddress, type TypedValue } from '../lib/vcard.js';
+import { textoDeFicha } from '../client/seleccion.js';
 import { downloadVcf, exportFilename, hasEmbeddedPhoto } from '../client/vcard.js';
 import { correoPrincipal } from '../client/seleccion.js';
 import { InteraccionesRecientes } from './InteraccionesRecientes.js';
@@ -122,6 +123,8 @@ interface Props {
   onMerge?: ((contact: Contact) => void) | undefined;
   /** Abre el modal de creación desde el estado vacío (ausente si no hay libreta activa). */
   onCreate?: (() => void) | undefined;
+  /** «Compartir por correo»: el redactor de Mail con la ficha escrita. Sin él, no sale. */
+  onCompartir?: ((contact: Contact, texto: string) => void) | undefined;
   /** Si el contacto está destacado (para pintar la estrella). */
   isFavorite?: boolean;
   /** Destaca/quita el destacado del contacto; rechaza si el servidor falla. */
@@ -152,6 +155,7 @@ export function ContactDetail({
   onToggleGroup,
   onEdit,
   onMerge,
+  onCompartir,
   onCreate,
   isFavorite = false,
   onToggleFavorite,
@@ -237,7 +241,9 @@ export function ContactDetail({
     : undefined;
 
   return (
-    <div class="mx-auto w-full max-w-3xl p-4 sm:p-6 lg:p-8">
+    // `sytue-reserva-flotante`: en escritorio el «+» de «Nuevo contacto» flota sobre la
+    // ficha, y sin el hueco el final de la ficha se quedaba debajo.
+    <div class="sytue-reserva-flotante mx-auto w-full max-w-3xl p-4 sm:p-6 lg:p-8">
       {/* Cabecera de identidad: avatar + nombre + «Cargo · Empresa» + acciones. */}
       <header class="flex flex-col gap-4 sm:flex-row sm:items-center">
         <ContactPhoto t={t} contact={contact} onChanged={onChanged} editable={!readOnly} />
@@ -324,6 +330,19 @@ export function ContactDetail({
                 >
                   {t('detail.export')}
                 </MenuItem>
+                {onCompartir && details ? (
+                  <MenuItem
+                    onClick={() => {
+                      close();
+                      onCompartir(
+                        contact,
+                        textoDeFicha(contact.fullName, details, contact.organization),
+                      );
+                    }}
+                  >
+                    {t('detail.shareByEmail')}
+                  </MenuItem>
+                ) : null}
                 {onMerge ? (
                   <MenuItem
                     onClick={() => {

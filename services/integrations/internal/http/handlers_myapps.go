@@ -56,7 +56,19 @@ func (h *Handlers) MyApps(w http.ResponseWriter, r *http.Request) {
 		byKey[t.Key] = m
 	}
 
+	apps := launcherTiles(instances, byKey)
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"apps": apps})
+}
+
+// launcherTiles convierte las conexiones ACTIVAS con dirección de lanzamiento en
+// teselas, en el orden en que llegan (la más reciente primero).
+//
+// La misma aplicación conectada dos veces con la misma dirección de lanzamiento es la
+// misma tesela: el lanzador enseñaba dos «Google Workspace» idénticos que abrían lo
+// mismo. Se queda la primera, que es la conexión más reciente.
+func launcherTiles(instances []domain.AppInstance, byKey map[string]*manifest.Manifest) []myApp {
 	apps := make([]myApp, 0, len(instances))
+	vistas := make(map[[2]string]bool, len(instances))
 	for _, inst := range instances {
 		if inst.Status != domain.StatusActive {
 			continue // solo las activas son lanzables como producto.
@@ -73,6 +85,11 @@ func (h *Handlers) MyApps(w http.ResponseWriter, r *http.Request) {
 		if href == "" {
 			continue // sin URL de lanzamiento resuelta no es un tile útil.
 		}
+		clave := [2]string{inst.TemplateKey, href}
+		if vistas[clave] {
+			continue
+		}
+		vistas[clave] = true
 		name := inst.Name
 		if name == "" {
 			name = m.Name
@@ -87,7 +104,7 @@ func (h *Handlers) MyApps(w http.ResponseWriter, r *http.Request) {
 			Status:      string(inst.Status),
 		})
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"apps": apps})
+	return apps
 }
 
 // svgDataURI empaqueta un SVG inline como data URI (base64) apto para <img src>. Base64

@@ -51,6 +51,11 @@ const (
 	LadoPuntoSinLeer  float32 = 2 * 0.25 * tema.Rem
 	RellenoPuntoAviso float32 = 2 * 0.25 * tema.Rem
 	LadoBotonLeido            = LadoPuntoSinLeer + 2*RellenoPuntoAviso
+	// SangriaMenuAviso es el `mt-2` del menú «…» de cada aviso (un `IconButton` `sm`,
+	// de 24, `ui.LadoIconoSM`), a la derecha del punto.
+	SangriaMenuAviso float32 = 2 * 0.25 * tema.Rem
+	// HuecoTrasDia es el `mb-1` del encabezado de día de la bandeja, hasta su lista.
+	HuecoTrasDia float32 = 1 * 0.25 * tema.Rem
 
 	// El esqueleto: `Skeleton circle 18px` y dos barras de 14px y 12px con `gap-2`. Son
 	// píxeles LITERALES en la web, no rem.
@@ -124,6 +129,66 @@ const (
 	ReglasCargando
 	ReglasFallo
 )
+
+// TiposCriticos son los tipos que piden actuar y que el Hub entrega siempre
+// (`tiposCriticos` de services/hub, `TIPOS_CRITICOS` de @sytue/shell): ofrecer
+// «Silenciar avisos como este» en uno de ellos sería un botón que no hace nada. Lo vigila
+// `TestLosTiposCriticosSonLosDelHub` contra el fichero del servicio.
+var TiposCriticos = []string{
+	"pages.order.oversold",
+	"pages.payment.duplicated",
+	"pages.erp.failed",
+	"pages.store.busy",
+	"pages.withdrawal.requested",
+	"rooms.report",
+	"cast.report",
+}
+
+// SilenciableDesdeElAviso es el `silenciableDesdeElAviso` de la web: el aviso trae tipo,
+// su origen se puede callar (Sytue ID no) y su tipo no es crítico. La regla que guarda
+// es la de «Qué quieres recibir» por tipo: origen y `kind` = el tipo del aviso.
+func SilenciableDesdeElAviso(n api.HubNotification) bool {
+	return n.Type != "" && n.Source != OrigenFijo && !slices.Contains(TiposCriticos, n.Type)
+}
+
+// DiaDeAvisos es un día de la bandeja: su encabezado y qué avisos son suyos.
+type DiaDeAvisos struct {
+	Grupo GrupoDeDia
+	// Avisos, en el orden en que llegaron.
+	Avisos []api.HubNotification
+}
+
+// PorDiaAvisos es el `agruparPorDia` de la bandeja web: el mismo corte que la actividad
+// (`PorDia`), con la fecha de cada aviso, en la zona de `zona`.
+func PorDiaAvisos(avisos []api.HubNotification, zona *time.Location) []DiaDeAvisos {
+	var orden []string
+	cubos := map[string]*DiaDeAvisos{}
+	for _, n := range avisos {
+		var clave string
+		var fecha time.Time
+		if !n.CreatedAt.IsZero() {
+			fecha = n.CreatedAt.In(zona)
+			clave = fecha.Format("2006-01-02")
+		}
+		d, ok := cubos[clave]
+		if !ok {
+			d = &DiaDeAvisos{Grupo: GrupoDeDia{Dia: clave, Fecha: fecha}}
+			cubos[clave] = d
+			orden = append(orden, clave)
+		}
+		d.Avisos = append(d.Avisos, n)
+	}
+	out := make([]DiaDeAvisos, 0, len(orden))
+	var sinFecha []DiaDeAvisos
+	for _, c := range orden {
+		if c == "" {
+			sinFecha = append(sinFecha, *cubos[c])
+			continue
+		}
+		out = append(out, *cubos[c])
+	}
+	return append(out, sinFecha...)
+}
 
 // OrigenFijo es el origen que sale al final, encendido y sin poder tocarse: los avisos
 // de seguridad de Sytue ID, que el Hub no deja silenciar (`domain.Silenciable`) y que
@@ -218,8 +283,12 @@ type Avisos struct {
 	// siguiente, o a la última si era el último.
 	enfocarPuesto int
 	AlMarcarTodas func()
-	AlSilenciar   func(origen string, silenciar bool)
-	AlReintentar  func()
+	// AlDesmarcar devuelve UNO a «sin leer» desde su menú «…»; AlSilenciarComoEste
+	// silencia los de su tipo (origen + tipo) desde el mismo menú.
+	AlDesmarcar         func(api.HubNotification)
+	AlSilenciarComoEste func(api.HubNotification)
+	AlSilenciar         func(origen string, silenciar bool)
+	AlReintentar        func()
 }
 
 var _ fyne.Widget = (*Avisos)(nil)
@@ -332,7 +401,14 @@ type avisosRenderer struct {
 	// ids es el aviso de cada fila, a su par en `filas`.
 	ids     []string
 	filetes []*canvas.Rectangle
-	mas     *ui.Boton
+	// menus es el «…» de cada fila, a su par en `filas` (nil si no hay nada que ofrecer).
+	menus []*ui.BotonIcono
+	// divFilas es el filete de encima de cada fila, a su par en `filas`: nil en la
+	// primera de cada día, que lleva encima el encabezado del día.
+	divFilas []*canvas.Rectangle
+	// dias son los encabezados («Hoy», «Ayer», la fecha) y desde qué fila empieza cada uno.
+	dias []diaPintado
+	mas  *ui.Boton
 
 	fileteReglas *canvas.Rectangle
 	tituloReglas *canvas.Text
@@ -356,6 +432,14 @@ type avisosRenderer struct {
 	objetos []fyne.CanvasObject
 }
 
+// diaPintado es el encabezado de un día de la bandeja: el `sytue-overline` con su
+// filete debajo (`border-b pb-2`), como el de la actividad.
+type diaPintado struct {
+	titulo *ui.Versal
+	filete *canvas.Rectangle
+	desde  int
+}
+
 // textosAvisos son las claves de sus dos estados propios.
 func textosAvisos(soloSinLeer bool) Textos {
 	if soloSinLeer {
@@ -374,6 +458,7 @@ func (r *avisosRenderer) rehacer() {
 	r.cabecera.preparar(v, ancho)
 	r.hacerBarra(t)
 	r.esqueleto, r.carga, r.aviso, r.filas, r.filetes, r.mas, r.leidos, r.ids = nil, nil, nil, nil, nil, nil, nil, nil
+	r.menus, r.divFilas, r.dias = nil, nil, nil
 
 	visibles := Visibles(a.Items, a.SoloSinLeer, a.Producto)
 	switch {
@@ -407,29 +492,11 @@ func (r *avisosRenderer) rehacer() {
 		}
 		r.aviso = Aviso(t, v, SinNada, textos, nil)
 	default:
-		for puesto, n := range visibles {
-			r.filas = append(r.filas, r.filaDe(n, ancho))
-			r.ids = append(r.ids, n.ID)
-			var b *BotonLeido
-			if !n.Read {
-				b = NuevoBotonLeido(t.T("inbox.markRead", nil), func() {
-					if b.Enfocado() {
-						a.enfocarTras, a.enfocarPuesto = n.ID, puesto
-					}
-					if a.AlMarcarLeido != nil {
-						a.AlMarcarLeido(n)
-					}
-				})
-			}
-			r.leidos = append(r.leidos, b)
-		}
-		r.filetes = Divisores(v, len(r.filas))
+		r.filasPorDia(v, visibles, ancho)
 	}
 	// «Cargar más» también con un filtro que no deja ver nada: lo que busca puede estar
 	// detrás. Como en la web.
-	if a.Estado == Listo && a.HayMas && a.AlCargarMas != nil && len(a.Items) > 0 {
-		r.mas = ui.NuevoBoton(t.T("notifications.loadMore", nil), a.AlCargarMas).Con(ui.Secundario, ui.TallaSM)
-	}
+	r.cargarMas()
 
 	r.fileteReglas = canvas.NewRectangle(tema.Color("border", v))
 	r.tituloReglas = ui.Texto(t.T("inbox.prefsTitle", nil), tema.TextoBase, ui.SemiNegrita, tema.Color("text", v))
@@ -443,6 +510,57 @@ func (r *avisosRenderer) rehacer() {
 		A(max(0, ancho-SangriaNotaFija))
 	r.rehacerReglas(v)
 	r.recomponer()
+}
+
+// filasPorDia monta la lista cortada por día, como la actividad y como la web: «Hoy»,
+// «Ayer» y fechas, cada aviso con su punto (sin leer) y su «…» (si hay qué ofrecer).
+func (r *avisosRenderer) filasPorDia(v tema.Variante, visibles []api.HubNotification, ancho float32) {
+	a, t := r.a, r.a.T
+	puesto := 0
+	for _, dia := range PorDiaAvisos(visibles, a.ahora().Location()) {
+		r.dias = append(r.dias, diaPintado{
+			titulo: ui.NuevoVersal(EtiquetaDia(t, dia.Grupo, a.ahora()), tema.TextoXS, ui.SemiNegrita,
+				tema.Color("text-subtle", v)),
+			filete: canvas.NewRectangle(tema.Color("border", v)),
+			desde:  len(r.filas),
+		})
+		for i, n := range dia.Avisos {
+			f := r.filaDe(n, ancho)
+			menu := r.menuDe(n)
+			f.ConMenu = menu != nil
+			r.filas = append(r.filas, f)
+			r.ids = append(r.ids, n.ID)
+			r.menus = append(r.menus, menu)
+			var div *canvas.Rectangle
+			if i > 0 {
+				div = canvas.NewRectangle(tema.Color("border", v)) // `divide-y`
+			}
+			r.divFilas = append(r.divFilas, div)
+			var b *BotonLeido
+			enPuesto := puesto
+			if !n.Read {
+				b = NuevoBotonLeido(t.T("inbox.markRead", nil), func() {
+					if b.Enfocado() {
+						a.enfocarTras, a.enfocarPuesto = n.ID, enPuesto
+					}
+					if a.AlMarcarLeido != nil {
+						a.AlMarcarLeido(n)
+					}
+				})
+			}
+			r.leidos = append(r.leidos, b)
+			puesto++
+		}
+	}
+}
+
+// cargarMas es «Cargar más»: también con un filtro que no deja ver nada, porque lo que
+// se busca puede estar detrás. Como en la web.
+func (r *avisosRenderer) cargarMas() {
+	a := r.a
+	if a.Estado == Listo && a.HayMas && a.AlCargarMas != nil && len(a.Items) > 0 {
+		r.mas = ui.NuevoBoton(a.T.T("notifications.loadMore", nil), a.AlCargarMas).Con(ui.Secundario, ui.TallaSM)
+	}
 }
 
 // hacerBarra construye los filtros y «Marcar todas», que solo sale si hay algo sin leer.
@@ -481,8 +599,19 @@ func (r *avisosRenderer) hacerBarra(t *i18n.Translator) {
 		r.filtros = append(r.filtros, pl)
 	}
 	r.marcar = nil
-	if sinLeer > 0 {
-		r.marcar = ui.NuevoBoton(t.T("inbox.markAll", nil), func() {
+	// Con un producto elegido, «Marcar todas» es de ESE producto, que es lo que se ve:
+	// sale si él tiene algo sin leer y lo dice en el rótulo.
+	rotulo, hay := t.T("inbox.markAll", nil), sinLeer > 0
+	if a.Producto != "" {
+		nombre := a.Producto
+		if p, ok := ProductoDe(a.Producto); ok {
+			nombre = p.NombreCorto()
+		}
+		rotulo = t.T("inbox.markAllOf", i18n.Vars{"app": nombre})
+		hay = slices.ContainsFunc(a.Items, func(n api.HubNotification) bool { return n.Source == a.Producto && !n.Read })
+	}
+	if hay {
+		r.marcar = ui.NuevoBoton(rotulo, func() {
 			if a.AlMarcarTodas != nil {
 				a.AlMarcarTodas()
 			}
@@ -511,6 +640,35 @@ func (r *avisosRenderer) filaDe(n api.HubNotification, ancho float32) *FilaAviso
 	return f
 }
 
+// menuDe es el «…» de un aviso: devolverlo a «sin leer» (si está leído) y silenciar los
+// de su tipo (si se puede). Sin nada que ofrecer, no hay botón, como en la web.
+func (r *avisosRenderer) menuDe(n api.HubNotification) *ui.BotonIcono {
+	a := r.a
+	desmarcar := n.Read && a.AlDesmarcar != nil
+	silenciar := SilenciableDesdeElAviso(n) && a.AlSilenciarComoEste != nil
+	if !desmarcar && !silenciar {
+		return nil
+	}
+	rotulo := a.T.T("inbox.actionsOf", i18n.Vars{"title": ui.TituloAviso(a.T, n)})
+	var b *ui.BotonIcono
+	b = ui.NuevoBotonIcono(iconos.Puntos, rotulo, func() {
+		var elementos []fyne.CanvasObject
+		if desmarcar {
+			elementos = append(elementos, ui.NuevoElementoMenu(a.T.T("inbox.markUnread", nil), iconos.Ninguno,
+				func() { a.AlDesmarcar(n) }))
+		}
+		if silenciar {
+			elementos = append(elementos, ui.NuevoElementoMenu(a.T.T("inbox.muteLikeThis", nil), iconos.Ninguno,
+				func() { a.AlSilenciarComoEste(n) }))
+		}
+		m := ui.NuevoMenu(elementos...)
+		m.Rotulo = rotulo
+		m.Mostrar(b)
+	})
+	b.Lado = ui.LadoIconoSM
+	return b
+}
+
 func (r *avisosRenderer) recomponer() {
 	r.objetos = []fyne.CanvasObject{r.fondo}
 	r.objetos = append(r.objetos, r.cabecera.objetos()...)
@@ -528,15 +686,7 @@ func (r *avisosRenderer) recomponer() {
 	}
 	// Cada punto justo detrás de SU fila: Fyne recorre el foco en el orden de Objects(),
 	// y el de la web es el del DOM, fila, punto, fila, punto (docs/design.md §2.6).
-	for i, f := range r.filas {
-		r.objetos = append(r.objetos, f)
-		if b := r.leidos[i]; b != nil {
-			r.objetos = append(r.objetos, b)
-		}
-	}
-	for _, f := range r.filetes {
-		r.objetos = append(r.objetos, f)
-	}
+	r.objetos = append(r.objetos, r.objetosDeLista()...)
 	if r.mas != nil {
 		r.objetos = append(r.objetos, r.mas)
 	}
@@ -566,6 +716,34 @@ func (r *avisosRenderer) recomponer() {
 	if r.conFijo() {
 		r.objetos = append(r.objetos, r.fijo, r.notaFijo)
 	}
+}
+
+// objetosDeLista son los encabezados de día, y cada fila con su punto y su menú justo
+// detrás: Fyne recorre el foco en el orden de Objects(), y el de la web es el del DOM,
+// fila, punto, menú (docs/design.md §2.6).
+func (r *avisosRenderer) objetosDeLista() []fyne.CanvasObject {
+	var out []fyne.CanvasObject
+	for _, d := range r.dias {
+		out = append(append(out, d.titulo.Objetos()...), d.filete)
+	}
+	for i, f := range r.filas {
+		out = append(out, f)
+		if b := r.leidos[i]; b != nil {
+			out = append(out, b)
+		}
+		if m := r.menus[i]; m != nil {
+			out = append(out, m)
+		}
+	}
+	for _, f := range r.filetes {
+		out = append(out, f)
+	}
+	for _, f := range r.divFilas {
+		if f != nil {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // conFijo dice si sale la fila fija de Sytue ID: con las reglas cargadas, como en la web.
@@ -695,12 +873,29 @@ func (r *avisosRenderer) altoLista(ancho float32) float32 {
 	}
 	var alto float32
 	for i, f := range r.filas {
-		if i > 0 {
-			alto += tema.Borde // `divide-y`
-		}
+		alto += r.antesDeFila(i)
 		alto += AltoFilaAviso(f, ancho)
 	}
 	return alto + extra
+}
+
+// antesDeFila es lo que va encima de la fila i: el filete del `divide-y` dentro de un día,
+// o, en la primera de un día, el hueco entre días (`gap-6`, salvo el primero) y su
+// encabezado con el `mb-1`.
+func (r *avisosRenderer) antesDeFila(i int) float32 {
+	if r.divFilas[i] != nil {
+		return tema.Borde
+	}
+	var alto float32
+	for d, dia := range r.dias {
+		if dia.desde == i {
+			if d > 0 {
+				alto += HuecoBandeja
+			}
+			alto += AltoEncabezadoDia() + HuecoTrasDia
+		}
+	}
+	return alto
 }
 
 func (r *avisosRenderer) altoReglas() float32 {
@@ -789,17 +984,37 @@ func (r *avisosRenderer) Layout(t fyne.Size) {
 		r.aviso.Resize(fyne.NewSize(ancho, r.aviso.MedidaVacio(ancho)))
 	}
 	fy := y
+	dia := 0
 	for i, f := range r.filas {
-		if i > 0 {
-			ColocarDivisor(r.filetes[i-1], x, fy, ancho)
+		if d := r.divFilas[i]; d != nil {
+			ColocarDivisor(d, x, fy, ancho)
 			fy += tema.Borde
+		} else {
+			for dia < len(r.dias) && r.dias[dia].desde == i {
+				if dia > 0 {
+					fy += HuecoBandeja
+				}
+				p := r.dias[dia]
+				p.titulo.Colocar(x, fy)
+				// El filete va DENTRO de la caja (`border-box`): bajo el `pb-2`.
+				ColocarDivisor(p.filete, x, fy+tema.TextoXS.Linea+MargenEncabezado, ancho)
+				fy += AltoEncabezadoDia() + HuecoTrasDia
+				dia++
+			}
 		}
 		h := AltoFilaAviso(f, ancho)
 		f.Move(fyne.NewPos(x, fy))
 		f.Resize(fyne.NewSize(anchoFilaAviso(f, ancho), h))
+		derecha := x + ancho
+		if m := r.menus[i]; m != nil {
+			// `mt-2`, lo último de la fila.
+			derecha -= ui.LadoIconoSM
+			m.Move(fyne.NewPos(derecha, fy+SangriaMenuAviso))
+			m.Resize(fyne.NewSize(ui.LadoIconoSM, ui.LadoIconoSM))
+		}
 		if b := r.leidos[i]; b != nil {
-			// `mt-3`, a la derecha de la fila.
-			b.Move(fyne.NewPos(x+ancho-LadoBotonLeido, fy+MargenYAviso))
+			// `mt-3`, a la derecha de la fila (y a la izquierda del menú).
+			b.Move(fyne.NewPos(derecha-LadoBotonLeido, fy+MargenYAviso))
 			b.Resize(fyne.NewSize(LadoBotonLeido, LadoBotonLeido))
 		}
 		fy += h
@@ -968,6 +1183,8 @@ type FilaAviso struct {
 	Enlace bool
 	// RotuloPunto es el «Sin leer» que la fila dice para quien no ve el punto.
 	RotuloPunto string
+	// ConMenu deja sitio a la derecha para el «…» del aviso, que va fuera de la fila.
+	ConMenu bool
 	// Ancho es el de la lista, que es el que decide en cuántas líneas cae el texto.
 	Ancho float32
 }
@@ -1017,9 +1234,12 @@ func (f *FilaAviso) peso() ui.Peso {
 // botón del punto si está sin leer.
 func anchoFilaAviso(f *FilaAviso, ancho float32) float32 {
 	if f.SinLeer {
-		return max(ancho-LadoBotonLeido, 1)
+		ancho -= LadoBotonLeido
 	}
-	return ancho
+	if f.ConMenu {
+		ancho -= ui.LadoIconoSM
+	}
+	return max(ancho, 1)
 }
 
 // anchoTextoAviso es lo que le queda a la columna de texto en una fila de ese ancho.
@@ -1040,6 +1260,9 @@ func AltoFilaAviso(f *FilaAviso, ancho float32) float32 {
 	alto := 2*MargenYAviso + max(texto, SangriaMarca+LadoMarcaAviso)
 	if f.SinLeer {
 		alto = max(alto, MargenYAviso+LadoBotonLeido)
+	}
+	if f.ConMenu {
+		alto = max(alto, SangriaMenuAviso+ui.LadoIconoSM)
 	}
 	return alto
 }

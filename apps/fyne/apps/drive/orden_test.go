@@ -340,18 +340,40 @@ func TestOrdenarSaleDondeNoHayColumnas(t *testing.T) {
 	if b == nil {
 		t.Fatal("la lista del teléfono no lleva «Ordenar»: solo se podría ordenar por nombre")
 	}
-	nuevo := lay.Acciones[1]
 	cercaDe(t, "«Ordenar», en la fila del conmutador", b.Position().Y+b.Size().Height/2,
 		lay.Conmutador.Position().Y+lay.Conmutador.Size().Height/2, 0.01)
-	cercaDe(t, "«Ordenar», pegado al final de la segunda columna", b.Position().X+b.Size().Width,
-		nuevo.Position().X+nuevo.Size().Width, 0.01)
+	// La segunda columna mide lo que «Ordenar» (`auto`): ya no la ensancha «Nuevo», que
+	// es el «+» flotante. Así que va pegado al conmutador, a un `gap-x-2`.
+	cercaDe(t, "«Ordenar», pegado al final de la segunda columna", b.Position().X+b.Size().Width+HuecoAcciones,
+		lay.Conmutador.Position().X, 0.01)
 	if b.Size().Width < b.MinSize().Width {
 		t.Errorf("«Ordenar» no cabe entero: %g de %g", b.Size().Width, b.MinSize().Width)
 	}
-	if fin := lay.Ruta.Position().X + lay.Ruta.Size().Width; fin > nuevo.Position().X-HuecoAcciones+0.01 {
-		t.Errorf("las migas acaban en %g y pisan la segunda columna, que empieza en %g", fin, nuevo.Position().X)
+	if fin := lay.Ruta.Position().X + lay.Ruta.Size().Width; fin > b.Position().X-HuecoAcciones+0.01 {
+		t.Errorf("las migas acaban en %g y pisan la segunda columna, que empieza en %g", fin, b.Position().X)
 	}
-	if nuevo.Size().Width < b.MinSize().Width {
-		t.Errorf("la segunda columna mide %g y no le cabe «Ordenar» (%g)", nuevo.Size().Width, b.MinSize().Width)
+}
+
+// TestUnaBusquedaSinNadaSeBorraDesdeElVacio es el «Borrar la búsqueda» del estado vacío
+// de la web: vacía el buscador y le pide la carpeta otra vez a quien busca.
+func TestUnaBusquedaSinNadaSeBorraDesdeElVacio(t *testing.T) {
+	test.NewTempApp(t)
+	tr := traductor(t)
+	e := NuevoExplorador(tr)
+	e.Fase, e.Ventana, e.EnBusqueda, e.Consulta = Vacia, 1280, true, "zzz"
+	var pedido []string
+	e.AlBuscar = func(s string) { pedido = append(pedido, s); e.Consulta = s }
+	var borrar *ui.Boton
+	recorrer(e.Objeto(testVariante()), func(o fyne.CanvasObject) {
+		if b, ok := o.(*ui.Boton); ok && b.Texto == tr.T("files.search.clear", nil) {
+			borrar = b
+		}
+	})
+	if borrar == nil {
+		t.Fatal("una búsqueda sin resultados no ofrece «Borrar la búsqueda»")
+	}
+	test.Tap(borrar)
+	if len(pedido) != 1 || pedido[0] != "" || e.campoBusqueda().Texto() != "" {
+		t.Errorf("«Borrar la búsqueda» pidió %q y dejó %q en el campo", pedido, e.campoBusqueda().Texto())
 	}
 }

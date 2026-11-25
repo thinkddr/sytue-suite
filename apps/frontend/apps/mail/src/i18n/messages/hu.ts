@@ -976,4 +976,14 @@ export const hu: AppCatalog<typeof en> = {
     'Az előző levelezőrendszer már nem érhető el. Amíg nem helyezi át a leveleit a széfbe, nem kap új leveleket: az addig küldött levelek a feladó szerverén várnak, amely néhány napig újra próbálkozik. Ha időben áthelyezi a leveleit, ezek utána megérkeznek; ha nem, a feladó értesítést kap, hogy nem sikerült kézbesíteni őket. Ami már az előző rendszerrel titkosítva van, akárcsak a már meglévő levelei, nem olvasható el: nem törlődik, de senki sem tudja megnyitni. Az áthelyezés után a levelek újra megérkeznek, és a többi alkalmazáshoz hasonlóan a Sytue ID-bejelentkezésével nyílnak meg.',
   'privateMail.vaultMoveCheckFailed':
     'Nem sikerült ellenőrizni a levelei állapotát. Próbálja újra egy pillanat múlva.',
+  'shortcuts.goInbox': 'Ugrás: Beérkezett üzenetek',
+  'shortcuts.goSent': 'Ugrás: Elküldött üzenetek',
+  'shortcuts.goDrafts': 'Ugrás: Piszkozatok',
+  'shortcuts.goArchive': 'Ugrás: Archívum',
+  'compose.sendAndArchive': 'Küldés és archiválás',
+  'reader.copyAddress': 'Cím másolása',
+  'reader.addressCopied': 'Cím kimásolva',
+  'reader.copyAddressFailed': 'A címet nem sikerült kimásolni',
+  'reader.viewPlain': 'Megjelenítés egyszerű szövegként',
+  'reader.viewFormatted': 'Megjelenítés formázással',
 };

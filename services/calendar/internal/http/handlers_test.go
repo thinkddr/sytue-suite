@@ -117,7 +117,12 @@ type fakeService struct {
 	gotIMIP string
 	imipErr error
 
-	dismissErr    error
+	dismissErr error
+	// posponer: lo recibido y lo que contesta.
+	gotSnoozeMin int
+	snoozeErr    error
+	// el .ics de un evento.
+	eventICS      string
 	gotDismissID  uuid.UUID
 	gotDismissSub string
 
@@ -358,6 +363,15 @@ func (f *fakeService) DueReminders(_ context.Context, ownerSub string, _ time.Ti
 func (f *fakeService) DismissReminder(_ context.Context, ownerSub string, id uuid.UUID) error {
 	f.gotDismissSub, f.gotDismissID = ownerSub, id
 	return f.dismissErr
+}
+
+func (f *fakeService) SnoozeReminder(_ context.Context, ownerSub string, id uuid.UUID, minutes int) (time.Time, error) {
+	f.gotDismissSub, f.gotDismissID, f.gotSnoozeMin = ownerSub, id, minutes
+	return time.Date(2026, 11, 30, 10, 10, 0, 0, time.UTC), f.snoozeErr
+}
+
+func (f *fakeService) EventICS(context.Context, domain.Event) (string, error) {
+	return f.eventICS, nil
 }
 
 func (f *fakeService) AmendRecurrence(_ context.Context, _ uuid.UUID, uid string, recurrenceID time.Time, mode string, _ uuid.UUID) (domain.CalendarObject, error) {
@@ -1144,6 +1158,65 @@ func TestDismissReminderBadID(t *testing.T) {
 	newHandlers(&fakeService{}).DismissReminder(rec, req(http.MethodPost, "/", "", authClaims(), map[string]string{"id": "nope"}))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("code = %d, want 400", rec.Code)
+	}
+}
+
+func TestSnoozeReminder(t *testing.T) {
+	id := uuid.New()
+	f := &fakeService{}
+	rec := httptest.NewRecorder()
+	newHandlers(f).SnoozeReminder(rec, req(http.MethodPost, "/", `{"minutes":10}`, authClaims(), map[string]string{"id": id.String()}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200 (%s)", rec.Code, rec.Body.String())
+	}
+	if f.gotDismissID != id || f.gotDismissSub != "user-1" || f.gotSnoozeMin != 10 {
+		t.Errorf("posponer mal enrutado: id=%s sub=%s min=%d", f.gotDismissID, f.gotDismissSub, f.gotSnoozeMin)
+	}
+	if !strings.Contains(rec.Body.String(), `"trigger_at":"2026-11-30T10:10:00Z"`) {
+		t.Errorf("no dice cuándo vuelve: %s", rec.Body.String())
+	}
+
+	// Fuera de [1, 1440] no llega al servicio.
+	for _, cuerpo := range []string{`{"minutes":0}`, `{"minutes":1441}`, `{}`, `nope`} {
+		f := &fakeService{}
+		rec := httptest.NewRecorder()
+		newHandlers(f).SnoozeReminder(rec, req(http.MethodPost, "/", cuerpo, authClaims(), map[string]string{"id": id.String()}))
+		if rec.Code != http.StatusBadRequest || f.gotSnoozeMin != 0 {
+			t.Errorf("%s: code = %d, servicio con %d; want 400 sin llamar", cuerpo, rec.Code, f.gotSnoozeMin)
+		}
+	}
+
+	// Descartado o ajeno: 404, como al descartar.
+	f = &fakeService{snoozeErr: domain.ErrNotFound}
+	rec = httptest.NewRecorder()
+	newHandlers(f).SnoozeReminder(rec, req(http.MethodPost, "/", `{"minutes":5}`, authClaims(), map[string]string{"id": id.String()}))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("code = %d, want 404", rec.Code)
+	}
+}
+
+func TestEventICS(t *testing.T) {
+	ics := "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:u1\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+	f := &fakeService{event: domain.Event{UID: "u1", Summary: "Revisión / anual"}, eventICS: ics}
+	rec := httptest.NewRecorder()
+	newHandlers(f).EventICS(rec, req(http.MethodGet, "/", "", authClaims(), map[string]string{"id": uuid.NewString()}))
+	if rec.Code != http.StatusOK || rec.Body.String() != ics {
+		t.Fatalf("code = %d, cuerpo %q", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/calendar") {
+		t.Errorf("Content-Type = %q", ct)
+	}
+	// La barra del título no puede abrir una ruta en el nombre del fichero.
+	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, `filename="Revisión - anual.ics"`) {
+		t.Errorf("Content-Disposition = %q", cd)
+	}
+
+	// Sin acceso al evento: el 404 de GetEvent, sin leer el recurso.
+	f = &fakeService{eventErr: domain.ErrNotFound, eventICS: ics}
+	rec = httptest.NewRecorder()
+	newHandlers(f).EventICS(rec, req(http.MethodGet, "/", "", authClaims(), map[string]string{"id": uuid.NewString()}))
+	if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "VCALENDAR") {
+		t.Fatalf("code = %d, cuerpo %q", rec.Code, rec.Body.String())
 	}
 }
 

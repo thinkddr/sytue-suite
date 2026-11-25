@@ -20,10 +20,12 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import type { Locale } from '@sytue/i18n';
 import {
   Button,
   Card,
   ConfirmDialog,
+  copiarAlPortapapeles,
   FieldGroup,
   FieldHint,
   InlineHelp,
@@ -43,21 +45,20 @@ import {
 import { RequisitosPassword } from './RequisitosPassword.js';
 import { CodigosRecuperacion } from './CodigosRecuperacion.js';
 import { DosPasosWizard } from './DosPasosWizard.js';
+import { FilaPasskey, type Passkey } from './FilaPasskey.js';
+import { sugerirContrasena } from '../lib/contrasenaSegura.js';
 
 type Estado = 'quieto' | 'enviando' | 'error';
 
-interface Passkey {
-  id: string;
-  name: string;
-  last_used?: string | null;
-}
-
 export function SeguridadCard({
   t,
+  locale = 'en',
   mfaRequired = false,
   sobreDeSeguridad = sobreDeContrasena,
 }: {
   t: T;
+  /** Para las fechas de las passkeys. */
+  locale?: Locale;
   mfaRequired?: boolean;
   /** El sobre del desbloqueo para la contraseña nueva (ADR 0085); el puente de Sytue ID. */
   sobreDeSeguridad?: typeof sobreDeContrasena;
@@ -75,6 +76,11 @@ export function SeguridadCard({
   const [actual, setActual] = useState('');
   const [nueva, setNueva] = useState('');
   const [estadoPwd, setEstadoPwd] = useState<Estado>('quieto');
+  // La contraseña que se ha sugerido, mientras siga siendo la del campo: entonces se
+  // enseña en claro (hay que poder leerla para guardarla) y se ofrece copiarla. En
+  // cuanto se teclea encima deja de ser la sugerida y el campo vuelve a ocultarse.
+  const [sugerida, setSugerida] = useState<string | null>(null);
+  const [copiaSugerida, setCopiaSugerida] = useState<'nada' | 'hecha' | 'fallo'>('nada');
   const [cerrada, setCerrada] = useState(false);
   // La política efectiva que sirve `/me`. Sin ella (servicio antiguo o `/me`
   // caído) no se pinta la lista ni se bloquea nada: el servidor sigue validando.
@@ -160,6 +166,20 @@ export function SeguridadCard({
     }
   }
 
+  const verSugerida = sugerida !== null && nueva === sugerida;
+
+  function sugerir(): void {
+    const nuevaSugerida = sugerirContrasena(politica);
+    setSugerida(nuevaSugerida);
+    setNueva(nuevaSugerida);
+    setCopiaSugerida('nada');
+  }
+
+  async function copiarSugerida(): Promise<void> {
+    if (sugerida === null) return;
+    setCopiaSugerida((await copiarAlPortapapeles(sugerida)) ? 'hecha' : 'fallo');
+  }
+
   const requisitos = politica ? requisitosPassword(politica, nueva, actual) : [];
   const faltanRequisitos = requisitos.some((r) => !r.cumplido);
 
@@ -187,6 +207,7 @@ export function SeguridadCard({
     // Sin volver a pedir nada: esta sesión ya no existe del lado del servicio.
     setActual('');
     setNueva('');
+    setSugerida(null);
     setEstadoPwd('quieto');
     setCerrada(true);
   }
@@ -347,7 +368,7 @@ export function SeguridadCard({
           <FieldGroup label={t('security.password.new')} htmlFor="pwd-nueva" required>
             <Input
               id="pwd-nueva"
-              type="password"
+              type={verSugerida ? 'text' : 'password'}
               autocomplete="new-password"
               value={nueva}
               onInput={(e: Event) => setNueva((e.target as HTMLInputElement).value)}
@@ -355,6 +376,37 @@ export function SeguridadCard({
               required
             />
           </FieldGroup>
+          {/* Una contraseña larga y aleatoria, que cumple la política de la
+              organización. Se genera en el navegador (`crypto.getRandomValues`) y
+              no viaja a ningún sitio hasta que se pulsa «Cambiar». */}
+          <div class="-mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={sugerir}>
+              {t('security.password.suggest')}
+            </Button>
+            {verSugerida && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => void copiarSugerida()}>
+                {t('common.copy')}
+              </Button>
+            )}
+            {/* Siempre montada y dentro de la fila: una región `status` que nace con
+                el texto no la anuncian todos los lectores, y suelta en el
+                formulario sumaría un hueco vacío entre campos. */}
+            <span
+              role="status"
+              class={
+                copiaSugerida === 'fallo' ? 'text-danger-text text-xs' : 'text-success-text text-xs'
+              }
+            >
+              {verSugerida && copiaSugerida === 'hecha'
+                ? t('common.copied')
+                : verSugerida && copiaSugerida === 'fallo'
+                  ? t('common.copy_failed')
+                  : ''}
+            </span>
+          </div>
+          {verSugerida && (
+            <p class="text-text-muted -mt-2 text-xs">{t('security.password.suggested')}</p>
+          )}
           {politica && (
             <RequisitosPassword
               t={t}
@@ -457,18 +509,14 @@ export function SeguridadCard({
               <p class="text-text-muted text-xs">{t('security.passkeys.hint')}</p>
               <ul class="flex flex-col gap-2">
                 {llaves.map((k) => (
-                  <li key={k.id} class="flex items-center justify-between gap-3">
-                    <span class="truncate text-sm">{k.name || t('security.passkeys.unnamed')}</span>
-                    <Button
-                      variant="ghost"
-                      aria-label={t('security.passkeys.remove_named', {
-                        name: k.name || t('security.passkeys.unnamed'),
-                      })}
-                      onClick={() => void quitarLlave(k)}
-                    >
-                      {t('security.passkeys.remove')}
-                    </Button>
-                  </li>
+                  <FilaPasskey
+                    key={k.id}
+                    t={t}
+                    locale={locale}
+                    llave={k}
+                    onQuitar={(x) => void quitarLlave(x)}
+                    onRenombrada={() => void cargarLlaves()}
+                  />
                 ))}
               </ul>
 

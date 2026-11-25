@@ -289,10 +289,10 @@ func TestEntradaPrivadaDeAvisos(t *testing.T) {
 		// «Marcar todo», también desde otra organización: lo suyo y las copias sí, lo
 		// congelado no (no puede cambiar hasta soltar la fuente) y sin error.
 		enGlobex := domain.ConBuzonesPersonales(globex, "ana", []string{"ana"}, time.Now())
-		if n, err := st.MarkAllRead(enGlobex, []string{"ana"}); err != nil || n != 2 {
+		if n, err := st.MarkAllRead(enGlobex, []string{"ana"}, ""); err != nil || n != 2 {
 			t.Fatalf("desde globex marcó %d (%v), quiero los 2 suyos", n, err)
 		}
-		if n, err := st.MarkAllRead(ana, []string{"ana"}); err != nil || n != 0 {
+		if n, err := st.MarkAllRead(ana, []string{"ana"}, ""); err != nil || n != 0 {
 			t.Fatalf("en acme marcó %d (%v), quiero 0: lo congelado no cambia", n, err)
 		}
 		if count(`SELECT count(*) FROM notifications WHERE id=$1 AND NOT read`, legado.ID) != 1 {

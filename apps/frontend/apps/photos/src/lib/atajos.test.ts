@@ -45,7 +45,7 @@ test('la hoja de la galería trae los dos grupos; la del visor, solo el suyo', (
     t('shortcuts.group.gallery'),
     t('shortcuts.group.viewer'),
   ]);
-  expect(galeria[0]!.atajos.map((a) => a.teclas)).toEqual([['U'], ['Esc'], ['?']]);
+  expect(galeria[0]!.atajos.map((a) => a.teclas)).toEqual([['U'], ['/'], ['Esc'], ['?']]);
   const visor = gruposDeAtajos(t, 'visor');
   expect(visor.map((g) => g.titulo)).toEqual([t('shortcuts.group.viewer')]);
   expect(visor[0]!.atajos.map((a) => a.teclas)).toEqual([
@@ -56,6 +56,8 @@ test('la hoja de la galería trae los dos grupos; la del visor, solo el suyo', (
     [t('shortcuts.keySpace')],
     ['I'],
     ['Z'],
+    ['F'],
+    ['E'],
     [t('shortcuts.keyDelete'), '⌫'],
     ['Esc'],
     ['?'],
@@ -76,4 +78,25 @@ test('la hoja no promete lo que ese visor no atiende', () => {
   const todo = descripciones({});
   expect(todo).toContain(t('shortcuts.first'));
   expect(todo).toContain(t('viewer.delete'));
+});
+
+test('«/» va al buscador; con una foto abierta, F es el corazón y E el editor', () => {
+  expect(accionDeGaleria('/')).toBe('buscar');
+  expect(accionDelVisor('f')).toBe('favorita');
+  // Con el bloqueo de mayúsculas puesto llegan en mayúscula, y valen igual.
+  expect(accionDelVisor('F')).toBe('favorita');
+  expect(accionDelVisor('e')).toBe('editar');
+  // En la galería no hay foto a la que dar corazón ni que editar.
+  expect(accionDeGaleria('f')).toBeNull();
+  expect(accionDeGaleria('e')).toBeNull();
+});
+
+test('la hoja solo promete F donde se puede marcar favorita', () => {
+  const descripciones = (o: { favorita?: boolean }) =>
+    gruposDeAtajos(t, 'visor', o)[0]!.atajos.map((a) => a.descripcion);
+  expect(descripciones({})).toContain(t('shortcuts.favorite'));
+  expect(descripciones({ favorita: false })).not.toContain(t('shortcuts.favorite'));
+  expect(descripciones({ favorita: false })).toContain(t('viewer.edit'));
+  // Y la de la galería cuenta el «/».
+  expect(gruposDeAtajos(t, 'galeria')[0]!.atajos.map((a) => a.teclas.join())).toContain('/');
 });

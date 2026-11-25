@@ -332,4 +332,10 @@ export const da: AppCatalog<typeof en> = {
   'relation.coworker': 'Kollega',
   'relation.emergency': 'Nødkontakt',
   'relation.other': 'Anden',
+  'batch.copyEmails': 'Kopiér e-mailadresserne',
+  'batch.emailsCopied': 'E-mailadresserne er kopieret',
+  'birthdays.anniversary': 'Mærkedag',
+  'list.sortByLastName': 'Sortér efter efternavn',
+  'list.sortByFirstName': 'Sortér efter fornavn',
+  'detail.shareByEmail': 'Del via e-mail',
 };

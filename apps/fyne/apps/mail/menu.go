@@ -123,12 +123,6 @@ func (m *Menu) Construir() *ui.Lateral {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	t := m.T
 
-	// `leadingIcon={<Icon name="plus" />}`: el «+» de 20 (el `size` por defecto de
-	// Icon.tsx) y el `gap-2`, centrados como bloque en la caja `fullWidth`.
-	redactar := ui.NuevoBoton(t.T("nav.compose", nil), m.AlRedactar)
-	redactar.Ancho = ui.AnchoUtilMenu
-	redactar.Icono = iconos.Mas
-
 	// `ui.Columna` sin hueco: cada sección ya trae su `mb-4` dentro, así que meterlas
 	// en otra `SeccionLateral` sumaría un margen de más al final del cuerpo.
 	// `overflow-y-auto`: el cuerpo desplaza y no empuja al pie. Lo decide quien monta
@@ -146,7 +140,9 @@ func (m *Menu) Construir() *ui.Lateral {
 	}
 	cuerpo := m.desplaza
 
-	l := ui.NuevoLateral(t.T("ui.mainNav", nil), cuerpo).ConCabecera(redactar)
+	// Sin «Redactar» en la cabecera: es el «+» flotante de la pantalla, en todos los anchos
+	// (`ui.BotonFlotante`). Producto pidió un solo control para redactar (2026-11-25).
+	l := ui.NuevoLateral(t.T("ui.mainNav", nil), cuerpo)
 	l.Pie = m.pie()
 	return l
 }

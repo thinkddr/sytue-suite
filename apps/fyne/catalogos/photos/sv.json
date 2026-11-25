@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Undanta organisationen från den automatiska Sytue AI-körningen",
   "aiBatch.excludedHint": "Organisationen är undantagen från den automatiska Sytue AI-körningen. Nya bilder bearbetas inte i bakgrunden för förslag eller likheter.",
   "album.coverSet": "Albumomslaget har uppdaterats",
+  "album.download": "Ladda ned album",
   "album.isCover": "Det här är albumomslaget",
   "album.linkCopied": "Länk kopierad",
   "album.newLink": "Ny länk",
@@ -257,6 +258,7 @@
   "public.count": "{count} foton",
   "public.notFound": "Den här länken är inte längre giltig.",
   "public.title": "Delat album",
+  "shortcuts.favorite": "Markera eller ta bort som favorit",
   "shortcuts.first": "Första bilden",
   "shortcuts.group.gallery": "Galleri",
   "shortcuts.group.viewer": "Visare",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Raderas i dag",
   "trash.restore": "Återställ",
+  "trash.restoreAll": "Återställ allt",
+  "trash.restoredAll": "Tillbaka bland dina foton: {count}",
   "trash.retention": {
     "one": "Foton som du tar bort från galleriet ligger kvar här i 1 dag och kan återställas fram till dess.",
     "other": "Foton som du tar bort från galleriet ligger kvar här i {count} dagar och kan återställas fram till dess."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Tekniska detaljer",
   "viewer.infoUploaded": "Uppladdat (inget EXIF-datum)",
   "viewer.next": "Nästa foto",
+  "viewer.openInDrive": "Visa originalet i Sytue Drive",
   "viewer.prev": "Föregående foto",
   "viewer.rotate": "Rotera 90°",
   "viewer.rotateFailed": "Fotot kunde inte roteras.",

@@ -770,4 +770,17 @@ export const cs: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Další výsledky se nepodařilo načíst. Zkuste to znovu.',
   'privacy.notice':
     'Vaše údaje neprodáváme ani je nepředáváme třetím stranám. Nepoužíváme je k profilování, k reklamě ani k trénování či vylepšování našich služeb nebo služeb kohokoli jiného. Jsou šifrované při přenosu i v klidu a naši evropskou infrastrukturu opouštějí jen v nezbytně nutném rozsahu kvůli fakturaci a v integracích, které si zapnete — v nich vás třetí strana požádá o souhlas s údaji, které použije.',
+  'inbox.markAllOf': 'Označit {app} jako přečtené',
+  'inbox.markUnread': 'Označit jako nepřečtené',
+  'inbox.muteLikeThis': 'Ztlumit podobná oznámení',
+  'inbox.mutedLikeThis':
+    'Taková oznámení už nedostanete. Změnit to můžete níže v části „Co chcete dostávat“.',
+  'inbox.muteFailed': 'Nepodařilo se je ztlumit. Zkuste to znovu.',
+  'inbox.actionsOf': 'Akce pro „{title}“',
+  'downloads.checksum': 'Ověřit stažení',
+  'downloads.checksumHelp':
+    'Jeho otisk SHA-256. Spočítejte otisk staženého souboru a ověřte, že se shodují.',
+  'downloads.checksumLabel': 'Otisk SHA-256',
+  'downloads.copyChecksum': 'Kopírovat otisk',
+  'downloads.checksumCopied': 'Otisk zkopírován',
 };

@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Exclude organization from the automatic Sytue AI batch",
   "aiBatch.excludedHint": "This organization is excluded from the automatic Sytue AI batch. New photos are not processed in the background for suggestions or similarity.",
   "album.coverSet": "Album cover updated",
+  "album.download": "Download album",
   "album.isCover": "This is the album cover",
   "album.linkCopied": "Link copied",
   "album.newLink": "New link",
@@ -257,6 +258,7 @@
   "public.count": "{count} photos",
   "public.notFound": "This link is no longer valid.",
   "public.title": "Shared album",
+  "shortcuts.favorite": "Mark or unmark as favourite",
   "shortcuts.first": "First photo",
   "shortcuts.group.gallery": "Gallery",
   "shortcuts.group.viewer": "Viewer",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Deleted today",
   "trash.restore": "Restore",
+  "trash.restoreAll": "Restore all",
+  "trash.restoredAll": "Back in your photos: {count}",
   "trash.retention": {
     "one": "Photos you remove from the gallery stay here for 1 day, and you can restore them until then.",
     "other": "Photos you remove from the gallery stay here for {count} days, and you can restore them until then."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Technical details",
   "viewer.infoUploaded": "Uploaded (no EXIF date)",
   "viewer.next": "Next photo",
+  "viewer.openInDrive": "See the original in Sytue Drive",
   "viewer.prev": "Previous photo",
   "viewer.rotate": "Rotate 90°",
   "viewer.rotateFailed": "The photo could not be rotated.",

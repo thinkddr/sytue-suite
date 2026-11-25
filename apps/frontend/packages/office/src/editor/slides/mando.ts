@@ -13,7 +13,7 @@
 import type { DocsKey } from '../../i18n/index';
 import type { EditorIconName } from '../icons';
 import { recordStep } from '../macros';
-import type { ConnectorKind, SlideShape, SlideSize, SmartArtLayout } from '../types';
+import type { ConnectorKind, Slide, SlideShape, SlideSize, SmartArtLayout } from '../types';
 
 /* ---------- Comandos de la pestaña InicioSlides / Insertar / Vista ---------- */
 
@@ -89,6 +89,16 @@ export function getSlidesSize(): SlideSize | undefined {
 /** El lienzo publica su tamaño al montarse y al cambiar; `undefined` al desmontarse. */
 export function publicarTamano(size: SlideSize | undefined): void {
   slidesSizeSnapshot = size;
+}
+
+/** Las diapositivas del lienzo montado (sus notas, para «Descargar las notas del orador»
+ *  del menú Archivo, que no ve el modelo). Vacío sin lienzo. ponytail: variable de módulo. */
+let slidesSnapshot: readonly Slide[] = [];
+export function getDiapositivas(): readonly Slide[] {
+  return slidesSnapshot;
+}
+export function publicarDiapositivas(slides: readonly Slide[]): void {
+  slidesSnapshot = slides;
 }
 
 /** Los diseños vigentes (id y nombre) para el selector «Disposición» del ribbon, que no ve

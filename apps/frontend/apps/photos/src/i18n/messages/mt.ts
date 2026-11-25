@@ -415,4 +415,9 @@ export const mt: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     "L-editjar isir f'dan l-apparat u jiġi ssejvjat kriptat bħala verżjoni ġdida tar-ritratt.",
   'gallery.encrypted.albumEmpty': "Dan l-album kriptat għad m'għandux ritratti.",
+  'shortcuts.favorite': 'Immarka jew neħħi minn favoriti',
+  'trash.restoreAll': 'Irrestawra kollox',
+  'trash.restoredAll': 'Lura fir-ritratti tiegħek: {count}',
+  'album.download': 'Niżżel l-album',
+  'viewer.openInDrive': 'Ara l-oriġinal f’Sytue Drive',
 };

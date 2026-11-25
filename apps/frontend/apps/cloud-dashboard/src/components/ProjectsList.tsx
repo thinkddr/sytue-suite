@@ -10,6 +10,7 @@ import {
   CardBody,
   Button,
   Input,
+  Select,
   Badge,
   Icon,
   EmptyState,
@@ -25,6 +26,7 @@ import { r } from '../lib/rutas.js';
 import { FRAMEWORK_NAME } from '../lib/nuevo-proyecto.js';
 import DemoBanner from './DemoBanner.js';
 import { contiene } from '@sytue/i18n';
+import { ordenarProyectos, type OrdenProyectos } from '../lib/proyectos.js';
 
 /** Nombres propios de framework; solo «estático» es una palabra que se traduce. */
 function frameworkLabel(t: T, fw: string): string {
@@ -73,6 +75,7 @@ function ProjectsInner({ projects: initial, live: initialLive, locale, error }: 
   const [projects] = useState(initial);
   const [live] = useState(initialLive);
   const [query, setQuery] = useState('');
+  const [orden, setOrden] = useState<OrdenProyectos>('recent');
   // `sytue:app-ready`: la lista llega con sus proyectos del servidor; pintada e
   // hidratada, la app está lista. Lo que se presupuesta en vez del LCP.
   useEffect(() => marcarAppLista(), []);
@@ -92,9 +95,10 @@ function ProjectsInner({ projects: initial, live: initialLive, locale, error }: 
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => contiene(p.name, q) || contiene(p.repo, q));
-  }, [projects, query]);
+    const base = q ? projects.filter((p) => contiene(p.name, q) || contiene(p.repo, q)) : projects;
+    return ordenarProyectos(base, orden, locale);
+  }, [projects, query, orden, locale]);
+  const pausados = useMemo(() => projects.filter((p) => p.paused).length, [projects]);
 
   return (
     <>
@@ -117,6 +121,23 @@ function ProjectsInner({ projects: initial, live: initialLive, locale, error }: 
               // que cupiera echaba los dos botones fuera de la pantalla.
               class="w-64 min-w-0"
             />
+            {/* Con una docena de proyectos el orden de alta deja de servir para
+                encontrar nada; «pausados primero» es el repaso de lo que se apagó
+                y sigue reservando dominio y base de datos. */}
+            {projects.length > 1 ? (
+              <Select
+                value={orden}
+                class="w-48 shrink-0"
+                aria-label={t('projects.sort.label')}
+                onChange={(e) => setOrden(e.currentTarget.value as OrdenProyectos)}
+              >
+                <option value="recent">{t('projects.sort.recent')}</option>
+                <option value="name">{t('projects.sort.name')}</option>
+                {pausados > 0 ? (
+                  <option value="paused">{t('projects.sort.paused', { count: pausados })}</option>
+                ) : null}
+              </Select>
+            ) : null}
             <Button
               variant="secondary"
               class="shrink-0 whitespace-nowrap"
@@ -215,6 +236,9 @@ function ProjectsInner({ projects: initial, live: initialLive, locale, error }: 
                       {p.productionUrl.replace('https://', '')}
                     </p>
                     <div class="mt-auto flex flex-wrap items-center gap-1.5">
+                      {/* Pausado se dice en la tarjeta: sin ello, un proyecto apagado
+                          parecía igual de vivo que los demás hasta abrirlo. */}
+                      {p.paused ? <Badge tone="warning">{t('pause.badge')}</Badge> : null}
                       <Badge tone="primary">{frameworkLabel(t, p.framework)}</Badge>
                       <Badge tone="neutral">{p.region}</Badge>
                       {p.services.map((s) => (

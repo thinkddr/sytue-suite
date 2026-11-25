@@ -384,10 +384,14 @@ export const mt: Catalog = {
   'import.fromGoogle': 'Ġibha minn Google',
   'import.fromMicrosoft': 'Ġibha minn Microsoft 365',
   'import.running': "Qed tiġi kkupjata d-data tiegħek… {count} oġġett s'issa.",
-  'import.done': '{count} oġġett miġjuba, {skipped} imħollija barra.',
+  'import.done': '{what}: {count} oġġett miġjuba, {skipped} imħollija barra. Intemmet: {date}.',
   'import.someFailed':
     "Parti mid-data tiegħek ma setgħetx tiġi kkupjata. L-amministrazzjoni tal-organizzazzjoni tista' tara għaliex.",
   'import.failed': "L-importazzjoni ma setgħetx tinbeda. Erġa' pprova ftit ieħor.",
+  'import.unavailable':
+    "Il-konnessjoni ma' {source} ma tistax tinqara bħalissa: skadiet, ġiet revokata jew qatt ma ġiet awtorizzata. Itlob lill-amministrazzjoni tal-organizzazzjoni biex terġa' tqabbadha.",
+  'import.needsAdmin':
+    "Il-konnessjoni ma' {source} għadha ma tistax tikkopja d-data ta' kull persuna. Itlob lill-amministrazzjoni tal-organizzazzjoni biex tlesti s-setup.",
   'dataflow.label': "X'jiġri mid-data",
   'dataflow.in.title': "Tidħol biss f'Sytue One",
   'dataflow.in.body':

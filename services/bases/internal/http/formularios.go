@@ -6,6 +6,7 @@ package baseshttp
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -67,6 +68,8 @@ func (h *Handlers) retoFormulario(w http.ResponseWriter, r *http.Request) {
 type envioFormulario struct {
 	Values map[string]json.RawMessage `json:"values"`
 	Altcha string                     `json:"altcha"`
+	// Today es el día de quien responde (AAAA-MM-DD), para los campos con defecto «hoy».
+	Today string `json:"today"`
 }
 
 func (h *Handlers) enviarFormulario(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +85,12 @@ func (h *Handlers) enviarFormulario(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("altcha_invalid"))
 		return
 	}
-	if err := h.Store.EnviarFormulario(r.Context(), token, in.Values); err != nil {
+	hoy, ok := hoyDe(url.Values{"today": {in.Today}})
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest)
+		return
+	}
+	if err := h.Store.EnviarFormularioEl(r.Context(), token, in.Values, hoy); err != nil {
 		httpx.Fail(w, r, errorAPI(err))
 		return
 	}

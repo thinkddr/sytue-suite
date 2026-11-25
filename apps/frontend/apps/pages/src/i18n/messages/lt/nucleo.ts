@@ -396,4 +396,36 @@ export const nucleo = {
 
   'forms.empty': 'Atsakymų dar nėra',
   'forms.empty_help': 'Kai kas nors pateiks formą jūsų svetainėje, pamatysite ją čia.',
+  'sites.search': 'Ieškoti svetainių',
+  'sites.search_empty': 'Nė viena svetainė neatitinka „{q}“.',
+  'sites.sort_label': 'Rikiuoti svetaines',
+  'sites.sort_recent': 'Neseniai redaguotos',
+  'sites.sort_name': 'Pavadinimas (A–Ž)',
+  'sites.view_live': 'Peržiūrėti svetainę',
+  'sites.view_live_aria': 'Peržiūrėti paskelbtą {nombre} (atsidaro naujame skirtuke)',
+  'seo.title': 'Ką matys paieškos sistemos',
+  'seo.intro':
+    'Juodraščio peržiūra: pavadinimai, aprašai ir paveikslėliai, nuo kurių priklauso paieškos sistemos ir ekrano skaitytuvai. Tai įspėjimai; jie netrukdo skelbti.',
+  'seo.open_editor': 'Atidaryti redaktorių',
+  'seo.recheck': 'Tikrinti dar kartą',
+  'seo.error': 'Peržiūros įkelti nepavyko. Bandykite dar kartą.',
+  'seo.all_good':
+    'Viskas gerai: kiekvienas puslapis turi pavadinimą ir aprašą, o paveikslėliai – alternatyvųjį tekstą.',
+  'seo.summary': 'Įspėjimai: {count}',
+  'seo.badge_warning': 'Pagerinti',
+  'seo.badge_info': 'Pastaba',
+  'seo.on_page': 'Puslapis: {page}',
+  'seo.title_missing': 'Puslapis neturi pavadinimo: paieškos sistema jį sugalvos pati.',
+  'seo.title_long':
+    'Pavadinime yra {count} simbolių; tilps apie 60, kol paieškos sistema jį sutrumpins.',
+  'seo.title_duplicate': 'Kitas puslapis turi tokį patį pavadinimą: rezultatuose jie konkuruos.',
+  'seo.description_missing':
+    'Puslapis neturi aprašo: paieškos sistema rodys atsitiktinę teksto ištrauką.',
+  'seo.description_long': 'Apraše yra {count} simbolių; rodoma apie 160.',
+  'seo.image_alt_missing':
+    'Paveikslėliai be alternatyviojo teksto: {count}. Ekrano skaitytuvai ir paieškos sistemos nežino, ką jie rodo; jei nieko nerodo, pažymėkite juos kaip dekoratyvius.',
+  'seo.page_noindex': 'Šis puslapis paslėptas nuo paieškos sistemų (noindex).',
+  'seo.site_noindex': 'Visa svetainė paslėpta nuo paieškos sistemų (noindex).',
+  'seo.share_image_missing':
+    'Svetainė neturi bendrinimo paveikslėlio: nuorodos žinutėse ir socialiniuose tinkluose bus rodomos be paveikslėlio.',
 };

@@ -382,9 +382,13 @@ export const et: Catalog = {
   'import.fromGoogle': "Too Google'ist",
   'import.fromMicrosoft': 'Too Microsoft 365-st',
   'import.running': 'Andmete kopeerimine… seni {count} üksust.',
-  'import.done': '{count} üksust toodud, {skipped} jäeti välja.',
+  'import.done': '{what}: {count} üksust toodud, {skipped} jäeti välja. Lõpetatud {date}.',
   'import.someFailed': 'Osa teie andmeid ei õnnestunud kopeerida. Administraator näeb, miks.',
   'import.failed': 'Importi ei õnnestunud käivitada. Proovige mõne hetke pärast uuesti.',
+  'import.unavailable':
+    'Ühendust teenusega {source} ei saa praegu lugeda: see on aegunud, tühistatud või pole seda kunagi volitatud. Paluge administraatoril see uuesti ühendada.',
+  'import.needsAdmin':
+    'Ühendus teenusega {source} ei saa veel iga inimese andmeid kopeerida. Paluge administraatoril seadistus lõpule viia.',
   'dataflow.label': 'Mis andmetega juhtub',
   'dataflow.in.title': 'Tuleb ainult teenusesse Sytue One',
   'dataflow.in.body':

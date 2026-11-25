@@ -964,4 +964,14 @@ export const da: AppCatalog<typeof en> = {
     'Det tidligere mailsystem er ikke længere tilgængeligt. Indtil du flytter din mail til boksen, modtager du ikke ny mail: det, der sendes til dig i mellemtiden, venter på afsenderens server, som prøver igen i nogle dage. Flytter du i tide, når det frem til dig bagefter; ellers får afsenderen besked om, at det ikke kunne leveres. Det, der allerede er krypteret med det tidligere system, ligesom den mail, du allerede havde, kan ikke læses: det slettes ikke, men ingen kan åbne det. Når du har flyttet, kommer din mail igen frem og åbnes med dit Sytue ID-login ligesom de andre apps.',
   'privateMail.vaultMoveCheckFailed':
     'Status for din mail kunne ikke kontrolleres. Prøv igen om et øjeblik.',
+  'shortcuts.goInbox': 'Gå til Indbakke',
+  'shortcuts.goSent': 'Gå til Sendt',
+  'shortcuts.goDrafts': 'Gå til Kladder',
+  'shortcuts.goArchive': 'Gå til Arkiv',
+  'compose.sendAndArchive': 'Send og arkivér',
+  'reader.copyAddress': 'Kopiér adressen',
+  'reader.addressCopied': 'Adressen er kopieret',
+  'reader.copyAddressFailed': 'Adressen kunne ikke kopieres',
+  'reader.viewPlain': 'Vis som ren tekst',
+  'reader.viewFormatted': 'Vis med formatering',
 };

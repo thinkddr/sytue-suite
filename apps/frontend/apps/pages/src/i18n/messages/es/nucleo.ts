@@ -383,4 +383,37 @@ export const nucleo = {
 
   'forms.empty': 'Todavía no hay respuestas',
   'forms.empty_help': 'Cuando alguien envíe un formulario de tu web, lo verás aquí.',
+  'sites.search': 'Buscar webs',
+  'sites.search_empty': 'Ninguna web coincide con «{q}».',
+  'sites.sort_label': 'Ordenar webs',
+  'sites.sort_recent': 'Editadas recientemente',
+  'sites.sort_name': 'Nombre (A–Z)',
+  'sites.view_live': 'Ver web',
+  'sites.view_live_aria': 'Ver {nombre} publicada (se abre en una pestaña nueva)',
+  'seo.title': 'Lo que verán los buscadores',
+  'seo.intro':
+    'Una revisión del borrador: títulos, descripciones e imágenes de los que dependen los buscadores y los lectores de pantalla. Son avisos; no impiden publicar.',
+  'seo.open_editor': 'Abrir el editor',
+  'seo.recheck': 'Volver a revisar',
+  'seo.error': 'No se ha podido cargar la revisión. Vuelve a intentarlo.',
+  'seo.all_good':
+    'Todo bien: cada página tiene su título y su descripción, y las imágenes tienen texto alternativo.',
+  'seo.summary': 'Avisos: {count}',
+  'seo.badge_warning': 'Mejorar',
+  'seo.badge_info': 'Nota',
+  'seo.on_page': 'Página: {page}',
+  'seo.title_missing': 'La página no tiene título: el buscador se inventará uno.',
+  'seo.title_long':
+    'El título tiene {count} caracteres; caben unos 60 antes de que el buscador lo corte.',
+  'seo.title_duplicate':
+    'Otra página tiene el mismo título: competirán entre sí en los resultados.',
+  'seo.description_missing':
+    'La página no tiene descripción: el buscador enseñará un trozo de texto cualquiera.',
+  'seo.description_long': 'La descripción tiene {count} caracteres; se enseñan unos 160.',
+  'seo.image_alt_missing':
+    'Imágenes sin texto alternativo: {count}. Ni los lectores de pantalla ni los buscadores saben qué muestran; márcalas como decorativas si no enseñan nada.',
+  'seo.page_noindex': 'Esta página está oculta a los buscadores (noindex).',
+  'seo.site_noindex': 'Todo el sitio está oculto a los buscadores (noindex).',
+  'seo.share_image_missing':
+    'El sitio no tiene imagen para compartir: los enlaces en mensajes y redes saldrán sin foto.',
 };

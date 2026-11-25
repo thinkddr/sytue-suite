@@ -1025,4 +1025,14 @@ export const en = {
     "The previous mail system is no longer available. Until you move your mail to the vault you will not receive new mail: anything sent to you in the meantime waits on the sender's server, which keeps retrying for a few days. If you move in time, it reaches you afterwards; if not, the sender is told it could not be delivered. Anything already encrypted with the previous system, like the mail you already had, cannot be read: it is not deleted, but nobody will be able to open it. Once you move, mail reaches you again and opens with your Sytue ID sign-in, like the rest of the apps.",
   'privateMail.vaultMoveCheckFailed':
     'The state of your mail could not be checked. Try again in a moment.',
+  'shortcuts.goInbox': 'Go to Inbox',
+  'shortcuts.goSent': 'Go to Sent',
+  'shortcuts.goDrafts': 'Go to Drafts',
+  'shortcuts.goArchive': 'Go to Archive',
+  'compose.sendAndArchive': 'Send and archive',
+  'reader.copyAddress': 'Copy address',
+  'reader.addressCopied': 'Address copied',
+  'reader.copyAddressFailed': 'The address could not be copied',
+  'reader.viewPlain': 'Show as plain text',
+  'reader.viewFormatted': 'Show with formatting',
 } satisfies Record<string, MessageEntry>;

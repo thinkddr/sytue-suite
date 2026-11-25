@@ -355,4 +355,8 @@ export const fi: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Poista julkiselta sivulta',
   'moderation.action.unpublish': 'Peru julkaisu',
   'moderation.action.block': 'Estä henkilö organisaatiossa',
+  'player.loop': 'Toista uudelleen',
+  'watch.chapters': 'Luvut',
+  'watch.jumpTo': 'Siirry kohtaan {time}',
+  'share.startAt': 'Aloita kohdasta {time}',
 };

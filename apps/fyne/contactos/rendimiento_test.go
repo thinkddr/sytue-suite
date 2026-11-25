@@ -39,7 +39,7 @@ func appDeBanco(b testing.TB, n int) (*App, fyne.Window) {
 			Emails:        []api.ContactEmail{{Email: fmt.Sprintf("c%04d@sytue.eu", i)}},
 		}
 	}
-	a.todos = porInicial(cs, "es")
+	a.todos = porInicial(cs, "es", false)
 	libreta := api.AddressBook{ID: "l1", DisplayName: "Personal"}
 	a.Pantalla.Libretas, a.Pantalla.Activa = []api.AddressBook{libreta}, &libreta
 	a.Pantalla.Estado = ui.EstadoExito

@@ -140,6 +140,10 @@ type Bienvenida struct {
 	CargandoResumen bool
 	// Facturacion es la de los doce últimos meses, que va bajo los indicadores.
 	Facturacion FacturacionMensual
+	// Antiguedad es lo pendiente de cobro por tramos y BajoMinimo los productos que no
+	// llegan a su stock mínimo (cartera.go); nil, sin cargar o sin nada que enseñar.
+	Antiguedad *api.ERPAntiguedad
+	BajoMinimo []api.ERPProductoBajoMinimo
 	// Tareas son las propias de hoy o vencidas; SinJustificar, los movimientos del
 	// banco que esperan su factura.
 	Tareas, SinJustificar int
@@ -607,6 +611,11 @@ func (b *Bienvenida) resumen(v tema.Variante, ancho float32) (fyne.CanvasObject,
 	// a su `gap-3` de las cifras.
 	if o, alto := b.tarjetaFacturacion(v, ancho); o != nil {
 		p.add(o, alto, HuecoTarjetas)
+	}
+	// La antigüedad de lo pendiente y lo que falta en el almacén (cartera.go), a lo
+	// ancho de la rejilla y a su `gap-3`.
+	for _, c := range b.tarjetasCartera(v, ancho) {
+		p.add(c.o, c.alto, HuecoTarjetas)
 	}
 	return p.objeto()
 }

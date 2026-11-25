@@ -123,8 +123,8 @@ func TestLaCabeceraColocaSusControlesDondeProduccion(t *testing.T) {
 	casi(t, "y la ruta se centra en la línea de 32",
 		lay.Ruta.Position().Y, 11)
 
-	if len(lay.Acciones) != 3 {
-		t.Fatalf("la cabecera tiene %d acciones y en producción hay tres (buscador, Nuevo, Subir)", len(lay.Acciones))
+	if len(lay.Acciones) != 1 {
+		t.Fatalf("la cabecera tiene %d acciones y es el buscador: «Nuevo» y «Subir» son el «+» flotante", len(lay.Acciones))
 	}
 	buscador, conmutador := lay.Acciones[0], lay.Conmutador
 	casi(t, "el buscador mide 196 de ancho", buscador.Size().Width, 224)
@@ -183,18 +183,7 @@ func TestSinConexionApagaLasMutaciones(t *testing.T) {
 	if !e.SinRed() {
 		t.Fatal("la fase SinConexion no se reconoce como sin red")
 	}
-	cab := e.cabecera(tema.Claro)
-	c, _ := cab.(*fyne.Container)
-	lay, _ := c.Layout.(*CabeceraVista)
-	for i, o := range lay.Acciones[1:] {
-		b, ok := o.(*ui.Boton)
-		if !ok {
-			continue
-		}
-		if !b.Inerte {
-			t.Errorf("el botón %d (%q) sigue activo sin conexión", i+1, b.Texto)
-		}
-	}
+	// Subir y crear son el «+» flotante, que sin red no se pinta (TestNuevoFlota).
 	// Y la lista no ofrece casillas: marcar sin poder mover ni borrar no lleva a nada.
 	e.Fase = SinConexion
 	if e.Marcados() != 0 {

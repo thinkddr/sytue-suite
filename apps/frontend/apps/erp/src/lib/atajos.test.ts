@@ -23,6 +23,12 @@ describe('atajos del ERP', () => {
     expect(accionDeTecla({ key: 'Escape' })).toBe('cerrar');
   });
 
+  test('Ctrl+S y ⌘S guardan la ficha; la «s» suelta se escribe', () => {
+    expect(accionDeTecla({ key: 's', ctrlKey: true })).toBe('guardar');
+    expect(accionDeTecla({ key: 'S', metaKey: true })).toBe('guardar');
+    expect(accionDeTecla({ key: 's' })).toBeNull();
+  });
+
   test('lo que no es suyo sigue siendo del navegador', () => {
     // ⌘N abre una ventana y «k» suelta no es nada: no pueden colarse como atajos.
     expect(accionDeTecla({ key: 'n', metaKey: true })).toBeNull();
@@ -39,6 +45,7 @@ describe('atajos del ERP', () => {
       'Ir a cualquier área o lista',
       'Buscar en esta lista',
       'Nuevo registro en esta lista',
+      'Guardar la ficha abierta',
       'Cerrar «Ir a»',
       'Ver esta lista',
     ]);
@@ -65,6 +72,6 @@ describe('atajos del ERP', () => {
         for (const a of g.atajos) expect(a.descripcion).not.toContain('shortcuts.');
       }
     }
-    expect(gruposDeAtajos(useT('fr'))[1]?.atajos[1]?.teclas).toEqual(['Échap']);
+    expect(gruposDeAtajos(useT('fr'))[1]?.atajos[2]?.teclas).toEqual(['Échap']);
   });
 });

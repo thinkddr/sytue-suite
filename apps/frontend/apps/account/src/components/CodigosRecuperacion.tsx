@@ -15,7 +15,14 @@ import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { Button, Checkbox, Icon, copiarAlPortapapeles } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
-import { descargarTexto, nombreFicheroCodigos, textoCodigos } from '../lib/codigosRecuperacion.js';
+import {
+  ID_IMPRIMIBLE,
+  descargarTexto,
+  fechaLarga,
+  imprimirCodigos,
+  nombreFicheroCodigos,
+  textoCodigos,
+} from '../lib/codigosRecuperacion.js';
 
 export function CodigosRecuperacion({
   t,
@@ -54,16 +61,30 @@ export function CodigosRecuperacion({
     );
   }
 
+  // La fecha del papel, fijada al montar: la misma en pantalla que en el folio.
+  const [impresoEl] = useState(() => fechaLarga(ahora()));
+
   return (
     <div class="flex flex-col gap-4">
-      <ul
-        aria-label={t('security.codes.title')}
-        class="border-border bg-bg-subtle grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border p-3 font-mono text-sm"
-      >
-        {codigos.map((c) => (
-          <li key={c}>{c}</li>
-        ))}
-      </ul>
+      {/* Lo que sale en el papel: el título, la cuenta y la fecha, solo al imprimir
+          (`sytue-solo-print`), y la lista, que es la misma que se ve. Al pulsar
+          «Imprimir» la hoja de impresión de esta app esconde todo lo demás. */}
+      <div id={ID_IMPRIMIBLE} class="flex flex-col gap-2">
+        <div class="sytue-solo-print hidden">
+          <p class="text-lg font-semibold">{t('security.codes.file_title')}</p>
+          {cuenta && <p class="text-sm">{t('security.codes.file_account', { account: cuenta })}</p>}
+          <p class="text-sm">{t('security.codes.file_date', { date: impresoEl })}</p>
+        </div>
+        <ul
+          aria-label={t('security.codes.title')}
+          class="border-border bg-bg-subtle grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border p-3 font-mono text-sm"
+        >
+          {codigos.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+        <p class="sytue-solo-print hidden text-sm">{t('security.codes.file_note')}</p>
+      </div>
       <div class="flex flex-wrap gap-2">
         <Button
           variant="secondary"
@@ -78,6 +99,11 @@ export function CodigosRecuperacion({
           onClick={descargar}
         >
           {t('security.codes.download')}
+        </Button>
+        {/* Imprimirlos: lo que mucha gente hace con ellos de verdad, guardarlos en
+            papel lejos del ordenador. Solo los códigos, no la página entera. */}
+        <Button variant="secondary" onClick={() => imprimirCodigos()}>
+          {t('security.codes.print')}
         </Button>
       </div>
       {/* Siempre montada: una región `status` que nace con el texto dentro no la

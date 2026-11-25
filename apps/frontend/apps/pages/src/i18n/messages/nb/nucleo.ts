@@ -381,4 +381,36 @@ export const nucleo = {
 
   'forms.empty': 'Ingen svar ennå',
   'forms.empty_help': 'Når noen sender inn et skjema på nettstedet ditt, ser du det her.',
+  'sites.search': 'Søk etter nettsteder',
+  'sites.search_empty': 'Ingen nettsteder samsvarer med «{q}».',
+  'sites.sort_label': 'Sorter nettsteder',
+  'sites.sort_recent': 'Nylig redigert',
+  'sites.sort_name': 'Navn (A–Å)',
+  'sites.view_live': 'Se nettstedet',
+  'sites.view_live_aria': 'Se publisert {nombre} (åpnes i ny fane)',
+  'seo.title': 'Det søkemotorene vil se',
+  'seo.intro':
+    'En gjennomgang av utkastet: titler, beskrivelser og bilder som søkemotorer og skjermlesere er avhengige av. Dette er advarsler; de hindrer ikke publisering.',
+  'seo.open_editor': 'Åpne redigeringsverktøyet',
+  'seo.recheck': 'Sjekk på nytt',
+  'seo.error': 'Gjennomgangen kunne ikke lastes inn. Prøv igjen.',
+  'seo.all_good':
+    'Alt i orden: hver side har tittel og beskrivelse, og bildene har alternativ tekst.',
+  'seo.summary': 'Advarsler: {count}',
+  'seo.badge_warning': 'Forbedre',
+  'seo.badge_info': 'Merk',
+  'seo.on_page': 'Side: {page}',
+  'seo.title_missing': 'Siden har ingen tittel: søkemotoren finner på en.',
+  'seo.title_long': 'Tittelen har {count} tegn; omtrent 60 får plass før søkemotoren kutter den.',
+  'seo.title_duplicate':
+    'En annen side har samme tittel: de vil konkurrere med hverandre i resultatene.',
+  'seo.description_missing':
+    'Siden har ingen beskrivelse: søkemotoren viser et tilfeldig tekstutdrag.',
+  'seo.description_long': 'Beskrivelsen har {count} tegn; omtrent 160 vises.',
+  'seo.image_alt_missing':
+    'Bilder uten alternativ tekst: {count}. Skjermlesere og søkemotorer vet ikke hva de viser; merk dem som dekorative hvis de ikke viser noe.',
+  'seo.page_noindex': 'Denne siden er skjult for søkemotorer (noindex).',
+  'seo.site_noindex': 'Hele nettstedet er skjult for søkemotorer (noindex).',
+  'seo.share_image_missing':
+    'Nettstedet har ikke noe delingsbilde: lenker i meldinger og sosiale medier vises uten bilde.',
 };

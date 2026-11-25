@@ -17,16 +17,32 @@ export interface Cumpleanos {
   dias: number;
   /** Los años que cumple, si el vCard trae el de nacimiento. */
   edad?: number;
+  /** Es un aniversario (ANNIVERSARY), no un cumpleaños: la lista lo dice. */
+  aniversario?: true;
 }
 
 // Con prefijo de grupo opcional (`item1.BDAY`, como lo escriben algunos clientes)
 // y sus parámetros aparte: la ficha leía antes el BDAY con `parseVcardDetails`,
 // que ya respetaba los grupos, y no debe dejar de enseñarlo por leerlo aquí.
 const BDAY = /^(?:[A-Za-z0-9-]+\.)?BDAY((?:;[^:]*)?):(.+)$/im;
+// El aniversario (vCard 4) se escribe con las mismas formas que el cumpleaños.
+const ANNIVERSARY = /^(?:[A-Za-z0-9-]+\.)?ANNIVERSARY((?:;[^:]*)?):(.+)$/im;
 
 /** Mes (1-12), día y, si lo hay, año de nacimiento; `null` si no hay BDAY legible. */
 export function cumpleanosDe(vcard: string): { mes: number; dia: number; anyo?: number } | null {
-  const m = BDAY.exec(vcard.replace(/\r?\n[ \t]/g, ''));
+  return fechaDe(vcard, BDAY);
+}
+
+/** Lo mismo con el ANNIVERSARY: una boda, el día que se conocieron. */
+export function aniversarioDe(vcard: string): { mes: number; dia: number; anyo?: number } | null {
+  return fechaDe(vcard, ANNIVERSARY);
+}
+
+function fechaDe(
+  vcard: string,
+  propiedad: RegExp,
+): { mes: number; dia: number; anyo?: number } | null {
+  const m = propiedad.exec(vcard.replace(/\r?\n[ \t]/g, ''));
   if (!m) return null;
   const v = (m[2] ?? '').trim();
   let r = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(v);
@@ -86,13 +102,28 @@ export function proximosCumpleanos(
   const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
   const out: Cumpleanos[] = [];
   for (const contact of contacts) {
-    const c = cumpleanosDe(contact.vcard);
-    if (!c) continue;
-    let fecha = new Date(inicio.getFullYear(), c.mes - 1, c.dia);
-    if (fecha < inicio) fecha = new Date(inicio.getFullYear() + 1, c.mes - 1, c.dia);
-    const dias = Math.round((fecha.getTime() - inicio.getTime()) / 86_400_000);
-    if (dias > ventana) continue;
-    out.push({ contact, fecha, dias, ...(c.anyo ? { edad: fecha.getFullYear() - c.anyo } : {}) });
+    // El cumpleaños y, si lo hay, el aniversario: los dos son «el día de alguien» que
+    // no se quiere olvidar, y la lista ya está para eso.
+    for (const [c, aniversario] of [
+      [cumpleanosDe(contact.vcard), false],
+      [aniversarioDe(contact.vcard), true],
+    ] as const) {
+      if (!c) continue;
+      let fecha = new Date(inicio.getFullYear(), c.mes - 1, c.dia);
+      if (fecha < inicio) fecha = new Date(inicio.getFullYear() + 1, c.mes - 1, c.dia);
+      const dias = Math.round((fecha.getTime() - inicio.getTime()) / 86_400_000);
+      if (dias > ventana) continue;
+      out.push({
+        contact,
+        fecha,
+        dias,
+        ...(aniversario
+          ? { aniversario: true as const }
+          : c.anyo
+            ? { edad: fecha.getFullYear() - c.anyo }
+            : {}),
+      });
+    }
   }
   return out.sort(
     (a, b) => a.dias - b.dias || a.contact.fullName.localeCompare(b.contact.fullName),

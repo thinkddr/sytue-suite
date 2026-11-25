@@ -56,6 +56,9 @@ const aviso = (id: string, extra: Partial<Notification> = {}): Notification => (
 function hubDoble(lista: Notification[], sinLeer: number, correo: number | null = null) {
   const flujos: FlujoDoble[] = [];
   const leidos: string[] = [];
+  const desleidos: string[] = [];
+  const origenesTodos: (string | undefined)[] = [];
+  let falloDesleer = false;
   let todos = 0;
   let cargas = 0;
   let pendientes = sinLeer;
@@ -72,10 +75,18 @@ function hubDoble(lista: Notification[], sinLeer: number, correo: number | null 
       if (filas.some((n) => n.id === id && !n.read)) pendientes = Math.max(0, pendientes - 1);
       filas = filas.map((n) => (n.id === id ? { ...n, read: true } : n));
     },
-    markAllRead: async () => {
+    markAllRead: async (source?: string) => {
       todos++;
-      pendientes = 0;
-      filas = filas.map((n) => ({ ...n, read: true }));
+      origenesTodos.push(source);
+      const toca = (n: Notification) => !source || n.source === source;
+      pendientes = filas.filter((n) => !toca(n) && !n.read).length;
+      filas = filas.map((n) => (toca(n) ? { ...n, read: true } : n));
+    },
+    markUnread: async (id: string) => {
+      if (falloDesleer) throw new Error('500');
+      desleidos.push(id);
+      if (filas.some((n) => n.id === id && n.read)) pendientes++;
+      filas = filas.map((n) => (n.id === id ? { ...n, read: false } : n));
     },
     streamNotifications: async () => {
       const f = new FlujoDoble();
@@ -104,7 +115,17 @@ function hubDoble(lista: Notification[], sinLeer: number, correo: number | null 
     filas = [n, ...filas];
     if (!n.read) pendientes++;
   };
-  return { hub, flujos, leidos, todos: () => todos, cargas: () => cargas, agregar };
+  return {
+    hub,
+    flujos,
+    leidos,
+    desleidos,
+    origenesTodos,
+    fallarDesleer: () => (falloDesleer = true),
+    todos: () => todos,
+    cargas: () => cargas,
+    agregar,
+  };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -1035,5 +1056,49 @@ describe('TIPOS_DE_AVISOS', () => {
     for (const f of filas) {
       if (!f.critico) for (const t of f.tipos) expect(TIPOS_CRITICOS.has(t)).toBe(false);
     }
+  });
+});
+
+describe('«no leído» y «marcar todas» de un producto (la bandeja del portal)', () => {
+  it('desleer devuelve uno a sin leer y lo pide al Hub; uno ya sin leer no se pide', async () => {
+    const d = hubDoble([aviso('a', { read: true }), aviso('b')], 1);
+    let e: EstadoAvisos | undefined;
+    const avisos = conectarAvisos(d.hub, (x) => (e = x), { limite: 30 });
+    await tick();
+    await avisos.desleer('a');
+    await tick();
+    expect(d.desleidos).toEqual(['a']);
+    expect(e?.items.find((n) => n.id === 'a')?.read).toBe(false);
+    expect(e?.sinLeer).toBe(2);
+    await avisos.desleer('b');
+    expect(d.desleidos).toEqual(['a']);
+    avisos.cerrar();
+  });
+
+  it('si el Hub no lo guarda, el aviso vuelve a leído', async () => {
+    const d = hubDoble([aviso('c', { read: true })], 0);
+    d.fallarDesleer();
+    let e: EstadoAvisos | undefined;
+    const avisos = conectarAvisos(d.hub, (x) => (e = x), { limite: 30 });
+    await tick();
+    await avisos.desleer('c');
+    await tick();
+    expect(e?.items.find((n) => n.id === 'c')?.read).toBe(true);
+    expect(e?.sinLeer).toBe(0);
+    avisos.cerrar();
+  });
+
+  it('con un producto, «marcar todas» solo apaga los suyos y se lo dice al Hub', async () => {
+    const d = hubDoble([aviso('a', { source: 'drive' }), aviso('m', { source: 'mail' })], 2);
+    let e: EstadoAvisos | undefined;
+    const avisos = conectarAvisos(d.hub, (x) => (e = x), { limite: 30 });
+    await tick();
+    await avisos.leerTodos('drive');
+    await tick();
+    expect(d.origenesTodos).toEqual(['drive']);
+    expect(e?.items.find((n) => n.id === 'a')?.read).toBe(true);
+    expect(e?.items.find((n) => n.id === 'm')?.read).toBe(false);
+    expect(e?.sinLeer).toBe(1);
+    avisos.cerrar();
   });
 });

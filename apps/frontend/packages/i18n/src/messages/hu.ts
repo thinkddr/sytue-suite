@@ -390,10 +390,14 @@ export const hu: Catalog = {
   'import.fromGoogle': 'Áthozás a Google-ből',
   'import.fromMicrosoft': 'Áthozás a Microsoft 365-ből',
   'import.running': 'Az adatok másolása folyik… eddig {count} elem.',
-  'import.done': '{count} elem áthozva, {skipped} kihagyva.',
+  'import.done': '{what}: {count} elem áthozva, {skipped} kihagyva. Befejezve: {date}.',
   'import.someFailed':
     'Az adatok egy részét nem sikerült átmásolni. A rendszergazda látja az okát.',
   'import.failed': 'Az importálást nem sikerült elindítani. Próbálja újra egy kicsit később.',
+  'import.unavailable':
+    'A(z) {source} kapcsolat most nem olvasható: lejárt, visszavonták, vagy sosem engedélyezték. Kérje meg a rendszergazdát, hogy kapcsolja újra.',
+  'import.needsAdmin':
+    'A(z) {source} kapcsolat még nem tudja átmásolni minden személy adatait. Kérje meg a rendszergazdát, hogy fejezze be a beállítást.',
   'dataflow.label': 'Mi történik az adatokkal',
   'dataflow.in.title': 'Csak a Sytue One szolgáltatásba érkezik',
   'dataflow.in.body':

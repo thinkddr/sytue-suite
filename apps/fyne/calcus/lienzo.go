@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
 
+	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -130,6 +131,17 @@ func NuevoLienzo(l *Libro) *Lienzo {
 	c.Rejilla.AlEditar = func() { c.sincronizar(); c.avisar() }
 	c.Rejilla.AlDeshacer = c.Deshacer
 	c.Rejilla.AlAtajos = c.MostrarAtajos
+	// Por el cromo si lo hay (graba la macro y repinta la cinta), como un botón.
+	c.Rejilla.AlMandar = func(cmd editor.Comando, valor string) {
+		if ctx := c.Rejilla.Contexto; ctx != nil {
+			ctx.Mandar(cmd, valor)
+			return
+		}
+		c.Mandar(cmd, valor)
+	}
+	c.Rejilla.AlHojaVecina = func(dir int) {
+		c.CambiarHoja(hojaVecina(c.Libro.Activa(), len(c.Libro.Hojas()), dir))
+	}
 	c.Rejilla.AlIrA = c.Barra.EnfocarCuadro
 	c.Barra.AlIrA = c.IrA
 	c.sug = nuevasSugerencias(c)

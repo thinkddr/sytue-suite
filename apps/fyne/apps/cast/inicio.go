@@ -44,12 +44,12 @@ type Inicio struct {
 
 // PantallaInicio monta «Inicio».
 func PantallaInicio(v Vista, d Inicio) *fyne.Container {
-	subir := ui.NuevoBoton(v.Traduce("nav.upload"), d.AlSubir).Con(ui.Primario, ui.TallaSM).ConIcono(iconos.Subir, iconos.TallaSM)
+	// «Subir» ya no va aquí: es el «+» flotante de la app, en todos los anchos.
 	emitir := ui.NuevoBoton(v.Traduce("nav.studio"), d.AlEmitir).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Emitir, iconos.TallaSM)
-	acciones := []fyne.CanvasObject{emitir, subir}
+	acciones := []fyne.CanvasObject{emitir}
 	if v.Estado == SinSesion || v.Ventana < ui.CorteSM {
-		// Sin sesión no hay nada que subir ni emitir: el botón es «Entrar». Y en un
-		// teléfono (`hidden sm:flex`) subir es el botón flotante y emitir, el menú.
+		// Sin sesión no hay nada que emitir: el botón es «Entrar». Y en un teléfono
+		// (`hidden sm:flex`) emitir es el menú.
 		acciones = nil
 	}
 	bloques := []ui.Bloque{{

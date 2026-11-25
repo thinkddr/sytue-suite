@@ -380,4 +380,9 @@ export const bg: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Редакцията се прави на това устройство и се запазва шифрована като нова версия на снимката.',
   'gallery.encrypted.albumEmpty': 'Този шифрован албум все още няма снимки.',
+  'shortcuts.favorite': 'Добави или махни от любими',
+  'trash.restoreAll': 'Възстанови всичко',
+  'trash.restoredAll': 'Върнати в снимките ви: {count}',
+  'album.download': 'Изтегли албума',
+  'viewer.openInDrive': 'Виж оригинала в Sytue Drive',
 };

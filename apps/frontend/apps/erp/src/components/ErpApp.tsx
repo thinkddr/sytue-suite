@@ -43,6 +43,7 @@ import {
   EmptyState,
   esAtajoDeApp,
   FILA_UNICA_EN_MOVIL,
+  haySuperposicionAbierta,
   Icon,
   InlineHelp,
   Kbd,
@@ -142,6 +143,8 @@ import { EstadoVerifactuFactura, TarjetaVerifactu } from './Verifactu.js';
 import { AsistenteImportarDesde } from './ImportarDesde.js';
 import { EnviarFactura } from './EnviarFactura.js';
 import { FacturacionMes } from './FacturacionMes.js';
+import { AntiguedadCartera, BajoMinimo, EstadoCuentaContacto } from './Cartera.js';
+import { diasVencida } from './vencimiento.js';
 
 export interface ErpAppProps {
   user: SytueUser;
@@ -567,7 +570,8 @@ function ErpAppInterna({
   useEffect(() => {
     const alPulsar = (ev: KeyboardEvent): void => {
       const accion = accionDeTecla(ev);
-      if (accion === 'paleta' || accion === 'cerrar') return;
+      // ⌘K y Escape son de la paleta; Ctrl+S, de la ficha abierta.
+      if (accion === 'paleta' || accion === 'cerrar' || accion === 'guardar') return;
       // Las teclas sueltas solo mandan si no se está escribiendo y no hay nada
       // flotando delante. `esAtajoDeApp` lo comprueba en un sitio para toda la
       // suite: sin ella, teclear «n» en el nombre de un cliente abriría una ficha
@@ -1267,6 +1271,11 @@ function ErpAppInterna({
                 onCambios={marcarFicha}
                 onCerrar={() => dejarFicha(() => setFicha(null))}
                 onConvertido={(r) => abrirRegistro(r.modelo, r.id)}
+                onAbrirRegistro={abrirRegistro}
+                etiquetaEstado={(clave, est) =>
+                  modelos.find((x) => x.clave === clave)?.estados?.find((e) => e.valor === est)
+                    ?.etiqueta ?? est
+                }
                 onDuplicar={(r) =>
                   dejarFicha(() => {
                     setSemilla(r);
@@ -1767,9 +1776,14 @@ export function Lista({
   const [vistaModo, setVistaModo] = useState<'tabla' | 'tarjetas'>('tabla');
   const [stats, setStats] = useState<EstadisticasModelo | null>(null);
 
+  // Con la búsqueda y el estado de la lista: el recuento y la suma de la barra cuentan
+  // lo que se ve. Antes sumaban el modelo entero, así que «Importe acumulado» bajo una
+  // lista filtrada por «Pagado» sumaba también lo pendiente.
   useEffect(() => {
     let montado = true;
-    api<EstadisticasModelo>(`${modelo.clave}/estadisticas`)
+    api<EstadisticasModelo>(
+      `${modelo.clave}/estadisticas${consulta({ q: busqueda || undefined, estado: estado || undefined })}`,
+    )
       .then((data) => {
         if (montado) setStats(data);
       })
@@ -1779,7 +1793,7 @@ export function Lista({
     return () => {
       montado = false;
     };
-  }, [modelo.clave, revision]);
+  }, [modelo.clave, revision, busqueda, estado]);
 
   const colDinero = useMemo(
     () => modelo.campos.find((c) => c.tipo === 'dinero' && modelo.lista.includes(c.clave)),
@@ -1974,7 +1988,7 @@ export function Lista({
             <h1 class="text-text sytue-h4">{modelo.etiqueta}</h1>
             <Badge tone="neutral">
               {stats
-                ? t('list.recordsLoaded', { count: stats.total })
+                ? t('list.recordsLoaded', { count: stats.filtrados ?? stats.total })
                 : t('list.recordsLoaded', { count: registros.length })}
             </Badge>
             {stats?.suma_dinero !== undefined && stats.suma_dinero > 0 ? (
@@ -2047,7 +2061,14 @@ export function Lista({
             title={t('list.exportCsv')}
             href={withBase(
               baseDeLaApp(),
-              `/api/${modelo.clave}/export${consulta({ q: busqueda, estado })}`,
+              // En el orden de la lista: quien ordena por importe y exporta espera el
+              // fichero en ese orden, no en el de alta.
+              `/api/${modelo.clave}/export${consulta({
+                q: busqueda,
+                estado,
+                orden: orden?.campo,
+                dir: orden?.asc === true ? 'asc' : undefined,
+              })}`,
             )}
           >
             <Icon name="download" size={14} class="sm:mr-1" />
@@ -2296,9 +2317,12 @@ export function Lista({
                     <span class="text-text-muted font-mono text-xs">{r.ref || '—'}</span>
                   </div>
                   {r.estado ? (
-                    <Badge tone={tonoDeEstado(r.estado)}>
-                      {modelo.estados?.find((e) => e.valor === r.estado)?.etiqueta ?? r.estado}
-                    </Badge>
+                    <span class="flex flex-wrap gap-1">
+                      <Badge tone={tonoDeEstado(r.estado)}>
+                        {modelo.estados?.find((e) => e.valor === r.estado)?.etiqueta ?? r.estado}
+                      </Badge>
+                      <InsigniaVencida r={r} t={t} />
+                    </span>
                   ) : null}
                 </div>
                 <h3 class="text-text mb-2 text-sm font-semibold">{nombreDe(r)}</h3>
@@ -2464,7 +2488,10 @@ export function Lista({
                           return (
                             <td key={col} class="px-3 py-2.5">
                               {etiqueta ? (
-                                <Badge tone={tonoDeEstado(r.estado)}>{etiqueta}</Badge>
+                                <span class="inline-flex flex-wrap gap-1">
+                                  <Badge tone={tonoDeEstado(r.estado)}>{etiqueta}</Badge>
+                                  <InsigniaVencida r={r} t={t} />
+                                </span>
                               ) : null}
                             </td>
                           );
@@ -2549,6 +2576,7 @@ export function Lista({
                           {modelo.estados?.find((e) => e.valor === r.estado)?.etiqueta ?? r.estado}
                         </Badge>
                       ) : null}
+                      <InsigniaVencida r={r} t={t} />
                     </span>
                     <span class="text-text-muted mt-1 flex flex-wrap gap-x-3 text-xs">
                       {modelo.lista
@@ -2592,6 +2620,20 @@ export function Lista({
       ) : null}
     </div>
   );
+}
+
+/**
+ * «Vencida · 12 d» junto al estado de una factura abierta cuyo vencimiento ya pasó
+ * (`vencimiento.ts`). Nada en la que no lo está: «Confirmado» decía lo mismo de la que
+ * vence mañana que de la que lleva tres meses sin cobrarse.
+ */
+export function InsigniaVencida({ r, t }: { r: Registro; t: Traducir }): JSX.Element | null {
+  const dias = diasVencida(r);
+  return dias > 0 ? (
+    <Badge tone="danger" data-vencida={dias}>
+      {t('due.overdue', { n: dias })}
+    </Badge>
+  ) : null;
 }
 
 function tonoDeEstado(estado?: string): 'success' | 'info' | 'danger' | 'neutral' {
@@ -2640,6 +2682,8 @@ export function Ficha({
   onConvertido,
   onGuardado,
   onInvalidar,
+  onAbrirRegistro,
+  etiquetaEstado,
   enPapelera,
   facturae,
   requisitos,
@@ -2670,6 +2714,10 @@ export function Ficha({
   onGuardado: () => void;
   /** El «Deshacer» del borrado: refresca el modelo sin cerrar la ficha que haya. */
   onInvalidar: (clave: string) => void;
+  /** Abre otro registro (una factura del estado de cuenta de un contacto). */
+  onAbrirRegistro?: (modelo: string, id: string) => void;
+  /** El nombre de un estado de otro modelo, en el idioma de quien mira. */
+  etiquetaEstado?: (modelo: string, estado: string) => string;
   t: Traducir;
 }): JSX.Element {
   const altas = useContext(AltasContext);
@@ -2712,6 +2760,8 @@ export function Ficha({
   // El diálogo de enviar la factura por correo, y cuántas han salido (refresca el
   // historial, donde queda apuntado el envío).
   const [enviarAbierto, setEnviarAbierto] = useState(false);
+  /** El diálogo de envío abierto como recordatorio de pago de una factura vencida. */
+  const [recordarAbierto, setRecordarAbierto] = useState(false);
   const [enviadas, setEnviadas] = useState(0);
   // Qué campo falló, para pintarlo DEBAJO de él. El 422 del servicio los trae
   // uno a uno; antes se aplastaban en una frase única arriba del formulario y
@@ -2779,6 +2829,18 @@ export function Ficha({
     cargarAsientos();
   }, [cargarAsientos]);
   const panel = useRef<HTMLFormElement | null>(null);
+  // Ctrl+S (⌘S) guarda la ficha, también con el cursor en un campo: es justo donde se
+  // pulsa. Sin esto el navegador ofrecía «Guardar página como…» y lo escrito seguía sin
+  // guardar. Con otra capa delante (un diálogo) la tecla es suya.
+  useEffect(() => {
+    const alPulsar = (ev: KeyboardEvent): void => {
+      if (accionDeTecla(ev) !== 'guardar' || haySuperposicionAbierta()) return;
+      ev.preventDefault();
+      if (!soloLectura && !enPapelera) panel.current?.requestSubmit();
+    };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, [soloLectura, enPapelera]);
 
   // El foco entra en el panel al abrirlo: sin esto, el teclado se queda en la
   // lista de detrás y Tab recorre lo que no se está mirando. Se busca el primer
@@ -2971,7 +3033,10 @@ export function Ficha({
               {registro ? nombreDe(registro) : `${t('action.new')} · ${modelo.etiqueta}`}
             </h2>
             {registro?.ref ? (
-              <p class="text-text-subtle font-mono text-xs">{registro.ref}</p>
+              <p class="text-text-subtle flex flex-wrap items-center gap-2 font-mono text-xs">
+                {registro.ref}
+                <InsigniaVencida r={registro} t={t} />
+              </p>
             ) : null}
           </div>
           {registro && modelo.cobro ? (
@@ -3014,12 +3079,43 @@ export function Ficha({
               <Icon name="mail" size={14} />
             </Button>
           ) : null}
+          {/* El recordatorio de pago, solo en una factura vencida: es el gesto de cobro
+              que faltaba, y apuntado en el historial como recordatorio. */}
+          {registro &&
+          modelo.clave === 'factura_venta' &&
+          !enPapelera &&
+          !soloLectura &&
+          diasVencida(registro) > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setRecordarAbierto(true)}
+            >
+              <Icon name="bell" size={14} class="mr-1" />
+              {t('remind.action')}
+            </Button>
+          ) : null}
           {enviarAbierto && registro ? (
             <EnviarFactura
               facturaId={registro.id}
               referencia={registro.ref || nombreDe(registro)}
               t={t}
               onCerrar={() => setEnviarAbierto(false)}
+              onEnviada={() => setEnviadas((n) => n + 1)}
+            />
+          ) : null}
+          {recordarAbierto && registro ? (
+            <EnviarFactura
+              facturaId={registro.id}
+              referencia={registro.ref || nombreDe(registro)}
+              t={t}
+              recordatorio={{
+                importe: formatearDinero(Number(registro.data['total'] ?? 0), locale),
+                vencimiento: formatearFecha(String(registro.data['vencimiento'] ?? ''), locale),
+              }}
+              onCerrar={() => setRecordarAbierto(false)}
               onEnviada={() => setEnviadas((n) => n + 1)}
             />
           ) : null}
@@ -3288,6 +3384,16 @@ export function Ficha({
               t={t}
             />
           </div>
+        ) : null}
+
+        {registro && modelo.clave === 'contacto' && !enPapelera ? (
+          <EstadoCuentaContacto
+            contactoId={registro.id}
+            locale={locale}
+            t={t}
+            etiquetaEstado={etiquetaEstado ?? ((_m, e) => e)}
+            {...(onAbrirRegistro ? { onAbrir: onAbrirRegistro } : {})}
+          />
         ) : null}
 
         {/* Panel de Trazabilidad y Auditoría (Estilo Odoo) */}
@@ -4008,6 +4114,10 @@ export function Bienvenida({
     () => todosLosModelos.some((m) => m.clave === 'factura_venta' && activos.includes(m.modulo)),
     [todosLosModelos, activos],
   );
+  const modeloActivo = (clave: string): boolean =>
+    todosLosModelos.some((m) => m.clave === clave && activos.includes(m.modulo));
+  const conInventario = modeloActivo('producto') && modeloActivo('existencia');
+  const modeloProducto = todosLosModelos.find((m) => m.clave === 'producto');
   const modelosRecientes = useMemo(
     () =>
       recientes
@@ -4299,6 +4409,24 @@ export function Bienvenida({
               ellas el servicio contestaría «fuente desconocida». */}
           {conFacturasVenta ? (
             <FacturacionMes locale={locale} t={t} class="min-w-0 sm:col-span-3" />
+          ) : null}
+          {/* Lo pendiente por antigüedad y lo que falta en el almacén (Cartera.tsx). Cada
+              una solo con sus modelos encendidos: sin ellos el servicio no tiene de dónde
+              contar. */}
+          {conFacturasVenta ? (
+            <AntiguedadCartera
+              locale={locale}
+              t={t}
+              conPagos={modeloActivo('factura_compra')}
+              class={cx('min-w-0', conInventario ? 'sm:col-span-2' : 'sm:col-span-3')}
+            />
+          ) : null}
+          {conInventario ? (
+            <BajoMinimo
+              t={t}
+              class={cx('min-w-0', conFacturasVenta ? '' : 'sm:col-span-3')}
+              {...(modeloProducto ? { onVerProductos: () => onAbrirModelo(modeloProducto) } : {})}
+            />
           ) : null}
         </div>
       </section>

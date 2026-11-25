@@ -483,4 +483,7 @@ type FormInbox struct {
 	Fields []ir.CampoFormulario `json:"fields"`
 	Notify []string             `json:"notify"`
 	Total  int                  `json:"total"`
+	// Unread son las respuestas sin marcar como leídas: el número que la bandeja
+	// enseña en la pestaña de cada formulario.
+	Unread int `json:"unread"`
 }

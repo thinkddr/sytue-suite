@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 )
 
@@ -157,5 +158,29 @@ func TestMailSummaryTraeCadaCuentaConSusCarpetas(t *testing.T) {
 	}
 	if len(items) != 2 || items[0].State != ExternalMailOK || !items[0].IsICloud() || items[0].Folders[0].Unread != 4 || items[1].State != ExternalMailReconnect {
 		t.Fatalf("resumen = %+v", items)
+	}
+}
+
+// TestAccountsFor: el selector de cuentas de Calendar, Contacts y Notes enseña cada
+// cuenta del proveedor una vez, con la conexión que abre ese servicio (o la ya abierta).
+func TestAccountsFor(t *testing.T) {
+	items := []ExternalMailAccount{
+		{InstanceID: "mail", Provider: "gmail", Address: "Ana@Gmail.com", Connected: true, Services: []string{"mail"}},
+		{InstanceID: "cal", Provider: "gmail", Address: "ana@gmail.com", Connected: true, Services: []string{"calendar"}},
+		{InstanceID: "otra", Provider: "gmail", Address: "luis@gmail.com", Connected: true},
+		{InstanceID: "ms", Provider: "microsoft", Address: "ana@gmail.com", Connected: true},
+	}
+	ids := func(as []ExternalMailAccount) []string {
+		out := make([]string, 0, len(as))
+		for _, a := range as {
+			out = append(out, a.InstanceID)
+		}
+		return out
+	}
+	if got := ids(AccountsFor(items, "calendar", "")); !slices.Equal(got, []string{"cal", "otra", "ms"}) {
+		t.Fatalf("cuentas = %v", got)
+	}
+	if got := ids(AccountsFor(items, "calendar", "mail")); !slices.Equal(got, []string{"mail", "otra", "ms"}) {
+		t.Fatalf("la ya abierta se queda: %v", got)
 	}
 }

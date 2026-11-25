@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -278,14 +279,23 @@ func (h *Handlers) renombrarCampo(w http.ResponseWriter, r *http.Request) {
 	}
 	// {"name": …} renombra; {"formula": …} cambia la expresión de un campo de fórmula;
 	// {"choices": […]} sustituye las opciones de un campo de selección.
+	// {"default": valor} fija el valor por defecto; {"default": null} lo quita. Un
+	// json.RawMessage distingue las dos cosas de no mandarlo: null llega como "null".
 	var in struct {
-		Name    string    `json:"name"`
-		Formula *string   `json:"formula"`
-		Choices *[]string `json:"choices"`
+		Name    string          `json:"name"`
+		Formula *string         `json:"formula"`
+		Choices *[]string       `json:"choices"`
+		Default json.RawMessage `json:"default"`
 	}
 	if err := httpx.DecodeJSON(w, r, &in); err != nil {
 		httpx.Fail(w, r, err)
 		return
+	}
+	if in.Default != nil {
+		if err := h.Store.CambiarDefecto(r.Context(), a, fid, in.Default); err != nil || (in.Name == "" && in.Formula == nil && in.Choices == nil) {
+			h.hecho(w, r, err)
+			return
+		}
 	}
 	if in.Choices != nil {
 		if err := h.Store.CambiarOpciones(r.Context(), a, fid, *in.Choices); err != nil || in.Name == "" {
@@ -345,25 +355,72 @@ func (h *Handlers) listarRegistros(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	vista := ""
-	if v := r.URL.Query().Get("view"); v != "" {
-		if vista, err = idDe(v); err != nil {
-			httpx.Fail(w, r, httpx.ErrNotFound)
-			return
-		}
-	}
-	limite, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	extra, ok := lecturaAdHoc(r.URL.Query())
+	vista, extra, ok := lecturaDe(r)
 	if !ok {
 		httpx.Fail(w, r, httpx.ErrBadRequest)
 		return
 	}
+	limite, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	p, err := h.Store.ListarRegistrosCon(r.Context(), a, tid, vista, limite, r.URL.Query().Get("cursor"), extra)
 	if err != nil {
 		httpx.Fail(w, r, errorAPI(err))
 		return
 	}
 	httpx.JSON(w, r, http.StatusOK, p)
+}
+
+// lecturaDe lee de la consulta lo que decide qué registros se leen: la vista (`view`,
+// un UUID) y lo del momento (`q`, `sort`, `today`). Lo comparten la rejilla, la
+// exportación y el resumen: si cada uno lo leyera a su modo, el pie sumaría una cosa y
+// la descarga traería otra.
+func lecturaDe(r *http.Request) (string, store.LecturaAdHoc, bool) {
+	vista := ""
+	if v := r.URL.Query().Get("view"); v != "" {
+		var err error
+		if vista, err = idDe(v); err != nil {
+			return "", store.LecturaAdHoc{}, false
+		}
+	}
+	extra, ok := lecturaAdHoc(r.URL.Query())
+	return vista, extra, ok
+}
+
+// resumir es el pie de la rejilla: cuántos registros pasan la vista y las cifras de
+// cada columna (store.Resumir).
+func (h *Handlers) resumir(w http.ResponseWriter, r *http.Request) {
+	a, err := actor(r)
+	tid, err2 := id(r, "tid")
+	if err = firstErr(err, err2); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	vista, extra, ok := lecturaDe(r)
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest)
+		return
+	}
+	res, err := h.Store.Resumir(r.Context(), a, tid, vista, extra)
+	if err != nil {
+		httpx.Fail(w, r, errorAPI(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, res)
+}
+
+// duplicarRegistro crea una copia de un registro en su tabla (store.DuplicarRegistro).
+func (h *Handlers) duplicarRegistro(w http.ResponseWriter, r *http.Request) {
+	a, err := actor(r)
+	rid, err2 := id(r, "rid")
+	if err = firstErr(err, err2); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	reg, err := h.Store.DuplicarRegistro(r.Context(), a, rid)
+	if err != nil {
+		httpx.Fail(w, r, errorAPI(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusCreated, reg)
 }
 
 // maxBusqueda y maxClavesOrden acotan lo que una lectura puede pedir de un momento.
@@ -379,6 +436,13 @@ func lecturaAdHoc(v url.Values) (store.LecturaAdHoc, bool) {
 	out := store.LecturaAdHoc{Search: strings.TrimSpace(v.Get("q"))}
 	if utf8.RuneCountInString(out.Search) > maxBusqueda {
 		return out, false
+	}
+	hoy, ok := diaDeQuienPide(v)
+	if !ok {
+		return out, false
+	}
+	if !hoy.IsZero() {
+		out.Today = hoy.Format(time.DateOnly)
 	}
 	s := strings.TrimSpace(v.Get("sort"))
 	if s == "" {
@@ -401,6 +465,38 @@ func lecturaAdHoc(v url.Values) (store.LecturaAdHoc, bool) {
 	return out, true
 }
 
+// maxDesfaseDia es cuánto puede separarse el día que dice quien pide del día del
+// servidor: los husos van de UTC−12 a UTC+14. Más que eso no es un huso, es otra fecha,
+// y una fecha que no es hoy no debe colarse como «hoy» en un alta ni en un filtro.
+const maxDesfaseDia = 36 * time.Hour
+
+// diaDeQuienPide lee `?today=AAAA-MM-DD`, el día de quien pide en su huso. Sin él, la
+// hora cero (y quien la use pone el del servidor). Mal formado o lejos de hoy, `ok` falso.
+func diaDeQuienPide(v url.Values) (time.Time, bool) {
+	s := strings.TrimSpace(v.Get("today"))
+	if s == "" {
+		return time.Time{}, true
+	}
+	d, err := time.Parse(time.DateOnly, s)
+	if err != nil {
+		return time.Time{}, false
+	}
+	desfase := time.Since(d.Add(12 * time.Hour)) // el mediodía de ese día, contra ahora
+	if desfase > maxDesfaseDia || desfase < -maxDesfaseDia {
+		return time.Time{}, false
+	}
+	return d, true
+}
+
+// hoyDe es el día de la petición: el que dice quien pide o, sin él, el del servidor.
+func hoyDe(v url.Values) (time.Time, bool) {
+	d, ok := diaDeQuienPide(v)
+	if ok && d.IsZero() {
+		d = time.Now()
+	}
+	return d, ok
+}
+
 func (h *Handlers) crearRegistro(w http.ResponseWriter, r *http.Request) {
 	a, err := actor(r)
 	tid, err2 := id(r, "tid")
@@ -408,12 +504,17 @@ func (h *Handlers) crearRegistro(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
+	hoy, ok := hoyDe(r.URL.Query())
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest)
+		return
+	}
 	var in entradaRegistro
 	if err := httpx.DecodeJSON(w, r, &in); err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
-	reg, err := h.Store.CrearRegistro(r.Context(), a, tid, in.Data, in.Links)
+	reg, err := h.Store.CrearRegistroEl(r.Context(), a, tid, in.Data, in.Links, hoy)
 	if err != nil {
 		httpx.Fail(w, r, errorAPI(err))
 		return
@@ -547,12 +648,18 @@ func (h *Handlers) exportar(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, errorAPI(domain.ErrInvalido))
 		return
 	}
+	// Lo que se ve: la vista, la búsqueda y el orden del momento (como `listarRegistros`).
+	vista, extra, ok := lecturaDe(r)
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest)
+		return
+	}
 	// Por tramos: la tabla no cabe en memoria (ya no tiene el techo de 50.000). La cabecera
 	// sale con el primero, así que un 403 o un 404 siguen siendo un estado y no un fichero.
 	// Una tabla grande no sale en los 30 s de escritura del servidor.
 	conPlazoDeTransferencia(w)
 	ex := exportador{w: w, formato: formato}
-	if err := h.Store.ExportarTabla(r.Context(), a, tid, ex.tramo); err != nil {
+	if err := h.Store.ExportarVista(r.Context(), a, tid, vista, extra, ex.tramo); err != nil {
 		if ex.campos == nil {
 			httpx.Fail(w, r, errorAPI(err))
 			return

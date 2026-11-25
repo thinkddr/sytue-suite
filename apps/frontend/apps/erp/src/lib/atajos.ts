@@ -15,7 +15,7 @@ import type { ErpMessageKey } from '../i18n/index.js';
 type T = (key: ErpMessageKey) => string;
 
 /** Lo que hace el ERP con una tecla. */
-export type AccionErp = 'paleta' | 'buscar' | 'nueva' | 'cerrar' | 'ayuda';
+export type AccionErp = 'paleta' | 'buscar' | 'nueva' | 'guardar' | 'cerrar' | 'ayuda';
 
 /** Una pulsación: `KeyboardEvent.key`, con Ctrl (⌘ en el Mac) o sin él. */
 interface Combinacion {
@@ -57,6 +57,14 @@ export const GRUPOS_ERP: { titulo: ErpMessageKey; atajos: AtajoErp[] }[] = [
         descripcion: 'shortcuts.new',
         accion: 'nueva',
         combinaciones: [{ key: 'n' }],
+      },
+      {
+        // Guardar la ficha abierta, también escribiendo en un campo (la atiende la
+        // propia ficha): el navegador ofrecía «Guardar página como…».
+        teclas: () => [atajoDelSistema('Ctrl+S')],
+        descripcion: 'shortcuts.save',
+        accion: 'guardar',
+        combinaciones: [{ key: 's', ctrl: true }],
       },
       {
         teclas: (t) => [t('shortcuts.key.esc')],

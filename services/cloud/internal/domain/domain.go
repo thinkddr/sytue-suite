@@ -48,6 +48,10 @@ var (
 	// ErrTooSoon: la misma acción se repitió antes de su intervalo mínimo (p. ej.
 	// «Comprobar ahora» un dominio). Se mapea a 429 con Retry-After.
 	ErrTooSoon = errors.New("cloud: demasiado pronto; espera unos segundos")
+	// ErrDeployFrozen: los despliegues de producción del proyecto están
+	// congelados (ver DeployFreeze). Se mapea a 409 con un código propio para que
+	// la interfaz diga POR QUÉ y no un «estado inválido» genérico.
+	ErrDeployFrozen = errors.New("cloud: los despliegues de producción están congelados")
 )
 
 // slugRe valida slugs DNS-compatibles (usados en subdominios de apps/previews).

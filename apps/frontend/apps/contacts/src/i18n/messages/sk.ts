@@ -376,4 +376,10 @@ export const sk: AppCatalog<typeof en> = {
   'relation.coworker': 'Kolega',
   'relation.emergency': 'Núdzový kontakt',
   'relation.other': 'Iný',
+  'batch.copyEmails': 'Kopírovať e-mailové adresy',
+  'batch.emailsCopied': 'E-mailové adresy skopírované',
+  'birthdays.anniversary': 'Výročie',
+  'list.sortByLastName': 'Zoradiť podľa priezviska',
+  'list.sortByFirstName': 'Zoradiť podľa mena',
+  'detail.shareByEmail': 'Zdieľať e-mailom',
 };

@@ -85,8 +85,20 @@ func Descartar(c fyne.Canvas) bool {
 	}
 	d, es := c.Overlays().Top().(Descartable)
 	if !es {
-		// Sin capa encima, un cajón abierto: Escape lo cierra (`useNavDrawer`).
-		if a := cajonDe(c); a != nil && c.Overlays().Top() == nil {
+		if c.Overlays().Top() != nil {
+			return false
+		}
+		// Sin capa encima, la cara de la suite desplegada del teléfono se pliega antes que
+		// nada: es lo último que se abrió y lo que tapa la barra de la app. Escape ya la
+		// plegaba en la web, pero aquí no la miraba nadie, y el «atrás» de Android mandaba
+		// la app al fondo con la suite abierta (en la web el «atrás» del navegador se iba de
+		// la página: los dos, `useMobileBack` en TopBar.tsx desde el 2026-11-25).
+		if b := barraSuiteDe(c); b != nil && b.suiteDesplegada() {
+			b.desplegar(false)
+			return true
+		}
+		// Un cajón abierto: Escape lo cierra (`useNavDrawer`).
+		if a := cajonDe(c); a != nil {
 			a.cerrarDesdeMando()
 			return true
 		}

@@ -371,4 +371,10 @@ export const de: AppCatalog<typeof en> = {
   'relation.coworker': 'Kollege/in',
   'relation.emergency': 'Notfall',
   'relation.other': 'Andere',
+  'batch.copyEmails': 'E-Mail-Adressen kopieren',
+  'batch.emailsCopied': 'E-Mail-Adressen kopiert',
+  'birthdays.anniversary': 'Jahrestag',
+  'list.sortByLastName': 'Nach Nachname sortieren',
+  'list.sortByFirstName': 'Nach Vorname sortieren',
+  'detail.shareByEmail': 'Per E-Mail teilen',
 };

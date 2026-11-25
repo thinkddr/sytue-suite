@@ -32,6 +32,7 @@ import type { CustomRole, CustomRoleMember, DirectoryUser } from '../lib/types.j
 import { useUserSearch } from '../lib/useUserSearch.js';
 import { PermissionChecklist } from './PermissionChecklist.js';
 import RoleWizard from './RoleWizard.js';
+import { useTGestion } from '../i18n/gestion/index.js';
 
 interface RolesPanelProps {
   /** Idioma negociado en el servidor; llega por props desde el `.astro`. */
@@ -66,6 +67,11 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
 
   // Alta guiada: sustituye la página entera, como el resto de asistentes de la consola.
   const [creatingRole, setCreatingRole] = useState(false);
+  // Al duplicar, el asistente arranca con el nombre y los permisos del original.
+  const [plantilla, setPlantilla] = useState<{ name: string; permissions: string[] } | undefined>(
+    undefined,
+  );
+  const tg = useTGestion(locale);
 
   // Detalle del rol seleccionado.
   const [selected, setSelected] = useState<CustomRole | null>(null);
@@ -265,6 +271,7 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
       <SettingsShell title={t('roles.create')} description={t('roles.wizard.description')}>
         <RoleWizard
           t={t}
+          initial={plantilla}
           onCreated={roleCreated}
           onAssign={(role) => {
             setCreatingRole(false);
@@ -286,7 +293,10 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
           variant="primary"
           leadingIcon={<Icon name="plus" size={16} />}
           disabled={!live}
-          onClick={() => setCreatingRole(true)}
+          onClick={() => {
+            setPlantilla(undefined);
+            setCreatingRole(true);
+          }}
         >
           {t('roles.create')}
         </Button>
@@ -331,7 +341,10 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
                       size="sm"
                       leadingIcon={<Icon name="plus" size={14} />}
                       disabled={!live}
-                      onClick={() => setCreatingRole(true)}
+                      onClick={() => {
+                        setPlantilla(undefined);
+                        setCreatingRole(true);
+                      }}
                     >
                       {t('roles.create')}
                     </Button>
@@ -534,6 +547,26 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
                 )}
               </div>
             ) : null}
+
+            {/* Duplicar: un rol «como Soporte pero sin facturación» empezaba marcando
+                a mano las mismas casillas, que es donde se cuela la que falta. */}
+            <div class="border-border flex flex-wrap items-center gap-2 border-t pt-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!live}
+                onClick={() => {
+                  setPlantilla({
+                    name: tg('gestion.roles.copia', { name: selected.name }),
+                    permissions: selected.permissions,
+                  });
+                  closeModal();
+                  setCreatingRole(true);
+                }}
+              >
+                {tg('gestion.roles.duplicar')}
+              </Button>
+            </div>
 
             <div class="border-border border-t pt-3">
               {confirmingDelete ? (

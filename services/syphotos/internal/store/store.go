@@ -518,6 +518,29 @@ func (s *Store) Restaurar(ctx context.Context, id uuid.UUID, duenyo string) erro
 	})
 }
 
+// RestaurarTodo saca de la papelera TODAS las fotos de esa persona en una sola
+// sentencia y dice cuántas. Es el «Restaurar todo» de la papelera: tras borrar una
+// carpeta entera por error, devolverlas una a una eran cientos de clics y cientos de
+// peticiones (docs/CONVENTIONS.md §13.3: un UPDATE, no N).
+//
+// Solo lo de quien llama: el `owner_sub` es la verja, como en Restaurar.
+func (s *Store) RestaurarTodo(ctx context.Context, duenyo string) (int64, error) {
+	var n int64
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		tenant, err := tenantDe(ctx)
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `
+			UPDATE assets SET deleted_at = NULL, updated_at = now()
+			WHERE tenant = $1 AND owner_sub = $2 AND deleted_at IS NOT NULL`,
+			tenant, duenyo)
+		n = tag.RowsAffected()
+		return err
+	})
+	return n, err
+}
+
 // MarcarFavorita pone o quita la marca de favorita.
 //
 // Devuelve `ErrNotFound` si la foto no es de esa persona o está en la papelera:

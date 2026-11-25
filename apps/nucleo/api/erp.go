@@ -180,7 +180,9 @@ func (e *ERP) ListarCon(ctx context.Context, modelo string, f ERPFiltro) (ERPPag
 // el modelo tiene importe, la suma en CÉNTIMOS. Es lo que lleva la cabecera de la lista y
 // los números de las píldoras, y no se puede contar en el cliente: la lista es una página.
 type ERPEstadisticas struct {
-	Total      int            `json:"total"`
+	Total int `json:"total"`
+	// Filtrados es lo que la lista enseña: la búsqueda y el estado pedidos (EstadisticasDe).
+	Filtrados  int            `json:"filtrados"`
 	PorEstado  map[string]int `json:"por_estado"`
 	SumaDinero int64          `json:"suma_dinero,omitempty"`
 }

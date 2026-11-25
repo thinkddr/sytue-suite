@@ -138,6 +138,10 @@ type dataStore interface {
 	CreateAlertPolicy(ctx context.Context, rec store.NewAlertPolicyRecord) (domain.AlertPolicy, error)
 	UpdateAlertPolicy(ctx context.Context, id uuid.UUID, upd store.UpdateAlertPolicyRecord) (domain.AlertPolicy, error)
 	ConfirmAlertPolicyByToken(ctx context.Context, tokenHash string) (domain.AlertPolicy, error)
+	// Congelación de producción (deployfreeze.go): el bool dice si la hay.
+	GetDeployFreeze(ctx context.Context, projectID uuid.UUID) (domain.DeployFreeze, bool, error)
+	SetDeployFreeze(ctx context.Context, projectID uuid.UUID, reason, by string) (domain.DeployFreeze, error)
+	ClearDeployFreeze(ctx context.Context, projectID uuid.UUID) (bool, error)
 }
 
 // Service es la fachada de aplicación de Sytue Cloud.
@@ -624,36 +628,7 @@ func (s *Service) Deploy(ctx context.Context, in DeployInput) (domain.Deployment
 	if err != nil {
 		return domain.Deployment{}, domain.Build{}, err
 	}
-
-	// Choke point de facturación: si el tenant tiene un tope de gasto y lo ha
-	// superado este mes, se rechaza el nuevo despliegue ANTES de encolar el build
-	// (o de crear el deployment BYO, que también consume cómputo). Tope nil = sin
-	// tope: WithinSpendLimit no consulta el uso (barato en el caso común).
-	within, err := s.WithinSpendLimit(ctx)
-	if err != nil {
-		return domain.Deployment{}, domain.Build{}, err
-	}
-	if !within {
-		return domain.Deployment{}, domain.Build{}, domain.ErrSpendLimitExceeded
-	}
-
-	// Requisito de suscripción: Sytue Cloud no se vende suelto. El plan Free exige
-	// al menos un puesto de la suite (Mail/Drive/Docs/Rooms). Se comprueba en el
-	// MISMO punto que el tope de gasto —justo antes de comprometer cómputo— para
-	// que no haya una puerta lateral que despliegue sin suscripción.
-	ok, err := s.MeetsSuiteRequirement(ctx)
-	if err != nil {
-		return domain.Deployment{}, domain.Build{}, err
-	}
-	if !ok {
-		return domain.Deployment{}, domain.Build{}, domain.ErrSuiteRequired
-	}
-
-	// Topes de cola (CLOUD-06): la cola de builds es una sola para todas las
-	// organizaciones, y cada preview pide su propio certificado a Let's Encrypt,
-	// cuyo límite semanal es del dominio entero. Una organización no puede
-	// llenar ninguna de las dos.
-	if err := s.checkQueue(ctx, in); err != nil {
+	if err := s.deployGates(ctx, in); err != nil {
 		return domain.Deployment{}, domain.Build{}, err
 	}
 
@@ -733,6 +708,50 @@ func (s *Service) Deploy(ctx context.Context, in DeployInput) (domain.Deployment
 		"commit": in.CommitSHA, "created_by": in.CreatedBy,
 	})
 	return dep, build, nil
+}
+
+// deployGates son las verjas de Deploy, en el orden en que se aplican, antes de
+// comprometer nada (ni build ni deployment). Viven juntas para que el orden se
+// lea de un vistazo: la primera que falla es la que se le explica a quien pulsa.
+func (s *Service) deployGates(ctx context.Context, in DeployInput) error {
+	// Producción congelada: la primera, antes que el gasto o la cola, porque es
+	// la respuesta más útil —«está parado a propósito»— y la única que no se
+	// arregla esperando. Las previews pasan: no cambian lo que ve el público.
+	if in.Target == domain.TargetProduction {
+		if err := s.checkProductionFreeze(ctx, in.ProjectID, deployOrigin(in)); err != nil {
+			return err
+		}
+	}
+
+	// Choke point de facturación: si el tenant tiene un tope de gasto y lo ha
+	// superado este mes, se rechaza el nuevo despliegue ANTES de encolar el build
+	// (o de crear el deployment BYO, que también consume cómputo). Tope nil = sin
+	// tope: WithinSpendLimit no consulta el uso (barato en el caso común).
+	within, err := s.WithinSpendLimit(ctx)
+	if err != nil {
+		return err
+	}
+	if !within {
+		return domain.ErrSpendLimitExceeded
+	}
+
+	// Requisito de suscripción: Sytue Cloud no se vende suelto. El plan Free exige
+	// al menos un puesto de la suite (Mail/Drive/Docs/Rooms). Se comprueba en el
+	// MISMO punto que el tope de gasto —justo antes de comprometer cómputo— para
+	// que no haya una puerta lateral que despliegue sin suscripción.
+	ok, err := s.MeetsSuiteRequirement(ctx)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return domain.ErrSuiteRequired
+	}
+
+	// Topes de cola (CLOUD-06): la cola de builds es una sola para todas las
+	// organizaciones, y cada preview pide su propio certificado a Let's Encrypt,
+	// cuyo límite semanal es del dominio entero. Una organización no puede
+	// llenar ninguna de las dos.
+	return s.checkQueue(ctx, in)
 }
 
 // checkQueue aplica los topes de cola de Deploy (CLOUD-06).
@@ -1011,6 +1030,12 @@ func (s *Service) PromotePreview(ctx context.Context, deploymentID uuid.UUID) (d
 	}
 	if src.Status != domain.DeployReady {
 		return domain.Deployment{}, fmt.Errorf("%w: la preview todavía no está lista", domain.ErrInvalidState)
+	}
+	// Publicar una preview ES un despliegue nuevo en producción, aunque no
+	// compile: con la producción congelada se para igual que un push. El
+	// rollback, en cambio, no pasa por aquí: es la salida de emergencia.
+	if err := s.checkProductionFreeze(ctx, src.ProjectID, "promote_preview"); err != nil {
+		return domain.Deployment{}, err
 	}
 	image, err := s.deployedImage(ctx, src)
 	if err != nil {

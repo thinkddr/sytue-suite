@@ -18,6 +18,9 @@ import type {
 } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import {
+  MAX_DIAS,
+  OPS_CON_DIAS,
+  OPS_SIN_VALOR,
   operadoresDe,
   borradorDeVista,
   camposDeFormulario,
@@ -131,17 +134,31 @@ export function DialogoVista(p: {
             <legend class="text-text mb-1 text-sm font-semibold">{p.t('view.formFields')}</legend>
             <p class="text-text-muted text-xs">{p.t('view.formFieldsHelp')}</p>
             {camposDeFormulario(p.campos).map((c) => (
-              <Checkbox
-                key={c.id}
-                label={c.name}
-                checked={b.campos.includes(c.id)}
-                onChange={(e) => {
-                  const marcado = e.currentTarget.checked;
-                  set({
-                    campos: marcado ? [...b.campos, c.id] : b.campos.filter((x) => x !== c.id),
-                  });
-                }}
-              />
+              // Cada campo, y a su lado si es obligatorio: solo se puede pedir lo que el
+              // formulario enseña, así que la segunda casilla se apaga sin la primera.
+              <div key={c.id} class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <Checkbox
+                  label={c.name}
+                  checked={b.campos.includes(c.id)}
+                  onChange={(e) => {
+                    const marcado = e.currentTarget.checked;
+                    set({
+                      campos: marcado ? [...b.campos, c.id] : b.campos.filter((x) => x !== c.id),
+                    });
+                  }}
+                />
+                <Checkbox
+                  label={p.t('view.required')}
+                  aria-label={`${p.t('view.required')} · ${c.name}`}
+                  disabled={!b.campos.includes(c.id)}
+                  checked={b.campos.includes(c.id) && (b.obligatorios ?? []).includes(c.id)}
+                  onChange={(e) => {
+                    const marcado = e.currentTarget.checked;
+                    const antes = (b.obligatorios ?? []).filter((x) => x !== c.id);
+                    set({ obligatorios: marcado ? [...antes, c.id] : antes });
+                  }}
+                />
+              </div>
             ))}
           </fieldset>
         ) : (
@@ -167,7 +184,16 @@ export function DialogoVista(p: {
                   <Select
                     aria-label={p.t('view.filterOp')}
                     value={b.filtroOp}
-                    onChange={(e) => set({ filtroOp: e.currentTarget.value })}
+                    onChange={(e) => {
+                      const op = e.currentTarget.value;
+                      // Pasar a «últimos N días» desde una fecha deja un valor que no es
+                      // un número: se propone 7 en vez de dejar el filtro sin guardar.
+                      set(
+                        OPS_CON_DIAS.includes(op) && !OPS_CON_DIAS.includes(b.filtroOp)
+                          ? { filtroOp: op, filtroValor: '7' }
+                          : { filtroOp: op },
+                      );
+                    }}
                   >
                     {operadoresDe(campoFiltro).map((op) => (
                       <option key={op} value={op}>
@@ -175,38 +201,47 @@ export function DialogoVista(p: {
                       </option>
                     ))}
                   </Select>
-                  {b.filtroOp !== 'empty' && b.filtroOp !== 'notempty' ? (
-                    campoFiltro.kind === 'select' || campoFiltro.kind === 'multiselect' ? (
-                      <Select
-                        aria-label={p.t('view.filterValue')}
-                        value={b.filtroValor}
-                        onChange={(e) => set({ filtroValor: e.currentTarget.value })}
-                      >
-                        <option value="" />
-                        {(campoFiltro.choices ?? []).map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
-                        ))}
-                      </Select>
-                    ) : campoFiltro.kind === 'checkbox' ? (
-                      <Select
-                        aria-label={p.t('view.filterValue')}
-                        value={b.filtroValor || 'true'}
-                        onChange={(e) => set({ filtroValor: e.currentTarget.value })}
-                      >
-                        <option value="true">{p.t('view.checked')}</option>
-                        <option value="false">{p.t('view.unchecked')}</option>
-                      </Select>
-                    ) : (
-                      <Input
-                        aria-label={p.t('view.filterValue')}
-                        type={campoFiltro.kind === 'date' ? 'date' : 'text'}
-                        value={b.filtroValor}
-                        onInput={(e) => set({ filtroValor: e.currentTarget.value })}
-                      />
-                    )
-                  ) : null}
+                  {OPS_SIN_VALOR.includes(b.filtroOp) ? null : OPS_CON_DIAS.includes(b.filtroOp) ? (
+                    <Input
+                      aria-label={p.t('view.days')}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={MAX_DIAS}
+                      class="w-24"
+                      value={b.filtroValor}
+                      onInput={(e) => set({ filtroValor: e.currentTarget.value })}
+                    />
+                  ) : campoFiltro.kind === 'select' || campoFiltro.kind === 'multiselect' ? (
+                    <Select
+                      aria-label={p.t('view.filterValue')}
+                      value={b.filtroValor}
+                      onChange={(e) => set({ filtroValor: e.currentTarget.value })}
+                    >
+                      <option value="" />
+                      {(campoFiltro.choices ?? []).map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : campoFiltro.kind === 'checkbox' ? (
+                    <Select
+                      aria-label={p.t('view.filterValue')}
+                      value={b.filtroValor || 'true'}
+                      onChange={(e) => set({ filtroValor: e.currentTarget.value })}
+                    >
+                      <option value="true">{p.t('view.checked')}</option>
+                      <option value="false">{p.t('view.unchecked')}</option>
+                    </Select>
+                  ) : (
+                    <Input
+                      aria-label={p.t('view.filterValue')}
+                      type={campoFiltro.kind === 'date' ? 'date' : 'text'}
+                      value={b.filtroValor}
+                      onInput={(e) => set({ filtroValor: e.currentTarget.value })}
+                    />
+                  )}
                 </div>
               ) : null}
             </fieldset>

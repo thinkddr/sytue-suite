@@ -369,4 +369,8 @@ export const hr: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Ukloni s javne stranice',
   'moderation.action.unpublish': 'Poništi objavu',
   'moderation.action.block': 'Blokiraj osobu u organizaciji',
+  'player.loop': 'Ponavljaj',
+  'watch.chapters': 'Poglavlja',
+  'watch.jumpTo': 'Idi na {time}',
+  'share.startAt': 'Počni od {time}',
 };

@@ -149,6 +149,8 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/notifications/prefs", h.ListNotificationPrefs)
 		api.Put("/notifications/prefs", h.SetNotificationPref)
 		api.Post("/notifications/{id}/read", h.MarkRead)
+		// Y el camino de vuelta: «Marcar como no leído» desde la bandeja.
+		api.Post("/notifications/{id}/unread", h.MarkUnread)
 		api.Post("/notifications/read_all", h.MarkAllRead)
 		// Stream SSE en tiempo real (sin timeout de petición: conexión larga).
 		api.Get("/notifications/stream", h.Stream)

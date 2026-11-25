@@ -182,6 +182,59 @@ func (a *App) descartar(r api.Reminder) {
 	})
 }
 
+// PosponerMinutos es lo que se ofrece al posponer: `POSPONER_MINUTOS` de la web.
+var PosponerMinutos = []int{5, 10, 30, 60}
+
+// alternarPosponer abre o cierra las opciones de «Posponer» de un recordatorio: una fila
+// a la vez, como en la web.
+func (a *App) alternarPosponer(r api.Reminder) {
+	if a.P.recPosponiendo == r.ID {
+		a.P.recPosponiendo = ""
+	} else {
+		a.P.recPosponiendo = r.ID
+	}
+	a.pintarPanelRecordatorios()
+	a.pintar()
+}
+
+// posponer es `snooze`: fuera de la lista ya y de los anunciados (al volver a vencer se
+// avisa otra vez, con el mismo id); el servicio lo rearma `minutos` después. Si falla,
+// se vuelve a sondear y reaparece.
+func (a *App) posponer(r api.Reminder, minutos int) {
+	a.P.recPosponiendo = ""
+	resto := a.P.Recordatorios[:0:0]
+	for _, x := range a.P.Recordatorios {
+		if x.ID != r.ID {
+			resto = append(resto, x)
+		}
+	}
+	a.P.Recordatorios = resto
+	prefs := fyne.CurrentApp().Preferences()
+	prefs.SetStringList(preferenciaAnunciados, slices.DeleteFunc(prefs.StringList(preferenciaAnunciados), func(id string) bool { return id == r.ID }))
+	a.pintarPanelRecordatorios()
+	a.pintar()
+	var vuelve time.Time
+	a.escribir(func(ctx context.Context) error {
+		var err error
+		vuelve, err = a.Cal.SnoozeReminder(ctx, r.ID, minutos)
+		return err
+	}, func(err error) {
+		if err != nil {
+			a.avisar(ui.AvisoPeligro, "toast.reminderSnoozeFailed")
+			// Una ronda suelta del sondeo (no otro bucle): lo devuelve a la lista.
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
+				defer parar()
+				lista, err := a.Cal.Reminders(ctx)
+				a.enUI(func() { a.llegaronRecordatorios(lista, err) })
+			})
+			return
+		}
+		titulo := a.P.t("reminders.snoozed", i18n.Vars{"time": i18n.FormatTimeDigits(a.P.locale(), vuelve.In(a.P.zona()))})
+		a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, titulo, ""))
+	})
+}
+
 // abrirRecordatorios despliega el panel colgando de la campana, pegado a su borde
 // derecho y acotado a la ventana.
 func (a *App) abrirRecordatorios(campana fyne.CanvasObject) {
@@ -265,7 +318,11 @@ func (p *Pantalla) listaRecordatorios(cargando, fallo bool, saltar, descartar fu
 	default:
 		filas := make([]fyne.CanvasObject, 0, len(lista))
 		for i, r := range lista {
-			filas = append(filas, p.nuevaFilaRecordatorio(r, i > 0, func() { saltar(r) }, func() { descartar(r) }))
+			f := p.nuevaFilaRecordatorio(r, i > 0, func() { saltar(r) }, func() { descartar(r) })
+			if p.alternarRec != nil && p.posponerRec != nil {
+				f.ponerPosponer(p, r, p.recPosponiendo == r.ID)
+			}
+			filas = append(filas, f)
 		}
 		col := container.New(ui.Columna{}, filas...)
 		_, d := desplazable(col)
@@ -335,11 +392,14 @@ type filaRecordatorio struct {
 	widget.BaseWidget
 	titulo, cuando *canvas.Text
 	aspa           *ui.Boton
-	filete         *canvas.Rectangle
-	fondo          *canvas.Rectangle
-	tituloTexto    string
-	alPulsar       func()
-	encima         bool
+	// reloj abre «Posponer»; opciones son sus botones, debajo del título (nil cerradas).
+	reloj       *ui.Boton
+	opciones    fyne.CanvasObject
+	filete      *canvas.Rectangle
+	fondo       *canvas.Rectangle
+	tituloTexto string
+	alPulsar    func()
+	encima      bool
 }
 
 var (
@@ -371,6 +431,27 @@ func (p *Pantalla) nuevaFilaRecordatorio(r api.Reminder, filete bool, saltar, de
 	return f
 }
 
+// ponerPosponer añade el reloj de «Posponer» y, abiertas, sus opciones: «5 min»,
+// «10 min», «30 min» y «1 h», con las etiquetas de duración de los ajustes.
+func (f *filaRecordatorio) ponerPosponer(p *Pantalla, r api.Reminder, abiertas bool) {
+	nombre := r.Summary
+	if nombre == "" {
+		nombre = p.t("reminders.eventFallback", nil)
+	}
+	f.reloj = ui.NuevoBoton("", func() { p.alternarRec(r) }).Con(ui.Fantasma, ui.TallaSM)
+	f.reloj.SoloIcono, f.reloj.Icono, f.reloj.TamIcono = true, iconos.Reloj, 16
+	f.reloj.Rotulo = p.t("reminders.snooze", i18n.Vars{"title": nombre})
+	if !abiertas {
+		return
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	hijos := []fyne.CanvasObject{ui.Texto(p.t("reminders.snoozeFor", nil), tema.TextoXS, ui.Normal, tema.Color("text-subtle", v))}
+	for _, m := range PosponerMinutos {
+		hijos = append(hijos, ui.NuevoBoton(p.etiquetaDuracion(m), func() { p.posponerRec(r, m) }).Con(ui.Secundario, ui.TallaSM))
+	}
+	f.opciones = container.New(ui.Fila{Hueco: tema.Espacio(1.5)}, hijos...)
+}
+
 func (f *filaRecordatorio) Tapped(*fyne.PointEvent) {
 	if f.alPulsar != nil {
 		f.alPulsar()
@@ -382,7 +463,11 @@ func (f *filaRecordatorio) MouseOut()                      { f.encima = false; f
 func (f *filaRecordatorio) AccessibilityLabel() string     { return f.tituloTexto }
 
 func (f *filaRecordatorio) MinSize() fyne.Size {
-	return fyne.NewSize(0, 2*espacio2p5+max(tema.TextoSM.Linea+tema.TextoXS.Linea, espacio0p5+f.aspa.MinSize().Height))
+	alto := 2*espacio2p5 + max(tema.TextoSM.Linea+tema.TextoXS.Linea, espacio0p5+f.aspa.MinSize().Height)
+	if f.opciones != nil {
+		alto += espacio2 + f.opciones.MinSize().Height
+	}
+	return fyne.NewSize(0, alto)
 }
 
 func (f *filaRecordatorio) CreateRenderer() fyne.WidgetRenderer {
@@ -395,7 +480,14 @@ type filaRecRenderer struct{ f *filaRecordatorio }
 
 func (r *filaRecRenderer) MinSize() fyne.Size { return r.f.MinSize() }
 func (r *filaRecRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.f.fondo, r.f.filete, r.f.titulo, r.f.cuando, r.f.aspa}
+	objs := []fyne.CanvasObject{r.f.fondo, r.f.filete, r.f.titulo, r.f.cuando, r.f.aspa}
+	if r.f.reloj != nil {
+		objs = append(objs, r.f.reloj)
+	}
+	if r.f.opciones != nil {
+		objs = append(objs, r.f.opciones)
+	}
+	return objs
 }
 func (r *filaRecRenderer) Destroy() {}
 
@@ -407,6 +499,18 @@ func (r *filaRecRenderer) Layout(t fyne.Size) {
 	f.aspa.Move(fyne.NewPos(t.Width-espacio3-a.Width, espacio2p5+espacio0p5))
 	f.aspa.Resize(a)
 	cabe := max(t.Width-2*espacio3-a.Width-espacio2, 0)
+	if f.reloj != nil {
+		// El reloj a la izquierda del aspa, con el mismo `gap-2`.
+		rl := f.reloj.MinSize()
+		f.reloj.Move(fyne.NewPos(t.Width-espacio3-a.Width-espacio2-rl.Width, espacio2p5+espacio0p5))
+		f.reloj.Resize(rl)
+		cabe = max(cabe-rl.Width-espacio2, 0)
+	}
+	if f.opciones != nil {
+		y := espacio2p5 + max(tema.TextoSM.Linea+tema.TextoXS.Linea, espacio0p5+a.Height) + espacio2
+		f.opciones.Move(fyne.NewPos(espacio3, y))
+		f.opciones.Resize(fyne.NewSize(max(t.Width-2*espacio3, 0), f.opciones.MinSize().Height))
+	}
 	ui.Truncar(f.titulo, f.tituloTexto, tema.TextoSM, ui.Medio, cabe)
 	ui.ColocarTexto(f.titulo, tema.TextoSM, espacio3, espacio2p5)
 	ui.ColocarTexto(f.cuando, tema.TextoXS, espacio3, espacio2p5+tema.TextoSM.Linea)

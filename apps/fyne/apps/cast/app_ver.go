@@ -657,11 +657,29 @@ func (a *App) datosCompartir() Compartir {
 	d := Compartir{
 		Video: vid, Enlace: a.enlace(), Copiado: a.ver.copiado,
 		AlCopiarEnlace: a.copiarEnlace, AlCopiarInsercion: a.copiarInsercion,
+		Momento: a.ver.momento, EnMomento: a.ver.enMomento,
 	}
 	if vid.Visibility == api.CastPublic || vid.Visibility == api.CastUnlisted {
 		d.Insercion = CodigoInsercion(d.Enlace, vid.ID, vid.Title)
 	}
+	if d.Momento >= time.Second {
+		d.Enlace = a.enlaceCompartido()
+		d.AlEnMomento = func(si bool) {
+			a.ver.enMomento = si
+			if dlg := a.ver.compartir; dlg != nil {
+				dlg.CambiarCuerpo(ui.AlAncho(anchoDialogo(a), CuerpoCompartir(a.v, a.datosCompartir())))
+			}
+		}
+	}
 	return d
+}
+
+// enlaceCompartido es el enlace del diálogo: con «?t=» si se marcó «Empezar en…».
+func (a *App) enlaceCompartido() string {
+	if a.ver.enMomento && a.ver.momento >= time.Second {
+		return EnlaceEn(a.enlace(), a.ver.momento)
+	}
+	return a.enlace()
 }
 
 // abrirCompartir abre el ShareDialog: el enlace y, si el vídeo es abierto, el código
@@ -671,6 +689,10 @@ func (a *App) abrirCompartir() {
 		return
 	}
 	a.ver.copiado = ""
+	a.ver.momento, a.ver.enMomento = 0, false
+	if r := a.deVer(); r != nil && a.ver.video.Status != api.CastStatusLive {
+		a.ver.momento = r.Posicion().Truncate(time.Second)
+	}
 	if a.w == nil {
 		return
 	}
@@ -705,7 +727,7 @@ func (a *App) copiarEnlace() {
 	if !a.puedeCompartir() {
 		return
 	}
-	a.ultimoEnlace = a.enlace()
+	a.ultimoEnlace = a.enlaceCompartido()
 	a.copiar(a.ultimoEnlace)
 }
 

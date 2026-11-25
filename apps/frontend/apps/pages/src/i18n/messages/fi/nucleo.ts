@@ -380,4 +380,35 @@ export const nucleo = {
 
   'forms.empty': 'Ei vielä vastauksia',
   'forms.empty_help': 'Kun joku lähettää lomakkeen verkkosivustollasi, näet sen täällä.',
+  'sites.search': 'Hae sivustoja',
+  'sites.search_empty': 'Mikään sivusto ei vastaa hakua ”{q}”.',
+  'sites.sort_label': 'Lajittele sivustot',
+  'sites.sort_recent': 'Viimeksi muokatut',
+  'sites.sort_name': 'Nimi (A–Ö)',
+  'sites.view_live': 'Näytä sivusto',
+  'sites.view_live_aria': 'Näytä julkaistu {nombre} (avautuu uuteen välilehteen)',
+  'seo.title': 'Mitä hakukoneet näkevät',
+  'seo.intro':
+    'Luonnoksen tarkistus: otsikot, kuvaukset ja kuvat, joista hakukoneet ja ruudunlukijat ovat riippuvaisia. Nämä ovat varoituksia; ne eivät estä julkaisemista.',
+  'seo.open_editor': 'Avaa editori',
+  'seo.recheck': 'Tarkista uudelleen',
+  'seo.error': 'Tarkistusta ei voitu ladata. Yritä uudelleen.',
+  'seo.all_good':
+    'Kaikki kunnossa: jokaisella sivulla on otsikko ja kuvaus, ja kuvilla on vaihtoehtoinen teksti.',
+  'seo.summary': 'Varoitukset: {count}',
+  'seo.badge_warning': 'Paranna',
+  'seo.badge_info': 'Huomio',
+  'seo.on_page': 'Sivu: {page}',
+  'seo.title_missing': 'Sivulla ei ole otsikkoa: hakukone keksii sen itse.',
+  'seo.title_long':
+    'Otsikossa on {count} merkkiä; noin 60 mahtuu ennen kuin hakukone lyhentää sen.',
+  'seo.title_duplicate': 'Toisella sivulla on sama otsikko: ne kilpailevat keskenään tuloksissa.',
+  'seo.description_missing': 'Sivulla ei ole kuvausta: hakukone näyttää satunnaisen tekstinpätkän.',
+  'seo.description_long': 'Kuvauksessa on {count} merkkiä; noin 160 näytetään.',
+  'seo.image_alt_missing':
+    'Kuvat ilman vaihtoehtoista tekstiä: {count}. Ruudunlukijat ja hakukoneet eivät tiedä, mitä ne esittävät; merkitse ne koristeellisiksi, jos ne eivät esitä mitään.',
+  'seo.page_noindex': 'Tämä sivu on piilotettu hakukoneilta (noindex).',
+  'seo.site_noindex': 'Koko sivusto on piilotettu hakukoneilta (noindex).',
+  'seo.share_image_missing':
+    'Sivustolla ei ole jakokuvaa: linkit viesteissä ja sosiaalisessa mediassa näkyvät ilman kuvaa.',
 };

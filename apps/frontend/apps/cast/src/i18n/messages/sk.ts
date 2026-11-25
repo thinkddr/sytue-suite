@@ -375,4 +375,8 @@ export const sk: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Odstrániť z verejnej stránky',
   'moderation.action.unpublish': 'Zrušiť zverejnenie',
   'moderation.action.block': 'Zablokovať osobu v organizácii',
+  'player.loop': 'Opakovať',
+  'watch.chapters': 'Kapitoly',
+  'watch.jumpTo': 'Prejsť na {time}',
+  'share.startAt': 'Začať v {time}',
 };

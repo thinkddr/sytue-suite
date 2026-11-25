@@ -25,6 +25,7 @@
     "./matrix": "./src/matrix.ts",
     "./base-path": "./src/base-path.ts",
     "./client-core": "./src/client-core.ts",
+    "./guardianes": "./src/guardianes.ts",
     "./session-owner": "./src/session-owner.ts"
   },
   "files": [

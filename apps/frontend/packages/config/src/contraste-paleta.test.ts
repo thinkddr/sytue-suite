@@ -41,6 +41,7 @@
  * `--sytue-sidebar-field` de la barra-carril del móvil.
  */
 import { expect, test } from 'bun:test';
+import { leerFuentes } from './guardianes.js';
 import { PALETA_DE_USUARIO } from './paleta-usuario.js';
 
 /** Una hoja de tokens, sin comentarios. */
@@ -732,8 +733,14 @@ test('cada app de la web encuentra su color por el prefijo bajo el que se sirve'
   const CASA = ['one', 'account'];
   const frontend = new URL('../../../apps/', import.meta.url);
   const sinColor: string[] = [];
-  for await (const fichero of new Bun.Glob('*/astro.config.*').scan(frontend.pathname)) {
-    const base = /base:\s*'\/([a-z]+)'/.exec(await Bun.file(frontend.pathname + fichero).text());
+  // Con el recorrido a cero, esto seguía en verde (medido el 2026-11-25, ver
+  // `guardianes.ts`): de 20 configuraciones, que salgan 10 como poco.
+  for (const [fichero, config] of await leerFuentes({
+    glob: '*/astro.config.*',
+    cwd: frontend,
+    minimo: 10,
+  })) {
+    const base = /base:\s*'\/([a-z]+)'/.exec(config);
     if (!base || CASA.includes(base[1]!)) continue;
     if (!hojas[0]!.includes(`[data-color='app'][data-app='${base[1]}']`)) sinColor.push(fichero);
   }

@@ -53,6 +53,12 @@ func TestElBotonFlotanteEsUnMasRedondoEnTodosLosAnchos(t *testing.T) {
 			r.fondo.CornerRadius, r.velo.CornerRadius)
 	}
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	// El driver de pruebas de Fyne da a CUALQUIER objeto el lienzo de la última ventana
+	// creada (`CanvasForObject` «hace trampa»). Con el orden barajado, la ventana de otra
+	// prueba con el cajón abierto ponía su velo sobre este botón suelto y el «primary»
+	// salía oscurecido (ci-desktop de v3.27.3, -test.shuffle 1795648395173060070). Una
+	// ventana vacía propia, la última, lo aísla.
+	test.NewTempWindow(t, container.NewWithoutLayout())
 	suelto := NuevoBotonFlotante("Crear evento", nil)
 	suelto.Resize(fyne.NewSize(56, 56))
 	img := pinta(t, 56, 56, suelto)

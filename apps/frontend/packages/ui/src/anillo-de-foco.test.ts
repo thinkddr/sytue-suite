@@ -11,6 +11,7 @@
  * tema oscuro sí pasa — que es lo que hace que el fallo sobreviva a mirarlo.
  * Ejecutar: `bun test`.
  */
+import { leerFuentes } from '@sytue/config/guardianes';
 import { describe, expect, test } from 'bun:test';
 
 const theme = await Bun.file(new URL('../../config/src/theme.css', import.meta.url)).text();
@@ -98,14 +99,15 @@ describe('las variantes nuevas', () => {
  * `peer-`/`group-focus-visible:` sí valen: pintan en OTRO nodo, que no tiene el foco.
  */
 test('nadie pinta el aro con una utilidad de sombra ni de anillo', async () => {
-  const raiz = new URL('../../../', import.meta.url).pathname; // apps/frontend/
-  const muerta = /(?<![\w-])(?:focus-visible|has-\[:focus-visible\]):(?:shadow-\[|ring-)/g;
-  const con: string[] = [];
-  const glob = new Bun.Glob('{apps,packages}/*/src/**/*.{ts,tsx,astro}');
-  for await (const rel of glob.scan({ cwd: raiz })) {
-    if (rel.includes('.test.')) continue;
-    if (muerta.test(await Bun.file(raiz + rel).text())) con.push(rel);
-    muerta.lastIndex = 0;
-  }
+  const muerta = /(?<![\w-])(?:focus-visible|has-\[:focus-visible\]):(?:shadow-\[|ring-)/;
+  // Con el recorrido a cero, este test seguía en verde (medido el 2026-11-25, ver
+  // `@sytue/config/guardianes`). Eran 3179 ficheros; el mínimo va muy por debajo.
+  const fuentes = await leerFuentes({
+    glob: '{apps,packages}/*/src/**/*.{ts,tsx,astro}',
+    cwd: new URL('../../../', import.meta.url), // apps/frontend/
+    minimo: 1500,
+    filtro: (rel) => !rel.includes('.test.'),
+  });
+  const con = fuentes.filter(([, texto]) => muerta.test(texto)).map(([rel]) => rel);
   expect(con).toEqual([]);
 });

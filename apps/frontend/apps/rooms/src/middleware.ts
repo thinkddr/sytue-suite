@@ -36,7 +36,7 @@ const sfuOrigen = (): string[] => {
 };
 
 // El servidor de Matrix (Synapse), al que habla el cliente de Matrix del navegador:
-// sin él en `connect-src`, la CSP cerrada del 22/10 bloqueaba su primera petición y el
+// sin él en `conectar`, la CSP cerrada del 22/10 bloqueaba su primera petición y el
 // cifrado de extremo a extremo no se podía configurar («No se pudo configurar el
 // cifrado»). La URL buena la da el servicio en el bootstrap; esta es la misma, la del
 // despliegue, y se puede cambiar con SYTUE_MATRIX_URL.

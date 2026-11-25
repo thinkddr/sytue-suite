@@ -309,28 +309,62 @@ verificar_perfil_grupo() { # <ruta> <App ID> <ios|macappstore|developerid> <grup
   python3 "$(dirname "${BASH_SOURCE[0]}")/apple_perfil.py" verificar "$@"
 }
 
+# codesign con --timestamp, reintentando SOLO cuando el servicio de sellos de tiempo
+# de Apple no contesta («A timestamp was expected but was not found»: release-desktop
+# 45693645649 se quedó en rojo por eso). Cualquier otro fallo de codesign sale a la
+# primera, con su salida.
+codesign_sellado() { # <argumentos de codesign…>
+  local salida intento
+  for intento in 1 2 3 4; do
+    if salida="$(codesign "$@" 2>&1)"; then
+      [ -z "$salida" ] || printf '%s\n' "$salida" >&2
+      return 0
+    fi
+    printf '%s\n' "$salida" >&2
+    case "$salida" in
+    *"A timestamp was expected but was not found"* | *"The timestamp service is not available"*) ;;
+    *) return 1 ;;
+    esac
+    [ "$intento" -lt 4 ] || return 1
+    echo "::warning::codesign sin sello de tiempo de Apple; reintento $intento de 3 en $((intento * 15)) s" >&2
+    sleep $((intento * 15))
+  done
+}
+
 # altool (ContentDelivery) se ha colgado 3 h 36 min sin escribir ni salir (41166113491,
 # sytue-diapos-macos-tienda.pkg). Se acota por grupo de procesos y solo se reintenta una
 # vez cuando vence el reloj, nunca ante un rechazo real de Apple.
 publicar_acotado() { # <ipa|pkg>
   local paquete="$1" limite="${SYTUE_APPLE_PUBLISH_TIMEOUT_SEC:-900}"
   python3 - "$limite" app-store-connect publish --path "$paquete" <<'PY'
-import os, signal, subprocess, sys
+import os, signal, subprocess, sys, tempfile
 limite = float(sys.argv[1])
 if limite <= 0:
     sys.exit(2)
 orden = sys.argv[2:]
 for intento in (1, 2):
-    proc = subprocess.Popen(orden, stdout=sys.stderr, stderr=sys.stderr, start_new_session=True)
-    try:
-        sys.exit(proc.wait(timeout=limite))
-    except subprocess.TimeoutExpired:
+    # A un fichero y luego a stderr: hace falta leerlo para distinguir «ese build ya
+    # está subido» (sale 3) de cualquier otro rechazo.
+    with tempfile.TemporaryFile("w+") as salida:
+        proc = subprocess.Popen(orden, stdout=salida, stderr=subprocess.STDOUT, start_new_session=True)
         try:
-            os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        proc.wait()
+            estado = proc.wait(timeout=limite)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.wait()
+            estado = None
+        salida.seek(0)
+        texto = salida.read()
+    sys.stderr.write(texto)
+    if estado is None:
         print(f"::warning::tiempo agotado ({limite:g}s) subiendo {orden[-1]} (intento {intento}/2)", file=sys.stderr)
+        continue
+    if estado != 0 and "ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE" in texto:
+        sys.exit(3)
+    sys.exit(estado)
 sys.exit(124)
 PY
 }
@@ -347,6 +381,12 @@ subir() {
     [ -f "$ipa" ] || mal "$ipa no existe"
     if publicar_acotado "$ipa"; then
       echo "✓ $ipa: en App Store Connect (TestFlight, pruebas internas)" >&2
+    elif [ "$?" = 3 ] && [ "${GITHUB_RUN_ATTEMPT:-1}" -gt 1 ] 2>/dev/null; then
+      # Un relanzamiento repite el número de build (el de la ejecución, ver
+      # empaquetar.sh) con el mismo commit: lo que el intento anterior ya subió
+      # vuelve como duplicado. Antes eso dejaba en rojo la release-desktop
+      # 45693645649 con las quince apps de iOS ya en TestFlight.
+      echo "✓ $ipa: ya estaba en App Store Connect (lo subió el intento anterior de esta ejecución)" >&2
     else
       fallidos="$fallidos $(basename "$ipa")"
     fi
@@ -426,7 +466,7 @@ notarizar() { # <dmg>...
   for dmg in "$@"; do
     # Los .app de dentro ya van firmados (empaquetar.sh, runtime endurecido); el .dmg
     # también, o `spctl -t open` no tiene firma primaria que mirar.
-    codesign -f -s "$SYTUE_MACOS_IDENTIDAD" --timestamp "$dmg" >&2
+    codesign_sellado -f -s "$SYTUE_MACOS_IDENTIDAD" --timestamp "$dmg" >&2
     if ! salida="$(xcrun notarytool submit "$dmg" --key "$clave/AuthKey.p8" \
       --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
       --wait --timeout 45m --output-format json 2>&1)"; then

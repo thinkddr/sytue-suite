@@ -22,23 +22,31 @@
  * y pegando `sytue-mobilebar` en Rooms (falla el primero).
  */
 import { expect, test } from 'bun:test';
+import { leerFuentes } from './guardianes.js';
 
 const RAIZ = new URL('../../../', import.meta.url);
-const FUENTES = ['apps/*/src/**/*.tsx', 'packages/*/src/**/*.tsx'];
+/**
+ * Con el recorrido a cero, el segundo test seguía en verde: solo lo salvaba que el
+ * primero espera ver `BarraMovil.tsx` (medido el 2026-11-25, ver `guardianes.ts`).
+ * Eran 426 y 175 `.tsx`; los mínimos van muy por debajo.
+ */
+const FUENTES = [
+  { glob: 'apps/*/src/**/*.tsx', minimo: 200 },
+  { glob: 'packages/*/src/**/*.tsx', minimo: 80 },
+];
 const esTest = (rel: string): boolean => /\.test\.tsx$|\/dev\/|\/test\//.test(rel);
 
-async function* fuentes(): AsyncGenerator<[string, string]> {
-  for (const patron of FUENTES) {
-    for await (const rel of new Bun.Glob(patron).scan({ cwd: RAIZ.pathname })) {
-      if (esTest(rel)) continue;
-      yield [rel, await Bun.file(new URL(rel, RAIZ)).text()];
-    }
+async function fuentes(): Promise<[string, string][]> {
+  const todas: [string, string][] = [];
+  for (const { glob, minimo } of FUENTES) {
+    todas.push(...(await leerFuentes({ glob, cwd: RAIZ, minimo, filtro: (r) => !esTest(r) })));
   }
+  return todas;
 }
 
 test('la barra de 44 solo la pinta BarraMovil', async () => {
   const pintan: string[] = [];
-  for await (const [rel, src] of fuentes()) {
+  for (const [rel, src] of await fuentes()) {
     if (src.includes("'sytue-mobilebar") || src.includes('"sytue-mobilebar')) pintan.push(rel);
   }
   expect(pintan).toEqual(['packages/ui/src/components/BarraMovil.tsx']);
@@ -46,7 +54,7 @@ test('la barra de 44 solo la pinta BarraMovil', async () => {
 
 test('ningún mando de cajón solo-móvil fuera de la barra única en una app con la Shell', async () => {
   const sueltos: string[] = [];
-  for await (const [rel, src] of fuentes()) {
+  for (const [rel, src] of await fuentes()) {
     if (!rel.startsWith('apps/') && !rel.startsWith('packages/office/')) continue;
     if (!src.includes('SytueShell') && !rel.startsWith('packages/office/')) continue;
     const lineas = src.split('\n');

@@ -10,5 +10,5 @@
   },
   "references": [{ "path": "../i18n/tsconfig.lib.json" }],
   "include": ["src/**/*.ts", "src/**/*.json"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/guardianes.ts"]
 }

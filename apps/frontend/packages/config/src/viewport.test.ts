@@ -1,14 +1,21 @@
 import { expect, test } from 'bun:test';
+import { leerFuentes } from './guardianes.js';
 import { APP_VIEWPORT } from './viewport.js';
 
 test('las apps de la suite usan el contrato común de viewport, sin extenderlo al sitio público', async () => {
   expect(APP_VIEWPORT).toContain('viewport-fit=cover');
   expect(APP_VIEWPORT).toContain('interactive-widget=resizes-content');
   expect(APP_VIEWPORT).not.toContain('user-scalable=no');
-  const frontend = new URL('../../../', import.meta.url).pathname;
-  for await (const ruta of new Bun.Glob('apps/*/src/layouts/*.astro').scan(frontend)) {
-    const fuente = await Bun.file(`${frontend}${ruta}`).text();
-    if (ruta.includes('/www/') || !fuente.includes('name="viewport"')) continue;
+  // Con el recorrido a cero, este test seguía en verde (medido el 2026-11-25, ver
+  // `guardianes.ts`): de 15 layouts de app, que salgan 8 como poco.
+  const layouts = await leerFuentes({
+    glob: 'apps/*/src/layouts/*.astro',
+    cwd: new URL('../../../', import.meta.url),
+    minimo: 8,
+    filtro: (ruta) => !ruta.includes('/www/'),
+  });
+  for (const [ruta, fuente] of layouts) {
+    if (!fuente.includes('name="viewport"')) continue;
     expect(fuente, ruta).toContain('content={APP_VIEWPORT}');
   }
   const office = await Bun.file(

@@ -12,6 +12,9 @@
 
 global:
   env: staging
+  # Los servicios hablan con PgBouncer por TLS y lo verifican (ver values.yaml).
+  pgbouncerTls:
+    enabled: true
   domain: staging.sytue.eu
   region: fr-par
   imageRegistry: rg.fr-par.scw.cloud/sytue-staging-platform

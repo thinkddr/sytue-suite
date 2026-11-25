@@ -28,5 +28,6 @@ func contactsPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client],
 	return cifrado.NewRecordApplicationPlan(ctx, resources, cifrado.RecordApplicationConfig[*privateContacts.Repository]{
 		Gateway: api.NewDrive(suite.URL("drive"), resources.HTTP(), nil), Source: source,
 		Service: api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil), New: privateContacts.New, Historical: privateContacts.NewHistoricalSource,
+		OnWrite: suite.AvisarEscritura,
 	})
 }

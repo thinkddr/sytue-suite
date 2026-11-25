@@ -238,6 +238,37 @@ export const ga: AppCatalog<typeof en> = {
     'Ní féidir an seoladh sin a úsáid: caithfidh sé a bheith bailí agus lasmuigh de Sytue.',
   'recovery.wrong_password': 'Níl an pasfhocal ceart.',
   'recovery.failed': 'Níorbh fhéidir é a shábháil. Bain triail eile as i gceann tamaill.',
+  'recovery.password.hint':
+    'Teastaíonn do phasfhocal reatha le haghaidh aon athrú ar an gcárta seo.',
+  'recovery.username.new': 'Ainm úsáideora nua',
+  'recovery.username.hint':
+    'Coinnítear an ceann a fhágann tú in áirithe duit ar feadh 30 lá, agus is féidir é a athrú uair amháin gach 30 lá.',
+  'recovery.username.change': 'Athraigh an t-ainm úsáideora',
+  'recovery.username.changed': 'Athraíodh an t-ainm úsáideora.',
+  'recovery.username.invalid':
+    'Níl an t-ainm úsáideora sin bailí: úsáid 3 go 64 litir, uimhir, ponc nó fleasc.',
+  'recovery.username.taken': 'Níl an t-ainm úsáideora sin ar fáil.',
+  'recovery.username.recent': 'D’athraigh tú d’ainm úsáideora níos lú ná 30 lá ó shin.',
+  'recovery.username.is_address':
+    'I gcuntas pearsanta is é d’ainm úsáideora do sheoladh Sytue, mar sin ní féidir é a athrú anseo.',
+  'recovery.phone.none':
+    'Níl uimhir fóin phóca agat fós: cuir ceann leis chun síniú isteach leis freisin.',
+  'recovery.phone.new': 'Uimhir fóin phóca nua',
+  'recovery.phone.format': 'Le cód na tíre, mar shampla +353 85 000 0000.',
+  'recovery.phone.send': 'Seol cód',
+  'recovery.phone.sent': 'Sheolamar cód i dteachtaireacht téacs chuig {phone}.',
+  'recovery.phone.code': 'Cód',
+  'recovery.phone.confirm': 'Deimhnigh',
+  'recovery.phone.changed': 'Sábháladh an uimhir fóin phóca.',
+  'recovery.phone.invalid': 'Níl an uimhir sin bailí: scríobh í le cód na tíre.',
+  'recovery.phone.same': 'Is í sin d’uimhir fóin phóca cheana féin.',
+  'recovery.phone.wait': 'Fan nóiméad sula n-iarrfaidh tú cód eile.',
+  'recovery.phone.limit': 'Iarradh an iomarca cód. Bain triail eile as ar ball.',
+  'recovery.phone.code_wrong': 'Níl an cód ceart.',
+  'recovery.phone.code_expired': 'Tá an cód imithe in éag. Iarr ceann eile.',
+  'recovery.phone.has_account': 'Baineann an uimhir fóin phóca sin le cuntas eile cheana.',
+  'recovery.phone.unavailable':
+    'Ní féidir teachtaireachtaí téacs a sheoladh faoi láthair. Bain triail eile as ar ball.',
   'delete.title': 'Scrios mo chuntas',
   'delete.hint':
     'Scriostar do shonraí logála isteach agus gach rud nach mbaineann ach leatsa; fanann an méid a bhaineann le d’eagraíocht inti. Is féidir an cuntas a aisghabháil ar feadh 30 lá.',

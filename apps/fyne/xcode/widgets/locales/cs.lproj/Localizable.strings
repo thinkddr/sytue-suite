@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nová poznámka";
 "widgets.newContact" = "Nový kontakt";
 "widgets.addPhotos" = "Přidat fotky";
+"widgets.newDocument" = "Nový dokument";
+"widgets.newSpreadsheet" = "Nová tabulka";
+"widgets.newPresentation" = "Nová prezentace";
+"widgets.openToUpdate" = "Aktualizuje se při otevřené aplikaci";
 "widgets.notes" = "Poznámky";
 "widgets.rows" = "Řádky";
 "widgets.pending" = "Čekající";

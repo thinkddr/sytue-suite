@@ -614,6 +614,31 @@ describe('relay', () => {
     expect(relay).not.toContain('e2e-confirm');
   });
 
+  test('a native app asks for the password in the same trip, and never stays stuck without the key', async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
+    const { f } = recorder();
+    const login = '/oauth2/authorize?prompt=login&sytue_unlock_typed=1';
+    const cfg = {
+      ...base,
+      hint: vectors.hint,
+      app_key: vectors.native.app_public,
+      web: false,
+      login,
+      auth_age: 3_600_000,
+    };
+    // No key in this browser: it used to go back empty and the app had to come back
+    // with `prompt=login`. Now the password is asked for here, once.
+    const r = await e2e.relay(cfg, { fetch: f, now: () => now });
+    expect(r).toEqual({ unlocked: false, blob: '' });
+    expect(e2e.relayOutcome(cfg, r)).toBe('login');
+    // Still without it after typing (or just signed in): back to the app, not a dead end.
+    expect(e2e.relayOutcome({ ...cfg, typed: true }, r)).toBe('go');
+    expect(e2e.relayOutcome({ ...cfg, auth_age: 5_000 }, r)).toBe('go');
+    expect(e2e.relayOutcome({ ...cfg, login: '' }, r)).toBe('go');
+    // With the key here, it goes straight back with it.
+    expect(e2e.relayOutcome(cfg, { unlocked: true, blob: 'x' })).toBe('go');
+  });
+
   test('after a password change, the browser that holds the key re-wraps it with the new password', async () => {
     const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
     const otherKEK = await e2e.passwordKEK('una contraseña nueva', passwordKDF);

@@ -280,6 +280,7 @@ export const pl: AppCatalog<typeof en> = {
     other: 'Możesz dodać maksymalnie {count} osoby.',
   },
   'dm.openFailed': 'Nie udało się otworzyć rozmowy.',
+  'dm.externalClosed': 'Twoja organizacja nie pozwala na rozmowy z tą osobą.',
   'people.search': 'Szukaj „{query}” w Sytue One',
   'people.searching': 'Wyszukiwanie w Sytue One…',
   'people.notFound': 'Nikt w Sytue One nie używa tego adresu e-mail ani @nazwy użytkownika.',

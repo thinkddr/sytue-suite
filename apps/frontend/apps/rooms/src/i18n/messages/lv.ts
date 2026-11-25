@@ -269,6 +269,7 @@ export const lv: AppCatalog<typeof en> = {
     other: 'Varat pievienot ne vairāk kā {count} personas.',
   },
   'dm.openFailed': 'Sarunu neizdevās atvērt.',
+  'dm.externalClosed': 'Jūsu organizācija neatļauj sarunas ar šo personu.',
   'people.search': 'Meklēt “{query}” Sytue One',
   'people.searching': 'Notiek meklēšana Sytue One…',
   'people.notFound': 'Neviens Sytue One konts neizmanto šo e-pastu vai @lietotājvārdu.',

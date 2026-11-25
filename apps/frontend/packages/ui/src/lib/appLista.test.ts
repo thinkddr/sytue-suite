@@ -60,3 +60,26 @@ test('every app behind the vault gate marks `sytue:app-ready`', () => {
   expect(raices.length).toBeGreaterThan(10);
   expect(sinMarca.map((dir) => dir.slice(raiz.length + 1))).toEqual([]);
 });
+
+/**
+ * Y las páginas SECUNDARIAS de esas apps, que montan su propia isla: sin la marca, en
+ * ellas la bóveda esperaba los 5 s (los dispositivos y los datos del portal, los álbumes
+ * de Photos, el detalle de una base y el estudio de PDF de CertiPDF, medido el
+ * 2026-11-24). VISTO EN ROJO con las siete sin `marcarAppLista`.
+ */
+test('the secondary pages behind the vault gate mark `sytue:app-ready` too', () => {
+  const raiz = join(import.meta.dir, '../../../..');
+  const paginas = [
+    'apps/portal/src/components/ConnectDevices.tsx', // /dispositivos
+    'apps/portal/src/components/TusDatos.tsx', // /datos
+    'apps/photos/src/components/Albums.tsx', // /albums
+    'apps/photos/src/components/AlbumView.tsx', // /album
+    'apps/bases/src/islands/BaseApp.tsx', // /base/[id]
+    'packages/office/src/pdf/PdfApp.tsx', // /pdf?path= de CertiPDF
+    'packages/office/src/pdf/EstudioBoveda.tsx', // /pdf?path= con el Drive en la bóveda
+  ];
+  const sinMarca = paginas.filter(
+    (f) => !readFileSync(join(raiz, f), 'utf8').includes('marcarAppLista('),
+  );
+  expect(sinMarca).toEqual([]);
+});

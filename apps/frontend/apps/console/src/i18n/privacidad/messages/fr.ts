@@ -1,0 +1,97 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * El registro de solicitudes RGPD y la supresión física de una cuenta: traducción
+ * del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const fr: AppCatalog<typeof en> = {
+  'privacidad.titulo': 'Demandes relatives aux données',
+  'privacidad.descripcion':
+    "Ce que les personnes demandent à votre organisation au sujet de leurs données personnelles (RGPD, articles 15 à 21). Enregistrez chaque demande, répondez sous un mois et, s'il s'agit d'un effacement, exécutez-le ici.",
+  'privacidad.registrar': 'Enregistrer une demande',
+  'privacidad.filtro': 'Afficher',
+  'privacidad.filtro.abiertas': 'Ouvertes',
+  'privacidad.filtro.vencidas': 'En retard',
+  'privacidad.filtro.todas': 'Toutes',
+  'privacidad.resumen.abiertas': 'Demandes ouvertes',
+  'privacidad.resumen.vencidas': 'Délai dépassé',
+  'privacidad.vacia': 'Aucune demande à afficher.',
+  'privacidad.errorCarga': "Le registre n'a pas pu être chargé.",
+  'privacidad.col.persona': 'Personne',
+  'privacidad.col.tipo': 'Demande',
+  'privacidad.col.recibida': 'Reçue',
+  'privacidad.col.plazo': 'Échéance',
+  'privacidad.col.estado': 'État',
+  'privacidad.tipo.access': 'Accès à ses données',
+  'privacidad.tipo.rectification': 'Rectification',
+  'privacidad.tipo.erasure': 'Effacement',
+  'privacidad.tipo.restriction': 'Limitation du traitement',
+  'privacidad.tipo.portability': 'Portabilité',
+  'privacidad.tipo.objection': 'Opposition',
+  'privacidad.canal.email': 'E-mail',
+  'privacidad.canal.web': 'Formulaire web',
+  'privacidad.canal.letter': 'Courrier',
+  'privacidad.canal.phone': 'Téléphone',
+  'privacidad.canal.in_person': 'En personne',
+  'privacidad.canal.other': 'Autre',
+  'privacidad.estado.received': 'Reçue',
+  'privacidad.estado.in_progress': 'En cours',
+  'privacidad.estado.completed': 'Répondue',
+  'privacidad.estado.rejected': 'Refusée',
+  'privacidad.plazo.vencida': 'En retard',
+  'privacidad.plazo.pronto': 'Échéance proche',
+  'privacidad.plazo.prorrogada': 'Prolongée',
+  'privacidad.alta.quien': 'Qui fait la demande',
+  'privacidad.alta.miembro': "Une personne de l'organisation",
+  'privacidad.alta.fuera': 'Une personne extérieure',
+  'privacidad.alta.elegirMiembro': 'Choisissez la personne',
+  'privacidad.alta.correo': 'Son adresse e-mail',
+  'privacidad.alta.nombre': 'Son nom (facultatif)',
+  'privacidad.alta.tipo': 'Ce qui est demandé',
+  'privacidad.alta.canal': 'Canal de réception',
+  'privacidad.alta.recibida': 'Date de réception',
+  'privacidad.alta.recibidaAyuda':
+    "Le délai d'un mois court à partir de cette date, pas d'aujourd'hui.",
+  'privacidad.alta.identidad': 'Identité vérifiée',
+  'privacidad.alta.metodo': 'Comment elle a été vérifiée',
+  'privacidad.alta.notas': 'Notes',
+  'privacidad.alta.error.subject': 'Indiquez qui fait la demande.',
+  'privacidad.alta.error.email': 'Saisissez une adresse e-mail valide.',
+  'privacidad.alta.error.date': "La date doit dater de moins d'un an et ne pas être future.",
+  'privacidad.alta.error.upstream': "La demande n'a pas pu être enregistrée.",
+  'privacidad.alta.hecha': 'Demande enregistrée.',
+  'privacidad.detalle.plazo': 'Répondre avant le {fecha}',
+  'privacidad.detalle.resolucion': 'Réponse donnée à la personne',
+  'privacidad.detalle.resolucionAyuda':
+    "Obligatoire pour clôturer la demande : c'est ce qui est communiqué à la personne.",
+  'privacidad.detalle.guardar': 'Enregistrer',
+  'privacidad.detalle.guardado': 'Demande mise à jour.',
+  'privacidad.detalle.cerrada': 'Cette demande est clôturée et ne peut plus être modifiée.',
+  'privacidad.detalle.prorroga': 'Prolonger de deux mois',
+  'privacidad.detalle.prorrogaAyuda':
+    "Une seule fois, avant l'échéance. Il faut en indiquer le motif à la personne : écrivez-le ici.",
+  'privacidad.detalle.prorrogar': 'Prolonger',
+  'privacidad.detalle.historia': 'Historique',
+  'privacidad.evento.created': 'Enregistrée',
+  'privacidad.evento.updated': 'Mise à jour',
+  'privacidad.evento.extended': 'Délai prolongé',
+  'privacidad.evento.erasureStarted': 'Effacement lancé',
+  'privacidad.evento.erasureCompleted': 'Effacement terminé',
+  'privacidad.supresion.titulo': 'Effacer le compte',
+  'privacidad.supresion.explica':
+    "Le compte est fermé immédiatement, sans retour possible, et ses moyens de connexion sont supprimés. En quelques minutes, sa fiche est anonymisée et ce que les autres services conservent sur la personne est supprimé. Ce que la personne a créé pour l'organisation (boîte mail, fichiers, événements) reste à l'organisation.",
+  'privacidad.supresion.confirmar': 'Saisissez {correo} pour confirmer',
+  'privacidad.supresion.iniciada': 'Effacement lancé. Il se termine en quelques minutes.',
+  'privacidad.supresion.enCurso': "L'effacement est en cours.",
+  'privacidad.supresion.hecha': 'Le compte a été effacé.',
+  'privacidad.supresion.sinCuenta':
+    "La personne n'a pas de compte dans l'organisation : il n'y a ici aucun compte à effacer.",
+  'privacidad.supresion.noMiembro': "La personne n'est plus membre de l'organisation.",
+  'privacidad.supresion.error': "Le compte n'a pas pu être effacé.",
+  'privacidad.error.upstream': "La modification n'a pas pu être enregistrée.",
+  'privacidad.cancelar': 'Annuler',
+};

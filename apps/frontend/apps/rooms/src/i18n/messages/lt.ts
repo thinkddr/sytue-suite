@@ -280,6 +280,7 @@ export const lt: AppCatalog<typeof en> = {
     other: 'Galite pridėti ne daugiau kaip {count} asmenų.',
   },
   'dm.openFailed': 'Nepavyko atverti pokalbio.',
+  'dm.externalClosed': 'Jūsų organizacija neleidžia pokalbių su šiuo asmeniu.',
   'people.search': 'Ieškoti „{query}“ Sytue One',
   'people.searching': 'Ieškoma Sytue One…',
   'people.notFound': 'Sytue One niekas nenaudoja šio el. pašto ar @naudotojo vardo.',

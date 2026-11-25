@@ -2815,9 +2815,9 @@ export const it: AppCatalog<typeof en> = {
     'La firma non entra in quella pagina. Scegli un’altra pagina o posizione.',
   'pdf.device.view': 'Visualizza',
   'pdf.vault.help':
-    'Questo PDF è nel tuo Drive cifrato: viene decifrato solo su questo dispositivo, dove puoi visualizzarlo, annotarlo, compilarlo, organizzarlo e firmarlo. Ciò che salvi torna cifrato.',
+    'Questo PDF è nel tuo Drive cifrato: viene decifrato solo su questo dispositivo, dove puoi visualizzarlo, annotarlo, compilarlo, organizzarlo, proteggerlo, oscurarlo, modificarlo, confrontarlo, stamparlo e firmarlo. Ciò che salvi torna cifrato.',
   'pdf.vault.serverOnly':
-    'Con il tuo Drive cifrato non sono ancora disponibili richiedere firme, proteggere con password, riconoscere il testo, oscurare, modificare testo o immagini, timbri e filigrane, confrontare, la cronologia delle versioni e la stampa: richiedono che il servizio legga il PDF o non si fanno ancora sul dispositivo.',
+    'Con il tuo Drive cifrato non sono disponibili la richiesta di firma, il riconoscimento del testo e l’assistente: richiedono che il servizio legga il PDF. Tutto il resto si fa su questo dispositivo.',
   'pdf.vault.notFound.title': 'Questo PDF non è nel tuo Drive cifrato',
   'pdf.vault.notFound.description':
     'Potrebbe essere stato spostato o eliminato. Cercalo in Sytue Drive.',
@@ -2832,7 +2832,9 @@ export const it: AppCatalog<typeof en> = {
     'Il tuo Drive sta ancora passando alla cifratura end-to-end. Completa da Sytue Drive.',
   'pdf.device.error.password': 'Questa password non apre il certificato.',
   'pdf.device.error.encrypted':
-    'Questo PDF è protetto da password e non può essere firmato su questo dispositivo.',
+    'Questo PDF è protetto da password: aprilo e firmalo dal suo studio, dove si usa la sua password.',
+  'pdf.device.protectedNote':
+    'Questo PDF è protetto da password. Per firmarlo viene riscritto senza password su questo dispositivo, come fa il server: la copia firmata viene salvata cifrata nel tuo Drive, ma senza la password del PDF.',
   'pdf.device.error.locked':
     'Questo PDF è certificato contro qualsiasi modifica: un’altra firma lo invaliderebbe.',
   'pdf.device.error.unreadable':

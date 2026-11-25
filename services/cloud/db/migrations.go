@@ -5,12 +5,19 @@
 // runner de migraciones de platform/pkg/pg las aplique al arrancar (o vía CLI).
 package db
 
-import "embed"
+import (
+	"embed"
 
-// Migrations contiene los ficheros *.up.sql / *.down.sql de db/migrations.
+	"git.sytue.eu/sytue/one/platform/pkg/pg"
+)
+
+// migrationFiles contiene los ficheros *.up.sql / *.down.sql de db/migrations.
 //
 //go:embed all:migrations
-var Migrations embed.FS
+var migrationFiles embed.FS
+
+// Migrations expande el SQL común de la cola de purga de tenant (ADR 0054).
+var Migrations = pg.WithTenantPurgeDDL(migrationFiles)
 
 // MigrationsDir es la subcarpeta dentro de Migrations donde viven los .sql.
 const MigrationsDir = "migrations"

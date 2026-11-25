@@ -134,6 +134,23 @@ export function docsBaseUrl(): string {
   return env.SYTUE_DOCS_INTERNAL_URL ?? env.PUBLIC_SYTUE_DOCS_BASE_URL ?? 'https://docs.sytue.eu';
 }
 
+/**
+ * Calendar y Contactos, para su traza de acceso en la auditoría unificada. Por el
+ * Service interno, como en sus propias apps (calendar/src/lib/caldav.ts y
+ * contacts/src/lib/carddav.ts).
+ */
+export function calendarBaseUrl(): string {
+  return (
+    env.SYTUE_CALENDAR_INTERNAL_URL ?? env.SYTUE_CALENDAR_BASE_URL ?? 'https://calendar.sytue.eu'
+  );
+}
+
+export function contactsBaseUrl(): string {
+  return (
+    env.SYTUE_CONTACTS_INTERNAL_URL ?? env.SYTUE_CONTACTS_BASE_URL ?? 'https://contacts.sytue.eu'
+  );
+}
+
 /** Sytue ERP, para los permisos por módulo. Por el Service interno, como Rooms. */
 export function erpBaseUrl(): string {
   return env.SYTUE_SYERP_INTERNAL_URL ?? env.SYTUE_SYERP_BASE_URL ?? 'https://erp.sytue.eu';

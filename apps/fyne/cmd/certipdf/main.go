@@ -85,7 +85,7 @@ func main() {
 
 	storage, err := newPDFStorage(s, a, w, tr)
 	if err != nil || storage == nil {
-		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(tr.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.PDF).ConSinSesionPropia().Montar(storage.Objeto()))
 		// La voz del sistema no se calla sola al cerrar: sigue en su propio proceso.

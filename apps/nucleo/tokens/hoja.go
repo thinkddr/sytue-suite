@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"image/color"
+	"slices"
+	"sync"
 )
 
 // # Las paletas y las formas de arranque, generadas al compilar
@@ -68,35 +70,64 @@ func huella(hojas ...string) uint64 {
 	return uint64(ieee)<<32 | uint64(ca)
 }
 
-// leerHoja da los colores de la suite que declara la hoja y los juegos de arranque: los
-// generados si son de estas hojas, y si no, leyendo la de la casa.
-func leerHoja() (map[string]bool, map[pedido]*juego) {
-	return leerHojaCon(huellaGenerada == huellaHojas())
+// generadasAlDia dice si lo generado es de las hojas embebidas: la huella se calcula una
+// vez.
+var generadasAlDia = sync.OnceValue(func() bool { return huellaGenerada == huellaHojas() })
+
+// leerColores da los colores de la suite que declara la hoja: los generados si son de
+// estas hojas, y si no, leyéndola.
+func leerColores() map[string]bool {
+	colores, _ := leerHojaCon(generadasAlDia(), false)
+	return colores
 }
 
-func leerHojaCon(generadas bool) (map[string]bool, map[pedido]*juego) {
+// leerHojaCon da los colores de la suite y, con `conJuegos`, los juegos de arranque: los
+// generados o, sin ellos, el de la casa leyendo la hoja. Lo usa el guardián de lo
+// generado; al arrancar, los juegos se resuelven uno a uno al pedirlos (juegoDel).
+func leerHojaCon(generadas, conJuegos bool) (map[string]bool, map[pedido]*juego) {
 	if !generadas {
+		if !conJuegos {
+			return coloresDeclarados(coloresCSS), nil
+		}
 		return coloresDeclarados(coloresCSS), mustJuegos(coloresCSS, aparienciaCSS)
 	}
 	colores := make(map[string]bool, len(coloresGenerados))
 	for _, c := range coloresGenerados {
 		colores[c] = true
 	}
+	if !conJuegos {
+		return colores, nil
+	}
 	js := make(map[pedido]*juego, len(pedidosGenerados))
 	for i, p := range pedidosGenerados {
-		var crudas [variantes]map[string]color.NRGBA
-		for v := range crudas {
-			crudas[v] = make(map[string]color.NRGBA, len(tokensGenerados))
-			for k := range tokensGenerados {
-				tk := &tokensGenerados[k]
-				var c [4]byte
-				binary.BigEndian.PutUint32(c[:], tk.colores[i][v])
-				crudas[v][tk.nombre] = color.NRGBA{R: c[0], G: c[1], B: c[2], A: c[3]}
-			}
-		}
-		js[p] = juegoDe(crudas)
+		js[p] = juegoDe(crudasGeneradas(i))
 	}
 	return colores, js
+}
+
+// juegoGenerado es el juego de un pedido que va generado, o nil si no lo va o si lo
+// generado no es de estas hojas.
+func juegoGenerado(p pedido) *juego {
+	i := slices.Index(pedidosGenerados[:], p)
+	if i < 0 || !generadasAlDia() {
+		return nil
+	}
+	return juegoDe(crudasGeneradas(i))
+}
+
+// crudasGeneradas son las crudas del juego generado `i` (en el orden de pedidosGenerados).
+func crudasGeneradas(i int) [variantes]map[string]color.NRGBA {
+	var crudas [variantes]map[string]color.NRGBA
+	for v := range crudas {
+		crudas[v] = make(map[string]color.NRGBA, len(tokensGenerados))
+		for k := range tokensGenerados {
+			tk := &tokensGenerados[k]
+			var c [4]byte
+			binary.BigEndian.PutUint32(c[:], tk.colores[i][v])
+			crudas[v][tk.nombre] = color.NRGBA{R: c[0], G: c[1], B: c[2], A: c[3]}
+		}
+	}
+	return crudas
 }
 
 // juegoDe completa un juego a partir de sus crudas: los bordes aplanados y su índice.

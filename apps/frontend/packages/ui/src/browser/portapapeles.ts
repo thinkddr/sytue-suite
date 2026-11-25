@@ -4,7 +4,7 @@
  */
 
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
-import { BLOQUES_DE_NOTAS } from './bloques-de-notas.js';
+import { BLOQUES_DE_NOTAS, numeroDeBloque } from './bloques-de-notas.js';
 
 export { BLOQUES_DE_NOTAS };
 
@@ -214,6 +214,8 @@ function atributosDeBloque(
     ) {
       out.push([name, '']);
     } else if (etiqueta === 'time' && name === 'datetime' && fechaISO(value)) {
+      out.push([name, value]);
+    } else if (numeroDeBloque(etiqueta, name, value) !== null) {
       out.push([name, value]);
     }
   }

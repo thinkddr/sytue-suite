@@ -155,6 +155,11 @@ func main() {
 				if err != nil {
 					return cifrado.ApplicationView{}, err
 				}
+				// El widget lee este repositorio mientras esté montado: el servidor de esta
+				// cuenta está congelado desde que pasó a Matrix (ADR 0078). Vive lo que la cuenta
+				// montada, no esta petición de montaje.
+				//nolint:contextcheck // la vida es la de la cuenta (resources.Context).
+				s.WidgetDesdeRegistrosPrivados(resources.Context(), resources.HTTP(), facade)
 				return mount(resources, facade, nil), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
 			},
 		},
@@ -168,7 +173,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(tr.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Docs).ConSinSesionPropia().Montar(private.Objeto()))
 		w.SetOnClosed(func() {
@@ -189,6 +194,12 @@ func main() {
 	// Se lee y se guarda allí. Es ruta PROPIA: no es la página «no encontrada».
 	s.RutaPropia(func(u *url.URL) bool { return api.IDDeEdicion("docs", u) != "" })
 	s.AlAbrirURL(func(u *url.URL) {
+		// «Nuevo documento» del widget nativo (ADR 0078): la pregunta antes de crear, que espera a que
+		// la portada tenga su lista (editor.Portada.PreguntarCrear).
+		if api.LeerAccion("docs", u) == "create" {
+			fyne.Do(func() { d.Portada().PreguntarCrear(w.Canvas()) })
+			return
+		}
 		if id := api.IDDeEdicion("docs", u); id != "" {
 			go fyne.Do(func() { d.AbrirID(id, "") }) // puede llegar antes de arrancar el bucle
 		}

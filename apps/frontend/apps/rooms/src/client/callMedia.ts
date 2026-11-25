@@ -13,30 +13,25 @@ export function registerReconnectBarrier(
   register(RoomEvent.SignalReconnecting, stop);
 }
 
-/** An automatic SDK reconnect may restart tracks: end the call synchronously. */
-export function endAutomaticReconnect(
+/**
+ * Para las pistas locales al momento: el SDK puede volver a arrancarlas al reconectar
+ * solo, y en una llamada cifrada nada se publica hasta el acuse nuevo
+ * (client/reanudacion.ts). Cada pista por separado: que una ya estuviera parada no deja
+ * a las demás en marcha.
+ */
+export function detenerPistas(
   tracks: Iterable<{ mediaStreamTrack: { enabled: boolean }; stop: () => void }>,
-  invalidate: () => void,
-  fail: () => void,
 ): void {
-  try {
-    invalidate();
-  } finally {
+  for (const track of tracks) {
     try {
-      for (const track of tracks) {
-        try {
-          track.mediaStreamTrack.enabled = false;
-        } catch {
-          // Stopping and closing must still run if a browser rejects a change.
-        }
-        try {
-          track.stop();
-        } catch {
-          // Continue stopping the remaining tracks.
-        }
-      }
-    } finally {
-      fail();
+      track.mediaStreamTrack.enabled = false;
+    } catch {
+      // Stopping must still run if a browser rejects the change.
+    }
+    try {
+      track.stop();
+    } catch {
+      // Continue stopping the remaining tracks.
     }
   }
 }

@@ -332,6 +332,7 @@ type eventReq struct {
 	Description    string        `json:"description"`
 	Location       string        `json:"location"`
 	Organizer      string        `json:"organizer"`
+	OrganizerName  string        `json:"organizer_name"`
 	Start          time.Time     `json:"start"`
 	End            time.Time     `json:"end"`
 	TZID           string        `json:"tzid"`
@@ -378,6 +379,7 @@ func (req eventReq) toInput(calendarID uuid.UUID) service.EventInput {
 		Description:    req.Description,
 		Location:       req.Location,
 		Organizer:      req.Organizer,
+		OrganizerName:  req.OrganizerName,
 		DTStart:        req.Start,
 		DTEnd:          req.End,
 		TZID:           req.TZID,

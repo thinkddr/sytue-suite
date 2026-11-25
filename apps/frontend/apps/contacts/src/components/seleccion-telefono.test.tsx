@@ -210,3 +210,37 @@ test('en el escritorio la fila abre la ficha aunque haya algo marcado', async ()
     false,
   );
 });
+
+/**
+ * Las acciones de la libreta (y las de la etiqueta) eran botones de icono sueltos en la
+ * cabecera del teléfono, junto al «…»: tres iconos que no se distinguían (roadmap,
+ * «Rendimiento y estética de la web»). En el teléfono van dentro del «…», en un grupo con
+ * su nombre; el botón de la cabecera queda para el escritorio. VISTO EN ROJO con el
+ * botón de la libreta a la vista y sin grupo en el «…».
+ */
+test('en el teléfono las acciones de la libreta van en el «…», en su grupo', async () => {
+  const conFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (String(url).split('?')[0] === '/api/addressbooks')
+      return new Response(
+        JSON.stringify({
+          addressBooks: [
+            { url: '/books/u/default/', displayName: 'Mía', id: 'b1', isDefault: true },
+          ],
+        }),
+        { status: 200 },
+      );
+    return conFetch(url, init);
+  }) as typeof fetch;
+  const host = await montar();
+  const boton = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="Acciones de la libreta"]',
+  );
+  expect(boton?.closest('.max-md\\:hidden')).not.toBeNull();
+  const menu = await menuDelTelefono(host);
+  expect(menu.has('Cambiar el nombre')).toBe(true);
+  // La predeterminada no se puede borrar: el grupo solo trae «Cambiar el nombre».
+  expect(menu.has('Eliminar libreta')).toBe(false);
+  const grupo = menu.get('Cambiar el nombre')!.closest('[role="group"]');
+  expect(grupo?.getAttribute('aria-label')).toBe('Acciones de la libreta');
+});

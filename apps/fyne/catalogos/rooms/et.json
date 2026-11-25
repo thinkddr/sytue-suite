@@ -316,6 +316,7 @@
   "dm.deleteFailed": "Vestlust ei õnnestunud kustutada.",
   "dm.empty": "Meeskonnas pole veel kedagi teist.",
   "dm.emptyQuery": "Otsingule ei vasta keegi.",
+  "dm.externalClosed": "Sinu organisatsioon ei luba selle inimesega vestelda.",
   "dm.invite": "Kutsu inimesi",
   "dm.maxPeople": {
     "one": "Saate lisada kuni {count} inimese.",

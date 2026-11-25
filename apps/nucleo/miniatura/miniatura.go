@@ -144,15 +144,26 @@ func Cabecera(datos []byte) (image.Config, string, error) {
 	if err == nil && formato == "webp" && cfg.ColorModel == color.YCbCrModel {
 		cfg.ColorModel = color.NRGBAModel
 	}
+	// Un HEIC sale derecho de Decodificar: la cabecera da su forma ya girada (heif.go).
+	if err == nil && esHEIF(formato) {
+		cfg = girarConfigHEIF(cfg, datos)
+	}
 	return cfg, formato, err
 }
 
 // Decodificar es Cabecera, Cabe y Decode, en ese orden: la cabecera decide
 // si se gasta la memoria antes de gastarla.
 func Decodificar(datos []byte) (image.Image, error) {
-	cfg, _, err := Cabecera(datos)
+	cfg, formato, err := Cabecera(datos)
 	if err != nil || !Cabe(cfg) {
 		return nil, ErrMedioNoSoportado
+	}
+	if esHEIF(formato) {
+		img, err := decodificarHEIF(datos)
+		if err != nil {
+			return nil, ErrMedioNoSoportado
+		}
+		return img, nil
 	}
 	img, _, err := image.Decode(bytes.NewReader(datos))
 	if err != nil {

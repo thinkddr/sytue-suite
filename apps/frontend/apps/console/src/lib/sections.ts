@@ -43,6 +43,9 @@ export const SECTION_PERMS: Record<string, readonly SytuePermission[] | null> = 
   erp: null,
   governance: null,
   compliance: null,
+  // Las solicitudes RGPD de la organización y la supresión física de una cuenta:
+  // responder en su nombre no se delega (Sytue ID lo reserva a owner/admin).
+  privacy: null,
   'sensitivity-labels': null,
   audit: ['audit.view'],
 };

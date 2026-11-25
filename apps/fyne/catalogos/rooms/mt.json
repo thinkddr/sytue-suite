@@ -346,6 +346,7 @@
   "dm.deleteFailed": "Iċ-chat ma setgħetx titħassar.",
   "dm.empty": "Għad m'hemm ħadd iżjed fit-tim.",
   "dm.emptyQuery": "Ħadd ma jaqbel mat-tfittxija tiegħek.",
+  "dm.externalClosed": "L-organizzazzjoni tiegħek ma tħallix konversazzjonijiet ma’ din il-persuna.",
   "dm.invite": "Stieden persuni",
   "dm.maxPeople": {
     "one": "Tista' żżid sa persuna waħda.",

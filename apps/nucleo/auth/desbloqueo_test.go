@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 )
@@ -134,5 +135,39 @@ func TestLaClaveDeDesbloqueoVaConLaSesion(t *testing.T) {
 	// Y los bytes que tenía este proceso, a cero (ADR 0085).
 	if !bytes.Equal(enMemoria.Clave, make([]byte, 32)) {
 		t.Fatal("cerrar sesión deja la clave de desbloqueo en memoria")
+	}
+}
+
+// Un nuevo inicio de sesión de la misma persona que vuelve SIN clave (el navegador no
+// la tenía) no borra la que el dispositivo ya guarda con la sesión; uno de otra
+// persona nunca la hereda. La clave sigue viva lo que vive la sesión de Sytue ID.
+func TestUnLoginSinClaveNoBorraLaDeLaSesion(t *testing.T) {
+	d := &Desbloqueo{Clave: bytes.Repeat([]byte{7}, 32)}
+	var guardados []Tokens
+	s := NewSession(Tokens{Refresh: "r1", Subject: "ada", Issuer: "https://id.test", Desbloqueo: d}, nil,
+		func(t Tokens) error { guardados = append(guardados, t); return nil })
+	if err := s.AdoptarCon(t.Context(), Tokens{Access: "a2", Refresh: "r2", Subject: "ada", Issuer: "https://id.test", Expiry: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if clave, _ := s.Desbloqueo(); !bytes.Equal(clave, d.Clave) {
+		t.Fatal("un login de la misma persona sin clave borró la de la sesión")
+	}
+	if n := len(guardados); n == 0 || guardados[n-1].Desbloqueo == nil || !bytes.Equal(guardados[n-1].Desbloqueo.Clave, d.Clave) {
+		t.Fatal("la clave no queda guardada con la sesión nueva")
+	}
+	// Con clave nueva, manda la nueva.
+	nueva := &Desbloqueo{Clave: bytes.Repeat([]byte{8}, 32)}
+	if err := s.AdoptarCon(t.Context(), Tokens{Access: "a3", Refresh: "r3", Subject: "ada", Issuer: "https://id.test", Expiry: time.Now().Add(time.Hour), Desbloqueo: nueva}); err != nil {
+		t.Fatal(err)
+	}
+	if clave, _ := s.Desbloqueo(); !bytes.Equal(clave, nueva.Clave) {
+		t.Fatal("la clave que trae el login no sustituye a la anterior")
+	}
+	// Otra persona: nunca hereda la clave.
+	if err := s.AdoptarCon(t.Context(), Tokens{Access: "b", Refresh: "rb", Subject: "beto", Issuer: "https://id.test", Expiry: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if clave, _ := s.Desbloqueo(); clave != nil {
+		t.Fatal("la clave pasó a otra persona")
 	}
 }

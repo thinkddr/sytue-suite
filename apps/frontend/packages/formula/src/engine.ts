@@ -25,7 +25,7 @@ import {
   FormulaError,
   type CellValue,
 } from './values.js';
-import { buildRegistry } from './functions/index.js';
+import { registroParaMotor } from './perezosas.js';
 import { groupBy, pivotBy } from './functions/agrupar.js';
 import type { Agregador } from './functions/agrupar.js';
 import type { Arg, FnCtx, FnImpl, RefRange, Registry, TableResolver } from './registry.js';
@@ -366,11 +366,19 @@ export class Engine {
    *  caché). Es la medida de «una edición solo reevalúa a sus dependientes». */
   private evaluadas = 0;
 
+  /**
+   * El motor se construyó antes de que llegaran las funciones (`cargarFunciones`): las
+   * fórmulas que llaman a una dan `#BUSY!`. Quien lo usa construye otro cuando lleguen.
+   */
+  readonly esperaFunciones: boolean;
+
   constructor(opts: EngineOptions = {}) {
     this.names = opts.sheets && opts.sheets.length > 0 ? [...opts.sheets] : ['Hoja1'];
     this.clock = opts.now ?? (() => new Date());
     this.rng = opts.random ?? Math.random;
-    this.registry = buildRegistry();
+    const { registro, pendiente } = registroParaMotor();
+    this.registry = registro;
+    this.esperaFunciones = pendiente;
     this.tableResolver = opts.resolveTable;
   }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/buscar"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/services/bases/internal/domain"
 )
@@ -144,7 +145,31 @@ func autorizar(ctx context.Context, tx pgx.Tx, a domain.Actor, baseID, tabla str
 	if !domain.Permite(rol, acc) {
 		return domain.ErrSinPermiso
 	}
+	if domain.Escribe(acc) {
+		// Lo que se escribe en una base lo ven su propietario y las personas con permiso:
+		// les llega la señal de cambios (ADR 0078), como al dueño de un calendario. Una
+		// consulta por base y petición, y solo si hay señal en curso.
+		hubnotify.AvisarQuienesVen(ctx, "bases/"+baseID, func() ([]string, error) {
+			return quienesVenBase(ctx, tx, a, baseID)
+		})
+	}
 	return nil
+}
+
+// quienesVenBase son el propietario de la base y las personas de la organización con un
+// permiso sobre ella (o sobre una de sus tablas). Ni grupos ni toda la organización, que
+// no se avisan uno a uno, ni personas de fuera, que son de otra organización.
+func quienesVenBase(ctx context.Context, tx pgx.Tx, a domain.Actor, baseID string) ([]string, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT owner_sub FROM bases WHERE id = $1 AND tenant = $2
+		UNION
+		SELECT principal_id FROM base_permissions
+		 WHERE base_id = $1 AND tenant = $2 AND principal_kind = $3
+		LIMIT $4`, baseID, a.Tenant, domain.PrincipalUsuario, domain.MaxPermisosPorBase+1)
+	if err != nil {
+		return nil, fmt.Errorf("quiénes ven la base: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
 // baseDeTabla resuelve la base de una tabla. Un id de tabla de otro tenant no
@@ -481,6 +506,11 @@ func (s *Store) RevocarPermiso(ctx context.Context, a domain.Actor, base, permis
 			permiso, base, a.Tenant).Scan(&kind, &id, &rol)
 		if err != nil {
 			return errNoFilas(err)
+		}
+		if kind == domain.PrincipalUsuario {
+			// Quien pierde el permiso deja de ver la base en su widget: también le llega la
+			// señal (antes, solo a quien lo concedía o lo revocaba).
+			hubnotify.AvisarTambien(ctx, id)
 		}
 		return auditar(ctx, tx, a, base, nil, nil, nil, "permission.revoke", jsonDe(map[string]string{"kind": kind, "principal": id, "role": rol}), nil)
 	})

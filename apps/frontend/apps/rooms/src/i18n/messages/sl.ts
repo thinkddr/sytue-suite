@@ -281,6 +281,7 @@ export const sl: AppCatalog<typeof en> = {
     other: 'Dodate lahko največ {count} oseb.',
   },
   'dm.openFailed': 'Pogovora ni bilo mogoče odpreti.',
+  'dm.externalClosed': 'Vaša organizacija ne dovoljuje pogovorov s to osebo.',
   'people.search': 'Išči »{query}« v Sytue One',
   'people.searching': 'Iskanje v Sytue One…',
   'people.notFound':

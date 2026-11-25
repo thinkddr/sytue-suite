@@ -232,6 +232,36 @@ export const fi: AppCatalog<typeof en> = {
     'Tätä osoitetta ei voi käyttää: sen on oltava kelvollinen ja Sytuen ulkopuolinen.',
   'recovery.wrong_password': 'Salasana ei ole oikein.',
   'recovery.failed': 'Tallennus epäonnistui. Yritä hetken päästä uudelleen.',
+  'recovery.password.hint': 'Kaikkiin tämän kortin muutoksiin tarvitaan nykyinen salasanasi.',
+  'recovery.username.new': 'Uusi käyttäjänimi',
+  'recovery.username.hint':
+    'Jättämäsi nimi pysyy varattuna sinulle 30 päivää, ja sen voi vaihtaa kerran 30 päivässä.',
+  'recovery.username.change': 'Vaihda käyttäjänimi',
+  'recovery.username.changed': 'Käyttäjänimi vaihdettu.',
+  'recovery.username.invalid':
+    'Käyttäjänimi ei kelpaa: käytä 3–64 kirjainta, numeroa, pistettä tai yhdysmerkkiä.',
+  'recovery.username.taken': 'Käyttäjänimi ei ole vapaana.',
+  'recovery.username.recent': 'Vaihdoit käyttäjänimesi alle 30 päivää sitten.',
+  'recovery.username.is_address':
+    'Henkilökohtaisella tilillä käyttäjänimesi on Sytue-osoitteesi, joten sitä ei voi vaihtaa täällä.',
+  'recovery.phone.none':
+    'Sinulla ei ole vielä matkapuhelinnumeroa: lisää se, niin voit kirjautua myös sillä.',
+  'recovery.phone.new': 'Uusi matkapuhelinnumero',
+  'recovery.phone.format': 'Maatunnuksen kanssa, esimerkiksi +358 40 000 0000.',
+  'recovery.phone.send': 'Lähetä koodi',
+  'recovery.phone.sent': 'Lähetimme koodin tekstiviestillä numeroon {phone}.',
+  'recovery.phone.code': 'Koodi',
+  'recovery.phone.confirm': 'Vahvista',
+  'recovery.phone.changed': 'Matkapuhelinnumero tallennettu.',
+  'recovery.phone.invalid': 'Numero ei kelpaa: kirjoita se maatunnuksen kanssa.',
+  'recovery.phone.same': 'Tämä on jo matkapuhelinnumerosi.',
+  'recovery.phone.wait': 'Odota minuutti ennen kuin pyydät uuden koodin.',
+  'recovery.phone.limit': 'Liian monta koodia pyydetty. Yritä myöhemmin uudelleen.',
+  'recovery.phone.code_wrong': 'Koodi on väärä.',
+  'recovery.phone.code_expired': 'Koodi on vanhentunut. Pyydä uusi.',
+  'recovery.phone.has_account': 'Tämä matkapuhelinnumero kuuluu jo toiselle tilille.',
+  'recovery.phone.unavailable':
+    'Tekstiviestejä ei voi lähettää juuri nyt. Yritä myöhemmin uudelleen.',
   'delete.title': 'Poista tilini',
   'delete.hint':
     'Kirjautumistietosi ja kaikki vain sinulle kuuluva poistetaan; organisaatiollesi kuuluva jää sinne. Tilin voi palauttaa 30 päivän ajan.',

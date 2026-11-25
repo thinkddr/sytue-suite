@@ -72,7 +72,16 @@ spec:
           startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 30 }
           livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20 }
           readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10 }
+          # Raíz del TLS de PgBouncer (global.pgbouncerTls): el DSN la verifica.
+          {{- with (include "sytue.pgbouncerCaMount" .) }}
+          volumeMounts:
+            {{- . | nindent 12 }}
+          {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
+      {{- with (include "sytue.pgbouncerCaVolume" .) }}
+      volumes:
+        {{- . | nindent 8 }}
+      {{- end }}
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- range . }}

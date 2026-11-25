@@ -124,8 +124,8 @@ func TestTodosLosJuegosDeLaHojaSeLeen(t *testing.T) {
 				continue
 			}
 			for v := range crudas {
-				if len(crudas[v]) != len(paletas[Light]) && !carril {
-					t.Errorf("%+v, apariencia %d: %d tokens y la casa tiene %d", p, v, len(crudas[v]), len(paletas[Light]))
+				if len(crudas[v]) != len(casa().paletas[Light]) && !carril {
+					t.Errorf("%+v, apariencia %d: %d tokens y la casa tiene %d", p, v, len(crudas[v]), len(casa().paletas[Light]))
 				}
 			}
 		}

@@ -6,14 +6,22 @@
 // El @usuario contra PostgreSQL real (ADR 0040). Lo que se fija es lo que rompe
 // sin ruido: dos personas que se llaman igual, un nombre que suplantaría a la
 // plataforma, un @usuario que acabaría siendo la dirección de OTRA persona en el
-// dominio raíz, y el barrido que da nombre a todo el que existía antes.
+// dominio raíz, y que desde la 0125 ninguna cuenta viva se quede sin él.
 package store_test
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
+	"git.sytue.eu/sytue/one/services/id/db"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
+	"git.sytue.eu/sytue/one/services/id/internal/store"
 )
 
 func TestUsername_SeAsignaAlCrear(t *testing.T) {
@@ -63,46 +71,58 @@ func TestUsername_SeAsignaAlCrear(t *testing.T) {
 	}
 }
 
-// El barrido da @usuario a quien no lo tenía, y quien tiene dirección en el
-// dominio raíz se queda con SU parte local aunque otra persona con el mismo
-// nombre sea más antigua.
-func TestUsername_BarridoDePendientes(t *testing.T) {
-	st, ctx := newStore(t)
+// La 0125 hace obligatorio el @usuario: rellena a quien siguiera sin él con uno que no
+// pisa a nadie, y desde entonces una cuenta viva no se puede quedar sin él. La purgada
+// de «Borrar mi cuenta» sí, que lo pierde a propósito. Se reaplica el SQL REAL de la
+// migración con el dueño, como en producción.
+func TestUsername_ObligatorioTrasLa0125(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	ctx := context.Background()
+	dueno, err := pgx.Connect(ctx, h.DSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = dueno.Close(ctx) }()
+	aplicar := func(nombre string) {
+		t.Helper()
+		sql, err := db.Migrations.ReadFile("migrations/0125_username_obligatorio." + nombre + ".sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := dueno.Exec(ctx, string(sql)); err != nil {
+			t.Fatalf("0125 %s: %v", nombre, err)
+		}
+	}
+	st := store.New(h.Pool)
 	st.SetSuiteDomain("sytue.eu")
 
-	antigua := usuarioConNombre(ctx, t, st, "ana@acme.example", "Ana", "Ruiz")
-	personal := usuarioConNombre(ctx, t, st, "ana@gmail.example", "Ana", "Gómez")
-	org, err := st.CreateOrg(ctx, nil, domain.Organization{
-		Slug: domain.PersonalSlug("ana@gmail.example"), Name: "ana@gmail.example", Kind: domain.OrgKindPersonal,
-	})
-	if err != nil {
-		t.Fatalf("CreateOrg personal: %v", err)
+	aplicar("down") // como antes: la columna admite NULL
+	sin := usuarioConNombre(ctx, t, st, "sin@acme.example", "Sin", "Nombre")
+	purgada := usuarioConNombre(ctx, t, st, "ida@acme.example", "Ida", "Ya")
+	listo := usuarioConNombre(ctx, t, st, "listo@acme.example", "Listo", "Uno")
+	fallo := "u" + strings.ReplaceAll(sin.ID, "-", "")
+	// El relleno de `sin` ya es el @usuario de otra persona: tiene que desempatar.
+	if _, err := dueno.Exec(ctx, `UPDATE users SET username = $2 WHERE id = $1`, listo.ID, fallo); err != nil {
+		t.Fatal(err)
 	}
-	if err := st.ReserveMailbox(ctx, nil, org.ID, personal.ID, "ana@sytue.eu"); err != nil {
-		t.Fatalf("ReserveMailbox: %v", err)
+	if _, err := dueno.Exec(ctx, `UPDATE users SET username = NULL WHERE id IN ($1, $2)`, sin.ID, purgada.ID); err != nil {
+		t.Fatal(err)
 	}
-	// Como antes de la mig 0065: nadie tiene @usuario.
-	if _, err := st.DB().Exec(ctx, `UPDATE users SET username = NULL`); err != nil {
-		t.Fatalf("vaciar @usuario: %v", err)
-	}
-	// «Ana Ruiz» se llamaría ana.ruiz; se fuerza el choque con la raíz «ana» dándole
-	// a la antigua el nombre corto, que es el caso que importa.
-	if _, err := st.DB().Exec(ctx, `UPDATE users SET given_name = 'Ana', family_name = '', name = 'Ana' WHERE id = $1`, antigua.ID); err != nil {
-		t.Fatalf("renombrar: %v", err)
+	if _, err := dueno.Exec(ctx, `UPDATE users SET purged_at = now() WHERE id = $1`, purgada.ID); err != nil {
+		t.Fatal(err)
 	}
 
-	n, err := st.AsignarUsernamesPendientes(ctx, 100)
-	if err != nil || n != 2 {
-		t.Fatalf("barrido: n=%d err=%v, quiero 2", n, err)
+	aplicar("up")
+	if got, _ := st.GetUserByID(ctx, sin.ID); got.Username != fallo+"1" || !domain.ValidUsername(got.Username) {
+		t.Fatalf("relleno = %q, quiero %q y válido", got.Username, fallo+"1")
 	}
-	if got, _ := st.GetUserByID(ctx, personal.ID); got.Username != "ana" {
-		t.Fatalf("la de ana@sytue.eu = %q, quiero ana", got.Username)
+	if got, _ := st.GetUserByID(ctx, purgada.ID); got.Username != "" {
+		t.Fatalf("la purgada recibió @usuario %q", got.Username)
 	}
-	if got, _ := st.GetUserByID(ctx, antigua.ID); got.Username != "ana2" {
-		t.Fatalf("la otra Ana = %q, quiero ana2", got.Username)
-	}
-	// Idempotente: la segunda pasada no encuentra nada.
-	if n, err := st.AsignarUsernamesPendientes(ctx, 100); err != nil || n != 0 {
-		t.Fatalf("segunda pasada: n=%d err=%v", n, err)
+	// Una viva ya no puede quedarse sin él.
+	_, err = h.Pool.Exec(ctx, `UPDATE users SET username = NULL WHERE id = $1`, listo.ID)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
+		t.Fatalf("vaciar el @usuario de una cuenta viva: err=%v, quiero check_violation", err)
 	}
 }

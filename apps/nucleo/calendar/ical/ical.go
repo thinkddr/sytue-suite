@@ -113,6 +113,7 @@ func eventInputFromICal(evt *ical.Event) (domain.Input, error) {
 		Description:    propText(evt.Props, ical.PropDescription),
 		Location:       propText(evt.Props, ical.PropLocation),
 		Organizer:      cleanCalAddress(propText(evt.Props, ical.PropOrganizer)),
+		OrganizerName:  organizerName(evt.Props),
 		DTStart:        dtstart.UTC(),
 		DTEnd:          dtend.UTC(),
 		TZID:           tzidOf(evt.Props, ical.PropDateTimeStart),
@@ -196,6 +197,9 @@ func EncodeEvent(ev domain.Event, method domain.SchedulingMethod) (string, error
 		// la invitación por correo, y entonces no sabe a quién mandar el REPLY.
 		org := ical.NewProp(ical.PropOrganizer)
 		org.Value = ensureMailto(ev.Organizer)
+		if cn := domain.SanitizeCommonName(ev.OrganizerName); cn != "" {
+			org.Params.Set("CN", cn)
+		}
 		p.Set(org)
 	}
 	if ev.Status != "" {
@@ -476,6 +480,15 @@ func attendeesFromICal(evt *ical.Event) []domain.Attendee {
 		out = append(out, a)
 	}
 	return out
+}
+
+// organizerName es el CN del ORGANIZER, si lo trae: el nombre con el que la web y el
+// cliente de correo de quien recibe la invitación presentan a quien organiza.
+func organizerName(props ical.Props) string {
+	if p := props.Get(ical.PropOrganizer); p != nil {
+		return domain.SanitizeCommonName(p.Params.Get("CN"))
+	}
+	return ""
 }
 
 func CleanCalAddress(v string) string {

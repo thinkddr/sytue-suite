@@ -66,6 +66,7 @@ interface Props {
 /** Traduce el fallo de una acción: los 4xx que el BFF preserva del servicio Go. */
 function actionMessage(t: T, err: unknown): string {
   if (err instanceof ChatHttpError) {
+    if (err.code === 'rooms_external_closed') return t('dm.externalClosed');
     if (err.status === 403) return t('members.errorForbidden');
     if (err.status === 409) return t('members.errorArchived');
     if (err.status === 404) return t('members.errorGone');

@@ -169,7 +169,7 @@ func (h *photosStorage) render(text func(string) string) {
 	}
 	h.slot.Objects = []fyne.CanvasObject{h.photos.Objeto()}
 	if h.needed {
-		var status fyne.CanvasObject = ui.NuevoVacio(text("matrix.failed"), "")
+		var status fyne.CanvasObject = ui.NuevoVacioError(text("matrix.failed"), "")
 		if h.drive != nil {
 			status = h.drive.Objeto()
 		}
@@ -198,7 +198,7 @@ func photosPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], s
 		plans.Close() //nolint:contextcheck // Constructor failure has started no source work.
 		return empty, err
 	}
-	plan, err := cifrado.NewRecordApplicationPlan(ctx, resources, cifrado.RecordApplicationConfig[*privatePhotos.Repository]{Gateway: gateway, Source: source, Service: api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil), New: privatePhotos.New, Historical: privatePhotos.NewHistoricalSource})
+	plan, err := cifrado.NewRecordApplicationPlan(ctx, resources, cifrado.RecordApplicationConfig[*privatePhotos.Repository]{Gateway: gateway, Source: source, Service: api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil), New: privatePhotos.New, Historical: privatePhotos.NewHistoricalSource, OnWrite: suite.AvisarEscritura})
 	if err != nil {
 		plans.Close() //nolint:contextcheck // Constructor failure has started no source work.
 		return empty, err

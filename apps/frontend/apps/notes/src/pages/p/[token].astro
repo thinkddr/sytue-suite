@@ -12,7 +12,7 @@
  * sería exactamente lo que nadie pidió al pulsar «publicar».
  */
 import '../../styles/app.css';
-import { SUFIJO_ICONOS, themeInitScript, withBase } from '@sytue/ui';
+import { SUFIJO_ICONOS, withBase } from '@sytue/ui';
 import { htmlLangAttrs } from '@sytue/i18n';
 import { serverEnv } from '@sytue/auth/server';
 import { useT } from '../../i18n/index.js';
@@ -66,7 +66,8 @@ const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BA
       rel="apple-touch-icon"
       href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
     />
-    <script is:inline set:html={themeInitScript}></script>
+    <!-- El tema guardado, de /arranque.js (sytueArranque) y no en línea. -->
+    <script is:inline src={withBase(prefijo, '/arranque.js')}></script>
   </head>
   <body class="bg-bg text-text h-full antialiased">
     <PublicNotebook

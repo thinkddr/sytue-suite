@@ -11,6 +11,7 @@ import type { Bff } from './bff.js';
 import { crearProxyDeServicio } from './proxy.js';
 import { privateStorageScope, privateStorageFailure as fail } from './matrix-storage-scope.js';
 import { sessionOwnerHeader } from '@sytue/config/session-owner';
+import { contextoDerivado } from './contexto-derivado.js';
 
 export type MatrixMigrationProduct =
   | 'drive'
@@ -269,11 +270,13 @@ export function rutaMigracionMatrixPrivada(options: {
       if (bounded instanceof Response) return bounded;
       request = bounded;
     }
-    const response = await proxy({
-      ...ctx,
-      request,
-      params: { ...ctx.params, ruta: 'migration' + (raw ? '/' + raw : '') },
-    });
+    const response = await proxy(
+      contextoDerivado(
+        ctx,
+        { ...ctx.params, ruta: 'migration' + (raw ? '/' + raw : '') },
+        { request },
+      ),
+    );
     response.headers.set('cache-control', 'no-store');
     response.headers.set('vary', 'Cookie');
     response.headers.set('x-content-type-options', 'nosniff');

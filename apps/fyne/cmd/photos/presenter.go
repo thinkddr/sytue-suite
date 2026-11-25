@@ -47,6 +47,11 @@ func newPhotosPresenter(application fyne.App, window fyne.Window, suite *sesion.
 	if err != nil {
 		return nil, err
 	}
+	if almacen.repository != nil {
+		// Con repositorio, el widget lee esos registros mientras la cuenta siga montada: el
+		// servidor de esta cuenta está congelado desde que pasó a Matrix (ADR 0078).
+		suite.WidgetDesdeRegistrosPrivados(almacen.cuenta.Context(), almacen.cuenta.HTTP(), client)
+	}
 	thumbnails, large := photos.NuevaFototeca(), photos.NuevaFototeca()
 	large.Variante = photos.VarianteGrande
 	view := photos.Vista{T: translate, Teca: thumbnails, TecaGrande: large, Ventana: anchoInicial, Variante: tema.De(application.Settings().ThemeVariant())}

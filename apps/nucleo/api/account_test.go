@@ -133,14 +133,16 @@ func TestMisOrganizaciones(t *testing.T) {
 	}
 }
 
+// Las rutas de «mi cuenta» que leen datos de la persona van en el grupo `persona`, confinado por
+// RLS a quien firma el token (migración 0127 de Sytue ID).
 func TestLaCuentaHablaElIdiomaDeSytueID(t *testing.T) {
 	rutas := webref.Read(t, "services/id/internal/http/server.go")
 	for _, ruta := range []string{
 		`r.Route("/api/v1"`, `r.Get("/me", s.handleMe)`, `r.Patch("/me", s.handleMeUpdate)`,
-		`r.Get("/me/sessions", s.handleMeSessions)`, `r.Delete("/me/sessions/{id}", s.handleMeSessionRevoke)`,
-		`r.Delete("/me/sessions", s.handleMeSessionRevokeOthers)`, `r.Get("/me/devices", s.handleMeDevices)`,
-		`r.Get("/me/app-passwords", s.handleMeAppPasswords)`,
-		`r.With(loginRL).Post("/me/app-passwords", s.handleMeAppPasswordCreate)`,
+		`persona.Get("/me/sessions", s.handleMeSessions)`, `persona.Delete("/me/sessions/{id}", s.handleMeSessionRevoke)`,
+		`persona.Delete("/me/sessions", s.handleMeSessionRevokeOthers)`, `persona.Get("/me/devices", s.handleMeDevices)`,
+		`persona.Get("/me/app-passwords", s.handleMeAppPasswords)`,
+		`persona.With(loginRL).Post("/me/app-passwords", s.handleMeAppPasswordCreate)`,
 		`r.Get("/me/avatar", s.handleMeAvatarGet)`,
 		`r.Get("/subscription", s.handleSubscriptionStatus)`, `r.Get("/", s.handleOnboardingGet)`,
 		`r.Route("/webauthn"`, `r.Get("/credentials", s.handleWebAuthnList)`,

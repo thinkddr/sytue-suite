@@ -111,7 +111,7 @@ func TestLaGenteDeFueraAceptaAntesDeEntrar(t *testing.T) {
 	if _, err := st.GetChannel(acme, dm.ID, carla); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("Carla lee el DM sin aceptarlo: %v", err)
 	}
-	if ch, hay, err := st.AceptarDirectoPendiente(bg, carla, "tercera", []string{carla, "alice"}); err != nil || !hay || ch.ID != dm.ID {
+	if ch, hay, err := st.AceptarDirectoPendiente(bg, carla, "tercera", []string{carla, "alice"}, nil); err != nil || !hay || ch.ID != dm.ID {
 		t.Fatalf("AceptarDirectoPendiente: hay=%v id=%v err=%v", hay, ch.ID, err)
 	}
 	if _, err := st.GetChannel(acme, dm.ID, carla); err != nil {

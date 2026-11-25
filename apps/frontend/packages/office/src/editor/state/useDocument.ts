@@ -52,14 +52,9 @@ import { CoedicionModelo, mismoContenido, type Registro } from './fusion';
 import type { OpRGA } from './rga';
 import { hacerCopia } from '../../lib/copia';
 import { esAnclaDeBoveda } from './anclaDrive';
-import {
-  abrirDriveCifrado,
-  anclarEnServicio,
-  driveEnBoveda,
-  exportarDocumento,
-  guardarDocumentoEnBoveda,
-  motivoDriveCifrado,
-} from './driveCifrado';
+import { driveEnBoveda } from './driveEnBoveda';
+import type * as ModuloDriveCifradoNs from './driveCifrado';
+
 import {
   cacheLocalContent,
   cacheLocalTitle,
@@ -69,6 +64,9 @@ import {
   markTitleSynced,
   readOfflineDocument,
 } from './offline';
+
+/** El Drive de la bóveda, que baja con `import()` al guardar en él (guardarCifrado). */
+type ModuloDriveCifrado = typeof ModuloDriveCifradoNs;
 
 /** Debounce del autosave (§4.4). */
 const AUTOSAVE_MS = 1500;
@@ -1152,8 +1150,13 @@ export function useDocument(
    * el ancla. Cada motivo de no poder lo dice con su frase.
    */
   const guardarCifrado = useCallback(async (): Promise<void> => {
+    // El Drive de la bóveda (`@sytue/offline/matrix`) baja aquí, al guardar en él, y no
+    // con el editor: casi ningún documento lo usa.
+    let cifrado: ModuloDriveCifrado | undefined;
     try {
-      const r = await guardarDocumentoEnBoveda({
+      cifrado = await import('./driveCifrado');
+      const { abrirDriveCifrado, anclarEnServicio, exportarDocumento } = cifrado;
+      const r = await cifrado.guardarDocumentoEnBoveda({
         ancla: sourceRef,
         esDueno: roleRef.current === 'owner',
         titulo: title,
@@ -1169,7 +1172,7 @@ export function useDocument(
         description: t('doc.msg.savedToDriveEncryptedIn', { name: r.nombre }),
       });
     } catch (error) {
-      switch (motivoDriveCifrado(error)) {
+      switch (cifrado?.motivoDriveCifrado(error) ?? 'fallo') {
         case 'entrar':
           toast.notify({ tone: 'warning', title: t('doc.msg.saveToDriveVaultSignIn') });
           return;

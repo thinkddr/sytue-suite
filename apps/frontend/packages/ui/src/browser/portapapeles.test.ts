@@ -141,6 +141,21 @@ test('un valor fuera de su lista se cae, y el atributo de un bloque no vale en o
   );
 });
 
+test('las celdas combinadas pasan con un número de verdad; una imagen, nunca', () => {
+  const html =
+    '<table><tbody><tr><td colspan="2" rowspan="3">a</td><td colspan="1">b</td>' +
+    '<td colspan="02">c</td><td colspan="21">d</td><td rowspan="2 onclick=x()">e</td></tr></tbody></table>' +
+    '<p>x<img src="adjunto:a1" onerror="x()"></p>';
+  expect(pegadoConFormato(html, { bloques: true })).toBe(
+    '<table><tbody><tr><td colspan="2" rowspan="3">a</td><td>b</td><td>c</td><td>d</td><td>e</td></tr></tbody></table>' +
+      '<p>x</p>',
+  );
+  // Sin pedir los bloques (Mail), la tabla pegada no los lleva.
+  expect(pegadoConFormato('<table><tr><td colspan="2">a</td></tr></table>')).toBe(
+    '<table><tbody><tr><td>a</td></tr></tbody></table>',
+  );
+});
+
 test('una fila de tarea sin `<span>` toma el resto de la fila como texto', () => {
   expect(
     pegadoConFormato('<div class="task-row"><input type="checkbox"> <b>sola</b></div>', {

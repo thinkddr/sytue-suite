@@ -95,8 +95,15 @@ import {
   useDedo,
   usePointerDrag,
 } from '@sytue/ui';
-import { FormulaError, nombresDeFunciones, numToCol, type Engine } from '@sytue/formula';
-import type { CellValue } from '@sytue/formula';
+import {
+  cargarFunciones,
+  FormulaError,
+  funcionesCargadas,
+  nombresDeFunciones,
+  numToCol,
+  type Engine,
+} from '@sytue/formula/motor';
+import type { CellValue } from '@sytue/formula/motor';
 import type {
   CellBorder,
   CellStyle,
@@ -1254,11 +1261,31 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
    * calculado CRUDO (el numfmt lo formatea al pintar); getRaw sigue siendo la fuente de
    * verdad que persiste (§7). */
   const motorRef = useRef<MotorVivo | null>(null);
+  /* Las funciones de la librería llegan en su propio trozo (`cargarFunciones`, que
+   * `tipos/hoja` pide al bajar el editor): hasta entonces el motor da #BUSY! en las
+   * fórmulas que llaman a una —se pintan vacías, nunca con un valor equivocado— y las
+   * demás se calculan ya. Al llegar se construye otro motor, y todo lo que depende de él
+   * (filtros, formatos, gráficos) se recalcula con el nuevo. */
+  const [conFunciones, setConFunciones] = useState(funcionesCargadas);
+  useEffect(() => {
+    if (conFunciones) return;
+    let montado = true;
+    cargarFunciones().then(
+      () => montado && setConFunciones(true),
+      // Sin red, las fórmulas siguen en espera; el siguiente montaje lo reintenta.
+      () => undefined,
+    );
+    return () => {
+      montado = false;
+    };
+  }, [conFunciones]);
   const engine = useMemo(() => {
-    const { vivo } = sincronizarMotor(motorRef.current, modeloVisto);
+    const previo =
+      motorRef.current?.engine.esperaFunciones && conFunciones ? null : motorRef.current;
+    const { vivo } = sincronizarMotor(previo, modeloVisto);
     motorRef.current = vivo;
     return vivo.engine;
-  }, [modeloVisto]);
+  }, [modeloVisto, conFunciones]);
   /** El autofiltro que ESTA persona ve: el compartido con su vista activa encima. */
   const vistaActiva = vistas.activeOf(sheet.name);
   const afVisto = useMemo(

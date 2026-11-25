@@ -46,6 +46,39 @@ export const sytueSecurity = {
 };
 
 /**
+ * El bloque `security.csp` de Astro para las superficies SSR: `script-src` SIN
+ * `'unsafe-inline'`. Astro emite la cabecera con el hash de cada script que procesa
+ * (las islas, su hidratación, lo que inyectan las integraciones) y solo eso, más lo
+ * de este origen, se ejecuta. Los scripts de arranque del layout ya no van en línea:
+ * los sirve `/arranque.js` (`sytueArranque()`).
+ *
+ * `'wasm-unsafe-eval'` va por defecto, igual que en `cabecerasCerradas`: el núcleo de
+ * la bóveda (`core.wasm`) y el cifrado de Matrix son WebAssembly, y sin él el
+ * navegador se niega a compilarlos. Permite compilar wasm, no `eval()`.
+ *
+ * `hashes` son los de scripts en línea que la app NO puede servir como fichero
+ * porque el navegador los ejecuta dentro de un documento que hereda esta política:
+ * el sandbox de scripts de Bases y de la ofimática (`@sytue/scripts`, `srcdoc`).
+ *
+ * Los estilos siguen con `'unsafe-inline'`: Tailwind y los `style` de Preact lo
+ * necesitan, y un estilo inyectado no ejecuta nada.
+ *
+ * Esta política se SUMA a la de `cabecerasCerradas` (que pone `connect-src`, `img-src`,
+ * `worker-src` y las cuatro de la casa): el navegador aplica las dos, así que un
+ * script tiene que pasar ambas.
+ */
+export function sytueCsp(opciones: { hashes?: readonly `sha256-${string}`[] } = {}) {
+  return {
+    algorithm: 'SHA-256' as const,
+    scriptDirective: {
+      resources: ["'self'", "'wasm-unsafe-eval'"],
+      hashes: [...(opciones.hashes ?? [])],
+    },
+    styleDirective: { resources: ["'self'", "'unsafe-inline'"] },
+  };
+}
+
+/**
  * Permissions-Policy de referencia: apaga las capacidades del navegador que
  * NINGUNA superficie de la suite usa. No se listan las que ya vienen acotadas a
  * `self` por defecto (portapapeles, pantalla completa…): repetir el defecto no
@@ -123,12 +156,10 @@ export const SYTUE_PERMISSIONS_POLICY_ROOMS = [
  *   - `form-action 'self'`: un formulario inyectado no puede enviar credenciales
  *     fuera.
  *
- * NO lleva `default-src`/`script-src`/`connect-src`: ese es el paso siguiente y
- * exige una lista por app (Rooms habla con el SFU en `wss:`, Docs incrusta
- * informes de Power BI de un origen externo, Drive sirve vistas previas desde
- * `blob:`). Ponerlo a ciegas apagaría la suite entera, así que va como ola
- * propia con su medición contra producción. ponytail: subconjunto seguro ahora;
- * `script-src`/`connect-src` cuando cada app tenga su inventario de orígenes.
+ * Esto NO lleva `script-src`/`connect-src` porque dependen de cada app (Rooms
+ * habla con el SFU en `wss:`, la ofimática con su servicio de coedición): los
+ * pone `cabecerasCerradas` (astro-middleware.ts) con el inventario de la app, y
+ * los scripts sin `'unsafe-inline'` los pone Astro con `sytueCsp()` (abajo).
  */
 export const SYTUE_SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'content-security-policy': [

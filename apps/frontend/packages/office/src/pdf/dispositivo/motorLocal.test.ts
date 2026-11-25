@@ -2,10 +2,12 @@
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
- * EL MOTOR DE PDF EN EL DISPOSITIVO (ADR 0086, tercera entrega): lo que el estudio de la
- * bóveda le pide al módulo `pdf` (`cmd/pdf-wasm`) y cómo traduce el «aplicar» del
- * estudio a sus operaciones. El motor en sí (Go) tiene sus pruebas en
- * `apps/nucleo/pdf/device_session_test.go`; aquí, el contrato de mensajes y la tabla.
+ * EL MOTOR DE PDF EN EL DISPOSITIVO (ADR 0086, tercera y cuarta entregas): lo que el
+ * estudio de la bóveda le pide al módulo `pdf` (`cmd/pdf-wasm`) y cómo traduce el
+ * «aplicar» del estudio a sus operaciones. El motor en sí (Go) tiene sus pruebas en
+ * `apps/nucleo/pdf/device_session_test.go` y `device_session_boveda_test.go` (lo
+ * protegido no abre sin su contraseña, lo censurado no queda en los bytes); aquí, el
+ * contrato de mensajes y la tabla.
  */
 import { expect, test } from 'bun:test';
 import { clientCoreModuleBounds, isClientCoreModule } from '@sytue/config/client-core';
@@ -87,7 +89,12 @@ test('el motor manda bytes (no cadenas) y una COPIA del PDF; los errores son Err
 
 /** Un motor que apunta qué se le pidió, sin wasm. */
 function motorQueApunta() {
-  const llamadas: { que: string; docs: string[]; campos: Record<string, string> }[] = [];
+  const llamadas: {
+    que: string;
+    docs: string[];
+    campos: Record<string, string>;
+    bytes?: string;
+  }[] = [];
   const abiertos: string[] = [];
   const cerrados: string[] = [];
   const edicion = { datos: bytes('%PDF-nuevo'), tipo: 'application/pdf' };
@@ -102,8 +109,13 @@ function motorQueApunta() {
       llamadas.push({ que: 'anotar', docs: [doc], campos }),
       Promise.resolve(edicion)
     ),
-    formulario: (doc, campos) => (
-      llamadas.push({ que: 'formulario', docs: [doc], campos }),
+    formulario: (doc, campos, _nombre, datos) => (
+      llamadas.push({
+        que: 'formulario',
+        docs: [doc],
+        campos,
+        ...(datos ? { bytes: texto(datos) } : {}),
+      }),
       Promise.resolve(edicion)
     ),
     paginas: (docs, campos) => (
@@ -114,6 +126,23 @@ function motorQueApunta() {
       llamadas.push({ que: 'herramienta', docs: [doc], campos }),
       Promise.resolve(edicion)
     ),
+    proteger: (doc, campos) => (
+      llamadas.push({ que: 'proteger', docs: [doc], campos }),
+      Promise.resolve(edicion)
+    ),
+    editar: (doc, campos, imagen) => (
+      llamadas.push({
+        que: 'editar',
+        docs: [doc],
+        campos,
+        ...(imagen ? { bytes: texto(imagen) } : {}),
+      }),
+      Promise.resolve({ ...edicion, reemplazos: 2 })
+    ),
+    comparar: () => Promise.resolve({}),
+    texto: () => Promise.resolve({ paginas: [] }),
+    verificar: () => Promise.resolve({ firmas: [], anclas: false }),
+    adjunto: () => Promise.resolve(bytes('adjunto')),
     cerrar: (doc) => (cerrados.push(doc), Promise.resolve()),
     apagar: () => undefined,
   };
@@ -181,16 +210,128 @@ test('aplicar en el dispositivo es la tabla del BFF: operación, campo de datos 
   expect(limpiarSufijo('  a b/../c\n')).toBe('a bc');
 });
 
+test('la cuarta entrega: proteger, censurar, sellos, editar, índice e importar, con la tabla del BFF', async () => {
+  const { motor, llamadas } = motorQueApunta();
+  const base = { motor, doc: 'd1', nombre: 'Acta.pdf', autor: 'Ana' };
+  const abrirOtro = () => Promise.reject(new Error('no'));
+  const aplicar = (cuerpo: Record<string, unknown>) =>
+    aplicarEnDispositivo({ ...base, abrirOtro, cuerpo });
+
+  // Proteger (AES-256 en el motor) y censurar dejan SIEMPRE copia, aunque se pida guardar.
+  expect(
+    await aplicar({
+      op: 'proteger',
+      destino: 'guardar',
+      campos: { usuario: 'abre', dueno: 'dueño', permisos: 'imprimir' },
+    }),
+  ).toMatchObject({ copia: true, sufijo: 'proteger' });
+  expect(llamadas.at(-1)).toEqual({
+    que: 'proteger',
+    docs: ['d1'],
+    campos: { op: 'proteger', usuario: 'abre', dueno: 'dueño', permisos: 'imprimir' },
+  });
+  const zonas = [{ pagina: 0, x1: 1, y1: 2, x2: 3, y2: 4 }];
+  expect(await aplicar({ op: 'redactar', datos: zonas, destino: 'guardar' })).toMatchObject({
+    copia: true,
+  });
+  expect(llamadas.at(-1)!.campos).toEqual({ op: 'redactar', areas: JSON.stringify(zonas) });
+  // Las propiedades no dejan copia: son el mismo documento.
+  expect(await aplicar({ op: 'metadatos', datos: { Titulo: 'Acta' } })).toMatchObject({
+    copia: false,
+  });
+
+  // Sellos y marcas de agua van por `paginas`, como en el servicio.
+  await aplicar({ op: 'paginas', campos: { op: 'marca-agua', texto: 'BORRADOR' } });
+  expect(llamadas.at(-1)).toMatchObject({
+    que: 'paginas',
+    campos: { op: 'marca-agua', texto: 'BORRADOR' },
+  });
+
+  // Editar texto, reemplazar (con `aplicar=1` y la búsqueda en JSON) y el índice.
+  await aplicar({ op: 'editar-texto', datos: [{ pagina: 0, id: 1, nuevo: 'x' }] });
+  expect(llamadas.at(-1)!.campos).toEqual({
+    op: 'texto',
+    cambios: '[{"pagina":0,"id":1,"nuevo":"x"}]',
+  });
+  const reemplazo = await aplicar({
+    op: 'reemplazar-texto',
+    busqueda: { buscar: 'a', reemplazar: 'b' },
+    elegidas: [{ pagina: 0, id: 3 }],
+  });
+  expect(reemplazo.reemplazos).toBe(2);
+  expect(llamadas.at(-1)!.campos).toEqual({
+    op: 'buscar-reemplazar',
+    aplicar: '1',
+    busqueda: '{"buscar":"a","reemplazar":"b"}',
+    elegidas: '[{"pagina":0,"id":3}]',
+  });
+  await aplicar({ op: 'indice', datos: [{ titulo: 'Uno', pagina: 0, nivel: 0 }] });
+  expect(llamadas.at(-1)!.campos).toEqual({
+    op: 'indice',
+    marcadores: '[{"titulo":"Uno","pagina":0,"nivel":0}]',
+  });
+
+  // La imagen nueva llega como dataURL y al motor como bytes; una que no es imagen, no.
+  await aplicar({
+    op: 'editar-imagen',
+    campos: { pagina: 1, id: 'Im1' },
+    imagen: `data:image/png;base64,${btoa('PNG!')}`,
+  });
+  expect(llamadas.at(-1)).toMatchObject({
+    que: 'editar',
+    campos: { op: 'imagen', pagina: '1', id: 'Im1' },
+    bytes: 'PNG!',
+  });
+  const mala = await aplicar({
+    op: 'editar-imagen',
+    campos: { pagina: 1, id: 'Im1' },
+    imagen: 'data:text/html;base64,PHA+',
+  }).catch((x: unknown) => x);
+  expect(mala).toBeInstanceOf(ErrorPDF);
+  expect((mala as ErrorPDF).codigo).toBe('bad_image');
+
+  // Importar el XFDF: el texto del cuerpo, como bytes al motor; sin él, nada.
+  await aplicar({ op: 'importar-datos', xfdf: '<xfdf/>' });
+  expect(llamadas.at(-1)).toMatchObject({
+    que: 'formulario',
+    campos: { op: 'importar-datos' },
+    bytes: '<xfdf/>',
+  });
+  const sinDatos = await aplicar({ op: 'importar-datos' }).catch((x: unknown) => x);
+  expect((sinDatos as ErrorPDF).codigo).toBe('missing_data');
+});
+
+test('el motor manda la imagen y el XFDF como bytes, y lee las lecturas como JSON', async () => {
+  const { e, pedido } = ejecutor((r) => {
+    switch (r.operation) {
+      case 'pdf.comparar':
+        return { body: bytes('{"iguales":true,"diferencias":[]}') };
+      case 'pdf.adjunto':
+        return { body: bytes('<factura/>'), content_type: 'application/octet-stream' };
+      default:
+        return { body: bytes('%PDF-x'), content_type: 'application/pdf', xmp: true, reemplazos: 3 };
+    }
+  });
+  const motor = motorSobre(e);
+  const imagen = bytes('PNG');
+  const editado = await motor.editar('d1', { op: 'imagen' }, imagen);
+  expect(editado).toMatchObject({ xmp: true, reemplazos: 3 });
+  expect(pedido[0]!.imagen).toEqual(imagen);
+  expect(pedido[0]!.imagen).not.toBe(imagen);
+  await motor.formulario('d1', { op: 'importar-datos' }, 'a.pdf', bytes('<xfdf/>'));
+  expect(texto(pedido[1]!.datos)).toBe('<xfdf/>');
+  expect(await motor.comparar('d1', 'd2', { modo: 'texto' })).toEqual({
+    iguales: true,
+    diferencias: [],
+  });
+  expect(pedido[2]).toMatchObject({ operation: 'pdf.comparar', docs: ['d1', 'd2'] });
+  expect(texto(await motor.adjunto('d1', 'factura.xml'))).toBe('<factura/>');
+  expect(pedido[3]).toMatchObject({ operation: 'pdf.adjunto', doc: 'd1', nombre: 'factura.xml' });
+});
+
 test('lo que no se hace en el dispositivo se dice, sin llamar al motor', async () => {
   const { motor, llamadas } = motorQueApunta();
-  for (const op of [
-    'proteger',
-    'redactar',
-    'reconocer-texto',
-    'firmar-certificado',
-    'capas',
-    'x',
-  ]) {
+  for (const op of ['reconocer-texto', 'capa-de-texto', 'firmar', 'firmar-certificado', 'x']) {
     expect(seHaceEnElDispositivo(op)).toBe(false);
     const e = await aplicarEnDispositivo({
       motor,

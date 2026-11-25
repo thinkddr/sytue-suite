@@ -314,13 +314,11 @@ func run(ctx context.Context, cfg idhttp.Config, logger *slog.Logger, capturados
 	// webmail (ver internal/mailprov).
 	go mailboxProvisionLoop(ctx, st, cfg, issuer, logger)
 
-	// @usuario para quien aún no lo tiene: las cuentas anteriores a la mig 0065 y
-	// las que dé de alta un pod del binario anterior mientras dura el despliegue.
-	go usernamesLoop(ctx, st, logger)
-
 	// «Borrar mi cuenta» (ADR 0054): lo que otros servicios guardan de quien se
-	// ha ido y, vencida la ventana de 30 días, la anonimización de su ficha.
-	go cuentasBorradasLoop(ctx, srv, logger)
+	// ha ido y, vencida la ventana de 30 días, la anonimización de su ficha; las
+	// supresiones RGPD, el contenido de las organizaciones que desaparecen y la
+	// retención del registro de solicitudes.
+	go cuentasBorradasLoop(ctx, srv, st, logger)
 
 	// Rotación programada de la clave de firma JWKS con retiro tras la ventana de
 	// gracia (F10). Deshabilitada si RotationInterval <= 0.
@@ -476,43 +474,27 @@ func mailboxProvisionLoop(ctx context.Context, st *store.Store, cfg idhttp.Confi
 	}
 }
 
-// cuentasBorradasLoop termina las bajas propias pendientes al arrancar y cada
-// diez minutos (ver idhttp.BarrerCuentasBorradas). Sin nada pendiente es una
-// consulta sobre un índice parcial vacío.
-func cuentasBorradasLoop(ctx context.Context, srv *idhttp.Server, logger *slog.Logger) {
+// cuentasBorradasLoop termina las bajas propias pendientes y las purgas de
+// organizaciones al arrancar y cada diez minutos (ver
+// idhttp.BarrerCuentasBorradas e idhttp.BarrerPurgasDeTenant). Sin nada
+// pendiente son dos consultas sobre índices parciales vacíos.
+func cuentasBorradasLoop(ctx context.Context, srv *idhttp.Server, st *store.Store, logger *slog.Logger) {
 	ticker := time.NewTicker(idhttp.BarridoCuentasBorradas)
 	defer ticker.Stop()
 	for {
 		if err := srv.BarrerCuentasBorradas(ctx); err != nil && ctx.Err() == nil {
 			logger.Warn("borrar mi cuenta: el barrido falló", "error", err)
 		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
+		// Y el contenido de las organizaciones que desaparecen (mig 0129): va
+		// detrás porque la purga de una cuenta personal es la que las encola.
+		if err := srv.BarrerPurgasDeTenant(ctx); err != nil && ctx.Err() == nil {
+			logger.Warn("purga de organizaciones: el barrido falló", "error", err)
 		}
-	}
-}
-
-// usernamesLoop asigna los @usuario pendientes al arrancar —vaciando la cola por
-// lotes— y vuelve a mirar cada diez minutos. En régimen normal no hay nada que
-// hacer y el barrido es una consulta sobre un índice parcial vacío.
-func usernamesLoop(ctx context.Context, st *store.Store, logger *slog.Logger) {
-	const lote = 200
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-	for {
-		for {
-			n, err := st.AsignarUsernamesPendientes(ctx, lote)
-			if err != nil && ctx.Err() == nil {
-				logger.Warn("asignar @usuario pendientes falló", "error", err)
-			}
-			if n > 0 {
-				logger.Info("@usuario asignados", "personas", n)
-			}
-			if err != nil || n < lote {
-				break
-			}
+		// Y la retención del registro de solicitudes RGPD (mig 0130).
+		if n, err := st.PurgarSolicitudesRGPDVencidas(ctx); err != nil && ctx.Err() == nil {
+			logger.Warn("registro RGPD: la retención falló", "error", err)
+		} else if n > 0 {
+			logger.Info("registro RGPD: solicitudes cerradas fuera de plazo de conservación borradas", "solicitudes", n)
 		}
 		select {
 		case <-ctx.Done():

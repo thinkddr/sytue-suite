@@ -4,6 +4,10 @@
 "widgets.newNote" = "Naujas užrašas";
 "widgets.newContact" = "Naujas kontaktas";
 "widgets.addPhotos" = "Pridėti nuotraukų";
+"widgets.newDocument" = "Naujas dokumentas";
+"widgets.newSpreadsheet" = "Nauja skaičiuoklė";
+"widgets.newPresentation" = "Nauja pateiktis";
+"widgets.openToUpdate" = "Atnaujinama, kai programėlė atidaryta";
 "widgets.notes" = "Užrašai";
 "widgets.rows" = "Eilutės";
 "widgets.pending" = "Laukiama";

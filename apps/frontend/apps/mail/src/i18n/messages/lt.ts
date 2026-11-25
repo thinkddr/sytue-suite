@@ -1026,7 +1026,7 @@ export const lt: AppCatalog<typeof en> = {
   'privateMail.vaultMoveKeep': 'Kol kas tęsti su ankstesniu paštu',
   'privateMail.vaultMoveRetiredTitle': 'Perkelkite paštą į naują saugyklą, kad toliau jį gautumėte',
   'privateMail.vaultMoveRetiredBody':
-    'Ankstesnė pašto sistema nebepasiekiama. Kol neperkelsite pašto į saugyklą, naujo pašto negausite: tai, kas ateina tuo metu, saugoma užšifruota ankstesne sistema, kaip ir jau turėtas paštas, ir jo nebus galima perskaityti. Jis neištrinamas, bet niekas negalės jo atidaryti. Perkėlus paštas vėl pradės ateiti ir atsidarys prisijungus prie Sytue ID, kaip ir kitos programos.',
+    'Ankstesnė pašto sistema nebepasiekiama. Kol neperkelsite pašto į saugyklą, naujo pašto negausite: tuo metu jums siunčiami laiškai laukia serveryje, iš kurio buvo išsiųsti, o jis kelias dienas bando juos pristatyti iš naujo. Jei perkelsite laiku, jie jus pasieks vėliau; jei ne, jie bus grąžinti kaip nepristatyti. To, kas jau užšifruota ankstesne sistema, kaip ir jau turėto pašto, nebus galima perskaityti: tai neištrinama, bet niekas negalės to atidaryti. Perkėlus paštas vėl pradės ateiti ir atsidarys prisijungus prie Sytue ID, kaip ir kitos programos.',
   'privateMail.vaultMoveCheckFailed':
     'Nepavyko patikrinti jūsų pašto būsenos. Bandykite dar kartą po akimirkos.',
 };

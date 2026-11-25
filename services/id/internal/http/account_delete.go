@@ -299,7 +299,8 @@ const (
 
 // BarrerCuentasBorradas termina las bajas propias pendientes: borra lo que los
 // otros servicios guardan de cada persona y, vencida la ventana, anonimiza su
-// ficha. Idempotente y seguro con varias réplicas a la vez: cada paso se
+// ficha. Termina también las supresiones físicas que una organización ejecuta
+// por una solicitud RGPD (admin_privacidad.go), sin esperar la ventana. Idempotente y seguro con varias réplicas a la vez: cada paso se
 // comprueba en su WHERE.
 func (s *Server) BarrerCuentasBorradas(ctx context.Context) error {
 	antes := time.Now().Add(-retencionBaja)
@@ -327,7 +328,9 @@ func (s *Server) BarrerCuentasBorradas(ctx context.Context) error {
 				return err
 			}
 		}
-		if !c.ClosedAt.Before(antes) {
+		// Una supresión RGPD (mig 0130) no espera la ventana: la organización ya
+		// decidió y no hay restauración posible.
+		if c.Supresion == "" && !c.ClosedAt.Before(antes) {
 			continue
 		}
 		personales, err := s.store.PurgarCuentaPropia(ctx, c.ID, antes)
@@ -337,18 +340,20 @@ func (s *Server) BarrerCuentasBorradas(ctx context.Context) error {
 		if personales == nil {
 			continue
 		}
-		_ = s.store.Audit(ctx, nil, store.AuditEntry{
-			Action: "user.self_deleted.purged", Target: c.ID,
-			Detail: map[string]any{"at": time.Now().UTC().Format(time.RFC3339)},
-		})
-		// El contenido de una cuenta personal (correo, archivos, fotos...) vive en
-		// diez bases y en el almacén de objetos, y su borrado todavía es manual
-		// (docs/security.md §11.4). Nivel error a propósito: es lo que dispara la
-		// alerta, y el plazo de un mes del RGPD corre desde ahora.
-		for _, org := range personales {
-			s.log.ErrorContext(ctx, "borrar mi cuenta: el contenido de la cuenta personal espera su borrado manual",
-				"org_id", org, "user_id", c.ID)
+		accion := "user.self_deleted.purged"
+		if c.Supresion != "" {
+			accion = "user.erased.purged"
+			if err := s.store.CompletarSupresionRGPD(ctx, nil, c.Supresion); err != nil {
+				return err
+			}
 		}
+		_ = s.store.Audit(ctx, nil, store.AuditEntry{
+			Action: accion, Target: c.ID,
+			Detail: map[string]any{"at": time.Now().UTC().Format(time.RFC3339), "personal_orgs": len(personales)},
+		})
+		// El contenido de su cuenta personal (correo, archivos, fotos...) ya está
+		// en la cola de purga de organizaciones (PurgarCuentaPropia, mig 0129): lo
+		// borra BarrerPurgasDeTenant, servicio a servicio.
 	}
 	return nil
 }

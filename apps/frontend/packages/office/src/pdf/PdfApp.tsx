@@ -18,6 +18,12 @@
  * Las páginas se piden por LOTES según se va llegando a ellas: un expediente de
  * trescientas páginas no cabe en una respuesta, y pedir de una en una vuelve a
  * subir el fichero por cada una.
+ *
+ * TODO lo pide a una FUENTE (`fuente.ts`): la del servidor por la ruta de Drive, que
+ * es la de siempre, o la del dispositivo con el PDF de la bóveda (ADR 0086), que
+ * dibuja, edita y guarda con el motor en WebAssembly sin que el servidor vea nada. Con
+ * la del dispositivo, lo que solo hace el servidor (pedir firma, reconocer texto, el
+ * asistente) sale apagado con su motivo, y firmar es el diálogo del dispositivo.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
@@ -28,7 +34,6 @@ import { r as ruta } from '../lib/rutas';
 import { descargarBlob, nombreDePagina, paginaComoImagen } from './imagenes';
 import type { Locale } from '@sytue/i18n';
 import {
-  api,
   firmas,
   pendienteDe,
   quienFirma,
@@ -54,13 +59,15 @@ import {
   confirmarEnEditor,
   enCampoDeTexto,
   haySuperposicionAbierta,
+  marcarAppLista,
   preguntarEnEditor,
   ShortcutsModal,
 } from '@sytue/ui';
 import { accionDeTecla, gruposDeAtajos } from './atajos';
 import { mensajeDeError } from './errores';
-import { BarraHerramientas, type Herramienta } from './Barra';
+import { BarraHerramientas, type Herramienta, type NoDisponible } from './Barra';
 import { PanelLateral, Dialogos, type Dialogo, type PanelActivo } from './Paneles';
+import { FuenteContext, fuenteDelServidor, type FuentePdf } from './fuente';
 
 /** Cuántas páginas se dibujan de golpe. Alineado con el tope del servicio. */
 const LOTE = 4;
@@ -90,10 +97,29 @@ export interface PdfAppProps {
   autor: string;
   /** Carpeta de Drive desde la que se abrió, si vino de allí. */
   volverA?: string | undefined;
+  /**
+   * De dónde sale el documento (`fuente.ts`). Sin ella, el Drive del servidor por la
+   * ruta; con la del dispositivo, el PDF de la bóveda (ADR 0086).
+   */
+  fuente?: FuentePdf | undefined;
+  /** Lo que aquí no se puede hacer, apagado y con su motivo (la bóveda). */
+  noDisponible?: NoDisponible | undefined;
+  /** Firmar con otro diálogo (el del dispositivo, con el PDF de la bóveda). */
+  onFirmar?: (() => void) | undefined;
 }
 
-export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
+export function PdfApp({
+  path,
+  locale,
+  autor,
+  volverA,
+  fuente: fuentePedida,
+  noDisponible,
+  onFirmar,
+}: PdfAppProps) {
   const t = useMemo(() => docsT(locale), [locale]);
+  const fuenteServidor = useMemo(() => fuenteDelServidor(path), [path]);
+  const fuente = fuentePedida ?? fuenteServidor;
 
   const [contenido, setContenido] = useState<Contenido | null>(null);
   const [svgs, setSvgs] = useState<Record<number, string>>({});
@@ -157,7 +183,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       setCargando(true);
       setError('');
       try {
-        const c = await api.contenido(path, conClave || undefined);
+        const c = await fuente.contenido(conClave || undefined);
         setContenido(c);
         setPideClave(false);
         setClave(conClave);
@@ -171,7 +197,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         setCargando(false);
       }
     },
-    [path, t],
+    [fuente, t],
   );
 
   useEffect(() => {
@@ -179,13 +205,15 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
   }, [cargar]);
 
   // Si alguien me pide firmar este PDF, la franja lo dice. Un fallo aquí no
-  // estorba a abrir el documento: sin la lista, simplemente no hay franja.
+  // estorba a abrir el documento: sin la lista, simplemente no hay franja. Con el PDF
+  // en la bóveda no hay peticiones: el servicio no puede leer lo que se firmaría.
   useEffect(() => {
+    if (fuente.local) return;
     firmas
       .listar()
       .then((ps) => setPeticion(pendienteDe(ps, path)))
       .catch(() => setPeticion(undefined));
-  }, [path]);
+  }, [path, fuente]);
 
   /** Entrega el firmado a quien lo pidió. */
   const entregar = useCallback(
@@ -219,7 +247,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       if (faltan.length === 0) return;
       faltan.forEach((n) => pidiendo.current.add(n));
       try {
-        const r = await api.render(path, `${faltan[0]}-${faltan[faltan.length - 1]}`, 1, clave);
+        const r = await fuente.render(`${faltan[0]}-${faltan[faltan.length - 1]}`, 1, clave);
         setSvgs((prev) => {
           const out = { ...prev };
           for (const [n, svg] of Object.entries(r.paginas)) out[Number(n)] = svg;
@@ -234,12 +262,18 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         faltan.forEach((n) => pidiendo.current.delete(n));
       }
     },
-    [contenido, path, clave, svgs, t],
+    [contenido, fuente, clave, svgs, t],
   );
 
   useEffect(() => {
     if (contenido) void pedirLote(1);
   }, [contenido, pedirLote]);
+
+  // `sytue:app-ready`: el documento (o su fallo, o la petición de contraseña) ya está en
+  // pantalla. Sin la marca, la bóveda esperaba los 5 s de `cuandoAppLista` para abrirse.
+  useEffect(() => {
+    if (!cargando) marcarAppLista();
+  }, [cargando]);
 
   /** Al desplazarse: qué página se está mirando y qué hay que ir pidiendo. */
   const alDesplazar = useCallback(() => {
@@ -329,7 +363,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         setTrabajando(true);
         setError('');
         try {
-          const r = await api.aplicar({ path, clave: clave || undefined, ...cuerpo });
+          const r = await fuente.aplicar({ clave: clave || undefined, ...cuerpo });
           const deCopia = r.copia ? t('pdf.saved.copy', { name: nombreDe(r.path) }) : mensaje;
           // Reconocer cuenta lo que hizo, y hay que decirlo: de un expediente de
           // veinte páginas se pueden reconocer doce y saltar ocho por no tener
@@ -388,7 +422,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         }
       }
     },
-    [path, clave, cargar, t, peticion, entregar],
+    [fuente, clave, cargar, t, peticion, entregar],
   );
 
   /**
@@ -577,7 +611,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
     setPreparando({ hechas, total });
     try {
       for (const [desde, hasta] of rangos) {
-        const r = await api.render(path, `${desde}-${hasta}`, 1, clave);
+        const r = await fuente.render(`${desde}-${hasta}`, 1, clave);
         // Como en pantalla: la que el motor no supo dibujar sale en blanco, no detiene
         // la impresión de las demás.
         for (let n = desde; n <= hasta; n++) dibujadas[n] = r.paginas[String(n)] ?? '';
@@ -595,7 +629,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       imprimiendo.current = false;
       setPreparando(null);
     }
-  }, [contenido, path, clave, t]);
+  }, [contenido, fuente, clave, t]);
 
   // Con las hojas ya en el DOM (los efectos corren tras pintar), al papel. Se desmontan
   // al acabar: son una copia de todo el documento y en pantalla no pintan nada.
@@ -686,13 +720,13 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
   const cargarTexto = useCallback(async () => {
     if (textos) return textos;
     try {
-      const r = await api.texto(path, clave || undefined);
+      const r = await fuente.texto(clave || undefined);
       setTextos(r.paginas);
       return r.paginas;
     } catch {
       return null;
     }
-  }, [textos, path, clave]);
+  }, [textos, fuente, clave]);
 
   /* --- Leer en voz alta -------------------------------------------------- */
 
@@ -786,7 +820,8 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
     );
   }
 
-  return (
+  const descarga = fuente.descarga();
+  const vista = (
     <div data-suelo-tactil class="sytue-sheet-corners bg-bg-subtle flex h-full min-h-0 flex-col">
       {/* Lo que cambia sin que nadie lo pida: en qué página se está al desplazarse y que se
           trabaja en algo. Una región viva SIEMPRE presente —una que aparece con su texto ya
@@ -818,7 +853,9 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         pagina={paginaActual}
         total={contenido.total}
         onIrA={irAPagina}
-        onDialogo={setDialogo}
+        // Con el PDF de la bóveda, firmar es el diálogo del dispositivo (el `.p12` de la
+        // persona en el navegador), no el que manda el certificado al servicio.
+        onDialogo={(d) => (d === 'firmar' && onFirmar ? onFirmar() : setDialogo(d))}
         permisos={contenido.permisos}
         trabajando={trabajando || preparando !== null}
         progreso={
@@ -826,10 +863,12 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
             ? t('pdf.print.preparing', { n: preparando.hechas, total: preparando.total })
             : undefined
         }
-        urlDescarga={ruta(`/api/pdf-descargar?path=${encodeURIComponent(path)}`)}
+        urlDescarga={descarga.url}
+        nombreDescarga={descarga.nombre}
         onImprimir={() => void imprimir()}
         panelAbierto={panelAbierto}
         onPanelAbierto={setPanelAbierto}
+        noDisponible={noDisponible}
       />
 
       {(error || aviso) && (
@@ -879,7 +918,9 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
             )}
             {peticion.external && (
               <span class="block text-xs">
-                {t('pdf.signatureRequest.externalNote', { name: quienFirma(peticion, 'received') })}
+                {t('pdf.signatureRequest.externalNote', {
+                  name: quienFirma(peticion, 'received'),
+                })}
               </span>
             )}
           </span>
@@ -954,7 +995,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
             <button
               type="button"
               class="bg-primary sytue-focus-ring rounded-control px-3 py-1 text-xs font-medium text-[var(--sytue-on-primary)]"
-              onClick={() => setDialogo('firmar')}
+              onClick={() => (onFirmar ? onFirmar() : setDialogo('firmar'))}
             >
               {t('pdf.signatureRequest.sign')}
             </button>
@@ -1128,6 +1169,8 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       />
     </div>
   );
+  // Los paneles y los diálogos piden a la misma fuente que el estudio (`fuente.ts`).
+  return <FuenteContext.Provider value={fuente}>{vista}</FuenteContext.Provider>;
 }
 
 /* ------------------------------------------------------------------------ */

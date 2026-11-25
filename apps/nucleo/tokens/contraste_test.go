@@ -25,7 +25,7 @@ func TestMasContrasteResuelveElBloqueDeLaHoja(t *testing.T) {
 			ElegirApp("mail")
 			ElegirForma(forma)
 			ElegirMasContraste(false)
-			normal := enVigor.Load()
+			normal := vigente()
 			if !ElegirMasContraste(true) {
 				t.Fatalf("%q/%q: ElegirMasContraste(true) no cambia nada", color, forma)
 			}

@@ -198,3 +198,26 @@ func TestHTMLConvierteLosEnlacesEntreNotasEnAnclajes(t *testing.T) {
 		t.Error("el enlace a una nota de fuera del fichero se perdió; tenía que quedarse")
 	}
 }
+
+// Una imagen o un fichero del texto (`adjunto:ID`) sale en el volcado con los datos de
+// su adjunto, que fuera de la app es lo único que se puede ver o descargar; lo que no es
+// un adjunto de la nota, o no es una imagen, no se pone en un `src`.
+func TestHTMLLlevaLosAdjuntosDelTexto(t *testing.T) {
+	png := "data:image/png;base64,iVBORw0KGgo="
+	data := json.RawMessage(`{"attachments":[` +
+		`{"id":"a1","name":"plano.png","dataUrl":"` + png + `"},` +
+		`{"id":"a2","name":"in<forme>.pdf","dataUrl":"data:application/pdf;base64,JVBERg=="},` +
+		`{"id":"a3","name":"falso.png","dataUrl":"data:application/pdf;base64,JVBERg=="}]}`)
+	doc := NotebookAHTML(Notebook{Title: "C"}, []Note{{Title: "n", Data: data, Content: `<p><img src="adjunto:a1" alt="p">` +
+		`<a href="adjunto:a2">f</a><img src="adjunto:a3"><img src="adjunto:zz"></p>`}})
+	for _, quiero := range []string{
+		`<img src="` + png + `" alt="p">`,
+		`href="data:application/pdf;base64,JVBERg==" download="in&lt;forme&gt;.pdf"`,
+		`<img src="adjunto:a3">`,
+		`<img src="adjunto:zz">`,
+	} {
+		if !strings.Contains(doc, quiero) {
+			t.Errorf("falta %s en:\n%s", quiero, parteVisible(t, doc))
+		}
+	}
+}

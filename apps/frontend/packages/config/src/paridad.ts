@@ -237,7 +237,11 @@ export interface FuncionParidad {
 // 2026-11-17: +1 en las dos por «calcus-rangos-editables» (PEND-CALC-FYNE-RANGOS): los
 // rangos editables por persona de la web no tenían entrada; Fyne ya los conserva, los mueve
 // y los respeta, pero aún no deja definirlos al proteger la hoja.
-export const TOPE_DEUDA = { escritorio: 70, movil: 95 } as const;
+// 2026-11-25: +1 en las dos por «certipdf-boveda-dispositivo» (ADR 0086, cuarta entrega):
+// el estudio de un PDF de la bóveda lo hace todo en el dispositivo en la web; en Fyne la
+// fachada del Drive privado ya lo hace en local con sus tests, falta verlo en una ventana
+// real.
+export const TOPE_DEUDA = { escritorio: 71, movil: 96 } as const;
 
 /**
  * DÓNDE SE CIERRA LA DEUDA. Una sola sección y no tres cadenas: las tres que
@@ -517,6 +521,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // `facturacionMensual.ts`; en Fyne, `apps/erp/facturacion_mes.go`, mismos nombres),
     // pedida al motor de informes con `agrupar: fecha:mes`. Código de Fyne y tests del
     // driver hechos; falta verlo en una ventana real.
+    // 2026-11-25: la tarjeta «Trae tus datos de otro programa» de la portada y su
+    // asistente (Holded, Odoo, Salesforce y Business Central; `ImportarDesde.tsx`) también
+    // en Fyne (`apps/erp/importar_desde.go`, mismos programas, objetos y claves, que el test
+    // compara con la web y con los mapeos del servicio), solo para quien administra. Sin
+    // ventana real aún.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -556,9 +565,12 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // cesta con cantidades e IVA por tipo, abrir y elegir caja, cliente, efectivo con
     // cambio o tarjeta, y la venta hecha con «Imprimir factura» y «Abrir»; el botón va
     // en el carril entre Tareas y Banco. El cobro reintenta con la MISMA operación
-    // (`CobrarTPV` en `apps/nucleo/api/erp_tpv.go`). Faltan las imágenes de producto y
-    // «Crear presupuesto» (ERP-09), conservar el cobro incierto al cerrar la app y verlo
-    // en una ventana real.
+    // (`CobrarTPV` en `apps/nucleo/api/erp_tpv.go`).
+    // 2026-11-25, Fyne (ERP-09): imágenes de producto (las teselas con foto y «Imágenes»
+    // para subirlas, `tpv_imagenes.go`), «Crear presupuesto» con la cesta y el cobro
+    // incierto guardado antes de enviarlo en el almacén sin conexión de la suite, a nombre
+    // de la cuenta, que vuelve al abrir la app con la misma operación (`tpv_pendiente.go`;
+    // el `erp-tpv`/`cobro` de la web). Falta verlo en una ventana real.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -569,6 +581,10 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     producto: 'photos',
     web: true,
     // Fotos en Gio enseña, marca favoritas, descarga y manda a la papelera.
+    // 2026-11-25: syphotos mide, indexa y deriva HEIC (`miniatura`, HEVC en Go puro), así
+    // que la foto del iPhone subida sin convertir desde Windows o Linux —la web o la copia
+    // de Fyne— sale en la galería. Y en el escritorio la copia con la app cerrada la
+    // despierta el Hub desde la bandeja (`sesion.DespertarTareasEnFondo`). Sin ventana real.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -922,9 +938,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // 2026-11-05: organizador e invitados con su respuesta (sí/quizá/no/sin responder)
     // en la vista rápida y en las píldoras del formulario, y guardar ya no devuelve a
     // todos a NEEDS-ACTION; web (`GuestList`, `parseGuests`) y Fyne
-    // (`seccionInvitados`). Sin ventana real aún. Diferencia aceptada: el organizador
-    // sale por su CN en la web (`parseOrganizer`) y por su dirección en Fyne, porque
-    // `api.Event.Organizer` no trae el CN (el servicio no lo guarda; ver roadmap).
+    // (`seccionInvitados`). Sin ventana real aún.
+    // 2026-11-25: el organizador sale por su CN también en Fyne (`nombreOrganizador`):
+    // el servicio lo guarda (`organizer_name`, migración 0028) del ORGANIZER del
+    // iCalendar o del nombre de la sesión de quien organiza. Los eventos guardados antes
+    // lo toman al volver a guardarse; hasta entonces Fyne enseña la dirección.
     // 2026-11-05: la búsqueda de eventos filtra por calendario propio y por periodo
     // (cualquiera, próximos, pasados, este mes, este año) en web (`periodRange`) y Fyne
     // (`rangoPeriodo`, `api.SearchEventsFiltrada`). Sin ventana real aún.
@@ -1235,8 +1253,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
       'Barra del editor en una fila con «Más»: estilos con vista previa, «Más formato», alineación y sangría en un menú, ayudas con atajo',
     producto: 'notes',
     web: true,
-    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
-    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24); el 2026-11-25, Título 6 en el
+    // estilo (Ctrl+Alt+6), subíndice y superíndice en «Más formato» y, en el teléfono, la
+    // barra pegada encima del teclado (barra_teclado.go; en la web, barra-teclado.ts).
+    // Probado con el driver de pruebas y capturas, sin verlo aún en una ventana real ni en
+    // el teléfono (listón de 'si').
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -1244,11 +1265,15 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
   {
     id: 'notes-editor-insertar',
     nombre:
-      'Catálogo «+» y «/» con descripción: paneles, sección plegable, estado, decisiones, fecha, columnas, código con lenguaje',
+      'Catálogo «+» y «/» con descripción: paneles, sección plegable, estado, decisiones, fecha, columnas, código con lenguaje, imagen y archivo',
     producto: 'notes',
     web: true,
-    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
-    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24); el 2026-11-25, columnas de 2 y 3
+    // (columnas.go) e «Imagen» y «Archivo», en las dos: adjuntos de la nota nombrados en
+    // el texto con `adjunto:ID` (adjuntos_cuerpo.go, adjuntos-texto.ts). Una nota con
+    // `div[data-columnas]` o `details[open]` ya no se abre en solo lectura en Fyne.
+    // Probado con el driver de pruebas y capturas, sin verlo aún en una ventana real ni en
+    // el teléfono (listón de 'si').
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -1269,8 +1294,10 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Símbolos y emoji (con «:»), con búsqueda y los 16 últimos usados',
     producto: 'notes',
     web: true,
-    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
-    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24); el 2026-11-25, los emoji: «:» al
+    // escribir y su apartado del selector, pintados con la cara de color de la suite
+    // (emoji.go). Probado con el driver de pruebas y capturas, sin verlo aún en una
+    // ventana real ni en el teléfono (listón de 'si').
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -1300,11 +1327,14 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
   {
     id: 'notes-editor-tabla',
     nombre:
-      'Barra flotante de tabla: cabeceras de fila y columna, filas numeradas, fondo de celda, alineación; Tab entre celdas y menú de celda',
+      'Barra flotante de tabla: cabeceras de fila y columna, filas numeradas, combinar y separar celdas, fondo de celda, alineación; Tab entre celdas y menú de celda',
     producto: 'notes',
     web: true,
-    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
-    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24); el 2026-11-25, filas numeradas
+    // (`data-numerada`) y combinar con la de la derecha o la de abajo y separar, en las
+    // dos (combinar.go, tabla-notas.ts), con los topes del saneador. Probado con el driver
+    // de pruebas y capturas, sin verlo aún en una ventana real ni en el teléfono (listón
+    // de 'si').
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -1315,7 +1345,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     producto: 'notes',
     web: true,
     // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
-    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si'). En
+    // la web, desde el 2026-11-25, pegar una captura la guarda como adjunto en el texto;
+    // en Fyne el portapapeles no trae imágenes.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -1326,8 +1358,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
       'Asa ⋮⋮ de cada bloque: subir, bajar, duplicar, eliminar, «Convertir en…» y arrastrar para mover',
     producto: 'notes',
     web: true,
-    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24) y probado con el driver de
-    // pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de 'si').
+    // Hecho en Fyne (apps/fyne/apps/notes, 2026-11-24); el 2026-11-25, arrastrar el asa
+    // con el ratón lleva el bloque (o la tabla entera) donde dice la raya
+    // (arrastre_bloque.go); con el dedo, «Subir» y «Bajar» del menú. Probado con el
+    // driver de pruebas, sin verlo aún en una ventana real ni en el teléfono (listón de
+    // 'si').
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -1641,6 +1676,22 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // (`firmaposicion.go`) y, solo allí, con el certificado del sistema
     // (`firmasistema.go`). Código y tests del driver hechos; falta verlo en una
     // ventana real.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'certipdf-boveda-dispositivo',
+    nombre:
+      'CertiPDF con el Drive en la bóveda: proteger, censurar, sellos, campos, índice, comparar, versiones, imprimir, leer en voz alta y certificar en el dispositivo',
+    producto: 'pdf',
+    web: true,
+    // ADR 0086, cuarta entrega. En la web, el estudio de siempre sobre el motor en
+    // WebAssembly (`dispositivo/fuenteLocal.ts`). En Fyne, la fachada del Drive privado
+    // (`apps/nucleo/api/docs_pdf_local*.go`) hace en local las mismas operaciones del
+    // motor, ahora también las capas, comparar, verificar, los adjuntos y la firma con
+    // el certificado del sistema en dos pasos. Código y tests hechos; falta verlo en
+    // una ventana real.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

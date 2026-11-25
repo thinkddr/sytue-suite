@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/services/cloud/internal/buildcache"
 	"git.sytue.eu/sytue/one/services/cloud/internal/config"
 )
 
@@ -61,6 +62,13 @@ type JobSpec struct {
 	GitRef     string
 	AppDir     string
 	RunImage   string
+
+	// CacheSecret es el Secret con la credencial del registry ACOTADA a la caché de
+	// builds de ESTE tenant (internal/buildcache) y CacheImage su imagen de caché. Ese
+	// sí va en el contenedor de build: el código del tenant solo alcanza su propia caché.
+	// Vacíos ⇒ la caché va en línea, como siempre.
+	CacheSecret string
+	CacheImage  string
 }
 
 // JobClient programa y espera Jobs de Kaniko en Kapsule. La implementación real
@@ -79,11 +87,24 @@ type LogSink interface {
 	PutBuildLog(ctx context.Context, tenant, buildID string, logs []byte) (key string, err error)
 }
 
+// CacheProvider deja lista la caché de builds de un tenant (internal/buildcache).
+type CacheProvider interface {
+	Asegurar(ctx context.Context, tenant string) (buildcache.Destino, error)
+}
+
 // KubeRunner ejecuta builds de Kaniko vía un JobClient de Kapsule.
 type KubeRunner struct {
-	cfg  config.Config
-	jobs JobClient
-	logs LogSink
+	cfg   config.Config
+	jobs  JobClient
+	logs  LogSink
+	cache CacheProvider
+}
+
+// ConCache hace que las builds con Dockerfile guarden y lean su caché de capas en el
+// registry, con la credencial acotada a la caché de su tenant.
+func (k *KubeRunner) ConCache(p CacheProvider) *KubeRunner {
+	k.cache = p
+	return k
 }
 
 // NewKubeRunner construye el runner sobre Kapsule.
@@ -98,6 +119,7 @@ func NewKubeRunner(cfg config.Config, jobs JobClient, logs LogSink) *KubeRunner 
 func (k *KubeRunner) Run(ctx context.Context, req KanikoRequest) KanikoResult {
 	l := log.From(ctx).With("component", "kaniko", "build_id", req.BuildID)
 	spec := k.specFor(req)
+	k.conCacheDeRegistry(ctx, req, &spec)
 
 	name, err := k.jobs.Submit(ctx, spec)
 	if err != nil {
@@ -175,6 +197,67 @@ func (k *KubeRunner) specFor(req KanikoRequest) JobSpec {
 	return spec
 }
 
+// ProvisionerDeCache es el que acuña la credencial acotada a la caché de cada tenant, o
+// nil si falta lo que hace falta (la secret key con derecho IAM, la organización o un
+// registry de Scaleway del que sacar la región): entonces la caché va en línea.
+func ProvisionerDeCache(cfg config.Config, jobs *KubeJobClient) *buildcache.Provisioner {
+	region := buildcache.RegionDeRegistry(cfg.RegistryURL)
+	if cfg.SCWSecretKey == "" || cfg.SCWOrgID == "" || region == "" || jobs == nil {
+		return nil
+	}
+	api := buildcache.NewScaleway(cfg.SCWAPIURL, region, cfg.SCWSecretKey, cfg.SCWOrgID)
+	return buildcache.NewProvisioner(api, buildcache.NewSecretosKube(jobs.cs, cfg.BuildNamespace), buildcache.HostDeRegistry(cfg.RegistryURL))
+}
+
+// conCacheDeRegistry pone en una build con Dockerfile la caché de capas del registry: la
+// importa y la exporta (`mode=max`, también las capas intermedias) en la imagen de caché
+// del tenant, con su credencial acotada. Si no se puede (sin IAM, un fallo de Scaleway),
+// la build sigue con la caché en línea: la caché es una mejora, no un requisito.
+//
+// ponytail: CNB sigue con la caché en un emptyDir. Su exporter empuja con la credencial
+// de plataforma, y un config.json no admite dos credenciales para el mismo host del
+// registry; llevarla al registry pide restaurar y guardar la caché en contenedores
+// propios con la credencial del tenant.
+func (k *KubeRunner) conCacheDeRegistry(ctx context.Context, req KanikoRequest, spec *JobSpec) {
+	if k.cache == nil || spec.Buildpacks {
+		return
+	}
+	destino, err := k.cache.Asegurar(ctx, req.Tenant)
+	if err != nil {
+		log.From(ctx).Warn("caché de build sin registry; sigue en línea", "tenant", req.Tenant, "error", err)
+		return
+	}
+	spec.CacheSecret = destino.Secret
+	spec.CacheImage = destino.Imagen(nombreDeImagen(req.Destination), "buildkit")
+	spec.Args = cacheDeRegistryArgs(spec.Args, spec.CacheImage)
+}
+
+// cacheDeRegistryArgs cambia la caché en línea por la de la imagen de caché del tenant.
+func cacheDeRegistryArgs(args []string, imagen string) []string {
+	out := make([]string, 0, len(args)+1)
+	for _, a := range args {
+		if a == "--export-cache=type=inline" {
+			out = append(out, "--export-cache=type=registry,ref="+imagen+",mode=max",
+				"--import-cache=type=registry,ref="+imagen)
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// nombreDeImagen es el repositorio de una referencia sin registry, ruta, tag ni digest
+// (`rg.fr-par.scw.cloud/sytue/acme-web:abc` da `acme-web`): el nombre de su caché.
+func nombreDeImagen(ref string) string {
+	ref, _, _ = strings.Cut(ref, "@")
+	nombre := ref[strings.LastIndex(ref, "/")+1:]
+	nombre, _, _ = strings.Cut(nombre, ":")
+	if nombre == "" {
+		return "app"
+	}
+	return nombre
+}
+
 // cnbAppDir es el directorio de la app dentro de /workspace sobre el que opera el
 // lifecycle de CNB: la raíz del contexto clonado o, en monorepos, el root_dir
 // (ContextSub). El buildpack auto-detecta el lenguaje sobre él.
@@ -191,6 +274,10 @@ func cnbAppDir(contextSub string) string {
 // monta— la credencial del registry; la empuja después `crane`. Cierra el
 // registry-cred cross-tenant en el camino por defecto.
 const kanikoTarPath = "/workspace/image.sytue.tar"
+
+// cacheDockerConfigDir es donde se monta, en el contenedor de build, la credencial
+// acotada a la caché del tenant (DOCKER_CONFIG apunta aquí).
+const cacheDockerConfigDir = "/cache-docker-config"
 
 // buildctlArgs traduce la solicitud a la CLI de BuildKit.
 //

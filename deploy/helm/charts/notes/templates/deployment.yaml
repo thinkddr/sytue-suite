@@ -151,9 +151,12 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+            # Raíz del TLS de PgBouncer (global.pgbouncerTls): el DSN la verifica.
+            {{- include "sytue.pgbouncerCaMount" . | nindent 12 }}
             - name: tmp
               mountPath: /tmp
       volumes:
+        {{- include "sytue.pgbouncerCaVolume" . | nindent 8 }}
         - name: tmp
           emptyDir: {}
       {{- with .Values.topologySpreadConstraints }}

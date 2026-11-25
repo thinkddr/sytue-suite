@@ -4,6 +4,10 @@
 "widgets.newNote" = "Jauna piezīme";
 "widgets.newContact" = "Jauns kontakts";
 "widgets.addPhotos" = "Pievienot fotoattēlus";
+"widgets.newDocument" = "Jauns dokuments";
+"widgets.newSpreadsheet" = "Jauna izklājlapa";
+"widgets.newPresentation" = "Jauna prezentācija";
+"widgets.openToUpdate" = "Atjauninās, kad lietotne ir atvērta";
 "widgets.notes" = "Piezīmes";
 "widgets.rows" = "Rindas";
 "widgets.pending" = "Gaida";

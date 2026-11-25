@@ -99,6 +99,73 @@ func TestCrearSalaDeDocumentoExigeAccesoYGuardaSoloTituloEId(t *testing.T) {
 	}
 }
 
+// gateQueAvisa es la verja de Docs que además deja el aviso de la llamada.
+type gateQueAvisa struct {
+	fakeGate
+	avisos chan string
+}
+
+func (g *gateQueAvisa) AvisarLlamada(ctx context.Context, id string) error {
+	g.avisos <- bearerFrom(ctx) + " " + id
+	return nil
+}
+
+// Llamar desde el documento avisa por Docs a quien colabora (ADR 0070): al CREAR la sala,
+// con el token de quien llama; unirse a la que ya hay no vuelve a avisar.
+//
+// Visto en rojo sin avisarLlamadaDeDocumento en CreateRoom: no llegaba ningún aviso.
+func TestLaLlamadaNuevaDeUnDocumentoPideElAviso(t *testing.T) {
+	fs := &fakeStore{room: docRoom()}
+	s := newSvc(fs, &fakeLK{}, nil)
+	g := &gateQueAvisa{avisos: make(chan string, 2)}
+	s.SetDocumentGate(g)
+	ctx := WithBearer(accessCtx(t), "tok-bob")
+	if _, err := s.CreateRoomFromSource(ctx, domain.SourceDocument, docUUID, "Plan", "bob", 0); err != nil {
+		t.Fatalf("crear la sala: %v", err)
+	}
+	select {
+	case a := <-g.avisos:
+		if a != "tok-bob "+docUUID {
+			t.Fatalf("aviso = %q, quiero el del documento con el token de quien llama", a)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("abrir la llamada del documento no pidió el aviso")
+	}
+	fs.findRoom, fs.findFound = docRoom(), true
+	if _, err := s.CreateRoomFromSource(ctx, domain.SourceDocument, docUUID, "Plan", "carl", 0); err != nil {
+		t.Fatalf("unirse a la que ya hay: %v", err)
+	}
+	select {
+	case a := <-g.avisos:
+		t.Fatalf("unirse a la llamada que ya hay volvió a avisar: %q", a)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestDocsClientPideElAvisoDeLlamada(t *testing.T) {
+	var cabecera, ruta, metodo string
+	estado := http.StatusAccepted
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cabecera, ruta, metodo = r.Header.Get("Authorization"), r.URL.Path, r.Method
+		w.WriteHeader(estado)
+	}))
+	defer srv.Close()
+	c := NewDocsClient(srv.URL)
+	if err := c.AvisarLlamada(WithBearer(context.Background(), "tok"), docUUID); err != nil {
+		t.Fatalf("202: %v", err)
+	}
+	if metodo != http.MethodPost || cabecera != "Bearer tok" || ruta != "/api/v1/documents/"+docUUID+"/call-notice" {
+		t.Fatalf("pide %s %s con %q", metodo, ruta, cabecera)
+	}
+	estado = http.StatusForbidden
+	if err := c.AvisarLlamada(WithBearer(context.Background(), "tok"), docUUID); err == nil {
+		t.Fatal("un 403 no es un aviso hecho")
+	}
+	if err := c.AvisarLlamada(context.Background(), docUUID); err == nil {
+		t.Fatal("sin token no se pide nada")
+	}
+}
+
 func TestSoloUnDocumentoConIdValidoEsOrigen(t *testing.T) {
 	if (domain.RoomSource{Kind: domain.SourceDocument, RefID: "no-es-uuid"}).Valid() {
 		t.Fatal("el id de un documento es un UUID")

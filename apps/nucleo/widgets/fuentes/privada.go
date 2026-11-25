@@ -34,25 +34,45 @@ func sinDatosPrivados() widgets.Fuente {
 }
 
 // Privada es la Fuente de un producto cuyos datos viven en el repositorio privado: lee del
-// que la app tenga montado y, sin ninguno, falla con ErrSinDatosPrivados. Es segura entre
-// rutinas; el valor cero vale.
+// que la app tenga montado y, sin ninguno, de su respaldo (Respaldar) o, sin respaldo,
+// falla con ErrSinDatosPrivados. Es segura entre rutinas; el valor cero vale.
 type Privada struct {
-	mu     sync.Mutex
-	actual widgets.Fuente
-	turno  uint64
+	mu       sync.Mutex
+	actual   widgets.Fuente
+	respaldo widgets.Fuente
+	turno    uint64
 }
 
-// Fuente es la que se le da al Publicador (sesion.Suite.PublicadorWidget).
+// Fuente es la que se le da al Publicador (sesion.Suite.PublicadorWidget). Lo que lee
+// del repositorio montado sale marcado SoloConLaApp: ya rancio, el lector dice que se
+// actualiza con la app abierta.
 func (p *Privada) Fuente() widgets.Fuente {
 	return func(ctx context.Context) (widgets.Detail, error) {
 		p.mu.Lock()
-		f := p.actual
+		f, montada := p.actual, p.actual != nil
+		if f == nil {
+			f = p.respaldo
+		}
 		p.mu.Unlock()
 		if f == nil {
 			return widgets.Detail{}, ErrSinDatosPrivados
 		}
-		return f(ctx)
+		d, err := f(ctx)
+		if err == nil && montada {
+			d.SoloConLaApp = true
+		}
+		return d, err
 	}
+}
+
+// Respaldar pone la Fuente que se lee mientras no haya repositorio montado: la registrada
+// del producto (Registrada). En Drive y CertiPDF es la que falla con ErrSinDatosPrivados;
+// en una app de registros, la que lee el servidor solo si la fuente de la cuenta sigue
+// `legacy` (registros.go).
+func (p *Privada) Respaldar(f widgets.Fuente) {
+	p.mu.Lock()
+	p.respaldo = f
+	p.mu.Unlock()
 }
 
 // Montar pone la Fuente sobre el repositorio que la app acaba de abrir y devuelve cómo

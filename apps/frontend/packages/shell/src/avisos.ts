@@ -587,6 +587,8 @@ const documentos: readonly TipoDeAviso[] = [
   { id: 'shared', tipos: ['docs.shared'] },
   { id: 'comments', tipos: ['docs.comment'] },
   { id: 'mentions', tipos: ['docs.mention'] },
+  // «Llamar desde el documento» (ADR 0070): es una invitación a entrar en la llamada.
+  { id: 'invitations', tipos: ['docs.call'] },
   ...peticiones('docs'),
 ];
 
@@ -669,7 +671,7 @@ export const TIPOS_DE_AVISOS: Readonly<
     { id: 'live', tipos: ['cast.live'] },
     { id: 'reports', tipos: ['cast.report'], critico: true },
   ],
-  cloud: [{ id: 'deploys', tipos: ['cloud.deploy'] }],
+  cloud: [{ id: 'deploys', tipos: ['cloud.deploy.ready', 'cloud.deploy.failed'] }],
   one: [{ id: 'updates', tipos: ['one.update.available'] }],
 };
 

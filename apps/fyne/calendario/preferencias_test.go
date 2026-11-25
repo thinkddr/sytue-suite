@@ -19,7 +19,7 @@ import (
 func TestRecuerdaVistaYOcultosPorPersona(t *testing.T) {
 	prefs := test.NewApp().Preferences()
 	quien := "ana"
-	almacen := sesion.NuevoPorPersona(prefs, func() string { return quien })
+	almacen := sesion.NuevoPorPersona(prefs, func() sesion.Alcance { return sesion.Alcance{Sujeto: quien} })
 
 	a := appDePrueba(t, &servicioFalso{})
 	a.Almacen = almacen
@@ -64,7 +64,7 @@ func TestRecuerdaVistaYOcultosPorPersona(t *testing.T) {
 func TestRecuerdaElCambioDePersonaEnLaMismaVentana(t *testing.T) {
 	prefs := test.NewApp().Preferences()
 	quien := "beto"
-	almacen := sesion.NuevoPorPersona(prefs, func() string { return quien })
+	almacen := sesion.NuevoPorPersona(prefs, func() sesion.Alcance { return sesion.Alcance{Sujeto: quien} })
 	almacen.Poner(ClaveVista, "agenda")
 	almacen.Poner(ClaveOcultos, `["suyo"]`)
 
@@ -85,7 +85,7 @@ func TestRecuerdaElCambioDePersonaEnLaMismaVentana(t *testing.T) {
 // guardado no lo pisa ni el enlace cambia lo guardado.
 func TestRecuerdaPeroElEnlaceManda(t *testing.T) {
 	prefs := test.NewApp().Preferences()
-	almacen := sesion.NuevoPorPersona(prefs, func() string { return "ana" })
+	almacen := sesion.NuevoPorPersona(prefs, func() sesion.Alcance { return sesion.Alcance{Sujeto: "ana"} })
 	almacen.Poner(ClaveVista, "week")
 
 	a := appDePrueba(t, &servicioFalso{})
@@ -123,7 +123,7 @@ func TestRecuerdaSinAlmacenEsComoSiempre(t *testing.T) {
 func TestRecuerdaQueOtraPersonaSinNadaGuardadoEmpiezaEnElMes(t *testing.T) {
 	prefs := test.NewApp().Preferences()
 	quien := "ana"
-	almacen := sesion.NuevoPorPersona(prefs, func() string { return quien })
+	almacen := sesion.NuevoPorPersona(prefs, func() sesion.Alcance { return sesion.Alcance{Sujeto: quien} })
 
 	a := appDePrueba(t, &servicioFalso{})
 	a.Almacen = almacen

@@ -149,8 +149,15 @@ export function createPrivateDriveGate(options: {
           // Otro dispositivo está pasando su Drive de Matrix a esta bóveda (ADR
           // 0086): mientras su marca valga, no se importa encima. La puerta lo
           // enseña y deja esperar o cancelar esa copia; el servidor tampoco dejaría
-          // publicar.
-          if ((await vault.copyMarker(signal))?.active) throw new PqVaultError('copy');
+          // publicar (409 → `copy`). Por eso la marca es un aviso y no una puerta:
+          // si no se puede leer, se sigue. Antes un fallo al releerla dejaba Drive en
+          // «no se pudieron abrir los datos cifrados» (`prepare/vault.unavailable`)
+          // con la bóveda ya abierta, y ni reintentar ni vaciar lo cambiaban.
+          const marker = await vault.copyMarker(signal).catch((error: unknown) => {
+            if (error instanceof PqVaultError && error.reason === 'unavailable') return null;
+            throw error;
+          });
+          if (marker?.active) throw new PqVaultError('copy');
           signal.throwIfAborted();
           // migrate prepares the vault before it can read the retained source.
           await repository.migrate(source, signal);

@@ -97,6 +97,10 @@ type Config struct {
 	SCWIAMURL    string
 	SCWSecretKey string
 	SCWOrgID     string
+	// SCWAPIURL es la raíz de la API de Scaleway (Account, Registry, IAM) para la
+	// credencial del registry acotada a la caché de builds de cada tenant
+	// (internal/buildcache).
+	SCWAPIURL string
 
 	// Registry es el Container Registry destino de las imágenes construidas
 	// (Scaleway Registry en prod).
@@ -313,6 +317,7 @@ func Load(defaultPort string) (Config, error) {
 		S3BackupSecretKey: l.Get("S3_BACKUP_SECRET_KEY"),
 
 		SCWIAMURL:    l.GetDefault("SCW_IAM_URL", "https://api.scaleway.com/iam/v1alpha1"),
+		SCWAPIURL:    l.GetDefault("SCW_API_URL", "https://api.scaleway.com"),
 		SCWSecretKey: l.Get("SCW_SECRET_KEY"),
 		SCWOrgID:     l.Get("SCW_ORG_ID"),
 

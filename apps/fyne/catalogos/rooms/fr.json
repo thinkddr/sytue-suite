@@ -316,6 +316,7 @@
   "dm.deleteFailed": "La discussion n’a pas pu être supprimée.",
   "dm.empty": "Il n’y a encore personne d’autre dans l’équipe.",
   "dm.emptyQuery": "Personne ne correspond à votre recherche.",
+  "dm.externalClosed": "Votre organisation n’autorise pas les conversations avec cette personne.",
   "dm.invite": "Inviter des personnes",
   "dm.maxPeople": {
     "one": "Vous pouvez ajouter {count} personne au maximum.",

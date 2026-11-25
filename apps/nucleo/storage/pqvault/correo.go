@@ -64,13 +64,13 @@ func (v *Vault) RegisterSigningKey(ctx context.Context, registry Registry, hando
 	if encoded == "" {
 		return SigningMissing
 	}
-	status := registerSigningKey(ctx, registry, v.scope, encoded, handover)
+	status, check := registerSigningKey(ctx, registry, v.scope, encoded, handover)
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.closed {
 		return SigningUnavailable
 	}
-	v.signing = status
+	v.signing, v.signingCheck = status, check
 	return status
 }
 

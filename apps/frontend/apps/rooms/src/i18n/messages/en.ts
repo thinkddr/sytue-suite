@@ -287,6 +287,7 @@ export const en = {
     other: 'You can add up to {count} people.',
   },
   'dm.openFailed': 'The conversation could not be opened.',
+  'dm.externalClosed': 'Your organisation does not allow conversations with this person.',
 
   // --- Personas de otra organización (ADR 0040) ---------------------------
   'people.search': 'Search “{query}” on Sytue One',

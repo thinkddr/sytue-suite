@@ -86,6 +86,14 @@ func TestContratoComunConLosLectoresNativos(t *testing.T) {
 			if got := s.Rancio(time.Unix(entero(t, c[3]), 0)); got != (c[4] == "1") {
 				t.Errorf("rancio «%s»: %v, el contrato dice %s", c[1], got, c[4])
 			}
+		case "abrir":
+			if len(c) != 6 {
+				t.Fatalf("caso mal formado: %q", c)
+			}
+			s := Snapshot{SoloConLaApp: c[2] == "1", UpdatedAt: entero(t, c[3])}
+			if got := s.PideAbrir(time.Unix(entero(t, c[4]), 0)); got != (c[5] == "1") {
+				t.Errorf("abrir «%s»: %v, el contrato dice %s", c[1], got, c[5])
+			}
 		case "vigente":
 			zona, err := time.LoadLocation(c[2])
 			if err != nil {
@@ -124,7 +132,7 @@ func TestContratoComunConLosLectoresNativos(t *testing.T) {
 			t.Fatalf("tipo de caso desconocido: %q", c[0])
 		}
 	}
-	if cuenta["visible"] < 15 || cuenta["rancio"] < 4 || cuenta["vigente"] < 10 || cuenta["ruta"] < 20 {
+	if cuenta["visible"] < 15 || cuenta["rancio"] < 4 || cuenta["abrir"] < 4 || cuenta["vigente"] < 10 || cuenta["ruta"] < 20 {
 		t.Fatalf("el contrato se ha quedado corto: %v", cuenta)
 	}
 }
@@ -142,6 +150,7 @@ func TestLosLectoresNativosDicenLasMismasConstantes(t *testing.T) {
 			regexp.MustCompile(`static let version = ` + version + `\b`),
 			regexp.MustCompile(`static let maxRouteBytes = ` + ruta + `\b`),
 			regexp.MustCompile(`"route"`),
+			regexp.MustCompile(`"app_only"`),
 		},
 		fuenteJava: {
 			regexp.MustCompile(`public static final long MAX_AGE = ` + maximo + `;`),
@@ -149,7 +158,7 @@ func TestLosLectoresNativosDicenLasMismasConstantes(t *testing.T) {
 			regexp.MustCompile(`public static final long VERSION = ` + version + `;`),
 			regexp.MustCompile(`public static final int MAX_ROUTE_BYTES = ` + ruta + `;`),
 		},
-		fuenteJavaLector: {regexp.MustCompile(`"route"`)},
+		fuenteJavaLector: {regexp.MustCompile(`"route"`), regexp.MustCompile(`"app_only"`)},
 		pruebaSwift:      {regexp.MustCompile(regexp.QuoteMeta(filepath.Base(ficheroContrato)))},
 		pruebaJava:       {regexp.MustCompile(regexp.QuoteMeta(filepath.Base(ficheroContrato)))},
 	}

@@ -288,6 +288,8 @@ export const mt: AppCatalog<typeof en> = {
     other: "Tista' żżid sa {count} persuna.",
   },
   'dm.openFailed': 'Il-konversazzjoni ma setgħetx tinfetaħ.',
+  'dm.externalClosed':
+    'L-organizzazzjoni tiegħek ma tħallix konversazzjonijiet ma’ din il-persuna.',
   'people.search': "Fittex “{query}” f'Sytue One",
   'people.searching': "Qed infittxu f'Sytue One…",
   'people.notFound': "Ħadd f'Sytue One ma juża dik l-email jew @username.",

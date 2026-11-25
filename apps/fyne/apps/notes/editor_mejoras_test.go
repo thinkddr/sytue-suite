@@ -373,7 +373,7 @@ func TestLasAccionesDelBloque(t *testing.T) {
 	for id, quiero := range map[string]string{
 		"decision":    `<ul data-tipo="decisiones"><li>uno</li></ul>`,
 		"panel_exito": `<div data-panel="exito"><p>uno</p></div>`,
-		"expandir":    `<details data-expandir=""><summary></summary><p>uno</p></details>`,
+		"expandir":    `<details data-expandir="" open=""><summary></summary><p>uno</p></details>`,
 	} {
 		ed := editorNotas(t, "<p>uno</p>")
 		for _, c := range comandos {

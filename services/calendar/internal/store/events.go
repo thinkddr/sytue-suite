@@ -16,7 +16,7 @@ import (
 	"git.sytue.eu/sytue/one/services/calendar/internal/domain"
 )
 
-const eventCols = `id, calendar_id, object_id, uid, summary, description, location, organizer,
+const eventCols = `id, calendar_id, object_id, uid, summary, description, location, organizer, organizer_name,
 	dtstart, dtend, tzid, all_day, status, classification, transp, color, conference_url,
 	rrule, rdate, exdate, recurrence_end, recurrence_id, sequence_no, created_at, updated_at`
 
@@ -24,7 +24,7 @@ func scanEvent(row pgx.Row, t string) (domain.Event, error) {
 	var e domain.Event
 	var status, class, transp string
 	if err := row.Scan(&e.ID, &e.CalendarID, &e.ObjectID, &e.UID, &e.Summary, &e.Description,
-		&e.Location, &e.Organizer, &e.DTStart, &e.DTEnd, &e.TZID, &e.AllDay,
+		&e.Location, &e.Organizer, &e.OrganizerName, &e.DTStart, &e.DTEnd, &e.TZID, &e.AllDay,
 		&status, &class, &transp, &e.Color, &e.ConferenceURL, &e.RRule, &e.RDate, &e.ExDate, &e.RecurrenceEnd,
 		&e.RecurrenceID, &e.SequenceNo, &e.CreatedAt, &e.UpdatedAt); err != nil {
 		return domain.Event{}, err
@@ -182,15 +182,15 @@ func insertEventRow(ctx context.Context, tx pgx.Tx, tenant string, objectID uuid
 	row := tx.QueryRow(ctx,
 		`INSERT INTO events (tenant, calendar_id, object_id, uid, summary, description, location, organizer,
 			dtstart, dtend, tzid, all_day, status, classification, transp, color, conference_url,
-			rrule, rdate, exdate, recurrence_end, recurrence_id, sequence_no)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+			rrule, rdate, exdate, recurrence_end, recurrence_id, sequence_no, organizer_name)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
 		 RETURNING `+eventCols,
 		tenant, calendarID, objectID, in.UID, in.Summary, in.Description, in.Location, in.Organizer,
 		in.DTStart.UTC(), in.DTEnd.UTC(), in.TZID, in.AllDay, string(in.Status), string(in.Classification),
 		string(in.Transparency), domain.SanitizeColor(in.Color),
 		domain.SanitizeConferenceURL(in.ConferenceURL),
 		in.RRule, utcSlice(in.RDate), utcSlice(in.ExDate),
-		in.RecurrenceEnd, in.RecurrenceID, in.SequenceNo)
+		in.RecurrenceEnd, in.RecurrenceID, in.SequenceNo, in.OrganizerName)
 	ev, err := scanEvent(row, tenant)
 	if uniqueViolation(err) {
 		return domain.Event{}, domain.ErrConflict
@@ -205,7 +205,7 @@ func updateMasterRow(ctx context.Context, tx pgx.Tx, tenant string, objectID uui
 		`UPDATE events SET uid=$3, summary=$4, description=$5, location=$6, organizer=$7,
 			dtstart=$8, dtend=$9, tzid=$10, all_day=$11, status=$12, classification=$13, transp=$14,
 			color=$15, conference_url=$16, rrule=$17, rdate=$18, exdate=$19, recurrence_end=$20,
-			sequence_no=$21, updated_at=now()
+			sequence_no=$21, organizer_name=$22, updated_at=now()
 		 WHERE tenant=$1 AND object_id=$2 AND recurrence_id IS NULL AND deleted_at IS NULL
 		 RETURNING `+eventCols,
 		tenant, objectID, in.UID, in.Summary, in.Description, in.Location, in.Organizer,
@@ -213,7 +213,7 @@ func updateMasterRow(ctx context.Context, tx pgx.Tx, tenant string, objectID uui
 		string(in.Transparency), domain.SanitizeColor(in.Color),
 		domain.SanitizeConferenceURL(in.ConferenceURL),
 		in.RRule, utcSlice(in.RDate), utcSlice(in.ExDate),
-		in.RecurrenceEnd, in.SequenceNo)
+		in.RecurrenceEnd, in.SequenceNo, in.OrganizerName)
 	return scanEvent(row, tenant)
 }
 
@@ -438,7 +438,7 @@ func utcSlice(ts []time.Time) []time.Time {
 // eventQual devuelve la lista de columnas de evento cualificadas por alias.
 func eventQual(alias string) string {
 	cols := []string{
-		"id", "calendar_id", "object_id", "uid", "summary", "description", "location", "organizer",
+		"id", "calendar_id", "object_id", "uid", "summary", "description", "location", "organizer", "organizer_name",
 		"dtstart", "dtend", "tzid", "all_day", "status", "classification", "transp", "color", "conference_url",
 		"rrule", "rdate", "exdate", "recurrence_end", "recurrence_id", "sequence_no", "created_at", "updated_at",
 	}

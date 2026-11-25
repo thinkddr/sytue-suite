@@ -55,6 +55,10 @@ func (s *Service) personasDeFuera(ctx context.Context, teamID uuid.UUID, subs []
 	if s.directorio == nil {
 		return nil, domain.ErrNotMember
 	}
+	// La política de contacto de la organización donde se abre (contacto_externo.go).
+	if err := s.contactoDeSalida(ctx, fuera); err != nil {
+		return nil, err
+	}
 	out := make(map[string]string, len(fuera))
 	for _, sub := range fuera {
 		p, err := s.directorio.PorID(ctx, sub)
@@ -82,13 +86,31 @@ func (s *Service) ListExternalChannels(ctx context.Context, sub string) ([]domai
 	if s.pstore == nil {
 		return nil, nil, nil
 	}
-	return s.pstore.ListExternalChannels(ctx, sub, t.Slug)
+	canales, leidos, err := s.pstore.ListExternalChannels(ctx, sub, t.Slug)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Las de una organización que las políticas no admiten no se ven desde esta sesión.
+	permitida := map[string]bool{}
+	var cs []domain.Channel
+	var ls []domain.ReadState
+	for i, c := range canales {
+		ok, visto := permitida[c.Tenant]
+		if !visto {
+			ok = s.contactoPermitido(ctx, t.Slug, c.Tenant)
+			permitida[c.Tenant] = ok
+		}
+		if ok {
+			cs, ls = append(cs, c), append(ls, leidos[i])
+		}
+	}
+	return cs, ls, nil
 }
 
 // RefAnfitrion es el recurso de una ruta por el que se busca la organización
-// anfitriona: un canal, un mensaje o una sala (uno solo).
+// anfitriona: un canal, un mensaje, una sala o un mensaje programado (uno solo).
 type RefAnfitrion struct {
-	Canal, Mensaje, Sala uuid.UUID
+	Canal, Mensaje, Sala, Programado uuid.UUID
 }
 
 // Anfitrion devuelve la organización donde vive el recurso cuando quien pregunta
@@ -98,11 +120,26 @@ func (s *Service) Anfitrion(ctx context.Context, subject string, ref RefAnfitrio
 	if err != nil || s.pstore == nil || subject == "" {
 		return "", err
 	}
+	anfitrion, err := s.anfitrion(ctx, subject, t, ref)
+	if err != nil || anfitrion == "" {
+		return anfitrion, err
+	}
+	// Sin admitirlo las políticas de las dos organizaciones (contacto_externo.go), la
+	// petición se queda en la suya: allí la conversación no existe.
+	if !s.contactoPermitido(ctx, t.Slug, anfitrion) {
+		return "", nil
+	}
+	return anfitrion, nil
+}
+
+func (s *Service) anfitrion(ctx context.Context, subject string, t tenancy.Tenant, ref RefAnfitrion) (string, error) {
 	switch {
 	case ref.Canal != uuid.Nil:
 		return s.pstore.AnfitrionDeCanal(ctx, subject, t.Slug, ref.Canal)
 	case ref.Mensaje != uuid.Nil:
 		return s.pstore.AnfitrionDeMensaje(ctx, subject, t.Slug, ref.Mensaje)
+	case ref.Programado != uuid.Nil:
+		return s.pstore.AnfitrionDeProgramado(ctx, subject, t.Slug, ref.Programado)
 	case ref.Sala != uuid.Nil:
 		anfitrion, err := s.pstore.AnfitrionDeSala(ctx, subject, t.Slug, ref.Sala)
 		if err != nil || anfitrion != "" {
@@ -113,6 +150,18 @@ func (s *Service) Anfitrion(ctx context.Context, subject string, ref RefAnfitrio
 		return s.pstore.AnfitrionDeReunionDeEvento(ctx, t.Slug, ref.Sala)
 	}
 	return "", nil
+}
+
+// enOrganizacionDelCanal devuelve el contexto en la organización donde vive el canal
+// cuando subject está en él como persona de fuera; el mismo en el caso normal. Es para
+// lo que se escribe por persona y no por una ruta del canal (el borrador), que tiene
+// que quedar junto al canal, como lo demás de la conversación.
+func (s *Service) enOrganizacionDelCanal(ctx context.Context, subject string, channelID uuid.UUID) (context.Context, error) {
+	anfitrion, err := s.Anfitrion(ctx, subject, RefAnfitrion{Canal: channelID})
+	if err != nil || anfitrion == "" {
+		return ctx, err
+	}
+	return tenancy.Into(ctx, tenancy.Tenant{Slug: anfitrion}), nil
 }
 
 // DirectorioID es el Directorio real: pregunta a Sytue ID con el token de quien

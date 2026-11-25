@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/resource"
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
@@ -29,6 +30,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/resourcepg"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -243,7 +245,13 @@ func run() error {
 			return fmt.Errorf("resource source authority provider: %w", err)
 		}
 	}
+	// La traza de acceso a documentos (docs/security.md §1.7): en lotes, sin
+	// bloquear la petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
 	handler := dochttp.New(dochttp.Deps{
+		Traza:   traza,
 		Service: svc, Store: st, Hub: hub, Objects: objects,
 		Verifier: verifier, SnapshotInlineLimit: cfg.SnapshotInlineLimit,
 		Sealer: sealer, Executor: executor,
@@ -291,6 +299,7 @@ func run() error {
 		Logger:         logger,
 		RequestTimeout: 30 * time.Second,
 		MaxBodyBytes:   domain.MaxPDFBytes + (1 << 20),
+		Traza:          traza.Middleware(dochttp.ReglasDeTraza...),
 	})
 	checkers := []httpx.Checker{
 		httpx.CheckerFunc{Label: "postgres", Fn: st.Healthz},
@@ -329,6 +338,14 @@ func run() error {
 			logger.Error("fan-out colab: subscriber detenido", "error", err)
 		}
 	}()
+
+	// Purga de tenant (ADR 0054): los objetos de una organización que desaparece.
+	// Sin S3 no hay objetos, y las órdenes se cumplen sin más.
+	var almacenPurga purgatenant.Almacen = purgatenant.SinAlmacen{}
+	if objects != nil {
+		almacenPurga = objects
+	}
+	go purgatenant.Trabajador{DB: pool, Almacen: almacenPurga, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
 
 	// Purga periódica del outbox en una goroutine ligada al contexto.
 	go runOutboxPurge(ctx, st)

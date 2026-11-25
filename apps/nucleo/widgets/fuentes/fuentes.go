@@ -83,11 +83,12 @@ func sinAcceso(err error) bool {
 
 // secundaria es el error de una lectura que aporta filas o contadores al widget (la
 // cuota, los directos, los álbumes) que no es la principal. Un 403/404 es que ese dato
-// no es para esta persona o el servicio no lo tiene: se publica sin él (nil). Otro
-// error —la red, un 5xx, un 401— se devuelve, y el Publicador conserva lo publicado:
+// no es para esta persona o el servicio no lo tiene, y una operación que el repositorio
+// privado no tiene (noEnPrivado), que esa cuenta no lo tiene: se publica sin él (nil).
+// Otro error —la red, un 5xx, un 401— se devuelve, y el Publicador conserva lo publicado:
 // publicar con éxito un parcial borraría del widget, p. ej., un directo en curso.
 func secundaria(err error) error {
-	if err == nil || sinAcceso(err) {
+	if err == nil || sinAcceso(err) || noEnPrivado(err) {
 		return nil
 	}
 	return err

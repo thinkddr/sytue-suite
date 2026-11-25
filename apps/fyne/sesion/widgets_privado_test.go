@@ -78,7 +78,7 @@ func TestElWidgetDeDriveLeeElDrivePrivadoAbierto(t *testing.T) {
 	s.WidgetDesdeDrivePrivado(vida, datos, cuenta)
 	reloj.Avanzar(2 * time.Second)
 	snap, err := widgets.Read("eu.sytue.drive")
-	if err != nil || len(snap.Items) != 1 || snap.Items[0].Title != "Recién subido.pdf" ||
+	if err != nil || len(snap.Items) != 1 || snap.Items[0].Title != "Recién subido.pdf" || !snap.SoloConLaApp ||
 		snap.Items[0].Route != "/?preview=%2FReci%C3%A9n%20subido.pdf" {
 		t.Fatalf("con el Drive privado abierto: %+v, %v", snap, err)
 	}
@@ -88,5 +88,69 @@ func TestElWidgetDeDriveLeeElDrivePrivadoAbierto(t *testing.T) {
 	reloj.Avanzar(2 * time.Second)
 	if snap, err := widgets.Read("eu.sytue.drive"); err != nil || len(snap.Items) != 1 {
 		t.Fatalf("al cerrar el Drive privado se perdió lo publicado: %+v, %v", snap, err)
+	}
+}
+
+// basesPrivadasDePrueba es el repositorio de Bases de Ana, ya en Matrix.
+type basesPrivadasDePrueba struct {
+	api.BasesData
+	nombre string
+}
+
+func (basesPrivadasDePrueba) PrivateStorageScope() storage.Scope {
+	return storage.Scope{Tenant: "org", Subject: "ana", Product: "bases"}
+}
+
+func (b basesPrivadasDePrueba) ListBases(context.Context) ([]api.BasesBase, error) {
+	return []api.BasesBase{{ID: "0b5c6f3e-1d2a-4c8e-9f00-112233445566", Name: b.nombre}}, nil
+}
+
+// TestElWidgetDeUnaAppDeRegistrosLeeSuRepositorioEnMatrix: lo mismo que Drive para las
+// apps de registros con la cuenta en Matrix (Calendar, Contacts, Notes, Photos, Bases,
+// ERP, Cast y la ofimática). Sin el repositorio montado no se publica lo del servidor
+// congelado; montado, lo que hay en él; y con la vista ya cerrada lo publicado se queda.
+func TestElWidgetDeUnaAppDeRegistrosLeeSuRepositorioEnMatrix(t *testing.T) {
+	t.Cleanup(widgets.SimularLector(true))
+	aparte(t)
+	app := test.NewApp()
+	defer app.Quit()
+	s := suiteConSesion(t, appDeWidget{App: app, id: "eu.sytue.bases", esquema: "sytue-bases"}, "ana")
+	reloj := widgets.NuevoRelojDePrueba(time.Now())
+	s.ProbarWidgetsCon(reloj.Opciones(widgets.OpcionesPublicador{}))
+	pub := s.PublicadorWidget(s.FuenteWidget(nil))
+	if pub == nil {
+		t.Fatal("Bases sin publicador")
+	}
+	pub.Avisar()
+	reloj.Avanzar(2 * time.Second)
+	if _, err := widgets.Read("eu.sytue.bases"); err == nil {
+		t.Fatal("sin el repositorio ni el modo de la fuente se publicó algo")
+	}
+
+	congelado := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("el widget de Bases leyó el servidor congelado: %s", r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer congelado.Close()
+	datos, err := api.NewBases(congelado.URL, nil, nil).WithPrivateData(basesPrivadasDePrueba{nombre: "Inventario"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vida, cerrar := context.WithCancel(context.Background())
+	// Una fachada que no es la de su producto no monta nada.
+	s.WidgetDesdeRegistrosPrivados(vida, nil, api.NewDocs(congelado.URL, nil, nil))
+	s.WidgetDesdeRegistrosPrivados(vida, nil, datos)
+	reloj.Avanzar(2 * time.Second)
+	snap, err := widgets.Read("eu.sytue.bases")
+	if err != nil || len(snap.Items) != 1 || snap.Items[0].Title != "Inventario" || !snap.SoloConLaApp ||
+		snap.Items[0].Route != "/base/0b5c6f3e-1d2a-4c8e-9f00-112233445566" {
+		t.Fatalf("con el repositorio abierto: %+v, %v", snap, err)
+	}
+
+	cerrar()
+	pub.Avisar()
+	reloj.Avanzar(2 * time.Second)
+	if snap, err := widgets.Read("eu.sytue.bases"); err != nil || len(snap.Items) != 1 {
+		t.Fatalf("al cerrar el repositorio se perdió lo publicado: %+v, %v", snap, err)
 	}
 }

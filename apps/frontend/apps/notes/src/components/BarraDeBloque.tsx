@@ -37,7 +37,14 @@ import {
   type Contexto,
   type TipoDePanel,
 } from './bloques.js';
-import { alineacionDe, tieneCabeceraDeColumna, tieneCabeceraDeFila } from './tabla-notas.js';
+import {
+  alineacionDe,
+  esCombinada,
+  tieneCabeceraDeColumna,
+  tieneCabeceraDeFila,
+  vecinaAbajo,
+  vecinaDerecha,
+} from './tabla-notas.js';
 import { Glyph, type GlyphName } from './glyphs.js';
 
 /** El nombre de cada color de bloque (los de la paleta de tokens). */
@@ -94,6 +101,9 @@ export interface AccionesDeBloque {
     cabeceraFila: () => void;
     cabeceraColumna: () => void;
     numerada: () => void;
+    combinarDerecha: () => void;
+    combinarAbajo: () => void;
+    separar: () => void;
     fondo: (c: ColorDeBloque | null) => void;
     alinear: (lado: 'left' | 'center' | 'right') => void;
   };
@@ -114,11 +124,14 @@ function Boton({
   rotulo,
   dibujo,
   pulsado,
+  desactivado,
   onPulsar,
 }: {
   rotulo: string;
   dibujo: JSX.Element;
   pulsado?: boolean;
+  /** No vale aquí (combinar en la última celda): se ve apagado y no hace nada. */
+  desactivado?: boolean;
   onPulsar: () => void;
 }): JSX.Element {
   return (
@@ -127,6 +140,7 @@ function Boton({
         type="button"
         class={BOTON_DE_BARRA}
         aria-label={rotulo}
+        disabled={desactivado}
         {...(pulsado === undefined ? {} : { 'aria-pressed': pulsado })}
         onMouseDown={(e) => e.preventDefault()}
         onClick={onPulsar}
@@ -306,6 +320,25 @@ export function BarraDeBloque({
               </MenuItem>
             ))}
           </Dropdown>
+          {/* Combinar y separar celdas (tabla-notas.ts), apagados donde no valen. */}
+          <Boton
+            rotulo={t('editor.mergeRight')}
+            dibujo={g('combinar')}
+            desactivado={!vecinaDerecha(contexto.celda)}
+            onPulsar={a.combinarDerecha}
+          />
+          <Boton
+            rotulo={t('editor.mergeDown')}
+            dibujo={g('combinarAbajo')}
+            desactivado={!vecinaAbajo(contexto.celda)}
+            onPulsar={a.combinarAbajo}
+          />
+          <Boton
+            rotulo={t('editor.splitCell')}
+            dibujo={g('separar')}
+            desactivado={!esCombinada(contexto.celda)}
+            onPulsar={a.separar}
+          />
           <Sep />
           <Boton
             rotulo={t('editor.rowAbove')}

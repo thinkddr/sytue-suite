@@ -316,6 +316,7 @@
   "dm.deleteFailed": "Ekki tókst að eyða spjallinu.",
   "dm.empty": "Það er ekkert annað fólk í teyminu enn.",
   "dm.emptyQuery": "Ekkert fólk passar við leitina.",
+  "dm.externalClosed": "Stofnunin þín leyfir ekki samtöl við þennan aðila.",
   "dm.invite": "Bjóða fólki",
   "dm.maxPeople": {
     "one": "Þú getur bætt við allt að {count} manneskju.",

@@ -1,0 +1,15 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- Cola del borrado de OBJETOS de un tenant purgado (ADR 0054, enmienda del
+-- 2026-11-25). Sytue ID borra las filas de esta base con sus credenciales de
+-- fusión (pg.PurgarTenant) y, cuando ya no queda nada del tenant, deja aquí la
+-- orden; el trabajador de purga de este servicio (platform/pkg/purgatenant), que
+-- es quien tiene la clave del almacén, borra sus objetos y la marca hecha.
+--
+-- El SQL es el común de platform/pkg/pg/tenant_purge_v1.sql:
+-- sytue:tenant-purge-v1
+--
+-- Si db.Migrations no expandiera el marcador, esto falla en vez de dejar el
+-- servicio sin cola en silencio.
+SELECT 'platform_tenant_purges'::regclass, 'platform_tenant_purge_keys'::regclass;

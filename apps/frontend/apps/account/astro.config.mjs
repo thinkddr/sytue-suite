@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { sytueHealthEndpoint } from '@sytue/config/astro-health';
 import { sytuePrecarga } from '@sytue/config/astro-precarga';
 import { sytueNoEncontrada } from '@sytue/config/astro-404';
+import { sytueArranque } from '@sytue/config/astro-arranque';
 import { sytueSecurity } from '@sytue/config/astro-security';
 
 /**
@@ -30,8 +31,10 @@ export default defineConfig({
   // `allowedDomains`: sin él, Astro descarta el Host real y `Astro.url` acaba en
   // localhost, y checkOrigin rechaza entonces todo POST con 403.
   //
-  // `csp`: esta app comparte origen con Sytue ID y es la única con `script-src`
-  // estricto (docs/security.md#riesgo-aceptado-mi-cuenta-en-el-origen-del-idp).
+  // `csp`: esta app comparte origen con Sytue ID y por eso fue la primera con
+  // `script-src` estricto (docs/security.md#riesgo-aceptado-mi-cuenta-en-el-origen-del-idp).
+  // No usa `sytueCsp()` a propósito: no ejecuta WebAssembly, y en el origen del IdP
+  // no se concede `'wasm-unsafe-eval'` sin necesidad.
   // Los estilos quedan con 'unsafe-inline': Tailwind y los `style` de Preact los
   // necesitan, y un estilo inyectado no ejecuta nada.
   security: {
@@ -43,6 +46,7 @@ export default defineConfig({
     sytuePrecarga(),
     sytueHealthEndpoint(),
     sytueNoEncontrada(),
+    sytueArranque(),
     preact({ compat: true }),
   ],
   server: { port: 4333, host: true },

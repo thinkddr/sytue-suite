@@ -2708,9 +2708,9 @@ export const hr: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Potpis ne stane na tu stranicu. Odaberite drugu stranicu ili položaj.',
   'pdf.device.view': 'Prikaži',
   'pdf.vault.help':
-    'Ovaj PDF je u vašem šifriranom Driveu: dešifrira se samo na ovom uređaju, gdje ga možete pregledati, komentirati, ispuniti, organizirati i potpisati. Ono što spremite vraća se šifrirano.',
+    'Ovaj PDF je u vašem šifriranom Driveu: dešifrira se samo na ovom uređaju, gdje ga možete pregledati, komentirati, ispuniti, organizirati, zaštititi, zacrniti, urediti, usporediti, ispisati i potpisati. Ono što spremite vraća se šifrirano.',
   'pdf.vault.serverOnly':
-    'S vašim šifriranim Driveom još nisu dostupni zahtjevi za potpis, zaštita lozinkom, prepoznavanje teksta, zacrnjivanje, uređivanje teksta ili slika, pečati i vodeni žigovi, usporedba, povijest verzija ni ispis: zahtijevaju da usluga pročita PDF ili se još ne rade na uređaju.',
+    'S vašim šifriranim Driveom nisu dostupni zahtjevi za potpis, prepoznavanje teksta ni asistent: zahtijevaju da usluga pročita PDF. Sve ostalo radi se na ovom uređaju.',
   'pdf.vault.notFound.title': 'Ovaj PDF nije u vašem šifriranom Driveu',
   'pdf.vault.notFound.description':
     'Možda je premješten ili izbrisan. Potražite ga u Sytue Driveu.',
@@ -2726,7 +2726,9 @@ export const hr: AppCatalog<typeof en> = {
     'Vaš Disk još prelazi na šifriranje s kraja na kraj. Dovršite to u Sytue Driveu.',
   'pdf.device.error.password': 'Ta lozinka ne otvara certifikat.',
   'pdf.device.error.encrypted':
-    'Ovaj je PDF zaštićen lozinkom i ne može se potpisati na ovom uređaju.',
+    'Ovaj je PDF zaštićen lozinkom: otvorite ga i potpišite iz njegova studija, gdje se koristi njegova lozinka.',
+  'pdf.device.protectedNote':
+    'Ovaj je PDF zaštićen lozinkom. Da bi se potpisao, na ovom se uređaju ponovno zapisuje bez nje, kao što to radi i poslužitelj: potpisana kopija sprema se šifrirana u vaš Drive, ali bez lozinke PDF-a.',
   'pdf.device.error.locked':
     'Ovaj je PDF certificiran protiv svake promjene: novi potpis bi ga poništio.',
   'pdf.device.error.unreadable':

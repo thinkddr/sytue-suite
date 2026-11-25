@@ -17,8 +17,8 @@
  *
  * Self-test: packages/office/test/formula-edit.test.ts (bun test).
  */
-import { numToCol, parseBracketSpec, parseCellWord, parseRefEnd } from '@sytue/formula';
-import type { CellRef, RefEnd, TableArea } from '@sytue/formula';
+import { numToCol, parseBracketSpec, parseCellWord, parseRefEnd } from '@sytue/formula/motor';
+import type { CellRef, RefEnd, TableArea } from '@sytue/formula/motor';
 import { parseRangeRef } from './format';
 import type { RangeRect } from './format';
 

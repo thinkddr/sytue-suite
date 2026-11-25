@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nowa notatka";
 "widgets.newContact" = "Nowy kontakt";
 "widgets.addPhotos" = "Dodaj zdjęcia";
+"widgets.newDocument" = "Nowy dokument";
+"widgets.newSpreadsheet" = "Nowy arkusz kalkulacyjny";
+"widgets.newPresentation" = "Nowa prezentacja";
+"widgets.openToUpdate" = "Aktualizuje się przy otwartej aplikacji";
 "widgets.notes" = "Notatki";
 "widgets.rows" = "Wiersze";
 "widgets.pending" = "Oczekujące";

@@ -19,7 +19,7 @@
  * por tabla (Excel admite varias en las de 1 variable; ponytail: ampliar si se pide).
  * Self-test: packages/office/test/sheets-datatable.test.ts (bun test).
  */
-import type { CellValue } from '@sytue/formula';
+import type { CellValue } from '@sytue/formula/motor';
 import type { RangeRect } from './format';
 
 /** Tope de celdas de resultado (no bloquear la UI; la rejilla 26×100 ya acota,

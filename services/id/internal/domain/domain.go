@@ -386,6 +386,10 @@ type Session struct {
 	Lugar     string
 	ExpiresAt time.Time
 	RevokedAt *time.Time
+	// DeviceID es el dispositivo registrado (devices.id, mig 0022) desde el que se
+	// abrió la sesión, o vacío. Con él se evalúa `device_trust` en cada token
+	// (mig 0128, ver EvaluarConfianzaDelDispositivo).
+	DeviceID string
 	// Current marca, solo en listados (ListSessionsForUser), la sesión desde la
 	// que se hace la petición. No se persiste.
 	Current bool

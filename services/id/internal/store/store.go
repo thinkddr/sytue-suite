@@ -49,15 +49,22 @@ func NewWithCipher(db *pg.Pool, c *keycrypto.Cipher) *Store {
 	return &Store{db: db, keyCipher: c}
 }
 
-// DB devuelve el Querier del pool para operaciones fuera de transacción.
-func (s *Store) DB() pg.Querier { return s.db }
+// DB devuelve el Querier del pool para operaciones fuera de transacción. Aplica el
+// ámbito de RLS que traiga el contexto (ambito.go): sin él, es el pool tal cual.
+func (s *Store) DB() pg.Querier { return conAmbito{db: s.db} }
 
 // Healthz delega en el pool (para /readyz).
 func (s *Store) Healthz(ctx context.Context) error { return s.db.Healthz(ctx) }
 
-// InTx ejecuta fn dentro de una transacción; el Querier pasado es la tx.
+// InTx ejecuta fn dentro de una transacción; el Querier pasado es la tx. Si el
+// contexto declara un ámbito de RLS, se fija antes de la primera sentencia.
 func (s *Store) InTx(ctx context.Context, fn func(q pg.Querier) error) error {
 	return s.db.InTx(ctx, func(t pgx.Tx) error {
+		if a, ok := AmbitoDe(ctx); ok {
+			if err := fijarAmbito(ctx, t, a); err != nil {
+				return err
+			}
+		}
 		if err := fn(t); err != nil {
 			return err
 		}

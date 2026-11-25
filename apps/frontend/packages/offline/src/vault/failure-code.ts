@@ -51,7 +51,7 @@ export function vaultFailureCode(error: unknown): string {
     check = part(e.check);
   switch (e.name) {
     case 'PqVaultError':
-      return 'vault.' + (reason || 'other');
+      return 'vault.' + (reason || 'other') + (check ? '.' + check : '');
     case 'DriveImportError':
       return 'drive.import.' + (check || 'other');
     case 'PrivateDriveError':

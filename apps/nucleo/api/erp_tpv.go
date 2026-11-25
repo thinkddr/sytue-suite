@@ -6,7 +6,10 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 // # El punto de venta (`PuntoVenta.tsx`)
@@ -66,4 +69,42 @@ func (e *ERP) CobrarTPV(ctx context.Context, c ERPCobroTPV) (ERPVentaTPV, error)
 	r.Method, r.Body = http.MethodPost, datos
 	r.Header.Set("Content-Type", "application/json")
 	return JSON[ERPVentaTPV](ctx, e.c, r)
+}
+
+// ERPPresupuestoTPV es «Crear presupuesto» desde la cesta: el cliente y las líneas tal
+// como se vieron. `Operacion` hace el reintento seguro igual que en el cobro: la misma
+// operación devuelve el presupuesto que ya se creó.
+type ERPPresupuestoTPV struct {
+	Operacion string        `json:"operacion"`
+	Cliente   string        `json:"cliente"`
+	Lineas    []ERPLineaTPV `json:"lineas"`
+}
+
+// PresupuestoTPV crea un presupuesto con la cesta (`POST /api/v1/tpv/presupuesto`) y lo
+// devuelve, para abrirlo. No necesita caja abierta ni cobra nada.
+func (e *ERP) PresupuestoTPV(ctx context.Context, p ERPPresupuestoTPV) (ERPRegistro, error) {
+	return e.escribir(ctx, http.MethodPost, "/tpv/presupuesto", p)
+}
+
+// MaxImagenesProductos es cuántos productos admite una consulta de imágenes: el tope
+// del servicio (`maxImagenesProductos`).
+const MaxImagenesProductos = 200
+
+// ImagenesProductos dice qué adjunto es la imagen de cada producto que la tiene
+// (`GET /api/v1/productos/imagenes?registros=…`). Solo identificadores: los bytes se
+// bajan con [ERP.Adjunto], por la descarga autenticada de siempre. Parte la consulta en
+// tandas de [MaxImagenesProductos].
+func (e *ERP) ImagenesProductos(ctx context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	for i := 0; i < len(ids); i += MaxImagenesProductos {
+		tanda := ids[i:min(i+MaxImagenesProductos, len(ids))]
+		r, err := JSON[struct {
+			Imagenes map[string]string `json:"imagenes"`
+		}](ctx, e.c, e.pedir("/productos/imagenes", url.Values{"registros": {strings.Join(tanda, ",")}}))
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(out, r.Imagenes)
+	}
+	return out, nil
 }

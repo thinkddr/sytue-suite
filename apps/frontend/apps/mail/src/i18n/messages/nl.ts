@@ -987,7 +987,7 @@ export const nl: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Zet je e-mail over naar de nieuwe kluis om e-mail te blijven ontvangen',
   'privateMail.vaultMoveRetiredBody':
-    'Het vorige e-mailsysteem is niet meer beschikbaar. Tot je je e-mail naar de kluis overzet, ontvang je geen nieuwe e-mail: wat in de tussentijd binnenkomt, wordt net als je bestaande e-mail versleuteld met het vorige systeem bewaard en kan niet worden gelezen. Het wordt niet verwijderd, maar niemand kan het openen. Na het overzetten komt je e-mail weer binnen en opent hij met je Sytue ID-aanmelding, net als de andere apps.',
+    'Het vorige e-mailsysteem is niet meer beschikbaar. Tot je je e-mail naar de kluis overzet, ontvang je geen nieuwe e-mail: wat je in de tussentijd wordt gestuurd, wacht op de server van de afzender, die het een paar dagen opnieuw probeert. Zet je op tijd over, dan komt het daarna alsnog binnen; zo niet, dan krijgt de afzender bericht dat het niet kon worden bezorgd. Wat al met het vorige systeem is versleuteld, zoals je bestaande e-mail, kan niet worden gelezen: het wordt niet verwijderd, maar niemand kan het openen. Na het overzetten komt je e-mail weer binnen en opent hij met je Sytue ID-aanmelding, net als de andere apps.',
   'privateMail.vaultMoveCheckFailed':
     'De status van je e-mail kon niet worden gecontroleerd. Probeer het zo meteen opnieuw.',
 };

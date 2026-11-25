@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nova bilješka";
 "widgets.newContact" = "Novi kontakt";
 "widgets.addPhotos" = "Dodaj fotografije";
+"widgets.newDocument" = "Novi dokument";
+"widgets.newSpreadsheet" = "Nova proračunska tablica";
+"widgets.newPresentation" = "Nova prezentacija";
+"widgets.openToUpdate" = "Ažurira se kad je aplikacija otvorena";
 "widgets.notes" = "Bilješke";
 "widgets.rows" = "Redci";
 "widgets.pending" = "Na čekanju";

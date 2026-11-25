@@ -65,7 +65,8 @@ func Hub(c Comunes, hub *api.Hub, cal *api.Calendars, correo *api.Mail) widgets.
 }
 
 // agendaDeHoy: la agenda ya viene ordenada y cortada (api.RecortarHoy); los ya
-// terminados siguen, sin marcar, como en la tarjeta (api.EventoDeHoy.HaTerminado).
+// terminados siguen, sin marcar, como en la tarjeta (api.EventoDeHoy.HaTerminado). Cada
+// fila abre su día en Calendar, desde One (RutaAgenda), como la de la tarjeta «Hoy».
 func agendaDeHoy(eventos []api.EventoDeHoy, ahora time.Time) []widgets.Item {
 	out := make([]widgets.Item, 0, len(eventos))
 	for _, e := range eventos {
@@ -73,14 +74,16 @@ func agendaDeHoy(eventos []api.EventoDeHoy, ahora time.Time) []widgets.Item {
 		if titulo == "" {
 			continue
 		}
-		badge := e.Inicio.In(ahora.Location()).Format("15:04")
+		dia := e.Inicio.In(ahora.Location())
+		badge := dia.Format("15:04")
 		if e.TodoElDia {
-			badge = "HOY"
+			// Flotante: su fecha es la del día, sin pasarla a la zona (hub.RutaDelEvento).
+			dia, badge = e.Inicio, "HOY"
 		}
 		out = append(out, widgets.Item{
 			Title: titulo, Badge: badge,
 			StartAt: unix(e.Inicio), EndAt: unix(e.Fin),
-			Unread: !e.HaTerminado(ahora),
+			Unread: !e.HaTerminado(ahora), Route: RutaAgenda(dia, e.TodoElDia),
 		})
 	}
 	return out

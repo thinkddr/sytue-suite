@@ -149,25 +149,33 @@ func TestAppPasswordTenantMigracionLegacy(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = owner.Close(l.ctx) })
-	down, err := db.Migrations.ReadFile("migrations/0119_app_password_org.down.sql")
-	if err != nil {
-		t.Fatal(err)
+	// Las políticas de RLS de 0127 leen app_passwords.org_id: para volver al esquema
+	// de antes de 0119 hay que quitarlas primero, en el orden en que se bajaría de
+	// verdad, y ponerlas de nuevo al final. Antes que 0127 bajan las que usan sus
+	// funciones de ámbito en sus propias políticas (0129 y 0130).
+	migracion := func(nombre string) {
+		t.Helper()
+		sql, err := db.Migrations.ReadFile("migrations/" + nombre)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = owner.Exec(l.ctx, string(sql)); err != nil {
+			t.Fatalf("%s: %v", nombre, err)
+		}
 	}
-	if _, err = owner.Exec(l.ctx, string(down)); err != nil {
-		t.Fatal(err)
-	}
+	migracion("0130_solicitudes_rgpd.down.sql")
+	migracion("0129_purga_de_tenants.down.sql")
+	migracion("0127_rls_ambito_declarado.down.sql")
+	migracion("0119_app_password_org.down.sql")
 	for _, u := range []domain.User{single, multi} {
 		if _, err = l.st.DB().Exec(l.ctx, `INSERT INTO app_passwords(user_id,secret_hash,label) VALUES($1,$2,'legacy')`, u.ID, domain.HashToken(NormalizeAppPassword("legacy-"+u.ID))); err != nil {
 			t.Fatal(err)
 		}
 	}
-	up, err := db.Migrations.ReadFile("migrations/0119_app_password_org.up.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = owner.Exec(l.ctx, string(up)); err != nil {
-		t.Fatal(err)
-	}
+	migracion("0119_app_password_org.up.sql")
+	migracion("0127_rls_ambito_declarado.up.sql")
+	migracion("0129_purga_de_tenants.up.sql")
+	migracion("0130_solicitudes_rgpd.up.sql")
 	if rr, out := l.canjearAppPassword(t, single.Email, "legacy-"+single.ID, false); rr.Code != http.StatusOK || out["tenant"] != a.Slug {
 		t.Fatalf("legacy inequívoca: %d %v", rr.Code, out)
 	}

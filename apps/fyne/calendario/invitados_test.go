@@ -134,3 +134,38 @@ func TestUnInvitadoSinPartstatSaleSinResponder(t *testing.T) {
 		t.Errorf("las píldoras dicen %v y quiero %v", got, quiero)
 	}
 }
+
+// TestElOrganizadorSalePorSuNombre es `organizer.name ?? organizer.email` de GuestList:
+// con el CN que ahora guarda el servicio (`organizer_name`), Fyne nombra al organizador
+// como la web, en la vista rápida y en el formulario; sin él, por su dirección.
+//
+// VISTO EN ROJO (2026-11-25): con `api.SinMailto(ev.Organizer)` sale «ada@sytue.eu».
+func TestElOrganizadorSalePorSuNombre(t *testing.T) {
+	a, _ := appConVentana(t, &escrituras{})
+	ancla := container.NewWithoutLayout()
+	ancla.Move(fyne.NewPos(700, 200))
+	ancla.Resize(fyne.NewSize(140, 18))
+	a.raiz.Add(container.NewWithoutLayout(ancla))
+	o := reunion(t, a)
+	o.Event.OrganizerName = "Ada Lovelace"
+	a.abrirVistaRapida(o, ancla)
+	if buscarParrafo(a.vista, "Ada Lovelace") == nil || buscarParrafo(a.vista, "ada@sytue.eu") != nil {
+		t.Error("la vista rápida no nombra al organizador por su CN")
+	}
+	e := a.P.EdicionDe(o)
+	f := a.P.nuevoFormulario(e, a.destinos(), a.accionesFormulario(e))
+	if buscarParrafo(f.bloqueInvitados(), "Ada Lovelace") == nil {
+		t.Error("el formulario no nombra al organizador por su CN")
+	}
+	for _, c := range []struct {
+		ev     api.Event
+		quiero string
+	}{
+		{api.Event{Organizer: "mailto:ada@sytue.eu", OrganizerName: "  "}, "ada@sytue.eu"},
+		{api.Event{OrganizerName: "Ada"}, ""},
+	} {
+		if got := nombreOrganizador(c.ev); got != c.quiero {
+			t.Errorf("nombreOrganizador(%+v) = %q, quiero %q", c.ev, got, c.quiero)
+		}
+	}
+}

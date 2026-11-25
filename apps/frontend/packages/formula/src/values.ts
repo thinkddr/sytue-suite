@@ -18,7 +18,8 @@ export type ErrorCode =
   | '#NULL!'
   | '#SPILL!' // un array dinámico no cabe: choca con una celda ocupada
   | '#CALC!' // un array vacío (FILTER/UNIQUE sin resultados)
-  | '#CIRC!'; // referencia circular (equivalente a la #REF! circular de Excel)
+  | '#CIRC!' // referencia circular (equivalente a la #REF! circular de Excel)
+  | '#BUSY!'; // la función aún no ha llegado (`perezosas.ts`): el de Excel para «calculando»
 
 /** Un error de fórmula. Es un *valor* de celda: se propaga como tal. */
 export class FormulaError {
@@ -40,6 +41,7 @@ export const ERR = {
   SPILL: new FormulaError('#SPILL!'),
   CALC: new FormulaError('#CALC!'),
   CIRC: new FormulaError('#CIRC!'),
+  BUSY: new FormulaError('#BUSY!'),
 } as const;
 
 /** El valor calculado de una celda o subexpresión. */

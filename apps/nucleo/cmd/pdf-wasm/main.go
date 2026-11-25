@@ -10,7 +10,9 @@
 // No tiene red, ni claves, ni almacenamiento: recibe los bytes ya descifrados por el
 // host, los transforma en memoria con las MISMAS operaciones que el servicio de Docs
 // (`ApplyAnnotationOperation`, `ApplyFormOperation`, `ApplyPageOperation`,
-// `ApplyToolOperation`, `RenderView`, `Summary`) y devuelve bytes. Cifrar y guardar el
+// `ApplyLayerOperation`, `ApplyToolOperation`, `ApplyProtectionOperation`,
+// `ApplyEditOperation`, `ApplyCompareOperation`, `RenderView`, `Summary`, el texto,
+// la verificación y los adjuntos) y devuelve bytes. Cifrar y guardar el
 // resultado es cosa del host (la bóveda), nunca de este módulo.
 package main
 
@@ -35,6 +37,12 @@ func main() {
 			"pdf.formulario":  docs.formularioJS,
 			"pdf.paginas":     docs.paginasJS,
 			"pdf.herramienta": docs.herramientaJS,
+			"pdf.proteger":    docs.protegerJS,
+			"pdf.editar":      docs.editarJS,
+			"pdf.comparar":    docs.compararJS,
+			"pdf.texto":       docs.textoJS,
+			"pdf.verificar":   docs.verificarJS,
+			"pdf.adjunto":     docs.adjuntoJS,
 		},
 	})
 }

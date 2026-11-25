@@ -61,6 +61,7 @@ func scanRoom(row pgx.Row, t string) (domain.Room, error) {
 		_ = json.Unmarshal(meta, &r.Metadata)
 	}
 	r.Tenant = t
+	r.WaitingRoom = domain.SourceDeMetadata(r.Metadata).Kind == domain.SourceCalendar
 	return r, nil
 }
 

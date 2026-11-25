@@ -2764,9 +2764,9 @@ export const pl: AppCatalog<typeof en> = {
     'Podpis nie mieści się na tej stronie. Wybierz inną stronę lub położenie.',
   'pdf.device.view': 'Wyświetl',
   'pdf.vault.help':
-    'Ten PDF jest w Twoim zaszyfrowanym Drive: jest odszyfrowywany tylko na tym urządzeniu, gdzie możesz go przeglądać, komentować, wypełniać, porządkować i podpisywać. To, co zapiszesz, wraca zaszyfrowane.',
+    'Ten PDF jest w Twoim zaszyfrowanym Drive: jest odszyfrowywany tylko na tym urządzeniu, gdzie możesz go przeglądać, komentować, wypełniać, porządkować, chronić, zaczerniać, edytować, porównywać, drukować i podpisywać. To, co zapiszesz, wraca zaszyfrowane.',
   'pdf.vault.serverOnly':
-    'Z zaszyfrowanym Drive nie są jeszcze dostępne prośby o podpis, ochrona hasłem, rozpoznawanie tekstu, zaczernianie, edycja tekstu lub obrazów, pieczątki i znaki wodne, porównywanie, historia wersji ani drukowanie: wymagają, by usługa odczytała PDF, albo jeszcze nie działają na urządzeniu.',
+    'Z zaszyfrowanym Drive niedostępne są prośby o podpis, rozpoznawanie tekstu i asystent: wymagają, by usługa przeczytała PDF. Wszystko inne dzieje się na tym urządzeniu.',
   'pdf.vault.notFound.title': 'Tego pliku PDF nie ma na Twoim zaszyfrowanym Dysku',
   'pdf.vault.notFound.description':
     'Mógł zostać przeniesiony lub usunięty. Poszukaj go w Sytue Drive.',
@@ -2781,7 +2781,9 @@ export const pl: AppCatalog<typeof en> = {
     'Twój Drive wciąż przechodzi na szyfrowanie end-to-end. Dokończ to w Sytue Drive.',
   'pdf.device.error.password': 'To hasło nie otwiera certyfikatu.',
   'pdf.device.error.encrypted':
-    'Ten PDF jest chroniony hasłem i nie można go podpisać na tym urządzeniu.',
+    'Ten PDF jest chroniony hasłem: otwórz go i podpisz w jego studiu, gdzie używane jest jego hasło.',
+  'pdf.device.protectedNote':
+    'Ten PDF jest chroniony hasłem. Aby go podpisać, jest zapisywany na nowo bez hasła na tym urządzeniu, tak jak robi to serwer: podpisana kopia zostaje zapisana zaszyfrowana w Twoim Drive, ale bez hasła PDF.',
   'pdf.device.error.locked':
     'Ten PDF jest certyfikowany przeciw wszelkim zmianom: kolejny podpis by go unieważnił.',
   'pdf.device.error.unreadable':

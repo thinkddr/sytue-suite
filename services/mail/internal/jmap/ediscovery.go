@@ -54,7 +54,9 @@ type complianceStore interface {
 	ReleaseHold(ctx context.Context, id uuid.UUID, actor string) error
 	EDiscoverySearch(ctx context.Context, accountID uuid.UUID, f store.EDiscoveryFilter) ([]domain.EDiscoveryHit, error)
 	WriteAudit(ctx context.Context, actor, action, target string, detail any) error
-	ListAudit(ctx context.Context, limit int) ([]domain.AuditEntry, error)
+	// ListarTraza devuelve una página de la traza (cumplimiento y acceso) con los
+	// filtros en la consulta: auditlog.Listar sobre el pool del servicio.
+	ListarTraza(ctx context.Context, q auditlog.Consulta) ([]domain.AuditEntry, string, error)
 }
 
 // requireAdmin exige claims con rol de compliance (owner|admin). Defensa en

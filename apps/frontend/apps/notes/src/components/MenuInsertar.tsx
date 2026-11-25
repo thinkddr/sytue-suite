@@ -39,6 +39,8 @@ const DIBUJO: Record<IdComando, { glyph?: GlyphName; icon?: IconName }> = {
   tabla: { glyph: 'table' },
   columnas2: { glyph: 'layoutColumns' },
   columnas3: { glyph: 'layoutColumns' },
+  imagen: { icon: 'image' },
+  archivo: { glyph: 'file' },
   regla: { icon: 'minus' },
   estado: { icon: 'tag' },
   fecha: { icon: 'calendar' },

@@ -15,6 +15,7 @@ import {
   Dropdown,
   Icon,
   IconButton,
+  marcarAppLista,
   MenuItem,
   MenuSeparator,
   Skeleton,
@@ -232,6 +233,12 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   useEffect(() => {
     void cargarEstructura().finally(() => setCargando(false));
   }, [cargarEstructura]);
+
+  // `sytue:app-ready`: la base con sus tablas y campos (o su fallo) ya está pintada, como
+  // la lista de bases (BasesApp). Sin la marca, la bóveda esperaba 5 s para abrirse.
+  useEffect(() => {
+    if (!cargando) marcarAppLista();
+  }, [cargando]);
 
   /** Carga la primera ventana ('inicio'), la que sigue ('mas') o la anterior ('antes'). */
   const cargarRegistros = useCallback(

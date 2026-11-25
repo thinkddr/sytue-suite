@@ -35,7 +35,8 @@ export function silenciado(
  * Si los avisos de un tipo están silenciados, con la misma regla que aplica el Hub al
  * entregar (`domain.Muted`): la que nombra origen y tipo manda; si no la hay, la del
  * origen entero. Así «callar todo el correo y dejar las menciones» se ve como es. Un
- * tipo crítico o de un origen fijo nunca lo está.
+ * tipo crítico o de un origen fijo nunca lo está. Un tipo partido en varios hereda la
+ * regla del de antes (`TIPOS_PARTIDOS`), como en el Hub.
  */
 export function tipoSilenciado(
   prefs: readonly { source: string; kind?: string | undefined; muted: boolean }[],
@@ -44,8 +45,17 @@ export function tipoSilenciado(
 ): boolean {
   if (!silenciable(source) || TIPOS_CRITICOS.has(tipo)) return false;
   const exacta = prefs.find((p) => p.source === source && p.kind === tipo);
-  return exacta ? exacta.muted : silenciado(prefs, source);
+  if (exacta) return exacta.muted;
+  const anterior = TIPOS_PARTIDOS[tipo];
+  const heredada = anterior && prefs.find((p) => p.source === source && p.kind === anterior);
+  return heredada ? heredada.muted : silenciado(prefs, source);
 }
+
+/** De qué tipo salió cada uno de los partidos: `tiposPartidos` del `domain.go` del Hub. */
+export const TIPOS_PARTIDOS: Readonly<Record<string, string>> = {
+  'cloud.deploy.ready': 'cloud.deploy',
+  'cloud.deploy.failed': 'cloud.deploy',
+};
 
 /**
  * Una fila de tipos (que puede reunir varios del Hub) sale encendida mientras llegue

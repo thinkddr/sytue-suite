@@ -420,6 +420,26 @@ func (c *KubeJobClient) buildJob(spec JobSpec) *batchv1.Job {
 		})
 	}
 
+	// La credencial del registry ACOTADA a la caché de este tenant (internal/buildcache):
+	// buildctl la lee de DOCKER_CONFIG para importar y exportar la caché de capas. Es la
+	// única credencial del contenedor que ejecuta el RUN del tenant, y no alcanza nada
+	// que no sea su propia caché.
+	if spec.CacheSecret != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "cache-docker-config",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: spec.CacheSecret,
+					Items:      []corev1.KeyToPath{{Key: ".dockerconfigjson", Path: "config.json"}},
+				},
+			},
+		})
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name: "cache-docker-config", MountPath: cacheDockerConfigDir, ReadOnly: true,
+		})
+		container.Env = append(container.Env, corev1.EnvVar{Name: "DOCKER_CONFIG", Value: cacheDockerConfigDir})
+	}
+
 	// Frameworks gestionados: el Dockerfile generado (ConfigMap creado en Submit)
 	// se monta de solo lectura sobre el /workspace compartido en la ruta que Kaniko
 	// espera. subPath monta solo ese fichero y no vuelve /workspace de solo lectura.

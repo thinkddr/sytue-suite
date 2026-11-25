@@ -4,6 +4,10 @@
 "widgets.newNote" = "Нова бележка";
 "widgets.newContact" = "Нов контакт";
 "widgets.addPhotos" = "Добавяне на снимки";
+"widgets.newDocument" = "Нов документ";
+"widgets.newSpreadsheet" = "Нова електронна таблица";
+"widgets.newPresentation" = "Нова презентация";
+"widgets.openToUpdate" = "Обновява се, когато приложението е отворено";
 "widgets.notes" = "Бележки";
 "widgets.rows" = "Редове";
 "widgets.pending" = "Чакащи";

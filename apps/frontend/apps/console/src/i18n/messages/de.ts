@@ -54,6 +54,17 @@ export const de: AppCatalog<typeof en> = {
   'externalSignatures.loadFailed': 'Laden nicht möglich',
   'externalSignatures.loadFailedHelp':
     'Sytue Docs antwortet nicht. Versuchen Sie es gleich noch einmal.',
+  'roomsExternal.title': 'Unterhaltungen mit anderen Organisationen',
+  'roomsExternal.description':
+    'Lege fest, mit wem aus anderen Organisationen man in Rooms sprechen kann: Direktnachrichten, Gruppen, Kanäle und ihre Anrufe sowie Termin-Besprechungen.',
+  'roomsExternal.mode.abierta.help': 'Mit jeder Organisation. Das ist die Voreinstellung.',
+  'roomsExternal.mode.cerrada.help':
+    'Niemand von hier beginnt Unterhaltungen mit Externen, niemand von außen tritt denen von hier bei, und die anderer Organisationen lassen sich von hier aus nicht öffnen.',
+  'roomsExternal.mode.confianza.help':
+    'Nur mit den Organisationen auf der Liste, und nur, wenn auch sie diese zulassen.',
+  'roomsExternal.trustedHelp':
+    'Eine pro Zeile: der Name in ihrer Adresse, etwa „acme“ in …/rooms/acme/.',
+  'roomsExternal.loadFailedHelp': 'Sytue Rooms antwortet nicht. Versuch es gleich noch einmal.',
   'editor.title': 'Dokumenteditor',
   'editor.description':
     'Wähle, mit welchem Editor die Office-Dokumente deiner Organisation geöffnet werden.',
@@ -181,6 +192,7 @@ export const de: AppCatalog<typeof en> = {
     'Die Berechtigungen konnten nicht gelesen werden. Vielleicht startet der Dienst gerade neu; versuche es gleich noch einmal.',
   'nav.governance': 'Governance',
   'nav.compliance': 'Compliance',
+  'nav.privacy': 'Datenschutzanfragen',
   'nav.sensitivityLabels': 'Vertraulichkeitsbezeichnungen',
   'nav.audit': 'Überwachung',
   'nav.account': 'Mein Konto',
@@ -861,6 +873,11 @@ export const de: AppCatalog<typeof en> = {
   'audit.source.mail': 'E-Mail',
   'audit.source.drive': 'Dateien',
   'audit.source.notes': 'Notizen',
+  'audit.source.docs': 'Dokumente',
+  'audit.source.rooms': 'Rooms',
+  'audit.source.calendar': 'Kalender',
+  'audit.source.contacts': 'Kontakte',
+  'audit.source.hub': 'Hub',
   'audit.source.integrations': 'Integrationen',
   'audit.filterService': 'Nach Dienst filtern',
   'audit.filterAction': 'Nach Aktion filtern',
@@ -1374,13 +1391,13 @@ export const de: AppCatalog<typeof en> = {
   // SAML-SP: Drittanbieter-Apps, für die Sytue ID als IdP auftritt.
   'sso.saml.title': 'Anwendungen, die sich per SAML mit Sytue anmelden',
   'sso.saml.description':
-    'Sytue ID ist der Identitätsanbieter dieser Anwendungen. Sie erscheinen hier, sobald Sie eine App aus dem Katalog aktivieren, und Sie können jede einzeln abschalten, ohne ihre Konfiguration zu verlieren.',
+    'Sytue ID ist der Identitätsanbieter dieser Anwendungen. Sie erscheinen hier, sobald Sie eine App aus dem Katalog aktivieren oder eine von Hand hinzufügen, und Sie können jede einzeln abschalten, ohne ihre Konfiguration zu verlieren.',
   'sso.saml.caption': 'Anwendungen, die sich per SAML mit Sytue anmelden',
   'sso.saml.col.app': 'Anwendung',
   'sso.saml.col.acs': 'Sendet die Antwort an',
   'sso.saml.emptyTitle': 'Noch keine Anwendung nutzt Sytue als SAML-Anbieter',
   'sso.saml.emptyDescription':
-    'Aktivieren Sie eine Anwendung aus dem Katalog; sie erscheint dann hier und lässt sich abschalten oder entfernen.',
+    'Aktivieren Sie eine Anwendung aus dem Katalog oder fügen Sie sie von Hand hinzu, wenn sie dort fehlt – dann erscheint sie hier, bereit zum Abschalten oder Entfernen.',
   'sso.saml.incomplete': 'Unvollständig',
   'sso.saml.details': 'Verbindungsdaten',
   'sso.saml.detailsAria': 'Verbindungsdaten von {name}',
@@ -1396,6 +1413,114 @@ export const de: AppCatalog<typeof en> = {
     '{name} kann sich ab sofort nicht mehr mit Sytue anmelden. In der Anwendung selbst wird nichts gelöscht, aber Sie müssen sie erneut registrieren, um den Zugang wiederherzustellen.',
   'sso.saml.toast.toggleFailed': 'Status konnte nicht geändert werden',
   'sso.saml.toast.deleted': 'Anwendung entfernt',
+  'sso.saml.register': 'SAML-Anwendung hinzufügen',
+  'sso.saml.wizardDescription':
+    'Für eine Anwendung, die SAML spricht und nicht im Katalog steht: Sytue ID meldet die Personen dort an.',
+  'sso.saml.emptyAction': 'SAML-Anwendung hinzufügen',
+  'wizard.saml.step.app': 'Anwendung',
+  'wizard.saml.step.identity': 'Identität',
+  'wizard.saml.step.review': 'Prüfen',
+  'wizard.saml.step.done': 'Fertig',
+  'wizard.saml.app.heading': 'Welche Anwendung, und wohin sendet Sytue die Anmeldung?',
+  'wizard.saml.app.description':
+    'Kopieren Sie diese Werte aus den SAML-Einstellungen der Anwendung. Sie heißen meist „Entity ID“ und „ACS URL“.',
+  'wizard.saml.app.nameLabel': 'Name',
+  'wizard.saml.app.namePlaceholder': 'Spesen-Tool',
+  'wizard.saml.app.nameHint': 'Woran Ihr Team sie in dieser Liste erkennt.',
+  'wizard.saml.app.entityIdLabel': 'Entity ID der Anwendung',
+  'wizard.saml.app.entityIdHint':
+    'Damit weist sich die Anwendung aus. Oft ist es eine URL, muss es aber nicht sein.',
+  'wizard.saml.app.acsLabel': 'URL des Assertion Consumer Service (ACS)',
+  'wizard.saml.app.acsHint': 'Wohin Sytue ID die signierte Antwort sendet. Sie muss https sein.',
+  'wizard.saml.app.whereTitle': 'Wo finde ich diese Werte?',
+  'wizard.saml.app.whereBody':
+    'Suchen Sie in der Anwendung nach den Einstellungen für Single Sign-on oder SAML. Bietet sie eine Metadatendatei an, stehen beide Werte darin: das Attribut entityID und die Location von AssertionConsumerService.',
+  'wizard.saml.identity.heading': 'Was die Anwendung über jede Person erhält',
+  'wizard.saml.identity.description':
+    'Sytue ID sendet, wer die Person ist (die NameID), und drei Attribute. Verwenden Sie die Namen, die die Anwendung erwartet.',
+  'wizard.saml.identity.nameIdLabel': 'Wie die Person identifiziert wird (NameID)',
+  'wizard.saml.identity.nameIdHint':
+    'Die E-Mail-Adresse erwarten die meisten Anwendungen. Wählen Sie nur etwas anderes, wenn die Anwendung es verlangt.',
+  'wizard.saml.nameId.email': 'E-Mail-Adresse',
+  'wizard.saml.nameId.persistent':
+    'Dauerhafte Kennung (ändert sich nicht, wenn sich die E-Mail ändert)',
+  'wizard.saml.nameId.transient': 'Temporäre Kennung (bei jeder Anmeldung anders)',
+  'wizard.saml.nameId.unspecified': 'Nicht angegeben',
+  'wizard.saml.identity.attrsLegend': 'Namen der Attribute',
+  'wizard.saml.identity.attrsHint':
+    'Lassen Sie ein Feld leer, um das Attribut unter seinem Standardnamen zu senden (email, name, groups).',
+  'wizard.saml.attr.email': 'E-Mail',
+  'wizard.saml.attr.name': 'Vollständiger Name',
+  'wizard.saml.attr.groups': 'Gruppen',
+  'wizard.saml.identity.certLabel': 'Zertifikat der Anwendung (optional)',
+  'wizard.saml.identity.certHint':
+    'Fügen Sie es im PEM-Format ein, wenn die Anwendung ihre Anfragen signiert. Nur das Zertifikat – niemals ihren privaten Schlüssel.',
+  'wizard.saml.identity.advanced': 'Anmeldung aus Sytue heraus',
+  'wizard.saml.identity.idpInitiatedLabel': 'Anmeldung aus Sytue erlauben (IdP-initiiert)',
+  'wizard.saml.identity.idpInitiatedHint':
+    'Personen können die Anwendung direkt aus Sytue öffnen, ohne zuerst dorthin zu gehen. Nur aktivieren, wenn die Anwendung das unterstützt.',
+  'wizard.saml.identity.relayStateLabel': 'Seite, die in der Anwendung geöffnet wird (RelayState)',
+  'wizard.saml.identity.relayStateHint':
+    'Optional. Wohin die Anwendung die Person nach der Anmeldung aus Sytue führt.',
+  'wizard.saml.err.nameRequired': 'Geben Sie ihr einen Namen.',
+  'wizard.saml.err.entityIdRequired':
+    'Die Entity ID ist erforderlich: Ohne sie erkennt Sytue ID die Anwendung nicht.',
+  'wizard.saml.err.entityIdSpaces':
+    'Eine Entity ID enthält keine Leerzeichen: Prüfen Sie, ob Sie sie vollständig kopiert haben.',
+  'wizard.saml.err.acsRequired':
+    'Die ACS-URL ist erforderlich: Dorthin sendet Sytue ID die Anmeldung.',
+  'wizard.saml.err.acsNotUrl':
+    'Das ist keine vollständige URL: Sie muss mit https:// beginnen und darf kein # enthalten.',
+  'wizard.saml.err.acsInsecure':
+    'Die Antwort enthält die Identität der Person: Die ACS-URL muss https sein.',
+  'wizard.saml.err.certPrivateKey':
+    'Das ist ein privater Schlüssel, kein Zertifikat. Fügen Sie ihn hier nicht ein: Alle in der Konsole könnten ihn sehen. Fügen Sie den Block ein, der mit -----BEGIN CERTIFICATE----- beginnt.',
+  'wizard.saml.err.certNotPem':
+    'Fügen Sie das Zertifikat im PEM-Format ein, von -----BEGIN CERTIFICATE----- bis -----END CERTIFICATE-----.',
+  'wizard.saml.err.certTooLarge':
+    'Das Zertifikat ist zu groß. Fügen Sie nur das Zertifikat der Anwendung ein.',
+  'wizard.saml.err.nameIdUnknown': 'Wählen Sie eines der Formate aus der Liste.',
+  'wizard.saml.err.attrSpaces': 'Attributnamen enthalten keine Leerzeichen.',
+  'wizard.saml.summary.app': 'Anwendung',
+  'wizard.saml.summary.entityId': 'Entity ID',
+  'wizard.saml.summary.acs': 'Sendet die Antwort an',
+  'wizard.saml.summary.nameId': 'Identifiziert durch',
+  'wizard.saml.summary.attrs': 'Attribute',
+  'wizard.saml.summary.cert': 'Zertifikat der Anwendung',
+  'wizard.saml.summary.certYes': 'Hinzugefügt',
+  'wizard.saml.summary.certNo': 'Keins',
+  'wizard.saml.summary.idpInitiated': 'Anmeldung aus Sytue',
+  'wizard.saml.summary.yes': 'Erlaubt',
+  'wizard.saml.summary.no': 'Nicht erlaubt',
+  'wizard.saml.review.heading': 'Vor dem Hinzufügen prüfen',
+  'wizard.saml.review.description':
+    'Sytue ID sendet dies an die Anwendung, jedes Mal wenn sich jemand aus Ihrer Organisation dort anmeldet.',
+  'wizard.saml.review.submit': 'Anwendung hinzufügen',
+  'wizard.saml.review.enabledTitle': 'Sie startet eingeschaltet',
+  'wizard.saml.review.enabledBody':
+    'Personen Ihrer Organisation können sich anmelden, sobald die Anwendung Sytue ID vertraut. Sie können sie jederzeit in der Liste abschalten.',
+  'wizard.saml.toast.saveFailed': 'Die Anwendung wurde nicht hinzugefügt',
+  'wizard.saml.fix.badRequest':
+    'Sytue ID hat die Daten nicht akzeptiert. Prüfen Sie das Zertifikat: Es muss ein gültiges X.509-Zertifikat sein.',
+  'wizard.saml.fix.conflict':
+    'Eine Anwendung mit dieser Entity ID ist bereits registriert. Verwenden Sie diese oder prüfen Sie, ob Sie den richtigen Wert kopiert haben.',
+  'wizard.saml.fix.forbidden':
+    'Sie benötigen die Berechtigung, Anwendungen in dieser Organisation zu verwalten.',
+  'wizard.saml.fix.idpDown': 'Sytue ID antwortet nicht. Versuchen Sie es gleich noch einmal.',
+  'wizard.saml.fix.generic': 'Etwas ist schiefgelaufen. Versuchen Sie es erneut.',
+  'wizard.saml.done.heading': '{name} ist hinzugefügt',
+  'wizard.saml.done.fallbackName': 'Die Anwendung',
+  'wizard.saml.done.pasteTitle': 'Fügen Sie dies jetzt in der Anwendung ein',
+  'wizard.saml.done.pasteBody':
+    'Akzeptiert die Anwendung eine Metadaten-URL, genügt das. Andernfalls kopieren Sie die übrigen Werte einzeln. Sie können sie in der Liste erneut ansehen.',
+  'wizard.saml.done.nextTitle': 'Nächste Schritte',
+  'wizard.saml.done.step1Title': 'Lassen Sie die Anwendung Sytue ID vertrauen',
+  'wizard.saml.done.step1Body':
+    'Fügen Sie die Metadaten-URL oder die Entity ID, die Anmelde- und die Abmelde-URL in ihre SAML-Einstellungen ein.',
+  'wizard.saml.done.step2Title': 'Anmeldung ausprobieren',
+  'wizard.saml.done.step2Body':
+    'Öffnen Sie die Anwendung in einem privaten Fenster und wählen Sie die Anmeldung per SAML. Schlägt sie fehl, prüfen Sie zuerst die Entity ID und die ACS-URL.',
+  'wizard.saml.done.back': 'Zurück zu Single Sign-on',
   'sso.secret.title': 'Kopieren Sie das Geheimnis jetzt',
   'sso.secret.body':
     'Das ist das neue Geheimnis von {name}. Das vorherige gilt nicht mehr: Fügen Sie dieses so bald wie möglich in die Anwendung ein. Wir können es Ihnen nicht erneut zeigen.',

@@ -4,6 +4,7 @@
 package hubnotify
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"slices"
@@ -153,8 +154,14 @@ func (a *agrupador) cerrar(k claveCambio) {
 type cambioPeticion struct {
 	mu        sync.Mutex
 	productos []string
-	otros     []string
+	otros     []destinoCambio
+	// vistos son los recursos cuyos lectores ya se sumaron (AvisarQuienesVen).
+	vistos map[string]bool
 }
+
+// destinoCambio es a quién más va la señal y en qué organización: la del contexto con
+// que se le añadió (vacía: la de la escritura).
+type destinoCambio struct{ tenant, subject string }
 
 type claveCtxCambio struct{}
 
@@ -180,21 +187,39 @@ func (c *Client) TrasEscribir(saltar func(*http.Request) bool, productos ...stri
 			if estado := httpx.ServirConEstado(next, w, r.WithContext(ctx)); estado < 200 || estado > 299 {
 				return
 			}
-			claims, ok := authn.FromContext(ctx)
-			if !ok {
-				return
-			}
-			tenant := claims.Tenant
-			if t, err := tenancy.From(ctx); err == nil {
-				tenant = t.Slug
-			}
-			cp.mu.Lock()
-			ps, para := cp.productos, append([]string{claims.Subject}, cp.otros...)
-			cp.mu.Unlock()
-			for _, p := range ps {
-				c.AvisarCambio(ctx, tenant, p, para...)
-			}
+			c.enviarTrasEscribir(ctx, cp)
 		})
+	}
+}
+
+// enviarTrasEscribir manda la señal de una escritura que salió bien: a quien la hizo y a
+// quienes sumó AvisarTambien, por organización, la de quien escribe primero. Un
+// documento de otra organización (ADR 0057) lo ven su propietario y sus colaboradores en
+// ESA.
+func (c *Client) enviarTrasEscribir(ctx context.Context, cp *cambioPeticion) {
+	claims, ok := authn.FromContext(ctx)
+	if !ok {
+		return
+	}
+	tenant := claims.Tenant
+	if t, err := tenancy.From(ctx); err == nil {
+		tenant = t.Slug
+	}
+	cp.mu.Lock()
+	ps, otros := cp.productos, cp.otros
+	cp.mu.Unlock()
+	orgs, para := []string{tenant}, map[string][]string{tenant: {claims.Subject}}
+	for _, d := range otros {
+		org := cmp.Or(d.tenant, tenant)
+		if _, ya := para[org]; !ya {
+			orgs = append(orgs, org)
+		}
+		para[org] = append(para[org], d.subject)
+	}
+	for _, p := range ps {
+		for _, org := range orgs {
+			c.AvisarCambio(ctx, org, p, para[org]...)
+		}
 	}
 }
 
@@ -202,12 +227,50 @@ func (c *Client) TrasEscribir(saltar func(*http.Request) bool, productos ...stri
 // escrito: el dueño de un calendario compartido y quienes lo comparten, por su sujeto
 // o por PorCorreo. Fuera de una petición de TrasEscribir no hace nada, así que los
 // servicios lo llaman en su verja de escritura sin preguntar quién los ha llamado.
+//
+// Van a la organización de `ctx` (tenancy), que es donde vive lo escrito: si la ruta
+// pasó a la organización anfitriona de un documento compartido desde otra (ADR 0057),
+// su propietario recibe la señal en la suya, no en la de quien escribe.
 func AvisarTambien(ctx context.Context, subjects ...string) {
 	if cp, ok := ctx.Value(claveCtxCambio{}).(*cambioPeticion); ok {
+		org := ""
+		if t, err := tenancy.From(ctx); err == nil {
+			org = t.Slug
+		}
 		cp.mu.Lock()
-		cp.otros = append(cp.otros, subjects...)
+		for _, s := range subjects {
+			cp.otros = append(cp.otros, destinoCambio{tenant: org, subject: s})
+		}
 		cp.mu.Unlock()
 	}
+}
+
+// AvisarQuienesVen es AvisarTambien con quienes ven `recurso` (el dueño de una base y
+// las personas con permiso, el dueño de un cuaderno y quienes lo comparten…), que da
+// `quienes`. Fuera de una escritura con señal no consulta nada, y dentro la consulta UNA
+// vez por recurso aunque la verja de escritura se pase varias veces en la misma
+// petición. Si la consulta falla, se queda sin ellos: la señal es best effort.
+func AvisarQuienesVen(ctx context.Context, recurso string, quienes func() ([]string, error)) {
+	cp, ok := ctx.Value(claveCtxCambio{}).(*cambioPeticion)
+	if !ok || quienes == nil {
+		return
+	}
+	cp.mu.Lock()
+	if cp.vistos[recurso] {
+		cp.mu.Unlock()
+		return
+	}
+	if cp.vistos == nil {
+		cp.vistos = map[string]bool{}
+	}
+	cp.vistos[recurso] = true
+	cp.mu.Unlock()
+	subjects, err := quienes()
+	if err != nil {
+		log.From(ctx).Warn("hubnotify: quiénes ven lo escrito", "error", err)
+		return
+	}
+	AvisarTambien(ctx, subjects...)
 }
 
 // CambioEn precisa de qué productos es la escritura en curso, cuando la ruta no lo
@@ -227,4 +290,20 @@ func CambioEn(ctx context.Context, productos ...string) {
 func EnEscritura(ctx context.Context) bool {
 	_, ok := ctx.Value(claveCtxCambio{}).(*cambioPeticion)
 	return ok
+}
+
+// EscrituraDePrueba es SOLO para las pruebas de los servicios: `ctx` dentro de una
+// escritura con señal, como lo deja TrasEscribir, y a quiénes le va sumando
+// AvisarTambien (en orden, con repetidos: AvisarCambio los quita al enviar).
+func EscrituraDePrueba(ctx context.Context) (context.Context, func() []string) {
+	cp := &cambioPeticion{}
+	return context.WithValue(ctx, claveCtxCambio{}, cp), func() []string {
+		cp.mu.Lock()
+		defer cp.mu.Unlock()
+		out := make([]string, 0, len(cp.otros))
+		for _, d := range cp.otros {
+			out = append(out, d.subject)
+		}
+		return out
+	}
 }

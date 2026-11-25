@@ -91,7 +91,7 @@ func BuildDiscovery(issuer string) DiscoveryDocument {
 		},
 		CodeChallengeMethodsSupported: []string{"S256"},
 		ClaimsSupported: []string{
-			"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "amr",
+			"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "amr", "device_trust",
 			"email", "email_verified", "name", "given_name", "family_name",
 			"preferred_username", "locale", "picture", "tenant", "org_logo", "org_color", "org_forma", "roles", "perms", "groups", "scope",
 		},

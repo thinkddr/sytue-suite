@@ -4,7 +4,7 @@
  * Crear/editar/eliminar vía ContactModal -> BFF CardDAV (servicio Go Sytue
  * Contacts). Estética Sytue, modo claro/oscuro. docs/CONVENTIONS.md §1, §5.
  */
-import type { JSX } from 'preact';
+import { Fragment, type JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { SytueShell, ImportData, LinkedServices } from '@sytue/shell';
 import { MatrixStorageGate } from '@sytue/shell/vault';
@@ -509,6 +509,25 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }, [activeGroup, contacts]);
   // La raíz de Mail con la org de la sesión (ADR 0056), como el «Enviar correo» de la ficha.
   const mailBase = appUrl('mail', '', user.tenant);
+  // Las acciones de la etiqueta y de la libreta activas (solo con red): en el escritorio,
+  // cada una en su botón de la cabecera; en el teléfono, dentro del «…» de la lista.
+  const accionesEtiqueta = useAccionesEtiqueta({
+    t,
+    group: !offline ? activeGroup : null,
+    members: activeMembers,
+    mailBase,
+    onRename: () => setLabelModal({ open: true, editing: activeGroup }),
+    onDeleted: () => {
+      setActiveGroupId(null);
+      reloadGroups();
+    },
+  });
+  const accionesLibreta = useAccionesLibreta({
+    t,
+    book: !offline ? activeBook : null,
+    onRename: () => setAddressBookModal({ open: true, editing: activeBook }),
+    onDeleted: () => setBooksAttempt((n) => n + 1),
+  });
 
   const filtrados = useMemo(() => {
     const memberSet = activeGroup ? new Set(activeGroup.members) : null;
@@ -1002,28 +1021,19 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
           <div class="flex shrink-0 items-center gap-1.5">
             {/* Renombrar y eliminar la etiqueta, junto a la vista que filtra por
                 ella: el servicio y el BFF lo servían desde el primer día y la
-                interfaz solo sabía crearlas. */}
-            {!offline && activeGroup ? (
-              <LabelActions
-                t={t}
-                group={activeGroup}
-                members={activeMembers}
-                mailBase={mailBase}
-                onRename={() => setLabelModal({ open: true, editing: activeGroup })}
-                onDeleted={() => {
-                  setActiveGroupId(null);
-                  reloadGroups();
-                }}
-              />
-            ) : null}
-            {!offline && activeBook ? (
-              <BookActions
-                t={t}
-                book={activeBook}
-                onRename={() => setAddressBookModal({ open: true, editing: activeBook })}
-                onDeleted={() => setBooksAttempt((n) => n + 1)}
-              />
-            ) : null}
+                interfaz solo sabía crearlas. En el teléfono, las dos van en el «…»:
+                tres botones de icono juntos no dejaban ver cuál era cuál. */}
+            <BotonDeAcciones
+              acciones={accionesEtiqueta}
+              class="max-md:hidden"
+              // A 16, como el `user` de la libreta que va al lado.
+              icono={<TagGlyph size={16} />}
+            />
+            <BotonDeAcciones
+              acciones={accionesLibreta}
+              class="max-md:hidden"
+              icono={<Icon name="user" size={16} />}
+            />
             {/* En el teléfono «Revisar duplicados» va dentro de «…». */}
             {!offline && duplicateGroups.length > 0 ? (
               <Button
@@ -1055,6 +1065,9 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     }
                   : undefined
               }
+              grupos={[accionesEtiqueta, accionesLibreta].filter(
+                (a): a is AccionesDeMenu => a !== null,
+              )}
             />
           </div>
         }
@@ -1441,6 +1454,7 @@ function VcardToolbar({
   offline,
   onSeleccionar,
   onDuplicados,
+  grupos = [],
 }: {
   t: T;
   contacts: Contact[];
@@ -1453,6 +1467,8 @@ function VcardToolbar({
   onSeleccionar?: (() => void) | undefined;
   /** Los duplicados, que en el teléfono pasan del botón de la cabecera al «…». */
   onDuplicados?: { count: number; abrir: () => void } | undefined;
+  /** Las acciones de la etiqueta y de la libreta: en el teléfono, un grupo cada una. */
+  grupos?: readonly AccionesDeMenu[] | undefined;
 }): JSX.Element {
   const toast = useToast();
   const vcfRef = useRef<HTMLInputElement>(null);
@@ -1682,6 +1698,22 @@ function VcardToolbar({
               </MenuItem>
             ) : null}
             {onSeleccionar || onDuplicados ? <MenuSeparator /> : null}
+            {grupos.map((g) => (
+              <Fragment key={g.rotulo}>
+                {/* Un grupo con su nombre: «Cambiar nombre» y «Eliminar» de la etiqueta
+                    y de la libreta se leen distintos aunque digan lo mismo. */}
+                <div role="group" aria-label={g.rotulo}>
+                  <div
+                    aria-hidden="true"
+                    class="text-text-subtle px-3 pt-1.5 pb-0.5 text-xs font-medium"
+                  >
+                    {g.rotulo}
+                  </div>
+                  {g.elementos(cerrar)}
+                </div>
+                <MenuSeparator />
+              </Fragment>
+            ))}
             {accionesIo(cerrar)}
           </>
         )}
@@ -1713,12 +1745,28 @@ function enviarCorreoATodos(
 }
 
 /**
+ * Las acciones de la etiqueta o de la libreta activas, para pintarlas en su botón (en el
+ * escritorio, `LabelActions` y `BookActions`) o como un grupo del «…» de la lista (en el
+ * teléfono, donde los dos botones sueltos en la cabecera no cabían junto al «…»).
+ */
+export interface AccionesDeMenu {
+  /** «Acciones de la etiqueta», «Acciones de la libreta»: el nombre del botón o del grupo. */
+  rotulo: string;
+  ocupado: boolean;
+  /** Los elementos del menú; `cerrar` lo cierra antes de actuar. */
+  elementos: (cerrar: () => void) => JSX.Element;
+  /** El diálogo de confirmar el borrado, montado una vez donde se pinten. */
+  dialogo: JSX.Element | null;
+}
+
+/**
  * LabelActions — cambiar el nombre y eliminar la etiqueta por la que se está
  * filtrando. Eliminarla NO tiene vuelta atrás (no hay papelera de etiquetas), así
  * que pregunta; los contactos no se tocan y el diálogo lo dice. Vive bajo la
- * Sytue Shell para poder usar useToast (mismo motivo que VcardToolbar).
+ * Sytue Shell para poder usar useToast (mismo motivo que VcardToolbar). Sin etiqueta,
+ * nada.
  */
-export function LabelActions({
+export function useAccionesEtiqueta({
   t,
   group,
   members,
@@ -1727,28 +1775,30 @@ export function LabelActions({
   onDeleted,
 }: {
   t: T;
-  group: ContactGroup;
+  group: ContactGroup | null;
   /** Los contactos de la libreta que llevan la etiqueta. */
   members: Contact[];
   mailBase: string;
   onRename: () => void;
   onDeleted: () => void;
-}): JSX.Element {
+}): AccionesDeMenu | null {
   const toast = useToast();
   const { confirmar, dialogo } = useConfirm();
   const [busy, setBusy] = useState(false);
+  if (!group) return null;
+  const etiqueta = group;
 
   async function remove(): Promise<void> {
     const ok = await confirmar({
       titulo: t('label.delete'),
-      mensaje: t('label.deleteConfirm', { label: group.name }),
+      mensaje: t('label.deleteConfirm', { label: etiqueta.name }),
       confirmLabel: t('label.delete'),
       tone: 'danger',
     });
     if (!ok) return;
     setBusy(true);
     try {
-      await deleteGroup(group.id);
+      await deleteGroup(etiqueta.id);
       toast.notify({ tone: 'success', title: t('label.deleted') });
       onDeleted();
     } catch {
@@ -1762,72 +1812,68 @@ export function LabelActions({
     }
   }
 
+  return {
+    rotulo: t('label.actions'),
+    ocupado: busy,
+    dialogo,
+    elementos: (close) => (
+      <>
+        {/* Lo que se hace CON la etiqueta, antes de lo que se le hace a ella. */}
+        <MenuItem
+          disabled={members.length === 0}
+          onClick={() => {
+            close();
+            enviarCorreoATodos(toast, t, members, mailBase);
+          }}
+        >
+          {t('batch.emailAll')}
+        </MenuItem>
+        <MenuItem
+          disabled={members.length === 0}
+          onClick={() => {
+            close();
+            downloadVcf(
+              exportFilename(etiqueta.name),
+              members.map((c) => c.vcard),
+            );
+          }}
+        >
+          {t('batch.exportVcf')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close();
+            onRename();
+          }}
+        >
+          {t('label.rename')}
+        </MenuItem>
+        <MenuItem
+          danger
+          onClick={() => {
+            close();
+            void remove();
+          }}
+        >
+          {t('label.delete')}
+        </MenuItem>
+      </>
+    ),
+  };
+}
+
+/** El botón de las acciones de la etiqueta, con su menú (`useAccionesEtiqueta`). */
+export function LabelActions(
+  props: Parameters<typeof useAccionesEtiqueta>[0] & { group: ContactGroup; class?: string },
+): JSX.Element {
+  const acciones = useAccionesEtiqueta(props);
   return (
-    <>
-      <Dropdown
-        label={t('label.actions')}
-        align="end"
-        trigger={({ onClick, ...aria }) => (
-          <Button
-            {...aria}
-            onClick={onClick}
-            variant="ghost"
-            size="sm"
-            iconOnly
-            disabled={busy}
-            aria-label={t('label.actions')}
-            title={t('label.actions')}
-            // A 16, como el `user` de BookActions que va al lado.
-            leadingIcon={<TagGlyph size={16} />}
-          />
-        )}
-      >
-        {(close) => (
-          <>
-            {/* Lo que se hace CON la etiqueta, antes de lo que se le hace a ella. */}
-            <MenuItem
-              disabled={members.length === 0}
-              onClick={() => {
-                close();
-                enviarCorreoATodos(toast, t, members, mailBase);
-              }}
-            >
-              {t('batch.emailAll')}
-            </MenuItem>
-            <MenuItem
-              disabled={members.length === 0}
-              onClick={() => {
-                close();
-                downloadVcf(
-                  exportFilename(group.name),
-                  members.map((c) => c.vcard),
-                );
-              }}
-            >
-              {t('batch.exportVcf')}
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                close();
-                onRename();
-              }}
-            >
-              {t('label.rename')}
-            </MenuItem>
-            <MenuItem
-              danger
-              onClick={() => {
-                close();
-                void remove();
-              }}
-            >
-              {t('label.delete')}
-            </MenuItem>
-          </>
-        )}
-      </Dropdown>
-      {dialogo}
-    </>
+    <BotonDeAcciones
+      acciones={acciones}
+      class={props.class}
+      // A 16, como el `user` de BookActions que va al lado.
+      icono={<TagGlyph size={16} />}
+    />
   );
 }
 
@@ -1838,28 +1884,28 @@ export function LabelActions({
  * tampoco se puede borrar (el servicio la protege); si lo es, solo se ofrece
  * renombrar. Mismo patrón que LabelActions.
  */
-function BookActions({
+export function useAccionesLibreta({
   t,
   book,
   onRename,
   onDeleted,
 }: {
   t: T;
-  book: AddressBook;
+  book: AddressBook | null;
   onRename: () => void;
   onDeleted: () => void;
-}): JSX.Element | null {
+}): AccionesDeMenu | null {
   const toast = useToast();
   const { confirmar, dialogo } = useConfirm();
   const [busy, setBusy] = useState(false);
-
-  if (!book.id) return null;
+  if (!book?.id) return null;
+  const libreta = book;
   const id = book.id;
 
   async function remove(): Promise<void> {
     const ok = await confirmar({
       titulo: t('book.delete'),
-      mensaje: t('book.deleteConfirm', { book: book.displayName }),
+      mensaje: t('book.deleteConfirm', { book: libreta.displayName }),
       confirmLabel: t('book.delete'),
       tone: 'danger',
     });
@@ -1880,10 +1926,52 @@ function BookActions({
     }
   }
 
+  return {
+    rotulo: t('book.actions'),
+    ocupado: busy,
+    dialogo,
+    elementos: (close) => (
+      <>
+        <MenuItem
+          onClick={() => {
+            close();
+            onRename();
+          }}
+        >
+          {t('book.rename')}
+        </MenuItem>
+        {!libreta.isDefault ? (
+          <MenuItem
+            danger
+            onClick={() => {
+              close();
+              void remove();
+            }}
+          >
+            {t('book.delete')}
+          </MenuItem>
+        ) : null}
+      </>
+    ),
+  };
+}
+
+/** El botón fantasma de solo icono con el menú de unas acciones, y su diálogo. */
+function BotonDeAcciones({
+  acciones,
+  icono,
+  class: cls,
+}: {
+  acciones: AccionesDeMenu | null;
+  icono: JSX.Element;
+  class?: string | undefined;
+}): JSX.Element | null {
+  if (!acciones) return null;
   return (
     <>
       <Dropdown
-        label={t('book.actions')}
+        {...(cls ? { class: cls } : {})}
+        label={acciones.rotulo}
         align="end"
         trigger={({ onClick, ...aria }) => (
           <Button
@@ -1892,38 +1980,16 @@ function BookActions({
             variant="ghost"
             size="sm"
             iconOnly
-            disabled={busy}
-            aria-label={t('book.actions')}
-            title={t('book.actions')}
-            leadingIcon={<Icon name="user" size={16} />}
+            disabled={acciones.ocupado}
+            aria-label={acciones.rotulo}
+            title={acciones.rotulo}
+            leadingIcon={icono}
           />
         )}
       >
-        {(close) => (
-          <>
-            <MenuItem
-              onClick={() => {
-                close();
-                onRename();
-              }}
-            >
-              {t('book.rename')}
-            </MenuItem>
-            {!book.isDefault ? (
-              <MenuItem
-                danger
-                onClick={() => {
-                  close();
-                  void remove();
-                }}
-              >
-                {t('book.delete')}
-              </MenuItem>
-            ) : null}
-          </>
-        )}
+        {acciones.elementos}
       </Dropdown>
-      {dialogo}
+      {acciones.dialogo}
     </>
   );
 }

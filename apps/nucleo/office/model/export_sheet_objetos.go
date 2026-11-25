@@ -74,8 +74,8 @@ type partesObjetos struct {
 
 // contadorObjetos numera tablas, dibujos y gráficos en todo el libro.
 type contadorObjetos struct {
-	tablas, dibujos, graficos, notas, bloquesVML int
-	personas                                     personasHilosXlsx // los autores de los hilos del libro
+	tablas, dibujos, graficos, notas, bloquesVML, segmentadores int
+	personas                                                    personasHilosXlsx // los autores de los hilos del libro
 }
 
 // celdasConTablas es la hoja con las celdas que sus tablas exigen en OOXML: la cabecera
@@ -163,7 +163,7 @@ func objetosXlsx(sd sheetData, hoja string, cuenta *contadorObjetos) *partesObje
 		p.rels = append(p.rels, `<Relationship Id="`+id+`" Type="`+tipo+`" Target="`+destino+`"/>`)
 		return id
 	}
-	if len(sd.Charts) > 0 {
+	if len(sd.Charts) > 0 || len(sd.segXlsx) > 0 {
 		cuenta.dibujos++
 		n := cuenta.dibujos
 		dibujo, relsDibujo := dibujoXlsx(sd, hoja, cuenta, p)
@@ -217,6 +217,12 @@ func objetosXlsx(sd sheetData, hoja string, cuenta *contadorObjetos) *partesObje
 			ext.WriteString(minigraficoXlsx(m, hoja))
 		}
 		ext.WriteString(`</x14:sparklineGroups></ext>`)
+	}
+	// Los segmentadores que Excel sabe pintar, en su forma (x14 los de dinámica y x15 los
+	// de tabla); todos, además, en la extensión de Sytue, que lleva su id.
+	if len(sd.segXlsx) > 0 {
+		deDinamica, deTabla := listasSegmentadoresXlsx(sd.segXlsx, cuenta, p, rid)
+		ext.WriteString(deDinamica + deTabla)
 	}
 	if len(sd.Slicers) > 0 {
 		b, _ := json.Marshal(sd.Slicers)
@@ -317,6 +323,7 @@ func dibujoXlsx(sd sheetData, hoja string, cuenta *contadorObjetos, p *partesObj
 			`<c:chart xmlns:c="` + nsChart + `" xmlns:r="` + nsRelX + `" r:id="` + id + `"/></a:graphicData></a:graphic>` +
 			`</xdr:graphicFrame><xdr:clientData/></xdr:oneCellAnchor>`)
 	}
+	d.WriteString(anclasSegmentadoresXlsx(sd.segXlsx, len(sd.Charts)+2))
 	d.WriteString(`</xdr:wsDr>`)
 	r.WriteString(`</Relationships>`)
 	return d.String(), r.String()

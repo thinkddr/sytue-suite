@@ -51,6 +51,8 @@ spec:
                   name: {{ .Values.postgresql.existingSecret }}
                   key: {{ .Values.postgresql.dsnKey }}
           volumeMounts:
+            # Raíz del TLS de PgBouncer (global.pgbouncerTls): el DSN la verifica.
+            {{- include "sytue.pgbouncerCaMount" . | nindent 12 }}
             - name: client-secrets
               mountPath: {{ .Values.clientSecrets.mountPath }}
               readOnly: true
@@ -438,6 +440,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+            # Raíz del TLS de PgBouncer (global.pgbouncerTls): el DSN la verifica.
+            {{- include "sytue.pgbouncerCaMount" . | nindent 12 }}
             - name: tmp
               mountPath: /tmp
             {{- if .Values.clientSecrets.enabled }}
@@ -446,6 +450,7 @@ spec:
               readOnly: true
             {{- end }}
       volumes:
+        {{- include "sytue.pgbouncerCaVolume" . | nindent 8 }}
         - name: tmp
           emptyDir: {}
         {{- if .Values.clientSecrets.enabled }}

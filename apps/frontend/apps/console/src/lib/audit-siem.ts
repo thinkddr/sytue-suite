@@ -11,6 +11,11 @@
  *   - mail          → Sytue Mail: traza de compliance (GET /api/v1/admin/audit-log).
  *   - drive         → Sytue Drive: traza de compliance (GET /api/v1/admin/audit-log).
  *   - notes         → Sytue Notepads: traza de compliance (GET /api/v1/admin/audit-log).
+ *   - docs, rooms, calendar, contacts, hub → la traza de ACCESO a datos de cliente
+ *                     (docs/security.md §1.7, platform/pkg/auditlog): quién abrió,
+ *                     descargó, compartió o exportó qué. Mismo GET /admin/audit-log y
+ *                     misma forma que la de cumplimiento; en Mail y Drive las dos
+ *                     trazas van en la misma tabla y llegan juntas.
  *   - integrations  → Integration Gateway: egress (GET /admin/egress-audit) + decisiones
  *                     de política (GET /admin/policy-decisions).
  *
@@ -28,13 +33,48 @@
  */
 import { HttpClient, bearer } from '@sytue/api-clients';
 import type { SytueSession } from '@sytue/auth';
-import { adminBaseUrl, mailBaseUrl, driveBaseUrl, notesBaseUrl, gatewayBaseUrl } from './auth.js';
+import {
+  adminBaseUrl,
+  calendarBaseUrl,
+  contactsBaseUrl,
+  docsBaseUrl,
+  driveBaseUrl,
+  gatewayBaseUrl,
+  hubInternalUrl,
+  mailBaseUrl,
+  notesBaseUrl,
+  roomsBaseUrl,
+} from './auth.js';
 import { contiene } from '@sytue/i18n';
 
 /** Fuente (servicio) de un registro de auditoría. */
-export type AuditSource = 'id' | 'mail' | 'drive' | 'notes' | 'integrations';
+export type AuditSource =
+  | 'id'
+  | 'mail'
+  | 'drive'
+  | 'notes'
+  | 'docs'
+  | 'rooms'
+  | 'calendar'
+  | 'contacts'
+  | 'hub'
+  | 'integrations';
 
-export const ALL_SOURCES: readonly AuditSource[] = ['id', 'mail', 'drive', 'notes', 'integrations'];
+/** Las fuentes que sirven `GET /api/v1/admin/audit-log` (platform/pkg/auditlog). */
+type TrazaSource = Exclude<AuditSource, 'id' | 'integrations'>;
+
+export const ALL_SOURCES: readonly AuditSource[] = [
+  'id',
+  'mail',
+  'drive',
+  'notes',
+  'docs',
+  'rooms',
+  'calendar',
+  'contacts',
+  'hub',
+  'integrations',
+];
 
 /** Etiqueta de presentación de cada fuente. */
 export const SOURCE_LABEL: Record<AuditSource, string> = {
@@ -42,6 +82,11 @@ export const SOURCE_LABEL: Record<AuditSource, string> = {
   mail: 'Correo',
   drive: 'Archivos',
   notes: 'Notas',
+  docs: 'Documentos',
+  rooms: 'Rooms',
+  calendar: 'Calendario',
+  contacts: 'Contactos',
+  hub: 'Hub',
   integrations: 'Integraciones',
 };
 
@@ -165,7 +210,7 @@ async function loadId(session: SytueSession, w: AuditWindow): Promise<SiemRecord
 async function loadCompliance(
   session: SytueSession,
   base: string,
-  service: 'mail' | 'drive' | 'notes',
+  service: TrazaSource,
   w: AuditWindow,
 ): Promise<SiemRecord[]> {
   const res = await http(session, base).json<{ items?: ComplianceAuditWire[] }>({
@@ -252,10 +297,24 @@ function applyFilters(records: SiemRecord[], f: AuditFilters): SiemRecord[] {
   });
 }
 
+/** Dónde vive cada fuente de `GET /admin/audit-log`, por el Service interno. */
+const TRAZA_BASE: Record<TrazaSource, () => string> = {
+  mail: mailBaseUrl,
+  drive: driveBaseUrl,
+  notes: notesBaseUrl,
+  docs: docsBaseUrl,
+  rooms: roomsBaseUrl,
+  calendar: calendarBaseUrl,
+  contacts: contactsBaseUrl,
+  hub: hubInternalUrl,
+};
+const TRAZA_SOURCES = Object.keys(TRAZA_BASE) as TrazaSource[];
+
 /**
- * Auditoría unificada: fan-out best-effort a las 5 fuentes (6 llamadas — Integraciones
- * agrega egress + decisiones), normaliza, filtra de forma uniforme, ordena por fecha
- * DESC y topa a `limit`. Reporta el estado por-fuente para avisar de una fuente caída.
+ * Auditoría unificada: fan-out best-effort a las 10 fuentes (11 llamadas —
+ * Integraciones agrega egress + decisiones), normaliza, filtra de forma uniforme,
+ * ordena por fecha DESC y topa a `limit`. Reporta el estado por-fuente para avisar
+ * de una fuente caída.
  */
 export async function loadUnifiedAudit(
   session: SytueSession,
@@ -266,19 +325,16 @@ export async function loadUnifiedAudit(
     until: filters.until,
     limit: clampLimit(filters.limit),
   };
-  const [id, mail, drive, notes, egress, decisions] = await Promise.all([
+  const trazas = TRAZA_SOURCES;
+  const [id, egress, decisions, ...deTraza] = await Promise.all([
     attempt(loadId(session, w)),
-    attempt(loadCompliance(session, mailBaseUrl(), 'mail', w)),
-    attempt(loadCompliance(session, driveBaseUrl(), 'drive', w)),
-    attempt(loadCompliance(session, notesBaseUrl(), 'notes', w)),
     attempt(loadEgress(session, w)),
     attempt(loadDecisions(session, w)),
+    ...trazas.map((s) => attempt(loadCompliance(session, TRAZA_BASE[s](), s, w))),
   ]);
   const sources: SourceStatus[] = [
     { source: 'id', ok: id.ok, count: id.data.length },
-    { source: 'mail', ok: mail.ok, count: mail.data.length },
-    { source: 'drive', ok: drive.ok, count: drive.data.length },
-    { source: 'notes', ok: notes.ok, count: notes.data.length },
+    ...trazas.map((s, i) => ({ source: s, ok: deTraza[i]!.ok, count: deTraza[i]!.data.length })),
     // Integraciones = egress + decisiones: viva si CUALQUIERA respondió.
     {
       source: 'integrations',
@@ -286,14 +342,7 @@ export async function loadUnifiedAudit(
       count: egress.data.length + decisions.data.length,
     },
   ];
-  let records = [
-    ...id.data,
-    ...mail.data,
-    ...drive.data,
-    ...notes.data,
-    ...egress.data,
-    ...decisions.data,
-  ];
+  let records = [...id.data, ...deTraza.flatMap((r) => r.data), ...egress.data, ...decisions.data];
   records = applyFilters(records, filters);
   records.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
   if (records.length > w.limit) records = records.slice(0, w.limit);

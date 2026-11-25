@@ -418,8 +418,7 @@ func (h *anfitrionDrive) fallar(err error) {
 	h.soltarBoveda()
 	// El código corto (drive.import.row_heads, http.409…) debajo del aviso: sin él,
 	// en producción no había forma de saber qué comprobación lo rechazó.
-	vacio := ui.NuevoVacio(h.translate("matrix.failed"), avisarFallo("el Drive de la bóveda", err))
-	vacio.Tono = ui.VacioError // DS-06: es un fallo, no una lista vacía
+	vacio := ui.NuevoVacioError(h.translate("matrix.failed"), avisarFallo("el Drive de la bóveda", err)) // DS-06
 	vacio.Accion = ui.NuevoBoton(h.translate("action.retry"), h.reintentar)
 	h.enseñar(vacio)
 	if h.estado != nil {

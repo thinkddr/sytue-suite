@@ -396,7 +396,8 @@ export interface OidcApp {
 /**
  * Proveedor de servicio SAML registrado por la organización: una app de terceros a la
  * que Sytue ID hace de IdP. Lo crea el catálogo de plantillas (servicio `integrations`)
- * al activar una app, y desde la Console se ve, se apaga y se borra. Los campos `idp*`
+ * al activar una app o un admin a mano desde la Console, donde también se apaga y se
+ * borra. Los campos `idp*`
  * son los datos que hay que pegar EN la app de terceros; son iguales para toda la org.
  */
 export interface SamlSp {
@@ -426,6 +427,22 @@ export interface OidcAppInput {
   post_logout_redirect_uris?: string[];
   scopes?: string[];
   public?: boolean;
+}
+
+/**
+ * Payload de alta manual de un SP SAML (snake_case de Sytue ID). El certificado del SP
+ * es opcional y PÚBLICO; el mapeo da el nombre del atributo SAML de cada dato lógico.
+ */
+export interface SamlSpInput {
+  name: string;
+  entity_id: string;
+  acs_url: string;
+  cert_pem?: string;
+  name_id_format?: string;
+  attribute_mapping?: Partial<Record<'email' | 'name' | 'groups', string>>;
+  idp_initiated?: boolean;
+  relay_state_default?: string;
+  enabled?: boolean;
 }
 
 /**

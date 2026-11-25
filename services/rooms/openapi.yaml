@@ -881,6 +881,7 @@ paths:
     get:
       tags: [messages]
       summary: Listar mis mensajes programados (Ola 12; opcionalmente por canal)
+      description: Incluye lo de las conversaciones de otras organizaciones donde el usuario está como persona de fuera (ADR 0040), que se guarda en la organización anfitriona.
       parameters:
         - in: query
           name: channel_id
@@ -907,6 +908,7 @@ paths:
     patch:
       tags: [messages]
       summary: Editar un mensaje programado (cuerpo / instante / adjuntos)
+      description: El de una conversación de otra organización se edita en la anfitriona, donde se guardó.
       requestBody:
         required: true
         content:
@@ -930,6 +932,7 @@ paths:
     delete:
       tags: [messages]
       summary: Cancelar (borrar) un mensaje programado
+      description: El de una conversación de otra organización se cancela en la anfitriona, donde se guardó.
       responses:
         "204": { description: Cancelado }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -938,6 +941,7 @@ paths:
     get:
       tags: [messages]
       summary: Listar mis mensajes guardados (cross-canal, keyset por fecha)
+      description: Incluye lo de las conversaciones de otras organizaciones donde el usuario está como persona de fuera (ADR 0040), que se guarda en la organización anfitriona.
       parameters:
         - in: query
           name: before
@@ -958,6 +962,45 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Message" }
                   next_before: { type: string, format: date-time }
+
+  /api/v1/admin/external-contact:
+    get:
+      tags: [channels]
+      summary: Política de contacto con gente de otras organizaciones (owner o admin)
+      description: >
+        Abierta (la predeterminada, también sin fila), cerrada o solo con las
+        organizaciones de confianza (por el nombre de su dirección, hasta 100). Vale en
+        los dos sentidos para DM, grupos, canales, sus llamadas y la reunión de un
+        evento: quien es de aquí no abre conversaciones con quien no se admite (403
+        `rooms_external_closed`), y una conversación de fuera solo existe para una
+        persona si las políticas de las dos organizaciones se admiten.
+      responses:
+        "200":
+          description: La política
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalContactPolicy" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [channels]
+      summary: Guardar la política de contacto con gente de fuera (owner o admin)
+      description: >
+        Se guarda limpia: sin la propia organización ni repetidos en la lista, y vacía
+        si el modo no es `confianza`. Un nombre que no es de organización es 400
+        `rooms_external_policy_org` con el nombre en `details.org`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExternalContactPolicy" }
+      responses:
+        "200":
+          description: La política como queda
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalContactPolicy" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/v1/me/categories:
     get:
@@ -1243,6 +1286,49 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/Error" }
 
+  /api/v1/admin/audit-log:
+    get:
+      tags: [realtime]
+      summary: Traza de auditoría de la organización activa (owner/admin)
+      description: >
+        La traza de docs/security.md §1.7 de este servicio: los accesos a datos de
+        cliente (`acceso.*`: miembros de equipos y canales, webhooks, puentes, bots, llamadas y grabaciones). Quién, qué (id del recurso, nunca su
+        contenido), cuándo y desde dónde (`detail.ip`, `detail.request_id`).
+        Paginación keyset (occurred_at, id) DESC con los filtros en la consulta;
+        `format=csv` exporta hasta 5000 filas. La traza `acceso.*` se guarda doce
+        meses.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: action, in: query, required: false, schema: { type: string, maxLength: 100 }, description: Prefijo de la acción }
+        - { name: actor, in: query, required: false, schema: { type: string }, description: Subcadena del actor }
+        - { name: since, in: query, required: false, schema: { type: string }, description: RFC3339 o AAAA-MM-DD }
+        - { name: until, in: query, required: false, schema: { type: string }, description: RFC3339 o AAAA-MM-DD (inclusivo) }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [csv] } }
+      responses:
+        "200":
+          description: Página de la traza ({ items, nextCursor }) o CSV
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        occurred_at: { type: string, format: date-time }
+                        actor: { type: string }
+                        action: { type: string }
+                        target: { type: string }
+                        detail: { type: object }
+                  nextCursor: { type: string }
+        "400": { description: Filtros, fechas o cursor no válidos }
+        "403": { description: Rol insuficiente }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1474,6 +1560,17 @@ components:
           description: >
             Si viene (RFC3339 futuro), PROGRAMA el envío en vez de publicarlo ya: la
             respuesta es un ScheduledMessage, no un Message.
+    ExternalContactPolicy:
+      type: object
+      description: Política de la organización para el contacto con gente de fuera (mig 0083).
+      required: [mode, trusted]
+      properties:
+        mode: { type: string, enum: [abierta, cerrada, confianza] }
+        trusted:
+          type: array
+          maxItems: 100
+          items: { type: string, description: "Nombre de la organización en su dirección." }
+        updated_at: { type: string, format: date-time, readOnly: true }
     ScheduledMessage:
       type: object
       description: Mensaje redactado para publicarse en send_at; un worker lo envía al vencer (Ola 12).

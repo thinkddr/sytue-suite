@@ -316,9 +316,9 @@ func TestUnaLecturaSecundariaQueFallaConservaLoPublicado(t *testing.T) {
 		rutas  map[string]any
 		ruta   string
 	}{
-		{"los directos de Cast", func(b string) widgets.Fuente { return Cast(Comunes{}, api.NewCast(b, nil, nil)) }, cast, "/videos " + api.CastOrgScope + " " + api.CastStatusLive},
-		{"lo publicado en la organización", func(b string) widgets.Fuente { return Cast(Comunes{}, api.NewCast(b, nil, nil)) }, cast, "/videos " + api.CastOrgScope + " " + api.CastStatusReady},
-		{"la cuota de Cast", func(b string) widgets.Fuente { return Cast(Comunes{}, api.NewCast(b, nil, nil)) }, cast, "/quota"},
+		{"los directos de Cast", func(b string) widgets.Fuente { cl := api.NewCast(b, nil, nil); return Cast(Comunes{}, cl, cl) }, cast, "/videos " + api.CastOrgScope + " " + api.CastStatusLive},
+		{"lo publicado en la organización", func(b string) widgets.Fuente { cl := api.NewCast(b, nil, nil); return Cast(Comunes{}, cl, cl) }, cast, "/videos " + api.CastOrgScope + " " + api.CastStatusReady},
+		{"la cuota de Cast", func(b string) widgets.Fuente { cl := api.NewCast(b, nil, nil); return Cast(Comunes{}, cl, cl) }, cast, "/quota"},
 		{"los álbumes", func(b string) widgets.Fuente { return Photos(Comunes{}, api.NewPhotos(b, nil, nil)) }, fotos, "/albums"},
 		{"la cuota de Drive", func(b string) widgets.Fuente {
 			return Drive(Comunes{}, api.NewDrive(b, nil, nil), api.NewDrive(b, nil, nil))

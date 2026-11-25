@@ -17,7 +17,7 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
-var Migrations = pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateIngressDDL(migrationFiles)))
+var Migrations = pg.WithAuditLogDDL(pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateIngressDDL(migrationFiles))))
 
 // MigrationsDir es la subcarpeta dentro de Migrations con los .sql.
 const MigrationsDir = "migrations"

@@ -11,7 +11,13 @@ import {
   alternarCabeceraDeFila,
   alternarFilasNumeradas,
   celdaVecina,
+  combinarAbajo,
+  combinarDerecha,
+  esCombinada,
   fondoDeCelda,
+  separarCelda,
+  vecinaAbajo,
+  vecinaDerecha,
   tieneCabeceraDeColumna,
   tieneCabeceraDeFila,
 } from './tabla-notas.js';
@@ -86,4 +92,49 @@ test('Tab va de celda en celda en orden de lectura; en los extremos, nada', () =
   expect(celdaVecina(c!, -1)).toBe(b!);
   expect(celdaVecina(d!, 1)).toBeNull();
   expect(celdaVecina(a!, -1)).toBeNull();
+});
+
+function rejilla(html: string): HTMLTableElement {
+  const caja = document.createElement('div');
+  caja.innerHTML = html;
+  return caja.querySelector('table')!;
+}
+const celdas = (t: HTMLTableElement) => [...t.querySelectorAll<HTMLTableCellElement>('td, th')];
+
+test('combinar a la derecha y abajo, y separar, como Fyne (combinar.go)', () => {
+  const t = rejilla(
+    '<table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></tbody></table>',
+  );
+  const [a] = celdas(t);
+  expect(vecinaDerecha(a!)).toBe(celdas(t)[1]!);
+  expect(vecinaDerecha(celdas(t)[1]!)).toBeNull();
+  combinarDerecha(a!);
+  expect(t.innerHTML).toBe(
+    '<tbody><tr><td colspan="2">ab</td></tr><tr><td>c</td><td>d</td></tr></tbody>',
+  );
+  expect(vecinaAbajo(a!)).toBeNull(); // una de dos columnas no se junta con una de una
+  separarCelda(a!);
+  expect(t.innerHTML).toBe(
+    '<tbody><tr><td>ab</td><td><br></td></tr><tr><td>c</td><td>d</td></tr></tbody>',
+  );
+  combinarAbajo(a!);
+  expect(t.innerHTML).toBe(
+    '<tbody><tr><td rowspan="2">abc</td><td><br></td></tr><tr><td>d</td></tr></tbody>',
+  );
+  expect(esCombinada(a!)).toBe(true);
+  separarCelda(a!);
+  expect(t.innerHTML).toBe(
+    '<tbody><tr><td>abc</td><td><br></td></tr><tr><td><br></td><td>d</td></tr></tbody>',
+  );
+});
+
+test('no se combina entre secciones ni pasando el tope del saneador', () => {
+  const t = rejilla(
+    '<table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>',
+  );
+  expect(vecinaAbajo(celdas(t)[0]!)).toBeNull();
+  const ancha = rejilla(
+    '<table><tbody><tr><td colspan="19">a</td><td colspan="2">b</td></tr></tbody></table>',
+  );
+  expect(vecinaDerecha(celdas(ancha)[0]!)).toBeNull();
 });

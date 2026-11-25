@@ -99,6 +99,11 @@ var escalonCompositor = tema.Escalon{Tam: tema.TextoBase.Tam, Linea: 1.5 * tema.
 // de puntero que usa el compositor real sin cambiar los otros botones de la suite.
 var tactilEnCompositor = ui.EsTactil
 
+// flechasFiables dice si una ↑ que llega es de verdad una ↑ sola, y no Ctrl+↑ o Alt+↑
+// con los modificadores perdidos por el driver del móvil (`ui.ModificadoresEnElMovil`).
+// Es una variable por los guardianes, cuyo driver es de escritorio.
+var flechasFiables = ui.ModificadoresEnElMovil
+
 func ladoBotonesCompositor() float32 {
 	if tactilEnCompositor() {
 		return max(LadoBotonBarra, ui.SueloTactilBarra)
@@ -269,12 +274,12 @@ func (c *Compositor) tecla(k *fyne.KeyEvent) bool {
 		}
 	}
 	// ↑ con la caja vacía edita el último mensaje propio. Ctrl/Alt/Super+↑ no llega
-	// aquí en escritorio ni en wasm: el driver glfw lo convierte en un
-	// `desktop.CustomShortcut`. En móvil con teclado físico SÍ llega como ↑ a secas,
-	// porque el driver móvil (`typeDownCanvas`) descarta los modificadores; es deuda
-	// del fork (docs/roadmap.md, «Fork de Fyne»).
+	// aquí en escritorio: el driver glfw lo convierte en un `desktop.CustomShortcut`. En
+	// el móvil con teclado físico, el driver de Fyne hasta `v2.8.2-sytue.10` descarta los
+	// modificadores y Ctrl+↑ o Alt+↑ (cambiar de canal) llegan como ↑ a secas: hasta que
+	// la suite use el fork con el parche 0023, ahí ↑ no edita (`flechasFiables`).
 	if k.Name == fyne.KeyUp && !c.area.Mayus() && c.Texto() == "" && len(c.Pendientes) == 0 &&
-		c.AlEditarUltimo != nil && c.AlEditarUltimo() {
+		c.AlEditarUltimo != nil && flechasFiables() && c.AlEditarUltimo() {
 		return true
 	}
 	if k.Name != fyne.KeyReturn && k.Name != fyne.KeyEnter || c.area.Mayus() {

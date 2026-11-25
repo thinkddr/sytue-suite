@@ -137,7 +137,7 @@ func TestLosCamposDelEnvioSonLosDelServicio(t *testing.T) {
 	rutas := webref.Read(t, "services/rooms/internal/http/server.go")
 	for _, ruta := range []string{
 		`porMensaje.Post("/messages/{messageID}/ack", h.AckMessage)`, `porMensaje.Get("/messages/{messageID}/readers", h.MessageReaders)`,
-		`api.Patch("/scheduled/{scheduledID}", h.UpdateScheduled)`,
+		`porProgramado.Patch("/scheduled/{scheduledID}", h.UpdateScheduled)`,
 		`porMensaje.Put("/messages/{messageID}/card/{value}", h.SetCardVote)`,
 		`porMensaje.Delete("/messages/{messageID}/card/{value}", h.ClearCardVote)`,
 	} {

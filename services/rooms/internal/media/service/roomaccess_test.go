@@ -272,6 +272,77 @@ func TestLlamarALaPuertaExigeAccesoALaSala(t *testing.T) {
 	}
 }
 
+// La reunión de un evento tiene sala de espera para quien viene de OTRA organización
+// (roadmap: «que entren por la sala de espera»). Con el enlace viejo, sin clave ni
+// invitación, la puerta está echada para él aunque la sala esté abierta: puede llamar,
+// y cuando el anfitrión le deja pasar entra y sigue dentro para lo que pide después la
+// llamada. A la gente de la anfitriona no le cambia nada, ni a la reunión suelta.
+//
+// Visto en rojo sin salaDeEsperaDeFuera: el invitado de fuera recibía ErrPermission y
+// no podía ni llamar.
+func TestLaReunionDeUnEventoTieneSalaDeEsperaParaLosDeFuera(t *testing.T) {
+	room := domain.Room{
+		ID: uuid.New(), Name: "r-evento", Status: domain.RoomActive, CreatedBy: "alice", LinkKey: "k",
+		Metadata:    map[string]any{"source": map[string]any{"kind": "calendar", "ref_id": "uid-1"}},
+		WaitingRoom: true,
+	}
+	fs := &fakeStore{room: room, admitidos: map[string]bool{}}
+	s := newSvc(fs, &fakeLK{}, nil)
+	s.SetCalendarGate(calendarioFalso{})
+	dentro := accessCtx(t)
+	fuera := DeOtraOrganizacion(dentro)
+
+	if _, err := s.JoinRoom(fuera, room.ID, "eve", "Eve", domain.RoleSpeaker, false); !errors.Is(err, domain.ErrRoomLocked) {
+		t.Fatalf("la de fuera sin clave: err=%v, quiero ErrRoomLocked (sala de espera)", err)
+	}
+	if _, err := s.JoinRoom(dentro, room.ID, "eve", "Eve", domain.RoleSpeaker, false); !errors.Is(err, domain.ErrPermission) {
+		t.Fatalf("la de la anfitriona sin clave: err=%v, quiero ErrPermission como siempre", err)
+	}
+	if _, err := s.Knock(dentro, room.ID, "eve", "Eve"); !errors.Is(err, domain.ErrRoomOpen) {
+		t.Fatalf("la de la anfitriona llamando a una sala abierta: err=%v, quiero ErrRoomOpen", err)
+	}
+	if _, err := s.Knock(fuera, room.ID, "eve", "Eve"); err != nil {
+		t.Fatalf("la de fuera llama a la puerta: %v", err)
+	}
+	if len(fs.knocks) != 1 || fs.knocks[0].Identity != "eve" {
+		t.Fatalf("cola = %+v, quiero a Eve", fs.knocks)
+	}
+
+	// Con la clave del enlace entra sin esperar, y no hay puerta que llamar.
+	conClave := ConClave(fuera, room.LinkKey)
+	if _, err := s.JoinRoom(conClave, room.ID, "bea", "Bea", domain.RoleSpeaker, false); err != nil {
+		t.Fatalf("la de fuera con la clave: %v", err)
+	}
+	if _, err := s.Knock(conClave, room.ID, "bea", "Bea"); !errors.Is(err, domain.ErrRoomOpen) {
+		t.Fatalf("la de fuera con la clave llamando: err=%v, quiero ErrRoomOpen", err)
+	}
+
+	// El anfitrión la deja pasar: entra, y la verja la reconoce para el cifrado.
+	fs.admitidos["eve"] = true
+	if _, err := s.JoinRoom(fuera, room.ID, "eve", "Eve", domain.RoleSpeaker, false); err != nil {
+		t.Fatalf("admitida: %v", err)
+	}
+	if err := s.requireRoomAccess(fuera, room, "eve", false); err != nil {
+		t.Fatalf("admitida, la verja de después: %v", err)
+	}
+	// La admisión no abre la reunión a quien es de la anfitriona sin clave.
+	if err := s.requireRoomAccess(dentro, room, "eve", false); !errors.Is(err, domain.ErrPermission) {
+		t.Fatalf("la admisión de fuera no vale dentro: %v", err)
+	}
+
+	// Una reunión suelta que no es de un evento no tiene sala de espera.
+	suelta := room
+	suelta.ID, suelta.Metadata, suelta.WaitingRoom = uuid.New(), nil, false
+	fs2 := &fakeStore{room: suelta, admitidos: map[string]bool{"eve": true}}
+	s2 := newSvc(fs2, &fakeLK{}, nil)
+	if _, err := s2.JoinRoom(fuera, suelta.ID, "eve", "Eve", domain.RoleSpeaker, false); !errors.Is(err, domain.ErrPermission) {
+		t.Fatalf("reunión suelta, de fuera: err=%v, quiero ErrPermission", err)
+	}
+	if _, err := s2.Knock(fuera, suelta.ID, "eve", "Eve"); !errors.Is(err, domain.ErrRoomOpen) {
+		t.Fatalf("reunión suelta, de fuera, llamando: err=%v, quiero ErrRoomOpen", err)
+	}
+}
+
 // sesion es el contexto de una petición de `sub` en acme, con o sin rol de la organización.
 func sesion(t *testing.T, sub string, roles ...string) context.Context {
 	t.Helper()

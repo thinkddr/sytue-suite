@@ -24,6 +24,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
@@ -1727,6 +1728,11 @@ func (h *Handlers) CreateShare(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
+	// A quién se le dio acceso y cómo; sin el token del enlace ni su contraseña.
+	objetivo := req.FileID + req.FolderID
+	auditlog.Anotar(r.Context(), "share.create", objetivo, map[string]any{
+		"share": sh.ID.String(), "kind": string(sh.Kind), "permission": string(sh.Permission), "subject": sh.Subject,
+	})
 	resp := map[string]any{"share": sh}
 	// Para enlaces, devolver la URL pública completa (incluye el token una vez).
 	if sh.Kind == domain.ShareLink && sh.Token != "" {

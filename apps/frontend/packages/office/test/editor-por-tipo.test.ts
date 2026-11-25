@@ -48,6 +48,11 @@ const LIENZO_DIAPOS = /\/editor\/slides\/SlidesCanvas\.tsx$/;
 const FOLIO = /\/editor\/canvas\/PageCanvas\.tsx$/;
 const PESTANAS = /\/editor\/ribbon\/tabs\//;
 const FORMULAS = /\/packages\/formula\/src\/(engine|functions\/)/;
+const MOTOR = /\/packages\/formula\/src\/engine\.ts$/;
+// Las funciones de la librería, salvo los agregadores de GROUPBY/PIVOTBY, que despacha
+// el motor.
+const FUNCIONES =
+  /\/packages\/formula\/src\/(functions\/(?!agrupar\.ts$)|catalogo\.ts$|index\.ts$)/;
 const PARSE5 = /\/node_modules\/.*\/(parse5|entities)\//;
 
 test('the editor island carries no canvas, no tab body, no formulas and no parse5', () => {
@@ -57,6 +62,22 @@ test('the editor island carries no canvas, no tab body, no formulas and no parse
     expect({ re: String(re), files: hay(g, re) }).toEqual({ re: String(re), files: [] });
 });
 
+// El Drive de la bóveda (`@sytue/offline/matrix`, ~183 KB): el editor solo pregunta si el
+// Drive está en ella (`driveEnBoveda.ts`) y baja `driveCifrado.ts` al guardar en él.
+const DRIVE_BOVEDA = /\/packages\/offline\/src\/matrix\/|\/editor\/state\/driveCifrado\.ts$/;
+
+test('the editor and each kind carry no vault Drive until saving to it', () => {
+  for (const ruta of [
+    '../src/editor/EditorApp.tsx',
+    '../src/editor/tipos/documento.tsx',
+    '../src/editor/tipos/hoja.tsx',
+    '../src/editor/tipos/presentacion.tsx',
+  ]) {
+    const g = grafo(ruta);
+    expect({ ruta, files: hay(g, DRIVE_BOVEDA) }).toEqual({ ruta, files: [] });
+  }
+});
+
 test('each kind carries its own canvas, and only the spreadsheet the formula engine', () => {
   const documento = grafo('../src/editor/tipos/documento.tsx');
   const hoja = grafo('../src/editor/tipos/hoja.tsx');
@@ -64,7 +85,10 @@ test('each kind carries its own canvas, and only the spreadsheet the formula eng
   expect(hay(documento, FOLIO)).toHaveLength(1);
   expect(hay(hoja, LIENZO_HOJA)).toHaveLength(1);
   expect(hay(presentacion, LIENZO_DIAPOS)).toHaveLength(1);
-  expect(hay(hoja, FORMULAS).length).toBeGreaterThan(5);
+  expect(hay(hoja, MOTOR)).toHaveLength(1);
+  // Las funciones de fórmula (~245 KB) no bajan con el editor de hojas: las pide él, en
+  // su propio trozo (`cargarFunciones` de @sytue/formula/motor).
+  expect(hay(hoja, FUNCIONES)).toEqual([]);
   for (const g of [documento, presentacion]) {
     expect(hay(g, LIENZO_HOJA)).toEqual([]);
     expect(hay(g, FORMULAS)).toEqual([]);

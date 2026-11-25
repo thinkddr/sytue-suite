@@ -183,6 +183,9 @@ func (a *PrivateApplication[R]) renderState(cfg PrivateApplicationConfig[R], sta
 			title, body = cfg.Translate("matrix.failed"), ""
 		}
 		view := ui.NuevoVacio(title, body)
+		if state == ApplicationFailed {
+			view.Tono = ui.VacioError // DS-06: es un fallo, no una lista vacía
+		}
 		if state == ApplicationPreparing || state == ApplicationRetiring {
 			loading := widget.NewProgressBarInfinite()
 			a.slot.Objects = []fyne.CanvasObject{container.NewBorder(nil, loading, nil, nil, view)}

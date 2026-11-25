@@ -25,7 +25,7 @@ import (
 // SelectorAvatar es AvatarPicker.tsx: el avatar con el botón de la cámara en su esquina,
 // que despliega los colores predefinidos, «Subir una foto…» y, si la hay, «Quitar foto».
 //
-//	botón   `absolute -right-1 -bottom-1 h-7 w-7 rounded-full border-2 border-surface  hoja
+//	botón   `absolute -right-2 -bottom-2 h-7 w-7 rounded-full border-2 border-surface  hoja
 //	        bg-surface text-text-muted shadow-xs`, la cámara de 14 (medido: 24,5)
 //	menú    `w-56 p-2.5 flex-col gap-2`: «Colores predefinidos» `text-xs font-medium   hoja
 //	        text-muted px-0.5`, la rejilla `grid-cols-6 gap-1.5` de círculos `h-7 w-7`
@@ -56,10 +56,10 @@ var ColoresAvatar = []string{"avatar-1", "avatar-2", "avatar-3", "avatar-4", "av
 // Las medidas del selector.
 var (
 	LadoBotonCamara = tema.Espacio(7) // h-7 w-7
-	// FueraBotonCamara es lo que el botón sale del avatar: `-right-2 -bottom-2`, uno más
-	// que el `-right-1 -bottom-1` de la web. Con el de la web, en el avatar de 64 de la
-	// ficha de Contacts el botón tapaba el pie de la segunda inicial (auditoría del
-	// 2026-11-24). Ver `ladoBotonCamara`.
+	// FueraBotonCamara es lo que el botón sale del avatar: `-right-2 -bottom-2`. Con el
+	// `-right-1 -bottom-1` de antes, en el avatar de 64 de la ficha de Contacts el botón
+	// tapaba el pie de la segunda inicial (auditoría del 2026-11-24); la web lo sigue
+	// desde el 2026-11-25. Ver `ladoBotonCamara`.
 	FueraBotonCamara  = tema.Espacio(2)
 	anchoMenuAvatar   = tema.Espacio(56)  // w-56
 	rellenoMenuAvatar = tema.Espacio(2.5) // p-2.5

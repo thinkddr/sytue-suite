@@ -9,6 +9,9 @@
 package http
 
 import (
+	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"net/http"
 	"strings"
 	"time"
@@ -111,6 +114,10 @@ func (s *Server) handleAdminCreateSAMLSP(w http.ResponseWriter, r *http.Request)
 		httpx.Fail(w, r, err)
 		return
 	}
+	if err := validarCertificadoSP(sp.CertPEM); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
 	created, err := s.store.CreateSAMLServiceProvider(r.Context(), nil, sp)
 	if err != nil {
 		httpx.Fail(w, r, mapDomainErr(err)) // ErrConflict (entity_id repetido) ⇒ 409
@@ -164,6 +171,12 @@ func (s *Server) handleAdminUpdateSAMLSP(w http.ResponseWriter, r *http.Request)
 	}
 	if req.CertPEM != nil {
 		sp.CertPEM = strings.TrimSpace(*req.CertPEM)
+		// Solo si llega: un SP dado de alta por el catálogo con un certificado que hoy
+		// no pasaría no puede impedir que se apague.
+		if err := validarCertificadoSP(sp.CertPEM); err != nil {
+			httpx.Fail(w, r, err)
+			return
+		}
 	}
 	if req.NameIDFormat != nil {
 		sp.NameIDFormat = strings.TrimSpace(*req.NameIDFormat)
@@ -270,4 +283,47 @@ func (s *Server) loadOrgSAMLSP(r *http.Request, orgID string) (domain.SAMLServic
 		return domain.SAMLServiceProvider{}, mapDomainErr(err)
 	}
 	return p, nil
+}
+
+// maxCertificadoSP acota el PEM del SP: una cadena de tres certificados RSA-4096 ocupa
+// unos 7 KiB, así que 16 KiB sobran y no se guarda un megabyte en un campo público.
+const maxCertificadoSP = 16 << 10
+
+// validarCertificadoSP admite vacío (el certificado del SP es opcional) o uno o más
+// bloques PEM CERTIFICATE que se puedan leer como X.509, y nada más.
+//
+// Lo que importa es lo que RECHAZA: el campo es PÚBLICO —se devuelve en cada lectura
+// y lo ve cualquier admin de la organización—, y pegar ahí la clave privada del SP en
+// vez de su certificado es un error fácil con dos bloques PEM casi iguales. Guardarla
+// sería publicarla. Se dice cuál es el problema para que se pueda corregir.
+func validarCertificadoSP(texto string) error {
+	if texto == "" {
+		return nil
+	}
+	if len(texto) > maxCertificadoSP {
+		return httpx.ErrBadRequest.WithMessage("cert_pem is too large.")
+	}
+	resto := []byte(texto)
+	bloques := 0
+	for {
+		var b *pem.Block
+		b, resto = pem.Decode(resto)
+		if b == nil {
+			break
+		}
+		if strings.Contains(b.Type, "PRIVATE KEY") {
+			return httpx.ErrBadRequest.WithMessage("cert_pem contains a private key: paste the certificate of the service provider, never its key.")
+		}
+		if b.Type != "CERTIFICATE" {
+			return httpx.ErrBadRequest.WithMessage("cert_pem must only contain CERTIFICATE blocks.")
+		}
+		if _, err := x509.ParseCertificate(b.Bytes); err != nil {
+			return httpx.ErrBadRequest.WithMessage("cert_pem is not a valid X.509 certificate.")
+		}
+		bloques++
+	}
+	if bloques == 0 || len(bytes.TrimSpace(resto)) > 0 {
+		return httpx.ErrBadRequest.WithMessage("cert_pem must be a PEM certificate (-----BEGIN CERTIFICATE-----).")
+	}
+	return nil
 }

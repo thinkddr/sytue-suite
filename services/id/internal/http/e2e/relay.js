@@ -329,16 +329,23 @@
    * - `login`: no hay clave que entregar y aún no se ha tecleado la contraseña:
    *   se pide (la autorización con `prompt=login`, una sola vez).
    * - `failed`: tampoco tras teclearla. Se explica y se ofrece repetir o volver.
+   *
+   * Las apps nativas igual, con una diferencia. Antes volvían sin clave cuando el
+   * navegador no la tenía. Entonces cada app hacía otro viaje a Sytue ID con
+   * `prompt=login`: con iniciar sesión no bastaba. Ahora se pide la contraseña en
+   * este mismo viaje. Pero una nativa vuelve igual aunque no haya clave: no se
+   * queda en `failed`. Entrar en la app no depende del desbloqueo, y es la app la
+   * que enseña su candado.
    */
   E.relayOutcome = function (cfg, r) {
     if (r.enroll) return "enroll";
     if (r.lost) return "lost";
-    if (cfg.web !== true || !cfg.app_key) return "go";
-    if (r.blob) return "go";
+    if (!cfg.app_key || r.blob) return "go";
     // Recién identificada (dos minutos) cuenta como tecleada: pedirlo otra vez no
     // cambiaría nada.
     var fresh = typeof cfg.auth_age === "number" && cfg.auth_age < 120000;
-    return cfg.login && !cfg.typed && !fresh ? "login" : "failed";
+    if (cfg.login && !cfg.typed && !fresh) return "login";
+    return cfg.web === true ? "failed" : "go";
   };
 
   var doc = global.document;

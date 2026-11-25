@@ -41,6 +41,9 @@ type Server struct {
 	fed *federation.Broker
 	// hub avisa a las pantallas abiertas de un cambio de estado (la foto). nil = sin Hub.
 	hub *hubnotify.Client
+	// basesDeServicio abre la base de un servicio para la purga de organizaciones
+	// (purga_tenants.go). nil = derivarla del DSN de Sytue ID; los tests la fijan.
+	basesDeServicio abridorDeBases
 
 	// Limitadores anti-fuerza-bruta. login y acct son pg.RateLimiter (bucket
 	// compartido entre réplicas vía Postgres: seguridad-crítico y decenas de
@@ -64,6 +67,10 @@ type Server struct {
 	// frena bots baratos, estos frenan a quien lo resuelve.
 	smsPhoneLimiter httpx.RateLimiter
 	smsIPLimiter    httpx.RateLimiter
+	// smsGlobalLimiter es el tope de todos los SMS de Sytue ID en una hora
+	// (Config.SMSMaxPerHour): lo que frena un fraude repartido entre muchos números
+	// e IP, que los dos de arriba no ven. nil = sin tope.
+	smsGlobalLimiter httpx.RateLimiter
 	// directorioLimiter frena /internal/directory/resolve por organización: quien
 	// tenga su secreto no puede barrer el directorio de nadie a golpe de llamadas.
 	directorioLimiter httpx.RateLimiter
@@ -221,6 +228,13 @@ func NewServer(cfg Config, logger *slog.Logger, st *store.Store, km *oidc.KeyMan
 	}
 	s.scim = scim.New(st, cfg.Issuer, cfg.SCIMOrgSlug)
 	s.fed = federation.New()
+	// El tope global de SMS por hora (ADR 0041): la hora entera de ráfaga y se repone
+	// a ese ritmo, compartido entre réplicas como los otros dos.
+	if cfg.SMSMaxPerHour > 0 {
+		s.smsGlobalLimiter = pg.NewRateLimiter(st.DB(), pg.RateLimiterConfig{
+			PerSecond: float64(cfg.SMSMaxPerHour) / 3600, Burst: cfg.SMSMaxPerHour,
+		})
+	}
 	// El dominio de la suite baja al store porque quien asigna la dirección de
 	// correo al dar de alta cuelga de UpsertMembership, tres capas por debajo de la
 	// configuración. Se deduce del issuer igual que las coordenadas de IMAP/SMTP
@@ -640,36 +654,46 @@ func (s *Server) Router() http.Handler {
 			r.Put("/me/avatar", s.handleMeAvatarPut)
 			r.Delete("/me/avatar", s.handleMeAvatarDelete)
 			// La rúbrica que la persona pidió recordar en CertiPDF (cifrada en reposo).
-			r.Get("/me/rubrica", s.handleMeRubricaGet)
-			r.Put("/me/rubrica", s.handleMeRubricaPut)
-			r.Delete("/me/rubrica", s.handleMeRubricaDelete)
+			//
+			// Las rutas de `persona` (aquí y abajo) son las de seguridad de la propia
+			// cuenta: la base solo deja ver y escribir filas de quien llama (RLS,
+			// ambito.go). Ninguna toca legítimamente algo de otra persona.
+			persona := r.With(s.confinarAPersona)
+			persona.Get("/me/rubrica", s.handleMeRubricaGet)
+			persona.Put("/me/rubrica", s.handleMeRubricaPut)
+			persona.Delete("/me/rubrica", s.handleMeRubricaDelete)
 			// La clave de firma de mis bóvedas (ADR 0087): el historial y el registro
 			// de la generación siguiente. Ver claves_boveda.go.
-			r.Get("/me/vault-keys/{product}", s.handleMeVaultKeysGet)
-			r.Put("/me/vault-keys/{product}", s.handleMeVaultKeyPut)
+			persona.Get("/me/vault-keys/{product}", s.handleMeVaultKeysGet)
+			persona.Put("/me/vault-keys/{product}", s.handleMeVaultKeyPut)
 			// «Exportar tus datos»: la entrega de la cuenta (platform/pkg/portabilidad).
 			r.Get("/me/export", s.handleMeExport)
-			r.Get("/me/sessions", s.handleMeSessions)
+			persona.Get("/me/sessions", s.handleMeSessions)
 			// El otro lado de la lectura de arriba. Existían solo como formulario
 			// HTML (`/account/sessions/revoke*`), así que quien no renderiza ese
 			// HTML podía ver sus sesiones pero no cerrarlas.
-			r.Delete("/me/sessions/{id}", s.handleMeSessionRevoke)
-			r.Delete("/me/sessions", s.handleMeSessionRevokeOthers)
+			persona.Delete("/me/sessions/{id}", s.handleMeSessionRevoke)
+			persona.Delete("/me/sessions", s.handleMeSessionRevokeOthers)
 			// Cambiar a otra de MIS organizaciones (multi-org real). Self-service:
 			// la verja es la membresía, no un rol. Ver me_orgs.go.
 			r.Put("/me/active-organization", s.handleSetActiveOrg)
 			// Dispositivos de confianza self-service (mig 0022): mis dispositivos (con el
 			// actual marcado si llega la cookie de dispositivo), marcar de confianza el
 			// actual y revocar uno. La confianza se acota por usuario en el store.
-			r.Get("/me/devices", s.handleMeDevices)
-			r.Post("/me/devices/{id}/trust", s.handleMeDeviceTrust)
-			r.Delete("/me/devices/{id}", s.handleMeDeviceRevoke)
+			persona.Get("/me/devices", s.handleMeDevices)
+			persona.Post("/me/devices/{id}/trust", s.handleMeDeviceTrust)
+			persona.Delete("/me/devices/{id}", s.handleMeDeviceRevoke)
 			// Ciclo de vida de credenciales self-service. El cambio de contraseña y
 			// la confirmación/baja de TOTP verifican secretos → rate-limitados como
 			// el login (anti fuerza bruta). enroll solo genera un secreto: sin límite.
 			r.With(loginRL).Post("/me/password", s.handleMePassword)
 			// Pide la contraseña actual: va limitado como el login por la misma razón.
 			r.With(loginRL).Put("/me/recovery-email", s.handleMeRecoveryEmail)
+			// Cambiar el @usuario y el móvil (me_cuenta.go): piden la contraseña, así
+			// que van limitados como el login; confirmar el código del SMS también.
+			r.With(loginRL).Put("/me/username", s.handleMeUsername)
+			r.With(loginRL).Put("/me/phone", s.handleMePhone)
+			r.With(loginRL).Post("/me/phone/verify", s.handleMePhoneVerify)
 			// Las cuatro de TOTP son la superficie JSON del contrato publicado
 			// (`services/id/openapi.yaml`), con sus tests de integración, y NO tienen
 			// consumidor en `apps/`: quien activa el segundo factor desde el navegador
@@ -679,18 +703,18 @@ func (s *Server) Router() http.Handler {
 			// propósito: retirar un contrato publicado y probado para ahorrarse un grep
 			// sale más caro. Queda dicho aquí para que la próxima auditoría de cableado
 			// no las levante otra vez como «superficie sin puerta».
-			r.Post("/me/mfa/totp/enroll", s.handleMFATOTPEnroll)
-			r.With(loginRL).Post("/me/mfa/totp/confirm", s.handleMFATOTPConfirm)
-			r.With(loginRL).Post("/me/mfa/totp/recovery-codes", s.handleMFARecoveryRegenerate)
-			r.With(loginRL).Delete("/me/mfa/totp", s.handleMFATOTPDisable)
+			persona.Post("/me/mfa/totp/enroll", s.handleMFATOTPEnroll)
+			persona.With(loginRL).Post("/me/mfa/totp/confirm", s.handleMFATOTPConfirm)
+			persona.With(loginRL).Post("/me/mfa/totp/recovery-codes", s.handleMFARecoveryRegenerate)
+			persona.With(loginRL).Delete("/me/mfa/totp", s.handleMFATOTPDisable)
 			// Contraseñas de aplicación (mig 0056). Eran la ÚNICA parte de la
 			// cuenta que solo se podía gestionar renderizando el HTML de
 			// `/account`, y es la credencial con la que entra un cliente de correo.
 			// El alta va rate-limitada como el resto del self-service sensible:
 			// crear es barato, pero no hay motivo para dejar generar mil.
-			r.Get("/me/app-passwords", s.handleMeAppPasswords)
-			r.With(loginRL).Post("/me/app-passwords", s.handleMeAppPasswordCreate)
-			r.With(loginRL).Delete("/me/app-passwords/{id}", s.handleMeAppPasswordRevoke)
+			persona.Get("/me/app-passwords", s.handleMeAppPasswords)
+			persona.With(loginRL).Post("/me/app-passwords", s.handleMeAppPasswordCreate)
+			persona.With(loginRL).Delete("/me/app-passwords/{id}", s.handleMeAppPasswordRevoke)
 			// El perfil de Apple con su propia contraseña de aplicación: el «un clic» de
 			// las apps nativas en macOS e iOS (me_app_passwords.go).
 			r.With(loginRL).Post("/me/apple-profile", s.handleMeAppleProfile)
@@ -937,6 +961,26 @@ func (s *Server) Router() http.Handler {
 				r.Get("/admin/pim/activations", s.handleAdminListActivations)
 				r.Post("/admin/pim/activations/{id}/approve", s.handleAdminApproveActivation)
 				r.Post("/admin/pim/activations/{id}/deny", s.handleAdminDenyActivation)
+				// Registro de solicitudes RGPD de la organización y supresión física
+				// de una cuenta suya (mig 0130, admin_privacidad.go). Responder en
+				// nombre de la organización no se delega, como los roles. Suprimir
+				// pide reautenticación: no se deshace.
+				//
+				// El registro va confinado a la organización activa (RLS, ambito.go):
+				// todo lo que toca es suyo. La supresión NO: para negarse tiene que
+				// ver si la cuenta es también de OTRA organización o tiene la suya
+				// personal, y con el ámbito puesto esas membresías no se verían y la
+				// comprobación diría que no hay ninguna. Filtra por la organización
+				// en cada sentencia, como el resto de este grupo.
+				r.Group(func(r chi.Router) {
+					r.Use(s.confinarAOrgActiva)
+					r.Get("/admin/privacy/requests", s.handleAdminListPrivacyRequests)
+					r.Post("/admin/privacy/requests", s.handleAdminCreatePrivacyRequest)
+					r.Get("/admin/privacy/requests/{id}", s.handleAdminGetPrivacyRequest)
+					r.Patch("/admin/privacy/requests/{id}", s.handleAdminUpdatePrivacyRequest)
+					r.Post("/admin/privacy/requests/{id}/extend", s.handleAdminExtendPrivacyRequest)
+				})
+				r.With(s.requireStepUp).Post("/admin/privacy/requests/{id}/erase", s.handleAdminErasePrivacyRequest)
 				// Etiquetas de sensibilidad (mig 0024): la TAXONOMÍA de clasificación de la
 				// org. Gobierno de cumplimiento, como roles/PIM: NO delegable con el catálogo
 				// FIJO de permisos actual, así que owner/admin. La lectura sí es abierta a
@@ -951,6 +995,8 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermUsersRead, domain.PermUsersManage))
 				r.Use(s.requireOrgKind(domain.OrgKindOrg))
+				// RLS: la base solo deja ver la organización activa (ambito.go).
+				r.Use(s.confinarAOrgActiva)
 				// Directorio de usuarios de la org activa (Console), keyset por
 				// (created_at,id) DESC. Distinto del listado SCIM (RFC 7644).
 				httpx.GetYQuery(r, "/admin/users", s.handleAdminListUsers)
@@ -978,6 +1024,7 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermUsersManage))
 				r.Use(s.requireOrgKind(domain.OrgKindOrg))
+				r.Use(s.confinarAOrgActiva)
 				// Invitar por email a la org activa (alta de usuario): emite un token
 				// firmado de un solo uso y envía el enlace de aceptación.
 				r.Post("/admin/invitations", s.handleAdminInviteUser)
@@ -1035,6 +1082,7 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermGroupsManage))
 				r.Use(s.requireOrgKind(domain.OrgKindOrg))
+				r.Use(s.confinarAOrgActiva)
 				r.Get("/admin/groups", s.handleAdminListGroups)
 				r.Post("/admin/groups", s.handleAdminCreateGroup)
 				// Previsualiza a quién incluiría una regla dinámica antes de guardarla.
@@ -1055,6 +1103,7 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermAuditView))
 				r.Use(s.requireOrgKind(domain.OrgKindOrg))
+				r.Use(s.confinarAOrgActiva)
 				r.Get("/admin/audit", s.handleAdminListAudit)
 				r.With(s.requireStepUp).Get("/admin/audit/export.csv", s.handleAdminExportAudit)
 				// Destino SIEM: la auditoría en PUSH, además del export bajo demanda.
@@ -1069,6 +1118,7 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermSSOManage))
 				r.Use(s.requireOrgKind(domain.OrgKindOrg))
+				r.Use(s.confinarAOrgActiva)
 				r.Get("/admin/sso/providers", s.handleAdminListProviders)
 				r.With(s.requireStepUp).Post("/admin/sso/providers", s.handleAdminCreateProvider)
 				r.Get("/admin/sso/providers/{id}", s.handleAdminGetProvider)
@@ -1094,6 +1144,7 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermAccessPoliciesManage))
 				r.Use(s.requireOrgKind(domain.OrgKindOrg))
+				r.Use(s.confinarAOrgActiva)
 				r.Get("/admin/access-policies", s.handleAdminListAccessPolicies)
 				r.Post("/admin/access-policies", s.handleAdminCreateAccessPolicy)
 				r.Get("/admin/access-policies/{id}", s.handleAdminGetAccessPolicy)
@@ -1106,6 +1157,7 @@ func (s *Server) Router() http.Handler {
 			// OIDC (RFC 7591). Aislamiento por org (activa) fail-closed.
 			r.Group(func(r chi.Router) {
 				r.Use(s.requirePermission(domain.PermAppsManage))
+				r.Use(s.confinarAOrgActiva)
 				r.Get("/admin/apps/saml-sps", s.handleAdminListSAMLSPs)
 				r.Post("/admin/apps/saml-sps", s.handleAdminCreateSAMLSP)
 				r.Get("/admin/apps/saml-sps/{id}", s.handleAdminGetSAMLSP)

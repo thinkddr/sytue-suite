@@ -25,7 +25,7 @@
  * errores, y los vacíos al final. Cada casilla agrega los REGISTROS que le tocan —el
  * promedio de un subtotal es el de sus filas, no el promedio de promedios—.
  */
-import { FormulaError, formatNumber, type CellValue } from '@sytue/formula';
+import { FormulaError, formatNumber, type CellValue } from '@sytue/formula/motor';
 import type { NumFmt } from '../types';
 import { parseRangeRef, sanitizeNumFmt } from './format';
 

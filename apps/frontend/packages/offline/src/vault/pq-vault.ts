@@ -94,6 +94,13 @@ export interface PqVaultCopyMarker {
 }
 
 export class PqVaultError extends Error {
+  /**
+   * Qué petición falló y cómo (`signing_put_403_vault_key_proof`), para «Más
+   * información» y la consola: sin él, todo fallo de red de la bóveda era el mismo
+   * `vault.unavailable`. Solo lleva lo fijo del código: la petición, el estado HTTP
+   * y el código de error del servicio; nunca datos de la persona.
+   */
+  check?: string;
   constructor(
     readonly reason: PqVaultReason,
     message?: string,
@@ -103,6 +110,20 @@ export class PqVaultError extends Error {
     super(message ?? `pq_vault_${reason}`);
     this.name = 'PqVaultError';
   }
+}
+
+const checkToken = /[^a-z0-9_]+/gu;
+
+/** `unavailable` con el detalle de la petición que falló (ver `PqVaultError.check`). */
+export function pqVaultUnavailable(...parts: Array<string | number | undefined>): PqVaultError {
+  const error = new PqVaultError('unavailable');
+  const check = parts
+    .filter((p) => p !== undefined && p !== '')
+    .map((p) => String(p).toLowerCase().replace(checkToken, '_'))
+    .join('_')
+    .slice(0, 64);
+  if (check) error.check = check;
+  return error;
 }
 
 /** Señal de despliegue con `SYTUE_CIFRADO_E2E=desactivado` (sin cifrado E2E). */
@@ -276,7 +297,8 @@ export async function fetchPqVaultBootstrap(options: {
     credentials: 'same-origin',
     ...(options.signal ? { signal: options.signal } : {}),
   });
-  if (!response.ok) throw new PqVaultError('unavailable');
+  if (!response.ok)
+    throw pqVaultUnavailable('bootstrap', response.status, await errorCode(response));
   const data = (await response.json()) as Record<string, unknown>;
   if (data.cifrado === 'desactivado') throw new PqVaultDisabledError();
   if (
@@ -312,24 +334,34 @@ function copyMarker(state: PqVaultStateResponse): PqVaultCopyMarker | null {
   return copy;
 }
 
-/** El código de error de `services/drive` (`{"error":{"code":…}}`), o "". */
+/**
+ * El código de error de un servicio en el sobre de `platform/pkg/httpx`
+ * (`{"error":{"code":…}}`: `services/drive` y Sytue ID), o "". Un `{"code"}` en la
+ * raíz (lo que contesta el propio BFF) vale igual.
+ */
 async function errorCode(res: Response): Promise<string> {
   try {
-    const body = (await res.json()) as { error?: { code?: unknown } };
-    return typeof body?.error?.code === 'string' ? body.error.code : '';
+    const body = (await res.json()) as { error?: unknown; code?: unknown } | null;
+    const inner = body?.error;
+    if (inner && typeof inner === 'object') {
+      const code = (inner as { code?: unknown }).code;
+      return typeof code === 'string' ? code : '';
+    }
+    if (typeof inner === 'string') return inner;
+    return typeof body?.code === 'string' ? body.code : '';
   } catch {
     return '';
   }
 }
 
 /** Los dos rechazos de la bóveda que el cliente distingue; si no, `unavailable`. */
-async function pqVaultFailure(res: Response): Promise<PqVaultError> {
+async function pqVaultFailure(res: Response, where = 'keys_put'): Promise<PqVaultError> {
+  const code = await errorCode(res);
   if (res.status === 409) {
-    const code = await errorCode(res);
     if (code === 'pq_vault_copy_in_progress') return new PqVaultError('copy');
     if (code === 'pq_vault_changed') return new PqVaultError('changed');
   }
-  return new PqVaultError('unavailable');
+  return pqVaultUnavailable(where, res.status, code);
 }
 
 async function copyRequest(
@@ -358,7 +390,7 @@ async function readCopy(
     headers: { [storageScopeHeader]: scopeHeader },
     ...(signal ? { signal } : {}),
   });
-  if (!res.ok) throw new PqVaultError('unavailable');
+  if (!res.ok) throw pqVaultUnavailable('copy_keys_get', res.status, await errorCode(res));
   return copyMarker((await res.json()) as PqVaultStateResponse);
 }
 
@@ -377,7 +409,7 @@ async function releaseCopy(
     ...(signal ? { signal } : {}),
   });
   // Otra marca distinta (`changed`) es que la que se quería retirar ya no está.
-  if (!res.ok) throw await pqVaultFailure(res);
+  if (!res.ok) throw await pqVaultFailure(res, 'copy_delete');
 }
 
 /** La marca de copia en curso de la bóveda (o `null`), sin abrirla. */
@@ -454,6 +486,13 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 
 export type PqVaultSigningKeyStatus = 'registered' | 'reauth' | 'missing' | 'unavailable';
 
+/** El resultado de registrar la clave de firma, con el porqué si no quedó registrada. */
+interface SigningKeyOutcome {
+  status: PqVaultSigningKeyStatus;
+  /** Ver `PqVaultError.check`: `signing_put_409_vault_key_stale`, `signing_get_502`… */
+  check?: string | undefined;
+}
+
 type CoreInvoker = Pick<PqcRuntime, 'invoke'>;
 
 function bytesToText(value: unknown): string {
@@ -500,7 +539,7 @@ async function addSigningKey(o: {
   });
   if (!wrapped.ok) throw new PqVaultError(wrapped.error);
   const res = await o.put(wrapped.wrapper);
-  if (!res.ok) throw new PqVaultError('unavailable');
+  if (!res.ok) throw pqVaultUnavailable('signing_keys_put', res.status, await errorCode(res));
   return next;
 }
 
@@ -515,6 +554,14 @@ interface SigningKeyView {
  * (ADR 0087). Sin clave activa es un alta; con otra activa, que esta bóveda ya
  * no puede aprobar porque no la tiene, es un vaciado, y Sytue ID pide entonces
  * una identificación reciente (`reauth`).
+ *
+ * Los rechazos de Sytue ID llegan en el sobre de `platform/pkg/httpx`
+ * (`{"error":{"code":…}}`). Aquí se leía `code` en la raíz, así que el `403
+ * vault_key_reauth` de un vaciado salía como `unavailable`: el correo enseñaba
+ * «no se pudieron abrir los datos cifrados» (`prepare/vault.unavailable`) en vez
+ * de llevar a identificarse otra vez, y ni volver a entrar ni vaciar lo arreglaban.
+ * Si otro dispositivo registró entre la lectura y el registro (`409
+ * vault_key_stale`), se vuelve a leer la activa y se repite una vez.
  */
 async function registerSigningKey(o: {
   core: CoreInvoker;
@@ -522,10 +569,29 @@ async function registerSigningKey(o: {
   signingKey: string;
   handover?: boolean | undefined;
   call: (method: 'GET' | 'PUT', body?: unknown) => Promise<Response>;
-}): Promise<PqVaultSigningKeyStatus> {
-  if (o.handover && o.scope.product !== 'mail') return 'unavailable';
+}): Promise<SigningKeyOutcome> {
+  if (o.handover && o.scope.product !== 'mail')
+    return { status: 'unavailable', check: 'signing_handover' };
+  for (let attempt = 0; ; attempt++) {
+    const outcome = await registerSigningKeyOnce(o);
+    if (outcome !== 'stale') return outcome;
+    if (attempt > 0) return { status: 'unavailable', check: 'signing_put_409_vault_key_stale' };
+  }
+}
+
+async function registerSigningKeyOnce(o: {
+  core: CoreInvoker;
+  scope: MatrixStorageScope;
+  signingKey: string;
+  handover?: boolean | undefined;
+  call: (method: 'GET' | 'PUT', body?: unknown) => Promise<Response>;
+}): Promise<SigningKeyOutcome | 'stale'> {
   const listed = await o.call('GET');
-  if (!listed.ok) return 'unavailable';
+  if (!listed.ok)
+    return {
+      status: 'unavailable',
+      check: pqVaultUnavailable('signing_get', listed.status, await errorCode(listed)).check,
+    };
   const { keys } = (await listed.json()) as { keys?: SigningKeyView[] };
   const active = (Array.isArray(keys) ? keys : []).find((k) => !k.retired_at);
   const raw = encoder.encode(o.signingKey);
@@ -547,7 +613,7 @@ async function registerSigningKey(o: {
       ...(active ? { previous_key_id: active.key_id } : {}),
     });
     // Un traspaso se pide siempre: Sytue ID dice si esa clave ya lo tiene.
-    if (active && active.key_id === enroll.key_id && !o.handover) return 'registered';
+    if (active && active.key_id === enroll.key_id && !o.handover) return { status: 'registered' };
     const res = await o.call('PUT', {
       public_key: {
         profile: enroll.profile,
@@ -558,12 +624,14 @@ async function registerSigningKey(o: {
       proof: toBase64(enroll.proof),
       ...(o.handover ? { handover: true } : {}),
     });
-    if (res.ok) return 'registered';
-    if (res.status === 403) {
-      const body = (await res.json().catch(() => ({}))) as { code?: string };
-      if (body.code === 'vault_key_reauth') return 'reauth';
-    }
-    return 'unavailable';
+    if (res.ok) return { status: 'registered' };
+    const code = await errorCode(res);
+    if (res.status === 403 && code === 'vault_key_reauth') return { status: 'reauth' };
+    if (res.status === 409 && code === 'vault_key_stale') return 'stale';
+    return {
+      status: 'unavailable',
+      check: pqVaultUnavailable('signing_put', res.status, code).check,
+    };
   } finally {
     raw.fill(0);
   }
@@ -589,6 +657,8 @@ export class PqVault {
    * bóveda funciona igual, solo lo que firma (el correo entrante) espera.
    */
   readonly signingKeyStatus: PqVaultSigningKeyStatus;
+  /** Si no quedó registrada, por qué (ver `PqVaultError.check`). */
+  readonly signingKeyCheck: string | undefined;
   private readonly base: string;
   private readonly fetchImpl: typeof fetch;
   private readonly core: PqcRuntime;
@@ -617,9 +687,12 @@ export class PqVault {
     hmacKey: CryptoKey;
     offlinePort?: EncryptedOfflinePort | undefined;
     signingKeyStatus?: PqVaultSigningKeyStatus | undefined;
+    signingKeyCheck?: string | undefined;
     signingKey?: string | undefined;
   }) {
     this.signingKeyStatus = params.signingKeyStatus ?? 'missing';
+    this.signingKeyCheck =
+      this.signingKeyStatus === 'registered' ? undefined : params.signingKeyCheck;
     this.signingKey = params.signingKey ? encoder.encode(params.signingKey) : undefined;
     this.scope = Object.freeze({ ...params.scope });
     this.idOrigin = params.idOrigin;
@@ -756,7 +829,8 @@ export class PqVault {
         headers: { [storageScopeHeader]: scopeHeader },
         ...(options.signal ? { signal: options.signal } : {}),
       });
-      if (!keysRes.ok) throw new PqVaultError('unavailable');
+      if (!keysRes.ok)
+        throw pqVaultUnavailable('keys_get', keysRes.status, await errorCode(keysRes));
       const state = (await keysRes.json()) as PqVaultStateResponse;
       options.signal?.throwIfAborted();
       // Lo que se vacía, si se vacía: lo que vio quien decidió vaciar, que tiene
@@ -879,7 +953,7 @@ export class PqVault {
         });
         if (!putRes.ok) throw await pqVaultFailure(putRes);
         const saved = (await putRes.json()) as PqVaultStateResponse;
-        if (!saved.vault_id) throw new PqVaultError('unavailable');
+        if (!saved.vault_id) throw pqVaultUnavailable('keys_put_no_vault');
         vaultId = saved.vault_id;
         keyId = created.key_id;
         recipient = created.recipient;
@@ -908,8 +982,8 @@ export class PqVault {
         }).catch(() => secret);
         options.signal?.throwIfAborted();
       }
-      const signingKeyStatus: PqVaultSigningKeyStatus = options.existing
-        ? 'unavailable'
+      const signing: SigningKeyOutcome = options.existing
+        ? { status: 'unavailable', check: 'signing_existing' }
         : secret.signing_key
           ? await registerSigningKey({
               core,
@@ -928,8 +1002,11 @@ export class PqVault {
                     : {}),
                   ...(options.signal ? { signal: options.signal } : {}),
                 }),
-            }).catch((): PqVaultSigningKeyStatus => 'unavailable')
-          : 'missing';
+            }).catch((error: unknown): SigningKeyOutcome => ({
+              status: 'unavailable',
+              check: error instanceof PqVaultError && error.check ? error.check : 'signing_failed',
+            }))
+          : { status: 'missing', check: 'signing_missing' };
       options.signal?.throwIfAborted();
 
       const hmacKey = await importHmacKey(secret.owner_key);
@@ -949,7 +1026,8 @@ export class PqVault {
         identityBytes: keptIdentity,
         hmacKey,
         offlinePort: options.offlinePort,
-        signingKeyStatus,
+        signingKeyStatus: signing.status,
+        signingKeyCheck: signing.check,
         signingKey: secret.signing_key,
       });
     } catch (error) {

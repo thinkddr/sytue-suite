@@ -17,20 +17,25 @@ import (
 // comparten, y es vinculante —así se guarda la nota y así vuelve—:
 //
 //	panel        <div data-panel="info|nota|exito|aviso|error">…</div>
-//	desplegable  <details data-expandir><summary>Título</summary>…</details>
+//	desplegable  <details data-expandir [open]><summary>Título</summary>…</details>
 //	estado       <span data-estado="gris|azul|verde|amarillo|rojo|morado">TEXTO</span>
 //	decisiones   <ul data-tipo="decisiones"><li>…</li></ul>
 //	fecha        <time datetime="AAAA-MM-DD">texto</time>
-//	código       <pre><code data-lenguaje="go">…</code></pre>
-//	tabla        <thead> la fila de cabecera; <th scope="row"> la columna de cabecera;
-//	             data-fondo="gris|azul|…" el fondo de una celda
+//	código       <pre [data-lineas] [data-ajuste]><code data-lenguaje="go">…</code></pre>
+//	tabla        <table [data-numerada]>; <thead> la fila de cabecera; <th scope="row">
+//	             la columna de cabecera; data-fondo="gris|azul|…" el fondo de una celda;
+//	             colspan y rowspan, las celdas combinadas (combinar.go)
+//	columnas     <div data-columnas="2|3"><div data-columna>…</div>…</div> (columnas.go)
+//	subíndice    <sub>…</sub>, y superíndice <sup>…</sup>, como cualquier otra marca
+//	imagen       <img src="adjunto:ID" alt="nombre"> y fichero <a href="adjunto:ID">,
+//	             los adjuntos de la nota (adjuntos_cuerpo.go)
 //
 // Las tareas NO cambian: siguen siendo `<div class="task-row"><input type="checkbox">
 // <span>…</span></div>`, que es lo que el modelo, la web y el servicio ya escriben.
 //
 // Todos los valores son listas cerradas: lo que no está en ellas no se lee (el atributo se
 // cae, la nota deja de ser fiel y se abre en solo lectura, como cualquier HTML que esta
-// vista no entiende). Las columnas (`data-columnas`) no están: ver el informe.
+// vista no entiende).
 //
 // Un panel y un desplegable son una CAJA: como una tabla, no es un bloque sino algo que
 // comparten los bloques de dentro (`Bloque.Caja`), así que dentro se escribe, se pega y se
@@ -66,6 +71,9 @@ type Caja struct {
 	Valor string
 	// Titulo es el `<summary>` de un desplegable, en texto plano.
 	Titulo string
+	// Abierta es el `open` de un desplegable: si al leer la nota se ve lo de dentro. La
+	// web lo pone al insertarlo y lo cambia al plegarlo; escribiendo, se ve siempre.
+	Abierta bool
 }
 
 // cajaDe dice si un elemento abre una caja: un `div[data-panel]` con un valor de la
@@ -77,7 +85,7 @@ func cajaDe(n *html.Node) *Caja {
 			return &Caja{Tipo: CajaPanel, Valor: v}
 		}
 	case n.DataAtom == atom.Details && tiene(n, "data-expandir"):
-		return &Caja{Tipo: CajaExpandir}
+		return &Caja{Tipo: CajaExpandir, Abierta: tiene(n, "open")}
 	}
 	return nil
 }
@@ -172,7 +180,11 @@ func escribirCaja(b *strings.Builder, run []Bloque) {
 	}
 	switch c.Tipo {
 	case CajaExpandir:
-		b.WriteString(`<details data-expandir=""><summary>` + html.EscapeString(c.Titulo) + `</summary>`)
+		abierta := ""
+		if c.Abierta {
+			abierta = ` open=""` // detrás de `data-expandir`, como lo escribe la web
+		}
+		b.WriteString(`<details data-expandir=""` + abierta + `><summary>` + html.EscapeString(c.Titulo) + `</summary>`)
 		escribirBloques(b, dentro)
 		b.WriteString("</details>")
 	default:
@@ -212,9 +224,10 @@ func (d *Documento) PonerCaja(a, b Pos, tipo, valor string) {
 	d.bloques(a, b, func(bl *Bloque) {
 		quitar = quitar && bl.Caja != nil && bl.Caja.Tipo == tipo && bl.Caja.Valor == valor
 	})
-	c := &Caja{Tipo: tipo, Valor: valor}
+	// Un desplegable nace abierto, como el de la web (`plantillaExpandir`).
+	c := &Caja{Tipo: tipo, Valor: valor, Abierta: tipo == CajaExpandir}
 	d.bloques(a, b, func(bl *Bloque) {
-		if bl.Celda.EnTabla() {
+		if bl.Celda.EnTabla() && !bl.Celda.Tabla.EsColumnas() {
 			return
 		}
 		if quitar {
@@ -231,11 +244,23 @@ func (d *Documento) PonerCaja(a, b Pos, tipo, valor string) {
 // TitularCaja cambia el título del desplegable del bloque `i`: una caja nueva para todos
 // sus bloques, que la vieja la comparten las fotos de deshacer.
 func (d *Documento) TitularCaja(i int, titulo string) {
+	d.cambiarCaja(i, func(c *Caja) { c.Titulo = titulo })
+}
+
+// AbrirCaja pone o quita el `open` del desplegable del bloque `i`: si al leer la nota
+// se ve abierto.
+func (d *Documento) AbrirCaja(i int, abierta bool) {
+	d.cambiarCaja(i, func(c *Caja) { c.Abierta = abierta })
+}
+
+// cambiarCaja hace una caja nueva para todos los bloques de la del bloque `i`, con el
+// cambio puesto.
+func (d *Documento) cambiarCaja(i int, cambio func(*Caja)) {
 	if i < 0 || i >= len(d.Bloques) || d.Bloques[i].Caja == nil {
 		return
 	}
 	nueva := *d.Bloques[i].Caja
-	nueva.Titulo = titulo
+	cambio(&nueva)
 	desde, hasta := d.rangoDeCaja(i)
 	for k := desde; k < hasta; k++ {
 		d.Bloques[k].Caja = &nueva

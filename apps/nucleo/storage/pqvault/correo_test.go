@@ -62,6 +62,41 @@ func TestTraspasoSinIdentificacionRecienteYAlVolverNoVaciaOtraVez(t *testing.T) 
 	}
 }
 
+// Si otro dispositivo registró entre la lectura y el registro, Sytue ID contesta
+// `409 vault_key_stale`: se vuelve a leer la activa y se repite una vez, como la web.
+func TestClaveDeFirmaRanciaSeRepiteUnaVez(t *testing.T) {
+	server, cfg := newFake(t, mailScope)
+	server.StaleOnce = true
+	vault, err := Open(t.Context(), withKey(cfg, unlockKey(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer vault.Close()
+	if vault.SigningStatus() != SigningRegistered || vault.SigningError() != nil || len(server.Signing) != 1 {
+		t.Fatalf("tras un vault_key_stale se repite y queda registrada: %s %v", vault.SigningStatus(), vault.SigningError())
+	}
+}
+
+// Un rechazo de Sytue ID queda dicho: qué petición, qué estado y qué código, la
+// misma etiqueta que enseña la web en «Más información».
+func TestClaveDeFirmaRechazadaDiceElPorque(t *testing.T) {
+	server, cfg := newFake(t, mailScope)
+	server.BadProof = true
+	vault, err := Open(t.Context(), withKey(cfg, unlockKey(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer vault.Close()
+	if vault.SigningStatus() != SigningUnavailable {
+		t.Fatalf("estado = %s", vault.SigningStatus())
+	}
+	err = vault.SigningError()
+	var detalle *SigningKeyError
+	if !errors.Is(err, ErrSigningKey) || !errors.As(err, &detalle) || detalle.Check != "signing_put_400_vault_key_proof" {
+		t.Fatalf("el porqué del rechazo: %v", err)
+	}
+}
+
 // El traspaso es solo del correo, y nunca se cuelga de una clave que ya estaba
 // registrada sin él.
 func TestTraspasoSoloEnElCorreoYConClaveNueva(t *testing.T) {

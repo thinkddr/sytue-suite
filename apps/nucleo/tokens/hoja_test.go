@@ -103,8 +103,8 @@ func TestLasPaletasGeneradasSonLasDeLaHoja(t *testing.T) {
 		t.Fatal("paletas_generadas.go no es lo que sale de las hojas embebidas: `go generate ./tokens`")
 	}
 
-	generados, jg := leerHojaCon(true)
-	leidos, jl := leerHojaCon(false)
+	generados, jg := leerHojaCon(true, true)
+	leidos, jl := leerHojaCon(false, true)
 	if !reflect.DeepEqual(generados, leidos) {
 		t.Errorf("los colores de la suite generados son %v y la hoja declara %v", generados, leidos)
 	}
@@ -119,17 +119,49 @@ func TestLasPaletasGeneradasSonLasDeLaHoja(t *testing.T) {
 	}
 }
 
-// TestElArranqueNoLeeLaHoja: con lo generado al día, el `init` ya tiene el juego del papel
-// y ElegirCromo no lee nada; y las formas son las generadas, sin leer theme.css.
+// TestElArranqueNoLeeLaHoja: con lo generado al día, el juego del papel sale de lo
+// generado sin leer la hoja, y el de la casa no se resuelve si se elige el papel antes
+// del primer color; y las formas son las generadas, sin leer theme.css.
+//
+// VISTO EN ROJO con los dos juegos generados pasados a mapas en el `init`: el de la casa
+// ya estaba resuelto antes de elegir nada.
 func TestElArranqueNoLeeLaHoja(t *testing.T) {
-	if huellaGenerada != huellaHojas() {
+	if !generadasAlDia() {
 		t.Skip("lo generado no es de estas hojas: lo dice TestLasPaletasGeneradasSonLasDeLaHoja")
 	}
+	// El estado del arranque: nada resuelto ni en vigor.
+	eleccion.Lock()
+	antes, vigor := juegos, enVigor.Load()
+	juegos = map[pedido]*juego{}
+	enVigor.Store(nil)
+	eleccion.Unlock()
+	t.Cleanup(func() {
+		eleccion.Lock()
+		juegos = antes
+		enVigor.Store(vigor)
+		eleccion.Unlock()
+		ElegirCromo("")
+	})
+	if !ElegirCromo(CromoPapel) {
+		t.Error("elegir el papel antes del primer color no dice que cambia")
+	}
+	eleccion.Lock()
+	resueltos := len(juegos)
+	eleccion.Unlock()
+	if resueltos != 0 {
+		t.Errorf("elegir el cromo ha resuelto %d juegos antes del primer color", resueltos)
+	}
+	lecturas := lecturasDeHoja.Load()
+	_ = Color("bg", Light)
 	eleccion.Lock()
 	_, papel := juegos[pedido{papel: true}]
+	_, deLaCasa := juegos[pedido{}]
 	eleccion.Unlock()
-	if !papel {
-		t.Error("el juego del cromo «papel» no está cargado de arranque")
+	if !papel || deLaCasa {
+		t.Errorf("el primer color resuelve el papel (%v) y la casa (%v): solo tenía que ser el papel", papel, deLaCasa)
+	}
+	if lecturasDeHoja.Load() != lecturas {
+		t.Error("el juego del papel se ha leído de la hoja y no de lo generado")
 	}
 	if huellaFormasGenerada != huellaFormas() {
 		t.Skip("las formas generadas no son de estas hojas: lo dice TestLasFormasGeneradasSonLasDeLaHoja")

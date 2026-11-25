@@ -5,6 +5,7 @@ package pdf
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,15 +15,19 @@ import (
 	"time"
 )
 
-// LA SESIÓN DEL DISPOSITIVO (ADR 0086, «Firmar en el dispositivo», tercera entrega).
+// LA SESIÓN DEL DISPOSITIVO (ADR 0086, «Firmar en el dispositivo», tercera y cuarta
+// entregas).
 //
 // Es lo que `cmd/pdf-wasm` expone al estudio de CertiPDF para los PDF de la bóveda:
 // los documentos que el host ya descifró, abiertos UNA vez y referidos por un
 // identificador opaco, para que dibujar veinte lotes de páginas no vuelva a leer el
 // fichero veinte veces. Cada operación es la MISMA del servicio de Docs
 // (`RenderView`, `Summary`, `ApplyAnnotationOperation`, `ApplyFormOperation`,
-// `ApplyPageOperation`, `ApplyToolOperation`): ni un segundo motor ni atajos. No hay
-// red ni almacenamiento: devuelve bytes, y cifrarlos y guardarlos es cosa del host.
+// `ApplyPageOperation`, `ApplyLayerOperation`, `ApplyToolOperation`,
+// `ApplyProtectionOperation`, `ApplyEditOperation`, `ApplyCompareOperation`,
+// `TextSpans`, `VerificarFirmas`, `ExtraerAdjunto`): ni un segundo motor ni atajos.
+// No hay red ni almacenamiento: devuelve bytes, y cifrarlos y guardarlos es cosa del
+// host.
 //
 // Vive aquí, sin la etiqueta js/wasm, para probarla con `go test` como el resto del
 // motor; el wasm solo traduce valores de JavaScript.
@@ -68,6 +73,11 @@ type DeviceEdit struct {
 	Archival       string
 	ImportedFields int
 	Compression    *ResultadoCompresion
+	// UnchangedXMP avisa de que el documento lleva XMP y el cambio de propiedades
+	// puede no verse en otro lector (el `X-Sytue-Metadatos-Xmp` del servicio).
+	UnchangedXMP bool
+	// Replacements es cuántas coincidencias se sustituyeron al buscar y reemplazar.
+	Replacements *int
 }
 
 type deviceDocument struct {
@@ -214,7 +224,10 @@ func (s *DeviceSession) Form(id string, fields map[string]string, filename strin
 
 // Pages aplica `ApplyPageOperation` (`combinar`, `extraer` —que, con otro orden, es
 // reordenar—, `borrar`, `rotar`) con los campos `op`, `paginas`, `grados` e
-// `invalidar_firmas`. Combinar recibe los documentos en su orden.
+// `invalidar_firmas`. Combinar recibe los documentos en su orden. Las capas de
+// `/pdf/pages` (`marca-agua`, `fondo`, `numerar`, `bates`, `encabezado`, `pie`, con
+// `texto`, `posicion`, `desde` y `digitos`) van por `ApplyLayerOperation`, sobre un
+// único documento: el diálogo «Sellos y marcas» del estudio.
 func (s *DeviceSession) Pages(ids []string, fields map[string]string) (DeviceEdit, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -230,6 +243,16 @@ func (s *DeviceSession) Pages(ids []string, fields map[string]string) (DeviceEdi
 		docs = append(docs, doc)
 	}
 	op := strings.TrimSpace(fields["op"])
+	if IsLayerOperation(op) {
+		if len(docs) != 1 {
+			return DeviceEdit{}, inputError(fmt.Sprintf("“%s” works on a single file.", op))
+		}
+		out, err := ApplyLayerOperation(op, docs[0], onlyFields(fields, "texto", "posicion", "desde", "digitos"))
+		if err != nil {
+			return DeviceEdit{}, err
+		}
+		return DeviceEdit{Data: out, ContentType: "application/pdf", Archival: ArchivalChange(docs[0], out)}, nil
+	}
 	if !slices.Contains([]string{"combinar", "extraer", "borrar", "rotar"}, op) {
 		return DeviceEdit{}, inputError(fmt.Sprintf("Unknown op: %q.", op))
 	}
@@ -238,6 +261,115 @@ func (s *DeviceSession) Pages(ids []string, fields map[string]string) (DeviceEdi
 		return DeviceEdit{}, err
 	}
 	return DeviceEdit{Data: out, ContentType: "application/pdf", Archival: ArchivalChange(docs[0], out)}, nil
+}
+
+// Protect aplica `ApplyProtectionOperation`: `proteger` (AES-256, revisión 6),
+// `desproteger`, `metadatos`, `sanear` y `redactar`. Las contraseñas y las zonas
+// llegan del host y no salen de aquí.
+func (s *DeviceSession) Protect(id string, fields map[string]string) (DeviceEdit, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, err := s.target(id, fields)
+	if err != nil {
+		return DeviceEdit{}, err
+	}
+	result, err := ApplyProtectionOperation(doc, onlyFields(fields, "op", "usuario", "dueno", "permisos", "metadatos", "areas"))
+	if err != nil {
+		clear(result.Data)
+		return DeviceEdit{}, err
+	}
+	return DeviceEdit{
+		Data: result.Data, ContentType: "application/pdf",
+		Archival: ArchivalChange(doc, result.Data), UnchangedXMP: result.UnchangedXMP,
+	}, nil
+}
+
+// Edit aplica `ApplyEditOperation`: `analizar` y buscar sin aplicar devuelven JSON;
+// `texto`, `buscar-reemplazar` con `aplicar=1`, `imagen` (con `image`, o sin ella
+// para quitarla), `capas` e `indice` devuelven el PDF.
+func (s *DeviceSession) Edit(id string, fields map[string]string, image []byte) (DeviceEdit, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, err := s.target(id, fields)
+	if err != nil {
+		return DeviceEdit{}, err
+	}
+	result, err := ApplyEditOperation(doc, EditOperationInput{
+		Fields: onlyFields(fields, "op", "pagina", "cambios", "busqueda", "aplicar", "elegidas", "id", "visibles", "marcadores"),
+		Image:  image,
+	})
+	if err != nil {
+		clear(result.Data)
+		return DeviceEdit{}, err
+	}
+	edit := DeviceEdit{Data: result.Data, ContentType: result.ContentType, Replacements: result.Replacements}
+	if result.ContentType == "application/pdf" {
+		edit.Archival = ArchivalChange(doc, result.Data)
+	}
+	return edit, nil
+}
+
+// Compare compara dos documentos abiertos con `ApplyCompareOperation` (`modo`,
+// `pagina`, `escala`, `tolerancia`, `vecindad`) y devuelve su JSON.
+func (s *DeviceSession) Compare(ctx context.Context, a, b string, fields map[string]string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	first, err := s.lookup(a)
+	if err != nil {
+		return nil, err
+	}
+	second, err := s.lookup(b)
+	if err != nil {
+		return nil, err
+	}
+	return ApplyCompareOperation(ctx, first, second, onlyFields(fields, "modo", "pagina", "escala", "tolerancia", "vecindad"))
+}
+
+// Text devuelve el texto de cada página con su posición (`/pdf/text`): lo que leen
+// buscar y leer en voz alta.
+func (s *DeviceSession) Text(ctx context.Context, id string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, err := s.lookup(id)
+	if err != nil {
+		return nil, err
+	}
+	pages, err := TextSpans(ctx, doc)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(map[string]any{"paginas": pages})
+}
+
+// Verify es el informe de cada firma (`/pdf/verify`) SIN anclas de confianza: el
+// dispositivo no tiene en quién confiar, y el panel lo dice (`anclas: false`).
+// Integridad, cambios posteriores y sellos sí se comprueban.
+func (s *DeviceSession) Verify(id string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, err := s.lookup(id)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(map[string]any{"firmas": doc.VerificarFirmas(OpcionesVerificacion{}), "anclas": false})
+}
+
+// Attachment saca un fichero incrustado por su nombre (`/pdf/attachment`).
+func (s *DeviceSession) Attachment(id, name string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, err := s.lookup(id)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(name) == "" {
+		return nil, inputError("Say which attachment to extract.")
+	}
+	out, err := doc.ExtraerAdjunto(name)
+	if err != nil {
+		return nil, &OperationFailure{Status: 404, Code: "not_found", Message: "This document has no such attachment."}
+	}
+	return out, nil
 }
 
 // Tool aplica `ApplyToolOperation` (`comprimir`, `recortar`, `archivo`,

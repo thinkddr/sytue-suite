@@ -5,6 +5,7 @@ package fuentes
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -13,10 +14,17 @@ import (
 
 // ERP lee las tareas propias pendientes que vencen hoy o ya vencieron, también las que
 // otra persona acaba de asignar. Peticiones: 1.
+//
+// Las tareas son del servicio y el repositorio privado no las tiene (api.ERPData): con la
+// cuenta en Matrix la app enseña su lista de tareas vacía, y el widget lo mismo, sin
+// contador ni filas —el marco de «sin datos» con su acción—, en vez de lo congelado.
 func ERP(c Comunes, e *api.ERP) widgets.Fuente {
 	return func(ctx context.Context) (widgets.Detail, error) {
 		hoy := c.ahora().Format(time.DateOnly)
 		tareas, err := e.Actividades(ctx, api.ERPFiltroActividades{Estado: "pendiente", Mias: true, Hasta: hoy})
+		if errors.Is(err, api.ErrPrivateERPOperation) {
+			return widgets.Detail{}, nil
+		}
 		if err != nil {
 			return widgets.Detail{}, err
 		}

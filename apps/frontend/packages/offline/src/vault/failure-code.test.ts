@@ -7,13 +7,18 @@ import { PrivateDriveError } from '../matrix/private-drive.js';
 import { StorageRecordError } from '../matrix/storage.js';
 import { MatrixSecurityError } from '../matrix/types.js';
 import { vaultFailureCode } from './failure-code.js';
-import { PqVaultError } from './pq-vault.js';
+import { PqVaultError, pqVaultUnavailable } from './pq-vault.js';
 
 const secret = 'https://drive.example/api/matrix/storage/migration/7f1e?nombre=informe.pdf';
 
 test('el código del fallo dice qué comprobación fue, con lo que es fijo en el código', () => {
   const cases: [unknown, string][] = [
     [new PqVaultError('unavailable'), 'vault.unavailable'],
+    [
+      pqVaultUnavailable('signing_put', 403, 'vault_key_proof'),
+      'vault.unavailable.signing_put_403_vault_key_proof',
+    ],
+    [pqVaultUnavailable('keys_get', 502, ''), 'vault.unavailable.keys_get_502'],
     [new DriveImportError('row_heads'), 'drive.import.row_heads'],
     [new PrivateDriveError('conflict', 'receipt'), 'drive.conflict.receipt'],
     [new PrivateDriveError('not_ready'), 'drive.not_ready'],

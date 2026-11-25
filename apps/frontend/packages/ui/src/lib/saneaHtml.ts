@@ -126,11 +126,12 @@ export const ESTILO_VETADO: readonly string[] = [
 
 /** Lista blanca por prefijo sobre el valor recortado y en minúsculas: `javascript:`,
  *  `vbscript:`, `data:text/html` y sus variantes disfrazadas caen solas. */
-function urlAdmitida(valor: string, recurso: boolean): boolean {
+function urlAdmitida(valor: string, recurso: boolean, propios: readonly string[] = []): boolean {
   const v = valor.trim().toLowerCase();
   if (v === '') return true;
   return (
     ESQUEMAS_DE_ENLACE.some((p) => v.startsWith(p)) ||
+    propios.some((p) => v.startsWith(p)) ||
     (recurso && ESQUEMAS_DE_RECURSO.some((p) => v.startsWith(p)))
   );
 }
@@ -140,15 +141,15 @@ function estiloPeligroso(valor: string): boolean {
   return ESTILO_VETADO.some((x) => v.includes(x));
 }
 
-function limpiaAtributos(el: Element, etiqueta: string): void {
+function limpiaAtributos(el: Element, etiqueta: string, propios: readonly string[]): void {
   for (const attr of Array.from(el.attributes)) {
     const nombre = attr.name.toLowerCase();
     let fuera = false;
     if (nombre.startsWith('on') || nombre === 'srcdoc') fuera = true;
     else if (nombre === 'style') fuera = estiloPeligroso(attr.value);
-    else if (ATRIBUTOS_DE_RECURSO.has(nombre)) fuera = !urlAdmitida(attr.value, true);
+    else if (ATRIBUTOS_DE_RECURSO.has(nombre)) fuera = !urlAdmitida(attr.value, true, propios);
     else if (ATRIBUTOS_DE_ENLACE.has(nombre))
-      fuera = !urlAdmitida(attr.value, ELEMENTOS_DE_RECURSO.has(etiqueta));
+      fuera = !urlAdmitida(attr.value, ELEMENTOS_DE_RECURSO.has(etiqueta), propios);
     if (fuera) el.removeAttribute(attr.name);
   }
 }
@@ -175,10 +176,14 @@ export function saneaHtmlDeDocumento(
     /** Etiquetas que esta superficie conserva además de las del contrato: las casillas
      *  (`input`) de las tareas de Notepads. Sus atributos se limpian igual. */
     conservar?: readonly string[];
+    /** Comienzos de URL que esta superficie admite además de los del contrato, en
+     *  minúsculas: el `adjunto:` con que una nota nombra sus adjuntos. */
+    esquemas?: readonly string[];
   } = {},
 ): string {
   if (!html || !html.includes('<')) return html;
   const conservar = new Set(opciones.conservar ?? []);
+  const propios = opciones.esquemas ?? [];
   if (typeof DOMParser === 'undefined') return '';
   const doc = new DOMParser().parseFromString(html, 'text/html');
   quitaComentarios(doc.body);
@@ -200,7 +205,7 @@ export function saneaHtmlDeDocumento(
       const texto = el.textContent ?? '';
       el.textContent = texto;
     }
-    limpiaAtributos(el, etiqueta);
+    limpiaAtributos(el, etiqueta, propios);
   }
   return doc.body.innerHTML;
 }

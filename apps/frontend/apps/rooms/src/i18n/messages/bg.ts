@@ -252,6 +252,7 @@ export const bg: AppCatalog<typeof en> = {
     other: 'Можете да добавите до {count} души.',
   },
   'dm.openFailed': 'Разговорът не можа да се отвори.',
+  'dm.externalClosed': 'Вашата организация не позволява разговори с този човек.',
   'people.search': 'Търсене на „{query}“ в Sytue One',
   'people.searching': 'Търсене в Sytue One…',
   'people.notFound': 'Никой в Sytue One не използва този имейл или @потребител.',

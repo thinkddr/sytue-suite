@@ -13,7 +13,9 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/media/domain"
+	"git.sytue.eu/sytue/one/services/rooms/internal/media/service"
 )
 
 // La llamada de una conversación con personas de OTRA organización (ADR 0040)
@@ -39,13 +41,24 @@ func porSala(cambiar cambioDeOrganizacion) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if r, err = cambiar(r, id, uuid.Nil); err != nil {
+			propia, _ := tenancy.From(r.Context())
+			llevada, err := cambiar(r, id, uuid.Nil)
+			if err != nil {
 				httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
 				return
 			}
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, deFueraSiCambio(llevada, propia.Slug))
 		})
 	}
+}
+
+// deFueraSiCambio: si la petición se ha llevado a la anfitriona, quien llama es de
+// otra organización, y en la reunión de un evento eso le abre la sala de espera.
+func deFueraSiCambio(r *http.Request, propia string) *http.Request {
+	if anfitriona, _ := tenancy.From(r.Context()); anfitriona.Slug != propia {
+		return r.WithContext(service.DeOtraOrganizacion(r.Context()))
+	}
+	return r
 }
 
 // porCanalDeOrigen: la sala aún no se conoce y lo que viene es su canal de origen,

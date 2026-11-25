@@ -6,6 +6,7 @@ package inboundhook
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,7 @@ import (
 // doble registra lo que le llega y devuelve lo que se le pida.
 type doble struct {
 	errResolve   map[string]error
+	errAplazar   map[string]error
 	errDeliver   error
 	entregado    *delivery.InboundMessage
 	cuerpo       string
@@ -33,7 +35,11 @@ func (d *doble) Resolve(_ context.Context, address string) (store.ResolvedAddres
 	if err, ok := d.errResolve[address]; ok {
 		return store.ResolvedAddress{}, err
 	}
-	return store.ResolvedAddress{}, nil
+	return store.ResolvedAddress{Address: address}, nil
+}
+
+func (d *doble) Aplazar(_ context.Context, rcpt store.ResolvedAddress) error {
+	return d.errAplazar[rcpt.Address]
 }
 
 func (d *doble) Deliver(_ context.Context, msg delivery.InboundMessage) error {
@@ -196,5 +202,38 @@ func TestLosErroresSeTraducenAReintentarONo(t *testing.T) {
 				t.Fatalf("esperaba %d, salió %d", c.esperado, w.Code)
 			}
 		})
+	}
+}
+
+// UNA CUENTA QUE AÚN NO HA PASADO SU CORREO A LA BÓVEDA (ADR 0087) ESPERA: el
+// webhook contesta lo mismo que el 450 del MX, un 503 con Retry-After, y no
+// entrega nada. El reenviador reintenta y, si no se resuelve, se rinde.
+func TestDestinatarioAplazadoSeReintenta(t *testing.T) {
+	aplazada := fmt.Errorf("%w (retirada)", delivery.ErrAplazada)
+	d := &doble{errAplazar: map[string]error{"ana@sytue.eu": aplazada}}
+	w := httptest.NewRecorder()
+	montar(t, d, secreto).ServeHTTP(w, peticion(secreto, "a@b.c", "ana@sytue.eu", "hola"))
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("esperaba 503 con Retry-After, salió %d %q", w.Code, w.Header().Get("Retry-After"))
+	}
+	if d.entregado != nil {
+		t.Fatal("entregó el correo de una cuenta aplazada")
+	}
+
+	// Con otro destinatario que sí recibe, una respuesta no puede aplazar a uno
+	// y entregar al otro: entra para los dos, como antes, sin duplicar a nadie.
+	d = &doble{errAplazar: map[string]error{"ana@sytue.eu": aplazada}}
+	w = httptest.NewRecorder()
+	montar(t, d, secreto).ServeHTTP(w, peticion(secreto, "a@b.c", "ana@sytue.eu, luis@sytue.eu", "hola"))
+	if w.Code != http.StatusNoContent || d.entregado == nil || len(d.entregado.Recipients) != 2 {
+		t.Fatalf("con otro destinatario: %d %+v", w.Code, d.entregado)
+	}
+
+	// Un fallo al decidirlo es un fallo nuestro: se reintenta todo, sin entregar.
+	d = &doble{errAplazar: map[string]error{"ana@sytue.eu": errors.New("base caída")}}
+	w = httptest.NewRecorder()
+	montar(t, d, secreto).ServeHTTP(w, peticion(secreto, "a@b.c", "ana@sytue.eu, luis@sytue.eu", "hola"))
+	if w.Code != http.StatusInternalServerError || d.entregado != nil {
+		t.Fatalf("fallo al decidir: %d %+v", w.Code, d.entregado)
 	}
 }

@@ -143,6 +143,31 @@ test('lo que no se puede firmar anexando se rechaza con su motivo, sin escribir 
   ).toBe('ilegible');
 });
 
+test('certificar (/DocMDP, /P 1) solo en la primera firma; después ya no admite otra', async () => {
+  const id = await leerPkcs12(await leer(P12, 'moderno.p12'), CLAVE_P12);
+  const original = await leer(CORPUS, 'sin-firmas.pdf');
+  const certificado = await firmarPdf(original, id, { certificar: true });
+  expect(certificado.subarray(0, original.length)).toEqual(original);
+  const anexo = latin1(certificado.subarray(original.length));
+  // La firma lleva su transformación y el catálogo la nombra en /Perms: sin eso ningún
+  // lector la trataría como certificación (como en Go, `dictDeFirma` y `anexarFirma`).
+  expect(anexo).toContain(
+    '/Reference [<</Type /SigRef /TransformMethod /DocMDP /TransformParams <</Type /TransformParams /P 1 /V /1.2>>>>]',
+  );
+  expect(anexo).toMatch(/\/Perms <<\s*\/DocMDP \d+ 0 R\s*>>/);
+  expect(await verificarFirmas(certificado)).toEqual([
+    { firmante: 'EMPRESA DE PRUEBAS SL', integra: true, cubreTodo: true },
+  ]);
+  // Certificado con /P 1: otra firma lo rompería, y se dice.
+  const otra = await firmarPdf(certificado, id).catch((e: unknown) => e);
+  expect(motivoFirmaLocal(otra)).toBe('bloqueado');
+  // Y uno ya firmado no se puede certificar: solo la primera firma certifica.
+  const firmado = await firmarPdf(original, id);
+  const tarde = await firmarPdf(firmado, id, { certificar: true }).catch((e: unknown) => e);
+  expect(tarde).toBeInstanceOf(ErrorPdf);
+  expect(motivoFirmaLocal(tarde)).toBe('certificarFirmado');
+});
+
 test('el nombre del firmado no pisa nada', () => {
   expect(nombreFirmado('Acta.pdf', 'firmado')).toBe('Acta (firmado).pdf');
   expect(nombreFirmado('Acta.PDF', 'signed')).toBe('Acta (signed).pdf');

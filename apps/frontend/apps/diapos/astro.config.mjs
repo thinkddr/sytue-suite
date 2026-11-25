@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { sytueHealthEndpoint } from '@sytue/config/astro-health';
 import { sytuePrecarga } from '@sytue/config/astro-precarga';
 import { sytueNoEncontrada } from '@sytue/config/astro-404';
+import { sytueArranque } from '@sytue/config/astro-arranque';
 import { sytueSecurity } from '@sytue/config/astro-security';
 import { sytueOffice } from '@sytue/office/astro';
 
@@ -36,6 +37,7 @@ export default defineConfig({
     sytuePrecarga(),
     sytueHealthEndpoint(),
     sytueNoEncontrada(),
+    sytueArranque(),
     sytueOffice(),
     preact({ compat: true }),
   ],

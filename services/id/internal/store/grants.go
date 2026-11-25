@@ -5,7 +5,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
@@ -77,13 +80,39 @@ func (s *Store) InsertSession(ctx context.Context, q pg.Querier, ss domain.Sessi
 		q = s.DB()
 	}
 	const sql = `INSERT INTO sessions
-		(token_hash, user_id, org_id, auth_time, amr, user_agent, lugar_cifrado, expires_at)
-		VALUES ($1,$2,nullif($3,'')::uuid,$4,$5,$6,$7,$8)
+		(token_hash, user_id, org_id, auth_time, amr, user_agent, lugar_cifrado, expires_at, device_id)
+		VALUES ($1,$2,nullif($3,'')::uuid,$4,$5,$6,$7,$8,nullif($9,'')::uuid)
 		RETURNING id`
 	var id string
 	err := q.QueryRow(ctx, sql, ss.TokenHash, ss.UserID, ss.OrgID, ss.AuthTime,
-		ss.AMR, ss.UserAgent, ss.LugarCifrado, ss.ExpiresAt).Scan(&id)
+		ss.AMR, ss.UserAgent, ss.LugarCifrado, ss.ExpiresAt, ss.DeviceID).Scan(&id)
 	return id, errf("InsertSession", err)
+}
+
+// ConfianzaDelDispositivo evalúa el claim `device_trust` de un token respaldado por
+// la sesión sessionID: cómo se identificó (`amr`) y si su dispositivo está HOY de
+// confianza. Se lee en cada emisión —código y refresco— y no se guarda en el token de
+// refresco, para que quitar la confianza o revocar el dispositivo baje el claim en el
+// siguiente refresco. El dispositivo tiene que ser de la misma persona que la sesión:
+// el JOIN no confía en que el lazo lo esté. Sin sesión, sin dispositivo o con la
+// sesión revocada: `none`.
+func (s *Store) ConfianzaDelDispositivo(ctx context.Context, sessionID string) (string, error) {
+	if sessionID == "" {
+		return domain.DeviceTrustNone, nil
+	}
+	var amr []string
+	var deConfianza bool
+	err := s.DB().QueryRow(ctx, `SELECT s.amr, coalesce(d.trusted, false)
+		FROM sessions s
+		LEFT JOIN devices d ON d.id = s.device_id AND d.user_id = s.user_id
+		WHERE s.id = $1::uuid AND s.revoked_at IS NULL`, sessionID).Scan(&amr, &deConfianza)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.DeviceTrustNone, nil
+		}
+		return domain.DeviceTrustNone, errf("ConfianzaDelDispositivo", err)
+	}
+	return domain.EvaluarConfianzaDelDispositivo(amr, deConfianza), nil
 }
 
 // GetSessionByToken recupera una sesión vigente por hash de token.
@@ -467,6 +496,15 @@ func (s *Store) CleanupExpired(ctx context.Context, now time.Time) error {
 	_, err = s.DB().Exec(ctx, `DELETE FROM signup_phone_codes WHERE expires_at < $1`, now)
 	if err != nil {
 		return errf("CleanupExpired.signupcodes", err)
+	}
+	// Cambios de móvil sin confirmar y @usuario que ya no están reservados (mig 0126).
+	_, err = s.DB().Exec(ctx, `DELETE FROM phone_change_codes WHERE expires_at < $1`, now)
+	if err != nil {
+		return errf("CleanupExpired.phonechange", err)
+	}
+	_, err = s.DB().Exec(ctx, `DELETE FROM usernames_retirados WHERE hasta < $1`, now)
+	if err != nil {
+		return errf("CleanupExpired.usernames", err)
 	}
 	// Sesiones caducadas hace >7 días. El margen deja que el logout/cascada de
 	// revocación las consulte justo tras expirar. Usa sessions_expires_idx.

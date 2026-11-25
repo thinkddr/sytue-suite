@@ -58,8 +58,13 @@ struct SnapshotContractTests {
                 "an action outside the product's table is never exported")
         require(SytueWidgetActions.label(for: "create", product: "contacts") == "widgets.newContact"
                 && SytueWidgetActions.label(for: "create", product: "notes") == "widgets.newNote"
-                && SytueWidgetActions.label(for: "upload", product: "photos") == "widgets.addPhotos",
+                && SytueWidgetActions.label(for: "upload", product: "photos") == "widgets.addPhotos"
+                && SytueWidgetActions.label(for: "create", product: "docs") == "widgets.newDocument"
+                && SytueWidgetActions.label(for: "create", product: "sheets") == "widgets.newSpreadsheet"
+                && SytueWidgetActions.label(for: "create", product: "slides") == "widgets.newPresentation",
                 "each product names its own action")
+        require(SytueWidgetActions.routes(product: "sheets", scheme: "sytue-sheets", declared: ["open", "create"])["create"]?.absoluteString
+                == "sytue-sheets:/?action=create", "the office apps ask before creating a document")
         require(SytueWidgetActions.label(for: "create") == "widgets.create"
                 && SytueWidgetActions.symbol(for: "create") == "calendar.badge.plus", "create has a translated name alongside its symbol")
         // Cada fila lleva a su elemento con la ruta que escribió la app (widgets.Ruta): en
@@ -141,6 +146,15 @@ struct SnapshotContractTests {
                     let decoded = try JSONDecoder().decode(SytueWidgetSnapshot.self,
                                                            from: JSONSerialization.data(withJSONObject: object))
                     require(decoded.isStale(now: int(c[3])) == (c[4] == "1"), "contract stale: " + c[1])
+                case "abrir":
+                    var object: [String: Any] = [
+                        "version": 3, "product": "drive", "active": true, "generation": "g",
+                        "updated_at": int(c[3]), "expires_at": int(c[3]) + 60, "counters": [[String: Any]](),
+                    ]
+                    if c[2] == "1" { object["app_only"] = true }
+                    let decoded = try JSONDecoder().decode(SytueWidgetSnapshot.self,
+                                                           from: JSONSerialization.data(withJSONObject: object))
+                    require(decoded.asksToOpen(now: int(c[4])) == (c[5] == "1"), "contract asks to open: " + c[1])
                 case "vigente":
                     var zone = Calendar(identifier: .gregorian)
                     guard let tz = TimeZone(identifier: c[2]) else { return require(false, "known zone " + c[2]) }
@@ -168,7 +182,8 @@ struct SnapshotContractTests {
                     require(false, "unknown contract case " + c[0])
                 }
             }
-            require((counts["visible"] ?? 0) >= 15 && (counts["rancio"] ?? 0) >= 4 && (counts["vigente"] ?? 0) >= 10
+            require((counts["visible"] ?? 0) >= 15 && (counts["rancio"] ?? 0) >= 4 && (counts["abrir"] ?? 0) >= 4
+                        && (counts["vigente"] ?? 0) >= 10
                         && (counts["ruta"] ?? 0) >= 20,
                     "the contrato.tsv cases are all there")
         }

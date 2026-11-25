@@ -18,8 +18,11 @@ type PushSubscription struct {
 }
 
 // PushTarget es una suscripción a la que enviar un push, con su dueño (Subject) para
-// poder limpiarla si el servicio de push la reporta caduca (404/410).
+// poder limpiarla si el servicio de push la reporta caduca (404/410). Tenant es la
+// organización donde vive la suscripción cuando no es la del canal: la de una persona
+// de fuera (ADR 0040), que se suscribió desde la suya. Vacío = la del canal.
 type PushTarget struct {
+	Tenant   string
 	Subject  string
 	Endpoint string
 	P256dh   string

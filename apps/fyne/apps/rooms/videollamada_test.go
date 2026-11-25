@@ -357,6 +357,36 @@ func TestLaLlamadaCifradaNoOfreceGrabacionDelServidor(t *testing.T) {
 	}
 }
 
+// La reunión de un evento tiene sala de espera para los invitados de otra organización:
+// quien modera ve quién llama a la puerta aunque la sala esté abierta, como en la web
+// (`ChannelCall.waitingRoom`). Con la sala abierta y sin sala de espera, no se pide.
+//
+// VISTO EN ROJO (2026-11-25): con `mirarPuerta` mirando solo `Bloqueada`, la cola de una
+// reunión de evento abierta no se pedía nunca.
+func TestLaSalaDeEsperaDeUnEventoSeVeConLaSalaAbierta(t *testing.T) {
+	for _, c := range []struct {
+		espera bool
+		pide   bool
+	}{{true, true}, {false, false}} {
+		base := servicioConDos()
+		sa, _, _ := salaEn(t, base, 1280)
+		s := &conModeracion{conLlamada: &conLlamada{conReuniones: &conReuniones{servicioFalso: base}}}
+		sa.S = s
+		en := &enCursoFalsa{}
+		v := NuevaVistaLlamada(sa.P.T, "Revisión trimestral", en, false)
+		v.Lanzar = func(fn func()) { fn() }
+		call := api.RoomsCall{Room: api.RoomsMeeting{ID: "evento", WaitingRoom: c.espera}, Role: "host"}
+		sa.prepararBarra(v, call, "", en)
+		v.AbrirPanel(PanelParticipantes)
+		if got := s.pidio("Knocks(evento)"); got != c.pide {
+			t.Fatalf("sala de espera %v: pidió la cola %v (%v)", c.espera, got, s.llamadas)
+		}
+		if c.pide && len(v.filasPuerta(tema.Claro)) == 0 {
+			t.Fatal("quien llama a la puerta de la reunión del evento no se ve")
+		}
+	}
+}
+
 // El resto de la barra: el chat es el del canal (carga lo último, lo que se escribe va
 // al canal y lo que llega en vivo entra), el anfitrión modera (silenciar, quitar la
 // palabra, cerrar la puerta y ver quién espera, abrirle, grabar), las reacciones flotan

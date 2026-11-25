@@ -93,6 +93,10 @@ type Panel struct {
 	workers              atomic.Pointer[PanelWorkers]
 	localWork            *offline.WorkGate
 	clients              map[*mx.Client]bool
+
+	// entroSolo: el panel ya fue solo a Sytue ID a por la clave de desbloqueo (ver
+	// irSoloAEntrar). Una vez por inicio: si a la vuelta sigue sin ella, queda el botón.
+	entroSolo bool
 }
 
 func (c *Panel) Cliente(ctx context.Context) (*mx.Client, error) {
@@ -121,6 +125,7 @@ func (c *Panel) Iniciar(ctx context.Context, subject, tenant string) {
 	}
 	c.Base.Subject, c.Base.Tenant = subject, tenant
 	c.Base.VerificationCallbacks = c
+	c.entroSolo = false
 	c.generation++
 	generation := c.generation
 	c.busy = true
@@ -262,8 +267,21 @@ func (c *Panel) revisar(ctx context.Context, generation uint64, client *mx.Clien
 			}
 			c.pintar() //nolint:contextcheck // UI rendering installs future actions scoped to the device lifecycle.
 			c.lista()
+			c.irSoloAEntrar() //nolint:contextcheck // Como iniciarSesion: vive con el ciclo del dispositivo (c.ctx).
 		})
 	})
+}
+
+// irSoloAEntrar: sin la clave de desbloqueo en este dispositivo, el panel va solo a
+// Sytue ID a por ella, sin esperar a que la persona pulse «Iniciar sesión», como la
+// puerta de la bóveda (PuertaBoveda) y la web (PqVaultGate): con iniciar sesión
+// tiene que bastar. Una vez por inicio; si a la vuelta sigue sin ella, queda el botón.
+func (c *Panel) irSoloAEntrar() {
+	if c.entroSolo || c.busy || c.client == nil || c.diag.Paso != PasoIniciarSesion || c.IniciarSesion == nil {
+		return
+	}
+	c.entroSolo = true
+	c.iniciarSesion()
 }
 
 // listo: verificado y sin nada pendiente de la custodia. Una clave por envolver
@@ -587,6 +605,7 @@ func (c *Panel) custodiar(fn func(context.Context, *mx.Client, Custodia) (Diagno
 			}
 			c.pintar() //nolint:contextcheck // UI rendering installs future actions scoped to the device lifecycle.
 			c.lista()
+			c.irSoloAEntrar() //nolint:contextcheck // Como iniciarSesion: vive con el ciclo del dispositivo (c.ctx).
 		})
 	})
 }

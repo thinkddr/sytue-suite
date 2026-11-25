@@ -78,6 +78,7 @@ export const onRequest = sequence(
       'groups',
       'migrations',
       'platform',
+      'privacidad',
       'privileged-access',
       'rooms',
       'roles',

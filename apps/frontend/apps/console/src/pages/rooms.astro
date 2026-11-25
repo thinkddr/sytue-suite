@@ -12,6 +12,7 @@
 import ConsoleLayout from '../layouts/ConsoleLayout.astro';
 import { useT } from '../i18n/index.js';
 import RoomsPanel from '../components/RoomsPanel';
+import RoomsContactoExterno from '../components/RoomsContactoExterno';
 import { requireSession } from '@sytue/auth/server';
 import { canonicaConOrg } from '@sytue/config';
 import { getBff, toBffContext } from '../server/bff.js';
@@ -52,4 +53,7 @@ const t = useT(locale);
     stats={stats.ok ? stats.data : null}
     problema={problema}
   />
+  <div class="mt-6">
+    <RoomsContactoExterno client:load locale={locale} />
+  </div>
 </ConsoleLayout>

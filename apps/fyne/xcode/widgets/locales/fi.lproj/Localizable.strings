@@ -4,6 +4,10 @@
 "widgets.newNote" = "Uusi muistiinpano";
 "widgets.newContact" = "Uusi yhteystieto";
 "widgets.addPhotos" = "Lisää kuvia";
+"widgets.newDocument" = "Uusi asiakirja";
+"widgets.newSpreadsheet" = "Uusi laskentataulukko";
+"widgets.newPresentation" = "Uusi esitys";
+"widgets.openToUpdate" = "Päivittyy, kun sovellus on auki";
 "widgets.notes" = "Muistiinpanot";
 "widgets.rows" = "Rivit";
 "widgets.pending" = "Odottaa";

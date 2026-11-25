@@ -69,6 +69,11 @@ type Fake struct {
 	RecentLogin bool
 	// Handovers cuenta los PUT de la clave de firma que pidieron traspaso.
 	Handovers int
+	// StaleOnce: el próximo registro de la clave de firma contesta `409
+	// vault_key_stale`, como si otro dispositivo hubiera registrado antes.
+	StaleOnce bool
+	// BadProof: Sytue ID rechaza las firmas de la declaración (`400 vault_key_proof`).
+	BadProof bool
 	// Blobs son los bloques cifrados de /api/v1/cipher/blobs.
 	Blobs storagetest.CipherState
 }
@@ -382,6 +387,15 @@ func (f *Fake) vaultKeys(w http.ResponseWriter, r *http.Request) {
 	if f.beforeHandover(w, req, keyID) {
 		return
 	}
+	if f.StaleOnce {
+		f.StaleOnce = false
+		f.idError(w, http.StatusConflict, "vault_key_stale")
+		return
+	}
+	if f.BadProof {
+		f.idError(w, http.StatusBadRequest, "vault_key_proof")
+		return
+	}
 	generation, previous := int64(1), ""
 	if len(f.Signing) > 0 {
 		generation, previous = f.Signing[0].Generation+1, f.Signing[0].KeyID
@@ -392,7 +406,7 @@ func (f *Fake) vaultKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if previous != "" && !f.RecentLogin {
-		f.json(w, http.StatusForbidden, map[string]string{"code": api.CodeVaultKeyReauth, "message": "reauth"})
+		f.idError(w, http.StatusForbidden, api.CodeVaultKeyReauth)
 		return
 	}
 	reason := "alta"
@@ -411,6 +425,16 @@ func (f *Fake) vaultKeys(w http.ResponseWriter, r *http.Request) {
 	f.json(w, http.StatusOK, f.Signing[0])
 }
 
+// idError contesta como Sytue ID (platform/pkg/httpx): el código va DENTRO de
+// `error`, no en la raíz. Con la raíz, la web leía mal el 403 de reautenticar y
+// ninguna prueba lo vio.
+func (f *Fake) idError(w http.ResponseWriter, status int, code string) {
+	f.json(w, status, map[string]any{
+		"error":      map[string]any{"status": status, "code": code, "message": code},
+		"request_id": "artificial",
+	})
+}
+
 // beforeHandover es lo que Sytue ID resuelve antes de verificar firmas
 // (antesDelTraspaso): un traspaso solo en `mail` y sin aprobación de la anterior;
 // la misma clave otra vez no cambia nada (repetir un traspaso devuelve el hecho,
@@ -421,19 +445,19 @@ func (f *Fake) beforeHandover(w http.ResponseWriter, req api.VaultKeyRegistratio
 		f.Handovers++
 	}
 	if req.Handover && (f.scope.Product != "mail" || len(req.Continuity) > 0) {
-		f.json(w, http.StatusBadRequest, map[string]string{"code": "vault_key_handover", "message": "handover"})
+		f.idError(w, http.StatusBadRequest, "vault_key_handover")
 		return true
 	}
 	if len(f.Signing) > 0 && f.Signing[0].KeyID == keyID {
 		if req.Handover && f.Signing[0].Reason != "traspaso" {
-			f.json(w, http.StatusBadRequest, map[string]string{"code": "vault_key_handover", "message": "handover"})
+			f.idError(w, http.StatusBadRequest, "vault_key_handover")
 			return true
 		}
 		f.json(w, http.StatusOK, f.Signing[0])
 		return true
 	}
 	if req.Handover && !f.RecentLogin {
-		f.json(w, http.StatusForbidden, map[string]string{"code": api.CodeVaultKeyReauth, "message": "reauth"})
+		f.idError(w, http.StatusForbidden, api.CodeVaultKeyReauth)
 		return true
 	}
 	return false

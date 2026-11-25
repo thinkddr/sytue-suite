@@ -281,6 +281,7 @@ export const sk: AppCatalog<typeof en> = {
     other: 'Môžete pridať najviac {count} osôb.',
   },
   'dm.openFailed': 'Konverzáciu sa nepodarilo otvoriť.',
+  'dm.externalClosed': 'Vaša organizácia nepovoľuje konverzácie s touto osobou.',
   'people.search': 'Hľadať „{query}“ v Sytue One',
   'people.searching': 'Hľadá sa v Sytue One…',
   'people.notFound': 'Tento e-mail ani @používateľské meno v Sytue One nikto nepoužíva.',

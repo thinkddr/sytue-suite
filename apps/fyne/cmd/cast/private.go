@@ -26,6 +26,6 @@ func castPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], sui
 	return cifrado.NewRecordApplicationPlan(ctx, resources, cifrado.RecordApplicationConfig[*privateCast.Repository]{
 		Gateway: api.NewDrive(suite.URL("drive"), resources.HTTP(), nil), Source: source,
 		Service: api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil), New: privateCast.New,
-		Historical: privateCast.NewHistoricalSource,
+		Historical: privateCast.NewHistoricalSource, OnWrite: suite.AvisarEscritura,
 	})
 }

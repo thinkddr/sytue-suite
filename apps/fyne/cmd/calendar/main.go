@@ -148,6 +148,11 @@ func main() {
 				if err != nil {
 					return cifrado.ApplicationView{}, err
 				}
+				// El widget lee este repositorio mientras esté montado: el servidor de esta
+				// cuenta está congelado desde que pasó a Matrix (ADR 0078). Vive lo que la cuenta
+				// montada, no esta petición de montaje.
+				//nolint:contextcheck // la vida es la de la cuenta (resources.Context).
+				s.WidgetDesdeRegistrosPrivados(resources.Context(), resources.HTTP(), facade)
 				return mount(resources, facade), nil //nolint:contextcheck // Presenter retains its mounted resource lifetime; future UI gestures must not inherit the mount request.
 			},
 		},
@@ -161,7 +166,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(t.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Calendar).Montar(private.Objeto()))
 		w.Canvas().SetOnTypedRune(func(r rune) {

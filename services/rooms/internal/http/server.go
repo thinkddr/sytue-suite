@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/operador"
@@ -46,11 +47,23 @@ type Deps struct {
 	// Operador pregunta a Sytue ID por la cola de denuncias del operador. nil =
 	// esa cola contesta 403.
 	Operador operador.Autorizar
+	// Traza escribe la traza de acceso (ReglasDeTraza y, con la videollamada
+	// montada, ReglasDeTrazaDeLlamadas) y sirve su lectura admin. Nil ⇒ sin traza.
+	Traza *auditlog.Registro
 }
 
 // NewRouter construye el router completo de Sytue Rooms: mensajería y vídeo.
 func NewRouter(d Deps) http.Handler {
+	var traza func(http.Handler) http.Handler
+	if d.Traza != nil {
+		reglas := ReglasDeTraza
+		if d.MountExtra != nil {
+			reglas = append(append([]auditlog.Regla(nil), ReglasDeTraza...), ReglasDeTrazaDeLlamadas...)
+		}
+		traza = d.Traza.Middleware(reglas...)
+	}
 	r := httpx.NewRouter(httpx.RouterOptions{
+		Traza:          traza,
 		RequestTimeout: 30 * time.Second,
 		RequestTimeoutFor: func(r *http.Request) time.Duration {
 			if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/whatsapp/consent" || r.URL.Path == "/internal/rooms/document-access" || r.URL.Path == "/internal/rooms/subject-access") {
@@ -140,6 +153,14 @@ func NewRouter(d Deps) http.Handler {
 				adm.Get("/admin/channels", adminH.ListChannels)
 				adm.Patch("/admin/channels/{channelID}", adminH.SetChannelArchived)
 				adm.Get("/admin/stats", adminH.Stats)
+				// Contacto con gente de fuera (mig 0083; contacto_externo.go).
+				adm.Get("/admin/external-contact", h.PoliticaContactoExterno)
+				adm.Put("/admin/external-contact", h.GuardarPoliticaContactoExterno)
+				// La traza de acceso de la organización (docs/security.md §1.7), para
+				// la auditoría unificada de Sytue Admin: listado keyset y CSV.
+				if d.Traza != nil {
+					adm.Get("/admin/audit-log", d.Traza.Lectura("rooms"))
+				}
 			})
 		}
 
@@ -180,6 +201,9 @@ func NewRouter(d Deps) http.Handler {
 		}))
 		porMensaje := api.With(enAnfitrionPor(h.svc, "messageID", func(id uuid.UUID) service.RefAnfitrion {
 			return service.RefAnfitrion{Mensaje: id}
+		}))
+		porProgramado := api.With(enAnfitrionPor(h.svc, "scheduledID", func(id uuid.UUID) service.RefAnfitrion {
+			return service.RefAnfitrion{Programado: id}
 		}))
 
 		// Canales.
@@ -263,8 +287,9 @@ func NewRouter(d Deps) http.Handler {
 		// Borrado vía DELETE (server-to-server, sin CSRF de navegador); el BFF lo
 		// hace POST {cancel}.
 		api.Get("/me/scheduled", h.ListScheduled)
-		api.Patch("/scheduled/{scheduledID}", h.UpdateScheduled)
-		api.Delete("/scheduled/{scheduledID}", h.CancelScheduled)
+		// El de una conversación de otra organización vive en la anfitriona.
+		porProgramado.Patch("/scheduled/{scheduledID}", h.UpdateScheduled)
+		porProgramado.Delete("/scheduled/{scheduledID}", h.CancelScheduled)
 
 		// Reacciones.
 		porMensaje.Put("/messages/{messageID}/reactions/{emoji}", h.AddReaction)

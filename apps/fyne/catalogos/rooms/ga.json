@@ -346,6 +346,7 @@
   "dm.deleteFailed": "Níorbh fhéidir an comhrá a scriosadh.",
   "dm.empty": "Níl aon duine eile ar an bhfoireann fós.",
   "dm.emptyQuery": "Níl aon duine a mheaitseálann do chuardach.",
+  "dm.externalClosed": "Ní cheadaíonn d’eagraíocht comhráite leis an duine seo.",
   "dm.invite": "Tabhair cuireadh do dhaoine",
   "dm.maxPeople": {
     "one": "Is féidir leat suas le duine amháin a chur leis.",

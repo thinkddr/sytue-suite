@@ -112,6 +112,7 @@ func ValidClassification(c Classification) bool { return event.ValidClassificati
 func ValidTransparency(t Transparency) bool     { return event.ValidTransparency(t) }
 func SanitizeColor(v string) string             { return event.SanitizeColor(v) }
 func SanitizeConferenceURL(v string) string     { return event.SanitizeConferenceURL(v) }
+func SanitizeCommonName(v string) string        { return event.SanitizeCommonName(v) }
 func ValidPartStat(p ParticipationStatus) bool  { return event.ValidPartStat(p) }
 func ValidMethod(m SchedulingMethod) bool       { return event.ValidMethod(m) }
 func ValidName(name string) bool                { return event.ValidName(name) }

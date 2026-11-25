@@ -13,7 +13,7 @@
  * una simulación que cambia entre ejecuciones. Cada familia tiene su tolerancia relativa, con
  * su motivo, en `ets-divergencias.json`; lo que la supera se declara allí fórmula a fórmula.
  */
-import { Engine } from '../src/engine';
+import { Engine } from '../src/index'; // el índice instala las funciones (perezosas.ts)
 import { FormulaError } from '../src/values';
 import { DATOS_ETS, SERIES, rangos } from './ets-corpus';
 import type { Esperado, Resultado } from './libreoffice';

@@ -134,14 +134,46 @@ func TestCadaFilaDelWidgetAbreSuElemento(t *testing.T) {
 			t.Fatalf("One abre %v", d)
 		}
 	})
+	// La agenda de hoy de One: su día en Calendar (hub.DiaDeAgenda), la misma ruta que la
+	// fila de «Hoy» y que Calendar lee.
+	t.Run("one, agenda", func(t *testing.T) {
+		for _, diaCompleto := range []bool{false, true} {
+			u := abrir(t, "one", fuentes.RutaAgenda(time.Date(2026, 11, 30, 18, 30, 0, 0, madrid), diaCompleto))
+			ruta, ok := hub.DiaDeAgenda(u)
+			if !ok {
+				t.Fatalf("One no atiende %s", u)
+			}
+			cal, err := url.Parse(api.Esquema("calendar") + ":" + ruta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d, ok := calendario.FechaDelEnlace(cal.Query(), madrid); !ok || d.Day() != 30 || d.Month() != 11 ||
+				(cal.Query().Get("all_day") == "1") != diaCompleto {
+				t.Fatalf("%s lleva a Calendar %s: %v", u, ruta, d)
+			}
+		}
+		for _, malo := range []string{"/agenda", "/agenda?date=ayer", "/agenda?date=2026-11-30&x=1", "/agenda?date=2026-11-30&all_day=0"} {
+			if u, _ := url.Parse(api.Esquema("one") + ":" + malo); u != nil {
+				if _, ok := hub.DiaDeAgenda(u); ok {
+					t.Errorf("One atiende %s", malo)
+				}
+			}
+		}
+	})
+	t.Run("mail", func(t *testing.T) {
+		if hilo, ok := api.LeerHilo(abrir(t, "mail", fuentes.RutaHilo("<t1@sytue.eu>"))); !ok || hilo != "<t1@sytue.eu>" {
+			t.Fatalf("Mail abre el hilo %q", hilo)
+		}
+	})
 }
 
 // TestCadaAccionDelWidgetTieneQuienLaAtienda: cada acción rápida que declara un
 // FyneApp.toml (`widget_acciones`, la que ponen los widgets de Apple y de Android como
 // `sytue-<producto>:/?action=<acción>`) la lee el receptor de esa app y abre un
 // formulario, una pregunta o el selector: Calendar su formulario, Contacts el suyo
-// (contactos.App.PedirNuevo), Notes la pregunta de «Nueva nota» (notes.Entrante.Crear) y
-// Photos el selector (photos.App.AnyadirFotos). Una acción nueva sin receptor falla aquí.
+// (contactos.App.PedirNuevo), Notes la pregunta de «Nueva nota» (notes.Entrante.Crear),
+// Photos el selector (photos.App.AnyadirFotos) y la ofimática la pregunta de «Documento
+// nuevo» (editor.Portada.PreguntarCrear). Una acción nueva sin receptor falla aquí.
 func TestCadaAccionDelWidgetTieneQuienLaAtienda(t *testing.T) {
 	atiende := map[string]func(*url.URL) bool{
 		"calendar/create": func(u *url.URL) bool {
@@ -154,6 +186,11 @@ func TestCadaAccionDelWidgetTieneQuienLaAtienda(t *testing.T) {
 			return ok && e.Crear
 		},
 		"photos/upload": func(u *url.URL) bool { return api.LeerAccion("photos", u) == "upload" },
+		// Docus, Calcus y Diapos preguntan antes de crear (editor.Portada.PreguntarCrear,
+		// desde el AlAbrirURL de su cmd).
+		"docs/create":   func(u *url.URL) bool { return api.LeerAccion("docs", u) == "create" },
+		"sheets/create": func(u *url.URL) bool { return api.LeerAccion("sheets", u) == "create" },
+		"slides/create": func(u *url.URL) bool { return api.LeerAccion("slides", u) == "create" },
 		// Mail la atiende su propia rama (cmd/mail, fuera de este cambio).
 		"mail/compose": func(u *url.URL) bool { return api.LeerAccion("mail", u) == "compose" },
 	}
@@ -186,7 +223,7 @@ func TestCadaAccionDelWidgetTieneQuienLaAtienda(t *testing.T) {
 			vistas++
 		}
 	}
-	if vistas < 5 {
-		t.Fatalf("solo %d acciones declaradas; son cinco (mail, calendar, contacts, notes, photos)", vistas)
+	if vistas < 8 {
+		t.Fatalf("solo %d acciones declaradas; son ocho (mail, calendar, contacts, notes, photos, docs, sheets, slides)", vistas)
 	}
 }

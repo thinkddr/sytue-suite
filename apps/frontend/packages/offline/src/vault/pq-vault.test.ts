@@ -338,7 +338,14 @@ describe('PqVault: abrir solo una bóveda que ya existe (Photos sobre la de Driv
 
 describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
   /** Un núcleo con las operaciones de firma y un Sytue ID con su registro. */
-  function conFirma(opciones: { conFirma?: boolean } = {}) {
+  /** Un rechazo de Sytue ID, en el sobre de verdad de `platform/pkg/httpx`. */
+  const rechazo = (status: number, code: string) =>
+    Response.json({ error: { status, code, message: code }, request_id: 'r' }, { status });
+
+  function conFirma(
+    opciones: { conFirma?: boolean; rancias?: number; firmasMalas?: boolean } = {},
+  ) {
+    let rancias = opciones.rancias ?? 0;
     let n = 0;
     // Un núcleo por apertura: cerrar una bóveda cierra el suyo.
     const nuevoNucleo = () => {
@@ -378,9 +385,13 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
         return Response.json({ keys: [...registro].reverse() });
       const body = JSON.parse(String(init?.body)) as { previous_key_id: string };
       const activa = registro.find((k) => !k.retired_at);
-      if (activa && !reciente) return Response.json({ code: 'vault_key_reauth' }, { status: 403 });
-      if ((activa?.key_id ?? '') !== body.previous_key_id)
-        return Response.json({ code: 'vault_key_stale' }, { status: 409 });
+      if (opciones.firmasMalas) return rechazo(400, 'vault_key_proof');
+      if (activa && !reciente) return rechazo(403, 'vault_key_reauth');
+      if (rancias > 0) {
+        rancias--;
+        return rechazo(409, 'vault_key_stale');
+      }
+      if ((activa?.key_id ?? '') !== body.previous_key_id) return rechazo(409, 'vault_key_stale');
       if (activa) activa.retired_at = 'ayer';
       registro.push({ generation: registro.length + 1, key_id: 'x'.repeat(64) });
       return Response.json({});
@@ -428,6 +439,24 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
     expect(vaciada.signingKeyStatus).toBe('reauth');
     expect(c.registro).toHaveLength(1);
     await vaciada.closeAndDrain();
+  });
+
+  test('si otro dispositivo registró entre medias, se vuelve a leer y se repite una vez', async () => {
+    const c = conFirma({ rancias: 1 });
+    const vault = await c.abrir();
+    expect(vault.signingKeyStatus).toBe('registered');
+    expect(vault.signingKeyCheck).toBeUndefined();
+    expect(c.registro).toHaveLength(1);
+    await vault.closeAndDrain();
+  });
+
+  test('un rechazo de Sytue ID queda dicho: qué petición, qué estado y qué código', async () => {
+    const c = conFirma({ firmasMalas: true });
+    const vault = await c.abrir();
+    expect(vault.isClosed).toBe(false);
+    expect(vault.signingKeyStatus).toBe('unavailable');
+    expect(vault.signingKeyCheck).toBe('signing_put_400_vault_key_proof');
+    await vault.closeAndDrain();
   });
 });
 

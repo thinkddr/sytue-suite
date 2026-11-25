@@ -74,7 +74,7 @@ func recordsConfiguration(cfg Config) records.Config {
 
 func recordsConfigurationFor(cfg Config, r *Repository) records.Config {
 	return records.Config{
-		WorkLease: cfg.WorkLease, Context: cfg.Context, Scope: cfg.Scope, Product: "photos", EntityKind: "org.sytue.photos.entity.v1", ReceiptKind: "org.sytue.photos.snapshot.v1", Crypto: cfg.Crypto, Gateway: cfg.Gateway, Journal: cfg.Journal, Source: cfg.Source,
+		WorkLease: cfg.WorkLease, Context: cfg.Context, Scope: cfg.Scope, Product: "photos", EntityKind: "org.sytue.photos.entity.v1", ReceiptKind: "org.sytue.photos.snapshot.v1", Crypto: cfg.Crypto, Gateway: cfg.Gateway, Journal: cfg.Journal, Source: cfg.Source, OnWrite: cfg.OnWrite,
 		ValidateRow: func(_ context.Context, kind, id string, raw []byte) error {
 			if err := model.ValidateRow(cfg.Scope, model.Row{Kind: kind, ID: id, JSON: raw}); err != nil {
 				return err

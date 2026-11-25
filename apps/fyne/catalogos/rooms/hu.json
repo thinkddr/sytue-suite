@@ -316,6 +316,7 @@
   "dm.deleteFailed": "Nem sikerült törölni a csevegést.",
   "dm.empty": "Még nincs más a csapatban.",
   "dm.emptyQuery": "Senki sem felel meg a keresésnek.",
+  "dm.externalClosed": "A szervezeted nem engedélyezi a beszélgetést ezzel a személlyel.",
   "dm.invite": "Személyek meghívása",
   "dm.maxPeople": {
     "one": "Legfeljebb {count} személyt adhat hozzá.",

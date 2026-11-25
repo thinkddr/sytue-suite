@@ -14,7 +14,7 @@
  * props desde el `.astro`: nunca se detecta aquí (desajustaría la hidratación).
  */
 import type { ComponentChildren, JSX } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { Locale } from '@sytue/i18n';
 import {
   Button,
@@ -24,6 +24,7 @@ import {
   EmptyState,
   FieldHint,
   InlineHelp,
+  marcarAppLista,
   ReviewSummary,
   SettingsShell,
   SettingsSection,
@@ -114,6 +115,10 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
   // cambiar de plataforma o salir de las instrucciones.
   const [client, setClient] = useState<OneClickState | null>(null);
   const toast = useToast();
+  // `sytue:app-ready`: las direcciones de conexión llegan con la página (no hay nada más
+  // que esperar), así que la app está lista al montarse. Sin la marca, la bóveda esperaba
+  // los 5 s de `cuandoAppLista` para empezar a abrirse.
+  useEffect(() => marcarAppLista(), []);
 
   /** `what` es la clave del catálogo que dice QUÉ se ha copiado. */
   async function copy(text: string, what: PortalMessageKey) {

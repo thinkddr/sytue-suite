@@ -18,6 +18,8 @@ github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608 h1:5XWaET4YAcppq3
 github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608/go.mod h1:BEksegNspIkjCQfmzWgsgbu6KdeJ/4LwUZs7DMBzjzw=
 github.com/emersion/go-vcard v0.1.0 h1:1GN6X5Rc91nvefm0ODRCEmTLVsnXK1f7++Uj0FKo+n0=
 github.com/emersion/go-vcard v0.1.0/go.mod h1:HMJKR5wlh/ziNp+sHEDV2ltblO4JD2+IdDOWtGcQBTM=
+github.com/gen2brain/h265 v0.2.7 h1:PGGRPSZ5K0RsKhmk7UBk+j55HtWh/8mJgJk4ns8U3ho=
+github.com/gen2brain/h265 v0.2.7/go.mod h1:xR/WG8zUmzFC4GpeiRwBX/ERtlu3hamQcAgD76/8rcI=
 github.com/godbus/dbus/v5 v5.2.4 h1:F2gUCy++NMIxGmo9J+z5le/+ZC8W1OgeR51P4i9ZB/U=
 github.com/godbus/dbus/v5 v5.2.4/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

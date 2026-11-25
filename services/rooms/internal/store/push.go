@@ -49,24 +49,26 @@ func (s *Store) DeletePushSubscription(ctx context.Context, subject, endpoint st
 // caminos de aviso (Web Push y la bandeja del Hub) y deben decidir exactamente lo
 // mismo. El despertar de iOS no lo usa: sigue al contador del widget
 // (DespertablesForMessage).
+// Lleva `externo`: la persona de otra organización (ADR 0040) tiene sus
+// suscripciones en la suya, no en la del canal (suscripcionesDeExternos).
 // Parámetros: $1 tenant, $2 canal, $3 autor, $4 menciones.
 const destinatariosCTE = `WITH ch AS (
 			     SELECT kind FROM channels WHERE tenant = $1 AND id = $2
 			 ),
 			 recipients AS (
-			     SELECT subject, notify_level, bool_or(mentioned) AS mentioned
+			     SELECT subject, notify_level, externo, bool_or(mentioned) AS mentioned
 			     FROM (
-			         SELECT cm.subject, cm.notify_level, false AS mentioned
+			         SELECT cm.subject, cm.notify_level, cm.externo, false AS mentioned
 			         FROM channel_members cm, ch
 			         WHERE cm.tenant = $1 AND cm.channel_id = $2
 			           AND ch.kind = 'direct' AND cm.subject <> $3
 			         UNION ALL
-			         SELECT cm.subject, cm.notify_level, true AS mentioned
+			         SELECT cm.subject, cm.notify_level, cm.externo, true AS mentioned
 			         FROM channel_members cm
 			         WHERE cm.tenant = $1 AND cm.channel_id = $2
 			           AND cm.subject = ANY($4) AND cm.subject <> $3
 			     ) u
-			     GROUP BY subject, notify_level
+			     GROUP BY subject, notify_level, externo
 			 )`
 
 // avisables filtra los destinatarios por su nivel de aviso: a un mencionado se le avisa
@@ -92,18 +94,25 @@ const sinPausa = `
 // con notify_level='all' (por defecto), igual que la política del cliente; y a nadie
 // con «Pausar avisos» en curso (sinPausa). Una sola
 // consulta indexada (channel_members PK + push_subscriptions_subject_idx), sin N+1.
+//
+// La persona de OTRA organización (ADR 0040) se suscribió desde la suya, con su token,
+// así que sus suscripciones —y su pausa— no están en la organización del canal: se
+// buscan aparte (suscripcionesDeExternos). Su nivel de aviso sí es el de su fila del
+// canal, que vive aquí. Esas llevan su organización en Tenant, para poder limpiarlas.
 func (s *Store) PushTargetsForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string) ([]domain.PushTarget, error) {
 	t := tenancy.MustFrom(ctx)
 	if mentions == nil {
 		mentions = []string{}
 	}
 	var out []domain.PushTarget
+	var externos []string
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			destinatariosCTE+`
 			 SELECT r.subject, ps.endpoint, ps.p256dh, ps.auth_key
 			 FROM recipients r
-			 JOIN push_subscriptions ps ON ps.tenant = $1 AND ps.subject = r.subject`+avisables+sinPausa,
+			 JOIN push_subscriptions ps ON ps.tenant = $1 AND ps.subject = r.subject`+avisables+sinPausa+`
+			   AND NOT r.externo`,
 			t.Slug, channelID, authorSub, mentions)
 		if err != nil {
 			return err
@@ -116,12 +125,67 @@ func (s *Store) PushTargetsForMessage(ctx context.Context, channelID uuid.UUID, 
 			}
 			out = append(out, pt)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		rows, err = tx.Query(ctx,
+			destinatariosCTE+`
+			 SELECT r.subject FROM recipients r`+avisables+`
+			   AND r.externo`,
+			t.Slug, channelID, authorSub, mentions)
+		if err != nil {
+			return err
+		}
+		externos, err = pgx.CollectRows(rows, pgx.RowTo[string])
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
+	if len(externos) > 0 {
+		fuera, err := s.suscripcionesDeExternos(ctx, externos, t.Slug)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, fuera...)
+	}
 	return sinQuienesBloquean(ctx, s, authorSub, out, func(x domain.PushTarget) string { return x.Subject })
+}
+
+// maxSuscripcionesDeFuera acota lo que se lee de las organizaciones de las personas de
+// fuera de un mensaje: es el pushMaxTargets del servicio, que no manda más.
+const maxSuscripcionesDeFuera = 50
+
+// suscripcionesDeExternos lee las suscripciones push de las personas de fuera de un
+// canal en SUS organizaciones —cualquiera distinta de la del canal—, sin las que estén
+// en «Pausar avisos» allí. Es una lectura entre organizaciones y va por la política de
+// mantenimiento (mig 0082), que solo enseña suscripciones y pausas de quien está como
+// externo en alguna conversación.
+func (s *Store) suscripcionesDeExternos(ctx context.Context, subjects []string, canal string) ([]domain.PushTarget, error) {
+	var out []domain.PushTarget
+	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			`SELECT ps.tenant, ps.subject, ps.endpoint, ps.p256dh, ps.auth_key
+			 FROM push_subscriptions ps
+			 WHERE ps.subject = ANY($1) AND ps.tenant <> $2
+			   AND NOT EXISTS (SELECT 1 FROM user_notify_prefs np
+			       WHERE np.tenant = ps.tenant AND np.subject = ps.subject AND np.paused_until > now())
+			 ORDER BY ps.subject, ps.tenant, ps.endpoint
+			 LIMIT $3`, subjects, canal, maxSuscripcionesDeFuera)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var pt domain.PushTarget
+			if err := rows.Scan(&pt.Tenant, &pt.Subject, &pt.Endpoint, &pt.P256dh, &pt.Auth); err != nil {
+				return err
+			}
+			out = append(out, pt)
+		}
+		return rows.Err()
+	})
+	return out, err
 }
 
 // maxDespertables acota lo que se lee por mensaje: es el pushMaxTargets del servicio,

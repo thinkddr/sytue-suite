@@ -221,7 +221,7 @@ func GraphFromEvent(ev domain.Event) GraphEvent {
 		g.Location = &GraphLocation{DisplayName: ev.Location}
 	}
 	if ev.Organizer != "" {
-		g.Organizer = &GraphRecipient{EmailAddress: GraphEmailAddress{Address: ev.Organizer}}
+		g.Organizer = &GraphRecipient{EmailAddress: GraphEmailAddress{Name: ev.OrganizerName, Address: ev.Organizer}}
 	}
 	g.Attendees = graphAttendees(ev.Attendees)
 	return g

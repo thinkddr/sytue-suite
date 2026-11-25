@@ -79,6 +79,9 @@ export const NAV: { id: string; labelKey: ConsoleMessageKey; icon: IconName; hre
   { id: 'erp', labelKey: 'nav.erp', icon: 'receipt', href: '/erp' },
   { id: 'governance', labelKey: 'nav.governance', icon: 'shield', href: '/governance' },
   { id: 'compliance', labelKey: 'nav.compliance', icon: 'check', href: '/compliance' },
+  // Lo que las personas piden a la organización sobre sus datos (RGPD): el registro
+  // de solicitudes y la supresión física de una cuenta (ADR 0054).
+  { id: 'privacy', labelKey: 'nav.privacy', icon: 'shield', href: '/privacidad' },
   {
     id: 'sensitivity-labels',
     labelKey: 'nav.sensitivityLabels',

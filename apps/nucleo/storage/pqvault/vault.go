@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"regexp"
+	"strconv"
 	"sync"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -112,7 +114,11 @@ type Vault struct {
 	// el correo para firmar sus acciones de entrada. Se borra al cerrar.
 	signingKey []byte
 	signing    SigningStatus
-	closed     bool
+	// signingCheck dice por qué la clave de firma no quedó registrada (vacío si lo
+	// está): la misma etiqueta que la web (`PqVaultError.check`), para el código de
+	// fallo. No se borra al cerrar: no es secreta.
+	signingCheck string
+	closed       bool
 }
 
 // Open abre la bóveda con la clave de desbloqueo, o la crea si no existe. Si la
@@ -200,9 +206,9 @@ func open(ctx context.Context, cfg Config, reset bool) (*Vault, error) {
 			secret = next
 		}
 	}
-	signing := SigningMissing
+	signing, signingCheck := SigningMissing, "signing_missing"
 	if secret.SigningKey != "" {
-		signing = registerSigningKey(ctx, cfg.Registry, scope, secret.SigningKey, cfg.Handover)
+		signing, signingCheck = registerSigningKey(ctx, cfg.Registry, scope, secret.SigningKey, cfg.Handover)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -218,7 +224,7 @@ func open(ctx context.Context, cfg Config, reset bool) (*Vault, error) {
 	}
 	return &Vault{
 		scope: scope, server: cfg.Server, vaultID: vaultID, keyID: keyID,
-		recipient: identity.Recipient(), signing: signing, identity: identity, owner: owner,
+		recipient: identity.Recipient(), signing: signing, signingCheck: signingCheck, identity: identity, owner: owner,
 		signingKey: []byte(secret.SigningKey),
 	}, nil
 }
@@ -343,22 +349,43 @@ func addSigningKey(ctx context.Context, server Server, auk []byte, scope storage
 // porque no la tiene, es un vaciado, y Sytue ID pide identificarse otra vez. Con
 // `handover` (solo `mail`) se pide siempre, con la marca de traspaso: Sytue ID
 // dice si esa clave ya lo tiene, y si no, exige identificación reciente.
-func registerSigningKey(ctx context.Context, registry Registry, scope storage.Scope, encoded string, handover bool) SigningStatus {
-	if registry == nil || handover && scope.Product != "mail" {
-		return SigningUnavailable
+//
+// Si otro dispositivo registró entre la lectura y el registro (`409
+// vault_key_stale`), se vuelve a leer la activa y se repite una vez, como la web.
+// Devuelve también por qué no quedó registrada (signingCheck), vacío si lo está.
+func registerSigningKey(ctx context.Context, registry Registry, scope storage.Scope, encoded string, handover bool) (SigningStatus, string) {
+	if registry == nil {
+		return SigningUnavailable, "signing_registry"
+	}
+	if handover && scope.Product != "mail" {
+		return SigningUnavailable, "signing_handover"
 	}
 	signer, err := recoverywrap.ParsePQVaultSigningKey(encoded)
 	if err != nil {
-		return SigningUnavailable
+		return SigningUnavailable, "signing_key"
 	}
+	for intento := 0; ; intento++ {
+		status, check, rancia := registerSigningKeyOnce(ctx, registry, scope, signer, handover)
+		if !rancia {
+			return status, check
+		}
+		if intento > 0 {
+			return SigningUnavailable, check
+		}
+	}
+}
+
+// registerSigningKeyOnce es un intento de registerSigningKey; `rancia` dice que
+// Sytue ID contestó vault_key_stale y vale la pena repetir.
+func registerSigningKeyOnce(ctx context.Context, registry Registry, scope storage.Scope, signer *recoverywrap.PQVaultSigner, handover bool) (status SigningStatus, check string, rancia bool) {
 	public := signer.Public()
 	keyID, err := public.ID()
 	if err != nil {
-		return SigningUnavailable
+		return SigningUnavailable, "signing_key", false
 	}
 	keys, err := registry.VaultKeys(ctx, scope.Product)
 	if err != nil {
-		return SigningUnavailable
+		return SigningUnavailable, signingCheck("signing_get", err), false
 	}
 	var active *api.VaultKey
 	for i := range keys {
@@ -375,29 +402,52 @@ func registerSigningKey(ctx context.Context, registry Registry, scope storage.Sc
 			// clave que ya estaba sin él; y una clave no se sucede a sí misma en la
 			// declaración, así que ni se pide.
 			if !handover || active.Reason == ReasonHandover {
-				return SigningRegistered
+				return SigningRegistered, "", false
 			}
-			return SigningUnavailable
+			return SigningUnavailable, "signing_handover_taken", false
 		}
 		generation, previous = active.Generation+1, active.KeyID
 	}
 	statement, err := recoverywrap.PQVaultKeyStatement(scope.Subject, scope.Tenant, scope.Product, generation, keyID, previous)
 	if err != nil {
-		return SigningUnavailable
+		return SigningUnavailable, "signing_statement", false
 	}
 	proof, err := signer.Sign(recoverywrap.VaultKeyEnrollContext, statement)
 	if err != nil {
-		return SigningUnavailable
+		return SigningUnavailable, "signing_sign", false
 	}
 	err = registry.PutVaultKey(ctx, scope.Product, api.VaultKeyRegistration{PublicKey: public, PreviousKeyID: previous, Proof: proof, Handover: handover})
 	if err == nil {
-		return SigningRegistered
+		return SigningRegistered, "", false
 	}
 	var apiErr *api.Error
 	if errors.As(err, &apiErr) && apiErr.Status == 403 && apiErr.Code() == api.CodeVaultKeyReauth {
-		return SigningReauth
+		return SigningReauth, "", false
 	}
-	return SigningUnavailable
+	return SigningUnavailable, signingCheck("signing_put", err), errors.As(err, &apiErr) && apiErr.Status == 409 && apiErr.Code() == codeVaultKeyStale
+}
+
+// codeVaultKeyStale es el 409 de Sytue ID cuando la declaración se firmó para otra
+// generación: otro dispositivo registró antes.
+const codeVaultKeyStale = "vault_key_stale"
+
+var checkToken = regexp.MustCompile(`^[a-z0-9_]{1,64}$`)
+
+// signingCheck es la etiqueta de un fallo de Sytue ID: la petición, el estado HTTP
+// y el código del servicio (`signing_put_400_vault_key_proof`), lo mismo que la web.
+func signingCheck(peticion string, err error) string {
+	var apiErr *api.Error
+	if !errors.As(err, &apiErr) {
+		return peticion + "_failed"
+	}
+	check := peticion + "_" + strconv.Itoa(apiErr.Status)
+	if code := apiErr.Code(); checkToken.MatchString(code) {
+		check += "_" + code
+	}
+	if len(check) > 64 {
+		check = check[:64]
+	}
+	return check
 }
 
 func validVaultID(id string) bool {
@@ -419,6 +469,29 @@ func (v *Vault) SigningStatus() SigningStatus {
 	defer v.mu.RUnlock()
 	return v.signing
 }
+
+// SigningError es ErrSigningKey con el porqué de que la clave de firma no sea la
+// activa (SigningKeyError.Check), para el código de fallo; nil si lo es.
+func (v *Vault) SigningError() error {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	if v.signing == SigningRegistered {
+		return nil
+	}
+	check := v.signingCheck
+	if check == "" {
+		check = "signing_" + string(v.signing)
+	}
+	return &SigningKeyError{Check: check}
+}
+
+// SigningKeyError es ErrSigningKey con la etiqueta de qué contestó Sytue ID
+// (`signing_put_400_vault_key_proof`, `signing_missing`…). errors.Is(err,
+// ErrSigningKey) sigue valiendo.
+type SigningKeyError struct{ Check string }
+
+func (e *SigningKeyError) Error() string { return ErrSigningKey.Error() + " (" + e.Check + ")" }
+func (e *SigningKeyError) Unwrap() error { return ErrSigningKey }
 
 // PublicationTarget es el destino de las publicaciones, el mismo que usa la web:
 // la bóveda y un dispositivo `pq-` derivado de la clave.

@@ -96,13 +96,18 @@ type RouterOptions struct {
 	//
 	// Conviene fijarlo a mano en los tests, para no medir contra el global.
 	Meter *telemetry.Meter
+	// Traza es el punto de estrangulamiento de la traza de acceso a datos de
+	// cliente (platform/pkg/auditlog, Registro.Middleware). Va en el router y no
+	// en un grupo de rutas porque necesita ver el patrón de la ruta que casó, y
+	// chi solo lo completa para quien envuelve el router entero. nil = sin traza.
+	Traza func(http.Handler) http.Handler
 }
 
 // NewRouter construye un *chi.Mux con la cadena de middlewares SEGURA por
 // defecto de Sytue One, en orden (deny-by-default, defensa en profundidad):
 //
 //	request id -> logging -> [métricas] -> recovery -> security headers ->
-//	[CORS] -> body-limit -> [rate-limit] -> [CSRF] -> [timeout]
+//	[CORS] -> body-limit -> [rate-limit] -> [CSRF] -> [timeout] -> [traza]
 //
 // Las cabeceras de seguridad se aplican SIEMPRE (endurecidas si no se configuran);
 // CORS/rate-limit/CSRF son opcionales pero recomendados en superficies con cookies.
@@ -158,6 +163,9 @@ func NewRouter(opts RouterOptions) *chi.Mux {
 	}
 	if opts.RequestTimeout > 0 || opts.RequestTimeoutFor != nil {
 		r.Use(requestTimeout(opts.RequestTimeout, opts.RequestTimeoutFor))
+	}
+	if opts.Traza != nil {
+		r.Use(opts.Traza)
 	}
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) { Fail(w, req, ErrNotFound) })
 	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {

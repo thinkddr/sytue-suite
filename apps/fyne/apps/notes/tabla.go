@@ -334,9 +334,15 @@ func (m *Maquetado) tabla(bloques []Bloque, indice func(int) int, y, ancho float
 		lineas = max(lineas, p.estilo.borde)
 	}
 	llenar := strings.TrimSpace(propiedad(attr(t.Atributos, "style"), "width")) == "100%"
-	anchos := anchosDeColumna(celdas, columnas, ancho, lineas, llenar, v)
+	// Las filas numeradas (`table[data-numerada]`) llevan delante una columna más, la
+	// del número: `w-10`, como el `tr::before` de app.css.
+	var gutter float32
+	if numerada(t) {
+		gutter = anchoNumeroFila + max(lineas, tema.Borde)
+	}
+	anchos := anchosDeColumna(celdas, columnas, ancho-gutter, lineas, llenar, v)
 	xs := make([]float32, columnas+1)
-	xs[0] = lineas
+	xs[0] = lineas + gutter
 	for c := range columnas {
 		xs[c+1] = xs[c] + anchos[c] + lineas
 	}
@@ -370,6 +376,9 @@ func (m *Maquetado) tabla(bloques []Bloque, indice func(int) int, y, ancho float
 
 	cajas := make([]CajaBloque, len(bloques))
 	fondos := len(m.Adornos)
+	if gutter > 0 {
+		fondos = m.numerarFilas(t, ys, lineas, v)
+	}
 	for k, p := range celdas {
 		x0, y0 := xs[p.col], ys[p.fila]
 		w, h := caja(p), ys[p.fila+p.filas]-lineas-y0
@@ -429,6 +438,44 @@ func (m *Maquetado) tabla(bloques []Bloque, indice func(int) int, y, ancho float
 		m.Adornos = slices.Insert(m.Adornos, fondos, rejilla...)
 	}
 	return alto, cajas
+}
+
+// anchoNumeroFila es el `w-10` de la columna de los números de una tabla numerada.
+var anchoNumeroFila = tema.Espacio(10)
+
+// numerada dice si una tabla lleva las filas numeradas.
+func numerada(t *Tabla) bool {
+	return slices.ContainsFunc(t.Atributos, func(a html.Attribute) bool { return a.Key == "data-numerada" })
+}
+
+// numerarFilas pone la columna de los números de una tabla numerada: cada fila, su caja
+// en `bg-subtle` con su rejilla y, en las del cuerpo, su número (el contador de app.css
+// cuenta solo las de `tbody`). Devuelve dónde siguen los fondos.
+func (m *Maquetado) numerarFilas(t *Tabla, ys []float32, lineas float32, v tema.Variante) int {
+	grueso := max(lineas, tema.Borde)
+	x0 := lineas
+	n := 0
+	rejilla, numeros := make([]Adorno, 0, 4*len(t.Filas)), make([]Adorno, 0, len(t.Filas))
+	for f, fila := range t.Filas {
+		y0, h := ys[f], ys[f+1]-lineas-ys[f]
+		m.Adornos = append(m.Adornos, Adorno{Tipo: adornoCaja, X: x0, Y: y0, An: anchoNumeroFila, Al: h, color: tema.Color("bg-subtle", v)})
+		c := tema.Color("border", v)
+		rejilla = append(rejilla,
+			Adorno{Tipo: adornoCaja, X: x0 - grueso, Y: y0 - grueso, An: anchoNumeroFila + 2*grueso, Al: grueso, color: c},
+			Adorno{Tipo: adornoCaja, X: x0 - grueso, Y: y0 + h, An: anchoNumeroFila + 2*grueso, Al: grueso, color: c},
+			Adorno{Tipo: adornoCaja, X: x0 - grueso, Y: y0 - grueso, An: grueso, Al: h + 2*grueso, color: c},
+			Adorno{Tipo: adornoCaja, X: x0 + anchoNumeroFila, Y: y0 - grueso, An: grueso, Al: h + 2*grueso, color: c})
+		if fila.Seccion == "tbody" || fila.Seccion == "" {
+			n++
+			numeros = append(numeros, Adorno{
+				Tipo: adornoNumeroFila, X: x0, Y: y0 + pyCeldaTabla, An: anchoNumeroFila,
+				Texto: strconv.Itoa(n), escalon: m.letra.Escalon,
+			})
+		}
+	}
+	m.Adornos = append(m.Adornos, rejilla...)
+	m.Adornos = append(m.Adornos, numeros...)
+	return len(m.Adornos)
 }
 
 // tablaOpaca maqueta una tabla guardada entera en un bloque (la de dentro de una celda):

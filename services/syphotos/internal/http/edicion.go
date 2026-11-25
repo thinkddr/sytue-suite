@@ -128,14 +128,8 @@ func (h *Handlers) anyadirComoEditora(w http.ResponseWriter, r *http.Request, al
 			h.prepararEnSegundoPlano(pctx, cancelar, token, album, prep, recetas)
 		}
 	}
-	if n > 0 && h.anyadidos.Primera("anyadidas|"+org+"|"+album.String()+"|"+yo) {
-		titulo := ""
-		if al, err := h.store.Album(ctx, album, duenya); err == nil {
-			titulo = al.Titulo
-		}
-		c, _ := authn.FromContext(ctx)
-		actor := cmp.Or(strings.TrimSpace(c.Name), c.Email)
-		h.hub.SendAsync(ctx, avisoDeAnyadidas(h.cfg.PublicURL, org, duenya, album.String(), titulo, actor, n))
+	if n > 0 {
+		h.avisarAnyadidas(ctx, org, album, duenya, yo, n)
 	}
 	switch {
 	case errors.Is(corte, drive.ErrSinCuota):
@@ -145,6 +139,23 @@ func (h *Handlers) anyadirComoEditora(w http.ResponseWriter, r *http.Request, al
 	default:
 		httpx.JSON(w, r, http.StatusOK, map[string]int{"added": n})
 	}
+}
+
+// avisarAnyadidas: las `n` fotos son ya de la dueña y están en su álbum. Su widget
+// cambia (la señal de cambios, ADR 0078) y le llega el aviso `photos.album.added`, uno
+// por persona y álbum cada VentanaAvisoAnyadidos.
+func (h *Handlers) avisarAnyadidas(ctx context.Context, org string, album uuid.UUID, duenya, yo string, n int) {
+	hubnotify.AvisarTambien(ctx, duenya)
+	if !h.anyadidos.Primera("anyadidas|" + org + "|" + album.String() + "|" + yo) {
+		return
+	}
+	titulo := ""
+	if al, err := h.store.Album(ctx, album, duenya); err == nil {
+		titulo = al.Titulo
+	}
+	c, _ := authn.FromContext(ctx)
+	actor := cmp.Or(strings.TrimSpace(c.Name), c.Email)
+	h.hub.SendAsync(ctx, avisoDeAnyadidas(h.cfg.PublicURL, org, duenya, album.String(), titulo, actor, n))
 }
 
 // avisarRenombrado le dice a la dueña que alguien con edición ha renombrado su álbum

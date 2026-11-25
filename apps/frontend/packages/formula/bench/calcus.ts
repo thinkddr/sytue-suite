@@ -24,7 +24,7 @@
  */
 import os from 'node:os';
 
-import { Engine } from '../src/engine.js';
+import { Engine } from '../src/index.js'; // el índice instala las funciones (perezosas.ts)
 
 /** La máquina, para que la cifra se pueda situar. `SYTUE_BENCH_MAQUINA` la fija a mano: en un
  *  contenedor ARM `os.cpus()` no trae el modelo. */

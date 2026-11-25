@@ -1,0 +1,416 @@
+From f392f36e01ec1ffd8c0b8de99608c909beca9e3b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 10:32:42 +0000
+Subject: [PATCH] fix(mobile): deliver keys held with Ctrl, Alt or Meta as
+ shortcuts
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+On a phone or tablet with a hardware keyboard the modifiers never reached the
+widgets. Android left them unset ("TODO(crawshaw): set Modifiers") and
+typeDownCanvas ignored them except for Tab, so Ctrl+Up arrived as a plain Up
+and Ctrl+C as C: a chat that edits your last message on Up did it on Ctrl+Up
+too.
+
+- Android reads the meta state of each key event (keyModifiers).
+- typeDownCanvas delivers a key held with Control, Alt or Meta as a shortcut,
+  as the desktop driver does: Control (Command on iOS) with Z, Y, V, C, X or A
+  is the standard shortcut, anything else a desktop.CustomShortcut, to the
+  focused Shortcutable or else to the canvas. A key that still produces a
+  character with Alt alone is typed: AltGr, which Android reports as Alt,
+  writes "@" or "€" on many European layouts.
+- Android no longer also hands those keys to the hidden EditText behind the
+  soft keyboard, which applied Ctrl+V to it and would paste twice.
+
+Tested: TestTypeDownCanvas_ModifiersMakeShortcuts and
+TestTypeDownCanvas_ShortcutWithoutFocusGoesToTheCanvas (red without the
+typeDownCanvas change), TestKeyModifiers and TestKeyIsShortcut.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01K7a9FPvLA4FsHbm41nkUrM
+---
+ internal/driver/mobile/app/android.go         |   4 +-
+ internal/driver/mobile/app/keymodifiers.go    |  66 ++++++++++
+ .../driver/mobile/app/keymodifiers_test.go    |  45 +++++++
+ internal/driver/mobile/driver.go              |   5 +
+ internal/driver/mobile/shortcut.go            |  80 ++++++++++++
+ internal/driver/mobile/shortcut_test.go       | 121 ++++++++++++++++++
+ 6 files changed, 319 insertions(+), 2 deletions(-)
+ create mode 100644 internal/driver/mobile/app/keymodifiers.go
+ create mode 100644 internal/driver/mobile/app/keymodifiers_test.go
+ create mode 100644 internal/driver/mobile/shortcut.go
+ create mode 100644 internal/driver/mobile/shortcut_test.go
+
+diff --git a/internal/driver/mobile/app/android.go b/internal/driver/mobile/app/android.go
+index 87027181f..1845aecbd 100644
+--- a/internal/driver/mobile/app/android.go
++++ b/internal/driver/mobile/app/android.go
+@@ -649,10 +649,10 @@ func processKey(env *C.JNIEnv, e *C.AInputEvent) bool {
+ 		return false
+ 	}
+ 	k.Direction = keyDirection(int32(C.AKeyEvent_getAction(e)))
+-	// TODO(crawshaw): set Modifiers.
++	k.Modifiers = keyModifiers(int32(C.AKeyEvent_getMetaState(e)))
+ 	theApp.events.In() <- k
+ 
+-	return keyEditsText(k)
++	return keyIsShortcut(k) || keyEditsText(k)
+ }
+ 
+ // keyEditsText reports whether Android would also apply this key to the hidden
+diff --git a/internal/driver/mobile/app/keymodifiers.go b/internal/driver/mobile/app/keymodifiers.go
+new file mode 100644
+index 000000000..44633ac9a
+--- /dev/null
++++ b/internal/driver/mobile/app/keymodifiers.go
+@@ -0,0 +1,66 @@
++package app
++
++import (
++	"strconv"
++
++	"fyne.io/fyne/v2/internal/driver/mobile/event/key"
++)
++
++// Android meta state flags (AMETA_* in android/input.h). The *_ON flags are set
++// whenever either the left or the right key is down.
++const (
++	androidMetaShiftOn = 0x01
++	androidMetaAltOn   = 0x02
++	androidMetaCtrlOn  = 0x1000
++	androidMetaMetaOn  = 0x10000
++)
++
++// keyModifiers maps the meta state of an Android key event to key modifiers.
++//
++// They used to be left unset ("TODO(crawshaw): set Modifiers"), so a key pressed
++// with Ctrl, Alt or Meta on a hardware keyboard arrived as the bare key: Ctrl+Up
++// was Up, and Ctrl+C was C.
++func keyModifiers(meta int32) key.Modifiers {
++	var m key.Modifiers
++	if meta&androidMetaShiftOn != 0 {
++		m |= key.ModShift
++	}
++	if meta&androidMetaCtrlOn != 0 {
++		m |= key.ModControl
++	}
++	if meta&androidMetaAltOn != 0 {
++		m |= key.ModAlt
++	}
++	if meta&androidMetaMetaOn != 0 {
++		m |= key.ModMeta
++	}
++	return m
++}
++
++// isModifierKey reports whether the key is a modifier key itself.
++func isModifierKey(c key.Code) bool {
++	switch c {
++	case key.CodeLeftControl, key.CodeRightControl, key.CodeLeftShift, key.CodeRightShift,
++		key.CodeLeftAlt, key.CodeRightAlt, key.CodeLeftGUI, key.CodeRightGUI:
++		return true
++	}
++	return false
++}
++
++// keyIsShortcut reports whether the driver delivers this key as a shortcut rather
++// than typing it: it is held with Control or Meta, or with Alt without producing a
++// character. A character produced with Alt alone is typing - AltGr, which Android
++// reports as Alt, writes "@" or "€" on many European layouts.
++//
++// Android must not also hand such a key to the hidden EditText behind the soft
++// keyboard: it would apply Ctrl+V or Ctrl+A to it, and a paste would arrive twice,
++// once as the shortcut and once through the text watcher.
++func keyIsShortcut(k key.Event) bool {
++	if isModifierKey(k.Code) {
++		return false
++	}
++	if k.Modifiers&(key.ModControl|key.ModMeta) != 0 {
++		return true
++	}
++	return k.Modifiers&key.ModAlt != 0 && !strconv.IsPrint(k.Rune)
++}
+diff --git a/internal/driver/mobile/app/keymodifiers_test.go b/internal/driver/mobile/app/keymodifiers_test.go
+new file mode 100644
+index 000000000..37380ee1b
+--- /dev/null
++++ b/internal/driver/mobile/app/keymodifiers_test.go
+@@ -0,0 +1,45 @@
++package app
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2/internal/driver/mobile/event/key"
++)
++
++func TestKeyModifiers(t *testing.T) {
++	for meta, want := range map[int32]key.Modifiers{
++		0:                     0,
++		0x01 | 0x40:           key.ModShift,   // AMETA_SHIFT_ON | AMETA_SHIFT_LEFT_ON
++		0x1000 | 0x2000:       key.ModControl, // AMETA_CTRL_ON | AMETA_CTRL_LEFT_ON
++		0x02 | 0x20:           key.ModAlt,     // AMETA_ALT_ON | AMETA_ALT_RIGHT_ON (AltGr)
++		0x10000 | 0x20000:     key.ModMeta,    // AMETA_META_ON | AMETA_META_LEFT_ON
++		0x1000 | 0x01:         key.ModControl | key.ModShift,
++		0x100000 | 0x200000:   0, // AMETA_CAPS_LOCK_ON | AMETA_NUM_LOCK_ON are not modifiers
++		0x1000 | 0x02 | 0x200: key.ModControl | key.ModAlt,
++	} {
++		if got := keyModifiers(meta); got != want {
++			t.Errorf("meta %#x gives %v, want %v", meta, got, want)
++		}
++	}
++}
++
++func TestKeyIsShortcut(t *testing.T) {
++	for _, c := range []struct {
++		name string
++		ev   key.Event
++		want bool
++	}{
++		{"up", key.Event{Rune: -1, Code: key.CodeUpArrow}, false},
++		{"ctrl+up", key.Event{Rune: -1, Code: key.CodeUpArrow, Modifiers: key.ModControl}, true},
++		{"ctrl+v", key.Event{Rune: -1, Code: key.CodeV, Modifiers: key.ModControl}, true},
++		{"meta+c", key.Event{Rune: -1, Code: key.CodeC, Modifiers: key.ModMeta}, true},
++		{"alt+up", key.Event{Rune: -1, Code: key.CodeUpArrow, Modifiers: key.ModAlt}, true},
++		{"altgr+2 types @", key.Event{Rune: '@', Code: key.Code2, Modifiers: key.ModAlt}, false},
++		{"shift+a types A", key.Event{Rune: 'A', Code: key.CodeA, Modifiers: key.ModShift}, false},
++		{"ctrl alone", key.Event{Rune: -1, Code: key.CodeLeftControl, Modifiers: key.ModControl}, false},
++	} {
++		if got := keyIsShortcut(c.ev); got != c.want {
++			t.Errorf("%s: keyIsShortcut = %v, want %v", c.name, got, c.want)
++		}
++	}
++}
+diff --git a/internal/driver/mobile/driver.go b/internal/driver/mobile/driver.go
+index fd11f362d..a36499488 100644
+--- a/internal/driver/mobile/driver.go
++++ b/internal/driver/mobile/driver.go
+@@ -684,6 +684,11 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
+ 		}
+ 	}
+ 
++	if s := keyShortcut(keyName, r, mod); s != nil {
++		d.typeShortcut(canvas, s)
++		return
++	}
++
+ 	r = runeToPrintable(r)
+ 	keyEvent := &fyne.KeyEvent{Name: keyName}
+ 
+diff --git a/internal/driver/mobile/shortcut.go b/internal/driver/mobile/shortcut.go
+new file mode 100644
+index 000000000..91710e847
+--- /dev/null
++++ b/internal/driver/mobile/shortcut.go
+@@ -0,0 +1,80 @@
++package mobile
++
++import (
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/driver/desktop"
++	"fyne.io/fyne/v2/internal/driver/mobile/event/key"
++)
++
++// keyModifier maps the modifiers of a mobile key event to Fyne's.
++func keyModifier(mod key.Modifiers) fyne.KeyModifier {
++	var m fyne.KeyModifier
++	if mod&key.ModShift != 0 {
++		m |= fyne.KeyModifierShift
++	}
++	if mod&key.ModControl != 0 {
++		m |= fyne.KeyModifierControl
++	}
++	if mod&key.ModAlt != 0 {
++		m |= fyne.KeyModifierAlt
++	}
++	if mod&key.ModMeta != 0 {
++		m |= fyne.KeyModifierSuper
++	}
++	return m
++}
++
++// keyShortcut is the shortcut that a key pressed on a hardware keyboard stands for,
++// or nil if it is typed as usual. It follows the desktop driver: Control (Command on
++// iOS) with Z, Y, V, C, X or A is the standard shortcut, and any other key held with
++// Control, Alt or Meta is a desktop.CustomShortcut.
++//
++// The modifiers used to be ignored here, so Ctrl+Up reached the focused widget as a
++// plain Up: a chat that edits your last message on Up did it on Ctrl+Up too. A key
++// that still produces a character with Alt alone is typing, not a shortcut: AltGr,
++// which Android reports as Alt, writes "@" or "€" on many European layouts.
++func keyShortcut(keyName fyne.KeyName, r rune, mod key.Modifiers) fyne.Shortcut {
++	if keyName == "" || mod&(key.ModControl|key.ModAlt|key.ModMeta) == 0 {
++		return nil
++	}
++	if mod&(key.ModControl|key.ModMeta) == 0 && runeToPrintable(r) != 0 {
++		return nil
++	}
++	modifier := keyModifier(mod)
++	if modifier == fyne.KeyModifierShortcutDefault {
++		switch keyName {
++		case fyne.KeyZ:
++			return &fyne.ShortcutUndo{}
++		case fyne.KeyY:
++			return &fyne.ShortcutRedo{}
++		case fyne.KeyV:
++			return &fyne.ShortcutPaste{Clipboard: NewClipboard()}
++		case fyne.KeyC:
++			return &fyne.ShortcutCopy{Clipboard: NewClipboard()}
++		case fyne.KeyX:
++			return &fyne.ShortcutCut{Clipboard: NewClipboard()}
++		case fyne.KeyA:
++			return &fyne.ShortcutSelectAll{}
++		}
++	}
++	return &desktop.CustomShortcut{KeyName: keyName, Modifier: modifier}
++}
++
++// typeShortcut delivers a shortcut as the desktop driver does: to the focused
++// object if it handles shortcuts - a disabled one only gets Copy - and to the canvas
++// otherwise.
++func (d *driver) typeShortcut(c *canvas, s fyne.Shortcut) {
++	focused, ok := c.Focused().(fyne.Shortcutable)
++	if !ok {
++		c.TypedShortcut(s)
++		return
++	}
++	type selectableText interface {
++		fyne.Disableable
++		SelectedText() string
++	}
++	if w, ok := focused.(selectableText); ok && w.Disabled() && s.ShortcutName() != "Copy" {
++		return
++	}
++	focused.TypedShortcut(s)
++}
+diff --git a/internal/driver/mobile/shortcut_test.go b/internal/driver/mobile/shortcut_test.go
+new file mode 100644
+index 000000000..8a32ffbb0
+--- /dev/null
++++ b/internal/driver/mobile/shortcut_test.go
+@@ -0,0 +1,121 @@
++//go:build !windows || !ci
++
++package mobile
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/driver/desktop"
++	"fyne.io/fyne/v2/internal/driver/mobile/event/key"
++	"fyne.io/fyne/v2/widget"
++
++	"github.com/stretchr/testify/assert"
++)
++
++// keyRecorder is a focusable widget that records what the driver types into it.
++type keyRecorder struct {
++	widget.BaseWidget
++
++	keys      []fyne.KeyName
++	runes     []rune
++	shortcuts []fyne.Shortcut
++}
++
++var (
++	_ fyne.Focusable    = (*keyRecorder)(nil)
++	_ fyne.Shortcutable = (*keyRecorder)(nil)
++)
++
++func newKeyRecorder() *keyRecorder {
++	r := &keyRecorder{}
++	r.ExtendBaseWidget(r)
++	return r
++}
++
++func (r *keyRecorder) CreateRenderer() fyne.WidgetRenderer {
++	return widget.NewSimpleRenderer(widget.NewLabel(""))
++}
++func (r *keyRecorder) FocusGained()                  {}
++func (r *keyRecorder) FocusLost()                    {}
++func (r *keyRecorder) TypedKey(e *fyne.KeyEvent)     { r.keys = append(r.keys, e.Name) }
++func (r *keyRecorder) TypedRune(c rune)              { r.runes = append(r.runes, c) }
++func (r *keyRecorder) TypedShortcut(s fyne.Shortcut) { r.shortcuts = append(r.shortcuts, s) }
++func (r *keyRecorder) reset()                        { r.keys, r.runes, r.shortcuts = nil, nil, nil }
++
++// A hardware keyboard on a phone or tablet: a key held with Control, Alt or Meta is a
++// shortcut, as on the desktop, and never the bare key. Ctrl+Up used to reach the
++// focused widget as a plain Up.
++func TestTypeDownCanvas_ModifiersMakeShortcuts(t *testing.T) {
++	c := newCanvas(fyne.CurrentDevice()).(*canvas)
++	rec := newKeyRecorder()
++	c.SetContent(rec)
++
++	d.DoFromGoroutine(func() {
++		c.Focus(rec)
++
++		// A plain Up is a key, as before.
++		d.typeDownCanvas(c, -1, key.CodeUpArrow, 0)
++		assert.Equal(t, []fyne.KeyName{fyne.KeyUp}, rec.keys)
++		assert.Empty(t, rec.shortcuts)
++		rec.reset()
++
++		// Ctrl+Up is a shortcut, never a plain Up.
++		d.typeDownCanvas(c, -1, key.CodeUpArrow, key.ModControl)
++		assert.Empty(t, rec.keys, "Ctrl+Up must not arrive as Up")
++		if assert.Len(t, rec.shortcuts, 1) {
++			assert.Equal(t, &desktop.CustomShortcut{KeyName: fyne.KeyUp, Modifier: fyne.KeyModifierControl}, rec.shortcuts[0])
++		}
++		rec.reset()
++
++		// Alt+Up and Ctrl+Shift+Up too, with all their modifiers.
++		d.typeDownCanvas(c, -1, key.CodeUpArrow, key.ModAlt)
++		d.typeDownCanvas(c, -1, key.CodeUpArrow, key.ModControl|key.ModShift)
++		assert.Empty(t, rec.keys)
++		if assert.Len(t, rec.shortcuts, 2) {
++			assert.Equal(t, &desktop.CustomShortcut{KeyName: fyne.KeyUp, Modifier: fyne.KeyModifierAlt}, rec.shortcuts[0])
++			assert.Equal(t, &desktop.CustomShortcut{KeyName: fyne.KeyUp, Modifier: fyne.KeyModifierControl | fyne.KeyModifierShift}, rec.shortcuts[1])
++		}
++		rec.reset()
++
++		// The standard shortcuts, with the default modifier of the platform.
++		def := key.ModControl
++		if fyne.KeyModifierShortcutDefault == fyne.KeyModifierSuper {
++			def = key.ModMeta
++		}
++		d.typeDownCanvas(c, -1, key.CodeC, def)
++		d.typeDownCanvas(c, -1, key.CodeV, def)
++		d.typeDownCanvas(c, -1, key.CodeA, def)
++		if assert.Len(t, rec.shortcuts, 3) {
++			assert.IsType(t, &fyne.ShortcutCopy{}, rec.shortcuts[0])
++			assert.IsType(t, &fyne.ShortcutPaste{}, rec.shortcuts[1])
++			assert.IsType(t, &fyne.ShortcutSelectAll{}, rec.shortcuts[2])
++		}
++		assert.Empty(t, rec.keys)
++		assert.Empty(t, rec.runes)
++		rec.reset()
++
++		// Shift alone types, and AltGr (Alt with a character) types its character.
++		d.typeDownCanvas(c, 'A', key.CodeA, key.ModShift)
++		d.typeDownCanvas(c, '@', key.Code2, key.ModAlt)
++		assert.Equal(t, []rune{'A', '@'}, rec.runes)
++		assert.Empty(t, rec.shortcuts)
++	}, true)
++}
++
++// With nothing focused the shortcut goes to the canvas, and the bare key does not.
++func TestTypeDownCanvas_ShortcutWithoutFocusGoesToTheCanvas(t *testing.T) {
++	c := newCanvas(fyne.CurrentDevice()).(*canvas)
++	c.SetContent(widget.NewLabel("nothing focused"))
++	var got fyne.Shortcut
++	want := &desktop.CustomShortcut{KeyName: fyne.KeyUp, Modifier: fyne.KeyModifierControl}
++	c.AddShortcut(want, func(s fyne.Shortcut) { got = s })
++	typed := false
++	c.SetOnTypedKey(func(*fyne.KeyEvent) { typed = true })
++
++	d.DoFromGoroutine(func() {
++		d.typeDownCanvas(c, -1, key.CodeUpArrow, key.ModControl)
++	}, true)
++	assert.Equal(t, want, got)
++	assert.False(t, typed, "Ctrl+Up must not arrive as Up")
++}
+-- 
+2.43.0
+

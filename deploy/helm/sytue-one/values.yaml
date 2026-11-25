@@ -18,6 +18,15 @@
 # propaga automaticamente a las dependencias).
 # -----------------------------------------------------------------------------
 global:
+  # TLS de los servicios a PgBouncer (charts/pgbouncer/templates/certificate.yaml).
+  # Un solo interruptor para las dos mitades: PgBouncer exige TLS y cada servicio
+  # monta la raiz con la que su DSN lo verifica (`sslmode=verify-full&sslrootcert=`
+  # + mountPath + `/ca.crt`, deploy/production/02b-secretos.sh). Apagado aqui
+  # porque PgBouncer tambien lo esta; lo encienden los perfiles que lo despliegan.
+  pgbouncerTls:
+    enabled: false
+    secretName: sytue-pgbouncer-tls
+    mountPath: /etc/sytue/pgbouncer-ca
   # Enabled only after both Docs and Rooms have the synchronous access guard.
   documentCalls:
     enabled: false

@@ -438,18 +438,28 @@ func signupListoPage(w http.ResponseWriter, loc string, u domain.User, returnTo,
 	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "signup.done_title"), body)))
 }
 
-// smsPermitido gasta un SMS del cupo de ese número y del de la IP. Si el
-// limitador falla se deja pasar: el captcha y el limitador del formulario
-// siguen delante, y un Postgres con hipo no debe cerrar el alta.
+// smsPermitido gasta un SMS del cupo de ese número, del de la IP y del de todo
+// Sytue ID en una hora (ADR 0041). Lo usan el alta y el cambio de móvil de Mi
+// cuenta, que cuestan lo mismo. Si un limitador falla se deja pasar: el captcha y el
+// limitador del formulario siguen delante, y un Postgres con hipo no debe cerrar el
+// alta. El global va el último, para que un número o una IP ya frenados no gasten
+// cupo de todos.
 func (s *Server) smsPermitido(r *http.Request, phone string) bool {
 	for _, l := range []struct {
 		lim httpx.RateLimiter
 		key string
-	}{{s.smsPhoneLimiter, "sms-alta:tel:" + phone}, {s.smsIPLimiter, "sms-alta:ip:" + clientIP(r)}} {
+	}{
+		{s.smsPhoneLimiter, "sms-alta:tel:" + phone},
+		{s.smsIPLimiter, "sms-alta:ip:" + clientIP(r)},
+		{s.smsGlobalLimiter, "sms:global"},
+	} {
 		if l.lim == nil {
 			continue
 		}
 		if res, err := l.lim.Allow(r.Context(), l.key); err == nil && !res.Allowed {
+			if l.lim == s.smsGlobalLimiter {
+				s.log.WarnContext(r.Context(), "tope global de SMS por hora alcanzado (SYTUE_ID_SMS_MAX_PER_HOUR)")
+			}
 			return false
 		}
 	}

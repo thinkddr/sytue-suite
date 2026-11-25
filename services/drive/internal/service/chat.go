@@ -5,7 +5,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -52,14 +54,17 @@ func NewChatClient(baseURL, secret string) *ChatClient {
 	}
 }
 
-// CanAccessChannel devuelve nil si el sujeto puede LEER el canal; domain.ErrNotFound
-// si no puede (o el canal no existe: no se distingue, para no filtrar existencia).
-// Cualquier otro fallo (red, 5xx, secreto inválido) es un error: el llamador NO
-// sirve el adjunto.
-func (c *ChatClient) CanAccessChannel(ctx context.Context, channelID uuid.UUID, subject string) error {
+// ChannelTenant devuelve la organización donde vive el canal si el sujeto puede
+// LEERLO: la del contexto, o la ANFITRIONA cuando está en él como persona de otra
+// organización (ADR 0040), que es donde viven sus mensajes y, por tanto, sus
+// adjuntos. Rooms contesta 204 en el primer caso y 200 con {"tenant": …} en el
+// segundo. domain.ErrNotFound si no puede (o el canal no existe: no se distingue,
+// para no filtrar existencia). Cualquier otro fallo (red, 5xx, secreto inválido,
+// una respuesta que no se entiende) es un error: el llamador NO sirve el adjunto.
+func (c *ChatClient) ChannelTenant(ctx context.Context, channelID uuid.UUID, subject string) (tenancy.Tenant, error) {
 	t, err := tenancy.From(ctx)
 	if err != nil {
-		return err
+		return tenancy.Tenant{}, err
 	}
 	q := url.Values{
 		"tenant":  {t.Slug},
@@ -69,22 +74,34 @@ func (c *ChatClient) CanAccessChannel(ctx context.Context, channelID uuid.UUID, 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		c.baseURL+"/internal/channel-access?"+q.Encode(), http.NoBody)
 	if err != nil {
-		return err
+		return tenancy.Tenant{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.secret)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("chat: verja de canal: %w", err)
+		return tenancy.Tenant{}, fmt.Errorf("chat: verja de canal: %w", err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusNoContent:
-		return nil
+		return t, nil
+	case http.StatusOK:
+		var cuerpo struct {
+			Tenant string `json:"tenant"`
+		}
+		if err := json.NewDecoder(io.LimitReader(resp.Body, 1024)).Decode(&cuerpo); err != nil {
+			return tenancy.Tenant{}, fmt.Errorf("chat: verja de canal: respuesta ilegible: %w", err)
+		}
+		anfitriona, err := tenancy.New(cuerpo.Tenant)
+		if err != nil {
+			return tenancy.Tenant{}, fmt.Errorf("chat: verja de canal: %w", err)
+		}
+		return anfitriona, nil
 	case http.StatusNotFound, http.StatusForbidden:
-		return domain.ErrNotFound
+		return tenancy.Tenant{}, domain.ErrNotFound
 	default:
-		return fmt.Errorf("chat: verja de canal: respuesta %d", resp.StatusCode)
+		return tenancy.Tenant{}, fmt.Errorf("chat: verja de canal: respuesta %d", resp.StatusCode)
 	}
 }
 

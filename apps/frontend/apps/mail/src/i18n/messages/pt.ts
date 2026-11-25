@@ -970,7 +970,7 @@ export const pt: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Passe o seu correio para o novo cofre para continuar a recebê-lo',
   'privateMail.vaultMoveRetiredBody':
-    'O sistema de correio anterior já não está disponível. Até passar o seu correio para o cofre, não receberá correio novo: o que chegar entretanto fica guardado cifrado com o sistema anterior, tal como o correio que já tinha, e não poderá ser lido. Não é apagado, mas ninguém o poderá abrir. Depois de passar, o correio volta a chegar-lhe e abre com o seu início de sessão do Sytue ID, como as restantes aplicações.',
+    'O sistema de correio anterior já não está disponível. Até passar o seu correio para o cofre, não receberá correio novo: o que lhe enviarem entretanto fica à espera no servidor de quem o envia, que volta a tentar durante alguns dias. Se passar a tempo, chega-lhe depois; caso contrário, quem o enviou será avisado de que não foi possível entregá-lo. O que já está cifrado com o sistema anterior, como o correio que já tinha, não poderá ser lido: não é apagado, mas ninguém o poderá abrir. Depois de passar, o correio volta a chegar-lhe e abre com o seu início de sessão do Sytue ID, como as restantes aplicações.',
   'privateMail.vaultMoveCheckFailed':
     'Não foi possível verificar o estado do seu correio. Tente de novo dentro de momentos.',
 };

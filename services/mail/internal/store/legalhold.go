@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
 )
 
@@ -339,6 +340,14 @@ func (s *Store) ListAudit(ctx context.Context, limit int) ([]domain.AuditEntry, 
 		return rows.Err()
 	})
 	return out, err
+}
+
+// ListarTraza devuelve una página de la traza de la organización del contexto
+// (cumplimiento y acceso) con los filtros EN LA CONSULTA (auditlog.Listar): con
+// la traza de acceso en la misma tabla, filtrar en memoria las últimas filas
+// dejaría la de cumplimiento enterrada.
+func (s *Store) ListarTraza(ctx context.Context, q auditlog.Consulta) ([]domain.AuditEntry, string, error) {
+	return auditlog.Listar(ctx, s.pool, tenantOf(ctx), q)
 }
 
 func writeAuditTx(ctx context.Context, tx pgx.Tx, tenant, actor, action, target string, detail any) error {

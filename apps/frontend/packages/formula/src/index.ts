@@ -8,6 +8,9 @@
  * API pública: el motor `Engine`, `parseFormula` (+ tipos del AST), los valores
  * y errores canónicos, y el contrato de función (Registry/FnCtx/Arg/…).
  */
+import { buildRegistry } from './functions/index.js';
+import { instalarFunciones } from './perezosas.js';
+
 export { Engine, numToCol, VOLATILES, isValidName as isValidDefinedName } from './engine.js';
 export type { EngineOptions } from './engine.js';
 
@@ -46,6 +49,12 @@ export type {
 } from './registry.js';
 
 export { buildRegistry } from './functions/index.js';
+
+// El índice trae las funciones e INSTALA su registro al cargarse: un `new Engine()` las
+// tiene todas, como siempre. El editor de hojas importa `./motor`, que no las trae, y las
+// pide aparte (perezosas.ts).
+instalarFunciones(buildRegistry);
+export { cargarFunciones, funcionesCargadas } from './perezosas.js';
 
 export { CATALOGO_VERSION, FUNCIONES_DEL_MOTOR, catalogo, nombresDeFunciones } from './catalogo.js';
 export type { Compatibilidad, Ejemplo, FuncionCatalogo } from './catalogo.js';

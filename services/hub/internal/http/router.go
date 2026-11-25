@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/personas"
@@ -55,7 +56,10 @@ type Deps struct {
 	// PrivateIngress es la cola de entrada privada de avisos (ADR 0086). Nil = sin
 	// montar (pruebas).
 	PrivateIngress httpx.PrivateIngressPort
-	ReadyCheckers  []httpx.Checker
+	// Traza escribe la traza de acceso (ReglasDeTraza) y sirve su lectura admin.
+	// Nil = sin traza.
+	Traza         *auditlog.Registro
+	ReadyCheckers []httpx.Checker
 }
 
 // NewRouter construye el router completo de Sytue Hub.
@@ -63,11 +67,16 @@ func NewRouter(d Deps) http.Handler {
 	// CORS: la Sytue Shell (islas Preact) llama al Hub desde CADA subdominio de la
 	// suite. Allowlist por comodín de subdominio; credenciales para el SSE (EventSource
 	// withCredentials). Los headers/métodos por defecto de httpx cubren Authorization.
+	var traza func(http.Handler) http.Handler
+	if d.Traza != nil {
+		traza = d.Traza.Middleware(ReglasDeTraza...)
+	}
 	r := httpx.NewRouter(httpx.RouterOptions{
 		CORS: &httpx.CORSConfig{
 			AllowedOrigins:   d.Cfg.CORSAllowedOrigins,
 			AllowCredentials: true,
 		},
+		Traza: traza,
 	})
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
@@ -115,6 +124,12 @@ func NewRouter(d Deps) http.Handler {
 		// Qué productos levanta esta instalación, para que el conmutador de
 		// aplicaciones no ofrezca lo que no está desplegado.
 		api.Get("/apps", h.Apps)
+
+		// La traza de acceso de la organización (docs/security.md §1.7), para la
+		// auditoría unificada de Sytue Admin: listado keyset y CSV.
+		if d.Traza != nil {
+			api.With(d.Verifier.RequireRole("owner", "admin")).Get("/admin/audit-log", d.Traza.Lectura("hub"))
+		}
 
 		// Búsqueda federada (consulta drive/mail/calendar/contacts/chat).
 		// Timeout de petición acotado: la federación ya impone su propio plazo.

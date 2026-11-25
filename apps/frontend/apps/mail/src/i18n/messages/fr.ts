@@ -1044,7 +1044,7 @@ export const fr: AppCatalog<typeof en> = {
   'privateMail.vaultMoveRetiredTitle':
     'Passez votre messagerie au nouveau coffre pour continuer à recevoir vos messages',
   'privateMail.vaultMoveRetiredBody':
-    "L'ancien système de messagerie n'est plus disponible. Tant que vous n'aurez pas passé votre messagerie au coffre, vous ne recevrez pas de nouveaux messages : ceux qui arrivent entre-temps sont conservés chiffrés avec l'ancien système, comme les messages que vous aviez déjà, et ne pourront pas être lus. Ils ne sont pas supprimés, mais personne ne pourra les ouvrir. Une fois le passage fait, vos messages vous parviennent de nouveau et s'ouvrent avec votre connexion Sytue ID, comme les autres applications.",
+    "L'ancien système de messagerie n'est plus disponible. Tant que vous n'aurez pas passé votre messagerie au coffre, vous ne recevrez pas de nouveaux messages : ceux qu'on vous envoie entre-temps attendent sur le serveur de l'expéditeur, qui réessaie pendant quelques jours. Si vous faites le passage à temps, ils vous parviendront ensuite ; sinon, l'expéditeur sera averti qu'ils n'ont pas pu être remis. Ce qui est déjà chiffré avec l'ancien système, comme les messages que vous aviez déjà, ne pourra pas être lu : rien n'est supprimé, mais personne ne pourra l'ouvrir. Une fois le passage fait, vos messages vous parviennent de nouveau et s'ouvrent avec votre connexion Sytue ID, comme les autres applications.",
   'privateMail.vaultMoveCheckFailed':
     "Impossible de vérifier l'état de votre messagerie. Réessayez dans un instant.",
 };

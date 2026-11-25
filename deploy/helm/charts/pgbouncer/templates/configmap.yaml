@@ -46,9 +46,23 @@ data:
     ;; Asi NO hace falta pgx en QueryExecModeSimple ni cache off.
     max_prepared_statements = {{ .Values.settings.maxPreparedStatements }}
 
-    ;; TLS hacia la RDB (Scaleway exige TLS); los clientes llegan en claro
-    ;; DENTRO del cluster (NetworkPolicy) => sslmode=disable en los DSN.
+    ;; TLS hacia la RDB (Scaleway exige TLS).
     server_tls_sslmode = {{ .Values.settings.serverTlsSslmode }}
+    {{- if ((.Values.global).pgbouncerTls).enabled }}
+
+    ;; TLS de los servicios a PgBouncer (templates/certificate.yaml): los DSN
+    ;; verifican el certificado (verify-full) y aqui se rechaza lo que llegue en
+    ;; claro. Sin esto, el primer salto iba sin cifrar dentro del cluster.
+    client_tls_sslmode = {{ .Values.settings.clientTlsSslmode }}
+    client_tls_protocols = {{ .Values.settings.clientTlsProtocols }}
+    client_tls_cert_file = /etc/pgbouncer/tls/tls.crt
+    client_tls_key_file = /etc/pgbouncer/tls/tls.key
+    {{- else }}
+
+    ;; Sin global.pgbouncerTls.enabled los clientes llegan en claro (perfiles sin
+    ;; cert-manager); prod y staging lo encienden.
+    client_tls_sslmode = disable
+    {{- end }}
 
     ;; Reciclaje de conexiones de servidor (alineado con platform/pkg/pg).
     server_lifetime = {{ .Values.settings.serverLifetime }}

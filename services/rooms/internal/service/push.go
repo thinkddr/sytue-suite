@@ -281,7 +281,7 @@ func (s *Service) entregarWebPush(ctx context.Context, msg pushPayload) {
 	for _, t := range targets {
 		if err := s.sendOnePush(ctx, t, payload); err != nil {
 			if errors.Is(err, errPushGone) {
-				if derr := ps.DeletePushSubscription(ctx, t.Subject, t.Endpoint); derr != nil {
+				if derr := ps.DeletePushSubscription(contextoDeSuscripcion(ctx, t), t.Subject, t.Endpoint); derr != nil {
 					log.From(ctx).Warn("push: no se pudo limpiar suscripción caduca", "error", derr)
 				}
 				continue
@@ -289,6 +289,16 @@ func (s *Service) entregarWebPush(ctx context.Context, msg pushPayload) {
 			log.From(ctx).Warn("push: entrega fallida", "error", err)
 		}
 	}
+}
+
+// contextoDeSuscripcion es el contexto con la organización donde vive la suscripción:
+// la del canal, o la suya si es de una persona de fuera (ADR 0040), que se suscribió
+// desde ella. Es donde hay que borrarla cuando caduca.
+func contextoDeSuscripcion(ctx context.Context, t domain.PushTarget) context.Context {
+	if t.Tenant == "" {
+		return ctx
+	}
+	return tenancy.Into(ctx, tenancy.Tenant{Slug: t.Tenant})
 }
 
 // despertarIOS despierta la app de Rooms de quien ve moverse su contador de pendientes

@@ -12,3 +12,6 @@ const BytesDeCabecera = shared.BytesDeCabecera
 var ErrSinExif = shared.ErrSinExif
 
 func Leer(datos []byte) (Metadatos, error) { return shared.Leer(datos) }
+
+// LeerTIFF es el lector compartido sobre un bloque TIFF ya extraído (el EXIF de un HEIC).
+func LeerTIFF(tiff []byte) (Metadatos, error) { return shared.LeerTIFF(tiff) }

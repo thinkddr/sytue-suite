@@ -35,7 +35,7 @@ func inputEvent(in api.EventInput, uid string) (event.Event, error) {
 	if in.Transparency == "" {
 		in.Transparency = string(event.TranspOpaque)
 	}
-	ev := event.Event{UID: uid, Summary: in.Summary, Description: in.Description, Location: in.Location, Organizer: in.Organizer, DTStart: in.Start.UTC(), DTEnd: in.End.UTC(), TZID: in.TZID, AllDay: in.AllDay, Status: event.Status(in.Status), Classification: event.Classification(in.Classification), Transparency: event.Transparency(in.Transparency), Color: event.SanitizeColor(in.Color), ConferenceURL: event.SanitizeConferenceURL(in.ConferenceURL), RRule: in.RRule, RDate: in.RDate, ExDate: in.ExDate}
+	ev := event.Event{UID: uid, Summary: in.Summary, Description: in.Description, Location: in.Location, Organizer: in.Organizer, OrganizerName: event.SanitizeCommonName(in.OrganizerName), DTStart: in.Start.UTC(), DTEnd: in.End.UTC(), TZID: in.TZID, AllDay: in.AllDay, Status: event.Status(in.Status), Classification: event.Classification(in.Classification), Transparency: event.Transparency(in.Transparency), Color: event.SanitizeColor(in.Color), ConferenceURL: event.SanitizeConferenceURL(in.ConferenceURL), RRule: in.RRule, RDate: in.RDate, ExDate: in.ExDate}
 	if !event.ValidStatus(ev.Status) || !event.ValidClassification(ev.Classification) || !event.ValidTransparency(ev.Transparency) || ev.Color != in.Color || ev.ConferenceURL != in.ConferenceURL {
 		return event.Event{}, event.ErrInvalidEvent
 	}
@@ -216,7 +216,7 @@ func recurrenceKey(id *time.Time) string {
 }
 
 func eventFields(in event.Input, object string, now time.Time) map[string]any {
-	return map[string]any{"object_id": object, "calendar_id": in.CalendarID.String(), "uid": in.UID, "summary": in.Summary, "description": in.Description, "location": in.Location, "organizer": in.Organizer, "dtstart": in.DTStart, "dtend": in.DTEnd, "tzid": in.TZID, "all_day": in.AllDay, "status": in.Status, "classification": in.Classification, "transp": in.Transparency, "color": in.Color, "conference_url": in.ConferenceURL, "rrule": in.RRule, "rdate": in.RDate, "exdate": in.ExDate, "recurrence_end": in.RecurrenceEnd, "recurrence_id": in.RecurrenceID, "sequence_no": in.SequenceNo, "updated_at": now, "deleted_at": nil}
+	return map[string]any{"object_id": object, "calendar_id": in.CalendarID.String(), "uid": in.UID, "summary": in.Summary, "description": in.Description, "location": in.Location, "organizer": in.Organizer, "organizer_name": in.OrganizerName, "dtstart": in.DTStart, "dtend": in.DTEnd, "tzid": in.TZID, "all_day": in.AllDay, "status": in.Status, "classification": in.Classification, "transp": in.Transparency, "color": in.Color, "conference_url": in.ConferenceURL, "rrule": in.RRule, "rdate": in.RDate, "exdate": in.ExDate, "recurrence_end": in.RecurrenceEnd, "recurrence_id": in.RecurrenceID, "sequence_no": in.SequenceNo, "updated_at": now, "deleted_at": nil}
 }
 
 // reproject keeps historical rows, IDs and unknown columns. Removed overrides,

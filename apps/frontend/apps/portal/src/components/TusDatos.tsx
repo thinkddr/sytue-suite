@@ -17,7 +17,14 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { Locale } from '@sytue/i18n';
 import { adminUrl } from '@sytue/config';
-import { Button, ChoiceCard, InlineHelp, SettingsSection, SettingsShell } from '@sytue/ui';
+import {
+  Button,
+  ChoiceCard,
+  InlineHelp,
+  marcarAppLista,
+  SettingsSection,
+  SettingsShell,
+} from '@sytue/ui';
 import { useT } from '../i18n/index.js';
 import { r } from '../lib/rutas.js';
 
@@ -68,7 +75,10 @@ export function TusDatos({ locale }: { locale: Locale }): JSX.Element {
         setOrgs(lista);
         setOrg(lista.find((o) => o.active)?.id ?? '');
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      // `sytue:app-ready`: con las organizaciones (o sin ellas) la página ya no cambia
+      // de forma. Sin la marca, la bóveda esperaba 5 s para empezar a abrirse.
+      .finally(() => marcarAppLista());
   }, []);
 
   const otra = orgs.find((o) => o.id === org && !o.active);

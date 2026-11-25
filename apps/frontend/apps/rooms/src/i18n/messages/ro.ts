@@ -274,6 +274,7 @@ export const ro: AppCatalog<typeof en> = {
     other: 'Puteți adăuga cel mult {count} de persoane.',
   },
   'dm.openFailed': 'Conversația nu a putut fi deschisă.',
+  'dm.externalClosed': 'Organizația ta nu permite conversații cu această persoană.',
   'people.search': 'Caută „{query}” în Sytue One',
   'people.searching': 'Se caută în Sytue One…',
   'people.notFound': 'Nimeni din Sytue One nu folosește acest e-mail sau @utilizator.',

@@ -91,7 +91,7 @@ const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BA
          se sirve bajo su prefijo y la raíz del host es un 404. -->
     <!-- El prefijo de /api y /auth, y el tema: un fichero de este origen y no dos
          scripts en línea, porque la CSP de esta app no deja correr nada en línea
-         que Astro no haya firmado (ver src/pages/arranque.js.ts). Síncrono a
+         que Astro no haya firmado (`/arranque.js`, sytueArranque). Síncrono a
          propósito: tiene que ir antes que las islas. -->
     <script is:inline src={withBase(prefijo, '/arranque.js')}></script>
   </head>

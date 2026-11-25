@@ -27,6 +27,7 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/emersion/go-vcard v0.1.0
+	github.com/gen2brain/h265 v0.2.7
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.20.3

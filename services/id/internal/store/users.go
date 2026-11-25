@@ -16,8 +16,8 @@ import (
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
-// El @usuario sale vacío mientras esté por asignar: quien entró por un binario
-// anterior a la mig 0065 hasta que AsignarUsernamesPendientes pase por él.
+// El @usuario solo sale vacío en una cuenta purgada por «Borrar mi cuenta», que lo
+// pierde a propósito (mig 0125: obligatorio en cualquier otra).
 const userCols = `id, email, coalesce(username, ''), email_verified, name, given_name, family_name,
 	locale, coalesce(password_hash, ''), mfa_enabled, status,
 	coalesce(external_id, ''), coalesce(department, ''), coalesce(title, ''),
@@ -110,7 +110,10 @@ func (s *Store) usernameLibre(ctx context.Context, q pg.Querier, userID, base st
 			UNION
 			SELECT lower(split_part(address, '@', 1)) FROM org_mailboxes
 			 WHERE lower(address) LIKE $1 || '%@' || $2 AND removed_at IS NULL
-			   AND user_id::text <> $3`,
+			   AND user_id::text <> $3
+			UNION
+			SELECT username FROM usernames_retirados
+			 WHERE username LIKE $1 || '%' AND hasta > now() AND user_id::text <> $3`,
 			base, strings.ToLower(s.suiteDomain), userID)
 		if err != nil {
 			return "", nil, errf("usernameLibre", err)
@@ -154,14 +157,16 @@ func (s *Store) GetUserByAddress(ctx context.Context, address string) (domain.Us
 
 // UsernameLibre dice si un @usuario elegido (ya normalizado) está libre: no es el
 // de otra persona ni la parte local de una dirección del dominio raíz, ya sea de
-// un buzón o un correo de acceso. Es la pregunta de antes de mandar el SMS del
+// un buzón o un correo de acceso, ni lo dejó alguien hace menos de 30 días
+// (usernames_retirados, mig 0126). Es la pregunta de antes de mandar el SMS del
 // alta; la respuesta definitiva la da el índice único al crear la cuenta.
 func (s *Store) UsernameLibre(ctx context.Context, username string) (bool, error) {
 	var libre bool
 	dir := strings.ToLower(username) + "@" + strings.ToLower(s.suiteDomain)
 	err := s.DB().QueryRow(ctx, `SELECT
 		NOT EXISTS (SELECT 1 FROM users WHERE lower(username) = lower($1) OR lower(email) = $2)
-		AND NOT EXISTS (SELECT 1 FROM org_mailboxes WHERE lower(address) = $2 AND removed_at IS NULL)`,
+		AND NOT EXISTS (SELECT 1 FROM org_mailboxes WHERE lower(address) = $2 AND removed_at IS NULL)
+		AND NOT EXISTS (SELECT 1 FROM usernames_retirados WHERE username = lower($1) AND hasta > now())`,
 		username, dir).Scan(&libre)
 	return libre, errf("UsernameLibre", err)
 }
@@ -196,75 +201,6 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (domain.
 	const sql = `SELECT ` + userCols + ` FROM users WHERE lower(username) = lower($1)`
 	u, err := scanUser(s.DB().QueryRow(ctx, sql, domain.NormalizeUsername(username)))
 	return u, errf("GetUserByUsername", err)
-}
-
-// AsignarUsernamesPendientes da @usuario a quien todavía no lo tiene: todas las
-// cuentas anteriores a la mig 0065 y las que cree un binario anterior durante el
-// despliegue. Devuelve cuántas asignó en este lote.
-//
-// Van PRIMERO quienes tienen buzón en el dominio raíz, con su parte local tal
-// cual: esa dirección ya es suya y no puede acabar siendo el @usuario de otra
-// persona que pasara antes por el barrido.
-func (s *Store) AsignarUsernamesPendientes(ctx context.Context, lote int) (int, error) {
-	rows, err := s.DB().Query(ctx, `
-		SELECT u.id::text, u.email, u.name, u.given_name, u.family_name,
-		       coalesce(split_part(mb.address, '@', 1), '')
-		FROM users u
-		LEFT JOIN org_mailboxes mb
-		       ON mb.user_id = u.id AND mb.primary_address AND mb.removed_at IS NULL
-		      AND lower(split_part(mb.address, '@', 2)) = lower($1)
-		-- Una cuenta purgada (mig 0098) perdió su @usuario a propósito: no se le
-		-- vuelve a dar uno.
-		WHERE u.username IS NULL AND u.purged_at IS NULL
-		ORDER BY (mb.address IS NULL), u.created_at, u.id
-		LIMIT $2`, s.suiteDomain, lote)
-	if err != nil {
-		return 0, errf("AsignarUsernamesPendientes", err)
-	}
-	type pendiente struct{ id, email, name, given, family, raiz string }
-	var lista []pendiente
-	for rows.Next() {
-		var p pendiente
-		if err := rows.Scan(&p.id, &p.email, &p.name, &p.given, &p.family, &p.raiz); err != nil {
-			rows.Close()
-			return 0, errf("AsignarUsernamesPendientes.scan", err)
-		}
-		lista = append(lista, p)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return 0, errf("AsignarUsernamesPendientes.rows", err)
-	}
-
-	hechos := 0
-	for _, p := range lista {
-		base := domain.NormalizeUsername(p.raiz)
-		if !domain.ValidUsername(base) {
-			base = domain.UsernameBase(p.given, p.family, p.name, p.email)
-		}
-		var ocupados map[string]bool
-		for intento := 0; intento < maxCarrerasUsername; intento++ {
-			var cand string
-			if cand, ocupados, err = s.usernameLibre(ctx, s.DB(), p.id, base, ocupados); err != nil {
-				return hechos, err
-			}
-			tag, err := s.DB().Exec(ctx,
-				`UPDATE users SET username = $2 WHERE id = $1 AND username IS NULL`, p.id, cand)
-			if errors.Is(pgErr(err), domain.ErrConflict) {
-				// Otra réplica, o un alta, se lo quedó entre la lectura y aquí.
-				ocupados[cand] = true
-				continue
-			}
-			if err != nil {
-				return hechos, errf("AsignarUsernamesPendientes.update", err)
-			}
-			if tag.RowsAffected() > 0 {
-				hechos++
-			}
-			break
-		}
-	}
-	return hechos, nil
 }
 
 // GetUserByID recupera un usuario por id.
@@ -762,7 +698,9 @@ func (s *Store) CloseUser(ctx context.Context, q pg.Querier, id, porID, motivo s
 // Una baja PROPIA («Borrar mi cuenta», closed_by = la cuenta) no se restaura
 // por aquí: es la supresión que pidió la persona (art. 17 RGPD), y un
 // administrador de cualquiera de sus organizaciones no puede anularla. Solo la
-// deshace el equipo de privacidad, a petición suya (ADR 0054).
+// deshace el equipo de privacidad, a petición suya (ADR 0054). Tampoco una
+// SUPRESIÓN FÍSICA ordenada por una solicitud RGPD (erasure_request_id, mig
+// 0130): restaurarla sería deshacer la respuesta que se le dio a la persona.
 //
 // `desde` es el límite de la ventana: una baja anterior a esa marca ya no se
 // toca. La comprobación va en el WHERE —no en un SELECT previo— para que dos
@@ -806,7 +744,7 @@ func restaurarComo(ctx context.Context, q pg.Querier, id string, desde time.Time
 	tag, err := q.Exec(ctx, `UPDATE users
 		   SET status=$3, closed_at=NULL, closed_by=NULL, close_reason=''
 		 WHERE id=$1 AND status='deleted' AND (closed_at IS NULL OR closed_at >= $2)
-		   AND closed_by IS DISTINCT FROM id`,
+		   AND closed_by IS DISTINCT FROM id AND erasure_request_id IS NULL`,
 		id, desde, st)
 	if err != nil {
 		return errf(op, err)
@@ -841,7 +779,7 @@ func (s *Store) ClosedUsersInOrg(ctx context.Context, orgID string, desde time.T
 		JOIN memberships m ON m.user_id = u.id AND m.org_id = $1
 		LEFT JOIN users quien ON quien.id = u.closed_by
 		WHERE u.status = 'deleted' AND u.closed_at IS NOT NULL AND u.closed_at >= $2
-		  AND u.closed_by IS DISTINCT FROM u.id
+		  AND u.closed_by IS DISTINCT FROM u.id AND u.erasure_request_id IS NULL
 		ORDER BY u.closed_at DESC
 		LIMIT 200`
 	rows, err := s.DB().Query(ctx, sql, orgID, desde)

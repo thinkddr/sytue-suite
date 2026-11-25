@@ -152,6 +152,11 @@ type Portada struct {
 	// copiando: hay una copia en curso (Copiar); solo la toca el hilo de la interfaz.
 	copiando bool
 
+	// La pregunta de «Documento nuevo» del widget (portada_nuevo.go): pendiente hasta que
+	// haya lista, abierta, y el lienzo donde enseñarla. Solo las toca el hilo de la interfaz.
+	nuevoPendiente, preguntandoNuevo bool
+	lienzoNuevo                      fyne.Canvas
+
 	vista *vistaPortada
 }
 
@@ -296,6 +301,7 @@ func (p *Portada) Cargar() {
 			p.Docs, p.Cursor = docs, cursor
 			p.Estado = EstadoDe(err, p.hayRed(), len(docs))
 			p.Repintar()
+			p.atenderNuevo()
 		})
 	})
 }
@@ -407,36 +413,6 @@ func (p *Portada) ElegirOrden(porTitulo bool) {
 func (p *Portada) VerTodo() {
 	p.Alcance, p.Destacados = api.DocsAll, false
 	p.Cargar()
-}
-
-// Crear da de alta un documento en blanco del tipo del producto y lo abre. Sin id en
-// la respuesta NO se navega: se avisa.
-func (p *Portada) Crear() {
-	if p.Svc == nil || p.Creando || !p.hayRed() {
-		return
-	}
-	p.Creando = true
-	p.Repintar()
-	p.lanzar(func() {
-		ctx, cancelar := p.ctx()
-		defer cancelar()
-		d, err := p.Svc.Create(ctx, p.Tipo.Kind(), "")
-		fyne.Do(func() {
-			p.Creando = false
-			if err != nil || d.ID == "" {
-				if p.Avisos != nil {
-					p.Avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro,
-						p.t("create.error.title"), p.t("create.error.description")))
-				}
-				p.Repintar()
-				return
-			}
-			p.Repintar()
-			if p.AlAbrir != nil {
-				p.AlAbrir(d)
-			}
-		})
-	})
 }
 
 // Destacar marca o desmarca, OPTIMISTA y reversible: la estrella cambia al instante y
@@ -759,25 +735,24 @@ func (w *vistaPortada) rehacerCuerpo() {
 func (w *vistaPortada) vacio() *ui.Vacio {
 	p := w.p
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	aviso := func() fyne.CanvasObject { return iconos.Trazo(iconos.Aviso, 40, "danger-text", v).Objeto() }
 	reintentar := ui.NuevoBoton(p.t("list.retry"), p.Cargar).Con(ui.Secundario, ui.TallaSM)
+	// Los fallos son el `tone="error"` de `DocList.tsx` (DS-06): el glifo de peligro lo
+	// pone VacioError, en `danger-text`.
 	var e *ui.Vacio
 	switch p.Estado {
 	case SinConexion:
-		e = ui.NuevoVacio(p.t("list.offline.emptyTitle"), p.t("list.offline.emptyDescription"))
-		e.Ilustracion, e.Accion = aviso(), reintentar
+		e = ui.NuevoVacioError(p.t("list.offline.emptyTitle"), p.t("list.offline.emptyDescription"))
+		e.Accion = reintentar
 	case SinSesion:
 		// La web nunca llega aquí: sin sesión redirige al inicio de sesión. En nativo
 		// lo que se hace es lo mismo, pero lo pide quien mira: abrir el navegador por su
 		// cuenta al arrancar sería peor que un botón.
-		e = ui.NuevoVacio(p.t("list.error.title"), p.t("pdf.error.session"))
-		e.Ilustracion = aviso()
+		e = ui.NuevoVacioError(p.t("list.error.title"), p.t("pdf.error.session"))
 		if p.AlEntrar != nil {
 			e.Accion = ui.NuevoBoton(p.t("account.signIn"), p.AlEntrar).Con(ui.Primario, ui.TallaSM)
 		}
 	case SinPermiso:
-		e = ui.NuevoVacio(p.t("forbidden.title"), p.t("forbidden.description"))
-		e.Ilustracion = aviso()
+		e = ui.NuevoVacioError(p.t("forbidden.title"), p.t("forbidden.description"))
 	case Vacio:
 		if p.Aplicada != "" {
 			e = ui.NuevoVacio(p.t("list.empty.search.title", i18n.Vars{"query": p.Aplicada}), p.t("list.empty.search.description"))
@@ -797,8 +772,8 @@ func (w *vistaPortada) vacio() *ui.Vacio {
 		crear.Cargando = p.Creando
 		e.Accion = crear
 	default: // Error
-		e = ui.NuevoVacio(p.t("list.error.title"), p.t("list.error.description"))
-		e.Ilustracion, e.Accion = aviso(), reintentar
+		e = ui.NuevoVacioError(p.t("list.error.title"), p.t("list.error.description"))
+		e.Accion = reintentar
 	}
 	return e
 }

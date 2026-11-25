@@ -7,12 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/media/domain"
 )
@@ -88,6 +90,59 @@ func (c *DocsClient) CanAccessDocument(ctx context.Context, docID string) error 
 }
 
 var _ DocumentGate = (*DocsClient)(nil)
+
+// AvisarLlamada pide a Sytue Docs que avise por el Hub a quien colabora en el documento
+// de que se ha abierto una llamada en él (ADR 0070): POST
+// /api/v1/documents/{id}/call-notice con el token de quien la abre. Es Docs quien sabe
+// a quién avisar; aquí no viaja ninguna lista de personas.
+func (c *DocsClient) AvisarLlamada(ctx context.Context, docID string) error {
+	token := bearerFrom(ctx)
+	if token == "" {
+		return domain.ErrPermission
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		c.baseURL+"/api/v1/documents/"+url.PathEscape(docID)+"/call-notice", http.NoBody)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("meet: aviso de llamada del documento: respuesta %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// avisadorDeLlamada es lo que el DocumentGate sabe hacer además de abrir la puerta.
+type avisadorDeLlamada interface {
+	AvisarLlamada(ctx context.Context, docID string) error
+}
+
+// esperaAvisoLlamada acota lo que se espera a Docs por el aviso, que va aparte.
+const esperaAvisoLlamada = 5 * time.Second
+
+// avisarLlamadaDeDocumento pide el aviso de una llamada recién abierta en un documento,
+// sin esperar: crear la sala no depende de él, y un Docs lento no puede retrasar a quien
+// llama. Lleva el token de quien la abre, que es con lo que Docs comprueba que puede
+// verlo y nombra a quien llama.
+func (s *Service) avisarLlamadaDeDocumento(ctx context.Context, docID string) {
+	a, ok := s.docGate.(avisadorDeLlamada)
+	token := bearerFrom(ctx)
+	if !ok || token == "" {
+		return
+	}
+	go func() {
+		actx, cancel := context.WithTimeout(WithBearer(context.WithoutCancel(ctx), token), esperaAvisoLlamada)
+		defer cancel()
+		if err := a.AvisarLlamada(actx, docID); err != nil {
+			log.From(actx).Warn("meet: aviso de la llamada del documento", "error", err)
+		}
+	}()
+}
 
 // CalendarGate pregunta a Sytue Calendar si QUIEN LLAMA está invitado al evento de ese
 // UID (organiza, figura como asistente o recibió su invitación). Es lo que abre la reunión

@@ -52,6 +52,17 @@ export interface AvatarPickerProps {
   onError?: ((message: string) => void) | undefined;
 }
 
+/**
+ * El lado del botón de la cámara: `h-7` en el avatar de 64 y el `h-6` de 24 (el mínimo
+ * de WCAG 2.5.8; con el dedo el blanco sigue siendo de 44) en los menores. Con
+ * `-right-2 -bottom-2` los dos quedan por debajo de la tinta de las iniciales; el de 28
+ * a `-right-1` tapaba el pie de la segunda en el de 64 de la ficha de Contacts. Es
+ * `ladoBotonCamara` de Fyne (`ui/selectoravatar.go`).
+ */
+function ladoCamara(size: AvatarSize): string {
+  return size === 'xl' ? 'h-7 w-7' : 'h-6 w-6';
+}
+
 export function AvatarPicker({
   name,
   src,
@@ -107,7 +118,7 @@ export function AvatarPicker({
             type="button"
             disabled={isBusy}
             aria-label={hasPhoto ? labels.change : labels.add}
-            class="border-surface bg-surface text-text-muted hover:text-text sytue-focus-ring rounded-control absolute -right-1 -bottom-1 grid h-7 w-7 place-items-center border-2 shadow-[var(--shadow-xs)] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']"
+            class={`border-surface bg-surface text-text-muted hover:text-text sytue-focus-ring rounded-control absolute -right-2 -bottom-2 grid place-items-center border-2 shadow-[var(--shadow-xs)] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-[''] ${ladoCamara(size)}`}
             {...props}
           >
             <Icon name="camera" size={14} />

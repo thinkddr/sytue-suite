@@ -6,6 +6,8 @@ package notes
 import (
 	"slices"
 
+	"golang.org/x/net/html"
+
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -19,14 +21,16 @@ import (
 //
 //	filas      insertar encima | debajo
 //	columnas   insertar a la izquierda | a la derecha
-//	cabeceras  fila de cabecera (`<thead>`) | columna de cabecera (`<th scope="row">`)
-//	celda      fondo de la celda (`data-fondo`, los seis colores) | alineación y sangría
+//	cabeceras  fila de cabecera (`<thead>`) | columna de cabecera (`<th scope="row">`) |
+//	           filas numeradas (`data-numerada`)
+//	celda      fondo de la celda (`data-fondo`, los seis colores) | alineación y sangría |
+//	           combinar con la de la derecha | con la de abajo | separar
 //	borrar     la fila | la columna | la tabla
 //
 // Tab y Mayús+Tab van de celda en celda; Tab en la última añade una fila, como en
-// cualquier editor de tablas. Combinar o dividir celdas, numerar filas y repartir el ancho
-// de las columnas no están: el modelo no guarda anchos y el formato compartido no tiene
-// ni numeración ni combinación propias (ver el informe).
+// cualquier editor de tablas. Las filas numeradas (`data-numerada`) van con las cabeceras,
+// y combinar y separar celdas (combinar.go) con la celda. Repartir el ancho de las
+// columnas no está: el modelo no guarda anchos.
 
 // Los glifos de la barra de tabla: la rejilla con lo que cambia marcado.
 const (
@@ -63,8 +67,12 @@ func (e *EditorNota) accionesTabla() []accionBarra {
 		{clave: "colDespues", grupo: grupoTablaColumnas, prioridad: prioEsencial, glifo: ColDespuesD, rotulo: t("editor.colAfter"), pulsar: orden("colDespues")},
 		{clave: "cabeceraFila", grupo: grupoTablaCabeceras, prioridad: prioFormato, glifo: CabeceraFilaD, rotulo: t("editor.headerRow"), pulsar: orden("cabeceraFila")},
 		{clave: "cabeceraCol", grupo: grupoTablaCabeceras, prioridad: prioColor, glifo: CabeceraColD, rotulo: t("editor.headerColumn"), pulsar: orden("cabeceraCol")},
+		{clave: "numerada", grupo: grupoTablaCabeceras, prioridad: prioColor, glifo: NumerosD, rotulo: t("editor.numberedRows"), pulsar: orden("numerada")},
 		{clave: "fondoCelda", grupo: grupoTablaCelda, prioridad: prioColor, glifo: FondoCeldaD, rotulo: t("editor.cellBackground"), abre: true, pulsar: e.menuFondoCelda},
 		{clave: "alinearCelda", grupo: grupoTablaCelda, prioridad: prioInsertar, glifo: IzquierdaD, rotulo: t("editor.align"), abre: true, pulsar: e.menuAlinear},
+		{clave: "combinarDerecha", grupo: grupoTablaCelda, prioridad: prioInsertar, glifo: CombinarD, rotulo: t("editor.mergeRight"), pulsar: orden("combinarDerecha")},
+		{clave: "combinarAbajo", grupo: grupoTablaCelda, prioridad: prioHerramienta, glifo: CombinarAbajoD, rotulo: t("editor.mergeDown"), pulsar: orden("combinarAbajo")},
+		{clave: "separarCelda", grupo: grupoTablaCelda, prioridad: prioHerramienta, glifo: SepararD, rotulo: t("editor.splitCell"), pulsar: orden("separarCelda")},
 		{clave: "borrarFila", grupo: grupoTablaBorrar, prioridad: prioMedia, glifo: BorrarFilaD, rotulo: t("editor.rowDelete"), pulsar: orden("borrarFila")},
 		{clave: "borrarCol", grupo: grupoTablaBorrar, prioridad: prioFormato, glifo: BorrarColD, rotulo: t("editor.colDelete"), pulsar: orden("borrarCol")},
 		{clave: "borrarTabla", grupo: grupoTablaBorrar, prioridad: prioAlta, glifo: PapeleraD, rotulo: t("editor.tableDelete"), pulsar: orden("borrarTabla")},
@@ -134,7 +142,7 @@ func cabeceraDeColumna(t *Tabla) bool {
 // cabecera, la columna de cabecera o el fondo de la celda (`valor`). Es una `Tabla` nueva
 // (las fotos de deshacer comparten la vieja).
 func (d *Documento) FormatearTabla(orden, valor string, p Pos) {
-	if len(d.Bloques) == 0 || !d.Bloques[p.B].Celda.EnTabla() {
+	if len(d.Bloques) == 0 || !d.Bloques[p.B].Celda.EnTabla() || d.Bloques[p.B].Celda.Tabla.EsColumnas() {
 		return
 	}
 	en := d.Bloques[p.B].Celda
@@ -153,6 +161,18 @@ func (d *Documento) FormatearTabla(orden, valor string, p Pos) {
 		ponerCabeceraFila(filas, !cabeceraDeFila(vieja))
 	case "cabeceraCol":
 		ponerCabeceraColumna(filas, !cabeceraDeColumna(vieja))
+	case "numerada":
+		// Una `Tabla` nueva con el atributo puesto o quitado: sin valor, como lo escribe la
+		// web (`alternarFilasNumeradas`).
+		atrs := slices.DeleteFunc(slices.Clone(vieja.Atributos), func(a html.Attribute) bool { return a.Key == "data-numerada" })
+		if !numerada(vieja) {
+			atrs = append(atrs, html.Attribute{Key: "data-numerada"})
+		}
+		t := &Tabla{Atributos: atrs, Filas: filas}
+		for k := i; k < j; k++ {
+			d.Bloques[k].Celda.Tabla = t
+		}
+		return
 	case "fondoCelda":
 		if valor != "" && !slices.Contains(FondosPermitidos, valor) {
 			return

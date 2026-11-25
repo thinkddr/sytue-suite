@@ -2742,9 +2742,9 @@ export const sk: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Podpis sa na túto stranu nezmestí. Vyberte inú stranu alebo polohu.',
   'pdf.device.view': 'Zobraziť',
   'pdf.vault.help':
-    'Toto PDF je vo vašom šifrovanom Drive: dešifruje sa len v tomto zariadení, kde ho môžete zobraziť, anotovať, vyplniť, usporiadať a podpísať. Čo uložíte, sa vráti zašifrované.',
+    'Toto PDF je vo vašom šifrovanom Drive: dešifruje sa len v tomto zariadení, kde ho môžete zobraziť, anotovať, vyplniť, usporiadať, zabezpečiť, začierniť, upraviť, porovnať, vytlačiť a podpísať. Čo uložíte, sa vráti zašifrované.',
   'pdf.vault.serverOnly':
-    'So šifrovaným Drive zatiaľ nie sú k dispozícii žiadosti o podpis, ochrana heslom, rozpoznávanie textu, začiernenie, úpravy textu alebo obrázkov, pečiatky a vodoznaky, porovnanie, história verzií ani tlač: vyžadujú, aby služba PDF prečítala, alebo sa zatiaľ v zariadení nerobia.',
+    'So šifrovaným Drive nie sú k dispozícii žiadosti o podpis, rozpoznávanie textu ani asistent: vyžadujú, aby služba PDF prečítala. Všetko ostatné sa robí v tomto zariadení.',
   'pdf.vault.notFound.title': 'Toto PDF nie je vo vašom šifrovanom Disku',
   'pdf.vault.notFound.description':
     'Možno bolo presunuté alebo odstránené. Vyhľadajte ho v Sytue Drive.',
@@ -2759,7 +2759,9 @@ export const sk: AppCatalog<typeof en> = {
     'Váš Disk ešte prechádza na šifrovanie end-to-end. Dokončite to v Sytue Drive.',
   'pdf.device.error.password': 'Toto heslo certifikát neotvorí.',
   'pdf.device.error.encrypted':
-    'Toto PDF je chránené heslom a na tomto zariadení ho nemožno podpísať.',
+    'Toto PDF je chránené heslom: otvorte ho a podpíšte z jeho štúdia, kde sa použije jeho heslo.',
+  'pdf.device.protectedNote':
+    'Toto PDF je chránené heslom. Aby sa dalo podpísať, v tomto zariadení sa prepíše bez hesla, rovnako ako to robí server: podpísaná kópia sa uloží zašifrovaná vo vašom Drive, ale bez hesla PDF.',
   'pdf.device.error.locked':
     'Toto PDF je certifikované proti akejkoľvek zmene: ďalší podpis by ho zneplatnil.',
   'pdf.device.error.unreadable':

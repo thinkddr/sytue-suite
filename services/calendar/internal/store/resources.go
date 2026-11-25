@@ -219,7 +219,7 @@ func scanResourceEvent(row pgx.Row, tenant string, resID *uuid.UUID) (domain.Eve
 	var e domain.Event
 	var status, class, transp string
 	if err := row.Scan(resID, &e.ID, &e.CalendarID, &e.ObjectID, &e.UID, &e.Summary, &e.Description,
-		&e.Location, &e.Organizer, &e.DTStart, &e.DTEnd, &e.TZID, &e.AllDay,
+		&e.Location, &e.Organizer, &e.OrganizerName, &e.DTStart, &e.DTEnd, &e.TZID, &e.AllDay,
 		&status, &class, &transp, &e.Color, &e.ConferenceURL, &e.RRule, &e.RDate, &e.ExDate, &e.RecurrenceEnd,
 		&e.RecurrenceID, &e.SequenceNo, &e.CreatedAt, &e.UpdatedAt); err != nil {
 		return domain.Event{}, err

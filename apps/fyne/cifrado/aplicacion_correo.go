@@ -535,8 +535,10 @@ func (h *anfitrionCorreo) bovedaLista(life context.Context, owner auth.IdentityS
 		}
 		h.pedirIdentificacion()
 	case pqvault.SigningMissing, pqvault.SigningUnavailable:
+		// Con el porqué (SigningError): el código de fallo dice qué contestó Sytue ID.
+		err := vault.SigningError()
 		vault.Close()
-		h.fallar(pqvault.ErrSigningKey) //nolint:contextcheck // Soltar la bóveda vive más que esta entrega.
+		h.fallar(err) //nolint:contextcheck // Soltar la bóveda vive más que esta entrega.
 	}
 }
 
@@ -593,8 +595,9 @@ func (h *anfitrionCorreo) firmaRegistrada(life context.Context, owner auth.Ident
 		h.abrirCorreo(life, owner, ctx, vault)
 	default:
 		h.pendiente = nil
+		err := vault.SigningError()
 		vault.Close()
-		h.fallar(pqvault.ErrSigningKey) //nolint:contextcheck // Soltar la bóveda vive más que esta entrega.
+		h.fallar(err) //nolint:contextcheck // Soltar la bóveda vive más que esta entrega.
 	}
 }
 
@@ -649,8 +652,9 @@ func (h *anfitrionCorreo) inicializado(life context.Context, owner auth.Identity
 func (h *anfitrionCorreo) fallar(err error) {
 	h.decidirDestino(correoSinDecidir, auth.IdentitySnapshot{})
 	h.soltarBoveda()
-	vacio := ui.NuevoVacio(h.translate("matrix.failed"), "")
-	vacio.Tono = ui.VacioError // DS-06: es un fallo, no una lista vacía
+	// Con el código corto, como Drive y la puerta (CodigoFallo): sin él, en producción
+	// no había forma de saber qué contestó Sytue ID.
+	vacio := ui.NuevoVacioError(h.translate("matrix.failed"), avisarFallo("el correo de la bóveda", err)) // DS-06: es un fallo, no una lista vacía
 	vacio.Accion = ui.NuevoBoton(h.translate("action.retry"), h.reintentar)
 	h.enseñar(vacio)
 	if h.estado != nil {

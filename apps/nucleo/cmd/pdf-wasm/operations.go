@@ -70,7 +70,20 @@ func edicion(edit pdf.DeviceEdit) any {
 	if c := edit.Compression; c != nil {
 		out["antes"], out["despues"], out["ahorro"] = c.Antes, c.Despues, c.Ahorro()
 	}
+	if edit.UnchangedXMP {
+		out["xmp"] = true
+	}
+	if edit.Replacements != nil {
+		out["reemplazos"] = *edit.Replacements
+	}
 	return out
+}
+
+// cuerpo devuelve bytes que no son un documento (un JSON, un adjunto) y los borra
+// de la memoria del módulo en cuanto cruzan.
+func cuerpo(data []byte, contentType string) any {
+	defer clear(data)
+	return map[string]any{"body": webport.BytesValue(data), "content_type": contentType}
 }
 
 func (d *documentos) abrirJS(ctx context.Context, req js.Value) (any, error) {
@@ -211,4 +224,108 @@ func (d *documentos) herramientaJS(_ context.Context, req js.Value) (any, error)
 		return fallo(err), nil
 	}
 	return edicion(edit), nil
+}
+
+func (d *documentos) protegerJS(_ context.Context, req js.Value) (any, error) {
+	id, err := texto(req.Get("doc"))
+	if err != nil {
+		return nil, err
+	}
+	fields, err := campos(req)
+	if err != nil {
+		return nil, err
+	}
+	edit, err := d.session.Protect(id, fields)
+	if err != nil {
+		return fallo(err), nil
+	}
+	return edicion(edit), nil
+}
+
+func (d *documentos) editarJS(_ context.Context, req js.Value) (any, error) {
+	id, err := texto(req.Get("doc"))
+	if err != nil {
+		return nil, err
+	}
+	fields, err := campos(req)
+	if err != nil {
+		return nil, err
+	}
+	var imagen []byte
+	if value := req.Get("imagen"); value.Type() != js.TypeUndefined {
+		if imagen, err = webport.BytesArg(value, pdf.MaxOperationFileBytes); err != nil {
+			return nil, err
+		}
+		defer clear(imagen)
+	}
+	edit, err := d.session.Edit(id, fields, imagen)
+	if err != nil {
+		return fallo(err), nil
+	}
+	return edicion(edit), nil
+}
+
+func (d *documentos) compararJS(ctx context.Context, req js.Value) (any, error) {
+	lista := req.Get("docs")
+	if lista.Type() != js.TypeObject || !lista.InstanceOf(js.Global().Get("Array")) || lista.Length() != 2 {
+		return nil, webport.ErrRejected
+	}
+	a, err := texto(lista.Index(0))
+	if err != nil {
+		return nil, err
+	}
+	b, err := texto(lista.Index(1))
+	if err != nil {
+		return nil, err
+	}
+	fields, err := campos(req)
+	if err != nil {
+		return nil, err
+	}
+	out, err := d.session.Compare(ctx, a, b, fields)
+	if err != nil {
+		return fallo(err), nil
+	}
+	return cuerpo(out, "application/json"), nil
+}
+
+func (d *documentos) textoJS(ctx context.Context, req js.Value) (any, error) {
+	id, err := texto(req.Get("doc"))
+	if err != nil {
+		return nil, err
+	}
+	out, err := d.session.Text(ctx, id)
+	if err != nil {
+		return fallo(err), nil
+	}
+	return cuerpo(out, "application/json"), nil
+}
+
+func (d *documentos) verificarJS(_ context.Context, req js.Value) (any, error) {
+	id, err := texto(req.Get("doc"))
+	if err != nil {
+		return nil, err
+	}
+	out, err := d.session.Verify(id)
+	if err != nil {
+		return fallo(err), nil
+	}
+	return cuerpo(out, "application/json"), nil
+}
+
+func (d *documentos) adjuntoJS(_ context.Context, req js.Value) (any, error) {
+	id, err := texto(req.Get("doc"))
+	if err != nil {
+		return nil, err
+	}
+	nombre, err := texto(req.Get("nombre"))
+	if err != nil {
+		return nil, err
+	}
+	out, err := d.session.Attachment(id, nombre)
+	if err != nil {
+		return fallo(err), nil
+	}
+	// Siempre como bytes opacos: el tipo que declara el documento no decide nada.
+	return cuerpo(out, "application/octet-stream"), nil
 }

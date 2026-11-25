@@ -2708,9 +2708,9 @@ export const fi: AppCatalog<typeof en> = {
     'Allekirjoitus ei mahdu tälle sivulle. Valitse toinen sivu tai sijainti.',
   'pdf.device.view': 'Näytä',
   'pdf.vault.help':
-    'Tämä PDF on salatussa Drivessasi: se puretaan vain tällä laitteella, jossa voit katsoa, merkitä, täyttää, järjestää ja allekirjoittaa sen. Tallentamasi palaa salattuna.',
+    'Tämä PDF on salatussa Drivessasi: se puretaan vain tällä laitteella, jossa voit katsoa, merkitä, täyttää, järjestää, suojata, sensuroida, muokata, verrata, tulostaa ja allekirjoittaa sen. Tallentamasi palaa salattuna.',
   'pdf.vault.serverOnly':
-    'Salatun Driven kanssa allekirjoituspyynnöt, salasanasuojaus, tekstintunnistus, peittäminen, tekstin tai kuvien muokkaus, leimat ja vesileimat, vertailu, versiohistoria ja tulostus eivät ole vielä käytettävissä: ne vaativat, että palvelu lukee PDF:n, tai niitä ei vielä tehdä laitteella.',
+    'Salatulla Drivella allekirjoituspyynnöt, tekstintunnistus ja avustaja eivät ole käytettävissä: ne edellyttävät, että palvelu lukee PDF:n. Kaikki muu tehdään tällä laitteella.',
   'pdf.vault.notFound.title': 'Tämä PDF ei ole salatussa Drivessasi',
   'pdf.vault.notFound.description': 'Se on ehkä siirretty tai poistettu. Etsi se Sytue Drivesta.',
   'pdf.vault.openSigned': 'Avaa allekirjoitettu kopio',
@@ -2724,7 +2724,9 @@ export const fi: AppCatalog<typeof en> = {
     'Drivesi siirtyy vielä päästä päähän -salaukseen. Viimeistele se Sytue Drivessa.',
   'pdf.device.error.password': 'Tämä salasana ei avaa varmennetta.',
   'pdf.device.error.encrypted':
-    'Tämä PDF on suojattu salasanalla, eikä sitä voi allekirjoittaa tällä laitteella.',
+    'Tämä PDF on suojattu salasanalla: avaa se ja allekirjoita se sen studiossa, jossa sen salasanaa käytetään.',
+  'pdf.device.protectedNote':
+    'Tämä PDF on suojattu salasanalla. Allekirjoitusta varten se kirjoitetaan tällä laitteella uudelleen ilman salasanaa, kuten palvelinkin tekee: allekirjoitettu kopio tallennetaan salattuna Driveesi, mutta ilman PDF:n salasanaa.',
   'pdf.device.error.locked':
     'Tämä PDF on varmennettu kaikkia muutoksia vastaan: uusi allekirjoitus mitätöisi sen.',
   'pdf.device.error.unreadable':

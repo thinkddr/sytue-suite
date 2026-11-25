@@ -136,24 +136,38 @@ func localPDFResponse(contentType string, out []byte) PDFRespuesta {
 	return PDFRespuesta{Datos: out, Cabecera: http.Header{"Content-Type": {contentType}, "Content-Length": {strconv.Itoa(len(out))}, "Cache-Control": {"no-store"}}}
 }
 
-func (p *PDF) localMotor(ctx context.Context, route string, fields map[string]string, parts []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
-	if len(parts) > 0 && route != "/pdf/form" && route != "/pdf/edit" && route != "/pdf/sign" {
-		return PDFRespuesta{}, ErrPrivatePDFOperation
-	}
-	switch route {
-	case "/pdf/form":
-		return p.localForm(ctx, fields, parts, docs...)
-	case "/pdf/annotate":
+// localRoute es una operación del motor hecha en el dispositivo.
+type localRoute func(p *PDF, ctx context.Context, fields map[string]string, parts []PDFParte, docs ...PDFFichero) (PDFRespuesta, error)
+
+// localRoutes son las rutas del motor que el Drive privado hace en local; las
+// demás (reconocer texto, pedir firma) contestan ErrPrivatePDFOperation.
+var localRoutes = map[string]localRoute{
+	"/pdf/form": (*PDF).localForm,
+	"/pdf/annotate": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 		return p.localAnnotations(ctx, fields, docs...)
-	case "/pdf/protect":
+	},
+	"/pdf/protect": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 		return p.localProtection(ctx, fields, docs...)
-	case "/pdf/tools":
+	},
+	"/pdf/tools": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 		return p.localTools(ctx, fields, docs...)
-	case "/pdf/edit":
-		return p.localContentEdit(ctx, fields, parts, docs...)
-	case "/pdf/sign":
-		return p.localSign(ctx, fields, parts, docs...)
-	case "/pdf/content":
+	},
+	"/pdf/edit":         (*PDF).localContentEdit,
+	"/pdf/sign":         (*PDF).localSign,
+	"/pdf/sign/prepare": (*PDF).localSignPrepare,
+	"/pdf/sign/complete": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localSignComplete(ctx, fields, docs...)
+	},
+	"/pdf/compare": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localCompare(ctx, fields, docs...)
+	},
+	"/pdf/verify": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localVerify(ctx, fields, docs...)
+	},
+	"/pdf/attachment": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localAttachment(ctx, fields, docs...)
+	},
+	"/pdf/content": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 		if len(docs) != 1 {
 			return PDFRespuesta{}, localPDFError(400, "bad_request", "Send a single PDF.")
 		}
@@ -162,14 +176,32 @@ func (p *PDF) localMotor(ctx context.Context, route string, fields map[string]st
 			return PDFRespuesta{}, err
 		}
 		return localPDFResponse("application/json", out), nil
-	case "/pdf/render", "/pdf/text":
-		return p.localView(ctx, route, fields, docs...)
-	case "/pdf/pages":
+	},
+	"/pdf/render": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localView(ctx, "/pdf/render", fields, docs...)
+	},
+	"/pdf/text": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localView(ctx, "/pdf/text", fields, docs...)
+	},
+	"/pdf/pages": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		if localpdf.IsLayerOperation(fields["op"]) {
+			return p.localLayer(ctx, fields, docs...)
+		}
 		invalidate := fields["invalidar_firmas"] == "1" || fields["invalidar_firmas"] == "true"
 		return p.localPageOperation(ctx, fields["op"], fields["paginas"], fields["grados"], fields["clave"], invalidate, docs...)
-	default:
+	},
+}
+
+// localRoutesWithParts son las que reciben ficheros sueltos además del documento: el
+// XFDF, la imagen nueva, la identidad con que se firma o el certificado elegido.
+var localRoutesWithParts = map[string]bool{"/pdf/form": true, "/pdf/edit": true, "/pdf/sign": true, "/pdf/sign/prepare": true}
+
+func (p *PDF) localMotor(ctx context.Context, route string, fields map[string]string, parts []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+	run, ok := localRoutes[route]
+	if !ok || len(parts) > 0 && !localRoutesWithParts[route] {
 		return PDFRespuesta{}, ErrPrivatePDFOperation
 	}
+	return run(p, ctx, fields, parts, docs...)
 }
 
 func (p *PDF) localView(ctx context.Context, route string, fields map[string]string, docs ...PDFFichero) (PDFRespuesta, error) {

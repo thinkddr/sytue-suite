@@ -306,6 +306,13 @@ func (z *zonaEdicion) tocarEspecial(p fyne.Position) bool {
 	x, y := p.X-PXZonaEd, p.Y-PYZonaEd
 	for _, a := range z.maquetado().Adornos {
 		if a.Tipo == adornoCabecera && x >= a.X && x <= a.X+a.An && y >= a.Y && y <= a.Y+a.Al {
+			if x <= a.X+14+tema.Espacio(1.5) && a.caja != nil {
+				// La flecha: si al leer la nota se ve abierto (el `open` de la web), en su
+				// paso de deshacer. Escribiendo se sigue viendo lo de dentro.
+				bloque, abierta := a.Bloque, !a.caja.Abierta
+				e.hacer(func() { e.doc.AbrirCaja(bloque, abierta) })
+				return true
+			}
 			e.abrirTituloCaja(a.Bloque, z.anclaEn(fyne.NewPos(PXZonaEd+a.X, PYZonaEd+a.Y+a.Al)))
 			return true
 		}
@@ -336,18 +343,48 @@ func (z *zonaEdicion) tocarEspecial(p fyne.Position) bool {
 
 // enCodigo dice si el cursor está en un bloque de código: es lo que enseña su barra.
 func (e *EditorNota) enCodigo() bool {
-	return len(e.doc.Bloques) > 0 && e.bloqueActual().Tipo == Codigo && !e.bloqueActual().Celda.EnTabla()
+	if len(e.doc.Bloques) == 0 {
+		return false
+	}
+	b := e.bloqueActual()
+	return b.Tipo == Codigo && (!b.Celda.EnTabla() || b.Celda.Tabla.EsColumnas())
 }
 
 // armarBarraCodigo es la barra de un bloque de código: su lenguaje, que se elige de la
 // lista cerrada y se guarda como `<code data-lenguaje>`. El botón dice el lenguaje
 // actual en su pista y en su nombre accesible.
 func (e *EditorNota) armarBarraCodigo() *fyne.Container {
+	orden := func(o string) func(fyne.CanvasObject) {
+		return func(fyne.CanvasObject) { e.Orden(o, "") }
+	}
 	e.codigoEd = e.nuevaBarraEd([]accionBarra{{
 		clave: "lenguaje", grupo: grupoBloque, prioridad: prioEsencial, icono: iconos.Codigo,
 		rotulo: e.tr.T("editor.codeLanguage", nil), abre: true, pulsar: e.menuLenguaje,
+	}, {
+		// Los números de línea (`data-lineas`) y el ajuste de las líneas largas
+		// (`data-ajuste`), como la barra del bloque de código de la web.
+		clave: "lineas", grupo: grupoFormato, prioridad: prioEsencial, glifo: NumerosD,
+		rotulo: e.tr.T("editor.lineNumbers", nil), pulsar: orden("lineas"),
+	}, {
+		clave: "ajuste", grupo: grupoFormato, prioridad: prioEsencial, glifo: AjusteD,
+		rotulo: e.tr.T("editor.wrap", nil), pulsar: orden("ajuste"),
 	}})
 	return e.codigoEd.c
+}
+
+// AlternarCodigo pone o quita los números de línea («lineas») o el ajuste («ajuste») del
+// bloque de código `i`.
+func (d *Documento) AlternarCodigo(i int, que string) {
+	if i < 0 || i >= len(d.Bloques) || d.Bloques[i].Tipo != Codigo {
+		return
+	}
+	b := &d.Bloques[i]
+	switch que {
+	case "lineas":
+		b.Lineas = !b.Lineas
+	case "ajuste":
+		b.Ajuste = !b.Ajuste
+	}
 }
 
 // refrescarBarraCodigo pone en el botón el lenguaje del bloque del cursor.

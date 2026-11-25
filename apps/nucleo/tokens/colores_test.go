@@ -113,13 +113,13 @@ func TestTodosLosTokensExistenEnLasTresApariencias(t *testing.T) {
 	}
 	for _, n := range nombres {
 		for _, v := range []Variant{Dark, Translucent} {
-			if _, ok := paletas[v][n]; !ok {
+			if _, ok := casa().paletas[v][n]; !ok {
 				t.Errorf("%s está en claro y no en la apariencia %d", n, v)
 			}
 		}
 	}
 	for _, n := range []string{"ink-rgb", "selected-strength"} {
-		if _, ok := paletas[Light][n]; ok {
+		if _, ok := casa().paletas[Light][n]; ok {
 			t.Errorf("%s no es un color y ha entrado en la paleta", n)
 		}
 	}
@@ -263,11 +263,11 @@ func TestLosTokensSonLosDeLaWeb(t *testing.T) {
 		}
 		web := aplanar(crudasWeb)
 		for v, nombre := range []string{"claro", "oscuro", "traslúcido"} {
-			if len(web[v]) != len(paletas[v]) {
-				t.Errorf("%s %s: la web tiene %d tokens y las nativas %d", nombre, puerta, len(web[v]), len(paletas[v]))
+			if len(web[v]) != len(casa().paletas[v]) {
+				t.Errorf("%s %s: la web tiene %d tokens y las nativas %d", nombre, puerta, len(web[v]), len(casa().paletas[v]))
 			}
 			for n, c := range web[v] {
-				if got, ok := paletas[v][n]; !ok || got != c {
+				if got, ok := casa().paletas[v][n]; !ok || got != c {
 					t.Errorf("%s (%s) --sytue-%s: nativas %v, web %v", nombre, puerta, n, got, c)
 				}
 			}

@@ -24,6 +24,7 @@ import (
 
 	gosmtp "github.com/emersion/go-smtp"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -32,6 +33,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 
 	maildb "git.sytue.eu/sytue/one/services/mail/db"
@@ -200,7 +202,17 @@ func run() error {
 	// Hub notifier para notificaciones unificadas en tiempo real en la suite.
 	hubNotifier := hubnotify.New(cfg.HubBaseURL, cfg.HubInternalSecret)
 
+	// Rooms por su canal interno: la entrada privada (reclamaciones y recibos) y,
+	// en la recepción, si el correo de una cuenta de Matrix retirada tiene que
+	// esperar al traspaso a la bóveda (ADR 0087). nil si falta la URL o el
+	// secreto, y entonces no se aplaza nada.
+	rooms := callaccess.New(cfg.RoomsURL, cfg.RoomsInternalSecret)
+	var autoridadCorreo delivery.AutoridadCorreo
+	if rooms != nil {
+		autoridadCorreo = rooms
+	}
 	inbound := delivery.NewInbound(st, blobs, nil, outbound, logger, delivery.InboundConfig{
+		Autoridad:     autoridadCorreo,
 		MaxBytes:      cfg.MaxMessageBytes,
 		VerifySPF:     cfg.VerifySPF,
 		VerifyDKIM:    cfg.VerifyDKIM,
@@ -262,17 +274,23 @@ func run() error {
 	// El tope del router acompaña al del mensaje: sin él manda el defecto de 1
 	// MiB y un correo con un adjunto normal no se puede ni componer, por mucho
 	// que MAX_MESSAGE_MB diga 50. Ver la nota de services/drive.
+	// La traza de acceso al correo (docs/security.md §1.7): en lotes, sin bloquear
+	// la petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
 	router := httpx.NewRouter(httpx.RouterOptions{
 		Logger:         logger,
 		RequestTimeout: 30 * time.Second,
 		MaxBodyBytes:   cfg.MaxMessageBytes + (1 << 20),
+		Traza:          traza.Middleware(jmap.ReglasDeTraza...),
 	})
 	httpx.MountHealth(
 		router, cfg.Version, 3*time.Second,
 		httpx.CheckerFunc{Label: "postgres", Fn: st.Healthz},
 		httpx.CheckerFunc{Label: "objectstore", Fn: blobs.Healthz},
 	)
-	api := jmap.New(cfg, st, blobs, outbound, logger).WithHub(hubNotifier).WithPrivateIngressQueue(st.PrivateIngressQueue(callaccess.New(cfg.RoomsURL, cfg.RoomsInternalSecret), blobs))
+	api := jmap.New(cfg, st, blobs, outbound, logger).WithHub(hubNotifier).WithPrivateIngressQueue(st.PrivateIngressQueue(rooms, blobs))
 	// El mismo servicio que firma publica su ancla: sin esto la ruta contesta 503
 	// y el correo sale firmado por una autoridad que nadie puede instalar.
 	//
@@ -317,6 +335,7 @@ func run() error {
 	// por la política de la otra.
 	if cfg.InboundWebhookToken != "" {
 		inboundHTTP := delivery.NewInbound(st, blobs, nil, outbound, logger, delivery.InboundConfig{
+			Autoridad:     autoridadCorreo,
 			MaxBytes:      cfg.MaxMessageBytes,
 			VerifySPF:     false,
 			VerifyDKIM:    cfg.VerifyDKIM,
@@ -371,6 +390,12 @@ func run() error {
 
 	go func() { errCh <- httpServer.Run(ctx) }()
 	go func() { queue.Run(ctx) }()
+	// Purga de tenant (ADR 0054): los objetos de una organización que desaparece,
+	// también sus .eml deduplicados (`shared/mensajes/<slug>/`, blobs.Clave) y los
+	// compartidos entre organizaciones que se quedaron sin referencias.
+	go purgatenant.Trabajador{DB: pool, Almacen: blobs, Log: logger, Prefijos: func(slug string) []string {
+		return []string{objectstore.PrefijoCompartido + "mensajes/" + slug + "/"}
+	}}.Ejecutar(ctx, purgatenant.Cada)
 
 	go func() { errCh <- serveSMTP(smtpServers.MX, false, logger, "mx") }()
 	go func() { errCh <- serveSMTP(smtpServers.Submission, false, logger, "submission") }()

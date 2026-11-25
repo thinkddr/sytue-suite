@@ -125,6 +125,11 @@ type estiloTrozo struct {
 	mayus    bool
 	href     string
 	codigoLn bool
+	// bajar es lo que la letra baja (positivo) o sube (negativo) desde la línea base: el
+	// `vertical-align` de `<sub>` y `<sup>`.
+	bajar float32
+	// emoji dice que el trozo es un emoji, que va en la cara de color (emoji.go).
+	emoji bool
 }
 
 // Trozo es un pedazo de texto con UN estilo en una línea, con la parte del texto del
@@ -196,12 +201,23 @@ const (
 	adornoCabecera
 	adornoDecision
 	adornoEtiqueta
+	// adornoGuia es la guía punteada de una columna mientras se escribe (columnas.go);
+	// adornoNumeroFila, el número de una fila de una tabla numerada; adornoLineas, los
+	// números de línea de un bloque de código (codigo.go).
+	adornoGuia
+	adornoNumeroFila
+	adornoLineas
 )
 
 // Maquetado es la prosa entera a un ancho.
 type Maquetado struct {
 	// imagenes es el `Documento.Imagenes` de lo que se maqueta, también para sus celdas.
 	imagenes func(src string) image.Image
+	// desplegado, rotulo y letra son los del documento y la letra con que se maqueta: los
+	// heredan las columnas, que se maquetan aparte (columnas.go).
+	desplegado bool
+	rotulo     string
+	letra      Letra
 
 	Lineas  []LineaProsa
 	Adornos []Adorno
@@ -287,7 +303,7 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 	if d == nil {
 		return m
 	}
-	m.imagenes = d.Imagenes
+	m.imagenes, m.desplegado, m.rotulo, m.letra = d.Imagenes, d.desplegado, d.rotuloExpandir, l
 	var y, margenPrevio float32
 	var numeros [8]int
 	numero := 0
@@ -298,7 +314,7 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 			d.Bloques[otro].Celda == d.Bloques[k].Celda
 	}
 	ocultos := d.ocultos()
-	cj := cajas{m: m, ancho: ancho, rotulo: d.rotuloExpandir}
+	cj := cajas{m: m, ancho: ancho, rotulo: d.rotuloExpandir, d: d}
 	for i := 0; i < len(d.Bloques); i++ {
 		b := d.Bloques[i]
 		if b.Caja != cj.abierta && (i >= len(ocultos) || !ocultos[i]) {
@@ -310,9 +326,10 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 				margenPrevio = 0
 			}
 		}
-		if i < len(ocultos) && ocultos[i] {
-			// Cuelga de un elemento plegado (plegar.go): no ocupa, pero conserva su caja
-			// para que los índices de `Bloques` sigan siendo los del documento.
+		if i < len(ocultos) && ocultos[i] || cj.cerrada {
+			// Cuelga de un elemento plegado (plegar.go) o va en un desplegable cerrado: no
+			// ocupa, pero conserva su caja para que los índices de `Bloques` sigan siendo
+			// los del documento.
 			m.Bloques = append(m.Bloques, CajaBloque{Y: y})
 			continue
 		}
@@ -325,8 +342,21 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maq
 			for j < len(d.Bloques) && d.Bloques[j].Celda.Tabla == b.Celda.Tabla {
 				j++
 			}
+			indice := func(k int) int { return i + k }
+			if b.Celda.Tabla.EsColumnas() {
+				// Unas columnas: `my-3`, que colapsa con los márgenes de al lado.
+				if i > 0 {
+					y += max(margenPrevio, margenColumnas)
+				}
+				alto, cajas := m.columnas(d.Bloques[i:j], indice, y, ancho, v)
+				m.Bloques = append(m.Bloques, cajas...)
+				y += alto
+				margenPrevio = margenColumnas
+				i = j - 1
+				continue
+			}
 			y += margenPrevio
-			alto, cajas := m.tabla(d.Bloques[i:j], func(k int) int { return i + k }, y, ancho, v)
+			alto, cajas := m.tabla(d.Bloques[i:j], indice, y, ancho, v)
 			m.Bloques = append(m.Bloques, cajas...)
 			y += alto
 			margenPrevio = 0
@@ -412,8 +442,15 @@ func (m *Maquetado) bloque(i int, b Bloque, e estiloBloque, y, ancho float32, nu
 			m.Adornos = append(m.Adornos, Adorno{Tipo: adornoEtiqueta, Bloque: i, X: e.x, Y: y + e.pyFondo, Texto: nombreLenguaje(b.Lenguaje), escalon: tema.TextoXS})
 			arriba += tema.TextoXS.Linea + margenEtiquetaCodigo
 		}
+		borde, primera := e.x-pxCodigo, len(m.Lineas)
+		if b.Lineas {
+			e.x = borde + sangriaCodigoLineas // `pl-13`: el código, detrás de los números
+		}
 		alto := m.lineas(i, b, e, y+arriba, ancho, v) + arriba + e.pyFondo
-		m.Adornos[inicio].An, m.Adornos[inicio].Al = ancho-(e.x-pxCodigo)-(e.der-pxCodigo), alto
+		if b.Lineas {
+			m.numerarCodigo(i, b, primera, borde+anchoNumerosCodigo, e)
+		}
+		m.Adornos[inicio].An, m.Adornos[inicio].Al = ancho-borde-(e.der-pxCodigo), alto
 		return alto
 	default:
 	}
@@ -459,8 +496,15 @@ type pedazo struct {
 	estilo estiloTrozo
 	blanco bool // es el blanco de detrás
 	salto  bool // `<br>`
-	img    *imagenLinea
+	// corte dice que la línea se puede partir detrás de este pedazo aunque no haya
+	// blanco: el código con ajuste se parte por cualquier letra (codigo.go).
+	corte bool
+	img   *imagenLinea
 }
+
+// corta dice si la línea se puede partir detrás del pedazo: un blanco, un salto o una
+// letra de código con ajuste.
+func (p pedazo) corta() bool { return p.blanco || p.salto || p.corte }
 
 // ancho es lo que ocupa un pedazo en la línea.
 func (p pedazo) ancho() float32 {
@@ -509,7 +553,7 @@ func (m *Maquetado) lineas(i int, b Bloque, e estiloBloque, y, ancho float32, v 
 			}
 			anchoPal += w
 			fin++
-			if p.blanco || p.salto {
+			if p.corta() {
 				break
 			}
 		}
@@ -613,7 +657,7 @@ func (m *Maquetado) componer(i int, fila []pedazo, e estiloBloque, y, cabe float
 			continue
 		}
 		a, b := metrica(t.estilo.escalon.Tam, t.estilo.escalon.Tam*razon)
-		arriba, abajo = max(arriba, a), max(abajo, b)
+		arriba, abajo = max(arriba, a-t.estilo.bajar), max(abajo, b+t.estilo.bajar)
 	}
 	l.Alto = max(l.Alto, arriba+abajo)
 	l.Base = y + arriba
@@ -669,10 +713,35 @@ func (m *Maquetado) pedazosDe(b Bloque, e estiloBloque, v tema.Variante, cabe fl
 		if e.mayus || est.mayus {
 			texto = strings.ToUpper(texto)
 		}
-		for _, trozo := range partirBlancos(texto) {
-			out = append(out, pedazo{texto: trozo, desde: pos, estilo: est, blanco: strings.TrimSpace(trozo) == ""})
-			pos += utf8.RuneCountInString(trozo)
+		renglones := []string{texto}
+		if b.Tipo == Codigo {
+			// En un `<pre>` el salto escrito es un salto (`white-space: pre`): la web
+			// guarda así las líneas del código, y no con `<br>`.
+			renglones = strings.Split(texto, "\n")
 		}
+		for k, renglon := range renglones {
+			if k > 0 {
+				out = append(out, pedazo{texto: "\n", desde: pos, salto: true})
+				pos++
+			}
+			partes, emojis := trozosEmoji(renglon)
+			for n, parte := range partes {
+				if emojis[n] {
+					conEmoji := est
+					conEmoji.emoji = true
+					out = append(out, pedazo{texto: parte, desde: pos, estilo: conEmoji})
+					pos += utf8.RuneCountInString(parte)
+					continue
+				}
+				for _, trozo := range partirBlancos(parte) {
+					out = append(out, pedazo{texto: trozo, desde: pos, estilo: est, blanco: strings.TrimSpace(trozo) == ""})
+					pos += utf8.RuneCountInString(trozo)
+				}
+			}
+		}
+	}
+	if b.Tipo == Codigo && b.Ajuste {
+		return letraALetra(out) // se parte por cualquier letra (codigo.go)
 	}
 	return out
 }
@@ -735,6 +804,8 @@ func estiloTramo(t Tramo, e estiloBloque, v tema.Variante) estiloTrozo {
 			if v == tema.Oscuro {
 				s.fondo = resaltadoOscuro
 			}
+		case "sub", "sup":
+			subirBajar(&s, marca == "sub")
 		case "code":
 			if !e.mono { // dentro de `pre` el código no lleva su fondo
 				s.mono, s.codigoLn = true, true
@@ -773,6 +844,19 @@ func estiloTramo(t Tramo, e estiloBloque, v tema.Variante) estiloTrozo {
 		s.mono = true
 	}
 	return s
+}
+
+// subirBajar es el `<sub>` (abajo) o el `<sup>`: lo de Chromium, `font-size: smaller`
+// (÷1,2) y la base corrida un quinto del tamaño de fuera hacia abajo, o un tercio hacia
+// arriba, más un píxel.
+func subirBajar(s *estiloTrozo, abajo bool) {
+	tam := s.escalon.Tam
+	if abajo {
+		s.bajar += tam/5 + 1
+	} else {
+		s.bajar -= tam/3 + 1
+	}
+	s.escalon = tema.Escalon{Tam: tam / 1.2, Linea: s.escalon.Linea}
 }
 
 // tamanoCSS lee un `font-size` sobre el tamaño `base` de su bloque: px, pt, em, rem, % y
@@ -848,6 +932,8 @@ func (m *Maquetado) medirImagen(attrs []html.Attribute, cabe float32) *imagenLin
 // del tema.
 func caraDe(s estiloTrozo) (fyne.Resource, fyne.TextStyle) {
 	switch {
+	case s.emoji:
+		return caraEmoji(), fyne.TextStyle{}
 	case s.mono:
 		return nil, fyne.TextStyle{Monospace: true}
 	case s.cursiva:
@@ -1047,6 +1133,13 @@ func (p *Prosa) AccessibilityRole() fyne.AccessibleRole { return fyne.Accessible
 // Tapped sigue el enlace de debajo, si lo hay, y si no empieza a escribir. Sobre la viñeta
 // de un elemento con sublista, la pliega o la despliega.
 func (p *Prosa) Tapped(e *fyne.PointEvent) {
+	if c := p.cabeceraEn(e.Position); c != nil {
+		// El título de un desplegable lo abre o lo cierra, como el `<summary>` de la web.
+		p.Doc.alternarAlLeer(c)
+		p.memo = [2]maqMemo{}
+		p.Refresh()
+		return
+	}
 	if p.AlPlegar != nil && p.maq != nil {
 		if i := p.maq.viñetaEn(e.Position.X, e.Position.Y); i >= 0 && p.Doc.tieneSublista(i) {
 			p.AlPlegar(i)
@@ -1058,6 +1151,19 @@ func (p *Prosa) Tapped(e *fyne.PointEvent) {
 		return
 	}
 	llamar0(p.AlPulsar)
+}
+
+// cabeceraEn es el desplegable cuyo título está bajo el punto, si lo hay.
+func (p *Prosa) cabeceraEn(pos fyne.Position) *Caja {
+	if p.maq == nil || p.Doc == nil {
+		return nil
+	}
+	for _, a := range p.maq.Adornos {
+		if a.Tipo == adornoCabecera && a.caja != nil && pos.X >= a.X && pos.X <= a.X+a.An && pos.Y >= a.Y && pos.Y <= a.Y+a.Al {
+			return a.caja
+		}
+	}
+	return nil
 }
 
 // Cursor es el de texto cuando se puede escribir, como el `cursor-text` de la web.
@@ -1232,6 +1338,8 @@ func pintarAdorno(a Adorno, v tema.Variante) []fyne.CanvasObject {
 		return []fyne.CanvasObject{rect(a.color, a.X, a.Y, a.An, a.Al, 0)}
 	case adornoPanel, adornoIcono, adornoCabecera, adornoDecision, adornoEtiqueta:
 		return pintarAdornoRico(a, v)
+	case adornoGuia, adornoNumeroFila, adornoLineas:
+		return pintarAdornoNuevo(a, v)
 	}
 	return nil
 }
@@ -1249,6 +1357,7 @@ func casillaNativa(a Adorno, v tema.Variante) []fyne.CanvasObject {
 // imagen, apoyada en la línea base.
 func pintarTrozo(l LineaProsa, t Trozo, v tema.Variante) []fyne.CanvasObject {
 	s := t.estilo
+	l.Base += s.bajar // `<sub>` y `<sup>`: su propia línea base
 	if t.img != nil {
 		y := l.Base - t.img.al
 		if t.img.img == nil {

@@ -34,6 +34,9 @@ import (
 type PDF struct {
 	drive *Drive
 	motor *Client
+	// signatures son las firmas con el certificado del sistema preparadas en el
+	// dispositivo (solo con el Drive privado): ver docs_pdf_local_system_sign.go.
+	signatures *localSignatures
 }
 
 // NewPDF crea el cliente sobre las raíces de Docs y de Drive.

@@ -263,6 +263,8 @@ func DeNota(n api.Note) Nota {
 	o.Traslados = trasladosDe(n.Data)
 	o.Adjuntos = adjuntosDe(n.Data)
 	o.Doc = Leer(o.Contenido)
+	adjuntos := o.Adjuntos
+	o.Doc.Imagenes = imagenesDeAdjuntos(func() []Adjunto { return adjuntos })
 	return o
 }
 
@@ -399,7 +401,15 @@ func (o Orden) ClaveI18n() string { return "orden." + string(o) }
 // la única que lo llama.
 func Ordenar(notas []Nota, o Orden, _ i18n.Locale) []Nota {
 	out := slices.Clone(notas)
-	slices.SortStableFunc(out, func(a, b Nota) int {
+	c := compararNotas(o)
+	slices.SortStableFunc(out, func(a, b Nota) int { return c(&a, &b) })
+	return out
+}
+
+// compararNotas es la comparación de Ordenar, por puntero: ordenar posiciones
+// (Pantalla.ordenadas) no copia ninguna nota.
+func compararNotas(o Orden) func(a, b *Nota) int {
+	return func(a, b *Nota) int {
 		if a.Fijada != b.Fijada {
 			if a.Fijada {
 				return -1
@@ -425,8 +435,7 @@ func Ordenar(notas []Nota, o Orden, _ i18n.Locale) []Nota {
 			return cmp.Compare(a.Posicion, b.Posicion)
 		}
 		return 0
-	})
-	return out
+	}
 }
 
 // Filtrar es el `notasVisibles` de NotesApp.tsx: el texto se busca en título y cuerpo,

@@ -2730,9 +2730,9 @@ export const cs: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Podpis se na tuto stránku nevejde. Zvolte jinou stránku nebo polohu.',
   'pdf.device.view': 'Zobrazit',
   'pdf.vault.help':
-    'Toto PDF je ve vašem šifrovaném Drive: dešifruje se jen v tomto zařízení, kde ho můžete zobrazit, anotovat, vyplnit, uspořádat a podepsat. Co uložíte, se vrací zašifrované.',
+    'Toto PDF je ve vašem šifrovaném Drive: dešifruje se jen v tomto zařízení, kde ho můžete zobrazit, anotovat, vyplnit, uspořádat, zabezpečit, začernit, upravit, porovnat, vytisknout a podepsat. Co uložíte, se vrací zašifrované.',
   'pdf.vault.serverOnly':
-    'Se šifrovaným Drive zatím nejsou k dispozici žádosti o podpis, ochrana heslem, rozpoznávání textu, začernění, úpravy textu nebo obrázků, razítka a vodoznaky, porovnání, historie verzí ani tisk: vyžadují, aby služba PDF přečetla, nebo se zatím v zařízení nedělají.',
+    'S šifrovaným Drive nejsou k dispozici žádosti o podpis, rozpoznávání textu ani asistent: vyžadují, aby služba PDF přečetla. Vše ostatní se dělá v tomto zařízení.',
   'pdf.vault.notFound.title': 'Toto PDF není ve vašem šifrovaném Disku',
   'pdf.vault.notFound.description':
     'Možná bylo přesunuto nebo smazáno. Vyhledejte ho v Sytue Drive.',
@@ -2747,7 +2747,9 @@ export const cs: AppCatalog<typeof en> = {
     'Váš Disk se stále převádí na koncové šifrování. Dokončete to v Sytue Drive.',
   'pdf.device.error.password': 'Toto heslo certifikát neotevře.',
   'pdf.device.error.encrypted':
-    'Toto PDF je chráněno heslem a na tomto zařízení ho nelze podepsat.',
+    'Toto PDF je chráněno heslem: otevřete ho a podepište z jeho studia, kde se použije jeho heslo.',
+  'pdf.device.protectedNote':
+    'Toto PDF je chráněno heslem. Aby ho šlo podepsat, přepíše se v tomto zařízení bez hesla, stejně jako to dělá server: podepsaná kopie se uloží zašifrovaná ve vašem Drive, ale bez hesla PDF.',
   'pdf.device.error.locked':
     'Toto PDF je certifikováno proti jakékoli změně: další podpis by ho zneplatnil.',
   'pdf.device.error.unreadable':

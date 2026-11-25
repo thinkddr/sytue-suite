@@ -79,6 +79,10 @@ const (
 	PrincipalExterno = "external"
 )
 
+// Escribe dice si `acc` cambia algo de la base (y lleva la señal de cambios a quienes la
+// ven): todo menos leer y la traza.
+func Escribe(acc Accion) bool { return acc != AccLeer && acc != AccAuditoria }
+
 // MaxGruposDelActor acota los grupos del token que entran en una consulta de ACL.
 const MaxGruposDelActor = 200
 

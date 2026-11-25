@@ -478,15 +478,16 @@ export function PqVaultGate({
         if (failure instanceof PqVaultError) {
           // La clave es de la cuenta y vive en Sytue ID: sin ella aquí, con una que
           // no es la de la bóveda o con Sytue ID pidiendo identificarse de nuevo, se
-          // va a buscarla sin pedir nada a la persona (una vez; ver autoSignIn). En
-          // segundo plano no: la app ya está en pantalla y no la necesita para
-          // enseñar lo suyo; su candado lo dice.
+          // va a buscarla sin pedir nada a la persona (una vez; ver autoSignIn).
+          // También en segundo plano (Calendar, Notes…): antes ahí se dejaba el
+          // candado en «atención» y había que pulsarlo y volver a Sytue ID a mano;
+          // con iniciar sesión tiene que bastar. La bóveda se abre en cuanto la app
+          // está lista, así que el viaje es al entrar, no a mitad de algo.
           if (
             (failure.reason === 'signin' ||
               failure.reason === 'reauth' ||
               failure.reason === 'wrong') &&
             autoSignIn &&
-            !enSegundoPlano &&
             takeAutoSignIn(product, Date.now())
           ) {
             if (failure.reason === 'signin' && shouldReset && notOpened)

@@ -316,6 +316,7 @@
   "dm.deleteFailed": "Chatten kunde inte tas bort.",
   "dm.empty": "Det finns inga andra i teamet än.",
   "dm.emptyQuery": "Ingen matchar sökningen.",
+  "dm.externalClosed": "Din organisation tillåter inte samtal med den här personen.",
   "dm.invite": "Bjud in personer",
   "dm.maxPeople": {
     "one": "Du kan lägga till högst {count} person.",

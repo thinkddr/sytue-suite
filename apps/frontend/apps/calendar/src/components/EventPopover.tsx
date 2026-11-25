@@ -80,10 +80,10 @@ interface Props {
 
 /**
  * Aspecto de un botón de «¿vas a ir?»: pulsado (`aria-pressed`), primario y con la
- * marca ✓ solo el de la respuesta dada. La marca no sobra: en la casa el secundario
- * es el mismo relleno con borde, y el cambio de variante solo no se distingue a
- * simple vista. Sin respuesta, los tres secundarios: un «Sí» primario sin pulsar se
- * leería como «ya has dicho que sí».
+ * marca ✓ solo el de la respuesta dada. El principal relleno ya se distingue del
+ * secundario de contorno, pero solo por el color; la marca lo dice sin él (WCAG
+ * 1.4.1), como el ✓ de la respuesta en Fyne. Sin respuesta, los tres secundarios: un
+ * «Sí» primario sin pulsar se leería como «ya has dicho que sí».
  */
 function aspectoRespuesta(
   estado: 'accepted' | 'tentative' | 'declined',

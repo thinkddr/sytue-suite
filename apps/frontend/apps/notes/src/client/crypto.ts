@@ -28,6 +28,7 @@
  */
 
 import { saneaHtmlDeDocumento } from '@sytue/ui';
+import { ESQUEMA_ADJUNTO } from '@sytue/ui/browser/bloques-de-notas';
 
 /** Parámetros de derivación que viajan con el cuaderno (no son secretos). */
 export interface NotesCrypto {
@@ -206,8 +207,11 @@ export async function empaquetar(
   return cipher;
 }
 
-/** Lo que una nota lleva además del contrato del saneador: las casillas de las tareas. */
-const CONSERVAR = { conservar: ['input'] } as const;
+/**
+ * Lo que una nota lleva además del contrato del saneador: las casillas de las tareas y
+ * el `adjunto:` con que el texto nombra sus imágenes y ficheros (bloques-de-notas.ts).
+ */
+const CONSERVAR = { conservar: ['input'], esquemas: [ESQUEMA_ADJUNTO] } as const;
 
 /** Deshace `empaquetar`. Devuelve null si el criptograma no abre con esta clave. */
 export async function desempaquetar(

@@ -47,7 +47,7 @@ public final class WidgetSnapshotPrueba {
 
     /** Los casos de testdata/contrato.tsv, con la misma lectura que contrato_test.go. */
     private static void contrato(String fichero) throws IOException {
-        int visibles = 0, rancios = 0, vigentes = 0, rutas = 0;
+        int visibles = 0, rancios = 0, abrir = 0, vigentes = 0, rutas = 0;
         for (String linea : Files.readAllLines(Paths.get(fichero), StandardCharsets.UTF_8)) {
             if (linea.isEmpty() || linea.startsWith("#")) {
                 continue;
@@ -68,6 +68,15 @@ public final class WidgetSnapshotPrueba {
                     WidgetSnapshot s = make(3, "mail", "g", Long.parseLong(c[2]), Long.parseLong(c[2]) + 60, true);
                     check(s.rancio(Long.parseLong(c[3])) == "1".equals(c[4]), "contrato rancio: " + c[1]);
                     rancios++;
+                    break;
+                }
+                case "abrir": {
+                    WidgetSnapshot s = new WidgetSnapshot(3, "drive", "g", Long.parseLong(c[3]), Long.parseLong(c[3]) + 60,
+                            true, Collections.<WidgetSnapshot.Counter>emptyList(), null, null, "1".equals(c[2]));
+                    check(s.pideAbrir(Long.parseLong(c[4])) == "1".equals(c[5]), "contrato abrir: " + c[1]);
+                    check(s.conVigentes(Long.parseLong(c[4]), TimeZone.getTimeZone("UTC")).soloConLaApp == "1".equals(c[2]),
+                            "conVigentes conserva app_only: " + c[1]);
+                    abrir++;
                     break;
                 }
                 case "vigente": {
@@ -96,7 +105,7 @@ public final class WidgetSnapshotPrueba {
                     throw new AssertionError("tipo de caso desconocido: " + c[0]);
             }
         }
-        check(visibles >= 15 && rancios >= 4 && vigentes >= 10 && rutas >= 20, "el contrato se ha quedado corto");
+        check(visibles >= 15 && rancios >= 4 && abrir >= 4 && vigentes >= 10 && rutas >= 20, "el contrato se ha quedado corto");
     }
 
     public static void main(String[] args) throws IOException {
@@ -204,8 +213,10 @@ public final class WidgetSnapshotPrueba {
         check(pronto.conVigentes(mediodia + 3600, madrid) == pronto, "other products are not trimmed");
         check(WidgetSnapshot.accionPermitida("mail", "compose") && WidgetSnapshot.accionPermitida("calendar", "create")
                 && WidgetSnapshot.accionPermitida("contacts", "create") && WidgetSnapshot.accionPermitida("notes", "create")
-                && WidgetSnapshot.accionPermitida("photos", "upload"), "each product keeps its quick action");
-        check(!WidgetSnapshot.accionPermitida("docs", "create") && !WidgetSnapshot.accionPermitida("mail", "create")
+                && WidgetSnapshot.accionPermitida("photos", "upload") && WidgetSnapshot.accionPermitida("docs", "create")
+                && WidgetSnapshot.accionPermitida("sheets", "create") && WidgetSnapshot.accionPermitida("slides", "create"),
+                "each product keeps its quick action");
+        check(!WidgetSnapshot.accionPermitida("docs", "upload") && !WidgetSnapshot.accionPermitida("mail", "create")
                 && !WidgetSnapshot.accionPermitida("photos", "create") && !WidgetSnapshot.accionPermitida("drive", "upload")
                 && !WidgetSnapshot.accionPermitida("mail", "search") && !WidgetSnapshot.accionPermitida(null, "open"),
                 "no action outside the table");

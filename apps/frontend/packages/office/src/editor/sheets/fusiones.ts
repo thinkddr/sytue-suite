@@ -7,7 +7,7 @@
  * el rango); las demás quedan cubiertas. Puro, sin DOM: lo usan SheetCanvas y los tests.
  * Self-test: packages/office/test/sheets-fusiones.test.ts (bun test).
  */
-import { numToCol } from '@sytue/formula';
+import { numToCol } from '@sytue/formula/motor';
 import { parseCell, parseRangeRef, renderCellHtml, stripHtml } from './format';
 
 export interface Fusion {

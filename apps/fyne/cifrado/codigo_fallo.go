@@ -64,6 +64,16 @@ func CodigoFallo(err error) string {
 	if check := privateDrive.ImportCheck(err); check != "" {
 		return "drive.import." + check
 	}
+	// La clave de firma de la bóveda no es la activa en Sytue ID: el mismo código
+	// que la web (`vault.unavailable.signing_put_400_vault_key_proof`…), con qué
+	// contestó Sytue ID. Antes salía `other` y no decía nada.
+	var firma *pqvault.SigningKeyError
+	if errors.As(err, &firma) && codigoServicio.MatchString(firma.Check) {
+		return "vault.unavailable." + firma.Check
+	}
+	if errors.Is(err, pqvault.ErrSigningKey) {
+		return "vault.unavailable.signing"
+	}
 	for _, c := range centinelas {
 		if errors.Is(err, c.err) {
 			return c.codigo

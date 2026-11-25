@@ -18,7 +18,7 @@ import (
 var migrationFiles embed.FS
 
 // Migrations expands the suite's shared versioned source write fence.
-var Migrations = pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateStorageDDL(migrationFiles)))
+var Migrations = pg.WithTenantPurgeDDL(pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateStorageDDL(migrationFiles))))
 
 // MigrationsDir es la subcarpeta dentro de Migrations donde viven los .sql.
 const MigrationsDir = "migrations"

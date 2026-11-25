@@ -14,6 +14,7 @@
     "./prettier": "./prettier.config.js",
     "./astro-health": "./src/astro-health.ts",
     "./astro-404": "./src/astro-404.ts",
+    "./astro-arranque": "./src/astro-arranque.ts",
     "./astro-security": "./src/astro-security.ts",
     "./astro-precarga": "./src/astro-precarga.ts",
     "./astro-precarga-middleware": "./src/astro-precarga-middleware.ts",

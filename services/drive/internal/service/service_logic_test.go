@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1149,16 +1150,22 @@ func TestSharedUploadPermission(t *testing.T) {
 
 	// Editor: sube (subpath "" resuelve a la raíz del share).
 	editor := &fakeStore{
-		shareForRes: domain.Share{FolderID: &folderID, Permission: domain.PermWrite},
+		shareForRes: domain.Share{FolderID: &folderID, Permission: domain.PermWrite, CreatedBy: "ana"},
 		quota:       domain.Quota{LimitBytes: 1 << 20},
 		file:        domain.File{ID: uuid.New(), Name: "f.txt", SizeBytes: 2},
 	}
 	s = newSvc(editor, &fakeBlobs{}, &capturePub{})
-	if _, err := s.SharedUpload(tenantCtx(t), "bob", nil, folderID, "", "f.txt", "text/plain", "bob", strings.NewReader("hi")); err != nil {
+	ctx, avisados := hubnotify.EscrituraDePrueba(tenantCtx(t))
+	if _, err := s.SharedUpload(ctx, "bob", nil, folderID, "", "f.txt", "text/plain", "bob", strings.NewReader("hi")); err != nil {
 		t.Fatalf("editor SharedUpload: %v", err)
 	}
 	if editor.newFile == nil || editor.newFile.Name != "f.txt" {
 		t.Fatalf("el editor debe crear el metadato, got %+v", editor.newFile)
+	}
+	// La señal de cambios llega también a quien compartió la carpeta (ADR 0078); al
+	// viewer rechazado, a nadie. VISTO EN ROJO sin el AvisarTambien de SharedUpload.
+	if got := avisados(); !slices.Equal(got, []string{"ana"}) {
+		t.Fatalf("la señal va a %v; quiero a quien compartió (ana)", got)
 	}
 }
 

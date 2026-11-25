@@ -256,6 +256,7 @@ export const hu: AppCatalog<typeof en> = {
     other: 'Legfeljebb {count} személyt adhat hozzá.',
   },
   'dm.openFailed': 'Nem sikerült megnyitni a beszélgetést.',
+  'dm.externalClosed': 'A szervezeted nem engedélyezi a beszélgetést ezzel a személlyel.',
   'people.search': '„{query}” keresése a Sytue One-ban',
   'people.searching': 'Keresés a Sytue One-ban…',
   'people.notFound':

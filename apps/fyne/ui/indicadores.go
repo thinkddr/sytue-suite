@@ -509,6 +509,14 @@ func NuevoVacio(titulo, descripcion string) *Vacio {
 	return v
 }
 
+// NuevoVacioError es el `<EmptyState tone="error">`: un fallo, no una lista vacía
+// (DS-06). El glifo de peligro en `danger-text` lo pone el tono; nadie lo pinta a mano.
+func NuevoVacioError(titulo, descripcion string) *Vacio {
+	v := NuevoVacio(titulo, descripcion)
+	v.Tono = VacioError
+	return v
+}
+
 // glifo es el glifo que tiñe el estado vacío: el que le den o, en error, el de peligro.
 // Como en la web, el de peligro es la marca POR DEFECTO del error y no una imposición:
 // una Ilustracion que se pida se respeta, salvo en compacto, que no lleva ilustración.

@@ -168,6 +168,18 @@ describe('saneaHtmlDeDocumento: lo que es del editor, intacto', () => {
     expect(s('<textarea>texto</textarea>')).toBe('texto');
   });
 
+  it('admite un esquema propio solo si quien lo usa lo pide (los adjuntos de una nota)', () => {
+    const nota = '<p><img src="adjunto:a1" alt="x"><a href="adjunto:a2">f</a></p>';
+    expect(s(nota)).toBe('<p><img alt="x"><a>f</a></p>');
+    expect(saneaHtmlDeDocumento(nota, { esquemas: ['adjunto:'] })).toBe(nota);
+    // El esquema propio no abre la puerta a lo demás.
+    expect(
+      saneaHtmlDeDocumento('<img src="javascript:x" onerror="x()"><a href="vbscript:x">a</a>', {
+        esquemas: ['adjunto:'],
+      }),
+    ).toBe('<img><a>a</a>');
+  });
+
   it('paso rápido: sin `<` devuelve el texto tal cual', () => {
     expect(s('123,45')).toBe('123,45');
     expect(s('=SUMA(A1:A2)')).toBe('=SUMA(A1:A2)');

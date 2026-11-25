@@ -129,7 +129,14 @@ func run() error {
 		if jerr != nil {
 			return fmt.Errorf("cliente de Jobs de Kapsule: %w", jerr)
 		}
-		runner = builder.NewKubeRunner(cfg, jobClient, logSink)
+		kube := builder.NewKubeRunner(cfg, jobClient, logSink)
+		// La caché de capas en el registry, con la credencial acotada a la de cada tenant.
+		// Sin IAM configurado, en línea como siempre.
+		if cache := builder.ProvisionerDeCache(cfg, jobClient); cache != nil {
+			kube.ConCache(cache)
+			logger.Info("caché de build en el registry, por tenant")
+		}
+		runner = kube
 		logger.Info("builder en modo Kapsule (client-go)", "build_namespace", cfg.BuildNamespace)
 	} else {
 		runner = builder.NewStubRunner(cfg)

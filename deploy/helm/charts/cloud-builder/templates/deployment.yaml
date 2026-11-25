@@ -108,6 +108,19 @@ spec:
               value: {{ .Values.config.s3.bucket | quote }}
             - name: S3_USE_SSL
               value: {{ .Values.config.s3.useSSL | quote }}
+            {{- with .Values.config.scw.orgId }}
+            # Scaleway IAM: la credencial del registry de cada tenant, acotada a su caché.
+            - name: SCW_ORG_ID
+              value: {{ . | quote }}
+            {{- end }}
+            # SCW_SECRET_KEY (token de plataforma con derecho IAM). Ausente ⇒ sin caché por
+            # registry: la build sigue con la caché en línea.
+            - name: SCW_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: scw-secret-key
+                  optional: true
             # ── Obligatorias (config.Load l.Require): sin ellas el binario ABORTA ──
             - name: DATABASE_URL
               valueFrom:

@@ -28,6 +28,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 
 	basesdb "git.sytue.eu/sytue/one/services/bases/db"
@@ -110,6 +111,13 @@ func runAPI() error {
 	} else {
 		logger.Warn("sin almacén de objetos (S3_*): los adjuntos no están disponibles")
 	}
+	// Purga de tenant (ADR 0054): los adjuntos de una organización que desaparece.
+	// Sin almacén no hay adjuntos, y las órdenes se cumplen sin más.
+	var almacenPurga purgatenant.Almacen = purgatenant.SinAlmacen{}
+	if objetos != nil {
+		almacenPurga = objetos
+	}
+	go purgatenant.Trabajador{DB: pool, Almacen: almacenPurga, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
 
 	verifier, err := authn.NewVerifier(ctx, authn.VerifierConfig{
 		Issuer:    cfg.OIDCIssuer,

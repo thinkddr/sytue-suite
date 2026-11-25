@@ -36,7 +36,10 @@ const PATHS = {
     'M8 10V7a4 4 0 0 1 7.5-2M5 11a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8Z',
   pin: 'M9.5 3.5h5l-.8 5.5 3.3 3.5H7l3.3-3.5ZM12 12.5V20.5',
   archive: 'M3.5 5h17v4h-17zM5 9v10h14V9M10 13h4',
-  copy: 'M9 9h9.5a1.5 1.5 0 0 1 1.5 1.5V20a1.5 1.5 0 0 1-1.5 1.5H9A1.5 1.5 0 0 1 7.5 20v-9.5A1.5 1.5 0 0 1 9 9ZM4.5 15V4a1.5 1.5 0 0 1 1.5-1.5h9',
+  // Dos hojas iguales, la de detrás asomando lo mismo por arriba que por la izquierda y
+  // con sus dos esquinas: antes asomaba 3 de lado y 6,5 de alto, sin esquinas, y no se
+  // leía como «copiar». Centrado en la caja de 24, como tijeras y pegar.
+  copy: 'M10 8.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 8.5 18v-8A1.5 1.5 0 0 1 10 8.5ZM8.5 15.5H6A1.5 1.5 0 0 1 4.5 14V6A1.5 1.5 0 0 1 6 4.5h8A1.5 1.5 0 0 1 15.5 6v2.5',
   send: 'M20.5 3.5 3.5 10l7 3 3 7Z',
   filter: 'M3.5 5.5h17l-6.5 7.5v6l-4 2v-8Z',
   // Dos flechas en sentidos opuestos: el orden de lectura, que en el móvil se queda
@@ -72,6 +75,9 @@ const PATHS = {
   // «Coincidir mayúsculas» de la búsqueda: una A grande y una a pequeña.
   mayusculas:
     'M3.5 18 8 6l4.5 12M5 14h6M19.5 12.5V18M19.5 15.25a2.5 2.75 0 1 1-5 0 2.5 2.75 0 0 1 5 0Z',
+  // «Más formato» de la burbuja de la selección: la «A» subrayada, la de Fyne. Un botón
+  // como los demás, sin flecha: así la burbuja tiene el mismo hueco entre todos.
+  formato: 'M6.5 16 11 4.5h2L17.5 16M8.2 12h7.6M4.5 20h15',
   // Cortar y pegar de la burbuja de la selección (copiar es `copy`, más arriba).
   tijeras:
     'M8.5 7a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8.5 17a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8 8.5l11.5 9M8 15.5l11.5-9',
@@ -87,6 +93,10 @@ const PATHS = {
   columnaQuitar: 'M8.5 4.5h7v15h-7ZM10.5 10l3 4M13.5 10l-3 4',
   cabeceraFila: 'M4.5 4.5h15v5h-15ZM4.5 9.5v10h15v-10M4.5 14.5h15M12 9.5v10',
   cabeceraColumna: 'M4.5 4.5h5v15h-5ZM9.5 4.5h10v15h-10M9.5 12h10M14.5 4.5v15',
+  // Combinar con la de la derecha o con la de abajo, y separar: las de Fyne (combinar.go).
+  combinar: 'M4.5 5.5h15v13h-15ZM8 12h8M13.5 9.5 16 12l-2.5 2.5M10.5 9.5 8 12l2.5 2.5',
+  combinarAbajo: 'M5.5 4.5v15h13v-15ZM12 8v8M9.5 13.5 12 16l2.5-2.5M9.5 10.5 12 8l2.5 2.5',
+  separar: 'M4.5 5.5h15v13h-15ZM12 5.5v13M9.5 10 7.5 12l2 2M14.5 10l2 2-2 2',
 } as const;
 
 /** Los nombres de Notepads que dibuja el catálogo común. Una nota guarda el suyo en

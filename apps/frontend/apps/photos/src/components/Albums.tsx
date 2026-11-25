@@ -4,7 +4,17 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Badge, Button, Checkbox, EmptyState, Icon, Input, Select, usePrompt } from '@sytue/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  EmptyState,
+  Icon,
+  Input,
+  marcarAppLista,
+  Select,
+  usePrompt,
+} from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import {
   albumes,
@@ -133,6 +143,11 @@ function Albumes({
       .then(setAjustes)
       .catch(() => {});
   }, []);
+  // `sytue:app-ready`: la lista de álbumes (o su fallo) ya está pintada. Sin la marca,
+  // la bóveda esperaba los 5 s de `cuandoAppLista` para empezar a abrirse.
+  useEffect(() => {
+    if (lista !== null || fallo !== null) marcarAppLista();
+  }, [lista, fallo]);
 
   const crear = async (e: Event) => {
     e.preventDefault();

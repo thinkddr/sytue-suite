@@ -4,6 +4,10 @@
 "widgets.newNote" = "Nóta nua";
 "widgets.newContact" = "Teagmhálaí nua";
 "widgets.addPhotos" = "Cuir grianghraif leis";
+"widgets.newDocument" = "Doiciméad nua";
+"widgets.newSpreadsheet" = "Scarbhileog nua";
+"widgets.newPresentation" = "Cur i láthair nua";
+"widgets.openToUpdate" = "Nuashonraítear é nuair atá an aip oscailte";
 "widgets.notes" = "Nótaí";
 "widgets.rows" = "Rónna";
 "widgets.pending" = "Ar feitheamh";

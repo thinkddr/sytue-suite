@@ -158,8 +158,9 @@ func TestDeviceSessionRejectsWithStableCodes(t *testing.T) {
 	if _, err := s.Pages(nil, map[string]string{"op": "combinar"}); err == nil {
 		t.Fatal("sin documentos")
 	}
-	if _, err := s.Pages([]string{"d1"}, map[string]string{"op": "marca-agua"}); err == nil {
-		t.Fatal("operación de capa aceptada")
+	// Una capa sin su texto no se dibuja (las capas, en device_session_boveda_test.go).
+	if _, err := s.Pages([]string{"d1"}, map[string]string{"op": "marca-agua"}); DescribeDeviceError(err).Code != "bad_request" {
+		t.Fatalf("marca de agua sin texto: %v", err)
 	}
 }
 

@@ -83,6 +83,10 @@ type cajas struct {
 	// primero dice que el bloque que viene es el primero de la caja: no lleva margen
 	// de arriba (`first:mt-0`).
 	primero bool
+	// cerrada dice que la caja abierta es un desplegable cerrado que se está leyendo: de
+	// él solo se ve el título. d es el documento, que sabe cuáles se han abierto al leer.
+	cerrada bool
+	d       *Documento
 }
 
 // x es lo que se corre a la derecha el texto dentro de la caja.
@@ -100,6 +104,7 @@ func (c *cajas) abrir(i int, k *Caja, y, margenPrevio float32) float32 {
 		y += max(margenPrevio, margenCaja)
 	}
 	c.abierta, c.inicio, c.fondo, c.primero = k, y, len(c.m.Adornos), true
+	c.cerrada = k.Tipo == CajaExpandir && !c.d.desplegado && !c.d.abiertaAlLeer(k)
 	c.m.Adornos = append(c.m.Adornos, Adorno{Tipo: adornoPanel, Bloque: i, X: 0, Y: y, An: c.ancho, caja: k})
 	y += pyCaja
 	if k.Tipo == CajaPanel {
@@ -116,7 +121,13 @@ func (c *cajas) abrir(i int, k *Caja, y, margenPrevio float32) float32 {
 	c.m.Adornos = append(c.m.Adornos, Adorno{
 		Tipo: adornoCabecera, Bloque: i, X: pxCaja, Y: y, An: c.ancho - 2*pxCaja, Al: escalonCuerpo.Linea,
 		Texto: titulo, caja: k, escalon: escalonCuerpo, Marcada: k.Titulo != "",
+		// La flecha mira a la derecha con el desplegable cerrado: escribiendo se ve lo de
+		// dentro igual, pero se sabe cómo se leerá.
+		plegada: !k.Abierta && c.d.desplegado || c.cerrada,
 	})
+	if c.cerrada {
+		return y + escalonCuerpo.Linea // sin el `mb-1.5` del título de uno abierto
+	}
 	return y + altoCabeceraCaja
 }
 
@@ -125,8 +136,20 @@ func (c *cajas) abrir(i int, k *Caja, y, margenPrevio float32) float32 {
 func (c *cajas) cerrar(y float32) (float32, float32) {
 	y += pyCaja
 	c.m.Adornos[c.fondo].Al = y - c.inicio
-	c.abierta, c.primero = nil, false
+	c.abierta, c.primero, c.cerrada = nil, false, false
 	return y, margenCaja
+}
+
+// abiertaAlLeer dice si un desplegable se ve abierto en la lectura: su `open`, salvo que
+// se haya abierto o cerrado pulsando su título (eso no se guarda, como en la web).
+func (d *Documento) abiertaAlLeer(c *Caja) bool { return c.Abierta != d.alternadas[c] }
+
+// alternarAlLeer abre o cierra un desplegable en la lectura, sin tocar la nota.
+func (d *Documento) alternarAlLeer(c *Caja) {
+	if d.alternadas == nil {
+		d.alternadas = map[*Caja]bool{}
+	}
+	d.alternadas[c] = !d.alternadas[c]
 }
 
 // pintarAdornoRico pinta los adornos de los bloques ricos.
@@ -146,7 +169,11 @@ func pintarAdornoRico(a Adorno, v tema.Variante) []fyne.CanvasObject {
 		d.Colocar(a.X, a.Y, a.An)
 		return []fyne.CanvasObject{d.Objeto()}
 	case adornoCabecera:
-		d := iconos.Trazo(iconos.ChevronAbajo, 14, "text-muted", v)
+		flecha := iconos.ChevronAbajo
+		if a.plegada {
+			flecha = iconos.ChevronDerecha
+		}
+		d := iconos.Trazo(flecha, 14, "text-muted", v)
 		d.Colocar(a.X, a.Y+(a.Al-14)/2, 14)
 		tinta := "text"
 		if !a.Marcada {
@@ -165,7 +192,8 @@ func pintarAdornoRico(a Adorno, v tema.Variante) []fyne.CanvasObject {
 		t := ui.Texto(a.Texto, a.escalon, ui.Medio, tema.Color("text-subtle", v))
 		ui.ColocarTexto(t, a.escalon, a.X, a.Y)
 		return []fyne.CanvasObject{t}
-	case adornoVineta, adornoNumero, adornoCasilla, adornoFilo, adornoFondo, adornoRegla, adornoCaja:
+	case adornoVineta, adornoNumero, adornoCasilla, adornoFilo, adornoFondo, adornoRegla, adornoCaja,
+		adornoGuia, adornoNumeroFila, adornoLineas:
 	}
 	return nil
 }

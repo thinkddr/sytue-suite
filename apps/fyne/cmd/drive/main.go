@@ -115,7 +115,7 @@ func main() {
 		if control != nil && control.pantalla != nil {
 			control.pantalla.AvisarCifrado(cryptoT("matrix.failed"))
 		} else if control != nil {
-			view := ui.NuevoVacio(cryptoT("matrix.failed"), codigo)
+			view := ui.NuevoVacioError(cryptoT("matrix.failed"), codigo)
 			view.Accion = ui.NuevoBoton(tr.T("action.retry", nil), func() {
 				if c := control.ciclo; c != nil {
 					control.preparar(c.ctx)

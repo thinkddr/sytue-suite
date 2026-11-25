@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
@@ -69,8 +70,17 @@ func (f *fakeCompliance) WriteAudit(_ context.Context, actor, action, target str
 	return nil
 }
 
-func (f *fakeCompliance) ListAudit(_ context.Context, _ int) ([]domain.AuditEntry, error) {
-	return f.auditLog, f.auditLogErr
+func (f *fakeCompliance) ListarTraza(_ context.Context, q auditlog.Consulta) ([]domain.AuditEntry, string, error) {
+	if f.auditLogErr != nil {
+		return nil, "", f.auditLogErr
+	}
+	// El filtro en memoria hace aquí de la consulta del store.
+	entries := auditlog.Filtrar(append([]domain.AuditEntry(nil), f.auditLog...), q)
+	if q.CSV {
+		return entries, "", nil
+	}
+	page, next := auditlog.Paginar(entries, q.After, q.Limit)
+	return page, next, nil
 }
 
 // fakeBlobs implementa blobGetter: devuelve un contenido fijo por clave.

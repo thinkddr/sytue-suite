@@ -2707,9 +2707,9 @@ export const lv: AppCatalog<typeof en> = {
     'Paraksts neietilpst šajā lappusē. Izvēlieties citu lappusi vai novietojumu.',
   'pdf.device.view': 'Skatīt',
   'pdf.vault.help':
-    'Šis PDF ir jūsu šifrētajā Drive: tas tiek atšifrēts tikai šajā ierīcē, kur varat to skatīt, anotēt, aizpildīt, kārtot un parakstīt. Tas, ko saglabājat, atgriežas šifrēts.',
+    'Šis PDF ir jūsu šifrētajā Drive: tas tiek atšifrēts tikai šajā ierīcē, kur varat to skatīt, anotēt, aizpildīt, kārtot, aizsargāt, aizklāt, rediģēt, salīdzināt, drukāt un parakstīt. Tas, ko saglabājat, atgriežas šifrēts.',
   'pdf.vault.serverOnly':
-    'Ar šifrēto Drive vēl nav pieejami parakstu pieprasījumi, aizsardzība ar paroli, teksta atpazīšana, aizklāšana, teksta vai attēlu rediģēšana, zīmogi un ūdenszīmes, salīdzināšana, versiju vēsture un drukāšana: tiem nepieciešams, lai pakalpojums nolasa PDF, vai tie vēl netiek veikti ierīcē.',
+    'Ar šifrēto Drive nav pieejami paraksta pieprasījumi, teksta atpazīšana un asistents: tiem nepieciešams, lai pakalpojums nolasa PDF. Viss pārējais notiek šajā ierīcē.',
   'pdf.vault.notFound.title': 'Šis PDF nav jūsu šifrētajā Diskā',
   'pdf.vault.notFound.description':
     'Iespējams, tas ir pārvietots vai izdzēsts. Meklējiet to Sytue Drive.',
@@ -2724,7 +2724,9 @@ export const lv: AppCatalog<typeof en> = {
     'Jūsu Drive vēl pāriet uz pilnīgu šifrēšanu. Pabeidziet to Sytue Drive.',
   'pdf.device.error.password': 'Šī parole neatver sertifikātu.',
   'pdf.device.error.encrypted':
-    'Šis PDF ir aizsargāts ar paroli, un to nevar parakstīt šajā ierīcē.',
+    'Šis PDF ir aizsargāts ar paroli: atveriet to un parakstiet no tā studijas, kur tiek izmantota tā parole.',
+  'pdf.device.protectedNote':
+    'Šis PDF ir aizsargāts ar paroli. Lai to parakstītu, šajā ierīcē tas tiek pārrakstīts bez paroles, kā to dara arī serveris: parakstītā kopija tiek saglabāta šifrēta jūsu Drive, bet bez PDF paroles.',
   'pdf.device.error.locked':
     'Šis PDF ir sertificēts pret jebkurām izmaiņām: vēl viens paraksts to padarītu nederīgu.',
   'pdf.device.error.unreadable':

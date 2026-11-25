@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/apns"
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
@@ -193,7 +194,13 @@ func run() error {
 		}
 	}
 
+	// La traza de acceso (docs/security.md §1.7): en lotes, sin bloquear la
+	// petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
 	router := hubhttp.NewRouter(hubhttp.Deps{
+		Traza:    traza,
 		Cfg:      cfg,
 		Verifier: verifier,
 		Search:   searchSvc,

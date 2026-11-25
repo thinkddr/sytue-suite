@@ -39,6 +39,20 @@ spec:
           args:
             - |
               printf '[databases]\n* = host=%s port=%s\n' "$PGB_DB_HOST" "$PGB_DB_PORT" > /run/pgbouncer/databases.ini
+              {{- if ((.Values.global).pgbouncerTls).enabled }}
+              # cert-manager renueva el certificado en el Secret montado, pero
+              # PgBouncer lo tiene cargado en memoria: sin esto serviria el viejo
+              # hasta caducar. Cuando el fichero cambia, SIGHUP (recarga la
+              # configuracion y el TLS sin cortar conexiones). `exec` deja a
+              # pgbouncer como PID 1, que es a quien va la señal.
+              (
+                antes="$(cksum < /etc/pgbouncer/tls/tls.crt)"
+                while sleep {{ .Values.tls.reloadCheckSeconds }}; do
+                  ahora="$(cksum < /etc/pgbouncer/tls/tls.crt)"
+                  [ "$ahora" = "$antes" ] || { antes="$ahora"; kill -HUP 1; }
+                done
+              ) &
+              {{- end }}
               exec pgbouncer /etc/pgbouncer/pgbouncer.ini
           env:
             # Endpoint PRIVADO de la RDB (Scaleway, UE) — nunca en git.
@@ -82,6 +96,13 @@ spec:
               mountPath: /etc/pgbouncer/userlist.txt
               subPath: {{ .Values.auth.userlistKey }}
               readOnly: true
+            {{- if ((.Values.global).pgbouncerTls).enabled }}
+            # Directorio entero y no subPath: un subPath no se actualiza cuando
+            # cert-manager renueva el Secret.
+            - name: tls
+              mountPath: /etc/pgbouncer/tls
+              readOnly: true
+            {{- end }}
             # rootfs de solo lectura: escrituras efimeras (databases.ini, socket).
             - name: run
               mountPath: /run/pgbouncer
@@ -94,6 +115,15 @@ spec:
         - name: auth
           secret:
             secretName: {{ .Values.auth.existingSecret }}
+        {{- if ((.Values.global).pgbouncerTls).enabled }}
+        - name: tls
+          secret:
+            secretName: {{ ((.Values.global).pgbouncerTls).secretName | default "sytue-pgbouncer-tls" }}
+            defaultMode: 0440
+            items:
+              - { key: tls.crt, path: tls.crt }
+              - { key: tls.key, path: tls.key }
+        {{- end }}
         - name: run
           emptyDir: {}
         - name: tmp

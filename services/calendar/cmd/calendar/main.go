@@ -21,6 +21,7 @@ import (
 	// copia embebida para resolver zonas y DST en producción. Es stdlib.
 	_ "time/tzdata"
 
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
@@ -203,7 +204,13 @@ func run() error {
 		defer func() { _ = c.Close() }()
 	}
 
+	// La traza de acceso (docs/security.md §1.7): en lotes, sin bloquear la
+	// petición, y con su retención de doce meses.
+	traza := auditlog.NuevoRegistro(pool, logger)
+	go traza.Ejecutar(ctx)
+	go traza.Retener(ctx, 0)
 	router := calendarhttp.NewRouter(calendarhttp.Deps{
+		Traza:          traza,
 		Cfg:            cfg,
 		Service:        svc,
 		Verifier:       verifier,

@@ -330,7 +330,8 @@ func (p *PapeleraDocs) volver() {
 }
 
 func (p *PapeleraDocs) cuerpo(v tema.Variante) fyne.CanvasObject {
-	aviso := func() fyne.CanvasObject { return iconos.Trazo(iconos.Aviso, 40, "danger-text", v).Objeto() }
+	// Los fallos son el `tone="error"` de `DocTrash.tsx` (DS-06): el glifo de peligro
+	// lo pone VacioError, en `danger-text`.
 	var e *ui.Vacio
 	switch p.Estado {
 	case Cargando:
@@ -349,17 +350,13 @@ func (p *PapeleraDocs) cuerpo(v tema.Variante) fyne.CanvasObject {
 		e = ui.NuevoVacio(p.t("trash.emptyTitle"), p.t("trash.emptyBody"))
 		e.Ilustracion = tiposVacio()
 	case SinConexion:
-		e = ui.NuevoVacio(p.t("list.offline.emptyTitle"), p.t("list.offline.emptyDescription"))
-		e.Ilustracion = aviso()
+		e = ui.NuevoVacioError(p.t("list.offline.emptyTitle"), p.t("list.offline.emptyDescription"))
 	case SinSesion:
-		e = ui.NuevoVacio(p.t("trash.errorTitle"), p.t("pdf.error.session"))
-		e.Ilustracion = aviso()
+		e = ui.NuevoVacioError(p.t("trash.errorTitle"), p.t("pdf.error.session"))
 	case SinPermiso:
-		e = ui.NuevoVacio(p.t("forbidden.title"), p.t("forbidden.description"))
-		e.Ilustracion = aviso()
+		e = ui.NuevoVacioError(p.t("forbidden.title"), p.t("forbidden.description"))
 	case Error:
-		e = ui.NuevoVacio(p.t("trash.errorTitle"), p.t("list.error.description"))
-		e.Ilustracion = aviso()
+		e = ui.NuevoVacioError(p.t("trash.errorTitle"), p.t("list.error.description"))
 		e.Accion = ui.NuevoBoton(p.t("list.retry"), p.Cargar).Con(ui.Secundario, ui.TallaSM)
 	}
 	return e

@@ -254,6 +254,10 @@ func AltoSemana(alto float32) float32 {
 // 2026-11-25; aquí además las filas de barras ceden antes que la última píldora, para
 // que nada se salga de su semana.
 
+// El «+N más» mide 24 (AltoMasDia) y se reserva lo de siempre, su `gap-0.5` y una línea
+// de `text-xs` (18): se pega a la última píldora, sin el hueco, y baja al relleno de la
+// celda (ver celdaRenderer.Layout). Así el objetivo de 24 no le quita sitio a nada.
+
 // pasoFicha es lo que ocupa una píldora con su `gap-0.5` (`FICHA_H + FICHA_GAP`).
 var pasoFicha = AltoPildora + espacio0p5
 
@@ -295,17 +299,20 @@ func cabenBarras(alto float32, filas int, mas bool) bool {
 	return libre >= 0
 }
 
-// cabenDosLineas dice si la píldora en dos líneas cabe en una celda sin barras: la
-// web la pone con la ventana a 640 de alto o más, «donde caben sus 38 px».
-func cabenDosLineas(alto float32) bool {
-	return libreBajo(alto, 0)-espacio0p5 >= AltoPildoraDosLineas
+// cabenDosLineas dice si `n` píldoras en dos líneas caben bajo `filas` filas de barras
+// (`fichasEnDosLineas` de CalendarGrid.tsx): la web las pone con la ventana a 640 de
+// alto o más, «donde caben sus 38 px». Hasta el 2026-11-25 solo la píldora sola de una
+// semana sin barras; con dos o más se cortaban todas a una línea aunque sobrara sitio.
+func cabenDosLineas(alto float32, filas, n int) bool {
+	return n > 0 && libreBajo(alto, filas)-espacio0p5 >= float32(n)*(AltoPildoraDosLineas+espacio0p5)-espacio0p5
 }
 
 // firmaAlto es todo lo que decide el alto de una semana: si cambia, la rejilla se rehace.
 type firmaAlto struct {
 	fichas [MaxFilasBarra + 1][2]int
 	barras [MaxFilasBarra + 1][2]bool
-	dos    bool
+	// dos es cuántas píldoras caben en dos líneas bajo cada número de filas de barras.
+	dos [MaxFilasBarra + 1]int
 }
 
 func firmaDe(alto float32) firmaAlto {
@@ -313,14 +320,16 @@ func firmaDe(alto float32) firmaAlto {
 	for filas := range MaxFilasBarra + 1 {
 		f.fichas[filas][0], f.fichas[filas][1] = fichas(alto, filas)
 		f.barras[filas] = [2]bool{cabenBarras(alto, filas, false), cabenBarras(alto, filas, true)}
+		for f.dos[filas] < MaxCarriles && cabenDosLineas(alto, filas, f.dos[filas]+1) {
+			f.dos[filas]++
+		}
 	}
-	f.dos = cabenDosLineas(alto)
 	return f
 }
 
 // repartoSemana es lo que se ve de una semana: las barras de sus filas visibles y,
-// por día, cuántas píldoras se pintan, cuántas cosas van al «+N más» y si la única
-// píldora va en dos líneas.
+// por día, cuántas píldoras se pintan, cuántas cosas van al «+N más» y si sus píldoras
+// van en dos líneas.
 type repartoSemana struct {
 	filas    int
 	visibles []Tramo[Ocurrencia]
@@ -347,10 +356,9 @@ func repartirSemana(alto float32, tramos []Tramo[Ocurrencia], chips [][]Ocurrenc
 			r.pildoras[c] = min(n, tope, conMas)
 		}
 		r.ocultas[c] += n - r.pildoras[c]
-		// La única píldora de un día sin barras en su semana —ni escondidas: entonces
-		// lleva «+N más» debajo— sigue en una segunda línea en vez de cortarse en
-		// «08:00 Reunión s…» (`dosLineas` de la web).
-		r.dos[c] = filas == 0 && n == 1 && r.pildoras[c] == 1 && r.ocultas[c] == 0 && cabenDosLineas(alto)
+		// Las píldoras de un día sin «+N más» siguen en una segunda línea si caben todas
+		// así, en vez de cortarse en «08:00 Reunión s…» (`dosLineas` de la web).
+		r.dos[c] = r.ocultas[c] == 0 && cabenDosLineas(alto, filas, r.pildoras[c])
 	}
 	return r
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
+	"git.sytue.eu/sytue/one/services/id/internal/store"
 )
 
 // sesionBorrado abre una sesión con la antigüedad y los métodos dados y devuelve
@@ -212,6 +213,12 @@ func TestPurgaDeCuentaBorrada(t *testing.T) {
 	if err != nil || len(p) != 1 || p[0] != org.ID {
 		t.Fatalf("purga vencida: %v %v, quiero [%s]", p, err, org.ID)
 	}
+	// Su contenido queda pedido en la misma transacción (mig 0129), con el slug que
+	// conocen los servicios.
+	if pt, err := l.st.PurgaDeTenantDe(l.ctx, org.ID); err != nil || pt == nil || pt.Slug != org.Slug ||
+		pt.Motivo != store.PurgaCuentaBorrada || pt.Completada != nil {
+		t.Fatalf("purga de su cuenta personal sin encolar: %+v %v", pt, err)
+	}
 	var email, nombre string
 	var username, phone *string
 	if err := l.st.DB().QueryRow(l.ctx, `SELECT email, name, username, phone FROM users WHERE id = $1`, u.ID).
@@ -223,12 +230,6 @@ func TestPurgaDeCuentaBorrada(t *testing.T) {
 	}
 	if n := l.cuenta(t, `SELECT count(*) FROM memberships WHERE user_id = $1`, u.ID); n != 0 {
 		t.Fatalf("quedan %d membresías", n)
-	}
-	if _, err := l.st.AsignarUsernamesPendientes(l.ctx, 100); err != nil {
-		t.Fatal(err)
-	}
-	if n := l.cuenta(t, `SELECT count(*) FROM users WHERE id = $1 AND username IS NOT NULL`, u.ID); n != 0 {
-		t.Fatal("la cuenta purgada recibió otro @usuario")
 	}
 	// Y su dirección sigue ocupada: nadie puede quedarse con ella y recibir lo suyo.
 	if n := l.cuenta(t, `SELECT count(*) FROM org_mailboxes WHERE user_id = $1 AND removed_at IS NULL`, u.ID); n == 0 {

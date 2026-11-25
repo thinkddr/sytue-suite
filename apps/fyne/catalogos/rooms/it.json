@@ -316,6 +316,7 @@
   "dm.deleteFailed": "Non è stato possibile eliminare la chat.",
   "dm.empty": "Non c’è ancora nessun altro nel team.",
   "dm.emptyQuery": "Nessuno corrisponde alla ricerca.",
+  "dm.externalClosed": "La tua organizzazione non consente conversazioni con questa persona.",
   "dm.invite": "Invita persone",
   "dm.maxPeople": {
     "one": "Puoi aggiungere al massimo {count} persona.",

@@ -38,7 +38,8 @@ import { OID_SELLO } from './dispositivo/sello';
 import { verificarFirmas } from './dispositivo/pades';
 import { DocumentoPdf } from './dispositivo/pdfObjetos';
 import type { EdicionLocal, MotorPdf } from './dispositivo/motorPdf';
-import type { Contenido } from './api';
+import { ErrorPDF, type Contenido } from './api';
+
 import { EstudioBoveda, EstudioPdf, type CrearMotor } from './EstudioBoveda';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
@@ -95,10 +96,16 @@ async function cuerpoDe(body: BodyInit | null | undefined): Promise<string> {
   return latin1(new Uint8Array(await new Response(body).arrayBuffer()));
 }
 
+/** Lo que el motor falso «protegió»: pide su contraseña (`abre-me`) para abrirlo. */
+const MARCA_PROTEGIDO = /\n%proteger \{[^\n]*"op":"proteger"[^\n]*\n/g;
+const protegido = (b: Uint8Array) => new RegExp(MARCA_PROTEGIDO.source).test(latin1(b));
+const deLatin1 = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
+
 /**
  * Un motor FALSO con el contrato de `MotorPdf`: lee las páginas con el lector del
  * firmador (`DocumentoPdf`), dibuja un SVG por página y «edita» añadiendo al final un
  * comentario con la operación y sus campos, para poder comprobar qué llegó a la bóveda.
+ * Lo «protegido» pide su contraseña al abrir, y «desproteger» le quita la marca.
  */
 function motorFalso(registro: { abierto: number; llamadas: string[] }): CrearMotor {
   return async () => {
@@ -114,7 +121,9 @@ function motorFalso(registro: { abierto: number; llamadas: string[] }): CrearMot
       return { datos, tipo: 'application/pdf' };
     };
     const motor: MotorPdf = {
-      async abrir(pdf) {
+      async abrir(pdf, clave) {
+        if (protegido(pdf) && clave !== 'abre-me')
+          throw new ErrorPDF('pdf_password_required', 'pdf_password_required');
         registro.abierto++;
         const doc = `f${++n}`;
         docs.set(doc, pdf.slice());
@@ -149,7 +158,7 @@ function motorFalso(registro: { abierto: number; llamadas: string[] }): CrearMot
             },
           ],
           firmas: [],
-          cifrado: false,
+          cifrado: protegido(pdf),
           permisos: {
             Imprimir: true,
             Modificar: true,
@@ -177,6 +186,32 @@ function motorFalso(registro: { abierto: number; llamadas: string[] }): CrearMot
       formulario: async (doc, campos) => editar(doc, 'formulario', campos),
       paginas: async (ds, campos) => editar(ds[0]!, `paginas-${ds.length}`, campos),
       herramienta: async (doc, campos) => editar(doc, 'herramienta', campos),
+      async proteger(doc, campos) {
+        if (campos.op !== 'desproteger') return editar(doc, 'proteger', campos);
+        registro.llamadas.push(`desproteger ${doc}`);
+        return {
+          datos: deLatin1(latin1(docs.get(doc)!).replace(MARCA_PROTEGIDO, '\n')),
+          tipo: 'application/pdf',
+        };
+      },
+      async editar(doc, campos) {
+        if (campos.op !== 'analizar') return editar(doc, 'editar', campos);
+        const vacio = { fragmentos: [], imagenes: [], capas: [], avisos: [] };
+        return { datos: new TextEncoder().encode(JSON.stringify(vacio)), tipo: 'application/json' };
+      },
+      async comparar(a, b, campos) {
+        registro.llamadas.push(`comparar ${a} ${b} ${JSON.stringify(campos)}`);
+        return {
+          diferencias: [{ pagina: 1, anadido: ['precio nuevo'], quitado: [], solo_en_uno: false }],
+          iguales: false,
+        };
+      },
+      async texto(doc) {
+        registro.llamadas.push(`texto ${doc}`);
+        return { paginas: [[{ texto: 'Acta de la reunión', x: 10, y: 700, tamano: 12 }], []] };
+      },
+      verificar: async () => ({ firmas: [], anclas: false }),
+      adjunto: async () => new Uint8Array(),
       cerrar: async (doc) => {
         docs.delete(doc);
       },
@@ -227,6 +262,16 @@ afterEach(() => {
 
 const boton = (nombre: string) =>
   [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === nombre);
+/** Un botón que NO es una pestaña de la cinta («Firmar» es las dos cosas). */
+const botonDeAccion = (nombre: string) =>
+  [...document.querySelectorAll('button')].find(
+    (b) => b.textContent?.trim() === nombre && b.getAttribute('role') !== 'tab',
+  );
+/** Una pestaña (de la cinta o del panel) por cómo empieza su rótulo: llevan contador. */
+const pestana = (texto: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) =>
+    b.textContent?.trim().startsWith(texto),
+  )!;
 
 /** El control de un rótulo, por su `for`. */
 function control<T extends HTMLElement>(rotulo: string): T {
@@ -250,12 +295,14 @@ async function bovedaConActa() {
     'application/pdf',
     new Blob([pdf], { type: 'application/pdf' }),
   );
-  const vida = new AbortController();
   let abierta = 0;
+  // Cada apertura con su vida, como la puerta de verdad: cerrar un estudio no corta otro.
   const abrirDrive = async () => {
     abierta++;
+    const vida = new AbortController();
     return { repository: repositorio, signal: vida.signal, close: async () => vida.abort() };
   };
+
   return { f, repositorio, pdf, abrirDrive, abiertas: () => abierta };
 }
 
@@ -340,10 +387,6 @@ test('abre el PDF de la bóveda en memoria, lo dibuja el motor del dispositivo, 
     expect(host.querySelector('[data-visor-boveda]')).toBeNull();
     expect(host.querySelector('[data-pagina="2"] [data-pagina-motor="2"]')).not.toBeNull();
     // Lo que aquí no se hace, apagado y con su motivo en la cinta.
-    const pestana = (texto: string) =>
-      [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
-        (b) => b.textContent?.trim() === texto,
-      )!;
     act(() => pestana(t('pdf.menu.sign')).click());
     const pedir = boton(t('pdf.menu.requestSignature'))!;
     expect(pedir.disabled).toBe(true);
@@ -355,9 +398,16 @@ test('abre el PDF de la bóveda en memoria, lo dibuja el motor del dispositivo, 
     expect(descarga.getAttribute('download')).toBe('Acta.pdf');
     expect(descarga.getAttribute('href')).toStartWith('blob:');
 
-    // Firmar: el diálogo dice ANTES que habrá sello y de quién.
-    act(() => boton(t('pdf.menu.sign'))!.click());
+    // Firmar (la cinta abre el diálogo del dispositivo): dice ANTES que habrá sello y
+    // de quién, y ofrece certificar.
+    act(() => pestana(t('pdf.menu.sign')).click());
+    await act(async () => {
+      botonDeAccion(t('pdf.menu.sign'))!.click();
+      await tick(10);
+    });
     await hasta(() => document.querySelector('[data-sello="si"]') !== null);
+    expect(document.querySelector('[data-certificar]')).not.toBeNull();
+    expect(document.querySelector('[data-firma-protegido]')).toBeNull();
     expect(document.body.textContent).toContain(
       t('pdf.device.stamp.on', { authority: 'tsa.example' }),
     );
@@ -437,7 +487,7 @@ test('abre el PDF de la bóveda en memoria, lo dibuja el motor del dispositivo, 
     await repositorio.close();
     await f.close();
   }
-});
+}, 30_000);
 
 test('sin motor, el visor del navegador (verlo, bajarlo y firmarlo); y sin autoridad de sellado, lo dice antes de firmar', async () => {
   selloConfigurado = false;
@@ -480,7 +530,7 @@ test('sin motor, el visor del navegador (verlo, bajarlo y firmarlo); y sin autor
     await repositorio.close();
     await f.close();
   }
-});
+}, 30_000);
 
 test('anota, rellena y organiza en el dispositivo: versión nueva o fichero nuevo, cifrados, y el PDF no sale', async () => {
   const { f, repositorio, pdf, abrirDrive } = await bovedaConActa();
@@ -524,6 +574,8 @@ test('anota, rellena y organiza en el dispositivo: versión nueva o fichero nuev
     const id = String((await acta()).id);
 
     // RELLENAR: el panel de campos del estudio; versión nueva del MISMO fichero.
+    act(() => pestana(t('pdf.panel.fields')).click());
+    await hasta(() => host.querySelector('#campo-nombre') !== null);
     const campo = host.querySelector<HTMLInputElement>('#campo-nombre')!;
     act(() => {
       campo.value = 'Ana Perez';
@@ -541,11 +593,8 @@ test('anota, rellena y organiza en el dispositivo: versión nueva o fichero nuev
     expect(host.querySelector<HTMLInputElement>('#campo-nombre')?.value).toBe('Ana Perez');
 
     // ANOTAR: un rectángulo con la herramienta de la cinta, sobre la página 1.
-    const pestana = (texto: string) =>
-      [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
-        (b) => b.textContent?.trim() === texto,
-      )!;
     act(() => pestana(t('pdf.ribbon.tab.annotate')).click());
+
     act(() =>
       host.querySelector<HTMLButtonElement>(`[aria-label="${t('pdf.tool.rect')}"]`)!.click(),
     );
@@ -636,7 +685,342 @@ test('anota, rellena y organiza en el dispositivo: versión nueva o fichero nuev
     await repositorio.close();
     await f.close();
   }
-});
+}, 30_000);
+
+/** Arrastra con el puntero sobre la capa de la página 1 (la herramienta elegida). */
+async function arrastrarEnLaPagina1(): Promise<void> {
+  const capa = host.querySelector<SVGSVGElement>('[data-pagina="1"] svg[aria-hidden="true"]')!;
+  const puntero = (tipo: string, x: number, y: number) =>
+    new PointerEvent(tipo, {
+      bubbles: true,
+      clientX: x,
+      clientY: y,
+      pointerId: 9,
+      isPrimary: true,
+      button: 0,
+      pointerType: 'mouse',
+    });
+  act(() => {
+    capa.dispatchEvent(puntero('pointerdown', 10, 10));
+  });
+  await act(async () => {
+    capa.dispatchEvent(puntero('pointermove', 90, 50));
+    await tick(40);
+  });
+  act(() => {
+    capa.dispatchEvent(puntero('pointerup', 90, 50));
+  });
+}
+
+/** Rellena un control de un diálogo por el comienzo de su rótulo y manda su formulario. */
+function escribirEn(rotulo: string, valor: string): void {
+  const label = [...document.querySelectorAll('label')].find((l) =>
+    l.textContent?.trim().startsWith(rotulo),
+  )!;
+  const campo = label.querySelector('input')!;
+  act(() => {
+    campo.value = valor;
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function enviarHerramienta(): Promise<void> {
+  await act(async () => {
+    document.querySelector<HTMLFormElement>('#pdf-herramienta')!.requestSubmit();
+    await tick(10);
+  });
+}
+
+test('la cuarta entrega en el dispositivo: proteger, censurar, sellos, comparar, versiones, imprimir y leer; y un PDF protegido se abre con su contraseña y se firma', async () => {
+  const { f, repositorio, pdf, abrirDrive } = await bovedaConActa();
+  const motor = { abierto: 0, llamadas: [] as string[] };
+  // Lo que el navegador haría con la voz, la impresora y una pestaña nueva.
+  const dicho: string[] = [];
+  const abiertas: string[] = [];
+  let impresiones = 0;
+  const g = globalThis as unknown as Record<string, unknown>;
+  const antes = {
+    voz: g.speechSynthesis,
+    frase: g.SpeechSynthesisUtterance,
+    print: window.print,
+    open: window.open,
+  };
+  g.speechSynthesis = { speak: (u: { text: string }) => dicho.push(u.text), cancel: () => {} };
+  g.SpeechSynthesisUtterance = class {
+    lang = '';
+    onend: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    constructor(readonly text: string) {}
+  };
+  window.print = () => {
+    impresiones++;
+  };
+  window.open = ((u: string) => (abiertas.push(u), null)) as typeof window.open;
+  const carpeta = String(
+    (await repositorio.children(String((await repositorio.root()).id))).folders[0]!.id,
+  );
+  const fichero = async (nombre: string) =>
+    (await repositorio.children(carpeta)).files.find((x) => x.name === nombre);
+  const { collectPrivateDriveFile } = await import('@sytue/offline/vault/drive');
+  const leerDeBoveda = async (fila: Record<string, unknown>) =>
+    latin1(
+      new Uint8Array(
+        await (
+          await collectPrivateDriveFile({
+            size: fila.size_bytes,
+            maximum: 1 << 24,
+            type: 'application/pdf',
+            run: (sink) => repositorio.download(String(fila.id), sink),
+          })
+        ).arrayBuffer(),
+      ),
+    );
+  try {
+    act(() => {
+      render(
+        <EstudioBoveda
+          path="/Contratos/Acta.pdf"
+          locale="es"
+          actor="owner"
+          tenant="acme"
+          autor="Ana"
+          abrirDrive={abrirDrive}
+          crearMotor={motorFalso(motor)}
+        />,
+        host,
+      );
+    });
+    act(() => boton(t('pdf.device.open'))!.click());
+    await hasta(() => host.querySelectorAll('[data-pagina-motor]').length === 2);
+    // Solo lo que de verdad necesita al servidor sigue apagado: pedir firma y el OCR.
+    const apagados = [...host.querySelectorAll('[data-solo-servidor] button')].map(
+      (b) => b.textContent,
+    );
+    expect(apagados).toEqual([t('pdf.menu.requestSignature'), t('pdf.tools.ocr')]);
+    // Y el asistente (le mandaría el texto al servidor) ni aparece.
+    expect(pestana(t('pdf.ai.tab'))).toBeUndefined();
+
+    // PROTEGER: AES-256 en el motor; deja una copia «(protegido)» cifrada en la bóveda.
+    act(() => pestana(t('pdf.menu.sign')).click());
+    act(() => botonDeAccion(t('pdf.menu.protect'))!.click());
+    await hasta(() => document.querySelector('#pdf-herramienta') !== null);
+    escribirEn(t('pdf.dialog.proteger.userPassword'), 'abre-me');
+    await enviarHerramienta();
+    const nombreProtegido = `Acta (${t('pdf.suffix.protected')}).pdf`;
+    await hasta(() =>
+      (host.textContent ?? '').includes(t('pdf.saved.copy', { name: nombreProtegido })),
+    );
+    expect(motor.llamadas.at(-1)).toStartWith('proteger {"usuario":"abre-me"');
+    expect(motor.llamadas.at(-1)).toContain('"op":"proteger"');
+
+    expect(await leerDeBoveda((await fichero(nombreProtegido))!)).toContain('%proteger');
+
+    // CENSURAR: la herramienta de la cinta marca la zona; aplicarla deja copia.
+    act(() => pestana(t('pdf.menu.sign')).click());
+    act(() =>
+      host.querySelector<HTMLButtonElement>(`[aria-label="${t('pdf.tool.redact')}"]`)!.click(),
+    );
+    await arrastrarEnLaPagina1();
+    await hasta(() => (host.textContent ?? '').includes(t('pdf.redact.pending', { count: 1 })));
+    act(() => boton(t('pdf.redact.apply'))!.click());
+    await hasta(
+      () =>
+        [...document.querySelectorAll('button')].filter(
+          (b) => b.textContent?.trim() === t('pdf.redact.apply'),
+        ).length > 1,
+    );
+    const confirmarCensura = [...document.querySelectorAll('button')].filter(
+      (b) => b.textContent?.trim() === t('pdf.redact.apply'),
+    );
+    act(() => confirmarCensura[confirmarCensura.length - 1]!.click());
+    const nombreCensurado = `Acta (${t('pdf.suffix.redacted')}).pdf`;
+    await hasta(() => motor.llamadas.some((l) => l.includes('"op":"redactar"')));
+    expect(motor.llamadas.find((l) => l.includes('"op":"redactar"'))).toContain('"areas":"[{');
+    await hasta(() =>
+      (host.textContent ?? '').includes(t('pdf.saved.copy', { name: nombreCensurado })),
+    );
+
+    // SELLOS Y MARCAS DE AGUA: el diálogo de capas, por `paginas` y con copia.
+    act(() => pestana(t('pdf.menu.organize')).click());
+    act(() => botonDeAccion(t('pdf.menu.stamp'))!.click());
+    await hasta(() => document.querySelector('#pdf-herramienta') !== null);
+    escribirEn(t('pdf.dialog.capas.text'), 'BORRADOR');
+    await enviarHerramienta();
+    await hasta(() => motor.llamadas.some((l) => l.includes('"op":"marca-agua"')));
+    expect(motor.llamadas.find((l) => l.includes('"op":"marca-agua"'))).toStartWith(
+      'paginas-1 {"op":"marca-agua","texto":"BORRADOR"}',
+    );
+    const nombreSellado = `Acta (${t('pdf.suffix.stamped')}).pdf`;
+    await hasta(() =>
+      (host.textContent ?? '').includes(t('pdf.saved.copy', { name: nombreSellado })),
+    );
+
+    // COMPARAR con otro PDF de la bóveda, por su ruta: descifrado aquí y comparado aquí.
+    act(() => pestana(t('pdf.menu.organize')).click());
+    act(() => botonDeAccion(t('pdf.menu.compare'))!.click());
+    const otra = await (async () => {
+      await hasta(
+        () => document.querySelector(`[aria-label="${t('pdf.dialog.comparar.path')}"]`) !== null,
+      );
+      return document.querySelector<HTMLInputElement>(
+        `[aria-label="${t('pdf.dialog.comparar.path')}"]`,
+      )!;
+    })();
+    act(() => {
+      otra.value = `/Contratos/${nombreCensurado}`;
+      otra.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      otra.form!.requestSubmit();
+      await tick(10);
+    });
+    await hasta(() => (document.body.textContent ?? '').includes('+ precio nuevo'));
+    expect(document.body.textContent).not.toContain(t('pdf.dialog.comparar.error'));
+
+    expect(motor.llamadas.some((l) => l.startsWith('comparar '))).toBe(true);
+
+    // LEER EN VOZ ALTA: el texto lo da el motor; IMPRIMIR: las hojas del motor, al papel.
+    act(() => pestana(t('ribbon.tab.view')).click());
+    const leerBoton = host.querySelector<HTMLButtonElement>(`[title="${t('pdf.speak.start')}"]`)!;
+    expect(leerBoton.disabled).toBe(false);
+    act(() => leerBoton.click());
+    await hasta(() => dicho.length > 0);
+    expect(dicho[0]).toContain('Acta de la reunión');
+    act(() => pestana(t('pdf.menu.organize')).click());
+    const imprimir = botonDeAccion(t('pdf.menu.print'))!;
+    expect(imprimir.disabled).toBe(false);
+    act(() => imprimir.click());
+    await hasta(() => impresiones === 1);
+    expect(document.querySelectorAll('[data-hoja-impresa]').length).toBe(2);
+    window.dispatchEvent(new Event('afterprint'));
+
+    // VERSIONES: el historial del repositorio cifrado; abrir una la descifra en un `blob:`.
+    act(() => pestana(t('pdf.panel.fields')).click());
+    await hasta(() => host.querySelector('#campo-nombre') !== null);
+    const campo = host.querySelector<HTMLInputElement>('#campo-nombre')!;
+    act(() => {
+      campo.value = 'Ana Perez';
+      campo.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => boton(t('pdf.fields.save'))!.click());
+    await hasta(() => (host.textContent ?? '').includes(t('pdf.saved.filled')));
+    act(() => pestana(t('pdf.menu.organize')).click());
+    act(() => botonDeAccion(t('pdf.menu.versions'))!.click());
+    const abrirV1 = await (async () => {
+      const sel = `[aria-label="${t('pdf.versions.openAria', { version: 1 })}"]`;
+      await hasta(() => document.querySelector(sel) !== null);
+      return document.querySelector<HTMLButtonElement>(sel)!;
+    })();
+    expect(abrirV1.tagName).toBe('BUTTON');
+    await act(async () => {
+      abrirV1.click();
+      await tick(30);
+    });
+    await hasta(() => abiertas.length === 1);
+    expect(abiertas[0]).toStartWith('blob:');
+    act(() =>
+      document
+        .querySelector<HTMLButtonElement>(
+          `[aria-label="${t('pdf.versions.restoreAria', { version: 1 })}"]`,
+        )!
+        .click(),
+    );
+    await hasta(() => boton(t('pdf.versions.restore')) !== undefined);
+    const restaurar = [...document.querySelectorAll('button')].filter(
+      (b) => b.textContent?.trim() === t('pdf.versions.restore'),
+    );
+    act(() => restaurar[restaurar.length - 1]!.click());
+    await hasta(() =>
+      (host.textContent ?? '').includes(t('pdf.versions.restored', { version: 1 })),
+    );
+    expect(await leerDeBoveda((await fichero('Acta.pdf'))!)).not.toContain('%formulario');
+
+    // NADA salió: ni el PDF, ni sus contraseñas, ni lo que se le hizo.
+    expect(enviado.some((e) => /\/api\/pdf(-aplicar|-versiones)?$/.test(e.url))).toBe(false);
+    for (const e of enviado) {
+      expect(e.cuerpo).not.toContain('%PDF');
+      expect(e.cuerpo).not.toContain(latin1(pdf.subarray(0, 64)));
+      expect(e.cuerpo).not.toContain('abre-me');
+      expect(e.cuerpo).not.toContain('BORRADOR');
+    }
+    const enClaro = ['%PDF-', '%proteger', 'abre-me', 'BORRADOR', '%paginas', 'Ana Perez'];
+    for (const cifrado of f.blobs.values())
+      for (const x of enClaro) expect(latin1(cifrado)).not.toContain(x);
+    for (const registro of f.records.values())
+      for (const x of enClaro) expect(JSON.stringify(registro)).not.toContain(x);
+
+    // UN PDF PROTEGIDO: el estudio pide su contraseña, lo abre con ella y lo firma
+    // reescrito sin ella (lo dice antes).
+    act(() => render(null, host));
+    act(() => {
+      render(
+        <EstudioBoveda
+          path={`/Contratos/${nombreProtegido}`}
+          locale="es"
+          actor="owner"
+          tenant="acme"
+          abrirDrive={abrirDrive}
+          crearMotor={motorFalso(motor)}
+        />,
+        host,
+      );
+    });
+    act(() => boton(t('pdf.device.open'))!.click());
+    await hasta(() => (host.textContent ?? '').includes(t('pdf.password.title')));
+
+    const clavePdf = host.querySelector<HTMLInputElement>('input[type="password"]')!;
+    act(() => {
+      clavePdf.value = 'abre-me';
+      clavePdf.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => boton(t('pdf.password.open'))!.click());
+    await hasta(() => host.querySelectorAll('[data-pagina-motor]').length === 2);
+    act(() => pestana(t('pdf.menu.sign')).click());
+    await act(async () => {
+      botonDeAccion(t('pdf.menu.sign'))!.click();
+      await tick(20);
+    });
+    await hasta(() => document.querySelector('[data-firma-protegido]') !== null);
+    expect(document.body.textContent).toContain(t('pdf.device.protectedNote'));
+    const p12 = control<HTMLInputElement>(t('pdf.dialog.firmar.p12'));
+    Object.defineProperty(p12, 'files', {
+      value: [new File([await leer(P12, 'moderno.p12')], 'yo.p12')],
+    });
+    await act(async () => {
+      p12.dispatchEvent(new Event('change', { bubbles: true }));
+      await tick(20);
+    });
+    const claveP12 = control<HTMLInputElement>(t('pdf.dialog.firmar.p12Clave'));
+    act(() => {
+      claveP12.value = 'secreta';
+      claveP12.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // Certificarlo, de paso: /DocMDP con /P 1 y /Perms en el catálogo.
+    act(() => document.querySelector<HTMLInputElement>('[data-certificar]')!.click());
+    await hasta(() => document.querySelector('[data-sello="si"]') !== null);
+    const firmar = [...document.querySelectorAll('button')].filter(
+      (b) => b.textContent?.trim() === t('pdf.device.sign'),
+    );
+    act(() => firmar[firmar.length - 1]!.click());
+    await hasta(() => (document.body.textContent ?? '').includes(t('pdf.vault.openSigned')));
+    expect(motor.llamadas.some((l) => l.startsWith('desproteger '))).toBe(true);
+    const firmadoNombre = `Acta (${t('pdf.suffix.protected')}) (firmado).pdf`;
+    const firmado = await leerDeBoveda((await fichero(firmadoNombre))!);
+    expect(firmado).not.toMatch(new RegExp(MARCA_PROTEGIDO.source));
+
+    expect(firmado).toContain('/TransformMethod /DocMDP');
+    expect(firmado).toContain('/Perms');
+    const [v] = await verificarFirmas(deLatin1(firmado));
+    expect(v).toMatchObject({ integra: true, cubreTodo: true });
+  } finally {
+    g.speechSynthesis = antes.voz;
+    g.SpeechSynthesisUtterance = antes.frase;
+    window.print = antes.print;
+    window.open = antes.open;
+    await repositorio.close();
+    await f.close();
+  }
+}, 60_000);
 
 test('una ruta que no está en la bóveda se dice con su estado vacío', async () => {
   const { f, repositorio, abrirDrive } = await bovedaConActa();

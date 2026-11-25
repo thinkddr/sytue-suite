@@ -42,6 +42,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/operador"
 	"git.sytue.eu/sytue/one/platform/pkg/personas"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/purgatenant"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 
 	castdb "git.sytue.eu/sytue/one/services/cast/db"
@@ -260,6 +261,9 @@ func run(esTranscoder bool) error {
 	// El barrido: borrados pasada la gracia, subidas atascadas y el relleno de
 	// calidades de los vídeos de antes. Aquí y no en el transcodificador
 	// (service/barrido.go); las réplicas se turnan con un cerrojo.
+	// Purga de tenant (ADR 0054): los vídeos de una organización que desaparece.
+	go purgatenant.Trabajador{DB: pool, Almacen: objetos, Log: logger}.Ejecutar(ctx, purgatenant.Cada)
+
 	if cfg.SweepInterval > 0 {
 		go svc.BucleDeBarrido(ctx, cfg.SweepInterval, service.Barrido{
 			Gracia: cfg.SweepDeletedGrace, Subida: cfg.SweepStaleUpload,

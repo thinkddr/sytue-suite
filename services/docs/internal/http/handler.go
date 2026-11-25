@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/resource"
+	"git.sytue.eu/sytue/one/platform/pkg/auditlog"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/platform/pkg/correo"
@@ -37,6 +38,9 @@ import (
 
 // Deps son las dependencias de la capa HTTP.
 type Deps struct {
+	// Traza escribe la traza de acceso (ReglasDeTraza) y sirve su lectura admin.
+	// Nil ⇒ sin lectura de la traza (el middleware lo pone el router).
+	Traza    *auditlog.Registro
 	Service  *domain.Service
 	Store    *store.Store
 	Hub      *collab.Hub
@@ -95,7 +99,8 @@ type Deps struct {
 
 // Handler agrupa las dependencias y expone las rutas.
 type Handler struct {
-	svc *domain.Service
+	traza *auditlog.Registro
+	svc   *domain.Service
 	// store es el contrato de persistencia (domain.Store). En producción lo
 	// satisface *store.Store; declararlo como interfaz permite inyectar fakes en
 	// los tests de la capa HTTP sin PostgreSQL.
@@ -108,19 +113,21 @@ type Handler struct {
 
 	// Conector de datos externos. connStore es *store.Store (contrato concreto,
 	// no domain.Store, porque estas tablas no son del dominio documental).
-	connStore    connectorStore
-	sealer       *connectors.Sealer
-	executor     *connectors.Executor
-	execLimiter  httpx.RateLimiter
-	publicURL    string
-	hubNotifier  *hubnotify.Client
-	idBaseURL    string
-	idSecreto    string
-	correo       correo.Config
-	peticiones   peticionesStore
-	vistasFiltro vistasFiltroStore
-	auditoria    auditoriaStore
-	canje        canjeStore
+	connStore   connectorStore
+	sealer      *connectors.Sealer
+	executor    *connectors.Executor
+	execLimiter httpx.RateLimiter
+	publicURL   string
+	hubNotifier *hubnotify.Client
+	// avisosLlamada calla el aviso de «Llamar desde el documento» durante su ventana.
+	avisosLlamada avisosDeLlamada
+	idBaseURL     string
+	idSecreto     string
+	correo        correo.Config
+	peticiones    peticionesStore
+	vistasFiltro  vistasFiltroStore
+	auditoria     auditoriaStore
+	canje         canjeStore
 	// claveEnlaces lee y cambia la contraseña de los enlaces; limitesClave acota los
 	// intentos de desbloqueo (enlaces_clave.go).
 	claveEnlaces claveEnlacesStore
@@ -168,6 +175,9 @@ type Handler struct {
 	// miniaturas dibuja y sirve la miniatura de la portada (miniaturas.go). nil = sin
 	// Object Storage: la portada enseña el glifo del tipo.
 	miniaturas *miniaturas
+	// enVivo frena la señal de la edición en vivo: una por documento y VentanaEnVivo
+	// (senal_colaboradores.go).
+	enVivo *hubnotify.UnaVez
 }
 
 // selloDeTiempo devuelve la función que pide el sello, o nil si no hay autoridad.
@@ -193,7 +203,8 @@ func New(d Deps) *Handler {
 		d.SnapshotInlineLimit = 256 * 1024 // 256 KiB inline por defecto
 	}
 	h := &Handler{
-		svc: d.Service, store: d.Store, hub: d.Hub,
+		traza: d.Traza,
+		svc:   d.Service, store: d.Store, hub: d.Hub,
 		presence: collab.NewPresenceRegistry(),
 		objects:  d.Objects, verifier: d.Verifier, inline: d.SnapshotInlineLimit,
 		connStore: d.Store, sealer: d.Sealer, executor: d.Executor,
@@ -204,6 +215,7 @@ func New(d Deps) *Handler {
 		execLimiter:            httpx.NewTokenBucket(2, 10),
 		publicURL:              d.PublicURL,
 		hubNotifier:            d.HubNotifier,
+		enVivo:                 hubnotify.NuevaUnaVez(VentanaEnVivo),
 		idBaseURL:              d.IDBaseURL,
 		idSecreto:              d.IDOrgsSecret,
 		correo:                 d.Correo,
@@ -392,6 +404,11 @@ func (h *Handler) Mount(r chi.Router) {
 			adm.Use(h.verifier.RequireRole("owner", "admin"))
 			adm.Get("/api/v1/pdf/signature-policy", h.politicaFirma)
 			adm.Put("/api/v1/pdf/signature-policy", h.guardarPoliticaFirma)
+			// La traza de acceso de la organización (docs/security.md §1.7), para la
+			// auditoría unificada de Sytue Admin: listado keyset y CSV.
+			if h.traza != nil {
+				adm.Get("/api/v1/admin/audit-log", h.traza.Lectura("docs"))
+			}
 		})
 		pr.Post("/api/v1/pdf/compare", h.pdfComparar)
 		pr.Post("/api/v1/pdf/tools", h.pdfHerramientas) // comprimir, recortar, imágenes→PDF, PDF/A
@@ -428,8 +445,13 @@ func (h *Handler) Mount(r chi.Router) {
 
 			dr.Route("/{id}", func(idr chi.Router) {
 				idr.Use(h.enAnfitrion)
+				// Tras pasar a la organización anfitriona: es donde lo ven su propietario y
+				// sus colaboradores (senal_colaboradores.go).
+				idr.Use(h.conQuienesVen)
 				idr.Get("/", h.getDocument)
 				idr.Get("/call-access", h.documentCallAccess)
+				// Rooms lo pide al abrir la sala del documento (llamada_aviso.go).
+				idr.Post("/call-notice", h.avisarLlamada)
 				idr.Patch("/", h.renameDocument)
 				idr.Delete("/", h.deleteDocument)
 				idr.Put("/star", h.starDocument)

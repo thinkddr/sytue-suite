@@ -316,6 +316,7 @@
   "dm.deleteFailed": "Keskustelun poistaminen epäonnistui.",
   "dm.empty": "Tiimissä ei ole vielä muita.",
   "dm.emptyQuery": "Kukaan ei vastaa hakuasi.",
+  "dm.externalClosed": "Organisaatiosi ei salli keskusteluja tämän henkilön kanssa.",
   "dm.invite": "Kutsu henkilöitä",
   "dm.maxPeople": {
     "one": "Voit lisätä enintään {count} henkilön.",

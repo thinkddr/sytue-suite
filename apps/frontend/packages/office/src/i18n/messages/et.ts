@@ -2683,9 +2683,9 @@ export const et: AppCatalog<typeof en> = {
   'pdf.device.error.page': 'Allkiri ei mahu sellele lehele. Vali teine leht või asukoht.',
   'pdf.device.view': 'Vaata',
   'pdf.vault.help':
-    'See PDF on sinu krüpteeritud Drive’is: see dekrüpteeritakse ainult selles seadmes, kus saad seda vaadata, märkustega varustada, täita, korraldada ja allkirjastada. Mida salvestad, läheb tagasi krüpteerituna.',
+    'See PDF on sinu krüpteeritud Drive’is: see dekrüpteeritakse ainult selles seadmes, kus saad seda vaadata, märkustega varustada, täita, korraldada, kaitsta, varjata, muuta, võrrelda, printida ja allkirjastada. Mida salvestad, läheb tagasi krüpteerituna.',
   'pdf.vault.serverOnly':
-    'Krüpteeritud Drive’iga pole veel saadaval allkirjataotlused, paroolikaitse, tekstituvastus, varjamine, teksti või piltide muutmine, templid ja vesimärgid, võrdlemine, versiooniajalugu ega printimine: need vajavad, et teenus loeks PDF-i, või neid ei tehta veel seadmes.',
+    'Krüpteeritud Drive’iga ei ole allkirja küsimine, teksti tuvastamine ega assistent saadaval: need nõuavad, et teenus loeks PDF-i. Kõik muu tehakse selles seadmes.',
   'pdf.vault.notFound.title': 'Seda PDF-i pole sinu krüptitud Drive’is',
   'pdf.vault.notFound.description':
     'See võib olla teisaldatud või kustutatud. Otsi seda Sytue Drive’ist.',
@@ -2700,7 +2700,9 @@ export const et: AppCatalog<typeof en> = {
     'Teie Drive alles läheb üle otspunktkrüptimisele. Lõpetage see Sytue Drive’is.',
   'pdf.device.error.password': 'See parool ei ava sertifikaati.',
   'pdf.device.error.encrypted':
-    'See PDF on parooliga kaitstud ja seda ei saa selles seadmes allkirjastada.',
+    'See PDF on parooliga kaitstud: ava see ja allkirjasta selle stuudiost, kus kasutatakse selle parooli.',
+  'pdf.device.protectedNote':
+    'See PDF on parooliga kaitstud. Allkirjastamiseks kirjutatakse see selles seadmes ilma paroolita ümber, nagu teeb ka server: allkirjastatud koopia salvestatakse krüpteerituna sinu Drive’i, kuid ilma PDF-i paroolita.',
   'pdf.device.error.locked':
     'See PDF on sertifitseeritud igasuguste muudatuste vastu: uus allkiri muudaks selle kehtetuks.',
   'pdf.device.error.unreadable':

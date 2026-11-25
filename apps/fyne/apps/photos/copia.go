@@ -44,9 +44,10 @@ import (
 //     cogido, con « (2)»: con un Drive anterior a la opción, tampoco se pisa nada.
 //  3. **Subir no es indexar.** Lo que ya está en Drive cuenta como copiado aunque la
 //     galería de Sytue no lo haya podido apuntar todavía: el índice se reintenta en la
-//     ronda siguiente, sin volver a subir. Lo que syphotos no sabe medir (vídeos, RAW, o
-//     un HEIC donde el sistema no lo convierte) queda en Drive como copia y no sale en la
-//     galería.
+//     ronda siguiente, sin volver a subir. Lo que syphotos no sabe medir (vídeos, RAW)
+//     queda en Drive como copia y no sale en la galería. Un HEIC que el sistema no
+//     convierte (Windows, Linux) sí sale desde el 2026-11-25: syphotos lo decodifica
+//     (`miniatura`, HEVC en Go puro).
 //  4. **La galería de Sytue enseña JPEG, PNG y GIF.** Una foto HEIC, WebP o AVIF se pasa a
 //     JPEG con sus metadatos en el propio dispositivo antes de subirla, como hace el
 //     iPhone al pasar fotos a un ordenador (carrete.Convertir).

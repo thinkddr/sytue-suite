@@ -235,13 +235,23 @@ func (p pivotSpec) dentro(n int) pivotSpec {
 
 // ---- OOXML ----
 
-// addXlsxPivots añade al paquete las tablas dinámicas de cada hoja: las partes de la
-// caché y de la tabla, sus relaciones y sus tipos, y las <pivotCaches> del libro.
-func addXlsxPivots(files map[string]string, m *sheetModel) {
-	cacheID := 0
-	var caches, wbRels, types strings.Builder
+// pivotePlaneado es una dinámica que sale al .xlsx: su hoja, su definición, su origen y
+// el `cacheId` de su caché. Lo usan las dinámicas y sus segmentadores
+// (export_sheet_segmentadores.go), que citan la caché.
+type pivotePlaneado struct {
+	hoja    int
+	p       pivotSpec
+	srcName string
+	names   []string
+	cols    [][]pivotItem
+	cacheID int
+}
+
+// planDePivotes son las dinámicas de cada hoja que se pueden exportar, con su `cacheId`
+// (1-based, en el orden del libro).
+func planDePivotes(m *sheetModel) []pivotePlaneado {
+	var out []pivotePlaneado
 	for i, sd := range m.Sheets {
-		var sheetRels strings.Builder
 		for _, p := range sd.Pivots {
 			src, srcName, ok := pivotSourceSheet(m, i, p)
 			if !ok {
@@ -251,35 +261,48 @@ func addXlsxPivots(files map[string]string, m *sheetModel) {
 			if !ok {
 				continue
 			}
-			p = p.dentro(len(names))
-			cacheID++
-			n := strconv.Itoa(cacheID)
-			defPart := "xl/pivotCache/pivotCacheDefinition" + n + ".xml"
-			tabPart := "xl/pivotTables/pivotTable" + n + ".xml"
-			files[defPart] = xlsxPivotCache(p, srcName, names, cols)
-			files[tabPart] = xlsxPivotTable(p, n, names, cols)
-			files["xl/pivotTables/_rels/pivotTable"+n+".xml.rels"] = xmlHeader +
-				`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-				`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition` + n + `.xml"/>` +
-				`</Relationships>`
-			caches.WriteString(`<pivotCache cacheId="` + n + `" r:id="rIdPc` + n + `"/>`)
-			wbRels.WriteString(`<Relationship Id="rIdPc` + n + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition` + n + `.xml"/>`)
-			sheetRels.WriteString(`<Relationship Id="rIdPt` + n + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable` + n + `.xml"/>`)
-			types.WriteString(`<Override PartName="/` + defPart + `" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>` +
-				`<Override PartName="/` + tabPart + `" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>`)
-		}
-		if sheetRels.Len() == 0 {
-			continue
-		}
-		relsPart := "xl/worksheets/_rels/sheet" + strconv.Itoa(i+1) + ".xml.rels"
-		if cur, ok := files[relsPart]; ok && strings.Contains(cur, "</Relationships>") {
-			files[relsPart] = strings.Replace(cur, "</Relationships>", sheetRels.String()+"</Relationships>", 1)
-		} else {
-			files[relsPart] = xmlHeader + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-				sheetRels.String() + `</Relationships>`
+			out = append(out, pivotePlaneado{hoja: i, p: p.dentro(len(names)), srcName: srcName, names: names, cols: cols, cacheID: len(out) + 1})
 		}
 	}
-	if cacheID == 0 {
+	return out
+}
+
+// addXlsxPivots añade al paquete las tablas dinámicas de cada hoja: las partes de la
+// caché y de la tabla, sus relaciones y sus tipos, y las <pivotCaches> del libro.
+// `segmentados` son, por caché, los campos que segmenta algún segmentador: van con sus
+// elementos, y la caché con su x14:pivotCacheDefinition, que es la que cita el segmentador.
+func addXlsxPivots(files map[string]string, plan []pivotePlaneado, segmentados map[int]map[int]bool) {
+	var caches, wbRels, types strings.Builder
+	sheetRels := map[int]*strings.Builder{}
+	for _, pv := range plan {
+		n := strconv.Itoa(pv.cacheID)
+		defPart := "xl/pivotCache/pivotCacheDefinition" + n + ".xml"
+		tabPart := "xl/pivotTables/pivotTable" + n + ".xml"
+		files[defPart] = xlsxPivotCache(pv.p, pv.srcName, pv.names, pv.cols, segmentados[pv.cacheID], pv.cacheID)
+		files[tabPart] = xlsxPivotTable(pv.p, n, pv.names, pv.cols, segmentados[pv.cacheID])
+		files["xl/pivotTables/_rels/pivotTable"+n+".xml.rels"] = xmlHeader +
+			`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+			`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition` + n + `.xml"/>` +
+			`</Relationships>`
+		caches.WriteString(`<pivotCache cacheId="` + n + `" r:id="rIdPc` + n + `"/>`)
+		wbRels.WriteString(`<Relationship Id="rIdPc` + n + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition` + n + `.xml"/>`)
+		if sheetRels[pv.hoja] == nil {
+			sheetRels[pv.hoja] = &strings.Builder{}
+		}
+		sheetRels[pv.hoja].WriteString(`<Relationship Id="rIdPt` + n + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable` + n + `.xml"/>`)
+		types.WriteString(`<Override PartName="/` + defPart + `" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>` +
+			`<Override PartName="/` + tabPart + `" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>`)
+	}
+	for i, rels := range sheetRels {
+		relsPart := "xl/worksheets/_rels/sheet" + strconv.Itoa(i+1) + ".xml.rels"
+		if cur, ok := files[relsPart]; ok && strings.Contains(cur, "</Relationships>") {
+			files[relsPart] = strings.Replace(cur, "</Relationships>", rels.String()+"</Relationships>", 1)
+		} else {
+			files[relsPart] = xmlHeader + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+				rels.String() + `</Relationships>`
+		}
+	}
+	if len(plan) == 0 {
 		return
 	}
 	// <pivotCaches> va tras <calcPr> en CT_Workbook: justo antes del cierre.
@@ -302,10 +325,13 @@ func pivotAxisFields(p pivotSpec) map[int]bool {
 
 // xlsxPivotCache es la definición de la caché: el origen y, por campo, sus elementos.
 // Sin registros y con `refreshOnLoad`: Excel la rellena al abrir.
-func xlsxPivotCache(p pivotSpec, srcSheet string, names []string, cols [][]pivotItem) string {
+func xlsxPivotCache(p pivotSpec, srcSheet string, names []string, cols [][]pivotItem, segmentados map[int]bool, cacheID int) string {
 	axis := pivotAxisFields(p)
 	for _, f := range p.HiddenFilters { // sus ocultos se dicen por elemento, como los de un eje
 		axis[f.Field] = true
+	}
+	for f := range segmentados { // un segmentador cita los elementos de su campo
+		axis[f] = true
 	}
 	var b strings.Builder
 	b.WriteString(xmlHeader + `<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ` +
@@ -318,7 +344,13 @@ func xlsxPivotCache(p pivotSpec, srcSheet string, names []string, cols [][]pivot
 		b.WriteString(xlsxSharedItems(cols[f], axis[f]))
 		b.WriteString(`</cacheField>`)
 	}
-	b.WriteString(`</cacheFields></pivotCacheDefinition>`)
+	b.WriteString(`</cacheFields>`)
+	if len(segmentados) > 0 {
+		// El `pivotCacheId` que cita `tabular@pivotCacheId` del segmentador ([MS-XLSX]).
+		b.WriteString(`<extLst><ext uri="` + uriPivotCacheX14 + `" xmlns:x14="` + nsX14 + `"><x14:pivotCacheDefinition pivotCacheId="` +
+			strconv.Itoa(cacheID) + `"/></ext></extLst>`)
+	}
+	b.WriteString(`</pivotCacheDefinition>`)
 	return b.String()
 }
 
@@ -387,7 +419,7 @@ func isIntegral(x float64) bool { return x == float64(int64(x)) }
 // xlsxPivotTable es la definición de la tabla: dónde está, qué campo va en cada eje,
 // los elementos ocultos, los campos de valores y, en su extensión, la definición de
 // Sytue entera.
-func xlsxPivotTable(p pivotSpec, cacheID string, names []string, cols [][]pivotItem) string {
+func xlsxPivotTable(p pivotSpec, cacheID string, names []string, cols [][]pivotItem, segmentados map[int]bool) string {
 	loc, pageRows := xlsxPivotLocation(p)
 	var b strings.Builder
 	b.WriteString(xmlHeader + `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="` +
@@ -407,7 +439,7 @@ func xlsxPivotTable(p pivotSpec, cacheID string, names []string, cols [][]pivotI
 		b.WriteString(` rowPageCount="` + strconv.Itoa(len(p.Filters)) + `" colPageCount="1"`)
 	}
 	b.WriteString(`/>`)
-	xlsxPivotFields(&b, p, names, cols)
+	xlsxPivotFields(&b, p, names, cols, segmentados)
 	xlsxAxisFields(&b, "rowFields", p.Rows, false)
 	xlsxAxisFields(&b, "colFields", p.Cols, len(p.Values) > 1)
 	if len(p.Filters) > 0 {
@@ -445,8 +477,11 @@ func xlsxPivotLocation(p pivotSpec) (string, int) {
 
 // xlsxPivotFields son los <pivotField>: uno por campo del origen, con su eje, sus
 // elementos (y los ocultos) si va en uno, y si es un campo de valores.
-func xlsxPivotFields(b *strings.Builder, p pivotSpec, names []string, cols [][]pivotItem) {
+func xlsxPivotFields(b *strings.Builder, p pivotSpec, names []string, cols [][]pivotItem, segmentados map[int]bool) {
 	axisOf, hidden := map[int]string{}, map[int][]string{}
+	for f := range segmentados { // fuera de los ejes, con sus elementos, como un filtro oculto
+		axisOf[f] = ""
+	}
 	for _, eje := range []struct {
 		ax string
 		l  []pivotFieldSpec

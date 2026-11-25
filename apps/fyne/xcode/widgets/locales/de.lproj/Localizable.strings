@@ -4,6 +4,10 @@
 "widgets.newNote" = "Neue Notiz";
 "widgets.newContact" = "Neuer Kontakt";
 "widgets.addPhotos" = "Fotos hinzufügen";
+"widgets.newDocument" = "Neues Dokument";
+"widgets.newSpreadsheet" = "Neue Tabelle";
+"widgets.newPresentation" = "Neue Präsentation";
+"widgets.openToUpdate" = "Wird bei geöffneter App aktualisiert";
 "widgets.notes" = "Notizen";
 "widgets.rows" = "Zeilen";
 "widgets.pending" = "Ausstehend";

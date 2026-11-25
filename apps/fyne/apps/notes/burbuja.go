@@ -46,7 +46,7 @@ func (e *EditorNota) armarBurbuja() *flotante {
 	// `Atajo` de quien aloja el editor, como Ctrl/⌘+V.
 	portapapeles := func() fyne.Clipboard { return fyne.CurrentApp().Clipboard() }
 	edicion := []fyne.CanvasObject{
-		boton("", iconos.Copias, t("editor.copy", nil), atajo(t("editor.copy", nil), ui.AtajoDelSistema("Ctrl+C")),
+		boton(CopiarD, iconos.Ninguno, t("editor.copy", nil), atajo(t("editor.copy", nil), ui.AtajoDelSistema("Ctrl+C")),
 			func() { e.zona.TypedShortcut(&fyne.ShortcutCopy{Clipboard: portapapeles()}) }),
 		boton(TijerasD, iconos.Ninguno, t("editor.cut", nil), atajo(t("editor.cut", nil), ui.AtajoDelSistema("Ctrl+X")),
 			func() { e.zona.TypedShortcut(&fyne.ShortcutCut{Clipboard: portapapeles()}) }),

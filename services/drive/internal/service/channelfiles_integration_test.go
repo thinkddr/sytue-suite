@@ -37,6 +37,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/db"
@@ -47,16 +48,22 @@ import (
 
 // fakeChannelGate imita la verja de Sytue Rooms: el roster vive en Chat, así que aquí
 // se sustituye por un conjunto (canal → miembros) mutable en caliente, que es justo
-// lo que permite comprobar que la decisión se toma EN CADA petición.
+// lo que permite comprobar que la decisión se toma EN CADA petición. `anfitriona` es la
+// organización de los canales que no viven en la del token de quien pregunta: las
+// conversaciones con gente de fuera (ADR 0040).
 type fakeChannelGate struct {
-	members map[uuid.UUID]map[string]bool
+	members    map[uuid.UUID]map[string]bool
+	anfitriona map[uuid.UUID]string
 }
 
-func (g *fakeChannelGate) CanAccessChannel(_ context.Context, channelID uuid.UUID, subject string) error {
-	if g.members[channelID][subject] {
-		return nil
+func (g *fakeChannelGate) ChannelTenant(ctx context.Context, channelID uuid.UUID, subject string) (tenancy.Tenant, error) {
+	if !g.members[channelID][subject] {
+		return tenancy.Tenant{}, domain.ErrNotFound
 	}
-	return domain.ErrNotFound
+	if a := g.anfitriona[channelID]; a != "" {
+		return tenancy.Tenant{Slug: a}, nil
+	}
+	return tenancy.From(ctx)
 }
 
 func (g *fakeChannelGate) join(channelID uuid.UUID, subs ...string) {
@@ -276,5 +283,82 @@ func TestChannelAttachmentByReferenceAndNameCollision(t *testing.T) {
 	}
 	if a1.Version != 1 || a2.Version != 1 {
 		t.Fatalf("versiones inesperadas: %d y %d (ninguna es una versión de la otra)", a1.Version, a2.Version)
+	}
+}
+
+// blobsPorOrganizacion apunta en qué organización se guarda y se lee cada blob.
+type blobsPorOrganizacion struct {
+	*fakeBlobs
+	puts, gets []string
+}
+
+func (b *blobsPorOrganizacion) Put(ctx context.Context, t tenancy.Tenant, key string, r io.Reader, n int64, o objectstore.PutOptions) error {
+	b.puts = append(b.puts, t.Slug)
+	return b.fakeBlobs.Put(ctx, t, key, r, n, o)
+}
+
+func (b *blobsPorOrganizacion) Get(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	b.gets = append(b.gets, t.Slug)
+	return b.fakeBlobs.Get(ctx, t, key)
+}
+
+// TestAdjuntoDeUnaConversacionConGenteDeFuera (ADR 0040): la conversación vive en la
+// organización de quien la abrió y sus adjuntos también. Bea, de «otra», sube con un
+// token de la suya y el fichero queda en «acme», con su cuota y su almacenamiento;
+// Alice, de «acme», lo lee allí, y Bea también desde la suya. «Guardar en mi Drive»
+// copia los bytes a «otra»: un blob de la anfitriona no se referencia desde fuera.
+func TestAdjuntoDeUnaConversacionConGenteDeFuera(t *testing.T) {
+	svc, gate, fb, acme := newChannelService(t)
+	blobs := &blobsPorOrganizacion{fakeBlobs: fb}
+	svc.blobs = blobs
+	otra := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "otra"})
+	canal := uuid.New()
+	gate.join(canal, "alice", "bea")
+	gate.anfitriona = map[uuid.UUID]string{canal: "acme"}
+
+	att, err := svc.ChannelUploadFile(otra, canal, "bea", "plano.png", "image/png", strings.NewReader("bytes"))
+	if err != nil {
+		t.Fatalf("la externa sube: %v", err)
+	}
+	if att.Tenant != "acme" || len(blobs.puts) != 1 || blobs.puts[0] != "acme" {
+		t.Fatalf("el adjunto vive en %q y su blob en %v; quiero acme", att.Tenant, blobs.puts)
+	}
+	q, err := svc.Quota(acme)
+	if err != nil || q.UsedBytes == 0 {
+		t.Fatalf("la cuota de la anfitriona no lo cuenta: %+v %v", q, err)
+	}
+	if q, err := svc.Quota(otra); err == nil && q.UsedBytes != 0 {
+		t.Fatalf("la cuota de «otra» cuenta %d bytes de un adjunto de «acme»", q.UsedBytes)
+	}
+
+	for quien, ctx := range map[string]context.Context{"alice": acme, "bea": otra} {
+		blobs.gets = nil
+		f, rc, err := svc.ChannelFileContent(ctx, canal, att.ID, quien)
+		if err != nil {
+			t.Fatalf("%s descarga: %v", quien, err)
+		}
+		_ = rc.Close()
+		if f.ID != att.ID || len(blobs.gets) != 1 || blobs.gets[0] != "acme" {
+			t.Fatalf("%s lee %v del almacenamiento de %v; quiero el adjunto en acme", quien, f.ID, blobs.gets)
+		}
+	}
+	// Quien no está en la conversación no lo ve, venga de donde venga.
+	if _, err := svc.ChannelFile(otra, canal, att.ID, "carla"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("no miembro de «otra»: %v, quiero ErrNotFound", err)
+	}
+
+	blobs.gets, blobs.puts = nil, nil
+	copia, err := svc.CopyChannelFileToMyDrive(otra, canal, att.ID, "bea")
+	if err != nil {
+		t.Fatalf("Guardar en mi Drive desde fuera: %v", err)
+	}
+	if copia.Tenant != "otra" || copia.ID == att.ID {
+		t.Fatalf("la copia vive en %q (id %v); quiero un fichero nuevo en «otra»", copia.Tenant, copia.ID)
+	}
+	if len(blobs.gets) != 1 || blobs.gets[0] != "acme" || len(blobs.puts) != 1 || blobs.puts[0] != "otra" {
+		t.Fatalf("la copia lee de %v y escribe en %v; quiero de acme a otra", blobs.gets, blobs.puts)
+	}
+	if got, err := svc.GetFile(store.WithOwner(otra, "bea"), copia.ID); err != nil || got.Name == "" {
+		t.Fatalf("la copia no está en «Mi unidad» de Bea: %+v %v", got, err)
 	}
 }

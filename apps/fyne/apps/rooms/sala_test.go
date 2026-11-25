@@ -1150,6 +1150,32 @@ func TestFlechaArribaEditaElUltimoPropio(t *testing.T) {
 	}
 }
 
+// En el móvil, con un fork de Fyne que pierde los modificadores, Ctrl+↑ y Alt+↑ (cambiar
+// de canal) llegan como ↑ a secas: ahí ↑ no edita el último mensaje, que es lo que
+// hacía con cualquiera de las dos.
+//
+// VISTO EN ROJO (2026-11-25): sin `flechasFiables`, la ↑ que en el teléfono era Alt+↑
+// abre la edición de «mio».
+func TestFlechaArribaNoEditaSiElMovilPierdeLosModificadores(t *testing.T) {
+	antes := flechasFiables
+	t.Cleanup(func() { flechasFiables = antes })
+	flechasFiables = func() bool { return false }
+	s := servicioConDos()
+	s.mensajes["c1"] = append(s.mensajes["c1"], mensajeMio())
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	h, c := sa.P.Canal.Historial, sa.P.Canal.Compositor
+	c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp})
+	if h.EditandoID != "" {
+		t.Fatalf("↑ sin saber si era Ctrl+↑ abrió la edición de %q", h.EditandoID)
+	}
+	flechasFiables = func() bool { return true }
+	c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp})
+	if h.EditandoID != "mio" {
+		t.Fatalf("con el fork que entrega los modificadores ↑ edita %q y debía editar «mio»", h.EditandoID)
+	}
+}
+
 // TestCerrarLaEdicionDeFlechaVuelveAlCompositor: la edición abierta con ↑ se cierra con
 // Intro o con Esc y el foco vuelve al compositor, no se queda en la caja que desaparece
 // (design.md §2.6). Gemelo de editarVuelveElFoco.test.tsx. Abierta desde el menú del

@@ -101,7 +101,17 @@ func main() {
 		// Quien ha entrado: la cola de aprobaciones no le ofrece aprobar lo suyo.
 		subject := resources.PrivateStorageScope().Subject
 		p.Yo = func() string { return subject }
+		// El cobro del punto de venta enviado y sin confirmar, en el almacén sin conexión
+		// de la suite a nombre de esta cuenta: cerrar la app con un cobro incierto ya no
+		// lo pierde (ERP-09). Sin almacén, vive lo que la pantalla, como antes.
+		if almacen, err := sesion.Almacen(); err == nil {
+			cuenta := sesion.IdentidadDeCuenta(s.URL("id"), subject, organization)
+			p.CobrosTPV = erp.AlmacenCobroTPVDe(almacen, func() string { return cuenta })
+		} else {
+			slog.Warn("erp: sin almacén para el cobro pendiente del punto de venta", "error", err)
+		}
 		p.AbrirApp = func(producto, ruta string) { _ = api.AbrirEn(a, s.Apex(), producto, organization, ruta) }
+		p.PoliticaURL = ui.PoliticaDePrivacidad(s.Apex(), l)
 		p.Atajos(w.Canvas(), barra)
 		current = p
 		p.Arrancar()
@@ -149,6 +159,11 @@ func main() {
 				if err != nil {
 					return cifrado.ApplicationView{}, err
 				}
+				// El widget lee este repositorio mientras esté montado: el servidor de esta
+				// cuenta está congelado desde que pasó a Matrix (ADR 0078). Vive lo que la cuenta
+				// montada, no esta petición de montaje.
+				//nolint:contextcheck // la vida es la de la cuenta (resources.Context).
+				s.WidgetDesdeRegistrosPrivados(resources.Context(), resources.HTTP(), facade)
 				return mount(resources, facade), nil //nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
 			},
 		},
@@ -163,7 +178,7 @@ func main() {
 	})
 
 	if err != nil {
-		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+		w.SetContent(ui.NuevoVacioError(t.T("matrix.failed", nil), ""))
 	} else {
 		w.SetContent(barra.Montar(private.Objeto()))
 		w.SetOnClosed(private.Close)

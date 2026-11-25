@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
@@ -73,11 +74,20 @@ func (p *Pantalla) filaOrganizador(organizador string, ancho float32, esc tema.E
 		ui.NuevoParrafo(organizador, esc, ui.Normal, "text", v).A(max(ancho-w-espacio1p5, 0)).Recortado(1))
 }
 
+// nombreOrganizador es `organizer.name ?? organizer.email` de GuestList: el CN del
+// ORGANIZER si el servicio lo trae y, si no, su dirección sin «mailto:».
+func nombreOrganizador(ev api.Event) string {
+	if api.SinMailto(ev.Organizer) == "" {
+		return ""
+	}
+	return cmp.Or(strings.TrimSpace(ev.OrganizerName), api.SinMailto(ev.Organizer))
+}
+
 // seccionInvitados es GuestList: el organizador, el rótulo «Invitados» y una fila por
 // invitado —nombre o dirección y la insignia de su respuesta—. Nil si el evento no
 // tiene ni organizador ni invitados: un evento personal no gana una sección vacía.
 func (p *Pantalla) seccionInvitados(ev api.Event, ancho float32, esc tema.Escalon) fyne.CanvasObject {
-	organizador := api.SinMailto(ev.Organizer)
+	organizador := nombreOrganizador(ev)
 	if organizador == "" && len(ev.Attendees) == 0 {
 		return nil
 	}

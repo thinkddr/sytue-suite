@@ -95,16 +95,60 @@ type pedido struct {
 // 8–13 ms del `init` y otros 6–14 de `ElegirCromo`. Lo generado lleva la huella de las
 // hojas de las que salió: si no es la de las embebidas, se leen como siempre
 // (leerHoja), y TestLasPaletasGeneradasSonLasDeLaHoja se pone en rojo.
+//
+// Y ni siquiera lo generado se pasa a mapas en el `init`: eran ~0,5 ms del arranque de
+// cada app (dos juegos × tres apariencias × ~230 tokens, sus aplanados y sus índices),
+// y la mayoría elige el cromo «papel» antes de pintar nada, así que el de la casa no lo
+// usaba. El juego se resuelve al pedir el primer color, con lo elegido para entonces
+// (vigente), y cada juego una sola vez (juegoDel).
 var (
-	coloresDeLaHoja, juegos = leerHoja()
-	paletas                 = juegos[pedido{}].paletas
-	// enVigor es el juego con el que se pinta. Atómico: lo cambia el vigilante de los
-	// ajustes compartidos (otra app de la suite puede cambiar el color o la forma) y lo
-	// leen los renderers.
+	coloresDeLaHoja = leerColores()
+	// juegos son los ya resueltos, por pedido. Van bajo el cerrojo de `eleccion`.
+	juegos = map[pedido]*juego{}
+	// enVigor es el juego con el que se pinta; nil hasta el primer color. Atómico: lo
+	// cambia el vigilante de los ajustes compartidos (otra app de la suite puede cambiar
+	// el color o la forma) y lo leen los renderers.
 	enVigor atomic.Pointer[juego]
 )
 
-func init() { enVigor.Store(juegos[pedido{}]) }
+// vigente es el juego con el que se pinta: el en vigor o, antes del primer color, el de
+// lo elegido hasta ahora, que se resuelve aquí.
+func vigente() *juego {
+	if j := enVigor.Load(); j != nil {
+		return j
+	}
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	if j := enVigor.Load(); j != nil {
+		return j
+	}
+	j := juegoDel(enLaHoja(eleccion.pedido))
+	enVigor.Store(j)
+	return j
+}
+
+// juegoDel es el juego de un pedido, resuelto la primera vez que se pide: el generado si
+// lo hay y es de estas hojas, o leyendo la hoja. Va con el cerrojo de `eleccion` cogido.
+func juegoDel(p pedido) *juego {
+	if j := juegos[p]; j != nil {
+		return j
+	}
+	j := juegoGenerado(p)
+	if j == nil {
+		// Un producto sin rampa propia en la hoja —el Hub— sale con la de la casa: su
+		// bloque no existe y el reparto de `[data-color='app']` da esos valores.
+		j = mustJuego(p, coloresCSS, aparienciaCSS)
+	}
+	juegos[p] = j
+	return j
+}
+
+// casa es el juego de la casa, el del pedido cero.
+func casa() *juego {
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	return juegoDel(pedido{})
+}
 
 // ColorDeCadaApp es el tercer valor del eje de color: el carril y la acción toman el
 // color de producto de la app que se está usando (`[data-color='app']` con `data-app`).
@@ -224,17 +268,15 @@ func enLaHoja(p pedido) pedido {
 	return p
 }
 
-// ponerEnVigor resuelve el juego de lo elegido. Va con el cerrojo cogido.
+// ponerEnVigor resuelve el juego de lo elegido. Va con el cerrojo cogido. Antes del
+// primer color no resuelve nada —lo hará vigente con lo elegido entonces—, y lo que había
+// «en vigor» era el de la casa.
 func ponerEnVigor() bool {
 	p := enLaHoja(eleccion.pedido)
-	j := juegos[p]
-	if j == nil {
-		// La primera vez que se pide. Un producto sin rampa propia en la hoja —el Hub—
-		// sale con la de la casa: su bloque no existe y el reparto de `[data-color='app']`
-		// da esos valores.
-		j = mustJuego(p, coloresCSS, aparienciaCSS)
-		juegos[p] = j
+	if enVigor.Load() == nil {
+		return p != pedido{}
 	}
+	j := juegoDel(p)
 	return enVigor.Swap(j) != j
 }
 
@@ -256,7 +298,7 @@ func Colores() []string {
 // Un nombre que no existe es un error de quien escribe el widget, no un estado de la
 // aplicación, y entra en pánico como regexp.MustCompile.
 func Color(name string, v Variant) color.NRGBA {
-	c, ok := enVigor.Load().paletas[v][name]
+	c, ok := vigente().paletas[v][name]
 	if !ok {
 		panic("tokens: no existe el token de color --sytue-" + name)
 	}
@@ -272,7 +314,7 @@ func Color(name string, v Variant) color.NRGBA {
 // aplanado sobre blanco los convertía en una raya clara que partía barra y lateral.
 // Quien lo use compone con `SobreSRGB` sobre el fondo que tenga debajo.
 func Crudo(name string, v Variant) color.NRGBA {
-	c, ok := enVigor.Load().crudas[v][name]
+	c, ok := vigente().crudas[v][name]
 	if !ok {
 		panic("tokens: no existe el token de color --sytue-" + name)
 	}
@@ -281,6 +323,7 @@ func Crudo(name string, v Variant) color.NRGBA {
 
 // Names lista los tokens de color, ordenados. Son los mismos en las tres apariencias.
 func Names() []string {
+	paletas := vigente().paletas
 	out := make([]string, 0, len(paletas[Light]))
 	for n := range paletas[Light] {
 		out = append(out, n)
@@ -331,8 +374,13 @@ func mustJuegos(hojas ...string) map[pedido]*juego {
 	return map[pedido]*juego{{}: mustJuego(pedido{}, hojas...)}
 }
 
+// lecturasDeHoja cuenta los juegos leídos de la hoja: el guardián del arranque mira que
+// lo generado no la lea.
+var lecturasDeHoja atomic.Int64
+
 // mustJuego lee las paletas de un pedido.
 func mustJuego(p pedido, hojas ...string) *juego {
+	lecturasDeHoja.Add(1)
 	crudas, err := parseCrudasDe(oscuroElegido, p, hojas...)
 	if err != nil {
 		panic(fmt.Sprintf("tokens: colors.css y appearance.css (%+v): %v", p, err))
@@ -633,7 +681,7 @@ func aplanarBordes(tokens map[string]color.NRGBA) {
 // devuelve el de la hoja, con su alfa. Es para quien recibe el color y no el nombre (una
 // caja a la que le pasan su borde) y necesita componerlo sobre otro fondo que `surface`.
 func BordeCrudo(c color.NRGBA, v Variant) (color.NRGBA, bool) {
-	crudo, ok := enVigor.Load().bordes[v][c]
+	crudo, ok := vigente().bordes[v][c]
 	return crudo, ok
 }
 

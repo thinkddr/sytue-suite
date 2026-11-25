@@ -53,6 +53,10 @@ type Inbound struct {
 	calendario     *PuenteCalendario
 	hubNotifier    *hubnotify.Client
 	mailPublicURL  string
+	// autoridad y planes deciden si el correo de una cuenta espera al traspaso a
+	// la bóveda (aplazar.go). Sin autoridad no se aplaza nada.
+	autoridad AutoridadCorreo
+	planes    planesDeEntrada
 	// authservID firma la cabecera Authentication-Results que el MX antepone
 	// (RFC 8601): el FQDN del MTA.
 	authservID string
@@ -84,6 +88,10 @@ type InboundConfig struct {
 	MailPublicURL string
 	// AuthServID es el nombre del MX en la cabecera Authentication-Results.
 	AuthServID string
+	// Autoridad es Rooms: con ella, el correo para un plan de entrada de Matrix
+	// que ya nadie reclama se aplaza en vez de quedar ilegible (aplazar.go). Nil,
+	// como antes.
+	Autoridad AutoridadCorreo
 }
 
 // NewInbound construye el entregador entrante. `auto` despacha las autorespuestas
@@ -96,7 +104,12 @@ func NewInbound(st *store.Store, objetos *objectstore.Client, resolver auth.Reso
 	if objetos != nil {
 		privateObjects = objetos
 	}
+	var planes planesDeEntrada
+	if st != nil {
+		planes = st
+	}
 	return &Inbound{
+		autoridad: cfg.Autoridad, planes: planes,
 		store: st, blobs: objetos, privateObjects: privateObjects, resolver: resolver, autoSender: auto, logger: logger,
 		channels:      cfg.Channels,
 		calendario:    cfg.Calendario,

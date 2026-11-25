@@ -65,25 +65,31 @@ func (d *Documento) InsertarTabla(p Pos, filas, columnas int) Pos {
 		t.Filas = append(t.Filas, fila)
 	}
 	tabla := aplanar(t, celdas)
+	return Pos{d.ponerConParrafo(p, tabla) + len(tabla), 0}
+}
+
+// ponerConParrafo mete unos bloques (una tabla, unas columnas) en el cursor y detrás un
+// párrafo vacío, como el `insertHTML` del navegador: en el sitio de un bloque vacío o,
+// si no, partiendo el del cursor. Devuelve dónde empiezan.
+func (d *Documento) ponerConParrafo(p Pos, nuevos []Bloque) int {
 	parrafo := Bloque{Tipo: Parrafo, Etiqueta: "p"}
 	if len(d.Bloques) == 0 {
-		tabla = append(tabla, parrafo)
-		d.Bloques = tabla
-		return Pos{len(d.Bloques) - 1, 0}
+		d.Bloques = slices.Concat(nuevos, []Bloque{parrafo})
+		return 0
 	}
 	actual := d.Bloques[p.B]
 	if vacio(actual) {
-		d.Bloques = slices.Concat(d.Bloques[:p.B], tabla, []Bloque{parrafo}, d.Bloques[p.B+1:])
-		return Pos{p.B + len(tabla), 0}
+		d.Bloques = slices.Concat(d.Bloques[:p.B], nuevos, []Bloque{parrafo}, d.Bloques[p.B+1:])
+		return p.B
 	}
 	q := d.Partir(p)
 	if vacio(d.Bloques[q.B]) {
 		d.Bloques[q.B] = parrafo // al final de la línea, el que nace es el de detrás
-		d.Bloques = slices.Insert(d.Bloques, q.B, tabla...)
+		d.Bloques = slices.Insert(d.Bloques, q.B, nuevos...)
 	} else {
-		d.Bloques = slices.Insert(d.Bloques, q.B, append(tabla, parrafo)...)
+		d.Bloques = slices.Insert(d.Bloques, q.B, append(nuevos, parrafo)...)
 	}
-	return Pos{q.B + len(tabla), 0}
+	return q.B
 }
 
 // vacio dice si en un bloque escribible no hay nada escrito.
@@ -98,7 +104,10 @@ func aplanar(t *Tabla, celdas [][][]Bloque) []Bloque {
 	var out []Bloque
 	for f, fila := range t.Filas {
 		for c := range fila.Celdas {
-			bs := celdas[f][c]
+			var bs []Bloque
+			if f < len(celdas) && c < len(celdas[f]) {
+				bs = celdas[f][c]
+			}
 			if len(bs) == 0 {
 				bs = []Bloque{{Tipo: Parrafo}}
 			}
@@ -144,7 +153,7 @@ func (d *Documento) desplegar(i, j int) [][][]Bloque {
 //
 //nolint:gocognit,gocyclo // Las órdenes de tabla comparten cursor y estructura, separarlas duplica invariantes.
 func (d *Documento) EditarTabla(orden string, p Pos) Pos {
-	if len(d.Bloques) == 0 || !d.Bloques[p.B].Celda.EnTabla() {
+	if len(d.Bloques) == 0 || !d.Bloques[p.B].Celda.EnTabla() || d.Bloques[p.B].Celda.Tabla.EsColumnas() {
 		return p
 	}
 	en := d.Bloques[p.B].Celda

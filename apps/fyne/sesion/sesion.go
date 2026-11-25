@@ -689,13 +689,23 @@ var ErrYaEntrando = errors.New("sesion: ya hay un inicio de sesión abierto en e
 // pedirla.
 func (s *Suite) Entrar(ctx context.Context) error { return s.entrar(ctx, nil) }
 
-// EntrarParaDesbloquear vuelve a entrar en Sytue ID pidiendo que la persona meta su
-// clave aunque la sesión del navegador siga viva (`prompt=login`): es como este
-// dispositivo consigue la clave de desbloqueo del cifrado que le falta (ADR 0084).
-// `legado` son los parámetros públicos de los envoltorios de la ADR 0082 que la página
-// de inicio de sesión debe abrir también. Nunca se pide nada dentro de la app.
+// EntrarParaDesbloquear vuelve a Sytue ID a por la clave de desbloqueo del cifrado
+// que le falta a este dispositivo (ADR 0084). Nunca se pide nada dentro de la app.
+//
+// Sin teclear si se puede: si el navegador ya tiene la clave (la persona entró ahí
+// antes), Sytue ID la entrega sin preguntar, como a una app web. Si no la tiene, el
+// propio relevo pide la contraseña en el MISMO viaje (relay.js, `login`). Antes iba
+// siempre con `prompt=login` y había que volver a teclear la contraseña en cada
+// app aunque Sytue ID ya tuviera la clave: con iniciar sesión no bastaba.
+//
+// `legado` son los parámetros públicos de los envoltorios de la ADR 0082 que la
+// página de inicio de sesión debe abrir también; esos sí piden la contraseña.
 func (s *Suite) EntrarParaDesbloquear(ctx context.Context, legado string) error {
-	return s.entrarCon(ctx, nil, auth.PeticionLogin{Prompt: "login", Legado: legado})
+	peticion := auth.PeticionLogin{Legado: legado}
+	if legado != "" {
+		peticion.Prompt = "login"
+	}
+	return s.entrarCon(ctx, nil, peticion)
 }
 
 // Reidentificar vuelve a entrar en Sytue ID pidiendo identificarse otra vez

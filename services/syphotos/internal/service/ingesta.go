@@ -12,6 +12,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/gen2brain/h265/heic"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/miniatura"
 	photorender "git.sytue.eu/sytue/one/apps/nucleo/photos/render"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -34,7 +37,8 @@ import (
 // correcto —que se sabe del EXIF— y las miniaturas entran cuando están.
 //
 // Y las dimensiones salen de `DecodeConfig` sobre esos mismos 128 KiB, sin
-// decodificar un píxel: la cabecera SOF de un JPEG va con las demás.
+// decodificar un píxel: la cabecera SOF de un JPEG va con las demás, y la caja
+// `meta` de un HEIC también (miniatura.Cabecera, que la da ya girada).
 
 // Ingesta orquesta el alta de una foto.
 type Ingesta struct {
@@ -81,7 +85,7 @@ func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo, idioma st
 	// Las dimensiones son OBLIGATORIAS: sin ellas no hay dónde colocar el hueco
 	// en la cuadrícula, y el store lo rechaza. Salen de la cabecera, sin
 	// decodificar.
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(cab))
+	cfg, formato, err := miniatura.Cabecera(cab)
 	if err != nil {
 		return domain.Activo{}, fmt.Errorf("%w: %s no es una imagen que se pueda medir",
 			domain.ErrInvalidInput, f.Nombre)
@@ -95,7 +99,7 @@ func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo, idioma st
 	}
 	// El EXIF es OPCIONAL: hay millones de imágenes sin él —capturas, PNG— y
 	// tratarlo como error impediría subirlas. Lo que no trae, se queda vacío.
-	if m, err := exif.Leer(cab); err == nil {
+	if m, err := leerExif(cab, formato); err == nil {
 		a.Orientacion = domain.OrientacionDe(int(m.Orientacion))
 		a.TomadaEn = m.TomadaEn
 		a.Lat, a.Lon = m.Lat, m.Lon
@@ -103,6 +107,24 @@ func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo, idioma st
 		a.Objetivo = m.Objetivo
 	}
 	return i.store.Ingerir(ctx, a)
+}
+
+// leerExif es el EXIF de la cabecera. El de un HEIC no va en un segmento APP1 sino en
+// su elemento `Exif` (heic.RawExif), y su Orientation NO cuenta: en HEIF manda el `irot`
+// del contenedor, que miniatura ya aplica al decodificar, y girar además con el EXIF
+// pondría la foto de lado. La fecha, la cámara y el lugar sí valen. Si el elemento cae
+// fuera de los bytes de cabecera, la foto entra sin ellos, como una sin EXIF.
+func leerExif(cab []byte, formato string) (exif.Metadatos, error) {
+	if formato != "heic" {
+		return exif.Leer(cab)
+	}
+	tiff, err := heic.RawExif(bytes.NewReader(cab))
+	if err != nil {
+		return exif.Metadatos{}, exif.ErrSinExif
+	}
+	m, err := exif.LeerTIFF(tiff)
+	m.Orientacion = 0
+	return m, err
 }
 
 // Derivar genera y guarda las variantes de una foto para una receta dada.
@@ -149,8 +171,8 @@ func (i *Ingesta) derivar(ctx context.Context, token string, a domain.Activo, re
 	})
 }
 
-// maxOriginal acota lo que se lee de Drive. Solo se decodifica JPEG, PNG, GIF y WebP,
-// y lo que cabe en miniatura.MaxBytes ya decodificado no ocupa más que esto
+// maxOriginal acota lo que se lee de Drive. Solo se decodifica JPEG, PNG, GIF, WebP y
+// HEIC, y lo que cabe en miniatura.MaxBytes ya decodificado no ocupa más que esto
 // comprimido. Con 512 MiB, leer un fichero grande ya llenaba el pod (FILE-07).
 const maxOriginal = photorender.MaxOriginal
 

@@ -378,12 +378,24 @@ export function EditorHeader({ ctx }: { ctx: EditorContext }): JSX.Element {
         </button>
       ) : null}
 
+      {/* Por debajo de 400 px «Compartir» es solo su icono (con el rótulo para quien no lo
+          ve y en el `title`): con dos personas en el documento, a 320 en castellano el
+          chip de guardado se quedaba en «● G…» y el título en «Acta de» (2026-11-24). */}
       <ShareDialog
         ctx={ctx}
         align="end"
         trigger={(trigger) => (
-          <Button {...trigger} variant="primary" size="sm" disabled={ctx.connection === 'offline'}>
-            {t('header.share')}
+          <Button
+            {...trigger}
+            variant="primary"
+            size="sm"
+            title={t('header.share')}
+            disabled={ctx.connection === 'offline'}
+          >
+            <span class="inline-flex min-[25rem]:hidden" aria-hidden="true">
+              <EditorIcon name="share" />
+            </span>
+            <span class="max-[25rem]:sr-only">{t('header.share')}</span>
           </Button>
         )}
       />

@@ -41,16 +41,17 @@ func (a *API) listAuditLog(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	entries, err := a.compliance.ListAudit(r.Context(), auditlog.VentanaMax)
+	page, next, err := a.compliance.ListarTraza(r.Context(), q)
 	if err != nil {
 		httpx.Fail(w, r, mapErr(err))
 		return
 	}
-	entries = auditlog.Filtrar(entries, q)
 	if q.CSV {
-		auditlog.EscribirCSV(w, r, "mail", entries)
+		auditlog.EscribirCSV(w, r, "mail", page)
 		return
 	}
-	page, next := auditlog.Paginar(entries, q.After, q.Limit)
+	if page == nil {
+		page = []auditlog.Entrada{}
+	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"items": page, "nextCursor": next})
 }

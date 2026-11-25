@@ -232,6 +232,36 @@ export const is: AppCatalog<typeof en> = {
   'recovery.invalid': 'Ekki er hægt að nota þetta netfang: það þarf að vera gilt og utan Sytue.',
   'recovery.wrong_password': 'Lykilorðið er ekki rétt.',
   'recovery.failed': 'Ekki tókst að vista. Reyndu aftur eftir smástund.',
+  'recovery.password.hint':
+    'Núverandi lykilorðið þitt þarf fyrir allar breytingar á þessu spjaldi.',
+  'recovery.username.new': 'Nýtt notandanafn',
+  'recovery.username.hint':
+    'Það sem þú hættir að nota er frátekið fyrir þig í 30 daga og þú getur breytt því einu sinni á 30 daga fresti.',
+  'recovery.username.change': 'Breyta notandanafni',
+  'recovery.username.changed': 'Notandanafni breytt.',
+  'recovery.username.invalid':
+    'Þetta notandanafn er ógilt: notaðu 3 til 64 bókstafi, tölustafi, punkta eða bandstrik.',
+  'recovery.username.taken': 'Þetta notandanafn er ekki laust.',
+  'recovery.username.recent': 'Þú breyttir notandanafninu fyrir minna en 30 dögum.',
+  'recovery.username.is_address':
+    'Í persónulegum aðgangi er notandanafnið Sytue-netfangið þitt og því er ekki hægt að breyta því hér.',
+  'recovery.phone.none':
+    'Ekkert farsímanúmer ennþá: bættu einu við til að skrá þig líka inn með því.',
+  'recovery.phone.new': 'Nýtt farsímanúmer',
+  'recovery.phone.format': 'Með landsnúmeri, til dæmis +354 600 0000.',
+  'recovery.phone.send': 'Senda kóða',
+  'recovery.phone.sent': 'Við sendum kóða með SMS í {phone}.',
+  'recovery.phone.code': 'Kóði',
+  'recovery.phone.confirm': 'Staðfesta',
+  'recovery.phone.changed': 'Farsímanúmer vistað.',
+  'recovery.phone.invalid': 'Þetta númer er ógilt: skrifaðu það með landsnúmeri.',
+  'recovery.phone.same': 'Þetta er nú þegar farsímanúmerið þitt.',
+  'recovery.phone.wait': 'Bíddu í mínútu áður en þú biður um nýjan kóða.',
+  'recovery.phone.limit': 'Of margir kóðar beðnir um. Reyndu aftur síðar.',
+  'recovery.phone.code_wrong': 'Kóðinn er ekki réttur.',
+  'recovery.phone.code_expired': 'Kóðinn er útrunninn. Biddu um nýjan.',
+  'recovery.phone.has_account': 'Þetta farsímanúmer tilheyrir nú þegar öðrum aðgangi.',
+  'recovery.phone.unavailable': 'Ekki er hægt að senda SMS núna. Reyndu aftur síðar.',
   'delete.title': 'Eyða reikningnum mínum',
   'delete.hint':
     'Innskráningarupplýsingunum þínum og öllu sem er aðeins þitt er eytt; það sem tilheyrir fyrirtækinu þínu verður þar áfram. Í 30 daga er hægt að endurheimta reikninginn.',

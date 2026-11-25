@@ -1,0 +1,1912 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos (thinkddr)
+#
+# sytue-deploy — Instalador paso a paso de Sytue Suite.
+#
+#   ./sytue-deploy            Asistente: comprueba requisitos, genera los secretos,
+#                             construye, arranca, crea el administrador y verifica.
+#   ./sytue-deploy --yes      Lo mismo sin preguntas (valores recomendados).
+#
+# Ningún secreto viene en el repositorio: se generan aquí con `openssl rand` y se
+# guardan con permisos 0600 en ficheros que Git ignora.
+
+# Los códigos de color van en el formato de printf a propósito: son constantes.
+# shellcheck disable=SC2059
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_DIR="${ROOT_DIR}/deploy/compose"
+COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.yml"
+ENV_FILE="${COMPOSE_DIR}/.env"
+CERT_DIR="${COMPOSE_DIR}/traefik/certs"
+HELM_DIR="${ROOT_DIR}/deploy/helm"
+
+# El entorno Docker Compose vive siempre en *.sytue.localhost: los nombres de host
+# están fijados en docker-compose.yml, en Traefik y en los clientes OIDC sembrados.
+LOCAL_DOMAIN="sytue.localhost"
+LOCAL_ADMIN_EMAIL="admin@sytue.localhost"
+LOCAL_MEMBER_EMAIL="member@sytue.localhost"
+LOCAL_ORG="acme"
+LOCAL_TOTP_SEED="JBSWY3DPEHPK3PXP"
+
+# Colores ANSI (solo si stdout es terminal)
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  BOLD="\033[1m" DIM="\033[2m" CYAN="\033[36m" GREEN="\033[32m" YELLOW="\033[33m" RED="\033[31m" RESET="\033[0m"
+else
+  BOLD="" DIM="" CYAN="" GREEN="" YELLOW="" RED="" RESET=""
+fi
+
+info()  { printf "${CYAN}▸${RESET} %b\n" "$*"; }
+ok()    { printf "${GREEN}✓${RESET} %b\n" "$*"; }
+warn()  { printf "${YELLOW}!${RESET} %b\n" "$*"; }
+err()   { printf "${RED}✗${RESET} %b\n" "$*" >&2; }
+die()   { err "$*"; exit 1; }
+step()  { printf "\n${BOLD}${CYAN}=== %s ===${RESET}\n" "$*"; }
+
+usage() {
+  cat <<'EOF'
+Uso: ./sytue-deploy [opciones]
+
+Instala Sytue Suite paso a paso. Sin opciones abre el asistente interactivo.
+
+Modo local (Docker Compose, recomendado)
+  ./sytue-deploy                      Asistente completo: requisitos → secretos →
+                                      construcción → arranque → administrador → verificación
+  ./sytue-deploy --yes                Igual, sin preguntas (suite completa)
+  ./sytue-deploy --yes --profile office
+                                      Solo ofimática (menos memoria)
+  ./sytue-deploy --only-config        Solo genera deploy/compose/.env (no arranca nada)
+  ./sytue-deploy --reset              Borra los datos locales y vuelve a instalar desde cero
+
+Modo servidor único (tu dominio, una sola máquina con Docker)
+  ./sytue-deploy --mode servidor --domain suite.miempresa.eu
+                                      Con certificados de Let's Encrypt (por defecto)
+  ./sytue-deploy --mode servidor --domain suite.lan --tls interno
+                                      Red local o pruebas (certificados de mkcert)
+
+Modo clúster (Kubernetes/Helm, avanzado)
+  ./sytue-deploy --mode helm          Genera values y scripts de Secrets para tu clúster
+  ./sytue-deploy --integrations       Solo las apps OAuth de terceros sobre un Helm existente
+
+Opciones:
+  --mode <compose|servidor|helm>
+                            Modo de despliegue (por defecto: compose)
+  --profile <full|office|core|lista>
+                            Servicios de Compose: full (todo), office, core o una lista
+                            de perfiles separados por comas (p. ej. mail,drive,docs)
+  -y, --yes                 No pregunta nada: usa los valores recomendados
+      --non-interactive     Alias de --yes
+  --only-config             Genera la configuración y los secretos, sin arrancar nada
+  --reset                   (Compose) Para la suite, BORRA sus volúmenes y regenera secretos
+  --admin-password <pwd>    Contraseña del administrador (también SYTUE_ADMIN_PASSWORD).
+                            Si se omite, se genera una aleatoria
+  --skip-verify             (Compose) No ejecuta la verificación final (smoke test)
+  --sin-matrix              Sin el complemento Matrix (cifrado de extremo a extremo; Drive,
+                            Mail y Rooms guardan entonces sus datos en el servidor)
+  --con-matrix              Activa Matrix en una instalación que ya existía sin él
+  --sin-erp                 Sin el complemento SyERP (facturación, contabilidad, TPV…)
+  --sin-devx                Sin el complemento DevX: Sytue Cloud (PaaS) y Sytue Analytics
+  --sms-sweego-key <clave>  Activa el complemento de verificación por SMS (Sweego)
+                            (también SYTUE_SMS_SWEEGO_API_KEY)
+  --no-build                (Compose) Arranca con las imágenes ya construidas, sin reconstruir
+  --domain <dominio>        (Servidor/Helm) Dominio raíz, p. ej. suite.miempresa.eu
+  --tls <letsencrypt|interno>
+                            (Servidor) Certificados HTTPS (por defecto: letsencrypt)
+  --acme-email <correo>     (Servidor) Correo para Let's Encrypt
+  --usuarios <uno|varios>   (Servidor) Solo tú, o un equipo con invitaciones (por defecto: varios)
+  --registro-abierto        (Servidor, varios) Cualquiera puede crearse una cuenta en /signup
+  --registro-cerrado        (Servidor) Vuelve a cerrar el registro público
+  --admin-email <correo>    (Servidor/Helm) Correo del propietario inicial
+  --org-slug <slug>         (Servidor/Helm) Organización inicial
+  --namespace <ns>          (Helm) Namespace de Kubernetes (por defecto: sytue-prod)
+  --integrations            Solo el asistente de integraciones (Helm)
+  -h, --help                Muestra esta ayuda
+EOF
+}
+
+# Parámetros
+MODE=""
+PROFILE=""
+DOMAIN=""
+ADMIN_EMAIL=""
+ADMIN_PASSWORD="${SYTUE_ADMIN_PASSWORD:-}"
+ORG_SLUG=""
+K8S_NAMESPACE="sytue-prod"
+PG_HOST=""
+PG_PORT="5432"
+S3_ENDPOINT=""
+S3_ACCESS_KEY=""
+S3_SECRET_KEY=""
+TLS_EMAIL=""
+IMAGE_REGISTRY=""
+AI_PROVIDER=""
+AI_API_KEY=""
+AI_MODEL=""
+AI_BASE_URL=""
+NON_INTERACTIVE=0
+ONLY_CONFIG=0
+INTEGRATIONS_ONLY=0
+DO_RESET=0
+SKIP_VERIFY=0
+NO_BUILD=0
+TLS_MODO=""
+USUARIOS=""
+REGISTRO_ABIERTO=""
+CON_ERP=""
+CON_MATRIX=""
+CON_DEVX=""
+SMS_KEY="${SYTUE_SMS_SWEEGO_API_KEY:-}"
+
+need_arg() { [ $# -ge 2 ] && [ -n "$2" ] || die "La opción $1 necesita un valor."; }
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --mode)            need_arg "$@"; MODE="$2"; shift 2 ;;
+    --profile)         need_arg "$@"; PROFILE="$2"; shift 2 ;;
+    --domain)          need_arg "$@"; DOMAIN="$2"; shift 2 ;;
+    --admin-email)     need_arg "$@"; ADMIN_EMAIL="$2"; shift 2 ;;
+    --admin-password)  need_arg "$@"; ADMIN_PASSWORD="$2"; shift 2 ;;
+    --org-slug)        need_arg "$@"; ORG_SLUG="$2"; shift 2 ;;
+    --namespace)       need_arg "$@"; K8S_NAMESPACE="$2"; shift 2 ;;
+    -y|--yes|--non-interactive) NON_INTERACTIVE=1; shift ;;
+    --only-config)     ONLY_CONFIG=1; shift ;;
+    --reset)           DO_RESET=1; shift ;;
+    --skip-verify)     SKIP_VERIFY=1; shift ;;
+    --no-build)        NO_BUILD=1; shift ;;
+    --tls)             need_arg "$@"; TLS_MODO="$2"; shift 2 ;;
+    --acme-email)      need_arg "$@"; TLS_EMAIL="$2"; shift 2 ;;
+    --usuarios)        need_arg "$@"; USUARIOS="$2"; shift 2 ;;
+    --registro-abierto) REGISTRO_ABIERTO="true"; shift ;;
+    --registro-cerrado) REGISTRO_ABIERTO="false"; shift ;;
+    --sin-erp)         CON_ERP=0; shift ;;
+    --sin-matrix)      CON_MATRIX=0; shift ;;
+    --con-matrix)      CON_MATRIX=1; shift ;;
+    --sin-devx)        CON_DEVX=0; shift ;;
+    --sms-sweego-key)  need_arg "$@"; SMS_KEY="$2"; shift 2 ;;
+    --integrations|integraciones) INTEGRATIONS_ONLY=1; shift ;;
+    -h|--help)         usage; exit 0 ;;
+    *) err "Opción desconocida: $1"; usage; exit 2 ;;
+  esac
+done
+case "$MODE" in ""|compose|servidor|helm) ;; *) die "--mode debe ser «compose», «servidor» o «helm»." ;; esac
+
+prompt_default() {
+  local prompt_text="$1" default_val="$2" var_name="$3" input=""
+  if [ "$NON_INTERACTIVE" -eq 1 ]; then
+    printf -v "$var_name" "%s" "$default_val"
+    return
+  fi
+  if [ -n "$default_val" ]; then
+    read -r -p "$(printf "  %b [%b]: " "$prompt_text" "$default_val")" input
+    printf -v "$var_name" "%s" "${input:-$default_val}"
+  else
+    read -r -p "$(printf "  %b: " "$prompt_text")" input
+    printf -v "$var_name" "%s" "$input"
+  fi
+}
+
+prompt_secret() {
+  local prompt_text="$1" var_name="$2" input=""
+  if [ "$NON_INTERACTIVE" -eq 1 ]; then
+    printf -v "$var_name" "%s" ""
+    return
+  fi
+  read -r -s -p "$(printf "  %b (Enter para autogenerar): " "$prompt_text")" input
+  echo ""
+  printf -v "$var_name" "%s" "$input"
+}
+
+prompt_yes_no() {
+  local prompt_text="$1" default_ans="${2:-s}" hint="S/n" ans=""
+  if [ "$NON_INTERACTIVE" -eq 1 ]; then
+    [ "$default_ans" = "s" ]
+    return
+  fi
+  [ "$default_ans" = "n" ] && hint="s/N"
+  read -r -p "$(printf "  %b [%s]: " "$prompt_text" "$hint")" ans
+  ans="$(printf "%s" "${ans:-$default_ans}" | tr '[:upper:]' '[:lower:]')"
+  case "$ans" in
+    s|si|sí|y|yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+rand_hex() { openssl rand -hex "${1:-24}"; }
+rand_b64() { openssl rand -base64 "${1:-32}" | tr -d '\n'; }
+check_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+# Contraseña del administrador: la indicada o una aleatoria que cumple la política
+# de Sytue ID (longitud, mayúsculas, minúsculas, dígitos y símbolo).
+resolver_password_admin() {
+  if [ -z "$ADMIN_PASSWORD" ]; then
+    prompt_secret "Contraseña del administrador (mín. 12 caracteres)" ADMIN_PASSWORD
+  fi
+  if [ -z "$ADMIN_PASSWORD" ]; then
+    ADMIN_PASSWORD="Sytue-$(rand_hex 10)!"
+    ADMIN_PASS_GENERATED=1
+  else
+    ADMIN_PASS_GENERATED=0
+    [ "${#ADMIN_PASSWORD}" -ge 12 ] || die "La contraseña del administrador debe tener al menos 12 caracteres."
+    case "$ADMIN_PASSWORD" in
+      *[[:space:]]*|*\'*|*\"*|*\$*|*\\*|*\`*) die "La contraseña no puede llevar espacios, comillas, «\$», «\\» ni «\`»." ;;
+    esac
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Integraciones y conectores con terceros (Sytue Integration Gateway)
+# ---------------------------------------------------------------------------
+# Tres niveles, de menos a más trabajo para quien despliega:
+#   1. Base del gateway (siempre): KEK de los secretos de cada conector, cliente
+#      `sytue-gateway` en Sytue ID y secreto interno con Drive/Rooms. Las genera
+#      apply-integrations.sh al aplicarse y NO las rota nunca: rotar la KEK
+#      dejaría ilegibles las credenciales ya selladas.
+#   2. Apps OAuth de plataforma (opcional, por proveedor): con ellas cada
+#      organización conecta con un clic, solo aprobando la pantalla de permisos.
+#      Sin ellas, el asistente de Sytue Admin pide a cada organización que
+#      registre su propia app (BYO).
+#   3. Lo demás (SAML, OIDC, IMAP/POP3, tokens de API) lo da de alta cada
+#      organización desde Sytue Admin → Aplicaciones, sin tocar el despliegue.
+#
+# Clave = plantilla del conector (services/integrations/db/seeds/templates). Una
+# app de Google, Microsoft o Slack sirve para toda su familia
+# (services/integrations/internal/http/oauth_clients.go).
+# Formato: clave|nombre|qué cubre|dónde se registra|cómo
+PROVEEDORES_OAUTH=(
+  "google-workspace|Google|Workspace, Google Drive, Gmail, Chat y Meet|https://console.cloud.google.com/apis/credentials|Configura la pantalla de consentimiento OAuth; luego «Crear credenciales» → «ID de cliente de OAuth» → tipo «Aplicación web». Habilita las API que vayas a usar (Drive, Gmail, Chat, Calendar)."
+  "microsoft365|Microsoft|Microsoft 365, Azure, OneDrive, Teams y Outlook|https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade|«Nuevo registro», cuentas de cualquier directorio (multiinquilino), URI de redirección de tipo «Web». Después «Certificados y secretos» → «Nuevo secreto de cliente». El client_id es el «Id. de aplicación (cliente)»."
+  "slack|Slack|SSO/SCIM, canales y salas de Rooms|https://api.slack.com/apps|«Create New App» → «From an app manifest» (puedes partir de integraciones-marketplace/slack/). En «OAuth & Permissions» añade la URI de redirección; Client ID y Client Secret están en «Basic Information»."
+  "zoom|Zoom|reuniones de Zoom|https://marketplace.zoom.us/develop/create|Crea una app «General App» con OAuth de usuario; añade la URI de redirección y la lista de permitidos (allow list) con el mismo dominio."
+  "github|GitHub|repositorios y migración desde GitHub|https://github.com/settings/applications/new|«New OAuth App» (o en la organización: Settings → Developer settings). «Authorization callback URL» = la URI de redirección; genera un client secret."
+  "jira-cloud|Jira Cloud (Atlassian)|Jira y SSO de Atlassian|https://developer.atlassian.com/console/myapps/|«Create» → «OAuth 2.0 integration»; en «Authorization» configura la Callback URL; añade los permisos de Jira que necesites."
+  "salesforce|Salesforce|CRM de Salesforce|https://login.salesforce.com/|Setup → App Manager → «New Connected App» (o External Client App) con OAuth habilitado y la Callback URL; Consumer Key = client_id, Consumer Secret = client_secret."
+  "servicenow|ServiceNow|incidencias y servicios de ServiceNow|https://developer.servicenow.com/|En tu instancia: System OAuth → Application Registry → «Create an OAuth API endpoint for external clients», con la Redirect URL."
+  "dropbox-storage|Dropbox|almacenamiento conectado de Dropbox en Drive|https://www.dropbox.com/developers/apps|«Create app» → Scoped access, Full Dropbox; en «Settings» añade la Redirect URI; App key = client_id, App secret = client_secret."
+  "business-central|Dynamics 365 Business Central|ERP de Business Central|https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade|Registro de app en Entra ID con permiso de API «Dynamics 365 Business Central» (delegado) y URI de redirección «Web»."
+  "databricks|Databricks|datos de Databricks|https://accounts.cloud.databricks.com/|Account console → Settings → App connections → «Add connection» con la Redirect URL; genera el client secret."
+  "yahoo-mail|Yahoo Mail|migración y buzones de Yahoo Mail|https://developer.yahoo.com/apps/|«Create an App», tipo web, con la Redirect URI y el permiso de Mail."
+  "whatsapp-business|WhatsApp Business (Meta)|conversaciones de WhatsApp Business en Rooms|https://developers.facebook.com/apps/|Crea una app de tipo «Business» con el producto WhatsApp; en «Inicio de sesión con Facebook» añade la URI de redirección. App ID = client_id, App secret = client_secret."
+)
+
+INTEG_TSV="${HELM_DIR}/integrations-oauth.tsv"
+INTEG_JSON="${HELM_DIR}/integrations-oauth-clients.json"
+INTEG_APPLY="${HELM_DIR}/apply-integrations.sh"
+INTEG_VALUES="${HELM_DIR}/values-integrations.yaml"
+INTEG_WHATSAPP=0
+INTEG_OPERADOR=0
+declare -A OAUTH_ID=() OAUTH_SECRET=()
+
+json_str() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '"%s"' "$s"
+}
+
+# Sin tabuladores, saltos de línea ni otros caracteres de control: el estado se
+# guarda en TSV y acaba en un JSON.
+valor_valido() {
+  [[ -n "$1" && "$1" != *[[:cntrl:]]* ]]
+}
+
+cargar_oauth() {
+  [ -f "$INTEG_TSV" ] || return 0
+  local clave id secreto
+  while IFS=$'\t' read -r clave id secreto; do
+    [ -n "$clave" ] || continue
+    OAUTH_ID["$clave"]="$id"
+    OAUTH_SECRET["$clave"]="$secreto"
+  done < "$INTEG_TSV"
+}
+
+guardar_oauth() {
+  local clave primero=1
+  ( umask 077
+    : > "$INTEG_TSV"
+    for clave in "${!OAUTH_ID[@]}"; do
+      printf '%s\t%s\t%s\n' "$clave" "${OAUTH_ID[$clave]}" "${OAUTH_SECRET[$clave]}" >> "$INTEG_TSV"
+    done
+    {
+      printf '{'
+      for clave in "${!OAUTH_ID[@]}"; do
+        [ "$primero" -eq 1 ] || printf ','
+        primero=0
+        printf '\n  %s: {"client_id": %s, "client_secret": %s}' \
+          "$(json_str "$clave")" "$(json_str "${OAUTH_ID[$clave]}")" "$(json_str "${OAUTH_SECRET[$clave]}")"
+      done
+      printf '\n}\n'
+    } > "$INTEG_JSON"
+  )
+  chmod 600 "$INTEG_TSV" "$INTEG_JSON"
+}
+
+leer_secreto_visible() {
+  local prompt_text="$1" var_name="$2" input=""
+  read -r -s -p "$(printf "  %b: " "$prompt_text")" input
+  echo ""
+  printf -v "$var_name" "%s" "$input"
+}
+
+configurar_proveedor() {
+  local linea="$1" redirect="$2"
+  local clave nombre cubre url como id secreto
+  IFS='|' read -r clave nombre cubre url como <<< "$linea"
+  echo ""
+  printf "  ${BOLD}%s${RESET} ${DIM}(%s)${RESET}\n" "$nombre" "$cubre"
+  if [ -n "${OAUTH_ID[$clave]:-}" ]; then
+    printf "    Configurado · client_id ${BOLD}%s${RESET}\n" "${OAUTH_ID[$clave]}"
+    prompt_yes_no "¿Cambiar la app de ${nombre}?" "n" || return 0
+  else
+    prompt_yes_no "¿Registrar una app de ${nombre}?" "n" || return 0
+  fi
+  printf "    ${BOLD}1.${RESET} Abre %s\n" "$url"
+  printf "    ${BOLD}2.${RESET} %s\n" "$como"
+  printf "    ${BOLD}3.${RESET} URI de redirección: ${BOLD}%s${RESET}\n" "$redirect"
+  printf "    ${BOLD}4.${RESET} Pega aquí el client_id y el client_secret.\n"
+  while :; do
+    prompt_default "client_id de ${nombre}" "${OAUTH_ID[$clave]:-}" id
+    valor_valido "$id" && break
+    warn "El client_id no puede estar vacío ni llevar tabuladores o saltos de línea."
+  done
+  while :; do
+    if [ -n "${OAUTH_SECRET[$clave]:-}" ]; then
+      leer_secreto_visible "client_secret de ${nombre} (Enter para conservar el actual)" secreto
+      [ -n "$secreto" ] || secreto="${OAUTH_SECRET[$clave]}"
+    else
+      leer_secreto_visible "client_secret de ${nombre}" secreto
+    fi
+    valor_valido "$secreto" && break
+    warn "El client_secret no puede estar vacío ni llevar tabuladores o saltos de línea."
+  done
+  OAUTH_ID["$clave"]="$id"
+  OAUTH_SECRET["$clave"]="$secreto"
+  ok "${nombre}: app de plataforma registrada."
+}
+
+escribir_integraciones() {
+  umask 077
+  cat > "$INTEG_VALUES" <<'EOF'
+# ===========================================================================
+# Sytue Suite — Overlay de integraciones generado por ./sytue-deploy
+# Activa la reconciliación de secretos de cliente en Sytue ID para que el
+# cliente `sytue-gateway` del Integration Gateway pueda autenticarse.
+# Uso: añade `-f deploy/helm/values-integrations.yaml` a tu `helm upgrade`.
+# ===========================================================================
+id:
+  clientSecrets:
+    enabled: true
+EOF
+  chmod 600 "$INTEG_VALUES"
+
+  cat > "$INTEG_APPLY" <<EOF
+#!/usr/bin/env bash
+# Script autogenerado por ./sytue-deploy: prepara los Secrets del Sytue
+# Integration Gateway en el namespace '${K8S_NAMESPACE}'.
+#
+# Idempotente. Las claves que ya existen en el clúster NO se rotan nunca (rotar la
+# KEK dejaría ilegibles las credenciales de conectores ya selladas): solo se
+# generan las que faltan. Las apps OAuth de plataforma salen de
+# integrations-oauth-clients.json, junto a este fichero.
+set -euo pipefail
+
+NS="${K8S_NAMESPACE}"
+WHATSAPP=${INTEG_WHATSAPP}
+OPERADOR=${INTEG_OPERADOR}
+EOF
+  cat >> "$INTEG_APPLY" <<'EOF'
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+leer() { # leer <secret> <clave> → valor en claro, o vacío
+  local v
+  v="$(kubectl -n "$NS" get secret "$1" -o go-template="{{ index .data \"$2\" }}" 2>/dev/null || true)"
+  if [ -z "$v" ] || [ "$v" = "<no value>" ]; then
+    return 0
+  fi
+  printf '%s' "$v" | base64 -d
+}
+asegurar() { kubectl -n "$NS" get secret "$1" >/dev/null 2>&1 || kubectl -n "$NS" create secret generic "$1" >/dev/null; }
+poner() { kubectl -n "$NS" patch secret "$1" --type merge -p "{\"stringData\":{\"$2\":\"$3\"}}" >/dev/null; }
+existente_o() { local v; v="$(leer "$1" "$2")"; if [ -n "$v" ]; then printf '%s' "$v"; else "${@:3}"; fi; }
+
+kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
+
+KEK="$(existente_o sytue-integrations key-encryption-key openssl rand -base64 32)"
+GATEWAY="$(existente_o sytue-integrations gateway-client-secret openssl rand -hex 32)"
+INTERNO="$(existente_o sytue-integrations internal-secret openssl rand -hex 32)"
+
+asegurar sytue-integrations
+poner sytue-integrations key-encryption-key "$KEK"
+poner sytue-integrations gateway-client-secret "$GATEWAY"
+poner sytue-integrations internal-secret "$INTERNO"
+if [ "$OPERADOR" = 1 ]; then
+  poner sytue-integrations operator-token "$(existente_o sytue-integrations operator-token openssl rand -hex 32)"
+fi
+if [ "$WHATSAPP" = 1 ]; then
+  poner sytue-integrations whatsapp-webhook-verify-token \
+    "$(existente_o sytue-integrations whatsapp-webhook-verify-token openssl rand -hex 16)"
+fi
+echo "✓ sytue-integrations: KEK, cliente del gateway y secreto interno listos."
+
+# El mismo secreto en los dos extremos: Sytue ID fija con él el cliente
+# `sytue-gateway` (reconcile-client-secrets) y Drive pide con el interno los
+# tokens del almacenamiento conectado (Google Drive, OneDrive, Dropbox).
+asegurar sytue-id-client-secrets
+poner sytue-id-client-secrets sytue-gateway "$GATEWAY"
+asegurar sytue-drive
+poner sytue-drive integrations-internal-secret "$INTERNO"
+echo "✓ sytue-id-client-secrets y sytue-drive enlazados con el gateway."
+
+if [ -s "$DIR/integrations-oauth-clients.json" ] && [ "$(tr -d '[:space:]' < "$DIR/integrations-oauth-clients.json")" != "{}" ]; then
+  kubectl -n "$NS" create secret generic sytue-integrations-platform-oauth \
+    --from-file=clients.json="$DIR/integrations-oauth-clients.json" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  echo "✓ sytue-integrations-platform-oauth: apps OAuth de plataforma aplicadas."
+else
+  echo "· Sin apps OAuth de plataforma: las organizaciones usarán su propia app (BYO)."
+fi
+
+# Los Secrets montados como variables no se releen solos: se reinicia lo que los usa.
+for d in sytue-one-id sytue-one-integrations sytue-one-drive; do
+  if kubectl -n "$NS" get deployment "$d" >/dev/null 2>&1; then
+    kubectl -n "$NS" rollout restart deployment "$d" >/dev/null
+    echo "↻ $d reiniciado."
+  fi
+done
+EOF
+  chmod 700 "$INTEG_APPLY"
+}
+
+asistente_integraciones() {
+  if [ "$MODE" = "compose" ]; then
+    warn "El Sytue Integration Gateway todavía no forma parte del despliegue con Docker Compose."
+    info "Los conectores con terceros (Google, Microsoft, Slack, Zoom…) necesitan el modo Kubernetes/Helm."
+    info "Sytue AI, que es el único proveedor externo del perfil Compose, se configura en el paso anterior."
+    return 0
+  fi
+
+  local redirect="https://integrations.${DOMAIN}/api/v1/oauth/callback"
+  local admin_apps="https://admin.${DOMAIN}/admin/apps"
+  echo "  Las integraciones se activan en tres niveles:"
+  echo "    1) Base del gateway — se genera sola: KEK de cifrado, cliente 'sytue-gateway' en Sytue ID"
+  echo "       y secreto interno con Drive. Nunca se rota al volver a aplicar."
+  echo "    2) Apps OAuth de plataforma — opcional, por proveedor. Con ellas cada organización"
+  echo "       conecta con un clic; sin ellas, cada una registra su propia app (BYO)."
+  echo "    3) Conectores SAML, OIDC, IMAP/POP3 y por token — los da de alta cada organización"
+  printf "       desde ${BOLD}%s${RESET}, sin tocar el despliegue.\n" "$admin_apps"
+  printf "\n  URI de redirección para TODOS los proveedores: ${BOLD}%s${RESET}\n" "$redirect"
+
+  cargar_oauth
+  if [ "$NON_INTERACTIVE" -eq 0 ]; then
+    local linea
+    for linea in "${PROVEEDORES_OAUTH[@]}"; do
+      configurar_proveedor "$linea" "$redirect"
+    done
+    echo ""
+    if prompt_yes_no "¿Vas a recibir mensajes de WhatsApp Business (webhook de verificación)?" "n"; then
+      INTEG_WHATSAPP=1
+    fi
+    if prompt_yes_no "¿Habilitar la API de operador del gateway (gestionar apps OAuth y plantillas sin reiniciar)?" "n"; then
+      INTEG_OPERADOR=1
+    fi
+  elif [ "${#OAUTH_ID[@]}" -gt 0 ]; then
+    info "Se conservan ${#OAUTH_ID[@]} apps OAuth de ${INTEG_TSV#"${ROOT_DIR}"/}."
+  fi
+
+  guardar_oauth
+  escribir_integraciones
+  ok "Apps OAuth de plataforma: ${BOLD}${#OAUTH_ID[@]}${RESET} (guardadas en deploy/helm/integrations-oauth.tsv, permisos 0600)."
+  ok "Generados ${BOLD}deploy/helm/apply-integrations.sh${RESET} y ${BOLD}deploy/helm/values-integrations.yaml${RESET}."
+  if [ "$INTEG_WHATSAPP" -eq 1 ]; then
+    info "Webhook de WhatsApp: ${BOLD}https://integrations.${DOMAIN}/api/v1/whatsapp/webhook${RESET}; el token de verificación queda en el Secret sytue-integrations (clave whatsapp-webhook-verify-token)."
+  fi
+}
+
+# Modo `--integrations`: solo este asistente, sobre un despliegue Helm existente.
+modo_integraciones() {
+  MODE="helm"
+  step "Integraciones y conectores con terceros"
+  local dominio_previo=""
+  if [ -f "${HELM_DIR}/values-custom.yaml" ]; then
+    dominio_previo="$(sed -n 's/^  baseDomain: "\(.*\)"$/\1/p' "${HELM_DIR}/values-custom.yaml" | head -1)"
+  fi
+  [ -n "$DOMAIN" ] || prompt_default "Dominio raíz del despliegue" "${dominio_previo:-suite.ejemplo.eu}" DOMAIN
+  prompt_default "Namespace de Kubernetes" "$K8S_NAMESPACE" K8S_NAMESPACE
+  asistente_integraciones
+
+  local helm_cmd="helm upgrade --install sytue-one deploy/helm/sytue-one -n ${K8S_NAMESPACE} -f deploy/helm/sytue-one/values.yaml"
+  [ -f "${HELM_DIR}/values-custom.yaml" ] && helm_cmd="${helm_cmd} -f deploy/helm/values-custom.yaml"
+  helm_cmd="${helm_cmd} -f deploy/helm/values-integrations.yaml"
+  if [ "$ONLY_CONFIG" -eq 0 ] && check_cmd kubectl && check_cmd helm &&
+    prompt_yes_no "¿Aplicar ahora los Secrets de integraciones y actualizar el despliegue?" "n"; then
+    bash "$INTEG_APPLY"
+    # shellcheck disable=SC2086 # helm_cmd se compone arriba con rutas sin espacios.
+    (cd "$ROOT_DIR" && $helm_cmd)
+    ok "Integraciones activadas. Entra en ${BOLD}https://admin.${DOMAIN}/admin/apps${RESET} y pulsa «Conectar»."
+  else
+    echo ""
+    info "Para activarlas en tu clúster:"
+    printf "    ${BOLD}1) bash deploy/helm/apply-integrations.sh${RESET}\n"
+    printf "    ${BOLD}2) %s${RESET}\n" "$helm_cmd"
+    printf "    ${BOLD}3) https://admin.%s/admin/apps${RESET} → «Conectar» en cada aplicación\n" "$DOMAIN"
+  fi
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Modo local: Docker Compose
+# ---------------------------------------------------------------------------
+# Ficheros de Compose: el base y las apps web compiladas (frontlite.yml), que
+# gastan ~80 MiB cada una frente a 0,6-0,9 GiB con `astro dev`. El modo servidor
+# añade los suyos (ver instalar_servidor).
+COMPOSE_FILES=("$COMPOSE_FILE" "${COMPOSE_DIR}/frontlite.yml")
+dc() {
+  local args=() f
+  for f in "${COMPOSE_FILES[@]}"; do args+=(-f "$f"); done
+  docker compose --project-directory "$COMPOSE_DIR" "${args[@]}" "$@"
+}
+
+# Valor de una variable del .env (sin interpretar el fichero como shell).
+env_get() { [ -f "$ENV_FILE" ] && sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 || true; }
+
+# Añade o sustituye una variable del .env.
+env_set() {
+  local clave="$1" valor="$2" tmp
+  tmp="$(mktemp "${ENV_FILE}.XXXXXX")"
+  grep -v "^${clave}=" "$ENV_FILE" > "$tmp" || true
+  printf '%s=%s\n' "$clave" "$valor" >> "$tmp"
+  # Reescribe en el sitio: .env puede ser un enlace a un volumen (todo en uno).
+  cat "$tmp" > "$ENV_FILE"
+  rm -f "$tmp"
+}
+
+# Aparta el .env a .env.bak (para --reset). Si es un enlace, conserva el enlace.
+apartar_env() {
+  [ -f "$ENV_FILE" ] || return 0
+  cp "$ENV_FILE" "${ENV_FILE}.bak" && chmod 600 "${ENV_FILE}.bak"
+  if [ -L "$ENV_FILE" ]; then rm -f -- "$(readlink "$ENV_FILE")"; else rm -f -- "$ENV_FILE"; fi
+}
+
+# La api_key de LiveKit es un identificador público (el secreto es api_secret). Va
+# fija en deploy/compose/livekit/livekit.yaml, que el SFU monta sin interpolar
+# variables; el .env la toma de ahí para que webhook y tokens casen siempre.
+livekit_api_key() {
+  local k
+  k="$(sed -n 's/^  api_key:[[:space:]]*"\{0,1\}\([^"]*\)"\{0,1\}[[:space:]]*$/\1/p' "${COMPOSE_DIR}/livekit/livekit.yaml" | head -1)"
+  printf '%s' "${k:-changeme-livekit-api-key}"
+}
+
+# Perfiles de Compose de la suite sin complementos; ERP y DevX se añaden aparte.
+PERFILES_BASE="portal,console,www,hub,mail,drive,docs,calendar,contacts,notes,photos,rooms,cast,pages,bases"
+perfiles_compose() {
+  local p
+  case "$1" in
+    full)
+      if [ "${CON_ERP:-1}" = 1 ] && [ "${CON_DEVX:-1}" = 1 ]; then echo "full"; return; fi
+      p="$PERFILES_BASE"
+      [ "${CON_ERP:-1}" = 1 ] && p="${p},erp"
+      [ "${CON_DEVX:-1}" = 1 ] && p="${p},cloud,analytics"
+      echo "$p" ;;
+    office) echo "drive,docs,mail,calendar,contacts,portal,console" ;;
+    core)   echo "portal,console" ;;
+    *)      echo "$1" ;;
+  esac
+}
+
+# Productos que ofrece el lanzador (Hub, variable APPS) a partir de los perfiles.
+# `photos` no entra: en Compose no tiene app web y su tesela llevaba a la API.
+apps_lanzador() {
+  local perfiles=",$1," apps="one,console,id" par perfil app
+  case "$perfiles" in *,full,*) perfiles=",${PERFILES_BASE},erp,cloud," ;; esac
+  for par in mail:mail drive:drive docs:docs calendar:calendar contacts:contacts notes:notes \
+    rooms:rooms cast:cast pages:pages bases:bases erp:erp cloud:cloud; do
+    perfil="${par%%:*}"; app="${par##*:}"
+    case "$perfiles" in *,"$perfil",*) apps="${apps},${app}" ;; esac
+  done
+  echo "$apps"
+}
+
+datos_locales_existen() {
+  [ -n "$(docker volume ls -q --filter label=com.docker.compose.project=sytue-one-dev 2>/dev/null)" ]
+}
+
+puerto_ocupado_por_otro() { # puerto → 0 si algo que no es nuestro Traefik escucha
+  local p="$1"
+  (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null || return 1
+  [ -z "$(docker ps -q --filter name=sytue-one-dev-traefik 2>/dev/null)" ]
+}
+
+requisitos_compose() {
+  local fallos=0
+  if ! check_cmd docker; then
+    err "Falta Docker. Instala Docker Desktop (macOS/Windows) o Docker Engine (Linux): https://docs.docker.com/get-docker/"
+    fallos=1
+  elif ! docker info >/dev/null 2>&1; then
+    err "Docker está instalado pero no responde. Arráncalo (Docker Desktop, o «colima start», o «sudo systemctl start docker») y vuelve a ejecutar."
+    fallos=1
+  elif ! docker compose version >/dev/null 2>&1; then
+    err "Falta Docker Compose v2 (el subcomando «docker compose»). Actualiza Docker."
+    fallos=1
+  else
+    ok "Docker $(docker version --format '{{.Server.Version}}' 2>/dev/null) y $(docker compose version --short 2>/dev/null | sed 's/^/Compose /')"
+    local mem
+    mem="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
+    mem=$(( ${mem:-0} / 1024 / 1024 / 1024 ))
+    # Medido con todo arrancado y las apps web compiladas: ~1,4 GiB la suite
+    # completa. La primera construcción (Go + 18 apps en paralelo) pide más.
+    if [ "$mem" -gt 0 ] && [ "$mem" -lt 4 ]; then
+      warn "Docker tiene ${mem} GB de memoria: la suite necesita al menos 4 GB (8 GB para la primera construcción). Súbela en la configuración de Docker."
+    else
+      ok "Memoria disponible para Docker: ${mem} GB"
+    fi
+    # Disco: la primera construcción completa llega a ~25 GB entre imágenes y caché.
+    # Solo se mide donde el directorio de Docker es visible (Linux); en Docker
+    # Desktop vive dentro de su máquina virtual.
+    local raiz libre
+    raiz="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+    if [ "$NO_BUILD" -eq 0 ] && [ -n "$raiz" ] && [ -d "$raiz" ]; then
+      libre=$(( $(df -Pk "$raiz" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
+      if [ "$libre" -lt 25 ]; then
+        warn "Quedan ${libre} GB libres en ${raiz}; la primera construcción necesita unos 25 GB (libera con «docker system prune»)."
+      else
+        ok "Disco libre para Docker: ${libre} GB"
+      fi
+    fi
+  fi
+  if [ "$MODE" = "servidor" ] && [ "$TLS_MODO" = "letsencrypt" ]; then
+    : # Let's Encrypt emite los certificados: mkcert no hace falta.
+  elif check_cmd mkcert; then
+    ok "mkcert $(mkcert -version 2>/dev/null)"
+  else
+    err "Falta mkcert (certificados HTTPS locales de confianza). Instálalo:"
+    printf "      macOS:   brew install mkcert nss\n"
+    printf "      Debian/Ubuntu: sudo apt install mkcert libnss3-tools\n"
+    printf "      Windows: choco install mkcert   ·   Otros: https://github.com/FiloSottile/mkcert#installation\n"
+    fallos=1
+  fi
+  local p
+  for p in 80 443; do
+    if puerto_ocupado_por_otro "$p"; then
+      warn "El puerto ${p} de 127.0.0.1 ya está en uso por otro programa; la suite lo necesita para https://*.${LOCAL_DOMAIN}."
+    fi
+  done
+  [ "$fallos" -eq 0 ] || die "Resuelve lo anterior y vuelve a ejecutar ${BOLD}./sytue-deploy${RESET}."
+}
+
+escribir_env() {
+  local perfiles="$1"
+  umask 077
+  cat > "$ENV_FILE" <<EOF
+# ===========================================================================
+# Sytue Suite — Configuración local generada por ./sytue-deploy
+# Fecha: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Contiene secretos de ESTE equipo. Git lo ignora: no lo subas a ningún sitio.
+# Las contraseñas de PostgreSQL se fijan al crear el volumen de datos: si cambias
+# este fichero después, ejecuta ./sytue-deploy --reset (borra los datos locales).
+# ===========================================================================
+
+# Servicios que se levantan junto al núcleo (full = suite completa).
+COMPOSE_PROFILES=${perfiles}
+
+# --- Administrador inicial (lo crea «make dev-seed» / el asistente) ---------
+# Usuario: ${LOCAL_ADMIN_EMAIL} (organización ${LOCAL_ORG}); también ${LOCAL_MEMBER_EMAIL}.
+SYTUE_ID_DEV_SEED_PASSWORD=${ADMIN_PASSWORD}
+
+# --- PostgreSQL (superusuario + 1 rol/BD por servicio Go) ------------------
+POSTGRES_SUPERUSER=postgres
+POSTGRES_SUPERUSER_PASSWORD=$(rand_hex 24)
+
+ID_DB_NAME=sytue_id
+ID_DB_USER=sytue_id
+ID_DB_PASSWORD=$(rand_hex 24)
+
+DRIVE_DB_NAME=sytue_drive
+DRIVE_DB_USER=sytue_drive
+DRIVE_DB_PASSWORD=$(rand_hex 24)
+
+DOCS_DB_NAME=sytue_docs
+DOCS_DB_USER=sytue_docs
+DOCS_DB_PASSWORD=$(rand_hex 24)
+
+MAIL_DB_NAME=sytue_mail
+MAIL_DB_USER=sytue_mail
+MAIL_DB_PASSWORD=$(rand_hex 24)
+
+CALENDAR_DB_NAME=sytue_calendar
+CALENDAR_DB_USER=sytue_calendar
+CALENDAR_DB_PASSWORD=$(rand_hex 24)
+
+CONTACTS_DB_NAME=sytue_contacts
+CONTACTS_DB_USER=sytue_contacts
+CONTACTS_DB_PASSWORD=$(rand_hex 24)
+
+SYERP_DB_NAME=sytue_syerp
+SYERP_DB_USER=sytue_syerp
+SYERP_DB_PASSWORD=$(rand_hex 24)
+SYERP_SECRET_ENC_KEY=$(rand_b64 32)
+
+NOTES_DB_NAME=sytue_notes
+NOTES_DB_USER=sytue_notes
+NOTES_DB_PASSWORD=$(rand_hex 24)
+
+SYPHOTOS_DB_NAME=sytue_syphotos
+SYPHOTOS_DB_USER=sytue_syphotos
+SYPHOTOS_DB_PASSWORD=$(rand_hex 24)
+
+CAST_DB_NAME=sytue_cast
+CAST_DB_USER=sytue_cast
+CAST_DB_PASSWORD=$(rand_hex 24)
+CAST_MEDIA_SIGNING_KEY=$(rand_hex 32)
+CAST_INTERNAL_SECRET=$(rand_hex 32)
+
+PAGES_DB_NAME=sytue_pages
+PAGES_DB_USER=sytue_pages
+PAGES_DB_PASSWORD=$(rand_hex 24)
+
+BASES_DB_NAME=sytue_bases
+BASES_DB_USER=sytue_bases
+BASES_DB_PASSWORD=$(rand_hex 24)
+
+ROOMS_DB_NAME=sytue_rooms
+ROOMS_DB_USER=sytue_rooms
+ROOMS_DB_PASSWORD=$(rand_hex 24)
+
+HUB_DB_NAME=sytue_hub
+HUB_DB_USER=sytue_hub
+HUB_DB_PASSWORD=$(rand_hex 24)
+
+INTEGRATIONS_DB_NAME=sytue_integrations
+INTEGRATIONS_DB_USER=sytue_integrations
+INTEGRATIONS_DB_PASSWORD=$(rand_hex 24)
+
+CLOUD_DB_NAME=sytue_cloud
+CLOUD_DB_USER=sytue_cloud
+CLOUD_DB_PASSWORD=$(rand_hex 24)
+CLOUD_SECRET_ENC_KEY=$(rand_b64 32)
+CLOUD_WEBHOOK_SECRET=$(rand_hex 32)
+
+ANALYTICS_DB_NAME=sytue_analytics
+ANALYTICS_DB_USER=sytue_analytics
+ANALYTICS_DB_PASSWORD=$(rand_hex 24)
+SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY=$(rand_b64 32)
+
+# --- Almacenamiento S3 (SeaweedFS; variables con nombre histórico MINIO_*) ---
+MINIO_ROOT_USER=sytue_minio
+MINIO_ROOT_PASSWORD=$(rand_hex 24)
+
+# --- LiveKit SFU (Rooms y Cast) --------------------------------------------
+# La api_key es la de deploy/compose/livekit/livekit.yaml (identificador, no secreto).
+LIVEKIT_API_KEY=$(livekit_api_key)
+LIVEKIT_API_SECRET=$(rand_hex 32)
+
+# --- PostgREST (Sytue Cloud DB Studio) -------------------------------------
+POSTGREST_ROLE=authenticator
+POSTGREST_ROLE_PASSWORD=$(rand_hex 24)
+POSTGREST_JWT_SECRET=$(rand_hex 32)
+
+# --- Cifrado en reposo y secretos entre servicios --------------------------
+DOCS_SECRET_ENC_KEY=$(rand_b64 32)
+ROOMS_INTERNAL_SECRET=$(rand_hex 32)
+ID_INTERNAL_SECRET=$(rand_hex 32)
+
+# --- Sesión de las apps web y cliente OIDC ---------------------------------
+SYTUE_SESSION_SECRET=$(rand_hex 32)
+SYTUE_DEV_CLIENT_SECRET=$(rand_hex 32)
+
+# --- Complementos -----------------------------------------------------------
+# Productos que ofrece el lanzador (los que levanta esta instalación).
+SYTUE_APPS=$(apps_lanzador "$perfiles")
+# Cifrado de extremo a extremo (complemento Matrix): lo ajusta el asistente.
+SYTUE_CIFRADO_E2E=desactivado
+SYTUE_ROOMS_MATRIX_REQUIRED=false
+# Verificación por SMS (Sweego). Vacía: sin SMS (en local el código va al log).
+SYTUE_SMS_SWEEGO_API_KEY=${SMS_KEY}
+
+# --- Sytue AI (opcional) ---------------------------------------------------
+# Sin clave el servicio arranca y el asistente responde «no configurado».
+# Proveedores: scaleway (por defecto) u openai-compat (+ AI_BASE_URL, p. ej. Ollama).
+EOF
+  if [ -n "$AI_API_KEY" ] || [ -n "$AI_BASE_URL" ]; then
+    {
+      printf 'AI_PROVIDER=%s\n' "${AI_PROVIDER:-scaleway}"
+      printf 'AI_API_KEY=%s\n' "$AI_API_KEY"
+      [ -n "$AI_MODEL" ] && printf 'AI_MODEL=%s\n' "$AI_MODEL"
+      [ -n "$AI_BASE_URL" ] && printf 'AI_BASE_URL=%s\n' "$AI_BASE_URL"
+    } >> "$ENV_FILE"
+  else
+    printf '# AI_PROVIDER=scaleway\n# AI_API_KEY=\n# AI_MODEL=\n# AI_BASE_URL=\n' >> "$ENV_FILE"
+  fi
+  chmod 600 "$ENV_FILE"
+}
+
+# Un .env de una versión anterior del asistente puede no traer variables que la
+# suite necesita hoy: se completan sin tocar las existentes (las contraseñas de
+# PostgreSQL ya están fijadas en el volumen de datos y no se pueden cambiar).
+completar_env() {
+  local nuevas=()
+  [ -n "$(env_get CLOUD_WEBHOOK_SECRET)" ]    || { env_set CLOUD_WEBHOOK_SECRET "$(rand_hex 32)"; nuevas+=(CLOUD_WEBHOOK_SECRET); }
+  [ -n "$(env_get CAST_MEDIA_SIGNING_KEY)" ]  || { env_set CAST_MEDIA_SIGNING_KEY "$(rand_hex 32)"; nuevas+=(CAST_MEDIA_SIGNING_KEY); }
+  [ -n "$(env_get CAST_INTERNAL_SECRET)" ]    || { env_set CAST_INTERNAL_SECRET "$(rand_hex 32)"; nuevas+=(CAST_INTERNAL_SECRET); }
+  if [ "$(env_get LIVEKIT_API_KEY)" != "$(livekit_api_key)" ]; then
+    env_set LIVEKIT_API_KEY "$(livekit_api_key)"; nuevas+=(LIVEKIT_API_KEY)
+  fi
+  [ -n "$(env_get SYTUE_CIFRADO_E2E)" ] || { env_set SYTUE_CIFRADO_E2E desactivado; nuevas+=(SYTUE_CIFRADO_E2E); }
+  [ -n "$(env_get SYTUE_ROOMS_MATRIX_REQUIRED)" ] || { env_set SYTUE_ROOMS_MATRIX_REQUIRED false; nuevas+=(SYTUE_ROOMS_MATRIX_REQUIRED); }
+  if [ -z "$(env_get SYTUE_ID_DEV_SEED_PASSWORD)" ]; then
+    env_set SYTUE_ID_DEV_SEED_PASSWORD "$ADMIN_PASSWORD"; nuevas+=(SYTUE_ID_DEV_SEED_PASSWORD)
+  fi
+  if [ "${#nuevas[@]}" -gt 0 ]; then
+    ok "Configuración existente completada con: ${nuevas[*]}"
+  fi
+}
+
+generar_certificados() {
+  if [ -s "${CERT_DIR}/sytue-localhost.pem" ] && [ -s "${CERT_DIR}/sytue-localhost-key.pem" ]; then
+    ok "Certificado HTTPS local ya presente (deploy/compose/traefik/certs/)."
+    return
+  fi
+  info "Instalando la autoridad local de mkcert (puede pedir tu contraseña de administrador una vez)..."
+  mkcert -install
+  mkdir -p "$CERT_DIR"
+  mkcert -cert-file "${CERT_DIR}/sytue-localhost.pem" -key-file "${CERT_DIR}/sytue-localhost-key.pem" \
+    "${LOCAL_DOMAIN}" "*.${LOCAL_DOMAIN}" >/dev/null 2>&1
+  ok "Certificado HTTPS para *.${LOCAL_DOMAIN} creado."
+}
+
+# Espera a que todos los contenedores del perfil estén «healthy» (o «running» si
+# no declaran healthcheck). Devuelve 1 si alguno sale o no lo consigue a tiempo.
+# Servicio y número de reinicios de cada contenedor de la suite.
+reinicios() {
+  local c
+  for c in $(dc ps -aq 2>/dev/null); do
+    docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}} {{.RestartCount}}' "$c" 2>/dev/null
+  done | sort
+}
+
+esperar_salud() {
+  local limite="${1:-900}" inicio ahora estado pendientes caidos
+  inicio="$(date +%s)"
+  while :; do
+    estado="$(dc ps -a --format '{{.Service}} {{.State}} {{.Health}}' 2>/dev/null || true)"
+    # Los contenedores de una sola ejecución (minio-init) terminan con «exited».
+    pendientes="$(printf '%s\n' "$estado" | awk 'NF && $1!="minio-init" && !($2=="running" && ($3=="" || $3=="healthy")) {print $1}' | sort -u | tr '\n' ' ')"
+    caidos="$(printf '%s\n' "$estado" | awk 'NF && $1!="minio-init" && ($2=="exited" || $2=="dead" || $3=="unhealthy") {print $1}' | sort -u | tr '\n' ' ')"
+    if [ -z "${pendientes// /}" ]; then
+      # Las apps web no declaran healthcheck: una que se reinicia en bucle aparece
+      # «running» unos segundos entre caída y caída. Se da por buena la foto solo si
+      # nadie se reinicia durante los 30 s siguientes.
+      local antes despues
+      antes="$(reinicios)"
+      sleep 30
+      despues="$(reinicios)"
+      if [ "$antes" = "$despues" ]; then
+        return 0
+      fi
+      caidos="$(diff <(printf '%s\n' "$antes") <(printf '%s\n' "$despues") | sed -n 's/^> \([^ ]*\) .*/\1/p' | tr '\n' ' ')"
+      pendientes="$caidos"
+    fi
+    ahora="$(date +%s)"
+    if [ $((ahora - inicio)) -ge "$limite" ]; then
+      warn "Sin terminar de arrancar tras ${limite}s: ${pendientes}"
+      [ -n "${caidos// /}" ] && warn "Con error: ${caidos} → mira sus logs con ${BOLD}make dev-logs SVC=<servicio>${RESET}"
+      return 1
+    fi
+    printf "\r  ${DIM}Esperando a que arranquen: %-90.90s${RESET}" "$pendientes"
+    sleep 5
+  done
+}
+
+# Compila en tandas: todo lo que no es app web de una vez y después las apps web
+# (Astro) de N en N. Compose las lanzaba todas a la vez y cada compilación de
+# Astro ronda 2-3 GB: medido, 18 en paralelo agotan 15 GB (exit 137). N sale de la
+# memoria de Docker, a ~3 GB por compilación.
+construir_por_tandas() {
+  local servicios web otros=() apps=() s mem n i
+  servicios="$(dc config --services 2>/dev/null)"
+  web=" $(sed -n 's/^  \([a-z0-9-]*\):$/\1/p' "${COMPOSE_DIR}/frontlite.yml" | tr '\n' ' ') "
+  for s in $servicios; do
+    case "$web" in *" $s "*) apps+=("$s") ;; *) otros+=("$s") ;; esac
+  done
+  mem="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
+  n=$(( ${mem:-0} / 1024 / 1024 / 1024 / 3 ))
+  [ "$n" -ge 1 ] || n=1
+  if [ "${#otros[@]}" -gt 0 ]; then
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build "${otros[@]}"
+  fi
+  for ((i = 0; i < ${#apps[@]}; i += n)); do
+    info "Apps web $((i + 1))-$(( i + n < ${#apps[@]} ? i + n : ${#apps[@]} )) de ${#apps[@]}..."
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build "${apps[@]:i:n}"
+  done
+}
+
+sembrar_admin() {
+  local _
+  for _ in 1 2 3 4 5 6; do
+    if dc exec -T -e SYTUE_ID_DEV_SEED_PASSWORD="$(env_get SYTUE_ID_DEV_SEED_PASSWORD)" id /app/id seed >/dev/null 2>&1; then
+      ok "Administrador listo en Sytue ID: ${BOLD}${LOCAL_ADMIN_EMAIL}${RESET} (organización ${LOCAL_ORG})."
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+
+resumen_compose() {
+  local pass
+  pass="$(env_get SYTUE_ID_DEV_SEED_PASSWORD)"
+  printf "\n${BOLD}${GREEN}Sytue Suite está en marcha.${RESET}\n\n"
+  printf "  Abre ${BOLD}https://one.%s${RESET} e inicia sesión:\n" "$LOCAL_DOMAIN"
+  printf "    • Correo      : ${BOLD}%s${RESET}\n" "$LOCAL_ADMIN_EMAIL"
+  printf "    • Contraseña  : ${BOLD}%s${RESET}  ${DIM}(guardada en deploy/compose/.env)${RESET}\n" "$pass"
+  printf "    • Código 2FA  : la cuenta admin pide un código TOTP. Añade en tu app de\n"
+  printf "                    autenticación la clave ${BOLD}%s${RESET} (o: oathtool --totp -b %s)\n" "$LOCAL_TOTP_SEED" "$LOCAL_TOTP_SEED"
+  printf "    • Sin 2FA     : %s (rol miembro, misma contraseña)\n\n" "$LOCAL_MEMBER_EMAIL"
+  printf "    (en el login, marca la casilla de verificación humana antes de continuar)\n\n"
+  printf "  Aplicaciones: mail · drive · docus · calcus · diapos · certipdf · calendar · contacts\n"
+  printf "                notes · rooms · erp · cast · web · bases · cloud · admin\n"
+  printf "                → https://<app>.%s\n\n" "$LOCAL_DOMAIN"
+  printf "  Día a día: ${BOLD}make dev-down${RESET} (parar) · ${BOLD}make dev-up${RESET} (arrancar) · ${BOLD}make dev-ps${RESET} (estado)\n"
+  printf "             ${BOLD}make dev-logs SVC=id${RESET} (logs) · ${BOLD}./sytue-deploy --reset${RESET} (empezar de cero)\n"
+}
+
+instalar_compose() {
+  # --- Paso 2: requisitos -----------------------------------------------------
+  step "Paso 2 de 5 · Requisitos"
+  if [ "$ONLY_CONFIG" -eq 1 ]; then
+    check_cmd openssl || die "Falta openssl."
+    ok "Solo configuración: no se comprueba Docker."
+  else
+    requisitos_compose
+  fi
+
+  # --- Paso 3: servicios ------------------------------------------------------
+  step "Paso 3 de 5 · Servicios"
+  local perfil_previo=""
+  perfil_previo="$(env_get COMPOSE_PROFILES)"
+  if [ -z "$PROFILE" ]; then
+    if [ -n "$perfil_previo" ] && [ "$DO_RESET" -eq 0 ]; then
+      PROFILE="$perfil_previo"
+    elif [ "$NON_INTERACTIVE" -eq 1 ]; then
+      PROFILE="full"
+    else
+      echo "  ¿Qué quieres levantar? (siempre se incluyen Sytue ID, Hub, PostgreSQL, S3 y Traefik)"
+      echo "    1) Suite completa      — todas las aplicaciones (~1,4 GB de RAM)"
+      echo "    2) Ofimática           — Drive, Docus/Calcus/Diapos/CertiPDF, Mail, Calendar, Contacts (~0,8 GB)"
+      echo "    3) Mínimo              — solo identidad, portal y consola de administración (~0,5 GB)"
+      echo "    4) A medida            — perfiles separados por comas (p. ej. mail,drive,docs,rooms)"
+      local opcion=""
+      prompt_default "Opción" "1" opcion
+      case "$opcion" in
+        2) PROFILE="office" ;;
+        3) PROFILE="core" ;;
+        4) prompt_default "Perfiles" "mail,drive,docs,portal,console" PROFILE ;;
+        *) PROFILE="full" ;;
+      esac
+    fi
+  fi
+  # Complementos: se pueden quitar sin que el resto pierda funciones.
+  if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "$perfil_previo" ]; then
+    case ",${perfil_previo}," in
+      ,full,|,,) ;;
+      *) [ -z "$CON_ERP" ] && case ",$perfil_previo," in *,erp,*) CON_ERP=1 ;; *) CON_ERP=0 ;; esac
+         [ -z "$CON_DEVX" ] && case ",$perfil_previo," in *,cloud,*) CON_DEVX=1 ;; *) CON_DEVX=0 ;; esac ;;
+    esac
+  fi
+  if [ "$PROFILE" = "full" ] && [ "$NON_INTERACTIVE" -eq 0 ] && [ -z "$perfil_previo" ]; then
+    echo ""
+    echo "  Complementos (se pueden quitar sin que el resto de la suite pierda nada):"
+    if [ -z "$CON_ERP" ]; then
+      prompt_yes_no "¿Incluir SyERP (facturación, contabilidad, inventario, TPV, RR. HH.)?" "s" && CON_ERP=1 || CON_ERP=0
+    fi
+    if [ -z "$CON_DEVX" ]; then
+      prompt_yes_no "¿Incluir DevX (Sytue Cloud: despliegues desde Git y analítica web)?" "s" && CON_DEVX=1 || CON_DEVX=0
+    fi
+    if [ -z "$SMS_KEY" ] && prompt_yes_no "¿Activar la verificación por SMS (necesita una cuenta de Sweego)?" "n"; then
+      read -r -s -p "  Clave de API de Sweego: " SMS_KEY; echo ""
+    fi
+  fi
+  [ "$DO_RESET" -eq 1 ] && [ -z "$CON_MATRIX" ] && CON_MATRIX=1
+  decidir_matrix
+  CON_ERP="${CON_ERP:-1}"; CON_DEVX="${CON_DEVX:-1}"
+  local perfiles
+  perfiles="$(perfiles_compose "$PROFILE")"
+  ok "Perfiles: ${BOLD}${perfiles}${RESET} · dominio local: ${BOLD}*.${LOCAL_DOMAIN}${RESET}"
+  info "Complementos: Matrix (cifrado E2E) $([ "$CON_MATRIX" = 1 ] && echo sí || echo no) · ERP $([ "$CON_ERP" = 1 ] && echo sí || echo no) · DevX $([ "$CON_DEVX" = 1 ] && echo sí || echo no) · SMS $([ -n "$SMS_KEY" ] && echo sí || echo no)"
+
+  # --- Paso 4: configuración y secretos --------------------------------------
+  step "Paso 4 de 5 · Configuración y secretos"
+  if [ "$DO_RESET" -eq 1 ]; then
+    if [ "$NON_INTERACTIVE" -eq 0 ] && ! prompt_yes_no "Se BORRARÁN todos los datos locales de la suite (bases de datos, ficheros, correo). ¿Continuar?" "n"; then
+      die "Cancelado: no se ha borrado nada."
+    fi
+    if check_cmd docker && docker info >/dev/null 2>&1 && [ -f "$ENV_FILE" ]; then
+      info "Parando la suite y borrando sus volúmenes..."
+      dc --profile full down -v --remove-orphans >/dev/null 2>&1 || true
+      docker volume rm -f sytue-one-dev_matrix-data >/dev/null 2>&1 || true
+    fi
+    [ -f "$ENV_FILE" ] && apartar_env && info "Configuración anterior guardada en deploy/compose/.env.bak"
+  fi
+
+  if [ -f "$ENV_FILE" ]; then
+    ok "Se reutiliza ${BOLD}deploy/compose/.env${RESET} (sus contraseñas ya están en las bases de datos)."
+    [ -z "$ADMIN_PASSWORD" ] && ADMIN_PASSWORD="$(env_get SYTUE_ID_DEV_SEED_PASSWORD)"
+    if [ -z "$ADMIN_PASSWORD" ]; then resolver_password_admin; fi
+    completar_env
+    if [ "$perfiles" != "$perfil_previo" ]; then env_set COMPOSE_PROFILES "$perfiles"; fi
+    env_set SYTUE_APPS "$(apps_lanzador "$perfiles")"
+    [ -n "$SMS_KEY" ] && env_set SYTUE_SMS_SWEEGO_API_KEY "$SMS_KEY"
+    if [ "$(env_get SYTUE_ID_DEV_SEED_PASSWORD)" != "$ADMIN_PASSWORD" ]; then
+      env_set SYTUE_ID_DEV_SEED_PASSWORD "$ADMIN_PASSWORD"
+      ok "Contraseña del administrador actualizada."
+    fi
+  else
+    if [ "$ONLY_CONFIG" -eq 0 ] && datos_locales_existen; then
+      warn "Hay datos de una instalación anterior pero no su deploy/compose/.env: sus contraseñas ya no casarán."
+      die "Recupera aquel .env, o empieza de cero con ${BOLD}./sytue-deploy --reset${RESET}."
+    fi
+    printf "  Cuenta de administración local: ${BOLD}%s${RESET} (organización %s)\n" "$LOCAL_ADMIN_EMAIL" "$LOCAL_ORG"
+    resolver_password_admin
+    if [ "$NON_INTERACTIVE" -eq 0 ] && prompt_yes_no "¿Configurar ahora un proveedor para Sytue AI? (opcional, se puede hacer después)" "n"; then
+      prompt_default "Proveedor (scaleway | openai-compat)" "scaleway" AI_PROVIDER
+      if [ "$AI_PROVIDER" = "openai-compat" ]; then
+        prompt_default "URL base compatible con OpenAI" "http://host.docker.internal:11434/v1" AI_BASE_URL
+      fi
+      prompt_default "Modelo (Enter = el recomendado)" "" AI_MODEL
+      read -r -s -p "  Clave de API (puede ir vacía con openai-compat local): " AI_API_KEY; echo ""
+    fi
+    info "Generando contraseñas y claves únicas (17 bases de datos, AES-256, OIDC, LiveKit)..."
+    escribir_env "$perfiles"
+    ok "Creado ${BOLD}deploy/compose/.env${RESET} (permisos 0600, ignorado por Git)."
+  fi
+  env_matrix
+  preparar_matrix "$LOCAL_DOMAIN"
+
+  if [ "$ONLY_CONFIG" -eq 1 ]; then
+    echo ""
+    ok "Configuración lista. Para arrancar: ${BOLD}./sytue-deploy${RESET} (o ${BOLD}make dev-up && make dev-seed${RESET})."
+    exit 0
+  fi
+
+  # --- Paso 5: arranque ------------------------------------------------------
+  step "Paso 5 de 5 · Construcción y arranque"
+  generar_certificados
+  if [ "$NO_BUILD" -eq 1 ]; then
+    info "Sin reconstruir (--no-build): se usan las imágenes ya construidas."
+  else
+    info "Construyendo las imágenes (servicios Go y apps web compiladas). La primera vez tarda (≈20-60 min según el equipo); después es incremental."
+    construir_por_tandas
+  fi
+  bd_matrix
+  info "Arrancando contenedores..."
+  dc up -d --no-build --remove-orphans
+  info "Esperando a Sytue ID..."
+  local t=0
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q id)" 2>/dev/null)" = "healthy" ]; do
+    t=$((t + 5)); [ "$t" -lt 300 ] || die "Sytue ID no arranca. Revisa: ${BOLD}make dev-logs SVC=id${RESET}"
+    sleep 5
+  done
+  sembrar_admin || die "No se pudo crear el administrador. Reintenta con ${BOLD}make dev-seed${RESET} y revisa ${BOLD}make dev-logs SVC=id${RESET}."
+  oidc_matrix "$LOCAL_DOMAIN"
+  controlador_matrix
+  info "Esperando a que el resto de servicios estén sanos..."
+  local sanos=1
+  esperar_salud 900 || sanos=0
+  printf "\r%-120s\r" ""
+  if [ "$sanos" -eq 1 ]; then
+    ok "Todos los servicios están en marcha y sanos."
+  fi
+
+  if [ "$SKIP_VERIFY" -eq 0 ] && [ -x "${ROOT_DIR}/scripts/e2e/smoke.sh" ] && [ "$perfiles" = "full" ]; then
+    info "Verificación de extremo a extremo (salud, OIDC, enrutado)..."
+    if E2E_RETRIES=6 E2E_RETRY_WAIT=5 "${ROOT_DIR}/scripts/e2e/smoke.sh" > "${COMPOSE_DIR}/.verificacion.log" 2>&1; then
+      ok "Verificación superada (detalle en deploy/compose/.verificacion.log)."
+    else
+      sanos=0
+      warn "La verificación encontró fallos: ${BOLD}deploy/compose/.verificacion.log${RESET}"
+      grep -E '✗|FAIL' "${COMPOSE_DIR}/.verificacion.log" | head -10 || true
+    fi
+  fi
+
+  resumen_compose
+  if [ "$sanos" -eq 0 ]; then
+    warn "Algún servicio no está sano todavía: ${BOLD}make dev-ps${RESET} para ver cuál."
+    exit 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Modo clúster: Kubernetes / Helm (avanzado)
+# ---------------------------------------------------------------------------
+# Lo que el chart necesita y no despliega él mismo:
+#   · las imágenes en TU registro (deploy/helm/publicar-imagenes.sh las construye y sube);
+#   · PostgreSQL externo con una base y un rol por servicio (create-databases.sh);
+#   · S3 compatible;
+#   · los Secrets de cada servicio (apply-secrets.sh, generado aquí);
+#   · el propietario inicial en Sytue ID (bootstrap-admin.sh, tras el helm upgrade).
+
+# servicio-del-chart:rol/base de datos
+HELM_DBS=(
+  "id:sytue_id" "drive:sytue_drive" "docs:sytue_docs" "mail:sytue_mail"
+  "calendar:sytue_calendar" "contacts:sytue_contacts" "rooms:sytue_rooms"
+  "hub:sytue_hub" "integrations:sytue_integrations" "cloud:sytue_cloud"
+  "analytics:sytue_analytics" "syerp:sytue_syerp" "notes:sytue_notes"
+  "syphotos:sytue_syphotos" "cast:sytue_cast" "pages:sytue_pages" "bases:sytue_bases"
+)
+# app del frontend (clave <app>-oidc-client-secret) : client_id en Sytue ID
+HELM_CLIENTES=(
+  "account:sytue-account" "bases:sytue-bases" "calcus:sytue-calcus"
+  "calendar:sytue-calendar" "cast:sytue-cast" "certipdf:sytue-certipdf"
+  "cloud-dashboard:sytue-cloud" "console:sytue-console" "contacts:sytue-contacts"
+  "diapos:sytue-diapos" "docus:sytue-docus" "drive:sytue-drive" "erp:sytue-syerp"
+  "mail:sytue-mail" "notes:sytue-notes" "pages:sytue-pages" "photos:sytue-syphotos"
+  "platform:sytue-platform" "portal:sytue-one" "rooms:sytue-chat"
+)
+
+instalar_helm() {
+  step "Paso 2 de 5 · Clúster, dominio e infraestructura"
+  echo "  El modo Helm despliega en TU clúster. Necesitas, además de kubectl y helm:"
+  echo "    · un registro de imágenes donde subir la suite (p. ej. ghcr.io/tu-org);"
+  echo "    · PostgreSQL 16+ externo y un almacenamiento S3 compatible;"
+  echo "    · DNS de *.tu-dominio apuntando al balanceador del clúster."
+  [ -n "$DOMAIN" ] || prompt_default "Dominio raíz (ej: suite.miempresa.eu)" "suite.ejemplo.eu" DOMAIN
+  prompt_default "Namespace de Kubernetes" "$K8S_NAMESPACE" K8S_NAMESPACE
+  prompt_default "Registro de imágenes (donde subirás la suite)" "ghcr.io/mi-organizacion" IMAGE_REGISTRY
+  prompt_default "Correo para certificados TLS (Let's Encrypt)" "ops@${DOMAIN}" TLS_EMAIL
+  prompt_default "Host de PostgreSQL" "postgres.${DOMAIN}" PG_HOST
+  prompt_default "Puerto de PostgreSQL" "$PG_PORT" PG_PORT
+  prompt_default "Endpoint S3" "https://s3.${DOMAIN}" S3_ENDPOINT
+  prompt_default "Access Key de S3" "sytue-s3-$(rand_hex 8)" S3_ACCESS_KEY
+  prompt_secret "Secret Key de S3" S3_SECRET_KEY
+  [ -n "$S3_SECRET_KEY" ] || S3_SECRET_KEY="$(rand_hex 24)"
+  ok "Dominio ${BOLD}${DOMAIN}${RESET} · namespace ${BOLD}${K8S_NAMESPACE}${RESET} · registro ${BOLD}${IMAGE_REGISTRY}${RESET}"
+
+  step "Paso 3 de 5 · Propietario inicial"
+  [ -n "$ORG_SLUG" ] || prompt_default "Organización inicial (slug, minúsculas)" "acme" ORG_SLUG
+  [ -n "$ADMIN_EMAIL" ] || prompt_default "Correo del propietario" "admin@${DOMAIN}" ADMIN_EMAIL
+  resolver_password_admin
+
+  step "Paso 4 de 5 · Integraciones con terceros"
+  if [ "$NON_INTERACTIVE" -eq 0 ] &&
+    ! prompt_yes_no "¿Registrar ahora apps OAuth de proveedores (Google, Microsoft, Slack, Zoom…)?" "n"; then
+    # La base del gateway se genera igualmente: sin ella el pod de integraciones
+    # no arranca. Las apps OAuth se pueden añadir después con --integrations.
+    NON_INTERACTIVE=1 asistente_integraciones
+    info "Puedes registrar apps OAuth más adelante con ${BOLD}./sytue-deploy --integrations${RESET}."
+  else
+    asistente_integraciones
+  fi
+
+  step "Paso 5 de 5 · Secretos y ficheros del despliegue"
+  escribir_helm
+  printf "\n${BOLD}Propietario inicial:${RESET} %s en la organización %s\n" "$ADMIN_EMAIL" "$ORG_SLUG"
+  if [ "${ADMIN_PASS_GENERATED:-0}" -eq 1 ]; then
+    printf "  Contraseña: ${BOLD}%s${RESET} ${DIM}(también en deploy/helm/bootstrap-admin.sh)${RESET}\n" "$ADMIN_PASSWORD"
+  fi
+  cat <<EOF
+
+$(printf "${BOLD}Para desplegar en tu clúster, en este orden:${RESET}")
+  1) bash deploy/helm/publicar-imagenes.sh ${IMAGE_REGISTRY} ${DOMAIN}   # construye y sube las imágenes
+  2) bash deploy/helm/create-databases.sh                       # roles y bases en tu PostgreSQL
+  3) bash deploy/helm/apply-secrets.sh && bash deploy/helm/apply-integrations.sh
+  4) bash scripts/prepare-helm-vendor.sh && helm dependency build deploy/helm/sytue-one
+  5) helm upgrade --install sytue-one deploy/helm/sytue-one -n ${K8S_NAMESPACE} --create-namespace \\
+       -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml -f deploy/helm/values-integrations.yaml
+  6) bash deploy/helm/bootstrap-admin.sh                        # crea el propietario inicial
+  7) Entra en https://one.${DOMAIN} y activa la verificación en dos pasos en https://id.${DOMAIN}/account
+EOF
+}
+
+escribir_helm() {
+  umask 077
+  local VALUES="${HELM_DIR}/values-custom.yaml" SECRETS="${HELM_DIR}/apply-secrets.sh"
+  local DBSQL="${HELM_DIR}/create-databases.sh" BOOT="${HELM_DIR}/bootstrap-admin.sh"
+  local LK_KEY LK_SECRET par svc db app cliente
+  local -A DBPASS=()
+  LK_KEY="LK$(rand_hex 8)"
+  LK_SECRET="$(rand_hex 32)"
+
+  cat > "$VALUES" <<EOF
+# ===========================================================================
+# Sytue Suite — Overlay de Helm generado por ./sytue-deploy ($(date -u +"%Y-%m-%dT%H:%M:%SZ"))
+# Uso: helm upgrade --install sytue-one deploy/helm/sytue-one -n ${K8S_NAMESPACE} \\
+#        -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml \\
+#        -f deploy/helm/values-integrations.yaml
+# ===========================================================================
+global:
+  env: prod
+  baseDomain: "${DOMAIN}"
+  appsDomain: "apps.${DOMAIN}"
+  previewDomain: "preview.${DOMAIN}"
+  issuerURL: "https://id.${DOMAIN}"
+  imageRegistry: "${IMAGE_REGISTRY}"
+  certIssuer: "sytue-letsencrypt-prod"
+  acmeEmail: "${TLS_EMAIL}"
+  postgresql:
+    host: "${PG_HOST}"
+    port: ${PG_PORT}
+    sslMode: "require"
+  objectStorage:
+    endpoint: "${S3_ENDPOINT}"
+    region: "eu-central-1"
+  networkPolicy:
+    # Redes desde las que tu balanceador llega a Traefik. 0.0.0.0/0 = cualquiera:
+    # acótalo a la red de tu proveedor cuando la conozcas.
+    loadBalancerSourceCIDRs: ["0.0.0.0/0"]
+livekit:
+  webhook:
+    apiKey: "${LK_KEY}"
+EOF
+  chmod 600 "$VALUES"
+  ok "deploy/helm/values-custom.yaml"
+
+  {
+    cat <<EOF
+#!/usr/bin/env bash
+# Generado por ./sytue-deploy: crea los Secrets de Sytue Suite en '${K8S_NAMESPACE}'.
+# Contiene secretos: NO lo subas a Git. Idempotente (kubectl apply).
+set -euo pipefail
+NS="${K8S_NAMESPACE}"
+kubectl get namespace "\$NS" >/dev/null 2>&1 || kubectl create namespace "\$NS"
+s() { local n="\$1"; shift; kubectl -n "\$NS" create secret generic "\$n" "\$@" --dry-run=client -o yaml | kubectl apply -f - >/dev/null; echo "✓ \$n"; }
+
+s sytue-postgresql --from-literal=host="${PG_HOST}" --from-literal=port="${PG_PORT}"
+s sytue-object-storage --from-literal=endpoint="${S3_ENDPOINT}" \\
+  --from-literal=access-key="${S3_ACCESS_KEY}" --from-literal=secret-key="${S3_SECRET_KEY}"
+s sytue-id --from-literal=key-encryption-key="$(rand_hex 32)" --from-literal=internal-secret="$(rand_hex 32)"
+s sytue-livekit-keys --from-literal=api-key="${LK_KEY}" --from-literal=api-secret="${LK_SECRET}" \\
+  --from-literal=keys.yaml="${LK_KEY}: ${LK_SECRET}"
+s sytue-analytics --from-literal=key-encryption-key="$(rand_b64 32)"
+s sytue-docs --from-literal=secret-enc-key="$(rand_b64 32)"
+s sytue-pages --from-literal=secret-enc-key="$(rand_b64 32)"
+s sytue-syerp --from-literal=secret-enc-key="$(rand_b64 32)"
+s sytue-rooms --from-literal=key-encryption-key="$(rand_b64 32)"
+s sytue-bases --from-literal=altcha-secret="$(rand_hex 32)"
+s sytue-cast --from-literal=cast-internal-secret="$(rand_hex 32)" --from-literal=media-signing-key="$(rand_hex 32)"
+EOF
+    # Una base y un rol por servicio. La contraseña de cada rol la fija create-databases.sh.
+    for par in "${HELM_DBS[@]}"; do
+      IFS=':' read -r svc db <<< "$par"
+      DBPASS[$svc]="$(rand_hex 24)"
+      local dsn="postgres://${db}:${DBPASS[$svc]}@${PG_HOST}:${PG_PORT}/${db}?sslmode=require"
+      printf 's sytue-%s-db --from-literal=dsn="%s" --from-literal=dsn-direct="%s"\n' "$svc" "$dsn" "$dsn"
+    done
+    # Sytue Cloud: los tres componentes comparten base, S3 y clave de cifrado.
+    local cloud_dsn="postgres://sytue_cloud:${DBPASS[cloud]}@${PG_HOST}:${PG_PORT}/sytue_cloud?sslmode=require"
+    local cloud_key; cloud_key="$(rand_b64 32)"
+    for svc in cloud-api cloud-builder cloud-controller; do
+      printf 's sytue-%s --from-literal=database-url="%s" --from-literal=s3-access-key="%s" --from-literal=s3-secret-key="%s" --from-literal=secret-enc-key="%s"\n' \
+        "$svc" "$cloud_dsn" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$cloud_key"
+    done
+    # Clientes OIDC de los frontends: el MISMO secreto en el BFF de cada app y en
+    # Sytue ID (sytue-id-client-secrets, que id reconcilia al arrancar).
+    local bff=(--from-literal=cookie-secret="$(rand_hex 32)") idc=()
+    for par in "${HELM_CLIENTES[@]}"; do
+      IFS=':' read -r app cliente <<< "$par"
+      local sec; sec="$(rand_hex 32)"
+      bff+=(--from-literal="${app}-oidc-client-secret=${sec}")
+      idc+=(--from-literal="${cliente}=${sec}")
+    done
+    printf 's sytue-frontend-bff'; printf ' %q' "${bff[@]}"; printf '\n'
+    cat <<'EOF'
+# sytue-id-client-secrets ya puede tener el cliente del gateway (apply-integrations.sh):
+# se fusiona en vez de reemplazarse.
+kubectl -n "$NS" get secret sytue-id-client-secrets >/dev/null 2>&1 || kubectl -n "$NS" create secret generic sytue-id-client-secrets >/dev/null
+EOF
+    local c
+    for c in "${idc[@]}"; do
+      local kv="${c#--from-literal=}"
+      printf 'kubectl -n "$NS" patch secret sytue-id-client-secrets --type merge -p %q >/dev/null\n' "{\"stringData\":{\"${kv%%=*}\":\"${kv#*=}\"}}"
+    done
+    cat <<'EOF'
+echo "✓ sytue-id-client-secrets"
+# Certificado del correo (SMTP/IMAP). Si no tienes uno comodín propio, se crea uno
+# autofirmado para que Mail arranque; sustitúyelo después por el de tu dominio.
+if ! kubectl -n "$NS" get secret tls-wildcard-sytue-eu >/dev/null 2>&1; then
+  t="$(mktemp -d)"
+EOF
+    printf '  openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=*.%s" -keyout "$t/k" -out "$t/c" >/dev/null 2>&1\n' "$DOMAIN"
+    cat <<'EOF'
+  kubectl -n "$NS" create secret tls tls-wildcard-sytue-eu --cert="$t/c" --key="$t/k" >/dev/null
+  rm -rf "$t"; echo "✓ tls-wildcard-sytue-eu (autofirmado: sustitúyelo por el de tu dominio)"
+fi
+echo "Secrets de Sytue Suite aplicados en el namespace '$NS'."
+EOF
+  } > "$SECRETS"
+  chmod 700 "$SECRETS"
+  ok "deploy/helm/apply-secrets.sh"
+
+  {
+    cat <<EOF
+#!/usr/bin/env bash
+# Generado por ./sytue-deploy: crea en tu PostgreSQL un rol y una base por servicio.
+# Ejecútalo con un usuario con CREATEROLE y CREATEDB. Idempotente. Contiene secretos.
+#   PGUSER=postgres PGPASSWORD=… bash deploy/helm/create-databases.sh
+set -euo pipefail
+export PGHOST="\${PGHOST:-${PG_HOST}}" PGPORT="\${PGPORT:-${PG_PORT}}" PGSSLMODE="\${PGSSLMODE:-require}"
+crear() {
+  psql -v ON_ERROR_STOP=1 -d "\${PGDATABASE:-postgres}" <<SQL
+DO \\\$\\\$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '\$1') THEN
+    CREATE ROLE "\$1" LOGIN CREATEROLE PASSWORD '\$2';
+  ELSE
+    ALTER ROLE "\$1" PASSWORD '\$2';
+  END IF;
+END \\\$\\\$;
+SELECT 'CREATE DATABASE "\$1" OWNER "\$1"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '\$1')\\gexec
+-- Las migraciones definen funciones con SET app.<x>='on': desde PostgreSQL 15 un
+-- rol sin superusuario necesita este permiso. Si quien ejecuta no puede darlo
+-- (PostgreSQL gestionado), avisa en vez de cortar.
+DO \\\$\\\$ BEGIN
+  EXECUTE 'GRANT SET ON PARAMETER app.maintenance, app.docs_definer, app.merge, app.scope_admission_internal TO "\$1"';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE WARNING 'Sin permiso para GRANT SET ON PARAMETER a %: concédelo como superusuario o las migraciones fallarán', '\$1';
+END \\\$\\\$;
+SQL
+  echo "✓ \$1"
+}
+EOF
+    for par in "${HELM_DBS[@]}"; do
+      IFS=':' read -r svc db <<< "$par"
+      printf 'crear %s %s\n' "$db" "${DBPASS[$svc]}"
+    done
+  } > "$DBSQL"
+  chmod 700 "$DBSQL"
+  ok "deploy/helm/create-databases.sh"
+
+  cat > "$BOOT" <<EOF
+#!/usr/bin/env bash
+# Generado por ./sytue-deploy: crea (o reafirma) el propietario inicial de Sytue ID
+# con un Job de una sola ejecución, con la misma imagen que el Deployment de id.
+# Ejecútalo DESPUÉS del helm upgrade. Idempotente. Contiene la contraseña inicial.
+set -euo pipefail
+NS="${K8S_NAMESPACE}"
+IMG="\$(kubectl -n "\$NS" get deployment sytue-one-id -o jsonpath='{.spec.template.spec.containers[0].image}')"
+kubectl -n "\$NS" create secret generic sytue-id-bootstrap \\
+  --from-literal=owner-password='${ADMIN_PASSWORD}' --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n "\$NS" delete job sytue-bootstrap-owner --ignore-not-found --wait=true >/dev/null
+kubectl -n "\$NS" apply -f - >/dev/null <<YAML
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sytue-bootstrap-owner
+  labels: { app.kubernetes.io/part-of: sytue-one, app.kubernetes.io/component: bootstrap-owner }
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels: { app.kubernetes.io/part-of: sytue-one, app.kubernetes.io/component: bootstrap-owner }
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532 }
+      containers:
+        - name: bootstrap
+          image: \$IMG
+          args: ["bootstrap-owner"]
+          env:
+            - { name: SYTUE_ID_DATABASE_DSN, valueFrom: { secretKeyRef: { name: sytue-id-db, key: dsn-direct } } }
+            - { name: SYTUE_ID_BOOTSTRAP_PASSWORD, valueFrom: { secretKeyRef: { name: sytue-id-bootstrap, key: owner-password } } }
+            - { name: SYTUE_ID_BOOTSTRAP_EMAIL, value: "${ADMIN_EMAIL}" }
+            - { name: SYTUE_ID_BOOTSTRAP_ORG_SLUG, value: "${ORG_SLUG}" }
+            - { name: SYTUE_ID_BOOTSTRAP_ORG_NAME, value: "${ORG_SLUG}" }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } }
+---
+# La política base del chart deniega por defecto: el Job solo necesita DNS y PostgreSQL.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sytue-bootstrap-owner
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/component: bootstrap-owner } }
+  policyTypes: ["Egress"]
+  egress:
+    - ports: [ { protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }, { protocol: TCP, port: ${PG_PORT} } ]
+YAML
+kubectl -n "\$NS" wait --for=condition=complete job/sytue-bootstrap-owner --timeout=180s
+kubectl -n "\$NS" logs job/sytue-bootstrap-owner
+EOF
+  chmod 700 "$BOOT"
+  ok "deploy/helm/bootstrap-admin.sh"
+}
+
+# ---------------------------------------------------------------------------
+# Complemento Matrix (Synapse): almacenamiento cifrado de extremo a extremo
+# ---------------------------------------------------------------------------
+# El mismo servidor y la misma configuración que producción (deploy/helm/charts/
+# matrix), incrustado en la instalación: Drive, Mail, Rooms y el resto guardan sus
+# datos cifrados en el dispositivo y Rooms usa Matrix como transporte.
+MATRIX_DIR="${COMPOSE_DIR}/.matrix"
+
+matrix_activo() { [ "$(env_get SYTUE_MATRIX)" = "1" ]; }
+
+# Decide el complemento: la opción manda; si no, lo que diga el .env; en una
+# instalación nueva, sí. Un .env anterior sin la variable se queda sin Matrix:
+# encenderlo cambia dónde guardan las apps sus datos, y eso se pide (--con-matrix).
+decidir_matrix() {
+  [ -n "$CON_MATRIX" ] && return 0
+  if [ -f "$ENV_FILE" ]; then
+    CON_MATRIX="$(env_get SYTUE_MATRIX)"; CON_MATRIX="${CON_MATRIX:-0}"
+  elif [ "$NON_INTERACTIVE" -eq 0 ]; then
+    prompt_yes_no "¿Incluir Matrix (cifrado de extremo a extremo; Drive, Mail y Rooms lo usan para sus datos)?" "s" && CON_MATRIX=1 || CON_MATRIX=0
+  else
+    CON_MATRIX=1
+  fi
+}
+
+# Variables del complemento en el .env. Los secretos se crean una vez y no se
+# cambian: la contraseña de la base ya está en PostgreSQL.
+env_matrix() {
+  env_set SYTUE_MATRIX "$CON_MATRIX"
+  if [ "$CON_MATRIX" = 1 ]; then
+    env_set SYTUE_CIFRADO_E2E activado
+    env_set SYTUE_ROOMS_MATRIX_REQUIRED true
+    local v
+    for v in MATRIX_DB_PASSWORD MATRIX_REGISTRATION_SECRET MATRIX_MACAROON_SECRET MATRIX_FORM_SECRET \
+      MATRIX_LIFECYCLE_SECRET ORGS_PERSONA_SECRET; do
+      [ -n "$(env_get "$v")" ] || env_set "$v" "$(rand_hex 32)"
+    done
+  else
+    env_set SYTUE_CIFRADO_E2E desactivado
+    env_set SYTUE_ROOMS_MATRIX_REQUIRED false
+  fi
+}
+
+# La configuración de Synapse para <dominio> y su overlay en la lista de Compose.
+preparar_matrix() { # <dominio>
+  matrix_activo || return 0
+  check_cmd python3 || die "El complemento Matrix necesita python3 para generar su configuración (o usa --sin-matrix)."
+  (umask 077 && mkdir -p "$MATRIX_DIR")
+  DOMINIO="$1" \
+    MATRIX_DB_PASSWORD="$(env_get MATRIX_DB_PASSWORD)" \
+    MATRIX_REGISTRATION_SECRET="$(env_get MATRIX_REGISTRATION_SECRET)" \
+    MATRIX_MACAROON_SECRET="$(env_get MATRIX_MACAROON_SECRET)" \
+    MATRIX_FORM_SECRET="$(env_get MATRIX_FORM_SECRET)" \
+    OIDC_MATRIX="$(env_get SYTUE_DEV_CLIENT_SECRET)" \
+    python3 "${COMPOSE_DIR}/matrix/configurar.py" "${ROOT_DIR}/apps/nucleo/storage/products.txt" \
+    >"${MATRIX_DIR}/homeserver.yaml.nuevo" || die "No se pudo generar la configuración de Matrix."
+  # Synapse corre como uid 991: el fichero se lee dentro; la carpeta (0700) lo esconde fuera.
+  chmod 644 "${MATRIX_DIR}/homeserver.yaml.nuevo"
+  mv "${MATRIX_DIR}/homeserver.yaml.nuevo" "${MATRIX_DIR}/homeserver.yaml"
+  local overlay="${COMPOSE_DIR}/matrix.yml"
+  if [ "$1" != "$LOCAL_DOMAIN" ]; then
+    DOMINIO="$1" perl -pe 's/sytue\.localhost/$ENV{DOMINIO}/g' "$overlay" >"${SERVIDOR_DIR}/matrix.yml"
+    overlay="${SERVIDOR_DIR}/matrix.yml"
+  fi
+  COMPOSE_FILES+=("$overlay")
+}
+
+esperar_servicio() { # <servicio> <segundos>
+  local t=0
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q "$1")" 2>/dev/null)" = "healthy" ]; do
+    t=$((t + 5)); [ "$t" -lt "$2" ] || return 1
+    sleep 5
+  done
+}
+
+# Rol y base propios de Synapse, con locale C (lo exige). Idempotente.
+bd_matrix() {
+  matrix_activo || return 0
+  dc up -d postgres >/dev/null 2>&1
+  esperar_servicio postgres 180 || die "PostgreSQL no arranca. Revisa: ${BOLD}make dev-logs SVC=postgres${RESET}"
+  dc exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(env_get POSTGRES_SUPERUSER || true)" -d postgres -q >/dev/null <<SQL ||
+SELECT format('CREATE ROLE sytue_matrix LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD %L', '$(env_get MATRIX_DB_PASSWORD)')
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'sytue_matrix')\gexec
+SELECT 'CREATE DATABASE sytue_matrix OWNER sytue_matrix ENCODING ''UTF8'' LC_COLLATE ''C'' LC_CTYPE ''C'' TEMPLATE template0'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'sytue_matrix')\gexec
+SQL
+    die "No se pudo crear la base de Matrix (make dev-logs SVC=postgres)."
+  ok "Base de Matrix lista."
+}
+
+# El cliente «sytue-matrix» de Sytue ID: su secreto (el de Synapse) y la vuelta
+# del inicio de sesión en <dominio>. Idempotente.
+oidc_matrix() { # <dominio>
+  matrix_activo || return 0
+  local tmp
+  tmp="$(mktemp -d)"
+  chmod 755 "$tmp"
+  printf '%s' "$(env_get SYTUE_DEV_CLIENT_SECRET)" >"${tmp}/sytue-matrix"
+  chmod 644 "${tmp}/sytue-matrix"
+  if ! dc run --rm --no-deps -T -v "${tmp}:/secretos:ro" id reconcile-client-secrets /secretos >/dev/null 2>&1; then
+    rm -rf "$tmp"
+    die "No se pudo activar el cliente de Matrix en Sytue ID (make dev-logs SVC=id)."
+  fi
+  rm -rf "$tmp"
+  dc exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(env_get POSTGRES_SUPERUSER || true)" -d "$(env_get ID_DB_NAME || true)" -q >/dev/null <<SQL ||
+UPDATE oauth_clients SET redirect_uris = ARRAY(SELECT DISTINCT u FROM unnest(redirect_uris ||
+  ARRAY['https://matrix.$1/_synapse/client/oidc/callback']) u)
+WHERE id = 'sytue-matrix';
+SQL
+    die "No se pudo registrar la vuelta de Matrix en Sytue ID."
+}
+
+# La credencial con la que Rooms administra sus salas en Synapse (como
+# deploy/private-production/bin/matrix.sh controller): se registra una vez por el
+# secreto compartido, que no se publica, y se guarda en el .env.
+controlador_matrix() {
+  matrix_activo || return 0
+  info "Esperando a Matrix..."
+  esperar_servicio matrix 300 || die "Matrix no arranca. Revisa: ${BOLD}make dev-logs SVC=matrix${RESET}"
+  local token
+  token="$(env_get MATRIX_CONTROLLER_TOKEN)"
+  if [ -n "$token" ] && dc exec -T matrix curl -fsS -H "Authorization: Bearer ${token}" \
+    http://localhost:8008/_matrix/client/v3/account/whoami >/dev/null 2>&1; then
+    ok "Matrix listo (cifrado de extremo a extremo activo)."
+    return 0
+  fi
+  token="$(dc exec -T matrix gosu 991:991 python - 2>/dev/null <<'PY'
+import hashlib, hmac, json, os, pathlib, secrets, urllib.error, urllib.request
+cfg = json.loads(pathlib.Path('/config/homeserver.yaml').read_text())
+raiz = 'http://127.0.0.1:8008'
+pendiente = pathlib.Path('/data/controller-token')
+def pedir(ruta, cuerpo=None, token=None):
+    cabeceras = {'Content-Type': 'application/json'}
+    if token: cabeceras['Authorization'] = 'Bearer ' + token
+    datos = None if cuerpo is None else json.dumps(cuerpo).encode()
+    with urllib.request.urlopen(urllib.request.Request(raiz + ruta, data=datos, headers=cabeceras), timeout=15) as r:
+        return json.load(r)
+token = pendiente.read_text().strip() if pendiente.exists() else ''
+if not token:
+    nonce = pedir('/_synapse/admin/v1/register')['nonce']
+    usuario, clave = 'rooms_controller', secrets.token_urlsafe(48)
+    carga = bytes([0]).join(p.encode() for p in [nonce, usuario, clave, 'admin'])
+    mac = hmac.new(cfg['registration_shared_secret'].encode(), carga, hashlib.sha1).hexdigest()
+    token = pedir('/_synapse/admin/v1/register', {'nonce': nonce, 'username': usuario, 'password': clave,
+                                                 'admin': True, 'mac': mac, 'inhibit_login': False})['access_token']
+    fd = os.open(pendiente, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'w') as f:
+        f.write(token)
+yo = pedir('/_matrix/client/v3/account/whoami', token=token)
+if yo['user_id'] != '@rooms_controller:' + cfg['server_name']:
+    raise SystemExit('identidad inesperada')
+print(token, end='')
+PY
+)" || true
+  [ -n "$token" ] || die "Matrix no dio la credencial de Rooms. Revisa: ${BOLD}make dev-logs SVC=matrix${RESET}"
+  env_set MATRIX_CONTROLLER_TOKEN "$token"
+  dc up -d --no-build rooms >/dev/null 2>&1 || true
+  ok "Matrix listo (cifrado de extremo a extremo activo)."
+}
+
+# ---------------------------------------------------------------------------
+# Modo servidor único: toda la suite en una máquina con tu dominio
+# ---------------------------------------------------------------------------
+SERVIDOR_DIR="${COMPOSE_DIR}/.servidor"
+
+dominio_valido() { [[ "$1" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; }
+
+# Compose renderizado para el dominio: el mismo docker-compose.yml y frontlite.yml
+# con sytue.localhost cambiado por el dominio, más los ajustes de servidor que no
+# caben en un overlay (están dentro de anclas YAML).
+renderizar_servidor() {
+  mkdir -p "$SERVIDOR_DIR"
+  local tls_verificar="0"
+  [ "$TLS_MODO" = "letsencrypt" ] && tls_verificar="1"
+  DOMINIO="$DOMAIN" VERIFICAR="$tls_verificar" perl -pe '
+    s/sytue\.localhost/$ENV{DOMINIO}/g;
+    s/SYTUE_SECURE_COOKIES: "false".*/SYTUE_SECURE_COOKIES: "true"/;
+    s/NODE_TLS_REJECT_UNAUTHORIZED: "0"/NODE_TLS_REJECT_UNAUTHORIZED: "$ENV{VERIFICAR}"/;
+    s/^  LOG_LEVEL: debug$/  LOG_LEVEL: info/;
+    s/^  GO_ENV: development$/  GO_ENV: development\n  SYTUE_BASE_DOMAIN: $ENV{DOMINIO}/;
+  ' "${COMPOSE_DIR}/docker-compose.yml" > "${SERVIDOR_DIR}/docker-compose.yml"
+  DOMINIO="$DOMAIN" perl -pe 's/sytue\.localhost/$ENV{DOMINIO}/g' "${COMPOSE_DIR}/frontlite.yml" > "${SERVIDOR_DIR}/frontlite.yml"
+  # Todos los <app>.<dominio> resuelven a Traefik DENTRO de la red de la suite: el
+  # BFF de cada app llama a otras por su nombre público, y no todo servidor llega
+  # a su propia IP pública desde dentro (hairpin NAT).
+  {
+    echo "name: sytue-one-dev"
+    echo "services:"
+    echo "  traefik:"
+    echo "    networks:"
+    echo "      edge: {}"
+    echo "      backend:"
+    echo "        aliases:"
+    grep -oE "Host\(\`[a-z0-9.-]+\`\)" "${SERVIDOR_DIR}/docker-compose.yml" | sed -E 's/Host\(`([^`]+)`\)/          - \1/' | sort -u
+  } > "${SERVIDOR_DIR}/alias.yml"
+  # Videollamadas: el SFU anuncia a los navegadores la IP por la que le llegan.
+  # Con Let's Encrypt (Internet), la pública que descubre por STUN; en una red
+  # local, la IP de esta máquina en esa red.
+  # SYTUE_IP_MEDIOS la fija a mano (p. ej. detrás de NAT o en el contenedor único).
+  local ip_lan="${SYTUE_IP_MEDIOS:-}"
+  if [ -z "$ip_lan" ] && [ "$TLS_MODO" = "interno" ]; then
+    ip_lan="$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -1)"
+    [ -n "$ip_lan" ] || ip_lan="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  fi
+  IP_LAN="$ip_lan" perl -pe '
+    if ($ENV{IP_LAN} eq "") { s/use_external_ip: false/use_external_ip: true/; $_ = "" if /^\s*node_ip:/; }
+    else { s/node_ip: "127\.0\.0\.1"/node_ip: "$ENV{IP_LAN}"/; }
+  ' "${COMPOSE_DIR}/livekit/livekit.yaml" > "${SERVIDOR_DIR}/livekit.yaml"
+  if [ "$TLS_MODO" = "letsencrypt" ]; then
+    CORREO="$TLS_EMAIL" perl -pe 's/__ACME_EMAIL__/$ENV{CORREO}/g' "${COMPOSE_DIR}/traefik/traefik-letsencrypt.yml.tpl" > "${SERVIDOR_DIR}/traefik.yml"
+  fi
+  COMPOSE_FILES=("${SERVIDOR_DIR}/docker-compose.yml" "${SERVIDOR_DIR}/frontlite.yml"
+    "${COMPOSE_DIR}/servidor.yml" "${SERVIDOR_DIR}/alias.yml")
+  [ "$TLS_MODO" = "letsencrypt" ] && COMPOSE_FILES+=("${COMPOSE_DIR}/letsencrypt.yml")
+  return 0
+}
+
+certificado_interno() {
+  if [ -s "${CERT_DIR}/servidor.pem" ] && openssl x509 -in "${CERT_DIR}/servidor.pem" -noout -text 2>/dev/null | grep -q "DNS:\*\.${DOMAIN}"; then
+    ok "Certificado interno para *.${DOMAIN} ya presente."
+    return
+  fi
+  check_cmd mkcert || die "El TLS interno usa mkcert, que no está instalado (o elige Let's Encrypt)."
+  mkcert -install >/dev/null 2>&1 || true
+  mkdir -p "$CERT_DIR"
+  mkcert -cert-file "${CERT_DIR}/servidor.pem" -key-file "${CERT_DIR}/servidor-key.pem" \
+    "${DOMAIN}" "*.${DOMAIN}" >/dev/null 2>&1
+  ok "Certificado interno para *.${DOMAIN} creado (confía en él cada equipo con «mkcert -install» y la CA de $(mkcert -CAROOT))."
+}
+
+# Con Let's Encrypt, un certificado autofirmado solo para lo que no tiene uno de
+# ACME (accesos por IP o nombres desconocidos): tls.yml lo usa por defecto.
+certificado_respaldo() {
+  [ -s "${CERT_DIR}/servidor.pem" ] && return 0
+  mkdir -p "$CERT_DIR"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=${DOMAIN}" \
+    -keyout "${CERT_DIR}/servidor-key.pem" -out "${CERT_DIR}/servidor.pem" >/dev/null 2>&1 ||
+    die "No se pudo crear el certificado de respaldo (¿está openssl instalado?)."
+}
+
+# Clientes OIDC de las apps web: el mismo secreto que usan sus BFF y sus
+# direcciones de vuelta en tu dominio. Idempotente.
+configurar_clientes_oidc() {
+  local tmp secreto c clientes
+  secreto="$(env_get SYTUE_DEV_CLIENT_SECRET)"
+  clientes="$(dc config 2>/dev/null | sed -n 's/^ *SYTUE_OIDC_CLIENT_ID: *"\{0,1\}\([a-z0-9-]*\)"\{0,1\}$/\1/p' | sort -u)"
+  tmp="$(mktemp -d)"
+  chmod 755 "$tmp"
+  for c in $clientes; do
+    printf '%s' "$secreto" > "${tmp}/${c}"
+    chmod 644 "${tmp}/${c}"
+  done
+  if ! dc run --rm --no-deps -T -v "${tmp}:/secretos:ro" id reconcile-client-secrets /secretos >/dev/null 2>&1; then
+    rm -rf "$tmp"
+    die "No se pudieron fijar los secretos de los clientes OIDC (make dev-logs SVC=id)."
+  fi
+  rm -rf "$tmp"
+  dc exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(env_get POSTGRES_SUPERUSER)" -d "$(env_get ID_DB_NAME)" -q >/dev/null <<SQL || die "No se pudieron registrar las direcciones de vuelta de ${DOMAIN} en Sytue ID."
+UPDATE oauth_clients c SET
+  redirect_uris = ARRAY(SELECT DISTINCT u FROM unnest(c.redirect_uris || ARRAY(
+    SELECT replace(x, '.sytue.localhost/', '.${DOMAIN}/') FROM unnest(c.redirect_uris) x
+    WHERE x LIKE 'https://%.sytue.localhost/%')) u),
+  post_logout_redirect_uris = ARRAY(SELECT DISTINCT u FROM unnest(c.post_logout_redirect_uris || ARRAY(
+    SELECT replace(x, '.sytue.localhost/', '.${DOMAIN}/') FROM unnest(c.post_logout_redirect_uris) x
+    WHERE x LIKE 'https://%.sytue.localhost/%')) u)
+WHERE EXISTS (SELECT 1 FROM unnest(c.redirect_uris) x WHERE x LIKE 'https://%.sytue.localhost/%');
+SQL
+  ok "Clientes OIDC de las apps listos para ${DOMAIN} ($(echo "$clientes" | wc -w | tr -d ' ') apps)."
+}
+
+alta_propietario() {
+  dc run --rm --no-deps -T \
+    -e SYTUE_ID_BOOTSTRAP_EMAIL="$ADMIN_EMAIL" \
+    -e SYTUE_ID_BOOTSTRAP_ORG_SLUG="$ORG_SLUG" \
+    -e SYTUE_ID_BOOTSTRAP_ORG_NAME="$ORG_SLUG" \
+    -e SYTUE_ID_BOOTSTRAP_PASSWORD="$(env_get SYTUE_PROPIETARIO_PASSWORD)" \
+    id bootstrap-owner >/dev/null 2>&1 ||
+    die "No se pudo crear el propietario inicial (make dev-logs SVC=id)."
+  ok "Propietario listo: ${BOLD}${ADMIN_EMAIL}${RESET} (organización ${ORG_SLUG})."
+}
+
+# Un usuario: solo la cuenta del propietario, sin alta pública. Varios: el
+# propietario invita desde Sytue Admin y, si se pide, cualquiera puede darse de
+# alta en /signup. Se cambia volviendo a ejecutar el asistente: no toca datos.
+elegir_usuarios() {
+  [ -n "$USUARIOS" ] || USUARIOS="$(env_get SYTUE_USUARIOS)"
+  if [ -z "$USUARIOS" ]; then
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+      USUARIOS="varios"
+    else
+      echo "  ¿Quién va a usar la suite?"
+      echo "    1) Solo yo          — una sola cuenta (la tuya); sin registro público"
+      echo "    2) Un equipo        — invitas a más personas desde Sytue Admin"
+      local o=""
+      prompt_default "Opción" "2" o
+      case "$o" in 1|uno) USUARIOS="uno" ;; *) USUARIOS="varios" ;; esac
+    fi
+  fi
+  case "$USUARIOS" in uno|varios) ;; *) die "--usuarios debe ser «uno» o «varios»." ;; esac
+  if [ "$USUARIOS" = "uno" ]; then
+    [ "$REGISTRO_ABIERTO" != "true" ] || die "--registro-abierto solo tiene sentido con --usuarios varios."
+    REGISTRO_ABIERTO="false"
+  else
+    [ -n "$REGISTRO_ABIERTO" ] || REGISTRO_ABIERTO="$(env_get SYTUE_REGISTRO_ABIERTO)"
+    if [ -z "$REGISTRO_ABIERTO" ]; then
+      REGISTRO_ABIERTO="false"
+      if [ "$NON_INTERACTIVE" -eq 0 ] && prompt_yes_no "¿Permitir que cualquiera se cree una cuenta (registro abierto)? Si no, solo entran las personas que invites" "n"; then
+        REGISTRO_ABIERTO="true"
+      fi
+    fi
+  fi
+  if [ "$USUARIOS" = "uno" ]; then
+    ok "Usuarios: ${BOLD}solo el propietario${RESET} (registro cerrado)"
+  elif [ "$REGISTRO_ABIERTO" = "true" ]; then
+    ok "Usuarios: ${BOLD}equipo${RESET} · invitaciones y registro abierto en /signup"
+  else
+    ok "Usuarios: ${BOLD}equipo${RESET} · por invitación desde Sytue Admin"
+  fi
+}
+
+instalar_servidor() {
+  step "Paso 2 de 5 · Servidor, dominio y requisitos"
+  echo "  Toda la suite en esta máquina, en <app>.<tu dominio>. Necesitas un registro DNS"
+  echo "  comodín (*.tu-dominio) apuntando a este servidor y los puertos 80 y 443 libres."
+  [ -n "$DOMAIN" ] || prompt_default "Dominio de la suite (ej: suite.miempresa.eu)" "" DOMAIN
+  DOMAIN="$(printf '%s' "$DOMAIN" | tr '[:upper:]' '[:lower:]')"
+  dominio_valido "$DOMAIN" || die "«${DOMAIN}» no es un dominio válido (ej: suite.miempresa.eu)."
+  [ "$DOMAIN" != "$LOCAL_DOMAIN" ] || die "Para *.${LOCAL_DOMAIN} usa el modo local (./sytue-deploy)."
+  if [ -z "$TLS_MODO" ]; then
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+      TLS_MODO="letsencrypt"
+    else
+      echo "  Certificados HTTPS:"
+      echo "    1) Let's Encrypt — gratuitos y automáticos (el servidor tiene que ser accesible desde Internet)"
+      echo "    2) Internos      — para una red local o pruebas (mkcert; cada equipo debe confiar en su CA)"
+      local o=""
+      prompt_default "Opción" "1" o
+      case "$o" in 2) TLS_MODO="interno" ;; *) TLS_MODO="letsencrypt" ;; esac
+    fi
+  fi
+  case "$TLS_MODO" in letsencrypt|interno) ;; *) die "--tls debe ser «letsencrypt» o «interno»." ;; esac
+  if [ "$TLS_MODO" = "letsencrypt" ]; then
+    [ -n "$TLS_EMAIL" ] || prompt_default "Correo para Let's Encrypt (avisos de caducidad)" "admin@${DOMAIN}" TLS_EMAIL
+    [[ "$TLS_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || die "Correo no válido: ${TLS_EMAIL}"
+  fi
+  if [ "$ONLY_CONFIG" -eq 0 ]; then requisitos_compose; fi
+  ok "Dominio ${BOLD}${DOMAIN}${RESET} · HTTPS ${BOLD}${TLS_MODO}${RESET}"
+
+  step "Paso 3 de 5 · Servicios y propietario"
+  PROFILE="${PROFILE:-full}"
+  [ "$DO_RESET" -eq 1 ] && [ -z "$CON_MATRIX" ] && CON_MATRIX=1
+  decidir_matrix
+  CON_ERP="${CON_ERP:-1}"; CON_DEVX="${CON_DEVX:-1}"
+  local perfiles
+  perfiles="$(perfiles_compose "$PROFILE")"
+  [ -n "$ORG_SLUG" ] || ORG_SLUG="$(env_get SYTUE_ORGANIZACION)"
+  [ -n "$ADMIN_EMAIL" ] || ADMIN_EMAIL="$(env_get SYTUE_PROPIETARIO)"
+  [ -n "$ORG_SLUG" ] || prompt_default "Organización (slug, minúsculas)" "$(printf '%s' "${DOMAIN%%.*}" | tr -cd 'a-z0-9-')" ORG_SLUG
+  [ -n "$ADMIN_EMAIL" ] || prompt_default "Correo del propietario" "admin@${DOMAIN}" ADMIN_EMAIL
+  elegir_usuarios
+  ok "Perfiles: ${BOLD}${perfiles}${RESET} · propietario ${BOLD}${ADMIN_EMAIL}${RESET} (${ORG_SLUG})"
+
+  step "Paso 4 de 5 · Configuración y secretos"
+  if [ "$DO_RESET" -eq 1 ]; then
+    if [ "$NON_INTERACTIVE" -eq 0 ] && ! prompt_yes_no "Se BORRARÁN todos los datos de la suite en esta máquina. ¿Continuar?" "n"; then
+      die "Cancelado: no se ha borrado nada."
+    fi
+    if [ -f "$ENV_FILE" ]; then
+      renderizar_servidor
+      dc --profile full down -v --remove-orphans >/dev/null 2>&1 || true
+      docker volume rm -f sytue-one-dev_matrix-data >/dev/null 2>&1 || true
+      apartar_env
+    fi
+  fi
+  if [ -f "$ENV_FILE" ] && [ "$(env_get SYTUE_DOMINIO)" != "$DOMAIN" ]; then
+    die "deploy/compose/.env es de otra instalación ($(env_get SYTUE_DOMINIO || true)). Empieza de cero con --reset."
+  fi
+  if [ -f "$ENV_FILE" ]; then
+    ok "Se reutiliza ${BOLD}deploy/compose/.env${RESET}."
+    completar_env
+  else
+    if datos_locales_existen; then
+      die "Hay datos de otra instalación en Docker. Empieza de cero con ${BOLD}./sytue-deploy --mode servidor --reset${RESET}."
+    fi
+    resolver_password_admin
+    escribir_env "$perfiles"
+    {
+      echo ""
+      echo "# --- Servidor único -------------------------------------------------------"
+      echo "SYTUE_DOMINIO=${DOMAIN}"
+      echo "SYTUE_TLS=${TLS_MODO}"
+      echo "SYTUE_ACME_EMAIL=${TLS_EMAIL}"
+      echo "SYTUE_PROPIETARIO=${ADMIN_EMAIL}"
+      echo "SYTUE_ORGANIZACION=${ORG_SLUG}"
+      echo "SYTUE_PROPIETARIO_PASSWORD=${ADMIN_PASSWORD}"
+      echo "ID_KEY_ENCRYPTION_KEY=$(rand_b64 32)"
+      echo "CONTACTS_INTERNAL_SECRET=$(rand_hex 32)"
+      echo "SYTUE_MAIL_FROM=Sytue <no-reply@${DOMAIN}>"
+      echo "# Correo saliente de Sytue ID. Vacío: el servidor de correo de la propia suite."
+      echo "SYTUE_SMTP_ADDR="
+      echo "SYTUE_SMTP_USERNAME="
+      echo "SYTUE_SMTP_PASSWORD="
+    } >> "$ENV_FILE"
+    ok "Creado ${BOLD}deploy/compose/.env${RESET} (permisos 0600, ignorado por Git)."
+  fi
+  env_set SYTUE_USUARIOS "$USUARIOS"
+  env_set SYTUE_REGISTRO_ABIERTO "$REGISTRO_ABIERTO"
+  ADMIN_PASSWORD="$(env_get SYTUE_PROPIETARIO_PASSWORD)"
+  env_matrix
+  renderizar_servidor
+  preparar_matrix "$DOMAIN"
+  ok "Compose para ${DOMAIN} en deploy/compose/.servidor/ · Matrix $([ "$CON_MATRIX" = 1 ] && echo sí || echo no)"
+  if [ "$ONLY_CONFIG" -eq 1 ]; then
+    ok "Configuración lista. Para arrancar: ${BOLD}./sytue-deploy --mode servidor --domain ${DOMAIN}${RESET}"
+    exit 0
+  fi
+
+  step "Paso 5 de 5 · Construcción y arranque"
+  if [ "$TLS_MODO" = "interno" ]; then certificado_interno; else certificado_respaldo; fi
+  if [ "$NO_BUILD" -eq 0 ]; then
+    info "Construyendo las imágenes para ${DOMAIN} (la primera vez, 20-60 min)..."
+    construir_por_tandas
+  fi
+  bd_matrix
+  info "Arrancando contenedores..."
+  dc up -d --no-build --remove-orphans
+  info "Esperando a Sytue ID..."
+  local t=0
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q id)" 2>/dev/null)" = "healthy" ]; do
+    t=$((t + 5)); [ "$t" -lt 300 ] || die "Sytue ID no arranca. Revisa: ${BOLD}make dev-logs SVC=id${RESET}"
+    sleep 5
+  done
+  configurar_clientes_oidc
+  oidc_matrix "$DOMAIN"
+  alta_propietario
+  controlador_matrix
+  info "Esperando a que el resto de servicios estén sanos..."
+  local sanos=1
+  esperar_salud 900 || sanos=0
+  printf "\r%-120s\r" ""
+  [ "$sanos" -eq 1 ] && ok "Todos los servicios están en marcha y sanos."
+
+  printf "\n${BOLD}${GREEN}Sytue Suite está en marcha en https://one.%s${RESET}\n\n" "$DOMAIN"
+  printf "  Propietario : ${BOLD}%s${RESET} · contraseña en deploy/compose/.env (SYTUE_PROPIETARIO_PASSWORD)\n" "$ADMIN_EMAIL"
+  printf "  Primer paso : entra en https://id.%s/account y activa la verificación en dos pasos;\n" "$DOMAIN"
+  printf "                hasta entonces Sytue Admin sigue cerrada para el propietario.\n"
+  if [ "$USUARIOS" = "uno" ]; then
+    printf "  Usuarios    : solo tu cuenta. Para abrirla a un equipo: ./sytue-deploy --mode servidor --usuarios varios\n"
+  else
+    printf "  Usuarios    : invita a tu equipo en https://admin.%s" "$DOMAIN"
+    [ "$REGISTRO_ABIERTO" = "true" ] && printf " · registro abierto en https://id.%s/signup" "$DOMAIN"
+    printf "\n"
+  fi
+  [ "$TLS_MODO" = "letsencrypt" ] && printf "  Certificados: Let's Encrypt los emite en el primer acceso a cada app (unos segundos).\n"
+  printf "  Correo SMTP/IMAP para clientes externos aún no se publica: el correo web funciona.\n\n"
+  [ "$sanos" -eq 1 ] || { warn "Algún servicio no está sano todavía: ${BOLD}make dev-ps${RESET}."; exit 1; }
+}
+
+# ---------------------------------------------------------------------------
+# Inicio
+# ---------------------------------------------------------------------------
+printf "${BOLD}${CYAN}"
+cat <<'BANNER'
+  ____        _               ____        _ _
+ / ___| _   _| |_ _   _  ___ / ___| _   _(_) |_ ___
+ \___ \| | | | __| | | |/ _ \\___ \| | | | | __/ _ \
+  ___) | |_| | |_| |_| |  __/ ___) | |_| | | ||  __/
+ |____/ \__, |\__|\__,_|\___||____/ \__,_|_|\__\___|
+        |___/
+BANNER
+printf "${RESET}${BOLD}Instalador paso a paso (Apache-2.0)${RESET}\n"
+
+check_cmd openssl || die "Se necesita 'openssl' para generar las claves criptográficas."
+
+if [ "$INTEGRATIONS_ONLY" -eq 1 ]; then
+  modo_integraciones
+fi
+
+step "Paso 1 de 5 · Dónde instalar"
+if [ -z "$MODE" ]; then
+  if [ "$NON_INTERACTIVE" -eq 1 ] || [ "$DO_RESET" -eq 1 ]; then
+    MODE="compose"
+  else
+    echo "    1) En este equipo con Docker  — recomendado: prueba o servidor único, en https://*.${LOCAL_DOMAIN}"
+    echo "    2) En un servidor con tu dominio — una máquina con Docker, HTTPS con Let's Encrypt"
+    echo "    3) En un clúster Kubernetes   — avanzado: tu dominio, tu registro, tu PostgreSQL y tu S3"
+    eleccion=""
+    prompt_default "Opción" "1" eleccion
+    case "$eleccion" in
+      2|servidor) MODE="servidor" ;;
+      3|helm|k8s) MODE="helm" ;;
+      *)          MODE="compose" ;;
+    esac
+  fi
+fi
+ok "Modo: ${BOLD}${MODE}${RESET}"
+
+case "$MODE" in
+  compose)  instalar_compose ;;
+  servidor) instalar_servidor ;;
+  *)        instalar_helm ;;
+esac

@@ -48,6 +48,8 @@ export const nb: AppCatalog<typeof en> = {
   'list.unstar': 'Fjern {name} fra kontakter med stjerne',
   'list.starredTitle': 'Med stjerne',
   'list.reviewDuplicates': 'Se gjennom duplikater ({count})',
+  'list.selectMode': 'Velg',
+  'list.moreActions': 'Flere handlinger',
   'list.count': { one: '{count} kontakt', other: '{count} kontakter' },
   'list.countFiltered': {
     one: '{shown} av {count} kontakt',

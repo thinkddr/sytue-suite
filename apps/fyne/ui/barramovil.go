@@ -70,6 +70,10 @@ type BarraMovil struct {
 	// algo pendiente en el cajón, y pinta su punto (`mobileNavNotice`). Vacío: ni punto
 	// ni cambio de nombre.
 	Aviso string
+	// Respaldo, ya traducido, sustituye al nombre de marca del producto en la barra
+	// única cuando no hay título que enseñar. Es para la app cuyo nombre se TRADUCE: la
+	// lista de Contacts decía «Contacts» y su ficha «Contactos». Vacío: la marca («Mail»).
+	Respaldo string
 
 	// enSuite: va DENTRO de la barra de la suite, la barra única del teléfono (lo pone el
 	// armazón por orden de `BarraSuite.Montar`). Mide lo que la barra de la suite, pinta
@@ -296,8 +300,12 @@ func (r *barraMovilRenderer) tituloVisible() string {
 	if r.b.EnDetalle || !r.b.ConLista {
 		t = r.b.Titulo
 	}
-	// En la barra única nunca se queda vacía: sin título, el nombre del producto.
+	// En la barra única nunca se queda vacía: sin título, el nombre del producto (o el
+	// traducido que dé la app, Respaldo).
 	if t == "" && r.b.enSuite {
+		if r.b.Respaldo != "" {
+			return r.b.Respaldo
+		}
 		return r.b.tituloRespaldo
 	}
 	return t
@@ -357,6 +365,17 @@ func (r *barraMovilRenderer) Refresh() {
 }
 
 // ---- El botón flotante ----
+
+// detalleALaVista dice si el armazón de la ventana de `o` enseña su detalle en vez de la
+// lista: la ficha, el lector. Ahí no va el botón flotante.
+func detalleALaVista(o fyne.CanvasObject) bool {
+	c := lienzoDe(o)
+	if c == nil {
+		return false
+	}
+	a := armazonEn(c.Content())
+	return a != nil && a.enDetalle()
+}
 
 // BotonFlotante es MobileFab.tsx: la acción principal al alcance del pulgar en el
 // teléfono, donde el menú lateral es un cajón cerrado. Cuadrado de `h-14` en `primary`,
@@ -478,6 +497,11 @@ func (r *flotanteRenderer) Refresh() {
 
 // CapaFlotante es el `fixed right-4 bottom-4 md:hidden` del botón flotante: lo pega a
 // la esquina de abajo a la derecha de lo que cubre, y lo esconde en ancho (≥ 768).
+//
+// Y en una pantalla de DETALLE: con la ficha de un contacto o el lector de Mail a la vista,
+// el «+» tapaba el final de lo que se lee y no es la acción de esa pantalla (auditoría del
+// 2026-11-24). Lo dice el armazón de la ventana (`Armazon.DetalleAbierto` con panel, en
+// estrecho), que vuelve a colocar la capa cuando eso cambia.
 type CapaFlotante struct{}
 
 var _ fyne.Layout = CapaFlotante{}
@@ -488,7 +512,7 @@ func (CapaFlotante) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize
 // Layout coloca el botón en la esquina, o lo esconde.
 func (CapaFlotante) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	for _, o := range objs {
-		esconder(o, t.Width >= Estrecho)
+		esconder(o, t.Width >= Estrecho || detalleALaVista(o))
 		m := o.MinSize()
 		o.Move(fyne.NewPos(t.Width-MargenBotonFlotante-m.Width, t.Height-MargenBotonFlotante-m.Height))
 		o.Resize(m)

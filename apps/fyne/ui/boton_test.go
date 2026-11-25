@@ -49,19 +49,35 @@ func TestElBotonMideLoQueDiceMedir(t *testing.T) {
 	mismaCaja(t, "el botón", declarada, x0, x1, y0, y1)
 }
 
-// TestElBotonSecundarioEsAzulComoElPrimario fija la acción azul de Button.tsx.
-func TestElBotonSecundarioEsAzulComoElPrimario(t *testing.T) {
+// TestElBotonSecundarioEsDeContornoYNoDelColorDelPrincipal fija el `secondary` de
+// Button.tsx: superficie, tinta del texto y borde de control. VISTO EN ROJO con el relleno
+// primario de antes (auditoría del 2026-11-24: «Cancelar» y «Guardar» del mismo verde).
+// Se mira el píxel del borde, el del relleno y, en claro y en oscuro, que el rótulo y el
+// borde lleguen a AA (4,5:1 el texto, 3:1 el contorno de un control).
+func TestElBotonSecundarioEsDeContornoYNoDelColorDelPrincipal(t *testing.T) {
 	b := NuevoBoton("Cancelar", nil).Con(Secundario, TallaMD)
 	m := b.MinSize()
 	b.Resize(m)
 	img := pinta(t, m.Width+10, m.Height+10, b)
-	for _, x := range []int{0, int(tema.Borde * escala)} {
-		quiero := tema.Color("primary", tema.Claro)
-		if x == 0 {
-			quiero = BordeSobre("border-strong", "primary", tema.Claro)
+	for _, c := range []struct {
+		x     int
+		token string
+	}{{0, "border-strong"}, {int(tema.Borde*escala) + 1, "surface"}} {
+		if got, quiero := px(img, c.x, int(m.Height*escala/2)), tema.Color(c.token, tema.Claro); !cerca(got, quiero) {
+			t.Errorf("el secundario pinta %v en x=%d y Button.tsx pide `%s` (%v)", got, c.x, c.token, quiero)
 		}
-		if got := px(img, x, int(m.Height*escala/2)); !cerca(got, quiero) {
-			t.Errorf("el secundario pinta %v; Button.tsx usa el azul %v", got, quiero)
+	}
+	if relleno, _, _ := b.colores(tema.Claro); relleno == tema.Color("primary", tema.Claro) {
+		t.Error("el secundario vuelve a ser del color del principal")
+	}
+	for _, v := range []tema.Variante{tema.Claro, tema.Oscuro} {
+		relleno, texto, borde := b.colores(v)
+		fondo := tema.Color("bg", v)
+		if c := contraste(texto, relleno); c < 4.5 {
+			t.Errorf("tema %v: el rótulo del secundario queda a %.2f:1 de su relleno", v, c)
+		}
+		if c := contraste(borde, fondo); c < 3 {
+			t.Errorf("tema %v: el contorno del secundario queda a %.2f:1 del lienzo", v, c)
 		}
 	}
 }
@@ -367,5 +383,34 @@ func TestElGalonDeDetrasCambiaDeDibujo(t *testing.T) {
 	fyne.DoAndWait(b.Refresh)
 	if slices.Equal(abajo, pinta()) {
 		t.Error("cambiar IconoDetras no cambia el dibujo del galón")
+	}
+}
+
+// TestElFantasmaDestructivoVaEnLaTintaDePeligro: `variant="ghost"` con `text-danger-text
+// hover:bg-danger-bg`. Sin caja en reposo —no es el rojo macizo de Peligro—, con el velo
+// de peligro con el puntero, y el rótulo AA sobre la superficie y sobre ese velo en los
+// dos temas (medido: 6,8 y 5,9:1 en claro; 7,4 y 6,7:1 en oscuro).
+func TestElFantasmaDestructivoVaEnLaTintaDePeligro(t *testing.T) {
+	for _, v := range []tema.Variante{tema.Claro, tema.Oscuro} {
+		b := NuevoBoton("Eliminar", nil).Con(Fantasma, TallaMD)
+		b.Destructivo = true
+		relleno, tinta, borde := b.colores(v)
+		if relleno.A != 0 || borde.A != 0 {
+			t.Errorf("tema %v: en reposo lleva caja (%v, %v) y el fantasma no tiene", v, relleno, borde)
+		}
+		if tinta != tema.Color("danger-text", v) {
+			t.Errorf("tema %v: el rótulo es %v y tocaba `danger-text`", v, tinta)
+		}
+		if c := contraste(tinta, tema.Color("surface", v)); c < 4.5 {
+			t.Errorf("tema %v: el rótulo queda a %.2f:1 de la superficie", v, c)
+		}
+		b.encima = true
+		encima, tinta, _ := b.colores(v)
+		if encima != tema.Color("danger-bg", v) {
+			t.Errorf("tema %v: con el puntero pinta %v y tocaba `danger-bg`", v, encima)
+		}
+		if c := contraste(tinta, encima); c < 4.5 {
+			t.Errorf("tema %v: con el puntero el rótulo queda a %.2f:1", v, c)
+		}
 	}
 }

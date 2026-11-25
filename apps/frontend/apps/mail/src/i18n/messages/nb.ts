@@ -446,6 +446,7 @@ export const nb: AppCatalog<typeof en> = {
   'compose.templates': 'Maler',
   'compose.templatesEmpty': 'Ingen maler ennå. Opprett dem i innstillingene for Mail.',
   'compose.attachFailed': 'Vedlegget kunne ikke leses',
+  'compose.openFailed': 'Meldingsredigeringen kunne ikke åpnes. Prøv igjen.',
   'compose.pastedImageDropped': 'Det innlimte bildet ble ikke tatt med',
   'compose.pastedImagesDropped': 'De innlimte bildene ble ikke tatt med',
   'compose.pastedImagesDroppedDescription': 'Legg ved bilder som filer for å sende dem.',

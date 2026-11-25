@@ -180,8 +180,9 @@ export async function openVaultMailPrivate(
   const scope = Object.freeze({ ...vault.scope });
   if (vault.isClosed || scope.product !== 'mail') throw new MatrixSecurityError('identity');
   // Sin la clave de firma activa en Sytue ID el servidor no acepta nada de lo que
-  // la bóveda firme: tras un vaciado hay que identificarse otra vez.
-  if (vault.signingKeyStatus === 'reauth') throw new PqVaultError('signin');
+  // la bóveda firme: tras un vaciado hay que identificarse otra vez, de verdad
+  // (`reauth`: con `max_age=0`, no con la sesión que ya hay).
+  if (vault.signingKeyStatus === 'reauth') throw new PqVaultError('reauth');
   if (vault.signingKeyStatus !== 'registered') throw new PqVaultError('unavailable');
   options.signal?.throwIfAborted();
   const basePath = options.basePath || '/';
@@ -208,8 +209,9 @@ export async function openVaultMailPrivate(
     signal: group.signal,
     assertOpen: () => group.assertOpen(),
   };
-  const kernel = createRuntime(lease, 'core'),
-    domain = createRuntime(lease, 'mail');
+  // Un solo núcleo: el de Mail sirve también `mail.capabilities`. Antes se bajaba
+  // además el núcleo completo (11 MB) solo para esa pregunta.
+  const domain = createRuntime(lease, 'mail');
   const jobs = new StorageJobs();
   let closing: Promise<void> | undefined;
   const closeAndDrain = (): Promise<void> => {
@@ -220,7 +222,6 @@ export async function openVaultMailPrivate(
         owner.closeAndDrain(),
         jobs.close(),
         domain.closeAndDrain(),
-        kernel.closeAndDrain(),
       ]);
       const errors: unknown[] = results.flatMap((r): unknown[] =>
         r.status === 'rejected' ? [r.reason as unknown] : [],
@@ -308,7 +309,7 @@ export async function openVaultMailPrivate(
       open: unavailable,
     });
     const temporary = group.add(
-      kernel.registerHostPort({
+      domain.registerHostPort({
         scope,
         lease: group,
         run,
@@ -318,7 +319,7 @@ export async function openVaultMailPrivate(
     );
     let maximum: number;
     try {
-      const capabilities = await kernel.invoke<{
+      const capabilities = await domain.invoke<{
         v: number;
         scope: MatrixStorageScope;
         max_body_bytes: number;

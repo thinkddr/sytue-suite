@@ -449,6 +449,7 @@ export const fi: AppCatalog<typeof en> = {
   'compose.templates': 'Pohjat',
   'compose.templatesEmpty': 'Ei vielä pohjia. Luo ne Mailin asetuksissa.',
   'compose.attachFailed': 'Liitettä ei voitu lukea',
+  'compose.openFailed': 'Viestieditoria ei voitu avata. Yritä uudelleen.',
   'compose.pastedImageDropped': 'Liitettyä kuvaa ei otettu mukaan',
   'compose.pastedImagesDropped': 'Liitettyjä kuvia ei otettu mukaan',
   'compose.pastedImagesDroppedDescription': 'Lähetä kuvat liittämällä ne tiedostoina.',

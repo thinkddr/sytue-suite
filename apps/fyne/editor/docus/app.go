@@ -195,9 +195,13 @@ func (a *App) t(clave string) string {
 	return a.T(clave, nil)
 }
 
+// mostrar pone lo que se enseña. Al volver a la portada la barra de la suite tiene que
+// saber que ya no hay barra de la app que acoger (el editor va en un armazón; la
+// portada, no): sin el aviso, en el teléfono se quedaba sin su marca.
 func (a *App) mostrar(o fyne.CanvasObject) {
 	a.raiz.Objects[0] = o
 	a.raiz.Refresh()
+	ui.RecolocarBarraSuite(a.raiz)
 }
 
 // Volver cierra el documento y enseña la portada, con la lista al día: el título o la
@@ -273,7 +277,7 @@ func (a *App) AbrirID(id, titulo string) {
 	}
 	ctx.PanelAjustes = func() fyne.CanvasObject { return folio.PanelAjustes(a.T) }
 	a.abierto = ab
-	a.mostrar(marco)
+	a.mostrar(marco.Montado())
 	// «Reintentar» del error vuelve a pedir el mismo documento, con el título que ya se sepa.
 	ab.ctx.Reintentar = func() { a.AbrirID(id, ab.ctx.Titulo) }
 	if a.Svc == nil {

@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Send alligevel",
   "compose.noAttachmentTitle": "Send uden vedhæftede filer",
   "compose.noDraftsFolder": "Mappen Kladder blev ikke fundet",
+  "compose.openFailed": "Beskededitoren kunne ikke åbnes. Prøv igen.",
   "compose.pastedImageDropped": "Det indsatte billede kom ikke med",
   "compose.pastedImagesDropped": "De indsatte billeder kom ikke med",
   "compose.pastedImagesDroppedDescription": "Vedhæft billeder som filer for at sende dem.",

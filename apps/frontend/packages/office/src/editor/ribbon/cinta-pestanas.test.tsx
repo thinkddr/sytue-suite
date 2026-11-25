@@ -15,6 +15,7 @@ import { render } from 'preact';
 import { docsT } from '../../i18n';
 import type { EditorContext } from '../types';
 import { Ribbon } from './Ribbon';
+import { EDITORES } from '../tipos/todos';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
@@ -51,7 +52,7 @@ async function montar(): Promise<HTMLElement> {
   const host = document.createElement('div');
   montado = host;
   document.body.appendChild(host);
-  render(<Ribbon ctx={contexto()} />, host);
+  render(<Ribbon ctx={contexto()} cuerpos={EDITORES.document.cuerpos} />, host);
   await tick();
   return host;
 }

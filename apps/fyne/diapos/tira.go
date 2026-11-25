@@ -55,8 +55,7 @@ type Miniatura struct {
 	// PowerPoint. nil = no se deja (solo lectura).
 	AlOcultar func()
 	// Rotulo traduce una clave del catálogo (para el nombre accesible).
-	Rotulo   func(clave string, n, total int) string
-	Variante tema.Variante
+	Rotulo func(clave string, n, total int) string
 
 	enfocada bool
 }
@@ -71,7 +70,7 @@ var (
 
 // NuevaMiniatura crea la miniatura de la diapositiva `i`.
 func NuevaMiniatura(m *Modelo, i int, alElegir func(int)) *Miniatura {
-	t := &Miniatura{M: m, Indice: i, AlElegir: alElegir, Variante: tema.Claro}
+	t := &Miniatura{M: m, Indice: i, AlElegir: alElegir}
 	t.ExtendBaseWidget(t)
 	return t
 }
@@ -180,26 +179,30 @@ const atenuadoOculta = 0.6
 func (t *Miniatura) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
 
 // CreateRenderer compone la miniatura: la diapositiva escalada, el anillo de activa y
-// el número.
+// el número. Los colores son los del tema EN VIGOR y se resuelven en Refresh: la
+// miniatura guardaba la variante que le daba el editor al componer el carril, y al
+// cambiar de tema en caliente el anillo, la placa del número y los marcadores de la
+// diapositiva seguían en el anterior.
 func (t *Miniatura) CreateRenderer() fyne.WidgetRenderer {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	l := NuevoLienzo(t.M, t.Indice)
-	l.Variante = t.Variante
+	l.AlTema = true
 	l.AlinearDefecto = "center"
 	// El número va en `text-2xs` sobre `bg-bg-subtle`, redondeado y con `leading-4`.
-	placa := canvas.NewRectangle(tema.Color("bg-subtle", t.Variante))
+	placa := canvas.NewRectangle(tema.Color("bg-subtle", v))
 	placa.CornerRadius = tema.RadioSM
-	num := ui.Texto(strconv.Itoa(t.Indice+1), tema.Texto2XS, ui.Normal, tema.Color("text-muted", t.Variante))
+	num := ui.Texto(strconv.Itoa(t.Indice+1), tema.Texto2XS, ui.Normal, tema.Color("text-muted", v))
 	r := &miniaturaRenderer{
 		t:      t,
 		lienzo: l,
 		// La web pinta el anillo con `box-shadow: 0 0 0 2px`, que va POR FUERA. `Aro`
 		// es esa misma receta y ya la tiene medida.
-		aro:   ui.NuevoAroCon("primary", tema.RadioSM, 0, t.Variante),
-		velo:  canvas.NewRectangle(tokens.ConAlfa(tema.Color("surface", t.Variante), atenuadoOculta)),
+		aro:   ui.NuevoAroCon("primary", tema.RadioSM, 0, v),
+		velo:  canvas.NewRectangle(tokens.ConAlfa(tema.Color("surface", v), atenuadoOculta)),
 		placa: placa,
 		num:   num,
 		// `line-through` del número de una oculta: una raya de 1 px a media altura.
-		tachon: canvas.NewRectangle(tema.Color("text-muted", t.Variante)),
+		tachon: canvas.NewRectangle(tema.Color("text-muted", v)),
 	}
 	// El aro va al PRINCIPIO: `foco.go` lo dice y aquí se ve — puesto detrás del
 	// lienzo se ve el anillo de 2 px que sobresale; puesto delante, el rectángulo del
@@ -246,11 +249,16 @@ func (r *miniaturaRenderer) Layout(t fyne.Size) {
 }
 
 func (r *miniaturaRenderer) Refresh() {
-	r.lienzo.Variante = r.t.Variante
-	r.aro.Pintar(r.t.Variante)
-	r.placa.FillColor = tema.Color("bg-subtle", r.t.Variante)
-	r.num.Color = tema.Color("text-muted", r.t.Variante)
-	r.velo.FillColor = tokens.ConAlfa(tema.Color("surface", r.t.Variante), atenuadoOculta)
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	if r.lienzo.Variante != v {
+		// Fyne refresca el lienzo antes que la miniatura cuando recorre el árbol, pero no
+		// cuando se refresca ella sola: si su variante se ha quedado atrás, se rehace.
+		r.lienzo.Refresh()
+	}
+	r.aro.Pintar(v)
+	r.placa.FillColor = tema.Color("bg-subtle", v)
+	r.num.Color = tema.Color("text-muted", v)
+	r.velo.FillColor = tokens.ConAlfa(tema.Color("surface", v), atenuadoOculta)
 	r.tachon.FillColor = r.num.Color
 	r.Layout(r.t.Size())
 	canvas.Refresh(r.t)

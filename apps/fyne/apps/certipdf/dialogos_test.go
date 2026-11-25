@@ -659,15 +659,24 @@ func TestFirmarAlEstrechoEsElDeLaWeb(t *testing.T) {
 	if len(casillas) != 2 || pagina == nil {
 		t.Fatalf("la fila del recuadro no está: %d casillas, página %v", len(casillas), pagina != nil)
 	}
-	for i, c := range []struct{ x, ancho float32 }{{24, 89.1875}, {129.1875, 84.96875}} {
-		casiTexto(t, "la casilla x", absoluta(casillas[i]).X, c.x)
-		casiTexto(t, "la casilla ancho", casillas[i].Size().Width, c.ancho)
-		cerca(t, "la casilla y", absoluta(casillas[i]).Y, 364.57813)
-		cerca(t, "la casilla alto", casillas[i].Size().Height, 48)
+	// Por debajo de `sm` las casillas y la página van una debajo de otra (`max-sm:flex-col
+	// gap-2`), cada una en un renglón: en fila eran tres columnas con el rótulo partido en
+	// tres (auditoría del 2026-11-24).
+	y := absoluta(casillas[0]).Y
+	cerca(t, "la primera casilla y", y, 364.57813)
+	for i, c := range casillas {
+		casiTexto(t, "la casilla x", absoluta(c).X, 24)
+		cerca(t, "la casilla y", absoluta(c).Y, y)
+		if alto := c.Size().Height; alto > tema.TextoXS.Linea+1 {
+			t.Errorf("la casilla %d mide %v de alto: su rótulo se parte", i, alto)
+		}
+		y += c.Size().Height + tema.Espacio(2)
 	}
-	casiTexto(t, "la página x", absoluta(pagina).X, 272)
-	cerca(t, "la página y", absoluta(pagina).Y, 375.57813)
-	selectorDePosicionComoLaWeb(t, objs, absoluta(casillas[0]).Y+48+tema.Espacio(3), 24, 108, 44)
+	if absoluta(pagina).X <= 24 || absoluta(pagina).Y < y-tema.Espacio(2) {
+		t.Errorf("«En la página» está en %v; va en su renglón, bajo las casillas (y ≥ %v)", absoluta(pagina), y-tema.Espacio(2))
+	}
+	fin := absoluta(pagina).Y + pagina.Size().Height
+	selectorDePosicionComoLaWeb(t, objs, fin+tema.Espacio(3), 24, 108, 44)
 }
 
 // selectorDePosicionComoLaWeb mide `PosicionDeFirma` contra Chromium: el fieldset

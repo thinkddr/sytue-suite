@@ -239,8 +239,10 @@ func (p *Pantalla) marco() fyne.CanvasObject {
 	p.rellenarMenu()
 	if p.arm == nil {
 		p.arm = ui.NuevoArmazon(nil)
-		// El cajón se abre con el botón del carril o con el de `main`, como en la web.
-		p.arm.SinBarraMovil = true
+		// El cajón se abre con el botón del carril en ancho y, por debajo de 768, con el
+		// «☰» de la barra móvil del armazón, que en el teléfono va DENTRO de la barra de
+		// la suite. Era un botón propio en una caja sobre la vista (`#erp-cajon-boton`):
+		// dos barras, una con la marca y otra solo con el «☰».
 		p.arm.AlCajon = func(abierto bool) { p.cajon = abierto }
 		p.arm.AlPulsar = func() { p.cajon = false; p.Repintar() }
 	}
@@ -285,16 +287,8 @@ func (p *Pantalla) principal(v tema.Variante) fyne.CanvasObject {
 	if fs := p.franjasPeticion(); len(fs) > 0 {
 		contenido = container.New(ui.Columna{}, append(fs, contenido)...)
 	}
-	var cajon *BotonCajon
-	if movil {
-		cajon = NuevoBotonCajon(p.t("nav.menu"), p.abrirCajon)
-	}
-	m := &mainERP{cajon: cajon, contenido: contenido}
-	hijos := []fyne.CanvasObject{}
-	if cajon != nil {
-		hijos = append(hijos, cajon)
-	}
-	hijos = append(hijos, contenido)
+	m := &mainERP{contenido: contenido}
+	hijos := []fyne.CanvasObject{contenido}
 	// ERP usa el lienzo del armazón compartido: bg en claro/oscuro y el fondo
 	// canónico traslúcido, como .erp-main de app.css.
 	p.scrollMain = container.NewVScroll(container.New(m, hijos...))

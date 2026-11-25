@@ -38,6 +38,8 @@ type celdaMes struct {
 	ocultas  int
 	// reserva es el alto del carril de barras de su semana (`barsAreaH`).
 	reserva float32
+	// dosLineas: su única píldora sigue en una segunda línea (`dosLineas` de la web).
+	dosLineas bool
 	// destino: aquí caería el evento que se está arrastrando (`arrastremes.go`).
 	destino bool
 }
@@ -105,6 +107,7 @@ func (c *celdaMes) CreateRenderer() fyne.WidgetRenderer {
 	r.objetos = []fyne.CanvasObject{r.fondo, r.der, r.abajo, r.circulo, r.numero}
 	for _, o := range c.visibles {
 		p, obj := nuevaPildoraMes(c.m, o, v)
+		p.dosLineas = c.dosLineas
 		r.pildoras = append(r.pildoras, p)
 		r.objetos = append(r.objetos, obj)
 	}

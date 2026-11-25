@@ -16,6 +16,7 @@ import { DEFAULT_LOCALE, LOCALES } from '@sytue/i18n';
 import { appForKey, Badge, Glifo, ProductIcon } from '@sytue/ui';
 import { appDomains } from '@sytue/config';
 import MarketingLayout from '../../../layouts/MarketingLayout.astro';
+import type { ImageMetadata } from 'astro';
 import Captura from '../../../components/Captura.astro';
 import { localeFromParam, localeParams, localePath, useT } from '../../../i18n';
 import {
@@ -72,12 +73,14 @@ const abrible = sePuedeAbrir(key);
 // Si falta la de este idioma se usa la del idioma por defecto, y solo si tampoco
 // está se queda sin imagen. Una tanda que falla en un idioma suelto —pasa: una
 // sesión que caduca a mitad— no puede dejar la ficha peor de lo que estaba.
-const capturas = import.meta.glob<string>('../../../capturas/*.webp', {
+//
+// Llegan como imagen de `astro:assets` y no como URL: `Captura` saca de cada una
+// varios anchos para `srcset` (la de 2880 px se pintaba a 362 en el teléfono).
+const capturas = import.meta.glob<ImageMetadata>('../../../capturas/*.webp', {
   eager: true,
-  query: '?url',
   import: 'default',
 });
-const capturaDe = (nombre: string): string | undefined =>
+const capturaDe = (nombre: string): ImageMetadata | undefined =>
   capturas[`../../../capturas/${nombre}.${locale}.webp`] ??
   capturas[`../../../capturas/${nombre}.${DEFAULT_LOCALE}.webp`];
 const capturaPrincipal = capturaDe(key);

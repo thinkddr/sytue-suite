@@ -72,6 +72,8 @@ export const sk: Catalog = {
   'vault.emptyUnderstood': 'Rozumiem, že údaje zašifrované strateným kľúčom sa odstránia',
   'vault.failed':
     'Šifrované údaje sa nepodarilo otvoriť. Skúste to znova alebo sa znova prihláste do Sytue ID. Ak sa kľúč stratil, môžete šifrované údaje tejto aplikácie vyprázdniť.',
+  'vault.moreInfo': 'Ďalšie informácie',
+  'vault.attention': 'Tvoje šifrované údaje vyžadujú pozornosť',
   'matrix.incoming': 'Overiť toto zariadenie',
   'matrix.match': 'Zhodujú sa',
   'matrix.mismatch': 'Nezhodujú sa',

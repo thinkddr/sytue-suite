@@ -124,17 +124,15 @@ func (r *Repository) initialize(ctx context.Context) error {
 		return ErrNotReady
 	}
 	if state.Mode == "legacy" {
-		operation, err := r.historicalInitialization(ctx)
+		state, err = r.startLegacyMigration(ctx, binding)
 		if err != nil {
 			return err
 		}
-		if err := operation.authorizeCurrent(ctx); err != nil {
-			return err
-		}
-		state, err = r.beginMigration(ctx, binding)
-		if err != nil {
-			return err
-		}
+	}
+	// Lo que dejaron dos importaciones a la vez (dos copias de una fila, dos
+	// recibos) se junta antes de mirar el recibo: si no, no abriría nunca.
+	if err := r.mergeImportCopies(ctx, binding, state.Epoch); err != nil {
+		return err
 	}
 	found, err := r.completed(ctx, state)
 	if err != nil {
@@ -147,8 +145,27 @@ func (r *Repository) initialize(ctx context.Context) error {
 		return ErrNotReady
 	}
 	if state.Mode != "frozen" {
-		return ErrSource
+		return refuse("source_mode", ErrSource)
 	}
+	return r.importFrozen(ctx, binding, state)
+}
+
+// startLegacyMigration empieza a migrar una fuente todavía en `legacy`: con la
+// autorización vigente de la lectura histórica, la congela en una época nueva.
+func (r *Repository) startLegacyMigration(ctx context.Context, binding storage.Binding) (storage.LegacyMigrationState, error) {
+	operation, err := r.historicalInitialization(ctx)
+	if err != nil {
+		return storage.LegacyMigrationState{}, err
+	}
+	if err := operation.authorizeCurrent(ctx); err != nil {
+		return storage.LegacyMigrationState{}, err
+	}
+	return r.beginMigration(ctx, binding)
+}
+
+// importFrozen importa la fuente ya congelada, junta las copias repetidas que deje
+// otra importación a la vez, publica el recibo y termina de inicializar.
+func (r *Repository) importFrozen(ctx context.Context, binding storage.Binding, state storage.LegacyMigrationState) error {
 	operation, err := r.historicalInitialization(ctx)
 	if err != nil {
 		return err
@@ -161,6 +178,9 @@ func (r *Repository) initialize(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := r.mergeImportCopies(ctx, binding, state.Epoch); err != nil {
+		return err
+	}
 	if err := r.publishCompletion(ctx, binding, receipt); err != nil {
 		return err
 	}
@@ -168,8 +188,10 @@ func (r *Repository) initialize(ctx context.Context) error {
 }
 
 func (r *Repository) beginMigration(ctx context.Context, binding storage.Binding) (storage.LegacyMigrationState, error) {
+	// La fuente volvió a `legacy` (se soltó) con la bóveda llena: importar encima
+	// mezclaría dos épocas. Se sale vaciando la bóveda (la puerta lo ofrece).
 	if r.hasPrivateItems() {
-		return storage.LegacyMigrationState{}, ErrSource
+		return storage.LegacyMigrationState{}, refuse("begin_items", ErrSource)
 	}
 	key := "begin_" + digest([]byte(binding.Target.DeviceID))
 	var work beginWork
@@ -228,7 +250,7 @@ func (r *Repository) importSnapshot(ctx context.Context, binding storage.Binding
 		}
 	}
 	if inventory.rows != state.Rows || inventory.blobs != state.Blobs {
-		return completion{}, ErrSource
+		return completion{}, refuse("inventory", ErrSource)
 	}
 	return completion{Kind: migrationKind, Epoch: state.Epoch, Rows: inventory.rows, Blobs: inventory.blobs, InventorySHA256: hex.EncodeToString(inventory.sum.Sum(nil))}, nil
 }
@@ -248,7 +270,7 @@ func (r *Repository) importPage(ctx context.Context, binding storage.Binding, in
 			inventory.blobs++
 		}
 		if inventory.rows > inventory.state.Rows || inventory.blobs > inventory.state.Blobs {
-			return ErrSource
+			return refuse("inventory", ErrSource)
 		}
 		inventory.cursor = storage.LegacySourceCursor{Kind: row.Kind, ID: row.ID}
 	}
@@ -340,26 +362,50 @@ func (r *Repository) completed(ctx context.Context, state storage.LegacyMigratio
 	if len(versions) == 0 {
 		return false, nil
 	}
-	if len(versions) != 1 {
-		return false, ErrConflict
+	// Dos importaciones que terminan a la vez dejan dos recibos. Valen si todos
+	// dicen lo mismo (época, filas, ficheros e inventario) y cada uno es válido:
+	// no hay nada que elegir. Inventarios distintos son lecturas distintas de la
+	// fuente: conflicto, como siempre.
+	if len(versions) > 16 {
+		return false, refuse("receipt", ErrConflict)
 	}
-	version := versions[0]
-	var receipt completion
-	if json.Unmarshal(version.Commit.Metadata, &receipt) != nil || receipt.Kind != migrationKind || receipt.Epoch != state.Epoch || receipt.Rows != state.Rows || receipt.Blobs != state.Blobs || !validHash(receipt.InventorySHA256) {
-		return false, ErrSource
+	receipts := make([]completion, len(versions))
+	for i, version := range versions {
+		if json.Unmarshal(version.Commit.Metadata, &receipts[i]) != nil {
+			return false, ErrSource
+		}
+		if receipts[i] != receipts[0] {
+			return false, refuse("receipt", ErrConflict)
+		}
+	}
+	for i, version := range versions {
+		if err := r.checkReceipt(ctx, state, version, receipts[i]); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// checkReceipt comprueba un recibo de la época: que diga lo mismo que la fuente
+// congelada y que su registro cifrado sea exactamente el que publica la cabeza.
+func (r *Repository) checkReceipt(ctx context.Context, state storage.LegacyMigrationState, version storage.ObjectVersion, receipt completion) error {
+	if receipt.Kind != migrationKind || receipt.Epoch != state.Epoch || receipt.Rows != state.Rows || receipt.Blobs != state.Blobs || !validHash(receipt.InventorySHA256) {
+		return ErrSource
 	}
 	pointer := version.Commit.Content
 	if version.Commit.State != "live" || pointer == nil || pointer.Kind != "record" {
-		return false, ErrSource
+		return ErrSource
 	}
 	record, err := r.cfg.Crypto.ReadStorageRecord(ctx, pointer.Reference, version.ObjectID, "content")
 	if err != nil {
-		return false, err
+		return err
 	}
-	if record.Validate(r.cfg.Scope) != nil || record.ObjectID != version.ObjectID || record.RevisionID != pointer.RevisionID || record.Role != "content" || !bytes.Equal(record.Payload, version.Commit.Metadata) {
-		return false, ErrSource
+	valid := record.Validate(r.cfg.Scope) == nil && record.ObjectID == version.ObjectID && record.RevisionID == pointer.RevisionID && record.Role == "content" && bytes.Equal(record.Payload, version.Commit.Metadata)
+	clear(record.Payload)
+	if !valid {
+		return ErrSource
 	}
-	return true, nil
+	return nil
 }
 
 func (r *Repository) importRow(ctx context.Context, binding storage.Binding, epoch string, row storage.LegacySourceRow) error {
@@ -384,8 +430,10 @@ func (r *Repository) importRow(ctx context.Context, binding storage.Binding, epo
 			existing = append(existing, version)
 		}
 	}
+	// Las copias idénticas de otra importación ya se juntaron (mergeImportCopies):
+	// varias cabezas aquí son revisiones distintas de la fila, un conflicto de verdad.
 	if len(existing) > 1 {
-		return ErrConflict
+		return refuse("row_heads", ErrConflict)
 	}
 	if len(existing) == 1 {
 		return r.confirmImportedRow(ctx, workID, item, row, existing[0])
@@ -421,7 +469,7 @@ func (r *Repository) confirmImportedRow(ctx context.Context, workID string, item
 		return err
 	}
 	if prior.Epoch != item.Epoch || !bytes.Equal(raw, row.Payload) {
-		return ErrSource
+		return refuse("row_mismatch", ErrSource)
 	}
 	if data.Binary != nil {
 		if err := r.readBody(ctx, data.observation, *data.Binary, prior, "binary", io.Discard); err != nil {

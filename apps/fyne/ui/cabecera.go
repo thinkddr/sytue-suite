@@ -78,11 +78,34 @@ type CabeceraApp struct {
 // tituloVisible es el título que se pinta: ninguno si lo dice ya la barra única.
 func (c *CabeceraApp) tituloVisible() string {
 	if c.RepiteLaBarra {
-		if l := lienzoDe(c); l != nil && l.Size().Width < Estrecho && barraSuiteDe(l) != nil {
+		l := lienzoDe(c)
+		if l == nil || barraSuiteDe(l) == nil {
+			// Aún sin montar: quien reparte la columna la mide ANTES de colgarla (Contacts
+			// guarda su alto en `franjas`), y sin lienzo no se sabe dónde va. Se mira la
+			// ventana de la app con la barra de la suite, que es donde va a ir: con el título
+			// contado, la franja reservaba la línea vacía aunque luego no se pintara.
+			l = lienzoConBarraSuite()
+		}
+		if l != nil && l.Size().Width < Estrecho && barraSuiteDe(l) != nil {
 			return ""
 		}
 	}
 	return c.Titulo
+}
+
+// lienzoConBarraSuite es el de la primera ventana de la app montada bajo la barra de la
+// suite, o nil.
+func lienzoConBarraSuite() fyne.Canvas {
+	a := fyne.CurrentApp()
+	if a == nil {
+		return nil
+	}
+	for _, w := range a.Driver().AllWindows() {
+		if barraSuiteDe(w.Canvas()) != nil {
+			return w.Canvas()
+		}
+	}
+	return nil
 }
 
 var _ fyne.Widget = (*CabeceraApp)(nil)
@@ -105,8 +128,12 @@ func (c *CabeceraApp) AccessibilityRole() fyne.AccessibleRole { return fyne.Acce
 // el alto de la línea del título y el de TODAS las de las acciones, que con su propio
 // `flex-wrap` pueden ser varias. `filas` son cuántas acciones van en cada una.
 type repartoCabecera struct {
-	envuelve       bool
-	desliza        bool
+	envuelve bool
+	desliza  bool
+	// soloAcciones: el título está escondido (lo dice la barra única) y no hay marca ni
+	// subtítulo. Las acciones van en la PRIMERA línea, a la derecha, y no hay `min-h-12`
+	// (`max-md:min-h-0 max-md:justify-end` de SectionHeader); sin acciones, no ocupa.
+	soloAcciones   bool
 	linea1, linea2 float32
 	filas          []filaAcciones
 }
@@ -146,6 +173,9 @@ func envolverAcciones(acciones []fyne.CanvasObject, ancho float32) []filaAccione
 
 func repartir(c *CabeceraApp, ancho float32) repartoCabecera {
 	var r repartoCabecera
+	if c.RepiteLaBarra && c.tituloVisible() == "" && c.Subtitulo == "" && c.marca() == nil {
+		return repartirSoloAcciones(c, ancho)
+	}
 	r.linea1 = EscalonTitulo(4).Linea
 	if c.Subtitulo != "" {
 		r.linea1 += tema.TextoSM.Linea
@@ -173,7 +203,13 @@ func repartir(c *CabeceraApp, ancho float32) repartoCabecera {
 	// pone en móvil. Apilar dos o tres filas de botones sobre la lista robaba
 	// la pantalla que la lista venía a usar. `linea2` ya quedó arriba con el
 	// alto del botón más alto, que es el de la tira.
-	if r.envuelve && EsTactil() {
+	//
+	// Y TAMBIÉN CON PUNTERO cuando una acción sola ya no cabe en la línea: las acciones
+	// de una app que van en UN grupo (las de Contacts: libreta, etiqueta, duplicados e
+	// «Importar / Exportar») no se pueden repartir entre ellas, y el grupo se salía de la
+	// columna de 320 por encima del lector (auditoría del 2026-11-24). En la tira se
+	// recortan, se alcanzan con la rueda y el tabulador, y el difuminado dice que hay más.
+	if r.envuelve && (EsTactil() || algunaNoCabe(c.Acciones, ancho-2*cabeceraPX)) {
 		r.desliza = true
 		r.filas = nil
 		return r
@@ -193,6 +229,35 @@ func repartir(c *CabeceraApp, ancho float32) repartoCabecera {
 	return r
 }
 
+// algunaNoCabe dice si alguna acción, sola, es más ancha que la línea.
+func algunaNoCabe(acciones []fyne.CanvasObject, ancho float32) bool {
+	for _, a := range acciones {
+		if a.MinSize().Width > ancho {
+			return true
+		}
+	}
+	return false
+}
+
+// repartirSoloAcciones es la cabecera con el título escondido por la barra única: SIN la
+// línea del título, que reservaba ~40 px vacíos encima de las acciones en el teléfono. Las
+// acciones van en esa única línea, a la derecha; si no caben, en la tira deslizable a todo
+// el ancho, también en ella.
+func repartirSoloAcciones(c *CabeceraApp, ancho float32) repartoCabecera {
+	r := repartoCabecera{soloAcciones: true}
+	acciones := float32(0)
+	for i, a := range c.Acciones {
+		m := a.MinSize()
+		if i > 0 {
+			acciones += huecoAcc
+		}
+		acciones += m.Width
+		r.linea1 = max(r.linea1, m.Height)
+	}
+	r.desliza = len(c.Acciones) > 0 && ancho > 0 && acciones > ancho-2*cabeceraPX
+	return r
+}
+
 // MedidaCabeceraApp es lo que ocupa: el `min-h-12` o, si el contenido pasa de ahí, el
 // contenido con su relleno y su filete. Con las acciones en su segunda fila, las dos
 // líneas y su `gap-y-2`.
@@ -202,6 +267,12 @@ func MedidaCabeceraApp(c *CabeceraApp) fyne.Size {
 		ancho = c.Size().Width
 	}
 	r := repartir(c, ancho)
+	if r.soloAcciones {
+		if len(c.Acciones) == 0 {
+			return fyne.NewSize(0, 0) // `max-md:hidden`
+		}
+		return fyne.NewSize(0, r.linea1+2*cabeceraPYv+tema.Borde)
+	}
 	contenido := r.linea1
 	if r.envuelve {
 		contenido += huecoLineasCab + r.linea2
@@ -281,8 +352,11 @@ func (r *cabeceraRenderer) prepararTira(rep repartoCabecera) {
 	if !rep.desliza || r.tira != nil {
 		return
 	}
-	r.tira = NuevaTiraDeslizable(rep.linea2, huecoAcc, r.c.Acciones...)
+	r.tira = NuevaTiraDeslizable(max(rep.linea1, rep.linea2), huecoAcc, r.c.Acciones...)
 	r.tira.AnchoPropio = true
+	// Lo que no cabe se funde con el fondo de la cabecera: «Importar / Exportar» cortado
+	// a tijera parecía un botón roto, no uno que sigue a la derecha.
+	r.tira.Difuminar = "surface"
 	r.objetosEnTira = append(append([]fyne.CanvasObject{}, r.objetos[:r.objetosFijos]...), r.tira)
 }
 
@@ -293,6 +367,9 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
 	r.fondo.TopLeftCornerRadius, r.fondo.TopRightCornerRadius = c.RadioArriba, c.RadioArriba
 	r.filete.Move(fyne.NewPos(0, t.Height-tema.Borde))
+	// Sin alto (el título lo dice la barra y no hay acciones) no se pinta ni el filete,
+	// que quedaría un píxel por encima, sobre lo de arriba.
+	r.filete.Hidden = t.Height < tema.Borde
 	r.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
 
 	rep := repartir(c, t.Width)
@@ -315,6 +392,10 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	}
 	der := t.Width - cabeceraPX
 	switch {
+	case rep.desliza && rep.soloAcciones:
+		// Sin título: la tira es la única línea.
+		r.tira.Move(fyne.NewPos(cabeceraPX, y1))
+		r.tira.Resize(fyne.NewSize(t.Width-2*cabeceraPX, rep.linea1))
 	case rep.desliza:
 		// La tira ocupa la segunda línea entera; el título conserva su ancho,
 		// como con la envoltura (las acciones ya no están a su derecha).

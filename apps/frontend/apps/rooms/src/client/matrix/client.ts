@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { type SuiteMatrix, MatrixSecurityError } from '@sytue/offline/matrix';
+// Rooms vive en Matrix: el valor del SDK, de su propio subpath (el índice lo da solo
+// como tipo para que las apps de la bóveda no lo bajen).
+export { SuiteMatrix as RoomsMatrix } from '@sytue/offline/matrix/client';
 export {
-  SuiteMatrix as RoomsMatrix,
   safeAttachmentType,
   validCallContent,
   type MatrixRecoveryUI,

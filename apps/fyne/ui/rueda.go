@@ -77,7 +77,7 @@ type Rueda struct {
 	mu     sync.Mutex
 	tinta  color.NRGBA
 	angulo float64
-	anim   *fyne.Animation
+	giro   animacionSinFin
 }
 
 var (
@@ -149,31 +149,19 @@ func (r *Rueda) arrancar(raster *canvas.Raster) {
 	if MenosMovimiento() {
 		return
 	}
-	a := fyne.NewAnimation(DuracionRueda, func(p float32) {
+	r.giro.arrancar(DuracionRueda, func(p float32) {
 		r.mu.Lock()
 		r.angulo = 2 * math.Pi * float64(p)
 		r.mu.Unlock()
 		raster.Refresh()
 	})
-	a.Curve = fyne.AnimationLinear
-	a.RepeatCount = fyne.AnimationRepeatForever
-	r.mu.Lock()
-	r.anim = a
-	r.mu.Unlock()
-	a.Start()
 }
 
-// Parar detiene el giro. Lo llama el renderer al destruirse; una pantalla que esconde
-// la rueda sin quitarla del árbol puede llamarlo también.
-func (r *Rueda) Parar() {
-	r.mu.Lock()
-	a := r.anim
-	r.anim = nil
-	r.mu.Unlock()
-	if a != nil {
-		a.Stop()
-	}
-}
+// Parar detiene el giro para siempre: ya no lo despierta volver a pintarse. Lo llama el
+// renderer al destruirse. Una rueda que se esconde o sale del árbol deja de girar sola
+// (animacionSinFin) y vuelve a girar al pintarse otra vez, así que no hace falta pararla
+// para eso.
+func (r *Rueda) Parar() { r.giro.parar() }
 
 // pintar rasteriza el anillo y el arco en w×h píxeles de DISPOSITIVO.
 //
@@ -257,8 +245,11 @@ type ruedaRenderer struct {
 	raster *canvas.Raster
 }
 
-func (rr *ruedaRenderer) MinSize() fyne.Size           { return MedidaRueda(rr.r.Lado) }
-func (rr *ruedaRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{rr.raster} }
-func (rr *ruedaRenderer) Destroy()                     { rr.r.Parar() }
-func (rr *ruedaRenderer) Layout(t fyne.Size)           { rr.raster.Resize(t) }
-func (rr *ruedaRenderer) Refresh()                     { rr.raster.Refresh() }
+func (rr *ruedaRenderer) MinSize() fyne.Size { return MedidaRueda(rr.r.Lado) }
+func (rr *ruedaRenderer) Objects() []fyne.CanvasObject {
+	rr.r.giro.pintada()
+	return []fyne.CanvasObject{rr.raster}
+}
+func (rr *ruedaRenderer) Destroy()           { rr.r.Parar() }
+func (rr *ruedaRenderer) Layout(t fyne.Size) { rr.raster.Resize(t) }
+func (rr *ruedaRenderer) Refresh()           { rr.raster.Refresh() }

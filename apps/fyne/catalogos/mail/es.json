@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Enviar igual",
   "compose.noAttachmentTitle": "Enviar sin adjuntos",
   "compose.noDraftsFolder": "No se encontró la carpeta Borradores",
+  "compose.openFailed": "No se pudo abrir el editor del mensaje. Inténtalo otra vez.",
   "compose.pastedImageDropped": "La imagen pegada no se ha incluido",
   "compose.pastedImagesDropped": "Las imágenes pegadas no se han incluido",
   "compose.pastedImagesDroppedDescription": "Para enviar imágenes, adjúntalas como archivos.",

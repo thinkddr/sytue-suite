@@ -453,6 +453,7 @@ export const sv: AppCatalog<typeof en> = {
   'compose.templates': 'Mallar',
   'compose.templatesEmpty': 'Inga mallar än. Skapa dem i inställningarna för Mail.',
   'compose.attachFailed': 'Bilagan kunde inte läsas',
+  'compose.openFailed': 'Meddelandeeditorn kunde inte öppnas. Försök igen.',
   'compose.pastedImageDropped': 'Den inklistrade bilden togs inte med',
   'compose.pastedImagesDropped': 'De inklistrade bilderna togs inte med',
   'compose.pastedImagesDroppedDescription': 'Bifoga bilder som filer för att skicka dem.',

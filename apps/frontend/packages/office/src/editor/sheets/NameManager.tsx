@@ -16,7 +16,7 @@ import { EditorIcon } from '../icons';
 import { POPOVER_SHELL, usePopover } from '../ribbon/primitives';
 import type { DefinedName } from '../types';
 import { nameError, normalizeRef } from './nombres';
-import { dispatchSheetCommand, readSheetState } from './SheetCanvas';
+import { dispatchSheetCommand, readSheetState } from './mando';
 
 /** Lo que se está escribiendo; `prev` = el nombre que se edita (null: uno nuevo). */
 interface Draft {

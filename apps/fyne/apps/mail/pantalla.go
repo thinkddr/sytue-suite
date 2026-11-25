@@ -183,6 +183,9 @@ func (p *Pantalla) Refrescar() {
 		p.Movil.Refresh()
 	}
 	p.Menu.EnAjustes = p.Ajustes != nil
+	// El menú se rehace con cada dato: el de antes, y el panel o la página que se
+	// descuelguen, se sueltan en cuanto lo nuevo está colocado (ui.SoltarArboles).
+	viejos := []fyne.CanvasObject{p.armazon.Menu, p.armazon.Panel, p.armazon.Contenido}
 	switch {
 	case p.Ajustes != nil:
 		// Sin lista: la página se lleva todo el ancho, también en el teléfono (sin
@@ -203,7 +206,14 @@ func (p *Pantalla) Refrescar() {
 	p.armazon.Refresh()
 	p.Bandeja.Refresh()
 	p.Lector.Refresh()
+	// La bandeja, el lector y la franja se reutilizan aunque ahora no se vean (en la
+	// página de ajustes, o sin buzón compartido).
+	soltarArboles(viejos, p.armazon, p.bandeja, p.Lector, p.Franja)
 }
+
+// soltarArboles es `ui.SoltarArboles`; el guardián de la memoria retenida lo cambia para
+// medir sin él.
+var soltarArboles = ui.SoltarArboles
 
 // Elegir abre una conversación: la marca en la lista y la pinta en el lector. Es la
 // única costura entre las dos columnas, y por eso está aquí y no dentro de ninguna.

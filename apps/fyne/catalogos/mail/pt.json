@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Enviar mesmo assim",
   "compose.noAttachmentTitle": "Enviar sem anexos",
   "compose.noDraftsFolder": "Não foi encontrada a pasta Rascunhos",
+  "compose.openFailed": "Não foi possível abrir o editor da mensagem. Tente de novo.",
   "compose.pastedImageDropped": "A imagem colada não foi incluída",
   "compose.pastedImagesDropped": "As imagens coladas não foram incluídas",
   "compose.pastedImagesDroppedDescription": "Para enviar imagens, anexe-as como ficheiros.",

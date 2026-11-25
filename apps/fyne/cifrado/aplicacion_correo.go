@@ -256,12 +256,15 @@ type anfitrionCorreo struct {
 	modo    modoPuerta
 	// pendiente es la bóveda entregada cuya clave de firma espera a que la persona
 	// vuelva a identificarse.
-	pendiente   *pqvault.Vault
-	recursos    recursosCorreo
-	repo        repositorioCorreo
-	vista       *ApplicationView
-	matrixLista bool
-	oferta      fyne.CanvasObject
+	pendiente *pqvault.Vault
+	// reidentificoSolo: ya se fue sola a Sytue ID por la clave de firma de esta
+	// cuenta en esta ejecución; si aún falta, se enseña la vista con sus botones.
+	reidentificoSolo map[auth.IdentitySnapshot]bool
+	recursos         recursosCorreo
+	repo             repositorioCorreo
+	vista            *ApplicationView
+	matrixLista      bool
+	oferta           fyne.CanvasObject
 
 	// Lo pedido por cuenta en esta ejecución.
 	traspasos map[auth.IdentitySnapshot]*marcaTraspaso
@@ -520,6 +523,16 @@ func (h *anfitrionCorreo) bovedaLista(life context.Context, owner auth.IdentityS
 		h.abrirCorreo(life, owner, ctx, vault)
 	case pqvault.SigningReauth:
 		h.pendiente = vault
+		// Sin pedir que pulse nada: se va a identificarse otra vez y se registra la
+		// clave (una vez; si no sale, la vista con sus botones).
+		if !h.reidentificoSolo[owner] {
+			if h.reidentificoSolo == nil {
+				h.reidentificoSolo = map[auth.IdentitySnapshot]bool{}
+			}
+			h.reidentificoSolo[owner] = true
+			h.registrarFirma(true) //nolint:contextcheck // Registrar la firma vive con la cuenta (h.life), no con la apertura de la puerta.
+			return
+		}
 		h.pedirIdentificacion()
 	case pqvault.SigningMissing, pqvault.SigningUnavailable:
 		vault.Close()
@@ -637,6 +650,7 @@ func (h *anfitrionCorreo) fallar(err error) {
 	h.decidirDestino(correoSinDecidir, auth.IdentitySnapshot{})
 	h.soltarBoveda()
 	vacio := ui.NuevoVacio(h.translate("matrix.failed"), "")
+	vacio.Tono = ui.VacioError // DS-06: es un fallo, no una lista vacía
 	vacio.Accion = ui.NuevoBoton(h.translate("action.retry"), h.reintentar)
 	h.enseñar(vacio)
 	if h.estado != nil {

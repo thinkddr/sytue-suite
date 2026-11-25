@@ -21,7 +21,7 @@
  */
 import type { JSX } from 'preact';
 import { useRef, useState } from 'preact/hooks';
-import { numToCol } from '@sytue/formula';
+import { numToCol } from '@sytue/formula/ligero';
 import { Input, Select, Checkbox } from '@sytue/ui';
 import type { CellValue, Engine } from '@sytue/formula';
 import type { ChartLegend, ChartSpec } from '../types';

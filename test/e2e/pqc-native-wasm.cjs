@@ -14,7 +14,8 @@ const jsonBytes = (value) => new TextEncoder().encode(JSON.stringify(value));
   const { instance } = await WebAssembly.instantiate(fs.readFileSync(bundle), go.importObject);
   void go.run(instance);
   const core = globalThis.sytuePqc;
-  assert.equal(core.module_id, 'core');
+  // El mismo sobre se abre en el núcleo completo (`core`) y en el de la bóveda (`vault`).
+  assert.ok(core.module_id === 'core' || core.module_id === 'vault');
   const invoke = (request) => {
     const result = core.invoke(request);
     assert.equal(result.ok, true);

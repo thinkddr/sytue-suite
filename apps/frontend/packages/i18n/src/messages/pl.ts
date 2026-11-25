@@ -74,6 +74,8 @@ export const pl: Catalog = {
   'vault.emptyUnderstood': 'Rozumiem, że dane zaszyfrowane utraconym kluczem zostaną usunięte',
   'vault.failed':
     'Nie udało się otworzyć zaszyfrowanych danych. Spróbuj ponownie lub zaloguj się ponownie do Sytue ID. Jeśli klucz został utracony, możesz opróżnić zaszyfrowane dane tej aplikacji.',
+  'vault.moreInfo': 'Więcej informacji',
+  'vault.attention': 'Twoje zaszyfrowane dane wymagają uwagi',
   'matrix.incoming': 'Zweryfikuj to urządzenie',
   'matrix.match': 'Zgadzają się',
   'matrix.mismatch': 'Nie zgadzają się',

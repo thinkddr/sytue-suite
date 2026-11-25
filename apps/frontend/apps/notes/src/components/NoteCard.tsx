@@ -596,6 +596,12 @@ export function NoteCard({
             {...arrastre}
             class={cx(
               'text-text-subtle hover:text-primary-text sytue-focus-ring grid shrink-0 cursor-grab touch-none place-items-center rounded-md select-none active:cursor-grabbing disabled:cursor-wait disabled:opacity-40 pointer-coarse:size-11',
+              // Con el dedo el asa mide 44 de alto para cogerla, pero la línea del título
+              // mide 24: sin devolver los 20 de más, la cabecera crecía hasta 44 y en el
+              // teléfono había más hueco entre el título y el cuerpo de una nota que entre
+              // una nota y la siguiente. El margen negativo deja la zona de toque y quita
+              // el alto, y la mantiene centrada en la primera línea. Lo mismo el «…».
+              'pointer-coarse:-my-2.5',
               diario
                 ? 'size-6 opacity-60 transition-opacity duration-150 sm:pointer-fine:absolute sm:pointer-fine:top-1.5 sm:pointer-fine:-left-5 sm:pointer-fine:opacity-0 sm:pointer-fine:group-focus-within:opacity-100 sm:pointer-fine:group-hover:opacity-100'
                 : '-mt-0.5 -ml-1 size-6',
@@ -747,7 +753,9 @@ export function NoteCard({
                 {...props}
                 label={t('common.more')}
                 size="sm"
-                class="opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                // `-my-2.5` con el dedo, como el asa: el «…» mide 44 para tocarlo y no
+                // tiene que estirar la cabecera más allá de la línea del título.
+                class="opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:-my-2.5 pointer-coarse:opacity-100"
               >
                 <Icon name="ellipsis" size={16} />
               </IconButton>

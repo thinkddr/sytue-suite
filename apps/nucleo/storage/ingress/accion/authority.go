@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-package matrixproof
+package accion
 
 import (
 	"strings"
@@ -20,7 +20,7 @@ type Authority struct {
 }
 
 func (a Authority) Validate(scope storage.Scope) error {
-	if a.Version != 1 || a.Scope != scope || !scope.Valid() || !validKey(a.RootKey) || a.Generation < 1 || a.Generation >= 1<<53 || !strings.HasPrefix(a.UserID, storage.IsolatedMatrixUserPrefix(scope)) || len(a.UserID) <= len(storage.IsolatedMatrixUserPrefix(scope)) || strings.ContainsAny(a.UserID, "\x00\r\n\t /?#\\") || len(a.UserID) > 255 {
+	if a.Version != 1 || a.Scope != scope || !scope.Valid() || !ValidKey(a.RootKey) || a.Generation < 1 || a.Generation >= 1<<53 || !strings.HasPrefix(a.UserID, storage.IsolatedMatrixUserPrefix(scope)) || len(a.UserID) <= len(storage.IsolatedMatrixUserPrefix(scope)) || strings.ContainsAny(a.UserID, "\x00\r\n\t /?#\\") || len(a.UserID) > 255 {
 		return ErrUnverified
 	}
 	switch a.Status {
@@ -70,7 +70,7 @@ type Authorization struct {
 }
 
 func (a Authorization) Validate(expected Action) error {
-	if a.Version != 1 || a.Authority.RequireActive(expected.Scope, expected.Generation) != nil || a.Authority.RootKey != expected.RootKey || a.Target != expected.Target || !validKey(a.SigningKey) || a.Nonce != expected.Nonce || a.RequestSHA256 != expected.RequestSHA256 {
+	if a.Version != 1 || a.Authority.RequireActive(expected.Scope, expected.Generation) != nil || a.Authority.RootKey != expected.RootKey || a.Target != expected.Target || !ValidKey(a.SigningKey) || a.Nonce != expected.Nonce || a.RequestSHA256 != expected.RequestSHA256 {
 		return ErrUnverified
 	}
 	return nil

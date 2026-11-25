@@ -42,7 +42,9 @@ func TestElMasDelMesDespliegaElDiaYNoCrea(t *testing.T) {
 	vista := p.vista()
 	w := test.NewWindow(vista)
 	t.Cleanup(w.Close)
-	w.Resize(fyne.NewSize(1024, 768))
+	// Alta para que en la semana quepan los cuatro carriles de la web (la barra y tres
+	// píldoras) y el «+N más»: con menos alto se ven menos y el número sube (CAL-08).
+	w.Resize(fyne.NewSize(1024, 1000))
 	m := vista.(*container.ThemeOverride).Content.(*container.Scroll).Content.(*Mes)
 	r := test.WidgetRenderer(m).(*mesRenderer)
 	var celda *celdaMes

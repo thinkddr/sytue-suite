@@ -48,6 +48,8 @@ export const fi: AppCatalog<typeof en> = {
   'list.unstar': 'Poista {name} tähdellä merkityistä',
   'list.starredTitle': 'Tähdellä merkityt',
   'list.reviewDuplicates': 'Tarkista kaksoiskappaleet ({count})',
+  'list.selectMode': 'Valitse',
+  'list.moreActions': 'Lisää toimintoja',
   'list.count': { one: '{count} yhteystieto', other: '{count} yhteystietoa' },
   'list.countFiltered': {
     one: '{shown}/{count} yhteystieto',

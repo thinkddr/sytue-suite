@@ -278,6 +278,17 @@ dialog::backdrop {
     0 0 0 3px var(--sytue-focus-ring);
 }
 
+/* Sobre RELLENO el anillo es del color del TEXTO, no del primario: el token de foco ES
+     el primario (#0f7680 en claro), así que en un botón primario el aro se fundía con su
+     relleno y lo único que se veía era el hueco de 1 px, como si el botón engordara.
+     El texto contrasta con la superficie del hueco y con cualquier relleno de acento, en
+     los tres temas. Se cambia el COLOR y no la sombra, como en el cromo, y por eso va
+     antes: un botón del cromo sigue con su aro blanco. */
+.sytue-focus-ring-inset,
+.sytue-focus-ring-inset-within {
+  --sytue-focus-ring: var(--sytue-text);
+}
+
 /* Sobre el CROMO (topbar, menú lateral), el aro es blanco (`--sytue-chrome-focus`):
      el azul se queda en 3,4:1 sobre el carril claro. Se cambia el COLOR y no la sombra.
      Lo que había era `focus-visible:shadow-[0_0_0_2px_var(--sytue-chrome-focus)]` en 27

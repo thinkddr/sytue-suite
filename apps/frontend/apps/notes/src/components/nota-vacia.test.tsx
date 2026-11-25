@@ -9,6 +9,7 @@
  * escribir, el aviso lleva el lápiz delante y ocupa todo el alto (`flex-1`). Fuera del
  * árbol, elegir una tarjeta no abre el editor: robaría el foco a quien solo mira.
  */
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

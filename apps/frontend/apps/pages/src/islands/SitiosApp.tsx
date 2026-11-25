@@ -1,6 +1,6 @@
 import type { JSX } from 'preact';
 import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
-import { Button, EmptyState, Badge, Skeleton } from '@sytue/ui';
+import { Button, EmptyState, Badge, Skeleton, marcarAppLista } from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { Marco } from '../components/Marco.js';
@@ -58,6 +58,12 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
   useEffect(() => {
     void cargarSitios();
   }, [cargarSitios]);
+
+  // `sytue:app-ready`: la lista de sitios ya está pintada (o su fallo). Lo que se
+  // presupuesta en vez del LCP.
+  useEffect(() => {
+    if (!cargando) marcarAppLista();
+  }, [cargando]);
 
   const restaurarSitio = async (id: string) => {
     setRestaurando(id);

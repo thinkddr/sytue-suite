@@ -8,10 +8,18 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Input, SectionHeader, useSondeo } from '@sytue/ui';
+import {
+  Button,
+  EmptyState,
+  Icon,
+  Input,
+  SectionHeader,
+  marcarAppLista,
+  useSondeo,
+} from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 import { useT, type T } from '../i18n/index.js';
 import { Marco } from '../components/Marco.js';
 import { CargandoRejilla, Fallo, REJILLA, useEnLinea } from '../components/Estados.js';
@@ -84,6 +92,12 @@ function HomeAppBody({ locale, user, hubBaseUrl }: Props): JSX.Element {
     return () => clearTimeout(id);
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
+
+  // `sytue:app-ready`: la portada ya enseña sus vídeos (o por qué no). Lo que se
+  // presupuesta en vez del LCP y lo que espera la bóveda para abrirse detrás.
+  useEffect(() => {
+    if (datos || fallo || !enLinea) marcarAppLista();
+  }, [datos, fallo, enLinea]);
 
   // Lo que se procesa o está en directo cambia solo: se refresca cada 20 s.
   const hayVivo =

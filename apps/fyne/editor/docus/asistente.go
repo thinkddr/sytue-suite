@@ -161,6 +161,27 @@ func (c PanelIA) Objeto(d DestinoIA) fyne.CanvasObject { return c.nuevo(d).objet
 
 func (c PanelIA) nuevo(d DestinoIA) *panelAsistente {
 	p := &panelAsistente{cfg: c, ctx: c.Ctx, d: d, idioma: idiomasIA[0]}
+	t := p.ctx.Traducir
+	p.chat = ui.NuevaAreaTexto(t("ai.chat.placeholder"))
+	p.chat.Filas = 3
+	p.respuesta = container.New(ui.Columna{Hueco: tema.Espacio(2)})
+	p.pintarRespuesta()
+	m := editor.MargenPanel // `p-3`
+	desliz := container.NewVScroll(container.New(layout.NewCustomPaddedLayout(m, m, m, m), p.cuerpo()))
+	// Los rótulos, el glifo, la raya y la caja de la respuesta llevan los colores ya
+	// resueltos: al cambiar de tema en caliente el panel se vuelve a componer —con la
+	// misma área de chat, que conserva lo escrito—, o se quedaba en el tema anterior.
+	p.objeto = ui.RehacerConElTema(desliz, func() {
+		desliz.Content = container.New(layout.NewCustomPaddedLayout(m, m, m, m), p.cuerpo())
+		p.pintarRespuesta()
+		desliz.Refresh()
+	})
+	return p
+}
+
+// cuerpo compone el panel con el tema en vigor, alrededor del área de chat y de la
+// respuesta, que se conservan.
+func (p *panelAsistente) cuerpo() fyne.CanvasObject {
 	t, v := p.ctx.Traducir, tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	seccion := func(clave string, contenido ...fyne.CanvasObject) fyne.CanvasObject {
 		rotulo := ui.NuevoVersal(t(clave), tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v))
@@ -176,7 +197,7 @@ func (c PanelIA) nuevo(d DestinoIA) *panelAsistente {
 		return container.New(&envuelta{hueco: tema.Espacio(1.5), ancho: anchoContenidoIA}, out...)
 	}
 	ambito := "ai.scope.document"
-	if _, sel := d.ContextoIA(); sel {
+	if _, sel := p.d.ContextoIA(); sel {
 		ambito = "ai.scope.selection"
 	}
 	glifo := iconos.TrazoEd(iconos.EdIA, iconos.TallaXS, "text-muted", v)
@@ -186,23 +207,16 @@ func (c PanelIA) nuevo(d DestinoIA) *panelAsistente {
 	}
 	idioma := editor.NuevoSelectorCinta(t("ai.lang.label"), anchoSelectorIdioma, opciones, p.idioma, func(k string) { p.idioma = k })
 	traducir := editor.NuevoBotonPequeno(t("ai.translate"), func() { p.pedir("traducir", t(p.idioma)) })
-	p.chat = ui.NuevaAreaTexto(t("ai.chat.placeholder"))
-	p.chat.Filas = 3
 	enviar := ui.NuevoBoton(t("ai.chat.send"), func() { p.pedir("chat", p.chat.Texto()) }).Con(ui.Primario, ui.TallaSM)
-	p.respuesta = container.New(ui.Columna{Hueco: tema.Espacio(2)})
-	p.pintarRespuesta()
-	cuerpo := container.New(ui.Columna{Hueco: tema.Espacio(2)},
+	return container.New(ui.Columna{Hueco: tema.Espacio(2)},
 		container.New(ui.Fila{Hueco: tema.Espacio(1.5)}, glifo.Objeto(), ui.NuevoRotulo(t(ambito), tema.TextoXS, ui.Normal, "text-muted")),
 		seccion("ai.section.actions", chips(accionesRapidasIA)),
 		seccion("ai.section.rewrite", chips(reescrituraIA)),
 		seccion("ai.section.translate", container.New(ui.Fila{Hueco: tema.Espacio(1.5)}, idioma, traducir)),
 		seccion("ai.section.chat", p.chat, container.New(alFinal{}, enviar)),
-		separador(v), // `border-t pt-3`
+		separador(), // `border-t pt-3`
 		p.respuesta,
 	)
-	m := editor.MargenPanel // `p-3`
-	p.objeto = container.NewVScroll(container.New(layout.NewCustomPaddedLayout(m, m, m, m), cuerpo))
-	return p
 }
 
 // contexto es el texto de la selección o, sin ella, el del documento; y si había selección.
@@ -379,9 +393,9 @@ func (f *Folio) AplicarIA(respuesta string, reemplazar bool) string {
 var anchoContenidoIA = editor.AnchoPanel - 2*editor.MargenPanel
 
 // separador es una raya de borde a lo ancho.
-func separador(v tema.Variante) fyne.CanvasObject {
-	r := canvas.NewRectangle(tema.Color("border", v))
-	r.SetMinSize(fyne.NewSize(0, tema.Borde))
+func separador() fyne.CanvasObject {
+	r := ui.NuevoLiso("border")
+	r.Minimo = fyne.NewSize(0, tema.Borde)
 	return r
 }
 

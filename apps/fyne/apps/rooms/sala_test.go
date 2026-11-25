@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	fcanvas "fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
@@ -813,34 +814,103 @@ func TestUnHiloQueNoCargaLoDice(t *testing.T) {
 	}
 }
 
-// TestLaCabeceraEstrechaLlevaHamburguesa: por debajo de `md` la banda lleva la
-// hamburguesa delante y solo «Ponme al día», buscar y llamar; lo demás es
-// `max-md:hidden`. La hamburguesa saca el carril como cajón, y elegir canal lo recoge.
+// TestLaCabeceraEstrechaSubeALaBarra: por debajo de `md` la banda del canal no se pinta
+// y lo suyo va en la barra de la app (la de la suite en el teléfono): el «☰», «#equipo»
+// y «Ponme al día», buscar, llamar SOLO con el icono y el menú del canal. Eran dos barras,
+// con el nombre en «eq…» por el rótulo de «Llamar» (auditoría del 2026-11-24). La
+// hamburguesa saca el carril como cajón, y elegir canal lo recoge.
 //
 // VISTO EN ROJO (2026-09-22, en el frontal): sin esconder las acciones salen 7 en vez
 // de 2. Deshecho. El «Aa» del compositor también cabe en la tira desplazable móvil.
-func TestLaCabeceraEstrechaLlevaHamburguesa(t *testing.T) {
+func TestLaCabeceraEstrechaSubeALaBarra(t *testing.T) {
 	sa, _, _ := salaEn(t, servicioConDos(), 360)
 	sa.Arrancar(context.Background())
-	cab := sa.P.Canal.Cabecera
-	if !cab.Estrecha || cab.menu == nil || len(cab.acciones) != 2 {
-		t.Fatalf("a 360 la banda: estrecha %v, hamburguesa %v, %d acciones (son 2)",
-			cab.Estrecha, cab.menu != nil, len(cab.acciones))
+	cab, barra := sa.P.Canal.Cabecera, sa.P.movil
+	if !cab.Estrecha || cab.Visible() || cab.menu != nil {
+		t.Fatalf("a 360 la banda del canal: estrecha %v, visible %v, hamburguesa propia %v; quiero escondida y sin ☰",
+			cab.Estrecha, cab.Visible(), cab.menu != nil)
 	}
-	if cab.nombre.Position().X+ui.Medir("equipo", escalonNombre, ui.SemiNegrita).Width > cab.acciones[0].Position().X {
-		t.Error("el nombre del canal no cabe delante de las acciones")
+	if barra.Titulo != "#equipo" || len(barra.Acciones) != 4 || barra.AlMenu == nil {
+		t.Fatalf("la barra de la app dice %q con %d acciones (con ☰: %v); quiero «#equipo» y 4", barra.Titulo, len(barra.Acciones), barra.AlMenu != nil)
+	}
+	rotulos := make([]string, 0, 4)
+	for _, a := range barra.Acciones {
+		b, es := a.(*ui.BotonIcono)
+		if !es {
+			t.Fatalf("una acción de la barra es %T y no un botón de icono: «Llamar» va solo con el icono", a)
+		}
+		rotulos = append(rotulos, b.Rotulo)
+	}
+	t1 := sa.P.T
+	quiero := []string{
+		t1.T("channel.summarize", nil), t1.T("channel.search", nil), t1.T("call.call", nil),
+		t1.T("channel.menuAria", i18n.Vars{"name": "equipo"}),
+	}
+	if strings.Join(rotulos, "|") != strings.Join(quiero, "|") {
+		t.Errorf("la barra lleva %q; quiero %q", rotulos, quiero)
+	}
+	if arriba := sa.P.Canal.Historial.Position().Y; arriba != 0 {
+		t.Errorf("sin la banda, el historial empieza en y=%v; quiero 0", arriba)
 	}
 	// El «Aa» también se alcanza en el teléfono, sin desplazar Enviar fuera.
 	if n := len(sa.P.Canal.Compositor.botones); n != 5 || sa.P.Canal.Compositor.SinFormato {
 		t.Errorf("a 360 la barra del compositor lleva %d botones y son 5, incluido «Aa»", n)
 	}
-	test.Tap(cab.menu)
+	barra.AlMenu()
 	if !sa.P.armazon.CajonAbierto || !sa.P.armazon.Menu.Visible() {
 		t.Fatal("la hamburguesa no saca el carril")
 	}
 	sa.Elegir(sa.P.Lateral.Canales[1])
 	if sa.P.armazon.CajonAbierto {
 		t.Error("elegir un canal no recoge el cajón")
+	}
+	if barra.Titulo != "Ana Ruiz" {
+		t.Errorf("en un directo la barra dice %q; quiero el nombre de la otra persona", barra.Titulo)
+	}
+}
+
+// TestEditarElTemaEnElTelefonoEnseñaLaBanda: el tema se escribe en la banda del canal,
+// así que mientras se edita se pinta también por debajo de `md`.
+func TestEditarElTemaEnElTelefonoEnseñaLaBanda(t *testing.T) {
+	sa, _, _ := salaEn(t, servicioConDos(), 360)
+	sa.Arrancar(context.Background())
+	c := sa.P.Canal
+	c.Cabecera.EditandoTema = true
+	c.Refresh()
+	if !c.Cabecera.Visible() || c.Historial.Position().Y != AltoCabecera {
+		t.Errorf("editando el tema a 360 la banda se ve %v y el historial empieza en %v", c.Cabecera.Visible(), c.Historial.Position().Y)
+	}
+	c.Cabecera.EditandoTema = false
+	c.Refresh()
+	if c.Cabecera.Visible() {
+		t.Error("acabada la edición, la banda vuelve a la barra de la app")
+	}
+}
+
+// TestLlamarRecuperaSuRotuloAlEnsancharse: «Llamar» va solo con el icono en una banda
+// estrecha y con su rótulo en una ancha. Al pasar de una a otra se quedaba una caja
+// vacía: el rótulo escondido al montarlo sin él no volvía.
+func TestLlamarRecuperaSuRotuloAlEnsancharse(t *testing.T) {
+	c := NuevaCabecera(traductor(t), "es")
+	c.Canal = Canal{ID: "c1", Nombre: "equipo"}
+	w := test.NewWindow(c)
+	defer w.Close()
+	w.Resize(fyne.NewSize(300, AltoCabecera))
+	if !c.llamar.SoloIcono {
+		t.Fatal("a 300 «Llamar» va solo con el icono")
+	}
+	w.Resize(fyne.NewSize(1000, AltoCabecera))
+	if c.llamar.SoloIcono {
+		t.Fatal("a 1000 «Llamar» lleva su rótulo")
+	}
+	var rotulo *fcanvas.Text
+	for _, o := range test.WidgetRenderer(c.llamar).Objects() {
+		if x, es := o.(*fcanvas.Text); es && x.Text == c.T.T("call.call", nil) {
+			rotulo = x
+		}
+	}
+	if rotulo == nil || !rotulo.Visible() {
+		t.Error("a 1000 el rótulo de «Llamar» no se pinta")
 	}
 }
 

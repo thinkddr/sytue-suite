@@ -6,10 +6,13 @@ package mail
 import (
 	"context"
 	"errors"
+	"fmt"
 	"image/png"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"slices"
@@ -700,16 +703,26 @@ func TestUnaRespuestaTardiaNoPisaLaVista(t *testing.T) {
 	}
 }
 
-// TestElErrorDiceLoQuePaso: un 403 no es «no hay red», y «no hay red» no es un fallo
-// del servidor.
+// TestElErrorDiceLoQuePaso: un 403 no es «no hay red», «no hay red» no es un fallo del
+// servidor, y un fallo del servidor que no es una respuesta HTTP —un `serverFail` de
+// JMAP, un JSON roto— tampoco es «no hay red» (la auditoría del 2026-11-24 lo vio como
+// «Sin conexión» y sin «Reintentar»).
+//
+// VISTO EN ROJO con el `estadoDe` de antes, que daba por falta de red todo lo que no
+// era un `*api.Error`: el `serverFail` sale «Sin conexión».
 func TestElErrorDiceLoQuePaso(t *testing.T) {
+	sinRuta := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("no route to host")}
 	for _, c := range []struct {
 		err  error
 		want Estado
 	}{
 		{&api.Error{Status: http.StatusForbidden}, SinPermiso},
 		{&api.Error{Status: http.StatusBadGateway}, Error},
-		{errors.New("dial tcp: no route to host"), SinConexion},
+		{sinRuta, SinConexion},
+		{&url.Error{Op: "Get", URL: "https://mail.sytue.eu/api/v1/messages", Err: sinRuta}, SinConexion},
+		{fmt.Errorf("mail: lista: %w", &url.Error{Op: "Get", URL: "https://mail.sytue.eu", Err: io.ErrUnexpectedEOF}), SinConexion},
+		{errors.New("mail: Email/query: serverFail"), Error},
+		{api.ErrRespuestaGrande, Error},
 	} {
 		if got := estadoDe(c.err); got != c.want {
 			t.Errorf("estadoDe(%v) = %d y tenía que ser %d", c.err, got, c.want)

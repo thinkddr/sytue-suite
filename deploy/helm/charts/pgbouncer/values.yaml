@@ -54,7 +54,7 @@ image:
   # socket y ficheros los pone el chart, no la imagen.
   # Upstream para desarrollo; values-prod usa el mirror privado de Scaleway.
   repository: ghcr.io/cloudnative-pg/pgbouncer
-  tag: "1.26.1-202611121015-trixie@sha256:6c91fd7383b8b098bc0c3b71dba4e98bd568c0d301b9fc66027fbc23259c6a7d"
+  tag: "1.26.1-202611241637-trixie@sha256:2fa259d22b8ffc0218a2421298909fb36bf45ceff7652f36bcf7b63197103fb0"
   pullPolicy: IfNotPresent
   useGlobalRegistry: false
 

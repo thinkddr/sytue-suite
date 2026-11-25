@@ -17,7 +17,7 @@
  */
 import type { CommentItem, SheetData, SheetModel } from '../types';
 import { ejeColumnas, ejeFilas, idDe, indiceDe } from './anclas';
-import { numToCol } from '@sytue/formula';
+import { numToCol } from '@sytue/formula/ligero';
 
 export interface AnclaCelda {
   hoja: string;

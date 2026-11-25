@@ -18,7 +18,7 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { SytueShell } from '@sytue/shell';
-import { AdminShell } from '@sytue/ui';
+import { AdminShell, Skeleton, SkeletonRows } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import { getAccessToken } from '@sytue/auth/client';
@@ -34,6 +34,19 @@ interface ShellProps {
   /** Idioma ya negociado en el servidor. */
   locale: Locale;
   children?: ComponentChildren;
+}
+
+/**
+ * La lista de archivos mientras la bóveda abre: el cabecero y las filas con la
+ * tesela de tipo, del alto de las de verdad. Nada sale de la bóveda.
+ */
+function EsqueletoDeArchivos() {
+  return (
+    <div class="flex flex-col gap-4 p-4">
+      <Skeleton width="10rem" height="1.5rem" />
+      <SkeletonRows rows={8} lead="tile" meta />
+    </div>
+  );
 }
 
 const SECCIONES: readonly Section[] = [
@@ -71,32 +84,40 @@ export function Shell({ user, hubBaseUrl, locale }: ShellProps) {
       accessToken={getAccessToken}
       locale={locale}
     >
-      <PrivateDriveGate actor={user.id} tenant={user.tenant} locale={locale}>
-        {(session, baseURL) => (
-          <PrivateDriveProvider session={session} baseURL={baseURL}>
-            <AdminShell
-              sidebar={
-                <DriveSidebar
-                  active={section}
-                  onSelect={(s) => {
-                    const url = new URL(window.location.href);
-                    for (const key of ['request', 'path', 'preview', 'file', 'folder'])
-                      url.searchParams.delete(key);
-                    url.searchParams.set('section', s);
-                    window.history.replaceState(null, '', url);
-                    setCloud(null);
-                    setSection(s);
-                    setNavigation((value) => value + 1);
-                  }}
-                  locale={locale}
-                  cloud={cloud?.instance_id ?? null}
-                  onCloud={setCloud}
-                />
-              }
-              // Sin `title`: cada vista trae su propio cabecero con el nombre de la sección
-              // justo debajo de la barra móvil, y «Mi unidad» salía dos veces seguidas.
-            >
-              <div class="bg-surface flex min-h-full flex-col">
+      {/* Solo el navegador de archivos espera a la bóveda (ADR 0086): el menú lateral
+          lee del servidor (cuota, nubes, equipos) y se pinta ya, con el esqueleto de
+          la lista debajo mientras la bóveda abre. */}
+      <AdminShell
+        sidebar={
+          <DriveSidebar
+            active={section}
+            onSelect={(s) => {
+              const url = new URL(window.location.href);
+              for (const key of ['request', 'path', 'preview', 'file', 'folder'])
+                url.searchParams.delete(key);
+              url.searchParams.set('section', s);
+              window.history.replaceState(null, '', url);
+              setCloud(null);
+              setSection(s);
+              setNavigation((value) => value + 1);
+            }}
+            locale={locale}
+            cloud={cloud?.instance_id ?? null}
+            onCloud={setCloud}
+          />
+        }
+        // Sin `title`: cada vista trae su propio cabecero con el nombre de la sección
+        // justo debajo de la barra móvil, y «Mi unidad» salía dos veces seguidas.
+      >
+        <div class="bg-surface flex min-h-full flex-col">
+          <PrivateDriveGate
+            actor={user.id}
+            tenant={user.tenant}
+            locale={locale}
+            skeleton={<EsqueletoDeArchivos />}
+          >
+            {(session, baseURL) => (
+              <PrivateDriveProvider session={session} baseURL={baseURL}>
                 <PrivateFileBrowser
                   key={navigation}
                   section={cloud ? 'external' : section}
@@ -105,11 +126,11 @@ export function Shell({ user, hubBaseUrl, locale }: ShellProps) {
                     setSection('my');
                   }}
                 />
-              </div>
-            </AdminShell>
-          </PrivateDriveProvider>
-        )}
-      </PrivateDriveGate>
+              </PrivateDriveProvider>
+            )}
+          </PrivateDriveGate>
+        </div>
+      </AdminShell>
     </SytueShell>
   );
 }

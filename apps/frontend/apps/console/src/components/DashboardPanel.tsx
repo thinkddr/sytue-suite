@@ -3,6 +3,7 @@
  * identidad, organizaciones recientes y últimos eventos de auditoría. Solo
  * @sytue/ui. docs/CONVENTIONS.md §8.
  */
+import { useEffect } from 'preact/hooks';
 import {
   Button,
   Card,
@@ -14,6 +15,7 @@ import {
   Icon,
   SectionHeader,
   Stat,
+  marcarAppLista,
 } from '@sytue/ui';
 import type { IconName } from '@sytue/ui';
 import { formatDateTime, type Locale } from '@sytue/i18n';
@@ -91,6 +93,9 @@ export default function DashboardPanel({
   locale: Locale;
 }) {
   const t = useT(locale);
+  // `sytue:app-ready`: el panel llega con sus datos del servidor; pintado e hidratado,
+  // la consola está lista. Lo que se presupuesta en vez del LCP.
+  useEffect(() => marcarAppLista(), []);
 
   // Se construyen aquí y no en el JSX para poder preguntar cuántos hay antes de
   // decidir si la tarjeta existe siquiera.

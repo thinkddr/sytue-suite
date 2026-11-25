@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { eraseOwnedBytes } from './owned-bytes.js';
 import { withBase } from '@sytue/config/base-path';
-import { isClientCoreModule, type ClientCoreModule } from '@sytue/config/client-core';
+import {
+  isClientCoreModule,
+  vaultCoreModule,
+  type ClientCoreModule,
+} from '@sytue/config/client-core';
 export type { ClientCoreModule } from '@sytue/config/client-core';
 import {
   PqcHostPorts,
@@ -36,6 +40,127 @@ interface Pending {
   cleanup: () => void;
 }
 
+/**
+ * Los resúmenes del núcleo que el servidor escribió en la página
+ * (`<meta name="sytue-client-core" content="<wasm_sha256> <runtime_sha256>">`,
+ * `clientCoreHead`). Con ellos el worker no pide antes `manifest.json`: baja
+ * `wasm_exec.js` y `core.wasm` a la vez, y las mismas URL que la página ya precargó.
+ * Son una pista, no una confianza nueva: el worker sigue comprobando el sha256 del
+ * wasm, el servidor contesta 412 a un resumen que no es el suyo, y entonces el
+ * worker vuelve al manifiesto. Solo los lleva el núcleo de la bóveda (`vault`,
+ * `vaultCoreModule`), que es el que toda app con bóveda arranca y precarga.
+ */
+export interface ClientCoreDigests {
+  wasm_sha256: string;
+  runtime_sha256: string;
+}
+const hex64 = /^[0-9a-f]{64}$/;
+export function pageClientCoreDigests(): ClientCoreDigests | null {
+  if (typeof document === 'undefined') return null;
+  const content = document
+    .querySelector('meta[name="sytue-client-core"]')
+    ?.getAttribute('content')
+    ?.trim();
+  const [wasm, runtime, ...rest] = content ? content.split(/\s+/u) : [];
+  if (!wasm || !runtime || rest.length || !hex64.test(wasm) || !hex64.test(runtime)) return null;
+  return { wasm_sha256: wasm, runtime_sha256: runtime };
+}
+
+/**
+ * Un worker del núcleo arrancado ANTES de que exista su arrendamiento: solo ha bajado
+ * los artefactos públicos del compilador, sin cuenta, sin claves y sin puertos. Lo que
+ * conteste mientras nadie lo adopta se guarda y se entrega al adoptarlo.
+ */
+interface WorkerReply {
+  type?: string;
+  id?: number;
+  ok?: boolean;
+  value?: unknown;
+  module_id?: unknown;
+}
+interface SpawnedWorker {
+  readonly worker: Worker;
+  readonly module: ClientCoreModule;
+  readonly queue: MessageEvent<WorkerReply>[];
+  errored: boolean;
+}
+
+function spawnCoreWorker(module: ClientCoreModule): SpawnedWorker {
+  const worker = new Worker(new URL('./worker.ts', import.meta.url), {
+    type: 'module',
+    name: module === 'core' || module === vaultCoreModule ? 'sytue-crypto' : 'sytue-' + module,
+  });
+  const spawned: SpawnedWorker = { worker, module, queue: [], errored: false };
+  worker.onmessage = (event: MessageEvent<WorkerReply>) => {
+    spawned.queue.push(event);
+  };
+  worker.onerror = worker.onmessageerror = () => {
+    spawned.errored = true;
+  };
+  const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+  const assetBaseURL = new URL(withBase(base, '/api/client-core/'), globalThis.location.origin);
+  const digests = module === vaultCoreModule ? pageClientCoreDigests() : null;
+  worker.postMessage({
+    type: 'initialize',
+    assetBaseURL: assetBaseURL.href,
+    module,
+    ...(digests ? { digests } : {}),
+  });
+  return spawned;
+}
+
+/** Como mucho uno por módulo, y se suelta solo si nadie lo adopta a tiempo. */
+const warmWorkers = new Map<
+  ClientCoreModule,
+  { spawned: SpawnedWorker; timer: ReturnType<typeof setTimeout> }
+>();
+
+function dropWarm(module: ClientCoreModule): void {
+  const entry = warmWorkers.get(module);
+  if (!entry) return;
+  warmWorkers.delete(module);
+  clearTimeout(entry.timer);
+  entry.spawned.worker.terminate();
+}
+
+/**
+ * Empieza a bajar y compilar el núcleo YA, en paralelo con el bootstrap de la bóveda
+ * (antes, el worker nacía con el primer `invoke`, tras bootstrap, claves y puente). El
+ * primer `PqcRuntime` de ese módulo que lo necesite lo adopta en vez de crear otro, y
+ * sigue siendo SUYO: un worker por arrendamiento, que se termina al cerrarlo. Devuelve
+ * cómo soltarlo (p. ej. si el despliegue no cifra). Sin `Worker`, no hace nada.
+ */
+export function prewarmClientCore(
+  module: ClientCoreModule = vaultCoreModule,
+  ttlMs = 60_000,
+): () => void {
+  if (!isClientCoreModule(module) || typeof Worker === 'undefined') return () => {};
+  if (!warmWorkers.has(module)) {
+    try {
+      const spawned = spawnCoreWorker(module);
+      const timer = setTimeout(() => dropWarm(module), ttlMs);
+      warmWorkers.set(module, { spawned, timer });
+    } catch {
+      return () => {};
+    }
+  }
+  const mine = warmWorkers.get(module)?.spawned;
+  return () => {
+    if (warmWorkers.get(module)?.spawned === mine) dropWarm(module);
+  };
+}
+
+function adoptWarm(module: ClientCoreModule): SpawnedWorker | null {
+  const entry = warmWorkers.get(module);
+  if (!entry) return null;
+  warmWorkers.delete(module);
+  clearTimeout(entry.timer);
+  return entry.spawned;
+}
+
+/** Sin noticias del worker en este tiempo (ni progreso de la descarga), se da por caído. */
+const readyStallMs = 15_000;
+
 /** One worker per authorized account/product lease. It contains no network
  * credentials or persistence, and all algorithms execute in the shared Go core. */
 export class PqcRuntime {
@@ -65,7 +190,9 @@ export class PqcRuntime {
   };
   constructor(
     private readonly lease: PqcLease,
-    private readonly module: ClientCoreModule = 'core',
+    /** Sin módulo, el núcleo ligero de la bóveda (`vault`). Quien necesite Matrix,
+     * recursos o la búsqueda de Rooms pide `core` explícitamente. */
+    private readonly module: ClientCoreModule = vaultCoreModule,
     private readonly delegationResolver?: HostDelegationResolver,
   ) {
     if (!isClientCoreModule(module)) throw new Error('crypto_runtime_unavailable');
@@ -150,13 +277,25 @@ export class PqcRuntime {
     this.pending.clear();
   }
 
+  /** Arranca el worker (y la descarga del núcleo) sin pedirle nada todavía. */
+  warm(): void {
+    try {
+      void this.ensureWorker().catch(() => {});
+    } catch {
+      // Cerrado: nada que calentar.
+    }
+  }
+
   private ensureWorker(): Promise<void> {
     this.assertOpen();
     if (this.readiness) return this.readiness;
-    const worker = new Worker(new URL('./worker.ts', import.meta.url), {
-      type: 'module',
-      name: this.module === 'core' ? 'sytue-crypto' : 'sytue-' + this.module,
-    });
+    // La bóveda adopta también un `core` precalentado: lleva sus mismas operaciones
+    // (es el caso de un Rooms que no conoce `vault`) y así no baja un segundo núcleo.
+    const spawned =
+      adoptWarm(this.module) ??
+      (this.module === vaultCoreModule ? adoptWarm('core') : null) ??
+      spawnCoreWorker(this.module);
+    const worker = spawned.worker;
     this.worker = worker;
     this.readiness = new Promise<void>((resolve, reject) => {
       this.readyReject = reject;
@@ -164,18 +303,16 @@ export class PqcRuntime {
         reject(new Error('crypto_runtime_unavailable'));
         if (this.worker === worker) this.reset(new Error('crypto_runtime_unavailable'));
       };
-      this.readyTimer = setTimeout(failed, 15000);
+      // Un plazo sin noticias, no un plazo total: en 1,6 Mbps los 2 MB del núcleo
+      // tardan más de 15 s, y el worker avisa de cada tramo que le llega.
+      const stalled = (): void => {
+        if (this.readyTimer) clearTimeout(this.readyTimer);
+        this.readyTimer = setTimeout(failed, readyStallMs);
+      };
+      stalled();
       worker.onerror = failed;
       worker.onmessageerror = failed;
-      worker.onmessage = (
-        event: MessageEvent<{
-          type?: string;
-          id?: number;
-          ok?: boolean;
-          value?: unknown;
-          module_id?: unknown;
-        }>,
-      ): void => {
+      const onMessage = (event: MessageEvent<WorkerReply>): void => {
         if (this.worker !== worker) return;
         const message = event.data;
         if (message.type === 'host.revoked') {
@@ -234,8 +371,14 @@ export class PqcRuntime {
           failed();
           return;
         }
+        if (message.type === 'progress') {
+          if (this.readyReject) stalled();
+          return;
+        }
         if (message.type === 'ready') {
-          if (message.module_id !== this.module) {
+          // `vault` puede arrancar sobre `core` con un servidor anterior (worker.ts).
+          const served = message.module_id;
+          if (served !== this.module && !(this.module === vaultCoreModule && served === 'core')) {
             failed();
             return;
           }
@@ -263,13 +406,10 @@ export class PqcRuntime {
           entry.reject(error instanceof Error ? error : new Error('crypto_rejected'));
         }
       };
-      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
-      const assetBaseURL = new URL(withBase(base, '/api/client-core/'), globalThis.location.origin);
-      worker.postMessage({
-        type: 'initialize',
-        assetBaseURL: assetBaseURL.href,
-        module: this.module,
-      });
+      worker.onmessage = onMessage;
+      // Lo que el worker contestó antes de que este arrendamiento lo adoptara.
+      if (spawned.errored) failed();
+      for (const event of spawned.queue.splice(0)) onMessage(event);
     });
     return this.readiness;
   }

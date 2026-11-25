@@ -3,6 +3,7 @@
  * uno que no dispara es solo un atajo que no existe. Por eso los negativos
  * importan más que los positivos.
  */
+import './html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';

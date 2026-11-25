@@ -40,6 +40,7 @@ import {
   marcarConTramo,
   moverFocoEnRejilla,
   useLongPress,
+  marcarAppLista,
 } from '@sytue/ui';
 import { formatDateTime, translate, type Locale } from '@sytue/i18n';
 import {
@@ -116,7 +117,7 @@ import { textoDeFallo } from '../lib/fallo.js';
 import { Marco } from './Marco.js';
 import { ContadorVisor, EscenarioVisor } from './EscenarioVisor.js';
 import type { SytueUser } from '@sytue/auth';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 
 interface Props {
   locale: Locale;
@@ -772,6 +773,12 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
     // Solo la primera página: las siguientes las pide el centinela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // `sytue:app-ready`: la primera página de la línea de tiempo ya está pintada (o su
+  // fallo). Lo que se presupuesta en vez del LCP y lo que espera la bóveda.
+  useEffect(() => {
+    if (!cargando) marcarAppLista();
+  }, [cargando]);
 
   // La barra de años se pide aparte y sin bloquear la galería: si falla, la
   // galería sigue y simplemente no hay barra.
@@ -2592,10 +2599,11 @@ export function Miniatura({
       {/* El corazón se ve SIEMPRE si está marcada y solo al pasar por encima si
           no: en una galería, un mando en cada tesela es ruido, pero saber cuáles
           son favoritas de un vistazo es justo lo que se busca.
-          CON EL DEDO SE VE SIEMPRE (`pointer-coarse:opacity-100`) y se pulsa: ahí
-          no hay «pasar por encima», y el botón de las no favoritas estaba en su
-          esquina INVISIBLE, robándole el toque a la foto. Lo que fallaba no era
-          que se pudiera pulsar, sino que no se viera.
+          CON EL DEDO, SOLO EL DE LAS FAVORITAS (`pointer-coarse:hidden` en las
+          demás): ahí no hay «pasar por encima», y un corazón hueco en cada tesela
+          era ruido y le robaba el toque a la foto (invisible, peor: se pulsaba sin
+          verse). Marcar una favorita con el dedo va por el visor o la barra de
+          selección, como en las apps nativas (`apps/fyne/apps/photos`).
           EL OBJETIVO MIDE 32, NO 44. El fondo que se ve mide 24; el botón le suma
           4 px de aire por cada lado y va pegado a la esquina. Con 44 no cabe: en
           un teléfono de 390 la fila más baja mide 98, el centro de la foto queda
@@ -2611,7 +2619,7 @@ export function Miniatura({
           class={cx(
             'group/corazon sytue-focus-ring rounded-control absolute bottom-0 left-0 p-1',
             !foto.favorite &&
-              'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
+              'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden',
           )}
         >
           <span

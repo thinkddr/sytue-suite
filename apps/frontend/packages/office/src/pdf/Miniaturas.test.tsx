@@ -97,3 +97,27 @@ test('con el puntero dentro del panel la tira no se mueve', () => {
   montar(31);
   expect(llamadas.map((l) => l.pagina)).toEqual(['31']);
 });
+
+// El extracto de la página ACTUAL va sobre `bg-selected`, y ahí el texto sutil se queda
+// en 4,4:1 en oscuro: axe lo marcó en certipdf-dark-1280 (2026-11-25). Va atenuado, que
+// la paleta sí garantiza sobre una fila seleccionada (contraste-paleta.test.ts).
+test('el extracto de la página actual va atenuado y el de las demás, sutil', () => {
+  const conExtracto = {
+    total: 3,
+    paginas: [1, 2, 3].map((numero) => ({ numero, ancho: 595, alto: 842, extracto: 'Anexo' })),
+  } as unknown as Contenido;
+  act(() => {
+    render(
+      <Miniaturas contenido={conExtracto} svgs={{}} actual={2} onIrA={() => undefined} t={t} />,
+      host,
+    );
+  });
+  const clases = (n: number) =>
+    host
+      .querySelector(`[data-pagina="${n}"] .line-clamp-3`)!
+      .className.split(/\s+/)
+      .filter((c) => c.startsWith('text-text'));
+  expect(clases(2)).toEqual(['text-text-muted']);
+  expect(clases(1)).toEqual(['text-text-subtle']);
+  expect(clases(3)).toEqual(['text-text-subtle']);
+});

@@ -754,11 +754,17 @@ func estiloTramo(t Tramo, e estiloBloque, v tema.Variante) estiloTrozo {
 			s.subrayado, s.peso = false, max(s.peso, ui.Medio)
 		}
 	}
-	if c, ok := tokens.ParseColor(t.Color); ok && t.Color != "" {
-		s.tinta = c
+	// Casi ningún tramo lleva color: sin él no se llama a `ParseColor`, que con la
+	// cadena vacía hacía todo su trabajo para decir que no.
+	if t.Color != "" {
+		if c, ok := tokens.ParseColor(t.Color); ok {
+			s.tinta = c
+		}
 	}
-	if c, ok := tokens.ParseColor(t.Fondo); ok && t.Fondo != "" {
-		s.fondo = c
+	if t.Fondo != "" {
+		if c, ok := tokens.ParseColor(t.Fondo); ok {
+			s.fondo = c
+		}
 	}
 	if tam, ok := tamanoCSS(t.Tamano, e.escalon.Tam); ok {
 		s.escalon = tema.Escalon{Tam: tam, Linea: tam * e.escalon.Linea / e.escalon.Tam}
@@ -949,6 +955,10 @@ type Prosa struct {
 
 	maq   *Maquetado
 	ancho float32
+	// memo son los dos últimos maquetados (el de medir, en claro, y el de pintar) con lo
+	// que los decide: `MinSize` y `Layout` los piden muchas veces al mismo ancho, y
+	// maquetar es partir y medir cada palabra del documento.
+	memo [2]maqMemo
 	// encima es el puntero sobre la prosa: enciende el fondo del aviso de nota vacía.
 	encima bool
 	// hrefPrevia es el enlace bajo el puntero; relojPrevia, el retardo antes de abrir su
@@ -980,7 +990,35 @@ func (p *Prosa) AltoPara(ancho float32) float32 {
 	if ancho <= 0 {
 		ancho = 1e6
 	}
-	return max(Maquetar(p.Doc, ancho, tema.Claro, p.letras()...).Alto, 24)
+	return max(p.maquetar(ancho, tema.Claro).Alto, 24)
+}
+
+// maqMemo es un maquetado con su documento, ancho, variante y letra.
+type maqMemo struct {
+	doc   *Documento
+	ancho float32
+	v     tema.Variante
+	letra Letra
+	con   bool // con Letra pedida
+	m     *Maquetado
+}
+
+// maquetar es `Maquetar` recordando los dos últimos: el documento no cambia en su sitio
+// (plegar y editar hacen una copia), así que el mismo documento al mismo ancho, con la
+// misma variante y letra, se maqueta igual.
+func (p *Prosa) maquetar(ancho float32, v tema.Variante) *Maquetado {
+	clave := maqMemo{doc: p.Doc, ancho: ancho, v: v}
+	if p.Letra != nil {
+		clave.letra, clave.con = *p.Letra, true
+	}
+	for i := range p.memo {
+		if m := p.memo[i]; m.m != nil && m.doc == clave.doc && m.ancho == ancho && m.v == v && m.con == clave.con && m.letra == clave.letra {
+			return m.m
+		}
+	}
+	clave.m = Maquetar(p.Doc, ancho, v, p.letras()...)
+	p.memo[1], p.memo[0] = p.memo[0], clave
+	return clave.m
 }
 
 // letras es la Letra pedida, como argumento de Maquetar.
@@ -1074,7 +1112,7 @@ func (r *prosaRenderer) Destroy() {}
 func (r *prosaRenderer) Layout(t fyne.Size) {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.p.ancho = t.Width
-	r.p.maq = Maquetar(r.p.Doc, t.Width, v, r.p.letras()...)
+	r.p.maq = r.p.maquetar(t.Width, v)
 	r.objetos = PintarProsa(r.p.maq, v)
 	if r.p.Doc.Vacio() && r.p.Marca != "" {
 		r.objetos = append(r.objetos, r.p.marca(t, v)...)

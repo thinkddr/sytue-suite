@@ -29,6 +29,16 @@ export interface ButtonProps extends Omit<
   trailingIcon?: JSX.Element;
   fullWidth?: boolean;
   /**
+   * El rótulo es una FRASE y no un verbo: salta de línea y el botón crece en vez de
+   * salirse de la pantalla. Es la excepción a `whitespace-nowrap` (ver `base`), que
+   * pide que salte la fila y no el rótulo: eso deja de bastar cuando un solo rótulo
+   * mide más que la fila entera de un teléfono. «Vorerst bei den bisherigen E-Mails
+   * bleiben», en la puerta de la bóveda de Mail, desbordaba 7 px en 320 (barrido
+   * móvil del 2026-11-24); el francés es más largo todavía. El alto de la talla
+   * queda como mínimo, así que con una línea el botón mide lo mismo que los demás.
+   */
+  multilinea?: boolean;
+  /**
    * Destino: renderiza un `<a>` con EXACTAMENTE el mismo aspecto.
    *
    * Existe porque «botón que navega» es un control real y frecuente, y sin esto se
@@ -50,7 +60,8 @@ const base =
   // rótulo que salta de línea no cabe en él: se sale por arriba y por abajo. En el
   // ERP, al abrir el formulario lateral la barra de la lista se estrecha y
   // «Exportar CSV» salía en tres líneas e «Importar CSV o facturas» en cuatro, con
-  // el texto fuera del botón. Si no hay sitio, que salte la FILA, no el rótulo.
+  // el texto fuera del botón. Si no hay sitio, que salte la FILA, no el rótulo. La
+  // excepción es `multilinea`, que cambia a la vez el alto fijo por uno mínimo.
   // `rounded-control`: 4 px en «Marco» y «Carril», compartidos por toda la suite.
   'inline-flex items-center justify-center whitespace-nowrap rounded-control font-semibold ' +
   'transition-colors duration-150 ease-[var(--ease-standard)] select-none ' +
@@ -73,8 +84,13 @@ const base =
 const variants: Record<ButtonVariant, string> = {
   primary:
     'bg-primary text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)]',
-  secondary:
-    'bg-primary text-[var(--sytue-on-primary)] border border-border-strong hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)]',
+  // CONTORNO, no el relleno primario. Lo fue desde los tres temas del 2026-10-04, y la
+  // auditoría del 2026-11-24 lo encontró por todas partes: dos o tres botones del mismo
+  // verde azulado juntos (Cancelar/Guardar, Duplicar/Editar, Ordenar/Nuevo/Subir) y la
+  // acción principal sin distinguirse. `text` sobre `surface` pasa de 13:1 en los dos
+  // temas y `border-strong` es el contorno de control (≥3:1). Su espejo nativo es
+  // `ui.Secundario` (apps/fyne/ui/boton.go): se cambian a la vez.
+  secondary: 'bg-surface text-text border border-border-strong hover:bg-bg-subtle active:bg-border',
   ghost: 'bg-transparent text-primary-text hover:bg-selected active:bg-selected',
   // Blanco y no `on-primary`: aquel es el rótulo del relleno PRIMARIO, y en oscuro es casi
   // negro. Sobre el rojo de peligro daría 3,7:1; el blanco, 5,1:1 en los tres temas.
@@ -133,6 +149,22 @@ const iconSizes: Record<ButtonSize, string> = {
   lg: 'h-11 w-11 p-0 pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]',
 };
 
+// `multilinea`: el rótulo puede saltar de línea, así que el alto fijo de la talla pasa
+// a mínimo (`h-9` → `min-h-9`) y hay relleno vertical para la segunda línea. Se
+// sustituyen las clases y no se añaden encima: dos utilidades del mismo tipo se
+// resuelven por la hoja generada, no por el orden de la cadena (ver `sizes`). Y van
+// escritas enteras, no compuestas: Tailwind solo genera las clases que lee en el código.
+const baseMultilinea = base.replace('whitespace-nowrap', 'whitespace-normal text-center');
+const altoMinimo: Record<ButtonSize, string> = {
+  // `xs` ya lleva su suelo en px (`min-h-[24px]`, ver `sizes`): se queda tal cual.
+  xs: 'py-1.5',
+  sm: 'min-h-8 py-1.5',
+  md: 'min-h-9 py-1.5',
+  lg: 'min-h-11 py-1.5',
+};
+const multilineaDe = (size: ButtonSize): string =>
+  `${altoMinimo[size]} ${sizes[size].replace(/(^|\s)h-\S+\s*/, '$1')}`;
+
 export function Button({
   variant = 'primary',
   size = 'md',
@@ -141,6 +173,7 @@ export function Button({
   leadingIcon,
   trailingIcon,
   fullWidth = false,
+  multilinea = false,
   disabled,
   type = 'button',
   href,
@@ -149,10 +182,11 @@ export function Button({
   ...rest
 }: ButtonProps): JSX.Element {
   const inerte = disabled || loading;
+  const variasLineas = multilinea && !iconOnly;
   const klass = cx(
-    base,
+    variasLineas ? baseMultilinea : base,
     variants[variant],
-    iconOnly ? iconSizes[size] : sizes[size],
+    iconOnly ? iconSizes[size] : variasLineas ? multilineaDe(size) : sizes[size],
     // Cargando ≠ deshabilitado: el botón ocupado se atenúa menos y muestra
     // cursor de espera; el deshabilitado real queda al 50 % sin puntero.
     loading ? 'cursor-wait opacity-75' : 'disabled:pointer-events-none disabled:opacity-50',

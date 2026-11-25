@@ -53,6 +53,8 @@ export const sl: AppCatalog<typeof en> = {
   'list.unstar': 'Odstrani {name} iz označenih z zvezdico',
   'list.starredTitle': 'Z zvezdico',
   'list.reviewDuplicates': 'Preglej dvojnike ({count})',
+  'list.selectMode': 'Izberi',
+  'list.moreActions': 'Več dejanj',
   'list.count': {
     one: '{count} stik',
     two: '{count} stika',

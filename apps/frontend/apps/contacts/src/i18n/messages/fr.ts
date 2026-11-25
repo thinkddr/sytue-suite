@@ -58,6 +58,8 @@ export const fr: AppCatalog<typeof en> = {
   'list.unstar': 'Retirer {name} des favoris',
   'list.starredTitle': 'Favori',
   'list.reviewDuplicates': 'Examiner les doublons ({count})',
+  'list.selectMode': 'Sélectionner',
+  'list.moreActions': 'Plus d’actions',
   'list.count': { one: '{count} contact', other: '{count} contacts' },
   'list.countFiltered': {
     one: '{shown} contact sur {count}',

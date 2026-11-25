@@ -176,6 +176,17 @@ func (b *Bandeja) VerFila(i int) {
 // de hilos que ya no están en la lista (movidos, borrados) no cuentan.
 func (b *Bandeja) hayMarcadas() bool { return b.CuantasMarcadas() > 0 }
 
+// seleccionActiva es `hayMarcadas` tal como la contó el último Refresh. Quien cambia
+// las marcas o la lista repinta la bandeja (`pintarSeleccion`), y la lista vuelve a
+// rellenar sus filas DESDE ese Refresh: contarlas una vez por fila era O(N) por fila, y
+// al desplazar, por cada fila que se recicla. Sin renderer todavía, se cuenta.
+func (b *Bandeja) seleccionActiva() bool {
+	if b.r == nil {
+		return b.hayMarcadas()
+	}
+	return b.r.marcadas > 0
+}
+
 // CuantasMarcadas es `selectedCount`: las marcadas de entre las visibles.
 func (b *Bandeja) CuantasMarcadas() int {
 	n := 0
@@ -231,8 +242,7 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 		}
 	})
 	r.cabecera = ui.NuevaCabeceraApp(b.encabezado(), r.conteo)
-	r.busqueda = ui.NuevaEntrada(b.T.T("list.searchPlaceholder", nil))
-	r.busqueda.Icono = iconos.Buscar
+	r.busqueda = ui.NuevoBuscador(b.T.T("list.searchPlaceholder", nil))
 	r.busqueda.Ancho = AnchoBusqueda
 	r.busqueda.AlCambiar(func(s string) {
 		if b.AlBuscar != nil {
@@ -276,6 +286,8 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 		},
 	)
 	r.lista = lista
+	// Una fila vacía al final en el teléfono: «Redactar» flotante tapaba la última.
+	r.reserva = ui.ReservarEnLista(lista)
 	r.cuerpo = ui.EnvolverLista(lista)
 
 	r.esqueleto = nuevoEsqueleto(b.T.T("list.loading", nil))
@@ -302,7 +314,7 @@ func (b *Bandeja) rellenar(f *FilaConversacion, i int, c Conversacion) {
 	f.ConCasilla = !b.SoloLectura
 	f.Abierta = c.HiloID == b.AbiertaID
 	f.Marcada = b.Marcadas[c.HiloID]
-	f.SeleccionActiva = !b.SoloLectura && b.hayMarcadas()
+	f.SeleccionActiva = !b.SoloLectura && b.seleccionActiva()
 	f.SinLeerTexto = b.T.T("list.unreadPrefix", nil)
 	f.RespondidaTexto = b.T.T("list.answered", nil)
 	f.T = b.T
@@ -354,6 +366,7 @@ type bandejaRenderer struct {
 	vaciar                                     *botonVaciar
 	seleccion                                  *BarraSeleccion
 	lista                                      *widget.List
+	reserva                                    *ui.ReservaEnLista
 	cuerpo                                     fyne.CanvasObject
 	esqueleto                                  *ui.FilasEsqueleto
 	vacio                                      *ui.Vacio
@@ -362,6 +375,13 @@ type bandejaRenderer struct {
 	// altos son las filas a las que se ha dado un alto propio (las que llevan chips),
 	// para devolverlas a los 83 cuando dejan de llevarlos.
 	altos map[int]float32
+	// marcadas es CuantasMarcadas() del último Refresh: lo leen las filas al rellenarse.
+	marcadas int
+	// anchoAltos es el ancho con el que se ajustaron los altos y altosAlDia dice que la
+	// lista no ha cambiado desde entonces: ajustarlos recorre TODAS las conversaciones,
+	// y Layout llega con cada fotograma que recoloca la bandeja, no solo al cambiar.
+	anchoAltos float32
+	altosAlDia bool
 }
 
 func (r *bandejaRenderer) MinSize() fyne.Size {
@@ -391,7 +411,9 @@ func (r *bandejaRenderer) Layout(t fyne.Size) {
 	if r.limpiar.Visible() {
 		botones += hueco + ml.Width
 	}
-	ancho := max(min(AnchoBusqueda, dentro-2*MargenBusqueda-botones), 0)
+	// En el teléfono, a todo lo que queda (`ui.AnchoBuscador`): con los 184 de escritorio
+	// el campo se quedaba a media fila.
+	ancho := ui.AnchoBuscador(r.busqueda, AnchoBusqueda, dentro-2*MargenBusqueda-botones)
 	r.busqueda.Move(fyne.NewPos(MargenBusqueda, y+RellenoBusqueda))
 	r.busqueda.Resize(fyne.NewSize(ancho, ui.AltoCampo(ui.CampoMD)))
 	x := MargenBusqueda + ancho + hueco
@@ -410,6 +432,7 @@ func (r *bandejaRenderer) Layout(t fyne.Size) {
 	}
 
 	alto := max(t.Height-y, 0)
+	r.reserva.Ajustar(0) // antes de los altos: les devuelve el suyo
 	r.ajustarAltos(dentro)
 	for _, o := range []fyne.CanvasObject{r.cuerpo, r.esqueleto} {
 		o.Move(fyne.NewPos(0, y))
@@ -443,6 +466,7 @@ func (r *bandejaRenderer) Refresh() {
 	}
 	verlo(r.limpiar, b.Consulta != "")
 	marcadas := b.CuantasMarcadas()
+	r.marcadas, r.altosAlDia = marcadas, false
 	r.seleccion.Cuantas, r.seleccion.Todas = marcadas, marcadas > 0 && marcadas == len(b.Conversaciones)
 	verlo(r.seleccion, !b.SoloLectura && marcadas > 0 && b.Estado == Listo)
 
@@ -466,9 +490,10 @@ func (r *bandejaRenderer) Refresh() {
 // mínimo de la plantilla, así que la excepción se declara fila a fila.
 func (r *bandejaRenderer) ajustarAltos(ancho float32) {
 	b := r.b
-	if ancho <= 0 {
+	if ancho <= 0 || (r.altosAlDia && ancho == r.anchoAltos) {
 		return
 	}
+	r.anchoAltos, r.altosAlDia = ancho, true
 	if r.altos == nil {
 		r.altos = map[int]float32{}
 	}
@@ -510,9 +535,12 @@ func (r *bandejaRenderer) ponerVacio() {
 	case SinConexion:
 		// La web lo trae de `@sytue/shell`, que pinta el aviso de «sin conexión» en la
 		// barra. Aquí no hay barra (es la exclusión de paridad escrita), así que el
-		// aviso vive donde se busca el correo.
+		// aviso vive donde se busca el correo. Con su «Reintentar»: la red vuelve sin
+		// avisar, y sin el botón la bandeja vacía se quedaba así hasta cambiar de carpeta.
 		titulo = t.T("offline.status", nil)
 		desc = t.T("offline.description", nil)
+		accion = ui.NuevoBoton(t.T("common.retry", nil), b.AlReintentar).
+			Con(ui.Secundario, ui.TallaSM)
 	case SinPermiso:
 		titulo = t.T("forbidden.title", nil)
 		desc = t.T("forbidden.description", nil)

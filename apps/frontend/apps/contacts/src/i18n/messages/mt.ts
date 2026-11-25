@@ -53,6 +53,8 @@ export const mt: AppCatalog<typeof en> = {
   'list.unstar': "Neħħi lil {name} mill-kuntatti b'stilla",
   'list.starredTitle': "B'stilla",
   'list.reviewDuplicates': 'Irrevedi d-duplikati ({count})',
+  'list.selectMode': 'Agħżel',
+  'list.moreActions': 'Aktar azzjonijiet',
   'list.count': {
     one: 'Kuntatt {count}',
     few: '{count} kuntatti',

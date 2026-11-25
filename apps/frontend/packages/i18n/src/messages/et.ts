@@ -74,6 +74,8 @@ export const et: Catalog = {
   'vault.emptyUnderstood': 'Saan aru, et kadunud võtmega krüptitud andmed kustutatakse',
   'vault.failed':
     'Krüptitud andmeid ei õnnestunud avada. Proovi uuesti või logi uuesti Sytue ID-sse. Kui võti on kadunud, võid selle rakenduse krüptitud andmed tühjendada.',
+  'vault.moreInfo': 'Lisateave',
+  'vault.attention': 'Sinu krüpteeritud andmed vajavad tähelepanu',
   'matrix.incoming': 'Kinnita see seade',
   'matrix.match': 'Need kattuvad',
   'matrix.mismatch': 'Need ei kattu',

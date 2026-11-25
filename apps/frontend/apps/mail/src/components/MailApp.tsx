@@ -35,6 +35,7 @@ import {
   MobileFab,
   withBase,
   useUltimo,
+  marcarAppLista,
 } from '@sytue/ui';
 import {
   isICloudMail,
@@ -74,6 +75,7 @@ import {
   usePrivateMailApi,
 } from '../client/privateMailApi.js';
 import { PrivateMailGate } from './PrivateMailGate.js';
+import { EsqueletoCorreo } from './EsqueletoCorreo.js';
 import { getAccessToken } from '@sytue/auth/client';
 import {
   mailboxLabel,
@@ -250,6 +252,14 @@ export function MailApp(props: Props): JSX.Element {
       tenant={props.user.tenant}
       locale={props.locale}
       vault={props.correoEnBoveda}
+      skeleton={(franja) => (
+        <EsqueletoCorreo
+          user={props.user}
+          hubBaseUrl={props.hubBaseUrl}
+          locale={props.locale}
+          franja={franja}
+        />
+      )}
     >
       {(client) => (
         <PrivateMailProvider client={client}>
@@ -903,7 +913,12 @@ function MailAppBody({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Elemen
         setEmails([]);
         setListError(true);
       })
-      .finally(() => active && setLoadingList(false));
+      .finally(() => {
+        if (!active) return;
+        setLoadingList(false);
+        // `sytue:app-ready`: la primera carpeta ya enseña sus correos (o el fallo).
+        requestAnimationFrame(() => marcarAppLista());
+      });
     return () => {
       active = false;
     };

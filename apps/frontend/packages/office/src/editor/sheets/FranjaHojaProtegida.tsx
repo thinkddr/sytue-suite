@@ -12,7 +12,7 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { ReadOnlyBar, usePrompt } from '@sytue/ui';
 import { translate, type Locale } from '@sytue/i18n';
-import { dispatchSheetCommand, readSheetState, subscribeSheetState } from './SheetCanvas';
+import { dispatchSheetCommand, readSheetState, subscribeSheetState } from './mando';
 import { esPropietario } from '../state/proteccion';
 
 export function FranjaHojaProtegida({ locale }: { locale: Locale }): JSX.Element | null {

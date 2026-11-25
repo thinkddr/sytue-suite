@@ -72,6 +72,8 @@ export const mt: Catalog = {
   'vault.emptyUnderstood': 'Nifhem li d-data kriptata biċ-ċavetta mitlufa se titħassar',
   'vault.failed':
     'Id-data kriptata ma setgħetx tinfetaħ. Erġa’ pprova jew erġa’ idħol f’Sytue ID. Jekk iċ-ċavetta intilfet, tista’ tbattal id-data kriptata ta’ din l-app.',
+  'vault.moreInfo': 'Aktar informazzjoni',
+  'vault.attention': 'Id-data kriptata tiegħek teħtieġ l-attenzjoni',
   'matrix.incoming': 'Ivverifika dan it-tagħmir',
   'matrix.match': 'Jaqblu',
   'matrix.mismatch': 'Ma jaqblux',

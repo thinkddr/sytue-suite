@@ -57,6 +57,8 @@ func nuevoBancoBoveda(t *testing.T) *bancoBoveda {
 		Lista:     func(_ context.Context, v *pqvault.Vault) { b.listas = append(b.listas, v) },
 		Translate: func(k string) string { return k },
 		Dispatch:  func(f func()) { b.ui <- f },
+		// Estas pruebas miran los botones; la que va sola tiene la suya.
+		SoloConBoton: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -130,6 +132,50 @@ func TestPuertaBovedaSinClavePideEntrarYLuegoAbre(t *testing.T) {
 	}
 }
 
+// La clave es de la cuenta y vive en Sytue ID: sin ella en el dispositivo, o con
+// una que no abre, la puerta va sola a buscarla, sin que la persona pulse nada. Una
+// vez: si a la vuelta sigue igual, enseña el botón.
+func TestPuertaBovedaSinClaveVaSolaASytueIDUnaVez(t *testing.T) {
+	for _, conDatos := range []bool{false, true} {
+		b := nuevoBancoBoveda(t)
+		b.puerta.cfg.SoloConBoton = false
+		if conDatos {
+			b.sembrar(claveBoveda(9))
+		} else {
+			b.clave = nil
+		}
+		entradas := 0
+		b.entrar = func(context.Context) error {
+			entradas++
+			if !conDatos {
+				b.clave = claveBoveda(1)
+			}
+			return nil
+		}
+		b.puerta.Iniciar(t.Context())
+		b.esperar() // la primera apertura: sin clave, o una que no abre
+		got := b.esperar()
+		if entradas != 1 {
+			t.Fatalf("con datos=%v, fue a Sytue ID %d veces", conDatos, entradas)
+		}
+		if !conDatos {
+			if got != BovedaLista || len(b.listas) != 1 {
+				t.Fatalf("tras ir sola a por la clave, abre: %v", got)
+			}
+			continue
+		}
+		// La clave que trae sigue sin abrir: el botón, sin volver a ir.
+		if got != BovedaNoAbre || !b.puerta.vista.otraVez.Visible() {
+			t.Fatalf("si a la vuelta sigue sin abrir, lo dice: %v", got)
+		}
+		select {
+		case <-b.ui:
+			t.Fatal("no va otra vez sola")
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
 func TestPuertaBovedaClaveQueNoAbreOfreceEntrarOVaciar(t *testing.T) {
 	b := nuevoBancoBoveda(t)
 	b.sembrar(claveBoveda(9))
@@ -193,10 +239,17 @@ func TestPuertaBovedaFalloOfreceReintentar(t *testing.T) {
 	if got := b.esperar(); got != BovedaFallo || !b.puerta.vista.reintenta.Visible() || !b.puerta.vista.otraVez.Visible() || !b.puerta.vista.vaciar.Visible() {
 		t.Fatalf("ante cualquier otro fallo, las mismas salidas: %v", got)
 	}
+	// Con su código corto debajo, sin el texto del error.
+	if !b.puerta.vista.codigo.Visible() || b.puerta.vista.codigo.Text != "other" {
+		t.Fatalf("el fallo no lleva su código: %q", b.puerta.vista.codigo.Text)
+	}
 	b.puerta.cfg.abrir = pqvault.Open
 	fynetest.Tap(b.puerta.vista.reintenta)
 	if got := b.esperar(); got != BovedaLista {
 		t.Fatalf("reintentar abre: %v", got)
+	}
+	if b.puerta.vista.codigo.Visible() {
+		t.Fatal("abierta, el código del fallo de antes sigue a la vista")
 	}
 }
 

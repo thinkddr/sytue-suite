@@ -4,8 +4,13 @@
 package ui
 
 import (
+	"image/color"
+
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
+
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
 // TiraDeslizable es una fila de botones cuadrados en `overflow-x-auto` SIN barra
@@ -35,9 +40,17 @@ type TiraDeslizable struct {
 	HuecoEntre   func(anterior, actual fyne.CanvasObject) float32
 	AnchoPropio  bool
 	AlDesplazarV func(*fyne.ScrollEvent)
+	// Difuminar es el token del fondo sobre el que va la tira. Con él, el lado por el
+	// que queda contenido escondido se funde en ese fondo (`AnchoDifuminado`): sin
+	// barra, un botón cortado a tijera parecía roto y no uno que sigue más allá. Vacío,
+	// sin difuminado.
+	Difuminar string
 
 	desX float32
 }
+
+// AnchoDifuminado es lo que mide el difuminado de cada lado de una tira que no cabe.
+var AnchoDifuminado = tema.Espacio(6)
 
 var (
 	_ fyne.Widget     = (*TiraDeslizable)(nil)
@@ -198,14 +211,64 @@ func (t *TiraDeslizable) MinSize() fyne.Size {
 }
 
 // CreateRenderer coloca los botones en fila, corridos lo desplazado.
-func (t *TiraDeslizable) CreateRenderer() fyne.WidgetRenderer { return &tiraDeslizableRenderer{t: t} }
+func (t *TiraDeslizable) CreateRenderer() fyne.WidgetRenderer {
+	r := &tiraDeslizableRenderer{t: t}
+	if t.Difuminar != "" {
+		// Izquierda: del fondo a transparente; derecha: de transparente al fondo.
+		r.fundidos = [2]*canvas.LinearGradient{
+			canvas.NewHorizontalGradient(color.NRGBA{}, color.NRGBA{}),
+			canvas.NewHorizontalGradient(color.NRGBA{}, color.NRGBA{}),
+		}
+	}
+	return r
+}
 
-type tiraDeslizableRenderer struct{ t *TiraDeslizable }
+type tiraDeslizableRenderer struct {
+	t *TiraDeslizable
+	// fundidos son los difuminados de la izquierda y de la derecha (ver Difuminar).
+	fundidos [2]*canvas.LinearGradient
+	objetos  []fyne.CanvasObject
+}
 
-func (r *tiraDeslizableRenderer) MinSize() fyne.Size           { return r.t.MinSize() }
-func (r *tiraDeslizableRenderer) Objects() []fyne.CanvasObject { return r.t.Objetos }
-func (r *tiraDeslizableRenderer) Destroy()                     {}
-func (r *tiraDeslizableRenderer) Refresh()                     { r.Layout(r.t.Size()) }
+func (r *tiraDeslizableRenderer) MinSize() fyne.Size { return r.t.MinSize() }
+
+// Objects son los hijos y, encima, los dos difuminados.
+func (r *tiraDeslizableRenderer) Objects() []fyne.CanvasObject {
+	if r.fundidos[0] == nil {
+		return r.t.Objetos
+	}
+	if len(r.objetos) != len(r.t.Objetos)+2 {
+		r.objetos = make([]fyne.CanvasObject, 0, len(r.t.Objetos)+2)
+	}
+	r.objetos = append(append(r.objetos[:0], r.t.Objetos...), r.fundidos[0], r.fundidos[1])
+	return r.objetos
+}
+
+func (r *tiraDeslizableRenderer) Destroy() {}
+func (r *tiraDeslizableRenderer) Refresh() { r.Layout(r.t.Size()) }
+
+// difuminar pone los dos fundidos: cada uno solo si por su lado queda algo escondido.
+func (r *tiraDeslizableRenderer) difuminar(tam fyne.Size) {
+	if r.fundidos[0] == nil {
+		return
+	}
+	t := r.t
+	fondo := tema.Color(t.Difuminar, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	nada := color.NRGBA{R: fondo.R, G: fondo.G, B: fondo.B}
+	sobra := max(t.AnchoContenido()-tam.Width, 0)
+	ancho := min(AnchoDifuminado, tam.Width/2)
+	izq, der := r.fundidos[0], r.fundidos[1]
+	izq.StartColor, izq.EndColor = fondo, nada
+	der.StartColor, der.EndColor = nada, fondo
+	izq.Move(fyne.NewPos(0, 0))
+	izq.Resize(fyne.NewSize(ancho, tam.Height))
+	der.Move(fyne.NewPos(tam.Width-ancho, 0))
+	der.Resize(fyne.NewSize(ancho, tam.Height))
+	izq.Hidden = t.desX <= 0.5
+	der.Hidden = sobra-t.desX <= 0.5
+	izq.Refresh()
+	der.Refresh()
+}
 
 func (r *tiraDeslizableRenderer) Layout(tam fyne.Size) {
 	t := r.t
@@ -229,4 +292,5 @@ func (r *tiraDeslizableRenderer) Layout(tam fyne.Size) {
 		x += w
 		anterior = o
 	}
+	r.difuminar(tam)
 }

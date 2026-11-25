@@ -7,7 +7,7 @@
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { SytueShell, ImportData, LinkedServices } from '@sytue/shell';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 import { useConnectivity } from '@sytue/offline/preact';
 import {
   AppShell,
@@ -45,6 +45,9 @@ import {
   Glifo,
   useUltimo,
   Resaltado,
+  useEnHoja,
+  MenuSeparator,
+  marcarAppLista,
 } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import { appUrl } from '@sytue/config';
@@ -192,9 +195,20 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // ancla de shift-click recuerda la última fila pulsada para seleccionar rangos.
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const anchorRef = useRef<number | null>(null);
+  // En el teléfono las casillas no se pintan en cada fila: se entra en el modo de
+  // selección manteniendo el dedo sobre un contacto o con «Seleccionar» del menú «…»
+  // (la vía que no depende del gesto, para el teclado y el lector de pantalla). Con
+  // algo marcado también se está en él; `seleccionando` lo mantiene sin nada marcado.
+  const [seleccionando, setSeleccionando] = useState(false);
+  const enSeleccion = seleccionando || selection.size > 0;
+  // Por debajo de 768 —donde la lista y la ficha no caben juntas—, tocar una fila en el
+  // modo de selección la marca en vez de abrirla, como en Fotos y en Mail.
+  const enHoja = useEnHoja();
   // Contacto pedido por enlace (/contacts/{id}, el del buscador global de la suite):
   // su libreta se abre en vez de la primera y su ficha, al cargar la lista.
   const enlace = useRef<{ book: string; uid: string } | null>(null);
+  // La primera lista de contactos ya llegó (o falló): para `sytue:app-ready`.
+  const contactosLlegaron = useRef(false);
 
   // La conectividad puede caer con una edición abierta. Contacts degrada a
   // lectura, así que cierra todos los flujos que escriben y limpia su selección.
@@ -208,6 +222,7 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
     setReviewingDups(false);
     setTrashOpen(false);
     setSelection(new Set());
+    setSeleccionando(false);
     anchorRef.current = null;
   }, [offline]);
 
@@ -246,8 +261,10 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
     };
   }, [booksAttempt]);
 
+  /** Vacía la selección y sale del modo de selección del teléfono. */
   function clearSelection(): void {
     setSelection(new Set());
+    setSeleccionando(false);
     anchorRef.current = null;
   }
 
@@ -282,8 +299,18 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
         setContacts([]);
         setContactsError(true);
       })
-      .finally(() => setLoadingContacts(false));
+      .finally(() => {
+        contactosLlegaron.current = true;
+        setLoadingContacts(false);
+      });
   }
+
+  // `sytue:app-ready`: la libreta ya enseña sus contactos (o no hay libreta, o falló
+  // la carga). Lo que se presupuesta en vez del LCP y lo que espera la bóveda.
+  useEffect(() => {
+    if (loadingBooks || loadingContacts) return;
+    if (contactosLlegaron.current || booksError || !activeBook) marcarAppLista();
+  }, [loadingBooks, loadingContacts, booksError, activeBook]);
 
   function reloadGroups(): void {
     void cargarEtiquetas();
@@ -951,6 +978,9 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
     </Sidebar>
   );
 
+  // Tocar una fila marca en vez de abrir: el modo de selección, en el teléfono.
+  const marcaAlTocar = enSeleccion && enHoja;
+
   const mantenerContacto = useLongPress<string>((href) => {
     const i = filtered.findIndex((c) => c.href === href);
     if (i >= 0) toggleRow(i, false);
@@ -994,8 +1024,14 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 onDeleted={() => setBooksAttempt((n) => n + 1)}
               />
             ) : null}
+            {/* En el teléfono «Revisar duplicados» va dentro de «…». */}
             {!offline && duplicateGroups.length > 0 ? (
-              <Button variant="secondary" size="sm" onClick={() => setReviewingDups(true)}>
+              <Button
+                variant="secondary"
+                size="sm"
+                class="max-md:hidden"
+                onClick={() => setReviewingDups(true)}
+              >
                 {t('list.reviewDuplicates', { count: duplicateGroups.length })}
               </Button>
             ) : null}
@@ -1006,6 +1042,19 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
               addressBookId={activeBook?.id ?? null}
               onImported={reload}
               offline={offline}
+              onSeleccionar={
+                !offline && !enSeleccion && contacts.length > 0
+                  ? () => setSeleccionando(true)
+                  : undefined
+              }
+              onDuplicados={
+                !offline && duplicateGroups.length > 0
+                  ? {
+                      count: duplicateGroups.length,
+                      abrir: () => setReviewingDups(true),
+                    }
+                  : undefined
+              }
             />
           </div>
         }
@@ -1024,7 +1073,7 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
           // mt-3 y no mt-2: la zona de toque de la casilla se estira 10 px hacia
           // arriba y con 8 px de hueco pisaba el borde del buscador.
           <div class="mt-3 flex items-center gap-2.5 px-0.5">
-            <label class={CHECKBOX_HIT}>
+            <label class={cx(CHECKBOX_HIT, !enSeleccion && 'max-md:hidden')}>
               <Checkbox
                 class={CHECKBOX_CLASS}
                 aria-label={t('list.selectAll')}
@@ -1040,6 +1089,13 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 ? t('list.countWithLabel', { summary: countSummary, label: activeGroup.name })
                 : countSummary}
             </p>
+            {/* La salida del modo de selección mientras no hay nada marcado: con algo
+                marcado sale la barra del lote, que trae su aspa (y Escape). */}
+            {seleccionando && selection.size === 0 ? (
+              <Button variant="ghost" size="sm" class="ml-auto md:hidden" onClick={clearSelection}>
+                {t('common.cancel')}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -1170,7 +1226,9 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
                       clicable y hacía falta un data-select y dos
                       stopPropagation para que marcar a alguien no abriera además
                       su ficha. Como hermanos, el problema no existe. */}
-                  <label class={CHECKBOX_HIT}>
+                  {/* En el teléfono, solo en el modo de selección: una casilla por fila
+                      era el escritorio metido en una pantalla de 390. */}
+                  <label class={cx(CHECKBOX_HIT, !enSeleccion && 'max-md:hidden')}>
                     <Checkbox
                       class={CHECKBOX_CLASS}
                       tabIndex={parada}
@@ -1195,10 +1253,13 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     onFocus={() => setCursor(index)}
                     class="sytue-focus-ring-inner flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left"
                     aria-current={isSelected ? 'true' : undefined}
+                    // En el modo de selección del teléfono la fila marca: lo dice como
+                    // un conmutador, y la casilla de al lado sigue ahí para quien la busque.
+                    aria-pressed={marcaAlTocar ? selection.has(c.href) : undefined}
                     onPointerDown={(e) => mantenerContacto.iniciar(e, c.href)}
                     onClickCapture={mantenerContacto.onClickCapture}
                     onContextMenuCapture={mantenerContacto.onContextMenuCapture}
-                    onClick={() => setSelected(c)}
+                    onClick={() => (marcaAlTocar ? toggleRow(index, false) : setSelected(c))}
                   >
                     <Avatar name={c.fullName} src={avatarSrc(c)} size="sm" />
                     <span class="flex min-w-0 flex-1 flex-col">
@@ -1366,6 +1427,10 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
  *    salta filas inválidas y deduplica por correo (una sola llamada).
  *  - Exportar vCard: descarga la libreta cargada como .vcf multi-tarjeta.
  *  - Exportar CSV: descarga TODOS los contactos del usuario (GET /api/export-csv).
+ *
+ * En el teléfono (por debajo de 768) no es el botón «Importar / Exportar» con texto, que
+ * era el escritorio metido en la cabecera: es un «…» con lo de la lista que no cabe en
+ * ella —«Seleccionar», «Revisar duplicados»— y debajo lo de importar y exportar.
  */
 function VcardToolbar({
   t,
@@ -1374,6 +1439,8 @@ function VcardToolbar({
   addressBookId,
   onImported,
   offline,
+  onSeleccionar,
+  onDuplicados,
 }: {
   t: T;
   contacts: Contact[];
@@ -1382,6 +1449,10 @@ function VcardToolbar({
   addressBookId: string | null;
   onImported: () => void;
   offline: boolean;
+  /** Entrar en el modo de selección (solo en el «…» del teléfono). Sin él, no se ofrece. */
+  onSeleccionar?: (() => void) | undefined;
+  /** Los duplicados, que en el teléfono pasan del botón de la cabecera al «…». */
+  onDuplicados?: { count: number; abrir: () => void } | undefined;
 }): JSX.Element {
   const toast = useToast();
   const vcfRef = useRef<HTMLInputElement>(null);
@@ -1465,6 +1536,61 @@ function VcardToolbar({
     }
   }
 
+  // El propio botón lleva la cuenta: es donde mira quien acaba de pulsarlo, y el
+  // `aria-busy` del Button ya está puesto. role=status para que el avance también se
+  // anuncie sin robar el foco. Una función y no un elemento: lo pintan dos botones.
+  const progreso = (): JSX.Element | null =>
+    vcfProgress ? (
+      <span class="tabular-nums" role="status">
+        {t('io.importProgress', vcfProgress)}
+      </span>
+    ) : null;
+
+  /** Importar y exportar: lo mismo en el menú del escritorio y en el «…» del teléfono. */
+  const accionesIo = (cerrar: () => void): JSX.Element => (
+    <>
+      <MenuItem
+        disabled={offline || !addressBookUrl}
+        onClick={() => {
+          cerrar();
+          vcfRef.current?.click();
+        }}
+      >
+        {t('io.importVcard')}
+      </MenuItem>
+      <MenuItem
+        disabled={offline || !addressBookUrl}
+        onClick={() => {
+          cerrar();
+          csvRef.current?.click();
+        }}
+      >
+        {t('io.importCsv')}
+      </MenuItem>
+      <MenuItem
+        disabled={contacts.length === 0}
+        onClick={() => {
+          cerrar();
+          downloadVcf(
+            t('io.exportFilename'),
+            contacts.map((c) => c.vcard),
+          );
+        }}
+      >
+        {t('io.exportVcard')}
+      </MenuItem>
+      <MenuItem
+        disabled={offline}
+        onClick={() => {
+          cerrar();
+          window.location.assign(withBase(import.meta.env.BASE_URL, '/api/export-csv'));
+        }}
+      >
+        {t('io.exportCsv')}
+      </MenuItem>
+    </>
+  );
+
   return (
     <>
       <input
@@ -1485,7 +1611,10 @@ function VcardToolbar({
         tabindex={-1}
         onChange={(e) => void onCsv(e.currentTarget)}
       />
+      {/* Dos menús con las mismas acciones y uno solo a la vista: el oculto lleva
+          `display: none`, así que tampoco está en el orden de Tab ni lo lee nadie. */}
       <Dropdown
+        class="max-md:hidden"
         label={t('io.menuLabel')}
         align="end"
         trigger={(props) => (
@@ -1497,44 +1626,65 @@ function VcardToolbar({
             trailingIcon={<Icon name="chevronDown" size={14} />}
             {...props}
           >
-            {/* El propio botón lleva la cuenta: es donde mira quien acaba de
-                pulsarlo, y el `aria-busy` del Button ya está puesto. role=status
-                para que el avance también se anuncie sin robar el foco. */}
-            {vcfProgress ? (
-              <span class="tabular-nums" role="status">
-                {t('io.importProgress', vcfProgress)}
-              </span>
-            ) : (
-              t('io.button')
-            )}
+            {progreso() ?? t('io.button')}
           </Button>
         )}
       >
-        <MenuItem disabled={offline || !addressBookUrl} onClick={() => vcfRef.current?.click()}>
-          {t('io.importVcard')}
-        </MenuItem>
-        <MenuItem disabled={offline || !addressBookUrl} onClick={() => csvRef.current?.click()}>
-          {t('io.importCsv')}
-        </MenuItem>
-        <MenuItem
-          disabled={contacts.length === 0}
-          onClick={() =>
-            downloadVcf(
-              t('io.exportFilename'),
-              contacts.map((c) => c.vcard),
-            )
-          }
-        >
-          {t('io.exportVcard')}
-        </MenuItem>
-        <MenuItem
-          disabled={offline}
-          onClick={() =>
-            window.location.assign(withBase(import.meta.env.BASE_URL, '/api/export-csv'))
-          }
-        >
-          {t('io.exportCsv')}
-        </MenuItem>
+        {(cerrar) => accionesIo(cerrar)}
+      </Dropdown>
+      <Dropdown
+        class="md:hidden"
+        label={t('list.moreActions')}
+        align="end"
+        trigger={(props) => {
+          // Importando, el «…» se apaga como el botón del escritorio y, con la cuenta de
+          // la vCard, la enseña.
+          const cuenta = progreso();
+          return cuenta ? (
+            <Button variant="ghost" size="sm" loading disabled {...props}>
+              {cuenta}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              loading={importing}
+              disabled={importing}
+              aria-label={t('list.moreActions')}
+              title={t('list.moreActions')}
+              leadingIcon={<Icon name="ellipsis" size={16} />}
+              {...props}
+            />
+          );
+        }}
+      >
+        {(cerrar) => (
+          <>
+            {onSeleccionar ? (
+              <MenuItem
+                onClick={() => {
+                  cerrar();
+                  onSeleccionar();
+                }}
+              >
+                {t('list.selectMode')}
+              </MenuItem>
+            ) : null}
+            {onDuplicados ? (
+              <MenuItem
+                onClick={() => {
+                  cerrar();
+                  onDuplicados.abrir();
+                }}
+              >
+                {t('list.reviewDuplicates', { count: onDuplicados.count })}
+              </MenuItem>
+            ) : null}
+            {onSeleccionar || onDuplicados ? <MenuSeparator /> : null}
+            {accionesIo(cerrar)}
+          </>
+        )}
       </Dropdown>
     </>
   );

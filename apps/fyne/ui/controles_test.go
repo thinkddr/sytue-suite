@@ -127,6 +127,45 @@ func TestElAroEsElDeLaHoja(t *testing.T) {
 	}
 }
 
+// TestElAroSobreRellenoEsDelColorDelTexto es la otra mitad de la paridad del aro: el
+// COLOR, que la de arriba no miraba. La hoja cambia `--sytue-focus-ring` a `--sytue-text`
+// en `.sytue-focus-ring-inset` —el token de foco es el primario y sobre un botón principal
+// el aro se fundía con su relleno—, y el botón de aquí tiene que pintarlo igual, en claro
+// y en oscuro: lo PINTADO, a un píxel del hueco, y no solo el token. El aro blanco del
+// cromo se queda (la regla del cromo va después en la hoja y gana).
+// VISTO EN ROJO con el `focus-ring` de antes en el botón.
+func TestElAroSobreRellenoEsDelColorDelTexto(t *testing.T) {
+	hoja := webref.Read(t, "apps/frontend/packages/ui/src/styles.css")
+	if !strings.Contains(hoja, ".sytue-focus-ring-inset,\n.sytue-focus-ring-inset-within {\n  --sytue-focus-ring: var(--sytue-text);\n}") {
+		t.Fatal("styles.css ya no pinta el aro sobre relleno con `--sytue-text`: revisad `Aro.tokenPintado`")
+	}
+	t.Cleanup(func() { tema.Elegir("") })
+	for _, modo := range []string{"claro", "oscuro"} {
+		tema.Elegir(modo)
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		const m = 8
+		for _, b := range []*Boton{NuevoBoton("Guardar", nil), NuevoBoton("Cancelar", nil).Con(Secundario, TallaMD)} {
+			declarada := b.MinSize()
+			b.FocusGained()
+			img := colocado(t, b, declarada, m)
+			// El anillo va de 1 a 3 px fuera de la caja: su centro, a 2 px.
+			got := px(img, int((m-2)*escala), int((m+declarada.Height/2)*escala))
+			if quiero := tema.Color("text", v); !cerca(got, quiero) {
+				t.Errorf("%s, «%s»: el aro pinta %v y la hoja pide `text` (%v)", modo, b.Texto, got, quiero)
+			}
+			if foco := tema.Color("focus-ring", v); cerca(got, foco) && foco != tema.Color("text", v) {
+				t.Errorf("%s, «%s»: el aro sigue en `focus-ring`", modo, b.Texto)
+			}
+		}
+		cromo := NuevoBoton("Crear", nil)
+		cromo.TokenAro = "sidebar-focus"
+		r := test.WidgetRenderer(cromo).(*botonRenderer)
+		if got := r.aro.anillo.FillColor; got != tema.Color("sidebar-focus", v) {
+			t.Errorf("%s: el aro del cromo pinta %v y es `sidebar-focus`", modo, got)
+		}
+	}
+}
+
 // TestElAroSePintaFueraDeLaCajaYNoOcupaSitio es la comprobación que decide si el aro se
 // puede hacer así en Fyne. `box-shadow` no participa en el layout de CSS, así que el
 // widget tiene que seguir midiendo lo mismo con el foco puesto y pintar DOS píxeles más
@@ -880,7 +919,7 @@ func TestElBotonTieneLasCuatroVariantes(t *testing.T) {
 		relleno, texto, borde string
 	}{
 		{"primary: bg-primary text-on-primary", Primario, "primary", "on-primary", ""},
-		{"secondary: bg-primary text-on-primary border-border-strong", Secundario, "primary", "on-primary", "border-strong"},
+		{"secondary: bg-surface text-text border-border-strong", Secundario, "surface", "text", "border-strong"},
 		{"ghost: bg-transparent text-primary-text", Fantasma, "", "primary-text", ""},
 		// Blanco, no `on-primary`: es el rótulo del primario y en oscuro es casi negro.
 		{"danger: bg-danger text-white", Peligro, "danger", "neutral-0", ""},
@@ -902,12 +941,9 @@ func TestElBotonTieneLasCuatroVariantes(t *testing.T) {
 				t.Errorf("%s: lleva borde (%v) y en la hoja no tiene", c.clase, borde)
 			}
 		} else {
+			// CSS pinta el borde sobre el relleno del propio botón, que en el secundario es
+			// la superficie: el `border-strong` aplanado del tema.
 			quiero := tema.Color(c.borde, tema.Claro)
-			if c.v == Secundario {
-				// border-strong rgba(15,29,32,.6) sobre primary-600 #0f7680:
-				// CSS pinta el borde sobre el relleno del propio botón.
-				quiero = color.NRGBA{R: 15, G: 65, B: 70, A: 255}
-			}
 			if borde != quiero {
 				t.Errorf("%s: el borde es %v; CSS requiere %v", c.clase, borde, quiero)
 			}

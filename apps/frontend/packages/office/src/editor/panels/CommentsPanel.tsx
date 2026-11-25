@@ -27,7 +27,7 @@ import {
   readCommentCellRef,
   revealCommentCell,
   subscribeSheetState,
-} from '../sheets/SheetCanvas';
+} from '../sheets/mando';
 
 const HL_ANCHOR = 'sytue-comment-anchor';
 

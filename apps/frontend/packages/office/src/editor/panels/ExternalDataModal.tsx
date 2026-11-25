@@ -41,7 +41,7 @@ import {
 } from '@sytue/ui';
 import type { ReviewItem, WizardStep } from '@sytue/ui';
 import { EditorIcon } from '../icons';
-import { dispatchSheetCommand, readSheetState } from '../sheets/SheetCanvas';
+import { dispatchSheetCommand, readSheetState } from '../sheets/mando';
 import { parseRangeRef } from '../sheets/format';
 import { TABLE_STYLES } from '../sheets/table';
 import {

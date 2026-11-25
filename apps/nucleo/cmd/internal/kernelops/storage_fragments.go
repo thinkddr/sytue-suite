@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //go:build js && wasm
 
-package main
+package kernelops
 
 import (
 	"encoding/json"
@@ -13,13 +13,13 @@ import (
 )
 
 func init() {
-	domainOperations["storage.record.encode"] = encodeRecordPayload
-	domainOperations["storage.record.decode"] = decodeRecordPayload
-	domainOperations["storage.fragment.seal"] = sealFragment
-	domainOperations["storage.fragment.open"] = openFragment
-	domainOperations["storage.fragment.root.seal"] = sealFragmentRoot
-	domainOperations["storage.fragment.root.open"] = openFragmentRoot
-	domainOperations["storage.fragment.assemble"] = assembleFragments
+	Operations["storage.record.encode"] = encodeRecordPayload
+	Operations["storage.record.decode"] = decodeRecordPayload
+	Operations["storage.fragment.seal"] = sealFragment
+	Operations["storage.fragment.open"] = openFragment
+	Operations["storage.fragment.root.seal"] = sealFragmentRoot
+	Operations["storage.fragment.root.open"] = openFragmentRoot
+	Operations["storage.fragment.assemble"] = assembleFragments
 }
 
 func encodeRecordPayload(req js.Value) (any, error) {

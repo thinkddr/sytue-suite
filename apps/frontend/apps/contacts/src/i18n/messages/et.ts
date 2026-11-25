@@ -48,6 +48,8 @@ export const et: AppCatalog<typeof en> = {
   'list.unstar': 'Eemalda {name} tärniga märgitute hulgast',
   'list.starredTitle': 'Tärniga',
   'list.reviewDuplicates': 'Vaata duplikaadid üle ({count})',
+  'list.selectMode': 'Vali',
+  'list.moreActions': 'Rohkem toiminguid',
   'list.count': { one: '{count} kontakt', other: '{count} kontakti' },
   'list.countFiltered': { one: '{shown}/{count} kontakt', other: '{shown}/{count} kontakti' },
   'list.countWithLabel': '{summary} · {label}',

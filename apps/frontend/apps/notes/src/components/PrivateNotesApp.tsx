@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import type { ComponentProps, JSX } from 'preact';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 import { NotesApp } from './NotesApp.js';
 
 export function PrivateNotesApp(props: ComponentProps<typeof NotesApp>): JSX.Element {

@@ -503,6 +503,7 @@ export const sl: AppCatalog<typeof en> = {
   'compose.templates': 'Predloge',
   'compose.templatesEmpty': 'Predlog še nimate. Ustvarite jih v nastavitvah Maila.',
   'compose.attachFailed': 'Priloge ni bilo mogoče prebrati',
+  'compose.openFailed': 'Urejevalnika sporočila ni bilo mogoče odpreti. Poskusite znova.',
   'compose.pastedImageDropped': 'Prilepljena slika ni bila vključena',
   'compose.pastedImagesDropped': 'Prilepljene slike niso bile vključene',
   'compose.pastedImagesDroppedDescription': 'Če želite poslati slike, jih priložite kot datoteke.',

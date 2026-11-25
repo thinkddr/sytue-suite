@@ -9,7 +9,7 @@
  * Drive (api/pdf-recientes.ts): un PDF no es un documento de Docs.
  */
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
-import { Badge, Button, EmptyState, Input, Skeleton, Spinner, cx } from '@sytue/ui';
+import { Badge, Button, EmptyState, Input, Skeleton, Spinner, cx, marcarAppLista } from '@sytue/ui';
 import { contiene, formatDate, type Locale } from '@sytue/i18n';
 import { productColor } from '@sytue/config';
 import { docsT } from '../i18n';
@@ -235,6 +235,12 @@ export function PortadaPdf({
   }, []);
 
   useEffect(cargar, [cargar]);
+
+  // `sytue:app-ready`: la portada ya enseña los PDF recientes (o el fallo). Lo que se
+  // presupuesta en vez del LCP y lo que espera la bóveda para abrirse detrás.
+  useEffect(() => {
+    if (lista !== null || fallo) marcarAppLista();
+  }, [lista, fallo]);
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();

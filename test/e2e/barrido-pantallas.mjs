@@ -14,7 +14,13 @@ import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
-import { activarOrganizacion, codigoTOTP, esCuentaDelIdPDesdeAdmin, porQueNoEntra } from "./tests/helpers.ts";
+import {
+  activarOrganizacion,
+  codigoTOTP,
+  esCuentaDelIdPDesdeAdmin,
+  porQueNoEntra,
+  salirDelPasoDeAutorizacion,
+} from "./tests/helpers.ts";
 import { appsDesplegadas, desplegada } from "./apps-desplegadas.mjs";
 
 const INFORME = `${createReportDirectory('barrido')}/informe.json`;
@@ -179,7 +185,11 @@ function urlDe(def, ruta) {
  * existe para no producir.
  */
 async function asegurarSesion(page, destino) {
-  if (new URL(page.url()).hostname !== IDP) return false;
+  // Con sesión en el IdP, `/oauth2/authorize` devuelve solo a la app: se espera a
+  // que salga del paso antes de mirar dónde está (ver `salirDelPasoDeAutorizacion`).
+  // Si estaba en él, la app ya tiene su sesión y se vuelve a pedir la ruta.
+  const deVuelta = await salirDelPasoDeAutorizacion(page);
+  if (new URL(page.url()).hostname !== IDP) return deVuelta;
   if (esCuentaDelIdPDesdeAdmin(destino, page.url(), DOMINIO)) return false;
   // Solo se rellena el formulario de ACCESO, reconocido por la contraseña (igual
   // que en `mobile-audit.mjs`). Sin esto, cualquier otra pantalla del IdP
@@ -192,6 +202,11 @@ async function asegurarSesion(page, destino) {
     .then(() => true, () => false);
   if (!formulario) {
     const aqui = new URL(page.url());
+    // Mientras se esperaba el formulario, la página pudo seguir sola hasta la app
+    // (o hasta la cuenta del IdP desde Admin): entonces no hay nada que rellenar, y
+    // su ruta no es una pantalla del IdP.
+    if (aqui.hostname !== IDP) return true;
+    if (esCuentaDelIdPDesdeAdmin(destino, page.url(), DOMINIO)) return false;
     throw new Error(`el IdP muestra ${aqui.pathname}${aqui.search}, que no es el formulario de acceso`);
   }
   for (let intento = 1; ; intento++) {

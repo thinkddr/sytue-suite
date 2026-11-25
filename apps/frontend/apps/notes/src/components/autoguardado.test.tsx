@@ -11,6 +11,7 @@
  * antes de irse. Y que los guardados de una misma edición van con la MISMA
  * marca de sesión, que es lo que mantiene el deshacer en una sola entrada.
  */
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

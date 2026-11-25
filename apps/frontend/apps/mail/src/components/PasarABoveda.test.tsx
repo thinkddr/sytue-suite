@@ -85,3 +85,16 @@ test('con Matrix retirada no se ofrece seguir con el anterior', () => {
   act(() => boton(en['privateMail.handoverConfirm']).click());
   expect(llamadas).toEqual({ vaciar: 1, seguir: 0 });
 });
+
+// Los rótulos son frases: «Vorerst bei den bisherigen E-Mails bleiben» desbordaba 7 px
+// en un teléfono de 320 (barrido móvil del 2026-11-24). Saltan de línea (`multilinea`)
+// en vez de salirse de la pantalla.
+test('los rótulos largos de la pantalla saltan de línea en un teléfono', () => {
+  const { host } = pintar();
+  const botones = [...host.querySelectorAll('button')];
+  expect(botones).toHaveLength(2);
+  for (const b of botones) {
+    expect(b.className.split(/\s+/)).toContain('whitespace-normal');
+    expect(b.className.split(/\s+/)).not.toContain('whitespace-nowrap');
+  }
+});

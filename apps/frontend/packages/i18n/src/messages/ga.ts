@@ -75,6 +75,8 @@ export const ga: Catalog = {
   'vault.emptyUnderstood': 'Tuigim go scriosfar na sonraí a criptíodh leis an eochair caillte',
   'vault.failed':
     'Níorbh fhéidir na sonraí criptithe a oscailt. Bain triail eile as nó sínigh isteach i Sytue ID arís. Má cailleadh an eochair, is féidir leat sonraí criptithe na haipe seo a fholmhú.',
+  'vault.moreInfo': 'Tuilleadh eolais',
+  'vault.attention': 'Tá aird ag teastáil ó do shonraí criptithe',
   'matrix.incoming': 'Fíoraigh an gléas seo',
   'matrix.match': 'Tá siad mar an gcéanna',
   'matrix.mismatch': 'Níl siad mar an gcéanna',

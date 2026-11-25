@@ -14,8 +14,8 @@ import {
   type ShowSasCallbacks,
   type VerificationRequest,
 } from 'matrix-js-sdk/lib/crypto-api';
+import { SuiteMatrix } from '@sytue/offline/matrix/client';
 import {
-  SuiteMatrix,
   MatrixCustodyError,
   MatrixSecurityError,
   type MatrixKeyCustody,

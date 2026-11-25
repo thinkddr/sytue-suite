@@ -426,16 +426,18 @@ func TestAnfitrionCorreoTraspasoConReidentificacionNoVaciaDosVeces(t *testing.T)
 	if p.modo != puertaTraspaso || b.host.matrixPuedeEmpezar() {
 		t.Fatal("el traspaso no abre una bóveda nueva con la marca")
 	}
+	// Sin pulsar nada, va sola a identificarse otra vez; la persona lo cancela.
+	b.entrar = func() error { return errors.New("cancelado") }
 	vault := b.entregar(p)
 	if vault.SigningStatus() != pqvault.SigningReauth || b.host.pendiente != vault {
 		t.Fatalf("sin identificación reciente la bóveda espera: %s", vault.SigningStatus())
 	}
 	resets := len(b.fake.Resets())
-
-	// La persona cancela el inicio de sesión: se sigue pidiendo, con la misma bóveda.
-	b.entrar = func() error { return errors.New("cancelado") }
-	b.host.registrarFirma(true)
 	b.esperar()
+	if b.entradas != 1 {
+		t.Fatalf("no fue sola a identificarse: %d", b.entradas)
+	}
+	// Cancelado: se sigue pidiendo, con la misma bóveda, y ya con el botón.
 	if b.host.pendiente != vault || vault.Closed() || len(b.abiertas) != 0 {
 		t.Fatal("cancelar el inicio de sesión soltó la bóveda o abrió el correo")
 	}
@@ -520,7 +522,10 @@ func TestAnfitrionCorreoCambiarDeCuentaCierraLaBovedaPendiente(t *testing.T) {
 	b.host.adoptar()
 	b.esperar()
 	b.host.pedirTraspaso()
+	// La vuelta sola a Sytue ID no sale (cancelada): la bóveda sigue esperando.
+	b.entrar = func() error { return errors.New("cancelado") }
 	vault := b.entregar(b.ultimaPuerta())
+	b.esperar()
 	if b.host.pendiente != vault {
 		t.Fatal("la bóveda no espera")
 	}

@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -305,11 +306,7 @@ const anchoMascara float32 = 24
 //
 // Se apaga al llegar al final para no anunciar lo que ya no hay.
 func conMascara(caja fyne.CanvasObject, s *ui.DesplazaLado, fondo string) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	c := tema.Color(fondo, v)
-	transparente := c
-	transparente.A = 0
-	d := canvas.NewHorizontalGradient(transparente, c)
+	d := nuevoFundidoMascara(fondo)
 	m := &mascara{s: s, degradado: d}
 	antes := s.AlDesplazar
 	s.AlDesplazar = func() {
@@ -323,7 +320,47 @@ func conMascara(caja fyne.CanvasObject, s *ui.DesplazaLado, fondo string) fyne.C
 
 type mascara struct {
 	s         *ui.DesplazaLado
-	degradado *canvas.LinearGradient
+	degradado *fundidoMascara
+}
+
+// fundidoMascara es el degradado de conMascara, de transparente al color de `token`. El
+// color se resuelve AL PINTARSE, como el de `ui.Liso`: resuelto al componer la tira, se
+// quedaba en la variante en que nació, y al cambiar de tema los últimos 24 px de la tira
+// de pestañas y de la banda se fundían en el papel del tema anterior.
+type fundidoMascara struct {
+	widget.BaseWidget
+	token string
+}
+
+func nuevoFundidoMascara(token string) *fundidoMascara {
+	f := &fundidoMascara{token: token}
+	f.ExtendBaseWidget(f)
+	return f
+}
+
+func (f *fundidoMascara) CreateRenderer() fyne.WidgetRenderer {
+	r := &fundidoMascaraRenderer{f: f, g: canvas.NewHorizontalGradient(color.Transparent, color.Transparent)}
+	r.Refresh()
+	return r
+}
+
+type fundidoMascaraRenderer struct {
+	f *fundidoMascara
+	g *canvas.LinearGradient
+}
+
+func (r *fundidoMascaraRenderer) MinSize() fyne.Size           { return fyne.Size{} }
+func (r *fundidoMascaraRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.g} }
+func (r *fundidoMascaraRenderer) Destroy()                     {}
+func (r *fundidoMascaraRenderer) Layout(t fyne.Size)           { r.g.Resize(t) }
+
+func (r *fundidoMascaraRenderer) Refresh() {
+	c := tema.Color(r.f.token, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	transparente := c
+	transparente.A = 0
+	r.g.StartColor, r.g.EndColor = transparente, c
+	r.g.Resize(r.f.Size())
+	r.g.Refresh()
 }
 
 // queda es `Math.ceil(scrollLeft + clientWidth) < scrollWidth`.

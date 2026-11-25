@@ -576,8 +576,10 @@ func (p *Pantalla) objetoTabla(v tema.Variante) fyne.CanvasObject {
 		p.elegirVista(vistas[i-1].ID)
 	})
 	campo := botonSM(p.t("field.add"), ui.Secundario, p.dialogoCampo).ConIcono(iconos.Mas, 14)
-	// `h-8`: el selector, a la altura de los botones de la barra.
-	selector.Rotulo, selector.Elegida, selector.Talla = p.t("view.list"), elegida, ui.CampoSM
+	// `h-8`: el selector, a la altura de los botones de la barra, y con la letra del de
+	// «Ordenar por» de debajo: en `CampoSM` iba en `text-xs` y los dos desplegables de la
+	// barra tenían tallas distintas (auditoría del 2026-11-24).
+	selector.Rotulo, selector.Elegida = p.t("view.list"), elegida
 	selector.Alto = ui.MedidaBotonDe(campo).Height
 	barra := []fyne.CanvasObject{container.New(tope{Max: 18 * tema.Rem}, selector)}
 	if puedeEsquema(b.Datos.Role) {

@@ -11,11 +11,13 @@ package drive
 // reanudar una época ya congelada:
 //
 //   - la fuente en `legacy`: este dispositivo la congela y la importa;
-//   - la fuente congelada sin recibo en la bóveda: solo si la congeló este
-//     dispositivo (su intención `begin_` con esa época sigue en el diario) o si
-//     la persona eligió adoptarla (AdoptRetainedSource). Si no, ErrNotReady: la
-//     importa quien la empezó (la web u otro dispositivo), o la época es la de
-//     Matrix y sus datos están allí.
+//   - la fuente congelada sin recibo en la bóveda: si la congeló este
+//     dispositivo (su intención `begin_` con esa época sigue en el diario), si
+//     la persona eligió adoptarla (AdoptRetainedSource) o si la bóveda ya guarda,
+//     sin marca de copia, una importación a medias de ESA época (la empezó la web,
+//     otro dispositivo, o este y perdió su diario): se termina, como haría la web.
+//     Si no, ErrNotReady: la bóveda vacía con una época ajena puede ser la de
+//     Matrix, cuyos datos están allí.
 //
 // Así una copia a medias de otra cosa (la de Matrix a la bóveda) nunca se mezcla
 // con la fuente del servidor, y la importación es idempotente y reanudable: cada
@@ -24,6 +26,7 @@ package drive
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
@@ -47,6 +50,10 @@ func (r *Repository) initializeDirect(ctx context.Context, binding storage.Bindi
 			return err
 		}
 	}
+	// Lo que dejaron dos importaciones a la vez se junta antes de mirar el recibo.
+	if err := r.mergeImportCopies(ctx, binding, state.Epoch); err != nil {
+		return err
+	}
 	found, err := r.completed(ctx, state)
 	if err != nil {
 		return err
@@ -58,20 +65,94 @@ func (r *Repository) initializeDirect(ctx context.Context, binding storage.Bindi
 	if err != nil {
 		return err
 	}
+	if !owned && state.Mode == "frozen" {
+		owned, err = r.adoptPartialImport(ctx, state.Epoch)
+		if err != nil {
+			return err
+		}
+	}
 	if !owned {
-		return ErrNotReady
+		return refuse("foreign_epoch", ErrNotReady)
 	}
 	if state.Mode != "frozen" {
-		return ErrSource
+		return refuse("source_mode", ErrSource)
 	}
 	receipt, err := r.importSnapshot(ctx, binding, state)
 	if err != nil {
+		return err
+	}
+	if err := r.mergeImportCopies(ctx, binding, state.Epoch); err != nil {
 		return err
 	}
 	if err := r.publishCompletion(ctx, binding, receipt); err != nil {
 		return err
 	}
 	return r.finishInitialization(ctx, state)
+}
+
+// adoptPartialImport adopta `epoch` cuando la bóveda ya tiene una importación a
+// medias de exactamente esa época (lo que deja la web, otro dispositivo, o este
+// sin su diario, cuando se cortan) y no lleva marca de copia. Es lo que la web
+// hace siempre: terminar la importación de la fuente congelada que encuentra.
+//
+// Por qué no abre la puerta a nada que antes estuviera cerrado: cada fila que ya
+// está en la bóveda se sigue confirmando contra la fila congelada (y su fichero
+// contra el original) antes de publicar el recibo, así que una bóveda que no sea
+// esa importación no llega a abrir; lo que hay son revisiones autenticadas por la
+// persona, que el servidor no puede fabricar; y la copia de Matrix a la bóveda,
+// lo único que podría dejar filas de esa época con datos más nuevos, lleva su
+// marca en el servidor mientras copia (con ella, se sigue esperando). Una bóveda
+// vacía con una época ajena tampoco se adopta: puede ser la época de Matrix.
+func (r *Repository) adoptPartialImport(ctx context.Context, epoch string) (bool, error) {
+	if !r.partialImportOf(epoch) {
+		return false, nil
+	}
+	state, err := r.cfg.Gateway.PQVaultKeys(ctx, r.cfg.Scope)
+	if err != nil {
+		return false, err
+	}
+	if state.Copy != nil {
+		return false, nil
+	}
+	if err := AdoptRetainedSource(r.cfg.Journal, r.cfg.Scope, epoch); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// partialImportOf dice si TODO lo de Drive en la bóveda es una importación sin
+// terminar de `epoch`: al menos una fila, todas semilla de esa época (ninguna
+// editada) y ningún fichero de otra época ni recibo alguno.
+func (r *Repository) partialImportOf(epoch string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rows := 0
+	for _, versions := range r.heads {
+		for _, version := range versions {
+			var meta struct {
+				Kind  string `json:"kind"`
+				Epoch string `json:"epoch"`
+			}
+			if json.Unmarshal(version.Commit.Metadata, &meta) != nil {
+				return false
+			}
+			switch meta.Kind {
+			case itemKind:
+				item, err := decodeSummary(version)
+				if err != nil || !item.Seed || item.Epoch != epoch || item.BaselineSHA256 != item.RawSHA256 {
+					return false
+				}
+				rows++
+			case bodyKind:
+				if meta.Epoch != epoch {
+					return false
+				}
+			case migrationKind:
+				return false
+			}
+		}
+	}
+	return rows > 0
 }
 
 // ownsRetainedSource dice si este dispositivo puede seguir importando `epoch`.

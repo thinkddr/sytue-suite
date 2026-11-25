@@ -118,6 +118,7 @@
   "compose.noAttachmentSend": "Napriek tomu odoslať",
   "compose.noAttachmentTitle": "Odoslať bez príloh",
   "compose.noDraftsFolder": "Priečinok Koncepty sa nepodarilo nájsť",
+  "compose.openFailed": "Editor správy sa nepodarilo otvoriť. Skúste to znova.",
   "compose.pastedImageDropped": "Vložený obrázok nebol zahrnutý",
   "compose.pastedImagesDropped": "Vložené obrázky neboli zahrnuté",
   "compose.pastedImagesDroppedDescription": "Ak chcete poslať obrázky, priložte ich ako súbory.",

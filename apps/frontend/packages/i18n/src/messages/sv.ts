@@ -74,6 +74,8 @@ export const sv: Catalog = {
   'vault.emptyUnderstood': 'Jag förstår att data som krypterats med den förlorade nyckeln raderas',
   'vault.failed':
     'De krypterade data kunde inte öppnas. Försök igen eller logga in på Sytue ID igen. Om nyckeln har gått förlorad kan du tömma appens krypterade data.',
+  'vault.moreInfo': 'Mer information',
+  'vault.attention': 'Dina krypterade data behöver uppmärksamhet',
   'matrix.incoming': 'Verifiera den här enheten',
   'matrix.match': 'De stämmer överens',
   'matrix.mismatch': 'De stämmer inte överens',

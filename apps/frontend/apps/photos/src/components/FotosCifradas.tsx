@@ -409,8 +409,10 @@ export function MiniaturaCifrada({
           aria-pressed={favorita}
           class={cx(
             'sytue-focus-ring rounded-control absolute bottom-0 left-0 p-1',
+            // Con el dedo, solo el de las favoritas: como en la galería del servidor
+            // (PhotosApp) y en las apps nativas; se marca desde el visor o la selección.
             !favorita &&
-              'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
+              'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden',
           )}
         >
           <span class="rounded-control block bg-black/60 p-1 text-white">

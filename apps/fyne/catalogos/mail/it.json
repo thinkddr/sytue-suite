@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Invia comunque",
   "compose.noAttachmentTitle": "Inviare senza allegati",
   "compose.noDraftsFolder": "Impossibile trovare la cartella Bozze",
+  "compose.openFailed": "Impossibile aprire l’editor del messaggio. Riprova.",
   "compose.pastedImageDropped": "L’immagine incollata non è stata inclusa",
   "compose.pastedImagesDropped": "Le immagini incollate non sono state incluse",
   "compose.pastedImagesDroppedDescription": "Per inviare immagini, allegale come file.",

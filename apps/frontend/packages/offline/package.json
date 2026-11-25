@@ -10,6 +10,7 @@
     "./preact": "./src/preact.ts",
     "./worker": "./src/worker.ts",
     "./matrix": "./src/matrix/index.ts",
+    "./matrix/client": "./src/matrix/client.ts",
     "./matrix/types": "./src/matrix/types.ts",
     "./matrix/auth": "./src/matrix/auth.ts",
     "./matrix/unlock-bridge": "./src/matrix/unlock-bridge.ts",

@@ -478,6 +478,7 @@ export const hr: AppCatalog<typeof en> = {
   'compose.templates': 'Predlošci',
   'compose.templatesEmpty': 'Još nemate predložaka. Izradite ih u postavkama Maila.',
   'compose.attachFailed': 'Privitak se nije mogao pročitati',
+  'compose.openFailed': 'Uređivač poruke nije se mogao otvoriti. Pokušajte ponovno.',
   'compose.pastedImageDropped': 'Zalijepljena slika nije uključena',
   'compose.pastedImagesDropped': 'Zalijepljene slike nisu uključene',
   'compose.pastedImagesDroppedDescription': 'Da biste poslali slike, priložite ih kao datoteke.',

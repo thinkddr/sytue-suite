@@ -48,6 +48,8 @@ export const hr: AppCatalog<typeof en> = {
   'list.unstar': 'Ukloni {name} iz označenih zvjezdicom',
   'list.starredTitle': 'Sa zvjezdicom',
   'list.reviewDuplicates': 'Pregledaj duplikate ({count})',
+  'list.selectMode': 'Odaberi',
+  'list.moreActions': 'Više radnji',
   'list.count': { one: '{count} kontakt', few: '{count} kontakta', other: '{count} kontakata' },
   'list.countFiltered': {
     one: '{shown} od {count} kontakta',

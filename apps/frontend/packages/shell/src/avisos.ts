@@ -7,7 +7,7 @@
  * —el Hub lo cortaba a los 30 s hasta el 2026-09-24— no volvía hasta recargar.
  */
 import type { HubClient, Notification, NotificationSource } from '@sytue/api-clients';
-import { catalogs, formatDateTime, translate, type Locale, type MessageKey } from '@sytue/i18n';
+import { catalogFor, formatDateTime, translate, type Locale, type MessageKey } from '@sytue/i18n';
 
 /** Lo que se usa del cliente del Hub. Un subconjunto, para poder probarlo con un doble. */
 export type FuenteAvisos = Pick<
@@ -690,7 +690,7 @@ const HUECO = /\{(\w+)\}/g;
  */
 export function tituloAviso(locale: Locale, n: Notification): string {
   const clave = `notifications.kind.${n.type ?? ''}`;
-  const plantilla = (catalogs[locale] as Record<string, unknown>)[clave];
+  const plantilla = (catalogFor(locale) as Record<string, unknown> | undefined)?.[clave];
   if (typeof plantilla !== 'string') return n.title;
   const vars = n.params ?? {};
   for (const [, nombre] of plantilla.matchAll(HUECO)) {

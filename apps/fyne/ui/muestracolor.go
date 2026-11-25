@@ -5,10 +5,12 @@ package ui
 
 import (
 	"image/color"
+	"math"
 
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // MuestraColor es una muestra REDONDA que elige un color. Calcus conserva el lado de
@@ -86,7 +88,31 @@ func (m *MuestraColor) borde(v tema.Variante) color.NRGBA {
 	if m.Elegida {
 		return tema.Color("text", v)
 	}
+	// Una muestra que se confunde con lo de detrás —el negro en oscuro, el blanco en
+	// claro— con el filete `border` no se ve: la negra de CertiPDF quedaba a ~1,1:1 en
+	// oscuro (auditoría del 2026-11-24). Esa lleva el contorno de control, `border-strong`,
+	// que contrasta 3:1 con la superficie: el aro que se ve alrededor de la muestra.
+	fondo := tema.Color("surface", v)
+	if relacionContraste(tokens.SobreSRGB(m.Color, fondo), fondo) < 3 {
+		return tema.Color("border-strong", v)
+	}
 	return tema.Color("border", v)
+}
+
+// relacionContraste es la relación de contraste de WCAG 2 entre dos colores opacos.
+func relacionContraste(a, b color.NRGBA) float64 {
+	lum := func(c color.NRGBA) float64 {
+		lin := func(v uint8) float64 {
+			x := float64(v) / 255
+			if x <= 0.04045 {
+				return x / 12.92
+			}
+			return math.Pow((x+0.055)/1.055, 2.4)
+		}
+		return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
+	}
+	la, lb := lum(a), lum(b)
+	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
 // CreateRenderer: el aro detrás y la caja redonda encima. El radio es el lado ENTERO y

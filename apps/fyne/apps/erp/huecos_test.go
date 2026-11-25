@@ -123,8 +123,10 @@ func TestLasCifrasVanASuAvanceFijo(t *testing.T) {
 // de la página, CSS1Compat, raíz16 y Figtree; cada uno sale de su rectángulo DOM.
 // Los COLORES son esa misma composición rehecha a mano con la paleta petróleo, sin
 // pasar por el renderer nativo: cada capa (card-blue #e8efff; `bg/50` encima para el
-// modelo; primary #0f7680 y su borde rgba(15,29,32,.6); bg-subtle #e8efef) al 80 % sobre
-// el lienzo #f1f6f6. El borde va sobre primary antes de aplicar la opacidad del grupo.
+// modelo; el secundario de contorno, surface #ffffff y su borde rgba(15,29,32,.6);
+// bg-subtle #e8efef) al 80 % sobre el lienzo #f1f6f6. El borde va sobre la superficie del
+// botón antes de aplicar la opacidad del grupo. El botón fue del relleno primario hasta el
+// 2026-11-24, cuando el secundario pasó a contorno en Button.tsx y aquí a la vez.
 func TestUnAreaApagadaVaEnteraAlOchentaPorCiento(t *testing.T) {
 	b := portadaArnes(t, 1280)
 	c := b.tarjeta(tema.Claro, b.Modulos[0], 278)
@@ -140,8 +142,8 @@ func TestUnAreaApagadaVaEnteraAlOchentaPorCiento(t *testing.T) {
 	}{
 		{"el fondo de la tarjeta", 2, 88, 234, 240, 253},
 		{"el fondo del modelo", 20, 85, 237, 243, 248},
-		{"el borde del botón", 219, 159, 60, 101, 105},
-		{"el fondo del botón", 182, 144, 60, 144, 152},
+		{"el borde del botón", 219, 159, 137, 145, 146},
+		{"el fondo del botón", 182, 144, 252, 253, 253},
 		// Cuatro píxeles antes del borde derecho, en el centro vertical y fuera del texto.
 		{"el fondo de la insignia", 257, 27, 235, 240, 237},
 	} {

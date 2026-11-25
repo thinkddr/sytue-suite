@@ -25,7 +25,7 @@ import { EditorIcon } from '../../icons';
 import type { EditorContext } from '../../types';
 import { MenuHistorial } from '../../HistorialVersiones';
 import { RibbonButton, RibbonGroup, RibbonSeparator } from '../primitives';
-import { readSheetCellAnchor } from '../../sheets/SheetCanvas';
+import { readSheetCellAnchor } from '../../sheets/mando';
 
 /** Receta de foco visible del blueprint (§0.6): nunca outline:none sin reemplazo. */
 // El anillo canónico vive en `@sytue/ui/styles.css` (.sytue-focus-ring): una sola

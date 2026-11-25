@@ -277,6 +277,20 @@ func (d *dialogoFirmar) opciones(ancho float32) fyne.CanvasObject {
 	e, hueco := tema.TextoXS, tema.Espacio(1.5)
 	pagina := a.t("pdf.dialog.firmar.page")
 	conPagina := d.visible && !d.todas
+	if a.estrecha() {
+		// Por debajo de `sm`, una debajo de otra: en fila, a 390, eran tres columnas con
+		// el rótulo partido en tres renglones (auditoría del 2026-11-24).
+		filas := make([]fyne.CanvasObject, 0, 3)
+		for _, c := range casillas {
+			filas = append(filas, container.New(alPrincipio{}, c))
+		}
+		if conPagina {
+			v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+			filas = append(filas, container.New(alPrincipio{}, container.New(filaCentrada{hueco: hueco},
+				ui.NuevoParrafo(pagina, e, ui.Normal, "text-muted", v).A(ui.Medir(pagina, e, ui.Normal).Width), d.pagina)))
+		}
+		return container.New(ui.Columna{Hueco: tema.Espacio(2)}, filas...)
+	}
 	// Las `<label>` no tienen relleno: su base interior es su ancho entero.
 	maxc, minc := make([]float32, 0, 3), make([]float32, 0, 3)
 	for _, c := range casillas {

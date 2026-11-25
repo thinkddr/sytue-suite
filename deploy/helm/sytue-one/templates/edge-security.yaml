@@ -33,6 +33,15 @@ metadata:
     app.kubernetes.io/part-of: sytue-one
 spec:
   compress:
+    # Lo que ya llega comprimido NO se vuelve a comprimir: Traefik deja pasar tal cual
+    # toda respuesta con Content-Encoding (compression_handler.go, «If we detect a
+    # contentEncoding, we know we are never going to compress»). Así salen los
+    # WebAssembly del núcleo de cliente, precomprimidos en brotli 11 al generarlos
+    # (scripts/client-core-assets.sh) y servidos según Accept-Encoding por Rooms y el
+    # proxy de cada app. `application/wasm` no se excluye a propósito: si un wasm llega
+    # sin comprimir —sin variante válida, o un cliente que solo acepta zstd— Traefik lo
+    # comprime como antes en vez de mandarlo crudo (docs/decisions.md#0086).
+    #
     # Por preferencia del cliente: zstd y brotli ganan a gzip en texto, y gzip
     # queda de suelo para lo que no anuncie los otros dos.
     encodings:

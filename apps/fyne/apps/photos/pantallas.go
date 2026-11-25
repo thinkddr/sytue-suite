@@ -27,8 +27,7 @@ const AnchoBuscador = 64 * 0.25 * tema.Rem
 // con la lupa delante (`leadingIcon`). Era un campo `sm` sin icono, 28 px al lado de
 // botones de 32.
 func nuevoBuscador(v Vista, texto string) *ui.Entrada {
-	e := ui.NuevaEntrada(v.Traduce("gallery.search"))
-	e.Icono = iconos.Buscar
+	e := ui.NuevoBuscador(v.Traduce("gallery.search"))
 	e.PonerTexto(texto)
 	return e
 }
@@ -172,26 +171,7 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	}
 	hayFotos := len(d.Grupos) > 0
 
-	// La fila de arriba: la nav, el buscador empujado a la derecha y los botones.
-	buscador := d.Buscador
-	if buscador == nil {
-		buscador = nuevoBuscador(v, d.Busqueda)
-		buscador.AlCambiar(d.AlBuscar)
-	}
-	// `min-w-0 flex-1 sm:w-56 sm:flex-none`: en un teléfono el buscador llena su fila.
-	campo := anchoFijo(buscador, AnchoBuscador)
-	elastico := 0
-	if v.Ventana < ui.CorteSM {
-		campo, elastico = buscador, 2
-	}
-	arriba := append([]fyne.CanvasObject{Nav(v, activa, d.AlIr)}, accionesBarra(v, d, campo, hayFotos)...)
-	// `flex flex-wrap gap-2` con `mb-4` en cada hijo: entre fila y fila, 14 + 7.
-	fila := container.New(ui.FilaAuto{
-		Hueco: tema.Espacio(2), Derecha: 1, Partir: true,
-		SaltoFila: SeparacionBloque + tema.Espacio(2), Elastico: elastico,
-	}, arriba...)
-
-	bloques := []ui.Bloque{{Obj: fila, Margen: SeparacionBloque}}
+	bloques := cabeceraGaleria(v, d, activa, hayFotos)
 	if d.EnSeleccion {
 		barra := barraSeleccion(v, d)
 		if d.AlBarra != nil {
@@ -241,6 +221,55 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 		bloques = append(bloques, ui.Bloque{Obj: vacioDeBusqueda(v, d), Margen: SeparacionSeccion})
 	}
 
+	bloques = append(bloques, bloquesDeMeses(v, d)...)
+	bloques = append(bloques, ui.Bloque{Obj: centinela(v, d.Cargando)})
+	return Envolver(v, true, ui.PilaBloques(bloques...))
+}
+
+// cabeceraGaleria es la fila de arriba: la nav, el buscador empujado a la derecha y los
+// botones. En el teléfono la nav y el buscador van cada uno en su fila.
+func cabeceraGaleria(v Vista, d Galeria, activa Seccion, hayFotos bool) []ui.Bloque {
+	buscador := d.Buscador
+	if buscador == nil {
+		buscador = nuevoBuscador(v, d.Busqueda)
+		buscador.AlCambiar(d.AlBuscar)
+	}
+	// `min-w-0 flex-1 sm:w-56 sm:flex-none`: en un teléfono el buscador llena su fila. Y la
+	// fila es SUYA: al lado de «Seleccionar» y «+» se quedaba en «Buscar por no…»
+	// (auditoría del 2026-11-24).
+	campo := anchoFijo(buscador, AnchoBuscador)
+	var solo fyne.CanvasObject
+	if v.Ventana < ui.CorteSM {
+		campo, solo = nil, buscador
+	}
+	// `flex flex-wrap gap-2` con `mb-4` en cada hijo: entre fila y fila, 14 + 7.
+	salto := SeparacionBloque + tema.Espacio(2)
+	var bloques []ui.Bloque
+	arriba := accionesBarra(v, d, campo, hayFotos)
+	derecha := 0
+	if v.Ventana < ui.CorteSM {
+		// En el teléfono la nav va en su fila, como cuando sus rótulos no cabían en
+		// ninguna: con solo iconos ya no la llena, y el buscador subía a su lado
+		// apretado a «Busca…».
+		bloques = append(bloques, ui.Bloque{Obj: Nav(v, activa, d.AlIr), Margen: salto})
+	} else {
+		arriba, derecha = append([]fyne.CanvasObject{Nav(v, activa, d.AlIr)}, arriba...), 1
+	}
+	fila := container.New(ui.FilaAuto{
+		Hueco: tema.Espacio(2), Derecha: derecha, Partir: true,
+		SaltoFila: salto,
+	}, arriba...)
+	bloques = append(bloques, ui.Bloque{Obj: fila, Margen: SeparacionBloque})
+	if solo != nil {
+		bloques = append(bloques, ui.Bloque{Obj: solo, Margen: SeparacionBloque})
+	}
+	return bloques
+}
+
+// bloquesDeMeses es cada mes de la línea de tiempo, su cabecera y su rejilla, con las
+// flechas del teclado enlazadas de una tesela a la siguiente por toda la galería.
+func bloquesDeMeses(v Vista, d Galeria) []ui.Bloque {
+	bloques := make([]ui.Bloque, 0, 2*len(d.Grupos))
 	var teselas []fyne.CanvasObject
 	for _, g := range d.Grupos {
 		cab, rej := cabeceraMes(v, g, d), rejillaDeFotos(v, g.Fotos, d)
@@ -251,8 +280,7 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 		bloques = append(bloques, ui.Bloque{Obj: cab}, ui.Bloque{Obj: rej, Margen: SeparacionMes})
 	}
 	enlazarFlechas(v, teselas)
-	bloques = append(bloques, ui.Bloque{Obj: centinela(v, d.Cargando)})
-	return Envolver(v, true, ui.PilaBloques(bloques...))
+	return bloques
 }
 
 // BarraDeAnyos es `BarraDeAnyos.tsx`: «Recientes» y un botón por año, el elegido en
@@ -293,7 +321,10 @@ func BarraDeAnyos(v Vista, anyos []api.TimelineYear, activo int, alElegir func(i
 // acción rellena —«Añadir fotos»— y las demás de fantasma con su icono: «Seleccionar» era
 // otro botón relleno del mismo peso.
 func accionesBarra(v Vista, d Galeria, campo fyne.CanvasObject, hayFotos bool) []fyne.CanvasObject {
-	derecha := []fyne.CanvasObject{campo}
+	var derecha []fyne.CanvasObject
+	if campo != nil {
+		derecha = append(derecha, campo)
+	}
 	if d.Busqueda != "" && hayFotos && !d.EnSeleccion {
 		derecha = append(derecha,
 			ui.NuevoBoton(v.Traduce("gallery.likeTheseResults"), d.AlComoEstas).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Imagen, 0))

@@ -72,6 +72,8 @@ export const lt: Catalog = {
   'vault.emptyUnderstood': 'Suprantu, kad prarastu raktu užšifruoti duomenys bus ištrinti',
   'vault.failed':
     'Nepavyko atidaryti šifruotų duomenų. Bandykite dar kartą arba vėl prisijunkite prie Sytue ID. Jei raktas prarastas, galite išvalyti šios programos šifruotus duomenis.',
+  'vault.moreInfo': 'Daugiau informacijos',
+  'vault.attention': 'Tavo šifruotiems duomenims reikia dėmesio',
   'matrix.incoming': 'Patvirtinti šį įrenginį',
   'matrix.match': 'Sutampa',
   'matrix.mismatch': 'Nesutampa',

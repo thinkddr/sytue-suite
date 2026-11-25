@@ -365,7 +365,6 @@ func (r *esqueletoEditorRenderer) Refresh() {
 // el documento— y «Volver». Cada botón solo sale si hay a dónde llevar: un fichero
 // suelto que no se pudo leer no tiene nada que reintentar.
 func PantallaFallo(c *Contexto) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	e := ui.NuevoVacio(c.Traducir("editor.error.title"), c.Traducir("editor.error.description"))
 	e.Tono = ui.VacioError
 	var acciones []fyne.CanvasObject
@@ -381,5 +380,5 @@ func PantallaFallo(c *Contexto) fyne.CanvasObject {
 	if len(acciones) > 1 {
 		e.AccionSecundaria = acciones[1]
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("surface", v)), e)
+	return container.NewStack(ui.NuevoLiso("surface"), e)
 }

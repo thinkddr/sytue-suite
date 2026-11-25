@@ -25,7 +25,12 @@ import { chromium, devices } from 'playwright';
 import { appsDesplegadas, desplegada } from './apps-desplegadas.mjs';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { codigoTOTP, esCuentaDelIdPDesdeAdmin, porQueNoEntra } from './tests/helpers.ts';
+import {
+  codigoTOTP,
+  esCuentaDelIdPDesdeAdmin,
+  porQueNoEntra,
+  salirDelPasoDeAutorizacion,
+} from './tests/helpers.ts';
 import { PERFIL_CIFRADO, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
 import {
   DETECTOR,
@@ -163,19 +168,12 @@ async function asegurarSesion(page, destino = '') {
   // lo que pida el IdP si está limitando. Medido en el run 2043 (2026-09-15): el
   // paso se quedó quieto en Pixel 5 sobre Calendar y rompió el perfil, con las
   // 671 visitas restantes entrando sin problema.
-  const esPaso = (u) => /^\/oauth2\/authorize\/?$/.test(u.pathname);
-  for (let intento = 1; esPaso(new URL(page.url())); intento++) {
-    const salio = await page
-      .waitForURL((u) => !esPaso(u), { timeout: 20_000 })
-      .then(
-        () => true,
-        () => false,
-      );
-    if (salio || intento >= 3) break;
-    const pedido = limitando.get(page) ?? 0;
-    await page.waitForTimeout(pedido > 0 ? (pedido + 5) * 1000 : 5_000);
-    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-  }
+  await salirDelPasoDeAutorizacion(page, {
+    pausa: () => {
+      const pedido = limitando.get(page) ?? 0;
+      return pedido > 0 ? (pedido + 5) * 1000 : 5_000;
+    },
+  });
   const aqui = new URL(page.url());
   if (aqui.hostname !== IDP) return false;
   const sinBarra = (p) => p.replace(/\/+$/, '');
@@ -1225,16 +1223,28 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
           const dice = await page
             .evaluate(() => (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim())
             .catch(() => '');
+          // El código del fallo (`prepare/drive.import.row_heads`) va plegado dentro de
+          // «Más información» y no sale en el texto. Es fijo, sin datos de la cuenta.
+          const codigo = await page
+            .evaluate(
+              () =>
+                document
+                  .querySelector('[data-sytue-boveda-fallo]')
+                  ?.getAttribute('data-sytue-boveda-fallo') ?? '',
+            )
+            .catch(() => '');
           console.log(
             `  SALTO   ${nombre.padEnd(20)} ${url.padEnd(46)} la puerta del cifrado no se abrió: se mediría la puerta, no la app`,
           );
           console.log(`          la puerta dice: ${dice.slice(0, 300)}`);
+          if (codigo) console.log(`          código del fallo: ${codigo.slice(0, 120)}`);
           informe.push({
             app,
             ruta,
             perfil: nombre,
             salto: 'la puerta del cifrado no se abrió tras volver a entrar: no hay app que medir',
             puerta: dice.slice(0, 600),
+            ...(codigo ? { codigo: codigo.slice(0, 120) } : {}),
           });
           continue;
         }

@@ -6,6 +6,8 @@ package ui
 // paridad-web: apps/frontend/packages/ui/src/components/ReadOnlyBar.tsx
 
 import (
+	"strings"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
@@ -27,8 +29,13 @@ import (
 // `flex items-center gap-x-3 border-b bg-bg-subtle px-4 py-1 text-sm text-text-muted`,
 // con el candado de 14, el texto que se estira y los botones `xs` a la derecha.
 //
-// ponytail: una sola línea; la web salta de línea con `flex-wrap` y aquí el texto se
-// recorta con puntos suspensivos. Basta en el ancho de un editor de escritorio.
+// En el TELÉFONO (táctil y por debajo de `Estrecho`) el botón lleva su suelo de 44 y el
+// mensaje se reparte en DOS líneas, la segunda con puntos suspensivos si aún no cabe: en
+// una sola, al lado de «Pedir acceso de edición», se quedaba en cuatro palabras, y el botón
+// de 44 se salía de una franja medida para el de 24 (auditoría del 2026-11-24).
+//
+// ponytail: dos líneas como mucho; la web salta de línea con `flex-wrap` y baja el botón a
+// otra fila. En escritorio, una línea con puntos suspensivos.
 type FranjaSoloLectura struct {
 	widget.BaseWidget
 
@@ -95,13 +102,26 @@ func (f *FranjaSoloLectura) botones() []*Boton {
 }
 
 // MedidaFranjaSoloLectura es su alto: el `py-1` de los dos lados, lo más alto que lleva
-// dentro —el botón `xs` si hay botón, la línea de `text-sm` si no— y el `border-b`.
+// dentro —el botón `xs` con su suelo táctil si hay botón, las líneas de `text-sm` del
+// mensaje— y el `border-b`.
 func MedidaFranjaSoloLectura(f *FranjaSoloLectura) fyne.Size {
-	dentro := tema.TextoSM.Linea
-	if len(f.botones()) > 0 {
-		dentro = max(dentro, medidas[TallaXS].alto)
+	dentro := float32(f.lineasMensaje()) * tema.TextoSM.Linea
+	if bs := f.botones(); len(bs) > 0 {
+		dentro = max(dentro, bs[0].MinSize().Height)
 	}
 	return fyne.NewSize(0, 2*rellenoFranjaY+dentro+tema.Borde)
+}
+
+// lineasMensaje son las que reserva el mensaje: dos en el teléfono, una en lo demás. El
+// ancho es el último que le dieron; sin él todavía, el del dispositivo.
+func (f *FranjaSoloLectura) lineasMensaje() int {
+	if !EsTactil() {
+		return 1
+	}
+	if w := f.Size().Width; w >= Estrecho {
+		return 1
+	}
+	return 2
 }
 
 // MinSize es la medida declarada.
@@ -119,6 +139,7 @@ func (f *FranjaSoloLectura) CreateRenderer() fyne.WidgetRenderer {
 		filete: canvas.NewRectangle(tema.Color("border", v)),
 		glifo:  iconos.Trazo(iconos.Candado, ladoCandado, "text-muted", v),
 		texto:  Texto(f.Texto, tema.TextoSM, Normal, tema.Color("text-muted", v)),
+		texto2: Texto("", tema.TextoSM, Normal, tema.Color("text-muted", v)),
 		nota:   Texto(f.Nota, tema.TextoSM, Medio, tema.Color("text", v)),
 	}
 	r.Refresh()
@@ -129,7 +150,8 @@ type franjaSoloLecturaRenderer struct {
 	f             *FranjaSoloLectura
 	fondo, filete *canvas.Rectangle
 	glifo         *iconos.Dibujo
-	texto, nota   *canvas.Text
+	// texto2 es la segunda línea del mensaje en el teléfono.
+	texto, texto2, nota *canvas.Text
 }
 
 func (r *franjaSoloLecturaRenderer) MinSize() fyne.Size { return MedidaFranjaSoloLectura(r.f) }
@@ -137,8 +159,8 @@ func (r *franjaSoloLecturaRenderer) Destroy()           {}
 
 func (r *franjaSoloLecturaRenderer) Objects() []fyne.CanvasObject {
 	bs := r.f.botones()
-	objs := make([]fyne.CanvasObject, 0, 5+len(bs))
-	objs = append(objs, r.fondo, r.filete, r.glifo.Objeto(), r.texto, r.nota)
+	objs := make([]fyne.CanvasObject, 0, 6+len(bs))
+	objs = append(objs, r.fondo, r.filete, r.glifo.Objeto(), r.texto, r.texto2, r.nota)
 	for _, b := range bs {
 		objs = append(objs, b)
 	}
@@ -171,8 +193,21 @@ func (r *franjaSoloLecturaRenderer) Layout(t fyne.Size) {
 
 	r.glifo.Colocar(rellenoFranjaX, (linea-ladoCandado)/2, ladoCandado)
 	x := rellenoFranjaX + ladoCandado + huecoFranja
-	Truncar(r.texto, r.f.Texto, tema.TextoSM, Normal, max(derecha-x, 0))
-	ColocarTexto(r.texto, tema.TextoSM, x, (linea-tema.TextoSM.Linea)/2)
+	cabe := max(derecha-x, 0)
+	partes := []string{r.f.Texto}
+	if r.f.lineasMensaje() > 1 {
+		if l := Repartir(r.f.Texto, tema.TextoSM, Normal, cabe); len(l) > 1 {
+			partes = []string{l[0], strings.Join(l[1:], " ")}
+		}
+	}
+	y := (linea - float32(len(partes))*tema.TextoSM.Linea) / 2
+	Truncar(r.texto, partes[0], tema.TextoSM, Normal, cabe)
+	ColocarTexto(r.texto, tema.TextoSM, x, y)
+	r.texto2.Hidden = len(partes) < 2
+	if len(partes) > 1 {
+		Truncar(r.texto2, partes[1], tema.TextoSM, Normal, cabe)
+		ColocarTexto(r.texto2, tema.TextoSM, x, y+tema.TextoSM.Linea)
+	}
 }
 
 // Refresh repinta con los tokens del tema actual y el texto de ahora.
@@ -182,10 +217,11 @@ func (r *franjaSoloLecturaRenderer) Refresh() {
 	r.filete.FillColor = tema.Color("border", v)
 	r.glifo.Tenir("text-muted", v)
 	r.texto.Color = tema.Color("text-muted", v)
+	r.texto2.Color = r.texto.Color
 	r.nota.Text, r.nota.Color = r.f.Nota, tema.Color("text", v)
 	r.nota.Hidden = r.f.Nota == ""
 	r.Layout(r.f.Size())
-	for _, o := range []fyne.CanvasObject{r.fondo, r.filete, r.texto, r.nota} {
+	for _, o := range []fyne.CanvasObject{r.fondo, r.filete, r.texto, r.texto2, r.nota} {
 		o.Refresh()
 	}
 	for _, b := range r.f.botones() {

@@ -6,6 +6,7 @@ package calendario
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -179,6 +180,49 @@ type App struct {
 	cargandoEv     bool                      // `loadingEvents`
 	fallo          string                    // clave del error, o ""
 	prohibido      bool                      // el error fue un 403
+
+	// fundidos es el último `Fundir` ya ordenado y huellaFundidos de qué salió: cada
+	// repintado (una flecha, un día elegido, la campana) volvía a fundir y ordenar todas
+	// las ocurrencias aunque no hubiera cambiado ninguna.
+	fundidos       []Ocurrencia
+	huellaFundidos []huellaCalendario
+	sinRedFundidos bool
+	// diaPintado es el día de hoy del último pintado: si el sondeo de recordatorios no
+	// trae nada nuevo solo se repinta para que «hoy» pase al día siguiente.
+	diaPintado time.Time
+}
+
+// huellaCalendario es lo que de un calendario decide sus ocurrencias en `Fundir`: si se
+// ve, su color, si es de solo lectura y QUÉ lista de instancias tiene (la caché las
+// sustituye al llegar, nunca las cambia en su sitio).
+type huellaCalendario struct {
+	id, color   string
+	soloLectura bool
+	visible     bool
+	inst        *api.Instance
+	n           int
+}
+
+// eventosFundidos es `Fundir` y `ordenar`, reutilizando el resultado anterior si nada de
+// lo que lo decide ha cambiado. Quien lo lee no lo modifica: el arrastre del mes copia.
+func (a *App) eventosFundidos() []Ocurrencia {
+	p := a.P
+	cals := a.todos()
+	huella := make([]huellaCalendario, 0, len(cals))
+	for _, c := range cals {
+		h := huellaCalendario{id: c.ID, color: c.Color, soloLectura: c.ReadOnly, visible: p.Visibles == nil || p.Visibles[c.ID]}
+		if inst := a.porCal[c.ID]; len(inst) > 0 {
+			h.inst, h.n = &inst[0], len(inst)
+		}
+		huella = append(huella, h)
+	}
+	if a.huellaFundidos != nil && a.sinRedFundidos == p.SinConexion && slices.Equal(huella, a.huellaFundidos) {
+		return a.fundidos
+	}
+	eventos := Fundir(cals, p.Visibles, a.porCal, p.SinConexion)
+	ordenar(eventos)
+	a.fundidos, a.huellaFundidos, a.sinRedFundidos = eventos, huella, p.SinConexion
+	return eventos
 }
 
 // NuevaApp conecta la pantalla con el servicio. Arranca en carga: hasta que no
@@ -575,8 +619,8 @@ func (a *App) pintar() {
 		return
 	}
 	p := a.P
-	p.Eventos = Fundir(a.todos(), p.Visibles, a.porCal, p.SinConexion)
-	ordenar(p.Eventos)
+	p.Eventos = a.eventosFundidos()
+	a.diaPintado = inicioDelDia(p.ahora(), p.zona())
 	p.CargandoCalendarios = a.cargandoCal
 	p.Recargando = false
 	p.Fallo = ""
@@ -607,8 +651,29 @@ func (a *App) pintar() {
 	}
 	grupoAntes := p.grupoCajon
 	p.diaElegido, p.asaMes, p.grupoCajon = nil, nil, nil // si ya no hay mes del teléfono, no hay adónde volver
-	a.raiz.Objects = []fyne.CanvasObject{p.Construir(), a.capaFlotante(), a.avisos}
+	latidos := p.latidos
+	p.latidos = nil
+	var arm *ui.Armazon
+	ok := false
+	if len(a.raiz.Objects) > 0 {
+		arm, ok = a.raiz.Objects[0].(*ui.Armazon)
+	}
+	// Lo que se descuelga —el menú, la vista y la barra de antes, la capa flotante— se
+	// suelta en cuanto lo nuevo está colocado, en vez de quedarse un minuto en la caché
+	// de Fyne: el mes del teléfono y la agenda se rehacen enteros en cada pintado.
+	viejos := slices.Clone(a.raiz.Objects)
+	if ok {
+		viejos = append(viejos, arm.Contenido, arm.Menu, arm.BarraMovil)
+		p.ConstruirEn(arm).Refresh()
+	} else {
+		arm = p.ConstruirEn(ui.NuevoArmazon(nil))
+	}
+	a.raiz.Objects = []fyne.CanvasObject{arm, a.capaFlotante(), a.avisos}
 	a.raiz.Refresh()
+	pararLatidos(latidos)
+	// Se conservan, además del árbol nuevo, las piezas que la pantalla guarda para el
+	// pintado siguiente aunque ahora no se vean (otra vista, el cajón cerrado).
+	soltarArboles(viejos, a.raiz, p.mesObjeto, p.menuHecho, p.cabeceraHecha, p.buscadorAgenda)
 	switch foco.(type) {
 	case *diaCompacto:
 		if p.diaElegido != nil {
@@ -626,6 +691,10 @@ func (a *App) pintar() {
 		}
 	}
 }
+
+// soltarArboles es `ui.SoltarArboles`; el guardián de la memoria retenida lo cambia para
+// medir sin él.
+var soltarArboles = ui.SoltarArboles
 
 // ordenar deja las ocurrencias por inicio, ESTABLE: a igualdad manda el orden de los
 // calendarios y el del servicio, que es lo que hace el `sort` de la web por día.

@@ -325,7 +325,9 @@ func TestLosPanelesEnElCajonSonLosDeLaWeb(t *testing.T) {
 			continue
 		}
 		cerca(t, c.que+" x", absoluta(e).X, 8)
-		cerca(t, c.que+" y", absoluta(e).Y, c.y)
+		// Desde arriba de la pantalla del documento: por debajo de `md` va bajo la barra
+		// de la app, que sin la de la suite encima es la del armazón.
+		cerca(t, c.que+" y", absoluta(e).Y-absoluta(p.marco).Y, c.y)
 		w.Close()
 	}
 }

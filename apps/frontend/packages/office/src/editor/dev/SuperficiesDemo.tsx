@@ -22,6 +22,7 @@ import { EditorHeader } from '../layout/EditorHeader';
 import { StatusBar } from '../layout/StatusBar';
 import { LeftRail } from '../layout/LeftRail';
 import { Ribbon } from '../ribbon/Ribbon';
+import { EDITORES } from '../tipos/todos';
 import { PageCanvas } from '../canvas/PageCanvas';
 import { SheetCanvas } from '../sheets/SheetCanvas';
 import { SlidesCanvas } from '../slides/SlidesCanvas';
@@ -156,7 +157,7 @@ export function SuperficiesDemo(props: {
           <div class="h-dvh">
             <EditorLayout
               header={<EditorHeader ctx={ctx} />}
-              ribbon={<Ribbon ctx={ctx} />}
+              ribbon={<Ribbon ctx={ctx} cuerpos={EDITORES[props.kind].cuerpos} />}
               rail={<LeftRail ctx={ctx} />}
               main={canvas}
               settings={null}

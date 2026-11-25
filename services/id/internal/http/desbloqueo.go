@@ -364,7 +364,8 @@ const paramTecleado = "sytue_unlock_typed"
 // cada app tiene su almacén aparte y cada app mandaba a teclear la contraseña otra
 // vez: trece apps, trece veces, que es como se vivía «un cifrado por app». Si este
 // navegador ya la tiene en el origen de Sytue ID, el relevo se la entrega al puente
-// tras un clic de confirmación AQUÍ (un guion inyectado en la app no puede darlo);
+// sin preguntar nada (la clave es de la cuenta y la vuelta solo va a una app web de
+// la suite);
 // si no la tiene, el propio relevo pide la autorización tecleada (uriTecleada).
 func entregaSinTeclear(r *http.Request, req authzRequest, client domain.Client) bool {
 	if r.URL.Query().Get(paramTecleado) == "1" {
@@ -479,9 +480,9 @@ func bloqueDeDatos(id string, datos any) (string, error) {
 // salida a mano si el navegador no deja ir solo a la app, el aviso de una passkey
 // que aún no abre nada (entrar una vez con la contraseña) y el de que la
 // contraseña ya no abre el sobre (con «empezar de cero» tras confirmar). Con la
-// clave del puente de una app web (`login`), además: la confirmación de entregar la
-// clave que este navegador ya tiene, y el aviso de que no hay ninguna que entregar,
-// con la entrada tecleada. Volver a la app con las manos vacías y sin decir nada
+// clave del puente de una app web (`login`), además: el aviso de que no hay ninguna
+// clave que entregar, con la entrada tecleada. La que este navegador ya tiene se
+// entrega sin preguntar. Volver a la app con las manos vacías y sin decir nada
 // era un bucle: la app solo sabía pedir «Iniciar sesión» otra vez.
 func relevoPage(loc, destino, login string, datos relevoDatos) (string, error) {
 	bloque, err := bloqueDeDatos("e2e-relay", datos)
@@ -491,13 +492,7 @@ func relevoPage(loc, destino, login string, datos relevoDatos) (string, error) {
 	t := func(k string) string { return html.EscapeString(i18n.T(loc, k)) }
 	puente := ""
 	if login != "" {
-		puente = `<section id="e2e-confirm" hidden>` +
-			`<p class="sub">` + t("e2e.confirm_body") + `</p>` +
-			`<p class="sub"><strong id="e2e-app"></strong></p>` +
-			`<button type="button" id="e2e-confirm-go">` + t("e2e.confirm_action") + `</button>` +
-			`<p class="alt"><a class="btn-link" href="` + html.EscapeString(destino) + `">` + t("e2e.continue") + `</a></p>` +
-			`</section>` +
-			`<section id="e2e-failed" hidden>` +
+		puente = `<section id="e2e-failed" hidden>` +
 			alertHTML(i18n.T(loc, "e2e.lost_title")) +
 			`<p class="sub">` + t("e2e.failed_body") + `</p>` +
 			`<p class="alt"><a class="btn-link" id="e2e-retry" href="` + html.EscapeString(login) + `">` + t("e2e.retry") + `</a></p>` +

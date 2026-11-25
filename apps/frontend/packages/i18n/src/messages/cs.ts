@@ -71,6 +71,8 @@ export const cs: Catalog = {
   'vault.emptyUnderstood': 'Rozumím, že data zašifrovaná ztraceným klíčem budou smazána',
   'vault.failed':
     'Šifrovaná data se nepodařilo otevřít. Zkuste to znovu nebo se znovu přihlaste do Sytue ID. Pokud se klíč ztratil, můžete šifrovaná data této aplikace vyprázdnit.',
+  'vault.moreInfo': 'Další informace',
+  'vault.attention': 'Tvá šifrovaná data vyžadují pozornost',
   'matrix.incoming': 'Ověřit toto zařízení',
   'matrix.match': 'Shodují se',
   'matrix.mismatch': 'Neshodují se',

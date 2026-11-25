@@ -144,6 +144,17 @@ type Tarjeta struct {
 	alEmpezar func()
 	// prosa es el cuerpo que se ve, si es prosa: donde están los títulos para un `h=`.
 	prosa *Prosa
+	// render es el renderer de la tarjeta, si ya tiene: sus piezas son las que se miden.
+	render *tarjetaRenderer
+	// clave y reutilizable son con qué se hizo, para que el lienzo la reutilice en el
+	// repintado siguiente si nada ha cambiado (Lienzo.tarjeta).
+	clave        claveTarjeta
+	reutilizable bool
+	// fuera es que su columna no la tiene colgada porque no se ve (virtual.go), y
+	// medidas, su alto por ancho mientras no tiene renderer: con ellas se reparte la
+	// columna entera sin montarla.
+	fuera   bool
+	medidas map[float32]float32
 }
 
 var (
@@ -268,21 +279,69 @@ func (t *Tarjeta) AccessibilityRole() fyne.AccessibleRole { return fyne.Accessib
 
 // MedidaTarjetaNota es lo que va a ocupar. Es LA cuenta: el `MinSize` del renderer la
 // llama y el guardián compara contra ella y contra los píxeles.
+//
+// Con la tarjeta ya montada mide SUS piezas, y recuerda el alto de cada ancho mientras
+// no se rehagan (`medible`). Antes rehacía cabecera, cuerpo y pie —y maquetaba la
+// prosa— en cada `MinSize` y en cada `Layout`: era un tercio de lo que costaba repintar.
 func MedidaTarjetaNota(t *Tarjeta, ancho float32) fyne.Size {
+	r := t.render
+	conRenderer := r != nil && r.t == t
+	if t.medible() {
+		altos := t.medidas
+		if conRenderer {
+			altos = r.altos
+		}
+		if alto, ok := altos[ancho]; ok {
+			return fyne.NewSize(ancho, alto)
+		}
+	}
+	var pz piezasTarjeta
+	if conRenderer {
+		pz = piezasTarjeta{izq: r.izq, titulo: r.titulo, der: r.der, cuerpo: r.cuerpo, pie: r.pie}
+	} else {
+		pz.izq, pz.titulo, pz.der, _ = t.cabecera(tema.Claro)
+		pz.cuerpo, pz.pie = t.cuerpo(tema.Claro), t.pie(tema.Claro)
+	}
 	mx, _, sangria := t.geometria()
 	interior := max(ancho-2*mx, 0)
-	alto := t.altoCabecera(interior)
-	if c := altoCuerpo(t.cuerpo(tema.Claro), interior-sangria); c > 0 || t.estirada() {
+	alto := t.altoCabeceraCon(pz, interior)
+	if c := altoCuerpo(pz.cuerpo, interior-sangria); c > 0 || t.estirada() {
 		alto += HuecoTarjeta + c
 	}
-	if pie := t.pie(tema.Claro); pie != nil {
-		alto += HuecoTarjeta + altoDe(pie, interior-t.sangriaPie())
+	if pz.pie != nil {
+		alto += HuecoTarjeta + altoDe(pz.pie, interior-t.sangriaPie())
 	}
 	alto += 2 * t.margenY()
 	if t.Editor != nil && t.Ancha {
 		alto = max(alto, AltoAncha*ventana([]fyne.CanvasObject{t}).Height)
 	}
+	if t.medible() {
+		// Sin renderer también: la tarjeta que su columna no cuelga se mide una vez por
+		// ancho, con unas piezas que se tiran (virtual.go).
+		altos := &t.medidas
+		if conRenderer {
+			altos = &r.altos
+		}
+		if *altos == nil || len(*altos) > 8 {
+			*altos = map[float32]float32{}
+		}
+		(*altos)[ancho] = alto
+	}
 	return fyne.NewSize(ancho, alto)
+}
+
+// piezasTarjeta son las piezas que se miden: las del renderer o unas recién hechas.
+type piezasTarjeta struct {
+	izq, der    []pieza
+	titulo      fyne.CanvasObject
+	cuerpo, pie fyne.CanvasObject
+}
+
+// medible dice si el alto de la tarjeta a un ancho es fijo mientras no se rehagan sus
+// piezas: el editor y el campo de renombrar crecen al escribir, y la hoja de un árbol
+// mide la ventana.
+func (t *Tarjeta) medible() bool {
+	return t.Editor == nil && t.Renombrar == nil && !t.hoja()
 }
 
 // AltoAncha es el `min-h-[70dvh]` de la nota ensanchada.
@@ -312,8 +371,15 @@ func altoCuerpo(o fyne.CanvasObject, ancho float32) float32 {
 // alto. Con el «…» son sus 24; sin él —sin conexión—, el título, que ahí PARTE en líneas
 // (`break-words`); y mientras se renombra, el campo (24,75).
 func (t *Tarjeta) altoCabecera(interior float32) float32 {
+	var pz piezasTarjeta
+	pz.izq, pz.titulo, pz.der, _ = t.cabecera(tema.Claro)
+	return t.altoCabeceraCon(pz, interior)
+}
+
+// altoCabeceraCon es altoCabecera con unas piezas ya hechas.
+func (t *Tarjeta) altoCabeceraCon(pz piezasTarjeta, interior float32) float32 {
 	alto := tema.TextoBase.Linea
-	izq, titulo, der, _ := t.cabecera(tema.Claro)
+	izq, titulo, der := pz.izq, pz.titulo, pz.der
 	_, hueco, _ := t.geometria()
 	switch p := titulo.(type) {
 	case *ui.Parrafo:
@@ -358,6 +424,7 @@ func (t *Tarjeta) CreateRenderer() fyne.WidgetRenderer {
 	// centro. Pintado encima de la caja, la nota enfocada salía del color del anillo.
 	r.objetos = append([]fyne.CanvasObject{r.sombra.Objeto()}, r.aro.Antes(r.caja.Objetos()...)...)
 	r.rehacerHijos(v)
+	t.render = r
 	// Regla 7: el renderer termina refrescando, o nace a medias y se pinta invisible.
 	r.Refresh()
 	return r
@@ -375,10 +442,13 @@ type tarjetaRenderer struct {
 	pie      fyne.CanvasObject
 	objetos  []fyne.CanvasObject
 	marca    *canvas.Rectangle
+	// altos son los de MedidaTarjetaNota por ancho, de estas piezas.
+	altos map[float32]float32
 }
 
 func (r *tarjetaRenderer) rehacerHijos(v tema.Variante) {
 	t := r.t
+	r.altos = nil
 	r.izq, r.titulo, r.der, t.mas = t.cabecera(v)
 	r.cuerpo, r.pie = t.cuerpo(v), t.pie(v)
 	t.prosa, _ = r.cuerpo.(*Prosa)
@@ -485,11 +555,62 @@ func (t *Tarjeta) cabecera(v tema.Variante) (izq []pieza, titulo fyne.CanvasObje
 		der = append(der, pieza{b, 0})
 	}
 	if !t.SinAcciones && !t.SinMenu {
-		mas = nuevoBotonMas(t.tr.T("common.more", nil), t.Refresh)
-		mas.AlPulsar = func() { llamar1(t.AlMenu, fyne.CanvasObject(mas)) }
-		der = append(der, pieza{mas, 0})
+		// El «…» solo se ve con la tarjeta encima o enfocada: hasta entonces va su hueco,
+		// que mide lo mismo, y el botón nace la primera vez que hace falta (ponerMas). Un
+		// cuaderno de mil notas eran mil botones que nadie veía.
+		if t.quiereMas() {
+			mas = t.nuevoMas()
+			der = append(der, pieza{mas, 0})
+		} else {
+			der = append(der, pieza{nuevoHuecoMas(), 0})
+		}
 	}
 	return izq, titulo, der, mas
+}
+
+// nuevoMas es el «…» de la tarjeta, que abre su menú.
+func (t *Tarjeta) nuevoMas() *botonMas {
+	mas := nuevoBotonMas(t.tr.T("common.more", nil), t.Refresh)
+	mas.AlPulsar = func() { llamar1(t.AlMenu, fyne.CanvasObject(mas)) }
+	return mas
+}
+
+// huecoMas guarda el sitio del «…» mientras no se ha creado: mide lo mismo y no se pinta.
+type huecoMas struct{ canvas.Rectangle }
+
+func nuevoHuecoMas() *huecoMas {
+	h := &huecoMas{}
+	h.SetMinSize(ui.MedidaBotonIcono(ui.LadoIconoSM))
+	h.Hide()
+	return h
+}
+
+// quiereMas dice si el «…» se tiene que ver ya, antes de que exista (ver verMas).
+func (t *Tarjeta) quiereMas() bool {
+	return t.encima || t.sobreRaya || t.enfocado || fyne.CurrentApp().Driver().Device().IsMobile()
+}
+
+// ponerMas crea el «…» en el sitio que le guardaba su hueco, la primera vez que la tarjeta
+// lo enseña: al pasar el ratón o al llegar el foco. Se crea ANTES de que el puntero
+// pueda llegar a él —está dentro de la tarjeta, y la tarjeta recibe antes su `MouseIn`—,
+// así que pasar al botón sigue sin parpadeo (botonMas).
+func (r *tarjetaRenderer) ponerMas() {
+	t := r.t
+	for i, p := range r.der {
+		h, ok := p.o.(*huecoMas)
+		if !ok {
+			continue
+		}
+		mas := t.nuevoMas()
+		mas.Move(h.Position())
+		mas.Resize(h.Size())
+		r.der[i].o = mas
+		if j := slices.Index(r.objetos, fyne.CanvasObject(h)); j >= 0 {
+			r.objetos[j] = mas
+		}
+		t.mas = mas
+		return
+	}
 }
 
 // glifosCabecera conserva la columna de icono o casilla de cada tipo de nota.
@@ -896,13 +1017,33 @@ func (r *tarjetaRenderer) MinSize() fyne.Size {
 }
 
 func (r *tarjetaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *tarjetaRenderer) Destroy()                     {}
+
+// Destroy suelta las piezas: Fyne lo llama cuando la tarjeta lleva un rato sin pintarse,
+// que es lo que le pasa a la que su columna ya no cuelga (virtual.go). Sus altos quedan
+// en la tarjeta, que se sigue repartiendo sin montarse; al volver a la vista, Fyne le
+// hace otro renderer.
+func (r *tarjetaRenderer) Destroy() {
+	t := r.t
+	if t.render != r {
+		return
+	}
+	if t.medible() {
+		for w, h := range r.altos {
+			if t.medidas == nil {
+				t.medidas = map[float32]float32{}
+			}
+			t.medidas[w] = h
+		}
+	}
+	t.render, t.prosa, t.mas = nil, nil, nil
+}
 
 // Layout coloca cabecera y cuerpo dentro del relleno.
 func (r *tarjetaRenderer) Layout(t fyne.Size) {
-	r.sombra.Ajustar(fyne.NewPos(0, 0), t, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	// Ninguna forma lleva sombra ya (`shadow-none`): lo que separa es el aire. Y la
 	// sombra es una imagen opaca por dentro: con la fila sin fondo se veía como una caja gris.
+	// No se ajusta: desenfocarla para no enseñarla era la mitad de lo que costaba colocar
+	// cada tarjeta.
 	r.sombra.Objeto().Hide()
 	r.caja.Redimensionar(t)
 	r.aro.Colocar(t)
@@ -913,7 +1054,7 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 	interior := max(t.Width-2*margen, 0)
 	// Cabecera: lo de la izquierda, el título elástico y lo de la derecha, todo arriba.
 	y := my
-	altoC := r.t.altoCabecera(interior)
+	altoC := r.t.altoCabeceraCon(piezasTarjeta{izq: r.izq, titulo: r.titulo, der: r.der}, interior)
 	x, der := margen, t.Width-margen
 	for _, p := range r.izq {
 		m := p.o.MinSize()
@@ -1016,6 +1157,9 @@ func (r *tarjetaRenderer) Refresh() {
 	}
 	r.aro.Pintar(v)
 	r.aro.Ver(t.enfocado)
+	if t.mas == nil && t.quiereMas() {
+		r.ponerMas()
+	}
 	if t.mas != nil {
 		if t.verMas() {
 			t.mas.Show()

@@ -22,7 +22,7 @@
  */
 import type { ComponentChildren, JSX, TargetedEvent } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Button, useToast, Checkbox, reducirImagen, useMobileBack } from '@sytue/ui';
+import { Button, useToast, Checkbox, reducirImagen, useMobileBack, Spinner } from '@sytue/ui';
 import { executeEditingCommand } from '@sytue/ui/browser/editing';
 import { useT } from '../../context';
 import type { DocsKey, DocsT } from '../../../i18n';
@@ -34,13 +34,8 @@ import { buildEmbedHtml } from '../../canvas/embedDom';
 import { applyImage, getSelectedImage, readModel, removeImage } from '../../canvas/imageDom';
 import { IMAGE_WRAPS, isFloatWrap } from '../../images';
 import type { ImageAlign, ImageWrap } from '../../images';
-import {
-  answersToText,
-  buildFormFieldHtml,
-  extractFormAnswers,
-  parseOptions,
-} from '../../formfields';
-import type { FormFieldSpec, FormFieldType } from '../../formfields';
+import { answersToText, buildFormFieldHtml, parseOptions } from '../../formfields';
+import type { FormAnswer, FormFieldSpec, FormFieldType } from '../../formfields';
 import {
   CONNECTOR_KINDS_UI,
   dispatchSlidesCommand,
@@ -48,7 +43,7 @@ import {
   safeMediaSrc,
   SLIDE_SHAPES,
   SMARTART_LAYOUTS,
-} from '../../slides/SlidesCanvas';
+} from '../../slides/mando';
 import {
   HIGHLIGHT_PALETTE,
   RibbonButton,
@@ -1076,11 +1071,38 @@ function CampoFieldPanel(props: {
   );
 }
 
-/** Popover que recolecta {nombre: valor} de todos los campos (revisar/exportar). */
+/** Popover que recolecta {nombre: valor} de todos los campos (revisar/exportar). Las lee
+ *  `formfields-respuestas.ts`, que va sobre parse5 y se baja al abrirlo por primera vez:
+ *  mientras llega, el popover dice que está cargando; si no llega, que no hay red. */
 function VerRespuestasPanel(): JSX.Element {
   const t = useT();
   const toast = useToast();
-  const answers = extractFormAnswers(getEditorRoot()?.innerHTML ?? '');
+  const [answers, setAnswers] = useState<FormAnswer[] | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    const html = getEditorRoot()?.innerHTML ?? '';
+    import('../../formfields-respuestas').then(
+      (m) => vigente && setAnswers(m.extractFormAnswers(html)),
+      () => {
+        if (!vigente) return;
+        setAnswers([]);
+        toast.notify({
+          tone: 'danger',
+          title: t('extdata.advice.offline.title'),
+          description: t('extdata.advice.offline.action'),
+        });
+      },
+    );
+    return () => {
+      vigente = false;
+    };
+  }, [t, toast]);
+  if (answers === null)
+    return (
+      <div class="flex w-64 items-center justify-center py-3" aria-busy="true">
+        <Spinner size={16} />
+      </div>
+    );
 
   const copy = (): void => {
     navigator.clipboard?.writeText(answersToText(answers)).then(

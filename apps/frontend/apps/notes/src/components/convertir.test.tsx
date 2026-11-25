@@ -4,6 +4,7 @@
 // En el diario, la raya de una cosa es su casilla por marcar: pulsarla la hace tarea.
 // Y el menú de la línea convierte en los dos sentidos. Solo donde se puede editar la
 // nota entera: una compartida conmigo o una de solo lectura no cambian de tipo.
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

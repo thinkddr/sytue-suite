@@ -173,3 +173,38 @@ func TestLasHorasFueraDeLaJornadaSeAtenuan(t *testing.T) {
 		t.Error("una jornada de 0 a 24 no atenúa nada")
 	}
 }
+
+// TestLosAjustesCabenEnElTelefono: a 390 «Ajustes del calendario» se salía por la
+// derecha —los dos campos de «Eventos nuevos» y de «Horario laboral» iban siempre en dos
+// columnas, y «Volver al calendario» quedaba en «Vol»—. Por debajo de `sm` se apilan
+// (`grid sm:grid-cols-2` de la web) y el botón baja bajo el texto; desde `sm`, todo sigue
+// en su fila.
+func TestLosAjustesCabenEnElTelefono(t *testing.T) {
+	a, w := appConVentana(t, &escrituras{})
+	fyne.DoAndWait(func() { a.P.AlAbrirAjustes() })
+	d := fyne.CurrentApp().Driver()
+	derecha := func(o fyne.CanvasObject) float32 { return d.AbsolutePositionForObject(o).X + o.Size().Width }
+	arriba := func(o fyne.CanvasObject) float32 { return d.AbsolutePositionForObject(o).Y }
+	for _, ancho := range []float32{390, 320, 1280} {
+		w.Resize(fyne.NewSize(ancho, 844))
+		fyne.DoAndWait(func() {})
+		c := a.P.controlesAjustes
+		apilados := ancho < ui.CorteSM
+		for nombre, o := range map[string]fyne.CanvasObject{
+			"duración": c.duracion, "recordatorio": c.recordatorio, "inicio": c.inicio, "fin": c.fin, "volver": c.volver,
+		} {
+			if x := derecha(o); x > ancho {
+				t.Errorf("a %v «%s» acaba en x = %v, fuera de la ventana", ancho, nombre, x)
+			}
+		}
+		for _, par := range [][2]*ui.Selector{{c.duracion, c.recordatorio}, {c.inicio, c.fin}} {
+			if debajo := arriba(par[1]) > arriba(par[0]); debajo != apilados {
+				t.Errorf("a %v el segundo campo va debajo del primero: %v (tocaba %v)", ancho, debajo, apilados)
+			}
+		}
+		// Apilado, el botón va bajo el título y la entrada; al lado, arriba de la cabecera.
+		if bajo := c.volver.Position().Y > 0; bajo != apilados {
+			t.Errorf("a %v «Volver al calendario» baja bajo el texto: %v (tocaba %v)", ancho, bajo, apilados)
+		}
+	}
+}

@@ -52,6 +52,8 @@ export const lv: AppCatalog<typeof en> = {
   'list.unstar': 'Noņemt {name} no ar zvaigznīti atzīmētajiem',
   'list.starredTitle': 'Ar zvaigznīti',
   'list.reviewDuplicates': 'Pārskatīt dublikātus ({count})',
+  'list.selectMode': 'Atlasīt',
+  'list.moreActions': 'Vairāk darbību',
   'list.count': { zero: '{count} kontaktu', one: '{count} kontakts', other: '{count} kontakti' },
   'list.countFiltered': {
     zero: '{shown} no {count} kontaktiem',

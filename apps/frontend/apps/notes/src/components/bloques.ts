@@ -13,7 +13,7 @@
  * `data-nuevo` es una marca de un instante: dice dónde poner el cursor después de
  * insertar y se quita en seguida (y el saneador la tiraría igual).
  */
-import { BLOQUES_DE_NOTAS } from '@sytue/ui/browser/portapapeles';
+import { BLOQUES_DE_NOTAS } from '@sytue/ui/browser/bloques-de-notas';
 import { escapar } from '../client/captura.js';
 
 export type TipoDePanel = 'info' | 'nota' | 'exito' | 'aviso' | 'error';

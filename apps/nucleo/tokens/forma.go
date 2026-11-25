@@ -6,7 +6,6 @@ package tokens
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -27,8 +26,10 @@ type Medida struct {
 	Unidad string
 }
 
-// formas son las medidas de cada forma, ya resueltas: [0] Marco, [1] Carril.
-var formas = mustFormas(temaCSS, aparienciaCSS)
+// formas son las medidas de cada forma, ya resueltas: [0] Marco, [1] Carril. Al arrancar
+// no se leen de la hoja: van generadas en formas_generadas.go, como las paletas (ver
+// hoja.go), y solo se lee theme.css si lo generado no es de estas hojas.
+var formas = leerFormas()
 
 // MedidaDeForma devuelve el token de forma `nombre` —"radius-control", "sheet-gap",
 // "nav-pad", "title-weight"…, sin su `--` ni su `sytue-`— en la forma que esté en vigor
@@ -49,9 +50,9 @@ func MedidaEnForma(nombre string, carril bool) Medida {
 }
 
 var (
-	reDeclCualquiera = regexp.MustCompile(`--([a-z0-9-]+)\s*:\s*([^;{}]+);`)
-	reVarCualquiera  = regexp.MustCompile(`^var\(--([a-z0-9-]+)\)$`)
-	reMedida         = regexp.MustCompile(`^(-?\d*\.?\d+)(px|rem)?$`)
+	reDeclCualquiera = perezosa(`--([a-z0-9-]+)\s*:\s*([^;{}]+);`)
+	reVarCualquiera  = perezosa(`^var\(--([a-z0-9-]+)\)$`)
+	reMedida         = perezosa(`^(-?\d*\.?\d+)(px|rem)?$`)
 )
 
 // medidasDeForma son los tokens de forma que las nativas pintan: si la hoja deja de
@@ -117,7 +118,7 @@ func mustFormas(tema, apariencia string) [2]map[string]Medida {
 
 // declarar apunta las custom properties de un bloque; la última gana, como en CSS.
 func declarar(en map[string]string, cuerpo string) {
-	for _, m := range reDeclCualquiera.FindAllStringSubmatch(cuerpo, -1) {
+	for _, m := range reDeclCualquiera().FindAllStringSubmatch(cuerpo, -1) {
 		en[m[1]] = strings.TrimSpace(m[2])
 	}
 }
@@ -125,13 +126,13 @@ func declarar(en map[string]string, cuerpo string) {
 // medida lee un valor de la hoja como número con unidad, siguiendo un `var()` si lo es.
 func medida(valor string, base map[string]string) (Medida, bool) {
 	for range 4 { // un var() que apunta a otro, como mucho unas pocas veces
-		m := reVarCualquiera.FindStringSubmatch(valor)
+		m := reVarCualquiera().FindStringSubmatch(valor)
 		if m == nil {
 			break
 		}
 		valor = base[m[1]]
 	}
-	m := reMedida.FindStringSubmatch(valor)
+	m := reMedida().FindStringSubmatch(valor)
 	if m == nil {
 		return Medida{}, false
 	}
@@ -168,7 +169,7 @@ func bloquesDe(css string) []bloque {
 			if len(cuerpos) > 0 {
 				cuerpos[len(cuerpos)-1].WriteString(antes)
 			}
-			ruta = append(ruta, reEspacios.ReplaceAllString(strings.TrimSpace(selector), " "))
+			ruta = append(ruta, reEspacios().ReplaceAllString(strings.TrimSpace(selector), " "))
 			cuerpos = append(cuerpos, &strings.Builder{})
 			desde = i + 1
 		case '}':

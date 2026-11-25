@@ -652,11 +652,12 @@ func esperarRed(t *testing.T, listo <-chan struct{}) {
 	}
 }
 
-// TestElGrosorEsElRangoDeChromium: el `<input type="range">` del grosor va sin estilo,
-// así que es el de Chromium (carril de 8, pulgar de 16) y no el de la suite. Medido en
-// Ribbon.tsx real a rem16 y Figtree cargada:398,75,62 de64×16, centrado en la fila
-// de44 px de su grupo. w-16 mide64 y el alto UA permanece16.
-func TestElGrosorEsElRangoDeChromium(t *testing.T) {
+// TestElGrosorLlevaElPrimarioDeLaSuite: el deslizador del grosor es el de la suite, con
+// su primario, y no el `<input type="range">` sin estilo de Chromium, que era el único
+// azul de la cinta (auditoría del 2026-11-24; la web lo tiñe con `accent-primary`).
+// Conserva el sitio medido en Ribbon.tsx real a rem16: x 398,75, w-16 (64) y centrado en
+// la fila de 44 de su grupo, donde el de Chromium (16 de alto) caía en y = 62.
+func TestElGrosorLlevaElPrimarioDeLaSuite(t *testing.T) {
 	tv := traductorES(t)
 	b := NuevaBarra(func(c string) string { return tv(c, nil) })
 	w := ventanaSinRelleno(b.Objeto())
@@ -668,12 +669,11 @@ func TestElGrosorEsElRangoDeChromium(t *testing.T) {
 			d = x
 		}
 	})
-	if d == nil || !d.Nativo {
-		t.Fatal("el grosor no es el rango nativo de Chromium")
+	if d == nil || d.Nativo {
+		t.Fatal("el grosor tiene que ser el deslizador de la suite, no el rango de Chromium")
 	}
 	a := absoluta(d)
 	cerca(t, "el grosor x", a.X, 398.75)
-	cerca(t, "el grosor y", a.Y, 62)
+	cerca(t, "el centro del grosor", a.Y+d.Size().Height/2, 62+8)
 	cerca(t, "el grosor ancho", d.Size().Width, 64)
-	cerca(t, "el grosor alto", d.Size().Height, 16)
 }

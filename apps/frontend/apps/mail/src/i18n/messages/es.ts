@@ -555,6 +555,7 @@ export const es: AppCatalog<typeof en> = {
   'compose.templates': 'Plantillas',
   'compose.templatesEmpty': 'Aún no tienes plantillas. Créalas en Ajustes de Mail.',
   'compose.attachFailed': 'No se pudo leer el adjunto',
+  'compose.openFailed': 'No se pudo abrir el editor del mensaje. Inténtalo otra vez.',
   'compose.pastedImageDropped': 'La imagen pegada no se ha incluido',
   'compose.pastedImagesDropped': 'Las imágenes pegadas no se han incluido',
   'compose.pastedImagesDroppedDescription': 'Para enviar imágenes, adjúntalas como archivos.',

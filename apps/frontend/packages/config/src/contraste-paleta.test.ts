@@ -166,6 +166,10 @@ function medidas(t: Paleta, lienzo: Color, masContraste = false): [string, numbe
     ['Texto sutil sobre superficie', 4.5, razon(t('text-subtle'), sup)],
     ['Texto sutil sobre el lienzo', 4.5, razon(t('text-subtle'), lienzo)],
     ['Texto sobre fila seleccionada', 4.5, razon(t('text'), elegido)],
+    // El atenuado SÍ vale sobre una fila seleccionada; el sutil no se garantiza (4,4:1
+    // en oscuro sobre el panel): el extracto de la página actual de Sytue PDF lo llevaba
+    // y axe lo marcó en certipdf-dark-1280 (2026-11-25).
+    ['Texto atenuado sobre fila seleccionada', 4.5, razon(t('text-muted'), elegido)],
     ['Enlace sobre superficie', 4.5, razon(t('primary-text'), sup)],
     ['Rótulo del botón principal', 4.5, razon(t('on-primary'), t('primary'))],
     ['Botón principal contra la superficie', 3, razon(t('primary'), sup)],

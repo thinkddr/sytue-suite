@@ -290,6 +290,22 @@ export function detectLocale(): Locale {
 }
 
 /**
+ * Idioma del documento. Lo escribió el servidor en `<html lang>` al renderizar,
+ * así que ya está en el DOM cuando se hidrata la primera isla: el navegador no
+ * tiene que negociarlo otra vez ni esperar a ninguna petición para saberlo.
+ *
+ * Se queda con la subetiqueta primaria porque las once apps escriben `es` pero
+ * el sitio de marketing escribe `es-ES` —la forma completa es la que quieren los
+ * buscadores—, y leerlo tal cual hacía que www cayera al inglés con el idioma
+ * bien negociado. Es BCP-47: lo que va antes del primer guion es el idioma.
+ */
+export function documentLocale(): Locale {
+  const lang = typeof document === 'undefined' ? '' : document.documentElement.lang;
+  const primaria = lang.split('-')[0]?.toLowerCase() ?? '';
+  return isLocale(primaria) ? primaria : DEFAULT_LOCALE;
+}
+
+/**
  * Guarda la preferencia como cookie host-only. Las publicaciones Cloud viven
  * bajo el mismo apex, por lo que una cookie de dominio filtraría la preferencia
  * y permitiría que un sitio de usuario la sobrescribiera. En una app nueva se

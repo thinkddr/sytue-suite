@@ -20,7 +20,8 @@ RUN go mod download
 COPY . .
 
 # El núcleo de cliente que Rooms sirve en /api/v1/client-core/ (los WebAssembly de
-# apps/nucleo: core para el cifrado E2E, office y mail) lo genera UN guion, y este RUN
+# apps/nucleo: vault y core para el cifrado E2E, office, mail y pdf, ya precomprimidos
+# en brotli y gzip) lo genera UN guion, y este RUN
 # es solo su llamada: scripts/publicar-imagen-go.sh, que en la release no ejecuta esta
 # etapa, reconoce esta línea y ejecuta el mismo guion antes de cruzar el binario. Una
 # receta escrita aquí dentro se la saltaba y la v3.20.3 salió sin núcleo

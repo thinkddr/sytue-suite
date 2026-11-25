@@ -118,6 +118,7 @@
   "compose.noAttachmentSend": "Vis tiek siųsti",
   "compose.noAttachmentTitle": "Siųsti be priedų",
   "compose.noDraftsFolder": "Nepavyko rasti aplanko Juodraščiai",
+  "compose.openFailed": "Nepavyko atidaryti laiško rengyklės. Bandykite dar kartą.",
   "compose.pastedImageDropped": "Įklijuotas paveikslėlis neįtrauktas",
   "compose.pastedImagesDropped": "Įklijuoti paveikslėliai neįtraukti",
   "compose.pastedImagesDroppedDescription": "Norėdami išsiųsti paveikslėlius, pridėkite juos kaip failus.",

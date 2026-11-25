@@ -41,8 +41,8 @@ function arrancar(
 }
 
 for (const [stored, expected] of [
-  [null, 'light'],
-  ['invalid', 'light'],
+  [null, null],
+  ['invalid', null],
   ['light', 'light'],
   ['dark', 'dark'],
   ['system', null],
@@ -53,9 +53,9 @@ for (const [stored, expected] of [
   });
 }
 
-test('el almacenamiento bloqueado también abre en claro con el color de cada app', () => {
+test('el almacenamiento bloqueado también sigue al sistema con el color de cada app', () => {
   expect(arrancar(undefined, 'blocked')).toEqual({
-    theme: 'light',
+    theme: null,
     color: 'app',
     app: null,
     forma: null,
@@ -69,7 +69,7 @@ for (const [cookie, stored, expected] of [
   ['sytue-theme=light', 'dark', 'light'],
   ['sytue-theme=invalid', 'dark', 'dark'],
   ['other=value', 'translucent', 'translucent'],
-  ['', null, 'light'],
+  ['', null, null],
 ] as const) {
   test(`la preferencia compartida ${cookie || 'ausente'} se aplica antes de hidratar`, () => {
     expect(arrancar(cookie, { 'sytue-theme': stored }).theme).toBe(expected);

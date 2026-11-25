@@ -6,13 +6,14 @@ package webport
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/webport/rpc"
 )
 
-var ErrRejected = errors.New("webport: scoped host operation rejected")
+// ErrRejected es rpc.ErrRejected: el mismo valor, así errors.Is no distingue capas.
+var ErrRejected = rpc.ErrRejected
 
 const (
 	Version    = 1
@@ -92,12 +93,7 @@ var bounds = map[Method]Bounds{
 }
 
 func Limits(method Method) (Bounds, bool) { value, ok := bounds[method]; return value, ok }
-func ValidID(id string) bool {
-	if len(id) != 64 {
-		return false
-	}
-	return strings.Trim(id, "0123456789abcdef") == ""
-}
+func ValidID(id string) bool              { return rpc.ValidID(id) }
 
 type Binding struct {
 	MatrixUserID string `json:"matrix_user_id"`

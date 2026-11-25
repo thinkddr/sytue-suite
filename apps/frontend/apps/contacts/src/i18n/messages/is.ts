@@ -48,6 +48,8 @@ export const is: AppCatalog<typeof en> = {
   'list.unstar': 'Fjarlægja {name} úr tengiliðum með stjörnu',
   'list.starredTitle': 'Með stjörnu',
   'list.reviewDuplicates': 'Fara yfir tvítök ({count})',
+  'list.selectMode': 'Velja',
+  'list.moreActions': 'Fleiri aðgerðir',
   'list.count': { one: '{count} tengiliður', other: '{count} tengiliðir' },
   'list.countFiltered': {
     one: '{shown} af {count} tengilið',

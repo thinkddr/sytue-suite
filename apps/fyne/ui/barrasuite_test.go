@@ -310,6 +310,42 @@ func TestLaEsquinaDeMarcaSeCineSinMenuLateral(t *testing.T) {
 	}
 }
 
+// TestEnPapelLaBarraSinMenuLateralEsContinua: con el cromo «papel» —el de todas las
+// apps nativas— la esquina de marca es el fondo de la página (`sidebar-bg` es `bg`) y la
+// barra es `topbar-bg`. Sin menú lateral debajo, la esquina ceñida quedaba como un bloque
+// pálido suelto delante de una barra blanca (Hub, Docus, Calcus, Diapos y CertiPDF en la
+// auditoría del 2026-11-24): ahí no se pinta y la barra va de lado a lado con su fondo.
+// Con menú lateral la esquina sigue, que es la prolongación del menú hacia arriba.
+// VISTO EN ROJO con la esquina ceñida de siempre.
+func TestEnPapelLaBarraSinMenuLateralEsContinua(t *testing.T) {
+	conPetroleoClaro(t)
+	tema.ElegirCromo(tema.CromoPapel)
+	t.Cleanup(func() { tema.ElegirCromo("") })
+	fyne.CurrentApp().Settings().SetTheme(fyne.CurrentApp().Settings().Theme())
+	const y = 2
+	en := func(img image.Image, x float32) color.NRGBA { return px(img, int(x*escala), int(y*escala)) }
+	clara := tema.Color(fondoBarra, tema.Claro)
+	if pagina := tema.Color(fondoEsquina, tema.Claro); cerca(pagina, clara) {
+		t.Fatalf("en papel la esquina (%v) y la barra (%v) son del mismo color: la prueba no ve nada", pagina, clara)
+	}
+
+	b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.One)
+	t.Cleanup(b.Parar)
+	m := b.Montar(canvas.NewRectangle(tema.Color("bg", tema.Claro)))
+	m.Resize(fyne.NewSize(anchoPrueba, 200))
+	img := pinta(t, anchoPrueba, 200, m)
+	for _, x := range []float32{2, esquinaCenida(b.marca.Size().Width) - 2, tema.AnchoLateral - 2} {
+		if got := en(img, x); !cerca(got, clara) {
+			t.Errorf("sin menú lateral la barra pinta %v en x=%v y es la de la barra %v: queda la esquina suelta", got, x, clara)
+		}
+	}
+
+	conMenu, _ := cromoPrueba(t, anchoPrueba, 200)
+	if got, pagina := en(pinta(t, anchoPrueba, 200, conMenu), tema.AnchoLateral-2), tema.Color(fondoEsquina, tema.Claro); !cerca(got, pagina) {
+		t.Errorf("con menú lateral la esquina debe seguir sobre él: en su borde pinta %v y es %v", got, pagina)
+	}
+}
+
 // TestRetratoDeLaBarraConElLateral guarda la barra y su armazón para MIRAR el cromo:
 // filete, divisor, campana con aviso, avatar y esquinas de la hoja. No afirma nada.
 // Con `SYTUE_CAPTURA_CROMO=/ruta/cromo` deja PNGs de los tres modos, a 390 táctil y
@@ -1052,5 +1088,26 @@ func TestBarraSuitePreguntaAntesDeSubirFicheroLocal(t *testing.T) {
 	d.confirmar.Tapped(nil)
 	if recordado == nil || !*recordado {
 		t.Fatalf("recordado = %v, quiero true", recordado)
+	}
+}
+
+// TestElPanelEscondidoDelBuscadorNoPintaSuSombra: al montar la barra, el panel de
+// resultados está escondido y su sombra no se pinta; al abrirse sale con su tamaño.
+//
+// VISTO EN ROJO (2026-11-24): sin mirar Visible en el Layout del panel, la sombra ya está
+// hecha antes de abrir el panel.
+func TestElPanelEscondidoDelBuscadorNoPintaSuSombra(t *testing.T) {
+	b := barraPrueba(t)
+	p := b.buscador.panel
+	r := test.WidgetRenderer(p).(*panelBarraRenderer)
+	p.Resize(fyne.NewSize(600, 200))
+	r.Layout(p.Size())
+	if r.sombra.hecha {
+		t.Fatal("el panel escondido ha pintado su sombra")
+	}
+	p.Show()
+	if !r.sombra.hecha || r.sombra.ancho != p.Size().Width || r.sombra.alto != p.Size().Height {
+		t.Errorf("al abrirse, la sombra del panel no está hecha a su tamaño %v (hecha %v, %g×%g)",
+			p.Size(), r.sombra.hecha, r.sombra.ancho, r.sombra.alto)
 	}
 }

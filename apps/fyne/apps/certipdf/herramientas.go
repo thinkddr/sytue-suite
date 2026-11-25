@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -97,8 +96,7 @@ func seccion(titulo string, conBorde bool, partes ...fyne.CanvasObject) fyne.Can
 	if !conBorde {
 		return col
 	}
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	return container.New(conLineaArriba{sep: tema.Espacio(4)}, canvas.NewRectangle(tema.Color("border", v)), col)
+	return container.New(conLineaArriba{sep: tema.Espacio(4)}, ui.NuevoLiso("border"), col)
 }
 
 func (d *dialogoHerramientas) primario(clave string, f func()) *Accion {

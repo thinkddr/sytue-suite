@@ -202,6 +202,7 @@ func NuevoEditor(ctx *editor.Contexto) *Editor {
 	}
 	e.m = ModeloVacio(e.t)
 	e.escenario = NuevoLienzo(e.m, 0)
+	e.escenario.AlTema = true
 	e.escenario.Rotulo = e.t
 	e.sombra = ui.NuevaSombra(tema.SombraMD, 0)
 	area := &areaDiapo{e: e}
@@ -613,7 +614,7 @@ func (e *Editor) recomponer() {
 	if e.selCon != "" && e.m.conector(e.activa, e.selCon) == nil {
 		e.selCon = ""
 	}
-	e.escenario.M, e.escenario.Indice, e.escenario.Variante = e.m, e.activa, e.variante()
+	e.escenario.M, e.escenario.Indice = e.m, e.activa
 	e.escenario.Patron, e.escenario.Diseno, e.escenario.Conector = e.patron, e.diseno, e.selCon
 	e.carril.rehacer()
 	e.miniBarra.Objects = e.controlesMiniBarra()
@@ -624,9 +625,12 @@ func (e *Editor) recomponer() {
 		objs = append(objs, e.bandaPatron())
 	}
 	if e.aviso != "" {
-		objs = append(objs, cartel(e.aviso, e.variante()))
+		objs = append(objs, cartel(e.aviso))
 	}
-	objs = append(objs, container.NewStack(canvas.NewRectangle(colorLienzo(e.variante())), e.desliz))
+	// Los fondos de la zona son `ui.Liso`, que resuelve su color al pintarse: la zona no
+	// se recompone al cambiar de tema en caliente, y con rectángulos resueltos aquí la
+	// mini-barra se quedaba blanca y la mesa clara en oscuro (y al revés).
+	objs = append(objs, container.NewStack(ui.NuevoLisoCon(colorLienzo), e.desliz))
 	if p := e.panelAbajo(); p != nil {
 		objs = append(objs, p)
 	}
@@ -640,9 +644,7 @@ func (e *Editor) recomponer() {
 }
 
 func (e *Editor) miniBarraConFondo() fyne.CanvasObject {
-	v := e.variante()
-	return container.New(&bandaInferior{}, canvas.NewRectangle(tema.Color("surface", v)),
-		canvas.NewRectangle(tema.Color("border", v)), e.deslizBarra)
+	return container.New(&bandaInferior{}, ui.NuevoLiso("surface"), ui.NuevoLiso("border"), e.deslizBarra)
 }
 
 // controlesMiniBarra es la mini-barra de §7.2 en el orden de la web; lo que depende de
@@ -1123,7 +1125,7 @@ func (c *carrilDiapos) rehacer() {
 	minis := make([]fyne.CanvasObject, len(e.m.Diapos))
 	for i := range e.m.Diapos {
 		t := NuevaMiniatura(e.m, i, e.Elegir)
-		t.Activa, t.Variante = i == e.activa, e.variante()
+		t.Activa = i == e.activa
 		t.AlMover = func(hasta int) { e.Mover(i, hasta) }
 		t.AlOcultar = func() { e.AlternarOculta(i) }
 		t.AlAtajo = e.ctx.AtajoDelEditor
@@ -1376,11 +1378,9 @@ func (r *notasRenderer) Refresh() {
 // falta: sin ella, alguien daría por buena una diapositiva a la que le falta el gráfico.
 // Se pinta como la franja de solo lectura del cromo: `bg-selected`, borde inferior y
 // `text-xs`.
-func cartel(texto string, v tema.Variante) fyne.CanvasObject {
-	fondo := canvas.NewRectangle(tema.Color("selected", v))
-	borde := canvas.NewRectangle(tema.Color("border", v))
-	t := ui.Texto(texto, tema.TextoXS, ui.Normal, tema.Color("text", v))
-	return container.New(banda{}, fondo, borde, t)
+func cartel(texto string) fyne.CanvasObject {
+	t := ui.NuevoRotulo(texto, tema.TextoXS, ui.Normal, "text")
+	return container.New(banda{}, ui.NuevoLiso("selected"), ui.NuevoLiso("border"), t)
 }
 
 type banda struct{}
@@ -1393,9 +1393,8 @@ func (banda) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[0].Resize(t)
 	objs[1].Resize(fyne.NewSize(t.Width, tema.Borde))
 	objs[1].Move(fyne.NewPos(0, t.Height-tema.Borde))
-	if texto, ok := objs[2].(*canvas.Text); ok {
-		ui.ColocarTexto(texto, tema.TextoXS, tema.Espacio(3), tema.Espacio(1))
-	}
+	objs[2].Move(fyne.NewPos(tema.Espacio(3), tema.Espacio(1)))
+	objs[2].Resize(objs[2].MinSize())
 }
 
 // colorLienzo es `--editor-canvas-bg`: el fondo sobre el que flota el papel. No es un
@@ -1486,5 +1485,12 @@ func (r *bandaPatronRenderer) Objects() []fyne.CanvasObject {
 	}
 	return append(objs, r.b.cerrar)
 }
-func (r *bandaPatronRenderer) Refresh() { r.Layout(r.b.Size()); canvas.Refresh(r.b) }
+
+func (r *bandaPatronRenderer) Refresh() {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	r.fondo.FillColor = tema.Color("selected", v)
+	r.borde.FillColor = tema.Color("border", v)
+	r.Layout(r.b.Size())
+	canvas.Refresh(r.b)
+}
 func (r *bandaPatronRenderer) Destroy() {}

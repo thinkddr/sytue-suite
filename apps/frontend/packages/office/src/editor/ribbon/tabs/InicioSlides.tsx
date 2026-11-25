@@ -38,8 +38,8 @@ import {
   getSlidesSize,
   subscribeSlidesLayouts,
   SLIDE_LAYOUTS,
-} from '../../slides/SlidesCanvas';
-import type { SlidesSelectionSnapshot } from '../../slides/SlidesCanvas';
+} from '../../slides/mando';
+import type { SlidesSelectionSnapshot } from '../../slides/mando';
 import { TemaGroup } from '../TemaGroup';
 
 /* El select de disposición actúa como menú de comando: la 1.ª opción es el

@@ -120,3 +120,25 @@ test('la forma va por la misma regla que el color', () => {
     limpiar();
   }
 });
+
+test('sin elección de modo se sigue al sistema: en oscuro resuelve oscuro y no fija data-theme', () => {
+  limpiar();
+  localStorage.removeItem('sytue-theme');
+  document.documentElement.removeAttribute('data-theme');
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    matches: query === '(prefers-color-scheme: dark)',
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })) as unknown as typeof window.matchMedia;
+  const { tema, desmontar } = montar();
+  try {
+    expect([tema().mode, tema().resolved]).toEqual(['system', 'dark']);
+    // Sin atributo la hoja pinta `prefers-color-scheme`, igual que el primer pintado.
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+  } finally {
+    desmontar();
+    window.matchMedia = original;
+  }
+});

@@ -190,8 +190,26 @@ test('a divergent completion is an explicit conflict and cannot replace the last
   const receipt = structuredClone(memory.indexes.at(-1)!);
   receipt.reference.event_id = '$completion_branch';
   receipt.record.revision_id = 'completion_branch';
+  // Otro inventario de la misma época: dos importaciones que no leyeron lo mismo.
+  const commit = JSON.parse(atob(receipt.record.payload)) as { metadata: string };
+  const proof = JSON.parse(atob(commit.metadata)) as { inventory_sha256: string };
+  proof.inventory_sha256 = '0'.repeat(64);
+  commit.metadata = encodeStorageJSON(bytes(JSON.stringify(proof)));
+  receipt.record.payload = encodeStorageJSON(bytes(JSON.stringify(commit)));
   memory.indexes.push(receipt);
   await expect(drive.refresh()).rejects.toThrow('conflict');
+  expect((await drive.file('file')).id).toBe('file');
+  await drive.close();
+});
+
+test('two identical completions of the same frozen source (two imports at once) still open', async () => {
+  const { memory, drive, state } = await fixture();
+  const receipt = structuredClone(memory.indexes.at(-1)!);
+  receipt.reference.event_id = '$completion_branch';
+  receipt.record.revision_id = 'completion_branch';
+  memory.indexes.push(receipt);
+  await drive.initialize(state);
+  expect((await drive.root()).id).toBe('root');
   expect((await drive.file('file')).id).toBe('file');
   await drive.close();
 });

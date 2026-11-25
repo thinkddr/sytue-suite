@@ -42,8 +42,9 @@ const PX_PER_MIN = HOUR_PX / 60;
 const TOTAL_PX = DAY_MINUTES * PX_PER_MIN;
 
 // Geometría de las barras de la franja «todo el día».
-const STRIP_BAR_H = 22; // alto de una fila de barras, con separación
-const STRIP_BAR_INNER_H = 18; // alto pintado de la barra
+// 24 de alto, como las barras del mes y las fichas con hora (WCAG 2.5.8).
+const STRIP_BAR_H = 26; // alto de una fila de barras, con separación
+const STRIP_BAR_INNER_H = 24; // alto pintado de la barra
 const STRIP_PAD = 4; // relleno vertical de la franja
 
 type PE = TargetedPointerEvent<HTMLDivElement>;
@@ -824,7 +825,7 @@ function AllDayBar({
         color: barTextColor(fill),
       }}
     >
-      <span class="text-2xs truncate leading-none font-medium">
+      <span class="truncate text-xs leading-none font-medium">
         {event.summary || t('event.untitled')}
       </span>
     </button>

@@ -102,7 +102,7 @@ config:
     homeserverURL: ""
     serverName: ""
     ssoProviderID: oidc-sytue
-    sourceURL: https://github.com/element-hq/synapse/tree/v1.165.0
+    sourceURL: https://github.com/element-hq/synapse/tree/v1.166.0
     existingSecret: sytue-matrix
   # Retirada de la autoridad de Matrix del correo (ADR 0087, entrega 5) ->
   # SYTUE_MAIL_SIN_MATRIX. APAGADA por defecto: vacío deja todo como antes y solo

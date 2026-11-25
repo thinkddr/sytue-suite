@@ -363,4 +363,4 @@ export type {
 
 export { createStorageRootService } from './chat/storage-authority.js';
 
-export { clientCoreProxy, roomsServiceBase } from './core/clientCore.js';
+export { clientCoreHead, clientCoreProxy, roomsServiceBase } from './core/clientCore.js';

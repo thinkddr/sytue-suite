@@ -962,8 +962,13 @@ export function Miniaturas({
                   la portada, el anexo, la que hay que quitar. Solo el de las
                   páginas que el motor llegó a leer: de las demás no se sabe, y
                   «sin texto» sería mentir. */}
+              {/* En la página actual, atenuado y no sutil: sobre `bg-selected` el sutil
+                  se queda en 4,4:1 en oscuro (axe, certipdf-dark-1280, 2026-11-25), y la
+                  paleta solo garantiza el atenuado sobre una fila seleccionada. */}
               {p.extracto !== undefined && (
-                <span class="text-text-subtle text-2xs mt-0.5 line-clamp-3 block">
+                <span
+                  class={`${actual === p.numero ? 'text-text-muted' : 'text-text-subtle'} text-2xs mt-0.5 line-clamp-3 block`}
+                >
                   {extractoLegible(p.extracto) ?? t('pdf.page.noText')}
                 </span>
               )}
@@ -3584,7 +3589,9 @@ export function Firmar({
         )}
       </div>
 
-      <div class="flex items-center gap-4">
+      {/* Por debajo de `sm`, una debajo de otra: en fila, a 360, eran tres columnas con
+          el rótulo partido en tres renglones. */}
+      <div class="flex items-start gap-2 max-sm:flex-col sm:items-center sm:gap-4">
         <label class="text-text flex items-center gap-1.5 text-xs">
           <Checkbox
             checked={visible}

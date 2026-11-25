@@ -81,6 +81,43 @@ func TestLaMuestraDeColorEsLaDeBarraTsx(t *testing.T) {
 	}
 }
 
+// TestLaMuestraDelColorDelFondoLlevaAro: la negra de la paleta de CertiPDF, en oscuro,
+// quedaba a ~1,1:1 de la superficie con el filete `border` (auditoría del 2026-11-24), y
+// la blanca igual en claro. Esas llevan el contorno de control: el píxel del borde,
+// pintado, contrasta 3:1 con la superficie. La azul sigue con su filete de siempre.
+// VISTO EN ROJO con el `border` para todas.
+func TestLaMuestraDelColorDelFondoLlevaAro(t *testing.T) {
+	t.Cleanup(func() { tema.Elegir("") })
+	const lado, margen float32 = 20, 10
+	for _, c := range []struct {
+		modo  string
+		color color.NRGBA
+	}{
+		{"oscuro", color.NRGBA{R: 0x11, G: 0x18, B: 0x27, A: 255}},
+		{"oscuro", color.NRGBA{A: 255}},
+		{"claro", color.NRGBA{R: 255, G: 255, B: 255, A: 255}},
+	} {
+		tema.Elegir(c.modo)
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		m := NuevaMuestraColor(c.color, "Negro", nil)
+		img := colocado(t, m, m.MinSize(), margen)
+		aro := m.borde(v)
+		if k := relacionContraste(aro, tema.Color("surface", v)); k < 3 {
+			t.Errorf("%s, muestra %v: el borde es %v y queda a %.2f:1 de la superficie", c.modo, c.color, aro, k)
+		}
+		// Y es lo que se pinta: la fila de dispositivo de dentro del borde, por el centro.
+		centro := int((margen + lado/2) * escala)
+		if got := px(img, centro, int(margen*escala)); !cercaDe(got, aro, 40) {
+			t.Errorf("%s, muestra %v: el borde pinta %v y es %v", c.modo, c.color, got, aro)
+		}
+	}
+	tema.Elegir("claro")
+	azul := NuevaMuestraColor(color.NRGBA{R: 0x3b, G: 0x82, B: 0xf6, A: 255}, "Azul", nil)
+	if got := azul.borde(tema.Claro); got != tema.Color("border", tema.Claro) {
+		t.Errorf("la azul ha cambiado de filete: %v", got)
+	}
+}
+
 // TestLaMuestraNaceEntera es la regla 7 de `ui.go` para esta pieza: recién montada
 // pinta lo mismo que tras un `Refresh`.
 func TestLaMuestraNaceEntera(t *testing.T) {

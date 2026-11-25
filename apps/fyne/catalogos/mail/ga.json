@@ -121,6 +121,7 @@
   "compose.noAttachmentSend": "Seol mar sin féin",
   "compose.noAttachmentTitle": "Seol gan cheangaltáin",
   "compose.noDraftsFolder": "Níor aimsíodh an fillteán Dréachtaí",
+  "compose.openFailed": "Níorbh fhéidir eagarthóir na teachtaireachta a oscailt. Bain triail eile as.",
   "compose.pastedImageDropped": "Níor cuireadh an íomhá a greamaíodh san áireamh",
   "compose.pastedImagesDropped": "Níor cuireadh na híomhánna a greamaíodh san áireamh",
   "compose.pastedImagesDroppedDescription": "Chun íomhánna a sheoladh, ceangail iad mar chomhaid.",

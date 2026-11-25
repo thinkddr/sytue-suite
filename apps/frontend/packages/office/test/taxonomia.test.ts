@@ -22,6 +22,7 @@ import { COMANDOS } from '../src/editor/comandos';
 import type { IdComando } from '../src/editor/comandos';
 import { PESTANAS, pestanasDe } from '../src/editor/pestanas';
 import type { RibbonTabId } from '../src/editor/pestanas';
+import { EDITORES } from '../src/editor/tipos/todos';
 
 const KINDS = ['document', 'spreadsheet', 'presentation'] as const;
 const IDS = Object.keys(COMANDOS) as IdComando[];
@@ -91,14 +92,11 @@ describe('el fichero de pestañas', () => {
     }
   });
 
-  test('la cinta sabe pintar cada pestaña (una entrada en CUERPOS por id)', () => {
-    const s = fuente('ribbon/Ribbon.tsx');
-    const cuerpos = s.slice(
-      s.indexOf('const CUERPOS'),
-      s.indexOf('};', s.indexOf('const CUERPOS')),
-    );
-    const pintables = [...cuerpos.matchAll(/^ {2}([a-z]+): /gm)].map((m) => m[1]!);
-    expect(pintables.sort()).toEqual(PESTANAS.map((p) => p.id).sort());
+  test('cada editor de tipo pinta sus pestañas, ni una más ni una menos', () => {
+    for (const kind of KINDS) {
+      const pintables = Object.keys(EDITORES[kind].cuerpos).sort();
+      expect({ kind, pintables }).toEqual({ kind, pintables: [...idsDe(kind)].sort() });
+    }
   });
 });
 

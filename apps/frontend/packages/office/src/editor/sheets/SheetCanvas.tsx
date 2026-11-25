@@ -103,7 +103,6 @@ import type {
   ChartSpec,
   CondRule,
   DataValidation,
-  DefinedName,
   EditorContext,
   ExternalTable,
   NumFmt,
@@ -134,7 +133,6 @@ import { writePivot, pivotLabels, pivotSource, legacyPivot } from './pivot-hoja'
 import { nextPivotName, pivotItems, sanitizePivot, type SheetPivot } from './pivot';
 import { setEditorRoot } from '../canvas/exec';
 import type { MatchOptions } from '../canvas/exec';
-import { recordStep } from '../macros';
 import {
   anclarPosHoja,
   cursorPosKey,
@@ -154,6 +152,7 @@ import { CONTENT_PALETTE, RibbonButton } from '../ribbon/primitives';
 import { EditorIcon } from '../icons';
 import {
   NUMFMT_IDS,
+  alineacionPintada,
   applyNumFmt,
   buildCondDecor,
   canEditCell,
@@ -369,94 +368,42 @@ import {
 } from './atajosHoja';
 import '../canvas/superficies.css';
 import './superficie-hoja.css';
+import {
+  dispatchSheetCommand,
+  lienzoDeHoja,
+  type GoalSeekProbeResult,
+  type SheetCommand,
+  type SheetRibbonState,
+  type SolverConstraintRef,
+  type SolverProbeResult,
+} from './mando';
 
-/* ---------- Comandos de la pestaña InicioSheets (tarea B11) ---------- */
-
-export type SheetCommand =
-  | 'bold'
-  | 'italic'
-  | 'align'
-  | 'numfmt' // value: NumFmtId
-  | 'decimals' // value: '+1' | '-1'
-  | 'style' // value: JSON.stringify(Partial<CellStyle>) — parche sobre el rango (null = quitar prop)
-  | 'border' // value: 'all' | 'outer' | 'bottom' | 'none'
-  | 'clearstyle' // quita todo el formato visual del rango
-  | 'condadd' // value: JSON.stringify(CondRule)
-  | 'conddel' // value: índice de la regla
-  | 'condmove' // value: 'i,dir' — reordena la regla i (prioridad); dir -1 sube, +1 baja
-  | 'validadd' // value: JSON.stringify(DataValidation) (rango = selección actual)
-  | 'validdel' // value: índice de la validación
-  | 'merge' // value: 'center' (o ausente) combina y centra; 'merge' combina; 'unmerge' separa; 'content' une el texto en la primera celda (la combinación de contenido de antes)
-  | 'copy' // portapapeles: value 'cut' corta (mover); ausente = copiar
-  | 'paste' // value 'values' = pegado especial (solo valores)
-  /* --- Fase Datos --- */
-  | 'freeze' // value: 'cols,rows' ('0,0' descongela)
-  | 'sort' // value: 'asc' | 'desc' (por la columna del ancla, con engine.getValue)
-  | 'autofilter' // conmuta el autofiltro sobre el rango/tabla del ancla
-  | 'filterset' // value: JSON.stringify({ col, value, hidden }) — excluye/incluye un valor
-  | 'filtercond' // value: JSON.stringify({ col, cond }) — condición de la columna (cond null la quita)
-  | 'filtersort' // value: JSON.stringify({ col, dir }) — ordena el cuerpo del autofiltro
-  | 'dedupe' // quita filas duplicadas del rango seleccionado
-  | 'text2cols' // value: delimitador — reparte el texto de la columna en varias
-  | 'insrow' // value: 'above' | 'below'
-  | 'inscol' // value: 'left' | 'right'
-  | 'delrow'
-  | 'delcol'
-  /* --- Fase Visual --- */
-  | 'chartadd' // value: JSON.stringify({ type, range }) (id y posición los pone el lienzo)
-  | 'sparkadd' // value: JSON.stringify({ range, type, color?, cell? }) — cell por defecto = ancla
-  | 'sparkdel' // value: celda anfitriona de la sparkline a quitar
-  | 'pivot' // value: JSON de una SheetPivot (sin `name`, una nueva; con él, cambia esa) — la calcula, la escribe y la guarda
-  | 'pivotrefresh' // value: nombre de la tabla dinámica, o '' para todas las de la hoja — la recalcula desde su origen
-  | 'pivotdel' // value: nombre — vacía lo que ocupaba y la quita
-  | 'sliceradd' // value: JSON.stringify({ range, col }) — segmentación sobre una columna (usa/crea el autofiltro)
-  | 'aifill' // value: la fórmula del asistente — la escribe en la selección, adaptando referencias
-  | 'goalseek' // value: JSON.stringify({ cell, value }) — escribe el valor hallado en la celda variable (Buscar objetivo)
-  | 'solverapply' // value: JSON.stringify({ values: { ref: number } }) — escribe los valores hallados en las celdas variable (Solver)
-  | 'fillcells' // value: JSON.stringify({ values: { ref: texto } }) — escribe lo que la persona confirmó del relleno con IA
-  | 'bloquehoja' // value: JSON de un bloque reutilizable {cells, formats, styles, charts} — lo coloca en la celda activa
-  /* --- Escenarios (Administrador de escenarios) --- */
-  | 'scenadd' // value: JSON.stringify({ name, range }) — captura los valores actuales de las celdas del rango
-  | 'scenupdate' // value: nombre — recaptura los valores actuales de las celdas del escenario
-  | 'scenapply' // value: nombre — escribe los valores del escenario en las celdas (la hoja recalcula)
-  | 'scendel' // value: nombre — borra el escenario
-  | 'scenreport' // value: JSON.stringify({ target, results }) — informe resumen comparando escenarios
-  | 'datatable' // value: JSON.stringify({ range, rowInput?, colInput? }) — tabla de datos (sensibilidad)
-  /* --- Tablas con formato (ListObject) --- */
-  | 'tableadd' // value: JSON.stringify({ range, headers?, style? }) — nombre único automático
-  | 'tabledel' // quita la tabla que cubre el ancla
-  | 'tablestyle' // value: id de estilo (TABLE_STYLES) de la tabla del ancla
-  | 'tabletotals' // conmuta la fila de totales de la tabla del ancla
-  | 'tabletotalfn' // value: JSON.stringify({ name, col, fn }) — función de total de una columna
-  /* --- Datos externos (conector Power Query): materializar/refrescar --- */
-  | 'extdata' // value: JSON { connectionId, spec, anchor, columns, rows, style?, name? } — vuelca el resultado como SheetTable + guarda la definición (name presente = refrescar la existente)
-  /* --- Protección de hoja y celda --- */
-  /* --- Medidas de columna y fila (sheets/rejilla.ts) --- */
-  | 'colwidth' // value: «{px}» o «auto» — ancho de las columnas de la selección
-  | 'rowheight' // value: «{px}» o «auto» — alto de las filas de la selección
-  | 'protect' // value: JSON.stringify({ password?, selectCells?, formatCells? })
-  | 'unprotect' // value: contraseña tecleada (cotejo client-side, no cripto)
-  /* --- Protección de estructura del LIBRO --- */
-  | 'protectbook' // value: JSON.stringify({ password? }) — bloquea añadir/borrar/renombrar/reordenar hojas
-  | 'unprotectbook' // value: contraseña tecleada (cotejo client-side, no cripto)
-  /* --- Esquema (agrupar/outline) y subtotales --- */
-  | 'outline' // value: JSON { axis:'row'|'col', op:'group'|'ungroup'|'toggle'|'level'|'clear', start?, end?, level? }
-  | 'subtotal' // value: JSON { range, groupCol, fn } — inserta subtotales por grupo + total general
-  | 'hide' // value: JSON { axis:'row'|'col', op:'hide'|'show' } — oculta o muestra las de la selección
-  /* --- Nombres definidos (Administrador de nombres, sheets/nombres.ts) --- */
-  | 'nameset' // value: JSON NameRequest — crea o edita (renombrar reescribe las fórmulas que lo usan)
-  | 'namedel'; // value: JSON { name, sheet? } — borra el nombre de ese ámbito
-
-let sheetCommandHandler: ((cmd: SheetCommand, value?: string) => void) | null = null;
-
-/** Envía un comando de celda al SheetCanvas montado (no-op si no hay ninguno).
- *  Si hay grabación de macro activa, registra el comando antes de despacharlo
- *  (recordStep es no-op fuera de grabación: no altera el despacho normal). */
-export function dispatchSheetCommand(cmd: SheetCommand, value?: string): void {
-  if (!sheetCommandHandler) return;
-  recordStep('spreadsheet', cmd, value);
-  sheetCommandHandler(cmd, value);
-}
+/* El mando de la hoja (comandos y lectores) vive en `./mando`: lo importan la cinta y los
+ * paneles de cualquier documento sin bajar este lienzo. Se reexporta tal cual. */
+export {
+  dispatchSheetCommand,
+  highlightCommentCell,
+  makeGoalSeekProbe,
+  makeSolverProbe,
+  readCommentCellRef,
+  readSheetCellAnchor,
+  readSheetGrid,
+  readSheetName,
+  readSheetState,
+  readSheetValues,
+  revealCommentCell,
+  subscribeSheetState,
+} from './mando';
+export type {
+  ExternalTableState,
+  GoalSeekProbe,
+  GoalSeekProbeResult,
+  SheetCommand,
+  SheetRibbonState,
+  SolverConstraintRef,
+  SolverProbe,
+  SolverProbeResult,
+} from './mando';
 
 /**
  * Pide el ancho de columna o el alto de fila (px, o «auto» para ajustar a lo escrito) y lo
@@ -573,204 +520,6 @@ export function comandoVetadoPorProteccion(
     (PROTECT_FORMAT_CMDS.has(cmd) && protect.formatCells !== true) ||
     (perm !== undefined && !isPermissionGranted(protect, perm))
   );
-}
-
-/* ---------- Canal de LECTURA hoja→ribbon (dispatch es solo escritura) ---------- */
-
-/** Tabla de datos externos + el rango ACTUAL de su SheetTable enlazada (para
- *  localizar la que cubre el ancla y para el gestor/refresco del ribbon). */
-export interface ExternalTableState extends ExternalTable {
-  /** Rango A1 actual de la SheetTable enlazada; '' si ya no existe. */
-  range: string;
-}
-
-export interface SheetRibbonState {
-  /** Formato de número de la celda ancla ({ id: 'general' } si no tiene). */
-  numFmt: NumFmt;
-  /** Formato visual de la celda ancla ({} si ninguno) — refleja botones del ribbon. */
-  style: CellStyle;
-  /** Paneles congelados de la hoja activa (0,0 = sin congelar). */
-  freeze: { cols: number; rows: number };
-  /** Ancho de la columna y alto de la fila del ancla (px de maqueta): prellenan los cuadros
-   *  «Ancho de columna…» y «Alto de fila…». */
-  colWidth: number;
-  rowHeight: number;
-  /** Reglas de formato condicional de la hoja activa. */
-  condRules: readonly CondRule[];
-  /** Validaciones de datos de la hoja activa (la pestaña Datos las lista y elimina). */
-  validations: readonly DataValidation[];
-  /** Sparklines de la hoja activa (la pestaña Datos las lista y elimina). */
-  sparklines: readonly Sparkline[];
-  /** Selección actual en A1 («B2» o «A1:C3»), para prellenar el rango de una regla. */
-  selection: string;
-  /** Autofiltro persistente activo (los desplegables por columna viven en la rejilla). */
-  autofilter: boolean;
-  /** Tabla con formato que cubre la celda ancla (null si el ancla no está en una). */
-  table: SheetTable | null;
-  /** Tablas de datos externos de la hoja activa (con el rango actual de su SheetTable
-   *  enlazada) para el gestor/refresco del ribbon. */
-  externalTables: readonly ExternalTableState[];
-  /** La hoja activa está protegida (celdas bloqueadas en solo lectura). */
-  protectedSheet: boolean;
-  /** La protección de la hoja tiene contraseña (para pedirla al desproteger). */
-  protectHasPassword: boolean;
-  /** Referencias de los rangos editables por persona o grupo de la hoja protegida. */
-  protectRanges: readonly string[];
-  /** El LIBRO está protegido: estructura bloqueada (añadir/borrar/renombrar/reordenar hojas). */
-  protectedWorkbook: boolean;
-  /** La protección del libro tiene contraseña (para pedirla al desproteger). */
-  protectWorkbookHasPassword: boolean;
-  /** Escenarios del Análisis Y-si de la hoja activa (el Administrador los lista). */
-  scenarios: readonly Scenario[];
-  /** Tablas dinámicas de la hoja activa. */
-  pivots: readonly SheetPivot[];
-  /** La tabla dinámica cuya salida cubre la celda ancla, o null. */
-  pivotAt: SheetPivot | null;
-  /** Nombres definidos del libro, las hojas (su ámbito) y la activa: Administrador de nombres. */
-  names: readonly DefinedName[];
-  sheetNames: readonly string[];
-  activeSheet: string;
-}
-
-/** Sonda de Buscar objetivo: función objetivo lista para el solver + valor actual. */
-export interface GoalSeekProbe {
-  /** f(x) = valor calculado de la celda objetivo al fijar la variable en x;
-   *  null si la celda objetivo no da un número (error/texto). */
-  f: (x: number) => number | null;
-  /** Valor numérico actual de la celda variable (punto de partida del solver). */
-  current: number;
-}
-
-/** Resultado de preparar la sonda: lista, o el motivo por el que no se puede. */
-export type GoalSeekProbeResult =
-  | { ok: true; probe: GoalSeekProbe }
-  | {
-      ok: false;
-      reason: 'no-sheet' | 'bad-target' | 'bad-var' | 'target-not-formula' | 'var-is-formula';
-    };
-
-/** Una restricción del Solver sin resolver: refs de texto (LHS = celda; RHS =
- *  número en es-ES o celda). El lienzo las resuelve al construir la sonda. */
-export interface SolverConstraintRef {
-  lhs: string;
-  rhs: string;
-}
-
-/** Sonda del Solver: evaluador multivariable listo para el optimizador (solver.ts)
- *  + valores actuales de las celdas variable (punto de partida). */
-export interface SolverProbe {
-  /** evaluate(x) fija las celdas variable en x y lee objetivo + LHS/RHS de cada
-   *  restricción (una recalculación del motor desechable). */
-  evaluate: SolverEvaluate;
-  /** Valores numéricos actuales de las celdas variable, en su orden. */
-  current: number[];
-}
-
-/** Resultado de preparar la sonda del Solver: lista, o el motivo por el que no. */
-export type SolverProbeResult =
-  | { ok: true; probe: SolverProbe }
-  | {
-      ok: false;
-      reason:
-        | 'no-sheet'
-        | 'bad-target'
-        | 'target-not-formula'
-        | 'no-vars'
-        | 'bad-var'
-        | 'var-is-formula'
-        | 'bad-constraint';
-    };
-
-let sheetStateReader: (() => SheetRibbonState) | null = null;
-let sheetGridReader: ((range: string) => string[][] | null) | null = null;
-let sheetValueReader: ((range: string, sheet?: string) => CellValue[][] | null) | null = null;
-let sheetNameReader: (() => string | null) | null = null;
-let sheetCellAnchorReader: (() => AnclaCelda | null) | null = null;
-let sheetCellRevealer: ((a: AnclaCelda) => boolean) | null = null;
-let sheetCellRefReader: ((a: AnclaCelda) => string | null) | null = null;
-let sheetCellHighlighter: ((a: AnclaCelda | null) => void) | null = null;
-let sheetProbeReader: ((targetRef: string, varRef: string) => GoalSeekProbeResult) | null = null;
-let sheetSolverReader:
-  | ((targetRef: string, varRefs: string[], cons: SolverConstraintRef[]) => SolverProbeResult)
-  | null = null;
-const sheetStateListeners = new Set<() => void>();
-
-/** Estado actual de la hoja para el ribbon; null si no hay SheetCanvas montado. */
-export function readSheetState(): SheetRibbonState | null {
-  return sheetStateReader ? sheetStateReader() : null;
-}
-
-/** Valores mostrados (texto) de un rango de la hoja activa; null si no parsea o
- *  no hay lienzo. Lo usa el asistente de tabla dinámica para leer los encabezados. */
-export function readSheetGrid(range: string): string[][] | null {
-  return sheetGridReader ? sheetGridReader(range) : null;
-}
-
-/** Los VALORES calculados de un rango (de la hoja activa, o de `sheet`), sin formato:
- *  lo que necesita la tabla dinámica para agrupar como el cálculo. null sin hoja. */
-export function readSheetValues(range: string, sheet?: string): CellValue[][] | null {
-  return sheetValueReader ? sheetValueReader(range, sheet) : null;
-}
-
-/** Nombre de la hoja activa; null sin lienzo. Lo usan los scripts para acotar por ámbito. */
-export function readSheetName(): string | null {
-  return sheetNameReader ? sheetNameReader() : null;
-}
-
-/** El ancla de la celda activa (anclaCelda.ts), para colgarle un comentario: «Nuevo
- *  comentario» de la cinta. null sin lienzo de hoja. */
-export function readSheetCellAnchor(): AnclaCelda | null {
-  return sheetCellAnchorReader ? sheetCellAnchorReader() : null;
-}
-
-/** Lleva a la celda de un comentario: cambia de hoja si hace falta, la selecciona y la trae
- *  a la vista. false si no hay lienzo de hoja o la celda ya no existe. */
-export function revealCommentCell(a: AnclaCelda): boolean {
-  return sheetCellRevealer ? sheetCellRevealer(a) : false;
-}
-
-/** Dónde está HOY la celda de un comentario («B5», o «Hoja2!B5» si es de otra hoja): tras
- *  insertar una fila encima ya no es la que se citó al comentar. null sin lienzo o si ya no
- *  existe. */
-export function readCommentCellRef(a: AnclaCelda): string | null {
-  return sheetCellRefReader ? sheetCellRefReader(a) : null;
-}
-
-/** Enmarca en violeta la celda de un comentario mientras el puntero (o el foco) está en su
- *  hilo del panel; null lo apaga. Solo se ve en la hoja activa: no cambia de hoja ni mueve
- *  la selección, que es lo que hace el botón «Celda B5». */
-export function highlightCommentCell(a: AnclaCelda | null): void {
-  sheetCellHighlighter?.(a);
-}
-
-/** Prepara la sonda de Buscar objetivo para la celda objetivo y la variable (A1
- *  de la hoja activa). Trabaja sobre un motor DESECHABLE clonado del modelo
- *  actual: el solver puede fijar la variable cuantas veces quiera sin tocar la
- *  hoja real. Devuelve el motivo si las celdas no valen (para avisar en el diálogo). */
-export function makeGoalSeekProbe(targetRef: string, varRef: string): GoalSeekProbeResult {
-  return sheetProbeReader ? sheetProbeReader(targetRef, varRef) : { ok: false, reason: 'no-sheet' };
-}
-
-/** Prepara la sonda del Solver (celda objetivo, celdas variable y restricciones,
- *  A1 de la hoja activa) sobre un motor DESECHABLE clonado del modelo actual: el
- *  optimizador fija las variables cuantas veces quiera sin tocar la hoja real.
- *  Devuelve el motivo si algo no vale (para avisar en el diálogo). */
-export function makeSolverProbe(
-  targetRef: string,
-  varRefs: string[],
-  cons: SolverConstraintRef[],
-): SolverProbeResult {
-  return sheetSolverReader
-    ? sheetSolverReader(targetRef, varRefs, cons)
-    : { ok: false, reason: 'no-sheet' };
-}
-
-/** Suscribe al cambio de selección/modelo; devuelve la desuscripción. */
-export function subscribeSheetState(fn: () => void): () => void {
-  sheetStateListeners.add(fn);
-  return () => {
-    sheetStateListeners.delete(fn);
-  };
 }
 
 /* ---------- Constantes ---------- */
@@ -4943,16 +4692,16 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       }
       if (changed) applyCells(cells);
     };
-    sheetCommandHandler = run;
+    lienzoDeHoja.sheetCommandHandler = run;
     return () => {
-      if (sheetCommandHandler === run) sheetCommandHandler = null;
+      if (lienzoDeHoja.sheetCommandHandler === run) lienzoDeHoja.sheetCommandHandler = null;
     };
   }, [t, commandActionsRef, stateRef]);
 
   /* ----- canal de lectura hoja→ribbon: reader + aviso en cada cambio ----- */
 
   useEffect(() => {
-    sheetStateReader = (): SheetRibbonState => {
+    lienzoDeHoja.sheetStateReader = (): SheetRibbonState => {
       const cur = stateRef.current;
       const s = cur.model.sheets[cur.model.active];
       const r = rectOf(cur.sel, cur.ext);
@@ -5021,7 +4770,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       const u = cur.engine.usedRange(sheetName);
       return { c: Math.max(cur.cols, u.maxCol + 1) - 1, r: Math.max(cur.rows, u.maxRow + 1) - 1 };
     };
-    sheetGridReader = (range: string): string[][] | null => {
+    lienzoDeHoja.sheetGridReader = (range: string): string[][] | null => {
       const cur = stateRef.current;
       const rr = parseRangeRef(range);
       const s = cur.model.sheets[cur.model.active];
@@ -5037,11 +4786,11 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       }
       return out;
     };
-    sheetNameReader = (): string | null => {
+    lienzoDeHoja.sheetNameReader = (): string | null => {
       const cur = stateRef.current;
       return cur.model.sheets[cur.model.active]?.name ?? null;
     };
-    sheetValueReader = (range: string, sheet?: string): CellValue[][] | null => {
+    lienzoDeHoja.sheetValueReader = (range: string, sheet?: string): CellValue[][] | null => {
       const cur = stateRef.current;
       const rr = parseRangeRef(range);
       const s = sheet
@@ -5059,7 +4808,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       }
       return out;
     };
-    sheetProbeReader = (targetRef: string, varRef: string): GoalSeekProbeResult => {
+    lienzoDeHoja.sheetProbeReader = (targetRef: string, varRef: string): GoalSeekProbeResult => {
       const cur = stateRef.current;
       const s = cur.model.sheets[cur.model.active];
       if (!s) return { ok: false, reason: 'no-sheet' };
@@ -5089,7 +4838,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       };
       return { ok: true, probe: { f, current } };
     };
-    sheetSolverReader = (
+    lienzoDeHoja.sheetSolverReader = (
       targetRef: string,
       varRefs: string[],
       cons: SolverConstraintRef[],
@@ -5144,17 +4893,17 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       return { ok: true, probe: { evaluate, current } };
     };
     return () => {
-      sheetStateReader = null;
-      sheetGridReader = null;
-      sheetValueReader = null;
-      sheetNameReader = null;
-      sheetProbeReader = null;
-      sheetSolverReader = null;
+      lienzoDeHoja.sheetStateReader = null;
+      lienzoDeHoja.sheetGridReader = null;
+      lienzoDeHoja.sheetValueReader = null;
+      lienzoDeHoja.sheetNameReader = null;
+      lienzoDeHoja.sheetProbeReader = null;
+      lienzoDeHoja.sheetSolverReader = null;
     };
   }, [stateRef]);
 
   useEffect(() => {
-    for (const fn of sheetStateListeners) fn();
+    for (const fn of lienzoDeHoja.sheetStateListeners) fn();
   }, [model, sel.c, sel.r, ext]);
 
   /* ----- carga por época (contrato §7): parse inválido → modelo vacío + toast ----- */
@@ -6026,7 +5775,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   /* ----- comentarios anclados a una celda (anclaCelda.ts): la cinta y el panel ----- */
   const accionesCeldaRef = useUltimo({ switchSheet, select });
   useEffect(() => {
-    sheetCellAnchorReader = (): AnclaCelda | null => {
+    lienzoDeHoja.sheetCellAnchorReader = (): AnclaCelda | null => {
       const cur = stateRef.current;
       const s = cur.model.sheets[cur.model.active];
       if (!s) return null;
@@ -6034,7 +5783,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       const fu = fusionEn(cur.fusiones, cur.sel.c, cur.sel.r);
       return fu ? anclaDeCelda(s, fu.c1, fu.r1) : anclaDeCelda(s, cur.sel.c, cur.sel.r);
     };
-    sheetCellRevealer = (a: AnclaCelda): boolean => {
+    lienzoDeHoja.sheetCellRevealer = (a: AnclaCelda): boolean => {
       const cur = stateRef.current;
       const celda = celdaDeAncla(cur.model, a);
       if (!celda) return false;
@@ -6044,7 +5793,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       revelarRef.current = true;
       return true;
     };
-    sheetCellRefReader = (a: AnclaCelda): string | null => {
+    lienzoDeHoja.sheetCellRefReader = (a: AnclaCelda): string | null => {
       const cur = stateRef.current;
       const celda = celdaDeAncla(cur.model, a);
       if (!celda) return null;
@@ -6052,17 +5801,17 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       return `${cur.model.sheets[celda.hoja]?.name ?? ''}!${celda.ref}`;
     };
     return () => {
-      sheetCellAnchorReader = null;
-      sheetCellRevealer = null;
-      sheetCellRefReader = null;
+      lienzoDeHoja.sheetCellAnchorReader = null;
+      lienzoDeHoja.sheetCellRevealer = null;
+      lienzoDeHoja.sheetCellRefReader = null;
     };
   }, [stateRef, accionesCeldaRef]);
   /** El ancla del hilo con el puntero encima en el panel de comentarios (null: ninguno). */
   const [resalteComentario, setResalteComentario] = useState<AnclaCelda | null>(null);
   useEffect(() => {
-    sheetCellHighlighter = setResalteComentario;
+    lienzoDeHoja.sheetCellHighlighter = setResalteComentario;
     return () => {
-      sheetCellHighlighter = null;
+      lienzoDeHoja.sheetCellHighlighter = null;
     };
   }, []);
   /** La celda de ese hilo, si es de la hoja activa: la que se enmarca. */
@@ -6715,6 +6464,10 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       const fzCol = c < freeze.cols;
       let style = cellStyle(ringSel, inRange, fill, decor?.bar);
       if (cs) style = { ...style, ...cellStyleCss(cs) }; // fuente/color/bordes/subrayado/valign/wrap
+      // «General»: sin alineación propia, los números a la derecha. La propia la lleva el
+      // `<div>` de dentro y manda sobre esta.
+      if (alineacionPintada(sheet.cells[ref] ?? '', engine.getValue(sheet.name, ref)) === 'right')
+        style = { ...style, textAlign: 'right' };
       // «Buscar»: amarillo en las celdas que casan y melocotón en la actual (la seleccionada).
       if (searchHits.has(`${c},${r}`)) {
         style = { ...style, backgroundColor: isSel ? HIT_ACTIVE_BG : HIT_BG, color: HIT_INK };

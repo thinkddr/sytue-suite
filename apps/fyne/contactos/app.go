@@ -105,6 +105,14 @@ type App struct {
 	red               *offline.Monitor
 	escrituras        map[string]*ui.Dialogo
 	importadorCargado bool
+	// cuentas son las de `cuentasLibreta`, de la libreta que identifican.
+	cuentas struct {
+		listas              bool
+		primero             *api.Contact
+		n                   int
+		dia                 time.Time
+		cumples, duplicados int
+	}
 }
 
 // NuevaApp monta Contacts. `svc` nil deja la pantalla sin datos, que es lo que se ve
@@ -140,9 +148,9 @@ func (a *App) Objeto() fyne.CanvasObject {
 // entera del ancho: los cortes `sm:`, `md:` y `lg:` de la ficha y de la lista son de
 // VENTANA, y Fyne no avisa de que la ventana cambia más que colocando lo de dentro.
 //
-// ponytail: repinta la pantalla entera con cada cambio de ancho, también a mitad de
-// arrastrar el borde. La lista y el buscador no se rehacen (ver listaViva); si se nota
-// al redimensionar, repintar solo al cruzar un corte y recolocar el resto.
+// Solo rehace la columna cuyas medidas cambian con el ancho nuevo (`huellaAncho`): al
+// arrastrar el borde de la ventana entre dos cortes no se rehace nada, como el `alMedir`
+// de Drive. Antes repintaba la pantalla entera a cada píxel.
 type medidorVentana struct{ a *App }
 
 func (m *medidorVentana) MinSize(objs []fyne.CanvasObject) fyne.Size {
@@ -159,20 +167,53 @@ func (m *medidorVentana) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		o.Resize(t)
 	}
 	if p := m.a.Pantalla; t.Width > 0 && t.Width != p.Ventana {
+		antes := p.huellaAncho()
 		p.Ventana = t.Width
-		m.a.repintar()
+		ahora := p.huellaAncho()
+		var partes Partes
+		// En ventana estrecha con un contacto abierto la lista no se ve (se turna con la
+		// ficha): se rehace cuando vuelva a verse, no a cada píxel (listaPendiente).
+		oculta := p.Ventana < ui.Estrecho && p.DetalleAbierto
+		if ahora.lista != antes.lista || (p.listaPendiente && !oculta) {
+			if oculta {
+				p.listaPendiente = true
+			} else {
+				partes |= ParteLista
+			}
+		}
+		if ahora.ficha != antes.ficha {
+			// Si solo cambia el ancho de la tarjeta, la ficha se ajusta en su sitio.
+			soloTarjeta := ahora.ficha
+			soloTarjeta.tarjeta = antes.ficha.tarjeta
+			if soloTarjeta != antes.ficha || !p.ajustarAnchoFicha() {
+				partes |= ParteFicha
+			}
+		}
+		if partes != 0 {
+			m.a.repintarPartes(partes)
+		}
 	}
 }
 
 // repintar rehace la pantalla con el estado de ahora. SIEMPRE en el hilo de la
 // interfaz: quien venga de la red pasa por `fyne.Do`.
-func (a *App) repintar() {
+func (a *App) repintar() { a.repintarPartes(Todo) }
+
+// repintarPartes es `repintar` de solo esas columnas: el buscador y las casillas tocan
+// la lista; elegir un contacto, la lista (la fila abierta) y la ficha. Lo demás sigue
+// en pantalla tal cual. Si la pantalla cambia de forma, se rehace entera.
+func (a *App) repintarPartes(partes Partes) {
 	a.volcar()
 	if a.raiz == nil {
 		return
 	}
+	if a.Pantalla.Actualizar(partes) {
+		return
+	}
+	viejo := a.raiz.Objects[0]
 	a.raiz.Objects[0] = a.Pantalla.Construir()
 	a.raiz.Refresh()
+	a.Pantalla.soltar([]fyne.CanvasObject{viejo})
 }
 
 func (a *App) abridor() api.Abridor {
@@ -194,7 +235,8 @@ func (a *App) org() string {
 func (a *App) enganchar() {
 	p := a.Pantalla
 	p.AlElegirContacto = a.elegir
-	p.AlBuscar = func(s string) { p.Busqueda = s; a.repintar() }
+	// Una tecla en el buscador solo cambia la lista: ni el menú ni la ficha se rehacen.
+	p.AlBuscar = func(s string) { p.Busqueda = s; a.repintarPartes(ParteLista) }
 	p.AlElegirLibreta = func(b api.AddressBook) {
 		scope := a.capturar()
 		a.programarEn(scope, func(scope cargaContacts) { a.abrirLibretaEn(scope, b) })
@@ -215,7 +257,7 @@ func (a *App) enganchar() {
 		} else {
 			a.marcados[id] = true
 		}
-		a.repintar()
+		a.repintarPartes(ParteLista)
 	}
 	p.AlMarcarTodo = a.marcarTodo
 	p.AlLimpiarFiltro = func() {
@@ -242,7 +284,7 @@ func (a *App) enganchar() {
 	p.AlRepintar = a.repintar
 	p.AlVolver = func() {
 		p.Seleccionado, p.DetalleAbierto = nil, false
-		a.repintar()
+		a.repintarPartes(ParteLista | ParteFicha)
 	}
 	p.AlCombinar = func(c api.Contact) { a.abrirFusion(c, a.candidatosDe(c)) }
 	p.AlRevisarDuplicados = func() { a.verDuplicados() }
@@ -262,7 +304,7 @@ func (a *App) enganchar() {
 	p.AlImportarCSV = func() { a.elegirEImportar([]string{".csv"}, a.importarCSV) }
 	p.AlExportarVcard = a.exportarLibreta
 	p.AlExportarCSV = a.exportarCSV
-	p.AlSoltarMarcados = func() { clear(a.marcados); a.repintar() }
+	p.AlSoltarMarcados = func() { clear(a.marcados); a.repintarPartes(ParteLista) }
 	p.AlCorreoATodos = a.correoATodos
 	p.AlExportarSeleccion = func(sel []api.Contact) { a.exportarContactos(p.t("io.exportFilename", nil), sel) }
 	p.AlCorreoEtiqueta = func() {
@@ -990,15 +1032,36 @@ func (a *App) volcar() {
 	if p.ConCabeceras() {
 		p.Contactos = porInicial(p.Contactos, p.locale())
 	}
-	p.CumpleanosPronto = cumpleanosEn(a.todos, time.Now(), 30)
-	// ponytail: se recalcula en cada repintado (cada tecla del buscador). Es O(n) por
-	// claves; con una libreta de miles, recalcularlo solo al cargar.
-	p.Duplicados = len(GruposDuplicados(a.todos))
+	// Los cumpleaños y los duplicados son de la libreta ENTERA y no del filtro: se
+	// cuentan una vez por libreta cargada (y por día, los cumpleaños), no con cada tecla.
+	p.CumpleanosPronto, p.Duplicados = a.cuentasLibreta()
 	p.PuedeImportar = a.ElegirFichero != nil
 	p.Foto = nil
 	if p.Seleccionado != nil {
 		p.Foto = a.fotoDe(*p.Seleccionado)
 	}
+}
+
+// cuentasLibreta son los cumpleaños de los próximos 30 días y los grupos de duplicados
+// de la libreta cargada. La libreta se SUSTITUYE al cargar (nunca se cambia en su
+// sitio), así que su primer elemento y su largo la identifican.
+func (a *App) cuentasLibreta() (cumples, duplicados int) {
+	hoy := time.Now()
+	dia := time.Date(hoy.Year(), hoy.Month(), hoy.Day(), 0, 0, 0, 0, hoy.Location())
+	var primero *api.Contact
+	if len(a.todos) > 0 {
+		primero = &a.todos[0]
+	}
+	m := &a.cuentas
+	if !m.listas || m.primero != primero || m.n != len(a.todos) {
+		m.listas, m.primero, m.n = true, primero, len(a.todos)
+		m.duplicados = len(GruposDuplicados(a.todos))
+		m.dia = time.Time{}
+	}
+	if !m.dia.Equal(dia) {
+		m.dia, m.cumples = dia, cumpleanosEn(a.todos, hoy, 30)
+	}
+	return m.cumples, m.duplicados
 }
 
 // filtrar es el `filtered` de la web: destacados, etiqueta y búsqueda a la vez.
@@ -1085,7 +1148,8 @@ func (a *App) elegir(c api.Contact) {
 		a.Pantalla.Cursor = i
 	}
 	a.Pantalla.DetalleAbierto = true
-	a.repintar()
+	// La ficha y la fila abierta de la lista; el menú no depende del elegido.
+	a.repintarPartes(ParteLista | ParteFicha)
 	a.traerFoto(c)
 }
 
@@ -1099,7 +1163,7 @@ func (a *App) marcarTodo() {
 			a.marcados[c.ID] = true
 		}
 	}
-	a.repintar()
+	a.repintarPartes(ParteLista)
 }
 
 // destacar pone o quita la estrella. OPTIMISTA, como la web: la estrella cambia al

@@ -56,6 +56,11 @@ type Marco struct {
 	buscarAbierto bool
 	compacto      bool
 	renombrar     *ui.Dialogo
+	// arm y movil son el armazón que la app pone en su ventana y su barra de la app
+	// (barraapp.go); enBarra, que la cabecera va en esa barra (por debajo de `md`).
+	arm     *ui.Armazon
+	movil   *ui.BarraMovil
+	enBarra bool
 }
 
 // ResaltesDeBusqueda es el lienzo que pinta las coincidencias de «Buscar» y las quita
@@ -94,7 +99,7 @@ func NuevoMarco(ctx *Contexto, r *Registro, alVolver func()) *Marco {
 	ctx.Volver = alVolver
 	m.cabecera = NuevaCabecera(ctx, alVolver)
 	ctx.EnfocarTitulo = func() {
-		if m.compacto {
+		if m.compacto || m.enBarra {
 			m.renombrarCompacto()
 		} else {
 			m.cabecera.EnfocarTitulo()
@@ -137,6 +142,7 @@ func (m *Marco) Recomponer() {
 	m.cabecera.Sincronizar()
 	m.cabecera.Refresh()
 	m.estado.Refresh()
+	m.ponerBarraApp()
 	m.Refresh()
 }
 
@@ -301,10 +307,18 @@ func (r *marcoRenderer) Layout(t fyne.Size) {
 		return y + alto
 	}
 	m.ponerCompacto()
+	// Por debajo de `md`, montado en su armazón, la cabecera va en la barra de la app.
+	m.enBarra = !m.compacto && m.enBarraApp(t.Width)
+	if m.enBarra {
+		m.cabecera.Hide()
+		m.cinta.archivo.antes = m.opcionesBarraApp
+	}
 	y := float32(0)
 	altoEstado := float32(0)
 	if !m.compacto {
-		y = banda(m.cabecera, 0, AltoCabecera)
+		if !m.enBarra {
+			y = banda(m.cabecera, 0, AltoCabecera)
+		}
 		altoEstado = AltoEstado
 	}
 	y = banda(m.cinta, y, m.cinta.Alto(t.Width))

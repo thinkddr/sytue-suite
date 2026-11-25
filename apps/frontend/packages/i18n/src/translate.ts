@@ -4,9 +4,13 @@
  * universal (en francés el 0 va en singular, y en cuanto entre una lengua con
  * `few`/`many` el `if` se rompe en silencio). La API de la plataforma ya lo sabe.
  */
-import { DEFAULT_LOCALE, intlTag, isLocale, type Locale } from './locale.js';
+import { DEFAULT_LOCALE, documentLocale, intlTag, type Locale } from './locale.js';
 import { formatNumber } from './format.js';
-import { catalogs, type MessageKey, type PluralForms } from './messages/index.js';
+import { catalogFor, type MessageKey, type PluralForms } from './messages/index.js';
+
+// Vive en `locale.ts` (el catálogo compartido también lo necesita); se sigue
+// exportando desde aquí.
+export { documentLocale };
 
 /** Variables de interpolación. Los números se formatean según el locale. */
 export type Vars = Record<string, string | number>;
@@ -50,7 +54,10 @@ function interpolate(locale: Locale, template: string, vars: Vars | undefined): 
 
 /** Traduce una clave. `vars.count` es la cantidad que elige la forma plural. */
 export function translate(locale: Locale, key: MessageKey, vars?: Vars): string {
-  const entry = catalogs[locale][key];
+  // En el navegador solo está el catálogo del documento (`catalogFor`); si su trozo
+  // no llegó, la clave en crudo antes que una excepción en mitad del render.
+  const entry = catalogFor(locale)?.[key];
+  if (entry === undefined) return key;
   const template = typeof entry === 'string' ? entry : selectPlural(locale, entry, vars);
   return interpolate(locale, template, vars);
 }
@@ -145,8 +152,9 @@ export function createAppTranslator<EN extends Record<string, MessageEntry>>(
       const entry = catalog?.[appKey] ?? appCatalogs[DEFAULT_LOCALE]?.[appKey];
       // The native translator composes Common + app in the same order: app
       // meanings win, shared chrome needs no copied entries in each product.
+      // Todos los catálogos compartidos tienen las mismas claves: basta mirar el que hay.
       if (entry === undefined)
-        return Object.hasOwn(catalogs[DEFAULT_LOCALE], key)
+        return Object.hasOwn(catalogFor(locale) ?? {}, key)
           ? translate(locale, key as MessageKey, vars)
           : key;
       const template = typeof entry === 'string' ? entry : selectPlural(locale, entry, vars);
@@ -155,22 +163,6 @@ export function createAppTranslator<EN extends Record<string, MessageEntry>>(
     porIdioma.set(locale, t);
     return t;
   };
-}
-
-/**
- * Idioma del documento. Lo escribió el servidor en `<html lang>` al renderizar,
- * así que ya está en el DOM cuando se hidrata la primera isla: el navegador no
- * tiene que negociarlo otra vez ni esperar a ninguna petición para saberlo.
- *
- * Se queda con la subetiqueta primaria porque las once apps escriben `es` pero
- * el sitio de marketing escribe `es-ES` —la forma completa es la que quieren los
- * buscadores—, y leerlo tal cual hacía que www cayera al inglés con el idioma
- * bien negociado. Es BCP-47: lo que va antes del primer guion es el idioma.
- */
-export function documentLocale(): Locale {
-  const lang = typeof document === 'undefined' ? '' : document.documentElement.lang;
-  const primaria = lang.split('-')[0]?.toLowerCase() ?? '';
-  return isLocale(primaria) ? primaria : DEFAULT_LOCALE;
 }
 
 /**

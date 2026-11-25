@@ -451,6 +451,7 @@ export const is: AppCatalog<typeof en> = {
   'compose.templates': 'Sniðmát',
   'compose.templatesEmpty': 'Engin sniðmát enn. Búðu þau til í stillingum Mail.',
   'compose.attachFailed': 'Ekki tókst að lesa viðhengið',
+  'compose.openFailed': 'Ekki tókst að opna skilaboðaritilinn. Reyndu aftur.',
   'compose.pastedImageDropped': 'Myndin sem var límd inn fylgdi ekki með',
   'compose.pastedImagesDropped': 'Myndirnar sem voru límdar inn fylgdu ekki með',
   'compose.pastedImagesDroppedDescription': 'Til að senda myndir skaltu hengja þær við sem skrár.',

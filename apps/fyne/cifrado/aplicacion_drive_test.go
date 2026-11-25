@@ -232,6 +232,10 @@ func TestAnfitrionDriveFalloAlInicializarCierraLaBoveda(t *testing.T) {
 	if !vault.Closed() || b.repos[0].cierres.Load() != 1 {
 		t.Fatal("la bóveda o el repositorio quedaron abiertos tras el fallo")
 	}
+	// El aviso genérico lleva debajo el código de la comprobación que falló.
+	if vacio, ok := b.host.slot.Objects[0].(*ui.Vacio); !ok || vacio.Descripcion != "drive.not_ready" {
+		t.Fatalf("el fallo no enseña su código: %#v", b.host.slot.Objects[0])
+	}
 }
 
 // Una bóveda que abre pero cuyo Drive no carga (recién vaciada, con la fuente ya

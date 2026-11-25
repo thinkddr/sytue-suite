@@ -207,7 +207,7 @@ func TestUnFalloCedeLaPantallaEntera(t *testing.T) {
 	if a.abierto.ctx.Estado != editor.Error {
 		t.Errorf("con un 500 el editor queda en %v", a.abierto.ctx.Estado)
 	}
-	if a.raiz.Objects[0] == fyne.CanvasObject(a.abierto.marco) {
+	if a.raiz.Objects[0] == a.abierto.marco.Montado() {
 		t.Error("con el documento sin abrir sigue enseñándose el editor vacío")
 	}
 	// «Reintentar» vuelve a pedir el documento: con el servicio ya bien, se abre.
@@ -219,7 +219,7 @@ func TestUnFalloCedeLaPantallaEntera(t *testing.T) {
 	servicio.fallo = 0
 	servicio.mu.Unlock()
 	ctx.Reintentar()
-	if a.abierto.ctx.Estado != editor.Listo || a.raiz.Objects[0] != fyne.CanvasObject(a.abierto.marco) {
+	if a.abierto.ctx.Estado != editor.Listo || a.raiz.Objects[0] != a.abierto.marco.Montado() {
 		t.Errorf("tras «Reintentar» el editor queda en %v", a.abierto.ctx.Estado)
 	}
 	a.Volver()

@@ -168,8 +168,8 @@ traefik:
   image:
     registry: rg.fr-par.scw.cloud
     repository: sytue-prod-platform/traefik
-    tag: v3.7.19
-  versionOverride: v3.7.19
+    tag: v3.8.0
+  versionOverride: v3.8.0
   # Cada chart upstream nombra esta clave a su manera y NO lee la global: hay que
   # apagarlas una a una o el render se cae por el CRD que falta (ver global.metrics).
   metrics:
@@ -559,7 +559,7 @@ cloud-controller:
       postgres: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgres:18.7-sytue.1@sha256:0c83a9477bcff3ca6fbfd675393443936e7c4c4848d2476464b40806f5eb2570
       postgrest: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
       rclone: rg.fr-par.scw.cloud/sytue-prod-platform/managed-rclone:1.76.0@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466
-      httpTask: rg.fr-par.scw.cloud/sytue-prod-platform/managed-http-task:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d
+      httpTask: rg.fr-par.scw.cloud/sytue-prod-platform/managed-http-task:8.23.0@sha256:2a36f3dfe424231c1b03753929e43dda451c29a6193873916924f0b6073bbc5f
 
 # Sytue Analytics (ADR 0026). El COLECTOR es el endpoint de mas volumen de la
 # plataforma y el unico publico sin autenticar: suelo de 3 replicas para absorber

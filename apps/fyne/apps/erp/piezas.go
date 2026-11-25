@@ -5,6 +5,7 @@ package erp
 
 import (
 	"image/color"
+	"slices"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -165,6 +166,25 @@ func Envolver(anchos, altos []float32, hx, hy, ancho float32) (pos []fyne.Positi
 	}
 	ocupa.Height = y
 	return pos, ocupa
+}
+
+// EnvolverConRotulo es Envolver para una fila que empieza por su rótulo («Filtrar por
+// estado:», «Etapa:»): si no cabe en una línea, el rótulo se queda solo en la suya y las
+// piezas se envuelven DEBAJO, todas desde el borde. Envuelto a la par, las líneas de
+// debajo empezaban más a la izquierda que la primera píldora y el control de etapas se
+// partía con un segmento suelto (auditoría del 2026-11-24, a 390).
+func EnvolverConRotulo(anchos, altos []float32, hx, hy, ancho float32) (pos []fyne.Position, ocupa fyne.Size) {
+	pos, ocupa = Envolver(anchos, altos, hx, hy, ancho)
+	if len(anchos) < 2 || ocupa.Height <= slices.Max(altos)+0.5 {
+		return pos, ocupa
+	}
+	resto, debajo := Envolver(anchos[1:], altos[1:], hx, hy, ancho)
+	y := altos[0] + hy
+	pos = append([]fyne.Position{{}}, resto...)
+	for i := 1; i < len(pos); i++ {
+		pos[i].Y += y
+	}
+	return pos, fyne.NewSize(max(anchos[0], debajo.Width), y+debajo.Height)
 }
 
 func medidasDe(ps []pieza) (anchos, altos []float32) {
@@ -410,8 +430,13 @@ func (f *filaFiltros) colocar(ancho float32) {
 		// El `ml-2` va en un `<span>` que envuelve la píldora: ocupa como parte de ella.
 		anchos[f.papelera] += SeparaPapelera
 	}
-	f.pos, f.grupo = Envolver(anchos, altos, HuecoPildoras, HuecoPildoras, ancho)
-	if f.papelera > 0 {
+	if len(f.piezas) > 0 && f.piezas[0].texto {
+		f.pos, f.grupo = EnvolverConRotulo(anchos, altos, HuecoPildoras, HuecoPildoras, ancho)
+	} else {
+		f.pos, f.grupo = Envolver(anchos, altos, HuecoPildoras, HuecoPildoras, ancho)
+	}
+	// Al principio de una línea la papelera no se aparta: su `ml-2` sangraba esa línea.
+	if f.papelera > 0 && f.pos[f.papelera].X > 0 {
 		f.pos[f.papelera].X += SeparaPapelera
 	}
 	f.alto = f.grupo.Height

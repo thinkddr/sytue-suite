@@ -42,12 +42,24 @@ func Pagina(v Vista, bloques ...ui.Bloque) *fyne.Container {
 	if ventana <= 0 {
 		ventana = 1280
 	}
+	// La cabecera de la página (`Cabecera`, el primer bloque) va A SANGRE arriba, de
+	// borde a borde de la columna, como la de Mail o Drive: dentro de la caja centrada
+	// era una franja blanca suelta sobre el gris de Carril (auditoría del 2026-11-24).
+	if len(bloques) > 0 {
+		if c, es := bloques[0].Obj.(*ui.CabeceraApp); es {
+			return container.New(&marco{ventana: ventana, cabecera: true}, fondo, c, ui.PilaBloques(bloques[1:]...))
+		}
+	}
 	return container.New(&marco{ventana: ventana}, fondo, ui.PilaBloques(bloques...))
 }
 
 // marco centra la caja con su margen. Su alto depende del ancho, que MinSize no
-// recibe: recuerda el de la última vez que se colocó (el de la ventana).
-type marco struct{ ventana float32 }
+// recibe: recuerda el de la última vez que se colocó (el de la ventana). Con
+// `cabecera`, el segundo objeto es la cabecera a sangre y la caja empieza debajo.
+type marco struct {
+	ventana  float32
+	cabecera bool
+}
 
 var _ fyne.Layout = (*marco)(nil)
 
@@ -69,15 +81,26 @@ func MargenLateral(ventana float32) float32 {
 
 func (m *marco) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	_, ancho := CajaPagina(m.ventana)
-	return fyne.NewSize(0, ui.AltoA(objs[1], ancho)+2*MargenPagina)
+	arriba := float32(0)
+	if m.cabecera {
+		arriba = ui.AltoA(objs[1], m.ventana)
+	}
+	return fyne.NewSize(0, arriba+ui.AltoA(objs[len(objs)-1], ancho)+2*MargenPagina)
 }
 
 func (m *marco) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	m.ventana = t.Width
 	objs[0].Resize(t)
+	arriba := float32(0)
+	if m.cabecera {
+		arriba = ui.AltoA(objs[1], t.Width)
+		objs[1].Move(fyne.NewPos(0, 0))
+		objs[1].Resize(fyne.NewSize(t.Width, arriba))
+	}
+	caja := objs[len(objs)-1]
 	x, ancho := CajaPagina(t.Width)
-	objs[1].Move(fyne.NewPos(x, MargenPagina))
-	objs[1].Resize(fyne.NewSize(ancho, ui.AltoA(objs[1], ancho)))
+	caja.Move(fyne.NewPos(x, arriba+MargenPagina))
+	caja.Resize(fyne.NewSize(ancho, ui.AltoA(caja, ancho)))
 }
 
 // Cabecera es el `<SectionHeader level={1}>` de una página (HomeApp, ExploreApp,

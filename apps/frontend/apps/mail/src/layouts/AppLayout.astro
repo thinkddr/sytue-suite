@@ -7,7 +7,7 @@
  * docs/design.md §1 (toda superficie monta @sytue/shell + @sytue/ui).
  */
 import { APP_VIEWPORT, appDomains, returnToCanonico } from '@sytue/config';
-import { serverEnv } from '@sytue/auth/server';
+import { clientCoreHead, roomsServiceBase, serverEnv } from '@sytue/auth/server';
 import '../styles/app.css';
 import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
 import { bff, toBffContext } from '../lib/bff.js';
@@ -17,13 +17,15 @@ import { useT } from '../i18n/index.js';
 
 interface Props {
   title?: string;
+  /** La pantalla espera a la bóveda (correo en la bóveda): el núcleo baja desde el inicio. */
+  nucleo?: boolean;
 }
 
 // El idioma lo negoció el middleware (cookie > Accept-Language > inglés): aquí solo
 // se pinta, para que el <html> y el cromo del shell no puedan discrepar.
 const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
 const t = useT(Astro.locals.locale);
-const { title = 'Sytue Mail' } = Astro.props;
+const { title = 'Sytue Mail', nucleo = false } = Astro.props;
 
 // Guard: exige sesion valida. En .astro el redirect debe RETORNARSE (Astro no
 // sigue un throw de Response fuera de middleware). Sin sesion -> login SSO.
@@ -59,6 +61,11 @@ const userJSON = JSON.stringify(user)
 // producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
 // porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
 const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+// El núcleo de la bóveda empieza a bajar con el HTML (ADR 0086): sus resúmenes en la
+// página y la precarga de `wasm_exec.js` y `core.wasm` con las URL que pedirá el worker.
+const cabeceraNucleo = nucleo
+  ? await clientCoreHead(roomsServiceBase(serverEnv(import.meta.env)), prefijo)
+  : '';
 ---
 
 <!doctype html>
@@ -107,6 +114,7 @@ const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BA
       )}
     ></script>
     <script is:inline set:html={themeInitScript}></script>
+    <Fragment set:html={cabeceraNucleo} />
   </head>
   <body class="bg-bg text-text h-full antialiased">
     <slot name="app" />

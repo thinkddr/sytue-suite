@@ -46,7 +46,7 @@ const correoEnBoveda = correoSobreBoveda(serverEnv(import.meta.env).SYTUE_MAIL_B
 const t = useT(locale);
 ---
 
-<AppLayout title={t('page.title')}>
+<AppLayout title={t('page.title')} nucleo={correoEnBoveda}>
   <MailApp
     slot="app"
     client:load

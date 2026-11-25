@@ -33,7 +33,7 @@ async function run(): Promise<void> {
       if (!allowed || controller.signal.aborted) throw new Error('retired');
     },
   };
-  const kernel = new PqcRuntime(lease),
+  const kernel = new PqcRuntime(lease, 'core'),
     office = new PqcRuntime(lease, 'office');
   const port = office.registerHostPort({
     scope,

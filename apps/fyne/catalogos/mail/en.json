@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Send anyway",
   "compose.noAttachmentTitle": "Send without attachments",
   "compose.noDraftsFolder": "The Drafts folder could not be found",
+  "compose.openFailed": "The message editor could not be opened. Try again.",
   "compose.pastedImageDropped": "The pasted image was not included",
   "compose.pastedImagesDropped": "The pasted images were not included",
   "compose.pastedImagesDroppedDescription": "To send images, attach them as files.",

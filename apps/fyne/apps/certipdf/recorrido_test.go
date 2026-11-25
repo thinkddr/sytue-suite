@@ -24,6 +24,15 @@ import (
 // TestRecorridoConSesion pulsa todo lo que se ve con un PDF abierto contra el motor
 // falso y cierra con Escape cada modal que se abre (ver `ui/recorrido`).
 func TestRecorridoConSesion(t *testing.T) {
+	_, w := documentoDeRecorrido(t)
+	montaje.ComprobarRotacion(t, w, "certipdf/documento", iconos.PDF, true)
+	recorrido.Comprobar(t, w, 400)
+}
+
+// documentoDeRecorrido abre un PDF de dos páginas dibujables contra el motor falso, a
+// 1280×800 (o a la medida de Play), y espera a que las dos estén dibujadas.
+func documentoDeRecorrido(t *testing.T) (*Pantalla, fyne.Window) {
+	t.Helper()
 	campos := &motorDeCampos{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/pdf/render" {
@@ -81,6 +90,5 @@ func TestRecorridoConSesion(t *testing.T) {
 			t.Fatalf("la página %d sigue cargando o falló antes de retratar: %d", h.Numero(), h.estado)
 		}
 	}
-	montaje.ComprobarRotacion(t, w, "certipdf/documento", iconos.PDF, true)
-	recorrido.Comprobar(t, w, 400)
+	return p, w
 }

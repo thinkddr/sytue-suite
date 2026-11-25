@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Senda samt",
   "compose.noAttachmentTitle": "Senda án viðhengja",
   "compose.noDraftsFolder": "Mappan Drög fannst ekki",
+  "compose.openFailed": "Ekki tókst að opna skilaboðaritilinn. Reyndu aftur.",
   "compose.pastedImageDropped": "Myndin sem var límd inn fylgdi ekki með",
   "compose.pastedImagesDropped": "Myndirnar sem voru límdar inn fylgdu ekki með",
   "compose.pastedImagesDroppedDescription": "Til að senda myndir skaltu hengja þær við sem skrár.",

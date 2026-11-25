@@ -49,7 +49,13 @@ export function motivoDeEnvio(
   if (error.status === 400 || error.status === 422) return 'compose.sendInvalid';
   return null;
 }
-import { textToHtml, htmlToText, sanitizeHtml } from '../client/richtext.js';
+import {
+  cargarRichText,
+  htmlToText,
+  richTextCargado,
+  sanitizeHtml,
+  textToHtml,
+} from '../client/richtext.js';
 import { LocalComposeDraftStore, type LocalComposeDraft } from '../client/local-draft.js';
 import { RichTextEditor, type EditorControl } from './RichTextEditor.js';
 
@@ -277,7 +283,37 @@ interface Props {
     ((answers: string, outboundId: string | undefined, undoSeconds: number) => void) | undefined;
 }
 
-export function ComposeModal({
+/**
+ * El redactor se monta la primera vez que se abre, cuando ya está parse5
+ * (`cargarRichText`): así no viaja en el JS inicial de Mail. Cerrado no pintaba nada
+ * ni corría ningún efecto (todos esperan a `open`), así que montarlo al abrir es
+ * lo mismo que tenerlo montado desde el principio. Si el trozo no llega, el redactor
+ * se cierra con un aviso y el siguiente «Redactar» lo vuelve a intentar.
+ */
+export function ComposeModal(props: Props): JSX.Element | null {
+  const [listo, setListo] = useState(richTextCargado);
+  const toast = useToast();
+  const t = useT(props.locale);
+  const { open, onClose } = props;
+  useEffect(() => {
+    if (listo || !open) return;
+    let vigente = true;
+    cargarRichText().then(
+      () => vigente && setListo(true),
+      () => {
+        if (!vigente) return;
+        toast.notify({ tone: 'danger', title: t('compose.openFailed') });
+        onClose();
+      },
+    );
+    return () => {
+      vigente = false;
+    };
+  }, [listo, open, onClose, toast, t]);
+  return listo ? <Redactor {...props} /> : null;
+}
+
+function Redactor({
   locale,
   open,
   ownerId,

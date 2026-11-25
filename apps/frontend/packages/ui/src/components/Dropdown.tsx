@@ -333,9 +333,17 @@ export function Dropdown({
     }
     // Foco al item marcado como actual (el idioma en uso) o, si no hay, al
     // primero. `focus()` además lo desplaza a la vista dentro del panel.
+    //
+    // AL PRIMERO VIVO, NO AL PRIMERO. Un botón inerte no acepta el foco y
+    // `focus()` no hace nada: el foco se quedaba donde estaba y el menú abierto
+    // no recibía el teclado. En el «Más» del editor de Notes, cuando «Deshacer»
+    // cabe en la fila, la primera opción es «Rehacer», inerte sin nada que
+    // rehacer: el foco seguía en el texto, y el Escape que debía cerrar el menú
+    // lo recibía el editor y terminaba la edición (640×320, 2026-11-24).
     (
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"][aria-current="true"]') ??
-      menuRef.current?.querySelector<HTMLElement>(SELECTOR_ITEMS)
+      menuRef.current?.querySelector<HTMLElement>(
+        '[role="menuitem"][aria-current="true"]:not([disabled])',
+      ) ?? menuRef.current?.querySelector<HTMLElement>(SELECTOR_VIVOS)
     )?.focus();
     return () => {
       document.removeEventListener('mousedown', onClickOutside);
@@ -491,7 +499,13 @@ export function Dropdown({
 
   return (
     <div class={cx(trigger ? 'relative inline-flex' : 'contents', cls)}>
-      <div ref={triggerRef} class={trigger ? 'inline-flex' : 'contents'}>
+      {/* `min-w-0`: si quien lo usa deja encoger el desplegable (`class`), el
+          disparador encoge con él y su rótulo se recorta dentro. Sin él, esta capa
+          medía siempre el rótulo entero y el «Gespeichert» de la cabecera de Docus
+          empujaba «Teilen» 12 px fuera de un teléfono de 320 (barrido móvil). Sin
+          `class` que lo permita no cambia nada: la capa de fuera sigue midiendo el
+          contenido. */}
+      <div ref={triggerRef} class={trigger ? 'inline-flex min-w-0' : 'contents'}>
         {trigger?.({
           onClick: () => (controlado ? cerrar() : setOpen((v) => !v)),
           'aria-expanded': open,

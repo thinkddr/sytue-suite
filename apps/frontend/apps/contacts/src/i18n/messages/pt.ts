@@ -48,6 +48,8 @@ export const pt: AppCatalog<typeof en> = {
   'list.unstar': 'Tirar {name} dos contactos com estrela',
   'list.starredTitle': 'Com estrela',
   'list.reviewDuplicates': 'Rever duplicados ({count})',
+  'list.selectMode': 'Selecionar',
+  'list.moreActions': 'Mais ações',
   'list.count': { one: '{count} contacto', other: '{count} contactos' },
   'list.countFiltered': {
     one: '{shown} de {count} contacto',

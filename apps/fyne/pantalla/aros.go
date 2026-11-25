@@ -82,10 +82,12 @@ func Aros(v tema.Variante) (fyne.CanvasObject, []MuestraAro) {
 	icono := ui.NuevoBotonIcono(iconos.Ajustes, "Ajustes", nil)
 	icono.SinPista = true
 	poner("botón de icono", icono, 0, ui.SinHueco, "focus-ring")
-	poner("botón fantasma", ui.NuevoBoton("Más opciones", nil).Con(ui.Fantasma, ui.TallaMD), 0, ui.ConHueco, "focus-ring")
+	// Los botones llevan el aro sobre relleno (`.sytue-focus-ring-inset`), que la hoja
+	// pinta con el color del texto y no con el de foco.
+	poner("botón fantasma", ui.NuevoBoton("Más opciones", nil).Con(ui.Fantasma, ui.TallaMD), 0, ui.ConHueco, "text")
 	poner("opción de menú", ui.NuevoElementoMenu("Cambiar el nombre", iconos.Ninguno, nil), anchoFijo, ui.SinHueco, "focus-ring")
 	// Los dos de aro RELLENO, que son la referencia: su caja es opaca y lo tapa.
-	poner("botón principal", ui.NuevoBoton("Guardar cambios", nil), 0, ui.ConHueco, "focus-ring")
+	poner("botón principal", ui.NuevoBoton("Guardar cambios", nil), 0, ui.ConHueco, "text")
 	poner("campo de texto", ui.NuevaEntrada("Buscar…"), anchoFijo, ui.SinHueco, "focus-ring")
 	muestras[len(muestras)-1].BordeAlFoco = true
 

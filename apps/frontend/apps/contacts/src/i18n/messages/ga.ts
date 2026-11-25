@@ -48,6 +48,8 @@ export const ga: AppCatalog<typeof en> = {
   'list.unstar': 'Bain {name} de na teagmhálaithe le réalta',
   'list.starredTitle': 'Le réalta',
   'list.reviewDuplicates': 'Déan athbhreithniú ar dhúbailtí ({count})',
+  'list.selectMode': 'Roghnaigh',
+  'list.moreActions': 'Tuilleadh gníomhartha',
   'list.count': {
     one: '{count} teagmhálaí',
     two: '{count} theagmhálaí',

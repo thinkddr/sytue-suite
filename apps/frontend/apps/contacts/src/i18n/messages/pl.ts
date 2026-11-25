@@ -53,6 +53,8 @@ export const pl: AppCatalog<typeof en> = {
   'list.unstar': 'Usuń {name} z oznaczonych gwiazdką',
   'list.starredTitle': 'Oznaczone gwiazdką',
   'list.reviewDuplicates': 'Przejrzyj duplikaty ({count})',
+  'list.selectMode': 'Zaznacz',
+  'list.moreActions': 'Więcej akcji',
   'list.count': {
     one: '{count} kontakt',
     few: '{count} kontakty',

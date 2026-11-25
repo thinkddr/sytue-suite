@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
+import './html-estatico.js';
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { estadisticas, extracto, textoDeNota, type Estadisticas } from './extracto.js';

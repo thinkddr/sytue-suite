@@ -1,0 +1,318 @@
+From 77117020768f5e9edb7b82fb8b273734c2b09fe6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 00:25:18 +0000
+Subject: [PATCH] perf(widget): ReleaseRenderers frees a replaced tree's
+ renderers at once
+
+The renderer cache keeps the renderer of every widget until it expires, a
+minute after the widget was last painted, and only DestroyRenderer, which is
+internal, frees one earlier. An app that rebuilds part of a screen on every
+change therefore holds a minute of old screens: their renderers, the canvas
+of each object and their textures. Measured in the Sytue suite, a calendar
+month repaint left 1.3 MB behind each time (+79 MiB after 60).
+
+widget.ReleaseRenderers(old, kept...) frees at once what the cache holds for
+old and everything it contains: it destroys the cached renderers of its
+widgets (calling Destroy), forgets the canvas of each object and marks their
+textures as expired, so the next texture clean on the painter's thread frees
+them. Objects that are also in one of the kept trees, which is where an app
+that rebuilds only part of a screen leaves the pieces it reuses, are left
+alone with everything they contain. Only containers and existing renderers
+are walked: no renderer is created. A released widget that is shown again
+simply gets a new renderer.
+
+New tests: TestReleaseRenderers_FreesTheReplacedTreeAndKeepsTheReused and
+_CreatesNoRenderer (widget), TestReleaseTree_FreesNowWhatWouldExpireLater and
+_CreatesNoRenderer (internal/cache).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01K7a9FPvLA4FsHbm41nkUrM
+---
+ internal/cache/release.go       | 76 ++++++++++++++++++++++++++++
+ internal/cache/release_test.go  | 55 +++++++++++++++++++++
+ widget/release.go               | 33 +++++++++++++
+ widget/release_internal_test.go | 87 +++++++++++++++++++++++++++++++++
+ 4 files changed, 251 insertions(+)
+ create mode 100644 internal/cache/release.go
+ create mode 100644 internal/cache/release_test.go
+ create mode 100644 widget/release.go
+ create mode 100644 widget/release_internal_test.go
+
+diff --git a/internal/cache/release.go b/internal/cache/release.go
+new file mode 100644
+index 0000000..7541bb8
+--- /dev/null
++++ b/internal/cache/release.go
+@@ -0,0 +1,76 @@
++package cache
++
++import "fyne.io/fyne/v2"
++
++// Kept is the set of objects that ReleaseTree must leave alone.
++type Kept map[fyne.CanvasObject]struct{}
++
++// Keep adds o, and everything it contains, to k. Only containers and the cached
++// renderers of widgets are walked: no renderer is created.
++func (k Kept) Keep(o fyne.CanvasObject) {
++	if o == nil {
++		return
++	}
++	if _, ok := k[o]; ok {
++		return
++	}
++	k[o] = struct{}{}
++	switch x := o.(type) {
++	case *fyne.Container:
++		for _, c := range x.Objects {
++			k.Keep(c)
++		}
++	case fyne.Widget:
++		rinfo, ok := renderers.Load(superOf(x))
++		if !ok || rinfo == nil {
++			return
++		}
++		for _, c := range rinfo.renderer.Objects() {
++			k.Keep(c)
++		}
++	}
++}
++
++// ReleaseTree destroys at once the cached renderers of o and of everything it contains,
++// forgets their canvas and marks their textures as expired, so that the next texture
++// clean on the painter's thread frees them. It does what the cache would otherwise do
++// a minute after the tree stopped being painted. Objects in kept, and what they
++// contain, are left as they are. kept may be nil.
++func ReleaseTree(o fyne.CanvasObject, kept Kept) {
++	if o == nil {
++		return
++	}
++	if _, ok := kept[o]; ok {
++		return
++	}
++	canvases.Delete(o)
++	if tinfo, ok := objectTextures.Load(o); ok && tinfo != nil {
++		tinfo.expires.Store(0)
++	}
++	switch x := o.(type) {
++	case *fyne.Container:
++		for _, c := range x.Objects {
++			ReleaseTree(c, kept)
++		}
++	case fyne.Widget:
++		wid := superOf(x)
++		rinfo, ok := renderers.LoadAndDelete(wid)
++		overrides.Delete(wid)
++		if !ok || rinfo == nil {
++			return
++		}
++		objs := rinfo.renderer.Objects()
++		rinfo.renderer.Destroy()
++		for _, c := range objs {
++			ReleaseTree(c, kept)
++		}
++	}
++}
++
++// superOf is the widget that extends wid, which is the key of its renderer.
++func superOf(wid fyne.Widget) fyne.Widget {
++	if wd, ok := wid.(isBaseWidget); ok && wd.super() != nil {
++		return wd.super()
++	}
++	return wid
++}
+diff --git a/internal/cache/release_test.go b/internal/cache/release_test.go
+new file mode 100644
+index 0000000..3ed48ce
+--- /dev/null
++++ b/internal/cache/release_test.go
+@@ -0,0 +1,55 @@
++package cache
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2"
++
++	"github.com/stretchr/testify/assert"
++)
++
++func TestReleaseTree_FreesNowWhatWouldExpireLater(t *testing.T) {
++	testClearAll()
++	c := &dummyCanvas{}
++	destroyed := 0
++	rect := &dummyObject{}
++	child := &dummyWidget{onDestroy: func() { destroyed++ }}
++	parent := &dummyWidget{onDestroy: func() { destroyed++ }}
++	kept := &dummyWidget{onDestroy: func() { destroyed++ }}
++	Renderer(parent).(*dummyWidgetRenderer).objects = []fyne.CanvasObject{child, rect}
++	Renderer(child)
++	Renderer(kept)
++	tree := &fyne.Container{Objects: []fyne.CanvasObject{parent, kept}}
++	for _, o := range []fyne.CanvasObject{tree, parent, child, rect, kept} {
++		SetCanvasForObject(o, c, nil)
++	}
++	SetTexture(rect, 1, c)
++	SetTexture(kept, 2, c)
++
++	k := Kept{}
++	k.Keep(&fyne.Container{Objects: []fyne.CanvasObject{kept}})
++	ReleaseTree(tree, k)
++
++	assert.Equal(t, 2, destroyed)
++	assert.False(t, IsRendered(parent))
++	assert.False(t, IsRendered(child), "the walk goes down through cached renderers")
++	assert.True(t, IsRendered(kept))
++	assert.Nil(t, GetCanvasForObject(rect))
++	assert.Equal(t, c, GetCanvasForObject(kept))
++	var expired []fyne.CanvasObject
++	RangeExpiredTexturesFor(c, func(o fyne.CanvasObject) { expired = append(expired, o) })
++	assert.Equal(t, []fyne.CanvasObject{rect}, expired, "the textures of the tree are freed at the next clean, not a minute later")
++}
++
++func TestReleaseTree_CreatesNoRenderer(t *testing.T) {
++	testClearAll()
++	never := &dummyWidget{}
++	ReleaseTree(&fyne.Container{Objects: []fyne.CanvasObject{never}}, nil)
++	assert.False(t, IsRendered(never))
++	assert.Equal(t, 0, renderers.Len())
++}
++
++// dummyObject is a canvas object that is neither a widget nor a container.
++type dummyObject struct {
++	fyne.CanvasObject
++}
+diff --git a/widget/release.go b/widget/release.go
+new file mode 100644
+index 0000000..62c03fe
+--- /dev/null
++++ b/widget/release.go
+@@ -0,0 +1,33 @@
++package widget
++
++import (
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/internal/cache"
++)
++
++// ReleaseRenderers frees at once what the renderer cache holds for old and for
++// everything it contains: the renderers of its widgets (calling their Destroy), the
++// canvas each object was drawn on and their textures. Without it the cache keeps all of
++// that until it expires, a minute after old was last painted, so an app that rebuilds a
++// screen on every change holds a minute of old screens.
++//
++// It is meant for a tree that has been replaced and will not be shown again. A widget
++// in it that is shown later is not broken: it gets a new renderer. Anything that is
++// also in one of the kept trees, which is where an app that rebuilds only part of a
++// screen leaves the pieces it reuses, is left as it is, together with everything it
++// contains.
++//
++// Only containers and the renderers that already exist are walked: no renderer is
++// created. It must be called on the goroutine that runs the app's UI.
++//
++// Since: 2.8
++func ReleaseRenderers(old fyne.CanvasObject, kept ...fyne.CanvasObject) {
++	var k cache.Kept
++	if len(kept) > 0 {
++		k = cache.Kept{}
++		for _, o := range kept {
++			k.Keep(o)
++		}
++	}
++	cache.ReleaseTree(old, k)
++}
+diff --git a/widget/release_internal_test.go b/widget/release_internal_test.go
+new file mode 100644
+index 0000000..f937f0b
+--- /dev/null
++++ b/widget/release_internal_test.go
+@@ -0,0 +1,87 @@
++package widget
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/internal/cache"
++	"fyne.io/fyne/v2/layout"
++	"fyne.io/fyne/v2/test"
++
++	"github.com/stretchr/testify/assert"
++)
++
++func vbox(objs ...fyne.CanvasObject) *fyne.Container {
++	return &fyne.Container{Layout: layout.NewVBoxLayout(), Objects: objs}
++}
++
++type countDestroy struct {
++	BaseWidget
++	child     fyne.CanvasObject
++	destroyed int
++}
++
++func newCountDestroy(child fyne.CanvasObject) *countDestroy {
++	c := &countDestroy{child: child}
++	c.ExtendBaseWidget(c)
++	return c
++}
++
++func (c *countDestroy) CreateRenderer() fyne.WidgetRenderer {
++	return &countDestroyRenderer{WidgetRenderer: NewSimpleRenderer(c.child), w: c}
++}
++
++type countDestroyRenderer struct {
++	fyne.WidgetRenderer
++	w *countDestroy
++}
++
++func (r *countDestroyRenderer) Destroy() {
++	r.w.destroyed++
++	r.WidgetRenderer.Destroy()
++}
++
++func TestReleaseRenderers_FreesTheReplacedTreeAndKeepsTheReused(t *testing.T) {
++	test.NewTempApp(t)
++
++	label := NewLabel("old")
++	inner := newCountDestroy(label)
++	outer := newCountDestroy(inner)
++	reused := NewButton("kept", nil)
++	old := vbox(outer, reused)
++	w := test.NewTempWindow(t, old)
++	w.Resize(fyne.NewSize(200, 200))
++	w.Canvas().Capture()
++	for _, wid := range []fyne.Widget{outer, inner, label, reused} {
++		assert.True(t, cache.IsRendered(wid))
++	}
++
++	replacement := vbox(NewLabel("new"), reused)
++	w.SetContent(replacement)
++	w.Canvas().Capture()
++	ReleaseRenderers(old, replacement)
++
++	assert.False(t, cache.IsRendered(outer))
++	assert.False(t, cache.IsRendered(inner), "the walk goes down through cached renderers")
++	assert.False(t, cache.IsRendered(label))
++	assert.Equal(t, 1, outer.destroyed)
++	assert.Equal(t, 1, inner.destroyed)
++	assert.True(t, cache.IsRendered(reused), "a widget that is also in a kept tree is left alone")
++
++	// Shown again, a released widget simply gets a new renderer.
++	w.SetContent(old)
++	w.Canvas().Capture()
++	assert.True(t, cache.IsRendered(outer))
++	assert.True(t, cache.IsRendered(label))
++}
++
++func TestReleaseRenderers_CreatesNoRenderer(t *testing.T) {
++	test.NewTempApp(t)
++
++	never := newCountDestroy(NewLabel("never shown"))
++	ReleaseRenderers(vbox(never))
++	assert.False(t, cache.IsRendered(never))
++	assert.Equal(t, 0, never.destroyed)
++
++	ReleaseRenderers(nil)
++}
+-- 
+2.43.0
+

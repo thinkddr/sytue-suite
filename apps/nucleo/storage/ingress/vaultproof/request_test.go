@@ -13,7 +13,7 @@ import (
 // lee tal cual y lo firmado verifica.
 func TestVaultproofCuerpoDelPuerto(t *testing.T) {
 	s, reg := firmante(t, 1)
-	a := accion(t, reg, "key.enroll")
+	a := accionDePrueba(t, reg, "key.enroll")
 	i := a.Intent()
 	cuerpo, err := json.Marshal(SignRequest{Expected: IntentWire{i.Generation, i.Scope, i.Epoch, i.Kind, i.Target, i.RequestSHA256}, Action: a})
 	if err != nil {

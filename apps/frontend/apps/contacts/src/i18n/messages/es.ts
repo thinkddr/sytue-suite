@@ -57,6 +57,8 @@ export const es: AppCatalog<typeof en> = {
   'list.unstar': 'Quitar a {name} de destacados',
   'list.starredTitle': 'Destacado',
   'list.reviewDuplicates': 'Revisar duplicados ({count})',
+  'list.selectMode': 'Seleccionar',
+  'list.moreActions': 'Más acciones',
   'list.count': { one: '{count} contacto', other: '{count} contactos' },
   'list.countFiltered': {
     one: '{shown} de {count} contacto',

@@ -445,6 +445,7 @@ export const et: AppCatalog<typeof en> = {
   'compose.templates': 'Mallid',
   'compose.templatesEmpty': 'Malle veel pole. Loo need Maili seadetes.',
   'compose.attachFailed': 'Manust ei õnnestunud lugeda',
+  'compose.openFailed': 'Sõnumiredaktorit ei õnnestunud avada. Proovige uuesti.',
   'compose.pastedImageDropped': 'Kleebitud pilti ei lisatud',
   'compose.pastedImagesDropped': 'Kleebitud pilte ei lisatud',
   'compose.pastedImagesDroppedDescription': 'Piltide saatmiseks lisage need failidena.',

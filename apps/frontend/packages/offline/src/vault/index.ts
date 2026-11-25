@@ -15,6 +15,7 @@ export {
   type PqVaultReason,
   type PqVaultStateResponse,
 } from './pq-vault.js';
+export { vaultFailureCode } from './failure-code.js';
 export {
   pqVaultProfile,
   bridgeHandoffKey,

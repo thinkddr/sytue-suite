@@ -88,6 +88,7 @@ func RellenoHCampo(ventana float32) float32 {
 // ficha es la columna de la derecha: el contacto elegido, o el estado vacío.
 func (p *Pantalla) ficha() fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	p.alAnchoFicha = nil
 	if p.Seleccionado == nil {
 		// «Selecciona un contacto», con la ilustración de la web y su acción de crear.
 		x := ui.NuevoVacio(p.t("detail.emptyTitle", nil), p.t("detail.emptyDescription", nil))
@@ -108,6 +109,32 @@ func (p *Pantalla) ficha() fyne.CanvasObject {
 	)
 	// `mx-auto w-full max-w-3xl p-*`: la ficha se centra y se acota.
 	return container.NewVScroll(container.New(&acotado{Max: AnchoFicha, Relleno: RellenoFicha(p.Ventana)}, cuerpo))
+}
+
+// huellaAncho son las medidas que la pantalla toma del ancho de la ventana AL ARMARSE,
+// por columna: la lista (`anchoLista`, el alto de su cabecera) y la ficha (sus rellenos
+// por corte y, con un contacto abierto, el ancho de su tarjeta, que reparte la nota y
+// las etiquetas). Si la de una columna no cambia, rehacerla daría lo mismo.
+type huellaAncho struct {
+	lista float32
+	ficha huellaFicha
+}
+
+type huellaFicha struct {
+	relleno, rotulo, campo float32
+	estrecha               bool
+	tarjeta                float32
+}
+
+func (p *Pantalla) huellaAncho() huellaAncho {
+	h := huellaAncho{lista: p.anchoLista(), ficha: huellaFicha{
+		relleno: RellenoFicha(p.Ventana), rotulo: ColumnaRotulo(p.Ventana), campo: RellenoHCampo(p.Ventana),
+		estrecha: p.Ventana > 0 && p.Ventana < ui.CorteSM,
+	}}
+	if p.Seleccionado != nil {
+		h.ficha.tarjeta = p.anchoTarjeta()
+	}
+	return h
 }
 
 // anchoTarjeta es lo que mide la tarjeta de la ficha: el hueco de la columna menos su
@@ -484,13 +511,21 @@ func noVacias(s ...string) []string {
 func (p *Pantalla) nota(n string, v tema.Variante) fyne.CanvasObject {
 	ancho := p.anchoValor()
 	var lineas []fyne.CanvasObject
+	var parrafos []*ui.Parrafo
 	for _, l := range strings.Split(strings.TrimSpace(n), "\n") {
 		if strings.TrimSpace(l) == "" {
 			lineas = append(lineas, ui.Espaciador(tema.TextoBase.Linea))
 			continue
 		}
-		lineas = append(lineas, ui.NuevoParrafo(l, tema.TextoBase, ui.Normal, "text", v).A(ancho))
+		par := ui.NuevoParrafo(l, tema.TextoBase, ui.Normal, "text", v).A(ancho)
+		parrafos = append(parrafos, par)
+		lineas = append(lineas, par)
 	}
+	p.alAnchoFicha = append(p.alAnchoFicha, func(ancho float32) {
+		for _, par := range parrafos {
+			par.A(ancho).Refresh()
+		}
+	})
 	return ui.EnColumna(0, lineas...)
 }
 
@@ -538,7 +573,30 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 	// `flex flex-wrap items-center`: con muchas etiquetas las píldoras bajan de fila en
 	// vez de salirse de la columna. Con el ancho de la columna `1fr` el mínimo es el del
 	// flujo YA partido, que es lo que hace crecer el alto de la fila del `<dl>`.
-	return container.New(ui.Flujo{Hueco: HuecoChips, Ancho: p.anchoValor()}, hijos...)
+	flujo := container.New(ui.Flujo{Hueco: HuecoChips, Ancho: p.anchoValor()}, hijos...)
+	p.alAnchoFicha = append(p.alAnchoFicha, func(ancho float32) {
+		flujo.Layout = ui.Flujo{Hueco: HuecoChips, Ancho: ancho}
+		flujo.Refresh()
+	})
+	return flujo
+}
+
+// ajustarAnchoFicha pone el ancho nuevo de la tarjeta en la ficha montada: la nota y las
+// etiquetas, que son lo único que lo toma al armarse (`alAnchoFicha`). Arrastrar el
+// borde de una ventana estrecha con un contacto abierto rehacía la ficha a cada píxel:
+// por debajo de ~1350 px la tarjeta ya no llega a su `max-w-3xl` y cada píxel la cambia.
+// Devuelve false si no hay ficha montada que ajustar.
+func (p *Pantalla) ajustarAnchoFicha() bool {
+	a := p.armazon
+	if a == nil || a.Contenido == nil || p.Seleccionado == nil {
+		return false
+	}
+	ancho := p.anchoValor()
+	for _, f := range p.alAnchoFicha {
+		f(ancho)
+	}
+	a.Contenido.Refresh()
+	return true
 }
 
 // menuAnadirEtiqueta son las etiquetas que el contacto aún no tiene, o el aviso de que

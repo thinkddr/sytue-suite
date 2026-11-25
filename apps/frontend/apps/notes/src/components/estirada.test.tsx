@@ -18,6 +18,7 @@
  * se recorre desde el campo hasta la raíz: si alguien mete otro div intermedio,
  * aquí se ve.
  */
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

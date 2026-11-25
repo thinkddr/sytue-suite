@@ -24,8 +24,9 @@ func (e *EditorNota) armarBurbuja() *flotante {
 	atajo := func(rotulo, teclas string) string {
 		return t("editor.shortcut", i18n.Vars{"label": rotulo, "keys": teclas})
 	}
-	boton := func(glifo string, icono iconos.Icono, rotulo, pista string, f func()) fyne.CanvasObject {
-		return e.botonDeOrden(glifo, icono, rotulo, f).conPista(pista)
+	// Todos los de la burbuja son glifos propios (los de glyphs.tsx): sin icono del catálogo.
+	boton := func(glifo, rotulo, pista string, f func()) fyne.CanvasObject {
+		return e.botonDeOrden(glifo, iconos.Ninguno, rotulo, f).conPista(pista)
 	}
 	enlace := nuevoBotonBarra(EnlaceD, iconos.Ninguno, t("editor.linkTool", nil), nil)
 	enlace.AlPulsar = func() { llamar1(e.AlEnlazar, fyne.CanvasObject(enlace)) }
@@ -35,8 +36,8 @@ func (e *EditorNota) armarBurbuja() *flotante {
 	mas.AlPulsar = func() { e.menuFormato(mas) }
 	formato := make([]fyne.CanvasObject, 0, 8)
 	formato = append(formato,
-		boton(NegritaD, iconos.Ninguno, t("editor.bold", nil), atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
-		boton(CursivaD, iconos.Ninguno, t("editor.italic", nil), atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
+		boton(NegritaD, t("editor.bold", nil), atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
+		boton(CursivaD, t("editor.italic", nil), atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
 		mas.conPista(t("editor.moreFormatting", nil)),
 		enlace.conPista(atajo(t("editor.linkTool", nil), ui.AtajoDelSistema("Ctrl+K"))),
 	)
@@ -46,11 +47,11 @@ func (e *EditorNota) armarBurbuja() *flotante {
 	// `Atajo` de quien aloja el editor, como Ctrl/⌘+V.
 	portapapeles := func() fyne.Clipboard { return fyne.CurrentApp().Clipboard() }
 	edicion := []fyne.CanvasObject{
-		boton(CopiarD, iconos.Ninguno, t("editor.copy", nil), atajo(t("editor.copy", nil), ui.AtajoDelSistema("Ctrl+C")),
+		boton(CopiarD, t("editor.copy", nil), atajo(t("editor.copy", nil), ui.AtajoDelSistema("Ctrl+C")),
 			func() { e.zona.TypedShortcut(&fyne.ShortcutCopy{Clipboard: portapapeles()}) }),
-		boton(TijerasD, iconos.Ninguno, t("editor.cut", nil), atajo(t("editor.cut", nil), ui.AtajoDelSistema("Ctrl+X")),
+		boton(TijerasD, t("editor.cut", nil), atajo(t("editor.cut", nil), ui.AtajoDelSistema("Ctrl+X")),
 			func() { e.zona.TypedShortcut(&fyne.ShortcutCut{Clipboard: portapapeles()}) }),
-		boton(PegarD, iconos.Ninguno, t("editor.paste", nil), atajo(t("editor.paste", nil), ui.AtajoDelSistema("Ctrl+V")),
+		boton(PegarD, t("editor.paste", nil), atajo(t("editor.paste", nil), ui.AtajoDelSistema("Ctrl+V")),
 			func() { e.zona.TypedShortcut(&fyne.ShortcutPaste{Clipboard: portapapeles()}) }),
 	}
 	fila := append(append(formato, nuevoSeparadorEd()), edicion...)
